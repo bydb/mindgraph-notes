@@ -1,0 +1,32 @@
+MindGraph Notes - A modern note-taking app with integrated AI terminal
+Copyright (C) 2024-2026 Jochen Leeder (bydb.io)
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+---
+
+ADDITIONAL TERMS
+
+Attribution Requirement:
+Any derivative work or fork of this software must prominently display
+the following attribution in the application's about section, documentation,
+and any public-facing materials:
+
+"Based on MindGraph Notes by Jochen Leeder (bydb.io)"
+"Original project: https://github.com/bydb/mindgraph-notes"
+
+---
+
+For the full AGPL-3.0 license text, see:
+https://www.gnu.org/licenses/agpl-3.0.html
