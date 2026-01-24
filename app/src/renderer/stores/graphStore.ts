@@ -12,6 +12,7 @@ export interface CanvasLabel {
   height?: number
   color?: string
   fontSize?: 'small' | 'medium' | 'large'
+  folderContext?: string | null  // Ordner-Kontext für gefilterte Ansichten
 }
 
 interface GraphState {

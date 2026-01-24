@@ -1690,8 +1690,17 @@ export const GraphCanvas: React.FC = () => {
       }
     })
 
-    // Label-Nodes (Überschriften ohne Datei)
-    const labelNodes = labels.map((label) => ({
+    // Label-Nodes (Überschriften ohne Datei) - gefiltert nach Ordner-Kontext
+    const filteredLabels = labels.filter((label) => {
+      // Labels ohne Kontext werden nur angezeigt, wenn kein Filter aktiv ist
+      if (!label.folderContext) {
+        return !canvasFilterPath
+      }
+      // Labels mit Kontext werden nur im passenden Ordner angezeigt
+      return label.folderContext === canvasFilterPath
+    })
+
+    const labelNodes = filteredLabels.map((label) => ({
       id: label.id,
       type: 'label',
       position: { x: label.x, y: label.y },
@@ -1710,7 +1719,7 @@ export const GraphCanvas: React.FC = () => {
     }))
 
     return [...noteNodes, ...pdfNodes, ...labelNodes]
-  }, [notes, pdfs, positions, labels, getStablePosition, editingNodeId, handleNodeTitleChange, handleLabelTextChange, handleEditingDone, handleTaskToggle, handleOpenExternalLink, imageDataUrls, loadImageDataUrl, canvasShowTags, canvasShowLinks, canvasShowImages, canvasCompactMode, canvasDefaultCardWidth])
+  }, [notes, pdfs, positions, labels, getStablePosition, editingNodeId, handleNodeTitleChange, handleLabelTextChange, handleEditingDone, handleTaskToggle, handleOpenExternalLink, imageDataUrls, loadImageDataUrl, canvasShowTags, canvasShowLinks, canvasShowImages, canvasCompactMode, canvasDefaultCardWidth, canvasFilterPath])
   
   // Links zu Edges konvertieren - mit Deduplizierung
   const initialEdges: Edge[] = useMemo(() => {
@@ -2238,12 +2247,13 @@ export const GraphCanvas: React.FC = () => {
       y,
       width: 200,
       height: 50,
-      fontSize: 'medium'
+      fontSize: 'medium',
+      folderContext: canvasFilterPath || null  // Ordner-Kontext für gefilterte Ansichten
     })
     // Direkt in Bearbeitungsmodus
     setTimeout(() => setEditingNodeId(labelId), 100)
     setPaneContextMenu(null)
-  }, [addLabel])
+  }, [addLabel, canvasFilterPath])
 
   // Löschen Handler
   const handleDelete = useCallback(async () => {
