@@ -347,6 +347,139 @@
     .mock-node:nth-child(3) { top: 30%; left: 60%; }
     .mock-node:nth-child(4) { top: 70%; left: 30%; }
 
+    .mock-terminal {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 120px;
+      background: #0d0d0d;
+      border-top: 1px solid var(--border);
+      padding: 0.75rem;
+      font-family: 'SF Mono', Monaco, monospace;
+      font-size: 0.7rem;
+    }
+
+    .terminal-prompt {
+      color: #22c55e;
+    }
+
+    .terminal-command {
+      color: var(--text);
+    }
+
+    .terminal-output {
+      color: var(--text-muted);
+      margin-top: 0.25rem;
+    }
+
+    .terminal-cursor {
+      display: inline-block;
+      width: 8px;
+      height: 14px;
+      background: var(--accent);
+      animation: blink 1s infinite;
+      vertical-align: middle;
+      margin-left: 2px;
+    }
+
+    @keyframes blink {
+      0%, 50% { opacity: 1; }
+      51%, 100% { opacity: 0; }
+    }
+
+    /* Terminal Highlight Section */
+    .terminal-highlight {
+      padding: 6rem 2rem;
+      background: linear-gradient(180deg, transparent 0%, rgba(249, 115, 22, 0.03) 50%, transparent 100%);
+    }
+
+    .terminal-showcase {
+      max-width: 1100px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: 1.2fr 1fr;
+      gap: 4rem;
+      align-items: center;
+    }
+
+    .terminal-window {
+      background: #0d0d0d;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      overflow: hidden;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+    }
+
+    .terminal-bar {
+      padding: 0.75rem 1rem;
+      background: rgba(255, 255, 255, 0.05);
+      border-bottom: 1px solid var(--border);
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+
+    .terminal-body {
+      padding: 1.5rem;
+      font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
+      font-size: 0.9rem;
+      line-height: 1.8;
+    }
+
+    .terminal-line {
+      margin-bottom: 0.25rem;
+    }
+
+    .terminal-line.output {
+      color: var(--text-muted);
+      padding-left: 1rem;
+    }
+
+    .terminal-info h2 {
+      font-size: 2rem;
+      margin-bottom: 1rem;
+    }
+
+    .terminal-info p {
+      color: var(--text-muted);
+      font-size: 1.1rem;
+      margin-bottom: 1.5rem;
+      line-height: 1.7;
+    }
+
+    .terminal-features {
+      list-style: none;
+    }
+
+    .terminal-features li {
+      padding: 0.5rem 0;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      font-size: 1rem;
+    }
+
+    .terminal-features .check {
+      color: #22c55e;
+      font-weight: bold;
+    }
+
+    @media (max-width: 900px) {
+      .terminal-showcase {
+        grid-template-columns: 1fr;
+        gap: 2rem;
+      }
+
+      .terminal-info {
+        text-align: center;
+      }
+
+      .terminal-features {
+        display: inline-block;
+        text-align: left;
+      }
+    }
+
     /* Features Section */
     .features {
       padding: 8rem 2rem;
@@ -409,6 +542,16 @@
     .feature-card p {
       color: var(--text-muted);
       font-size: 0.95rem;
+    }
+
+    .feature-card.featured {
+      background: linear-gradient(135deg, rgba(249, 115, 22, 0.1) 0%, rgba(251, 191, 36, 0.05) 100%);
+      border-color: rgba(249, 115, 22, 0.3);
+    }
+
+    .feature-card.featured:hover {
+      border-color: rgba(249, 115, 22, 0.5);
+      box-shadow: 0 0 30px rgba(249, 115, 22, 0.2);
     }
 
     /* Download Section */
@@ -549,14 +692,14 @@
   <section class="hero">
     <div class="badge">
       <span class="badge-dot"></span>
-      Open Source & Kostenlos
+      Mit integriertem KI-Terminal
     </div>
 
-    <h1>Dein Wissen,<br>vernetzt.</h1>
+    <h1>Notizen treffen<br>KI-Terminal.</h1>
 
     <p class="subtitle">
-      Eine moderne Notiz-App mit interaktivem Wissensgraph.
-      Verlinke deine Gedanken, visualisiere Zusammenhänge, nutze lokale KI.
+      Die erste Notiz-App mit integriertem Terminal für Claude Code, Ollama und andere CLI-Tools.
+      Schreibe, denke und automatisiere - alles in einer App.
     </p>
 
     <div class="cta-group">
@@ -589,9 +732,8 @@
             <div class="mock-item">Meeting Notes</div>
             <div class="mock-item">Zettelkasten</div>
             <div class="mock-item">Daily Notes</div>
-            <div class="mock-item">Literatur</div>
           </div>
-          <div class="mock-editor">
+          <div class="mock-editor" style="position: relative;">
             <div class="mock-title">Projektideen</div>
             <div class="mock-text long"></div>
             <div class="mock-text medium"></div>
@@ -600,8 +742,13 @@
               <span class="mock-link">[[Meeting Notes]]</span>
             </div>
             <div class="mock-text short"></div>
-            <div class="mock-text long"></div>
-            <div class="mock-text medium"></div>
+            <div class="mock-terminal">
+              <div><span class="terminal-prompt">~/vault $</span> <span class="terminal-command">claude</span></div>
+              <div class="terminal-output">Claude Code v1.0.0</div>
+              <div class="terminal-output" style="margin-top: 0.5rem;">
+                <span style="color: #f97316;">●</span> Fasse alle Meeting Notes zusammen<span class="terminal-cursor"></span>
+              </div>
+            </div>
           </div>
           <div class="mock-canvas">
             <div class="mock-node">Projektideen</div>
@@ -614,17 +761,73 @@
     </div>
   </section>
 
+  <!-- Terminal Highlight Section -->
+  <section class="terminal-highlight">
+    <div class="terminal-showcase">
+      <div class="terminal-window">
+        <div class="terminal-bar">
+          <span>Terminal</span>
+        </div>
+        <div class="terminal-body">
+          <div class="terminal-line">
+            <span class="terminal-prompt">~/notes $</span>
+            <span class="terminal-command"> claude "Erstelle eine Zusammenfassung aller Meeting-Notizen"</span>
+          </div>
+          <div class="terminal-line output">
+            <span style="color: #f97316;">●</span> Analysiere 12 Meeting-Notizen...
+          </div>
+          <div class="terminal-line output">
+            <span style="color: #22c55e;">✓</span> Zusammenfassung erstellt in [[Meeting-Summary.md]]
+          </div>
+          <div class="terminal-line" style="margin-top: 1rem;">
+            <span class="terminal-prompt">~/notes $</span>
+            <span class="terminal-command"> ollama run llama3 "Erkläre [[Quantenmechanik]]"</span>
+          </div>
+          <div class="terminal-line output">
+            Die Quantenmechanik beschreibt das Verhalten von Materie...
+          </div>
+        </div>
+      </div>
+      <div class="terminal-info">
+        <h2>KI direkt in deinen Notizen</h2>
+        <p>
+          Das integrierte Terminal macht MindGraph Notes einzigartig:
+          Starte <strong>Claude Code</strong>, <strong>Ollama</strong> oder jedes andere CLI-Tool
+          direkt neben deinen Notizen - ohne Kontextwechsel.
+        </p>
+        <ul class="terminal-features">
+          <li><span class="check">✓</span> Claude Code für KI-gestützte Workflows</li>
+          <li><span class="check">✓</span> Lokale LLMs via Ollama, LM Studio</li>
+          <li><span class="check">✓</span> Git, npm, Python - jedes CLI-Tool</li>
+          <li><span class="check">✓</span> Direkter Zugriff auf deine Markdown-Dateien</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
   <section class="features" id="features">
     <div class="section-title">
-      <h2>Alles was du brauchst</h2>
-      <p>Leistungsstarke Features für vernetztes Denken</p>
+      <h2>Mehr als nur Notizen</h2>
+      <p>Die Brücke zwischen deinem Wissen und KI-Tools</p>
     </div>
 
     <div class="features-grid">
-      <div class="feature-card">
-        <div class="feature-icon">🔗</div>
-        <h3>Wikilinks</h3>
-        <p>Verlinke Notizen mit [[Wikilinks]]. Erstelle ein Netzwerk aus Gedanken, das organisch wächst.</p>
+      <div class="feature-card featured">
+        <div class="feature-icon">⌨️</div>
+        <h3>Integriertes Terminal</h3>
+        <p>Vollwertiges Terminal direkt in der App. Starte Claude Code, Ollama oder andere CLI-Tools ohne Kontextwechsel.</p>
+      </div>
+
+      <div class="feature-card featured">
+        <div class="feature-icon">🤖</div>
+        <h3>Claude Code / OpenCode</h3>
+        <p>Lass KI direkt auf deine Notizen zugreifen. Automatisiere, generiere und transformiere Inhalte mit natürlicher Sprache.</p>
+      </div>
+
+      <div class="feature-card featured">
+        <div class="feature-icon">🧠</div>
+        <h3>Lokale LLMs</h3>
+        <p>Ollama, LM Studio, llama.cpp - nutze jedes lokale LLM über das Terminal. Deine Daten bleiben auf deinem Rechner.</p>
       </div>
 
       <div class="feature-card">
@@ -634,15 +837,15 @@
       </div>
 
       <div class="feature-card">
-        <div class="feature-icon">🤖</div>
-        <h3>Lokale KI</h3>
-        <p>Nutze Ollama für KI-Features ohne Cloud. Zusammenfassen, übersetzen, erweitern - alles lokal.</p>
+        <div class="feature-icon">🔗</div>
+        <h3>Wikilinks</h3>
+        <p>Verlinke Notizen mit [[Wikilinks]]. Obsidian-kompatible Syntax für nahtlosen Wechsel.</p>
       </div>
 
       <div class="feature-card">
         <div class="feature-icon">📝</div>
         <h3>Live Preview</h3>
-        <p>Schreibe in Markdown mit sofortiger Vorschau. Unterstützt LaTeX, Mermaid-Diagramme und mehr.</p>
+        <p>Schreibe in Markdown mit sofortiger Vorschau. LaTeX, Mermaid-Diagramme, Callouts und mehr.</p>
       </div>
 
       <div class="feature-card">
@@ -653,26 +856,14 @@
 
       <div class="feature-card">
         <div class="feature-icon">📄</div>
-        <h3>PDF Support</h3>
-        <p>Betrachte PDFs direkt in der App. Erstelle Notizen und verlinke sie mit deinem Wissen.</p>
-      </div>
-
-      <div class="feature-card">
-        <div class="feature-icon">🎨</div>
-        <h3>Templates</h3>
-        <p>Erstelle Notizen mit Templates. Daily Notes, Zettel, Meetings - alles mit einem Klick.</p>
+        <h3>PDF Companion</h3>
+        <p>PDFs mit Markdown-Notizen verknüpfen. Annotiere, tagge und verlinke deine Dokumente.</p>
       </div>
 
       <div class="feature-card">
         <div class="feature-icon">🔒</div>
-        <h3>Deine Daten</h3>
-        <p>Alle Notizen sind lokale Markdown-Dateien. Kein Lock-in, kein Cloud-Zwang, volle Kontrolle.</p>
-      </div>
-
-      <div class="feature-card">
-        <div class="feature-icon">⏰</div>
-        <h3>Reminder</h3>
-        <p>Setze Erinnerungen für Tasks. Desktop-Benachrichtigungen zur richtigen Zeit.</p>
+        <h3>100% Lokal</h3>
+        <p>Alle Notizen sind Markdown-Dateien. Keine Cloud, kein Account, keine Telemetrie. Deine Daten gehören dir.</p>
       </div>
     </div>
   </section>
