@@ -1,0 +1,723 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MindGraph Notes - Dein Wissen, vernetzt</title>
+  <meta name="description" content="Eine moderne Notiz-App mit Wissensgraph. Verlinke deine Gedanken, visualisiere Zusammenhänge, nutze lokale KI.">
+  <link rel="icon" type="image/png" href="icon.png">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    :root {
+      --bg: #0a0a0f;
+      --bg-card: rgba(255, 255, 255, 0.03);
+      --bg-card-hover: rgba(255, 255, 255, 0.06);
+      --text: #e4e4e7;
+      --text-muted: #71717a;
+      --accent: #6366f1;
+      --accent-glow: rgba(99, 102, 241, 0.4);
+      --gradient: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #d946ef 100%);
+      --border: rgba(255, 255, 255, 0.08);
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      overflow-x: hidden;
+    }
+
+    /* Animated background */
+    .bg-animation {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: -1;
+      overflow: hidden;
+    }
+
+    .bg-animation::before {
+      content: '';
+      position: absolute;
+      top: -50%;
+      left: -50%;
+      width: 200%;
+      height: 200%;
+      background: radial-gradient(circle at 30% 30%, rgba(99, 102, 241, 0.15) 0%, transparent 50%),
+                  radial-gradient(circle at 70% 70%, rgba(139, 92, 246, 0.1) 0%, transparent 50%),
+                  radial-gradient(circle at 50% 50%, rgba(217, 70, 239, 0.05) 0%, transparent 50%);
+      animation: bgMove 20s ease-in-out infinite;
+    }
+
+    @keyframes bgMove {
+      0%, 100% { transform: translate(0, 0) rotate(0deg); }
+      33% { transform: translate(2%, 2%) rotate(1deg); }
+      66% { transform: translate(-1%, 1%) rotate(-1deg); }
+    }
+
+    /* Grid pattern overlay */
+    .grid-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: -1;
+      background-image:
+        linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
+      background-size: 50px 50px;
+    }
+
+    /* Navigation */
+    nav {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      padding: 1.5rem 2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      z-index: 100;
+      backdrop-filter: blur(10px);
+      background: rgba(10, 10, 15, 0.8);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      font-weight: 600;
+      font-size: 1.25rem;
+    }
+
+    .logo-icon {
+      width: 32px;
+      height: 32px;
+      background: var(--gradient);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 2rem;
+    }
+
+    .nav-links a {
+      color: var(--text-muted);
+      text-decoration: none;
+      font-size: 0.9rem;
+      transition: color 0.2s;
+    }
+
+    .nav-links a:hover {
+      color: var(--text);
+    }
+
+    /* Hero Section */
+    .hero {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      padding: 8rem 2rem 4rem;
+      position: relative;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.5rem 1rem;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 100px;
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      margin-bottom: 2rem;
+    }
+
+    .badge-dot {
+      width: 8px;
+      height: 8px;
+      background: #22c55e;
+      border-radius: 50%;
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+
+    h1 {
+      font-size: clamp(2.5rem, 8vw, 5rem);
+      font-weight: 700;
+      line-height: 1.1;
+      margin-bottom: 1.5rem;
+      background: var(--gradient);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .subtitle {
+      font-size: clamp(1.1rem, 3vw, 1.4rem);
+      color: var(--text-muted);
+      max-width: 600px;
+      margin-bottom: 3rem;
+    }
+
+    .cta-group {
+      display: flex;
+      gap: 1rem;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 1rem 2rem;
+      border-radius: 12px;
+      font-size: 1rem;
+      font-weight: 500;
+      text-decoration: none;
+      transition: all 0.3s ease;
+      cursor: pointer;
+      border: none;
+    }
+
+    .btn-primary {
+      background: var(--gradient);
+      color: white;
+      box-shadow: 0 0 30px var(--accent-glow);
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 0 50px var(--accent-glow);
+    }
+
+    .btn-secondary {
+      background: var(--bg-card);
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+
+    .btn-secondary:hover {
+      background: var(--bg-card-hover);
+      border-color: rgba(255, 255, 255, 0.15);
+    }
+
+    /* App Preview */
+    .app-preview {
+      margin-top: 4rem;
+      position: relative;
+      max-width: 1000px;
+      width: 100%;
+    }
+
+    .app-window {
+      background: linear-gradient(180deg, #1a1a2e 0%, #16162a 100%);
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      overflow: hidden;
+      box-shadow: 0 50px 100px -20px rgba(0, 0, 0, 0.5),
+                  0 0 50px var(--accent-glow);
+    }
+
+    .window-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 16px;
+      background: rgba(0, 0, 0, 0.3);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .window-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+    }
+
+    .window-dot.red { background: #ff5f57; }
+    .window-dot.yellow { background: #febc2e; }
+    .window-dot.green { background: #28c840; }
+
+    .window-content {
+      aspect-ratio: 16/10;
+      display: flex;
+      background: #0f0f1a;
+    }
+
+    .mock-sidebar {
+      width: 200px;
+      background: rgba(255, 255, 255, 0.02);
+      border-right: 1px solid var(--border);
+      padding: 1rem;
+    }
+
+    .mock-item {
+      padding: 0.5rem 0.75rem;
+      border-radius: 6px;
+      margin-bottom: 0.25rem;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+
+    .mock-item.active {
+      background: var(--accent);
+      color: white;
+    }
+
+    .mock-editor {
+      flex: 1;
+      padding: 2rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .mock-title {
+      font-size: 1.5rem;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .mock-text {
+      height: 12px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 4px;
+    }
+
+    .mock-text.short { width: 60%; }
+    .mock-text.medium { width: 80%; }
+    .mock-text.long { width: 95%; }
+
+    .mock-link {
+      display: inline-block;
+      padding: 0.25rem 0.5rem;
+      background: rgba(99, 102, 241, 0.2);
+      border-radius: 4px;
+      font-size: 0.85rem;
+      color: var(--accent);
+    }
+
+    .mock-canvas {
+      width: 300px;
+      background: rgba(0, 0, 0, 0.3);
+      border-left: 1px solid var(--border);
+      padding: 1rem;
+      position: relative;
+    }
+
+    .mock-node {
+      position: absolute;
+      padding: 0.5rem 1rem;
+      background: rgba(99, 102, 241, 0.2);
+      border: 1px solid var(--accent);
+      border-radius: 8px;
+      font-size: 0.75rem;
+      color: var(--text);
+    }
+
+    .mock-node:nth-child(1) { top: 20%; left: 20%; }
+    .mock-node:nth-child(2) { top: 50%; left: 50%; }
+    .mock-node:nth-child(3) { top: 30%; left: 60%; }
+    .mock-node:nth-child(4) { top: 70%; left: 30%; }
+
+    /* Features Section */
+    .features {
+      padding: 8rem 2rem;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .section-title {
+      text-align: center;
+      margin-bottom: 4rem;
+    }
+
+    .section-title h2 {
+      font-size: 2.5rem;
+      margin-bottom: 1rem;
+    }
+
+    .section-title p {
+      color: var(--text-muted);
+      font-size: 1.1rem;
+    }
+
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 1.5rem;
+    }
+
+    .feature-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 2rem;
+      transition: all 0.3s ease;
+    }
+
+    .feature-card:hover {
+      background: var(--bg-card-hover);
+      border-color: rgba(99, 102, 241, 0.3);
+      transform: translateY(-4px);
+    }
+
+    .feature-icon {
+      width: 48px;
+      height: 48px;
+      background: var(--gradient);
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.5rem;
+      margin-bottom: 1rem;
+    }
+
+    .feature-card h3 {
+      font-size: 1.25rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .feature-card p {
+      color: var(--text-muted);
+      font-size: 0.95rem;
+    }
+
+    /* Download Section */
+    .download {
+      padding: 8rem 2rem;
+      text-align: center;
+      position: relative;
+    }
+
+    .download::before {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 600px;
+      height: 600px;
+      background: radial-gradient(circle, var(--accent-glow) 0%, transparent 70%);
+      z-index: -1;
+    }
+
+    .download h2 {
+      font-size: 2.5rem;
+      margin-bottom: 1rem;
+    }
+
+    .download p {
+      color: var(--text-muted);
+      margin-bottom: 2rem;
+    }
+
+    .download-options {
+      display: flex;
+      justify-content: center;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+
+    .download-btn {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      padding: 1.25rem 2rem;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      text-decoration: none;
+      color: var(--text);
+      transition: all 0.3s ease;
+    }
+
+    .download-btn:hover {
+      background: var(--bg-card-hover);
+      border-color: var(--accent);
+    }
+
+    .download-btn svg {
+      width: 32px;
+      height: 32px;
+    }
+
+    .download-info {
+      text-align: left;
+    }
+
+    .download-info .platform {
+      font-weight: 600;
+    }
+
+    .download-info .version {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+    }
+
+    /* Footer */
+    footer {
+      padding: 4rem 2rem;
+      text-align: center;
+      border-top: 1px solid var(--border);
+    }
+
+    footer p {
+      color: var(--text-muted);
+      font-size: 0.9rem;
+    }
+
+    footer a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      nav {
+        padding: 1rem;
+      }
+
+      .nav-links {
+        display: none;
+      }
+
+      .hero {
+        padding: 6rem 1rem 2rem;
+      }
+
+      .mock-sidebar, .mock-canvas {
+        display: none;
+      }
+
+      .features {
+        padding: 4rem 1rem;
+      }
+
+      .download {
+        padding: 4rem 1rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="bg-animation"></div>
+  <div class="grid-overlay"></div>
+
+  <nav>
+    <div class="logo">
+      <div class="logo-icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+          <circle cx="12" cy="12" r="3"/>
+          <circle cx="4" cy="8" r="2"/>
+          <circle cx="20" cy="8" r="2"/>
+          <circle cx="4" cy="16" r="2"/>
+          <circle cx="20" cy="16" r="2"/>
+          <path d="M6 8h3M15 8h3M6 16h3M15 16h3M12 9V6M12 18v-3"/>
+        </svg>
+      </div>
+      MindGraph Notes
+    </div>
+    <div class="nav-links">
+      <a href="#features">Features</a>
+      <a href="#download">Download</a>
+      <a href="https://github.com/bydb/mindgraph-notes" target="_blank">GitHub</a>
+    </div>
+  </nav>
+
+  <section class="hero">
+    <div class="badge">
+      <span class="badge-dot"></span>
+      Open Source & Kostenlos
+    </div>
+
+    <h1>Dein Wissen,<br>vernetzt.</h1>
+
+    <p class="subtitle">
+      Eine moderne Notiz-App mit interaktivem Wissensgraph.
+      Verlinke deine Gedanken, visualisiere Zusammenhänge, nutze lokale KI.
+    </p>
+
+    <div class="cta-group">
+      <a href="#download" class="btn btn-primary">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+          <polyline points="7 10 12 15 17 10"/>
+          <line x1="12" y1="15" x2="12" y2="3"/>
+        </svg>
+        Download für macOS
+      </a>
+      <a href="https://github.com/bydb/mindgraph-notes" target="_blank" class="btn btn-secondary">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/>
+        </svg>
+        Source Code
+      </a>
+    </div>
+
+    <div class="app-preview">
+      <div class="app-window">
+        <div class="window-bar">
+          <div class="window-dot red"></div>
+          <div class="window-dot yellow"></div>
+          <div class="window-dot green"></div>
+        </div>
+        <div class="window-content">
+          <div class="mock-sidebar">
+            <div class="mock-item active">Projektideen</div>
+            <div class="mock-item">Meeting Notes</div>
+            <div class="mock-item">Zettelkasten</div>
+            <div class="mock-item">Daily Notes</div>
+            <div class="mock-item">Literatur</div>
+          </div>
+          <div class="mock-editor">
+            <div class="mock-title">Projektideen</div>
+            <div class="mock-text long"></div>
+            <div class="mock-text medium"></div>
+            <div style="display: flex; gap: 0.5rem; align-items: center;">
+              <span class="mock-link">[[Zettelkasten]]</span>
+              <span class="mock-link">[[Meeting Notes]]</span>
+            </div>
+            <div class="mock-text short"></div>
+            <div class="mock-text long"></div>
+            <div class="mock-text medium"></div>
+          </div>
+          <div class="mock-canvas">
+            <div class="mock-node">Projektideen</div>
+            <div class="mock-node">Zettelkasten</div>
+            <div class="mock-node">Meeting</div>
+            <div class="mock-node">Daily</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="features" id="features">
+    <div class="section-title">
+      <h2>Alles was du brauchst</h2>
+      <p>Leistungsstarke Features für vernetztes Denken</p>
+    </div>
+
+    <div class="features-grid">
+      <div class="feature-card">
+        <div class="feature-icon">🔗</div>
+        <h3>Wikilinks</h3>
+        <p>Verlinke Notizen mit [[Wikilinks]]. Erstelle ein Netzwerk aus Gedanken, das organisch wächst.</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon">🌐</div>
+        <h3>Wissensgraph</h3>
+        <p>Visualisiere alle Verbindungen in einem interaktiven Graph. Entdecke versteckte Zusammenhänge.</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon">🤖</div>
+        <h3>Lokale KI</h3>
+        <p>Nutze Ollama für KI-Features ohne Cloud. Zusammenfassen, übersetzen, erweitern - alles lokal.</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon">📝</div>
+        <h3>Live Preview</h3>
+        <p>Schreibe in Markdown mit sofortiger Vorschau. Unterstützt LaTeX, Mermaid-Diagramme und mehr.</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon">📚</div>
+        <h3>Zotero Integration</h3>
+        <p>Füge Literatur direkt aus Zotero ein. Perfekt für akademisches Arbeiten und Recherche.</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon">📄</div>
+        <h3>PDF Support</h3>
+        <p>Betrachte PDFs direkt in der App. Erstelle Notizen und verlinke sie mit deinem Wissen.</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon">🎨</div>
+        <h3>Templates</h3>
+        <p>Erstelle Notizen mit Templates. Daily Notes, Zettel, Meetings - alles mit einem Klick.</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon">🔒</div>
+        <h3>Deine Daten</h3>
+        <p>Alle Notizen sind lokale Markdown-Dateien. Kein Lock-in, kein Cloud-Zwang, volle Kontrolle.</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon">⏰</div>
+        <h3>Reminder</h3>
+        <p>Setze Erinnerungen für Tasks. Desktop-Benachrichtigungen zur richtigen Zeit.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="download" id="download">
+    <h2>Jetzt herunterladen</h2>
+    <p>Kostenlos und Open Source. Für immer.</p>
+
+    <div class="download-options">
+      <a href="https://github.com/bydb/mindgraph-notes/releases/latest" class="download-btn">
+        <svg viewBox="0 0 24 24" fill="currentColor">
+          <path d="M18.71 19.5C17.88 20.74 17 21.95 15.66 21.97C14.32 22 13.89 21.18 12.37 21.18C10.84 21.18 10.37 21.95 9.09997 22C7.78997 22.05 6.79997 20.68 5.95997 19.47C4.24997 17 2.93997 12.45 4.69997 9.39C5.56997 7.87 7.12997 6.91 8.81997 6.88C10.1 6.86 11.32 7.75 12.11 7.75C12.89 7.75 14.37 6.68 15.92 6.84C16.57 6.87 18.39 7.1 19.56 8.82C19.47 8.88 17.39 10.1 17.41 12.63C17.44 15.65 20.06 16.66 20.09 16.67C20.06 16.74 19.67 18.11 18.71 19.5ZM13 3.5C13.73 2.67 14.94 2.04 15.94 2C16.07 3.17 15.6 4.35 14.9 5.19C14.21 6.04 13.07 6.7 11.95 6.61C11.8 5.46 12.36 4.26 13 3.5Z"/>
+        </svg>
+        <div class="download-info">
+          <div class="platform">macOS (Apple Silicon)</div>
+          <div class="version">Version 0.8.5 - arm64</div>
+        </div>
+      </a>
+
+      <a href="https://github.com/bydb/mindgraph-notes/releases/latest" class="download-btn">
+        <svg viewBox="0 0 24 24" fill="currentColor">
+          <path d="M18.71 19.5C17.88 20.74 17 21.95 15.66 21.97C14.32 22 13.89 21.18 12.37 21.18C10.84 21.18 10.37 21.95 9.09997 22C7.78997 22.05 6.79997 20.68 5.95997 19.47C4.24997 17 2.93997 12.45 4.69997 9.39C5.56997 7.87 7.12997 6.91 8.81997 6.88C10.1 6.86 11.32 7.75 12.11 7.75C12.89 7.75 14.37 6.68 15.92 6.84C16.57 6.87 18.39 7.1 19.56 8.82C19.47 8.88 17.39 10.1 17.41 12.63C17.44 15.65 20.06 16.66 20.09 16.67C20.06 16.74 19.67 18.11 18.71 19.5ZM13 3.5C13.73 2.67 14.94 2.04 15.94 2C16.07 3.17 15.6 4.35 14.9 5.19C14.21 6.04 13.07 6.7 11.95 6.61C11.8 5.46 12.36 4.26 13 3.5Z"/>
+        </svg>
+        <div class="download-info">
+          <div class="platform">macOS (Intel)</div>
+          <div class="version">Version 0.8.5 - x64</div>
+        </div>
+      </a>
+    </div>
+
+    <p style="margin-top: 2rem; font-size: 0.9rem;">
+      Windows & Linux coming soon
+    </p>
+  </section>
+
+  <footer>
+    <p>
+      Made with ❤️ by <a href="https://github.com/bydb">bydb</a> ·
+      <a href="https://github.com/bydb/mindgraph-notes">GitHub</a> ·
+      MIT License
+    </p>
+  </footer>
+</body>
+</html>
