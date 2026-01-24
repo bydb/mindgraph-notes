@@ -206,8 +206,18 @@ ipcMain.handle('prompt-new-note', async () => {
   })
   
   if (result.canceled || !result.filePath) return null
-  
-  return result.filePath
+
+  // Ensure .md extension is always added (older macOS versions may not enforce it)
+  let filePath = result.filePath
+  if (!filePath.toLowerCase().endsWith('.md')) {
+    // Remove any other extension like .mkd, .markdown, etc. and add .md
+    filePath = filePath.replace(/\.(mkd|markdown|mdown|txt)$/i, '') + '.md'
+    if (!filePath.endsWith('.md')) {
+      filePath = filePath + '.md'
+    }
+  }
+
+  return filePath
 })
 
 // Neue Notiz erstellen
