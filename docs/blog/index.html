@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Blog - MindGraph Notes</title>
+  <meta name="description" content="Artikel über Wissensmanagement, KI und produktives Denken">
+  <link rel="icon" type="image/png" href="../icon.png">
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    :root {
+      --bg: #0a0a0f;
+      --bg-card: rgba(255, 255, 255, 0.03);
+      --bg-card-hover: rgba(255, 255, 255, 0.06);
+      --text: #e4e4e7;
+      --text-muted: #71717a;
+      --accent: #f97316;
+      --accent-glow: rgba(249, 115, 22, 0.4);
+      --border: rgba(255, 255, 255, 0.08);
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.7;
+    }
+
+    .bg-animation {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: -1;
+      overflow: hidden;
+    }
+
+    .bg-animation::before {
+      content: '';
+      position: absolute;
+      top: -50%;
+      left: -50%;
+      width: 200%;
+      height: 200%;
+      background: radial-gradient(circle at 30% 30%, rgba(249, 115, 22, 0.08) 0%, transparent 50%);
+    }
+
+    nav {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      padding: 1.5rem 2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      z-index: 100;
+      backdrop-filter: blur(10px);
+      background: rgba(10, 10, 15, 0.8);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      font-weight: 600;
+      font-size: 1.25rem;
+      text-decoration: none;
+      color: var(--text);
+    }
+
+    .logo-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      overflow: hidden;
+    }
+
+    .logo-icon img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 2rem;
+      align-items: center;
+    }
+
+    .nav-links a {
+      color: var(--text-muted);
+      text-decoration: none;
+      font-size: 0.9rem;
+      transition: color 0.2s;
+    }
+
+    .nav-links a:hover {
+      color: var(--text);
+    }
+
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 8rem 2rem 4rem;
+    }
+
+    h1 {
+      font-size: 2.5rem;
+      margin-bottom: 0.5rem;
+      background: linear-gradient(135deg, #f97316 0%, #fbbf24 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .subtitle {
+      color: var(--text-muted);
+      font-size: 1.1rem;
+      margin-bottom: 3rem;
+    }
+
+    .post-list {
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+    }
+
+    .post-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 1.5rem 2rem;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      text-decoration: none;
+      color: inherit;
+    }
+
+    .post-card:hover {
+      background: var(--bg-card-hover);
+      border-color: rgba(249, 115, 22, 0.3);
+      transform: translateY(-2px);
+    }
+
+    .post-card h2 {
+      font-size: 1.25rem;
+      margin-bottom: 0.5rem;
+      color: var(--text);
+    }
+
+    .post-card .date {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      margin-bottom: 0.75rem;
+    }
+
+    .post-card .summary {
+      color: var(--text-muted);
+      font-size: 0.95rem;
+    }
+
+    .post-card .tags {
+      display: flex;
+      gap: 0.5rem;
+      margin-top: 1rem;
+      flex-wrap: wrap;
+    }
+
+    .post-card .tag {
+      background: var(--accent);
+      color: white;
+      padding: 0.25rem 0.75rem;
+      border-radius: 100px;
+      font-size: 0.75rem;
+    }
+
+    /* Article View */
+    .article-view {
+      display: none;
+    }
+
+    .article-view.active {
+      display: block;
+    }
+
+    .post-list.hidden {
+      display: none;
+    }
+
+    .back-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      color: var(--accent);
+      text-decoration: none;
+      margin-bottom: 2rem;
+      font-size: 0.9rem;
+    }
+
+    .back-link:hover {
+      text-decoration: underline;
+    }
+
+    .article-header {
+      margin-bottom: 2rem;
+      padding-bottom: 2rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .article-header h1 {
+      font-size: 2rem;
+      line-height: 1.3;
+    }
+
+    .article-meta {
+      display: flex;
+      gap: 1rem;
+      color: var(--text-muted);
+      font-size: 0.9rem;
+      margin-top: 1rem;
+    }
+
+    .article-content {
+      font-size: 1.05rem;
+    }
+
+    .article-content h2 {
+      font-size: 1.5rem;
+      margin: 2rem 0 1rem;
+      color: var(--accent);
+    }
+
+    .article-content h3 {
+      font-size: 1.25rem;
+      margin: 1.5rem 0 0.75rem;
+    }
+
+    .article-content p {
+      margin-bottom: 1rem;
+    }
+
+    .article-content a {
+      color: var(--accent);
+    }
+
+    .article-content blockquote {
+      border-left: 3px solid var(--accent);
+      padding-left: 1rem;
+      margin: 1.5rem 0;
+      color: var(--text-muted);
+      font-style: italic;
+    }
+
+    .article-content code {
+      background: rgba(255, 255, 255, 0.1);
+      padding: 0.2rem 0.5rem;
+      border-radius: 4px;
+      font-size: 0.9em;
+    }
+
+    .article-content pre {
+      background: rgba(0, 0, 0, 0.3);
+      padding: 1rem;
+      border-radius: 8px;
+      overflow-x: auto;
+      margin: 1rem 0;
+    }
+
+    .article-content pre code {
+      background: none;
+      padding: 0;
+    }
+
+    .article-content ul, .article-content ol {
+      margin: 1rem 0;
+      padding-left: 1.5rem;
+    }
+
+    .article-content li {
+      margin-bottom: 0.5rem;
+    }
+
+    /* Callouts */
+    .callout {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1rem 1.25rem;
+      margin: 1.5rem 0;
+    }
+
+    .callout-title {
+      font-weight: 600;
+      margin-bottom: 0.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .callout.tip { border-left: 3px solid #22c55e; }
+    .callout.warning { border-left: 3px solid #eab308; }
+    .callout.note { border-left: 3px solid #3b82f6; }
+    .callout.abstract { border-left: 3px solid var(--accent); }
+
+    .loading {
+      text-align: center;
+      padding: 4rem;
+      color: var(--text-muted);
+    }
+
+    .empty {
+      text-align: center;
+      padding: 4rem;
+      color: var(--text-muted);
+    }
+
+    footer {
+      padding: 4rem 2rem;
+      text-align: center;
+      border-top: 1px solid var(--border);
+      margin-top: 4rem;
+    }
+
+    footer p {
+      color: var(--text-muted);
+      font-size: 0.9rem;
+    }
+
+    footer a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+
+    @media (max-width: 768px) {
+      .container {
+        padding: 6rem 1rem 2rem;
+      }
+
+      h1 {
+        font-size: 2rem;
+      }
+
+      .nav-links a:not(:last-child) {
+        display: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="bg-animation"></div>
+
+  <nav>
+    <a href="../" class="logo">
+      <div class="logo-icon">
+        <img src="../icon.png" alt="MindGraph Notes">
+      </div>
+      MindGraph Notes
+    </a>
+    <div class="nav-links">
+      <a href="../#features">Features</a>
+      <a href="../#download">Download</a>
+      <a href="./" style="color: var(--accent);">Blog</a>
+      <a href="https://github.com/bydb/mindgraph-notes" target="_blank">GitHub</a>
+    </div>
+  </nav>
+
+  <div class="container">
+    <!-- Post List -->
+    <div id="post-list" class="post-list">
+      <h1>Blog</h1>
+      <p class="subtitle">Artikel über Wissensmanagement, KI und produktives Denken</p>
+      <div id="posts" class="post-list">
+        <div class="loading">Lade Artikel...</div>
+      </div>
+    </div>
+
+    <!-- Article View -->
+    <div id="article-view" class="article-view">
+      <a href="#" class="back-link" onclick="showList(); return false;">← Zurück zur Übersicht</a>
+      <article>
+        <div class="article-header">
+          <h1 id="article-title"></h1>
+          <div class="article-meta">
+            <span id="article-date"></span>
+            <span id="article-author"></span>
+          </div>
+        </div>
+        <div id="article-content" class="article-content"></div>
+      </article>
+    </div>
+  </div>
+
+  <footer>
+    <p>
+      Made with ❤️ by <a href="https://bydb.io">bydb.io</a> ·
+      <a href="https://github.com/bydb/mindgraph-notes">GitHub</a> ·
+      <a href="../">MindGraph Notes</a>
+    </p>
+  </footer>
+
+  <script>
+    // List of blog posts (will be populated)
+    const posts = [];
+
+    // Parse YAML frontmatter
+    function parseFrontmatter(content) {
+      const match = content.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/);
+      if (!match) return { meta: {}, content };
+
+      const meta = {};
+      match[1].split('\n').forEach(line => {
+        const [key, ...valueParts] = line.split(':');
+        if (key && valueParts.length) {
+          let value = valueParts.join(':').trim();
+          // Remove quotes
+          if (value.startsWith('"') && value.endsWith('"')) {
+            value = value.slice(1, -1);
+          }
+          meta[key.trim()] = value;
+        }
+      });
+
+      return { meta, content: match[2] };
+    }
+
+    // Convert Obsidian callouts to HTML
+    function convertCallouts(content) {
+      return content.replace(/> \[!(\w+)\](.*?)\n((?:>.*\n?)*)/g, (match, type, title, body) => {
+        const cleanBody = body.replace(/^> ?/gm, '').trim();
+        const cleanTitle = title.trim() || type.charAt(0).toUpperCase() + type.slice(1);
+        return `<div class="callout ${type.toLowerCase()}">
+          <div class="callout-title">${cleanTitle}</div>
+          <div>${marked.parse(cleanBody)}</div>
+        </div>`;
+      });
+    }
+
+    // Remove wikilinks for display
+    function cleanWikilinks(content) {
+      return content.replace(/\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g, (match, link, alias) => {
+        return alias || link.split('/').pop();
+      });
+    }
+
+    // Fetch and display posts
+    async function loadPosts() {
+      const postsContainer = document.getElementById('posts');
+
+      try {
+        // Try to fetch posts.json (list of post files)
+        const response = await fetch('posts.json');
+        if (!response.ok) throw new Error('No posts.json');
+
+        const postFiles = await response.json();
+
+        if (postFiles.length === 0) {
+          postsContainer.innerHTML = '<div class="empty">Noch keine Artikel vorhanden.</div>';
+          return;
+        }
+
+        // Fetch each post
+        const postPromises = postFiles.map(async (file) => {
+          const res = await fetch(file);
+          if (!res.ok) return null;
+          const content = await res.text();
+          const { meta } = parseFrontmatter(content);
+          return { file, meta };
+        });
+
+        const loadedPosts = (await Promise.all(postPromises)).filter(p => p && p.meta.status === 'publish');
+
+        // Sort by date
+        loadedPosts.sort((a, b) => new Date(b.meta.date) - new Date(a.meta.date));
+
+        if (loadedPosts.length === 0) {
+          postsContainer.innerHTML = '<div class="empty">Noch keine veröffentlichten Artikel.</div>';
+          return;
+        }
+
+        postsContainer.innerHTML = loadedPosts.map(post => `
+          <a href="#${encodeURIComponent(post.file)}" class="post-card" onclick="showPost('${post.file}'); return false;">
+            <h2>${post.meta.title || post.file.replace('.md', '')}</h2>
+            <div class="date">${formatDate(post.meta.date)}</div>
+            ${post.meta.summary ? `<div class="summary">${post.meta.summary}</div>` : ''}
+          </a>
+        `).join('');
+
+        // Check if URL has a post hash
+        if (window.location.hash) {
+          const postFile = decodeURIComponent(window.location.hash.slice(1));
+          showPost(postFile);
+        }
+      } catch (e) {
+        postsContainer.innerHTML = '<div class="empty">Noch keine Artikel vorhanden.<br><br>Erstelle einen mit <code>/artikel</code> in Claude Code.</div>';
+      }
+    }
+
+    // Show single post
+    async function showPost(file) {
+      try {
+        const response = await fetch(file);
+        if (!response.ok) throw new Error('Post not found');
+
+        const content = await response.text();
+        const { meta, content: body } = parseFrontmatter(content);
+
+        document.getElementById('article-title').textContent = meta.title || file.replace('.md', '');
+        document.getElementById('article-date').textContent = formatDate(meta.date);
+        document.getElementById('article-author').textContent = meta.author ? `von ${meta.author}` : '';
+
+        // Process content
+        let processedContent = cleanWikilinks(body);
+        processedContent = convertCallouts(processedContent);
+        document.getElementById('article-content').innerHTML = marked.parse(processedContent);
+
+        document.getElementById('post-list').classList.add('hidden');
+        document.getElementById('article-view').classList.add('active');
+
+        window.location.hash = encodeURIComponent(file);
+        window.scrollTo(0, 0);
+
+        // Update page title
+        document.title = `${meta.title || 'Artikel'} - MindGraph Notes Blog`;
+      } catch (e) {
+        console.error('Error loading post:', e);
+      }
+    }
+
+    // Show post list
+    function showList() {
+      document.getElementById('post-list').classList.remove('hidden');
+      document.getElementById('article-view').classList.remove('active');
+      window.location.hash = '';
+      document.title = 'Blog - MindGraph Notes';
+    }
+
+    // Format date
+    function formatDate(dateStr) {
+      if (!dateStr) return '';
+      const date = new Date(dateStr);
+      return date.toLocaleDateString('de-DE', { year: 'numeric', month: 'long', day: 'numeric' });
+    }
+
+    // Handle back button
+    window.addEventListener('popstate', () => {
+      if (!window.location.hash) {
+        showList();
+      } else {
+        const postFile = decodeURIComponent(window.location.hash.slice(1));
+        showPost(postFile);
+      }
+    });
+
+    // Load posts on page load
+    loadPosts();
+  </script>
+</body>
+</html>
