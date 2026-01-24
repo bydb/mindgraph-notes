@@ -827,7 +827,7 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
 
         <div className="settings-footer">
           <div className="settings-version">
-            <strong>MindGraph Notes</strong> v0.8.5
+            <strong>MindGraph Notes</strong> v0.9.2
           </div>
           <div className="settings-credits">
             Entwickelt von Jochen Leeder
