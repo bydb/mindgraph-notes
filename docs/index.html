@@ -33,7 +33,6 @@
       overflow-x: hidden;
     }
 
-    /* Animated background */
     .bg-animation {
       position: fixed;
       top: 0;
@@ -63,7 +62,6 @@
       66% { transform: translate(-1%, 1%) rotate(-1deg); }
     }
 
-    /* Grid pattern overlay */
     .grid-overlay {
       position: fixed;
       top: 0;
@@ -77,7 +75,6 @@
       background-size: 50px 50px;
     }
 
-    /* Navigation */
     nav {
       position: fixed;
       top: 0;
@@ -117,6 +114,7 @@
     .nav-links {
       display: flex;
       gap: 2rem;
+      align-items: center;
     }
 
     .nav-links a {
@@ -130,7 +128,35 @@
       color: var(--text);
     }
 
-    /* Hero Section */
+    .lang-switch {
+      display: flex;
+      gap: 0.25rem;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.25rem;
+    }
+
+    .lang-switch button {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      padding: 0.35rem 0.75rem;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.85rem;
+      transition: all 0.2s;
+    }
+
+    .lang-switch button.active {
+      background: var(--accent);
+      color: white;
+    }
+
+    .lang-switch button:hover:not(.active) {
+      color: var(--text);
+    }
+
     .hero {
       min-height: 100vh;
       display: flex;
@@ -229,7 +255,6 @@
       border-color: rgba(255, 255, 255, 0.15);
     }
 
-    /* App Preview */
     .app-preview {
       margin-top: 4rem;
       position: relative;
@@ -260,7 +285,6 @@
       color: var(--text);
     }
 
-    /* Terminal Highlight Section */
     .terminal-highlight {
       padding: 6rem 2rem;
       background: linear-gradient(180deg, transparent 0%, rgba(249, 115, 22, 0.03) 50%, transparent 100%);
@@ -352,7 +376,6 @@
       }
     }
 
-    /* Features Section */
     .features {
       padding: 8rem 2rem;
       max-width: 1200px;
@@ -426,7 +449,6 @@
       box-shadow: 0 0 30px rgba(249, 115, 22, 0.2);
     }
 
-    /* Download Section */
     .download {
       padding: 8rem 2rem;
       text-align: center;
@@ -450,7 +472,7 @@
       margin-bottom: 1rem;
     }
 
-    .download p {
+    .download > p {
       color: var(--text-muted);
       margin-bottom: 2rem;
     }
@@ -498,7 +520,6 @@
       color: var(--text-muted);
     }
 
-    /* Install Note */
     .install-note {
       margin-top: 3rem;
       padding: 1.5rem 2rem;
@@ -545,7 +566,6 @@
       margin-bottom: 0 !important;
     }
 
-    /* Footer */
     footer {
       padding: 4rem 2rem;
       text-align: center;
@@ -562,22 +582,17 @@
       text-decoration: none;
     }
 
-    /* Responsive */
     @media (max-width: 768px) {
       nav {
         padding: 1rem;
       }
 
-      .nav-links {
+      .nav-links a:not(.lang-switch) {
         display: none;
       }
 
       .hero {
         padding: 6rem 1rem 2rem;
-      }
-
-      .mock-sidebar, .mock-canvas {
-        display: none;
       }
 
       .features {
@@ -602,21 +617,25 @@
       MindGraph Notes
     </div>
     <div class="nav-links">
-      <a href="#features">Features</a>
-      <a href="#download">Download</a>
+      <a href="#features" data-i18n="nav.features">Features</a>
+      <a href="#download" data-i18n="nav.download">Download</a>
       <a href="https://github.com/bydb/mindgraph-notes" target="_blank">GitHub</a>
+      <div class="lang-switch">
+        <button onclick="setLanguage('de')" id="lang-de" class="active">DE</button>
+        <button onclick="setLanguage('en')" id="lang-en">EN</button>
+      </div>
     </div>
   </nav>
 
   <section class="hero">
     <div class="badge">
       <span class="badge-dot"></span>
-      Mit integriertem KI-Terminal
+      <span data-i18n="hero.badge">Mit integriertem KI-Terminal</span>
     </div>
 
-    <h1>Notizen treffen<br>KI-Terminal.</h1>
+    <h1 data-i18n="hero.title">Notizen treffen<br>KI-Terminal.</h1>
 
-    <p class="subtitle">
+    <p class="subtitle" data-i18n="hero.subtitle">
       Die erste Notiz-App mit integriertem Terminal für OpenCode, Ollama und andere CLI-Tools.
       Schreibe, denke und automatisiere - alles in einer App.
     </p>
@@ -628,7 +647,7 @@
           <polyline points="7 10 12 15 17 10"/>
           <line x1="12" y1="15" x2="12" y2="3"/>
         </svg>
-        Download für macOS
+        <span data-i18n="hero.cta">Download für macOS</span>
       </a>
       <a href="https://github.com/bydb/mindgraph-notes" target="_blank" class="btn btn-secondary">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
@@ -645,7 +664,6 @@
     </div>
   </section>
 
-  <!-- Terminal Highlight Section -->
   <section class="terminal-highlight">
     <div class="terminal-showcase">
       <div class="terminal-window">
@@ -655,35 +673,35 @@
         <div class="terminal-body">
           <div class="terminal-line">
             <span class="terminal-prompt">~/notes $</span>
-            <span class="terminal-command"> claude "Erstelle eine Zusammenfassung aller Meeting-Notizen"</span>
+            <span class="terminal-command" data-i18n="terminal.cmd1"> opencode "Erstelle eine Zusammenfassung aller Meeting-Notizen"</span>
           </div>
           <div class="terminal-line output">
-            <span style="color: #f97316;">●</span> Analysiere 12 Meeting-Notizen...
+            <span style="color: #f97316;">●</span> <span data-i18n="terminal.out1">Analysiere 12 Meeting-Notizen...</span>
           </div>
           <div class="terminal-line output">
-            <span style="color: #22c55e;">✓</span> Zusammenfassung erstellt in [[Meeting-Summary.md]]
+            <span style="color: #22c55e;">✓</span> <span data-i18n="terminal.out2">Zusammenfassung erstellt in [[Meeting-Summary.md]]</span>
           </div>
           <div class="terminal-line" style="margin-top: 1rem;">
             <span class="terminal-prompt">~/notes $</span>
-            <span class="terminal-command"> ollama run llama3 "Erkläre [[Quantenmechanik]]"</span>
+            <span class="terminal-command" data-i18n="terminal.cmd2"> ollama run llama3 "Erkläre [[Quantenmechanik]]"</span>
           </div>
-          <div class="terminal-line output">
+          <div class="terminal-line output" data-i18n="terminal.out3">
             Die Quantenmechanik beschreibt das Verhalten von Materie...
           </div>
         </div>
       </div>
       <div class="terminal-info">
-        <h2>KI direkt in deinen Notizen</h2>
-        <p>
+        <h2 data-i18n="terminal.title">KI direkt in deinen Notizen</h2>
+        <p data-i18n="terminal.desc">
           Das integrierte Terminal macht MindGraph Notes einzigartig:
           Starte <strong>OpenCode</strong>, <strong>Ollama</strong> oder jedes andere CLI-Tool
           direkt neben deinen Notizen - ohne Kontextwechsel.
         </p>
         <ul class="terminal-features">
-          <li><span class="check">✓</span> OpenCode für KI-gestützte Workflows</li>
-          <li><span class="check">✓</span> Lokale LLMs via Ollama, LM Studio</li>
-          <li><span class="check">✓</span> Git, npm, Python - jedes CLI-Tool</li>
-          <li><span class="check">✓</span> Direkter Zugriff auf deine Markdown-Dateien</li>
+          <li><span class="check">✓</span> <span data-i18n="terminal.f1">OpenCode für KI-gestützte Workflows</span></li>
+          <li><span class="check">✓</span> <span data-i18n="terminal.f2">Lokale LLMs via Ollama, LM Studio</span></li>
+          <li><span class="check">✓</span> <span data-i18n="terminal.f3">Git, npm, Python - jedes CLI-Tool</span></li>
+          <li><span class="check">✓</span> <span data-i18n="terminal.f4">Direkter Zugriff auf deine Markdown-Dateien</span></li>
         </ul>
       </div>
     </div>
@@ -691,70 +709,70 @@
 
   <section class="features" id="features">
     <div class="section-title">
-      <h2>Mehr als nur Notizen</h2>
-      <p>Die Brücke zwischen deinem Wissen und KI-Tools</p>
+      <h2 data-i18n="features.title">Mehr als nur Notizen</h2>
+      <p data-i18n="features.subtitle">Die Brücke zwischen deinem Wissen und KI-Tools</p>
     </div>
 
     <div class="features-grid">
       <div class="feature-card featured">
         <div class="feature-icon">⌨️</div>
-        <h3>Integriertes Terminal</h3>
-        <p>Vollwertiges Terminal direkt in der App. Starte OpenCode, Ollama oder andere CLI-Tools ohne Kontextwechsel.</p>
+        <h3 data-i18n="features.terminal.title">Integriertes Terminal</h3>
+        <p data-i18n="features.terminal.desc">Vollwertiges Terminal direkt in der App. Starte OpenCode, Ollama oder andere CLI-Tools ohne Kontextwechsel.</p>
       </div>
 
       <div class="feature-card featured">
         <div class="feature-icon">🤖</div>
         <h3>OpenCode</h3>
-        <p>Lass KI direkt auf deine Notizen zugreifen. Automatisiere, generiere und transformiere Inhalte mit natürlicher Sprache.</p>
+        <p data-i18n="features.opencode.desc">Lass KI direkt auf deine Notizen zugreifen. Automatisiere, generiere und transformiere Inhalte mit natürlicher Sprache.</p>
       </div>
 
       <div class="feature-card featured">
         <div class="feature-icon">🧠</div>
-        <h3>Lokale LLMs</h3>
-        <p>Ollama, LM Studio, llama.cpp - nutze jedes lokale LLM über das Terminal. Deine Daten bleiben auf deinem Rechner.</p>
+        <h3 data-i18n="features.llm.title">Lokale LLMs</h3>
+        <p data-i18n="features.llm.desc">Ollama, LM Studio, llama.cpp - nutze jedes lokale LLM über das Terminal. Deine Daten bleiben auf deinem Rechner.</p>
       </div>
 
       <div class="feature-card">
         <div class="feature-icon">🌐</div>
-        <h3>Wissensgraph</h3>
-        <p>Visualisiere alle Verbindungen in einem interaktiven Graph. Entdecke versteckte Zusammenhänge.</p>
+        <h3 data-i18n="features.graph.title">Wissensgraph</h3>
+        <p data-i18n="features.graph.desc">Visualisiere alle Verbindungen in einem interaktiven Graph. Entdecke versteckte Zusammenhänge.</p>
       </div>
 
       <div class="feature-card">
         <div class="feature-icon">🔗</div>
         <h3>Wikilinks</h3>
-        <p>Verlinke Notizen mit [[Wikilinks]]. Obsidian-kompatible Syntax für nahtlosen Wechsel.</p>
+        <p data-i18n="features.wikilinks.desc">Verlinke Notizen mit [[Wikilinks]]. Obsidian-kompatible Syntax für nahtlosen Wechsel.</p>
       </div>
 
       <div class="feature-card">
         <div class="feature-icon">📝</div>
         <h3>Live Preview</h3>
-        <p>Schreibe in Markdown mit sofortiger Vorschau. LaTeX, Mermaid-Diagramme, Callouts und mehr.</p>
+        <p data-i18n="features.preview.desc">Schreibe in Markdown mit sofortiger Vorschau. LaTeX, Mermaid-Diagramme, Callouts und mehr.</p>
       </div>
 
       <div class="feature-card">
         <div class="feature-icon">📚</div>
-        <h3>Zotero Integration</h3>
-        <p>Füge Literatur direkt aus Zotero ein. Perfekt für akademisches Arbeiten und Recherche.</p>
+        <h3 data-i18n="features.zotero.title">Zotero Integration</h3>
+        <p data-i18n="features.zotero.desc">Füge Literatur direkt aus Zotero ein. Perfekt für akademisches Arbeiten und Recherche.</p>
       </div>
 
       <div class="feature-card">
         <div class="feature-icon">📄</div>
         <h3>PDF Companion</h3>
-        <p>PDFs mit Markdown-Notizen verknüpfen. Annotiere, tagge und verlinke deine Dokumente.</p>
+        <p data-i18n="features.pdf.desc">PDFs mit Markdown-Notizen verknüpfen. Annotiere, tagge und verlinke deine Dokumente.</p>
       </div>
 
       <div class="feature-card">
         <div class="feature-icon">🔒</div>
-        <h3>100% Lokal</h3>
-        <p>Alle Notizen sind Markdown-Dateien. Keine Cloud, kein Account, keine Telemetrie. Deine Daten gehören dir.</p>
+        <h3 data-i18n="features.local.title">100% Lokal</h3>
+        <p data-i18n="features.local.desc">Alle Notizen sind Markdown-Dateien. Keine Cloud, kein Account, keine Telemetrie. Deine Daten gehören dir.</p>
       </div>
     </div>
   </section>
 
   <section class="download" id="download">
-    <h2>Jetzt herunterladen</h2>
-    <p>Kostenlos und Open Source. Für immer.</p>
+    <h2 data-i18n="download.title">Jetzt herunterladen</h2>
+    <p data-i18n="download.subtitle">Kostenlos und Open Source. Für immer.</p>
 
     <div class="download-options">
       <a href="https://github.com/bydb/mindgraph-notes/releases/download/v0.9.2/MindGraph.Notes-0.9.2-arm64.dmg" class="download-btn">
@@ -779,14 +797,14 @@
     </div>
 
     <div class="install-note">
-      <h4>Installation auf macOS</h4>
-      <p>Da die App nicht im App Store ist, zeigt macOS beim ersten Start eine Warnung.</p>
+      <h4 data-i18n="install.title">Installation auf macOS</h4>
+      <p data-i18n="install.desc">Da die App nicht im App Store ist, zeigt macOS beim ersten Start eine Warnung.</p>
       <ol>
-        <li>DMG öffnen und App in Programme ziehen</li>
-        <li><strong>Rechtsklick</strong> auf die App → <strong>Öffnen</strong></li>
-        <li>Im Dialog auf <strong>Öffnen</strong> klicken</li>
+        <li data-i18n="install.step1">DMG öffnen und App in Programme ziehen</li>
+        <li data-i18n="install.step2"><strong>Rechtsklick</strong> auf die App → <strong>Öffnen</strong></li>
+        <li data-i18n="install.step3">Im Dialog auf <strong>Öffnen</strong> klicken</li>
       </ol>
-      <p class="install-alt">Alternative: <code>xattr -cr /Applications/MindGraph\ Notes.app</code> im Terminal</p>
+      <p class="install-alt"><span data-i18n="install.alt">Alternative:</span> <code>xattr -cr /Applications/MindGraph\ Notes.app</code></p>
     </div>
 
     <p style="margin-top: 2rem; font-size: 0.9rem;">
@@ -801,5 +819,120 @@
       MIT License
     </p>
   </footer>
+
+  <script>
+    const translations = {
+      de: {
+        "nav.features": "Features",
+        "nav.download": "Download",
+        "hero.badge": "Mit integriertem KI-Terminal",
+        "hero.title": "Notizen treffen<br>KI-Terminal.",
+        "hero.subtitle": "Die erste Notiz-App mit integriertem Terminal für OpenCode, Ollama und andere CLI-Tools. Schreibe, denke und automatisiere - alles in einer App.",
+        "hero.cta": "Download für macOS",
+        "terminal.cmd1": " opencode \"Erstelle eine Zusammenfassung aller Meeting-Notizen\"",
+        "terminal.out1": "Analysiere 12 Meeting-Notizen...",
+        "terminal.out2": "Zusammenfassung erstellt in [[Meeting-Summary.md]]",
+        "terminal.cmd2": " ollama run llama3 \"Erkläre [[Quantenmechanik]]\"",
+        "terminal.out3": "Die Quantenmechanik beschreibt das Verhalten von Materie...",
+        "terminal.title": "KI direkt in deinen Notizen",
+        "terminal.desc": "Das integrierte Terminal macht MindGraph Notes einzigartig: Starte <strong>OpenCode</strong>, <strong>Ollama</strong> oder jedes andere CLI-Tool direkt neben deinen Notizen - ohne Kontextwechsel.",
+        "terminal.f1": "OpenCode für KI-gestützte Workflows",
+        "terminal.f2": "Lokale LLMs via Ollama, LM Studio",
+        "terminal.f3": "Git, npm, Python - jedes CLI-Tool",
+        "terminal.f4": "Direkter Zugriff auf deine Markdown-Dateien",
+        "features.title": "Mehr als nur Notizen",
+        "features.subtitle": "Die Brücke zwischen deinem Wissen und KI-Tools",
+        "features.terminal.title": "Integriertes Terminal",
+        "features.terminal.desc": "Vollwertiges Terminal direkt in der App. Starte OpenCode, Ollama oder andere CLI-Tools ohne Kontextwechsel.",
+        "features.opencode.desc": "Lass KI direkt auf deine Notizen zugreifen. Automatisiere, generiere und transformiere Inhalte mit natürlicher Sprache.",
+        "features.llm.title": "Lokale LLMs",
+        "features.llm.desc": "Ollama, LM Studio, llama.cpp - nutze jedes lokale LLM über das Terminal. Deine Daten bleiben auf deinem Rechner.",
+        "features.graph.title": "Wissensgraph",
+        "features.graph.desc": "Visualisiere alle Verbindungen in einem interaktiven Graph. Entdecke versteckte Zusammenhänge.",
+        "features.wikilinks.desc": "Verlinke Notizen mit [[Wikilinks]]. Obsidian-kompatible Syntax für nahtlosen Wechsel.",
+        "features.preview.desc": "Schreibe in Markdown mit sofortiger Vorschau. LaTeX, Mermaid-Diagramme, Callouts und mehr.",
+        "features.zotero.title": "Zotero Integration",
+        "features.zotero.desc": "Füge Literatur direkt aus Zotero ein. Perfekt für akademisches Arbeiten und Recherche.",
+        "features.pdf.desc": "PDFs mit Markdown-Notizen verknüpfen. Annotiere, tagge und verlinke deine Dokumente.",
+        "features.local.title": "100% Lokal",
+        "features.local.desc": "Alle Notizen sind Markdown-Dateien. Keine Cloud, kein Account, keine Telemetrie. Deine Daten gehören dir.",
+        "download.title": "Jetzt herunterladen",
+        "download.subtitle": "Kostenlos und Open Source. Für immer.",
+        "install.title": "Installation auf macOS",
+        "install.desc": "Da die App nicht im App Store ist, zeigt macOS beim ersten Start eine Warnung.",
+        "install.step1": "DMG öffnen und App in Programme ziehen",
+        "install.step2": "<strong>Rechtsklick</strong> auf die App → <strong>Öffnen</strong>",
+        "install.step3": "Im Dialog auf <strong>Öffnen</strong> klicken",
+        "install.alt": "Alternative:"
+      },
+      en: {
+        "nav.features": "Features",
+        "nav.download": "Download",
+        "hero.badge": "With integrated AI terminal",
+        "hero.title": "Notes meet<br>AI Terminal.",
+        "hero.subtitle": "The first note-taking app with an integrated terminal for OpenCode, Ollama, and other CLI tools. Write, think, and automate - all in one app.",
+        "hero.cta": "Download for macOS",
+        "terminal.cmd1": " opencode \"Create a summary of all meeting notes\"",
+        "terminal.out1": "Analyzing 12 meeting notes...",
+        "terminal.out2": "Summary created in [[Meeting-Summary.md]]",
+        "terminal.cmd2": " ollama run llama3 \"Explain [[Quantum Mechanics]]\"",
+        "terminal.out3": "Quantum mechanics describes the behavior of matter...",
+        "terminal.title": "AI right in your notes",
+        "terminal.desc": "The integrated terminal makes MindGraph Notes unique: Run <strong>OpenCode</strong>, <strong>Ollama</strong>, or any other CLI tool right next to your notes - no context switching.",
+        "terminal.f1": "OpenCode for AI-powered workflows",
+        "terminal.f2": "Local LLMs via Ollama, LM Studio",
+        "terminal.f3": "Git, npm, Python - any CLI tool",
+        "terminal.f4": "Direct access to your Markdown files",
+        "features.title": "More than just notes",
+        "features.subtitle": "The bridge between your knowledge and AI tools",
+        "features.terminal.title": "Integrated Terminal",
+        "features.terminal.desc": "Full-featured terminal right in the app. Run OpenCode, Ollama, or other CLI tools without context switching.",
+        "features.opencode.desc": "Let AI access your notes directly. Automate, generate, and transform content using natural language.",
+        "features.llm.title": "Local LLMs",
+        "features.llm.desc": "Ollama, LM Studio, llama.cpp - use any local LLM via the terminal. Your data stays on your machine.",
+        "features.graph.title": "Knowledge Graph",
+        "features.graph.desc": "Visualize all connections in an interactive graph. Discover hidden relationships.",
+        "features.wikilinks.desc": "Link notes with [[Wikilinks]]. Obsidian-compatible syntax for seamless switching.",
+        "features.preview.desc": "Write in Markdown with instant preview. LaTeX, Mermaid diagrams, callouts, and more.",
+        "features.zotero.title": "Zotero Integration",
+        "features.zotero.desc": "Insert references directly from Zotero. Perfect for academic work and research.",
+        "features.pdf.desc": "Link PDFs with Markdown notes. Annotate, tag, and connect your documents.",
+        "features.local.title": "100% Local",
+        "features.local.desc": "All notes are Markdown files. No cloud, no account, no telemetry. Your data belongs to you.",
+        "download.title": "Download now",
+        "download.subtitle": "Free and open source. Forever.",
+        "install.title": "Installation on macOS",
+        "install.desc": "Since the app is not in the App Store, macOS shows a warning on first launch.",
+        "install.step1": "Open DMG and drag app to Applications",
+        "install.step2": "<strong>Right-click</strong> on the app → <strong>Open</strong>",
+        "install.step3": "Click <strong>Open</strong> in the dialog",
+        "install.alt": "Alternative:"
+      }
+    };
+
+    function setLanguage(lang) {
+      localStorage.setItem('lang', lang);
+      document.documentElement.lang = lang;
+
+      document.getElementById('lang-de').classList.toggle('active', lang === 'de');
+      document.getElementById('lang-en').classList.toggle('active', lang === 'en');
+
+      document.querySelectorAll('[data-i18n]').forEach(el => {
+        const key = el.getAttribute('data-i18n');
+        if (translations[lang][key]) {
+          el.innerHTML = translations[lang][key];
+        }
+      });
+
+      // Update page title
+      document.title = lang === 'de'
+        ? 'MindGraph Notes - Dein Wissen, vernetzt'
+        : 'MindGraph Notes - Your knowledge, connected';
+    }
+
+    // Initialize language
+    const savedLang = localStorage.getItem('lang') || 'de';
+    setLanguage(savedLang);
+  </script>
 </body>
 </html>
