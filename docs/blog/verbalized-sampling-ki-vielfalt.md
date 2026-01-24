@@ -67,6 +67,8 @@ Diese Forschung hat für mich zwei wichtige Implikationen.
 
 **Zweitens** zeigt sie, dass wir als Nutzer mehr Kontrolle haben, als wir denken. Mit einem einfachen Prompt-Zusatz können wir die verborgene Vielfalt der Modelle wieder hervorkitzeln. Das ist ermächtigend.
 
+![Warum KI oft langweilig antwortet – und wie wir das ändern](verbalized-sampling-infografik.png)
+
 ### Praktische Anwendung
 
 Die Technik gibt es in drei Varianten:
