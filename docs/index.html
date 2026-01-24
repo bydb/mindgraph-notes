@@ -19,9 +19,9 @@
       --bg-card-hover: rgba(255, 255, 255, 0.06);
       --text: #e4e4e7;
       --text-muted: #71717a;
-      --accent: #6366f1;
-      --accent-glow: rgba(99, 102, 241, 0.4);
-      --gradient: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #d946ef 100%);
+      --accent: #f97316;
+      --accent-glow: rgba(249, 115, 22, 0.4);
+      --gradient: linear-gradient(135deg, #f97316 0%, #fb923c 50%, #fbbf24 100%);
       --border: rgba(255, 255, 255, 0.08);
     }
 
@@ -51,9 +51,9 @@
       left: -50%;
       width: 200%;
       height: 200%;
-      background: radial-gradient(circle at 30% 30%, rgba(99, 102, 241, 0.15) 0%, transparent 50%),
-                  radial-gradient(circle at 70% 70%, rgba(139, 92, 246, 0.1) 0%, transparent 50%),
-                  radial-gradient(circle at 50% 50%, rgba(217, 70, 239, 0.05) 0%, transparent 50%);
+      background: radial-gradient(circle at 30% 30%, rgba(249, 115, 22, 0.15) 0%, transparent 50%),
+                  radial-gradient(circle at 70% 70%, rgba(251, 146, 60, 0.1) 0%, transparent 50%),
+                  radial-gradient(circle at 50% 50%, rgba(251, 191, 36, 0.05) 0%, transparent 50%);
       animation: bgMove 20s ease-in-out infinite;
     }
 
@@ -104,11 +104,14 @@
     .logo-icon {
       width: 32px;
       height: 32px;
-      background: var(--gradient);
-      border-radius: 8px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
+      border-radius: 50%;
+      overflow: hidden;
+    }
+
+    .logo-icon img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
     }
 
     .nav-links {
@@ -315,7 +318,7 @@
     .mock-link {
       display: inline-block;
       padding: 0.25rem 0.5rem;
-      background: rgba(99, 102, 241, 0.2);
+      background: rgba(249, 115, 22, 0.2);
       border-radius: 4px;
       font-size: 0.85rem;
       color: var(--accent);
@@ -332,7 +335,7 @@
     .mock-node {
       position: absolute;
       padding: 0.5rem 1rem;
-      background: rgba(99, 102, 241, 0.2);
+      background: rgba(249, 115, 22, 0.2);
       border: 1px solid var(--accent);
       border-radius: 8px;
       font-size: 0.75rem;
@@ -382,7 +385,7 @@
 
     .feature-card:hover {
       background: var(--bg-card-hover);
-      border-color: rgba(99, 102, 241, 0.3);
+      border-color: rgba(249, 115, 22, 0.3);
       transform: translateY(-4px);
     }
 
@@ -532,14 +535,7 @@
   <nav>
     <div class="logo">
       <div class="logo-icon">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
-          <circle cx="12" cy="12" r="3"/>
-          <circle cx="4" cy="8" r="2"/>
-          <circle cx="20" cy="8" r="2"/>
-          <circle cx="4" cy="16" r="2"/>
-          <circle cx="20" cy="16" r="2"/>
-          <path d="M6 8h3M15 8h3M6 16h3M15 16h3M12 9V6M12 18v-3"/>
-        </svg>
+        <img src="icon.png" alt="MindGraph Notes">
       </div>
       MindGraph Notes
     </div>
@@ -692,7 +688,7 @@
         </svg>
         <div class="download-info">
           <div class="platform">macOS (Apple Silicon)</div>
-          <div class="version">Version 0.8.5 - arm64</div>
+          <div class="version">Version 0.9.2 - arm64</div>
         </div>
       </a>
 
@@ -702,7 +698,7 @@
         </svg>
         <div class="download-info">
           <div class="platform">macOS (Intel)</div>
-          <div class="version">Version 0.8.5 - x64</div>
+          <div class="version">Version 0.9.2 - x64</div>
         </div>
       </a>
     </div>
