@@ -126,10 +126,3 @@ Der Quellcode liegt auf [GitHub](https://github.com/bydb/mindgraph-notes). Feedb
 
 Vielleicht ist es genau das Werkzeug, das dir gefehlt hat. Vielleicht nicht. Aber wenn du wie ich glaubst, dass Notizen und KI-Tools zusammengehören – dann probier es aus.
 
----
-
-## 🔗 Verwandte Beiträge
-
-- [[🤖🧠 Wir sollten über unser Selbstwertgefühl nachdenken]]
-- [[🤖🔍 Wenn Ki Nutzung zur Gewohnheit wird]]
-- [[✍️💭 Schreiben gleich denken]]
