@@ -449,6 +449,78 @@
       box-shadow: 0 0 30px rgba(249, 115, 22, 0.2);
     }
 
+    .shortcuts {
+      padding: 6rem 2rem;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .shortcuts-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 2rem;
+      margin-top: 2rem;
+    }
+
+    .shortcuts-category {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 1.5rem;
+    }
+
+    .shortcuts-category h3 {
+      color: var(--accent);
+      font-size: 1.1rem;
+      margin-bottom: 1rem;
+      padding-bottom: 0.75rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .shortcut-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+
+    .shortcut-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .shortcut-keys {
+      display: flex;
+      gap: 0.25rem;
+      flex-shrink: 0;
+    }
+
+    .shortcut-keys kbd {
+      background: rgba(249, 115, 22, 0.15);
+      color: var(--accent);
+      padding: 0.25rem 0.5rem;
+      border-radius: 6px;
+      font-size: 0.8rem;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Mono', Monaco, monospace;
+      border: 1px solid rgba(249, 115, 22, 0.3);
+      min-width: 1.5rem;
+      text-align: center;
+    }
+
+    .shortcut-desc {
+      color: var(--text-muted);
+      font-size: 0.9rem;
+      text-align: right;
+    }
+
+    .shortcuts-note {
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 0.85rem;
+      margin-top: 2rem;
+    }
+
     .setup {
       padding: 6rem 2rem;
       max-width: 1200px;
@@ -797,6 +869,7 @@
     </div>
     <div class="nav-links">
       <a href="#features" data-i18n="nav.features">Features</a>
+      <a href="#shortcuts" data-i18n="nav.shortcuts">Shortcuts</a>
       <a href="#setup" data-i18n="nav.setup">Setup</a>
       <a href="#download" data-i18n="nav.download">Download</a>
       <a href="./blog/" data-i18n="nav.blog">Blog</a>
@@ -949,6 +1022,121 @@
         <p data-i18n="features.local.desc">Alle Notizen sind Markdown-Dateien. Keine Cloud, kein Account, keine Telemetrie. Deine Daten gehören dir.</p>
       </div>
     </div>
+  </section>
+
+  <section class="shortcuts" id="shortcuts">
+    <div class="section-title">
+      <h2 data-i18n="shortcuts.title">Tastaturkürzel</h2>
+      <p data-i18n="shortcuts.subtitle">Arbeite schneller mit diesen Shortcuts</p>
+    </div>
+
+    <div class="shortcuts-grid">
+      <div class="shortcuts-category">
+        <h3 data-i18n="shortcuts.general">Allgemein</h3>
+        <div class="shortcut-list">
+          <div class="shortcut-item">
+            <span class="shortcut-keys"><kbd>⌘</kbd><kbd>N</kbd></span>
+            <span class="shortcut-desc" data-i18n="shortcuts.newNote">Neue Notiz</span>
+          </div>
+          <div class="shortcut-item">
+            <span class="shortcut-keys"><kbd>⌘</kbd><kbd>O</kbd></span>
+            <span class="shortcut-desc" data-i18n="shortcuts.openVault">Vault öffnen</span>
+          </div>
+          <div class="shortcut-item">
+            <span class="shortcut-keys"><kbd>⌘</kbd><kbd>P</kbd></span>
+            <span class="shortcut-desc" data-i18n="shortcuts.quickSearch">Schnellsuche</span>
+          </div>
+          <div class="shortcut-item">
+            <span class="shortcut-keys"><kbd>⌘</kbd><kbd>K</kbd></span>
+            <span class="shortcut-desc" data-i18n="shortcuts.quickSwitcher">Quick Switcher</span>
+          </div>
+          <div class="shortcut-item">
+            <span class="shortcut-keys"><kbd>⌘</kbd><kbd>,</kbd></span>
+            <span class="shortcut-desc" data-i18n="shortcuts.settings">Einstellungen</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="shortcuts-category">
+        <h3 data-i18n="shortcuts.formatting">Formatierung</h3>
+        <div class="shortcut-list">
+          <div class="shortcut-item">
+            <span class="shortcut-keys"><kbd>⌘</kbd><kbd>B</kbd></span>
+            <span class="shortcut-desc" data-i18n="shortcuts.bold">Fett</span>
+          </div>
+          <div class="shortcut-item">
+            <span class="shortcut-keys"><kbd>⌘</kbd><kbd>I</kbd></span>
+            <span class="shortcut-desc" data-i18n="shortcuts.italic">Kursiv</span>
+          </div>
+          <div class="shortcut-item">
+            <span class="shortcut-keys"><kbd>⌘</kbd><kbd>`</kbd></span>
+            <span class="shortcut-desc" data-i18n="shortcuts.code">Code</span>
+          </div>
+          <div class="shortcut-item">
+            <span class="shortcut-keys"><kbd>⌘</kbd><kbd>K</kbd></span>
+            <span class="shortcut-desc" data-i18n="shortcuts.link">Link einfügen</span>
+          </div>
+          <div class="shortcut-item">
+            <span class="shortcut-keys"><kbd>⌘</kbd><kbd>E</kbd></span>
+            <span class="shortcut-desc" data-i18n="shortcuts.toggleView">Ansicht wechseln</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="shortcuts-category">
+        <h3 data-i18n="shortcuts.ai">KI & Tools</h3>
+        <div class="shortcut-list">
+          <div class="shortcut-item">
+            <span class="shortcut-keys"><kbd>⌘</kbd><kbd>⇧</kbd><kbd>A</kbd></span>
+            <span class="shortcut-desc" data-i18n="shortcuts.aiMenu">KI-Menü</span>
+          </div>
+          <div class="shortcut-item">
+            <span class="shortcut-keys"><kbd>⌘</kbd><kbd>⇧</kbd><kbd>I</kbd></span>
+            <span class="shortcut-desc" data-i18n="shortcuts.aiImage">KI-Bildgenerierung</span>
+          </div>
+          <div class="shortcut-item">
+            <span class="shortcut-keys"><kbd>⌘</kbd><kbd>⇧</kbd><kbd>F</kbd></span>
+            <span class="shortcut-desc" data-i18n="shortcuts.formatMenu">Format-Menü</span>
+          </div>
+          <div class="shortcut-item">
+            <span class="shortcut-keys"><kbd>⌘</kbd><kbd>⇧</kbd><kbd>Z</kbd></span>
+            <span class="shortcut-desc" data-i18n="shortcuts.zotero">Zotero-Suche</span>
+          </div>
+          <div class="shortcut-item">
+            <span class="shortcut-keys"><kbd>⌘</kbd><kbd>⇧</kbd><kbd>T</kbd></span>
+            <span class="shortcut-desc" data-i18n="shortcuts.templates">Template-Auswahl</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="shortcuts-category">
+        <h3 data-i18n="shortcuts.special">Spezial</h3>
+        <div class="shortcut-list">
+          <div class="shortcut-item">
+            <span class="shortcut-keys"><kbd>Alt</kbd><kbd>Rechtsklick</kbd></span>
+            <span class="shortcut-desc" data-i18n="shortcuts.aiContext">KI-Kontextmenü</span>
+          </div>
+          <div class="shortcut-item">
+            <span class="shortcut-keys"><kbd>⌘</kbd><kbd>↵</kbd></span>
+            <span class="shortcut-desc" data-i18n="shortcuts.generateImage">Bild generieren</span>
+          </div>
+          <div class="shortcut-item">
+            <span class="shortcut-keys"><kbd>↑</kbd><kbd>↓</kbd></span>
+            <span class="shortcut-desc" data-i18n="shortcuts.navigate">In Listen navigieren</span>
+          </div>
+          <div class="shortcut-item">
+            <span class="shortcut-keys"><kbd>↵</kbd></span>
+            <span class="shortcut-desc" data-i18n="shortcuts.select">Auswahl bestätigen</span>
+          </div>
+          <div class="shortcut-item">
+            <span class="shortcut-keys"><kbd>Esc</kbd></span>
+            <span class="shortcut-desc" data-i18n="shortcuts.close">Dialog schließen</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <p class="shortcuts-note" data-i18n="shortcuts.note">Auf Windows/Linux: ⌘ = Ctrl</p>
   </section>
 
   <section class="setup" id="setup">
@@ -1125,6 +1313,7 @@
     const translations = {
       de: {
         "nav.features": "Features",
+        "nav.shortcuts": "Shortcuts",
         "nav.setup": "Setup",
         "nav.download": "Download",
         "nav.blog": "Blog",
@@ -1159,6 +1348,33 @@
         "features.pdf.desc": "PDFs mit Markdown-Notizen verknüpfen. Annotiere, tagge und verlinke deine Dokumente.",
         "features.local.title": "100% Lokal",
         "features.local.desc": "Alle Notizen sind Markdown-Dateien. Keine Cloud, kein Account, keine Telemetrie. Deine Daten gehören dir.",
+        "shortcuts.title": "Tastaturkürzel",
+        "shortcuts.subtitle": "Arbeite schneller mit diesen Shortcuts",
+        "shortcuts.general": "Allgemein",
+        "shortcuts.formatting": "Formatierung",
+        "shortcuts.ai": "KI & Tools",
+        "shortcuts.special": "Spezial",
+        "shortcuts.newNote": "Neue Notiz",
+        "shortcuts.openVault": "Vault öffnen",
+        "shortcuts.quickSearch": "Schnellsuche",
+        "shortcuts.quickSwitcher": "Quick Switcher",
+        "shortcuts.settings": "Einstellungen",
+        "shortcuts.bold": "Fett",
+        "shortcuts.italic": "Kursiv",
+        "shortcuts.code": "Code",
+        "shortcuts.link": "Link einfügen",
+        "shortcuts.toggleView": "Ansicht wechseln",
+        "shortcuts.aiMenu": "KI-Menü",
+        "shortcuts.aiImage": "KI-Bildgenerierung",
+        "shortcuts.formatMenu": "Format-Menü",
+        "shortcuts.zotero": "Zotero-Suche",
+        "shortcuts.templates": "Template-Auswahl",
+        "shortcuts.aiContext": "KI-Kontextmenü",
+        "shortcuts.generateImage": "Bild generieren",
+        "shortcuts.navigate": "In Listen navigieren",
+        "shortcuts.select": "Auswahl bestätigen",
+        "shortcuts.close": "Dialog schließen",
+        "shortcuts.note": "Auf Windows/Linux: ⌘ = Ctrl",
         "setup.title": "Tools einrichten",
         "setup.subtitle": "So holst du das Maximum aus MindGraph Notes heraus",
         "setup.opencode.desc": "KI-gestützte Entwicklung direkt im Terminal. OpenCode ermöglicht natürliche Sprachbefehle für deine Notizen.",
@@ -1206,6 +1422,7 @@
       },
       en: {
         "nav.features": "Features",
+        "nav.shortcuts": "Shortcuts",
         "nav.setup": "Setup",
         "nav.download": "Download",
         "nav.blog": "Blog",
@@ -1240,6 +1457,33 @@
         "features.pdf.desc": "Link PDFs with Markdown notes. Annotate, tag, and connect your documents.",
         "features.local.title": "100% Local",
         "features.local.desc": "All notes are Markdown files. No cloud, no account, no telemetry. Your data belongs to you.",
+        "shortcuts.title": "Keyboard Shortcuts",
+        "shortcuts.subtitle": "Work faster with these shortcuts",
+        "shortcuts.general": "General",
+        "shortcuts.formatting": "Formatting",
+        "shortcuts.ai": "AI & Tools",
+        "shortcuts.special": "Special",
+        "shortcuts.newNote": "New Note",
+        "shortcuts.openVault": "Open Vault",
+        "shortcuts.quickSearch": "Quick Search",
+        "shortcuts.quickSwitcher": "Quick Switcher",
+        "shortcuts.settings": "Settings",
+        "shortcuts.bold": "Bold",
+        "shortcuts.italic": "Italic",
+        "shortcuts.code": "Code",
+        "shortcuts.link": "Insert Link",
+        "shortcuts.toggleView": "Toggle View",
+        "shortcuts.aiMenu": "AI Menu",
+        "shortcuts.aiImage": "AI Image Generation",
+        "shortcuts.formatMenu": "Format Menu",
+        "shortcuts.zotero": "Zotero Search",
+        "shortcuts.templates": "Template Picker",
+        "shortcuts.aiContext": "AI Context Menu",
+        "shortcuts.generateImage": "Generate Image",
+        "shortcuts.navigate": "Navigate Lists",
+        "shortcuts.select": "Confirm Selection",
+        "shortcuts.close": "Close Dialog",
+        "shortcuts.note": "On Windows/Linux: ⌘ = Ctrl",
         "setup.title": "Setup Tools",
         "setup.subtitle": "Get the most out of MindGraph Notes",
         "setup.opencode.desc": "AI-powered development right in your terminal. OpenCode enables natural language commands for your notes.",
