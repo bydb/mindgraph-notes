@@ -4,7 +4,7 @@
 
 Eine moderne, lokale Notiz-App die Markdown-Notizen mit einem Wissensgraphen und einem vollwertigen Terminal kombiniert. Nutze OpenCode, Ollama und andere CLI-Tools direkt neben deinen Gedanken.
 
-[Website](https://mindgraph-notes.de) · [Download](https://mindgraph-notes.de/#download) · [Blog](https://mindgraph-notes.de/blog/)
+[Website](https://mindgraph-notes.de) · [Download](https://mindgraph-notes.de/#download) · [Blog](https://mindgraph-notes.de/blog/) · [Discord](https://discord.gg/u9N9R9vz)
 
 ---
 
