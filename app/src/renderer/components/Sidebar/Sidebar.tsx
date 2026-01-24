@@ -1,4 +1,4 @@
-import React, { useEffect, useCallback } from 'react'
+import React, { useEffect, useCallback, useState, useRef } from 'react'
 import { FileTree } from './FileTree'
 import { useNotesStore, createNoteFromFile } from '../../stores/notesStore'
 import { useUIStore } from '../../stores/uiStore'
@@ -9,6 +9,11 @@ export const Sidebar: React.FC = () => {
   const { sidebarWidth, sidebarVisible, fileTreeDisplayMode, setFileTreeDisplayMode } = useUIStore()
   const loadGraphData = useGraphStore((s) => s.loadFromVault)
   const resetGraphStore = useGraphStore((s) => s.reset)
+
+  // State für neue Notiz Dialog
+  const [newNoteDialogOpen, setNewNoteDialogOpen] = useState(false)
+  const [newNoteName, setNewNoteName] = useState('')
+  const newNoteInputRef = useRef<HTMLInputElement>(null)
 
   const handleOpenVault = useCallback(async () => {
     if (!window.electronAPI) {
@@ -90,38 +95,43 @@ export const Sidebar: React.FC = () => {
     }
   }, [setVaultPath, setFileTree, setNotes, setLoading, loadGraphData, resetGraphStore])
   
-  const handleNewNote = useCallback(async () => {
-    if (!window.electronAPI) return
-    
+  const handleNewNote = useCallback(() => {
     if (!vaultPath) {
-      // Vault muss zuerst geöffnet werden
       handleOpenVault()
       return
     }
-    
+    setNewNoteName('')
+    setNewNoteDialogOpen(true)
+    setTimeout(() => newNoteInputRef.current?.focus(), 50)
+  }, [vaultPath, handleOpenVault])
+
+  const handleSubmitNewNote = useCallback(async () => {
+    if (!window.electronAPI || !vaultPath || !newNoteName.trim()) return
+
+    const name = newNoteName.trim()
+    // Immer .md Endung erzwingen
+    const fileName = name.endsWith('.md') ? name : `${name}.md`
+    const filePath = `${vaultPath}/${fileName}`
+
     try {
-      // Native Save-Dialog öffnen
-      const filePath = await window.electronAPI.promptNewNote()
-      if (!filePath) return
-      
       // Notiz erstellen
       const result = await window.electronAPI.createNote(filePath)
-      
+
       // Dateibaum neu laden
       const tree = await window.electronAPI.readDirectory(vaultPath)
       setFileTree(tree)
-      
-      // Prüfen ob die Datei im Vault liegt
-      if (filePath.startsWith(vaultPath)) {
-        const relativePath = filePath.replace(vaultPath + '/', '')
-        const note = await createNoteFromFile(filePath, relativePath, result.content)
-        addNote(note)
-        selectNote(note.id)
-      }
+
+      // Notiz zum Store hinzufügen
+      const note = await createNoteFromFile(filePath, fileName, result.content)
+      addNote(note)
+      selectNote(note.id)
+
+      setNewNoteDialogOpen(false)
+      setNewNoteName('')
     } catch (error) {
       console.error('Fehler beim Erstellen der Notiz:', error)
     }
-  }, [vaultPath, setFileTree, addNote, selectNote, handleOpenVault])
+  }, [vaultPath, newNoteName, setFileTree, addNote, selectNote])
 
   const handleNewFolder = useCallback(async () => {
     if (!window.electronAPI) return
@@ -282,6 +292,34 @@ export const Sidebar: React.FC = () => {
           <button className="btn-primary" onClick={handleOpenVault}>
             Vault öffnen
           </button>
+        </div>
+      )}
+
+      {/* Dialog für neue Notiz */}
+      {newNoteDialogOpen && (
+        <div className="dialog-overlay" onClick={() => setNewNoteDialogOpen(false)}>
+          <div className="dialog" onClick={(e) => e.stopPropagation()}>
+            <h3>Neue Notiz erstellen</h3>
+            <input
+              ref={newNoteInputRef}
+              type="text"
+              placeholder="Name der Notiz"
+              value={newNoteName}
+              onChange={(e) => setNewNoteName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleSubmitNewNote()
+                if (e.key === 'Escape') setNewNoteDialogOpen(false)
+              }}
+            />
+            <div className="dialog-buttons">
+              <button onClick={handleSubmitNewNote} className="btn-primary" disabled={!newNoteName.trim()}>
+                Erstellen
+              </button>
+              <button onClick={() => setNewNoteDialogOpen(false)}>
+                Abbrechen
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
