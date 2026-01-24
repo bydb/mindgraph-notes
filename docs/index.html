@@ -233,131 +233,23 @@
     .app-preview {
       margin-top: 4rem;
       position: relative;
-      max-width: 1000px;
+      max-width: 1100px;
       width: 100%;
+      padding: 0 1rem;
     }
 
-    .app-window {
-      background: linear-gradient(180deg, #1a1a2e 0%, #16162a 100%);
+    .app-screenshot {
       border-radius: 12px;
-      border: 1px solid var(--border);
       overflow: hidden;
       box-shadow: 0 50px 100px -20px rgba(0, 0, 0, 0.5),
-                  0 0 50px var(--accent-glow);
+                  0 0 60px var(--accent-glow);
+      border: 1px solid var(--border);
     }
 
-    .window-bar {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      padding: 12px 16px;
-      background: rgba(0, 0, 0, 0.3);
-      border-bottom: 1px solid var(--border);
-    }
-
-    .window-dot {
-      width: 12px;
-      height: 12px;
-      border-radius: 50%;
-    }
-
-    .window-dot.red { background: #ff5f57; }
-    .window-dot.yellow { background: #febc2e; }
-    .window-dot.green { background: #28c840; }
-
-    .window-content {
-      aspect-ratio: 16/10;
-      display: flex;
-      background: #0f0f1a;
-    }
-
-    .mock-sidebar {
-      width: 200px;
-      background: rgba(255, 255, 255, 0.02);
-      border-right: 1px solid var(--border);
-      padding: 1rem;
-    }
-
-    .mock-item {
-      padding: 0.5rem 0.75rem;
-      border-radius: 6px;
-      margin-bottom: 0.25rem;
-      font-size: 0.8rem;
-      color: var(--text-muted);
-    }
-
-    .mock-item.active {
-      background: var(--accent);
-      color: white;
-    }
-
-    .mock-editor {
-      flex: 1;
-      padding: 2rem;
-      display: flex;
-      flex-direction: column;
-      gap: 1rem;
-    }
-
-    .mock-title {
-      font-size: 1.5rem;
-      font-weight: 600;
-      color: var(--text);
-    }
-
-    .mock-text {
-      height: 12px;
-      background: rgba(255, 255, 255, 0.1);
-      border-radius: 4px;
-    }
-
-    .mock-text.short { width: 60%; }
-    .mock-text.medium { width: 80%; }
-    .mock-text.long { width: 95%; }
-
-    .mock-link {
-      display: inline-block;
-      padding: 0.25rem 0.5rem;
-      background: rgba(249, 115, 22, 0.2);
-      border-radius: 4px;
-      font-size: 0.85rem;
-      color: var(--accent);
-    }
-
-    .mock-canvas {
-      width: 300px;
-      background: rgba(0, 0, 0, 0.3);
-      border-left: 1px solid var(--border);
-      padding: 1rem;
-      position: relative;
-    }
-
-    .mock-node {
-      position: absolute;
-      padding: 0.5rem 1rem;
-      background: rgba(249, 115, 22, 0.2);
-      border: 1px solid var(--accent);
-      border-radius: 8px;
-      font-size: 0.75rem;
-      color: var(--text);
-    }
-
-    .mock-node:nth-child(1) { top: 20%; left: 20%; }
-    .mock-node:nth-child(2) { top: 50%; left: 50%; }
-    .mock-node:nth-child(3) { top: 30%; left: 60%; }
-    .mock-node:nth-child(4) { top: 70%; left: 30%; }
-
-    .mock-terminal {
-      position: absolute;
-      bottom: 0;
-      left: 0;
-      right: 0;
-      height: 120px;
-      background: #0d0d0d;
-      border-top: 1px solid var(--border);
-      padding: 0.75rem;
-      font-family: 'SF Mono', Monaco, monospace;
-      font-size: 0.7rem;
+    .app-screenshot img {
+      width: 100%;
+      height: auto;
+      display: block;
     }
 
     .terminal-prompt {
@@ -366,26 +258,6 @@
 
     .terminal-command {
       color: var(--text);
-    }
-
-    .terminal-output {
-      color: var(--text-muted);
-      margin-top: 0.25rem;
-    }
-
-    .terminal-cursor {
-      display: inline-block;
-      width: 8px;
-      height: 14px;
-      background: var(--accent);
-      animation: blink 1s infinite;
-      vertical-align: middle;
-      margin-left: 2px;
-    }
-
-    @keyframes blink {
-      0%, 50% { opacity: 1; }
-      51%, 100% { opacity: 0; }
     }
 
     /* Terminal Highlight Section */
@@ -720,43 +592,8 @@
     </div>
 
     <div class="app-preview">
-      <div class="app-window">
-        <div class="window-bar">
-          <div class="window-dot red"></div>
-          <div class="window-dot yellow"></div>
-          <div class="window-dot green"></div>
-        </div>
-        <div class="window-content">
-          <div class="mock-sidebar">
-            <div class="mock-item active">Projektideen</div>
-            <div class="mock-item">Meeting Notes</div>
-            <div class="mock-item">Zettelkasten</div>
-            <div class="mock-item">Daily Notes</div>
-          </div>
-          <div class="mock-editor" style="position: relative;">
-            <div class="mock-title">Projektideen</div>
-            <div class="mock-text long"></div>
-            <div class="mock-text medium"></div>
-            <div style="display: flex; gap: 0.5rem; align-items: center;">
-              <span class="mock-link">[[Zettelkasten]]</span>
-              <span class="mock-link">[[Meeting Notes]]</span>
-            </div>
-            <div class="mock-text short"></div>
-            <div class="mock-terminal">
-              <div><span class="terminal-prompt">~/vault $</span> <span class="terminal-command">claude</span></div>
-              <div class="terminal-output">Claude Code v1.0.0</div>
-              <div class="terminal-output" style="margin-top: 0.5rem;">
-                <span style="color: #f97316;">●</span> Fasse alle Meeting Notes zusammen<span class="terminal-cursor"></span>
-              </div>
-            </div>
-          </div>
-          <div class="mock-canvas">
-            <div class="mock-node">Projektideen</div>
-            <div class="mock-node">Zettelkasten</div>
-            <div class="mock-node">Meeting</div>
-            <div class="mock-node">Daily</div>
-          </div>
-        </div>
+      <div class="app-screenshot">
+        <img src="screenshot.png" alt="MindGraph Notes - Editor, Wissensgraph und OpenCode Terminal">
       </div>
     </div>
   </section>
