@@ -297,26 +297,26 @@ export const Sidebar: React.FC = () => {
 
       {/* Dialog für neue Notiz */}
       {newNoteDialogOpen && (
-        <div className="dialog-overlay" onClick={() => setNewNoteDialogOpen(false)}>
-          <div className="dialog" onClick={(e) => e.stopPropagation()}>
-            <h3>Neue Notiz erstellen</h3>
+        <div className="new-note-dialog-overlay" onClick={() => setNewNoteDialogOpen(false)}>
+          <div className="new-note-dialog" onClick={(e) => e.stopPropagation()}>
             <input
               ref={newNoteInputRef}
               type="text"
-              placeholder="Name der Notiz"
+              placeholder="Name der neuen Notiz..."
               value={newNoteName}
               onChange={(e) => setNewNoteName(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === 'Enter') handleSubmitNewNote()
+                if (e.key === 'Enter' && newNoteName.trim()) handleSubmitNewNote()
                 if (e.key === 'Escape') setNewNoteDialogOpen(false)
               }}
+              autoFocus
             />
-            <div className="dialog-buttons">
-              <button onClick={handleSubmitNewNote} className="btn-primary" disabled={!newNoteName.trim()}>
-                Erstellen
-              </button>
+            <div className="new-note-dialog-buttons">
               <button onClick={() => setNewNoteDialogOpen(false)}>
                 Abbrechen
+              </button>
+              <button onClick={handleSubmitNewNote} className="btn-primary" disabled={!newNoteName.trim()}>
+                Erstellen
               </button>
             </div>
           </div>
