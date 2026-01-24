@@ -603,6 +603,75 @@
         padding: 4rem 1rem;
       }
     }
+
+    /* Modal styles */
+    .modal {
+      display: none;
+      position: fixed;
+      z-index: 1000;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.8);
+      backdrop-filter: blur(5px);
+      overflow-y: auto;
+    }
+
+    .modal-content {
+      background: var(--bg);
+      margin: 5% auto;
+      padding: 2rem 3rem;
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      max-width: 700px;
+      width: 90%;
+      position: relative;
+      box-shadow: 0 25px 50px rgba(0, 0, 0, 0.5);
+    }
+
+    .modal-close {
+      position: absolute;
+      right: 1.5rem;
+      top: 1rem;
+      font-size: 2rem;
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: color 0.2s;
+    }
+
+    .modal-close:hover {
+      color: var(--text);
+    }
+
+    .modal-content h2 {
+      font-size: 1.75rem;
+      margin-bottom: 1.5rem;
+      color: var(--accent);
+    }
+
+    .modal-content h3 {
+      font-size: 1.1rem;
+      margin-top: 1.5rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .modal-content h4 {
+      font-size: 1rem;
+      margin-top: 1rem;
+      margin-bottom: 0.5rem;
+      color: var(--text-muted);
+    }
+
+    .modal-content p {
+      color: var(--text-muted);
+      margin-bottom: 0.75rem;
+      font-size: 0.95rem;
+    }
+
+    .modal-content a {
+      color: var(--accent);
+    }
   </style>
 </head>
 <body>
@@ -819,7 +888,68 @@
       <a href="https://github.com/bydb/mindgraph-notes">GitHub</a> ·
       MIT License
     </p>
+    <p style="margin-top: 1rem;">
+      <a href="#" onclick="openModal('impressum'); return false;" data-i18n="footer.impressum">Impressum</a> ·
+      <a href="#" onclick="openModal('datenschutz'); return false;" data-i18n="footer.privacy">Datenschutz</a>
+    </p>
   </footer>
+
+  <!-- Impressum Modal -->
+  <div id="impressum-modal" class="modal">
+    <div class="modal-content">
+      <span class="modal-close" onclick="closeModal('impressum')">&times;</span>
+      <h2>Impressum</h2>
+      <h3>Angaben gemäß § 5 TMG</h3>
+      <p>
+        Jochen Leeder<br>
+        Kirschenweg 1<br>
+        35444 Biebertal<br>
+        Deutschland
+      </p>
+      <h3>Kontakt</h3>
+      <p>E-Mail: info@bydb.io</p>
+      <h3>Verantwortlich für den Inhalt nach § 55 Abs. 2 RStV</h3>
+      <p>Jochen Leeder</p>
+      <h3 data-i18n="impressum.liability">Haftungsausschluss</h3>
+      <h4 data-i18n="impressum.liability.content">Haftung für Inhalte</h4>
+      <p data-i18n="impressum.liability.content.text">Die Inhalte dieser Seiten wurden mit größter Sorgfalt erstellt. Für die Richtigkeit, Vollständigkeit und Aktualität der Inhalte kann jedoch keine Gewähr übernommen werden.</p>
+      <h4 data-i18n="impressum.liability.links">Haftung für Links</h4>
+      <p data-i18n="impressum.liability.links.text">Dieses Angebot enthält Links zu externen Websites Dritter, auf deren Inhalte kein Einfluss genommen werden kann. Für die Inhalte der verlinkten Seiten ist stets der jeweilige Anbieter oder Betreiber verantwortlich.</p>
+      <h3 data-i18n="impressum.copyright">Urheberrecht</h3>
+      <p data-i18n="impressum.copyright.text">Die durch den Seitenbetreiber erstellten Inhalte und Werke auf diesen Seiten unterliegen dem deutschen Urheberrecht. Beiträge Dritter sind als solche gekennzeichnet.</p>
+    </div>
+  </div>
+
+  <!-- Datenschutz Modal -->
+  <div id="datenschutz-modal" class="modal">
+    <div class="modal-content">
+      <span class="modal-close" onclick="closeModal('datenschutz')">&times;</span>
+      <h2 data-i18n="privacy.title">Datenschutzerklärung</h2>
+
+      <h3 data-i18n="privacy.general.title">1. Datenschutz auf einen Blick</h3>
+      <p data-i18n="privacy.general.text">Diese Website erhebt keine personenbezogenen Daten. Es werden keine Cookies gesetzt und keine Tracking-Tools verwendet.</p>
+
+      <h3 data-i18n="privacy.hosting.title">2. Hosting</h3>
+      <p data-i18n="privacy.hosting.text">Diese Website wird auf GitHub Pages gehostet. GitHub kann beim Aufruf der Seite technische Daten wie IP-Adresse, Browsertyp und Zugriffszeit in Server-Logs speichern. Weitere Informationen finden Sie in der <a href="https://docs.github.com/en/site-policy/privacy-policies/github-privacy-statement" target="_blank">GitHub Privacy Statement</a>.</p>
+
+      <h3 data-i18n="privacy.localstorage.title">3. Lokale Speicherung</h3>
+      <p data-i18n="privacy.localstorage.text">Diese Website verwendet localStorage, um Ihre Spracheinstellung (Deutsch/Englisch) zu speichern. Diese Daten verbleiben ausschließlich auf Ihrem Gerät und werden nicht an Server übertragen.</p>
+
+      <h3 data-i18n="privacy.app.title">4. MindGraph Notes App</h3>
+      <p data-i18n="privacy.app.text">Die MindGraph Notes Desktop-App speichert alle Daten lokal auf Ihrem Computer. Es werden keine Daten an externe Server gesendet. Die App enthält keine Telemetrie oder Tracking.</p>
+
+      <h3 data-i18n="privacy.rights.title">5. Ihre Rechte</h3>
+      <p data-i18n="privacy.rights.text">Sie haben das Recht auf Auskunft, Berichtigung, Löschung und Einschränkung der Verarbeitung Ihrer personenbezogenen Daten. Kontakt: info@bydb.io</p>
+
+      <h3 data-i18n="privacy.contact.title">6. Verantwortliche Stelle</h3>
+      <p>
+        Jochen Leeder<br>
+        Kirschenweg 1<br>
+        35444 Biebertal<br>
+        E-Mail: info@bydb.io
+      </p>
+    </div>
+  </div>
 
   <script>
     const translations = {
@@ -865,7 +995,28 @@
         "install.settings1": "App normal starten (Warnung erscheint, auf \"OK\" klicken)",
         "install.settings2": "<strong>Systemeinstellungen</strong> → <strong>Datenschutz & Sicherheit</strong>",
         "install.settings3": "Nach unten scrollen → <strong>Dennoch öffnen</strong> klicken",
-        "install.alt": "Terminal-Alternative:"
+        "install.alt": "Terminal-Alternative:",
+        "footer.impressum": "Impressum",
+        "footer.privacy": "Datenschutz",
+        "impressum.liability": "Haftungsausschluss",
+        "impressum.liability.content": "Haftung für Inhalte",
+        "impressum.liability.content.text": "Die Inhalte dieser Seiten wurden mit größter Sorgfalt erstellt. Für die Richtigkeit, Vollständigkeit und Aktualität der Inhalte kann jedoch keine Gewähr übernommen werden.",
+        "impressum.liability.links": "Haftung für Links",
+        "impressum.liability.links.text": "Dieses Angebot enthält Links zu externen Websites Dritter, auf deren Inhalte kein Einfluss genommen werden kann. Für die Inhalte der verlinkten Seiten ist stets der jeweilige Anbieter oder Betreiber verantwortlich.",
+        "impressum.copyright": "Urheberrecht",
+        "impressum.copyright.text": "Die durch den Seitenbetreiber erstellten Inhalte und Werke auf diesen Seiten unterliegen dem deutschen Urheberrecht. Beiträge Dritter sind als solche gekennzeichnet.",
+        "privacy.title": "Datenschutzerklärung",
+        "privacy.general.title": "1. Datenschutz auf einen Blick",
+        "privacy.general.text": "Diese Website erhebt keine personenbezogenen Daten. Es werden keine Cookies gesetzt und keine Tracking-Tools verwendet.",
+        "privacy.hosting.title": "2. Hosting",
+        "privacy.hosting.text": "Diese Website wird auf GitHub Pages gehostet. GitHub kann beim Aufruf der Seite technische Daten wie IP-Adresse, Browsertyp und Zugriffszeit in Server-Logs speichern. Weitere Informationen finden Sie in der <a href=\"https://docs.github.com/en/site-policy/privacy-policies/github-privacy-statement\" target=\"_blank\">GitHub Privacy Statement</a>.",
+        "privacy.localstorage.title": "3. Lokale Speicherung",
+        "privacy.localstorage.text": "Diese Website verwendet localStorage, um Ihre Spracheinstellung (Deutsch/Englisch) zu speichern. Diese Daten verbleiben ausschließlich auf Ihrem Gerät und werden nicht an Server übertragen.",
+        "privacy.app.title": "4. MindGraph Notes App",
+        "privacy.app.text": "Die MindGraph Notes Desktop-App speichert alle Daten lokal auf Ihrem Computer. Es werden keine Daten an externe Server gesendet. Die App enthält keine Telemetrie oder Tracking.",
+        "privacy.rights.title": "5. Ihre Rechte",
+        "privacy.rights.text": "Sie haben das Recht auf Auskunft, Berichtigung, Löschung und Einschränkung der Verarbeitung Ihrer personenbezogenen Daten. Kontakt: info@bydb.io",
+        "privacy.contact.title": "6. Verantwortliche Stelle"
       },
       en: {
         "nav.features": "Features",
@@ -909,7 +1060,28 @@
         "install.settings1": "Try to open the app normally (warning appears, click \"OK\")",
         "install.settings2": "<strong>System Settings</strong> → <strong>Privacy & Security</strong>",
         "install.settings3": "Scroll down → Click <strong>Open Anyway</strong>",
-        "install.alt": "Terminal alternative:"
+        "install.alt": "Terminal alternative:",
+        "footer.impressum": "Legal Notice",
+        "footer.privacy": "Privacy Policy",
+        "impressum.liability": "Disclaimer",
+        "impressum.liability.content": "Liability for Content",
+        "impressum.liability.content.text": "The contents of these pages were created with the greatest care. However, no guarantee can be given for the accuracy, completeness, and timeliness of the content.",
+        "impressum.liability.links": "Liability for Links",
+        "impressum.liability.links.text": "This website contains links to external third-party websites, over whose content we have no influence. Therefore, the respective provider or operator is always responsible for the content of the linked pages.",
+        "impressum.copyright": "Copyright",
+        "impressum.copyright.text": "The content and works created by the site operator on these pages are subject to German copyright law. Contributions by third parties are marked as such.",
+        "privacy.title": "Privacy Policy",
+        "privacy.general.title": "1. Privacy at a Glance",
+        "privacy.general.text": "This website does not collect personal data. No cookies are set and no tracking tools are used.",
+        "privacy.hosting.title": "2. Hosting",
+        "privacy.hosting.text": "This website is hosted on GitHub Pages. GitHub may store technical data such as IP address, browser type, and access time in server logs when accessing the site. For more information, see the <a href=\"https://docs.github.com/en/site-policy/privacy-policies/github-privacy-statement\" target=\"_blank\">GitHub Privacy Statement</a>.",
+        "privacy.localstorage.title": "3. Local Storage",
+        "privacy.localstorage.text": "This website uses localStorage to save your language preference (German/English). This data remains exclusively on your device and is not transmitted to any servers.",
+        "privacy.app.title": "4. MindGraph Notes App",
+        "privacy.app.text": "The MindGraph Notes desktop app stores all data locally on your computer. No data is sent to external servers. The app contains no telemetry or tracking.",
+        "privacy.rights.title": "5. Your Rights",
+        "privacy.rights.text": "You have the right to information, correction, deletion, and restriction of processing of your personal data. Contact: info@bydb.io",
+        "privacy.contact.title": "6. Responsible Party"
       }
     };
 
@@ -936,6 +1108,33 @@
     // Initialize language
     const savedLang = localStorage.getItem('lang') || 'de';
     setLanguage(savedLang);
+
+    // Modal functions
+    function openModal(name) {
+      document.getElementById(name + '-modal').style.display = 'block';
+      document.body.style.overflow = 'hidden';
+    }
+
+    function closeModal(name) {
+      document.getElementById(name + '-modal').style.display = 'none';
+      document.body.style.overflow = '';
+    }
+
+    // Close modal on outside click
+    window.onclick = function(event) {
+      if (event.target.classList.contains('modal')) {
+        event.target.style.display = 'none';
+        document.body.style.overflow = '';
+      }
+    }
+
+    // Close modal on Escape key
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape') {
+        document.querySelectorAll('.modal').forEach(m => m.style.display = 'none');
+        document.body.style.overflow = '';
+      }
+    });
   </script>
 </body>
 </html>
