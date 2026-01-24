@@ -449,6 +449,116 @@
       box-shadow: 0 0 30px rgba(249, 115, 22, 0.2);
     }
 
+    .setup {
+      padding: 6rem 2rem;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .setup-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 2rem;
+      margin-top: 2rem;
+    }
+
+    .setup-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 2rem;
+      transition: all 0.3s ease;
+    }
+
+    .setup-card:hover {
+      border-color: rgba(249, 115, 22, 0.3);
+      transform: translateY(-2px);
+    }
+
+    .setup-icon {
+      font-size: 2.5rem;
+      margin-bottom: 1rem;
+    }
+
+    .setup-card h3 {
+      font-size: 1.5rem;
+      margin-bottom: 0.75rem;
+      color: var(--accent);
+    }
+
+    .setup-card p {
+      color: var(--text-muted);
+      margin-bottom: 1rem;
+      line-height: 1.6;
+    }
+
+    .setup-install {
+      background: rgba(0, 0, 0, 0.3);
+      border-radius: 8px;
+      padding: 1rem;
+      margin: 1rem 0;
+    }
+
+    .setup-install span {
+      display: block;
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      margin-bottom: 0.5rem;
+    }
+
+    .setup-install code {
+      display: block;
+      background: rgba(249, 115, 22, 0.1);
+      color: var(--accent);
+      padding: 0.75rem;
+      border-radius: 6px;
+      font-size: 0.9rem;
+      word-break: break-all;
+    }
+
+    .setup-note {
+      font-size: 0.85rem;
+      background: rgba(249, 115, 22, 0.05);
+      padding: 0.75rem;
+      border-radius: 6px;
+      border-left: 3px solid var(--accent);
+    }
+
+    .setup-note code {
+      background: rgba(0, 0, 0, 0.2);
+      padding: 0.2rem 0.4rem;
+      border-radius: 4px;
+    }
+
+    .setup-steps ol {
+      margin: 1rem 0;
+      padding-left: 1.25rem;
+      color: var(--text-muted);
+    }
+
+    .setup-steps li {
+      margin-bottom: 0.5rem;
+      line-height: 1.5;
+    }
+
+    .setup-steps a {
+      color: var(--accent);
+    }
+
+    .setup-link {
+      display: inline-block;
+      color: var(--accent);
+      text-decoration: none;
+      font-size: 0.9rem;
+      margin-top: 0.5rem;
+      transition: opacity 0.2s;
+    }
+
+    .setup-link:hover {
+      opacity: 0.8;
+      text-decoration: underline;
+    }
+
     .download {
       padding: 8rem 2rem;
       text-align: center;
@@ -687,6 +797,7 @@
     </div>
     <div class="nav-links">
       <a href="#features" data-i18n="nav.features">Features</a>
+      <a href="#setup" data-i18n="nav.setup">Setup</a>
       <a href="#download" data-i18n="nav.download">Download</a>
       <a href="./blog/" data-i18n="nav.blog">Blog</a>
       <a href="https://github.com/bydb/mindgraph-notes" target="_blank">GitHub</a>
@@ -840,6 +951,52 @@
     </div>
   </section>
 
+  <section class="setup" id="setup">
+    <div class="section-title">
+      <h2 data-i18n="setup.title">Tools einrichten</h2>
+      <p data-i18n="setup.subtitle">So holst du das Maximum aus MindGraph Notes heraus</p>
+    </div>
+
+    <div class="setup-grid">
+      <div class="setup-card">
+        <div class="setup-icon">🤖</div>
+        <h3>OpenCode</h3>
+        <p data-i18n="setup.opencode.desc">KI-gestützte Entwicklung direkt im Terminal. OpenCode ermöglicht natürliche Sprachbefehle für deine Notizen.</p>
+        <div class="setup-install">
+          <span data-i18n="setup.install">Installation:</span>
+          <code>curl -fsSL https://opencode.ai/install | bash</code>
+        </div>
+        <a href="https://opencode.ai" target="_blank" class="setup-link" data-i18n="setup.more">Mehr erfahren →</a>
+      </div>
+
+      <div class="setup-card">
+        <div class="setup-icon">🦙</div>
+        <h3>Ollama</h3>
+        <p data-i18n="setup.ollama.desc">Lokale LLMs wie Llama, Mistral oder Gemma auf deinem Mac. Keine Cloud, keine API-Kosten, volle Privatsphäre.</p>
+        <div class="setup-install">
+          <span data-i18n="setup.install">Installation:</span>
+          <code>brew install ollama</code>
+        </div>
+        <p class="setup-note" data-i18n="setup.ollama.note">Nach der Installation: <code>ollama pull llama3</code> um ein Modell zu laden.</p>
+        <a href="https://ollama.ai" target="_blank" class="setup-link" data-i18n="setup.more">Mehr erfahren →</a>
+      </div>
+
+      <div class="setup-card">
+        <div class="setup-icon">📚</div>
+        <h3>Zotero</h3>
+        <p data-i18n="setup.zotero.desc">Literaturverwaltung für Wissenschaft und Recherche. Füge Zitate direkt in deine Notizen ein.</p>
+        <div class="setup-steps">
+          <ol>
+            <li data-i18n="setup.zotero.step1">Zotero installieren von <a href="https://www.zotero.org/download/" target="_blank">zotero.org</a></li>
+            <li data-i18n="setup.zotero.step2">Better BibTeX Plugin installieren für Export</li>
+            <li data-i18n="setup.zotero.step3">In MindGraph Notes: Einstellungen → Zotero Pfad setzen</li>
+          </ol>
+        </div>
+        <a href="https://www.zotero.org" target="_blank" class="setup-link" data-i18n="setup.more">Mehr erfahren →</a>
+      </div>
+    </div>
+  </section>
+
   <section class="download" id="download">
     <h2 data-i18n="download.title">Jetzt herunterladen</h2>
     <p data-i18n="download.subtitle">Kostenlos und Open Source. Für immer.</p>
@@ -956,6 +1113,7 @@
     const translations = {
       de: {
         "nav.features": "Features",
+        "nav.setup": "Setup",
         "nav.download": "Download",
         "nav.blog": "Blog",
         "hero.badge": "Mit integriertem KI-Terminal",
@@ -989,6 +1147,17 @@
         "features.pdf.desc": "PDFs mit Markdown-Notizen verknüpfen. Annotiere, tagge und verlinke deine Dokumente.",
         "features.local.title": "100% Lokal",
         "features.local.desc": "Alle Notizen sind Markdown-Dateien. Keine Cloud, kein Account, keine Telemetrie. Deine Daten gehören dir.",
+        "setup.title": "Tools einrichten",
+        "setup.subtitle": "So holst du das Maximum aus MindGraph Notes heraus",
+        "setup.opencode.desc": "KI-gestützte Entwicklung direkt im Terminal. OpenCode ermöglicht natürliche Sprachbefehle für deine Notizen.",
+        "setup.ollama.desc": "Lokale LLMs wie Llama, Mistral oder Gemma auf deinem Mac. Keine Cloud, keine API-Kosten, volle Privatsphäre.",
+        "setup.ollama.note": "Nach der Installation: <code>ollama pull llama3</code> um ein Modell zu laden.",
+        "setup.zotero.desc": "Literaturverwaltung für Wissenschaft und Recherche. Füge Zitate direkt in deine Notizen ein.",
+        "setup.zotero.step1": "Zotero installieren von <a href=\"https://www.zotero.org/download/\" target=\"_blank\">zotero.org</a>",
+        "setup.zotero.step2": "Better BibTeX Plugin installieren für Export",
+        "setup.zotero.step3": "In MindGraph Notes: Einstellungen → Zotero Pfad setzen",
+        "setup.install": "Installation:",
+        "setup.more": "Mehr erfahren →",
         "download.title": "Jetzt herunterladen",
         "download.subtitle": "Kostenlos und Open Source. Für immer.",
         "install.title": "Installation auf macOS",
@@ -1022,6 +1191,7 @@
       },
       en: {
         "nav.features": "Features",
+        "nav.setup": "Setup",
         "nav.download": "Download",
         "nav.blog": "Blog",
         "hero.badge": "With integrated AI terminal",
@@ -1055,6 +1225,17 @@
         "features.pdf.desc": "Link PDFs with Markdown notes. Annotate, tag, and connect your documents.",
         "features.local.title": "100% Local",
         "features.local.desc": "All notes are Markdown files. No cloud, no account, no telemetry. Your data belongs to you.",
+        "setup.title": "Setup Tools",
+        "setup.subtitle": "Get the most out of MindGraph Notes",
+        "setup.opencode.desc": "AI-powered development right in your terminal. OpenCode enables natural language commands for your notes.",
+        "setup.ollama.desc": "Local LLMs like Llama, Mistral or Gemma on your Mac. No cloud, no API costs, full privacy.",
+        "setup.ollama.note": "After installation: <code>ollama pull llama3</code> to download a model.",
+        "setup.zotero.desc": "Reference management for science and research. Insert citations directly into your notes.",
+        "setup.zotero.step1": "Install Zotero from <a href=\"https://www.zotero.org/download/\" target=\"_blank\">zotero.org</a>",
+        "setup.zotero.step2": "Install Better BibTeX plugin for export",
+        "setup.zotero.step3": "In MindGraph Notes: Settings → Set Zotero path",
+        "setup.install": "Installation:",
+        "setup.more": "Learn more →",
         "download.title": "Download now",
         "download.subtitle": "Free and open source. Forever.",
         "install.title": "Installation on macOS",
