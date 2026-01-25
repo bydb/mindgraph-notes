@@ -7,6 +7,7 @@ interface NotesState {
   notes: Note[]
   fileTree: FileEntry[]
   selectedNoteId: string | null
+  secondarySelectedNoteId: string | null  // Für Text-Split View
   selectedPdfPath: string | null  // Relativer Pfad zum ausgewählten PDF
   selectedImagePath: string | null  // Relativer Pfad zum ausgewählten Bild
   isLoading: boolean
@@ -20,12 +21,14 @@ interface NotesState {
   updateNotePath: (oldId: string, newPath: string, newId: string) => void
   removeNote: (id: string) => void
   selectNote: (id: string | null) => void
+  selectSecondaryNote: (id: string | null) => void  // Für Text-Split View
   selectPdf: (path: string | null) => void
   selectImage: (path: string | null) => void
   setLoading: (loading: boolean) => void
 
   // Computed
   getSelectedNote: () => Note | undefined
+  getSecondarySelectedNote: () => Note | undefined  // Für Text-Split View
   getNoteByPath: (path: string) => Note | undefined
   getNoteById: (id: string) => Note | undefined
 }
@@ -35,6 +38,7 @@ export const useNotesStore = create<NotesState>((set, get) => ({
   notes: [],
   fileTree: [],
   selectedNoteId: null,
+  secondarySelectedNoteId: null,
   selectedPdfPath: null,
   selectedImagePath: null,
   isLoading: false,
@@ -96,6 +100,8 @@ export const useNotesStore = create<NotesState>((set, get) => ({
   
   selectNote: (id) => set({ selectedNoteId: id, selectedPdfPath: null, selectedImagePath: null }),
 
+  selectSecondaryNote: (id) => set({ secondarySelectedNoteId: id }),
+
   selectPdf: (path) => set({ selectedPdfPath: path, selectedNoteId: null, selectedImagePath: null }),
 
   selectImage: (path) => set({ selectedImagePath: path, selectedNoteId: null, selectedPdfPath: null }),
@@ -106,7 +112,12 @@ export const useNotesStore = create<NotesState>((set, get) => ({
     const state = get()
     return state.notes.find(n => n.id === state.selectedNoteId)
   },
-  
+
+  getSecondarySelectedNote: () => {
+    const state = get()
+    return state.notes.find(n => n.id === state.secondarySelectedNoteId)
+  },
+
   getNoteByPath: (path) => {
     return get().notes.find(n => n.path === path)
   },

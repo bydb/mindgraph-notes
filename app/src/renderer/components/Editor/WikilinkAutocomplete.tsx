@@ -3,15 +3,17 @@ import { EditorView } from '@codemirror/view'
 import { useNotesStore } from '../../stores/notesStore'
 import { extractParagraphs, generateBlockId } from '../../utils/linkExtractor'
 
-export type AutocompleteMode = 'note' | 'heading' | 'block'
+export type AutocompleteMode = 'note' | 'heading' | 'block' | 'tag'
 
-// Erweiterte Selection-Info für Block-Referenzen
+// Erweiterte Selection-Info für Block-Referenzen und neue Notizen
 export interface BlockSelectionInfo {
   value: string           // Der fertige Wikilink-Wert
   needsBlockId: boolean   // Muss eine Block-ID generiert werden?
   targetNotePath?: string // Pfad zur Zieldatei
   targetLine?: number     // Zeilennummer für die Block-ID
   generatedId?: string    // Die generierte Block-ID
+  createNewNote?: boolean // Soll eine neue Notiz erstellt werden?
+  newNoteName?: string    // Name der neuen Notiz
 }
 
 export interface WikilinkAutocompleteProps {
@@ -34,6 +36,8 @@ interface AutocompleteItem {
   // Für Block-Items
   needsBlockId?: boolean
   targetLine?: number
+  // Für neue Notizen
+  createNewNote?: boolean
 }
 
 export const WikilinkAutocomplete: React.FC<WikilinkAutocompleteProps> = ({
@@ -110,7 +114,7 @@ export const WikilinkAutocomplete: React.FC<WikilinkAutocompleteProps> = ({
     const queryLower = query.toLowerCase()
 
     if (mode === 'note') {
-      return notes
+      const matchingNotes = notes
         .filter(n => {
           if (!queryLower) return true
           return n.title.toLowerCase().includes(queryLower) ||
@@ -124,6 +128,29 @@ export const WikilinkAutocomplete: React.FC<WikilinkAutocompleteProps> = ({
           icon: '📄',
           value: n.title
         }))
+
+      // Prüfe ob es einen exakten Treffer gibt (case-insensitive)
+      const exactMatch = notes.some(n =>
+        n.title.toLowerCase() === queryLower ||
+        n.path.replace('.md', '').toLowerCase() === queryLower ||
+        n.path.split('/').pop()?.replace('.md', '').toLowerCase() === queryLower
+      )
+
+      // Wenn Query vorhanden und kein exakter Treffer, zeige "Neue Notiz erstellen" Option
+      if (query.trim() && !exactMatch) {
+        const createItem: AutocompleteItem = {
+          id: '__create_new__',
+          label: query.trim(),
+          sublabel: 'Neue Notiz erstellen',
+          icon: '➕',
+          value: query.trim(),
+          createNewNote: true
+        }
+        // Füge "Erstellen" Option am Anfang ein
+        return [createItem, ...matchingNotes]
+      }
+
+      return matchingNotes
     }
 
     if (mode === 'heading' && targetNoteData) {
@@ -197,6 +224,53 @@ export const WikilinkAutocomplete: React.FC<WikilinkAutocompleteProps> = ({
         }))
     }
 
+    // Tag-Modus: Sammle alle Tags aus allen Notizen
+    if (mode === 'tag') {
+      const allTags = new Map<string, number>() // tag -> count
+
+      for (const note of notes) {
+        if (note.tags) {
+          for (const tag of note.tags) {
+            allTags.set(tag, (allTags.get(tag) || 0) + 1)
+          }
+        }
+      }
+
+      // Sortiere nach Häufigkeit, dann alphabetisch
+      const sortedTags = Array.from(allTags.entries())
+        .sort((a, b) => {
+          if (b[1] !== a[1]) return b[1] - a[1] // Häufigkeit absteigend
+          return a[0].localeCompare(b[0]) // Alphabetisch
+        })
+        .filter(([tag]) => {
+          if (!queryLower) return true
+          return tag.toLowerCase().includes(queryLower)
+        })
+        .slice(0, 30)
+        .map(([tag, count]) => ({
+          id: `tag-${tag}`,
+          label: tag,
+          sublabel: `${count} Notiz${count !== 1 ? 'en' : ''}`,
+          icon: '#',
+          value: tag
+        }))
+
+      // Option zum Erstellen eines neuen Tags
+      if (query.trim() && !allTags.has(query.trim())) {
+        const createItem: AutocompleteItem = {
+          id: '__create_tag__',
+          label: query.trim(),
+          sublabel: 'Neuen Tag erstellen',
+          icon: '+',
+          value: query.trim(),
+          createNewNote: false // Missbrauche nicht, aber markiere als "neu"
+        }
+        return [createItem, ...sortedTags]
+      }
+
+      return sortedTags
+    }
+
     return []
   }, [mode, notes, targetNoteData, targetNote, query, targetContent])
 
@@ -217,7 +291,16 @@ export const WikilinkAutocomplete: React.FC<WikilinkAutocompleteProps> = ({
 
   // Handle selection
   const handleSelect = (item: AutocompleteItem) => {
-    if (item.needsBlockId && targetNoteData) {
+    if (item.createNewNote) {
+      // Neue Notiz erstellen
+      const blockInfo: BlockSelectionInfo = {
+        value: item.value,
+        needsBlockId: false,
+        createNewNote: true,
+        newNoteName: item.value
+      }
+      onSelect(item.value, mode, blockInfo)
+    } else if (item.needsBlockId && targetNoteData) {
       // Generiere neue Block-ID
       const newBlockId = generateBlockId()
       const blockInfo: BlockSelectionInfo = {
@@ -297,6 +380,7 @@ export const WikilinkAutocomplete: React.FC<WikilinkAutocompleteProps> = ({
       case 'note': return 'Notizen'
       case 'heading': return `Überschriften in "${targetNote}"`
       case 'block': return `Absätze in "${targetNote}"`
+      case 'tag': return 'Tags'
     }
   }
 
@@ -319,21 +403,22 @@ export const WikilinkAutocomplete: React.FC<WikilinkAutocompleteProps> = ({
             {mode === 'note' && 'Keine Notizen gefunden'}
             {mode === 'heading' && 'Keine Überschriften gefunden'}
             {mode === 'block' && 'Keine Absätze gefunden'}
+            {mode === 'tag' && 'Keine Tags gefunden'}
           </div>
         ) : (
           items.map((item, index) => (
             <div
               key={item.id}
-              className={`wikilink-autocomplete-item ${index === selectedIndex ? 'selected' : ''} ${item.needsBlockId ? 'needs-id' : ''}`}
+              className={`wikilink-autocomplete-item ${index === selectedIndex ? 'selected' : ''} ${item.needsBlockId ? 'needs-id' : ''} ${item.createNewNote ? 'create-new' : ''}`}
               onClick={() => handleSelect(item)}
               onMouseEnter={() => setSelectedIndex(index)}
             >
-              <span className={`wikilink-autocomplete-icon ${item.needsBlockId ? 'new-id' : ''}`}>
+              <span className={`wikilink-autocomplete-icon ${item.needsBlockId ? 'new-id' : ''} ${item.createNewNote ? 'create-new' : ''}`}>
                 {item.icon}
               </span>
               <span className="wikilink-autocomplete-label">{item.label}</span>
               {item.sublabel && (
-                <span className={`wikilink-autocomplete-sublabel ${item.needsBlockId ? 'new-id' : ''}`}>
+                <span className={`wikilink-autocomplete-sublabel ${item.needsBlockId ? 'new-id' : ''} ${item.createNewNote ? 'create-new' : ''}`}>
                   {item.sublabel}
                 </span>
               )}

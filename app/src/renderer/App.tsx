@@ -37,8 +37,8 @@ const ViewModeButton: React.FC<{
 )
 
 const App: React.FC = () => {
-  const { viewMode, setViewMode, toggleSidebar, sidebarVisible, splitPosition, setSplitPosition, sidebarWidth, setSidebarWidth, theme, setTheme, accentColor, backgroundColor, fontFamily, setPendingTemplateInsert } = useUIStore()
-  const { notes, vaultPath, selectNote, selectedPdfPath, selectedImagePath } = useNotesStore()
+  const { viewMode, setViewMode, toggleSidebar, sidebarVisible, splitPosition, setSplitPosition, sidebarWidth, setSidebarWidth, theme, setTheme, accentColor, backgroundColor, fontFamily, setPendingTemplateInsert, textSplitEnabled, setTextSplitEnabled, textSplitPosition, setTextSplitPosition } = useUIStore()
+  const { notes, vaultPath, selectNote, selectedPdfPath, selectedImagePath, secondarySelectedNoteId } = useNotesStore()
   const { t } = useTranslation()
   const { startChecking, stopChecking } = useReminderStore()
   const [terminalVisible, setTerminalVisible] = useState(false)
@@ -53,6 +53,7 @@ const App: React.FC = () => {
   const contentAreaRef = useRef<HTMLDivElement>(null)
   const isDraggingRef = useRef(false)
   const isSidebarDraggingRef = useRef(false)
+  const isTextSplitDraggingRef = useRef(false)
 
   // Link-Count und Task-Stats verzögert berechnen für schnelleren UI-Start
   const [linkCount, setLinkCount] = useState(0)
@@ -142,15 +143,6 @@ const App: React.FC = () => {
     root.style.setProperty('--bg-primary-custom', bg.light)
     root.style.setProperty('--bg-primary-custom-dark', bg.dark)
   }, [backgroundColor])
-
-  // Theme Toggle Handler
-  const toggleTheme = useCallback(() => {
-    if (theme === 'dark') {
-      setTheme('light')
-    } else {
-      setTheme('dark')
-    }
-  }, [theme, setTheme])
 
   // Quick Switcher: Notiz erstellen
   const handleCreateNoteFromSwitcher = useCallback((title: string) => {
@@ -281,7 +273,34 @@ const App: React.FC = () => {
     document.addEventListener('mousemove', handleMouseMove)
     document.addEventListener('mouseup', handleMouseUp)
   }, [setSplitPosition])
-  
+
+  // Text-Split Divider Drag-Handler
+  const handleTextSplitDividerMouseDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault()
+    isTextSplitDraggingRef.current = true
+    document.body.style.cursor = 'col-resize'
+    document.body.style.userSelect = 'none'
+
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      if (!isTextSplitDraggingRef.current || !workspaceRef.current) return
+
+      const rect = workspaceRef.current.getBoundingClientRect()
+      const newPosition = ((moveEvent.clientX - rect.left) / rect.width) * 100
+      setTextSplitPosition(newPosition)
+    }
+
+    const handleMouseUp = () => {
+      isTextSplitDraggingRef.current = false
+      document.body.style.cursor = ''
+      document.body.style.userSelect = ''
+      document.removeEventListener('mousemove', handleMouseMove)
+      document.removeEventListener('mouseup', handleMouseUp)
+    }
+
+    document.addEventListener('mousemove', handleMouseMove)
+    document.addEventListener('mouseup', handleMouseUp)
+  }, [setTextSplitPosition])
+
   return (
     <ReactFlowProvider>
       <div className="app">
@@ -298,6 +317,43 @@ const App: React.FC = () => {
                 </svg>
               </button>
             </div>
+            <div
+              className="app-logo"
+              onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+              title={theme === 'dark' ? 'Light Mode aktivieren' : 'Dark Mode aktivieren'}
+            >
+              <svg width="22" height="22" viewBox="0 0 100 100" fill="none">
+                <circle className="logo-bg" cx="50" cy="50" r="48"/>
+                {/* Verbindungslinien */}
+                <g className="logo-lines" stroke="var(--accent-color)" strokeWidth="2.5">
+                  <line x1="50" y1="22" x2="35" y2="38"/>
+                  <line x1="50" y1="22" x2="65" y2="38"/>
+                  <line x1="35" y1="38" x2="65" y2="38"/>
+                  <line x1="35" y1="38" x2="25" y2="58"/>
+                  <line x1="35" y1="38" x2="50" y2="52"/>
+                  <line x1="65" y1="38" x2="75" y2="58"/>
+                  <line x1="65" y1="38" x2="50" y2="52"/>
+                  <line x1="25" y1="58" x2="50" y2="52"/>
+                  <line x1="75" y1="58" x2="50" y2="52"/>
+                  <line x1="25" y1="58" x2="38" y2="75"/>
+                  <line x1="50" y1="52" x2="38" y2="75"/>
+                  <line x1="50" y1="52" x2="62" y2="75"/>
+                  <line x1="75" y1="58" x2="62" y2="75"/>
+                  <line x1="38" y1="75" x2="62" y2="75"/>
+                </g>
+                {/* Nodes */}
+                <g className="logo-nodes" fill="var(--accent-color)">
+                  <circle cx="50" cy="22" r="7"/>
+                  <circle cx="35" cy="38" r="7"/>
+                  <circle cx="65" cy="38" r="7"/>
+                  <circle cx="25" cy="58" r="7"/>
+                  <circle cx="50" cy="52" r="7"/>
+                  <circle cx="75" cy="58" r="7"/>
+                  <circle cx="38" cy="75" r="7"/>
+                  <circle cx="62" cy="75" r="7"/>
+                </g>
+              </svg>
+            </div>
             <span className="app-title">MindGraph Notes</span>
           </div>
           
@@ -312,6 +368,17 @@ const App: React.FC = () => {
               <ViewModeButton mode="canvas" currentMode={viewMode} onClick={() => setViewMode('canvas')}>
                 {t('viewMode.canvas')}
               </ViewModeButton>
+              <span className="view-mode-separator" />
+              <button
+                className={`view-mode-btn ${textSplitEnabled ? 'active' : ''}`}
+                onClick={() => setTextSplitEnabled(!textSplitEnabled)}
+                title="Text-Split: Zwei Notizen vergleichen (Cmd/Ctrl+Klick in Sidebar für zweite Notiz)"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="3" width="8" height="18" rx="1"/>
+                  <rect x="13" y="3" width="8" height="18" rx="1"/>
+                </svg>
+              </button>
             </div>
           </div>
           
@@ -327,30 +394,7 @@ const App: React.FC = () => {
                   <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
                 </svg>
               </button>
-              <button
-                className="view-mode-btn"
-                onClick={toggleTheme}
-                title={theme === 'dark' ? 'Light Mode' : 'Dark Mode'}
-              >
-                {theme === 'dark' ? (
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <circle cx="12" cy="12" r="5"/>
-                    <line x1="12" y1="1" x2="12" y2="3"/>
-                    <line x1="12" y1="21" x2="12" y2="23"/>
-                    <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
-                    <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
-                    <line x1="1" y1="12" x2="3" y2="12"/>
-                    <line x1="21" y1="12" x2="23" y2="12"/>
-                    <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
-                    <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
-                  </svg>
-                ) : (
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
-                  </svg>
-                )}
-              </button>
-              <button
+                            <button
                 className={`view-mode-btn ${terminalVisible ? 'active' : ''}`}
                 onClick={() => setTerminalVisible(!terminalVisible)}
                 title="Terminal ein/ausblenden"
@@ -378,12 +422,13 @@ const App: React.FC = () => {
               </>
             )}
 
-            <div className={`workspace ${viewMode}`} ref={workspaceRef}>
+            <div className={`workspace ${viewMode} ${textSplitEnabled ? 'text-split' : ''}`} ref={workspaceRef}>
+              {/* Primary Editor Panel */}
               <div
                 className="editor-panel"
                 style={{
                   display: viewMode === 'canvas' ? 'none' : 'flex',
-                  flex: viewMode === 'split' ? `0 0 ${splitPosition}%` : 1
+                  flex: textSplitEnabled && viewMode === 'editor' ? `0 0 ${textSplitPosition}%` : (viewMode === 'split' ? `0 0 ${splitPosition}%` : 1)
                 }}
               >
                 {selectedPdfPath && vaultPath ? (
@@ -403,6 +448,42 @@ const App: React.FC = () => {
                   </>
                 )}
               </div>
+
+              {/* Text Split Divider */}
+              {textSplitEnabled && viewMode === 'editor' && (
+                <div
+                  className="text-split-divider"
+                  onMouseDown={handleTextSplitDividerMouseDown}
+                />
+              )}
+
+              {/* Secondary Editor Panel (Text Split) */}
+              {textSplitEnabled && viewMode === 'editor' && (
+                <div
+                  className="editor-panel editor-panel-secondary"
+                  style={{ flex: `0 0 ${100 - textSplitPosition}%` }}
+                >
+                  {secondarySelectedNoteId ? (
+                    <>
+                      <MarkdownEditor isSecondary />
+                      <BacklinksPanel isSecondary />
+                    </>
+                  ) : (
+                    <div className="text-split-placeholder">
+                      <div className="text-split-placeholder-content">
+                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                          <polyline points="14 2 14 8 20 8"/>
+                          <line x1="12" y1="18" x2="12" y2="12"/>
+                          <line x1="9" y1="15" x2="15" y2="15"/>
+                        </svg>
+                        <p>Cmd/Ctrl+Klick auf eine Notiz</p>
+                        <p className="text-split-placeholder-hint">um sie hier zu öffnen</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {viewMode === 'split' && (
                 <div

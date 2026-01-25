@@ -12,7 +12,7 @@ import katex from 'katex'
 import 'katex/dist/katex.min.css'
 import 'katex/contrib/mhchem/mhchem.js'  // Chemie-Support (mhchem)
 import mermaid from 'mermaid'
-import { useNotesStore } from '../../stores/notesStore'
+import { useNotesStore, createNoteFromFile } from '../../stores/notesStore'
 import { useUIStore } from '../../stores/uiStore'
 import { extractLinks, extractTags, extractTitle, extractHeadings, extractBlocks } from '../../utils/linkExtractor'
 import { WikilinkAutocomplete, AutocompleteMode, BlockSelectionInfo } from './WikilinkAutocomplete'
@@ -402,7 +402,12 @@ type ViewMode = 'edit' | 'preview' | 'live-preview'
 // Compartment for live preview extension (created once, reused)
 const livePreviewCompartment = new Compartment()
 
-export const MarkdownEditor: React.FC = () => {
+interface MarkdownEditorProps {
+  noteId?: string  // Optional: spezifische Notiz anzeigen (für Text-Split)
+  isSecondary?: boolean  // Ist dies das sekundäre Panel im Text-Split?
+}
+
+export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecondary = false }) => {
   const editorRef = useRef<HTMLDivElement>(null)
   const previewRef = useRef<HTMLDivElement>(null)
   const viewRef = useRef<EditorView | null>(null)
@@ -410,16 +415,33 @@ export const MarkdownEditor: React.FC = () => {
   const lastSavedContentRef = useRef<string>('')
   const isExternalUpdateRef = useRef(false)
 
-  const { vaultPath, selectedNoteId, notes, updateNote, selectNote, fileTree } = useNotesStore()
-  const { pendingTemplateInsert, setPendingTemplateInsert, ollama } = useUIStore()
-  const selectedNote = notes.find(n => n.id === selectedNoteId)
+  const { vaultPath, selectedNoteId, secondarySelectedNoteId, notes, updateNote, selectNote, selectSecondaryNote, addNote, fileTree, setFileTree } = useNotesStore()
+  const { pendingTemplateInsert, setPendingTemplateInsert, ollama, editorHeadingFolding, editorOutlining, outlineStyle, editorShowWordCount } = useUIStore()
+
+  // Verwende die übergebene noteId oder die primary/secondary Selection
+  const effectiveNoteId = noteId ?? (isSecondary ? secondarySelectedNoteId : selectedNoteId)
+  const selectedNote = notes.find(n => n.id === effectiveNoteId)
 
   const [isSaving, setIsSaving] = useState(false)
   const [viewMode, setViewMode] = useState<ViewMode>('edit')
   const [previewContent, setPreviewContent] = useState('')
   const [formatMenu, setFormatMenu] = useState<{ x: number; y: number } | null>(null)
+  const [foldedHeadings, setFoldedHeadings] = useState<Set<string>>(new Set())
   const [aiMenu, setAiMenu] = useState<{ x: number; y: number; selectedText: string; selectionStart: number; selectionEnd: number } | null>(null)
   const [showAIImageDialog, setShowAIImageDialog] = useState(false)
+
+  // Wikilink Hover Preview State
+  const [hoverPreview, setHoverPreview] = useState<{
+    x: number
+    y: number
+    noteName: string
+    content: string
+    title: string
+    showAbove?: boolean
+  } | null>(null)
+  const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const hideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const activeWikilinkRef = useRef<HTMLElement | null>(null)
 
   // Wikilink Autocomplete State
   const [autocomplete, setAutocomplete] = useState<{
@@ -428,6 +450,7 @@ export const MarkdownEditor: React.FC = () => {
     targetNote: string | null
     triggerPos: number
     query: string
+    wikilinkStart: number  // Position von [[ - wichtig für korrektes Einfügen bei Mausklick
   } | null>(null)
 
   // Template in aktuelle Notiz einfügen (Cmd+Shift+T)
@@ -654,8 +677,60 @@ export const MarkdownEditor: React.FC = () => {
   }, [saveContent])
 
   // Wikilink Autocomplete Selection Handler
-  const handleAutocompleteSelect = useCallback(async (value: string, _mode: AutocompleteMode, blockInfo?: BlockSelectionInfo) => {
+  const handleAutocompleteSelect = useCallback(async (value: string, mode: AutocompleteMode, blockInfo?: BlockSelectionInfo) => {
     if (!viewRef.current || !autocomplete) return
+
+    // Tag-Modus: Einfach den Tag einfügen
+    if (mode === 'tag') {
+      const view = viewRef.current
+      const start = autocomplete.wikilinkStart
+      const cursor = view.state.selection.main.head
+
+      // Tag mit # einfügen (ersetze #query durch #value)
+      const insertion = `#${value}`
+      view.dispatch({
+        changes: { from: start, to: cursor, insert: insertion },
+        selection: { anchor: start + insertion.length }
+      })
+
+      setAutocomplete(null)
+      view.focus()
+      return
+    }
+
+    // Neue Notiz erstellen wenn angefordert
+    if (blockInfo?.createNewNote && blockInfo.newNoteName && vaultPath) {
+      try {
+        // Bestimme den aktuellen Ordner basierend auf der ausgewählten Notiz
+        const currentFolder = selectedNote?.path
+          ? selectedNote.path.substring(0, selectedNote.path.lastIndexOf('/'))
+          : ''
+
+        // Erstelle Dateiname und Pfad
+        const fileName = blockInfo.newNoteName.endsWith('.md')
+          ? blockInfo.newNoteName
+          : `${blockInfo.newNoteName}.md`
+        const relativePath = currentFolder ? `${currentFolder}/${fileName}` : fileName
+        const fullPath = `${vaultPath}/${relativePath}`
+
+        // Initialer Inhalt mit Titel
+        const initialContent = `# ${blockInfo.newNoteName}\n\n`
+
+        // Datei erstellen
+        await window.electronAPI.writeFile(fullPath, initialContent)
+        console.log(`Neue Notiz erstellt: ${relativePath}`)
+
+        // Notiz zum Store hinzufügen
+        const newNote = await createNoteFromFile(fullPath, relativePath, initialContent)
+        addNote(newNote)
+
+        // FileTree aktualisieren
+        const tree = await window.electronAPI.readDirectory(vaultPath)
+        setFileTree(tree)
+      } catch (error) {
+        console.error('Fehler beim Erstellen der neuen Notiz:', error)
+      }
+    }
 
     // Wenn eine neue Block-ID generiert werden muss, erst in Zieldatei einfügen
     if (blockInfo?.needsBlockId && blockInfo.targetNotePath && blockInfo.targetLine !== undefined && blockInfo.generatedId) {
@@ -683,24 +758,30 @@ export const MarkdownEditor: React.FC = () => {
     }
 
     const view = viewRef.current
-    const cursor = view.state.selection.main.head
-    const line = view.state.doc.lineAt(cursor)
-    const textBefore = line.text.slice(0, cursor - line.from)
-    const textAfter = line.text.slice(cursor - line.from)
 
-    // Finde [[ Start
-    const startMatch = textBefore.lastIndexOf('[[')
-    if (startMatch === -1) {
-      setAutocomplete(null)
-      return
-    }
-    const start = line.from + startMatch
+    // Verwende die gespeicherte Startposition statt der aktuellen Cursor-Position
+    // Dies ist wichtig, weil beim Mausklick der Cursor sich verschoben haben könnte
+    const start = autocomplete.wikilinkStart
 
-    // Prüfe ob nach dem Cursor bereits ]] steht und entferne es
-    let end = cursor
-    const closingMatch = textAfter.match(/^\]*\]\]/)
-    if (closingMatch) {
-      end = cursor + closingMatch[0].length
+    // Suche das Ende des aktuellen Wikilink-Texts (alles bis ]] oder Zeilenende)
+    const docLength = view.state.doc.length
+    let end = start
+    const content = view.state.doc.toString()
+
+    // Finde das Ende: Suche nach ]] oder nimm die Position nach dem Query
+    for (let i = start; i < docLength && i < start + 200; i++) {
+      const char = content[i]
+      // Stoppe bei Zeilenumbruch
+      if (char === '\n') {
+        end = i
+        break
+      }
+      // Prüfe auf ]]
+      if (char === ']' && content[i + 1] === ']') {
+        end = i + 2
+        break
+      }
+      end = i + 1
     }
 
     // Kompletten Wikilink einfügen
@@ -712,7 +793,7 @@ export const MarkdownEditor: React.FC = () => {
 
     setAutocomplete(null)
     view.focus()
-  }, [autocomplete, vaultPath])
+  }, [autocomplete, vaultPath, selectedNote, addNote, setFileTree])
 
   // AI Result Handler - Fügt Ergebnis mit Fußnote ein
   const handleAIResult = useCallback((result: AIResult) => {
@@ -803,7 +884,57 @@ export const MarkdownEditor: React.FC = () => {
           history(),
           markdown(),
           syntaxHighlighting(defaultHighlightStyle),
-          keymap.of([...defaultKeymap, ...historyKeymap]),
+          keymap.of([
+            // Tab/Shift+Tab for list indentation (outlining)
+            {
+              key: 'Tab',
+              run: (view) => {
+                const { state } = view
+                const line = state.doc.lineAt(state.selection.main.head)
+                const lineText = line.text
+
+                // Check if line is a list item
+                const listMatch = lineText.match(/^(\s*)([-*+]|\d+\.)\s/)
+                if (listMatch) {
+                  // Indent: add 2 spaces at the beginning
+                  view.dispatch({
+                    changes: { from: line.from, to: line.from, insert: '  ' },
+                    selection: { anchor: state.selection.main.head + 2 }
+                  })
+                  return true
+                }
+                // Default tab behavior (insert tab/spaces)
+                view.dispatch({
+                  changes: { from: state.selection.main.head, to: state.selection.main.head, insert: '  ' },
+                  selection: { anchor: state.selection.main.head + 2 }
+                })
+                return true
+              }
+            },
+            {
+              key: 'Shift-Tab',
+              run: (view) => {
+                const { state } = view
+                const line = state.doc.lineAt(state.selection.main.head)
+                const lineText = line.text
+
+                // Check if line starts with spaces (can be outdented)
+                const indentMatch = lineText.match(/^(\s{2,})/)
+                if (indentMatch) {
+                  // Outdent: remove 2 spaces from the beginning
+                  const spacesToRemove = Math.min(2, indentMatch[1].length)
+                  view.dispatch({
+                    changes: { from: line.from, to: line.from + spacesToRemove, insert: '' },
+                    selection: { anchor: Math.max(line.from, state.selection.main.head - spacesToRemove) }
+                  })
+                  return true
+                }
+                return true
+              }
+            },
+            ...defaultKeymap,
+            ...historyKeymap
+          ]),
           // Image handling for drag & drop and paste
           imageHandlingExtension({ vaultPath: vaultPath || '' }),
           // Live Preview extension compartment (starts empty, can be reconfigured)
@@ -829,7 +960,8 @@ export const MarkdownEditor: React.FC = () => {
                   mode: 'block',
                   targetNote: blockMatch[1],
                   triggerPos: cursor - blockMatch[2].length,
-                  query: blockMatch[2]
+                  query: blockMatch[2],
+                  wikilinkStart: cursor - blockMatch[0].length
                 })
                 return
               }
@@ -842,7 +974,8 @@ export const MarkdownEditor: React.FC = () => {
                   mode: 'heading',
                   targetNote: headingMatch[1],
                   triggerPos: cursor - headingMatch[2].length,
-                  query: headingMatch[2]
+                  query: headingMatch[2],
+                  wikilinkStart: cursor - headingMatch[0].length
                 })
                 return
               }
@@ -855,9 +988,31 @@ export const MarkdownEditor: React.FC = () => {
                   mode: 'note',
                   targetNote: null,
                   triggerPos: cursor - noteMatch[1].length,
-                  query: noteMatch[1]
+                  query: noteMatch[1],
+                  wikilinkStart: cursor - noteMatch[0].length
                 })
                 return
+              }
+
+              // # öffnet Tag-Autocomplete (aber nicht am Zeilenanfang = Überschrift, nicht nach [ = Wikilink-Fragment)
+              const tagMatch = textBefore.match(/(?:^|[^\[#])#([a-zA-Z0-9_\-/äöüÄÖÜß]*)$/)
+              if (tagMatch) {
+                // Prüfe ob es keine Überschrift ist (# am Zeilenanfang mit Leerzeichen danach)
+                const lineStart = textBefore.lastIndexOf('\n') + 1
+                const lineText = textBefore.substring(lineStart)
+                const isHeading = /^#{1,6}\s/.test(lineText)
+
+                if (!isHeading) {
+                  setAutocomplete({
+                    isOpen: true,
+                    mode: 'tag',
+                    targetNote: null,
+                    triggerPos: cursor - tagMatch[1].length,
+                    query: tagMatch[1],
+                    wikilinkStart: cursor - tagMatch[1].length - 1 // -1 für das #
+                  })
+                  return
+                }
               }
 
               // Schließen wenn kein Match
@@ -1039,7 +1194,12 @@ export const MarkdownEditor: React.FC = () => {
         })
 
         if (linkedNote) {
-          selectNote(linkedNote.id)
+          // In sekundärem Panel: Note dort öffnen, sonst im primären
+          if (isSecondary) {
+            selectSecondaryNote(linkedNote.id)
+          } else {
+            selectNote(linkedNote.id)
+          }
 
           // Wenn Fragment vorhanden, nach kurzer Verzögerung zur Position scrollen
           if (fragment) {
@@ -1129,7 +1289,62 @@ export const MarkdownEditor: React.FC = () => {
         saveContent(newContent)
       }
     }
-  }, [notes, selectNote, previewContent, saveContent])
+  }, [notes, selectNote, selectSecondaryNote, isSecondary, vaultPath, previewContent, saveContent])
+
+  // Process headings to add fold toggles
+  const processHeadingFolds = useCallback((html: string): string => {
+    if (!editorHeadingFolding) return html
+
+    // Wrap content in a container for easier manipulation
+    const parser = new DOMParser()
+    const doc = parser.parseFromString(`<div>${html}</div>`, 'text/html')
+    const container = doc.body.firstChild as HTMLElement
+
+    if (!container) return html
+
+    const headings = container.querySelectorAll('h1, h2, h3, h4, h5, h6')
+    let headingIndex = 0
+
+    headings.forEach((heading) => {
+      const level = parseInt(heading.tagName[1])
+      const headingId = `fold-heading-${headingIndex++}`
+      heading.setAttribute('data-fold-id', headingId)
+
+      // Add fold toggle button
+      const toggle = doc.createElement('span')
+      toggle.className = 'fold-toggle'
+      toggle.setAttribute('data-fold-target', headingId)
+      toggle.setAttribute('data-fold-level', level.toString())
+      toggle.textContent = '▼'
+      toggle.title = 'Abschnitt zuklappen'
+      heading.insertBefore(toggle, heading.firstChild)
+
+      // Wrap following content until next heading of same or higher level
+      const wrapper = doc.createElement('div')
+      wrapper.className = 'fold-content'
+      wrapper.setAttribute('data-fold-parent', headingId)
+
+      let sibling = heading.nextElementSibling
+      const siblings: Element[] = []
+
+      while (sibling) {
+        const siblingTagName = sibling.tagName.toLowerCase()
+        if (/^h[1-6]$/.test(siblingTagName)) {
+          const siblingLevel = parseInt(siblingTagName[1])
+          if (siblingLevel <= level) break
+        }
+        siblings.push(sibling)
+        sibling = sibling.nextElementSibling
+      }
+
+      if (siblings.length > 0) {
+        heading.after(wrapper)
+        siblings.forEach(s => wrapper.appendChild(s))
+      }
+    })
+
+    return container.innerHTML
+  }, [editorHeadingFolding])
 
   // Rendered markdown (mit Frontmatter-Titel, Callouts, Figures und interaktiven Checkboxen)
   const { frontmatterTitle, renderedMarkdown } = useMemo(() => {
@@ -1138,11 +1353,95 @@ export const MarkdownEditor: React.FC = () => {
     const htmlContent = md.render(withCallouts)
     const withFigures = processFigures(htmlContent)
     const withInteractiveCheckboxes = processTaskCheckboxes(withFigures, previewContent)
+    const withFoldableHeadings = processHeadingFolds(withInteractiveCheckboxes)
     return {
       frontmatterTitle: title,
-      renderedMarkdown: withInteractiveCheckboxes
+      renderedMarkdown: withFoldableHeadings
     }
+  }, [previewContent, processHeadingFolds])
+
+  // Wort- und Zeichenzähler
+  const documentStats = useMemo(() => {
+    const text = previewContent || ''
+
+    // Entferne Frontmatter für Statistik
+    let cleanText = text
+    if (cleanText.startsWith('---')) {
+      const endOfFrontmatter = cleanText.indexOf('---', 3)
+      if (endOfFrontmatter !== -1) {
+        cleanText = cleanText.substring(endOfFrontmatter + 3)
+      }
+    }
+
+    // Zeichen (ohne Leerzeichen und Zeilenumbrüche für "echte" Zeichen)
+    const characters = cleanText.length
+    const charactersNoSpaces = cleanText.replace(/\s/g, '').length
+
+    // Wörter (einfache Methode: Split auf Whitespace, filter leere)
+    const words = cleanText.trim().split(/\s+/).filter(w => w.length > 0).length
+
+    // Lesezeit (durchschnittlich 250 Wörter pro Minute)
+    const readingTimeMinutes = Math.ceil(words / 250)
+
+    return { words, characters, charactersNoSpaces, readingTimeMinutes }
   }, [previewContent])
+
+  // Handle fold toggles in preview
+  useEffect(() => {
+    if (viewMode !== 'preview' || !previewRef.current || !editorHeadingFolding) return
+
+    const handleFoldToggle = (e: Event) => {
+      const toggle = e.target as HTMLElement
+      if (!toggle.classList.contains('fold-toggle')) return
+
+      const foldId = toggle.getAttribute('data-fold-target')
+      if (!foldId) return
+
+      const content = previewRef.current?.querySelector(`[data-fold-parent="${foldId}"]`)
+      if (!content) return
+
+      const isFolded = content.classList.contains('folded')
+
+      if (isFolded) {
+        content.classList.remove('folded')
+        toggle.textContent = '▼'
+        toggle.title = 'Abschnitt zuklappen'
+        toggle.classList.remove('folded')
+        setFoldedHeadings(prev => {
+          const newSet = new Set(prev)
+          newSet.delete(foldId)
+          return newSet
+        })
+      } else {
+        content.classList.add('folded')
+        toggle.textContent = '▶'
+        toggle.title = 'Abschnitt aufklappen'
+        toggle.classList.add('folded')
+        setFoldedHeadings(prev => {
+          const newSet = new Set(prev)
+          newSet.add(foldId)
+          return newSet
+        })
+      }
+    }
+
+    previewRef.current.addEventListener('click', handleFoldToggle)
+
+    // Restore fold states
+    foldedHeadings.forEach(foldId => {
+      const toggle = previewRef.current?.querySelector(`[data-fold-target="${foldId}"]`)
+      const content = previewRef.current?.querySelector(`[data-fold-parent="${foldId}"]`)
+      if (toggle && content) {
+        content.classList.add('folded')
+        toggle.textContent = '▶'
+        toggle.classList.add('folded')
+      }
+    })
+
+    return () => {
+      previewRef.current?.removeEventListener('click', handleFoldToggle)
+    }
+  }, [viewMode, renderedMarkdown, editorHeadingFolding, foldedHeadings])
 
   // Mermaid-Diagramme rendern nach Content-Update
   useEffect(() => {
@@ -1436,6 +1735,159 @@ export const MarkdownEditor: React.FC = () => {
     return () => clearTimeout(timer)
   }, [renderedMarkdown, viewMode, vaultPath, selectedNote?.path])
 
+  // Wikilink Hover Preview
+  useEffect(() => {
+    if (viewMode !== 'preview' || !previewRef.current) return
+
+    const clearAllTimeouts = () => {
+      if (hoverTimeoutRef.current) {
+        clearTimeout(hoverTimeoutRef.current)
+        hoverTimeoutRef.current = null
+      }
+      if (hideTimeoutRef.current) {
+        clearTimeout(hideTimeoutRef.current)
+        hideTimeoutRef.current = null
+      }
+    }
+
+    const showPreview = async (target: HTMLElement, noteName: string) => {
+      // Find the linked note
+      const linkedNote = notes.find(n => {
+        const titleLower = n.title.toLowerCase()
+        const linkLower = noteName.toLowerCase()
+        const fileNameWithoutExt = n.path.split('/').pop()?.replace('.md', '').toLowerCase() || ''
+        return titleLower === linkLower || fileNameWithoutExt === linkLower
+      })
+
+      if (!linkedNote || !vaultPath) {
+        return
+      }
+
+      try {
+        const fullPath = `${vaultPath}/${linkedNote.path}`
+        const content = await window.electronAPI.readFile(fullPath)
+
+        // Extract first meaningful content (skip frontmatter and get first ~500 chars)
+        let previewText = content
+        // Remove frontmatter
+        if (previewText.startsWith('---')) {
+          const endOfFrontmatter = previewText.indexOf('---', 3)
+          if (endOfFrontmatter !== -1) {
+            previewText = previewText.substring(endOfFrontmatter + 3).trim()
+          }
+        }
+        // Limit to first ~500 characters
+        if (previewText.length > 500) {
+          previewText = previewText.substring(0, 500) + '...'
+        }
+
+        // Position the preview near the link
+        const rect = target.getBoundingClientRect()
+        const previewHeight = 300 // approximate max height
+        const previewWidth = 400
+        const gap = 8
+
+        // Calculate x position (don't go off right edge)
+        let x = rect.left
+        if (x + previewWidth > window.innerWidth - 20) {
+          x = window.innerWidth - previewWidth - 20
+        }
+        if (x < 20) x = 20
+
+        // Calculate y position - prefer below, but show above if not enough space
+        let y: number
+        let showAbove = false
+
+        if (rect.bottom + gap + previewHeight > window.innerHeight - 20) {
+          // Not enough space below, show above
+          y = rect.top - gap
+          showAbove = true
+        } else {
+          // Show below
+          y = rect.bottom + gap
+        }
+
+        setHoverPreview({
+          x,
+          y,
+          noteName,
+          content: previewText,
+          title: linkedNote.title,
+          showAbove
+        })
+      } catch (error) {
+        console.error('Fehler beim Laden der Hover-Preview:', error)
+      }
+    }
+
+    const scheduleHide = () => {
+      clearAllTimeouts()
+      hideTimeoutRef.current = setTimeout(() => {
+        // Check if mouse is over wikilink or preview
+        const hoverPreviewEl = document.querySelector('.wikilink-hover-preview')
+        const isOverPreview = hoverPreviewEl && hoverPreviewEl.matches(':hover')
+        const isOverWikilink = activeWikilinkRef.current && activeWikilinkRef.current.matches(':hover')
+
+        if (!isOverPreview && !isOverWikilink) {
+          setHoverPreview(null)
+          activeWikilinkRef.current = null
+        }
+      }, 150)
+    }
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const target = e.target as HTMLElement
+
+      // Check if we're over a wikilink
+      if (target.classList.contains('wikilink')) {
+        const noteName = target.getAttribute('data-link')
+        if (!noteName) return
+
+        // Cancel any pending hide
+        if (hideTimeoutRef.current) {
+          clearTimeout(hideTimeoutRef.current)
+          hideTimeoutRef.current = null
+        }
+
+        // If this is a new wikilink, show preview after delay
+        if (activeWikilinkRef.current !== target) {
+          activeWikilinkRef.current = target
+          clearAllTimeouts()
+
+          hoverTimeoutRef.current = setTimeout(() => {
+            showPreview(target, noteName)
+          }, 400)
+        }
+      }
+    }
+
+    const handleMouseLeave = (e: MouseEvent) => {
+      const target = e.target as HTMLElement
+      const relatedTarget = e.relatedTarget as HTMLElement | null
+
+      // Check if leaving a wikilink
+      if (target.classList.contains('wikilink')) {
+        // Check if moving to the preview popup
+        const hoverPreviewEl = document.querySelector('.wikilink-hover-preview')
+        if (relatedTarget && hoverPreviewEl && hoverPreviewEl.contains(relatedTarget)) {
+          // Moving to preview, don't hide
+          return
+        }
+        scheduleHide()
+      }
+    }
+
+    const previewEl = previewRef.current
+    previewEl.addEventListener('mousemove', handleMouseMove)
+    previewEl.addEventListener('mouseout', handleMouseLeave)
+
+    return () => {
+      previewEl.removeEventListener('mousemove', handleMouseMove)
+      previewEl.removeEventListener('mouseout', handleMouseLeave)
+      clearAllTimeouts()
+    }
+  }, [viewMode, notes, vaultPath])
+
   // Toggle view mode (cycles: edit -> live-preview -> preview -> edit)
   const toggleViewMode = () => {
     setViewMode(prev => {
@@ -1616,6 +2068,18 @@ export const MarkdownEditor: React.FC = () => {
         <h3>{selectedNote.title}</h3>
         <div className="editor-header-right">
           {isSaving && <span className="saving-indicator">Speichern...</span>}
+          {isSecondary && (
+            <button
+              className="close-secondary-btn"
+              onClick={() => selectSecondaryNote(null)}
+              title="Sekundäres Panel schließen"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18"/>
+                <line x1="6" y1="6" x2="18" y2="18"/>
+              </svg>
+            </button>
+          )}
           <button
             className="export-btn"
             onClick={handleExportPDF}
@@ -1658,7 +2122,6 @@ export const MarkdownEditor: React.FC = () => {
               </svg>
             </button>
           </div>
-          <span className="editor-path">{selectedNote.path}</span>
         </div>
       </div>
 
@@ -1668,7 +2131,7 @@ export const MarkdownEditor: React.FC = () => {
         onContextMenu={handleEditorContextMenu}
       />
       <div
-        className={`editor-preview ${viewMode === 'preview' ? 'visible' : 'hidden'}`}
+        className={`editor-preview ${viewMode === 'preview' ? 'visible' : 'hidden'}${outlineStyle !== 'default' ? ` outline-${outlineStyle}` : ''}`}
         onClick={handlePreviewClick}
         ref={previewRef}
       >
@@ -1677,6 +2140,21 @@ export const MarkdownEditor: React.FC = () => {
         )}
         <div dangerouslySetInnerHTML={{ __html: renderedMarkdown }} />
       </div>
+
+      {/* Editor Footer mit Statistiken */}
+      {editorShowWordCount && (
+        <div className="editor-footer">
+          <span className="editor-stat" title="Wörter">
+            {documentStats.words} Wörter
+          </span>
+          <span className="editor-stat" title="Zeichen (mit/ohne Leerzeichen)">
+            {documentStats.characters} Zeichen
+          </span>
+          <span className="editor-stat" title="Geschätzte Lesezeit">
+            ~{documentStats.readingTimeMinutes} min Lesezeit
+          </span>
+        </div>
+      )}
 
       {/* Formatierungs-Kontextmenü */}
       {formatMenu && (
@@ -1719,6 +2197,39 @@ export const MarkdownEditor: React.FC = () => {
           onClose={() => setAutocomplete(null)}
           onSelect={handleAutocompleteSelect}
         />
+      )}
+
+      {/* Wikilink Hover Preview */}
+      {hoverPreview && (
+        <div
+          className={`wikilink-hover-preview ${hoverPreview.showAbove ? 'show-above' : ''}`}
+          style={{
+            position: 'fixed',
+            left: hoverPreview.x,
+            ...(hoverPreview.showAbove
+              ? { bottom: window.innerHeight - hoverPreview.y }
+              : { top: hoverPreview.y }),
+            zIndex: 1000
+          }}
+          onMouseLeave={(e) => {
+            // Check if moving back to a wikilink
+            const relatedTarget = e.relatedTarget as HTMLElement | null
+            if (relatedTarget && relatedTarget.classList.contains('wikilink')) {
+              return // Don't hide, let the wikilink handler manage it
+            }
+            setHoverPreview(null)
+            activeWikilinkRef.current = null
+          }}
+        >
+          <div className="wikilink-hover-preview-header">
+            <span className="wikilink-hover-preview-icon">📄</span>
+            <span className="wikilink-hover-preview-title">{hoverPreview.title}</span>
+          </div>
+          <div
+            className="wikilink-hover-preview-content"
+            dangerouslySetInnerHTML={{ __html: md.render(hoverPreview.content) }}
+          />
+        </div>
       )}
     </div>
   )

@@ -10,6 +10,7 @@ type AccentColor = 'blue' | 'orange' | 'green' | 'purple' | 'pink' | 'teal'
 type AIAction = 'translate' | 'summarize' | 'continue' | 'improve'
 export type Language = 'de' | 'en'
 export type IconSet = 'default' | 'minimal' | 'colorful' | 'emoji'
+export type OutlineStyle = 'default' | 'lines' | 'minimal' | 'bullets' | 'dashes'
 export type FontFamily = 'system' | 'inter' | 'source-sans' | 'roboto' | 'open-sans' | 'lato' |
   'jetbrains-mono-nerd' | 'fira-code-nerd' | 'hack-nerd' | 'meslo-nerd' | 'cascadia-code-nerd' | 'iosevka-nerd' | 'victor-mono-nerd' | 'agave-nerd'
 
@@ -81,6 +82,15 @@ export const ICON_SETS: Record<IconSet, { name: string; description: string }> =
   minimal: { name: 'Minimal', description: 'Umriss-Icons' },
   colorful: { name: 'Bunt', description: 'Gradient-Icons' },
   emoji: { name: 'Emoji', description: '📁 📄 📕' }
+}
+
+// Outline-Styles für Listen
+export const OUTLINE_STYLES: Record<OutlineStyle, { name: string; description: string }> = {
+  default: { name: 'Standard', description: 'Normale Listen ohne Linien' },
+  lines: { name: 'Vertikale Linien', description: 'Mit durchgehenden Linien' },
+  minimal: { name: 'Minimal', description: 'Dezente Einrückung' },
+  bullets: { name: 'Punkte', description: 'Gefüllte Aufzählungspunkte' },
+  dashes: { name: 'Striche', description: 'Gedankenstriche als Marker' }
 }
 
 // Folder Color Palette (für Rechtsklick-Menü) - Pastellfarben
@@ -211,11 +221,17 @@ interface UIState {
   editorLineNumbers: boolean
   editorDefaultView: EditorViewMode
   autoSaveInterval: number // in Millisekunden, 0 = deaktiviert
+  editorHeadingFolding: boolean // Überschriften auf-/zuklappen
+  editorOutlining: boolean // Einrückungsbasiertes Outlining (Listen etc.)
+  outlineStyle: OutlineStyle // Outlining-Design: 'default', 'lines', 'minimal', 'bullets', 'dashes'
+  editorShowWordCount: boolean // Wort-/Zeichenzähler anzeigen
 
   // UI State
   sidebarWidth: number
   sidebarVisible: boolean
   editorPreviewSplit: boolean
+  textSplitEnabled: boolean  // Text-Split: zwei Notizen nebeneinander
+  textSplitPosition: number  // Position des Text-Split Dividers (0-100)
   canvasFilterPath: string | null // null = alle anzeigen, sonst Ordnerpfad
   canvasViewMode: CanvasViewMode // 'cards' = Karten mit Titel, 'dots' = Punkte
   canvasShowTags: boolean // Tags in Karten anzeigen
@@ -249,9 +265,15 @@ interface UIState {
   setEditorLineNumbers: (show: boolean) => void
   setEditorDefaultView: (mode: EditorViewMode) => void
   setAutoSaveInterval: (interval: number) => void
+  setEditorHeadingFolding: (enabled: boolean) => void
+  setEditorOutlining: (enabled: boolean) => void
+  setOutlineStyle: (style: OutlineStyle) => void
+  setEditorShowWordCount: (show: boolean) => void
   setSidebarWidth: (width: number) => void
   toggleSidebar: () => void
   toggleEditorPreview: () => void
+  setTextSplitEnabled: (enabled: boolean) => void
+  setTextSplitPosition: (position: number) => void
   setCanvasFilterPath: (path: string | null) => void
   setCanvasViewMode: (mode: CanvasViewMode) => void
   setCanvasShowTags: (show: boolean) => void
@@ -284,11 +306,17 @@ const defaultState = {
   editorLineNumbers: true,
   editorDefaultView: 'edit' as EditorViewMode,
   autoSaveInterval: 500,
+  editorHeadingFolding: false,
+  editorOutlining: false,
+  outlineStyle: 'default' as OutlineStyle,
+  editorShowWordCount: true,
 
   // UI State
   sidebarWidth: 250,
   sidebarVisible: true,
   editorPreviewSplit: true,
+  textSplitEnabled: false,
+  textSplitPosition: 50,
   canvasFilterPath: null as string | null,
   canvasViewMode: 'cards' as CanvasViewMode,
   canvasShowTags: false,
@@ -319,7 +347,8 @@ const defaultState = {
 const persistedKeys = [
   'viewMode', 'theme', 'accentColor', 'backgroundColor', 'loadLastVaultOnStart',
   'language', 'fontFamily', 'editorFontSize', 'editorLineNumbers', 'editorDefaultView',
-  'autoSaveInterval', 'sidebarWidth', 'sidebarVisible', 'editorPreviewSplit',
+  'autoSaveInterval', 'editorHeadingFolding', 'editorOutlining', 'outlineStyle', 'editorShowWordCount',
+  'sidebarWidth', 'sidebarVisible', 'editorPreviewSplit', 'textSplitEnabled', 'textSplitPosition',
   'canvasFilterPath', 'canvasViewMode', 'canvasShowTags', 'canvasShowLinks', 'canvasShowImages',
   'canvasCompactMode', 'canvasDefaultCardWidth', 'splitPosition', 'fileTreeDisplayMode', 'ollama',
   'pdfCompanionEnabled', 'pdfDisplayMode', 'iconSet'
@@ -340,9 +369,15 @@ export const useUIStore = create<UIState>()((set, get) => ({
   setEditorLineNumbers: (show) => set({ editorLineNumbers: show }),
   setEditorDefaultView: (mode) => set({ editorDefaultView: mode }),
   setAutoSaveInterval: (interval) => set({ autoSaveInterval: interval }),
+  setEditorHeadingFolding: (enabled) => set({ editorHeadingFolding: enabled }),
+  setEditorOutlining: (enabled) => set({ editorOutlining: enabled }),
+  setOutlineStyle: (style) => set({ outlineStyle: style }),
+  setEditorShowWordCount: (show) => set({ editorShowWordCount: show }),
   setSidebarWidth: (width) => set({ sidebarWidth: width }),
   toggleSidebar: () => set((state) => ({ sidebarVisible: !state.sidebarVisible })),
   toggleEditorPreview: () => set((state) => ({ editorPreviewSplit: !state.editorPreviewSplit })),
+  setTextSplitEnabled: (enabled) => set({ textSplitEnabled: enabled }),
+  setTextSplitPosition: (position) => set({ textSplitPosition: Math.max(20, Math.min(80, position)) }),
   setCanvasFilterPath: (path) => set({ canvasFilterPath: path }),
   setCanvasViewMode: (mode) => set({ canvasViewMode: mode }),
   setCanvasShowTags: (show) => set({ canvasShowTags: show }),

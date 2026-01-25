@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { useUIStore, ACCENT_COLORS, AI_LANGUAGES, FONT_FAMILIES, UI_LANGUAGES, BACKGROUND_COLORS, ICON_SETS, type Language, type FontFamily, type BackgroundColor, type IconSet } from '../../stores/uiStore'
+import { useUIStore, ACCENT_COLORS, AI_LANGUAGES, FONT_FAMILIES, UI_LANGUAGES, BACKGROUND_COLORS, ICON_SETS, OUTLINE_STYLES, type Language, type FontFamily, type BackgroundColor, type IconSet, type OutlineStyle } from '../../stores/uiStore'
 import { useNotesStore } from '../../stores/notesStore'
 import { useTranslation } from '../../utils/translations'
 import {
@@ -59,6 +59,14 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
     setEditorFontSize,
     editorLineNumbers,
     setEditorLineNumbers,
+    editorHeadingFolding,
+    setEditorHeadingFolding,
+    editorOutlining,
+    setEditorOutlining,
+    outlineStyle,
+    setOutlineStyle,
+    editorShowWordCount,
+    setEditorShowWordCount,
     editorDefaultView,
     setEditorDefaultView,
     autoSaveInterval,
@@ -435,6 +443,44 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
                     type="checkbox"
                     checked={editorLineNumbers}
                     onChange={e => setEditorLineNumbers(e.target.checked)}
+                  />
+                </div>
+                <div className="settings-row">
+                  <label>Überschriften falten</label>
+                  <input
+                    type="checkbox"
+                    checked={editorHeadingFolding}
+                    onChange={e => setEditorHeadingFolding(e.target.checked)}
+                  />
+                </div>
+                <div className="settings-row">
+                  <label>Outlining (Listen falten)</label>
+                  <input
+                    type="checkbox"
+                    checked={editorOutlining}
+                    onChange={e => setEditorOutlining(e.target.checked)}
+                  />
+                </div>
+                <div className="settings-row">
+                  <label>Outline-Stil</label>
+                  <select
+                    value={outlineStyle}
+                    onChange={e => setOutlineStyle(e.target.value as OutlineStyle)}
+                    disabled={!editorOutlining}
+                  >
+                    {(Object.keys(OUTLINE_STYLES) as OutlineStyle[]).map(key => (
+                      <option key={key} value={key}>
+                        {OUTLINE_STYLES[key].name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="settings-row">
+                  <label>Wörter-/Zeichenzähler</label>
+                  <input
+                    type="checkbox"
+                    checked={editorShowWordCount}
+                    onChange={e => setEditorShowWordCount(e.target.checked)}
                   />
                 </div>
 

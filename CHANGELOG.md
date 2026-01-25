@@ -2,6 +2,26 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.9.7] - 2025-01-25
+
+### Features
+- **Text-Split View**: Zwei Notizen nebeneinander vergleichen (Cmd/Ctrl+Click im FileTree)
+- **Draggable Divider**: Anpassbare Trennlinie zwischen Split-Panels
+- **App-Logo als Theme Toggle**: MindGraph-Logo im Header zum Wechseln zwischen Dark/Light Mode
+- **Markdown Folding**: Code-Blöcke, Callouts und Frontmatter einklappbar
+
+### UI Verbesserungen
+- **Gerundete Ecken**: Moderneres Design mit abgerundeten Header-Bereichen
+- **Backlinks Panel Redesign**: Kompaktere Darstellung mit Akzentfarben
+- **Wikilink Hover Preview**: Vorschau beim Hovern über Wikilinks
+- **Outline Style Variants**: Verschiedene Styles für die Gliederungsansicht
+- **Word Count**: Wortzähler im Editor-Footer
+- **Tag Autocomplete**: Automatische Vervollständigung für Tags
+
+### Fixes
+- Dark Mode Konsistenz verbessert
+- Logo verwendet Akzentfarbe für bessere Theme-Integration
+
 ## [0.9.6] - 2025-01-25
 
 ### Performance Optimizations

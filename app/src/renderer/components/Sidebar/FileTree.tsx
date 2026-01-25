@@ -175,8 +175,8 @@ const FileItem: React.FC<FileItemProps> = ({ entry, level, onDrop, displayMode }
   const inputRef = useRef<HTMLInputElement>(null)
   const rowRef = useRef<HTMLDivElement>(null)
 
-  const { selectedNoteId, selectedPdfPath, selectedImagePath, selectNote, selectPdf, selectImage, removeNote, setFileTree, vaultPath, notes, updateNotePath } = useNotesStore()
-  const { iconSet } = useUIStore()
+  const { selectedNoteId, secondarySelectedNoteId, selectedPdfPath, selectedImagePath, selectNote, selectSecondaryNote, selectPdf, selectImage, removeNote, setFileTree, vaultPath, notes, updateNotePath } = useNotesStore()
+  const { iconSet, textSplitEnabled } = useUIStore()
   const { fileCustomizations, setFileCustomization, removeFileCustomization } = useGraphStore()
 
   const isPdf = entry.fileType === 'pdf'
@@ -187,6 +187,7 @@ const FileItem: React.FC<FileItemProps> = ({ entry, level, onDrop, displayMode }
     : isImage
       ? selectedImagePath === entry.path
       : selectedNoteId === noteId
+  const isSecondarySelected = !entry.isDirectory && !isPdf && !isImage && secondarySelectedNoteId === noteId
 
   // Finde die Notiz um Link-Count zu zeigen
   const note = notes.find(n => n.id === noteId)
@@ -231,7 +232,7 @@ const FileItem: React.FC<FileItemProps> = ({ entry, level, onDrop, displayMode }
     }
   }, [isEditing, entry.name, entry.isDirectory])
 
-  const handleClick = () => {
+  const handleClick = (e: React.MouseEvent) => {
     if (isEditing) return
     if (entry.isDirectory) {
       setIsOpen(!isOpen)
@@ -241,7 +242,12 @@ const FileItem: React.FC<FileItemProps> = ({ entry, level, onDrop, displayMode }
     } else if (isImage) {
       selectImage(entry.path)
     } else {
-      selectNote(noteId)
+      // Cmd/Ctrl+Click: In sekundäres Panel öffnen (wenn Text-Split aktiv)
+      if (textSplitEnabled && (e.metaKey || e.ctrlKey)) {
+        selectSecondaryNote(noteId)
+      } else {
+        selectNote(noteId)
+      }
     }
   }
 
@@ -605,7 +611,7 @@ const FileItem: React.FC<FileItemProps> = ({ entry, level, onDrop, displayMode }
     <div className="file-item">
       <div
         ref={rowRef}
-        className={`file-item-row ${isSelected ? 'selected' : ''} ${isDragOver ? 'drag-over' : ''}`}
+        className={`file-item-row ${isSelected ? 'selected' : ''} ${isSecondarySelected ? 'secondary-selected' : ''} ${isDragOver ? 'drag-over' : ''}`}
         style={{ paddingLeft }}
         onClick={handleClick}
         onContextMenu={handleContextMenu}
