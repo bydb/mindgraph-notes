@@ -303,6 +303,33 @@ ipcMain.handle('read-file', async (_event, filePath: string) => {
   }
 })
 
+// Mehrere Dateien auf einmal lesen (für Performance)
+ipcMain.handle('read-files-batch', async (_event, basePath: string, relativePaths: string[]) => {
+  const results: Record<string, string | null> = {}
+
+  // Parallel lesen mit Limit
+  const CONCURRENCY = 100
+  for (let i = 0; i < relativePaths.length; i += CONCURRENCY) {
+    const batch = relativePaths.slice(i, i + CONCURRENCY)
+    const batchResults = await Promise.all(
+      batch.map(async (relPath) => {
+        try {
+          const fullPath = path.join(basePath, relPath)
+          const content = await fs.readFile(fullPath, 'utf-8')
+          return { path: relPath, content }
+        } catch {
+          return { path: relPath, content: null }
+        }
+      })
+    )
+    for (const { path: p, content } of batchResults) {
+      results[p] = content
+    }
+  }
+
+  return results
+})
+
 // Binäre Datei lesen als Base64 (für PDFs etc.)
 ipcMain.handle('read-file-binary', async (_event, filePath: string) => {
   try {
@@ -1428,6 +1455,78 @@ ipcMain.handle('load-graph-data', async (_event, vaultPath: string) => {
     // Datei existiert nicht oder ist ungültig - leere Daten zurückgeben
     return null
   }
+})
+
+// ============ NOTES CACHE ============
+
+// Notes-Cache speichern
+ipcMain.handle('save-notes-cache', async (_event, vaultPath: string, cache: object) => {
+  try {
+    const mindgraphDir = path.join(vaultPath, '.mindgraph')
+    const cacheFile = path.join(mindgraphDir, 'notes-cache.json')
+
+    await fs.mkdir(mindgraphDir, { recursive: true })
+    await fs.writeFile(cacheFile, JSON.stringify(cache), 'utf-8')
+    console.log('[Cache] Notes-Cache gespeichert:', Object.keys((cache as any).notes || {}).length, 'Notizen')
+    return true
+  } catch (error) {
+    console.error('Fehler beim Speichern des Notes-Cache:', error)
+    return false
+  }
+})
+
+// Notes-Cache laden
+ipcMain.handle('load-notes-cache', async (_event, vaultPath: string) => {
+  try {
+    const cacheFile = path.join(vaultPath, '.mindgraph', 'notes-cache.json')
+    const content = await fs.readFile(cacheFile, 'utf-8')
+    const cache = JSON.parse(content)
+    console.log('[Cache] Notes-Cache geladen:', Object.keys(cache.notes || {}).length, 'Notizen')
+    return cache
+  } catch (error) {
+    console.log('[Cache] Kein Notes-Cache vorhanden, wird neu erstellt')
+    return null
+  }
+})
+
+// Alle Markdown-Dateien mit mtime abrufen (für Cache-Vergleich)
+ipcMain.handle('get-files-with-mtime', async (_event, vaultPath: string) => {
+  const files: Array<{ path: string; mtime: number }> = []
+
+  async function scanDirectory(dirPath: string, basePath: string) {
+    try {
+      const entries = await fs.readdir(dirPath, { withFileTypes: true })
+
+      for (const entry of entries) {
+        const fullPath = path.join(dirPath, entry.name)
+        const relativePath = path.relative(basePath, fullPath)
+
+        // Versteckte Dateien/Ordner überspringen
+        if (entry.name.startsWith('.')) continue
+
+        if (entry.isDirectory()) {
+          await scanDirectory(fullPath, basePath)
+        } else if (entry.name.endsWith('.md')) {
+          try {
+            const stats = await fs.stat(fullPath)
+            files.push({
+              path: relativePath,
+              mtime: stats.mtimeMs
+            })
+          } catch {
+            // Datei möglicherweise gelöscht während Scan
+          }
+        }
+      }
+    } catch (error) {
+      console.error(`Fehler beim Scannen von ${dirPath}:`, error)
+    }
+  }
+
+  const startTime = Date.now()
+  await scanDirectory(vaultPath, vaultPath)
+  console.log(`[Cache] ${files.length} Markdown-Dateien in ${Date.now() - startTime}ms gescannt`)
+  return files
 })
 
 // PDF Export - mit verstecktem Fenster für vollständigen Export

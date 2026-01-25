@@ -1,7 +1,9 @@
 import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react'
+import { createPortal } from 'react-dom'
 import type { FileEntry } from '../../../shared/types'
 import { useNotesStore } from '../../stores/notesStore'
-import { useUIStore } from '../../stores/uiStore'
+import { useUIStore, FOLDER_COLORS, FOLDER_ICONS, type IconSet } from '../../stores/uiStore'
+import { useGraphStore } from '../../stores/graphStore'
 import { generateNoteId } from '../../utils/linkExtractor'
 
 type DisplayMode = 'name' | 'path'
@@ -48,25 +50,80 @@ const ChevronIcon: React.FC<{ open: boolean }> = ({ open }) => (
   </svg>
 )
 
-const FolderIcon: React.FC<{ open: boolean }> = ({ open }) => (
-  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-    {open ? (
+// Hilfsfunktion um Farbe dunkler zu machen (für Stroke)
+const darkenColor = (color: string): string => {
+  // Wenn es ein Hex-Code ist, verdunkeln
+  if (color.startsWith('#')) {
+    const hex = color.slice(1)
+    const r = Math.max(0, parseInt(hex.slice(0, 2), 16) - 30)
+    const g = Math.max(0, parseInt(hex.slice(2, 4), 16) - 30)
+    const b = Math.max(0, parseInt(hex.slice(4, 6), 16) - 30)
+    return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`
+  }
+  return color
+}
+
+interface FolderIconProps {
+  open: boolean
+  color?: string
+  iconSet?: IconSet
+}
+
+const FolderIcon: React.FC<FolderIconProps> = ({ open, color = '#F5A623', iconSet = 'default' }) => {
+  const strokeColor = darkenColor(color)
+
+  // Emoji Icon Set
+  if (iconSet === 'emoji') {
+    return <span style={{ fontSize: '14px', lineHeight: 1 }}>{open ? '📂' : '📁'}</span>
+  }
+
+  // Minimal Icon Set (Umriss)
+  if (iconSet === 'minimal') {
+    return (
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+        <path
+          d="M2 4.5C2 3.67 2.67 3 3.5 3H6.17C6.7 3 7.2 3.21 7.59 3.59L8.41 4.41C8.8 4.79 9.3 5 9.83 5H12.5C13.33 5 14 5.67 14 6.5V11.5C14 12.33 13.33 13 12.5 13H3.5C2.67 13 2 12.33 2 11.5V4.5Z"
+          fill="none"
+          stroke={color}
+          strokeWidth="1.5"
+        />
+      </svg>
+    )
+  }
+
+  // Colorful Icon Set (Gradient)
+  if (iconSet === 'colorful') {
+    const gradientId = `folder-gradient-${color.replace('#', '')}`
+    return (
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+        <defs>
+          <linearGradient id={gradientId} x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor={color} />
+            <stop offset="100%" stopColor={strokeColor} />
+          </linearGradient>
+        </defs>
+        <path
+          d="M2 4.5C2 3.67 2.67 3 3.5 3H6.17C6.7 3 7.2 3.21 7.59 3.59L8.41 4.41C8.8 4.79 9.3 5 9.83 5H12.5C13.33 5 14 5.67 14 6.5V11.5C14 12.33 13.33 13 12.5 13H3.5C2.67 13 2 12.33 2 11.5V4.5Z"
+          fill={`url(#${gradientId})`}
+          stroke={strokeColor}
+          strokeWidth="0.5"
+        />
+      </svg>
+    )
+  }
+
+  // Default Icon Set
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
       <path
         d="M2 4.5C2 3.67 2.67 3 3.5 3H6.17C6.7 3 7.2 3.21 7.59 3.59L8.41 4.41C8.8 4.79 9.3 5 9.83 5H12.5C13.33 5 14 5.67 14 6.5V11.5C14 12.33 13.33 13 12.5 13H3.5C2.67 13 2 12.33 2 11.5V4.5Z"
-        fill="#F5A623"
-        stroke="#E09612"
+        fill={color}
+        stroke={strokeColor}
         strokeWidth="0.5"
       />
-    ) : (
-      <path
-        d="M2 4.5C2 3.67 2.67 3 3.5 3H6.17C6.7 3 7.2 3.21 7.59 3.59L8.41 4.41C8.8 4.79 9.3 5 9.83 5H12.5C13.33 5 14 5.67 14 6.5V11.5C14 12.33 13.33 13 12.5 13H3.5C2.67 13 2 12.33 2 11.5V4.5Z"
-        fill="#F5A623"
-        stroke="#E09612"
-        strokeWidth="0.5"
-      />
-    )}
-  </svg>
-)
+    </svg>
+  )
+}
 
 const FileIcon: React.FC = () => (
   <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
@@ -106,17 +163,21 @@ const ImageIcon: React.FC = () => (
 )
 
 const FileItem: React.FC<FileItemProps> = ({ entry, level, onDrop, displayMode }) => {
-  const [isOpen, setIsOpen] = useState(true)
+  // Ordner standardmäßig ZU für schnellstes initiales Rendering
+  const [isOpen, setIsOpen] = useState(false)
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null)
   const [newNoteDialog, setNewNoteDialog] = useState<{ folderPath: string } | null>(null)
   const [newNoteName, setNewNoteName] = useState('')
   const [isEditing, setIsEditing] = useState(false)
   const [editName, setEditName] = useState('')
   const [isDragOver, setIsDragOver] = useState(false)
+  const [pickerDialog, setPickerDialog] = useState<{ type: 'color' | 'icon'; path: string } | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const rowRef = useRef<HTMLDivElement>(null)
 
   const { selectedNoteId, selectedPdfPath, selectedImagePath, selectNote, selectPdf, selectImage, removeNote, setFileTree, vaultPath, notes, updateNotePath } = useNotesStore()
+  const { iconSet } = useUIStore()
+  const { fileCustomizations, setFileCustomization, removeFileCustomization } = useGraphStore()
 
   const isPdf = entry.fileType === 'pdf'
   const isImage = entry.fileType === 'image'
@@ -130,6 +191,12 @@ const FileItem: React.FC<FileItemProps> = ({ entry, level, onDrop, displayMode }
   // Finde die Notiz um Link-Count zu zeigen
   const note = notes.find(n => n.id === noteId)
   const linkCount = note ? note.outgoingLinks.length + note.incomingLinks.length : 0
+
+  // Hole Customization für diesen Eintrag (nur für Ordner)
+  const customization = entry.isDirectory ? fileCustomizations[entry.path] : undefined
+  const folderColor = customization?.color
+  const folderIcon = customization?.icon
+  const hasCustomization = folderColor || folderIcon
 
   // Display-Name basierend auf displayMode
   const getDisplayName = () => {
@@ -419,6 +486,51 @@ const FileItem: React.FC<FileItemProps> = ({ entry, level, onDrop, displayMode }
     startEditing()
   }, [])
 
+  // Folder Customization Handlers
+  const handleSetFolderColor = useCallback((colorId: string, path: string) => {
+    console.log('[FileTree] handleSetFolderColor called:', colorId, path)
+    const colorInfo = FOLDER_COLORS.find(c => c.id === colorId)
+    if (colorInfo && colorId !== 'default') {
+      setFileCustomization(path, { color: colorInfo.color })
+    } else {
+      const existing = fileCustomizations[path]
+      if (existing?.icon) {
+        setFileCustomization(path, { color: undefined, icon: existing.icon })
+      } else {
+        removeFileCustomization(path)
+      }
+    }
+    setPickerDialog(null)
+  }, [fileCustomizations, setFileCustomization, removeFileCustomization])
+
+  const handleSetFolderIcon = useCallback((iconId: string, path: string) => {
+    console.log('[FileTree] handleSetFolderIcon called:', iconId, path)
+    const iconInfo = FOLDER_ICONS.find(i => i.id === iconId)
+    if (iconInfo && iconId !== 'default') {
+      setFileCustomization(path, { icon: iconInfo.emoji })
+    } else {
+      const existing = fileCustomizations[path]
+      if (existing?.color) {
+        setFileCustomization(path, { color: existing.color, icon: undefined })
+      } else {
+        removeFileCustomization(path)
+      }
+    }
+    setPickerDialog(null)
+  }, [fileCustomizations, setFileCustomization, removeFileCustomization])
+
+  const handleRemoveCustomization = useCallback(() => {
+    if (!contextMenu || !contextMenu.entry.isDirectory) return
+    removeFileCustomization(contextMenu.entry.path)
+    setContextMenu(null)
+  }, [contextMenu, removeFileCustomization])
+
+  const openPickerDialog = useCallback((type: 'color' | 'icon') => {
+    if (!contextMenu || !contextMenu.entry.isDirectory) return
+    setPickerDialog({ type, path: contextMenu.entry.path })
+    setContextMenu(null)
+  }, [contextMenu])
+
   const closeContextMenu = useCallback(() => {
     setContextMenu(null)
   }, [])
@@ -511,7 +623,11 @@ const FileItem: React.FC<FileItemProps> = ({ entry, level, onDrop, displayMode }
               <ChevronIcon open={isOpen} />
             </span>
             <span className="file-icon-wrapper">
-              <FolderIcon open={isOpen} />
+              {folderIcon ? (
+                <span style={{ fontSize: '14px', lineHeight: 1 }}>{folderIcon}</span>
+              ) : (
+                <FolderIcon open={isOpen} color={folderColor} iconSet={iconSet} />
+              )}
             </span>
             {isEditing ? (
               <input
@@ -603,6 +719,26 @@ const FileItem: React.FC<FileItemProps> = ({ entry, level, onDrop, displayMode }
                 Neuer Unterordner
               </button>
               <div className="context-menu-divider" />
+              {/* Folder Color Picker */}
+              <button
+                className="context-menu-item"
+                onClick={() => openPickerDialog('color')}
+              >
+                Ordnerfarbe ändern
+              </button>
+              {/* Folder Icon Picker */}
+              <button
+                className="context-menu-item"
+                onClick={() => openPickerDialog('icon')}
+              >
+                Ordner-Icon ändern
+              </button>
+              {hasCustomization && (
+                <button onClick={handleRemoveCustomization} className="context-menu-item">
+                  Anpassung entfernen
+                </button>
+              )}
+              <div className="context-menu-divider" />
               <button onClick={handleCopyRelativePath} className="context-menu-item">
                 Relativen Pfad kopieren
               </button>
@@ -671,6 +807,57 @@ const FileItem: React.FC<FileItemProps> = ({ entry, level, onDrop, displayMode }
             <button onClick={() => { setNewNoteDialog(null); setNewNoteName('') }}>Abbrechen</button>
           </div>
         </div>
+      )}
+
+      {/* Color/Icon Picker Dialog */}
+      {pickerDialog && createPortal(
+        <div className="picker-dialog-overlay" onClick={() => setPickerDialog(null)}>
+          <div className="picker-dialog" onClick={e => e.stopPropagation()}>
+            <div className="picker-dialog-header">
+              {pickerDialog.type === 'color' ? 'Ordnerfarbe wählen' : 'Ordner-Icon wählen'}
+            </div>
+            <div className="picker-dialog-content">
+              {pickerDialog.type === 'color' ? (
+                <div className="picker-color-grid">
+                  {FOLDER_COLORS.map(color => (
+                    <button
+                      key={color.id}
+                      className={`picker-color-item ${
+                        (color.id === 'default' && !fileCustomizations[pickerDialog.path]?.color) ||
+                        fileCustomizations[pickerDialog.path]?.color === color.color ? 'active' : ''
+                      }`}
+                      onClick={() => handleSetFolderColor(color.id, pickerDialog.path)}
+                      title={color.name}
+                    >
+                      <span className="picker-color-swatch" style={{ backgroundColor: color.color }} />
+                      <span className="picker-color-name">{color.name}</span>
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div className="picker-icon-grid">
+                  {FOLDER_ICONS.map(icon => (
+                    <button
+                      key={icon.id}
+                      className={`picker-icon-item ${
+                        (icon.id === 'default' && !fileCustomizations[pickerDialog.path]?.icon) ||
+                        fileCustomizations[pickerDialog.path]?.icon === icon.emoji ? 'active' : ''
+                      }`}
+                      onClick={() => handleSetFolderIcon(icon.id, pickerDialog.path)}
+                      title={icon.name}
+                    >
+                      {icon.emoji}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="picker-dialog-footer">
+              <button onClick={() => setPickerDialog(null)}>Abbrechen</button>
+            </div>
+          </div>
+        </div>,
+        document.body
       )}
     </div>
   )

@@ -1,3 +1,47 @@
+// FileTree Icon Customization
+export type IconSet = 'default' | 'minimal' | 'colorful' | 'emoji'
+
+export interface FileCustomization {
+  color?: string           // Ordner/Datei Farbe (aus Palette)
+  icon?: string            // Icon-Override (z.B. '📚', '🎯', 'star')
+}
+
+// Task-Statistiken pro Notiz (für Cache)
+export interface CachedTaskStats {
+  total: number
+  completed: number
+  critical: number
+  overdue: number
+}
+
+// Notes Cache für schnelles Laden
+export interface CachedNoteMetadata {
+  id: string
+  path: string
+  title: string
+  outgoingLinks: string[]
+  tags: string[]
+  headings?: NoteHeading[]
+  blocks?: NoteBlock[]
+  sourcePdf?: string
+  taskStats?: CachedTaskStats  // Task-Statistiken für schnelle Berechnung
+  mtime: number            // Datei-Änderungszeit in ms
+  createdAt: number        // Als Timestamp für JSON-Serialisierung
+  modifiedAt: number
+}
+
+export interface NotesCache {
+  version: number
+  vaultPath: string
+  notes: Record<string, CachedNoteMetadata>  // Key = relativePath
+}
+
+export interface FileWithMtime {
+  path: string             // Relativer Pfad
+  mtime: number            // Änderungszeit in ms
+  isDirectory: boolean
+}
+
 // Überschriften-Daten für Autocomplete
 export interface NoteHeading {
   level: number;       // 1-6 für h1-h6
@@ -28,6 +72,9 @@ export interface Note {
 
   // PDF Companion Support
   sourcePdf?: string;            // Relativer Pfad zum Quell-PDF (nur für Companion-Notizen)
+
+  // Task-Statistiken (für schnelle Vault-weite Berechnung)
+  taskStats?: CachedTaskStats;
 
   // Metadaten
   createdAt: Date;

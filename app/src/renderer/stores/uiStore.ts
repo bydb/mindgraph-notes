@@ -9,6 +9,7 @@ type PdfDisplayMode = 'both' | 'companion-only' | 'pdf-only'  // Anzeige von PDF
 type AccentColor = 'blue' | 'orange' | 'green' | 'purple' | 'pink' | 'teal'
 type AIAction = 'translate' | 'summarize' | 'continue' | 'improve'
 export type Language = 'de' | 'en'
+export type IconSet = 'default' | 'minimal' | 'colorful' | 'emoji'
 export type FontFamily = 'system' | 'inter' | 'source-sans' | 'roboto' | 'open-sans' | 'lato' |
   'jetbrains-mono-nerd' | 'fira-code-nerd' | 'hack-nerd' | 'meslo-nerd' | 'cascadia-code-nerd' | 'iosevka-nerd' | 'victor-mono-nerd' | 'agave-nerd'
 
@@ -74,6 +75,115 @@ export const BACKGROUND_COLORS: Record<BackgroundColor, { name: string; light: s
   sage: { name: 'Salbei', light: '#f0f4ee', dark: '#141612' }
 }
 
+// Icon Sets für FileTree
+export const ICON_SETS: Record<IconSet, { name: string; description: string }> = {
+  default: { name: 'Standard', description: 'Klassische Ordner-Icons' },
+  minimal: { name: 'Minimal', description: 'Umriss-Icons' },
+  colorful: { name: 'Bunt', description: 'Gradient-Icons' },
+  emoji: { name: 'Emoji', description: '📁 📄 📕' }
+}
+
+// Folder Color Palette (für Rechtsklick-Menü) - Pastellfarben
+export const FOLDER_COLORS = [
+  { id: 'default', name: 'Standard', color: '#F5A623' },
+  { id: 'red', name: 'Rot', color: '#F4A4A4' },
+  { id: 'orange', name: 'Orange', color: '#FBBF7D' },
+  { id: 'yellow', name: 'Gelb', color: '#F7E19C' },
+  { id: 'green', name: 'Grün', color: '#A8D8A8' },
+  { id: 'teal', name: 'Türkis', color: '#9DD5D5' },
+  { id: 'blue', name: 'Blau', color: '#A4C8E8' },
+  { id: 'purple', name: 'Lila', color: '#C9B3D9' },
+  { id: 'pink', name: 'Pink', color: '#F0B8D0' },
+  { id: 'gray', name: 'Grau', color: '#B8B8B8' }
+]
+
+// Folder Icon Emojis (für Rechtsklick-Menü)
+export const FOLDER_ICONS = [
+  { id: 'default', emoji: '📁', name: 'Standard' },
+
+  // Archiv & Bibliothek
+  { id: 'temple', emoji: '🏛️', name: 'Archiv' },
+  { id: 'cabinet', emoji: '🗄️', name: 'Ablage' },
+  { id: 'cardbox', emoji: '🗃️', name: 'Kartei' },
+  { id: 'inbox', emoji: '📥', name: 'Eingang' },
+  { id: 'outbox', emoji: '📤', name: 'Ausgang' },
+
+  // Dokumente & Notizen
+  { id: 'books', emoji: '📚', name: 'Bücher' },
+  { id: 'book', emoji: '📖', name: 'Buch' },
+  { id: 'notebook', emoji: '📓', name: 'Notizbuch' },
+  { id: 'memo', emoji: '📝', name: 'Memo' },
+  { id: 'pencil', emoji: '✏️', name: 'Stift' },
+  { id: 'writing', emoji: '✍️', name: 'Schreiben' },
+
+  // Bildung & Lernen
+  { id: 'graduation', emoji: '🎓', name: 'Studium' },
+  { id: 'school', emoji: '🏫', name: 'Schule' },
+  { id: 'teacher', emoji: '👨‍🏫', name: 'Lehre' },
+  { id: 'student', emoji: '👨‍🎓', name: 'Lernen' },
+  { id: 'abc', emoji: '🔤', name: 'Sprache' },
+  { id: 'abacus', emoji: '🧮', name: 'Rechnen' },
+  { id: 'dna', emoji: '🧬', name: 'Biologie' },
+  { id: 'atom', emoji: '⚛️', name: 'Physik' },
+
+  // PKM - Wissensmanagement
+  { id: 'brain', emoji: '🧠', name: 'Wissen' },
+  { id: 'thought', emoji: '💭', name: 'Gedanken' },
+  { id: 'bulb', emoji: '💡', name: 'Ideen' },
+  { id: 'link', emoji: '🔗', name: 'Verknüpfung' },
+  { id: 'puzzle', emoji: '🧩', name: 'Zusammenhang' },
+  { id: 'seedling', emoji: '🌱', name: 'Keimling' },
+  { id: 'tree', emoji: '🌳', name: 'Ausgearbeitet' },
+  { id: 'map', emoji: '🗺️', name: 'Übersicht' },
+  { id: 'compass', emoji: '🧭', name: 'Navigation' },
+
+  // Forschung & Projekte
+  { id: 'microscope', emoji: '🔬', name: 'Forschung' },
+  { id: 'flask', emoji: '🧪', name: 'Experiment' },
+  { id: 'telescope', emoji: '🔭', name: 'Exploration' },
+  { id: 'target', emoji: '🎯', name: 'Ziel' },
+  { id: 'rocket', emoji: '🚀', name: 'Projekt' },
+  { id: 'gear', emoji: '⚙️', name: 'System' },
+  { id: 'tools', emoji: '🛠️', name: 'Werkzeuge' },
+
+  // Organisation
+  { id: 'clipboard', emoji: '📋', name: 'Liste' },
+  { id: 'check', emoji: '✅', name: 'Erledigt' },
+  { id: 'calendar', emoji: '📅', name: 'Kalender' },
+  { id: 'clock', emoji: '🕐', name: 'Zeitlich' },
+  { id: 'pin', emoji: '📌', name: 'Angeheftet' },
+  { id: 'bookmark', emoji: '🔖', name: 'Lesezeichen' },
+  { id: 'label', emoji: '🏷️', name: 'Label' },
+  { id: 'search', emoji: '🔍', name: 'Suche' },
+
+  // Bereiche & Kontext
+  { id: 'home', emoji: '🏠', name: 'Privat' },
+  { id: 'briefcase', emoji: '💼', name: 'Arbeit' },
+  { id: 'art', emoji: '🎨', name: 'Kreativ' },
+  { id: 'music', emoji: '🎵', name: 'Musik' },
+  { id: 'camera', emoji: '📷', name: 'Foto' },
+  { id: 'film', emoji: '🎬', name: 'Video' },
+  { id: 'globe', emoji: '🌍', name: 'Welt' },
+  { id: 'people', emoji: '👥', name: 'Personen' },
+
+  // Kommunikation
+  { id: 'speech', emoji: '💬', name: 'Gespräch' },
+  { id: 'mail', emoji: '📧', name: 'E-Mail' },
+  { id: 'megaphone', emoji: '📢', name: 'Ankündigung' },
+
+  // Markierungen & Status
+  { id: 'star', emoji: '⭐', name: 'Favorit' },
+  { id: 'sparkles', emoji: '✨', name: 'Neu' },
+  { id: 'heart', emoji: '❤️', name: 'Wichtig' },
+  { id: 'fire', emoji: '🔥', name: 'Hot' },
+  { id: 'gem', emoji: '💎', name: 'Premium' },
+  { id: 'lightning', emoji: '⚡', name: 'Schnell' },
+  { id: 'warning', emoji: '⚠️', name: 'Achtung' },
+  { id: 'lock', emoji: '🔒', name: 'Privat' },
+  { id: 'question', emoji: '❓', name: 'Offen' },
+  { id: 'recycle', emoji: '♻️', name: 'Wiederholen' }
+]
+
 interface PendingTemplateInsert {
   content: string
   cursorPosition?: number
@@ -124,6 +234,9 @@ interface UIState {
   pdfCompanionEnabled: boolean  // PDF Companion-Dateien automatisch erstellen
   pdfDisplayMode: PdfDisplayMode  // Anzeige im FileTree: 'both', 'companion-only', 'pdf-only'
 
+  // FileTree Icon Settings
+  iconSet: IconSet  // 'default' | 'minimal' | 'colorful' | 'emoji'
+
   // Actions
   setViewMode: (mode: ViewMode) => void
   setTheme: (theme: Theme) => void
@@ -152,6 +265,7 @@ interface UIState {
   setOllama: (settings: Partial<OllamaSettings>) => void
   setPdfCompanionEnabled: (enabled: boolean) => void
   setPdfDisplayMode: (mode: PdfDisplayMode) => void
+  setIconSet: (set: IconSet) => void
 }
 
 // Default-Werte für den Store
@@ -195,7 +309,10 @@ const defaultState = {
 
   // PDF Companion Settings
   pdfCompanionEnabled: true,
-  pdfDisplayMode: 'companion-only' as PdfDisplayMode
+  pdfDisplayMode: 'companion-only' as PdfDisplayMode,
+
+  // FileTree Icon Settings
+  iconSet: 'default' as IconSet
 }
 
 // Felder die persistiert werden sollen (keine Funktionen, keine transienten Werte)
@@ -205,7 +322,7 @@ const persistedKeys = [
   'autoSaveInterval', 'sidebarWidth', 'sidebarVisible', 'editorPreviewSplit',
   'canvasFilterPath', 'canvasViewMode', 'canvasShowTags', 'canvasShowLinks', 'canvasShowImages',
   'canvasCompactMode', 'canvasDefaultCardWidth', 'splitPosition', 'fileTreeDisplayMode', 'ollama',
-  'pdfCompanionEnabled', 'pdfDisplayMode'
+  'pdfCompanionEnabled', 'pdfDisplayMode', 'iconSet'
 ] as const
 
 export const useUIStore = create<UIState>()((set, get) => ({
@@ -238,7 +355,8 @@ export const useUIStore = create<UIState>()((set, get) => ({
   setPendingTemplateInsert: (template) => set({ pendingTemplateInsert: template }),
   setOllama: (settings) => set((state) => ({ ollama: { ...state.ollama, ...settings } })),
   setPdfCompanionEnabled: (enabled) => set({ pdfCompanionEnabled: enabled }),
-  setPdfDisplayMode: (mode) => set({ pdfDisplayMode: mode })
+  setPdfDisplayMode: (mode) => set({ pdfDisplayMode: mode }),
+  setIconSet: (iconSet) => set({ iconSet })
 }))
 
 // Settings laden beim App-Start

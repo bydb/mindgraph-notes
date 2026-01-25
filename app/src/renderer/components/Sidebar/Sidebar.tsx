@@ -3,6 +3,8 @@ import { FileTree } from './FileTree'
 import { useNotesStore, createNoteFromFile } from '../../stores/notesStore'
 import { useUIStore } from '../../stores/uiStore'
 import { useGraphStore } from '../../stores/graphStore'
+import { extractTaskStatsForCache } from '../../utils/linkExtractor'
+import type { Note, NotesCache, CachedNoteMetadata } from '../../../shared/types'
 
 export const Sidebar: React.FC = () => {
   const { vaultPath, fileTree, notes, setVaultPath, setFileTree, setNotes, addNote, selectNote, setLoading } = useNotesStore()
@@ -15,6 +17,9 @@ export const Sidebar: React.FC = () => {
   const [newNoteName, setNewNoteName] = useState('')
   const newNoteInputRef = useRef<HTMLInputElement>(null)
 
+  // Guard gegen doppeltes Laden (React Strict Mode)
+  const isLoadingRef = useRef(false)
+
   const handleOpenVault = useCallback(async () => {
     if (!window.electronAPI) {
       console.error('electronAPI not available')
@@ -25,8 +30,6 @@ export const Sidebar: React.FC = () => {
       const path = await window.electronAPI.openVault()
       if (!path) return
 
-      setLoading(true)
-
       // WICHTIG: Alten Vault aufräumen bevor neuer geladen wird
       window.electronAPI.unwatchDirectory() // Stoppt alten File-Watcher
       resetGraphStore() // Setzt Graph-Positionen zurück
@@ -35,11 +38,18 @@ export const Sidebar: React.FC = () => {
 
       setVaultPath(path)
 
+      // 1. FileTree SOFORT laden und anzeigen
       const tree = await window.electronAPI.readDirectory(path)
       setFileTree(tree)
+      console.log('[Sidebar] FileTree geladen, UI bereit')
 
+      // 2. Notizen im HINTERGRUND laden
+      await new Promise(resolve => setTimeout(resolve, 50))
+
+      setLoading(true)
       const loadedNotes = await loadAllNotes(path, tree)
       setNotes(loadedNotes)
+      setLoading(false)
 
       // Graph-Daten aus dem Vault laden
       await loadGraphData(path)
@@ -156,21 +166,32 @@ export const Sidebar: React.FC = () => {
   // Beim Start: Letzten Vault automatisch laden
   useEffect(() => {
     const loadLastVault = async () => {
-      if (!window.electronAPI || vaultPath) return
+      // Guard gegen doppeltes Laden
+      if (!window.electronAPI || vaultPath || isLoadingRef.current) return
+      isLoadingRef.current = true
 
       try {
         const lastVault = await window.electronAPI.getLastVault()
         if (lastVault) {
           console.log('[Sidebar] Auto-loading last vault:', lastVault)
-          setLoading(true)
 
           setVaultPath(lastVault)
 
+          // 1. FileTree SOFORT laden und anzeigen
           const tree = await window.electronAPI.readDirectory(lastVault)
           setFileTree(tree)
+          setLoading(false) // UI sofort freigeben!
 
+          console.log('[Sidebar] FileTree geladen, UI bereit')
+
+          // 2. Notizen im HINTERGRUND laden (blockiert UI nicht)
+          // requestIdleCallback oder setTimeout damit React erst rendern kann
+          await new Promise(resolve => setTimeout(resolve, 50))
+
+          setLoading(true) // Zeige Lade-Indikator für Notizen
           const loadedNotes = await loadAllNotes(lastVault, tree)
           setNotes(loadedNotes)
+          setLoading(false)
 
           // Graph-Daten aus dem Vault laden
           await loadGraphData(lastVault)
@@ -326,162 +347,218 @@ export const Sidebar: React.FC = () => {
   )
 }
 
-// Hilfsfunktion zum rekursiven Laden aller Notizen
-async function loadAllNotes(basePath: string, entries: any[]): Promise<any[]> {
-  const notes: any[] = []
+// Hilfsfunktion zum rekursiven Laden aller Notizen MIT CACHE
+async function loadAllNotes(basePath: string, entries: any[]): Promise<Note[]> {
+  const startTime = Date.now()
+  const notes: Note[] = []
+
+  // 1. Cache und Dateien mit mtime laden (parallel)
+  console.log('[Sidebar] Starte Laden...')
+  const [cache, filesWithMtime] = await Promise.all([
+    window.electronAPI.loadNotesCache(basePath) as Promise<NotesCache | null>,
+    window.electronAPI.getFilesWithMtime(basePath) as Promise<Array<{ path: string; mtime: number }>>
+  ])
+  console.log(`[Sidebar] Cache und mtime geladen in ${Date.now() - startTime}ms`)
+
+  const cachedNotes = cache?.notes || {}
+  const newCache: NotesCache = {
+    version: 1,
+    vaultPath: basePath,
+    notes: {}
+  }
+
+  // Map für schnellen mtime-Lookup
+  const mtimeMap = new Map(filesWithMtime.map(f => [f.path, f.mtime]))
 
   // Check if PDF companion feature is enabled
   const { pdfCompanionEnabled } = useUIStore.getState()
 
   // Sammle alle PDFs und existierende Companions
-  const pdfPaths: string[] = []
-  const existingCompanions: { path: string; content: string }[] = []
-
-  function collectFiles(items: any[]) {
-    for (const item of items) {
-      if (item.isDirectory && item.children) {
-        collectFiles(item.children)
-      } else if (!item.isDirectory) {
-        if (item.fileType === 'pdf') {
-          pdfPaths.push(item.path)
-        } else if (item.path.endsWith('.pdf.md')) {
-          existingCompanions.push({ path: item.path, content: '' })
-        }
-      }
-    }
-  }
+  const companionPaths = new Set<string>()
 
   if (pdfCompanionEnabled) {
-    collectFiles(entries)
-  }
-
-  // Erstelle Set der PDF-Pfade für schnelle Lookup
-  const pdfPathSet = new Set(pdfPaths)
-  // Map von PDF-Pfad zu Companion-Pfad (für Companions die bereits zum PDF gehören)
-  const pdfToCompanion = new Map<string, string>()
-  // Orphaned Companions (deren source PDF nicht mehr existiert)
-  const orphanedCompanions: { path: string; content: string; sourcePdf: string }[] = []
-
-  // Lade Companion-Inhalte und prüfe ob source PDF noch existiert
-  for (const companion of existingCompanions) {
-    try {
-      const fullPath = `${basePath}/${companion.path}`
-      const content = await window.electronAPI.readFile(fullPath)
-      companion.content = content
-
-      // Extrahiere source aus Frontmatter
-      const sourceMatch = content.match(/source:\s*"([^"]+)"/)
-      if (sourceMatch) {
-        const sourcePdf = sourceMatch[1]
-        // Finde den vollen Pfad zur source PDF
-        const companionDir = companion.path.substring(0, companion.path.lastIndexOf('/'))
-        const expectedPdfPath = companionDir ? `${companionDir}/${sourcePdf}` : sourcePdf
-
-        if (pdfPathSet.has(expectedPdfPath)) {
-          // PDF existiert noch, alles ok
-          pdfToCompanion.set(expectedPdfPath, companion.path)
-        } else {
-          // PDF existiert nicht mehr - orphaned companion
-          orphanedCompanions.push({ ...companion, sourcePdf: expectedPdfPath })
+    function collectPdfCompanions(items: any[]) {
+      for (const item of items) {
+        if (item.isDirectory && item.children) {
+          collectPdfCompanions(item.children)
+        } else if (!item.isDirectory && item.path.endsWith('.pdf.md')) {
+          companionPaths.add(item.path)
         }
       }
-    } catch (error) {
-      console.error(`Fehler beim Lesen von ${companion.path}:`, error)
+    }
+    collectPdfCompanions(entries)
+  }
+
+  // 2. Alle Markdown-Pfade sammeln (ohne PDF-Companions wenn pdfCompanionEnabled)
+  const allMdPaths = filesWithMtime
+    .map(f => f.path)
+    .filter(p => !(pdfCompanionEnabled && p.endsWith('.pdf.md')))
+
+  // 3. Trenne gecachte von neuen Dateien
+  const cachedPaths: string[] = []
+  const newPaths: string[] = []
+
+  for (const relativePath of allMdPaths) {
+    const mtime = mtimeMap.get(relativePath)!
+    const cached = cachedNotes[relativePath]
+    if (cached && cached.mtime === mtime) {
+      cachedPaths.push(relativePath)
+    } else {
+      newPaths.push(relativePath)
     }
   }
 
-  // Finde PDFs ohne Companions
-  const pdfsWithoutCompanions = pdfPaths.filter(pdf => !pdfToCompanion.has(pdf))
+  console.log(`[Sidebar] ${cachedPaths.length} aus Cache, ${newPaths.length} neu zu laden`)
 
-  // Versuche orphaned Companions mit PDFs ohne Companions zu matchen
-  // (basierend auf gleichem Verzeichnis)
-  for (const orphan of orphanedCompanions) {
-    const orphanDir = orphan.path.substring(0, orphan.path.lastIndexOf('/'))
+  // 4. Gecachte Notizen OHNE Content laden (super schnell!)
+  let fromCache = 0
+  for (const relativePath of cachedPaths) {
+    const cached = cachedNotes[relativePath]!
+    fromCache++
+    const note: Note = {
+      id: cached.id,
+      path: cached.path,
+      title: cached.title,
+      content: '', // Content wird lazy geladen!
+      outgoingLinks: cached.outgoingLinks,
+      incomingLinks: [],
+      tags: cached.tags,
+      headings: cached.headings,
+      blocks: cached.blocks,
+      sourcePdf: cached.sourcePdf,
+      taskStats: cached.taskStats, // Task-Stats aus Cache für Vault-Statistiken
+      createdAt: new Date(cached.createdAt),
+      modifiedAt: new Date(cached.modifiedAt)
+    }
+    newCache.notes[relativePath] = cached
+    notes.push(note)
+  }
 
-    // Suche PDF im selben Verzeichnis ohne Companion
-    const matchingPdf = pdfsWithoutCompanions.find(pdf => {
-      const pdfDir = pdf.substring(0, pdf.lastIndexOf('/'))
-      return pdfDir === orphanDir
-    })
+  // 5. Nur NEUE Dateien laden und parsen
+  let fromDisk = 0
+  if (newPaths.length > 0) {
+    const readStart = Date.now()
+    const newContents = await window.electronAPI.readFilesBatch(basePath, newPaths) as Record<string, string | null>
+    console.log(`[Sidebar] ${newPaths.length} neue Dateien in ${Date.now() - readStart}ms gelesen`)
 
-    if (matchingPdf) {
-      // Sync: Aktualisiere Companion mit neuem PDF-Namen
-      console.log(`[PDF Sync] Synchronisiere ${orphan.path} -> ${matchingPdf}`)
-      const syncResult = await window.electronAPI.syncPdfCompanion(orphan.path, matchingPdf, basePath)
+    for (const relativePath of newPaths) {
+      const content = newContents[relativePath]
+      if (content === null) continue
 
-      if (syncResult.success && syncResult.newPath && syncResult.content) {
-        // Entferne PDF aus der Liste ohne Companions
-        const idx = pdfsWithoutCompanions.indexOf(matchingPdf)
-        if (idx > -1) pdfsWithoutCompanions.splice(idx, 1)
+      const mtime = mtimeMap.get(relativePath)!
+      fromDisk++
+      try {
+        const fullPath = `${basePath}/${relativePath}`
+        const note = await createNoteFromFile(fullPath, relativePath, content)
 
-        // Füge als normalen Companion hinzu
-        pdfToCompanion.set(matchingPdf, syncResult.newPath)
+        // Task-Stats extrahieren für Cache
+        const taskStats = extractTaskStatsForCache(content)
+        note.taskStats = taskStats
 
-        // Erstelle Note
-        const fullPath = `${basePath}/${syncResult.newPath}`
-        const note = await createNoteFromFile(fullPath, syncResult.newPath, syncResult.content)
-        note.sourcePdf = matchingPdf
+        // Zum Cache hinzufügen
+        newCache.notes[relativePath] = {
+          id: note.id,
+          path: note.path,
+          title: note.title,
+          outgoingLinks: note.outgoingLinks,
+          tags: note.tags,
+          headings: note.headings,
+          blocks: note.blocks,
+          sourcePdf: note.sourcePdf,
+          taskStats: taskStats,
+          mtime: mtime,
+          createdAt: note.createdAt.getTime(),
+          modifiedAt: note.modifiedAt.getTime()
+        }
         notes.push(note)
+      } catch {
+        // Datei konnte nicht geparst werden
       }
     }
   }
 
-  // Erstelle neue Companions für verbleibende PDFs ohne Companions
-  const companionPaths = new Set<string>()
-  for (const pdfPath of pdfsWithoutCompanions) {
-    try {
-      const result = await window.electronAPI.ensurePdfCompanion(pdfPath, basePath)
-      companionPaths.add(result.path)
-      pdfToCompanion.set(pdfPath, result.path)
+  console.log(`[Sidebar] ${fromCache} aus Cache (ohne Content), ${fromDisk} neu geparst`)
 
-      const fullPath = `${basePath}/${result.path}`
-      const note = await createNoteFromFile(fullPath, result.path, result.content)
-      note.sourcePdf = pdfPath
-      notes.push(note)
-    } catch (error) {
-      console.error(`Fehler beim Erstellen der PDF-Companion für ${pdfPath}:`, error)
-    }
-  }
+  // 5. PDF Companion Handling (auch aus Batch-Ergebnis)
+  if (pdfCompanionEnabled && companionPaths.size > 0) {
+    // Companions wurden schon im Batch gelesen, hole sie aus allContents
+    // Aber sie wurden gefiltert - lade sie separat mit Batch
+    const companionPathsArray = Array.from(companionPaths)
+    const companionContents = await window.electronAPI.readFilesBatch(basePath, companionPathsArray) as Record<string, string | null>
 
-  // Lade existierende Companions die bereits gematcht wurden
-  for (const [pdfPath, companionPath] of pdfToCompanion.entries()) {
-    // Überspringe wenn bereits als Note hinzugefügt
-    if (notes.some(n => n.path === companionPath)) continue
+    for (const companionPath of companionPathsArray) {
+      const content = companionContents[companionPath]
+      if (!content) continue
 
-    try {
-      const fullPath = `${basePath}/${companionPath}`
-      const content = await window.electronAPI.readFile(fullPath)
-      const note = await createNoteFromFile(fullPath, companionPath, content)
-      note.sourcePdf = pdfPath
-      notes.push(note)
-      companionPaths.add(companionPath)
-    } catch (error) {
-      console.error(`Fehler beim Laden von ${companionPath}:`, error)
-    }
-  }
+      const mtime = mtimeMap.get(companionPath)
+      const cached = cachedNotes[companionPath]
 
-  // Lade normale Markdown-Dateien (aber keine PDF-Companions)
-  async function loadFromEntries(items: any[]) {
-    for (const entry of items) {
-      if (entry.isDirectory && entry.children) {
-        await loadFromEntries(entry.children)
-      } else if (!entry.isDirectory && entry.path.endsWith('.md')) {
-        // Überspringe PDF-Companion-Dateien
-        if (entry.path.endsWith('.pdf.md') || companionPaths.has(entry.path)) {
-          continue
+      // Extrahiere source PDF
+      const sourceMatch = content.match(/source:\s*"([^"]+)"/)
+      const companionDir = companionPath.substring(0, companionPath.lastIndexOf('/'))
+      const sourcePdf = sourceMatch
+        ? (companionDir ? `${companionDir}/${sourceMatch[1]}` : sourceMatch[1])
+        : undefined
+
+      if (cached && mtime && cached.mtime === mtime) {
+        // Cache-Hit
+        const note: Note = {
+          id: cached.id,
+          path: cached.path,
+          title: cached.title,
+          content,
+          outgoingLinks: cached.outgoingLinks,
+          incomingLinks: [],
+          tags: cached.tags,
+          headings: cached.headings,
+          blocks: cached.blocks,
+          sourcePdf,
+          taskStats: cached.taskStats,
+          createdAt: new Date(cached.createdAt),
+          modifiedAt: new Date(cached.modifiedAt)
         }
+        newCache.notes[companionPath] = cached
+        notes.push(note)
+      } else {
+        // Cache-Miss
         try {
-          const fullPath = `${basePath}/${entry.path}`
-          const content = await window.electronAPI.readFile(fullPath)
-          const note = await createNoteFromFile(fullPath, entry.path, content)
+          const fullPath = `${basePath}/${companionPath}`
+          const note = await createNoteFromFile(fullPath, companionPath, content)
+          note.sourcePdf = sourcePdf
+
+          // Task-Stats extrahieren
+          const taskStats = extractTaskStatsForCache(content)
+          note.taskStats = taskStats
+
+          if (mtime) {
+            newCache.notes[companionPath] = {
+              id: note.id,
+              path: note.path,
+              title: note.title,
+              outgoingLinks: note.outgoingLinks,
+              tags: note.tags,
+              headings: note.headings,
+              blocks: note.blocks,
+              sourcePdf,
+              taskStats,
+              mtime,
+              createdAt: note.createdAt.getTime(),
+              modifiedAt: note.modifiedAt.getTime()
+            }
+          }
           notes.push(note)
-        } catch (error) {
-          console.error(`Fehler beim Laden von ${entry.path}:`, error)
+        } catch {
+          // Companion konnte nicht geparst werden
         }
       }
     }
   }
 
-  await loadFromEntries(entries)
+  // 6. Cache speichern (im Hintergrund)
+  window.electronAPI.saveNotesCache(basePath, newCache).catch(console.error)
+
+  const elapsed = Date.now() - startTime
+  console.log(`[Sidebar] ${notes.length} Notizen in ${elapsed}ms geladen (${fromCache} aus Cache, ${fromDisk} neu geparst)`)
+
   return notes
 }

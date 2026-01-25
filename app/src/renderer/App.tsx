@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef, useEffect } from 'react'
+import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react'
 import { ReactFlowProvider } from 'reactflow'
 import { Sidebar } from './components/Sidebar/Sidebar'
 import { MarkdownEditor } from './components/Editor/MarkdownEditor'
@@ -17,6 +17,7 @@ import { useUIStore, ACCENT_COLORS, FONT_FAMILIES, BACKGROUND_COLORS, initialize
 import { useTranslation } from './utils/translations'
 import { useNotesStore } from './stores/notesStore'
 import { useReminderStore } from './stores/reminderStore'
+import { getVaultTaskStats } from './utils/linkExtractor'
 import './styles/index.css'
 
 type ViewMode = 'editor' | 'split' | 'canvas'
@@ -53,19 +54,49 @@ const App: React.FC = () => {
   const isDraggingRef = useRef(false)
   const isSidebarDraggingRef = useRef(false)
 
-  const linkCount = notes.reduce((acc, note) => acc + note.outgoingLinks.length, 0)
+  // Link-Count und Task-Stats verzögert berechnen für schnelleren UI-Start
+  const [linkCount, setLinkCount] = useState(0)
+  const [taskStats, setTaskStats] = useState<ReturnType<typeof getVaultTaskStats>>({
+    total: 0, completed: 0, open: 0, critical: 0, overdue: 0
+  })
+
+  useEffect(() => {
+    if (notes.length === 0) {
+      setLinkCount(0)
+      setTaskStats({ total: 0, completed: 0, open: 0, critical: 0, overdue: 0 })
+      return
+    }
+
+    // Verzögert berechnen damit UI sofort nutzbar ist
+    const timer = setTimeout(() => {
+      // Link-Count
+      const count = notes.reduce((acc, note) => acc + note.outgoingLinks.length, 0)
+      setLinkCount(count)
+
+      // Task-Stats
+      const stats = getVaultTaskStats(notes)
+      setTaskStats(stats)
+    }, 100) // Kurze Verzögerung, UI first
+
+    return () => clearTimeout(timer)
+  }, [notes])
 
   // UI-Settings beim App-Start laden
   useEffect(() => {
     initializeUISettings()
   }, [])
 
-  // Reminder-System starten wenn Notizen geladen sind
+  // Reminder-System starten - verzögert um UI nicht zu blockieren
   useEffect(() => {
-    if (notes.length > 0) {
+    if (notes.length === 0) return
+
+    // 2 Sekunden warten bis UI geladen ist, dann Reminders starten
+    const timer = setTimeout(() => {
       startChecking(notes)
-    }
+    }, 2000)
+
     return () => {
+      clearTimeout(timer)
       stopChecking()
     }
   }, [notes, startChecking, stopChecking])
@@ -256,9 +287,17 @@ const App: React.FC = () => {
       <div className="app">
         <div className="titlebar">
           <div className="titlebar-left">
-            <button className="btn-icon" onClick={toggleSidebar} title="Sidebar umschalten">
-              {sidebarVisible ? '◀' : '▶'}
-            </button>
+            <div className="view-mode-switcher">
+              <button className="view-mode-btn" onClick={toggleSidebar} title="Sidebar umschalten">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  {sidebarVisible ? (
+                    <><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="3" x2="9" y2="21"/></>
+                  ) : (
+                    <><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="3" x2="9" y2="21"/><polyline points="14 9 17 12 14 15"/></>
+                  )}
+                </svg>
+              </button>
+            </div>
             <span className="app-title">MindGraph Notes</span>
           </div>
           
@@ -277,30 +316,51 @@ const App: React.FC = () => {
           </div>
           
           <div className="titlebar-right">
-            <button
-              className="btn-icon"
-              onClick={() => setSettingsOpen(true)}
-              title="Einstellungen (Cmd+,)"
-            >
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                <circle cx="8" cy="8" r="2" stroke="currentColor" strokeWidth="1.5"/>
-                <path d="M8 1V3M8 13V15M1 8H3M13 8H15M3 3L4.5 4.5M11.5 11.5L13 13M3 13L4.5 11.5M11.5 4.5L13 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-              </svg>
-            </button>
-            <button
-              className="theme-toggle"
-              onClick={toggleTheme}
-              title={theme === 'dark' ? 'Light Mode' : 'Dark Mode'}
-            >
-              {theme === 'dark' ? '☀️' : '🌙'}
-            </button>
-            <button
-              className={`btn-icon ${terminalVisible ? 'active' : ''}`}
-              onClick={() => setTerminalVisible(!terminalVisible)}
-              title="Terminal ein/ausblenden (Claude Code)"
-            >
-              ⌘
-            </button>
+            <div className="view-mode-switcher">
+              <button
+                className="view-mode-btn"
+                onClick={() => setSettingsOpen(true)}
+                title="Einstellungen (Cmd+,)"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="3"/>
+                  <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                </svg>
+              </button>
+              <button
+                className="view-mode-btn"
+                onClick={toggleTheme}
+                title={theme === 'dark' ? 'Light Mode' : 'Dark Mode'}
+              >
+                {theme === 'dark' ? (
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="5"/>
+                    <line x1="12" y1="1" x2="12" y2="3"/>
+                    <line x1="12" y1="21" x2="12" y2="23"/>
+                    <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
+                    <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+                    <line x1="1" y1="12" x2="3" y2="12"/>
+                    <line x1="21" y1="12" x2="23" y2="12"/>
+                    <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
+                    <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+                  </svg>
+                ) : (
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+                  </svg>
+                )}
+              </button>
+              <button
+                className={`view-mode-btn ${terminalVisible ? 'active' : ''}`}
+                onClick={() => setTerminalVisible(!terminalVisible)}
+                title="Terminal ein/ausblenden"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="4 17 10 11 4 5"/>
+                  <line x1="12" y1="19" x2="20" y2="19"/>
+                </svg>
+              </button>
+            </div>
           </div>
         </div>
         
@@ -378,6 +438,31 @@ const App: React.FC = () => {
           <span className="status-item">{notes.length} {t('statusbar.notes')}</span>
           <span className="status-separator">|</span>
           <span className="status-item">{linkCount} {t('statusbar.links')}</span>
+          {taskStats.total > 0 && (
+            <>
+              <span className="status-separator">|</span>
+              <span className="status-item status-tasks">
+                <span className="task-count">
+                  ✓ {taskStats.completed}/{taskStats.total}
+                </span>
+                {taskStats.open > 0 && (
+                  <span className="task-open" title="Offene Tasks">
+                    • {taskStats.open} offen
+                  </span>
+                )}
+                {taskStats.critical > 0 && (
+                  <span className="task-critical" title="Kritische Tasks">
+                    • {taskStats.critical} kritisch
+                  </span>
+                )}
+                {taskStats.overdue > 0 && (
+                  <span className="task-overdue" title="Überfällige Tasks">
+                    • {taskStats.overdue} überfällig
+                  </span>
+                )}
+              </span>
+            </>
+          )}
           <span className="status-separator">|</span>
           <button
             className="status-btn"

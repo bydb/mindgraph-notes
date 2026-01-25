@@ -12,6 +12,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   openVault: () => ipcRenderer.invoke('open-vault'),
   readDirectory: (dirPath: string) => ipcRenderer.invoke('read-directory', dirPath),
   readFile: (filePath: string) => ipcRenderer.invoke('read-file', filePath),
+  readFilesBatch: (basePath: string, relativePaths: string[]) => ipcRenderer.invoke('read-files-batch', basePath, relativePaths),
   readFileBinary: (filePath: string) => ipcRenderer.invoke('read-file-binary', filePath),
   writeFile: (filePath: string, content: string) => ipcRenderer.invoke('write-file', filePath, content),
   deleteFile: (filePath: string) => ipcRenderer.invoke('delete-file', filePath),
@@ -46,6 +47,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Graph-Daten Persistenz
   saveGraphData: (vaultPath: string, data: object) => ipcRenderer.invoke('save-graph-data', vaultPath, data),
   loadGraphData: (vaultPath: string) => ipcRenderer.invoke('load-graph-data', vaultPath),
+
+  // Notes-Cache für schnelles Laden
+  saveNotesCache: (vaultPath: string, cache: object) => ipcRenderer.invoke('save-notes-cache', vaultPath, cache),
+  loadNotesCache: (vaultPath: string) => ipcRenderer.invoke('load-notes-cache', vaultPath),
+  getFilesWithMtime: (vaultPath: string) => ipcRenderer.invoke('get-files-with-mtime', vaultPath),
 
   // PDF Export
   exportPDF: (defaultFileName: string, htmlContent: string, title: string) =>

@@ -151,6 +151,14 @@ body {
   display: flex;
   align-items: center;
   gap: 12px;
+  /* Containers erben drag vom parent, nur Buttons sind no-drag */
+}
+
+/* Nur interaktive Elemente in der Titlebar sind nicht draggable */
+.titlebar button,
+.titlebar input,
+.titlebar select,
+.titlebar .view-mode-btn {
   -webkit-app-region: no-drag;
 }
 
@@ -171,47 +179,44 @@ body {
   letter-spacing: -0.01em;
 }
 
-/* Theme Toggle Button */
-.theme-toggle {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 36px;
-  height: 36px;
-  border: none;
-  background: var(--bg-tertiary);
-  border-radius: var(--radius-full);
-  cursor: pointer;
-  font-size: 16px;
-  color: var(--text-secondary);
-  transition: all var(--transition-fast);
-}
+/* ============ UNIFIED BUTTON GROUP DESIGN ============ */
+/* Einheitliches Design für alle Button-Gruppen in der Titlebar */
 
-.theme-toggle:hover {
-  background-color: var(--accent-subtle);
-  color: var(--accent-color);
-  transform: scale(1.05);
-}
-
-/* View Mode Switcher */
 .view-mode-switcher {
   display: flex;
   background-color: var(--bg-tertiary);
-  border-radius: var(--radius-lg);
-  padding: 4px;
-  gap: 4px;
+  border-radius: var(--radius-md);
+  padding: 3px;
+  gap: 2px;
 }
 
 .view-mode-btn {
-  padding: 6px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 5px 12px;
   border: none;
   background: none;
-  border-radius: var(--radius-md);
+  border-radius: calc(var(--radius-md) - 2px);
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 500;
   color: var(--text-muted);
   cursor: pointer;
   transition: all var(--transition-fast);
+  white-space: nowrap;
+}
+
+/* Icon-only Buttons - quadratisch */
+.view-mode-btn:has(svg:only-child) {
+  padding: 5px 8px;
+}
+
+.view-mode-btn svg {
+  display: block;
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
 }
 
 .view-mode-btn:hover {
@@ -219,10 +224,23 @@ body {
   background-color: var(--bg-secondary);
 }
 
+.view-mode-btn:hover svg {
+  stroke: var(--text-primary);
+}
+
 .view-mode-btn.active {
   background-color: var(--accent-color);
   color: white;
-  box-shadow: var(--shadow-md);
+}
+
+.view-mode-btn.active svg {
+  stroke: white;
+}
+
+/* Emoji in Buttons (Theme Toggle) */
+.view-mode-btn:has(svg:only-child),
+.view-mode-btn:not(:has(svg)) {
+  font-size: 13px;
 }
 
 /* ============ MAIN CONTENT ============ */
@@ -587,21 +605,20 @@ body {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 6px 12px;
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-md);
-  background: var(--bg-secondary);
-  color: var(--text-primary);
-  font-size: 12px;
+  padding: 5px 12px;
+  border: none;
+  border-radius: calc(var(--radius-md) - 2px);
+  background: var(--bg-tertiary);
+  color: var(--text-muted);
+  font-size: 11px;
   font-weight: 500;
   cursor: pointer;
   transition: all 0.15s ease;
 }
 
 .export-btn:hover {
-  background: var(--accent-color);
-  border-color: var(--accent-color);
-  color: white;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
 }
 
 .export-btn svg {
@@ -644,21 +661,21 @@ body {
 /* View Mode Toggle */
 .view-mode-toggle {
   display: flex;
-  gap: 4px;
+  gap: 2px;
   background-color: var(--bg-tertiary);
   border-radius: var(--radius-md);
-  padding: 4px;
+  padding: 3px;
 }
 
 .toggle-btn {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 28px;
+  width: 30px;
+  height: 26px;
   border: none;
   background: transparent;
-  border-radius: var(--radius-sm);
+  border-radius: calc(var(--radius-md) - 2px);
   color: var(--text-muted);
   cursor: pointer;
   transition: all var(--transition-fast);
@@ -1993,6 +2010,31 @@ body {
   background: var(--bg-tertiary);
 }
 
+/* Task Status in Statusbar */
+.status-tasks {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.task-count {
+  color: var(--text-secondary);
+}
+
+.task-open {
+  color: var(--text-muted);
+}
+
+.task-critical {
+  color: #e53935;
+  font-weight: 500;
+}
+
+.task-overdue {
+  color: #fb8c00;
+  font-weight: 500;
+}
+
 /* ============ BUTTONS ============ */
 .btn-icon {
   display: flex;
@@ -2144,11 +2186,25 @@ body {
 
 .context-menu-item.with-submenu {
   position: relative;
+  cursor: default;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  font-size: 13px;
+  color: var(--text-primary);
+  border-radius: var(--radius-sm);
+  transition: background-color var(--transition-fast);
+}
+
+.context-menu-item.with-submenu:hover {
+  background-color: var(--bg-tertiary);
 }
 
 .submenu-arrow {
   font-size: 10px;
   opacity: 0.5;
+  margin-left: auto;
 }
 
 .context-menu-item.danger {
@@ -2163,6 +2219,156 @@ body {
   height: 1px;
   background-color: var(--border-color);
   margin: 6px 0;
+}
+
+/* Picker Dialog */
+.picker-dialog-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  animation: picker-fade-in 0.15s ease-out;
+}
+
+@keyframes picker-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.picker-dialog {
+  background: var(--bg-elevated);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  min-width: 280px;
+  max-width: 320px;
+  animation: picker-slide-in 0.15s ease-out;
+}
+
+@keyframes picker-slide-in {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.picker-dialog-header {
+  padding: 16px 20px 12px;
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--text-primary);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.picker-dialog-content {
+  padding: 16px 20px;
+}
+
+.picker-dialog-footer {
+  padding: 12px 20px 16px;
+  display: flex;
+  justify-content: flex-end;
+  border-top: 1px solid var(--border-color);
+}
+
+.picker-dialog-footer button {
+  padding: 8px 16px;
+  border: none;
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.picker-dialog-footer button:hover {
+  background: var(--bg-secondary);
+}
+
+/* Color Picker Grid */
+.picker-color-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.picker-color-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border: none;
+  background: none;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: background-color var(--transition-fast);
+  width: 100%;
+  text-align: left;
+}
+
+.picker-color-item:hover {
+  background: var(--bg-tertiary);
+}
+
+.picker-color-item.active {
+  background: var(--accent-subtle);
+}
+
+.picker-color-swatch {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid var(--border-color);
+  flex-shrink: 0;
+}
+
+.picker-color-item.active .picker-color-swatch {
+  border-color: var(--accent-color);
+}
+
+.picker-color-name {
+  font-size: 13px;
+  color: var(--text-primary);
+}
+
+/* Icon Picker Grid */
+.picker-icon-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.picker-icon-item {
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  border: none;
+  background: var(--bg-secondary);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.picker-icon-item:hover {
+  background: var(--bg-tertiary);
+  transform: scale(1.1);
+}
+
+.picker-icon-item.active {
+  background: var(--accent-subtle);
+  box-shadow: 0 0 0 2px var(--accent-color);
 }
 
 /* ============ COLOR PICKER ============ */

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { useUIStore, ACCENT_COLORS, AI_LANGUAGES, FONT_FAMILIES, UI_LANGUAGES, BACKGROUND_COLORS, type Language, type FontFamily, type BackgroundColor } from '../../stores/uiStore'
+import { useUIStore, ACCENT_COLORS, AI_LANGUAGES, FONT_FAMILIES, UI_LANGUAGES, BACKGROUND_COLORS, ICON_SETS, type Language, type FontFamily, type BackgroundColor, type IconSet } from '../../stores/uiStore'
 import { useNotesStore } from '../../stores/notesStore'
 import { useTranslation } from '../../utils/translations'
 import {
@@ -70,7 +70,9 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
     pdfDisplayMode,
     setPdfDisplayMode,
     canvasDefaultCardWidth,
-    setCanvasDefaultCardWidth
+    setCanvasDefaultCardWidth,
+    iconSet,
+    setIconSet
   } = useUIStore()
 
   const { t } = useTranslation()
@@ -510,6 +512,27 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
                   <p>
                     <strong>Kartenbreite</strong> bestimmt die Mindestbreite für Karten im Canvas.
                     Größere Werte zeigen mehr Inhalt, kleinere Werte ermöglichen kompaktere Darstellung.
+                  </p>
+                </div>
+
+                <h3>Dateibaum</h3>
+                <div className="settings-row">
+                  <label>Icon-Stil</label>
+                  <select
+                    value={iconSet}
+                    onChange={e => setIconSet(e.target.value as IconSet)}
+                  >
+                    {(Object.keys(ICON_SETS) as IconSet[]).map(key => (
+                      <option key={key} value={key}>
+                        {ICON_SETS[key].name} - {ICON_SETS[key].description}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="settings-info">
+                  <p>
+                    <strong>Icon-Stil</strong> ändert die Darstellung von Ordnern im Dateibaum.
+                    Individuelle Ordner-Farben und -Icons können per Rechtsklick angepasst werden.
                   </p>
                 </div>
 

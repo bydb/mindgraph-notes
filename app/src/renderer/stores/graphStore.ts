@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { subscribeWithSelector } from 'zustand/middleware'
-import type { NodePosition, ManualEdge } from '../../shared/types'
+import type { NodePosition, ManualEdge, FileCustomization } from '../../shared/types'
 
 // Canvas Label (Überschrift ohne Datei)
 export interface CanvasLabel {
@@ -19,6 +19,7 @@ interface GraphState {
   positions: Record<string, NodePosition>
   manualEdges: ManualEdge[]
   labels: CanvasLabel[]
+  fileCustomizations: Record<string, FileCustomization>
   viewport: { x: number; y: number; zoom: number }
   vaultPath: string | null
   isDirty: boolean
@@ -44,6 +45,10 @@ interface GraphState {
   updateLabel: (labelId: string, updates: Partial<Omit<CanvasLabel, 'id'>>) => void
   removeLabel: (labelId: string) => void
 
+  // FileTree Customization Actions
+  setFileCustomization: (path: string, customization: FileCustomization) => void
+  removeFileCustomization: (path: string) => void
+
   setViewport: (viewport: { x: number; y: number; zoom: number }) => void
 
   reset: () => void
@@ -53,6 +58,7 @@ const initialState = {
   positions: {} as Record<string, NodePosition>,
   manualEdges: [] as ManualEdge[],
   labels: [] as CanvasLabel[],
+  fileCustomizations: {} as Record<string, FileCustomization>,
   viewport: { x: 0, y: 0, zoom: 1 },
   vaultPath: null as string | null,
   isDirty: false
@@ -75,11 +81,12 @@ export const useGraphStore = create<GraphState>()(
             positions: (data as any).positions || {},
             manualEdges: (data as any).manualEdges || [],
             labels: (data as any).labels || [],
+            fileCustomizations: (data as any).fileCustomizations || {},
             viewport: (data as any).viewport || { x: 0, y: 0, zoom: 1 },
             vaultPath,
             isDirty: false
           })
-          console.log('Graph-Daten geladen:', Object.keys((data as any).positions || {}).length, 'Positionen,', ((data as any).labels || []).length, 'Labels')
+          console.log('Graph-Daten geladen:', Object.keys((data as any).positions || {}).length, 'Positionen,', ((data as any).labels || []).length, 'Labels,', Object.keys((data as any).fileCustomizations || {}).length, 'FileCustomizations')
         } else {
           set({ vaultPath, isDirty: false })
           console.log('Keine vorhandenen Graph-Daten gefunden')
@@ -104,17 +111,18 @@ export const useGraphStore = create<GraphState>()(
 
       try {
         const data = {
-          version: '1.1',
+          version: '1.2',
           lastModified: new Date().toISOString(),
           positions: state.positions,
           manualEdges: state.manualEdges,
           labels: state.labels,
+          fileCustomizations: state.fileCustomizations,
           viewport: state.viewport
         }
         console.log('Speichere Graph-Daten nach:', state.vaultPath)
         await window.electronAPI.saveGraphData(state.vaultPath, data)
         set({ isDirty: false })
-        console.log('Graph-Daten gespeichert:', Object.keys(state.positions).length, 'Positionen,', state.labels.length, 'Labels')
+        console.log('Graph-Daten gespeichert:', Object.keys(state.positions).length, 'Positionen,', state.labels.length, 'Labels,', Object.keys(state.fileCustomizations).length, 'FileCustomizations')
       } catch (error) {
         console.error('Fehler beim Speichern der Graph-Daten:', error)
       }
@@ -267,6 +275,37 @@ export const useGraphStore = create<GraphState>()(
         labels: state.labels.filter((l) => l.id !== labelId),
         isDirty: true
       }))
+      scheduleSave()
+    },
+
+    // FileTree Customization Actions
+    setFileCustomization: (path, customization) => {
+      console.log('[GraphStore] setFileCustomization:', path, customization)
+      set((state) => {
+        const existing = state.fileCustomizations[path] || {}
+        const merged = { ...existing, ...customization }
+        // Remove undefined/null values
+        const cleaned: FileCustomization = {}
+        if (merged.color) cleaned.color = merged.color
+        if (merged.icon) cleaned.icon = merged.icon
+
+        console.log('[GraphStore] Saving cleaned customization:', cleaned)
+        return {
+          fileCustomizations: {
+            ...state.fileCustomizations,
+            [path]: cleaned
+          },
+          isDirty: true
+        }
+      })
+      scheduleSave()
+    },
+
+    removeFileCustomization: (path) => {
+      set((state) => {
+        const { [path]: _, ...rest } = state.fileCustomizations
+        return { fileCustomizations: rest, isDirty: true }
+      })
       scheduleSave()
     },
 

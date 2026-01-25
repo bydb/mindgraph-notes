@@ -190,6 +190,7 @@ export interface ExtractedTask {
   line: number           // Zeilennummer im Dokument
   dueDate?: Date         // Aus @[[YYYY-MM-DD]] HH:MM
   isOverdue?: boolean    // Heute > dueDate
+  isCritical?: boolean   // Enthält #critical, @urgent, !!, etc.
 }
 
 export interface TaskSummary {
@@ -198,6 +199,16 @@ export interface TaskSummary {
   tasks: ExtractedTask[]
   hasOverdue: boolean
   nextDue?: Date
+  critical: number       // Anzahl kritischer unerledigter Tasks
+}
+
+// Vault-weite Task-Statistiken
+export interface VaultTaskStats {
+  total: number
+  completed: number
+  open: number
+  critical: number       // Kritische unerledigte Tasks
+  overdue: number        // Überfällige unerledigte Tasks
 }
 
 // Regex für Obsidian Reminder Format: (@[[YYYY-MM-DD]] HH:MM) oder (@[[YYYY-MM-DD]])
@@ -232,6 +243,23 @@ function isOverdue(date: Date): boolean {
   return date < new Date()
 }
 
+// Prüft ob ein Task als kritisch markiert ist
+// Erkannte Marker: #critical, #kritisch, @critical, @urgent, @dringend, !!, !!!
+function isCriticalTask(text: string): boolean {
+  const criticalPatterns = [
+    /#critical/i,
+    /#kritisch/i,
+    /#urgent/i,
+    /#dringend/i,
+    /@critical/i,
+    /@urgent/i,
+    /@dringend/i,
+    /!{2,}/,           // !! oder !!!
+    /\[!\]/,           // [!] Marker
+  ]
+  return criticalPatterns.some(pattern => pattern.test(text))
+}
+
 // Extrahiert alle Tasks aus Content
 export function extractTasks(content: string): TaskSummary {
   const tasks: ExtractedTask[] = []
@@ -247,19 +275,22 @@ export function extractTasks(content: string): TaskSummary {
       const fullText = match[2]
       const dueDate = parseReminderDate(fullText)
       const text = cleanTaskText(fullText)
+      const isCritical = isCriticalTask(fullText)
 
       tasks.push({
         text,
         completed,
         line: index + 1,
         dueDate,
-        isOverdue: dueDate ? isOverdue(dueDate) : false
+        isOverdue: dueDate ? isOverdue(dueDate) : false,
+        isCritical
       })
     }
   })
 
   const completedCount = tasks.filter(t => t.completed).length
   const hasOverdue = tasks.some(t => !t.completed && t.isOverdue)
+  const criticalCount = tasks.filter(t => !t.completed && t.isCritical).length
 
   // Nächstes fälliges Datum finden (nur unerledigte Tasks)
   const uncompletedWithDue = tasks.filter(t => !t.completed && t.dueDate)
@@ -275,7 +306,52 @@ export function extractTasks(content: string): TaskSummary {
     completed: completedCount,
     tasks,
     hasOverdue,
-    nextDue
+    nextDue,
+    critical: criticalCount
+  }
+}
+
+// Extrahiert Task-Statistiken für den Cache (wird beim Parsen aufgerufen)
+export function extractTaskStatsForCache(content: string): { total: number; completed: number; critical: number; overdue: number } {
+  const summary = extractTasks(content)
+  return {
+    total: summary.total,
+    completed: summary.completed,
+    critical: summary.critical,
+    overdue: summary.tasks.filter(t => !t.completed && t.isOverdue).length
+  }
+}
+
+// Berechnet Vault-weite Task-Statistiken aus allen Notizen
+// Unterstützt sowohl Notes mit content als auch CachedNoteMetadata mit taskStats
+export function getVaultTaskStats(notes: Array<{ content?: string; taskStats?: { total: number; completed: number; critical: number; overdue: number } }>): VaultTaskStats {
+  let total = 0
+  let completed = 0
+  let critical = 0
+  let overdue = 0
+
+  for (const note of notes) {
+    // Priorität: gecachte taskStats > content parsing
+    if (note.taskStats) {
+      total += note.taskStats.total
+      completed += note.taskStats.completed
+      critical += note.taskStats.critical
+      overdue += note.taskStats.overdue
+    } else if (note.content) {
+      const summary = extractTasks(note.content)
+      total += summary.total
+      completed += summary.completed
+      critical += summary.critical
+      overdue += summary.tasks.filter(t => !t.completed && t.isOverdue).length
+    }
+  }
+
+  return {
+    total,
+    completed,
+    open: total - completed,
+    critical,
+    overdue
   }
 }
 

@@ -21,6 +21,7 @@ export const Terminal: React.FC<TerminalProps> = ({ visible, onToggle }) => {
   const startHeightRef = useRef(0)
   const wasVisibleRef = useRef(false)
   const ptyStartedRef = useRef(false)
+  const errorShownRef = useRef(false)
 
   const vaultPath = useNotesStore((s) => s.vaultPath)
 
@@ -119,13 +120,29 @@ export const Terminal: React.FC<TerminalProps> = ({ visible, onToggle }) => {
       term.writeln('\r\n\x1b[31m[Terminal beendet - Klicke ↻ zum Neustart]\x1b[0m')
     })
 
-    // Terminal Error Handler
+    // Terminal Error Handler - nur einmal anzeigen
     window.electronAPI.onTerminalError((error: string) => {
       console.error('[Terminal] Error event received:', error)
       setIsConnected(false)
       isConnectedRef.current = false
       ptyStartedRef.current = false
-      term.writeln(`\r\n\x1b[31m[Fehler: ${error}]\x1b[0m`)
+
+      // Fehler nur einmal anzeigen
+      if (errorShownRef.current) return
+      errorShownRef.current = true
+
+      // Benutzerfreundliche Fehlermeldung
+      if (error.includes('posix_spawnp')) {
+        term.writeln('\r\n\x1b[33m┌─────────────────────────────────────────┐\x1b[0m')
+        term.writeln('\x1b[33m│\x1b[0m  Terminal konnte nicht gestartet werden \x1b[33m│\x1b[0m')
+        term.writeln('\x1b[33m│\x1b[0m                                         \x1b[33m│\x1b[0m')
+        term.writeln('\x1b[33m│\x1b[0m  Das integrierte Terminal ist in der    \x1b[33m│\x1b[0m')
+        term.writeln('\x1b[33m│\x1b[0m  Entwicklungsumgebung eingeschränkt.    \x1b[33m│\x1b[0m')
+        term.writeln('\x1b[33m│\x1b[0m  Nutze ein externes Terminal.           \x1b[33m│\x1b[0m')
+        term.writeln('\x1b[33m└─────────────────────────────────────────┘\x1b[0m')
+      } else {
+        term.writeln(`\r\n\x1b[31m[Fehler: ${error}]\x1b[0m`)
+      }
     })
 
     // Daten zum Terminal senden

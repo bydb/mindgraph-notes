@@ -116,44 +116,58 @@ export const useNotesStore = create<NotesState>((set, get) => ({
   }
 }))
 
-// Hilfsfunktion zum Neuberechnen der Backlinks
+// Hilfsfunktion zum Neuberechnen der Backlinks - OPTIMIERT mit Index O(n) statt O(n²)
 function recalculateBacklinks(notes: Note[]): Note[] {
-  return notes.map(note => {
-    const incomingLinks: string[] = []
+  const startTime = Date.now()
 
-    // Finde alle Notizen, die auf diese Notiz verlinken
-    for (const otherNote of notes) {
-      if (otherNote.id === note.id) continue
+  // 1. Index aufbauen: Link-Ziel -> Note-ID
+  // Jede Notiz kann über mehrere Wege erreicht werden (Titel, Pfad, Dateiname, PDF)
+  const linkTargetToNoteId = new Map<string, string>()
 
-      // Prüfe jeden ausgehenden Link der anderen Notiz
-      for (const linkText of otherNote.outgoingLinks) {
-        const linkLower = linkText.toLowerCase()
-        const titleLower = note.title.toLowerCase()
-        const pathWithoutExt = note.path.replace('.md', '').toLowerCase()
-        const fileNameWithoutExt = note.path.split('/').pop()?.replace('.md', '').toLowerCase() || ''
+  for (const note of notes) {
+    const titleLower = note.title.toLowerCase()
+    const pathWithoutExt = note.path.replace('.md', '').toLowerCase()
+    const fileNameWithoutExt = note.path.split('/').pop()?.replace('.md', '').toLowerCase() || ''
 
-        // PDF-Link Matching: [[document.pdf]] -> PDF-Companion
-        if (linkLower.endsWith('.pdf') && note.sourcePdf) {
-          const pdfFileName = note.sourcePdf.split('/').pop()?.toLowerCase() || ''
-          const linkFileName = linkLower.split('/').pop() || linkLower
-          if (pdfFileName === linkFileName || note.sourcePdf.toLowerCase() === linkLower) {
-            incomingLinks.push(otherNote.id)
-            break
-          }
+    // Alle Varianten registrieren
+    linkTargetToNoteId.set(titleLower, note.id)
+    linkTargetToNoteId.set(pathWithoutExt, note.id)
+    linkTargetToNoteId.set(fileNameWithoutExt, note.id)
+
+    // PDF-Companion: Auch PDF-Dateinamen registrieren
+    if (note.sourcePdf) {
+      const pdfFileName = note.sourcePdf.split('/').pop()?.toLowerCase() || ''
+      const pdfPath = note.sourcePdf.toLowerCase()
+      linkTargetToNoteId.set(pdfFileName, note.id)
+      linkTargetToNoteId.set(pdfPath, note.id)
+    }
+  }
+
+  // 2. Incoming Links berechnen: Für jeden ausgehenden Link schauen, welche Notiz das Ziel ist
+  const incomingLinksMap = new Map<string, Set<string>>()
+
+  for (const note of notes) {
+    for (const linkText of note.outgoingLinks) {
+      const linkLower = linkText.toLowerCase()
+      const targetNoteId = linkTargetToNoteId.get(linkLower)
+
+      if (targetNoteId && targetNoteId !== note.id) {
+        if (!incomingLinksMap.has(targetNoteId)) {
+          incomingLinksMap.set(targetNoteId, new Set())
         }
-
-        // Vergleiche mit verschiedenen Varianten
-        if (linkLower === titleLower ||
-            linkLower === pathWithoutExt ||
-            linkLower === fileNameWithoutExt) {
-          incomingLinks.push(otherNote.id)
-          break // Nur einmal pro Notiz zählen
-        }
+        incomingLinksMap.get(targetNoteId)!.add(note.id)
       }
     }
+  }
 
-    return { ...note, incomingLinks }
-  })
+  // 3. Notes mit berechneten Backlinks zurückgeben
+  const result = notes.map(note => ({
+    ...note,
+    incomingLinks: Array.from(incomingLinksMap.get(note.id) || [])
+  }))
+
+  console.log(`[Backlinks] ${notes.length} Notizen in ${Date.now() - startTime}ms verarbeitet`)
+  return result
 }
 
 // Hilfsfunktion zum Erstellen einer Note aus Datei-Daten
