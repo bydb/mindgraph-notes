@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react'
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useNotesStore } from '../../stores/notesStore'
+import MarkdownIt from 'markdown-it'
 
 interface ChatMessage {
   role: 'user' | 'assistant'
@@ -37,6 +38,13 @@ export const NotesChat: React.FC<NotesChatProps> = ({ onClose }) => {
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
+
+  // Markdown-Renderer für Chat-Nachrichten
+  const md = useMemo(() => new MarkdownIt({
+    html: false,
+    linkify: true,
+    breaks: true
+  }), [])
 
   // Aktuelle Notiz
   const currentNote = notes.find(n => n.id === selectedNoteId)
@@ -428,9 +436,10 @@ export const NotesChat: React.FC<NotesChatProps> = ({ onClose }) => {
               <>
                 {messages.map((msg, idx) => (
                   <div key={idx} className={`notes-chat-message ${msg.role}`}>
-                    <div className="notes-chat-message-content">
-                      {msg.content}
-                    </div>
+                    <div
+                      className="notes-chat-message-content markdown-content"
+                      dangerouslySetInnerHTML={{ __html: md.render(msg.content) }}
+                    />
                     {msg.role === 'assistant' && (
                       <button
                         className={`notes-chat-copy ${copiedIndex === idx ? 'copied' : ''}`}
@@ -453,10 +462,10 @@ export const NotesChat: React.FC<NotesChatProps> = ({ onClose }) => {
                 ))}
                 {streamingContent && (
                   <div className="notes-chat-message assistant streaming">
-                    <div className="notes-chat-message-content">
-                      {streamingContent}
-                      <span className="notes-chat-cursor">|</span>
-                    </div>
+                    <div
+                      className="notes-chat-message-content markdown-content"
+                      dangerouslySetInnerHTML={{ __html: md.render(streamingContent) + '<span class="notes-chat-cursor">|</span>' }}
+                    />
                   </div>
                 )}
                 <div ref={messagesEndRef} />

@@ -8023,8 +8023,70 @@ body {
   border-radius: var(--radius-lg);
   font-size: 13px;
   line-height: 1.5;
-  white-space: pre-wrap;
   word-break: break-word;
+}
+
+/* Markdown-Rendering in Chat-Nachrichten */
+.notes-chat-message-content.markdown-content p {
+  margin: 0 0 0.5em 0;
+}
+
+.notes-chat-message-content.markdown-content p:last-child {
+  margin-bottom: 0;
+}
+
+.notes-chat-message-content.markdown-content strong {
+  font-weight: 600;
+}
+
+.notes-chat-message-content.markdown-content em {
+  font-style: italic;
+}
+
+.notes-chat-message-content.markdown-content code {
+  background: rgba(0, 0, 0, 0.15);
+  padding: 0.1em 0.3em;
+  border-radius: 3px;
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+}
+
+.notes-chat-message-content.markdown-content pre {
+  background: rgba(0, 0, 0, 0.2);
+  padding: 8px 12px;
+  border-radius: 6px;
+  overflow-x: auto;
+  margin: 0.5em 0;
+}
+
+.notes-chat-message-content.markdown-content pre code {
+  background: none;
+  padding: 0;
+}
+
+.notes-chat-message-content.markdown-content ul,
+.notes-chat-message-content.markdown-content ol {
+  margin: 0.5em 0;
+  padding-left: 1.5em;
+}
+
+.notes-chat-message-content.markdown-content blockquote {
+  border-left: 3px solid var(--accent-color);
+  margin: 0.5em 0;
+  padding-left: 10px;
+  opacity: 0.9;
+}
+
+.notes-chat-message-content.markdown-content a {
+  color: inherit;
+  text-decoration: underline;
+}
+
+.notes-chat-message-content.markdown-content hr {
+  border: none;
+  border-top: 1px solid currentColor;
+  opacity: 0.3;
+  margin: 0.75em 0;
 }
 
 .notes-chat-message.user .notes-chat-message-content {
