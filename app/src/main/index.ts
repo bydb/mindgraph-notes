@@ -1099,6 +1099,175 @@ ipcMain.handle('ollama-generate', async (_event, request: OllamaRequest) => {
   }
 })
 
+// Generiert Embeddings für Text (für Smart Connections)
+ipcMain.handle('ollama-embeddings', async (_event, model: string, text: string) => {
+  console.log('[Ollama] Embeddings request for model:', model, 'text length:', text.length)
+
+  try {
+    // Timeout nach 60 Sekunden
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 60000)
+
+    const response = await fetch(`${OLLAMA_API_URL}/api/embeddings`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model,
+        prompt: text
+      }),
+      signal: controller.signal
+    })
+
+    clearTimeout(timeoutId)
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error('[Ollama] Embeddings API error:', errorText)
+      throw new Error(`Ollama API Fehler: ${response.status}`)
+    }
+
+    const data = await response.json()
+
+    if (!data.embedding) {
+      throw new Error('Keine Embeddings in der Antwort')
+    }
+
+    return {
+      success: true,
+      embedding: data.embedding
+    }
+  } catch (error) {
+    console.error('[Ollama] Embeddings error:', error)
+
+    // Spezifische Fehlermeldungen
+    let errorMessage = 'Unbekannter Fehler'
+    if (error instanceof Error) {
+      if (error.name === 'AbortError') {
+        errorMessage = 'Timeout: Embedding-Generierung dauerte zu lange (>60s)'
+      } else {
+        errorMessage = error.message
+      }
+    }
+
+    return {
+      success: false,
+      error: errorMessage
+    }
+  }
+})
+
+// Chat mit Kontext (für Notes Chat)
+ipcMain.handle('ollama-chat', async (event, model: string, messages: Array<{ role: string; content: string }>, context: string) => {
+  console.log('[Ollama] Chat request with model:', model, 'context length:', context.length)
+
+  try {
+    // System-Prompt mit Kontext
+    const systemMessage = {
+      role: 'system',
+      content: `Du bist ein hilfreicher Assistent, der Fragen zu den folgenden Notizen beantwortet. Antworte auf Deutsch, sei präzise und beziehe dich auf den Inhalt der Notizen.
+
+NOTIZEN-KONTEXT:
+${context}
+
+---
+Beantworte nun die Fragen des Nutzers basierend auf diesen Notizen. Wenn die Antwort nicht in den Notizen zu finden ist, sage das ehrlich.`
+    }
+
+    const allMessages = [systemMessage, ...messages]
+
+    const response = await fetch(`${OLLAMA_API_URL}/api/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model,
+        messages: allMessages,
+        stream: true
+      })
+    })
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error('[Ollama] Chat API error:', errorText)
+      throw new Error(`Ollama API Fehler: ${response.status}`)
+    }
+
+    // Stream verarbeiten
+    const reader = response.body?.getReader()
+    if (!reader) throw new Error('Keine Response-Daten')
+
+    const decoder = new TextDecoder()
+    let fullResponse = ''
+    let buffer = ''
+
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+
+      const chunk = decoder.decode(value, { stream: true })
+      buffer += chunk
+
+      // Verarbeite komplette Zeilen
+      const lines = buffer.split('\n')
+      buffer = lines.pop() || ''
+
+      for (const line of lines) {
+        const trimmedLine = line.trim()
+        if (!trimmedLine) continue
+
+        try {
+          const json = JSON.parse(trimmedLine)
+          if (json.message?.content) {
+            fullResponse += json.message.content
+            // Sende Chunk an Renderer
+            event.sender.send('ollama-chat-chunk', json.message.content)
+          }
+          if (json.done) {
+            event.sender.send('ollama-chat-done')
+          }
+        } catch {
+          // Ignoriere ungültige JSON-Zeilen
+        }
+      }
+    }
+
+    return {
+      success: true,
+      response: fullResponse
+    }
+  } catch (error) {
+    console.error('[Ollama] Chat error:', error)
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unbekannter Fehler'
+    }
+  }
+})
+
+// Holt verfügbare Embedding-Modelle
+ipcMain.handle('ollama-embedding-models', async () => {
+  try {
+    const response = await fetch(`${OLLAMA_API_URL}/api/tags`, {
+      method: 'GET',
+      signal: AbortSignal.timeout(5000)
+    })
+
+    if (!response.ok) return []
+
+    const data = await response.json()
+    // Bekannte Embedding-Modelle (nomic-embed-text, mxbai-embed-large, all-minilm, etc.)
+    const embeddingPatterns = ['embed', 'minilm', 'bge', 'gte', 'e5']
+    return data.models?.filter((m: { name: string }) =>
+      embeddingPatterns.some(pattern => m.name.toLowerCase().includes(pattern))
+    ).map((m: { name: string; size: number }) => ({
+      name: m.name,
+      size: m.size
+    })) || []
+  } catch (error) {
+    console.error('[Ollama] Error fetching embedding models:', error)
+    return []
+  }
+})
+
 // Holt verfügbare Bildgenerierungs-Modelle (z.B. flux2-klein)
 ipcMain.handle('ollama-image-models', async () => {
   try {

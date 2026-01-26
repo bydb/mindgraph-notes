@@ -80,7 +80,11 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
     canvasDefaultCardWidth,
     setCanvasDefaultCardWidth,
     iconSet,
-    setIconSet
+    setIconSet,
+    smartConnectionsEnabled,
+    setSmartConnectionsEnabled,
+    notesChatEnabled,
+    setNotesChatEnabled
   } = useUIStore()
 
   const { t } = useTranslation()
@@ -772,6 +776,36 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
                   <p>
                     <strong>Transparenz:</strong> Jede KI-Nutzung wird automatisch als Fußnote dokumentiert.
                   </p>
+                </div>
+
+                <h3 style={{ marginTop: '32px' }}>KI-Features</h3>
+                <div className="settings-info" style={{ marginBottom: '16px' }}>
+                  <p>
+                    Diese Features benötigen Ollama. Auf älteren Rechnern ohne lokale KI-Unterstützung
+                    können sie deaktiviert werden, um Ressourcen zu sparen.
+                  </p>
+                </div>
+                <div className="settings-row">
+                  <label>
+                    Smart Connections
+                    <span className="settings-hint">Semantische Ähnlichkeitsanalyse zwischen Notizen</span>
+                  </label>
+                  <input
+                    type="checkbox"
+                    checked={smartConnectionsEnabled}
+                    onChange={e => setSmartConnectionsEnabled(e.target.checked)}
+                  />
+                </div>
+                <div className="settings-row">
+                  <label>
+                    Notes Chat
+                    <span className="settings-hint">Mit Notizen über ein KI-Modell chatten</span>
+                  </label>
+                  <input
+                    type="checkbox"
+                    checked={notesChatEnabled}
+                    onChange={e => setNotesChatEnabled(e.target.checked)}
+                  />
                 </div>
 
                 <h3 style={{ marginTop: '32px' }}>Zotero / Better BibTeX</h3>

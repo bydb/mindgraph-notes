@@ -91,6 +91,23 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('ollama-image-progress', (_event, progress) => callback(progress))
   },
 
+  // Ollama Embeddings für Smart Connections
+  ollamaEmbeddings: (model: string, text: string) =>
+    ipcRenderer.invoke('ollama-embeddings', model, text),
+  ollamaEmbeddingModels: () => ipcRenderer.invoke('ollama-embedding-models'),
+
+  // Ollama Chat für Notes Chat
+  ollamaChat: (model: string, messages: Array<{ role: string; content: string }>, context: string) =>
+    ipcRenderer.invoke('ollama-chat', model, messages, context),
+  onOllamaChatChunk: (callback: (chunk: string) => void) => {
+    ipcRenderer.removeAllListeners('ollama-chat-chunk')
+    ipcRenderer.on('ollama-chat-chunk', (_event, chunk) => callback(chunk))
+  },
+  onOllamaChatDone: (callback: () => void) => {
+    ipcRenderer.removeAllListeners('ollama-chat-done')
+    ipcRenderer.on('ollama-chat-done', () => callback())
+  },
+
   // Wikilink Stripping
   stripWikilinksInFolder: (folderPath: string, vaultPath: string) =>
     ipcRenderer.invoke('strip-wikilinks-in-folder', folderPath, vaultPath),

@@ -13,6 +13,10 @@ import { QuickSwitcher } from './components/QuickSwitcher/QuickSwitcher'
 import { TemplatePicker } from './components/TemplatePicker/TemplatePicker'
 import { TemplateSettings } from './components/TemplatePicker/TemplateSettings'
 import { Settings } from './components/Settings/Settings'
+import { OverduePanel } from './components/OverduePanel/OverduePanel'
+import { TagsPanel } from './components/TagsPanel/TagsPanel'
+import { SmartConnectionsPanel } from './components/SmartConnectionsPanel/SmartConnectionsPanel'
+import { NotesChat } from './components/NotesChat/NotesChat'
 import { useUIStore, ACCENT_COLORS, FONT_FAMILIES, BACKGROUND_COLORS, initializeUISettings } from './stores/uiStore'
 import { useTranslation } from './utils/translations'
 import { useNotesStore } from './stores/notesStore'
@@ -37,7 +41,7 @@ const ViewModeButton: React.FC<{
 )
 
 const App: React.FC = () => {
-  const { viewMode, setViewMode, toggleSidebar, sidebarVisible, splitPosition, setSplitPosition, sidebarWidth, setSidebarWidth, theme, setTheme, accentColor, backgroundColor, fontFamily, setPendingTemplateInsert, textSplitEnabled, setTextSplitEnabled, textSplitPosition, setTextSplitPosition } = useUIStore()
+  const { viewMode, setViewMode, toggleSidebar, sidebarVisible, splitPosition, setSplitPosition, sidebarWidth, setSidebarWidth, theme, setTheme, accentColor, backgroundColor, fontFamily, setPendingTemplateInsert, textSplitEnabled, setTextSplitEnabled, textSplitPosition, setTextSplitPosition, smartConnectionsEnabled, notesChatEnabled } = useUIStore()
   const { notes, vaultPath, selectNote, selectedPdfPath, selectedImagePath, secondarySelectedNoteId } = useNotesStore()
   const { t } = useTranslation()
   const { startChecking, stopChecking } = useReminderStore()
@@ -48,6 +52,10 @@ const App: React.FC = () => {
   const [templatePickerOpen, setTemplatePickerOpen] = useState(false)
   const [templateSettingsOpen, setTemplateSettingsOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [overduePanelOpen, setOverduePanelOpen] = useState(false)
+  const [tagsPanelOpen, setTagsPanelOpen] = useState(false)
+  const [smartConnectionsOpen, setSmartConnectionsOpen] = useState(false)
+  const [notesChatOpen, setNotesChatOpen] = useState(false)
   const [pendingNoteTitle, setPendingNoteTitle] = useState<string | null>(null)
   const workspaceRef = useRef<HTMLDivElement>(null)
   const contentAreaRef = useRef<HTMLDivElement>(null)
@@ -394,7 +402,60 @@ const App: React.FC = () => {
                   <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
                 </svg>
               </button>
-                            <button
+              <button
+                className={`view-mode-btn overdue-btn ${overduePanelOpen ? 'active' : ''} ${taskStats.overdue > 0 ? 'has-overdue' : ''}`}
+                onClick={() => setOverduePanelOpen(!overduePanelOpen)}
+                title={`Überfällige Aufgaben (${taskStats.overdue})`}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="10"/>
+                  <polyline points="12 6 12 12 16 14"/>
+                </svg>
+                {taskStats.overdue > 0 && (
+                  <span className="overdue-badge">{taskStats.overdue}</span>
+                )}
+              </button>
+              <button
+                className={`view-mode-btn ${tagsPanelOpen ? 'active' : ''}`}
+                onClick={() => setTagsPanelOpen(!tagsPanelOpen)}
+                title="Tags anzeigen"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/>
+                  <line x1="7" y1="7" x2="7.01" y2="7"/>
+                </svg>
+              </button>
+              {smartConnectionsEnabled && (
+                <button
+                  className={`view-mode-btn ${smartConnectionsOpen ? 'active' : ''}`}
+                  onClick={() => setSmartConnectionsOpen(!smartConnectionsOpen)}
+                  title="Smart Connections (KI-Ähnlichkeit)"
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="3"/>
+                    <path d="M12 2v4"/>
+                    <path d="M12 18v4"/>
+                    <path d="M4.93 4.93l2.83 2.83"/>
+                    <path d="M16.24 16.24l2.83 2.83"/>
+                    <path d="M2 12h4"/>
+                    <path d="M18 12h4"/>
+                    <path d="M4.93 19.07l2.83-2.83"/>
+                    <path d="M16.24 7.76l2.83-2.83"/>
+                  </svg>
+                </button>
+              )}
+              {notesChatEnabled && (
+                <button
+                  className={`view-mode-btn ${notesChatOpen ? 'active' : ''}`}
+                  onClick={() => setNotesChatOpen(!notesChatOpen)}
+                  title="Notes Chat (mit Notizen chatten)"
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                  </svg>
+                </button>
+              )}
+              <button
                 className={`view-mode-btn ${terminalVisible ? 'active' : ''}`}
                 onClick={() => setTerminalVisible(!terminalVisible)}
                 title="Terminal ein/ausblenden"
@@ -422,7 +483,7 @@ const App: React.FC = () => {
               </>
             )}
 
-            <div className={`workspace ${viewMode} ${textSplitEnabled ? 'text-split' : ''}`} ref={workspaceRef}>
+            <div className={`workspace ${viewMode} ${(textSplitEnabled || overduePanelOpen || tagsPanelOpen || (smartConnectionsOpen && smartConnectionsEnabled) || (notesChatOpen && notesChatEnabled)) ? 'text-split' : ''}`} ref={workspaceRef}>
               {/* Primary Editor Panel */}
               <div
                 className="editor-panel"
@@ -450,20 +511,28 @@ const App: React.FC = () => {
               </div>
 
               {/* Text Split Divider */}
-              {textSplitEnabled && viewMode === 'editor' && (
+              {(textSplitEnabled || overduePanelOpen || tagsPanelOpen || (smartConnectionsOpen && smartConnectionsEnabled) || (notesChatOpen && notesChatEnabled)) && viewMode === 'editor' && (
                 <div
                   className="text-split-divider"
                   onMouseDown={handleTextSplitDividerMouseDown}
                 />
               )}
 
-              {/* Secondary Editor Panel (Text Split) */}
-              {textSplitEnabled && viewMode === 'editor' && (
+              {/* Secondary Editor Panel (Text Split) or Overdue/Tags/SmartConnections/Chat Panel */}
+              {(textSplitEnabled || overduePanelOpen || tagsPanelOpen || (smartConnectionsOpen && smartConnectionsEnabled) || (notesChatOpen && notesChatEnabled)) && viewMode === 'editor' && (
                 <div
                   className="editor-panel editor-panel-secondary"
                   style={{ flex: `0 0 ${100 - textSplitPosition}%` }}
                 >
-                  {secondarySelectedNoteId ? (
+                  {overduePanelOpen ? (
+                    <OverduePanel onClose={() => setOverduePanelOpen(false)} />
+                  ) : tagsPanelOpen ? (
+                    <TagsPanel onClose={() => setTagsPanelOpen(false)} />
+                  ) : (smartConnectionsOpen && smartConnectionsEnabled) ? (
+                    <SmartConnectionsPanel onClose={() => setSmartConnectionsOpen(false)} />
+                  ) : (notesChatOpen && notesChatEnabled) ? (
+                    <NotesChat onClose={() => setNotesChatOpen(false)} />
+                  ) : secondarySelectedNoteId ? (
                     <>
                       <MarkdownEditor isSecondary />
                       <BacklinksPanel isSecondary />

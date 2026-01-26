@@ -253,6 +253,10 @@ interface UIState {
   // FileTree Icon Settings
   iconSet: IconSet  // 'default' | 'minimal' | 'colorful' | 'emoji'
 
+  // KI-Features (für ältere Rechner ohne Ollama deaktivierbar)
+  smartConnectionsEnabled: boolean
+  notesChatEnabled: boolean
+
   // Actions
   setViewMode: (mode: ViewMode) => void
   setTheme: (theme: Theme) => void
@@ -288,6 +292,8 @@ interface UIState {
   setPdfCompanionEnabled: (enabled: boolean) => void
   setPdfDisplayMode: (mode: PdfDisplayMode) => void
   setIconSet: (set: IconSet) => void
+  setSmartConnectionsEnabled: (enabled: boolean) => void
+  setNotesChatEnabled: (enabled: boolean) => void
 }
 
 // Default-Werte für den Store
@@ -340,7 +346,11 @@ const defaultState = {
   pdfDisplayMode: 'companion-only' as PdfDisplayMode,
 
   // FileTree Icon Settings
-  iconSet: 'default' as IconSet
+  iconSet: 'default' as IconSet,
+
+  // KI-Features (für ältere Rechner ohne Ollama deaktivierbar)
+  smartConnectionsEnabled: true,
+  notesChatEnabled: true
 }
 
 // Felder die persistiert werden sollen (keine Funktionen, keine transienten Werte)
@@ -351,7 +361,8 @@ const persistedKeys = [
   'sidebarWidth', 'sidebarVisible', 'editorPreviewSplit', 'textSplitEnabled', 'textSplitPosition',
   'canvasFilterPath', 'canvasViewMode', 'canvasShowTags', 'canvasShowLinks', 'canvasShowImages',
   'canvasCompactMode', 'canvasDefaultCardWidth', 'splitPosition', 'fileTreeDisplayMode', 'ollama',
-  'pdfCompanionEnabled', 'pdfDisplayMode', 'iconSet'
+  'pdfCompanionEnabled', 'pdfDisplayMode', 'iconSet',
+  'smartConnectionsEnabled', 'notesChatEnabled'
 ] as const
 
 export const useUIStore = create<UIState>()((set, get) => ({
@@ -391,7 +402,9 @@ export const useUIStore = create<UIState>()((set, get) => ({
   setOllama: (settings) => set((state) => ({ ollama: { ...state.ollama, ...settings } })),
   setPdfCompanionEnabled: (enabled) => set({ pdfCompanionEnabled: enabled }),
   setPdfDisplayMode: (mode) => set({ pdfDisplayMode: mode }),
-  setIconSet: (iconSet) => set({ iconSet })
+  setIconSet: (iconSet) => set({ iconSet }),
+  setSmartConnectionsEnabled: (enabled) => set({ smartConnectionsEnabled: enabled }),
+  setNotesChatEnabled: (enabled) => set({ notesChatEnabled: enabled })
 }))
 
 // Settings laden beim App-Start

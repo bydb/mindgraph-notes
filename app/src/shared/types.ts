@@ -144,6 +144,7 @@ export interface ElectronAPI {
   openVault: () => Promise<string | null>;
   readDirectory: (dirPath: string) => Promise<FileEntry[]>;
   readFile: (filePath: string) => Promise<string>;
+  readFilesBatch: (basePath: string, relativePaths: string[]) => Promise<Record<string, string | null>>;
   readFileBinary: (filePath: string) => Promise<string>;  // Returns Base64
   writeFile: (filePath: string, content: string) => Promise<void>;
   deleteFile: (filePath: string) => Promise<boolean>;
@@ -204,6 +205,11 @@ export interface ElectronAPI {
   // Graph-Daten Persistenz
   saveGraphData: (vaultPath: string, data: object) => Promise<boolean>;
   loadGraphData: (vaultPath: string) => Promise<object | null>;
+
+  // Notes Cache für schnelles Laden
+  saveNotesCache: (vaultPath: string, cache: object) => Promise<boolean>;
+  loadNotesCache: (vaultPath: string) => Promise<object | null>;
+  getFilesWithMtime: (vaultPath: string) => Promise<Array<{ path: string; mtime: number }>>;
 
   // PDF Export
   exportPDF: (defaultFileName: string, htmlContent: string, title: string) => Promise<{
@@ -267,6 +273,23 @@ export interface ElectronAPI {
     error?: string;
   }>;
   onOllamaImageProgress: (callback: (progress: { completed: number; total: number }) => void) => void;
+
+  // Ollama Embeddings für Smart Connections
+  ollamaEmbeddings: (model: string, text: string) => Promise<{
+    success: boolean;
+    embedding?: number[];
+    error?: string;
+  }>;
+  ollamaEmbeddingModels: () => Promise<Array<{ name: string; size: number }>>;
+
+  // Ollama Chat für Notes Chat
+  ollamaChat: (model: string, messages: Array<{ role: string; content: string }>, context: string) => Promise<{
+    success: boolean;
+    response?: string;
+    error?: string;
+  }>;
+  onOllamaChatChunk: (callback: (chunk: string) => void) => void;
+  onOllamaChatDone: (callback: () => void) => void;
 
   // Wikilink Stripping
   stripWikilinksInFolder: (folderPath: string, vaultPath: string) => Promise<{
