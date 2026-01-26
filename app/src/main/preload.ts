@@ -97,8 +97,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   ollamaEmbeddingModels: () => ipcRenderer.invoke('ollama-embedding-models'),
 
   // Ollama Chat für Notes Chat
-  ollamaChat: (model: string, messages: Array<{ role: string; content: string }>, context: string) =>
-    ipcRenderer.invoke('ollama-chat', model, messages, context),
+  ollamaChat: (model: string, messages: Array<{ role: string; content: string }>, context: string, chatMode: 'direct' | 'socratic' = 'direct') =>
+    ipcRenderer.invoke('ollama-chat', model, messages, context, chatMode),
   onOllamaChatChunk: (callback: (chunk: string) => void) => {
     ipcRenderer.removeAllListeners('ollama-chat-chunk')
     ipcRenderer.on('ollama-chat-chunk', (_event, chunk) => callback(chunk))

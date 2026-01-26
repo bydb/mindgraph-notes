@@ -15,6 +15,7 @@ interface OllamaModel {
 }
 
 type ContextMode = 'current' | 'folder' | 'all'
+type ChatMode = 'direct' | 'socratic'
 
 interface NotesChatProps {
   onClose: () => void
@@ -27,6 +28,7 @@ export const NotesChat: React.FC<NotesChatProps> = ({ onClose }) => {
   const [isOllamaAvailable, setIsOllamaAvailable] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [contextMode, setContextMode] = useState<ContextMode>('current')
+  const [chatMode, setChatMode] = useState<ChatMode>('direct')
   const [selectedFolder, setSelectedFolder] = useState<string>('')
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [inputValue, setInputValue] = useState('')
@@ -198,7 +200,7 @@ export const NotesChat: React.FC<NotesChatProps> = ({ onClose }) => {
       }))
       recentMessages.push({ role: 'user', content: userMessage })
 
-      await window.electronAPI.ollamaChat(selectedModel, recentMessages, context)
+      await window.electronAPI.ollamaChat(selectedModel, recentMessages, context, chatMode)
     } catch (err) {
       console.error('[NotesChat] Error sending message:', err)
       setMessages(prev => [...prev, {
@@ -387,6 +389,28 @@ export const NotesChat: React.FC<NotesChatProps> = ({ onClose }) => {
 
             <div className="notes-chat-context-info">
               {getContextInfo()}
+            </div>
+
+            <div className="notes-chat-mode">
+              <label>Modus:</label>
+              <div className="notes-chat-mode-buttons">
+                <button
+                  className={chatMode === 'direct' ? 'active' : ''}
+                  onClick={() => setChatMode('direct')}
+                  disabled={isStreaming}
+                  title="Direkte Antworten auf deine Fragen"
+                >
+                  Direkt
+                </button>
+                <button
+                  className={chatMode === 'socratic' ? 'active' : ''}
+                  onClick={() => setChatMode('socratic')}
+                  disabled={isStreaming}
+                  title="Sokratischer Dialog - die KI stellt Rückfragen"
+                >
+                  Sokratisch
+                </button>
+              </div>
             </div>
           </div>
 

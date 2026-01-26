@@ -1157,20 +1157,36 @@ ipcMain.handle('ollama-embeddings', async (_event, model: string, text: string) 
 })
 
 // Chat mit Kontext (für Notes Chat)
-ipcMain.handle('ollama-chat', async (event, model: string, messages: Array<{ role: string; content: string }>, context: string) => {
-  console.log('[Ollama] Chat request with model:', model, 'context length:', context.length)
+ipcMain.handle('ollama-chat', async (event, model: string, messages: Array<{ role: string; content: string }>, context: string, chatMode: 'direct' | 'socratic' = 'direct') => {
+  console.log('[Ollama] Chat request with model:', model, 'context length:', context.length, 'mode:', chatMode)
 
   try {
-    // System-Prompt mit Kontext
-    const systemMessage = {
-      role: 'system',
-      content: `Du bist ein hilfreicher Assistent, der Fragen zu den folgenden Notizen beantwortet. Antworte auf Deutsch, sei präzise und beziehe dich auf den Inhalt der Notizen.
+    // System-Prompt basierend auf Modus
+    const directPrompt = `Du bist ein hilfreicher Assistent, der Fragen zu den folgenden Notizen beantwortet. Antworte auf Deutsch, sei präzise und beziehe dich auf den Inhalt der Notizen.
 
 NOTIZEN-KONTEXT:
 ${context}
 
 ---
 Beantworte nun die Fragen des Nutzers basierend auf diesen Notizen. Wenn die Antwort nicht in den Notizen zu finden ist, sage das ehrlich.`
+
+    const socraticPrompt = `Du bist ein sokratischer Tutor. Deine Aufgabe: Den Nutzer durch EINE gezielte Frage zum Nachdenken anregen.
+
+REGELN:
+- Antworte IMMER mit genau EINER kurzen Rückfrage (1-2 Sätze max)
+- Gib NIEMALS die Antwort direkt
+- Halte dich kurz und prägnant
+- Nur bei "Ich weiß nicht" oder "Sag es mir" gibst du einen kleinen Hinweis
+
+NOTIZEN-KONTEXT:
+${context}
+
+---
+Stelle EINE kurze Frage, die zum Nachdenken anregt.`
+
+    const systemMessage = {
+      role: 'system',
+      content: chatMode === 'socratic' ? socraticPrompt : directPrompt
     }
 
     const allMessages = [systemMessage, ...messages]

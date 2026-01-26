@@ -7918,6 +7918,57 @@ body {
   padding: 4px 0;
 }
 
+.notes-chat-mode {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border-color);
+}
+
+.notes-chat-mode label {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-weight: 500;
+  min-width: 50px;
+}
+
+.notes-chat-mode-buttons {
+  display: flex;
+  gap: 4px;
+}
+
+.notes-chat-mode-buttons button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 10px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-primary);
+  color: var(--text-muted);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 12px;
+  transition: all var(--transition-fast);
+}
+
+.notes-chat-mode-buttons button:hover {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+.notes-chat-mode-buttons button.active {
+  background: var(--accent-color);
+  border-color: var(--accent-color);
+  color: white;
+}
+
+.notes-chat-mode-buttons button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .notes-chat-messages {
   flex: 1;
   overflow-y: auto;
