@@ -28,7 +28,7 @@ categories:
 
 ## Die Verschiebung, die ich spüre
 
-Wenn ich heute eine Vorlesung in meine Notiz-App lade und sie in Sekunden zusammengefasst bekomme, fasziniert mich das. Gleichzeitig beschleicht mich ein seltsames Unbehagen. Habe ich etwas verstanden – oder nur konsumiert?
+Wenn ich heute einen neuen Text in meine Notiz-App lade und sie in Sekunden zusammengefasst bekomme, fasziniert mich das. Gleichzeitig beschleicht mich ein seltsames Unbehagen. Habe ich etwas verstanden – oder nur konsumiert?
 
 Diese Ambivalenz ist kein individuelles Phänomen. Sie ist das Symptom einer tektonischen Verschiebung in der Art, wie wir Wissen generieren, vernetzen und verstehen. Wir bewegen uns von der "Informationsgesellschaft", in der der Zugang zu Informationen das Nadelöhr war, zur "Synthesegesellschaft", in der die Selektion und Verknüpfung durch KI zur primären Wertschöpfung wird.
 
