@@ -4,6 +4,7 @@ import type { FileEntry } from '../../../shared/types'
 import { useNotesStore } from '../../stores/notesStore'
 import { useUIStore, FOLDER_COLORS, FOLDER_ICONS, type IconSet } from '../../stores/uiStore'
 import { useGraphStore } from '../../stores/graphStore'
+import { useTabStore } from '../../stores/tabStore'
 import { generateNoteId } from '../../utils/linkExtractor'
 
 type DisplayMode = 'name' | 'path'
@@ -178,6 +179,7 @@ const FileItem: React.FC<FileItemProps> = ({ entry, level, onDrop, displayMode }
   const { selectedNoteId, secondarySelectedNoteId, selectedPdfPath, selectedImagePath, selectNote, selectSecondaryNote, selectPdf, selectImage, removeNote, setFileTree, vaultPath, notes, updateNotePath } = useNotesStore()
   const { iconSet, textSplitEnabled } = useUIStore()
   const { fileCustomizations, setFileCustomization, removeFileCustomization } = useGraphStore()
+  const { openCanvasTab } = useTabStore()
 
   const isPdf = entry.fileType === 'pdf'
   const isImage = entry.fileType === 'image'
@@ -492,6 +494,15 @@ const FileItem: React.FC<FileItemProps> = ({ entry, level, onDrop, displayMode }
     startEditing()
   }, [])
 
+  // Open note in local canvas tab
+  const handleOpenInCanvas = useCallback(() => {
+    if (!contextMenu || contextMenu.entry.isDirectory || isPdf || isImage) return
+    const noteId = generateNoteId(contextMenu.entry.path)
+    const title = contextMenu.entry.name.replace('.md', '')
+    openCanvasTab(noteId, title)
+    setContextMenu(null)
+  }, [contextMenu, isPdf, isImage, openCanvasTab])
+
   // Folder Customization Handlers
   const handleSetFolderColor = useCallback((colorId: string, path: string) => {
     console.log('[FileTree] handleSetFolderColor called:', colorId, path)
@@ -769,6 +780,15 @@ const FileItem: React.FC<FileItemProps> = ({ entry, level, onDrop, displayMode }
             </>
           ) : (
             <>
+              {/* Im Canvas erkunden - nur für Markdown-Dateien */}
+              {!isPdf && !isImage && (
+                <>
+                  <button onClick={handleOpenInCanvas} className="context-menu-item">
+                    Im Canvas erkunden
+                  </button>
+                  <div className="context-menu-divider" />
+                </>
+              )}
               <button onClick={handleCopyRelativePath} className="context-menu-item">
                 Relativen Pfad kopieren
               </button>

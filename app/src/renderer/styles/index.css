@@ -565,6 +565,7 @@ body {
   overflow: hidden;
   background-color: var(--bg-primary);
   border-top-left-radius: var(--radius-lg);
+  border-top-right-radius: var(--radius-lg);
 }
 
 .workspace.editor .editor-panel {
@@ -720,6 +721,7 @@ body {
   border-bottom: 1px solid var(--border-color);
   background-color: var(--bg-primary);
   gap: 12px;
+  border-top-left-radius: var(--radius-lg);
 }
 
 .editor-header h3 {
@@ -1984,26 +1986,37 @@ body {
 .canvas-filter-bar {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 12px 16px;
+  gap: 8px;
+  height: 44px;
+  min-height: 44px;
+  padding: 0 16px;
   background-color: var(--bg-primary);
   border-bottom: 1px solid var(--border-color);
   z-index: 10;
+  overflow: hidden;
+}
+
+/* In Full Canvas Mode: etwas großzügiger */
+.canvas-fullwidth .canvas-filter-bar {
+  height: 52px;
+  min-height: 52px;
+  padding: 0 20px;
 }
 
 .add-note-btn {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
+  width: 32px;
+  height: 32px;
   border: none;
   background: var(--accent-color);
   color: white;
-  border-radius: var(--radius-md);
+  border-radius: 50%;
   cursor: pointer;
   transition: all var(--transition-fast);
   box-shadow: var(--shadow-sm);
+  flex-shrink: 0;
 }
 
 .add-note-btn:hover {
@@ -2032,14 +2045,16 @@ body {
 }
 
 .canvas-filter-select {
-  padding: 8px 14px;
+  padding: 6px 12px;
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
   background-color: var(--bg-secondary);
   color: var(--text-primary);
   font-size: 12px;
   cursor: pointer;
-  min-width: 200px;
+  min-width: 140px;
+  max-width: 200px;
+  flex-shrink: 1;
   transition: all var(--transition-fast);
 }
 
@@ -2111,6 +2126,9 @@ body {
   margin-left: auto;
   font-size: 12px;
   color: var(--text-muted);
+  white-space: nowrap;
+  flex-shrink: 0;
+  padding-left: 12px;
 }
 
 .canvas-empty {
@@ -8230,4 +8248,531 @@ body {
   border-top-color: white;
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
+}
+
+/* ============ WORKSPACE WRAPPER ============ */
+.workspace-wrapper {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  border-top-left-radius: var(--radius-lg);
+  border-top-right-radius: var(--radius-lg);
+}
+
+/* ============ TAB BAR ============ */
+.tab-bar {
+  display: flex;
+  align-items: center;
+  height: 36px;
+  background-color: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-color);
+  padding: 0 8px;
+  overflow-x: auto;
+  flex-shrink: 0;
+  border-radius: var(--radius-sm);
+  margin: 4px 4px 0 4px;
+}
+
+.tab-bar::-webkit-scrollbar {
+  height: 4px;
+}
+
+.tab-bar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.tab-bar::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: 2px;
+}
+
+.tab-bar-content {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.tab-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  white-space: nowrap;
+  max-width: 200px;
+  min-width: 0;
+}
+
+.tab-item:hover {
+  background-color: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+.tab-item.active {
+  background-color: var(--accent-subtle);
+  color: var(--accent-color);
+}
+
+.tab-item.canvas-tab {
+  border-left: 2px solid var(--accent-color);
+}
+
+.tab-item.canvas-tab.active {
+  background-color: var(--accent-subtle);
+}
+
+.tab-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  opacity: 0.7;
+}
+
+.tab-item.active .tab-icon {
+  opacity: 1;
+}
+
+.tab-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.tab-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  border-radius: var(--radius-xs);
+  cursor: pointer;
+  opacity: 0;
+  transition: all var(--transition-fast);
+  flex-shrink: 0;
+}
+
+.tab-item:hover .tab-close {
+  opacity: 1;
+}
+
+.tab-close:hover {
+  background-color: rgba(255, 59, 48, 0.15);
+  color: #ff3b30;
+}
+
+/* ============ LOCAL CANVAS ============ */
+.local-canvas-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background-color: var(--bg-primary);
+}
+
+/* Global Canvas Panel (all notes) */
+.global-canvas-panel {
+  border-top-right-radius: var(--radius-lg);
+}
+
+/* Canvas Fullwidth Mode */
+.canvas-fullwidth {
+  border-top-left-radius: var(--radius-lg);
+  border-top-right-radius: var(--radius-lg);
+}
+
+.local-canvas {
+  flex: 1;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.local-canvas-flow {
+  flex: 1;
+  width: 100%;
+  height: 100%;
+}
+
+/* Local Canvas Header - matching editor-header style */
+.local-canvas-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 44px;
+  min-height: 44px;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--border-color);
+  background-color: var(--bg-primary);
+  gap: 12px;
+  border-top-right-radius: var(--radius-lg);
+}
+
+.local-canvas-header-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.local-canvas-icon {
+  flex-shrink: 0;
+  color: var(--accent-color);
+}
+
+.local-canvas-header h3 {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin: 0;
+}
+
+.local-canvas-header .local-canvas-stats {
+  font-size: 11px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.local-canvas-header-right {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.local-canvas-header-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.local-canvas-header-btn:hover {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+/* Local canvas panel shows alongside editor */
+.workspace.has-canvas-tab .local-canvas-panel {
+  display: flex;
+}
+
+/* ============ NOTE NODE EXPAND BUTTON (Local Canvas Mode) ============ */
+.note-node-expand-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  margin-top: 8px;
+  border: 1px dashed var(--accent-color);
+  background: var(--accent-subtle);
+  color: var(--accent-color);
+  font-size: 10px;
+  font-weight: 600;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.note-node-expand-btn:hover {
+  background: var(--accent-color);
+  color: white;
+  border-style: solid;
+}
+
+.note-node-root-badge {
+  display: inline-block;
+  padding: 2px 6px;
+  margin-top: 8px;
+  background: var(--accent-color);
+  color: white;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  border-radius: var(--radius-xs);
+  text-transform: uppercase;
+}
+
+/* ============ LOCAL NOTE NODE ============ */
+.local-note-node {
+  display: flex;
+  flex-direction: column;
+  padding: 10px 14px;
+  background: var(--node-bg);
+  border: 1px solid var(--node-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  transition: all var(--transition-fast);
+  min-width: 150px;
+  max-width: 250px;
+}
+
+.local-note-node:hover {
+  box-shadow: var(--shadow-md);
+}
+
+.local-note-node.selected {
+  box-shadow: 0 0 0 2px var(--accent-color);
+}
+
+.local-note-node.root {
+  border-width: 2px;
+  box-shadow: 0 0 20px var(--accent-subtle);
+}
+
+.local-note-node-content {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.local-note-node-root-badge {
+  display: inline-block;
+  padding: 2px 6px;
+  background: var(--accent-color);
+  color: white;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  border-radius: var(--radius-xs);
+  text-transform: uppercase;
+  align-self: flex-start;
+  margin-bottom: 4px;
+}
+
+.local-note-node-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: inherit;
+  line-height: 1.3;
+  word-break: break-word;
+}
+
+.local-note-node-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+
+.local-note-node-links {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.local-note-node-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.local-note-node-tag {
+  padding: 1px 5px;
+  background: var(--accent-subtle);
+  color: var(--accent-color);
+  font-size: 9px;
+  border-radius: var(--radius-xs);
+}
+
+.local-note-node-tag-more {
+  padding: 1px 5px;
+  background: var(--bg-tertiary);
+  color: var(--text-muted);
+  font-size: 9px;
+  border-radius: var(--radius-xs);
+}
+
+.local-note-node-expand {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  margin-top: 6px;
+  border: 1px dashed var(--border-color);
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  font-size: 10px;
+  font-weight: 600;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  align-self: flex-start;
+}
+
+.local-note-node-expand:hover {
+  border-color: var(--accent-color);
+  background: var(--accent-subtle);
+  color: var(--accent-color);
+}
+
+.local-note-node-expanded-badge {
+  display: inline-block;
+  padding: 2px 6px;
+  background: var(--bg-tertiary);
+  color: var(--text-muted);
+  font-size: 9px;
+  font-weight: 500;
+  border-radius: var(--radius-xs);
+  align-self: flex-start;
+  margin-top: 6px;
+}
+
+/* Node handles for LocalNoteNode */
+.local-note-node .node-handle {
+  width: 10px !important;
+  height: 10px !important;
+  background-color: var(--accent-color) !important;
+  border: 2px solid var(--bg-primary) !important;
+  border-radius: 50% !important;
+  opacity: 0;
+  transition: all var(--transition-fast);
+}
+
+.local-note-node:hover .node-handle {
+  opacity: 1;
+}
+
+.local-note-node.selected .node-handle {
+  opacity: 1;
+}
+
+/* ============ SIMPLE NOTE NODE (for LocalCanvas) ============ */
+.simple-note-node {
+  display: flex;
+  flex-direction: column;
+  padding: 12px 16px;
+  background: var(--node-bg);
+  border: 1px solid var(--node-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  transition: all var(--transition-fast);
+  min-width: 160px;
+  max-width: 220px;
+  cursor: pointer;
+  position: relative;
+}
+
+.simple-note-node:hover {
+  box-shadow: var(--shadow-md);
+  border-color: var(--text-muted);
+}
+
+.simple-note-node.selected {
+  box-shadow: 0 0 0 2px var(--accent-color);
+}
+
+.simple-note-node.is-root {
+  border-color: var(--accent-color);
+  border-width: 2px;
+  box-shadow: 0 0 20px var(--accent-subtle);
+}
+
+.simple-note-node.is-expanded {
+  border-style: dashed;
+}
+
+.simple-node-root-badge {
+  position: absolute;
+  top: -8px;
+  left: 12px;
+  padding: 2px 8px;
+  background: var(--accent-color);
+  color: white;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  border-radius: var(--radius-xs);
+  text-transform: uppercase;
+}
+
+.simple-node-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  line-height: 1.3;
+  word-break: break-word;
+  margin-bottom: 6px;
+}
+
+.simple-node-stats {
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.simple-node-expand-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 10px;
+  margin-top: 8px;
+  border: 1px dashed var(--border-color);
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  align-self: flex-start;
+}
+
+.simple-node-expand-btn:hover {
+  border-color: var(--accent-color);
+  background: var(--accent-subtle);
+  color: var(--accent-color);
+}
+
+.simple-node-expanded-indicator {
+  font-size: 9px;
+  color: var(--text-muted);
+  margin-top: 6px;
+  font-style: italic;
+}
+
+.simple-node-handle {
+  width: 8px !important;
+  height: 8px !important;
+  background-color: var(--accent-color) !important;
+  border: 2px solid var(--bg-primary) !important;
+  border-radius: 50% !important;
+  opacity: 0;
+  transition: all var(--transition-fast);
+}
+
+.simple-note-node:hover .simple-node-handle {
+  opacity: 1;
+}
+
+.simple-note-node.selected .simple-node-handle {
+  opacity: 1;
 }

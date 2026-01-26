@@ -420,6 +420,8 @@ export async function initializeUISettings(): Promise<void> {
           (validSettings as Record<string, unknown>)[key] = savedSettings[key]
         }
       }
+      // Always start with 'editor' mode on startup
+      validSettings.viewMode = 'editor'
       useUIStore.setState(validSettings)
     } else {
       console.log('[UIStore] No saved settings found, using defaults')

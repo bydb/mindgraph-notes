@@ -3,6 +3,7 @@ import { FileTree } from './FileTree'
 import { useNotesStore, createNoteFromFile } from '../../stores/notesStore'
 import { useUIStore } from '../../stores/uiStore'
 import { useGraphStore } from '../../stores/graphStore'
+import { useTabStore } from '../../stores/tabStore'
 import { extractTaskStatsForCache } from '../../utils/linkExtractor'
 import type { Note, NotesCache, CachedNoteMetadata } from '../../../shared/types'
 
@@ -11,6 +12,7 @@ export const Sidebar: React.FC = () => {
   const { sidebarWidth, sidebarVisible, fileTreeDisplayMode, setFileTreeDisplayMode } = useUIStore()
   const loadGraphData = useGraphStore((s) => s.loadFromVault)
   const resetGraphStore = useGraphStore((s) => s.reset)
+  const clearAllTabs = useTabStore((s) => s.clearAllTabs)
 
   // State für neue Notiz Dialog
   const [newNoteDialogOpen, setNewNoteDialogOpen] = useState(false)
@@ -33,6 +35,7 @@ export const Sidebar: React.FC = () => {
       // WICHTIG: Alten Vault aufräumen bevor neuer geladen wird
       window.electronAPI.unwatchDirectory() // Stoppt alten File-Watcher
       resetGraphStore() // Setzt Graph-Positionen zurück
+      clearAllTabs() // Schließt alle Canvas-Tabs
       setNotes([]) // Leert alte Notizen
       setFileTree([]) // Leert alten Dateibaum
 
@@ -103,7 +106,7 @@ export const Sidebar: React.FC = () => {
       console.error('Fehler beim Öffnen des Vaults:', error)
       setLoading(false)
     }
-  }, [setVaultPath, setFileTree, setNotes, setLoading, loadGraphData, resetGraphStore])
+  }, [setVaultPath, setFileTree, setNotes, setLoading, loadGraphData, resetGraphStore, clearAllTabs])
   
   const handleNewNote = useCallback(() => {
     if (!vaultPath) {

@@ -1,9 +1,10 @@
-import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react'
+import React, { useState, useCallback, useRef, useEffect } from 'react'
 import { ReactFlowProvider } from 'reactflow'
 import { Sidebar } from './components/Sidebar/Sidebar'
 import { MarkdownEditor } from './components/Editor/MarkdownEditor'
 import { BacklinksPanel } from './components/Editor/BacklinksPanel'
 import { GraphCanvas } from './components/Canvas/GraphCanvas'
+import { LocalCanvas } from './components/Canvas/LocalCanvas'
 import { PDFViewer } from './components/PDFViewer/PDFViewer'
 import { ImageViewer } from './components/ImageViewer/ImageViewer'
 import { Terminal } from './components/Terminal/Terminal'
@@ -17,7 +18,9 @@ import { OverduePanel } from './components/OverduePanel/OverduePanel'
 import { TagsPanel } from './components/TagsPanel/TagsPanel'
 import { SmartConnectionsPanel } from './components/SmartConnectionsPanel/SmartConnectionsPanel'
 import { NotesChat } from './components/NotesChat/NotesChat'
+import { TabBar } from './components/TabBar/TabBar'
 import { useUIStore, ACCENT_COLORS, FONT_FAMILIES, BACKGROUND_COLORS, initializeUISettings } from './stores/uiStore'
+import { useTabStore } from './stores/tabStore'
 import { useTranslation } from './utils/translations'
 import { useNotesStore } from './stores/notesStore'
 import { useReminderStore } from './stores/reminderStore'
@@ -43,6 +46,8 @@ const ViewModeButton: React.FC<{
 const App: React.FC = () => {
   const { viewMode, setViewMode, toggleSidebar, sidebarVisible, splitPosition, setSplitPosition, sidebarWidth, setSidebarWidth, theme, setTheme, accentColor, backgroundColor, fontFamily, setPendingTemplateInsert, textSplitEnabled, setTextSplitEnabled, textSplitPosition, setTextSplitPosition, smartConnectionsEnabled, notesChatEnabled } = useUIStore()
   const { notes, vaultPath, selectNote, selectedPdfPath, selectedImagePath, secondarySelectedNoteId } = useNotesStore()
+  const { tabs, activeTabId } = useTabStore()
+  const activeTab = tabs.find(t => t.id === activeTabId)
   const { t } = useTranslation()
   const { startChecking, stopChecking } = useReminderStore()
   const [terminalVisible, setTerminalVisible] = useState(false)
@@ -57,6 +62,7 @@ const App: React.FC = () => {
   const [smartConnectionsOpen, setSmartConnectionsOpen] = useState(false)
   const [notesChatOpen, setNotesChatOpen] = useState(false)
   const [pendingNoteTitle, setPendingNoteTitle] = useState<string | null>(null)
+
   const workspaceRef = useRef<HTMLDivElement>(null)
   const contentAreaRef = useRef<HTMLDivElement>(null)
   const isDraggingRef = useRef(false)
@@ -374,13 +380,14 @@ const App: React.FC = () => {
                 {t('viewMode.split')}
               </ViewModeButton>
               <ViewModeButton mode="canvas" currentMode={viewMode} onClick={() => setViewMode('canvas')}>
-                {t('viewMode.canvas')}
+                Canvas
               </ViewModeButton>
               <span className="view-mode-separator" />
               <button
                 className={`view-mode-btn ${textSplitEnabled ? 'active' : ''}`}
                 onClick={() => setTextSplitEnabled(!textSplitEnabled)}
-                title="Text-Split: Zwei Notizen vergleichen (Cmd/Ctrl+Klick in Sidebar für zweite Notiz)"
+                disabled={viewMode !== 'editor'}
+                title="Text-Split: Zwei Notizen vergleichen"
               >
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <rect x="3" y="3" width="8" height="18" rx="1"/>
@@ -483,25 +490,31 @@ const App: React.FC = () => {
               </>
             )}
 
-            <div className={`workspace ${viewMode} ${(textSplitEnabled || overduePanelOpen || tagsPanelOpen || (smartConnectionsOpen && smartConnectionsEnabled) || (notesChatOpen && notesChatEnabled)) ? 'text-split' : ''}`} ref={workspaceRef}>
-              {/* Primary Editor Panel */}
+            {/* Workspace wrapper - contains TabBar and workspace */}
+            <div className="workspace-wrapper">
+              {/* TabBar - only show when there are canvas tabs */}
+              {tabs.length > 0 && <TabBar />}
+
+              <div className={`workspace ${viewMode} ${activeTab?.type === 'canvas' ? 'has-canvas-tab' : ''} ${(textSplitEnabled || overduePanelOpen || tagsPanelOpen || (smartConnectionsOpen && smartConnectionsEnabled) || (notesChatOpen && notesChatEnabled)) && viewMode === 'editor' ? 'text-split' : ''}`} ref={workspaceRef}>
+
+              {/* Editor Panel - visible in editor and split mode */}
               <div
                 className="editor-panel"
                 style={{
                   display: viewMode === 'canvas' ? 'none' : 'flex',
-                  flex: textSplitEnabled && viewMode === 'editor' ? `0 0 ${textSplitPosition}%` : (viewMode === 'split' ? `0 0 ${splitPosition}%` : 1)
+                  flex: viewMode === 'editor'
+                    ? ((textSplitEnabled || overduePanelOpen || tagsPanelOpen || (smartConnectionsOpen && smartConnectionsEnabled) || (notesChatOpen && notesChatEnabled))
+                        ? `0 0 ${textSplitPosition}%`
+                        : (activeTab?.type === 'canvas'
+                            ? `0 0 ${splitPosition}%`
+                            : 1))
+                    : `0 0 ${splitPosition}%`
                 }}
               >
                 {selectedPdfPath && vaultPath ? (
-                  <PDFViewer
-                    filePath={`${vaultPath}/${selectedPdfPath}`}
-                    fileName={selectedPdfPath.split('/').pop() || selectedPdfPath}
-                  />
+                  <PDFViewer filePath={`${vaultPath}/${selectedPdfPath}`} fileName={selectedPdfPath.split('/').pop() || selectedPdfPath} />
                 ) : selectedImagePath && vaultPath ? (
-                  <ImageViewer
-                    filePath={`${vaultPath}/${selectedImagePath}`}
-                    fileName={selectedImagePath.split('/').pop() || selectedImagePath}
-                  />
+                  <ImageViewer filePath={`${vaultPath}/${selectedImagePath}`} fileName={selectedImagePath.split('/').pop() || selectedImagePath} />
                 ) : (
                   <>
                     <MarkdownEditor />
@@ -510,20 +523,14 @@ const App: React.FC = () => {
                 )}
               </div>
 
-              {/* Text Split Divider */}
-              {(textSplitEnabled || overduePanelOpen || tagsPanelOpen || (smartConnectionsOpen && smartConnectionsEnabled) || (notesChatOpen && notesChatEnabled)) && viewMode === 'editor' && (
-                <div
-                  className="text-split-divider"
-                  onMouseDown={handleTextSplitDividerMouseDown}
-                />
+              {/* Text Split Divider - in editor mode when text-split is enabled (takes priority over canvas tab) */}
+              {viewMode === 'editor' && (textSplitEnabled || overduePanelOpen || tagsPanelOpen || (smartConnectionsOpen && smartConnectionsEnabled) || (notesChatOpen && notesChatEnabled)) && (
+                <div className="text-split-divider" onMouseDown={handleTextSplitDividerMouseDown} />
               )}
 
-              {/* Secondary Editor Panel (Text Split) or Overdue/Tags/SmartConnections/Chat Panel */}
-              {(textSplitEnabled || overduePanelOpen || tagsPanelOpen || (smartConnectionsOpen && smartConnectionsEnabled) || (notesChatOpen && notesChatEnabled)) && viewMode === 'editor' && (
-                <div
-                  className="editor-panel editor-panel-secondary"
-                  style={{ flex: `0 0 ${100 - textSplitPosition}%` }}
-                >
+              {/* Secondary Panel (Text Split / Overdue / Tags / etc.) - takes priority over canvas tab */}
+              {viewMode === 'editor' && (textSplitEnabled || overduePanelOpen || tagsPanelOpen || (smartConnectionsOpen && smartConnectionsEnabled) || (notesChatOpen && notesChatEnabled)) && (
+                <div className="editor-panel editor-panel-secondary" style={{ flex: `0 0 ${100 - textSplitPosition}%` }}>
                   {overduePanelOpen ? (
                     <OverduePanel onClose={() => setOverduePanelOpen(false)} />
                   ) : tagsPanelOpen ? (
@@ -554,23 +561,39 @@ const App: React.FC = () => {
                 </div>
               )}
 
-              {viewMode === 'split' && (
-                <div
-                  className="split-divider"
-                  onMouseDown={handleDividerMouseDown}
-                />
+              {/* Split Divider for LocalCanvas Tab - only when text-split is NOT active */}
+              {viewMode === 'editor' && activeTab?.type === 'canvas' && !(textSplitEnabled || overduePanelOpen || tagsPanelOpen || (smartConnectionsOpen && smartConnectionsEnabled) || (notesChatOpen && notesChatEnabled)) && (
+                <div className="split-divider" onMouseDown={handleDividerMouseDown} />
               )}
 
-              <div
-                className="canvas-panel"
-                style={{
-                  display: viewMode === 'editor' ? 'none' : 'flex',
-                  flex: viewMode === 'split' ? `0 0 ${100 - splitPosition}%` : 1
-                }}
-              >
-                <GraphCanvas />
-              </div>
+              {/* Local Canvas Panel - only when text-split is NOT active */}
+              {viewMode === 'editor' && activeTab?.type === 'canvas' && !(textSplitEnabled || overduePanelOpen || tagsPanelOpen || (smartConnectionsOpen && smartConnectionsEnabled) || (notesChatOpen && notesChatEnabled)) && (
+                <div className="local-canvas-panel" style={{ flex: `0 0 ${100 - splitPosition}%` }}>
+                  <LocalCanvas tabId={activeTab.id} rootNoteId={activeTab.noteId} />
+                </div>
+              )}
+
+              {/* Split Divider - in split mode */}
+              {viewMode === 'split' && (
+                <div className="split-divider" onMouseDown={handleDividerMouseDown} />
+              )}
+
+              {/* Canvas Panel - only render when in split or canvas mode */}
+              {(viewMode === 'split' || viewMode === 'canvas') && (
+                <div
+                  key={`canvas-${viewMode}`}
+                  className={`canvas-panel ${viewMode === 'canvas' ? 'canvas-fullwidth' : ''}`}
+                  style={{
+                    display: 'flex',
+                    flex: viewMode === 'canvas' ? 1 : `0 0 ${100 - splitPosition}%`
+                  }}
+                >
+                  <GraphCanvas key={`graph-${viewMode}`} />
+                </div>
+              )}
+
             </div>
+            </div>{/* end workspace-wrapper */}
           </div>
 
           {/* Terminal am unteren Rand - immer verfügbar */}

@@ -904,7 +904,21 @@ function extractPdfsFromFileTree(entries: FileEntry[], filterPath: string | null
   return pdfs
 }
 
-export const GraphCanvas: React.FC = () => {
+// Props für Local Canvas Mode
+interface GraphCanvasProps {
+  localRootNoteId?: string | null  // Wenn gesetzt: nur diese Note + Verbindungen anzeigen
+  expandedNoteIds?: Set<string>    // Erweiterte Nodes im Local Mode
+  onExpandNode?: (noteId: string) => void  // Callback für Expand-Button
+}
+
+// Stabile leere Set-Referenz für Default
+const EMPTY_SET = new Set<string>()
+
+export const GraphCanvas: React.FC<GraphCanvasProps> = ({
+  localRootNoteId = null,
+  expandedNoteIds = EMPTY_SET,
+  onExpandNode
+}) => {
   const allNotes = useNotesStore((s) => s.notes)
   const selectNote = useNotesStore((s) => s.selectNote)
   const selectPdf = useNotesStore((s) => s.selectPdf)
@@ -999,8 +1013,48 @@ export const GraphCanvas: React.FC = () => {
     }
   }, [getNodes])
 
-  // Notizen nach Ordner-Filter filtern
+  // Notizen nach Ordner-Filter oder Local Mode filtern
   const notes = useMemo(() => {
+    // Local Mode: nur Root-Note + direkte Verbindungen
+    if (localRootNoteId) {
+      const rootNote = allNotes.find(n => n.id === localRootNoteId)
+      if (!rootNote) return []
+
+      const visibleIds = new Set<string>([localRootNoteId])
+
+      // Hilfsfunktion um Verbindungen einer Note zu finden
+      const addConnections = (note: typeof rootNote) => {
+        // Outgoing links
+        for (const linkText of note.outgoingLinks) {
+          const targetNote = allNotes.find(n =>
+            n.title === linkText ||
+            n.path === linkText ||
+            n.path.endsWith(`/${linkText}.md`) ||
+            n.path.endsWith(`/${linkText}`)
+          )
+          if (targetNote) visibleIds.add(targetNote.id)
+        }
+        // Incoming links (backlinks)
+        for (const backlinkId of note.incomingLinks) {
+          visibleIds.add(backlinkId)
+        }
+      }
+
+      // Root-Note Verbindungen hinzufügen
+      addConnections(rootNote)
+
+      // Erweiterte Nodes: auch deren Verbindungen hinzufügen
+      for (const expandedId of expandedNoteIds) {
+        const expandedNote = allNotes.find(n => n.id === expandedId)
+        if (expandedNote) {
+          addConnections(expandedNote)
+        }
+      }
+
+      return allNotes.filter(note => visibleIds.has(note.id))
+    }
+
+    // Standard Ordner-Filter
     if (!canvasFilterPath) return allNotes
     if (canvasFilterPath === '__root__') {
       // Nur Notizen auf Hauptebene (ohne Ordner)
@@ -1011,7 +1065,7 @@ export const GraphCanvas: React.FC = () => {
       const noteDir = note.path.split('/').slice(0, -1).join('/')
       return noteDir === canvasFilterPath || noteDir.startsWith(canvasFilterPath + '/')
     })
-  }, [allNotes, canvasFilterPath])
+  }, [allNotes, canvasFilterPath, localRootNoteId, expandedNoteIds])
 
   // PDFs nach Ordner-Filter filtern (nur PDFs ohne Companion-Note anzeigen)
   const pdfs = useMemo(() => {
@@ -1593,8 +1647,33 @@ export const GraphCanvas: React.FC = () => {
   const initialNodes: Node[] = useMemo(() => {
     // Note-Nodes
     const noteNodes = notes.map((note, index) => {
-      // Nutze gespeicherte Position oder generiere stabile Position
-      const position = positions[note.id] || getStablePosition(note.id, index)
+      // Nutze gespeicherte Position oder generiere Position
+      let position = positions[note.id]
+
+      // Im Local Mode: Grid-Layout für bessere Übersicht
+      if (!position && localRootNoteId) {
+        const isRoot = note.id === localRootNoteId
+        if (isRoot) {
+          // Root-Note oben in der Mitte
+          position = { x: 300, y: 50, pinned: false }
+        } else {
+          // Verbundene Notizen in Grid darunter
+          const connectedIndex = index - (notes[0]?.id === localRootNoteId ? 1 : 0)
+          const cols = Math.ceil(Math.sqrt(notes.length - 1)) || 1
+          const row = Math.floor(connectedIndex / cols)
+          const col = connectedIndex % cols
+          const spacingX = 260
+          const spacingY = 150
+          position = {
+            x: 50 + col * spacingX,
+            y: 200 + row * spacingY,
+            pinned: false
+          }
+        }
+      } else if (!position) {
+        const stablePos = getStablePosition(note.id, index)
+        position = { ...stablePos, pinned: false }
+      }
       const storedWidth = positions[note.id]?.width
       const storedHeight = positions[note.id]?.height
 
@@ -1635,6 +1714,30 @@ export const GraphCanvas: React.FC = () => {
         canvasCompactMode
       )
 
+      // Calculate hidden connections for Local Mode
+      let hiddenConnections = 0
+      if (localRootNoteId) {
+        const visibleNoteIds = new Set(notes.map(n => n.id))
+        // Count outgoing links not visible
+        for (const linkText of note.outgoingLinks) {
+          const targetNote = allNotes.find(n =>
+            n.title === linkText ||
+            n.path === linkText ||
+            n.path.endsWith(`/${linkText}.md`) ||
+            n.path.endsWith(`/${linkText}`)
+          )
+          if (targetNote && !visibleNoteIds.has(targetNote.id)) {
+            hiddenConnections++
+          }
+        }
+        // Count incoming links not visible
+        for (const backlinkId of note.incomingLinks) {
+          if (!visibleNoteIds.has(backlinkId)) {
+            hiddenConnections++
+          }
+        }
+      }
+
       return {
         id: note.id,
         type: 'note',
@@ -1658,7 +1761,12 @@ export const GraphCanvas: React.FC = () => {
           showTags: canvasShowTags,
           showLinks: canvasShowLinks,
           showImages: canvasShowImages,
-          compactMode: canvasCompactMode
+          compactMode: canvasCompactMode,
+          // Local Canvas Mode
+          isLocalRoot: localRootNoteId === note.id,
+          isExpanded: expandedNoteIds.has(note.id),
+          hiddenConnections,
+          onExpand: onExpandNode
         },
         // Dimensionen: User-Werte haben Vorrang, sonst berechnete Werte
         style: {
@@ -1719,7 +1827,7 @@ export const GraphCanvas: React.FC = () => {
     }))
 
     return [...noteNodes, ...pdfNodes, ...labelNodes]
-  }, [notes, pdfs, positions, labels, getStablePosition, editingNodeId, handleNodeTitleChange, handleLabelTextChange, handleEditingDone, handleTaskToggle, handleOpenExternalLink, imageDataUrls, loadImageDataUrl, canvasShowTags, canvasShowLinks, canvasShowImages, canvasCompactMode, canvasDefaultCardWidth, canvasFilterPath])
+  }, [notes, pdfs, positions, labels, getStablePosition, editingNodeId, handleNodeTitleChange, handleLabelTextChange, handleEditingDone, handleTaskToggle, handleOpenExternalLink, imageDataUrls, loadImageDataUrl, canvasShowTags, canvasShowLinks, canvasShowImages, canvasCompactMode, canvasDefaultCardWidth, canvasFilterPath, localRootNoteId, expandedNoteIds, onExpandNode, allNotes])
   
   // Links zu Edges konvertieren - mit Deduplizierung
   const initialEdges: Edge[] = useMemo(() => {
@@ -1833,6 +1941,17 @@ export const GraphCanvas: React.FC = () => {
   useEffect(() => {
     setEdges(initialEdges)
   }, [initialEdges, setEdges])
+
+  // Auto fit view when in Local Mode
+  useEffect(() => {
+    if (localRootNoteId && notes.length > 0) {
+      // Delay to allow nodes to be rendered
+      const timer = setTimeout(() => {
+        fitView({ padding: 0.3, maxZoom: 1.2, duration: 300 })
+      }, 100)
+      return () => clearTimeout(timer)
+    }
+  }, [localRootNoteId, notes.length, fitView])
 
   // Update isEditing state in nodes when editingNodeId changes
   useEffect(() => {
@@ -2885,6 +3004,7 @@ export const GraphCanvas: React.FC = () => {
           {notes.length} von {allNotes.length} Notizen
         </span>
 
+        {/* Alignment Tools - nur im Full Canvas Mode (mehr Platz) */}
         {viewMode === 'canvas' && (
           <>
             <div className="canvas-filter-divider" />

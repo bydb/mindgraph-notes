@@ -25,6 +25,11 @@ interface NoteNodeData {
   showLinks?: boolean
   showImages?: boolean
   compactMode?: boolean
+  // Local Canvas Mode
+  isLocalRoot?: boolean
+  isExpanded?: boolean
+  hiddenConnections?: number
+  onExpand?: (noteId: string) => void
 }
 
 // Vordefinierte Farben - müssen mit nodeColors in GraphCanvas.tsx übereinstimmen
@@ -73,7 +78,11 @@ const arePropsEqual = (prevProps: NodeProps<NoteNodeData>, nextProps: NodeProps<
     prevProps.data.imageDataUrl === nextProps.data.imageDataUrl &&
     prevProps.data.note.tags.length === nextProps.data.note.tags.length &&
     prevProps.data.note.outgoingLinks.length === nextProps.data.note.outgoingLinks.length &&
-    prevProps.data.note.incomingLinks.length === nextProps.data.note.incomingLinks.length
+    prevProps.data.note.incomingLinks.length === nextProps.data.note.incomingLinks.length &&
+    // Local Canvas Mode props
+    prevProps.data.isLocalRoot === nextProps.data.isLocalRoot &&
+    prevProps.data.isExpanded === nextProps.data.isExpanded &&
+    prevProps.data.hiddenConnections === nextProps.data.hiddenConnections
   )
 }
 
@@ -81,7 +90,8 @@ export const NoteNode: React.FC<NodeProps<NoteNodeData>> = memo(({ data, selecte
   const {
     title, note, color, isEditing, onTitleChange, onEditingDone, onTaskToggle, onOpenExternalLink,
     callout, taskSummary, externalLink, embeddedImage, imageDataUrl,
-    showTags = true, showLinks = true, showImages = true, compactMode = false
+    showTags = true, showLinks = true, showImages = true, compactMode = false,
+    isLocalRoot = false, isExpanded = false, hiddenConnections = 0, onExpand
   } = data
 
   const [editValue, setEditValue] = useState(title)
@@ -290,6 +300,29 @@ export const NoteNode: React.FC<NodeProps<NoteNodeData>> = memo(({ data, selecte
                 </div>
               )}
             </div>
+          )}
+
+          {/* Expand Button für Local Canvas Mode */}
+          {hiddenConnections > 0 && !isExpanded && onExpand && (
+            <button
+              className="note-node-expand-btn"
+              onClick={(e) => {
+                e.stopPropagation()
+                onExpand(note.id)
+              }}
+              title={`${hiddenConnections} weitere Verbindungen anzeigen`}
+            >
+              <svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                <line x1="8" y1="3" x2="8" y2="13" />
+                <line x1="3" y1="8" x2="13" y2="8" />
+              </svg>
+              +{hiddenConnections}
+            </button>
+          )}
+
+          {/* Root Badge für Local Canvas Mode */}
+          {isLocalRoot && (
+            <span className="note-node-root-badge">START</span>
           )}
         </div>
 
