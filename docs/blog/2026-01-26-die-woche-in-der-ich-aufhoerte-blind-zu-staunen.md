@@ -16,6 +16,7 @@ tags:
 status: publish
 type: post
 author: Jochen Leeder
+summary: Vibe Coding flutet den App Store, ChatGPT erkennt seine eigenen Fake-Videos nicht, und Anthropic korrigiert seine Prognosen nach unten. Eine Woche voller Widersprüche – und ein Anlass, über unseren Umgang mit dieser Technologie nachzudenken.
 ---
 
 > [!abstract] Reflexion über die KI-Nachrichten dieser Woche
