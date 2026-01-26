@@ -432,16 +432,32 @@
       return { meta, content: match[2] };
     }
 
-    // Convert Obsidian callouts to HTML
+    // Convert Obsidian callouts to HTML (using placeholder approach)
     function convertCallouts(content) {
-      return content.replace(/> \[!(\w+)\](.*?)\n((?:>.*\n?)*)/g, (match, type, title, body) => {
+      const callouts = [];
+
+      // First pass: extract callouts and replace with placeholders
+      const withPlaceholders = content.replace(/> \[!(\w+)\](.*?)\n((?:>.*\n?)*)/g, (match, type, title, body) => {
         const cleanBody = body.replace(/^> ?/gm, '').trim();
         const cleanTitle = title.trim() || type.charAt(0).toUpperCase() + type.slice(1);
-        return `<div class="callout ${type.toLowerCase()}">
-          <div class="callout-title">${cleanTitle}</div>
-          <div>${marked.parse(cleanBody)}</div>
-        </div>`;
+        const placeholder = `<!--CALLOUT_${callouts.length}-->`;
+        callouts.push({ type: type.toLowerCase(), title: cleanTitle, body: cleanBody });
+        return placeholder;
       });
+
+      // Parse markdown
+      let html = marked.parse(withPlaceholders);
+
+      // Second pass: replace placeholders with callout HTML
+      callouts.forEach((callout, i) => {
+        const calloutHtml = `<div class="callout ${callout.type}">
+          <div class="callout-title">${callout.title}</div>
+          <div>${marked.parse(callout.body)}</div>
+        </div>`;
+        html = html.replace(`<!--CALLOUT_${i}-->`, calloutHtml);
+      });
+
+      return html;
     }
 
     // Remove wikilinks for display
@@ -519,8 +535,8 @@
 
         // Process content
         let processedContent = cleanWikilinks(body);
-        processedContent = convertCallouts(processedContent);
-        document.getElementById('article-content').innerHTML = marked.parse(processedContent);
+        // convertCallouts now handles marked.parse internally
+        document.getElementById('article-content').innerHTML = convertCallouts(processedContent);
 
         document.getElementById('post-list').classList.add('hidden');
         document.getElementById('article-view').classList.add('active');
