@@ -778,17 +778,18 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
                   </p>
                 </div>
 
-                <h3 style={{ marginTop: '32px' }}>KI-Features</h3>
+                <h3 style={{ marginTop: '32px' }}>KI-Funktionen (optional)</h3>
                 <div className="settings-info" style={{ marginBottom: '16px' }}>
                   <p>
-                    Diese Features benötigen Ollama. Auf älteren Rechnern ohne lokale KI-Unterstützung
-                    können sie deaktiviert werden, um Ressourcen zu sparen.
+                    KI ist ein Werkzeug, kein Ersatz für eigenes Denken. Diese Features sind
+                    standardmäßig deaktiviert – aktiviere nur was du bewusst nutzen möchtest.
+                    Benötigt einen lokalen Ollama-Server.
                   </p>
                 </div>
                 <div className="settings-row">
                   <label>
-                    Smart Connections
-                    <span className="settings-hint">Semantische Ähnlichkeitsanalyse zwischen Notizen</span>
+                    Smart Connections aktivieren
+                    <span className="settings-hint">Findet ähnliche Notizen via KI-Embeddings</span>
                   </label>
                   <input
                     type="checkbox"
@@ -798,8 +799,8 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
                 </div>
                 <div className="settings-row">
                   <label>
-                    Notes Chat
-                    <span className="settings-hint">Mit Notizen über ein KI-Modell chatten</span>
+                    Notes Chat aktivieren
+                    <span className="settings-hint">Stelle Fragen an deine Notizen</span>
                   </label>
                   <input
                     type="checkbox"

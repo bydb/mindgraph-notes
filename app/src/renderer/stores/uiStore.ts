@@ -348,9 +348,9 @@ const defaultState = {
   // FileTree Icon Settings
   iconSet: 'default' as IconSet,
 
-  // KI-Features (für ältere Rechner ohne Ollama deaktivierbar)
-  smartConnectionsEnabled: true,
-  notesChatEnabled: true
+  // KI-Features (opt-in - Human in the Loop)
+  smartConnectionsEnabled: false,
+  notesChatEnabled: false
 }
 
 // Felder die persistiert werden sollen (keine Funktionen, keine transienten Werte)
