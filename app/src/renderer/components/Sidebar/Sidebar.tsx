@@ -1,5 +1,6 @@
 import React, { useEffect, useCallback, useState, useRef } from 'react'
 import { FileTree } from './FileTree'
+import { BookmarksBar } from './BookmarksBar'
 import { useNotesStore, createNoteFromFile } from '../../stores/notesStore'
 import { useUIStore } from '../../stores/uiStore'
 import { useGraphStore } from '../../stores/graphStore'
@@ -306,6 +307,7 @@ export const Sidebar: React.FC = () => {
               )}
             </button>
           </div>
+          <BookmarksBar />
           <div className="sidebar-content">
             <FileTree entries={fileTree} displayMode={fileTreeDisplayMode} />
           </div>

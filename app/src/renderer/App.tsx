@@ -45,8 +45,8 @@ const ViewModeButton: React.FC<{
 
 const App: React.FC = () => {
   const { viewMode, setViewMode, toggleSidebar, sidebarVisible, splitPosition, setSplitPosition, sidebarWidth, setSidebarWidth, theme, setTheme, accentColor, backgroundColor, fontFamily, setPendingTemplateInsert, textSplitEnabled, setTextSplitEnabled, textSplitPosition, setTextSplitPosition, smartConnectionsEnabled, notesChatEnabled } = useUIStore()
-  const { notes, vaultPath, selectNote, selectedPdfPath, selectedImagePath, secondarySelectedNoteId } = useNotesStore()
-  const { tabs, activeTabId } = useTabStore()
+  const { notes, vaultPath, selectNote, selectedPdfPath, selectedImagePath, secondarySelectedNoteId, navigateBack, navigateForward, selectedNoteId } = useNotesStore()
+  const { tabs, activeTabId, openEditorTab, setActiveTab, closeTab } = useTabStore()
   const activeTab = tabs.find(t => t.id === activeTabId)
   const { t } = useTranslation()
   const { startChecking, stopChecking } = useReminderStore()
@@ -123,6 +123,45 @@ const App: React.FC = () => {
       selectNote(noteId)
     })
   }, [selectNote])
+
+  // Tab-System: Bidirektionaler Sync zwischen Tabs und Notiz-Auswahl
+  // Verwendet getState() um Loops zu vermeiden
+  const syncTabsWithNotes = useCallback(() => {
+    const { selectedNoteId: currentNoteId } = useNotesStore.getState()
+    const { tabs: currentTabs, activeTabId: currentActiveTabId } = useTabStore.getState()
+
+    const activeTab = currentTabs.find(t => t.id === currentActiveTabId)
+
+    // Wenn aktiver Tab eine Notiz ist, die nicht ausgewählt ist → Notiz auswählen
+    if (activeTab?.type === 'editor' && activeTab.noteId !== currentNoteId) {
+      useNotesStore.getState().selectNote(activeTab.noteId, false)
+    }
+  }, [])
+
+  // Wenn activeTabId sich ändert → sync
+  useEffect(() => {
+    if (activeTabId) {
+      syncTabsWithNotes()
+    }
+  }, [activeTabId, syncTabsWithNotes])
+
+  // Wenn Notiz ausgewählt wird → Tab öffnen/aktivieren (direkter Zugriff ohne Loop)
+  useEffect(() => {
+    if (!selectedNoteId) return
+
+    const { tabs: currentTabs, activeTabId: currentActiveTabId, openEditorTab: openTab } = useTabStore.getState()
+
+    // Prüfen ob Tab für diese Notiz schon aktiv ist
+    const existingTab = currentTabs.find(t => t.type === 'editor' && t.noteId === selectedNoteId)
+    if (existingTab && existingTab.id === currentActiveTabId) {
+      return // Schon aktiv, nichts tun
+    }
+
+    const selectedNote = notes.find(n => n.id === selectedNoteId)
+    if (selectedNote) {
+      openTab(selectedNoteId, selectedNote.title)
+    }
+  }, [selectedNoteId, notes])
 
   // Theme auf document anwenden
   useEffect(() => {
@@ -227,6 +266,47 @@ const App: React.FC = () => {
         e.preventDefault()
         e.stopPropagation()
         setSettingsOpen(true) // Öffnet jetzt auch Settings
+      }
+      // Cmd+[ / Ctrl+[ für Navigation zurück (wie Browser)
+      if ((e.metaKey || e.ctrlKey) && e.key === '[' && !e.shiftKey) {
+        e.preventDefault()
+        e.stopPropagation()
+        navigateBack()
+      }
+      // Cmd+] / Ctrl+] für Navigation vorwärts (wie Browser)
+      if ((e.metaKey || e.ctrlKey) && e.key === ']' && !e.shiftKey) {
+        e.preventDefault()
+        e.stopPropagation()
+        navigateForward()
+      }
+      // Cmd+W / Ctrl+W für Tab schließen
+      if ((e.metaKey || e.ctrlKey) && e.key === 'w' && !e.shiftKey) {
+        e.preventDefault()
+        e.stopPropagation()
+        const { tabs, activeTabId, closeTab } = useTabStore.getState()
+        if (activeTabId && tabs.length > 0) {
+          closeTab(activeTabId)
+        }
+      }
+      // Cmd+Option+Left für vorherigen Tab
+      if ((e.metaKey || e.ctrlKey) && e.altKey && e.key === 'ArrowLeft') {
+        e.preventDefault()
+        e.stopPropagation()
+        const { tabs, activeTabId, setActiveTab } = useTabStore.getState()
+        const currentIndex = tabs.findIndex(t => t.id === activeTabId)
+        if (currentIndex > 0) {
+          setActiveTab(tabs[currentIndex - 1].id)
+        }
+      }
+      // Cmd+Option+Right für nächsten Tab
+      if ((e.metaKey || e.ctrlKey) && e.altKey && e.key === 'ArrowRight') {
+        e.preventDefault()
+        e.stopPropagation()
+        const { tabs, activeTabId, setActiveTab } = useTabStore.getState()
+        const currentIndex = tabs.findIndex(t => t.id === activeTabId)
+        if (currentIndex < tabs.length - 1) {
+          setActiveTab(tabs[currentIndex + 1].id)
+        }
       }
     }
 

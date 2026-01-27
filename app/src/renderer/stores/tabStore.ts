@@ -38,6 +38,7 @@ interface TabState {
   getCanvasState: (tabId: string) => CanvasTabState | undefined
   hasCanvasTabForNote: (noteId: string) => boolean
   clearAllTabs: () => void
+  updateTabTitle: (noteId: string, newTitle: string) => void
 }
 
 // Generate unique tab ID
@@ -54,7 +55,10 @@ export const useTabStore = create<TabState>()((set, get) => ({
     // Check if editor tab for this note already exists
     const existingTab = state.tabs.find(t => t.type === 'editor' && t.noteId === noteId)
     if (existingTab) {
-      set({ activeTabId: existingTab.id })
+      // Nur setzen wenn sich etwas ändert
+      if (state.activeTabId !== existingTab.id) {
+        set({ activeTabId: existingTab.id })
+      }
       return
     }
 
@@ -162,7 +166,7 @@ export const useTabStore = create<TabState>()((set, get) => ({
 
   setActiveTab: (tabId) => {
     const state = get()
-    if (state.tabs.some(t => t.id === tabId)) {
+    if (state.tabs.some(t => t.id === tabId) && state.activeTabId !== tabId) {
       set({ activeTabId: tabId })
     }
   },
@@ -253,5 +257,19 @@ export const useTabStore = create<TabState>()((set, get) => ({
       activeTabId: null,
       canvasStates: {}
     })
+  },
+
+  updateTabTitle: (noteId, newTitle) => {
+    const state = get()
+    const updatedTabs = state.tabs.map(tab => {
+      if (tab.type === 'editor' && tab.noteId === noteId) {
+        return { ...tab, title: newTitle }
+      }
+      if (tab.type === 'canvas' && tab.noteId === noteId) {
+        return { ...tab, title: `Canvas: ${newTitle}` }
+      }
+      return tab
+    })
+    set({ tabs: updatedTabs })
   }
 }))

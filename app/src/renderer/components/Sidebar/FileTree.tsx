@@ -5,6 +5,7 @@ import { useNotesStore } from '../../stores/notesStore'
 import { useUIStore, FOLDER_COLORS, FOLDER_ICONS, type IconSet } from '../../stores/uiStore'
 import { useGraphStore } from '../../stores/graphStore'
 import { useTabStore } from '../../stores/tabStore'
+import { useBookmarkStore } from '../../stores/bookmarkStore'
 import { generateNoteId } from '../../utils/linkExtractor'
 
 type DisplayMode = 'name' | 'path'
@@ -180,6 +181,7 @@ const FileItem: React.FC<FileItemProps> = ({ entry, level, onDrop, displayMode }
   const { iconSet, textSplitEnabled } = useUIStore()
   const { fileCustomizations, setFileCustomization, removeFileCustomization } = useGraphStore()
   const { openCanvasTab } = useTabStore()
+  const { isBookmarked, toggleBookmark } = useBookmarkStore()
 
   const isPdf = entry.fileType === 'pdf'
   const isImage = entry.fileType === 'image'
@@ -194,6 +196,9 @@ const FileItem: React.FC<FileItemProps> = ({ entry, level, onDrop, displayMode }
   // Finde die Notiz um Link-Count zu zeigen
   const note = notes.find(n => n.id === noteId)
   const linkCount = note ? note.outgoingLinks.length + note.incomingLinks.length : 0
+
+  // Bookmark Status (nur für Markdown-Notizen)
+  const noteIsBookmarked = !entry.isDirectory && !isPdf && !isImage && isBookmarked(noteId)
 
   // Hole Customization für diesen Eintrag (nur für Ordner)
   const customization = entry.isDirectory ? fileCustomizations[entry.path] : undefined
@@ -503,6 +508,14 @@ const FileItem: React.FC<FileItemProps> = ({ entry, level, onDrop, displayMode }
     setContextMenu(null)
   }, [contextMenu, isPdf, isImage, openCanvasTab])
 
+  // Toggle bookmark
+  const handleToggleBookmark = useCallback(() => {
+    if (!contextMenu || contextMenu.entry.isDirectory || isPdf || isImage) return
+    const noteId = generateNoteId(contextMenu.entry.path)
+    toggleBookmark(noteId)
+    setContextMenu(null)
+  }, [contextMenu, isPdf, isImage, toggleBookmark])
+
   // Folder Customization Handlers
   const handleSetFolderColor = useCallback((colorId: string, path: string) => {
     console.log('[FileTree] handleSetFolderColor called:', colorId, path)
@@ -780,9 +793,12 @@ const FileItem: React.FC<FileItemProps> = ({ entry, level, onDrop, displayMode }
             </>
           ) : (
             <>
-              {/* Im Canvas erkunden - nur für Markdown-Dateien */}
+              {/* Im Canvas erkunden + Lesezeichen - nur für Markdown-Dateien */}
               {!isPdf && !isImage && (
                 <>
+                  <button onClick={handleToggleBookmark} className="context-menu-item">
+                    {noteIsBookmarked ? 'Lesezeichen entfernen' : 'Lesezeichen hinzufügen'}
+                  </button>
                   <button onClick={handleOpenInCanvas} className="context-menu-item">
                     Im Canvas erkunden
                   </button>

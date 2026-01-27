@@ -12,6 +12,10 @@ interface NotesState {
   selectedImagePath: string | null  // Relativer Pfad zum ausgewählten Bild
   isLoading: boolean
 
+  // Navigation History (Browser-like back/forward)
+  navigationHistory: string[]  // Array of note IDs
+  navigationIndex: number      // Current position in history (-1 = empty)
+
   // Actions
   setVaultPath: (path: string | null) => void
   setFileTree: (tree: FileEntry[]) => void
@@ -20,11 +24,17 @@ interface NotesState {
   updateNote: (id: string, updates: Partial<Note>) => void
   updateNotePath: (oldId: string, newPath: string, newId: string) => void
   removeNote: (id: string) => void
-  selectNote: (id: string | null) => void
+  selectNote: (id: string | null, addToHistory?: boolean) => void
   selectSecondaryNote: (id: string | null) => void  // Für Text-Split View
   selectPdf: (path: string | null) => void
   selectImage: (path: string | null) => void
   setLoading: (loading: boolean) => void
+
+  // Navigation Actions
+  navigateBack: () => void
+  navigateForward: () => void
+  canNavigateBack: () => boolean
+  canNavigateForward: () => boolean
 
   // Computed
   getSelectedNote: () => Note | undefined
@@ -42,6 +52,8 @@ export const useNotesStore = create<NotesState>((set, get) => ({
   selectedPdfPath: null,
   selectedImagePath: null,
   isLoading: false,
+  navigationHistory: [],
+  navigationIndex: -1,
   
   setVaultPath: (path) => {
     set({ vaultPath: path })
@@ -98,7 +110,33 @@ export const useNotesStore = create<NotesState>((set, get) => ({
     return { notes: recalculateBacklinks(newNotes) }
   }),
   
-  selectNote: (id) => set({ selectedNoteId: id, selectedPdfPath: null, selectedImagePath: null }),
+  selectNote: (id, addToHistory = true) => set((state) => {
+    // Wenn keine ID oder gleiche wie aktuelle, nur State updaten
+    if (!id || id === state.selectedNoteId) {
+      return { selectedNoteId: id, selectedPdfPath: null, selectedImagePath: null }
+    }
+
+    // Navigation History updaten (nur wenn addToHistory true)
+    if (addToHistory) {
+      // Alles nach dem aktuellen Index abschneiden (wie Browser)
+      const newHistory = state.navigationHistory.slice(0, state.navigationIndex + 1)
+      // Neue Note hinzufügen
+      newHistory.push(id)
+      // History auf max 50 Einträge begrenzen
+      if (newHistory.length > 50) {
+        newHistory.shift()
+      }
+      return {
+        selectedNoteId: id,
+        selectedPdfPath: null,
+        selectedImagePath: null,
+        navigationHistory: newHistory,
+        navigationIndex: newHistory.length - 1
+      }
+    }
+
+    return { selectedNoteId: id, selectedPdfPath: null, selectedImagePath: null }
+  }),
 
   selectSecondaryNote: (id) => set({ secondarySelectedNoteId: id }),
 
@@ -107,6 +145,41 @@ export const useNotesStore = create<NotesState>((set, get) => ({
   selectImage: (path) => set({ selectedImagePath: path, selectedNoteId: null, selectedPdfPath: null }),
 
   setLoading: (loading) => set({ isLoading: loading }),
+
+  // Navigation Back/Forward
+  navigateBack: () => set((state) => {
+    if (state.navigationIndex <= 0) return state
+    const newIndex = state.navigationIndex - 1
+    const noteId = state.navigationHistory[newIndex]
+    return {
+      selectedNoteId: noteId,
+      selectedPdfPath: null,
+      selectedImagePath: null,
+      navigationIndex: newIndex
+    }
+  }),
+
+  navigateForward: () => set((state) => {
+    if (state.navigationIndex >= state.navigationHistory.length - 1) return state
+    const newIndex = state.navigationIndex + 1
+    const noteId = state.navigationHistory[newIndex]
+    return {
+      selectedNoteId: noteId,
+      selectedPdfPath: null,
+      selectedImagePath: null,
+      navigationIndex: newIndex
+    }
+  }),
+
+  canNavigateBack: () => {
+    const state = get()
+    return state.navigationIndex > 0
+  },
+
+  canNavigateForward: () => {
+    const state = get()
+    return state.navigationIndex < state.navigationHistory.length - 1
+  },
   
   getSelectedNote: () => {
     const state = get()

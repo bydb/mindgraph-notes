@@ -415,7 +415,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
   const lastSavedContentRef = useRef<string>('')
   const isExternalUpdateRef = useRef(false)
 
-  const { vaultPath, selectedNoteId, secondarySelectedNoteId, notes, updateNote, selectNote, selectSecondaryNote, addNote, fileTree, setFileTree } = useNotesStore()
+  const { vaultPath, selectedNoteId, secondarySelectedNoteId, notes, updateNote, selectNote, selectSecondaryNote, addNote, fileTree, setFileTree, navigateBack, navigateForward, canNavigateBack, canNavigateForward } = useNotesStore()
   const { pendingTemplateInsert, setPendingTemplateInsert, ollama, editorHeadingFolding, editorOutlining, outlineStyle, editorShowWordCount } = useUIStore()
 
   // Verwende die übergebene noteId oder die primary/secondary Selection
@@ -2065,6 +2065,30 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
   return (
     <div className="editor-container">
       <div className="editor-header">
+        {!isSecondary && (
+          <div className="editor-nav-buttons">
+            <button
+              className="nav-btn"
+              onClick={navigateBack}
+              disabled={!canNavigateBack()}
+              title="Zurück (Cmd+[)"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="15 18 9 12 15 6"/>
+              </svg>
+            </button>
+            <button
+              className="nav-btn"
+              onClick={navigateForward}
+              disabled={!canNavigateForward()}
+              title="Vorwärts (Cmd+])"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="9 18 15 12 9 6"/>
+              </svg>
+            </button>
+          </div>
+        )}
         <h3>{selectedNote.title}</h3>
         <div className="editor-header-right">
           {isSaving && <span className="saving-indicator">Speichern...</span>}
