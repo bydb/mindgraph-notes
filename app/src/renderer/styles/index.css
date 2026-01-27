@@ -1992,8 +1992,8 @@ body {
   padding: 0 16px;
   background-color: var(--bg-primary);
   border-bottom: 1px solid var(--border-color);
-  z-index: 10;
-  overflow: hidden;
+  z-index: 100;
+  position: relative;
 }
 
 /* In Full Canvas Mode: etwas großzügiger */
