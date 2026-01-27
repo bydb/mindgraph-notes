@@ -969,52 +969,42 @@
     </div>
 
     <div class="features-grid">
+      <!-- Hauptfeatures -->
       <div class="feature-card featured">
-        <div class="feature-icon">⌨️</div>
-        <h3 data-i18n="features.terminal.title">Integriertes Terminal</h3>
-        <p data-i18n="features.terminal.desc">Vollwertiges Terminal direkt in der App. Starte OpenCode, Ollama oder andere CLI-Tools ohne Kontextwechsel.</p>
-      </div>
-
-      <div class="feature-card featured">
-        <div class="feature-icon">🤖</div>
-        <h3>OpenCode</h3>
-        <p data-i18n="features.opencode.desc">Lass KI direkt auf deine Notizen zugreifen. Automatisiere, generiere und transformiere Inhalte mit natürlicher Sprache.</p>
+        <div class="feature-icon">🎨</div>
+        <h3 data-i18n="features.canvas.title">Local Canvas</h3>
+        <p data-i18n="features.canvas.desc">Erkunde Notizen visuell im Canvas. Starte mit einer Notiz, erweitere schrittweise über Verbindungen – alles in Tabs organisiert.</p>
       </div>
 
       <div class="feature-card featured">
-        <div class="feature-icon">🧠</div>
-        <h3 data-i18n="features.llm.title">Lokale LLMs</h3>
-        <p data-i18n="features.llm.desc">Ollama, LM Studio, llama.cpp - nutze jedes lokale LLM über das Terminal. Deine Daten bleiben auf deinem Rechner.</p>
+        <div class="feature-icon">📄</div>
+        <h3>PDF Companion</h3>
+        <p data-i18n="features.pdf.desc">PDFs direkt neben deinen Notizen. Perfekt für handschriftliche iPad-Notizen, Vorlesungsfolien oder Paper.</p>
       </div>
 
       <div class="feature-card featured">
-        <div class="feature-icon">🔮</div>
-        <h3 data-i18n="features.smart.title">Smart Connections</h3>
-        <p data-i18n="features.smart.desc">KI-gestützte Ähnlichkeitsanalyse findet verwandte Notizen. Hybrid-Scoring aus Embeddings, Wikilinks und Tags.</p>
+        <div class="feature-icon">🔒</div>
+        <h3 data-i18n="features.local.title">100% Lokal</h3>
+        <p data-i18n="features.local.desc">Alle Notizen sind Markdown-Dateien. Keine Cloud, kein Account, keine Telemetrie. Deine Daten gehören dir.</p>
       </div>
 
       <div class="feature-card featured">
-        <div class="feature-icon">💬</div>
-        <h3 data-i18n="features.chat.title">Notes Chat</h3>
-        <p data-i18n="features.chat.desc">Chatte mit deinen Notizen über lokale KI-Modelle. Stelle Fragen zu Inhalten, lass dir Zusammenfassungen erstellen.</p>
-      </div>
-
-      <div class="feature-card">
-        <div class="feature-icon">🌐</div>
-        <h3 data-i18n="features.graph.title">Wissensgraph</h3>
-        <p data-i18n="features.graph.desc">Visualisiere alle Verbindungen in einem interaktiven Graph. Entdecke versteckte Zusammenhänge.</p>
-      </div>
-
-      <div class="feature-card">
         <div class="feature-icon">🔗</div>
         <h3>Wikilinks</h3>
-        <p data-i18n="features.wikilinks.desc">Verlinke Notizen mit [[Wikilinks]]. Obsidian-kompatible Syntax für nahtlosen Wechsel.</p>
+        <p data-i18n="features.wikilinks.desc">Verlinke Notizen mit [[Wikilinks]]. Bidirektionale Verbindungen, Backlinks-Panel, Obsidian-kompatibel.</p>
       </div>
 
+      <!-- Standardfeatures -->
       <div class="feature-card">
         <div class="feature-icon">📝</div>
         <h3>Live Preview</h3>
         <p data-i18n="features.preview.desc">Schreibe in Markdown mit sofortiger Vorschau. LaTeX, Mermaid-Diagramme, Callouts und mehr.</p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon">🌐</div>
+        <h3 data-i18n="features.graph.title">Canvas Übersicht</h3>
+        <p data-i18n="features.graph.desc">Alle Notizen auf einen Blick. Filter nach Ordnern, ordne frei an, entdecke Zusammenhänge.</p>
       </div>
 
       <div class="feature-card">
@@ -1024,15 +1014,16 @@
       </div>
 
       <div class="feature-card">
-        <div class="feature-icon">📄</div>
-        <h3>PDF Companion</h3>
-        <p data-i18n="features.pdf.desc">PDFs mit Markdown-Notizen verknüpfen. Annotiere, tagge und verlinke deine Dokumente.</p>
+        <div class="feature-icon">⌨️</div>
+        <h3 data-i18n="features.terminal.title">Integriertes Terminal</h3>
+        <p data-i18n="features.terminal.desc">Vollwertiges Terminal in der App. Git, npm, Python – jedes CLI-Tool direkt neben deinen Notizen.</p>
       </div>
 
+      <!-- KI am Ende, zusammengefasst -->
       <div class="feature-card">
-        <div class="feature-icon">🔒</div>
-        <h3 data-i18n="features.local.title">100% Lokal</h3>
-        <p data-i18n="features.local.desc">Alle Notizen sind Markdown-Dateien. Keine Cloud, kein Account, keine Telemetrie. Deine Daten gehören dir.</p>
+        <div class="feature-icon">🤖</div>
+        <h3 data-i18n="features.ai.title">KI-Funktionen (optional)</h3>
+        <p data-i18n="features.ai.desc">Opt-in: Smart Connections, Notes Chat, lokale LLMs via Ollama. Aktiviere nur was du brauchst – oder lass es aus.</p>
       </div>
     </div>
   </section>
@@ -1348,24 +1339,21 @@
         "terminal.f4": "Direkter Zugriff auf deine Markdown-Dateien",
         "features.title": "Mehr als nur Notizen",
         "features.subtitle": "Alles was du brauchst. Nichts was du nicht willst.",
-        "features.terminal.title": "Integriertes Terminal",
-        "features.terminal.desc": "Vollwertiges Terminal direkt in der App. Starte OpenCode, Ollama oder andere CLI-Tools ohne Kontextwechsel.",
-        "features.opencode.desc": "Lass KI direkt auf deine Notizen zugreifen. Automatisiere, generiere und transformiere Inhalte mit natürlicher Sprache.",
-        "features.llm.title": "Lokale LLMs",
-        "features.llm.desc": "Ollama, LM Studio, llama.cpp - nutze jedes lokale LLM über das Terminal. Deine Daten bleiben auf deinem Rechner.",
-        "features.smart.title": "Smart Connections",
-        "features.smart.desc": "KI-gestützte Ähnlichkeitsanalyse findet verwandte Notizen. Hybrid-Scoring aus Embeddings, Wikilinks und Tags.",
-        "features.chat.title": "Notes Chat",
-        "features.chat.desc": "Chatte mit deinen Notizen über lokale KI-Modelle. Stelle Fragen zu Inhalten, lass dir Zusammenfassungen erstellen.",
-        "features.graph.title": "Wissensgraph",
-        "features.graph.desc": "Visualisiere alle Verbindungen in einem interaktiven Graph. Entdecke versteckte Zusammenhänge.",
-        "features.wikilinks.desc": "Verlinke Notizen mit [[Wikilinks]]. Obsidian-kompatible Syntax für nahtlosen Wechsel.",
-        "features.preview.desc": "Schreibe in Markdown mit sofortiger Vorschau. LaTeX, Mermaid-Diagramme, Callouts und mehr.",
-        "features.zotero.title": "Zotero Integration",
-        "features.zotero.desc": "Füge Literatur direkt aus Zotero ein. Perfekt für akademisches Arbeiten und Recherche.",
-        "features.pdf.desc": "PDFs mit Markdown-Notizen verknüpfen. Annotiere, tagge und verlinke deine Dokumente.",
+        "features.canvas.title": "Local Canvas",
+        "features.canvas.desc": "Erkunde Notizen visuell im Canvas. Starte mit einer Notiz, erweitere schrittweise über Verbindungen – alles in Tabs organisiert.",
+        "features.pdf.desc": "PDFs direkt neben deinen Notizen. Perfekt für handschriftliche iPad-Notizen, Vorlesungsfolien oder Paper.",
         "features.local.title": "100% Lokal",
         "features.local.desc": "Alle Notizen sind Markdown-Dateien. Keine Cloud, kein Account, keine Telemetrie. Deine Daten gehören dir.",
+        "features.wikilinks.desc": "Verlinke Notizen mit [[Wikilinks]]. Bidirektionale Verbindungen, Backlinks-Panel, Obsidian-kompatibel.",
+        "features.preview.desc": "Schreibe in Markdown mit sofortiger Vorschau. LaTeX, Mermaid-Diagramme, Callouts und mehr.",
+        "features.graph.title": "Canvas Übersicht",
+        "features.graph.desc": "Alle Notizen auf einen Blick. Filter nach Ordnern, ordne frei an, entdecke Zusammenhänge.",
+        "features.zotero.title": "Zotero Integration",
+        "features.zotero.desc": "Füge Literatur direkt aus Zotero ein. Perfekt für akademisches Arbeiten und Recherche.",
+        "features.terminal.title": "Integriertes Terminal",
+        "features.terminal.desc": "Vollwertiges Terminal in der App. Git, npm, Python – jedes CLI-Tool direkt neben deinen Notizen.",
+        "features.ai.title": "KI-Funktionen (optional)",
+        "features.ai.desc": "Opt-in: Smart Connections, Notes Chat, lokale LLMs via Ollama. Aktiviere nur was du brauchst – oder lass es aus.",
         "shortcuts.title": "Tastaturkürzel",
         "shortcuts.subtitle": "Arbeite schneller mit diesen Shortcuts",
         "shortcuts.general": "Allgemein",
@@ -1462,24 +1450,21 @@
         "terminal.f4": "Direct access to your Markdown files",
         "features.title": "More than just notes",
         "features.subtitle": "Everything you need. Nothing you don't.",
-        "features.terminal.title": "Integrated Terminal",
-        "features.terminal.desc": "Full-featured terminal right in the app. Run OpenCode, Ollama, or other CLI tools without context switching.",
-        "features.opencode.desc": "Let AI access your notes directly. Automate, generate, and transform content using natural language.",
-        "features.llm.title": "Local LLMs",
-        "features.llm.desc": "Ollama, LM Studio, llama.cpp - use any local LLM via the terminal. Your data stays on your machine.",
-        "features.smart.title": "Smart Connections",
-        "features.smart.desc": "AI-powered similarity analysis finds related notes. Hybrid scoring from embeddings, wikilinks, and tags.",
-        "features.chat.title": "Notes Chat",
-        "features.chat.desc": "Chat with your notes using local AI models. Ask questions about content, get summaries generated.",
-        "features.graph.title": "Knowledge Graph",
-        "features.graph.desc": "Visualize all connections in an interactive graph. Discover hidden relationships.",
-        "features.wikilinks.desc": "Link notes with [[Wikilinks]]. Obsidian-compatible syntax for seamless switching.",
-        "features.preview.desc": "Write in Markdown with instant preview. LaTeX, Mermaid diagrams, callouts, and more.",
-        "features.zotero.title": "Zotero Integration",
-        "features.zotero.desc": "Insert references directly from Zotero. Perfect for academic work and research.",
-        "features.pdf.desc": "Link PDFs with Markdown notes. Annotate, tag, and connect your documents.",
+        "features.canvas.title": "Local Canvas",
+        "features.canvas.desc": "Explore notes visually in the canvas. Start with one note, expand step by step through connections – all organized in tabs.",
+        "features.pdf.desc": "PDFs right next to your notes. Perfect for handwritten iPad notes, lecture slides, or papers.",
         "features.local.title": "100% Local",
         "features.local.desc": "All notes are Markdown files. No cloud, no account, no telemetry. Your data belongs to you.",
+        "features.wikilinks.desc": "Link notes with [[Wikilinks]]. Bidirectional connections, backlinks panel, Obsidian-compatible.",
+        "features.preview.desc": "Write in Markdown with instant preview. LaTeX, Mermaid diagrams, callouts, and more.",
+        "features.graph.title": "Canvas Overview",
+        "features.graph.desc": "All notes at a glance. Filter by folder, arrange freely, discover connections.",
+        "features.zotero.title": "Zotero Integration",
+        "features.zotero.desc": "Insert references directly from Zotero. Perfect for academic work and research.",
+        "features.terminal.title": "Integrated Terminal",
+        "features.terminal.desc": "Full-featured terminal in the app. Git, npm, Python – any CLI tool right next to your notes.",
+        "features.ai.title": "AI Features (optional)",
+        "features.ai.desc": "Opt-in: Smart Connections, Notes Chat, local LLMs via Ollama. Enable only what you need – or leave it off.",
         "shortcuts.title": "Keyboard Shortcuts",
         "shortcuts.subtitle": "Work faster with these shortcuts",
         "shortcuts.general": "General",
