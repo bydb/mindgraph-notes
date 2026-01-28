@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { useNotesStore } from '../../stores/notesStore'
+import { useTranslation } from '../../utils/translations'
 import { extractTasks, type ExtractedTask } from '../../utils/linkExtractor'
 
 interface OverdueTask extends ExtractedTask {
@@ -13,6 +14,7 @@ interface OverduePanelProps {
 }
 
 export const OverduePanel: React.FC<OverduePanelProps> = ({ onClose }) => {
+  const { t } = useTranslation()
   const { notes, vaultPath, selectNote } = useNotesStore()
   const [allTasks, setAllTasks] = useState<OverdueTask[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -184,7 +186,7 @@ export const OverduePanel: React.FC<OverduePanelProps> = ({ onClose }) => {
           </svg>
           <span>Termine</span>
         </div>
-        <button className="overdue-panel-close" onClick={onClose} title="Schließen">
+        <button className="overdue-panel-close" onClick={onClose} title={t('panel.close')}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <line x1="18" y1="6" x2="6" y2="18"/>
             <line x1="6" y1="6" x2="18" y2="18"/>

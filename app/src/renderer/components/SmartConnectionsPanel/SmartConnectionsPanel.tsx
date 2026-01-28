@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react'
 import { useNotesStore } from '../../stores/notesStore'
 import { useUIStore } from '../../stores/uiStore'
+import { useTranslation } from '../../utils/translations'
 
 interface EmbeddingModel {
   name: string
@@ -153,6 +154,7 @@ function cosineSimilarity(a: number[], b: number[]): number {
 }
 
 export const SmartConnectionsPanel: React.FC<SmartConnectionsPanelProps> = ({ onClose }) => {
+  const { t } = useTranslation()
   const { notes, selectedNoteId, selectNote, vaultPath } = useNotesStore()
   const { ollama: llmSettings } = useUIStore()
   const [embeddingModels, setEmbeddingModels] = useState<EmbeddingModel[]>([])
@@ -439,7 +441,7 @@ export const SmartConnectionsPanel: React.FC<SmartConnectionsPanelProps> = ({ on
           </svg>
           <span>Smart Connections</span>
         </div>
-        <button className="smart-connections-close" onClick={onClose} title="Schließen">
+        <button className="smart-connections-close" onClick={onClose} title={t('panel.close')}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <line x1="18" y1="6" x2="6" y2="18"/>
             <line x1="6" y1="6" x2="18" y2="18"/>
@@ -571,7 +573,7 @@ export const SmartConnectionsPanel: React.FC<SmartConnectionsPanelProps> = ({ on
                     <span className="smart-connections-badge tags" style={{ width: 14, height: 14 }}>#</span>
                     Tags
                   </span>
-                  <span className="smart-connections-legend-item" title="Ordner-Nähe (5%)">
+                  <span className="smart-connections-legend-item" title={t('smartConnections.folderProximity')}>
                     <span className="smart-connections-badge folder" style={{ width: 14, height: 14 }}>
                       <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
                         <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>

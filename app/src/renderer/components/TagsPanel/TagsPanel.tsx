@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react'
 import { useNotesStore } from '../../stores/notesStore'
+import { useTranslation } from '../../utils/translations'
 
 interface TagCount {
   tag: string
@@ -11,6 +12,7 @@ interface TagsPanelProps {
 }
 
 export const TagsPanel: React.FC<TagsPanelProps> = ({ onClose }) => {
+  const { t } = useTranslation()
   const { notes, selectNote } = useNotesStore()
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedTag, setSelectedTag] = useState<string | null>(null)
@@ -72,7 +74,7 @@ export const TagsPanel: React.FC<TagsPanelProps> = ({ onClose }) => {
           <span>Tags</span>
           <span className="tags-panel-count">{tagCounts.length}</span>
         </div>
-        <button className="tags-panel-close" onClick={onClose} title="Schließen">
+        <button className="tags-panel-close" onClick={onClose} title={t('panel.close')}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <line x1="18" y1="6" x2="6" y2="18"/>
             <line x1="6" y1="6" x2="18" y2="18"/>

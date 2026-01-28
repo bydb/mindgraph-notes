@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useNotesStore } from '../../stores/notesStore'
 import { useUIStore } from '../../stores/uiStore'
+import { useTranslation } from '../../utils/translations'
 import MarkdownIt from 'markdown-it'
 
 interface ChatMessage {
@@ -24,6 +25,7 @@ interface NotesChatProps {
 }
 
 export const NotesChat: React.FC<NotesChatProps> = ({ onClose }) => {
+  const { t } = useTranslation()
   const { notes, selectedNoteId, vaultPath } = useNotesStore()
   const { ollama: llmSettings } = useUIStore()
   const [models, setModels] = useState<OllamaModel[]>([])
@@ -312,7 +314,7 @@ export const NotesChat: React.FC<NotesChatProps> = ({ onClose }) => {
           </svg>
           <span>Notes Chat</span>
         </div>
-        <button className="notes-chat-close" onClick={onClose} title="Schließen">
+        <button className="notes-chat-close" onClick={onClose} title={t('panel.close')}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <line x1="18" y1="6" x2="6" y2="18"/>
             <line x1="6" y1="6" x2="18" y2="18"/>
@@ -446,7 +448,7 @@ export const NotesChat: React.FC<NotesChatProps> = ({ onClose }) => {
                   className={chatMode === 'socratic' ? 'active' : ''}
                   onClick={() => setChatMode('socratic')}
                   disabled={isStreaming}
-                  title="Sokratischer Dialog - die KI stellt Rückfragen"
+                  title={t('notesChat.socraticMode')}
                 >
                   Sokratisch
                 </button>
