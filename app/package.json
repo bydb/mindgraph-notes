@@ -18,7 +18,10 @@
     "graph",
     "electron"
   ],
-  "author": "Jochen Leeder",
+  "author": {
+    "name": "Jochen Leeder",
+    "email": "info@bydb.io"
+  },
   "license": "MIT",
   "repository": {
     "type": "git",
