@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef, useMemo } from 'react'
 import { EditorView } from '@codemirror/view'
 import { useNotesStore } from '../../stores/notesStore'
 import { extractParagraphs, generateBlockId } from '../../utils/linkExtractor'
+import { useTranslation } from '../../utils/translations'
 
 export type AutocompleteMode = 'note' | 'heading' | 'block' | 'tag'
 
@@ -50,6 +51,7 @@ export const WikilinkAutocomplete: React.FC<WikilinkAutocompleteProps> = ({
   onClose,
   onSelect
 }) => {
+  const { t } = useTranslation()
   const { notes, vaultPath } = useNotesStore()
   const [selectedIndex, setSelectedIndex] = useState(0)
   const listRef = useRef<HTMLDivElement>(null)
@@ -141,7 +143,7 @@ export const WikilinkAutocomplete: React.FC<WikilinkAutocompleteProps> = ({
         const createItem: AutocompleteItem = {
           id: '__create_new__',
           label: query.trim(),
-          sublabel: 'Neue Notiz erstellen',
+          sublabel: t('wikilink.createNewNote'),
           icon: '➕',
           value: query.trim(),
           createNewNote: true
@@ -218,7 +220,7 @@ export const WikilinkAutocomplete: React.FC<WikilinkAutocompleteProps> = ({
         .map(h => ({
           id: `h-${h.line}`,
           label: h.text,
-          sublabel: `H${h.level} (Überschrift)`,
+          sublabel: `H${h.level} (${t('wikilink.heading')})`,
           icon: '#'.repeat(h.level),
           value: `${targetNote}#${h.text}`
         }))
@@ -377,10 +379,10 @@ export const WikilinkAutocomplete: React.FC<WikilinkAutocompleteProps> = ({
 
   const getHeaderText = () => {
     switch (mode) {
-      case 'note': return 'Notizen'
-      case 'heading': return `Überschriften in "${targetNote}"`
-      case 'block': return `Absätze in "${targetNote}"`
-      case 'tag': return 'Tags'
+      case 'note': return t('wikilink.notes')
+      case 'heading': return `${t('wikilink.headingsIn')} "${targetNote}"`
+      case 'block': return `${t('wikilink.paragraphsIn')} "${targetNote}"`
+      case 'tag': return t('wikilink.tags')
     }
   }
 
@@ -400,10 +402,10 @@ export const WikilinkAutocomplete: React.FC<WikilinkAutocompleteProps> = ({
       <div className="wikilink-autocomplete-list" ref={listRef}>
         {items.length === 0 ? (
           <div className="wikilink-autocomplete-empty">
-            {mode === 'note' && 'Keine Notizen gefunden'}
-            {mode === 'heading' && 'Keine Überschriften gefunden'}
-            {mode === 'block' && 'Keine Absätze gefunden'}
-            {mode === 'tag' && 'Keine Tags gefunden'}
+            {mode === 'note' && t('wikilink.noNotesFound')}
+            {mode === 'heading' && t('wikilink.noHeadingsFound')}
+            {mode === 'block' && t('wikilink.noParagraphsFound')}
+            {mode === 'tag' && t('wikilink.noTagsFound')}
           </div>
         ) : (
           items.map((item, index) => (
@@ -428,9 +430,9 @@ export const WikilinkAutocomplete: React.FC<WikilinkAutocompleteProps> = ({
       </div>
 
       <div className="wikilink-autocomplete-footer">
-        <span>↑↓ navigieren</span>
-        <span>↵ auswählen</span>
-        <span>Esc schließen</span>
+        <span>{t('wikilink.navigate')}</span>
+        <span>{t('wikilink.pressEnterToSelect')}</span>
+        <span>{t('wikilink.pressEscToClose')}</span>
       </div>
     </div>
   )

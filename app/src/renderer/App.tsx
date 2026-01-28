@@ -699,18 +699,18 @@ const App: React.FC = () => {
                   ✓ {taskStats.completed}/{taskStats.total}
                 </span>
                 {taskStats.open > 0 && (
-                  <span className="task-open" title="Offene Tasks">
-                    • {taskStats.open} offen
+                  <span className="task-open" title={t('footer.openTasks')}>
+                    • {taskStats.open} {t('footer.open')}
                   </span>
                 )}
                 {taskStats.critical > 0 && (
-                  <span className="task-critical" title="Kritische Tasks">
-                    • {taskStats.critical} kritisch
+                  <span className="task-critical" title={t('footer.criticalTasks')}>
+                    • {taskStats.critical} {t('footer.critical')}
                   </span>
                 )}
                 {taskStats.overdue > 0 && (
-                  <span className="task-overdue" title="Überfällige Tasks">
-                    • {taskStats.overdue} überfällig
+                  <span className="task-overdue" title={t('footer.overdueTasks')}>
+                    • {taskStats.overdue} {t('footer.overdueCount')}
                   </span>
                 )}
               </span>

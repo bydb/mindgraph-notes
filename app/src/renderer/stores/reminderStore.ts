@@ -1,6 +1,8 @@
 import { create } from 'zustand'
 import type { Note } from '../../shared/types'
 import { extractTasks, type ExtractedTask } from '../utils/linkExtractor'
+import { t } from '../utils/translations'
+import { useUIStore } from './uiStore'
 
 interface ReminderState {
   checkInterval: ReturnType<typeof setInterval> | null
@@ -83,9 +85,10 @@ export const useReminderStore = create<ReminderState>((set, get) => ({
 
           try {
             // Notification senden
-            const title = `📋 Erinnerung: ${note.title}`
+            const language = useUIStore.getState().language
+            const title = `📋 ${t('reminder.title', language)}: ${note.title}`
             const body = task.dueDate < now
-              ? `⚠️ Überfällig: ${task.text}`
+              ? `⚠️ ${t('reminder.overdue', language)}: ${task.text}`
               : `${formatNotificationTime(task.dueDate)} - ${task.text}`
 
             const success = await window.electronAPI.showNotification(title, body, note.id)

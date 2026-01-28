@@ -113,9 +113,9 @@ export const OverduePanel: React.FC<OverduePanelProps> = ({ onClose }) => {
     const diffMs = date.getTime() - today.getTime()
     const diffDays = Math.floor(diffMs / (24 * 60 * 60 * 1000))
 
-    if (diffDays === 1) return 'Morgen'
-    if (diffDays < 7) return `In ${diffDays} Tagen`
-    if (diffDays < 14) return 'Nächste Woche'
+    if (diffDays === 1) return t('overdue.tomorrow')
+    if (diffDays < 7) return t('overdue.inDays', { days: diffDays })
+    if (diffDays < 14) return t('overdue.nextWeek')
     return formatDate(date)
   }
 
@@ -148,7 +148,7 @@ export const OverduePanel: React.FC<OverduePanelProps> = ({ onClose }) => {
         </div>
       </div>
       {task.isCritical && (
-        <div className="overdue-item-critical" title="Kritisch">!</div>
+        <div className="overdue-item-critical" title={t('overdue.critical')}>!</div>
       )}
     </div>
   )
@@ -166,7 +166,7 @@ export const OverduePanel: React.FC<OverduePanelProps> = ({ onClose }) => {
           )}
         </div>
         {tasks.length === 0 ? (
-          <div className="overdue-section-empty">Keine Termine</div>
+          <div className="overdue-section-empty">{t('overdue.noAppointments')}</div>
         ) : (
           <div className="overdue-section-list">
             {tasks.map(task => renderTask(task, showDate, isOverdue))}
@@ -184,7 +184,7 @@ export const OverduePanel: React.FC<OverduePanelProps> = ({ onClose }) => {
             <circle cx="12" cy="12" r="10"/>
             <polyline points="12 6 12 12 16 14"/>
           </svg>
-          <span>Termine</span>
+          <span>{t('overdue.title')}</span>
         </div>
         <button className="overdue-panel-close" onClick={onClose} title={t('panel.close')}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -198,7 +198,7 @@ export const OverduePanel: React.FC<OverduePanelProps> = ({ onClose }) => {
         {isLoading ? (
           <div className="overdue-loading">
             <div className="overdue-spinner"></div>
-            <p>Lade Termine...</p>
+            <p>{t('overdue.loading')}</p>
           </div>
         ) : allTasks.length === 0 ? (
           <div className="overdue-empty">
@@ -206,14 +206,14 @@ export const OverduePanel: React.FC<OverduePanelProps> = ({ onClose }) => {
               <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
               <polyline points="22 4 12 14.01 9 11.01"/>
             </svg>
-            <p>Keine Termine</p>
-            <span>Alle Aufgaben sind erledigt!</span>
+            <p>{t('overdue.noAppointments')}</p>
+            <span>{t('overdue.allDone')}</span>
           </div>
         ) : (
           <>
-            {renderSection('Überfällig', overdueTasks, 'overdue')}
-            {renderSection('Heute', todayTasks, 'today')}
-            {renderSection('Geplant', futureTasks, 'future')}
+            {renderSection(t('overdue.overdue'), overdueTasks, 'overdue')}
+            {renderSection(t('overdue.today'), todayTasks, 'today')}
+            {renderSection(t('overdue.scheduled'), futureTasks, 'future')}
           </>
         )}
       </div>

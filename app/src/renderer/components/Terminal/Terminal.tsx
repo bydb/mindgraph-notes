@@ -12,6 +12,7 @@ interface TerminalProps {
 
 export const Terminal: React.FC<TerminalProps> = ({ visible, onToggle }) => {
   const { t } = useTranslation()
+  const tRef = useRef(t)
   const terminalRef = useRef<HTMLDivElement>(null)
   const xtermRef = useRef<XTerm | null>(null)
   const fitAddonRef = useRef<FitAddon | null>(null)
@@ -24,6 +25,11 @@ export const Terminal: React.FC<TerminalProps> = ({ visible, onToggle }) => {
   const wasVisibleRef = useRef(false)
   const ptyStartedRef = useRef(false)
   const errorShownRef = useRef(false)
+
+  // Keep tRef updated with latest t function
+  useEffect(() => {
+    tRef.current = t
+  }, [t])
 
   const vaultPath = useNotesStore((s) => s.vaultPath)
 
@@ -107,7 +113,9 @@ export const Terminal: React.FC<TerminalProps> = ({ visible, onToggle }) => {
       }
       // Verwende xtermRef statt der closure-Variable
       if (xtermRef.current) {
-        xtermRef.current.write(data)
+        // Replace marker with translated text
+        const translatedData = data.replace('__TERMINAL_CONNECTED__', tRef.current('terminal.connected'))
+        xtermRef.current.write(translatedData)
       } else {
         console.error('[Terminal] xterm instance is null!')
       }
@@ -119,7 +127,7 @@ export const Terminal: React.FC<TerminalProps> = ({ visible, onToggle }) => {
       setIsConnected(false)
       isConnectedRef.current = false
       ptyStartedRef.current = false
-      term.writeln('\r\n\x1b[31m[Terminal beendet - Klicke ↻ zum Neustart]\x1b[0m')
+      term.writeln(`\r\n\x1b[31m[${tRef.current('terminal.ended')}]\x1b[0m`)
     })
 
     // Terminal Error Handler - nur einmal anzeigen
@@ -136,14 +144,14 @@ export const Terminal: React.FC<TerminalProps> = ({ visible, onToggle }) => {
       // Benutzerfreundliche Fehlermeldung
       if (error.includes('posix_spawnp')) {
         term.writeln('\r\n\x1b[33m┌─────────────────────────────────────────┐\x1b[0m')
-        term.writeln('\x1b[33m│\x1b[0m  Terminal konnte nicht gestartet werden \x1b[33m│\x1b[0m')
+        term.writeln(`\x1b[33m│\x1b[0m  ${tRef.current('terminal.couldNotStart').padEnd(38)} \x1b[33m│\x1b[0m`)
         term.writeln('\x1b[33m│\x1b[0m                                         \x1b[33m│\x1b[0m')
-        term.writeln('\x1b[33m│\x1b[0m  Das integrierte Terminal ist in der    \x1b[33m│\x1b[0m')
-        term.writeln('\x1b[33m│\x1b[0m  Entwicklungsumgebung eingeschränkt.    \x1b[33m│\x1b[0m')
-        term.writeln('\x1b[33m│\x1b[0m  Nutze ein externes Terminal.           \x1b[33m│\x1b[0m')
+        term.writeln(`\x1b[33m│\x1b[0m  ${tRef.current('terminal.devLimited').substring(0, 38).padEnd(38)} \x1b[33m│\x1b[0m`)
+        term.writeln('\x1b[33m│\x1b[0m                                         \x1b[33m│\x1b[0m')
+        term.writeln(`\x1b[33m│\x1b[0m  ${tRef.current('terminal.useExternal').padEnd(38)} \x1b[33m│\x1b[0m`)
         term.writeln('\x1b[33m└─────────────────────────────────────────┘\x1b[0m')
       } else {
-        term.writeln(`\r\n\x1b[31m[Fehler: ${error}]\x1b[0m`)
+        term.writeln(`\r\n\x1b[31m[${tRef.current('terminal.error')}: ${error}]\x1b[0m`)
       }
     })
 
@@ -266,13 +274,13 @@ export const Terminal: React.FC<TerminalProps> = ({ visible, onToggle }) => {
       <div className="terminal-resize-handle" onMouseDown={handleMouseDown} />
       <div className="terminal-header">
         <span className="terminal-title">
-          Terminal {!isConnected && <span style={{ color: '#f44747' }}>(getrennt)</span>}
+          Terminal {!isConnected && <span style={{ color: '#f44747' }}>({t('terminal.disconnected')})</span>}
         </span>
         <div className="terminal-actions">
           <button
             className="btn-icon"
             onClick={handleRestart}
-            title="Terminal neu starten"
+            title={t('terminal.restart')}
           >
             ↻
           </button>
@@ -283,14 +291,14 @@ export const Terminal: React.FC<TerminalProps> = ({ visible, onToggle }) => {
                 window.electronAPI.terminalWrite(`cd "${vaultPath}" && clear\n`)
               }
             }}
-            title="Zum Vault wechseln"
+            title={t('terminal.goToVault')}
           >
             📁
           </button>
           <button
             className="btn-icon"
             onClick={() => window.electronAPI.terminalWrite('opencode\n')}
-            title="OpenCode starten"
+            title={t('terminal.startOpenCode')}
           >
             🤖
           </button>

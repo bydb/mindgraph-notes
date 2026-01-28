@@ -16,6 +16,7 @@ import 'reactflow/dist/style.css'
 import { useNotesStore } from '../../stores/notesStore'
 import { useTabStore } from '../../stores/tabStore'
 import { SimpleNoteNode } from './SimpleNoteNode'
+import { useTranslation } from '../../utils/translations'
 import type { Note } from '../../../shared/types'
 
 // Node types - nur SimpleNoteNode
@@ -31,6 +32,7 @@ interface LocalCanvasProps {
 
 // Inner component that uses ReactFlow hooks
 const LocalCanvasInner: React.FC<LocalCanvasProps> = memo(({ tabId, rootNoteId }) => {
+  const { t } = useTranslation()
   // Nur die nötigsten Store-Zugriffe
   const allNotes = useNotesStore((s) => s.notes)
   const selectNote = useNotesStore((s) => s.selectNote)
@@ -250,7 +252,7 @@ const LocalCanvasInner: React.FC<LocalCanvasProps> = memo(({ tabId, rootNoteId }
 
   // Root Note Titel
   const rootNote = noteMap.get(rootNoteId)
-  const rootTitle = rootNote?.title || 'Unbekannt'
+  const rootTitle = rootNote?.title || t('localCanvas.unknown')
 
   return (
     <div className="local-canvas">
@@ -266,18 +268,18 @@ const LocalCanvasInner: React.FC<LocalCanvasProps> = memo(({ tabId, rootNoteId }
           </svg>
           <h3>{rootTitle}</h3>
           <span className="local-canvas-stats">
-            {visibleNotes.length} Notizen · {edges.length} Verbindungen
-            {expandedNoteIds.size > 0 && ` · Tiefe ${expandedNoteIds.size + 1}`}
+            {visibleNotes.length} {t('localCanvas.notes')} · {edges.length} {t('localCanvas.connections')}
+            {expandedNoteIds.size > 0 && ` · ${t('localCanvas.depth')} ${expandedNoteIds.size + 1}`}
           </span>
         </div>
         <div className="local-canvas-header-right">
-          <button className="local-canvas-header-btn" onClick={handleReset} title="Zurücksetzen">
+          <button className="local-canvas-header-btn" onClick={handleReset} title={t('localCanvas.reset')}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
               <path d="M3 3v5h5"/>
             </svg>
           </button>
-          <button className="local-canvas-header-btn" onClick={() => fitView(fitViewOptions)} title="Einpassen">
+          <button className="local-canvas-header-btn" onClick={() => fitView(fitViewOptions)} title={t('localCanvas.fitView')}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M15 3h6v6"/>
               <path d="M9 21H3v-6"/>

@@ -1,11 +1,13 @@
 import React, { useState } from 'react'
 import { useNotesStore } from '../../stores/notesStore'
+import { useTranslation } from '../../utils/translations'
 
 interface BacklinksPanelProps {
   isSecondary?: boolean
 }
 
 export const BacklinksPanel: React.FC<BacklinksPanelProps> = ({ isSecondary = false }) => {
+  const { t } = useTranslation()
   const { notes, getSelectedNote, getSecondarySelectedNote, selectNote, selectSecondaryNote } = useNotesStore()
   const selectedNote = isSecondary ? getSecondarySelectedNote() : getSelectedNote()
   const [isCollapsed, setIsCollapsed] = useState(false)
@@ -34,14 +36,14 @@ export const BacklinksPanel: React.FC<BacklinksPanelProps> = ({ isSecondary = fa
         onClick={() => setIsCollapsed(!isCollapsed)}
       >
         <div className="backlinks-header-left">
-          Backlinks
+          {t('backlinks.title')}
           <span className="backlinks-count">{backlinks.length}</span>
         </div>
         <span className="backlinks-toggle">▼</span>
       </div>
       <div className="backlinks-content">
         {backlinks.length === 0 ? (
-          <p className="no-backlinks">Keine Backlinks</p>
+          <p className="no-backlinks">{t('backlinks.none')}</p>
         ) : (
           <ul className="backlinks-list">
             {backlinks.map(note => (

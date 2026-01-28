@@ -220,7 +220,7 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
   const handleCreateTemplate = () => {
     const newTemplate: CustomTemplate = {
       id: generateRandomId(8),
-      name: 'Neues Template',
+      name: t('settings.templates.newTemplate'),
       content: `# {{title}}\n\n{{cursor}}`
     }
     setTemplates(prev => ({
@@ -233,11 +233,11 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
 
   const handleDeleteTemplate = () => {
     if (selectedTemplate.type !== 'custom') return
-    if (!confirm('Template wirklich löschen?')) return
+    if (!confirm(t('settings.templates.deleteConfirm'))) return
 
     setTemplates(prev => ({
       ...prev,
-      custom: prev.custom.filter(t => t.id !== selectedTemplate.id)
+      custom: prev.custom.filter(tpl => tpl.id !== selectedTemplate.id)
     }))
     setSelectedTemplate({ type: 'builtin', key: 'dailyNote' })
     setTemplateHasChanges(true)
@@ -267,7 +267,7 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
 
   const handleClose = () => {
     if (templateHasChanges) {
-      if (confirm('Ungespeicherte Template-Änderungen verwerfen?')) {
+      if (confirm(t('settings.templates.unsavedConfirm'))) {
         onClose()
       }
     } else {
@@ -449,9 +449,9 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
             {/* Editor Tab */}
             {activeTab === 'editor' && (
               <div className="settings-section">
-                <h3>Darstellung</h3>
+                <h3>{t('settings.editor.display')}</h3>
                 <div className="settings-row">
-                  <label>Schriftgröße</label>
+                  <label>{t('settings.editor.fontSize')}</label>
                   <div className="settings-input-group">
                     <input
                       type="number"
@@ -464,7 +464,7 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
                   </div>
                 </div>
                 <div className="settings-row">
-                  <label>Zeilennummern anzeigen</label>
+                  <label>{t('settings.editor.showLineNumbers')}</label>
                   <input
                     type="checkbox"
                     checked={editorLineNumbers}
@@ -472,7 +472,7 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
                   />
                 </div>
                 <div className="settings-row">
-                  <label>Überschriften falten</label>
+                  <label>{t('settings.editor.foldHeadings')}</label>
                   <input
                     type="checkbox"
                     checked={editorHeadingFolding}
@@ -480,7 +480,7 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
                   />
                 </div>
                 <div className="settings-row">
-                  <label>Outlining (Listen falten)</label>
+                  <label>{t('settings.editor.outlining')}</label>
                   <input
                     type="checkbox"
                     checked={editorOutlining}
@@ -488,7 +488,7 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
                   />
                 </div>
                 <div className="settings-row">
-                  <label>Outline-Stil</label>
+                  <label>{t('settings.editor.outlineStyle')}</label>
                   <select
                     value={outlineStyle}
                     onChange={e => setOutlineStyle(e.target.value as OutlineStyle)}
@@ -502,7 +502,7 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
                   </select>
                 </div>
                 <div className="settings-row">
-                  <label>Wörter-/Zeichenzähler</label>
+                  <label>{t('settings.editor.wordCounter')}</label>
                   <input
                     type="checkbox"
                     checked={editorShowWordCount}
@@ -510,35 +510,35 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
                   />
                 </div>
 
-                <h3>Verhalten</h3>
+                <h3>{t('settings.editor.behavior')}</h3>
                 <div className="settings-row">
-                  <label>Standard-Ansicht</label>
+                  <label>{t('settings.editor.defaultViewLabel')}</label>
                   <select
                     value={editorDefaultView}
                     onChange={e => setEditorDefaultView(e.target.value as 'edit' | 'live-preview' | 'preview')}
                   >
-                    <option value="edit">Bearbeiten</option>
-                    <option value="live-preview">Live Preview</option>
-                    <option value="preview">Vorschau</option>
+                    <option value="edit">{t('settings.editor.viewEdit')}</option>
+                    <option value="live-preview">{t('settings.editor.viewLivePreview')}</option>
+                    <option value="preview">{t('settings.editor.viewPreview')}</option>
                   </select>
                 </div>
                 <div className="settings-row">
-                  <label>Auto-Save Intervall</label>
+                  <label>{t('settings.editor.autoSaveInterval')}</label>
                   <select
                     value={autoSaveInterval}
                     onChange={e => setAutoSaveInterval(parseInt(e.target.value))}
                   >
-                    <option value="0">Deaktiviert</option>
-                    <option value="500">0,5 Sekunden</option>
-                    <option value="1000">1 Sekunde</option>
-                    <option value="2000">2 Sekunden</option>
-                    <option value="5000">5 Sekunden</option>
+                    <option value="0">{t('settings.editor.autoSaveDisabled')}</option>
+                    <option value="500">0.5 {t('settings.editor.autoSaveSeconds')}</option>
+                    <option value="1000">1 {t('settings.editor.autoSaveSeconds')}</option>
+                    <option value="2000">2 {t('settings.editor.autoSaveSeconds')}</option>
+                    <option value="5000">5 {t('settings.editor.autoSaveSeconds')}</option>
                   </select>
                 </div>
 
-                <h3>PDF Companion</h3>
+                <h3>{t('settings.pdf.title')}</h3>
                 <div className="settings-row">
-                  <label>PDF Companion aktiviert</label>
+                  <label>{t('settings.pdf.enabled')}</label>
                   <input
                     type="checkbox"
                     checked={pdfCompanionEnabled}
@@ -546,27 +546,26 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
                   />
                 </div>
                 <div className="settings-row">
-                  <label>Anzeige im Dateibaum</label>
+                  <label>{t('settings.pdf.displayMode')}</label>
                   <select
                     value={pdfDisplayMode}
                     onChange={e => setPdfDisplayMode(e.target.value as 'both' | 'companion-only' | 'pdf-only')}
                     disabled={!pdfCompanionEnabled}
                   >
-                    <option value="companion-only">Nur Companion (.pdf.md)</option>
-                    <option value="both">PDF und Companion</option>
-                    <option value="pdf-only">Nur PDF</option>
+                    <option value="companion-only">{t('settings.pdf.companionOnly')}</option>
+                    <option value="both">{t('settings.pdf.both')}</option>
+                    <option value="pdf-only">{t('settings.pdf.pdfOnly')}</option>
                   </select>
                 </div>
                 <div className="settings-info">
                   <p>
-                    <strong>PDF Companion</strong> erstellt automatisch Markdown-Dateien für PDFs,
-                    die Tagging, Verlinkung und Notizen ermöglichen.
+                    <strong>{t('settings.pdf.title')}</strong> {t('settings.pdf.description')}
                   </p>
                 </div>
 
-                <h3>Canvas</h3>
+                <h3>{t('settings.canvas.title')}</h3>
                 <div className="settings-row">
-                  <label>Standard-Kartenbreite</label>
+                  <label>{t('settings.canvas.cardWidth')}</label>
                   <div className="settings-input-group">
                     <input
                       type="range"
@@ -582,14 +581,13 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
                 </div>
                 <div className="settings-info">
                   <p>
-                    <strong>Kartenbreite</strong> bestimmt die Mindestbreite für Karten im Canvas.
-                    Größere Werte zeigen mehr Inhalt, kleinere Werte ermöglichen kompaktere Darstellung.
+                    {t('settings.canvas.cardWidthDesc')}
                   </p>
                 </div>
 
-                <h3>Dateibaum</h3>
+                <h3>{t('settings.fileTree.title')}</h3>
                 <div className="settings-row">
-                  <label>Icon-Stil</label>
+                  <label>{t('settings.fileTree.iconStyle')}</label>
                   <select
                     value={iconSet}
                     onChange={e => setIconSet(e.target.value as IconSet)}
@@ -603,41 +601,38 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
                 </div>
                 <div className="settings-info">
                   <p>
-                    <strong>Icon-Stil</strong> ändert die Darstellung von Ordnern im Dateibaum.
-                    Individuelle Ordner-Farben und -Icons können per Rechtsklick angepasst werden.
+                    {t('settings.fileTree.iconStyleDesc')}
                   </p>
                 </div>
 
-                <h3>Werkzeuge</h3>
+                <h3>{t('settings.tools.title')}</h3>
                 <div className="settings-row">
-                  <label>Wikilinks entfernen</label>
+                  <label>{t('settings.tools.stripWikilinks')}</label>
                   <button
                     className="btn-secondary"
                     onClick={async () => {
                       if (!vaultPath) {
-                        alert('Bitte zuerst einen Vault öffnen')
+                        alert(t('settings.tools.openVaultFirst'))
                         return
                       }
-                      // Öffne Ordnerauswahl-Dialog
                       const folderPath = await window.electronAPI.openVault()
                       if (folderPath && folderPath.startsWith(vaultPath)) {
                         await window.electronAPI.stripWikilinksInFolder(folderPath, vaultPath)
                       } else if (folderPath) {
-                        alert('Bitte wähle einen Ordner innerhalb des aktuellen Vaults')
+                        alert(t('settings.tools.selectFolderInVault'))
                       }
                     }}
                   >
-                    Ordner auswählen...
+                    {t('settings.tools.selectFolder')}
                   </button>
                 </div>
                 <div className="settings-info">
                   <p>
-                    <strong>Wikilinks entfernen</strong> entfernt die [[Klammern]] aus allen Markdown-Dateien
-                    im gewählten Ordner. Der verlinkte Text bleibt erhalten.<br/>
-                    Beispiel: <code>[[Notiz]]</code> → <code>Notiz</code>, <code>[[Notiz|Alias]]</code> → <code>Alias</code>
+                    {t('settings.tools.stripWikilinksDesc')}<br/>
+                    {t('settings.tools.stripWikilinksExample')}
                   </p>
                   <p style={{ marginTop: '8px', color: 'var(--text-muted)' }}>
-                    <strong>Tipp:</strong> Rechtsklick auf einen Ordner im Dateibaum → "Wikilinks entfernen"
+                    {t('settings.tools.stripWikiliksHint')}
                   </p>
                 </div>
               </div>
@@ -648,7 +643,7 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
               <div className="settings-templates">
                 <div className="settings-templates-sidebar">
                   <div className="settings-templates-section">
-                    <div className="settings-templates-section-title">Standard</div>
+                    <div className="settings-templates-section-title">{t('settings.templates.standard')}</div>
                     {(Object.keys(BUILTIN_LABELS) as BuiltInTemplateKey[]).map(key => (
                       <button
                         key={key}
@@ -662,7 +657,7 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
 
                   <div className="settings-templates-section">
                     <div className="settings-templates-section-title">
-                      Eigene
+                      {t('settings.templates.own')}
                       <button className="settings-templates-add" onClick={handleCreateTemplate}>+</button>
                     </div>
                     {templates.custom.map(template => (
@@ -675,7 +670,7 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
                       </button>
                     ))}
                     {templates.custom.length === 0 && (
-                      <div className="settings-templates-empty">Keine eigenen Templates</div>
+                      <div className="settings-templates-empty">{t('settings.templates.noCustom')}</div>
                     )}
                   </div>
                 </div>
@@ -695,10 +690,10 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
                     )}
                     <div className="settings-templates-actions">
                       {selectedTemplate.type === 'builtin' && (
-                        <button onClick={handleResetTemplate}>Standard</button>
+                        <button onClick={handleResetTemplate}>{t('settings.templates.standard')}</button>
                       )}
                       {selectedTemplate.type === 'custom' && (
-                        <button className="danger" onClick={handleDeleteTemplate}>Löschen</button>
+                        <button className="danger" onClick={handleDeleteTemplate}>{t('settings.templates.delete')}</button>
                       )}
                     </div>
                   </div>
@@ -714,7 +709,7 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
                   {templateHasChanges && (
                     <div className="settings-templates-footer">
                       <button className="primary" onClick={handleSaveTemplates} disabled={isSavingTemplates}>
-                        {isSavingTemplates ? 'Speichern...' : 'Templates speichern'}
+                        {isSavingTemplates ? t('settings.templates.saving') : t('settings.templates.saveTemplates')}
                       </button>
                     </div>
                   )}
@@ -725,10 +720,10 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
             {/* Integrationen Tab */}
             {activeTab === 'integrations' && (
               <div className="settings-section">
-                <h3>Lokale KI (Ollama / LM Studio)</h3>
+                <h3>{t('settings.integrations.localAI')}</h3>
 
                 <div className="settings-row">
-                  <label>KI-Funktionen aktiviert</label>
+                  <label>{t('settings.integrations.aiEnabled')}</label>
                   <input
                     type="checkbox"
                     checked={ollama.enabled}
@@ -737,7 +732,7 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
                 </div>
 
                 <div className="settings-row">
-                  <label>Backend</label>
+                  <label>{t('settings.integrations.backend')}</label>
                   <select
                     value={ollama.backend}
                     onChange={e => {
@@ -758,29 +753,29 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
                       <label>Ollama Status</label>
                       <div className="settings-status">
                         {ollamaStatus === 'checking' && (
-                          <span className="status-checking">Prüfe Verbindung...</span>
+                          <span className="status-checking">{t('settings.checkingConnection')}</span>
                         )}
                         {ollamaStatus === 'connected' && (
-                          <span className="status-connected">Verbunden ({ollamaModels.length} Modelle)</span>
+                          <span className="status-connected">{t('settings.connected')} ({ollamaModels.length} {t('settings.models')})</span>
                         )}
                         {ollamaStatus === 'disconnected' && (
-                          <span className="status-disconnected">Nicht verbunden</span>
+                          <span className="status-disconnected">{t('settings.notConnected')}</span>
                         )}
                         <button className="settings-refresh" onClick={checkOllamaConnection}>
-                          Aktualisieren
+                          {t('settings.refresh')}
                         </button>
                       </div>
                     </div>
 
                     {ollamaStatus === 'connected' && (
                       <div className="settings-row">
-                        <label>Modell</label>
+                        <label>{t('settings.integrations.ollama.model')}</label>
                         <select
                           value={ollama.selectedModel}
                           onChange={e => setOllama({ selectedModel: e.target.value })}
                           disabled={!ollama.enabled}
                         >
-                          <option value="">Modell wählen...</option>
+                          <option value="">{t('settings.selectModel')}</option>
                           {ollamaModels.map(model => (
                             <option key={model.name} value={model.name}>
                               {model.name}
@@ -792,10 +787,10 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
 
                     <div className="settings-info">
                       <p>
-                        <strong>Ollama</strong> ermöglicht lokale KI-Funktionen ohne Cloud-Dienste.
+                        <strong>Ollama</strong> {t('settings.integrations.ollamaDesc')}
                       </p>
                       <p>
-                        Installiere Ollama von <a href="https://ollama.ai" target="_blank" rel="noopener noreferrer">ollama.ai</a> und starte es.
+                        {t('settings.integrations.installOllama')} <a href="https://ollama.ai" target="_blank" rel="noopener noreferrer">ollama.ai</a>
                       </p>
                     </div>
                   </>
@@ -816,7 +811,7 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
                           style={{ width: '80px' }}
                         />
                         <button className="settings-refresh" onClick={checkLmstudioConnection}>
-                          Verbinden
+                          {t('settings.connect')}
                         </button>
                       </div>
                     </div>
@@ -825,29 +820,29 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
                       <label>LM Studio Status</label>
                       <div className="settings-status">
                         {lmstudioStatus === 'checking' && (
-                          <span className="status-checking">Prüfe Verbindung...</span>
+                          <span className="status-checking">{t('settings.checkingConnection')}</span>
                         )}
                         {lmstudioStatus === 'connected' && (
-                          <span className="status-connected">Verbunden ({lmstudioModels.length} Modelle)</span>
+                          <span className="status-connected">{t('settings.connected')} ({lmstudioModels.length} {t('settings.models')})</span>
                         )}
                         {lmstudioStatus === 'disconnected' && (
-                          <span className="status-disconnected">Nicht verbunden</span>
+                          <span className="status-disconnected">{t('settings.notConnected')}</span>
                         )}
                         <button className="settings-refresh" onClick={checkLmstudioConnection}>
-                          Aktualisieren
+                          {t('settings.refresh')}
                         </button>
                       </div>
                     </div>
 
                     {lmstudioStatus === 'connected' && (
                       <div className="settings-row">
-                        <label>Modell</label>
+                        <label>{t('settings.integrations.ollama.model')}</label>
                         <select
                           value={ollama.selectedModel}
                           onChange={e => setOllama({ selectedModel: e.target.value })}
                           disabled={!ollama.enabled}
                         >
-                          <option value="">Modell wählen...</option>
+                          <option value="">{t('settings.selectModel')}</option>
                           {lmstudioModels.map(model => (
                             <option key={model.name} value={model.name}>
                               {model.name}
@@ -859,20 +854,20 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
 
                     <div className="settings-info">
                       <p>
-                        <strong>LM Studio</strong> ist eine Desktop-App für lokale LLMs mit OpenAI-kompatibler API.
+                        <strong>LM Studio</strong> {t('settings.integrations.lmstudioDesc')}
                       </p>
                       <p>
                         Download: <a href="https://lmstudio.ai" target="_blank" rel="noopener noreferrer">lmstudio.ai</a>
                       </p>
                       <p>
-                        <strong>Setup:</strong> LM Studio starten → Modell laden → "Start Server" klicken
+                        <strong>Setup:</strong> {t('settings.integrations.lmstudioSetup')}
                       </p>
                     </div>
                   </>
                 )}
 
                 <div className="settings-row">
-                  <label>Standard-Übersetzungssprache</label>
+                  <label>{t('settings.integrations.defaultTranslation')}</label>
                   <select
                     value={ollama.defaultTranslateLanguage}
                     onChange={e => setOllama({ defaultTranslateLanguage: e.target.value as typeof ollama.defaultTranslateLanguage })}
@@ -888,25 +883,23 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
 
                 <div className="settings-info" style={{ marginTop: '12px' }}>
                   <p>
-                    <strong>Nutzung:</strong> Text markieren → Rechtsklick → KI-Funktion wählen
+                    {t('settings.integrations.usage')}
                   </p>
                   <p>
-                    <strong>Transparenz:</strong> Jede KI-Nutzung wird automatisch als Fußnote dokumentiert.
+                    {t('settings.integrations.transparency')}
                   </p>
                 </div>
 
-                <h3 style={{ marginTop: '32px' }}>KI-Funktionen (optional)</h3>
+                <h3 style={{ marginTop: '32px' }}>{t('settings.integrations.aiFeatures')}</h3>
                 <div className="settings-info" style={{ marginBottom: '16px' }}>
                   <p>
-                    KI ist ein Werkzeug, kein Ersatz für eigenes Denken. Diese Features sind
-                    standardmäßig deaktiviert – aktiviere nur was du bewusst nutzen möchtest.
-                    Benötigt einen lokalen Ollama-Server.
+                    {t('settings.integrations.aiFeaturesDesc')}
                   </p>
                 </div>
                 <div className="settings-row">
                   <label>
-                    Smart Connections aktivieren
-                    <span className="settings-hint">Findet ähnliche Notizen via KI-Embeddings</span>
+                    {t('settings.integrations.smartConnections')}
+                    <span className="settings-hint">{t('settings.integrations.smartConnectionsHint')}</span>
                   </label>
                   <input
                     type="checkbox"
@@ -916,8 +909,8 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
                 </div>
                 <div className="settings-row">
                   <label>
-                    Notes Chat aktivieren
-                    <span className="settings-hint">Stelle Fragen an deine Notizen</span>
+                    {t('settings.integrations.notesChat')}
+                    <span className="settings-hint">{t('settings.integrations.notesChatHint')}</span>
                   </label>
                   <input
                     type="checkbox"
@@ -926,30 +919,30 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
                   />
                 </div>
 
-                <h3 style={{ marginTop: '32px' }}>Zotero / Better BibTeX</h3>
+                <h3 style={{ marginTop: '32px' }}>{t('settings.integrations.zotero')}</h3>
                 <div className="settings-row">
                   <label>Status</label>
                   <div className="settings-status">
                     {zoteroStatus === 'checking' && (
-                      <span className="status-checking">Prüfe Verbindung...</span>
+                      <span className="status-checking">{t('settings.checkingConnection')}</span>
                     )}
                     {zoteroStatus === 'connected' && (
-                      <span className="status-connected">Verbunden</span>
+                      <span className="status-connected">{t('settings.connected')}</span>
                     )}
                     {zoteroStatus === 'disconnected' && (
-                      <span className="status-disconnected">Nicht verbunden</span>
+                      <span className="status-disconnected">{t('settings.notConnected')}</span>
                     )}
                     <button className="settings-refresh" onClick={checkZoteroConnection}>
-                      Aktualisieren
+                      {t('settings.refresh')}
                     </button>
                   </div>
                 </div>
                 <div className="settings-info">
                   <p>
-                    Um Zotero zu nutzen, muss <strong>Zotero</strong> mit dem <strong>Better BibTeX</strong> Plugin laufen.
+                    {t('settings.integrations.zoteroDesc')}
                   </p>
                   <p>
-                    Öffne die Zotero-Suche mit <kbd>Cmd</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd>
+                    {t('settings.integrations.zoteroShortcut')} <kbd>Cmd</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd>
                   </p>
                 </div>
               </div>
@@ -958,88 +951,88 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
             {/* Tastenkürzel Tab */}
             {activeTab === 'shortcuts' && (
               <div className="settings-section settings-shortcuts">
-                <h3>Navigation</h3>
+                <h3>{t('settings.shortcuts.navigation')}</h3>
                 <div className="shortcut-grid">
                   <div className="shortcut-item">
                     <kbd>Cmd</kbd>+<kbd>K</kbd>
-                    <span>Quick Switcher - Notizen wechseln oder neue erstellen</span>
+                    <span>{t('settings.shortcuts.quickSwitcher')}</span>
                   </div>
                   <div className="shortcut-item">
                     <kbd>Cmd</kbd>+<kbd>P</kbd>
-                    <span>Schnellsuche - In allen Notizen suchen</span>
+                    <span>{t('settings.shortcuts.quickSearch')}</span>
                   </div>
                   <div className="shortcut-item">
                     <kbd>Cmd</kbd>+<kbd>,</kbd>
-                    <span>Einstellungen öffnen</span>
+                    <span>{t('settings.shortcuts.openSettings')}</span>
                   </div>
                 </div>
 
-                <h3>Notizen & Templates</h3>
+                <h3>{t('settings.shortcuts.notesTemplates')}</h3>
                 <div className="shortcut-grid">
                   <div className="shortcut-item">
                     <kbd>Cmd</kbd>+<kbd>Shift</kbd>+<kbd>T</kbd>
-                    <span>Template-Picker - Template einfügen oder neue Notiz mit Template</span>
+                    <span>{t('settings.shortcuts.templatePicker')}</span>
                   </div>
                   <div className="shortcut-item">
                     <kbd>Cmd</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd>
-                    <span>Zotero-Suche - Literatur einfügen (Zotero muss laufen)</span>
+                    <span>{t('settings.shortcuts.zoteroSearch')}</span>
                   </div>
                   <div className="shortcut-item">
                     <kbd>Cmd</kbd>+<kbd>S</kbd>
-                    <span>Notiz speichern</span>
+                    <span>{t('settings.shortcuts.saveNote')}</span>
                   </div>
                 </div>
 
-                <h3>Editor</h3>
+                <h3>{t('settings.shortcuts.editorSection')}</h3>
                 <div className="shortcut-grid">
                   <div className="shortcut-item">
                     <kbd>Cmd</kbd>+<kbd>E</kbd>
-                    <span>Editor-Ansicht wechseln (Bearbeiten / Live Preview / Vorschau)</span>
+                    <span>{t('settings.shortcuts.switchView')}</span>
                   </div>
                   <div className="shortcut-item">
                     <kbd>Cmd</kbd>+<kbd>B</kbd>
-                    <span>Fett formatieren</span>
+                    <span>{t('settings.shortcuts.bold')}</span>
                   </div>
                   <div className="shortcut-item">
                     <kbd>Cmd</kbd>+<kbd>I</kbd>
-                    <span>Kursiv formatieren</span>
+                    <span>{t('settings.shortcuts.italic')}</span>
                   </div>
                   <div className="shortcut-item">
                     <kbd>Cmd</kbd>+<kbd>Shift</kbd>+<kbd>K</kbd>
-                    <span>Code formatieren</span>
+                    <span>{t('settings.shortcuts.code')}</span>
                   </div>
                   <div className="shortcut-item">
                     <kbd>Cmd</kbd>+<kbd>Shift</kbd>+<kbd>X</kbd>
-                    <span>Durchgestrichen formatieren</span>
+                    <span>{t('settings.shortcuts.strikethrough')}</span>
                   </div>
                 </div>
 
-                <h3>Wikilinks</h3>
+                <h3>{t('settings.shortcuts.wikilinks')}</h3>
                 <div className="shortcut-grid">
                   <div className="shortcut-item">
                     <kbd>[[</kbd>
-                    <span>Wikilink beginnen - Tippe [[ um eine andere Notiz zu verlinken</span>
+                    <span>{t('settings.shortcuts.startWikilink')}</span>
                   </div>
                   <div className="shortcut-item">
-                    <kbd>Cmd</kbd>+<kbd>Klick</kbd>
-                    <span>Wikilink öffnen - Zur verlinkten Notiz springen</span>
+                    <kbd>Cmd</kbd>+<kbd>Click</kbd>
+                    <span>{t('settings.shortcuts.openWikilink')}</span>
                   </div>
                 </div>
 
-                <h3>Ansicht</h3>
+                <h3>{t('settings.shortcuts.view')}</h3>
                 <div className="shortcut-grid">
                   <div className="shortcut-item">
                     <kbd>Sidebar-Button</kbd>
-                    <span>Sidebar ein-/ausblenden</span>
+                    <span>{t('settings.shortcuts.toggleSidebar')}</span>
                   </div>
                   <div className="shortcut-item">
                     <kbd>View-Switcher</kbd>
-                    <span>Zwischen Editor, Split und Canvas wechseln</span>
+                    <span>{t('settings.shortcuts.switchViews')}</span>
                   </div>
                 </div>
 
                 <div className="settings-info" style={{ marginTop: '24px' }}>
-                  <p><strong>Tipp:</strong> Verwende Wikilinks <code>[[Notizname]]</code> um deine Notizen miteinander zu verbinden und einen Knowledge Graph aufzubauen.</p>
+                  <p>{t('settings.shortcuts.tip')}</p>
                 </div>
               </div>
             )}
@@ -1051,7 +1044,7 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
             <strong>MindGraph Notes</strong> v1.0.2
           </div>
           <div className="settings-credits">
-            Entwickelt von Jochen Leeder
+            {t('settings.footer.developedBy')} Jochen Leeder
           </div>
         </div>
       </div>

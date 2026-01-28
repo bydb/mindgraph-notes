@@ -14,6 +14,7 @@ import 'katex/contrib/mhchem/mhchem.js'  // Chemie-Support (mhchem)
 import mermaid from 'mermaid'
 import { useNotesStore, createNoteFromFile } from '../../stores/notesStore'
 import { useUIStore } from '../../stores/uiStore'
+import { useTranslation } from '../../utils/translations'
 import { extractLinks, extractTags, extractTitle, extractHeadings, extractBlocks } from '../../utils/linkExtractor'
 import { WikilinkAutocomplete, AutocompleteMode, BlockSelectionInfo } from './WikilinkAutocomplete'
 import { livePreviewExtension } from './extensions/livePreview'
@@ -40,6 +41,7 @@ interface FormatMenuProps {
 }
 
 const FormatMenu: React.FC<FormatMenuProps> = memo(({ x, y, onFormat, onClose }) => {
+  const { t } = useTranslation()
   const menuRef = useRef<HTMLDivElement>(null)
   const [adjustedPos, setAdjustedPos] = useState({ x, y })
 
@@ -80,26 +82,26 @@ const FormatMenu: React.FC<FormatMenuProps> = memo(({ x, y, onFormat, onClose })
   }, [onClose])
 
   const formatOptions = [
-    { type: 'cut', label: 'Ausschneiden', icon: '✂️', shortcut: 'Cmd+X' },
-    { type: 'copy', label: 'Kopieren', icon: '📋', shortcut: 'Cmd+C' },
-    { type: 'paste', label: 'Einfügen', icon: '📥', shortcut: 'Cmd+V' },
+    { type: 'cut', label: t('format.cut'), icon: '✂️', shortcut: 'Cmd+X' },
+    { type: 'copy', label: t('format.copy'), icon: '📋', shortcut: 'Cmd+C' },
+    { type: 'paste', label: t('format.paste'), icon: '📥', shortcut: 'Cmd+V' },
     { type: 'divider', label: '', icon: '', shortcut: '' },
-    { type: 'bold', label: 'Fett', icon: 'B', shortcut: 'Cmd+B' },
-    { type: 'italic', label: 'Kursiv', icon: 'I', shortcut: 'Cmd+I' },
-    { type: 'code', label: 'Code', icon: '</>', shortcut: 'Cmd+`' },
-    { type: 'strikethrough', label: 'Durchgestrichen', icon: 'S', shortcut: '' },
-    { type: 'link', label: 'Link', icon: '🔗', shortcut: '' },
-    { type: 'wikilink', label: 'Wikilink', icon: '[[]]', shortcut: '' },
+    { type: 'bold', label: t('format.bold'), icon: 'B', shortcut: 'Cmd+B' },
+    { type: 'italic', label: t('format.italic'), icon: 'I', shortcut: 'Cmd+I' },
+    { type: 'code', label: t('format.code'), icon: '</>', shortcut: 'Cmd+`' },
+    { type: 'strikethrough', label: t('format.strikethrough'), icon: 'S', shortcut: '' },
+    { type: 'link', label: t('format.link'), icon: '🔗', shortcut: '' },
+    { type: 'wikilink', label: t('format.wikilink'), icon: '[[]]', shortcut: '' },
     { type: 'divider', label: '', icon: '', shortcut: '' },
-    { type: 'task', label: 'Task', icon: '☐', shortcut: '' },
-    { type: 'task-reminder', label: 'Task mit Reminder', icon: '⏰', shortcut: '' },
-    { type: 'footnote', label: 'Fußnote', icon: '¹', shortcut: '' },
+    { type: 'task', label: t('format.task'), icon: '☐', shortcut: '' },
+    { type: 'task-reminder', label: t('format.taskReminder'), icon: '⏰', shortcut: '' },
+    { type: 'footnote', label: t('format.footnote'), icon: '¹', shortcut: '' },
     { type: 'divider', label: '', icon: '', shortcut: '' },
-    { type: 'heading1', label: 'Überschrift 1', icon: 'H1', shortcut: '' },
-    { type: 'heading2', label: 'Überschrift 2', icon: 'H2', shortcut: '' },
-    { type: 'heading3', label: 'Überschrift 3', icon: 'H3', shortcut: '' },
+    { type: 'heading1', label: t('format.heading1'), icon: 'H1', shortcut: '' },
+    { type: 'heading2', label: t('format.heading2'), icon: 'H2', shortcut: '' },
+    { type: 'heading3', label: t('format.heading3'), icon: 'H3', shortcut: '' },
     { type: 'divider', label: '', icon: '', shortcut: '' },
-    { type: 'quote', label: 'Zitat', icon: '❝', shortcut: '' },
+    { type: 'quote', label: t('format.quote'), icon: '❝', shortcut: '' },
     { type: 'callout-note', label: 'Callout: Note', icon: '📝', shortcut: '' },
     { type: 'callout-tip', label: 'Callout: Tip', icon: '💡', shortcut: '' },
     { type: 'callout-warning', label: 'Callout: Warning', icon: '⚠️', shortcut: '' },
@@ -408,6 +410,7 @@ interface MarkdownEditorProps {
 }
 
 export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecondary = false }) => {
+  const { t } = useTranslation()
   const editorRef = useRef<HTMLDivElement>(null)
   const previewRef = useRef<HTMLDivElement>(null)
   const viewRef = useRef<EditorView | null>(null)
@@ -2056,8 +2059,8 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
   if (!selectedNote) {
     return (
       <div className="editor-empty">
-        <p>Wähle eine Notiz aus der Sidebar</p>
-        <p className="hint">oder erstelle eine neue mit Cmd+N</p>
+        <p>{t('editor.placeholder.select')}</p>
+        <p className="hint">{t('editor.placeholder.create')}</p>
       </div>
     )
   }
@@ -2168,14 +2171,14 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
       {/* Editor Footer mit Statistiken */}
       {editorShowWordCount && (
         <div className="editor-footer">
-          <span className="editor-stat" title="Wörter">
-            {documentStats.words} Wörter
+          <span className="editor-stat" title={t('editor.words')}>
+            {documentStats.words} {t('editor.words')}
           </span>
-          <span className="editor-stat" title="Zeichen (mit/ohne Leerzeichen)">
-            {documentStats.characters} Zeichen
+          <span className="editor-stat" title={t('editor.charactersTooltip')}>
+            {documentStats.characters} {t('editor.characters')}
           </span>
-          <span className="editor-stat" title="Geschätzte Lesezeit">
-            ~{documentStats.readingTimeMinutes} min Lesezeit
+          <span className="editor-stat" title={t('editor.readTime')}>
+            ~{documentStats.readingTimeMinutes} {t('editor.readTimeMin')}
           </span>
         </div>
       )}

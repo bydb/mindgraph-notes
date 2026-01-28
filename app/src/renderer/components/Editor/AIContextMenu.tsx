@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { useUIStore, AI_LANGUAGES, AILanguageCode } from '../../stores/uiStore'
+import { useTranslation } from '../../utils/translations'
 
 type AIAction = 'translate' | 'summarize' | 'continue' | 'improve' | 'custom'
 
@@ -24,12 +25,12 @@ export interface AIResult {
   timestamp: string
 }
 
-const ACTION_LABELS: Record<AIAction, { icon: string; label: string; description: string }> = {
-  translate: { icon: '🌐', label: 'Übersetzen', description: 'Text in andere Sprache übersetzen' },
-  summarize: { icon: '📝', label: 'Zusammenfassen', description: 'Text prägnant zusammenfassen' },
-  continue: { icon: '✍️', label: 'Fortsetzen', description: 'Text im gleichen Stil weiterschreiben' },
-  improve: { icon: '✨', label: 'Verbessern', description: 'Grammatik und Stil verbessern' },
-  custom: { icon: '💬', label: 'Eigener Prompt', description: 'Eigene Anweisung eingeben' }
+const ACTION_ICONS: Record<AIAction, string> = {
+  translate: '🌐',
+  summarize: '📝',
+  continue: '✍️',
+  improve: '✨',
+  custom: '💬'
 }
 
 export const AIContextMenu: React.FC<AIContextMenuProps> = ({
@@ -39,6 +40,7 @@ export const AIContextMenu: React.FC<AIContextMenuProps> = ({
   onClose,
   onResult
 }) => {
+  const { t } = useTranslation()
   const { ollama } = useUIStore()
   const [isLoading, setIsLoading] = useState(false)
   const [loadingAction, setLoadingAction] = useState<AIAction | null>(null)
@@ -87,7 +89,7 @@ export const AIContextMenu: React.FC<AIContextMenuProps> = ({
       console.error('[AI] Error:', error)
       onResult({
         success: false,
-        error: error instanceof Error ? error.message : 'Unbekannter Fehler',
+        error: error instanceof Error ? error.message : t('ai.unknownError'),
         action,
         model: ollama.selectedModel,
         prompt: customPrompt || '',
@@ -112,7 +114,7 @@ export const AIContextMenu: React.FC<AIContextMenuProps> = ({
 
   const getLanguageName = (code: AILanguageCode): string => {
     const lang = AI_LANGUAGES.find(l => l.code === code)
-    return lang?.name || 'Englisch'
+    return lang?.name || t('ai.english')
   }
 
   // Positionierung anpassen, damit das Menü nicht außerhalb des Viewports ist
@@ -127,9 +129,9 @@ export const AIContextMenu: React.FC<AIContextMenuProps> = ({
     return (
       <div className="ai-context-menu" style={menuStyle}>
         <div className="ai-context-menu-disabled">
-          KI-Funktionen sind deaktiviert.
+          {t('ai.disabled')}
           <br />
-          Aktiviere sie in den Einstellungen.
+          {t('ai.enableInSettings')}
         </div>
       </div>
     )
@@ -143,7 +145,7 @@ export const AIContextMenu: React.FC<AIContextMenuProps> = ({
       <div className="ai-context-menu" style={menuStyle}>
         <div className="ai-context-menu-header">
           <span className="ai-icon">🤖</span>
-          <span>KI-Assistent</span>
+          <span>{t('ai.assistant')}</span>
           <span className="ai-model">{ollama.selectedModel}</span>
         </div>
 
@@ -154,9 +156,9 @@ export const AIContextMenu: React.FC<AIContextMenuProps> = ({
           onMouseLeave={() => setShowLanguageSubmenu(false)}
           onClick={() => !isLoading && handleAction('translate', getLanguageName(ollama.defaultTranslateLanguage))}
         >
-          <span className="ai-action-icon">{ACTION_LABELS.translate.icon}</span>
+          <span className="ai-action-icon">{ACTION_ICONS.translate}</span>
           <span className="ai-action-label">
-            {ACTION_LABELS.translate.label} → {getLanguageName(ollama.defaultTranslateLanguage)}
+            {t('ai.translate')} → {getLanguageName(ollama.defaultTranslateLanguage)}
           </span>
           {isLoading && loadingAction === 'translate' ? (
             <span className="ai-loading-spinner" />
@@ -189,8 +191,8 @@ export const AIContextMenu: React.FC<AIContextMenuProps> = ({
             className={`ai-context-menu-item ${isLoading && loadingAction === action ? 'loading' : ''}`}
             onClick={() => !isLoading && handleAction(action)}
           >
-            <span className="ai-action-icon">{ACTION_LABELS[action].icon}</span>
-            <span className="ai-action-label">{ACTION_LABELS[action].label}</span>
+            <span className="ai-action-icon">{ACTION_ICONS[action]}</span>
+            <span className="ai-action-label">{t(`ai.${action}` as const)}</span>
             {isLoading && loadingAction === action && (
               <span className="ai-loading-spinner" />
             )}
@@ -206,15 +208,15 @@ export const AIContextMenu: React.FC<AIContextMenuProps> = ({
             className="ai-context-menu-item"
             onClick={() => setShowCustomPrompt(true)}
           >
-            <span className="ai-action-icon">{ACTION_LABELS.custom.icon}</span>
-            <span className="ai-action-label">{ACTION_LABELS.custom.label}</span>
+            <span className="ai-action-icon">{ACTION_ICONS.custom}</span>
+            <span className="ai-action-label">{t('ai.custom')}</span>
           </div>
         ) : (
           <div className="ai-custom-prompt">
             <input
               ref={customPromptInputRef}
               type="text"
-              placeholder="Was soll die KI tun?"
+              placeholder={t('ai.whatShouldAIDo')}
               value={customPromptText}
               onChange={(e) => setCustomPromptText(e.target.value)}
               onKeyDown={(e) => {
@@ -241,7 +243,7 @@ export const AIContextMenu: React.FC<AIContextMenuProps> = ({
         )}
 
         <div className="ai-context-menu-footer">
-          <small>Wird als Fußnote dokumentiert</small>
+          <small>{t('ai.documentedAsFootnote')}</small>
         </div>
       </div>
     </>

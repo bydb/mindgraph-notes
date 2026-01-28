@@ -293,15 +293,15 @@ export const NotesChat: React.FC<NotesChatProps> = ({ onClose }) => {
   const getContextInfo = (): string => {
     switch (contextMode) {
       case 'current':
-        return currentNote ? `Notiz: ${currentNote.title}` : 'Keine Notiz ausgewählt'
+        return currentNote ? `${t('notesChat.notePrefix')}: ${currentNote.title}` : t('notesChat.noNoteSelected')
       case 'folder':
         if (selectedFolder) {
           const count = notes.filter(n => n.path.startsWith(selectedFolder + '/') || n.path === selectedFolder).length
-          return `Ordner: ${selectedFolder} (${count} Notizen)`
+          return `${t('notesChat.folderPrefix')}: ${selectedFolder} (${count} ${t('notesChat.notesCount')})`
         }
-        return 'Kein Ordner ausgewählt'
+        return t('notesChat.noFolderSelected')
       case 'all':
-        return `Alle Notizen (${Math.min(notes.length, 50)} von ${notes.length})`
+        return `${t('notesChat.allNotes')} (${Math.min(notes.length, 50)} ${t('notesChat.ofNotes')} ${notes.length})`
     }
   }
 
@@ -440,9 +440,9 @@ export const NotesChat: React.FC<NotesChatProps> = ({ onClose }) => {
                   className={chatMode === 'direct' ? 'active' : ''}
                   onClick={() => setChatMode('direct')}
                   disabled={isStreaming}
-                  title="Direkte Antworten auf deine Fragen"
+                  title={t('notesChat.modeDirectTitle')}
                 >
-                  Direkt
+                  {t('notesChat.modeDirect')}
                 </button>
                 <button
                   className={chatMode === 'socratic' ? 'active' : ''}
@@ -450,7 +450,7 @@ export const NotesChat: React.FC<NotesChatProps> = ({ onClose }) => {
                   disabled={isStreaming}
                   title={t('notesChat.socraticMode')}
                 >
-                  Sokratisch
+                  {t('notesChat.modeSocratic')}
                 </button>
               </div>
             </div>
@@ -463,8 +463,8 @@ export const NotesChat: React.FC<NotesChatProps> = ({ onClose }) => {
                 <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
                 </svg>
-                <p>Stelle Fragen zu deinen Notizen</p>
-                <span>Das KI-Modell hat Zugriff auf den ausgewählten Kontext</span>
+                <p>{t('notesChat.askQuestions')}</p>
+                <span>{t('notesChat.aiContext')}</span>
               </div>
             ) : (
               <>
@@ -527,7 +527,7 @@ export const NotesChat: React.FC<NotesChatProps> = ({ onClose }) => {
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Frage stellen..."
+              placeholder={t('notesChat.inputPlaceholder')}
               disabled={isStreaming}
               rows={1}
             />
@@ -535,7 +535,7 @@ export const NotesChat: React.FC<NotesChatProps> = ({ onClose }) => {
               className="notes-chat-send"
               onClick={sendMessage}
               disabled={!inputValue.trim() || isStreaming}
-              title="Senden (Enter)"
+              title={t('common.send')}
             >
               {isStreaming ? (
                 <div className="notes-chat-spinner-small"></div>

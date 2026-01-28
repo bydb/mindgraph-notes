@@ -7,6 +7,7 @@ import { useGraphStore } from '../../stores/graphStore'
 import { useTabStore } from '../../stores/tabStore'
 import { useBookmarkStore } from '../../stores/bookmarkStore'
 import { generateNoteId } from '../../utils/linkExtractor'
+import { useTranslation } from '../../utils/translations'
 
 type DisplayMode = 'name' | 'path'
 
@@ -165,6 +166,7 @@ const ImageIcon: React.FC = () => (
 )
 
 const FileItem: React.FC<FileItemProps> = ({ entry, level, onDrop, displayMode }) => {
+  const { t } = useTranslation()
   // Ordner standardmäßig ZU für schnellstes initiales Rendering
   const [isOpen, setIsOpen] = useState(false)
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null)
@@ -716,7 +718,7 @@ const FileItem: React.FC<FileItemProps> = ({ entry, level, onDrop, displayMode }
               <span className="file-name" onDoubleClick={handleDoubleClick} title={entry.path}>{displayName}</span>
             )}
             {linkCount > 0 && !isEditing && (
-              <span className="file-link-count" title={`${linkCount} Verbindungen`}>
+              <span className="file-link-count" title={`${linkCount} ${t('fileTree.connections')}`}>
                 {linkCount}
               </span>
             )}
@@ -743,10 +745,10 @@ const FileItem: React.FC<FileItemProps> = ({ entry, level, onDrop, displayMode }
           {contextMenu.entry.isDirectory ? (
             <>
               <button onClick={handleCreateNoteInFolder} className="context-menu-item">
-                Neue Notiz hier
+                {t('fileTree.newNoteHere')}
               </button>
               <button onClick={handleCreateSubfolder} className="context-menu-item">
-                Neuer Unterordner
+                {t('fileTree.newSubfolder')}
               </button>
               <div className="context-menu-divider" />
               {/* Folder Color Picker */}
@@ -754,41 +756,41 @@ const FileItem: React.FC<FileItemProps> = ({ entry, level, onDrop, displayMode }
                 className="context-menu-item"
                 onClick={() => openPickerDialog('color')}
               >
-                Ordnerfarbe ändern
+                {t('fileTree.changeFolderColor')}
               </button>
               {/* Folder Icon Picker */}
               <button
                 className="context-menu-item"
                 onClick={() => openPickerDialog('icon')}
               >
-                Ordner-Icon ändern
+                {t('fileTree.changeFolderIcon')}
               </button>
               {hasCustomization && (
                 <button onClick={handleRemoveCustomization} className="context-menu-item">
-                  Anpassung entfernen
+                  {t('fileTree.removeCustomization')}
                 </button>
               )}
               <div className="context-menu-divider" />
               <button onClick={handleCopyRelativePath} className="context-menu-item">
-                Relativen Pfad kopieren
+                {t('fileTree.copyRelativePath')}
               </button>
               <button onClick={handleCopyAbsolutePath} className="context-menu-item">
-                Absoluten Pfad kopieren
+                {t('fileTree.copyAbsolutePath')}
               </button>
               <div className="context-menu-divider" />
               <button onClick={handleRenameFromMenu} className="context-menu-item">
-                Umbenennen
+                {t('fileTree.rename')}
               </button>
               <button onClick={handleShowInFinder} className="context-menu-item">
-                Im Finder zeigen
+                {t('fileTree.showInFinder')}
               </button>
               <div className="context-menu-divider" />
               <button onClick={handleStripWikilinks} className="context-menu-item">
-                Wikilinks entfernen
+                {t('fileTree.stripWikilinks')}
               </button>
               <div className="context-menu-divider" />
               <button onClick={handleDeleteFolder} className="context-menu-item danger">
-                Ordner löschen
+                {t('fileTree.deleteFolder')}
               </button>
             </>
           ) : (
@@ -797,33 +799,33 @@ const FileItem: React.FC<FileItemProps> = ({ entry, level, onDrop, displayMode }
               {!isPdf && !isImage && (
                 <>
                   <button onClick={handleToggleBookmark} className="context-menu-item">
-                    {noteIsBookmarked ? 'Lesezeichen entfernen' : 'Lesezeichen hinzufügen'}
+                    {noteIsBookmarked ? t('fileTree.removeBookmark') : t('fileTree.addBookmark')}
                   </button>
                   <button onClick={handleOpenInCanvas} className="context-menu-item">
-                    Im Canvas erkunden
+                    {t('fileTree.exploreInCanvas')}
                   </button>
                   <div className="context-menu-divider" />
                 </>
               )}
               <button onClick={handleCopyRelativePath} className="context-menu-item">
-                Relativen Pfad kopieren
+                {t('fileTree.copyRelativePath')}
               </button>
               <button onClick={handleCopyAbsolutePath} className="context-menu-item">
-                Absoluten Pfad kopieren
+                {t('fileTree.copyAbsolutePath')}
               </button>
               <div className="context-menu-divider" />
               <button onClick={handleRenameFromMenu} className="context-menu-item">
-                Umbenennen
+                {t('fileTree.rename')}
               </button>
               <button onClick={handleDuplicate} className="context-menu-item">
-                Duplizieren
+                {t('fileTree.duplicate')}
               </button>
               <button onClick={handleShowInFinder} className="context-menu-item">
-                Im Finder zeigen
+                {t('fileTree.showInFinder')}
               </button>
               <div className="context-menu-divider" />
               <button onClick={handleDelete} className="context-menu-item danger">
-                Notiz löschen
+                {t('fileTree.deleteNote')}
               </button>
             </>
           )}
@@ -841,12 +843,12 @@ const FileItem: React.FC<FileItemProps> = ({ entry, level, onDrop, displayMode }
               if (e.key === 'Enter') handleSubmitNewNote()
               if (e.key === 'Escape') { setNewNoteDialog(null); setNewNoteName('') }
             }}
-            placeholder="Notiz-Name..."
+            placeholder={t('fileTree.noteName')}
             autoFocus
           />
           <div className="new-note-dialog-buttons">
-            <button onClick={handleSubmitNewNote} className="btn-primary">Erstellen</button>
-            <button onClick={() => { setNewNoteDialog(null); setNewNoteName('') }}>Abbrechen</button>
+            <button onClick={handleSubmitNewNote} className="btn-primary">{t('fileTree.create')}</button>
+            <button onClick={() => { setNewNoteDialog(null); setNewNoteName('') }}>{t('fileTree.cancel')}</button>
           </div>
         </div>
       )}
@@ -856,7 +858,7 @@ const FileItem: React.FC<FileItemProps> = ({ entry, level, onDrop, displayMode }
         <div className="picker-dialog-overlay" onClick={() => setPickerDialog(null)}>
           <div className="picker-dialog" onClick={e => e.stopPropagation()}>
             <div className="picker-dialog-header">
-              {pickerDialog.type === 'color' ? 'Ordnerfarbe wählen' : 'Ordner-Icon wählen'}
+              {pickerDialog.type === 'color' ? t('fileTree.chooseFolderColor') : t('fileTree.chooseFolderIcon')}
             </div>
             <div className="picker-dialog-content">
               {pickerDialog.type === 'color' ? (
@@ -895,7 +897,7 @@ const FileItem: React.FC<FileItemProps> = ({ entry, level, onDrop, displayMode }
               )}
             </div>
             <div className="picker-dialog-footer">
-              <button onClick={() => setPickerDialog(null)}>Abbrechen</button>
+              <button onClick={() => setPickerDialog(null)}>{t('fileTree.cancel')}</button>
             </div>
           </div>
         </div>,

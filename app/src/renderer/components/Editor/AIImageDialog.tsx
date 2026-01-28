@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { useUIStore } from '../../stores/uiStore'
 import { useNotesStore } from '../../stores/notesStore'
+import { useTranslation } from '../../utils/translations'
 
 interface AIImageDialogProps {
   onClose: () => void
@@ -14,14 +15,15 @@ interface ImageSettings {
 }
 
 const PRESET_SIZES = [
-  { label: 'Klein (256x256)', width: 256, height: 256 },
-  { label: 'Mittel (512x512)', width: 512, height: 512 },
-  { label: 'Groß (768x768)', width: 768, height: 768 },
-  { label: 'Breit (768x512)', width: 768, height: 512 },
-  { label: 'Hoch (512x768)', width: 512, height: 768 },
+  { key: 'sizeSmall', width: 256, height: 256 },
+  { key: 'sizeMedium', width: 512, height: 512 },
+  { key: 'sizeLarge', width: 768, height: 768 },
+  { key: 'sizeWide', width: 768, height: 512 },
+  { key: 'sizeTall', width: 512, height: 768 },
 ]
 
 export const AIImageDialog: React.FC<AIImageDialogProps> = ({ onClose, onInsert }) => {
+  const { t } = useTranslation()
   const { ollama } = useUIStore()
   const { vaultPath } = useNotesStore()
 
@@ -89,10 +91,10 @@ export const AIImageDialog: React.FC<AIImageDialogProps> = ({ onClose, onInsert 
         onInsert(markdownImage)
         onClose()
       } else {
-        setError(result.error || 'Unbekannter Fehler')
+        setError(result.error || t('aiImage.unknownError'))
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unbekannter Fehler')
+      setError(err instanceof Error ? err.message : t('aiImage.unknownError'))
     } finally {
       setIsLoading(false)
       setProgress(null)
@@ -121,13 +123,13 @@ export const AIImageDialog: React.FC<AIImageDialogProps> = ({ onClose, onInsert 
       <div className="ai-image-dialog-overlay" onClick={onClose}>
         <div className="ai-image-dialog" onClick={e => e.stopPropagation()}>
           <div className="ai-image-dialog-header">
-            <h3>KI-Bildgenerierung</h3>
+            <h3>{t('aiImage.title')}</h3>
             <button className="close-btn" onClick={onClose}>&times;</button>
           </div>
           <div className="ai-image-dialog-disabled">
-            KI-Funktionen sind deaktiviert.
+            {t('aiImage.disabled')}
             <br />
-            Aktiviere Ollama in den Einstellungen.
+            {t('aiImage.enableOllama')}
           </div>
         </div>
       </div>
@@ -139,13 +141,13 @@ export const AIImageDialog: React.FC<AIImageDialogProps> = ({ onClose, onInsert 
       <div className="ai-image-dialog-overlay" onClick={onClose}>
         <div className="ai-image-dialog" onClick={e => e.stopPropagation()}>
           <div className="ai-image-dialog-header">
-            <h3>KI-Bildgenerierung</h3>
+            <h3>{t('aiImage.title')}</h3>
             <button className="close-btn" onClick={onClose}>&times;</button>
           </div>
           <div className="ai-image-dialog-disabled">
-            Kein Bildgenerierungs-Modell gefunden.
+            {t('aiImage.noModel')}
             <br />
-            Installiere z.B. <code>ollama pull x/flux2-klein</code>
+            {t('aiImage.installModel')} <code>ollama pull x/flux2-klein</code>
           </div>
         </div>
       </div>
@@ -156,14 +158,14 @@ export const AIImageDialog: React.FC<AIImageDialogProps> = ({ onClose, onInsert 
     <div className="ai-image-dialog-overlay" onClick={onClose}>
       <div className="ai-image-dialog" onClick={e => e.stopPropagation()}>
         <div className="ai-image-dialog-header">
-          <h3>KI-Bildgenerierung</h3>
+          <h3>{t('aiImage.title')}</h3>
           <button className="close-btn" onClick={onClose}>&times;</button>
         </div>
 
         <div className="ai-image-dialog-content">
           {/* Model Selection */}
           <div className="ai-image-field">
-            <label>Modell</label>
+            <label>{t('aiImage.model')}</label>
             <select
               value={selectedModel}
               onChange={e => setSelectedModel(e.target.value)}
@@ -179,31 +181,31 @@ export const AIImageDialog: React.FC<AIImageDialogProps> = ({ onClose, onInsert 
 
           {/* Prompt */}
           <div className="ai-image-field">
-            <label>Beschreibung</label>
+            <label>{t('aiImage.description')}</label>
             <textarea
               ref={promptInputRef}
               value={prompt}
               onChange={e => setPrompt(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Beschreibe das gewünschte Bild..."
+              placeholder={t('aiImage.placeholder')}
               rows={3}
               disabled={isLoading}
             />
-            <small>Tipp: Beschreibe das Bild auf Englisch für bessere Ergebnisse</small>
+            <small>{t('aiImage.tip')}</small>
           </div>
 
           {/* Size Presets */}
           <div className="ai-image-field">
-            <label>Größe</label>
+            <label>{t('aiImage.size')}</label>
             <div className="ai-image-presets">
               {PRESET_SIZES.map(preset => (
                 <button
-                  key={preset.label}
+                  key={preset.key}
                   className={`preset-btn ${settings.width === preset.width && settings.height === preset.height ? 'active' : ''}`}
                   onClick={() => handlePresetSize(preset)}
                   disabled={isLoading}
                 >
-                  {preset.label}
+                  {t(`aiImage.${preset.key}` as const)}
                 </button>
               ))}
             </div>
@@ -212,7 +214,7 @@ export const AIImageDialog: React.FC<AIImageDialogProps> = ({ onClose, onInsert 
           {/* Advanced Settings */}
           <div className="ai-image-advanced-toggle">
             <button onClick={() => setShowAdvanced(!showAdvanced)}>
-              {showAdvanced ? '▼' : '▶'} Erweiterte Einstellungen
+              {showAdvanced ? '▼' : '▶'} {t('aiImage.advancedSettings')}
             </button>
           </div>
 
@@ -220,7 +222,7 @@ export const AIImageDialog: React.FC<AIImageDialogProps> = ({ onClose, onInsert 
             <div className="ai-image-advanced">
               <div className="ai-image-field-row">
                 <div className="ai-image-field">
-                  <label>Breite</label>
+                  <label>{t('aiImage.width')}</label>
                   <input
                     type="number"
                     value={settings.width}
@@ -232,7 +234,7 @@ export const AIImageDialog: React.FC<AIImageDialogProps> = ({ onClose, onInsert 
                   />
                 </div>
                 <div className="ai-image-field">
-                  <label>Höhe</label>
+                  <label>{t('aiImage.height')}</label>
                   <input
                     type="number"
                     value={settings.height}
@@ -244,7 +246,7 @@ export const AIImageDialog: React.FC<AIImageDialogProps> = ({ onClose, onInsert 
                   />
                 </div>
                 <div className="ai-image-field">
-                  <label>Schritte</label>
+                  <label>{t('aiImage.steps')}</label>
                   <input
                     type="number"
                     value={settings.steps}
@@ -255,7 +257,7 @@ export const AIImageDialog: React.FC<AIImageDialogProps> = ({ onClose, onInsert 
                   />
                 </div>
               </div>
-              <small>Mehr Schritte = bessere Qualität, aber langsamer</small>
+              <small>{t('aiImage.stepsTip')}</small>
             </div>
           )}
 
@@ -276,7 +278,7 @@ export const AIImageDialog: React.FC<AIImageDialogProps> = ({ onClose, onInsert 
                 />
               </div>
               <span>
-                {progress ? `Schritt ${progress.completed} von ${progress.total}` : 'Starte Generierung...'}
+                {progress ? t('aiImage.stepProgress', { current: progress.completed, total: progress.total }) : t('aiImage.starting')}
               </span>
             </div>
           )}
@@ -284,14 +286,14 @@ export const AIImageDialog: React.FC<AIImageDialogProps> = ({ onClose, onInsert 
 
         <div className="ai-image-dialog-footer">
           <button className="cancel-btn" onClick={onClose} disabled={isLoading}>
-            Abbrechen
+            {t('aiImage.cancel')}
           </button>
           <button
             className="generate-btn"
             onClick={handleGenerate}
             disabled={isLoading || !prompt.trim() || !selectedModel}
           >
-            {isLoading ? 'Generiere...' : 'Bild generieren'}
+            {isLoading ? t('aiImage.generating') : t('aiImage.generate')}
           </button>
         </div>
       </div>

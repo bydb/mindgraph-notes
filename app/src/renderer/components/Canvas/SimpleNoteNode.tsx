@@ -1,6 +1,7 @@
 import React, { memo, useCallback } from 'react'
 import { Handle, Position, type NodeProps } from 'reactflow'
 import type { Note } from '../../../shared/types'
+import { useTranslation } from '../../utils/translations'
 
 interface SimpleNoteNodeData {
   title: string
@@ -13,6 +14,7 @@ interface SimpleNoteNodeData {
 }
 
 export const SimpleNoteNode: React.FC<NodeProps<SimpleNoteNodeData>> = memo(({ data, selected }) => {
+  const { t } = useTranslation()
   const { title, note, isRoot, isExpanded, hiddenConnections, onExpand, onClick } = data
 
   const handleClick = useCallback((e: React.MouseEvent) => {
@@ -39,11 +41,11 @@ export const SimpleNoteNode: React.FC<NodeProps<SimpleNoteNodeData>> = memo(({ d
       {isRoot && <div className="simple-node-root-badge">Root</div>}
 
       {/* Title */}
-      <div className="simple-node-title">{title || 'Unbenannt'}</div>
+      <div className="simple-node-title">{title || t('localCanvas.untitled')}</div>
 
       {/* Stats */}
       <div className="simple-node-stats">
-        {totalConnections} Verbindung{totalConnections !== 1 ? 'en' : ''}
+        {totalConnections} {totalConnections !== 1 ? t('localCanvas.connectionPlural') : t('localCanvas.connection')}
       </div>
 
       {/* Expand Button */}
@@ -51,7 +53,7 @@ export const SimpleNoteNode: React.FC<NodeProps<SimpleNoteNodeData>> = memo(({ d
         <button
           className="simple-node-expand-btn"
           onClick={handleExpand}
-          title={`${hiddenConnections} weitere Verbindungen anzeigen`}
+          title={`${hiddenConnections} ${t('localCanvas.showMoreConnections')}`}
         >
           +{hiddenConnections}
         </button>
@@ -59,7 +61,7 @@ export const SimpleNoteNode: React.FC<NodeProps<SimpleNoteNodeData>> = memo(({ d
 
       {/* Expanded Indicator */}
       {isExpanded && (
-        <div className="simple-node-expanded-indicator">erweitert</div>
+        <div className="simple-node-expanded-indicator">{t('localCanvas.expanded')}</div>
       )}
 
       <Handle type="source" position={Position.Bottom} className="simple-node-handle" />

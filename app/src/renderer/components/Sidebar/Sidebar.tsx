@@ -292,7 +292,7 @@ export const Sidebar: React.FC = () => {
         <>
           <div className="vault-info">
             <span className="vault-name">{vaultPath.split('/').pop()}</span>
-            <span className="notes-count">{notes.length} Notizen</span>
+            <span className="notes-count">{notes.length} {t('sidebar.notesCount')}</span>
             <button
               className={`display-mode-toggle ${fileTreeDisplayMode === 'path' ? 'active' : ''}`}
               onClick={() => setFileTreeDisplayMode(fileTreeDisplayMode === 'name' ? 'path' : 'name')}

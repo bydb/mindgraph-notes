@@ -207,7 +207,7 @@ export const SmartConnectionsPanel: React.FC<SmartConnectionsPanelProps> = ({ on
         }
       } catch (err) {
         console.error('[SmartConnections] Error checking backend:', err)
-        setError('Fehler beim Prüfen des KI-Backends')
+        setError(t('smartConnections.errorCheckingBackend'))
       } finally {
         setIsLoading(false)
       }
@@ -278,7 +278,7 @@ export const SmartConnectionsPanel: React.FC<SmartConnectionsPanelProps> = ({ on
       }
 
       if (!currentContent.trim()) {
-        setError('Aktuelle Notiz ist leer')
+        setError(t('smartConnections.noteEmpty'))
         setIsCalculating(false)
         return
       }
@@ -290,7 +290,7 @@ export const SmartConnectionsPanel: React.FC<SmartConnectionsPanelProps> = ({ on
       console.log(`[SmartConnections] Generating embedding for "${currentNote.title}" (${currentContent.length} chars)`)
       const currentEmbedding = await getEmbedding(currentContent)
       if (!currentEmbedding) {
-        setError(`Konnte Embedding nicht generieren (${currentContent.length} Zeichen). Prüfe Ollama-Logs.`)
+        setError(`${t('smartConnections.errorGeneratingEmbedding')} (${currentContent.length}). ${t('smartConnections.checkLogs')}`)
         setIsCalculating(false)
         return
       }
@@ -396,7 +396,7 @@ export const SmartConnectionsPanel: React.FC<SmartConnectionsPanelProps> = ({ on
       }
     } catch (err) {
       console.error('[SmartConnections] Error calculating similarities:', err)
-      setError('Fehler bei der Berechnung')
+      setError(t('smartConnections.errorCalculating'))
     } finally {
       setIsCalculating(false)
     }
@@ -453,7 +453,7 @@ export const SmartConnectionsPanel: React.FC<SmartConnectionsPanelProps> = ({ on
         {isLoading ? (
           <div className="smart-connections-loading">
             <div className="smart-connections-spinner"></div>
-            <p>Prüfe {llmSettings.backend === 'lm-studio' ? 'LM Studio' : 'Ollama'}...</p>
+            <p>{t('smartConnections.checking')} {llmSettings.backend === 'lm-studio' ? 'LM Studio' : 'Ollama'}...</p>
           </div>
         ) : !isBackendAvailable ? (
           <div className="smart-connections-unavailable">
@@ -462,11 +462,11 @@ export const SmartConnectionsPanel: React.FC<SmartConnectionsPanelProps> = ({ on
               <line x1="12" y1="8" x2="12" y2="12"/>
               <line x1="12" y1="16" x2="12.01" y2="16"/>
             </svg>
-            <p>{llmSettings.backend === 'lm-studio' ? 'LM Studio' : 'Ollama'} nicht verfügbar</p>
+            <p>{llmSettings.backend === 'lm-studio' ? 'LM Studio' : 'Ollama'} {t('smartConnections.notAvailable')}</p>
             <span>
               {llmSettings.backend === 'lm-studio'
-                ? 'Starte LM Studio und lade ein Embedding-Modell'
-                : 'Starte Ollama für KI-basierte Ähnlichkeitsanalyse'}
+                ? t('smartConnections.startLMStudioEmbed')
+                : t('smartConnections.startOllama')}
             </span>
           </div>
         ) : embeddingModels.length === 0 ? (
@@ -476,11 +476,11 @@ export const SmartConnectionsPanel: React.FC<SmartConnectionsPanelProps> = ({ on
               <polyline points="7 10 12 15 17 10"/>
               <line x1="12" y1="15" x2="12" y2="3"/>
             </svg>
-            <p>Kein Embedding-Modell</p>
+            <p>{t('smartConnections.noEmbeddingModel')}</p>
             <span>
               {llmSettings.backend === 'lm-studio'
-                ? 'Lade ein Embedding-Modell in LM Studio'
-                : 'Installiere z.B.: ollama pull nomic-embed-text'}
+                ? t('smartConnections.loadEmbeddingLMStudio')
+                : t('smartConnections.installEmbeddingOllama')}
             </span>
           </div>
         ) : !currentNote ? (
@@ -489,14 +489,14 @@ export const SmartConnectionsPanel: React.FC<SmartConnectionsPanelProps> = ({ on
               <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
               <polyline points="14 2 14 8 20 8"/>
             </svg>
-            <p>Keine Notiz ausgewählt</p>
-            <span>Wähle eine Notiz um ähnliche zu finden</span>
+            <p>{t('smartConnections.noNoteSelected')}</p>
+            <span>{t('smartConnections.selectNote')}</span>
           </div>
         ) : (
           <>
             {/* Modell-Auswahl */}
             <div className="smart-connections-model">
-              <label>Modell:</label>
+              <label>{t('smartConnections.model')}:</label>
               <select
                 value={selectedModel}
                 onChange={(e) => setSelectedModel(e.target.value)}
@@ -512,7 +512,7 @@ export const SmartConnectionsPanel: React.FC<SmartConnectionsPanelProps> = ({ on
                 className="smart-connections-refresh"
                 onClick={calculateSimilarities}
                 disabled={isCalculating}
-                title="Neu berechnen"
+                title={t('smartConnections.recalculate')}
               >
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <polyline points="23 4 23 10 17 10"/>
@@ -524,7 +524,7 @@ export const SmartConnectionsPanel: React.FC<SmartConnectionsPanelProps> = ({ on
 
             {/* Aktuelle Notiz */}
             <div className="smart-connections-current">
-              <span className="smart-connections-current-label">Aktuelle Notiz:</span>
+              <span className="smart-connections-current-label">{t('smartConnections.currentNote')}:</span>
               <span className="smart-connections-current-title">{currentNote.title}</span>
             </div>
 
@@ -537,7 +537,7 @@ export const SmartConnectionsPanel: React.FC<SmartConnectionsPanelProps> = ({ on
                     style={{ width: `${progress.total > 0 ? (progress.current / progress.total) * 100 : 0}%` }}
                   />
                 </div>
-                <p>Berechne Ähnlichkeiten... {progress.current}/{progress.total}</p>
+                <p>{t('smartConnections.calculating')}... {progress.current}/{progress.total}</p>
               </div>
             ) : error ? (
               <div className="smart-connections-error">
@@ -550,28 +550,28 @@ export const SmartConnectionsPanel: React.FC<SmartConnectionsPanelProps> = ({ on
               </div>
             ) : similarNotes.length === 0 ? (
               <div className="smart-connections-empty">
-                <p>Keine ähnlichen Notizen gefunden</p>
-                <span>Klicke auf Aktualisieren um zu suchen</span>
+                <p>{t('smartConnections.noSimilar')}</p>
+                <span>{t('smartConnections.clickRefresh')}</span>
               </div>
             ) : (
               <div className="smart-connections-results">
                 <div className="smart-connections-results-header">
-                  <span>Ähnliche Notizen</span>
+                  <span>{t('smartConnections.similarNotes')}</span>
                   <span className="smart-connections-results-count">{similarNotes.length}</span>
                 </div>
                 <div className="smart-connections-legend">
-                  <span className="smart-connections-legend-item" title="Expliziter Wikilink (40%)">
+                  <span className="smart-connections-legend-item" title={t('smartConnections.explicitWikilink')}>
                     <span className="smart-connections-badge wikilink" style={{ width: 14, height: 14 }}>
                       <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
                         <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
                         <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
                       </svg>
                     </span>
-                    Link
+                    {t('smartConnections.link')}
                   </span>
-                  <span className="smart-connections-legend-item" title="Gemeinsame Tags (23%)">
+                  <span className="smart-connections-legend-item" title={t('smartConnections.sharedTags')}>
                     <span className="smart-connections-badge tags" style={{ width: 14, height: 14 }}>#</span>
-                    Tags
+                    {t('smartConnections.tags')}
                   </span>
                   <span className="smart-connections-legend-item" title={t('smartConnections.folderProximity')}>
                     <span className="smart-connections-badge folder" style={{ width: 14, height: 14 }}>
@@ -579,7 +579,7 @@ export const SmartConnectionsPanel: React.FC<SmartConnectionsPanelProps> = ({ on
                         <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
                       </svg>
                     </span>
-                    Ordner
+                    {t('smartConnections.folder')}
                   </span>
                 </div>
                 <div className="smart-connections-list">
@@ -596,7 +596,7 @@ export const SmartConnectionsPanel: React.FC<SmartConnectionsPanelProps> = ({ on
                         {/* Score-Indikatoren */}
                         <div className="smart-connections-badges">
                           {note.hasWikilink && (
-                            <span className="smart-connections-badge wikilink" title={`Explizit verlinkt (+${(WEIGHTS.wikilink * 100).toFixed(0)}%)`}>
+                            <span className="smart-connections-badge wikilink" title={`${t('smartConnections.explicitlyLinked')} (+${(WEIGHTS.wikilink * 100).toFixed(0)}%)`}>
                               <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                                 <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
                                 <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
@@ -604,12 +604,12 @@ export const SmartConnectionsPanel: React.FC<SmartConnectionsPanelProps> = ({ on
                             </span>
                           )}
                           {note.tagOverlap > 0 && (
-                            <span className="smart-connections-badge tags" title={`Tags: ${(note.tagOverlap * 100).toFixed(0)}% Überlappung`}>
+                            <span className="smart-connections-badge tags" title={t('smartConnections.tagsOverlap', { percent: (note.tagOverlap * 100).toFixed(0) })}>
                               #
                             </span>
                           )}
                           {note.folderProximity > 0.5 && (
-                            <span className="smart-connections-badge folder" title={`Ordner: ${(note.folderProximity * 100).toFixed(0)}% Nähe`}>
+                            <span className="smart-connections-badge folder" title={t('smartConnections.folderProximityTooltip', { percent: (note.folderProximity * 100).toFixed(0) })}>
                               <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                                 <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
                               </svg>
@@ -619,7 +619,7 @@ export const SmartConnectionsPanel: React.FC<SmartConnectionsPanelProps> = ({ on
                         <span className="smart-connections-item-title">{note.title}</span>
                       </div>
                       {/* Embedding-Score als Tooltip-Info */}
-                      <div className="smart-connections-item-bar" title={`Embedding: ${(note.embeddingScore * 100).toFixed(0)}%`}>
+                      <div className="smart-connections-item-bar" title={`${t('smartConnections.embedding')}: ${(note.embeddingScore * 100).toFixed(0)}%`}>
                         <div
                           className="smart-connections-item-bar-fill"
                           style={{

@@ -28,6 +28,7 @@ import { LabelNode } from './LabelNode'
 import type { FileEntry } from '../../../shared/types'
 import { resolveLink, extractLinks, generateNoteId, extractFirstCardCallout, extractTasks, extractExternalLinks, extractFirstImage } from '../../utils/linkExtractor'
 import { applyLayout, type LayoutAlgorithm, type LayoutNode, type LayoutEdge } from '../../utils/layoutAlgorithms'
+import { useTranslation } from '../../utils/translations'
 
 // Verfügbare Farben für Nodes
 const nodeColors = [
@@ -59,6 +60,7 @@ interface ContextMenuProps {
 }
 
 const ContextMenu: React.FC<ContextMenuProps> = memo(({ x, y, onClose, onDelete, onColorChange, onOpenInEditor, onRename, onEditTags, onAddExternalLink, onAddImage, type, currentColor }) => {
+  const { t } = useTranslation()
   const [showColors, setShowColors] = useState(false)
 
   useEffect(() => {
@@ -86,7 +88,7 @@ const ContextMenu: React.FC<ContextMenuProps> = memo(({ x, y, onClose, onDelete,
               onClose()
             }}
           >
-            Im Editor öffnen
+            {t('graphCanvas.openInEditor')}
           </button>
 
           <button
@@ -96,7 +98,7 @@ const ContextMenu: React.FC<ContextMenuProps> = memo(({ x, y, onClose, onDelete,
               onClose()
             }}
           >
-            Umbenennen
+            {t('graphCanvas.rename')}
           </button>
 
           <button
@@ -106,7 +108,7 @@ const ContextMenu: React.FC<ContextMenuProps> = memo(({ x, y, onClose, onDelete,
               onClose()
             }}
           >
-            Tags bearbeiten
+            {t('graphCanvas.editTags')}
           </button>
 
           <button
@@ -116,7 +118,7 @@ const ContextMenu: React.FC<ContextMenuProps> = memo(({ x, y, onClose, onDelete,
               onClose()
             }}
           >
-            Externen Link hinzufügen
+            {t('graphCanvas.addExternalLink')}
           </button>
 
           <button
@@ -126,7 +128,7 @@ const ContextMenu: React.FC<ContextMenuProps> = memo(({ x, y, onClose, onDelete,
               onClose()
             }}
           >
-            Bild hinzufügen
+            {t('graphCanvas.addImage')}
           </button>
 
           <div className="context-menu-divider" />
@@ -138,7 +140,7 @@ const ContextMenu: React.FC<ContextMenuProps> = memo(({ x, y, onClose, onDelete,
               setShowColors(!showColors)
             }}
           >
-            Farbe ändern
+            {t('graphCanvas.changeColor')}
             <span className="submenu-arrow">▶</span>
           </button>
 
@@ -173,7 +175,7 @@ const ContextMenu: React.FC<ContextMenuProps> = memo(({ x, y, onClose, onDelete,
               onClose()
             }}
           >
-            Umbenennen
+            {t('graphCanvas.rename')}
           </button>
 
           <div className="context-menu-divider" />
@@ -185,7 +187,7 @@ const ContextMenu: React.FC<ContextMenuProps> = memo(({ x, y, onClose, onDelete,
               setShowColors(!showColors)
             }}
           >
-            Farbe ändern
+            {t('graphCanvas.changeColor')}
             <span className="submenu-arrow">▶</span>
           </button>
 
@@ -212,7 +214,7 @@ const ContextMenu: React.FC<ContextMenuProps> = memo(({ x, y, onClose, onDelete,
       )}
 
       <button className="context-menu-item danger" onClick={onDelete}>
-        {type === 'node' ? 'Notiz löschen' : type === 'label' ? 'Überschrift löschen' : 'Verbindung löschen'}
+        {type === 'node' ? t('graphCanvas.deleteNote') : type === 'label' ? t('graphCanvas.deleteHeading') : t('graphCanvas.deleteConnection')}
       </button>
     </div>
   )
@@ -232,6 +234,7 @@ interface TagEditDialogProps {
 }
 
 const TagEditDialog: React.FC<TagEditDialogProps> = memo(({ x, y, noteId: _noteId, currentTags, allTags, onClose, onSave }) => {
+  const { t } = useTranslation()
   const [tags, setTags] = useState<string[]>(currentTags)
   const [inputValue, setInputValue] = useState('')
   const [showSuggestions, setShowSuggestions] = useState(false)
@@ -318,7 +321,7 @@ const TagEditDialog: React.FC<TagEditDialogProps> = memo(({ x, y, noteId: _noteI
         style={{ left: x, top: y }}
       >
         <div className="tag-edit-header">
-          <span>Tags bearbeiten</span>
+          <span>{t('graphCanvas.editTags')}</span>
           <button className="tag-edit-close" onClick={onClose}>×</button>
         </div>
 
@@ -326,7 +329,7 @@ const TagEditDialog: React.FC<TagEditDialogProps> = memo(({ x, y, noteId: _noteI
           {/* Aktuelle Tags */}
           <div className="tag-edit-current">
             {tags.length === 0 ? (
-              <span className="tag-edit-empty">Keine Tags</span>
+              <span className="tag-edit-empty">{t('graphCanvas.noTags')}</span>
             ) : (
               tags.map(tag => (
                 <span key={tag} className="tag-edit-chip">
@@ -354,7 +357,7 @@ const TagEditDialog: React.FC<TagEditDialogProps> = memo(({ x, y, noteId: _noteI
               }}
               onKeyDown={handleKeyDown}
               onFocus={() => setShowSuggestions(true)}
-              placeholder="Tag hinzufügen..."
+              placeholder={t('graphCanvas.addTag')}
               className="tag-edit-input"
             />
 
@@ -377,10 +380,10 @@ const TagEditDialog: React.FC<TagEditDialogProps> = memo(({ x, y, noteId: _noteI
 
         <div className="tag-edit-actions">
           <button className="tag-edit-cancel" onClick={onClose}>
-            Abbrechen
+            {t('graphCanvas.cancel')}
           </button>
           <button className="tag-edit-save" onClick={handleSave}>
-            Speichern
+            {t('graphCanvas.save')}
           </button>
         </div>
       </div>
@@ -399,6 +402,7 @@ interface ExternalLinkDialogProps {
 }
 
 const ExternalLinkDialog: React.FC<ExternalLinkDialogProps> = memo(({ x, y, onClose, onSave }) => {
+  const { t } = useTranslation()
   const [url, setUrl] = useState('')
   const [title, setTitle] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
@@ -451,7 +455,7 @@ const ExternalLinkDialog: React.FC<ExternalLinkDialogProps> = memo(({ x, y, onCl
         style={{ left: x, top: y }}
       >
         <div className="external-link-header">
-          <span>Externen Link hinzufügen</span>
+          <span>{t('graphCanvas.addExternalLink')}</span>
           <button className="external-link-close" onClick={onClose}>×</button>
         </div>
 
@@ -470,13 +474,13 @@ const ExternalLinkDialog: React.FC<ExternalLinkDialogProps> = memo(({ x, y, onCl
           </div>
 
           <div className="external-link-field">
-            <label>Titel (optional)</label>
+            <label>{t('graphCanvas.titleOptional')}</label>
             <input
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Link-Beschreibung"
+              placeholder={t('graphCanvas.linkDescription')}
               className="external-link-input"
             />
           </div>
@@ -484,14 +488,14 @@ const ExternalLinkDialog: React.FC<ExternalLinkDialogProps> = memo(({ x, y, onCl
 
         <div className="external-link-actions">
           <button className="external-link-cancel" onClick={onClose}>
-            Abbrechen
+            {t('graphCanvas.cancel')}
           </button>
           <button
             className="external-link-save"
             onClick={handleSave}
             disabled={!url.trim()}
           >
-            Hinzufügen
+            {t('graphCanvas.add')}
           </button>
         </div>
       </div>
@@ -510,6 +514,7 @@ interface ImageUploadDialogProps {
 }
 
 const ImageUploadDialog: React.FC<ImageUploadDialogProps> = memo(({ x, y, onClose, onSave }) => {
+  const { t } = useTranslation()
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -563,7 +568,7 @@ const ImageUploadDialog: React.FC<ImageUploadDialogProps> = memo(({ x, y, onClos
         style={{ left: x, top: y }}
       >
         <div className="image-upload-header">
-          <span>Bild hinzufügen</span>
+          <span>{t('graphCanvas.addImage')}</span>
           <button className="image-upload-close" onClick={onClose}>×</button>
         </div>
 
@@ -602,21 +607,21 @@ const ImageUploadDialog: React.FC<ImageUploadDialogProps> = memo(({ x, y, onClos
                 <circle cx="8" cy="10" r="2" stroke="currentColor" strokeWidth="1.5"/>
                 <path d="M3 17l5-5 3 3 5-5 5 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
-              <span>Bild auswählen</span>
+              <span>{t('graphCanvas.selectImage')}</span>
             </button>
           )}
         </div>
 
         <div className="image-upload-actions">
           <button className="image-upload-cancel" onClick={onClose}>
-            Abbrechen
+            {t('graphCanvas.cancel')}
           </button>
           <button
             className="image-upload-save"
             onClick={handleSave}
             disabled={!selectedFile}
           >
-            Hinzufügen
+            {t('graphCanvas.add')}
           </button>
         </div>
       </div>
@@ -639,6 +644,7 @@ interface AlignmentToolbarProps {
 }
 
 const AlignmentToolbar: React.FC<AlignmentToolbarProps> = memo(({ onAlign, onDistribute, onAutoGrid, onLayout, onClusterByColor, onClusterByTag, disabled, selectedCount }) => {
+  const { t } = useTranslation()
   const [showLayoutMenu, setShowLayoutMenu] = useState(false)
   const layoutMenuRef = useRef<HTMLDivElement>(null)
 
@@ -662,7 +668,7 @@ const AlignmentToolbar: React.FC<AlignmentToolbarProps> = memo(({ onAlign, onDis
           className="alignment-btn"
           onClick={() => onAlign('left')}
           disabled={disabled}
-          title="Links ausrichten (2+ Karten)"
+          title={t('graphCanvas.alignLeft')}
         >
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
             <path d="M2 2v12M5 4h7M5 8h5M5 12h9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
@@ -672,7 +678,7 @@ const AlignmentToolbar: React.FC<AlignmentToolbarProps> = memo(({ onAlign, onDis
           className="alignment-btn"
           onClick={() => onAlign('centerH')}
           disabled={disabled}
-          title="Horizontal zentrieren"
+          title={t('graphCanvas.alignCenter')}
         >
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
             <path d="M8 2v12M4 5h8M5 8h6M3 11h10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
@@ -682,7 +688,7 @@ const AlignmentToolbar: React.FC<AlignmentToolbarProps> = memo(({ onAlign, onDis
           className="alignment-btn"
           onClick={() => onAlign('right')}
           disabled={disabled}
-          title="Rechts ausrichten"
+          title={t('graphCanvas.alignRight')}
         >
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
             <path d="M14 2v12M4 4h7M6 8h5M2 12h9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
@@ -695,7 +701,7 @@ const AlignmentToolbar: React.FC<AlignmentToolbarProps> = memo(({ onAlign, onDis
           className="alignment-btn"
           onClick={() => onAlign('top')}
           disabled={disabled}
-          title="Oben ausrichten"
+          title={t('graphCanvas.alignTop')}
         >
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
             <path d="M2 2h12M4 5v7M8 5v5M12 5v9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
@@ -705,7 +711,7 @@ const AlignmentToolbar: React.FC<AlignmentToolbarProps> = memo(({ onAlign, onDis
           className="alignment-btn"
           onClick={() => onAlign('centerV')}
           disabled={disabled}
-          title="Vertikal zentrieren"
+          title={t('graphCanvas.alignMiddle')}
         >
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
             <path d="M2 8h12M5 4v8M8 5v6M11 3v10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
@@ -715,7 +721,7 @@ const AlignmentToolbar: React.FC<AlignmentToolbarProps> = memo(({ onAlign, onDis
           className="alignment-btn"
           onClick={() => onAlign('bottom')}
           disabled={disabled}
-          title="Unten ausrichten"
+          title={t('graphCanvas.alignBottom')}
         >
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
             <path d="M2 14h12M4 4v7M8 6v5M12 2v9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
@@ -730,7 +736,7 @@ const AlignmentToolbar: React.FC<AlignmentToolbarProps> = memo(({ onAlign, onDis
           className="alignment-btn"
           onClick={() => onDistribute('horizontal')}
           disabled={selectedCount < 3}
-          title="Horizontal verteilen (3+ Karten)"
+          title={t('graphCanvas.distributeHorizontal')}
         >
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
             <rect x="2" y="5" width="3" height="6" rx="0.5" stroke="currentColor" strokeWidth="1.5"/>
@@ -742,7 +748,7 @@ const AlignmentToolbar: React.FC<AlignmentToolbarProps> = memo(({ onAlign, onDis
           className="alignment-btn"
           onClick={() => onDistribute('vertical')}
           disabled={selectedCount < 3}
-          title="Vertikal verteilen (3+ Karten)"
+          title={t('graphCanvas.distributeVertical')}
         >
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
             <rect x="5" y="2" width="6" height="3" rx="0.5" stroke="currentColor" strokeWidth="1.5"/>
@@ -759,7 +765,7 @@ const AlignmentToolbar: React.FC<AlignmentToolbarProps> = memo(({ onAlign, onDis
         <button
           className="alignment-btn layout-btn"
           onClick={() => setShowLayoutMenu(!showLayoutMenu)}
-          title="Layout-Algorithmus wählen"
+          title={t('graphCanvas.selectLayout')}
         >
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
             <circle cx="4" cy="4" r="2" stroke="currentColor" strokeWidth="1.5"/>
@@ -779,7 +785,7 @@ const AlignmentToolbar: React.FC<AlignmentToolbarProps> = memo(({ onAlign, onDis
             <button
               className="layout-menu-item"
               onClick={() => { onLayout('hierarchical'); setShowLayoutMenu(false) }}
-              title="Hierarchisches Layout - minimiert Kreuzungen"
+              title={t('graphCanvas.layoutHierarchical')}
             >
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                 <rect x="1" y="2" width="3" height="3" rx="0.5" stroke="currentColor" strokeWidth="1"/>
@@ -790,8 +796,8 @@ const AlignmentToolbar: React.FC<AlignmentToolbarProps> = memo(({ onAlign, onDis
                 <rect x="12" y="6" width="3" height="4" rx="0.5" stroke="currentColor" strokeWidth="1"/>
                 <path d="M4 3.5H6L7 5.5M4 8.5H6L7 6.5M4 13H6L7 11.5M10 5.5H11L12 8M10 11.5H11L12 9" stroke="currentColor" strokeWidth="0.8"/>
               </svg>
-              <span>Hierarchisch</span>
-              <span className="layout-hint">Keine Kreuzungen</span>
+              <span>{t('graphCanvas.hierarchical')}</span>
+              <span className="layout-hint">{t('graphCanvas.noCrossings')}</span>
             </button>
 
             <div className="layout-menu-divider" />
@@ -799,7 +805,7 @@ const AlignmentToolbar: React.FC<AlignmentToolbarProps> = memo(({ onAlign, onDis
             <button
               className="layout-menu-item"
               onClick={() => { onAutoGrid(); setShowLayoutMenu(false) }}
-              title="Einfaches Raster"
+              title={t('graphCanvas.layoutGrid')}
             >
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                 <rect x="2" y="2" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.5"/>
@@ -807,14 +813,14 @@ const AlignmentToolbar: React.FC<AlignmentToolbarProps> = memo(({ onAlign, onDis
                 <rect x="2" y="9" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.5"/>
                 <rect x="9" y="9" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.5"/>
               </svg>
-              <span>Grid</span>
-              <span className="layout-hint">Einfaches Raster</span>
+              <span>{t('graphCanvas.grid')}</span>
+              <span className="layout-hint">{t('graphCanvas.layoutGrid')}</span>
             </button>
 
             <button
               className="layout-menu-item"
               onClick={() => { onClusterByColor(); setShowLayoutMenu(false) }}
-              title="Nach Farbe gruppieren"
+              title={t('graphCanvas.layoutByColor')}
             >
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                 <rect x="1" y="2" width="4" height="3" rx="0.5" fill="#ffcdd2" stroke="#e57373" strokeWidth="0.8"/>
@@ -825,14 +831,14 @@ const AlignmentToolbar: React.FC<AlignmentToolbarProps> = memo(({ onAlign, onDis
                 <rect x="11" y="2" width="4" height="3" rx="0.5" fill="#bbdefb" stroke="#64b5f6" strokeWidth="0.8"/>
                 <rect x="11" y="6" width="4" height="3" rx="0.5" fill="#bbdefb" stroke="#64b5f6" strokeWidth="0.8"/>
               </svg>
-              <span>Farb-Cluster</span>
-              <span className="layout-hint">Nach Farbe gruppieren</span>
+              <span>{t('graphCanvas.colorCluster')}</span>
+              <span className="layout-hint">{t('graphCanvas.layoutByColor')}</span>
             </button>
 
             <button
               className="layout-menu-item"
               onClick={() => { onClusterByTag(); setShowLayoutMenu(false) }}
-              title="Nach Tags gruppieren"
+              title={t('graphCanvas.layoutByTags')}
             >
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                 <text x="2" y="5" fontSize="4" fill="currentColor">#A</text>
@@ -845,15 +851,15 @@ const AlignmentToolbar: React.FC<AlignmentToolbarProps> = memo(({ onAlign, onDis
                 <text x="12" y="5" fontSize="4" fill="currentColor">#C</text>
                 <rect x="11" y="6" width="4" height="2" rx="0.3" stroke="currentColor" strokeWidth="0.6"/>
               </svg>
-              <span>Tag-Cluster</span>
-              <span className="layout-hint">Nach Tags gruppieren</span>
+              <span>{t('graphCanvas.tagCluster')}</span>
+              <span className="layout-hint">{t('graphCanvas.layoutByTags')}</span>
             </button>
           </div>
         )}
       </div>
 
       {selectedCount > 0 && (
-        <span className="alignment-info">{selectedCount} ausgewählt</span>
+        <span className="alignment-info">{selectedCount} {t('graphCanvas.selected')}</span>
       )}
     </div>
   )
@@ -945,6 +951,7 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
   } = useUIStore()
 
   const { fitView, screenToFlowPosition, getNodes } = useReactFlow()
+  const { t } = useTranslation()
 
   // SVG Export Funktion - exportiert das gesamte Canvas
   const handleExportSvg = useCallback(async () => {
@@ -1344,7 +1351,7 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
       const content = await window.electronAPI.readFile(filePath)
 
       // Format: [Titel](URL) oder nur URL als Link
-      const linkText = title ? `[${title}](${url})` : `[Link öffnen](${url})`
+      const linkText = title ? `[${title}](${url})` : `[${t('graphCanvas.openLink')}](${url})`
       const linkLine = `\n\n🔗 ${linkText}`
 
       const newContent = content.trimEnd() + linkLine
@@ -2241,9 +2248,9 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
         const link = newNoteLink.trim()
         // Link-Format: [Linktext](URL) oder nur URL
         if (link.startsWith('http://') || link.startsWith('https://')) {
-          initialContent += `🔗 [Link öffnen](${link})\n\n`
+          initialContent += `🔗 [${t('graphCanvas.openLink')}](${link})\n\n`
         } else {
-          initialContent += `🔗 [Link öffnen](https://${link})\n\n`
+          initialContent += `🔗 [${t('graphCanvas.openLink')}](https://${link})\n\n`
         }
       }
 
@@ -2361,7 +2368,7 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
   // Überschrift (Label) auf Canvas erstellen
   const handleCreateLabel = useCallback((x: number, y: number) => {
     const labelId = addLabel({
-      text: 'Neue Überschrift',
+      text: t('graphCanvas.newHeading'),
       x,
       y,
       width: 200,
@@ -2372,7 +2379,7 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
     // Direkt in Bearbeitungsmodus
     setTimeout(() => setEditingNodeId(labelId), 100)
     setPaneContextMenu(null)
-  }, [addLabel, canvasFilterPath])
+  }, [addLabel, canvasFilterPath, t])
 
   // Löschen Handler
   const handleDelete = useCallback(async () => {
@@ -2918,8 +2925,8 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
   if (allNotes.length === 0) {
     return (
       <div className="canvas-empty">
-        <p>Keine Notizen geladen</p>
-        <p className="hint">Öffne einen Vault um den Graph zu sehen</p>
+        <p>{t('graphCanvas.noNotesLoaded')}</p>
+        <p className="hint">{t('graphCanvas.openVaultHint')}</p>
       </div>
     )
   }
@@ -2932,7 +2939,7 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
         <button
           className="add-note-btn"
           onClick={handleAddNewNote}
-          title="Neue Karte hinzufügen"
+          title={t('graphCanvas.addCard')}
         >
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
             <path d="M8 3v10M3 8h10" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
@@ -2946,7 +2953,7 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
           <button
             className={`display-toggle-btn ${canvasShowTags ? 'active' : ''}`}
             onClick={() => setCanvasShowTags(!canvasShowTags)}
-            title={canvasShowTags ? 'Tags ausblenden' : 'Tags anzeigen'}
+            title={canvasShowTags ? t('graphCanvas.hideTags') : t('graphCanvas.showTags')}
           >
             <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
               <path d="M2 3h5l7 7-5 5-7-7V3z" stroke="currentColor" strokeWidth="1.5"/>
@@ -2956,7 +2963,7 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
           <button
             className={`display-toggle-btn ${canvasShowLinks ? 'active' : ''}`}
             onClick={() => setCanvasShowLinks(!canvasShowLinks)}
-            title={canvasShowLinks ? 'Link-Anzahl ausblenden' : 'Link-Anzahl anzeigen'}
+            title={canvasShowLinks ? t('graphCanvas.hideLinkCount') : t('graphCanvas.showLinkCount')}
           >
             <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
               <path d="M6.354 5.5H4a3 3 0 0 0 0 6h3a3 3 0 0 0 2.83-4H9c-.086 0-.17.01-.25.031A2 2 0 0 1 7 10H4a2 2 0 1 1 0-4h2.354" stroke="currentColor" strokeWidth="1.2"/>
@@ -2966,7 +2973,7 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
           <button
             className={`display-toggle-btn ${canvasShowImages ? 'active' : ''}`}
             onClick={() => setCanvasShowImages(!canvasShowImages)}
-            title={canvasShowImages ? 'Bilder ausblenden' : 'Bilder anzeigen'}
+            title={canvasShowImages ? t('graphCanvas.hideImages') : t('graphCanvas.showImages')}
           >
             <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
               <rect x="1" y="3" width="14" height="10" rx="1" stroke="currentColor" strokeWidth="1.2"/>
@@ -2983,8 +2990,8 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
           onChange={(e) => setCanvasFilterPath(e.target.value || null)}
           className="canvas-filter-select"
         >
-          <option value="">Alle Notizen ({allNotes.length})</option>
-          <option value="__root__">Nur Hauptebene</option>
+          <option value="">{t('graphCanvas.allNotes')} ({allNotes.length})</option>
+          <option value="__root__">{t('graphCanvas.rootLevelOnly')}</option>
           {folders.map(folder => (
             <option key={folder} value={folder}>
               📁 {folder} ({allNotes.filter(n => n.path.startsWith(folder + '/') || n.path.split('/').slice(0, -1).join('/') === folder).length})
@@ -2995,13 +3002,13 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
           <button
             className="canvas-filter-clear"
             onClick={() => setCanvasFilterPath(null)}
-            title="Filter zurücksetzen"
+            title={t('graphCanvas.resetFilter')}
           >
             ✕
           </button>
         )}
         <span className="canvas-filter-info">
-          {notes.length} von {allNotes.length} Notizen
+          {notes.length} {t('graphCanvas.notesOf')} {allNotes.length} {t('graphCanvas.notes')}
         </span>
 
         {/* Alignment Tools - nur im Full Canvas Mode (mehr Platz) */}
@@ -3029,25 +3036,25 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
                   className="focus-btn"
                   onClick={handleEnterFocusMode}
                   disabled={selectedCount === 0}
-                  title="Fokus-Modus: Nur ausgewählte Karten anzeigen"
+                  title={t('graphCanvas.focusMode')}
                 >
                   <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                     <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.5"/>
                     <circle cx="8" cy="8" r="2" fill="currentColor"/>
                   </svg>
-                  <span>Fokus</span>
+                  <span>{t('graphCanvas.focus')}</span>
                 </button>
               ) : (
                 <>
                   <div className="focus-mode-active">
                     <span className="focus-indicator" />
-                    <span>{focusedNodeIds.size} im Fokus</span>
+                    <span>{focusedNodeIds.size} {t('graphCanvas.inFocus')}</span>
                   </div>
                   <button
                     className="focus-btn small"
                     onClick={handleAddToFocus}
                     disabled={selectedCount === 0}
-                    title="Auswahl zum Fokus hinzufügen"
+                    title={t('graphCanvas.addToFocus')}
                   >
                     +
                   </button>
@@ -3055,16 +3062,16 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
                     className="focus-btn small"
                     onClick={handleRemoveFromFocus}
                     disabled={selectedCount === 0}
-                    title="Auswahl aus Fokus entfernen"
+                    title={t('graphCanvas.removeFromFocus')}
                   >
                     −
                   </button>
                   <button
                     className="focus-btn exit"
                     onClick={handleExitFocusMode}
-                    title="Fokus-Modus beenden"
+                    title={t('graphCanvas.exitFocusMode')}
                   >
-                    ✕ Beenden
+                    ✕ {t('graphCanvas.exit')}
                   </button>
                 </>
               )}
@@ -3075,9 +3082,9 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
 
       {notes.length === 0 ? (
         <div className="canvas-empty">
-          <p>Keine Notizen im ausgewählten Ordner</p>
+          <p>{t('graphCanvas.noNotesInFolder')}</p>
           <button className="btn-primary" onClick={() => setCanvasFilterPath(null)}>
-            Alle anzeigen
+            {t('graphCanvas.showAll')}
           </button>
         </div>
       ) : (
@@ -3108,7 +3115,7 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
           <button
             className="canvas-export-btn"
             onClick={handleExportSvg}
-            title="Als SVG exportieren"
+            title={t('graphCanvas.exportSVG')}
           >
             SVG
           </button>
@@ -3201,7 +3208,7 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
                 handleCreateLabel(paneContextMenu.flowPosition.x, paneContextMenu.flowPosition.y)
               }}
             >
-              Überschrift hinzufügen
+              {t('graphCanvas.addHeading')}
             </button>
             <button
               className="context-menu-item"
@@ -3215,7 +3222,7 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
                 setPaneContextMenu(null)
               }}
             >
-              Neue Notiz erstellen
+              {t('graphCanvas.createNewNote')}
             </button>
           </div>
         </>
@@ -3273,10 +3280,10 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
             className="new-note-dialog-extended"
             onClick={(e) => e.stopPropagation()}
           >
-            <h3>Neue Karte erstellen</h3>
+            <h3>{t('graphCanvas.createCard')}</h3>
 
             <div className="new-note-field">
-              <label>Titel *</label>
+              <label>{t('graphCanvas.titleRequired')}</label>
               <input
                 type="text"
                 value={newNoteName}
@@ -3293,17 +3300,17 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
                     setNewNoteImagePreview(null)
                   }
                 }}
-                placeholder="Notiz-Titel..."
+                placeholder={t('graphCanvas.noteTitlePlaceholder')}
                 autoFocus
               />
             </div>
 
             <div className="new-note-field">
-              <label>Zusammenfassung (auf Karte sichtbar)</label>
+              <label>{t('graphCanvas.summaryLabel')}</label>
               <textarea
                 value={newNoteContent}
                 onChange={(e) => setNewNoteContent(e.target.value)}
-                placeholder="Kurze Beschreibung..."
+                placeholder={t('graphCanvas.shortDescription')}
                 rows={3}
               />
             </div>
@@ -3319,17 +3326,17 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
             </div>
 
             <div className="new-note-field">
-              <label>Aufgaben</label>
+              <label>{t('graphCanvas.tasks')}</label>
               <textarea
                 value={newNoteTodos}
                 onChange={(e) => setNewNoteTodos(e.target.value)}
-                placeholder="Eine Aufgabe pro Zeile..."
+                placeholder={t('graphCanvas.oneTaskPerLine')}
                 rows={3}
               />
             </div>
 
             <div className="new-note-field">
-              <label>Externer Link</label>
+              <label>{t('graphCanvas.externalLink')}</label>
               <input
                 type="url"
                 value={newNoteLink}
@@ -3339,7 +3346,7 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
             </div>
 
             <div className="new-note-field">
-              <label>Bild</label>
+              <label>{t('graphCanvas.image')}</label>
               <div className="image-upload-area">
                 <input
                   type="file"
@@ -3374,7 +3381,7 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
                   </div>
                 ) : (
                   <label htmlFor="new-note-image-upload" className="image-upload-btn">
-                    📷 Bild auswählen
+                    📷 {t('graphCanvas.selectImage')}
                   </label>
                 )}
               </div>
@@ -3386,7 +3393,7 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
                 className="btn-primary"
                 disabled={!newNoteName.trim()}
               >
-                Erstellen
+                {t('graphCanvas.create')}
               </button>
               <button onClick={() => {
                 setNewNoteDialog(null)
@@ -3398,7 +3405,7 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
                 setNewNoteImage(null)
                 setNewNoteImagePreview(null)
               }}>
-                Abbrechen
+                {t('graphCanvas.cancel')}
               </button>
             </div>
           </div>

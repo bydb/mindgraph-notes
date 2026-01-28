@@ -71,7 +71,7 @@ export const TagsPanel: React.FC<TagsPanelProps> = ({ onClose }) => {
             <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/>
             <line x1="7" y1="7" x2="7.01" y2="7"/>
           </svg>
-          <span>Tags</span>
+          <span>{t('tags.title')}</span>
           <span className="tags-panel-count">{tagCounts.length}</span>
         </div>
         <button className="tags-panel-close" onClick={onClose} title={t('panel.close')}>
@@ -89,7 +89,7 @@ export const TagsPanel: React.FC<TagsPanelProps> = ({ onClose }) => {
         </svg>
         <input
           type="text"
-          placeholder="Tags durchsuchen..."
+          placeholder={t('tags.search')}
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
         />
@@ -106,7 +106,7 @@ export const TagsPanel: React.FC<TagsPanelProps> = ({ onClose }) => {
                 </svg>
               </button>
               <span className="tags-notes-tag">#{selectedTag}</span>
-              <span className="tags-notes-count">{notesWithTag.length} Notizen</span>
+              <span className="tags-notes-count">{notesWithTag.length} {t('tags.notesCount')}</span>
             </div>
             <div className="tags-notes-list">
               {notesWithTag.map(note => (
@@ -129,7 +129,7 @@ export const TagsPanel: React.FC<TagsPanelProps> = ({ onClose }) => {
           <div className="tags-list">
             {filteredTags.length === 0 ? (
               <div className="tags-empty">
-                {searchQuery ? 'Keine Tags gefunden' : 'Keine Tags im Vault'}
+                {searchQuery ? t('tags.noTagsFound') : t('tags.noTagsInVault')}
               </div>
             ) : (
               filteredTags.map(({ tag, count }) => (

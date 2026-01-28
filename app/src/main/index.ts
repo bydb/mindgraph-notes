@@ -1895,7 +1895,7 @@ ipcMain.on('terminal-create', (_event, cwd: string) => {
       if (isQuitting || !mainWindow || mainWindow.isDestroyed()) return
 
       console.log('[Terminal] Sending test message via IPC...')
-      mainWindow.webContents.send('terminal-data', '\x1b[32m[Terminal verbunden]\x1b[0m\r\n')
+      mainWindow.webContents.send('terminal-data', '\x1b[32m[__TERMINAL_CONNECTED__]\x1b[0m\r\n')
 
       // Sende einen Zeilenumbruch an die Shell um den Prompt auszulösen
       if (ptyProcess) {
@@ -1905,7 +1905,7 @@ ipcMain.on('terminal-create', (_event, cwd: string) => {
     }, 100)
   } catch (error) {
     console.error('[Terminal] Failed to create PTY:', error)
-    mainWindow?.webContents.send('terminal-error', `Terminal konnte nicht gestartet werden: ${error}`)
+    mainWindow?.webContents.send('terminal-error', `${error}`)
   }
 })
 
