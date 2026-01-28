@@ -923,7 +923,7 @@
     <div class="terminal-showcase">
       <div class="terminal-window">
         <div class="terminal-bar">
-          <span>Terminal</span>
+          <span data-i18n="terminal.bar">Terminal</span>
         </div>
         <div class="terminal-body">
           <div class="terminal-line">
@@ -978,7 +978,7 @@
 
       <div class="feature-card featured">
         <div class="feature-icon">📄</div>
-        <h3>PDF Companion</h3>
+        <h3 data-i18n="features.pdf.title">PDF Companion</h3>
         <p data-i18n="features.pdf.desc">PDFs direkt neben deinen Notizen. Perfekt für handschriftliche iPad-Notizen, Vorlesungsfolien oder Paper.</p>
       </div>
 
@@ -990,14 +990,14 @@
 
       <div class="feature-card featured">
         <div class="feature-icon">🔗</div>
-        <h3>Wikilinks</h3>
+        <h3 data-i18n="features.wikilinks.title">Wikilinks</h3>
         <p data-i18n="features.wikilinks.desc">Verlinke Notizen mit [[Wikilinks]]. Bidirektionale Verbindungen, Backlinks-Panel, Obsidian-kompatibel.</p>
       </div>
 
       <!-- Standardfeatures -->
       <div class="feature-card">
         <div class="feature-icon">📝</div>
-        <h3>Live Preview</h3>
+        <h3 data-i18n="features.preview.title">Live Preview</h3>
         <p data-i18n="features.preview.desc">Schreibe in Markdown mit sofortiger Vorschau. LaTeX, Mermaid-Diagramme, Callouts und mehr.</p>
       </div>
 
@@ -1158,7 +1158,7 @@
     <div class="setup-grid">
       <div class="setup-card">
         <div class="setup-icon">🧠</div>
-        <h3>Claude Code</h3>
+        <h3 data-i18n="setup.claudecode.title">Claude Code</h3>
         <p data-i18n="setup.claudecode.desc">Anthropics offizieller KI-Coding-Agent. Claude Code ist der mächtigste KI-Assistent für Entwickler.</p>
         <div class="setup-steps">
           <ol>
@@ -1175,7 +1175,7 @@
 
       <div class="setup-card">
         <div class="setup-icon">🤖</div>
-        <h3>OpenCode</h3>
+        <h3 data-i18n="setup.opencode.title">OpenCode</h3>
         <p data-i18n="setup.opencode.desc">Open-Source KI-Coding-Agent. Unterstützt verschiedene LLM-Anbieter wie OpenAI, Anthropic, Gemini und lokale Modelle.</p>
         <div class="setup-steps">
           <ol>
@@ -1190,7 +1190,7 @@
 
       <div class="setup-card">
         <div class="setup-icon">🦙</div>
-        <h3>Ollama</h3>
+        <h3 data-i18n="setup.ollama.title">Ollama</h3>
         <p data-i18n="setup.ollama.desc">Lokale LLMs wie Llama, Mistral oder Gemma auf deinem Mac. Keine Cloud, keine API-Kosten, volle Privatsphäre.</p>
         <div class="setup-install">
           <span data-i18n="setup.install">Installation:</span>
@@ -1202,7 +1202,7 @@
 
       <div class="setup-card">
         <div class="setup-icon">📚</div>
-        <h3>Zotero</h3>
+        <h3 data-i18n="setup.zotero.title">Zotero</h3>
         <p data-i18n="setup.zotero.desc">Literaturverwaltung für Wissenschaft und Recherche. Füge Zitate direkt in deine Notizen ein.</p>
         <div class="setup-steps">
           <ol>
@@ -1313,17 +1313,17 @@
   <div id="impressum-modal" class="modal">
     <div class="modal-content">
       <span class="modal-close" onclick="closeModal('impressum')">&times;</span>
-      <h2>Impressum</h2>
-      <h3>Angaben gemäß § 5 TMG</h3>
+      <h2 data-i18n="impressum.title">Impressum</h2>
+      <h3 data-i18n="impressum.info">Angaben gemäß § 5 TMG</h3>
       <p>
         Jochen Leeder<br>
         Kirschenweg 1<br>
         35444 Biebertal<br>
-        Deutschland
+        <span data-i18n="impressum.country">Deutschland</span>
       </p>
-      <h3>Kontakt</h3>
+      <h3 data-i18n="impressum.contact">Kontakt</h3>
       <p>E-Mail: info@bydb.io</p>
-      <h3>Verantwortlich für den Inhalt nach § 55 Abs. 2 RStV</h3>
+      <h3 data-i18n="impressum.responsible">Verantwortlich für den Inhalt nach § 55 Abs. 2 RStV</h3>
       <p>Jochen Leeder</p>
       <h3 data-i18n="impressum.liability">Haftungsausschluss</h3>
       <h4 data-i18n="impressum.liability.content">Haftung für Inhalte</h4>
@@ -1383,6 +1383,7 @@
         "terminal.out2": "1 file changed, 47 insertions(+)",
         "terminal.cmd2": " ollama run llama3 \"Fasse [[Meeting-Notes]] zusammen\" # optional",
         "terminal.out3": "Die wichtigsten Punkte waren...",
+        "terminal.bar": "Terminal",
         "terminal.title": "Du denkst. KI assistiert.",
         "terminal.desc": "In einer Welt voller AI-generiertem Inhalt brauchen wir authentisches menschliches Denken. MindGraph Notes gibt dir die Werkzeuge – <strong>du entscheidest</strong>, wann und ob KI eingreift. Jeder KI-Beitrag wird in deinen Notizen zitiert.",
         "terminal.f1": "Human First: Du schreibst, KI unterstützt optional",
@@ -1393,10 +1394,13 @@
         "features.subtitle": "Alles was du brauchst. Nichts was du nicht willst.",
         "features.canvas.title": "Local Canvas",
         "features.canvas.desc": "Erkunde Notizen visuell im Canvas. Starte mit einer Notiz, erweitere schrittweise über Verbindungen – alles in Tabs organisiert.",
+        "features.pdf.title": "PDF Companion",
         "features.pdf.desc": "PDFs direkt neben deinen Notizen. Perfekt für handschriftliche iPad-Notizen, Vorlesungsfolien oder Paper.",
         "features.local.title": "100% Lokal",
         "features.local.desc": "Alle Notizen sind Markdown-Dateien. Keine Cloud, kein Account, keine Telemetrie. Deine Daten gehören dir.",
+        "features.wikilinks.title": "Wikilinks",
         "features.wikilinks.desc": "Verlinke Notizen mit [[Wikilinks]]. Bidirektionale Verbindungen, Backlinks-Panel, Obsidian-kompatibel.",
+        "features.preview.title": "Live Preview",
         "features.preview.desc": "Schreibe in Markdown mit sofortiger Vorschau. LaTeX, Mermaid-Diagramme, Callouts und mehr.",
         "features.graph.title": "Canvas Übersicht",
         "features.graph.desc": "Alle Notizen auf einen Blick. Filter nach Ordnern, ordne frei an, entdecke Zusammenhänge.",
@@ -1437,6 +1441,7 @@
         "shortcuts.note": "Auf Windows/Linux: ⌘ = Ctrl",
         "setup.title": "Tools einrichten",
         "setup.subtitle": "So holst du das Maximum aus MindGraph Notes heraus",
+        "setup.claudecode.title": "Claude Code",
         "setup.claudecode.desc": "Anthropics offizieller KI-Coding-Agent. Claude Code ist der mächtigste KI-Assistent für Entwickler.",
         "setup.claudecode.step1": "Node.js installieren: <code>brew install node</code>",
         "setup.claudecode.step2": "Claude Code installieren: <code>npm i -g @anthropic-ai/claude-code</code>",
@@ -1444,13 +1449,16 @@
         "setup.claudecode.step4": "Key setzen: <code>export ANTHROPIC_API_KEY=\"sk-ant-...\"</code>",
         "setup.claudecode.step5": "Starten: <code>claude</code>",
         "setup.claudecode.note": "Tipp: Key permanent speichern mit <code>echo 'export ANTHROPIC_API_KEY=\"...\"' >> ~/.zshrc</code>",
+        "setup.opencode.title": "OpenCode",
         "setup.opencode.desc": "Open-Source KI-Coding-Agent. Unterstützt verschiedene LLM-Anbieter wie OpenAI, Anthropic, Gemini und lokale Modelle.",
         "setup.opencode.step1": "OpenCode installieren: <code>curl -fsSL https://opencode.ai/install | bash</code>",
         "setup.opencode.step2": "API-Key setzen (z.B. OpenAI): <code>export OPENAI_API_KEY=\"sk-...\"</code>",
         "setup.opencode.step3": "Starten: <code>opencode</code>",
         "setup.opencode.note": "Unterstützt auch lokale Modelle via Ollama - keine API-Kosten!",
+        "setup.ollama.title": "Ollama",
         "setup.ollama.desc": "Lokale LLMs wie Llama, Mistral oder Gemma auf deinem Mac. Keine Cloud, keine API-Kosten, volle Privatsphäre.",
         "setup.ollama.note": "Nach der Installation: <code>ollama pull llama3</code> um ein Modell zu laden.",
+        "setup.zotero.title": "Zotero",
         "setup.zotero.desc": "Literaturverwaltung für Wissenschaft und Recherche. Füge Zitate direkt in deine Notizen ein.",
         "setup.zotero.step1": "Zotero installieren von <a href=\"https://www.zotero.org/download/\" target=\"_blank\">zotero.org</a>",
         "setup.zotero.step2": "Better BibTeX Plugin installieren für Export",
@@ -1475,6 +1483,11 @@
         "install.linux.deb": "<strong>Debian/Ubuntu:</strong>",
         "footer.impressum": "Impressum",
         "footer.privacy": "Datenschutz",
+        "impressum.title": "Impressum",
+        "impressum.info": "Angaben gemäß § 5 TMG",
+        "impressum.country": "Deutschland",
+        "impressum.contact": "Kontakt",
+        "impressum.responsible": "Verantwortlich für den Inhalt nach § 55 Abs. 2 RStV",
         "impressum.liability": "Haftungsausschluss",
         "impressum.liability.content": "Haftung für Inhalte",
         "impressum.liability.content.text": "Die Inhalte dieser Seiten wurden mit größter Sorgfalt erstellt. Für die Richtigkeit, Vollständigkeit und Aktualität der Inhalte kann jedoch keine Gewähr übernommen werden.",
@@ -1510,6 +1523,7 @@
         "terminal.out2": "1 file changed, 47 insertions(+)",
         "terminal.cmd2": " ollama run llama3 \"Summarize [[Meeting-Notes]]\" # optional",
         "terminal.out3": "The key points were...",
+        "terminal.bar": "Terminal",
         "terminal.title": "You think. AI assists.",
         "terminal.desc": "In a world flooded with AI-generated content, we need authentic human thinking. MindGraph Notes gives you the tools – <strong>you decide</strong> when and if AI steps in. Every AI contribution is cited in your notes.",
         "terminal.f1": "Human First: You write, AI supports optionally",
@@ -1520,10 +1534,13 @@
         "features.subtitle": "Everything you need. Nothing you don't.",
         "features.canvas.title": "Local Canvas",
         "features.canvas.desc": "Explore notes visually in the canvas. Start with one note, expand step by step through connections – all organized in tabs.",
+        "features.pdf.title": "PDF Companion",
         "features.pdf.desc": "PDFs right next to your notes. Perfect for handwritten iPad notes, lecture slides, or papers.",
         "features.local.title": "100% Local",
         "features.local.desc": "All notes are Markdown files. No cloud, no account, no telemetry. Your data belongs to you.",
+        "features.wikilinks.title": "Wikilinks",
         "features.wikilinks.desc": "Link notes with [[Wikilinks]]. Bidirectional connections, backlinks panel, Obsidian-compatible.",
+        "features.preview.title": "Live Preview",
         "features.preview.desc": "Write in Markdown with instant preview. LaTeX, Mermaid diagrams, callouts, and more.",
         "features.graph.title": "Canvas Overview",
         "features.graph.desc": "All notes at a glance. Filter by folder, arrange freely, discover connections.",
@@ -1564,6 +1581,7 @@
         "shortcuts.note": "On Windows/Linux: ⌘ = Ctrl",
         "setup.title": "Setup Tools",
         "setup.subtitle": "Get the most out of MindGraph Notes",
+        "setup.claudecode.title": "Claude Code",
         "setup.claudecode.desc": "Anthropic's official AI coding agent. Claude Code is the most powerful AI assistant for developers.",
         "setup.claudecode.step1": "Install Node.js: <code>brew install node</code>",
         "setup.claudecode.step2": "Install Claude Code: <code>npm i -g @anthropic-ai/claude-code</code>",
@@ -1571,13 +1589,16 @@
         "setup.claudecode.step4": "Set key: <code>export ANTHROPIC_API_KEY=\"sk-ant-...\"</code>",
         "setup.claudecode.step5": "Start: <code>claude</code>",
         "setup.claudecode.note": "Tip: Save key permanently with <code>echo 'export ANTHROPIC_API_KEY=\"...\"' >> ~/.zshrc</code>",
+        "setup.opencode.title": "OpenCode",
         "setup.opencode.desc": "Open-source AI coding agent. Supports various LLM providers like OpenAI, Anthropic, Gemini, and local models.",
         "setup.opencode.step1": "Install OpenCode: <code>curl -fsSL https://opencode.ai/install | bash</code>",
         "setup.opencode.step2": "Set API key (e.g. OpenAI): <code>export OPENAI_API_KEY=\"sk-...\"</code>",
         "setup.opencode.step3": "Start: <code>opencode</code>",
         "setup.opencode.note": "Also supports local models via Ollama - no API costs!",
+        "setup.ollama.title": "Ollama",
         "setup.ollama.desc": "Local LLMs like Llama, Mistral or Gemma on your Mac. No cloud, no API costs, full privacy.",
         "setup.ollama.note": "After installation: <code>ollama pull llama3</code> to download a model.",
+        "setup.zotero.title": "Zotero",
         "setup.zotero.desc": "Reference management for science and research. Insert citations directly into your notes.",
         "setup.zotero.step1": "Install Zotero from <a href=\"https://www.zotero.org/download/\" target=\"_blank\">zotero.org</a>",
         "setup.zotero.step2": "Install Better BibTeX plugin for export",
@@ -1602,6 +1623,11 @@
         "install.linux.deb": "<strong>Debian/Ubuntu:</strong>",
         "footer.impressum": "Legal Notice",
         "footer.privacy": "Privacy Policy",
+        "impressum.title": "Legal Notice",
+        "impressum.info": "Information according to § 5 TMG",
+        "impressum.country": "Germany",
+        "impressum.contact": "Contact",
+        "impressum.responsible": "Responsible for content according to § 55 Abs. 2 RStV",
         "impressum.liability": "Disclaimer",
         "impressum.liability.content": "Liability for Content",
         "impressum.liability.content.text": "The contents of these pages were created with the greatest care. However, no guarantee can be given for the accuracy, completeness, and timeliness of the content.",
