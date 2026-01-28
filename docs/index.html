@@ -1157,13 +1157,34 @@
 
     <div class="setup-grid">
       <div class="setup-card">
+        <div class="setup-icon">🧠</div>
+        <h3>Claude Code</h3>
+        <p data-i18n="setup.claudecode.desc">Anthropics offizieller KI-Coding-Agent. Claude Code ist der mächtigste KI-Assistent für Entwickler.</p>
+        <div class="setup-steps">
+          <ol>
+            <li data-i18n="setup.claudecode.step1">Node.js installieren: <code>brew install node</code></li>
+            <li data-i18n="setup.claudecode.step2">Claude Code installieren: <code>npm i -g @anthropic-ai/claude-code</code></li>
+            <li data-i18n="setup.claudecode.step3">API-Key von <a href="https://console.anthropic.com" target="_blank">console.anthropic.com</a> holen</li>
+            <li data-i18n="setup.claudecode.step4">Key setzen: <code>export ANTHROPIC_API_KEY="sk-ant-..."</code></li>
+            <li data-i18n="setup.claudecode.step5">Starten: <code>claude</code></li>
+          </ol>
+        </div>
+        <p class="setup-note" data-i18n="setup.claudecode.note">Tipp: Key permanent speichern mit <code>echo 'export ANTHROPIC_API_KEY="..."' >> ~/.zshrc</code></p>
+        <a href="https://docs.anthropic.com/en/docs/claude-code" target="_blank" class="setup-link" data-i18n="setup.more">Mehr erfahren →</a>
+      </div>
+
+      <div class="setup-card">
         <div class="setup-icon">🤖</div>
         <h3>OpenCode</h3>
-        <p data-i18n="setup.opencode.desc">KI-gestützte Entwicklung direkt im Terminal. OpenCode ermöglicht natürliche Sprachbefehle für deine Notizen.</p>
-        <div class="setup-install">
-          <span data-i18n="setup.install">Installation:</span>
-          <code>curl -fsSL https://opencode.ai/install | bash</code>
+        <p data-i18n="setup.opencode.desc">Open-Source KI-Coding-Agent. Unterstützt verschiedene LLM-Anbieter wie OpenAI, Anthropic, Gemini und lokale Modelle.</p>
+        <div class="setup-steps">
+          <ol>
+            <li data-i18n="setup.opencode.step1">OpenCode installieren: <code>curl -fsSL https://opencode.ai/install | bash</code></li>
+            <li data-i18n="setup.opencode.step2">API-Key setzen (z.B. OpenAI): <code>export OPENAI_API_KEY="sk-..."</code></li>
+            <li data-i18n="setup.opencode.step3">Starten: <code>opencode</code></li>
+          </ol>
         </div>
+        <p class="setup-note" data-i18n="setup.opencode.note">Unterstützt auch lokale Modelle via Ollama - keine API-Kosten!</p>
         <a href="https://opencode.ai" target="_blank" class="setup-link" data-i18n="setup.more">Mehr erfahren →</a>
       </div>
 
@@ -1391,7 +1412,18 @@
         "shortcuts.note": "Auf Windows/Linux: ⌘ = Ctrl",
         "setup.title": "Tools einrichten",
         "setup.subtitle": "So holst du das Maximum aus MindGraph Notes heraus",
-        "setup.opencode.desc": "KI-gestützte Entwicklung direkt im Terminal. OpenCode ermöglicht natürliche Sprachbefehle für deine Notizen.",
+        "setup.claudecode.desc": "Anthropics offizieller KI-Coding-Agent. Claude Code ist der mächtigste KI-Assistent für Entwickler.",
+        "setup.claudecode.step1": "Node.js installieren: <code>brew install node</code>",
+        "setup.claudecode.step2": "Claude Code installieren: <code>npm i -g @anthropic-ai/claude-code</code>",
+        "setup.claudecode.step3": "API-Key von <a href=\"https://console.anthropic.com\" target=\"_blank\">console.anthropic.com</a> holen",
+        "setup.claudecode.step4": "Key setzen: <code>export ANTHROPIC_API_KEY=\"sk-ant-...\"</code>",
+        "setup.claudecode.step5": "Starten: <code>claude</code>",
+        "setup.claudecode.note": "Tipp: Key permanent speichern mit <code>echo 'export ANTHROPIC_API_KEY=\"...\"' >> ~/.zshrc</code>",
+        "setup.opencode.desc": "Open-Source KI-Coding-Agent. Unterstützt verschiedene LLM-Anbieter wie OpenAI, Anthropic, Gemini und lokale Modelle.",
+        "setup.opencode.step1": "OpenCode installieren: <code>curl -fsSL https://opencode.ai/install | bash</code>",
+        "setup.opencode.step2": "API-Key setzen (z.B. OpenAI): <code>export OPENAI_API_KEY=\"sk-...\"</code>",
+        "setup.opencode.step3": "Starten: <code>opencode</code>",
+        "setup.opencode.note": "Unterstützt auch lokale Modelle via Ollama - keine API-Kosten!",
         "setup.ollama.desc": "Lokale LLMs wie Llama, Mistral oder Gemma auf deinem Mac. Keine Cloud, keine API-Kosten, volle Privatsphäre.",
         "setup.ollama.note": "Nach der Installation: <code>ollama pull llama3</code> um ein Modell zu laden.",
         "setup.zotero.desc": "Literaturverwaltung für Wissenschaft und Recherche. Füge Zitate direkt in deine Notizen ein.",
@@ -1504,7 +1536,18 @@
         "shortcuts.note": "On Windows/Linux: ⌘ = Ctrl",
         "setup.title": "Setup Tools",
         "setup.subtitle": "Get the most out of MindGraph Notes",
-        "setup.opencode.desc": "AI-powered development right in your terminal. OpenCode enables natural language commands for your notes.",
+        "setup.claudecode.desc": "Anthropic's official AI coding agent. Claude Code is the most powerful AI assistant for developers.",
+        "setup.claudecode.step1": "Install Node.js: <code>brew install node</code>",
+        "setup.claudecode.step2": "Install Claude Code: <code>npm i -g @anthropic-ai/claude-code</code>",
+        "setup.claudecode.step3": "Get API key from <a href=\"https://console.anthropic.com\" target=\"_blank\">console.anthropic.com</a>",
+        "setup.claudecode.step4": "Set key: <code>export ANTHROPIC_API_KEY=\"sk-ant-...\"</code>",
+        "setup.claudecode.step5": "Start: <code>claude</code>",
+        "setup.claudecode.note": "Tip: Save key permanently with <code>echo 'export ANTHROPIC_API_KEY=\"...\"' >> ~/.zshrc</code>",
+        "setup.opencode.desc": "Open-source AI coding agent. Supports various LLM providers like OpenAI, Anthropic, Gemini, and local models.",
+        "setup.opencode.step1": "Install OpenCode: <code>curl -fsSL https://opencode.ai/install | bash</code>",
+        "setup.opencode.step2": "Set API key (e.g. OpenAI): <code>export OPENAI_API_KEY=\"sk-...\"</code>",
+        "setup.opencode.step3": "Start: <code>opencode</code>",
+        "setup.opencode.note": "Also supports local models via Ollama - no API costs!",
         "setup.ollama.desc": "Local LLMs like Llama, Mistral or Gemma on your Mac. No cloud, no API costs, full privacy.",
         "setup.ollama.note": "After installation: <code>ollama pull llama3</code> to download a model.",
         "setup.zotero.desc": "Reference management for science and research. Insert citations directly into your notes.",
