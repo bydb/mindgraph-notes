@@ -990,8 +990,9 @@ const OLLAMA_API_URL = 'http://localhost:11434'
 const LM_STUDIO_DEFAULT_PORT = 1234
 
 // Helper to get LM Studio URL with custom port
+// Use 127.0.0.1 instead of localhost to avoid IPv6 resolution issues
 function getLMStudioUrl(port: number = LM_STUDIO_DEFAULT_PORT): string {
-  return `http://localhost:${port}`
+  return `http://127.0.0.1:${port}`
 }
 
 // Prüft ob Ollama läuft
