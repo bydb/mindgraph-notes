@@ -2,7 +2,61 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
-## [0.9.7] - 2025-01-25
+## [1.0.3] - 2026-01-29
+
+### Features
+- **Vollständige Internationalisierung (i18n)**: Deutsche und englische Übersetzungen für alle UI-Komponenten
+- **Terminal-Übersetzungen**: Statusmeldungen (verbunden/beendet) werden jetzt lokalisiert
+- **GraphCanvas-Übersetzungen**: Toolbar, Filter, Focus-Mode, Dialoge vollständig übersetzt
+- **150+ neue Übersetzungsschlüssel** für durchgängige Mehrsprachigkeit
+
+### Technische Änderungen
+- `tRef` Pattern im Terminal für sprachreaktive Übersetzungen in Callbacks
+- Marker-basierte Übersetzung für Main-Process-Nachrichten
+
+## [1.0.2] - 2026-01-28
+
+### Features
+- **Panel-Übersetzungen**: SmartConnections, TagsPanel, OverduePanel vollständig übersetzt
+- **UI-Tooltips**: Alle Button-Tooltips und Labels lokalisiert
+
+### Fixes
+- Fehlende Übersetzungen auf der Website nachgetragen
+
+## [1.0.1] - 2026-01-28
+
+### Features
+- **Sidebar-Übersetzungen**: FileTree, Bookmarks, Sidebar-Komponenten übersetzt
+- **Editor-Übersetzungen**: AI-Menüs, Backlinks, WikilinkAutocomplete lokalisiert
+
+## [1.0.0] - 2026-01-27
+
+### Major Release
+- **Erster stabiler Release** mit vollständiger Feature-Parität
+- **Tab-System**: Mehrere Notizen und Canvas-Ansichten als Tabs
+- **Local Canvas**: Fokussierte Graphansicht mit schrittweiser Erweiterung
+- **Sprachunterstützung**: Grundlegende DE/EN Lokalisierung
+
+## [0.9.9] - 2026-01-27
+
+### Features
+- **Local Canvas**: Rechtsklick → "Im Canvas erkunden" zeigt nur Root + direkte Verbindungen
+- **Expand-Buttons**: `+X` an Nodes zeigt versteckte Verbindungen
+- **Tab-System**: Canvas öffnet als Tab neben Editor-Tabs
+- **View Modes**: Editor / Split / Canvas (Vollbild) / Text-Split
+
+### UI Verbesserungen
+- Einheitliche 44px Header-Höhe
+- Perfekte Kreis-Buttons im Header
+
+## [0.9.8] - 2026-01-26
+
+### Features
+- **Smart Connections Panel**: KI-basierte ähnliche Notizen finden
+- **Embedding-Support**: Ollama-Embeddings für semantische Suche
+- **Verbessertes Tagging**: Tag-Filter und -Verwaltung optimiert
+
+## [0.9.7] - 2026-01-25
 
 ### Features
 - **Text-Split View**: Zwei Notizen nebeneinander vergleichen (Cmd/Ctrl+Click im FileTree)
@@ -22,7 +76,7 @@ Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 - Dark Mode Konsistenz verbessert
 - Logo verwendet Akzentfarbe für bessere Theme-Integration
 
-## [0.9.6] - 2025-01-25
+## [0.9.6] - 2026-01-25
 
 ### Performance Optimizations
 - **Massive Vault-Ladezeit-Verbesserung**: Ladezeit reduziert von ~85 Sekunden auf ~2-5 Sekunden für Vaults mit 3000+ Notizen
@@ -43,43 +97,43 @@ Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 - React Strict Mode Double-Render Guard
 - Task-Statistiken Caching pro Notiz
 
-## [0.9.5] - 2025-01-24
+## [0.9.5] - 2026-01-24
 
 ### Fixes
 - Canvas Labels erscheinen nicht mehr in allen Ordneransichten
 - Flux2 Titel-Übersetzung korrigiert
 
-## [0.9.4] - 2025-01-24
+## [0.9.4] - 2026-01-24
 
 ### Features
 - Verbessertes Terminal mit benutzerfreundlicher Fehlermeldung
 - Konsistente UI-Elemente
 
-## [0.9.3] - 2025-01-24
+## [0.9.3] - 2026-01-24
 
 ### Features
 - Terminal-Integration verbessert
 - Fehlerbehandlung optimiert
 
-## [0.9.2] - 2025-01-24
+## [0.9.2] - 2026-01-24
 
 ### Features
 - Terminal-Komponente mit xterm.js
 - PTY-basierte Shell-Integration
 
-## [0.9.1] - 2025-01-22
+## [0.9.1] - 2026-01-22
 
 ### Features
 - Flux2 Bildgenerierung via Ollama
 - Verbesserte KI-Integration
 
-## [0.9.0] - 2025-01-22
+## [0.9.0] - 2026-01-22
 
 ### Features
 - Task-Management im Footer mit Statistiken
 - Reminder-System für Tasks
 
-## [0.8.x] - 2025-01-21/22
+## [0.8.x] - 2026-01-21/22
 
 ### Features
 - Canvas Labels und Styling
@@ -87,49 +141,49 @@ Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 - Zotero Integration
 - Template-System
 
-## [0.7.0] - 2025-01-21
+## [0.7.0] - 2026-01-21
 
 ### Features
 - Wissensgraph mit React Flow
 - Verschiedene Layout-Algorithmen
 - Node-Styling und Farben
 
-## [0.6.0] - 2025-01-20
+## [0.6.0] - 2026-01-20
 
 ### Features
 - KI-Integration mit Ollama
 - Kontextmenü für KI-Aktionen
 - Transparente Dokumentation via Fußnoten
 
-## [0.5.0] - 2025-01-20
+## [0.5.0] - 2026-01-20
 
 ### Features
 - Live Preview Modus
 - Split View (Editor + Canvas)
 - Backlinks Panel
 
-## [0.4.x] - 2025-01-20
+## [0.4.x] - 2026-01-20
 
 ### Features
 - Mermaid Diagramme
 - LaTeX/KaTeX Support
 - Callouts
 
-## [0.3.x] - 2025-01-19/20
+## [0.3.x] - 2026-01-19/20
 
 ### Features
 - Wikilinks mit Autocomplete
 - Quick Switcher (Cmd+K)
 - Schnellsuche (Cmd+P)
 
-## [0.2.0] - 2025-01-18
+## [0.2.0] - 2026-01-18
 
 ### Features
 - Dateibaum mit Kontextmenü
 - Drag & Drop für Dateien
 - Themes (Light/Dark)
 
-## [0.1.0] - 2025-01-18
+## [0.1.0] - 2026-01-18
 
 ### Initial Release
 - Markdown Editor mit CodeMirror
