@@ -5,6 +5,7 @@ import { useNotesStore, createNoteFromFile } from '../../stores/notesStore'
 import { useUIStore } from '../../stores/uiStore'
 import { useGraphStore } from '../../stores/graphStore'
 import { useTabStore } from '../../stores/tabStore'
+import { useTranslation } from '../../utils/translations'
 import { extractTaskStatsForCache } from '../../utils/linkExtractor'
 import type { Note, NotesCache, CachedNoteMetadata } from '../../../shared/types'
 
@@ -14,6 +15,7 @@ export const Sidebar: React.FC = () => {
   const loadGraphData = useGraphStore((s) => s.loadFromVault)
   const resetGraphStore = useGraphStore((s) => s.reset)
   const clearAllTabs = useTabStore((s) => s.clearAllTabs)
+  const { t } = useTranslation()
 
   // State für neue Notiz Dialog
   const [newNoteDialogOpen, setNewNoteDialogOpen] = useState(false)
@@ -281,7 +283,7 @@ export const Sidebar: React.FC = () => {
         <button className="btn-icon" onClick={handleNewFolder} title="Neuer Ordner">
           📂
         </button>
-        <button className="btn-icon" onClick={handleOpenVault} title="Vault öffnen (Cmd+O)">
+        <button className="btn-icon" onClick={handleOpenVault} title={t('sidebar.openVault')}>
           📁
         </button>
       </div>

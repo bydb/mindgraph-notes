@@ -1,5 +1,6 @@
 import React, { memo } from 'react'
 import { useTabStore, type Tab } from '../../stores/tabStore'
+import { useTranslation } from '../../utils/translations'
 
 interface TabBarProps {
   className?: string
@@ -49,6 +50,8 @@ interface TabItemProps {
 }
 
 const TabItem: React.FC<TabItemProps> = memo(({ tab, isActive, onActivate, onClose }) => {
+  const { t } = useTranslation()
+
   const handleClose = (e: React.MouseEvent) => {
     e.stopPropagation()
     onClose(e)
@@ -63,21 +66,24 @@ const TabItem: React.FC<TabItemProps> = memo(({ tab, isActive, onActivate, onClo
 
   const isCanvasType = tab.type === 'canvas' || tab.type === 'global-canvas'
 
+  // Translate title for global-canvas tabs
+  const displayTitle = tab.type === 'global-canvas' ? t('tabs.allNotes') : tab.title
+
   return (
     <div
       className={`tab-item ${isActive ? 'active' : ''} ${isCanvasType ? 'canvas-tab' : 'editor-tab'}`}
       onClick={onActivate}
       onMouseDown={handleMiddleClick}
-      title={tab.title}
+      title={displayTitle}
     >
       <span className="tab-icon">
         {isCanvasType ? <CanvasIcon /> : <FileIcon />}
       </span>
-      <span className="tab-title">{tab.title}</span>
+      <span className="tab-title">{displayTitle}</span>
       <button
         className="tab-close"
         onClick={handleClose}
-        title="Tab schließen"
+        title={t('common.close')}
       >
         <CloseIcon />
       </button>

@@ -153,6 +153,68 @@ const translations = {
     'statusbar.noVault': 'Kein Vault',
     'statusbar.notes': 'Notizen',
     'statusbar.links': 'Links',
+
+    // Titlebar Buttons
+    'titlebar.textSplit': 'Text-Split: Zwei Notizen vergleichen',
+    'titlebar.settings': 'Einstellungen (Cmd+,)',
+    'titlebar.overdue': 'Überfällige Aufgaben',
+    'titlebar.tags': 'Tags anzeigen',
+    'titlebar.smartConnections': 'Smart Connections',
+    'titlebar.notesChat': 'Notes Chat (mit Notizen chatten)',
+    'titlebar.terminal': 'Terminal ein/ausblenden',
+
+    // Text Split Placeholder
+    'textSplit.placeholder.instruction': 'Cmd/Ctrl+Klick auf eine Notiz',
+    'textSplit.placeholder.hint': 'um sie hier zu öffnen',
+
+    // Tabs
+    'tabs.allNotes': 'Alle Notizen',
+
+    // Sidebar
+    'sidebar.openVault': 'Vault öffnen (Cmd+O)',
+
+    // Panels
+    'panel.close': 'Schließen',
+    'panel.overdueTasks': 'Überfällige Tasks',
+
+    // PDF Viewer
+    'pdf.zoomIn': 'Vergrößern',
+    'pdf.zoomOut': 'Verkleinern',
+    'pdf.reset': 'Zurücksetzen',
+    'pdf.nextPage': 'Nächste Seite',
+    'pdf.prevPage': 'Vorherige Seite',
+
+    // Image Viewer
+    'image.zoomIn': 'Vergrößern (+)',
+    'image.resetZoom': 'Originalgröße (0)',
+
+    // Terminal
+    'terminal.close': 'Terminal schließen',
+
+    // Canvas
+    'canvas.reset': 'Zurücksetzen',
+    'canvas.addCard': 'Neue Karte hinzufügen',
+    'canvas.filterReset': 'Filter zurücksetzen',
+    'canvas.focusMode': 'Fokus-Modus: Nur ausgewählte Karten anzeigen',
+    'canvas.addToFocus': 'Auswahl zum Fokus hinzufügen',
+    'canvas.layoutSelect': 'Layout-Algorithmus wählen',
+
+    // Editor
+    'editor.back': 'Zurück (Cmd+[)',
+    'editor.forward': 'Vorwärts (Cmd+])',
+    'editor.closePanel': 'Sekundäres Panel schließen',
+    'editor.words': 'Wörter',
+    'editor.readTime': 'Geschätzte Lesezeit',
+
+    // Template Settings
+    'templates.resetDefault': 'Auf Standard zurücksetzen',
+    'templates.deleteTemplate': 'Template löschen',
+
+    // Notes Chat
+    'notesChat.socraticMode': 'Sokratischer Dialog - die KI stellt Rückfragen',
+
+    // Smart Connections
+    'smartConnections.folderProximity': 'Ordner-Nähe (5%)',
   },
 
   en: {
@@ -305,6 +367,68 @@ const translations = {
     'statusbar.noVault': 'No Vault',
     'statusbar.notes': 'Notes',
     'statusbar.links': 'Links',
+
+    // Titlebar Buttons
+    'titlebar.textSplit': 'Text-Split: Compare two notes',
+    'titlebar.settings': 'Settings (Cmd+,)',
+    'titlebar.overdue': 'Overdue tasks',
+    'titlebar.tags': 'Show tags',
+    'titlebar.smartConnections': 'Smart Connections',
+    'titlebar.notesChat': 'Notes Chat (chat with notes)',
+    'titlebar.terminal': 'Toggle terminal',
+
+    // Text Split Placeholder
+    'textSplit.placeholder.instruction': 'Cmd/Ctrl+click on a note',
+    'textSplit.placeholder.hint': 'to open it here',
+
+    // Tabs
+    'tabs.allNotes': 'All Notes',
+
+    // Sidebar
+    'sidebar.openVault': 'Open Vault (Cmd+O)',
+
+    // Panels
+    'panel.close': 'Close',
+    'panel.overdueTasks': 'Overdue tasks',
+
+    // PDF Viewer
+    'pdf.zoomIn': 'Zoom in',
+    'pdf.zoomOut': 'Zoom out',
+    'pdf.reset': 'Reset',
+    'pdf.nextPage': 'Next page',
+    'pdf.prevPage': 'Previous page',
+
+    // Image Viewer
+    'image.zoomIn': 'Zoom in (+)',
+    'image.resetZoom': 'Original size (0)',
+
+    // Terminal
+    'terminal.close': 'Close terminal',
+
+    // Canvas
+    'canvas.reset': 'Reset',
+    'canvas.addCard': 'Add new card',
+    'canvas.filterReset': 'Reset filter',
+    'canvas.focusMode': 'Focus mode: Show only selected cards',
+    'canvas.addToFocus': 'Add selection to focus',
+    'canvas.layoutSelect': 'Select layout algorithm',
+
+    // Editor
+    'editor.back': 'Back (Cmd+[)',
+    'editor.forward': 'Forward (Cmd+])',
+    'editor.closePanel': 'Close secondary panel',
+    'editor.words': 'Words',
+    'editor.readTime': 'Estimated reading time',
+
+    // Template Settings
+    'templates.resetDefault': 'Reset to default',
+    'templates.deleteTemplate': 'Delete template',
+
+    // Notes Chat
+    'notesChat.socraticMode': 'Socratic dialogue - AI asks follow-up questions',
+
+    // Smart Connections
+    'smartConnections.folderProximity': 'Folder proximity (5%)',
   }
 } as const
 

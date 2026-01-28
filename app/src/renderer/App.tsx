@@ -467,7 +467,7 @@ const App: React.FC = () => {
                 className={`view-mode-btn ${textSplitEnabled ? 'active' : ''}`}
                 onClick={() => setTextSplitEnabled(!textSplitEnabled)}
                 disabled={viewMode !== 'editor'}
-                title="Text-Split: Zwei Notizen vergleichen"
+                title={t('titlebar.textSplit')}
               >
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <rect x="3" y="3" width="8" height="18" rx="1"/>
@@ -482,7 +482,7 @@ const App: React.FC = () => {
               <button
                 className="view-mode-btn"
                 onClick={() => setSettingsOpen(true)}
-                title="Einstellungen (Cmd+,)"
+                title={t('titlebar.settings')}
               >
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <circle cx="12" cy="12" r="3"/>
@@ -492,7 +492,7 @@ const App: React.FC = () => {
               <button
                 className={`view-mode-btn overdue-btn ${overduePanelOpen ? 'active' : ''} ${taskStats.overdue > 0 ? 'has-overdue' : ''}`}
                 onClick={() => setOverduePanelOpen(!overduePanelOpen)}
-                title={`Überfällige Aufgaben (${taskStats.overdue})`}
+                title={`${t('titlebar.overdue')} (${taskStats.overdue})`}
               >
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <circle cx="12" cy="12" r="10"/>
@@ -505,7 +505,7 @@ const App: React.FC = () => {
               <button
                 className={`view-mode-btn ${tagsPanelOpen ? 'active' : ''}`}
                 onClick={() => setTagsPanelOpen(!tagsPanelOpen)}
-                title="Tags anzeigen"
+                title={t('titlebar.tags')}
               >
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/>
@@ -516,7 +516,7 @@ const App: React.FC = () => {
                 <button
                   className={`view-mode-btn ${smartConnectionsOpen ? 'active' : ''}`}
                   onClick={() => setSmartConnectionsOpen(!smartConnectionsOpen)}
-                  title="Smart Connections (KI-Ähnlichkeit)"
+                  title={t('titlebar.smartConnections')}
                 >
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <circle cx="12" cy="12" r="3"/>
@@ -535,7 +535,7 @@ const App: React.FC = () => {
                 <button
                   className={`view-mode-btn ${notesChatOpen ? 'active' : ''}`}
                   onClick={() => setNotesChatOpen(!notesChatOpen)}
-                  title="Notes Chat (mit Notizen chatten)"
+                  title={t('titlebar.notesChat')}
                 >
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
@@ -545,7 +545,7 @@ const App: React.FC = () => {
               <button
                 className={`view-mode-btn ${terminalVisible ? 'active' : ''}`}
                 onClick={() => setTerminalVisible(!terminalVisible)}
-                title="Terminal ein/ausblenden"
+                title={t('titlebar.terminal')}
               >
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <polyline points="4 17 10 11 4 5"/>
@@ -633,8 +633,8 @@ const App: React.FC = () => {
                           <line x1="12" y1="18" x2="12" y2="12"/>
                           <line x1="9" y1="15" x2="15" y2="15"/>
                         </svg>
-                        <p>Cmd/Ctrl+Klick auf eine Notiz</p>
-                        <p className="text-split-placeholder-hint">um sie hier zu öffnen</p>
+                        <p>{t('textSplit.placeholder.instruction')}</p>
+                        <p className="text-split-placeholder-hint">{t('textSplit.placeholder.hint')}</p>
                       </div>
                     </div>
                   )}

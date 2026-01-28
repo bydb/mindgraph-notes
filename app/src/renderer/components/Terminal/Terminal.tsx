@@ -3,6 +3,7 @@ import { Terminal as XTerm } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import '@xterm/xterm/css/xterm.css'
 import { useNotesStore } from '../../stores/notesStore'
+import { useTranslation } from '../../utils/translations'
 
 interface TerminalProps {
   visible: boolean
@@ -10,6 +11,7 @@ interface TerminalProps {
 }
 
 export const Terminal: React.FC<TerminalProps> = ({ visible, onToggle }) => {
+  const { t } = useTranslation()
   const terminalRef = useRef<HTMLDivElement>(null)
   const xtermRef = useRef<XTerm | null>(null)
   const fitAddonRef = useRef<FitAddon | null>(null)
@@ -292,7 +294,7 @@ export const Terminal: React.FC<TerminalProps> = ({ visible, onToggle }) => {
           >
             🤖
           </button>
-          <button className="btn-icon" onClick={onToggle} title="Terminal schließen">
+          <button className="btn-icon" onClick={onToggle} title={t('terminal.close')}>
             ✕
           </button>
         </div>
