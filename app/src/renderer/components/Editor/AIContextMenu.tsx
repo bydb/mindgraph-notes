@@ -64,14 +64,19 @@ export const AIContextMenu: React.FC<AIContextMenuProps> = ({
     setLoadingAction(action)
 
     try {
-      const response = await window.electronAPI.ollamaGenerate({
+      // Backend-basierte API-Auswahl
+      const requestParams = {
         model: ollama.selectedModel,
         prompt: customPrompt || '',
         action: action === 'custom' ? 'custom' : action,
         targetLanguage: targetLanguage || (action === 'translate' ? getLanguageName(ollama.defaultTranslateLanguage) : undefined),
         originalText: selectedText,
         customPrompt: customPrompt
-      })
+      }
+
+      const response = ollama.backend === 'lm-studio'
+        ? await window.electronAPI.lmstudioGenerate({ ...requestParams, port: ollama.lmStudioPort })
+        : await window.electronAPI.ollamaGenerate(requestParams)
 
       const result = response as AIResult
       if (customPrompt) {

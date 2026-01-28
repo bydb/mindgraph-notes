@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react'
 import { useNotesStore } from '../../stores/notesStore'
+import { useUIStore } from '../../stores/uiStore'
 
 interface EmbeddingModel {
   name: string
@@ -153,9 +154,10 @@ function cosineSimilarity(a: number[], b: number[]): number {
 
 export const SmartConnectionsPanel: React.FC<SmartConnectionsPanelProps> = ({ onClose }) => {
   const { notes, selectedNoteId, selectNote, vaultPath } = useNotesStore()
+  const { ollama: llmSettings } = useUIStore()
   const [embeddingModels, setEmbeddingModels] = useState<EmbeddingModel[]>([])
   const [selectedModel, setSelectedModel] = useState<string>('')
-  const [isOllamaAvailable, setIsOllamaAvailable] = useState(false)
+  const [isBackendAvailable, setIsBackendAvailable] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [isCalculating, setIsCalculating] = useState(false)
   const [progress, setProgress] = useState({ current: 0, total: 0 })
@@ -169,36 +171,48 @@ export const SmartConnectionsPanel: React.FC<SmartConnectionsPanelProps> = ({ on
     return notes.find(n => n.id === selectedNoteId)
   }, [notes, selectedNoteId])
 
-  // Ollama und Modelle prüfen
+  // Backend (Ollama oder LM Studio) und Modelle prüfen
   useEffect(() => {
-    const checkOllama = async () => {
+    const checkBackend = async () => {
       setIsLoading(true)
       try {
-        const available = await window.electronAPI.ollamaCheck()
-        setIsOllamaAvailable(available)
+        let available = false
+        let models: EmbeddingModel[] = []
 
-        if (available) {
-          const models = await window.electronAPI.ollamaEmbeddingModels()
-          setEmbeddingModels(models)
+        if (llmSettings.backend === 'lm-studio') {
+          available = await window.electronAPI.lmstudioCheck(llmSettings.lmStudioPort)
+          if (available) {
+            models = await window.electronAPI.lmstudioEmbeddingModels(llmSettings.lmStudioPort)
+          }
+        } else {
+          available = await window.electronAPI.ollamaCheck()
+          if (available) {
+            models = await window.electronAPI.ollamaEmbeddingModels()
+          }
+        }
 
+        setIsBackendAvailable(available)
+        setEmbeddingModels(models)
+
+        if (models.length > 0) {
           // Versuche nomic-embed-text als Standard
           const nomicModel = models.find((m: EmbeddingModel) => m.name.includes('nomic'))
           if (nomicModel) {
             setSelectedModel(nomicModel.name)
-          } else if (models.length > 0) {
+          } else {
             setSelectedModel(models[0].name)
           }
         }
       } catch (err) {
-        console.error('[SmartConnections] Error checking Ollama:', err)
-        setError('Fehler beim Prüfen von Ollama')
+        console.error('[SmartConnections] Error checking backend:', err)
+        setError('Fehler beim Prüfen des KI-Backends')
       } finally {
         setIsLoading(false)
       }
     }
 
-    checkOllama()
-  }, [])
+    checkBackend()
+  }, [llmSettings.backend, llmSettings.lmStudioPort])
 
   // Lade gecachte Embeddings aus .mindgraph/
   useEffect(() => {
@@ -228,7 +242,12 @@ export const SmartConnectionsPanel: React.FC<SmartConnectionsPanelProps> = ({ on
     try {
       // Kürze Text falls zu lang für Embedding-Modell
       const truncatedText = truncateForEmbedding(text)
-      const result = await window.electronAPI.ollamaEmbeddings(selectedModel, truncatedText)
+
+      // Backend-basierte API-Auswahl
+      const result = llmSettings.backend === 'lm-studio'
+        ? await window.electronAPI.lmstudioEmbeddings(selectedModel, truncatedText, llmSettings.lmStudioPort)
+        : await window.electronAPI.ollamaEmbeddings(selectedModel, truncatedText)
+
       if (result.success && result.embedding) {
         return result.embedding
       }
@@ -238,7 +257,7 @@ export const SmartConnectionsPanel: React.FC<SmartConnectionsPanelProps> = ({ on
       console.error('[SmartConnections] Embedding error:', err)
       return null
     }
-  }, [selectedModel])
+  }, [selectedModel, llmSettings.backend, llmSettings.lmStudioPort])
 
   // Ähnliche Notizen berechnen
   const calculateSimilarities = useCallback(async () => {
@@ -383,7 +402,7 @@ export const SmartConnectionsPanel: React.FC<SmartConnectionsPanelProps> = ({ on
 
   // Automatisch berechnen wenn Notiz gewechselt wird
   useEffect(() => {
-    if (currentNote && selectedModel && isOllamaAvailable && !isCalculating) {
+    if (currentNote && selectedModel && isBackendAvailable && !isCalculating) {
       // Verzögerung um zu viele Berechnungen zu vermeiden
       const timer = setTimeout(() => {
         calculateSimilarities()
@@ -432,17 +451,21 @@ export const SmartConnectionsPanel: React.FC<SmartConnectionsPanelProps> = ({ on
         {isLoading ? (
           <div className="smart-connections-loading">
             <div className="smart-connections-spinner"></div>
-            <p>Prüfe Ollama...</p>
+            <p>Prüfe {llmSettings.backend === 'lm-studio' ? 'LM Studio' : 'Ollama'}...</p>
           </div>
-        ) : !isOllamaAvailable ? (
+        ) : !isBackendAvailable ? (
           <div className="smart-connections-unavailable">
             <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
               <circle cx="12" cy="12" r="10"/>
               <line x1="12" y1="8" x2="12" y2="12"/>
               <line x1="12" y1="16" x2="12.01" y2="16"/>
             </svg>
-            <p>Ollama nicht verfügbar</p>
-            <span>Starte Ollama für KI-basierte Ähnlichkeitsanalyse</span>
+            <p>{llmSettings.backend === 'lm-studio' ? 'LM Studio' : 'Ollama'} nicht verfügbar</p>
+            <span>
+              {llmSettings.backend === 'lm-studio'
+                ? 'Starte LM Studio und lade ein Embedding-Modell'
+                : 'Starte Ollama für KI-basierte Ähnlichkeitsanalyse'}
+            </span>
           </div>
         ) : embeddingModels.length === 0 ? (
           <div className="smart-connections-unavailable">
@@ -452,7 +475,11 @@ export const SmartConnectionsPanel: React.FC<SmartConnectionsPanelProps> = ({ on
               <line x1="12" y1="15" x2="12" y2="3"/>
             </svg>
             <p>Kein Embedding-Modell</p>
-            <span>Installiere z.B.: ollama pull nomic-embed-text</span>
+            <span>
+              {llmSettings.backend === 'lm-studio'
+                ? 'Lade ein Embedding-Modell in LM Studio'
+                : 'Installiere z.B.: ollama pull nomic-embed-text'}
+            </span>
           </div>
         ) : !currentNote ? (
           <div className="smart-connections-unavailable">

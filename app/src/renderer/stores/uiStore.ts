@@ -8,6 +8,7 @@ type EditorViewMode = 'edit' | 'live-preview' | 'preview'
 type PdfDisplayMode = 'both' | 'companion-only' | 'pdf-only'  // Anzeige von PDF/Companion im FileTree
 type AccentColor = 'blue' | 'orange' | 'green' | 'purple' | 'pink' | 'teal'
 type AIAction = 'translate' | 'summarize' | 'continue' | 'improve'
+export type LLMBackend = 'ollama' | 'lm-studio'
 export type Language = 'de' | 'en'
 export type IconSet = 'default' | 'minimal' | 'colorful' | 'emoji'
 export type OutlineStyle = 'default' | 'lines' | 'minimal' | 'bullets' | 'dashes'
@@ -199,12 +200,17 @@ interface PendingTemplateInsert {
   cursorPosition?: number
 }
 
-// Ollama AI Settings
-interface OllamaSettings {
+// LLM AI Settings (Ollama & LM Studio)
+interface LLMSettings {
   enabled: boolean
+  backend: LLMBackend  // 'ollama' | 'lm-studio'
   selectedModel: string
   defaultTranslateLanguage: AILanguageCode
+  lmStudioPort: number  // Default: 1234
 }
+
+// Legacy type alias for backward compatibility
+type OllamaSettings = LLMSettings
 
 interface UIState {
   // Allgemein
@@ -243,8 +249,8 @@ interface UIState {
   fileTreeDisplayMode: FileTreeDisplayMode // 'name' = nur Dateiname, 'path' = voller Pfad
   pendingTemplateInsert: PendingTemplateInsert | null // Template das in Editor eingefügt werden soll
 
-  // Ollama AI Settings
-  ollama: OllamaSettings
+  // LLM AI Settings (Ollama & LM Studio)
+  ollama: LLMSettings
 
   // PDF Companion Settings
   pdfCompanionEnabled: boolean  // PDF Companion-Dateien automatisch erstellen
@@ -288,7 +294,7 @@ interface UIState {
   setSplitPosition: (position: number) => void
   setFileTreeDisplayMode: (mode: FileTreeDisplayMode) => void
   setPendingTemplateInsert: (template: PendingTemplateInsert | null) => void
-  setOllama: (settings: Partial<OllamaSettings>) => void
+  setOllama: (settings: Partial<LLMSettings>) => void
   setPdfCompanionEnabled: (enabled: boolean) => void
   setPdfDisplayMode: (mode: PdfDisplayMode) => void
   setIconSet: (set: IconSet) => void
@@ -334,11 +340,13 @@ const defaultState = {
   fileTreeDisplayMode: 'name' as FileTreeDisplayMode,
   pendingTemplateInsert: null as PendingTemplateInsert | null,
 
-  // Ollama AI Settings
+  // LLM AI Settings (Ollama & LM Studio)
   ollama: {
     enabled: true,
+    backend: 'ollama' as LLMBackend,
     selectedModel: '',
-    defaultTranslateLanguage: 'en' as AILanguageCode
+    defaultTranslateLanguage: 'en' as AILanguageCode,
+    lmStudioPort: 1234
   },
 
   // PDF Companion Settings

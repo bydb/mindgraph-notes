@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { useUIStore, ACCENT_COLORS, AI_LANGUAGES, FONT_FAMILIES, UI_LANGUAGES, BACKGROUND_COLORS, ICON_SETS, OUTLINE_STYLES, type Language, type FontFamily, type BackgroundColor, type IconSet, type OutlineStyle } from '../../stores/uiStore'
+import { useUIStore, ACCENT_COLORS, AI_LANGUAGES, FONT_FAMILIES, UI_LANGUAGES, BACKGROUND_COLORS, ICON_SETS, OUTLINE_STYLES, type Language, type FontFamily, type BackgroundColor, type IconSet, type OutlineStyle, type LLMBackend } from '../../stores/uiStore'
 import { useNotesStore } from '../../stores/notesStore'
 import { useTranslation } from '../../utils/translations'
 import {
@@ -39,7 +39,9 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
   const [activeTab, setActiveTab] = useState<Tab>('general')
   const [zoteroStatus, setZoteroStatus] = useState<'checking' | 'connected' | 'disconnected'>('checking')
   const [ollamaStatus, setOllamaStatus] = useState<'checking' | 'connected' | 'disconnected'>('checking')
+  const [lmstudioStatus, setLmstudioStatus] = useState<'checking' | 'connected' | 'disconnected'>('checking')
   const [ollamaModels, setOllamaModels] = useState<Array<{ name: string; size: number }>>([])
+  const [lmstudioModels, setLmstudioModels] = useState<Array<{ name: string; size: number }>>([])
 
   // UI Store
   const {
@@ -102,6 +104,7 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
     if (isOpen && activeTab === 'integrations') {
       checkZoteroConnection()
       checkOllamaConnection()
+      checkLmstudioConnection()
     }
   }, [isOpen, activeTab])
 
@@ -137,13 +140,32 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
       if (connected) {
         const models = await window.electronAPI.ollamaModels()
         setOllamaModels(models)
-        // Wenn noch kein Modell ausgewählt und Modelle verfügbar sind, erstes auswählen
-        if (!ollama.selectedModel && models.length > 0) {
+        // Wenn Ollama als Backend und noch kein Modell ausgewählt
+        if (ollama.backend === 'ollama' && !ollama.selectedModel && models.length > 0) {
           setOllama({ selectedModel: models[0].name })
         }
       }
     } catch {
       setOllamaStatus('disconnected')
+    }
+  }
+
+  const checkLmstudioConnection = async () => {
+    setLmstudioStatus('checking')
+    try {
+      const connected = await window.electronAPI.lmstudioCheck(ollama.lmStudioPort)
+      setLmstudioStatus(connected ? 'connected' : 'disconnected')
+
+      if (connected) {
+        const models = await window.electronAPI.lmstudioModels(ollama.lmStudioPort)
+        setLmstudioModels(models)
+        // Wenn LM Studio als Backend und noch kein Modell ausgewählt
+        if (ollama.backend === 'lm-studio' && !ollama.selectedModel && models.length > 0) {
+          setOllama({ selectedModel: models[0].name })
+        }
+      }
+    } catch {
+      setLmstudioStatus('disconnected')
     }
   }
 
@@ -703,73 +725,168 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
             {/* Integrationen Tab */}
             {activeTab === 'integrations' && (
               <div className="settings-section">
-                <h3>Ollama - Lokale KI</h3>
+                <h3>Lokale KI (Ollama / LM Studio)</h3>
+
                 <div className="settings-row">
-                  <label>Status</label>
-                  <div className="settings-status">
-                    {ollamaStatus === 'checking' && (
-                      <span className="status-checking">Prüfe Verbindung...</span>
-                    )}
-                    {ollamaStatus === 'connected' && (
-                      <span className="status-connected">Verbunden ({ollamaModels.length} Modelle)</span>
-                    )}
-                    {ollamaStatus === 'disconnected' && (
-                      <span className="status-disconnected">Nicht verbunden</span>
-                    )}
-                    <button className="settings-refresh" onClick={checkOllamaConnection}>
-                      Aktualisieren
-                    </button>
-                  </div>
+                  <label>KI-Funktionen aktiviert</label>
+                  <input
+                    type="checkbox"
+                    checked={ollama.enabled}
+                    onChange={e => setOllama({ enabled: e.target.checked })}
+                  />
                 </div>
 
-                {ollamaStatus === 'connected' && (
+                <div className="settings-row">
+                  <label>Backend</label>
+                  <select
+                    value={ollama.backend}
+                    onChange={e => {
+                      const newBackend = e.target.value as LLMBackend
+                      setOllama({ backend: newBackend, selectedModel: '' })
+                    }}
+                    disabled={!ollama.enabled}
+                  >
+                    <option value="ollama">Ollama (localhost:11434)</option>
+                    <option value="lm-studio">LM Studio (localhost:{ollama.lmStudioPort})</option>
+                  </select>
+                </div>
+
+                {/* Ollama Settings */}
+                {ollama.backend === 'ollama' && (
                   <>
                     <div className="settings-row">
-                      <label>KI-Funktionen aktiviert</label>
-                      <input
-                        type="checkbox"
-                        checked={ollama.enabled}
-                        onChange={e => setOllama({ enabled: e.target.checked })}
-                      />
+                      <label>Ollama Status</label>
+                      <div className="settings-status">
+                        {ollamaStatus === 'checking' && (
+                          <span className="status-checking">Prüfe Verbindung...</span>
+                        )}
+                        {ollamaStatus === 'connected' && (
+                          <span className="status-connected">Verbunden ({ollamaModels.length} Modelle)</span>
+                        )}
+                        {ollamaStatus === 'disconnected' && (
+                          <span className="status-disconnected">Nicht verbunden</span>
+                        )}
+                        <button className="settings-refresh" onClick={checkOllamaConnection}>
+                          Aktualisieren
+                        </button>
+                      </div>
                     </div>
-                    <div className="settings-row">
-                      <label>Modell</label>
-                      <select
-                        value={ollama.selectedModel}
-                        onChange={e => setOllama({ selectedModel: e.target.value })}
-                        disabled={!ollama.enabled}
-                      >
-                        {ollamaModels.map(model => (
-                          <option key={model.name} value={model.name}>
-                            {model.name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="settings-row">
-                      <label>Standard-Übersetzungssprache</label>
-                      <select
-                        value={ollama.defaultTranslateLanguage}
-                        onChange={e => setOllama({ defaultTranslateLanguage: e.target.value as typeof ollama.defaultTranslateLanguage })}
-                        disabled={!ollama.enabled}
-                      >
-                        {AI_LANGUAGES.map(lang => (
-                          <option key={lang.code} value={lang.code}>
-                            {lang.name}
-                          </option>
-                        ))}
-                      </select>
+
+                    {ollamaStatus === 'connected' && (
+                      <div className="settings-row">
+                        <label>Modell</label>
+                        <select
+                          value={ollama.selectedModel}
+                          onChange={e => setOllama({ selectedModel: e.target.value })}
+                          disabled={!ollama.enabled}
+                        >
+                          <option value="">Modell wählen...</option>
+                          {ollamaModels.map(model => (
+                            <option key={model.name} value={model.name}>
+                              {model.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+
+                    <div className="settings-info">
+                      <p>
+                        <strong>Ollama</strong> ermöglicht lokale KI-Funktionen ohne Cloud-Dienste.
+                      </p>
+                      <p>
+                        Installiere Ollama von <a href="https://ollama.ai" target="_blank" rel="noopener noreferrer">ollama.ai</a> und starte es.
+                      </p>
                     </div>
                   </>
                 )}
 
-                <div className="settings-info">
-                  <p>
-                    <strong>Ollama</strong> ermöglicht lokale KI-Funktionen ohne Cloud-Dienste.
-                  </p>
-                  <p>
-                    Installiere Ollama von <a href="https://ollama.ai" target="_blank" rel="noopener noreferrer">ollama.ai</a> und starte es.
-                  </p>
+                {/* LM Studio Settings */}
+                {ollama.backend === 'lm-studio' && (
+                  <>
+                    <div className="settings-row">
+                      <label>LM Studio Port</label>
+                      <div className="settings-input-group">
+                        <input
+                          type="number"
+                          min="1"
+                          max="65535"
+                          value={ollama.lmStudioPort}
+                          onChange={e => setOllama({ lmStudioPort: parseInt(e.target.value) || 1234 })}
+                          style={{ width: '80px' }}
+                        />
+                        <button className="settings-refresh" onClick={checkLmstudioConnection}>
+                          Verbinden
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="settings-row">
+                      <label>LM Studio Status</label>
+                      <div className="settings-status">
+                        {lmstudioStatus === 'checking' && (
+                          <span className="status-checking">Prüfe Verbindung...</span>
+                        )}
+                        {lmstudioStatus === 'connected' && (
+                          <span className="status-connected">Verbunden ({lmstudioModels.length} Modelle)</span>
+                        )}
+                        {lmstudioStatus === 'disconnected' && (
+                          <span className="status-disconnected">Nicht verbunden</span>
+                        )}
+                        <button className="settings-refresh" onClick={checkLmstudioConnection}>
+                          Aktualisieren
+                        </button>
+                      </div>
+                    </div>
+
+                    {lmstudioStatus === 'connected' && (
+                      <div className="settings-row">
+                        <label>Modell</label>
+                        <select
+                          value={ollama.selectedModel}
+                          onChange={e => setOllama({ selectedModel: e.target.value })}
+                          disabled={!ollama.enabled}
+                        >
+                          <option value="">Modell wählen...</option>
+                          {lmstudioModels.map(model => (
+                            <option key={model.name} value={model.name}>
+                              {model.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+
+                    <div className="settings-info">
+                      <p>
+                        <strong>LM Studio</strong> ist eine Desktop-App für lokale LLMs mit OpenAI-kompatibler API.
+                      </p>
+                      <p>
+                        Download: <a href="https://lmstudio.ai" target="_blank" rel="noopener noreferrer">lmstudio.ai</a>
+                      </p>
+                      <p>
+                        <strong>Setup:</strong> LM Studio starten → Modell laden → "Start Server" klicken
+                      </p>
+                    </div>
+                  </>
+                )}
+
+                <div className="settings-row">
+                  <label>Standard-Übersetzungssprache</label>
+                  <select
+                    value={ollama.defaultTranslateLanguage}
+                    onChange={e => setOllama({ defaultTranslateLanguage: e.target.value as typeof ollama.defaultTranslateLanguage })}
+                    disabled={!ollama.enabled}
+                  >
+                    {AI_LANGUAGES.map(lang => (
+                      <option key={lang.code} value={lang.code}>
+                        {lang.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="settings-info" style={{ marginTop: '12px' }}>
                   <p>
                     <strong>Nutzung:</strong> Text markieren → Rechtsklick → KI-Funktion wählen
                   </p>
@@ -931,7 +1048,7 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
 
         <div className="settings-footer">
           <div className="settings-version">
-            <strong>MindGraph Notes</strong> v0.9.2
+            <strong>MindGraph Notes</strong> v1.0.0
           </div>
           <div className="settings-credits">
             Entwickelt von Jochen Leeder

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useNotesStore } from '../../stores/notesStore'
+import { useUIStore } from '../../stores/uiStore'
 import MarkdownIt from 'markdown-it'
 
 interface ChatMessage {
@@ -24,9 +25,10 @@ interface NotesChatProps {
 
 export const NotesChat: React.FC<NotesChatProps> = ({ onClose }) => {
   const { notes, selectedNoteId, vaultPath } = useNotesStore()
+  const { ollama: llmSettings } = useUIStore()
   const [models, setModels] = useState<OllamaModel[]>([])
   const [selectedModel, setSelectedModel] = useState<string>('')
-  const [isOllamaAvailable, setIsOllamaAvailable] = useState(false)
+  const [isBackendAvailable, setIsBackendAvailable] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [contextMode, setContextMode] = useState<ContextMode>('current')
   const [chatMode, setChatMode] = useState<ChatMode>('direct')
@@ -56,38 +58,55 @@ export const NotesChat: React.FC<NotesChatProps> = ({ onClose }) => {
       .filter(p => p.length > 0)
   )).sort()
 
-  // Ollama und Modelle prüfen
+  // Backend (Ollama oder LM Studio) und Modelle prüfen
   useEffect(() => {
-    const checkOllama = async () => {
+    const checkBackend = async () => {
       setIsLoading(true)
       try {
-        const available = await window.electronAPI.ollamaCheck()
-        setIsOllamaAvailable(available)
+        let available = false
+        let modelList: OllamaModel[] = []
 
-        if (available) {
-          const modelList = await window.electronAPI.ollamaModels()
-          setModels(modelList)
+        if (llmSettings.backend === 'lm-studio') {
+          available = await window.electronAPI.lmstudioCheck(llmSettings.lmStudioPort)
+          if (available) {
+            modelList = await window.electronAPI.lmstudioModels(llmSettings.lmStudioPort)
+          }
+        } else {
+          available = await window.electronAPI.ollamaCheck()
+          if (available) {
+            modelList = await window.electronAPI.ollamaModels()
+          }
+        }
 
-          // Standard-Modell auswählen (bevorzugt llama3, mistral, oder das erste)
-          const preferredModels = ['llama3', 'llama3.2', 'mistral', 'qwen']
-          const preferred = modelList.find(m =>
-            preferredModels.some(p => m.name.toLowerCase().includes(p))
-          )
-          if (preferred) {
-            setSelectedModel(preferred.name)
-          } else if (modelList.length > 0) {
-            setSelectedModel(modelList[0].name)
+        setIsBackendAvailable(available)
+        setModels(modelList)
+
+        if (available && modelList.length > 0) {
+          // Bevorzugt das in den Settings ausgewählte Modell, sonst intelligent auswählen
+          if (llmSettings.selectedModel && modelList.some(m => m.name === llmSettings.selectedModel)) {
+            setSelectedModel(llmSettings.selectedModel)
+          } else {
+            // Standard-Modell auswählen (bevorzugt llama3, mistral, oder das erste)
+            const preferredModels = ['llama3', 'llama3.2', 'mistral', 'qwen']
+            const preferred = modelList.find(m =>
+              preferredModels.some(p => m.name.toLowerCase().includes(p))
+            )
+            if (preferred) {
+              setSelectedModel(preferred.name)
+            } else {
+              setSelectedModel(modelList[0].name)
+            }
           }
         }
       } catch (err) {
-        console.error('[NotesChat] Error checking Ollama:', err)
+        console.error('[NotesChat] Error checking backend:', err)
       } finally {
         setIsLoading(false)
       }
     }
 
-    checkOllama()
-  }, [])
+    checkBackend()
+  }, [llmSettings.backend, llmSettings.lmStudioPort, llmSettings.selectedModel])
 
   // Auto-scroll zu neuen Nachrichten
   useEffect(() => {
@@ -208,7 +227,12 @@ export const NotesChat: React.FC<NotesChatProps> = ({ onClose }) => {
       }))
       recentMessages.push({ role: 'user', content: userMessage })
 
-      await window.electronAPI.ollamaChat(selectedModel, recentMessages, context, chatMode)
+      // Backend-basierte API-Auswahl
+      if (llmSettings.backend === 'lm-studio') {
+        await window.electronAPI.lmstudioChat(selectedModel, recentMessages, context, chatMode, llmSettings.lmStudioPort)
+      } else {
+        await window.electronAPI.ollamaChat(selectedModel, recentMessages, context, chatMode)
+      }
     } catch (err) {
       console.error('[NotesChat] Error sending message:', err)
       setMessages(prev => [...prev, {
@@ -299,17 +323,21 @@ export const NotesChat: React.FC<NotesChatProps> = ({ onClose }) => {
       {isLoading ? (
         <div className="notes-chat-loading">
           <div className="notes-chat-spinner"></div>
-          <p>Prüfe Ollama...</p>
+          <p>Prüfe {llmSettings.backend === 'lm-studio' ? 'LM Studio' : 'Ollama'}...</p>
         </div>
-      ) : !isOllamaAvailable ? (
+      ) : !isBackendAvailable ? (
         <div className="notes-chat-unavailable">
           <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
             <circle cx="12" cy="12" r="10"/>
             <line x1="12" y1="8" x2="12" y2="12"/>
             <line x1="12" y1="16" x2="12.01" y2="16"/>
           </svg>
-          <p>Ollama nicht verfügbar</p>
-          <span>Starte Ollama für den Chat mit deinen Notizen</span>
+          <p>{llmSettings.backend === 'lm-studio' ? 'LM Studio' : 'Ollama'} nicht verfügbar</p>
+          <span>
+            {llmSettings.backend === 'lm-studio'
+              ? 'Starte LM Studio und lade ein Modell'
+              : 'Starte Ollama für den Chat mit deinen Notizen'}
+          </span>
         </div>
       ) : models.length === 0 ? (
         <div className="notes-chat-unavailable">
@@ -319,7 +347,11 @@ export const NotesChat: React.FC<NotesChatProps> = ({ onClose }) => {
             <line x1="12" y1="15" x2="12" y2="3"/>
           </svg>
           <p>Kein Chat-Modell</p>
-          <span>Installiere z.B.: ollama pull llama3.2</span>
+          <span>
+            {llmSettings.backend === 'lm-studio'
+              ? 'Lade ein Modell in LM Studio'
+              : 'Installiere z.B.: ollama pull llama3.2'}
+          </span>
         </div>
       ) : (
         <>

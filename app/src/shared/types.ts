@@ -283,13 +283,48 @@ export interface ElectronAPI {
   ollamaEmbeddingModels: () => Promise<Array<{ name: string; size: number }>>;
 
   // Ollama Chat für Notes Chat
-  ollamaChat: (model: string, messages: Array<{ role: string; content: string }>, context: string) => Promise<{
+  ollamaChat: (model: string, messages: Array<{ role: string; content: string }>, context: string, chatMode?: 'direct' | 'socratic') => Promise<{
     success: boolean;
     response?: string;
     error?: string;
   }>;
   onOllamaChatChunk: (callback: (chunk: string) => void) => void;
   onOllamaChatDone: (callback: () => void) => void;
+
+  // LM Studio Local AI API (OpenAI-kompatibel)
+  lmstudioCheck: (port?: number) => Promise<boolean>;
+  lmstudioModels: (port?: number) => Promise<Array<{ name: string; size: number }>>;
+  lmstudioGenerate: (request: {
+    model: string;
+    prompt: string;
+    action: 'translate' | 'summarize' | 'continue' | 'improve' | 'custom';
+    targetLanguage?: string;
+    originalText: string;
+    customPrompt?: string;
+    port?: number;
+  }) => Promise<{
+    success: boolean;
+    result?: string;
+    error?: string;
+    model?: string;
+    action?: string;
+    prompt?: string;
+    originalText?: string;
+    targetLanguage?: string;
+    customPrompt?: string;
+    timestamp?: string;
+  }>;
+  lmstudioChat: (model: string, messages: Array<{ role: string; content: string }>, context: string, chatMode?: 'direct' | 'socratic', port?: number) => Promise<{
+    success: boolean;
+    response?: string;
+    error?: string;
+  }>;
+  lmstudioEmbeddings: (model: string, text: string, port?: number) => Promise<{
+    success: boolean;
+    embedding?: number[];
+    error?: string;
+  }>;
+  lmstudioEmbeddingModels: (port?: number) => Promise<Array<{ name: string; size: number }>>;
 
   // Wikilink Stripping
   stripWikilinksInFolder: (folderPath: string, vaultPath: string) => Promise<{

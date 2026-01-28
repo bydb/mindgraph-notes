@@ -108,6 +108,24 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('ollama-chat-done', () => callback())
   },
 
+  // LM Studio Local AI API (OpenAI-kompatibel)
+  lmstudioCheck: (port?: number) => ipcRenderer.invoke('lmstudio-check', port),
+  lmstudioModels: (port?: number) => ipcRenderer.invoke('lmstudio-models', port),
+  lmstudioGenerate: (request: {
+    model: string
+    prompt: string
+    action: 'translate' | 'summarize' | 'continue' | 'improve' | 'custom'
+    targetLanguage?: string
+    originalText: string
+    customPrompt?: string
+    port?: number
+  }) => ipcRenderer.invoke('lmstudio-generate', request),
+  lmstudioChat: (model: string, messages: Array<{ role: string; content: string }>, context: string, chatMode: 'direct' | 'socratic' = 'direct', port?: number) =>
+    ipcRenderer.invoke('lmstudio-chat', model, messages, context, chatMode, port),
+  lmstudioEmbeddings: (model: string, text: string, port?: number) =>
+    ipcRenderer.invoke('lmstudio-embeddings', model, text, port),
+  lmstudioEmbeddingModels: (port?: number) => ipcRenderer.invoke('lmstudio-embedding-models', port),
+
   // Wikilink Stripping
   stripWikilinksInFolder: (folderPath: string, vaultPath: string) =>
     ipcRenderer.invoke('strip-wikilinks-in-folder', folderPath, vaultPath),

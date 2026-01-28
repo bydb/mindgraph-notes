@@ -985,8 +985,14 @@ ipcMain.handle('zotero-get-notes', async (_event, citekey: string) => {
   }
 })
 
-// ============ OLLAMA LOCAL AI API ============
+// ============ LOCAL AI API (Ollama & LM Studio) ============
 const OLLAMA_API_URL = 'http://localhost:11434'
+const LM_STUDIO_DEFAULT_PORT = 1234
+
+// Helper to get LM Studio URL with custom port
+function getLMStudioUrl(port: number = LM_STUDIO_DEFAULT_PORT): string {
+  return `http://localhost:${port}`
+}
 
 // Prüft ob Ollama läuft
 ipcMain.handle('ollama-check', async () => {
@@ -1439,6 +1445,311 @@ ipcMain.handle('ollama-generate-image', async (event, request: OllamaImageReques
       success: false,
       error: error instanceof Error ? error.message : 'Unbekannter Fehler'
     }
+  }
+})
+
+// ============ LM STUDIO LOCAL AI API (OpenAI-kompatibel) ============
+
+// Prüft ob LM Studio läuft
+ipcMain.handle('lmstudio-check', async (_event, port: number = LM_STUDIO_DEFAULT_PORT) => {
+  try {
+    const response = await fetch(`${getLMStudioUrl(port)}/v1/models`, {
+      method: 'GET',
+      signal: AbortSignal.timeout(3000)
+    })
+    return response.ok
+  } catch {
+    return false
+  }
+})
+
+// Holt verfügbare Modelle von LM Studio
+ipcMain.handle('lmstudio-models', async (_event, port: number = LM_STUDIO_DEFAULT_PORT) => {
+  try {
+    const response = await fetch(`${getLMStudioUrl(port)}/v1/models`, {
+      method: 'GET',
+      signal: AbortSignal.timeout(5000)
+    })
+
+    if (!response.ok) return []
+
+    const data = await response.json()
+    return data.data?.map((m: { id: string; owned_by?: string }) => ({
+      name: m.id,
+      size: 0  // LM Studio doesn't provide size info
+    })) || []
+  } catch (error) {
+    console.error('[LM Studio] Error fetching models:', error)
+    return []
+  }
+})
+
+// Führt eine KI-Anfrage mit LM Studio aus (OpenAI-kompatibles Format)
+interface LMStudioRequest {
+  model: string
+  prompt: string
+  action: 'translate' | 'summarize' | 'continue' | 'improve' | 'custom'
+  targetLanguage?: string
+  originalText: string
+  customPrompt?: string
+  port?: number
+}
+
+ipcMain.handle('lmstudio-generate', async (_event, request: LMStudioRequest) => {
+  console.log('[LM Studio] Generate request:', request.action, 'with model:', request.model)
+  const port = request.port || LM_STUDIO_DEFAULT_PORT
+
+  try {
+    // System-Prompts für verschiedene Aktionen (gleich wie Ollama)
+    const systemPrompts: Record<string, string> = {
+      translate: `Du bist ein professioneller Übersetzer. Übersetze den folgenden Text ins ${request.targetLanguage || 'Englische'}. Gib NUR die Übersetzung zurück, keine Erklärungen oder zusätzlichen Text.`,
+      summarize: 'Du bist ein Experte für Zusammenfassungen. Fasse den folgenden Text prägnant zusammen. Behalte die wichtigsten Punkte bei. Gib NUR die Zusammenfassung zurück.',
+      continue: 'Du bist ein kreativer Schreibassistent. Setze den folgenden Text nahtlos und im gleichen Stil fort. Gib NUR die Fortsetzung zurück, ohne den Originaltext zu wiederholen.',
+      improve: 'Du bist ein Lektor. Verbessere Grammatik, Stil und Klarheit des folgenden Textes. Behalte die ursprüngliche Bedeutung bei. Gib NUR den verbesserten Text zurück.',
+      custom: request.customPrompt || 'Bearbeite den folgenden Text nach deinem besten Wissen.'
+    }
+
+    const systemMessage = systemPrompts[request.action]
+    const userMessage = request.action === 'custom'
+      ? `${request.customPrompt}\n\nText:\n${request.originalText}`
+      : `Text:\n${request.originalText}`
+
+    const response = await fetch(`${getLMStudioUrl(port)}/v1/chat/completions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: request.model,
+        messages: [
+          { role: 'system', content: systemMessage },
+          { role: 'user', content: userMessage }
+        ],
+        temperature: request.action === 'translate' ? 0.3 : 0.7,
+        max_tokens: request.action === 'summarize' ? 500 : 2000,
+        stream: false
+      })
+    })
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error('[LM Studio] API error:', errorText)
+      throw new Error(`LM Studio API Fehler: ${response.status}`)
+    }
+
+    const data = await response.json()
+    const result = data.choices?.[0]?.message?.content || ''
+
+    console.log('[LM Studio] Response received:', {
+      hasResponse: !!result,
+      responseLength: result.length,
+      done: true
+    })
+
+    return {
+      success: true,
+      result: result.trim(),
+      model: request.model,
+      action: request.action,
+      prompt: userMessage,
+      originalText: request.originalText,
+      targetLanguage: request.targetLanguage,
+      customPrompt: request.customPrompt,
+      timestamp: new Date().toISOString()
+    }
+  } catch (error) {
+    console.error('[LM Studio] Generate error:', error)
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unbekannter Fehler',
+      model: request.model,
+      action: request.action
+    }
+  }
+})
+
+// Chat mit Kontext (für Notes Chat) - LM Studio Version
+ipcMain.handle('lmstudio-chat', async (event, model: string, messages: Array<{ role: string; content: string }>, context: string, chatMode: 'direct' | 'socratic' = 'direct', port: number = LM_STUDIO_DEFAULT_PORT) => {
+  console.log('[LM Studio] Chat request with model:', model, 'context length:', context.length, 'mode:', chatMode)
+
+  try {
+    // System-Prompt basierend auf Modus (gleich wie Ollama)
+    const directPrompt = `Du bist ein hilfreicher Assistent, der Fragen zu den folgenden Notizen beantwortet. Antworte auf Deutsch, sei präzise und beziehe dich auf den Inhalt der Notizen.
+
+NOTIZEN-KONTEXT:
+${context}
+
+---
+Beantworte nun die Fragen des Nutzers basierend auf diesen Notizen. Wenn die Antwort nicht in den Notizen zu finden ist, sage das ehrlich.`
+
+    const socraticPrompt = `Du bist ein sokratischer Tutor. Deine Aufgabe: Den Nutzer durch EINE gezielte Frage zum Nachdenken anregen.
+
+REGELN:
+- Antworte IMMER mit genau EINER kurzen Rückfrage (1-2 Sätze max)
+- Gib NIEMALS die Antwort direkt
+- Halte dich kurz und prägnant
+- Nur bei "Ich weiß nicht" oder "Sag es mir" gibst du einen kleinen Hinweis
+
+NOTIZEN-KONTEXT:
+${context}
+
+---
+Stelle EINE kurze Frage, die zum Nachdenken anregt.`
+
+    const systemMessage = {
+      role: 'system',
+      content: chatMode === 'socratic' ? socraticPrompt : directPrompt
+    }
+
+    const allMessages = [systemMessage, ...messages]
+
+    // LM Studio unterstützt auch Streaming
+    const response = await fetch(`${getLMStudioUrl(port)}/v1/chat/completions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model,
+        messages: allMessages,
+        stream: true
+      })
+    })
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error('[LM Studio] Chat API error:', errorText)
+      throw new Error(`LM Studio API Fehler: ${response.status}`)
+    }
+
+    // Stream verarbeiten (SSE Format für OpenAI-kompatible API)
+    const reader = response.body?.getReader()
+    if (!reader) throw new Error('Keine Response-Daten')
+
+    const decoder = new TextDecoder()
+    let fullResponse = ''
+    let buffer = ''
+
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+
+      const chunk = decoder.decode(value, { stream: true })
+      buffer += chunk
+
+      // Verarbeite SSE Zeilen
+      const lines = buffer.split('\n')
+      buffer = lines.pop() || ''
+
+      for (const line of lines) {
+        const trimmedLine = line.trim()
+        if (!trimmedLine || trimmedLine === 'data: [DONE]') continue
+        if (!trimmedLine.startsWith('data: ')) continue
+
+        try {
+          const jsonStr = trimmedLine.slice(6) // Remove "data: " prefix
+          const json = JSON.parse(jsonStr)
+          const content = json.choices?.[0]?.delta?.content
+          if (content) {
+            fullResponse += content
+            // Sende Chunk an Renderer (verwende gleichen Event-Namen wie Ollama)
+            event.sender.send('ollama-chat-chunk', content)
+          }
+          if (json.choices?.[0]?.finish_reason === 'stop') {
+            event.sender.send('ollama-chat-done')
+          }
+        } catch {
+          // Ignoriere ungültige JSON-Zeilen
+        }
+      }
+    }
+
+    return {
+      success: true,
+      response: fullResponse
+    }
+  } catch (error) {
+    console.error('[LM Studio] Chat error:', error)
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unbekannter Fehler'
+    }
+  }
+})
+
+// Generiert Embeddings mit LM Studio (falls unterstützt)
+ipcMain.handle('lmstudio-embeddings', async (_event, model: string, text: string, port: number = LM_STUDIO_DEFAULT_PORT) => {
+  console.log('[LM Studio] Embeddings request for model:', model, 'text length:', text.length)
+
+  try {
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 60000)
+
+    const response = await fetch(`${getLMStudioUrl(port)}/v1/embeddings`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model,
+        input: text
+      }),
+      signal: controller.signal
+    })
+
+    clearTimeout(timeoutId)
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error('[LM Studio] Embeddings API error:', errorText)
+      throw new Error(`LM Studio API Fehler: ${response.status}`)
+    }
+
+    const data = await response.json()
+
+    if (!data.data?.[0]?.embedding) {
+      throw new Error('Keine Embeddings in der Antwort')
+    }
+
+    return {
+      success: true,
+      embedding: data.data[0].embedding
+    }
+  } catch (error) {
+    console.error('[LM Studio] Embeddings error:', error)
+
+    let errorMessage = 'Unbekannter Fehler'
+    if (error instanceof Error) {
+      if (error.name === 'AbortError') {
+        errorMessage = 'Timeout: Embedding-Generierung dauerte zu lange (>60s)'
+      } else {
+        errorMessage = error.message
+      }
+    }
+
+    return {
+      success: false,
+      error: errorMessage
+    }
+  }
+})
+
+// Holt verfügbare Embedding-Modelle von LM Studio
+ipcMain.handle('lmstudio-embedding-models', async (_event, port: number = LM_STUDIO_DEFAULT_PORT) => {
+  try {
+    const response = await fetch(`${getLMStudioUrl(port)}/v1/models`, {
+      method: 'GET',
+      signal: AbortSignal.timeout(5000)
+    })
+
+    if (!response.ok) return []
+
+    const data = await response.json()
+    // LM Studio zeigt alle geladenen Modelle - Filter für Embedding-Modelle
+    const embeddingPatterns = ['embed', 'minilm', 'bge', 'gte', 'e5']
+    return data.data?.filter((m: { id: string }) =>
+      embeddingPatterns.some(pattern => m.id.toLowerCase().includes(pattern))
+    ).map((m: { id: string }) => ({
+      name: m.id,
+      size: 0
+    })) || []
+  } catch (error) {
+    console.error('[LM Studio] Error fetching embedding models:', error)
+    return []
   }
 })
 
