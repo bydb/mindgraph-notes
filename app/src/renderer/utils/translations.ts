@@ -639,6 +639,26 @@ const translations = {
     'ai.assistant': 'KI-Assistent',
     'ai.whatShouldAIDo': 'Was soll die KI tun?',
     'ai.documentedAsFootnote': 'Wird als Fußnote dokumentiert',
+
+    // Docling PDF Extraction
+    'settings.docling.title': 'Docling PDF-Extraktion',
+    'settings.docling.enabled': 'Docling aktiviert',
+    'settings.docling.url': 'API-URL',
+    'settings.docling.ocrEnabled': 'OCR aktiviert',
+    'settings.docling.ocrLanguages': 'OCR-Sprachen',
+    'settings.docling.description': 'extrahiert automatisch Inhalte aus PDFs (Text, Tabellen, Bilder) und wandelt sie in Markdown um.',
+    'settings.docling.usage': 'Nutzung: PDF öffnen → "Extrahieren" Button klicken → Inhalt wird in Companion-Note eingefügt.',
+    'settings.docling.installHint': 'Installation:',
+    'docling.extract': 'Extrahieren',
+    'docling.extracting': 'Extrahiert...',
+    'docling.extracted': 'Extrahiert!',
+    'docling.extractTooltip': 'PDF-Inhalt via Docling extrahieren und in Companion-Note einfügen',
+    'docling.error': 'Fehler',
+    'docling.notAvailable': 'Docling ist nicht erreichbar. Starte den Docling-Server.',
+    'docling.extractionFailed': 'PDF-Extraktion fehlgeschlagen',
+    'docling.unknownError': 'Unbekannter Fehler',
+    'docling.extractedContentHeader': 'Extrahierter Inhalt',
+    'docling.extractedOn': 'Extrahiert am',
   },
 
   en: {
@@ -1277,6 +1297,26 @@ const translations = {
     'ai.assistant': 'AI Assistant',
     'ai.whatShouldAIDo': 'What should the AI do?',
     'ai.documentedAsFootnote': 'Will be documented as footnote',
+
+    // Docling PDF Extraction
+    'settings.docling.title': 'Docling PDF Extraction',
+    'settings.docling.enabled': 'Docling enabled',
+    'settings.docling.url': 'API URL',
+    'settings.docling.ocrEnabled': 'OCR enabled',
+    'settings.docling.ocrLanguages': 'OCR Languages',
+    'settings.docling.description': 'automatically extracts content from PDFs (text, tables, images) and converts them to Markdown.',
+    'settings.docling.usage': 'Usage: Open PDF → Click "Extract" button → Content is inserted into companion note.',
+    'settings.docling.installHint': 'Installation:',
+    'docling.extract': 'Extract',
+    'docling.extracting': 'Extracting...',
+    'docling.extracted': 'Extracted!',
+    'docling.extractTooltip': 'Extract PDF content via Docling and insert into companion note',
+    'docling.error': 'Error',
+    'docling.notAvailable': 'Docling is not available. Start the Docling server.',
+    'docling.extractionFailed': 'PDF extraction failed',
+    'docling.unknownError': 'Unknown error',
+    'docling.extractedContentHeader': 'Extracted Content',
+    'docling.extractedOn': 'Extracted on',
   }
 } as const
 

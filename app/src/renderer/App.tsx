@@ -592,7 +592,7 @@ const App: React.FC = () => {
                 }}
               >
                 {selectedPdfPath && vaultPath ? (
-                  <PDFViewer filePath={`${vaultPath}/${selectedPdfPath}`} fileName={selectedPdfPath.split('/').pop() || selectedPdfPath} />
+                  <PDFViewer filePath={`${vaultPath}/${selectedPdfPath}`} fileName={selectedPdfPath.split('/').pop() || selectedPdfPath} relativePath={selectedPdfPath} />
                 ) : selectedImagePath && vaultPath ? (
                   <ImageViewer filePath={`${vaultPath}/${selectedImagePath}`} fileName={selectedImagePath.split('/').pop() || selectedImagePath} />
                 ) : (

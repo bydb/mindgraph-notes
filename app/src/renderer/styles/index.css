@@ -5488,6 +5488,62 @@ body {
   text-align: center;
 }
 
+/* PDF Viewer Extract Button (Docling) */
+.pdf-viewer-extract {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-right: 8px;
+  padding-right: 12px;
+  border-right: 1px solid var(--border-color);
+}
+
+.pdf-viewer-extract-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: var(--accent-color);
+  color: white;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.pdf-viewer-extract-btn:hover:not(:disabled) {
+  background: var(--accent-hover);
+  transform: translateY(-1px);
+}
+
+.pdf-viewer-extract-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.pdf-viewer-extract-btn.extracting {
+  background: var(--text-muted);
+}
+
+.pdf-viewer-extract-btn.success {
+  background: #30d158;
+}
+
+.pdf-viewer-spinner {
+  animation: spin 1s linear infinite;
+}
+
+.pdf-viewer-extract-error {
+  font-size: 11px;
+  color: var(--text-error, #e53935);
+  max-width: 100px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 /* ============ PDF NODE (Canvas) ============ */
 .pdf-node {
   display: flex;

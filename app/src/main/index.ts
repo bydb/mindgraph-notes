@@ -2293,6 +2293,188 @@ ipcMain.handle('show-notification', async (_event, title: string, body: string, 
   }
 })
 
+// ============ DOCLING PDF EXTRACTION API ============
+const DOCLING_DEFAULT_URL = 'http://localhost:5001'
+
+// Prüft ob Docling API erreichbar ist
+ipcMain.handle('docling-check', async (_event, baseUrl?: string) => {
+  const url = baseUrl || DOCLING_DEFAULT_URL
+  try {
+    const response = await fetch(`${url}/health`, {
+      method: 'GET',
+      signal: AbortSignal.timeout(3000)
+    })
+    if (response.ok) {
+      const data = await response.json()
+      return { available: true, version: data.version || 'unknown' }
+    }
+    return { available: false }
+  } catch (error) {
+    console.log('[Docling] Health check failed:', error)
+    return { available: false }
+  }
+})
+
+// Docling Options Interface
+interface DoclingConvertOptions {
+  ocrEnabled?: boolean
+  ocrLanguages?: string[]
+}
+
+// Hilfsfunktion zum Extrahieren von Markdown aus verschiedenen Antwort-Formaten
+function extractMarkdownFromResult(result: unknown): string {
+  if (!result || typeof result !== 'object') return ''
+
+  const r = result as Record<string, unknown>
+
+  // Verschiedene mögliche Pfade zum Markdown-Inhalt
+  if (typeof r.md_content === 'string') return r.md_content
+  if (typeof r.markdown === 'string') return r.markdown
+  if (typeof r.text === 'string') return r.text
+  if (typeof r.content === 'string') return r.content
+
+  // Verschachtelte Strukturen
+  if (r.document && typeof r.document === 'object') {
+    const doc = r.document as Record<string, unknown>
+    if (typeof doc.md_content === 'string') return doc.md_content
+    if (typeof doc.export_to_markdown === 'string') return doc.export_to_markdown
+    if (typeof doc.markdown === 'string') return doc.markdown
+  }
+
+  if (r.result && typeof r.result === 'object') {
+    const res = r.result as Record<string, unknown>
+    if (typeof res.md_content === 'string') return res.md_content
+    if (typeof res.markdown === 'string') return res.markdown
+  }
+
+  // Array von Dokumenten
+  if (Array.isArray(r.documents) && r.documents.length > 0) {
+    const doc = r.documents[0] as Record<string, unknown>
+    if (typeof doc.md_content === 'string') return doc.md_content
+    if (typeof doc.markdown === 'string') return doc.markdown
+  }
+
+  return ''
+}
+
+// Konvertiert PDF zu Markdown via Docling API
+// Verwendet async-Endpoint wenn OCR aktiviert ist (dann ist Polling erforderlich)
+ipcMain.handle('docling-convert-pdf', async (_event, pdfPath: string, baseUrl?: string, options?: DoclingConvertOptions) => {
+  const url = baseUrl || DOCLING_DEFAULT_URL
+  const pdfFileName = path.basename(pdfPath)
+  const useAsync = options?.ocrEnabled === true  // OCR erfordert async-Verarbeitung
+  console.log('[Docling] Converting PDF:', pdfPath, 'async:', useAsync)
+
+  // Temporäre Datei erstellen falls Pfad Sonderzeichen enthält
+  const os = await import('os')
+  const tempDir = os.tmpdir()
+  const safeName = pdfFileName.replace(/[^a-zA-Z0-9.-]/g, '_')
+  const tempPath = path.join(tempDir, `docling_${Date.now()}_${safeName}`)
+
+  // Helper für curl
+  const { execFile } = await import('child_process')
+  const { promisify } = await import('util')
+  const execFileAsync = promisify(execFile)
+
+  const runCurl = async (args: string[]): Promise<string> => {
+    const { stdout } = await execFileAsync('curl', args, {
+      timeout: 300000,
+      maxBuffer: 50 * 1024 * 1024
+    })
+    return stdout
+  }
+
+  try {
+    // Kopiere PDF in temporäres Verzeichnis
+    await fs.copyFile(pdfPath, tempPath)
+    console.log('[Docling] Copied to temp:', tempPath)
+
+    // Wähle Endpoint basierend auf OCR-Option
+    const endpoint = useAsync ? `${url}/v1/convert/file/async` : `${url}/v1/convert/file`
+
+    // Baue curl-Befehl
+    const curlArgs = ['-s', '-X', 'POST', endpoint, '-F', `files=@${tempPath}`, '-F', 'to_formats=md']
+
+    // OCR-Optionen hinzufügen
+    if (options?.ocrEnabled !== undefined) {
+      curlArgs.push('-F', `do_ocr=${options.ocrEnabled}`)
+    }
+    // Sprachen als separate -F Argumente (nicht als JSON-Array!)
+    if (options?.ocrLanguages && options.ocrLanguages.length > 0) {
+      for (const lang of options.ocrLanguages) {
+        curlArgs.push('-F', `ocr_lang=${lang}`)
+      }
+    }
+
+    console.log('[Docling] Calling endpoint:', endpoint)
+    const stdout = await runCurl(curlArgs)
+
+    // Parse JSON-Antwort
+    let result: Record<string, unknown>
+    try {
+      result = JSON.parse(stdout)
+    } catch {
+      console.error('[Docling] Failed to parse response:', stdout.slice(0, 500))
+      return { success: false, error: 'Ungültige JSON-Antwort von Docling' }
+    }
+
+    // Wenn async, pollen bis fertig
+    if (useAsync && result.task_id) {
+      const taskId = result.task_id as string
+      console.log('[Docling] Async task started:', taskId)
+
+      // Poll für Ergebnis (max 5 Minuten)
+      const maxAttempts = 150
+      for (let i = 0; i < maxAttempts; i++) {
+        await new Promise(r => setTimeout(r, 2000))  // 2 Sekunden warten
+
+        const pollResult = await runCurl(['-s', `${url}/v1/status/poll/${taskId}`])
+        const status = JSON.parse(pollResult) as Record<string, unknown>
+        const taskStatus = status.task_status as string
+        console.log('[Docling] Poll', i + 1, '- status:', taskStatus)
+
+        if (taskStatus === 'success') {
+          // Ergebnis abrufen
+          const resultData = await runCurl(['-s', `${url}/v1/result/${taskId}`])
+          const finalResult = JSON.parse(resultData)
+          const markdown = extractMarkdownFromResult(finalResult)
+
+          if (markdown) {
+            console.log('[Docling] Successfully extracted', markdown.length, 'characters')
+            return { success: true, content: markdown, sourceFile: pdfFileName }
+          }
+          return { success: false, error: 'Kein Markdown in Ergebnis gefunden' }
+        }
+
+        if (taskStatus === 'failure') {
+          return { success: false, error: status.error as string || 'Docling-Task fehlgeschlagen' }
+        }
+      }
+      return { success: false, error: 'Timeout: PDF-Konvertierung dauerte zu lange' }
+    }
+
+    // Synchrone Antwort - direkt Markdown extrahieren
+    const markdown = extractMarkdownFromResult(result)
+    if (markdown) {
+      console.log('[Docling] Successfully extracted', markdown.length, 'characters')
+      return { success: true, content: markdown, sourceFile: pdfFileName }
+    }
+
+    // Prüfe auf Fehler
+    if (result.errors && Array.isArray(result.errors) && result.errors.length > 0) {
+      return { success: false, error: String((result.errors[0] as Record<string, unknown>)?.message || 'Fehler') }
+    }
+
+    console.error('[Docling] No markdown in response:', JSON.stringify(result).slice(0, 500))
+    return { success: false, error: 'Kein Markdown-Inhalt gefunden' }
+  } catch (error) {
+    console.error('[Docling] Conversion error:', error)
+    return { success: false, error: error instanceof Error ? error.message : 'Unbekannter Fehler' }
+  } finally {
+    try { await fs.unlink(tempPath) } catch { /* ignore */ }
+  }
+})
+
 // ============ WIKILINK STRIPPING ============
 
 // Entfernt Wikilink-Klammern aus Text, behält den Text

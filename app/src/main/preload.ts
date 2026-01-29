@@ -136,6 +136,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   stripWikilinksInFolder: (folderPath: string, vaultPath: string) =>
     ipcRenderer.invoke('strip-wikilinks-in-folder', folderPath, vaultPath),
 
+  // Docling PDF Extraction API
+  doclingCheck: (baseUrl?: string) => ipcRenderer.invoke('docling-check', baseUrl),
+  doclingConvertPdf: (pdfPath: string, baseUrl?: string, options?: { ocrEnabled?: boolean; ocrLanguages?: string[] }) =>
+    ipcRenderer.invoke('docling-convert-pdf', pdfPath, baseUrl, options),
+
   onNotificationClicked: (callback: (noteId: string) => void) => {
     ipcRenderer.removeAllListeners('notification-clicked')
     ipcRenderer.on('notification-clicked', (_event, noteId) => callback(noteId))

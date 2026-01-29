@@ -40,6 +40,8 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
   const [zoteroStatus, setZoteroStatus] = useState<'checking' | 'connected' | 'disconnected'>('checking')
   const [ollamaStatus, setOllamaStatus] = useState<'checking' | 'connected' | 'disconnected'>('checking')
   const [lmstudioStatus, setLmstudioStatus] = useState<'checking' | 'connected' | 'disconnected'>('checking')
+  const [doclingStatus, setDoclingStatus] = useState<'checking' | 'connected' | 'disconnected'>('checking')
+  const [doclingVersion, setDoclingVersion] = useState<string>('')
   const [ollamaModels, setOllamaModels] = useState<Array<{ name: string; size: number }>>([])
   const [lmstudioModels, setLmstudioModels] = useState<Array<{ name: string; size: number }>>([])
 
@@ -88,7 +90,9 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
     notesChatEnabled,
     setNotesChatEnabled,
     smartConnectionsWeights,
-    setSmartConnectionsWeights
+    setSmartConnectionsWeights,
+    docling,
+    setDocling
   } = useUIStore()
 
   const { t } = useTranslation()
@@ -107,6 +111,7 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
       checkZoteroConnection()
       checkOllamaConnection()
       checkLmstudioConnection()
+      checkDoclingConnection()
     }
   }, [isOpen, activeTab])
 
@@ -168,6 +173,19 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
       }
     } catch {
       setLmstudioStatus('disconnected')
+    }
+  }
+
+  const checkDoclingConnection = async () => {
+    setDoclingStatus('checking')
+    try {
+      const result = await window.electronAPI.doclingCheck(docling.url)
+      setDoclingStatus(result.available ? 'connected' : 'disconnected')
+      if (result.version) {
+        setDoclingVersion(result.version)
+      }
+    } catch {
+      setDoclingStatus('disconnected')
     }
   }
 
@@ -1053,6 +1071,91 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
                     {t('settings.integrations.zoteroShortcut')} <kbd>Cmd</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd>
                   </p>
                 </div>
+
+                <h3 style={{ marginTop: '32px' }}>{t('settings.docling.title')}</h3>
+                <div className="settings-row">
+                  <label>{t('settings.docling.enabled')}</label>
+                  <input
+                    type="checkbox"
+                    checked={docling.enabled}
+                    onChange={e => setDocling({ enabled: e.target.checked })}
+                  />
+                </div>
+
+                <div className="settings-row">
+                  <label>{t('settings.docling.url')}</label>
+                  <div className="settings-input-group">
+                    <input
+                      type="text"
+                      value={docling.url}
+                      onChange={e => setDocling({ url: e.target.value })}
+                      placeholder="http://localhost:5001"
+                      disabled={!docling.enabled}
+                      style={{ width: '200px' }}
+                    />
+                    <button className="settings-refresh" onClick={checkDoclingConnection}>
+                      {t('settings.connect')}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="settings-row">
+                  <label>Status</label>
+                  <div className="settings-status">
+                    {doclingStatus === 'checking' && (
+                      <span className="status-checking">{t('settings.checkingConnection')}</span>
+                    )}
+                    {doclingStatus === 'connected' && (
+                      <span className="status-connected">
+                        {t('settings.connected')} {doclingVersion && `(v${doclingVersion})`}
+                      </span>
+                    )}
+                    {doclingStatus === 'disconnected' && (
+                      <span className="status-disconnected">{t('settings.notConnected')}</span>
+                    )}
+                    <button className="settings-refresh" onClick={checkDoclingConnection}>
+                      {t('settings.refresh')}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="settings-row">
+                  <label>{t('settings.docling.ocrEnabled')}</label>
+                  <input
+                    type="checkbox"
+                    checked={docling.ocrEnabled}
+                    onChange={e => setDocling({ ocrEnabled: e.target.checked })}
+                    disabled={!docling.enabled}
+                  />
+                </div>
+
+                <div className="settings-row">
+                  <label>{t('settings.docling.ocrLanguages')}</label>
+                  <div className="settings-input-group">
+                    <input
+                      type="text"
+                      value={docling.ocrLanguages.join(', ')}
+                      onChange={e => setDocling({
+                        ocrLanguages: e.target.value.split(',').map(s => s.trim()).filter(s => s)
+                      })}
+                      placeholder="de, en"
+                      disabled={!docling.enabled || !docling.ocrEnabled}
+                      style={{ width: '120px' }}
+                    />
+                  </div>
+                </div>
+
+                <div className="settings-info">
+                  <p>
+                    <strong>Docling</strong> {t('settings.docling.description')}
+                  </p>
+                  <p>
+                    {t('settings.docling.usage')}
+                  </p>
+                  <p>
+                    {t('settings.docling.installHint')} <code>docker run -p 5001:5001 ds4sd/docling-serve</code>
+                  </p>
+                </div>
               </div>
             )}
 
@@ -1149,7 +1252,7 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
 
         <div className="settings-footer">
           <div className="settings-version">
-            <strong>MindGraph Notes</strong> v1.0.4
+            <strong>MindGraph Notes</strong> v1.0.5
           </div>
           <div className="settings-credits">
             {t('settings.footer.developedBy')} Jochen Leeder

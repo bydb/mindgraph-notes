@@ -334,6 +334,24 @@ export interface ElectronAPI {
     wikilinksRemoved?: number;
     error?: string;
   }>;
+
+  // Docling PDF Extraction API
+  doclingCheck: (baseUrl?: string) => Promise<{
+    available: boolean;
+    version?: string;
+  }>;
+  doclingConvertPdf: (pdfPath: string, baseUrl?: string, options?: DoclingOptions) => Promise<{
+    success: boolean;
+    content?: string;
+    sourceFile?: string;
+    error?: string;
+  }>;
+}
+
+// Docling Options for PDF conversion
+export interface DoclingOptions {
+  ocrEnabled?: boolean;
+  ocrLanguages?: string[];
 }
 
 declare global {

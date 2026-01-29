@@ -218,6 +218,14 @@ export interface SmartConnectionsWeights {
   folder: number      // Ordner-Nähe (0-100)
 }
 
+// Docling PDF Extraction Settings
+export interface DoclingSettings {
+  enabled: boolean
+  url: string
+  ocrEnabled: boolean
+  ocrLanguages: string[]
+}
+
 // Legacy type alias for backward compatibility
 type OllamaSettings = LLMSettings
 
@@ -275,6 +283,9 @@ interface UIState {
   // Smart Connections Gewichtungen
   smartConnectionsWeights: SmartConnectionsWeights
 
+  // Docling PDF Extraction Settings
+  docling: DoclingSettings
+
   // Actions
   setViewMode: (mode: ViewMode) => void
   setTheme: (theme: Theme) => void
@@ -313,6 +324,7 @@ interface UIState {
   setSmartConnectionsEnabled: (enabled: boolean) => void
   setNotesChatEnabled: (enabled: boolean) => void
   setSmartConnectionsWeights: (weights: Partial<SmartConnectionsWeights>) => void
+  setDocling: (settings: Partial<DoclingSettings>) => void
 }
 
 // Default-Werte für den Store
@@ -380,6 +392,14 @@ const defaultState = {
     wikilink: 10,    // Explizite Wikilinks
     tags: 10,        // Tag-Überlappung
     folder: 0        // Ordner-Nähe (default: 0)
+  },
+
+  // Docling PDF Extraction Settings
+  docling: {
+    enabled: true,
+    url: 'http://localhost:5001',
+    ocrEnabled: false,
+    ocrLanguages: ['de', 'en']
   }
 }
 
@@ -392,7 +412,7 @@ const persistedKeys = [
   'canvasFilterPath', 'canvasViewMode', 'canvasShowTags', 'canvasShowLinks', 'canvasShowImages',
   'canvasCompactMode', 'canvasDefaultCardWidth', 'splitPosition', 'fileTreeDisplayMode', 'ollama',
   'pdfCompanionEnabled', 'pdfDisplayMode', 'iconSet',
-  'smartConnectionsEnabled', 'notesChatEnabled', 'smartConnectionsWeights'
+  'smartConnectionsEnabled', 'notesChatEnabled', 'smartConnectionsWeights', 'docling'
 ] as const
 
 export const useUIStore = create<UIState>()((set, get) => ({
@@ -437,6 +457,9 @@ export const useUIStore = create<UIState>()((set, get) => ({
   setNotesChatEnabled: (enabled) => set({ notesChatEnabled: enabled }),
   setSmartConnectionsWeights: (weights) => set((state) => ({
     smartConnectionsWeights: { ...state.smartConnectionsWeights, ...weights }
+  })),
+  setDocling: (settings) => set((state) => ({
+    docling: { ...state.docling, ...settings }
   }))
 }))
 
