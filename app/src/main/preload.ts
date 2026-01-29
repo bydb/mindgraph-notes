@@ -53,6 +53,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   loadNotesCache: (vaultPath: string) => ipcRenderer.invoke('load-notes-cache', vaultPath),
   getFilesWithMtime: (vaultPath: string) => ipcRenderer.invoke('get-files-with-mtime', vaultPath),
 
+  // Embeddings-Cache für Smart Connections
+  saveEmbeddingsCache: (vaultPath: string, model: string, cache: object) =>
+    ipcRenderer.invoke('save-embeddings-cache', vaultPath, model, cache),
+  loadEmbeddingsCache: (vaultPath: string, model: string) =>
+    ipcRenderer.invoke('load-embeddings-cache', vaultPath, model),
+
   // PDF Export
   exportPDF: (defaultFileName: string, htmlContent: string, title: string) =>
     ipcRenderer.invoke('export-pdf', defaultFileName, htmlContent, title),

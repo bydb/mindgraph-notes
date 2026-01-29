@@ -8,6 +8,19 @@ interface EmbeddingModel {
   size: number
 }
 
+interface EmbeddingsCacheEntry {
+  embedding: number[]
+  mtime: number      // File modification time when embedding was generated
+  size: number       // File size for change detection
+}
+
+interface EmbeddingsCache {
+  model: string
+  version: number
+  lastUpdated: number
+  files: Record<string, EmbeddingsCacheEntry>
+}
+
 interface SimilarNote {
   id: string
   title: string
@@ -15,19 +28,108 @@ interface SimilarNote {
   similarity: number          // Hybrid-Score (gewichtet)
   // Score-Komponenten für Transparenz
   embeddingScore: number      // Reine Embedding-Ähnlichkeit
+  keywordMatch: number        // Keyword-Überlappung (0-1)
   hasWikilink: boolean        // Expliziter Wikilink vorhanden
   tagOverlap: number          // Tag-Überlappung (0-1)
   folderProximity: number     // Ordner-Nähe (0-1)
 }
 
-// Gewichtungen für Hybrid-Score
-// Wikilinks > Embeddings, da explizite Links menschliche Entscheidungen sind
-// und Embeddings durch KI-generierten Content-Stil verfälscht werden können
-const WEIGHTS = {
-  embedding: 0.32,      // 32% Embedding-Ähnlichkeit (reduziert wegen KI-Stil-Problem)
-  wikilink: 0.40,       // 40% Wikilink-Bonus (erhöht - menschliche Entscheidung)
-  tags: 0.23,           // 23% Tag-Überlappung
-  folder: 0.05          // 5% Ordner-Nähe (reduziert)
+// Default-Gewichtungen (werden von uiStore überschrieben)
+const DEFAULT_WEIGHTS = {
+  embedding: 50,
+  keyword: 30,
+  wikilink: 10,
+  tags: 10,
+  folder: 0
+}
+
+// Stoppwörter die bei Keyword-Extraktion ignoriert werden
+const STOP_WORDS = new Set([
+  'der', 'die', 'das', 'den', 'dem', 'des', 'ein', 'eine', 'einer', 'einem', 'einen',
+  'und', 'oder', 'aber', 'wenn', 'weil', 'dass', 'als', 'auch', 'nur', 'noch',
+  'ist', 'sind', 'war', 'waren', 'wird', 'werden', 'hat', 'haben', 'kann', 'können',
+  'mit', 'von', 'für', 'auf', 'aus', 'bei', 'nach', 'vor', 'über', 'unter', 'durch',
+  'sich', 'nicht', 'mehr', 'sehr', 'wie', 'was', 'wer', 'wo', 'wann', 'warum',
+  'the', 'a', 'an', 'and', 'or', 'but', 'if', 'then', 'so', 'as', 'of', 'to', 'in',
+  'is', 'are', 'was', 'were', 'be', 'been', 'being', 'have', 'has', 'had', 'do', 'does',
+  'will', 'would', 'could', 'should', 'may', 'might', 'must', 'shall', 'can',
+  'this', 'that', 'these', 'those', 'it', 'its', 'they', 'them', 'their', 'we', 'our',
+  'note', 'notiz', 'inbox', 'zum', 'zur', 'im', 'am', 'um', 'es', 'sie', 'er', 'wir'
+])
+
+// Extrahiere wichtige Keywords aus Text
+function extractKeywords(text: string, title: string): string[] {
+  const keywords: string[] = []
+
+  // 1. Titel-Wörter sind sehr wichtig (ohne Datum/Emoji)
+  const titleWords = title
+    .replace(/^\d{12}\s*-?\s*/, '')  // Entferne Datums-Präfix
+    .replace(/[\u{1F300}-\u{1F9FF}]/gu, '')  // Entferne Emojis
+    .toLowerCase()
+    .split(/[\s\-_.,;:!?()[\]{}]+/)
+    .filter(w => w.length > 3 && !STOP_WORDS.has(w))
+
+  keywords.push(...titleWords)
+
+  // 2. Überschriften extrahieren (## Heading)
+  const headings = text.match(/^#{1,3}\s+(.+)$/gm) || []
+  for (const heading of headings) {
+    const words = heading
+      .replace(/^#+\s*/, '')
+      .toLowerCase()
+      .split(/[\s\-_.,;:!?()[\]{}]+/)
+      .filter(w => w.length > 3 && !STOP_WORDS.has(w))
+    keywords.push(...words)
+  }
+
+  // 3. Fettgedruckte Begriffe (**term** oder __term__)
+  const boldTerms = text.match(/\*\*([^*]+)\*\*|__([^_]+)__/g) || []
+  for (const term of boldTerms) {
+    const clean = term.replace(/\*\*|__/g, '').toLowerCase()
+    if (clean.length > 3 && !STOP_WORDS.has(clean)) {
+      keywords.push(clean)
+    }
+  }
+
+  // 4. Eigennamen und Fachbegriffe (Wörter mit Großbuchstaben im Text)
+  const properNouns = text.match(/\b[A-ZÄÖÜ][a-zäöüß]{3,}\b/g) || []
+  for (const noun of properNouns) {
+    const lower = noun.toLowerCase()
+    if (!STOP_WORDS.has(lower)) {
+      keywords.push(lower)
+    }
+  }
+
+  // Deduplizieren und häufigste behalten
+  const freq = new Map<string, number>()
+  for (const kw of keywords) {
+    freq.set(kw, (freq.get(kw) || 0) + 1)
+  }
+
+  // Top Keywords nach Häufigkeit, max 20
+  return [...freq.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 20)
+    .map(([kw]) => kw)
+}
+
+// Berechne Keyword-Überlappung zwischen zwei Texten
+function calculateKeywordMatch(keywords1: string[], text2: string, title2: string): number {
+  if (keywords1.length === 0) return 0
+
+  const text2Lower = (title2 + ' ' + text2).toLowerCase()
+  let matches = 0
+
+  for (const kw of keywords1) {
+    // Prüfe ob Keyword im Text vorkommt (als ganzes Wort)
+    const regex = new RegExp(`\\b${kw}\\b`, 'i')
+    if (regex.test(text2Lower)) {
+      matches++
+    }
+  }
+
+  // Normalisiere auf 0-1 (mind. 30% der Keywords müssen matchen für vollen Score)
+  return Math.min(1, matches / (keywords1.length * 0.3))
 }
 
 interface SmartConnectionsPanelProps {
@@ -103,34 +205,97 @@ function calculateFolderProximity(path1: string, path2: string): number {
 }
 
 // Kürze Text auf maximale Länge für Embedding-Modelle
-// nomic-embed-text hat 8192 Token-Limit, aber deutscher Text braucht mehr Tokens
-// Sicher: ~6000 Zeichen (~2000 Tokens mit Puffer)
-const MAX_EMBEDDING_LENGTH = 6000
+// nomic-embed-text hat strenges Token-Limit
+// 4000 Zeichen = ~1000-1400 Tokens, sicher für die meisten Modelle
+const MAX_EMBEDDING_LENGTH = 4000
 
+// Bereite Text für Embedding vor: Entferne Frontmatter, extrahiere semantischen Kern
+function prepareTextForEmbedding(text: string): string {
+  // 1. Entferne YAML Frontmatter (zwischen --- Markern)
+  let cleanText = text.replace(/^---[\s\S]*?---\n*/m, '')
+
+  // 2. Entferne Obsidian-spezifische Syntax
+  cleanText = cleanText
+    .replace(/>\s*Erstellt am.*?\n/g, '')           // Erstellungsdatum
+    .replace(/!\[\[.*?\]\]/g, '')                    // Bild-Embeds
+    .replace(/\[\[([^\]|]+)\|([^\]]+)\]\]/g, '$2')  // [[link|text]] → text
+    .replace(/\[\[([^\]]+)\]\]/g, '$1')              // [[link]] → link
+    .replace(/^>\s*\[!.*?\].*$/gm, '')               // Callout headers
+    .replace(/^[-*]\s*\[[ x]\]/gm, '')               // Checkboxen
+    .replace(/\n{3,}/g, '\n\n')                      // Mehrfache Leerzeilen
+
+  // 3. Extrahiere Überschriften für semantische Zusammenfassung
+  const headings = cleanText.match(/^#{1,3}\s+.+$/gm) || []
+  const headingsSummary = headings.slice(0, 10).join('\n')
+
+  // 4. Wenn kurz genug, nutze alles
+  if (cleanText.length <= MAX_EMBEDDING_LENGTH) {
+    return cleanText.trim()
+  }
+
+  // 5. Bei langen Texten: Überschriften + Anfang + Mitte-Samples
+  const contentWithoutHeadings = cleanText.replace(/^#{1,3}\s+.+$/gm, '')
+  const paragraphs = contentWithoutHeadings.split(/\n\n+/).filter(p => p.trim().length > 50)
+
+  // Nimm Überschriften + erste Paragraphen + einige aus der Mitte
+  const budget = MAX_EMBEDDING_LENGTH - headingsSummary.length - 100
+  let result = headingsSummary + '\n\n'
+  let usedChars = 0
+
+  // Erste Hälfte der Paragraphen (Einleitung, Hauptinhalt)
+  for (let i = 0; i < Math.min(paragraphs.length, 10) && usedChars < budget * 0.7; i++) {
+    result += paragraphs[i] + '\n\n'
+    usedChars += paragraphs[i].length
+  }
+
+  // Einige aus der Mitte (Kerninhalt)
+  const middleStart = Math.floor(paragraphs.length * 0.3)
+  const middleEnd = Math.floor(paragraphs.length * 0.6)
+  for (let i = middleStart; i < middleEnd && usedChars < budget; i++) {
+    if (!result.includes(paragraphs[i])) {
+      result += paragraphs[i] + '\n\n'
+      usedChars += paragraphs[i].length
+    }
+  }
+
+  console.log(`[SmartConnections] Text vorbereitet: ${text.length} → ${result.length} Zeichen (${headings.length} Überschriften)`)
+  return result.trim()
+}
+
+// Legacy-Funktion für Kompatibilität
 function truncateForEmbedding(text: string): string {
-  if (text.length <= MAX_EMBEDDING_LENGTH) return text
+  return prepareTextForEmbedding(text)
+}
 
-  // Kürze intelligent: Behalte Anfang (Titel, Zusammenfassung) und Ende (Schluss)
-  const halfLength = Math.floor(MAX_EMBEDDING_LENGTH / 2)
-  const start = text.slice(0, halfLength)
-  const end = text.slice(-halfLength)
+// Normalisiere Embedding-Score für bessere Differenzierung
+// Cosine-Similarity clustert typisch zwischen 0.5-0.95
+// Diese Funktion spreizt die Werte auf 0-1 für sichtbarere Unterschiede
+function normalizeEmbeddingScore(rawScore: number): number {
+  const MIN_EXPECTED = 0.50  // Scores darunter = unverwandt
+  const MAX_EXPECTED = 0.95  // Sehr hohe Ähnlichkeit
 
-  console.log(`[SmartConnections] Text gekürzt: ${text.length} → ${MAX_EMBEDDING_LENGTH} Zeichen`)
-  return start + '\n\n[...]\n\n' + end
+  const normalized = (rawScore - MIN_EXPECTED) / (MAX_EXPECTED - MIN_EXPECTED)
+  return Math.max(0, Math.min(1, normalized))
 }
 
 // Berechne Hybrid-Score aus allen Faktoren
 function calculateHybridScore(
   embeddingScore: number,
+  keywordMatch: number,
   hasWikilink: boolean,
   tagOverlap: number,
-  folderProximity: number
+  folderProximity: number,
+  weights: { embedding: number; keyword: number; wikilink: number; tags: number; folder: number }
 ): number {
+  // Normalisiere Embedding-Score für bessere Spreizung
+  const normalizedEmbedding = normalizeEmbeddingScore(embeddingScore)
+
   const score =
-    WEIGHTS.embedding * embeddingScore +
-    WEIGHTS.wikilink * (hasWikilink ? 1 : 0) +
-    WEIGHTS.tags * tagOverlap +
-    WEIGHTS.folder * folderProximity
+    weights.embedding * normalizedEmbedding +
+    weights.keyword * keywordMatch +
+    weights.wikilink * (hasWikilink ? 1 : 0) +
+    weights.tags * tagOverlap +
+    weights.folder * folderProximity
 
   return Math.min(1.0, score)
 }
@@ -156,7 +321,16 @@ function cosineSimilarity(a: number[], b: number[]): number {
 export const SmartConnectionsPanel: React.FC<SmartConnectionsPanelProps> = ({ onClose }) => {
   const { t } = useTranslation()
   const { notes, selectedNoteId, selectNote, vaultPath } = useNotesStore()
-  const { ollama: llmSettings } = useUIStore()
+  const { ollama: llmSettings, smartConnectionsWeights } = useUIStore()
+
+  // Gewichtungen aus Settings (als Dezimalwerte 0-1)
+  const WEIGHTS = useMemo(() => ({
+    embedding: (smartConnectionsWeights?.embedding ?? DEFAULT_WEIGHTS.embedding) / 100,
+    keyword: (smartConnectionsWeights?.keyword ?? DEFAULT_WEIGHTS.keyword) / 100,
+    wikilink: (smartConnectionsWeights?.wikilink ?? DEFAULT_WEIGHTS.wikilink) / 100,
+    tags: (smartConnectionsWeights?.tags ?? DEFAULT_WEIGHTS.tags) / 100,
+    folder: (smartConnectionsWeights?.folder ?? DEFAULT_WEIGHTS.folder) / 100
+  }), [smartConnectionsWeights])
   const [embeddingModels, setEmbeddingModels] = useState<EmbeddingModel[]>([])
   const [selectedModel, setSelectedModel] = useState<string>('')
   const [isBackendAvailable, setIsBackendAvailable] = useState(false)
@@ -164,7 +338,9 @@ export const SmartConnectionsPanel: React.FC<SmartConnectionsPanelProps> = ({ on
   const [isCalculating, setIsCalculating] = useState(false)
   const [progress, setProgress] = useState({ current: 0, total: 0 })
   const [similarNotes, setSimilarNotes] = useState<SimilarNote[]>([])
-  const [embeddingsCache, setEmbeddingsCache] = useState<Record<string, number[]>>({})
+  const [embeddingsCache, setEmbeddingsCache] = useState<EmbeddingsCache | null>(null)
+  const [pendingNotes, setPendingNotes] = useState<string[]>([]) // IDs of notes needing embedding
+  const [isIntegrating, setIsIntegrating] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   // Aktuelle Notiz
@@ -216,26 +392,79 @@ export const SmartConnectionsPanel: React.FC<SmartConnectionsPanelProps> = ({ on
     checkBackend()
   }, [llmSettings.backend, llmSettings.lmStudioPort])
 
-  // Lade gecachte Embeddings aus .mindgraph/
+  // Lade gecachte Embeddings und erkenne neue/geänderte Dateien
   useEffect(() => {
     const loadCachedEmbeddings = async () => {
       if (!vaultPath || !selectedModel) return
 
       try {
-        const graphData = await window.electronAPI.loadGraphData(vaultPath) as {
-          embeddings?: Record<string, Record<string, number[]>>
-        } | null
-        if (graphData?.embeddings?.[selectedModel]) {
-          setEmbeddingsCache(graphData.embeddings[selectedModel])
-          console.log('[SmartConnections] Loaded cached embeddings:', Object.keys(graphData.embeddings[selectedModel]).length)
+        // Lade separaten Embeddings-Cache
+        const cacheFile = await window.electronAPI.loadEmbeddingsCache?.(vaultPath, selectedModel) as EmbeddingsCache | null
+
+        // Fallback: Alte Struktur aus graph-data.json
+        if (!cacheFile) {
+          const graphData = await window.electronAPI.loadGraphData(vaultPath) as {
+            embeddings?: Record<string, Record<string, number[]>>
+          } | null
+
+          if (graphData?.embeddings?.[selectedModel]) {
+            // Migriere alte Struktur in neue
+            const oldCache = graphData.embeddings[selectedModel]
+            const migratedCache: EmbeddingsCache = {
+              model: selectedModel,
+              version: 1,
+              lastUpdated: Date.now(),
+              files: {}
+            }
+            for (const [id, embedding] of Object.entries(oldCache)) {
+              migratedCache.files[id] = {
+                embedding,
+                mtime: 0,  // Unbekannt, wird bei nächster Prüfung aktualisiert
+                size: 0
+              }
+            }
+            setEmbeddingsCache(migratedCache)
+            console.log('[SmartConnections] Migrated old cache:', Object.keys(migratedCache.files).length)
+          } else {
+            setEmbeddingsCache({ model: selectedModel, version: 1, lastUpdated: 0, files: {} })
+          }
+        } else {
+          setEmbeddingsCache(cacheFile)
+          console.log('[SmartConnections] Loaded embeddings cache:', Object.keys(cacheFile.files).length)
         }
       } catch (err) {
-        console.log('[SmartConnections] No cached embeddings found')
+        console.log('[SmartConnections] No cached embeddings found, starting fresh')
+        setEmbeddingsCache({ model: selectedModel, version: 1, lastUpdated: 0, files: {} })
       }
     }
 
     loadCachedEmbeddings()
   }, [vaultPath, selectedModel])
+
+  // Erkenne neue/geänderte Dateien
+  useEffect(() => {
+    if (!embeddingsCache || !notes.length) return
+
+    const pending: string[] = []
+    for (const note of notes) {
+      if (!note.path.endsWith('.md')) continue
+
+      const cached = embeddingsCache.files[note.id]
+      const noteMtime = note.modifiedAt?.getTime() || 0
+      if (!cached) {
+        // Neue Datei - noch kein Embedding
+        pending.push(note.id)
+      } else if (noteMtime && cached.mtime > 0 && noteMtime > cached.mtime) {
+        // Datei wurde seit letztem Embedding geändert
+        pending.push(note.id)
+      }
+    }
+
+    setPendingNotes(pending)
+    if (pending.length > 0) {
+      console.log('[SmartConnections] Pending notes (new/modified):', pending.length)
+    }
+  }, [embeddingsCache, notes])
 
   // Embedding für Text generieren (mit automatischer Kürzung)
   const getEmbedding = useCallback(async (text: string): Promise<number[] | null> => {
@@ -261,9 +490,81 @@ export const SmartConnectionsPanel: React.FC<SmartConnectionsPanelProps> = ({ on
     }
   }, [selectedModel, llmSettings.backend, llmSettings.lmStudioPort])
 
-  // Ähnliche Notizen berechnen
+  // Neue/geänderte Notizen integrieren (Embeddings generieren)
+  const integratePendingNotes = useCallback(async () => {
+    if (!vaultPath || !selectedModel || !embeddingsCache || pendingNotes.length === 0) return
+
+    setIsIntegrating(true)
+    setProgress({ current: 0, total: pendingNotes.length })
+
+    const updatedCache: EmbeddingsCache = {
+      ...embeddingsCache,
+      lastUpdated: Date.now(),
+      files: { ...embeddingsCache.files }
+    }
+
+    // Batch-Laden der Inhalte
+    const notesToProcess = notes.filter(n => pendingNotes.includes(n.id))
+    const paths = notesToProcess.map(n => n.path)
+    const contents = await window.electronAPI.readFilesBatch(vaultPath, paths)
+
+    for (let i = 0; i < notesToProcess.length; i++) {
+      const note = notesToProcess[i]
+      setProgress({ current: i + 1, total: notesToProcess.length })
+
+      const content = contents[note.path] || ''
+      let embedding: number[] = []
+
+      if (content.trim()) {
+        embedding = await getEmbedding(content) || []
+      }
+
+      // Speichere IMMER einen Cache-Eintrag, auch für leere Dateien
+      // damit sie nicht immer wieder als "pending" erscheinen
+      updatedCache.files[note.id] = {
+        embedding,
+        mtime: note.modifiedAt?.getTime() || Date.now(),
+        size: content.length
+      }
+    }
+
+    // Cache speichern
+    setEmbeddingsCache(updatedCache)
+    setPendingNotes([])
+
+    try {
+      // Speichere in separater Datei
+      if (window.electronAPI.saveEmbeddingsCache) {
+        await window.electronAPI.saveEmbeddingsCache(vaultPath, selectedModel, updatedCache)
+      } else {
+        // Fallback: In graph-data.json speichern
+        const existingData = await window.electronAPI.loadGraphData(vaultPath) as {
+          embeddings?: Record<string, Record<string, number[]>>
+          [key: string]: unknown
+        } | null
+        const graphData = existingData || {}
+        if (!graphData.embeddings) {
+          graphData.embeddings = {}
+        }
+        // Konvertiere zu altem Format für Rückwärtskompatibilität
+        const simpleCache: Record<string, number[]> = {}
+        for (const [id, entry] of Object.entries(updatedCache.files)) {
+          simpleCache[id] = entry.embedding
+        }
+        graphData.embeddings[selectedModel] = simpleCache
+        await window.electronAPI.saveGraphData(vaultPath, graphData)
+      }
+      console.log('[SmartConnections] Integrated', notesToProcess.length, 'notes')
+    } catch (err) {
+      console.error('[SmartConnections] Failed to save cache:', err)
+    }
+
+    setIsIntegrating(false)
+  }, [vaultPath, selectedModel, embeddingsCache, pendingNotes, notes, getEmbedding])
+
+  // Ähnliche Notizen berechnen (nutzt nur Cache, generiert keine neuen Embeddings)
   const calculateSimilarities = useCallback(async () => {
-    if (!currentNote || !selectedModel || !vaultPath) return
+    if (!currentNote || !selectedModel || !vaultPath || !embeddingsCache) return
 
     setIsCalculating(true)
     setError(null)
@@ -285,133 +586,106 @@ export const SmartConnectionsPanel: React.FC<SmartConnectionsPanelProps> = ({ on
 
       // Extrahiere Wikilinks aus aktueller Notiz für Bonus-Berechnung
       const wikilinks = extractWikilinks(currentContent)
-      console.log('[SmartConnections] Found wikilinks:', wikilinks)
 
-      console.log(`[SmartConnections] Generating embedding for "${currentNote.title}" (${currentContent.length} chars)`)
-      const currentEmbedding = await getEmbedding(currentContent)
+      // Extrahiere Keywords aus aktueller Notiz für Keyword-Matching
+      const currentKeywords = extractKeywords(currentContent, currentNote.title)
+      console.log(`[SmartConnections] Keywords extrahiert: ${currentKeywords.slice(0, 10).join(', ')}...`)
+
+      // Embedding für aktuelle Notiz (generiere falls nicht gecacht)
+      let currentEmbedding = embeddingsCache.files[currentNote.id]?.embedding
       if (!currentEmbedding) {
-        setError(`${t('smartConnections.errorGeneratingEmbedding')} (${currentContent.length}). ${t('smartConnections.checkLogs')}`)
-        setIsCalculating(false)
-        return
+        console.log(`[SmartConnections] Generating embedding for current note "${currentNote.title}"`)
+        currentEmbedding = await getEmbedding(currentContent) || undefined
+        if (!currentEmbedding) {
+          setError(`${t('smartConnections.errorGeneratingEmbedding')}`)
+          setIsCalculating(false)
+          return
+        }
+        // Cache aktualisieren
+        embeddingsCache.files[currentNote.id] = {
+          embedding: currentEmbedding,
+          mtime: currentNote.modifiedAt?.getTime() || Date.now(),
+          size: currentContent.length
+        }
       }
 
-      // 2. Berechne Ähnlichkeiten mit anderen Notizen
+      // 2. Berechne Ähnlichkeiten NUR mit gecachten Notizen
       const otherNotes = notes.filter(n => n.id !== selectedNoteId && n.path.endsWith('.md'))
-      const updatedCache = { ...embeddingsCache }
       const similarities: SimilarNote[] = []
 
-      setProgress({ current: 0, total: otherNotes.length })
+      // Debug: Wie viele Notizen haben gecachte Embeddings?
+      const cachedCount = otherNotes.filter(n => embeddingsCache?.files?.[n.id]?.embedding?.length > 0).length
+      console.log(`[SmartConnections] Vergleiche mit ${cachedCount}/${otherNotes.length} gecachten Notizen`)
 
-      // Batch-Laden der Inhalte für Notizen ohne gecachte Embeddings
-      const notesNeedingContent = otherNotes.filter(n => !updatedCache[n.id] && !n.content)
-      if (notesNeedingContent.length > 0) {
-        const paths = notesNeedingContent.map(n => n.path)
-        const contents = await window.electronAPI.readFilesBatch(vaultPath, paths)
-        for (const note of notesNeedingContent) {
-          const content = contents[note.path]
-          if (content) {
-            // Temporär speichern
-            ;(note as any)._loadedContent = content
-          }
-        }
+      if (cachedCount === 0) {
+        console.error('[SmartConnections] WARNUNG: Keine gecachten Embeddings gefunden! Cache:', embeddingsCache)
       }
 
-      // Verarbeite jede Notiz
-      for (let i = 0; i < otherNotes.length; i++) {
-        const note = otherNotes[i]
-        setProgress({ current: i + 1, total: otherNotes.length })
+      for (const note of otherNotes) {
+        const cachedEntry = embeddingsCache?.files?.[note.id]
+        // Überspringe Notizen ohne Cache oder mit leerem Embedding (fehlgeschlagen)
+        if (!cachedEntry || !cachedEntry.embedding || cachedEntry.embedding.length === 0) continue
 
-        let noteEmbedding = updatedCache[note.id]
+        const embeddingScore = cosineSimilarity(currentEmbedding, cachedEntry.embedding)
+        const hasWikilink = isLinkedViaWikilink(wikilinks, note)
+        const tagOverlap = calculateTagOverlap(currentNote.tags || [], note.tags || [])
+        const folderProximity = calculateFolderProximity(currentNote.path, note.path)
 
-        // Wenn kein gecachtes Embedding, generiere es
-        if (!noteEmbedding) {
-          const content = note.content || (note as any)._loadedContent
-          if (content && content.trim()) {
-            const generatedEmbedding = await getEmbedding(content)
-            if (generatedEmbedding) {
-              noteEmbedding = generatedEmbedding
-              updatedCache[note.id] = generatedEmbedding
-            }
-          }
-        }
+        // Keyword-Match: Prüfe ob Keywords im Titel/Tags der anderen Notiz vorkommen
+        const otherTagsText = (note.tags || []).join(' ')
+        const keywordMatch = calculateKeywordMatch(currentKeywords, otherTagsText, note.title)
 
-        // Berechne Hybrid-Ähnlichkeit
-        if (noteEmbedding) {
-          const embeddingScore = cosineSimilarity(currentEmbedding, noteEmbedding)
-          const hasWikilink = isLinkedViaWikilink(wikilinks, note)
-          const tagOverlap = calculateTagOverlap(currentNote.tags || [], note.tags || [])
-          const folderProximity = calculateFolderProximity(currentNote.path, note.path)
+        const similarity = calculateHybridScore(
+          embeddingScore,
+          keywordMatch,
+          hasWikilink,
+          tagOverlap,
+          folderProximity,
+          WEIGHTS
+        )
 
-          // Hybrid-Score berechnen
-          const similarity = calculateHybridScore(
+        if (similarity > 0.2) {
+          similarities.push({
+            id: note.id,
+            title: note.title,
+            path: note.path,
+            similarity,
             embeddingScore,
+            keywordMatch,
             hasWikilink,
             tagOverlap,
             folderProximity
-          )
-
-          if (hasWikilink || tagOverlap > 0) {
-            console.log(`[SmartConnections] "${note.title}": embed=${(embeddingScore*100).toFixed(0)}%, wikilink=${hasWikilink}, tags=${(tagOverlap*100).toFixed(0)}%, folder=${(folderProximity*100).toFixed(0)}% → hybrid=${(similarity*100).toFixed(0)}%`)
-          }
-
-          if (similarity > 0.2) { // Niedrigerer Threshold wegen gewichteter Scores
-            similarities.push({
-              id: note.id,
-              title: note.title,
-              path: note.path,
-              similarity,
-              embeddingScore,
-              hasWikilink,
-              tagOverlap,
-              folderProximity
-            })
-          }
+          })
         }
       }
 
-      // Sortiere nach Ähnlichkeit (absteigend)
       similarities.sort((a, b) => b.similarity - a.similarity)
-
-      // Top 20 anzeigen
       setSimilarNotes(similarities.slice(0, 20))
 
-      // Cache speichern
-      if (Object.keys(updatedCache).length > Object.keys(embeddingsCache).length) {
-        setEmbeddingsCache(updatedCache)
-        try {
-          const existingData = await window.electronAPI.loadGraphData(vaultPath) as {
-            embeddings?: Record<string, Record<string, number[]>>
-            [key: string]: unknown
-          } | null
-          const graphData = existingData || {}
-          if (!graphData.embeddings) {
-            graphData.embeddings = {}
-          }
-          graphData.embeddings[selectedModel] = updatedCache
-          await window.electronAPI.saveGraphData(vaultPath, graphData)
-          console.log('[SmartConnections] Saved embeddings cache')
-        } catch (err) {
-          console.error('[SmartConnections] Failed to save cache:', err)
-        }
-      }
     } catch (err) {
       console.error('[SmartConnections] Error calculating similarities:', err)
       setError(t('smartConnections.errorCalculating'))
     } finally {
       setIsCalculating(false)
     }
-  }, [currentNote, selectedModel, vaultPath, notes, selectedNoteId, embeddingsCache, getEmbedding])
+  }, [currentNote, selectedModel, vaultPath, notes, selectedNoteId, embeddingsCache, getEmbedding, t, WEIGHTS])
 
-  // Automatisch berechnen wenn Notiz gewechselt wird
+  // Automatisch berechnen wenn Notiz gewechselt wird UND Cache geladen ist
   useEffect(() => {
-    if (currentNote && selectedModel && isBackendAvailable && !isCalculating) {
+    // WICHTIG: Warte bis embeddingsCache geladen ist (nicht null und hat files)
+    const cacheReady = embeddingsCache && Object.keys(embeddingsCache.files || {}).length > 0
+
+    if (currentNote && selectedModel && isBackendAvailable && !isCalculating && cacheReady) {
+      console.log(`[SmartConnections] Cache ready with ${Object.keys(embeddingsCache.files).length} entries, calculating...`)
       // Verzögerung um zu viele Berechnungen zu vermeiden
       const timer = setTimeout(() => {
         calculateSimilarities()
       }, 500)
       return () => clearTimeout(timer)
+    } else if (currentNote && selectedModel && !cacheReady) {
+      console.log('[SmartConnections] Warte auf Cache...')
     }
-  }, [selectedNoteId, selectedModel])
+  }, [selectedNoteId, selectedModel, embeddingsCache])
 
   const handleNoteClick = (noteId: string) => {
     selectNote(noteId)
@@ -560,6 +834,10 @@ export const SmartConnectionsPanel: React.FC<SmartConnectionsPanelProps> = ({ on
                   <span className="smart-connections-results-count">{similarNotes.length}</span>
                 </div>
                 <div className="smart-connections-legend">
+                  <span className="smart-connections-legend-item" title={t('smartConnections.keywordMatchTooltip')}>
+                    <span className="smart-connections-badge keyword" style={{ width: 14, height: 14 }}>🔑</span>
+                    {t('smartConnections.keyword')}
+                  </span>
                   <span className="smart-connections-legend-item" title={t('smartConnections.explicitWikilink')}>
                     <span className="smart-connections-badge wikilink" style={{ width: 14, height: 14 }}>
                       <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
@@ -573,14 +851,12 @@ export const SmartConnectionsPanel: React.FC<SmartConnectionsPanelProps> = ({ on
                     <span className="smart-connections-badge tags" style={{ width: 14, height: 14 }}>#</span>
                     {t('smartConnections.tags')}
                   </span>
-                  <span className="smart-connections-legend-item" title={t('smartConnections.folderProximity')}>
-                    <span className="smart-connections-badge folder" style={{ width: 14, height: 14 }}>
-                      <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
-                      </svg>
+                  {WEIGHTS.folder > 0 && (
+                    <span className="smart-connections-legend-item" title={t('smartConnections.folderProximity')}>
+                      <span className="smart-connections-badge folder" style={{ width: 14, height: 14 }}>📁</span>
+                      {t('smartConnections.folder')}
                     </span>
-                    {t('smartConnections.folder')}
-                  </span>
+                  )}
                 </div>
                 <div className="smart-connections-list">
                   {similarNotes.map(note => (
@@ -603,16 +879,19 @@ export const SmartConnectionsPanel: React.FC<SmartConnectionsPanelProps> = ({ on
                               </svg>
                             </span>
                           )}
+                          {note.keywordMatch > 0.3 && (
+                            <span className="smart-connections-badge keyword" title={`Keyword-Match: ${(note.keywordMatch * 100).toFixed(0)}%`}>
+                              🔑
+                            </span>
+                          )}
                           {note.tagOverlap > 0 && (
                             <span className="smart-connections-badge tags" title={t('smartConnections.tagsOverlap', { percent: (note.tagOverlap * 100).toFixed(0) })}>
                               #
                             </span>
                           )}
-                          {note.folderProximity > 0.5 && (
+                          {WEIGHTS.folder > 0 && note.folderProximity > 0 && (
                             <span className="smart-connections-badge folder" title={t('smartConnections.folderProximityTooltip', { percent: (note.folderProximity * 100).toFixed(0) })}>
-                              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                                <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
-                              </svg>
+                              📁
                             </span>
                           )}
                         </div>
@@ -636,6 +915,35 @@ export const SmartConnectionsPanel: React.FC<SmartConnectionsPanelProps> = ({ on
           </>
         )}
       </div>
+
+      {/* Footer: Pending Notes Integration */}
+      {pendingNotes.length > 0 && isBackendAvailable && selectedModel && (
+        <div className="smart-connections-footer">
+          {isIntegrating ? (
+            <div className="smart-connections-integrating">
+              <div className="smart-connections-spinner small"></div>
+              <span>{t('smartConnections.integrating')} {progress.current}/{progress.total}</span>
+            </div>
+          ) : (
+            <>
+              <span className="smart-connections-pending-count">
+                {pendingNotes.length} {pendingNotes.length === 1 ? t('smartConnections.newNote') : t('smartConnections.newNotes')}
+              </span>
+              <button
+                className="smart-connections-integrate-btn"
+                onClick={integratePendingNotes}
+                title={t('smartConnections.integrateTooltip')}
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="12" y1="5" x2="12" y2="19"/>
+                  <line x1="5" y1="12" x2="19" y2="12"/>
+                </svg>
+                {t('smartConnections.integrate')}
+              </button>
+            </>
+          )}
+        </div>
+      )}
     </div>
   )
 }

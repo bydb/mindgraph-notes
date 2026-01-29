@@ -1986,6 +1986,38 @@ ipcMain.handle('load-notes-cache', async (_event, vaultPath: string) => {
   }
 })
 
+// Embeddings-Cache für Smart Connections (separate Datei pro Modell)
+ipcMain.handle('save-embeddings-cache', async (_event, vaultPath: string, model: string, cache: object) => {
+  try {
+    const mindgraphDir = path.join(vaultPath, '.mindgraph')
+    // Sanitize model name for filename (replace / and : with -)
+    const safeModelName = model.replace(/[/:]/g, '-')
+    const cacheFile = path.join(mindgraphDir, `embeddings-${safeModelName}.json`)
+
+    await fs.mkdir(mindgraphDir, { recursive: true })
+    await fs.writeFile(cacheFile, JSON.stringify(cache), 'utf-8')
+    console.log('[SmartConnections] Embeddings-Cache gespeichert:', Object.keys((cache as any).files || {}).length, 'Dateien')
+    return true
+  } catch (error) {
+    console.error('Fehler beim Speichern des Embeddings-Cache:', error)
+    return false
+  }
+})
+
+ipcMain.handle('load-embeddings-cache', async (_event, vaultPath: string, model: string) => {
+  try {
+    const safeModelName = model.replace(/[/:]/g, '-')
+    const cacheFile = path.join(vaultPath, '.mindgraph', `embeddings-${safeModelName}.json`)
+    const content = await fs.readFile(cacheFile, 'utf-8')
+    const cache = JSON.parse(content)
+    console.log('[SmartConnections] Embeddings-Cache geladen:', Object.keys(cache.files || {}).length, 'Dateien')
+    return cache
+  } catch (error) {
+    console.log('[SmartConnections] Kein Embeddings-Cache vorhanden für Modell:', model)
+    return null
+  }
+})
+
 // Alle Markdown-Dateien mit mtime abrufen (für Cache-Vergleich)
 ipcMain.handle('get-files-with-mtime', async (_event, vaultPath: string) => {
   const files: Array<{ path: string; mtime: number }> = []

@@ -209,6 +209,15 @@ interface LLMSettings {
   lmStudioPort: number  // Default: 1234
 }
 
+// Smart Connections Gewichtungen (User-konfigurierbar)
+export interface SmartConnectionsWeights {
+  embedding: number   // Semantische Ähnlichkeit (0-100)
+  keyword: number     // Keyword-Match (0-100)
+  wikilink: number    // Explizite Wikilinks (0-100)
+  tags: number        // Tag-Überlappung (0-100)
+  folder: number      // Ordner-Nähe (0-100)
+}
+
 // Legacy type alias for backward compatibility
 type OllamaSettings = LLMSettings
 
@@ -263,6 +272,9 @@ interface UIState {
   smartConnectionsEnabled: boolean
   notesChatEnabled: boolean
 
+  // Smart Connections Gewichtungen
+  smartConnectionsWeights: SmartConnectionsWeights
+
   // Actions
   setViewMode: (mode: ViewMode) => void
   setTheme: (theme: Theme) => void
@@ -300,6 +312,7 @@ interface UIState {
   setIconSet: (set: IconSet) => void
   setSmartConnectionsEnabled: (enabled: boolean) => void
   setNotesChatEnabled: (enabled: boolean) => void
+  setSmartConnectionsWeights: (weights: Partial<SmartConnectionsWeights>) => void
 }
 
 // Default-Werte für den Store
@@ -358,7 +371,16 @@ const defaultState = {
 
   // KI-Features (opt-in - Human in the Loop)
   smartConnectionsEnabled: false,
-  notesChatEnabled: false
+  notesChatEnabled: false,
+
+  // Smart Connections Gewichtungen (Summe sollte 100 ergeben)
+  smartConnectionsWeights: {
+    embedding: 50,   // Semantische Ähnlichkeit
+    keyword: 30,     // Keyword-Match
+    wikilink: 10,    // Explizite Wikilinks
+    tags: 10,        // Tag-Überlappung
+    folder: 0        // Ordner-Nähe (default: 0)
+  }
 }
 
 // Felder die persistiert werden sollen (keine Funktionen, keine transienten Werte)
@@ -370,7 +392,7 @@ const persistedKeys = [
   'canvasFilterPath', 'canvasViewMode', 'canvasShowTags', 'canvasShowLinks', 'canvasShowImages',
   'canvasCompactMode', 'canvasDefaultCardWidth', 'splitPosition', 'fileTreeDisplayMode', 'ollama',
   'pdfCompanionEnabled', 'pdfDisplayMode', 'iconSet',
-  'smartConnectionsEnabled', 'notesChatEnabled'
+  'smartConnectionsEnabled', 'notesChatEnabled', 'smartConnectionsWeights'
 ] as const
 
 export const useUIStore = create<UIState>()((set, get) => ({
@@ -412,7 +434,10 @@ export const useUIStore = create<UIState>()((set, get) => ({
   setPdfDisplayMode: (mode) => set({ pdfDisplayMode: mode }),
   setIconSet: (iconSet) => set({ iconSet }),
   setSmartConnectionsEnabled: (enabled) => set({ smartConnectionsEnabled: enabled }),
-  setNotesChatEnabled: (enabled) => set({ notesChatEnabled: enabled })
+  setNotesChatEnabled: (enabled) => set({ notesChatEnabled: enabled }),
+  setSmartConnectionsWeights: (weights) => set((state) => ({
+    smartConnectionsWeights: { ...state.smartConnectionsWeights, ...weights }
+  }))
 }))
 
 // Settings laden beim App-Start
