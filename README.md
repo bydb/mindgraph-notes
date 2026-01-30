@@ -38,6 +38,8 @@ Eine moderne, lokale Notiz-App die Markdown-Notizen mit einem Wissensgraphen und
 ### Weitere Features
 - Zotero Integration für Literaturverwaltung
 - PDF Viewer mit Companion-Notizen
+- Docling PDF-Extraktion (Text, Tabellen, Bilder)
+- LanguageTool Grammatik- & Rechtschreibprüfung
 - Template System
 - Volltext-Suche
 - Quick Switcher (⌘K)
@@ -48,7 +50,9 @@ Eine moderne, lokale Notiz-App die Markdown-Notizen mit einem Wissensgraphen und
 
 **macOS** (Apple Silicon & Intel): [mindgraph-notes.de/#download](https://mindgraph-notes.de/#download)
 
-Windows & Linux: Coming soon
+**Linux** (AppImage & .deb): [mindgraph-notes.de/#download](https://mindgraph-notes.de/#download)
+
+Windows: Coming soon
 
 ---
 
@@ -86,6 +90,17 @@ ollama pull llama3
 ```bash
 ollama run x/flux2-klein
 ```
+
+### Docling PDF-Extraktion
+```bash
+docker run -p 5001:5001 ds4sd/docling-serve
+```
+
+### LanguageTool Grammatikprüfung
+```bash
+docker run -d -p 8010:8010 erikvl87/languagetool
+```
+Alternativ: LanguageTool Premium API mit Username + API-Key in Einstellungen konfigurieren.
 
 ---
 

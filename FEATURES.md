@@ -150,6 +150,46 @@ Eine moderne Notiz-App mit Wissensgraph, gebaut mit Electron und React.
 - Als Fussnote mit vollstandiger Referenz
 - Automatische Formatierung
 
+## LanguageTool Integration
+
+### Grammatik- und Rechtschreibprufung
+- **Integrierte Prufung** direkt im Editor
+- Fehler werden farblich markiert:
+  - **Rot**: Rechtschreibfehler
+  - **Blau**: Grammatikfehler
+  - **Gelb**: Stilfehler
+- Klick auf Fehler zeigt **Korrekturvorschlage**
+- Ein-Klick-Korrektur
+
+### Betriebsmodi
+- **Lokal via Docker**: `docker run -d -p 8010:8010 erikvl87/languagetool`
+- **LanguageTool Premium API**: Mit Username und API-Key
+- Konfigurierbar in Einstellungen → Integrationen
+
+### Funktionen
+- Automatische Spracherkennung oder manuelle Auswahl
+- **Ignorieren-Funktion** fur falsch-positive Meldungen
+- Persistente Speicherung ignorierter Regeln
+- YAML-Frontmatter wird automatisch ausgeschlossen
+- "Prufen"-Button im Editor-Header
+
+## Smart Connections
+
+### KI-basierte Ahnlichkeitssuche
+- Findet ahnliche Notizen automatisch
+- **Konfigurierbare Gewichtungen**:
+  - Embedding-Ahnlichkeit (semantisch)
+  - Keyword-Matching
+  - Wikilink-Verbindungen
+  - Gemeinsame Tags
+  - Ordner-Nahe
+
+### Smart Connections Panel
+- Zeigt ahnliche Notizen mit Scores
+- Detaillierte Aufschlusselung der Ahnlichkeit
+- Klick offnet die Notiz
+- Erfordert Ollama fur Embeddings
+
 ## PDF-Features
 
 ### PDF-Viewer
@@ -162,6 +202,13 @@ Eine moderne Notiz-App mit Wissensgraph, gebaut mit Electron und React.
 - Ermoglicht Tagging und Verlinkung
 - Notizen zum PDF
 - Konfigurierbare Anzeige im Dateibaum
+
+### Docling PDF-Extraktion
+- **Automatische Extraktion** von Text, Tabellen und Bildern
+- Konvertiert PDFs zu sauberem Markdown
+- **OCR-Support** fur gescannte Dokumente
+- Lokale Verarbeitung via Docker (`docker run -p 5001:5001 ds4sd/docling-serve`)
+- Konfigurierbar in Einstellungen → Integrationen
 
 ### PDF-Export
 - Notizen als PDF exportieren

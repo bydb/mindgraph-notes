@@ -2,6 +2,51 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [1.0.6] - 2026-01-30
+
+### Features
+- **LanguageTool Integration**: Integrierte Grammatik- und Rechtschreibprüfung
+  - Unterstützt lokale Docker-Instanz (`docker run -d -p 8010:8010 erikvl87/languagetool`)
+  - Unterstützt LanguageTool Premium API mit Username + API-Key
+  - Fehler werden direkt im Editor markiert (rot = Rechtschreibung, blau = Grammatik, gelb = Stil)
+  - Klick auf markierte Fehler zeigt Popup mit Korrekturvorschlägen
+  - "Ignorieren"-Funktion mit persistenter Speicherung
+  - YAML-Frontmatter wird automatisch von der Prüfung ausgeschlossen
+  - Konfigurierbare Sprache (automatisch, Deutsch, Englisch, etc.)
+
+### Technische Änderungen
+- Neues CodeMirror Extension für LanguageTool mit StateField und ViewPlugin
+- IPC-Handler für lokale und API-basierte Grammatikprüfung
+- Persistente Speicherung von ignorierten Regeln im uiStore
+
+## [1.0.5] - 2026-01-29
+
+### Features
+- **Docling PDF-Extraktion**: Automatische Text-, Tabellen- und Bildextraktion aus PDFs
+  - Docker-Integration (`docker run -p 5001:5001 ds4sd/docling-serve`)
+  - Konvertiert PDFs zu sauberem Markdown
+  - OCR-Support für gescannte Dokumente
+  - Konfigurierbar in Einstellungen → Integrationen
+
+### Technische Änderungen
+- IPC-Handler für Docling-API-Kommunikation
+- PDF-Extraktion UI im PDF Viewer
+
+## [1.0.4] - 2026-01-29
+
+### Features
+- **Smart Connections**: KI-basierte ähnliche Notizen mit konfigurierbaren Gewichtungen
+  - Embedding-Ähnlichkeit (semantisch)
+  - Keyword-Matching
+  - Wikilink-Verbindungen
+  - Gemeinsame Tags
+  - Ordner-Nähe
+  - Gewichtungen individuell anpassbar in Einstellungen
+
+### Verbesserungen
+- Smart Connections Panel zeigt detaillierte Scores
+- Performance-Optimierungen für große Vaults
+
 ## [1.0.3] - 2026-01-29
 
 ### Features
