@@ -2475,6 +2475,90 @@ ipcMain.handle('docling-convert-pdf', async (_event, pdfPath: string, baseUrl?: 
   }
 })
 
+// ============ LANGUAGETOOL GRAMMAR/SPELL CHECK API ============
+const LANGUAGETOOL_DEFAULT_URL = 'http://localhost:8010'
+const LANGUAGETOOL_API_URL = 'https://api.languagetool.org'
+const LANGUAGETOOL_API_PREMIUM_URL = 'https://api.languagetoolplus.com'
+
+// Helper: Get the correct URL based on mode
+function getLanguageToolUrl(mode: 'local' | 'api', localUrl?: string, apiKey?: string): string {
+  if (mode === 'api') {
+    // Use premium URL if API key is provided, otherwise free API
+    return apiKey ? LANGUAGETOOL_API_PREMIUM_URL : LANGUAGETOOL_API_URL
+  }
+  return localUrl || LANGUAGETOOL_DEFAULT_URL
+}
+
+// Prüft ob LanguageTool API erreichbar ist
+ipcMain.handle('languagetool-check', async (_event, mode: 'local' | 'api' = 'local', localUrl?: string, apiKey?: string) => {
+  const url = getLanguageToolUrl(mode, localUrl, apiKey)
+  try {
+    // LanguageTool hat keinen echten /health endpoint, also prüfen wir /v2/languages
+    const response = await fetch(`${url}/v2/languages`, {
+      method: 'GET',
+      signal: AbortSignal.timeout(5000)
+    })
+    return { available: response.ok }
+  } catch (error) {
+    console.log('[LanguageTool] Health check failed:', error)
+    return { available: false }
+  }
+})
+
+// Text via LanguageTool prüfen
+ipcMain.handle('languagetool-analyze', async (
+  _event,
+  text: string,
+  language?: string,
+  mode: 'local' | 'api' = 'local',
+  localUrl?: string,
+  apiUsername?: string,
+  apiKey?: string
+) => {
+  const url = getLanguageToolUrl(mode, localUrl, apiKey)
+  console.log('[LanguageTool] Analyzing text, mode:', mode, 'length:', text.length, 'language:', language || 'auto')
+
+  try {
+    const params = new URLSearchParams()
+    params.append('text', text)
+    params.append('language', language || 'auto')
+
+    // Add credentials for premium API
+    if (mode === 'api' && apiUsername && apiKey) {
+      params.append('username', apiUsername)
+      params.append('apiKey', apiKey)
+    }
+
+    const response = await fetch(`${url}/v2/check`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Accept': 'application/json'
+      },
+      body: params.toString(),
+      signal: AbortSignal.timeout(30000)  // 30s Timeout für lange Texte
+    })
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error('[LanguageTool] API error:', response.status, errorText)
+      return { success: false, error: `LanguageTool API Fehler: ${response.status}` }
+    }
+
+    const data = await response.json()
+    console.log('[LanguageTool] Found', data.matches?.length || 0, 'issues')
+
+    return {
+      success: true,
+      matches: data.matches || [],
+      detectedLanguage: data.language?.detectedLanguage?.code || data.language?.code
+    }
+  } catch (error) {
+    console.error('[LanguageTool] Analysis error:', error)
+    return { success: false, error: error instanceof Error ? error.message : 'Unbekannter Fehler' }
+  }
+})
+
 // ============ WIKILINK STRIPPING ============
 
 // Entfernt Wikilink-Klammern aus Text, behält den Text

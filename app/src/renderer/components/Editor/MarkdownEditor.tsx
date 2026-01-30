@@ -19,6 +19,7 @@ import { extractLinks, extractTags, extractTitle, extractHeadings, extractBlocks
 import { WikilinkAutocomplete, AutocompleteMode, BlockSelectionInfo } from './WikilinkAutocomplete'
 import { livePreviewExtension } from './extensions/livePreview'
 import { imageHandlingExtension } from './extensions/imageHandling'
+import { languageToolExtension, setLanguageToolMatches, setLtErrorClickHandler, type LanguageToolMatch, type LanguageToolPopupMatch } from './extensions/languageTool'
 import { AIContextMenu, AIResult } from './AIContextMenu'
 import { AIImageDialog } from './AIImageDialog'
 import { insertAIResultWithFootnote } from '../../utils/aiFootnote'
@@ -419,7 +420,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
   const isExternalUpdateRef = useRef(false)
 
   const { vaultPath, selectedNoteId, secondarySelectedNoteId, notes, updateNote, selectNote, selectSecondaryNote, addNote, fileTree, setFileTree, navigateBack, navigateForward, canNavigateBack, canNavigateForward } = useNotesStore()
-  const { pendingTemplateInsert, setPendingTemplateInsert, ollama, editorHeadingFolding, editorOutlining, outlineStyle, editorShowWordCount } = useUIStore()
+  const { pendingTemplateInsert, setPendingTemplateInsert, ollama, editorHeadingFolding, editorOutlining, outlineStyle, editorShowWordCount, languageTool, setLanguageTool } = useUIStore()
 
   // Verwende die übergebene noteId oder die primary/secondary Selection
   const effectiveNoteId = noteId ?? (isSecondary ? secondarySelectedNoteId : selectedNoteId)
@@ -432,6 +433,12 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
   const [foldedHeadings, setFoldedHeadings] = useState<Set<string>>(new Set())
   const [aiMenu, setAiMenu] = useState<{ x: number; y: number; selectedText: string; selectionStart: number; selectionEnd: number } | null>(null)
   const [showAIImageDialog, setShowAIImageDialog] = useState(false)
+
+  // LanguageTool State
+  const [ltMatches, setLtMatches] = useState<LanguageToolMatch[]>([])
+  const [ltIsChecking, setLtIsChecking] = useState(false)
+  const [ltPopup, setLtPopup] = useState<{ x: number; y: number; match: LanguageToolPopupMatch } | null>(null)
+  const ltCheckTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   // Wikilink Hover Preview State
   const [hoverPreview, setHoverPreview] = useState<{
@@ -678,6 +685,176 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
       saveContent(content)
     }, 500)
   }, [saveContent])
+
+  // LanguageTool: Text prüfen (YAML-Header wird ausgeschlossen)
+  const checkLanguageTool = useCallback(async () => {
+    if (!viewRef.current || !languageTool.enabled) return
+
+    const content = viewRef.current.state.doc.toString()
+    if (!content.trim()) {
+      setLtMatches([])
+      return
+    }
+
+    // Strip YAML frontmatter from check (but remember offset for positioning)
+    let textToCheck = content
+    let frontmatterOffset = 0
+    const yamlMatch = content.match(/^---\n[\s\S]*?\n---\n/)
+    if (yamlMatch) {
+      frontmatterOffset = yamlMatch[0].length
+      textToCheck = content.substring(frontmatterOffset)
+    }
+
+    if (!textToCheck.trim()) {
+      setLtMatches([])
+      return
+    }
+
+    setLtIsChecking(true)
+    try {
+      const mode = languageTool.mode || 'local'
+      const result = await window.electronAPI.languagetoolAnalyze(
+        textToCheck,
+        languageTool.language === 'auto' ? undefined : languageTool.language,
+        mode,
+        mode === 'local' ? languageTool.url : undefined,
+        mode === 'api' ? languageTool.apiUsername : undefined,
+        mode === 'api' ? languageTool.apiKey : undefined
+      )
+
+      if (result.success && result.matches) {
+        // Adjust offsets to account for stripped frontmatter
+        const adjustedMatches = result.matches.map(match => ({
+          ...match,
+          offset: match.offset + frontmatterOffset
+        }))
+
+        // Filter out ignored matches
+        const ignoredRules = languageTool.ignoredRules || []
+        const filteredMatches = adjustedMatches.filter(match => {
+          const matchText = content.substring(match.offset, match.offset + match.length)
+          const isIgnored = ignoredRules.some(r => r.ruleId === match.rule.id && r.text === matchText)
+          return !isIgnored
+        })
+
+        setLtMatches(filteredMatches)
+        // Update CodeMirror decorations
+        if (viewRef.current) {
+          viewRef.current.dispatch({
+            effects: setLanguageToolMatches.of(filteredMatches)
+          })
+        }
+      } else {
+        console.error('[LanguageTool] Error:', result.error)
+      }
+    } catch (error) {
+      console.error('[LanguageTool] Check failed:', error)
+    } finally {
+      setLtIsChecking(false)
+    }
+  }, [languageTool.enabled, languageTool.language, languageTool.url, languageTool.mode, languageTool.apiUsername, languageTool.apiKey, languageTool.ignoredRules])
+
+  // LanguageTool: Auto-Check bei Änderungen
+  useEffect(() => {
+    if (!languageTool.enabled || !languageTool.autoCheck || viewMode === 'preview') return
+
+    // Clear previous timeout
+    if (ltCheckTimeoutRef.current) {
+      clearTimeout(ltCheckTimeoutRef.current)
+    }
+
+    // Set new timeout when content changes
+    const handleChange = () => {
+      if (ltCheckTimeoutRef.current) {
+        clearTimeout(ltCheckTimeoutRef.current)
+      }
+      ltCheckTimeoutRef.current = setTimeout(checkLanguageTool, languageTool.autoCheckDelay)
+    }
+
+    // Initial check
+    handleChange()
+
+    return () => {
+      if (ltCheckTimeoutRef.current) {
+        clearTimeout(ltCheckTimeoutRef.current)
+      }
+    }
+  }, [languageTool.enabled, languageTool.autoCheck, languageTool.autoCheckDelay, previewContent, viewMode, checkLanguageTool])
+
+  // LanguageTool: Clear matches when note changes
+  useEffect(() => {
+    setLtMatches([])
+    setLtPopup(null)
+    if (viewRef.current) {
+      viewRef.current.dispatch({
+        effects: setLanguageToolMatches.of([])
+      })
+    }
+  }, [selectedNoteId])
+
+  // LanguageTool: Apply suggestion
+  const applyLtSuggestion = useCallback((replacement: string, from: number, to: number) => {
+    if (!viewRef.current) return
+
+    viewRef.current.dispatch({
+      changes: { from, to, insert: replacement }
+    })
+    setLtPopup(null)
+
+    // Re-check after applying
+    if (languageTool.autoCheck) {
+      setTimeout(checkLanguageTool, 500)
+    }
+  }, [languageTool.autoCheck, checkLanguageTool])
+
+  // LanguageTool: Ignore a match (remove from list and persist)
+  const ignoreLtMatch = useCallback((from: number, to: number, ruleId: string, text: string) => {
+    // Remove the match from the list
+    const newMatches = ltMatches.filter(m => !(m.offset === from && m.offset + m.length === to))
+    setLtMatches(newMatches)
+
+    // Update CodeMirror decorations
+    if (viewRef.current) {
+      viewRef.current.dispatch({
+        effects: setLanguageToolMatches.of(newMatches)
+      })
+    }
+
+    // Persist the ignored rule (only if not already ignored)
+    const alreadyIgnored = languageTool.ignoredRules?.some(r => r.ruleId === ruleId && r.text === text)
+    if (!alreadyIgnored) {
+      setLanguageTool({
+        ignoredRules: [...(languageTool.ignoredRules || []), { ruleId, text }]
+      })
+    }
+
+    setLtPopup(null)
+  }, [ltMatches, languageTool.ignoredRules, setLanguageTool])
+
+  // LanguageTool: Setup click handler for error elements via CodeMirror extension
+  useEffect(() => {
+    if (!languageTool.enabled) {
+      setLtErrorClickHandler(null)
+      return
+    }
+
+    setLtErrorClickHandler((event: MouseEvent, matchData: string) => {
+      try {
+        const match = JSON.parse(matchData) as LanguageToolPopupMatch
+        setLtPopup({
+          x: event.clientX,
+          y: event.clientY,
+          match
+        })
+      } catch (err) {
+        console.error('[LanguageTool] Failed to parse match data:', err)
+      }
+    })
+
+    return () => {
+      setLtErrorClickHandler(null)
+    }
+  }, [languageTool.enabled])
 
   // Wikilink Autocomplete Selection Handler
   const handleAutocompleteSelect = useCallback(async (value: string, mode: AutocompleteMode, blockInfo?: BlockSelectionInfo) => {
@@ -942,6 +1119,8 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
           imageHandlingExtension({ vaultPath: vaultPath || '' }),
           // Live Preview extension compartment (starts empty, can be reconfigured)
           livePreviewCompartment.of([]),
+          // LanguageTool extension for grammar/spell checking
+          languageToolExtension({ enabled: languageTool.enabled }),
           EditorView.updateListener.of((update) => {
             if (update.docChanged) {
               const newContent = update.state.doc.toString()
@@ -2107,6 +2286,29 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
               </svg>
             </button>
           )}
+          {/* LanguageTool Check Button */}
+          {languageTool.enabled && viewMode !== 'preview' && (
+            <button
+              className={`lt-check-btn ${ltIsChecking ? 'checking' : ''}`}
+              onClick={checkLanguageTool}
+              disabled={ltIsChecking}
+              title={t('languagetool.check')}
+            >
+              {ltIsChecking ? (
+                <svg width="16" height="16" viewBox="0 0 16 16" className="lt-spinner">
+                  <circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" strokeWidth="2" strokeDasharray="20 10" />
+                </svg>
+              ) : (
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                  <path d="M13.5 4.5L6 12L2.5 8.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              )}
+              {t('languagetool.check')}
+              {ltMatches.length > 0 && (
+                <span className="lt-error-badge">{ltMatches.length}</span>
+              )}
+            </button>
+          )}
           <button
             className="export-btn"
             onClick={handleExportPDF}
@@ -2256,6 +2458,62 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
             className="wikilink-hover-preview-content"
             dangerouslySetInnerHTML={{ __html: md.render(hoverPreview.content) }}
           />
+        </div>
+      )}
+
+      {/* LanguageTool Error Popup */}
+      {ltPopup && (
+        <div
+          className="lt-popup"
+          style={{
+            position: 'fixed',
+            left: ltPopup.x,
+            top: ltPopup.y,
+            zIndex: 1001
+          }}
+        >
+          <div className="lt-popup-header">
+            <span className={`lt-popup-icon lt-${ltPopup.match.category}`}>
+              {ltPopup.match.category === 'spelling' ? '📝' :
+               ltPopup.match.category === 'grammar' ? '📖' :
+               ltPopup.match.category === 'style' ? '✨' : '📌'}
+            </span>
+            <span className="lt-popup-message">{ltPopup.match.shortMessage || ltPopup.match.message}</span>
+            <button
+              className="lt-popup-close"
+              onClick={() => setLtPopup(null)}
+            >
+              ✕
+            </button>
+          </div>
+          {ltPopup.match.message !== ltPopup.match.shortMessage && (
+            <div className="lt-popup-detail">{ltPopup.match.message}</div>
+          )}
+          {ltPopup.match.replacements && ltPopup.match.replacements.length > 0 && (
+            <div className="lt-popup-suggestions">
+              <div className="lt-popup-suggestions-label">{t('languagetool.suggestions')}:</div>
+              <div className="lt-popup-suggestions-list">
+                {ltPopup.match.replacements.slice(0, 5).map((r, i) => (
+                  <button
+                    key={i}
+                    className="lt-suggestion-btn"
+                    onClick={() => applyLtSuggestion(r.value, ltPopup.match.from, ltPopup.match.to)}
+                  >
+                    {r.value}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          <button
+            className="lt-ignore-btn"
+            onClick={() => {
+              const text = viewRef.current?.state.doc.sliceString(ltPopup.match.from, ltPopup.match.to) || ''
+              ignoreLtMatch(ltPopup.match.from, ltPopup.match.to, ltPopup.match.ruleId, text)
+            }}
+          >
+            {t('languagetool.ignore')}
+          </button>
         </div>
       )}
     </div>

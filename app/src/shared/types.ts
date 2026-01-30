@@ -346,12 +346,57 @@ export interface ElectronAPI {
     sourceFile?: string;
     error?: string;
   }>;
+
+  // LanguageTool Grammar/Spell Check API
+  languagetoolCheck: (mode?: 'local' | 'api', localUrl?: string, apiKey?: string) => Promise<{
+    available: boolean;
+  }>;
+  languagetoolAnalyze: (text: string, language?: string, mode?: 'local' | 'api', localUrl?: string, apiUsername?: string, apiKey?: string) => Promise<{
+    success: boolean;
+    matches?: LanguageToolMatch[];
+    detectedLanguage?: string;
+    error?: string;
+  }>;
 }
 
 // Docling Options for PDF conversion
 export interface DoclingOptions {
   ocrEnabled?: boolean;
   ocrLanguages?: string[];
+}
+
+// LanguageTool Settings
+export interface LanguageToolSettings {
+  enabled: boolean;
+  url: string;
+  language: string;  // 'auto', 'de-DE', 'en-US', etc.
+  autoCheck: boolean;
+  autoCheckDelay: number;  // ms
+}
+
+// LanguageTool API Response Types
+export interface LanguageToolMatch {
+  message: string;
+  shortMessage: string;
+  offset: number;
+  length: number;
+  replacements: Array<{ value: string }>;
+  rule: {
+    id: string;
+    category: { id: string; name: string };
+  };
+}
+
+export interface LanguageToolResponse {
+  matches: LanguageToolMatch[];
+  language: {
+    name: string;
+    code: string;
+    detectedLanguage?: {
+      name: string;
+      code: string;
+    };
+  };
 }
 
 declare global {

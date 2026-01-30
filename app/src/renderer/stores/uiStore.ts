@@ -226,6 +226,24 @@ export interface DoclingSettings {
   ocrLanguages: string[]
 }
 
+// LanguageTool Grammar/Spell Check Settings
+export interface LanguageToolIgnoredRule {
+  ruleId: string
+  text: string  // The ignored text for this rule
+}
+
+export interface LanguageToolSettings {
+  enabled: boolean
+  mode: 'local' | 'api'  // local = Docker, api = LanguageTool API
+  url: string  // For local mode
+  apiUsername: string  // For Premium API (email)
+  apiKey: string  // For API mode (optional for free tier, required for premium)
+  language: string  // 'auto', 'de-DE', 'en-US', etc.
+  autoCheck: boolean
+  autoCheckDelay: number  // ms
+  ignoredRules: LanguageToolIgnoredRule[]  // Persisted ignored matches
+}
+
 // Legacy type alias for backward compatibility
 type OllamaSettings = LLMSettings
 
@@ -286,6 +304,9 @@ interface UIState {
   // Docling PDF Extraction Settings
   docling: DoclingSettings
 
+  // LanguageTool Settings
+  languageTool: LanguageToolSettings
+
   // Actions
   setViewMode: (mode: ViewMode) => void
   setTheme: (theme: Theme) => void
@@ -325,6 +346,7 @@ interface UIState {
   setNotesChatEnabled: (enabled: boolean) => void
   setSmartConnectionsWeights: (weights: Partial<SmartConnectionsWeights>) => void
   setDocling: (settings: Partial<DoclingSettings>) => void
+  setLanguageTool: (settings: Partial<LanguageToolSettings>) => void
 }
 
 // Default-Werte für den Store
@@ -400,6 +422,19 @@ const defaultState = {
     url: 'http://localhost:5001',
     ocrEnabled: false,
     ocrLanguages: ['de', 'en']
+  },
+
+  // LanguageTool Settings
+  languageTool: {
+    enabled: false,
+    mode: 'local' as const,
+    url: 'http://localhost:8010',
+    apiUsername: '',
+    apiKey: '',
+    language: 'auto',
+    autoCheck: false,
+    autoCheckDelay: 1500,
+    ignoredRules: []
   }
 }
 
@@ -412,7 +447,7 @@ const persistedKeys = [
   'canvasFilterPath', 'canvasViewMode', 'canvasShowTags', 'canvasShowLinks', 'canvasShowImages',
   'canvasCompactMode', 'canvasDefaultCardWidth', 'splitPosition', 'fileTreeDisplayMode', 'ollama',
   'pdfCompanionEnabled', 'pdfDisplayMode', 'iconSet',
-  'smartConnectionsEnabled', 'notesChatEnabled', 'smartConnectionsWeights', 'docling'
+  'smartConnectionsEnabled', 'notesChatEnabled', 'smartConnectionsWeights', 'docling', 'languageTool'
 ] as const
 
 export const useUIStore = create<UIState>()((set, get) => ({
@@ -460,6 +495,9 @@ export const useUIStore = create<UIState>()((set, get) => ({
   })),
   setDocling: (settings) => set((state) => ({
     docling: { ...state.docling, ...settings }
+  })),
+  setLanguageTool: (settings) => set((state) => ({
+    languageTool: { ...state.languageTool, ...settings }
   }))
 }))
 

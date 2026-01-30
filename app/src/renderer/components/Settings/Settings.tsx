@@ -42,6 +42,7 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
   const [lmstudioStatus, setLmstudioStatus] = useState<'checking' | 'connected' | 'disconnected'>('checking')
   const [doclingStatus, setDoclingStatus] = useState<'checking' | 'connected' | 'disconnected'>('checking')
   const [doclingVersion, setDoclingVersion] = useState<string>('')
+  const [languageToolStatus, setLanguageToolStatus] = useState<'checking' | 'connected' | 'disconnected'>('checking')
   const [ollamaModels, setOllamaModels] = useState<Array<{ name: string; size: number }>>([])
   const [lmstudioModels, setLmstudioModels] = useState<Array<{ name: string; size: number }>>([])
 
@@ -92,7 +93,9 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
     smartConnectionsWeights,
     setSmartConnectionsWeights,
     docling,
-    setDocling
+    setDocling,
+    languageTool,
+    setLanguageTool
   } = useUIStore()
 
   const { t } = useTranslation()
@@ -112,6 +115,7 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
       checkOllamaConnection()
       checkLmstudioConnection()
       checkDoclingConnection()
+      checkLanguageToolConnection()
     }
   }, [isOpen, activeTab])
 
@@ -186,6 +190,21 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
       }
     } catch {
       setDoclingStatus('disconnected')
+    }
+  }
+
+  const checkLanguageToolConnection = async () => {
+    setLanguageToolStatus('checking')
+    try {
+      const mode = languageTool.mode || 'local'
+      const result = await window.electronAPI.languagetoolCheck(
+        mode,
+        mode === 'local' ? languageTool.url : undefined,
+        mode === 'api' ? languageTool.apiKey : undefined
+      )
+      setLanguageToolStatus(result.available ? 'connected' : 'disconnected')
+    } catch {
+      setLanguageToolStatus('disconnected')
     }
   }
 
@@ -1155,6 +1174,159 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
                   <p>
                     {t('settings.docling.installHint')} <code>docker run -p 5001:5001 ds4sd/docling-serve</code>
                   </p>
+                </div>
+
+                <h3 style={{ marginTop: '32px' }}>{t('settings.languagetool.title')}</h3>
+                <div className="settings-row">
+                  <label>{t('settings.languagetool.enabled')}</label>
+                  <input
+                    type="checkbox"
+                    checked={languageTool.enabled}
+                    onChange={e => setLanguageTool({ enabled: e.target.checked })}
+                  />
+                </div>
+
+                <div className="settings-row">
+                  <label>{t('settings.languagetool.mode')}</label>
+                  <select
+                    value={languageTool.mode || 'local'}
+                    onChange={e => setLanguageTool({ mode: e.target.value as 'local' | 'api' })}
+                    disabled={!languageTool.enabled}
+                  >
+                    <option value="local">{t('settings.languagetool.modeLocal')}</option>
+                    <option value="api">{t('settings.languagetool.modeApi')}</option>
+                  </select>
+                </div>
+
+                {(languageTool.mode || 'local') === 'local' && (
+                  <div className="settings-row">
+                    <label>{t('settings.languagetool.url')}</label>
+                    <div className="settings-input-group">
+                      <input
+                        type="text"
+                        value={languageTool.url}
+                        onChange={e => setLanguageTool({ url: e.target.value })}
+                        placeholder="http://localhost:8010"
+                        disabled={!languageTool.enabled}
+                        style={{ width: '200px' }}
+                      />
+                      <button className="settings-refresh" onClick={checkLanguageToolConnection}>
+                        {t('settings.connect')}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {(languageTool.mode || 'local') === 'api' && (
+                  <>
+                    <div className="settings-row">
+                      <label>{t('settings.languagetool.apiUsername')}</label>
+                      <input
+                        type="email"
+                        value={languageTool.apiUsername || ''}
+                        onChange={e => setLanguageTool({ apiUsername: e.target.value })}
+                        placeholder={t('settings.languagetool.apiUsernamePlaceholder')}
+                        disabled={!languageTool.enabled}
+                        style={{ width: '250px' }}
+                      />
+                    </div>
+                    <div className="settings-row">
+                      <label>{t('settings.languagetool.apiKey')}</label>
+                      <div className="settings-input-group">
+                        <input
+                          type="password"
+                          value={languageTool.apiKey || ''}
+                          onChange={e => setLanguageTool({ apiKey: e.target.value })}
+                          placeholder={t('settings.languagetool.apiKeyPlaceholder')}
+                          disabled={!languageTool.enabled}
+                          style={{ width: '200px' }}
+                        />
+                        <button className="settings-refresh" onClick={checkLanguageToolConnection}>
+                          {t('settings.connect')}
+                        </button>
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                <div className="settings-row">
+                  <label>Status</label>
+                  <div className="settings-status">
+                    {languageToolStatus === 'checking' && (
+                      <span className="status-checking">{t('settings.checkingConnection')}</span>
+                    )}
+                    {languageToolStatus === 'connected' && (
+                      <span className="status-connected">{t('settings.connected')}</span>
+                    )}
+                    {languageToolStatus === 'disconnected' && (
+                      <span className="status-disconnected">{t('settings.notConnected')}</span>
+                    )}
+                    <button className="settings-refresh" onClick={checkLanguageToolConnection}>
+                      {t('settings.refresh')}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="settings-row">
+                  <label>{t('settings.languagetool.language')}</label>
+                  <select
+                    value={languageTool.language}
+                    onChange={e => setLanguageTool({ language: e.target.value })}
+                    disabled={!languageTool.enabled}
+                  >
+                    <option value="auto">{t('settings.languagetool.languageAuto')}</option>
+                    <option value="de-DE">Deutsch</option>
+                    <option value="en-US">English (US)</option>
+                    <option value="en-GB">English (UK)</option>
+                    <option value="fr">Français</option>
+                    <option value="es">Español</option>
+                    <option value="it">Italiano</option>
+                    <option value="pt-PT">Português</option>
+                    <option value="nl">Nederlands</option>
+                    <option value="pl-PL">Polski</option>
+                  </select>
+                </div>
+
+                <div className="settings-row">
+                  <label>{t('settings.languagetool.autoCheck')}</label>
+                  <input
+                    type="checkbox"
+                    checked={languageTool.autoCheck}
+                    onChange={e => setLanguageTool({ autoCheck: e.target.checked })}
+                    disabled={!languageTool.enabled}
+                  />
+                </div>
+
+                <div className="settings-row">
+                  <label>{t('settings.languagetool.autoCheckDelay')}</label>
+                  <div className="settings-input-group">
+                    <input
+                      type="number"
+                      min="500"
+                      max="5000"
+                      step="100"
+                      value={languageTool.autoCheckDelay}
+                      onChange={e => setLanguageTool({ autoCheckDelay: parseInt(e.target.value) || 1500 })}
+                      disabled={!languageTool.enabled || !languageTool.autoCheck}
+                      style={{ width: '80px' }}
+                    />
+                    <span>ms</span>
+                  </div>
+                </div>
+
+                <div className="settings-info">
+                  <p>
+                    <strong>LanguageTool</strong> {t('settings.languagetool.description')}
+                  </p>
+                  {(languageTool.mode || 'local') === 'local' ? (
+                    <p>
+                      {t('settings.languagetool.installHint')} <code>docker run -d -p 8010:8010 erikvl87/languagetool</code>
+                    </p>
+                  ) : (
+                    <p>
+                      {t('settings.languagetool.apiHint')}
+                    </p>
+                  )}
                 </div>
               </div>
             )}

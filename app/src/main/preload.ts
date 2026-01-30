@@ -141,6 +141,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   doclingConvertPdf: (pdfPath: string, baseUrl?: string, options?: { ocrEnabled?: boolean; ocrLanguages?: string[] }) =>
     ipcRenderer.invoke('docling-convert-pdf', pdfPath, baseUrl, options),
 
+  // LanguageTool Grammar/Spell Check API
+  languagetoolCheck: (mode?: 'local' | 'api', localUrl?: string, apiKey?: string) =>
+    ipcRenderer.invoke('languagetool-check', mode || 'local', localUrl, apiKey),
+  languagetoolAnalyze: (text: string, language?: string, mode?: 'local' | 'api', localUrl?: string, apiUsername?: string, apiKey?: string) =>
+    ipcRenderer.invoke('languagetool-analyze', text, language, mode || 'local', localUrl, apiUsername, apiKey),
+
   onNotificationClicked: (callback: (noteId: string) => void) => {
     ipcRenderer.removeAllListeners('notification-clicked')
     ipcRenderer.on('notification-clicked', (_event, noteId) => callback(noteId))
