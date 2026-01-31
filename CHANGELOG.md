@@ -15,6 +15,15 @@ Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 ### UI-Verbesserungen
 - Ausgewählter Zielordner wird visuell hervorgehoben
 - Verhindert Verschieben eines Ordners in sich selbst
+- **Einheitliches Design-System**: Konsistente Abstände und Button-Größen
+  - Alle Header (Sidebar, Tab-Bar, Editor) auf 44px Höhe vereinheitlicht
+  - Einheitliche Button-Größen (28px) über die gesamte App
+  - Konsistente horizontale Abstände (16px)
+  - Tab-Bereich an Radius-Ausrichtung angepasst
+  - SVG-Icons statt Emojis in der Sidebar
+
+### Fixes
+- NotesChat: Scroll-Bug behoben (Fenster scrollte bei LLM-Streaming weg)
 
 ## [1.0.6] - 2026-01-30
 
