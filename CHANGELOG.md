@@ -2,6 +2,20 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [1.0.7] - 2026-01-31
+
+### Features
+- **Verschieben nach...**: Neue Kontextmenü-Option im Dateibaum
+  - Dateien und Ordner können in andere Ordner verschoben werden
+  - Dialog zeigt alle verfügbaren Ordner mit Einrückung an
+  - Ordner-Farben und -Icons werden im Dialog angezeigt
+  - Explizite Bestätigung durch "Verschieben"-Button
+  - Vault-Root als Ziel verfügbar
+
+### UI-Verbesserungen
+- Ausgewählter Zielordner wird visuell hervorgehoben
+- Verhindert Verschieben eines Ordners in sich selbst
+
 ## [1.0.6] - 2026-01-30
 
 ### Features

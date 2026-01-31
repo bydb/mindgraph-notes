@@ -31,6 +31,11 @@ interface ContextMenuState {
   entry: FileEntry
 }
 
+interface MoveDialogState {
+  entry: FileEntry
+  selectedTargetPath: string | null
+}
+
 // SVG Icons
 const ChevronIcon: React.FC<{ open: boolean }> = ({ open }) => (
   <svg
@@ -176,10 +181,11 @@ const FileItem: React.FC<FileItemProps> = ({ entry, level, onDrop, displayMode }
   const [editName, setEditName] = useState('')
   const [isDragOver, setIsDragOver] = useState(false)
   const [pickerDialog, setPickerDialog] = useState<{ type: 'color' | 'icon'; path: string } | null>(null)
+  const [moveDialog, setMoveDialog] = useState<MoveDialogState | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const rowRef = useRef<HTMLDivElement>(null)
 
-  const { selectedNoteId, secondarySelectedNoteId, selectedPdfPath, selectedImagePath, selectNote, selectSecondaryNote, selectPdf, selectImage, removeNote, setFileTree, vaultPath, notes, updateNotePath } = useNotesStore()
+  const { selectedNoteId, secondarySelectedNoteId, selectedPdfPath, selectedImagePath, selectNote, selectSecondaryNote, selectPdf, selectImage, removeNote, setFileTree, vaultPath, notes, updateNotePath, fileTree } = useNotesStore()
   const { iconSet, textSplitEnabled } = useUIStore()
   const { fileCustomizations, setFileCustomization, removeFileCustomization } = useGraphStore()
   const { openCanvasTab } = useTabStore()
@@ -557,6 +563,81 @@ const FileItem: React.FC<FileItemProps> = ({ entry, level, onDrop, displayMode }
     setContextMenu(null)
   }, [contextMenu, removeFileCustomization])
 
+  // Collect all folders from file tree
+  const collectFolders = useCallback((entries: FileEntry[], parentPath: string = ''): Array<{ path: string; name: string; depth: number }> => {
+    const folders: Array<{ path: string; name: string; depth: number }> = []
+    const depth = parentPath ? parentPath.split('/').length : 0
+
+    for (const entry of entries) {
+      if (entry.isDirectory) {
+        folders.push({ path: entry.path, name: entry.name, depth })
+        if (entry.children) {
+          folders.push(...collectFolders(entry.children, entry.path))
+        }
+      }
+    }
+    return folders
+  }, [])
+
+  // Open move dialog
+  const handleOpenMoveDialog = useCallback(() => {
+    if (!contextMenu) return
+    setMoveDialog({ entry: contextMenu.entry, selectedTargetPath: null })
+    setContextMenu(null)
+  }, [contextMenu])
+
+  // Select target folder (doesn't move yet)
+  const handleSelectTargetFolder = useCallback((targetFolderPath: string) => {
+    if (!moveDialog) return
+    setMoveDialog({ ...moveDialog, selectedTargetPath: targetFolderPath })
+  }, [moveDialog])
+
+  // Execute move
+  const handleExecuteMove = useCallback(async () => {
+    if (!moveDialog || moveDialog.selectedTargetPath === null || !vaultPath) return
+
+    const targetFolderPath = moveDialog.selectedTargetPath
+    const sourceFullPath = `${vaultPath}/${moveDialog.entry.path}`
+    const targetDir = targetFolderPath === '' ? vaultPath : `${vaultPath}/${targetFolderPath}`
+
+    // Don't move to same location
+    const currentDir = moveDialog.entry.path.includes('/')
+      ? moveDialog.entry.path.substring(0, moveDialog.entry.path.lastIndexOf('/'))
+      : ''
+    if (currentDir === targetFolderPath) {
+      setMoveDialog(null)
+      return
+    }
+
+    // Prevent moving folder into itself or its children
+    if (moveDialog.entry.isDirectory && targetFolderPath.startsWith(moveDialog.entry.path + '/')) {
+      setMoveDialog(null)
+      return
+    }
+
+    try {
+      const result = await window.electronAPI.moveFile(sourceFullPath, targetDir)
+      if (result.success) {
+        // Update note paths if needed
+        const fileName = moveDialog.entry.name
+        const newPath = targetFolderPath === '' ? fileName : `${targetFolderPath}/${fileName}`
+
+        if (!moveDialog.entry.isDirectory && moveDialog.entry.path.endsWith('.md')) {
+          const oldNoteId = generateNoteId(moveDialog.entry.path)
+          const newNoteId = generateNoteId(newPath)
+          updateNotePath(oldNoteId, newPath, newNoteId)
+        }
+
+        const tree = await window.electronAPI.readDirectory(vaultPath)
+        setFileTree(tree)
+      }
+    } catch (error) {
+      console.error('Fehler beim Verschieben:', error)
+    }
+
+    setMoveDialog(null)
+  }, [moveDialog, vaultPath, setFileTree, updateNotePath])
+
   const openPickerDialog = useCallback((type: 'color' | 'icon') => {
     if (!contextMenu || !contextMenu.entry.isDirectory) return
     setPickerDialog({ type, path: contextMenu.entry.path })
@@ -781,6 +862,9 @@ const FileItem: React.FC<FileItemProps> = ({ entry, level, onDrop, displayMode }
               <button onClick={handleRenameFromMenu} className="context-menu-item">
                 {t('fileTree.rename')}
               </button>
+              <button onClick={handleOpenMoveDialog} className="context-menu-item">
+                {t('fileTree.moveTo')}
+              </button>
               <button onClick={handleShowInFinder} className="context-menu-item">
                 {t('fileTree.showInFinder')}
               </button>
@@ -819,6 +903,9 @@ const FileItem: React.FC<FileItemProps> = ({ entry, level, onDrop, displayMode }
               </button>
               <button onClick={handleDuplicate} className="context-menu-item">
                 {t('fileTree.duplicate')}
+              </button>
+              <button onClick={handleOpenMoveDialog} className="context-menu-item">
+                {t('fileTree.moveTo')}
               </button>
               <button onClick={handleShowInFinder} className="context-menu-item">
                 {t('fileTree.showInFinder')}
@@ -898,6 +985,72 @@ const FileItem: React.FC<FileItemProps> = ({ entry, level, onDrop, displayMode }
             </div>
             <div className="picker-dialog-footer">
               <button onClick={() => setPickerDialog(null)}>{t('fileTree.cancel')}</button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Move to Folder Dialog */}
+      {moveDialog && createPortal(
+        <div className="picker-dialog-overlay" onClick={() => setMoveDialog(null)}>
+          <div className="picker-dialog move-dialog" onClick={e => e.stopPropagation()}>
+            <div className="picker-dialog-header">
+              {t('fileTree.moveToTitle', { name: moveDialog.entry.name })}
+            </div>
+            <div className="picker-dialog-content move-dialog-content">
+              {/* Root folder option */}
+              <button
+                className={`move-folder-item root-folder ${moveDialog.selectedTargetPath === '' ? 'selected' : ''}`}
+                onClick={() => handleSelectTargetFolder('')}
+              >
+                <span className="move-folder-icon">
+                  <FolderIcon open={false} color="#F5A623" iconSet={iconSet} />
+                </span>
+                <span className="move-folder-name">{t('fileTree.vaultRoot')}</span>
+              </button>
+              {/* All folders */}
+              {fileTree && collectFolders(fileTree).map(folder => {
+                // Don't show current folder or current file's parent
+                const currentDir = moveDialog.entry.path.includes('/')
+                  ? moveDialog.entry.path.substring(0, moveDialog.entry.path.lastIndexOf('/'))
+                  : ''
+                if (folder.path === currentDir) return null
+                // Don't show the folder itself if moving a folder
+                if (moveDialog.entry.isDirectory && folder.path === moveDialog.entry.path) return null
+                // Don't show children of a folder being moved
+                if (moveDialog.entry.isDirectory && folder.path.startsWith(moveDialog.entry.path + '/')) return null
+
+                const folderCustomization = fileCustomizations[folder.path]
+                const isSelected = moveDialog.selectedTargetPath === folder.path
+                return (
+                  <button
+                    key={folder.path}
+                    className={`move-folder-item ${isSelected ? 'selected' : ''}`}
+                    style={{ paddingLeft: `${folder.depth * 16 + 12}px` }}
+                    onClick={() => handleSelectTargetFolder(folder.path)}
+                  >
+                    <span className="move-folder-icon">
+                      {folderCustomization?.icon ? (
+                        <span style={{ fontSize: '14px' }}>{folderCustomization.icon}</span>
+                      ) : (
+                        <FolderIcon open={false} color={folderCustomization?.color} iconSet={iconSet} />
+                      )}
+                    </span>
+                    <span className="move-folder-name">{folder.name}</span>
+                  </button>
+                )
+              })}
+            </div>
+            <div className="picker-dialog-footer">
+              <button onClick={() => setMoveDialog(null)}>{t('fileTree.cancel')}</button>
+              <button
+                className="btn-primary"
+                onClick={handleExecuteMove}
+                disabled={moveDialog.selectedTargetPath === null}
+              >
+                {t('fileTree.moveButton')}
+              </button>
             </div>
           </div>
         </div>,

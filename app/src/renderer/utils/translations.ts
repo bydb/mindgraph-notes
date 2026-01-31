@@ -457,6 +457,10 @@ const translations = {
     'fileTree.chooseFolderColor': 'Ordnerfarbe wählen',
     'fileTree.chooseFolderIcon': 'Ordner-Icon wählen',
     'fileTree.connections': 'Verbindungen',
+    'fileTree.moveTo': 'Verschieben nach...',
+    'fileTree.moveToTitle': '"{name}" verschieben nach',
+    'fileTree.vaultRoot': 'Vault (Hauptordner)',
+    'fileTree.moveButton': 'Verschieben',
 
     // Canvas
     'canvas.reset': 'Zurücksetzen',
@@ -1145,6 +1149,10 @@ const translations = {
     'fileTree.chooseFolderColor': 'Choose folder color',
     'fileTree.chooseFolderIcon': 'Choose folder icon',
     'fileTree.connections': 'connections',
+    'fileTree.moveTo': 'Move to...',
+    'fileTree.moveToTitle': 'Move "{name}" to',
+    'fileTree.vaultRoot': 'Vault (root folder)',
+    'fileTree.moveButton': 'Move',
 
     // Canvas
     'canvas.reset': 'Reset',
