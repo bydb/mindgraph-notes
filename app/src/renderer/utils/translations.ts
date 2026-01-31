@@ -693,6 +693,16 @@ const translations = {
     'languagetool.style': 'Stil',
     'languagetool.ignore': 'Ignorieren',
     'languagetool.suggestions': 'Vorschläge',
+
+    // What's New Modal
+    'whatsNew.title': 'Neuigkeiten in',
+    'whatsNew.dismiss': 'Verstanden',
+    'whatsNew.noContent': 'Keine Neuigkeiten verfügbar.',
+
+    // Update Notification
+    'update.available': 'Version {version} ist verfügbar!',
+    'update.download': 'Herunterladen',
+    'update.checking': 'Suche nach Updates...',
   },
 
   en: {
@@ -1385,6 +1395,16 @@ const translations = {
     'languagetool.style': 'Style',
     'languagetool.ignore': 'Ignore',
     'languagetool.suggestions': 'Suggestions',
+
+    // What's New Modal
+    'whatsNew.title': "What's New in",
+    'whatsNew.dismiss': 'Got it',
+    'whatsNew.noContent': 'No new features to show.',
+
+    // Update Notification
+    'update.available': 'Version {version} is available!',
+    'update.download': 'Download',
+    'update.checking': 'Checking for updates...',
   }
 } as const
 

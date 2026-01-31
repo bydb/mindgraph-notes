@@ -2,6 +2,24 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [1.0.8] - 2026-01-31
+
+### Features
+- **Update-Checker**: Automatische Prüfung auf neue Versionen via GitHub Releases API
+  - Zeigt Benachrichtigungsbanner wenn neue Version verfügbar ist
+  - Link zum direkten Download der neuen Version
+  - Kann per Klick geschlossen werden
+
+- **What's New Modal**: Zeigt Neuigkeiten nach App-Update
+  - Automatische Anzeige nach Versionsänderung
+  - Zeigt CHANGELOG-Inhalt der aktuellen Version als Markdown
+  - Persistiert gesehene Version um Modal nur einmal zu zeigen
+
+### Technische Änderungen
+- Neue IPC-Handler: `get-app-version`, `check-for-updates`, `get-whats-new-content`
+- UIStore erweitert um `lastSeenVersion`, `updateAvailable`, `whatsNewOpen`
+- CHANGELOG.md wird in App-Resources für Produktion inkludiert
+
 ## [1.0.7] - 2026-01-31
 
 ### Features

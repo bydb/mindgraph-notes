@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import type { UpdateInfo } from '../../shared/types'
 
 type ViewMode = 'editor' | 'split' | 'canvas'
 type Theme = 'light' | 'dark' | 'system'
@@ -307,6 +308,11 @@ interface UIState {
   // LanguageTool Settings
   languageTool: LanguageToolSettings
 
+  // Update-Checker & What's New
+  lastSeenVersion: string
+  updateAvailable: UpdateInfo | null
+  whatsNewOpen: boolean
+
   // Actions
   setViewMode: (mode: ViewMode) => void
   setTheme: (theme: Theme) => void
@@ -347,6 +353,9 @@ interface UIState {
   setSmartConnectionsWeights: (weights: Partial<SmartConnectionsWeights>) => void
   setDocling: (settings: Partial<DoclingSettings>) => void
   setLanguageTool: (settings: Partial<LanguageToolSettings>) => void
+  setLastSeenVersion: (version: string) => void
+  setUpdateAvailable: (info: UpdateInfo | null) => void
+  setWhatsNewOpen: (open: boolean) => void
 }
 
 // Default-Werte für den Store
@@ -435,7 +444,12 @@ const defaultState = {
     autoCheck: false,
     autoCheckDelay: 1500,
     ignoredRules: []
-  }
+  },
+
+  // Update-Checker & What's New
+  lastSeenVersion: '',
+  updateAvailable: null as UpdateInfo | null,
+  whatsNewOpen: false
 }
 
 // Felder die persistiert werden sollen (keine Funktionen, keine transienten Werte)
@@ -447,7 +461,8 @@ const persistedKeys = [
   'canvasFilterPath', 'canvasViewMode', 'canvasShowTags', 'canvasShowLinks', 'canvasShowImages',
   'canvasCompactMode', 'canvasDefaultCardWidth', 'splitPosition', 'fileTreeDisplayMode', 'ollama',
   'pdfCompanionEnabled', 'pdfDisplayMode', 'iconSet',
-  'smartConnectionsEnabled', 'notesChatEnabled', 'smartConnectionsWeights', 'docling', 'languageTool'
+  'smartConnectionsEnabled', 'notesChatEnabled', 'smartConnectionsWeights', 'docling', 'languageTool',
+  'lastSeenVersion'
 ] as const
 
 export const useUIStore = create<UIState>()((set, get) => ({
@@ -498,7 +513,10 @@ export const useUIStore = create<UIState>()((set, get) => ({
   })),
   setLanguageTool: (settings) => set((state) => ({
     languageTool: { ...state.languageTool, ...settings }
-  }))
+  })),
+  setLastSeenVersion: (version) => set({ lastSeenVersion: version }),
+  setUpdateAvailable: (info) => set({ updateAvailable: info }),
+  setWhatsNewOpen: (open) => set({ whatsNewOpen: open })
 }))
 
 // Settings laden beim App-Start

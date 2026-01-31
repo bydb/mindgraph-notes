@@ -1,6 +1,15 @@
 // FileTree Icon Customization
 export type IconSet = 'default' | 'minimal' | 'colorful' | 'emoji'
 
+// Update-Checker Types
+export interface UpdateInfo {
+  available: boolean
+  version?: string
+  releaseUrl?: string
+  body?: string
+  error?: boolean
+}
+
 export interface FileCustomization {
   color?: string           // Ordner/Datei Farbe (aus Palette)
   icon?: string            // Icon-Override (z.B. '📚', '🎯', 'star')
@@ -357,6 +366,11 @@ export interface ElectronAPI {
     detectedLanguage?: string;
     error?: string;
   }>;
+
+  // Update-Checker & What's New
+  getAppVersion: () => Promise<string>;
+  checkForUpdates: () => Promise<UpdateInfo>;
+  getWhatsNewContent: (version: string) => Promise<string | null>;
 }
 
 // Docling Options for PDF conversion

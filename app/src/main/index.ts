@@ -2661,6 +2661,114 @@ ipcMain.handle('strip-wikilinks-in-folder', async (_event, folderPath: string, v
   }
 })
 
+// ============ UPDATE CHECKER & WHAT'S NEW ============
+
+// App-Version zurückgeben
+ipcMain.handle('get-app-version', () => {
+  return app.getVersion()
+})
+
+// GitHub Releases auf neue Version prüfen
+ipcMain.handle('check-for-updates', async () => {
+  try {
+    const response = await fetch(
+      'https://api.github.com/repos/bydb/mindgraph-notes/releases/latest',
+      {
+        headers: {
+          'Accept': 'application/vnd.github.v3+json',
+          'User-Agent': 'MindGraph-Notes'
+        }
+      }
+    )
+
+    if (!response.ok) {
+      console.error('[Update] GitHub API error:', response.status)
+      return { available: false, error: true }
+    }
+
+    const release = await response.json()
+    const latestVersion = release.tag_name.replace(/^v/, '')
+    const currentVersion = app.getVersion()
+
+    // Versionen vergleichen (einfacher String-Vergleich für semver)
+    if (latestVersion !== currentVersion && compareVersions(latestVersion, currentVersion) > 0) {
+      return {
+        available: true,
+        version: latestVersion,
+        releaseUrl: release.html_url,
+        body: release.body
+      }
+    }
+
+    return { available: false }
+  } catch (error) {
+    console.error('[Update] Check failed:', error)
+    return { available: false, error: true }
+  }
+})
+
+// Semver-Vergleich: Gibt 1 zurück wenn a > b, -1 wenn a < b, 0 wenn gleich
+function compareVersions(a: string, b: string): number {
+  const partsA = a.split('.').map(n => parseInt(n, 10))
+  const partsB = b.split('.').map(n => parseInt(n, 10))
+
+  for (let i = 0; i < Math.max(partsA.length, partsB.length); i++) {
+    const numA = partsA[i] || 0
+    const numB = partsB[i] || 0
+
+    if (numA > numB) return 1
+    if (numA < numB) return -1
+  }
+
+  return 0
+}
+
+// CHANGELOG-Inhalt für eine bestimmte Version holen
+ipcMain.handle('get-whats-new-content', async (_event, version: string) => {
+  try {
+    // CHANGELOG.md im App-Verzeichnis finden
+    let changelogPath: string
+
+    if (process.env.NODE_ENV === 'development') {
+      // In Entwicklung: Im Projektroot (app/out/main/ -> 3 levels up to mindgraph-notes/)
+      changelogPath = path.join(__dirname, '../../../CHANGELOG.md')
+    } else {
+      // In Produktion: Im Resources-Ordner
+      changelogPath = path.join(process.resourcesPath, 'CHANGELOG.md')
+    }
+
+    console.log('[WhatsNew] Reading CHANGELOG from:', changelogPath)
+
+    const content = await fs.readFile(changelogPath, 'utf-8')
+
+    // Abschnitt für die aktuelle Version extrahieren
+    const versionSection = extractVersionSection(content, version)
+
+    return versionSection || null
+  } catch (error) {
+    console.error('[WhatsNew] Failed to read CHANGELOG:', error)
+    return null
+  }
+})
+
+// Extrahiert den Changelog-Abschnitt für eine bestimmte Version
+function extractVersionSection(changelog: string, version: string): string {
+  // Regex für den Versions-Header (z.B. "## [1.0.7] - 2026-01-31")
+  const escapedVersion = version.replace(/\./g, '\\.')
+  const regex = new RegExp(`## \\[${escapedVersion}\\][\\s\\S]*?(?=## \\[|$)`, 'i')
+  const match = changelog.match(regex)
+
+  if (match) {
+    // Bereinige den Inhalt: Entferne den Header selbst und trim
+    let section = match[0].trim()
+    // Entferne das Datum aus dem Header für sauberere Anzeige
+    section = section.replace(/^## \[\d+\.\d+\.\d+\] - \d{4}-\d{2}-\d{2}\s*/, '')
+    return section
+  }
+
+  return ''
+}
+
 // Cleanup bei App-Beendigung
 app.on('before-quit', () => {
   isQuitting = true

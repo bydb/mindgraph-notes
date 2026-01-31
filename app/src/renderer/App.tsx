@@ -14,6 +14,8 @@ import { QuickSwitcher } from './components/QuickSwitcher/QuickSwitcher'
 import { TemplatePicker } from './components/TemplatePicker/TemplatePicker'
 import { TemplateSettings } from './components/TemplatePicker/TemplateSettings'
 import { Settings } from './components/Settings/Settings'
+import { WhatsNew } from './components/WhatsNew/WhatsNew'
+import { UpdateNotification } from './components/UpdateNotification/UpdateNotification'
 import { OverduePanel } from './components/OverduePanel/OverduePanel'
 import { TagsPanel } from './components/TagsPanel/TagsPanel'
 import { SmartConnectionsPanel } from './components/SmartConnectionsPanel/SmartConnectionsPanel'
@@ -99,6 +101,49 @@ const App: React.FC = () => {
   // UI-Settings beim App-Start laden
   useEffect(() => {
     initializeUISettings()
+  }, [])
+
+  // Update-Checker & What's New beim App-Start
+  useEffect(() => {
+    const checkVersionAndUpdates = async () => {
+      try {
+        // 1. Aktuelle Version holen
+        const currentVersion = await window.electronAPI.getAppVersion()
+        const { lastSeenVersion, setLastSeenVersion, setWhatsNewOpen, setUpdateAvailable } = useUIStore.getState()
+
+        console.log('[App] Current version:', currentVersion, 'Last seen:', lastSeenVersion)
+
+        // 2. What's New zeigen wenn neue Version (aber nicht beim allerersten Start)
+        if (lastSeenVersion && currentVersion !== lastSeenVersion) {
+          console.log('[App] New version detected, showing What\'s New')
+          setWhatsNewOpen(true)
+        }
+
+        // Beim allerersten Start die Version setzen ohne Modal zu zeigen
+        if (!lastSeenVersion) {
+          setLastSeenVersion(currentVersion)
+        }
+
+        // 3. Update-Check nach 5s Verzögerung (im Hintergrund)
+        setTimeout(async () => {
+          try {
+            const updateInfo = await window.electronAPI.checkForUpdates()
+            console.log('[App] Update check result:', updateInfo)
+            if (updateInfo.available) {
+              setUpdateAvailable(updateInfo)
+            }
+          } catch (error) {
+            console.error('[App] Update check failed:', error)
+          }
+        }, 5000)
+      } catch (error) {
+        console.error('[App] Version check failed:', error)
+      }
+    }
+
+    // Kurze Verzögerung damit UI erst fertig laden kann
+    const timer = setTimeout(checkVersionAndUpdates, 1000)
+    return () => clearTimeout(timer)
   }, [])
 
   // Reminder-System starten - verzögert um UI nicht zu blockieren
@@ -772,6 +817,12 @@ const App: React.FC = () => {
         isOpen={settingsOpen}
         onClose={() => setSettingsOpen(false)}
       />
+
+      {/* What's New Modal (shown after update) */}
+      <WhatsNew />
+
+      {/* Update Notification Banner */}
+      <UpdateNotification />
     </ReactFlowProvider>
   )
 }

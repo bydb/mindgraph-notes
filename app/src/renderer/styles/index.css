@@ -9311,3 +9311,226 @@ body {
 .simple-note-node.selected .simple-node-handle {
   opacity: 1;
 }
+
+/* ============================================ */
+/* What's New Modal                             */
+/* ============================================ */
+
+.whats-new-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  animation: fadeIn 0.15s ease-out;
+}
+
+.whats-new-modal {
+  background: var(--bg-primary);
+  border-radius: var(--radius-xl);
+  width: 90%;
+  max-width: 600px;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: var(--shadow-lg);
+  animation: slideUp 0.2s ease-out;
+  overflow: hidden;
+}
+
+.whats-new-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--border-color);
+  flex-shrink: 0;
+}
+
+.whats-new-header h2 {
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0;
+  color: var(--text-primary);
+}
+
+.whats-new-close {
+  background: none;
+  border: none;
+  padding: 8px;
+  cursor: pointer;
+  color: var(--text-secondary);
+  border-radius: var(--radius-md);
+  transition: all var(--transition-fast);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.whats-new-close:hover {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+.whats-new-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px;
+}
+
+.whats-new-loading,
+.whats-new-empty {
+  color: var(--text-secondary);
+  text-align: center;
+  padding: 40px 20px;
+}
+
+.whats-new-markdown {
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--text-primary);
+}
+
+.whats-new-markdown h3 {
+  font-size: 15px;
+  font-weight: 600;
+  margin: 0 0 12px 0;
+  color: var(--accent-color);
+}
+
+.whats-new-markdown ul {
+  margin: 0 0 16px 0;
+  padding-left: 20px;
+}
+
+.whats-new-markdown li {
+  margin-bottom: 8px;
+}
+
+.whats-new-markdown strong {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.whats-new-markdown code {
+  background: var(--bg-secondary);
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-family: var(--font-mono);
+}
+
+.whats-new-footer {
+  padding: 16px 24px;
+  border-top: 1px solid var(--border-color);
+  display: flex;
+  justify-content: flex-end;
+  flex-shrink: 0;
+}
+
+.whats-new-dismiss {
+  background: var(--accent-color);
+  color: white;
+  border: none;
+  padding: 10px 24px;
+  border-radius: var(--radius-md);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.whats-new-dismiss:hover {
+  background: var(--accent-hover);
+}
+
+/* ============================================ */
+/* Update Notification Banner                   */
+/* ============================================ */
+
+.update-notification {
+  position: fixed;
+  top: 44px; /* Below titlebar */
+  left: 0;
+  right: 0;
+  background: linear-gradient(135deg, #ff9500 0%, #ff7b00 100%);
+  color: white;
+  padding: 10px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  z-index: 9999;
+  box-shadow: 0 2px 8px rgba(255, 149, 0, 0.3);
+  animation: slideDown 0.3s ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    transform: translateY(-100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.update-notification-content {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.update-notification-icon {
+  flex-shrink: 0;
+}
+
+.update-notification-text {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.update-notification-download {
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  padding: 6px 14px;
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.update-notification-download:hover {
+  background: rgba(255, 255, 255, 0.3);
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+.update-notification-dismiss {
+  background: none;
+  border: none;
+  padding: 6px;
+  cursor: pointer;
+  color: rgba(255, 255, 255, 0.8);
+  border-radius: var(--radius-md);
+  transition: all var(--transition-fast);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.update-notification-dismiss:hover {
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+}
+
+/* Adjust main content when update banner is visible */
+.app.has-update-banner .main-content {
+  padding-top: 44px;
+}

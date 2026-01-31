@@ -187,5 +187,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onTerminalError: (callback: (error: string) => void) => {
     ipcRenderer.removeAllListeners('terminal-error')
     ipcRenderer.on('terminal-error', (_event, error) => callback(error))
-  }
+  },
+
+  // Update-Checker & What's New
+  getAppVersion: () => ipcRenderer.invoke('get-app-version'),
+  checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
+  getWhatsNewContent: (version: string) => ipcRenderer.invoke('get-whats-new-content', version)
 })
