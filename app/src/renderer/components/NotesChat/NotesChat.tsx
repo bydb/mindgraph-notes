@@ -40,7 +40,7 @@ export const NotesChat: React.FC<NotesChatProps> = ({ onClose }) => {
   const [isStreaming, setIsStreaming] = useState(false)
   const [streamingContent, setStreamingContent] = useState('')
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null)
-  const messagesEndRef = useRef<HTMLDivElement>(null)
+  const messagesContainerRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
 
   // Markdown-Renderer für Chat-Nachrichten
@@ -110,9 +110,11 @@ export const NotesChat: React.FC<NotesChatProps> = ({ onClose }) => {
     checkBackend()
   }, [llmSettings.backend, llmSettings.lmStudioPort, llmSettings.selectedModel])
 
-  // Auto-scroll zu neuen Nachrichten
+  // Auto-scroll zu neuen Nachrichten (scrollt nur den Container, nicht das ganze Fenster)
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    if (messagesContainerRef.current) {
+      messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight
+    }
   }, [messages, streamingContent])
 
   // Streaming-Listener einrichten
@@ -457,7 +459,7 @@ export const NotesChat: React.FC<NotesChatProps> = ({ onClose }) => {
           </div>
 
           {/* Chat-Nachrichten */}
-          <div className="notes-chat-messages">
+          <div className="notes-chat-messages" ref={messagesContainerRef}>
             {messages.length === 0 && !streamingContent ? (
               <div className="notes-chat-welcome">
                 <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -502,7 +504,6 @@ export const NotesChat: React.FC<NotesChatProps> = ({ onClose }) => {
                     />
                   </div>
                 )}
-                <div ref={messagesEndRef} />
               </>
             )}
           </div>

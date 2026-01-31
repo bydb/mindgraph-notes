@@ -277,15 +277,22 @@ export const Sidebar: React.FC = () => {
     <div className="sidebar" style={{ width: sidebarWidth }}>
       <div className="sidebar-header">
         <h2>MindGraph Notes</h2>
-        <button className="btn-icon" onClick={handleNewNote} title="Neue Notiz (Cmd+N)">
-          +
-        </button>
-        <button className="btn-icon" onClick={handleNewFolder} title="Neuer Ordner">
-          📂
-        </button>
-        <button className="btn-icon" onClick={handleOpenVault} title={t('sidebar.openVault')}>
-          📁
-        </button>
+        <div className="sidebar-header-actions">
+          <button className="btn-icon" onClick={handleNewNote} title="Neue Notiz (Cmd+N)">
+            +
+          </button>
+          <button className="btn-icon" onClick={handleNewFolder} title="Neuer Ordner">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+              <path d="M2 4.5A1.5 1.5 0 013.5 3h3.379a1.5 1.5 0 011.06.44l.622.62a.5.5 0 00.354.147H12.5A1.5 1.5 0 0114 5.707V11.5a1.5 1.5 0 01-1.5 1.5h-9A1.5 1.5 0 012 11.5v-7z" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M8 7v4M6 9h4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
+            </svg>
+          </button>
+          <button className="btn-icon" onClick={handleOpenVault} title={t('sidebar.openVault')}>
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+              <path d="M2 4.5A1.5 1.5 0 013.5 3h3.379a1.5 1.5 0 011.06.44l.622.62a.5.5 0 00.354.147H12.5A1.5 1.5 0 0114 5.707V11.5a1.5 1.5 0 01-1.5 1.5h-9A1.5 1.5 0 012 11.5v-7z" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </button>
+        </div>
       </div>
       
       {vaultPath ? (

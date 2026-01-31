@@ -215,8 +215,8 @@ body {
   display: flex;
   background-color: var(--bg-tertiary);
   border-radius: var(--radius-md);
-  padding: 3px;
-  gap: 2px;
+  padding: 0;
+  gap: 0;
 }
 
 .view-mode-btn {
@@ -224,10 +224,11 @@ body {
   align-items: center;
   justify-content: center;
   gap: 6px;
-  padding: 5px 12px;
+  height: 28px;
+  padding: 0 10px;
   border: none;
   background: none;
-  border-radius: calc(var(--radius-md) - 2px);
+  border-radius: var(--radius-md);
   font-size: 11px;
   font-weight: 500;
   color: var(--text-muted);
@@ -238,7 +239,8 @@ body {
 
 /* Icon-only Buttons - quadratisch */
 .view-mode-btn:has(svg:only-child) {
-  padding: 5px 8px;
+  width: 28px;
+  padding: 0;
 }
 
 .view-mode-btn svg {
@@ -313,9 +315,11 @@ body {
 .sidebar-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 16px 18px;
+  height: 44px;
+  min-height: 44px;
+  padding: 0 16px;
   border-bottom: 1px solid var(--border-color);
+  gap: 12px;
 }
 
 .sidebar-header h2 {
@@ -323,6 +327,13 @@ body {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.08em;
+  flex: 1;
+}
+
+.sidebar-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
   color: var(--text-muted);
 }
 
@@ -330,7 +341,7 @@ body {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 10px 18px;
+  padding: 10px 16px;
   font-size: 12px;
   color: var(--text-secondary);
   border-bottom: 1px solid var(--border-color);
@@ -388,7 +399,7 @@ body {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 14px;
+  padding: 8px 16px;
   cursor: pointer;
   user-select: none;
   transition: background-color var(--transition-fast);
@@ -689,6 +700,12 @@ body {
   border-top-right-radius: var(--radius-lg);
 }
 
+/* Kein oberer Radius wenn Tabs vorhanden */
+.tab-bar + .workspace {
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+}
+
 .workspace.editor .editor-panel {
   flex: 1;
 }
@@ -842,7 +859,6 @@ body {
   border-bottom: 1px solid var(--border-color);
   background-color: var(--bg-primary);
   gap: 12px;
-  border-top-left-radius: var(--radius-lg);
 }
 
 .editor-header h3 {
@@ -915,9 +931,10 @@ body {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 5px 12px;
+  height: 28px;
+  padding: 0 10px;
   border: none;
-  border-radius: calc(var(--radius-md) - 2px);
+  border-radius: var(--radius-md);
   background: var(--bg-tertiary);
   color: var(--text-muted);
   font-size: 11px;
@@ -940,9 +957,10 @@ body {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 5px 12px;
+  height: 28px;
+  padding: 0 10px;
   border: none;
-  border-radius: calc(var(--radius-md) - 2px);
+  border-radius: var(--radius-md);
   background: var(--bg-tertiary);
   color: var(--text-muted);
   font-size: 11px;
@@ -1174,17 +1192,19 @@ body {
   background-color: var(--bg-tertiary);
   border-radius: var(--radius-md);
   padding: 3px;
+  height: 28px;
+  box-sizing: border-box;
 }
 
 .toggle-btn {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 30px;
-  height: 26px;
+  width: 22px;
+  height: 22px;
   border: none;
   background: transparent;
-  border-radius: calc(var(--radius-md) - 2px);
+  border-radius: var(--radius-sm);
   color: var(--text-muted);
   cursor: pointer;
   transition: all var(--transition-fast);
@@ -2196,7 +2216,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 14px;
+  padding: 10px 16px;
   cursor: pointer;
   user-select: none;
   transition: background-color var(--transition-fast);
@@ -4188,7 +4208,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 12px;
+  padding: 8px 16px;
   background-color: #161616;
   border-bottom: 1px solid #2a2a2a;
 }
@@ -8779,14 +8799,14 @@ body {
 .tab-bar {
   display: flex;
   align-items: center;
-  height: 36px;
+  height: 44px;
+  min-height: 44px;
   background-color: var(--bg-secondary);
   border-bottom: 1px solid var(--border-color);
-  padding: 0 8px;
+  padding: 0 16px 0 6px;
   overflow-x: auto;
   flex-shrink: 0;
-  border-radius: var(--radius-sm);
-  margin: 4px 4px 0 4px;
+  margin: 0;
 }
 
 .tab-bar::-webkit-scrollbar {
@@ -8813,8 +8833,9 @@ body {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 6px 10px;
-  border-radius: var(--radius-sm);
+  height: 28px;
+  padding: 0 12px;
+  border-radius: var(--radius-md);
   background: transparent;
   color: var(--text-secondary);
   font-size: 12px;
