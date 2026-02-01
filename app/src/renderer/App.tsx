@@ -16,6 +16,9 @@ import { TemplateSettings } from './components/TemplatePicker/TemplateSettings'
 import { Settings } from './components/Settings/Settings'
 import { WhatsNew } from './components/WhatsNew/WhatsNew'
 import { UpdateNotification } from './components/UpdateNotification/UpdateNotification'
+import { QuizModal } from './components/Quiz/QuizModal'
+import { FlashcardsPanel, FlashcardStudy, FlashcardEditor } from './components/Flashcards'
+import { useFlashcardStore } from './stores/flashcardStore'
 import { OverduePanel } from './components/OverduePanel/OverduePanel'
 import { TagsPanel } from './components/TagsPanel/TagsPanel'
 import { SmartConnectionsPanel } from './components/SmartConnectionsPanel/SmartConnectionsPanel'
@@ -46,7 +49,7 @@ const ViewModeButton: React.FC<{
 )
 
 const App: React.FC = () => {
-  const { viewMode, setViewMode, toggleSidebar, sidebarVisible, splitPosition, setSplitPosition, sidebarWidth, setSidebarWidth, theme, setTheme, accentColor, backgroundColor, fontFamily, setPendingTemplateInsert, textSplitEnabled, setTextSplitEnabled, textSplitPosition, setTextSplitPosition, smartConnectionsEnabled, notesChatEnabled } = useUIStore()
+  const { viewMode, setViewMode, toggleSidebar, sidebarVisible, splitPosition, setSplitPosition, sidebarWidth, setSidebarWidth, theme, setTheme, accentColor, backgroundColor, fontFamily, setPendingTemplateInsert, textSplitEnabled, setTextSplitEnabled, textSplitPosition, setTextSplitPosition, smartConnectionsEnabled, notesChatEnabled, flashcardsEnabled } = useUIStore()
   const { notes, vaultPath, selectNote, selectedPdfPath, selectedImagePath, secondarySelectedNoteId, navigateBack, navigateForward, selectedNoteId } = useNotesStore()
   const { tabs, activeTabId, openEditorTab, setActiveTab, closeTab } = useTabStore()
   const activeTab = tabs.find(t => t.id === activeTabId)
@@ -63,6 +66,7 @@ const App: React.FC = () => {
   const [tagsPanelOpen, setTagsPanelOpen] = useState(false)
   const [smartConnectionsOpen, setSmartConnectionsOpen] = useState(false)
   const [notesChatOpen, setNotesChatOpen] = useState(false)
+  const { isPanelOpen: flashcardsPanelOpen, setPanel: setFlashcardsPanelOpen } = useFlashcardStore()
   const [pendingNoteTitle, setPendingNoteTitle] = useState<string | null>(null)
 
   const workspaceRef = useRef<HTMLDivElement>(null)
@@ -587,6 +591,19 @@ const App: React.FC = () => {
                   </svg>
                 </button>
               )}
+              {flashcardsEnabled && (
+                <button
+                  className={`view-mode-btn ${flashcardsPanelOpen ? 'active' : ''}`}
+                  onClick={() => setFlashcardsPanelOpen(!flashcardsPanelOpen)}
+                  title={t('titlebar.flashcards')}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="2" y="4" width="20" height="16" rx="2" />
+                    <path d="M10 4v4" />
+                    <path d="M14 4v4" />
+                  </svg>
+                </button>
+              )}
               <button
                 className={`view-mode-btn ${terminalVisible ? 'active' : ''}`}
                 onClick={() => setTerminalVisible(!terminalVisible)}
@@ -620,7 +637,7 @@ const App: React.FC = () => {
               {/* TabBar - only show when there are canvas tabs */}
               {tabs.length > 0 && <TabBar />}
 
-              <div className={`workspace ${viewMode} ${activeTab?.type === 'canvas' ? 'has-canvas-tab' : ''} ${(textSplitEnabled || overduePanelOpen || tagsPanelOpen || (smartConnectionsOpen && smartConnectionsEnabled) || (notesChatOpen && notesChatEnabled)) && viewMode === 'editor' ? 'text-split' : ''}`} ref={workspaceRef}>
+              <div className={`workspace ${viewMode} ${activeTab?.type === 'canvas' ? 'has-canvas-tab' : ''} ${(textSplitEnabled || overduePanelOpen || tagsPanelOpen || (smartConnectionsOpen && smartConnectionsEnabled) || (notesChatOpen && notesChatEnabled) || (flashcardsPanelOpen && flashcardsEnabled)) && viewMode === 'editor' ? 'text-split' : ''}`} ref={workspaceRef}>
 
               {/* Editor Panel - visible in editor and split mode */}
               <div
@@ -628,7 +645,7 @@ const App: React.FC = () => {
                 style={{
                   display: viewMode === 'canvas' ? 'none' : 'flex',
                   flex: viewMode === 'editor'
-                    ? ((textSplitEnabled || overduePanelOpen || tagsPanelOpen || (smartConnectionsOpen && smartConnectionsEnabled) || (notesChatOpen && notesChatEnabled))
+                    ? ((textSplitEnabled || overduePanelOpen || tagsPanelOpen || (smartConnectionsOpen && smartConnectionsEnabled) || (notesChatOpen && notesChatEnabled) || (flashcardsPanelOpen && flashcardsEnabled))
                         ? `0 0 ${textSplitPosition}%`
                         : (activeTab?.type === 'canvas'
                             ? `0 0 ${splitPosition}%`
@@ -649,12 +666,12 @@ const App: React.FC = () => {
               </div>
 
               {/* Text Split Divider - in editor mode when text-split is enabled (takes priority over canvas tab) */}
-              {viewMode === 'editor' && (textSplitEnabled || overduePanelOpen || tagsPanelOpen || (smartConnectionsOpen && smartConnectionsEnabled) || (notesChatOpen && notesChatEnabled)) && (
+              {viewMode === 'editor' && (textSplitEnabled || overduePanelOpen || tagsPanelOpen || (smartConnectionsOpen && smartConnectionsEnabled) || (notesChatOpen && notesChatEnabled) || (flashcardsPanelOpen && flashcardsEnabled)) && (
                 <div className="text-split-divider" onMouseDown={handleTextSplitDividerMouseDown} />
               )}
 
-              {/* Secondary Panel (Text Split / Overdue / Tags / etc.) - takes priority over canvas tab */}
-              {viewMode === 'editor' && (textSplitEnabled || overduePanelOpen || tagsPanelOpen || (smartConnectionsOpen && smartConnectionsEnabled) || (notesChatOpen && notesChatEnabled)) && (
+              {/* Secondary Panel (Text Split / Overdue / Tags / Flashcards / etc.) - takes priority over canvas tab */}
+              {viewMode === 'editor' && (textSplitEnabled || overduePanelOpen || tagsPanelOpen || (smartConnectionsOpen && smartConnectionsEnabled) || (notesChatOpen && notesChatEnabled) || (flashcardsPanelOpen && flashcardsEnabled)) && (
                 <div className="editor-panel editor-panel-secondary" style={{ flex: `0 0 ${100 - textSplitPosition}%` }}>
                   {overduePanelOpen ? (
                     <OverduePanel onClose={() => setOverduePanelOpen(false)} />
@@ -664,6 +681,8 @@ const App: React.FC = () => {
                     <SmartConnectionsPanel onClose={() => setSmartConnectionsOpen(false)} />
                   ) : (notesChatOpen && notesChatEnabled) ? (
                     <NotesChat onClose={() => setNotesChatOpen(false)} />
+                  ) : (flashcardsPanelOpen && flashcardsEnabled) ? (
+                    <FlashcardsPanel onClose={() => setFlashcardsPanelOpen(false)} />
                   ) : secondarySelectedNoteId ? (
                     <>
                       <MarkdownEditor isSecondary />
@@ -687,12 +706,12 @@ const App: React.FC = () => {
               )}
 
               {/* Split Divider for LocalCanvas Tab - only when text-split is NOT active */}
-              {viewMode === 'editor' && activeTab?.type === 'canvas' && !(textSplitEnabled || overduePanelOpen || tagsPanelOpen || (smartConnectionsOpen && smartConnectionsEnabled) || (notesChatOpen && notesChatEnabled)) && (
+              {viewMode === 'editor' && activeTab?.type === 'canvas' && !(textSplitEnabled || overduePanelOpen || tagsPanelOpen || (smartConnectionsOpen && smartConnectionsEnabled) || (notesChatOpen && notesChatEnabled) || (flashcardsPanelOpen && flashcardsEnabled)) && (
                 <div className="split-divider" onMouseDown={handleDividerMouseDown} />
               )}
 
               {/* Local Canvas Panel - only when text-split is NOT active */}
-              {viewMode === 'editor' && activeTab?.type === 'canvas' && !(textSplitEnabled || overduePanelOpen || tagsPanelOpen || (smartConnectionsOpen && smartConnectionsEnabled) || (notesChatOpen && notesChatEnabled)) && (
+              {viewMode === 'editor' && activeTab?.type === 'canvas' && !(textSplitEnabled || overduePanelOpen || tagsPanelOpen || (smartConnectionsOpen && smartConnectionsEnabled) || (notesChatOpen && notesChatEnabled) || (flashcardsPanelOpen && flashcardsEnabled)) && (
                 <div className="local-canvas-panel" style={{ flex: `0 0 ${100 - splitPosition}%` }}>
                   <LocalCanvas tabId={activeTab.id} rootNoteId={activeTab.noteId} />
                 </div>
@@ -820,6 +839,13 @@ const App: React.FC = () => {
 
       {/* What's New Modal (shown after update) */}
       <WhatsNew />
+
+      {/* Quiz Modal */}
+      <QuizModal />
+
+      {/* Flashcard Modals */}
+      <FlashcardStudy />
+      <FlashcardEditor />
 
       {/* Update Notification Banner */}
       <UpdateNotification />

@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react'
+import React, { useState, useCallback, useRef, useEffect, useLayoutEffect, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import type { FileEntry } from '../../../shared/types'
 import { useNotesStore } from '../../stores/notesStore'
@@ -6,6 +6,7 @@ import { useUIStore, FOLDER_COLORS, FOLDER_ICONS, type IconSet } from '../../sto
 import { useGraphStore } from '../../stores/graphStore'
 import { useTabStore } from '../../stores/tabStore'
 import { useBookmarkStore } from '../../stores/bookmarkStore'
+import { useQuizStore } from '../../stores/quizStore'
 import { generateNoteId } from '../../utils/linkExtractor'
 import { useTranslation } from '../../utils/translations'
 
@@ -184,9 +185,77 @@ const FileItem: React.FC<FileItemProps> = ({ entry, level, onDrop, displayMode }
   const [moveDialog, setMoveDialog] = useState<MoveDialogState | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const rowRef = useRef<HTMLDivElement>(null)
+  const contextMenuRef = useRef<HTMLDivElement>(null)
+  const [menuReady, setMenuReady] = useState(false)
+  const [menuPosition, setMenuPosition] = useState<{ x: number; y: number }>({ x: 0, y: 0 })
+  const [menuMaxHeight, setMenuMaxHeight] = useState<number | null>(null)
+
+  // Click-outside Handler für Kontextmenü
+  useEffect(() => {
+    if (!contextMenu) return
+
+    const handleClickOutside = (e: MouseEvent) => {
+      if (contextMenuRef.current && !contextMenuRef.current.contains(e.target as Node)) {
+        setContextMenu(null)
+        setMenuReady(false)
+        setMenuMaxHeight(null)
+      }
+    }
+
+    // Verzögerung damit der Klick der das Menü öffnet nicht sofort schließt
+    const timeoutId = setTimeout(() => {
+      document.addEventListener('mousedown', handleClickOutside)
+    }, 10)
+
+    return () => {
+      clearTimeout(timeoutId)
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [contextMenu])
+
+  // Menü-Position nach Rendern berechnen (synchron vor dem Paint)
+  useLayoutEffect(() => {
+    if (!contextMenu || !contextMenuRef.current) return
+
+    const menu = contextMenuRef.current
+    const rect = menu.getBoundingClientRect()
+    const padding = 12
+    const titleBarHeight = 52
+    const viewportHeight = window.innerHeight
+    const viewportWidth = window.innerWidth
+
+    let x = contextMenu.x
+    let y = contextMenu.y
+    let maxHeight: number | null = null
+
+    // Rechter Rand - Menü nach links verschieben
+    if (x + rect.width + padding > viewportWidth) {
+      x = viewportWidth - rect.width - padding
+    }
+
+    // Berechne verfügbare Höhe
+    const availableHeight = viewportHeight - titleBarHeight - padding * 2
+
+    // Wenn Menü höher als verfügbarer Platz, max-height setzen und scrollbar machen
+    if (rect.height > availableHeight) {
+      maxHeight = availableHeight
+      y = titleBarHeight + padding
+    } else if (y + rect.height + padding > viewportHeight) {
+      // Menü nach oben verschieben damit es komplett sichtbar ist
+      y = viewportHeight - rect.height - padding
+    }
+
+    // Mindestens am oberen/linken Rand (nicht über Titlebar)
+    x = Math.max(padding, x)
+    y = Math.max(titleBarHeight + padding, y)
+
+    setMenuMaxHeight(maxHeight)
+    setMenuPosition({ x, y })
+    setMenuReady(true)
+  }, [contextMenu])
 
   const { selectedNoteId, secondarySelectedNoteId, selectedPdfPath, selectedImagePath, selectNote, selectSecondaryNote, selectPdf, selectImage, removeNote, setFileTree, vaultPath, notes, updateNotePath, fileTree } = useNotesStore()
-  const { iconSet, textSplitEnabled } = useUIStore()
+  const { iconSet, textSplitEnabled, flashcardsEnabled } = useUIStore()
   const { fileCustomizations, setFileCustomization, removeFileCustomization } = useGraphStore()
   const { openCanvasTab } = useTabStore()
   const { isBookmarked, toggleBookmark } = useBookmarkStore()
@@ -330,30 +399,10 @@ const FileItem: React.FC<FileItemProps> = ({ entry, level, onDrop, displayMode }
 
   const handleContextMenu = (e: React.MouseEvent) => {
     e.preventDefault()
-
-    // Berechne Position mit Viewport-Grenzen
-    const menuWidth = 180  // Geschätzte Menübreite
-    const menuHeight = entry.isDirectory ? 320 : 240  // Ordner-Menü ist höher
-    const padding = 8
-
-    let x = e.clientX
-    let y = e.clientY
-
-    // Prüfe rechten Rand
-    if (x + menuWidth + padding > window.innerWidth) {
-      x = window.innerWidth - menuWidth - padding
-    }
-
-    // Prüfe unteren Rand
-    if (y + menuHeight + padding > window.innerHeight) {
-      y = window.innerHeight - menuHeight - padding
-    }
-
-    // Mindestens am oberen/linken Rand
-    x = Math.max(padding, x)
-    y = Math.max(padding, y)
-
-    setContextMenu({ x, y, entry })
+    // Speichere Klickposition - die finale Position wird in useLayoutEffect berechnet
+    setMenuReady(false)
+    setMenuMaxHeight(null)
+    setContextMenu({ x: e.clientX, y: e.clientY, entry })
   }
 
   const handleDelete = useCallback(async () => {
@@ -436,6 +485,20 @@ const FileItem: React.FC<FileItemProps> = ({ entry, level, onDrop, displayMode }
 
     setContextMenu(null)
   }, [contextMenu, vaultPath, setFileTree])
+
+  // Quiz starten
+  const { startQuiz } = useQuizStore()
+  const { ollama } = useUIStore()
+
+  const handleStartQuiz = useCallback((questionCount: number) => {
+    if (!contextMenu) return
+
+    const sourceType = contextMenu.entry.isDirectory ? 'folder' : 'file'
+    const sourcePath = contextMenu.entry.path
+
+    startQuiz(sourceType, sourcePath, questionCount)
+    setContextMenu(null)
+  }, [contextMenu, startQuiz])
 
   const handleCreateNoteInFolder = useCallback(() => {
     if (!contextMenu || !vaultPath || !contextMenu.entry.isDirectory) return
@@ -813,14 +876,17 @@ const FileItem: React.FC<FileItemProps> = ({ entry, level, onDrop, displayMode }
         </div>
       )}
 
-      {contextMenu && (
+      {contextMenu && createPortal(
         <div
+          ref={contextMenuRef}
           className="context-menu"
           style={{
             position: 'fixed',
-            left: contextMenu.x,
-            top: contextMenu.y,
-            zIndex: 1000
+            left: menuReady ? menuPosition.x : contextMenu.x,
+            top: menuReady ? menuPosition.y : contextMenu.y,
+            visibility: menuReady ? 'visible' : 'hidden',
+            zIndex: 1000,
+            ...(menuMaxHeight ? { maxHeight: menuMaxHeight, overflowY: 'auto' } : {})
           }}
         >
           {contextMenu.entry.isDirectory ? (
@@ -872,6 +938,29 @@ const FileItem: React.FC<FileItemProps> = ({ entry, level, onDrop, displayMode }
               <button onClick={handleStripWikilinks} className="context-menu-item">
                 {t('fileTree.stripWikilinks')}
               </button>
+              {/* Quiz für Ordner - nur wenn Flashcards und Ollama aktiviert */}
+              {flashcardsEnabled && ollama.enabled && ollama.selectedModel && (
+                <>
+                  <div className="context-menu-divider" />
+                  <div className="context-menu-item with-submenu">
+                    <span>{t('quiz.startQuiz')}</span>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <polyline points="9 18 15 12 9 6" />
+                    </svg>
+                    <div className="context-submenu">
+                      <button onClick={() => handleStartQuiz(3)} className="context-menu-item">
+                        {t('quiz.questions3')}
+                      </button>
+                      <button onClick={() => handleStartQuiz(10)} className="context-menu-item">
+                        {t('quiz.questions10')}
+                      </button>
+                      <button onClick={() => handleStartQuiz(15)} className="context-menu-item">
+                        {t('quiz.questions15')}
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
               <div className="context-menu-divider" />
               <button onClick={handleDeleteFolder} className="context-menu-item danger">
                 {t('fileTree.deleteFolder')}
@@ -879,7 +968,7 @@ const FileItem: React.FC<FileItemProps> = ({ entry, level, onDrop, displayMode }
             </>
           ) : (
             <>
-              {/* Im Canvas erkunden + Lesezeichen - nur für Markdown-Dateien */}
+              {/* Im Canvas erkunden + Lesezeichen + Quiz - nur für Markdown-Dateien */}
               {!isPdf && !isImage && (
                 <>
                   <button onClick={handleToggleBookmark} className="context-menu-item">
@@ -888,6 +977,26 @@ const FileItem: React.FC<FileItemProps> = ({ entry, level, onDrop, displayMode }
                   <button onClick={handleOpenInCanvas} className="context-menu-item">
                     {t('fileTree.exploreInCanvas')}
                   </button>
+                  {/* Quiz für Datei - nur wenn Flashcards und Ollama aktiviert */}
+                  {flashcardsEnabled && ollama.enabled && ollama.selectedModel && (
+                    <div className="context-menu-item with-submenu">
+                      <span>{t('quiz.startQuiz')}</span>
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <polyline points="9 18 15 12 9 6" />
+                      </svg>
+                      <div className="context-submenu">
+                        <button onClick={() => handleStartQuiz(3)} className="context-menu-item">
+                          {t('quiz.questions3')}
+                        </button>
+                        <button onClick={() => handleStartQuiz(10)} className="context-menu-item">
+                          {t('quiz.questions10')}
+                        </button>
+                        <button onClick={() => handleStartQuiz(15)} className="context-menu-item">
+                          {t('quiz.questions15')}
+                        </button>
+                      </div>
+                    </div>
+                  )}
                   <div className="context-menu-divider" />
                 </>
               )}
@@ -916,7 +1025,8 @@ const FileItem: React.FC<FileItemProps> = ({ entry, level, onDrop, displayMode }
               </button>
             </>
           )}
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Dialog für neue Notiz im Ordner */}

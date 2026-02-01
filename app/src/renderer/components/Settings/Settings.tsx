@@ -90,6 +90,8 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
     setSmartConnectionsEnabled,
     notesChatEnabled,
     setNotesChatEnabled,
+    flashcardsEnabled,
+    setFlashcardsEnabled,
     smartConnectionsWeights,
     setSmartConnectionsWeights,
     docling,
@@ -1063,6 +1065,32 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
                     onChange={e => setNotesChatEnabled(e.target.checked)}
                   />
                 </div>
+
+                <div className="settings-row">
+                  <label>
+                    {t('settings.integrations.flashcards')}
+                    <span className="settings-hint">{t('settings.integrations.flashcardsHint')}</span>
+                  </label>
+                  <input
+                    type="checkbox"
+                    checked={flashcardsEnabled}
+                    onChange={e => setFlashcardsEnabled(e.target.checked)}
+                  />
+                </div>
+
+                {flashcardsEnabled && (!ollama.enabled || !ollama.selectedModel) && (
+                  <div className="settings-warning" style={{
+                    marginTop: '8px',
+                    padding: '12px',
+                    background: 'var(--color-warning-bg, rgba(255, 149, 0, 0.1))',
+                    borderRadius: 'var(--radius-md)',
+                    border: '1px solid var(--color-warning, #ff9500)'
+                  }}>
+                    <p style={{ margin: 0, fontSize: '13px', color: 'var(--color-warning, #ff9500)' }}>
+                      {t('settings.integrations.flashcardsOllamaWarning')}
+                    </p>
+                  </div>
+                )}
 
                 <h3 style={{ marginTop: '32px' }}>{t('settings.integrations.zotero')}</h3>
                 <div className="settings-row">

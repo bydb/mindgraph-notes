@@ -2784,6 +2784,479 @@ function extractVersionSection(changelog: string, version: string): string {
   return ''
 }
 
+// ============================================
+// Quiz / Spaced Repetition IPC Handlers
+// ============================================
+
+// Quiz-Fragen aus Notizinhalt generieren
+ipcMain.handle('quiz-generate-questions', async (event, model: string, content: string, count: number, sourcePath: string) => {
+  console.log(`[Quiz] Generating ${count} questions for: ${sourcePath}`)
+  console.log(`[Quiz] Model: ${model}, Content length: ${content.length} chars`)
+
+  try {
+    // Content kürzen wenn zu lang (max 15000 Zeichen für schnellere Verarbeitung)
+    const maxContentLength = 15000
+    let trimmedContent = content
+    if (content.length > maxContentLength) {
+      trimmedContent = content.slice(0, maxContentLength) + '\n\n[... Text gekürzt ...]'
+      console.log(`[Quiz] Content trimmed from ${content.length} to ${maxContentLength} chars`)
+    }
+
+    const systemPrompt = `Generate exactly ${count} quiz questions about the following text.
+Vary difficulty: easy (facts), medium (understanding), hard (application).
+
+You MUST respond with ONLY a valid JSON array, nothing else:
+[{"question":"Q1?","expectedAnswer":"A1","topic":"Topic","difficulty":"easy"}]
+
+No markdown, no explanation, no text before or after. Just the JSON array.`
+
+    // Timeout nach 90 Sekunden
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => {
+      console.log('[Quiz] Request timeout after 90s')
+      controller.abort()
+    }, 90000)
+
+    console.log('[Quiz] Sending request to Ollama...')
+    const startTime = Date.now()
+
+    const response = await fetch(`${OLLAMA_API_URL}/api/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: `Generate ${count} questions about this text:\n\n${trimmedContent}` }
+        ],
+        stream: false,
+        options: {
+          temperature: 0.7,
+          num_predict: 3000
+        }
+      }),
+      signal: controller.signal
+    })
+
+    clearTimeout(timeoutId)
+    console.log(`[Quiz] Response received in ${Date.now() - startTime}ms, status: ${response.status}`)
+
+    if (!response.ok) {
+      throw new Error(`Ollama API error: ${response.status}`)
+    }
+
+    const data = await response.json() as { message?: { content?: string } }
+    const responseText = data.message?.content || ''
+    console.log(`[Quiz] Response text length: ${responseText.length}`)
+    console.log(`[Quiz] Response preview: ${responseText.slice(0, 200)}...`)
+
+    // JSON aus der Antwort extrahieren - robuste Strategien
+    let questions: Array<{
+      question: string
+      expectedAnswer: string
+      topic: string
+      difficulty: string
+    }> = []
+
+    // Hilfsfunktion: JSON bereinigen und parsen
+    const tryParseJson = (jsonStr: string): typeof questions | null => {
+      try {
+        // Bereinige häufige JSON-Fehler
+        let cleaned = jsonStr
+          .replace(/,\s*]/g, ']')  // Trailing commas entfernen
+          .replace(/,\s*}/g, '}')  // Trailing commas in objects
+          .replace(/[\x00-\x1F\x7F]/g, ' ')  // Control characters entfernen
+          .replace(/\n/g, ' ')  // Newlines durch Spaces ersetzen
+          .replace(/\r/g, '')  // Carriage returns entfernen
+          .replace(/\t/g, ' ')  // Tabs durch Spaces ersetzen
+          .replace(/"\s*:\s*"/g, '": "')  // Spacing normalisieren
+          .replace(/\\'/g, "'")  // Escaped single quotes
+          .replace(/`/g, "'")  // Backticks zu normalen Quotes
+
+        // Versuche unbalancierte Klammern zu reparieren
+        const openBrackets = (cleaned.match(/\[/g) || []).length
+        const closeBrackets = (cleaned.match(/\]/g) || []).length
+        if (openBrackets > closeBrackets) {
+          cleaned = cleaned + ']'.repeat(openBrackets - closeBrackets)
+        }
+
+        const openBraces = (cleaned.match(/\{/g) || []).length
+        const closeBraces = (cleaned.match(/\}/g) || []).length
+        if (openBraces > closeBraces) {
+          // Füge fehlende schließende Klammern vor dem letzten ] ein
+          const lastBracket = cleaned.lastIndexOf(']')
+          if (lastBracket > 0) {
+            cleaned = cleaned.slice(0, lastBracket) + '}'.repeat(openBraces - closeBraces) + cleaned.slice(lastBracket)
+          }
+        }
+
+        const parsed = JSON.parse(cleaned)
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed
+        }
+        return null
+      } catch {
+        return null
+      }
+    }
+
+    // Strategie 1: Suche nach ```json Block
+    const codeBlockMatch = responseText.match(/```(?:json)?\s*([\s\S]*?)```/)
+    if (codeBlockMatch) {
+      const parsed = tryParseJson(codeBlockMatch[1].trim())
+      if (parsed) {
+        questions = parsed
+        console.log('[Quiz] Parsed from code block')
+      }
+    }
+
+    // Strategie 2: Suche nach vollständigem JSON-Array
+    if (questions.length === 0) {
+      const arrayStart = responseText.indexOf('[')
+      const arrayEnd = responseText.lastIndexOf(']')
+      if (arrayStart !== -1 && arrayEnd > arrayStart) {
+        const parsed = tryParseJson(responseText.slice(arrayStart, arrayEnd + 1))
+        if (parsed) {
+          questions = parsed
+          console.log('[Quiz] Parsed from array bounds')
+        }
+      }
+    }
+
+    // Strategie 3: Extrahiere einzelne Objekte und baue Array
+    if (questions.length === 0) {
+      console.log('[Quiz] Trying to extract individual objects...')
+      const objectRegex = /\{[^{}]*"question"\s*:\s*"[^"]+[^{}]*\}/g
+      const objects = responseText.match(objectRegex)
+      if (objects && objects.length > 0) {
+        const parsedObjects: typeof questions = []
+        for (const obj of objects) {
+          try {
+            const cleaned = obj
+              .replace(/,\s*}/g, '}')
+              .replace(/[\x00-\x1F\x7F]/g, ' ')
+            const parsed = JSON.parse(cleaned)
+            if (parsed.question) {
+              parsedObjects.push(parsed)
+            }
+          } catch {
+            // Skip malformed object
+          }
+        }
+        if (parsedObjects.length > 0) {
+          questions = parsedObjects
+          console.log(`[Quiz] Extracted ${parsedObjects.length} individual objects`)
+        }
+      }
+    }
+
+    // Strategie 4: Versuche den gesamten Text als JSON
+    if (questions.length === 0) {
+      const parsed = tryParseJson(responseText.trim())
+      if (parsed) {
+        questions = parsed
+        console.log('[Quiz] Parsed entire response')
+      }
+    }
+
+    // Strategie 5: Letzte Chance - suche nach question/answer Patterns
+    if (questions.length === 0) {
+      console.log('[Quiz] Last resort: extracting from patterns...')
+      const questionPattern = /"question"\s*:\s*"([^"]+)"/g
+      const answerPattern = /"expectedAnswer"\s*:\s*"([^"]+)"/g
+      const topicPattern = /"topic"\s*:\s*"([^"]+)"/g
+
+      const questionMatches = [...responseText.matchAll(questionPattern)]
+      const answerMatches = [...responseText.matchAll(answerPattern)]
+      const topicMatches = [...responseText.matchAll(topicPattern)]
+
+      if (questionMatches.length > 0 && answerMatches.length > 0) {
+        for (let i = 0; i < Math.min(questionMatches.length, answerMatches.length); i++) {
+          questions.push({
+            question: questionMatches[i][1],
+            expectedAnswer: answerMatches[i]?.[1] || 'Keine Antwort verfügbar',
+            topic: topicMatches[i]?.[1] || 'Allgemein',
+            difficulty: 'medium'
+          })
+        }
+        console.log(`[Quiz] Extracted ${questions.length} questions from patterns`)
+      }
+    }
+
+    if (questions.length === 0) {
+      console.error('[Quiz] All parsing strategies failed. Response:', responseText.slice(0, 1500))
+      throw new Error('Konnte keine Fragen aus der KI-Antwort extrahieren. Bitte erneut versuchen.')
+    }
+
+    console.log(`[Quiz] Successfully parsed ${questions.length} questions`)
+
+    if (!Array.isArray(questions) || questions.length === 0) {
+      throw new Error('Response did not contain valid questions array')
+    }
+
+    console.log(`[Quiz] Parsed ${questions.length} questions`)
+
+    // IDs hinzufügen
+    const questionsWithIds = questions.map((q, index) => ({
+      id: `q-${Date.now()}-${index}`,
+      question: q.question || 'Keine Frage',
+      expectedAnswer: q.expectedAnswer || 'Keine Antwort',
+      topic: q.topic || 'Allgemein',
+      difficulty: (['easy', 'medium', 'hard'].includes(q.difficulty) ? q.difficulty : 'medium') as 'easy' | 'medium' | 'hard',
+      sourceFile: sourcePath
+    }))
+
+    console.log(`[Quiz] Successfully generated ${questionsWithIds.length} questions`)
+    return { success: true, questions: questionsWithIds }
+  } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : 'Unknown error'
+    console.error('[Quiz] Failed to generate questions:', errorMsg)
+    if (error instanceof Error && error.name === 'AbortError') {
+      return { success: false, error: 'Timeout: Die Anfrage hat zu lange gedauert. Versuche es mit weniger Fragen.' }
+    }
+    return { success: false, error: errorMsg }
+  }
+})
+
+// Antwort bewerten
+ipcMain.handle('quiz-evaluate-answer', async (_event, model: string, question: string, expectedAnswer: string, userAnswer: string) => {
+  try {
+    const systemPrompt = `Du bist ein fairer Prüfer. Bewerte die Antwort des Lernenden.
+
+Kriterien:
+- Korrektheit des Inhalts
+- Vollständigkeit (aber bestrafe nicht übermäßig wenn Nebenpunkte fehlen)
+- Verständnis des Konzepts
+
+WICHTIG: Antworte ausschließlich mit validem JSON im folgenden Format:
+{
+  "score": 0-100,
+  "correct": true/false,
+  "feedback": "Konstruktives Feedback in 1-3 Sätzen..."
+}
+
+Score-Richtwerte:
+- 90-100: Exzellent, sehr vollständig
+- 70-89: Gut, Kernpunkte richtig
+- 50-69: Teilweise richtig, wichtige Aspekte fehlen
+- 20-49: Wenig richtig, Missverständnisse
+- 0-19: Falsch oder keine Antwort
+
+Keine Erklärungen, kein Markdown, nur das JSON-Objekt.`
+
+    const userMessage = `Frage: ${question}
+
+Erwartete Antwort (Musterantwort): ${expectedAnswer}
+
+Antwort des Lernenden: ${userAnswer || '(keine Antwort gegeben)'}
+
+Bewerte diese Antwort.`
+
+    const response = await fetch(`${OLLAMA_API_URL}/api/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userMessage }
+        ],
+        stream: false,
+        options: {
+          temperature: 0.3,
+          num_predict: 500
+        }
+      })
+    })
+
+    if (!response.ok) {
+      throw new Error(`Ollama API error: ${response.status}`)
+    }
+
+    const data = await response.json() as { message?: { content?: string } }
+    const responseText = data.message?.content || ''
+
+    // JSON aus der Antwort extrahieren
+    const jsonMatch = responseText.match(/\{[\s\S]*\}/)
+    if (!jsonMatch) {
+      throw new Error('Could not parse evaluation from response')
+    }
+
+    const evaluation = JSON.parse(jsonMatch[0]) as {
+      score: number
+      correct: boolean
+      feedback: string
+    }
+
+    return {
+      success: true,
+      score: Math.max(0, Math.min(100, evaluation.score)),
+      feedback: evaluation.feedback,
+      correct: evaluation.correct
+    }
+  } catch (error) {
+    console.error('[Quiz] Failed to evaluate answer:', error)
+    return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
+  }
+})
+
+// Ergebnisse analysieren und Schwächen identifizieren
+ipcMain.handle('quiz-analyze-results', async (_event, model: string, results: Array<{ questionId: string; score: number; correct: boolean }>, questions: Array<{ id: string; topic: string; sourceFile: string }>) => {
+  try {
+    // Ergebnisse nach Themen gruppieren
+    const topicScores: Record<string, { scores: number[]; files: Set<string> }> = {}
+
+    for (const result of results) {
+      const question = questions.find(q => q.id === result.questionId)
+      if (question) {
+        if (!topicScores[question.topic]) {
+          topicScores[question.topic] = { scores: [], files: new Set() }
+        }
+        topicScores[question.topic].scores.push(result.score)
+        topicScores[question.topic].files.add(question.sourceFile)
+      }
+    }
+
+    // Durchschnitt pro Thema berechnen
+    const topicAverages: Array<{ topic: string; average: number; files: string[] }> = []
+    for (const [topic, data] of Object.entries(topicScores)) {
+      const avg = data.scores.reduce((a, b) => a + b, 0) / data.scores.length
+      topicAverages.push({
+        topic,
+        average: Math.round(avg),
+        files: Array.from(data.files)
+      })
+    }
+
+    // Schwache Themen identifizieren (unter 70%)
+    const weakTopics = topicAverages
+      .filter(t => t.average < 70)
+      .sort((a, b) => a.average - b.average)
+      .map(t => t.topic)
+
+    // Dateien für Wiederholung empfehlen
+    const suggestedFiles = topicAverages
+      .filter(t => t.average < 70)
+      .flatMap(t => t.files)
+      .filter((v, i, a) => a.indexOf(v) === i)
+
+    // Gesamtscore
+    const overallScore = results.length > 0
+      ? Math.round(results.reduce((sum, r) => sum + r.score, 0) / results.length)
+      : 0
+
+    // KI für Empfehlungen nutzen
+    const systemPrompt = `Du bist ein Lernberater. Basierend auf den Quiz-Ergebnissen, gib 2-3 konkrete Lernempfehlungen.
+
+Ergebnisse nach Themen:
+${topicAverages.map(t => `- ${t.topic}: ${t.average}%`).join('\n')}
+
+Gesamtscore: ${overallScore}%
+
+WICHTIG: Antworte ausschließlich mit validem JSON:
+{
+  "recommendations": ["Empfehlung 1", "Empfehlung 2", "Empfehlung 3"]
+}
+
+Keine Erklärungen, kein Markdown, nur das JSON-Objekt.`
+
+    const response = await fetch(`${OLLAMA_API_URL}/api/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: 'Gib mir Lernempfehlungen basierend auf diesen Ergebnissen.' }
+        ],
+        stream: false,
+        options: {
+          temperature: 0.5,
+          num_predict: 500
+        }
+      })
+    })
+
+    let recommendations: string[] = []
+    if (response.ok) {
+      const data = await response.json() as { message?: { content?: string } }
+      const responseText = data.message?.content || ''
+      const jsonMatch = responseText.match(/\{[\s\S]*\}/)
+      if (jsonMatch) {
+        const parsed = JSON.parse(jsonMatch[0]) as { recommendations?: string[] }
+        recommendations = parsed.recommendations || []
+      }
+    }
+
+    return {
+      success: true,
+      analysis: {
+        weakTopics,
+        recommendations,
+        suggestedFiles,
+        overallScore
+      }
+    }
+  } catch (error) {
+    console.error('[Quiz] Failed to analyze results:', error)
+    return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
+  }
+})
+
+// Learning Progress speichern
+ipcMain.handle('save-learning-progress', async (_event, vaultPath: string, progress: object) => {
+  try {
+    const progressPath = path.join(vaultPath, '.mindgraph', 'learning-progress.json')
+
+    // Verzeichnis erstellen falls nicht vorhanden
+    await fs.mkdir(path.dirname(progressPath), { recursive: true })
+
+    await fs.writeFile(progressPath, JSON.stringify(progress, null, 2), 'utf-8')
+    return true
+  } catch (error) {
+    console.error('[Quiz] Failed to save learning progress:', error)
+    return false
+  }
+})
+
+// Learning Progress laden
+ipcMain.handle('load-learning-progress', async (_event, vaultPath: string) => {
+  try {
+    const progressPath = path.join(vaultPath, '.mindgraph', 'learning-progress.json')
+    const content = await fs.readFile(progressPath, 'utf-8')
+    return JSON.parse(content)
+  } catch {
+    return null
+  }
+})
+
+// Flashcards laden
+ipcMain.handle('flashcards-load', async (_event, vaultPath: string) => {
+  try {
+    const flashcardsPath = path.join(vaultPath, '.mindgraph', 'flashcards.json')
+    const content = await fs.readFile(flashcardsPath, 'utf-8')
+    return JSON.parse(content)
+  } catch {
+    return null
+  }
+})
+
+// Flashcards speichern
+ipcMain.handle('flashcards-save', async (_event, vaultPath: string, flashcards: object[]) => {
+  try {
+    const flashcardsPath = path.join(vaultPath, '.mindgraph', 'flashcards.json')
+
+    // Verzeichnis erstellen falls nicht vorhanden
+    await fs.mkdir(path.dirname(flashcardsPath), { recursive: true })
+
+    await fs.writeFile(flashcardsPath, JSON.stringify(flashcards, null, 2), 'utf-8')
+    return true
+  } catch (error) {
+    console.error('[Flashcards] Failed to save:', error)
+    return false
+  }
+})
+
 // Cleanup bei App-Beendigung
 app.on('before-quit', () => {
   isQuitting = true

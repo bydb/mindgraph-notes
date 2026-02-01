@@ -298,6 +298,7 @@ interface UIState {
   // KI-Features (für ältere Rechner ohne Ollama deaktivierbar)
   smartConnectionsEnabled: boolean
   notesChatEnabled: boolean
+  flashcardsEnabled: boolean
 
   // Smart Connections Gewichtungen
   smartConnectionsWeights: SmartConnectionsWeights
@@ -350,6 +351,7 @@ interface UIState {
   setIconSet: (set: IconSet) => void
   setSmartConnectionsEnabled: (enabled: boolean) => void
   setNotesChatEnabled: (enabled: boolean) => void
+  setFlashcardsEnabled: (enabled: boolean) => void
   setSmartConnectionsWeights: (weights: Partial<SmartConnectionsWeights>) => void
   setDocling: (settings: Partial<DoclingSettings>) => void
   setLanguageTool: (settings: Partial<LanguageToolSettings>) => void
@@ -415,6 +417,7 @@ const defaultState = {
   // KI-Features (opt-in - Human in the Loop)
   smartConnectionsEnabled: false,
   notesChatEnabled: false,
+  flashcardsEnabled: true,
 
   // Smart Connections Gewichtungen (Summe sollte 100 ergeben)
   smartConnectionsWeights: {
@@ -461,7 +464,7 @@ const persistedKeys = [
   'canvasFilterPath', 'canvasViewMode', 'canvasShowTags', 'canvasShowLinks', 'canvasShowImages',
   'canvasCompactMode', 'canvasDefaultCardWidth', 'splitPosition', 'fileTreeDisplayMode', 'ollama',
   'pdfCompanionEnabled', 'pdfDisplayMode', 'iconSet',
-  'smartConnectionsEnabled', 'notesChatEnabled', 'smartConnectionsWeights', 'docling', 'languageTool',
+  'smartConnectionsEnabled', 'notesChatEnabled', 'flashcardsEnabled', 'smartConnectionsWeights', 'docling', 'languageTool',
   'lastSeenVersion'
 ] as const
 
@@ -505,6 +508,7 @@ export const useUIStore = create<UIState>()((set, get) => ({
   setIconSet: (iconSet) => set({ iconSet }),
   setSmartConnectionsEnabled: (enabled) => set({ smartConnectionsEnabled: enabled }),
   setNotesChatEnabled: (enabled) => set({ notesChatEnabled: enabled }),
+  setFlashcardsEnabled: (enabled) => set({ flashcardsEnabled: enabled }),
   setSmartConnectionsWeights: (weights) => set((state) => ({
     smartConnectionsWeights: { ...state.smartConnectionsWeights, ...weights }
   })),

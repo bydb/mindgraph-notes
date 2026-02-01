@@ -192,5 +192,27 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Update-Checker & What's New
   getAppVersion: () => ipcRenderer.invoke('get-app-version'),
   checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
-  getWhatsNewContent: (version: string) => ipcRenderer.invoke('get-whats-new-content', version)
+  getWhatsNewContent: (version: string) => ipcRenderer.invoke('get-whats-new-content', version),
+
+  // Quiz / Spaced Repetition
+  quizGenerateQuestions: (model: string, content: string, count: number, sourcePath: string) =>
+    ipcRenderer.invoke('quiz-generate-questions', model, content, count, sourcePath),
+  quizEvaluateAnswer: (model: string, question: string, expectedAnswer: string, userAnswer: string) =>
+    ipcRenderer.invoke('quiz-evaluate-answer', model, question, expectedAnswer, userAnswer),
+  quizAnalyzeResults: (model: string, results: object[], questions: object[]) =>
+    ipcRenderer.invoke('quiz-analyze-results', model, results, questions),
+  onQuizProgress: (callback: (progress: { current: number; total: number; status: string }) => void) =>
+    ipcRenderer.on('quiz-progress', (_event, progress) => callback(progress)),
+
+  // Learning Progress Persistence
+  saveLearningProgress: (vaultPath: string, progress: object) =>
+    ipcRenderer.invoke('save-learning-progress', vaultPath, progress),
+  loadLearningProgress: (vaultPath: string) =>
+    ipcRenderer.invoke('load-learning-progress', vaultPath),
+
+  // Flashcards Persistence
+  flashcardsLoad: (vaultPath: string) =>
+    ipcRenderer.invoke('flashcards-load', vaultPath),
+  flashcardsSave: (vaultPath: string, flashcards: object[]) =>
+    ipcRenderer.invoke('flashcards-save', vaultPath, flashcards)
 })

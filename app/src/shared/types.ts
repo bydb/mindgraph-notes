@@ -10,6 +10,83 @@ export interface UpdateInfo {
   error?: boolean
 }
 
+// Quiz / Spaced Repetition Types
+export type QuizDifficulty = 'easy' | 'medium' | 'hard'
+
+export interface QuizQuestion {
+  id: string
+  question: string
+  expectedAnswer: string
+  topic: string
+  difficulty: QuizDifficulty
+  sourceFile: string
+}
+
+export interface QuizResult {
+  questionId: string
+  userAnswer: string
+  score: number          // 0-100
+  feedback: string
+  correct: boolean
+}
+
+export interface QuizSession {
+  id: string
+  sourceType: 'file' | 'folder'
+  sourcePath: string
+  createdAt: Date
+  questions: QuizQuestion[]
+  results: QuizResult[]
+  weakTopics: string[]
+  completed: boolean
+}
+
+export interface TopicProgress {
+  correctCount: number
+  totalCount: number
+  lastAsked: Date
+  nextReview: Date
+}
+
+export interface LearningProgress {
+  filePath: string
+  topics: Record<string, TopicProgress>
+}
+
+export interface QuizAnalysis {
+  weakTopics: string[]
+  recommendations: string[]
+  suggestedFiles: string[]
+  overallScore: number
+}
+
+// Flashcard / Spaced Repetition Types
+export type FlashcardStatus = 'pending' | 'active' | 'suspended'
+
+export interface Flashcard {
+  id: string
+  sourceNote: string           // Pfad zur Quell-Notiz
+  front: string                // Frage
+  back: string                 // Antwort
+  topic: string                // Themenbereich
+  status: FlashcardStatus
+  created: string              // ISO date string
+  modified: string             // ISO date string
+  // SM-2 Felder
+  easeFactor: number           // 1.3-2.5
+  interval: number             // Tage bis nächste Review
+  repetitions: number          // Anzahl erfolgreicher Reviews
+  nextReview: string | null    // ISO date string, null = noch nie gelernt
+  lastReview: string | null    // ISO date string
+}
+
+export interface FlashcardSession {
+  cards: Flashcard[]
+  currentIndex: number
+  startedAt: string
+  completedCount: number
+}
+
 export interface FileCustomization {
   color?: string           // Ordner/Datei Farbe (aus Palette)
   icon?: string            // Icon-Override (z.B. '📚', '🎯', 'star')
@@ -371,6 +448,34 @@ export interface ElectronAPI {
   getAppVersion: () => Promise<string>;
   checkForUpdates: () => Promise<UpdateInfo>;
   getWhatsNewContent: (version: string) => Promise<string | null>;
+
+  // Quiz / Spaced Repetition
+  quizGenerateQuestions: (model: string, content: string, count: number, sourcePath: string) => Promise<{
+    success: boolean;
+    questions?: QuizQuestion[];
+    error?: string;
+  }>;
+  quizEvaluateAnswer: (model: string, question: string, expectedAnswer: string, userAnswer: string) => Promise<{
+    success: boolean;
+    score?: number;
+    feedback?: string;
+    correct?: boolean;
+    error?: string;
+  }>;
+  quizAnalyzeResults: (model: string, results: QuizResult[], questions: QuizQuestion[]) => Promise<{
+    success: boolean;
+    analysis?: QuizAnalysis;
+    error?: string;
+  }>;
+  onQuizProgress: (callback: (progress: { current: number; total: number; status: string }) => void) => void;
+
+  // Learning Progress Persistence
+  saveLearningProgress: (vaultPath: string, progress: Record<string, LearningProgress>) => Promise<boolean>;
+  loadLearningProgress: (vaultPath: string) => Promise<Record<string, LearningProgress> | null>;
+
+  // Flashcards Persistence
+  flashcardsLoad: (vaultPath: string) => Promise<Flashcard[] | null>;
+  flashcardsSave: (vaultPath: string, flashcards: Flashcard[]) => Promise<boolean>;
 }
 
 // Docling Options for PDF conversion
