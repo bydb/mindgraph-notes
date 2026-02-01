@@ -62,9 +62,15 @@ async function saveUISettings(settings: Record<string, unknown>): Promise<void> 
 
 function createWindow(): void {
   // Icon-Pfad basierend auf Platform
+  // Im Dev-Modus: app.getAppPath() zeigt auf das app-Verzeichnis
+  // Im Production: __dirname ist out/main, also ../../resources
+  const resourcesPath = app.isPackaged
+    ? path.join(__dirname, '../../resources')
+    : path.join(app.getAppPath(), 'resources')
+
   const iconPath = process.platform === 'darwin'
-    ? path.join(__dirname, '../../resources/icon.icns')
-    : path.join(__dirname, '../../resources/icon.png')
+    ? path.join(resourcesPath, 'icon.icns')
+    : path.join(resourcesPath, 'icon.png')
 
   mainWindow = new BrowserWindow({
     width: 1400,
@@ -117,10 +123,19 @@ function createWindow(): void {
 // App-Name setzen
 app.name = 'MindGraph Notes'
 
+// Linux: WM_CLASS setzen für korrektes Taskbar-Icon
+if (process.platform === 'linux') {
+  // Im Dev-Modus: eigene .desktop-Datei, im Production: von electron-builder generiert
+  app.setDesktopName(app.isPackaged ? 'mindgraph-notes.desktop' : 'mindgraph-notes-dev.desktop')
+}
+
 app.whenReady().then(() => {
   // App-Icon für macOS Dock setzen
   if (process.platform === 'darwin') {
-    app.dock.setIcon(path.join(__dirname, '../../resources/icon.png'))
+    const dockIconPath = app.isPackaged
+      ? path.join(__dirname, '../../resources/icon.png')
+      : path.join(app.getAppPath(), 'resources/icon.png')
+    app.dock.setIcon(dockIconPath)
   }
 
   createWindow()
