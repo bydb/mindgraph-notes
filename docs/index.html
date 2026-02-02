@@ -449,6 +449,219 @@
       box-shadow: 0 0 30px rgba(249, 115, 22, 0.2);
     }
 
+    /* Dataview & Properties Documentation */
+    .dataview-docs,
+    .properties-docs {
+      padding: 6rem 2rem;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .docs-container {
+      margin-top: 2rem;
+    }
+
+    .docs-intro {
+      text-align: center;
+      max-width: 700px;
+      margin: 0 auto 3rem;
+      color: var(--text-muted);
+      font-size: 1.1rem;
+      line-height: 1.6;
+    }
+
+    .docs-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 1.5rem;
+    }
+
+    .docs-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 1.5rem;
+    }
+
+    .docs-card.wide {
+      grid-column: 1 / -1;
+    }
+
+    .docs-card h3 {
+      color: var(--accent);
+      font-size: 1.1rem;
+      margin-bottom: 1rem;
+      padding-bottom: 0.75rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .code-example {
+      margin-bottom: 1rem;
+    }
+
+    .code-example:last-child {
+      margin-bottom: 0;
+    }
+
+    .code-example pre {
+      background: rgba(0, 0, 0, 0.3);
+      border-radius: 8px;
+      padding: 0.75rem 1rem;
+      margin: 0 0 0.5rem 0;
+      overflow-x: auto;
+    }
+
+    .code-example code {
+      font-family: 'SF Mono', Monaco, Consolas, monospace;
+      font-size: 0.85rem;
+      color: #e2e8f0;
+    }
+
+    .code-desc {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      display: block;
+    }
+
+    .fields-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 1.5rem;
+    }
+
+    .field-group h4 {
+      color: var(--text);
+      font-size: 0.95rem;
+      margin-bottom: 0.75rem;
+    }
+
+    .field-group p {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      margin-bottom: 0.5rem;
+    }
+
+    .field-group ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+
+    .field-group li {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      padding: 0.25rem 0;
+    }
+
+    .field-group code {
+      background: rgba(249, 115, 22, 0.15);
+      color: var(--accent);
+      padding: 0.15rem 0.4rem;
+      border-radius: 4px;
+      font-size: 0.8rem;
+    }
+
+    .example-card .full-example {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 2rem;
+      align-items: center;
+    }
+
+    .example-card .full-example pre {
+      background: rgba(0, 0, 0, 0.3);
+      border-radius: 8px;
+      padding: 1rem 1.25rem;
+      margin: 0;
+    }
+
+    .example-desc {
+      color: var(--text-muted);
+      font-size: 0.95rem;
+      line-height: 1.6;
+    }
+
+    /* Properties Documentation */
+    .properties-features {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 1.5rem;
+      margin-bottom: 2rem;
+    }
+
+    .property-type {
+      display: flex;
+      gap: 1rem;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.25rem;
+    }
+
+    .property-icon {
+      font-size: 1.5rem;
+      flex-shrink: 0;
+    }
+
+    .property-info h4 {
+      color: var(--text);
+      font-size: 1rem;
+      margin-bottom: 0.25rem;
+    }
+
+    .property-info p {
+      color: var(--text-muted);
+      font-size: 0.85rem;
+      margin: 0;
+    }
+
+    .property-info code {
+      background: rgba(249, 115, 22, 0.15);
+      color: var(--accent);
+      padding: 0.1rem 0.3rem;
+      border-radius: 3px;
+      font-size: 0.8rem;
+    }
+
+    .properties-example {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 1.5rem;
+    }
+
+    .properties-example h3 {
+      color: var(--accent);
+      font-size: 1.1rem;
+      margin-bottom: 1rem;
+    }
+
+    .properties-example pre {
+      background: rgba(0, 0, 0, 0.3);
+      border-radius: 8px;
+      padding: 1rem 1.25rem;
+      margin: 0 0 1rem 0;
+      overflow-x: auto;
+    }
+
+    .properties-example code {
+      font-family: 'SF Mono', Monaco, Consolas, monospace;
+      font-size: 0.85rem;
+      color: #e2e8f0;
+    }
+
+    .example-note {
+      color: var(--text-muted);
+      font-size: 0.9rem;
+      margin: 0;
+    }
+
+    @media (max-width: 768px) {
+      .example-card .full-example {
+        grid-template-columns: 1fr;
+      }
+    }
+
     .shortcuts {
       padding: 6rem 2rem;
       max-width: 1200px;
@@ -1043,6 +1256,204 @@
         <h3 data-i18n="features.flashcards.title">Karteikarten & Quiz</h3>
         <p data-i18n="features.flashcards.desc">NEU: Generiere Quiz-Fragen aus deinen Notizen via Ollama. Speichere sie als Karteikarten mit Spaced Repetition (SM-2). Lerne effektiver – alles lokal.</p>
       </div>
+
+      <div class="feature-card featured">
+        <div class="feature-icon">🔍</div>
+        <h3 data-i18n="features.dataview.title">Dataview Queries</h3>
+        <p data-i18n="features.dataview.desc">NEU: Frage deine Notizen ab wie eine Datenbank. LIST und TABLE Queries mit FROM, WHERE, SORT. Filtere nach Tags, Ordnern und YAML-Frontmatter.</p>
+      </div>
+
+      <div class="feature-card featured">
+        <div class="feature-icon">⚙️</div>
+        <h3 data-i18n="features.properties.title">Properties Panel</h3>
+        <p data-i18n="features.properties.desc">NEU: Bearbeite YAML-Frontmatter komfortabel. Checkboxen für Booleans, Datumspicker, Arrays – alles ohne YAML-Syntax.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Dataview Documentation Section -->
+  <section class="dataview-docs" id="dataview">
+    <div class="section-title">
+      <h2 data-i18n="dataview.title">Dataview Queries</h2>
+      <p data-i18n="dataview.subtitle">Frage deine Notizen ab wie eine Datenbank</p>
+    </div>
+
+    <div class="docs-container">
+      <div class="docs-intro">
+        <p data-i18n="dataview.intro">Mit Dataview kannst du Notizen nach Metadaten abfragen und als Listen oder Tabellen darstellen. Schreibe Queries im Edit-Modus und wechsle zu Live-Preview, um die Ergebnisse zu sehen.</p>
+      </div>
+
+      <div class="docs-grid">
+        <!-- Grundsyntax -->
+        <div class="docs-card">
+          <h3 data-i18n="dataview.basic.title">Grundsyntax</h3>
+          <div class="code-example">
+            <pre><code>```dataview
+LIST
+```</code></pre>
+            <span class="code-desc" data-i18n="dataview.basic.list">Listet alle Notizen auf</span>
+          </div>
+          <div class="code-example">
+            <pre><code>```dataview
+TABLE status, priority, deadline
+```</code></pre>
+            <span class="code-desc" data-i18n="dataview.basic.table">Tabelle mit Frontmatter-Spalten</span>
+          </div>
+        </div>
+
+        <!-- FROM Clause -->
+        <div class="docs-card">
+          <h3 data-i18n="dataview.from.title">FROM - Quellen filtern</h3>
+          <div class="code-example">
+            <pre><code>LIST FROM #projekt</code></pre>
+            <span class="code-desc" data-i18n="dataview.from.tag">Nach Tag filtern</span>
+          </div>
+          <div class="code-example">
+            <pre><code>LIST FROM "Work/Projects"</code></pre>
+            <span class="code-desc" data-i18n="dataview.from.folder">Nach Ordner filtern</span>
+          </div>
+          <div class="code-example">
+            <pre><code>LIST FROM #projekt AND "Work"</code></pre>
+            <span class="code-desc" data-i18n="dataview.from.combine">Quellen kombinieren</span>
+          </div>
+        </div>
+
+        <!-- WHERE Clause -->
+        <div class="docs-card">
+          <h3 data-i18n="dataview.where.title">WHERE - Bedingungen</h3>
+          <div class="code-example">
+            <pre><code>LIST WHERE status = "active"</code></pre>
+            <span class="code-desc" data-i18n="dataview.where.text">Text vergleichen</span>
+          </div>
+          <div class="code-example">
+            <pre><code>LIST WHERE priority >= 2</code></pre>
+            <span class="code-desc" data-i18n="dataview.where.number">Zahlen vergleichen</span>
+          </div>
+          <div class="code-example">
+            <pre><code>LIST WHERE completed = false</code></pre>
+            <span class="code-desc" data-i18n="dataview.where.bool">Boolean prüfen</span>
+          </div>
+          <div class="code-example">
+            <pre><code>LIST WHERE contains(tags, "urgent")</code></pre>
+            <span class="code-desc" data-i18n="dataview.where.contains">In Arrays suchen</span>
+          </div>
+        </div>
+
+        <!-- SORT & LIMIT -->
+        <div class="docs-card">
+          <h3 data-i18n="dataview.sort.title">SORT & LIMIT</h3>
+          <div class="code-example">
+            <pre><code>LIST SORT file.mtime DESC</code></pre>
+            <span class="code-desc" data-i18n="dataview.sort.date">Nach Datum sortieren</span>
+          </div>
+          <div class="code-example">
+            <pre><code>LIST SORT priority ASC LIMIT 10</code></pre>
+            <span class="code-desc" data-i18n="dataview.sort.limit">Sortieren und begrenzen</span>
+          </div>
+        </div>
+
+        <!-- Verfügbare Felder -->
+        <div class="docs-card wide">
+          <h3 data-i18n="dataview.fields.title">Verfügbare Felder</h3>
+          <div class="fields-grid">
+            <div class="field-group">
+              <h4 data-i18n="dataview.fields.file">Datei-Felder</h4>
+              <ul>
+                <li><code>file.name</code> - <span data-i18n="dataview.fields.filename">Dateiname ohne Endung</span></li>
+                <li><code>file.path</code> - <span data-i18n="dataview.fields.filepath">Relativer Pfad</span></li>
+                <li><code>file.folder</code> - <span data-i18n="dataview.fields.folder">Übergeordneter Ordner</span></li>
+                <li><code>file.ctime</code> - <span data-i18n="dataview.fields.ctime">Erstelldatum</span></li>
+                <li><code>file.mtime</code> - <span data-i18n="dataview.fields.mtime">Änderungsdatum</span></li>
+                <li><code>file.tags</code> - <span data-i18n="dataview.fields.tags">Alle Tags</span></li>
+              </ul>
+            </div>
+            <div class="field-group">
+              <h4 data-i18n="dataview.fields.frontmatter">Frontmatter-Felder</h4>
+              <p data-i18n="dataview.fields.frontmatterDesc">Alle Felder aus dem YAML-Header sind direkt verfügbar:</p>
+              <ul>
+                <li><code>status</code>, <code>priority</code>, <code>deadline</code></li>
+                <li><code>author</code>, <code>tags</code>, <code>category</code></li>
+                <li><span data-i18n="dataview.fields.custom">...und alle eigenen Felder</span></li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <!-- Vollständiges Beispiel -->
+        <div class="docs-card wide example-card">
+          <h3 data-i18n="dataview.example.title">Vollständiges Beispiel</h3>
+          <div class="full-example">
+            <pre><code>```dataview
+TABLE status, deadline, priority
+FROM "Work/Projects"
+WHERE !completed AND priority >= 2
+SORT deadline ASC
+LIMIT 10
+```</code></pre>
+            <div class="example-desc">
+              <p data-i18n="dataview.example.desc">Zeigt eine Tabelle mit Status, Deadline und Priorität für alle nicht abgeschlossenen Projekte mit Priorität ≥ 2, sortiert nach Deadline.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Properties Panel Documentation -->
+  <section class="properties-docs" id="properties">
+    <div class="section-title">
+      <h2 data-i18n="properties.title">Properties Panel</h2>
+      <p data-i18n="properties.subtitle">YAML-Frontmatter komfortabel bearbeiten</p>
+    </div>
+
+    <div class="docs-container">
+      <div class="docs-intro">
+        <p data-i18n="properties.intro">Das Properties Panel zeigt alle YAML-Frontmatter-Felder oberhalb des Editors an. Bearbeite Metadaten ohne YAML-Syntax – mit passenden Eingabefeldern für jeden Datentyp.</p>
+      </div>
+
+      <div class="properties-features">
+        <div class="property-type">
+          <div class="property-icon">☑️</div>
+          <div class="property-info">
+            <h4 data-i18n="properties.bool.title">Booleans</h4>
+            <p data-i18n="properties.bool.desc">Checkboxen für true/false Werte wie <code>completed</code> oder <code>published</code></p>
+          </div>
+        </div>
+        <div class="property-type">
+          <div class="property-icon">📅</div>
+          <div class="property-info">
+            <h4 data-i18n="properties.date.title">Datum</h4>
+            <p data-i18n="properties.date.desc">Datumspicker für Felder im ISO-Format (YYYY-MM-DD)</p>
+          </div>
+        </div>
+        <div class="property-type">
+          <div class="property-icon">🔢</div>
+          <div class="property-info">
+            <h4 data-i18n="properties.number.title">Zahlen</h4>
+            <p data-i18n="properties.number.desc">Zahlenfelder für <code>priority</code>, <code>rating</code> etc.</p>
+          </div>
+        </div>
+        <div class="property-type">
+          <div class="property-icon">📝</div>
+          <div class="property-info">
+            <h4 data-i18n="properties.text.title">Text & Arrays</h4>
+            <p data-i18n="properties.text.desc">Textfelder für Strings, kommagetrennte Listen für Arrays</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="properties-example">
+        <h3 data-i18n="properties.example.title">Beispiel Frontmatter</h3>
+        <pre><code>---
+title: Mein Projekt
+status: active
+priority: 2
+deadline: 2026-03-15
+completed: false
+tags: [projekt, arbeit, wichtig]
+---</code></pre>
+        <p class="example-note" data-i18n="properties.example.note">Diese Felder werden im Properties Panel als Textfeld, Dropdown, Zahl, Datumspicker, Checkbox und Array-Input angezeigt.</p>
+      </div>
     </div>
   </section>
 
@@ -1452,6 +1863,54 @@
         "features.languagetool.desc": "NEU: Integrierte Grammatik- und Rechtschreibprüfung. Lokal via Docker oder mit LanguageTool Premium API. Fehler werden direkt im Editor markiert – Klick für Korrekturvorschläge.",
         "features.flashcards.title": "Karteikarten & Quiz",
         "features.flashcards.desc": "NEU: Generiere Quiz-Fragen aus deinen Notizen via Ollama. Speichere sie als Karteikarten mit Spaced Repetition (SM-2). Lerne effektiver – alles lokal.",
+        "features.dataview.title": "Dataview Queries",
+        "features.dataview.desc": "NEU: Frage deine Notizen ab wie eine Datenbank. LIST und TABLE Queries mit FROM, WHERE, SORT. Filtere nach Tags, Ordnern und YAML-Frontmatter.",
+        "features.properties.title": "Properties Panel",
+        "features.properties.desc": "NEU: Bearbeite YAML-Frontmatter komfortabel. Checkboxen für Booleans, Datumspicker, Arrays – alles ohne YAML-Syntax.",
+        "dataview.title": "Dataview Queries",
+        "dataview.subtitle": "Frage deine Notizen ab wie eine Datenbank",
+        "dataview.intro": "Mit Dataview kannst du Notizen nach Metadaten abfragen und als Listen oder Tabellen darstellen. Schreibe Queries im Edit-Modus und wechsle zu Live-Preview, um die Ergebnisse zu sehen.",
+        "dataview.basic.title": "Grundsyntax",
+        "dataview.basic.list": "Listet alle Notizen auf",
+        "dataview.basic.table": "Tabelle mit Frontmatter-Spalten",
+        "dataview.from.title": "FROM - Quellen filtern",
+        "dataview.from.tag": "Nach Tag filtern",
+        "dataview.from.folder": "Nach Ordner filtern",
+        "dataview.from.combine": "Quellen kombinieren",
+        "dataview.where.title": "WHERE - Bedingungen",
+        "dataview.where.text": "Text vergleichen",
+        "dataview.where.number": "Zahlen vergleichen",
+        "dataview.where.bool": "Boolean prüfen",
+        "dataview.where.contains": "In Arrays suchen",
+        "dataview.sort.title": "SORT & LIMIT",
+        "dataview.sort.date": "Nach Datum sortieren",
+        "dataview.sort.limit": "Sortieren und begrenzen",
+        "dataview.fields.title": "Verfügbare Felder",
+        "dataview.fields.file": "Datei-Felder",
+        "dataview.fields.filename": "Dateiname ohne Endung",
+        "dataview.fields.filepath": "Relativer Pfad",
+        "dataview.fields.folder": "Übergeordneter Ordner",
+        "dataview.fields.ctime": "Erstelldatum",
+        "dataview.fields.mtime": "Änderungsdatum",
+        "dataview.fields.tags": "Alle Tags",
+        "dataview.fields.frontmatter": "Frontmatter-Felder",
+        "dataview.fields.frontmatterDesc": "Alle Felder aus dem YAML-Header sind direkt verfügbar:",
+        "dataview.fields.custom": "...und alle eigenen Felder",
+        "dataview.example.title": "Vollständiges Beispiel",
+        "dataview.example.desc": "Zeigt eine Tabelle mit Status, Deadline und Priorität für alle nicht abgeschlossenen Projekte mit Priorität ≥ 2, sortiert nach Deadline.",
+        "properties.title": "Properties Panel",
+        "properties.subtitle": "YAML-Frontmatter komfortabel bearbeiten",
+        "properties.intro": "Das Properties Panel zeigt alle YAML-Frontmatter-Felder oberhalb des Editors an. Bearbeite Metadaten ohne YAML-Syntax – mit passenden Eingabefeldern für jeden Datentyp.",
+        "properties.bool.title": "Booleans",
+        "properties.bool.desc": "Checkboxen für true/false Werte wie completed oder published",
+        "properties.date.title": "Datum",
+        "properties.date.desc": "Datumspicker für Felder im ISO-Format (YYYY-MM-DD)",
+        "properties.number.title": "Zahlen",
+        "properties.number.desc": "Zahlenfelder für priority, rating etc.",
+        "properties.text.title": "Text & Arrays",
+        "properties.text.desc": "Textfelder für Strings, kommagetrennte Listen für Arrays",
+        "properties.example.title": "Beispiel Frontmatter",
+        "properties.example.note": "Diese Felder werden im Properties Panel als Textfeld, Dropdown, Zahl, Datumspicker, Checkbox und Array-Input angezeigt.",
         "shortcuts.title": "Tastaturkürzel",
         "shortcuts.subtitle": "Arbeite schneller mit diesen Shortcuts",
         "shortcuts.general": "Allgemein",
@@ -1602,6 +2061,54 @@
         "features.languagetool.desc": "NEW: Integrated grammar and spell checking. Local via Docker or with LanguageTool Premium API. Errors are highlighted in the editor – click for correction suggestions.",
         "features.flashcards.title": "Flashcards & Quiz",
         "features.flashcards.desc": "NEW: Generate quiz questions from your notes via Ollama. Save them as flashcards with Spaced Repetition (SM-2). Learn more effectively – all local.",
+        "features.dataview.title": "Dataview Queries",
+        "features.dataview.desc": "NEW: Query your notes like a database. LIST and TABLE queries with FROM, WHERE, SORT. Filter by tags, folders and YAML frontmatter.",
+        "features.properties.title": "Properties Panel",
+        "features.properties.desc": "NEW: Edit YAML frontmatter comfortably. Checkboxes for booleans, date pickers, arrays – no YAML syntax needed.",
+        "dataview.title": "Dataview Queries",
+        "dataview.subtitle": "Query your notes like a database",
+        "dataview.intro": "Dataview lets you query notes by metadata and display them as lists or tables. Write queries in Edit mode and switch to Live-Preview to see results.",
+        "dataview.basic.title": "Basic Syntax",
+        "dataview.basic.list": "Lists all notes",
+        "dataview.basic.table": "Table with frontmatter columns",
+        "dataview.from.title": "FROM - Filter Sources",
+        "dataview.from.tag": "Filter by tag",
+        "dataview.from.folder": "Filter by folder",
+        "dataview.from.combine": "Combine sources",
+        "dataview.where.title": "WHERE - Conditions",
+        "dataview.where.text": "Compare text",
+        "dataview.where.number": "Compare numbers",
+        "dataview.where.bool": "Check boolean",
+        "dataview.where.contains": "Search in arrays",
+        "dataview.sort.title": "SORT & LIMIT",
+        "dataview.sort.date": "Sort by date",
+        "dataview.sort.limit": "Sort and limit results",
+        "dataview.fields.title": "Available Fields",
+        "dataview.fields.file": "File Fields",
+        "dataview.fields.filename": "Filename without extension",
+        "dataview.fields.filepath": "Relative path",
+        "dataview.fields.folder": "Parent folder",
+        "dataview.fields.ctime": "Creation date",
+        "dataview.fields.mtime": "Modification date",
+        "dataview.fields.tags": "All tags",
+        "dataview.fields.frontmatter": "Frontmatter Fields",
+        "dataview.fields.frontmatterDesc": "All fields from the YAML header are directly available:",
+        "dataview.fields.custom": "...and all custom fields",
+        "dataview.example.title": "Full Example",
+        "dataview.example.desc": "Shows a table with status, deadline and priority for all incomplete projects with priority ≥ 2, sorted by deadline.",
+        "properties.title": "Properties Panel",
+        "properties.subtitle": "Edit YAML frontmatter comfortably",
+        "properties.intro": "The Properties Panel displays all YAML frontmatter fields above the editor. Edit metadata without YAML syntax – with appropriate input fields for each data type.",
+        "properties.bool.title": "Booleans",
+        "properties.bool.desc": "Checkboxes for true/false values like completed or published",
+        "properties.date.title": "Date",
+        "properties.date.desc": "Date picker for fields in ISO format (YYYY-MM-DD)",
+        "properties.number.title": "Numbers",
+        "properties.number.desc": "Number fields for priority, rating etc.",
+        "properties.text.title": "Text & Arrays",
+        "properties.text.desc": "Text fields for strings, comma-separated lists for arrays",
+        "properties.example.title": "Example Frontmatter",
+        "properties.example.note": "These fields are displayed in the Properties Panel as text field, dropdown, number, date picker, checkbox and array input.",
         "shortcuts.title": "Keyboard Shortcuts",
         "shortcuts.subtitle": "Work faster with these shortcuts",
         "shortcuts.general": "General",
