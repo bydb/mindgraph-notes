@@ -20,6 +20,9 @@ import { WikilinkAutocomplete, AutocompleteMode, BlockSelectionInfo } from './Wi
 import { livePreviewExtension } from './extensions/livePreview'
 import { imageHandlingExtension } from './extensions/imageHandling'
 import { languageToolExtension, setLanguageToolMatches, setLtErrorClickHandler, type LanguageToolMatch, type LanguageToolPopupMatch } from './extensions/languageTool'
+import { dataviewExtension, setDataviewNotes, setDataviewLanguage, setDataviewViewMode, setNoteClickHandler } from './extensions/dataview'
+import { useDataviewStore } from '../../stores/dataviewStore'
+import { PropertiesPanel } from './PropertiesPanel'
 import { AIContextMenu, AIResult } from './AIContextMenu'
 import { AIImageDialog } from './AIImageDialog'
 import { insertAIResultWithFootnote } from '../../utils/aiFootnote'
@@ -264,16 +267,28 @@ md.renderer.rules.text = (tokens, idx, options, env, self) => {
   return result
 }
 
-// Custom fence renderer für Mermaid-Diagramme
+// Custom fence renderer für Mermaid-Diagramme und Dataview
 const defaultFenceRender = md.renderer.rules.fence
 md.renderer.rules.fence = (tokens, idx, options, env, self) => {
   const token = tokens[idx]
   const info = token.info.trim().toLowerCase()
 
+  // Debug logging
+  console.log('[FenceRenderer] info:', info, 'content length:', token.content.length)
+
   if (info === 'mermaid') {
     const code = token.content.trim()
     const id = `mermaid-${idx}-${Date.now()}`
     return `<div class="mermaid-container"><pre class="mermaid" id="${id}">${code}</pre></div>`
+  }
+
+  // Dataview code blocks - render as placeholder, will be processed after render
+  if (info === 'dataview') {
+    const query = token.content.trim()
+    const id = `dataview-${idx}-${Date.now()}`
+    return `<div class="dataview-preview-container" id="${id}" data-query="${md.utils.escapeHtml(query)}">
+      <div class="dataview-loading"><span class="dataview-spinner"></span></div>
+    </div>`
   }
 
   // Fallback zum Standard-Renderer
@@ -404,6 +419,8 @@ type ViewMode = 'edit' | 'preview' | 'live-preview'
 
 // Compartment for live preview extension (created once, reused)
 const livePreviewCompartment = new Compartment()
+// Compartment for dataview extension
+const dataviewCompartment = new Compartment()
 
 interface MarkdownEditorProps {
   noteId?: string  // Optional: spezifische Notiz anzeigen (für Text-Split)
@@ -430,6 +447,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
   const [viewMode, setViewMode] = useState<ViewMode>('edit')
   const [previewContent, setPreviewContent] = useState('')
   const [formatMenu, setFormatMenu] = useState<{ x: number; y: number } | null>(null)
+  const [propertiesCollapsed, setPropertiesCollapsed] = useState(false)
   const [foldedHeadings, setFoldedHeadings] = useState<Set<string>>(new Set())
   const [aiMenu, setAiMenu] = useState<{ x: number; y: number; selectedText: string; selectionStart: number; selectionEnd: number } | null>(null)
   const [showAIImageDialog, setShowAIImageDialog] = useState(false)
@@ -462,6 +480,56 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
     query: string
     wikilinkStart: number  // Position von [[ - wichtig für korrektes Einfügen bei Mausklick
   } | null>(null)
+
+  // Dataview: Update notes in extension and rebuild indexes when notes change
+  const dataviewRebuildIndexes = useDataviewStore(s => s.rebuildIndexes)
+  const language = useUIStore(s => s.language)
+
+  useEffect(() => {
+    // Rebuild dataview indexes when notes change
+    if (notes.length > 0) {
+      dataviewRebuildIndexes(notes)
+    }
+  }, [notes, dataviewRebuildIndexes])
+
+  useEffect(() => {
+    // Update dataview extension with current notes
+    console.log('[MarkdownEditor] Notes effect - viewRef:', !!viewRef.current, 'notes:', notes.length)
+    if (viewRef.current && notes.length > 0) {
+      console.log('[MarkdownEditor] Dispatching setDataviewNotes with', notes.length, 'notes')
+      viewRef.current.dispatch({
+        effects: setDataviewNotes.of(notes)
+      })
+    }
+  }, [notes])
+
+  useEffect(() => {
+    // Update dataview language
+    if (viewRef.current) {
+      viewRef.current.dispatch({
+        effects: setDataviewLanguage.of(language)
+      })
+    }
+  }, [language])
+
+  useEffect(() => {
+    // Update dataview view mode - only show results in live-preview mode
+    if (viewRef.current) {
+      viewRef.current.dispatch({
+        effects: setDataviewViewMode.of(viewMode)
+      })
+    }
+  }, [viewMode])
+
+  // Set up note click handler for dataview
+  useEffect(() => {
+    setNoteClickHandler((notePath: string) => {
+      const note = notes.find(n => n.path === notePath)
+      if (note) {
+        selectNote(note.id)
+      }
+    })
+  }, [notes, selectNote])
 
   // Template in aktuelle Notiz einfügen (Cmd+Shift+T)
   useEffect(() => {
@@ -684,6 +752,25 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
     saveTimeoutRef.current = setTimeout(() => {
       saveContent(content)
     }, 500)
+  }, [saveContent])
+
+  // Handle properties panel changes
+  const handlePropertiesChange = useCallback((newContent: string) => {
+    // Update CodeMirror editor content
+    if (viewRef.current) {
+      const currentContent = viewRef.current.state.doc.toString()
+      if (currentContent !== newContent) {
+        viewRef.current.dispatch({
+          changes: {
+            from: 0,
+            to: currentContent.length,
+            insert: newContent
+          }
+        })
+      }
+    }
+    // Trigger save
+    saveContent(newContent)
   }, [saveContent])
 
   // LanguageTool: Text prüfen (YAML-Header wird ausgeschlossen)
@@ -1119,6 +1206,8 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
           imageHandlingExtension({ vaultPath: vaultPath || '' }),
           // Live Preview extension compartment (starts empty, can be reconfigured)
           livePreviewCompartment.of([]),
+          // Dataview extension for live query rendering
+          dataviewCompartment.of(dataviewExtension()),
           // LanguageTool extension for grammar/spell checking
           languageToolExtension({ enabled: languageTool.enabled }),
           EditorView.updateListener.of((update) => {
@@ -1228,6 +1317,18 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
       })
 
       viewRef.current = view
+
+      // Dispatch current notes and viewMode to the dataview extension
+      if (notes.length > 0) {
+        console.log('[MarkdownEditor] Editor created, dispatching', notes.length, 'notes, viewMode:', viewMode)
+        view.dispatch({
+          effects: [
+            setDataviewNotes.of(notes),
+            setDataviewLanguage.of(language),
+            setDataviewViewMode.of(viewMode)
+          ]
+        })
+      }
     }
 
     loadAndCreateEditor()
@@ -1645,6 +1746,60 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
       return () => clearTimeout(timer)
     }
   }, [renderedMarkdown, viewMode])
+
+  // Dataview queries in preview mode
+  const dataviewExecuteQuery = useDataviewStore(s => s.executeQuery)
+  useEffect(() => {
+    console.log('[Dataview Effect] viewMode:', viewMode, 'previewRef:', !!previewRef.current)
+    if (viewMode !== 'preview' || !previewRef.current) return
+
+    const processDataviewBlocks = () => {
+      const dataviewContainers = previewRef.current?.querySelectorAll('.dataview-preview-container:not([data-processed])')
+      console.log('[Dataview Effect] Found containers:', dataviewContainers?.length || 0)
+      if (!dataviewContainers || dataviewContainers.length === 0) return
+
+      // Import renderResult for rendering
+      import('../../utils/dataview').then(({ renderResult }) => {
+        for (const container of Array.from(dataviewContainers)) {
+          const query = container.getAttribute('data-query')
+          console.log('[Dataview Effect] Processing query:', query?.slice(0, 50))
+          if (!query) continue
+
+          try {
+            // Execute query using the store (has frontmatter cache)
+            const result = dataviewExecuteQuery(query, notes)
+            const html = renderResult(result, { language })
+            console.log('[Dataview Effect] Result HTML length:', html.length, 'rows:', result.rows?.length)
+            container.innerHTML = html
+            container.setAttribute('data-processed', 'true')
+
+          // Add click handlers for note links
+          const links = container.querySelectorAll('.dataview-link')
+          for (const link of Array.from(links)) {
+            link.addEventListener('click', (e) => {
+              e.preventDefault()
+              const notePath = (link as HTMLElement).dataset.notePath
+              if (notePath) {
+                const note = notes.find(n => n.path === notePath)
+                if (note) {
+                  selectNote(note.id)
+                }
+              }
+            })
+          }
+          } catch (error) {
+            console.error('Dataview rendering error:', error)
+            container.innerHTML = `<div class="dataview-error">Error: ${error instanceof Error ? error.message : 'Unknown error'}</div>`
+            container.setAttribute('data-processed', 'true')
+          }
+        }
+      })
+    }
+
+    // Delay to let the DOM update
+    const timer = setTimeout(processDataviewBlocks, 50)
+    return () => clearTimeout(timer)
+  }, [renderedMarkdown, viewMode, notes, language, selectNote, dataviewExecuteQuery])
 
   // Prozessiere Wikilink-Embeds in der Preview
   useEffect(() => {
@@ -2353,6 +2508,16 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
           </div>
         </div>
       </div>
+
+      {/* Properties Panel for editing frontmatter */}
+      {viewMode !== 'preview' && (
+        <PropertiesPanel
+          content={viewRef.current?.state.doc.toString() || selectedNote?.content || ''}
+          onContentChange={handlePropertiesChange}
+          collapsed={propertiesCollapsed}
+          onToggleCollapsed={() => setPropertiesCollapsed(!propertiesCollapsed)}
+        />
+      )}
 
       <div
         className={`editor-content ${viewMode !== 'preview' ? 'visible' : 'hidden'} ${viewMode === 'live-preview' ? 'live-preview-mode' : ''}`}

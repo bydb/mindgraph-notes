@@ -5,9 +5,11 @@ import { useNotesStore, createNoteFromFile } from '../../stores/notesStore'
 import { useUIStore } from '../../stores/uiStore'
 import { useGraphStore } from '../../stores/graphStore'
 import { useTabStore } from '../../stores/tabStore'
+import { useDataviewStore } from '../../stores/dataviewStore'
 import { useTranslation } from '../../utils/translations'
 import { extractTaskStatsForCache } from '../../utils/linkExtractor'
-import type { Note, NotesCache, CachedNoteMetadata } from '../../../shared/types'
+import { parseFrontmatter } from '../../utils/metadataExtractor'
+import type { Note, NotesCache, NoteFrontmatter } from '../../../shared/types'
 
 export const Sidebar: React.FC = () => {
   const { vaultPath, fileTree, notes, setVaultPath, setFileTree, setNotes, addNote, selectNote, setLoading } = useNotesStore()
@@ -424,6 +426,9 @@ async function loadAllNotes(basePath: string, entries: any[]): Promise<Note[]> {
 
   console.log(`[Sidebar] ${cachedPaths.length} aus Cache, ${newPaths.length} neu zu laden`)
 
+  // Collect frontmatter from cache for dataview
+  const frontmatterMap = new Map<string, NoteFrontmatter>()
+
   // 4. Gecachte Notizen OHNE Content laden (super schnell!)
   let fromCache = 0
   for (const relativePath of cachedPaths) {
@@ -443,6 +448,10 @@ async function loadAllNotes(basePath: string, entries: any[]): Promise<Note[]> {
       taskStats: cached.taskStats, // Task-Stats aus Cache für Vault-Statistiken
       createdAt: new Date(cached.createdAt),
       modifiedAt: new Date(cached.modifiedAt)
+    }
+    // Collect cached frontmatter for dataview
+    if (cached.frontmatter) {
+      frontmatterMap.set(cached.id, cached.frontmatter)
     }
     newCache.notes[relativePath] = cached
     notes.push(note)
@@ -469,6 +478,11 @@ async function loadAllNotes(basePath: string, entries: any[]): Promise<Note[]> {
         const taskStats = extractTaskStatsForCache(content)
         note.taskStats = taskStats
 
+        // Frontmatter für Dataview Cache extrahieren
+        const frontmatter = parseFrontmatter(content)
+        // Add to frontmatter map for dataview
+        frontmatterMap.set(note.id, frontmatter)
+
         // Zum Cache hinzufügen
         newCache.notes[relativePath] = {
           id: note.id,
@@ -480,6 +494,7 @@ async function loadAllNotes(basePath: string, entries: any[]): Promise<Note[]> {
           blocks: note.blocks,
           sourcePdf: note.sourcePdf,
           taskStats: taskStats,
+          frontmatter: frontmatter,  // Frontmatter für Dataview
           mtime: mtime,
           createdAt: note.createdAt.getTime(),
           modifiedAt: note.modifiedAt.getTime()
@@ -568,7 +583,17 @@ async function loadAllNotes(basePath: string, entries: any[]): Promise<Note[]> {
     }
   }
 
-  // 6. Cache speichern (im Hintergrund)
+  // 6. Populate dataview store's frontmatter cache
+  // This is critical because notes are loaded without content, so frontmatter must come from cache
+  const dataviewState = useDataviewStore.getState()
+  const currentFmCache = new Map(dataviewState.frontmatterCache)
+  for (const [noteId, fm] of frontmatterMap) {
+    currentFmCache.set(noteId, fm)
+  }
+  useDataviewStore.setState({ frontmatterCache: currentFmCache })
+  console.log(`[Sidebar] Dataview frontmatter cache populated with ${frontmatterMap.size} entries`)
+
+  // 7. Cache speichern (im Hintergrund)
   window.electronAPI.saveNotesCache(basePath, newCache).catch(console.error)
 
   const elapsed = Date.now() - startTime

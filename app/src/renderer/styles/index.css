@@ -6425,6 +6425,111 @@ body {
   flex: 1;
 }
 
+/* ============ SETTINGS DATAVIEW HELP ============ */
+.settings-dataview h3 {
+  margin-top: 24px;
+}
+
+.settings-dataview h3:first-child {
+  margin-top: 0;
+}
+
+.settings-description {
+  color: var(--text-secondary);
+  font-size: 13px;
+  margin-bottom: 16px;
+  line-height: 1.5;
+}
+
+.dataview-example {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 10px 12px;
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-sm);
+  margin-bottom: 8px;
+}
+
+.dataview-example.full-example {
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.dataview-code {
+  font-family: 'SF Mono', Monaco, Consolas, monospace;
+  font-size: 12px;
+  color: var(--accent-color);
+  background: var(--bg-primary);
+  padding: 4px 8px;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
+.dataview-code-block {
+  font-family: 'SF Mono', Monaco, Consolas, monospace;
+  font-size: 12px;
+  color: var(--text-primary);
+  background: var(--bg-primary);
+  padding: 12px 16px;
+  border-radius: var(--radius-sm);
+  white-space: pre;
+  width: 100%;
+  overflow-x: auto;
+  line-height: 1.6;
+}
+
+.dataview-desc {
+  font-size: 13px;
+  color: var(--text-secondary);
+  flex: 1;
+}
+
+.dataview-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 8px;
+}
+
+.dataview-field-group {
+  background: var(--bg-tertiary);
+  padding: 12px 16px;
+  border-radius: var(--radius-sm);
+}
+
+.dataview-field-group strong {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--text-primary);
+}
+
+.dataview-field-group p {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin: 0 0 8px 0;
+}
+
+.dataview-field-group ul {
+  margin: 0;
+  padding-left: 20px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.dataview-field-group ul li {
+  margin-bottom: 4px;
+}
+
+.dataview-field-group ul code {
+  font-family: 'SF Mono', Monaco, Consolas, monospace;
+  font-size: 12px;
+  color: var(--accent-color);
+  background: var(--bg-primary);
+  padding: 2px 6px;
+  border-radius: 3px;
+}
+
 /* ============ AI CONTEXT MENU ============ */
 .ai-context-menu-overlay {
   position: fixed;
@@ -11165,4 +11270,502 @@ body {
 
 .flashcard-btn-delete:hover {
   background: #e0304f;
+}
+
+/* ============ PROPERTIES PANEL STYLES ============ */
+
+.properties-panel {
+  margin: 16px 24px 16px 24px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  font-size: 13px;
+}
+
+.properties-panel.collapsed {
+  margin: 8px 24px;
+  background: transparent;
+  border: none;
+}
+
+.properties-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  cursor: pointer;
+  user-select: none;
+  border-radius: var(--radius-md);
+  transition: background 0.15s;
+}
+
+.properties-header:hover {
+  background: var(--bg-hover);
+}
+
+.properties-toggle {
+  font-size: 10px;
+  color: var(--text-muted);
+  width: 12px;
+}
+
+.properties-title {
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.properties-count {
+  font-size: 11px;
+  color: var(--text-muted);
+  background: var(--bg-tertiary);
+  padding: 1px 6px;
+  border-radius: 10px;
+}
+
+.properties-content {
+  padding: 8px 20px 16px;
+  border-top: 1px solid var(--border-color);
+}
+
+.properties-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+}
+
+.properties-field:hover .properties-remove {
+  opacity: 1;
+}
+
+.properties-label {
+  min-width: 100px;
+  max-width: 150px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.properties-value {
+  flex: 1;
+  display: flex;
+  align-items: center;
+}
+
+.properties-input {
+  width: 100%;
+  padding: 4px 8px;
+  font-size: 13px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.properties-input:focus {
+  outline: none;
+  border-color: var(--accent-color);
+  box-shadow: 0 0 0 2px var(--accent-color-alpha);
+}
+
+.properties-input.properties-number {
+  max-width: 100px;
+}
+
+.properties-input.properties-date {
+  max-width: 150px;
+}
+
+.properties-checkbox {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  accent-color: var(--accent-color);
+}
+
+.properties-remove {
+  opacity: 0;
+  padding: 2px 6px;
+  font-size: 14px;
+  color: var(--text-muted);
+  background: none;
+  border: none;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  transition: opacity 0.15s, background 0.15s, color 0.15s;
+}
+
+.properties-remove:hover {
+  background: var(--danger-color);
+  color: white;
+}
+
+.properties-add-btn {
+  display: block;
+  width: 100%;
+  padding: 6px 8px;
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--text-muted);
+  background: none;
+  border: 1px dashed var(--border-color);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.properties-add-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+  border-color: var(--text-muted);
+}
+
+.properties-add-form {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border-color);
+}
+
+.properties-add-form .properties-input {
+  flex: 1;
+}
+
+.properties-select {
+  padding: 4px 8px;
+  font-size: 12px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.properties-btn-add,
+.properties-btn-cancel {
+  padding: 4px 12px;
+  font-size: 12px;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.properties-btn-add {
+  background: var(--accent-color);
+  color: white;
+}
+
+.properties-btn-add:hover {
+  filter: brightness(1.1);
+}
+
+.properties-btn-cancel {
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+}
+
+.properties-btn-cancel:hover {
+  background: var(--bg-hover);
+}
+
+/* ============ DATAVIEW QUERY STYLES ============ */
+
+/* Container for dataview results */
+.dataview-container {
+  margin: 12px 0;
+  padding: 16px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  font-size: 14px;
+}
+
+.dataview-widget {
+  margin: 8px 0;
+}
+
+/* Loading state */
+.dataview-loading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.dataview-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--border-color);
+  border-top-color: var(--accent-color);
+  border-radius: 50%;
+  animation: dataview-spin 0.8s linear infinite;
+}
+
+@keyframes dataview-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Empty state */
+.dataview-empty {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.dataview-empty-icon {
+  font-size: 16px;
+}
+
+/* Error state */
+.dataview-error {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 12px;
+  background: rgba(255, 55, 95, 0.1);
+  border: 1px solid rgba(255, 55, 95, 0.3);
+  border-radius: var(--radius-sm);
+  color: #ff375f;
+  font-size: 13px;
+}
+
+.dataview-error-icon {
+  font-size: 14px;
+}
+
+.dataview-error-message {
+  flex: 1;
+  word-break: break-word;
+}
+
+/* LIST view */
+.dataview-list {
+  padding: 12px;
+}
+
+.dataview-list-items {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.dataview-list-item {
+  padding: 6px 8px;
+  margin: 2px 0;
+  border-radius: var(--radius-xs);
+  transition: background var(--transition-fast);
+}
+
+.dataview-list-item:hover {
+  background: var(--bg-tertiary);
+}
+
+.dataview-list-item::before {
+  content: "•";
+  margin-right: 8px;
+  color: var(--text-muted);
+}
+
+/* TABLE view */
+.dataview-table-container {
+  overflow-x: auto;
+}
+
+.dataview-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.dataview-table th {
+  padding: 10px 12px;
+  text-align: left;
+  font-weight: 600;
+  color: var(--text-secondary);
+  background: var(--bg-tertiary);
+  border-bottom: 2px solid var(--border-color);
+  white-space: nowrap;
+}
+
+.dataview-table td {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border-subtle);
+  vertical-align: top;
+}
+
+.dataview-table tr:hover td {
+  background: var(--bg-tertiary);
+}
+
+.dataview-table tr:last-child td {
+  border-bottom: none;
+}
+
+.dataview-col-note {
+  min-width: 150px;
+}
+
+/* TASK view */
+.dataview-task-list {
+  padding: 12px;
+}
+
+.dataview-tasks {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.dataview-task-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 6px 8px;
+  margin: 2px 0;
+  border-radius: var(--radius-xs);
+  transition: background var(--transition-fast);
+}
+
+.dataview-task-item:hover {
+  background: var(--bg-tertiary);
+}
+
+.dataview-task-checkbox {
+  margin-top: 2px;
+  accent-color: var(--accent-color);
+}
+
+.dataview-task-text {
+  flex: 1;
+  color: var(--text-primary);
+}
+
+.dataview-task-completed .dataview-task-text {
+  text-decoration: line-through;
+  color: var(--text-muted);
+}
+
+.dataview-task-source {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-left: 8px;
+  white-space: nowrap;
+}
+
+/* Links */
+.dataview-link {
+  color: var(--accent-color);
+  text-decoration: none;
+  cursor: pointer;
+  transition: opacity var(--transition-fast);
+}
+
+.dataview-link:hover {
+  opacity: 0.8;
+  text-decoration: underline;
+}
+
+/* Value formatting */
+.dataview-null {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.dataview-date {
+  font-family: monospace;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.dataview-number {
+  font-family: monospace;
+  color: #a78bfa;
+}
+
+.dataview-bool {
+  font-weight: 600;
+}
+
+.dataview-bool-true {
+  color: #34d399;
+}
+
+.dataview-bool-false {
+  color: #f87171;
+}
+
+.dataview-tag {
+  display: inline-block;
+  padding: 2px 6px;
+  background: var(--accent-subtle);
+  color: var(--accent-color);
+  border-radius: var(--radius-xs);
+  font-size: 12px;
+  margin: 1px;
+}
+
+/* Footer */
+.dataview-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 12px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border-subtle);
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.dataview-count {
+  font-weight: 500;
+}
+
+.dataview-time {
+  opacity: 0.7;
+}
+
+/* Show more link */
+.dataview-more {
+  padding: 8px;
+  text-align: center;
+  color: var(--accent-color);
+  font-size: 12px;
+  cursor: pointer;
+  border-radius: var(--radius-xs);
+  transition: background var(--transition-fast);
+}
+
+.dataview-more:hover {
+  background: var(--bg-tertiary);
+}
+
+/* Preview container */
+.dataview-preview-container {
+  margin: 16px 0;
+}
+
+/* Widget in editor */
+.dataview-widget {
+  margin: 4px 0;
+}
+
+.dataview-placeholder {
+  border: 1px dashed var(--border-color);
+  border-radius: var(--radius-sm);
+  background: var(--bg-secondary);
+}
+
+.dataview-error-widget {
+  background: var(--bg-secondary);
+  border-radius: var(--radius-sm);
 }

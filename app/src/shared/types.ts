@@ -100,6 +100,106 @@ export interface CachedTaskStats {
   overdue: number
 }
 
+// Dataview Query Types
+export interface NoteFrontmatter {
+  [key: string]: unknown
+}
+
+// Inline-Felder: Key:: Value und [key:: value]
+export interface InlineField {
+  key: string
+  value: string
+  line: number
+}
+
+// Implizite Felder (automatisch aus Note abgeleitet)
+export interface FileMetadata {
+  name: string        // Dateiname ohne Extension
+  path: string        // Relativer Pfad
+  folder: string      // Übergeordneter Ordner
+  ext: string         // Extension (.md)
+  ctime: Date         // Erstellt
+  mtime: Date         // Geändert
+  tags: string[]      // Alle Tags
+  outlinks: string[]  // Ausgehende Links
+  inlinks: string[]   // Eingehende Links
+}
+
+// Kombinierte Query-Metadaten
+export interface NoteQueryMetadata {
+  file: FileMetadata
+  frontmatter: NoteFrontmatter
+  fields: Record<string, unknown>
+}
+
+// Dataview Query Types
+export type DataviewQueryType = 'LIST' | 'TABLE' | 'TASK'
+
+export interface DataviewFromClause {
+  tags?: string[]                // #tag
+  folders?: string[]             // "Folder/Path"
+  links?: { to?: string[]; from?: string[] }
+}
+
+export interface DataviewSort {
+  field: string
+  direction: 'ASC' | 'DESC'
+}
+
+export type DataviewOperator = '=' | '!=' | '>' | '<' | '>=' | '<=' | 'contains'
+export type DataviewLogicalOp = 'AND' | 'OR'
+
+export interface DataviewComparison {
+  type: 'comparison'
+  field: string
+  operator: DataviewOperator
+  value: unknown
+}
+
+export interface DataviewLogical {
+  type: 'logical'
+  operator: DataviewLogicalOp
+  left: DataviewExpression
+  right: DataviewExpression
+}
+
+export interface DataviewNot {
+  type: 'not'
+  expression: DataviewExpression
+}
+
+export interface DataviewFunctionCall {
+  type: 'function'
+  name: string
+  args: (string | number | DataviewExpression)[]
+}
+
+export type DataviewExpression = DataviewComparison | DataviewLogical | DataviewNot | DataviewFunctionCall | { type: 'field'; name: string } | { type: 'literal'; value: unknown }
+
+export interface DataviewQuery {
+  type: DataviewQueryType
+  fields?: string[]              // TABLE Spalten
+  from?: DataviewFromClause
+  where?: DataviewExpression
+  sort?: DataviewSort[]
+  groupBy?: string               // v2 - später
+  limit?: number
+}
+
+export interface DataviewResultRow {
+  note: Note
+  metadata: NoteQueryMetadata
+  values?: Record<string, unknown>  // TABLE column values
+}
+
+export interface DataviewResult {
+  type: DataviewQueryType
+  rows: DataviewResultRow[]
+  columns?: string[]
+  error?: string
+  executionTime?: number
+}
+
 // Notes Cache für schnelles Laden
 export interface CachedNoteMetadata {
   id: string
@@ -111,6 +211,7 @@ export interface CachedNoteMetadata {
   blocks?: NoteBlock[]
   sourcePdf?: string
   taskStats?: CachedTaskStats  // Task-Statistiken für schnelle Berechnung
+  frontmatter?: NoteFrontmatter  // Parsed YAML frontmatter for Dataview
   mtime: number            // Datei-Änderungszeit in ms
   createdAt: number        // Als Timestamp für JSON-Serialisierung
   modifiedAt: number

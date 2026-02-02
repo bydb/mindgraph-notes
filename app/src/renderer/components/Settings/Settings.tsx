@@ -16,7 +16,7 @@ interface SettingsProps {
   onClose: () => void
 }
 
-type Tab = 'general' | 'editor' | 'templates' | 'integrations' | 'shortcuts'
+type Tab = 'general' | 'editor' | 'templates' | 'integrations' | 'shortcuts' | 'dataview'
 
 type BuiltInTemplateKey = 'empty' | 'dailyNote' | 'zettel' | 'meeting'
 
@@ -394,6 +394,16 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
                 <path d="M4 8H5M7 8H8M10 8H11M13 8H14M5 11H13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
               </svg>
               {t('settings.tab.shortcuts')}
+            </button>
+            <button
+              className={`settings-nav-item ${activeTab === 'dataview' ? 'active' : ''}`}
+              onClick={() => setActiveTab('dataview')}
+            >
+              <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+                <rect x="2" y="3" width="14" height="12" rx="2" stroke="currentColor" strokeWidth="1.5"/>
+                <path d="M5 7H13M5 10H13M5 13H9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+              </svg>
+              {t('settings.tab.dataview')}
             </button>
           </nav>
 
@@ -1444,6 +1454,104 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
 
                 <div className="settings-info" style={{ marginTop: '24px' }}>
                   <p>{t('settings.shortcuts.tip')}</p>
+                </div>
+              </div>
+            )}
+
+            {/* Dataview Tab */}
+            {activeTab === 'dataview' && (
+              <div className="settings-section settings-dataview">
+                <h3>{t('settings.dataview.title')}</h3>
+                <p className="settings-description">{t('settings.dataview.description')}</p>
+
+                <h3>{t('settings.dataview.basicSyntax')}</h3>
+                <div className="dataview-example">
+                  <code className="dataview-code">```dataview<br/>LIST<br/>```</code>
+                  <span className="dataview-desc">{t('settings.dataview.listAllNotes')}</span>
+                </div>
+                <div className="dataview-example">
+                  <code className="dataview-code">```dataview<br/>TABLE status, priority<br/>```</code>
+                  <span className="dataview-desc">{t('settings.dataview.tableWithColumns')}</span>
+                </div>
+
+                <h3>{t('settings.dataview.fromClause')}</h3>
+                <div className="dataview-example">
+                  <code className="dataview-code">LIST FROM #projekt</code>
+                  <span className="dataview-desc">{t('settings.dataview.filterByTag')}</span>
+                </div>
+                <div className="dataview-example">
+                  <code className="dataview-code">LIST FROM "Work/Projects"</code>
+                  <span className="dataview-desc">{t('settings.dataview.filterByFolder')}</span>
+                </div>
+                <div className="dataview-example">
+                  <code className="dataview-code">LIST FROM #projekt AND "Work"</code>
+                  <span className="dataview-desc">{t('settings.dataview.combineSources')}</span>
+                </div>
+
+                <h3>{t('settings.dataview.whereClause')}</h3>
+                <div className="dataview-example">
+                  <code className="dataview-code">LIST WHERE status = "active"</code>
+                  <span className="dataview-desc">{t('settings.dataview.filterByField')}</span>
+                </div>
+                <div className="dataview-example">
+                  <code className="dataview-code">LIST WHERE priority &gt;= 2</code>
+                  <span className="dataview-desc">{t('settings.dataview.filterByNumber')}</span>
+                </div>
+                <div className="dataview-example">
+                  <code className="dataview-code">LIST WHERE completed = false</code>
+                  <span className="dataview-desc">{t('settings.dataview.filterByBoolean')}</span>
+                </div>
+                <div className="dataview-example">
+                  <code className="dataview-code">LIST WHERE contains(tags, "urgent")</code>
+                  <span className="dataview-desc">{t('settings.dataview.filterWithContains')}</span>
+                </div>
+
+                <h3>{t('settings.dataview.sortAndLimit')}</h3>
+                <div className="dataview-example">
+                  <code className="dataview-code">LIST SORT file.mtime DESC</code>
+                  <span className="dataview-desc">{t('settings.dataview.sortByDate')}</span>
+                </div>
+                <div className="dataview-example">
+                  <code className="dataview-code">LIST SORT priority ASC LIMIT 10</code>
+                  <span className="dataview-desc">{t('settings.dataview.sortAndLimitResults')}</span>
+                </div>
+
+                <h3>{t('settings.dataview.availableFields')}</h3>
+                <div className="dataview-fields">
+                  <div className="dataview-field-group">
+                    <strong>{t('settings.dataview.fileFields')}</strong>
+                    <ul>
+                      <li><code>file.name</code> - {t('settings.dataview.fileName')}</li>
+                      <li><code>file.path</code> - {t('settings.dataview.filePath')}</li>
+                      <li><code>file.folder</code> - {t('settings.dataview.fileFolder')}</li>
+                      <li><code>file.ctime</code> - {t('settings.dataview.fileCreated')}</li>
+                      <li><code>file.mtime</code> - {t('settings.dataview.fileModified')}</li>
+                      <li><code>file.tags</code> - {t('settings.dataview.fileTags')}</li>
+                    </ul>
+                  </div>
+                  <div className="dataview-field-group">
+                    <strong>{t('settings.dataview.frontmatterFields')}</strong>
+                    <p>{t('settings.dataview.frontmatterDesc')}</p>
+                    <ul>
+                      <li><code>status</code>, <code>priority</code>, <code>deadline</code></li>
+                      <li><code>author</code>, <code>tags</code>, <code>category</code></li>
+                    </ul>
+                  </div>
+                </div>
+
+                <h3>{t('settings.dataview.fullExample')}</h3>
+                <div className="dataview-example full-example">
+                  <pre className="dataview-code-block">{`\`\`\`dataview
+TABLE status, deadline, priority
+FROM "Work/Projects"
+WHERE !completed AND priority >= 2
+SORT deadline ASC
+LIMIT 10
+\`\`\``}</pre>
+                </div>
+
+                <div className="settings-info" style={{ marginTop: '24px' }}>
+                  <p>{t('settings.dataview.tip')}</p>
                 </div>
               </div>
             )}
