@@ -2,6 +2,28 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [1.0.9] - 2026-02-01
+
+### Features
+- **Karteikarten & Quiz-System**: Lerne aus deinen Notizen mit Spaced Repetition
+  - Rechtsklick auf Notiz oder Ordner → "Quiz starten" generiert Fragen via Ollama
+  - Quiz-Fragen können als Karteikarten gespeichert werden
+  - **SM-2 Algorithmus**: Optimale Wiederholungsintervalle für effektives Lernen
+  - Karteikarten-Panel zeigt alle Karten gruppiert nach Themen/Ordnern
+  - Lern-Session mit Bewertung (Nochmal/Schwer/Gut/Einfach)
+  - Manuelle Karten erstellen und bearbeiten
+  - Markdown und LaTeX werden vollständig gerendert
+
+### Einstellungen
+- **Karteikarten ein-/ausschalten**: Neuer Toggle in Einstellungen → Integrationen
+- Hinweis wenn Ollama nicht konfiguriert ist
+
+### Technische Änderungen
+- Neue Stores: `quizStore.ts`, `flashcardStore.ts`
+- Neue Komponenten: `QuizModal`, `FlashcardsPanel`, `FlashcardStudy`, `FlashcardEditor`
+- IPC-Handler für Quiz-Generierung und Flashcard-Persistenz
+- Pro-Vault Speicherung in `.mindgraph/flashcards.json`
+
 ## [1.0.8] - 2026-01-31
 
 ### Features
