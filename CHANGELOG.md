@@ -2,6 +2,35 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [1.0.10] - 2026-02-02
+
+### Features
+- **Dataview Query System**: Abfragen von Notizen nach Metadaten
+  - Query-Typen: `LIST` und `TABLE`
+  - `FROM`: Filtern nach Tags (`#tag`) und Ordnern (`"Folder/Path"`)
+  - `WHERE`: Bedingungen mit Vergleichen (`=`, `!=`, `>`, `<`, `>=`, `<=`)
+  - `SORT`: Sortierung mit `ASC`/`DESC`
+  - `LIMIT`: Ergebnisse begrenzen
+  - Built-in Funktionen: `contains()`, `length()`, `lower()`, `default()`
+  - Zugriff auf `file.*` Felder und YAML-Frontmatter
+
+- **Properties Panel**: Komfortable Bearbeitung von YAML-Frontmatter
+  - Anzeige oberhalb des Editors
+  - Automatische Typ-Erkennung: Boolean (Checkbox), Zahlen, Datum, Arrays, Text
+  - Eigenschaften hinzufügen und entfernen
+  - Erhält Original-Schreibweise der Keys (z.B. `Künstler`)
+
+- **Dataview-Hilfe**: Neuer Tab in Einstellungen mit Syntax-Dokumentation
+
+### Technische Änderungen
+- Edit-Modus zeigt Dataview-Code, Live-Preview zeigt Ergebnisse
+- Frontmatter-Caching für bessere Query-Performance
+- Support für deutsche Umlaute in Frontmatter-Feldnamen
+- Große Zahlen (Timestamps) werden als Text statt als Zahl angezeigt
+- Neue Stores: `dataviewStore.ts`
+- Neue Utils: `metadataExtractor.ts`, `dataview/` (Parser, Executor, Renderer)
+- CodeMirror-Extension für Dataview-Block-Rendering
+
 ## [1.0.9] - 2026-02-01
 
 ### Features
