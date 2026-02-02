@@ -19,6 +19,8 @@ Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
   - Automatische Typ-Erkennung: Boolean (Checkbox), Zahlen, Datum, Arrays, Text
   - Eigenschaften hinzufügen und entfernen
   - Erhält Original-Schreibweise der Keys (z.B. `Künstler`)
+  - **Tag-Autocomplete**: Vorschläge aus allen existierenden Vault-Tags
+  - YAML-Arrays immer im Block-Format mit Spiegelstrichen
 
 - **Dataview-Hilfe**: Neuer Tab in Einstellungen mit Syntax-Dokumentation
 
