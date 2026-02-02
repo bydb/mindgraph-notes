@@ -3,9 +3,10 @@
  * Displays and allows editing of YAML frontmatter fields
  */
 
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useTranslation } from '../../utils/translations'
 import { parseFrontmatter } from '../../utils/metadataExtractor'
+import { useDataviewStore } from '../../stores/dataviewStore'
 import type { NoteFrontmatter } from '../../../shared/types'
 
 interface PropertiesPanelProps {
@@ -86,6 +87,176 @@ function detectFieldType(value: unknown): 'boolean' | 'number' | 'date' | 'array
 }
 
 /**
+ * Strip # prefix from tag if present
+ */
+const stripHashFromTag = (tag: string): string => {
+  return tag.startsWith('#') ? tag.slice(1) : tag
+}
+
+/**
+ * Tags field editor with autocomplete from existing tags
+ */
+const TagsFieldEditor: React.FC<{
+  fieldKey: string
+  value: unknown
+  onChange: (key: string, value: unknown) => void
+}> = ({ fieldKey, value, onChange }) => {
+  // Strip # from all tags when loading
+  const arrayValue = Array.isArray(value) ? value.map(t => stripHashFromTag(String(t))) : []
+  const [inputValue, setInputValue] = useState(arrayValue.join(', '))
+  const [isFocused, setIsFocused] = useState(false)
+  const [showSuggestions, setShowSuggestions] = useState(false)
+  const [filterText, setFilterText] = useState('')
+  const inputRef = useRef<HTMLInputElement>(null)
+  const suggestionsRef = useRef<HTMLDivElement>(null)
+
+  // Get all tags from dataview store
+  const tagIndex = useDataviewStore(s => s.tagIndex)
+  const allTags = useMemo(() => Array.from(tagIndex.keys()).sort(), [tagIndex])
+
+  // Filter suggestions based on current input and already selected tags
+  const suggestions = useMemo(() => {
+    const currentTags = arrayValue.map(t => t.toLowerCase())
+    const filter = filterText.toLowerCase()
+    return allTags
+      .filter(tag => !currentTags.includes(stripHashFromTag(tag).toLowerCase()))
+      .filter(tag => !filter || stripHashFromTag(tag).toLowerCase().includes(filter))
+      .slice(0, 10)
+  }, [allTags, arrayValue, filterText])
+
+  // Sync input value when external value changes (but not while editing)
+  useEffect(() => {
+    if (!isFocused) {
+      setInputValue(arrayValue.join(', '))
+    }
+  }, [arrayValue, isFocused])
+
+  // Close suggestions when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (suggestionsRef.current && !suggestionsRef.current.contains(e.target as Node) &&
+          inputRef.current && !inputRef.current.contains(e.target as Node)) {
+        setShowSuggestions(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newInputValue = e.target.value
+    setInputValue(newInputValue)
+
+    // Extract filter text (text after last comma)
+    const parts = newInputValue.split(',')
+    const lastPart = parts[parts.length - 1].trim()
+    setFilterText(stripHashFromTag(lastPart))
+
+    // Parse and update the actual value (filtering empty items, stripping #)
+    const items = newInputValue.split(',').map(s => stripHashFromTag(s.trim())).filter(Boolean)
+    onChange(fieldKey, items)
+  }
+
+  const handleAddTag = (tag: string) => {
+    // Strip # from tag when adding
+    const cleanTag = stripHashFromTag(tag)
+    const newTags = [...arrayValue, cleanTag]
+    onChange(fieldKey, newTags)
+    setInputValue(newTags.join(', '))
+    setFilterText('')
+    setShowSuggestions(false)
+    inputRef.current?.focus()
+  }
+
+  return (
+    <div className="properties-tags-container">
+      <input
+        ref={inputRef}
+        type="text"
+        value={inputValue}
+        onChange={handleChange}
+        onFocus={() => {
+          setIsFocused(true)
+          setShowSuggestions(true)
+        }}
+        onBlur={() => {
+          setIsFocused(false)
+          // Clean up the display value on blur (delayed to allow click on suggestion)
+          setTimeout(() => {
+            if (!showSuggestions) {
+              setInputValue(arrayValue.join(', '))
+            }
+          }, 200)
+        }}
+        className="properties-input properties-array"
+        placeholder="tag1, tag2, ..."
+      />
+      {showSuggestions && suggestions.length > 0 && (
+        <div ref={suggestionsRef} className="properties-tags-suggestions">
+          {suggestions.map(tag => (
+            <div
+              key={tag}
+              className="properties-tag-suggestion"
+              onMouseDown={(e) => {
+                e.preventDefault()
+                handleAddTag(tag)
+              }}
+            >
+              {stripHashFromTag(tag)}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+/**
+ * Array field editor with local state to allow typing commas
+ */
+const ArrayFieldEditor: React.FC<{
+  fieldKey: string
+  value: unknown
+  onChange: (key: string, value: unknown) => void
+}> = ({ fieldKey, value, onChange }) => {
+  const arrayValue = Array.isArray(value) ? value : []
+  const [inputValue, setInputValue] = useState(arrayValue.join(', '))
+  const [isFocused, setIsFocused] = useState(false)
+
+  // Sync input value when external value changes (but not while editing)
+  useEffect(() => {
+    if (!isFocused) {
+      setInputValue(arrayValue.join(', '))
+    }
+  }, [arrayValue, isFocused])
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newInputValue = e.target.value
+    setInputValue(newInputValue)
+
+    // Parse and update the actual value (filtering empty items)
+    const items = newInputValue.split(',').map(s => s.trim()).filter(Boolean)
+    onChange(fieldKey, items)
+  }
+
+  return (
+    <input
+      type="text"
+      value={inputValue}
+      onChange={handleChange}
+      onFocus={() => setIsFocused(true)}
+      onBlur={() => {
+        setIsFocused(false)
+        // Clean up the display value on blur
+        setInputValue(arrayValue.join(', '))
+      }}
+      className="properties-input properties-array"
+      placeholder="item1, item2, ..."
+    />
+  )
+}
+
+/**
  * Field editor component for different types
  */
 const FieldEditor: React.FC<{
@@ -130,17 +301,21 @@ const FieldEditor: React.FC<{
       )
 
     case 'array':
-      const arrayValue = Array.isArray(value) ? value.join(', ') : ''
+      // Use TagsFieldEditor for 'tags' field with autocomplete
+      if (fieldKey.toLowerCase() === 'tags') {
+        return (
+          <TagsFieldEditor
+            fieldKey={fieldKey}
+            value={value}
+            onChange={onChange}
+          />
+        )
+      }
       return (
-        <input
-          type="text"
-          value={arrayValue}
-          onChange={(e) => {
-            const items = e.target.value.split(',').map(s => s.trim()).filter(Boolean)
-            onChange(fieldKey, items)
-          }}
-          className="properties-input properties-array"
-          placeholder="item1, item2, ..."
+        <ArrayFieldEditor
+          fieldKey={fieldKey}
+          value={value}
+          onChange={onChange}
         />
       )
 
@@ -360,6 +535,7 @@ function rebuildFrontmatterWithOriginalKeys(
 
 /**
  * Replace a single value in frontmatter while preserving key order and casing
+ * Arrays are ALWAYS output in block format with dashes for consistency
  */
 function replaceFrontmatterPreservingKeys(
   content: string,
@@ -377,20 +553,57 @@ function replaceFrontmatterPreservingKeys(
     return `---\n${serializeFrontmatter(newFm)}\n---\n\n${content}`
   }
 
+  const yamlContent = match[1]
+
   // Parse existing lines to preserve formatting
-  const yamlLines = match[1].split('\n')
+  const yamlLines = yamlContent.split('\n')
   const newLines: string[] = []
   let found = false
+  let skipDashLines = false
+  let currentKeyForSkipping = ''
 
-  for (const line of yamlLines) {
-    const keyMatch = line.match(/^([^:]+):/)
+  for (let i = 0; i < yamlLines.length; i++) {
+    const line = yamlLines[i]
+
+    // Check if this is a dash line (array item) that should be skipped
+    if (skipDashLines) {
+      if (line.match(/^\s+-/)) {
+        continue // Skip this dash line, it belongs to the key we're replacing
+      } else {
+        skipDashLines = false // End of block array
+        currentKeyForSkipping = ''
+      }
+    }
+
+    const keyMatch = line.match(/^([^:]+):(.*)$/)
     if (keyMatch) {
       const lineKey = keyMatch[1].trim()
       if (lineKey.toLowerCase() === changedKey.toLowerCase()) {
-        // Replace this line with new value
-        newLines.push(formatYamlLine(lineKey, newValue))
+        // Replace this key with new value
+        if (Array.isArray(newValue)) {
+          // ALWAYS output arrays in block format with dashes
+          newLines.push(`${lineKey}:`)
+          for (const item of newValue) {
+            newLines.push(`  - ${item}`)
+          }
+        } else {
+          newLines.push(formatYamlLine(lineKey, newValue))
+        }
         found = true
+        // Skip any following dash lines (whether original was block or inline format)
+        // Also skip if there was an inline array - the next lines might be orphaned dashes
+        skipDashLines = true
+        currentKeyForSkipping = lineKey.toLowerCase()
+        // Check if next line is a dash line OR if current line had inline array
+        const valueAfterColon = keyMatch[2].trim()
+        if (valueAfterColon && !valueAfterColon.startsWith('[')) {
+          // There's a non-array value after colon, don't skip dash lines
+          skipDashLines = false
+        }
         continue
+      } else {
+        // Different key - stop skipping dash lines
+        skipDashLines = false
       }
     }
     newLines.push(line)
@@ -398,12 +611,21 @@ function replaceFrontmatterPreservingKeys(
 
   // If key wasn't found, add it
   if (!found) {
-    newLines.push(formatYamlLine(changedKey, newValue))
+    if (Array.isArray(newValue) && newValue.length > 0) {
+      // New arrays in block format
+      newLines.push(`${changedKey}:`)
+      for (const item of newValue) {
+        newLines.push(`  - ${item}`)
+      }
+    } else {
+      newLines.push(formatYamlLine(changedKey, newValue))
+    }
   }
 
   const newFrontmatterBlock = `---\n${newLines.join('\n')}\n---`
   return content.replace(frontmatterRegex, newFrontmatterBlock)
 }
+
 
 /**
  * Format a single YAML line

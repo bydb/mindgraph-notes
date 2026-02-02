@@ -11473,6 +11473,40 @@ body {
   background: var(--bg-hover);
 }
 
+/* Tags autocomplete */
+.properties-tags-container {
+  position: relative;
+  flex: 1;
+}
+
+.properties-tags-suggestions {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  max-height: 200px;
+  overflow-y: auto;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  z-index: 100;
+  margin-top: 2px;
+}
+
+.properties-tag-suggestion {
+  padding: 6px 10px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.properties-tag-suggestion:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
 /* ============ DATAVIEW QUERY STYLES ============ */
 
 /* Container for dataview results */
