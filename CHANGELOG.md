@@ -2,6 +2,16 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [1.0.11] - 2026-02-02
+
+### Features
+- **Tag-Autocomplete**: Im Properties Panel werden beim Tags-Feld alle existierenden Vault-Tags als Vorschläge angezeigt
+
+### Fixes
+- YAML-Arrays werden jetzt immer im Block-Format mit Spiegelstrichen gespeichert
+- `#` Präfix wird automatisch von Tags entfernt (Anzeige und Speicherung)
+- Komma-Eingabe zum Hinzufügen neuer Tags funktioniert jetzt korrekt
+
 ## [1.0.10] - 2026-02-02
 
 ### Features
