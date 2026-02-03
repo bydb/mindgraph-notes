@@ -2,6 +2,11 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [1.0.12] - 2026-02-03
+
+### Fixes
+- Properties Panel: Hinzufügen von neuen Eigenschaften mit + Button funktioniert jetzt
+
 ## [1.0.11] - 2026-02-02
 
 ### Features
