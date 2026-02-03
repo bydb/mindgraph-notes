@@ -524,9 +524,12 @@ function rebuildFrontmatterWithOriginalKeys(
   const result: NoteFrontmatter = {}
 
   for (const origKey of originalKeys) {
-    const lowerKey = origKey.toLowerCase()
-    if (frontmatter[lowerKey] !== undefined) {
-      result[origKey] = frontmatter[lowerKey]
+    // Try to find the value by matching keys case-insensitively
+    const value = Object.entries(frontmatter).find(
+      ([k]) => k.toLowerCase() === origKey.toLowerCase()
+    )?.[1]
+    if (value !== undefined) {
+      result[origKey] = value
     }
   }
 
