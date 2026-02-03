@@ -435,6 +435,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const lastSavedContentRef = useRef<string>('')
   const isExternalUpdateRef = useRef(false)
+  const currentNoteIdRef = useRef<string | null>(null)  // Track current note ID for async operations
 
   const { vaultPath, selectedNoteId, secondarySelectedNoteId, notes, updateNote, selectNote, selectSecondaryNote, addNote, fileTree, setFileTree, navigateBack, navigateForward, canNavigateBack, canNavigateForward } = useNotesStore()
   const { pendingTemplateInsert, setPendingTemplateInsert, ollama, editorHeadingFolding, editorOutlining, outlineStyle, editorShowWordCount, languageTool, setLanguageTool } = useUIStore()
@@ -877,7 +878,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
         effects: setLanguageToolMatches.of([])
       })
     }
-  }, [selectedNoteId])
+  }, [effectiveNoteId])
 
   // LanguageTool: Apply suggestion
   const applyLtSuggestion = useCallback((replacement: string, from: number, to: number) => {
@@ -1111,7 +1112,16 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
 
   // Editor erstellen/zerstören bei Notizwechsel
   useEffect(() => {
-    if (!editorRef.current || !selectedNote) return
+    if (!editorRef.current || !effectiveNoteId) return
+
+    // Speichere die aktuelle Note ID im ref für async Prüfung
+    currentNoteIdRef.current = effectiveNoteId
+
+    // Finde die Notiz direkt im useEffect (nicht die gecachte selectedNote Variable)
+    const currentNote = notes.find(n => n.id === effectiveNoteId)
+    if (!currentNote) return
+
+    console.log('[MarkdownEditor] Loading note:', effectiveNoteId, 'path:', currentNote.path)
 
     // Alten Editor zerstören
     if (viewRef.current) {
@@ -1124,18 +1134,37 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
       viewRef.current = null
     }
 
+    // DOM-Element explizit leeren um sicherzustellen, dass kein alter Content bleibt
+    if (editorRef.current) {
+      editorRef.current.innerHTML = ''
+    }
+
     // Content von Datei laden (nicht aus Store!)
     const loadAndCreateEditor = async () => {
-      let content = selectedNote.content
+      // Speichere die ID zum Zeitpunkt des Starts
+      const noteIdAtStart = effectiveNoteId
+      const notePath = currentNote.path
+
+      let content = ''
 
       try {
-        const fullPath = `${vaultPath}/${selectedNote.path}`
+        const fullPath = `${vaultPath}/${notePath}`
+        console.log('[MarkdownEditor] Reading file:', fullPath)
         content = await window.electronAPI.readFile(fullPath)
         lastSavedContentRef.current = content
       } catch (error) {
         console.error('Fehler beim Laden:', error)
-        lastSavedContentRef.current = selectedNote.content
+        content = currentNote.content
+        lastSavedContentRef.current = content
       }
+
+      // Abbrechen wenn sich die Notiz in der Zwischenzeit geändert hat (prüfe gegen ref!)
+      if (currentNoteIdRef.current !== noteIdAtStart) {
+        console.log('[MarkdownEditor] Note changed during load, aborting. Was:', noteIdAtStart, 'Now:', currentNoteIdRef.current)
+        return
+      }
+
+      console.log('[MarkdownEditor] Setting content for:', noteIdAtStart, 'length:', content.length)
 
       // Set preview content
       setPreviewContent(content)
@@ -1311,12 +1340,19 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
         ]
       })
 
+      // Nochmalige Prüfung direkt vor Editor-Erstellung
+      if (currentNoteIdRef.current !== noteIdAtStart) {
+        console.log('[MarkdownEditor] Note changed before editor creation, aborting. Was:', noteIdAtStart, 'Now:', currentNoteIdRef.current)
+        return
+      }
+
       const view = new EditorView({
         state,
         parent: editorRef.current
       })
 
       viewRef.current = view
+      console.log('[MarkdownEditor] Editor created successfully for:', noteIdAtStart)
 
       // Dispatch current notes and viewMode to the dataview extension
       if (notes.length > 0) {
@@ -1338,7 +1374,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
         clearTimeout(saveTimeoutRef.current)
       }
     }
-  }, [selectedNoteId]) // Nur bei Notizwechsel neu erstellen
+  }, [effectiveNoteId]) // Bei Notizwechsel neu erstellen (effectiveNoteId statt selectedNoteId für Text-Split Support)
 
   // Externe Updates (z.B. durch Graph-Verbindungen) im Editor anzeigen
   useEffect(() => {

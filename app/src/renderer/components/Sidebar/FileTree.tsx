@@ -306,15 +306,26 @@ const FileItem: React.FC<FileItemProps> = ({ entry, level, onDrop, displayMode }
   }
   const displayName = getDisplayName()
 
+  // Ermittle die Dateiendung für Nicht-Verzeichnisse
+  // Spezialfall: PDF Companion Dateien haben .pdf.md Endung
+  const getFileExtension = () => {
+    if (entry.isDirectory) return ''
+    // PDF Companion Dateien (.pdf.md) speziell behandeln
+    if (entry.name.endsWith('.pdf.md')) return '.pdf.md'
+    const lastDot = entry.name.lastIndexOf('.')
+    return lastDot > 0 ? entry.name.substring(lastDot) : ''
+  }
+  const fileExtension = getFileExtension()
+
   // Focus input when editing starts
   useEffect(() => {
     if (isEditing && inputRef.current) {
       inputRef.current.focus()
       // Select text without extension
-      const name = entry.isDirectory ? entry.name : entry.name.replace('.md', '')
+      const name = entry.isDirectory ? entry.name : entry.name.replace(fileExtension, '')
       inputRef.current.setSelectionRange(0, name.length)
     }
-  }, [isEditing, entry.name, entry.isDirectory])
+  }, [isEditing, entry.name, entry.isDirectory, fileExtension])
 
   const handleClick = (e: React.MouseEvent) => {
     if (isEditing) return
@@ -348,7 +359,7 @@ const FileItem: React.FC<FileItemProps> = ({ entry, level, onDrop, displayMode }
   }
 
   const startEditing = () => {
-    const name = entry.isDirectory ? entry.name : entry.name.replace('.md', '')
+    const name = entry.isDirectory ? entry.name : entry.name.replace(fileExtension, '')
     setEditName(name)
     setIsEditing(true)
   }
@@ -364,7 +375,7 @@ const FileItem: React.FC<FileItemProps> = ({ entry, level, onDrop, displayMode }
       return
     }
 
-    const newName = entry.isDirectory ? editName.trim() : `${editName.trim()}.md`
+    const newName = entry.isDirectory ? editName.trim() : `${editName.trim()}${fileExtension}`
     if (newName === entry.name) {
       cancelEditing()
       return
