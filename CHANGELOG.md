@@ -4,8 +4,13 @@ Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
 ## [1.0.12] - 2026-02-03
 
+### Features
+- **FileTree**: Rechtsklick auf Ordner → "Im Canvas anzeigen" öffnet Canvas mit diesem Ordner gefiltert
+
 ### Fixes
 - Properties Panel: Hinzufügen von neuen Eigenschaften mit + Button funktioniert jetzt
+- **Canvas Performance**: Große Vaults (3000+ Notizen) werden jetzt schnell im Canvas angezeigt durch gecachte Ordner-Counts
+- **Sidebar-Panels**: Klick auf Panel-Button öffnet dieses Panel und schließt andere automatisch
 
 ## [1.0.11] - 2026-02-02
 
