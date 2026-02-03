@@ -255,7 +255,7 @@ const FileItem: React.FC<FileItemProps> = ({ entry, level, onDrop, displayMode }
   }, [contextMenu])
 
   const { selectedNoteId, secondarySelectedNoteId, selectedPdfPath, selectedImagePath, selectNote, selectSecondaryNote, selectPdf, selectImage, removeNote, setFileTree, vaultPath, notes, updateNotePath, fileTree } = useNotesStore()
-  const { iconSet, textSplitEnabled, flashcardsEnabled } = useUIStore()
+  const { iconSet, textSplitEnabled, flashcardsEnabled, setViewMode, setCanvasFilterPath } = useUIStore()
   const { fileCustomizations, setFileCustomization, removeFileCustomization } = useGraphStore()
   const { openCanvasTab } = useTabStore()
   const { isBookmarked, toggleBookmark } = useBookmarkStore()
@@ -626,6 +626,14 @@ const FileItem: React.FC<FileItemProps> = ({ entry, level, onDrop, displayMode }
     setContextMenu(null)
   }, [contextMenu, removeFileCustomization])
 
+  // Show folder in canvas view
+  const handleShowFolderInCanvas = useCallback(() => {
+    if (!contextMenu || !contextMenu.entry.isDirectory) return
+    setCanvasFilterPath(contextMenu.entry.path)
+    setViewMode('canvas')
+    setContextMenu(null)
+  }, [contextMenu, setCanvasFilterPath, setViewMode])
+
   // Collect all folders from file tree
   const collectFolders = useCallback((entries: FileEntry[], parentPath: string = ''): Array<{ path: string; name: string; depth: number }> => {
     const folders: Array<{ path: string; name: string; depth: number }> = []
@@ -933,6 +941,9 @@ const FileItem: React.FC<FileItemProps> = ({ entry, level, onDrop, displayMode }
               </button>
               <button onClick={handleShowInFinder} className="context-menu-item">
                 {t('fileTree.showInFinder')}
+              </button>
+              <button onClick={handleShowFolderInCanvas} className="context-menu-item">
+                {t('fileTree.showInCanvas')}
               </button>
               <div className="context-menu-divider" />
               <button onClick={handleStripWikilinks} className="context-menu-item">

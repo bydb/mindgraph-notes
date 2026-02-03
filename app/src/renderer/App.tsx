@@ -69,6 +69,34 @@ const App: React.FC = () => {
   const { isPanelOpen: flashcardsPanelOpen, setPanel: setFlashcardsPanelOpen } = useFlashcardStore()
   const [pendingNoteTitle, setPendingNoteTitle] = useState<string | null>(null)
 
+  // Helper to switch right panel - clicking opens that panel and closes others
+  const switchRightPanel = useCallback((panel: 'overdue' | 'tags' | 'smartConnections' | 'notesChat' | 'flashcards') => {
+    const isCurrentlyOpen =
+      panel === 'overdue' ? overduePanelOpen :
+      panel === 'tags' ? tagsPanelOpen :
+      panel === 'smartConnections' ? smartConnectionsOpen :
+      panel === 'notesChat' ? notesChatOpen :
+      panel === 'flashcards' ? flashcardsPanelOpen : false
+
+    // Close all panels
+    setOverduePanelOpen(false)
+    setTagsPanelOpen(false)
+    setSmartConnectionsOpen(false)
+    setNotesChatOpen(false)
+    setFlashcardsPanelOpen(false)
+
+    // If the panel wasn't open, open it
+    if (!isCurrentlyOpen) {
+      switch (panel) {
+        case 'overdue': setOverduePanelOpen(true); break
+        case 'tags': setTagsPanelOpen(true); break
+        case 'smartConnections': setSmartConnectionsOpen(true); break
+        case 'notesChat': setNotesChatOpen(true); break
+        case 'flashcards': setFlashcardsPanelOpen(true); break
+      }
+    }
+  }, [overduePanelOpen, tagsPanelOpen, smartConnectionsOpen, notesChatOpen, flashcardsPanelOpen, setFlashcardsPanelOpen])
+
   const workspaceRef = useRef<HTMLDivElement>(null)
   const contentAreaRef = useRef<HTMLDivElement>(null)
   const isDraggingRef = useRef(false)
@@ -540,7 +568,7 @@ const App: React.FC = () => {
               </button>
               <button
                 className={`view-mode-btn overdue-btn ${overduePanelOpen ? 'active' : ''} ${taskStats.overdue > 0 ? 'has-overdue' : ''}`}
-                onClick={() => setOverduePanelOpen(!overduePanelOpen)}
+                onClick={() => switchRightPanel('overdue')}
                 title={`${t('titlebar.overdue')} (${taskStats.overdue})`}
               >
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -553,7 +581,7 @@ const App: React.FC = () => {
               </button>
               <button
                 className={`view-mode-btn ${tagsPanelOpen ? 'active' : ''}`}
-                onClick={() => setTagsPanelOpen(!tagsPanelOpen)}
+                onClick={() => switchRightPanel('tags')}
                 title={t('titlebar.tags')}
               >
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -564,7 +592,7 @@ const App: React.FC = () => {
               {smartConnectionsEnabled && (
                 <button
                   className={`view-mode-btn ${smartConnectionsOpen ? 'active' : ''}`}
-                  onClick={() => setSmartConnectionsOpen(!smartConnectionsOpen)}
+                  onClick={() => switchRightPanel('smartConnections')}
                   title={t('titlebar.smartConnections')}
                 >
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -583,7 +611,7 @@ const App: React.FC = () => {
               {notesChatEnabled && (
                 <button
                   className={`view-mode-btn ${notesChatOpen ? 'active' : ''}`}
-                  onClick={() => setNotesChatOpen(!notesChatOpen)}
+                  onClick={() => switchRightPanel('notesChat')}
                   title={t('titlebar.notesChat')}
                 >
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -594,7 +622,7 @@ const App: React.FC = () => {
               {flashcardsEnabled && (
                 <button
                   className={`view-mode-btn ${flashcardsPanelOpen ? 'active' : ''}`}
-                  onClick={() => setFlashcardsPanelOpen(!flashcardsPanelOpen)}
+                  onClick={() => switchRightPanel('flashcards')}
                   title={t('titlebar.flashcards')}
                 >
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

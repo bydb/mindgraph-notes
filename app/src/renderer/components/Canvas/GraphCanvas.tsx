@@ -1082,19 +1082,42 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
     return allPdfs.filter(pdf => !companionPdfPaths.has(pdf.path))
   }, [fileTree, canvasFilterPath, notes])
 
-  // Ordnerliste für Filter-Dropdown extrahieren
-  const folders = useMemo(() => {
+  // Ordnerliste für Filter-Dropdown extrahieren + Counts vorberechnen
+  const { folders, folderCounts } = useMemo(() => {
     const folderSet = new Set<string>()
+    const counts = new Map<string, number>()
+
     allNotes.forEach(note => {
       const parts = note.path.split('/')
       if (parts.length > 1) {
         // Alle Ordner-Ebenen hinzufügen
         for (let i = 1; i < parts.length; i++) {
-          folderSet.add(parts.slice(0, i).join('/'))
+          const folder = parts.slice(0, i).join('/')
+          folderSet.add(folder)
         }
+        // Count für den direkten Parent-Ordner
+        const noteDir = parts.slice(0, -1).join('/')
+        counts.set(noteDir, (counts.get(noteDir) || 0) + 1)
       }
     })
-    return Array.from(folderSet).sort()
+
+    // Auch Unterordner-Counts aggregieren
+    const sortedFolders = Array.from(folderSet).sort()
+    sortedFolders.forEach(folder => {
+      if (!counts.has(folder)) {
+        // Zähle alle Notizen in diesem Ordner und Unterordnern
+        let count = 0
+        allNotes.forEach(note => {
+          const noteDir = note.path.split('/').slice(0, -1).join('/')
+          if (noteDir === folder || noteDir.startsWith(folder + '/')) {
+            count++
+          }
+        })
+        counts.set(folder, count)
+      }
+    })
+
+    return { folders: sortedFolders, folderCounts: counts }
   }, [allNotes])
 
   const [contextMenu, setContextMenu] = useState<{
@@ -2994,7 +3017,7 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
           <option value="__root__">{t('graphCanvas.rootLevelOnly')}</option>
           {folders.map(folder => (
             <option key={folder} value={folder}>
-              📁 {folder} ({allNotes.filter(n => n.path.startsWith(folder + '/') || n.path.split('/').slice(0, -1).join('/') === folder).length})
+              📁 {folder} ({folderCounts.get(folder) || 0})
             </option>
           ))}
         </select>
