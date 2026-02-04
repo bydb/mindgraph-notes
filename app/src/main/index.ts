@@ -1841,31 +1841,59 @@ ipcMain.on('terminal-create', (_event, cwd: string) => {
     ptyProcess = null
   }
 
-  const shell = process.platform === 'win32' ? 'powershell.exe' : '/bin/zsh'
+  const isWindows = process.platform === 'win32'
+  const shell = isWindows ? 'powershell.exe' : '/bin/zsh'
   console.log('[Terminal] Using shell:', shell)
 
   // Resolve ~ to HOME - IMMER Home-Verzeichnis verwenden um Probleme mit Leerzeichen zu vermeiden
-  const workingDir = process.env.HOME || '/'
+  const workingDir = isWindows
+    ? (process.env.USERPROFILE || 'C:\\Users\\' + process.env.USERNAME)
+    : (process.env.HOME || '/')
   console.log('[Terminal] Working directory:', workingDir, '(requested:', cwd, ')')
 
   try {
-    // Shell-Args für interaktive Shell (ohne -l, da das Probleme machen kann)
-    const shellArgs = process.platform === 'win32' ? [] : ['-i']
+    // Shell-Args: PowerShell braucht -NoLogo für sauberen Start, Unix braucht -i für interaktiv
+    const shellArgs = isWindows ? ['-NoLogo', '-NoExit'] : ['-i']
     console.log('[Terminal] Shell args:', shellArgs)
 
-    // Erweitere PATH für Homebrew und andere Tools die in GUI-Apps oft fehlen
-    const homeDir = process.env.HOME || '/Users/' + process.env.USER
-    const additionalPaths = [
-      '/opt/homebrew/bin',
-      '/opt/homebrew/sbin',
-      '/usr/local/bin',
-      '/usr/local/sbin',
-      `${homeDir}/.local/bin`,
-      `${homeDir}/.cargo/bin`,
-      `${homeDir}/.nvm/versions/node/v20.18.1/bin`, // Falls NVM verwendet wird
-    ]
-    const currentPath = process.env.PATH || '/usr/bin:/bin:/usr/sbin:/sbin'
-    const extendedPath = [...additionalPaths, ...currentPath.split(':')].join(':')
+    // Plattform-spezifisches PATH-Setup
+    let extendedPath: string
+
+    if (isWindows) {
+      // Windows: PATH mit ; trennen, typische Pfade hinzufügen
+      const homeDir = process.env.USERPROFILE || ''
+      const additionalPaths = [
+        `${homeDir}\\AppData\\Local\\Programs\\Python\\Python311`,
+        `${homeDir}\\AppData\\Local\\Programs\\Python\\Python311\\Scripts`,
+        `${homeDir}\\.cargo\\bin`,
+        `${homeDir}\\AppData\\Roaming\\npm`,
+        `${homeDir}\\scoop\\shims`,
+      ].filter(p => p) // Leere Pfade entfernen
+      const currentPath = process.env.PATH || ''
+      extendedPath = [...additionalPaths, ...currentPath.split(';')].join(';')
+    } else {
+      // macOS/Linux: PATH mit : trennen
+      const homeDir = process.env.HOME || '/Users/' + process.env.USER
+      const additionalPaths = [
+        '/opt/homebrew/bin',
+        '/opt/homebrew/sbin',
+        '/usr/local/bin',
+        '/usr/local/sbin',
+        `${homeDir}/.local/bin`,
+        `${homeDir}/.cargo/bin`,
+        `${homeDir}/.nvm/versions/node/v20.18.1/bin`, // Falls NVM verwendet wird
+      ]
+      const currentPath = process.env.PATH || '/usr/bin:/bin:/usr/sbin:/sbin'
+      extendedPath = [...additionalPaths, ...currentPath.split(':')].join(':')
+    }
+
+    // Plattform-spezifische Environment-Variablen
+    const termEnv = isWindows ? {} : {
+      TERM: 'xterm-256color',
+      COLORTERM: 'truecolor',
+      LANG: 'en_US.UTF-8',
+      LC_ALL: 'en_US.UTF-8',
+    }
 
     ptyProcess = pty.spawn(shell, shellArgs, {
       name: 'xterm-256color',
@@ -1875,10 +1903,7 @@ ipcMain.on('terminal-create', (_event, cwd: string) => {
       env: {
         ...process.env,
         PATH: extendedPath,
-        TERM: 'xterm-256color',
-        COLORTERM: 'truecolor',
-        LANG: 'en_US.UTF-8',
-        LC_ALL: 'en_US.UTF-8',
+        ...termEnv,
       } as { [key: string]: string }
     })
 

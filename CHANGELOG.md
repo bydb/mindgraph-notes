@@ -2,6 +2,12 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [1.0.14] - 2026-02-03
+
+### Features
+- **Windows-Support**: MindGraph Notes ist jetzt auch für Windows verfügbar (Installer + Portable)
+- **Terminal**: Plattformübergreifende Terminal-Unterstützung (PowerShell auf Windows, zsh auf macOS/Linux)
+
 ## [1.0.13] - 2026-02-03
 
 ### Fixes
