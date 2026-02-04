@@ -52,7 +52,7 @@ Eine moderne, lokale Notiz-App die Markdown-Notizen mit einem Wissensgraphen und
 
 **Linux** (AppImage & .deb): [mindgraph-notes.de/#download](https://mindgraph-notes.de/#download)
 
-Windows: Coming soon
+**Windows** (Installer & Portable): [mindgraph-notes.de/#download](https://mindgraph-notes.de/#download)
 
 ---
 
