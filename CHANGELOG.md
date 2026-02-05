@@ -2,6 +2,11 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [1.0.15] - 2026-02-04
+
+### Fixes
+- **Windows**: Dateien werden nicht mehr doppelt im Canvas angezeigt beim Erstellen neuer Notizen (Pfad-Normalisierung für Windows Backslashes)
+
 ## [1.0.14] - 2026-02-03
 
 ### Features

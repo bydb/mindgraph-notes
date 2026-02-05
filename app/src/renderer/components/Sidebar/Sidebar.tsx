@@ -71,7 +71,10 @@ export const Sidebar: React.FC = () => {
 
         // Bei neuer oder geänderter Datei: Notizen neu laden
         if (event === 'add' || event === 'change') {
-          const relativePath = changedFilePath.replace(path + '/', '')
+          // Normalisiere Pfade für plattformübergreifende Kompatibilität (Windows verwendet \, Unix verwendet /)
+          const normalizedChangedPath = changedFilePath.replace(/\\/g, '/')
+          const normalizedVaultPath = path.replace(/\\/g, '/')
+          const relativePath = normalizedChangedPath.replace(normalizedVaultPath + '/', '')
           if (relativePath.endsWith('.md')) {
             try {
               const content = await window.electronAPI.readFile(changedFilePath)
@@ -97,8 +100,10 @@ export const Sidebar: React.FC = () => {
             }
           }
         } else if (event === 'unlink') {
-          // Datei gelöscht
-          const relativePath = changedFilePath.replace(path + '/', '')
+          // Datei gelöscht - auch hier Pfade normalisieren
+          const normalizedChangedPath = changedFilePath.replace(/\\/g, '/')
+          const normalizedVaultPath = path.replace(/\\/g, '/')
+          const relativePath = normalizedChangedPath.replace(normalizedVaultPath + '/', '')
           const existingNote = useNotesStore.getState().getNoteByPath(relativePath)
           if (existingNote) {
             useNotesStore.getState().removeNote(existingNote.id)
@@ -212,7 +217,10 @@ export const Sidebar: React.FC = () => {
             setFileTree(newTree)
 
             if (event === 'add' || event === 'change') {
-              const relativePath = changedFilePath.replace(lastVault + '/', '')
+              // Normalisiere Pfade für plattformübergreifende Kompatibilität (Windows verwendet \, Unix verwendet /)
+              const normalizedChangedPath = changedFilePath.replace(/\\/g, '/')
+              const normalizedVaultPath = lastVault.replace(/\\/g, '/')
+              const relativePath = normalizedChangedPath.replace(normalizedVaultPath + '/', '')
               if (relativePath.endsWith('.md')) {
                 try {
                   const content = await window.electronAPI.readFile(changedFilePath)
@@ -235,7 +243,10 @@ export const Sidebar: React.FC = () => {
                 }
               }
             } else if (event === 'unlink') {
-              const relativePath = changedFilePath.replace(lastVault + '/', '')
+              // Auch hier Pfade normalisieren
+              const normalizedChangedPath = changedFilePath.replace(/\\/g, '/')
+              const normalizedVaultPath = lastVault.replace(/\\/g, '/')
+              const relativePath = normalizedChangedPath.replace(normalizedVaultPath + '/', '')
               const existingNote = useNotesStore.getState().getNoteByPath(relativePath)
               if (existingNote) {
                 useNotesStore.getState().removeNote(existingNote.id)
