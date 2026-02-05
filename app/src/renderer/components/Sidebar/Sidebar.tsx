@@ -179,8 +179,9 @@ export const Sidebar: React.FC = () => {
   // Beim Start: Letzten Vault automatisch laden
   useEffect(() => {
     const loadLastVault = async () => {
-      // Guard gegen doppeltes Laden
-      if (!window.electronAPI || vaultPath || isLoadingRef.current) return
+      // Guard gegen doppeltes Laden + warten bis Onboarding fertig ist
+      const { onboardingCompleted } = useUIStore.getState()
+      if (!window.electronAPI || vaultPath || isLoadingRef.current || !onboardingCompleted) return
       isLoadingRef.current = true
 
       try {
@@ -264,6 +265,35 @@ export const Sidebar: React.FC = () => {
 
     loadLastVault()
   }, []) // Nur einmal beim Mount
+
+  // Nach Onboarding-Abschluss: Vault laden wenn Pfad gesetzt wurde
+  const onboardingCompleted = useUIStore((s) => s.onboardingCompleted)
+  useEffect(() => {
+    if (!onboardingCompleted || !vaultPath || notes.length > 0) return
+    // Onboarding hat vaultPath gesetzt, aber Vault wurde noch nicht geladen
+    const loadAfterOnboarding = async () => {
+      if (isLoadingRef.current) return
+      isLoadingRef.current = true
+      try {
+        console.log('[Sidebar] Loading vault after onboarding:', vaultPath)
+        const tree = await window.electronAPI.readDirectory(vaultPath)
+        setFileTree(tree)
+        setLoading(true)
+        const loadedNotes = await loadAllNotes(vaultPath, tree)
+        setNotes(loadedNotes)
+        setLoading(false)
+        await loadGraphData(vaultPath)
+        window.electronAPI.watchDirectory(vaultPath, async (event: string, changedFilePath: string) => {
+          const newTree = await window.electronAPI.readDirectory(vaultPath)
+          setFileTree(newTree)
+        })
+      } catch (error) {
+        console.error('[Sidebar] Failed to load vault after onboarding:', error)
+        setLoading(false)
+      }
+    }
+    loadAfterOnboarding()
+  }, [onboardingCompleted, vaultPath])
 
   // Keyboard shortcuts
   useEffect(() => {

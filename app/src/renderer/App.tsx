@@ -15,6 +15,7 @@ import { TemplatePicker } from './components/TemplatePicker/TemplatePicker'
 import { TemplateSettings } from './components/TemplatePicker/TemplateSettings'
 import { Settings } from './components/Settings/Settings'
 import { WhatsNew } from './components/WhatsNew/WhatsNew'
+import { Onboarding } from './components/Onboarding/Onboarding'
 import { UpdateNotification } from './components/UpdateNotification/UpdateNotification'
 import { QuizModal } from './components/Quiz/QuizModal'
 import { FlashcardsPanel, FlashcardStudy, FlashcardEditor } from './components/Flashcards'
@@ -130,9 +131,17 @@ const App: React.FC = () => {
     return () => clearTimeout(timer)
   }, [notes])
 
-  // UI-Settings beim App-Start laden
+  // UI-Settings beim App-Start laden + Onboarding prüfen
   useEffect(() => {
-    initializeUISettings()
+    const init = async () => {
+      await initializeUISettings()
+      // Nach dem Laden prüfen ob Onboarding abgeschlossen ist
+      const { onboardingCompleted, setOnboardingOpen } = useUIStore.getState()
+      if (!onboardingCompleted) {
+        setOnboardingOpen(true)
+      }
+    }
+    init()
   }, [])
 
   // Update-Checker & What's New beim App-Start
@@ -877,6 +886,9 @@ const App: React.FC = () => {
 
       {/* Update Notification Banner */}
       <UpdateNotification />
+
+      {/* Onboarding (Fullscreen Overlay beim ersten Start) */}
+      <Onboarding />
     </ReactFlowProvider>
   )
 }

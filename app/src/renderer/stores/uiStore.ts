@@ -314,6 +314,10 @@ interface UIState {
   updateAvailable: UpdateInfo | null
   whatsNewOpen: boolean
 
+  // Onboarding
+  onboardingCompleted: boolean
+  onboardingOpen: boolean
+
   // Actions
   setViewMode: (mode: ViewMode) => void
   setTheme: (theme: Theme) => void
@@ -358,6 +362,8 @@ interface UIState {
   setLastSeenVersion: (version: string) => void
   setUpdateAvailable: (info: UpdateInfo | null) => void
   setWhatsNewOpen: (open: boolean) => void
+  setOnboardingCompleted: (completed: boolean) => void
+  setOnboardingOpen: (open: boolean) => void
 }
 
 // Default-Werte für den Store
@@ -452,7 +458,11 @@ const defaultState = {
   // Update-Checker & What's New
   lastSeenVersion: '',
   updateAvailable: null as UpdateInfo | null,
-  whatsNewOpen: false
+  whatsNewOpen: false,
+
+  // Onboarding
+  onboardingCompleted: false,
+  onboardingOpen: false
 }
 
 // Felder die persistiert werden sollen (keine Funktionen, keine transienten Werte)
@@ -465,7 +475,8 @@ const persistedKeys = [
   'canvasCompactMode', 'canvasDefaultCardWidth', 'splitPosition', 'fileTreeDisplayMode', 'ollama',
   'pdfCompanionEnabled', 'pdfDisplayMode', 'iconSet',
   'smartConnectionsEnabled', 'notesChatEnabled', 'flashcardsEnabled', 'smartConnectionsWeights', 'docling', 'languageTool',
-  'lastSeenVersion'
+  'lastSeenVersion',
+  'onboardingCompleted'
 ] as const
 
 export const useUIStore = create<UIState>()((set, get) => ({
@@ -520,7 +531,9 @@ export const useUIStore = create<UIState>()((set, get) => ({
   })),
   setLastSeenVersion: (version) => set({ lastSeenVersion: version }),
   setUpdateAvailable: (info) => set({ updateAvailable: info }),
-  setWhatsNewOpen: (open) => set({ whatsNewOpen: open })
+  setWhatsNewOpen: (open) => set({ whatsNewOpen: open }),
+  setOnboardingCompleted: (completed) => set({ onboardingCompleted: completed }),
+  setOnboardingOpen: (open) => set({ onboardingOpen: open })
 }))
 
 // Settings laden beim App-Start

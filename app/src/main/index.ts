@@ -678,6 +678,63 @@ ipcMain.handle('ensure-dir', async (_event, dirPath: string) => {
   }
 })
 
+// ============ STARTER VAULT ============
+
+// Rekursiv Verzeichnis kopieren
+async function copyDirectoryRecursive(src: string, dest: string): Promise<void> {
+  await fs.mkdir(dest, { recursive: true })
+  const entries = await fs.readdir(src, { withFileTypes: true })
+  for (const entry of entries) {
+    const srcPath = path.join(src, entry.name)
+    const destPath = path.join(dest, entry.name)
+    if (entry.isDirectory()) {
+      await copyDirectoryRecursive(srcPath, destPath)
+    } else {
+      await fs.copyFile(srcPath, destPath)
+    }
+  }
+}
+
+// Starter-Vault in Zielordner kopieren
+ipcMain.handle('create-starter-vault', async (_event, targetPath: string, language: string) => {
+  try {
+    const resourcesBase = app.isPackaged
+      ? path.join(process.resourcesPath)
+      : path.join(app.getAppPath(), 'resources')
+
+    const vaultName = language === 'en' ? 'starter-vault-en' : 'starter-vault'
+    const sourcePath = path.join(resourcesBase, vaultName)
+
+    // Prüfen ob Quellverzeichnis existiert
+    try {
+      await fs.access(sourcePath)
+    } catch {
+      console.error('[StarterVault] Source not found:', sourcePath)
+      throw new Error(`Starter vault not found at ${sourcePath}`)
+    }
+
+    await copyDirectoryRecursive(sourcePath, targetPath)
+    console.log('[StarterVault] Created at:', targetPath)
+    return true
+  } catch (error) {
+    console.error('[StarterVault] Error creating starter vault:', error)
+    throw error
+  }
+})
+
+// Leeren Vault erstellen
+ipcMain.handle('create-empty-vault', async (_event, targetPath: string) => {
+  try {
+    await fs.mkdir(targetPath, { recursive: true })
+    await fs.mkdir(path.join(targetPath, '.mindgraph'), { recursive: true })
+    console.log('[EmptyVault] Created at:', targetPath)
+    return true
+  } catch (error) {
+    console.error('[EmptyVault] Error creating empty vault:', error)
+    throw error
+  }
+})
+
 // ============ IMAGE HANDLING ============
 const SUPPORTED_IMAGE_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg']
 

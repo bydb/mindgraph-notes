@@ -28,6 +28,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   promptNewFolder: (basePath: string) => ipcRenderer.invoke('prompt-new-folder', basePath),
   ensureDir: (dirPath: string) => ipcRenderer.invoke('ensure-dir', dirPath),
 
+  // Starter-Vault & Onboarding
+  createStarterVault: (targetPath: string, language: string) =>
+    ipcRenderer.invoke('create-starter-vault', targetPath, language),
+  createEmptyVault: (targetPath: string) =>
+    ipcRenderer.invoke('create-empty-vault', targetPath),
+
   // Image Handling
   copyImageToAttachments: (vaultPath: string, sourcePath: string) =>
     ipcRenderer.invoke('copy-image-to-attachments', vaultPath, sourcePath),

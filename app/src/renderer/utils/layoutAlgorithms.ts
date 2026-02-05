@@ -1097,22 +1097,28 @@ function countLayerCrossings(
 ): number {
   let crossings = 0
 
+  // Build index maps for O(1) lookups instead of O(n) indexOf
+  const layer1Index = new Map<string, number>()
+  const layer2Index = new Map<string, number>()
+  layer1.forEach((id, idx) => layer1Index.set(id, idx))
+  layer2.forEach((id, idx) => layer2Index.set(id, idx))
+
   // Get edges between these two layers
   const layerEdges: Array<{ source: number; target: number }> = []
 
   for (const edge of edges) {
-    const sourceIdx = layer1.indexOf(edge.source)
-    const targetIdx = layer2.indexOf(edge.target)
+    const sourceIdx = layer1Index.get(edge.source)
+    const targetIdx = layer2Index.get(edge.target)
 
-    if (sourceIdx !== -1 && targetIdx !== -1) {
+    if (sourceIdx !== undefined && targetIdx !== undefined) {
       layerEdges.push({ source: sourceIdx, target: targetIdx })
     }
 
     // Also check reverse direction
-    const sourceIdx2 = layer1.indexOf(edge.target)
-    const targetIdx2 = layer2.indexOf(edge.source)
+    const sourceIdx2 = layer1Index.get(edge.target)
+    const targetIdx2 = layer2Index.get(edge.source)
 
-    if (sourceIdx2 !== -1 && targetIdx2 !== -1) {
+    if (sourceIdx2 !== undefined && targetIdx2 !== undefined) {
       layerEdges.push({ source: sourceIdx2, target: targetIdx2 })
     }
   }
@@ -1138,19 +1144,19 @@ function countLayerCrossings(
  */
 function calculateBarycenter(
   nodeId: string,
-  adjacentLayer: string[],
+  adjacentLayerIndex: Map<string, number>,
   edges: LayoutEdge[]
 ): number {
   const positions: number[] = []
 
   for (const edge of edges) {
     if (edge.source === nodeId) {
-      const idx = adjacentLayer.indexOf(edge.target)
-      if (idx !== -1) positions.push(idx)
+      const idx = adjacentLayerIndex.get(edge.target)
+      if (idx !== undefined) positions.push(idx)
     }
     if (edge.target === nodeId) {
-      const idx = adjacentLayer.indexOf(edge.source)
-      if (idx !== -1) positions.push(idx)
+      const idx = adjacentLayerIndex.get(edge.source)
+      if (idx !== undefined) positions.push(idx)
     }
   }
 
@@ -1172,8 +1178,8 @@ function minimizeLayerCrossings(
   // Calculate total nodes for performance scaling
   const totalNodes = layers.reduce((sum, layer) => sum + layer.length, 0)
 
-  // Performance guard: skip for very large graphs
-  if (totalNodes > 100) {
+  // Performance guard: skip for large graphs
+  if (totalNodes > 60) {
     console.log(`[Layout] Skipping crossing minimization for large graph (${totalNodes} nodes)`)
     return result
   }
@@ -1193,10 +1199,14 @@ function minimizeLayerCrossings(
       const layer = result[i]
       const prevLayer = result[i - 1]
 
+      // Build index map for adjacent layer
+      const prevLayerIndex = new Map<string, number>()
+      prevLayer.forEach((id, idx) => prevLayerIndex.set(id, idx))
+
       // Calculate barycenters
       const barycenters = layer.map(nodeId => ({
         nodeId,
-        barycenter: calculateBarycenter(nodeId, prevLayer, edges)
+        barycenter: calculateBarycenter(nodeId, prevLayerIndex, edges)
       }))
 
       // Sort by barycenter (nodes without connections keep relative position)
@@ -1240,9 +1250,13 @@ function minimizeLayerCrossings(
       const layer = result[i]
       const nextLayer = result[i + 1]
 
+      // Build index map for adjacent layer
+      const nextLayerIndex = new Map<string, number>()
+      nextLayer.forEach((id, idx) => nextLayerIndex.set(id, idx))
+
       const barycenters = layer.map(nodeId => ({
         nodeId,
-        barycenter: calculateBarycenter(nodeId, nextLayer, edges)
+        barycenter: calculateBarycenter(nodeId, nextLayerIndex, edges)
       }))
 
       const withBarycenter = barycenters.filter(b => b.barycenter >= 0)
@@ -1287,14 +1301,16 @@ export function hierarchicalLayout(
     return { positions: {} }
   }
 
-  // Performance guard: for very large or highly connected graphs, use simpler grid layout
+  // Performance guard: for large or highly connected graphs, use simpler grid layout
   const edgeDensity = edges.length / Math.max(nodes.length, 1)
-  if (nodes.length > 150 || (nodes.length > 50 && edgeDensity > 3)) {
-    console.log(`[Layout] Graph too large/dense for hierarchical layout (${nodes.length} nodes, ${edges.length} edges). Using grid fallback.`)
+  if (nodes.length > 80 || (nodes.length > 40 && edgeDensity > 2)) {
+    console.log(`[Layout] Graph too large/dense for hierarchical layout (${nodes.length} nodes, ${edges.length} edges, density ${edgeDensity.toFixed(1)}). Using grid fallback.`)
     return smartGridLayout(nodes, edges, options)
   }
 
   console.log(`[Layout] Running hierarchical layout for ${nodes.length} nodes, ${edges.length} edges`)
+  const layoutStartTime = Date.now()
+  const layoutTimeout = 3000 // Max 3 seconds for entire hierarchical layout
 
   // Build adjacency lists
   const outgoing = new Map<string, string[]>()
@@ -1327,26 +1343,42 @@ export function hierarchicalLayout(
     roots.push(sorted[0])
   }
 
-  // BFS to assign levels
+  // BFS to assign levels (with cycle protection)
   const queue: string[] = []
+  const inQueue = new Set<string>()
+  const maxLevel = nodes.length - 1  // In a DAG, longest path can't exceed this
   roots.forEach(r => {
     levels.set(r.id, 0)
     queue.push(r.id)
+    inQueue.add(r.id)
   })
 
-  while (queue.length > 0) {
+  let bfsIterations = 0
+  const maxBfsIterations = nodes.length * nodes.length  // Safety cap for cycles
+
+  while (queue.length > 0 && bfsIterations < maxBfsIterations) {
+    bfsIterations++
     const current = queue.shift()!
+    inQueue.delete(current)
     const currentLevel = levels.get(current) || 0
 
     outgoing.get(current)?.forEach(target => {
+      const newLevel = currentLevel + 1
+      // Cap level to prevent infinite growth from cycles
+      if (newLevel > maxLevel) return
       const existingLevel = levels.get(target)
-      if (existingLevel === undefined || existingLevel < currentLevel + 1) {
-        levels.set(target, currentLevel + 1)
-        if (!queue.includes(target)) {
+      if (existingLevel === undefined || existingLevel < newLevel) {
+        levels.set(target, newLevel)
+        if (!inQueue.has(target)) {
           queue.push(target)
+          inQueue.add(target)
         }
       }
     })
+  }
+
+  if (bfsIterations >= maxBfsIterations) {
+    console.warn(`[Layout] BFS hit iteration limit (possible cycles in graph)`)
   }
 
   // Handle disconnected nodes
@@ -1357,10 +1389,10 @@ export function hierarchicalLayout(
   })
 
   // Group nodes by level
-  const maxLevel = Math.max(...Array.from(levels.values()))
+  const maxAssignedLevel = Math.max(...Array.from(levels.values()))
   const layers: string[][] = []
 
-  for (let i = 0; i <= maxLevel; i++) {
+  for (let i = 0; i <= maxAssignedLevel; i++) {
     layers.push([])
   }
 
@@ -1369,8 +1401,14 @@ export function hierarchicalLayout(
     layers[level].push(n.id)
   })
 
-  // Step 2: Minimize crossings using barycenter method
-  const optimizedLayers = minimizeLayerCrossings(layers, edges, 30)
+  // Step 2: Minimize crossings using barycenter method (with timeout check)
+  if (Date.now() - layoutStartTime > layoutTimeout) {
+    console.log(`[Layout] Hierarchical layout timeout before crossing minimization`)
+    // Skip crossing minimization, use layers as-is
+  }
+  const optimizedLayers = (Date.now() - layoutStartTime > layoutTimeout)
+    ? layers.map(l => [...l])
+    : minimizeLayerCrossings(layers, edges, 30)
 
   // Step 3: Assign coordinates with proper spacing based on actual node sizes
   const positions: Record<string, { x: number; y: number }> = {}
@@ -1446,8 +1484,14 @@ export function hierarchicalLayout(
     })
   })
 
-  // Resolve any remaining overlaps
-  return { positions: resolveOverlaps(positions, nodes) }
+  // Resolve any remaining overlaps (skip if already over time budget)
+  if (Date.now() - layoutStartTime > layoutTimeout) {
+    console.log(`[Layout] Hierarchical layout timeout (${Date.now() - layoutStartTime}ms), skipping overlap resolution`)
+    return { positions }
+  }
+  const finalPositions = resolveOverlaps(positions, nodes)
+  console.log(`[Layout] Hierarchical layout completed in ${Date.now() - layoutStartTime}ms`)
+  return { positions: finalPositions }
 }
 
 // ============================================================================
