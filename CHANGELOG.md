@@ -2,6 +2,20 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [1.0.16] - 2026-02-05
+
+### Features
+- **Onboarding**: Willkommen-Screen mit Setup-Wizard beim ersten Start
+  - Sprachwahl (Deutsch/Englisch) direkt auf dem Welcome-Screen
+  - Vault-Einrichtung: Bestehenden Vault öffnen, Starter-Vault oder leeren Vault erstellen
+  - Starter-Vault mit Beispielnotizen (Canvas, Dataview, Flashcards, Zotero)
+  - KI-Setup: Automatische Erkennung von Ollama und LM Studio
+  - Feature-Übersicht mit Tastenkürzel-Tipps
+
+### Fixes
+- **Canvas**: Hierarchisches Layout stürzt nicht mehr ab bei zyklischen Verlinkungen (A→B→C→A)
+- **Canvas Performance**: Layout-Algorithmus optimiert (Map-Lookups statt indexOf, niedrigere Fallback-Schwellen, 3s Timeout)
+
 ## [1.0.15] - 2026-02-05
 
 ### Fixes
