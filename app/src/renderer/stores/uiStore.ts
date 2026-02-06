@@ -551,6 +551,11 @@ export async function initializeUISettings(): Promise<void> {
       }
       // Always start with 'editor' mode on startup
       validSettings.viewMode = 'editor'
+      // Existing users upgrading from pre-1.0.16: they have settings but no onboardingCompleted
+      // → skip onboarding for them
+      if (!('onboardingCompleted' in savedSettings)) {
+        validSettings.onboardingCompleted = true
+      }
       useUIStore.setState(validSettings)
     } else {
       console.log('[UIStore] No saved settings found, using defaults')

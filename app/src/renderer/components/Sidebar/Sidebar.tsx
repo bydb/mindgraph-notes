@@ -176,87 +176,100 @@ export const Sidebar: React.FC = () => {
     }
   }, [vaultPath, setFileTree, handleOpenVault])
 
-  // Beim Start: Letzten Vault automatisch laden
+  // Beim Start: Letzten Vault automatisch laden (wartet auf onboardingCompleted)
+  const onboardingCompleted = useUIStore((s) => s.onboardingCompleted)
   useEffect(() => {
+    if (!onboardingCompleted) return // Warten bis Settings geladen & Onboarding abgeschlossen
+
     const loadLastVault = async () => {
-      // Guard gegen doppeltes Laden + warten bis Onboarding fertig ist
-      const { onboardingCompleted } = useUIStore.getState()
-      if (!window.electronAPI || vaultPath || isLoadingRef.current || !onboardingCompleted) return
+      // Guard gegen doppeltes Laden
+      if (!window.electronAPI || vaultPath || isLoadingRef.current) return
       isLoadingRef.current = true
 
+      // Determine which vault to load: either already set (from onboarding) or last used
+      let targetVault = vaultPath
+      if (!targetVault) {
+        try {
+          targetVault = await window.electronAPI.getLastVault()
+        } catch (error) {
+          console.error('[Sidebar] Failed to get last vault:', error)
+        }
+      }
+      if (!targetVault) {
+        isLoadingRef.current = false
+        return
+      }
+
       try {
-        const lastVault = await window.electronAPI.getLastVault()
-        if (lastVault) {
-          console.log('[Sidebar] Auto-loading last vault:', lastVault)
+        console.log('[Sidebar] Auto-loading vault:', targetVault)
 
-          setVaultPath(lastVault)
+        setVaultPath(targetVault)
 
-          // 1. FileTree SOFORT laden und anzeigen
-          const tree = await window.electronAPI.readDirectory(lastVault)
-          setFileTree(tree)
-          setLoading(false) // UI sofort freigeben!
+        // 1. FileTree SOFORT laden und anzeigen
+        const tree = await window.electronAPI.readDirectory(targetVault)
+        setFileTree(tree)
+        setLoading(false) // UI sofort freigeben!
 
-          console.log('[Sidebar] FileTree geladen, UI bereit')
+        console.log('[Sidebar] FileTree geladen, UI bereit')
 
-          // 2. Notizen im HINTERGRUND laden (blockiert UI nicht)
-          // requestIdleCallback oder setTimeout damit React erst rendern kann
-          await new Promise(resolve => setTimeout(resolve, 50))
+        // 2. Notizen im HINTERGRUND laden (blockiert UI nicht)
+        // requestIdleCallback oder setTimeout damit React erst rendern kann
+        await new Promise(resolve => setTimeout(resolve, 50))
 
-          setLoading(true) // Zeige Lade-Indikator für Notizen
-          const loadedNotes = await loadAllNotes(lastVault, tree)
-          setNotes(loadedNotes)
-          setLoading(false)
+        setLoading(true) // Zeige Lade-Indikator für Notizen
+        const loadedNotes = await loadAllNotes(targetVault, tree)
+        setNotes(loadedNotes)
+        setLoading(false)
 
-          // Graph-Daten aus dem Vault laden
-          await loadGraphData(lastVault)
+        // Graph-Daten aus dem Vault laden
+        await loadGraphData(targetVault)
 
-          // File-Watcher starten
-          window.electronAPI.watchDirectory(lastVault, async (event: string, changedFilePath: string) => {
-            console.log('File changed:', event, changedFilePath)
+        // File-Watcher starten
+        window.electronAPI.watchDirectory(targetVault, async (event: string, changedFilePath: string) => {
+          console.log('File changed:', event, changedFilePath)
 
-            const newTree = await window.electronAPI.readDirectory(lastVault)
-            setFileTree(newTree)
+          const newTree = await window.electronAPI.readDirectory(targetVault!)
+          setFileTree(newTree)
 
-            if (event === 'add' || event === 'change') {
-              // Normalisiere Pfade für plattformübergreifende Kompatibilität (Windows verwendet \, Unix verwendet /)
-              const normalizedChangedPath = changedFilePath.replace(/\\/g, '/')
-              const normalizedVaultPath = lastVault.replace(/\\/g, '/')
-              const relativePath = normalizedChangedPath.replace(normalizedVaultPath + '/', '')
-              if (relativePath.endsWith('.md')) {
-                try {
-                  const content = await window.electronAPI.readFile(changedFilePath)
-                  const note = await createNoteFromFile(changedFilePath, relativePath, content)
+          if (event === 'add' || event === 'change') {
+            // Normalisiere Pfade für plattformübergreifende Kompatibilität (Windows verwendet \, Unix verwendet /)
+            const normalizedChangedPath = changedFilePath.replace(/\\/g, '/')
+            const normalizedVaultPath = targetVault!.replace(/\\/g, '/')
+            const relativePath = normalizedChangedPath.replace(normalizedVaultPath + '/', '')
+            if (relativePath.endsWith('.md')) {
+              try {
+                const content = await window.electronAPI.readFile(changedFilePath)
+                const note = await createNoteFromFile(changedFilePath, relativePath, content)
 
-                  const existingNote = useNotesStore.getState().getNoteByPath(relativePath)
-                  if (existingNote) {
-                    useNotesStore.getState().updateNote(existingNote.id, {
-                      content,
-                      title: note.title,
-                      outgoingLinks: note.outgoingLinks,
-                      tags: note.tags,
-                      modifiedAt: new Date()
-                    })
-                  } else {
-                    addNote(note)
-                  }
-                } catch (error) {
-                  console.error('Fehler beim Laden der geänderten Datei:', error)
+                const existingNote = useNotesStore.getState().getNoteByPath(relativePath)
+                if (existingNote) {
+                  useNotesStore.getState().updateNote(existingNote.id, {
+                    content,
+                    title: note.title,
+                    outgoingLinks: note.outgoingLinks,
+                    tags: note.tags,
+                    modifiedAt: new Date()
+                  })
+                } else {
+                  addNote(note)
                 }
-              }
-            } else if (event === 'unlink') {
-              // Auch hier Pfade normalisieren
-              const normalizedChangedPath = changedFilePath.replace(/\\/g, '/')
-              const normalizedVaultPath = lastVault.replace(/\\/g, '/')
-              const relativePath = normalizedChangedPath.replace(normalizedVaultPath + '/', '')
-              const existingNote = useNotesStore.getState().getNoteByPath(relativePath)
-              if (existingNote) {
-                useNotesStore.getState().removeNote(existingNote.id)
+              } catch (error) {
+                console.error('Fehler beim Laden der geänderten Datei:', error)
               }
             }
-          })
+          } else if (event === 'unlink') {
+            // Auch hier Pfade normalisieren
+            const normalizedChangedPath = changedFilePath.replace(/\\/g, '/')
+            const normalizedVaultPath = targetVault!.replace(/\\/g, '/')
+            const relativePath = normalizedChangedPath.replace(normalizedVaultPath + '/', '')
+            const existingNote = useNotesStore.getState().getNoteByPath(relativePath)
+            if (existingNote) {
+              useNotesStore.getState().removeNote(existingNote.id)
+            }
+          }
+        })
 
-          setLoading(false)
-        }
+        setLoading(false)
       } catch (error) {
         console.error('Fehler beim Auto-Laden des Vaults:', error)
         setLoading(false)
@@ -264,36 +277,7 @@ export const Sidebar: React.FC = () => {
     }
 
     loadLastVault()
-  }, []) // Nur einmal beim Mount
-
-  // Nach Onboarding-Abschluss: Vault laden wenn Pfad gesetzt wurde
-  const onboardingCompleted = useUIStore((s) => s.onboardingCompleted)
-  useEffect(() => {
-    if (!onboardingCompleted || !vaultPath || notes.length > 0) return
-    // Onboarding hat vaultPath gesetzt, aber Vault wurde noch nicht geladen
-    const loadAfterOnboarding = async () => {
-      if (isLoadingRef.current) return
-      isLoadingRef.current = true
-      try {
-        console.log('[Sidebar] Loading vault after onboarding:', vaultPath)
-        const tree = await window.electronAPI.readDirectory(vaultPath)
-        setFileTree(tree)
-        setLoading(true)
-        const loadedNotes = await loadAllNotes(vaultPath, tree)
-        setNotes(loadedNotes)
-        setLoading(false)
-        await loadGraphData(vaultPath)
-        window.electronAPI.watchDirectory(vaultPath, async (event: string, changedFilePath: string) => {
-          const newTree = await window.electronAPI.readDirectory(vaultPath)
-          setFileTree(newTree)
-        })
-      } catch (error) {
-        console.error('[Sidebar] Failed to load vault after onboarding:', error)
-        setLoading(false)
-      }
-    }
-    loadAfterOnboarding()
-  }, [onboardingCompleted, vaultPath])
+  }, [onboardingCompleted, vaultPath]) // Reagiert auf Settings-Laden UND Onboarding-Abschluss
 
   // Keyboard shortcuts
   useEffect(() => {
