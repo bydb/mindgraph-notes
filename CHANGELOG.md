@@ -2,6 +2,12 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [1.0.17] - 2026-02-06
+
+### Fixes
+- **Vault-Persistierung**: Vault wird nach App-Neustart wieder korrekt geladen (Race Condition zwischen Settings-Laden und Vault-Loading behoben)
+- **Upgrade-Pfad**: Bestehende User sehen beim Update kein unnötiges Onboarding mehr
+
 ## [1.0.16] - 2026-02-05
 
 ### Features
@@ -15,8 +21,6 @@ Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 ### Fixes
 - **Canvas**: Hierarchisches Layout stürzt nicht mehr ab bei zyklischen Verlinkungen (A→B→C→A)
 - **Canvas Performance**: Layout-Algorithmus optimiert (Map-Lookups statt indexOf, niedrigere Fallback-Schwellen, 3s Timeout)
-- **Vault-Persistierung**: Vault wird nach App-Neustart wieder korrekt geladen (Race Condition zwischen Settings-Laden und Vault-Loading behoben)
-- **Upgrade-Pfad**: Bestehende User sehen beim Update auf v1.0.16 kein unnötiges Onboarding mehr
 
 ## [1.0.15] - 2026-02-05
 
