@@ -208,6 +208,19 @@ body {
   letter-spacing: -0.01em;
 }
 
+.beta-badge {
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--accent-color);
+  border: 1px solid var(--accent-color);
+  border-radius: 4px;
+  padding: 1px 5px;
+  margin-left: 6px;
+  opacity: 0.8;
+}
+
 /* ============ UNIFIED BUTTON GROUP DESIGN ============ */
 /* Einheitliches Design für alle Button-Gruppen in der Titlebar */
 

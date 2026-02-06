@@ -539,6 +539,7 @@ const App: React.FC = () => {
               )}
             </div>
             <span className="app-title">MindGraph Notes</span>
+            <span className="beta-badge">Beta</span>
           </div>
           
           <div className="titlebar-center">
