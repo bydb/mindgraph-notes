@@ -2,6 +2,13 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [1.0.18] - 2026-02-06
+
+### Fixes
+- **Windows Installer**: Installation jetzt nach `C:\Program Files\` statt ins User-Verzeichnis (NSIS `perMachine`)
+- **Windows Taskbar**: Taskleisten-Pin bleibt nach Updates erhalten (stabiler Installationspfad)
+- **Windows Installer UX**: Installations-Dialog mit Ordnerauswahl statt One-Click-Install
+
 ## [1.0.17] - 2026-02-06
 
 ### Fixes
