@@ -2,6 +2,18 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [1.0.19-beta] - 2026-02-06
+
+### Features
+- **Akzentfarben**: 6 neue Farben (Rosé, Koralle, Malve, Mint, Limette, Gold) → 12 Akzentfarben gesamt
+- **Hintergrundfarben**: 6 neue Farben (Rosenblatt, Kirschblüte, Meeresschaum, Pistazie, Limonade, Baumwolle) → 15 Hintergründe gesamt
+- **Custom Logo**: Eigenes Logo hochladen, das in der Titelleiste angezeigt wird (PNG, SVG, JPG, WebP)
+- **Dynamische Version**: Settings-Footer zeigt aktuelle App-Version statt hardcoded v1.0.5
+- **Beta-Badge**: Beta-Status sichtbar in Titelleiste, Settings-Footer und package.json
+
+### UI
+- **Farb-Picker**: Flex-Wrap für Akzent- und Hintergrundfarben (mehrzeilige Darstellung)
+
 ## [1.0.18] - 2026-02-06
 
 ### Fixes
