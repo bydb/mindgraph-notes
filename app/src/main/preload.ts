@@ -195,6 +195,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('terminal-error', (_event, error) => callback(error))
   },
 
+  // Custom Logo
+  selectCustomLogo: () => ipcRenderer.invoke('select-custom-logo'),
+  removeCustomLogo: () => ipcRenderer.invoke('remove-custom-logo'),
+
   // Update-Checker & What's New
   getAppVersion: () => ipcRenderer.invoke('get-app-version'),
   checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),

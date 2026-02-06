@@ -6284,7 +6284,9 @@ body {
 /* Accent Color Picker */
 .accent-color-picker {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
+  max-width: 280px;
 }
 
 .accent-color-btn {

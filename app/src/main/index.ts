@@ -2765,6 +2765,51 @@ ipcMain.handle('get-app-version', () => {
   return app.getVersion()
 })
 
+// Custom Logo: Bild auswählen und als Data-URL zurückgeben
+ipcMain.handle('select-custom-logo', async () => {
+  const result = await dialog.showOpenDialog(mainWindow!, {
+    title: 'Logo auswählen',
+    filters: [{ name: 'Bilder', extensions: ['png', 'jpg', 'jpeg', 'svg', 'webp'] }],
+    properties: ['openFile']
+  })
+
+  if (result.canceled || result.filePaths.length === 0) return null
+
+  const sourcePath = result.filePaths[0]
+  const ext = path.extname(sourcePath).toLowerCase()
+  const buffer = await fs.readFile(sourcePath)
+
+  const mimeTypes: Record<string, string> = {
+    '.png': 'image/png',
+    '.jpg': 'image/jpeg',
+    '.jpeg': 'image/jpeg',
+    '.svg': 'image/svg+xml',
+    '.webp': 'image/webp'
+  }
+  const mime = mimeTypes[ext] || 'image/png'
+  const dataUrl = `data:${mime};base64,${buffer.toString('base64')}`
+
+  // Kopie im userData-Verzeichnis speichern
+  const logoPath = path.join(app.getPath('userData'), 'custom-logo' + ext)
+  await fs.copyFile(sourcePath, logoPath)
+
+  return dataUrl
+})
+
+// Custom Logo entfernen
+ipcMain.handle('remove-custom-logo', async () => {
+  const userDataDir = app.getPath('userData')
+  const extensions = ['.png', '.jpg', '.jpeg', '.svg', '.webp']
+  for (const ext of extensions) {
+    try {
+      await fs.unlink(path.join(userDataDir, 'custom-logo' + ext))
+    } catch {
+      // Datei existiert nicht - ignorieren
+    }
+  }
+  return true
+})
+
 // GitHub Releases auf neue Version prüfen
 ipcMain.handle('check-for-updates', async () => {
   try {

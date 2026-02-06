@@ -97,18 +97,31 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
     docling,
     setDocling,
     languageTool,
-    setLanguageTool
+    setLanguageTool,
+    customLogo,
+    setCustomLogo,
+    removeCustomLogo
   } = useUIStore()
 
   const { t } = useTranslation()
 
   const { vaultPath } = useNotesStore()
 
+  // App Version
+  const [appVersion, setAppVersion] = useState<string>('')
+
   // Template State
   const [templates, setTemplates] = useState<TemplateConfig>(DEFAULT_TEMPLATES)
   const [selectedTemplate, setSelectedTemplate] = useState<SelectedTemplate>({ type: 'builtin', key: 'dailyNote' })
   const [templateHasChanges, setTemplateHasChanges] = useState(false)
   const [isSavingTemplates, setIsSavingTemplates] = useState(false)
+
+  // App-Version laden
+  useEffect(() => {
+    if (isOpen) {
+      window.electronAPI.getAppVersion().then((v: string) => setAppVersion(v))
+    }
+  }, [isOpen])
 
   // Zotero Status prüfen
   useEffect(() => {
@@ -449,6 +462,34 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
                         title={BACKGROUND_COLORS[colorKey].name}
                       />
                     ))}
+                  </div>
+                </div>
+                <div className="settings-row">
+                  <label>{t('settings.general.logo')}</label>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    {customLogo && (
+                      <img src={customLogo} width="28" height="28" style={{ borderRadius: '50%', objectFit: 'cover' }} />
+                    )}
+                    <button
+                      className="settings-refresh"
+                      onClick={async () => {
+                        const dataUrl = await window.electronAPI.selectCustomLogo()
+                        if (dataUrl) setCustomLogo(dataUrl)
+                      }}
+                    >
+                      {t('settings.general.logo.upload')}
+                    </button>
+                    {customLogo && (
+                      <button
+                        className="settings-refresh"
+                        onClick={async () => {
+                          await window.electronAPI.removeCustomLogo()
+                          removeCustomLogo()
+                        }}
+                      >
+                        {t('settings.general.logo.remove')}
+                      </button>
+                    )}
                   </div>
                 </div>
                 <div className="settings-row">
@@ -1560,7 +1601,7 @@ LIMIT 10
 
         <div className="settings-footer">
           <div className="settings-version">
-            <strong>MindGraph Notes</strong> v1.0.5
+            <strong>MindGraph Notes</strong> {appVersion ? `v${appVersion}` : ''}
           </div>
           <div className="settings-credits">
             {t('settings.footer.developedBy')} Jochen Leeder

@@ -7,7 +7,7 @@ type CanvasViewMode = 'cards'
 type FileTreeDisplayMode = 'name' | 'path'  // 'name' = nur Dateiname, 'path' = voller Pfad
 type EditorViewMode = 'edit' | 'live-preview' | 'preview'
 type PdfDisplayMode = 'both' | 'companion-only' | 'pdf-only'  // Anzeige von PDF/Companion im FileTree
-type AccentColor = 'blue' | 'orange' | 'green' | 'purple' | 'pink' | 'teal'
+type AccentColor = 'blue' | 'orange' | 'green' | 'purple' | 'pink' | 'teal' | 'rose' | 'coral' | 'mauve' | 'mint' | 'lime' | 'gold'
 type AIAction = 'translate' | 'summarize' | 'continue' | 'improve'
 export type LLMBackend = 'ollama' | 'lm-studio'
 export type Language = 'de' | 'en'
@@ -60,11 +60,17 @@ export const ACCENT_COLORS: Record<AccentColor, { name: string; color: string; h
   green: { name: 'Grün', color: '#30d158', hover: '#28b84c' },
   purple: { name: 'Violett', color: '#bf5af2', hover: '#a849d6' },
   pink: { name: 'Pink', color: '#ff375f', hover: '#e62e52' },
-  teal: { name: 'Türkis', color: '#5ac8fa', hover: '#4ab8e8' }
+  teal: { name: 'Türkis', color: '#5ac8fa', hover: '#4ab8e8' },
+  rose: { name: 'Rosé', color: '#f472b6', hover: '#ec4899' },
+  coral: { name: 'Koralle', color: '#fb7185', hover: '#f43f5e' },
+  mauve: { name: 'Malve', color: '#c084fc', hover: '#a855f7' },
+  mint: { name: 'Mint', color: '#34d399', hover: '#10b981' },
+  lime: { name: 'Limette', color: '#a3e635', hover: '#84cc16' },
+  gold: { name: 'Gold', color: '#fbbf24', hover: '#f59e0b' }
 }
 
 // Hintergrundfarben (Pastelltöne)
-export type BackgroundColor = 'default' | 'beige' | 'cream' | 'lavender' | 'mint' | 'blush' | 'sky' | 'peach' | 'sage'
+export type BackgroundColor = 'default' | 'beige' | 'cream' | 'lavender' | 'mint' | 'blush' | 'sky' | 'peach' | 'sage' | 'rosepetal' | 'blossom' | 'seafoam' | 'pistachio' | 'lemonade' | 'cotton'
 
 export const BACKGROUND_COLORS: Record<BackgroundColor, { name: string; light: string; dark: string }> = {
   default: { name: 'Standard', light: '#ffffff', dark: '#0d0d0d' },
@@ -75,7 +81,13 @@ export const BACKGROUND_COLORS: Record<BackgroundColor, { name: string; light: s
   blush: { name: 'Rosé', light: '#f8eef0', dark: '#181214' },
   sky: { name: 'Himmel', light: '#eef4f8', dark: '#121518' },
   peach: { name: 'Pfirsich', light: '#f8f2ee', dark: '#181614' },
-  sage: { name: 'Salbei', light: '#f0f4ee', dark: '#141612' }
+  sage: { name: 'Salbei', light: '#f0f4ee', dark: '#141612' },
+  rosepetal: { name: 'Rosenblatt', light: '#fce4ec', dark: '#1a1215' },
+  blossom: { name: 'Kirschblüte', light: '#fdf2f8', dark: '#1a1118' },
+  seafoam: { name: 'Meeresschaum', light: '#e8f5f0', dark: '#111815' },
+  pistachio: { name: 'Pistazie', light: '#f0f7ee', dark: '#141712' },
+  lemonade: { name: 'Limonade', light: '#fefce8', dark: '#191812' },
+  cotton: { name: 'Baumwolle', light: '#faf5ff', dark: '#161218' }
 }
 
 // Icon Sets für FileTree
@@ -314,6 +326,9 @@ interface UIState {
   updateAvailable: UpdateInfo | null
   whatsNewOpen: boolean
 
+  // Custom Logo
+  customLogo: string | null
+
   // Onboarding
   onboardingCompleted: boolean
   onboardingOpen: boolean
@@ -362,6 +377,8 @@ interface UIState {
   setLastSeenVersion: (version: string) => void
   setUpdateAvailable: (info: UpdateInfo | null) => void
   setWhatsNewOpen: (open: boolean) => void
+  setCustomLogo: (logo: string | null) => void
+  removeCustomLogo: () => void
   setOnboardingCompleted: (completed: boolean) => void
   setOnboardingOpen: (open: boolean) => void
 }
@@ -460,6 +477,9 @@ const defaultState = {
   updateAvailable: null as UpdateInfo | null,
   whatsNewOpen: false,
 
+  // Custom Logo
+  customLogo: null as string | null,
+
   // Onboarding
   onboardingCompleted: false,
   onboardingOpen: false
@@ -476,6 +496,7 @@ const persistedKeys = [
   'pdfCompanionEnabled', 'pdfDisplayMode', 'iconSet',
   'smartConnectionsEnabled', 'notesChatEnabled', 'flashcardsEnabled', 'smartConnectionsWeights', 'docling', 'languageTool',
   'lastSeenVersion',
+  'customLogo',
   'onboardingCompleted'
 ] as const
 
@@ -532,6 +553,8 @@ export const useUIStore = create<UIState>()((set, get) => ({
   setLastSeenVersion: (version) => set({ lastSeenVersion: version }),
   setUpdateAvailable: (info) => set({ updateAvailable: info }),
   setWhatsNewOpen: (open) => set({ whatsNewOpen: open }),
+  setCustomLogo: (logo) => set({ customLogo: logo }),
+  removeCustomLogo: () => set({ customLogo: null }),
   setOnboardingCompleted: (completed) => set({ onboardingCompleted: completed }),
   setOnboardingOpen: (open) => set({ onboardingOpen: open })
 }))

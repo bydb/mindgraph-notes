@@ -545,6 +545,10 @@ export interface ElectronAPI {
     error?: string;
   }>;
 
+  // Custom Logo
+  selectCustomLogo: () => Promise<string | null>;
+  removeCustomLogo: () => Promise<boolean>;
+
   // Update-Checker & What's New
   getAppVersion: () => Promise<string>;
   checkForUpdates: () => Promise<UpdateInfo>;
