@@ -10,6 +10,8 @@ Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 - **Custom Logo**: Eigenes Logo hochladen, das in der Titelleiste angezeigt wird (PNG, SVG, JPG, WebP)
 - **Dynamische Version**: Settings-Footer zeigt aktuelle App-Version statt hardcoded v1.0.5
 - **Beta-Badge**: Beta-Status sichtbar in Titelleiste, Settings-Footer und package.json
+- **Kontextmenü**: Emojis durch einheitliche SVG-Icons ersetzt
+- **Preview-Kopieren**: Rechtsklick im Preview-Modus zeigt Kopieren-Menü für selektierten Text
 
 ### UI
 - **Farb-Picker**: Flex-Wrap für Akzent- und Hintergrundfarben (mehrzeilige Darstellung)
