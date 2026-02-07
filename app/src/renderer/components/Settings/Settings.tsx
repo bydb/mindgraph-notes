@@ -100,7 +100,13 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
     setLanguageTool,
     customLogo,
     setCustomLogo,
-    removeCustomLogo
+    removeCustomLogo,
+    customAccentColor,
+    setCustomAccentColor,
+    customBackgroundColorLight,
+    setCustomBackgroundColorLight,
+    customBackgroundColorDark,
+    setCustomBackgroundColorDark
   } = useUIStore()
 
   const { t } = useTranslation()
@@ -448,6 +454,28 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
                         title={ACCENT_COLORS[colorKey].name}
                       />
                     ))}
+                    {accentColor === 'custom' && (
+                      <button
+                        className="accent-color-btn custom-color-swatch active"
+                        style={{ backgroundColor: customAccentColor }}
+                        onClick={() => setAccentColor('custom')}
+                        title={customAccentColor}
+                      />
+                    )}
+                    <label
+                      className="accent-color-btn custom-color-btn"
+                      title={t('settings.general.customColor')}
+                    >
+                      <input
+                        type="color"
+                        value={customAccentColor}
+                        onChange={e => {
+                          setCustomAccentColor(e.target.value)
+                          setAccentColor('custom')
+                        }}
+                        style={{ position: 'absolute', opacity: 0, width: 0, height: 0 }}
+                      />
+                    </label>
                   </div>
                 </div>
                 <div className="settings-row">
@@ -462,6 +490,33 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
                         title={BACKGROUND_COLORS[colorKey].name}
                       />
                     ))}
+                    {backgroundColor === 'custom' && (
+                      <button
+                        className="accent-color-btn custom-color-swatch active"
+                        style={{ backgroundColor: customBackgroundColorLight }}
+                        onClick={() => setBackgroundColor('custom')}
+                        title={customBackgroundColorLight}
+                      />
+                    )}
+                    <label
+                      className="accent-color-btn custom-color-btn"
+                      title={t('settings.general.customColor')}
+                    >
+                      <input
+                        type="color"
+                        value={customBackgroundColorLight}
+                        onChange={e => {
+                          setCustomBackgroundColorLight(e.target.value)
+                          const hex = e.target.value
+                          const r = Math.round(parseInt(hex.slice(1, 3), 16) * 0.1)
+                          const g = Math.round(parseInt(hex.slice(3, 5), 16) * 0.1)
+                          const b = Math.round(parseInt(hex.slice(5, 7), 16) * 0.1)
+                          setCustomBackgroundColorDark(`#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`)
+                          setBackgroundColor('custom')
+                        }}
+                        style={{ position: 'absolute', opacity: 0, width: 0, height: 0 }}
+                      />
+                    </label>
                   </div>
                 </div>
                 <div className="settings-row">

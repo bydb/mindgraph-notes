@@ -50,7 +50,7 @@ const ViewModeButton: React.FC<{
 )
 
 const App: React.FC = () => {
-  const { viewMode, setViewMode, toggleSidebar, sidebarVisible, splitPosition, setSplitPosition, sidebarWidth, setSidebarWidth, theme, setTheme, accentColor, backgroundColor, fontFamily, setPendingTemplateInsert, textSplitEnabled, setTextSplitEnabled, textSplitPosition, setTextSplitPosition, smartConnectionsEnabled, notesChatEnabled, flashcardsEnabled, customLogo } = useUIStore()
+  const { viewMode, setViewMode, toggleSidebar, sidebarVisible, splitPosition, setSplitPosition, sidebarWidth, setSidebarWidth, theme, setTheme, accentColor, backgroundColor, fontFamily, setPendingTemplateInsert, textSplitEnabled, setTextSplitEnabled, textSplitPosition, setTextSplitPosition, smartConnectionsEnabled, notesChatEnabled, flashcardsEnabled, customLogo, customAccentColor, customBackgroundColorLight, customBackgroundColorDark } = useUIStore()
   const { notes, vaultPath, selectNote, selectedPdfPath, selectedImagePath, secondarySelectedNoteId, navigateBack, navigateForward, selectedNoteId } = useNotesStore()
   const { tabs, activeTabId, openEditorTab, setActiveTab, closeTab } = useTabStore()
   const activeTab = tabs.find(t => t.id === activeTabId)
@@ -262,11 +262,17 @@ const App: React.FC = () => {
   // Akzentfarbe auf document anwenden
   useEffect(() => {
     const root = document.documentElement
-    const colors = ACCENT_COLORS[accentColor]
-    root.style.setProperty('--accent-color', colors.color)
-    root.style.setProperty('--accent-hover', colors.hover)
-    root.style.setProperty('--accent-subtle', `${colors.color}20`)
-  }, [accentColor])
+    if (accentColor === 'custom') {
+      root.style.setProperty('--accent-color', customAccentColor)
+      root.style.setProperty('--accent-hover', customAccentColor)
+      root.style.setProperty('--accent-subtle', `${customAccentColor}20`)
+    } else {
+      const colors = ACCENT_COLORS[accentColor]
+      root.style.setProperty('--accent-color', colors.color)
+      root.style.setProperty('--accent-hover', colors.hover)
+      root.style.setProperty('--accent-subtle', `${colors.color}20`)
+    }
+  }, [accentColor, customAccentColor])
 
   // Schriftart auf document anwenden
   useEffect(() => {
@@ -278,10 +284,15 @@ const App: React.FC = () => {
   // Hintergrundfarbe auf document anwenden
   useEffect(() => {
     const root = document.documentElement
-    const bg = BACKGROUND_COLORS[backgroundColor]
-    root.style.setProperty('--bg-primary-custom', bg.light)
-    root.style.setProperty('--bg-primary-custom-dark', bg.dark)
-  }, [backgroundColor])
+    if (backgroundColor === 'custom') {
+      root.style.setProperty('--bg-primary-custom', customBackgroundColorLight)
+      root.style.setProperty('--bg-primary-custom-dark', customBackgroundColorDark)
+    } else {
+      const bg = BACKGROUND_COLORS[backgroundColor]
+      root.style.setProperty('--bg-primary-custom', bg.light)
+      root.style.setProperty('--bg-primary-custom-dark', bg.dark)
+    }
+  }, [backgroundColor, customBackgroundColorLight, customBackgroundColorDark])
 
   // Quick Switcher: Notiz erstellen
   const handleCreateNoteFromSwitcher = useCallback((title: string) => {

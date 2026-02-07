@@ -142,6 +142,7 @@ const FormatMenu: React.FC<FormatMenuProps> = memo(({ x, y, onFormat, onClose, p
     <div
       ref={menuRef}
       className="format-menu"
+      onMouseDown={e => e.preventDefault()}
       style={{
         position: 'fixed',
         left: adjustedPos.x,
@@ -580,15 +581,8 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
 
   // Formatierung anwenden
   const applyFormat = useCallback(async (type: string) => {
-    // In Preview-Modus: Kopieren über Browser-Selektion
+    // In Preview-Modus: Kontextmenü wird per DOM erzeugt, nicht über React
     if (!viewRef.current) {
-      if (type === 'copy') {
-        const selection = window.getSelection()
-        const selectedText = selection?.toString() || ''
-        if (selectedText) {
-          await navigator.clipboard.writeText(selectedText)
-        }
-      }
       setFormatMenu(null)
       return
     }
@@ -2352,17 +2346,51 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [viewMode, applyFormat])
 
-  // Rechtsklick = Format-Menü, Alt+Rechtsklick = AI-Menü (bei Textauswahl)
-  // Preview-Kontextmenü: Kopieren ermöglichen
+  // Preview-Kontextmenü: Per DOM erzeugen um React-Rerender zu vermeiden (bewahrt Selektion)
   const handlePreviewContextMenu = useCallback((e: React.MouseEvent) => {
     const selection = window.getSelection()
     const selectedText = selection?.toString() || ''
-    if (!selectedText) return // Kein Text selektiert → kein Menü
+    if (!selectedText) return
 
     e.preventDefault()
-    setFormatMenu({ x: e.clientX, y: e.clientY })
-    setAiMenu(null)
-  }, [])
+
+    // Vorheriges Menü entfernen
+    document.getElementById('preview-copy-menu')?.remove()
+
+    const menu = document.createElement('div')
+    menu.id = 'preview-copy-menu'
+    menu.className = 'format-menu'
+    menu.style.position = 'fixed'
+    menu.style.left = `${e.clientX}px`
+    menu.style.top = `${e.clientY}px`
+    menu.style.zIndex = '10000'
+    menu.onmousedown = (ev) => ev.preventDefault()
+
+    const copyBtn = document.createElement('button')
+    copyBtn.className = 'format-menu-item'
+    copyBtn.innerHTML = '<span class="format-menu-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></span><span class="format-menu-label">' + t('format.copy') + '</span><span class="format-menu-shortcut">Cmd+C</span>'
+    copyBtn.onclick = async () => {
+      await navigator.clipboard.writeText(selectedText)
+      menu.remove()
+    }
+    menu.appendChild(copyBtn)
+
+    // In editor-container einfügen für korrekte CSS-Variablen
+    const container = (e.target as HTMLElement).closest('.editor-container') || document.body
+    container.appendChild(menu)
+    const rect = menu.getBoundingClientRect()
+    if (rect.right > window.innerWidth) menu.style.left = `${window.innerWidth - rect.width - 8}px`
+    if (rect.bottom > window.innerHeight) menu.style.top = `${window.innerHeight - rect.height - 8}px`
+
+    // Klick außerhalb schließt Menü
+    const handleOutside = (ev: MouseEvent) => {
+      if (!menu.contains(ev.target as Node)) {
+        menu.remove()
+        document.removeEventListener('mousedown', handleOutside)
+      }
+    }
+    setTimeout(() => document.addEventListener('mousedown', handleOutside), 0)
+  }, [t])
 
   const handleEditorContextMenu = useCallback((e: React.MouseEvent) => {
     if (viewMode === 'preview' || !viewRef.current) return

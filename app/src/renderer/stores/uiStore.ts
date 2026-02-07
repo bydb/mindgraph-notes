@@ -7,7 +7,7 @@ type CanvasViewMode = 'cards'
 type FileTreeDisplayMode = 'name' | 'path'  // 'name' = nur Dateiname, 'path' = voller Pfad
 type EditorViewMode = 'edit' | 'live-preview' | 'preview'
 type PdfDisplayMode = 'both' | 'companion-only' | 'pdf-only'  // Anzeige von PDF/Companion im FileTree
-type AccentColor = 'blue' | 'orange' | 'green' | 'purple' | 'pink' | 'teal' | 'rose' | 'coral' | 'mauve' | 'mint' | 'lime' | 'gold'
+type AccentColor = 'blue' | 'orange' | 'green' | 'purple' | 'pink' | 'teal' | 'rose' | 'coral' | 'mauve' | 'mint' | 'lime' | 'gold' | 'custom'
 type AIAction = 'translate' | 'summarize' | 'continue' | 'improve'
 export type LLMBackend = 'ollama' | 'lm-studio'
 export type Language = 'de' | 'en'
@@ -70,7 +70,7 @@ export const ACCENT_COLORS: Record<AccentColor, { name: string; color: string; h
 }
 
 // Hintergrundfarben (Pastelltöne)
-export type BackgroundColor = 'default' | 'beige' | 'cream' | 'lavender' | 'mint' | 'blush' | 'sky' | 'peach' | 'sage' | 'rosepetal' | 'blossom' | 'seafoam' | 'pistachio' | 'lemonade' | 'cotton'
+export type BackgroundColor = 'default' | 'beige' | 'cream' | 'lavender' | 'mint' | 'blush' | 'sky' | 'peach' | 'sage' | 'rosepetal' | 'blossom' | 'seafoam' | 'pistachio' | 'lemonade' | 'cotton' | 'custom'
 
 export const BACKGROUND_COLORS: Record<BackgroundColor, { name: string; light: string; dark: string }> = {
   default: { name: 'Standard', light: '#ffffff', dark: '#0d0d0d' },
@@ -326,6 +326,11 @@ interface UIState {
   updateAvailable: UpdateInfo | null
   whatsNewOpen: boolean
 
+  // Custom Colors
+  customAccentColor: string
+  customBackgroundColorLight: string
+  customBackgroundColorDark: string
+
   // Custom Logo
   customLogo: string | null
 
@@ -377,6 +382,9 @@ interface UIState {
   setLastSeenVersion: (version: string) => void
   setUpdateAvailable: (info: UpdateInfo | null) => void
   setWhatsNewOpen: (open: boolean) => void
+  setCustomAccentColor: (color: string) => void
+  setCustomBackgroundColorLight: (color: string) => void
+  setCustomBackgroundColorDark: (color: string) => void
   setCustomLogo: (logo: string | null) => void
   removeCustomLogo: () => void
   setOnboardingCompleted: (completed: boolean) => void
@@ -477,6 +485,11 @@ const defaultState = {
   updateAvailable: null as UpdateInfo | null,
   whatsNewOpen: false,
 
+  // Custom Colors
+  customAccentColor: '#0a84ff',
+  customBackgroundColorLight: '#ffffff',
+  customBackgroundColorDark: '#0d0d0d',
+
   // Custom Logo
   customLogo: null as string | null,
 
@@ -496,6 +509,7 @@ const persistedKeys = [
   'pdfCompanionEnabled', 'pdfDisplayMode', 'iconSet',
   'smartConnectionsEnabled', 'notesChatEnabled', 'flashcardsEnabled', 'smartConnectionsWeights', 'docling', 'languageTool',
   'lastSeenVersion',
+  'customAccentColor', 'customBackgroundColorLight', 'customBackgroundColorDark',
   'customLogo',
   'onboardingCompleted'
 ] as const
@@ -553,6 +567,9 @@ export const useUIStore = create<UIState>()((set, get) => ({
   setLastSeenVersion: (version) => set({ lastSeenVersion: version }),
   setUpdateAvailable: (info) => set({ updateAvailable: info }),
   setWhatsNewOpen: (open) => set({ whatsNewOpen: open }),
+  setCustomAccentColor: (color) => set({ customAccentColor: color }),
+  setCustomBackgroundColorLight: (color) => set({ customBackgroundColorLight: color }),
+  setCustomBackgroundColorDark: (color) => set({ customBackgroundColorDark: color }),
   setCustomLogo: (logo) => set({ customLogo: logo }),
   removeCustomLogo: () => set({ customLogo: null }),
   setOnboardingCompleted: (completed) => set({ onboardingCompleted: completed }),

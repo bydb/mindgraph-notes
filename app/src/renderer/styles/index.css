@@ -6333,6 +6333,16 @@ body {
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
 }
 
+.custom-color-btn {
+  background: conic-gradient(red, yellow, lime, aqua, blue, magenta, red) !important;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.custom-color-swatch {
+  cursor: pointer;
+}
+
 /* Settings Footer */
 .settings-footer {
   display: flex;
