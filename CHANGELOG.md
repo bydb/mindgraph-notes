@@ -2,6 +2,20 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [1.0.20-beta] - 2026-02-07
+
+### Features
+- **Karteikarten Statistik-Dashboard**: Neuer "Statistik"-Tab im Karteikarten-Panel
+  - **Lern-Streak**: Aktuelle Streak-Tage, längster Streak und Lerntage gesamt mit Flammen-Icon
+  - **Kalender-Heatmap**: 12-Wochen Aktivitätsübersicht im GitHub-Style (5 Grün-Abstufungen)
+  - **Quick Stats**: Karten gesamt, aktive Karten, heute gelernt/richtig, gefestigte Karten, durchschn. Leichtigkeit
+  - **Anstehende Wiederholungen**: 7-Tage Balkendiagramm mit fälligen Karten pro Tag
+  - **Backward-Kompatibilität**: Bestehende Lern-Daten werden automatisch aus lastReview übernommen
+  - Persistenz in separater `study-stats.json` (unabhängig von flashcards.json)
+
+### Fixes
+- **SVG-Bildansicht**: SVG-Dateien werden jetzt korrekt in der Bildansicht dargestellt (inline-Rendering statt base64 Data-URL, behebt Darstellungsprobleme bei SVGs ohne explizite width/height)
+
 ## [1.0.19-beta] - 2026-02-06
 
 ### Features
