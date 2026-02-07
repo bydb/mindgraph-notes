@@ -16,7 +16,8 @@ export const FlashcardStudy: React.FC = () => {
     flipCard,
     rateCard,
     endStudySession,
-    saveFlashcards
+    saveFlashcards,
+    saveStudyStats
   } = useFlashcardStore()
 
   const currentCard = studyQueue[currentStudyIndex]
@@ -31,7 +32,10 @@ export const FlashcardStudy: React.FC = () => {
 
     if (e.key === 'Escape') {
       endStudySession()
-      if (vaultPath) saveFlashcards(vaultPath)
+      if (vaultPath) {
+        saveFlashcards(vaultPath)
+        saveStudyStats(vaultPath)
+      }
       return
     }
 
@@ -47,7 +51,7 @@ export const FlashcardStudy: React.FC = () => {
       if (e.key === '3') rateCard(2) // Good
       if (e.key === '4') rateCard(3) // Easy
     }
-  }, [isStudying, isFlipped, flipCard, rateCard, endStudySession, saveFlashcards, vaultPath])
+  }, [isStudying, isFlipped, flipCard, rateCard, endStudySession, saveFlashcards, saveStudyStats, vaultPath])
 
   useEffect(() => {
     window.addEventListener('keydown', handleKeyDown)
@@ -59,21 +63,28 @@ export const FlashcardStudy: React.FC = () => {
     return () => {
       if (vaultPath) {
         saveFlashcards(vaultPath)
+        saveStudyStats(vaultPath)
       }
     }
-  }, [vaultPath, saveFlashcards])
+  }, [vaultPath, saveFlashcards, saveStudyStats])
 
   const handleRate = (quality: ReviewQuality) => {
     rateCard(quality)
     // Save after each rating
     if (vaultPath) {
-      setTimeout(() => saveFlashcards(vaultPath), 100)
+      setTimeout(() => {
+        saveFlashcards(vaultPath)
+        saveStudyStats(vaultPath)
+      }, 100)
     }
   }
 
   const handleClose = () => {
     endStudySession()
-    if (vaultPath) saveFlashcards(vaultPath)
+    if (vaultPath) {
+      saveFlashcards(vaultPath)
+      saveStudyStats(vaultPath)
+    }
   }
 
   if (!isStudying || !currentCard) return null

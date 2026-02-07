@@ -3384,6 +3384,30 @@ ipcMain.handle('flashcards-save', async (_event, vaultPath: string, flashcards: 
   }
 })
 
+// Study Statistics laden
+ipcMain.handle('study-stats-load', async (_event, vaultPath: string) => {
+  try {
+    const statsPath = path.join(vaultPath, '.mindgraph', 'study-stats.json')
+    const content = await fs.readFile(statsPath, 'utf-8')
+    return JSON.parse(content)
+  } catch {
+    return null
+  }
+})
+
+// Study Statistics speichern
+ipcMain.handle('study-stats-save', async (_event, vaultPath: string, data: object) => {
+  try {
+    const statsPath = path.join(vaultPath, '.mindgraph', 'study-stats.json')
+    await fs.mkdir(path.dirname(statsPath), { recursive: true })
+    await fs.writeFile(statsPath, JSON.stringify(data, null, 2), 'utf-8')
+    return true
+  } catch (error) {
+    console.error('[StudyStats] Failed to save:', error)
+    return false
+  }
+})
+
 // Cleanup bei App-Beendigung
 app.on('before-quit', () => {
   isQuitting = true

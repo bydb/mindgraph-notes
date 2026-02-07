@@ -224,5 +224,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   flashcardsLoad: (vaultPath: string) =>
     ipcRenderer.invoke('flashcards-load', vaultPath),
   flashcardsSave: (vaultPath: string, flashcards: object[]) =>
-    ipcRenderer.invoke('flashcards-save', vaultPath, flashcards)
+    ipcRenderer.invoke('flashcards-save', vaultPath, flashcards),
+
+  // Study Statistics Persistence
+  studyStatsLoad: (vaultPath: string) =>
+    ipcRenderer.invoke('study-stats-load', vaultPath),
+  studyStatsSave: (vaultPath: string, data: object) =>
+    ipcRenderer.invoke('study-stats-save', vaultPath, data)
 })

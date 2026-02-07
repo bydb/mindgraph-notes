@@ -8,9 +8,12 @@ interface ImageViewerProps {
 
 export const ImageViewer: React.FC<ImageViewerProps> = ({ filePath, fileName }) => {
   const [imageSrc, setImageSrc] = useState<string | null>(null)
+  const [svgContent, setSvgContent] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [zoom, setZoom] = useState(100)
   const [isLoading, setIsLoading] = useState(true)
+
+  const isSvg = filePath.toLowerCase().endsWith('.svg')
 
   // Bild laden
   useEffect(() => {
@@ -18,16 +21,28 @@ export const ImageViewer: React.FC<ImageViewerProps> = ({ filePath, fileName }) 
     setIsLoading(true)
     setError(null)
     setImageSrc(null)
+    setSvgContent(null)
 
     const loadImage = async () => {
       try {
-        const result = await window.electronAPI.readImageAsDataUrl(filePath)
-        if (cancelled) return
-
-        if (result.success && result.dataUrl) {
-          setImageSrc(result.dataUrl)
+        if (isSvg) {
+          // SVGs inline laden für korrekte Darstellung
+          const content = await window.electronAPI.readFile(filePath)
+          if (cancelled) return
+          if (content) {
+            setSvgContent(content)
+          } else {
+            setError('SVG konnte nicht geladen werden')
+          }
         } else {
-          setError(result.error || 'Bild konnte nicht geladen werden')
+          const result = await window.electronAPI.readImageAsDataUrl(filePath)
+          if (cancelled) return
+
+          if (result.success && result.dataUrl) {
+            setImageSrc(result.dataUrl)
+          } else {
+            setError(result.error || 'Bild konnte nicht geladen werden')
+          }
         }
       } catch (err) {
         if (!cancelled) {
@@ -45,7 +60,7 @@ export const ImageViewer: React.FC<ImageViewerProps> = ({ filePath, fileName }) 
     return () => {
       cancelled = true
     }
-  }, [filePath])
+  }, [filePath, isSvg])
 
   // Zoom-Funktionen
   const handleZoomIn = useCallback(() => {
@@ -149,6 +164,14 @@ export const ImageViewer: React.FC<ImageViewerProps> = ({ filePath, fileName }) 
               draggable={false}
             />
           </div>
+        )}
+
+        {svgContent && !isLoading && !error && (
+          <div
+            className="image-container svg-container"
+            style={{ transform: `scale(${zoom / 100})` }}
+            dangerouslySetInnerHTML={{ __html: svgContent }}
+          />
         )}
       </div>
     </div>

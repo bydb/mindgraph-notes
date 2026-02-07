@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react'
 import { useFlashcardStore, getDaysUntilReview, type FlashcardFilter } from '../../stores/flashcardStore'
 import { useNotesStore } from '../../stores/notesStore'
 import { useTranslation } from '../../utils/translations'
+import { FlashcardStats } from './FlashcardStats'
 import type { Flashcard } from '../../../shared/types'
 
 interface FlashcardsPanelProps {
@@ -23,18 +24,20 @@ export const FlashcardsPanel: React.FC<FlashcardsPanelProps> = ({ onClose }) => 
     getFilteredCards,
     getStats,
     loadFlashcards,
+    loadStudyStats,
     startStudySession,
     setEditingCard,
     setCreatingCard,
     getDueCards
   } = useFlashcardStore()
 
-  // Load flashcards when vault changes
+  // Load flashcards and study stats when vault changes
   useEffect(() => {
     if (vaultPath) {
       loadFlashcards(vaultPath)
+      loadStudyStats(vaultPath)
     }
-  }, [vaultPath, loadFlashcards])
+  }, [vaultPath, loadFlashcards, loadStudyStats])
 
   const stats = useMemo(() => getStats(), [flashcards])
   const filteredCards = useMemo(() => getFilteredCards(), [flashcards, activeFilter])
@@ -112,7 +115,8 @@ export const FlashcardsPanel: React.FC<FlashcardsPanelProps> = ({ onClose }) => 
     { key: 'all', label: t('flashcards.filterAll') },
     { key: 'due', label: t('flashcards.filterDue'), count: stats.due },
     { key: 'pending', label: t('flashcards.filterPending'), count: stats.pending },
-    { key: 'suspended', label: t('flashcards.filterSuspended') }
+    { key: 'suspended', label: t('flashcards.filterSuspended') },
+    { key: 'stats', label: t('flashcards.filterStats') }
   ]
 
   return (
@@ -163,112 +167,121 @@ export const FlashcardsPanel: React.FC<FlashcardsPanelProps> = ({ onClose }) => 
         ))}
       </div>
 
-      {/* Card List - Grouped by Topic */}
-      <div className="flashcards-list">
-        {filteredCards.length === 0 ? (
-          <div className="flashcards-empty">
-            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="2" y="4" width="20" height="16" rx="2" />
-              <path d="M10 4v4" />
-              <path d="M14 4v4" />
-            </svg>
-            <p>{t('flashcards.noCards')}</p>
-            {activeFilter !== 'all' && (
-              <button
-                className="flashcards-show-all-btn"
-                onClick={() => setFilter('all')}
-              >
-                {t('flashcards.showAll')}
-              </button>
-            )}
-          </div>
-        ) : (
-          Object.entries(groupedCards).map(([topic, cards]) => {
-            const isExpanded = expandedTopics.has(topic)
-            const dueCount = getDueCountForTopic(cards)
-            return (
-              <div key={topic} className="flashcards-topic-group">
-                <button
-                  className="flashcards-topic-header"
-                  onClick={() => toggleTopic(topic)}
-                >
-                  <svg
-                    width="12"
-                    height="12"
-                    viewBox="0 0 12 12"
-                    fill="none"
-                    className={`flashcards-topic-chevron ${isExpanded ? 'expanded' : ''}`}
+      {/* Stats View or Card List */}
+      {activeFilter === 'stats' ? (
+        <div className="flashcards-list">
+          <FlashcardStats />
+        </div>
+      ) : (
+        <>
+          {/* Card List - Grouped by Topic */}
+          <div className="flashcards-list">
+            {filteredCards.length === 0 ? (
+              <div className="flashcards-empty">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="2" y="4" width="20" height="16" rx="2" />
+                  <path d="M10 4v4" />
+                  <path d="M14 4v4" />
+                </svg>
+                <p>{t('flashcards.noCards')}</p>
+                {activeFilter !== 'all' && (
+                  <button
+                    className="flashcards-show-all-btn"
+                    onClick={() => setFilter('all')}
                   >
-                    <path
-                      d="M4.5 2.5L8 6L4.5 9.5"
-                      stroke="currentColor"
-                      strokeWidth="1.5"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                  <span className="flashcards-topic-name">{topic}</span>
-                  <span className="flashcards-topic-count">{cards.length}</span>
-                  {dueCount > 0 && (
-                    <span className="flashcards-topic-due">{dueCount} {t('flashcards.due')}</span>
-                  )}
-                </button>
-                {isExpanded && (
-                  <div className="flashcards-topic-cards">
-                    {cards.map((card) => (
-                      <div
-                        key={card.id}
-                        className={`flashcards-card-item ${card.status}`}
-                        onClick={() => handleCardClick(card)}
-                      >
-                        <div className="flashcards-card-content">
-                          <div className="flashcards-card-front">
-                            {card.front.length > 80 ? card.front.slice(0, 80) + '...' : card.front}
-                          </div>
-                          <div className="flashcards-card-meta">
-                            <span className="flashcards-card-source">
-                              {card.sourceNote.split('/').pop()?.replace('.md', '')}
-                            </span>
-                            <span className={`flashcards-card-status status-${card.status}`}>
-                              {getCardStatus(card)}
-                            </span>
-                          </div>
-                        </div>
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <polyline points="9 18 15 12 9 6" />
-                        </svg>
-                      </div>
-                    ))}
-                  </div>
+                    {t('flashcards.showAll')}
+                  </button>
                 )}
               </div>
-            )
-          })
-        )}
-      </div>
+            ) : (
+              Object.entries(groupedCards).map(([topic, cards]) => {
+                const isExpanded = expandedTopics.has(topic)
+                const dueCount = getDueCountForTopic(cards)
+                return (
+                  <div key={topic} className="flashcards-topic-group">
+                    <button
+                      className="flashcards-topic-header"
+                      onClick={() => toggleTopic(topic)}
+                    >
+                      <svg
+                        width="12"
+                        height="12"
+                        viewBox="0 0 12 12"
+                        fill="none"
+                        className={`flashcards-topic-chevron ${isExpanded ? 'expanded' : ''}`}
+                      >
+                        <path
+                          d="M4.5 2.5L8 6L4.5 9.5"
+                          stroke="currentColor"
+                          strokeWidth="1.5"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                      <span className="flashcards-topic-name">{topic}</span>
+                      <span className="flashcards-topic-count">{cards.length}</span>
+                      {dueCount > 0 && (
+                        <span className="flashcards-topic-due">{dueCount} {t('flashcards.due')}</span>
+                      )}
+                    </button>
+                    {isExpanded && (
+                      <div className="flashcards-topic-cards">
+                        {cards.map((card) => (
+                          <div
+                            key={card.id}
+                            className={`flashcards-card-item ${card.status}`}
+                            onClick={() => handleCardClick(card)}
+                          >
+                            <div className="flashcards-card-content">
+                              <div className="flashcards-card-front">
+                                {card.front.length > 80 ? card.front.slice(0, 80) + '...' : card.front}
+                              </div>
+                              <div className="flashcards-card-meta">
+                                <span className="flashcards-card-source">
+                                  {card.sourceNote.split('/').pop()?.replace('.md', '')}
+                                </span>
+                                <span className={`flashcards-card-status status-${card.status}`}>
+                                  {getCardStatus(card)}
+                                </span>
+                              </div>
+                            </div>
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <polyline points="9 18 15 12 9 6" />
+                            </svg>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )
+              })
+            )}
+          </div>
 
-      {/* Study Button */}
-      {dueCards.length > 0 && (
-        <div className="flashcards-panel-footer">
-          <button
-            className="flashcards-study-btn"
-            onClick={handleStartStudy}
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <polygon points="5 3 19 12 5 21 5 3" />
-            </svg>
-            {t('flashcards.startStudy', { count: dueCards.length })}
-          </button>
-        </div>
-      )}
+          {/* Study Button */}
+          {dueCards.length > 0 && (
+            <div className="flashcards-panel-footer">
+              <button
+                className="flashcards-study-btn"
+                onClick={handleStartStudy}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polygon points="5 3 19 12 5 21 5 3" />
+                </svg>
+                {t('flashcards.startStudy', { count: dueCards.length })}
+              </button>
+            </div>
+          )}
 
-      {/* Activate Pending Cards Button */}
-      {stats.pending > 0 && activeFilter === 'pending' && (
-        <div className="flashcards-panel-footer">
-          <p className="flashcards-pending-hint">
-            {t('flashcards.pendingHint')}
-          </p>
-        </div>
+          {/* Activate Pending Cards Button */}
+          {stats.pending > 0 && activeFilter === 'pending' && (
+            <div className="flashcards-panel-footer">
+              <p className="flashcards-pending-hint">
+                {t('flashcards.pendingHint')}
+              </p>
+            </div>
+          )}
+        </>
       )}
     </div>
   )

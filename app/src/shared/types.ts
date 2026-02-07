@@ -60,6 +60,18 @@ export interface QuizAnalysis {
   overallScore: number
 }
 
+// Study Statistics Types
+export interface DailyReview {
+  date: string         // YYYY-MM-DD
+  cardsReviewed: number
+  cardsCorrect: number // quality >= 2
+}
+
+export interface StudyStatsData {
+  studyDays: string[]
+  dailyReviews: DailyReview[]
+}
+
 // Flashcard / Spaced Repetition Types
 export type FlashcardStatus = 'pending' | 'active' | 'suspended'
 
@@ -581,6 +593,10 @@ export interface ElectronAPI {
   // Flashcards Persistence
   flashcardsLoad: (vaultPath: string) => Promise<Flashcard[] | null>;
   flashcardsSave: (vaultPath: string, flashcards: Flashcard[]) => Promise<boolean>;
+
+  // Study Statistics Persistence
+  studyStatsLoad: (vaultPath: string) => Promise<StudyStatsData | null>;
+  studyStatsSave: (vaultPath: string, data: StudyStatsData) => Promise<boolean>;
 }
 
 // Docling Options for PDF conversion

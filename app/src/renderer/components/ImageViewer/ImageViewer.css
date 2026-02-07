@@ -108,6 +108,19 @@
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
+.svg-container {
+  max-width: 90%;
+  max-height: 90%;
+}
+
+.svg-container svg {
+  width: 100%;
+  height: auto;
+  max-height: 80vh;
+  border-radius: var(--radius-sm);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
 .image-loading,
 .image-error {
   display: flex;
