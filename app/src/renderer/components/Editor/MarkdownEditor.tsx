@@ -42,9 +42,10 @@ interface FormatMenuProps {
   y: number
   onFormat: (type: string) => void
   onClose: () => void
+  previewMode?: boolean
 }
 
-const FormatMenu: React.FC<FormatMenuProps> = memo(({ x, y, onFormat, onClose }) => {
+const FormatMenu: React.FC<FormatMenuProps> = memo(({ x, y, onFormat, onClose, previewMode }) => {
   const { t } = useTranslation()
   const menuRef = useRef<HTMLDivElement>(null)
   const [adjustedPos, setAdjustedPos] = useState({ x, y })
@@ -85,31 +86,56 @@ const FormatMenu: React.FC<FormatMenuProps> = memo(({ x, y, onFormat, onClose })
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [onClose])
 
-  const formatOptions = [
-    { type: 'cut', label: t('format.cut'), icon: '✂️', shortcut: 'Cmd+X' },
-    { type: 'copy', label: t('format.copy'), icon: '📋', shortcut: 'Cmd+C' },
-    { type: 'paste', label: t('format.paste'), icon: '📥', shortcut: 'Cmd+V' },
+  const svgProps = { width: 14, height: 14, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const }
+
+  const icons = {
+    cut: <svg {...svgProps}><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" y1="4" x2="8.12" y2="15.88"/><line x1="14.47" y1="14.48" x2="20" y2="20"/><line x1="8.12" y1="8.12" x2="12" y2="12"/></svg>,
+    copy: <svg {...svgProps}><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>,
+    paste: <svg {...svgProps}><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>,
+    bold: <svg {...svgProps}><path d="M6 4h8a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"/><path d="M6 12h9a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"/></svg>,
+    italic: <svg {...svgProps}><line x1="19" y1="4" x2="10" y2="4"/><line x1="14" y1="20" x2="5" y2="20"/><line x1="15" y1="4" x2="9" y2="20"/></svg>,
+    code: <svg {...svgProps}><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>,
+    strikethrough: <svg {...svgProps}><line x1="4" y1="12" x2="20" y2="12"/><path d="M16 4c-1.5 0-3 .5-3 2 0 3 6 3 6 6 0 1.5-1.5 2-3 2"/><path d="M8 20c1.5 0 3-.5 3-2 0-3-6-3-6-6 0-1.5 1.5-2 3-2"/></svg>,
+    link: <svg {...svgProps}><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>,
+    wikilink: <svg {...svgProps}><rect x="2" y="6" width="7" height="12" rx="1"/><rect x="15" y="6" width="7" height="12" rx="1"/><line x1="9" y1="12" x2="15" y2="12"/></svg>,
+    task: <svg {...svgProps}><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><path d="M9 12l2 2 4-4"/></svg>,
+    taskReminder: <svg {...svgProps}><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>,
+    footnote: <svg {...svgProps}><path d="M4 7V4h16v3"/><path d="M9 20h6"/><path d="M12 4v16"/><circle cx="17" cy="6" r="3" fill="currentColor" stroke="none"/></svg>,
+    heading: <svg {...svgProps}><path d="M4 4v16"/><path d="M20 4v16"/><path d="M4 12h16"/></svg>,
+    quote: <svg {...svgProps}><path d="M3 21c3 0 7-1 7-8V5c0-1.25-.756-2.017-2-2H4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2 1 0 1 0 1 1v1c0 1-1 2-2 2s-1 .008-1 1.031V21z"/><path d="M15 21c3 0 7-1 7-8V5c0-1.25-.757-2.017-2-2h-4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2h.75c0 2.25.25 4-2.75 4v3z"/></svg>,
+    note: <svg {...svgProps}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>,
+    tip: <svg {...svgProps}><line x1="9" y1="18" x2="15" y2="18"/><line x1="10" y1="22" x2="14" y2="22"/><path d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0 0 18 8 6 6 0 0 0 6 8c0 1 .23 2.23 1.5 3.5A4.61 4.61 0 0 1 8.91 14"/></svg>,
+    warning: <svg {...svgProps}><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>,
+    summary: <svg {...svgProps}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></svg>,
+  }
+
+  const formatOptions = previewMode ? [
+    { type: 'copy', label: t('format.copy'), icon: icons.copy, shortcut: 'Cmd+C' },
+  ] : [
+    { type: 'cut', label: t('format.cut'), icon: icons.cut, shortcut: 'Cmd+X' },
+    { type: 'copy', label: t('format.copy'), icon: icons.copy, shortcut: 'Cmd+C' },
+    { type: 'paste', label: t('format.paste'), icon: icons.paste, shortcut: 'Cmd+V' },
     { type: 'divider', label: '', icon: '', shortcut: '' },
-    { type: 'bold', label: t('format.bold'), icon: 'B', shortcut: 'Cmd+B' },
-    { type: 'italic', label: t('format.italic'), icon: 'I', shortcut: 'Cmd+I' },
-    { type: 'code', label: t('format.code'), icon: '</>', shortcut: 'Cmd+`' },
-    { type: 'strikethrough', label: t('format.strikethrough'), icon: 'S', shortcut: '' },
-    { type: 'link', label: t('format.link'), icon: '🔗', shortcut: '' },
-    { type: 'wikilink', label: t('format.wikilink'), icon: '[[]]', shortcut: '' },
+    { type: 'bold', label: t('format.bold'), icon: icons.bold, shortcut: 'Cmd+B' },
+    { type: 'italic', label: t('format.italic'), icon: icons.italic, shortcut: 'Cmd+I' },
+    { type: 'code', label: t('format.code'), icon: icons.code, shortcut: 'Cmd+`' },
+    { type: 'strikethrough', label: t('format.strikethrough'), icon: icons.strikethrough, shortcut: '' },
+    { type: 'link', label: t('format.link'), icon: icons.link, shortcut: '' },
+    { type: 'wikilink', label: t('format.wikilink'), icon: icons.wikilink, shortcut: '' },
     { type: 'divider', label: '', icon: '', shortcut: '' },
-    { type: 'task', label: t('format.task'), icon: '☐', shortcut: '' },
-    { type: 'task-reminder', label: t('format.taskReminder'), icon: '⏰', shortcut: '' },
-    { type: 'footnote', label: t('format.footnote'), icon: '¹', shortcut: '' },
+    { type: 'task', label: t('format.task'), icon: icons.task, shortcut: '' },
+    { type: 'task-reminder', label: t('format.taskReminder'), icon: icons.taskReminder, shortcut: '' },
+    { type: 'footnote', label: t('format.footnote'), icon: icons.footnote, shortcut: '' },
     { type: 'divider', label: '', icon: '', shortcut: '' },
-    { type: 'heading1', label: t('format.heading1'), icon: 'H1', shortcut: '' },
-    { type: 'heading2', label: t('format.heading2'), icon: 'H2', shortcut: '' },
-    { type: 'heading3', label: t('format.heading3'), icon: 'H3', shortcut: '' },
+    { type: 'heading1', label: t('format.heading1'), icon: icons.heading, shortcut: '' },
+    { type: 'heading2', label: t('format.heading2'), icon: icons.heading, shortcut: '' },
+    { type: 'heading3', label: t('format.heading3'), icon: icons.heading, shortcut: '' },
     { type: 'divider', label: '', icon: '', shortcut: '' },
-    { type: 'quote', label: t('format.quote'), icon: '❝', shortcut: '' },
-    { type: 'callout-note', label: 'Callout: Note', icon: '📝', shortcut: '' },
-    { type: 'callout-tip', label: 'Callout: Tip', icon: '💡', shortcut: '' },
-    { type: 'callout-warning', label: 'Callout: Warning', icon: '⚠️', shortcut: '' },
-    { type: 'callout-summary', label: 'Callout: Summary', icon: '📄', shortcut: '' },
+    { type: 'quote', label: t('format.quote'), icon: icons.quote, shortcut: '' },
+    { type: 'callout-note', label: 'Callout: Note', icon: icons.note, shortcut: '' },
+    { type: 'callout-tip', label: 'Callout: Tip', icon: icons.tip, shortcut: '' },
+    { type: 'callout-warning', label: 'Callout: Warning', icon: icons.warning, shortcut: '' },
+    { type: 'callout-summary', label: 'Callout: Summary', icon: icons.summary, shortcut: '' },
   ]
 
   return (
@@ -554,9 +580,20 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
 
   // Formatierung anwenden
   const applyFormat = useCallback(async (type: string) => {
-    const view = viewRef.current
-    if (!view) return
+    // In Preview-Modus: Kopieren über Browser-Selektion
+    if (!viewRef.current) {
+      if (type === 'copy') {
+        const selection = window.getSelection()
+        const selectedText = selection?.toString() || ''
+        if (selectedText) {
+          await navigator.clipboard.writeText(selectedText)
+        }
+      }
+      setFormatMenu(null)
+      return
+    }
 
+    const view = viewRef.current
     const { from, to } = view.state.selection.main
     const selectedText = view.state.doc.sliceString(from, to)
 
@@ -2316,6 +2353,17 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
   }, [viewMode, applyFormat])
 
   // Rechtsklick = Format-Menü, Alt+Rechtsklick = AI-Menü (bei Textauswahl)
+  // Preview-Kontextmenü: Kopieren ermöglichen
+  const handlePreviewContextMenu = useCallback((e: React.MouseEvent) => {
+    const selection = window.getSelection()
+    const selectedText = selection?.toString() || ''
+    if (!selectedText) return // Kein Text selektiert → kein Menü
+
+    e.preventDefault()
+    setFormatMenu({ x: e.clientX, y: e.clientY })
+    setAiMenu(null)
+  }, [])
+
   const handleEditorContextMenu = useCallback((e: React.MouseEvent) => {
     if (viewMode === 'preview' || !viewRef.current) return
 
@@ -2563,6 +2611,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
       <div
         className={`editor-preview ${viewMode === 'preview' ? 'visible' : 'hidden'}${outlineStyle !== 'default' ? ` outline-${outlineStyle}` : ''}`}
         onClick={handlePreviewClick}
+        onContextMenu={handlePreviewContextMenu}
         ref={previewRef}
       >
         {frontmatterTitle && (
@@ -2593,6 +2642,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
           y={formatMenu.y}
           onFormat={applyFormat}
           onClose={() => setFormatMenu(null)}
+          previewMode={viewMode === 'preview'}
         />
       )}
 
