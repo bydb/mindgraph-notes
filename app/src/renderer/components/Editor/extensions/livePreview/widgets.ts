@@ -158,10 +158,15 @@ export class LinkWidget extends WidgetType {
   }
 }
 
+// Cache for resolved image data URLs to avoid repeated IPC calls
+const imageCache = new Map<string, string | null>()
+
 /**
  * Widget for image preview with actual image rendering
  */
 export class ImageWidget extends WidgetType {
+  private loadId = 0
+
   constructor(
     readonly url: string,
     readonly width: number | null,
@@ -181,9 +186,24 @@ export class ImageWidget extends WidgetType {
     )
   }
 
+  private get cacheKey(): string {
+    return `${this.vaultPath}::${this.url}`
+  }
+
   toDOM(): HTMLElement {
     const container = document.createElement('span')
     container.className = 'lp-image-container'
+
+    // Check cache first for instant rendering
+    const cached = imageCache.get(this.cacheKey)
+    if (cached) {
+      this.renderImage(container, cached)
+      return container
+    }
+    if (cached === null) {
+      this.renderError(container, 'Image not found')
+      return container
+    }
 
     // Start with a loading placeholder
     const placeholder = document.createElement('span')
@@ -198,10 +218,13 @@ export class ImageWidget extends WidgetType {
   }
 
   private async loadImage(container: HTMLElement): Promise<void> {
+    const currentLoadId = ++this.loadId
+
     try {
       // For external URLs or data URLs, use directly
       if (this.url.startsWith('http') || this.url.startsWith('data:')) {
-        this.renderImage(container, this.url)
+        imageCache.set(this.cacheKey, this.url)
+        if (currentLoadId === this.loadId) this.renderImage(container, this.url)
         return
       }
 
@@ -209,29 +232,26 @@ export class ImageWidget extends WidgetType {
       if (this.url.startsWith('/')) {
         const result = await window.electronAPI.readImageAsDataUrl(this.url)
         if (result.success && result.dataUrl) {
-          this.renderImage(container, result.dataUrl)
+          imageCache.set(this.cacheKey, result.dataUrl)
+          if (currentLoadId === this.loadId) this.renderImage(container, result.dataUrl)
           return
         }
       }
 
       // Try multiple possible locations for relative paths
       const possiblePaths = [
-        // Im Vault-Root
         `${this.vaultPath}/${this.url}`,
-        // In .attachments/
         `${this.vaultPath}/.attachments/${this.url}`,
-        // In attachments/ (ohne Punkt)
         `${this.vaultPath}/attachments/${this.url}`,
-        // In assets/
         `${this.vaultPath}/assets/${this.url}`,
-        // In images/
         `${this.vaultPath}/images/${this.url}`,
       ]
 
       for (const imagePath of possiblePaths) {
         const result = await window.electronAPI.readImageAsDataUrl(imagePath)
         if (result.success && result.dataUrl) {
-          this.renderImage(container, result.dataUrl)
+          imageCache.set(this.cacheKey, result.dataUrl)
+          if (currentLoadId === this.loadId) this.renderImage(container, result.dataUrl)
           return
         }
       }
@@ -242,21 +262,22 @@ export class ImageWidget extends WidgetType {
         const fullPath = `${this.vaultPath}/${searchResult.path}`
         const imageResult = await window.electronAPI.readImageAsDataUrl(fullPath)
         if (imageResult.success && imageResult.dataUrl) {
-          this.renderImage(container, imageResult.dataUrl)
+          imageCache.set(this.cacheKey, imageResult.dataUrl)
+          if (currentLoadId === this.loadId) this.renderImage(container, imageResult.dataUrl)
           return
         }
       }
 
-      // If no path worked, show error
-      this.renderError(container, 'Image not found')
+      // If no path worked, cache the miss and show error
+      imageCache.set(this.cacheKey, null)
+      if (currentLoadId === this.loadId) this.renderError(container, 'Image not found')
     } catch (error) {
       console.error('[ImageWidget] Load error:', error)
-      this.renderError(container, 'Failed to load image')
+      if (currentLoadId === this.loadId) this.renderError(container, 'Failed to load image')
     }
   }
 
   private renderImage(container: HTMLElement, src: string): void {
-    // Clear the container
     container.innerHTML = ''
 
     const img = document.createElement('img')
@@ -264,7 +285,6 @@ export class ImageWidget extends WidgetType {
     img.className = 'lp-image'
     if (this.alt) img.alt = this.alt
 
-    // Apply size constraints
     if (this.width) {
       img.style.width = `${this.width}px`
     }
@@ -272,7 +292,6 @@ export class ImageWidget extends WidgetType {
       img.style.height = `${this.height}px`
     }
 
-    // Ensure image doesn't exceed container
     img.style.maxWidth = '100%'
 
     container.appendChild(img)
