@@ -474,6 +474,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
   const [isSaving, setIsSaving] = useState(false)
   const [viewMode, setViewMode] = useState<ViewMode>('edit')
   const [previewContent, setPreviewContent] = useState('')
+  const [contentVersion, setContentVersion] = useState(0)
   const [formatMenu, setFormatMenu] = useState<{ x: number; y: number } | null>(null)
   const [propertiesCollapsed, setPropertiesCollapsed] = useState(false)
   const [foldedHeadings, setFoldedHeadings] = useState<Set<string>>(new Set())
@@ -1200,6 +1201,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
       // Set preview content and apply configured default view mode
       setPreviewContent(content)
       setViewMode(editorDefaultView)
+      setContentVersion(v => v + 1)
 
       if (!editorRef.current) return
 
@@ -1867,7 +1869,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
     // Delay to let the DOM update
     const timer = setTimeout(processDataviewBlocks, 50)
     return () => clearTimeout(timer)
-  }, [renderedMarkdown, viewMode, notes, language, selectNote, dataviewExecuteQuery])
+  }, [renderedMarkdown, viewMode, notes, language, selectNote, dataviewExecuteQuery, contentVersion])
 
   // Prozessiere Wikilink-Embeds in der Preview
   useEffect(() => {
@@ -1968,7 +1970,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
     // Kurze Verzögerung um sicherzustellen dass das DOM bereit ist
     const timer = setTimeout(processEmbeds, 50)
     return () => clearTimeout(timer)
-  }, [renderedMarkdown, viewMode, notes, vaultPath])
+  }, [renderedMarkdown, viewMode, notes, vaultPath, contentVersion])
 
   // Load images in preview mode
   useEffect(() => {
@@ -2043,7 +2045,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
 
     const timer = setTimeout(loadImages, 50)
     return () => clearTimeout(timer)
-  }, [renderedMarkdown, viewMode, vaultPath, selectedNote?.path, fileTree])
+  }, [renderedMarkdown, viewMode, vaultPath, selectedNote?.path, fileTree, contentVersion])
 
   // Load PDFs in preview mode
   useEffect(() => {
@@ -2138,7 +2140,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
 
     const timer = setTimeout(loadPdfs, 100)
     return () => clearTimeout(timer)
-  }, [renderedMarkdown, viewMode, vaultPath, selectedNote?.path])
+  }, [renderedMarkdown, viewMode, vaultPath, selectedNote?.path, contentVersion])
 
   // Wikilink Hover Preview
   useEffect(() => {
