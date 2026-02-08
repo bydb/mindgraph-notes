@@ -472,7 +472,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
   const selectedNote = notes.find(n => n.id === effectiveNoteId)
 
   const [isSaving, setIsSaving] = useState(false)
-  const [viewMode, setViewMode] = useState<ViewMode>(editorDefaultView)
+  const [viewMode, setViewMode] = useState<ViewMode>('edit')
   const [previewContent, setPreviewContent] = useState('')
   const [formatMenu, setFormatMenu] = useState<{ x: number; y: number } | null>(null)
   const [propertiesCollapsed, setPropertiesCollapsed] = useState(false)
@@ -1197,8 +1197,9 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
 
       console.log('[MarkdownEditor] Setting content for:', noteIdAtStart, 'length:', content.length)
 
-      // Set preview content
+      // Set preview content and apply configured default view mode
       setPreviewContent(content)
+      setViewMode(editorDefaultView)
 
       if (!editorRef.current) return
 
