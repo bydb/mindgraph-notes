@@ -3,11 +3,75 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>MindGraph Notes - Dein Wissen, vernetzt</title>
-  <meta name="description" content="Eine moderne Notiz-App mit Wissensgraph. Verlinke deine Gedanken, visualisiere Zusammenhänge, nutze lokale KI.">
+  <title>MindGraph Notes - Karteikarten & Spaced Repetition Notiz-App</title>
+  <meta name="description" content="Kostenlose Notiz-App mit Karteikarten, Spaced Repetition (SM-2), KI-Quiz-Generierung, Wissensgraph und Zotero-Integration. Lokal, privat, Open Source. Perfekt für Studium und Wissenschaft.">
   <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
   <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png">
   <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+
+  <!-- Canonical & hreflang -->
+  <link rel="canonical" href="https://mindgraph-notes.de/">
+  <link rel="alternate" hreflang="de" href="https://mindgraph-notes.de/">
+  <link rel="alternate" hreflang="en" href="https://mindgraph-notes.de/">
+  <link rel="alternate" hreflang="x-default" href="https://mindgraph-notes.de/">
+
+  <!-- Open Graph -->
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://mindgraph-notes.de/">
+  <meta property="og:title" content="MindGraph Notes - Karteikarten & Spaced Repetition Notiz-App">
+  <meta property="og:description" content="Kostenlose Notiz-App mit Karteikarten, Spaced Repetition (SM-2), KI-Quiz-Generierung, Wissensgraph und Zotero-Integration. 100% lokal, Open Source.">
+  <meta property="og:image" content="https://mindgraph-notes.de/screenshot.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:locale" content="de_DE">
+  <meta property="og:locale:alternate" content="en_US">
+  <meta property="og:site_name" content="MindGraph Notes">
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="MindGraph Notes - Karteikarten & Spaced Repetition Notiz-App">
+  <meta name="twitter:description" content="Kostenlose Notiz-App mit Karteikarten, Spaced Repetition (SM-2), KI-Quiz-Generierung, Wissensgraph und Zotero-Integration. 100% lokal, Open Source.">
+  <meta name="twitter:image" content="https://mindgraph-notes.de/screenshot.png">
+
+  <!-- Structured Data -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "MindGraph Notes",
+    "applicationCategory": "EducationalApplication",
+    "operatingSystem": "macOS, Windows, Linux",
+    "offers": {
+      "@type": "Offer",
+      "price": "0",
+      "priceCurrency": "EUR"
+    },
+    "description": "Notiz-App mit Karteikarten, Spaced Repetition (SM-2), KI-Quiz-Generierung via Ollama, Wissensgraph, Zotero-Integration. 100% lokal und Open Source.",
+    "url": "https://mindgraph-notes.de/",
+    "downloadUrl": "https://github.com/bydb/mindgraph-notes/releases",
+    "screenshot": "https://mindgraph-notes.de/screenshot.png",
+    "softwareVersion": "1.0.22-beta",
+    "author": {
+      "@type": "Person",
+      "name": "Jochen Leeder",
+      "url": "https://bydb.io"
+    },
+    "license": "https://opensource.org/licenses/AGPL-3.0",
+    "featureList": [
+      "Karteikarten mit Spaced Repetition (SM-2)",
+      "KI-Quiz-Generierung via Ollama",
+      "Wissensgraph / Knowledge Graph",
+      "Zotero Integration",
+      "100% Lokale Daten",
+      "Markdown Editor mit Live Preview",
+      "LaTeX und Mermaid Diagramme",
+      "PDF Companion mit Docling",
+      "Dataview Queries",
+      "Integriertes Terminal"
+    ]
+  }
+  </script>
+
   <style>
     * {
       margin: 0;
@@ -1098,6 +1162,208 @@
     .modal-content a {
       color: var(--accent);
     }
+
+    /* Lernen / Student Section */
+    .lernen-section {
+      padding: 8rem 2rem;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .lernen-hero-text {
+      text-align: center;
+      max-width: 700px;
+      margin: 0 auto 3rem;
+      color: var(--text-muted);
+      font-size: 1.15rem;
+      line-height: 1.7;
+    }
+
+    .lernen-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+      gap: 1.5rem;
+      margin-bottom: 3rem;
+    }
+
+    .lernen-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 2rem;
+      transition: all 0.3s ease;
+    }
+
+    .lernen-card:hover {
+      background: var(--bg-card-hover);
+      border-color: rgba(249, 115, 22, 0.3);
+      transform: translateY(-4px);
+    }
+
+    .lernen-card-primary {
+      background: linear-gradient(135deg, rgba(249, 115, 22, 0.1) 0%, rgba(251, 191, 36, 0.05) 100%);
+      border-color: rgba(249, 115, 22, 0.3);
+    }
+
+    .lernen-card-primary:hover {
+      border-color: rgba(249, 115, 22, 0.5);
+      box-shadow: 0 0 30px rgba(249, 115, 22, 0.2);
+    }
+
+    .lernen-card-icon {
+      font-size: 2rem;
+      margin-bottom: 1rem;
+    }
+
+    .lernen-card h3 {
+      font-size: 1.25rem;
+      margin-bottom: 0.75rem;
+      color: var(--text);
+    }
+
+    .lernen-card p {
+      color: var(--text-muted);
+      font-size: 0.95rem;
+      line-height: 1.6;
+    }
+
+    .lernen-features-list {
+      list-style: none;
+      margin-top: 1rem;
+      padding: 0;
+    }
+
+    .lernen-features-list li {
+      padding: 0.4rem 0;
+      color: var(--text-muted);
+      font-size: 0.9rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .lernen-features-list li::before {
+      content: '\2713';
+      color: #22c55e;
+      font-weight: bold;
+      flex-shrink: 0;
+    }
+
+    .lernen-workflow {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 2.5rem;
+      margin-bottom: 3rem;
+    }
+
+    .lernen-workflow-content h3 {
+      font-size: 1.5rem;
+      margin-bottom: 1rem;
+      text-align: center;
+    }
+
+    .lernen-workflow-content > p {
+      color: var(--text-muted);
+      font-size: 1rem;
+      line-height: 1.7;
+      text-align: center;
+      max-width: 700px;
+      margin: 0 auto 2rem;
+    }
+
+    .lernen-workflow-steps {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+
+    .lernen-step {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      background: rgba(249, 115, 22, 0.08);
+      border: 1px solid rgba(249, 115, 22, 0.2);
+      border-radius: 12px;
+      padding: 1rem 1.5rem;
+    }
+
+    .lernen-step-num {
+      width: 28px;
+      height: 28px;
+      background: var(--gradient);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 0.85rem;
+      color: white;
+      flex-shrink: 0;
+    }
+
+    .lernen-step span:last-child {
+      font-size: 0.9rem;
+      color: var(--text);
+    }
+
+    .lernen-step-arrow {
+      color: var(--accent);
+      font-size: 1.5rem;
+      font-weight: bold;
+    }
+
+    .lernen-audience {
+      text-align: center;
+    }
+
+    .lernen-audience > p {
+      color: var(--text-muted);
+      font-size: 1rem;
+      margin-bottom: 1rem;
+    }
+
+    .lernen-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      justify-content: center;
+    }
+
+    .lernen-tag {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 100px;
+      padding: 0.5rem 1.25rem;
+      font-size: 0.9rem;
+      color: var(--text-muted);
+      transition: all 0.2s;
+    }
+
+    .lernen-tag:hover {
+      border-color: var(--accent);
+      color: var(--text);
+    }
+
+    @media (max-width: 768px) {
+      .lernen-section {
+        padding: 4rem 1rem;
+      }
+
+      .lernen-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .lernen-workflow-steps {
+        flex-direction: column;
+      }
+
+      .lernen-step-arrow {
+        transform: rotate(90deg);
+      }
+    }
   </style>
 </head>
 <body>
@@ -1113,6 +1379,7 @@
     </div>
     <div class="nav-links">
       <a href="#features" data-i18n="nav.features">Features</a>
+      <a href="#lernen" data-i18n="nav.lernen">Lernen</a>
       <a href="#shortcuts" data-i18n="nav.shortcuts">Shortcuts</a>
       <a href="#setup" data-i18n="nav.setup">Setup</a>
       <a href="#download" data-i18n="nav.download">Download</a>
@@ -1282,7 +1549,7 @@
         <p data-i18n="features.languagetool.desc">NEU: Integrierte Grammatik- und Rechtschreibprüfung. Lokal via Docker oder mit LanguageTool Premium API. Fehler werden direkt im Editor markiert – Klick für Korrekturvorschläge.</p>
       </div>
 
-      <div class="feature-card featured">
+      <div class="feature-card featured" style="cursor: pointer;" onclick="document.getElementById('lernen').scrollIntoView({behavior: 'smooth'})">
         <div class="feature-icon">🎴</div>
         <h3 data-i18n="features.flashcards.title">Karteikarten & Quiz</h3>
         <p data-i18n="features.flashcards.desc">NEU: Generiere Quiz-Fragen aus deinen Notizen via Ollama. Speichere sie als Karteikarten mit Spaced Repetition (SM-2). Lerne effektiver – alles lokal.</p>
@@ -1318,6 +1585,103 @@
           <span style="background:#a3e635"></span>
           <span style="background:#fbbf24"></span>
         </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Lernen / Student Section -->
+  <section class="lernen-section" id="lernen">
+    <div class="section-title">
+      <h2 data-i18n="lernen.title">Dein Lern-Cockpit</h2>
+      <p data-i18n="lernen.subtitle">Karteikarten, Spaced Repetition und KI-Quiz &ndash; alles in einer App</p>
+    </div>
+
+    <div class="lernen-hero-text">
+      <p data-i18n="lernen.intro">MindGraph Notes verwandelt deine Notizen in aktives Lernmaterial. Generiere Quiz-Fragen per KI, lerne mit wissenschaftlich bewiesenem Spaced Repetition und behalte den &Uuml;berblick mit deinem pers&ouml;nlichen Lern-Dashboard.</p>
+    </div>
+
+    <div class="lernen-grid">
+      <div class="lernen-card lernen-card-primary">
+        <div class="lernen-card-icon"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a9 9 0 0 1 9 9c0 3.9-3.2 7.2-6 9.5C13.6 21.7 12.8 22 12 22s-1.6-.3-3-1.5C6.2 18.2 3 14.9 3 11a9 9 0 0 1 9-9z"/><circle cx="12" cy="11" r="3"/></svg></div>
+        <h3 data-i18n="lernen.sr.title">Spaced Repetition (SM-2)</h3>
+        <p data-i18n="lernen.sr.desc">Der SuperMemo-2 Algorithmus plant automatisch, wann du welche Karte wiederholen solltest. Wissenschaftlich bewiesen: Spaced Repetition ist die effektivste Methode f&uuml;r Langzeitged&auml;chtnis.</p>
+        <ul class="lernen-features-list">
+          <li data-i18n="lernen.sr.f1">Automatische Wiederholungsplanung</li>
+          <li data-i18n="lernen.sr.f2">Schwierigkeitsbewertung pro Karte</li>
+          <li data-i18n="lernen.sr.f3">Optimale Intervalle f&uuml;r Langzeitlernen</li>
+        </ul>
+      </div>
+
+      <div class="lernen-card lernen-card-primary">
+        <div class="lernen-card-icon"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4m0 12v4M4.93 4.93l2.83 2.83m8.48 8.48l2.83 2.83M2 12h4m12 0h4M4.93 19.07l2.83-2.83m8.48-8.48l2.83-2.83"/><circle cx="12" cy="12" r="4"/></svg></div>
+        <h3 data-i18n="lernen.ai.title">KI-Quiz aus deinen Notizen</h3>
+        <p data-i18n="lernen.ai.desc">Rechtsklick auf eine Notiz oder einen Ordner und generiere per Klick Quiz-Fragen mit deiner lokalen KI (Ollama). Die Fragen werden automatisch als Karteikarten gespeichert &ndash; inklusive Spaced Repetition.</p>
+        <ul class="lernen-features-list">
+          <li data-i18n="lernen.ai.f1">Quiz-Generierung aus Notizen oder Ordnern</li>
+          <li data-i18n="lernen.ai.f2">Lokale KI &ndash; keine Daten in der Cloud</li>
+          <li data-i18n="lernen.ai.f3">Sofortiges Feedback und Erkl&auml;rungen</li>
+        </ul>
+      </div>
+
+      <div class="lernen-card">
+        <div class="lernen-card-icon"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M7 17v-4m4 4v-8m4 8v-6m4 6v-2"/></svg></div>
+        <h3 data-i18n="lernen.stats.title">Lern-Statistiken &amp; Dashboard</h3>
+        <p data-i18n="lernen.stats.desc">Verfolge deinen Lernfortschritt mit Streak-Tracking, Heatmap und detaillierten Statistiken. Sieh auf einen Blick, wie viele Karten du gelernt hast und wann die n&auml;chste Session ansteht.</p>
+      </div>
+
+      <div class="lernen-card">
+        <div class="lernen-card-icon"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></div>
+        <h3 data-i18n="lernen.citation.title">KI-Zitation &amp; Transparenz</h3>
+        <p data-i18n="lernen.citation.desc">Jede KI-generierte &Auml;nderung wird in deinen Notizen zitiert: Modellname, Zeitstempel und Originaltext als Fu&szlig;note. Du wei&szlig;t immer, was von dir und was von der KI stammt.</p>
+      </div>
+
+      <div class="lernen-card">
+        <div class="lernen-card-icon"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></div>
+        <h3 data-i18n="lernen.privacy.title">100% Lokal &amp; Privat</h3>
+        <p data-i18n="lernen.privacy.desc">Kein Account, keine Cloud, keine Telemetrie. Deine Lernkarten und Statistiken bleiben auf deinem Rechner. Perfekt f&uuml;r sensible Studieninhalte.</p>
+      </div>
+
+      <div class="lernen-card">
+        <div class="lernen-card-icon"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c0 1.1 2.7 3 6 3s6-1.9 6-3v-5"/></svg></div>
+        <h3 data-i18n="lernen.academic.title">Akademischer Workflow</h3>
+        <p data-i18n="lernen.academic.desc">Zotero-Zitate in Karteikarten, LaTeX-Formeln in der Vorschau, PDF-Extraktion f&uuml;r Vorlesungsfolien. Gebaut f&uuml;r den wissenschaftlichen Alltag.</p>
+      </div>
+    </div>
+
+    <!-- iPad Handwriting Workflow -->
+    <div class="lernen-workflow">
+      <div class="lernen-workflow-content">
+        <h3 data-i18n="lernen.ipad.title">Handschrift vom iPad in deine Notizen</h3>
+        <p data-i18n="lernen.ipad.desc">Schreibe mit dem Apple Pencil auf dem iPad, lasse die Handschrift per Apple Shortcuts automatisch transkribieren und sende sie direkt in deinen MindGraph Vault. Vorlesungsmitschriften werden zu durchsuchbarem Markdown.</p>
+        <div class="lernen-workflow-steps">
+          <div class="lernen-step">
+            <span class="lernen-step-num">1</span>
+            <span data-i18n="lernen.ipad.step1">Apple Pencil auf iPad</span>
+          </div>
+          <div class="lernen-step-arrow">&rarr;</div>
+          <div class="lernen-step">
+            <span class="lernen-step-num">2</span>
+            <span data-i18n="lernen.ipad.step2">Apple Shortcuts transkribiert</span>
+          </div>
+          <div class="lernen-step-arrow">&rarr;</div>
+          <div class="lernen-step">
+            <span class="lernen-step-num">3</span>
+            <span data-i18n="lernen.ipad.step3">Markdown in MindGraph Vault</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Target Audience Tags -->
+    <div class="lernen-audience">
+      <p data-i18n="lernen.audience.title">Perfekt f&uuml;r:</p>
+      <div class="lernen-tags">
+        <span class="lernen-tag" data-i18n="lernen.audience.med">Medizinstudium</span>
+        <span class="lernen-tag" data-i18n="lernen.audience.law">Jura</span>
+        <span class="lernen-tag" data-i18n="lernen.audience.cs">Informatik</span>
+        <span class="lernen-tag" data-i18n="lernen.audience.lang">Sprachen lernen</span>
+        <span class="lernen-tag" data-i18n="lernen.audience.teach">Lehrkr&auml;fte</span>
+        <span class="lernen-tag" data-i18n="lernen.audience.exam">Pr&uuml;fungsvorbereitung</span>
       </div>
     </div>
   </section>
@@ -1943,6 +2307,42 @@ tags: [projekt, arbeit, wichtig]
         "features.properties.desc": "NEU: Bearbeite YAML-Frontmatter komfortabel. Checkboxen für Booleans, Datumspicker, Arrays – alles ohne YAML-Syntax.",
         "features.customization.title": "Deine Farben, dein Logo",
         "features.customization.desc": "NEU: 12 Akzentfarben, 15 Hintergründe und ein eigenes Logo in der Titelleiste. Mach MindGraph Notes zu deiner App.",
+
+        "nav.lernen": "Lernen",
+        "lernen.title": "Dein Lern-Cockpit",
+        "lernen.subtitle": "Karteikarten, Spaced Repetition und KI-Quiz – alles in einer App",
+        "lernen.intro": "MindGraph Notes verwandelt deine Notizen in aktives Lernmaterial. Generiere Quiz-Fragen per KI, lerne mit wissenschaftlich bewiesenem Spaced Repetition und behalte den Überblick mit deinem persönlichen Lern-Dashboard.",
+        "lernen.sr.title": "Spaced Repetition (SM-2)",
+        "lernen.sr.desc": "Der SuperMemo-2 Algorithmus plant automatisch, wann du welche Karte wiederholen solltest. Wissenschaftlich bewiesen: Spaced Repetition ist die effektivste Methode für Langzeitgedächtnis.",
+        "lernen.sr.f1": "Automatische Wiederholungsplanung",
+        "lernen.sr.f2": "Schwierigkeitsbewertung pro Karte",
+        "lernen.sr.f3": "Optimale Intervalle für Langzeitlernen",
+        "lernen.ai.title": "KI-Quiz aus deinen Notizen",
+        "lernen.ai.desc": "Rechtsklick auf eine Notiz oder einen Ordner und generiere per Klick Quiz-Fragen mit deiner lokalen KI (Ollama). Die Fragen werden automatisch als Karteikarten gespeichert – inklusive Spaced Repetition.",
+        "lernen.ai.f1": "Quiz-Generierung aus Notizen oder Ordnern",
+        "lernen.ai.f2": "Lokale KI – keine Daten in der Cloud",
+        "lernen.ai.f3": "Sofortiges Feedback und Erklärungen",
+        "lernen.stats.title": "Lern-Statistiken & Dashboard",
+        "lernen.stats.desc": "Verfolge deinen Lernfortschritt mit Streak-Tracking, Heatmap und detaillierten Statistiken. Sieh auf einen Blick, wie viele Karten du gelernt hast und wann die nächste Session ansteht.",
+        "lernen.citation.title": "KI-Zitation & Transparenz",
+        "lernen.citation.desc": "Jede KI-generierte Änderung wird in deinen Notizen zitiert: Modellname, Zeitstempel und Originaltext als Fußnote. Du weißt immer, was von dir und was von der KI stammt.",
+        "lernen.privacy.title": "100% Lokal & Privat",
+        "lernen.privacy.desc": "Kein Account, keine Cloud, keine Telemetrie. Deine Lernkarten und Statistiken bleiben auf deinem Rechner. Perfekt für sensible Studieninhalte.",
+        "lernen.academic.title": "Akademischer Workflow",
+        "lernen.academic.desc": "Zotero-Zitate in Karteikarten, LaTeX-Formeln in der Vorschau, PDF-Extraktion für Vorlesungsfolien. Gebaut für den wissenschaftlichen Alltag.",
+        "lernen.ipad.title": "Handschrift vom iPad in deine Notizen",
+        "lernen.ipad.desc": "Schreibe mit dem Apple Pencil auf dem iPad, lasse die Handschrift per Apple Shortcuts automatisch transkribieren und sende sie direkt in deinen MindGraph Vault. Vorlesungsmitschriften werden zu durchsuchbarem Markdown.",
+        "lernen.ipad.step1": "Apple Pencil auf iPad",
+        "lernen.ipad.step2": "Apple Shortcuts transkribiert",
+        "lernen.ipad.step3": "Markdown in MindGraph Vault",
+        "lernen.audience.title": "Perfekt für:",
+        "lernen.audience.med": "Medizinstudium",
+        "lernen.audience.law": "Jura",
+        "lernen.audience.cs": "Informatik",
+        "lernen.audience.lang": "Sprachen lernen",
+        "lernen.audience.teach": "Lehrkräfte",
+        "lernen.audience.exam": "Prüfungsvorbereitung",
+
         "dataview.title": "Dataview Queries",
         "dataview.subtitle": "Frage deine Notizen ab wie eine Datenbank",
         "dataview.intro": "Mit Dataview kannst du Notizen nach Metadaten abfragen und als Listen oder Tabellen darstellen. Schreibe Queries im Edit-Modus und wechsle zu Live-Preview, um die Ergebnisse zu sehen.",
@@ -2148,6 +2548,42 @@ tags: [projekt, arbeit, wichtig]
         "features.properties.desc": "NEW: Edit YAML frontmatter comfortably. Checkboxes for booleans, date pickers, arrays – no YAML syntax needed.",
         "features.customization.title": "Your colors, your logo",
         "features.customization.desc": "NEW: 12 accent colors, 15 backgrounds and a custom logo in the title bar. Make MindGraph Notes truly yours.",
+
+        "nav.lernen": "Learning",
+        "lernen.title": "Your Learning Cockpit",
+        "lernen.subtitle": "Flashcards, spaced repetition and AI quizzes – all in one app",
+        "lernen.intro": "MindGraph Notes transforms your notes into active learning material. Generate quiz questions with AI, study with scientifically proven spaced repetition, and track your progress with a personal learning dashboard.",
+        "lernen.sr.title": "Spaced Repetition (SM-2)",
+        "lernen.sr.desc": "The SuperMemo-2 algorithm automatically schedules when you should review each card. Scientifically proven: spaced repetition is the most effective method for long-term memory.",
+        "lernen.sr.f1": "Automatic review scheduling",
+        "lernen.sr.f2": "Difficulty rating per card",
+        "lernen.sr.f3": "Optimal intervals for long-term retention",
+        "lernen.ai.title": "AI Quizzes from Your Notes",
+        "lernen.ai.desc": "Right-click on a note or folder and generate quiz questions with one click using your local AI (Ollama). Questions are automatically saved as flashcards – including spaced repetition.",
+        "lernen.ai.f1": "Quiz generation from notes or folders",
+        "lernen.ai.f2": "Local AI – no data in the cloud",
+        "lernen.ai.f3": "Instant feedback and explanations",
+        "lernen.stats.title": "Study Statistics & Dashboard",
+        "lernen.stats.desc": "Track your learning progress with streak tracking, heatmap, and detailed statistics. See at a glance how many cards you've studied and when your next session is due.",
+        "lernen.citation.title": "AI Citation & Transparency",
+        "lernen.citation.desc": "Every AI-generated change is cited in your notes: model name, timestamp, and original text as a footnote. You always know what's yours and what's from AI.",
+        "lernen.privacy.title": "100% Local & Private",
+        "lernen.privacy.desc": "No account, no cloud, no telemetry. Your flashcards and statistics stay on your machine. Perfect for sensitive study content.",
+        "lernen.academic.title": "Academic Workflow",
+        "lernen.academic.desc": "Zotero citations in flashcards, LaTeX formulas in preview, PDF extraction for lecture slides. Built for the scientific workflow.",
+        "lernen.ipad.title": "Handwriting from iPad to Your Notes",
+        "lernen.ipad.desc": "Write with Apple Pencil on iPad, have your handwriting automatically transcribed via Apple Shortcuts, and send it directly to your MindGraph vault. Lecture notes become searchable Markdown.",
+        "lernen.ipad.step1": "Apple Pencil on iPad",
+        "lernen.ipad.step2": "Apple Shortcuts transcribes",
+        "lernen.ipad.step3": "Markdown in MindGraph Vault",
+        "lernen.audience.title": "Perfect for:",
+        "lernen.audience.med": "Medical School",
+        "lernen.audience.law": "Law",
+        "lernen.audience.cs": "Computer Science",
+        "lernen.audience.lang": "Language Learning",
+        "lernen.audience.teach": "Teachers",
+        "lernen.audience.exam": "Exam Preparation",
+
         "dataview.title": "Dataview Queries",
         "dataview.subtitle": "Query your notes like a database",
         "dataview.intro": "Dataview lets you query notes by metadata and display them as lists or tables. Write queries in Edit mode and switch to Live-Preview to see results.",
@@ -2317,8 +2753,23 @@ tags: [projekt, arbeit, wichtig]
 
       // Update page title
       document.title = lang === 'de'
-        ? 'MindGraph Notes - Dein Wissen, vernetzt'
-        : 'MindGraph Notes - Your knowledge, connected';
+        ? 'MindGraph Notes - Karteikarten & Spaced Repetition Notiz-App'
+        : 'MindGraph Notes - Flashcard & Spaced Repetition Note-Taking App';
+
+      // Update OG/Twitter meta for language
+      const ogTitle = document.querySelector('meta[property="og:title"]');
+      const ogDesc = document.querySelector('meta[property="og:description"]');
+      const twTitle = document.querySelector('meta[name="twitter:title"]');
+      const twDesc = document.querySelector('meta[name="twitter:description"]');
+      const ogLocale = document.querySelector('meta[property="og:locale"]');
+      if (ogTitle) ogTitle.content = document.title;
+      if (twTitle) twTitle.content = document.title;
+      if (ogLocale) ogLocale.content = lang === 'de' ? 'de_DE' : 'en_US';
+      const descText = lang === 'de'
+        ? 'Kostenlose Notiz-App mit Karteikarten, Spaced Repetition (SM-2), KI-Quiz-Generierung, Wissensgraph und Zotero-Integration. 100% lokal, Open Source.'
+        : 'Free note-taking app with flashcards, spaced repetition (SM-2), AI quiz generation, knowledge graph and Zotero integration. 100% local, open source.';
+      if (ogDesc) ogDesc.content = descText;
+      if (twDesc) twDesc.content = descText;
     }
 
     // Initialize language
