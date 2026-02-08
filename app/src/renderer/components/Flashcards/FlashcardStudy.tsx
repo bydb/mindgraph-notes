@@ -129,14 +129,14 @@ export const FlashcardStudy: React.FC = () => {
           <div className="flashcard-study-question-section">
             <div className="flashcard-study-card-topic">{currentCard.topic}</div>
             <div className="flashcard-study-label">{t('flashcards.front')}</div>
-            <MarkdownContent content={currentCard.front} className="flashcard-study-card-text" />
+            <MarkdownContent content={currentCard.front} className="flashcard-study-card-text" vaultPath={vaultPath} />
           </div>
 
           {/* Answer Section - only show when flipped */}
           {isFlipped ? (
             <div className="flashcard-study-answer-section">
               <div className="flashcard-study-label">{t('flashcards.back')}</div>
-              <MarkdownContent content={currentCard.back} className="flashcard-study-answer" />
+              <MarkdownContent content={currentCard.back} className="flashcard-study-answer" vaultPath={vaultPath} />
             </div>
           ) : (
             <button className="flashcard-show-answer-btn" onClick={flipCard}>

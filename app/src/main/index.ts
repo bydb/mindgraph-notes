@@ -3384,6 +3384,54 @@ ipcMain.handle('flashcards-save', async (_event, vaultPath: string, flashcards: 
   }
 })
 
+// Anki Import
+ipcMain.handle('import-anki', async (_event, vaultPath: string) => {
+  if (!mainWindow) return { success: false, error: 'No window' }
+
+  const result = await dialog.showOpenDialog(mainWindow, {
+    title: 'Import Anki Deck',
+    filters: [{ name: 'Anki Package', extensions: ['apkg'] }],
+    properties: ['openFile']
+  })
+
+  if (result.canceled || result.filePaths.length === 0) {
+    return { success: false, canceled: true }
+  }
+
+  try {
+    const { parseAnkiPackage } = await import('./ankiImport')
+    const importResult = await parseAnkiPackage(result.filePaths[0], vaultPath)
+
+    const now = new Date().toISOString()
+    const flashcards = importResult.cards.map((card) => ({
+      id: `fc-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+      sourceNote: card.sourceNote,
+      front: card.front,
+      back: card.back,
+      topic: card.topic,
+      status: 'pending' as const,
+      created: now,
+      modified: now,
+      easeFactor: 2.5,
+      interval: 0,
+      repetitions: 0,
+      nextReview: null,
+      lastReview: null
+    }))
+
+    return {
+      success: true,
+      cards: flashcards,
+      mediaCount: importResult.mediaCount,
+      deckNames: importResult.deckNames,
+      cardCount: flashcards.length
+    }
+  } catch (error) {
+    console.error('[AnkiImport] Error:', error)
+    return { success: false, error: String(error) }
+  }
+})
+
 // Study Statistics laden
 ipcMain.handle('study-stats-load', async (_event, vaultPath: string) => {
   try {

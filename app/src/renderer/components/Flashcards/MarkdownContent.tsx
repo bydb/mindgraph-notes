@@ -60,9 +60,10 @@ md.renderer.rules.fence = (tokens, idx, options, env, self) => {
 interface MarkdownContentProps {
   content: string
   className?: string
+  vaultPath?: string
 }
 
-export const MarkdownContent: React.FC<MarkdownContentProps> = ({ content, className = '' }) => {
+export const MarkdownContent: React.FC<MarkdownContentProps> = ({ content, className = '', vaultPath }) => {
   const containerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -88,6 +89,48 @@ export const MarkdownContent: React.FC<MarkdownContentProps> = ({ content, class
     const timeoutId = setTimeout(renderMermaid, 50)
     return () => clearTimeout(timeoutId)
   }, [content])
+
+  // Resolve images from vault after render
+  useEffect(() => {
+    if (!containerRef.current || !vaultPath) return
+
+    let cancelled = false
+
+    const loadImages = async () => {
+      const images = containerRef.current?.querySelectorAll('img')
+      if (!images || images.length === 0) return
+
+      for (const img of images) {
+        if (cancelled) return
+        const src = img.getAttribute('src')
+        if (!src || src.startsWith('data:') || src.startsWith('http')) continue
+
+        const possiblePaths = [
+          src.startsWith('/') ? src : null,
+          `${vaultPath}/${src}`,
+          `${vaultPath}/attachments/${src}`,
+          `${vaultPath}/.attachments/${src}`,
+          `${vaultPath}/assets/${src}`,
+          `${vaultPath}/images/${src}`,
+        ].filter(Boolean) as string[]
+
+        for (const imagePath of possiblePaths) {
+          try {
+            const result = await window.electronAPI.readImageAsDataUrl(imagePath)
+            if (result.success && result.dataUrl) {
+              img.src = result.dataUrl
+              break
+            }
+          } catch {
+            // Try next path
+          }
+        }
+      }
+    }
+
+    const timer = setTimeout(loadImages, 50)
+    return () => { cancelled = true; clearTimeout(timer) }
+  }, [content, vaultPath])
 
   // Markdown zu HTML rendern
   const html = md.render(content)

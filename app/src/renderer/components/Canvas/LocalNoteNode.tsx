@@ -33,7 +33,7 @@ export const LocalNoteNode: React.FC<NodeProps<LocalNoteNodeData>> = memo(({ dat
     ? colorPalette[color]
     : { bg: 'var(--node-bg)', border: 'var(--node-border)', text: 'var(--text-primary)' }
 
-  const linkCount = note.outgoingLinks.length + note.incomingLinks.length
+  const linkCount = (data as any).linkCount ?? (note.outgoingLinks.length + note.incomingLinks.length)
 
   const handleDoubleClick = (e: React.MouseEvent) => {
     e.stopPropagation()

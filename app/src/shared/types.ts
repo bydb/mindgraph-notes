@@ -594,6 +594,17 @@ export interface ElectronAPI {
   flashcardsLoad: (vaultPath: string) => Promise<Flashcard[] | null>;
   flashcardsSave: (vaultPath: string, flashcards: Flashcard[]) => Promise<boolean>;
 
+  // Anki Import
+  importAnki: (vaultPath: string) => Promise<{
+    success: boolean
+    canceled?: boolean
+    cards?: Flashcard[]
+    mediaCount?: number
+    deckNames?: string[]
+    cardCount?: number
+    error?: string
+  }>;
+
   // Study Statistics Persistence
   studyStatsLoad: (vaultPath: string) => Promise<StudyStatsData | null>;
   studyStatsSave: (vaultPath: string, data: StudyStatsData) => Promise<boolean>;

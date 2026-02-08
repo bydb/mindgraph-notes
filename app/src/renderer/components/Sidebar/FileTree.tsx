@@ -272,7 +272,7 @@ const FileItem: React.FC<FileItemProps> = ({ entry, level, onDrop, displayMode }
 
   // Finde die Notiz um Link-Count zu zeigen
   const note = notes.find(n => n.id === noteId)
-  const linkCount = note ? note.outgoingLinks.length + note.incomingLinks.length : 0
+  const linkCount = note ? note.outgoingLinks.filter(l => !/\.(png|jpe?g|gif|svg|webp|bmp|ico|tiff?)$/i.test(l)).length : 0
 
   // Bookmark Status (nur für Markdown-Notizen)
   const noteIsBookmarked = !entry.isDirectory && !isPdf && !isImage && isBookmarked(noteId)

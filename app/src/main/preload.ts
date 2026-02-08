@@ -226,6 +226,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   flashcardsSave: (vaultPath: string, flashcards: object[]) =>
     ipcRenderer.invoke('flashcards-save', vaultPath, flashcards),
 
+  // Anki Import
+  importAnki: (vaultPath: string) =>
+    ipcRenderer.invoke('import-anki', vaultPath),
+
   // Study Statistics Persistence
   studyStatsLoad: (vaultPath: string) =>
     ipcRenderer.invoke('study-stats-load', vaultPath),

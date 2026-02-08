@@ -1,20 +1,25 @@
 import type { Note, NoteHeading, NoteBlock } from '../../shared/types'
 
-const WIKILINK_REGEX = /\[\[([^\]|]+)(\|[^\]]+)?\]\]/g
+const WIKILINK_REGEX = /(?<!!)\[\[([^\]|]+)(\|[^\]]+)?\]\]/g
 const TAG_REGEX = /#([\p{L}\p{N}_-]+)/gu
+
+const IMAGE_EXTENSIONS = /\.(png|jpe?g|gif|svg|webp|bmp|ico|tiff?)$/i
 
 export function extractLinks(content: string): string[] {
   const links: string[] = []
   let match
-  
+
   // Reset regex state
   WIKILINK_REGEX.lastIndex = 0
-  
+
   while ((match = WIKILINK_REGEX.exec(content)) !== null) {
     const linkTarget = match[1].trim()
-    links.push(linkTarget)
+    // Bild-Embeds und andere Medien-Dateien nicht als Links zählen
+    if (!IMAGE_EXTENSIONS.test(linkTarget)) {
+      links.push(linkTarget)
+    }
   }
-  
+
   return [...new Set(links)] // Deduplizieren
 }
 

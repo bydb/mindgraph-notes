@@ -20,6 +20,7 @@ interface NoteNodeData {
   externalLink?: ExtractedExternalLink | null
   embeddedImage?: ExtractedImage | null
   imageDataUrl?: string | null
+  linkCount?: number
   // Display settings
   showTags?: boolean
   showLinks?: boolean
@@ -137,7 +138,7 @@ export const NoteNode: React.FC<NodeProps<NoteNodeData>> = memo(({ data, selecte
     ? colorPalette[color]
     : { bg: 'var(--node-bg)', border: 'var(--node-border)', text: 'var(--text-primary)' }
 
-  const linkCount = note.outgoingLinks.length + note.incomingLinks.length
+  const linkCount = data.linkCount ?? (note.outgoingLinks.length + note.incomingLinks.length)
 
   return (
     <>

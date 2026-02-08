@@ -394,7 +394,7 @@ export const QuizModal: React.FC = () => {
               </div>
 
               <div className="quiz-question">
-                <MarkdownContent content={currentQuestion.question} />
+                <MarkdownContent content={currentQuestion.question} vaultPath={vaultPath} />
               </div>
 
               <div className="quiz-answer">
@@ -444,12 +444,12 @@ export const QuizModal: React.FC = () => {
 
                 <div className="quiz-feedback-section">
                   <h4>{t('quiz.feedback')}</h4>
-                  <MarkdownContent content={currentFeedback.feedback} />
+                  <MarkdownContent content={currentFeedback.feedback} vaultPath={vaultPath} />
                 </div>
 
                 <div className="quiz-feedback-section quiz-expected-answer">
                   <h4>{t('quiz.expectedAnswer')}</h4>
-                  <MarkdownContent content={currentQuestion.expectedAnswer} />
+                  <MarkdownContent content={currentQuestion.expectedAnswer} vaultPath={vaultPath} />
                 </div>
               </div>
 

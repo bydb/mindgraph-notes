@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useMemo } from 'react'
+import React, { useState, useEffect, useMemo, useRef } from 'react'
 import { useFlashcardStore, createFlashcardFromQuiz } from '../../stores/flashcardStore'
 import { useNotesStore } from '../../stores/notesStore'
 import { useTranslation } from '../../utils/translations'
+import { fileToBase64, extractImageFromDataTransfer } from '../../utils/imageUtils'
 import type { FlashcardStatus, FileEntry } from '../../../shared/types'
 
 export const FlashcardEditor: React.FC = () => {
@@ -24,6 +25,11 @@ export const FlashcardEditor: React.FC = () => {
   const [topic, setTopic] = useState('')
   const [status, setStatus] = useState<FlashcardStatus>('pending')
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+
+  const frontTextareaRef = useRef<HTMLTextAreaElement>(null)
+  const backTextareaRef = useRef<HTMLTextAreaElement>(null)
+  const frontFileInputRef = useRef<HTMLInputElement>(null)
+  const backFileInputRef = useRef<HTMLInputElement>(null)
 
   const isEditing = !!editingCard
   const isOpen = isEditing || isCreatingCard
@@ -162,6 +168,72 @@ export const FlashcardEditor: React.FC = () => {
     }
   }
 
+  const insertImageIntoTextarea = async (
+    file: File,
+    textareaRef: React.RefObject<HTMLTextAreaElement | null>,
+    setter: React.Dispatch<React.SetStateAction<string>>
+  ) => {
+    if (!vaultPath) return
+
+    try {
+      const base64 = await fileToBase64(file)
+      const suggestedName = (file.name?.replace(/\.[^.]+$/, '') || 'flashcard-image').replace(/\s+/g, '-')
+
+      const result = await window.electronAPI.writeImageFromBase64(vaultPath, base64, suggestedName)
+
+      if (result.success && result.relativePath) {
+        const textarea = textareaRef.current
+        if (!textarea) return
+
+        const cursorPos = textarea.selectionStart
+        const currentValue = textarea.value
+        const imageMarkdown = `![](${result.relativePath})`
+
+        const before = currentValue.substring(0, cursorPos)
+        const after = currentValue.substring(textarea.selectionEnd)
+        const needsNewlineBefore = before.length > 0 && !before.endsWith('\n')
+        const needsNewlineAfter = after.length > 0 && !after.startsWith('\n')
+        const insert = (needsNewlineBefore ? '\n' : '') + imageMarkdown + (needsNewlineAfter ? '\n' : '')
+
+        const newValue = before + insert + after
+        setter(newValue)
+
+        requestAnimationFrame(() => {
+          const newCursorPos = cursorPos + insert.length
+          textarea.focus()
+          textarea.setSelectionRange(newCursorPos, newCursorPos)
+        })
+      }
+    } catch (error) {
+      console.error('[FlashcardEditor] Image insert error:', error)
+    }
+  }
+
+  const handleImageSelect = (
+    e: React.ChangeEvent<HTMLInputElement>,
+    textareaRef: React.RefObject<HTMLTextAreaElement | null>,
+    setter: React.Dispatch<React.SetStateAction<string>>
+  ) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      insertImageIntoTextarea(file, textareaRef, setter)
+    }
+    e.target.value = ''
+  }
+
+  const handlePaste = async (
+    e: React.ClipboardEvent<HTMLTextAreaElement>,
+    textareaRef: React.RefObject<HTMLTextAreaElement | null>,
+    setter: React.Dispatch<React.SetStateAction<string>>
+  ) => {
+    if (!e.clipboardData) return
+    const imageFile = await extractImageFromDataTransfer(e.clipboardData as unknown as DataTransfer)
+    if (imageFile) {
+      e.preventDefault()
+      insertImageIntoTextarea(imageFile, textareaRef, setter)
+    }
+  }
+
   if (!isOpen) return null
 
   const statusOptions: { value: FlashcardStatus; label: string }[] = [
@@ -207,10 +279,33 @@ export const FlashcardEditor: React.FC = () => {
         <div className="flashcard-editor-content">
           {/* Front */}
           <div className="flashcard-editor-field">
-            <label>{t('flashcards.front')}</label>
+            <div className="flashcard-editor-field-header">
+              <label>{t('flashcards.front')}</label>
+              <button
+                className="flashcard-editor-image-btn"
+                onClick={() => frontFileInputRef.current?.click()}
+                title={t('flashcards.insertImage')}
+                type="button"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                  <circle cx="8.5" cy="8.5" r="1.5" />
+                  <polyline points="21 15 16 10 5 21" />
+                </svg>
+              </button>
+              <input
+                ref={frontFileInputRef}
+                type="file"
+                accept="image/*"
+                style={{ display: 'none' }}
+                onChange={(e) => handleImageSelect(e, frontTextareaRef, setFront)}
+              />
+            </div>
             <textarea
+              ref={frontTextareaRef}
               value={front}
               onChange={(e) => setFront(e.target.value)}
+              onPaste={(e) => handlePaste(e, frontTextareaRef, setFront)}
               placeholder={t('flashcards.frontPlaceholder')}
               rows={3}
               autoFocus
@@ -219,10 +314,33 @@ export const FlashcardEditor: React.FC = () => {
 
           {/* Back */}
           <div className="flashcard-editor-field">
-            <label>{t('flashcards.back')}</label>
+            <div className="flashcard-editor-field-header">
+              <label>{t('flashcards.back')}</label>
+              <button
+                className="flashcard-editor-image-btn"
+                onClick={() => backFileInputRef.current?.click()}
+                title={t('flashcards.insertImage')}
+                type="button"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                  <circle cx="8.5" cy="8.5" r="1.5" />
+                  <polyline points="21 15 16 10 5 21" />
+                </svg>
+              </button>
+              <input
+                ref={backFileInputRef}
+                type="file"
+                accept="image/*"
+                style={{ display: 'none' }}
+                onChange={(e) => handleImageSelect(e, backTextareaRef, setBack)}
+              />
+            </div>
             <textarea
+              ref={backTextareaRef}
               value={back}
               onChange={(e) => setBack(e.target.value)}
+              onPaste={(e) => handlePaste(e, backTextareaRef, setBack)}
               placeholder={t('flashcards.backPlaceholder')}
               rows={4}
             />

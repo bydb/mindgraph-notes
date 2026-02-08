@@ -24,12 +24,17 @@ export const FlashcardsPanel: React.FC<FlashcardsPanelProps> = ({ onClose }) => 
     getFilteredCards,
     getStats,
     loadFlashcards,
+    saveFlashcards,
     loadStudyStats,
     startStudySession,
     setEditingCard,
     setCreatingCard,
-    getDueCards
+    getDueCards,
+    addFlashcards
   } = useFlashcardStore()
+
+  const [isImporting, setIsImporting] = useState(false)
+  const [importResult, setImportResult] = useState<{ count: number; decks: string[] } | null>(null)
 
   // Load flashcards and study stats when vault changes
   useEffect(() => {
@@ -100,6 +105,28 @@ export const FlashcardsPanel: React.FC<FlashcardsPanelProps> = ({ onClose }) => 
     }
   }
 
+  const handleImportAnki = async () => {
+    if (!vaultPath || isImporting) return
+    setIsImporting(true)
+
+    try {
+      const result = await window.electronAPI.importAnki(vaultPath)
+
+      if (result.success && result.cards) {
+        addFlashcards(result.cards)
+        await saveFlashcards(vaultPath)
+        setImportResult({ count: result.cardCount!, decks: result.deckNames! })
+        setTimeout(() => setImportResult(null), 5000)
+      } else if (result.error) {
+        console.error('[AnkiImport] Error:', result.error)
+      }
+    } catch (error) {
+      console.error('[AnkiImport] Failed:', error)
+    } finally {
+      setIsImporting(false)
+    }
+  }
+
   const getCardStatus = (card: Flashcard): string => {
     if (card.status === 'pending') return t('flashcards.statusPending')
     if (card.status === 'suspended') return t('flashcards.statusSuspended')
@@ -135,6 +162,24 @@ export const FlashcardsPanel: React.FC<FlashcardsPanelProps> = ({ onClose }) => 
         </div>
         <button
           className="flashcards-add-btn"
+          onClick={handleImportAnki}
+          disabled={isImporting}
+          title={t('flashcards.importAnki')}
+        >
+          {isImporting ? (
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="spinning">
+              <path d="M21 12a9 9 0 11-6.219-8.56" />
+            </svg>
+          ) : (
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
+              <polyline points="7 10 12 15 17 10" />
+              <line x1="12" y1="15" x2="12" y2="3" />
+            </svg>
+          )}
+        </button>
+        <button
+          className="flashcards-add-btn"
           onClick={() => setCreatingCard(true)}
           title={t('flashcards.createCard')}
         >
@@ -166,6 +211,22 @@ export const FlashcardsPanel: React.FC<FlashcardsPanelProps> = ({ onClose }) => 
           </button>
         ))}
       </div>
+
+      {/* Import Success Notification */}
+      {importResult && (
+        <div className="flashcards-import-success">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <polyline points="20 6 9 17 4 12" />
+          </svg>
+          <span>{t('flashcards.importSuccess', { count: importResult.count })}</span>
+          <button onClick={() => setImportResult(null)}>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+        </div>
+      )}
 
       {/* Stats View or Card List */}
       {activeFilter === 'stats' ? (

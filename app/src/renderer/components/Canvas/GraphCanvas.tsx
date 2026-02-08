@@ -2,6 +2,7 @@ import React, { useCallback, useMemo, useEffect, useState, memo, useRef } from '
 import ReactFlow, {
   Node,
   Edge,
+  MarkerType,
   useNodesState,
   useEdgesState,
   Controls,
@@ -1728,7 +1729,7 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
       const hasImage = embeddedImage !== null && imageDataUrls[note.id] !== undefined
       const hasExternalLink = externalLink !== null
       const tagCount = note.tags.length
-      const linkCount = note.outgoingLinks.length + note.incomingLinks.length
+      const linkCount = note.outgoingLinks.filter(l => !/\.(png|jpe?g|gif|svg|webp|bmp|ico|tiff?)$/i.test(l)).length
 
       // Berechne die optimalen Dimensionen basierend auf Inhalt
       const dimensions = calculateNodeDimensions(
@@ -1788,6 +1789,7 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
           embeddedImage,
           imageDataUrl: imageDataUrls[note.id] || null,
           // Display settings
+          linkCount,
           showTags: canvasShowTags,
           showLinks: canvasShowLinks,
           showImages: canvasShowImages,
@@ -1859,26 +1861,59 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
     return [...noteNodes, ...pdfNodes, ...labelNodes]
   }, [notes, pdfs, positions, labels, getStablePosition, editingNodeId, handleNodeTitleChange, handleLabelTextChange, handleEditingDone, handleTaskToggle, handleOpenExternalLink, imageDataUrls, loadImageDataUrl, canvasShowTags, canvasShowLinks, canvasShowImages, canvasCompactMode, canvasDefaultCardWidth, canvasFilterPath, localRootNoteId, expandedNoteIds, onExpandNode, allNotes])
   
-  // Links zu Edges konvertieren - mit Deduplizierung
+  // Links zu Edges konvertieren - bidirektionale Links zusammenführen
   const initialEdges: Edge[] = useMemo(() => {
     const edgeMap = new Map<string, Edge>()
-    
+    // Alle gerichteten Links sammeln für Bidirektional-Erkennung
+    const directedLinks = new Set<string>()
+
     notes.forEach((note) => {
-      note.outgoingLinks.forEach((linkText, linkIndex) => {
+      note.outgoingLinks.forEach((linkText) => {
         const targetNote = resolveLink(linkText, notes)
         if (targetNote && targetNote.id !== note.id) {
-          const edgeKey = `${note.id}-${targetNote.id}`
-          if (!edgeMap.has(edgeKey)) {
-            edgeMap.set(edgeKey, {
-              id: `link-${edgeKey}-${linkIndex}`,
-              source: note.id,
-              target: targetNote.id,
+          directedLinks.add(`${note.id}->${targetNote.id}`)
+        }
+      })
+    })
+
+    notes.forEach((note) => {
+      note.outgoingLinks.forEach((linkText) => {
+        const targetNote = resolveLink(linkText, notes)
+        if (targetNote && targetNote.id !== note.id) {
+          // Kanonischer Key (sortiert) um A→B und B→A als eine Kante zu behandeln
+          const ids = [note.id, targetNote.id].sort()
+          const canonicalKey = `${ids[0]}-${ids[1]}`
+
+          if (!edgeMap.has(canonicalKey)) {
+            const isBidirectional = directedLinks.has(`${targetNote.id}->${note.id}`)
+
+            // Bei bidirektionalen Edges: source/target anhand der x-Position bestimmen
+            // Der linke Node wird source (rechts raus), der rechte wird target (links rein)
+            let edgeSource = note.id
+            let edgeTarget = targetNote.id
+            if (isBidirectional) {
+              const posA = positions[note.id]
+              const posB = positions[targetNote.id]
+              if (posA && posB && posA.x > posB.x) {
+                edgeSource = targetNote.id
+                edgeTarget = note.id
+              }
+            }
+
+            edgeMap.set(canonicalKey, {
+              id: `link-${canonicalKey}`,
+              source: edgeSource,
+              target: edgeTarget,
               sourceHandle: 'source-right',
               targetHandle: 'target-left',
               type: 'default',
               animated: false,
-              style: { stroke: 'var(--edge-color)', strokeWidth: 1.5 },
-              data: { isManual: false }
+              style: { stroke: 'var(--edge-color)', strokeWidth: isBidirectional ? 2 : 1.5 },
+              markerEnd: { type: MarkerType.ArrowClosed, color: 'var(--edge-color)', width: 12, height: 12 },
+              ...(isBidirectional ? {
+                markerStart: { type: MarkerType.ArrowClosed, color: 'var(--edge-color)', width: 12, height: 12 }
+              } : {}),
+              data: { isManual: false, isBidirectional }
             })
           }
         }
@@ -1903,7 +1938,7 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
     })
     
     return Array.from(edgeMap.values())
-  }, [notes, manualEdges])
+  }, [notes, manualEdges, positions])
   
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes)
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges)
@@ -2153,25 +2188,35 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
     try {
       // WICHTIG: Aktuellen Datei-Content lesen (nicht aus Store!)
       const fullPath = `${vaultPath}/${sourceNote.path}`
-      console.log('Reading file:', fullPath)
       const currentContent = await window.electronAPI.readFile(fullPath)
-      console.log('Current content length:', currentContent.length)
-      
+
       // Wikilink zur Notiz hinzufügen
       const newContent = currentContent.trimEnd() + `\n\n[[${targetNote.title}]]`
-      console.log('New content:', newContent)
-      
-      // Datei speichern
       await window.electronAPI.writeFile(fullPath, newContent)
-      console.log('File saved successfully')
-      
+
       // Store aktualisieren mit neuem Content und Links
       updateNote(sourceNote.id, {
         content: newContent,
         outgoingLinks: extractLinks(newContent),
         modifiedAt: new Date()
       })
-      console.log('Store updated')
+
+      // Bidirektional: Auch Rücklink in Target-Datei einfügen
+      const reverseExists = targetNote.outgoingLinks.some(link => {
+        const resolved = resolveLink(link, notes)
+        return resolved?.id === sourceNote.id
+      })
+      if (!reverseExists) {
+        const targetFullPath = `${vaultPath}/${targetNote.path}`
+        const targetContent = await window.electronAPI.readFile(targetFullPath)
+        const newTargetContent = targetContent.trimEnd() + `\n\n[[${sourceNote.title}]]`
+        await window.electronAPI.writeFile(targetFullPath, newTargetContent)
+        updateNote(targetNote.id, {
+          content: newTargetContent,
+          outgoingLinks: extractLinks(newTargetContent),
+          modifiedAt: new Date()
+        })
+      }
     } catch (error) {
       console.error('Fehler beim Erstellen der Verbindung:', error)
     }
@@ -2187,8 +2232,10 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
   const onConnectEnd: OnConnectEnd = useCallback((event) => {
     if (!connectingNodeId.current || !vaultPath) return
 
-    // Prüfen ob auf einer Node gelandet
-    const targetIsPane = (event.target as HTMLElement).classList.contains('react-flow__pane')
+    // Prüfen ob auf einer Node gelandet (closest ist robuster als classList.contains)
+    const target = event.target as HTMLElement
+    const targetIsPane = target.classList.contains('react-flow__pane') ||
+      (target.closest('.react-flow') !== null && !target.closest('.react-flow__node'))
 
     if (targetIsPane && event instanceof MouseEvent) {
       // Ins Leere gezogen - Dialog öffnen
@@ -2211,7 +2258,11 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
 
     const noteName = newNoteName.trim()
     const fileName = `${noteName}.md`
-    const filePath = `${vaultPath}/${fileName}`
+    // Notiz im aktuell gefilterten Ordner erstellen (wenn Filter aktiv)
+    const relativePath = canvasFilterPath && canvasFilterPath !== '__root__'
+      ? `${canvasFilterPath}/${fileName}`
+      : fileName
+    const filePath = `${vaultPath}/${relativePath}`
 
     try {
       // Prüfen ob Datei bereits existiert
@@ -2297,18 +2348,24 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
         }
       }
 
+      // Sicherstellen, dass der Ordner existiert
+      if (canvasFilterPath && canvasFilterPath !== '__root__') {
+        await window.electronAPI.createDirectory(`${vaultPath}/${canvasFilterPath}`)
+      }
+
       await window.electronAPI.writeFile(filePath, initialContent)
 
       // Notiz zum Store hinzufügen
-      const note = await createNoteFromFile(filePath, fileName, initialContent)
+      const note = await createNoteFromFile(filePath, relativePath, initialContent)
       addNote(note)
 
       // Position für neue Node setzen
       setNodePosition(note.id, newNoteDialog.flowPosition.x, newNoteDialog.flowPosition.y)
 
-      // Wikilink von Source-Note zur neuen Note hinzufügen
+      // Bidirektionale Wikilinks: Source → neue Note und neue Note → Source
       const sourceNote = notes.find(n => n.id === newNoteDialog.sourceNodeId)
       if (sourceNote) {
+        // Wikilink von Source zur neuen Note
         const sourceFullPath = `${vaultPath}/${sourceNote.path}`
         const currentContent = await window.electronAPI.readFile(sourceFullPath)
         const newContent = currentContent.trimEnd() + `\n\n[[${noteName}]]`
@@ -2317,6 +2374,15 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
         updateNote(sourceNote.id, {
           content: newContent,
           outgoingLinks: extractLinks(newContent),
+          modifiedAt: new Date()
+        })
+
+        // Rücklink von neuer Note zur Source-Note
+        const updatedNoteContent = initialContent.trimEnd() + `\n\n[[${sourceNote.title}]]`
+        await window.electronAPI.writeFile(filePath, updatedNoteContent)
+        updateNote(note.id, {
+          content: updatedNoteContent,
+          outgoingLinks: extractLinks(updatedNoteContent),
           modifiedAt: new Date()
         })
       }
@@ -2338,7 +2404,7 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
     } catch (error) {
       console.error('Fehler beim Erstellen der Notiz:', error)
     }
-  }, [newNoteDialog, newNoteName, newNoteContent, newNoteTags, newNoteTodos, newNoteLink, newNoteImage, vaultPath, notes, addNote, updateNote, setNodePosition, setFileTree])
+  }, [newNoteDialog, newNoteName, newNoteContent, newNoteTags, newNoteTodos, newNoteLink, newNoteImage, vaultPath, notes, addNote, updateNote, setNodePosition, setFileTree, canvasFilterPath])
 
   const handleNodeDoubleClick = useCallback((_event: React.MouseEvent, node: Node) => {
     // Bei Label-Nodes: In Bearbeitungsmodus wechseln
@@ -2668,7 +2734,7 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
         width: position?.width || 240,
         height: position?.height || 140,
         pinned: position?.pinned || false,
-        linkCount: (noteData?.outgoingLinks.length || 0) + (noteData?.incomingLinks.length || 0),
+        linkCount: noteData?.outgoingLinks.filter(l => !/\.(png|jpe?g|gif|svg|webp|bmp|ico|tiff?)$/i.test(l)).length || 0,
         tags: noteData?.tags || [],
         folder: noteData?.path.split('/').slice(0, -1).join('/') || ''
       }
@@ -3321,6 +3387,9 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
                     setNewNoteLink('')
                     setNewNoteImage(null)
                     setNewNoteImagePreview(null)
+                  } else if (e.key === 'Enter' && newNoteName.trim()) {
+                    e.preventDefault()
+                    handleCreateNoteFromDialog()
                   }
                 }}
                 placeholder={t('graphCanvas.noteTitlePlaceholder')}

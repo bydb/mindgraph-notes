@@ -6,6 +6,7 @@ interface DotNodeData {
   title: string
   note: Note
   color?: string
+  linkCount?: number
 }
 
 // Farben für die Punkte
@@ -23,7 +24,7 @@ const colorPalette: Record<string, string> = {
 export const DotNode: React.FC<NodeProps<DotNodeData>> = memo(({ data, selected }) => {
   const { title, note, color } = data
 
-  const linkCount = note.outgoingLinks.length + note.incomingLinks.length
+  const linkCount = data.linkCount ?? (note.outgoingLinks.length + note.incomingLinks.length)
 
   // Größe basierend auf Verlinkungen (min 16px, max 60px)
   const baseSize = 16
