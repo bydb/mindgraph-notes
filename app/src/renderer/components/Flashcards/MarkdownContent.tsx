@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react'
 import MarkdownIt from 'markdown-it'
+import { sanitizeHtml } from '../../utils/sanitize'
 import texmath from 'markdown-it-texmath'
 import katex from 'katex'
 import 'katex/dist/katex.min.css'
@@ -10,7 +11,7 @@ import mermaid from 'mermaid'
 mermaid.initialize({
   startOnLoad: false,
   theme: 'dark',
-  securityLevel: 'loose',
+  securityLevel: 'strict',
   fontFamily: 'ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif'
 })
 
@@ -28,7 +29,7 @@ md.use(texmath, {
   delimiters: 'dollars',  // $...$ für inline, $$...$$ für block
   katexOptions: {
     throwOnError: false,
-    trust: true,
+    trust: false,
     strict: false,
     displayMode: false
   }
@@ -95,7 +96,7 @@ export const MarkdownContent: React.FC<MarkdownContentProps> = ({ content, class
     <div
       ref={containerRef}
       className={`markdown-content ${className}`}
-      dangerouslySetInnerHTML={{ __html: html }}
+      dangerouslySetInnerHTML={{ __html: sanitizeHtml(html) }}
     />
   )
 }

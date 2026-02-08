@@ -14,7 +14,9 @@ import 'katex/contrib/mhchem/mhchem.js'  // Chemie-Support (mhchem)
 import mermaid from 'mermaid'
 import { useNotesStore, createNoteFromFile } from '../../stores/notesStore'
 import { useUIStore } from '../../stores/uiStore'
+import { useShallow } from 'zustand/react/shallow'
 import { useTranslation } from '../../utils/translations'
+import { sanitizeHtml, escapeHtml } from '../../utils/sanitize'
 import { extractLinks, extractTags, extractTitle, extractHeadings, extractBlocks } from '../../utils/linkExtractor'
 import { WikilinkAutocomplete, AutocompleteMode, BlockSelectionInfo } from './WikilinkAutocomplete'
 import { livePreviewExtension } from './extensions/livePreview'
@@ -32,7 +34,7 @@ import { isImageFile, findImageInVault } from '../../utils/imageUtils'
 mermaid.initialize({
   startOnLoad: false,
   theme: 'dark',
-  securityLevel: 'loose',
+  securityLevel: 'strict',
   fontFamily: 'ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif'
 })
 
@@ -196,7 +198,7 @@ md.use(texmath, {
   delimiters: 'dollars',  // $...$ für inline, $$...$$ für block
   katexOptions: {
     throwOnError: false,
-    trust: true,
+    trust: false,
     strict: false
   }
 })
@@ -223,14 +225,14 @@ md.renderer.rules.image = (tokens, idx, options, env, self) => {
     }
 
     const style = width ? `style="width: ${width}px${height ? `; height: ${height}px` : ''}"` : ''
-    return `<img class="md-image" data-src="${src}" alt="${cleanAlt}" ${style}>`
+    return `<img class="md-image" data-src="${md.utils.escapeHtml(src)}" alt="${md.utils.escapeHtml(cleanAlt)}" ${style}>`
   }
 
   // Für externe URLs: Standard-Renderer verwenden
   if (defaultImageRender) {
     return defaultImageRender(tokens, idx, options, env, self)
   }
-  return `<img src="${src}" alt="${alt}">`
+  return `<img src="${md.utils.escapeHtml(src)}" alt="${md.utils.escapeHtml(alt)}">`
 }
 
 // Custom renderer für [[wikilinks]], ![[embeds]] und ![[images]]
@@ -256,14 +258,14 @@ md.renderer.rules.text = (tokens, idx, options, env, self) => {
 
       const style = width ? `style="width: ${width}px${height ? `; height: ${height}px` : ''}"` : ''
       // Behalte den originalen Pfad - wird später aufgelöst
-      return `<img class="md-image" data-src="${linkText}" alt="${linkText}" ${style}>`
+      return `<img class="md-image" data-src="${md.utils.escapeHtml(linkText)}" alt="${md.utils.escapeHtml(linkText)}" ${style}>`
     }
 
     // Prüfe ob es sich um ein PDF handelt
     if (linkText.toLowerCase().endsWith('.pdf')) {
       // PDF-Embed: ![[document.pdf]]
-      return `<div class="pdf-embed" data-filename="${linkText}">
-        <div class="pdf-embed-loading">Lade PDF: ${linkText}...</div>
+      return `<div class="pdf-embed" data-filename="${md.utils.escapeHtml(linkText)}">
+        <div class="pdf-embed-loading">Lade PDF: ${md.utils.escapeHtml(linkText)}...</div>
       </div>`
     }
 
@@ -273,8 +275,8 @@ md.renderer.rules.text = (tokens, idx, options, env, self) => {
     const fragment = hashIndex > -1 ? linkText.substring(hashIndex + 1) : ''
     const isBlock = fragment.startsWith('^')
 
-    return `<div class="wikilink-embed" data-note="${noteName}" data-fragment="${fragment}" data-is-block="${isBlock}">
-      <div class="wikilink-embed-loading">Lade ${linkText}...</div>
+    return `<div class="wikilink-embed" data-note="${md.utils.escapeHtml(noteName)}" data-fragment="${md.utils.escapeHtml(fragment)}" data-is-block="${isBlock}">
+      <div class="wikilink-embed-loading">Lade ${md.utils.escapeHtml(linkText)}...</div>
     </div>`
   })
 
@@ -288,7 +290,7 @@ md.renderer.rules.text = (tokens, idx, options, env, self) => {
     // Display text: nur Notizname wenn Fragment vorhanden
     const displayText = linkText
 
-    return `<a href="#" class="wikilink" data-link="${noteName}" data-fragment="${fragment}">${displayText}</a>`
+    return `<a href="#" class="wikilink" data-link="${md.utils.escapeHtml(noteName)}" data-fragment="${md.utils.escapeHtml(fragment)}">${md.utils.escapeHtml(displayText)}</a>`
   })
 
   return result
@@ -435,8 +437,8 @@ function processCallouts(content: string): string {
 
     const icon = icons[calloutType] || '📌'
 
-    return `<div class="callout callout-${calloutType}">
-      <div class="callout-title">${icon} ${title}</div>
+    return `<div class="callout callout-${md.utils.escapeHtml(calloutType)}">
+      <div class="callout-title">${icon} ${md.utils.escapeHtml(title)}</div>
       <div class="callout-content">${md.render(cleanBody)}</div>
     </div>\n`
   })
@@ -464,8 +466,12 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
   const isExternalUpdateRef = useRef(false)
   const currentNoteIdRef = useRef<string | null>(null)  // Track current note ID for async operations
 
-  const { vaultPath, selectedNoteId, secondarySelectedNoteId, notes, updateNote, selectNote, selectSecondaryNote, addNote, fileTree, setFileTree, navigateBack, navigateForward, canNavigateBack, canNavigateForward } = useNotesStore()
-  const { pendingTemplateInsert, setPendingTemplateInsert, ollama, editorHeadingFolding, editorOutlining, outlineStyle, editorShowWordCount, languageTool, setLanguageTool, editorDefaultView } = useUIStore()
+  const { vaultPath, selectedNoteId, secondarySelectedNoteId, notes, updateNote, selectNote, selectSecondaryNote, addNote, fileTree, setFileTree, navigateBack, navigateForward, canNavigateBack, canNavigateForward } = useNotesStore(
+    useShallow(s => ({ vaultPath: s.vaultPath, selectedNoteId: s.selectedNoteId, secondarySelectedNoteId: s.secondarySelectedNoteId, notes: s.notes, updateNote: s.updateNote, selectNote: s.selectNote, selectSecondaryNote: s.selectSecondaryNote, addNote: s.addNote, fileTree: s.fileTree, setFileTree: s.setFileTree, navigateBack: s.navigateBack, navigateForward: s.navigateForward, canNavigateBack: s.canNavigateBack, canNavigateForward: s.canNavigateForward }))
+  )
+  const { pendingTemplateInsert, setPendingTemplateInsert, ollama, editorHeadingFolding, editorOutlining, outlineStyle, editorShowWordCount, languageTool, setLanguageTool, editorDefaultView } = useUIStore(
+    useShallow(s => ({ pendingTemplateInsert: s.pendingTemplateInsert, setPendingTemplateInsert: s.setPendingTemplateInsert, ollama: s.ollama, editorHeadingFolding: s.editorHeadingFolding, editorOutlining: s.editorOutlining, outlineStyle: s.outlineStyle, editorShowWordCount: s.editorShowWordCount, languageTool: s.languageTool, setLanguageTool: s.setLanguageTool, editorDefaultView: s.editorDefaultView }))
+  )
 
   // Verwende die übergebene noteId oder die primary/secondary Selection
   const effectiveNoteId = noteId ?? (isSecondary ? secondarySelectedNoteId : selectedNoteId)
@@ -475,6 +481,8 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
   const [viewMode, setViewMode] = useState<ViewMode>('edit')
   const [previewContent, setPreviewContent] = useState('')
   const [contentVersion, setContentVersion] = useState(0)
+  const loadedImagesRef = useRef<Map<string, string>>(new Map())
+  const [imagesLoadedVersion, setImagesLoadedVersion] = useState(0)
   const [formatMenu, setFormatMenu] = useState<{ x: number; y: number } | null>(null)
   const [propertiesCollapsed, setPropertiesCollapsed] = useState(false)
   const [foldedHeadings, setFoldedHeadings] = useState<Set<string>>(new Set())
@@ -1149,6 +1157,9 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
     // Speichere die aktuelle Note ID im ref für async Prüfung
     currentNoteIdRef.current = effectiveNoteId
 
+    // Clear image cache when note changes
+    loadedImagesRef.current.clear()
+
     // Finde die Notiz direkt im useEffect (nicht die gecachte selectedNote Variable)
     const currentNote = notes.find(n => n.id === effectiveNoteId)
     if (!currentNote) return
@@ -1707,11 +1718,25 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
     const withFigures = processFigures(htmlContent)
     const withInteractiveCheckboxes = processTaskCheckboxes(withFigures, previewContent)
     const withFoldableHeadings = processHeadingFolds(withInteractiveCheckboxes)
+
+    // Embed cached images directly into HTML so they survive React re-renders
+    let finalHtml = withFoldableHeadings
+    if (loadedImagesRef.current.size > 0) {
+      finalHtml = finalHtml.replace(/(<img\s+class="md-image"\s+)data-src="([^"]+)"/g, (match, prefix, dataSrc) => {
+        const cachedUrl = loadedImagesRef.current.get(dataSrc)
+        if (cachedUrl) {
+          return `${prefix}src="${cachedUrl}"`
+        }
+        return match
+      })
+    }
+
     return {
       frontmatterTitle: title,
-      renderedMarkdown: withFoldableHeadings
+      renderedMarkdown: finalHtml
     }
-  }, [previewContent, processHeadingFolds])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [previewContent, processHeadingFolds, imagesLoadedVersion])
 
   // Wort- und Zeichenzähler
   const documentStats = useMemo(() => {
@@ -1840,7 +1865,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
             const result = dataviewExecuteQuery(query, notes)
             const html = renderResult(result, { language })
             console.log('[Dataview Effect] Result HTML length:', html.length, 'rows:', result.rows?.length)
-            container.innerHTML = html
+            container.innerHTML = sanitizeHtml(html)
             container.setAttribute('data-processed', 'true')
 
           // Add click handlers for note links
@@ -1859,7 +1884,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
           }
           } catch (error) {
             console.error('Dataview rendering error:', error)
-            container.innerHTML = `<div class="dataview-error">Error: ${error instanceof Error ? error.message : 'Unknown error'}</div>`
+            container.innerHTML = `<div class="dataview-error">Error: ${escapeHtml(error instanceof Error ? error.message : 'Unknown error')}</div>`
             container.setAttribute('data-processed', 'true')
           }
         }
@@ -1895,7 +1920,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
         })
 
         if (!targetNote || !vaultPath) {
-          embedEl.innerHTML = `<div class="wikilink-embed-error">Notiz "${noteName}" nicht gefunden</div>`
+          embedEl.innerHTML = `<div class="wikilink-embed-error">Notiz "${escapeHtml(noteName)}" nicht gefunden</div>`
           continue
         }
 
@@ -1955,14 +1980,14 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
             <div class="wikilink-embed-content">
               <div class="wikilink-embed-header">
                 <span class="wikilink-embed-icon">📎</span>
-                <a href="#" class="wikilink" data-link="${noteName}" data-fragment="${fragment}">${noteName}${fragment ? '#' + fragment : ''}</a>
+                <a href="#" class="wikilink" data-link="${escapeHtml(noteName)}" data-fragment="${escapeHtml(fragment)}">${escapeHtml(noteName)}${fragment ? '#' + escapeHtml(fragment) : ''}</a>
               </div>
-              <div class="wikilink-embed-body">${renderedEmbed}</div>
+              <div class="wikilink-embed-body">${sanitizeHtml(renderedEmbed)}</div>
             </div>
           `
         } catch (error) {
           console.error('Fehler beim Laden des Embeds:', error)
-          embedEl.innerHTML = `<div class="wikilink-embed-error">Fehler beim Laden von "${noteName}"</div>`
+          embedEl.innerHTML = `<div class="wikilink-embed-error">Fehler beim Laden von "${escapeHtml(noteName)}"</div>`
         }
       }
     }
@@ -1972,37 +1997,38 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
     return () => clearTimeout(timer)
   }, [renderedMarkdown, viewMode, notes, vaultPath, contentVersion])
 
-  // Load images in preview mode
+  // Load images in preview mode — resolves data-src to data URLs and caches them
   useEffect(() => {
-    if (viewMode !== 'preview' || !previewRef.current || !vaultPath) return
+    if (viewMode !== 'preview' || !vaultPath) return
+
+    // Find all uncached image sources from the raw rendered HTML
+    const uncachedSources: string[] = []
+    const dataSrcRegex = /data-src="([^"]+)"/g
+    let match
+    while ((match = dataSrcRegex.exec(renderedMarkdown)) !== null) {
+      if (!loadedImagesRef.current.has(match[1])) {
+        uncachedSources.push(match[1])
+      }
+    }
+    if (uncachedSources.length === 0) return
+
+    const noteDir = selectedNote?.path ? selectedNote.path.substring(0, selectedNote.path.lastIndexOf('/')) : ''
+    let cancelled = false
 
     const loadImages = async () => {
-      const imageElements = previewRef.current?.querySelectorAll('img.md-image[data-src]')
-      if (!imageElements || imageElements.length === 0) return
+      let newImagesLoaded = false
 
-      // Get current note's directory for relative path resolution
-      const noteDir = selectedNote?.path ? selectedNote.path.substring(0, selectedNote.path.lastIndexOf('/')) : ''
-
-      for (const imgEl of Array.from(imageElements)) {
-        const dataSrc = imgEl.getAttribute('data-src')
-        if (!dataSrc || imgEl.getAttribute('src')) continue // Already loaded
+      for (const dataSrc of uncachedSources) {
+        if (cancelled) return
 
         try {
-          // Try multiple possible locations for the image
           const possiblePaths = [
-            // Absoluter Pfad (wenn bereits vollständig)
             dataSrc.startsWith('/') ? dataSrc : null,
-            // Im gleichen Ordner wie die Notiz
             noteDir ? `${vaultPath}/${noteDir}/${dataSrc}` : null,
-            // Im Vault-Root
             `${vaultPath}/${dataSrc}`,
-            // In .attachments/
             `${vaultPath}/.attachments/${dataSrc}`,
-            // In attachments/ (ohne Punkt)
             `${vaultPath}/attachments/${dataSrc}`,
-            // In assets/
             `${vaultPath}/assets/${dataSrc}`,
-            // In images/
             `${vaultPath}/images/${dataSrc}`,
           ].filter(Boolean) as string[]
 
@@ -2010,8 +2036,8 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
           for (const imagePath of possiblePaths) {
             const result = await window.electronAPI.readImageAsDataUrl(imagePath)
             if (result.success && result.dataUrl) {
-              imgEl.setAttribute('src', result.dataUrl)
-              imgEl.removeAttribute('data-src')
+              loadedImagesRef.current.set(dataSrc, result.dataUrl)
+              newImagesLoaded = true
               loaded = true
               break
             }
@@ -2023,28 +2049,25 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
             if (foundPath) {
               const result = await window.electronAPI.readImageAsDataUrl(`${vaultPath}/${foundPath}`)
               if (result.success && result.dataUrl) {
-                imgEl.setAttribute('src', result.dataUrl)
-                imgEl.removeAttribute('data-src')
+                loadedImagesRef.current.set(dataSrc, result.dataUrl)
+                newImagesLoaded = true
                 loaded = true
               }
             }
-          }
-
-          if (!loaded) {
-            // Show error placeholder
-            const errorText = document.createElement('span')
-            errorText.className = 'md-image-error'
-            errorText.textContent = `[Image not found: ${dataSrc}]`
-            imgEl.replaceWith(errorText)
           }
         } catch (error) {
           console.error('[Preview] Image load error:', error)
         }
       }
+
+      // Trigger re-render to embed cached images into renderedMarkdown
+      if (newImagesLoaded && !cancelled) {
+        setImagesLoadedVersion(v => v + 1)
+      }
     }
 
     const timer = setTimeout(loadImages, 50)
-    return () => clearTimeout(timer)
+    return () => { cancelled = true; clearTimeout(timer) }
   }, [renderedMarkdown, viewMode, vaultPath, selectedNote?.path, fileTree, contentVersion])
 
   // Load PDFs in preview mode
@@ -2115,7 +2138,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
                   <path d="M4 1C3.45 1 3 1.45 3 2V14C3 14.55 3.45 15 4 15H12C12.55 15 13 14.55 13 14V5.41C13 5.15 12.89 4.9 12.71 4.71L10.29 2.29C10.1 2.11 9.85 2 9.59 2H4Z" fill="#ffebee" stroke="#e53935" stroke-width="0.8"/>
                   <text x="8" y="11" text-anchor="middle" font-size="5" font-weight="bold" fill="#e53935">PDF</text>
                 </svg>
-                <span class="pdf-embed-filename">${filename}</span>
+                <span class="pdf-embed-filename">${escapeHtml(filename)}</span>
               </div>
               <iframe class="pdf-embed-frame" src="${blobUrl}" style="width: 100%; height: 70vh; min-height: 500px; border: none;"></iframe>
             `
@@ -2128,7 +2151,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
                   <path d="M4 1C3.45 1 3 1.45 3 2V14C3 14.55 3.45 15 4 15H12C12.55 15 13 14.55 13 14V5.41C13 5.15 12.89 4.9 12.71 4.71L10.29 2.29C10.1 2.11 9.85 2 9.59 2H4Z" fill="#ffebee" stroke="#e53935" stroke-width="0.8"/>
                   <text x="8" y="11" text-anchor="middle" font-size="5" font-weight="bold" fill="#e53935">PDF</text>
                 </svg>
-                <span>PDF nicht gefunden: ${filename}</span>
+                <span>PDF nicht gefunden: ${escapeHtml(filename)}</span>
               </div>
             `
           }
@@ -2648,7 +2671,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
         {frontmatterTitle && (
           <h1 className="frontmatter-title">{frontmatterTitle}</h1>
         )}
-        <div dangerouslySetInnerHTML={{ __html: renderedMarkdown }} />
+        <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(renderedMarkdown) }} />
       </div>
 
       {/* Editor Footer mit Statistiken */}
@@ -2738,7 +2761,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
           </div>
           <div
             className="wikilink-hover-preview-content"
-            dangerouslySetInnerHTML={{ __html: md.render(hoverPreview.content) }}
+            dangerouslySetInnerHTML={{ __html: sanitizeHtml(md.render(hoverPreview.content)) }}
           />
         </div>
       )}

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react'
+import { sanitizeSvg } from '../../utils/sanitize'
 import './ImageViewer.css'
 
 interface ImageViewerProps {
@@ -170,7 +171,7 @@ export const ImageViewer: React.FC<ImageViewerProps> = ({ filePath, fileName }) 
           <div
             className="image-container svg-container"
             style={{ transform: `scale(${zoom / 100})` }}
-            dangerouslySetInnerHTML={{ __html: svgContent }}
+            dangerouslySetInnerHTML={{ __html: sanitizeSvg(svgContent) }}
           />
         )}
       </div>

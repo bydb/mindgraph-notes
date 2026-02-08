@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import MarkdownIt from 'markdown-it'
+import { sanitizeHtml } from '../../utils/sanitize'
 import { useUIStore } from '../../stores/uiStore'
 import { useTranslation } from '../../utils/translations'
 
@@ -79,7 +80,7 @@ export const WhatsNew: React.FC = () => {
           ) : content ? (
             <div
               className="whats-new-markdown"
-              dangerouslySetInnerHTML={{ __html: renderedContent }}
+              dangerouslySetInnerHTML={{ __html: sanitizeHtml(renderedContent) }}
             />
           ) : (
             <div className="whats-new-empty">{t('whatsNew.noContent')}</div>

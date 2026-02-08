@@ -2,6 +2,19 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [1.0.22-beta] - 2026-02-08
+
+### Security
+- **DOMPurify HTML-Sanitization**: Alle `dangerouslySetInnerHTML`- und `innerHTML`-Ausgaben werden jetzt mit DOMPurify sanitized — verhindert XSS über bösartige Markdown-Dateien, SVGs oder AI-Antworten
+- **SVG-Sanitization**: SVG-Dateien im ImageViewer werden mit spezieller SVG-Sanitization gerendert (Script-Tags, Event-Handler und foreignObject werden entfernt)
+- **HTML-Escaping**: Alle user-kontrollierten Werte (Dateinamen, Notiz-Namen, Fehlermeldungen) in innerHTML-Templates werden jetzt HTML-escaped
+- **Mermaid Security**: `securityLevel` von `loose` auf `strict` geändert — verhindert Click-Callbacks und HTML-Labels in Diagrammen
+- **KaTeX Trust**: `trust` von `true` auf `false` geändert — blockiert potenziell gefährliche KaTeX-Befehle
+- **Zustand Selector-Optimierung**: `useShallow` für Store-Aufrufe im MarkdownEditor — verhindert unnötige Re-Renders bei Panel-Wechseln
+
+### Fixes
+- **Preview-Bilder bei Panel-Wechsel**: Geladene Bilder werden jetzt gecacht und direkt in den HTML-String eingebettet — SVGs/Bilder verschwinden nicht mehr beim Öffnen von Karteikarten oder anderen Panels
+
 ## [1.0.21-beta] - 2026-02-08
 
 ### Features

@@ -1,4 +1,5 @@
 import { WidgetType } from '@codemirror/view'
+import { escapeHtml } from '../../../../utils/sanitize'
 
 /**
  * Widget for rendered wikilinks
@@ -390,7 +391,7 @@ export class PdfEmbedWidget extends WidgetType {
           <path d="M4 1C3.45 1 3 1.45 3 2V14C3 14.55 3.45 15 4 15H12C12.55 15 13 14.55 13 14V5.41C13 5.15 12.89 4.9 12.71 4.71L10.29 2.29C10.1 2.11 9.85 2 9.59 2H4Z" fill="#ffebee" stroke="#e53935" strokeWidth="0.8"/>
           <text x="8" y="11" text-anchor="middle" font-size="5" font-weight="bold" fill="#e53935">PDF</text>
         </svg>
-        <span class="lp-pdf-filename">${this.filename}</span>
+        <span class="lp-pdf-filename">${escapeHtml(this.filename)}</span>
       `
       container.appendChild(header)
 
@@ -420,7 +421,7 @@ export class PdfEmbedWidget extends WidgetType {
         console.log('[PdfEmbed] iframe added to container')
       } catch (e) {
         console.error('[PdfEmbed] Error creating PDF view:', e)
-        container.innerHTML += `<div class="lp-pdf-error">Error: ${e}</div>`
+        container.innerHTML += `<div class="lp-pdf-error">Error: ${escapeHtml(String(e))}</div>`
       }
     } else {
       // PDF not found
@@ -430,7 +431,7 @@ export class PdfEmbedWidget extends WidgetType {
             <path d="M4 1C3.45 1 3 1.45 3 2V14C3 14.55 3.45 15 4 15H12C12.55 15 13 14.55 13 14V5.41C13 5.15 12.89 4.9 12.71 4.71L10.29 2.29C10.1 2.11 9.85 2 9.59 2H4Z" fill="#ffebee" stroke="#e53935" strokeWidth="0.8"/>
             <text x="8" y="11" text-anchor="middle" font-size="5" font-weight="bold" fill="#e53935">PDF</text>
           </svg>
-          <span>PDF nicht gefunden: ${this.filename}</span>
+          <span>PDF nicht gefunden: ${escapeHtml(this.filename)}</span>
         </div>
       `
     }

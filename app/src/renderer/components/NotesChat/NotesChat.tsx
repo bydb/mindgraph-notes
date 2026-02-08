@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
+import { sanitizeHtml } from '../../utils/sanitize'
 import { useNotesStore } from '../../stores/notesStore'
 import { useUIStore } from '../../stores/uiStore'
 import { useTranslation } from '../../utils/translations'
@@ -474,7 +475,7 @@ export const NotesChat: React.FC<NotesChatProps> = ({ onClose }) => {
                   <div key={idx} className={`notes-chat-message ${msg.role}`}>
                     <div
                       className="notes-chat-message-content markdown-content"
-                      dangerouslySetInnerHTML={{ __html: md.render(msg.content) }}
+                      dangerouslySetInnerHTML={{ __html: sanitizeHtml(md.render(msg.content)) }}
                     />
                     {msg.role === 'assistant' && (
                       <button
@@ -500,7 +501,7 @@ export const NotesChat: React.FC<NotesChatProps> = ({ onClose }) => {
                   <div className="notes-chat-message assistant streaming">
                     <div
                       className="notes-chat-message-content markdown-content"
-                      dangerouslySetInnerHTML={{ __html: md.render(streamingContent) + '<span class="notes-chat-cursor">|</span>' }}
+                      dangerouslySetInnerHTML={{ __html: sanitizeHtml(md.render(streamingContent)) + '<span class="notes-chat-cursor">|</span>' }}
                     />
                   </div>
                 )}

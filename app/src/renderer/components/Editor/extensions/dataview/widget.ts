@@ -7,6 +7,7 @@ import { WidgetType } from '@codemirror/view'
 import type { Note } from '../../../../../shared/types'
 import { renderResult } from '../../../../utils/dataview'
 import { useDataviewStore } from '../../../../stores/dataviewStore'
+import { sanitizeHtml, escapeHtml } from '../../../../utils/sanitize'
 
 export class DataviewWidget extends WidgetType {
   private container: HTMLElement | null = null
@@ -64,7 +65,7 @@ export class DataviewWidget extends WidgetType {
       console.log('[DataviewWidget] Rendered HTML length:', html.length)
 
       if (this.container) {
-        this.container.innerHTML = html
+        this.container.innerHTML = sanitizeHtml(html)
 
         // Add click handlers for note links
         this.setupLinkHandlers()
@@ -74,7 +75,7 @@ export class DataviewWidget extends WidgetType {
       if (this.container) {
         this.container.innerHTML = `<div class="dataview-error">
           <span class="dataview-error-icon">⚠️</span>
-          <span class="dataview-error-message">Error: ${error instanceof Error ? error.message : 'Unknown error'}</span>
+          <span class="dataview-error-message">Error: ${escapeHtml(error instanceof Error ? error.message : 'Unknown error')}</span>
         </div>`
       }
     }
