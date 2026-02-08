@@ -465,14 +465,14 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
   const currentNoteIdRef = useRef<string | null>(null)  // Track current note ID for async operations
 
   const { vaultPath, selectedNoteId, secondarySelectedNoteId, notes, updateNote, selectNote, selectSecondaryNote, addNote, fileTree, setFileTree, navigateBack, navigateForward, canNavigateBack, canNavigateForward } = useNotesStore()
-  const { pendingTemplateInsert, setPendingTemplateInsert, ollama, editorHeadingFolding, editorOutlining, outlineStyle, editorShowWordCount, languageTool, setLanguageTool } = useUIStore()
+  const { pendingTemplateInsert, setPendingTemplateInsert, ollama, editorHeadingFolding, editorOutlining, outlineStyle, editorShowWordCount, languageTool, setLanguageTool, editorDefaultView } = useUIStore()
 
   // Verwende die übergebene noteId oder die primary/secondary Selection
   const effectiveNoteId = noteId ?? (isSecondary ? secondarySelectedNoteId : selectedNoteId)
   const selectedNote = notes.find(n => n.id === effectiveNoteId)
 
   const [isSaving, setIsSaving] = useState(false)
-  const [viewMode, setViewMode] = useState<ViewMode>('edit')
+  const [viewMode, setViewMode] = useState<ViewMode>(editorDefaultView)
   const [previewContent, setPreviewContent] = useState('')
   const [formatMenu, setFormatMenu] = useState<{ x: number; y: number } | null>(null)
   const [propertiesCollapsed, setPropertiesCollapsed] = useState(false)

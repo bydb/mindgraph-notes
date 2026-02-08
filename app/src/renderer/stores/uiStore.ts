@@ -405,7 +405,7 @@ const defaultState = {
   // Editor Settings
   editorFontSize: 15,
   editorLineNumbers: true,
-  editorDefaultView: 'edit' as EditorViewMode,
+  editorDefaultView: 'preview' as EditorViewMode,
   autoSaveInterval: 500,
   editorHeadingFolding: false,
   editorOutlining: false,
