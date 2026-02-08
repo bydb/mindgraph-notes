@@ -2,6 +2,15 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [1.0.21-beta] - 2026-02-08
+
+### Features
+- **Standard-Ansicht Preview**: Notizen öffnen jetzt standardmäßig in der Preview-Ansicht statt im Editor. Einstellbar unter Settings → Editor → Standard-Ansicht.
+
+### Fixes
+- **Bilder/SVGs in Preview zuverlässig**: Eingebettete Bilder (SVG, PNG etc.), Wikilink-Embeds und PDFs werden jetzt zuverlässig beim ersten Laden und nach Panel-Wechseln (z.B. Karteikarten) angezeigt
+- **Live-Preview Bild-Caching**: Bilder im Live-Preview-Modus werden gecacht, um wiederholte IPC-Aufrufe zu vermeiden und Flickern zu reduzieren
+
 ## [1.0.20-beta] - 2026-02-07
 
 ### Features
