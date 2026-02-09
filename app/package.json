@@ -71,12 +71,17 @@
       "shortcutName": "MindGraph Notes"
     },
     "linux": {
-      "icon": "resources/icon.png",
+      "icon": "resources/icons/linux",
       "target": [
         "AppImage",
         "deb"
       ],
-      "category": "Office"
+      "category": "Office",
+      "desktop": {
+        "Name": "MindGraph Notes",
+        "Comment": "Markdown-Notizen-App mit Wissensgraph",
+        "Keywords": "markdown;notes;graph;productivity"
+      }
     }
   },
   "devDependencies": {
