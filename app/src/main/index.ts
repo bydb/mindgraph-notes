@@ -1899,7 +1899,7 @@ ipcMain.on('terminal-create', (_event, cwd: string) => {
   }
 
   const isWindows = process.platform === 'win32'
-  const shell = isWindows ? 'powershell.exe' : '/bin/zsh'
+  const shell = isWindows ? 'powershell.exe' : (process.env.SHELL || '/bin/bash')
   console.log('[Terminal] Using shell:', shell)
 
   // Resolve ~ to HOME - IMMER Home-Verzeichnis verwenden um Probleme mit Leerzeichen zu vermeiden
