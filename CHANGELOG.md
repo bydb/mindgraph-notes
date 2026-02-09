@@ -2,6 +2,21 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [1.0.23-beta] - 2026-02-09
+
+### Features
+- **Anki Import (.apkg)**: Karteikarten aus Anki-Decks importieren mit Medien-Extraktion (Bilder, Audio). Unterstützt Basic, Reversed und Cloze-Karten
+- **Bilder im Karteikarten-Editor**: Bild-Upload per Button (File-Picker) und Clipboard-Paste (Cmd+V) beim Erstellen von Karteikarten
+- **Bidirektionale Canvas-Verbindungen**: Neue Verbindungen im Canvas werden automatisch in beide Dateien geschrieben (Hin- und Rücklink)
+- **Bidirektionale Edge-Darstellung**: Hin- und Rücklinks werden als eine Kante mit Pfeilen an beiden Enden dargestellt statt als zwei separate Kanten
+
+### Fixes
+- **Flashcard-Bilder**: Bilder in Karteikarten werden jetzt korrekt angezeigt (MarkdownContent mit vaultPath-basierter Bildauflösung)
+- **Canvas: Notiz im gefilterten Ordner**: Neue Notizen aus Canvas-Drag werden jetzt im aktuell gefilterten Ordner erstellt
+- **Link-Zählung**: Bild-Embeds (`![[bild.svg]]`) werden nicht mehr als Wikilinks gezählt
+- **Link-Zählung im FileTree**: Zeigt jetzt nur ausgehende Wikilinks (konsistent mit dem Dokumentinhalt)
+- **Dateinamen mit Leerzeichen**: Bilder mit Leerzeichen im Dateinamen werden jetzt korrekt in Markdown eingefügt (Leerzeichen → Bindestrich)
+
 ## [1.0.22-beta] - 2026-02-08
 
 ### Security

@@ -64,6 +64,7 @@ Eine moderne Notiz-App mit Wissensgraph, gebaut mit Electron und React.
 - **Klick auf Knoten**: Offnet die Notiz im Editor
 - **Drag & Drop**: Knoten verschieben
 - **Verbindungen**: Visualisieren Wikilinks zwischen Notizen
+- **Bidirektionale Verbindungen**: Neue Verbindungen schreiben automatisch Wikilinks in beide Dateien
 - **Konfigurierbare Kartenbreite** in Einstellungen
 
 ## Navigation & Suche
@@ -189,6 +190,26 @@ Eine moderne Notiz-App mit Wissensgraph, gebaut mit Electron und React.
 - Detaillierte Aufschlusselung der Ahnlichkeit
 - Klick offnet die Notiz
 - Erfordert Ollama fur Embeddings
+
+## Karteikarten (Flashcards)
+
+### Spaced Repetition
+- **Leitner-System**: Automatische Wiederholung mit steigenden Intervallen
+- **Statistik-Dashboard**: Lern-Streak, Kalender-Heatmap, anstehende Wiederholungen
+
+### Karteikarten-Editor
+- **Markdown-Unterstutzung**: Vorder- und Ruckseite mit Markdown
+- **Bild-Upload**: Per Button (File-Picker) oder Clipboard-Paste (Cmd+V)
+- **Tags und Kategorien**: Organisation der Karten
+
+### Anki Import
+- **Import von .apkg-Dateien**: Karteikarten aus Anki ubernehmen
+- **Medien-Extraktion**: Bilder und Audio werden automatisch extrahiert
+- **Kartentypen**: Basic, Reversed und Cloze-Karten werden unterstutzt
+
+### Quiz-Modus
+- **Interaktives Quiz**: Multiple-Choice basierend auf Karteikarten
+- **Auswertung**: Ergebnis mit richtigen/falschen Antworten
 
 ## PDF-Features
 
