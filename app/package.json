@@ -76,12 +76,7 @@
         "AppImage",
         "deb"
       ],
-      "category": "Office",
-      "desktop": {
-        "Name": "MindGraph Notes",
-        "Comment": "Markdown-Notizen-App mit Wissensgraph",
-        "Keywords": "markdown;notes;graph;productivity"
-      }
+      "category": "Office"
     }
   },
   "devDependencies": {
