@@ -26,12 +26,24 @@ export const VaultStep: React.FC<VaultStepProps> = ({ vaultPath, setVaultPath, o
     }
   }
 
+  const confirmIfNotEmpty = async (dirPath: string): Promise<boolean> => {
+    const isEmpty = await window.electronAPI.checkDirectoryEmpty(dirPath)
+    if (isEmpty) return true
+
+    return new Promise((resolve) => {
+      const confirmed = window.confirm(t('onboarding.vault.directoryNotEmpty'))
+      resolve(confirmed)
+    })
+  }
+
   const handleCreateStarter = async () => {
     setError(null)
     try {
-      // Zielordner auswählen
-      const result = await window.electronAPI.openVault()
+      const result = await window.electronAPI.selectVaultDirectory()
       if (!result) return
+
+      const confirmed = await confirmIfNotEmpty(result)
+      if (!confirmed) return
 
       setLoading(true)
       console.log('[Onboarding] Creating starter vault at:', result, 'language:', language)
@@ -49,8 +61,11 @@ export const VaultStep: React.FC<VaultStepProps> = ({ vaultPath, setVaultPath, o
   const handleCreateEmpty = async () => {
     setError(null)
     try {
-      const result = await window.electronAPI.openVault()
+      const result = await window.electronAPI.selectVaultDirectory()
       if (!result) return
+
+      const confirmed = await confirmIfNotEmpty(result)
+      if (!confirmed) return
 
       setLoading(true)
       await window.electronAPI.createEmptyVault(result)
@@ -123,7 +138,7 @@ export const VaultStep: React.FC<VaultStepProps> = ({ vaultPath, setVaultPath, o
 
       {vaultPath && (
         <div className="onboarding-vault-selected">
-          {t('onboarding.vault.selected', { path: vaultPath.split('/').pop() || vaultPath })}
+          {t('onboarding.vault.selected', { path: vaultPath.split(/[/\\]/).pop() || vaultPath })}
         </div>
       )}
 

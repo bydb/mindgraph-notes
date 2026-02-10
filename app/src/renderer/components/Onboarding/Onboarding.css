@@ -359,74 +359,66 @@
   cursor: pointer;
 }
 
-/* ============ FEATURES STEP ============ */
-.onboarding-shortcuts {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-bottom: 24px;
+/* ============ GUIDE STEP (Icon Explanation) ============ */
+.onboarding-guide-section {
+  margin-bottom: 18px;
 }
 
-.onboarding-shortcut {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  font-size: 13px;
-  color: var(--text-secondary);
-}
-
-.onboarding-kbd {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 48px;
-  padding: 3px 8px;
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-xs);
-  font-size: 12px;
-  font-family: monospace;
-  color: var(--text-primary);
-}
-
-.onboarding-features {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
-  margin-bottom: 32px;
-}
-
-.onboarding-feature-card {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  padding: 12px;
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-md);
-}
-
-.onboarding-feature-card svg {
-  flex-shrink: 0;
-  margin-top: 2px;
-}
-
-.onboarding-feature-text {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.onboarding-feature-name {
-  font-size: 13px;
+.onboarding-guide-label {
+  display: block;
+  font-size: 11px;
   font-weight: 600;
-  color: var(--text-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+  margin-bottom: 8px;
 }
 
-.onboarding-feature-desc {
+.onboarding-guide-row {
+  display: flex;
+  gap: 8px;
+}
+
+.onboarding-guide-row .onboarding-guide-item {
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 10px 8px;
+}
+
+.onboarding-guide-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 8px;
+}
+
+.onboarding-guide-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+}
+
+.onboarding-guide-item svg {
+  flex-shrink: 0;
+  color: var(--accent-color);
+}
+
+.onboarding-guide-item span {
   font-size: 11px;
   color: var(--text-secondary);
-  line-height: 1.4;
+  line-height: 1.3;
+}
+
+.onboarding-guide-icon-text {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent-color);
+  white-space: nowrap;
 }
 
 /* ============ NAVIGATION ============ */

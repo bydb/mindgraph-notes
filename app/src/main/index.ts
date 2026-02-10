@@ -10,6 +10,14 @@ let fileWatcher: FSWatcher | null = null
 let ptyProcess: pty.IPty | null = null
 let isQuitting = false
 
+// EPIPE-Fehler bei console.log ignorieren (tritt auf wenn PTY-Pipe geschlossen wird)
+process.stdout?.on('error', (err) => {
+  if ((err as NodeJS.ErrnoException).code === 'EPIPE') return
+})
+process.stderr?.on('error', (err) => {
+  if ((err as NodeJS.ErrnoException).code === 'EPIPE') return
+})
+
 // Settings-Pfad im User-Data-Verzeichnis
 function getSettingsPath(): string {
   return path.join(app.getPath('userData'), 'settings.json')
@@ -181,18 +189,66 @@ ipcMain.handle('save-ui-settings', async (_event, settings: Record<string, unkno
 // Vault-Ordner öffnen
 ipcMain.handle('open-vault', async () => {
   if (!mainWindow) return null
-  
+
   const result = await dialog.showOpenDialog(mainWindow, {
     properties: ['openDirectory', 'createDirectory'],
     title: 'Vault-Ordner auswählen',
     buttonLabel: 'Vault öffnen'
   })
-  
+
   if (result.canceled || result.filePaths.length === 0) {
     return null
   }
-  
+
   return result.filePaths[0]
+})
+
+// Zielordner für neuen Vault auswählen (mit passender Beschriftung)
+// 'createDirectory' ist macOS-exklusiv. Auf Windows/Linux nutzen wir
+// showSaveDialog als Workaround, damit der User neue Ordner anlegen kann.
+ipcMain.handle('select-vault-directory', async () => {
+  if (!mainWindow) return null
+
+  if (process.platform === 'darwin') {
+    // macOS: showOpenDialog mit createDirectory (macOS-exklusiv)
+    const result = await dialog.showOpenDialog(mainWindow, {
+      properties: ['openDirectory', 'createDirectory'],
+      title: 'Zielordner für Notizen auswählen',
+      buttonLabel: 'Ordner auswählen'
+    })
+
+    if (result.canceled || result.filePaths.length === 0) return null
+    return result.filePaths[0]
+  }
+
+  // Windows / Linux: showSaveDialog als Workaround, da showOpenDialog
+  // mit 'openDirectory' kein Erstellen neuer Ordner erlaubt
+  const result = await dialog.showSaveDialog(mainWindow, {
+    title: 'Neuen Ordner für Notizen anlegen oder bestehenden wählen',
+    buttonLabel: 'Ordner auswählen',
+    defaultPath: path.join(app.getPath('documents'), 'MindGraph Notes'),
+    properties: ['showOverwriteConfirmation']
+  })
+
+  if (result.canceled || !result.filePath) return null
+
+  // Der gewählte Pfad ist der Zielordner — erstelle ihn falls nötig
+  const targetDir = result.filePath
+  await fs.mkdir(targetDir, { recursive: true })
+  return targetDir
+})
+
+// Prüfen ob ein Verzeichnis leer ist
+ipcMain.handle('check-directory-empty', async (_event, dirPath: string) => {
+  try {
+    const entries = await fs.readdir(dirPath)
+    // Ignoriere versteckte Dateien wie .DS_Store
+    const visibleEntries = entries.filter(e => !e.startsWith('.'))
+    return visibleEntries.length === 0
+  } catch {
+    // Verzeichnis existiert nicht → gilt als "leer"
+    return true
+  }
 })
 
 // Dialog für neue Notiz

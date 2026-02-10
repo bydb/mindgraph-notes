@@ -1,6 +1,5 @@
 import React, { useState, useCallback } from 'react'
 import { useUIStore } from '../../stores/uiStore'
-import { useNotesStore } from '../../stores/notesStore'
 import { WelcomeScreen } from './WelcomeScreen'
 import { VaultStep } from './steps/VaultStep'
 import { AISetupStep } from './steps/AISetupStep'
@@ -11,15 +10,13 @@ type OnboardingStep = 'welcome' | 'vault' | 'ai' | 'features'
 
 export const Onboarding: React.FC = () => {
   const { onboardingOpen, setOnboardingOpen, setOnboardingCompleted } = useUIStore()
-  const { setVaultPath } = useNotesStore()
   const [step, setStep] = useState<OnboardingStep>('welcome')
   const [vaultPath, setLocalVaultPath] = useState<string | null>(null)
 
   const finishWithVault = useCallback(async (path: string) => {
-    // Save as last vault so it loads on next start / via Sidebar
+    // Save as last vault — Sidebar will load it when onboardingCompleted becomes true
     await window.electronAPI.setLastVault(path)
-    setVaultPath(path)
-  }, [setVaultPath])
+  }, [])
 
   const completeOnboarding = useCallback(async () => {
     if (vaultPath) {
@@ -73,6 +70,7 @@ export const Onboarding: React.FC = () => {
         )}
         {step === 'features' && (
           <FeaturesStep
+            onBack={() => setStep('ai')}
             onFinish={completeOnboarding}
           />
         )}

@@ -29,6 +29,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   ensureDir: (dirPath: string) => ipcRenderer.invoke('ensure-dir', dirPath),
 
   // Starter-Vault & Onboarding
+  selectVaultDirectory: () => ipcRenderer.invoke('select-vault-directory'),
+  checkDirectoryEmpty: (dirPath: string) => ipcRenderer.invoke('check-directory-empty', dirPath),
   createStarterVault: (targetPath: string, language: string) =>
     ipcRenderer.invoke('create-starter-vault', targetPath, language),
   createEmptyVault: (targetPath: string) =>

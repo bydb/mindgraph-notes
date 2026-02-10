@@ -224,6 +224,14 @@ export const Sidebar: React.FC = () => {
         // Graph-Daten aus dem Vault laden
         await loadGraphData(targetVault)
 
+        // Nach Onboarding: Willkommen-Notiz automatisch öffnen
+        const welcomeNote = loadedNotes.find(n =>
+          n.path === 'Willkommen.md' || n.path === 'Welcome.md'
+        )
+        if (welcomeNote) {
+          selectNote(welcomeNote.id)
+        }
+
         // File-Watcher starten
         window.electronAPI.watchDirectory(targetVault, async (event: string, changedFilePath: string) => {
           console.log('File changed:', event, changedFilePath)

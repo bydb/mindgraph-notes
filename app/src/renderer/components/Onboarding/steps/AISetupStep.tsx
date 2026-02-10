@@ -12,6 +12,7 @@ export const AISetupStep: React.FC<AISetupStepProps> = ({ onBack, onNext }) => {
   const { ollama, setOllama } = useUIStore()
   const [ollamaConnected, setOllamaConnected] = useState(false)
   const [lmStudioConnected, setLmStudioConnected] = useState(false)
+  const [zoteroConnected, setZoteroConnected] = useState(false)
   const [ollamaModels, setOllamaModels] = useState<string[]>([])
   const [checking, setChecking] = useState(true)
 
@@ -49,6 +50,14 @@ export const AISetupStep: React.FC<AISetupStepProps> = ({ onBack, onNext }) => {
       } catch {
         setLmStudioConnected(false)
       }
+
+      // Check Zotero + Better BibTeX
+      try {
+        const result = await window.electronAPI.zoteroCheck()
+        setZoteroConnected(!!result)
+      } catch {
+        setZoteroConnected(false)
+      }
     } finally {
       setChecking(false)
     }
@@ -74,9 +83,11 @@ export const AISetupStep: React.FC<AISetupStepProps> = ({ onBack, onNext }) => {
         </div>
       </div>
 
-      <h2 className="onboarding-step-title">{t('onboarding.ai.title')}</h2>
-      <p className="onboarding-step-desc">{t('onboarding.ai.description')}</p>
+      <h2 className="onboarding-step-title">{t('onboarding.integrations.title')}</h2>
+      <p className="onboarding-step-desc">{t('onboarding.integrations.description')}</p>
 
+      {/* KI-Modelle */}
+      <div className="onboarding-guide-label">{t('onboarding.integrations.aiLabel')}</div>
       <div className="onboarding-ai-providers">
         <div className={`onboarding-ai-provider ${ollamaConnected ? 'connected' : ''}`}>
           <div className="onboarding-ai-provider-header">
@@ -115,6 +126,25 @@ export const AISetupStep: React.FC<AISetupStepProps> = ({ onBack, onNext }) => {
           <span>{t('onboarding.ai.installHint')}</span>
           {' '}
           <span className="onboarding-ai-link">{t('onboarding.ai.downloadOllama')}</span>
+        </div>
+      )}
+
+      {/* Zotero */}
+      <div className="onboarding-guide-label" style={{ marginTop: 18 }}>{t('onboarding.integrations.zoteroLabel')}</div>
+      <div className="onboarding-ai-providers">
+        <div className={`onboarding-ai-provider ${zoteroConnected ? 'connected' : ''}`}>
+          <div className="onboarding-ai-provider-header">
+            <span className="onboarding-ai-provider-name">Zotero + Better BibTeX</span>
+            <span className={`onboarding-ai-status ${zoteroConnected ? 'connected' : ''}`}>
+              {checking ? '...' : zoteroConnected ? t('onboarding.ai.connected') : t('onboarding.ai.notDetected')}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {!zoteroConnected && !checking && (
+        <div className="onboarding-ai-hint">
+          {t('onboarding.integrations.zoteroHint')}
         </div>
       )}
 

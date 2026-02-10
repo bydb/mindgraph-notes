@@ -341,6 +341,10 @@ export interface ElectronAPI {
   saveUISettings: (settings: Record<string, unknown>) => Promise<boolean>;
 
   openVault: () => Promise<string | null>;
+  selectVaultDirectory: () => Promise<string | null>;
+  checkDirectoryEmpty: (dirPath: string) => Promise<boolean>;
+  createStarterVault: (targetPath: string, language: string) => Promise<boolean>;
+  createEmptyVault: (targetPath: string) => Promise<boolean>;
   readDirectory: (dirPath: string) => Promise<FileEntry[]>;
   readFile: (filePath: string) => Promise<string>;
   readFilesBatch: (basePath: string, relativePaths: string[]) => Promise<Record<string, string | null>>;
