@@ -1,0 +1,14 @@
+services:
+  sync-server:
+    build: .
+    ports:
+      - "8080:8080"
+    volumes:
+      - sync-data:/app/data
+    environment:
+      - PORT=8080
+      - DB_PATH=/app/data/sync.db
+    restart: unless-stopped
+
+volumes:
+  sync-data:

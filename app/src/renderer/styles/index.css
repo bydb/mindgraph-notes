@@ -12152,3 +12152,334 @@ body {
   background: var(--bg-secondary);
   border-radius: var(--radius-sm);
 }
+
+/* ============================================
+   Sync Settings & Status
+   ============================================ */
+
+.sync-setup {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.sync-description {
+  color: var(--text-secondary);
+  font-size: 14px;
+  line-height: 1.6;
+  margin-bottom: 4px;
+}
+
+.sync-mode-selector {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sync-mode-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 16px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  background: var(--bg-primary);
+}
+
+.sync-mode-option:hover {
+  border-color: var(--accent-color);
+  background: var(--accent-subtle);
+}
+
+.sync-mode-option.selected {
+  border-color: var(--accent-color);
+  background: var(--accent-subtle);
+}
+
+.sync-mode-radio {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid var(--text-muted);
+  flex-shrink: 0;
+  margin-top: 2px;
+  transition: all var(--transition-fast);
+}
+
+.sync-mode-option.selected .sync-mode-radio {
+  border-color: var(--accent-color);
+  background: var(--accent-color);
+  box-shadow: inset 0 0 0 3px var(--bg-primary);
+}
+
+.sync-mode-text h4 {
+  margin: 0 0 2px 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.sync-mode-text p {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.sync-input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sync-input-group label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.sync-input-group input {
+  padding: 8px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font-size: 14px;
+  outline: none;
+  transition: border-color var(--transition-fast);
+}
+
+.sync-input-group input:focus {
+  border-color: var(--accent-color);
+}
+
+.sync-input-hint {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.sync-input-warning {
+  font-size: 11px;
+  color: #fb8c00;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.sync-activate-btn {
+  padding: 10px 20px;
+  background: var(--accent-color);
+  color: white;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  align-self: flex-start;
+}
+
+.sync-activate-btn:hover {
+  background: var(--accent-hover);
+}
+
+.sync-activate-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Sync Active State */
+
+.sync-active {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.sync-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.sync-status-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  background: rgba(76, 175, 80, 0.12);
+  color: #4caf50;
+}
+
+.sync-status-badge.error {
+  background: rgba(229, 57, 53, 0.12);
+  color: #e53935;
+}
+
+.sync-status-badge.syncing {
+  background: rgba(33, 150, 243, 0.12);
+  color: #2196f3;
+}
+
+.sync-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.sync-status-dot.syncing {
+  animation: syncPulse 1.5s ease-in-out infinite;
+}
+
+@keyframes syncPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+.sync-info-grid {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 8px 16px;
+  font-size: 13px;
+}
+
+.sync-info-label {
+  color: var(--text-secondary);
+}
+
+.sync-info-value {
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sync-copy-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 2px;
+  border-radius: var(--radius-xs);
+  transition: all var(--transition-fast);
+  display: flex;
+  align-items: center;
+}
+
+.sync-copy-btn:hover {
+  color: var(--accent-color);
+  background: var(--accent-subtle);
+}
+
+.sync-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.sync-btn-primary {
+  padding: 8px 16px;
+  background: var(--accent-color);
+  color: white;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.sync-btn-primary:hover {
+  background: var(--accent-hover);
+}
+
+.sync-btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.sync-btn-danger {
+  padding: 8px 16px;
+  background: none;
+  color: #e53935;
+  border: 1px solid #e53935;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.sync-btn-danger:hover {
+  background: rgba(229, 57, 53, 0.08);
+}
+
+.sync-progress-bar {
+  height: 4px;
+  background: var(--bg-tertiary);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.sync-progress-fill {
+  height: 100%;
+  background: var(--accent-color);
+  border-radius: 2px;
+  transition: width 0.3s ease;
+}
+
+.sync-progress-text {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
+/* Sync Status in Statusbar */
+
+.sync-status-indicator {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: var(--radius-xs);
+  transition: all var(--transition-fast);
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.sync-status-indicator:hover {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+.sync-status-indicator.synced {
+  color: #4caf50;
+}
+
+.sync-status-indicator.syncing {
+  color: #2196f3;
+}
+
+.sync-status-indicator.error {
+  color: #e53935;
+}
+
+.sync-status-icon {
+  width: 14px;
+  height: 14px;
+}
+
+.sync-status-icon.syncing {
+  animation: syncSpin 2s linear infinite;
+}
+
+@keyframes syncSpin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}

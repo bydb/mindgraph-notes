@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useUIStore, ACCENT_COLORS, AI_LANGUAGES, FONT_FAMILIES, UI_LANGUAGES, BACKGROUND_COLORS, ICON_SETS, OUTLINE_STYLES, type Language, type FontFamily, type BackgroundColor, type IconSet, type OutlineStyle, type LLMBackend } from '../../stores/uiStore'
 import { useNotesStore } from '../../stores/notesStore'
+import { useSyncStore } from '../../stores/syncStore'
 import { useTranslation } from '../../utils/translations'
 import {
   TemplateConfig,
@@ -16,7 +17,7 @@ interface SettingsProps {
   onClose: () => void
 }
 
-type Tab = 'general' | 'editor' | 'templates' | 'integrations' | 'shortcuts' | 'dataview'
+type Tab = 'general' | 'editor' | 'templates' | 'integrations' | 'shortcuts' | 'dataview' | 'sync'
 
 type BuiltInTemplateKey = 'empty' | 'dailyNote' | 'zettel' | 'meeting'
 
@@ -45,6 +46,17 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
   const [languageToolStatus, setLanguageToolStatus] = useState<'checking' | 'connected' | 'disconnected'>('checking')
   const [ollamaModels, setOllamaModels] = useState<Array<{ name: string; size: number }>>([])
   const [lmstudioModels, setLmstudioModels] = useState<Array<{ name: string; size: number }>>([])
+
+  // Sync Setup State
+  const [syncMode, setSyncMode] = useState<'new' | 'join'>('new')
+  const [syncPassphrase, setSyncPassphrase] = useState('')
+  const [syncJoinVaultId, setSyncJoinVaultId] = useState('')
+  const [syncLoading, setSyncLoading] = useState(false)
+  const [syncCopied, setSyncCopied] = useState(false)
+  const [syncSetupError, setSyncSetupError] = useState<string | null>(null)
+
+  // Sync Store
+  const syncState = useSyncStore()
 
   // UI Store
   const {
@@ -423,6 +435,18 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
                 <path d="M5 7H13M5 10H13M5 13H9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
               </svg>
               {t('settings.tab.dataview')}
+            </button>
+            <button
+              className={`settings-nav-item ${activeTab === 'sync' ? 'active' : ''}`}
+              onClick={() => setActiveTab('sync')}
+            >
+              <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+                <path d="M3 9C3 5.69 5.69 3 9 3C11.22 3 13.15 4.26 14.13 6.1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                <path d="M15 9C15 12.31 12.31 15 9 15C6.78 15 4.85 13.74 3.87 11.9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                <path d="M12 6H15V3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M6 12H3V15" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+              {t('settings.tab.sync')}
             </button>
           </nav>
 
@@ -1649,6 +1673,232 @@ LIMIT 10
                 <div className="settings-info" style={{ marginTop: '24px' }}>
                   <p>{t('settings.dataview.tip')}</p>
                 </div>
+              </div>
+            )}
+
+            {/* Sync Tab */}
+            {activeTab === 'sync' && (
+              <div className="settings-section">
+                {!syncState.syncEnabled ? (
+                  /* Setup Mode */
+                  <div className="sync-setup">
+                    <h3>{t('settings.sync.title')}</h3>
+                    <p className="sync-description">{t('settings.sync.description')}</p>
+
+                    <div className="sync-mode-selector">
+                      <div
+                        className={`sync-mode-option ${syncMode === 'new' ? 'selected' : ''}`}
+                        onClick={() => setSyncMode('new')}
+                      >
+                        <div className="sync-mode-radio" />
+                        <div className="sync-mode-text">
+                          <h4>{t('settings.sync.newSync')}</h4>
+                          <p>{t('settings.sync.newSyncDesc')}</p>
+                        </div>
+                      </div>
+                      <div
+                        className={`sync-mode-option ${syncMode === 'join' ? 'selected' : ''}`}
+                        onClick={() => setSyncMode('join')}
+                      >
+                        <div className="sync-mode-radio" />
+                        <div className="sync-mode-text">
+                          <h4>{t('settings.sync.joinSync')}</h4>
+                          <p>{t('settings.sync.joinSyncDesc')}</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {syncMode === 'join' && (
+                      <div className="sync-input-group">
+                        <label>{t('settings.sync.vaultId')}</label>
+                        <input
+                          type="text"
+                          value={syncJoinVaultId}
+                          onChange={e => setSyncJoinVaultId(e.target.value)}
+                          placeholder={t('settings.sync.enterVaultId')}
+                        />
+                      </div>
+                    )}
+
+                    <div className="sync-input-group">
+                      <label>{t('settings.sync.passphrase')}</label>
+                      <input
+                        type="password"
+                        value={syncPassphrase}
+                        onChange={e => setSyncPassphrase(e.target.value)}
+                        placeholder={t('settings.sync.passphrase')}
+                      />
+                      <span className="sync-input-hint">{t('settings.sync.passphraseHint')}</span>
+                      <span className="sync-input-warning">{t('settings.sync.passphraseWarning')}</span>
+                    </div>
+
+                    <div className="sync-input-group">
+                      <label>{t('settings.sync.relayUrl')}</label>
+                      <input
+                        type="text"
+                        value={syncState.relayUrl}
+                        onChange={e => syncState.setRelayUrl(e.target.value)}
+                        placeholder="wss://sync.mindgraph.app"
+                      />
+                      <span className="sync-input-hint">ws://localhost:8080 zum lokalen Testen</span>
+                    </div>
+
+                    {syncSetupError && (
+                      <div className="sync-input-warning" style={{ color: '#e53935' }}>
+                        {syncSetupError}
+                      </div>
+                    )}
+
+                    <button
+                      className="sync-activate-btn"
+                      disabled={!syncPassphrase || (syncMode === 'join' && !syncJoinVaultId) || !vaultPath || syncLoading}
+                      onClick={async () => {
+                        if (!vaultPath) return
+                        setSyncLoading(true)
+                        setSyncSetupError(null)
+                        try {
+                          if (syncMode === 'new') {
+                            await syncState.initSync(vaultPath, syncPassphrase)
+                          } else {
+                            await syncState.joinSync(vaultPath, syncJoinVaultId, syncPassphrase)
+                          }
+                          setSyncPassphrase('')
+                          setSyncJoinVaultId('')
+                        } catch (err) {
+                          setSyncSetupError(err instanceof Error ? err.message : 'Setup failed')
+                        } finally {
+                          setSyncLoading(false)
+                        }
+                      }}
+                    >
+                      {syncLoading ? t('settings.sync.status.connecting') : t('settings.sync.activate')}
+                    </button>
+                  </div>
+                ) : (
+                  /* Active Mode */
+                  <div className="sync-active">
+                    <div className="sync-header">
+                      <h3>{t('settings.sync.title')}</h3>
+                      <div className={`sync-status-badge ${
+                        syncState.syncStatus === 'error' ? 'error' :
+                        syncState.syncStatus !== 'idle' && syncState.syncStatus !== 'done' ? 'syncing' : ''
+                      }`}>
+                        <div className={`sync-status-dot ${
+                          syncState.syncStatus !== 'idle' && syncState.syncStatus !== 'done' && syncState.syncStatus !== 'error' ? 'syncing' : ''
+                        }`} />
+                        {syncState.syncStatus === 'idle' || syncState.syncStatus === 'done'
+                          ? t('settings.sync.active')
+                          : syncState.syncStatus === 'error'
+                            ? t('settings.sync.status.error')
+                            : t('settings.sync.syncing')
+                        }
+                      </div>
+                    </div>
+
+                    <div className="sync-info-grid">
+                      <span className="sync-info-label">{t('settings.sync.vaultId')}:</span>
+                      <span className="sync-info-value">
+                        <code>{syncState.vaultId}</code>
+                        <button
+                          className="sync-copy-btn"
+                          onClick={() => {
+                            navigator.clipboard.writeText(syncState.vaultId)
+                            setSyncCopied(true)
+                            setTimeout(() => setSyncCopied(false), 2000)
+                          }}
+                          title={syncCopied ? t('settings.sync.copied') : 'Copy'}
+                        >
+                          {syncCopied ? (
+                            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                              <path d="M3 7L6 10L11 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                            </svg>
+                          ) : (
+                            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                              <rect x="5" y="5" width="7" height="7" rx="1" stroke="currentColor" strokeWidth="1.2"/>
+                              <path d="M9 5V3C9 2.45 8.55 2 8 2H3C2.45 2 2 2.45 2 3V8C2 8.55 2.45 9 3 9H5" stroke="currentColor" strokeWidth="1.2"/>
+                            </svg>
+                          )}
+                        </button>
+                      </span>
+
+                      <span className="sync-info-label">{t('settings.sync.lastSync')}:</span>
+                      <span className="sync-info-value">
+                        {syncState.lastSyncTime
+                          ? (() => {
+                              const diff = Math.floor((Date.now() - syncState.lastSyncTime) / 1000)
+                              if (diff < 60) return t('settings.sync.ago', { time: `${diff} ${t('settings.sync.seconds')}` })
+                              if (diff < 3600) return t('settings.sync.ago', { time: `${Math.floor(diff / 60)} ${t('settings.sync.minutes')}` })
+                              return t('settings.sync.ago', { time: `${Math.floor(diff / 3600)} ${t('settings.sync.hours')}` })
+                            })()
+                          : t('settings.sync.neverSynced')
+                        }
+                      </span>
+                    </div>
+
+                    {/* Progress Bar */}
+                    {syncState.syncStatus !== 'idle' && syncState.syncStatus !== 'done' && syncState.syncStatus !== 'error' && syncState.syncProgress.total > 0 && (
+                      <div>
+                        <div className="sync-progress-bar">
+                          <div
+                            className="sync-progress-fill"
+                            style={{ width: `${(syncState.syncProgress.current / syncState.syncProgress.total) * 100}%` }}
+                          />
+                        </div>
+                        <div className="sync-progress-text">
+                          {syncState.syncProgress.fileName && `${syncState.syncProgress.fileName} `}
+                          ({syncState.syncProgress.current}/{syncState.syncProgress.total})
+                        </div>
+                      </div>
+                    )}
+
+                    {syncState.syncError && (
+                      <div className="sync-input-warning" style={{ color: '#e53935' }}>
+                        {syncState.syncError}
+                      </div>
+                    )}
+
+                    <div className="settings-row">
+                      <label>{t('settings.sync.autoSync')}</label>
+                      <input
+                        type="checkbox"
+                        checked={syncState.autoSync}
+                        onChange={e => syncState.setAutoSync(e.target.checked)}
+                      />
+                    </div>
+
+                    {syncState.autoSync && (
+                      <div className="settings-row">
+                        <label>{t('settings.sync.interval')}</label>
+                        <input
+                          type="number"
+                          min="60"
+                          max="3600"
+                          value={syncState.syncInterval}
+                          onChange={e => syncState.setSyncInterval(parseInt(e.target.value) || 300)}
+                          style={{ width: '100px' }}
+                        />
+                      </div>
+                    )}
+
+                    <div className="sync-actions">
+                      <button
+                        className="sync-btn-primary"
+                        disabled={syncState.syncStatus !== 'idle' && syncState.syncStatus !== 'done' && syncState.syncStatus !== 'error'}
+                        onClick={() => syncState.triggerSync()}
+                      >
+                        {t('settings.sync.syncNow')}
+                      </button>
+                      <button
+                        className="sync-btn-danger"
+                        onClick={async () => {
+                          await syncState.disableSync()
+                        }}
+                      >
+                        {t('settings.sync.deactivate')}
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>

@@ -1,6 +1,31 @@
 // FileTree Icon Customization
 export type IconSet = 'default' | 'minimal' | 'colorful' | 'emoji'
 
+// Sync Types
+export interface SyncProgress {
+  status: 'idle' | 'connecting' | 'scanning' | 'uploading' | 'downloading' | 'done' | 'error'
+  current: number
+  total: number
+  fileName?: string
+  error?: string
+}
+
+export interface SyncResult {
+  success: boolean
+  uploaded: number
+  downloaded: number
+  conflicts: number
+  error?: string
+}
+
+export interface SyncConfig {
+  enabled: boolean
+  vaultId: string
+  relayUrl: string
+  autoSync: boolean
+  syncInterval: number
+}
+
 // Update-Checker Types
 export interface UpdateInfo {
   available: boolean
@@ -612,6 +637,22 @@ export interface ElectronAPI {
   // Study Statistics Persistence
   studyStatsLoad: (vaultPath: string) => Promise<StudyStatsData | null>;
   studyStatsSave: (vaultPath: string, data: StudyStatsData) => Promise<boolean>;
+
+  // Sync
+  syncSetup: (vaultPath: string, passphrase: string, relayUrl: string, autoSyncInterval?: number) => Promise<{ vaultId: string }>;
+  syncJoin: (vaultPath: string, vaultId: string, passphrase: string, relayUrl: string, autoSyncInterval?: number) => Promise<boolean>;
+  syncNow: () => Promise<SyncResult>;
+  syncDisable: () => Promise<boolean>;
+  syncSetAutoSync: (intervalSeconds: number) => Promise<boolean>;
+  syncStatus: () => Promise<{
+    status: SyncProgress['status'];
+    vaultId: string;
+    connected: boolean;
+    lastSyncTime: number | null;
+  }>;
+  syncSavePassphrase: (passphrase: string) => Promise<boolean>;
+  syncLoadPassphrase: () => Promise<string | null>;
+  onSyncProgress: (callback: (data: SyncProgress) => void) => void;
 }
 
 // Docling Options for PDF conversion

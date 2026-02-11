@@ -236,5 +236,22 @@ contextBridge.exposeInMainWorld('electronAPI', {
   studyStatsLoad: (vaultPath: string) =>
     ipcRenderer.invoke('study-stats-load', vaultPath),
   studyStatsSave: (vaultPath: string, data: object) =>
-    ipcRenderer.invoke('study-stats-save', vaultPath, data)
+    ipcRenderer.invoke('study-stats-save', vaultPath, data),
+
+  // Sync
+  syncSetup: (vaultPath: string, passphrase: string, relayUrl: string, autoSyncInterval?: number) =>
+    ipcRenderer.invoke('sync-setup', vaultPath, passphrase, relayUrl, autoSyncInterval),
+  syncJoin: (vaultPath: string, vaultId: string, passphrase: string, relayUrl: string, autoSyncInterval?: number) =>
+    ipcRenderer.invoke('sync-join', vaultPath, vaultId, passphrase, relayUrl, autoSyncInterval),
+  syncNow: () => ipcRenderer.invoke('sync-now'),
+  syncDisable: () => ipcRenderer.invoke('sync-disable'),
+  syncSetAutoSync: (intervalSeconds: number) => ipcRenderer.invoke('sync-set-auto-sync', intervalSeconds),
+  syncStatus: () => ipcRenderer.invoke('sync-status'),
+  syncSavePassphrase: (passphrase: string) =>
+    ipcRenderer.invoke('sync-save-passphrase', passphrase),
+  syncLoadPassphrase: () => ipcRenderer.invoke('sync-load-passphrase'),
+  onSyncProgress: (callback: (data: { status: string; current: number; total: number; fileName?: string; error?: string }) => void) => {
+    ipcRenderer.removeAllListeners('sync-progress')
+    ipcRenderer.on('sync-progress', (_event, data) => callback(data))
+  }
 })

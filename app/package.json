@@ -1,6 +1,6 @@
 {
   "name": "mindgraph-notes",
-  "version": "1.0.24-beta",
+  "version": "1.0.25-alpha",
   "description": "Eine minimalistische Markdown-Notizen-App mit editierbarer Graph View",
   "main": "out/main/index.js",
   "scripts": {
@@ -85,6 +85,7 @@
     "@types/markdown-it": "^14.1.2",
     "@types/react": "^19.2.8",
     "@types/react-dom": "^19.2.3",
+    "@types/ws": "^8.5.13",
     "electron": "^40.0.0",
     "electron-builder": "^26.4.0",
     "electron-vite": "^5.0.0",
@@ -118,6 +119,7 @@
     "react-window": "^2.2.5",
     "reactflow": "^11.11.4",
     "sql.js": "^1.13.0",
+    "ws": "^8.18.0",
     "xterm": "^5.3.0",
     "zustand": "^5.0.10"
   }

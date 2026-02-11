@@ -30,6 +30,7 @@ import { useTabStore } from './stores/tabStore'
 import { useTranslation } from './utils/translations'
 import { useNotesStore } from './stores/notesStore'
 import { useReminderStore } from './stores/reminderStore'
+import { useSyncStore } from './stores/syncStore'
 import { getVaultTaskStats } from './utils/linkExtractor'
 import './styles/index.css'
 
@@ -56,6 +57,8 @@ const App: React.FC = () => {
   const activeTab = tabs.find(t => t.id === activeTabId)
   const { t } = useTranslation()
   const { startChecking, stopChecking } = useReminderStore()
+  const syncEnabled = useSyncStore(state => state.syncEnabled)
+  const syncStatus = useSyncStore(state => state.syncStatus)
   const [terminalVisible, setTerminalVisible] = useState(false)
   const [quickSearchOpen, setQuickSearchOpen] = useState(false)
   const [zoteroSearchOpen, setZoteroSearchOpen] = useState(false)
@@ -831,6 +834,27 @@ const App: React.FC = () => {
                   </span>
                 )}
               </span>
+            </>
+          )}
+          {syncEnabled && (
+            <>
+              <span className="status-separator">|</span>
+              <button
+                className={`sync-status-indicator ${
+                  syncStatus === 'done' || syncStatus === 'idle' ? 'synced' :
+                  syncStatus === 'error' ? 'error' :
+                  'syncing'
+                }`}
+                onClick={() => setSettingsOpen(true)}
+                title="Sync"
+              >
+                <svg className={`sync-status-icon ${syncStatus !== 'idle' && syncStatus !== 'done' && syncStatus !== 'error' ? 'syncing' : ''}`} viewBox="0 0 14 14" fill="none">
+                  <path d="M2 7C2 4.24 4.24 2 7 2C8.66 2 10.1 2.84 11 4.1" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
+                  <path d="M12 7C12 9.76 9.76 12 7 12C5.34 12 3.9 11.16 3 9.9" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
+                  <path d="M9 4H11V2" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+                  <path d="M5 10H3V12" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </button>
             </>
           )}
           <span className="status-separator">|</span>

@@ -1,14 +1,16 @@
-import { app, BrowserWindow, ipcMain, dialog, shell, Notification } from 'electron'
+import { app, BrowserWindow, ipcMain, dialog, shell, Notification, safeStorage } from 'electron'
 import * as path from 'path'
 import * as fs from 'fs/promises'
 import { FSWatcher, watch } from 'chokidar'
 import * as pty from 'node-pty'
 import type { FileEntry } from '../shared/types'
+import { SyncEngine } from './sync/syncEngine'
 
 let mainWindow: BrowserWindow | null = null
 let fileWatcher: FSWatcher | null = null
 let ptyProcess: pty.IPty | null = null
 let isQuitting = false
+let syncEngine: SyncEngine | null = null
 
 // EPIPE-Fehler bei console.log ignorieren (tritt auf wenn PTY-Pipe geschlossen wird)
 process.stdout?.on('error', (err) => {
@@ -1923,6 +1925,20 @@ ipcMain.on('watch-directory', (_event, dirPath: string) => {
     if (filePath.endsWith('.md')) {
       mainWindow?.webContents.send('file-changed', eventName, filePath)
     }
+
+    // Notify sync engine of file changes (debounced in pushFile)
+    if (syncEngine && syncEngine.isInitialized() && typeof filePath === 'string') {
+      const relativePath = path.relative(dirPath, filePath).replace(/\\/g, '/')
+      if (
+        !relativePath.startsWith('.trash/') &&
+        !relativePath.includes('sync-manifest.json') &&
+        (eventName === 'add' || eventName === 'change')
+      ) {
+        syncEngine.pushFile(relativePath).catch(() => {
+          // Ignore push errors for individual files
+        })
+      }
+    }
   })
 })
 
@@ -3512,9 +3528,123 @@ ipcMain.handle('study-stats-save', async (_event, vaultPath: string, data: objec
   }
 })
 
+// ============================================
+// Sync IPC Handlers
+// ============================================
+
+function getSyncCredentialsPath(): string {
+  return path.join(app.getPath('userData'), 'sync-credentials.enc')
+}
+
+ipcMain.handle('sync-setup', async (_event, vaultPath: string, passphrase: string, relayUrl: string, autoSyncInterval?: number) => {
+  try {
+    syncEngine = new SyncEngine()
+    const result = await syncEngine.init(vaultPath, passphrase, relayUrl)
+    await syncEngine.connect()
+    if (autoSyncInterval && autoSyncInterval > 0) {
+      syncEngine.startAutoSync(autoSyncInterval)
+    }
+    return result
+  } catch (error) {
+    console.error('[Sync] Setup failed:', error)
+    throw error
+  }
+})
+
+ipcMain.handle('sync-join', async (_event, vaultPath: string, vaultId: string, passphrase: string, relayUrl: string, autoSyncInterval?: number) => {
+  try {
+    syncEngine = new SyncEngine()
+    await syncEngine.join(vaultPath, vaultId, passphrase, relayUrl)
+    await syncEngine.connect()
+    if (autoSyncInterval && autoSyncInterval > 0) {
+      syncEngine.startAutoSync(autoSyncInterval)
+    }
+    return true
+  } catch (error) {
+    console.error('[Sync] Join failed:', error)
+    throw error
+  }
+})
+
+ipcMain.handle('sync-set-auto-sync', async (_event, intervalSeconds: number) => {
+  if (!syncEngine || !syncEngine.isInitialized()) return false
+  if (intervalSeconds <= 0) {
+    syncEngine.stopAutoSync()
+  } else {
+    syncEngine.startAutoSync(intervalSeconds)
+  }
+  return true
+})
+
+ipcMain.handle('sync-now', async () => {
+  if (!syncEngine || !syncEngine.isInitialized()) {
+    return { success: false, uploaded: 0, downloaded: 0, conflicts: 0, error: 'Sync not initialized' }
+  }
+  return await syncEngine.sync()
+})
+
+ipcMain.handle('sync-disable', async () => {
+  try {
+    if (syncEngine) {
+      syncEngine.disconnect()
+      syncEngine = null
+    }
+    // Remove stored credentials
+    try {
+      await fs.unlink(getSyncCredentialsPath())
+    } catch {
+      // File might not exist
+    }
+    return true
+  } catch (error) {
+    console.error('[Sync] Disable failed:', error)
+    return false
+  }
+})
+
+ipcMain.handle('sync-status', async () => {
+  if (!syncEngine || !syncEngine.isInitialized()) {
+    return { status: 'idle', vaultId: '', connected: false, lastSyncTime: null }
+  }
+  return syncEngine.getStatus()
+})
+
+ipcMain.handle('sync-save-passphrase', async (_event, passphrase: string) => {
+  try {
+    if (!safeStorage.isEncryptionAvailable()) {
+      console.warn('[Sync] safeStorage encryption not available')
+      return false
+    }
+    const encrypted = safeStorage.encryptString(passphrase)
+    await fs.writeFile(getSyncCredentialsPath(), encrypted)
+    return true
+  } catch (error) {
+    console.error('[Sync] Failed to save passphrase:', error)
+    return false
+  }
+})
+
+ipcMain.handle('sync-load-passphrase', async () => {
+  try {
+    if (!safeStorage.isEncryptionAvailable()) {
+      return null
+    }
+    const encrypted = await fs.readFile(getSyncCredentialsPath())
+    return safeStorage.decryptString(encrypted)
+  } catch {
+    return null
+  }
+})
+
 // Cleanup bei App-Beendigung
 app.on('before-quit', () => {
   isQuitting = true
+
+  // Sync Engine stoppen
+  if (syncEngine) {
+    syncEngine.disconnect()
+    syncEngine = null
+  }
 
   // File Watcher stoppen
   if (fileWatcher) {
