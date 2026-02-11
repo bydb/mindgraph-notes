@@ -26,3 +26,7 @@ npm-debug.log*
 # Environment
 .env
 .env.local
+
+# Private
+mindgraph-sync-server/
+.claude/
