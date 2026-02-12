@@ -14,6 +14,9 @@ import type { SyncProgress, SyncResult } from '../../shared/types'
 
 type SyncStatus = SyncProgress['status']
 
+const PARALLEL_UPLOADS = 5
+const PARALLEL_DOWNLOADS = 5
+
 interface ServerMessage {
   type: string
   files?: Record<string, { hash: string; size: number; modifiedAt: number }>
@@ -34,6 +37,7 @@ export class SyncEngine {
   private vaultId: string = ''
   private relayUrl: string = ''
   private status: SyncStatus = 'idle'
+  private syncing: boolean = false
   private autoSyncInterval: ReturnType<typeof setInterval> | null = null
   private syncDebounceTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -152,24 +156,28 @@ export class SyncEngine {
   private handleServerMessage(msg: ServerMessage): void {
     switch (msg.type) {
       case 'notify':
-        if (msg.event === 'file-changed') {
+        if (msg.event === 'file-changed' && !this.syncing) {
           // Another client changed a file, trigger debounced sync
           this.debouncedSync()
         }
         break
 
       case 'error':
-        console.error('[Sync] Server error:', msg.message || msg.error)
-        this.status = 'error'
-        this.sendProgress({
-          status: 'error',
-          error: msg.message || msg.error
-        })
+        // Only set error status if we're not actively syncing (sync handles its own errors)
+        if (!this.syncing) {
+          console.error('[Sync] Server error:', msg.message || msg.error)
+          this.status = 'error'
+          this.sendProgress({
+            status: 'error',
+            error: msg.message || msg.error
+          })
+        }
         break
     }
   }
 
   private debouncedSync(): void {
+    if (this.syncing) return
     if (this.syncDebounceTimer) {
       clearTimeout(this.syncDebounceTimer)
     }
@@ -184,6 +192,13 @@ export class SyncEngine {
     if (!this.key || !this.vaultPath || !this.vaultId) {
       return { success: false, uploaded: 0, downloaded: 0, conflicts: 0, error: 'Sync not initialized' }
     }
+
+    // Prevent concurrent syncs
+    if (this.syncing) {
+      return { success: false, uploaded: 0, downloaded: 0, conflicts: 0, error: 'Sync already in progress' }
+    }
+
+    this.syncing = true
 
     try {
       // Ensure connection
@@ -216,37 +231,43 @@ export class SyncEngine {
       const total = diff.toUpload.length + diff.toDownload.length + diff.conflicts.length
       let current = 0
 
-      // Upload files
+      // Upload files in parallel batches
       this.status = 'uploading'
-      for (const filePath of diff.toUpload) {
-        current++
-        this.sendProgress({
-          status: 'uploading',
-          current,
-          total,
-          fileName: filePath
-        })
-        await this.uploadFile(filePath)
-        currentManifest.files[filePath].syncedAt = Date.now()
-      }
-
-      // Download files
-      this.status = 'downloading'
-      for (const filePath of diff.toDownload) {
-        current++
-        this.sendProgress({
-          status: 'downloading',
-          current,
-          total,
-          fileName: filePath
-        })
-        await this.downloadFile(filePath)
-        if (currentManifest.files[filePath]) {
+      for (let i = 0; i < diff.toUpload.length; i += PARALLEL_UPLOADS) {
+        const batch = diff.toUpload.slice(i, i + PARALLEL_UPLOADS)
+        await Promise.all(batch.map(async (filePath) => {
+          await this.uploadFile(filePath)
           currentManifest.files[filePath].syncedAt = Date.now()
-        }
+          current++
+          this.sendProgress({
+            status: 'uploading',
+            current,
+            total,
+            fileName: filePath
+          })
+        }))
       }
 
-      // Handle conflicts: newer timestamp wins, create conflict copy of older
+      // Download files in parallel batches
+      this.status = 'downloading'
+      for (let i = 0; i < diff.toDownload.length; i += PARALLEL_DOWNLOADS) {
+        const batch = diff.toDownload.slice(i, i + PARALLEL_DOWNLOADS)
+        await Promise.all(batch.map(async (filePath) => {
+          await this.downloadFile(filePath)
+          if (currentManifest.files[filePath]) {
+            currentManifest.files[filePath].syncedAt = Date.now()
+          }
+          current++
+          this.sendProgress({
+            status: 'downloading',
+            current,
+            total,
+            fileName: filePath
+          })
+        }))
+      }
+
+      // Handle conflicts (sequential — needs careful ordering)
       for (const filePath of diff.conflicts) {
         current++
         this.sendProgress({
@@ -286,8 +307,10 @@ export class SyncEngine {
 
       // Reset status to idle after a moment
       setTimeout(() => {
-        this.status = 'idle'
-        this.sendProgress({ status: 'idle' })
+        if (!this.syncing) {
+          this.status = 'idle'
+          this.sendProgress({ status: 'idle' })
+        }
       }, 3000)
 
       return result
@@ -296,6 +319,8 @@ export class SyncEngine {
       const error = err instanceof Error ? err.message : 'Unknown sync error'
       this.sendProgress({ status: 'error', error })
       return { success: false, uploaded: 0, downloaded: 0, conflicts: 0, error }
+    } finally {
+      this.syncing = false
     }
   }
 
@@ -440,10 +465,12 @@ export class SyncEngine {
         return reject(new Error('Not connected'))
       }
 
+      const hashedPath = hashPath(relativePath)
+
       const handler = (data: WebSocket.Data) => {
         try {
           const msg: ServerMessage = JSON.parse(data.toString())
-          if (msg.type === 'file-data' && msg.path === hashPath(relativePath)) {
+          if (msg.type === 'file-data' && msg.path === hashedPath) {
             this.ws?.removeListener('message', handler)
             resolve({
               data: msg.data!,
@@ -464,7 +491,7 @@ export class SyncEngine {
       this.wsSend({
         type: 'download',
         vaultId: this.vaultId,
-        path: hashPath(relativePath)
+        path: hashedPath
       })
 
       setTimeout(() => {
@@ -507,6 +534,7 @@ export class SyncEngine {
 
   async pushFile(relativePath: string): Promise<void> {
     if (!this.key || !this.ws || this.ws.readyState !== WebSocket.OPEN) return
+    if (this.syncing) return
 
     try {
       await this.uploadFile(relativePath)
@@ -530,7 +558,7 @@ export class SyncEngine {
   startAutoSync(intervalSeconds: number): void {
     this.stopAutoSync()
     this.autoSyncInterval = setInterval(() => {
-      if (this.status === 'idle') {
+      if (this.status === 'idle' && !this.syncing) {
         this.sync().catch(err => {
           console.error('[Sync] Periodic sync failed:', err)
         })
