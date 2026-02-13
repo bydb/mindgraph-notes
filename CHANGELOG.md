@@ -2,6 +2,25 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [1.0.26-alpha] - 2026-02-13
+
+### Features
+- **E2E-verschlüsselte Vault-Synchronisation**: Vollständig verschlüsselte Synchronisation über WebSocket-Relay-Server mit AES-256-GCM-Verschlüsselung
+- **Aktivierungscode-System**: Sync erfordert einen Aktivierungscode zur Registrierung neuer Vaults
+- **Konfigurierbarer Relay-Server**: Eigene Sync-Server-URL kann in den Einstellungen angegeben werden
+- **Per-Vault Sync-Konfiguration**: Jedes Vault speichert seine Sync-Einstellungen unabhängig
+
+### Security & Safety
+- **Cross-Vault-Schutz**: `savedForVault`-Feld validiert, dass Sync-Konfiguration zum korrekten Vault gehört
+- **SyncEngine Destroyed-Flag**: Blockiert alle Dateioperationen nach Disconnect
+- **Pfad-Traversal-Schutz**: Jeder Dateischreibvorgang prüft, dass das Ziel innerhalb des Vault-Verzeichnisses liegt
+- **Race-Condition-Schutz**: Erkennt Vault-Wechsel während asynchroner Sync-Operationen
+
+### Improvements
+- Parallele Uploads/Downloads (5 gleichzeitig)
+- Sync-Lock verhindert konkurrierende Operationen
+- Automatische Wiederverbindung bei Vault-Wechsel
+
 ## [1.0.23-beta] - 2026-02-09
 
 ### Features
