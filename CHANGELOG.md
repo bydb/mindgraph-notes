@@ -2,6 +2,19 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [1.0.27-alpha] - 2026-02-13
+
+### Security Fixes
+- **Registrierungs-Gate fuer Sync**: Client wartet jetzt auf Server-Bestaetigung (`registered`) bevor Sync-Operationen starten. Zuvor konnte ein geloeschtes Vault weiterhin Dateien hochladen.
+- **Server-seitige Registrierungspruefung**: Alle Dateioperationen (Upload, Download, Delete, Manifest) pruefen ob der Client registriert ist.
+
+### Bug Fixes
+- **Geloeschtes Vault konnte Dateien hochladen**: Ein vom Server geloeschtes Vault konnte sich reconnecten und Dateien hochladen, da der Client nicht auf die Registrierungsbestaetigung wartete.
+- **Server Vault-Loeschung bereinigt files-Tabelle**: `deleteVault()` loescht jetzt sowohl `vault_meta` als auch `files` Eintraege.
+
+### Improvements
+- Admin API: Neue Endpoints `GET /admin/vaults` und `DELETE /admin/vaults/:id`
+
 ## [1.0.26-alpha] - 2026-02-13
 
 ### Features
