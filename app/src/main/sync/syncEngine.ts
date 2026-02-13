@@ -111,10 +111,13 @@ export class SyncEngine {
     return true
   }
 
+  private registered: boolean = false
+
   async connect(): Promise<void> {
-    if (this.ws && this.ws.readyState === WebSocket.OPEN) return
+    if (this.ws && this.ws.readyState === WebSocket.OPEN && this.registered) return
 
     this.intentionalDisconnect = false
+    this.registered = false
     this.status = 'connecting'
     this.sendProgress({ status: 'connecting' })
 
@@ -124,16 +127,34 @@ export class SyncEngine {
       this.ws.on('open', () => {
         console.log('[Sync] Connected to relay server')
         this.reconnectAttempts = 0
-        // Register vault
+        // Register vault — do NOT resolve until server confirms registration
         this.wsSend({ type: 'register', vaultId: this.vaultId, ...(this.activationCode ? { activationCode: this.activationCode } : {}) })
-        this.status = 'idle'
-        this.sendProgress({ status: 'idle' })
-        resolve()
       })
 
       this.ws.on('message', (data: WebSocket.Data) => {
         try {
           const msg: ServerMessage = JSON.parse(data.toString())
+
+          // Handle registration response BEFORE resolving connect()
+          if (!this.registered) {
+            if (msg.type === 'registered') {
+              this.registered = true
+              this.status = 'idle'
+              this.sendProgress({ status: 'idle' })
+              console.log('[Sync] Vault registered on server')
+              resolve()
+              return
+            }
+            if (msg.type === 'error') {
+              console.error('[Sync] Registration rejected:', msg.message || msg.code)
+              this.status = 'error'
+              this.sendProgress({ status: 'error', error: msg.message || 'Registration rejected' })
+              this.ws?.close()
+              reject(new Error(msg.message || msg.code || 'Registration rejected'))
+              return
+            }
+          }
+
           this.handleServerMessage(msg)
         } catch (err) {
           console.error('[Sync] Failed to parse server message:', err)
@@ -143,6 +164,7 @@ export class SyncEngine {
       this.ws.on('close', () => {
         console.log('[Sync] Disconnected from relay server')
         this.ws = null
+        this.registered = false
         if (this.status !== 'error') {
           this.status = 'idle'
         }
@@ -155,6 +177,7 @@ export class SyncEngine {
       this.ws.on('error', (err) => {
         console.error('[Sync] WebSocket error:', err)
         this.status = 'error'
+        this.registered = false
         this.sendProgress({
           status: 'error',
           error: err.message
@@ -167,6 +190,11 @@ export class SyncEngine {
         if (this.ws && this.ws.readyState !== WebSocket.OPEN) {
           this.ws.close()
           reject(new Error('Connection timeout'))
+        }
+        // Also timeout if connected but not registered
+        if (this.ws && this.ws.readyState === WebSocket.OPEN && !this.registered) {
+          this.ws.close()
+          reject(new Error('Registration timeout'))
         }
       }, 10000)
     })
