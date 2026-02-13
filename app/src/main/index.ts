@@ -3536,10 +3536,10 @@ function getSyncCredentialsPath(): string {
   return path.join(app.getPath('userData'), 'sync-credentials.enc')
 }
 
-ipcMain.handle('sync-setup', async (_event, vaultPath: string, passphrase: string, relayUrl: string, autoSyncInterval?: number) => {
+ipcMain.handle('sync-setup', async (_event, vaultPath: string, passphrase: string, relayUrl: string, autoSyncInterval?: number, activationCode?: string) => {
   try {
     syncEngine = new SyncEngine()
-    const result = await syncEngine.init(vaultPath, passphrase, relayUrl)
+    const result = await syncEngine.init(vaultPath, passphrase, relayUrl, activationCode || '')
     await syncEngine.connect()
     if (autoSyncInterval && autoSyncInterval > 0) {
       syncEngine.startAutoSync(autoSyncInterval)
@@ -3551,10 +3551,10 @@ ipcMain.handle('sync-setup', async (_event, vaultPath: string, passphrase: strin
   }
 })
 
-ipcMain.handle('sync-join', async (_event, vaultPath: string, vaultId: string, passphrase: string, relayUrl: string, autoSyncInterval?: number) => {
+ipcMain.handle('sync-join', async (_event, vaultPath: string, vaultId: string, passphrase: string, relayUrl: string, autoSyncInterval?: number, activationCode?: string) => {
   try {
     syncEngine = new SyncEngine()
-    await syncEngine.join(vaultPath, vaultId, passphrase, relayUrl)
+    await syncEngine.join(vaultPath, vaultId, passphrase, relayUrl, activationCode || '')
     await syncEngine.connect()
     if (autoSyncInterval && autoSyncInterval > 0) {
       syncEngine.startAutoSync(autoSyncInterval)
@@ -3586,14 +3586,10 @@ ipcMain.handle('sync-now', async () => {
 ipcMain.handle('sync-disable', async () => {
   try {
     if (syncEngine) {
-      syncEngine.disconnect()
-      syncEngine = null
-    }
-    // Remove stored credentials
-    try {
-      await fs.unlink(getSyncCredentialsPath())
-    } catch {
-      // File might not exist
+      const oldEngine = syncEngine
+      syncEngine = null  // Clear reference FIRST to prevent any re-use
+      oldEngine.disconnect()  // Then destroy the engine
+      console.log('[Sync] Engine disconnected and reference cleared')
     }
     return true
   } catch (error) {
@@ -3633,6 +3629,33 @@ ipcMain.handle('sync-load-passphrase', async () => {
     return safeStorage.decryptString(encrypted)
   } catch {
     return null
+  }
+})
+
+ipcMain.handle('sync-restore', async (_event, vaultPath: string, vaultId: string, relayUrl: string, autoSyncInterval?: number) => {
+  try {
+    // Load passphrase from safeStorage
+    if (!safeStorage.isEncryptionAvailable()) {
+      return false
+    }
+    const encrypted = await fs.readFile(getSyncCredentialsPath())
+    const passphrase = safeStorage.decryptString(encrypted)
+    if (!passphrase) return false
+
+    // Re-initialize sync engine
+    syncEngine = new SyncEngine()
+    await syncEngine.join(vaultPath, vaultId, passphrase, relayUrl)
+    await syncEngine.connect()
+
+    if (autoSyncInterval && autoSyncInterval > 0) {
+      syncEngine.startAutoSync(autoSyncInterval)
+    }
+
+    console.log('[Sync] Restored sync engine for vault:', vaultId.slice(0, 12) + '...')
+    return true
+  } catch (error) {
+    console.error('[Sync] Restore failed:', error)
+    return false
   }
 })
 

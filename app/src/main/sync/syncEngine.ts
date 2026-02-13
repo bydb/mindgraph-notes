@@ -19,6 +19,7 @@ const PARALLEL_DOWNLOADS = 5
 
 interface ServerMessage {
   type: string
+  code?: string
   files?: Record<string, { hash: string; size: number; modifiedAt: number }>
   path?: string
   iv?: string
@@ -29,6 +30,9 @@ interface ServerMessage {
   error?: string
 }
 
+const RECONNECT_BASE_DELAY = 2000
+const RECONNECT_MAX_DELAY = 60000
+
 export class SyncEngine {
   private ws: WebSocket | null = null
   private key: Buffer | null = null
@@ -36,8 +40,13 @@ export class SyncEngine {
   private vaultPath: string = ''
   private vaultId: string = ''
   private relayUrl: string = ''
+  private activationCode: string = ''
   private status: SyncStatus = 'idle'
   private syncing: boolean = false
+  private destroyed: boolean = false  // SAFETY: blocks ALL file operations after disconnect
+  private intentionalDisconnect: boolean = false
+  private reconnectAttempts: number = 0
+  private reconnectTimer: ReturnType<typeof setTimeout> | null = null
   private autoSyncInterval: ReturnType<typeof setInterval> | null = null
   private syncDebounceTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -56,10 +65,12 @@ export class SyncEngine {
   async init(
     vaultPath: string,
     passphrase: string,
-    relayUrl: string
+    relayUrl: string,
+    activationCode: string = ''
   ): Promise<{ vaultId: string }> {
     this.vaultPath = vaultPath
     this.relayUrl = relayUrl
+    this.activationCode = activationCode
     this.vaultId = generateVaultId()
     this.key = deriveKey(passphrase, this.vaultId)
 
@@ -80,10 +91,12 @@ export class SyncEngine {
     vaultPath: string,
     vaultId: string,
     passphrase: string,
-    relayUrl: string
+    relayUrl: string,
+    activationCode: string = ''
   ): Promise<boolean> {
     this.vaultPath = vaultPath
     this.relayUrl = relayUrl
+    this.activationCode = activationCode
     this.vaultId = vaultId
     this.key = deriveKey(passphrase, this.vaultId)
 
@@ -101,6 +114,7 @@ export class SyncEngine {
   async connect(): Promise<void> {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) return
 
+    this.intentionalDisconnect = false
     this.status = 'connecting'
     this.sendProgress({ status: 'connecting' })
 
@@ -109,8 +123,9 @@ export class SyncEngine {
 
       this.ws.on('open', () => {
         console.log('[Sync] Connected to relay server')
+        this.reconnectAttempts = 0
         // Register vault
-        this.wsSend({ type: 'register', vaultId: this.vaultId })
+        this.wsSend({ type: 'register', vaultId: this.vaultId, ...(this.activationCode ? { activationCode: this.activationCode } : {}) })
         this.status = 'idle'
         this.sendProgress({ status: 'idle' })
         resolve()
@@ -130,6 +145,10 @@ export class SyncEngine {
         this.ws = null
         if (this.status !== 'error') {
           this.status = 'idle'
+        }
+        // Auto-reconnect if not intentional and engine is initialized
+        if (!this.intentionalDisconnect && this.key) {
+          this.scheduleReconnect()
         }
       })
 
@@ -151,6 +170,31 @@ export class SyncEngine {
         }
       }, 10000)
     })
+  }
+
+  private scheduleReconnect(): void {
+    if (this.reconnectTimer) return
+
+    const delay = Math.min(
+      RECONNECT_BASE_DELAY * Math.pow(2, this.reconnectAttempts),
+      RECONNECT_MAX_DELAY
+    )
+    this.reconnectAttempts++
+
+    console.log(`[Sync] Reconnecting in ${delay / 1000}s (attempt ${this.reconnectAttempts})`)
+
+    this.reconnectTimer = setTimeout(async () => {
+      this.reconnectTimer = null
+      if (this.intentionalDisconnect || !this.key) return
+
+      try {
+        await this.connect()
+        console.log('[Sync] Reconnected successfully')
+      } catch (err) {
+        console.error('[Sync] Reconnect failed:', err)
+        // close handler will schedule next attempt
+      }
+    }, delay)
   }
 
   private handleServerMessage(msg: ServerMessage): void {
@@ -189,6 +233,12 @@ export class SyncEngine {
   }
 
   async sync(): Promise<SyncResult> {
+    // SAFETY: refuse to sync if engine was destroyed
+    if (this.destroyed) {
+      console.warn('[SyncEngine] BLOCKED: sync() called on destroyed engine')
+      return { success: false, uploaded: 0, downloaded: 0, conflicts: 0, error: 'Engine destroyed' }
+    }
+
     if (!this.key || !this.vaultPath || !this.vaultId) {
       return { success: false, uploaded: 0, downloaded: 0, conflicts: 0, error: 'Sync not initialized' }
     }
@@ -251,8 +301,10 @@ export class SyncEngine {
       // Download files in parallel batches
       this.status = 'downloading'
       for (let i = 0; i < diff.toDownload.length; i += PARALLEL_DOWNLOADS) {
+        if (this.destroyed) break  // SAFETY: stop immediately
         const batch = diff.toDownload.slice(i, i + PARALLEL_DOWNLOADS)
         await Promise.all(batch.map(async (filePath) => {
+          if (this.destroyed) return  // SAFETY
           await this.downloadFile(filePath)
           if (currentManifest.files[filePath]) {
             currentManifest.files[filePath].syncedAt = Date.now()
@@ -267,8 +319,14 @@ export class SyncEngine {
         }))
       }
 
+      // SAFETY: abort if destroyed during downloads
+      if (this.destroyed) {
+        return { success: false, uploaded: 0, downloaded: 0, conflicts: 0, error: 'Engine destroyed during sync' }
+      }
+
       // Handle conflicts (sequential — needs careful ordering)
       for (const filePath of diff.conflicts) {
+        if (this.destroyed) break  // SAFETY
         current++
         this.sendProgress({
           status: 'downloading',
@@ -281,6 +339,7 @@ export class SyncEngine {
 
       // Handle remote deletes
       for (const filePath of diff.toDeleteLocal) {
+        if (this.destroyed) break  // SAFETY
         const absPath = path.join(this.vaultPath, filePath)
         try {
           await fs.unlink(absPath)
@@ -397,10 +456,28 @@ export class SyncEngine {
   }
 
   private async downloadFile(relativePath: string): Promise<void> {
+    // SAFETY: refuse to write if engine was destroyed
+    if (this.destroyed) {
+      console.warn('[SyncEngine] BLOCKED: downloadFile() on destroyed engine, path:', relativePath)
+      return
+    }
+
     if (!this.key) throw new Error('No encryption key')
+
+    // SAFETY: prevent path traversal attacks
+    if (relativePath.includes('..') || path.isAbsolute(relativePath)) {
+      console.error('[SyncEngine] BLOCKED: dangerous path:', relativePath)
+      return
+    }
 
     const fileData = await this.requestFile(relativePath)
     if (!fileData) return
+
+    // SAFETY: check destroyed again after async operation
+    if (this.destroyed) {
+      console.warn('[SyncEngine] BLOCKED: downloadFile() destroyed during download, path:', relativePath)
+      return
+    }
 
     const ciphertext = Buffer.from(fileData.data, 'base64')
     const iv = Buffer.from(fileData.iv, 'base64')
@@ -409,6 +486,13 @@ export class SyncEngine {
     const plaintext = decryptFile(ciphertext, this.key, iv, tag)
 
     const absPath = path.join(this.vaultPath, relativePath)
+
+    // SAFETY: verify the resolved path is inside the vault
+    if (!absPath.startsWith(this.vaultPath)) {
+      console.error('[SyncEngine] BLOCKED: path escapes vault:', absPath)
+      return
+    }
+
     await fs.mkdir(path.dirname(absPath), { recursive: true })
     await fs.writeFile(absPath, plaintext)
 
@@ -574,7 +658,14 @@ export class SyncEngine {
   }
 
   disconnect(): void {
+    this.destroyed = true  // SAFETY: immediately block all file operations
+    this.intentionalDisconnect = true
+    this.syncing = false
     this.stopAutoSync()
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer)
+      this.reconnectTimer = null
+    }
     if (this.syncDebounceTimer) {
       clearTimeout(this.syncDebounceTimer)
       this.syncDebounceTimer = null
@@ -585,6 +676,8 @@ export class SyncEngine {
     }
     this.status = 'idle'
     this.key = null
+    this.reconnectAttempts = 0
+    console.log('[SyncEngine] Disconnected and destroyed — all file operations blocked')
   }
 
   getStatus(): {

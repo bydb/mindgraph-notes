@@ -147,6 +147,13 @@ const App: React.FC = () => {
     init()
   }, [])
 
+  // Sync-Config per Vault laden (bei Vault-Wechsel: alte Verbindung trennen, neue Config laden)
+  useEffect(() => {
+    if (vaultPath) {
+      useSyncStore.getState().loadForVault(vaultPath)
+    }
+  }, [vaultPath])
+
   // Update-Checker & What's New beim App-Start
   useEffect(() => {
     const checkVersionAndUpdates = async () => {

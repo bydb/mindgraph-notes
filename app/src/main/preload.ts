@@ -239,10 +239,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('study-stats-save', vaultPath, data),
 
   // Sync
-  syncSetup: (vaultPath: string, passphrase: string, relayUrl: string, autoSyncInterval?: number) =>
-    ipcRenderer.invoke('sync-setup', vaultPath, passphrase, relayUrl, autoSyncInterval),
-  syncJoin: (vaultPath: string, vaultId: string, passphrase: string, relayUrl: string, autoSyncInterval?: number) =>
-    ipcRenderer.invoke('sync-join', vaultPath, vaultId, passphrase, relayUrl, autoSyncInterval),
+  syncSetup: (vaultPath: string, passphrase: string, relayUrl: string, autoSyncInterval?: number, activationCode?: string) =>
+    ipcRenderer.invoke('sync-setup', vaultPath, passphrase, relayUrl, autoSyncInterval, activationCode),
+  syncJoin: (vaultPath: string, vaultId: string, passphrase: string, relayUrl: string, autoSyncInterval?: number, activationCode?: string) =>
+    ipcRenderer.invoke('sync-join', vaultPath, vaultId, passphrase, relayUrl, autoSyncInterval, activationCode),
   syncNow: () => ipcRenderer.invoke('sync-now'),
   syncDisable: () => ipcRenderer.invoke('sync-disable'),
   syncSetAutoSync: (intervalSeconds: number) => ipcRenderer.invoke('sync-set-auto-sync', intervalSeconds),
@@ -250,6 +250,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   syncSavePassphrase: (passphrase: string) =>
     ipcRenderer.invoke('sync-save-passphrase', passphrase),
   syncLoadPassphrase: () => ipcRenderer.invoke('sync-load-passphrase'),
+  syncRestore: (vaultPath: string, vaultId: string, relayUrl: string, autoSyncInterval?: number) =>
+    ipcRenderer.invoke('sync-restore', vaultPath, vaultId, relayUrl, autoSyncInterval),
   onSyncProgress: (callback: (data: { status: string; current: number; total: number; fileName?: string; error?: string }) => void) => {
     ipcRenderer.removeAllListeners('sync-progress')
     ipcRenderer.on('sync-progress', (_event, data) => callback(data))

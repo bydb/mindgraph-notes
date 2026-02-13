@@ -639,8 +639,8 @@ export interface ElectronAPI {
   studyStatsSave: (vaultPath: string, data: StudyStatsData) => Promise<boolean>;
 
   // Sync
-  syncSetup: (vaultPath: string, passphrase: string, relayUrl: string, autoSyncInterval?: number) => Promise<{ vaultId: string }>;
-  syncJoin: (vaultPath: string, vaultId: string, passphrase: string, relayUrl: string, autoSyncInterval?: number) => Promise<boolean>;
+  syncSetup: (vaultPath: string, passphrase: string, relayUrl: string, autoSyncInterval?: number, activationCode?: string) => Promise<{ vaultId: string }>;
+  syncJoin: (vaultPath: string, vaultId: string, passphrase: string, relayUrl: string, autoSyncInterval?: number, activationCode?: string) => Promise<boolean>;
   syncNow: () => Promise<SyncResult>;
   syncDisable: () => Promise<boolean>;
   syncSetAutoSync: (intervalSeconds: number) => Promise<boolean>;
@@ -652,6 +652,7 @@ export interface ElectronAPI {
   }>;
   syncSavePassphrase: (passphrase: string) => Promise<boolean>;
   syncLoadPassphrase: () => Promise<string | null>;
+  syncRestore: (vaultPath: string, vaultId: string, relayUrl: string, autoSyncInterval?: number) => Promise<boolean>;
   onSyncProgress: (callback: (data: SyncProgress) => void) => void;
 }
 

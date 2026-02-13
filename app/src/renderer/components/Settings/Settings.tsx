@@ -49,6 +49,7 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
 
   // Sync Setup State
   const [syncMode, setSyncMode] = useState<'new' | 'join'>('new')
+  const [syncActivationCode, setSyncActivationCode] = useState('')
   const [syncPassphrase, setSyncPassphrase] = useState('')
   const [syncJoinVaultId, setSyncJoinVaultId] = useState('')
   const [syncLoading, setSyncLoading] = useState(false)
@@ -1721,6 +1722,27 @@ LIMIT 10
                     )}
 
                     <div className="sync-input-group">
+                      <label>{t('settings.sync.relayUrl')}</label>
+                      <input
+                        type="text"
+                        value={syncState.relayUrl}
+                        onChange={e => syncState.setRelayUrl(e.target.value)}
+                        placeholder="wss://sync.example.com"
+                      />
+                    </div>
+
+                    <div className="sync-input-group">
+                      <label>{t('settings.sync.activationCode')}</label>
+                      <input
+                        type="text"
+                        value={syncActivationCode}
+                        onChange={e => setSyncActivationCode(e.target.value)}
+                        placeholder={t('settings.sync.activationCode')}
+                      />
+                      <span className="sync-input-hint">{t('settings.sync.activationCodeHint')}</span>
+                    </div>
+
+                    <div className="sync-input-group">
                       <label>{t('settings.sync.passphrase')}</label>
                       <input
                         type="password"
@@ -1732,17 +1754,6 @@ LIMIT 10
                       <span className="sync-input-warning">{t('settings.sync.passphraseWarning')}</span>
                     </div>
 
-                    <div className="sync-input-group">
-                      <label>{t('settings.sync.relayUrl')}</label>
-                      <input
-                        type="text"
-                        value={syncState.relayUrl}
-                        onChange={e => syncState.setRelayUrl(e.target.value)}
-                        placeholder="wss://sync.mindgraph.app"
-                      />
-                      <span className="sync-input-hint">ws://localhost:8080 zum lokalen Testen</span>
-                    </div>
-
                     {syncSetupError && (
                       <div className="sync-input-warning" style={{ color: '#e53935' }}>
                         {syncSetupError}
@@ -1751,19 +1762,20 @@ LIMIT 10
 
                     <button
                       className="sync-activate-btn"
-                      disabled={!syncPassphrase || (syncMode === 'join' && !syncJoinVaultId) || !vaultPath || syncLoading}
+                      disabled={!syncPassphrase || !syncActivationCode || !syncState.relayUrl || (syncMode === 'join' && !syncJoinVaultId) || !vaultPath || syncLoading}
                       onClick={async () => {
                         if (!vaultPath) return
                         setSyncLoading(true)
                         setSyncSetupError(null)
                         try {
                           if (syncMode === 'new') {
-                            await syncState.initSync(vaultPath, syncPassphrase)
+                            await syncState.initSync(vaultPath, syncPassphrase, syncActivationCode)
                           } else {
-                            await syncState.joinSync(vaultPath, syncJoinVaultId, syncPassphrase)
+                            await syncState.joinSync(vaultPath, syncJoinVaultId, syncPassphrase, syncActivationCode)
                           }
                           setSyncPassphrase('')
                           setSyncJoinVaultId('')
+                          setSyncActivationCode('')
                         } catch (err) {
                           setSyncSetupError(err instanceof Error ? err.message : 'Setup failed')
                         } finally {
@@ -1796,9 +1808,14 @@ LIMIT 10
                     </div>
 
                     <div className="sync-info-grid">
+                      <span className="sync-info-label">{t('settings.sync.vaultName')}:</span>
+                      <span className="sync-info-value">
+                        <strong>{syncState.vaultName || vaultPath?.split(/[/\\]/).pop() || 'Vault'}</strong>
+                      </span>
+
                       <span className="sync-info-label">{t('settings.sync.vaultId')}:</span>
                       <span className="sync-info-value">
-                        <code>{syncState.vaultId}</code>
+                        <code style={{ fontSize: '0.85em', opacity: 0.7 }}>{syncState.vaultId}</code>
                         <button
                           className="sync-copy-btn"
                           onClick={() => {
