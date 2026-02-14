@@ -1282,36 +1282,30 @@
         </div>
         <div class="terminal-body">
           <div class="terminal-line">
-            <span class="terminal-prompt">~/notes $</span>
-            <span class="terminal-command" data-i18n="terminal.cmd1"> opencode "Erstelle eine Zusammenfassung aller Meeting-Notizen"</span>
+            <span class="terminal-prompt">~/Organische Chemie $</span>
+            <span class="terminal-command" data-i18n="terminal.cmd1"> opencode "Erstelle mir anschauliche Grafiken zum Thema Alkane"</span>
           </div>
           <div class="terminal-line output">
-            <span style="color: #f97316;">●</span> <span data-i18n="terminal.out1">Analysiere 12 Meeting-Notizen...</span>
+            <span style="color: #f97316;">&#9679;</span> <span data-i18n="terminal.out1">Lese [[Alkane.md]], [[Bindungstypen.md]] und 3 weitere Notizen...</span>
           </div>
           <div class="terminal-line output">
-            <span style="color: #22c55e;">✓</span> <span data-i18n="terminal.out2">Zusammenfassung erstellt in [[Meeting-Summary.md]]</span>
+            <span style="color: #22c55e;">&#10003;</span> <span data-i18n="terminal.out2">SVG-Strukturformeln f&uuml;r Methan, Ethan, Propan erstellt</span>
           </div>
-          <div class="terminal-line" style="margin-top: 1rem;">
-            <span class="terminal-prompt">~/notes $</span>
-            <span class="terminal-command" data-i18n="terminal.cmd2"> ollama run llama3 "Erkläre [[Quantenmechanik]]"</span>
-          </div>
-          <div class="terminal-line output" data-i18n="terminal.out3">
-            Die Quantenmechanik beschreibt das Verhalten von Materie...
+          <div class="terminal-line output">
+            <span style="color: #22c55e;">&#10003;</span> <span data-i18n="terminal.out3">Bilder in [[Alkane.md]] eingebettet</span>
           </div>
         </div>
       </div>
       <div class="terminal-info">
         <h2 data-i18n="terminal.title">KI direkt in deinen Notizen</h2>
         <p data-i18n="terminal.desc">
-          Das integrierte Terminal macht MindGraph Notes einzigartig:
-          Starte <strong>OpenCode</strong>, <strong>Ollama</strong> oder jedes andere CLI-Tool
-          direkt neben deinen Notizen - ohne Kontextwechsel.
+          Das integrierte Terminal macht MindGraph Notes einzigartig: Starte <strong>OpenCode</strong>, <strong>Claude Code</strong> oder <strong>Ollama</strong> direkt neben deinen Notizen. Lass dir Grafiken erstellen, Zusammenfassungen schreiben oder Quiz-Fragen generieren &ndash; ohne Kontextwechsel.
         </p>
         <ul class="terminal-features">
-          <li><span class="check">✓</span> <span data-i18n="terminal.f1">OpenCode für KI-gestützte Workflows</span></li>
-          <li><span class="check">✓</span> <span data-i18n="terminal.f2">Lokale LLMs via Ollama, LM Studio</span></li>
-          <li><span class="check">✓</span> <span data-i18n="terminal.f3">Git, npm, Python - jedes CLI-Tool</span></li>
-          <li><span class="check">✓</span> <span data-i18n="terminal.f4">Direkter Zugriff auf deine Markdown-Dateien</span></li>
+          <li><span class="check">&#10003;</span> <span data-i18n="terminal.f1">OpenCode, Claude Code und Ollama direkt nutzen</span></li>
+          <li><span class="check">&#10003;</span> <span data-i18n="terminal.f2">KI liest deine Notizen und arbeitet im Kontext</span></li>
+          <li><span class="check">&#10003;</span> <span data-i18n="terminal.f3">Grafiken, Zusammenfassungen, Quiz &ndash; alles per Prompt</span></li>
+          <li><span class="check">&#10003;</span> <span data-i18n="terminal.f4">100% lokal m&ouml;glich &ndash; deine Daten bleiben privat</span></li>
         </ul>
       </div>
     </div>
@@ -2070,18 +2064,17 @@ tags: [projekt, arbeit, wichtig]
         "hero.title": "Dein Wissen,<br>deine Werkzeuge.",
         "hero.subtitle": "Eine Notiz-App für Menschen die selbst denken wollen. Lokale Dateien, bidirektionale Links, visuelles Canvas – und ein Terminal für die, die mehr wollen.",
         "hero.cta": "Jetzt herunterladen",
-        "terminal.cmd1": " git commit -m \"Neue Erkenntnisse zu Quantenmechanik\"",
-        "terminal.out1": "[main 4f2a1b3] Neue Erkenntnisse zu Quantenmechanik",
-        "terminal.out2": "1 file changed, 47 insertions(+)",
-        "terminal.cmd2": " ollama run llama3 \"Fasse [[Meeting-Notes]] zusammen\" # optional",
-        "terminal.out3": "Die wichtigsten Punkte waren...",
+        "terminal.cmd1": " opencode \"Erstelle mir anschauliche Grafiken zum Thema Alkane\"",
+        "terminal.out1": "Lese [[Alkane.md]], [[Bindungstypen.md]] und 3 weitere Notizen...",
+        "terminal.out2": "SVG-Strukturformeln für Methan, Ethan, Propan erstellt",
+        "terminal.out3": "Bilder in [[Alkane.md]] eingebettet",
         "terminal.bar": "Terminal",
-        "terminal.title": "Du denkst. KI assistiert.",
-        "terminal.desc": "In einer Welt voller AI-generiertem Inhalt brauchen wir authentisches menschliches Denken. MindGraph Notes gibt dir die Werkzeuge – <strong>du entscheidest</strong>, wann und ob KI eingreift. Jeder KI-Beitrag wird in deinen Notizen zitiert.",
-        "terminal.f1": "Human First: Du schreibst, KI unterstützt optional",
-        "terminal.f2": "Transparent: KI-Beiträge werden als solche gekennzeichnet",
-        "terminal.f3": "Lokal: Deine Gedanken bleiben auf deinem Rechner",
-        "terminal.f4": "Kein AI Slop: Echter Content statt generierter Masse",
+        "terminal.title": "KI direkt in deinen Notizen",
+        "terminal.desc": "Das integrierte Terminal macht MindGraph Notes einzigartig: Starte <strong>OpenCode</strong>, <strong>Claude Code</strong> oder <strong>Ollama</strong> direkt neben deinen Notizen. Lass dir Grafiken erstellen, Zusammenfassungen schreiben oder Quiz-Fragen generieren – ohne Kontextwechsel.",
+        "terminal.f1": "OpenCode, Claude Code und Ollama direkt nutzen",
+        "terminal.f2": "KI liest deine Notizen und arbeitet im Kontext",
+        "terminal.f3": "Grafiken, Zusammenfassungen, Quiz – alles per Prompt",
+        "terminal.f4": "100% lokal möglich – deine Daten bleiben privat",
         "features.title": "Mehr als nur Notizen",
         "features.subtitle": "Alles was du brauchst. Nichts was du nicht willst.",
         "features.canvas.title": "Local Canvas",
@@ -2289,18 +2282,17 @@ tags: [projekt, arbeit, wichtig]
         "hero.title": "Your knowledge,<br>your tools.",
         "hero.subtitle": "A note-taking app for people who want to think for themselves. Local files, bidirectional links, visual canvas – and a terminal for those who want more.",
         "hero.cta": "Download now",
-        "terminal.cmd1": " git commit -m \"New insights on quantum mechanics\"",
-        "terminal.out1": "[main 4f2a1b3] New insights on quantum mechanics",
-        "terminal.out2": "1 file changed, 47 insertions(+)",
-        "terminal.cmd2": " ollama run llama3 \"Summarize [[Meeting-Notes]]\" # optional",
-        "terminal.out3": "The key points were...",
+        "terminal.cmd1": " opencode \"Create visual diagrams about alkanes for my chemistry notes\"",
+        "terminal.out1": "Reading [[Alkanes.md]], [[Bond Types.md]] and 3 more notes...",
+        "terminal.out2": "SVG structural formulas for methane, ethane, propane created",
+        "terminal.out3": "Images embedded in [[Alkanes.md]]",
         "terminal.bar": "Terminal",
-        "terminal.title": "You think. AI assists.",
-        "terminal.desc": "In a world flooded with AI-generated content, we need authentic human thinking. MindGraph Notes gives you the tools – <strong>you decide</strong> when and if AI steps in. Every AI contribution is cited in your notes.",
-        "terminal.f1": "Human First: You write, AI supports optionally",
-        "terminal.f2": "Transparent: AI contributions are marked as such",
-        "terminal.f3": "Local: Your thoughts stay on your machine",
-        "terminal.f4": "No AI slop: Real content over generated mass",
+        "terminal.title": "AI right inside your notes",
+        "terminal.desc": "The integrated terminal makes MindGraph Notes unique: Run <strong>OpenCode</strong>, <strong>Claude Code</strong> or <strong>Ollama</strong> right next to your notes. Generate diagrams, write summaries or create quiz questions – without switching context.",
+        "terminal.f1": "Use OpenCode, Claude Code and Ollama directly",
+        "terminal.f2": "AI reads your notes and works in context",
+        "terminal.f3": "Diagrams, summaries, quizzes – all via prompt",
+        "terminal.f4": "100% local possible – your data stays private",
         "features.title": "More than just notes",
         "features.subtitle": "Everything you need. Nothing you don't.",
         "features.canvas.title": "Local Canvas",
