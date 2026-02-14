@@ -686,7 +686,7 @@ const App: React.FC = () => {
             {sidebarVisible && (
               <>
                 <div style={{ width: sidebarWidth, minWidth: sidebarWidth, flexShrink: 0 }}>
-                  <Sidebar />
+                  <Sidebar onOpenSearch={() => setQuickSearchOpen(true)} />
                 </div>
                 <div
                   className="sidebar-divider"

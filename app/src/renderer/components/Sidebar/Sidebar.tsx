@@ -11,7 +11,11 @@ import { extractTaskStatsForCache } from '../../utils/linkExtractor'
 import { parseFrontmatter } from '../../utils/metadataExtractor'
 import type { Note, NotesCache, NoteFrontmatter } from '../../../shared/types'
 
-export const Sidebar: React.FC = () => {
+interface SidebarProps {
+  onOpenSearch?: () => void
+}
+
+export const Sidebar: React.FC<SidebarProps> = ({ onOpenSearch }) => {
   const { vaultPath, fileTree, notes, setVaultPath, setFileTree, setNotes, addNote, selectNote, setLoading } = useNotesStore()
   const { sidebarWidth, sidebarVisible, fileTreeDisplayMode, setFileTreeDisplayMode } = useUIStore()
   const loadGraphData = useGraphStore((s) => s.loadFromVault)
@@ -313,6 +317,14 @@ export const Sidebar: React.FC = () => {
       <div className="sidebar-header">
         <h2>MindGraph Notes</h2>
         <div className="sidebar-header-actions">
+          {onOpenSearch && (
+            <button className="btn-icon" onClick={onOpenSearch} title={t('sidebar.search')}>
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                <circle cx="7" cy="7" r="4.5" stroke="currentColor" strokeWidth="1.3"/>
+                <path d="M10.5 10.5L14 14" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
+              </svg>
+            </button>
+          )}
           <button className="btn-icon" onClick={handleNewNote} title="Neue Notiz (Cmd+N)">
             +
           </button>
