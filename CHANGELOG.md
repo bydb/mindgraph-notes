@@ -2,6 +2,23 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.2.3-alpha] - 2026-02-14
+
+### Features
+- **Formatierungsleiste**: Neue sichtbare Toolbar mit Buttons für Bold, Italic, Strikethrough, Code, Überschriften (H1-H3), Listen, Checkboxen, Zitate, Links und Trennlinien
+- **Hilfe-Guide**: Icon-Übersicht jederzeit aufrufbar über `?`-Button in der Titelleiste oder `Cmd+/`
+- **Aufzählungslisten in applyFormat**: Neue Formatierungsoptionen für Bullet Lists, nummerierte Listen und horizontale Trennlinien
+
+### Improvements
+- **Onboarding überarbeitet**: Icon-Übersicht auf Seite 3 zeigt jetzt alle App-Icons korrekt, profilspezifisch (Smart Connections, Notes Chat nur für Wissensarbeiter)
+- **Schüler-Profil**: Startet jetzt mit sichtbarer Formatierungsleiste und Preview-Modus
+- **Alle Profile**: Dateien öffnen standardmäßig in der Preview-Ansicht
+- **Live Preview erweitert**: Versteckt jetzt auch Aufzählungszeichen (`- `), nummerierte Listen und Blockquotes (`> `) visuell
+
+### Fixes
+- **Settings-Hinweistexte**: Labels und Beschreibungen in den Einstellungen werden nicht mehr ohne Zeilenumbruch zusammengeschoben (`.settings-hint` CSS Fix)
+- **Sidebar**: Such-Icon in der Übersicht ergänzt
+
 ## [1.0.27-alpha] - 2026-02-13
 
 ### Security Fixes
