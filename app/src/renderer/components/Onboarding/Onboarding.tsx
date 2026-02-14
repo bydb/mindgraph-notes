@@ -88,6 +88,9 @@ export const Onboarding: React.FC = () => {
           <FeaturesStep
             onBack={() => setStep('ai')}
             onFinish={completeOnboarding}
+            showFlashcards={selectedProfile !== 'wissensmanagement'}
+            showSmartConnections={selectedProfile === 'wissensmanagement'}
+            showNotesChat={selectedProfile === 'wissensmanagement'}
           />
         )}
       </div>

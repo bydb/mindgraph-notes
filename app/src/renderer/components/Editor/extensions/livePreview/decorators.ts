@@ -85,7 +85,9 @@ function isOnCursorLine(ctx: DecoratorContext, from: number, to: number): boolea
 }
 
 /**
- * Add decoration if not on cursor line
+ * Add decoration safely.
+ * Replace decorations (those without 'class' in spec) must not span line breaks —
+ * CodeMirror throws "Decorations that replace line breaks may not be specified via plugins".
  */
 function addDecoration(
   ctx: DecoratorContext,
@@ -93,6 +95,12 @@ function addDecoration(
   to: number,
   decoration: Decoration
 ): void {
+  if (!('class' in decoration.spec) && from < to) {
+    const doc = ctx.view.state.doc
+    if (doc.lineAt(from).number !== doc.lineAt(to).number) {
+      return
+    }
+  }
   ctx.decorations.push({ from, to, decoration })
 }
 
@@ -347,10 +355,14 @@ export function decorateTaskList(ctx: DecoratorContext, node: SyntaxNode): void 
 export function decorateHorizontalRule(ctx: DecoratorContext, node: SyntaxNode): void {
   if (isOnCursorLine(ctx, node.from, node.to)) return
 
+  // Clamp to line end — the syntax tree node may include a trailing newline
+  const line = ctx.view.state.doc.lineAt(node.from)
+  const to = Math.min(node.to, line.to)
+
   addDecoration(
     ctx,
     node.from,
-    node.to,
+    to,
     Decoration.replace({ widget: new HorizontalRuleWidget() })
   )
 }

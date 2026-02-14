@@ -1,4 +1,5 @@
-import { Extension, StateField, StateEffect } from '@codemirror/state'
+import { Extension, StateField, StateEffect, RangeSetBuilder } from '@codemirror/state'
+import { Decoration, DecorationSet, EditorView } from '@codemirror/view'
 import { createLivePreviewPlugin } from './plugin'
 import { livePreviewTheme } from './theme'
 
@@ -46,10 +47,42 @@ export const vaultPathField = StateField.define<string>({
  * ]
  * ```
  */
+/**
+ * StateField that hides YAML frontmatter (--- ... ---) in live preview.
+ * Uses a StateField (not a ViewPlugin) so replace decorations CAN span line breaks.
+ */
+const frontmatterField = StateField.define<DecorationSet>({
+  create(state) {
+    return buildFrontmatterDecorations(state.doc.toString())
+  },
+  update(value, tr) {
+    if (tr.docChanged) {
+      return buildFrontmatterDecorations(tr.newDoc.toString())
+    }
+    return value
+  },
+  provide: f => EditorView.decorations.from(f)
+})
+
+function buildFrontmatterDecorations(doc: string): DecorationSet {
+  const builder = new RangeSetBuilder<Decoration>()
+  if (doc.startsWith('---')) {
+    const endIdx = doc.indexOf('\n---', 3)
+    if (endIdx !== -1) {
+      // Include the closing --- and the newline after it
+      let end = endIdx + 4 // length of '\n---'
+      if (doc[end] === '\n') end++ // skip trailing newline
+      builder.add(0, end, Decoration.replace({}))
+    }
+  }
+  return builder.finish()
+}
+
 export function livePreviewExtension(config: LivePreviewConfig = {}): Extension {
   return [
     vaultPathField.init(() => config.vaultPath || ''),
     livePreviewTheme,
+    frontmatterField,
     createLivePreviewPlugin()
   ]
 }

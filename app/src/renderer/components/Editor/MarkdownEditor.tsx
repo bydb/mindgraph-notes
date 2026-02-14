@@ -25,6 +25,7 @@ import { languageToolExtension, setLanguageToolMatches, setLtErrorClickHandler, 
 import { dataviewExtension, setDataviewNotes, setDataviewLanguage, setDataviewViewMode, setNoteClickHandler } from './extensions/dataview'
 import { useDataviewStore } from '../../stores/dataviewStore'
 import { PropertiesPanel } from './PropertiesPanel'
+import { FormattingToolbar } from './FormattingToolbar'
 import { AIContextMenu, AIResult } from './AIContextMenu'
 import { AIImageDialog } from './AIImageDialog'
 import { insertAIResultWithFootnote } from '../../utils/aiFootnote'
@@ -469,8 +470,8 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
   const { vaultPath, selectedNoteId, secondarySelectedNoteId, notes, updateNote, selectNote, selectSecondaryNote, addNote, fileTree, setFileTree, navigateBack, navigateForward, canNavigateBack, canNavigateForward } = useNotesStore(
     useShallow(s => ({ vaultPath: s.vaultPath, selectedNoteId: s.selectedNoteId, secondarySelectedNoteId: s.secondarySelectedNoteId, notes: s.notes, updateNote: s.updateNote, selectNote: s.selectNote, selectSecondaryNote: s.selectSecondaryNote, addNote: s.addNote, fileTree: s.fileTree, setFileTree: s.setFileTree, navigateBack: s.navigateBack, navigateForward: s.navigateForward, canNavigateBack: s.canNavigateBack, canNavigateForward: s.canNavigateForward }))
   )
-  const { pendingTemplateInsert, setPendingTemplateInsert, ollama, editorHeadingFolding, editorOutlining, outlineStyle, editorShowWordCount, languageTool, setLanguageTool, editorDefaultView } = useUIStore(
-    useShallow(s => ({ pendingTemplateInsert: s.pendingTemplateInsert, setPendingTemplateInsert: s.setPendingTemplateInsert, ollama: s.ollama, editorHeadingFolding: s.editorHeadingFolding, editorOutlining: s.editorOutlining, outlineStyle: s.outlineStyle, editorShowWordCount: s.editorShowWordCount, languageTool: s.languageTool, setLanguageTool: s.setLanguageTool, editorDefaultView: s.editorDefaultView }))
+  const { pendingTemplateInsert, setPendingTemplateInsert, ollama, editorHeadingFolding, editorOutlining, outlineStyle, editorShowWordCount, languageTool, setLanguageTool, editorDefaultView, showFormattingToolbar, setShowFormattingToolbar, showRawEditor } = useUIStore(
+    useShallow(s => ({ pendingTemplateInsert: s.pendingTemplateInsert, setPendingTemplateInsert: s.setPendingTemplateInsert, ollama: s.ollama, editorHeadingFolding: s.editorHeadingFolding, editorOutlining: s.editorOutlining, outlineStyle: s.outlineStyle, editorShowWordCount: s.editorShowWordCount, languageTool: s.languageTool, setLanguageTool: s.setLanguageTool, editorDefaultView: s.editorDefaultView, showFormattingToolbar: s.showFormattingToolbar, setShowFormattingToolbar: s.setShowFormattingToolbar, showRawEditor: s.showRawEditor }))
   )
 
   // Verwende die übergebene noteId oder die primary/secondary Selection
@@ -685,6 +686,50 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
         break
       case 'callout-summary':
         replacement = `> [!summary] Zusammenfassung\n> ${selectedText || 'Inhalt hier...'}`
+        break
+      case 'bulletList': {
+        const bulletLines = view.state.doc.sliceString(
+          view.state.doc.lineAt(from).from,
+          view.state.doc.lineAt(to).to
+        )
+        const lineFrom = view.state.doc.lineAt(from).from
+        const lineTo = view.state.doc.lineAt(to).to
+        const lines = bulletLines.split('\n')
+        const allBullets = lines.every(l => /^\s*- /.test(l))
+        const toggled = allBullets
+          ? lines.map(l => l.replace(/^(\s*)- /, '$1')).join('\n')
+          : lines.map(l => /^\s*- /.test(l) ? l : `- ${l}`).join('\n')
+        view.dispatch({
+          changes: { from: lineFrom, to: lineTo, insert: toggled },
+          selection: { anchor: lineFrom + toggled.length }
+        })
+        setFormatMenu(null)
+        view.focus()
+        return
+      }
+      case 'numberedList': {
+        const numLines = view.state.doc.sliceString(
+          view.state.doc.lineAt(from).from,
+          view.state.doc.lineAt(to).to
+        )
+        const numLineFrom = view.state.doc.lineAt(from).from
+        const numLineTo = view.state.doc.lineAt(to).to
+        const nLines = numLines.split('\n')
+        const allNumbered = nLines.every(l => /^\s*\d+\.\s/.test(l))
+        const numToggled = allNumbered
+          ? nLines.map(l => l.replace(/^(\s*)\d+\.\s/, '$1')).join('\n')
+          : nLines.map((l, i) => /^\s*\d+\.\s/.test(l) ? l : `${i + 1}. ${l}`).join('\n')
+        view.dispatch({
+          changes: { from: numLineFrom, to: numLineTo, insert: numToggled },
+          selection: { anchor: numLineFrom + numToggled.length }
+        })
+        setFormatMenu(null)
+        view.focus()
+        return
+      }
+      case 'horizontalRule':
+        replacement = `\n---\n`
+        cursorOffset = 0
         break
       case 'task':
         replacement = `- [ ] ${selectedText || 'Aufgabe'}`
@@ -1652,8 +1697,90 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
         // SOFORT speichern (ohne Debounce) für instant Canvas-Update
         saveContent(newContent)
       }
+      return
     }
+
   }, [notes, selectNote, selectSecondaryNote, isSecondary, vaultPath, previewContent, saveContent])
+
+  // Double-click on preview text → switch to live-preview and position cursor
+  const handlePreviewDoubleClick = useCallback((e: React.MouseEvent) => {
+    const target = e.target as HTMLElement
+
+    // Don't switch for interactive elements
+    if (target.classList.contains('wikilink') ||
+        target.classList.contains('task-checkbox') ||
+        target.classList.contains('task-list-item-checkbox') ||
+        (target.tagName === 'INPUT') ||
+        target.tagName === 'A') return
+
+    if (!viewRef.current || !previewRef.current) return
+
+    // Get the word selected by double-click (browser auto-selects the word)
+    const selection = window.getSelection()
+    const clickedWord = selection?.toString().trim() || ''
+
+    const docText = viewRef.current.state.doc.toString()
+
+    // Skip past YAML frontmatter
+    let searchStart = 0
+    if (docText.startsWith('---')) {
+      const endIdx = docText.indexOf('\n---', 3)
+      if (endIdx !== -1) {
+        searchStart = endIdx + 4
+        if (docText[searchStart] === '\n') searchStart++
+      }
+    }
+
+    // Estimate source line via click Y relative to preview scroll height
+    const previewEl = previewRef.current
+    const previewRect = previewEl.getBoundingClientRect()
+    const clickY = e.clientY - previewRect.top + previewEl.scrollTop
+    const totalHeight = previewEl.scrollHeight
+    const ratio = totalHeight > 0 ? clickY / totalHeight : 0
+
+    const doc = viewRef.current.state.doc
+    // Estimate which line we're on (map ratio to line number, skipping frontmatter lines)
+    const firstBodyLine = doc.lineAt(searchStart).number
+    const totalLines = doc.lines
+    const bodyLines = totalLines - firstBodyLine + 1
+    const estimatedLineNum = firstBodyLine + Math.floor(bodyLines * ratio)
+    const clampedLineNum = Math.max(firstBodyLine, Math.min(totalLines, estimatedLineNum))
+    const estimatedLine = doc.line(clampedLineNum)
+
+    // Search for the clicked word on the estimated line and nearby lines (±5)
+    let cursorPos = estimatedLine.from
+    if (clickedWord && clickedWord.length > 1) {
+      const searchRadius = 5
+      let found = false
+      for (let delta = 0; delta <= searchRadius && !found; delta++) {
+        const offsets = delta === 0 ? [0] : [-delta, delta]
+        for (const d of offsets) {
+          const lineNum = clampedLineNum + d
+          if (lineNum < firstBodyLine || lineNum > totalLines) continue
+          const line = doc.line(lineNum)
+          const idx = line.text.indexOf(clickedWord)
+          if (idx >= 0) {
+            cursorPos = line.from + idx
+            found = true
+            break
+          }
+        }
+      }
+    }
+
+    // Collapse properties panel and switch to live-preview
+    setPropertiesCollapsed(true)
+    setViewMode('live-preview')
+
+    setTimeout(() => {
+      if (!viewRef.current) return
+      viewRef.current.dispatch({
+        selection: { anchor: cursorPos },
+        scrollIntoView: true
+      })
+      viewRef.current.focus()
+    }, 50)
+  }, [])
 
   // Process headings to add fold toggles
   const processHeadingFolds = useCallback((html: string): string => {
@@ -2318,12 +2445,18 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
     }
   }, [viewMode, notes, vaultPath])
 
-  // Toggle view mode (cycles: edit -> live-preview -> preview -> edit)
+  // Toggle view mode (cycles depending on showRawEditor setting)
   const toggleViewMode = () => {
     setViewMode(prev => {
-      if (prev === 'edit') return 'live-preview'
-      if (prev === 'live-preview') return 'preview'
-      return 'edit'
+      if (showRawEditor) {
+        // Full cycle: edit -> live-preview -> preview -> edit
+        if (prev === 'edit') return 'live-preview'
+        if (prev === 'live-preview') return 'preview'
+        return 'edit'
+      } else {
+        // Simplified: live-preview <-> preview
+        return prev === 'preview' ? 'live-preview' : 'preview'
+      }
     })
   }
 
@@ -2602,6 +2735,19 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
               )}
             </button>
           )}
+          {viewMode !== 'preview' && (
+            <button
+              className={`formatting-toolbar-toggle ${showFormattingToolbar ? 'active' : ''}`}
+              onClick={() => setShowFormattingToolbar(!showFormattingToolbar)}
+              title={showFormattingToolbar ? t('toolbar.hide') : t('toolbar.show')}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M4 6h16"/>
+                <path d="M4 12h10"/>
+                <path d="M4 18h6"/>
+              </svg>
+            </button>
+          )}
           <button
             className="export-btn"
             onClick={handleExportPDF}
@@ -2614,15 +2760,17 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
             PDF
           </button>
           <div className="view-mode-toggle">
-            <button
-              className={`toggle-btn ${viewMode === 'edit' ? 'active' : ''}`}
-              onClick={() => setViewMode('edit')}
-              title="Bearbeiten (Cmd+E)"
-            >
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                <path d="M11.5 2.5L13.5 4.5L5 13H3V11L11.5 2.5Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-            </button>
+            {showRawEditor && (
+              <button
+                className={`toggle-btn ${viewMode === 'edit' ? 'active' : ''}`}
+                onClick={() => setViewMode('edit')}
+                title="Bearbeiten (Cmd+E)"
+              >
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                  <path d="M11.5 2.5L13.5 4.5L5 13H3V11L11.5 2.5Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </button>
+            )}
             <button
               className={`toggle-btn ${viewMode === 'live-preview' ? 'active' : ''}`}
               onClick={() => setViewMode('live-preview')}
@@ -2657,6 +2805,14 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
         />
       )}
 
+      {/* Formatting Toolbar */}
+      {showFormattingToolbar && viewMode !== 'preview' && (
+        <FormattingToolbar
+          onFormat={applyFormat}
+          viewRef={viewRef}
+        />
+      )}
+
       <div
         className={`editor-content ${viewMode !== 'preview' ? 'visible' : 'hidden'} ${viewMode === 'live-preview' ? 'live-preview-mode' : ''}`}
         ref={editorRef}
@@ -2665,6 +2821,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
       <div
         className={`editor-preview ${viewMode === 'preview' ? 'visible' : 'hidden'}${outlineStyle !== 'default' ? ` outline-${outlineStyle}` : ''}`}
         onClick={handlePreviewClick}
+        onDoubleClick={handlePreviewDoubleClick}
         onContextMenu={handlePreviewContextMenu}
         ref={previewRef}
       >

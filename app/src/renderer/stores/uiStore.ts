@@ -339,6 +339,11 @@ interface UIState {
   // Onboarding
   onboardingCompleted: boolean
   onboardingOpen: boolean
+  helpGuideOpen: boolean
+
+  // Formatting Toolbar
+  showFormattingToolbar: boolean
+  showRawEditor: boolean
 
   // User Profile
   userProfile: UserProfile
@@ -394,6 +399,9 @@ interface UIState {
   removeCustomLogo: () => void
   setOnboardingCompleted: (completed: boolean) => void
   setOnboardingOpen: (open: boolean) => void
+  setHelpGuideOpen: (open: boolean) => void
+  setShowFormattingToolbar: (show: boolean) => void
+  setShowRawEditor: (show: boolean) => void
   setUserProfile: (profile: UserProfile) => void
   applyProfileDefaults: (profile: UserProfile) => void
 }
@@ -503,6 +511,11 @@ const defaultState = {
   // Onboarding
   onboardingCompleted: false,
   onboardingOpen: false,
+  helpGuideOpen: false,
+
+  // Formatting Toolbar
+  showFormattingToolbar: false,
+  showRawEditor: false,
 
   // User Profile
   userProfile: null as UserProfile
@@ -522,7 +535,9 @@ const persistedKeys = [
   'customAccentColor', 'customBackgroundColorLight', 'customBackgroundColorDark',
   'customLogo',
   'onboardingCompleted',
-  'userProfile'
+  'userProfile',
+  'showFormattingToolbar',
+  'showRawEditor'
 ] as const
 
 export const useUIStore = create<UIState>()((set, get) => ({
@@ -585,6 +600,9 @@ export const useUIStore = create<UIState>()((set, get) => ({
   removeCustomLogo: () => set({ customLogo: null }),
   setOnboardingCompleted: (completed) => set({ onboardingCompleted: completed }),
   setOnboardingOpen: (open) => set({ onboardingOpen: open }),
+  setHelpGuideOpen: (open) => set({ helpGuideOpen: open }),
+  setShowFormattingToolbar: (show) => set({ showFormattingToolbar: show }),
+  setShowRawEditor: (show) => set({ showRawEditor: show }),
   setUserProfile: (profile) => set({ userProfile: profile }),
   applyProfileDefaults: (profile) => {
     if (!profile) return
@@ -595,7 +613,9 @@ export const useUIStore = create<UIState>()((set, get) => ({
           pdfCompanionEnabled: false,
           smartConnectionsEnabled: false,
           notesChatEnabled: false,
-          editorDefaultView: 'preview' as EditorViewMode
+          editorDefaultView: 'preview' as EditorViewMode,
+          showFormattingToolbar: true,
+          showRawEditor: false
         })
         break
       case 'studium':
@@ -603,7 +623,8 @@ export const useUIStore = create<UIState>()((set, get) => ({
           flashcardsEnabled: true,
           pdfCompanionEnabled: true,
           smartConnectionsEnabled: false,
-          notesChatEnabled: false
+          notesChatEnabled: false,
+          editorDefaultView: 'preview' as EditorViewMode
         })
         break
       case 'wissensmanagement':
@@ -611,7 +632,8 @@ export const useUIStore = create<UIState>()((set, get) => ({
           flashcardsEnabled: false,
           pdfCompanionEnabled: false,
           smartConnectionsEnabled: true,
-          notesChatEnabled: true
+          notesChatEnabled: true,
+          editorDefaultView: 'preview' as EditorViewMode
         })
         break
     }

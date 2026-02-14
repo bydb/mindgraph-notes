@@ -16,6 +16,7 @@ import { TemplateSettings } from './components/TemplatePicker/TemplateSettings'
 import { Settings } from './components/Settings/Settings'
 import { WhatsNew } from './components/WhatsNew/WhatsNew'
 import { Onboarding } from './components/Onboarding/Onboarding'
+import { HelpGuide } from './components/Onboarding/HelpGuide'
 import { UpdateNotification } from './components/UpdateNotification/UpdateNotification'
 import { QuizModal } from './components/Quiz/QuizModal'
 import { FlashcardsPanel, FlashcardStudy, FlashcardEditor } from './components/Flashcards'
@@ -51,7 +52,7 @@ const ViewModeButton: React.FC<{
 )
 
 const App: React.FC = () => {
-  const { viewMode, setViewMode, toggleSidebar, sidebarVisible, splitPosition, setSplitPosition, sidebarWidth, setSidebarWidth, theme, setTheme, accentColor, backgroundColor, fontFamily, setPendingTemplateInsert, textSplitEnabled, setTextSplitEnabled, textSplitPosition, setTextSplitPosition, smartConnectionsEnabled, notesChatEnabled, flashcardsEnabled, customLogo, customAccentColor, customBackgroundColorLight, customBackgroundColorDark } = useUIStore()
+  const { viewMode, setViewMode, toggleSidebar, sidebarVisible, splitPosition, setSplitPosition, sidebarWidth, setSidebarWidth, theme, setTheme, accentColor, backgroundColor, fontFamily, setPendingTemplateInsert, textSplitEnabled, setTextSplitEnabled, textSplitPosition, setTextSplitPosition, smartConnectionsEnabled, notesChatEnabled, flashcardsEnabled, customLogo, customAccentColor, customBackgroundColorLight, customBackgroundColorDark, setHelpGuideOpen } = useUIStore()
   const { notes, vaultPath, selectNote, selectedPdfPath, selectedImagePath, secondarySelectedNoteId, navigateBack, navigateForward, selectedNoteId } = useNotesStore()
   const { tabs, activeTabId, openEditorTab, setActiveTab, closeTab } = useTabStore()
   const activeTab = tabs.find(t => t.id === activeTabId)
@@ -415,6 +416,13 @@ const App: React.FC = () => {
           setActiveTab(tabs[currentIndex + 1].id)
         }
       }
+      // Cmd+/ für Hilfe-Guide (App-Übersicht)
+      if ((e.metaKey || e.ctrlKey) && e.key === '/' && !e.shiftKey && !e.altKey) {
+        e.preventDefault()
+        e.stopPropagation()
+        const { setHelpGuideOpen, helpGuideOpen } = useUIStore.getState()
+        setHelpGuideOpen(!helpGuideOpen)
+      }
     }
 
     // Capture-Phase verwenden, damit Event vor anderen Handlern abgefangen wird
@@ -677,6 +685,17 @@ const App: React.FC = () => {
                   <line x1="12" y1="19" x2="20" y2="19"/>
                 </svg>
               </button>
+              <button
+                className="view-mode-btn"
+                onClick={() => setHelpGuideOpen(true)}
+                title={t('titlebar.help')}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="10"/>
+                  <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
+                  <line x1="12" y1="17" x2="12.01" y2="17"/>
+                </svg>
+              </button>
             </div>
           </div>
         </div>
@@ -936,6 +955,8 @@ const App: React.FC = () => {
 
       {/* Onboarding (Fullscreen Overlay beim ersten Start) */}
       <Onboarding />
+      {/* Help Guide (jederzeit aufrufbar) */}
+      <HelpGuide />
     </ReactFlowProvider>
   )
 }

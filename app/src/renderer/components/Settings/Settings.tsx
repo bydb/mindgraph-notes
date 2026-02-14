@@ -119,7 +119,11 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
     customBackgroundColorLight,
     setCustomBackgroundColorLight,
     customBackgroundColorDark,
-    setCustomBackgroundColorDark
+    setCustomBackgroundColorDark,
+    showFormattingToolbar,
+    setShowFormattingToolbar,
+    showRawEditor,
+    setShowRawEditor
   } = useUIStore()
 
   const { t } = useTranslation()
@@ -701,6 +705,22 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
                     type="checkbox"
                     checked={editorShowWordCount}
                     onChange={e => setEditorShowWordCount(e.target.checked)}
+                  />
+                </div>
+                <div className="settings-row">
+                  <label>{t('settings.editor.formattingToolbar')}</label>
+                  <input
+                    type="checkbox"
+                    checked={showFormattingToolbar}
+                    onChange={e => setShowFormattingToolbar(e.target.checked)}
+                  />
+                </div>
+                <div className="settings-row">
+                  <label>{t('settings.editor.rawEditor')}</label>
+                  <input
+                    type="checkbox"
+                    checked={showRawEditor}
+                    onChange={e => setShowRawEditor(e.target.checked)}
                   />
                 </div>
 
