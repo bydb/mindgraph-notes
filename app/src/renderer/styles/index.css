@@ -26,15 +26,15 @@
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
   --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
   --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.12);
-  --shadow-glow: 0 0 20px rgba(255, 149, 0, 0.3);
+  --shadow-glow: 0 0 20px rgba(196, 130, 106, 0.3);
 
   /* Accent Colors */
   --accent-color: #0a84ff;
   --accent-hover: #0070e0;
   --accent-subtle: rgba(10, 132, 255, 0.12);
 
-  /* Backlink Colors - Orange! */
-  --backlink-color: #ff9500;
+  /* Backlink Colors - Warm Orange */
+  --backlink-color: #d4875a;
   --backlink-bg: #1a1a1a;
   --backlink-hover: #ffaa33;
 }
@@ -45,7 +45,8 @@
   --bg-secondary: color-mix(in srgb, var(--bg-primary-custom, #ffffff) 95%, #000);
   --bg-tertiary: color-mix(in srgb, var(--bg-primary-custom, #ffffff) 90%, #000);
   --bg-elevated: var(--bg-primary-custom, #ffffff);
-  --text-primary: #1a1a1a;
+  --bg-content: #ffffff;
+  --text-primary: #2d2d2d;
   --text-secondary: #555555;
   --text-muted: #888888;
   --border-color: color-mix(in srgb, var(--bg-primary-custom, #ffffff) 85%, #000);
@@ -71,6 +72,7 @@
   --bg-secondary: color-mix(in srgb, var(--bg-primary-custom-dark, #0d0d0d) 85%, #fff);
   --bg-tertiary: color-mix(in srgb, var(--bg-primary-custom-dark, #0d0d0d) 75%, #fff);
   --bg-elevated: color-mix(in srgb, var(--bg-primary-custom-dark, #0d0d0d) 90%, #fff);
+  --bg-content: color-mix(in srgb, var(--bg-primary-custom-dark, #0d0d0d) 95%, #fff);
   --text-primary: #f0f0f0;
   --text-secondary: #a0a0a0;
   --text-muted: #666666;
@@ -90,6 +92,7 @@
     --bg-secondary: #161616;
     --bg-tertiary: #1f1f1f;
     --bg-elevated: #1a1a1a;
+    --bg-content: #111111;
     --text-primary: #f0f0f0;
     --text-secondary: #a0a0a0;
     --text-muted: #666666;
@@ -852,7 +855,7 @@ body {
   flex-direction: column;
   border-right: 1px solid var(--border-color);
   overflow: hidden;
-  background-color: var(--bg-primary);
+  background-color: var(--bg-content);
 }
 
 .editor-container {
@@ -870,7 +873,7 @@ body {
   min-height: 44px;
   padding: 0 16px;
   border-bottom: 1px solid var(--border-color);
-  background-color: var(--bg-primary);
+  background-color: var(--bg-content);
   gap: 12px;
 }
 

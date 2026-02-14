@@ -53,7 +53,7 @@
     "url": "https://mindgraph-notes.de/",
     "downloadUrl": "https://github.com/bydb/mindgraph-notes/releases",
     "screenshot": "https://mindgraph-notes.de/screenshot.png",
-    "softwareVersion": "1.0.24-beta",
+    "softwareVersion": "0.2.1-alpha",
     "author": {
       "@type": "Person",
       "name": "Jochen Leeder",
@@ -83,15 +83,15 @@
     }
 
     :root {
-      --bg: #0a0a0f;
-      --bg-card: rgba(255, 255, 255, 0.03);
-      --bg-card-hover: rgba(255, 255, 255, 0.06);
-      --text: #e4e4e7;
-      --text-muted: #71717a;
-      --accent: #f97316;
-      --accent-glow: rgba(249, 115, 22, 0.4);
-      --gradient: linear-gradient(135deg, #f97316 0%, #fb923c 50%, #fbbf24 100%);
-      --border: rgba(255, 255, 255, 0.08);
+      --bg: #faf8f0;
+      --bg-card: rgba(255, 255, 255, 0.7);
+      --bg-card-hover: rgba(255, 255, 255, 0.9);
+      --text: #2d2d2d;
+      --text-muted: #6b6b6b;
+      --accent: #d4875a;
+      --accent-glow: rgba(212, 135, 90, 0.25);
+      --gradient: linear-gradient(135deg, #d4875a 0%, #e0976a 50%, #c47a4e 100%);
+      --border: rgba(0, 0, 0, 0.08);
     }
 
     body {
@@ -119,9 +119,9 @@
       left: -50%;
       width: 200%;
       height: 200%;
-      background: radial-gradient(circle at 30% 30%, rgba(249, 115, 22, 0.15) 0%, transparent 50%),
-                  radial-gradient(circle at 70% 70%, rgba(251, 146, 60, 0.1) 0%, transparent 50%),
-                  radial-gradient(circle at 50% 50%, rgba(251, 191, 36, 0.05) 0%, transparent 50%);
+      background: radial-gradient(circle at 30% 30%, rgba(212, 135, 90, 0.08) 0%, transparent 50%),
+                  radial-gradient(circle at 70% 70%, rgba(212, 135, 90, 0.05) 0%, transparent 50%),
+                  radial-gradient(circle at 50% 50%, rgba(212, 135, 90, 0.03) 0%, transparent 50%);
       animation: bgMove 20s ease-in-out infinite;
     }
 
@@ -139,8 +139,8 @@
       height: 100%;
       z-index: -1;
       background-image:
-        linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
+        linear-gradient(rgba(0,0,0,0.02) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,0,0,0.02) 1px, transparent 1px);
       background-size: 50px 50px;
     }
 
@@ -155,7 +155,7 @@
       align-items: center;
       z-index: 100;
       backdrop-filter: blur(10px);
-      background: rgba(10, 10, 15, 0.8);
+      background: rgba(250, 248, 240, 0.85);
       border-bottom: 1px solid var(--border);
     }
 
@@ -321,7 +321,7 @@
 
     .btn-secondary:hover {
       background: var(--bg-card-hover);
-      border-color: rgba(255, 255, 255, 0.15);
+      border-color: rgba(0, 0, 0, 0.15);
     }
 
     .app-preview {
@@ -335,7 +335,7 @@
     .app-screenshot {
       border-radius: 12px;
       overflow: hidden;
-      box-shadow: 0 50px 100px -20px rgba(0, 0, 0, 0.5),
+      box-shadow: 0 50px 100px -20px rgba(0, 0, 0, 0.15),
                   0 0 60px var(--accent-glow);
       border: 1px solid var(--border);
     }
@@ -351,12 +351,12 @@
     }
 
     .terminal-command {
-      color: var(--text);
+      color: #e4e4e7;
     }
 
     .terminal-highlight {
       padding: 6rem 2rem;
-      background: linear-gradient(180deg, transparent 0%, rgba(249, 115, 22, 0.03) 50%, transparent 100%);
+      background: linear-gradient(180deg, transparent 0%, rgba(212, 135, 90, 0.05) 50%, transparent 100%);
     }
 
     .terminal-showcase {
@@ -369,19 +369,19 @@
     }
 
     .terminal-window {
-      background: #0d0d0d;
+      background: #1a1a1a;
       border-radius: 12px;
-      border: 1px solid var(--border);
+      border: 1px solid rgba(0, 0, 0, 0.12);
       overflow: hidden;
-      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.15);
     }
 
     .terminal-bar {
       padding: 0.75rem 1rem;
-      background: rgba(255, 255, 255, 0.05);
-      border-bottom: 1px solid var(--border);
+      background: rgba(255, 255, 255, 0.08);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
       font-size: 0.8rem;
-      color: var(--text-muted);
+      color: #999;
     }
 
     .terminal-body {
@@ -396,7 +396,7 @@
     }
 
     .terminal-line.output {
-      color: var(--text-muted);
+      color: #999;
       padding-left: 1rem;
     }
 
@@ -482,7 +482,7 @@
 
     .feature-card:hover {
       background: var(--bg-card-hover);
-      border-color: rgba(249, 115, 22, 0.3);
+      border-color: rgba(212, 135, 90, 0.3);
       transform: translateY(-4px);
     }
 
@@ -509,13 +509,13 @@
     }
 
     .feature-card.featured {
-      background: linear-gradient(135deg, rgba(249, 115, 22, 0.1) 0%, rgba(251, 191, 36, 0.05) 100%);
-      border-color: rgba(249, 115, 22, 0.3);
+      background: linear-gradient(135deg, rgba(212, 135, 90, 0.08) 0%, rgba(212, 135, 90, 0.03) 100%);
+      border-color: rgba(212, 135, 90, 0.3);
     }
 
     .feature-card.featured:hover {
-      border-color: rgba(249, 115, 22, 0.5);
-      box-shadow: 0 0 30px rgba(249, 115, 22, 0.2);
+      border-color: rgba(212, 135, 90, 0.5);
+      box-shadow: 0 0 30px rgba(212, 135, 90, 0.15);
     }
 
     .color-dots {
@@ -538,13 +538,56 @@
     }
 
     .customization-card {
-      background: linear-gradient(135deg, rgba(244, 114, 182, 0.08) 0%, rgba(192, 132, 252, 0.08) 33%, rgba(52, 211, 153, 0.08) 66%, rgba(251, 191, 36, 0.08) 100%) !important;
-      border-color: rgba(192, 132, 252, 0.3) !important;
+      background: linear-gradient(135deg, rgba(244, 114, 182, 0.06) 0%, rgba(192, 132, 252, 0.06) 33%, rgba(52, 211, 153, 0.06) 66%, rgba(251, 191, 36, 0.06) 100%) !important;
+      border-color: rgba(192, 132, 252, 0.2) !important;
     }
 
     .customization-card:hover {
-      border-color: rgba(244, 114, 182, 0.5) !important;
-      box-shadow: 0 0 30px rgba(192, 132, 252, 0.2) !important;
+      border-color: rgba(244, 114, 182, 0.4) !important;
+      box-shadow: 0 0 30px rgba(192, 132, 252, 0.1) !important;
+    }
+
+    /* User Group Sections */
+    .user-group {
+      margin-bottom: 4rem;
+    }
+
+    .user-group:last-child {
+      margin-bottom: 0;
+    }
+
+    .user-group-header {
+      display: flex;
+      align-items: center;
+      gap: 1.25rem;
+      margin-bottom: 2rem;
+      padding-bottom: 1.5rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .user-group-icon {
+      width: 56px;
+      height: 56px;
+      background: var(--gradient);
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      color: white;
+    }
+
+    .user-group-info h3 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      margin-bottom: 0.25rem;
+      color: var(--text);
+    }
+
+    .user-group-info p {
+      color: var(--text-muted);
+      font-size: 0.95rem;
+      margin: 0;
     }
 
     /* Dataview & Properties Documentation */
@@ -602,7 +645,7 @@
     }
 
     .code-example pre {
-      background: rgba(0, 0, 0, 0.3);
+      background: rgba(0, 0, 0, 0.05);
       border-radius: 8px;
       padding: 0.75rem 1rem;
       margin: 0 0 0.5rem 0;
@@ -612,7 +655,7 @@
     .code-example code {
       font-family: 'SF Mono', Monaco, Consolas, monospace;
       font-size: 0.85rem;
-      color: #e2e8f0;
+      color: #4a4a4a;
     }
 
     .code-desc {
@@ -652,7 +695,7 @@
     }
 
     .field-group code {
-      background: rgba(249, 115, 22, 0.15);
+      background: rgba(212, 135, 90, 0.12);
       color: var(--accent);
       padding: 0.15rem 0.4rem;
       border-radius: 4px;
@@ -667,7 +710,7 @@
     }
 
     .example-card .full-example pre {
-      background: rgba(0, 0, 0, 0.3);
+      background: rgba(0, 0, 0, 0.05);
       border-radius: 8px;
       padding: 1rem 1.25rem;
       margin: 0;
@@ -714,7 +757,7 @@
     }
 
     .property-info code {
-      background: rgba(249, 115, 22, 0.15);
+      background: rgba(212, 135, 90, 0.12);
       color: var(--accent);
       padding: 0.1rem 0.3rem;
       border-radius: 3px;
@@ -735,7 +778,7 @@
     }
 
     .properties-example pre {
-      background: rgba(0, 0, 0, 0.3);
+      background: rgba(0, 0, 0, 0.05);
       border-radius: 8px;
       padding: 1rem 1.25rem;
       margin: 0 0 1rem 0;
@@ -745,7 +788,7 @@
     .properties-example code {
       font-family: 'SF Mono', Monaco, Consolas, monospace;
       font-size: 0.85rem;
-      color: #e2e8f0;
+      color: #4a4a4a;
     }
 
     .example-note {
@@ -808,13 +851,13 @@
     }
 
     .shortcut-keys kbd {
-      background: rgba(249, 115, 22, 0.15);
+      background: rgba(212, 135, 90, 0.12);
       color: var(--accent);
       padding: 0.25rem 0.5rem;
       border-radius: 6px;
       font-size: 0.8rem;
       font-family: -apple-system, BlinkMacSystemFont, 'SF Mono', Monaco, monospace;
-      border: 1px solid rgba(249, 115, 22, 0.3);
+      border: 1px solid rgba(212, 135, 90, 0.3);
       min-width: 1.5rem;
       text-align: center;
     }
@@ -854,7 +897,7 @@
     }
 
     .setup-card:hover {
-      border-color: rgba(249, 115, 22, 0.3);
+      border-color: rgba(212, 135, 90, 0.3);
       transform: translateY(-2px);
     }
 
@@ -876,7 +919,7 @@
     }
 
     .setup-install {
-      background: rgba(0, 0, 0, 0.3);
+      background: rgba(0, 0, 0, 0.05);
       border-radius: 8px;
       padding: 1rem;
       margin: 1rem 0;
@@ -891,7 +934,7 @@
 
     .setup-install code {
       display: block;
-      background: rgba(249, 115, 22, 0.1);
+      background: rgba(212, 135, 90, 0.08);
       color: var(--accent);
       padding: 0.75rem;
       border-radius: 6px;
@@ -901,14 +944,14 @@
 
     .setup-note {
       font-size: 0.85rem;
-      background: rgba(249, 115, 22, 0.05);
+      background: rgba(212, 135, 90, 0.04);
       padding: 0.75rem;
       border-radius: 6px;
       border-left: 3px solid var(--accent);
     }
 
     .setup-note code {
-      background: rgba(0, 0, 0, 0.2);
+      background: rgba(0, 0, 0, 0.04);
       padding: 0.2rem 0.4rem;
       border-radius: 4px;
     }
@@ -1046,7 +1089,7 @@
     }
 
     .install-note code {
-      background: rgba(255, 255, 255, 0.1);
+      background: rgba(212, 135, 90, 0.1);
       padding: 0.2rem 0.5rem;
       border-radius: 4px;
       font-size: 0.8rem;
@@ -1106,13 +1149,13 @@
       top: 0;
       width: 100%;
       height: 100%;
-      background: rgba(0, 0, 0, 0.8);
+      background: rgba(0, 0, 0, 0.4);
       backdrop-filter: blur(5px);
       overflow-y: auto;
     }
 
     .modal-content {
-      background: var(--bg);
+      background: #ffffff;
       margin: 5% auto;
       padding: 2rem 3rem;
       border: 1px solid var(--border);
@@ -1120,7 +1163,7 @@
       max-width: 700px;
       width: 90%;
       position: relative;
-      box-shadow: 0 25px 50px rgba(0, 0, 0, 0.5);
+      box-shadow: 0 25px 50px rgba(0, 0, 0, 0.15);
     }
 
     .modal-close {
@@ -1166,207 +1209,6 @@
       color: var(--accent);
     }
 
-    /* Lernen / Student Section */
-    .lernen-section {
-      padding: 8rem 2rem;
-      max-width: 1200px;
-      margin: 0 auto;
-    }
-
-    .lernen-hero-text {
-      text-align: center;
-      max-width: 700px;
-      margin: 0 auto 3rem;
-      color: var(--text-muted);
-      font-size: 1.15rem;
-      line-height: 1.7;
-    }
-
-    .lernen-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
-      gap: 1.5rem;
-      margin-bottom: 3rem;
-    }
-
-    .lernen-card {
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      padding: 2rem;
-      transition: all 0.3s ease;
-    }
-
-    .lernen-card:hover {
-      background: var(--bg-card-hover);
-      border-color: rgba(249, 115, 22, 0.3);
-      transform: translateY(-4px);
-    }
-
-    .lernen-card-primary {
-      background: linear-gradient(135deg, rgba(249, 115, 22, 0.1) 0%, rgba(251, 191, 36, 0.05) 100%);
-      border-color: rgba(249, 115, 22, 0.3);
-    }
-
-    .lernen-card-primary:hover {
-      border-color: rgba(249, 115, 22, 0.5);
-      box-shadow: 0 0 30px rgba(249, 115, 22, 0.2);
-    }
-
-    .lernen-card-icon {
-      font-size: 2rem;
-      margin-bottom: 1rem;
-    }
-
-    .lernen-card h3 {
-      font-size: 1.25rem;
-      margin-bottom: 0.75rem;
-      color: var(--text);
-    }
-
-    .lernen-card p {
-      color: var(--text-muted);
-      font-size: 0.95rem;
-      line-height: 1.6;
-    }
-
-    .lernen-features-list {
-      list-style: none;
-      margin-top: 1rem;
-      padding: 0;
-    }
-
-    .lernen-features-list li {
-      padding: 0.4rem 0;
-      color: var(--text-muted);
-      font-size: 0.9rem;
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-    }
-
-    .lernen-features-list li::before {
-      content: '\2713';
-      color: #22c55e;
-      font-weight: bold;
-      flex-shrink: 0;
-    }
-
-    .lernen-workflow {
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      padding: 2.5rem;
-      margin-bottom: 3rem;
-    }
-
-    .lernen-workflow-content h3 {
-      font-size: 1.5rem;
-      margin-bottom: 1rem;
-      text-align: center;
-    }
-
-    .lernen-workflow-content > p {
-      color: var(--text-muted);
-      font-size: 1rem;
-      line-height: 1.7;
-      text-align: center;
-      max-width: 700px;
-      margin: 0 auto 2rem;
-    }
-
-    .lernen-workflow-steps {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 1rem;
-      flex-wrap: wrap;
-    }
-
-    .lernen-step {
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-      background: rgba(249, 115, 22, 0.08);
-      border: 1px solid rgba(249, 115, 22, 0.2);
-      border-radius: 12px;
-      padding: 1rem 1.5rem;
-    }
-
-    .lernen-step-num {
-      width: 28px;
-      height: 28px;
-      background: var(--gradient);
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-weight: 700;
-      font-size: 0.85rem;
-      color: white;
-      flex-shrink: 0;
-    }
-
-    .lernen-step span:last-child {
-      font-size: 0.9rem;
-      color: var(--text);
-    }
-
-    .lernen-step-arrow {
-      color: var(--accent);
-      font-size: 1.5rem;
-      font-weight: bold;
-    }
-
-    .lernen-audience {
-      text-align: center;
-    }
-
-    .lernen-audience > p {
-      color: var(--text-muted);
-      font-size: 1rem;
-      margin-bottom: 1rem;
-    }
-
-    .lernen-tags {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.75rem;
-      justify-content: center;
-    }
-
-    .lernen-tag {
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      border-radius: 100px;
-      padding: 0.5rem 1.25rem;
-      font-size: 0.9rem;
-      color: var(--text-muted);
-      transition: all 0.2s;
-    }
-
-    .lernen-tag:hover {
-      border-color: var(--accent);
-      color: var(--text);
-    }
-
-    @media (max-width: 768px) {
-      .lernen-section {
-        padding: 4rem 1rem;
-      }
-
-      .lernen-grid {
-        grid-template-columns: 1fr;
-      }
-
-      .lernen-workflow-steps {
-        flex-direction: column;
-      }
-
-      .lernen-step-arrow {
-        transform: rotate(90deg);
-      }
-    }
   </style>
 </head>
 <body>
@@ -1382,7 +1224,6 @@
     </div>
     <div class="nav-links">
       <a href="#features" data-i18n="nav.features">Features</a>
-      <a href="#lernen" data-i18n="nav.lernen">Lernen</a>
       <a href="#shortcuts" data-i18n="nav.shortcuts">Shortcuts</a>
       <a href="#setup" data-i18n="nav.setup">Setup</a>
       <a href="#download" data-i18n="nav.download">Download</a>
@@ -1479,216 +1320,178 @@
   <section class="features" id="features">
     <div class="section-title">
       <h2 data-i18n="features.title">Mehr als nur Notizen</h2>
-      <p data-i18n="features.subtitle">Die Brücke zwischen deinem Wissen und KI-Tools</p>
+      <p data-i18n="features.subtitle">Alles was du brauchst. Nichts was du nicht willst.</p>
     </div>
 
-    <div class="features-grid">
-      <!-- Hauptfeatures -->
-      <div class="feature-card featured">
-        <div class="feature-icon">🎨</div>
-        <h3 data-i18n="features.canvas.title">Local Canvas</h3>
-        <p data-i18n="features.canvas.desc">Erkunde Notizen visuell im Canvas. Starte mit einer Notiz, erweitere schrittweise über Verbindungen. NEU: Bidirektionale Links zwischen Canvas und Notizen.</p>
+    <!-- Schule / Lernen -->
+    <div class="user-group" id="schueler">
+      <div class="user-group-header">
+        <div class="user-group-icon">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M22 10v6M2 10l10-5 10 5-10 5z"/>
+            <path d="M6 12v5c0 1.66 2.69 3 6 3s6-1.34 6-3v-5"/>
+          </svg>
+        </div>
+        <div class="user-group-info">
+          <h3 data-i18n="usergroup.schule.title">Schule &amp; Lernen</h3>
+          <p data-i18n="usergroup.schule.desc">Karteikarten, Spaced Repetition und KI-Quiz &ndash; verwandle Notizen in aktives Lernmaterial</p>
+        </div>
       </div>
-
-      <div class="feature-card featured">
-        <div class="feature-icon">📄</div>
-        <h3 data-i18n="features.pdf.title">PDF Companion + Docling</h3>
-        <p data-i18n="features.pdf.desc">PDFs direkt neben deinen Notizen. NEU: Extrahiere Text, Tabellen und Bilder automatisch via Docling. Perfekt für Vorlesungsfolien, Paper und Scans.</p>
+      <div class="features-grid">
+        <div class="feature-card featured">
+          <div class="feature-icon">🎴</div>
+          <h3 data-i18n="features.flashcards.title">Karteikarten &amp; Quiz</h3>
+          <p data-i18n="features.flashcards.desc">Generiere Quiz-Fragen via Ollama, importiere Decks aus Anki (.apkg) und lerne mit Spaced Repetition (SM-2). NEU: Bilder in Karteikarten.</p>
+        </div>
+        <div class="feature-card featured">
+          <div class="feature-icon">🧠</div>
+          <h3 data-i18n="features.spaced.title">Spaced Repetition (SM-2)</h3>
+          <p data-i18n="features.spaced.desc">Wissenschaftlich bewiesene Lernmethode. Der SM-2 Algorithmus plant automatisch optimale Wiederholungsintervalle f&uuml;r Langzeitged&auml;chtnis.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">📝</div>
+          <h3 data-i18n="features.preview.title">Live Preview</h3>
+          <p data-i18n="features.preview.desc">Schreibe in Markdown mit sofortiger Vorschau. LaTeX, Mermaid-Diagramme, Callouts und mehr.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">⏰</div>
+          <h3 data-i18n="features.reminders.title">Erinnerungen</h3>
+          <p data-i18n="features.reminders.desc">&Uuml;berf&auml;llige Aufgaben und Lernkarten im Blick. Automatische Erinnerungen halten deinen Lernplan auf Kurs.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">🔒</div>
+          <h3 data-i18n="features.local.title">100% Lokal</h3>
+          <p data-i18n="features.local.desc">Alle Notizen sind Markdown-Dateien. Keine Cloud, kein Account, keine Telemetrie. Deine Daten geh&ouml;ren dir.</p>
+        </div>
       </div>
+    </div>
 
-      <div class="feature-card featured">
-        <div class="feature-icon">🔒</div>
-        <h3 data-i18n="features.local.title">100% Lokal</h3>
-        <p data-i18n="features.local.desc">Alle Notizen sind Markdown-Dateien. Keine Cloud, kein Account, keine Telemetrie. Deine Daten gehören dir.</p>
+    <!-- Studium & Wissenschaft -->
+    <div class="user-group" id="studium">
+      <div class="user-group-header">
+        <div class="user-group-icon">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="2"/>
+            <path d="M12 2v4"/><path d="m15 5.2-1.8 3.2"/><path d="m19.4 8-3.2 1.8"/>
+            <path d="M22 12h-4"/><path d="m19.4 16-3.2-1.8"/><path d="m15 18.8-1.8-3.2"/>
+            <path d="M12 22v-4"/><path d="m9 18.8 1.8-3.2"/><path d="m4.6 16 3.2-1.8"/>
+            <path d="M2 12h4"/><path d="m4.6 8 3.2 1.8"/><path d="m9 5.2 1.8 3.2"/>
+          </svg>
+        </div>
+        <div class="user-group-info">
+          <h3 data-i18n="usergroup.studium.title">Studium &amp; Wissenschaft</h3>
+          <p data-i18n="usergroup.studium.desc">Zotero, PDF Companion, Dataview und LaTeX &ndash; gebaut f&uuml;r den akademischen Alltag</p>
+        </div>
       </div>
-
-      <div class="feature-card featured">
-        <div class="feature-icon">🔗</div>
-        <h3 data-i18n="features.wikilinks.title">Wikilinks</h3>
-        <p data-i18n="features.wikilinks.desc">Verlinke Notizen mit [[Wikilinks]]. Bidirektionale Verbindungen, Backlinks-Panel, Obsidian-kompatibel.</p>
+      <div class="features-grid">
+        <div class="feature-card featured">
+          <div class="feature-icon">📚</div>
+          <h3 data-i18n="features.zotero.title">Zotero Integration</h3>
+          <p data-i18n="features.zotero.desc">F&uuml;ge Literatur direkt aus Zotero ein. Perfekt f&uuml;r akademisches Arbeiten und Recherche.</p>
+        </div>
+        <div class="feature-card featured">
+          <div class="feature-icon">📄</div>
+          <h3 data-i18n="features.pdf.title">PDF Companion + Docling</h3>
+          <p data-i18n="features.pdf.desc">PDFs direkt neben deinen Notizen. NEU: Extrahiere Text, Tabellen und Bilder automatisch via Docling. Perfekt f&uuml;r Vorlesungsfolien, Paper und Scans.</p>
+        </div>
+        <div class="feature-card featured">
+          <div class="feature-icon">🔍</div>
+          <h3 data-i18n="features.dataview.title">Dataview Queries</h3>
+          <p data-i18n="features.dataview.desc">NEU: Frage deine Notizen ab wie eine Datenbank. LIST und TABLE Queries mit FROM, WHERE, SORT. Filtere nach Tags, Ordnern und YAML-Frontmatter.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">⚙️</div>
+          <h3 data-i18n="features.properties.title">Properties Panel</h3>
+          <p data-i18n="features.properties.desc">NEU: Bearbeite YAML-Frontmatter komfortabel. Checkboxen f&uuml;r Booleans, Datumspicker, Arrays &ndash; alles ohne YAML-Syntax.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">📝</div>
+          <h3 data-i18n="features.languagetool.title">LanguageTool</h3>
+          <p data-i18n="features.languagetool.desc">NEU: Integrierte Grammatik- und Rechtschreibpr&uuml;fung. Lokal via Docker oder mit LanguageTool Premium API. Fehler werden direkt im Editor markiert.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">🎴</div>
+          <h3 data-i18n="features.flashcards.title">Karteikarten &amp; Quiz</h3>
+          <p data-i18n="features.flashcards.desc">Generiere Quiz-Fragen via Ollama, importiere Decks aus Anki (.apkg) und lerne mit Spaced Repetition (SM-2). NEU: Bilder in Karteikarten.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">✏️</div>
+          <h3 data-i18n="features.latex.title">LaTeX &amp; Mermaid</h3>
+          <p data-i18n="features.latex.desc">Mathematische Formeln mit LaTeX und Diagramme mit Mermaid direkt in der Vorschau. Perfekt f&uuml;r MINT-F&auml;cher.</p>
+        </div>
       </div>
+    </div>
 
-      <!-- Standardfeatures -->
-      <div class="feature-card">
-        <div class="feature-icon">📝</div>
-        <h3 data-i18n="features.preview.title">Live Preview</h3>
-        <p data-i18n="features.preview.desc">Schreibe in Markdown mit sofortiger Vorschau. LaTeX, Mermaid-Diagramme, Callouts und mehr.</p>
+    <!-- Wissensmanagement / PKM -->
+    <div class="user-group" id="pkm">
+      <div class="user-group-header">
+        <div class="user-group-icon">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 2a8 8 0 0 0-8 8c0 3.4 2.1 6.3 5 7.4V20h6v-2.6c2.9-1.1 5-4 5-7.4a8 8 0 0 0-8-8z"/>
+            <path d="M9 22h6"/><path d="M12 2v4"/><path d="M8 10h8"/><path d="M10 14h4"/>
+          </svg>
+        </div>
+        <div class="user-group-info">
+          <h3 data-i18n="usergroup.pkm.title">Wissensmanagement</h3>
+          <p data-i18n="usergroup.pkm.desc">Wikilinks, Canvas, Smart Connections und lokale KI &ndash; dein pers&ouml;nliches Wissensnetz</p>
+        </div>
       </div>
-
-      <div class="feature-card">
-        <div class="feature-icon">🌐</div>
-        <h3 data-i18n="features.graph.title">Canvas Übersicht</h3>
-        <p data-i18n="features.graph.desc">Alle Notizen auf einen Blick. Filter nach Ordnern, ordne frei an, entdecke Zusammenhänge.</p>
-      </div>
-
-      <div class="feature-card">
-        <div class="feature-icon">📚</div>
-        <h3 data-i18n="features.zotero.title">Zotero Integration</h3>
-        <p data-i18n="features.zotero.desc">Füge Literatur direkt aus Zotero ein. Perfekt für akademisches Arbeiten und Recherche.</p>
-      </div>
-
-      <div class="feature-card">
-        <div class="feature-icon">✅</div>
-        <h3 data-i18n="features.tasks.title">Task Management</h3>
-        <p data-i18n="features.tasks.desc">Aufgaben mit Fälligkeiten direkt in Notizen. Erinnerungen, Überfällig-Panel, Fortschritt auf Karten – alles ohne Extra-App.</p>
-      </div>
-
-      <div class="feature-card">
-        <div class="feature-icon">⌨️</div>
-        <h3 data-i18n="features.terminal.title">Integriertes Terminal</h3>
-        <p data-i18n="features.terminal.desc">Vollwertiges Terminal in der App. Git, npm, Python – jedes CLI-Tool direkt neben deinen Notizen.</p>
-      </div>
-
-      <!-- KI am Ende, zusammengefasst -->
-      <div class="feature-card featured">
-        <div class="feature-icon">🤖</div>
-        <h3 data-i18n="features.ai.title">KI-Funktionen (optional)</h3>
-        <p data-i18n="features.ai.desc">NEU: Smart Connections mit konfigurierbaren Gewichtungen (Embedding, Keywords, Wikilinks, Tags, Ordner). Notes Chat, lokale LLMs via Ollama/LM Studio. Aktiviere nur was du brauchst.</p>
-      </div>
-
-      <div class="feature-card featured">
-        <div class="feature-icon">📝</div>
-        <h3 data-i18n="features.languagetool.title">LanguageTool</h3>
-        <p data-i18n="features.languagetool.desc">NEU: Integrierte Grammatik- und Rechtschreibprüfung. Lokal via Docker oder mit LanguageTool Premium API. Fehler werden direkt im Editor markiert – Klick für Korrekturvorschläge.</p>
-      </div>
-
-      <div class="feature-card featured" style="cursor: pointer;" onclick="document.getElementById('lernen').scrollIntoView({behavior: 'smooth'})">
-        <div class="feature-icon">🎴</div>
-        <h3 data-i18n="features.flashcards.title">Karteikarten & Quiz</h3>
-        <p data-i18n="features.flashcards.desc">Generiere Quiz-Fragen via Ollama, importiere Decks aus Anki (.apkg) und lerne mit Spaced Repetition (SM-2). NEU: Bilder in Karteikarten.</p>
-      </div>
-
-      <div class="feature-card featured">
-        <div class="feature-icon">🔍</div>
-        <h3 data-i18n="features.dataview.title">Dataview Queries</h3>
-        <p data-i18n="features.dataview.desc">NEU: Frage deine Notizen ab wie eine Datenbank. LIST und TABLE Queries mit FROM, WHERE, SORT. Filtere nach Tags, Ordnern und YAML-Frontmatter.</p>
-      </div>
-
-      <div class="feature-card featured">
-        <div class="feature-icon">⚙️</div>
-        <h3 data-i18n="features.properties.title">Properties Panel</h3>
-        <p data-i18n="features.properties.desc">NEU: Bearbeite YAML-Frontmatter komfortabel. Checkboxen für Booleans, Datumspicker, Arrays – alles ohne YAML-Syntax.</p>
-      </div>
-
-      <div class="feature-card featured customization-card">
-        <div class="feature-icon">🎨</div>
-        <h3 data-i18n="features.customization.title">Deine Farben, dein Logo</h3>
-        <p data-i18n="features.customization.desc">NEU: 12 Akzentfarben, 15 Hintergründe und ein eigenes Logo in der Titelleiste. Mach MindGraph Notes zu deiner App.</p>
-        <div class="color-dots">
-          <span style="background:#0a84ff"></span>
-          <span style="background:#ff9500"></span>
-          <span style="background:#30d158"></span>
-          <span style="background:#bf5af2"></span>
-          <span style="background:#ff375f"></span>
-          <span style="background:#5ac8fa"></span>
-          <span style="background:#f472b6"></span>
-          <span style="background:#fb7185"></span>
-          <span style="background:#c084fc"></span>
-          <span style="background:#34d399"></span>
-          <span style="background:#a3e635"></span>
-          <span style="background:#fbbf24"></span>
+      <div class="features-grid">
+        <div class="feature-card featured">
+          <div class="feature-icon">🔗</div>
+          <h3 data-i18n="features.wikilinks.title">Wikilinks</h3>
+          <p data-i18n="features.wikilinks.desc">Verlinke Notizen mit [[Wikilinks]]. Bidirektionale Verbindungen, Backlinks-Panel, Obsidian-kompatibel.</p>
+        </div>
+        <div class="feature-card featured">
+          <div class="feature-icon">🎨</div>
+          <h3 data-i18n="features.canvas.title">Local Canvas</h3>
+          <p data-i18n="features.canvas.desc">Erkunde Notizen visuell im Canvas. Starte mit einer Notiz, erweitere schrittweise &uuml;ber Verbindungen. NEU: Bidirektionale Links zwischen Canvas und Notizen.</p>
+        </div>
+        <div class="feature-card featured">
+          <div class="feature-icon">🤖</div>
+          <h3 data-i18n="features.ai.title">KI-Funktionen (optional)</h3>
+          <p data-i18n="features.ai.desc">NEU: Smart Connections mit konfigurierbaren Gewichtungen (Embedding, Keywords, Wikilinks, Tags, Ordner). Notes Chat, lokale LLMs via Ollama/LM Studio. Aktiviere nur was du brauchst.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">⌨️</div>
+          <h3 data-i18n="features.terminal.title">Integriertes Terminal</h3>
+          <p data-i18n="features.terminal.desc">Vollwertiges Terminal in der App. Git, npm, Python &ndash; jedes CLI-Tool direkt neben deinen Notizen.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">✅</div>
+          <h3 data-i18n="features.tasks.title">Task Management</h3>
+          <p data-i18n="features.tasks.desc">Aufgaben mit F&auml;lligkeiten direkt in Notizen. Erinnerungen, &Uuml;berf&auml;llig-Panel, Fortschritt auf Karten &ndash; alles ohne Extra-App.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">🌐</div>
+          <h3 data-i18n="features.graph.title">Canvas &Uuml;bersicht</h3>
+          <p data-i18n="features.graph.desc">Alle Notizen auf einen Blick. Filter nach Ordnern, ordne frei an, entdecke Zusammenh&auml;nge.</p>
+        </div>
+        <div class="feature-card featured customization-card">
+          <div class="feature-icon">🎨</div>
+          <h3 data-i18n="features.customization.title">Deine Farben, dein Logo</h3>
+          <p data-i18n="features.customization.desc">NEU: 12 Akzentfarben, 15 Hintergr&uuml;nde und ein eigenes Logo in der Titelleiste. Mach MindGraph Notes zu deiner App.</p>
+          <div class="color-dots">
+            <span style="background:#0a84ff"></span>
+            <span style="background:#ff9500"></span>
+            <span style="background:#30d158"></span>
+            <span style="background:#bf5af2"></span>
+            <span style="background:#ff375f"></span>
+            <span style="background:#5ac8fa"></span>
+            <span style="background:#f472b6"></span>
+            <span style="background:#fb7185"></span>
+            <span style="background:#c084fc"></span>
+            <span style="background:#34d399"></span>
+            <span style="background:#a3e635"></span>
+            <span style="background:#fbbf24"></span>
+          </div>
         </div>
       </div>
     </div>
   </section>
 
-  <!-- Lernen / Student Section -->
-  <section class="lernen-section" id="lernen">
-    <div class="section-title">
-      <h2 data-i18n="lernen.title">Dein Lern-Cockpit</h2>
-      <p data-i18n="lernen.subtitle">Karteikarten, Spaced Repetition und KI-Quiz &ndash; alles in einer App</p>
-    </div>
-
-    <div class="lernen-hero-text">
-      <p data-i18n="lernen.intro">MindGraph Notes verwandelt deine Notizen in aktives Lernmaterial. Generiere Quiz-Fragen per KI, lerne mit wissenschaftlich bewiesenem Spaced Repetition und behalte den &Uuml;berblick mit deinem pers&ouml;nlichen Lern-Dashboard.</p>
-    </div>
-
-    <div class="lernen-grid">
-      <div class="lernen-card lernen-card-primary">
-        <div class="lernen-card-icon"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a9 9 0 0 1 9 9c0 3.9-3.2 7.2-6 9.5C13.6 21.7 12.8 22 12 22s-1.6-.3-3-1.5C6.2 18.2 3 14.9 3 11a9 9 0 0 1 9-9z"/><circle cx="12" cy="11" r="3"/></svg></div>
-        <h3 data-i18n="lernen.sr.title">Spaced Repetition (SM-2)</h3>
-        <p data-i18n="lernen.sr.desc">Der SuperMemo-2 Algorithmus plant automatisch, wann du welche Karte wiederholen solltest. Wissenschaftlich bewiesen: Spaced Repetition ist die effektivste Methode f&uuml;r Langzeitged&auml;chtnis.</p>
-        <ul class="lernen-features-list">
-          <li data-i18n="lernen.sr.f1">Automatische Wiederholungsplanung</li>
-          <li data-i18n="lernen.sr.f2">Schwierigkeitsbewertung pro Karte</li>
-          <li data-i18n="lernen.sr.f3">Optimale Intervalle f&uuml;r Langzeitlernen</li>
-          <li data-i18n="lernen.sr.f4">NEU: Anki-Import (.apkg) &amp; Bilder in Karten</li>
-        </ul>
-      </div>
-
-      <div class="lernen-card lernen-card-primary">
-        <div class="lernen-card-icon"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4m0 12v4M4.93 4.93l2.83 2.83m8.48 8.48l2.83 2.83M2 12h4m12 0h4M4.93 19.07l2.83-2.83m8.48-8.48l2.83-2.83"/><circle cx="12" cy="12" r="4"/></svg></div>
-        <h3 data-i18n="lernen.ai.title">KI-Quiz aus deinen Notizen</h3>
-        <p data-i18n="lernen.ai.desc">Rechtsklick auf eine Notiz oder einen Ordner und generiere per Klick Quiz-Fragen mit deiner lokalen KI (Ollama). Die Fragen werden automatisch als Karteikarten gespeichert &ndash; inklusive Spaced Repetition.</p>
-        <ul class="lernen-features-list">
-          <li data-i18n="lernen.ai.f1">Quiz-Generierung aus Notizen oder Ordnern</li>
-          <li data-i18n="lernen.ai.f2">Lokale KI &ndash; keine Daten in der Cloud</li>
-          <li data-i18n="lernen.ai.f3">Sofortiges Feedback und Erkl&auml;rungen</li>
-        </ul>
-      </div>
-
-      <div class="lernen-card">
-        <div class="lernen-card-icon"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M7 17v-4m4 4v-8m4 8v-6m4 6v-2"/></svg></div>
-        <h3 data-i18n="lernen.stats.title">Lern-Statistiken &amp; Dashboard</h3>
-        <p data-i18n="lernen.stats.desc">Verfolge deinen Lernfortschritt mit Streak-Tracking, Heatmap und detaillierten Statistiken. Sieh auf einen Blick, wie viele Karten du gelernt hast und wann die n&auml;chste Session ansteht.</p>
-      </div>
-
-      <div class="lernen-card">
-        <div class="lernen-card-icon"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></div>
-        <h3 data-i18n="lernen.citation.title">KI-Zitation &amp; Transparenz</h3>
-        <p data-i18n="lernen.citation.desc">Jede KI-generierte &Auml;nderung wird in deinen Notizen zitiert: Modellname, Zeitstempel und Originaltext als Fu&szlig;note. Du wei&szlig;t immer, was von dir und was von der KI stammt.</p>
-      </div>
-
-      <div class="lernen-card">
-        <div class="lernen-card-icon"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></div>
-        <h3 data-i18n="lernen.privacy.title">100% Lokal &amp; Privat</h3>
-        <p data-i18n="lernen.privacy.desc">Kein Account, keine Cloud, keine Telemetrie. Deine Lernkarten und Statistiken bleiben auf deinem Rechner. Perfekt f&uuml;r sensible Studieninhalte.</p>
-      </div>
-
-      <div class="lernen-card">
-        <div class="lernen-card-icon"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c0 1.1 2.7 3 6 3s6-1.9 6-3v-5"/></svg></div>
-        <h3 data-i18n="lernen.academic.title">Akademischer Workflow</h3>
-        <p data-i18n="lernen.academic.desc">Zotero-Zitate in Karteikarten, LaTeX-Formeln in der Vorschau, PDF-Extraktion f&uuml;r Vorlesungsfolien. Gebaut f&uuml;r den wissenschaftlichen Alltag.</p>
-      </div>
-    </div>
-
-    <!-- iPad Handwriting Workflow -->
-    <div class="lernen-workflow">
-      <div class="lernen-workflow-content">
-        <h3 data-i18n="lernen.ipad.title">Handschrift vom iPad in deine Notizen</h3>
-        <p data-i18n="lernen.ipad.desc">Schreibe mit dem Apple Pencil auf dem iPad, lasse die Handschrift per Apple Shortcuts automatisch transkribieren und sende sie direkt in deinen MindGraph Vault. Vorlesungsmitschriften werden zu durchsuchbarem Markdown.</p>
-        <div class="lernen-workflow-steps">
-          <div class="lernen-step">
-            <span class="lernen-step-num">1</span>
-            <span data-i18n="lernen.ipad.step1">Apple Pencil auf iPad</span>
-          </div>
-          <div class="lernen-step-arrow">&rarr;</div>
-          <div class="lernen-step">
-            <span class="lernen-step-num">2</span>
-            <span data-i18n="lernen.ipad.step2">Apple Shortcuts transkribiert</span>
-          </div>
-          <div class="lernen-step-arrow">&rarr;</div>
-          <div class="lernen-step">
-            <span class="lernen-step-num">3</span>
-            <span data-i18n="lernen.ipad.step3">Markdown in MindGraph Vault</span>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Target Audience Tags -->
-    <div class="lernen-audience">
-      <p data-i18n="lernen.audience.title">Perfekt f&uuml;r:</p>
-      <div class="lernen-tags">
-        <span class="lernen-tag" data-i18n="lernen.audience.med">Medizinstudium</span>
-        <span class="lernen-tag" data-i18n="lernen.audience.law">Jura</span>
-        <span class="lernen-tag" data-i18n="lernen.audience.cs">Informatik</span>
-        <span class="lernen-tag" data-i18n="lernen.audience.lang">Sprachen lernen</span>
-        <span class="lernen-tag" data-i18n="lernen.audience.teach">Lehrkr&auml;fte</span>
-        <span class="lernen-tag" data-i18n="lernen.audience.exam">Pr&uuml;fungsvorbereitung</span>
-      </div>
-    </div>
-  </section>
+  <!-- Keep lernen anchor for backwards compatibility -->
+  <div id="lernen"></div>
 
   <!-- Dataview Documentation Section -->
   <section class="dataview-docs" id="dataview">
@@ -2106,53 +1909,53 @@ tags: [projekt, arbeit, wichtig]
     <p data-i18n="download.subtitle">Kostenlos und Open Source. Für immer.</p>
 
     <div class="download-options">
-      <a href="https://github.com/bydb/mindgraph-notes/releases/download/v1.0.24-beta/MindGraph.Notes-1.0.24-beta-arm64.dmg" class="download-btn">
+      <a href="https://github.com/bydb/mindgraph-notes/releases/download/v0.2.1-alpha/MindGraph.Notes-0.2.1-alpha-arm64.dmg" class="download-btn">
         <svg viewBox="0 0 24 24" fill="currentColor">
           <path d="M18.71 19.5C17.88 20.74 17 21.95 15.66 21.97C14.32 22 13.89 21.18 12.37 21.18C10.84 21.18 10.37 21.95 9.09997 22C7.78997 22.05 6.79997 20.68 5.95997 19.47C4.24997 17 2.93997 12.45 4.69997 9.39C5.56997 7.87 7.12997 6.91 8.81997 6.88C10.1 6.86 11.32 7.75 12.11 7.75C12.89 7.75 14.37 6.68 15.92 6.84C16.57 6.87 18.39 7.1 19.56 8.82C19.47 8.88 17.39 10.1 17.41 12.63C17.44 15.65 20.06 16.66 20.09 16.67C20.06 16.74 19.67 18.11 18.71 19.5ZM13 3.5C13.73 2.67 14.94 2.04 15.94 2C16.07 3.17 15.6 4.35 14.9 5.19C14.21 6.04 13.07 6.7 11.95 6.61C11.8 5.46 12.36 4.26 13 3.5Z"/>
         </svg>
         <div class="download-info">
           <div class="platform">macOS (Apple Silicon)</div>
-          <div class="version">Version 1.0.24-beta - arm64</div>
+          <div class="version">Version 0.2.1-alpha - arm64</div>
         </div>
       </a>
 
-      <a href="https://github.com/bydb/mindgraph-notes/releases/download/v1.0.24-beta/MindGraph.Notes-1.0.24-beta.dmg" class="download-btn">
+      <a href="https://github.com/bydb/mindgraph-notes/releases/download/v0.2.1-alpha/MindGraph.Notes-0.2.1-alpha.dmg" class="download-btn">
         <svg viewBox="0 0 24 24" fill="currentColor">
           <path d="M18.71 19.5C17.88 20.74 17 21.95 15.66 21.97C14.32 22 13.89 21.18 12.37 21.18C10.84 21.18 10.37 21.95 9.09997 22C7.78997 22.05 6.79997 20.68 5.95997 19.47C4.24997 17 2.93997 12.45 4.69997 9.39C5.56997 7.87 7.12997 6.91 8.81997 6.88C10.1 6.86 11.32 7.75 12.11 7.75C12.89 7.75 14.37 6.68 15.92 6.84C16.57 6.87 18.39 7.1 19.56 8.82C19.47 8.88 17.39 10.1 17.41 12.63C17.44 15.65 20.06 16.66 20.09 16.67C20.06 16.74 19.67 18.11 18.71 19.5ZM13 3.5C13.73 2.67 14.94 2.04 15.94 2C16.07 3.17 15.6 4.35 14.9 5.19C14.21 6.04 13.07 6.7 11.95 6.61C11.8 5.46 12.36 4.26 13 3.5Z"/>
         </svg>
         <div class="download-info">
           <div class="platform">macOS (Intel)</div>
-          <div class="version">Version 1.0.24-beta - x64</div>
+          <div class="version">Version 0.2.1-alpha - x64</div>
         </div>
       </a>
 
-      <a href="https://github.com/bydb/mindgraph-notes/releases/download/v1.0.24-beta/MindGraph.Notes-1.0.24-beta.AppImage" class="download-btn">
+      <a href="https://github.com/bydb/mindgraph-notes/releases/download/v0.2.1-alpha/MindGraph.Notes-0.2.1-alpha.AppImage" class="download-btn">
         <svg viewBox="0 0 24 24" fill="currentColor">
           <path d="M12.504 0c-.155 0-.315.008-.48.021-4.226.333-3.105 4.807-3.17 6.298-.076 1.092-.3 1.953-1.05 3.02-.885 1.051-2.127 2.75-2.716 4.521-.278.832-.41 1.684-.287 2.489a.424.424 0 00-.11.135c-.26.268-.45.6-.663.839-.199.199-.485.267-.797.4-.313.136-.658.269-.864.68-.09.189-.136.394-.132.602 0 .199.027.4.055.536.058.399.116.728.04.97-.249.68-.28 1.145-.106 1.484.174.334.535.47.94.601.81.2 1.91.135 2.774.6.926.466 1.866.67 2.616.47.526-.116.97-.464 1.208-.946.587-.003 1.23-.269 2.26-.334.699-.058 1.574.267 2.577.2.025.134.063.198.114.333l.003.003c.391.778 1.113 1.132 1.884 1.071.771-.06 1.592-.536 2.257-1.306.631-.765 1.683-1.084 2.378-1.503.348-.199.629-.469.649-.853.023-.4-.2-.811-.714-1.376v-.097l-.003-.003c-.17-.2-.25-.535-.338-.926-.085-.401-.182-.786-.492-1.046h-.003c-.059-.054-.123-.067-.188-.135a.357.357 0 00-.19-.064c.431-1.278.264-2.55-.173-3.694-.533-1.41-1.465-2.638-2.175-3.483-.796-1.005-1.576-1.957-1.56-3.368.026-2.152.236-6.133-3.544-6.139zm.529 3.405h.013c.213 0 .396.062.584.198.19.135.33.332.438.533.105.259.158.459.166.724 0-.02.006-.04.006-.06v.105a.086.086 0 01-.004-.021l-.004-.024a1.807 1.807 0 01-.15.706.953.953 0 01-.213.335.71.71 0 00-.088-.042c-.104-.045-.198-.064-.284-.133a1.312 1.312 0 00-.22-.066c.05-.06.146-.133.183-.198.053-.128.082-.264.088-.402v-.02a1.21 1.21 0 00-.061-.4c-.045-.134-.101-.2-.183-.333-.084-.066-.167-.132-.267-.132h-.016c-.093 0-.176.03-.262.132a.8.8 0 00-.205.334 1.18 1.18 0 00-.09.4v.019c.002.089.008.179.02.267-.193-.067-.438-.135-.607-.202a1.635 1.635 0 01-.018-.2v-.02a1.772 1.772 0 01.15-.768c.082-.22.232-.406.43-.533a.985.985 0 01.594-.2zm-2.962.059h.036c.142 0 .27.048.399.135.146.129.264.288.344.465.09.199.14.4.153.667v.004c.007.134.006.2-.002.266v.08c-.03.007-.056.018-.083.024-.152.055-.274.135-.393.2.012-.09.013-.18.003-.267v-.015c-.012-.133-.04-.2-.082-.333a.613.613 0 00-.166-.267.248.248 0 00-.183-.064h-.021c-.071.006-.13.04-.186.132a.552.552 0 00-.12.27.944.944 0 00-.023.33v.015c.012.135.037.2.08.334.046.134.098.2.166.268.01.009.02.018.034.024-.07.057-.117.07-.176.136a.304.304 0 01-.131.068 2.62 2.62 0 01-.275-.402 1.772 1.772 0 01-.155-.667 1.759 1.759 0 01.08-.668 1.43 1.43 0 01.283-.535c.128-.133.26-.2.418-.2zm1.37 1.706c.332 0 .733.065 1.216.399.293.2.523.269 1.052.468h.003c.255.136.405.266.478.399v-.131a.571.571 0 01.016.47c-.123.31-.516.643-1.063.842v.002c-.268.135-.501.333-.775.465-.276.135-.588.292-1.012.267a1.139 1.139 0 01-.448-.067 3.566 3.566 0 01-.322-.198c-.195-.135-.363-.332-.612-.465v-.005h-.005c-.4-.246-.616-.512-.686-.71-.07-.268-.005-.47.193-.6.224-.135.38-.271.483-.336.104-.074.143-.102.176-.131h.002v-.003c.169-.202.436-.47.839-.601.139-.036.294-.065.466-.065zm2.8 2.142c.358 1.417 1.196 3.475 1.735 4.473.286.534.855 1.659 1.102 3.024.156-.005.33.018.513.064.646-1.671-.546-3.467-1.089-3.966-.22-.2-.232-.335-.123-.335.59.534 1.365 1.572 1.646 2.757.13.535.16 1.104.021 1.67.067.028.135.06.205.067 1.032.534 1.413.938 1.23 1.537v-.002c-.06.135-.19.334-.59.534-.22.135-.46.2-.717.2-.26 0-.537-.065-.755-.2-.216-.135-.399-.267-.544-.399-.145-.134-.3-.2-.467-.268-.19-.066-.39-.133-.57-.2h-.005a2.61 2.61 0 01-.016-.064c-.064-.135-.067-.267-.085-.399-.016-.135-.023-.268-.018-.334v-.004c.016-.267.076-.54.157-.813.088-.333.194-.666.319-.999a15.823 15.823 0 00.552-1.736c.065-.166.089-.333.048-.465-.04-.135-.119-.2-.238-.267a.927.927 0 00-.306-.064c-.125 0-.252.03-.386.1-.263.135-.474.333-.62.535a1.62 1.62 0 00-.246.6 1.44 1.44 0 00-.006.668c.056.266.17.468.345.665a1.12 1.12 0 00.675.332c.1.013.2-.002.3-.027-.432.937-.962 1.87-1.666 2.535-.247.237-.511.409-.779.564v.132c.018.067.042.135.063.198.022.064.04.135.063.199h-.008c.055.135.135.268.226.399.094.135.2.2.319.333l.003.003c.26.2.592.401.907.601h.001c.165.067.332.133.493.201.16.066.315.133.462.2.65.198 1.23.265 1.776.2.547-.066 1.028-.269 1.484-.669.46-.399.802-.936.977-1.67.174-.735.146-1.536-.092-2.339-.206-.666-.559-1.335-1.094-1.936-.105-.066-.18-.133-.24-.133h-.008c-.156 0-.348.066-.465.267l-.004.003c-.167.334-.37.534-.635.734-.264.2-.554.4-.837.534a2.062 2.062 0 01-.795.2c-.285 0-.532-.065-.73-.267-.197-.2-.345-.533-.383-.935v-.003c.078-.135.182-.27.268-.399.088-.135.177-.27.249-.401.18-.334.323-.666.422-1 .1-.335.16-.67.133-1.002v-.003c-.016-.198-.06-.398-.138-.6z"/>
         </svg>
         <div class="download-info">
           <div class="platform">Linux (AppImage)</div>
-          <div class="version">Version 1.0.24-beta - x64</div>
+          <div class="version">Version 0.2.1-alpha - x64</div>
         </div>
       </a>
 
-      <a href="https://github.com/bydb/mindgraph-notes/releases/download/v1.0.24-beta/mindgraph-notes_1.0.24-beta_amd64.deb" class="download-btn">
+      <a href="https://github.com/bydb/mindgraph-notes/releases/download/v0.2.1-alpha/mindgraph-notes_0.2.1-alpha_amd64.deb" class="download-btn">
         <svg viewBox="0 0 24 24" fill="currentColor">
           <path d="M12.504 0c-.155 0-.315.008-.48.021-4.226.333-3.105 4.807-3.17 6.298-.076 1.092-.3 1.953-1.05 3.02-.885 1.051-2.127 2.75-2.716 4.521-.278.832-.41 1.684-.287 2.489a.424.424 0 00-.11.135c-.26.268-.45.6-.663.839-.199.199-.485.267-.797.4-.313.136-.658.269-.864.68-.09.189-.136.394-.132.602 0 .199.027.4.055.536.058.399.116.728.04.97-.249.68-.28 1.145-.106 1.484.174.334.535.47.94.601.81.2 1.91.135 2.774.6.926.466 1.866.67 2.616.47.526-.116.97-.464 1.208-.946.587-.003 1.23-.269 2.26-.334.699-.058 1.574.267 2.577.2.025.134.063.198.114.333l.003.003c.391.778 1.113 1.132 1.884 1.071.771-.06 1.592-.536 2.257-1.306.631-.765 1.683-1.084 2.378-1.503.348-.199.629-.469.649-.853.023-.4-.2-.811-.714-1.376v-.097l-.003-.003c-.17-.2-.25-.535-.338-.926-.085-.401-.182-.786-.492-1.046h-.003c-.059-.054-.123-.067-.188-.135a.357.357 0 00-.19-.064c.431-1.278.264-2.55-.173-3.694-.533-1.41-1.465-2.638-2.175-3.483-.796-1.005-1.576-1.957-1.56-3.368.026-2.152.236-6.133-3.544-6.139zm.529 3.405h.013c.213 0 .396.062.584.198.19.135.33.332.438.533.105.259.158.459.166.724 0-.02.006-.04.006-.06v.105a.086.086 0 01-.004-.021l-.004-.024a1.807 1.807 0 01-.15.706.953.953 0 01-.213.335.71.71 0 00-.088-.042c-.104-.045-.198-.064-.284-.133a1.312 1.312 0 00-.22-.066c.05-.06.146-.133.183-.198.053-.128.082-.264.088-.402v-.02a1.21 1.21 0 00-.061-.4c-.045-.134-.101-.2-.183-.333-.084-.066-.167-.132-.267-.132h-.016c-.093 0-.176.03-.262.132a.8.8 0 00-.205.334 1.18 1.18 0 00-.09.4v.019c.002.089.008.179.02.267-.193-.067-.438-.135-.607-.202a1.635 1.635 0 01-.018-.2v-.02a1.772 1.772 0 01.15-.768c.082-.22.232-.406.43-.533a.985.985 0 01.594-.2zm-2.962.059h.036c.142 0 .27.048.399.135.146.129.264.288.344.465.09.199.14.4.153.667v.004c.007.134.006.2-.002.266v.08c-.03.007-.056.018-.083.024-.152.055-.274.135-.393.2.012-.09.013-.18.003-.267v-.015c-.012-.133-.04-.2-.082-.333a.613.613 0 00-.166-.267.248.248 0 00-.183-.064h-.021c-.071.006-.13.04-.186.132a.552.552 0 00-.12.27.944.944 0 00-.023.33v.015c.012.135.037.2.08.334.046.134.098.2.166.268.01.009.02.018.034.024-.07.057-.117.07-.176.136a.304.304 0 01-.131.068 2.62 2.62 0 01-.275-.402 1.772 1.772 0 01-.155-.667 1.759 1.759 0 01.08-.668 1.43 1.43 0 01.283-.535c.128-.133.26-.2.418-.2zm1.37 1.706c.332 0 .733.065 1.216.399.293.2.523.269 1.052.468h.003c.255.136.405.266.478.399v-.131a.571.571 0 01.016.47c-.123.31-.516.643-1.063.842v.002c-.268.135-.501.333-.775.465-.276.135-.588.292-1.012.267a1.139 1.139 0 01-.448-.067 3.566 3.566 0 01-.322-.198c-.195-.135-.363-.332-.612-.465v-.005h-.005c-.4-.246-.616-.512-.686-.71-.07-.268-.005-.47.193-.6.224-.135.38-.271.483-.336.104-.074.143-.102.176-.131h.002v-.003c.169-.202.436-.47.839-.601.139-.036.294-.065.466-.065zm2.8 2.142c.358 1.417 1.196 3.475 1.735 4.473.286.534.855 1.659 1.102 3.024.156-.005.33.018.513.064.646-1.671-.546-3.467-1.089-3.966-.22-.2-.232-.335-.123-.335.59.534 1.365 1.572 1.646 2.757.13.535.16 1.104.021 1.67.067.028.135.06.205.067 1.032.534 1.413.938 1.23 1.537v-.002c-.06.135-.19.334-.59.534-.22.135-.46.2-.717.2-.26 0-.537-.065-.755-.2-.216-.135-.399-.267-.544-.399-.145-.134-.3-.2-.467-.268-.19-.066-.39-.133-.57-.2h-.005a2.61 2.61 0 01-.016-.064c-.064-.135-.067-.267-.085-.399-.016-.135-.023-.268-.018-.334v-.004c.016-.267.076-.54.157-.813.088-.333.194-.666.319-.999a15.823 15.823 0 00.552-1.736c.065-.166.089-.333.048-.465-.04-.135-.119-.2-.238-.267a.927.927 0 00-.306-.064c-.125 0-.252.03-.386.1-.263.135-.474.333-.62.535a1.62 1.62 0 00-.246.6 1.44 1.44 0 00-.006.668c.056.266.17.468.345.665a1.12 1.12 0 00.675.332c.1.013.2-.002.3-.027-.432.937-.962 1.87-1.666 2.535-.247.237-.511.409-.779.564v.132c.018.067.042.135.063.198.022.064.04.135.063.199h-.008c.055.135.135.268.226.399.094.135.2.2.319.333l.003.003c.26.2.592.401.907.601h.001c.165.067.332.133.493.201.16.066.315.133.462.2.65.198 1.23.265 1.776.2.547-.066 1.028-.269 1.484-.669.46-.399.802-.936.977-1.67.174-.735.146-1.536-.092-2.339-.206-.666-.559-1.335-1.094-1.936-.105-.066-.18-.133-.24-.133h-.008c-.156 0-.348.066-.465.267l-.004.003c-.167.334-.37.534-.635.734-.264.2-.554.4-.837.534a2.062 2.062 0 01-.795.2c-.285 0-.532-.065-.73-.267-.197-.2-.345-.533-.383-.935v-.003c.078-.135.182-.27.268-.399.088-.135.177-.27.249-.401.18-.334.323-.666.422-1 .1-.335.16-.67.133-1.002v-.003c-.016-.198-.06-.398-.138-.6z"/>
         </svg>
         <div class="download-info">
           <div class="platform">Linux (Debian/Ubuntu)</div>
-          <div class="version">Version 1.0.24-beta - amd64</div>
+          <div class="version">Version 0.2.1-alpha - amd64</div>
         </div>
       </a>
 
-      <a href="https://github.com/bydb/mindgraph-notes/releases/download/v1.0.24-beta/MindGraph.Notes.Setup.1.0.24-beta.exe" class="download-btn">
+      <a href="https://github.com/bydb/mindgraph-notes/releases/download/v0.2.1-alpha/MindGraph.Notes.Setup.0.2.1-alpha.exe" class="download-btn">
         <svg viewBox="0 0 24 24" fill="currentColor">
           <path d="M0 3.449L9.75 2.1v9.451H0m10.949-9.602L24 0v11.4H10.949M0 12.6h9.75v9.451L0 20.699M10.949 12.6H24V24l-12.9-1.801"/>
         </svg>
         <div class="download-info">
           <div class="platform">Windows (Installer)</div>
-          <div class="version">Version 1.0.24-beta - x64</div>
+          <div class="version">Version 0.2.1-alpha - x64</div>
         </div>
       </a>
     </div>
@@ -2312,41 +2115,18 @@ tags: [projekt, arbeit, wichtig]
         "features.customization.title": "Deine Farben, dein Logo",
         "features.customization.desc": "NEU: 12 Akzentfarben, 15 Hintergründe und ein eigenes Logo in der Titelleiste. Mach MindGraph Notes zu deiner App.",
 
-        "nav.lernen": "Lernen",
-        "lernen.title": "Dein Lern-Cockpit",
-        "lernen.subtitle": "Karteikarten, Spaced Repetition und KI-Quiz – alles in einer App",
-        "lernen.intro": "MindGraph Notes verwandelt deine Notizen in aktives Lernmaterial. Generiere Quiz-Fragen per KI, lerne mit wissenschaftlich bewiesenem Spaced Repetition und behalte den Überblick mit deinem persönlichen Lern-Dashboard.",
-        "lernen.sr.title": "Spaced Repetition (SM-2)",
-        "lernen.sr.desc": "Der SuperMemo-2 Algorithmus plant automatisch, wann du welche Karte wiederholen solltest. Wissenschaftlich bewiesen: Spaced Repetition ist die effektivste Methode für Langzeitgedächtnis.",
-        "lernen.sr.f1": "Automatische Wiederholungsplanung",
-        "lernen.sr.f2": "Schwierigkeitsbewertung pro Karte",
-        "lernen.sr.f3": "Optimale Intervalle für Langzeitlernen",
-        "lernen.sr.f4": "NEU: Anki-Import (.apkg) & Bilder in Karten",
-        "lernen.ai.title": "KI-Quiz aus deinen Notizen",
-        "lernen.ai.desc": "Rechtsklick auf eine Notiz oder einen Ordner und generiere per Klick Quiz-Fragen mit deiner lokalen KI (Ollama). Die Fragen werden automatisch als Karteikarten gespeichert – inklusive Spaced Repetition.",
-        "lernen.ai.f1": "Quiz-Generierung aus Notizen oder Ordnern",
-        "lernen.ai.f2": "Lokale KI – keine Daten in der Cloud",
-        "lernen.ai.f3": "Sofortiges Feedback und Erklärungen",
-        "lernen.stats.title": "Lern-Statistiken & Dashboard",
-        "lernen.stats.desc": "Verfolge deinen Lernfortschritt mit Streak-Tracking, Heatmap und detaillierten Statistiken. Sieh auf einen Blick, wie viele Karten du gelernt hast und wann die nächste Session ansteht.",
-        "lernen.citation.title": "KI-Zitation & Transparenz",
-        "lernen.citation.desc": "Jede KI-generierte Änderung wird in deinen Notizen zitiert: Modellname, Zeitstempel und Originaltext als Fußnote. Du weißt immer, was von dir und was von der KI stammt.",
-        "lernen.privacy.title": "100% Lokal & Privat",
-        "lernen.privacy.desc": "Kein Account, keine Cloud, keine Telemetrie. Deine Lernkarten und Statistiken bleiben auf deinem Rechner. Perfekt für sensible Studieninhalte.",
-        "lernen.academic.title": "Akademischer Workflow",
-        "lernen.academic.desc": "Zotero-Zitate in Karteikarten, LaTeX-Formeln in der Vorschau, PDF-Extraktion für Vorlesungsfolien. Gebaut für den wissenschaftlichen Alltag.",
-        "lernen.ipad.title": "Handschrift vom iPad in deine Notizen",
-        "lernen.ipad.desc": "Schreibe mit dem Apple Pencil auf dem iPad, lasse die Handschrift per Apple Shortcuts automatisch transkribieren und sende sie direkt in deinen MindGraph Vault. Vorlesungsmitschriften werden zu durchsuchbarem Markdown.",
-        "lernen.ipad.step1": "Apple Pencil auf iPad",
-        "lernen.ipad.step2": "Apple Shortcuts transkribiert",
-        "lernen.ipad.step3": "Markdown in MindGraph Vault",
-        "lernen.audience.title": "Perfekt für:",
-        "lernen.audience.med": "Medizinstudium",
-        "lernen.audience.law": "Jura",
-        "lernen.audience.cs": "Informatik",
-        "lernen.audience.lang": "Sprachen lernen",
-        "lernen.audience.teach": "Lehrkräfte",
-        "lernen.audience.exam": "Prüfungsvorbereitung",
+        "usergroup.schule.title": "Schule & Lernen",
+        "usergroup.schule.desc": "Karteikarten, Spaced Repetition und KI-Quiz – verwandle Notizen in aktives Lernmaterial",
+        "usergroup.studium.title": "Studium & Wissenschaft",
+        "usergroup.studium.desc": "Zotero, PDF Companion, Dataview und LaTeX – gebaut für den akademischen Alltag",
+        "usergroup.pkm.title": "Wissensmanagement",
+        "usergroup.pkm.desc": "Wikilinks, Canvas, Smart Connections und lokale KI – dein persönliches Wissensnetz",
+        "features.spaced.title": "Spaced Repetition (SM-2)",
+        "features.spaced.desc": "Wissenschaftlich bewiesene Lernmethode. Der SM-2 Algorithmus plant automatisch optimale Wiederholungsintervalle für Langzeitgedächtnis.",
+        "features.reminders.title": "Erinnerungen",
+        "features.reminders.desc": "Überfällige Aufgaben und Lernkarten im Blick. Automatische Erinnerungen halten deinen Lernplan auf Kurs.",
+        "features.latex.title": "LaTeX & Mermaid",
+        "features.latex.desc": "Mathematische Formeln mit LaTeX und Diagramme mit Mermaid direkt in der Vorschau. Perfekt für MINT-Fächer.",
 
         "dataview.title": "Dataview Queries",
         "dataview.subtitle": "Frage deine Notizen ab wie eine Datenbank",
@@ -2554,41 +2334,18 @@ tags: [projekt, arbeit, wichtig]
         "features.customization.title": "Your colors, your logo",
         "features.customization.desc": "NEW: 12 accent colors, 15 backgrounds and a custom logo in the title bar. Make MindGraph Notes truly yours.",
 
-        "nav.lernen": "Learning",
-        "lernen.title": "Your Learning Cockpit",
-        "lernen.subtitle": "Flashcards, spaced repetition and AI quizzes – all in one app",
-        "lernen.intro": "MindGraph Notes transforms your notes into active learning material. Generate quiz questions with AI, study with scientifically proven spaced repetition, and track your progress with a personal learning dashboard.",
-        "lernen.sr.title": "Spaced Repetition (SM-2)",
-        "lernen.sr.desc": "The SuperMemo-2 algorithm automatically schedules when you should review each card. Scientifically proven: spaced repetition is the most effective method for long-term memory.",
-        "lernen.sr.f1": "Automatic review scheduling",
-        "lernen.sr.f2": "Difficulty rating per card",
-        "lernen.sr.f3": "Optimal intervals for long-term retention",
-        "lernen.sr.f4": "NEW: Anki import (.apkg) & images in cards",
-        "lernen.ai.title": "AI Quizzes from Your Notes",
-        "lernen.ai.desc": "Right-click on a note or folder and generate quiz questions with one click using your local AI (Ollama). Questions are automatically saved as flashcards – including spaced repetition.",
-        "lernen.ai.f1": "Quiz generation from notes or folders",
-        "lernen.ai.f2": "Local AI – no data in the cloud",
-        "lernen.ai.f3": "Instant feedback and explanations",
-        "lernen.stats.title": "Study Statistics & Dashboard",
-        "lernen.stats.desc": "Track your learning progress with streak tracking, heatmap, and detailed statistics. See at a glance how many cards you've studied and when your next session is due.",
-        "lernen.citation.title": "AI Citation & Transparency",
-        "lernen.citation.desc": "Every AI-generated change is cited in your notes: model name, timestamp, and original text as a footnote. You always know what's yours and what's from AI.",
-        "lernen.privacy.title": "100% Local & Private",
-        "lernen.privacy.desc": "No account, no cloud, no telemetry. Your flashcards and statistics stay on your machine. Perfect for sensitive study content.",
-        "lernen.academic.title": "Academic Workflow",
-        "lernen.academic.desc": "Zotero citations in flashcards, LaTeX formulas in preview, PDF extraction for lecture slides. Built for the scientific workflow.",
-        "lernen.ipad.title": "Handwriting from iPad to Your Notes",
-        "lernen.ipad.desc": "Write with Apple Pencil on iPad, have your handwriting automatically transcribed via Apple Shortcuts, and send it directly to your MindGraph vault. Lecture notes become searchable Markdown.",
-        "lernen.ipad.step1": "Apple Pencil on iPad",
-        "lernen.ipad.step2": "Apple Shortcuts transcribes",
-        "lernen.ipad.step3": "Markdown in MindGraph Vault",
-        "lernen.audience.title": "Perfect for:",
-        "lernen.audience.med": "Medical School",
-        "lernen.audience.law": "Law",
-        "lernen.audience.cs": "Computer Science",
-        "lernen.audience.lang": "Language Learning",
-        "lernen.audience.teach": "Teachers",
-        "lernen.audience.exam": "Exam Preparation",
+        "usergroup.schule.title": "School & Learning",
+        "usergroup.schule.desc": "Flashcards, spaced repetition and AI quizzes – turn notes into active learning material",
+        "usergroup.studium.title": "University & Research",
+        "usergroup.studium.desc": "Zotero, PDF Companion, Dataview and LaTeX – built for academic workflows",
+        "usergroup.pkm.title": "Knowledge Management",
+        "usergroup.pkm.desc": "Wikilinks, Canvas, Smart Connections and local AI – your personal knowledge network",
+        "features.spaced.title": "Spaced Repetition (SM-2)",
+        "features.spaced.desc": "Scientifically proven learning method. The SM-2 algorithm automatically plans optimal review intervals for long-term memory.",
+        "features.reminders.title": "Reminders",
+        "features.reminders.desc": "Keep track of overdue tasks and flashcards. Automatic reminders keep your study plan on track.",
+        "features.latex.title": "LaTeX & Mermaid",
+        "features.latex.desc": "Mathematical formulas with LaTeX and diagrams with Mermaid right in the preview. Perfect for STEM subjects.",
 
         "dataview.title": "Dataview Queries",
         "dataview.subtitle": "Query your notes like a database",

@@ -7,11 +7,12 @@ type CanvasViewMode = 'cards'
 type FileTreeDisplayMode = 'name' | 'path'  // 'name' = nur Dateiname, 'path' = voller Pfad
 type EditorViewMode = 'edit' | 'live-preview' | 'preview'
 type PdfDisplayMode = 'both' | 'companion-only' | 'pdf-only'  // Anzeige von PDF/Companion im FileTree
-type AccentColor = 'blue' | 'orange' | 'green' | 'purple' | 'pink' | 'teal' | 'rose' | 'coral' | 'mauve' | 'mint' | 'lime' | 'gold' | 'custom'
+type AccentColor = 'blue' | 'orange' | 'green' | 'purple' | 'pink' | 'teal' | 'rose' | 'coral' | 'mauve' | 'mint' | 'lime' | 'gold' | 'terracotta' | 'custom'
 type AIAction = 'translate' | 'summarize' | 'continue' | 'improve'
 export type LLMBackend = 'ollama' | 'lm-studio'
 export type Language = 'de' | 'en'
 export type IconSet = 'default' | 'minimal' | 'colorful' | 'emoji'
+export type UserProfile = 'schueler' | 'studium' | 'wissensmanagement' | null
 export type OutlineStyle = 'default' | 'lines' | 'minimal' | 'bullets' | 'dashes'
 export type FontFamily = 'system' | 'inter' | 'source-sans' | 'roboto' | 'open-sans' | 'lato' |
   'jetbrains-mono-nerd' | 'fira-code-nerd' | 'hack-nerd' | 'meslo-nerd' | 'cascadia-code-nerd' | 'iosevka-nerd' | 'victor-mono-nerd' | 'agave-nerd'
@@ -66,7 +67,8 @@ export const ACCENT_COLORS: Record<AccentColor, { name: string; color: string; h
   mauve: { name: 'Malve', color: '#c084fc', hover: '#a855f7' },
   mint: { name: 'Mint', color: '#34d399', hover: '#10b981' },
   lime: { name: 'Limette', color: '#a3e635', hover: '#84cc16' },
-  gold: { name: 'Gold', color: '#fbbf24', hover: '#f59e0b' }
+  gold: { name: 'Gold', color: '#fbbf24', hover: '#f59e0b' },
+  terracotta: { name: 'Terracotta', color: '#d4875a', hover: '#c47a4e' }
 }
 
 // Hintergrundfarben (Pastelltöne)
@@ -338,6 +340,9 @@ interface UIState {
   onboardingCompleted: boolean
   onboardingOpen: boolean
 
+  // User Profile
+  userProfile: UserProfile
+
   // Actions
   setViewMode: (mode: ViewMode) => void
   setTheme: (theme: Theme) => void
@@ -389,6 +394,8 @@ interface UIState {
   removeCustomLogo: () => void
   setOnboardingCompleted: (completed: boolean) => void
   setOnboardingOpen: (open: boolean) => void
+  setUserProfile: (profile: UserProfile) => void
+  applyProfileDefaults: (profile: UserProfile) => void
 }
 
 // Default-Werte für den Store
@@ -396,8 +403,8 @@ const defaultState = {
   // Allgemein
   viewMode: 'split' as ViewMode,
   theme: 'system' as Theme,
-  accentColor: 'blue' as AccentColor,
-  backgroundColor: 'default' as BackgroundColor,
+  accentColor: 'terracotta' as AccentColor,
+  backgroundColor: 'cream' as BackgroundColor,
   loadLastVaultOnStart: true,
   language: 'de' as Language,
   fontFamily: 'system' as FontFamily,
@@ -486,7 +493,7 @@ const defaultState = {
   whatsNewOpen: false,
 
   // Custom Colors
-  customAccentColor: '#0a84ff',
+  customAccentColor: '#d4875a',
   customBackgroundColorLight: '#ffffff',
   customBackgroundColorDark: '#0d0d0d',
 
@@ -495,7 +502,10 @@ const defaultState = {
 
   // Onboarding
   onboardingCompleted: false,
-  onboardingOpen: false
+  onboardingOpen: false,
+
+  // User Profile
+  userProfile: null as UserProfile
 }
 
 // Felder die persistiert werden sollen (keine Funktionen, keine transienten Werte)
@@ -511,7 +521,8 @@ const persistedKeys = [
   'lastSeenVersion',
   'customAccentColor', 'customBackgroundColorLight', 'customBackgroundColorDark',
   'customLogo',
-  'onboardingCompleted'
+  'onboardingCompleted',
+  'userProfile'
 ] as const
 
 export const useUIStore = create<UIState>()((set, get) => ({
@@ -573,7 +584,38 @@ export const useUIStore = create<UIState>()((set, get) => ({
   setCustomLogo: (logo) => set({ customLogo: logo }),
   removeCustomLogo: () => set({ customLogo: null }),
   setOnboardingCompleted: (completed) => set({ onboardingCompleted: completed }),
-  setOnboardingOpen: (open) => set({ onboardingOpen: open })
+  setOnboardingOpen: (open) => set({ onboardingOpen: open }),
+  setUserProfile: (profile) => set({ userProfile: profile }),
+  applyProfileDefaults: (profile) => {
+    if (!profile) return
+    switch (profile) {
+      case 'schueler':
+        set({
+          flashcardsEnabled: true,
+          pdfCompanionEnabled: false,
+          smartConnectionsEnabled: false,
+          notesChatEnabled: false,
+          editorDefaultView: 'preview' as EditorViewMode
+        })
+        break
+      case 'studium':
+        set({
+          flashcardsEnabled: true,
+          pdfCompanionEnabled: true,
+          smartConnectionsEnabled: false,
+          notesChatEnabled: false
+        })
+        break
+      case 'wissensmanagement':
+        set({
+          flashcardsEnabled: false,
+          pdfCompanionEnabled: false,
+          smartConnectionsEnabled: true,
+          notesChatEnabled: true
+        })
+        break
+    }
+  }
 }))
 
 // Settings laden beim App-Start

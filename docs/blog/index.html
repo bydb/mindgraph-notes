@@ -37,14 +37,14 @@
     }
 
     :root {
-      --bg: #0a0a0f;
-      --bg-card: rgba(255, 255, 255, 0.03);
-      --bg-card-hover: rgba(255, 255, 255, 0.06);
-      --text: #e4e4e7;
-      --text-muted: #71717a;
-      --accent: #f97316;
-      --accent-glow: rgba(249, 115, 22, 0.4);
-      --border: rgba(255, 255, 255, 0.08);
+      --bg: #faf8f0;
+      --bg-card: rgba(255, 255, 255, 0.7);
+      --bg-card-hover: rgba(255, 255, 255, 0.9);
+      --text: #2d2d2d;
+      --text-muted: #6b6b6b;
+      --accent: #d4875a;
+      --accent-glow: rgba(212, 135, 90, 0.25);
+      --border: rgba(0, 0, 0, 0.08);
     }
 
     body {
@@ -71,7 +71,7 @@
       left: -50%;
       width: 200%;
       height: 200%;
-      background: radial-gradient(circle at 30% 30%, rgba(249, 115, 22, 0.08) 0%, transparent 50%);
+      background: radial-gradient(circle at 30% 30%, rgba(212, 135, 90, 0.06) 0%, transparent 50%);
     }
 
     nav {
@@ -85,7 +85,7 @@
       align-items: center;
       z-index: 100;
       backdrop-filter: blur(10px);
-      background: rgba(10, 10, 15, 0.8);
+      background: rgba(250, 248, 240, 0.85);
       border-bottom: 1px solid var(--border);
     }
 
@@ -138,7 +138,7 @@
     h1 {
       font-size: 2.5rem;
       margin-bottom: 0.5rem;
-      background: linear-gradient(135deg, #f97316 0%, #fbbf24 100%);
+      background: linear-gradient(135deg, #d4875a 0%, #c47a4e 100%);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
       background-clip: text;
@@ -169,7 +169,7 @@
 
     .post-card:hover {
       background: var(--bg-card-hover);
-      border-color: rgba(249, 115, 22, 0.3);
+      border-color: rgba(212, 135, 90, 0.3);
       transform: translateY(-2px);
     }
 
@@ -283,14 +283,14 @@
     }
 
     .article-content code {
-      background: rgba(255, 255, 255, 0.1);
+      background: rgba(212, 135, 90, 0.1);
       padding: 0.2rem 0.5rem;
       border-radius: 4px;
       font-size: 0.9em;
     }
 
     .article-content pre {
-      background: rgba(0, 0, 0, 0.3);
+      background: rgba(0, 0, 0, 0.05);
       padding: 1rem;
       border-radius: 8px;
       overflow-x: auto;

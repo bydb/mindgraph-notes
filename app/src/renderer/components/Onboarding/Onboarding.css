@@ -223,6 +223,11 @@
   background: var(--bg-tertiary);
 }
 
+.onboarding-vault-option.selected {
+  border-color: var(--accent-color);
+  background: var(--accent-subtle);
+}
+
 .onboarding-vault-option:disabled {
   opacity: 0.5;
   cursor: not-allowed;

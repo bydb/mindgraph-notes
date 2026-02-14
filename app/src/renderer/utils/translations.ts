@@ -26,6 +26,8 @@ const translations = {
     'settings.general.logo.upload': 'Bild auswählen',
     'settings.general.logo.remove': 'Entfernen',
     'settings.general.logo.description': 'Eigenes Logo in der Titelleiste anzeigen',
+    'settings.general.resetAppearance': 'Design zurücksetzen',
+    'settings.general.resetAppearanceHint': 'Setzt alle Darstellungsoptionen auf die Standardwerte zurück',
     'settings.general.loadLastVault': 'Letzten Vault beim Start öffnen',
     'settings.general.vault': 'Vault',
     'settings.general.currentVault': 'Aktueller Vault',
@@ -923,6 +925,17 @@ const translations = {
     'onboarding.back': 'Zurück',
     'onboarding.next': 'Weiter',
 
+    // Profile Step
+    'onboarding.profile.title': 'Wie nutzt du MindGraph Notes?',
+    'onboarding.profile.subtitle': 'Wir passen die Einstellungen an deinen Workflow an. Du kannst alles jederzeit in den Einstellungen ändern.',
+    'onboarding.profile.skip': 'Überspringen',
+    'onboarding.profile.schueler.title': 'Schule',
+    'onboarding.profile.schueler.desc': 'Karteikarten, Spaced Repetition, KI-Quiz und Erinnerungen',
+    'onboarding.profile.studium.title': 'Studium & Wissenschaft',
+    'onboarding.profile.studium.desc': 'Alles aus Schule plus Zotero, PDF-Companion, Dataview und LaTeX',
+    'onboarding.profile.wissensmanagement.title': 'Wissensmanagement',
+    'onboarding.profile.wissensmanagement.desc': 'Wikilinks, Canvas, Smart Connections, lokale KI und Terminal',
+
     // Sync
     'settings.tab.sync': 'Synchronisation',
     'settings.sync.title': 'Synchronisation',
@@ -987,6 +1000,8 @@ const translations = {
     'settings.general.logo.upload': 'Choose Image',
     'settings.general.logo.remove': 'Remove',
     'settings.general.logo.description': 'Display a custom logo in the title bar',
+    'settings.general.resetAppearance': 'Reset Appearance',
+    'settings.general.resetAppearanceHint': 'Resets all appearance options to defaults',
     'settings.general.loadLastVault': 'Open last vault on startup',
     'settings.general.vault': 'Vault',
     'settings.general.currentVault': 'Current Vault',
@@ -1882,6 +1897,17 @@ const translations = {
     'onboarding.step': 'Step {current} of {total}',
     'onboarding.back': 'Back',
     'onboarding.next': 'Next',
+
+    // Profile Step
+    'onboarding.profile.title': 'How will you use MindGraph Notes?',
+    'onboarding.profile.subtitle': 'We\'ll adjust settings for your workflow. You can change everything anytime in settings.',
+    'onboarding.profile.skip': 'Skip',
+    'onboarding.profile.schueler.title': 'School',
+    'onboarding.profile.schueler.desc': 'Flashcards, spaced repetition, AI quizzes, and reminders',
+    'onboarding.profile.studium.title': 'University & Research',
+    'onboarding.profile.studium.desc': 'Everything from School plus Zotero, PDF companion, Dataview and LaTeX',
+    'onboarding.profile.wissensmanagement.title': 'Knowledge Management',
+    'onboarding.profile.wissensmanagement.desc': 'Wikilinks, canvas, smart connections, local AI and terminal',
 
     // Sync
     'settings.tab.sync': 'Sync',

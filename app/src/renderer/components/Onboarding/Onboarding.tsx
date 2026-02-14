@@ -1,17 +1,20 @@
 import React, { useState, useCallback } from 'react'
 import { useUIStore } from '../../stores/uiStore'
+import type { UserProfile } from '../../stores/uiStore'
 import { WelcomeScreen } from './WelcomeScreen'
+import { ProfileStep } from './steps/ProfileStep'
 import { VaultStep } from './steps/VaultStep'
 import { AISetupStep } from './steps/AISetupStep'
 import { FeaturesStep } from './steps/FeaturesStep'
 import './Onboarding.css'
 
-type OnboardingStep = 'welcome' | 'vault' | 'ai' | 'features'
+type OnboardingStep = 'welcome' | 'profile' | 'vault' | 'ai' | 'features'
 
 export const Onboarding: React.FC = () => {
-  const { onboardingOpen, setOnboardingOpen, setOnboardingCompleted } = useUIStore()
+  const { onboardingOpen, setOnboardingOpen, setOnboardingCompleted, setUserProfile, applyProfileDefaults } = useUIStore()
   const [step, setStep] = useState<OnboardingStep>('welcome')
   const [vaultPath, setLocalVaultPath] = useState<string | null>(null)
+  const [selectedProfile, setSelectedProfile] = useState<UserProfile>(null)
 
   const finishWithVault = useCallback(async (path: string) => {
     // Save as last vault — Sidebar will load it when onboardingCompleted becomes true
@@ -26,9 +29,14 @@ export const Onboarding: React.FC = () => {
         console.error('[Onboarding] Failed to set vault:', error)
       }
     }
+    // Apply profile defaults before completing
+    if (selectedProfile) {
+      setUserProfile(selectedProfile)
+      applyProfileDefaults(selectedProfile)
+    }
     setOnboardingCompleted(true)
     setOnboardingOpen(false)
-  }, [vaultPath, finishWithVault, setOnboardingCompleted, setOnboardingOpen])
+  }, [vaultPath, selectedProfile, finishWithVault, setOnboardingCompleted, setOnboardingOpen, setUserProfile, applyProfileDefaults])
 
   const handleOpenVaultDirect = useCallback(async () => {
     try {
@@ -50,15 +58,23 @@ export const Onboarding: React.FC = () => {
       <div className="onboarding-container">
         {step === 'welcome' && (
           <WelcomeScreen
-            onStartWizard={() => setStep('vault')}
+            onStartWizard={() => setStep('profile')}
             onOpenVault={handleOpenVaultDirect}
+          />
+        )}
+        {step === 'profile' && (
+          <ProfileStep
+            selectedProfile={selectedProfile}
+            onSelectProfile={setSelectedProfile}
+            onBack={() => setStep('welcome')}
+            onNext={() => setStep('vault')}
           />
         )}
         {step === 'vault' && (
           <VaultStep
             vaultPath={vaultPath}
             setVaultPath={setLocalVaultPath}
-            onBack={() => setStep('welcome')}
+            onBack={() => setStep('profile')}
             onNext={() => setStep('ai')}
           />
         )}

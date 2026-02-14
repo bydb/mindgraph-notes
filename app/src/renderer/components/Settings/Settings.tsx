@@ -606,6 +606,28 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
                   </select>
                 </div>
 
+                <div className="settings-row" style={{ marginTop: '12px' }}>
+                  <div>
+                    <label>{t('settings.general.resetAppearance')}</label>
+                    <div className="settings-hint">{t('settings.general.resetAppearanceHint')}</div>
+                  </div>
+                  <button
+                    className="settings-refresh"
+                    onClick={() => {
+                      setTheme('system')
+                      setAccentColor('terracotta')
+                      setBackgroundColor('cream')
+                      setFontFamily('system')
+                      setCustomAccentColor('#d4875a')
+                      setCustomBackgroundColorLight('#faf8f0')
+                      setCustomBackgroundColorDark('#18170f')
+                      removeCustomLogo()
+                    }}
+                  >
+                    {t('settings.general.resetAppearance')}
+                  </button>
+                </div>
+
                 <h3>{t('settings.general.vault')}</h3>
                 <div className="settings-row">
                   <label>{t('settings.general.loadLastVault')}</label>

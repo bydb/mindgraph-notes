@@ -12,8 +12,9 @@ export const FeaturesStep: React.FC<FeaturesStepProps> = ({ onFinish, onBack }) 
   return (
     <div className="onboarding-step">
       <div className="onboarding-step-header">
-        <span className="onboarding-step-indicator">{t('onboarding.step', { current: '3', total: '3' })}</span>
+        <span className="onboarding-step-indicator">{t('onboarding.step', { current: '4', total: '4' })}</span>
         <div className="onboarding-progress">
+          <div className="onboarding-progress-dot active" />
           <div className="onboarding-progress-dot active" />
           <div className="onboarding-progress-dot active" />
           <div className="onboarding-progress-dot active" />
