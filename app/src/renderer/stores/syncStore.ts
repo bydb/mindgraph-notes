@@ -187,8 +187,8 @@ export const useSyncStore = create<SyncState>()((set, get) => ({
     // Same vault, nothing to do
     if (vaultPath === currentVaultPath) return
 
-    // ALWAYS disconnect any active sync first — wait for it to fully complete
-    if (syncEnabled || currentVaultPath) {
+    // Disconnect any active sync first — only if there's actually a sync running
+    if (syncEnabled && currentVaultPath) {
       try {
         await window.electronAPI.syncDisable()
         console.log('[SyncStore] Disconnected sync before vault switch')
@@ -223,21 +223,26 @@ export const useSyncStore = create<SyncState>()((set, get) => ({
     })
 
     // Auto-restore sync ONLY if config is valid for this vault
+    // Fire-and-forget: don't block vault loading while connecting to relay server
     if (config.syncEnabled && config.vaultId && config.relayUrl) {
       const url = config.relayUrl
       const interval = config.autoSync ? config.syncInterval : 0
-      try {
-        console.log('[SyncStore] Auto-restoring sync for vault:', vaultPath, 'vaultId:', config.vaultId.slice(0, 12) + '...')
-        const success = await window.electronAPI.syncRestore(vaultPath, config.vaultId, url, interval)
-        if (success) {
-          set({ syncStatus: 'idle' })
-          console.log('[SyncStore] Auto-restored sync for vault:', vaultPath)
-        } else {
-          console.warn('[SyncStore] Could not auto-restore sync for vault:', vaultPath)
-        }
-      } catch (err) {
-        console.error('[SyncStore] Auto-restore failed:', err)
-      }
+      console.log('[SyncStore] Auto-restoring sync for vault:', vaultPath, 'vaultId:', config.vaultId.slice(0, 12) + '...')
+      window.electronAPI.syncRestore(vaultPath, config.vaultId, url, interval)
+        .then(success => {
+          // Safety: check vault hasn't changed while we were connecting
+          if (get().currentVaultPath !== vaultPath) return
+          if (success) {
+            set({ syncStatus: 'idle' })
+            console.log('[SyncStore] Auto-restored sync for vault:', vaultPath)
+          } else {
+            console.warn('[SyncStore] Could not auto-restore sync for vault:', vaultPath)
+          }
+        })
+        .catch(err => {
+          if (get().currentVaultPath !== vaultPath) return
+          console.error('[SyncStore] Auto-restore failed:', err)
+        })
     }
   },
 
