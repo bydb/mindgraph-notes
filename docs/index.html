@@ -494,7 +494,7 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 1.5rem;
+      color: white;
       margin-bottom: 1rem;
     }
 
@@ -740,8 +740,10 @@
     }
 
     .property-icon {
-      font-size: 1.5rem;
       flex-shrink: 0;
+      color: var(--accent);
+      display: flex;
+      align-items: center;
     }
 
     .property-info h4 {
@@ -902,8 +904,9 @@
     }
 
     .setup-icon {
-      font-size: 2.5rem;
+      color: var(--accent);
       margin-bottom: 1rem;
+      display: flex;
     }
 
     .setup-card h3 {
@@ -1333,27 +1336,27 @@
       </div>
       <div class="features-grid">
         <div class="feature-card featured">
-          <div class="feature-icon">🎴</div>
+          <div class="feature-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="14" height="14" rx="2"/><path d="M8 2h10a2 2 0 0 1 2 2v10"/></svg></div>
           <h3 data-i18n="features.flashcards.title">Karteikarten &amp; Quiz</h3>
           <p data-i18n="features.flashcards.desc">Generiere Quiz-Fragen via Ollama, importiere Decks aus Anki (.apkg) und lerne mit Spaced Repetition (SM-2). NEU: Bilder in Karteikarten.</p>
         </div>
         <div class="feature-card featured">
-          <div class="feature-icon">🧠</div>
+          <div class="feature-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/></svg></div>
           <h3 data-i18n="features.spaced.title">Spaced Repetition (SM-2)</h3>
           <p data-i18n="features.spaced.desc">Wissenschaftlich bewiesene Lernmethode. Der SM-2 Algorithmus plant automatisch optimale Wiederholungsintervalle f&uuml;r Langzeitged&auml;chtnis.</p>
         </div>
         <div class="feature-card">
-          <div class="feature-icon">📝</div>
+          <div class="feature-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg></div>
           <h3 data-i18n="features.preview.title">Live Preview</h3>
           <p data-i18n="features.preview.desc">Schreibe in Markdown mit sofortiger Vorschau. LaTeX, Mermaid-Diagramme, Callouts und mehr.</p>
         </div>
         <div class="feature-card">
-          <div class="feature-icon">⏰</div>
+          <div class="feature-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg></div>
           <h3 data-i18n="features.reminders.title">Erinnerungen</h3>
           <p data-i18n="features.reminders.desc">&Uuml;berf&auml;llige Aufgaben und Lernkarten im Blick. Automatische Erinnerungen halten deinen Lernplan auf Kurs.</p>
         </div>
         <div class="feature-card">
-          <div class="feature-icon">🔒</div>
+          <div class="feature-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg></div>
           <h3 data-i18n="features.local.title">100% Lokal</h3>
           <p data-i18n="features.local.desc">Alle Notizen sind Markdown-Dateien. Keine Cloud, kein Account, keine Telemetrie. Deine Daten geh&ouml;ren dir.</p>
         </div>
@@ -1379,37 +1382,37 @@
       </div>
       <div class="features-grid">
         <div class="feature-card featured">
-          <div class="feature-icon">📚</div>
+          <div class="feature-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg></div>
           <h3 data-i18n="features.zotero.title">Zotero Integration</h3>
           <p data-i18n="features.zotero.desc">F&uuml;ge Literatur direkt aus Zotero ein. Perfekt f&uuml;r akademisches Arbeiten und Recherche.</p>
         </div>
         <div class="feature-card featured">
-          <div class="feature-icon">📄</div>
+          <div class="feature-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg></div>
           <h3 data-i18n="features.pdf.title">PDF Companion + Docling</h3>
           <p data-i18n="features.pdf.desc">PDFs direkt neben deinen Notizen. NEU: Extrahiere Text, Tabellen und Bilder automatisch via Docling. Perfekt f&uuml;r Vorlesungsfolien, Paper und Scans.</p>
         </div>
         <div class="feature-card featured">
-          <div class="feature-icon">🔍</div>
+          <div class="feature-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14a9 3 0 0 0 18 0V5"/><path d="M3 12a9 3 0 0 0 18 0"/></svg></div>
           <h3 data-i18n="features.dataview.title">Dataview Queries</h3>
           <p data-i18n="features.dataview.desc">NEU: Frage deine Notizen ab wie eine Datenbank. LIST und TABLE Queries mit FROM, WHERE, SORT. Filtere nach Tags, Ordnern und YAML-Frontmatter.</p>
         </div>
         <div class="feature-card">
-          <div class="feature-icon">⚙️</div>
+          <div class="feature-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21v-7"/><path d="M4 10V3"/><path d="M12 21v-9"/><path d="M12 8V3"/><path d="M20 21v-5"/><path d="M20 12V3"/><path d="M2 14h4"/><path d="M10 8h4"/><path d="M18 16h4"/></svg></div>
           <h3 data-i18n="features.properties.title">Properties Panel</h3>
           <p data-i18n="features.properties.desc">NEU: Bearbeite YAML-Frontmatter komfortabel. Checkboxen f&uuml;r Booleans, Datumspicker, Arrays &ndash; alles ohne YAML-Syntax.</p>
         </div>
         <div class="feature-card">
-          <div class="feature-icon">📝</div>
+          <div class="feature-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 16 6-12 6 12"/><path d="M8 12h8"/><path d="m16 20 2 2 4-4"/></svg></div>
           <h3 data-i18n="features.languagetool.title">LanguageTool</h3>
           <p data-i18n="features.languagetool.desc">NEU: Integrierte Grammatik- und Rechtschreibpr&uuml;fung. Lokal via Docker oder mit LanguageTool Premium API. Fehler werden direkt im Editor markiert.</p>
         </div>
         <div class="feature-card">
-          <div class="feature-icon">🎴</div>
+          <div class="feature-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="14" height="14" rx="2"/><path d="M8 2h10a2 2 0 0 1 2 2v10"/></svg></div>
           <h3 data-i18n="features.flashcards.title">Karteikarten &amp; Quiz</h3>
           <p data-i18n="features.flashcards.desc">Generiere Quiz-Fragen via Ollama, importiere Decks aus Anki (.apkg) und lerne mit Spaced Repetition (SM-2). NEU: Bilder in Karteikarten.</p>
         </div>
         <div class="feature-card">
-          <div class="feature-icon">✏️</div>
+          <div class="feature-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 7V4H6l6 8-6 8h12v-3"/></svg></div>
           <h3 data-i18n="features.latex.title">LaTeX &amp; Mermaid</h3>
           <p data-i18n="features.latex.desc">Mathematische Formeln mit LaTeX und Diagramme mit Mermaid direkt in der Vorschau. Perfekt f&uuml;r MINT-F&auml;cher.</p>
         </div>
@@ -1432,37 +1435,37 @@
       </div>
       <div class="features-grid">
         <div class="feature-card featured">
-          <div class="feature-icon">🔗</div>
+          <div class="feature-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg></div>
           <h3 data-i18n="features.wikilinks.title">Wikilinks</h3>
           <p data-i18n="features.wikilinks.desc">Verlinke Notizen mit [[Wikilinks]]. Bidirektionale Verbindungen, Backlinks-Panel, Obsidian-kompatibel.</p>
         </div>
         <div class="feature-card featured">
-          <div class="feature-icon">🎨</div>
+          <div class="feature-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg></div>
           <h3 data-i18n="features.canvas.title">Local Canvas</h3>
           <p data-i18n="features.canvas.desc">Erkunde Notizen visuell im Canvas. Starte mit einer Notiz, erweitere schrittweise &uuml;ber Verbindungen. NEU: Bidirektionale Links zwischen Canvas und Notizen.</p>
         </div>
         <div class="feature-card featured">
-          <div class="feature-icon">🤖</div>
+          <div class="feature-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.287 1.288L3 12l5.8 1.9a2 2 0 0 1 1.288 1.287L12 21l1.9-5.8a2 2 0 0 1 1.287-1.288L21 12l-5.8-1.9a2 2 0 0 1-1.288-1.287Z"/><path d="M5 3v4"/><path d="M19 17v4"/><path d="M3 5h4"/><path d="M17 19h4"/></svg></div>
           <h3 data-i18n="features.ai.title">KI-Funktionen (optional)</h3>
           <p data-i18n="features.ai.desc">NEU: Smart Connections mit konfigurierbaren Gewichtungen (Embedding, Keywords, Wikilinks, Tags, Ordner). Notes Chat, lokale LLMs via Ollama/LM Studio. Aktiviere nur was du brauchst.</p>
         </div>
         <div class="feature-card">
-          <div class="feature-icon">⌨️</div>
+          <div class="feature-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg></div>
           <h3 data-i18n="features.terminal.title">Integriertes Terminal</h3>
           <p data-i18n="features.terminal.desc">Vollwertiges Terminal in der App. Git, npm, Python &ndash; jedes CLI-Tool direkt neben deinen Notizen.</p>
         </div>
         <div class="feature-card">
-          <div class="feature-icon">✅</div>
+          <div class="feature-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="m9 12 2 2 4-4"/></svg></div>
           <h3 data-i18n="features.tasks.title">Task Management</h3>
           <p data-i18n="features.tasks.desc">Aufgaben mit F&auml;lligkeiten direkt in Notizen. Erinnerungen, &Uuml;berf&auml;llig-Panel, Fortschritt auf Karten &ndash; alles ohne Extra-App.</p>
         </div>
         <div class="feature-card">
-          <div class="feature-icon">🌐</div>
+          <div class="feature-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg></div>
           <h3 data-i18n="features.graph.title">Canvas &Uuml;bersicht</h3>
           <p data-i18n="features.graph.desc">Alle Notizen auf einen Blick. Filter nach Ordnern, ordne frei an, entdecke Zusammenh&auml;nge.</p>
         </div>
         <div class="feature-card featured customization-card">
-          <div class="feature-icon">🎨</div>
+          <div class="feature-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="13.5" cy="6.5" r="1.5" fill="currentColor" stroke="none"/><circle cx="17.5" cy="10.5" r="1.5" fill="currentColor" stroke="none"/><circle cx="8.5" cy="7.5" r="1.5" fill="currentColor" stroke="none"/><circle cx="6.5" cy="12" r="1.5" fill="currentColor" stroke="none"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/></svg></div>
           <h3 data-i18n="features.customization.title">Deine Farben, dein Logo</h3>
           <p data-i18n="features.customization.desc">NEU: 12 Akzentfarben, 15 Hintergr&uuml;nde und ein eigenes Logo in der Titelleiste. Mach MindGraph Notes zu deiner App.</p>
           <div class="color-dots">
@@ -1629,35 +1632,35 @@ LIMIT 10
 
       <div class="properties-features">
         <div class="property-type">
-          <div class="property-icon">☑️</div>
+          <div class="property-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="m9 12 2 2 4-4"/></svg></div>
           <div class="property-info">
             <h4 data-i18n="properties.bool.title">Booleans</h4>
             <p data-i18n="properties.bool.desc">Checkboxen für true/false Werte wie <code>completed</code> oder <code>published</code></p>
           </div>
         </div>
         <div class="property-type">
-          <div class="property-icon">📅</div>
+          <div class="property-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></div>
           <div class="property-info">
             <h4 data-i18n="properties.date.title">Datum</h4>
             <p data-i18n="properties.date.desc">Datumspicker für Felder im ISO-Format (YYYY-MM-DD)</p>
           </div>
         </div>
         <div class="property-type">
-          <div class="property-icon">🔢</div>
+          <div class="property-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="9" x2="20" y2="9"/><line x1="4" y1="15" x2="20" y2="15"/><line x1="10" y1="3" x2="8" y2="21"/><line x1="16" y1="3" x2="14" y2="21"/></svg></div>
           <div class="property-info">
             <h4 data-i18n="properties.number.title">Zahlen</h4>
             <p data-i18n="properties.number.desc">Zahlenfelder für <code>priority</code>, <code>rating</code> etc.</p>
           </div>
         </div>
         <div class="property-type">
-          <div class="property-icon">📝</div>
+          <div class="property-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/></svg></div>
           <div class="property-info">
             <h4 data-i18n="properties.text.title">Text & Arrays</h4>
             <p data-i18n="properties.text.desc">Textfelder für Strings, kommagetrennte Listen für Arrays</p>
           </div>
         </div>
         <div class="property-type">
-          <div class="property-icon">🏷️</div>
+          <div class="property-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z"/><circle cx="7.5" cy="7.5" r="1.5" fill="currentColor" stroke="none"/></svg></div>
           <div class="property-info">
             <h4 data-i18n="properties.tags.title">Tag-Autocomplete</h4>
             <p data-i18n="properties.tags.desc">Beim Tags-Feld werden alle existierenden Vault-Tags als Vorschläge angezeigt</p>
@@ -1803,7 +1806,7 @@ tags: [projekt, arbeit, wichtig]
 
     <div class="setup-grid">
       <div class="setup-card">
-        <div class="setup-icon">🧠</div>
+        <div class="setup-icon"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.287 1.288L3 12l5.8 1.9a2 2 0 0 1 1.288 1.287L12 21l1.9-5.8a2 2 0 0 1 1.287-1.288L21 12l-5.8-1.9a2 2 0 0 1-1.288-1.287Z"/><path d="M5 3v4"/><path d="M19 17v4"/><path d="M3 5h4"/><path d="M17 19h4"/></svg></div>
         <h3 data-i18n="setup.claudecode.title">Claude Code</h3>
         <p data-i18n="setup.claudecode.desc">Anthropics offizieller KI-Coding-Agent. Claude Code ist der mächtigste KI-Assistent für Entwickler.</p>
         <div class="setup-steps">
@@ -1820,7 +1823,7 @@ tags: [projekt, arbeit, wichtig]
       </div>
 
       <div class="setup-card">
-        <div class="setup-icon">🤖</div>
+        <div class="setup-icon"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg></div>
         <h3 data-i18n="setup.opencode.title">OpenCode</h3>
         <p data-i18n="setup.opencode.desc">Open-Source KI-Coding-Agent. Unterstützt verschiedene LLM-Anbieter wie OpenAI, Anthropic, Gemini und lokale Modelle.</p>
         <div class="setup-steps">
@@ -1835,7 +1838,7 @@ tags: [projekt, arbeit, wichtig]
       </div>
 
       <div class="setup-card">
-        <div class="setup-icon">🦙</div>
+        <div class="setup-icon"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M15 2v2"/><path d="M15 20v2"/><path d="M2 15h2"/><path d="M2 9h2"/><path d="M20 15h2"/><path d="M20 9h2"/><path d="M9 2v2"/><path d="M9 20v2"/></svg></div>
         <h3 data-i18n="setup.ollama.title">Ollama</h3>
         <p data-i18n="setup.ollama.desc">Lokale LLMs wie Llama, Mistral oder Gemma auf deinem Mac. Keine Cloud, keine API-Kosten, volle Privatsphäre.</p>
         <div class="setup-install">
@@ -1847,7 +1850,7 @@ tags: [projekt, arbeit, wichtig]
       </div>
 
       <div class="setup-card">
-        <div class="setup-icon">📚</div>
+        <div class="setup-icon"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg></div>
         <h3 data-i18n="setup.zotero.title">Zotero</h3>
         <p data-i18n="setup.zotero.desc">Literaturverwaltung für Wissenschaft und Recherche. Füge Zitate direkt in deine Notizen ein.</p>
         <div class="setup-steps">
@@ -1861,7 +1864,7 @@ tags: [projekt, arbeit, wichtig]
       </div>
 
       <div class="setup-card">
-        <div class="setup-icon">🎨</div>
+        <div class="setup-icon"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg></div>
         <h3 data-i18n="setup.flux.title">Flux2 Bildgenerierung</h3>
         <p data-i18n="setup.flux.desc">Generiere Bilder direkt im Terminal mit Flux2. Lokale KI-Bildgenerierung für deine Notizen - läuft über Ollama.</p>
         <div class="setup-install">
@@ -1873,7 +1876,7 @@ tags: [projekt, arbeit, wichtig]
       </div>
 
       <div class="setup-card">
-        <div class="setup-icon">📑</div>
+        <div class="setup-icon"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10V7.5L14.5 2H6a2 2 0 0 0-2 2v16c0 1.1.9 2 2 2h4.5"/><polyline points="14 2 14 8 20 8"/><path d="M16 22a2 2 0 0 1-2-2"/><path d="M20 22a2 2 0 0 0 2-2"/><path d="M20 14a2 2 0 0 1 2 2"/><path d="M16 14a2 2 0 0 0-2 2"/></svg></div>
         <h3 data-i18n="setup.docling.title">Docling PDF-Extraktion</h3>
         <p data-i18n="setup.docling.desc">Extrahiere automatisch Text, Tabellen und Bilder aus PDFs. Konvertiert zu sauberem Markdown – lokal auf deinem Rechner.</p>
         <div class="setup-install">
@@ -1885,7 +1888,7 @@ tags: [projekt, arbeit, wichtig]
       </div>
 
       <div class="setup-card">
-        <div class="setup-icon">📝</div>
+        <div class="setup-icon"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="m6 16 6-12 6 12"/><path d="M8 12h8"/><path d="m16 20 2 2 4-4"/></svg></div>
         <h3 data-i18n="setup.languagetool.title">LanguageTool Grammatikprüfung</h3>
         <p data-i18n="setup.languagetool.desc">Prüfe deine Texte auf Grammatik, Rechtschreibung und Stil. Lokal via Docker oder mit LanguageTool Premium für erweiterte Funktionen.</p>
         <div class="setup-install">
@@ -1984,7 +1987,7 @@ tags: [projekt, arbeit, wichtig]
 
   <footer>
     <p>
-      Made with ❤️ by <a href="https://bydb.io">bydb.io</a> ·
+      Made with <svg width="14" height="14" viewBox="0 0 24 24" fill="var(--accent)" stroke="none" style="vertical-align: -2px; display: inline-block;"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></svg> by <a href="https://bydb.io">bydb.io</a> ·
       <a href="https://github.com/bydb/mindgraph-notes">GitHub</a> ·
       <a href="https://discord.gg/u9N9R9vz">Discord</a> ·
       AGPL-3.0
