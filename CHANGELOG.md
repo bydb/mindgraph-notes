@@ -2,6 +2,16 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.2.5-alpha] - 2026-02-15
+
+### Features
+- **Sync-Trash**: Vom Sync gelöschte Dateien werden in `.sync-trash/` verschoben statt unwiderruflich gelöscht — Dateien sind jetzt wiederherstellbar
+- **Flashcard-Merge**: Sync-Konflikte bei Flashcards werden per JSON-Merge nach Card-ID gelöst statt überschrieben
+
+### Improvements
+- **Sync-Sicherheit**: Strengere Mass-Deletion-Schwellenwerte (>10% und ≥10 Dateien) für lokale und remote Löschungen
+- **Manifest-Handling**: Frisches Manifest bei neuem Vault verhindert fehlerhafte Löschungen durch veraltete syncedAt-Werte
+
 ## [0.2.4-alpha] - 2026-02-15
 
 ### Features
