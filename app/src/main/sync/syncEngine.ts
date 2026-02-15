@@ -313,10 +313,10 @@ export class SyncEngine {
       // Get remote manifest
       const remoteManifest = await this.getRemoteManifest()
 
-      // Compute diff
-      const diff = diffManifests(currentManifest, remoteManifest)
+      // Compute diff — pass saved manifest so we can detect locally deleted files
+      const diff = diffManifests(currentManifest, remoteManifest, this.manifest || undefined)
 
-      const total = diff.toUpload.length + diff.toDownload.length + diff.conflicts.length
+      const total = diff.toUpload.length + diff.toDownload.length + diff.conflicts.length + diff.toDeleteRemote.length
       let current = 0
 
       // Upload files in parallel batches
@@ -376,6 +376,24 @@ export class SyncEngine {
           fileName: filePath
         })
         await this.resolveConflict(filePath, currentManifest, remoteManifest)
+      }
+
+      // Delete files on server that were deleted locally
+      for (const filePath of diff.toDeleteRemote) {
+        if (this.destroyed) break  // SAFETY
+        current++
+        await this.deleteRemoteFile(filePath)
+        // Remove from saved manifest so it won't be detected as locally deleted again
+        if (this.manifest) {
+          delete this.manifest.files[filePath]
+        }
+        this.sendLog({ type: 'delete', message: `Deleted on server: ${filePath}`, fileName: filePath })
+        this.sendProgress({
+          status: 'uploading',
+          current,
+          total,
+          fileName: filePath
+        })
       }
 
       // Handle remote deletes
@@ -499,6 +517,15 @@ export class SyncEngine {
     })
 
     // Wait for acknowledgment
+    await this.waitForAck()
+  }
+
+  private async deleteRemoteFile(relativePath: string): Promise<void> {
+    this.wsSend({
+      type: 'delete',
+      vaultId: this.vaultId,
+      path: hashPath(relativePath)
+    })
     await this.waitForAck()
   }
 

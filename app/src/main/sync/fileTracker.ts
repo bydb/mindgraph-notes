@@ -162,16 +162,19 @@ export interface ManifestDiff {
   toDownload: string[]
   conflicts: string[]
   toDeleteLocal: string[]
+  toDeleteRemote: string[]
 }
 
 export function diffManifests(
   local: FileManifest,
-  remote: FileManifest
+  remote: FileManifest,
+  previousLocal?: FileManifest
 ): ManifestDiff {
   const toUpload: string[] = []
   const toDownload: string[] = []
   const conflicts: string[] = []
   const toDeleteLocal: string[] = []
+  const toDeleteRemote: string[] = []
 
   const allPaths = new Set([
     ...Object.keys(local.files),
@@ -192,8 +195,15 @@ export function diffManifests(
         toUpload.push(filePath)
       }
     } else if (!localFile && remoteFile) {
-      // Only exists remotely, download
-      toDownload.push(filePath)
+      // Only exists remotely — was it previously synced locally and then deleted by the user?
+      const previousFile = previousLocal?.files[filePath]
+      if (previousFile && previousFile.syncedAt !== null) {
+        // File was synced before but deleted locally → delete on server
+        toDeleteRemote.push(filePath)
+      } else {
+        // New remote file, download
+        toDownload.push(filePath)
+      }
     } else if (localFile && remoteFile) {
       if (localFile.hash === remoteFile.hash) {
         // Identical, nothing to do
@@ -214,7 +224,7 @@ export function diffManifests(
     }
   }
 
-  return { toUpload, toDownload, conflicts, toDeleteLocal }
+  return { toUpload, toDownload, conflicts, toDeleteLocal, toDeleteRemote }
 }
 
 const MANIFEST_FILE = '.mindgraph/sync-manifest.json'
