@@ -11,6 +11,7 @@ import {
   isSyncable,
   type FileManifest
 } from './fileTracker'
+import { moveToSyncTrash } from './trash'
 import type { SyncProgress, SyncResult } from '../../shared/types'
 
 type SyncStatus = SyncProgress['status']
@@ -82,13 +83,13 @@ export class SyncEngine {
     this.vaultId = generateVaultId()
     this.key = deriveKey(passphrase, this.vaultId)
 
-    // Load or create manifest
-    this.manifest = await loadManifest(vaultPath) || {
+    // Always start fresh for a new vault — old syncedAt values from a previous
+    // vault would cause diffManifests to incorrectly delete local files
+    this.manifest = {
       files: {},
       lastSyncTime: 0,
       vaultId: this.vaultId
     }
-    this.manifest.vaultId = this.vaultId
 
     await saveManifest(vaultPath, this.manifest)
 
@@ -115,12 +116,23 @@ export class SyncEngine {
     this.vaultId = vaultId
     this.key = deriveKey(passphrase, this.vaultId)
 
-    this.manifest = await loadManifest(vaultPath) || {
-      files: {},
-      lastSyncTime: 0,
-      vaultId: this.vaultId
+    const loaded = await loadManifest(vaultPath)
+
+    if (loaded && loaded.vaultId === this.vaultId) {
+      // Same vault — keep syncedAt values (reconnecting to same vault)
+      this.manifest = loaded
+    } else {
+      // Different vault or no manifest — start fresh to prevent stale
+      // syncedAt values from causing incorrect local deletions
+      if (loaded) {
+        console.log(`[SyncEngine] Discarding old manifest (was ${loaded.vaultId}, now ${this.vaultId})`)
+      }
+      this.manifest = {
+        files: {},
+        lastSyncTime: 0,
+        vaultId: this.vaultId
+      }
     }
-    this.manifest.vaultId = this.vaultId
 
     await saveManifest(vaultPath, this.manifest)
     return true
@@ -340,13 +352,27 @@ export class SyncEngine {
       const diff = diffManifests(currentManifest, remoteManifest, this.manifest || undefined)
 
       // SAFETY: Mass-deletion protection
-      // If the remote manifest is empty but we have many local files with syncedAt set,
-      // something is wrong (e.g., corrupted vault ID, server error). Abort instead of deleting everything.
+      // If many local files would be deleted, something is likely wrong
+      // (e.g., stale manifest, corrupted vault ID, server error). Abort to prevent data loss.
       const localFileCount = Object.keys(currentManifest.files).length
       if (diff.toDeleteLocal.length > 0 && localFileCount > 0) {
         const deleteRatio = diff.toDeleteLocal.length / localFileCount
-        if (deleteRatio > 0.5 && diff.toDeleteLocal.length >= 3) {
+        if (deleteRatio > 0.1 && diff.toDeleteLocal.length >= 10) {
           const errorMsg = `SAFETY: Refusing to delete ${diff.toDeleteLocal.length}/${localFileCount} local files (${Math.round(deleteRatio * 100)}%). This likely indicates a server/connection issue.`
+          console.error('[SyncEngine]', errorMsg)
+          this.sendLog({ type: 'error', message: errorMsg })
+          this.status = 'error'
+          this.sendProgress({ status: 'error', error: errorMsg })
+          return { success: false, uploaded: 0, downloaded: 0, conflicts: 0, error: errorMsg }
+        }
+      }
+
+      // SAFETY: Same protection for remote deletions
+      const remoteFileCount = Object.keys(remoteManifest.files).length
+      if (diff.toDeleteRemote.length > 0 && remoteFileCount > 0) {
+        const deleteRatio = diff.toDeleteRemote.length / remoteFileCount
+        if (deleteRatio > 0.1 && diff.toDeleteRemote.length >= 10) {
+          const errorMsg = `SAFETY: Refusing to delete ${diff.toDeleteRemote.length}/${remoteFileCount} remote files (${Math.round(deleteRatio * 100)}%). This likely indicates a stale local manifest.`
           console.error('[SyncEngine]', errorMsg)
           this.sendLog({ type: 'error', message: errorMsg })
           this.status = 'error'
@@ -435,14 +461,13 @@ export class SyncEngine {
         })
       }
 
-      // Handle remote deletes
+      // Handle remote deletes — move to .sync-trash/ instead of permanent deletion
       for (const filePath of diff.toDeleteLocal) {
         if (this.destroyed) break  // SAFETY
-        const absPath = path.join(this.vaultPath, filePath)
         try {
-          await fs.unlink(absPath)
+          await moveToSyncTrash(this.vaultPath, filePath)
           delete currentManifest.files[filePath]
-          this.sendLog({ type: 'delete', message: `Deleted locally: ${filePath}`, fileName: filePath })
+          this.sendLog({ type: 'delete', message: `Moved to trash: ${filePath}`, fileName: filePath })
         } catch {
           // File might already be gone
         }

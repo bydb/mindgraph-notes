@@ -21,7 +21,8 @@ const EXCLUDE_PATTERNS = [
   '*.tmp',
   '~*',
   '.mindgraph/sync-manifest.json',
-  '.trash'
+  '.trash',
+  '.sync-trash'
 ]
 
 const INCLUDE_EXTENSIONS = new Set([
@@ -48,6 +49,7 @@ function shouldExclude(relativePath: string, fileName: string): boolean {
   if (relativePath === '.mindgraph/sync-manifest.json') return true
   if (relativePath === '.mindgraph/notes-cache.json') return true
   if (relativePath.startsWith('.trash/') || relativePath.startsWith('.trash\\')) return true
+  if (relativePath.startsWith('.sync-trash/') || relativePath.startsWith('.sync-trash\\')) return true
   if (fileName.startsWith('~')) return true
   if (fileName.endsWith('.tmp')) return true
   return false
