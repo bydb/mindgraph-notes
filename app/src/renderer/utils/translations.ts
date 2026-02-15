@@ -995,6 +995,36 @@ const translations = {
     'settings.sync.seconds': 'Sekunden',
     'settings.sync.minutes': 'Minuten',
     'settings.sync.hours': 'Stunden',
+
+    // Sync - Selective Sync
+    'settings.sync.excludeFolders': 'Ausgeschlossene Ordner',
+    'settings.sync.excludeFoldersHint': 'Ordner die nicht synchronisiert werden',
+    'settings.sync.excludeExtensions': 'Ausgeschlossene Dateitypen',
+    'settings.sync.addFolder': 'Ordner hinzufügen',
+
+    // Sync - Log
+    'settings.sync.log.title': 'Sync-Protokoll',
+    'settings.sync.log.clear': 'Protokoll leeren',
+    'settings.sync.log.empty': 'Keine Einträge',
+    'settings.sync.log.syncStarted': 'Synchronisation gestartet',
+    'settings.sync.log.syncCompleted': '{uploaded} hochgeladen, {downloaded} heruntergeladen, {conflicts} Konflikte',
+    'settings.sync.log.uploaded': 'Hochgeladen: {file}',
+    'settings.sync.log.downloaded': 'Heruntergeladen: {file}',
+    'settings.sync.log.conflict': 'Konflikt: {file}',
+    'settings.sync.log.deleted': 'Lokal gelöscht: {file}',
+    'settings.sync.log.connected': 'Verbunden',
+    'settings.sync.log.disconnected': 'Verbindung getrennt',
+    'settings.sync.log.error': 'Fehler: {message}',
+
+    // Sync - Deleted Files
+    'settings.sync.deleted.title': 'Gelöschte Dateien',
+    'settings.sync.deleted.load': 'Gelöschte Dateien laden',
+    'settings.sync.deleted.empty': 'Keine gelöschten Dateien',
+    'settings.sync.deleted.restore': 'Wiederherstellen',
+    'settings.sync.deleted.restored': 'Wiederhergestellt!',
+    'settings.sync.deleted.hint': 'Dateien werden nach 7 Tagen endgültig gelöscht',
+    'settings.sync.deleted.daysAgo': 'vor {days} Tagen',
+    'settings.sync.deleted.loading': 'Laden...',
   },
 
   en: {
@@ -1989,6 +2019,36 @@ const translations = {
     'settings.sync.seconds': 'seconds',
     'settings.sync.minutes': 'minutes',
     'settings.sync.hours': 'hours',
+
+    // Sync - Selective Sync
+    'settings.sync.excludeFolders': 'Excluded folders',
+    'settings.sync.excludeFoldersHint': 'Folders that won\'t be synced',
+    'settings.sync.excludeExtensions': 'Excluded file types',
+    'settings.sync.addFolder': 'Add folder',
+
+    // Sync - Log
+    'settings.sync.log.title': 'Sync Log',
+    'settings.sync.log.clear': 'Clear log',
+    'settings.sync.log.empty': 'No entries',
+    'settings.sync.log.syncStarted': 'Sync started',
+    'settings.sync.log.syncCompleted': '{uploaded} uploaded, {downloaded} downloaded, {conflicts} conflicts',
+    'settings.sync.log.uploaded': 'Uploaded: {file}',
+    'settings.sync.log.downloaded': 'Downloaded: {file}',
+    'settings.sync.log.conflict': 'Conflict: {file}',
+    'settings.sync.log.deleted': 'Deleted locally: {file}',
+    'settings.sync.log.connected': 'Connected',
+    'settings.sync.log.disconnected': 'Disconnected',
+    'settings.sync.log.error': 'Error: {message}',
+
+    // Sync - Deleted Files
+    'settings.sync.deleted.title': 'Deleted files',
+    'settings.sync.deleted.load': 'Load deleted files',
+    'settings.sync.deleted.empty': 'No deleted files',
+    'settings.sync.deleted.restore': 'Restore',
+    'settings.sync.deleted.restored': 'Restored!',
+    'settings.sync.deleted.hint': 'Files are permanently deleted after 7 days',
+    'settings.sync.deleted.daysAgo': '{days} days ago',
+    'settings.sync.deleted.loading': 'Loading...',
   }
 } as const
 

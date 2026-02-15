@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { SyncProgress, SyncResult } from '../../shared/types'
+import type { SyncProgress, SyncResult, SyncLogEntry } from '../../shared/types'
 
 const DEFAULT_RELAY_URL = ''
 const DEFAULT_SYNC_INTERVAL = 300
@@ -15,6 +15,8 @@ interface PersistedSyncConfig {
   syncInterval: number
   lastSyncTime: number | null
   savedForVault: string  // vault path this config was saved for (safety check)
+  excludeFolders: string[]
+  excludeExtensions: string[]
 }
 
 interface SyncState extends PersistedSyncConfig {
@@ -23,6 +25,7 @@ interface SyncState extends PersistedSyncConfig {
   syncStatus: SyncProgress['status']
   syncProgress: { current: number; total: number; fileName?: string }
   syncError: string | null
+  syncLog: SyncLogEntry[]
 
   // Actions
   loadForVault: (vaultPath: string) => Promise<void>
@@ -34,6 +37,10 @@ interface SyncState extends PersistedSyncConfig {
   setAutoSync: (enabled: boolean) => void
   setSyncInterval: (seconds: number) => void
   setRelayUrl: (url: string) => void
+  setExcludeFolders: (folders: string[]) => void
+  setExcludeExtensions: (exts: string[]) => void
+  addSyncLogEntry: (entry: Omit<SyncLogEntry, 'timestamp'>) => void
+  clearSyncLog: () => void
   loadSyncState: () => void
   saveSyncState: () => void
 }
@@ -55,7 +62,9 @@ const DEFAULT_CONFIG: PersistedSyncConfig = {
   autoSync: true,
   syncInterval: DEFAULT_SYNC_INTERVAL,
   lastSyncTime: null,
-  savedForVault: ''
+  savedForVault: '',
+  excludeFolders: [],
+  excludeExtensions: []
 }
 
 function loadPersistedStateForVault(vaultPath: string): PersistedSyncConfig {
@@ -83,7 +92,9 @@ function loadPersistedStateForVault(vaultPath: string): PersistedSyncConfig {
         autoSync: parsed.autoSync ?? true,
         syncInterval: parsed.syncInterval || DEFAULT_SYNC_INTERVAL,
         lastSyncTime: parsed.lastSyncTime || null,
-        savedForVault: vaultPath
+        savedForVault: vaultPath,
+        excludeFolders: parsed.excludeFolders || [],
+        excludeExtensions: parsed.excludeExtensions || []
       }
     }
   } catch {
@@ -106,7 +117,9 @@ function savePersistedStateForVault(vaultPath: string, config: PersistedSyncConf
       autoSync: config.autoSync,
       syncInterval: config.syncInterval,
       lastSyncTime: config.lastSyncTime,
-      savedForVault: vaultPath
+      savedForVault: vaultPath,
+      excludeFolders: config.excludeFolders,
+      excludeExtensions: config.excludeExtensions
     }))
   } catch {
     // ignore
@@ -138,7 +151,9 @@ function migrateLegacyConfig(vaultPath: string): PersistedSyncConfig | null {
       autoSync: parsed.autoSync ?? true,
       syncInterval: parsed.syncInterval || DEFAULT_SYNC_INTERVAL,
       lastSyncTime: parsed.lastSyncTime || null,
-      savedForVault: vaultPath
+      savedForVault: vaultPath,
+      excludeFolders: parsed.excludeFolders || [],
+      excludeExtensions: parsed.excludeExtensions || []
     }
     savePersistedStateForVault(vaultPath, config)
     localStorage.removeItem(LEGACY_STORAGE_KEY)
@@ -160,7 +175,9 @@ function getCurrentConfig(state: SyncState): PersistedSyncConfig {
     autoSync: state.autoSync,
     syncInterval: state.syncInterval,
     lastSyncTime: state.lastSyncTime,
-    savedForVault: state.currentVaultPath
+    savedForVault: state.currentVaultPath,
+    excludeFolders: state.excludeFolders,
+    excludeExtensions: state.excludeExtensions
   }
 }
 
@@ -174,12 +191,15 @@ export const useSyncStore = create<SyncState>()((set, get) => ({
   autoSync: true,
   syncInterval: DEFAULT_SYNC_INTERVAL,
   lastSyncTime: null,
+  excludeFolders: [],
+  excludeExtensions: [],
 
   // Transient
   currentVaultPath: '',
   syncStatus: 'idle',
   syncProgress: { current: 0, total: 0 },
   syncError: null,
+  syncLog: [],
 
   loadForVault: async (vaultPath: string) => {
     const { currentVaultPath, syncEnabled } = get()
@@ -234,6 +254,10 @@ export const useSyncStore = create<SyncState>()((set, get) => ({
           if (get().currentVaultPath !== vaultPath) return
           if (success) {
             set({ syncStatus: 'idle' })
+            // Push exclude config to engine after restore
+            if (config.excludeFolders.length || config.excludeExtensions.length) {
+              window.electronAPI.syncSetExcludeConfig({ folders: config.excludeFolders, extensions: config.excludeExtensions })
+            }
             console.log('[SyncStore] Auto-restored sync for vault:', vaultPath)
           } else {
             console.warn('[SyncStore] Could not auto-restore sync for vault:', vaultPath)
@@ -379,6 +403,35 @@ export const useSyncStore = create<SyncState>()((set, get) => ({
     savePersistedStateForVault(currentVaultPath, getCurrentConfig(get()))
   },
 
+  setExcludeFolders: (folders: string[]) => {
+    set({ excludeFolders: folders })
+    const { currentVaultPath, syncEnabled } = get()
+    savePersistedStateForVault(currentVaultPath, getCurrentConfig(get()))
+    if (syncEnabled) {
+      window.electronAPI.syncSetExcludeConfig({ folders, extensions: get().excludeExtensions })
+    }
+  },
+
+  setExcludeExtensions: (exts: string[]) => {
+    set({ excludeExtensions: exts })
+    const { currentVaultPath, syncEnabled } = get()
+    savePersistedStateForVault(currentVaultPath, getCurrentConfig(get()))
+    if (syncEnabled) {
+      window.electronAPI.syncSetExcludeConfig({ folders: get().excludeFolders, extensions: exts })
+    }
+  },
+
+  addSyncLogEntry: (entry: Omit<SyncLogEntry, 'timestamp'>) => {
+    const { syncLog } = get()
+    const newEntry: SyncLogEntry = { ...entry, timestamp: Date.now() }
+    const newLog = [newEntry, ...syncLog].slice(0, 200)
+    set({ syncLog: newLog })
+  },
+
+  clearSyncLog: () => {
+    set({ syncLog: [] })
+  },
+
   loadSyncState: () => {
     const { currentVaultPath } = get()
     if (currentVaultPath) {
@@ -392,6 +445,13 @@ export const useSyncStore = create<SyncState>()((set, get) => ({
     savePersistedStateForVault(currentVaultPath, getCurrentConfig(get()))
   }
 }))
+
+// Set up sync log listener
+if (typeof window !== 'undefined' && window.electronAPI) {
+  window.electronAPI.onSyncLog((entry) => {
+    useSyncStore.getState().addSyncLogEntry(entry)
+  })
+}
 
 // Set up sync progress listener
 if (typeof window !== 'undefined' && window.electronAPI) {

@@ -3632,6 +3632,37 @@ ipcMain.handle('sync-load-passphrase', async () => {
   }
 })
 
+ipcMain.handle('sync-set-exclude-config', async (_event, config: { folders: string[]; extensions: string[] }) => {
+  if (!syncEngine || !syncEngine.isInitialized()) return false
+  syncEngine.setExcludeConfig(config)
+  return true
+})
+
+ipcMain.handle('sync-get-deleted-files', async () => {
+  if (!syncEngine || !syncEngine.isInitialized()) return []
+  try {
+    return await syncEngine.getDeletedFiles()
+  } catch (error) {
+    console.error('[Sync] Get deleted files failed:', error)
+    return []
+  }
+})
+
+ipcMain.handle('sync-restore-file', async (_event, filePath: string) => {
+  if (!syncEngine || !syncEngine.isInitialized()) return false
+  try {
+    const restored = await syncEngine.restoreFile(filePath)
+    if (restored) {
+      // Trigger sync to download the restored file
+      syncEngine.sync().catch(err => console.error('[Sync] Post-restore sync failed:', err))
+    }
+    return restored
+  } catch (error) {
+    console.error('[Sync] Restore file failed:', error)
+    return false
+  }
+})
+
 ipcMain.handle('sync-restore', async (_event, vaultPath: string, vaultId: string, relayUrl: string, autoSyncInterval?: number) => {
   try {
     // Load passphrase from safeStorage

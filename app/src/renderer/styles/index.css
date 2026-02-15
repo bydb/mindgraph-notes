@@ -12560,6 +12560,201 @@ body {
   margin-top: 4px;
 }
 
+/* Sync Sections */
+.sync-section {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-color);
+}
+.sync-section h4 {
+  margin: 0 0 4px 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+.sync-section-hint {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin: 0 0 8px 0;
+}
+.sync-section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+/* Sync Chips (exclude folders) */
+.sync-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 6px;
+}
+.sync-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 12px;
+  background: var(--bg-tertiary);
+  font-size: 12px;
+  color: var(--text-primary);
+}
+.sync-chip button {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+}
+.sync-chip button:hover {
+  color: var(--text-primary);
+}
+.sync-chip-input input {
+  width: 100%;
+  padding: 4px 8px;
+  font-size: 12px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-xs);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
+/* Sync Exclude Extensions */
+.sync-ext-checkboxes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.sync-ext-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.sync-ext-checkbox input {
+  width: auto;
+  margin: 0;
+}
+
+/* Sync Log */
+.sync-log {
+  max-height: 300px;
+  overflow-y: auto;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-xs);
+  background: var(--bg-secondary);
+}
+.sync-log-empty {
+  padding: 16px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.sync-log-entry {
+  display: flex;
+  gap: 8px;
+  padding: 4px 8px;
+  font-size: 0.85em;
+  border-bottom: 1px solid var(--border-color);
+  align-items: flex-start;
+}
+.sync-log-entry:last-child {
+  border-bottom: none;
+}
+.sync-log-time {
+  color: var(--text-muted);
+  white-space: nowrap;
+  font-size: 11px;
+  min-width: 65px;
+}
+.sync-log-icon {
+  width: 16px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  color: var(--text-muted);
+}
+.sync-log-icon-upload { color: var(--accent-primary, #4caf50); }
+.sync-log-icon-download { color: var(--accent-primary, #2196f3); }
+.sync-log-icon-conflict { color: #ff9800; }
+.sync-log-icon-delete { color: #e53935; }
+.sync-log-icon-error { color: #e53935; }
+.sync-log-message {
+  color: var(--text-primary);
+  word-break: break-all;
+  flex: 1;
+}
+.sync-log-clear-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 11px;
+  cursor: pointer;
+  padding: 2px 6px;
+}
+.sync-log-clear-btn:hover {
+  color: var(--text-primary);
+}
+
+/* Sync Deleted Files */
+.sync-deleted-list {
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-xs);
+  background: var(--bg-secondary);
+  max-height: 300px;
+  overflow-y: auto;
+}
+.sync-deleted-entry {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border-color);
+  gap: 8px;
+}
+.sync-deleted-entry:last-child {
+  border-bottom: none;
+}
+.sync-deleted-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+.sync-deleted-name {
+  font-size: 12px;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sync-deleted-meta {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.sync-btn-secondary {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  padding: 4px 10px;
+  border-radius: var(--radius-xs);
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.sync-btn-secondary:hover {
+  background: var(--bg-hover);
+}
+.sync-btn-secondary:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
 /* Sync Status in Statusbar */
 
 .sync-status-indicator {

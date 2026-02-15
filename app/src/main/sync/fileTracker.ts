@@ -52,9 +52,28 @@ function shouldExclude(relativePath: string, fileName: string): boolean {
   return false
 }
 
-function shouldInclude(relativePath: string): boolean {
+export interface ExcludeConfig {
+  folders: string[]
+  extensions: string[]
+}
+
+function shouldInclude(relativePath: string, excludeConfig?: ExcludeConfig): boolean {
   const ext = path.extname(relativePath).toLowerCase()
   const topDir = relativePath.split(/[/\\]/)[0]
+
+  // Check user exclude extensions
+  if (excludeConfig?.extensions.length) {
+    const normalizedExts = excludeConfig.extensions.map(e => e.startsWith('.') ? e.toLowerCase() : `.${e.toLowerCase()}`)
+    if (normalizedExts.includes(ext)) return false
+  }
+
+  // Check user exclude folders
+  if (excludeConfig?.folders.length) {
+    const pathParts = relativePath.split(/[/\\]/)
+    for (const folder of excludeConfig.folders) {
+      if (pathParts.includes(folder)) return false
+    }
+  }
 
   // Files in root with allowed extensions
   if (INCLUDE_EXTENSIONS.has(ext)) return true
@@ -69,7 +88,8 @@ function shouldInclude(relativePath: string): boolean {
 async function walkDirectory(
   dirPath: string,
   basePath: string,
-  files: Map<string, { absPath: string }>
+  files: Map<string, { absPath: string }>,
+  excludeConfig?: ExcludeConfig
 ): Promise<void> {
   let entries: Awaited<ReturnType<typeof fs.readdir>>
   try {
@@ -85,13 +105,18 @@ async function walkDirectory(
     if (shouldExclude(relativePath, entry.name)) continue
 
     if (entry.isDirectory()) {
+      // Check user exclude folders
+      if (excludeConfig?.folders.length && excludeConfig.folders.includes(entry.name)) {
+        continue
+      }
+
       const topDir = relativePath.split('/')[0]
       // Only recurse into known dirs or top-level non-hidden dirs
       if (INCLUDE_DIRS.has(topDir) || !entry.name.startsWith('.')) {
-        await walkDirectory(fullPath, basePath, files)
+        await walkDirectory(fullPath, basePath, files, excludeConfig)
       }
     } else if (entry.isFile()) {
-      if (shouldInclude(relativePath)) {
+      if (shouldInclude(relativePath, excludeConfig)) {
         files.set(relativePath, { absPath: fullPath })
       }
     }
@@ -100,10 +125,11 @@ async function walkDirectory(
 
 export async function buildManifest(
   vaultPath: string,
-  vaultId: string
+  vaultId: string,
+  excludeConfig?: ExcludeConfig
 ): Promise<FileManifest> {
   const filesMap = new Map<string, { absPath: string }>()
-  await walkDirectory(vaultPath, vaultPath, filesMap)
+  await walkDirectory(vaultPath, vaultPath, filesMap, excludeConfig)
 
   const files: Record<string, FileInfo> = {}
 

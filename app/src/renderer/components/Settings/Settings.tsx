@@ -55,6 +55,12 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
   const [syncLoading, setSyncLoading] = useState(false)
   const [syncCopied, setSyncCopied] = useState(false)
   const [syncSetupError, setSyncSetupError] = useState<string | null>(null)
+  const [excludeFolderInput, setExcludeFolderInput] = useState('')
+  const [excludeExtInput, setExcludeExtInput] = useState('')
+  const [deletedFiles, setDeletedFiles] = useState<Array<{ path: string; originalPath: string; size: number; deletedAt: number }>>([])
+  const [deletedFilesLoading, setDeletedFilesLoading] = useState(false)
+  const [deletedFilesLoaded, setDeletedFilesLoaded] = useState(false)
+  const [restoredFiles, setRestoredFiles] = useState<Set<string>>(new Set())
 
   // Sync Store
   const syncState = useSyncStore()
@@ -1938,6 +1944,201 @@ LIMIT 10
                         />
                       </div>
                     )}
+
+                    {/* Exclude Folders */}
+                    <div className="sync-section">
+                      <h4>{t('settings.sync.excludeFolders')}</h4>
+                      <p className="sync-section-hint">{t('settings.sync.excludeFoldersHint')}</p>
+                      <div className="sync-chips">
+                        {syncState.excludeFolders.map(folder => (
+                          <span key={folder} className="sync-chip">
+                            {folder}
+                            <button onClick={() => syncState.setExcludeFolders(syncState.excludeFolders.filter(f => f !== folder))}>
+                              <svg width="10" height="10" viewBox="0 0 10 10"><path d="M2 2L8 8M8 2L2 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                      <div className="sync-chip-input">
+                        <input
+                          type="text"
+                          value={excludeFolderInput}
+                          onChange={e => setExcludeFolderInput(e.target.value)}
+                          onKeyDown={e => {
+                            if (e.key === 'Enter' && excludeFolderInput.trim()) {
+                              const folder = excludeFolderInput.trim()
+                              if (!syncState.excludeFolders.includes(folder)) {
+                                syncState.setExcludeFolders([...syncState.excludeFolders, folder])
+                              }
+                              setExcludeFolderInput('')
+                            }
+                          }}
+                          placeholder={t('settings.sync.addFolder')}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Exclude Extensions */}
+                    <div className="sync-section">
+                      <h4>{t('settings.sync.excludeExtensions')}</h4>
+                      <div className="sync-ext-checkboxes">
+                        {['.pdf', '.png', '.jpg', '.gif', '.svg', '.webp', '.bmp'].map(ext => (
+                          <label key={ext} className="sync-ext-checkbox">
+                            <input
+                              type="checkbox"
+                              checked={syncState.excludeExtensions.includes(ext)}
+                              onChange={e => {
+                                if (e.target.checked) {
+                                  syncState.setExcludeExtensions([...syncState.excludeExtensions, ext])
+                                } else {
+                                  syncState.setExcludeExtensions(syncState.excludeExtensions.filter(x => x !== ext))
+                                }
+                              }}
+                            />
+                            {ext}
+                          </label>
+                        ))}
+                      </div>
+                      <div className="sync-chip-input">
+                        <input
+                          type="text"
+                          value={excludeExtInput}
+                          onChange={e => setExcludeExtInput(e.target.value)}
+                          onKeyDown={e => {
+                            if (e.key === 'Enter' && excludeExtInput.trim()) {
+                              let ext = excludeExtInput.trim()
+                              if (!ext.startsWith('.')) ext = '.' + ext
+                              if (!syncState.excludeExtensions.includes(ext)) {
+                                syncState.setExcludeExtensions([...syncState.excludeExtensions, ext])
+                              }
+                              setExcludeExtInput('')
+                            }
+                          }}
+                          placeholder=".docx"
+                        />
+                      </div>
+                      {syncState.excludeExtensions.filter(e => !['.pdf', '.png', '.jpg', '.gif', '.svg', '.webp', '.bmp'].includes(e)).length > 0 && (
+                        <div className="sync-chips" style={{ marginTop: '4px' }}>
+                          {syncState.excludeExtensions.filter(e => !['.pdf', '.png', '.jpg', '.gif', '.svg', '.webp', '.bmp'].includes(e)).map(ext => (
+                            <span key={ext} className="sync-chip">
+                              {ext}
+                              <button onClick={() => syncState.setExcludeExtensions(syncState.excludeExtensions.filter(x => x !== ext))}>
+                                <svg width="10" height="10" viewBox="0 0 10 10"><path d="M2 2L8 8M8 2L2 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
+                              </button>
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Sync Log */}
+                    <div className="sync-section">
+                      <div className="sync-section-header">
+                        <h4>{t('settings.sync.log.title')}</h4>
+                        {syncState.syncLog.length > 0 && (
+                          <button className="sync-log-clear-btn" onClick={() => syncState.clearSyncLog()}>
+                            {t('settings.sync.log.clear')}
+                          </button>
+                        )}
+                      </div>
+                      <div className="sync-log">
+                        {syncState.syncLog.length === 0 ? (
+                          <div className="sync-log-empty">{t('settings.sync.log.empty')}</div>
+                        ) : (
+                          syncState.syncLog.map((entry, i) => (
+                            <div key={i} className="sync-log-entry">
+                              <span className="sync-log-time">
+                                {new Date(entry.timestamp).toLocaleTimeString()}
+                              </span>
+                              <span className={`sync-log-icon sync-log-icon-${entry.type}`}>
+                                {entry.type === 'upload' && (
+                                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 11V3M7 3L4 6M7 3L10 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                                )}
+                                {entry.type === 'download' && (
+                                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 3V11M7 11L4 8M7 11L10 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                                )}
+                                {entry.type === 'conflict' && (
+                                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 4V8M7 10V10.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/><path d="M1.5 12L7 2L12.5 12H1.5Z" stroke="currentColor" strokeWidth="1.2" fill="none"/></svg>
+                                )}
+                                {entry.type === 'delete' && (
+                                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M3 4H11M5 4V3H9V4M5.5 6V10.5M8.5 6V10.5M4 4L4.5 11.5H9.5L10 4" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                                )}
+                                {entry.type === 'error' && (
+                                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="5.5" stroke="currentColor" strokeWidth="1.2"/><path d="M5 5L9 9M9 5L5 9" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>
+                                )}
+                                {(entry.type === 'connect' || entry.type === 'disconnect') && (
+                                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M4.5 7H9.5M3 4.5C3 4.5 2 5.5 2 7S3 9.5 3 9.5M11 4.5C11 4.5 12 5.5 12 7S11 9.5 11 9.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>
+                                )}
+                                {entry.type === 'sync' && (
+                                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2.5 7.5A4.5 4.5 0 0 1 11 4.5M11.5 6.5A4.5 4.5 0 0 1 3 9.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/><path d="M9 3.5L11 4.5L10 6.5M5 10.5L3 9.5L4 7.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                                )}
+                              </span>
+                              <span className="sync-log-message">{entry.message}</span>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Deleted Files */}
+                    <div className="sync-section">
+                      <h4>{t('settings.sync.deleted.title')}</h4>
+                      <p className="sync-section-hint">{t('settings.sync.deleted.hint')}</p>
+                      {!deletedFilesLoaded ? (
+                        <button
+                          className="sync-btn-secondary"
+                          disabled={deletedFilesLoading}
+                          onClick={async () => {
+                            setDeletedFilesLoading(true)
+                            try {
+                              const files = await window.electronAPI.syncGetDeletedFiles()
+                              setDeletedFiles(files)
+                              setDeletedFilesLoaded(true)
+                            } catch {
+                              // ignore
+                            } finally {
+                              setDeletedFilesLoading(false)
+                            }
+                          }}
+                        >
+                          {deletedFilesLoading ? t('settings.sync.deleted.loading') : t('settings.sync.deleted.load')}
+                        </button>
+                      ) : (
+                        <div className="sync-deleted-list">
+                          {deletedFiles.length === 0 ? (
+                            <div className="sync-log-empty">{t('settings.sync.deleted.empty')}</div>
+                          ) : (
+                            deletedFiles.map(file => {
+                              const daysAgo = Math.floor((Date.now() / 1000 - file.deletedAt) / 86400)
+                              const sizeKB = Math.round(file.size / 1024)
+                              const displayPath = file.originalPath || file.path
+                              return (
+                                <div key={file.path} className="sync-deleted-entry">
+                                  <div className="sync-deleted-info">
+                                    <span className="sync-deleted-name">{displayPath}</span>
+                                    <span className="sync-deleted-meta">
+                                      {sizeKB} KB &middot; {t('settings.sync.deleted.daysAgo', { days: daysAgo })}
+                                    </span>
+                                  </div>
+                                  <button
+                                    className="sync-btn-secondary"
+                                    disabled={restoredFiles.has(file.path)}
+                                    onClick={async () => {
+                                      const ok = await window.electronAPI.syncRestoreFile(file.path)
+                                      if (ok) {
+                                        setRestoredFiles(prev => new Set(prev).add(file.path))
+                                      }
+                                    }}
+                                  >
+                                    {restoredFiles.has(file.path) ? t('settings.sync.deleted.restored') : t('settings.sync.deleted.restore')}
+                                  </button>
+                                </div>
+                              )
+                            })
+                          )}
+                        </div>
+                      )}
+                    </div>
 
                     <div className="sync-actions">
                       <button

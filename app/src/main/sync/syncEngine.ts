@@ -49,6 +49,13 @@ export class SyncEngine {
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null
   private autoSyncInterval: ReturnType<typeof setInterval> | null = null
   private syncDebounceTimer: ReturnType<typeof setTimeout> | null = null
+  private excludeConfig: { folders: string[]; extensions: string[] } = { folders: [], extensions: [] }
+
+  private sendLog(entry: { type: string; message: string; fileName?: string }): void {
+    for (const win of BrowserWindow.getAllWindows()) {
+      win.webContents.send('sync-log', entry)
+    }
+  }
 
   private sendProgress(progress: Partial<SyncProgress>): void {
     const data: SyncProgress = {
@@ -141,6 +148,7 @@ export class SyncEngine {
               this.registered = true
               this.status = 'idle'
               this.sendProgress({ status: 'idle' })
+              this.sendLog({ type: 'connect', message: 'Connected' })
               console.log('[Sync] Vault registered on server')
               resolve()
               return
@@ -163,6 +171,7 @@ export class SyncEngine {
 
       this.ws.on('close', () => {
         console.log('[Sync] Disconnected from relay server')
+        this.sendLog({ type: 'disconnect', message: 'Disconnected' })
         this.ws = null
         this.registered = false
         if (this.status !== 'error') {
@@ -286,9 +295,10 @@ export class SyncEngine {
 
       this.status = 'scanning'
       this.sendProgress({ status: 'scanning' })
+      this.sendLog({ type: 'sync', message: 'Sync started' })
 
       // Build current local manifest
-      const currentManifest = await buildManifest(this.vaultPath, this.vaultId)
+      const currentManifest = await buildManifest(this.vaultPath, this.vaultId, this.excludeConfig)
 
       // Merge with saved manifest to preserve syncedAt timestamps
       if (this.manifest) {
@@ -317,6 +327,7 @@ export class SyncEngine {
           await this.uploadFile(filePath)
           currentManifest.files[filePath].syncedAt = Date.now()
           current++
+          this.sendLog({ type: 'upload', message: `Uploaded: ${filePath}`, fileName: filePath })
           this.sendProgress({
             status: 'uploading',
             current,
@@ -338,6 +349,7 @@ export class SyncEngine {
             currentManifest.files[filePath].syncedAt = Date.now()
           }
           current++
+          this.sendLog({ type: 'download', message: `Downloaded: ${filePath}`, fileName: filePath })
           this.sendProgress({
             status: 'downloading',
             current,
@@ -356,6 +368,7 @@ export class SyncEngine {
       for (const filePath of diff.conflicts) {
         if (this.destroyed) break  // SAFETY
         current++
+        this.sendLog({ type: 'conflict', message: `Conflict: ${filePath}`, fileName: filePath })
         this.sendProgress({
           status: 'downloading',
           current,
@@ -372,6 +385,7 @@ export class SyncEngine {
         try {
           await fs.unlink(absPath)
           delete currentManifest.files[filePath]
+          this.sendLog({ type: 'delete', message: `Deleted locally: ${filePath}`, fileName: filePath })
         } catch {
           // File might already be gone
         }
@@ -390,6 +404,10 @@ export class SyncEngine {
         conflicts: diff.conflicts.length
       }
 
+      this.sendLog({
+        type: 'sync',
+        message: `${diff.toUpload.length} uploaded, ${diff.toDownload.length} downloaded, ${diff.conflicts.length} conflicts`
+      })
       this.sendProgress({ status: 'done', current: total, total })
 
       // Reset status to idle after a moment
@@ -404,6 +422,7 @@ export class SyncEngine {
     } catch (err) {
       this.status = 'error'
       const error = err instanceof Error ? err.message : 'Unknown sync error'
+      this.sendLog({ type: 'error', message: `Error: ${error}` })
       this.sendProgress({ status: 'error', error })
       return { success: false, uploaded: 0, downloaded: 0, conflicts: 0, error }
     } finally {
@@ -720,6 +739,74 @@ export class SyncEngine {
       connected: this.ws !== null && this.ws.readyState === WebSocket.OPEN,
       lastSyncTime: this.manifest?.lastSyncTime || null
     }
+  }
+
+  setExcludeConfig(config: { folders: string[]; extensions: string[] }): void {
+    this.excludeConfig = config
+  }
+
+  async getDeletedFiles(): Promise<Array<{ path: string; originalPath: string; size: number; deletedAt: number }>> {
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+      throw new Error('Not connected')
+    }
+
+    return new Promise((resolve, reject) => {
+      const handler = (data: WebSocket.Data) => {
+        try {
+          const msg = JSON.parse(data.toString())
+          if (msg.type === 'deleted-files') {
+            this.ws?.removeListener('message', handler)
+            resolve(msg.files || [])
+          } else if (msg.type === 'error') {
+            this.ws?.removeListener('message', handler)
+            reject(new Error(msg.message || 'Failed to get deleted files'))
+          }
+        } catch (err) {
+          this.ws?.removeListener('message', handler)
+          reject(err)
+        }
+      }
+
+      this.ws!.on('message', handler)
+      this.wsSend({ type: 'get-deleted-files', vaultId: this.vaultId })
+
+      setTimeout(() => {
+        this.ws?.removeListener('message', handler)
+        reject(new Error('Get deleted files timeout'))
+      }, 15000)
+    })
+  }
+
+  async restoreFile(filePath: string): Promise<boolean> {
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+      throw new Error('Not connected')
+    }
+
+    return new Promise((resolve, reject) => {
+      const handler = (data: WebSocket.Data) => {
+        try {
+          const msg = JSON.parse(data.toString())
+          if (msg.type === 'file-restored') {
+            this.ws?.removeListener('message', handler)
+            resolve(true)
+          } else if (msg.type === 'error') {
+            this.ws?.removeListener('message', handler)
+            resolve(false)
+          }
+        } catch (err) {
+          this.ws?.removeListener('message', handler)
+          reject(err)
+        }
+      }
+
+      this.ws!.on('message', handler)
+      this.wsSend({ type: 'restore-file', vaultId: this.vaultId, path: filePath })
+
+      setTimeout(() => {
+        this.ws?.removeListener('message', handler)
+        reject(new Error('Restore file timeout'))
+      }, 15000)
+    })
   }
 
   isInitialized(): boolean {

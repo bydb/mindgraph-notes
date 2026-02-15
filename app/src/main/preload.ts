@@ -252,8 +252,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
   syncLoadPassphrase: () => ipcRenderer.invoke('sync-load-passphrase'),
   syncRestore: (vaultPath: string, vaultId: string, relayUrl: string, autoSyncInterval?: number) =>
     ipcRenderer.invoke('sync-restore', vaultPath, vaultId, relayUrl, autoSyncInterval),
+  syncSetExcludeConfig: (config: { folders: string[]; extensions: string[] }) =>
+    ipcRenderer.invoke('sync-set-exclude-config', config),
+  syncGetDeletedFiles: () => ipcRenderer.invoke('sync-get-deleted-files'),
+  syncRestoreFile: (filePath: string) => ipcRenderer.invoke('sync-restore-file', filePath),
   onSyncProgress: (callback: (data: { status: string; current: number; total: number; fileName?: string; error?: string }) => void) => {
     ipcRenderer.removeAllListeners('sync-progress')
     ipcRenderer.on('sync-progress', (_event, data) => callback(data))
+  },
+  onSyncLog: (callback: (entry: { type: string; message: string; fileName?: string }) => void) => {
+    ipcRenderer.removeAllListeners('sync-log')
+    ipcRenderer.on('sync-log', (_event, entry) => callback(entry))
   }
 })

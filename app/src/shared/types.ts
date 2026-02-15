@@ -24,6 +24,22 @@ export interface SyncConfig {
   relayUrl: string
   autoSync: boolean
   syncInterval: number
+  excludeFolders: string[]
+  excludeExtensions: string[]
+}
+
+export interface SyncLogEntry {
+  timestamp: number
+  type: 'sync' | 'upload' | 'download' | 'conflict' | 'delete' | 'error' | 'connect' | 'disconnect'
+  message: string
+  fileName?: string
+}
+
+export interface DeletedFileInfo {
+  path: string
+  originalPath: string
+  size: number
+  deletedAt: number
 }
 
 // Update-Checker Types
@@ -653,7 +669,11 @@ export interface ElectronAPI {
   syncSavePassphrase: (passphrase: string) => Promise<boolean>;
   syncLoadPassphrase: () => Promise<string | null>;
   syncRestore: (vaultPath: string, vaultId: string, relayUrl: string, autoSyncInterval?: number) => Promise<boolean>;
+  syncSetExcludeConfig: (config: { folders: string[]; extensions: string[] }) => Promise<boolean>;
+  syncGetDeletedFiles: () => Promise<DeletedFileInfo[]>;
+  syncRestoreFile: (filePath: string) => Promise<boolean>;
   onSyncProgress: (callback: (data: SyncProgress) => void) => void;
+  onSyncLog: (callback: (entry: Omit<SyncLogEntry, 'timestamp'>) => void) => void;
 }
 
 // Docling Options for PDF conversion
