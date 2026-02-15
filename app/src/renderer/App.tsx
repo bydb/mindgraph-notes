@@ -423,6 +423,15 @@ const App: React.FC = () => {
         const { setHelpGuideOpen, helpGuideOpen } = useUIStore.getState()
         setHelpGuideOpen(!helpGuideOpen)
       }
+      // Shift+Cmd+O für Onboarding zurücksetzen
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && (e.key === 'o' || e.key === 'O') && !e.altKey) {
+        e.preventDefault()
+        e.stopPropagation()
+        const { setOnboardingCompleted, setOnboardingOpen, setUserProfile } = useUIStore.getState()
+        setOnboardingCompleted(false)
+        setUserProfile(null)
+        setOnboardingOpen(true)
+      }
     }
 
     // Capture-Phase verwenden, damit Event vor anderen Handlern abgefangen wird

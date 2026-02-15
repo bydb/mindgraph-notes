@@ -1025,6 +1025,7 @@ const translations = {
     'settings.sync.deleted.hint': 'Dateien werden nach 7 Tagen endgültig gelöscht',
     'settings.sync.deleted.daysAgo': 'vor {days} Tagen',
     'settings.sync.deleted.loading': 'Laden...',
+    'settings.sync.deleted.reload': 'Neu laden',
   },
 
   en: {
@@ -2049,6 +2050,7 @@ const translations = {
     'settings.sync.deleted.hint': 'Files are permanently deleted after 7 days',
     'settings.sync.deleted.daysAgo': '{days} days ago',
     'settings.sync.deleted.loading': 'Loading...',
+    'settings.sync.deleted.reload': 'Reload',
   }
 } as const
 

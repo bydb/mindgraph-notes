@@ -86,6 +86,12 @@ function shouldInclude(relativePath: string, excludeConfig?: ExcludeConfig): boo
   return false
 }
 
+export function isSyncable(relativePath: string, excludeConfig?: ExcludeConfig): boolean {
+  const fileName = path.basename(relativePath)
+  if (shouldExclude(relativePath, fileName)) return false
+  return shouldInclude(relativePath, excludeConfig)
+}
+
 async function walkDirectory(
   dirPath: string,
   basePath: string,

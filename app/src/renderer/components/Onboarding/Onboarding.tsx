@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react'
+import React, { useState, useCallback, useEffect } from 'react'
 import { useUIStore } from '../../stores/uiStore'
 import type { UserProfile } from '../../stores/uiStore'
 import { WelcomeScreen } from './WelcomeScreen'
@@ -15,6 +15,14 @@ export const Onboarding: React.FC = () => {
   const [step, setStep] = useState<OnboardingStep>('welcome')
   const [vaultPath, setLocalVaultPath] = useState<string | null>(null)
   const [selectedProfile, setSelectedProfile] = useState<UserProfile>(null)
+
+  // Reset to first step when onboarding is reopened
+  useEffect(() => {
+    if (onboardingOpen) {
+      setStep('welcome')
+      setSelectedProfile(null)
+    }
+  }, [onboardingOpen])
 
   const finishWithVault = useCallback(async (path: string) => {
     // Save as last vault — Sidebar will load it when onboardingCompleted becomes true

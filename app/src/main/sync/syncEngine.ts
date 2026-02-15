@@ -8,6 +8,7 @@ import {
   diffManifests,
   loadManifest,
   saveManifest,
+  isSyncable,
   type FileManifest
 } from './fileTracker'
 import type { SyncProgress, SyncResult } from '../../shared/types'
@@ -94,6 +95,12 @@ export class SyncEngine {
     return { vaultId: this.vaultId }
   }
 
+  private validateVaultId(vaultId: string): void {
+    if (!vaultId || !vaultId.startsWith('mg-') || vaultId.length > 30 || vaultId.includes('://')) {
+      throw new Error(`Invalid vault ID: "${vaultId.slice(0, 50)}"`)
+    }
+  }
+
   async join(
     vaultPath: string,
     vaultId: string,
@@ -101,6 +108,7 @@ export class SyncEngine {
     relayUrl: string,
     activationCode: string = ''
   ): Promise<boolean> {
+    this.validateVaultId(vaultId)
     this.vaultPath = vaultPath
     this.relayUrl = relayUrl
     this.activationCode = activationCode
@@ -313,8 +321,39 @@ export class SyncEngine {
       // Get remote manifest
       const remoteManifest = await this.getRemoteManifest()
 
+      // Filter out excluded files from remote manifest and saved manifest
+      // so they are completely invisible to the diff algorithm
+      for (const filePath of Object.keys(remoteManifest.files)) {
+        if (!isSyncable(filePath, this.excludeConfig)) {
+          delete remoteManifest.files[filePath]
+        }
+      }
+      if (this.manifest) {
+        for (const filePath of Object.keys(this.manifest.files)) {
+          if (!isSyncable(filePath, this.excludeConfig)) {
+            delete this.manifest.files[filePath]
+          }
+        }
+      }
+
       // Compute diff — pass saved manifest so we can detect locally deleted files
       const diff = diffManifests(currentManifest, remoteManifest, this.manifest || undefined)
+
+      // SAFETY: Mass-deletion protection
+      // If the remote manifest is empty but we have many local files with syncedAt set,
+      // something is wrong (e.g., corrupted vault ID, server error). Abort instead of deleting everything.
+      const localFileCount = Object.keys(currentManifest.files).length
+      if (diff.toDeleteLocal.length > 0 && localFileCount > 0) {
+        const deleteRatio = diff.toDeleteLocal.length / localFileCount
+        if (deleteRatio > 0.5 && diff.toDeleteLocal.length >= 3) {
+          const errorMsg = `SAFETY: Refusing to delete ${diff.toDeleteLocal.length}/${localFileCount} local files (${Math.round(deleteRatio * 100)}%). This likely indicates a server/connection issue.`
+          console.error('[SyncEngine]', errorMsg)
+          this.sendLog({ type: 'error', message: errorMsg })
+          this.status = 'error'
+          this.sendProgress({ status: 'error', error: errorMsg })
+          return { success: false, uploaded: 0, downloaded: 0, conflicts: 0, error: errorMsg }
+        }
+      }
 
       const total = diff.toUpload.length + diff.toDownload.length + diff.conflicts.length + diff.toDeleteRemote.length
       let current = 0

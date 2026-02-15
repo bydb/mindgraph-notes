@@ -2084,26 +2084,26 @@ LIMIT 10
                     <div className="sync-section">
                       <h4>{t('settings.sync.deleted.title')}</h4>
                       <p className="sync-section-hint">{t('settings.sync.deleted.hint')}</p>
-                      {!deletedFilesLoaded ? (
-                        <button
-                          className="sync-btn-secondary"
-                          disabled={deletedFilesLoading}
-                          onClick={async () => {
-                            setDeletedFilesLoading(true)
-                            try {
-                              const files = await window.electronAPI.syncGetDeletedFiles()
-                              setDeletedFiles(files)
-                              setDeletedFilesLoaded(true)
-                            } catch {
-                              // ignore
-                            } finally {
-                              setDeletedFilesLoading(false)
-                            }
-                          }}
-                        >
-                          {deletedFilesLoading ? t('settings.sync.deleted.loading') : t('settings.sync.deleted.load')}
-                        </button>
-                      ) : (
+                      <button
+                        className="sync-btn-secondary"
+                        disabled={deletedFilesLoading}
+                        onClick={async () => {
+                          setDeletedFilesLoading(true)
+                          setRestoredFiles(new Set())
+                          try {
+                            const files = await window.electronAPI.syncGetDeletedFiles()
+                            setDeletedFiles(files)
+                            setDeletedFilesLoaded(true)
+                          } catch {
+                            // ignore
+                          } finally {
+                            setDeletedFilesLoading(false)
+                          }
+                        }}
+                      >
+                        {deletedFilesLoading ? t('settings.sync.deleted.loading') : deletedFilesLoaded ? t('settings.sync.deleted.reload') : t('settings.sync.deleted.load')}
+                      </button>
+                      {deletedFilesLoaded && (
                         <div className="sync-deleted-list">
                           {deletedFiles.length === 0 ? (
                             <div className="sync-log-empty">{t('settings.sync.deleted.empty')}</div>
@@ -2127,6 +2127,14 @@ LIMIT 10
                                       const ok = await window.electronAPI.syncRestoreFile(file.path)
                                       if (ok) {
                                         setRestoredFiles(prev => new Set(prev).add(file.path))
+                                        // Reload deleted files list after restore
+                                        setTimeout(async () => {
+                                          try {
+                                            const files = await window.electronAPI.syncGetDeletedFiles()
+                                            setDeletedFiles(files)
+                                            setRestoredFiles(new Set())
+                                          } catch { /* ignore */ }
+                                        }, 2000)
                                       }
                                     }}
                                   >

@@ -12702,6 +12702,9 @@ body {
 }
 
 /* Sync Deleted Files */
+.sync-section > .sync-btn-secondary {
+  margin-bottom: 6px;
+}
 .sync-deleted-list {
   border: 1px solid var(--border-color);
   border-radius: var(--radius-xs);

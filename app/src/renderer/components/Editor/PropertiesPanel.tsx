@@ -428,16 +428,12 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
 
   const hasProperties = Object.keys(frontmatter).length > 0
 
-  if (!hasProperties && collapsed) {
-    return null
-  }
-
   return (
     <div className={`properties-panel ${collapsed ? 'collapsed' : ''}`}>
       <div className="properties-header" onClick={onToggleCollapsed}>
         <span className="properties-toggle">{collapsed ? '▶' : '▼'}</span>
         <span className="properties-title">{t('properties', 'Properties')}</span>
-        <span className="properties-count">{Object.keys(frontmatter).length}</span>
+        {hasProperties && <span className="properties-count">{Object.keys(frontmatter).length}</span>}
       </div>
 
       {!collapsed && (
