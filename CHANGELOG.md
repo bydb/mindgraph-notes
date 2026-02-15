@@ -2,6 +2,31 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.2.4-alpha] - 2026-02-15
+
+### Features
+- **Selektive Synchronisierung**: Ordner und Dateitypen können vom Sync ausgeschlossen werden (Einstellungen > Sync)
+- **Sync-Protokoll**: Transparentes Log aller Sync-Aktivitäten (Uploads, Downloads, Konflikte, Fehler) in den Einstellungen
+- **Gelöschte Dateien wiederherstellen**: Auf dem Server gelöschte Dateien werden 7 Tage aufbewahrt und können wiederhergestellt werden
+- **Sync-Server**: mindgraph-sync-server als Teil des Repositories hinzugefügt
+
+### Improvements
+- **Sync-Sicherheit**: Mass-Deletion-Schutz verhindert versehentliches Löschen von >50% der lokalen Dateien
+- **Vault-ID-Validierung**: Sync prüft die Vault-ID auf korrektes Format, verhindert korrupte IDs
+- **notes-cache.json vom Sync ausgeschlossen**: Interne Cache-Dateien werden nicht mehr synchronisiert
+- **Lokale Dateilöschungen**: Werden jetzt korrekt erkannt und an den Server propagiert
+- **Gelöschte Dateien UI**: Automatisches Neuladen nach Wiederherstellung, Neu-Laden-Button immer sichtbar
+- **Onboarding**: Setzt sich beim erneuten Öffnen auf die erste Seite zurück (Shift+Cmd+O)
+- **Properties Panel**: Wird jetzt auch bei neuen Dateien ohne Frontmatter angezeigt
+
+### Fixes
+- **Kritischer Sync-Bug behoben**: Korrupte Vault-ID konnte dazu führen, dass alle lokalen Dateien gelöscht werden
+- **Server Soft-Delete**: Server verwendet jetzt Soft-Delete statt Hard-Delete für Dateien
+
+### Website
+- Alle Emojis durch SVG-Icons ersetzt
+- Neuer Blog-Post: "Preiskampf, Sicherheitskrise und das Web als KI-Datenbank"
+
 ## [0.2.3-alpha] - 2026-02-14
 
 ### Features
