@@ -46,6 +46,7 @@ const INCLUDE_DIRS = new Set([
 function shouldExclude(relativePath: string, fileName: string): boolean {
   if (EXCLUDE_PATTERNS.includes(fileName)) return true
   if (relativePath === '.mindgraph/sync-manifest.json') return true
+  if (relativePath === '.mindgraph/notes-cache.json') return true
   if (relativePath.startsWith('.trash/') || relativePath.startsWith('.trash\\')) return true
   if (fileName.startsWith('~')) return true
   if (fileName.endsWith('.tmp')) return true
