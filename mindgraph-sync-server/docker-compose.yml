@@ -1,0 +1,16 @@
+services:
+  sync-server:
+    build: .
+    ports:
+      - "8080:8080"
+    volumes:
+      - sync-data:/app/data
+    environment:
+      - PORT=8080
+      - DB_PATH=/app/data/sync.db
+      - REQUIRE_ACTIVATION=true
+      - ADMIN_SECRET=${ADMIN_SECRET:-changeme}
+    restart: unless-stopped
+
+volumes:
+  sync-data:
