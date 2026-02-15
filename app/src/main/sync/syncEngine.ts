@@ -630,6 +630,12 @@ export class SyncEngine {
 
     if (!localFile || !remoteFile) return
 
+    // JSON merge for flashcards — merge by card ID instead of overwriting
+    if (relativePath === '.mindgraph/flashcards.json') {
+      await this.mergeFlashcardsConflict(relativePath, localManifest)
+      return
+    }
+
     if (remoteFile.modifiedAt >= localFile.modifiedAt) {
       // Remote is newer — save local as conflict copy, then download remote
       const ext = path.extname(relativePath)
@@ -652,6 +658,99 @@ export class SyncEngine {
       await this.uploadFile(relativePath)
       localManifest.files[relativePath].syncedAt = Date.now()
     }
+  }
+
+  /**
+   * Merge flashcards.json by card ID.
+   * - Cards only in local → keep
+   * - Cards only in remote → keep
+   * - Cards in both → take the one with the newer `modified` timestamp
+   * Result is saved locally and uploaded to server.
+   */
+  private async mergeFlashcardsConflict(
+    relativePath: string,
+    localManifest: FileManifest
+  ): Promise<void> {
+    if (!this.key) return
+
+    const absPath = path.join(this.vaultPath, relativePath)
+
+    // Read local flashcards
+    let localCards: Array<{ id: string; modified: string; [key: string]: unknown }> = []
+    try {
+      const localData = await fs.readFile(absPath, 'utf-8')
+      localCards = JSON.parse(localData)
+      if (!Array.isArray(localCards)) localCards = []
+    } catch {
+      localCards = []
+    }
+
+    // Download and decrypt remote flashcards
+    let remoteCards: Array<{ id: string; modified: string; [key: string]: unknown }> = []
+    try {
+      const fileData = await this.requestFile(relativePath)
+      if (fileData) {
+        const ciphertext = Buffer.from(fileData.data, 'base64')
+        const iv = Buffer.from(fileData.iv, 'base64')
+        const tag = Buffer.from(fileData.tag, 'base64')
+        const plaintext = decryptFile(ciphertext, this.key, iv, tag)
+        remoteCards = JSON.parse(plaintext.toString('utf-8'))
+        if (!Array.isArray(remoteCards)) remoteCards = []
+      }
+    } catch {
+      remoteCards = []
+    }
+
+    // Build map: id → card, using the newer version for duplicates
+    const merged = new Map<string, typeof localCards[0]>()
+
+    for (const card of localCards) {
+      if (card.id) merged.set(card.id, card)
+    }
+
+    for (const remoteCard of remoteCards) {
+      if (!remoteCard.id) continue
+      const existing = merged.get(remoteCard.id)
+      if (!existing) {
+        // Card only on remote → add
+        merged.set(remoteCard.id, remoteCard)
+      } else {
+        // Both have it → newer `modified` wins
+        const localTime = new Date(existing.modified || 0).getTime()
+        const remoteTime = new Date(remoteCard.modified || 0).getTime()
+        if (remoteTime > localTime) {
+          merged.set(remoteCard.id, remoteCard)
+        }
+      }
+    }
+
+    const mergedArray = Array.from(merged.values())
+    const mergedJson = JSON.stringify(mergedArray, null, 2)
+
+    // Write merged result locally
+    await fs.writeFile(absPath, mergedJson, 'utf-8')
+
+    // Upload merged result to server
+    await this.uploadFile(relativePath)
+
+    // Update manifest
+    const content = Buffer.from(mergedJson, 'utf-8')
+    localManifest.files[relativePath] = {
+      hash: hashContent(content),
+      size: content.length,
+      modifiedAt: Date.now(),
+      syncedAt: Date.now()
+    }
+
+    const localCount = localCards.length
+    const remoteCount = remoteCards.length
+    const mergedCount = mergedArray.length
+    console.log(`[Sync] Merged flashcards: ${localCount} local + ${remoteCount} remote → ${mergedCount} merged`)
+    this.sendLog({
+      type: 'sync',
+      message: `Flashcards merged: ${localCount} local + ${remoteCount} remote → ${mergedCount} cards`,
+      fileName: relativePath
+    })
   }
 
   private requestFile(
