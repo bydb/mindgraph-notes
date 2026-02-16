@@ -32,3 +32,4 @@ mindgraph-sync-server/node_modules/
 mindgraph-sync-server/data/
 mindgraph-sync-server/dist/
 .claude/
+CLAUDE.md
