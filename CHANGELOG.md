@@ -2,6 +2,12 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.2.6-alpha] - 2026-02-16
+
+### Fixes
+- **LanguageTool**: Korrekturvorschläge werden jetzt zuverlässig im Popup angezeigt — Click-Handler nutzt nun CodeMirror's Position-API statt unzuverlässige DOM-Traversierung
+- **LanguageTool**: Popup schließt sich beim Klick außerhalb automatisch
+
 ## [0.2.5-alpha] - 2026-02-15
 
 ### Features
