@@ -8298,6 +8298,19 @@ body {
   margin-bottom: 8px;
 }
 
+.inbox-experimental-warning {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  background: rgba(245, 158, 11, 0.1);
+  border-radius: var(--radius-sm);
+  color: #f59e0b;
+  font-size: 11px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
 /* Spinning animation for refresh */
 @keyframes inbox-spin {
   to { transform: rotate(360deg); }

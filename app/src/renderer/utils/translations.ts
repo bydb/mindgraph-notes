@@ -757,6 +757,7 @@ const translations = {
     'settings.email.analysisModel': 'Analyse-Modell',
     'settings.email.analysisModelDefault': 'Standard (globales Modell)',
     'settings.email.gmailHint': 'Gmail benötigt ein App-Passwort (Google-Konto → Sicherheit → App-Passwörter)',
+    'settings.email.warning': '⚠️ Experimentell — E-Mail-Inhalte werden an das KI-Modell weitergeleitet. Es besteht ein Prompt-Injection-Risiko: Bösartige E-Mails könnten die Analyse manipulieren. Nur zu Testzwecken mit lokaler KI verwenden (empfohlen: Ministral).',
 
     // Inbox Panel
     'inbox.title': 'Posteingang',
@@ -780,6 +781,7 @@ const translations = {
     'inbox.sentiment.neutral': 'Neutral',
     'inbox.sentiment.negative': 'Negativ',
     'inbox.sentiment.urgent': 'Dringend',
+    'inbox.experimentalWarning': 'Experimentell — Prompt-Injection-Risiko. Nur mit lokaler KI verwenden.',
     'titlebar.inbox': 'Posteingang',
 
     'languagetool.check': 'Prüfen',
@@ -1861,6 +1863,7 @@ const translations = {
     'settings.email.analysisModel': 'Analysis model',
     'settings.email.analysisModelDefault': 'Default (global model)',
     'settings.email.gmailHint': 'Gmail requires an App Password (Google Account → Security → App Passwords)',
+    'settings.email.warning': '⚠️ Experimental — Email contents are forwarded to the AI model. There is a prompt injection risk: malicious emails could manipulate the analysis. Use only for testing with local AI (recommended: Ministral).',
 
     // Inbox Panel
     'inbox.title': 'Inbox',
@@ -1884,6 +1887,7 @@ const translations = {
     'inbox.sentiment.neutral': 'Neutral',
     'inbox.sentiment.negative': 'Negative',
     'inbox.sentiment.urgent': 'Urgent',
+    'inbox.experimentalWarning': 'Experimental — Prompt injection risk. Use only with local AI.',
     'titlebar.inbox': 'Inbox',
 
     'languagetool.check': 'Check',
