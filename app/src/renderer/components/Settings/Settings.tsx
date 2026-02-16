@@ -50,6 +50,8 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
   const [readwiseSyncResult, setReadwiseSyncResult] = useState<string | null>(null)
   const [ollamaModels, setOllamaModels] = useState<Array<{ name: string; size: number }>>([])
   const [lmstudioModels, setLmstudioModels] = useState<Array<{ name: string; size: number }>>([])
+  const [emailTestStatus, setEmailTestStatus] = useState<Record<string, 'idle' | 'testing' | 'success' | 'failed'>>({})
+  const [emailPasswords, setEmailPasswords] = useState<Record<string, string>>({})
 
   // Sync Setup State
   const [syncMode, setSyncMode] = useState<'new' | 'join'>('new')
@@ -135,7 +137,9 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
     showFormattingToolbar,
     setShowFormattingToolbar,
     showRawEditor,
-    setShowRawEditor
+    setShowRawEditor,
+    email: emailSettings,
+    setEmail
   } = useUIStore()
 
   const { t } = useTranslation()
@@ -169,6 +173,25 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
       checkReadwiseConnection()
     }
   }, [isOpen, activeTab])
+
+  // Email-Passwörter aus safeStorage laden
+  useEffect(() => {
+    if (isOpen && emailSettings.accounts.length > 0) {
+      const loadPasswords = async () => {
+        const passwords: Record<string, string> = {}
+        for (const account of emailSettings.accounts) {
+          try {
+            const pw = await window.electronAPI.emailLoadPassword(account.id)
+            if (pw) passwords[account.id] = pw
+          } catch { /* ignore */ }
+        }
+        if (Object.keys(passwords).length > 0) {
+          setEmailPasswords(prev => ({ ...prev, ...passwords }))
+        }
+      }
+      loadPasswords()
+    }
+  }, [isOpen, emailSettings.accounts.length])
 
   // Templates laden
   useEffect(() => {
@@ -1780,6 +1803,249 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
                     <strong>Readwise</strong> {t('settings.readwise.description')}
                   </p>
                 </div>
+
+                {/* Email Integration */}
+                <h3 style={{ marginTop: '32px' }}>{t('settings.email.title')}</h3>
+                <div className="settings-row">
+                  <label>{t('settings.email.enabled')}</label>
+                  <input
+                    type="checkbox"
+                    checked={emailSettings.enabled}
+                    onChange={e => setEmail({ enabled: e.target.checked })}
+                  />
+                </div>
+
+                {emailSettings.enabled && (
+                  <>
+                    <div className="settings-info" style={{ color: '#f59e0b', background: 'rgba(245, 158, 11, 0.1)', borderLeft: '3px solid #f59e0b' }}>
+                      {t('settings.email.warning')}
+                    </div>
+                    <div className="settings-row" style={{ alignItems: 'flex-start' }}>
+                      <label>{t('settings.email.accounts')}</label>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', flex: 1 }}>
+                        {emailSettings.accounts.map((account, idx) => (
+                          <div key={account.id} style={{ padding: '12px', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-md)', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                              <input
+                                type="text"
+                                value={account.name}
+                                onChange={e => {
+                                  const updated = [...emailSettings.accounts]
+                                  updated[idx] = { ...account, name: e.target.value }
+                                  setEmail({ accounts: updated })
+                                }}
+                                placeholder={t('settings.email.accountName')}
+                                style={{ width: '150px' }}
+                              />
+                              <button
+                                className="settings-refresh"
+                                style={{ color: 'var(--color-error)', fontSize: '11px' }}
+                                onClick={() => {
+                                  const updated = emailSettings.accounts.filter((_, i) => i !== idx)
+                                  setEmail({ accounts: updated })
+                                }}
+                              >
+                                {t('settings.email.removeAccount')}
+                              </button>
+                            </div>
+                            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                              <input
+                                type="text"
+                                value={account.host}
+                                onChange={e => {
+                                  const updated = [...emailSettings.accounts]
+                                  updated[idx] = { ...account, host: e.target.value }
+                                  setEmail({ accounts: updated })
+                                }}
+                                placeholder={t('settings.email.host')}
+                                style={{ width: '180px' }}
+                              />
+                              <input
+                                type="number"
+                                value={account.port}
+                                onChange={e => {
+                                  const updated = [...emailSettings.accounts]
+                                  updated[idx] = { ...account, port: parseInt(e.target.value) || 993 }
+                                  setEmail({ accounts: updated })
+                                }}
+                                placeholder={t('settings.email.port')}
+                                style={{ width: '70px' }}
+                              />
+                              <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px' }}>
+                                <input
+                                  type="checkbox"
+                                  checked={account.tls}
+                                  onChange={e => {
+                                    const updated = [...emailSettings.accounts]
+                                    updated[idx] = { ...account, tls: e.target.checked }
+                                    setEmail({ accounts: updated })
+                                  }}
+                                />
+                                {t('settings.email.tls')}
+                              </label>
+                            </div>
+                            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                              <input
+                                type="text"
+                                value={account.user}
+                                onChange={e => {
+                                  const updated = [...emailSettings.accounts]
+                                  updated[idx] = { ...account, user: e.target.value }
+                                  setEmail({ accounts: updated })
+                                }}
+                                placeholder={t('settings.email.user')}
+                                style={{ width: '180px' }}
+                              />
+                              <input
+                                type="password"
+                                value={emailPasswords[account.id] || ''}
+                                onChange={e => setEmailPasswords(prev => ({ ...prev, [account.id]: e.target.value }))}
+                                onBlur={async () => {
+                                  const pw = emailPasswords[account.id]
+                                  if (pw) {
+                                    await window.electronAPI.emailSavePassword(account.id, pw)
+                                  }
+                                }}
+                                placeholder={t('settings.email.password')}
+                                style={{ width: '150px' }}
+                              />
+                              <button
+                                className="settings-refresh"
+                                onClick={async () => {
+                                  const pw = emailPasswords[account.id]
+                                  if (pw) {
+                                    await window.electronAPI.emailSavePassword(account.id, pw)
+                                  }
+                                  setEmailTestStatus(prev => ({ ...prev, [account.id]: 'testing' }))
+                                  const result = await window.electronAPI.emailConnect(account)
+                                  setEmailTestStatus(prev => ({ ...prev, [account.id]: result.success ? 'success' : 'failed' }))
+                                  setTimeout(() => setEmailTestStatus(prev => ({ ...prev, [account.id]: 'idle' })), 3000)
+                                }}
+                              >
+                                {emailTestStatus[account.id] === 'testing' ? '...' :
+                                 emailTestStatus[account.id] === 'success' ? t('settings.email.testSuccess') :
+                                 emailTestStatus[account.id] === 'failed' ? t('settings.email.testFailed') :
+                                 t('settings.email.testConnection')}
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                        <button
+                          className="settings-refresh"
+                          onClick={() => {
+                            const id = `email-${Date.now()}`
+                            setEmail({
+                              accounts: [...emailSettings.accounts, { id, name: '', host: '', port: 993, user: '', tls: true }]
+                            })
+                          }}
+                        >
+                          + {t('settings.email.addAccount')}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="settings-row">
+                      <label>{t('settings.email.fetchInterval')}</label>
+                      <div className="settings-input-group">
+                        <select
+                          value={emailSettings.fetchIntervalMinutes}
+                          onChange={e => setEmail({ fetchIntervalMinutes: parseInt(e.target.value) })}
+                        >
+                          <option value={5}>5 {t('settings.email.minutes')}</option>
+                          <option value={15}>15 {t('settings.email.minutes')}</option>
+                          <option value={30}>30 {t('settings.email.minutes')}</option>
+                          <option value={60}>60 {t('settings.email.minutes')}</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="settings-row">
+                      <label>{t('settings.email.instructionNote')}</label>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <input
+                          type="text"
+                          value={emailSettings.instructionNotePath}
+                          onChange={e => setEmail({ instructionNotePath: e.target.value })}
+                          placeholder="z.B. Email-Instruktionen.md"
+                          style={{ width: '250px' }}
+                        />
+                        <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                          {t('settings.email.instructionNoteHint')}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="settings-row">
+                      <label>{t('settings.email.relevanceThreshold')}</label>
+                      <div className="settings-input-group" style={{ gap: '8px' }}>
+                        <input
+                          type="range"
+                          min={0}
+                          max={100}
+                          value={emailSettings.relevanceThreshold}
+                          onChange={e => setEmail({ relevanceThreshold: parseInt(e.target.value) })}
+                          style={{ width: '150px' }}
+                        />
+                        <span style={{ fontSize: '12px', minWidth: '30px' }}>{emailSettings.relevanceThreshold}</span>
+                      </div>
+                    </div>
+
+                    <div className="settings-row">
+                      <label>{t('settings.email.maxPerFetch')}</label>
+                      <input
+                        type="number"
+                        value={emailSettings.maxEmailsPerFetch}
+                        onChange={e => setEmail({ maxEmailsPerFetch: parseInt(e.target.value) || 50 })}
+                        min={10}
+                        max={200}
+                        style={{ width: '80px' }}
+                      />
+                    </div>
+
+                    <div className="settings-row">
+                      <label>{t('settings.email.retainDays')}</label>
+                      <input
+                        type="number"
+                        value={emailSettings.retainDays}
+                        onChange={e => setEmail({ retainDays: parseInt(e.target.value) || 30 })}
+                        min={7}
+                        max={365}
+                        style={{ width: '80px' }}
+                      />
+                    </div>
+
+                    <div className="settings-row">
+                      <label>{t('settings.email.autoAnalyze')}</label>
+                      <input
+                        type="checkbox"
+                        checked={emailSettings.autoAnalyze}
+                        onChange={e => setEmail({ autoAnalyze: e.target.checked })}
+                      />
+                    </div>
+
+                    <div className="settings-row">
+                      <label>{t('settings.email.analysisModel')}</label>
+                      <select
+                        value={emailSettings.analysisModel}
+                        onChange={e => setEmail({ analysisModel: e.target.value })}
+                      >
+                        <option value="">{t('settings.email.analysisModelDefault')}</option>
+                        {ollamaModels.map(m => (
+                          <option key={m.name} value={m.name}>{m.name}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="settings-info">
+                      <p>
+                        <strong>E-Mail</strong> {t('settings.email.description')}
+                      </p>
+                      <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                        {t('settings.email.gmailHint')}
+                      </p>
+                    </div>
+                  </>
+                )}
               </div>
             )}
 

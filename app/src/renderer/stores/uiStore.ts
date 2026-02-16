@@ -276,6 +276,19 @@ export interface LanguageToolSettings {
   ignoredRules: LanguageToolIgnoredRule[]  // Persisted ignored matches
 }
 
+// Email Integration Settings
+export interface EmailSettings {
+  enabled: boolean
+  accounts: Array<{ id: string; name: string; host: string; port: number; user: string; tls: boolean }>
+  fetchIntervalMinutes: number
+  instructionNotePath: string
+  relevanceThreshold: number
+  maxEmailsPerFetch: number
+  retainDays: number
+  autoAnalyze: boolean
+  analysisModel: string
+}
+
 // Legacy type alias for backward compatibility
 type OllamaSettings = LLMSettings
 
@@ -342,6 +355,9 @@ interface UIState {
 
   // LanguageTool Settings
   languageTool: LanguageToolSettings
+
+  // Email Settings
+  email: EmailSettings
 
   // Update-Checker & What's New
   lastSeenVersion: string
@@ -410,6 +426,7 @@ interface UIState {
   setDocling: (settings: Partial<DoclingSettings>) => void
   setReadwise: (settings: Partial<ReadwiseSettings>) => void
   setLanguageTool: (settings: Partial<LanguageToolSettings>) => void
+  setEmail: (settings: Partial<EmailSettings>) => void
   setLastSeenVersion: (version: string) => void
   setUpdateAvailable: (info: UpdateInfo | null) => void
   setWhatsNewOpen: (open: boolean) => void
@@ -533,6 +550,19 @@ const defaultState = {
     ignoredRules: []
   },
 
+  // Email Settings
+  email: {
+    enabled: false,
+    accounts: [],
+    fetchIntervalMinutes: 15,
+    instructionNotePath: '',
+    relevanceThreshold: 30,
+    maxEmailsPerFetch: 50,
+    retainDays: 30,
+    autoAnalyze: true,
+    analysisModel: ''
+  },
+
   // Update-Checker & What's New
   lastSeenVersion: '',
   updateAvailable: null as UpdateInfo | null,
@@ -568,7 +598,7 @@ const persistedKeys = [
   'canvasFilterPath', 'canvasViewMode', 'canvasShowTags', 'canvasShowLinks', 'canvasShowImages',
   'canvasCompactMode', 'canvasDefaultCardWidth', 'splitPosition', 'fileTreeDisplayMode', 'ollama',
   'pdfCompanionEnabled', 'pdfDisplayMode', 'iconSet',
-  'smartConnectionsEnabled', 'notesChatEnabled', 'flashcardsEnabled', 'smartConnectionsWeights', 'docling', 'readwise', 'languageTool',
+  'smartConnectionsEnabled', 'notesChatEnabled', 'flashcardsEnabled', 'smartConnectionsWeights', 'docling', 'readwise', 'languageTool', 'email',
   'lastSeenVersion',
   'customAccentColor', 'customBackgroundColorLight', 'customBackgroundColorDark',
   'customLogo',
@@ -630,6 +660,9 @@ export const useUIStore = create<UIState>()((set, get) => ({
   })),
   setLanguageTool: (settings) => set((state) => ({
     languageTool: { ...state.languageTool, ...settings }
+  })),
+  setEmail: (settings) => set((state) => ({
+    email: { ...state.email, ...settings }
   })),
   setLastSeenVersion: (version) => set({ lastSeenVersion: version }),
   setUpdateAvailable: (info) => set({ updateAvailable: info }),
