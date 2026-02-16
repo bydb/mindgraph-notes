@@ -2728,6 +2728,375 @@ ipcMain.handle('languagetool-analyze', async (
   }
 })
 
+// ============ READWISE INTEGRATION ============
+
+// Readwise API Token validieren
+ipcMain.handle('readwise-check', async (_event, apiKey: string) => {
+  try {
+    const response = await fetch('https://readwise.io/api/v2/auth/', {
+      method: 'GET',
+      headers: { 'Authorization': `Token ${apiKey}` },
+      signal: AbortSignal.timeout(10000)
+    })
+    return { available: response.ok }
+  } catch (error) {
+    console.log('[Readwise] Auth check failed:', error)
+    return { available: false }
+  }
+})
+
+// Hilfsfunktion: Dateiname aus Titel erzeugen (Obsidian-kompatibel)
+function sanitizeFileName(title: string): string {
+  return title
+    .replace(/[/\\:*?"<>|]/g, '')  // Ungültige Zeichen entfernen
+    .replace(/\s+/g, ' ')          // Mehrfache Leerzeichen
+    .trim()
+    .slice(0, 200)                 // Max Länge
+}
+
+// Hilfsfunktion: Kategorie → Unterordner
+function getCategoryFolder(category: string): string {
+  switch (category) {
+    case 'books': return 'Books'
+    case 'articles': return 'Articles'
+    case 'tweets': return 'Tweets'
+    case 'supplementals': return 'Supplementals'
+    case 'podcasts': return 'Podcasts'
+    default: return 'Articles'
+  }
+}
+
+// Hilfsfunktion: Bild von URL herunterladen und lokal speichern
+async function downloadReadwiseImage(imageUrl: string, targetDir: string, fileName: string): Promise<string | null> {
+  try {
+    if (!imageUrl) return null
+
+    await fs.mkdir(targetDir, { recursive: true })
+
+    // Dateiendung aus URL oder Content-Type ermitteln
+    const urlPath = new URL(imageUrl).pathname
+    let ext = path.extname(urlPath).toLowerCase()
+    if (!ext || !['.jpg', '.jpeg', '.png', '.webp', '.gif'].includes(ext)) {
+      ext = '.jpg'  // Default
+    }
+
+    const safeFileName = sanitizeFileName(fileName) + ext
+    const targetPath = path.join(targetDir, safeFileName)
+
+    // Prüfen ob Bild schon existiert
+    try {
+      await fs.access(targetPath)
+      return safeFileName  // Bereits heruntergeladen
+    } catch {
+      // Noch nicht vorhanden, herunterladen
+    }
+
+    const response = await fetch(imageUrl, {
+      signal: AbortSignal.timeout(15000)
+    })
+
+    if (!response.ok) {
+      console.log(`[Readwise] Image download failed (${response.status}): ${imageUrl}`)
+      return null
+    }
+
+    const arrayBuffer = await response.arrayBuffer()
+    const buffer = Buffer.from(arrayBuffer)
+    await fs.writeFile(targetPath, buffer)
+    console.log(`[Readwise] Downloaded cover: ${safeFileName}`)
+    return safeFileName
+  } catch (error) {
+    console.log(`[Readwise] Image download error: ${error}`)
+    return null
+  }
+}
+
+// Hilfsfunktion: Markdown-Datei aus Readwise-Buch/Artikel erzeugen
+function generateReadwiseMarkdown(book: {
+  user_book_id: number
+  title: string
+  author: string
+  category: string
+  source: string
+  cover_image_url: string
+  source_url: string
+  highlights: Array<{
+    id: number
+    text: string
+    note: string
+    location: number
+    location_type: string
+    highlighted_at: string
+    url: string
+    tags: Array<{ name: string }>
+  }>
+}, localCoverPath?: string): string {
+  const lines: string[] = []
+
+  // Frontmatter
+  lines.push('---')
+  lines.push(`Buch: ${book.title}`)
+  const highlightDate = book.highlights.length > 0
+    ? book.highlights[0].highlighted_at?.split('T')[0] || ''
+    : ''
+  lines.push(`date: ${highlightDate}`)
+  lines.push(`author: ${book.author || ''}`)
+  lines.push('rating:')
+  lines.push('tags:')
+  lines.push(`  - ${book.category}`)
+  lines.push('---')
+  lines.push('')
+
+  // Cover (150px breit — Obsidian-Format: ![alt|width](path))
+  if (localCoverPath) {
+    lines.push(`![rw-book-cover|150](../.attachments/${localCoverPath})`)
+    lines.push('')
+  } else if (book.cover_image_url) {
+    lines.push(`![rw-book-cover|150](${book.cover_image_url})`)
+    lines.push('')
+  }
+
+  // Metadata
+  lines.push('## Metadata')
+  if (book.source_url) {
+    lines.push(`- URL: ${book.source_url}`)
+  }
+  if (book.author) {
+    lines.push(`- Author: ${book.author}`)
+  }
+  lines.push('')
+
+  // Highlights
+  lines.push('## Highlights')
+  for (const highlight of book.highlights) {
+    let line = `- ${highlight.text}`
+    if (highlight.location) {
+      line += ` ([Location ${highlight.location}](${highlight.url || ''}))`
+    }
+    lines.push(line)
+
+    if (highlight.tags && highlight.tags.length > 0) {
+      lines.push(`    - Tags: ${highlight.tags.map(t => t.name).join(', ')}`)
+    }
+    if (highlight.note) {
+      lines.push(`    - Note: ${highlight.note}`)
+    }
+  }
+
+  return lines.join('\n')
+}
+
+// Readwise Export synchronisieren
+ipcMain.handle('readwise-sync', async (_event, apiKey: string, syncFolder: string, vaultPath: string, lastSyncedAt?: string, syncCategories?: Record<string, boolean>) => {
+  if (!mainWindow) return { success: false, error: 'Kein Fenster verfügbar' }
+
+  try {
+    const syncBasePath = path.join(vaultPath, syncFolder)
+    // Unterordner sicherstellen
+    await fs.mkdir(syncBasePath, { recursive: true })
+
+    let allBooks: Array<{
+      user_book_id: number
+      title: string
+      author: string
+      category: string
+      source: string
+      cover_image_url: string
+      source_url: string
+      highlights: Array<{
+        id: number
+        text: string
+        note: string
+        location: number
+        location_type: string
+        highlighted_at: string
+        url: string
+        tags: Array<{ name: string }>
+      }>
+    }> = []
+
+    let nextPageCursor: string | null = null
+    let pageCount = 0
+
+    // Pagination: Alle Seiten holen
+    do {
+      const params = new URLSearchParams()
+      if (lastSyncedAt) {
+        params.append('updatedAfter', lastSyncedAt)
+      }
+      if (nextPageCursor) {
+        params.append('pageCursor', nextPageCursor)
+      }
+
+      const url = `https://readwise.io/api/v2/export/?${params.toString()}`
+      console.log(`[Readwise] Fetching page ${pageCount + 1}...`, url)
+
+      mainWindow.webContents.send('readwise-sync-progress', {
+        current: pageCount,
+        total: -1,  // Unbekannt
+        status: 'fetching',
+        title: `Seite ${pageCount + 1} wird geladen...`
+      })
+
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: { 'Authorization': `Token ${apiKey}` },
+        signal: AbortSignal.timeout(30000)
+      })
+
+      if (response.status === 429) {
+        // Rate limit — Retry-After Header respektieren
+        const retryAfter = parseInt(response.headers.get('Retry-After') || '60', 10)
+        console.log(`[Readwise] Rate limited, waiting ${retryAfter}s...`)
+        mainWindow.webContents.send('readwise-sync-progress', {
+          current: pageCount,
+          total: -1,
+          status: 'rate-limited',
+          title: `Rate limit erreicht, warte ${retryAfter}s...`
+        })
+        await new Promise(resolve => setTimeout(resolve, retryAfter * 1000))
+        continue  // Retry same page
+      }
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        console.error('[Readwise] API error:', response.status, errorText)
+        return { success: false, error: `Readwise API Fehler: ${response.status}` }
+      }
+
+      const data = await response.json()
+      allBooks = allBooks.concat(data.results || [])
+      nextPageCursor = data.nextPageCursor || null
+      pageCount++
+
+      console.log(`[Readwise] Page ${pageCount}: ${data.results?.length || 0} books, nextCursor: ${nextPageCursor ? 'yes' : 'no'}`)
+
+    } while (nextPageCursor)
+
+    console.log(`[Readwise] Total books/articles fetched: ${allBooks.length}`)
+
+    // Kategorie-Filter anwenden
+    if (syncCategories) {
+      const before = allBooks.length
+      allBooks = allBooks.filter(book => {
+        const cat = book.category || 'articles'
+        return syncCategories[cat] !== false
+      })
+      console.log(`[Readwise] After category filter: ${allBooks.length} (filtered ${before - allBooks.length})`)
+    }
+
+    console.log(`[Readwise] Total books/articles to sync: ${allBooks.length}`)
+
+    // Dateien schreiben
+    let newCount = 0
+    let updatedCount = 0
+    const syncedFiles: string[] = []  // Relative Pfade zum Vault
+
+    for (let i = 0; i < allBooks.length; i++) {
+      const book = allBooks[i]
+      const categoryFolder = getCategoryFolder(book.category)
+      const folderPath = path.join(syncBasePath, categoryFolder)
+      await fs.mkdir(folderPath, { recursive: true })
+
+      const fileName = sanitizeFileName(book.title) + '.md'
+      const filePath = path.join(folderPath, fileName)
+
+      mainWindow.webContents.send('readwise-sync-progress', {
+        current: i + 1,
+        total: allBooks.length,
+        status: 'writing',
+        title: book.title
+      })
+
+      // Prüfen ob Datei bereits existiert
+      let fileExists = false
+      try {
+        await fs.access(filePath)
+        fileExists = true
+      } catch {
+        // Datei existiert nicht
+      }
+
+      // Cover-Bild herunterladen (für neue und bestehende Dateien)
+      let localCoverPath: string | null = null
+      if (book.cover_image_url) {
+        const attachmentsDir = path.join(syncBasePath, '.attachments')
+        localCoverPath = await downloadReadwiseImage(
+          book.cover_image_url,
+          attachmentsDir,
+          `rw-cover-${book.user_book_id}`
+        )
+      }
+
+      if (fileExists) {
+        // Append-Only: Neue Highlights an bestehende Datei anhängen
+        const existingContent = await fs.readFile(filePath, 'utf-8')
+
+        // Highlight-IDs aus bestehender Datei extrahieren (über Location-Links)
+        // Wir prüfen ob ein Highlight-Text schon vorhanden ist
+        const newHighlights = book.highlights.filter(h => {
+          // Einfache Prüfung: Text schon enthalten?
+          return !existingContent.includes(h.text.slice(0, 80))
+        })
+
+        if (newHighlights.length > 0) {
+          const appendLines: string[] = ['']
+          const today = new Date().toISOString().split('T')[0]
+          appendLines.push(`## New highlights added ${today}`)
+
+          for (const highlight of newHighlights) {
+            let line = `- ${highlight.text}`
+            if (highlight.location) {
+              line += ` ([Location ${highlight.location}](${highlight.url || ''}))`
+            }
+            appendLines.push(line)
+
+            if (highlight.tags && highlight.tags.length > 0) {
+              appendLines.push(`    - Tags: ${highlight.tags.map(t => t.name).join(', ')}`)
+            }
+            if (highlight.note) {
+              appendLines.push(`    - Note: ${highlight.note}`)
+            }
+          }
+
+          await fs.appendFile(filePath, appendLines.join('\n'))
+          updatedCount++
+          syncedFiles.push(path.join(syncFolder, categoryFolder, fileName))
+          console.log(`[Readwise] Updated: ${fileName} (+${newHighlights.length} highlights)`)
+        }
+      } else {
+        // Neue Datei erstellen
+        const content = generateReadwiseMarkdown(book, localCoverPath || undefined)
+        await fs.writeFile(filePath, content, 'utf-8')
+        newCount++
+        syncedFiles.push(path.join(syncFolder, categoryFolder, fileName))
+        console.log(`[Readwise] Created: ${fileName}`)
+      }
+    }
+
+    mainWindow.webContents.send('readwise-sync-progress', {
+      current: allBooks.length,
+      total: allBooks.length,
+      status: 'done',
+      title: 'Sync abgeschlossen'
+    })
+
+    console.log(`[Readwise] Sync complete: ${newCount} new, ${updatedCount} updated, ${allBooks.length} total`)
+    return {
+      success: true,
+      stats: {
+        new: newCount,
+        updated: updatedCount,
+        total: allBooks.length
+      },
+      syncedFiles
+    }
+  } catch (error) {
+    console.error('[Readwise] Sync error:', error)
+    return { success: false, error: error instanceof Error ? error.message : 'Unbekannter Fehler' }
+  }
+})
+
 // ============ WIKILINK STRIPPING ============
 
 // Entfernt Wikilink-Klammern aus Text, behält den Text

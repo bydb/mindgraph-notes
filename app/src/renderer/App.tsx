@@ -29,7 +29,7 @@ import { TabBar } from './components/TabBar/TabBar'
 import { useUIStore, ACCENT_COLORS, FONT_FAMILIES, BACKGROUND_COLORS, initializeUISettings } from './stores/uiStore'
 import { useTabStore } from './stores/tabStore'
 import { useTranslation } from './utils/translations'
-import { useNotesStore } from './stores/notesStore'
+import { useNotesStore, createNoteFromFile } from './stores/notesStore'
 import { useReminderStore } from './stores/reminderStore'
 import { useSyncStore } from './stores/syncStore'
 import { getVaultTaskStats } from './utils/linkExtractor'
@@ -152,6 +152,64 @@ const App: React.FC = () => {
   useEffect(() => {
     if (vaultPath) {
       useSyncStore.getState().loadForVault(vaultPath)
+    }
+  }, [vaultPath])
+
+  // Readwise Auto-Sync
+  useEffect(() => {
+    const { readwise } = useUIStore.getState()
+    if (!readwise.enabled || !readwise.autoSync || !readwise.apiKey || !vaultPath) return
+
+    const intervalMs = readwise.autoSyncInterval * 60 * 1000
+    console.log(`[Readwise] Auto-sync enabled, interval: ${readwise.autoSyncInterval}min`)
+
+    const doSync = async () => {
+      const currentState = useUIStore.getState().readwise
+      if (!currentState.enabled || !currentState.autoSync || !currentState.apiKey) return
+
+      console.log('[Readwise] Auto-sync triggered')
+      try {
+        const result = await window.electronAPI.readwiseSync(
+          currentState.apiKey,
+          currentState.syncFolder,
+          vaultPath,
+          currentState.lastSyncedAt || undefined,
+          currentState.syncCategories
+        )
+        if (result.success && result.stats) {
+          useUIStore.getState().setReadwise({ lastSyncedAt: new Date().toISOString() })
+          console.log(`[Readwise] Auto-sync complete: ${result.stats.new} new, ${result.stats.updated} updated`)
+
+          // Synced-Dateien in den NotesStore laden
+          if ((result.stats.new > 0 || result.stats.updated > 0) && result.syncedFiles?.length) {
+            try {
+              const newTree = await window.electronAPI.readDirectory(vaultPath)
+              useNotesStore.getState().setFileTree(newTree)
+              const contents = await window.electronAPI.readFilesBatch(vaultPath, result.syncedFiles)
+              for (const relativePath of result.syncedFiles) {
+                const content = contents[relativePath]
+                if (!content) continue
+                const note = await createNoteFromFile(`${vaultPath}/${relativePath}`, relativePath, content)
+                useNotesStore.getState().addNote(note)
+              }
+              console.log(`[Readwise] ${result.syncedFiles.length} Notizen in Store geladen`)
+            } catch (e) {
+              console.error('[Readwise] Store-Update nach Auto-Sync failed:', e)
+            }
+          }
+        }
+      } catch (error) {
+        console.error('[Readwise] Auto-sync error:', error)
+      }
+    }
+
+    // Initial sync nach 10s Verzögerung
+    const initialTimer = setTimeout(doSync, 10000)
+    const interval = setInterval(doSync, intervalMs)
+
+    return () => {
+      clearTimeout(initialTimer)
+      clearInterval(interval)
     }
   }, [vaultPath])
 

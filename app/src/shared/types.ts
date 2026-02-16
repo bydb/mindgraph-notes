@@ -591,6 +591,16 @@ export interface ElectronAPI {
     error?: string;
   }>;
 
+  // Readwise Integration API
+  readwiseCheck: (apiKey: string) => Promise<{ available: boolean }>;
+  readwiseSync: (apiKey: string, syncFolder: string, vaultPath: string, lastSyncedAt?: string, syncCategories?: Record<string, boolean>) => Promise<{
+    success: boolean;
+    stats?: { new: number; updated: number; total: number };
+    syncedFiles?: string[];
+    error?: string;
+  }>;
+  onReadwiseSyncProgress: (callback: (progress: { current: number; total: number; status: string; title?: string }) => void) => void;
+
   // LanguageTool Grammar/Spell Check API
   languagetoolCheck: (mode?: 'local' | 'api', localUrl?: string, apiKey?: string) => Promise<{
     available: boolean;

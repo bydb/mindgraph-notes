@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { useUIStore, ACCENT_COLORS, AI_LANGUAGES, FONT_FAMILIES, UI_LANGUAGES, BACKGROUND_COLORS, ICON_SETS, OUTLINE_STYLES, type Language, type FontFamily, type BackgroundColor, type IconSet, type OutlineStyle, type LLMBackend } from '../../stores/uiStore'
-import { useNotesStore } from '../../stores/notesStore'
+import { useNotesStore, createNoteFromFile } from '../../stores/notesStore'
 import { useSyncStore } from '../../stores/syncStore'
 import { useTranslation } from '../../utils/translations'
 import {
@@ -44,6 +44,10 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
   const [doclingStatus, setDoclingStatus] = useState<'checking' | 'connected' | 'disconnected'>('checking')
   const [doclingVersion, setDoclingVersion] = useState<string>('')
   const [languageToolStatus, setLanguageToolStatus] = useState<'checking' | 'connected' | 'disconnected'>('checking')
+  const [readwiseStatus, setReadwiseStatus] = useState<'checking' | 'connected' | 'disconnected'>('checking')
+  const [readwiseSyncing, setReadwiseSyncing] = useState(false)
+  const [readwiseSyncProgress, setReadwiseSyncProgress] = useState<{ current: number; total: number; status: string; title?: string } | null>(null)
+  const [readwiseSyncResult, setReadwiseSyncResult] = useState<string | null>(null)
   const [ollamaModels, setOllamaModels] = useState<Array<{ name: string; size: number }>>([])
   const [lmstudioModels, setLmstudioModels] = useState<Array<{ name: string; size: number }>>([])
 
@@ -115,6 +119,8 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
     setSmartConnectionsWeights,
     docling,
     setDocling,
+    readwise,
+    setReadwise,
     languageTool,
     setLanguageTool,
     customLogo,
@@ -160,6 +166,7 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
       checkLmstudioConnection()
       checkDoclingConnection()
       checkLanguageToolConnection()
+      checkReadwiseConnection()
     }
   }, [isOpen, activeTab])
 
@@ -249,6 +256,81 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
       setLanguageToolStatus(result.available ? 'connected' : 'disconnected')
     } catch {
       setLanguageToolStatus('disconnected')
+    }
+  }
+
+  const checkReadwiseConnection = async () => {
+    if (!readwise.apiKey) {
+      setReadwiseStatus('disconnected')
+      return
+    }
+    setReadwiseStatus('checking')
+    try {
+      const result = await window.electronAPI.readwiseCheck(readwise.apiKey)
+      setReadwiseStatus(result.available ? 'connected' : 'disconnected')
+    } catch {
+      setReadwiseStatus('disconnected')
+    }
+  }
+
+  const triggerReadwiseSync = async () => {
+    if (!readwise.apiKey || !vaultPath || readwiseSyncing) return
+    setReadwiseSyncing(true)
+    setReadwiseSyncResult(null)
+    setReadwiseSyncProgress(null)
+
+    // Progress-Listener registrieren
+    window.electronAPI.onReadwiseSyncProgress((progress) => {
+      setReadwiseSyncProgress(progress)
+    })
+
+    try {
+      const result = await window.electronAPI.readwiseSync(
+        readwise.apiKey,
+        readwise.syncFolder,
+        vaultPath,
+        readwise.lastSyncedAt || undefined,
+        readwise.syncCategories
+      )
+
+      if (result.success && result.stats) {
+        const now = new Date().toISOString()
+        setReadwise({ lastSyncedAt: now })
+        setReadwiseSyncResult(
+          t('settings.readwise.syncStats')
+            .replace('{new}', String(result.stats.new))
+            .replace('{updated}', String(result.stats.updated))
+            .replace('{total}', String(result.stats.total))
+        )
+
+        // FileTree neu laden und synced Dateien in den NotesStore aufnehmen
+        if ((result.stats.new > 0 || result.stats.updated > 0) && result.syncedFiles && result.syncedFiles.length > 0) {
+          try {
+            // FileTree aktualisieren
+            const newTree = await window.electronAPI.readDirectory(vaultPath)
+            useNotesStore.getState().setFileTree(newTree)
+
+            // Synced-Dateien lesen und in NotesStore laden
+            const contents = await window.electronAPI.readFilesBatch(vaultPath, result.syncedFiles)
+            for (const relativePath of result.syncedFiles) {
+              const content = contents[relativePath]
+              if (!content) continue
+              const fullPath = `${vaultPath}/${relativePath}`
+              const note = await createNoteFromFile(fullPath, relativePath, content)
+              useNotesStore.getState().addNote(note)
+            }
+            console.log(`[Readwise] ${result.syncedFiles.length} Notizen in Store geladen`)
+          } catch (e) {
+            console.error('[Readwise] Store-Update failed:', e)
+          }
+        }
+      } else {
+        setReadwiseSyncResult(`Fehler: ${result.error}`)
+      }
+    } catch (error) {
+      setReadwiseSyncResult(`Fehler: ${error instanceof Error ? error.message : 'Unbekannt'}`)
+    } finally {
+      setReadwiseSyncing(false)
     }
   }
 
@@ -1534,6 +1616,169 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
                       {t('settings.languagetool.apiHint')}
                     </p>
                   )}
+                </div>
+
+                <h3 style={{ marginTop: '32px' }}>{t('settings.readwise.title')}</h3>
+                <div className="settings-row">
+                  <label>{t('settings.readwise.enabled')}</label>
+                  <input
+                    type="checkbox"
+                    checked={readwise.enabled}
+                    onChange={e => setReadwise({ enabled: e.target.checked })}
+                  />
+                </div>
+
+                <div className="settings-row">
+                  <label>{t('settings.readwise.apiKey')}</label>
+                  <div className="settings-input-group">
+                    <input
+                      type="password"
+                      value={readwise.apiKey}
+                      onChange={e => setReadwise({ apiKey: e.target.value })}
+                      placeholder={t('settings.readwise.apiKeyHint')}
+                      disabled={!readwise.enabled}
+                      style={{ width: '250px' }}
+                    />
+                    <button className="settings-refresh" onClick={checkReadwiseConnection}>
+                      {t('settings.connect')}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="settings-row">
+                  <label>Status</label>
+                  <div className="settings-status">
+                    {readwiseStatus === 'checking' && (
+                      <span className="status-checking">{t('settings.checkingConnection')}</span>
+                    )}
+                    {readwiseStatus === 'connected' && (
+                      <span className="status-connected">{t('settings.connected')}</span>
+                    )}
+                    {readwiseStatus === 'disconnected' && (
+                      <span className="status-disconnected">{t('settings.notConnected')}</span>
+                    )}
+                    <button className="settings-refresh" onClick={checkReadwiseConnection}>
+                      {t('settings.refresh')}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="settings-row">
+                  <label>{t('settings.readwise.syncFolder')}</label>
+                  <input
+                    type="text"
+                    value={readwise.syncFolder}
+                    onChange={e => setReadwise({ syncFolder: e.target.value })}
+                    placeholder="500 - 📚 Readwise"
+                    disabled={!readwise.enabled}
+                    style={{ width: '250px' }}
+                  />
+                </div>
+
+                <div className="settings-row">
+                  <label>{t('settings.readwise.categories')}</label>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    {(['books', 'articles', 'tweets', 'podcasts', 'supplementals'] as const).map(cat => (
+                      <label key={cat} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', cursor: 'pointer' }}>
+                        <input
+                          type="checkbox"
+                          checked={readwise.syncCategories?.[cat] !== false}
+                          onChange={e => setReadwise({
+                            syncCategories: { ...readwise.syncCategories, [cat]: e.target.checked }
+                          })}
+                          disabled={!readwise.enabled}
+                        />
+                        {t(`settings.readwise.category.${cat}`)}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="settings-row">
+                  <label>{t('settings.readwise.autoSync')}</label>
+                  <input
+                    type="checkbox"
+                    checked={readwise.autoSync}
+                    onChange={e => setReadwise({ autoSync: e.target.checked })}
+                    disabled={!readwise.enabled}
+                  />
+                </div>
+
+                <div className="settings-row">
+                  <label>{t('settings.readwise.autoSyncInterval')}</label>
+                  <div className="settings-input-group">
+                    <select
+                      value={readwise.autoSyncInterval}
+                      onChange={e => setReadwise({ autoSyncInterval: parseInt(e.target.value) })}
+                      disabled={!readwise.enabled || !readwise.autoSync}
+                    >
+                      <option value={15}>15 {t('settings.readwise.minutes')}</option>
+                      <option value={30}>30 {t('settings.readwise.minutes')}</option>
+                      <option value={60}>60 {t('settings.readwise.minutes')}</option>
+                      <option value={120}>120 {t('settings.readwise.minutes')}</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="settings-row">
+                  <label>{t('settings.readwise.lastSync')}</label>
+                  <div className="settings-input-group">
+                    <span>
+                      {readwise.lastSyncedAt
+                        ? new Date(readwise.lastSyncedAt).toLocaleString()
+                        : t('settings.readwise.never')
+                      }
+                    </span>
+                    {readwise.lastSyncedAt && (
+                      <button
+                        className="settings-refresh"
+                        onClick={() => setReadwise({ lastSyncedAt: '' })}
+                        disabled={readwiseSyncing}
+                        title={t('settings.readwise.resetSync')}
+                        style={{ fontSize: '11px' }}
+                      >
+                        {t('settings.readwise.resetSync')}
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                <div className="settings-row">
+                  <label>{t('settings.readwise.syncNow')}</label>
+                  <div className="settings-input-group">
+                    <button
+                      className="settings-refresh"
+                      onClick={triggerReadwiseSync}
+                      disabled={!readwise.enabled || !readwise.apiKey || readwiseSyncing || readwiseStatus !== 'connected'}
+                    >
+                      {readwiseSyncing ? t('settings.readwise.syncing') : (readwise.lastSyncedAt ? t('settings.readwise.syncNow') : t('settings.readwise.fullSync'))}
+                    </button>
+                  </div>
+                </div>
+
+                {readwiseSyncProgress && readwiseSyncing && (
+                  <div className="settings-row">
+                    <label></label>
+                    <span style={{ fontSize: '12px', opacity: 0.7 }}>
+                      {readwiseSyncProgress.title}
+                      {readwiseSyncProgress.total > 0 && ` (${readwiseSyncProgress.current}/${readwiseSyncProgress.total})`}
+                    </span>
+                  </div>
+                )}
+
+                {readwiseSyncResult && (
+                  <div className="settings-row">
+                    <label></label>
+                    <span style={{ fontSize: '12px', color: readwiseSyncResult.startsWith('Fehler') ? 'var(--color-error)' : 'var(--color-success)' }}>
+                      {readwiseSyncResult}
+                    </span>
+                  </div>
+                )}
+
+                <div className="settings-info">
+                  <p>
+                    <strong>Readwise</strong> {t('settings.readwise.description')}
+                  </p>
                 </div>
               </div>
             )}

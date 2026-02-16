@@ -241,6 +241,23 @@ export interface DoclingSettings {
   ocrLanguages: string[]
 }
 
+// Readwise Integration Settings
+export interface ReadwiseSettings {
+  enabled: boolean
+  apiKey: string
+  syncFolder: string        // Relativer Pfad im Vault, z.B. "500 - 📚 Readwise"
+  autoSync: boolean
+  autoSyncInterval: number  // Minuten (z.B. 60)
+  lastSyncedAt: string      // ISO timestamp für inkrementellen Sync
+  syncCategories: {         // Welche Kategorien synchronisiert werden sollen
+    books: boolean
+    articles: boolean
+    tweets: boolean
+    podcasts: boolean
+    supplementals: boolean
+  }
+}
+
 // LanguageTool Grammar/Spell Check Settings
 export interface LanguageToolIgnoredRule {
   ruleId: string
@@ -320,6 +337,9 @@ interface UIState {
   // Docling PDF Extraction Settings
   docling: DoclingSettings
 
+  // Readwise Settings
+  readwise: ReadwiseSettings
+
   // LanguageTool Settings
   languageTool: LanguageToolSettings
 
@@ -388,6 +408,7 @@ interface UIState {
   setFlashcardsEnabled: (enabled: boolean) => void
   setSmartConnectionsWeights: (weights: Partial<SmartConnectionsWeights>) => void
   setDocling: (settings: Partial<DoclingSettings>) => void
+  setReadwise: (settings: Partial<ReadwiseSettings>) => void
   setLanguageTool: (settings: Partial<LanguageToolSettings>) => void
   setLastSeenVersion: (version: string) => void
   setUpdateAvailable: (info: UpdateInfo | null) => void
@@ -482,6 +503,23 @@ const defaultState = {
     ocrLanguages: ['de', 'en']
   },
 
+  // Readwise Settings
+  readwise: {
+    enabled: false,
+    apiKey: '',
+    syncFolder: '500 - 📚 Readwise',
+    autoSync: false,
+    autoSyncInterval: 60,
+    lastSyncedAt: '',
+    syncCategories: {
+      books: true,
+      articles: true,
+      tweets: false,
+      podcasts: true,
+      supplementals: false
+    }
+  },
+
   // LanguageTool Settings
   languageTool: {
     enabled: false,
@@ -530,7 +568,7 @@ const persistedKeys = [
   'canvasFilterPath', 'canvasViewMode', 'canvasShowTags', 'canvasShowLinks', 'canvasShowImages',
   'canvasCompactMode', 'canvasDefaultCardWidth', 'splitPosition', 'fileTreeDisplayMode', 'ollama',
   'pdfCompanionEnabled', 'pdfDisplayMode', 'iconSet',
-  'smartConnectionsEnabled', 'notesChatEnabled', 'flashcardsEnabled', 'smartConnectionsWeights', 'docling', 'languageTool',
+  'smartConnectionsEnabled', 'notesChatEnabled', 'flashcardsEnabled', 'smartConnectionsWeights', 'docling', 'readwise', 'languageTool',
   'lastSeenVersion',
   'customAccentColor', 'customBackgroundColorLight', 'customBackgroundColorDark',
   'customLogo',
@@ -586,6 +624,9 @@ export const useUIStore = create<UIState>()((set, get) => ({
   })),
   setDocling: (settings) => set((state) => ({
     docling: { ...state.docling, ...settings }
+  })),
+  setReadwise: (settings) => set((state) => ({
+    readwise: { ...state.readwise, ...settings }
   })),
   setLanguageTool: (settings) => set((state) => ({
     languageTool: { ...state.languageTool, ...settings }

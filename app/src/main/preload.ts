@@ -149,6 +149,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
   doclingConvertPdf: (pdfPath: string, baseUrl?: string, options?: { ocrEnabled?: boolean; ocrLanguages?: string[] }) =>
     ipcRenderer.invoke('docling-convert-pdf', pdfPath, baseUrl, options),
 
+  // Readwise Integration API
+  readwiseCheck: (apiKey: string) => ipcRenderer.invoke('readwise-check', apiKey),
+  readwiseSync: (apiKey: string, syncFolder: string, vaultPath: string, lastSyncedAt?: string, syncCategories?: Record<string, boolean>) =>
+    ipcRenderer.invoke('readwise-sync', apiKey, syncFolder, vaultPath, lastSyncedAt, syncCategories),
+  onReadwiseSyncProgress: (callback: (progress: { current: number; total: number; status: string; title?: string }) => void) => {
+    ipcRenderer.removeAllListeners('readwise-sync-progress')
+    ipcRenderer.on('readwise-sync-progress', (_event, progress) => callback(progress))
+  },
+
   // LanguageTool Grammar/Spell Check API
   languagetoolCheck: (mode?: 'local' | 'api', localUrl?: string, apiKey?: string) =>
     ipcRenderer.invoke('languagetool-check', mode || 'local', localUrl, apiKey),
