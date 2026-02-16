@@ -2,6 +2,16 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.2.7-alpha] - 2026-02-16
+
+### Features
+- **Readwise-Integration**: Native Synchronisierung von Readwise-Highlights in den Vault — Bücher, Artikel, Podcasts und mehr mit Cover-Bildern, Kategorie-Filter, inkrementellem Sync und Auto-Sync
+- **Readwise-Kategorien**: Auswählbare Kategorien (Bücher, Artikel, Tweets, Podcasts, Supplementals) zum gezielten Filtern der Synchronisierung
+- **Readwise-Cover**: Buchcover werden automatisch heruntergeladen und lokal gespeichert
+
+### Improvements
+- **Readwise-Dateien**: Nach dem Sync werden neue Notizen sofort im Editor mit Inhalt angezeigt — kein Vault-Reload mehr nötig
+
 ## [0.2.6-alpha] - 2026-02-16
 
 ### Fixes
