@@ -1974,6 +1974,9 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
                         </span>
                       </div>
                     </div>
+                    <div className="settings-info" style={{ whiteSpace: 'pre-line', fontSize: '11px', lineHeight: '1.5' }}>
+                      {t('settings.email.instructionTips')}
+                    </div>
 
                     <div className="settings-row">
                       <label>{t('settings.email.relevanceThreshold')}</label>
