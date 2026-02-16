@@ -684,6 +684,82 @@ export interface ElectronAPI {
   syncRestoreFile: (filePath: string) => Promise<boolean>;
   onSyncProgress: (callback: (data: SyncProgress) => void) => void;
   onSyncLog: (callback: (entry: Omit<SyncLogEntry, 'timestamp'>) => void) => void;
+
+  // Email Integration
+  emailConnect: (account: EmailAccount) => Promise<{ success: boolean; error?: string }>;
+  emailFetch: (vaultPath: string, accounts: EmailAccount[], lastFetchedAt: Record<string, string>, maxPerAccount: number) => Promise<EmailFetchResult>;
+  emailAnalyze: (vaultPath: string, model: string, emailIds?: string[]) => Promise<{ success: boolean; analyzed: number; error?: string }>;
+  emailLoad: (vaultPath: string) => Promise<{ emails: EmailMessage[]; lastFetchedAt: Record<string, string> } | null>;
+  emailSave: (vaultPath: string, data: { emails: EmailMessage[]; lastFetchedAt: Record<string, string> }) => Promise<boolean>;
+  emailSavePassword: (accountId: string, password: string) => Promise<boolean>;
+  emailLoadPassword: (accountId: string) => Promise<string | null>;
+  onEmailFetchProgress: (callback: (progress: { current: number; total: number; status: string }) => void) => void;
+  onEmailAnalysisProgress: (callback: (progress: { current: number; total: number }) => void) => void;
+  emailSetup: (vaultPath: string) => Promise<{ success: boolean; folderPath?: string; instructionPath?: string; error?: string }>;
+  emailCreateNote: (vaultPath: string, email: EmailMessage) => Promise<{ success: boolean; path?: string; alreadyExists?: boolean; error?: string }>;
+}
+
+// Email Integration Types
+export interface EmailMessage {
+  id: string              // Message-ID Header
+  uid: number
+  accountId: string
+  from: { name: string; address: string }
+  to: { name: string; address: string }[]
+  subject: string
+  date: string            // ISO
+  snippet: string         // Erste ~200 Zeichen
+  bodyText: string
+  flags: string[]         // \Seen, \Flagged etc.
+  fetchedAt: string
+  analysis?: EmailAnalysis
+}
+
+export interface EmailSuggestedAction {
+  action?: string
+  beschreibung?: string
+  date?: string
+  datum?: string
+  time?: string
+  uhrzeit?: string
+  [key: string]: unknown
+}
+
+export interface EmailAnalysis {
+  relevant: boolean
+  relevanceScore: number  // 0-100
+  sentiment: 'positive' | 'neutral' | 'negative' | 'urgent'
+  summary: string
+  extractedInfo: string[]
+  categories: string[]
+  suggestedActions?: (EmailSuggestedAction | string)[]
+  analyzedAt: string
+  model: string
+}
+
+export interface EmailFilter {
+  sender?: string
+  subject?: string
+  content?: string
+  onlyRelevant?: boolean
+  onlyUnread?: boolean
+  sentiment?: string
+}
+
+export interface EmailAccount {
+  id: string
+  name: string
+  host: string
+  port: number
+  user: string
+  tls: boolean
+}
+
+export interface EmailFetchResult {
+  success: boolean
+  newCount: number
+  totalCount: number
+  error?: string
 }
 
 // Docling Options for PDF conversion

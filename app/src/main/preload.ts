@@ -272,5 +272,33 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onSyncLog: (callback: (entry: { type: string; message: string; fileName?: string }) => void) => {
     ipcRenderer.removeAllListeners('sync-log')
     ipcRenderer.on('sync-log', (_event, entry) => callback(entry))
-  }
+  },
+
+  // Email Integration
+  emailConnect: (account: { id: string; host: string; port: number; user: string; tls: boolean }) =>
+    ipcRenderer.invoke('email-connect', account),
+  emailFetch: (vaultPath: string, accounts: object[], lastFetchedAt: Record<string, string>, maxPerAccount: number) =>
+    ipcRenderer.invoke('email-fetch', vaultPath, accounts, lastFetchedAt, maxPerAccount),
+  emailAnalyze: (vaultPath: string, model: string, emailIds?: string[]) =>
+    ipcRenderer.invoke('email-analyze', vaultPath, model, emailIds),
+  emailLoad: (vaultPath: string) =>
+    ipcRenderer.invoke('email-load', vaultPath),
+  emailSave: (vaultPath: string, data: { emails: object[]; lastFetchedAt: Record<string, string> }) =>
+    ipcRenderer.invoke('email-save', vaultPath, data),
+  emailSavePassword: (accountId: string, password: string) =>
+    ipcRenderer.invoke('email-save-password', accountId, password),
+  emailLoadPassword: (accountId: string) =>
+    ipcRenderer.invoke('email-load-password', accountId),
+  onEmailFetchProgress: (callback: (progress: { current: number; total: number; status: string }) => void) => {
+    ipcRenderer.removeAllListeners('email-fetch-progress')
+    ipcRenderer.on('email-fetch-progress', (_event, progress) => callback(progress))
+  },
+  onEmailAnalysisProgress: (callback: (progress: { current: number; total: number }) => void) => {
+    ipcRenderer.removeAllListeners('email-analysis-progress')
+    ipcRenderer.on('email-analysis-progress', (_event, progress) => callback(progress))
+  },
+  emailSetup: (vaultPath: string) =>
+    ipcRenderer.invoke('email-setup', vaultPath),
+  emailCreateNote: (vaultPath: string, email: object) =>
+    ipcRenderer.invoke('email-create-note', vaultPath, email)
 })
