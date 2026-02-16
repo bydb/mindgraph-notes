@@ -156,19 +156,32 @@ export function createLanguageToolDecorationPlugin() {
     {
       decorations: (v) => v.decorations,
       eventHandlers: {
-        click: (event: MouseEvent, view: EditorView) => {
-          const target = event.target as HTMLElement
-          const ltElement = target.closest('[data-lt-match]') as HTMLElement | null
-          if (ltElement && onLtErrorClick) {
-            const matchData = ltElement.getAttribute('data-lt-match')
-            if (matchData) {
-              event.preventDefault()
-              event.stopPropagation()
-              onLtErrorClick(event, matchData)
-              return true
-            }
-          }
-          return false
+        mousedown: (event: MouseEvent, view: EditorView) => {
+          if (!onLtErrorClick) return false
+
+          // Use CodeMirror's position API instead of DOM traversal,
+          // which is unreliable because CM6 may recreate DOM elements
+          const pos = view.posAtCoords({ x: event.clientX, y: event.clientY })
+          if (pos === null) return false
+
+          const matches = view.state.field(languageToolMatchesField, false) || []
+          const clickedMatch = matches.find(m => pos >= m.offset && pos < m.offset + m.length)
+          if (!clickedMatch) return false
+
+          const matchData = JSON.stringify({
+            message: clickedMatch.message,
+            shortMessage: clickedMatch.shortMessage,
+            replacements: (clickedMatch.replacements || []).slice(0, 5),
+            category: getCategoryType(clickedMatch.rule.category.id),
+            ruleId: clickedMatch.rule.id,
+            from: clickedMatch.offset,
+            to: clickedMatch.offset + clickedMatch.length
+          })
+
+          event.preventDefault()
+          event.stopPropagation()
+          onLtErrorClick(event, matchData)
+          return true
         }
       }
     }

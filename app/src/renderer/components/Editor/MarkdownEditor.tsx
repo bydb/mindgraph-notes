@@ -1029,6 +1029,22 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
     }
   }, [languageTool.enabled])
 
+  // LanguageTool: Close popup when clicking outside
+  useEffect(() => {
+    if (!ltPopup) return
+    const handleOutsideClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement
+      if (target.closest('.lt-popup')) return
+      setLtPopup(null)
+    }
+    // Delay so the opening mousedown doesn't immediately close it
+    const timer = setTimeout(() => document.addEventListener('mousedown', handleOutsideClick), 0)
+    return () => {
+      clearTimeout(timer)
+      document.removeEventListener('mousedown', handleOutsideClick)
+    }
+  }, [ltPopup])
+
   // Wikilink Autocomplete Selection Handler
   const handleAutocompleteSelect = useCallback(async (value: string, mode: AutocompleteMode, blockInfo?: BlockSelectionInfo) => {
     if (!viewRef.current || !autocomplete) return
