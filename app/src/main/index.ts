@@ -4256,16 +4256,34 @@ ipcMain.handle('email-fetch', async (_event, vaultPath: string, accounts: Array<
           } catch { /* Default 30 */ }
           const retainLimit = new Date(Date.now() - retainDays * 24 * 60 * 60 * 1000)
           const lastFetched = lastFetchedAt[account.id] ? new Date(lastFetchedAt[account.id]) : null
-          // Immer das NEUERE Datum nehmen — retainDays ist die harte Grenze
-          const sinceDate = lastFetched && lastFetched > retainLimit ? lastFetched : retainLimit
+          // Bei Ersteinrichtung (kein lastFetched): nur letzte 3 Tage laden
+          const initialFetchLimit = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000)
+          const sinceDate = lastFetched
+            ? (lastFetched > retainLimit ? lastFetched : retainLimit)
+            : initialFetchLimit
 
-          const messages = []
+          // Alle UIDs im Zeitraum holen, dann absteigend sortieren (neueste zuerst)
+          const uids: number[] = []
           for await (const msg of client.fetch(
             { since: sinceDate },
-            { envelope: true, bodyStructure: true, source: true, flags: true, uid: true }
+            { uid: true }
           )) {
-            messages.push(msg)
-            if (messages.length >= maxPerAccount) break
+            uids.push(msg.uid)
+          }
+          uids.sort((a, b) => b - a) // neueste (höchste UID) zuerst
+          const selectedUids = uids.slice(0, maxPerAccount)
+
+          // Nur die ausgewählten UIDs mit vollem Body laden
+          const messages = []
+          if (selectedUids.length > 0) {
+            for await (const msg of client.fetch(
+              { uid: selectedUids.join(',') },
+              { envelope: true, bodyStructure: true, source: true, flags: true, uid: true }
+            )) {
+              messages.push(msg)
+            }
+            // Nach UID absteigend sortieren (neueste zuerst)
+            messages.sort((a, b) => b.uid - a.uid)
           }
 
           if (mainWindow) {
