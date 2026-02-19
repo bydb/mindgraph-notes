@@ -2,6 +2,22 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.2.10-alpha] - 2026-02-19
+
+### Features
+- **E-Mail-Integration**: IMAP-Abruf mit automatischer Ollama-Analyse — E-Mails werden regelmäßig abgerufen, nach Relevanz gefiltert und als Notizen im Vault gespeichert
+- **E-Mail-Konfiguration**: Mehrere Accounts, Instruktions-Notiz für individuelle Analyse-Anweisungen, Relevanz-Schwellenwert, Abrufintervall und Modellauswahl
+- **edoobox-Agent**: Akkreditierungsformulare (.docx) importieren, Veranstaltungen automatisch parsen und an edoobox API senden
+- **Agent Panel**: Neues UI-Panel zur Verwaltung importierter Veranstaltungen mit Status-Tracking (Importiert/Gesendet/Fehler)
+- **Agenten-Tab**: Neuer Settings-Tab "Agenten" — E-Mail und edoobox zentral konfigurierbar
+
+### Improvements
+- **E-Mail → Agenten-Tab**: E-Mail-Einstellungen von "Integrationen" nach "Agenten" verschoben — logisch konsistente Gruppierung aller automatisierten Aufgaben
+- **E-Mail-Sicherheit**: Prompt-Injection-Warnung im E-Mail-Modul für sicherheitsbewusste Nutzung
+
+### Fixes
+- **E-Mail-Abruf**: Neueste E-Mails werden zuerst geladen, 3-Tage-Fenster für neue Vaults verhindert Massenimport
+
 ## [0.2.7-alpha] - 2026-02-16
 
 ### Features

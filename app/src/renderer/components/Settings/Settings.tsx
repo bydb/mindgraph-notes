@@ -17,7 +17,7 @@ interface SettingsProps {
   onClose: () => void
 }
 
-type Tab = 'general' | 'editor' | 'templates' | 'integrations' | 'shortcuts' | 'dataview' | 'sync'
+type Tab = 'general' | 'editor' | 'templates' | 'integrations' | 'shortcuts' | 'dataview' | 'sync' | 'agents'
 
 type BuiltInTemplateKey = 'empty' | 'dailyNote' | 'zettel' | 'meeting'
 
@@ -52,6 +52,11 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
   const [lmstudioModels, setLmstudioModels] = useState<Array<{ name: string; size: number }>>([])
   const [emailTestStatus, setEmailTestStatus] = useState<Record<string, 'idle' | 'testing' | 'success' | 'failed'>>({})
   const [emailPasswords, setEmailPasswords] = useState<Record<string, string>>({})
+  const [edooboxApiKey, setEdooboxApiKey] = useState('')
+  const [edooboxApiSecret, setEdooboxApiSecret] = useState('')
+  const [edooboxTestStatus, setEdooboxTestStatus] = useState<'idle' | 'testing' | 'success' | 'failed'>('idle')
+  const [edooboxTestError, setEdooboxTestError] = useState<string | null>(null)
+  const [edooboxCredsSaved, setEdooboxCredsSaved] = useState(false)
 
   // Sync Setup State
   const [syncMode, setSyncMode] = useState<'new' | 'join'>('new')
@@ -139,7 +144,9 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
     showRawEditor,
     setShowRawEditor,
     email: emailSettings,
-    setEmail
+    setEmail,
+    edoobox: edooboxSettings,
+    setEdoobox
   } = useUIStore()
 
   const { t } = useTranslation()
@@ -192,6 +199,18 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
       loadPasswords()
     }
   }, [isOpen, emailSettings.accounts.length])
+
+  // edoobox Credentials laden
+  useEffect(() => {
+    if (isOpen && activeTab === 'agents') {
+      window.electronAPI.edooboxLoadCredentials().then(creds => {
+        if (creds) {
+          setEdooboxApiKey(creds.apiKey)
+          setEdooboxApiSecret(creds.apiSecret)
+        }
+      })
+    }
+  }, [isOpen, activeTab])
 
   // Templates laden
   useEffect(() => {
@@ -563,6 +582,16 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
                 <path d="M6 12H3V15" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
               {t('settings.tab.sync')}
+            </button>
+            <button
+              className={`settings-nav-item ${activeTab === 'agents' ? 'active' : ''}`}
+              onClick={() => setActiveTab('agents')}
+            >
+              <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+                <circle cx="9" cy="9" r="7" stroke="currentColor" strokeWidth="1.5"/>
+                <path d="M9 6v6M6 9h6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+              </svg>
+              {t('settings.tab.agents')}
             </button>
           </nav>
 
@@ -1803,252 +1832,6 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
                     <strong>Readwise</strong> {t('settings.readwise.description')}
                   </p>
                 </div>
-
-                {/* Email Integration */}
-                <h3 style={{ marginTop: '32px' }}>{t('settings.email.title')}</h3>
-                <div className="settings-row">
-                  <label>{t('settings.email.enabled')}</label>
-                  <input
-                    type="checkbox"
-                    checked={emailSettings.enabled}
-                    onChange={e => setEmail({ enabled: e.target.checked })}
-                  />
-                </div>
-
-                {emailSettings.enabled && (
-                  <>
-                    <div className="settings-info" style={{ color: '#f59e0b', background: 'rgba(245, 158, 11, 0.1)', borderLeft: '3px solid #f59e0b' }}>
-                      {t('settings.email.warning')}
-                    </div>
-                    <div className="settings-row" style={{ alignItems: 'flex-start' }}>
-                      <label>{t('settings.email.accounts')}</label>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', flex: 1 }}>
-                        {emailSettings.accounts.map((account, idx) => (
-                          <div key={account.id} style={{ padding: '12px', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-md)', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                              <input
-                                type="text"
-                                value={account.name}
-                                onChange={e => {
-                                  const updated = [...emailSettings.accounts]
-                                  updated[idx] = { ...account, name: e.target.value }
-                                  setEmail({ accounts: updated })
-                                }}
-                                placeholder={t('settings.email.accountName')}
-                                style={{ width: '150px' }}
-                              />
-                              <button
-                                className="settings-refresh"
-                                style={{ color: 'var(--color-error)', fontSize: '11px' }}
-                                onClick={() => {
-                                  const updated = emailSettings.accounts.filter((_, i) => i !== idx)
-                                  setEmail({ accounts: updated })
-                                }}
-                              >
-                                {t('settings.email.removeAccount')}
-                              </button>
-                            </div>
-                            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                              <input
-                                type="text"
-                                value={account.host}
-                                onChange={e => {
-                                  const updated = [...emailSettings.accounts]
-                                  updated[idx] = { ...account, host: e.target.value }
-                                  setEmail({ accounts: updated })
-                                }}
-                                placeholder={t('settings.email.host')}
-                                style={{ width: '180px' }}
-                              />
-                              <input
-                                type="number"
-                                value={account.port}
-                                onChange={e => {
-                                  const updated = [...emailSettings.accounts]
-                                  updated[idx] = { ...account, port: parseInt(e.target.value) || 993 }
-                                  setEmail({ accounts: updated })
-                                }}
-                                placeholder={t('settings.email.port')}
-                                style={{ width: '70px' }}
-                              />
-                              <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px' }}>
-                                <input
-                                  type="checkbox"
-                                  checked={account.tls}
-                                  onChange={e => {
-                                    const updated = [...emailSettings.accounts]
-                                    updated[idx] = { ...account, tls: e.target.checked }
-                                    setEmail({ accounts: updated })
-                                  }}
-                                />
-                                {t('settings.email.tls')}
-                              </label>
-                            </div>
-                            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                              <input
-                                type="text"
-                                value={account.user}
-                                onChange={e => {
-                                  const updated = [...emailSettings.accounts]
-                                  updated[idx] = { ...account, user: e.target.value }
-                                  setEmail({ accounts: updated })
-                                }}
-                                placeholder={t('settings.email.user')}
-                                style={{ width: '180px' }}
-                              />
-                              <input
-                                type="password"
-                                value={emailPasswords[account.id] || ''}
-                                onChange={e => setEmailPasswords(prev => ({ ...prev, [account.id]: e.target.value }))}
-                                onBlur={async () => {
-                                  const pw = emailPasswords[account.id]
-                                  if (pw) {
-                                    await window.electronAPI.emailSavePassword(account.id, pw)
-                                  }
-                                }}
-                                placeholder={t('settings.email.password')}
-                                style={{ width: '150px' }}
-                              />
-                              <button
-                                className="settings-refresh"
-                                onClick={async () => {
-                                  const pw = emailPasswords[account.id]
-                                  if (pw) {
-                                    await window.electronAPI.emailSavePassword(account.id, pw)
-                                  }
-                                  setEmailTestStatus(prev => ({ ...prev, [account.id]: 'testing' }))
-                                  const result = await window.electronAPI.emailConnect(account)
-                                  setEmailTestStatus(prev => ({ ...prev, [account.id]: result.success ? 'success' : 'failed' }))
-                                  setTimeout(() => setEmailTestStatus(prev => ({ ...prev, [account.id]: 'idle' })), 3000)
-                                }}
-                              >
-                                {emailTestStatus[account.id] === 'testing' ? '...' :
-                                 emailTestStatus[account.id] === 'success' ? t('settings.email.testSuccess') :
-                                 emailTestStatus[account.id] === 'failed' ? t('settings.email.testFailed') :
-                                 t('settings.email.testConnection')}
-                              </button>
-                            </div>
-                          </div>
-                        ))}
-                        <button
-                          className="settings-refresh"
-                          onClick={() => {
-                            const id = `email-${Date.now()}`
-                            setEmail({
-                              accounts: [...emailSettings.accounts, { id, name: '', host: '', port: 993, user: '', tls: true }]
-                            })
-                          }}
-                        >
-                          + {t('settings.email.addAccount')}
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="settings-row">
-                      <label>{t('settings.email.fetchInterval')}</label>
-                      <div className="settings-input-group">
-                        <select
-                          value={emailSettings.fetchIntervalMinutes}
-                          onChange={e => setEmail({ fetchIntervalMinutes: parseInt(e.target.value) })}
-                        >
-                          <option value={5}>5 {t('settings.email.minutes')}</option>
-                          <option value={15}>15 {t('settings.email.minutes')}</option>
-                          <option value={30}>30 {t('settings.email.minutes')}</option>
-                          <option value={60}>60 {t('settings.email.minutes')}</option>
-                        </select>
-                      </div>
-                    </div>
-
-                    <div className="settings-row">
-                      <label>{t('settings.email.instructionNote')}</label>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                        <input
-                          type="text"
-                          value={emailSettings.instructionNotePath}
-                          onChange={e => setEmail({ instructionNotePath: e.target.value })}
-                          placeholder="z.B. Email-Instruktionen.md"
-                          style={{ width: '250px' }}
-                        />
-                        <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                          {t('settings.email.instructionNoteHint')}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="settings-info" style={{ whiteSpace: 'pre-line', fontSize: '11px', lineHeight: '1.5' }}>
-                      {t('settings.email.instructionTips')}
-                    </div>
-
-                    <div className="settings-row">
-                      <label>{t('settings.email.relevanceThreshold')}</label>
-                      <div className="settings-input-group" style={{ gap: '8px' }}>
-                        <input
-                          type="range"
-                          min={0}
-                          max={100}
-                          value={emailSettings.relevanceThreshold}
-                          onChange={e => setEmail({ relevanceThreshold: parseInt(e.target.value) })}
-                          style={{ width: '150px' }}
-                        />
-                        <span style={{ fontSize: '12px', minWidth: '30px' }}>{emailSettings.relevanceThreshold}</span>
-                      </div>
-                    </div>
-
-                    <div className="settings-row">
-                      <label>{t('settings.email.maxPerFetch')}</label>
-                      <input
-                        type="number"
-                        value={emailSettings.maxEmailsPerFetch}
-                        onChange={e => setEmail({ maxEmailsPerFetch: parseInt(e.target.value) || 50 })}
-                        min={10}
-                        max={200}
-                        style={{ width: '80px' }}
-                      />
-                    </div>
-
-                    <div className="settings-row">
-                      <label>{t('settings.email.retainDays')}</label>
-                      <input
-                        type="number"
-                        value={emailSettings.retainDays}
-                        onChange={e => setEmail({ retainDays: parseInt(e.target.value) || 30 })}
-                        min={7}
-                        max={365}
-                        style={{ width: '80px' }}
-                      />
-                    </div>
-
-                    <div className="settings-row">
-                      <label>{t('settings.email.autoAnalyze')}</label>
-                      <input
-                        type="checkbox"
-                        checked={emailSettings.autoAnalyze}
-                        onChange={e => setEmail({ autoAnalyze: e.target.checked })}
-                      />
-                    </div>
-
-                    <div className="settings-row">
-                      <label>{t('settings.email.analysisModel')}</label>
-                      <select
-                        value={emailSettings.analysisModel}
-                        onChange={e => setEmail({ analysisModel: e.target.value })}
-                      >
-                        <option value="">{t('settings.email.analysisModelDefault')}</option>
-                        {ollamaModels.map(m => (
-                          <option key={m.name} value={m.name}>{m.name}</option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div className="settings-info">
-                      <p>
-                        <strong>E-Mail</strong> {t('settings.email.description')}
-                      </p>
-                      <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
-                        {t('settings.email.gmailHint')}
-                      </p>
-                    </div>
-                  </>
-                )}
               </div>
             )}
 
@@ -2681,6 +2464,381 @@ LIMIT 10
                     </div>
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* Agenten Tab */}
+            {activeTab === 'agents' && (
+              <div className="settings-section">
+                {/* Email Integration */}
+                <h3>{t('settings.email.title')}</h3>
+                <div className="settings-row">
+                  <label>{t('settings.email.enabled')}</label>
+                  <input
+                    type="checkbox"
+                    checked={emailSettings.enabled}
+                    onChange={e => setEmail({ enabled: e.target.checked })}
+                  />
+                </div>
+
+                {emailSettings.enabled && (
+                  <>
+                    <div className="settings-info" style={{ color: '#f59e0b', background: 'rgba(245, 158, 11, 0.1)', borderLeft: '3px solid #f59e0b' }}>
+                      {t('settings.email.warning')}
+                    </div>
+                    <div className="settings-row" style={{ alignItems: 'flex-start' }}>
+                      <label>{t('settings.email.accounts')}</label>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', flex: 1 }}>
+                        {emailSettings.accounts.map((account, idx) => (
+                          <div key={account.id} style={{ padding: '12px', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-md)', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                              <input
+                                type="text"
+                                value={account.name}
+                                onChange={e => {
+                                  const updated = [...emailSettings.accounts]
+                                  updated[idx] = { ...account, name: e.target.value }
+                                  setEmail({ accounts: updated })
+                                }}
+                                placeholder={t('settings.email.accountName')}
+                                style={{ width: '150px' }}
+                              />
+                              <button
+                                className="settings-refresh"
+                                style={{ color: 'var(--color-error)', fontSize: '11px' }}
+                                onClick={() => {
+                                  const updated = emailSettings.accounts.filter((_, i) => i !== idx)
+                                  setEmail({ accounts: updated })
+                                }}
+                              >
+                                {t('settings.email.removeAccount')}
+                              </button>
+                            </div>
+                            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                              <input
+                                type="text"
+                                value={account.host}
+                                onChange={e => {
+                                  const updated = [...emailSettings.accounts]
+                                  updated[idx] = { ...account, host: e.target.value }
+                                  setEmail({ accounts: updated })
+                                }}
+                                placeholder={t('settings.email.host')}
+                                style={{ width: '180px' }}
+                              />
+                              <input
+                                type="number"
+                                value={account.port}
+                                onChange={e => {
+                                  const updated = [...emailSettings.accounts]
+                                  updated[idx] = { ...account, port: parseInt(e.target.value) || 993 }
+                                  setEmail({ accounts: updated })
+                                }}
+                                placeholder={t('settings.email.port')}
+                                style={{ width: '70px' }}
+                              />
+                              <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px' }}>
+                                <input
+                                  type="checkbox"
+                                  checked={account.tls}
+                                  onChange={e => {
+                                    const updated = [...emailSettings.accounts]
+                                    updated[idx] = { ...account, tls: e.target.checked }
+                                    setEmail({ accounts: updated })
+                                  }}
+                                />
+                                {t('settings.email.tls')}
+                              </label>
+                            </div>
+                            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                              <input
+                                type="text"
+                                value={account.user}
+                                onChange={e => {
+                                  const updated = [...emailSettings.accounts]
+                                  updated[idx] = { ...account, user: e.target.value }
+                                  setEmail({ accounts: updated })
+                                }}
+                                placeholder={t('settings.email.user')}
+                                style={{ width: '180px' }}
+                              />
+                              <input
+                                type="password"
+                                value={emailPasswords[account.id] || ''}
+                                onChange={e => setEmailPasswords(prev => ({ ...prev, [account.id]: e.target.value }))}
+                                onBlur={async () => {
+                                  const pw = emailPasswords[account.id]
+                                  if (pw) {
+                                    await window.electronAPI.emailSavePassword(account.id, pw)
+                                  }
+                                }}
+                                placeholder={t('settings.email.password')}
+                                style={{ width: '150px' }}
+                              />
+                              <button
+                                className="settings-refresh"
+                                onClick={async () => {
+                                  const pw = emailPasswords[account.id]
+                                  if (pw) {
+                                    await window.electronAPI.emailSavePassword(account.id, pw)
+                                  }
+                                  setEmailTestStatus(prev => ({ ...prev, [account.id]: 'testing' }))
+                                  const result = await window.electronAPI.emailConnect(account)
+                                  setEmailTestStatus(prev => ({ ...prev, [account.id]: result.success ? 'success' : 'failed' }))
+                                  setTimeout(() => setEmailTestStatus(prev => ({ ...prev, [account.id]: 'idle' })), 3000)
+                                }}
+                              >
+                                {emailTestStatus[account.id] === 'testing' ? '...' :
+                                 emailTestStatus[account.id] === 'success' ? t('settings.email.testSuccess') :
+                                 emailTestStatus[account.id] === 'failed' ? t('settings.email.testFailed') :
+                                 t('settings.email.testConnection')}
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                        <button
+                          className="settings-refresh"
+                          onClick={() => {
+                            const id = `email-${Date.now()}`
+                            setEmail({
+                              accounts: [...emailSettings.accounts, { id, name: '', host: '', port: 993, user: '', tls: true }]
+                            })
+                          }}
+                        >
+                          + {t('settings.email.addAccount')}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="settings-row">
+                      <label>{t('settings.email.fetchInterval')}</label>
+                      <div className="settings-input-group">
+                        <select
+                          value={emailSettings.fetchIntervalMinutes}
+                          onChange={e => setEmail({ fetchIntervalMinutes: parseInt(e.target.value) })}
+                        >
+                          <option value={5}>5 {t('settings.email.minutes')}</option>
+                          <option value={15}>15 {t('settings.email.minutes')}</option>
+                          <option value={30}>30 {t('settings.email.minutes')}</option>
+                          <option value={60}>60 {t('settings.email.minutes')}</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="settings-row">
+                      <label>{t('settings.email.instructionNote')}</label>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <input
+                          type="text"
+                          value={emailSettings.instructionNotePath}
+                          onChange={e => setEmail({ instructionNotePath: e.target.value })}
+                          placeholder="z.B. Email-Instruktionen.md"
+                          style={{ width: '250px' }}
+                        />
+                        <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                          {t('settings.email.instructionNoteHint')}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="settings-info" style={{ whiteSpace: 'pre-line', fontSize: '11px', lineHeight: '1.5' }}>
+                      {t('settings.email.instructionTips')}
+                    </div>
+
+                    <div className="settings-row">
+                      <label>{t('settings.email.relevanceThreshold')}</label>
+                      <div className="settings-input-group" style={{ gap: '8px' }}>
+                        <input
+                          type="range"
+                          min={0}
+                          max={100}
+                          value={emailSettings.relevanceThreshold}
+                          onChange={e => setEmail({ relevanceThreshold: parseInt(e.target.value) })}
+                          style={{ width: '150px' }}
+                        />
+                        <span style={{ fontSize: '12px', minWidth: '30px' }}>{emailSettings.relevanceThreshold}</span>
+                      </div>
+                    </div>
+
+                    <div className="settings-row">
+                      <label>{t('settings.email.maxPerFetch')}</label>
+                      <input
+                        type="number"
+                        value={emailSettings.maxEmailsPerFetch}
+                        onChange={e => setEmail({ maxEmailsPerFetch: parseInt(e.target.value) || 50 })}
+                        min={10}
+                        max={200}
+                        style={{ width: '80px' }}
+                      />
+                    </div>
+
+                    <div className="settings-row">
+                      <label>{t('settings.email.retainDays')}</label>
+                      <input
+                        type="number"
+                        value={emailSettings.retainDays}
+                        onChange={e => setEmail({ retainDays: parseInt(e.target.value) || 30 })}
+                        min={7}
+                        max={365}
+                        style={{ width: '80px' }}
+                      />
+                    </div>
+
+                    <div className="settings-row">
+                      <label>{t('settings.email.autoAnalyze')}</label>
+                      <input
+                        type="checkbox"
+                        checked={emailSettings.autoAnalyze}
+                        onChange={e => setEmail({ autoAnalyze: e.target.checked })}
+                      />
+                    </div>
+
+                    <div className="settings-row">
+                      <label>{t('settings.email.analysisModel')}</label>
+                      <select
+                        value={emailSettings.analysisModel}
+                        onChange={e => setEmail({ analysisModel: e.target.value })}
+                      >
+                        <option value="">{t('settings.email.analysisModelDefault')}</option>
+                        {ollamaModels.map(m => (
+                          <option key={m.name} value={m.name}>{m.name}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="settings-info">
+                      <p>
+                        <strong>E-Mail</strong> {t('settings.email.description')}
+                      </p>
+                      <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                        {t('settings.email.gmailHint')}
+                      </p>
+                    </div>
+                  </>
+                )}
+
+                <div className="settings-divider" />
+
+                <h3>{t('settings.agents.edoobox.title')}</h3>
+                <p className="settings-hint">{t('settings.agents.edoobox.description')}</p>
+
+                <div className="settings-row">
+                  <label>{t('settings.agents.edoobox.enabled')}</label>
+                  <input
+                    type="checkbox"
+                    checked={edooboxSettings.enabled}
+                    onChange={e => setEdoobox({ enabled: e.target.checked })}
+                  />
+                </div>
+
+                {edooboxSettings.enabled && (
+                  <>
+                    <div className="settings-row">
+                      <label>{t('settings.agents.edoobox.apiKey')}</label>
+                      <input
+                        type="password"
+                        value={edooboxApiKey}
+                        onChange={e => { setEdooboxApiKey(e.target.value); setEdooboxCredsSaved(false) }}
+                        placeholder="API Key"
+                        className="settings-input"
+                      />
+                    </div>
+
+                    <div className="settings-row">
+                      <label>{t('settings.agents.edoobox.apiSecret')}</label>
+                      <input
+                        type="password"
+                        value={edooboxApiSecret}
+                        onChange={e => { setEdooboxApiSecret(e.target.value); setEdooboxCredsSaved(false) }}
+                        placeholder="API Secret"
+                        className="settings-input"
+                      />
+                    </div>
+
+                    <div className="settings-row">
+                      <label>{t('settings.agents.edoobox.apiVersion')}</label>
+                      <select
+                        value={edooboxSettings.apiVersion}
+                        onChange={e => setEdoobox({ apiVersion: e.target.value as 'v1' | 'v2' })}
+                      >
+                        <option value="v1">V1 (API Keys in Query)</option>
+                        <option value="v2">V2 (JWT Token)</option>
+                      </select>
+                    </div>
+
+                    <div className="settings-row">
+                      <label>{t('settings.agents.edoobox.baseUrl')}</label>
+                      <input
+                        type="text"
+                        value={edooboxSettings.baseUrl}
+                        onChange={e => setEdoobox({ baseUrl: e.target.value })}
+                        className="settings-input"
+                      />
+                    </div>
+
+                    <div className="settings-row">
+                      <label>{t('settings.agents.edoobox.webhookUrl')}</label>
+                      <input
+                        type="text"
+                        value={edooboxSettings.webhookUrl || ''}
+                        onChange={e => setEdoobox({ webhookUrl: e.target.value })}
+                        className="settings-input"
+                        placeholder="https://hooks.zapier.com/..."
+                      />
+                      <span className="settings-hint">{t('settings.agents.edoobox.webhookHint')}</span>
+                    </div>
+
+                    <div className="settings-row" style={{ gap: '8px' }}>
+                      <button
+                        className="settings-btn"
+                        onClick={async () => {
+                          if (edooboxApiKey && edooboxApiSecret) {
+                            const saved = await window.electronAPI.edooboxSaveCredentials(edooboxApiKey, edooboxApiSecret)
+                            setEdooboxCredsSaved(saved)
+                          }
+                        }}
+                      >
+                        {edooboxCredsSaved ? t('settings.agents.edoobox.saved') : t('settings.agents.edoobox.save')}
+                      </button>
+                      <button
+                        className="settings-btn"
+                        disabled={edooboxTestStatus === 'testing'}
+                        onClick={async () => {
+                          setEdooboxTestError(null)
+                          if (!edooboxApiKey || !edooboxApiSecret) {
+                            setEdooboxTestStatus('failed')
+                            setEdooboxTestError(t('settings.agents.edoobox.saveFirst'))
+                            return
+                          }
+                          // Save first, then test
+                          await window.electronAPI.edooboxSaveCredentials(edooboxApiKey, edooboxApiSecret)
+                          setEdooboxCredsSaved(true)
+                          setEdooboxTestStatus('testing')
+                          const result = await window.electronAPI.edooboxCheck(edooboxSettings.baseUrl, edooboxSettings.apiVersion)
+                          setEdooboxTestStatus(result.success ? 'success' : 'failed')
+                          setEdooboxTestError(result.success ? null : (result.error || null))
+                        }}
+                      >
+                        {edooboxTestStatus === 'testing'
+                          ? t('settings.agents.edoobox.testing')
+                          : t('settings.agents.edoobox.testConnection')}
+                      </button>
+                      {edooboxTestStatus === 'success' && (
+                        <span className="status-connected">{t('settings.agents.edoobox.connected')}</span>
+                      )}
+                      {edooboxTestStatus === 'failed' && (
+                        <span className="status-disconnected">{t('settings.agents.edoobox.failed')}</span>
+                      )}
+                    </div>
+                    {edooboxTestError && (
+                      <div className="settings-row">
+                        <span className="settings-error-detail">{edooboxTestError}</span>
+                      </div>
+                    )}
+                  </>
+                )}
+
+                <div className="settings-divider" />
+                <p className="settings-hint">{t('settings.agents.moreAgents')}</p>
               </div>
             )}
           </div>

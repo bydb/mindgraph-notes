@@ -289,6 +289,14 @@ export interface EmailSettings {
   analysisModel: string
 }
 
+// edoobox Agent Settings
+export interface EdooboxSettings {
+  enabled: boolean
+  baseUrl: string
+  apiVersion: 'v1' | 'v2'
+  webhookUrl: string
+}
+
 // Legacy type alias for backward compatibility
 type OllamaSettings = LLMSettings
 
@@ -359,6 +367,9 @@ interface UIState {
   // Email Settings
   email: EmailSettings
 
+  // edoobox Agent Settings
+  edoobox: EdooboxSettings
+
   // Update-Checker & What's New
   lastSeenVersion: string
   updateAvailable: UpdateInfo | null
@@ -427,6 +438,7 @@ interface UIState {
   setReadwise: (settings: Partial<ReadwiseSettings>) => void
   setLanguageTool: (settings: Partial<LanguageToolSettings>) => void
   setEmail: (settings: Partial<EmailSettings>) => void
+  setEdoobox: (settings: Partial<EdooboxSettings>) => void
   setLastSeenVersion: (version: string) => void
   setUpdateAvailable: (info: UpdateInfo | null) => void
   setWhatsNewOpen: (open: boolean) => void
@@ -563,6 +575,14 @@ const defaultState = {
     analysisModel: ''
   },
 
+  // edoobox Agent
+  edoobox: {
+    enabled: false,
+    baseUrl: 'https://app1.edoobox.com',
+    apiVersion: 'v2' as const,
+    webhookUrl: ''
+  },
+
   // Update-Checker & What's New
   lastSeenVersion: '',
   updateAvailable: null as UpdateInfo | null,
@@ -598,7 +618,7 @@ const persistedKeys = [
   'canvasFilterPath', 'canvasViewMode', 'canvasShowTags', 'canvasShowLinks', 'canvasShowImages',
   'canvasCompactMode', 'canvasDefaultCardWidth', 'splitPosition', 'fileTreeDisplayMode', 'ollama',
   'pdfCompanionEnabled', 'pdfDisplayMode', 'iconSet',
-  'smartConnectionsEnabled', 'notesChatEnabled', 'flashcardsEnabled', 'smartConnectionsWeights', 'docling', 'readwise', 'languageTool', 'email',
+  'smartConnectionsEnabled', 'notesChatEnabled', 'flashcardsEnabled', 'smartConnectionsWeights', 'docling', 'readwise', 'languageTool', 'email', 'edoobox',
   'lastSeenVersion',
   'customAccentColor', 'customBackgroundColorLight', 'customBackgroundColorDark',
   'customLogo',
@@ -663,6 +683,9 @@ export const useUIStore = create<UIState>()((set, get) => ({
   })),
   setEmail: (settings) => set((state) => ({
     email: { ...state.email, ...settings }
+  })),
+  setEdoobox: (settings) => set((state) => ({
+    edoobox: { ...state.edoobox, ...settings }
   })),
   setLastSeenVersion: (version) => set({ lastSeenVersion: version }),
   setUpdateAvailable: (info) => set({ updateAvailable: info }),
@@ -729,6 +752,20 @@ export async function initializeUISettings(): Promise<void> {
       }
       // Always start with 'editor' mode on startup
       validSettings.viewMode = 'editor'
+      // Migrate edoobox base URL: strip /v1 or /v2 suffix, use app2 for V2
+      if (validSettings.edoobox) {
+        const edoobox = validSettings.edoobox as EdooboxSettings
+        if (edoobox.baseUrl) {
+          edoobox.baseUrl = edoobox.baseUrl.replace(/\/v[12]$/i, '')
+        }
+        // Revert incorrect app2 migration
+        if (edoobox.baseUrl?.includes('app2.edoobox.com')) {
+          edoobox.baseUrl = edoobox.baseUrl.replace('app2.edoobox.com', 'app1.edoobox.com')
+        }
+        if (!edoobox.apiVersion) {
+          edoobox.apiVersion = 'v1'
+        }
+      }
       // Existing users upgrading from pre-1.0.16: they have settings but no onboardingCompleted
       // → skip onboarding for them
       if (!('onboardingCompleted' in savedSettings)) {

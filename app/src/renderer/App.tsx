@@ -23,7 +23,9 @@ import { FlashcardsPanel, FlashcardStudy, FlashcardEditor } from './components/F
 import { useFlashcardStore } from './stores/flashcardStore'
 import { OverduePanel } from './components/OverduePanel/OverduePanel'
 import { InboxPanel } from './components/InboxPanel/InboxPanel'
+import { AgentPanel } from './components/AgentPanel/AgentPanel'
 import { useEmailStore } from './stores/emailStore'
+import { useAgentStore } from './stores/agentStore'
 import { TagsPanel } from './components/TagsPanel/TagsPanel'
 import { SmartConnectionsPanel } from './components/SmartConnectionsPanel/SmartConnectionsPanel'
 import { NotesChat } from './components/NotesChat/NotesChat'
@@ -75,19 +77,22 @@ const App: React.FC = () => {
   const [notesChatOpen, setNotesChatOpen] = useState(false)
   const { isPanelOpen: flashcardsPanelOpen, setPanel: setFlashcardsPanelOpen } = useFlashcardStore()
   const [inboxPanelOpen, setInboxPanelOpen] = useState(false)
+  const [agentPanelOpen, setAgentPanelOpen] = useState(false)
   const { unreadRelevantCount } = useEmailStore()
   const emailEnabled = useUIStore(state => state.email.enabled)
+  const edooboxEnabled = useUIStore(state => state.edoobox.enabled)
   const [pendingNoteTitle, setPendingNoteTitle] = useState<string | null>(null)
 
   // Helper to switch right panel - clicking opens that panel and closes others
-  const switchRightPanel = useCallback((panel: 'overdue' | 'tags' | 'smartConnections' | 'notesChat' | 'flashcards' | 'inbox') => {
+  const switchRightPanel = useCallback((panel: 'overdue' | 'tags' | 'smartConnections' | 'notesChat' | 'flashcards' | 'inbox' | 'agent') => {
     const isCurrentlyOpen =
       panel === 'overdue' ? overduePanelOpen :
       panel === 'tags' ? tagsPanelOpen :
       panel === 'smartConnections' ? smartConnectionsOpen :
       panel === 'notesChat' ? notesChatOpen :
       panel === 'flashcards' ? flashcardsPanelOpen :
-      panel === 'inbox' ? inboxPanelOpen : false
+      panel === 'inbox' ? inboxPanelOpen :
+      panel === 'agent' ? agentPanelOpen : false
 
     // Close all panels
     setOverduePanelOpen(false)
@@ -96,6 +101,7 @@ const App: React.FC = () => {
     setNotesChatOpen(false)
     setFlashcardsPanelOpen(false)
     setInboxPanelOpen(false)
+    setAgentPanelOpen(false)
 
     // If the panel wasn't open, open it
     if (!isCurrentlyOpen) {
@@ -106,9 +112,10 @@ const App: React.FC = () => {
         case 'notesChat': setNotesChatOpen(true); break
         case 'flashcards': setFlashcardsPanelOpen(true); break
         case 'inbox': setInboxPanelOpen(true); break
+        case 'agent': setAgentPanelOpen(true); break
       }
     }
-  }, [overduePanelOpen, tagsPanelOpen, smartConnectionsOpen, notesChatOpen, flashcardsPanelOpen, setFlashcardsPanelOpen, inboxPanelOpen])
+  }, [overduePanelOpen, tagsPanelOpen, smartConnectionsOpen, notesChatOpen, flashcardsPanelOpen, setFlashcardsPanelOpen, inboxPanelOpen, agentPanelOpen])
 
   const workspaceRef = useRef<HTMLDivElement>(null)
   const contentAreaRef = useRef<HTMLDivElement>(null)
@@ -251,6 +258,13 @@ const App: React.FC = () => {
       clearInterval(interval)
     }
   }, [vaultPath, emailEnabled])
+
+  // edoobox Agent: Events laden beim Vault-Wechsel
+  useEffect(() => {
+    if (!edooboxEnabled || !vaultPath) return
+    useAgentStore.getState().loadEvents().catch(() => {})
+    useAgentStore.getState().checkConnection().catch(() => {})
+  }, [vaultPath, edooboxEnabled])
 
   // Update-Checker & What's New beim App-Start
   useEffect(() => {
@@ -796,6 +810,20 @@ const App: React.FC = () => {
                   )}
                 </button>
               )}
+              {edooboxEnabled && (
+                <button
+                  className={`view-mode-btn ${agentPanelOpen ? 'active' : ''}`}
+                  onClick={() => switchRightPanel('agent')}
+                  title={t('titlebar.agents')}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                    <line x1="16" y1="2" x2="16" y2="6" />
+                    <line x1="8" y1="2" x2="8" y2="6" />
+                    <line x1="3" y1="10" x2="21" y2="10" />
+                  </svg>
+                </button>
+              )}
               <button
                 className={`view-mode-btn ${terminalVisible ? 'active' : ''}`}
                 onClick={() => setTerminalVisible(!terminalVisible)}
@@ -840,7 +868,7 @@ const App: React.FC = () => {
               {/* TabBar - only show when there are canvas tabs */}
               {tabs.length > 0 && <TabBar />}
 
-              <div className={`workspace ${viewMode} ${activeTab?.type === 'canvas' ? 'has-canvas-tab' : ''} ${(textSplitEnabled || overduePanelOpen || tagsPanelOpen || (smartConnectionsOpen && smartConnectionsEnabled) || (notesChatOpen && notesChatEnabled) || (flashcardsPanelOpen && flashcardsEnabled) || inboxPanelOpen) && viewMode === 'editor' ? 'text-split' : ''}`} ref={workspaceRef}>
+              <div className={`workspace ${viewMode} ${activeTab?.type === 'canvas' ? 'has-canvas-tab' : ''} ${(textSplitEnabled || overduePanelOpen || tagsPanelOpen || (smartConnectionsOpen && smartConnectionsEnabled) || (notesChatOpen && notesChatEnabled) || (flashcardsPanelOpen && flashcardsEnabled) || inboxPanelOpen || agentPanelOpen) && viewMode === 'editor' ? 'text-split' : ''}`} ref={workspaceRef}>
 
               {/* Editor Panel - visible in editor and split mode */}
               <div
@@ -848,7 +876,7 @@ const App: React.FC = () => {
                 style={{
                   display: viewMode === 'canvas' ? 'none' : 'flex',
                   flex: viewMode === 'editor'
-                    ? ((textSplitEnabled || overduePanelOpen || tagsPanelOpen || (smartConnectionsOpen && smartConnectionsEnabled) || (notesChatOpen && notesChatEnabled) || (flashcardsPanelOpen && flashcardsEnabled) || inboxPanelOpen)
+                    ? ((textSplitEnabled || overduePanelOpen || tagsPanelOpen || (smartConnectionsOpen && smartConnectionsEnabled) || (notesChatOpen && notesChatEnabled) || (flashcardsPanelOpen && flashcardsEnabled) || inboxPanelOpen || agentPanelOpen)
                         ? `0 0 ${textSplitPosition}%`
                         : (activeTab?.type === 'canvas'
                             ? `0 0 ${splitPosition}%`
@@ -869,12 +897,12 @@ const App: React.FC = () => {
               </div>
 
               {/* Text Split Divider - in editor mode when text-split is enabled (takes priority over canvas tab) */}
-              {viewMode === 'editor' && (textSplitEnabled || overduePanelOpen || tagsPanelOpen || (smartConnectionsOpen && smartConnectionsEnabled) || (notesChatOpen && notesChatEnabled) || (flashcardsPanelOpen && flashcardsEnabled) || inboxPanelOpen) && (
+              {viewMode === 'editor' && (textSplitEnabled || overduePanelOpen || tagsPanelOpen || (smartConnectionsOpen && smartConnectionsEnabled) || (notesChatOpen && notesChatEnabled) || (flashcardsPanelOpen && flashcardsEnabled) || inboxPanelOpen || agentPanelOpen) && (
                 <div className="text-split-divider" onMouseDown={handleTextSplitDividerMouseDown} />
               )}
 
               {/* Secondary Panel (Text Split / Overdue / Tags / Flashcards / etc.) - takes priority over canvas tab */}
-              {viewMode === 'editor' && (textSplitEnabled || overduePanelOpen || tagsPanelOpen || (smartConnectionsOpen && smartConnectionsEnabled) || (notesChatOpen && notesChatEnabled) || (flashcardsPanelOpen && flashcardsEnabled) || inboxPanelOpen) && (
+              {viewMode === 'editor' && (textSplitEnabled || overduePanelOpen || tagsPanelOpen || (smartConnectionsOpen && smartConnectionsEnabled) || (notesChatOpen && notesChatEnabled) || (flashcardsPanelOpen && flashcardsEnabled) || inboxPanelOpen || agentPanelOpen) && (
                 <div className="editor-panel editor-panel-secondary" style={{ flex: `0 0 ${100 - textSplitPosition}%` }}>
                   {overduePanelOpen ? (
                     <OverduePanel onClose={() => setOverduePanelOpen(false)} />
@@ -888,6 +916,8 @@ const App: React.FC = () => {
                     <FlashcardsPanel onClose={() => setFlashcardsPanelOpen(false)} />
                   ) : inboxPanelOpen ? (
                     <InboxPanel onClose={() => setInboxPanelOpen(false)} />
+                  ) : agentPanelOpen ? (
+                    <AgentPanel onClose={() => setAgentPanelOpen(false)} />
                   ) : secondarySelectedNoteId ? (
                     <>
                       <MarkdownEditor isSecondary />
@@ -911,12 +941,12 @@ const App: React.FC = () => {
               )}
 
               {/* Split Divider for LocalCanvas Tab - only when text-split is NOT active */}
-              {viewMode === 'editor' && activeTab?.type === 'canvas' && !(textSplitEnabled || overduePanelOpen || tagsPanelOpen || (smartConnectionsOpen && smartConnectionsEnabled) || (notesChatOpen && notesChatEnabled) || (flashcardsPanelOpen && flashcardsEnabled) || inboxPanelOpen) && (
+              {viewMode === 'editor' && activeTab?.type === 'canvas' && !(textSplitEnabled || overduePanelOpen || tagsPanelOpen || (smartConnectionsOpen && smartConnectionsEnabled) || (notesChatOpen && notesChatEnabled) || (flashcardsPanelOpen && flashcardsEnabled) || inboxPanelOpen || agentPanelOpen) && (
                 <div className="split-divider" onMouseDown={handleDividerMouseDown} />
               )}
 
               {/* Local Canvas Panel - only when text-split is NOT active */}
-              {viewMode === 'editor' && activeTab?.type === 'canvas' && !(textSplitEnabled || overduePanelOpen || tagsPanelOpen || (smartConnectionsOpen && smartConnectionsEnabled) || (notesChatOpen && notesChatEnabled) || (flashcardsPanelOpen && flashcardsEnabled) || inboxPanelOpen) && (
+              {viewMode === 'editor' && activeTab?.type === 'canvas' && !(textSplitEnabled || overduePanelOpen || tagsPanelOpen || (smartConnectionsOpen && smartConnectionsEnabled) || (notesChatOpen && notesChatEnabled) || (flashcardsPanelOpen && flashcardsEnabled) || inboxPanelOpen || agentPanelOpen) && (
                 <div className="local-canvas-panel" style={{ flex: `0 0 ${100 - splitPosition}%` }}>
                   <LocalCanvas tabId={activeTab.id} rootNoteId={activeTab.noteId} />
                 </div>

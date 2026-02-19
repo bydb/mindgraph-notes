@@ -4799,6 +4799,197 @@ ipcMain.handle('email-create-note', async (_event, vaultPath: string, email: {
   }
 })
 
+// ========================================
+// edoobox Agent (Veranstaltungsmanagement)
+// ========================================
+
+function getEdooboxCredentialsPath(): string {
+  return path.join(app.getPath('userData'), 'edoobox-credentials.enc')
+}
+
+// Credentials speichern (safeStorage)
+ipcMain.handle('edoobox-save-credentials', async (_event, apiKey: string, apiSecret: string) => {
+  try {
+    if (!safeStorage.isEncryptionAvailable()) {
+      console.warn('[edoobox] safeStorage encryption not available')
+      return false
+    }
+    const data = JSON.stringify({ apiKey, apiSecret })
+    const encrypted = safeStorage.encryptString(data)
+    await fs.writeFile(getEdooboxCredentialsPath(), encrypted)
+    return true
+  } catch (error) {
+    console.error('[edoobox] Failed to save credentials:', error)
+    return false
+  }
+})
+
+// Credentials laden (safeStorage)
+ipcMain.handle('edoobox-load-credentials', async () => {
+  try {
+    if (!safeStorage.isEncryptionAvailable()) return null
+    const credPath = getEdooboxCredentialsPath()
+    const exists = await fs.access(credPath).then(() => true).catch(() => false)
+    if (!exists) return null
+    const encrypted = await fs.readFile(credPath)
+    const decrypted = safeStorage.decryptString(encrypted)
+    return JSON.parse(decrypted) as { apiKey: string; apiSecret: string }
+  } catch (error) {
+    console.error('[edoobox] Failed to load credentials:', error)
+    return null
+  }
+})
+
+// Verbindungstest
+ipcMain.handle('edoobox-check', async (_event, baseUrl: string, apiVersion: string) => {
+  try {
+    const credPath = getEdooboxCredentialsPath()
+    const exists = await fs.access(credPath).then(() => true).catch(() => false)
+    if (!exists) return { success: false, error: 'Keine Zugangsdaten gespeichert' }
+
+    const encrypted = await fs.readFile(credPath)
+    const { apiKey, apiSecret } = JSON.parse(safeStorage.decryptString(encrypted))
+
+    console.log('[edoobox] Check connection:', { baseUrl, apiVersion, keyLen: apiKey?.length, secretLen: apiSecret?.length, keyPrefix: apiKey?.slice(0, 4), secretPrefix: apiSecret?.slice(0, 4) })
+    const { EdooboxService } = await import('./edooboxService')
+    const service = new EdooboxService(baseUrl, apiKey, apiSecret, apiVersion as 'v1' | 'v2')
+    await service.checkConnection()
+    return { success: true }
+  } catch (error) {
+    console.error('[edoobox] Connection check failed:', error)
+    return { success: false, error: error instanceof Error ? error.message : 'Verbindung fehlgeschlagen' }
+  }
+})
+
+// Angebote auflisten
+ipcMain.handle('edoobox-list-offers', async (_event, baseUrl: string, apiVersion: string) => {
+  try {
+    const credPath = getEdooboxCredentialsPath()
+    const exists = await fs.access(credPath).then(() => true).catch(() => false)
+    if (!exists) return { success: false, error: 'Keine Zugangsdaten gespeichert' }
+    const encrypted = await fs.readFile(credPath)
+    const { apiKey, apiSecret } = JSON.parse(safeStorage.decryptString(encrypted))
+
+    const { EdooboxService } = await import('./edooboxService')
+    const service = new EdooboxService(baseUrl, apiKey, apiSecret, apiVersion as 'v1' | 'v2')
+    const offers = await service.listOffers()
+    return { success: true, offers }
+  } catch (error) {
+    console.error('[edoobox] List offers failed:', error)
+    return { success: false, error: error instanceof Error ? error.message : 'Angebote konnten nicht geladen werden' }
+  }
+})
+
+// Formular parsen (öffnet Dateiauswahl)
+ipcMain.handle('edoobox-parse-formular', async () => {
+  try {
+    const { dialog } = await import('electron')
+    const result = await dialog.showOpenDialog({
+      title: 'Akkreditierungsformular auswählen',
+      filters: [{ name: 'Word-Dokumente', extensions: ['docx'] }],
+      properties: ['openFile']
+    })
+
+    if (result.canceled || !result.filePaths[0]) return null
+
+    const { parseAkkreditierungsformular } = await import('./formularParser')
+    return await parseAkkreditierungsformular(result.filePaths[0])
+  } catch (error) {
+    console.error('[edoobox] Parse formular failed:', error)
+    return null
+  }
+})
+
+// Event an edoobox senden (Offer + Dates erstellen) — via Zapier Webhook oder direkte API
+ipcMain.handle('edoobox-import-event', async (_event, baseUrl: string, apiVersion: string, event: {
+  id?: string; title: string; description: string; maxParticipants?: number;
+  dates: Array<{ date: string; startTime: string; endTime: string }>;
+  location?: string; speakers?: Array<{ name: string; role?: string; institution?: string }>;
+  contact?: string; price?: number; category?: string
+}, webhookUrl?: string) => {
+  try {
+    // Zapier Webhook path
+    if (webhookUrl) {
+      const payload = {
+        title: event.title,
+        description: event.description,
+        maxParticipants: event.maxParticipants,
+        location: event.location,
+        price: event.price,
+        category: event.category,
+        dates: event.dates,
+        speakers: event.speakers,
+        contact: event.contact
+      }
+      const response = await fetch(webhookUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      })
+      if (!response.ok) {
+        const text = await response.text().catch(() => '')
+        return { success: false, error: `Webhook responded with ${response.status}: ${text}` }
+      }
+      return { success: true }
+    }
+
+    // Direct edoobox API path (fallback)
+    const credPath = getEdooboxCredentialsPath()
+    const exists = await fs.access(credPath).then(() => true).catch(() => false)
+    if (!exists) return { success: false, error: 'Keine Zugangsdaten gespeichert' }
+    const encrypted = await fs.readFile(credPath)
+    const { apiKey, apiSecret } = JSON.parse(safeStorage.decryptString(encrypted))
+
+    const { EdooboxService } = await import('./edooboxService')
+    const service = new EdooboxService(baseUrl, apiKey, apiSecret, apiVersion as 'v1' | 'v2')
+
+    const offerId = await service.createOffer({
+      name: event.title,
+      description: event.description,
+      maxParticipants: event.maxParticipants,
+      location: event.location,
+      price: event.price,
+      category: event.category
+    })
+
+    for (const d of event.dates) {
+      await service.createDate(offerId, d)
+    }
+
+    return { success: true, offerId }
+  } catch (error) {
+    console.error('[edoobox] Import event failed:', error)
+    return { success: false, error: error instanceof Error ? error.message : 'Event konnte nicht erstellt werden' }
+  }
+})
+
+// Events laden (JSON-Persistenz)
+ipcMain.handle('edoobox-load-events', async (_event, vaultPath: string) => {
+  try {
+    const eventsPath = path.join(vaultPath, '.mindgraph', 'edoobox-events.json')
+    const exists = await fs.access(eventsPath).then(() => true).catch(() => false)
+    if (!exists) return []
+    const data = await fs.readFile(eventsPath, 'utf-8')
+    return JSON.parse(data)
+  } catch (error) {
+    console.error('[edoobox] Load events failed:', error)
+    return []
+  }
+})
+
+// Events speichern (JSON-Persistenz)
+ipcMain.handle('edoobox-save-events', async (_event, vaultPath: string, events: unknown[]) => {
+  try {
+    const mindgraphDir = path.join(vaultPath, '.mindgraph')
+    await fs.mkdir(mindgraphDir, { recursive: true })
+    await fs.writeFile(path.join(mindgraphDir, 'edoobox-events.json'), JSON.stringify(events, null, 2))
+    return true
+  } catch (error) {
+    console.error('[edoobox] Save events failed:', error)
+    return false
+  }
+})
+
 // Cleanup bei App-Beendigung
 app.on('before-quit', () => {
   isQuitting = true

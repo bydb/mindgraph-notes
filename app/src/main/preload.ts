@@ -300,5 +300,23 @@ contextBridge.exposeInMainWorld('electronAPI', {
   emailSetup: (vaultPath: string) =>
     ipcRenderer.invoke('email-setup', vaultPath),
   emailCreateNote: (vaultPath: string, email: object) =>
-    ipcRenderer.invoke('email-create-note', vaultPath, email)
+    ipcRenderer.invoke('email-create-note', vaultPath, email),
+
+  // edoobox Agent
+  edooboxSaveCredentials: (apiKey: string, apiSecret: string) =>
+    ipcRenderer.invoke('edoobox-save-credentials', apiKey, apiSecret),
+  edooboxLoadCredentials: () =>
+    ipcRenderer.invoke('edoobox-load-credentials'),
+  edooboxCheck: (baseUrl: string, apiVersion: string) =>
+    ipcRenderer.invoke('edoobox-check', baseUrl, apiVersion),
+  edooboxListOffers: (baseUrl: string, apiVersion: string) =>
+    ipcRenderer.invoke('edoobox-list-offers', baseUrl, apiVersion),
+  edooboxParseFormular: () =>
+    ipcRenderer.invoke('edoobox-parse-formular'),
+  edooboxImportEvent: (baseUrl: string, apiVersion: string, event: object, webhookUrl?: string) =>
+    ipcRenderer.invoke('edoobox-import-event', baseUrl, apiVersion, event, webhookUrl),
+  edooboxLoadEvents: (vaultPath: string) =>
+    ipcRenderer.invoke('edoobox-load-events', vaultPath),
+  edooboxSaveEvents: (vaultPath: string, events: object[]) =>
+    ipcRenderer.invoke('edoobox-save-events', vaultPath, events)
 })

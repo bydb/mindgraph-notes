@@ -697,6 +697,16 @@ export interface ElectronAPI {
   onEmailAnalysisProgress: (callback: (progress: { current: number; total: number }) => void) => void;
   emailSetup: (vaultPath: string) => Promise<{ success: boolean; folderPath?: string; instructionPath?: string; error?: string }>;
   emailCreateNote: (vaultPath: string, email: EmailMessage) => Promise<{ success: boolean; path?: string; alreadyExists?: boolean; error?: string }>;
+
+  // edoobox Agent
+  edooboxSaveCredentials: (apiKey: string, apiSecret: string) => Promise<boolean>;
+  edooboxLoadCredentials: () => Promise<{ apiKey: string; apiSecret: string } | null>;
+  edooboxCheck: (baseUrl: string, apiVersion: string) => Promise<{ success: boolean; error?: string }>;
+  edooboxListOffers: (baseUrl: string, apiVersion: string) => Promise<{ success: boolean; offers?: EdooboxOffer[]; error?: string }>;
+  edooboxParseFormular: () => Promise<EdooboxImportResult | null>;
+  edooboxImportEvent: (baseUrl: string, apiVersion: string, event: EdooboxEvent, webhookUrl?: string) => Promise<{ success: boolean; offerId?: string; error?: string }>;
+  edooboxLoadEvents: (vaultPath: string) => Promise<EdooboxEvent[]>;
+  edooboxSaveEvents: (vaultPath: string, events: EdooboxEvent[]) => Promise<boolean>;
 }
 
 // Email Integration Types
@@ -760,6 +770,51 @@ export interface EmailFetchResult {
   newCount: number
   totalCount: number
   error?: string
+}
+
+// edoobox Agent Types
+export interface EdooboxSpeaker {
+  name: string
+  role?: string
+  institution?: string
+}
+
+export interface EdooboxEventDate {
+  date: string       // ISO date YYYY-MM-DD
+  startTime: string  // HH:mm
+  endTime: string    // HH:mm
+}
+
+export interface EdooboxEvent {
+  id: string
+  title: string
+  description: string
+  maxParticipants?: number
+  dates: EdooboxEventDate[]
+  location?: string
+  speakers: EdooboxSpeaker[]
+  contact?: string
+  price?: number
+  category?: string
+  status: 'imported' | 'pushed' | 'error'
+  warnings?: string[]
+  error?: string
+  edooboxOfferId?: string
+  importedAt: string  // ISO
+  pushedAt?: string   // ISO
+  sourceFile?: string
+}
+
+export interface EdooboxOffer {
+  id: string
+  name: string
+  status: string
+  dateCount: number
+}
+
+export interface EdooboxImportResult {
+  event: EdooboxEvent
+  warnings: string[]
 }
 
 // Docling Options for PDF conversion
