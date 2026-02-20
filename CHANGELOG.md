@@ -2,6 +2,11 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.2.12-alpha] - 2026-02-20
+
+### Features
+- **Ordner ausblenden**: Ordner können per Rechtsklick im FileTree ausgeblendet werden — versteckte Ordner über Augen-Toggle in der Sidebar temporär einblendbar (ausgegraut), Einstellung persistiert in graph.json
+
 ## [0.2.11-alpha] - 2026-02-20
 
 ### Features
