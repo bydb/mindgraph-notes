@@ -302,6 +302,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   emailCreateNote: (vaultPath: string, email: object) =>
     ipcRenderer.invoke('email-create-note', vaultPath, email),
 
+  // Apple Reminders (macOS)
+  platform: process.platform,
+  createAppleReminder: (options: { title: string; notes?: string; dueDate?: string; dueTime?: string; list?: string }) =>
+    ipcRenderer.invoke('create-apple-reminder', options),
+
   // edoobox Agent
   edooboxSaveCredentials: (apiKey: string, apiSecret: string) =>
     ipcRenderer.invoke('edoobox-save-credentials', apiKey, apiSecret),

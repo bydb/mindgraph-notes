@@ -3,6 +3,9 @@ import { useEmailStore } from '../../stores/emailStore'
 import { useUIStore } from '../../stores/uiStore'
 import { useNotesStore } from '../../stores/notesStore'
 import { useTranslation } from '../../utils/translations'
+import { sanitizeHtml } from '../../utils/sanitize'
+
+const isMac = window.electronAPI.platform === 'darwin'
 
 interface InboxPanelProps {
   onClose: () => void
@@ -27,6 +30,7 @@ export const InboxPanel: React.FC<InboxPanelProps> = ({ onClose }) => {
 
   const emails = useEmailStore(state => state.emails)
   const [searchQuery, setSearchQuery] = useState('')
+  const [reminderStatus, setReminderStatus] = useState<Record<number, 'loading' | 'success' | 'error'>>({})
 
   const filteredEmails = getFilteredEmails()
 
@@ -82,6 +86,45 @@ export const InboxPanel: React.FC<InboxPanelProps> = ({ onClose }) => {
       default: return t('inbox.sentiment.neutral')
     }
   }
+
+  const handleCreateReminder = useCallback(async (action: Record<string, unknown> | string, index: number) => {
+    if (!selectedEmail) return
+    setReminderStatus(prev => ({ ...prev, [index]: 'loading' }))
+
+    try {
+      let title: string
+      let dueDate: string | undefined
+      let dueTime: string | undefined
+
+      if (typeof action === 'object' && action !== null) {
+        title = String(action.action || action.beschreibung || '')
+        const rawDate = String(action.date || action.datum || '')
+        const rawTime = String(action.time || action.uhrzeit || '')
+        dueDate = rawDate.match(/^\d{4}-\d{2}-\d{2}$/) ? rawDate : undefined
+        const timeMatch = rawTime.match(/(\d{1,2}:\d{2})/)
+        dueTime = timeMatch ? timeMatch[1] : undefined
+      } else {
+        title = String(action)
+        const isoMatch = title.match(/(\d{4}-\d{2}-\d{2})/)
+        dueDate = isoMatch ? isoMatch[1] : undefined
+        const timeMatch = title.match(/(\d{1,2}:\d{2})/)
+        dueTime = timeMatch ? timeMatch[1] : undefined
+      }
+
+      const notes = `Von: ${selectedEmail.from.name || selectedEmail.from.address}\nBetreff: ${selectedEmail.subject}`
+
+      const result = await window.electronAPI.createAppleReminder({
+        title: title.substring(0, 200),
+        notes,
+        dueDate,
+        dueTime
+      })
+
+      setReminderStatus(prev => ({ ...prev, [index]: result.success ? 'success' : 'error' }))
+    } catch {
+      setReminderStatus(prev => ({ ...prev, [index]: 'error' }))
+    }
+  }, [selectedEmail])
 
   // Detail-Ansicht
   if (selectedEmail) {
@@ -159,7 +202,11 @@ export const InboxPanel: React.FC<InboxPanelProps> = ({ onClose }) => {
                   {selectedEmail.analysis.summary && (
                     <div className="inbox-analysis-section">
                       <h4>{t('inbox.detail.summary')}</h4>
-                      <p>{selectedEmail.analysis.summary}</p>
+                      <p dangerouslySetInnerHTML={{ __html: sanitizeHtml(
+                        selectedEmail.analysis.summary
+                          .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+                          .replace(/\*(.+?)\*/g, '<em>$1</em>')
+                      ) }} />
                     </div>
                   )}
 
@@ -172,6 +219,65 @@ export const InboxPanel: React.FC<InboxPanelProps> = ({ onClose }) => {
                           const isCritical = criticalCategories.some(c => catStr.toLowerCase().includes(c))
                           return (
                             <span key={i} className={`inbox-category-tag ${isCritical ? 'inbox-category-critical' : ''}`}>{catStr}</span>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {selectedEmail.analysis.suggestedActions && selectedEmail.analysis.suggestedActions.length > 0 && (
+                    <div className="inbox-analysis-section">
+                      <h4>{t('inbox.detail.suggestedActions')}</h4>
+                      <div className="inbox-actions-list">
+                        {selectedEmail.analysis.suggestedActions.map((action, i) => {
+                          const isObj = typeof action === 'object' && action !== null
+                          const obj = isObj ? action as Record<string, unknown> : null
+                          const text = obj ? String(obj.action || obj.beschreibung || '') : String(action)
+                          const date = obj ? String(obj.date || obj.datum || '') : ''
+                          const time = obj ? String(obj.time || obj.uhrzeit || '') : ''
+                          const timeMatch = time.match(/(\d{1,2}:\d{2})/)
+                          const status = reminderStatus[i]
+
+                          if (!text || text === '{}') return null
+
+                          return (
+                            <div key={i} className="inbox-action-item">
+                              <span className="inbox-action-text">{text}</span>
+                              <div className="inbox-action-meta">
+                                {date && date.match(/^\d{4}-\d{2}-\d{2}$/) && (
+                                  <span className="inbox-action-date">
+                                    {date}{timeMatch ? ` ${timeMatch[1]}` : ''}
+                                  </span>
+                                )}
+                                {isMac && (
+                                  <button
+                                    className={`inbox-reminder-btn ${status || ''}`}
+                                    onClick={() => handleCreateReminder(action, i)}
+                                    disabled={status === 'loading' || status === 'success'}
+                                    title={status === 'success' ? t('inbox.detail.reminderCreated') : status === 'error' ? t('inbox.detail.reminderFailed') : 'Apple Reminder'}
+                                  >
+                                    {status === 'loading' ? (
+                                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="spinning">
+                                        <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+                                      </svg>
+                                    ) : status === 'success' ? (
+                                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                        <polyline points="20 6 9 17 4 12" />
+                                      </svg>
+                                    ) : status === 'error' ? (
+                                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                        <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                                      </svg>
+                                    ) : (
+                                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                        <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+                                        <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+                                      </svg>
+                                    )}
+                                  </button>
+                                )}
+                              </div>
+                            </div>
                           )
                         })}
                       </div>

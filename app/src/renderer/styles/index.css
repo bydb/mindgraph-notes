@@ -8304,6 +8304,79 @@ body {
   margin-bottom: 8px;
 }
 
+.inbox-actions-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.inbox-action-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 8px;
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+}
+
+.inbox-action-text {
+  flex: 1;
+  min-width: 0;
+  color: var(--text-primary);
+  line-height: 1.4;
+}
+
+.inbox-action-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.inbox-action-date {
+  font-size: 10px;
+  padding: 1px 6px;
+  background: var(--bg-secondary);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.inbox-reminder-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.inbox-reminder-btn:hover:not(:disabled) {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
+.inbox-reminder-btn.success {
+  color: #22c55e;
+}
+
+.inbox-reminder-btn.error {
+  color: #ef4444;
+}
+
+.inbox-reminder-btn:disabled {
+  cursor: default;
+  opacity: 0.7;
+}
+
 .inbox-experimental-warning {
   display: flex;
   align-items: center;

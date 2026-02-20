@@ -698,6 +698,10 @@ export interface ElectronAPI {
   emailSetup: (vaultPath: string) => Promise<{ success: boolean; folderPath?: string; instructionPath?: string; error?: string }>;
   emailCreateNote: (vaultPath: string, email: EmailMessage) => Promise<{ success: boolean; path?: string; alreadyExists?: boolean; error?: string }>;
 
+  // Apple Reminders (macOS)
+  platform: string;
+  createAppleReminder: (options: { title: string; notes?: string; dueDate?: string; dueTime?: string; list?: string }) => Promise<{ success: boolean; error?: string }>;
+
   // edoobox Agent
   edooboxSaveCredentials: (apiKey: string, apiSecret: string) => Promise<boolean>;
   edooboxLoadCredentials: () => Promise<{ apiKey: string; apiSecret: string } | null>;

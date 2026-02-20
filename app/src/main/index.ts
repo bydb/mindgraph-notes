@@ -4800,6 +4800,73 @@ ipcMain.handle('email-create-note', async (_event, vaultPath: string, email: {
 })
 
 // ========================================
+// Apple Reminders (macOS only)
+// ========================================
+
+ipcMain.handle('create-apple-reminder', async (_event, options: {
+  title: string
+  notes?: string
+  dueDate?: string  // YYYY-MM-DD
+  dueTime?: string  // HH:mm
+  list?: string
+}) => {
+  if (process.platform !== 'darwin') {
+    return { success: false, error: 'macOS only' }
+  }
+
+  try {
+    const { execFile } = await import('child_process')
+    const { promisify } = await import('util')
+    const execFileAsync = promisify(execFile)
+
+    // Escape for AppleScript string literals
+    const escape = (s: string) => s.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/[\r\n]+/g, ' ')
+
+    const title = escape(options.title.substring(0, 200))
+    const body = options.notes ? escape(options.notes.substring(0, 1000)) : ''
+    const listName = options.list || 'MindGraph'
+
+    // Build properties
+    let props = `name:"${title}"`
+    if (body) props += `, body:"${body}"`
+
+    // Build due date via component assignment (locale-independent)
+    let dueDateBlock = ''
+    if (options.dueDate) {
+      const timePart = options.dueTime || '09:00'
+      const [hours, minutes] = timePart.split(':').map(Number)
+      const [year, month, day] = options.dueDate.split('-').map(Number)
+      dueDateBlock = `
+  set dueD to current date
+  set year of dueD to ${year}
+  set month of dueD to ${month}
+  set day of dueD to ${day}
+  set hours of dueD to ${hours}
+  set minutes of dueD to ${minutes}
+  set seconds of dueD to 0`
+      props += ', due date:dueD'
+    }
+
+    const script = `
+tell application "Reminders"
+  if not (exists list "${escape(listName)}") then
+    make new list with properties {name:"${escape(listName)}"}
+  end if
+  tell list "${escape(listName)}"${dueDateBlock}
+    make new reminder with properties {${props}}
+  end tell
+end tell`
+
+    await execFileAsync('osascript', ['-e', script], { timeout: 10000 })
+    console.log('[Reminders] Created:', title)
+    return { success: true }
+  } catch (error) {
+    console.error('[Reminders] Failed:', error)
+    return { success: false, error: error instanceof Error ? error.message : 'Erinnerung konnte nicht erstellt werden' }
+  }
+})
+
+// ========================================
 // edoobox Agent (Veranstaltungsmanagement)
 // ========================================
 

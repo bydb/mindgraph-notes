@@ -7,8 +7,10 @@ import { useGraphStore } from '../../stores/graphStore'
 import { useTabStore } from '../../stores/tabStore'
 import { useBookmarkStore } from '../../stores/bookmarkStore'
 import { useQuizStore } from '../../stores/quizStore'
-import { generateNoteId } from '../../utils/linkExtractor'
+import { generateNoteId, extractTasks } from '../../utils/linkExtractor'
 import { useTranslation } from '../../utils/translations'
+
+const isMac = window.electronAPI.platform === 'darwin'
 
 type DisplayMode = 'name' | 'path'
 
@@ -645,6 +647,58 @@ const FileItem: React.FC<FileItemProps> = ({ entry, level, onDrop, displayMode }
     setContextMenu(null)
   }, [contextMenu, setCanvasFilterPath, setViewMode])
 
+  // Apple Reminders aus Tasks erstellen
+  const [reminderCreating, setReminderCreating] = useState(false)
+  const handleCreateAppleReminders = useCallback(async () => {
+    if (!contextMenu || !vaultPath || contextMenu.entry.isDirectory || reminderCreating) return
+
+    const fullPath = `${vaultPath}/${contextMenu.entry.path}`
+    setReminderCreating(true)
+    setContextMenu(null)
+
+    try {
+      const content = await window.electronAPI.readFile(fullPath)
+      const { tasks } = extractTasks(content)
+      const tasksWithDate = tasks.filter(t => !t.completed && t.dueDate)
+
+      if (tasksWithDate.length === 0) {
+        await window.electronAPI.showNotification(
+          'Apple Reminders',
+          t('appleReminders.noTasks')
+        )
+        setReminderCreating(false)
+        return
+      }
+
+      let created = 0
+      const noteTitle = contextMenu.entry.name.replace('.md', '')
+
+      for (const task of tasksWithDate) {
+        const dueDate = task.dueDate!
+        const dateStr = `${dueDate.getFullYear()}-${String(dueDate.getMonth() + 1).padStart(2, '0')}-${String(dueDate.getDate()).padStart(2, '0')}`
+        const hasTime = dueDate.getHours() !== 0 || dueDate.getMinutes() !== 0
+        const timeStr = hasTime ? `${String(dueDate.getHours()).padStart(2, '0')}:${String(dueDate.getMinutes()).padStart(2, '0')}` : undefined
+
+        const result = await window.electronAPI.createAppleReminder({
+          title: task.text.substring(0, 200),
+          notes: noteTitle,
+          dueDate: dateStr,
+          dueTime: timeStr
+        })
+        if (result.success) created++
+      }
+
+      await window.electronAPI.showNotification(
+        'Apple Reminders',
+        t('appleReminders.createdCount').replace('{count}', String(created))
+      )
+    } catch (error) {
+      console.error('[Reminders] Failed:', error)
+    }
+
+    setReminderCreating(false)
+  }, [contextMenu, vaultPath, reminderCreating, t])
+
   // Collect all folders from file tree
   const collectFolders = useCallback((entries: FileEntry[], parentPath: string = ''): Array<{ path: string; name: string; depth: number }> => {
     const folders: Array<{ path: string; name: string; depth: number }> = []
@@ -1018,6 +1072,11 @@ const FileItem: React.FC<FileItemProps> = ({ entry, level, onDrop, displayMode }
                         </button>
                       </div>
                     </div>
+                  )}
+                  {isMac && (
+                    <button onClick={handleCreateAppleReminders} className="context-menu-item" disabled={reminderCreating}>
+                      {t('fileTree.createAppleReminder')}
+                    </button>
                   )}
                   <div className="context-menu-divider" />
                 </>
