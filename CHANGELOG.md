@@ -2,6 +2,16 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.2.11-alpha] - 2026-02-20
+
+### Features
+- **Apple Erinnerungen**: Aus E-Mail-Aktionen und Notiz-Tasks direkt Apple Erinnerungen erstellen (macOS) — mit Titel, Fälligkeitsdatum, Uhrzeit und Kontext
+- **InboxPanel suggestedActions**: Vorgeschlagene Aktionen aus der E-Mail-Analyse werden jetzt im Detail-View angezeigt — mit Datum-Badges und Reminder-Button
+- **FileTree Kontextmenü**: Neuer Menüpunkt "Apple Erinnerungen erstellen" für Markdown-Dateien — erstellt Erinnerungen aus allen offenen Tasks mit Datum
+
+### Improvements
+- **E-Mail-Zusammenfassung**: Markdown-Formatierung (fett, kursiv) wird jetzt in der Zusammenfassung gerendert
+
 ## [0.2.10-alpha] - 2026-02-19
 
 ### Features
