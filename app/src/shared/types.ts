@@ -143,6 +143,7 @@ export interface FlashcardSession {
 export interface FileCustomization {
   color?: string           // Ordner/Datei Farbe (aus Palette)
   icon?: string            // Icon-Override (z.B. '📚', '🎯', 'star')
+  hidden?: boolean         // Ordner im FileTree ausblenden
 }
 
 // Task-Statistiken pro Notiz (für Cache)

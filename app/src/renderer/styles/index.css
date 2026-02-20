@@ -592,6 +592,10 @@ body {
   cursor: grabbing;
 }
 
+.file-item-row.file-item-hidden {
+  opacity: 0.4;
+}
+
 .file-name-input {
   flex: 1;
   background: var(--bg-primary);

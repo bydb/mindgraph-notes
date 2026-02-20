@@ -20,6 +20,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ onOpenSearch }) => {
   const { sidebarWidth, sidebarVisible, fileTreeDisplayMode, setFileTreeDisplayMode } = useUIStore()
   const loadGraphData = useGraphStore((s) => s.loadFromVault)
   const resetGraphStore = useGraphStore((s) => s.reset)
+  const fileCustomizations = useGraphStore((s) => s.fileCustomizations)
+  const showHiddenFolders = useGraphStore((s) => s.showHiddenFolders)
+  const setShowHiddenFolders = useGraphStore((s) => s.setShowHiddenFolders)
+  const hasHiddenFolders = Object.values(fileCustomizations).some(c => c.hidden)
   const clearAllTabs = useTabStore((s) => s.clearAllTabs)
   const { t } = useTranslation()
 
@@ -362,6 +366,26 @@ export const Sidebar: React.FC<SidebarProps> = ({ onOpenSearch }) => {
                 </svg>
               )}
             </button>
+            {hasHiddenFolders && (
+              <button
+                className={`display-mode-toggle ${showHiddenFolders ? 'active' : ''}`}
+                onClick={() => setShowHiddenFolders(!showHiddenFolders)}
+                title={showHiddenFolders ? t('sidebar.hideHidden') : t('sidebar.showHidden')}
+              >
+                {showHiddenFolders ? (
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                    <path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5z" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+                    <circle cx="8" cy="8" r="2" stroke="currentColor" strokeWidth="1.3"/>
+                  </svg>
+                ) : (
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                    <path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5z" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+                    <circle cx="8" cy="8" r="2" stroke="currentColor" strokeWidth="1.3"/>
+                    <path d="M2 14L14 2" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
+                  </svg>
+                )}
+              </button>
+            )}
           </div>
           <BookmarksBar />
           <div className="sidebar-content">

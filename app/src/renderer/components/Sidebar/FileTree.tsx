@@ -258,7 +258,7 @@ const FileItem: React.FC<FileItemProps> = ({ entry, level, onDrop, displayMode }
 
   const { selectedNoteId, secondarySelectedNoteId, selectedPdfPath, selectedImagePath, selectNote, selectSecondaryNote, selectPdf, selectImage, removeNote, setFileTree, vaultPath, notes, updateNotePath, fileTree } = useNotesStore()
   const { iconSet, textSplitEnabled, flashcardsEnabled, setViewMode, setCanvasFilterPath } = useUIStore()
-  const { fileCustomizations, setFileCustomization, removeFileCustomization } = useGraphStore()
+  const { fileCustomizations, setFileCustomization, removeFileCustomization, toggleFolderHidden, showHiddenFolders } = useGraphStore()
   const { openCanvasTab } = useTabStore()
   const { isBookmarked, toggleBookmark } = useBookmarkStore()
 
@@ -283,6 +283,7 @@ const FileItem: React.FC<FileItemProps> = ({ entry, level, onDrop, displayMode }
   const customization = entry.isDirectory ? fileCustomizations[entry.path] : undefined
   const folderColor = customization?.color
   const folderIcon = customization?.icon
+  const isFolderHidden = entry.isDirectory && customization?.hidden === true
   const hasCustomization = folderColor || folderIcon
 
   // Display-Name basierend auf displayMode
@@ -639,6 +640,12 @@ const FileItem: React.FC<FileItemProps> = ({ entry, level, onDrop, displayMode }
     setContextMenu(null)
   }, [contextMenu, removeFileCustomization])
 
+  const handleToggleFolderHidden = useCallback(() => {
+    if (!contextMenu || !contextMenu.entry.isDirectory) return
+    toggleFolderHidden(contextMenu.entry.path)
+    setContextMenu(null)
+  }, [contextMenu, toggleFolderHidden])
+
   // Show folder in canvas view
   const handleShowFolderInCanvas = useCallback(() => {
     if (!contextMenu || !contextMenu.entry.isDirectory) return
@@ -854,7 +861,7 @@ const FileItem: React.FC<FileItemProps> = ({ entry, level, onDrop, displayMode }
     <div className="file-item">
       <div
         ref={rowRef}
-        className={`file-item-row ${isSelected ? 'selected' : ''} ${isSecondarySelected ? 'secondary-selected' : ''} ${isDragOver ? 'drag-over' : ''}`}
+        className={`file-item-row ${isSelected ? 'selected' : ''} ${isSecondarySelected ? 'secondary-selected' : ''} ${isDragOver ? 'drag-over' : ''} ${isFolderHidden && showHiddenFolders ? 'file-item-hidden' : ''}`}
         style={{ paddingLeft }}
         onClick={handleClick}
         onContextMenu={handleContextMenu}
@@ -990,6 +997,10 @@ const FileItem: React.FC<FileItemProps> = ({ entry, level, onDrop, displayMode }
                   {t('fileTree.removeCustomization')}
                 </button>
               )}
+              <div className="context-menu-divider" />
+              <button onClick={handleToggleFolderHidden} className="context-menu-item">
+                {isFolderHidden ? t('fileTree.showFolder') : t('fileTree.hideFolder')}
+              </button>
               <div className="context-menu-divider" />
               <button onClick={handleCopyRelativePath} className="context-menu-item">
                 {t('fileTree.copyRelativePath')}
@@ -1253,18 +1264,28 @@ const FileItem: React.FC<FileItemProps> = ({ entry, level, onDrop, displayMode }
 
 export const FileTree: React.FC<FileTreeProps> = ({ entries, level = 0, onDrop, displayMode = 'name' }) => {
   const { pdfCompanionEnabled, pdfDisplayMode } = useUIStore()
+  const { fileCustomizations, showHiddenFolders } = useGraphStore()
 
-  // Filter entries based on PDF settings
+  // Filter entries based on PDF settings and hidden folders
   const filteredEntries = useMemo(() => {
+    let filtered = entries
+
+    // Filter hidden folders (unless showHiddenFolders is active)
+    if (!showHiddenFolders) {
+      filtered = filtered.filter(entry =>
+        !entry.isDirectory || !fileCustomizations[entry.path]?.hidden
+      )
+    }
+
     if (!pdfCompanionEnabled) {
       // If companion is disabled, show only PDFs (hide .pdf.md files)
-      return entries.filter(entry => !entry.name.endsWith('.pdf.md'))
+      return filtered.filter(entry => !entry.name.endsWith('.pdf.md'))
     }
 
     // Collect all entry names for lookup
-    const entryNames = new Set(entries.map(e => e.name))
+    const entryNames = new Set(filtered.map(e => e.name))
 
-    return entries.filter(entry => {
+    return filtered.filter(entry => {
       const name = entry.name.toLowerCase()
 
       if (pdfDisplayMode === 'companion-only') {
@@ -1282,7 +1303,7 @@ export const FileTree: React.FC<FileTreeProps> = ({ entries, level = 0, onDrop, 
       // 'both' mode shows everything
       return true
     })
-  }, [entries, pdfCompanionEnabled, pdfDisplayMode])
+  }, [entries, pdfCompanionEnabled, pdfDisplayMode, showHiddenFolders, fileCustomizations])
 
   return (
     <div className="file-tree">

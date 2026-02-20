@@ -81,6 +81,8 @@ const translations = {
     'sidebar.newFolder': 'Neuer Ordner',
     'sidebar.refresh': 'Aktualisieren',
     'sidebar.notesCount': 'Notizen',
+    'sidebar.showHidden': 'Versteckte Ordner anzeigen',
+    'sidebar.hideHidden': 'Versteckte Ordner ausblenden',
 
     // Canvas
     'canvas.allNotes': 'Alle Notizen',
@@ -478,6 +480,8 @@ const translations = {
     'fileTree.moveToTitle': '"{name}" verschieben nach',
     'fileTree.vaultRoot': 'Vault (Hauptordner)',
     'fileTree.moveButton': 'Verschieben',
+    'fileTree.hideFolder': 'Ordner ausblenden',
+    'fileTree.showFolder': 'Ordner einblenden',
 
     // Canvas
     'canvas.reset': 'Zurücksetzen',
@@ -1235,6 +1239,8 @@ const translations = {
     'sidebar.newFolder': 'New Folder',
     'sidebar.refresh': 'Refresh',
     'sidebar.notesCount': 'Notes',
+    'sidebar.showHidden': 'Show hidden folders',
+    'sidebar.hideHidden': 'Hide hidden folders',
 
     // Canvas
     'canvas.allNotes': 'All Notes',
@@ -1632,6 +1638,8 @@ const translations = {
     'fileTree.moveToTitle': 'Move "{name}" to',
     'fileTree.vaultRoot': 'Vault (root folder)',
     'fileTree.moveButton': 'Move',
+    'fileTree.hideFolder': 'Hide folder',
+    'fileTree.showFolder': 'Show folder',
 
     // Canvas
     'canvas.reset': 'Reset',

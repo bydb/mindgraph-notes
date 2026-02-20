@@ -23,6 +23,7 @@ interface GraphState {
   viewport: { x: number; y: number; zoom: number }
   vaultPath: string | null
   isDirty: boolean
+  showHiddenFolders: boolean  // Transient (not persisted)
 
   // Actions
   setVaultPath: (path: string | null) => void
@@ -48,6 +49,8 @@ interface GraphState {
   // FileTree Customization Actions
   setFileCustomization: (path: string, customization: FileCustomization) => void
   removeFileCustomization: (path: string) => void
+  toggleFolderHidden: (path: string) => void
+  setShowHiddenFolders: (show: boolean) => void
 
   setViewport: (viewport: { x: number; y: number; zoom: number }) => void
 
@@ -61,7 +64,8 @@ const initialState = {
   fileCustomizations: {} as Record<string, FileCustomization>,
   viewport: { x: 0, y: 0, zoom: 1 },
   vaultPath: null as string | null,
-  isDirty: false
+  isDirty: false,
+  showHiddenFolders: false
 }
 
 // Debounce-Timer für Auto-Save
@@ -288,6 +292,7 @@ export const useGraphStore = create<GraphState>()(
         const cleaned: FileCustomization = {}
         if (merged.color) cleaned.color = merged.color
         if (merged.icon) cleaned.icon = merged.icon
+        if (merged.hidden) cleaned.hidden = merged.hidden
 
         console.log('[GraphStore] Saving cleaned customization:', cleaned)
         return {
@@ -307,6 +312,36 @@ export const useGraphStore = create<GraphState>()(
         return { fileCustomizations: rest, isDirty: true }
       })
       scheduleSave()
+    },
+
+    toggleFolderHidden: (path) => {
+      set((state) => {
+        const existing = state.fileCustomizations[path] || {}
+        const isHidden = !existing.hidden
+        const cleaned: FileCustomization = {}
+        if (existing.color) cleaned.color = existing.color
+        if (existing.icon) cleaned.icon = existing.icon
+        if (isHidden) cleaned.hidden = true
+
+        // If no properties left, remove entry entirely
+        if (!cleaned.color && !cleaned.icon && !cleaned.hidden) {
+          const { [path]: _, ...rest } = state.fileCustomizations
+          return { fileCustomizations: rest, isDirty: true }
+        }
+
+        return {
+          fileCustomizations: {
+            ...state.fileCustomizations,
+            [path]: cleaned
+          },
+          isDirty: true
+        }
+      })
+      scheduleSave()
+    },
+
+    setShowHiddenFolders: (show) => {
+      set({ showHiddenFolders: show })
     },
 
     setViewport: (viewport) => {
