@@ -2,6 +2,11 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.2.13-alpha] - 2026-02-21
+
+### Features
+- **Smart AI-Tool Erkennung**: Terminal-Bot-Button erkennt automatisch verfügbare AI-CLI-Tools (opencode bevorzugt, claude als Fallback) — Button passt Tooltip an und wird deaktiviert wenn kein Tool gefunden wird
+
 ## [0.2.12-alpha] - 2026-02-20
 
 ### Features
