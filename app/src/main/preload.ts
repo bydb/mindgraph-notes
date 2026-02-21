@@ -206,6 +206,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('terminal-error', (_event, error) => callback(error))
   },
 
+  // Command existence check (for AI tool detection)
+  checkCommandExists: (command: string) => ipcRenderer.invoke('check-command-exists', command),
+
   // Custom Logo
   selectCustomLogo: () => ipcRenderer.invoke('select-custom-logo'),
   removeCustomLogo: () => ipcRenderer.invoke('remove-custom-logo'),

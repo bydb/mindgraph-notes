@@ -19,6 +19,8 @@ export const Terminal: React.FC<TerminalProps> = ({ visible, onToggle }) => {
   const [isConnected, setIsConnected] = useState(false)
   const isConnectedRef = useRef(false)
   const [height, setHeight] = useState(300)
+  const [availableTool, setAvailableTool] = useState<'opencode' | 'claude' | null>(null)
+  const [toolChecked, setToolChecked] = useState(false)
   const resizingRef = useRef(false)
   const startYRef = useRef(0)
   const startHeightRef = useRef(0)
@@ -32,6 +34,31 @@ export const Terminal: React.FC<TerminalProps> = ({ visible, onToggle }) => {
   }, [t])
 
   const vaultPath = useNotesStore((s) => s.vaultPath)
+
+  // Detect available AI tool (opencode preferred, claude as fallback)
+  useEffect(() => {
+    const detectTool = async () => {
+      try {
+        const opencode = await window.electronAPI.checkCommandExists('opencode')
+        if (opencode.exists) {
+          setAvailableTool('opencode')
+          setToolChecked(true)
+          return
+        }
+        const claude = await window.electronAPI.checkCommandExists('claude')
+        if (claude.exists) {
+          setAvailableTool('claude')
+          setToolChecked(true)
+          return
+        }
+      } catch {
+        // ignore errors
+      }
+      setAvailableTool(null)
+      setToolChecked(true)
+    }
+    detectTool()
+  }, [])
 
   // Sync ref with state
   useEffect(() => {
@@ -297,8 +324,15 @@ export const Terminal: React.FC<TerminalProps> = ({ visible, onToggle }) => {
           </button>
           <button
             className="btn-icon"
-            onClick={() => window.electronAPI.terminalWrite('opencode\n')}
-            title={t('terminal.startOpenCode')}
+            onClick={() => {
+              if (availableTool) {
+                window.electronAPI.terminalWrite(availableTool + '\n')
+              }
+            }}
+            disabled={!availableTool && toolChecked}
+            title={availableTool
+              ? `${t('terminal.startAiTool')} (${availableTool})`
+              : t('terminal.noAiTool')}
           >
             🤖
           </button>
