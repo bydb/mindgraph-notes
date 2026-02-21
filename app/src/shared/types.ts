@@ -472,6 +472,9 @@ export interface ElectronAPI {
   onTerminalExit: (callback: () => void) => void;
   onTerminalError: (callback: (error: string) => void) => void;
 
+  // Command existence check
+  checkCommandExists: (command: string) => Promise<{ exists: boolean }>;
+
   // Notifications für Reminder-System
   showNotification: (title: string, body: string, noteId?: string) => Promise<boolean>;
   onNotificationClicked: (callback: (noteId: string) => void) => void;

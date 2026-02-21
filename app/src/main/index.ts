@@ -2101,6 +2101,54 @@ ipcMain.on('terminal-destroy', () => {
   }
 })
 
+// Check if a command exists in PATH
+ipcMain.handle('check-command-exists', async (_event, command: string) => {
+  try {
+    const { execFile } = await import('child_process')
+    const { promisify } = await import('util')
+    const execFileAsync = promisify(execFile)
+
+    const isWindows = process.platform === 'win32'
+    const checkCmd = isWindows ? 'where' : 'which'
+
+    // Use extended PATH (same as terminal-create)
+    let extendedPath: string
+    if (isWindows) {
+      const homeDir = process.env.USERPROFILE || ''
+      const additionalPaths = [
+        `${homeDir}\\AppData\\Local\\Programs\\Python\\Python311`,
+        `${homeDir}\\AppData\\Local\\Programs\\Python\\Python311\\Scripts`,
+        `${homeDir}\\.cargo\\bin`,
+        `${homeDir}\\AppData\\Roaming\\npm`,
+        `${homeDir}\\scoop\\shims`,
+      ].filter(p => p)
+      const currentPath = process.env.PATH || ''
+      extendedPath = [...additionalPaths, ...currentPath.split(';')].join(';')
+    } else {
+      const homeDir = process.env.HOME || '/Users/' + process.env.USER
+      const additionalPaths = [
+        '/opt/homebrew/bin',
+        '/opt/homebrew/sbin',
+        '/usr/local/bin',
+        '/usr/local/sbin',
+        `${homeDir}/.local/bin`,
+        `${homeDir}/.cargo/bin`,
+        `${homeDir}/.nvm/versions/node/v20.18.1/bin`,
+      ]
+      const currentPath = process.env.PATH || '/usr/bin:/bin:/usr/sbin:/sbin'
+      extendedPath = [...additionalPaths, ...currentPath.split(':')].join(':')
+    }
+
+    await execFileAsync(checkCmd, [command], {
+      env: { ...process.env, PATH: extendedPath },
+      timeout: 5000,
+    })
+    return { exists: true }
+  } catch {
+    return { exists: false }
+  }
+})
+
 // Graph-Daten speichern (im Vault unter .mindgraph/)
 ipcMain.handle('save-graph-data', async (_event, vaultPath: string, data: object) => {
   try {
