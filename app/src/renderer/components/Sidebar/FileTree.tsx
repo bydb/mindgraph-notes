@@ -588,7 +588,8 @@ const FileItem: React.FC<FileItemProps> = ({ entry, level, onDrop, displayMode }
   const handleOpenInCanvas = useCallback(() => {
     if (!contextMenu || contextMenu.entry.isDirectory || isPdf || isImage) return
     const noteId = generateNoteId(contextMenu.entry.path)
-    const title = contextMenu.entry.name.replace('.md', '')
+    const note = notes.find(n => n.id === noteId)
+    const title = note?.title || contextMenu.entry.name.replace('.md', '')
     openCanvasTab(noteId, title)
     setContextMenu(null)
   }, [contextMenu, isPdf, isImage, openCanvasTab])

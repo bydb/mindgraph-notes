@@ -1,6 +1,6 @@
 {
   "name": "mindgraph-notes",
-  "version": "0.2.13-alpha",
+  "version": "0.2.14-alpha",
   "description": "Eine minimalistische Markdown-Notizen-App mit editierbarer Graph View",
   "main": "out/main/index.js",
   "scripts": {
@@ -105,6 +105,7 @@
     "adm-zip": "^0.5.16",
     "chokidar": "^5.0.0",
     "dompurify": "^3.3.1",
+    "highlight.js": "^11.11.1",
     "html-to-image": "^1.11.13",
     "imapflow": "^1.2.9",
     "katex": "^0.16.27",

@@ -3,7 +3,10 @@ import { EditorState, Compartment } from '@codemirror/state'
 import { EditorView, keymap, lineNumbers, highlightActiveLine } from '@codemirror/view'
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands'
 import { markdown } from '@codemirror/lang-markdown'
-import { syntaxHighlighting, defaultHighlightStyle } from '@codemirror/language'
+import { syntaxHighlighting, defaultHighlightStyle, LanguageDescription } from '@codemirror/language'
+import { javascript } from '@codemirror/lang-javascript'
+import { html } from '@codemirror/lang-html'
+import { css as cssLanguage } from '@codemirror/lang-css'
 import MarkdownIt from 'markdown-it'
 import taskLists from 'markdown-it-task-lists'
 import footnote from 'markdown-it-footnote'
@@ -14,6 +17,7 @@ import 'katex/contrib/mhchem/mhchem.js'  // Chemie-Support (mhchem)
 import mermaid from 'mermaid'
 import { useNotesStore, createNoteFromFile } from '../../stores/notesStore'
 import { useUIStore } from '../../stores/uiStore'
+import { useTabStore } from '../../stores/tabStore'
 import { useShallow } from 'zustand/react/shallow'
 import { useTranslation } from '../../utils/translations'
 import { sanitizeHtml, escapeHtml } from '../../utils/sanitize'
@@ -30,6 +34,37 @@ import { AIContextMenu, AIResult } from './AIContextMenu'
 import { AIImageDialog } from './AIImageDialog'
 import { insertAIResultWithFootnote } from '../../utils/aiFootnote'
 import { isImageFile, findImageInVault } from '../../utils/imageUtils'
+import { highlightCode } from '../../utils/highlightSetup'
+
+const markdownCodeLanguages = [
+  LanguageDescription.of({
+    name: 'javascript',
+    alias: ['js', 'node', 'nodejs', 'mjs', 'cjs'],
+    support: javascript(),
+  }),
+  LanguageDescription.of({
+    name: 'typescript',
+    alias: ['ts', 'cts', 'mts'],
+    support: javascript({ typescript: true }),
+  }),
+  LanguageDescription.of({
+    name: 'jsx',
+    support: javascript({ jsx: true }),
+  }),
+  LanguageDescription.of({
+    name: 'tsx',
+    support: javascript({ jsx: true, typescript: true }),
+  }),
+  LanguageDescription.of({
+    name: 'html',
+    alias: ['xml'],
+    support: html(),
+  }),
+  LanguageDescription.of({
+    name: 'css',
+    support: cssLanguage(),
+  }),
+]
 
 // Mermaid initialisieren
 mermaid.initialize({
@@ -180,7 +215,8 @@ const md = new MarkdownIt({
   html: true,
   linkify: true,
   typographer: true,
-  breaks: true
+  breaks: true,
+  highlight: highlightCode
 })
 
 // Task-Listen Plugin aktivieren (für - [ ] und - [x] Syntax)
@@ -808,15 +844,19 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
       // Update note in store - markiere als externes Update
       const fileName = selectedNote.path.split('/').pop() || selectedNote.path
       isExternalUpdateRef.current = true
+      const newTitle = extractTitle(content, fileName)
       updateNote(selectedNote.id, {
         content,
-        title: extractTitle(content, fileName),
+        title: newTitle,
         outgoingLinks: extractLinks(content),
         tags: extractTags(content),
         headings: extractHeadings(content),
         blocks: extractBlocks(content),
         modifiedAt: new Date()
       })
+
+      // Tab-Titel synchronisieren
+      useTabStore.getState().updateTabTitle(selectedNote.id, newTitle)
 
       // Reset flag nach kurzer Verzögerung
       setTimeout(() => {
@@ -1284,7 +1324,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
           highlightActiveLine(),
           EditorView.lineWrapping,
           history(),
-          markdown(),
+          markdown({ codeLanguages: markdownCodeLanguages }),
           syntaxHighlighting(defaultHighlightStyle),
           keymap.of([
             // Tab/Shift+Tab for list indentation (outlining)
@@ -1603,6 +1643,37 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
   const handlePreviewClick = useCallback((e: React.MouseEvent) => {
     const target = e.target as HTMLElement
 
+    // Copy code block to clipboard
+    const copyButton = target.closest('.code-copy-btn') as HTMLButtonElement | null
+    if (copyButton) {
+      e.preventDefault()
+      e.stopPropagation()
+
+      const pre = copyButton.closest('pre')
+      const code = pre?.querySelector('code')
+      const codeText = code?.textContent ?? ''
+
+      if (!codeText) return
+
+      navigator.clipboard.writeText(codeText)
+        .then(() => {
+          const copyLabel = t('format.copy')
+          const copiedLabel = t('settings.sync.copied')
+          copyButton.textContent = copiedLabel
+          copyButton.classList.add('copied')
+
+          window.setTimeout(() => {
+            copyButton.textContent = copyLabel
+            copyButton.classList.remove('copied')
+          }, 1200)
+        })
+        .catch((error) => {
+          console.error('Failed to copy code block:', error)
+        })
+
+      return
+    }
+
     // Wikilink click handling
     if (target.classList.contains('wikilink')) {
       e.preventDefault()
@@ -1716,7 +1787,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
       return
     }
 
-  }, [notes, selectNote, selectSecondaryNote, isSecondary, vaultPath, previewContent, saveContent])
+  }, [notes, selectNote, selectSecondaryNote, isSecondary, vaultPath, previewContent, saveContent, t])
 
   // Double-click on preview text → switch to live-preview and position cursor
   const handlePreviewDoubleClick = useCallback((e: React.MouseEvent) => {
@@ -1724,6 +1795,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
 
     // Don't switch for interactive elements
     if (target.classList.contains('wikilink') ||
+        !!target.closest('.code-copy-btn') ||
         target.classList.contains('task-checkbox') ||
         target.classList.contains('task-list-item-checkbox') ||
         (target.tagName === 'INPUT') ||
@@ -1880,6 +1952,39 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [previewContent, processHeadingFolds, imagesLoadedVersion])
+
+  // Add copy buttons to fenced code blocks in preview mode
+  useEffect(() => {
+    if (viewMode !== 'preview' || !previewRef.current) return
+
+    const applyCodeCopyButtons = () => {
+      const root = previewRef.current
+      if (!root) return
+
+      const codeBlocks = root.querySelectorAll('pre > code')
+      for (const codeBlock of Array.from(codeBlocks)) {
+        const pre = codeBlock.parentElement as HTMLElement | null
+        if (!pre || pre.querySelector('.code-copy-btn')) continue
+
+        const copyButton = document.createElement('button')
+        copyButton.type = 'button'
+        copyButton.className = 'code-copy-btn'
+        copyButton.textContent = t('format.copy')
+        copyButton.setAttribute('aria-label', t('format.copy'))
+
+        pre.classList.add('code-copy-enabled')
+        pre.appendChild(copyButton)
+      }
+    }
+
+    applyCodeCopyButtons()
+
+    // Embedded note/content rendering mutates the preview DOM after initial render.
+    const observer = new MutationObserver(() => applyCodeCopyButtons())
+    observer.observe(previewRef.current, { childList: true, subtree: true })
+
+    return () => observer.disconnect()
+  }, [viewMode, renderedMarkdown, t, contentVersion])
 
   // Wort- und Zeichenzähler
   const documentStats = useMemo(() => {

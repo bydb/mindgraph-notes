@@ -2,6 +2,18 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.2.14-alpha] - 2026-02-22
+
+### Features
+- **Syntax Highlighting**: Code-Blöcke in der Preview werden jetzt mit highlight.js farblich hervorgehoben — unterstützt 20+ Sprachen (JS, TS, Python, Rust, Go, SQL, etc.) mit VS Code-inspiriertem Dark-Theme
+- **Code Copy Button**: Kopierschaltfläche auf Code-Blöcken in Editor-Preview, Flashcards und NotesChat — mit visueller Bestätigung nach dem Kopieren
+- **CodeMirror Sprachunterstützung**: Fenced Code Blocks im Editor erhalten jetzt Syntax Highlighting für JS, TS, JSX, TSX, HTML und CSS
+
+### Improvements
+- **Tab-Titel Sync**: Tab-Titel aktualisieren sich automatisch wenn sich der Notiz-Titel ändert
+- **Canvas Tab-Titel**: "In Canvas öffnen" zeigt jetzt den tatsächlichen Notiz-Titel statt des Dateinamens
+- **Code-Block Styling**: Modernisiertes Design mit dunklem Hintergrund, Zeilennummern und abgerundeten Ecken
+
 ## [0.2.13-alpha] - 2026-02-21
 
 ### Features

@@ -6,6 +6,8 @@ import katex from 'katex'
 import 'katex/dist/katex.min.css'
 import 'katex/contrib/mhchem/mhchem.js'
 import mermaid from 'mermaid'
+import { highlightCode } from '../../utils/highlightSetup'
+import { useTranslation } from '../../utils/translations'
 
 // Mermaid initialisieren
 mermaid.initialize({
@@ -20,7 +22,8 @@ const md = new MarkdownIt({
   html: true,
   linkify: true,
   typographer: true,
-  breaks: true
+  breaks: true,
+  highlight: highlightCode
 })
 
 // LaTeX/Math Plugin mit KaTeX (inkl. Chemie-Support via mhchem)
@@ -64,6 +67,7 @@ interface MarkdownContentProps {
 }
 
 export const MarkdownContent: React.FC<MarkdownContentProps> = ({ content, className = '', vaultPath }) => {
+  const { t } = useTranslation()
   const containerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -132,6 +136,64 @@ export const MarkdownContent: React.FC<MarkdownContentProps> = ({ content, class
     return () => { cancelled = true; clearTimeout(timer) }
   }, [content, vaultPath])
 
+  useEffect(() => {
+    if (!containerRef.current) return
+
+    const applyCodeCopyButtons = () => {
+      const root = containerRef.current
+      if (!root) return
+
+      const codeBlocks = root.querySelectorAll('pre > code')
+      for (const codeBlock of Array.from(codeBlocks)) {
+        const pre = codeBlock.parentElement as HTMLElement | null
+        if (!pre || pre.querySelector('.code-copy-btn')) continue
+
+        const copyButton = document.createElement('button')
+        copyButton.type = 'button'
+        copyButton.className = 'code-copy-btn'
+        copyButton.textContent = t('format.copy')
+        copyButton.setAttribute('aria-label', t('format.copy'))
+
+        pre.classList.add('code-copy-enabled')
+        pre.appendChild(copyButton)
+      }
+    }
+
+    applyCodeCopyButtons()
+
+    const observer = new MutationObserver(() => applyCodeCopyButtons())
+    observer.observe(containerRef.current, { childList: true, subtree: true })
+
+    return () => observer.disconnect()
+  }, [content, t])
+
+  const handleContainerClick = async (e: React.MouseEvent<HTMLDivElement>) => {
+    const target = e.target as HTMLElement
+    const copyButton = target.closest('.code-copy-btn') as HTMLButtonElement | null
+    if (!copyButton) return
+
+    e.preventDefault()
+    e.stopPropagation()
+
+    const pre = copyButton.closest('pre')
+    const code = pre?.querySelector('code')
+    const codeText = code?.textContent ?? ''
+    if (!codeText) return
+
+    try {
+      await navigator.clipboard.writeText(codeText)
+      copyButton.textContent = t('settings.sync.copied')
+      copyButton.classList.add('copied')
+
+      window.setTimeout(() => {
+        copyButton.textContent = t('format.copy')
+        copyButton.classList.remove('copied')
+      }, 1200)
+    } catch (error) {
+      console.error('[Flashcard] Copy code block failed:', error)
+    }
+  }
+
   // Markdown zu HTML rendern
   const html = md.render(content)
 
@@ -139,6 +201,7 @@ export const MarkdownContent: React.FC<MarkdownContentProps> = ({ content, class
     <div
       ref={containerRef}
       className={`markdown-content ${className}`}
+      onClick={handleContainerClick}
       dangerouslySetInnerHTML={{ __html: sanitizeHtml(html) }}
     />
   )

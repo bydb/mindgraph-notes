@@ -118,6 +118,61 @@ export const NotesChat: React.FC<NotesChatProps> = ({ onClose }) => {
     }
   }, [messages, streamingContent])
 
+  // Add copy buttons to markdown code blocks in chat messages
+  useEffect(() => {
+    if (!messagesContainerRef.current) return
+
+    const applyCodeCopyButtons = () => {
+      const root = messagesContainerRef.current
+      if (!root) return
+
+      const codeBlocks = root.querySelectorAll('.notes-chat-message-content pre > code')
+      for (const codeBlock of Array.from(codeBlocks)) {
+        const pre = codeBlock.parentElement as HTMLElement | null
+        if (!pre || pre.querySelector('.code-copy-btn')) continue
+
+        const copyButton = document.createElement('button')
+        copyButton.type = 'button'
+        copyButton.className = 'code-copy-btn'
+        copyButton.textContent = t('format.copy')
+        copyButton.setAttribute('aria-label', t('format.copy'))
+
+        pre.classList.add('code-copy-enabled')
+        pre.appendChild(copyButton)
+      }
+    }
+
+    applyCodeCopyButtons()
+  }, [messages, streamingContent, t])
+
+  const handleMessagesClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    const target = e.target as HTMLElement
+    const copyButton = target.closest('.code-copy-btn') as HTMLButtonElement | null
+    if (!copyButton) return
+
+    e.preventDefault()
+    e.stopPropagation()
+
+    const pre = copyButton.closest('pre')
+    const code = pre?.querySelector('code')
+    const codeText = code?.textContent ?? ''
+    if (!codeText) return
+
+    navigator.clipboard.writeText(codeText)
+      .then(() => {
+        copyButton.textContent = t('settings.sync.copied')
+        copyButton.classList.add('copied')
+
+        window.setTimeout(() => {
+          copyButton.textContent = t('format.copy')
+          copyButton.classList.remove('copied')
+        }, 1200)
+      })
+      .catch((error) => {
+        console.error('[NotesChat] Copy code block failed:', error)
+      })
+  }, [t])
+
   // Streaming-Listener einrichten
   useEffect(() => {
     window.electronAPI.onOllamaChatChunk((chunk) => {
@@ -460,7 +515,7 @@ export const NotesChat: React.FC<NotesChatProps> = ({ onClose }) => {
           </div>
 
           {/* Chat-Nachrichten */}
-          <div className="notes-chat-messages" ref={messagesContainerRef}>
+          <div className="notes-chat-messages" ref={messagesContainerRef} onClick={handleMessagesClick}>
             {messages.length === 0 && !streamingContent ? (
               <div className="notes-chat-welcome">
                 <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">

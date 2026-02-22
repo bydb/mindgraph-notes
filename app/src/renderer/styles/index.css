@@ -1434,19 +1434,173 @@ body {
   border-radius: var(--radius-sm);
 }
 
-.editor-preview pre {
+.editor-preview pre,
+.markdown-content pre {
   margin: 20px 0;
-  padding: 20px;
-  background-color: var(--bg-tertiary);
+  padding: 16px 20px;
+  background: #1a1a1a;
+  color: #d4d4d4;
   border-radius: var(--radius-lg);
   overflow-x: auto;
+  position: relative;
+  border: 1px solid #2a2a2a;
 }
 
-.editor-preview pre code {
+.editor-preview pre code,
+.markdown-content pre code {
   background: none;
   padding: 0;
   font-size: 13px;
-  line-height: 1.6;
+  line-height: 1.7;
+  color: inherit;
+  counter-reset: code-line;
+  display: block;
+}
+
+/* Line numbers via CSS counters */
+.editor-preview pre code .code-line,
+.markdown-content pre code .code-line {
+  display: block;
+  counter-increment: code-line;
+  min-height: 1.7em;
+}
+
+.editor-preview pre code .code-line::before,
+.markdown-content pre code .code-line::before {
+  content: counter(code-line);
+  display: inline-block;
+  width: 3ch;
+  margin-right: 1.5ch;
+  padding-right: 1ch;
+  text-align: right;
+  color: #555;
+  border-right: 1px solid #333;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* Copy button */
+.editor-preview pre.code-copy-enabled,
+.markdown-content pre.code-copy-enabled {
+  padding-top: 48px;
+}
+
+.editor-preview .code-copy-btn,
+.markdown-content .code-copy-btn {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  border: 1px solid #444;
+  background: #2a2a2a;
+  color: #999;
+  border-radius: var(--radius-sm);
+  padding: 5px 10px;
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.editor-preview .code-copy-btn:hover,
+.markdown-content .code-copy-btn:hover {
+  background: #333;
+  color: #e0e0e0;
+}
+
+.editor-preview .code-copy-btn.copied,
+.markdown-content .code-copy-btn.copied {
+  color: #6ab0f3;
+  border-color: #6ab0f3;
+}
+
+/* ============ Syntax Highlighting Token Colors (always dark bg) ============ */
+.editor-preview pre code .hljs-keyword,
+.editor-preview pre code .hljs-selector-tag,
+.editor-preview pre code .hljs-built_in,
+.editor-preview pre code .hljs-name,
+.markdown-content pre code .hljs-keyword,
+.markdown-content pre code .hljs-selector-tag,
+.markdown-content pre code .hljs-built_in,
+.markdown-content pre code .hljs-name { color: #c586c0; }
+
+.editor-preview pre code .hljs-string,
+.editor-preview pre code .hljs-attr,
+.editor-preview pre code .hljs-selector-class,
+.editor-preview pre code .hljs-selector-id,
+.markdown-content pre code .hljs-string,
+.markdown-content pre code .hljs-attr,
+.markdown-content pre code .hljs-selector-class,
+.markdown-content pre code .hljs-selector-id { color: #ce9178; }
+
+.editor-preview pre code .hljs-comment,
+.editor-preview pre code .hljs-quote,
+.markdown-content pre code .hljs-comment,
+.markdown-content pre code .hljs-quote { color: #6a9955; font-style: italic; }
+
+.editor-preview pre code .hljs-number,
+.editor-preview pre code .hljs-literal,
+.editor-preview pre code .hljs-variable,
+.editor-preview pre code .hljs-template-variable,
+.markdown-content pre code .hljs-number,
+.markdown-content pre code .hljs-literal,
+.markdown-content pre code .hljs-variable,
+.markdown-content pre code .hljs-template-variable { color: #b5cea8; }
+
+.editor-preview pre code .hljs-tag,
+.markdown-content pre code .hljs-tag { color: #569cd6; }
+
+.editor-preview pre code .hljs-title,
+.editor-preview pre code .hljs-section,
+.markdown-content pre code .hljs-title,
+.markdown-content pre code .hljs-section { color: #dcdcaa; }
+
+.editor-preview pre code .hljs-type,
+.editor-preview pre code .hljs-class .hljs-title,
+.markdown-content pre code .hljs-type,
+.markdown-content pre code .hljs-class .hljs-title { color: #4ec9b0; }
+
+.editor-preview pre code .hljs-meta,
+.editor-preview pre code .hljs-meta .hljs-keyword,
+.markdown-content pre code .hljs-meta,
+.markdown-content pre code .hljs-meta .hljs-keyword { color: #569cd6; }
+
+.editor-preview pre code .hljs-addition,
+.markdown-content pre code .hljs-addition { color: #b5cea8; background: rgba(75, 160, 75, 0.15); }
+
+.editor-preview pre code .hljs-deletion,
+.markdown-content pre code .hljs-deletion { color: #ce9178; background: rgba(200, 50, 50, 0.15); }
+
+.markdown-content pre {
+  position: relative;
+}
+
+.markdown-content pre.code-copy-enabled {
+  padding-top: 38px;
+}
+
+.markdown-content .code-copy-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  border-radius: var(--radius-sm);
+  padding: 4px 10px;
+  font-size: 11px;
+  line-height: 1;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.markdown-content .code-copy-btn:hover {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+.markdown-content .code-copy-btn.copied {
+  color: var(--accent-color);
+  border-color: var(--accent-color);
 }
 
 .editor-preview a {
@@ -11842,17 +11996,8 @@ body {
 
 .flashcard-study-card-text.markdown-content pre,
 .flashcard-study-answer.markdown-content pre {
-  background: var(--bg-tertiary);
   padding: 12px 16px;
-  border-radius: var(--radius-md);
-  overflow-x: auto;
   margin: 12px 0;
-}
-
-.flashcard-study-card-text.markdown-content pre code,
-.flashcard-study-answer.markdown-content pre code {
-  background: none;
-  padding: 0;
 }
 
 /* LaTeX/KaTeX in Flashcards */
