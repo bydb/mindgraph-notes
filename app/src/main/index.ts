@@ -2018,6 +2018,7 @@ ipcMain.on('terminal-create', (_event, cwd: string) => {
         '/usr/local/sbin',
         `${homeDir}/.local/bin`,
         `${homeDir}/.cargo/bin`,
+        `${homeDir}/.opencode/bin`,
         `${homeDir}/.nvm/versions/node/v20.18.1/bin`, // Falls NVM verwendet wird
       ]
       const currentPath = process.env.PATH || '/usr/bin:/bin:/usr/sbin:/sbin'
@@ -2133,6 +2134,7 @@ ipcMain.handle('check-command-exists', async (_event, command: string) => {
         '/usr/local/sbin',
         `${homeDir}/.local/bin`,
         `${homeDir}/.cargo/bin`,
+        `${homeDir}/.opencode/bin`,
         `${homeDir}/.nvm/versions/node/v20.18.1/bin`,
       ]
       const currentPath = process.env.PATH || '/usr/bin:/bin:/usr/sbin:/sbin'
