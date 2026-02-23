@@ -2216,6 +2216,15 @@ LIMIT 10
                     {syncState.syncError && (
                       <div className="sync-input-warning" style={{ color: '#e53935' }}>
                         {syncState.syncError}
+                        {syncState.syncError.includes('SAFETY') && (
+                          <button
+                            className="btn btn-small btn-danger"
+                            style={{ marginLeft: '8px' }}
+                            onClick={() => syncState.triggerSync(true)}
+                          >
+                            {t('settings.sync.forceSync')}
+                          </button>
+                        )}
                       </div>
                     )}
 

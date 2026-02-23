@@ -289,7 +289,7 @@ export class SyncEngine {
     }, 2000)
   }
 
-  async sync(): Promise<SyncResult> {
+  async sync(force: boolean = false): Promise<SyncResult> {
     // SAFETY: refuse to sync if engine was destroyed
     if (this.destroyed) {
       console.warn('[SyncEngine] BLOCKED: sync() called on destroyed engine')
@@ -354,30 +354,32 @@ export class SyncEngine {
       // SAFETY: Mass-deletion protection
       // If many local files would be deleted, something is likely wrong
       // (e.g., stale manifest, corrupted vault ID, server error). Abort to prevent data loss.
-      const localFileCount = Object.keys(currentManifest.files).length
-      if (diff.toDeleteLocal.length > 0 && localFileCount > 0) {
-        const deleteRatio = diff.toDeleteLocal.length / localFileCount
-        if (deleteRatio > 0.1 && diff.toDeleteLocal.length >= 10) {
-          const errorMsg = `SAFETY: Refusing to delete ${diff.toDeleteLocal.length}/${localFileCount} local files (${Math.round(deleteRatio * 100)}%). This likely indicates a server/connection issue.`
-          console.error('[SyncEngine]', errorMsg)
-          this.sendLog({ type: 'error', message: errorMsg })
-          this.status = 'error'
-          this.sendProgress({ status: 'error', error: errorMsg })
-          return { success: false, uploaded: 0, downloaded: 0, conflicts: 0, error: errorMsg }
+      if (!force) {
+        const localFileCount = Object.keys(currentManifest.files).length
+        if (diff.toDeleteLocal.length > 0 && localFileCount > 0) {
+          const deleteRatio = diff.toDeleteLocal.length / localFileCount
+          if (deleteRatio > 0.1 && diff.toDeleteLocal.length >= 10) {
+            const errorMsg = `SAFETY: Refusing to delete ${diff.toDeleteLocal.length}/${localFileCount} local files (${Math.round(deleteRatio * 100)}%). This likely indicates a server/connection issue.`
+            console.error('[SyncEngine]', errorMsg)
+            this.sendLog({ type: 'error', message: errorMsg })
+            this.status = 'error'
+            this.sendProgress({ status: 'error', error: errorMsg })
+            return { success: false, uploaded: 0, downloaded: 0, conflicts: 0, error: errorMsg }
+          }
         }
-      }
 
-      // SAFETY: Same protection for remote deletions
-      const remoteFileCount = Object.keys(remoteManifest.files).length
-      if (diff.toDeleteRemote.length > 0 && remoteFileCount > 0) {
-        const deleteRatio = diff.toDeleteRemote.length / remoteFileCount
-        if (deleteRatio > 0.1 && diff.toDeleteRemote.length >= 10) {
-          const errorMsg = `SAFETY: Refusing to delete ${diff.toDeleteRemote.length}/${remoteFileCount} remote files (${Math.round(deleteRatio * 100)}%). This likely indicates a stale local manifest.`
-          console.error('[SyncEngine]', errorMsg)
-          this.sendLog({ type: 'error', message: errorMsg })
-          this.status = 'error'
-          this.sendProgress({ status: 'error', error: errorMsg })
-          return { success: false, uploaded: 0, downloaded: 0, conflicts: 0, error: errorMsg }
+        // SAFETY: Same protection for remote deletions
+        const remoteFileCount = Object.keys(remoteManifest.files).length
+        if (diff.toDeleteRemote.length > 0 && remoteFileCount > 0) {
+          const deleteRatio = diff.toDeleteRemote.length / remoteFileCount
+          if (deleteRatio > 0.1 && diff.toDeleteRemote.length >= 10) {
+            const errorMsg = `SAFETY: Refusing to delete ${diff.toDeleteRemote.length}/${remoteFileCount} remote files (${Math.round(deleteRatio * 100)}%). This likely indicates a stale local manifest.`
+            console.error('[SyncEngine]', errorMsg)
+            this.sendLog({ type: 'error', message: errorMsg })
+            this.status = 'error'
+            this.sendProgress({ status: 'error', error: errorMsg })
+            return { success: false, uploaded: 0, downloaded: 0, conflicts: 0, error: errorMsg }
+          }
         }
       }
 

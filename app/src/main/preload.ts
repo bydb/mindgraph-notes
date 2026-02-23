@@ -255,7 +255,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('sync-setup', vaultPath, passphrase, relayUrl, autoSyncInterval, activationCode),
   syncJoin: (vaultPath: string, vaultId: string, passphrase: string, relayUrl: string, autoSyncInterval?: number, activationCode?: string) =>
     ipcRenderer.invoke('sync-join', vaultPath, vaultId, passphrase, relayUrl, autoSyncInterval, activationCode),
-  syncNow: () => ipcRenderer.invoke('sync-now'),
+  syncNow: (force?: boolean) => ipcRenderer.invoke('sync-now', force),
   syncDisable: () => ipcRenderer.invoke('sync-disable'),
   syncSetAutoSync: (intervalSeconds: number) => ipcRenderer.invoke('sync-set-auto-sync', intervalSeconds),
   syncStatus: () => ipcRenderer.invoke('sync-status'),
