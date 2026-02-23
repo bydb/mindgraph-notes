@@ -32,7 +32,7 @@ interface SyncState extends PersistedSyncConfig {
   initSync: (vaultPath: string, passphrase: string, activationCode: string) => Promise<string>
   joinSync: (vaultPath: string, vaultId: string, passphrase: string, activationCode: string) => Promise<void>
   restoreSync: (vaultPath: string) => Promise<boolean>
-  triggerSync: () => Promise<SyncResult>
+  triggerSync: (force?: boolean) => Promise<SyncResult>
   disableSync: () => Promise<void>
   setAutoSync: (enabled: boolean) => void
   setSyncInterval: (seconds: number) => void
@@ -334,10 +334,10 @@ export const useSyncStore = create<SyncState>()((set, get) => ({
     }
   },
 
-  triggerSync: async () => {
+  triggerSync: async (force?: boolean) => {
     const vaultPathBefore = get().currentVaultPath
     set({ syncStatus: 'connecting' })
-    const result = await window.electronAPI.syncNow()
+    const result = await window.electronAPI.syncNow(force)
 
     // Safety: if vault changed during sync, don't update state
     const { currentVaultPath } = get()

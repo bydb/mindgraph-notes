@@ -671,7 +671,7 @@ export interface ElectronAPI {
   // Sync
   syncSetup: (vaultPath: string, passphrase: string, relayUrl: string, autoSyncInterval?: number, activationCode?: string) => Promise<{ vaultId: string }>;
   syncJoin: (vaultPath: string, vaultId: string, passphrase: string, relayUrl: string, autoSyncInterval?: number, activationCode?: string) => Promise<boolean>;
-  syncNow: () => Promise<SyncResult>;
+  syncNow: (force?: boolean) => Promise<SyncResult>;
   syncDisable: () => Promise<boolean>;
   syncSetAutoSync: (intervalSeconds: number) => Promise<boolean>;
   syncStatus: () => Promise<{

@@ -1,6 +1,6 @@
 {
   "name": "mindgraph-notes",
-  "version": "0.2.14-alpha",
+  "version": "0.2.15-alpha",
   "description": "Eine minimalistische Markdown-Notizen-App mit editierbarer Graph View",
   "main": "out/main/index.js",
   "scripts": {

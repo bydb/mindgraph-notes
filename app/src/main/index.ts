@@ -4001,11 +4001,11 @@ ipcMain.handle('sync-set-auto-sync', async (_event, intervalSeconds: number) => 
   return true
 })
 
-ipcMain.handle('sync-now', async () => {
+ipcMain.handle('sync-now', async (_event, force?: boolean) => {
   if (!syncEngine || !syncEngine.isInitialized()) {
     return { success: false, uploaded: 0, downloaded: 0, conflicts: 0, error: 'Sync not initialized' }
   }
-  return await syncEngine.sync()
+  return await syncEngine.sync(force ?? false)
 })
 
 ipcMain.handle('sync-disable', async () => {
