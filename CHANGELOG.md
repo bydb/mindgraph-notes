@@ -2,6 +2,18 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.2.16-alpha] - 2026-02-23
+
+### Features
+- **Windows + WSL Support**: KI-Tool-Erkennung sucht jetzt automatisch innerhalb von WSL (Windows Subsystem for Linux) nach opencode und claude — der 🤖-Button startet `wsl opencode` bzw. `wsl claude` direkt aus dem Terminal. **Windows-User können damit erstmals das volle KI-Terminal nutzen!**
+- **Alpha-Tester Signup**: Neue Anmeldesektion auf der Website — E-Mail-Formular (Formspree) mit OS-Auswahl, Honeypot-Bot-Schutz und WSL-Schnellstart-Anleitung für Windows-User
+- **Discord-Integration**: Discord-Link mit offiziellem Logo im Signup-Footer und auf der gesamten Website
+
+### Improvements
+- **Signup-Formular Redesign**: Poliertes UI mit Accent-Gradient-Leiste, Alpha-Badge, Inline-Icons in Eingabefeldern und Discord-Logo im Footer
+- **Download-Gate**: Downloads sind jetzt hinter dem Alpha-Tester-Formular — Besucher melden sich zuerst an
+- **GitHub-Sicherheit**: Dependabot für wöchentliche npm-Dependency-Checks aktiviert, Branch Protection auf master (kein Force-Push)
+
 ## [0.2.15-alpha] - 2026-02-23
 
 ### Features
