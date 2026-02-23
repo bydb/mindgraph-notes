@@ -207,7 +207,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
 
   // Command existence check (for AI tool detection)
-  checkCommandExists: (command: string) => ipcRenderer.invoke('check-command-exists', command),
+  checkCommandExists: (command: string, args?: string[]) => ipcRenderer.invoke('check-command-exists', command, args),
 
   // Custom Logo
   selectCustomLogo: () => ipcRenderer.invoke('select-custom-logo'),

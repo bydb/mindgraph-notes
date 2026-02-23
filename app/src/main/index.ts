@@ -2103,14 +2103,15 @@ ipcMain.on('terminal-destroy', () => {
 })
 
 // Check if a command exists in PATH
-ipcMain.handle('check-command-exists', async (_event, command: string) => {
+// Optional args parameter: if provided, runs command with those args instead of which/where
+// e.g. checkCommandExists('wsl', ['which', 'opencode']) runs: wsl which opencode
+ipcMain.handle('check-command-exists', async (_event, command: string, args?: string[]) => {
   try {
     const { execFile } = await import('child_process')
     const { promisify } = await import('util')
     const execFileAsync = promisify(execFile)
 
     const isWindows = process.platform === 'win32'
-    const checkCmd = isWindows ? 'where' : 'which'
 
     // Use extended PATH (same as terminal-create)
     let extendedPath: string
@@ -2141,10 +2142,20 @@ ipcMain.handle('check-command-exists', async (_event, command: string) => {
       extendedPath = [...additionalPaths, ...currentPath.split(':')].join(':')
     }
 
-    await execFileAsync(checkCmd, [command], {
-      env: { ...process.env, PATH: extendedPath },
-      timeout: 5000,
-    })
+    if (args && args.length > 0) {
+      // Custom args: run command with provided arguments (e.g. wsl which opencode)
+      await execFileAsync(command, args, {
+        env: { ...process.env, PATH: extendedPath },
+        timeout: 10000,
+      })
+    } else {
+      // Default: use which/where to check if command exists
+      const checkCmd = isWindows ? 'where' : 'which'
+      await execFileAsync(checkCmd, [command], {
+        env: { ...process.env, PATH: extendedPath },
+        timeout: 5000,
+      })
+    }
     return { exists: true }
   } catch {
     return { exists: false }

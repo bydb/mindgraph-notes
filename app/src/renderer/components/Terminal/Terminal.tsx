@@ -19,7 +19,7 @@ export const Terminal: React.FC<TerminalProps> = ({ visible, onToggle }) => {
   const [isConnected, setIsConnected] = useState(false)
   const isConnectedRef = useRef(false)
   const [height, setHeight] = useState(300)
-  const [availableTool, setAvailableTool] = useState<'opencode' | 'claude' | null>(null)
+  const [availableTool, setAvailableTool] = useState<string | null>(null)
   const [toolChecked, setToolChecked] = useState(false)
   const resizingRef = useRef(false)
   const startYRef = useRef(0)
@@ -36,20 +36,57 @@ export const Terminal: React.FC<TerminalProps> = ({ visible, onToggle }) => {
   const vaultPath = useNotesStore((s) => s.vaultPath)
 
   // Detect available AI tool (opencode preferred, claude as fallback)
+  // On Windows, check inside WSL since AI tools are typically installed there
   useEffect(() => {
     const detectTool = async () => {
       try {
-        const opencode = await window.electronAPI.checkCommandExists('opencode')
-        if (opencode.exists) {
-          setAvailableTool('opencode')
-          setToolChecked(true)
-          return
-        }
-        const claude = await window.electronAPI.checkCommandExists('claude')
-        if (claude.exists) {
-          setAvailableTool('claude')
-          setToolChecked(true)
-          return
+        const isWindows = navigator.platform === 'Win32' || navigator.userAgent.includes('Windows')
+
+        if (isWindows) {
+          // Check if WSL is available first
+          const wsl = await window.electronAPI.checkCommandExists('wsl')
+          if (wsl.exists) {
+            // Check for tools inside WSL
+            const wslOpencode = await window.electronAPI.checkCommandExists('wsl', ['which', 'opencode'])
+            if (wslOpencode.exists) {
+              setAvailableTool('wsl opencode')
+              setToolChecked(true)
+              return
+            }
+            const wslClaude = await window.electronAPI.checkCommandExists('wsl', ['which', 'claude'])
+            if (wslClaude.exists) {
+              setAvailableTool('wsl claude')
+              setToolChecked(true)
+              return
+            }
+          }
+          // Fallback: check native Windows PATH
+          const opencode = await window.electronAPI.checkCommandExists('opencode')
+          if (opencode.exists) {
+            setAvailableTool('opencode')
+            setToolChecked(true)
+            return
+          }
+          const claude = await window.electronAPI.checkCommandExists('claude')
+          if (claude.exists) {
+            setAvailableTool('claude')
+            setToolChecked(true)
+            return
+          }
+        } else {
+          // macOS / Linux: direct check
+          const opencode = await window.electronAPI.checkCommandExists('opencode')
+          if (opencode.exists) {
+            setAvailableTool('opencode')
+            setToolChecked(true)
+            return
+          }
+          const claude = await window.electronAPI.checkCommandExists('claude')
+          if (claude.exists) {
+            setAvailableTool('claude')
+            setToolChecked(true)
+            return
+          }
         }
       } catch {
         // ignore errors
