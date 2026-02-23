@@ -405,6 +405,13 @@
       line-height: 1.5;
     }
 
+    .alpha-signup-card .signup-access-note {
+      color: var(--text-muted);
+      font-size: 0.85rem;
+      margin: -1rem 0 1.25rem;
+      line-height: 1.45;
+    }
+
     .alpha-signup-form {
       display: flex;
       flex-direction: column;
@@ -1488,6 +1495,7 @@
       <div class="signup-badge" data-i18n="signup.badge">Alpha-Programm</div>
       <h2 data-i18n="signup.title">Werde Alpha-Tester</h2>
       <p class="signup-desc" data-i18n="signup.desc">Erhalte Updates zu neuen Features und hilf mit, MindGraph Notes zu verbessern.</p>
+      <p class="signup-access-note" data-i18n="signup.accessInfo">Download-Link kommt per E-Mail nach Freischaltung.</p>
       <form id="alpha-signup-form" class="alpha-signup-form" action="https://formspree.io/f/xpqazwka" method="POST">
         <input type="text" name="_gotcha" style="display:none" tabindex="-1" autocomplete="off">
         <div class="signup-field">
@@ -1508,9 +1516,10 @@
           </select>
         </div>
         <div id="os-hint-windows" class="os-hint os-hint-windows" style="display:none" data-i18n="signup.windowsHint">
-          <strong>Hinweis f&#252;r Windows:</strong> MindGraph Notes funktioniert auf Windows, aber das integrierte KI-Terminal entfaltet sein volles Potenzial mit WSL (Windows Subsystem for Linux). Damit lassen sich Claude Code und OpenCode wie auf Mac/Linux nutzen.<br><br>
-          <strong>Schnellstart mit WSL:</strong><br>
-          <code>wsl --install</code> &rarr; Neustart &rarr; <code>npm i -g @anthropic-ai/claude-code</code>
+          <strong>Hinweis f&#252;r Windows:</strong> MindGraph Notes funktioniert auf Windows, aber das integrierte KI-Terminal entfaltet sein volles Potenzial mit WSL (Windows Subsystem for Linux). OpenCode wird automatisch bevorzugt, Claude Code dient als Fallback.<br><br>
+          <strong>Schnellstart mit WSL (empfohlen):</strong><br>
+          <code>wsl --install</code> &rarr; Neustart &rarr; <code>curl -fsSL https://opencode.ai/install | bash</code> <em>(optional zus&#228;tzlich: <code>npm i -g @anthropic-ai/claude-code</code>)</em><br>
+          <a href="#setup">Alle Setup-Schritte anzeigen</a>
         </div>
         <button type="submit" class="btn btn-primary" data-i18n="signup.submit">Anmelden</button>
       </form>
@@ -2159,7 +2168,7 @@ tags: [projekt, arbeit, wichtig]
     <p data-i18n="download.subtitle">MindGraph Notes befindet sich in der Alpha-Phase. Melde dich als Tester an, um Zugang zu erhalten.</p>
 
     <div style="display: flex; justify-content: center; gap: 1rem; flex-wrap: wrap; margin-top: 2rem;">
-      <a href="#alpha-signup" class="btn btn-primary" data-i18n="download.signup">Als Alpha-Tester anmelden</a>
+      <a href="#alpha-signup" class="btn btn-primary" data-i18n="download.signup">F&#252;r Alpha-Zugang registrieren</a>
       <a href="https://github.com/bydb/mindgraph-notes" target="_blank" class="btn btn-secondary">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
           <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/>
@@ -2254,13 +2263,14 @@ tags: [projekt, arbeit, wichtig]
         "hero.cta": "Alpha-Tester werden",
         "signup.title": "Werde Alpha-Tester",
         "signup.desc": "Erhalte Updates zu neuen Features und hilf mit, MindGraph Notes zu verbessern.",
+        "signup.accessInfo": "Download-Link kommt per E-Mail nach Freischaltung.",
         "signup.namePlaceholder": "Name (optional)",
         "signup.emailPlaceholder": "deine@email.de",
         "signup.submit": "Anmelden",
         "signup.success": "Danke! Du bist dabei. \u2705",
         "signup.error": "Fehler beim Senden. Bitte versuche es erneut.",
         "signup.osPlaceholder": "Betriebssystem w\u00e4hlen",
-        "signup.windowsHint": "<strong>Hinweis f\u00fcr Windows:</strong> MindGraph Notes funktioniert auf Windows, aber das integrierte KI-Terminal entfaltet sein volles Potenzial mit WSL (Windows Subsystem for Linux). Damit lassen sich Claude Code und OpenCode wie auf Mac/Linux nutzen.<br><br><strong>Schnellstart mit WSL:</strong><br><code>wsl --install</code> \u2192 Neustart \u2192 <code>npm i -g @anthropic-ai/claude-code</code>",
+        "signup.windowsHint": "<strong>Hinweis f\u00fcr Windows:</strong> MindGraph Notes funktioniert auf Windows, aber das integrierte KI-Terminal entfaltet sein volles Potenzial mit WSL (Windows Subsystem for Linux). OpenCode wird automatisch bevorzugt, Claude Code dient als Fallback.<br><br><strong>Schnellstart mit WSL (empfohlen):</strong><br><code>wsl --install</code> \u2192 Neustart \u2192 <code>curl -fsSL https://opencode.ai/install | bash</code> <em>(optional zus\u00e4tzlich: <code>npm i -g @anthropic-ai/claude-code</code>)</em><br><a href=\"#setup\">Alle Setup-Schritte anzeigen</a>",
         "signup.badge": "Alpha-Programm",
         "signup.privacy": "Kein Spam, jederzeit abmelden",
         "signup.discord": "Discord beitreten",
@@ -2432,7 +2442,7 @@ tags: [projekt, arbeit, wichtig]
         "setup.more": "Mehr erfahren →",
         "download.title": "Download",
         "download.subtitle": "MindGraph Notes befindet sich in der Alpha-Phase. Melde dich als Tester an, um Zugang zu erhalten.",
-        "download.signup": "Als Alpha-Tester anmelden",
+        "download.signup": "F\u00fcr Alpha-Zugang registrieren",
         "install.title": "Installation auf macOS",
         "install.desc": "Da die App nicht im App Store ist, zeigt macOS beim ersten Start eine Warnung.",
         "install.step1": "DMG öffnen und App in Programme ziehen",
@@ -2485,13 +2495,14 @@ tags: [projekt, arbeit, wichtig]
         "hero.cta": "Become an Alpha Tester",
         "signup.title": "Become an Alpha Tester",
         "signup.desc": "Get updates on new features and help improve MindGraph Notes.",
+        "signup.accessInfo": "Download link is sent by email after approval.",
         "signup.namePlaceholder": "Name (optional)",
         "signup.emailPlaceholder": "your@email.com",
         "signup.submit": "Sign up",
         "signup.success": "Thanks! You're in. \u2705",
         "signup.error": "Error sending. Please try again.",
         "signup.osPlaceholder": "Select operating system",
-        "signup.windowsHint": "<strong>Note for Windows:</strong> MindGraph Notes works on Windows, but the integrated AI terminal reaches its full potential with WSL (Windows Subsystem for Linux). This lets you use Claude Code and OpenCode just like on Mac/Linux.<br><br><strong>Quick start with WSL:</strong><br><code>wsl --install</code> \u2192 Restart \u2192 <code>npm i -g @anthropic-ai/claude-code</code>",
+        "signup.windowsHint": "<strong>Note for Windows:</strong> MindGraph Notes works on Windows, but the integrated AI terminal reaches its full potential with WSL (Windows Subsystem for Linux). OpenCode is preferred automatically, with Claude Code as fallback.<br><br><strong>Quick start with WSL (recommended):</strong><br><code>wsl --install</code> \u2192 Restart \u2192 <code>curl -fsSL https://opencode.ai/install | bash</code> <em>(optional add-on: <code>npm i -g @anthropic-ai/claude-code</code>)</em><br><a href=\"#setup\">See all setup steps</a>",
         "signup.badge": "Alpha Program",
         "signup.privacy": "No spam, unsubscribe anytime",
         "signup.discord": "Join Discord",
@@ -2663,7 +2674,7 @@ tags: [projekt, arbeit, wichtig]
         "setup.more": "Learn more →",
         "download.title": "Download",
         "download.subtitle": "MindGraph Notes is in alpha. Sign up as a tester to get access.",
-        "download.signup": "Sign up as Alpha Tester",
+        "download.signup": "Register for Alpha Access",
         "install.title": "Installation on macOS",
         "install.desc": "Since the app is not in the App Store, macOS shows a warning on first launch.",
         "install.step1": "Open DMG and drag app to Applications",
