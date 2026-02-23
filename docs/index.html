@@ -426,6 +426,62 @@
       border: 1px solid rgba(239, 68, 68, 0.2);
     }
 
+    .alpha-signup-card select {
+      width: 100%;
+      padding: 0.75rem 1rem;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 0.95rem;
+      background: white;
+      color: var(--text);
+      cursor: pointer;
+      box-sizing: border-box;
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b6b6b' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 1rem center;
+    }
+
+    .os-hint {
+      margin-top: 1rem;
+      padding: 1rem;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      text-align: left;
+      line-height: 1.5;
+    }
+
+    .os-hint-windows {
+      background: rgba(212, 135, 90, 0.08);
+      border: 1px solid rgba(212, 135, 90, 0.2);
+      color: var(--text);
+    }
+
+    .os-hint code {
+      background: rgba(0, 0, 0, 0.06);
+      padding: 0.15rem 0.4rem;
+      border-radius: 4px;
+      font-size: 0.8rem;
+    }
+
+    .signup-discord {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      margin-top: 0.5rem;
+      font-size: 0.85rem;
+      color: var(--text-muted);
+    }
+
+    .signup-discord a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+
+    .signup-discord a:hover {
+      text-decoration: underline;
+    }
+
     .terminal-prompt {
       color: #22c55e;
     }
@@ -1367,11 +1423,23 @@
         <input type="text" name="_gotcha" style="display:none" tabindex="-1" autocomplete="off">
         <input type="text" name="name" data-i18n-placeholder="signup.namePlaceholder" placeholder="Name (optional)">
         <input type="email" name="email" required data-i18n-placeholder="signup.emailPlaceholder" placeholder="deine@email.de">
+        <select name="os" id="signup-os">
+          <option value="" disabled selected data-i18n="signup.osPlaceholder">Betriebssystem w&#228;hlen</option>
+          <option value="macOS">macOS</option>
+          <option value="Linux">Linux</option>
+          <option value="Windows">Windows</option>
+        </select>
+        <div id="os-hint-windows" class="os-hint os-hint-windows" style="display:none" data-i18n="signup.windowsHint">
+          <strong>Hinweis f&#252;r Windows:</strong> MindGraph Notes funktioniert auf Windows, aber das integrierte KI-Terminal entfaltet sein volles Potenzial mit WSL (Windows Subsystem for Linux). Damit lassen sich Claude Code und OpenCode wie auf Mac/Linux nutzen.<br><br>
+          <strong>Schnellstart mit WSL:</strong><br>
+          <code>wsl --install</code> &rarr; Neustart &rarr; <code>npm i -g @anthropic-ai/claude-code</code>
+        </div>
         <button type="submit" class="btn btn-primary" data-i18n="signup.submit">Anmelden</button>
       </form>
       <div id="signup-success" class="signup-message signup-success" style="display:none" data-i18n="signup.success">Danke! Du bist dabei.</div>
       <div id="signup-error" class="signup-message signup-error" style="display:none" data-i18n="signup.error">Fehler beim Senden. Bitte versuche es erneut.</div>
       <p class="signup-privacy" data-i18n="signup.privacy">Kein Spam. Nur Updates zu neuen Versionen. Du kannst dich jederzeit abmelden.</p>
+      <p class="signup-discord" data-i18n="signup.discord">Tritt auch unserem <a href="https://discord.gg/u9N9R9vz" target="_blank">Discord</a> bei &ndash; f&#252;r Feedback, Fragen und Austausch.</p>
     </div>
   </section>
 
@@ -2104,7 +2172,10 @@ tags: [projekt, arbeit, wichtig]
         "signup.submit": "Anmelden",
         "signup.success": "Danke! Du bist dabei. \u2705",
         "signup.error": "Fehler beim Senden. Bitte versuche es erneut.",
+        "signup.osPlaceholder": "Betriebssystem w\u00e4hlen",
+        "signup.windowsHint": "<strong>Hinweis f\u00fcr Windows:</strong> MindGraph Notes funktioniert auf Windows, aber das integrierte KI-Terminal entfaltet sein volles Potenzial mit WSL (Windows Subsystem for Linux). Damit lassen sich Claude Code und OpenCode wie auf Mac/Linux nutzen.<br><br><strong>Schnellstart mit WSL:</strong><br><code>wsl --install</code> \u2192 Neustart \u2192 <code>npm i -g @anthropic-ai/claude-code</code>",
         "signup.privacy": "Kein Spam. Nur Updates zu neuen Versionen. Du kannst dich jederzeit abmelden.",
+        "signup.discord": "Tritt auch unserem <a href=\"https://discord.gg/u9N9R9vz\" target=\"_blank\">Discord</a> bei \u2013 f\u00fcr Feedback, Fragen und Austausch.",
         "terminal.cmd1": " opencode \"Erstelle mir anschauliche Grafiken zum Thema Alkane\"",
         "terminal.out1": "Lese [[Alkane.md]], [[Bindungstypen.md]] und 3 weitere Notizen...",
         "terminal.out2": "SVG-Strukturformeln für Methan, Ethan, Propan erstellt",
@@ -2331,7 +2402,10 @@ tags: [projekt, arbeit, wichtig]
         "signup.submit": "Sign up",
         "signup.success": "Thanks! You're in. \u2705",
         "signup.error": "Error sending. Please try again.",
+        "signup.osPlaceholder": "Select operating system",
+        "signup.windowsHint": "<strong>Note for Windows:</strong> MindGraph Notes works on Windows, but the integrated AI terminal reaches its full potential with WSL (Windows Subsystem for Linux). This lets you use Claude Code and OpenCode just like on Mac/Linux.<br><br><strong>Quick start with WSL:</strong><br><code>wsl --install</code> \u2192 Restart \u2192 <code>npm i -g @anthropic-ai/claude-code</code>",
         "signup.privacy": "No spam. Only updates on new releases. You can unsubscribe anytime.",
+        "signup.discord": "Also join our <a href=\"https://discord.gg/u9N9R9vz\" target=\"_blank\">Discord</a> \u2013 for feedback, questions and community.",
         "terminal.cmd1": " opencode \"Create visual diagrams about alkanes for my chemistry notes\"",
         "terminal.out1": "Reading [[Alkanes.md]], [[Bond Types.md]] and 3 more notes...",
         "terminal.out2": "SVG structural formulas for methane, ethane, propane created",
@@ -2565,6 +2639,14 @@ tags: [projekt, arbeit, wichtig]
         }
       });
 
+      // Update select option text
+      document.querySelectorAll('option[data-i18n]').forEach(el => {
+        const key = el.getAttribute('data-i18n');
+        if (translations[lang][key]) {
+          el.textContent = translations[lang][key];
+        }
+      });
+
       // Update page title
       document.title = lang === 'de'
         ? 'MindGraph Notes - Karteikarten & Spaced Repetition Notiz-App'
@@ -2655,6 +2737,20 @@ tags: [projekt, arbeit, wichtig]
           if (translations[lang]['signup.error']) {
             errorEl.innerHTML = translations[lang]['signup.error'];
           }
+        }
+      });
+    }
+
+    // OS dropdown: show Windows hint
+    const osSelect = document.getElementById('signup-os');
+    const windowsHint = document.getElementById('os-hint-windows');
+    if (osSelect && windowsHint) {
+      osSelect.addEventListener('change', function() {
+        windowsHint.style.display = this.value === 'Windows' ? 'block' : 'none';
+        // Translate hint for current language
+        const lang = localStorage.getItem('lang') || 'de';
+        if (translations[lang]['signup.windowsHint']) {
+          windowsHint.innerHTML = translations[lang]['signup.windowsHint'];
         }
       });
     }
