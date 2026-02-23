@@ -2,6 +2,14 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.2.15-alpha] - 2026-02-23
+
+### Features
+- **Force Sync**: Bei SAFETY-Fehlern (Mass-Deletion-Schutz) erscheint jetzt ein "Sync erzwingen"-Button, um den Sync manuell zu bestätigen und fortzusetzen
+
+### Fixes
+- **AI-Tool Erkennung**: `~/.opencode/bin` zum erweiterten PATH hinzugefügt — opencode wird jetzt korrekt erkannt und bevorzugt statt auf claude zurückzufallen
+
 ## [0.2.14-alpha] - 2026-02-22
 
 ### Features
