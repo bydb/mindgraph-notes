@@ -354,132 +354,200 @@
     }
 
     .alpha-signup-card {
-      max-width: 520px;
+      max-width: 560px;
       width: 100%;
       background: var(--bg-card);
       border: 1px solid var(--border);
       border-radius: 16px;
-      padding: 2.5rem;
+      padding: 2.5rem 3rem;
       text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .alpha-signup-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: var(--gradient);
+    }
+
+    .signup-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.35rem 0.85rem;
+      background: rgba(212, 135, 90, 0.1);
+      border: 1px solid rgba(212, 135, 90, 0.2);
+      border-radius: 100px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--accent);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 1.25rem;
     }
 
     .alpha-signup-card h2 {
-      color: var(--accent);
-      font-size: 1.5rem;
+      color: var(--text);
+      font-size: 1.6rem;
       margin-bottom: 0.5rem;
+      font-weight: 700;
     }
 
     .alpha-signup-card .signup-desc {
       color: var(--text-muted);
       font-size: 0.95rem;
-      margin-bottom: 1.5rem;
+      margin-bottom: 2rem;
+      line-height: 1.5;
     }
 
     .alpha-signup-form {
       display: flex;
       flex-direction: column;
-      gap: 0.75rem;
+      gap: 0.6rem;
     }
 
-    .alpha-signup-form input {
+    .signup-field {
+      position: relative;
+    }
+
+    .signup-field .field-icon {
+      position: absolute;
+      left: 0.85rem;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--text-muted);
+      pointer-events: none;
+      display: flex;
+    }
+
+    .alpha-signup-form input,
+    .alpha-signup-card select {
       width: 100%;
-      padding: 0.75rem 1rem;
+      padding: 0.8rem 1rem 0.8rem 2.6rem;
       border: 1px solid var(--border);
-      border-radius: 8px;
+      border-radius: 10px;
       font-size: 0.95rem;
       background: white;
       color: var(--text);
-      transition: border-color 0.2s ease;
+      transition: all 0.2s ease;
       box-sizing: border-box;
-    }
-
-    .alpha-signup-form input:focus {
-      outline: none;
-      border-color: var(--accent);
-    }
-
-    .alpha-signup-form button {
-      width: 100%;
-    }
-
-    .signup-privacy {
-      font-size: 0.8rem;
-      color: var(--text-muted);
-      margin-top: 0.75rem;
-    }
-
-    .signup-message {
-      padding: 1rem;
-      border-radius: 8px;
-      font-size: 0.95rem;
-    }
-
-    .signup-success {
-      background: rgba(34, 197, 94, 0.1);
-      color: #16a34a;
-      border: 1px solid rgba(34, 197, 94, 0.2);
-    }
-
-    .signup-error {
-      background: rgba(239, 68, 68, 0.1);
-      color: #dc2626;
-      border: 1px solid rgba(239, 68, 68, 0.2);
     }
 
     .alpha-signup-card select {
-      width: 100%;
-      padding: 0.75rem 1rem;
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      font-size: 0.95rem;
-      background: white;
-      color: var(--text);
       cursor: pointer;
-      box-sizing: border-box;
       appearance: none;
       background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b6b6b' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
       background-repeat: no-repeat;
       background-position: right 1rem center;
     }
 
+    .alpha-signup-form input:focus,
+    .alpha-signup-card select:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(212, 135, 90, 0.1);
+    }
+
+    .alpha-signup-form button {
+      width: 100%;
+      margin-top: 0.4rem;
+      padding: 0.85rem 2rem;
+      font-size: 1rem;
+      font-weight: 600;
+      letter-spacing: 0.01em;
+    }
+
     .os-hint {
-      margin-top: 1rem;
-      padding: 1rem;
-      border-radius: 8px;
+      margin-top: 0.75rem;
+      padding: 1rem 1.25rem;
+      border-radius: 10px;
       font-size: 0.85rem;
       text-align: left;
-      line-height: 1.5;
+      line-height: 1.6;
     }
 
     .os-hint-windows {
-      background: rgba(212, 135, 90, 0.08);
-      border: 1px solid rgba(212, 135, 90, 0.2);
+      background: rgba(212, 135, 90, 0.06);
+      border: 1px solid rgba(212, 135, 90, 0.15);
       color: var(--text);
     }
 
     .os-hint code {
       background: rgba(0, 0, 0, 0.06);
-      padding: 0.15rem 0.4rem;
+      padding: 0.2rem 0.5rem;
       border-radius: 4px;
       font-size: 0.8rem;
+      font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
     }
 
-    .signup-discord {
-      display: inline-flex;
+    .signup-footer {
+      display: flex;
       align-items: center;
-      gap: 0.4rem;
-      margin-top: 0.5rem;
-      font-size: 0.85rem;
+      justify-content: center;
+      gap: 1.25rem;
+      margin-top: 1.5rem;
+      padding-top: 1.25rem;
+      border-top: 1px solid var(--border);
+      font-size: 0.8rem;
       color: var(--text-muted);
     }
 
-    .signup-discord a {
-      color: var(--accent);
-      text-decoration: none;
+    .signup-footer-item {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
     }
 
-    .signup-discord a:hover {
-      text-decoration: underline;
+    .signup-footer a {
+      color: var(--text-muted);
+      text-decoration: none;
+      transition: color 0.2s ease;
+    }
+
+    .signup-footer a:hover {
+      color: var(--accent);
+    }
+
+    .signup-footer .separator {
+      width: 1px;
+      height: 14px;
+      background: var(--border);
+    }
+
+    .signup-message {
+      padding: 1.25rem;
+      border-radius: 10px;
+      font-size: 0.95rem;
+    }
+
+    .signup-success {
+      background: rgba(34, 197, 94, 0.08);
+      color: #16a34a;
+      border: 1px solid rgba(34, 197, 94, 0.15);
+    }
+
+    .signup-error {
+      background: rgba(239, 68, 68, 0.08);
+      color: #dc2626;
+      border: 1px solid rgba(239, 68, 68, 0.15);
+    }
+
+    @media (max-width: 768px) {
+      .alpha-signup-card {
+        padding: 2rem 1.5rem;
+      }
+      .signup-footer {
+        flex-direction: column;
+        gap: 0.5rem;
+      }
+      .signup-footer .separator {
+        display: none;
+      }
     }
 
     .terminal-prompt {
@@ -1417,18 +1485,28 @@
   <!-- Alpha Tester Signup -->
   <section class="alpha-signup" id="alpha-signup">
     <div class="alpha-signup-card">
+      <div class="signup-badge" data-i18n="signup.badge">Alpha-Programm</div>
       <h2 data-i18n="signup.title">Werde Alpha-Tester</h2>
       <p class="signup-desc" data-i18n="signup.desc">Erhalte Updates zu neuen Features und hilf mit, MindGraph Notes zu verbessern.</p>
       <form id="alpha-signup-form" class="alpha-signup-form" action="https://formspree.io/f/xpqazwka" method="POST">
         <input type="text" name="_gotcha" style="display:none" tabindex="-1" autocomplete="off">
-        <input type="text" name="name" data-i18n-placeholder="signup.namePlaceholder" placeholder="Name (optional)">
-        <input type="email" name="email" required data-i18n-placeholder="signup.emailPlaceholder" placeholder="deine@email.de">
-        <select name="os" id="signup-os">
-          <option value="" disabled selected data-i18n="signup.osPlaceholder">Betriebssystem w&#228;hlen</option>
-          <option value="macOS">macOS</option>
-          <option value="Linux">Linux</option>
-          <option value="Windows">Windows</option>
-        </select>
+        <div class="signup-field">
+          <span class="field-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>
+          <input type="text" name="name" data-i18n-placeholder="signup.namePlaceholder" placeholder="Name (optional)">
+        </div>
+        <div class="signup-field">
+          <span class="field-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg></span>
+          <input type="email" name="email" required data-i18n-placeholder="signup.emailPlaceholder" placeholder="deine@email.de">
+        </div>
+        <div class="signup-field">
+          <span class="field-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg></span>
+          <select name="os" id="signup-os">
+            <option value="" disabled selected data-i18n="signup.osPlaceholder">Betriebssystem w&#228;hlen</option>
+            <option value="macOS">macOS</option>
+            <option value="Linux">Linux</option>
+            <option value="Windows">Windows</option>
+          </select>
+        </div>
         <div id="os-hint-windows" class="os-hint os-hint-windows" style="display:none" data-i18n="signup.windowsHint">
           <strong>Hinweis f&#252;r Windows:</strong> MindGraph Notes funktioniert auf Windows, aber das integrierte KI-Terminal entfaltet sein volles Potenzial mit WSL (Windows Subsystem for Linux). Damit lassen sich Claude Code und OpenCode wie auf Mac/Linux nutzen.<br><br>
           <strong>Schnellstart mit WSL:</strong><br>
@@ -1438,8 +1516,17 @@
       </form>
       <div id="signup-success" class="signup-message signup-success" style="display:none" data-i18n="signup.success">Danke! Du bist dabei.</div>
       <div id="signup-error" class="signup-message signup-error" style="display:none" data-i18n="signup.error">Fehler beim Senden. Bitte versuche es erneut.</div>
-      <p class="signup-privacy" data-i18n="signup.privacy">Kein Spam. Nur Updates zu neuen Versionen. Du kannst dich jederzeit abmelden.</p>
-      <p class="signup-discord" data-i18n="signup.discord">Tritt auch unserem <a href="https://discord.gg/u9N9R9vz" target="_blank">Discord</a> bei &ndash; f&#252;r Feedback, Fragen und Austausch.</p>
+      <div class="signup-footer">
+        <span class="signup-footer-item">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          <span data-i18n="signup.privacy">Kein Spam, jederzeit abmelden</span>
+        </span>
+        <span class="separator"></span>
+        <a href="https://discord.gg/u9N9R9vz" target="_blank" class="signup-footer-item">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.095 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.095 2.157 2.42 0 1.333-.947 2.418-2.157 2.418z"/></svg>
+          <span data-i18n="signup.discord">Discord beitreten</span>
+        </a>
+      </div>
     </div>
   </section>
 
@@ -2174,8 +2261,9 @@ tags: [projekt, arbeit, wichtig]
         "signup.error": "Fehler beim Senden. Bitte versuche es erneut.",
         "signup.osPlaceholder": "Betriebssystem w\u00e4hlen",
         "signup.windowsHint": "<strong>Hinweis f\u00fcr Windows:</strong> MindGraph Notes funktioniert auf Windows, aber das integrierte KI-Terminal entfaltet sein volles Potenzial mit WSL (Windows Subsystem for Linux). Damit lassen sich Claude Code und OpenCode wie auf Mac/Linux nutzen.<br><br><strong>Schnellstart mit WSL:</strong><br><code>wsl --install</code> \u2192 Neustart \u2192 <code>npm i -g @anthropic-ai/claude-code</code>",
-        "signup.privacy": "Kein Spam. Nur Updates zu neuen Versionen. Du kannst dich jederzeit abmelden.",
-        "signup.discord": "Tritt auch unserem <a href=\"https://discord.gg/u9N9R9vz\" target=\"_blank\">Discord</a> bei \u2013 f\u00fcr Feedback, Fragen und Austausch.",
+        "signup.badge": "Alpha-Programm",
+        "signup.privacy": "Kein Spam, jederzeit abmelden",
+        "signup.discord": "Discord beitreten",
         "terminal.cmd1": " opencode \"Erstelle mir anschauliche Grafiken zum Thema Alkane\"",
         "terminal.out1": "Lese [[Alkane.md]], [[Bindungstypen.md]] und 3 weitere Notizen...",
         "terminal.out2": "SVG-Strukturformeln für Methan, Ethan, Propan erstellt",
@@ -2404,8 +2492,9 @@ tags: [projekt, arbeit, wichtig]
         "signup.error": "Error sending. Please try again.",
         "signup.osPlaceholder": "Select operating system",
         "signup.windowsHint": "<strong>Note for Windows:</strong> MindGraph Notes works on Windows, but the integrated AI terminal reaches its full potential with WSL (Windows Subsystem for Linux). This lets you use Claude Code and OpenCode just like on Mac/Linux.<br><br><strong>Quick start with WSL:</strong><br><code>wsl --install</code> \u2192 Restart \u2192 <code>npm i -g @anthropic-ai/claude-code</code>",
-        "signup.privacy": "No spam. Only updates on new releases. You can unsubscribe anytime.",
-        "signup.discord": "Also join our <a href=\"https://discord.gg/u9N9R9vz\" target=\"_blank\">Discord</a> \u2013 for feedback, questions and community.",
+        "signup.badge": "Alpha Program",
+        "signup.privacy": "No spam, unsubscribe anytime",
+        "signup.discord": "Join Discord",
         "terminal.cmd1": " opencode \"Create visual diagrams about alkanes for my chemistry notes\"",
         "terminal.out1": "Reading [[Alkanes.md]], [[Bond Types.md]] and 3 more notes...",
         "terminal.out2": "SVG structural formulas for methane, ethane, propane created",
