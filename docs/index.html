@@ -346,6 +346,86 @@
       display: block;
     }
 
+    /* Alpha Signup */
+    .alpha-signup {
+      padding: 4rem 2rem 2rem;
+      display: flex;
+      justify-content: center;
+    }
+
+    .alpha-signup-card {
+      max-width: 520px;
+      width: 100%;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 2.5rem;
+      text-align: center;
+    }
+
+    .alpha-signup-card h2 {
+      color: var(--accent);
+      font-size: 1.5rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .alpha-signup-card .signup-desc {
+      color: var(--text-muted);
+      font-size: 0.95rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .alpha-signup-form {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+
+    .alpha-signup-form input {
+      width: 100%;
+      padding: 0.75rem 1rem;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 0.95rem;
+      background: white;
+      color: var(--text);
+      transition: border-color 0.2s ease;
+      box-sizing: border-box;
+    }
+
+    .alpha-signup-form input:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+
+    .alpha-signup-form button {
+      width: 100%;
+    }
+
+    .signup-privacy {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      margin-top: 0.75rem;
+    }
+
+    .signup-message {
+      padding: 1rem;
+      border-radius: 8px;
+      font-size: 0.95rem;
+    }
+
+    .signup-success {
+      background: rgba(34, 197, 94, 0.1);
+      color: #16a34a;
+      border: 1px solid rgba(34, 197, 94, 0.2);
+    }
+
+    .signup-error {
+      background: rgba(239, 68, 68, 0.1);
+      color: #dc2626;
+      border: 1px solid rgba(239, 68, 68, 0.2);
+    }
+
     .terminal-prompt {
       color: #22c55e;
     }
@@ -1277,6 +1357,23 @@
     </div>
   </section>
 
+  <!-- Alpha Tester Signup -->
+  <section class="alpha-signup">
+    <div class="alpha-signup-card">
+      <h2 data-i18n="signup.title">Werde Alpha-Tester</h2>
+      <p class="signup-desc" data-i18n="signup.desc">Erhalte Updates zu neuen Features und hilf mit, MindGraph Notes zu verbessern.</p>
+      <form id="alpha-signup-form" class="alpha-signup-form" action="https://formspree.io/f/xpqazwka" method="POST">
+        <input type="text" name="_gotcha" style="display:none" tabindex="-1" autocomplete="off">
+        <input type="text" name="name" data-i18n-placeholder="signup.namePlaceholder" placeholder="Name (optional)">
+        <input type="email" name="email" required data-i18n-placeholder="signup.emailPlaceholder" placeholder="deine@email.de">
+        <button type="submit" class="btn btn-primary" data-i18n="signup.submit">Anmelden</button>
+      </form>
+      <div id="signup-success" class="signup-message signup-success" style="display:none" data-i18n="signup.success">Danke! Du bist dabei.</div>
+      <div id="signup-error" class="signup-message signup-error" style="display:none" data-i18n="signup.error">Fehler beim Senden. Bitte versuche es erneut.</div>
+      <p class="signup-privacy" data-i18n="signup.privacy">Kein Spam. Nur Updates zu neuen Versionen. Du kannst dich jederzeit abmelden.</p>
+    </div>
+  </section>
+
   <section class="terminal-highlight">
     <div class="terminal-showcase">
       <div class="terminal-window">
@@ -2067,6 +2164,14 @@ tags: [projekt, arbeit, wichtig]
         "hero.title": "Dein Wissen,<br>deine Werkzeuge.",
         "hero.subtitle": "Eine Notiz-App für Menschen die selbst denken wollen. Lokale Dateien, bidirektionale Links, visuelles Canvas – und ein Terminal für die, die mehr wollen.",
         "hero.cta": "Jetzt herunterladen",
+        "signup.title": "Werde Alpha-Tester",
+        "signup.desc": "Erhalte Updates zu neuen Features und hilf mit, MindGraph Notes zu verbessern.",
+        "signup.namePlaceholder": "Name (optional)",
+        "signup.emailPlaceholder": "deine@email.de",
+        "signup.submit": "Anmelden",
+        "signup.success": "Danke! Du bist dabei. \u2705",
+        "signup.error": "Fehler beim Senden. Bitte versuche es erneut.",
+        "signup.privacy": "Kein Spam. Nur Updates zu neuen Versionen. Du kannst dich jederzeit abmelden.",
         "terminal.cmd1": " opencode \"Erstelle mir anschauliche Grafiken zum Thema Alkane\"",
         "terminal.out1": "Lese [[Alkane.md]], [[Bindungstypen.md]] und 3 weitere Notizen...",
         "terminal.out2": "SVG-Strukturformeln für Methan, Ethan, Propan erstellt",
@@ -2285,6 +2390,14 @@ tags: [projekt, arbeit, wichtig]
         "hero.title": "Your knowledge,<br>your tools.",
         "hero.subtitle": "A note-taking app for people who want to think for themselves. Local files, bidirectional links, visual canvas – and a terminal for those who want more.",
         "hero.cta": "Download now",
+        "signup.title": "Become an Alpha Tester",
+        "signup.desc": "Get updates on new features and help improve MindGraph Notes.",
+        "signup.namePlaceholder": "Name (optional)",
+        "signup.emailPlaceholder": "your@email.com",
+        "signup.submit": "Sign up",
+        "signup.success": "Thanks! You're in. \u2705",
+        "signup.error": "Error sending. Please try again.",
+        "signup.privacy": "No spam. Only updates on new releases. You can unsubscribe anytime.",
         "terminal.cmd1": " opencode \"Create visual diagrams about alkanes for my chemistry notes\"",
         "terminal.out1": "Reading [[Alkanes.md]], [[Bond Types.md]] and 3 more notes...",
         "terminal.out2": "SVG structural formulas for methane, ethane, propane created",
@@ -2509,6 +2622,14 @@ tags: [projekt, arbeit, wichtig]
         }
       });
 
+      // Update placeholders
+      document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+        const key = el.getAttribute('data-i18n-placeholder');
+        if (translations[lang][key]) {
+          el.placeholder = translations[lang][key];
+        }
+      });
+
       // Update page title
       document.title = lang === 'de'
         ? 'MindGraph Notes - Karteikarten & Spaced Repetition Notiz-App'
@@ -2560,6 +2681,48 @@ tags: [projekt, arbeit, wichtig]
         document.body.style.overflow = '';
       }
     });
+
+    // Alpha signup form handler
+    const signupForm = document.getElementById('alpha-signup-form');
+    if (signupForm) {
+      signupForm.addEventListener('submit', async function(e) {
+        e.preventDefault();
+        const form = e.target;
+        const submitBtn = form.querySelector('button[type="submit"]');
+        const successEl = document.getElementById('signup-success');
+        const errorEl = document.getElementById('signup-error');
+
+        submitBtn.disabled = true;
+        successEl.style.display = 'none';
+        errorEl.style.display = 'none';
+
+        try {
+          const resp = await fetch(form.action, {
+            method: 'POST',
+            body: new FormData(form),
+            headers: { 'Accept': 'application/json' }
+          });
+          if (resp.ok) {
+            form.style.display = 'none';
+            successEl.style.display = 'block';
+            // Re-translate success message for current language
+            const lang = localStorage.getItem('lang') || 'de';
+            if (translations[lang]['signup.success']) {
+              successEl.innerHTML = translations[lang]['signup.success'];
+            }
+          } else {
+            throw new Error('Form submission failed');
+          }
+        } catch {
+          errorEl.style.display = 'block';
+          submitBtn.disabled = false;
+          const lang = localStorage.getItem('lang') || 'de';
+          if (translations[lang]['signup.error']) {
+            errorEl.innerHTML = translations[lang]['signup.error'];
+          }
+        }
+      });
+    }
   </script>
 </body>
 </html>
