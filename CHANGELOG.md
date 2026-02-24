@@ -2,6 +2,16 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.2.17-alpha] - 2026-02-24
+
+### Features
+- **reMarkable USB-Integration**: Neue native Anbindung an reMarkable-Geräte mit Import-/Export-Workflow für Notizen über USB
+- **reMarkable Panel**: Neues Sidebar-Panel inklusive Gerätestatus, Aktionen und UI-Flow für die reMarkable-Synchronisierung
+
+### Improvements
+- **Main/Preload IPC-Erweiterung**: Neue reMarkable-Handler und geteilte Typen für eine saubere, sichere Bridge zwischen Main- und Renderer-Process
+- **Website-Onboarding für Windows**: Klarere Hinweise für Windows-Nutzer im Alpha-Signup-Flow
+
 ## [0.2.16-alpha] - 2026-02-23
 
 ### Features
