@@ -4,6 +4,7 @@ import type { ReMarkableTransport, RMDocumentSummary } from '../types'
 interface RawReMarkableDocument {
   ID?: string
   VissibleName?: string
+  VisibleName?: string
   Type?: string
   Parent?: string
   ModifiedClient?: string
@@ -23,11 +24,11 @@ export class USBTransport implements ReMarkableTransport {
 
     for (const endpoint of endpoints) {
       try {
-        const res = await this.fetchWithTimeout(endpoint)
-        if (res.ok) {
+        const result = await this.requestWithElectronNet(endpoint, 8000)
+        if (result.statusCode >= 200 && result.statusCode < 300) {
           return true
         }
-        lastError = `HTTP ${res.status} (${endpoint})`
+        lastError = `HTTP ${result.statusCode} (${endpoint})`
       } catch (error) {
         lastError = error instanceof Error ? error.message : 'Unknown connection error'
       }
@@ -51,16 +52,13 @@ export class USBTransport implements ReMarkableTransport {
 
     for (const endpoint of endpoints) {
       try {
-        const res = await this.fetchWithTimeout(endpoint)
-        if (!res.ok) {
-          lastStatus = res.status
+        const result = await this.requestWithElectronNet(endpoint, 10000)
+        if (result.statusCode < 200 || result.statusCode >= 300) {
+          lastStatus = result.statusCode
           continue
         }
 
-        const payload = await res.json() as unknown
-        if (!Array.isArray(payload)) {
-          return []
-        }
+        const payload = this.parseDocumentsPayload(result.buffer)
 
         return payload
           .map((item) => this.normalizeDocument(item as RawReMarkableDocument))
@@ -172,7 +170,8 @@ export class USBTransport implements ReMarkableTransport {
   }
 
   private normalizeDocument(item: RawReMarkableDocument): RMDocumentSummary | null {
-    if (!item?.ID || !item?.VissibleName || !item?.Type) {
+    const name = item?.VissibleName || item?.VisibleName
+    if (!item?.ID || !name || !item?.Type) {
       return null
     }
 
@@ -180,11 +179,72 @@ export class USBTransport implements ReMarkableTransport {
 
     return {
       id: item.ID,
-      name: item.VissibleName,
+      name,
       type,
       parent: item.Parent || '',
       modifiedClient: item.ModifiedClient || ''
     }
+  }
+
+  private parseDocumentsPayload(buffer: Buffer): unknown[] {
+    let payload: unknown
+    try {
+      payload = JSON.parse(buffer.toString('utf-8')) as unknown
+    } catch {
+      return []
+    }
+
+    if (Array.isArray(payload)) {
+      return payload
+    }
+
+    if (payload && typeof payload === 'object') {
+      const withItems = payload as { items?: unknown; Items?: unknown }
+      if (Array.isArray(withItems.items)) {
+        return withItems.items
+      }
+      if (Array.isArray(withItems.Items)) {
+        return withItems.Items
+      }
+    }
+
+    return []
+  }
+
+  private requestWithElectronNet(
+    url: string,
+    timeoutMs: number
+  ): Promise<{ statusCode: number; buffer: Buffer }> {
+    return new Promise((resolve, reject) => {
+      const request = net.request({ method: 'GET', url })
+      const timeout = setTimeout(() => {
+        request.abort()
+        reject(new Error('reMarkable request timed out'))
+      }, timeoutMs)
+
+      request.on('response', (response) => {
+        const statusCode = response.statusCode
+        const chunks: Buffer[] = []
+        response.on('data', (chunk) => {
+          chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk))
+        })
+        response.on('end', () => {
+          clearTimeout(timeout)
+          resolve({ statusCode, buffer: Buffer.concat(chunks) })
+        })
+        response.on('error', (error) => {
+          clearTimeout(timeout)
+          reject(error)
+        })
+      })
+
+      request.on('error', (error) => {
+        clearTimeout(timeout)
+        reject(error)
+      })
+
+      request.end()
+    })
   }
 
   private async fetchWithTimeout(

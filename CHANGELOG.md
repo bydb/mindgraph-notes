@@ -2,6 +2,11 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.2.18-alpha] - 2026-02-24
+
+### Fixes
+- **reMarkable USB-Verbindung**: Stabilere Erkennung und Dokumentabfrage über `electron.net`, inklusive robusterem JSON-Parsing und Kompatibilität für `VissibleName`/`VisibleName`
+
 ## [0.2.17-alpha] - 2026-02-24
 
 ### Features
