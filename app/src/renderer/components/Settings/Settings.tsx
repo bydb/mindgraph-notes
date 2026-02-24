@@ -57,6 +57,8 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
   const [edooboxTestStatus, setEdooboxTestStatus] = useState<'idle' | 'testing' | 'success' | 'failed'>('idle')
   const [edooboxTestError, setEdooboxTestError] = useState<string | null>(null)
   const [edooboxCredsSaved, setEdooboxCredsSaved] = useState(false)
+  const [remarkableStatus, setRemarkableStatus] = useState<'checking' | 'connected' | 'disconnected'>('checking')
+  const [remarkableError, setRemarkableError] = useState<string | null>(null)
 
   // Sync Setup State
   const [syncMode, setSyncMode] = useState<'new' | 'join'>('new')
@@ -146,7 +148,9 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
     email: emailSettings,
     setEmail,
     edoobox: edooboxSettings,
-    setEdoobox
+    setEdoobox,
+    remarkable: remarkableSettings,
+    setRemarkable
   } = useUIStore()
 
   const { t } = useTranslation()
@@ -209,8 +213,24 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
           setEdooboxApiSecret(creds.apiSecret)
         }
       })
+      checkRemarkableConnection()
     }
   }, [isOpen, activeTab])
+
+  const checkRemarkableConnection = async () => {
+    setRemarkableStatus('checking')
+    setRemarkableError(null)
+    try {
+      const result = await window.electronAPI.remarkableUsbCheck()
+      setRemarkableStatus(result.connected ? 'connected' : 'disconnected')
+      if (!result.connected && result.error) {
+        setRemarkableError(result.error)
+      }
+    } catch {
+      setRemarkableStatus('disconnected')
+      setRemarkableError(t('settings.agents.remarkable.checkError'))
+    }
+  }
 
   // Templates laden
   useEffect(() => {
@@ -2479,6 +2499,63 @@ LIMIT 10
             {/* Agenten Tab */}
             {activeTab === 'agents' && (
               <div className="settings-section">
+                <h3>{t('settings.agents.remarkable.title')}</h3>
+                <p className="settings-hint">{t('settings.agents.remarkable.description')}</p>
+
+                <div className="settings-row">
+                  <label>{t('settings.agents.remarkable.enabled')}</label>
+                  <input
+                    type="checkbox"
+                    checked={remarkableSettings.enabled}
+                    onChange={e => setRemarkable({ enabled: e.target.checked })}
+                  />
+                </div>
+
+                {remarkableSettings.enabled && (
+                  <>
+                    <div className="settings-row">
+                      <label>{t('settings.agents.remarkable.transport')}</label>
+                      <select
+                        value={remarkableSettings.transport}
+                        onChange={e => setRemarkable({ transport: e.target.value as 'usb' })}
+                      >
+                        <option value="usb">USB</option>
+                      </select>
+                    </div>
+
+                    <div className="settings-row">
+                      <label>{t('settings.agents.remarkable.autoRefresh')}</label>
+                      <input
+                        type="checkbox"
+                        checked={remarkableSettings.autoRefreshOnOpen}
+                        onChange={e => setRemarkable({ autoRefreshOnOpen: e.target.checked })}
+                      />
+                    </div>
+
+                    <div className="settings-row" style={{ gap: '8px' }}>
+                      <button className="settings-btn" onClick={checkRemarkableConnection}>
+                        {t('settings.agents.remarkable.testConnection')}
+                      </button>
+                      {remarkableStatus === 'checking' && (
+                        <span className="settings-hint">{t('settings.agents.remarkable.checking')}</span>
+                      )}
+                      {remarkableStatus === 'connected' && (
+                        <span className="status-connected">{t('settings.agents.remarkable.connected')}</span>
+                      )}
+                      {remarkableStatus === 'disconnected' && (
+                        <span className="status-disconnected">{t('settings.agents.remarkable.disconnected')}</span>
+                      )}
+                    </div>
+                    {remarkableError && (
+                      <div className="settings-row">
+                        <span className="settings-error-detail">{remarkableError}</span>
+                      </div>
+                    )}
+                  </>
+                )}
+
+                <div className="settings-divider" />
+
                 {/* Email Integration */}
                 <h3>{t('settings.email.title')}</h3>
                 <div className="settings-row">

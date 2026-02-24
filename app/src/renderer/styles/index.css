@@ -399,6 +399,237 @@ body {
   color: var(--accent-color);
 }
 
+.remarkable-panel {
+  border-bottom: 1px solid var(--border-color);
+  background: var(--bg-tertiary);
+  padding: 10px 12px;
+}
+
+.remarkable-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.remarkable-title {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.remarkable-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.remarkable-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.remarkable-dot.connected {
+  background: #34c759;
+}
+
+.remarkable-dot.disconnected {
+  background: #ff3b30;
+}
+
+.remarkable-subtitle {
+  margin-top: 8px;
+  margin-bottom: 6px;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.remarkable-help {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}
+
+.remarkable-export-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  margin-bottom: 8px;
+}
+
+.remarkable-export-btn {
+  border: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+  padding: 2px 8px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.remarkable-export-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.remarkable-export-file {
+  min-width: 0;
+  font-size: 11px;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.remarkable-nav {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.remarkable-nav-btn {
+  border: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  font-size: 11px;
+  border-radius: var(--radius-sm);
+  padding: 2px 6px;
+  cursor: pointer;
+}
+
+.remarkable-nav-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.remarkable-path {
+  min-width: 0;
+  flex: 1;
+  font-size: 11px;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.remarkable-list {
+  max-height: 160px;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.remarkable-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px;
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.remarkable-item:hover {
+  background: var(--bg-secondary);
+}
+
+.remarkable-item.folder {
+  cursor: pointer;
+}
+
+.remarkable-item-icon {
+  font-size: 10px;
+  color: var(--text-muted);
+  width: 14px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.remarkable-item-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.remarkable-item-importing {
+  font-size: 10px;
+  color: var(--accent-color);
+  flex-shrink: 0;
+}
+
+.remarkable-import-btn {
+  border: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+  line-height: 1;
+  width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.remarkable-import-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.remarkable-open-btn {
+  border: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+  line-height: 1;
+  width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.remarkable-open-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.remarkable-empty,
+.remarkable-error {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
+.remarkable-error {
+  color: var(--danger-color);
+}
+
+.remarkable-info {
+  font-size: 12px;
+  color: var(--accent-color);
+  margin-top: 4px;
+}
+
 .sidebar-content {
   flex: 1;
   overflow-y: auto;

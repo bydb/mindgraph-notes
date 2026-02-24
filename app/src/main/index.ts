@@ -5,6 +5,7 @@ import { FSWatcher, watch } from 'chokidar'
 import * as pty from 'node-pty'
 import type { FileEntry } from '../shared/types'
 import { SyncEngine } from './sync/syncEngine'
+import { ReMarkableService } from './remarkable/service'
 
 // Globale Fehlerbehandlung für unhandled exceptions (z.B. IMAP Socket-Timeouts)
 process.on('uncaughtException', (error) => {
@@ -19,6 +20,7 @@ let fileWatcher: FSWatcher | null = null
 let ptyProcess: pty.IPty | null = null
 let isQuitting = false
 let syncEngine: SyncEngine | null = null
+const remarkableService = new ReMarkableService()
 
 // EPIPE-Fehler bei console.log ignorieren (tritt auf wenn PTY-Pipe geschlossen wird)
 process.stdout?.on('error', (err) => {
@@ -4924,6 +4926,80 @@ end tell`
   } catch (error) {
     console.error('[Reminders] Failed:', error)
     return { success: false, error: error instanceof Error ? error.message : 'Erinnerung konnte nicht erstellt werden' }
+  }
+})
+
+// ========================================
+// reMarkable (USB)
+// ========================================
+
+ipcMain.handle('remarkable-usb-check', async () => {
+  return remarkableService.checkUsbConnection()
+})
+
+ipcMain.handle('remarkable-list-documents', async (_event, folderId?: string) => {
+  try {
+    const documents = await remarkableService.listUsbDocuments(folderId)
+    return { documents }
+  } catch (error) {
+    console.error('[reMarkable] Failed to list USB documents:', error)
+    return {
+      documents: [],
+      error: error instanceof Error ? error.message : 'Dokumente konnten nicht geladen werden'
+    }
+  }
+})
+
+ipcMain.handle('remarkable-download-document', async (_event, vaultPath: string, document: { id: string; name: string }) => {
+  const sanitizeFileName = (name: string) => {
+    const trimmed = name.trim().replace(/\s+/g, ' ')
+    const sanitized = trimmed.replace(/[^a-zA-Z0-9\-_. ]/g, '').replace(/ /g, '-')
+    return sanitized || 'remarkable-note'
+  }
+
+  try {
+    const pdfBuffer = await remarkableService.downloadUsbDocumentPdf(document.id)
+    const pdfDir = path.join(vaultPath, 'reMarkable', 'pdf')
+    await fs.mkdir(pdfDir, { recursive: true })
+
+    const safeName = sanitizeFileName(document.name)
+    const fileName = `${safeName}-${document.id.slice(0, 8)}.pdf`
+    const filePath = path.join(pdfDir, fileName)
+    const relativePdfPath = `reMarkable/pdf/${fileName}`
+
+    const alreadyExists = await fs.access(filePath).then(() => true).catch(() => false)
+    if (!alreadyExists) {
+      await fs.writeFile(filePath, pdfBuffer)
+    }
+
+    return { success: true, relativePdfPath, alreadyExists }
+  } catch (error) {
+    console.error('[reMarkable] Failed to download document:', { id: document.id, name: document.name, error })
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Dokument konnte nicht heruntergeladen werden'
+    }
+  }
+})
+
+ipcMain.handle('remarkable-upload-pdf', async (_event, vaultPath: string, relativePdfPath: string) => {
+  try {
+    if (!relativePdfPath.toLowerCase().endsWith('.pdf')) {
+      return { success: false, error: 'Nur PDF-Dateien koennen exportiert werden' }
+    }
+
+    const filePath = path.join(vaultPath, relativePdfPath)
+    const content = await fs.readFile(filePath)
+    const fileName = path.basename(relativePdfPath)
+
+    await remarkableService.uploadUsbPdf(fileName, content)
+    return { success: true }
+  } catch (error) {
+    console.error('[reMarkable] Failed to upload PDF:', { relativePdfPath, error })
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'PDF konnte nicht exportiert werden'
+    }
   }
 })
 

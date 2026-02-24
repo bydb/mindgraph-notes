@@ -372,6 +372,32 @@ export interface PDFDocument {
   modifiedAt: Date;
 }
 
+export interface ReMarkableDocumentSummary {
+  id: string;
+  name: string;
+  type: 'DocumentType' | 'CollectionType';
+  parent: string;
+  modifiedClient: string;
+}
+
+export interface ReMarkableUsbCheckResult {
+  connected: boolean;
+  mode: 'usb';
+  error?: string;
+}
+
+export interface ReMarkableDownloadResult {
+  success: boolean;
+  relativePdfPath?: string;
+  alreadyExists?: boolean;
+  error?: string;
+}
+
+export interface ReMarkableUploadResult {
+  success: boolean;
+  error?: string;
+}
+
 // API Typen für IPC
 export interface ElectronAPI {
   // Settings / Vault Persistenz
@@ -705,6 +731,12 @@ export interface ElectronAPI {
   // Apple Reminders (macOS)
   platform: string;
   createAppleReminder: (options: { title: string; notes?: string; dueDate?: string; dueTime?: string; list?: string }) => Promise<{ success: boolean; error?: string }>;
+
+  // reMarkable (USB)
+  remarkableUsbCheck: () => Promise<ReMarkableUsbCheckResult>;
+  remarkableListDocuments: (folderId?: string) => Promise<{ documents: ReMarkableDocumentSummary[]; error?: string }>;
+  remarkableDownloadDocument: (vaultPath: string, document: { id: string; name: string }) => Promise<ReMarkableDownloadResult>;
+  remarkableUploadPdf: (vaultPath: string, relativePdfPath: string) => Promise<ReMarkableUploadResult>;
 
   // edoobox Agent
   edooboxSaveCredentials: (apiKey: string, apiSecret: string) => Promise<boolean>;

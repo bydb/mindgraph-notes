@@ -310,6 +310,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
   createAppleReminder: (options: { title: string; notes?: string; dueDate?: string; dueTime?: string; list?: string }) =>
     ipcRenderer.invoke('create-apple-reminder', options),
 
+  // reMarkable (USB)
+  remarkableUsbCheck: () =>
+    ipcRenderer.invoke('remarkable-usb-check'),
+  remarkableListDocuments: (folderId?: string) =>
+    ipcRenderer.invoke('remarkable-list-documents', folderId),
+  remarkableDownloadDocument: (vaultPath: string, document: { id: string; name: string }) =>
+    ipcRenderer.invoke('remarkable-download-document', vaultPath, document),
+  remarkableUploadPdf: (vaultPath: string, relativePdfPath: string) =>
+    ipcRenderer.invoke('remarkable-upload-pdf', vaultPath, relativePdfPath),
+
   // edoobox Agent
   edooboxSaveCredentials: (apiKey: string, apiSecret: string) =>
     ipcRenderer.invoke('edoobox-save-credentials', apiKey, apiSecret),

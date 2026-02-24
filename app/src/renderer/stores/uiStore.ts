@@ -297,6 +297,12 @@ export interface EdooboxSettings {
   webhookUrl: string
 }
 
+export interface ReMarkableSettings {
+  enabled: boolean
+  transport: 'usb'
+  autoRefreshOnOpen: boolean
+}
+
 // Legacy type alias for backward compatibility
 type OllamaSettings = LLMSettings
 
@@ -370,6 +376,9 @@ interface UIState {
   // edoobox Agent Settings
   edoobox: EdooboxSettings
 
+  // reMarkable Settings
+  remarkable: ReMarkableSettings
+
   // Update-Checker & What's New
   lastSeenVersion: string
   updateAvailable: UpdateInfo | null
@@ -439,6 +448,7 @@ interface UIState {
   setLanguageTool: (settings: Partial<LanguageToolSettings>) => void
   setEmail: (settings: Partial<EmailSettings>) => void
   setEdoobox: (settings: Partial<EdooboxSettings>) => void
+  setRemarkable: (settings: Partial<ReMarkableSettings>) => void
   setLastSeenVersion: (version: string) => void
   setUpdateAvailable: (info: UpdateInfo | null) => void
   setWhatsNewOpen: (open: boolean) => void
@@ -583,6 +593,13 @@ const defaultState = {
     webhookUrl: ''
   },
 
+  // reMarkable
+  remarkable: {
+    enabled: true,
+    transport: 'usb' as const,
+    autoRefreshOnOpen: true
+  },
+
   // Update-Checker & What's New
   lastSeenVersion: '',
   updateAvailable: null as UpdateInfo | null,
@@ -618,7 +635,7 @@ const persistedKeys = [
   'canvasFilterPath', 'canvasViewMode', 'canvasShowTags', 'canvasShowLinks', 'canvasShowImages',
   'canvasCompactMode', 'canvasDefaultCardWidth', 'splitPosition', 'fileTreeDisplayMode', 'ollama',
   'pdfCompanionEnabled', 'pdfDisplayMode', 'iconSet',
-  'smartConnectionsEnabled', 'notesChatEnabled', 'flashcardsEnabled', 'smartConnectionsWeights', 'docling', 'readwise', 'languageTool', 'email', 'edoobox',
+  'smartConnectionsEnabled', 'notesChatEnabled', 'flashcardsEnabled', 'smartConnectionsWeights', 'docling', 'readwise', 'languageTool', 'email', 'edoobox', 'remarkable',
   'lastSeenVersion',
   'customAccentColor', 'customBackgroundColorLight', 'customBackgroundColorDark',
   'customLogo',
@@ -686,6 +703,9 @@ export const useUIStore = create<UIState>()((set, get) => ({
   })),
   setEdoobox: (settings) => set((state) => ({
     edoobox: { ...state.edoobox, ...settings }
+  })),
+  setRemarkable: (settings) => set((state) => ({
+    remarkable: { ...state.remarkable, ...settings }
   })),
   setLastSeenVersion: (version) => set({ lastSeenVersion: version }),
   setUpdateAvailable: (info) => set({ updateAvailable: info }),
