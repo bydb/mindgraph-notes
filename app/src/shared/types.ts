@@ -428,6 +428,7 @@ export interface ElectronAPI {
   // UI-Settings Persistenz
   loadUISettings: () => Promise<Record<string, unknown>>;
   saveUISettings: (settings: Record<string, unknown>) => Promise<boolean>;
+  setMainLanguage: (lang: string) => Promise<boolean>;
 
   openVault: () => Promise<string | null>;
   selectVaultDirectory: () => Promise<string | null>;

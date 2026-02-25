@@ -654,7 +654,10 @@ export const useUIStore = create<UIState>()((set, get) => ({
   setAccentColor: (color) => set({ accentColor: color }),
   setBackgroundColor: (color) => set({ backgroundColor: color }),
   setLoadLastVaultOnStart: (value) => set({ loadLastVaultOnStart: value }),
-  setLanguage: (lang) => set({ language: lang }),
+  setLanguage: (lang) => {
+    set({ language: lang })
+    window.electronAPI.setMainLanguage(lang)
+  },
   setFontFamily: (font) => set({ fontFamily: font }),
   setEditorFontSize: (size) => set({ editorFontSize: Math.max(10, Math.min(24, size)) }),
   setEditorLineNumbers: (show) => set({ editorLineNumbers: show }),

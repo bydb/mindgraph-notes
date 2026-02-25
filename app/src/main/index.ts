@@ -22,6 +22,108 @@ let isQuitting = false
 let syncEngine: SyncEngine | null = null
 const remarkableService = new ReMarkableService()
 
+// Sprache für Main-Process-Dialoge (wird aus ui-settings.json geladen + per IPC aktualisiert)
+let currentLanguage: 'de' | 'en' = 'de'
+
+const mainTranslations: Record<'de' | 'en', Record<string, string>> = {
+  de: {
+    'btn.cancel': 'Abbrechen',
+    'btn.delete': 'Löschen',
+    'btn.create': 'Erstellen',
+    'btn.overwrite': 'Überschreiben',
+    'btn.ok': 'OK',
+    'dialog.openVault.title': 'Vault-Ordner auswählen',
+    'dialog.openVault.button': 'Vault öffnen',
+    'dialog.selectVaultDir.title': 'Zielordner für Notizen auswählen',
+    'dialog.selectVaultDir.button': 'Ordner auswählen',
+    'dialog.selectVaultDir.titleWinLinux': 'Neuen Ordner für Notizen anlegen oder bestehenden wählen',
+    'dialog.newNote.title': 'Neue Notiz',
+    'dialog.newNote.message': 'Neue Notiz erstellen',
+    'dialog.newNote.detail': 'Gib den Namen der neuen Notiz ein:',
+    'dialog.newNote.saveTitle': 'Neue Notiz erstellen',
+    'dialog.deleteFile.title': 'Notiz löschen',
+    'dialog.deleteFile.message': '"{name}" wirklich löschen?',
+    'dialog.deleteFile.detail': 'Diese Aktion kann nicht rückgängig gemacht werden.',
+    'dialog.deleteDir.title': 'Ordner löschen',
+    'dialog.deleteDir.message': 'Ordner "{name}" wirklich löschen?',
+    'dialog.deleteDir.detailFiles': 'Dieser Ordner enthält {count} Datei(en). Alle Inhalte werden gelöscht.',
+    'dialog.deleteDir.detailEmpty': 'Dieser Ordner ist leer.',
+    'dialog.deleteDir.detailSuffix': '\n\nDiese Aktion kann nicht rückgängig gemacht werden.',
+    'dialog.fileExists.title': 'Datei existiert bereits',
+    'dialog.fileExists.messageRename': '"{name}" existiert bereits.',
+    'dialog.fileExists.messageMove': '"{name}" existiert bereits im Zielordner.',
+    'dialog.fileExists.detail': 'Möchtest du die Datei überschreiben?',
+    'dialog.newFolder.title': 'Neuen Ordner erstellen',
+    'dialog.newFolder.button': 'Ordner erstellen',
+    'dialog.exportPdf.title': 'Als PDF exportieren',
+    'dialog.stripWikilinks.title': 'Wikilinks entfernen',
+    'dialog.stripWikilinks.message': 'Wikilinks in "{name}" entfernen?',
+    'dialog.stripWikilinks.detail': 'Diese Aktion entfernt alle [[Wikilink]]-Klammern aus den Markdown-Dateien in diesem Ordner (rekursiv). Der Text bleibt erhalten.\n\nBeispiel: [[Link]] → Link, [[Link|Alias]] → Alias\n\nDiese Aktion kann nicht rückgängig gemacht werden.',
+    'dialog.stripWikilinks.button': 'Wikilinks entfernen',
+    'dialog.stripWikilinks.successTitle': 'Wikilinks entfernt',
+    'dialog.stripWikilinks.successMessage': 'Wikilinks erfolgreich entfernt',
+    'dialog.stripWikilinks.successDetail': '{processed} Dateien verarbeitet\n{modified} Dateien geändert\n{removed} Wikilinks entfernt',
+    'dialog.selectLogo.title': 'Logo auswählen',
+    'dialog.selectLogo.filterName': 'Bilder',
+    'dialog.edooboxFormular.title': 'Akkreditierungsformular auswählen',
+    'dialog.edooboxFormular.filterName': 'Word-Dokumente',
+    'filter.markdown': 'Markdown'
+  },
+  en: {
+    'btn.cancel': 'Cancel',
+    'btn.delete': 'Delete',
+    'btn.create': 'Create',
+    'btn.overwrite': 'Overwrite',
+    'btn.ok': 'OK',
+    'dialog.openVault.title': 'Select Vault Folder',
+    'dialog.openVault.button': 'Open Vault',
+    'dialog.selectVaultDir.title': 'Select Target Folder for Notes',
+    'dialog.selectVaultDir.button': 'Select Folder',
+    'dialog.selectVaultDir.titleWinLinux': 'Create New Folder for Notes or Select Existing',
+    'dialog.newNote.title': 'New Note',
+    'dialog.newNote.message': 'Create New Note',
+    'dialog.newNote.detail': 'Enter the name for the new note:',
+    'dialog.newNote.saveTitle': 'Create New Note',
+    'dialog.deleteFile.title': 'Delete Note',
+    'dialog.deleteFile.message': 'Are you sure you want to delete "{name}"?',
+    'dialog.deleteFile.detail': 'This action cannot be undone.',
+    'dialog.deleteDir.title': 'Delete Folder',
+    'dialog.deleteDir.message': 'Are you sure you want to delete folder "{name}"?',
+    'dialog.deleteDir.detailFiles': 'This folder contains {count} file(s). All contents will be deleted.',
+    'dialog.deleteDir.detailEmpty': 'This folder is empty.',
+    'dialog.deleteDir.detailSuffix': '\n\nThis action cannot be undone.',
+    'dialog.fileExists.title': 'File Already Exists',
+    'dialog.fileExists.messageRename': '"{name}" already exists.',
+    'dialog.fileExists.messageMove': '"{name}" already exists in the target folder.',
+    'dialog.fileExists.detail': 'Do you want to overwrite the file?',
+    'dialog.newFolder.title': 'Create New Folder',
+    'dialog.newFolder.button': 'Create Folder',
+    'dialog.exportPdf.title': 'Export as PDF',
+    'dialog.stripWikilinks.title': 'Remove Wikilinks',
+    'dialog.stripWikilinks.message': 'Remove wikilinks in "{name}"?',
+    'dialog.stripWikilinks.detail': 'This action removes all [[Wikilink]] brackets from Markdown files in this folder (recursively). The text content is preserved.\n\nExample: [[Link]] → Link, [[Link|Alias]] → Alias\n\nThis action cannot be undone.',
+    'dialog.stripWikilinks.button': 'Remove Wikilinks',
+    'dialog.stripWikilinks.successTitle': 'Wikilinks Removed',
+    'dialog.stripWikilinks.successMessage': 'Wikilinks successfully removed',
+    'dialog.stripWikilinks.successDetail': '{processed} files processed\n{modified} files modified\n{removed} wikilinks removed',
+    'dialog.selectLogo.title': 'Select Logo',
+    'dialog.selectLogo.filterName': 'Images',
+    'dialog.edooboxFormular.title': 'Select Accreditation Form',
+    'dialog.edooboxFormular.filterName': 'Word Documents',
+    'filter.markdown': 'Markdown'
+  }
+}
+
+function t(key: string, params?: Record<string, string | number>): string {
+  let text = mainTranslations[currentLanguage][key] || mainTranslations.de[key] || key
+  if (params) {
+    for (const [k, v] of Object.entries(params)) {
+      text = text.replace(`{${k}}`, String(v))
+    }
+  }
+  return text
+}
+
 // EPIPE-Fehler bei console.log ignorieren (tritt auf wenn PTY-Pipe geschlossen wird)
 process.stdout?.on('error', (err) => {
   if ((err as NodeJS.ErrnoException).code === 'EPIPE') return
@@ -159,7 +261,15 @@ if (process.platform === 'linux') {
   app.setDesktopName(app.isPackaged ? 'mindgraph-notes.desktop' : 'mindgraph-notes-dev.desktop')
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
+  // Sprache aus persistierten UI-Settings laden
+  try {
+    const uiSettings = await loadUISettings()
+    if (uiSettings.language === 'en') currentLanguage = 'en'
+  } catch {
+    // Fallback: Deutsch
+  }
+
   // App-Icon für macOS Dock setzen
   if (process.platform === 'darwin') {
     const dockIconPath = app.isPackaged
@@ -208,14 +318,22 @@ ipcMain.handle('save-ui-settings', async (_event, settings: Record<string, unkno
   return true
 })
 
+// Sprache für Main-Process-Dialoge setzen (vom Renderer bei Sprachwechsel aufgerufen)
+ipcMain.handle('set-main-language', (_event, lang: string) => {
+  if (lang === 'de' || lang === 'en') {
+    currentLanguage = lang
+  }
+  return true
+})
+
 // Vault-Ordner öffnen
 ipcMain.handle('open-vault', async () => {
   if (!mainWindow) return null
 
   const result = await dialog.showOpenDialog(mainWindow, {
     properties: ['openDirectory', 'createDirectory'],
-    title: 'Vault-Ordner auswählen',
-    buttonLabel: 'Vault öffnen'
+    title: t('dialog.openVault.title'),
+    buttonLabel: t('dialog.openVault.button')
   })
 
   if (result.canceled || result.filePaths.length === 0) {
@@ -235,8 +353,8 @@ ipcMain.handle('select-vault-directory', async () => {
     // macOS: showOpenDialog mit createDirectory (macOS-exklusiv)
     const result = await dialog.showOpenDialog(mainWindow, {
       properties: ['openDirectory', 'createDirectory'],
-      title: 'Zielordner für Notizen auswählen',
-      buttonLabel: 'Ordner auswählen'
+      title: t('dialog.selectVaultDir.title'),
+      buttonLabel: t('dialog.selectVaultDir.button')
     })
 
     if (result.canceled || result.filePaths.length === 0) return null
@@ -246,8 +364,8 @@ ipcMain.handle('select-vault-directory', async () => {
   // Windows / Linux: showSaveDialog als Workaround, da showOpenDialog
   // mit 'openDirectory' kein Erstellen neuer Ordner erlaubt
   const result = await dialog.showSaveDialog(mainWindow, {
-    title: 'Neuen Ordner für Notizen anlegen oder bestehenden wählen',
-    buttonLabel: 'Ordner auswählen',
+    title: t('dialog.selectVaultDir.titleWinLinux'),
+    buttonLabel: t('dialog.selectVaultDir.button'),
     defaultPath: path.join(app.getPath('documents'), 'MindGraph Notes'),
     properties: ['showOverwriteConfirmation']
   })
@@ -279,10 +397,10 @@ ipcMain.handle('prompt-new-note', async () => {
   
   const { response, checkboxChecked } = await dialog.showMessageBox(mainWindow, {
     type: 'question',
-    title: 'Neue Notiz',
-    message: 'Neue Notiz erstellen',
-    detail: 'Gib den Namen der neuen Notiz ein:',
-    buttons: ['Abbrechen', 'Erstellen'],
+    title: t('dialog.newNote.title'),
+    message: t('dialog.newNote.message'),
+    detail: t('dialog.newNote.detail'),
+    buttons: [t('btn.cancel'), t('btn.create')],
     defaultId: 1,
     cancelId: 0
   })
@@ -292,9 +410,9 @@ ipcMain.handle('prompt-new-note', async () => {
   // Da MessageBox keine Texteingabe unterstützt, nutzen wir einen Workaround
   // Wir öffnen einen Save-Dialog
   const result = await dialog.showSaveDialog(mainWindow, {
-    title: 'Neue Notiz erstellen',
-    buttonLabel: 'Erstellen',
-    filters: [{ name: 'Markdown', extensions: ['md'] }],
+    title: t('dialog.newNote.saveTitle'),
+    buttonLabel: t('btn.create'),
+    filters: [{ name: t('filter.markdown'), extensions: ['md'] }],
     properties: ['createDirectory', 'showOverwriteConfirmation']
   })
   
@@ -547,10 +665,10 @@ ipcMain.handle('delete-file', async (_event, filePath: string) => {
 
   const { response } = await dialog.showMessageBox(mainWindow, {
     type: 'warning',
-    title: 'Notiz löschen',
-    message: `"${fileName}" wirklich löschen?`,
-    detail: 'Diese Aktion kann nicht rückgängig gemacht werden.',
-    buttons: ['Abbrechen', 'Löschen'],
+    title: t('dialog.deleteFile.title'),
+    message: t('dialog.deleteFile.message', { name: fileName }),
+    detail: t('dialog.deleteFile.detail'),
+    buttons: [t('btn.cancel'), t('btn.delete')],
     defaultId: 0,
     cancelId: 0
   })
@@ -592,15 +710,15 @@ ipcMain.handle('delete-directory', async (_event, dirPath: string) => {
   }
 
   const detail = fileCount > 0
-    ? `Dieser Ordner enthält ${fileCount} Datei(en). Alle Inhalte werden gelöscht.`
-    : 'Dieser Ordner ist leer.'
+    ? t('dialog.deleteDir.detailFiles', { count: fileCount })
+    : t('dialog.deleteDir.detailEmpty')
 
   const { response } = await dialog.showMessageBox(mainWindow, {
     type: 'warning',
-    title: 'Ordner löschen',
-    message: `Ordner "${folderName}" wirklich löschen?`,
-    detail: detail + '\n\nDiese Aktion kann nicht rückgängig gemacht werden.',
-    buttons: ['Abbrechen', 'Löschen'],
+    title: t('dialog.deleteDir.title'),
+    message: t('dialog.deleteDir.message', { name: folderName }),
+    detail: detail + t('dialog.deleteDir.detailSuffix'),
+    buttons: [t('btn.cancel'), t('btn.delete')],
     defaultId: 0,
     cancelId: 0
   })
@@ -641,10 +759,10 @@ ipcMain.handle('rename-file', async (_event, oldPath: string, newPath: string) =
 
       const { response } = await dialog.showMessageBox(mainWindow, {
         type: 'warning',
-        title: 'Datei existiert bereits',
-        message: `"${path.basename(newPath)}" existiert bereits.`,
-        detail: 'Möchtest du die Datei überschreiben?',
-        buttons: ['Abbrechen', 'Überschreiben'],
+        title: t('dialog.fileExists.title'),
+        message: t('dialog.fileExists.messageRename', { name: path.basename(newPath) }),
+        detail: t('dialog.fileExists.detail'),
+        buttons: [t('btn.cancel'), t('btn.overwrite')],
         defaultId: 0,
         cancelId: 0
       })
@@ -675,10 +793,10 @@ ipcMain.handle('move-file', async (_event, sourcePath: string, targetDir: string
 
       const { response } = await dialog.showMessageBox(mainWindow, {
         type: 'warning',
-        title: 'Datei existiert bereits',
-        message: `"${fileName}" existiert bereits im Zielordner.`,
-        detail: 'Möchtest du die Datei überschreiben?',
-        buttons: ['Abbrechen', 'Überschreiben'],
+        title: t('dialog.fileExists.title'),
+        message: t('dialog.fileExists.messageMove', { name: fileName }),
+        detail: t('dialog.fileExists.detail'),
+        buttons: [t('btn.cancel'), t('btn.overwrite')],
         defaultId: 0,
         cancelId: 0
       })
@@ -1909,9 +2027,9 @@ ipcMain.handle('prompt-new-folder', async (_event, basePath: string) => {
   if (!mainWindow) return null
 
   const result = await dialog.showSaveDialog(mainWindow, {
-    title: 'Neuen Ordner erstellen',
+    title: t('dialog.newFolder.title'),
     defaultPath: basePath,
-    buttonLabel: 'Ordner erstellen',
+    buttonLabel: t('dialog.newFolder.button'),
     properties: ['createDirectory']
   })
 
@@ -2335,7 +2453,7 @@ ipcMain.handle('export-pdf', async (_event, defaultFileName: string, htmlContent
 
   // Speicherdialog öffnen
   const result = await dialog.showSaveDialog(mainWindow, {
-    title: 'Als PDF exportieren',
+    title: t('dialog.exportPdf.title'),
     defaultPath: defaultFileName.replace('.md', '.pdf'),
     filters: [{ name: 'PDF', extensions: ['pdf'] }]
   })
@@ -3228,10 +3346,10 @@ ipcMain.handle('strip-wikilinks-in-folder', async (_event, folderPath: string, v
   // Bestätigungsdialog
   const { response } = await dialog.showMessageBox(mainWindow, {
     type: 'warning',
-    title: 'Wikilinks entfernen',
-    message: `Wikilinks in "${folderName}" entfernen?`,
-    detail: 'Diese Aktion entfernt alle [[Wikilink]]-Klammern aus den Markdown-Dateien in diesem Ordner (rekursiv). Der Text bleibt erhalten.\n\nBeispiel: [[Link]] → Link, [[Link|Alias]] → Alias\n\nDiese Aktion kann nicht rückgängig gemacht werden.',
-    buttons: ['Abbrechen', 'Wikilinks entfernen'],
+    title: t('dialog.stripWikilinks.title'),
+    message: t('dialog.stripWikilinks.message', { name: folderName }),
+    detail: t('dialog.stripWikilinks.detail'),
+    buttons: [t('btn.cancel'), t('dialog.stripWikilinks.button')],
     defaultId: 0,
     cancelId: 0
   })
@@ -3285,10 +3403,10 @@ ipcMain.handle('strip-wikilinks-in-folder', async (_event, folderPath: string, v
     // Erfolgsmeldung anzeigen
     await dialog.showMessageBox(mainWindow, {
       type: 'info',
-      title: 'Wikilinks entfernt',
-      message: 'Wikilinks erfolgreich entfernt',
-      detail: `${stats.filesProcessed} Dateien verarbeitet\n${stats.filesModified} Dateien geändert\n${stats.wikilinksRemoved} Wikilinks entfernt`,
-      buttons: ['OK']
+      title: t('dialog.stripWikilinks.successTitle'),
+      message: t('dialog.stripWikilinks.successMessage'),
+      detail: t('dialog.stripWikilinks.successDetail', { processed: stats.filesProcessed, modified: stats.filesModified, removed: stats.wikilinksRemoved }),
+      buttons: [t('btn.ok')]
     })
 
     return {
@@ -3311,8 +3429,8 @@ ipcMain.handle('get-app-version', () => {
 // Custom Logo: Bild auswählen und als Data-URL zurückgeben
 ipcMain.handle('select-custom-logo', async () => {
   const result = await dialog.showOpenDialog(mainWindow!, {
-    title: 'Logo auswählen',
-    filters: [{ name: 'Bilder', extensions: ['png', 'jpg', 'jpeg', 'svg', 'webp'] }],
+    title: t('dialog.selectLogo.title'),
+    filters: [{ name: t('dialog.selectLogo.filterName'), extensions: ['png', 'jpg', 'jpeg', 'svg', 'webp'] }],
     properties: ['openFile']
   })
 
@@ -5256,8 +5374,8 @@ ipcMain.handle('edoobox-parse-formular', async () => {
   try {
     const { dialog } = await import('electron')
     const result = await dialog.showOpenDialog({
-      title: 'Akkreditierungsformular auswählen',
-      filters: [{ name: 'Word-Dokumente', extensions: ['docx'] }],
+      title: t('dialog.edooboxFormular.title'),
+      filters: [{ name: t('dialog.edooboxFormular.filterName'), extensions: ['docx'] }],
       properties: ['openFile']
     })
 

@@ -8,6 +8,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // UI-Settings Persistenz
   loadUISettings: () => ipcRenderer.invoke('load-ui-settings'),
   saveUISettings: (settings: object) => ipcRenderer.invoke('save-ui-settings', settings),
+  setMainLanguage: (lang: string) => ipcRenderer.invoke('set-main-language', lang),
 
   openVault: () => ipcRenderer.invoke('open-vault'),
   readDirectory: (dirPath: string) => ipcRenderer.invoke('read-directory', dirPath),
