@@ -1,8 +1,9 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import type { ReMarkableDocumentSummary } from '../../../shared/types'
+import type { ReMarkableDocumentSummary, ReMarkableUsbDebugInfoResult } from '../../../shared/types'
 import { useTranslation } from '../../utils/translations'
 import { useUIStore } from '../../stores/uiStore'
 import { createNoteFromFile, useNotesStore } from '../../stores/notesStore'
+import remarkableLogo from '../../assets/remarkable-logo.png'
 
 export const RemarkablePanel: React.FC = () => {
   const { t } = useTranslation()
@@ -23,6 +24,11 @@ export const RemarkablePanel: React.FC = () => {
   const [importingDocumentId, setImportingDocumentId] = useState<string | null>(null)
   const [openingDocumentId, setOpeningDocumentId] = useState<string | null>(null)
   const [isExportingSelectedPdf, setIsExportingSelectedPdf] = useState(false)
+  const [isOptimizingAndExporting, setIsOptimizingAndExporting] = useState(false)
+  const [debugOpen, setDebugOpen] = useState(false)
+  const [usbDebugInfo, setUsbDebugInfo] = useState<ReMarkableUsbDebugInfoResult | null>(null)
+  const [lastExportMode, setLastExportMode] = useState<string>('n/a')
+  const [lastExportDetail, setLastExportDetail] = useState<string>('n/a')
   const [error, setError] = useState<string | null>(null)
   const [info, setInfo] = useState<string | null>(null)
   const refreshInFlightRef = useRef(false)
@@ -65,6 +71,11 @@ export const RemarkablePanel: React.FC = () => {
     try {
       const status = await window.electronAPI.remarkableUsbCheck()
       setIsConnected(status.connected)
+
+      const debugResult = await window.electronAPI.remarkableUsbDebugInfo()
+      if (debugResult.success) {
+        setUsbDebugInfo(debugResult)
+      }
 
       if (!status.connected) {
         if (status.error) {
@@ -326,12 +337,67 @@ export const RemarkablePanel: React.FC = () => {
         throw new Error(result.error || t('sidebar.remarkable.exportPdfError'))
       }
 
+      setLastExportMode('direct')
+      setLastExportDetail('Original PDF upload')
       setInfo(t('sidebar.remarkable.exportedPdf'))
       await refresh()
     } catch (err) {
       setError(err instanceof Error ? err.message : t('sidebar.remarkable.exportPdfError'))
     } finally {
       setIsExportingSelectedPdf(false)
+    }
+  }, [exportCandidatePath, refresh, t, vaultPath])
+
+  const optimizeAndExportSelectedPdfToRemarkable = useCallback(async () => {
+    if (!vaultPath) {
+      setError(t('sidebar.remarkable.noVault'))
+      return
+    }
+
+    if (!exportCandidatePath) {
+      setError(t('sidebar.remarkable.noPdfSelected'))
+      return
+    }
+
+    setIsOptimizingAndExporting(true)
+    setError(null)
+    setInfo('Optimiere PDF fuer reMarkable ...')
+
+    try {
+      const status = await window.electronAPI.remarkableUsbCheck()
+      if (!status.connected) {
+        throw new Error(status.error || t('sidebar.remarkable.disconnected'))
+      }
+
+      const optimizeResult = await window.electronAPI.remarkableOptimizePdfForUpload(vaultPath, exportCandidatePath)
+      if (!optimizeResult.success || !optimizeResult.relativePdfPath) {
+        throw new Error(optimizeResult.error || 'PDF-Optimierung fehlgeschlagen')
+      }
+
+      const uploadResult = await window.electronAPI.remarkableUploadPdf(vaultPath, optimizeResult.relativePdfPath)
+      if (!uploadResult.success) {
+        throw new Error(uploadResult.error || t('sidebar.remarkable.exportPdfError'))
+      }
+
+      const methodText = optimizeResult.method === 'ghostscript'
+        ? 'Ghostscript'
+        : optimizeResult.method === 'qpdf'
+          ? 'qpdf'
+          : 'Originalformat'
+      const originalKb = optimizeResult.originalSize ? Math.round(optimizeResult.originalSize / 1024) : null
+      const optimizedKb = optimizeResult.optimizedSize ? Math.round(optimizeResult.optimizedSize / 1024) : null
+      const sizeText = (originalKb !== null && optimizedKb !== null)
+        ? ` (${originalKb} KB -> ${optimizedKb} KB)`
+        : ''
+
+      setLastExportMode('optimize+export')
+      setLastExportDetail(methodText)
+      setInfo(`Export erfolgreich (${methodText})${sizeText}`)
+      await refresh()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t('sidebar.remarkable.exportPdfError'))
+    } finally {
+      setIsOptimizingAndExporting(false)
     }
   }, [exportCandidatePath, refresh, t, vaultPath])
 
@@ -348,7 +414,10 @@ export const RemarkablePanel: React.FC = () => {
   return (
     <div className="remarkable-panel">
       <div className="remarkable-header">
-        <div className="remarkable-title">reMarkable</div>
+        <div className="remarkable-title">
+          <img src={remarkableLogo} alt="reMarkable" className="remarkable-logo" />
+          <span>reMarkable</span>
+        </div>
         <button className="display-mode-toggle" onClick={refresh} disabled={isLoading} title={t('sidebar.remarkable.refresh')}>
           {isLoading ? '...' : 'R'}
         </button>
@@ -362,16 +431,46 @@ export const RemarkablePanel: React.FC = () => {
       {error && <div className="remarkable-error">{error}</div>}
       {info && <div className="remarkable-info">{info}</div>}
 
+      <div className="remarkable-debug">
+        <button className="remarkable-debug-toggle" onClick={() => setDebugOpen((prev) => !prev)}>
+          {debugOpen ? 'Debug ausblenden' : 'Debug anzeigen'}
+        </button>
+        {debugOpen && (
+          <div className="remarkable-debug-content">
+            <div>Vendor: {usbDebugInfo?.vendorName || 'n/a'}</div>
+            <div>Product: {usbDebugInfo?.productName || 'n/a'}</div>
+            <div>
+              USB IDs: {usbDebugInfo?.vendorIdHex || 'n/a'} / {usbDebugInfo?.productIdHex || 'n/a'}
+              {(usbDebugInfo?.vendorId || usbDebugInfo?.productId)
+                ? ` (${usbDebugInfo?.vendorId ?? 'n/a'} / ${usbDebugInfo?.productId ?? 'n/a'})`
+                : ''}
+            </div>
+            <div>Connected: {isConnected ? 'yes' : 'no'}</div>
+            <div>Last export mode: {lastExportMode}</div>
+            <div>Last export detail: {lastExportDetail}</div>
+            {error && <div>Last error: {error}</div>}
+          </div>
+        )}
+      </div>
+
       {isConnected && (
         <>
           <div className="remarkable-export-row">
             <button
               className="remarkable-export-btn"
               onClick={exportSelectedPdfToRemarkable}
-              disabled={isExportingSelectedPdf || !exportCandidatePath}
+              disabled={isExportingSelectedPdf || isOptimizingAndExporting || !exportCandidatePath}
               title={t('sidebar.remarkable.exportPdfAction')}
             >
               {isExportingSelectedPdf ? t('sidebar.remarkable.exporting') : t('sidebar.remarkable.exportPdfAction')}
+            </button>
+            <button
+              className="remarkable-export-btn remarkable-export-optimize-btn"
+              onClick={optimizeAndExportSelectedPdfToRemarkable}
+              disabled={isExportingSelectedPdf || isOptimizingAndExporting || !exportCandidatePath}
+              title="PDF optimieren und exportieren"
+            >
+              {isOptimizingAndExporting ? 'Optimiere ...' : 'Optimieren + Export'}
             </button>
             <span className="remarkable-export-file" title={exportCandidatePath || t('sidebar.remarkable.noPdfSelected')}>
               {exportCandidateName || t('sidebar.remarkable.noPdfSelected')}

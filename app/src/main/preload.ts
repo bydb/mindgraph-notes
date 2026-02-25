@@ -319,6 +319,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('remarkable-download-document', vaultPath, document),
   remarkableUploadPdf: (vaultPath: string, relativePdfPath: string) =>
     ipcRenderer.invoke('remarkable-upload-pdf', vaultPath, relativePdfPath),
+  remarkableOptimizePdfForUpload: (vaultPath: string, relativePdfPath: string) =>
+    ipcRenderer.invoke('remarkable-optimize-pdf', vaultPath, relativePdfPath),
+  remarkableUsbDebugInfo: () =>
+    ipcRenderer.invoke('remarkable-usb-debug-info'),
 
   // edoobox Agent
   edooboxSaveCredentials: (apiKey: string, apiSecret: string) =>

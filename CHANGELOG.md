@@ -2,6 +2,21 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.2.20-alpha] - 2026-02-25
+
+### Features
+- **reMarkable PDF-Optimierung**: Neuer "Optimieren + Export"-Button — PDFs werden vor dem Upload via Ghostscript oder qpdf komprimiert (automatischer Fallback)
+- **reMarkable USB Debug-Panel**: Klappbares Debug-Panel zeigt USB-Geräteinformationen (Vendor, Product, IDs), Verbindungsstatus und letzten Export-Modus
+
+### Improvements
+- **reMarkable Upload-Stabilität**: Upload-Flow komplett überarbeitet mit 20 Retry-Versuchen, Reachability-Checks vor jedem Versuch und manuell gebautem multipart/form-data via `electron.net` (behebt Probleme mit reMarkable Paper Pro)
+- **reMarkable Branding**: Logo im Panel-Header statt reinem Text
+- **Titlebar-Badges**: Overdue- und Inbox-Badges teilen jetzt eine gemeinsame `.titlebar-mini-badge`-Basisklasse mit einheitlichem Design
+
+### Security
+- **Path Traversal Schutz**: Neuer zentraler `validatePath()`-Helper verhindert Pfad-Ausbrüche aus dem Vault bei allen Datei-IPC-Handlern (read-files-batch, ensure-pdf-companion, sync-pdf-companion, copy-image-to-attachments, write-image-from-base64, remarkable-upload-pdf, remarkable-optimize-pdf, remarkable-download-document)
+- **checkCommandExists Whitelist**: `check-command-exists` IPC-Handler akzeptiert nur noch explizit erlaubte Kommandos (opencode, claude, wsl, gs, qpdf) statt beliebiger Eingaben
+
 ## [0.2.19-alpha] - 2026-02-25
 
 ### Fixes

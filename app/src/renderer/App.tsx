@@ -739,7 +739,7 @@ const App: React.FC = () => {
                   <polyline points="12 6 12 12 16 14"/>
                 </svg>
                 {taskStats.overdue > 0 && (
-                  <span className="overdue-badge">{taskStats.overdue}</span>
+                  <span className="titlebar-mini-badge overdue-badge">{taskStats.overdue}</span>
                 )}
               </button>
               <button
@@ -806,7 +806,7 @@ const App: React.FC = () => {
                     <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
                   </svg>
                   {unreadRelevantCount > 0 && (
-                    <span className="inbox-badge">{unreadRelevantCount > 99 ? '99+' : unreadRelevantCount}</span>
+                    <span className="titlebar-mini-badge inbox-badge">{unreadRelevantCount > 99 ? '99+' : unreadRelevantCount}</span>
                   )}
                 </button>
               )}

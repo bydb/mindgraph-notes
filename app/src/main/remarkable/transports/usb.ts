@@ -109,21 +109,46 @@ export class USBTransport implements ReMarkableTransport {
   }
 
   async uploadPdf(fileName: string, content: Buffer): Promise<void> {
-    const formData = new FormData()
-    formData.append('file', new Blob([content], { type: 'application/pdf' }), fileName)
-
-    const response = await this.fetchWithTimeout(
+    const endpoints = [
       `${this.baseUrl}/upload`,
-      60000,
-      {
-        method: 'POST',
-        body: formData
-      }
-    )
+      `${this.baseUrl}/upload/`
+    ]
 
-    if (response.status !== 200 && response.status !== 201) {
-      throw new Error(`reMarkable upload failed (HTTP ${response.status})`)
+    let lastStatus: number | null = null
+    let lastError: string | null = null
+
+    for (let attempt = 1; attempt <= 20; attempt++) {
+      const reachable = await this.ensureUsbReachable(3000)
+      if (!reachable) {
+        lastError = 'reMarkable USB interface not reachable'
+        await this.sleep(700)
+        continue
+      }
+
+      for (const endpoint of endpoints) {
+        try {
+          const result = await this.uploadWithElectronNet(endpoint, fileName, content, 60000)
+          if (result.statusCode === 200 || result.statusCode === 201) {
+            return
+          }
+
+          lastStatus = result.statusCode
+          lastError = result.body || null
+        } catch (error) {
+          lastError = error instanceof Error ? error.message : 'Unknown upload error'
+        }
+      }
+
+      if (attempt < 20 && lastError && /EHOSTUNREACH|ENETUNREACH|ECONNREFUSED|timed out|not reachable/i.test(lastError)) {
+        await this.sleep(800)
+      }
     }
+
+    if (lastStatus) {
+      throw new Error(`reMarkable upload failed (HTTP ${lastStatus})${lastError ? `: ${lastError}` : ''}`)
+    }
+
+    throw new Error(lastError || 'reMarkable upload endpoint not reachable')
   }
 
   private downloadWithElectronNet(
@@ -245,6 +270,82 @@ export class USBTransport implements ReMarkableTransport {
 
       request.end()
     })
+  }
+
+  private uploadWithElectronNet(
+    endpoint: string,
+    fileName: string,
+    content: Buffer,
+    timeoutMs: number
+  ): Promise<{ statusCode: number; body: string }> {
+    return new Promise((resolve, reject) => {
+      const boundary = `----MindGraphReMarkableBoundary${Date.now().toString(16)}`
+      const safeFileName = fileName.replace(/"/g, "'")
+
+      const prefix = Buffer.from(
+        `--${boundary}\r\n` +
+        `Content-Disposition: form-data; name="file"; filename="${safeFileName}"\r\n` +
+        'Content-Type: application/pdf\r\n\r\n',
+        'utf-8'
+      )
+      const suffix = Buffer.from(`\r\n--${boundary}--\r\n`, 'utf-8')
+      const payload = Buffer.concat([prefix, content, suffix])
+
+      const request = net.request({
+        method: 'POST',
+        url: endpoint
+      })
+
+      const timeout = setTimeout(() => {
+        request.abort()
+        reject(new Error('reMarkable upload timed out'))
+      }, timeoutMs)
+
+      request.setHeader('Content-Type', `multipart/form-data; boundary=${boundary}`)
+
+      request.on('response', (response) => {
+        const statusCode = response.statusCode
+        const chunks: Buffer[] = []
+
+        response.on('data', (chunk) => {
+          chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk))
+        })
+
+        response.on('end', () => {
+          clearTimeout(timeout)
+          resolve({
+            statusCode,
+            body: Buffer.concat(chunks).toString('utf-8').trim()
+          })
+        })
+
+        response.on('error', (error) => {
+          clearTimeout(timeout)
+          reject(error)
+        })
+      })
+
+      request.on('error', (error) => {
+        clearTimeout(timeout)
+        reject(error)
+      })
+
+      request.write(payload)
+      request.end()
+    })
+  }
+
+  private async ensureUsbReachable(timeoutMs: number): Promise<boolean> {
+    try {
+      const result = await this.requestWithElectronNet(`${this.baseUrl}/documents/`, timeoutMs)
+      return result.statusCode >= 200 && result.statusCode < 300
+    } catch {
+      return false
+    }
+  }
+
+  private sleep(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms))
   }
 
   private async fetchWithTimeout(

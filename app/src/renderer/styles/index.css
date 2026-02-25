@@ -413,11 +413,21 @@ body {
 }
 
 .remarkable-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.04em;
-  text-transform: uppercase;
+  text-transform: none;
   color: var(--text-secondary);
+}
+
+.remarkable-logo {
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
+  flex-shrink: 0;
 }
 
 .remarkable-status {
@@ -481,6 +491,11 @@ body {
 .remarkable-export-btn:disabled {
   opacity: 0.5;
   cursor: default;
+}
+
+.remarkable-export-optimize-btn {
+  background: color-mix(in srgb, var(--accent-color) 16%, var(--bg-secondary));
+  border-color: color-mix(in srgb, var(--accent-color) 35%, var(--border-color));
 }
 
 .remarkable-export-file {
@@ -628,6 +643,33 @@ body {
   font-size: 12px;
   color: var(--accent-color);
   margin-top: 4px;
+}
+
+.remarkable-debug {
+  margin-top: 6px;
+  margin-bottom: 6px;
+}
+
+.remarkable-debug-toggle {
+  border: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+  color: var(--text-muted);
+  border-radius: var(--radius-sm);
+  font-size: 10px;
+  padding: 2px 6px;
+  cursor: pointer;
+}
+
+.remarkable-debug-content {
+  margin-top: 6px;
+  border: 1px dashed var(--border-color);
+  border-radius: var(--radius-sm);
+  padding: 6px;
+  font-size: 10px;
+  color: var(--text-muted);
+  display: grid;
+  gap: 2px;
+  word-break: break-word;
 }
 
 .sidebar-content {
@@ -7975,32 +8017,42 @@ body {
 /* ============ OVERDUE PANEL ============ */
 .overdue-btn {
   position: relative;
+  overflow: visible;
 }
 
 .overdue-btn.has-overdue {
   color: #ef4444;
+  z-index: 1;
 }
 
 .overdue-btn.has-overdue svg {
   stroke: #ef4444;
 }
 
-.overdue-badge {
+.titlebar-mini-badge {
   position: absolute;
-  top: -2px;
-  right: -2px;
-  min-width: 14px;
+  top: 2px;
+  right: 2px;
+  transform: translate(40%, -45%);
+  min-width: 16px;
   height: 14px;
   padding: 0 4px;
-  background: #ef4444;
-  color: white;
   font-size: 9px;
   font-weight: 700;
-  border-radius: 7px;
+  border-radius: 999px;
   display: flex;
   align-items: center;
   justify-content: center;
   line-height: 1;
+  color: #fff;
+  border: 1px solid var(--bg-tertiary);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  pointer-events: none;
+  z-index: 3;
+}
+
+.overdue-badge {
+  background: #ef4444;
 }
 
 .overdue-panel {
@@ -8242,28 +8294,15 @@ body {
 
 .inbox-btn {
   position: relative;
+  overflow: visible;
 }
 
-.inbox-btn.has-emails svg {
-  stroke: var(--accent-color);
+.inbox-btn.has-emails {
+  z-index: 1;
 }
 
 .inbox-badge {
-  position: absolute;
-  top: -2px;
-  right: -2px;
-  min-width: 14px;
-  height: 14px;
-  padding: 0 4px;
   background: var(--accent-color);
-  color: white;
-  font-size: 9px;
-  font-weight: 700;
-  border-radius: 7px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  line-height: 1;
 }
 
 .inbox-panel {

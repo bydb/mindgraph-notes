@@ -398,6 +398,27 @@ export interface ReMarkableUploadResult {
   error?: string;
 }
 
+export interface ReMarkableOptimizeResult {
+  success: boolean;
+  relativePdfPath?: string;
+  method?: 'ghostscript' | 'qpdf' | 'unchanged';
+  originalSize?: number;
+  optimizedSize?: number;
+  error?: string;
+}
+
+export interface ReMarkableUsbDebugInfoResult {
+  success: boolean;
+  connected: boolean;
+  vendorName?: string;
+  productName?: string;
+  vendorId?: number;
+  productId?: number;
+  vendorIdHex?: string;
+  productIdHex?: string;
+  error?: string;
+}
+
 // API Typen für IPC
 export interface ElectronAPI {
   // Settings / Vault Persistenz
@@ -737,6 +758,8 @@ export interface ElectronAPI {
   remarkableListDocuments: (folderId?: string) => Promise<{ documents: ReMarkableDocumentSummary[]; error?: string }>;
   remarkableDownloadDocument: (vaultPath: string, document: { id: string; name: string }) => Promise<ReMarkableDownloadResult>;
   remarkableUploadPdf: (vaultPath: string, relativePdfPath: string) => Promise<ReMarkableUploadResult>;
+  remarkableOptimizePdfForUpload: (vaultPath: string, relativePdfPath: string) => Promise<ReMarkableOptimizeResult>;
+  remarkableUsbDebugInfo: () => Promise<ReMarkableUsbDebugInfoResult>;
 
   // edoobox Agent
   edooboxSaveCredentials: (apiKey: string, apiSecret: string) => Promise<boolean>;

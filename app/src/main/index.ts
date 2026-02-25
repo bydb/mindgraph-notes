@@ -80,6 +80,16 @@ async function saveUISettings(settings: Record<string, unknown>): Promise<void> 
   }
 }
 
+// Sicherheits-Helper: Stellt sicher, dass ein Pfad innerhalb des Vault bleibt
+function validatePath(basePath: string, requestedPath: string): string {
+  const resolved = path.resolve(basePath, requestedPath)
+  const relative = path.relative(basePath, resolved)
+  if (relative.startsWith('..') || path.isAbsolute(relative)) {
+    throw new Error('Path traversal detected')
+  }
+  return resolved
+}
+
 function createWindow(): void {
   // Icon-Pfad basierend auf Platform
   // Im Dev-Modus: app.getAppPath() zeigt auf das app-Verzeichnis
@@ -397,7 +407,7 @@ ipcMain.handle('read-files-batch', async (_event, basePath: string, relativePath
     const batchResults = await Promise.all(
       batch.map(async (relPath) => {
         try {
-          const fullPath = path.join(basePath, relPath)
+          const fullPath = validatePath(basePath, relPath)
           const content = await fs.readFile(fullPath, 'utf-8')
           return { path: relPath, content }
         } catch {
@@ -438,7 +448,7 @@ ipcMain.handle('write-file', async (_event, filePath: string, content: string) =
 ipcMain.handle('ensure-pdf-companion', async (_event, pdfPath: string, vaultPath: string) => {
   try {
     const companionPath = pdfPath + '.md'
-    const fullCompanionPath = path.join(vaultPath, companionPath)
+    const fullCompanionPath = validatePath(vaultPath, companionPath)
     const pdfFileName = path.basename(pdfPath)
     const pdfTitle = pdfFileName.replace('.pdf', '')
 
@@ -482,11 +492,11 @@ tags: []
 // PDF Companion synchronisieren (wenn PDF umbenannt wurde)
 ipcMain.handle('sync-pdf-companion', async (_event, oldCompanionPath: string, newPdfPath: string, vaultPath: string) => {
   try {
-    const fullOldCompanionPath = path.join(vaultPath, oldCompanionPath)
+    const fullOldCompanionPath = validatePath(vaultPath, oldCompanionPath)
     const newPdfFileName = path.basename(newPdfPath)
     const newPdfTitle = newPdfFileName.replace('.pdf', '')
     const newCompanionPath = newPdfPath + '.md'
-    const fullNewCompanionPath = path.join(vaultPath, newCompanionPath)
+    const fullNewCompanionPath = validatePath(vaultPath, newCompanionPath)
 
     // Lese alten Companion-Inhalt
     const oldContent = await fs.readFile(fullOldCompanionPath, 'utf-8')
@@ -817,14 +827,14 @@ ipcMain.handle('copy-image-to-attachments', async (_event, vaultPath: string, so
     }
 
     // Create .attachments directory if it doesn't exist
-    const attachmentsDir = path.join(vaultPath, '.attachments')
+    const attachmentsDir = validatePath(vaultPath, '.attachments')
     await fs.mkdir(attachmentsDir, { recursive: true })
 
     // Generate unique filename with timestamp
     const baseName = path.basename(sourcePath, ext)
     const timestamp = Date.now()
     const fileName = `${baseName}-${timestamp}${ext}`
-    const targetPath = path.join(attachmentsDir, fileName)
+    const targetPath = validatePath(attachmentsDir, fileName)
 
     // Copy the file
     await fs.copyFile(sourcePath, targetPath)
@@ -862,14 +872,14 @@ ipcMain.handle('write-image-from-base64', async (_event, vaultPath: string, base
     }
 
     // Create .attachments directory if it doesn't exist
-    const attachmentsDir = path.join(vaultPath, '.attachments')
+    const attachmentsDir = validatePath(vaultPath, '.attachments')
     await fs.mkdir(attachmentsDir, { recursive: true })
 
     // Generate unique filename
     const timestamp = Date.now()
     const baseName = suggestedName.replace(/\.[^.]+$/, '') || 'screenshot'
     const fileName = `${baseName}-${timestamp}${ext}`
-    const targetPath = path.join(attachmentsDir, fileName)
+    const targetPath = validatePath(attachmentsDir, fileName)
 
     // Write the file
     await fs.writeFile(targetPath, buffer)
@@ -2105,10 +2115,31 @@ ipcMain.on('terminal-destroy', () => {
 })
 
 // Check if a command exists in PATH
-// Optional args parameter: if provided, runs command with those args instead of which/where
-// e.g. checkCommandExists('wsl', ['which', 'opencode']) runs: wsl which opencode
+// Whitelisted commands only to prevent arbitrary command execution
+const ALLOWED_COMMANDS = new Set(['opencode', 'claude', 'wsl', 'gs', 'qpdf'])
+const ALLOWED_ARGS_PATTERNS: Array<{ command: string; args: string[] }> = [
+  { command: 'wsl', args: ['which', 'opencode'] },
+  { command: 'wsl', args: ['which', 'claude'] },
+]
+
 ipcMain.handle('check-command-exists', async (_event, command: string, args?: string[]) => {
   try {
+    // Validate command against whitelist
+    if (!ALLOWED_COMMANDS.has(command)) {
+      return { exists: false }
+    }
+
+    // Validate args if provided
+    if (args && args.length > 0) {
+      const argsKey = JSON.stringify({ command, args })
+      const isAllowed = ALLOWED_ARGS_PATTERNS.some(
+        p => JSON.stringify({ command: p.command, args: p.args }) === argsKey
+      )
+      if (!isAllowed) {
+        return { exists: false }
+      }
+    }
+
     const { execFile } = await import('child_process')
     const { promisify } = await import('util')
     const execFileAsync = promisify(execFile)
@@ -4937,6 +4968,63 @@ ipcMain.handle('remarkable-usb-check', async () => {
   return remarkableService.checkUsbConnection()
 })
 
+ipcMain.handle('remarkable-usb-debug-info', async () => {
+  try {
+    const status = await remarkableService.checkUsbConnection()
+
+    if (process.platform !== 'darwin') {
+      return {
+        success: true,
+        connected: status.connected,
+        error: status.connected ? undefined : status.error
+      }
+    }
+
+    const { execFile } = await import('child_process')
+    const { promisify } = await import('util')
+    const execFileAsync = promisify(execFile)
+    const { stdout } = await execFileAsync('ioreg', ['-p', 'IOUSB', '-l', '-w', '0'], { timeout: 10000 })
+    const output = typeof stdout === 'string' ? stdout : String(stdout)
+
+    const targetBlock = output
+      .split('\n\n')
+      .find((block) => /"USB Vendor Name"\s*=\s*"reMarkable"|"kUSBVendorString"\s*=\s*"reMarkable"/i.test(block))
+
+    if (!targetBlock) {
+      return {
+        success: true,
+        connected: status.connected,
+        error: status.error
+      }
+    }
+
+    const vendorId = Number(targetBlock.match(/"idVendor"\s*=\s*(\d+)/)?.[1] || NaN)
+    const productId = Number(targetBlock.match(/"idProduct"\s*=\s*(\d+)/)?.[1] || NaN)
+    const vendorName = targetBlock.match(/"USB Vendor Name"\s*=\s*"([^"]+)"/)?.[1]
+      || targetBlock.match(/"kUSBVendorString"\s*=\s*"([^"]+)"/)?.[1]
+    const productName = targetBlock.match(/"USB Product Name"\s*=\s*"([^"]+)"/)?.[1]
+      || targetBlock.match(/"kUSBProductString"\s*=\s*"([^"]+)"/)?.[1]
+
+    return {
+      success: true,
+      connected: status.connected,
+      vendorName,
+      productName,
+      vendorId: Number.isFinite(vendorId) ? vendorId : undefined,
+      productId: Number.isFinite(productId) ? productId : undefined,
+      vendorIdHex: Number.isFinite(vendorId) ? `0x${vendorId.toString(16)}` : undefined,
+      productIdHex: Number.isFinite(productId) ? `0x${productId.toString(16)}` : undefined,
+      error: status.connected ? undefined : status.error
+    }
+  } catch (error) {
+    return {
+      success: false,
+      connected: false,
+      error: error instanceof Error ? error.message : 'USB debug info konnte nicht geladen werden'
+    }
+  }
+})
+
 ipcMain.handle('remarkable-list-documents', async (_event, folderId?: string) => {
   try {
     const documents = await remarkableService.listUsbDocuments(folderId)
@@ -4959,12 +5047,12 @@ ipcMain.handle('remarkable-download-document', async (_event, vaultPath: string,
 
   try {
     const pdfBuffer = await remarkableService.downloadUsbDocumentPdf(document.id)
-    const pdfDir = path.join(vaultPath, 'reMarkable', 'pdf')
+    const pdfDir = validatePath(vaultPath, 'reMarkable/pdf')
     await fs.mkdir(pdfDir, { recursive: true })
 
     const safeName = sanitizeFileName(document.name)
     const fileName = `${safeName}-${document.id.slice(0, 8)}.pdf`
-    const filePath = path.join(pdfDir, fileName)
+    const filePath = validatePath(pdfDir, fileName)
     const relativePdfPath = `reMarkable/pdf/${fileName}`
 
     const alreadyExists = await fs.access(filePath).then(() => true).catch(() => false)
@@ -4988,7 +5076,7 @@ ipcMain.handle('remarkable-upload-pdf', async (_event, vaultPath: string, relati
       return { success: false, error: 'Nur PDF-Dateien koennen exportiert werden' }
     }
 
-    const filePath = path.join(vaultPath, relativePdfPath)
+    const filePath = validatePath(vaultPath, relativePdfPath)
     const content = await fs.readFile(filePath)
     const fileName = path.basename(relativePdfPath)
 
@@ -4999,6 +5087,85 @@ ipcMain.handle('remarkable-upload-pdf', async (_event, vaultPath: string, relati
     return {
       success: false,
       error: error instanceof Error ? error.message : 'PDF konnte nicht exportiert werden'
+    }
+  }
+})
+
+ipcMain.handle('remarkable-optimize-pdf', async (_event, vaultPath: string, relativePdfPath: string) => {
+  try {
+    if (!relativePdfPath.toLowerCase().endsWith('.pdf')) {
+      return { success: false, error: 'Nur PDF-Dateien koennen optimiert werden' }
+    }
+
+    const inputPath = validatePath(vaultPath, relativePdfPath)
+    const inputStat = await fs.stat(inputPath)
+    const outputPath = inputPath.replace(/\.pdf$/i, '.remarkable.pdf')
+
+    const { execFile } = await import('child_process')
+    const { promisify } = await import('util')
+    const execFileAsync = promisify(execFile)
+
+    const homeDir = process.env.HOME || `/Users/${process.env.USER || ''}`
+    const additionalPaths = [
+      '/opt/homebrew/bin',
+      '/opt/homebrew/sbin',
+      '/usr/local/bin',
+      '/usr/local/sbin',
+      `${homeDir}/.local/bin`
+    ]
+    const currentPath = process.env.PATH || '/usr/bin:/bin:/usr/sbin:/sbin'
+    const extendedPath = [...additionalPaths, ...currentPath.split(':')].join(':')
+    const env = { ...process.env, PATH: extendedPath }
+
+    let method: 'ghostscript' | 'qpdf' | 'unchanged' = 'unchanged'
+
+    try {
+      await execFileAsync('gs', [
+        '-sDEVICE=pdfwrite',
+        '-dCompatibilityLevel=1.4',
+        '-dPDFSETTINGS=/ebook',
+        '-dDetectDuplicateImages=true',
+        '-dCompressFonts=true',
+        '-dEmbedAllFonts=true',
+        '-dNOPAUSE',
+        '-dQUIET',
+        '-dBATCH',
+        `-sOutputFile=${outputPath}`,
+        inputPath
+      ], { env, timeout: 120000 })
+      method = 'ghostscript'
+    } catch {
+      try {
+        await execFileAsync('qpdf', ['--linearize', inputPath, outputPath], { env, timeout: 120000 })
+        method = 'qpdf'
+      } catch {
+        await fs.copyFile(inputPath, outputPath)
+        method = 'unchanged'
+      }
+    }
+
+    let optimizedStat = await fs.stat(outputPath)
+
+    if (optimizedStat.size > inputStat.size && method !== 'unchanged') {
+      await fs.copyFile(inputPath, outputPath)
+      method = 'unchanged'
+      optimizedStat = await fs.stat(outputPath)
+    }
+
+    const optimizedRelative = path.relative(vaultPath, outputPath).split(path.sep).join('/')
+
+    return {
+      success: true,
+      relativePdfPath: optimizedRelative,
+      method,
+      originalSize: inputStat.size,
+      optimizedSize: optimizedStat.size
+    }
+  } catch (error) {
+    console.error('[reMarkable] Failed to optimize PDF:', { relativePdfPath, error })
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'PDF konnte nicht optimiert werden'
     }
   }
 })
