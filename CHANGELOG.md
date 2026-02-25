@@ -2,6 +2,11 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.2.21-alpha] - 2026-02-25
+
+### Fixes
+- **Lokalisierung: Main-Process-Dialoge**: Alle nativen Dialoge (Notiz/Ordner löschen, umbenennen, verschieben, PDF-Export, Vault-Auswahl, Wikilink-Stripping, Logo-/Formular-Auswahl) respektieren jetzt die Spracheinstellung des Users — zuvor waren diese hardcoded auf Deutsch
+
 ## [0.2.20-alpha] - 2026-02-25
 
 ### Features
