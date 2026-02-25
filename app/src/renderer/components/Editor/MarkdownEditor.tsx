@@ -537,7 +537,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
     x: number
     y: number
     noteName: string
-    content: string
+    html: string
     title: string
     showAbove?: boolean
   } | null>(null)
@@ -2444,20 +2444,9 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
       try {
         const fullPath = `${vaultPath}/${linkedNote.path}`
         const content = await window.electronAPI.readFile(fullPath)
-
-        // Extract first meaningful content (skip frontmatter and get first ~500 chars)
-        let previewText = content
-        // Remove frontmatter
-        if (previewText.startsWith('---')) {
-          const endOfFrontmatter = previewText.indexOf('---', 3)
-          if (endOfFrontmatter !== -1) {
-            previewText = previewText.substring(endOfFrontmatter + 3).trim()
-          }
-        }
-        // Limit to first ~500 characters
-        if (previewText.length > 500) {
-          previewText = previewText.substring(0, 500) + '...'
-        }
+        const { body } = parseFrontmatter(content)
+        const withCallouts = processCallouts(body)
+        const html = processFigures(md.render(withCallouts))
 
         // Position the preview near the link
         const rect = target.getBoundingClientRect()
@@ -2489,7 +2478,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
           x,
           y,
           noteName,
-          content: previewText,
+          html,
           title: linkedNote.title,
           showAbove
         })
@@ -3039,7 +3028,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
           </div>
           <div
             className="wikilink-hover-preview-content"
-            dangerouslySetInnerHTML={{ __html: sanitizeHtml(md.render(hoverPreview.content)) }}
+            dangerouslySetInnerHTML={{ __html: sanitizeHtml(hoverPreview.html) }}
           />
         </div>
       )}

@@ -2,6 +2,11 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.2.19-alpha] - 2026-02-25
+
+### Fixes
+- **Wikilink Hover-Preview**: Vorschau rendert jetzt LaTeX und Callouts korrekt durch dieselbe Rendering-Pipeline wie die normale Markdown-Preview
+
 ## [0.2.18-alpha] - 2026-02-24
 
 ### Fixes
