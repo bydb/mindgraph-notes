@@ -16,6 +16,12 @@ export const AISetupStep: React.FC<AISetupStepProps> = ({ onBack, onNext }) => {
   const [ollamaModels, setOllamaModels] = useState<string[]>([])
   const [checking, setChecking] = useState(true)
 
+  // Pull model state
+  const [pullModelName, setPullModelName] = useState('ministral')
+  const [isPulling, setIsPulling] = useState(false)
+  const [pullProgress, setPullProgress] = useState<{ status: string; completed?: number; total?: number } | null>(null)
+  const [pullError, setPullError] = useState<string | null>(null)
+
   useEffect(() => {
     checkConnections()
   }, [])
@@ -72,6 +78,39 @@ export const AISetupStep: React.FC<AISetupStepProps> = ({ onBack, onNext }) => {
     setOllama({ selectedModel: model, enabled: true, backend: 'ollama' })
   }
 
+  const handlePullModel = async () => {
+    if (!pullModelName || isPulling) return
+
+    setIsPulling(true)
+    setPullError(null)
+    setPullProgress({ status: 'starting...' })
+
+    window.electronAPI.onOllamaPullProgress((progress) => {
+      setPullProgress(progress)
+    })
+
+    try {
+      const result = await window.electronAPI.ollamaPullModel(pullModelName)
+      if (result.success) {
+        setPullProgress(null)
+        // Refresh models and auto-select
+        const models = await window.electronAPI.ollamaModels()
+        if (Array.isArray(models) && models.length > 0) {
+          setOllamaModels(models.map((m: { name: string }) => m.name))
+        }
+        setOllama({ selectedModel: pullModelName, enabled: true, backend: 'ollama' })
+      } else {
+        setPullError(result.error || 'Unknown error')
+        setPullProgress(null)
+      }
+    } catch (err) {
+      setPullError(err instanceof Error ? err.message : 'Unknown error')
+      setPullProgress(null)
+    } finally {
+      setIsPulling(false)
+    }
+  }
+
   return (
     <div className="onboarding-step">
       <div className="onboarding-step-header">
@@ -108,6 +147,56 @@ export const AISetupStep: React.FC<AISetupStepProps> = ({ onBack, onNext }) => {
                   <option key={model} value={model}>{model}</option>
                 ))}
               </select>
+            </div>
+          )}
+          {/* Download model when Ollama connected but no models */}
+          {ollamaConnected && ollamaModels.length === 0 && !checking && (
+            <div style={{ padding: '8px 0', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                <select
+                  value={pullModelName}
+                  onChange={e => setPullModelName(e.target.value)}
+                  disabled={isPulling}
+                  style={{ flex: 1, fontSize: '13px' }}
+                >
+                  <optgroup label={t('settings.integrations.ollama.recommendedModels')}>
+                    <option value="ministral">Ministral 8B (~5 GB, empfohlen)</option>
+                    <option value="gemma3:4b">Gemma 3 4B (~3 GB)</option>
+                    <option value="llama3.2">Llama 3.2 (~2 GB)</option>
+                    <option value="qwen3:4b">Qwen 3 4B (~3 GB)</option>
+                    <option value="mistral">Mistral 7B (~4 GB)</option>
+                  </optgroup>
+                </select>
+                <button
+                  className="onboarding-btn-primary"
+                  onClick={handlePullModel}
+                  disabled={isPulling}
+                  style={{ padding: '6px 14px', fontSize: '13px' }}
+                >
+                  {isPulling ? t('settings.integrations.ollama.pulling') : t('settings.integrations.ollama.download')}
+                </button>
+              </div>
+              {isPulling && pullProgress && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <div className="inbox-progress-bar">
+                    <div style={{
+                      width: pullProgress.total
+                        ? `${Math.round((pullProgress.completed || 0) / pullProgress.total * 100)}%`
+                        : '100%',
+                      ...(pullProgress.total ? {} : { animation: 'indeterminate 1.5s infinite linear' })
+                    }} />
+                  </div>
+                  <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
+                    {pullProgress.status}
+                    {pullProgress.total ? ` — ${Math.round((pullProgress.completed || 0) / pullProgress.total * 100)}%` : ''}
+                  </span>
+                </div>
+              )}
+              {pullError && (
+                <span style={{ fontSize: '12px', color: 'var(--text-error, #e53935)' }}>
+                  {t('settings.integrations.ollama.pullError')}: {pullError}
+                </span>
+              )}
             </div>
           )}
         </div>

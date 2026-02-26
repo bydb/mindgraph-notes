@@ -2,6 +2,13 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.2.22-alpha] - 2026-02-26
+
+### Features
+- **In-App Ollama Model Download**: Ollama-Modelle können jetzt direkt in der App heruntergeladen werden — kein Terminal mehr nötig. Dropdown mit empfohlenen Modellen (Ministral 8B, Gemma 3, Llama 3.2, Qwen 3, Mistral 7B), Freitext-Eingabe für beliebige Modelle, Fortschrittsbalken mit Prozentanzeige
+- **Ollama Model löschen**: Installierte Modelle können direkt in den Settings per Klick entfernt werden
+- **Onboarding Model Download**: Wenn Ollama verbunden aber keine Modelle installiert sind, wird im Onboarding ein Download angeboten
+
 ## [0.2.21-alpha] - 2026-02-25
 
 ### Fixes

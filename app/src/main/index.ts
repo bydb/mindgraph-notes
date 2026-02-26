@@ -1297,6 +1297,115 @@ ipcMain.handle('ollama-models', async () => {
   }
 })
 
+// Zieht ein Modell von Ollama (Download mit Fortschritt)
+ipcMain.handle('ollama-pull-model', async (_event, modelName: string) => {
+  console.log('[Ollama] Pull model request:', modelName)
+  try {
+    const response = await fetch(`${OLLAMA_API_URL}/api/pull`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: modelName, stream: true })
+    })
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error('[Ollama] Pull API error:', errorText)
+      return { success: false, error: `Ollama API error: ${response.status}` }
+    }
+
+    const reader = response.body?.getReader()
+    if (!reader) return { success: false, error: 'No response stream' }
+
+    const decoder = new TextDecoder()
+    let buffer = ''
+
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+
+      const chunk = decoder.decode(value, { stream: true })
+      buffer += chunk
+
+      const lines = buffer.split('\n')
+      buffer = lines.pop() || ''
+
+      for (const line of lines) {
+        const trimmedLine = line.trim()
+        if (!trimmedLine) continue
+
+        try {
+          const json = JSON.parse(trimmedLine)
+
+          // Send progress to renderer
+          if (mainWindow) {
+            mainWindow.webContents.send('ollama-pull-progress', {
+              status: json.status || '',
+              completed: json.completed,
+              total: json.total
+            })
+          }
+
+          // Check for error in stream
+          if (json.error) {
+            return { success: false, error: json.error }
+          }
+        } catch {
+          // Skip unparseable lines
+        }
+      }
+    }
+
+    // Process remaining buffer
+    if (buffer.trim()) {
+      try {
+        const json = JSON.parse(buffer.trim())
+        if (json.error) {
+          return { success: false, error: json.error }
+        }
+        if (mainWindow) {
+          mainWindow.webContents.send('ollama-pull-progress', {
+            status: json.status || '',
+            completed: json.completed,
+            total: json.total
+          })
+        }
+      } catch {
+        // ignore
+      }
+    }
+
+    console.log('[Ollama] Pull completed:', modelName)
+    return { success: true }
+  } catch (error) {
+    console.error('[Ollama] Pull error:', error)
+    return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
+  }
+})
+
+// Löscht ein Ollama-Modell
+ipcMain.handle('ollama-delete-model', async (_event, modelName: string) => {
+  console.log('[Ollama] Delete model request:', modelName)
+  try {
+    const response = await fetch(`${OLLAMA_API_URL}/api/delete`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: modelName })
+    })
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error('[Ollama] Delete API error:', errorText)
+      return { success: false, error: `Ollama API error: ${response.status}` }
+    }
+
+    console.log('[Ollama] Delete completed:', modelName)
+    return { success: true }
+  } catch (error) {
+    console.error('[Ollama] Delete error:', error)
+    return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
+  }
+})
+
 // Führt eine KI-Anfrage aus
 interface OllamaRequest {
   model: string

@@ -8435,6 +8435,11 @@ body {
   transition: width 0.3s ease;
 }
 
+@keyframes indeterminate {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(200%); }
+}
+
 .inbox-panel-content {
   flex: 1;
   overflow-y: auto;

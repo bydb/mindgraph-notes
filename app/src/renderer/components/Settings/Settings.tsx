@@ -60,6 +60,14 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
   const [remarkableStatus, setRemarkableStatus] = useState<'checking' | 'connected' | 'disconnected'>('checking')
   const [remarkableError, setRemarkableError] = useState<string | null>(null)
 
+  // Ollama Pull Model State
+  const [pullModelName, setPullModelName] = useState('ministral')
+  const [customPullModelName, setCustomPullModelName] = useState('')
+  const [isPulling, setIsPulling] = useState(false)
+  const [pullProgress, setPullProgress] = useState<{ status: string; completed?: number; total?: number } | null>(null)
+  const [pullError, setPullError] = useState<string | null>(null)
+  const [pullSuccess, setPullSuccess] = useState(false)
+
   // Sync Setup State
   const [syncMode, setSyncMode] = useState<'new' | 'join'>('new')
   const [syncActivationCode, setSyncActivationCode] = useState('')
@@ -271,6 +279,62 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
       }
     } catch {
       setOllamaStatus('disconnected')
+    }
+  }
+
+  const handlePullModel = async () => {
+    const modelToPull = customPullModelName.trim() || pullModelName
+    if (!modelToPull || isPulling) return
+
+    setIsPulling(true)
+    setPullError(null)
+    setPullSuccess(false)
+    setPullProgress({ status: 'starting...' })
+
+    // Listen for progress
+    window.electronAPI.onOllamaPullProgress((progress) => {
+      setPullProgress(progress)
+    })
+
+    try {
+      const result = await window.electronAPI.ollamaPullModel(modelToPull)
+      if (result.success) {
+        setPullSuccess(true)
+        setPullProgress(null)
+        setCustomPullModelName('')
+        // Refresh models list and auto-select
+        const models = await window.electronAPI.ollamaModels()
+        setOllamaModels(models)
+        setOllamaStatus('connected')
+        setOllama({ selectedModel: modelToPull, enabled: true, backend: 'ollama' })
+      } else {
+        setPullError(result.error || 'Unknown error')
+        setPullProgress(null)
+      }
+    } catch (err) {
+      setPullError(err instanceof Error ? err.message : 'Unknown error')
+      setPullProgress(null)
+    } finally {
+      setIsPulling(false)
+    }
+  }
+
+  const handleDeleteModel = async (modelName: string) => {
+    const confirmMsg = t('settings.integrations.ollama.deleteConfirm').replace('{name}', modelName)
+    if (!confirm(confirmMsg)) return
+
+    try {
+      const result = await window.electronAPI.ollamaDeleteModel(modelName)
+      if (result.success) {
+        // Refresh models
+        const models = await window.electronAPI.ollamaModels()
+        setOllamaModels(models)
+        if (ollama.selectedModel === modelName) {
+          setOllama({ selectedModel: models.length > 0 ? models[0].name : '' })
+        }
+      }
+    } catch (err) {
+      console.error('Delete model error:', err)
     }
   }
 
@@ -1144,18 +1208,99 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
                     {ollamaStatus === 'connected' && (
                       <div className="settings-row">
                         <label>{t('settings.integrations.ollama.model')}</label>
-                        <select
-                          value={ollama.selectedModel}
-                          onChange={e => setOllama({ selectedModel: e.target.value })}
-                          disabled={!ollama.enabled}
-                        >
-                          <option value="">{t('settings.selectModel')}</option>
-                          {ollamaModels.map(model => (
-                            <option key={model.name} value={model.name}>
-                              {model.name}
-                            </option>
-                          ))}
-                        </select>
+                        <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flex: 1 }}>
+                          <select
+                            value={ollama.selectedModel}
+                            onChange={e => setOllama({ selectedModel: e.target.value })}
+                            disabled={!ollama.enabled}
+                            style={{ flex: 1 }}
+                          >
+                            <option value="">{t('settings.selectModel')}</option>
+                            {ollamaModels.map(model => (
+                              <option key={model.name} value={model.name}>
+                                {model.name}
+                              </option>
+                            ))}
+                          </select>
+                          {ollama.selectedModel && (
+                            <button
+                              className="settings-refresh"
+                              onClick={() => handleDeleteModel(ollama.selectedModel)}
+                              title={t('settings.integrations.ollama.deleteModel')}
+                              style={{ color: 'var(--text-error, #e53935)', flexShrink: 0 }}
+                            >
+                              ✕
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Model Download Section */}
+                    {ollamaStatus === 'connected' && (
+                      <div className="settings-row" style={{ flexDirection: 'column', alignItems: 'stretch', gap: '8px' }}>
+                        <label>{t('settings.integrations.ollama.pullModel')}</label>
+                        <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                          <select
+                            value={pullModelName}
+                            onChange={e => { setPullModelName(e.target.value); setCustomPullModelName('') }}
+                            disabled={isPulling}
+                            style={{ flex: 1 }}
+                          >
+                            <optgroup label={t('settings.integrations.ollama.recommendedModels')}>
+                              <option value="ministral">Ministral 8B (~5 GB, empfohlen)</option>
+                              <option value="gemma3:4b">Gemma 3 4B (~3 GB)</option>
+                              <option value="llama3.2">Llama 3.2 (~2 GB)</option>
+                              <option value="qwen3:4b">Qwen 3 4B (~3 GB)</option>
+                              <option value="mistral">Mistral 7B (~4 GB)</option>
+                            </optgroup>
+                          </select>
+                          <button
+                            className="settings-refresh"
+                            onClick={handlePullModel}
+                            disabled={isPulling}
+                            style={{ flexShrink: 0 }}
+                          >
+                            {isPulling ? t('settings.integrations.ollama.pulling') : t('settings.integrations.ollama.download')}
+                          </button>
+                        </div>
+                        <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                          <input
+                            type="text"
+                            placeholder={t('settings.integrations.ollama.customModel')}
+                            value={customPullModelName}
+                            onChange={e => setCustomPullModelName(e.target.value)}
+                            disabled={isPulling}
+                            onKeyDown={e => { if (e.key === 'Enter') handlePullModel() }}
+                            style={{ flex: 1 }}
+                          />
+                        </div>
+                        {isPulling && pullProgress && (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                            <div className="inbox-progress-bar">
+                              <div style={{
+                                width: pullProgress.total
+                                  ? `${Math.round((pullProgress.completed || 0) / pullProgress.total * 100)}%`
+                                  : '100%',
+                                ...(pullProgress.total ? {} : { animation: 'indeterminate 1.5s infinite linear' })
+                              }} />
+                            </div>
+                            <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
+                              {pullProgress.status}
+                              {pullProgress.total ? ` — ${Math.round((pullProgress.completed || 0) / pullProgress.total * 100)}%` : ''}
+                            </span>
+                          </div>
+                        )}
+                        {pullSuccess && (
+                          <span style={{ fontSize: '12px', color: 'var(--text-success, #43a047)' }}>
+                            {t('settings.integrations.ollama.pullSuccess')}
+                          </span>
+                        )}
+                        {pullError && (
+                          <span style={{ fontSize: '12px', color: 'var(--text-error, #e53935)' }}>
+                            {t('settings.integrations.ollama.pullError')}: {pullError}
+                          </span>
+                        )}
                       </div>
                     )}
 

@@ -105,6 +105,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.removeAllListeners('ollama-image-progress')
     ipcRenderer.on('ollama-image-progress', (_event, progress) => callback(progress))
   },
+  ollamaPullModel: (name: string) => ipcRenderer.invoke('ollama-pull-model', name),
+  ollamaDeleteModel: (name: string) => ipcRenderer.invoke('ollama-delete-model', name),
+  onOllamaPullProgress: (callback: (progress: { status: string; completed?: number; total?: number }) => void) => {
+    ipcRenderer.removeAllListeners('ollama-pull-progress')
+    ipcRenderer.on('ollama-pull-progress', (_event, progress) => callback(progress))
+  },
 
   // Ollama Embeddings für Smart Connections
   ollamaEmbeddings: (model: string, text: string) =>

@@ -569,6 +569,9 @@ export interface ElectronAPI {
     error?: string;
   }>;
   onOllamaImageProgress: (callback: (progress: { completed: number; total: number }) => void) => void;
+  ollamaPullModel: (name: string) => Promise<{ success: boolean; error?: string }>;
+  ollamaDeleteModel: (name: string) => Promise<{ success: boolean; error?: string }>;
+  onOllamaPullProgress: (callback: (progress: { status: string; completed?: number; total?: number }) => void) => void;
 
   // Ollama Embeddings für Smart Connections
   ollamaEmbeddings: (model: string, text: string) => Promise<{
