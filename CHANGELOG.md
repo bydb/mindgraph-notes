@@ -2,6 +2,18 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.2.23-alpha] - 2026-02-27
+
+### Features
+- **Canvas: Zusammenfassungen auf Karten**: Callout-Zusammenfassungen (summary, tldr, abstract, note, info) werden jetzt direkt auf den Canvas-Karten angezeigt — inkl. deutscher Aliase (Zusammenfassung, tl-dr). Neuer Toggle zum Ein-/Ausblenden in der Toolbar
+- **Canvas: Floating Focus Bar**: Fokus-Modus-Controls sind jetzt eine schwebende Leiste direkt auf dem Canvas (statt in der Toolbar). Verhindert abgeschnittene Buttons bei schmalen Fenstern. Escape-Taste beendet den Fokus-Modus
+- **Canvas: Anordnen-Dropdown**: Alignment-, Distribute- und Layout-Tools sind jetzt in einem einzigen "Anordnen"-Dropdown vereint — spart ~270px Toolbar-Breite
+- **Email: Konfigurierbarer Inbox-Ordner**: Email-Notizen können jetzt in einem frei wählbaren Ordner erstellt werden (Settings → Agenten → Email-Ordner), statt fest auf `‼️📧 - emails`
+
+### Improvements
+- **Callout-Extraktion verbessert**: Robusterer Parser für Callouts in Notizen mit korrekter Behandlung von Multiline-Inhalten und Typ-Aliase
+- **Canvas-Toolbar kompakter**: Gesamtersparnis von ~440px Breite bei aktivem Fokus-Modus, kein Overflow mehr bei schmalen Fenstern oder geöffneter Sidebar
+
 ## [0.2.22-alpha] - 2026-02-26
 
 ### Features

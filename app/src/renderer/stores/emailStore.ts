@@ -160,7 +160,8 @@ export const useEmailStore = create<EmailState>()((set, get) => ({
 
   setupEmail: async (vaultPath: string) => {
     try {
-      const result = await window.electronAPI.emailSetup(vaultPath)
+      const { email: emailSettings } = useUIStore.getState()
+      const result = await window.electronAPI.emailSetup(vaultPath, emailSettings.inboxFolderName)
       if (result.success) {
         if (result.instructionPath) {
           // Instruktions-Notiz Pfad in Settings setzen
@@ -190,7 +191,7 @@ export const useEmailStore = create<EmailState>()((set, get) => ({
 
     for (const email of relevantEmails) {
       try {
-        const result = await window.electronAPI.emailCreateNote(vaultPath, email)
+        const result = await window.electronAPI.emailCreateNote(vaultPath, email, emailSettings.inboxFolderName)
         if (result.success && !result.alreadyExists) {
           created++
         }

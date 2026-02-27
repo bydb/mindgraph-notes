@@ -282,6 +282,7 @@ export interface EmailSettings {
   accounts: Array<{ id: string; name: string; host: string; port: number; user: string; tls: boolean }>
   fetchIntervalMinutes: number
   instructionNotePath: string
+  inboxFolderName: string
   relevanceThreshold: number
   maxEmailsPerFetch: number
   retainDays: number
@@ -337,6 +338,7 @@ interface UIState {
   canvasShowTags: boolean // Tags in Karten anzeigen
   canvasShowLinks: boolean // Link-Anzahl in Karten anzeigen
   canvasShowImages: boolean // Bilder in Karten anzeigen
+  canvasShowSummaries: boolean // Zusammenfassungen/Callouts in Karten anzeigen
   canvasCompactMode: boolean // Kompakt-Modus: nur Titel anzeigen
   canvasDefaultCardWidth: number // Standard-Kartenbreite (150-400)
   splitPosition: number // Prozent für Editor-Breite im Split-Modus (0-100)
@@ -430,6 +432,7 @@ interface UIState {
   setCanvasShowTags: (show: boolean) => void
   setCanvasShowLinks: (show: boolean) => void
   setCanvasShowImages: (show: boolean) => void
+  setCanvasShowSummaries: (show: boolean) => void
   setCanvasCompactMode: (compact: boolean) => void
   setCanvasDefaultCardWidth: (width: number) => void
   setSplitPosition: (position: number) => void
@@ -498,6 +501,7 @@ const defaultState = {
   canvasShowTags: false,
   canvasShowLinks: true,
   canvasShowImages: true,
+  canvasShowSummaries: true,
   canvasCompactMode: false,
   canvasDefaultCardWidth: 220, // Standard: 220px
   splitPosition: 50,
@@ -578,6 +582,7 @@ const defaultState = {
     accounts: [],
     fetchIntervalMinutes: 15,
     instructionNotePath: '',
+    inboxFolderName: '‼️📧 - emails',
     relevanceThreshold: 30,
     maxEmailsPerFetch: 50,
     retainDays: 30,
@@ -632,7 +637,7 @@ const persistedKeys = [
   'language', 'fontFamily', 'editorFontSize', 'editorLineNumbers', 'editorDefaultView',
   'autoSaveInterval', 'editorHeadingFolding', 'editorOutlining', 'outlineStyle', 'editorShowWordCount',
   'sidebarWidth', 'sidebarVisible', 'editorPreviewSplit', 'textSplitEnabled', 'textSplitPosition',
-  'canvasFilterPath', 'canvasViewMode', 'canvasShowTags', 'canvasShowLinks', 'canvasShowImages',
+  'canvasFilterPath', 'canvasViewMode', 'canvasShowTags', 'canvasShowLinks', 'canvasShowImages', 'canvasShowSummaries',
   'canvasCompactMode', 'canvasDefaultCardWidth', 'splitPosition', 'fileTreeDisplayMode', 'ollama',
   'pdfCompanionEnabled', 'pdfDisplayMode', 'iconSet',
   'smartConnectionsEnabled', 'notesChatEnabled', 'flashcardsEnabled', 'smartConnectionsWeights', 'docling', 'readwise', 'languageTool', 'email', 'edoobox', 'remarkable',
@@ -677,6 +682,7 @@ export const useUIStore = create<UIState>()((set, get) => ({
   setCanvasShowTags: (show) => set({ canvasShowTags: show }),
   setCanvasShowLinks: (show) => set({ canvasShowLinks: show }),
   setCanvasShowImages: (show) => set({ canvasShowImages: show }),
+  setCanvasShowSummaries: (show) => set({ canvasShowSummaries: show }),
   setCanvasCompactMode: (compact) => set({ canvasCompactMode: compact }),
   setCanvasDefaultCardWidth: (width) => set({ canvasDefaultCardWidth: Math.max(150, Math.min(400, width)) }),
   setSplitPosition: (position) => set({ splitPosition: Math.max(20, Math.min(80, position)) }),

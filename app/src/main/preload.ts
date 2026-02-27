@@ -307,10 +307,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.removeAllListeners('email-analysis-progress')
     ipcRenderer.on('email-analysis-progress', (_event, progress) => callback(progress))
   },
-  emailSetup: (vaultPath: string) =>
-    ipcRenderer.invoke('email-setup', vaultPath),
-  emailCreateNote: (vaultPath: string, email: object) =>
-    ipcRenderer.invoke('email-create-note', vaultPath, email),
+  emailSetup: (vaultPath: string, inboxFolderName?: string) =>
+    ipcRenderer.invoke('email-setup', vaultPath, inboxFolderName),
+  emailCreateNote: (vaultPath: string, email: object, inboxFolderName?: string) =>
+    ipcRenderer.invoke('email-create-note', vaultPath, email, inboxFolderName),
 
   // Apple Reminders (macOS)
   platform: process.platform,

@@ -750,8 +750,8 @@ export interface ElectronAPI {
   emailLoadPassword: (accountId: string) => Promise<string | null>;
   onEmailFetchProgress: (callback: (progress: { current: number; total: number; status: string }) => void) => void;
   onEmailAnalysisProgress: (callback: (progress: { current: number; total: number }) => void) => void;
-  emailSetup: (vaultPath: string) => Promise<{ success: boolean; folderPath?: string; instructionPath?: string; error?: string }>;
-  emailCreateNote: (vaultPath: string, email: EmailMessage) => Promise<{ success: boolean; path?: string; alreadyExists?: boolean; error?: string }>;
+  emailSetup: (vaultPath: string, inboxFolderName?: string) => Promise<{ success: boolean; folderPath?: string; instructionPath?: string; error?: string }>;
+  emailCreateNote: (vaultPath: string, email: EmailMessage, inboxFolderName?: string) => Promise<{ success: boolean; path?: string; alreadyExists?: boolean; error?: string }>;
 
   // Apple Reminders (macOS)
   platform: string;

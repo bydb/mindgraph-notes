@@ -4839,9 +4839,10 @@ Text: ${sanitizedBody}
 })
 
 // Email-Setup: Ordner + Instruktions-Notiz erstellen
-ipcMain.handle('email-setup', async (_event, vaultPath: string) => {
+ipcMain.handle('email-setup', async (_event, vaultPath: string, inboxFolderName?: string) => {
   try {
-    const inboxFolder = path.join(vaultPath, '‼️📧 - emails')
+    const folderName = inboxFolderName || '‼️📧 - emails'
+    const inboxFolder = path.join(vaultPath, folderName)
     const instructionPath = path.join(vaultPath, 'Email-Instruktionen.md')
 
     // Ordner erstellen
@@ -4893,7 +4894,7 @@ Wenn eine E-Mail relevant ist, extrahiere:
       console.log('[Email] Instruction note created:', instructionPath)
     }
 
-    return { success: true, folderPath: '‼️📧 - emails', instructionPath: 'Email-Instruktionen.md' }
+    return { success: true, folderPath: folderName, instructionPath: 'Email-Instruktionen.md' }
   } catch (error) {
     console.error('[Email] Setup failed:', error)
     return { success: false, error: error instanceof Error ? error.message : 'Setup fehlgeschlagen' }
@@ -4916,9 +4917,10 @@ ipcMain.handle('email-create-note', async (_event, vaultPath: string, email: {
     categories: string[]
     suggestedActions?: (Record<string, unknown> | string)[]
   }
-}) => {
+}, inboxFolderName?: string) => {
   try {
-    const inboxFolder = path.join(vaultPath, '‼️📧 - emails')
+    const folderName = inboxFolderName || '‼️📧 - emails'
+    const inboxFolder = path.join(vaultPath, folderName)
     await fs.mkdir(inboxFolder, { recursive: true })
 
     // Dateiname: Datum + Zusammenfassung (deutsch) oder Betreff als Fallback
@@ -4939,7 +4941,7 @@ ipcMain.handle('email-create-note', async (_event, vaultPath: string, email: {
     try {
       await fs.access(filePath)
       console.log('[Email] Note already exists:', fileName)
-      return { success: true, path: `‼️📧 - emails/${fileName}`, alreadyExists: true }
+      return { success: true, path: `${folderName}/${fileName}`, alreadyExists: true }
     } catch { /* Noch nicht vorhanden */ }
 
     // Helper: JSON-Objekte rekursiv zu lesbarem Text konvertieren
@@ -5113,7 +5115,7 @@ ipcMain.handle('email-create-note', async (_event, vaultPath: string, email: {
     await fs.writeFile(filePath, lines.join('\n'), 'utf-8')
     console.log('[Email] Note created:', fileName)
 
-    return { success: true, path: `‼️📧 - emails/${fileName}`, alreadyExists: false }
+    return { success: true, path: `${folderName}/${fileName}`, alreadyExists: false }
   } catch (error) {
     console.error('[Email] Create note failed:', error)
     return { success: false, error: error instanceof Error ? error.message : 'Notiz-Erstellung fehlgeschlagen' }

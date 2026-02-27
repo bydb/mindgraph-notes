@@ -636,156 +636,101 @@ ImageUploadDialog.displayName = 'ImageUploadDialog'
 interface AlignmentToolbarProps {
   onAlign: (type: 'left' | 'right' | 'top' | 'bottom' | 'centerH' | 'centerV') => void
   onDistribute: (type: 'horizontal' | 'vertical') => void
-  onAutoGrid: () => void
-  onLayout: (algorithm: LayoutAlgorithm) => void
-  onClusterByColor: () => void
-  onClusterByTag: () => void
+  onApplyLayoutPreset: (preset: 'hierarchical' | 'grid' | 'colorCluster' | 'tagCluster') => void
+  activeLayoutPreset: 'hierarchical' | 'grid' | 'colorCluster' | 'tagCluster'
   disabled: boolean
   selectedCount: number
 }
 
-const AlignmentToolbar: React.FC<AlignmentToolbarProps> = memo(({ onAlign, onDistribute, onAutoGrid, onLayout, onClusterByColor, onClusterByTag, disabled, selectedCount }) => {
+const AlignmentToolbar: React.FC<AlignmentToolbarProps> = memo(({ onAlign, onDistribute, onApplyLayoutPreset, activeLayoutPreset, disabled, selectedCount }) => {
   const { t } = useTranslation()
-  const [showLayoutMenu, setShowLayoutMenu] = useState(false)
-  const layoutMenuRef = useRef<HTMLDivElement>(null)
+  const [showArrangeMenu, setShowArrangeMenu] = useState(false)
+  const arrangeMenuRef = useRef<HTMLDivElement>(null)
 
-  // Close layout menu when clicking outside
+  // Close arrange menu when clicking outside
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
-      if (layoutMenuRef.current && !layoutMenuRef.current.contains(e.target as Node)) {
-        setShowLayoutMenu(false)
+      if (arrangeMenuRef.current && !arrangeMenuRef.current.contains(e.target as Node)) {
+        setShowArrangeMenu(false)
       }
     }
-    if (showLayoutMenu) {
+    if (showArrangeMenu) {
       document.addEventListener('mousedown', handleClickOutside)
       return () => document.removeEventListener('mousedown', handleClickOutside)
     }
-  }, [showLayoutMenu])
+  }, [showArrangeMenu])
 
   return (
     <div className="alignment-toolbar">
-      <div className="alignment-group">
+      <div className="arrange-selector" ref={arrangeMenuRef}>
         <button
-          className="alignment-btn"
-          onClick={() => onAlign('left')}
-          disabled={disabled}
-          title={t('graphCanvas.alignLeft')}
+          className="alignment-btn arrange-btn"
+          onClick={() => setShowArrangeMenu(!showArrangeMenu)}
+          title={t('graphCanvas.arrange')}
         >
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-            <path d="M2 2v12M5 4h7M5 8h5M5 12h9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+            <rect x="1" y="1" width="5" height="3" rx="0.5" stroke="currentColor" strokeWidth="1.2"/>
+            <rect x="1" y="6" width="5" height="3" rx="0.5" stroke="currentColor" strokeWidth="1.2"/>
+            <rect x="10" y="1" width="5" height="3" rx="0.5" stroke="currentColor" strokeWidth="1.2"/>
+            <rect x="10" y="6" width="5" height="3" rx="0.5" stroke="currentColor" strokeWidth="1.2"/>
+            <path d="M1 12h14M1 14.5h14" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeDasharray="2 2"/>
           </svg>
-        </button>
-        <button
-          className="alignment-btn"
-          onClick={() => onAlign('centerH')}
-          disabled={disabled}
-          title={t('graphCanvas.alignCenter')}
-        >
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-            <path d="M8 2v12M4 5h8M5 8h6M3 11h10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-          </svg>
-        </button>
-        <button
-          className="alignment-btn"
-          onClick={() => onAlign('right')}
-          disabled={disabled}
-          title={t('graphCanvas.alignRight')}
-        >
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-            <path d="M14 2v12M4 4h7M6 8h5M2 12h9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-          </svg>
-        </button>
-      </div>
-
-      <div className="alignment-group">
-        <button
-          className="alignment-btn"
-          onClick={() => onAlign('top')}
-          disabled={disabled}
-          title={t('graphCanvas.alignTop')}
-        >
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-            <path d="M2 2h12M4 5v7M8 5v5M12 5v9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-          </svg>
-        </button>
-        <button
-          className="alignment-btn"
-          onClick={() => onAlign('centerV')}
-          disabled={disabled}
-          title={t('graphCanvas.alignMiddle')}
-        >
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-            <path d="M2 8h12M5 4v8M8 5v6M11 3v10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-          </svg>
-        </button>
-        <button
-          className="alignment-btn"
-          onClick={() => onAlign('bottom')}
-          disabled={disabled}
-          title={t('graphCanvas.alignBottom')}
-        >
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-            <path d="M2 14h12M4 4v7M8 6v5M12 2v9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-          </svg>
-        </button>
-      </div>
-
-      <div className="alignment-divider" />
-
-      <div className="alignment-group">
-        <button
-          className="alignment-btn"
-          onClick={() => onDistribute('horizontal')}
-          disabled={selectedCount < 3}
-          title={t('graphCanvas.distributeHorizontal')}
-        >
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-            <rect x="2" y="5" width="3" height="6" rx="0.5" stroke="currentColor" strokeWidth="1.5"/>
-            <rect x="6.5" y="5" width="3" height="6" rx="0.5" stroke="currentColor" strokeWidth="1.5"/>
-            <rect x="11" y="5" width="3" height="6" rx="0.5" stroke="currentColor" strokeWidth="1.5"/>
-          </svg>
-        </button>
-        <button
-          className="alignment-btn"
-          onClick={() => onDistribute('vertical')}
-          disabled={selectedCount < 3}
-          title={t('graphCanvas.distributeVertical')}
-        >
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-            <rect x="5" y="2" width="6" height="3" rx="0.5" stroke="currentColor" strokeWidth="1.5"/>
-            <rect x="5" y="6.5" width="6" height="3" rx="0.5" stroke="currentColor" strokeWidth="1.5"/>
-            <rect x="5" y="11" width="6" height="3" rx="0.5" stroke="currentColor" strokeWidth="1.5"/>
-          </svg>
-        </button>
-      </div>
-
-      <div className="alignment-divider" />
-
-      {/* Layout Algorithm Selector */}
-      <div className="layout-selector" ref={layoutMenuRef}>
-        <button
-          className="alignment-btn layout-btn"
-          onClick={() => setShowLayoutMenu(!showLayoutMenu)}
-          title={t('graphCanvas.selectLayout')}
-        >
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-            <circle cx="4" cy="4" r="2" stroke="currentColor" strokeWidth="1.5"/>
-            <circle cx="12" cy="4" r="2" stroke="currentColor" strokeWidth="1.5"/>
-            <circle cx="4" cy="12" r="2" stroke="currentColor" strokeWidth="1.5"/>
-            <circle cx="12" cy="12" r="2" stroke="currentColor" strokeWidth="1.5"/>
-            <path d="M6 4h4M4 6v4M12 6v4M6 12h4" stroke="currentColor" strokeWidth="1" strokeDasharray="2 1"/>
-          </svg>
-          <span>Layout</span>
+          <span>{t('graphCanvas.arrange')}</span>
           <svg width="10" height="10" viewBox="0 0 10 10" fill="none" className="dropdown-arrow">
             <path d="M2 4L5 7L8 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
           </svg>
         </button>
 
-        {showLayoutMenu && (
-          <div className="layout-menu">
+        {showArrangeMenu && (
+          <div className="arrange-menu">
+            {/* Align Section */}
+            <div className="arrange-menu-label">{t('graphCanvas.align')}</div>
+            <div className="arrange-menu-grid">
+              <button className="alignment-btn" onClick={() => onAlign('left')} disabled={disabled} title={t('graphCanvas.alignLeft')}>
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M2 2v12M5 4h7M5 8h5M5 12h9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
+              </button>
+              <button className="alignment-btn" onClick={() => onAlign('centerH')} disabled={disabled} title={t('graphCanvas.alignCenter')}>
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 2v12M4 5h8M5 8h6M3 11h10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
+              </button>
+              <button className="alignment-btn" onClick={() => onAlign('right')} disabled={disabled} title={t('graphCanvas.alignRight')}>
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M14 2v12M4 4h7M6 8h5M2 12h9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
+              </button>
+              <button className="alignment-btn" onClick={() => onAlign('top')} disabled={disabled} title={t('graphCanvas.alignTop')}>
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M2 2h12M4 5v7M8 5v5M12 5v9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
+              </button>
+              <button className="alignment-btn" onClick={() => onAlign('centerV')} disabled={disabled} title={t('graphCanvas.alignMiddle')}>
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M2 8h12M5 4v8M8 5v6M11 3v10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
+              </button>
+              <button className="alignment-btn" onClick={() => onAlign('bottom')} disabled={disabled} title={t('graphCanvas.alignBottom')}>
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M2 14h12M4 4v7M8 6v5M12 2v9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
+              </button>
+            </div>
+
+            {/* Distribute Section */}
+            <div className="arrange-menu-label">{t('graphCanvas.distribute')}</div>
+            <div className="arrange-menu-row">
+              <button className="alignment-btn" onClick={() => onDistribute('horizontal')} disabled={selectedCount < 3} title={t('graphCanvas.distributeHorizontal')}>
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                  <rect x="2" y="5" width="3" height="6" rx="0.5" stroke="currentColor" strokeWidth="1.5"/>
+                  <rect x="6.5" y="5" width="3" height="6" rx="0.5" stroke="currentColor" strokeWidth="1.5"/>
+                  <rect x="11" y="5" width="3" height="6" rx="0.5" stroke="currentColor" strokeWidth="1.5"/>
+                </svg>
+              </button>
+              <button className="alignment-btn" onClick={() => onDistribute('vertical')} disabled={selectedCount < 3} title={t('graphCanvas.distributeVertical')}>
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                  <rect x="5" y="2" width="6" height="3" rx="0.5" stroke="currentColor" strokeWidth="1.5"/>
+                  <rect x="5" y="6.5" width="6" height="3" rx="0.5" stroke="currentColor" strokeWidth="1.5"/>
+                  <rect x="5" y="11" width="6" height="3" rx="0.5" stroke="currentColor" strokeWidth="1.5"/>
+                </svg>
+              </button>
+            </div>
+
+            <div className="arrange-menu-divider" />
+
+            {/* Layout Presets */}
             <button
-              className="layout-menu-item"
-              onClick={() => { onLayout('hierarchical'); setShowLayoutMenu(false) }}
+              className={`layout-menu-item ${activeLayoutPreset === 'hierarchical' ? 'active' : ''}`}
+              onClick={() => { onApplyLayoutPreset('hierarchical'); setShowArrangeMenu(false) }}
               title={t('graphCanvas.layoutHierarchical')}
             >
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
@@ -799,13 +744,14 @@ const AlignmentToolbar: React.FC<AlignmentToolbarProps> = memo(({ onAlign, onDis
               </svg>
               <span>{t('graphCanvas.hierarchical')}</span>
               <span className="layout-hint">{t('graphCanvas.noCrossings')}</span>
+              <span className="layout-check">✓</span>
             </button>
 
             <div className="layout-menu-divider" />
 
             <button
-              className="layout-menu-item"
-              onClick={() => { onAutoGrid(); setShowLayoutMenu(false) }}
+              className={`layout-menu-item ${activeLayoutPreset === 'grid' ? 'active' : ''}`}
+              onClick={() => { onApplyLayoutPreset('grid'); setShowArrangeMenu(false) }}
               title={t('graphCanvas.layoutGrid')}
             >
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
@@ -816,11 +762,12 @@ const AlignmentToolbar: React.FC<AlignmentToolbarProps> = memo(({ onAlign, onDis
               </svg>
               <span>{t('graphCanvas.grid')}</span>
               <span className="layout-hint">{t('graphCanvas.layoutGrid')}</span>
+              <span className="layout-check">✓</span>
             </button>
 
             <button
-              className="layout-menu-item"
-              onClick={() => { onClusterByColor(); setShowLayoutMenu(false) }}
+              className={`layout-menu-item ${activeLayoutPreset === 'colorCluster' ? 'active' : ''}`}
+              onClick={() => { onApplyLayoutPreset('colorCluster'); setShowArrangeMenu(false) }}
               title={t('graphCanvas.layoutByColor')}
             >
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
@@ -834,11 +781,12 @@ const AlignmentToolbar: React.FC<AlignmentToolbarProps> = memo(({ onAlign, onDis
               </svg>
               <span>{t('graphCanvas.colorCluster')}</span>
               <span className="layout-hint">{t('graphCanvas.layoutByColor')}</span>
+              <span className="layout-check">✓</span>
             </button>
 
             <button
-              className="layout-menu-item"
-              onClick={() => { onClusterByTag(); setShowLayoutMenu(false) }}
+              className={`layout-menu-item ${activeLayoutPreset === 'tagCluster' ? 'active' : ''}`}
+              onClick={() => { onApplyLayoutPreset('tagCluster'); setShowArrangeMenu(false) }}
               title={t('graphCanvas.layoutByTags')}
             >
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
@@ -854,13 +802,16 @@ const AlignmentToolbar: React.FC<AlignmentToolbarProps> = memo(({ onAlign, onDis
               </svg>
               <span>{t('graphCanvas.tagCluster')}</span>
               <span className="layout-hint">{t('graphCanvas.layoutByTags')}</span>
+              <span className="layout-check">✓</span>
             </button>
           </div>
         )}
       </div>
 
       {selectedCount > 0 && (
-        <span className="alignment-info">{selectedCount} {t('graphCanvas.selected')}</span>
+        <span className="alignment-info" title={`${selectedCount} ${t('graphCanvas.selected')}`}>
+          {selectedCount}
+        </span>
       )}
     </div>
   )
@@ -947,12 +898,14 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
     canvasShowTags, setCanvasShowTags,
     canvasShowLinks, setCanvasShowLinks,
     canvasShowImages, setCanvasShowImages,
+    canvasShowSummaries, setCanvasShowSummaries,
     canvasCompactMode, setCanvasCompactMode,
     canvasDefaultCardWidth
   } = useUIStore()
 
   const { fitView, screenToFlowPosition, getNodes } = useReactFlow()
   const { t } = useTranslation()
+  const loadingContentPathsRef = useRef<Set<string>>(new Set())
 
   // SVG Export Funktion - exportiert das gesamte Canvas
   const handleExportSvg = useCallback(async () => {
@@ -1075,6 +1028,37 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
     })
   }, [allNotes, canvasFilterPath, localRootNoteId, expandedNoteIds])
 
+  useEffect(() => {
+    if (!vaultPath) return
+
+    const missingContentNotes = notes.filter(
+      note => !note.content && !loadingContentPathsRef.current.has(note.path)
+    )
+    if (missingContentNotes.length === 0) return
+
+    const pathsToLoad = missingContentNotes.map(note => note.path)
+    const notesByPath = new Map(missingContentNotes.map(note => [note.path, note]))
+    pathsToLoad.forEach(path => loadingContentPathsRef.current.add(path))
+
+    void (async () => {
+      try {
+        const contents = await window.electronAPI.readFilesBatch(vaultPath, pathsToLoad) as Record<string, string | null>
+
+        for (const path of pathsToLoad) {
+          const content = contents[path]
+          const note = notesByPath.get(path)
+          if (note && typeof content === 'string') {
+            updateNote(note.id, { content })
+          }
+        }
+      } catch (error) {
+        console.error('[Canvas] Failed to load note contents for callouts:', error)
+      } finally {
+        pathsToLoad.forEach(path => loadingContentPathsRef.current.delete(path))
+      }
+    })()
+  }, [notes, vaultPath, updateNote])
+
   // PDFs nach Ordner-Filter filtern (nur PDFs ohne Companion-Note anzeigen)
   const pdfs = useMemo(() => {
     const allPdfs = extractPdfsFromFileTree(fileTree, canvasFilterPath)
@@ -1159,6 +1143,7 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
   // Focus Mode State - nur ausgewählte Karten anzeigen
   const [focusMode, setFocusMode] = useState(false)
   const [focusedNodeIds, setFocusedNodeIds] = useState<Set<string>>(new Set())
+  const [activeLayoutPreset, setActiveLayoutPreset] = useState<'hierarchical' | 'grid' | 'colorCluster' | 'tagCluster'>('hierarchical')
 
   // Editing State - welche Node wird gerade bearbeitet
   const [editingNodeId, setEditingNodeId] = useState<string | null>(null)
@@ -1516,6 +1501,121 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
     window.open(url, '_blank', 'noopener,noreferrer')
   }, [])
 
+  const extractCardCalloutSafe = (content: string) => {
+    const parsed = extractFirstCardCallout(content)
+    if (parsed) return parsed
+
+    const blockMatch = content.match(/>\s*\[!([^\]\s]+)\]\s*([^\n\r]*)[\r\n]+((?:>.*(?:[\r\n]+|$))*)/i)
+    if (!blockMatch) return null
+
+    const rawType = blockMatch[1].toLowerCase()
+    const typeAlias: Record<string, string> = {
+      zusammenfassung: 'summary',
+      'tl-dr': 'tldr',
+      tl_dr: 'tldr'
+    }
+    const type = typeAlias[rawType] || rawType
+    const allowedTypes = new Set(['summary', 'tldr', 'abstract', 'note', 'info'])
+    if (!allowedTypes.has(type)) return null
+
+    const headerText = (blockMatch[2] || '').trim()
+    const body = (blockMatch[3] || '')
+      .split(/\r?\n/)
+      .map(line => line.replace(/^>\s?/, '').trim())
+      .filter(Boolean)
+      .join(' ')
+      .trim()
+
+    const contentText = body || headerText
+    if (!contentText) return null
+
+    const icons: Record<string, string> = {
+      summary: '📄',
+      tldr: '📄',
+      abstract: '📄',
+      note: '📝',
+      info: 'ℹ️'
+    }
+
+    return {
+      type,
+      title: headerText || type.charAt(0).toUpperCase() + type.slice(1),
+      content: contentText,
+      icon: icons[type] || '📌'
+    }
+  }
+
+  const truncateToWordLimit = (text: string, wordLimit: number): string => {
+    const normalized = text.replace(/\s+/g, ' ').trim()
+    if (!normalized) return ''
+
+    const words = normalized.split(' ')
+    if (words.length <= wordLimit) return normalized
+
+    return `${words.slice(0, wordLimit).join(' ')}...`
+  }
+
+  const estimateWrappedLineCount = (text: string, charsPerLine: number): number => {
+    const words = text.split(' ').filter(Boolean)
+    if (words.length === 0) return 0
+
+    let lines = 1
+    let currentLineChars = 0
+
+    for (const word of words) {
+      const wordLength = word.length
+
+      if (currentLineChars === 0) {
+        if (wordLength <= charsPerLine) {
+          currentLineChars = wordLength
+          continue
+        }
+
+        const wrappedWordLines = Math.ceil(wordLength / charsPerLine)
+        lines += wrappedWordLines - 1
+        currentLineChars = wordLength % charsPerLine || charsPerLine
+        continue
+      }
+
+      const charsWithSpace = currentLineChars + 1 + wordLength
+      if (charsWithSpace <= charsPerLine) {
+        currentLineChars = charsWithSpace
+        continue
+      }
+
+      lines += 1
+      if (wordLength <= charsPerLine) {
+        currentLineChars = wordLength
+      } else {
+        const wrappedWordLines = Math.ceil(wordLength / charsPerLine)
+        lines += wrappedWordLines - 1
+        currentLineChars = wordLength % charsPerLine || charsPerLine
+      }
+    }
+
+    return lines
+  }
+
+  const calculateCalloutHeight = (callout: any, nodeWidth: number): number => {
+    if (!callout?.content) return 0
+
+    const previewText = truncateToWordLimit(callout.content, 100)
+    if (!previewText) return 0
+
+    const contentWidth = Math.max(nodeWidth - 52, 120)
+    const averageCharWidth = 5.2
+    const charsPerLine = Math.max(18, Math.floor(contentWidth / averageCharWidth))
+    const estimatedLines = estimateWrappedLineCount(previewText, charsPerLine)
+    const lineSafetyBuffer = estimatedLines >= 5 ? 1 : 0
+    const totalLines = estimatedLines + lineSafetyBuffer
+
+    const headerHeight = 22
+    const contentHeight = totalLines * 14
+    const paddingAndGaps = 20
+
+    return headerHeight + contentHeight + paddingAndGaps
+  }
+
   // Berechnet die Dimensionen basierend auf Inhalt
   // STRATEGIE: Breite so wählen, dass Titel auf EINE Zeile passt → einfachere Höhenberechnung
   const calculateNodeDimensions = (
@@ -1528,6 +1628,7 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
     linkCount: number = 0,
     showTags: boolean = true,
     showLinks: boolean = true,
+    showSummaries: boolean = true,
     compactMode: boolean = false
   ): { width: number; height: number } => {
     // === BREITE berechnen ===
@@ -1547,7 +1648,7 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
     if (hasImage) width = Math.max(width, baseWidth + 20)
     if (taskSummary?.total > 0) width = Math.max(width, baseWidth)
     if (hasExternalLink) width = Math.max(width, baseWidth)
-    if (callout) width = Math.max(width, baseWidth + 20)
+    if (showSummaries && callout) width = Math.max(width, baseWidth + 20)
 
     // Tags brauchen Breite - damit mehr Tags nebeneinander passen
     if (showTags && tagCount > 0) {
@@ -1567,8 +1668,11 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
     const titleLines = titleFitsOneLine ? 1 : 2
     height += titleLines * 26 // ~26px pro Zeile (font-size + line-height)
 
-    // Im Kompakt-Modus nur Titel
+    // Im Kompakt-Modus: nur Titel, optional Zusammenfassung
     if (compactMode) {
+      if (showSummaries && callout) {
+        height += calculateCalloutHeight(callout, width)
+      }
       return { width, height: Math.max(height, 50) }
     }
 
@@ -1578,9 +1682,9 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
     // Externer Link
     if (hasExternalLink) height += 40 // 32px Link + 8px gap
 
-    // Callout - KRITISCH: Braucht viel Platz!
-    // Header (~20px) + Content (3 Zeilen à 14px = 42px) + Padding (12px) + Border (6px) + gap (8px)
-    if (callout) height += 95
+    if (showSummaries && callout) {
+      height += calculateCalloutHeight(callout, width)
+    }
 
     // Tasks
     if (taskSummary?.total > 0) {
@@ -1619,7 +1723,7 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
 
     // WICHTIG: Extra Höhe wenn Callout UND Tags zusammen vorkommen
     // Diese Kombination ist das Hauptproblem - braucht deutlich mehr Platz!
-    if (callout && hasVisibleTags) {
+    if (showSummaries && callout && hasVisibleTags) {
       height += 25
     }
 
@@ -1709,7 +1813,7 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
       const storedHeight = positions[note.id]?.height
 
       // Callout für Kartenanzeige extrahieren
-      const callout = extractFirstCardCallout(note.content)
+      const callout = extractCardCalloutSafe(note.content)
 
       // Tasks extrahieren
       const taskSummary = extractTasks(note.content)
@@ -1742,6 +1846,7 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
         linkCount,
         canvasShowTags,
         canvasShowLinks,
+        canvasShowSummaries,
         canvasCompactMode
       )
 
@@ -1793,6 +1898,7 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
           showTags: canvasShowTags,
           showLinks: canvasShowLinks,
           showImages: canvasShowImages,
+          showSummaries: canvasShowSummaries,
           compactMode: canvasCompactMode,
           // Local Canvas Mode
           isLocalRoot: localRootNoteId === note.id,
@@ -1859,7 +1965,7 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
     }))
 
     return [...noteNodes, ...pdfNodes, ...labelNodes]
-  }, [notes, pdfs, positions, labels, getStablePosition, editingNodeId, handleNodeTitleChange, handleLabelTextChange, handleEditingDone, handleTaskToggle, handleOpenExternalLink, imageDataUrls, loadImageDataUrl, canvasShowTags, canvasShowLinks, canvasShowImages, canvasCompactMode, canvasDefaultCardWidth, canvasFilterPath, localRootNoteId, expandedNoteIds, onExpandNode, allNotes])
+  }, [notes, pdfs, positions, labels, getStablePosition, editingNodeId, handleNodeTitleChange, handleLabelTextChange, handleEditingDone, handleTaskToggle, handleOpenExternalLink, imageDataUrls, loadImageDataUrl, canvasShowTags, canvasShowLinks, canvasShowImages, canvasShowSummaries, canvasCompactMode, canvasDefaultCardWidth, canvasFilterPath, localRootNoteId, expandedNoteIds, onExpandNode, allNotes])
   
   // Links zu Edges konvertieren - bidirektionale Links zusammenführen
   const initialEdges: Edge[] = useMemo(() => {
@@ -1988,10 +2094,6 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
         return {
           ...node,
           position: { x: storedPos.x, y: storedPos.y },
-          style: {
-            width: storedPos.width || 140,
-            height: storedPos.height || 70
-          },
           data: {
             ...node.data,
             color: storedPos.color,
@@ -2047,6 +2149,7 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
               showTags: canvasShowTags,
               showLinks: canvasShowLinks,
               showImages: canvasShowImages,
+              showSummaries: canvasShowSummaries,
               compactMode: canvasCompactMode,
               imageDataUrl: imageDataUrls[node.id] || node.data.imageDataUrl
             }
@@ -2068,6 +2171,7 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
           (note.outgoingLinks?.length || 0) + (note.incomingLinks?.length || 0),
           canvasShowTags,
           canvasShowLinks,
+          canvasShowSummaries,
           canvasCompactMode
         )
 
@@ -2075,10 +2179,11 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
           ...node,
           data: {
             ...node.data,
-            showTags: canvasShowTags,
-            showLinks: canvasShowLinks,
-            showImages: canvasShowImages,
-            compactMode: canvasCompactMode,
+              showTags: canvasShowTags,
+              showLinks: canvasShowLinks,
+              showImages: canvasShowImages,
+              showSummaries: canvasShowSummaries,
+              compactMode: canvasCompactMode,
             imageDataUrl: imageDataUrls[node.id] || node.data.imageDataUrl
           },
           style: {
@@ -2090,7 +2195,7 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
         }
       })
     )
-  }, [canvasShowTags, canvasShowLinks, canvasShowImages, canvasCompactMode, canvasDefaultCardWidth, imageDataUrls, setNodes])
+  }, [canvasShowTags, canvasShowLinks, canvasShowImages, canvasShowSummaries, canvasCompactMode, canvasDefaultCardWidth, imageDataUrls, setNodes])
 
   // Update imageDataUrl in nodes when images are loaded
   useEffect(() => {
@@ -2940,6 +3045,24 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
     setTimeout(() => fitView({ padding: 0.3 }), 100)
   }, [nodes, notes, positions, setNodePosition, fitView, focusMode, focusedNodeIds])
 
+  const handleApplyLayoutPreset = useCallback((preset: 'hierarchical' | 'grid' | 'colorCluster' | 'tagCluster') => {
+    setActiveLayoutPreset(preset)
+
+    if (preset === 'hierarchical') {
+      handleLayout('hierarchical')
+      return
+    }
+    if (preset === 'grid') {
+      handleAutoGrid()
+      return
+    }
+    if (preset === 'colorCluster') {
+      handleClusterByColor()
+      return
+    }
+    handleClusterByTag()
+  }, [handleLayout, handleAutoGrid, handleClusterByColor, handleClusterByTag])
+
   // Focus Mode Handler - ausgewählte Karten fokussieren
   const handleEnterFocusMode = useCallback(() => {
     if (selectedNodes.length === 0) return
@@ -2981,6 +3104,18 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
       return newSet
     })
   }, [focusMode, selectedNodes])
+
+  // Escape-Taste beendet Fokus-Modus
+  useEffect(() => {
+    if (!focusMode) return
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        handleExitFocusMode()
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [focusMode, handleExitFocusMode])
 
   // Neue Karte/Notiz erstellen - öffnet den erweiterten Dialog
   const handleAddNewNote = useCallback(() => {
@@ -3070,6 +3205,16 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
               <path d="M1 11l3-3 2 2 4-4 5 5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
           </button>
+          <button
+            className={`display-toggle-btn ${canvasShowSummaries ? 'active' : ''}`}
+            onClick={() => setCanvasShowSummaries(!canvasShowSummaries)}
+            title={canvasShowSummaries ? t('graphCanvas.hideSummaries') : t('graphCanvas.showSummaries')}
+          >
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+              <rect x="2" y="2" width="12" height="12" rx="1.5" stroke="currentColor" strokeWidth="1.2"/>
+              <path d="M4.5 6h7M4.5 8h7M4.5 10h4.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+            </svg>
+          </button>
         </div>
 
         <div className="canvas-filter-divider" />
@@ -3105,66 +3250,32 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
           <>
             <div className="canvas-filter-divider" />
 
-            <AlignmentToolbar
-              onAlign={handleAlign}
-              onDistribute={handleDistribute}
-              onAutoGrid={handleAutoGrid}
-              onLayout={handleLayout}
-              onClusterByColor={handleClusterByColor}
-              onClusterByTag={handleClusterByTag}
-              disabled={selectedCount < 2}
-              selectedCount={selectedCount}
-            />
+            {/* Focus Mode - nur Enter-Button in Toolbar */}
+            {!focusMode && (
+              <button
+                className="focus-btn"
+                onClick={handleEnterFocusMode}
+                disabled={selectedCount === 0}
+                title={t('graphCanvas.focusMode')}
+              >
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                  <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.5"/>
+                  <circle cx="8" cy="8" r="2" fill="currentColor"/>
+                </svg>
+                <span>{t('graphCanvas.focus')}</span>
+              </button>
+            )}
 
             <div className="canvas-filter-divider" />
 
-            {/* Focus Mode Controls */}
-            <div className="focus-mode-controls">
-              {!focusMode ? (
-                <button
-                  className="focus-btn"
-                  onClick={handleEnterFocusMode}
-                  disabled={selectedCount === 0}
-                  title={t('graphCanvas.focusMode')}
-                >
-                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                    <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.5"/>
-                    <circle cx="8" cy="8" r="2" fill="currentColor"/>
-                  </svg>
-                  <span>{t('graphCanvas.focus')}</span>
-                </button>
-              ) : (
-                <>
-                  <div className="focus-mode-active">
-                    <span className="focus-indicator" />
-                    <span>{focusedNodeIds.size} {t('graphCanvas.inFocus')}</span>
-                  </div>
-                  <button
-                    className="focus-btn small"
-                    onClick={handleAddToFocus}
-                    disabled={selectedCount === 0}
-                    title={t('graphCanvas.addToFocus')}
-                  >
-                    +
-                  </button>
-                  <button
-                    className="focus-btn small"
-                    onClick={handleRemoveFromFocus}
-                    disabled={selectedCount === 0}
-                    title={t('graphCanvas.removeFromFocus')}
-                  >
-                    −
-                  </button>
-                  <button
-                    className="focus-btn exit"
-                    onClick={handleExitFocusMode}
-                    title={t('graphCanvas.exitFocusMode')}
-                  >
-                    ✕ {t('graphCanvas.exit')}
-                  </button>
-                </>
-              )}
-            </div>
+            <AlignmentToolbar
+              onAlign={handleAlign}
+              onDistribute={handleDistribute}
+              onApplyLayoutPreset={handleApplyLayoutPreset}
+              activeLayoutPreset={activeLayoutPreset}
+              disabled={selectedCount < 2}
+              selectedCount={selectedCount}
+            />
           </>
         )}
       </div>
@@ -3209,7 +3320,38 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
             SVG
           </button>
         </Panel>
-        <MiniMap 
+        {focusMode && (
+          <Panel position="top-center" className="focus-floating-bar">
+            <div className="focus-mode-active">
+              <span className="focus-indicator" />
+              <span>{focusedNodeIds.size} {t('graphCanvas.inFocus')}</span>
+            </div>
+            <button
+              className="focus-btn small"
+              onClick={handleAddToFocus}
+              disabled={selectedCount === 0}
+              title={t('graphCanvas.addToFocus')}
+            >
+              +
+            </button>
+            <button
+              className="focus-btn small"
+              onClick={handleRemoveFromFocus}
+              disabled={selectedCount === 0}
+              title={t('graphCanvas.removeFromFocus')}
+            >
+              −
+            </button>
+            <button
+              className="focus-btn exit"
+              onClick={handleExitFocusMode}
+              title={t('graphCanvas.exitFocusMode')}
+            >
+              ✕
+            </button>
+          </Panel>
+        )}
+        <MiniMap
           nodeColor={(node) => node.data.color || 'var(--node-minimap-color)'}
           maskColor="var(--minimap-mask)"
         />

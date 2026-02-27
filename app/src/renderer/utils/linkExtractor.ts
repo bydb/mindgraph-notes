@@ -129,6 +129,11 @@ export function generateNoteId(path: string): string {
 
 // Callout-Typen die auf Karten angezeigt werden sollen
 const CARD_CALLOUT_TYPES = ['summary', 'tldr', 'abstract', 'note', 'info']
+const CARD_CALLOUT_TYPE_ALIASES: Record<string, string> = {
+  zusammenfassung: 'summary',
+  tl_dr: 'tldr',
+  'tl-dr': 'tldr'
+}
 
 export interface ExtractedCallout {
   type: string
@@ -141,41 +146,53 @@ export interface ExtractedCallout {
 export function extractCallouts(content: string): ExtractedCallout[] {
   const callouts: ExtractedCallout[] = []
 
-  // Callout Pattern: > [!type] optional title
-  // Gefolgt von > content lines
-  const calloutRegex = /^>\s*\[!(\w+)\](?:\s+(.+))?\n((?:>.*\n?)*)/gm
+  const lines = content.split('\n')
+  const headerRegex = /^>\s*\[!([^\]\s]+)\]\s*(.*)$/
 
-  let match
-  while ((match = calloutRegex.exec(content)) !== null) {
-    const type = match[1].toLowerCase()
-    const customTitle = match[2]?.trim()
-    const body = match[3]
+  for (let i = 0; i < lines.length; i++) {
+    const headerMatch = lines[i].match(headerRegex)
+    if (!headerMatch) continue
 
-    // Nur bestimmte Callout-Typen für Karten extrahieren
-    if (CARD_CALLOUT_TYPES.includes(type)) {
-      // Entferne > am Anfang jeder Zeile im Body
-      const cleanBody = body
-        .split('\n')
-        .map((line: string) => line.replace(/^>\s?/, ''))
-        .join(' ')
-        .trim()
+    const rawType = headerMatch[1].toLowerCase()
+    const normalizedType = CARD_CALLOUT_TYPE_ALIASES[rawType] || rawType
+    if (!CARD_CALLOUT_TYPES.includes(normalizedType)) continue
 
-      // Icons für Callout-Typen
-      const icons: Record<string, string> = {
-        summary: '📄',
-        tldr: '📄',
-        abstract: '📄',
-        note: '📝',
-        info: 'ℹ️'
-      }
+    const customTitle = headerMatch[2]?.trim()
+    const bodyLines: string[] = []
+    let j = i + 1
 
-      callouts.push({
-        type,
-        title: customTitle || type.charAt(0).toUpperCase() + type.slice(1),
-        content: cleanBody,
-        icon: icons[type] || '📌'
-      })
+    while (j < lines.length && /^>/.test(lines[j])) {
+      bodyLines.push(lines[j].replace(/^>\s?/, '').trim())
+      j++
     }
+
+    let cleanBody = bodyLines
+      .filter(Boolean)
+      .join(' ')
+      .trim()
+
+    // Fallback für einzeilige Callouts: > [!summary] Dein Text ...
+    if (!cleanBody && customTitle) {
+      cleanBody = customTitle
+    }
+
+    // Icons für Callout-Typen
+    const icons: Record<string, string> = {
+      summary: '📄',
+      tldr: '📄',
+      abstract: '📄',
+      note: '📝',
+      info: 'ℹ️'
+    }
+
+    callouts.push({
+      type: normalizedType,
+      title: cleanBody === customTitle ? normalizedType.charAt(0).toUpperCase() + normalizedType.slice(1) : (customTitle || normalizedType.charAt(0).toUpperCase() + normalizedType.slice(1)),
+      content: cleanBody,
+      icon: icons[normalizedType] || '📌'
+    })
+
+    i = j - 1
   }
 
   return callouts

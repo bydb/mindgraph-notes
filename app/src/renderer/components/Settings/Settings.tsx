@@ -2876,6 +2876,22 @@ LIMIT 10
                     </div>
 
                     <div className="settings-row">
+                      <label>{t('settings.email.inboxFolder')}</label>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <input
+                          type="text"
+                          value={emailSettings.inboxFolderName}
+                          onChange={e => setEmail({ inboxFolderName: e.target.value })}
+                          placeholder="‼️📧 - emails"
+                          style={{ width: '250px' }}
+                        />
+                        <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                          {t('settings.email.inboxFolderHint')}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="settings-row">
                       <label>{t('settings.email.relevanceThreshold')}</label>
                       <div className="settings-input-group" style={{ gap: '8px' }}>
                         <input

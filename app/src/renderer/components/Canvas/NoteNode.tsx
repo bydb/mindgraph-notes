@@ -25,12 +25,65 @@ interface NoteNodeData {
   showTags?: boolean
   showLinks?: boolean
   showImages?: boolean
+  showSummaries?: boolean
   compactMode?: boolean
   // Local Canvas Mode
   isLocalRoot?: boolean
   isExpanded?: boolean
   hiddenConnections?: number
   onExpand?: (noteId: string) => void
+}
+
+const MAX_CALLOUT_WORDS = 100
+
+function extractCalloutFromContent(content: string): ExtractedCallout | null {
+  const match = content.match(/>\s*\[!([^\]\s]+)\]\s*([^\n\r]*)[\r\n]+((?:>.*(?:[\r\n]+|$))*)/i)
+  if (!match) return null
+
+  const rawType = (match[1] || '').toLowerCase()
+  const typeAlias: Record<string, string> = {
+    zusammenfassung: 'summary',
+    'tl-dr': 'tldr',
+    tl_dr: 'tldr'
+  }
+  const type = typeAlias[rawType] || rawType
+  const allowedTypes = new Set(['summary', 'tldr', 'abstract', 'note', 'info'])
+  if (!allowedTypes.has(type)) return null
+
+  const title = (match[2] || '').trim() || type.charAt(0).toUpperCase() + type.slice(1)
+  const contentText = (match[3] || '')
+    .split(/\r?\n/)
+    .map(line => line.replace(/^>\s?/, '').trim())
+    .filter(Boolean)
+    .join(' ')
+    .trim()
+
+  if (!contentText) return null
+
+  const icons: Record<string, string> = {
+    summary: '📄',
+    tldr: '📄',
+    abstract: '📄',
+    note: '📝',
+    info: 'ℹ️'
+  }
+
+  return {
+    type,
+    title,
+    content: contentText,
+    icon: icons[type] || '📌'
+  }
+}
+
+function truncateToWordLimit(text: string, wordLimit: number): string {
+  const normalized = text.replace(/\s+/g, ' ').trim()
+  if (!normalized) return ''
+
+  const words = normalized.split(' ')
+  if (words.length <= wordLimit) return normalized
+
+  return `${words.slice(0, wordLimit).join(' ')}...`
 }
 
 // Vordefinierte Farben - müssen mit nodeColors in GraphCanvas.tsx übereinstimmen
@@ -75,8 +128,11 @@ const arePropsEqual = (prevProps: NodeProps<NoteNodeData>, nextProps: NodeProps<
     prevProps.data.showTags === nextProps.data.showTags &&
     prevProps.data.showLinks === nextProps.data.showLinks &&
     prevProps.data.showImages === nextProps.data.showImages &&
+    prevProps.data.showSummaries === nextProps.data.showSummaries &&
     prevProps.data.compactMode === nextProps.data.compactMode &&
     prevProps.data.imageDataUrl === nextProps.data.imageDataUrl &&
+    prevProps.data.callout?.content === nextProps.data.callout?.content &&
+    prevProps.data.note.content === nextProps.data.note.content &&
     prevProps.data.note.tags.length === nextProps.data.note.tags.length &&
     prevProps.data.note.outgoingLinks.length === nextProps.data.note.outgoingLinks.length &&
     prevProps.data.note.incomingLinks.length === nextProps.data.note.incomingLinks.length &&
@@ -91,7 +147,7 @@ export const NoteNode: React.FC<NodeProps<NoteNodeData>> = memo(({ data, selecte
   const {
     title, note, color, isEditing, onTitleChange, onEditingDone, onTaskToggle, onOpenExternalLink,
     callout, taskSummary, externalLink, embeddedImage, imageDataUrl,
-    showTags = true, showLinks = true, showImages = true, compactMode = false,
+    showTags = true, showLinks = true, showImages = true, showSummaries = true, compactMode = false,
     isLocalRoot = false, isExpanded = false, hiddenConnections = 0, onExpand
   } = data
 
@@ -139,6 +195,9 @@ export const NoteNode: React.FC<NodeProps<NoteNodeData>> = memo(({ data, selecte
     : { bg: 'var(--node-bg)', border: 'var(--node-border)', text: 'var(--text-primary)' }
 
   const linkCount = data.linkCount ?? (note.outgoingLinks.length + note.incomingLinks.length)
+  const calloutFromContent = extractCalloutFromContent(note.content)
+  const effectiveCallout = callout || calloutFromContent
+  const calloutPreview = effectiveCallout ? truncateToWordLimit(effectiveCallout.content, MAX_CALLOUT_WORDS) : ''
 
   return (
     <>
@@ -150,7 +209,7 @@ export const NoteNode: React.FC<NodeProps<NoteNodeData>> = memo(({ data, selecte
         handleClassName="node-resizer-handle"
       />
       <div
-        className={`note-node ${selected ? 'selected' : ''} ${callout ? 'has-callout' : ''} ${taskSummary && taskSummary.total > 0 ? 'has-tasks' : ''}`}
+        className={`note-node ${selected ? 'selected' : ''} ${effectiveCallout ? 'has-callout' : ''} ${taskSummary && taskSummary.total > 0 ? 'has-tasks' : ''}`}
         style={{
           width: '100%',
           height: '100%',
@@ -162,9 +221,9 @@ export const NoteNode: React.FC<NodeProps<NoteNodeData>> = memo(({ data, selecte
           color: color ? colorStyle.text : 'var(--text-primary)',
         }}
       >
-        <Handle
-          type="target"
-          position={Position.Left}
+          <Handle
+            type="target"
+            position={Position.Left}
           id="target-left"
           className="node-handle"
         />
@@ -218,17 +277,15 @@ export const NoteNode: React.FC<NodeProps<NoteNodeData>> = memo(({ data, selecte
             </div>
           )}
 
-          {/* Callout-Anzeige (nur wenn nicht im Kompakt-Modus) */}
-          {!compactMode && callout && (
-            <div className={`note-node-callout callout-type-${callout.type}`}>
+          {/* Callout-Anzeige */}
+          {showSummaries && effectiveCallout && (
+            <div className={`note-node-callout callout-type-${effectiveCallout.type}`}>
               <div className="note-node-callout-header">
-                <span className="note-node-callout-icon">{callout.icon}</span>
-                <span className="note-node-callout-title">{callout.title}</span>
+                <span className="note-node-callout-icon">{effectiveCallout.icon}</span>
+                <span className="note-node-callout-title">{effectiveCallout.title}</span>
               </div>
               <div className="note-node-callout-content">
-                {callout.content.length > 100
-                  ? callout.content.substring(0, 100) + '...'
-                  : callout.content}
+                {calloutPreview}
               </div>
             </div>
           )}

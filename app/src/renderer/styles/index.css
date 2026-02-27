@@ -3223,10 +3223,8 @@ body {
   opacity: 0.85;
   font-size: 10px;
   line-height: 1.35;
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 /* Callout-Typen auf Karten */
@@ -4875,6 +4873,7 @@ body {
   align-items: center;
   gap: 6px;
   margin-left: auto;
+  min-width: 0;
 }
 
 .alignment-group {
@@ -4883,6 +4882,83 @@ body {
   background: var(--bg-tertiary);
   border-radius: var(--radius-md);
   padding: 3px;
+}
+
+/* ============ ARRANGE DROPDOWN ============ */
+.arrange-selector {
+  position: relative;
+}
+
+.arrange-btn {
+  width: auto !important;
+  padding: 0 10px;
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-md);
+  font-size: 11px;
+  font-weight: 600;
+  gap: 6px;
+}
+
+.arrange-btn:hover {
+  background: var(--accent-subtle);
+  color: var(--accent-color);
+}
+
+.arrange-btn .dropdown-arrow {
+  margin-left: 2px;
+  opacity: 0.6;
+}
+
+.arrange-menu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 4px;
+  min-width: 220px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+  z-index: 1000;
+  padding: 8px;
+}
+
+.arrange-menu-label {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+  padding: 4px 6px 6px;
+}
+
+.arrange-menu-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 2px;
+  padding: 0 2px 8px;
+}
+
+.arrange-menu-grid .alignment-btn {
+  width: 100%;
+  height: 32px;
+}
+
+.arrange-menu-row {
+  display: flex;
+  gap: 2px;
+  padding: 0 2px 8px;
+}
+
+.arrange-menu-row .alignment-btn {
+  width: 32px;
+  height: 32px;
+}
+
+.arrange-menu-divider {
+  height: 1px;
+  background: var(--border-color);
+  margin: 4px 0;
 }
 
 .alignment-btn {
@@ -4936,10 +5012,15 @@ body {
 }
 
 .alignment-info {
+  min-width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   font-size: 11px;
   color: var(--accent-color);
   font-weight: 600;
-  padding: 4px 10px;
+  padding: 0 8px;
   background: var(--accent-subtle);
   border-radius: var(--radius-full);
 }
@@ -4956,7 +5037,15 @@ body {
   border-radius: var(--radius-md);
   font-size: 11px;
   font-weight: 600;
-  gap: 4px;
+  gap: 6px;
+  max-width: 96px;
+}
+
+.layout-btn-current {
+  max-width: 120px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .layout-btn:hover {
@@ -5003,6 +5092,15 @@ body {
   background: var(--bg-secondary);
 }
 
+.layout-menu-item.active {
+  background: var(--accent-subtle);
+  color: var(--accent-color);
+}
+
+.layout-menu-item.active svg {
+  color: var(--accent-color);
+}
+
 .layout-menu-item svg {
   flex-shrink: 0;
   color: var(--text-secondary);
@@ -5023,6 +5121,16 @@ body {
   font-weight: 400;
 }
 
+.layout-check {
+  opacity: 0;
+  color: var(--accent-color);
+  font-weight: 700;
+}
+
+.layout-menu-item.active .layout-check {
+  opacity: 1;
+}
+
 .layout-menu-item:hover .layout-hint {
   color: var(--text-secondary);
 }
@@ -5034,10 +5142,29 @@ body {
 }
 
 /* ============ FOCUS MODE ============ */
-.focus-mode-controls {
+
+/* Floating Focus Bar (inside ReactFlow Panel) */
+.focus-floating-bar {
   display: flex;
   align-items: center;
   gap: 8px;
+  padding: 8px 14px;
+  background: var(--bg-primary);
+  border: 1px solid rgba(255, 149, 0, 0.3);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  animation: focus-bar-enter 0.25s ease-out;
+}
+
+@keyframes focus-bar-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .focus-btn {
@@ -5075,8 +5202,12 @@ body {
 }
 
 .focus-btn.exit {
+  width: 28px;
+  padding: 0;
   background: rgba(244, 71, 71, 0.15);
   color: #f44747;
+  font-size: 14px;
+  font-weight: 700;
 }
 
 .focus-btn.exit:hover {
@@ -5087,11 +5218,13 @@ body {
 .focus-mode-active {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 6px 12px;
+  gap: 6px;
+  min-width: 42px;
+  justify-content: center;
+  padding: 6px 8px;
   background: rgba(255, 149, 0, 0.15);
   border-radius: var(--radius-md);
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
   color: #ff9500;
 }
