@@ -53,6 +53,7 @@ interface ContextMenuProps {
   onColorChange?: (color: string | undefined) => void
   onOpenInEditor?: () => void
   onRename?: () => void
+  onDuplicate?: () => void
   onEditTags?: () => void
   onAddExternalLink?: () => void
   onAddImage?: () => void
@@ -60,7 +61,7 @@ interface ContextMenuProps {
   currentColor?: string
 }
 
-const ContextMenu: React.FC<ContextMenuProps> = memo(({ x, y, onClose, onDelete, onColorChange, onOpenInEditor, onRename, onEditTags, onAddExternalLink, onAddImage, type, currentColor }) => {
+const ContextMenu: React.FC<ContextMenuProps> = memo(({ x, y, onClose, onDelete, onColorChange, onOpenInEditor, onRename, onDuplicate, onEditTags, onAddExternalLink, onAddImage, type, currentColor }) => {
   const { t } = useTranslation()
   const [showColors, setShowColors] = useState(false)
 
@@ -100,6 +101,16 @@ const ContextMenu: React.FC<ContextMenuProps> = memo(({ x, y, onClose, onDelete,
             }}
           >
             {t('graphCanvas.rename')}
+          </button>
+
+          <button
+            className="context-menu-item"
+            onClick={() => {
+              onDuplicate?.()
+              onClose()
+            }}
+          >
+            {t('graphCanvas.duplicate')}
           </button>
 
           <button
@@ -889,7 +900,7 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
   const vaultPath = useNotesStore((s) => s.vaultPath)
   const fileTree = useNotesStore((s) => s.fileTree)
 
-  const { positions, manualEdges, labels, viewport, setNodePosition, setViewport, removeManualEdge, setNodeColor, setNodeDimensions, removeNodePosition, addLabel, updateLabel, removeLabel } = useGraphStore()
+  const { positions, manualEdges, labels, viewport, setNodePosition, setViewport, removeManualEdge, setNodeColor, setNodeSize, setNodeDimensions, removeNodePosition, addLabel, updateLabel, removeLabel } = useGraphStore()
 
   const {
     viewMode,
@@ -3387,6 +3398,39 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
           onRename={() => {
             if (contextMenu.type === 'node' || contextMenu.type === 'label') {
               setEditingNodeId(contextMenu.id)
+            }
+          }}
+          onDuplicate={async () => {
+            if (contextMenu.type !== 'node' || !vaultPath) return
+            const noteToDuplicate = notes.find(n => n.id === contextMenu.id)
+            if (!noteToDuplicate) return
+
+            const fullPath = `${vaultPath}/${noteToDuplicate.path}`
+            try {
+              const result = await window.electronAPI.duplicateFile(fullPath)
+              if (!result.success || !result.newPath) return
+
+              const content = await window.electronAPI.readFile(result.newPath)
+              const relativePath = result.newPath.replace(vaultPath + '/', '')
+              const note = await createNoteFromFile(result.newPath, relativePath, content)
+              addNote(note)
+
+              // Position leicht versetzt
+              const origPos = positions[contextMenu.id]
+              const offsetX = (origPos?.x ?? 0) + 50
+              const offsetY = (origPos?.y ?? 0) + 50
+              setNodePosition(note.id, offsetX, offsetY)
+
+              // Farbe und Größe übernehmen
+              if (origPos?.color) setNodeColor(note.id, origPos.color)
+              if (origPos?.size) setNodeSize(note.id, origPos.size)
+              if (origPos?.width && origPos?.height) setNodeDimensions(note.id, origPos.width, origPos.height)
+
+              // FileTree aktualisieren
+              const tree = await window.electronAPI.readDirectory(vaultPath)
+              setFileTree(tree)
+            } catch (error) {
+              console.error('Fehler beim Duplizieren:', error)
             }
           }}
           onEditTags={() => {

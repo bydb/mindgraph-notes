@@ -401,6 +401,7 @@ const translations = {
     // Graph Canvas
     'graphCanvas.openInEditor': 'Im Editor öffnen',
     'graphCanvas.rename': 'Umbenennen',
+    'graphCanvas.duplicate': 'Duplizieren',
     'graphCanvas.editTags': 'Tags bearbeiten',
     'graphCanvas.addExternalLink': 'Externen Link hinzufügen',
     'graphCanvas.addImage': 'Bild hinzufügen',
@@ -1617,6 +1618,7 @@ const translations = {
     // Graph Canvas
     'graphCanvas.openInEditor': 'Open in editor',
     'graphCanvas.rename': 'Rename',
+    'graphCanvas.duplicate': 'Duplicate',
     'graphCanvas.editTags': 'Edit tags',
     'graphCanvas.addExternalLink': 'Add external link',
     'graphCanvas.addImage': 'Add image',
