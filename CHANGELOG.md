@@ -2,6 +2,11 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.2.24-alpha] - 2026-03-01
+
+### Features
+- **Canvas: Notiz duplizieren**: Neuer "Duplizieren"-Eintrag im Rechtsklick-Kontextmenü auf Canvas-Karten. Erstellt eine Kopie der Notiz im gleichen Ordner und platziert die neue Karte leicht versetzt neben dem Original — mit gleicher Farbe, Größe und Dimensionen
+
 ## [0.2.23-alpha] - 2026-02-27
 
 ### Features
