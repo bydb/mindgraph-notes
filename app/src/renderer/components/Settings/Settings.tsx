@@ -9,7 +9,8 @@ import {
   DEFAULT_TEMPLATES,
   loadTemplateConfig,
   saveTemplateConfig,
-  generateRandomId
+  generateRandomId,
+  formatDate
 } from '../../utils/templateEngine'
 
 interface SettingsProps {
@@ -158,7 +159,11 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
     edoobox: edooboxSettings,
     setEdoobox,
     remarkable: remarkableSettings,
-    setRemarkable
+    setRemarkable,
+    slashCommandDateFormat,
+    setSlashCommandDateFormat,
+    slashCommandTimeFormat,
+    setSlashCommandTimeFormat
   } = useUIStore()
 
   const { t } = useTranslation()
@@ -972,6 +977,36 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
                     <option value="2000">2 {t('settings.editor.autoSaveSeconds')}</option>
                     <option value="5000">5 {t('settings.editor.autoSaveSeconds')}</option>
                   </select>
+                </div>
+
+                <h3>{t('settings.editor.slashCommands')}</h3>
+                <div className="settings-row">
+                  <label>{t('settings.editor.slashCommands.dateFormat')}</label>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <input
+                      type="text"
+                      value={slashCommandDateFormat}
+                      onChange={e => setSlashCommandDateFormat(e.target.value)}
+                      style={{ width: '120px' }}
+                    />
+                    <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                      {t('settings.editor.slashCommands.preview')}: {formatDate(new Date(), slashCommandDateFormat)}
+                    </span>
+                  </div>
+                </div>
+                <div className="settings-row">
+                  <label>{t('settings.editor.slashCommands.timeFormat')}</label>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <input
+                      type="text"
+                      value={slashCommandTimeFormat}
+                      onChange={e => setSlashCommandTimeFormat(e.target.value)}
+                      style={{ width: '120px' }}
+                    />
+                    <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                      {t('settings.editor.slashCommands.preview')}: {formatDate(new Date(), slashCommandTimeFormat)}
+                    </span>
+                  </div>
                 </div>
 
                 <h3>{t('settings.pdf.title')}</h3>

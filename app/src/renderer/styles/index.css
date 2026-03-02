@@ -2519,6 +2519,123 @@ body {
   color: white;
 }
 
+/* ============ SLASH COMMAND MENU ============ */
+.slash-command-menu {
+  position: fixed;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  min-width: 280px;
+  max-width: 400px;
+  max-height: 340px;
+  z-index: 1000;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  animation: slashMenuFadeIn 0.15s ease;
+}
+
+@keyframes slashMenuFadeIn {
+  from { opacity: 0; transform: translateY(-5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.slash-command-menu-header {
+  padding: 8px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+  letter-spacing: 0.02em;
+}
+
+.slash-command-menu-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px;
+}
+
+.slash-command-menu-category {
+  padding: 6px 10px 2px;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.slash-command-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.slash-command-menu-item:hover {
+  background: var(--bg-tertiary);
+}
+
+.slash-command-menu-item.selected {
+  background: var(--accent-color);
+  color: white;
+}
+
+.slash-command-menu-icon {
+  width: 22px;
+  text-align: center;
+  flex-shrink: 0;
+  font-size: 13px;
+}
+
+.slash-command-menu-item.selected .slash-command-menu-icon {
+  color: white;
+}
+
+.slash-command-menu-label {
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: 500;
+}
+
+.slash-command-menu-desc {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-left: auto;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 140px;
+}
+
+.slash-command-menu-item.selected .slash-command-menu-desc {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.slash-command-menu-footer {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  padding: 6px;
+  font-size: 10px;
+  color: var(--text-muted);
+  border-top: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+}
+
+.slash-command-menu-empty {
+  padding: 16px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
 /* ============ PREVIEW FOLDING ============ */
 .editor-preview .fold-toggle {
   display: inline-block;

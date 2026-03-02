@@ -547,7 +547,15 @@ const App: React.FC = () => {
 
     // Capture-Phase verwenden, damit Event vor anderen Handlern abgefangen wird
     window.addEventListener('keydown', handleGlobalKeyDown, true)
-    return () => window.removeEventListener('keydown', handleGlobalKeyDown, true)
+
+    // Slash Command: /template öffnet Template-Picker
+    const handleOpenTemplatePicker = () => setTemplatePickerOpen(true)
+    window.addEventListener('mindgraph:open-template-picker', handleOpenTemplatePicker)
+
+    return () => {
+      window.removeEventListener('keydown', handleGlobalKeyDown, true)
+      window.removeEventListener('mindgraph:open-template-picker', handleOpenTemplatePicker)
+    }
   }, [])
 
   // Sidebar-Divider Drag-Handler

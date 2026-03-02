@@ -2,6 +2,13 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.2.25-alpha] - 2026-03-02
+
+### Features
+- **Slash Commands im Editor**: Tippe `/` am Zeilenanfang oder nach einem Leerzeichen, um ein filterbares Dropdown-Menü mit 28 Befehlen zu öffnen — wie in Obsidian oder Notion. Enthält Datum/Zeit-Stempel, Formatierung (Headings, Tasks, Code-Blöcke, Tabellen, Zitate, Trennlinien), 10 Callout-Typen und Template-Picker. Navigation per Pfeiltasten, Auswahl mit Enter/Tab, Schließen mit Escape
+- **Konfigurierbare Datums-/Zeitformate**: In den Editor-Einstellungen können Datums- und Zeitformat für Slash Commands angepasst werden (Default: `DD.MM.YYYY` / `HH:mm`) mit Live-Vorschau
+- **Datum-Wikilinks**: `/today`, `/tomorrow` und `/yesterday` fügen Wikilinks zum jeweiligen Datum ein (z.B. `[[2026-03-02]]`)
+
 ## [0.2.24-alpha] - 2026-03-01
 
 ### Features

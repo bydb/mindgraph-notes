@@ -399,6 +399,10 @@ interface UIState {
   onboardingOpen: boolean
   helpGuideOpen: boolean
 
+  // Slash Commands
+  slashCommandDateFormat: string
+  slashCommandTimeFormat: string
+
   // Formatting Toolbar
   showFormattingToolbar: boolean
   showRawEditor: boolean
@@ -463,6 +467,8 @@ interface UIState {
   setOnboardingCompleted: (completed: boolean) => void
   setOnboardingOpen: (open: boolean) => void
   setHelpGuideOpen: (open: boolean) => void
+  setSlashCommandDateFormat: (format: string) => void
+  setSlashCommandTimeFormat: (format: string) => void
   setShowFormattingToolbar: (show: boolean) => void
   setShowRawEditor: (show: boolean) => void
   setUserProfile: (profile: UserProfile) => void
@@ -623,6 +629,10 @@ const defaultState = {
   onboardingOpen: false,
   helpGuideOpen: false,
 
+  // Slash Commands
+  slashCommandDateFormat: 'DD.MM.YYYY',
+  slashCommandTimeFormat: 'HH:mm',
+
   // Formatting Toolbar
   showFormattingToolbar: false,
   showRawEditor: false,
@@ -646,6 +656,8 @@ const persistedKeys = [
   'customLogo',
   'onboardingCompleted',
   'userProfile',
+  'slashCommandDateFormat',
+  'slashCommandTimeFormat',
   'showFormattingToolbar',
   'showRawEditor'
 ] as const
@@ -727,6 +739,8 @@ export const useUIStore = create<UIState>()((set, get) => ({
   setOnboardingCompleted: (completed) => set({ onboardingCompleted: completed }),
   setOnboardingOpen: (open) => set({ onboardingOpen: open }),
   setHelpGuideOpen: (open) => set({ helpGuideOpen: open }),
+  setSlashCommandDateFormat: (format) => set({ slashCommandDateFormat: format }),
+  setSlashCommandTimeFormat: (format) => set({ slashCommandTimeFormat: format }),
   setShowFormattingToolbar: (show) => set({ showFormattingToolbar: show }),
   setShowRawEditor: (show) => set({ showRawEditor: show }),
   setUserProfile: (profile) => set({ userProfile: profile }),

@@ -23,6 +23,7 @@ import { useTranslation } from '../../utils/translations'
 import { sanitizeHtml, escapeHtml } from '../../utils/sanitize'
 import { extractLinks, extractTags, extractTitle, extractHeadings, extractBlocks } from '../../utils/linkExtractor'
 import { WikilinkAutocomplete, AutocompleteMode, BlockSelectionInfo } from './WikilinkAutocomplete'
+import { SlashCommandMenu } from './SlashCommandMenu'
 import { livePreviewExtension } from './extensions/livePreview'
 import { imageHandlingExtension } from './extensions/imageHandling'
 import { languageToolExtension, setLanguageToolMatches, setLtErrorClickHandler, type LanguageToolMatch, type LanguageToolPopupMatch } from './extensions/languageTool'
@@ -553,6 +554,13 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
     triggerPos: number
     query: string
     wikilinkStart: number  // Position von [[ - wichtig für korrektes Einfügen bei Mausklick
+  } | null>(null)
+
+  // Slash Command Menu State
+  const [slashMenu, setSlashMenu] = useState<{
+    isOpen: boolean
+    triggerPos: number
+    query: string
   } | null>(null)
 
   // Dataview: Update notes in extension and rebuild indexes when notes change
@@ -1392,11 +1400,30 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
               setPreviewContent(newContent)
             }
 
-            // Wikilink Autocomplete Trigger-Erkennung
+            // Slash Command & Wikilink Autocomplete Trigger-Erkennung
             if (update.docChanged || update.selectionSet) {
               const cursor = update.state.selection.main.head
               const line = update.state.doc.lineAt(cursor)
               const textBefore = line.text.slice(0, cursor - line.from)
+
+              // Slash Command Detection (VOR Wikilink, da / am Zeilenanfang oder nach Leerzeichen)
+              const slashMatch = textBefore.match(/(?:^|\s)\/([\w-]*)$/)
+              if (slashMatch) {
+                const slashPos = cursor - slashMatch[0].length + (slashMatch[0].startsWith('/') ? 0 : 1)
+                setSlashMenu({
+                  isOpen: true,
+                  triggerPos: slashPos,
+                  query: slashMatch[1]
+                })
+                // Close wikilink autocomplete if open
+                if (autocomplete?.isOpen) {
+                  setAutocomplete(null)
+                }
+                return
+              }
+
+              // Close slash menu if no match
+              setSlashMenu(null)
 
               // [[Note#^ öffnet Block-Autocomplete (muss vor heading geprüft werden)
               const blockMatch = textBefore.match(/\[\[([^\]#]+)#\^([^\]]*)$/)
@@ -2983,6 +3010,18 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
         <AIImageDialog
           onClose={() => setShowAIImageDialog(false)}
           onInsert={handleAIImageInsert}
+        />
+      )}
+
+      {/* Slash Command Menu */}
+      {slashMenu?.isOpen && (
+        <SlashCommandMenu
+          view={viewRef.current}
+          isOpen={slashMenu.isOpen}
+          triggerPos={slashMenu.triggerPos}
+          query={slashMenu.query}
+          onClose={() => setSlashMenu(null)}
+          onExecute={() => setSlashMenu(null)}
         />
       )}
 
