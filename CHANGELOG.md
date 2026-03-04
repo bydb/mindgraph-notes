@@ -2,6 +2,18 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.2.26-alpha] - 2026-03-04
+
+### Improvements
+- **Notes Cache v2**: Cache-Invalidierung bei Versionsänderung oder Vault-Pfad-Wechsel — verhindert veraltete Daten nach Updates
+- **Auto-Extraktion in updateNote**: Links, Tags, Headings, Blocks und Task-Stats werden automatisch aus dem Content extrahiert, wenn eine Notiz aktualisiert wird — konsistentere Metadaten ohne manuelle Aufrufe
+- **Overdue-Tasks tagesbasiert**: Überfällige Tasks werden jetzt nach Tag (Mitternacht) statt nach exakter Uhrzeit berechnet — Tasks mit heutigem Datum werden nicht mehr fälschlicherweise als überfällig angezeigt
+
+### Docs
+- **README überarbeitet**: Karteikarten, E2E Sync, E-Mail-Inbox, Slash Commands, reMarkable und edoobox-Agent als Features ergänzt
+- **Blog**: Neuer Artikel "Slash Commands in MindGraph Notes"
+- **SEO**: Neue Landing Page "Obsidian Alternative" unter `/obsidian-alternative/`
+
 ## [0.2.25-alpha] - 2026-03-02
 
 ### Features

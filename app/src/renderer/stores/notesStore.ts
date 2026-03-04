@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import type { Note, FileEntry } from '../../shared/types'
-import { extractLinks, extractTags, extractTitle, generateNoteId, extractHeadings, extractBlocks } from '../utils/linkExtractor'
+import { extractLinks, extractTags, extractTitle, generateNoteId, extractHeadings, extractBlocks, extractTaskStatsForCache } from '../utils/linkExtractor'
 
 interface NotesState {
   vaultPath: string | null
@@ -83,8 +83,30 @@ export const useNotesStore = create<NotesState>((set, get) => ({
   }),
   
   updateNote: (id, updates) => set((state) => {
+    const normalizedUpdates = { ...updates }
+
+    if (typeof normalizedUpdates.content === 'string') {
+      const content = normalizedUpdates.content
+
+      if (normalizedUpdates.outgoingLinks === undefined) {
+        normalizedUpdates.outgoingLinks = extractLinks(content)
+      }
+      if (normalizedUpdates.tags === undefined) {
+        normalizedUpdates.tags = extractTags(content)
+      }
+      if (normalizedUpdates.headings === undefined) {
+        normalizedUpdates.headings = extractHeadings(content)
+      }
+      if (normalizedUpdates.blocks === undefined) {
+        normalizedUpdates.blocks = extractBlocks(content)
+      }
+      if (normalizedUpdates.taskStats === undefined) {
+        normalizedUpdates.taskStats = extractTaskStatsForCache(content)
+      }
+    }
+
     const newNotes = state.notes.map(n =>
-      n.id === id ? { ...n, ...updates } : n
+      n.id === id ? { ...n, ...normalizedUpdates } : n
     )
     // Immer Backlinks neu berechnen, da sich Links geändert haben könnten
     return { notes: recalculateBacklinks(newNotes) }

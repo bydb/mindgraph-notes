@@ -438,6 +438,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ onOpenSearch }) => {
 async function loadAllNotes(basePath: string, entries: any[]): Promise<Note[]> {
   const startTime = Date.now()
   const notes: Note[] = []
+  const NOTES_CACHE_VERSION = 2
 
   // 1. Cache und Dateien mit mtime laden (parallel)
   console.log('[Sidebar] Starte Laden...')
@@ -447,11 +448,16 @@ async function loadAllNotes(basePath: string, entries: any[]): Promise<Note[]> {
   ])
   console.log(`[Sidebar] Cache und mtime geladen in ${Date.now() - startTime}ms`)
 
-  const cachedNotes = cache?.notes || {}
+  const hasValidCache = cache?.version === NOTES_CACHE_VERSION && cache.vaultPath === basePath
+  const cachedNotes = hasValidCache ? cache.notes : {}
   const newCache: NotesCache = {
-    version: 1,
+    version: NOTES_CACHE_VERSION,
     vaultPath: basePath,
     notes: {}
+  }
+
+  if (!hasValidCache && cache) {
+    console.log('[Sidebar] Invalidiere veralteten Notes-Cache (Version oder Vault-Pfad abweichend)')
   }
 
   // Map für schnellen mtime-Lookup

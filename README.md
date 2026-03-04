@@ -1,48 +1,66 @@
 # MindGraph Notes
 
-**Die erste Notiz-App mit integriertem KI-Terminal.**
+**Notizen, Karteikarten, KI und Terminal -- in einer App.**
 
-Eine moderne, lokale Notiz-App die Markdown-Notizen mit einem Wissensgraphen und einem vollwertigen Terminal kombiniert. Nutze OpenCode, Ollama und andere CLI-Tools direkt neben deinen Gedanken.
+Eine moderne, lokale Notiz-App die Markdown-Notizen mit einem Wissensgraphen, Karteikarten (Spaced Repetition), E2E-verschluesseltem Sync, KI-Integration und einem vollwertigen Terminal kombiniert. 100% lokal, Open Source, ohne Cloud-Zwang.
 
-[Website](https://mindgraph-notes.de) · [Download](https://mindgraph-notes.de/#download) · [Blog](https://mindgraph-notes.de/blog/) · [Discord](https://discord.gg/u9N9R9vz)
+[Website](https://mindgraph-notes.de) · [Download](https://mindgraph-notes.de/#download) · [Blog](https://mindgraph-notes.de/blog/) · [GitHub](https://github.com/bydb/mindgraph-notes)
 
 ---
 
 ## Features
 
-### Integriertes Terminal
-- Vollwertiges Terminal direkt in der App
-- OpenCode für KI-gestützte Workflows
-- Lokale LLMs via Ollama, LM Studio
-- Git, npm, Python - jedes CLI-Tool
-- Direkter Zugriff auf deine Markdown-Dateien
+### Karteikarten & Spaced Repetition
+- SM-2 Algorithmus mit optimalen Wiederholungsintervallen
+- KI-Quiz-Generierung aus beliebigen Notizen via Ollama
+- Anki-Import (.apkg) fuer einfache Migration
+- Statistik-Dashboard: Streak, Heatmap, Wiederholungsplan
+- Cloze Deletion und Image Occlusion
 
-### Wissensgraph
-- Interaktive Visualisierung aller Verbindungen
-- Entdecke versteckte Zusammenhänge
-- Navigiere durch dein Wissen
+### E2E-verschluesselter Sync
+- AES-256-GCM Verschluesselung, scrypt Key-Derivation
+- Zero-Knowledge Relay-Server -- Server sieht nur verschluesselte Blobs
+- Kein Account noetig: nur Vault-ID + Passphrase
+- Selektive Synchronisierung und Sync-Protokoll
 
 ### Notizen & Markdown
-- Live Preview mit sofortiger Vorschau
-- Wiki-style Linking mit `[[Wikilinks]]`
-- Obsidian-kompatible Syntax
-- Callouts, LaTeX, Mermaid-Diagramme
-- Backlinks Panel
+- CodeMirror 6 Editor mit Live Preview
+- Slash Commands: `/` fuer 28 Befehle (Datum-Wikilinks, Formatierung, Callouts, Templates)
+- Wiki-style Linking mit `[[Wikilinks]]` und Backlinks-Panel
+- Obsidian-kompatible Syntax, Callouts, LaTeX, Mermaid-Diagramme
+- Syntax Highlighting in Code-Bloecken (20+ Sprachen)
+
+### Wissensgraph
+- Interaktive Visualisierung aller Verbindungen (React Flow)
+- Cards & Dots View, Drag & Drop, Layout-Algorithmen
+- Zusammenfassungen und Tags direkt auf Canvas-Karten
 
 ### KI-Integration
-- KI-Menü für Textverarbeitung (⌘⇧A)
-- KI-Bildgenerierung mit Flux2 (⌘⇧I)
-- Alt+Rechtsklick für KI-Kontextmenü
-- Transparente KI-Nutzung mit Fußnoten
+- Lokale LLMs via Ollama (Zusammenfassen, Uebersetzen, Weiterschreiben)
+- In-App Ollama Model Download und Management
+- KI-Quiz-Generierung und Bildgenerierung (Flux2)
+- KI-Menue (⌘⇧A) und KI-Kontextmenue (Alt+Rechtsklick)
 
-### Weitere Features
-- Zotero Integration für Literaturverwaltung
-- PDF Viewer mit Companion-Notizen
-- Docling PDF-Extraktion (Text, Tabellen, Bilder)
-- LanguageTool Grammatik- & Rechtschreibprüfung
-- Template System
-- Volltext-Suche
-- Quick Switcher (⌘K)
+### Integriertes Terminal
+- Vollwertiges PTY-Terminal direkt in der App
+- Smart AI-Tool Detection (OpenCode, Claude)
+- Windows + WSL Support
+
+### E-Mail-Inbox
+- IMAP-Abruf von mehreren Accounts
+- Automatische KI-Relevanzanalyse via Ollama
+- Relevante E-Mails werden als Markdown-Notizen gespeichert
+
+### Weitere Integrationen
+- Zotero Integration fuer Literaturverwaltung (Better BibTeX)
+- reMarkable USB-Integration (Dokumente browsen, importieren, PDF exportieren)
+- Readwise Highlight-Sync (Buecher, Artikel, Podcasts)
+- edoobox-Agent (Veranstaltungsimport aus Akkreditierungsformularen)
+- PDF Viewer mit Docling-Extraktion
+- LanguageTool Grammatik- & Rechtschreibpruefung
+- Apple Erinnerungen aus Tasks erstellen (macOS)
+- Dataview Queries (LIST, TABLE, WHERE, SORT)
+- Template System (Built-in & Custom)
 
 ---
 
@@ -123,13 +141,15 @@ npm run build
 
 ## Tech Stack
 
-- **Electron** - Cross-platform Desktop App
-- **React** - UI Framework
-- **TypeScript** - Type-safe Development
-- **CodeMirror** - Markdown Editor
+- **Electron 40** - Cross-platform Desktop App
+- **React 19** - UI Framework
+- **TypeScript 5.9** - Type-safe Development
+- **CodeMirror 6** - Markdown Editor
 - **React Flow** - Graph Visualization
-- **Zustand** - State Management
-- **xterm.js** - Integrated Terminal
+- **Zustand 5** - State Management (12 Stores)
+- **xterm.js + node-pty** - Integrated Terminal
+- **imapflow + mailparser** - E-Mail Integration
+- **DOMPurify** - HTML/SVG Sanitization
 
 ---
 

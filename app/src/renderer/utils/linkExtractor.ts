@@ -265,6 +265,12 @@ function isOverdue(date: Date): boolean {
   return date < new Date()
 }
 
+function isOverdueByDay(date: Date): boolean {
+  const todayStart = new Date()
+  todayStart.setHours(0, 0, 0, 0)
+  return date < todayStart
+}
+
 // Prüft ob ein Task als kritisch markiert ist
 // Erkannte Marker: #critical, #kritisch, @critical, @urgent, @dringend, !!, !!!
 function isCriticalTask(text: string): boolean {
@@ -340,7 +346,7 @@ export function extractTaskStatsForCache(content: string): { total: number; comp
     total: summary.total,
     completed: summary.completed,
     critical: summary.critical,
-    overdue: summary.tasks.filter(t => !t.completed && t.isOverdue).length
+    overdue: summary.tasks.filter(t => !t.completed && t.dueDate && isOverdueByDay(t.dueDate)).length
   }
 }
 
@@ -353,18 +359,18 @@ export function getVaultTaskStats(notes: Array<{ content?: string; taskStats?: {
   let overdue = 0
 
   for (const note of notes) {
-    // Priorität: gecachte taskStats > content parsing
-    if (note.taskStats) {
-      total += note.taskStats.total
-      completed += note.taskStats.completed
-      critical += note.taskStats.critical
-      overdue += note.taskStats.overdue
-    } else if (note.content) {
+    // Priorität: geladenes Content Parsing > gecachte taskStats
+    if (note.content) {
       const summary = extractTasks(note.content)
       total += summary.total
       completed += summary.completed
       critical += summary.critical
-      overdue += summary.tasks.filter(t => !t.completed && t.isOverdue).length
+      overdue += summary.tasks.filter(t => !t.completed && t.dueDate && isOverdueByDay(t.dueDate)).length
+    } else if (note.taskStats) {
+      total += note.taskStats.total
+      completed += note.taskStats.completed
+      critical += note.taskStats.critical
+      overdue += note.taskStats.overdue
     }
   }
 
