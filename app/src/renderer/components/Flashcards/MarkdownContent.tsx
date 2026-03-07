@@ -27,16 +27,10 @@ const md = new MarkdownIt({
 })
 
 // LaTeX/Math Plugin mit KaTeX (inkl. Chemie-Support via mhchem)
-md.use(texmath, {
-  engine: katex,
-  delimiters: 'dollars',  // $...$ für inline, $$...$$ für block
-  katexOptions: {
-    throwOnError: false,
-    trust: false,
-    strict: false,
-    displayMode: false
-  }
-})
+// Beide Delimiter-Formate: $...$ und \(...\)
+const katexOptions = { throwOnError: false, trust: false, strict: false, displayMode: false }
+md.use(texmath, { engine: katex, delimiters: 'dollars', katexOptions })
+md.use(texmath, { engine: katex, delimiters: 'brackets', katexOptions })
 
 // Code-Block Renderer für Mermaid
 const defaultFence = md.renderer.rules.fence

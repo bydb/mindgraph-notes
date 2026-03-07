@@ -14,7 +14,8 @@ const ALLOWED_TAGS = [
   'g', 'text', 'tspan', 'defs', 'use', 'symbol', 'clipPath', 'mask',
   'linearGradient', 'radialGradient', 'stop', 'pattern', 'image',
   'foreignObject', 'marker', 'title', 'desc',
-  // KaTeX elements
+  // KaTeX elements (eq/eqn from markdown-it-texmath)
+  'eq', 'eqn', 'section',
   'math', 'semantics', 'mrow', 'mi', 'mo', 'mn', 'ms', 'mtext',
   'msup', 'msub', 'msubsup', 'mfrac', 'mroot', 'msqrt', 'mtable',
   'mtr', 'mtd', 'mover', 'munder', 'munderover', 'menclose',
@@ -40,8 +41,8 @@ const ALLOWED_ATTR = [
   'clip-path', 'mask', 'marker-end', 'marker-start', 'marker-mid',
   'gradientUnits', 'gradientTransform', 'offset', 'stop-color', 'stop-opacity',
   'patternUnits', 'patternTransform', 'preserveAspectRatio',
-  // KaTeX
-  'mathvariant', 'encoding', 'stretchy', 'fence', 'separator', 'accent',
+  // KaTeX / aria
+  'aria-hidden', 'mathvariant', 'encoding', 'stretchy', 'fence', 'separator', 'accent',
   'accentunder', 'columnalign', 'columnlines', 'columnspacing',
   'rowalign', 'rowlines', 'rowspacing', 'displaystyle', 'scriptlevel',
 ]

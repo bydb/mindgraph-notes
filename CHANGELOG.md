@@ -2,6 +2,22 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.2.27-alpha] - 2026-03-07
+
+### Features
+- **LaTeX-Rendering im Notes Chat**: Mathematische Formeln ($...$, $$...$$) werden jetzt im Chat mit KaTeX gerendert — statt rohem LaTeX-Text
+- **LaTeX-Brackets-Support**: Zusätzlich zu `$...$` wird jetzt auch `\(...\)` / `\[...\]` Notation in Editor, Flashcards und Notes Chat unterstützt
+
+### Improvements
+- **Quiz: Reasoning-Modell-Kompatibilität (Qwen3.5, DeepSeek)**: `think: false` Parameter deaktiviert interne Denkblöcke bei Reasoning-Modellen — verhindert Timeouts und Token-Verschwendung
+- **Quiz: Bessere Prompts**: Explizite Anweisung zur exakten Fragenanzahl, LaTeX-Nutzung für Formeln und ausführlichere Antworten (2-4 Sätze)
+- **Quiz: `<think>`-Block-Stripping**: Antworten von Reasoning-Modellen werden vor dem JSON-Parsing automatisch bereinigt
+- **Quiz: Erhöhtes Timeout**: 90s → 180s für langsamere lokale Modelle
+- **DOMPurify: KaTeX-Tags erlaubt**: `<eq>`, `<eqn>`, `aria-hidden` zur Sanitization-Allowlist hinzugefügt — verhindert, dass KaTeX-Ausgaben von DOMPurify entfernt werden
+
+### Sync
+- **FileTracker & SyncEngine Verbesserungen**: Optimierungen am File-Tracking und Sync-Engine
+
 ## [0.2.26-alpha] - 2026-03-04
 
 ### Improvements

@@ -4,6 +4,9 @@ import { useNotesStore } from '../../stores/notesStore'
 import { useUIStore } from '../../stores/uiStore'
 import { useTranslation } from '../../utils/translations'
 import MarkdownIt from 'markdown-it'
+import texmath from 'markdown-it-texmath'
+import katex from 'katex'
+import 'katex/dist/katex.min.css'
 
 interface ChatMessage {
   role: 'user' | 'assistant'
@@ -45,11 +48,17 @@ export const NotesChat: React.FC<NotesChatProps> = ({ onClose }) => {
   const inputRef = useRef<HTMLTextAreaElement>(null)
 
   // Markdown-Renderer für Chat-Nachrichten
-  const md = useMemo(() => new MarkdownIt({
-    html: false,
-    linkify: true,
-    breaks: true
-  }), [])
+  const md = useMemo(() => {
+    const instance = new MarkdownIt({
+      html: false,
+      linkify: true,
+      breaks: true
+    })
+    const katexOptions = { throwOnError: false, trust: false, strict: false, displayMode: false }
+    instance.use(texmath, { engine: katex, delimiters: 'dollars', katexOptions })
+    instance.use(texmath, { engine: katex, delimiters: 'brackets', katexOptions })
+    return instance
+  }, [])
 
   // Aktuelle Notiz
   const currentNote = notes.find(n => n.id === selectedNoteId)

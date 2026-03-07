@@ -119,7 +119,7 @@ export class SyncEngine {
     const loaded = await loadManifest(vaultPath)
 
     if (loaded && loaded.vaultId === this.vaultId) {
-      // Same vault — keep syncedAt values (reconnecting to same vault)
+      // Same vault — keep syncedAt values and tombstones (reconnecting to same vault)
       this.manifest = loaded
     } else {
       // Different vault or no manifest — start fresh to prevent stale
@@ -415,6 +415,10 @@ export class SyncEngine {
           if (currentManifest.files[filePath]) {
             currentManifest.files[filePath].syncedAt = Date.now()
           }
+          // Clear tombstone — file is intentionally being downloaded
+          if (currentManifest.tombstones?.[filePath]) {
+            delete currentManifest.tombstones[filePath]
+          }
           current++
           this.sendLog({ type: 'download', message: `Downloaded: ${filePath}`, fileName: filePath })
           this.sendProgress({
@@ -450,9 +454,11 @@ export class SyncEngine {
         if (this.destroyed) break  // SAFETY
         current++
         await this.deleteRemoteFile(filePath)
-        // Remove from saved manifest so it won't be detected as locally deleted again
+        // Remove from saved manifest and add tombstone so re-uploads get deleted again
         if (this.manifest) {
           delete this.manifest.files[filePath]
+          if (!this.manifest.tombstones) this.manifest.tombstones = {}
+          this.manifest.tombstones[filePath] = Date.now()
         }
         this.sendLog({ type: 'delete', message: `Deleted on server: ${filePath}`, fileName: filePath })
         this.sendProgress({
@@ -469,9 +475,53 @@ export class SyncEngine {
         try {
           await moveToSyncTrash(this.vaultPath, filePath)
           delete currentManifest.files[filePath]
+          // Add tombstone so if another device re-uploads, we know to delete again
+          if (!currentManifest.tombstones) currentManifest.tombstones = {}
+          currentManifest.tombstones[filePath] = Date.now()
           this.sendLog({ type: 'delete', message: `Moved to trash: ${filePath}`, fileName: filePath })
         } catch {
           // File might already be gone
+        }
+      }
+
+      // Merge tombstones from saved manifest into current
+      if (this.manifest?.tombstones) {
+        if (!currentManifest.tombstones) currentManifest.tombstones = {}
+        for (const [filePath, deletedAt] of Object.entries(this.manifest.tombstones)) {
+          if (!currentManifest.tombstones[filePath]) {
+            currentManifest.tombstones[filePath] = deletedAt
+          }
+        }
+      }
+      if (this.manifest?.tombstonePrefixes) {
+        if (!currentManifest.tombstonePrefixes) currentManifest.tombstonePrefixes = {}
+        for (const [prefix, deletedAt] of Object.entries(this.manifest.tombstonePrefixes)) {
+          if (!currentManifest.tombstonePrefixes[prefix]) {
+            currentManifest.tombstonePrefixes[prefix] = deletedAt
+          }
+        }
+      }
+
+      // Clean up tombstones older than 90 days
+      const cutoff = Date.now() - 90 * 24 * 60 * 60 * 1000
+      if (currentManifest.tombstones) {
+        for (const [filePath, deletedAt] of Object.entries(currentManifest.tombstones)) {
+          if (deletedAt < cutoff) {
+            delete currentManifest.tombstones[filePath]
+          }
+        }
+        if (Object.keys(currentManifest.tombstones).length === 0) {
+          delete currentManifest.tombstones
+        }
+      }
+      if (currentManifest.tombstonePrefixes) {
+        for (const [prefix, deletedAt] of Object.entries(currentManifest.tombstonePrefixes)) {
+          if (deletedAt < cutoff) {
+            delete currentManifest.tombstonePrefixes[prefix]
+          }
+        }
+        if (Object.keys(currentManifest.tombstonePrefixes).length === 0) {
+          delete currentManifest.tombstonePrefixes
         }
       }
 

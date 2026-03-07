@@ -1440,6 +1440,7 @@ ipcMain.handle('ollama-generate', async (_event, request: OllamaRequest) => {
         model: request.model,
         prompt: fullPrompt,
         stream: false,
+        think: false,
         options: {
           temperature: request.action === 'translate' ? 0.3 : 0.7,
           num_predict: request.action === 'summarize' ? 500 : 2000
@@ -3699,20 +3700,25 @@ ipcMain.handle('quiz-generate-questions', async (event, model: string, content: 
       console.log(`[Quiz] Content trimmed from ${content.length} to ${maxContentLength} chars`)
     }
 
-    const systemPrompt = `Generate exactly ${count} quiz questions about the following text.
-Vary difficulty: easy (facts), medium (understanding), hard (application).
+    const systemPrompt = `You are a quiz generator. Generate EXACTLY ${count} quiz questions about the provided text.
+Vary difficulty: easy (factual recall), medium (understanding), hard (application/calculation).
 
-You MUST respond with ONLY a valid JSON array, nothing else:
-[{"question":"Q1?","expectedAnswer":"A1","topic":"Topic","difficulty":"easy"}]
+Rules for question and answer content:
+- Use LaTeX notation with dollar signs for ALL mathematical formulas: $x^2$, $a \\neq 0$, $\\frac{a}{b}$
+- Answers should be detailed (2-4 sentences) and use proper formatting with LaTeX for math
+- Questions should be in the same language as the source text
 
-No markdown, no explanation, no text before or after. Just the JSON array.`
+You MUST respond with ONLY a valid JSON array containing EXACTLY ${count} objects:
+[{"question":"Was ist...?","expectedAnswer":"Die Antwort ist $x^2 + bx + c = 0$ weil...","topic":"Thema","difficulty":"easy"},{"question":"Erkläre...","expectedAnswer":"...","topic":"Thema","difficulty":"medium"}]
 
-    // Timeout nach 90 Sekunden
+CRITICAL: Output EXACTLY ${count} question objects. No markdown fences, no explanation, just the JSON array.`
+
+    // Timeout nach 180 Sekunden (Reasoning-Modelle wie Qwen3.5 brauchen länger)
     const controller = new AbortController()
     const timeoutId = setTimeout(() => {
-      console.log('[Quiz] Request timeout after 90s')
+      console.log('[Quiz] Request timeout after 180s')
       controller.abort()
-    }, 90000)
+    }, 180000)
 
     console.log('[Quiz] Sending request to Ollama...')
     const startTime = Date.now()
@@ -3724,12 +3730,13 @@ No markdown, no explanation, no text before or after. Just the JSON array.`
         model,
         messages: [
           { role: 'system', content: systemPrompt },
-          { role: 'user', content: `Generate ${count} questions about this text:\n\n${trimmedContent}` }
+          { role: 'user', content: `Generate exactly ${count} quiz questions (not fewer!) as a JSON array about this text:\n\n${trimmedContent}` }
         ],
         stream: false,
+        think: false,
         options: {
           temperature: 0.7,
-          num_predict: 3000
+          num_predict: 4000
         }
       }),
       signal: controller.signal
@@ -3743,7 +3750,8 @@ No markdown, no explanation, no text before or after. Just the JSON array.`
     }
 
     const data = await response.json() as { message?: { content?: string } }
-    const responseText = data.message?.content || ''
+    // Strip <think>...</think> blocks from reasoning models (e.g. Qwen3.5, DeepSeek)
+    let responseText = (data.message?.content || '').replace(/<think>[\s\S]*?<\/think>/g, '').trim()
     console.log(`[Quiz] Response text length: ${responseText.length}`)
     console.log(`[Quiz] Response preview: ${responseText.slice(0, 200)}...`)
 
@@ -3925,11 +3933,13 @@ Kriterien:
 - Vollständigkeit (aber bestrafe nicht übermäßig wenn Nebenpunkte fehlen)
 - Verständnis des Konzepts
 
+Verwende LaTeX mit Dollar-Zeichen für mathematische Formeln im Feedback: $x^2$, $\\frac{a}{b}$, $a \\neq 0$.
+
 WICHTIG: Antworte ausschließlich mit validem JSON im folgenden Format:
 {
   "score": 0-100,
   "correct": true/false,
-  "feedback": "Konstruktives Feedback in 1-3 Sätzen..."
+  "feedback": "Konstruktives Feedback in 1-3 Sätzen mit $LaTeX$ für Formeln..."
 }
 
 Score-Richtwerte:
@@ -3939,7 +3949,8 @@ Score-Richtwerte:
 - 20-49: Wenig richtig, Missverständnisse
 - 0-19: Falsch oder keine Antwort
 
-Keine Erklärungen, kein Markdown, nur das JSON-Objekt.`
+Keine Erklärungen, kein Markdown, nur das JSON-Objekt.
+Do NOT use <think> tags or internal reasoning. Output the JSON immediately.`
 
     const userMessage = `Frage: ${question}
 
@@ -3959,9 +3970,10 @@ Bewerte diese Antwort.`
           { role: 'user', content: userMessage }
         ],
         stream: false,
+        think: false,
         options: {
           temperature: 0.3,
-          num_predict: 500
+          num_predict: 2000
         }
       })
     })
@@ -3971,7 +3983,8 @@ Bewerte diese Antwort.`
     }
 
     const data = await response.json() as { message?: { content?: string } }
-    const responseText = data.message?.content || ''
+    // Strip <think>...</think> blocks from reasoning models
+    const responseText = (data.message?.content || '').replace(/<think>[\s\S]*?<\/think>/g, '').trim()
 
     // JSON aus der Antwort extrahieren
     const jsonMatch = responseText.match(/\{[\s\S]*\}/)
@@ -4055,7 +4068,8 @@ WICHTIG: Antworte ausschließlich mit validem JSON:
   "recommendations": ["Empfehlung 1", "Empfehlung 2", "Empfehlung 3"]
 }
 
-Keine Erklärungen, kein Markdown, nur das JSON-Objekt.`
+Keine Erklärungen, kein Markdown, nur das JSON-Objekt.
+Do NOT use <think> tags or internal reasoning. Output the JSON immediately.`
 
     const response = await fetch(`${OLLAMA_API_URL}/api/chat`, {
       method: 'POST',
@@ -4067,9 +4081,10 @@ Keine Erklärungen, kein Markdown, nur das JSON-Objekt.`
           { role: 'user', content: 'Gib mir Lernempfehlungen basierend auf diesen Ergebnissen.' }
         ],
         stream: false,
+        think: false,
         options: {
           temperature: 0.5,
-          num_predict: 500
+          num_predict: 2000
         }
       })
     })
@@ -4077,7 +4092,8 @@ Keine Erklärungen, kein Markdown, nur das JSON-Objekt.`
     let recommendations: string[] = []
     if (response.ok) {
       const data = await response.json() as { message?: { content?: string } }
-      const responseText = data.message?.content || ''
+      // Strip <think>...</think> blocks from reasoning models
+      const responseText = (data.message?.content || '').replace(/<think>[\s\S]*?<\/think>/g, '').trim()
       const jsonMatch = responseText.match(/\{[\s\S]*\}/)
       if (jsonMatch) {
         const parsed = JSON.parse(jsonMatch[0]) as { recommendations?: string[] }

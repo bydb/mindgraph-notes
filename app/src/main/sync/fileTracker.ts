@@ -11,8 +11,21 @@ export interface FileInfo {
 
 export interface FileManifest {
   files: Record<string, FileInfo>
+  tombstones?: Record<string, number>  // exact path → deletion timestamp
+  tombstonePrefixes?: Record<string, number>  // path prefix → deletion timestamp (for deleted folders)
   lastSyncTime: number
   vaultId: string
+}
+
+export function isTombstoned(filePath: string, manifest?: FileManifest): boolean {
+  if (!manifest) return false
+  if (manifest.tombstones?.[filePath]) return true
+  if (manifest.tombstonePrefixes) {
+    for (const prefix of Object.keys(manifest.tombstonePrefixes)) {
+      if (filePath.startsWith(prefix)) return true
+    }
+  }
+  return false
 }
 
 const EXCLUDE_PATTERNS = [
@@ -208,6 +221,9 @@ export function diffManifests(
       const previousFile = previousLocal?.files[filePath]
       if (previousFile && previousFile.syncedAt !== null) {
         // File was synced before but deleted locally → delete on server
+        toDeleteRemote.push(filePath)
+      } else if (isTombstoned(filePath, previousLocal)) {
+        // File was intentionally deleted before → delete on server
         toDeleteRemote.push(filePath)
       } else {
         // New remote file, download

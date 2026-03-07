@@ -231,15 +231,10 @@ md.use(taskLists, {
 md.use(footnote)
 
 // LaTeX/Math Plugin mit KaTeX (inkl. Chemie-Support via mhchem)
-md.use(texmath, {
-  engine: katex,
-  delimiters: 'dollars',  // $...$ für inline, $$...$$ für block
-  katexOptions: {
-    throwOnError: false,
-    trust: false,
-    strict: false
-  }
-})
+// Beide Delimiter-Formate: $...$ und \(...\)
+const katexOptions = { throwOnError: false, trust: false, strict: false }
+md.use(texmath, { engine: katex, delimiters: 'dollars', katexOptions })
+md.use(texmath, { engine: katex, delimiters: 'brackets', katexOptions })
 
 // Custom image renderer für Standard-Markdown ![alt](url) Syntax
 const defaultImageRender = md.renderer.rules.image
