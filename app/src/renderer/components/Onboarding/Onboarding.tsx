@@ -98,7 +98,7 @@ export const Onboarding: React.FC = () => {
             onFinish={completeOnboarding}
             showFlashcards={selectedProfile !== 'wissensmanagement'}
             showSmartConnections={selectedProfile === 'wissensmanagement'}
-            showNotesChat={selectedProfile === 'wissensmanagement'}
+            showNotesChat={true}
           />
         )}
       </div>

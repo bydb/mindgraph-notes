@@ -2,6 +2,16 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.2.29-alpha] - 2026-03-08
+
+### Improvements
+- **Onboarding Profil "Schule"**: Aktiviert jetzt PDF Companion, Vision OCR und Notes Chat — Schüler können PDFs direkt in Karteikarten umwandeln und Fragen zum Lernstoff stellen
+- **Onboarding Profil "Studium"**: Vision OCR und Notes Chat werden jetzt ebenfalls aktiviert
+- **Notes Chat im Onboarding**: Wird jetzt für alle Profile im Feature-Guide angezeigt
+
+### Fixes
+- **Cmd/Ctrl+Click Split-View wiederhergestellt**: Multi-Select nutzt jetzt Shift+Click statt Cmd/Ctrl+Click — Split-View funktioniert wieder wie gewohnt
+
 ## [0.2.28-alpha] - 2026-03-08
 
 ### Features

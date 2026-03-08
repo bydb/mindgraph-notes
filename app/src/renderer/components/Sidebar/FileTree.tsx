@@ -258,7 +258,7 @@ const FileItem: React.FC<FileItemProps> = ({ entry, level, onDrop, displayMode }
   }, [contextMenu])
 
   const { selectedNoteId, secondarySelectedNoteId, selectedPdfPath, selectedImagePath, selectNote, selectSecondaryNote, selectPdf, selectImage, removeNote, setFileTree, vaultPath, notes, updateNotePath, fileTree, selectedPaths, togglePathSelection, clearSelection, addPathToSelection } = useNotesStore()
-  const { iconSet, textSplitEnabled, flashcardsEnabled, setViewMode, setCanvasFilterPath } = useUIStore()
+  const { iconSet, textSplitEnabled, setTextSplitEnabled, flashcardsEnabled, setViewMode, setCanvasFilterPath } = useUIStore()
   const { fileCustomizations, setFileCustomization, removeFileCustomization, toggleFolderHidden, showHiddenFolders } = useGraphStore()
   const { openCanvasTab } = useTabStore()
   const { isBookmarked, toggleBookmark } = useBookmarkStore()
@@ -335,8 +335,8 @@ const FileItem: React.FC<FileItemProps> = ({ entry, level, onDrop, displayMode }
   const handleClick = (e: React.MouseEvent) => {
     if (isEditing) return
 
-    // Cmd/Ctrl+Click: Multi-Select Toggle (für nicht-Ordner)
-    if ((e.metaKey || e.ctrlKey) && !entry.isDirectory) {
+    // Shift+Click: Multi-Select Toggle (für nicht-Ordner)
+    if (e.shiftKey && !entry.isDirectory) {
       e.preventDefault()
       togglePathSelection(entry.path)
       return
@@ -345,6 +345,14 @@ const FileItem: React.FC<FileItemProps> = ({ entry, level, onDrop, displayMode }
     // Normaler Klick: Multi-Select aufheben
     if (selectedPaths.size > 0) {
       clearSelection()
+    }
+
+    // Cmd/Ctrl+Click: Split-View (Secondary Note)
+    if ((e.metaKey || e.ctrlKey) && !entry.isDirectory && !isPdf && !isImage) {
+      e.preventDefault()
+      setTextSplitEnabled(true)
+      selectSecondaryNote(noteId)
+      return
     }
 
     if (entry.isDirectory) {

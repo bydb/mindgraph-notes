@@ -770,9 +770,10 @@ export const useUIStore = create<UIState>()((set, get) => ({
       case 'schueler':
         set({
           flashcardsEnabled: true,
-          pdfCompanionEnabled: false,
+          pdfCompanionEnabled: true,
           smartConnectionsEnabled: false,
-          notesChatEnabled: false,
+          notesChatEnabled: true,
+          visionOcr: { ...get().visionOcr, enabled: true },
           editorDefaultView: 'preview' as EditorViewMode,
           showFormattingToolbar: true,
           showRawEditor: false
@@ -783,7 +784,8 @@ export const useUIStore = create<UIState>()((set, get) => ({
           flashcardsEnabled: true,
           pdfCompanionEnabled: true,
           smartConnectionsEnabled: false,
-          notesChatEnabled: false,
+          notesChatEnabled: true,
+          visionOcr: { ...get().visionOcr, enabled: true },
           editorDefaultView: 'preview' as EditorViewMode
         })
         break
