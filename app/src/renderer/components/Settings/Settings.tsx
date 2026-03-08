@@ -44,6 +44,8 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
   const [lmstudioStatus, setLmstudioStatus] = useState<'checking' | 'connected' | 'disconnected'>('checking')
   const [doclingStatus, setDoclingStatus] = useState<'checking' | 'connected' | 'disconnected'>('checking')
   const [doclingVersion, setDoclingVersion] = useState<string>('')
+  const [visionOcrModelList, setVisionOcrModelList] = useState<{ name: string; size: number }[]>([])
+
   const [languageToolStatus, setLanguageToolStatus] = useState<'checking' | 'connected' | 'disconnected'>('checking')
   const [readwiseStatus, setReadwiseStatus] = useState<'checking' | 'connected' | 'disconnected'>('checking')
   const [readwiseSyncing, setReadwiseSyncing] = useState(false)
@@ -137,6 +139,8 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
     setSmartConnectionsWeights,
     docling,
     setDocling,
+    visionOcr,
+    setVisionOcr,
     readwise,
     setReadwise,
     languageTool,
@@ -188,13 +192,15 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
 
   // Zotero Status prüfen
   useEffect(() => {
-    if (isOpen && activeTab === 'integrations') {
+    if (isOpen && (activeTab === 'integrations' || activeTab === 'agents')) {
       checkZoteroConnection()
       checkOllamaConnection()
       checkLmstudioConnection()
       checkDoclingConnection()
       checkLanguageToolConnection()
       checkReadwiseConnection()
+      // Load vision OCR models
+      window.electronAPI.visionOcrModels().then(setVisionOcrModelList).catch(() => {})
     }
   }, [isOpen, activeTab])
 
@@ -1714,6 +1720,57 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
                   </p>
                   <p>
                     {t('settings.docling.installHint')} <code>docker run -p 5001:5001 ds4sd/docling-serve</code>
+                  </p>
+                </div>
+
+                {/* Vision OCR */}
+                <h3 style={{ marginTop: '32px' }}>{t('settings.visionOcr.title')}</h3>
+                <div className="settings-row">
+                  <label>{t('settings.visionOcr.enabled')}</label>
+                  <input
+                    type="checkbox"
+                    checked={visionOcr.enabled}
+                    onChange={e => setVisionOcr({ enabled: e.target.checked })}
+                  />
+                </div>
+                <div className="settings-row">
+                  <label>{t('settings.visionOcr.model')}</label>
+                  <div className="settings-input-group">
+                    <select
+                      value={visionOcr.model}
+                      onChange={e => setVisionOcr({ model: e.target.value })}
+                      disabled={!visionOcr.enabled}
+                      style={{ minWidth: '200px' }}
+                    >
+                      <option value="">-- Modell wählen --</option>
+                      {visionOcrModelList.map(m => (
+                        <option key={m.name} value={m.name}>{m.name}</option>
+                      ))}
+                    </select>
+                    <button className="settings-refresh" onClick={() => window.electronAPI.visionOcrModels().then(setVisionOcrModelList).catch(() => {})}>
+                      {t('settings.refresh')}
+                    </button>
+                  </div>
+                </div>
+                <div className="settings-row">
+                  <label>{t('settings.visionOcr.pageWidth')}</label>
+                  <select
+                    value={visionOcr.pageWidth}
+                    onChange={e => setVisionOcr({ pageWidth: Number(e.target.value) })}
+                    disabled={!visionOcr.enabled}
+                  >
+                    <option value={400}>400px (schnell)</option>
+                    <option value={600}>600px</option>
+                    <option value={800}>800px (empfohlen)</option>
+                    <option value={1200}>1200px (hohe Qualität)</option>
+                  </select>
+                </div>
+                <div className="settings-info">
+                  <p>
+                    <strong>Vision OCR</strong> {t('settings.visionOcr.description')}
+                  </p>
+                  <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                    {t('settings.visionOcr.modelHint')}
                   </p>
                 </div>
 

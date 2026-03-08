@@ -59,11 +59,11 @@ export const useEmailStore = create<EmailState>()((set, get) => ({
           setTimeout(() => get().analyzeEmails(vaultPath), 1000)
         }
 
-        // Notizen für bereits analysierte relevante E-Mails erstellen (falls noch keine existieren)
-        const analyzed = (data.emails || []).filter((e: { analysis?: { relevanceScore?: number } }) =>
-          e.analysis && (e.analysis.relevanceScore || 0) >= emailSettings.relevanceThreshold
+        // Notizen nur für analysierte relevante E-Mails erstellen, die noch keine Notiz haben
+        const needsNote = (data.emails || []).filter((e: { analysis?: { relevanceScore?: number }; noteCreated?: boolean }) =>
+          e.analysis && !e.noteCreated && (e.analysis.relevanceScore || 0) >= emailSettings.relevanceThreshold
         )
-        if (analyzed.length > 0) {
+        if (needsNote.length > 0) {
           setTimeout(() => get().createNotesForRelevantEmails(vaultPath), 500)
         }
       }
@@ -184,21 +184,38 @@ export const useEmailStore = create<EmailState>()((set, get) => ({
     const { email: emailSettings } = useUIStore.getState()
     let created = 0
 
+    // Nur Emails ohne noteCreated-Flag verarbeiten
     const relevantEmails = emails.filter(e =>
       e.analysis &&
+      !e.noteCreated &&
       e.analysis.relevanceScore >= emailSettings.relevanceThreshold
     )
+
+    if (relevantEmails.length === 0) return 0
+
+    const updatedEmails = [...emails]
 
     for (const email of relevantEmails) {
       try {
         const result = await window.electronAPI.emailCreateNote(vaultPath, email, emailSettings.inboxFolderName)
-        if (result.success && !result.alreadyExists) {
-          created++
+        if (result.success) {
+          // noteCreated-Flag setzen (verhindert erneute Notiz-Erstellung)
+          const idx = updatedEmails.findIndex(e => e.id === email.id)
+          if (idx !== -1) {
+            updatedEmails[idx] = { ...updatedEmails[idx], noteCreated: true, notePath: result.path } as typeof updatedEmails[number]
+          }
+          if (!result.alreadyExists) {
+            created++
+          }
         }
       } catch (error) {
         console.error('[EmailStore] Failed to create note for email:', email.subject, error)
       }
     }
+
+    // State und Persistenz aktualisieren mit noteCreated-Flags
+    set({ emails: updatedEmails })
+    await get().saveEmails(vaultPath)
 
     // FileTree aktualisieren wenn Notizen erstellt wurden
     if (created > 0) {

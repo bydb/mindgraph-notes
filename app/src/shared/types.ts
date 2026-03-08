@@ -441,6 +441,7 @@ export interface ElectronAPI {
   readFileBinary: (filePath: string) => Promise<string>;  // Returns Base64
   writeFile: (filePath: string, content: string) => Promise<void>;
   deleteFile: (filePath: string) => Promise<boolean>;
+  deleteFiles: (filePaths: string[]) => Promise<{ deleted: number; total: number }>;
   deleteDirectory: (dirPath: string) => Promise<boolean>;
   renameFile: (oldPath: string, newPath: string) => Promise<{ success: boolean; newPath?: string; error?: string }>;
   moveFile: (sourcePath: string, targetDir: string) => Promise<{ success: boolean; newPath?: string; error?: string }>;
@@ -646,6 +647,14 @@ export interface ElectronAPI {
     error?: string;
   }>;
 
+  // Vision OCR (Ollama Vision Models)
+  visionOcrModels: () => Promise<{ name: string; size: number }[]>;
+  visionOcrExtractPage: (base64Image: string, model: string, pageNum: number) => Promise<{
+    success: boolean;
+    content: string;
+    error?: string;
+  }>;
+
   // Readwise Integration API
   readwiseCheck: (apiKey: string) => Promise<{ available: boolean }>;
   readwiseSync: (apiKey: string, syncFolder: string, vaultPath: string, lastSyncedAt?: string, syncCategories?: Record<string, boolean>) => Promise<{
@@ -790,6 +799,8 @@ export interface EmailMessage {
   flags: string[]         // \Seen, \Flagged etc.
   fetchedAt: string
   analysis?: EmailAnalysis
+  noteCreated?: boolean   // true wenn Notiz bereits erstellt wurde
+  notePath?: string       // Pfad zur erstellten Notiz
 }
 
 export interface EmailSuggestedAction {

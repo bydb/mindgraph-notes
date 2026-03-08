@@ -739,6 +739,22 @@ const translations = {
     'docling.extractedContentHeader': 'Extrahierter Inhalt',
     'docling.extractedOn': 'Extrahiert am',
 
+    // Vision OCR
+    'visionOcr.extract': 'Vision OCR',
+    'visionOcr.extracting': 'OCR läuft...',
+    'visionOcr.extracted': 'Fertig!',
+    'visionOcr.extractTooltip': 'PDF-Inhalt via Ollama Vision-Modell extrahieren (auch Handschrift)',
+    'visionOcr.error': 'Fehler',
+    'visionOcr.noModel': 'Kein Vision-Modell ausgewählt',
+    'visionOcr.extractedContentHeader': 'Vision OCR Inhalt',
+    'visionOcr.extractedOn': 'Extrahiert am',
+    'settings.visionOcr.title': 'Vision OCR (Ollama)',
+    'settings.visionOcr.enabled': 'Vision OCR aktiviert',
+    'settings.visionOcr.model': 'Vision-Modell',
+    'settings.visionOcr.pageWidth': 'Seitenbreite (px)',
+    'settings.visionOcr.description': 'extrahiert PDF-Inhalte via Ollama Vision-Modelle. Funktioniert mit gedruckten und handgeschriebenen Dokumenten.',
+    'settings.visionOcr.modelHint': 'Empfohlene Modelle: glm-ocr, qwen2.5-vl, minicpm-v',
+
     // LanguageTool Grammar/Spell Check
     'settings.languagetool.title': 'LanguageTool Grammatik-/Rechtschreibprüfung',
     'settings.languagetool.enabled': 'LanguageTool aktiviert',
@@ -834,6 +850,7 @@ const translations = {
     'inbox.detail.reminderFailed': 'Erinnerung fehlgeschlagen',
     'inbox.detail.relevance': 'Relevanz',
     'inbox.detail.sentiment': 'Sentiment',
+    'inbox.detail.model': 'Modell',
     'inbox.detail.back': 'Zurück',
     'inbox.sentiment.positive': 'Positiv',
     'inbox.sentiment.neutral': 'Neutral',
@@ -2021,6 +2038,22 @@ const translations = {
     'docling.extractedContentHeader': 'Extracted Content',
     'docling.extractedOn': 'Extracted on',
 
+    // Vision OCR
+    'visionOcr.extract': 'Vision OCR',
+    'visionOcr.extracting': 'OCR running...',
+    'visionOcr.extracted': 'Done!',
+    'visionOcr.extractTooltip': 'Extract PDF content via Ollama Vision model (including handwriting)',
+    'visionOcr.error': 'Error',
+    'visionOcr.noModel': 'No vision model selected',
+    'visionOcr.extractedContentHeader': 'Vision OCR Content',
+    'visionOcr.extractedOn': 'Extracted on',
+    'settings.visionOcr.title': 'Vision OCR (Ollama)',
+    'settings.visionOcr.enabled': 'Vision OCR enabled',
+    'settings.visionOcr.model': 'Vision model',
+    'settings.visionOcr.pageWidth': 'Page width (px)',
+    'settings.visionOcr.description': 'extracts PDF content via Ollama Vision models. Works with printed and handwritten documents.',
+    'settings.visionOcr.modelHint': 'Recommended models: glm-ocr, qwen2.5-vl, minicpm-v',
+
     // LanguageTool Grammar/Spell Check
     'settings.languagetool.title': 'LanguageTool Grammar/Spell Check',
     'settings.languagetool.enabled': 'LanguageTool enabled',
@@ -2116,6 +2149,7 @@ const translations = {
     'inbox.detail.reminderFailed': 'Reminder failed',
     'inbox.detail.relevance': 'Relevance',
     'inbox.detail.sentiment': 'Sentiment',
+    'inbox.detail.model': 'Model',
     'inbox.detail.back': 'Back',
     'inbox.sentiment.positive': 'Positive',
     'inbox.sentiment.neutral': 'Neutral',

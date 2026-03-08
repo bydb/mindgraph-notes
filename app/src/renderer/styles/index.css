@@ -840,6 +840,12 @@ body {
   color: white;
 }
 
+.file-item-row.multi-selected {
+  background-color: var(--accent-subtle);
+  outline: 1px solid var(--accent-color);
+  outline-offset: -1px;
+}
+
 .file-item-row.secondary-selected {
   background-color: rgba(255, 149, 0, 0.15);
   color: #ff9500;

@@ -2,6 +2,26 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.2.28-alpha] - 2026-03-08
+
+### Features
+- **Vision OCR (Ollama)**: PDF-Inhalte via Ollama Vision-Modelle extrahieren — funktioniert mit gedruckten und handgeschriebenen Dokumenten. Kein Docker/Docling nötig, alles lokal über Ollama. Empfohlene Modelle: glm-ocr, qwen2.5-vl
+- **Multi-Select im FileTree**: Dateien mit Cmd/Ctrl+Click auswählen und per Batch löschen oder in andere Ordner verschieben
+- **Email-Analyse: Modell-Anzeige**: Im Inbox-Panel wird jetzt angezeigt, welches KI-Modell die Email analysiert hat
+
+### Improvements
+- **Email-Analyse: Verbesserte Termin-Erkennung**: Prompt erkennt jetzt zuverlässig Termine, Uhrzeiten und Zoom/Teams/Meet-Links — auch in weitergeleiteten E-Mails
+- **Email-Analyse: Ollama Chat API**: Umstellung von `/api/generate` auf `/api/chat` — kompatibel mit Reasoning-Modellen (Qwen3.5, DeepSeek) inkl. `think: false` und `<think>`-Stripping
+- **Email-Analyse: Erhöhtes Body-Limit**: 1.500 → 3.000 Zeichen — weitergeleitete Mails werden nicht mehr abgeschnitten
+- **Email-Modell in Settings**: Analyse-Modell-Dropdown im Agenten-Tab funktioniert jetzt korrekt (Ollama-Models werden geladen)
+- **Quiz: Content-Limit erhöht**: 15.000 → 25.000 Zeichen für bessere Quiz-Qualität bei langen Dokumenten/PDFs
+
+### Fixes
+- **Email-Duplikate verhindert**: Dreifacher Schutz gegen doppelte E-Mail-Notizen (noteCreated-Flag, email-id Frontmatter, Dateiname-Check)
+- **Email-Fetch Deduplizierung**: Beim Zusammenführen neuer E-Mails werden Duplikate nach ID gefiltert
+- **Docling standardmäßig deaktiviert**: Vision OCR ist der empfohlene Weg für PDF-Extraktion
+- **reMarkable standardmäßig deaktiviert**: Muss bei Bedarf in den Settings aktiviert werden
+
 ## [0.2.27-alpha] - 2026-03-07
 
 ### Features

@@ -241,6 +241,13 @@ export interface DoclingSettings {
   ocrLanguages: string[]
 }
 
+// Vision OCR Settings (Ollama Vision Models)
+export interface VisionOcrSettings {
+  enabled: boolean
+  model: string
+  pageWidth: number
+}
+
 // Readwise Integration Settings
 export interface ReadwiseSettings {
   enabled: boolean
@@ -365,6 +372,8 @@ interface UIState {
 
   // Docling PDF Extraction Settings
   docling: DoclingSettings
+  // Vision OCR (Ollama Vision Models)
+  visionOcr: VisionOcrSettings
 
   // Readwise Settings
   readwise: ReadwiseSettings
@@ -451,6 +460,7 @@ interface UIState {
   setFlashcardsEnabled: (enabled: boolean) => void
   setSmartConnectionsWeights: (weights: Partial<SmartConnectionsWeights>) => void
   setDocling: (settings: Partial<DoclingSettings>) => void
+  setVisionOcr: (settings: Partial<VisionOcrSettings>) => void
   setReadwise: (settings: Partial<ReadwiseSettings>) => void
   setLanguageTool: (settings: Partial<LanguageToolSettings>) => void
   setEmail: (settings: Partial<EmailSettings>) => void
@@ -546,10 +556,17 @@ const defaultState = {
 
   // Docling PDF Extraction Settings
   docling: {
-    enabled: true,
+    enabled: false,
     url: 'http://localhost:5001',
     ocrEnabled: false,
     ocrLanguages: ['de', 'en']
+  },
+
+  // Vision OCR Settings
+  visionOcr: {
+    enabled: false,
+    model: '',
+    pageWidth: 800
   },
 
   // Readwise Settings
@@ -606,7 +623,7 @@ const defaultState = {
 
   // reMarkable
   remarkable: {
-    enabled: true,
+    enabled: false,
     transport: 'usb' as const,
     autoRefreshOnOpen: true
   },
@@ -650,7 +667,7 @@ const persistedKeys = [
   'canvasFilterPath', 'canvasViewMode', 'canvasShowTags', 'canvasShowLinks', 'canvasShowImages', 'canvasShowSummaries',
   'canvasCompactMode', 'canvasDefaultCardWidth', 'splitPosition', 'fileTreeDisplayMode', 'ollama',
   'pdfCompanionEnabled', 'pdfDisplayMode', 'iconSet',
-  'smartConnectionsEnabled', 'notesChatEnabled', 'flashcardsEnabled', 'smartConnectionsWeights', 'docling', 'readwise', 'languageTool', 'email', 'edoobox', 'remarkable',
+  'smartConnectionsEnabled', 'notesChatEnabled', 'flashcardsEnabled', 'smartConnectionsWeights', 'docling', 'visionOcr', 'readwise', 'languageTool', 'email', 'edoobox', 'remarkable',
   'lastSeenVersion',
   'customAccentColor', 'customBackgroundColorLight', 'customBackgroundColorDark',
   'customLogo',
@@ -712,6 +729,9 @@ export const useUIStore = create<UIState>()((set, get) => ({
   })),
   setDocling: (settings) => set((state) => ({
     docling: { ...state.docling, ...settings }
+  })),
+  setVisionOcr: (settings) => set((state) => ({
+    visionOcr: { ...state.visionOcr, ...settings }
   })),
   setReadwise: (settings) => set((state) => ({
     readwise: { ...state.readwise, ...settings }

@@ -17,6 +17,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   readFileBinary: (filePath: string) => ipcRenderer.invoke('read-file-binary', filePath),
   writeFile: (filePath: string, content: string) => ipcRenderer.invoke('write-file', filePath, content),
   deleteFile: (filePath: string) => ipcRenderer.invoke('delete-file', filePath),
+  deleteFiles: (filePaths: string[]) => ipcRenderer.invoke('delete-files', filePaths),
   deleteDirectory: (dirPath: string) => ipcRenderer.invoke('delete-directory', dirPath),
   renameFile: (oldPath: string, newPath: string) => ipcRenderer.invoke('rename-file', oldPath, newPath),
   moveFile: (sourcePath: string, targetDir: string) => ipcRenderer.invoke('move-file', sourcePath, targetDir),
@@ -155,6 +156,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   doclingCheck: (baseUrl?: string) => ipcRenderer.invoke('docling-check', baseUrl),
   doclingConvertPdf: (pdfPath: string, baseUrl?: string, options?: { ocrEnabled?: boolean; ocrLanguages?: string[] }) =>
     ipcRenderer.invoke('docling-convert-pdf', pdfPath, baseUrl, options),
+
+  // Vision OCR (Ollama Vision Models)
+  visionOcrModels: () => ipcRenderer.invoke('vision-ocr-models'),
+  visionOcrExtractPage: (base64Image: string, model: string, pageNum: number) =>
+    ipcRenderer.invoke('vision-ocr-extract-page', base64Image, model, pageNum),
 
   // Readwise Integration API
   readwiseCheck: (apiKey: string) => ipcRenderer.invoke('readwise-check', apiKey),

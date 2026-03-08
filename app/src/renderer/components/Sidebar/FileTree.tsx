@@ -36,6 +36,7 @@ interface ContextMenuState {
 
 interface MoveDialogState {
   entry: FileEntry
+  entries?: FileEntry[]  // Multi-select: alle zu verschiebenden Einträge
   selectedTargetPath: string | null
 }
 
@@ -256,7 +257,7 @@ const FileItem: React.FC<FileItemProps> = ({ entry, level, onDrop, displayMode }
     setMenuReady(true)
   }, [contextMenu])
 
-  const { selectedNoteId, secondarySelectedNoteId, selectedPdfPath, selectedImagePath, selectNote, selectSecondaryNote, selectPdf, selectImage, removeNote, setFileTree, vaultPath, notes, updateNotePath, fileTree } = useNotesStore()
+  const { selectedNoteId, secondarySelectedNoteId, selectedPdfPath, selectedImagePath, selectNote, selectSecondaryNote, selectPdf, selectImage, removeNote, setFileTree, vaultPath, notes, updateNotePath, fileTree, selectedPaths, togglePathSelection, clearSelection, addPathToSelection } = useNotesStore()
   const { iconSet, textSplitEnabled, flashcardsEnabled, setViewMode, setCanvasFilterPath } = useUIStore()
   const { fileCustomizations, setFileCustomization, removeFileCustomization, toggleFolderHidden, showHiddenFolders } = useGraphStore()
   const { openCanvasTab } = useTabStore()
@@ -265,11 +266,12 @@ const FileItem: React.FC<FileItemProps> = ({ entry, level, onDrop, displayMode }
   const isPdf = entry.fileType === 'pdf'
   const isImage = entry.fileType === 'image'
   const noteId = generateNoteId(entry.path)
-  const isSelected = isPdf
+  const isMultiSelected = selectedPaths.has(entry.path)
+  const isSelected = isMultiSelected || (isPdf
     ? selectedPdfPath === entry.path
     : isImage
       ? selectedImagePath === entry.path
-      : selectedNoteId === noteId
+      : selectedNoteId === noteId)
   const isSecondarySelected = !entry.isDirectory && !isPdf && !isImage && secondarySelectedNoteId === noteId
 
   // Finde die Notiz um Link-Count zu zeigen
@@ -332,20 +334,27 @@ const FileItem: React.FC<FileItemProps> = ({ entry, level, onDrop, displayMode }
 
   const handleClick = (e: React.MouseEvent) => {
     if (isEditing) return
+
+    // Cmd/Ctrl+Click: Multi-Select Toggle (für nicht-Ordner)
+    if ((e.metaKey || e.ctrlKey) && !entry.isDirectory) {
+      e.preventDefault()
+      togglePathSelection(entry.path)
+      return
+    }
+
+    // Normaler Klick: Multi-Select aufheben
+    if (selectedPaths.size > 0) {
+      clearSelection()
+    }
+
     if (entry.isDirectory) {
       setIsOpen(!isOpen)
     } else if (isPdf) {
-      // PDF direkt im Viewer anzeigen
       selectPdf(entry.path)
     } else if (isImage) {
       selectImage(entry.path)
     } else {
-      // Cmd/Ctrl+Click: In sekundäres Panel öffnen (wenn Text-Split aktiv)
-      if (textSplitEnabled && (e.metaKey || e.ctrlKey)) {
-        selectSecondaryNote(noteId)
-      } else {
-        selectNote(noteId)
-      }
+      selectNote(noteId)
     }
   }
 
@@ -413,7 +422,11 @@ const FileItem: React.FC<FileItemProps> = ({ entry, level, onDrop, displayMode }
 
   const handleContextMenu = (e: React.MouseEvent) => {
     e.preventDefault()
-    // Speichere Klickposition - die finale Position wird in useLayoutEffect berechnet
+    // Bei Multi-Select: rechts geklicktes Item zur Selektion hinzufügen falls nötig
+    if (selectedPaths.size > 0 && !selectedPaths.has(entry.path)) {
+      // Rechtsklick außerhalb der Selektion → Selektion aufheben
+      clearSelection()
+    }
     setMenuReady(false)
     setMenuMaxHeight(null)
     setContextMenu({ x: e.clientX, y: e.clientY, entry })
@@ -422,6 +435,27 @@ const FileItem: React.FC<FileItemProps> = ({ entry, level, onDrop, displayMode }
   const handleDelete = useCallback(async () => {
     if (!contextMenu || !vaultPath) return
 
+    // Multi-Select: Mehrere Dateien löschen
+    if (selectedPaths.size > 1 && selectedPaths.has(contextMenu.entry.path)) {
+      const paths = Array.from(selectedPaths).map(p => `${vaultPath}/${p}`)
+      try {
+        const result = await window.electronAPI.deleteFiles(paths)
+        if (result.deleted > 0) {
+          for (const p of selectedPaths) {
+            removeNote(generateNoteId(p))
+          }
+          clearSelection()
+          const tree = await window.electronAPI.readDirectory(vaultPath)
+          setFileTree(tree)
+        }
+      } catch (error) {
+        console.error('Fehler beim Batch-Löschen:', error)
+      }
+      setContextMenu(null)
+      return
+    }
+
+    // Single Delete
     const fullPath = `${vaultPath}/${contextMenu.entry.path}`
 
     try {
@@ -438,7 +472,7 @@ const FileItem: React.FC<FileItemProps> = ({ entry, level, onDrop, displayMode }
     }
 
     setContextMenu(null)
-  }, [contextMenu, vaultPath, removeNote, setFileTree])
+  }, [contextMenu, vaultPath, removeNote, setFileTree, selectedPaths, clearSelection])
 
   const handleCreateSubfolder = useCallback(async () => {
     if (!contextMenu || !vaultPath || !contextMenu.entry.isDirectory) return
@@ -723,12 +757,25 @@ const FileItem: React.FC<FileItemProps> = ({ entry, level, onDrop, displayMode }
     return folders
   }, [])
 
-  // Open move dialog
+  // Open move dialog (single or multi-select)
   const handleOpenMoveDialog = useCallback(() => {
     if (!contextMenu) return
-    setMoveDialog({ entry: contextMenu.entry, selectedTargetPath: null })
+    // Multi-Select: Mehrere Dateien verschieben
+    if (selectedPaths.size > 1 && selectedPaths.has(contextMenu.entry.path)) {
+      const allEntries: FileEntry[] = []
+      const collectEntries = (entries: FileEntry[]) => {
+        for (const e of entries) {
+          if (selectedPaths.has(e.path)) allEntries.push(e)
+          if (e.children) collectEntries(e.children)
+        }
+      }
+      if (fileTree) collectEntries(fileTree)
+      setMoveDialog({ entry: contextMenu.entry, entries: allEntries, selectedTargetPath: null })
+    } else {
+      setMoveDialog({ entry: contextMenu.entry, selectedTargetPath: null })
+    }
     setContextMenu(null)
-  }, [contextMenu])
+  }, [contextMenu, selectedPaths, fileTree])
 
   // Select target folder (doesn't move yet)
   const handleSelectTargetFolder = useCallback((targetFolderPath: string) => {
@@ -736,51 +783,49 @@ const FileItem: React.FC<FileItemProps> = ({ entry, level, onDrop, displayMode }
     setMoveDialog({ ...moveDialog, selectedTargetPath: targetFolderPath })
   }, [moveDialog])
 
-  // Execute move
+  // Execute move (single or multi)
   const handleExecuteMove = useCallback(async () => {
     if (!moveDialog || moveDialog.selectedTargetPath === null || !vaultPath) return
 
     const targetFolderPath = moveDialog.selectedTargetPath
-    const sourceFullPath = `${vaultPath}/${moveDialog.entry.path}`
     const targetDir = targetFolderPath === '' ? vaultPath : `${vaultPath}/${targetFolderPath}`
-
-    // Don't move to same location
-    const currentDir = moveDialog.entry.path.includes('/')
-      ? moveDialog.entry.path.substring(0, moveDialog.entry.path.lastIndexOf('/'))
-      : ''
-    if (currentDir === targetFolderPath) {
-      setMoveDialog(null)
-      return
-    }
-
-    // Prevent moving folder into itself or its children
-    if (moveDialog.entry.isDirectory && targetFolderPath.startsWith(moveDialog.entry.path + '/')) {
-      setMoveDialog(null)
-      return
-    }
+    const entriesToMove = moveDialog.entries || [moveDialog.entry]
 
     try {
-      const result = await window.electronAPI.moveFile(sourceFullPath, targetDir)
-      if (result.success) {
-        // Update note paths if needed
-        const fileName = moveDialog.entry.name
-        const newPath = targetFolderPath === '' ? fileName : `${targetFolderPath}/${fileName}`
+      for (const entry of entriesToMove) {
+        const sourceFullPath = `${vaultPath}/${entry.path}`
 
-        if (!moveDialog.entry.isDirectory && moveDialog.entry.path.endsWith('.md')) {
-          const oldNoteId = generateNoteId(moveDialog.entry.path)
-          const newNoteId = generateNoteId(newPath)
-          updateNotePath(oldNoteId, newPath, newNoteId)
+        // Don't move to same location
+        const currentDir = entry.path.includes('/')
+          ? entry.path.substring(0, entry.path.lastIndexOf('/'))
+          : ''
+        if (currentDir === targetFolderPath) continue
+
+        // Prevent moving folder into itself or its children
+        if (entry.isDirectory && targetFolderPath.startsWith(entry.path + '/')) continue
+
+        const result = await window.electronAPI.moveFile(sourceFullPath, targetDir)
+        if (result.success) {
+          const fileName = entry.name
+          const newPath = targetFolderPath === '' ? fileName : `${targetFolderPath}/${fileName}`
+
+          if (!entry.isDirectory && entry.path.endsWith('.md')) {
+            const oldNoteId = generateNoteId(entry.path)
+            const newNoteId = generateNoteId(newPath)
+            updateNotePath(oldNoteId, newPath, newNoteId)
+          }
         }
-
-        const tree = await window.electronAPI.readDirectory(vaultPath)
-        setFileTree(tree)
       }
+
+      const tree = await window.electronAPI.readDirectory(vaultPath)
+      setFileTree(tree)
+      clearSelection()
     } catch (error) {
       console.error('Fehler beim Verschieben:', error)
     }
 
     setMoveDialog(null)
-  }, [moveDialog, vaultPath, setFileTree, updateNotePath])
+  }, [moveDialog, vaultPath, setFileTree, updateNotePath, clearSelection])
 
   const openPickerDialog = useCallback((type: 'color' | 'icon') => {
     if (!contextMenu || !contextMenu.entry.isDirectory) return
@@ -862,7 +907,7 @@ const FileItem: React.FC<FileItemProps> = ({ entry, level, onDrop, displayMode }
     <div className="file-item">
       <div
         ref={rowRef}
-        className={`file-item-row ${isSelected ? 'selected' : ''} ${isSecondarySelected ? 'secondary-selected' : ''} ${isDragOver ? 'drag-over' : ''} ${isFolderHidden && showHiddenFolders ? 'file-item-hidden' : ''}`}
+        className={`file-item-row ${isSelected ? 'selected' : ''} ${isMultiSelected ? 'multi-selected' : ''} ${isSecondarySelected ? 'secondary-selected' : ''} ${isDragOver ? 'drag-over' : ''} ${isFolderHidden && showHiddenFolders ? 'file-item-hidden' : ''}`}
         style={{ paddingLeft }}
         onClick={handleClick}
         onContextMenu={handleContextMenu}
@@ -1107,14 +1152,18 @@ const FileItem: React.FC<FileItemProps> = ({ entry, level, onDrop, displayMode }
                 {t('fileTree.duplicate')}
               </button>
               <button onClick={handleOpenMoveDialog} className="context-menu-item">
-                {t('fileTree.moveTo')}
+                {selectedPaths.size > 1 && selectedPaths.has(entry.path)
+                  ? `${selectedPaths.size} Dateien verschieben`
+                  : t('fileTree.moveTo')}
               </button>
               <button onClick={handleShowInFinder} className="context-menu-item">
                 {t('fileTree.showInFinder')}
               </button>
               <div className="context-menu-divider" />
               <button onClick={handleDelete} className="context-menu-item danger">
-                {t('fileTree.deleteNote')}
+                {selectedPaths.size > 1 && selectedPaths.has(entry.path)
+                  ? `${selectedPaths.size} Dateien löschen`
+                  : t('fileTree.deleteNote')}
               </button>
             </>
           )}
@@ -1199,7 +1248,9 @@ const FileItem: React.FC<FileItemProps> = ({ entry, level, onDrop, displayMode }
         <div className="picker-dialog-overlay" onClick={() => setMoveDialog(null)}>
           <div className="picker-dialog move-dialog" onClick={e => e.stopPropagation()}>
             <div className="picker-dialog-header">
-              {t('fileTree.moveToTitle', { name: moveDialog.entry.name })}
+              {moveDialog.entries && moveDialog.entries.length > 1
+                ? `${moveDialog.entries.length} Dateien verschieben`
+                : t('fileTree.moveToTitle', { name: moveDialog.entry.name })}
             </div>
             <div className="picker-dialog-content move-dialog-content">
               {/* Root folder option */}
@@ -1214,15 +1265,12 @@ const FileItem: React.FC<FileItemProps> = ({ entry, level, onDrop, displayMode }
               </button>
               {/* All folders */}
               {fileTree && collectFolders(fileTree).map(folder => {
-                // Don't show current folder or current file's parent
-                const currentDir = moveDialog.entry.path.includes('/')
-                  ? moveDialog.entry.path.substring(0, moveDialog.entry.path.lastIndexOf('/'))
-                  : ''
-                if (folder.path === currentDir) return null
-                // Don't show the folder itself if moving a folder
-                if (moveDialog.entry.isDirectory && folder.path === moveDialog.entry.path) return null
-                // Don't show children of a folder being moved
-                if (moveDialog.entry.isDirectory && folder.path.startsWith(moveDialog.entry.path + '/')) return null
+                const entriesToMove = moveDialog.entries || [moveDialog.entry]
+                // Don't show folders that are being moved or their children
+                for (const e of entriesToMove) {
+                  if (e.isDirectory && folder.path === e.path) return null
+                  if (e.isDirectory && folder.path.startsWith(e.path + '/')) return null
+                }
 
                 const folderCustomization = fileCustomizations[folder.path]
                 const isSelected = moveDialog.selectedTargetPath === folder.path

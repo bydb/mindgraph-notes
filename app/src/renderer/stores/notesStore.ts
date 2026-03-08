@@ -12,6 +12,10 @@ interface NotesState {
   selectedImagePath: string | null  // Relativer Pfad zum ausgewählten Bild
   isLoading: boolean
 
+  // Multi-Select
+  selectedPaths: Set<string>  // Relative Pfade der selektierten Dateien
+  lastClickedPath: string | null  // Für Shift+Click Range-Select
+
   // Navigation History (Browser-like back/forward)
   navigationHistory: string[]  // Array of note IDs
   navigationIndex: number      // Current position in history (-1 = empty)
@@ -29,6 +33,13 @@ interface NotesState {
   selectPdf: (path: string | null) => void
   selectImage: (path: string | null) => void
   setLoading: (loading: boolean) => void
+
+  // Multi-Select Actions
+  togglePathSelection: (path: string) => void
+  addPathToSelection: (path: string) => void
+  clearSelection: () => void
+  isPathSelected: (path: string) => boolean
+  getSelectedPaths: () => string[]
 
   // Navigation Actions
   navigateBack: () => void
@@ -52,6 +63,8 @@ export const useNotesStore = create<NotesState>((set, get) => ({
   selectedPdfPath: null,
   selectedImagePath: null,
   isLoading: false,
+  selectedPaths: new Set<string>(),
+  lastClickedPath: null,
   navigationHistory: [],
   navigationIndex: -1,
   
@@ -167,6 +180,29 @@ export const useNotesStore = create<NotesState>((set, get) => ({
   selectImage: (path) => set({ selectedImagePath: path, selectedNoteId: null, selectedPdfPath: null }),
 
   setLoading: (loading) => set({ isLoading: loading }),
+
+  // Multi-Select
+  togglePathSelection: (path) => set((state) => {
+    const next = new Set(state.selectedPaths)
+    if (next.has(path)) {
+      next.delete(path)
+    } else {
+      next.add(path)
+    }
+    return { selectedPaths: next, lastClickedPath: path }
+  }),
+
+  addPathToSelection: (path) => set((state) => {
+    const next = new Set(state.selectedPaths)
+    next.add(path)
+    return { selectedPaths: next, lastClickedPath: path }
+  }),
+
+  clearSelection: () => set({ selectedPaths: new Set<string>(), lastClickedPath: null }),
+
+  isPathSelected: (path) => get().selectedPaths.has(path),
+
+  getSelectedPaths: () => Array.from(get().selectedPaths),
 
   // Navigation Back/Forward
   navigateBack: () => set((state) => {

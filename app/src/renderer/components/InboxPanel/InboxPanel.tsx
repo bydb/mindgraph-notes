@@ -199,6 +199,13 @@ export const InboxPanel: React.FC<InboxPanelProps> = ({ onClose }) => {
                     </span>
                   </div>
 
+                  {selectedEmail.analysis.model && (
+                    <div className="inbox-analysis-row">
+                      <span className="inbox-analysis-label">{t('inbox.detail.model')}</span>
+                      <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{selectedEmail.analysis.model}</span>
+                    </div>
+                  )}
+
                   {selectedEmail.analysis.summary && (
                     <div className="inbox-analysis-section">
                       <h4>{t('inbox.detail.summary')}</h4>
