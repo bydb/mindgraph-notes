@@ -41,29 +41,30 @@ jobs:
         run: npm run build
 
       - name: Prepare Apple API Key
-        if: "${{ env.APPLE_API_KEY != '' }}"
         env:
           APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
           APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
         run: |
-          mkdir -p $HOME/private_keys
-          echo "$APPLE_API_KEY" > $HOME/private_keys/AuthKey_${APPLE_API_KEY_ID}.p8
-          echo "APPLE_API_KEY_PATH=$HOME/private_keys/AuthKey_${APPLE_API_KEY_ID}.p8" >> $GITHUB_ENV
+          mkdir -p "$HOME/private_keys"
+          printf '%s\n' "$APPLE_API_KEY" > "$HOME/private_keys/AuthKey_${APPLE_API_KEY_ID}.p8"
+          ls -la "$HOME/private_keys/"
 
       - name: Build macOS (${{ matrix.arch }})
         working-directory: app
         env:
           CSC_LINK: ${{ secrets.CSC_LINK }}
           CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
-          APPLE_API_KEY: ${{ env.APPLE_API_KEY_PATH }}
           APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
           APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-        run: npx electron-builder --mac --${{ matrix.arch }} --publish never
+        run: |
+          export APPLE_API_KEY="$HOME/private_keys/AuthKey_${APPLE_API_KEY_ID}.p8"
+          echo "Using API key at: $APPLE_API_KEY"
+          npx electron-builder --mac --${{ matrix.arch }} --publish never
 
       - name: Cleanup Apple API Key
         if: always()
-        run: rm -f $HOME/private_keys/AuthKey_*.p8
+        run: rm -f "$HOME/private_keys/AuthKey_"*.p8
 
       - name: Upload macOS artifacts
         uses: actions/upload-artifact@v4
