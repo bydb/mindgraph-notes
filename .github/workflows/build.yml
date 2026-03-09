@@ -70,7 +70,7 @@ jobs:
             --key "$HOME/private_keys/AuthKey_${APPLE_API_KEY_ID}.p8" \
             --key-id "$APPLE_API_KEY_ID" \
             --issuer "$APPLE_API_ISSUER" \
-            --wait --timeout 20m
+            --wait --timeout 30m
           echo "Stapling..."
           xcrun stapler staple "$DMG_FILE"
 
