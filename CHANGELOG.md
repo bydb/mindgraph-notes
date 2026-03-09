@@ -2,6 +2,21 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.3.0-beta] - 2026-03-09
+
+### Highlights
+- **Open Beta** — MindGraph Notes verlässt die Alpha-Phase!
+- **macOS Code Signing & Notarization** — Keine Gatekeeper-Warnung mehr, die App wird als "Notarized Developer ID" erkannt
+- **Snap Store Integration** — Linux-Builds werden automatisch im Snap Store veröffentlicht (`snap install mindgraph-notes`)
+
+### Fixes
+- **Terminal-Reset Bug behoben** — Nach dem Neustart des Terminals wurden Mouse-Tracking-Escape-Sequenzen als Klartext angezeigt (z.B. nach Nutzung von OpenCode/Claude). Terminal-Zustand wird jetzt vollständig zurückgesetzt.
+
+### Infrastructure
+- Apple Developer ID Zertifikat (signiert + notarisiert via CI)
+- Snap Store Account registriert, CI-Pipeline erweitert
+- Website: Alpha-Signup-Formular durch direkte Download-Links ersetzt
+
 ## [0.2.29-alpha] - 2026-03-08
 
 ### Improvements

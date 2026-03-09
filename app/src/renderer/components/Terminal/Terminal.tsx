@@ -326,7 +326,11 @@ export const Terminal: React.FC<TerminalProps> = ({ visible, onToggle }) => {
   // Manueller Neustart
   const handleRestart = () => {
     console.log('Manual restart requested')
-    xtermRef.current?.clear()
+    // Reset terminal state: disable mouse tracking modes and clear screen
+    // This prevents garbled escape sequences after restarting from programs
+    // like opencode/claude that enable mouse tracking
+    xtermRef.current?.write('\x1b[?1000l\x1b[?1002l\x1b[?1003l\x1b[?1006l')
+    xtermRef.current?.reset()
     ptyStartedRef.current = false
     startPty(true)
   }
