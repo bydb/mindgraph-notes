@@ -216,6 +216,26 @@ export function restoreFile(vaultId: string, filePath: string): boolean {
   return false
 }
 
+export function getDeletedManifest(
+  vaultId: string
+): Record<string, { deletedAt: number }> {
+  const rows = db.prepare(`
+    SELECT file_path, original_path, deleted_at
+    FROM files WHERE vault_id = ? AND deleted_at IS NOT NULL
+  `).all(vaultId) as Array<{
+    file_path: string
+    original_path: string
+    deleted_at: number
+  }>
+
+  const manifest: Record<string, { deletedAt: number }> = {}
+  for (const row of rows) {
+    const key = row.original_path || row.file_path
+    manifest[key] = { deletedAt: row.deleted_at }
+  }
+  return manifest
+}
+
 export function purgeDeletedFiles(): number {
   // Hard-delete files that were soft-deleted more than 7 days ago (604800 seconds)
   const result = db.prepare(

@@ -23,6 +23,7 @@ interface ServerMessage {
   type: string
   code?: string
   files?: Record<string, { hash: string; size: number; modifiedAt: number }>
+  deletedFiles?: Record<string, { deletedAt: number }>
   path?: string
   iv?: string
   tag?: string
@@ -257,8 +258,8 @@ export class SyncEngine {
   private handleServerMessage(msg: ServerMessage): void {
     switch (msg.type) {
       case 'notify':
-        if (msg.event === 'file-changed' && !this.syncing) {
-          // Another client changed a file, trigger debounced sync
+        if ((msg.event === 'file-changed' || msg.event === 'file-deleted') && !this.syncing) {
+          // Another client changed or deleted a file, trigger debounced sync
           this.debouncedSync()
         }
         break
@@ -349,7 +350,8 @@ export class SyncEngine {
       }
 
       // Compute diff — pass saved manifest so we can detect locally deleted files
-      const diff = diffManifests(currentManifest, remoteManifest, this.manifest || undefined)
+      // Also pass server tombstones so files deleted on another device don't get re-uploaded
+      const diff = diffManifests(currentManifest, remoteManifest, this.manifest || undefined, this.lastServerTombstones)
 
       // SAFETY: Mass-deletion protection
       // If many local files would be deleted, something is likely wrong
@@ -564,6 +566,8 @@ export class SyncEngine {
     }
   }
 
+  private lastServerTombstones: Record<string, { deletedAt: number }> = {}
+
   private async getRemoteManifest(): Promise<FileManifest> {
     return new Promise((resolve, reject) => {
       if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
@@ -586,6 +590,8 @@ export class SyncEngine {
                 }
               }
             }
+            // Store server tombstones for use in diffManifests
+            this.lastServerTombstones = msg.deletedFiles || {}
             resolve({
               files: remoteFiles,
               lastSyncTime: 0,

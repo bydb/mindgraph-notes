@@ -1,6 +1,6 @@
 import http from 'http'
 import { WebSocketServer, WebSocket } from 'ws'
-import { initDatabase, registerVault, getManifest, storeFile, getFile, deleteFile, getDeletedFiles, restoreFile, purgeDeletedFiles, closeDatabase, vaultExists, validateActivationKey, claimActivationKey, addActivationKey, listActivationKeys, deactivateActivationKey, deleteVault, listVaults } from './storage'
+import { initDatabase, registerVault, getManifest, getDeletedManifest, storeFile, getFile, deleteFile, getDeletedFiles, restoreFile, purgeDeletedFiles, closeDatabase, vaultExists, validateActivationKey, claimActivationKey, addActivationKey, listActivationKeys, deactivateActivationKey, deleteVault, listVaults } from './storage'
 import { checkRateLimit } from './rateLimit'
 
 const PORT = parseInt(process.env.PORT || '8080', 10)
@@ -108,7 +108,8 @@ function handleMessage(ws: WebSocket, ip: string, raw: string): void {
         return
       }
       const files = getManifest(msg.vaultId)
-      sendJson(ws, { type: 'manifest', files })
+      const deletedFiles = getDeletedManifest(msg.vaultId)
+      sendJson(ws, { type: 'manifest', files, deletedFiles })
       break
     }
 

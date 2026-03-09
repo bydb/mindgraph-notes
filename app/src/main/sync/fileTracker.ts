@@ -190,7 +190,8 @@ export interface ManifestDiff {
 export function diffManifests(
   local: FileManifest,
   remote: FileManifest,
-  previousLocal?: FileManifest
+  previousLocal?: FileManifest,
+  serverTombstones?: Record<string, { deletedAt: number }>
 ): ManifestDiff {
   const toUpload: string[] = []
   const toDownload: string[] = []
@@ -211,6 +212,10 @@ export function diffManifests(
       // Only exists locally
       if (localFile.syncedAt !== null) {
         // Was previously synced, now deleted remotely
+        toDeleteLocal.push(filePath)
+      } else if (serverTombstones?.[filePath]) {
+        // Server has a tombstone for this file — it was deleted by another client.
+        // Even though our manifest is fresh (syncedAt === null), don't re-upload.
         toDeleteLocal.push(filePath)
       } else {
         // New local file, upload
