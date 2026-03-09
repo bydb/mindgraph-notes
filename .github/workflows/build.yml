@@ -130,6 +130,7 @@ jobs:
           if-no-files-found: error
 
       - name: Publish to Snap Store
+        continue-on-error: true
         if: startsWith(github.ref, 'refs/tags/') && env.SNAPCRAFT_STORE_CREDENTIALS != ''
         env:
           SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
