@@ -79,9 +79,18 @@
       "icon": "resources/icons/linux",
       "target": [
         "AppImage",
-        "deb"
+        "deb",
+        "snap"
       ],
       "category": "Office"
+    },
+    "snap": {
+      "confinement": "classic",
+      "summary": "Markdown note-taking app with knowledge graph",
+      "plugs": [
+        "default",
+        "removable-media"
+      ]
     }
   },
   "devDependencies": {
