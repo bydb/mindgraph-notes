@@ -2,6 +2,29 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.3.1-beta] - 2026-03-10
+
+### Features
+- **KI-Anordnung im Canvas** — Drei neue KI-gestützte Layout-Funktionen im Anordnen-Menü:
+  - **Thematisch gruppieren**: KI analysiert Titel und Tags, gruppiert Karten automatisch in thematische Spalten
+  - **Lernpfad erstellen**: KI ordnet Karten in optimaler Lernreihenfolge an (Grundlagen → Aufbauendes)
+  - **Verbindungen vorschlagen**: KI erkennt inhaltliche Zusammenhänge und erstellt fehlende Edges
+- **Canvas Lesemodus** — Neuer Toggle (Auge-Icon) in der Canvas-Toolbar:
+  - Hover-Zoom: Karten vergrößern sich beim Überfahren (Faktor per Slider einstellbar, 1x–8x)
+  - Titel-Tooltip über der Karte beim Hover
+  - Karten nicht verschiebbar/verbindbar im Lesemodus
+- **Verbindungslinien ein-/ausblenden** — Neuer Toggle zum Ausblenden aller Edges (praktisch für Grid-Ansicht)
+
+### Improvements
+- **Größere Canvas-Karten** — Default-Kartenbreite von 220px auf 280px erhöht, Max von 400px auf 500px
+- **Bessere Bildanzeige** — Bilder auf Karten max 200px statt 150px hoch
+- **Lesbarere Texte** — Callout/Tag Font-Größen erhöht (10→11px), besseres Line-Height
+- **Settings-Slider** für Kartenbreite geht jetzt bis 500px
+
+### Fixes
+- **Titel-Clipping behoben** — Karten-Border-Radius und Content-Overflow verursachten abgeschnittene Buchstaben oben links
+- **Robustes KI-JSON-Parsing** — LLM-Ausgaben mit Markdown-Blöcken, Trailing-Commas und Sonderzeichen werden korrekt verarbeitet
+
 ## [0.3.0-beta] - 2026-03-09
 
 ### Highlights

@@ -214,12 +214,13 @@ export const NoteNode: React.FC<NodeProps<NoteNodeData>> = memo(({ data, selecte
           width: '100%',
           height: '100%',
           minHeight: 50,
-          padding: '10px 14px',
+          padding: '12px 16px',
           boxSizing: 'border-box',
           background: color ? colorStyle.bg : 'var(--node-bg)',
           borderColor: selected ? 'var(--accent-color)' : colorStyle.border,
           color: color ? colorStyle.text : 'var(--text-primary)',
         }}
+        data-tooltip={title}
       >
           <Handle
             type="target"

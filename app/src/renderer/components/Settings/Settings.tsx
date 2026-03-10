@@ -1049,7 +1049,7 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
                     <input
                       type="range"
                       min="150"
-                      max="400"
+                      max="500"
                       step="10"
                       value={canvasDefaultCardWidth}
                       onChange={e => setCanvasDefaultCardWidth(parseInt(e.target.value))}

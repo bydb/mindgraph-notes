@@ -651,9 +651,13 @@ interface AlignmentToolbarProps {
   activeLayoutPreset: 'hierarchical' | 'grid' | 'colorCluster' | 'tagCluster'
   disabled: boolean
   selectedCount: number
+  onAiCluster?: () => void
+  onAiLearningPath?: () => void
+  onAiSuggestLinks?: () => void
+  aiLoading?: boolean
 }
 
-const AlignmentToolbar: React.FC<AlignmentToolbarProps> = memo(({ onAlign, onDistribute, onApplyLayoutPreset, activeLayoutPreset, disabled, selectedCount }) => {
+const AlignmentToolbar: React.FC<AlignmentToolbarProps> = memo(({ onAlign, onDistribute, onApplyLayoutPreset, activeLayoutPreset, disabled, selectedCount, onAiCluster, onAiLearningPath, onAiSuggestLinks, aiLoading }) => {
   const { t } = useTranslation()
   const [showArrangeMenu, setShowArrangeMenu] = useState(false)
   const arrangeMenuRef = useRef<HTMLDivElement>(null)
@@ -815,6 +819,75 @@ const AlignmentToolbar: React.FC<AlignmentToolbarProps> = memo(({ onAlign, onDis
               <span className="layout-hint">{t('graphCanvas.layoutByTags')}</span>
               <span className="layout-check">✓</span>
             </button>
+
+            {/* AI Layout Section */}
+            {(onAiCluster || onAiLearningPath || onAiSuggestLinks) && (
+              <>
+                <div className="arrange-menu-divider" />
+                <div className="arrange-menu-label">🤖 KI-Anordnung</div>
+
+                {onAiCluster && (
+                  <button
+                    className="layout-menu-item"
+                    onClick={() => { onAiCluster(); setShowArrangeMenu(false) }}
+                    disabled={aiLoading}
+                  >
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                      <circle cx="4" cy="4" r="2.5" stroke="#e57373" strokeWidth="1" fill="#ffcdd2"/>
+                      <circle cx="12" cy="4" r="2.5" stroke="#64b5f6" strokeWidth="1" fill="#bbdefb"/>
+                      <circle cx="8" cy="12" r="2.5" stroke="#81c784" strokeWidth="1" fill="#c8e6c9"/>
+                      <circle cx="3" cy="7" r="1" fill="#ffcdd2"/>
+                      <circle cx="13" cy="7" r="1" fill="#bbdefb"/>
+                      <circle cx="5" cy="10" r="1" fill="#c8e6c9"/>
+                    </svg>
+                    <span>{t('graphCanvas.aiCluster')}</span>
+                    <span className="layout-hint">{t('graphCanvas.aiClusterHint')}</span>
+                  </button>
+                )}
+
+                {onAiLearningPath && (
+                  <button
+                    className="layout-menu-item"
+                    onClick={() => { onAiLearningPath(); setShowArrangeMenu(false) }}
+                    disabled={aiLoading}
+                  >
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                      <rect x="1" y="7" width="3" height="3" rx="0.5" stroke="currentColor" strokeWidth="1"/>
+                      <rect x="6.5" y="7" width="3" height="3" rx="0.5" stroke="currentColor" strokeWidth="1"/>
+                      <rect x="12" y="7" width="3" height="3" rx="0.5" stroke="currentColor" strokeWidth="1"/>
+                      <path d="M4 8.5h2.5M9.5 8.5h2.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+                      <path d="M5 7l1.5 1.5L5 10" stroke="currentColor" strokeWidth="0.8" fill="none"/>
+                      <path d="M10.5 7l1.5 1.5-1.5 1.5" stroke="currentColor" strokeWidth="0.8" fill="none"/>
+                    </svg>
+                    <span>{t('graphCanvas.aiLearningPath')}</span>
+                    <span className="layout-hint">{t('graphCanvas.aiLearningPathHint')}</span>
+                  </button>
+                )}
+
+                {onAiSuggestLinks && (
+                  <button
+                    className="layout-menu-item"
+                    onClick={() => { onAiSuggestLinks(); setShowArrangeMenu(false) }}
+                    disabled={aiLoading}
+                  >
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                      <circle cx="4" cy="8" r="2" stroke="currentColor" strokeWidth="1.2"/>
+                      <circle cx="12" cy="8" r="2" stroke="currentColor" strokeWidth="1.2"/>
+                      <path d="M6 8h4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeDasharray="2 1.5"/>
+                      <path d="M13 5l1-2M13 11l1 2M3 5l-1-2M3 11l-1 2" stroke="#81c784" strokeWidth="1" strokeLinecap="round"/>
+                    </svg>
+                    <span>{t('graphCanvas.aiSuggestLinks')}</span>
+                    <span className="layout-hint">{t('graphCanvas.aiSuggestLinksHint')}</span>
+                  </button>
+                )}
+
+                {aiLoading && (
+                  <div className="arrange-menu-loading">
+                    <span className="loading-spinner-small" /> {t('graphCanvas.aiAnalyzing')}
+                  </div>
+                )}
+              </>
+            )}
           </div>
         )}
       </div>
@@ -900,17 +973,20 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
   const vaultPath = useNotesStore((s) => s.vaultPath)
   const fileTree = useNotesStore((s) => s.fileTree)
 
-  const { positions, manualEdges, labels, viewport, setNodePosition, setViewport, removeManualEdge, setNodeColor, setNodeSize, setNodeDimensions, removeNodePosition, addLabel, updateLabel, removeLabel } = useGraphStore()
+  const { positions, manualEdges, labels, viewport, setNodePosition, setViewport, addManualEdge, removeManualEdge, setNodeColor, setNodeSize, setNodeDimensions, removeNodePosition, addLabel, updateLabel, removeLabel } = useGraphStore()
 
   const {
     viewMode,
     setViewMode,
     canvasFilterPath, setCanvasFilterPath,
+    canvasShowEdges, setCanvasShowEdges,
     canvasShowTags, setCanvasShowTags,
     canvasShowLinks, setCanvasShowLinks,
     canvasShowImages, setCanvasShowImages,
     canvasShowSummaries, setCanvasShowSummaries,
     canvasCompactMode, setCanvasCompactMode,
+    canvasReadMode, setCanvasReadMode,
+    canvasHoverScale, setCanvasHoverScale,
     canvasDefaultCardWidth
   } = useUIStore()
 
@@ -1649,11 +1725,11 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
     // Titel-Breite berechnen (ca. 9px pro Zeichen)
     const charWidth = 9
     const titleWidth = title.length * charWidth
-    const padding = 32 // 14px links + 14px rechts + 4px Sicherheit
+    const padding = 36 // 16px links + 16px rechts + 4px Sicherheit
 
     // Breite = Maximum aus Basis-Breite und Titel-Breite
-    // Max: 400px (für sehr lange Titel)
-    let width = Math.max(baseWidth, Math.min(titleWidth + padding, 400))
+    // Max: 500px (für sehr lange Titel)
+    let width = Math.max(baseWidth, Math.min(titleWidth + padding, 500))
 
     // Spezielle Inhalte können mehr Breite brauchen
     if (hasImage) width = Math.max(width, baseWidth + 20)
@@ -1670,12 +1746,12 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
     }
 
     // === HÖHE berechnen ===
-    // Padding: 10px oben + 10px unten = 20px
-    let height = 20
+    // Padding: 12px oben + 12px unten = 24px
+    let height = 24
 
     // Titel: Bei unserer Breiten-Strategie passt der Titel auf eine Zeile
     // Nur bei sehr langen Titeln (>400px breit) kann es zu Umbruch kommen
-    const titleFitsOneLine = (titleWidth + padding) <= 400
+    const titleFitsOneLine = (titleWidth + padding) <= 500
     const titleLines = titleFitsOneLine ? 1 : 2
     height += titleLines * 26 // ~26px pro Zeile (font-size + line-height)
 
@@ -1688,7 +1764,7 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
     }
 
     // Bild
-    if (hasImage) height += 116 // 100px Bild + 8px gap + 8px margin
+    if (hasImage) height += 166 // 150px Bild + 8px gap + 8px margin
 
     // Externer Link
     if (hasExternalLink) height += 40 // 32px Link + 8px gap
@@ -3056,6 +3132,252 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
     setTimeout(() => fitView({ padding: 0.3 }), 100)
   }, [nodes, notes, positions, setNodePosition, fitView, focusMode, focusedNodeIds])
 
+  // ===== KI-LAYOUT FEATURES =====
+  const [aiLayoutLoading, setAiLayoutLoading] = useState(false)
+  const { ollama } = useUIStore()
+
+  // Robustes JSON-Parsing für LLM-Output
+  const parseAiJson = (text: string): any => {
+    // Markdown Code-Blöcke entfernen
+    let cleaned = text.replace(/```json\s*/gi, '').replace(/```\s*/g, '')
+    // Einfache Anführungszeichen → doppelte
+    cleaned = cleaned.replace(/'/g, '"')
+    // Steuerzeichen entfernen
+    cleaned = cleaned.replace(/[\x00-\x1F\x7F]/g, ' ')
+
+    // JSON-Array extrahieren: finde passende Klammern
+    const startIdx = cleaned.indexOf('[')
+    if (startIdx === -1) return null
+
+    let depth = 0
+    let endIdx = -1
+    for (let i = startIdx; i < cleaned.length; i++) {
+      if (cleaned[i] === '[') depth++
+      else if (cleaned[i] === ']') {
+        depth--
+        if (depth === 0) { endIdx = i; break }
+      }
+    }
+    if (endIdx === -1) return null
+
+    let json = cleaned.substring(startIdx, endIdx + 1)
+    // Trailing commas entfernen
+    json = json.replace(/,\s*\]/g, ']').replace(/,\s*\}/g, '}')
+
+    try {
+      return JSON.parse(json)
+    } catch {
+      // Letzter Versuch: kaputte Objekte am Ende abschneiden
+      const lastComplete = json.lastIndexOf('},')
+      if (lastComplete > 0) {
+        try { return JSON.parse(json.substring(0, lastComplete + 1) + ']') } catch { /* */ }
+      }
+      const lastComplete2 = json.lastIndexOf('")')
+      if (lastComplete2 === -1) {
+        // Versuche nur bis zum letzten vollständigen String-Element
+        const lastQuote = json.lastIndexOf('",')
+        if (lastQuote > 0) {
+          try { return JSON.parse(json.substring(0, lastQuote + 1) + ']') } catch { /* */ }
+        }
+      }
+      console.warn('parseAiJson failed, raw:', json.substring(0, 200))
+      return null
+    }
+  }
+
+  // KI: Thematisches Clustering
+  const handleAiCluster = useCallback(async () => {
+    if (aiLayoutLoading) return
+    const model = ollama.selectedModel
+    if (!model) { alert('Bitte zuerst ein KI-Modell in den Einstellungen auswählen.'); return }
+
+    const nodesToArrange = (focusMode ? nodes.filter(n => focusedNodeIds.has(n.id)) : nodes).filter(n => n.type !== 'label')
+    if (nodesToArrange.length < 3) return
+
+    setAiLayoutLoading(true)
+    try {
+      // Kurze numerische IDs für sauberes JSON
+      const idMap = new Map<string, string>() // shortId → realId
+      const noteList = nodesToArrange.map((node, i) => {
+        const shortId = `n${i}`
+        idMap.set(shortId, node.id)
+        const noteData = notes.find(n => n.id === node.id)
+        return { id: shortId, title: noteData?.title || node.id, tags: noteData?.tags || [] }
+      })
+
+      const prompt = `Analysiere diese Notizen und gruppiere sie thematisch. Antworte NUR mit einem JSON-Array. Jede Gruppe hat "group" (Gruppenname) und "ids" (Array der Notiz-IDs).
+
+Notizen:
+${noteList.map(n => `- ID: "${n.id}" | Titel: "${n.title}" | Tags: ${n.tags.join(', ') || 'keine'}`).join('\n')}
+
+Antworte NUR mit JSON, kein anderer Text:
+[{"group": "Thema", "ids": ["n0", "n1"]}, ...]`
+
+      const result = await window.electronAPI.ollamaGenerate({
+        model, prompt, action: 'custom', originalText: '', customPrompt: prompt
+      })
+
+      if (result.success && result.result) {
+        const clusters = parseAiJson(result.result) as Array<{ group: string; ids: string[] }> | null
+        if (clusters && Array.isArray(clusters)) {
+          const nodeWidth = 280
+          const nodeHeight = 160
+          const horizontalGap = 120
+          const verticalGap = 50
+          let currentX = 0
+
+          clusters.forEach(cluster => {
+            let currentY = 0
+            cluster.ids.forEach(shortId => {
+              const id = idMap.get(shortId) || shortId
+              if (nodesToArrange.find(n => n.id === id)) {
+                setNodePosition(id, currentX, currentY)
+                currentY += (positions[id]?.height || nodeHeight) + verticalGap
+              }
+            })
+            currentX += nodeWidth + horizontalGap
+          })
+
+          setTimeout(() => fitView({ padding: 0.3 }), 100)
+        }
+      }
+    } catch (e) {
+      console.error('AI Cluster error:', e)
+    }
+    setAiLayoutLoading(false)
+  }, [aiLayoutLoading, ollama.selectedModel, nodes, notes, positions, setNodePosition, fitView, focusMode, focusedNodeIds])
+
+  // KI: Lernpfad
+  const handleAiLearningPath = useCallback(async () => {
+    if (aiLayoutLoading) return
+    const model = ollama.selectedModel
+    if (!model) { alert('Bitte zuerst ein KI-Modell in den Einstellungen auswählen.'); return }
+
+    const nodesToArrange = (focusMode ? nodes.filter(n => focusedNodeIds.has(n.id)) : nodes).filter(n => n.type !== 'label')
+    if (nodesToArrange.length < 3) return
+
+    setAiLayoutLoading(true)
+    try {
+      const idMap = new Map<string, string>()
+      const noteList = nodesToArrange.map((node, i) => {
+        const shortId = `n${i}`
+        idMap.set(shortId, node.id)
+        const noteData = notes.find(n => n.id === node.id)
+        return { id: shortId, title: noteData?.title || node.id, tags: noteData?.tags || [] }
+      })
+
+      const prompt = `Ordne diese Notizen in eine optimale Lernreihenfolge. Grundlagen zuerst, dann aufbauende Themen. Antworte NUR mit einem JSON-Array der IDs in der richtigen Reihenfolge.
+
+Notizen:
+${noteList.map(n => `- ID: "${n.id}" | Titel: "${n.title}" | Tags: ${n.tags.join(', ') || 'keine'}`).join('\n')}
+
+Antworte NUR mit JSON, kein anderer Text:
+["n0", "n3", "n1", ...]`
+
+      const result = await window.electronAPI.ollamaGenerate({
+        model, prompt, action: 'custom', originalText: '', customPrompt: prompt
+      })
+
+      if (result.success && result.result) {
+        const orderedShortIds = parseAiJson(result.result) as string[] | null
+        if (orderedShortIds && Array.isArray(orderedShortIds)) {
+          const nodeWidth = 280
+          const horizontalGap = 100
+          let currentX = 0
+          const placedIds = new Set<string>()
+
+          orderedShortIds.forEach(shortId => {
+            const id = idMap.get(shortId) || shortId
+            if (nodesToArrange.find(n => n.id === id)) {
+              setNodePosition(id, currentX, 0)
+              currentX += (positions[id]?.width || nodeWidth) + horizontalGap
+              placedIds.add(id)
+            }
+          })
+
+          // Nicht zugeordnete Notizen am Ende platzieren
+          nodesToArrange.forEach(node => {
+            if (!placedIds.has(node.id)) {
+              setNodePosition(node.id, currentX, 0)
+              currentX += nodeWidth + horizontalGap
+            }
+          })
+
+          setTimeout(() => fitView({ padding: 0.3 }), 100)
+        }
+      }
+    } catch (e) {
+      console.error('AI Learning Path error:', e)
+    }
+    setAiLayoutLoading(false)
+  }, [aiLayoutLoading, ollama.selectedModel, nodes, notes, positions, setNodePosition, fitView, focusMode, focusedNodeIds])
+
+  // KI: Verbindungen vorschlagen
+  const handleAiSuggestLinks = useCallback(async () => {
+    if (aiLayoutLoading) return
+    const model = ollama.selectedModel
+    if (!model) { alert('Bitte zuerst ein KI-Modell in den Einstellungen auswählen.'); return }
+
+    const nodesToArrange = (focusMode ? nodes.filter(n => focusedNodeIds.has(n.id)) : nodes).filter(n => n.type !== 'label')
+    if (nodesToArrange.length < 3) return
+
+    setAiLayoutLoading(true)
+    try {
+      const idMap = new Map<string, string>()
+      const noteList = nodesToArrange.map((node, i) => {
+        const shortId = `n${i}`
+        idMap.set(shortId, node.id)
+        const noteData = notes.find(n => n.id === node.id)
+        const links = noteData?.outgoingLinks.filter(l => !/\.(png|jpe?g|gif|svg|webp)$/i.test(l)) || []
+        return { id: shortId, title: noteData?.title || node.id, tags: noteData?.tags || [], links }
+      })
+
+      const prompt = `Finde Paare von Notizen die inhaltlich zusammenhängen aber noch nicht verlinkt sind. Antworte NUR mit einem JSON-Array von Paaren.
+
+Notizen:
+${noteList.map(n => `${n.id}: "${n.title}" [${n.tags.join(', ')}]`).join('\n')}
+
+Antworte NUR mit JSON:
+[{"source":"n0","target":"n3"},{"source":"n1","target":"n5"}]`
+
+      const result = await window.electronAPI.ollamaGenerate({
+        model, prompt, action: 'custom', originalText: '', customPrompt: prompt
+      })
+
+      if (result.success && result.result) {
+        console.log('[AI Suggest Links] Raw response length:', result.result.length)
+        const suggestions = parseAiJson(result.result) as Array<{ source: string; target: string; reason?: string }> | null
+        console.log('[AI Suggest Links] Parsed suggestions:', suggestions?.length || 0)
+        if (suggestions && Array.isArray(suggestions)) {
+          const validNodeIds = new Set(nodesToArrange.map(n => n.id))
+          let added = 0
+          suggestions.forEach(suggestion => {
+            if (!suggestion.source || !suggestion.target) return
+            const sourceId = idMap.get(suggestion.source) || suggestion.source
+            const targetId = idMap.get(suggestion.target) || suggestion.target
+
+            if (validNodeIds.has(sourceId) && validNodeIds.has(targetId)) {
+              const exists = edges.some(e =>
+                (e.source === sourceId && e.target === targetId) ||
+                (e.source === targetId && e.target === sourceId)
+              )
+              if (!exists) {
+                addManualEdge({ source: sourceId, target: targetId })
+                added++
+              }
+            }
+          })
+          console.log('[AI Suggest Links] Added', added, 'new edges')
+        }
+      } else {
+        console.warn('[AI Suggest Links] No result from LLM')
+      }
+    } catch (e) {
+      console.error('AI Suggest Links error:', e)
+    }
+    setAiLayoutLoading(false)
+  }, [aiLayoutLoading, ollama, nodes, notes, edges, addManualEdge, focusMode, focusedNodeIds])
+
   const handleApplyLayoutPreset = useCallback((preset: 'hierarchical' | 'grid' | 'colorCluster' | 'tagCluster') => {
     setActiveLayoutPreset(preset)
 
@@ -3152,10 +3474,11 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
   }, [nodes, focusMode, focusedNodeIds])
 
   const displayEdges = useMemo(() => {
+    if (!canvasShowEdges) return []
     if (!focusMode) return edges
     // Im Focus Mode: nur Edges zwischen fokussierten Nodes anzeigen
     return edges.filter(e => focusedNodeIds.has(e.source) && focusedNodeIds.has(e.target))
-  }, [edges, focusMode, focusedNodeIds])
+  }, [edges, focusMode, focusedNodeIds, canvasShowEdges])
 
   if (allNotes.length === 0) {
     return (
@@ -3183,8 +3506,52 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
 
         <div className="canvas-filter-divider" />
 
+        {/* Read/Edit Mode Toggle */}
+        <button
+          className={`display-toggle-btn ${canvasReadMode ? 'active' : ''}`}
+          onClick={() => setCanvasReadMode(!canvasReadMode)}
+          title={canvasReadMode ? t('graphCanvas.editMode') : t('graphCanvas.readMode')}
+        >
+          {canvasReadMode ? (
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+              <path d="M8 3C4.5 3 1.5 8 1.5 8s3 5 6.5 5 6.5-5 6.5-5-3-5-6.5-5z" stroke="currentColor" strokeWidth="1.5"/>
+              <circle cx="8" cy="8" r="2" stroke="currentColor" strokeWidth="1.5"/>
+            </svg>
+          ) : (
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+              <path d="M11.5 1.5l3 3-9 9H2.5v-3l9-9z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
+            </svg>
+          )}
+        </button>
+        {canvasReadMode && (
+          <div className="canvas-hover-scale-slider" title={`Hover-Zoom: ${canvasHoverScale}x`}>
+            <input
+              type="range"
+              min="1"
+              max="8"
+              step="0.5"
+              value={canvasHoverScale}
+              onChange={e => setCanvasHoverScale(parseFloat(e.target.value))}
+            />
+            <span>{canvasHoverScale}x</span>
+          </div>
+        )}
+
+        <div className="canvas-filter-divider" />
+
         {/* Display Toggles */}
         <div className="canvas-display-toggles">
+          <button
+            className={`display-toggle-btn ${canvasShowEdges ? 'active' : ''}`}
+            onClick={() => setCanvasShowEdges(!canvasShowEdges)}
+            title={canvasShowEdges ? t('graphCanvas.hideEdges') : t('graphCanvas.showEdges')}
+          >
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+              <line x1="3" y1="13" x2="13" y2="3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+              <circle cx="3" cy="13" r="2" stroke="currentColor" strokeWidth="1.2"/>
+              <circle cx="13" cy="3" r="2" stroke="currentColor" strokeWidth="1.2"/>
+            </svg>
+          </button>
           <button
             className={`display-toggle-btn ${canvasShowTags ? 'active' : ''}`}
             onClick={() => setCanvasShowTags(!canvasShowTags)}
@@ -3286,6 +3653,10 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
               activeLayoutPreset={activeLayoutPreset}
               disabled={selectedCount < 2}
               selectedCount={selectedCount}
+              onAiCluster={handleAiCluster}
+              onAiLearningPath={handleAiLearningPath}
+              onAiSuggestLinks={handleAiSuggestLinks}
+              aiLoading={aiLayoutLoading}
             />
           </>
         )}
@@ -3300,14 +3671,16 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
         </div>
       ) : (
       <ReactFlow
+        className={canvasReadMode ? 'canvas-read-mode' : ''}
+        style={{ '--hover-scale': canvasHoverScale } as React.CSSProperties}
         nodes={displayNodes}
         edges={displayEdges}
         onNodesChange={handleNodesChange}
         onEdgesChange={handleEdgesChange}
-        onConnect={handleConnect}
-        onConnectStart={onConnectStart}
-        onConnectEnd={onConnectEnd}
-        onNodeDoubleClick={handleNodeDoubleClick}
+        onConnect={canvasReadMode ? undefined : handleConnect}
+        onConnectStart={canvasReadMode ? undefined : onConnectStart}
+        onConnectEnd={canvasReadMode ? undefined : onConnectEnd}
+        onNodeDoubleClick={canvasReadMode ? undefined : handleNodeDoubleClick}
         onNodeContextMenu={handleNodeContextMenu}
         onEdgeContextMenu={handleEdgeContextMenu}
         onPaneContextMenu={handlePaneContextMenu}
@@ -3320,6 +3693,8 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
         maxZoom={2}
         connectionLineStyle={connectionLineStyle}
         defaultEdgeOptions={defaultEdgeOptions}
+        nodesDraggable={!canvasReadMode}
+        nodesConnectable={!canvasReadMode}
       >
         <Controls />
         <Panel position="top-right" className="canvas-export-panel">

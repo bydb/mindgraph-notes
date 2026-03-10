@@ -342,12 +342,15 @@ interface UIState {
   textSplitPosition: number  // Position des Text-Split Dividers (0-100)
   canvasFilterPath: string | null // null = alle anzeigen, sonst Ordnerpfad
   canvasViewMode: CanvasViewMode // 'cards' = Karten mit Titel, 'dots' = Punkte
+  canvasShowEdges: boolean // Verbindungslinien anzeigen
   canvasShowTags: boolean // Tags in Karten anzeigen
   canvasShowLinks: boolean // Link-Anzahl in Karten anzeigen
   canvasShowImages: boolean // Bilder in Karten anzeigen
   canvasShowSummaries: boolean // Zusammenfassungen/Callouts in Karten anzeigen
   canvasCompactMode: boolean // Kompakt-Modus: nur Titel anzeigen
-  canvasDefaultCardWidth: number // Standard-Kartenbreite (150-400)
+  canvasReadMode: boolean // Lese-Modus: Hover-Zoom aktiv, kein Bearbeiten
+  canvasHoverScale: number // Hover-Vergrößerung im Lesemodus (1-8)
+  canvasDefaultCardWidth: number // Standard-Kartenbreite (150-500)
   splitPosition: number // Prozent für Editor-Breite im Split-Modus (0-100)
   fileTreeDisplayMode: FileTreeDisplayMode // 'name' = nur Dateiname, 'path' = voller Pfad
   pendingTemplateInsert: PendingTemplateInsert | null // Template das in Editor eingefügt werden soll
@@ -514,12 +517,15 @@ const defaultState = {
   textSplitPosition: 50,
   canvasFilterPath: null as string | null,
   canvasViewMode: 'cards' as CanvasViewMode,
+  canvasShowEdges: true,
   canvasShowTags: false,
   canvasShowLinks: true,
   canvasShowImages: true,
   canvasShowSummaries: true,
   canvasCompactMode: false,
-  canvasDefaultCardWidth: 220, // Standard: 220px
+  canvasReadMode: false,
+  canvasHoverScale: 3.6,
+  canvasDefaultCardWidth: 280, // Standard: 280px
   splitPosition: 50,
   fileTreeDisplayMode: 'name' as FileTreeDisplayMode,
   pendingTemplateInsert: null as PendingTemplateInsert | null,
@@ -664,8 +670,8 @@ const persistedKeys = [
   'language', 'fontFamily', 'editorFontSize', 'editorLineNumbers', 'editorDefaultView',
   'autoSaveInterval', 'editorHeadingFolding', 'editorOutlining', 'outlineStyle', 'editorShowWordCount',
   'sidebarWidth', 'sidebarVisible', 'editorPreviewSplit', 'textSplitEnabled', 'textSplitPosition',
-  'canvasFilterPath', 'canvasViewMode', 'canvasShowTags', 'canvasShowLinks', 'canvasShowImages', 'canvasShowSummaries',
-  'canvasCompactMode', 'canvasDefaultCardWidth', 'splitPosition', 'fileTreeDisplayMode', 'ollama',
+  'canvasFilterPath', 'canvasViewMode', 'canvasShowEdges', 'canvasShowTags', 'canvasShowLinks', 'canvasShowImages', 'canvasShowSummaries',
+  'canvasCompactMode', 'canvasReadMode', 'canvasHoverScale', 'canvasDefaultCardWidth', 'splitPosition', 'fileTreeDisplayMode', 'ollama',
   'pdfCompanionEnabled', 'pdfDisplayMode', 'iconSet',
   'smartConnectionsEnabled', 'notesChatEnabled', 'flashcardsEnabled', 'smartConnectionsWeights', 'docling', 'visionOcr', 'readwise', 'languageTool', 'email', 'edoobox', 'remarkable',
   'lastSeenVersion',
@@ -708,12 +714,15 @@ export const useUIStore = create<UIState>()((set, get) => ({
   setTextSplitPosition: (position) => set({ textSplitPosition: Math.max(20, Math.min(80, position)) }),
   setCanvasFilterPath: (path) => set({ canvasFilterPath: path }),
   setCanvasViewMode: (mode) => set({ canvasViewMode: mode }),
+  setCanvasShowEdges: (show) => set({ canvasShowEdges: show }),
   setCanvasShowTags: (show) => set({ canvasShowTags: show }),
   setCanvasShowLinks: (show) => set({ canvasShowLinks: show }),
   setCanvasShowImages: (show) => set({ canvasShowImages: show }),
   setCanvasShowSummaries: (show) => set({ canvasShowSummaries: show }),
   setCanvasCompactMode: (compact) => set({ canvasCompactMode: compact }),
-  setCanvasDefaultCardWidth: (width) => set({ canvasDefaultCardWidth: Math.max(150, Math.min(400, width)) }),
+  setCanvasReadMode: (read) => set({ canvasReadMode: read }),
+  setCanvasHoverScale: (scale) => set({ canvasHoverScale: Math.max(1, Math.min(8, scale)) }),
+  setCanvasDefaultCardWidth: (width) => set({ canvasDefaultCardWidth: Math.max(150, Math.min(500, width)) }),
   setSplitPosition: (position) => set({ splitPosition: Math.max(20, Math.min(80, position)) }),
   setFileTreeDisplayMode: (mode) => set({ fileTreeDisplayMode: mode }),
   setPendingTemplateInsert: (template) => set({ pendingTemplateInsert: template }),
