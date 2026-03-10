@@ -2,6 +2,14 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.3.2-beta] - 2026-03-10
+
+### Fixes
+- **Sync: Gelöschte Dateien werden nicht mehr zurückgespielt** — Dateien die auf einem Gerät gelöscht wurden, wurden von selten genutzten Geräten wieder hochgeladen. Ursache: `syncedAt` wurde nie für identische Dateien gesetzt, sodass Löschungen nach Ablauf der Server-Tombstones (7 Tage) nicht mehr erkannt wurden.
+  - `syncedAt` wird jetzt für alle beim Sync identischen Dateien markiert
+  - Neu heruntergeladene Dateien werden korrekt in das lokale Manifest übernommen
+  - Server-Tombstone-Retention von 7 auf 90 Tage erhöht (Safety Net für selten genutzte Geräte)
+
 ## [0.3.1-beta] - 2026-03-10
 
 ### Features

@@ -236,7 +236,11 @@ export function diffManifests(
       }
     } else if (localFile && remoteFile) {
       if (localFile.hash === remoteFile.hash) {
-        // Identical, nothing to do
+        // Identical — mark as synced so future deletion detection works
+        // without relying on server tombstones (which get purged)
+        if (localFile.syncedAt === null) {
+          localFile.syncedAt = Date.now()
+        }
         continue
       }
 

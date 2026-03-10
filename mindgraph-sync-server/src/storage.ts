@@ -237,12 +237,13 @@ export function getDeletedManifest(
 }
 
 export function purgeDeletedFiles(): number {
-  // Hard-delete files that were soft-deleted more than 7 days ago (604800 seconds)
+  // Hard-delete files that were soft-deleted more than 90 days ago (7776000 seconds)
+  // Long retention ensures clients that sync infrequently still see tombstones
   const result = db.prepare(
-    'DELETE FROM files WHERE deleted_at IS NOT NULL AND deleted_at < unixepoch() - 604800'
+    'DELETE FROM files WHERE deleted_at IS NOT NULL AND deleted_at < unixepoch() - 7776000'
   ).run()
   if (result.changes > 0) {
-    console.log(`[Storage] Purged ${result.changes} soft-deleted files older than 7 days`)
+    console.log(`[Storage] Purged ${result.changes} soft-deleted files older than 90 days`)
   }
   return result.changes
 }

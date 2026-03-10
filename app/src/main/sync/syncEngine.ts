@@ -416,6 +416,10 @@ export class SyncEngine {
           await this.downloadFile(filePath)
           if (currentManifest.files[filePath]) {
             currentManifest.files[filePath].syncedAt = Date.now()
+          } else if (this.manifest?.files[filePath]) {
+            // File was newly downloaded (didn't exist on disk when buildManifest ran)
+            // Copy the entry from this.manifest (set by downloadFile) into currentManifest
+            currentManifest.files[filePath] = { ...this.manifest.files[filePath] }
           }
           // Clear tombstone — file is intentionally being downloaded
           if (currentManifest.tombstones?.[filePath]) {
