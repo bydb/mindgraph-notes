@@ -144,6 +144,7 @@ export interface FileCustomization {
   color?: string           // Ordner/Datei Farbe (aus Palette)
   icon?: string            // Icon-Override (z.B. '📚', '🎯', 'star')
   hidden?: boolean         // Ordner im FileTree ausblenden
+  pinned?: boolean         // Ordner als Favorit oben im FileTree anpinnen
 }
 
 // Task-Statistiken pro Notiz (für Cache)

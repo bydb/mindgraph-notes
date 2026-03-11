@@ -101,18 +101,26 @@ export function resolveLink(linkText: string, allNotes: Note[]): Note | null {
 }
 
 export function extractTitle(content: string, fileName: string): string {
+  // Extract leading emoji from filename (e.g. "202512091255 - 🟢 Title.md" → "🟢")
+  const nameWithoutExt = fileName.endsWith('.pdf.md')
+    ? fileName.replace('.pdf.md', '')
+    : fileName.replace('.md', '')
+  const emojiMatch = nameWithoutExt.match(/(?:^|\s-\s)([\p{Emoji_Presentation}\p{Extended_Pictographic}]+(?:\s[\p{Emoji_Presentation}\p{Extended_Pictographic}]+)*)\s/u)
+  const fileNameEmoji = emojiMatch ? emojiMatch[1] : ''
+
   // Versuche, ersten H1 zu finden
   const h1Match = content.match(/^#\s+(.+)$/m)
   if (h1Match) {
-    return h1Match[1].trim()
+    const h1Title = h1Match[1].trim()
+    // Prepend emoji from filename if H1 doesn't already contain it
+    if (fileNameEmoji && !h1Title.includes(fileNameEmoji)) {
+      return `${fileNameEmoji} ${h1Title}`
+    }
+    return h1Title
   }
 
   // Fallback: Dateiname ohne Extension
-  // Für PDF-Companions: datei.pdf.md -> datei
-  if (fileName.endsWith('.pdf.md')) {
-    return fileName.replace('.pdf.md', '')
-  }
-  return fileName.replace('.md', '')
+  return nameWithoutExt
 }
 
 // Generiert eine eindeutige ID aus dem Pfad

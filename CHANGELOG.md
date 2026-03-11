@@ -2,6 +2,20 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.3.3-beta] - 2026-03-11
+
+### Features
+- **Ordner anpinnen (Pinned Folders)** — Tief verschachtelte Ordner können per Rechtsklick an die Sidebar angepinnt werden und erscheinen prominent oben im FileTree, unabhängig von ihrer Position in der Ordnerstruktur
+- **Canvas: Emoji-Dot-Kategorisierung bei KI-Clustering** — "Thematisch gruppieren" erkennt jetzt 🔴🟢🔵 Emoji-Dots in Notiz-Titeln, färbt die Karten automatisch nach Kategorie ein und weist die KI an, nach Kategorien zu clustern
+- **Emoji-Dots auf Canvas-Karten** — Notiz-Titel zeigen jetzt Emoji-Dots (🔴🟢🔵) aus dem Dateinamen auch auf Canvas-Karten an
+
+### Improvements
+- **Verbesserte Titel-Extraktion** — `extractTitle()` extrahiert Emojis aus dem Dateinamen und stellt sie dem H1-Titel voran
+- **Cache-Invalidierung** für korrekte Darstellung neuer Titel (NOTES_CACHE_VERSION bump)
+
+### Fixes
+- **Canvas-Titel-Clipping** — CSS für Notiz-Titel auf Canvas-Karten von `-webkit-line-clamp` auf `max-height` umgestellt, damit Emojis nicht abgeschnitten werden
+
 ## [0.3.2-beta] - 2026-03-10
 
 ### Fixes

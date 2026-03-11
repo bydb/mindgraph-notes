@@ -539,6 +539,9 @@ const translations = {
     'fileTree.moveButton': 'Verschieben',
     'fileTree.hideFolder': 'Ordner ausblenden',
     'fileTree.showFolder': 'Ordner einblenden',
+    'fileTree.pinFolder': 'An Sidebar anpinnen',
+    'fileTree.unpinFolder': 'Aus Sidebar lösen',
+    'fileTree.pinnedFolders': 'Angepinnt',
 
     // Canvas
     'canvas.reset': 'Zurücksetzen',
@@ -1849,6 +1852,9 @@ const translations = {
     'fileTree.moveButton': 'Move',
     'fileTree.hideFolder': 'Hide folder',
     'fileTree.showFolder': 'Show folder',
+    'fileTree.pinFolder': 'Pin to sidebar',
+    'fileTree.unpinFolder': 'Unpin from sidebar',
+    'fileTree.pinnedFolders': 'Pinned',
 
     // Canvas
     'canvas.reset': 'Reset',

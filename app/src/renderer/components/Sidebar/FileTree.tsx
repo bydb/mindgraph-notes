@@ -259,7 +259,7 @@ const FileItem: React.FC<FileItemProps> = ({ entry, level, onDrop, displayMode }
 
   const { selectedNoteId, secondarySelectedNoteId, selectedPdfPath, selectedImagePath, selectNote, selectSecondaryNote, selectPdf, selectImage, removeNote, setFileTree, vaultPath, notes, updateNotePath, fileTree, selectedPaths, togglePathSelection, clearSelection, addPathToSelection } = useNotesStore()
   const { iconSet, textSplitEnabled, setTextSplitEnabled, flashcardsEnabled, setViewMode, setCanvasFilterPath } = useUIStore()
-  const { fileCustomizations, setFileCustomization, removeFileCustomization, toggleFolderHidden, showHiddenFolders } = useGraphStore()
+  const { fileCustomizations, setFileCustomization, removeFileCustomization, toggleFolderHidden, toggleFolderPinned, showHiddenFolders } = useGraphStore()
   const { openCanvasTab } = useTabStore()
   const { isBookmarked, toggleBookmark } = useBookmarkStore()
 
@@ -286,6 +286,7 @@ const FileItem: React.FC<FileItemProps> = ({ entry, level, onDrop, displayMode }
   const folderColor = customization?.color
   const folderIcon = customization?.icon
   const isFolderHidden = entry.isDirectory && customization?.hidden === true
+  const isFolderPinned = entry.isDirectory && customization?.pinned === true
   const hasCustomization = folderColor || folderIcon
 
   // Display-Name basierend auf displayMode
@@ -689,6 +690,12 @@ const FileItem: React.FC<FileItemProps> = ({ entry, level, onDrop, displayMode }
     setContextMenu(null)
   }, [contextMenu, toggleFolderHidden])
 
+  const handleToggleFolderPinned = useCallback(() => {
+    if (!contextMenu || !contextMenu.entry.isDirectory) return
+    toggleFolderPinned(contextMenu.entry.path)
+    setContextMenu(null)
+  }, [contextMenu, toggleFolderPinned])
+
   // Show folder in canvas view
   const handleShowFolderInCanvas = useCallback(() => {
     if (!contextMenu || !contextMenu.entry.isDirectory) return
@@ -1055,6 +1062,9 @@ const FileItem: React.FC<FileItemProps> = ({ entry, level, onDrop, displayMode }
               <button onClick={handleToggleFolderHidden} className="context-menu-item">
                 {isFolderHidden ? t('fileTree.showFolder') : t('fileTree.hideFolder')}
               </button>
+              <button onClick={handleToggleFolderPinned} className="context-menu-item">
+                {isFolderPinned ? t('fileTree.unpinFolder') : t('fileTree.pinFolder')}
+              </button>
               <div className="context-menu-divider" />
               <button onClick={handleCopyRelativePath} className="context-menu-item">
                 {t('fileTree.copyRelativePath')}
@@ -1319,7 +1329,20 @@ const FileItem: React.FC<FileItemProps> = ({ entry, level, onDrop, displayMode }
   )
 }
 
+// Helper: find a FileEntry by path in the tree (recursive)
+function findEntryByPath(entries: FileEntry[], targetPath: string): FileEntry | null {
+  for (const entry of entries) {
+    if (entry.path === targetPath) return entry
+    if (entry.children) {
+      const found = findEntryByPath(entry.children, targetPath)
+      if (found) return found
+    }
+  }
+  return null
+}
+
 export const FileTree: React.FC<FileTreeProps> = ({ entries, level = 0, onDrop, displayMode = 'name' }) => {
+  const { t } = useTranslation()
   const { pdfCompanionEnabled, pdfDisplayMode } = useUIStore()
   const { fileCustomizations, showHiddenFolders } = useGraphStore()
 
@@ -1362,8 +1385,31 @@ export const FileTree: React.FC<FileTreeProps> = ({ entries, level = 0, onDrop, 
     })
   }, [entries, pdfCompanionEnabled, pdfDisplayMode, showHiddenFolders, fileCustomizations])
 
+  // Pinned folders (only at root level)
+  const pinnedEntries = useMemo(() => {
+    if (level !== 0) return []
+    return Object.entries(fileCustomizations)
+      .filter(([, c]) => c.pinned)
+      .map(([path]) => findEntryByPath(entries, path))
+      .filter((e): e is FileEntry => e !== null)
+  }, [level, fileCustomizations, entries])
+
   return (
     <div className="file-tree">
+      {level === 0 && pinnedEntries.length > 0 && (
+        <div className="pinned-folders-section">
+          <div className="pinned-folders-header">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 17v5" /><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z" />
+            </svg>
+            <span>{t('fileTree.pinnedFolders')}</span>
+          </div>
+          {pinnedEntries.map((entry) => (
+            <FileItem key={`pinned-${entry.path}`} entry={entry} level={0} onDrop={onDrop} displayMode={displayMode} />
+          ))}
+          <div className="pinned-folders-divider" />
+        </div>
+      )}
       {filteredEntries.map((entry) => (
         <FileItem key={entry.path} entry={entry} level={level} onDrop={onDrop} displayMode={displayMode} />
       ))}

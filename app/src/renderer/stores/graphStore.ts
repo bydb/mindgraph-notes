@@ -50,6 +50,7 @@ interface GraphState {
   setFileCustomization: (path: string, customization: FileCustomization) => void
   removeFileCustomization: (path: string) => void
   toggleFolderHidden: (path: string) => void
+  toggleFolderPinned: (path: string) => void
   setShowHiddenFolders: (show: boolean) => void
 
   setViewport: (viewport: { x: number; y: number; zoom: number }) => void
@@ -322,9 +323,36 @@ export const useGraphStore = create<GraphState>()(
         if (existing.color) cleaned.color = existing.color
         if (existing.icon) cleaned.icon = existing.icon
         if (isHidden) cleaned.hidden = true
+        if (existing.pinned) cleaned.pinned = true
 
         // If no properties left, remove entry entirely
-        if (!cleaned.color && !cleaned.icon && !cleaned.hidden) {
+        if (!cleaned.color && !cleaned.icon && !cleaned.hidden && !cleaned.pinned) {
+          const { [path]: _, ...rest } = state.fileCustomizations
+          return { fileCustomizations: rest, isDirty: true }
+        }
+
+        return {
+          fileCustomizations: {
+            ...state.fileCustomizations,
+            [path]: cleaned
+          },
+          isDirty: true
+        }
+      })
+      scheduleSave()
+    },
+
+    toggleFolderPinned: (path) => {
+      set((state) => {
+        const existing = state.fileCustomizations[path] || {}
+        const isPinned = !existing.pinned
+        const cleaned: FileCustomization = {}
+        if (existing.color) cleaned.color = existing.color
+        if (existing.icon) cleaned.icon = existing.icon
+        if (existing.hidden) cleaned.hidden = true
+        if (isPinned) cleaned.pinned = true
+
+        if (!cleaned.color && !cleaned.icon && !cleaned.hidden && !cleaned.pinned) {
           const { [path]: _, ...rest } = state.fileCustomizations
           return { fileCustomizations: rest, isDirty: true }
         }

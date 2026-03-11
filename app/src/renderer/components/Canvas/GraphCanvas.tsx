@@ -3196,16 +3196,42 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
 
     setAiLayoutLoading(true)
     try {
+      // Detect emoji dots in titles and auto-color cards
+      const emojiColorMap: Record<string, string> = { '🔴': '#ffcdd2', '🟢': '#c8e6c9', '🔵': '#bbdefb' }
+      const dotCategories = new Map<string, string>() // nodeId → emoji
+      nodesToArrange.forEach(node => {
+        const noteData = notes.find(n => n.id === node.id)
+        const title = noteData?.title || ''
+        for (const emoji of Object.keys(emojiColorMap)) {
+          if (title.includes(emoji)) {
+            dotCategories.set(node.id, emoji)
+            setNodeColor(node.id, emojiColorMap[emoji])
+            break
+          }
+        }
+      })
+
       // Kurze numerische IDs für sauberes JSON
       const idMap = new Map<string, string>() // shortId → realId
       const noteList = nodesToArrange.map((node, i) => {
         const shortId = `n${i}`
         idMap.set(shortId, node.id)
         const noteData = notes.find(n => n.id === node.id)
-        return { id: shortId, title: noteData?.title || node.id, tags: noteData?.tags || [] }
+        const dot = dotCategories.get(node.id)
+        const category = dot === '🔴' ? 'Aktion/Problem' : dot === '🟢' ? 'Wissen/Guide' : dot === '🔵' ? 'Info/Reader' : ''
+        return { id: shortId, title: noteData?.title || node.id, tags: noteData?.tags || [], category }
       })
 
-      const prompt = `Analysiere diese Notizen und gruppiere sie thematisch. Antworte NUR mit einem JSON-Array. Jede Gruppe hat "group" (Gruppenname) und "ids" (Array der Notiz-IDs).
+      const hasDotNotes = dotCategories.size > 0
+      const prompt = hasDotNotes
+        ? `Analysiere diese Notizen und gruppiere sie. Notizen mit einer Kategorie (Aktion/Problem, Wissen/Guide, Info/Reader) MÜSSEN in ihrer Kategorie-Gruppe bleiben. Notizen ohne Kategorie gruppiere thematisch. Antworte NUR mit einem JSON-Array. Jede Gruppe hat "group" (Gruppenname) und "ids" (Array der Notiz-IDs).
+
+Notizen:
+${noteList.map(n => `- ID: "${n.id}" | Titel: "${n.title}" | Tags: ${n.tags.join(', ') || 'keine'}${n.category ? ` | Kategorie: ${n.category}` : ''}`).join('\n')}
+
+Antworte NUR mit JSON, kein anderer Text:
+[{"group": "Gruppenname", "ids": ["n0", "n1"]}, ...]`
+        : `Analysiere diese Notizen und gruppiere sie thematisch. Antworte NUR mit einem JSON-Array. Jede Gruppe hat "group" (Gruppenname) und "ids" (Array der Notiz-IDs).
 
 Notizen:
 ${noteList.map(n => `- ID: "${n.id}" | Titel: "${n.title}" | Tags: ${n.tags.join(', ') || 'keine'}`).join('\n')}
@@ -3245,7 +3271,7 @@ Antworte NUR mit JSON, kein anderer Text:
       console.error('AI Cluster error:', e)
     }
     setAiLayoutLoading(false)
-  }, [aiLayoutLoading, ollama.selectedModel, nodes, notes, positions, setNodePosition, fitView, focusMode, focusedNodeIds])
+  }, [aiLayoutLoading, ollama.selectedModel, nodes, notes, positions, setNodePosition, setNodeColor, fitView, focusMode, focusedNodeIds])
 
   // KI: Lernpfad
   const handleAiLearningPath = useCallback(async () => {
