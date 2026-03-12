@@ -311,6 +311,14 @@ export interface ReMarkableSettings {
   autoRefreshOnOpen: boolean
 }
 
+// Daily Note Settings
+export interface DailyNoteSettings {
+  enabled: boolean
+  folderPath: string
+  templateId: string  // 'dailyNote' | 'zettel' | 'meeting' | 'empty' | custom template id | '' (= dailyNote)
+  dateFormat: string
+}
+
 // Legacy type alias for backward compatibility
 type OllamaSettings = LLMSettings
 
@@ -394,6 +402,9 @@ interface UIState {
   // reMarkable Settings
   remarkable: ReMarkableSettings
 
+  // Daily Note Settings
+  dailyNote: DailyNoteSettings
+
   // Update-Checker & What's New
   lastSeenVersion: string
   updateAvailable: UpdateInfo | null
@@ -471,6 +482,7 @@ interface UIState {
   setEmail: (settings: Partial<EmailSettings>) => void
   setEdoobox: (settings: Partial<EdooboxSettings>) => void
   setRemarkable: (settings: Partial<ReMarkableSettings>) => void
+  setDailyNote: (settings: Partial<DailyNoteSettings>) => void
   setLastSeenVersion: (version: string) => void
   setUpdateAvailable: (info: UpdateInfo | null) => void
   setWhatsNewOpen: (open: boolean) => void
@@ -637,6 +649,14 @@ const defaultState = {
     autoRefreshOnOpen: true
   },
 
+  // Daily Note
+  dailyNote: {
+    enabled: true,
+    folderPath: '',
+    templateId: 'dailyNote',
+    dateFormat: 'DD.MM.YY'
+  },
+
   // Update-Checker & What's New
   lastSeenVersion: '',
   updateAvailable: null as UpdateInfo | null,
@@ -676,7 +696,7 @@ const persistedKeys = [
   'canvasFilterPath', 'canvasViewMode', 'canvasShowEdges', 'canvasShowTags', 'canvasShowLinks', 'canvasShowImages', 'canvasShowSummaries',
   'canvasCompactMode', 'canvasReadMode', 'canvasHoverScale', 'canvasDefaultCardWidth', 'splitPosition', 'fileTreeDisplayMode', 'ollama',
   'pdfCompanionEnabled', 'pdfDisplayMode', 'iconSet',
-  'smartConnectionsEnabled', 'notesChatEnabled', 'flashcardsEnabled', 'semanticScholarEnabled', 'smartConnectionsWeights', 'docling', 'visionOcr', 'readwise', 'languageTool', 'email', 'edoobox', 'remarkable',
+  'smartConnectionsEnabled', 'notesChatEnabled', 'flashcardsEnabled', 'semanticScholarEnabled', 'smartConnectionsWeights', 'docling', 'visionOcr', 'readwise', 'languageTool', 'email', 'edoobox', 'remarkable', 'dailyNote',
   'lastSeenVersion',
   'customAccentColor', 'customBackgroundColorLight', 'customBackgroundColorDark',
   'customLogo',
@@ -760,6 +780,9 @@ export const useUIStore = create<UIState>()((set, get) => ({
   })),
   setRemarkable: (settings) => set((state) => ({
     remarkable: { ...state.remarkable, ...settings }
+  })),
+  setDailyNote: (settings) => set((state) => ({
+    dailyNote: { ...state.dailyNote, ...settings }
   })),
   setLastSeenVersion: (version) => set({ lastSeenVersion: version }),
   setUpdateAvailable: (info) => set({ updateAvailable: info }),

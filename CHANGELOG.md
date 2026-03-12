@@ -2,6 +2,22 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.3.5-beta] - 2026-03-12
+
+### Features
+- **Tägliche Notiz (Daily Note)** — Neuer Button in der Sidebar (neben der Suche) zum schnellen Erstellen/Öffnen der täglichen Journal-Notiz
+  - Nutzt das Template-System: Built-in Templates (Daily Note, Zettel, Meeting) und eigene Custom Templates wählbar
+  - Konfigurierbares Datumsformat (DD.MM.YY, YYYY-MM-DD, etc.) für den Dateinamen
+  - Konfigurierbarer Speicherort im Vault
+  - Eigener Einstellungs-Tab "Tägliche Notiz"
+  - Template-Variablen ({{date:FORMAT}}, {{weekday}}, {{cursor}} etc.) werden automatisch ersetzt
+  - Wenn Notiz bereits existiert, wird sie direkt geöffnet statt neu erstellt
+- **Drag & Drop Wikilinks aus Smart Connections** — Notizen aus dem Smart-Connections-Panel können per Drag & Drop als `[[Wikilink]]` in den Editor gezogen werden
+
+### Improvements
+- **reMarkable als eigener Einstellungs-Tab** — reMarkable-Einstellungen sind jetzt ein separater Punkt in den Settings (vorher unter Automationen)
+- **Einstellungen reorganisiert** — Neue Tab-Reihenfolge: Tägliche Notiz und reMarkable als eigenständige Bereiche
+
 ## [0.3.4-beta] - 2026-03-12
 
 ### Features

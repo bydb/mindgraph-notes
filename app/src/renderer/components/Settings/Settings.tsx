@@ -18,7 +18,7 @@ interface SettingsProps {
   onClose: () => void
 }
 
-type Tab = 'general' | 'editor' | 'templates' | 'integrations' | 'shortcuts' | 'dataview' | 'sync' | 'agents'
+type Tab = 'general' | 'editor' | 'templates' | 'integrations' | 'shortcuts' | 'dataview' | 'sync' | 'dailyNote' | 'remarkable' | 'agents'
 
 type BuiltInTemplateKey = 'empty' | 'dailyNote' | 'zettel' | 'meeting'
 
@@ -166,6 +166,8 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
     setEdoobox,
     remarkable: remarkableSettings,
     setRemarkable,
+    dailyNote: dailyNoteSettings,
+    setDailyNote,
     slashCommandDateFormat,
     setSlashCommandDateFormat,
     slashCommandTimeFormat,
@@ -234,6 +236,8 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
           setEdooboxApiSecret(creds.apiSecret)
         }
       })
+    }
+    if (isOpen && (activeTab === 'agents' || activeTab === 'remarkable')) {
       checkRemarkableConnection()
     }
   }, [isOpen, activeTab])
@@ -255,7 +259,7 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
 
   // Templates laden
   useEffect(() => {
-    if (isOpen && activeTab === 'templates' && vaultPath) {
+    if (isOpen && (activeTab === 'templates' || activeTab === 'dailyNote') && vaultPath) {
       loadTemplateConfig(vaultPath).then(config => {
         if (!config.custom) {
           config.custom = []
@@ -679,6 +683,28 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
                 <path d="M6 12H3V15" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
               {t('settings.tab.sync')}
+            </button>
+            <button
+              className={`settings-nav-item ${activeTab === 'dailyNote' ? 'active' : ''}`}
+              onClick={() => setActiveTab('dailyNote')}
+            >
+              <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+                <rect x="3" y="2" width="12" height="14" rx="2" stroke="currentColor" strokeWidth="1.5"/>
+                <path d="M6 6h6M6 9h6M6 12h3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                <circle cx="13" cy="13" r="4" fill="var(--bg-primary)" stroke="currentColor" strokeWidth="1.5"/>
+                <path d="M13 11v2h2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+              {t('settings.tab.dailyNote')}
+            </button>
+            <button
+              className={`settings-nav-item ${activeTab === 'remarkable' ? 'active' : ''}`}
+              onClick={() => setActiveTab('remarkable')}
+            >
+              <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+                <rect x="3" y="1" width="12" height="16" rx="2" stroke="currentColor" strokeWidth="1.5"/>
+                <path d="M7 5h4M7 8h4M7 11h2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+              </svg>
+              reMarkable
             </button>
             <button
               className={`settings-nav-item ${activeTab === 'agents' ? 'active' : ''}`}
@@ -2756,8 +2782,85 @@ LIMIT 10
               </div>
             )}
 
-            {/* Agenten Tab */}
-            {activeTab === 'agents' && (
+            {/* Tägliche Notiz Tab */}
+            {activeTab === 'dailyNote' && (
+              <div className="settings-section">
+                <h3>{t('settings.dailyNote.title')}</h3>
+                <p className="settings-hint">{t('settings.dailyNote.description')}</p>
+
+                <div className="settings-row">
+                  <label>{t('settings.dailyNote.enabled')}</label>
+                  <input
+                    type="checkbox"
+                    checked={dailyNoteSettings.enabled}
+                    onChange={e => setDailyNote({ enabled: e.target.checked })}
+                  />
+                </div>
+
+                {dailyNoteSettings.enabled && (
+                  <>
+                    <div className="settings-row">
+                      <label>{t('settings.dailyNote.folderPath')}</label>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <input
+                          type="text"
+                          value={dailyNoteSettings.folderPath}
+                          onChange={e => setDailyNote({ folderPath: e.target.value })}
+                          placeholder="Journal"
+                          style={{ width: '300px' }}
+                        />
+                        <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                          {t('settings.dailyNote.folderPathHint')}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="settings-row">
+                      <label>{t('settings.dailyNote.template')}</label>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <select
+                          value={dailyNoteSettings.templateId}
+                          onChange={e => setDailyNote({ templateId: e.target.value })}
+                          style={{ width: '300px' }}
+                        >
+                          <option value="dailyNote">{BUILTIN_LABELS.dailyNote}</option>
+                          <option value="zettel">{BUILTIN_LABELS.zettel}</option>
+                          <option value="meeting">{BUILTIN_LABELS.meeting}</option>
+                          <option value="empty">{BUILTIN_LABELS.empty}</option>
+                          {templates.custom.map(ct => (
+                            <option key={ct.id} value={ct.id}>{ct.name}</option>
+                          ))}
+                        </select>
+                        <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                          {t('settings.dailyNote.templateHint')}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="settings-row">
+                      <label>{t('settings.dailyNote.dateFormat')}</label>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <select
+                          value={dailyNoteSettings.dateFormat}
+                          onChange={e => setDailyNote({ dateFormat: e.target.value })}
+                        >
+                          <option value="DD.MM.YY">DD.MM.YY (12.03.26)</option>
+                          <option value="YYYY-MM-DD">YYYY-MM-DD (2026-03-12)</option>
+                          <option value="DD-MM-YYYY">DD-MM-YYYY (12-03-2026)</option>
+                          <option value="MM-DD-YYYY">MM-DD-YYYY (03-12-2026)</option>
+                        </select>
+                        <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                          {t('settings.dailyNote.dateFormatHint')}
+                        </span>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+
+            {/* reMarkable Tab */}
+            {activeTab === 'remarkable' && (
               <div className="settings-section">
                 <h3>{t('settings.agents.remarkable.title')}</h3>
                 <p className="settings-hint">{t('settings.agents.remarkable.description')}</p>
@@ -2813,9 +2916,12 @@ LIMIT 10
                     )}
                   </>
                 )}
+              </div>
+            )}
 
-                <div className="settings-divider" />
-
+            {/* Agenten Tab */}
+            {activeTab === 'agents' && (
+              <div className="settings-section">
                 {/* Email Integration */}
                 <h3>{t('settings.email.title')}</h3>
                 <div className="settings-row">

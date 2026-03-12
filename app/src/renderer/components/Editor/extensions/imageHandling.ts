@@ -128,11 +128,14 @@ export function imageHandlingExtension(config: ImageHandlingConfig): Extension {
       const dt = event.dataTransfer
       if (!dt) return false
 
+      // Check if there's a wikilink being dragged (from SmartConnections etc.)
+      const hasWikilink = dt.types.includes('application/x-mindgraph-wikilink')
+
       // Check if there's an image or file being dragged
       const hasImage = dt.types.includes('Files') ||
                        dt.types.includes('text/uri-list')
 
-      if (hasImage) {
+      if (hasWikilink || hasImage) {
         event.preventDefault()
         dt.dropEffect = 'copy'
 
@@ -156,7 +159,7 @@ export function imageHandlingExtension(config: ImageHandlingConfig): Extension {
     },
 
     /**
-     * Handle drop event for images - wrap async in sync handler
+     * Handle drop event for images and wikilinks - wrap async in sync handler
      */
     drop(event: DragEvent, view: EditorView) {
       const dt = event.dataTransfer
@@ -165,6 +168,15 @@ export function imageHandlingExtension(config: ImageHandlingConfig): Extension {
       // Remove visual feedback
       const target = event.currentTarget as HTMLElement
       target.classList.remove('drag-over')
+
+      // Check if this is a wikilink drop (from SmartConnections etc.)
+      const wikilinkTitle = dt.getData('application/x-mindgraph-wikilink')
+      if (wikilinkTitle) {
+        event.preventDefault()
+        event.stopPropagation()
+        insertWikilinkAtCursor(view, event, wikilinkTitle)
+        return true
+      }
 
       // Check if this might be an image drop
       const filePath = getFilePathFromDataTransfer(dt)
@@ -206,6 +218,22 @@ export function imageHandlingExtension(config: ImageHandlingConfig): Extension {
       return false
     }
   })
+}
+
+/**
+ * Insert wikilink at the drop position
+ */
+function insertWikilinkAtCursor(view: EditorView, event: DragEvent, title: string): void {
+  const pos = view.posAtCoords({ x: event.clientX, y: event.clientY })
+  const insertPos = pos !== null ? pos : view.state.selection.main.head
+  const wikilink = `[[${title}]]`
+
+  view.dispatch({
+    changes: { from: insertPos, to: insertPos, insert: wikilink },
+    selection: { anchor: insertPos + wikilink.length }
+  })
+
+  view.focus()
 }
 
 /**

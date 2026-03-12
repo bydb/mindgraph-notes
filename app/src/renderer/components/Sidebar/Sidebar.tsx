@@ -11,6 +11,7 @@ import { useTranslation } from '../../utils/translations'
 import { extractTaskStatsForCache } from '../../utils/linkExtractor'
 import { parseFrontmatter } from '../../utils/metadataExtractor'
 import type { Note, NotesCache, NoteFrontmatter } from '../../../shared/types'
+import { loadTemplateConfig, parseTemplate, formatDate } from '../../utils/templateEngine'
 
 interface SidebarProps {
   onOpenSearch?: () => void
@@ -18,7 +19,7 @@ interface SidebarProps {
 
 export const Sidebar: React.FC<SidebarProps> = ({ onOpenSearch }) => {
   const { vaultPath, fileTree, notes, setVaultPath, setFileTree, setNotes, addNote, selectNote, setLoading } = useNotesStore()
-  const { sidebarWidth, sidebarVisible, fileTreeDisplayMode, setFileTreeDisplayMode } = useUIStore()
+  const { sidebarWidth, sidebarVisible, fileTreeDisplayMode, setFileTreeDisplayMode, dailyNote: dailyNoteSettings } = useUIStore()
   const loadGraphData = useGraphStore((s) => s.loadFromVault)
   const resetGraphStore = useGraphStore((s) => s.reset)
   const fileCustomizations = useGraphStore((s) => s.fileCustomizations)
@@ -185,6 +186,62 @@ export const Sidebar: React.FC<SidebarProps> = ({ onOpenSearch }) => {
     }
   }, [vaultPath, setFileTree, handleOpenVault])
 
+  const handleOpenDailyNote = useCallback(async () => {
+    if (!window.electronAPI || !vaultPath) return
+
+    const now = new Date()
+    const dateStr = formatDate(now, dailyNoteSettings.dateFormat)
+
+    const fileName = `${dateStr} - Journal.md`
+    const folder = dailyNoteSettings.folderPath
+      ? `${vaultPath}/${dailyNoteSettings.folderPath}`
+      : vaultPath
+    const filePath = `${folder}/${fileName}`
+
+    // Check if file already exists by looking in notes
+    const existingNote = notes.find(n => n.path === filePath)
+    if (existingNote) {
+      selectNote(existingNote.id)
+      return
+    }
+
+    try {
+      // Ensure folder exists
+      if (dailyNoteSettings.folderPath) {
+        await window.electronAPI.ensureDir(folder)
+      }
+
+      // Load template content from Templates settings
+      const config = await loadTemplateConfig(vaultPath)
+      const templateId = dailyNoteSettings.templateId || 'dailyNote'
+      let templateContent: string
+
+      // Check built-in templates first, then custom
+      if (templateId in config && templateId !== 'custom') {
+        templateContent = config[templateId as keyof typeof config] as string
+      } else {
+        const custom = config.custom.find(t => t.id === templateId)
+        templateContent = custom?.content || config.dailyNote
+      }
+
+      const parsed = parseTemplate(templateContent, `${dateStr} - Journal`)
+      const content = parsed.content
+
+      await window.electronAPI.writeFile(filePath, content)
+
+      // Reload file tree
+      const tree = await window.electronAPI.readDirectory(vaultPath)
+      setFileTree(tree)
+
+      // Add note to store and select it
+      const note = await createNoteFromFile(filePath, fileName, content)
+      addNote(note)
+      selectNote(note.id)
+    } catch (error) {
+      console.error('[Sidebar] Failed to create daily note:', error)
+    }
+  }, [vaultPath, notes, dailyNoteSettings, selectNote, addNote, setFileTree])
+
   // Beim Start: Letzten Vault automatisch laden (wartet auf onboardingCompleted)
   const onboardingCompleted = useUIStore((s) => s.onboardingCompleted)
   useEffect(() => {
@@ -327,6 +384,16 @@ export const Sidebar: React.FC<SidebarProps> = ({ onOpenSearch }) => {
               <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
                 <circle cx="7" cy="7" r="4.5" stroke="currentColor" strokeWidth="1.3"/>
                 <path d="M10.5 10.5L14 14" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
+              </svg>
+            </button>
+          )}
+          {dailyNoteSettings.enabled && (
+            <button className="btn-icon" onClick={handleOpenDailyNote} title={t('sidebar.dailyNote')}>
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                <rect x="2" y="1.5" width="12" height="13" rx="1.5" stroke="currentColor" strokeWidth="1.3"/>
+                <path d="M5 5h6M5 8h6M5 11h3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
+                <circle cx="12" cy="12" r="3.5" fill="var(--bg-primary)" stroke="currentColor" strokeWidth="1.3"/>
+                <path d="M12 10.5v1.5h1.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
             </button>
           )}

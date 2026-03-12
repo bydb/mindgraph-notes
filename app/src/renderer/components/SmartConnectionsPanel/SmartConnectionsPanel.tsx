@@ -864,6 +864,12 @@ export const SmartConnectionsPanel: React.FC<SmartConnectionsPanelProps> = ({ on
                       key={note.id}
                       className={`smart-connections-item ${note.hasWikilink ? 'has-wikilink' : ''}`}
                       onClick={() => handleNoteClick(note.id)}
+                      draggable="true"
+                      onDragStart={(e) => {
+                        e.dataTransfer.setData('application/x-mindgraph-wikilink', note.title)
+                        e.dataTransfer.setData('text/plain', `[[${note.title}]]`)
+                        e.dataTransfer.effectAllowed = 'copy'
+                      }}
                     >
                       <div className="smart-connections-item-header">
                         <span className="smart-connections-item-similarity" style={{ color: getSimilarityColor(note.similarity) }}>
