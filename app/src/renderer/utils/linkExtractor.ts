@@ -155,7 +155,7 @@ export function extractCallouts(content: string): ExtractedCallout[] {
   const callouts: ExtractedCallout[] = []
 
   const lines = content.split('\n')
-  const headerRegex = /^>\s*\[!([^\]\s]+)\]\s*(.*)$/
+  const headerRegex = /^>\s*\[!([^\]\s]+)\][+-]?\s*(.*)$/
 
   for (let i = 0; i < lines.length; i++) {
     const headerMatch = lines[i].match(headerRegex)

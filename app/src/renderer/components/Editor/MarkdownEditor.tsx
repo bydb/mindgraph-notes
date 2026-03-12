@@ -420,61 +420,79 @@ function processFigures(html: string): string {
   )
 }
 
-// Konvertiert Obsidian Callouts zu HTML
-function processCallouts(content: string): string {
-  // Callout Pattern: > [!type] optional title
-  // Gefolgt von > content lines
-  const calloutRegex = /^>\s*\[!(\w+)\](?:\s+(.+))?\n((?:>.*\n?)*)/gm
+// Callout Icons
+const calloutIcons: Record<string, string> = {
+  note: '📝',
+  tip: '💡',
+  hint: '💡',
+  important: '❗',
+  warning: '⚠️',
+  caution: '⚠️',
+  danger: '🔴',
+  error: '❌',
+  bug: '🐛',
+  example: '📋',
+  quote: '💬',
+  cite: '💬',
+  info: 'ℹ️',
+  todo: '☑️',
+  success: '✅',
+  check: '✅',
+  done: '✅',
+  question: '❓',
+  help: '❓',
+  faq: '❓',
+  attention: '⚡',
+  failure: '❌',
+  fail: '❌',
+  missing: '❌',
+  abstract: '📄',
+  summary: '📄',
+  tldr: '📄'
+}
 
-  return content.replace(calloutRegex, (match, type, customTitle, body) => {
+// Konvertiert Obsidian Callouts zu HTML (mit Verschachtelung und Markdown im Titel)
+function processCallouts(content: string): string {
+  // Callout Pattern: > [!type](+|-) optional title
+  // Gefolgt von > content lines
+  const calloutRegex = /^>\s*\[!(\w+)\]([+-])?(?:\s+(.+))?\n((?:>.*\n?)*)/gm
+
+  const result = content.replace(calloutRegex, (match, type, foldModifier, customTitle, body) => {
     const calloutType = type.toLowerCase()
     const title = customTitle || type.charAt(0).toUpperCase() + type.slice(1)
+    const isFoldable = foldModifier === '+' || foldModifier === '-'
+    const isCollapsed = foldModifier === '-'
 
-    // Entferne > am Anfang jeder Zeile im Body
+    // Entferne ein > am Anfang jeder Zeile im Body
     const cleanBody = body
       .split('\n')
       .map((line: string) => line.replace(/^>\s?/, ''))
       .join('\n')
       .trim()
 
-    // Callout Icons
-    const icons: Record<string, string> = {
-      note: '📝',
-      tip: '💡',
-      hint: '💡',
-      important: '❗',
-      warning: '⚠️',
-      caution: '⚠️',
-      danger: '🔴',
-      error: '❌',
-      bug: '🐛',
-      example: '📋',
-      quote: '💬',
-      cite: '💬',
-      info: 'ℹ️',
-      todo: '☑️',
-      success: '✅',
-      check: '✅',
-      done: '✅',
-      question: '❓',
-      help: '❓',
-      faq: '❓',
-      attention: '⚡',
-      failure: '❌',
-      fail: '❌',
-      missing: '❌',
-      abstract: '📄',
-      summary: '📄',
-      tldr: '📄'
+    // Rekursiv verschachtelte Callouts verarbeiten
+    const processedBody = processCallouts(cleanBody)
+
+    const icon = calloutIcons[calloutType] || '📌'
+    const escapedType = md.utils.escapeHtml(calloutType)
+    // Titel wird als Inline-Markdown gerendert (für Bold, Links, Code etc.)
+    const renderedTitle = md.renderInline(title)
+    const renderedBody = md.render(processedBody)
+
+    if (isFoldable) {
+      return `<details class="callout callout-${escapedType}"${isCollapsed ? '' : ' open'}>
+      <summary class="callout-title">${icon} ${renderedTitle}<span class="callout-fold-indicator"></span></summary>
+      <div class="callout-content">${renderedBody}</div>
+    </details>\n`
     }
 
-    const icon = icons[calloutType] || '📌'
-
-    return `<div class="callout callout-${md.utils.escapeHtml(calloutType)}">
-      <div class="callout-title">${icon} ${md.utils.escapeHtml(title)}</div>
-      <div class="callout-content">${md.render(cleanBody)}</div>
+    return `<div class="callout callout-${escapedType}">
+      <div class="callout-title">${icon} ${renderedTitle}</div>
+      <div class="callout-content">${renderedBody}</div>
     </div>\n`
   })
+
+  return result
 }
 
 type ViewMode = 'edit' | 'preview' | 'live-preview'

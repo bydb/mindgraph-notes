@@ -1592,7 +1592,7 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
     const parsed = extractFirstCardCallout(content)
     if (parsed) return parsed
 
-    const blockMatch = content.match(/>\s*\[!([^\]\s]+)\]\s*([^\n\r]*)[\r\n]+((?:>.*(?:[\r\n]+|$))*)/i)
+    const blockMatch = content.match(/>\s*\[!([^\]\s]+)\][+-]?\s*([^\n\r]*)[\r\n]+((?:>.*(?:[\r\n]+|$))*)/i)
     if (!blockMatch) return null
 
     const rawType = blockMatch[1].toLowerCase()

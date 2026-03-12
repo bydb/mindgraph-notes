@@ -276,10 +276,10 @@ export function decorateBlockquote(ctx: DecoratorContext, node: SyntaxNode): voi
 
   const text = getText(ctx.view, node.from, node.to)
 
-  // Check if this is a callout
-  const calloutMatch = text.match(/^>\s*\[!(\w+)\](?:\s*(.*))?/)
+  // Check if this is a callout (with optional +/- fold modifier)
+  const calloutMatch = text.match(/^>\s*\[!(\w+)\]([+-])?(?:\s*(.*))?/)
   if (calloutMatch) {
-    const [fullMatch, type, title] = calloutMatch
+    const [fullMatch, type, foldModifier, title] = calloutMatch
     const calloutType = type.toLowerCase()
 
     // Hide the callout marker line's syntax and replace with icon widget
@@ -288,7 +288,7 @@ export function decorateBlockquote(ctx: DecoratorContext, node: SyntaxNode): voi
       ctx,
       node.from,
       markerEnd,
-      Decoration.replace({ widget: new CalloutIconWidget(calloutType, title || null) })
+      Decoration.replace({ widget: new CalloutIconWidget(calloutType, title || null, foldModifier as '+' | '-' | undefined) })
     )
 
     // Apply callout styling to content after the marker (not overlapping with replace)

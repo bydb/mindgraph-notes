@@ -37,7 +37,7 @@ interface NoteNodeData {
 const MAX_CALLOUT_WORDS = 100
 
 function extractCalloutFromContent(content: string): ExtractedCallout | null {
-  const match = content.match(/>\s*\[!([^\]\s]+)\]\s*([^\n\r]*)[\r\n]+((?:>.*(?:[\r\n]+|$))*)/i)
+  const match = content.match(/>\s*\[!([^\]\s]+)\][+-]?\s*([^\n\r]*)[\r\n]+((?:>.*(?:[\r\n]+|$))*)/i)
   if (!match) return null
 
   const rawType = (match[1] || '').toLowerCase()

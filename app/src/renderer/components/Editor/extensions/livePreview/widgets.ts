@@ -88,20 +88,22 @@ export class CalloutIconWidget extends WidgetType {
 
   constructor(
     readonly type: string,
-    readonly title: string | null
+    readonly title: string | null,
+    readonly foldModifier?: '+' | '-'
   ) {
     super()
   }
 
   eq(other: CalloutIconWidget): boolean {
-    return other.type === this.type && other.title === this.title
+    return other.type === this.type && other.title === this.title && other.foldModifier === this.foldModifier
   }
 
   toDOM(): HTMLElement {
     const span = document.createElement('span')
     span.className = `lp-callout-icon lp-callout-${this.type}`
     const icon = CalloutIconWidget.icons[this.type.toLowerCase()] || '\u{1F4DD}'
-    span.textContent = `${icon} ${this.title || this.type.charAt(0).toUpperCase() + this.type.slice(1)}`
+    const foldIndicator = this.foldModifier ? (this.foldModifier === '+' ? ' \u25BC' : ' \u25B6') : ''
+    span.textContent = `${icon} ${this.title || this.type.charAt(0).toUpperCase() + this.type.slice(1)}${foldIndicator}`
     span.style.fontWeight = 'bold'
     span.style.marginRight = '8px'
     return span

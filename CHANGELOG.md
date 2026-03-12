@@ -2,6 +2,18 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.3.6-beta] - 2026-03-12
+
+### Features
+- **Faltbare Callouts** — Obsidian-kompatible ein-/ausklappbare Callouts mit `+` und `-` Modifier
+  - `> [!note]+` — faltbar, standardmäßig offen
+  - `> [!note]-` — faltbar, standardmäßig geschlossen
+  - Animierter Pfeil-Indikator im Titel
+  - Funktioniert in Preview-Ansicht via `<details>`/`<summary>` HTML-Elemente
+  - Live-Preview zeigt Fold-Indikator (▼/▶) im Editor
+- **Verschachtelte Callouts** — Callouts können jetzt ineinander verschachtelt werden (z.B. `> > [!warning]` innerhalb eines `> [!note]`)
+- **Markdown im Callout-Titel** — Titel unterstützen jetzt Inline-Markdown (fett, kursiv, Code, Links etc.)
+
 ## [0.3.5-beta] - 2026-03-12
 
 ### Features
