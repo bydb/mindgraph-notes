@@ -534,6 +534,10 @@ export interface ElectronAPI {
   zoteroSearch: (query: string) => Promise<Array<{ item: object; citekey: string }>>;
   zoteroGetNotes: (citekey: string) => Promise<unknown>;
 
+  // Semantic Scholar API
+  semanticScholarSearch: (query: string, filters?: object) => Promise<{ total: number; papers: Array<object> }>;
+  semanticScholarGetPaper: (paperId: string) => Promise<object | null>;
+
   // Ollama Local AI API
   ollamaCheck: () => Promise<boolean>;
   ollamaModels: () => Promise<Array<{ name: string; size: number }>>;

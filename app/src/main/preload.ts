@@ -82,6 +82,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   zoteroSearch: (query: string) => ipcRenderer.invoke('zotero-search', query),
   zoteroGetNotes: (citekey: string) => ipcRenderer.invoke('zotero-get-notes', citekey),
 
+  // Semantic Scholar API
+  semanticScholarSearch: (query: string, filters?: object) =>
+    ipcRenderer.invoke('semantic-scholar-search', query, filters),
+  semanticScholarGetPaper: (paperId: string) =>
+    ipcRenderer.invoke('semantic-scholar-get-paper', paperId),
+
   // Ollama Local AI API
   ollamaCheck: () => ipcRenderer.invoke('ollama-check'),
   ollamaModels: () => ipcRenderer.invoke('ollama-models'),

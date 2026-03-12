@@ -2,6 +2,21 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.3.4-beta] - 2026-03-12
+
+### Features
+- **Semantic Scholar Integration** — Neues Right-Side-Panel zur Suche in über 200 Millionen wissenschaftlichen Publikationen direkt aus der App
+  - Paper-Suche mit Debounce und Enter-Sofortsuche
+  - Filter: Jahrbereich, Fachgebiet, Min. Zitierungen, Open Access Only
+  - Paper-Details aufklappbar mit Abstract, Venue und Aktions-Buttons
+  - **Zitation einfügen** (IEEE-Format) direkt an der Cursor-Position im Editor
+  - **Literaturnotiz erstellen** — Markdown-Notiz mit Frontmatter, Abstract und Metadaten im `Literatur/`-Ordner
+  - Open-Access-PDF direkt öffnen, Semantic Scholar Link im Browser öffnen
+  - Rate Limiter (1 Req/s) mit automatischem Retry bei 429-Fehlern
+  - Ein-/Ausschaltbar in den Einstellungen (Integrationen)
+  - Titlebar-Button (Buch-Icon) nur sichtbar wenn aktiviert
+  - Vollständig übersetzt (DE/EN)
+
 ## [0.3.3-beta] - 2026-03-11
 
 ### Features

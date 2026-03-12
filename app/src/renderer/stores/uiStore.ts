@@ -369,6 +369,7 @@ interface UIState {
   smartConnectionsEnabled: boolean
   notesChatEnabled: boolean
   flashcardsEnabled: boolean
+  semanticScholarEnabled: boolean
 
   // Smart Connections Gewichtungen
   smartConnectionsWeights: SmartConnectionsWeights
@@ -461,6 +462,7 @@ interface UIState {
   setSmartConnectionsEnabled: (enabled: boolean) => void
   setNotesChatEnabled: (enabled: boolean) => void
   setFlashcardsEnabled: (enabled: boolean) => void
+  setSemanticScholarEnabled: (enabled: boolean) => void
   setSmartConnectionsWeights: (weights: Partial<SmartConnectionsWeights>) => void
   setDocling: (settings: Partial<DoclingSettings>) => void
   setVisionOcr: (settings: Partial<VisionOcrSettings>) => void
@@ -550,6 +552,7 @@ const defaultState = {
   smartConnectionsEnabled: false,
   notesChatEnabled: false,
   flashcardsEnabled: true,
+  semanticScholarEnabled: true,
 
   // Smart Connections Gewichtungen (Summe sollte 100 ergeben)
   smartConnectionsWeights: {
@@ -673,7 +676,7 @@ const persistedKeys = [
   'canvasFilterPath', 'canvasViewMode', 'canvasShowEdges', 'canvasShowTags', 'canvasShowLinks', 'canvasShowImages', 'canvasShowSummaries',
   'canvasCompactMode', 'canvasReadMode', 'canvasHoverScale', 'canvasDefaultCardWidth', 'splitPosition', 'fileTreeDisplayMode', 'ollama',
   'pdfCompanionEnabled', 'pdfDisplayMode', 'iconSet',
-  'smartConnectionsEnabled', 'notesChatEnabled', 'flashcardsEnabled', 'smartConnectionsWeights', 'docling', 'visionOcr', 'readwise', 'languageTool', 'email', 'edoobox', 'remarkable',
+  'smartConnectionsEnabled', 'notesChatEnabled', 'flashcardsEnabled', 'semanticScholarEnabled', 'smartConnectionsWeights', 'docling', 'visionOcr', 'readwise', 'languageTool', 'email', 'edoobox', 'remarkable',
   'lastSeenVersion',
   'customAccentColor', 'customBackgroundColorLight', 'customBackgroundColorDark',
   'customLogo',
@@ -733,6 +736,7 @@ export const useUIStore = create<UIState>()((set, get) => ({
   setSmartConnectionsEnabled: (enabled) => set({ smartConnectionsEnabled: enabled }),
   setNotesChatEnabled: (enabled) => set({ notesChatEnabled: enabled }),
   setFlashcardsEnabled: (enabled) => set({ flashcardsEnabled: enabled }),
+  setSemanticScholarEnabled: (enabled) => set({ semanticScholarEnabled: enabled }),
   setSmartConnectionsWeights: (weights) => set((state) => ({
     smartConnectionsWeights: { ...state.smartConnectionsWeights, ...weights }
   })),

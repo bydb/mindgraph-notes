@@ -9852,6 +9852,353 @@ body {
   color: var(--text-primary);
 }
 
+/* ============ SEMANTIC SCHOLAR PANEL ============ */
+.semantic-scholar-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--bg-primary);
+}
+
+.semantic-scholar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 44px;
+  padding: 0 16px;
+  background: var(--bg-primary);
+  border-bottom: 1px solid var(--border-color);
+  flex-shrink: 0;
+}
+
+.semantic-scholar-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.semantic-scholar-close {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+}
+
+.semantic-scholar-close:hover {
+  color: var(--text-primary);
+  background: var(--bg-secondary);
+}
+
+.semantic-scholar-search {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-color);
+  flex-shrink: 0;
+}
+
+.semantic-scholar-search-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.semantic-scholar-input-wrapper {
+  flex: 1;
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.semantic-scholar-search-icon {
+  position: absolute;
+  left: 10px;
+  color: var(--text-tertiary);
+  pointer-events: none;
+}
+
+.semantic-scholar-input {
+  width: 100%;
+  padding: 8px 10px 8px 32px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font-size: 13px;
+  outline: none;
+}
+
+.semantic-scholar-input:focus {
+  border-color: var(--accent-color);
+}
+
+.semantic-scholar-input::placeholder {
+  color: var(--text-tertiary);
+}
+
+.semantic-scholar-filter-btn {
+  background: none;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 7px 8px;
+  display: flex;
+  align-items: center;
+}
+
+.semantic-scholar-filter-btn:hover,
+.semantic-scholar-filter-btn.active {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  border-color: var(--accent-color);
+}
+
+.semantic-scholar-filters {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  background: var(--bg-secondary);
+  border-radius: var(--radius-md);
+}
+
+.semantic-scholar-filter-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.semantic-scholar-filter-row label {
+  font-size: 12px;
+  color: var(--text-secondary);
+  min-width: 90px;
+  flex-shrink: 0;
+}
+
+.semantic-scholar-filter-row input[type="number"],
+.semantic-scholar-filter-row select {
+  flex: 1;
+  padding: 4px 8px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 12px;
+  outline: none;
+}
+
+.semantic-scholar-filter-row input[type="number"]:focus,
+.semantic-scholar-filter-row select:focus {
+  border-color: var(--accent-color);
+}
+
+.semantic-scholar-year-range {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+}
+
+.semantic-scholar-year-range input {
+  width: 80px;
+  padding: 4px 8px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 12px;
+  outline: none;
+}
+
+.semantic-scholar-year-range input:focus {
+  border-color: var(--accent-color);
+}
+
+.semantic-scholar-year-range span {
+  color: var(--text-tertiary);
+}
+
+.semantic-scholar-checkbox-label {
+  display: flex !important;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  min-width: auto !important;
+}
+
+.semantic-scholar-checkbox-label input[type="checkbox"] {
+  accent-color: var(--accent-color);
+}
+
+.semantic-scholar-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.semantic-scholar-loading,
+.semantic-scholar-empty,
+.semantic-scholar-error {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 16px;
+  color: var(--text-tertiary);
+  font-size: 13px;
+  text-align: center;
+}
+
+.semantic-scholar-error {
+  color: var(--error-color, #e74c3c);
+}
+
+.semantic-scholar-hint {
+  font-style: italic;
+}
+
+.semantic-scholar-result-count {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  padding-bottom: 4px;
+}
+
+.semantic-scholar-result {
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  transition: border-color var(--transition-fast);
+}
+
+.semantic-scholar-result:hover {
+  border-color: var(--accent-color);
+}
+
+.semantic-scholar-result.expanded {
+  border-color: var(--accent-color);
+}
+
+.semantic-scholar-result-header {
+  padding: 10px 12px 8px;
+  cursor: pointer;
+}
+
+.semantic-scholar-result-title {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+  line-height: 1.4;
+  margin-bottom: 6px;
+}
+
+.semantic-scholar-result-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  align-items: center;
+  font-size: 11px;
+  color: var(--text-tertiary);
+  padding-bottom: 2px;
+}
+
+.semantic-scholar-result-authors {
+  color: var(--text-secondary);
+}
+
+.semantic-scholar-result-year {
+  font-weight: 500;
+}
+
+.semantic-scholar-result-citations {
+  color: var(--text-tertiary);
+}
+
+.semantic-scholar-badge {
+  font-size: 9px;
+  font-weight: 600;
+  padding: 1px 5px;
+  border-radius: 3px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.semantic-scholar-badge.oa {
+  background: rgba(46, 204, 113, 0.15);
+  color: #2ecc71;
+}
+
+.semantic-scholar-result-details {
+  padding: 0 12px 12px;
+  border-top: 1px solid var(--border-color);
+}
+
+.semantic-scholar-abstract {
+  margin-top: 10px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+.semantic-scholar-abstract strong {
+  color: var(--text-primary);
+  display: block;
+  margin-bottom: 4px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.semantic-scholar-abstract p {
+  margin: 0;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.semantic-scholar-venue {
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.semantic-scholar-venue strong {
+  color: var(--text-primary);
+}
+
+.semantic-scholar-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+
+.semantic-scholar-action-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  font-size: 11px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.semantic-scholar-action-btn:hover {
+  background: var(--accent-color);
+  color: white;
+  border-color: var(--accent-color);
+}
+
 /* ============ SMART CONNECTIONS PANEL ============ */
 .smart-connections-panel {
   display: flex;

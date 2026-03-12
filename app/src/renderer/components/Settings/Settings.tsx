@@ -135,6 +135,8 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
     setNotesChatEnabled,
     flashcardsEnabled,
     setFlashcardsEnabled,
+    semanticScholarEnabled,
+    setSemanticScholarEnabled,
     smartConnectionsWeights,
     setSmartConnectionsWeights,
     docling,
@@ -1635,6 +1637,27 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
                   </p>
                   <p>
                     {t('settings.integrations.zoteroShortcut')} <kbd>Cmd</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd>
+                  </p>
+                </div>
+
+                <h3 style={{ marginTop: '32px' }}>{t('settings.integrations.semanticScholar')}</h3>
+                <div className="settings-row">
+                  <label>{t('settings.integrations.semanticScholar.enabled')}</label>
+                  <label className="toggle-switch">
+                    <input
+                      type="checkbox"
+                      checked={semanticScholarEnabled}
+                      onChange={(e) => setSemanticScholarEnabled(e.target.checked)}
+                    />
+                    <span className="toggle-slider"></span>
+                  </label>
+                </div>
+                <div className="settings-info">
+                  <p>
+                    {t('settings.integrations.semanticScholarDesc')}
+                  </p>
+                  <p>
+                    {t('settings.integrations.semanticScholarHint')}
                   </p>
                 </div>
 

@@ -1291,6 +1291,94 @@ ipcMain.handle('zotero-get-notes', async (_event, citekey: string) => {
   }
 })
 
+// ============ SEMANTIC SCHOLAR API ============
+const SEMANTIC_SCHOLAR_API_URL = 'https://api.semanticscholar.org/graph/v1'
+
+// Rate limiter: max 1 request per second (free tier limit)
+let semanticScholarLastRequest = 0
+
+async function semanticScholarFetch(url: string): Promise<Response> {
+  const now = Date.now()
+  const elapsed = now - semanticScholarLastRequest
+  if (elapsed < 1100) {
+    await new Promise(resolve => setTimeout(resolve, 1100 - elapsed))
+  }
+  semanticScholarLastRequest = Date.now()
+  return fetch(url, { headers: { 'Accept': 'application/json' } })
+}
+
+ipcMain.handle('semantic-scholar-search', async (_event, query: string, filters?: {
+  year?: string
+  fieldsOfStudy?: string
+  minCitationCount?: number
+  limit?: number
+  openAccessPdf?: boolean
+}) => {
+  console.log('[SemanticScholar] Search called with query:', query, 'filters:', filters)
+  if (!query.trim()) return { total: 0, papers: [] }
+
+  try {
+    const params = new URLSearchParams({
+      query,
+      fields: 'paperId,title,abstract,authors,year,citationCount,url,venue,publicationTypes,openAccessPdf,externalIds',
+      limit: String(filters?.limit || 20)
+    })
+
+    if (filters?.year) params.set('year', filters.year)
+    if (filters?.fieldsOfStudy) params.set('fieldsOfStudy', filters.fieldsOfStudy)
+    if (filters?.minCitationCount) params.set('minCitationCount', String(filters.minCitationCount))
+    if (filters?.openAccessPdf) params.set('openAccessPdf', '')
+
+    const url = `${SEMANTIC_SCHOLAR_API_URL}/paper/search?${params}`
+    console.log('[SemanticScholar] Fetching:', url)
+
+    let response = await semanticScholarFetch(url)
+
+    // Retry once on 429
+    if (response.status === 429) {
+      console.log('[SemanticScholar] Rate limited, retrying in 2s...')
+      await new Promise(resolve => setTimeout(resolve, 2000))
+      semanticScholarLastRequest = Date.now()
+      response = await fetch(url, { headers: { 'Accept': 'application/json' } })
+    }
+
+    if (!response.ok) {
+      console.error('[SemanticScholar] Search failed:', response.status, response.statusText)
+      return { total: 0, papers: [], error: response.status === 429 ? 'rate_limited' : 'error' }
+    }
+
+    const data = await response.json()
+    console.log('[SemanticScholar] Found', data.total, 'results, returning', data.data?.length || 0)
+
+    return {
+      total: data.total || 0,
+      papers: data.data || []
+    }
+  } catch (error) {
+    console.error('[SemanticScholar] Search error:', error)
+    return { total: 0, papers: [] }
+  }
+})
+
+ipcMain.handle('semantic-scholar-get-paper', async (_event, paperId: string) => {
+  console.log('[SemanticScholar] Getting paper:', paperId)
+
+  try {
+    const fields = 'paperId,title,abstract,authors,year,citationCount,url,venue,publicationTypes,openAccessPdf,externalIds,references.title,references.authors,references.year'
+    const response = await semanticScholarFetch(`${SEMANTIC_SCHOLAR_API_URL}/paper/${paperId}?fields=${fields}`)
+
+    if (!response.ok) {
+      console.error('[SemanticScholar] Get paper failed:', response.status)
+      return null
+    }
+
+    return await response.json()
+  } catch (error) {
+    console.error('[SemanticScholar] Get paper error:', error)
+    return null
+  }
+})
+
 // ============ LOCAL AI API (Ollama & LM Studio) ============
 const OLLAMA_API_URL = 'http://localhost:11434'
 const LM_STUDIO_DEFAULT_PORT = 1234

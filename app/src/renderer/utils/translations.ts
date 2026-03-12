@@ -72,6 +72,10 @@ const translations = {
     'settings.integrations.ollama.download': 'Herunterladen',
     'settings.integrations.zotero.connect': 'Verbinden',
     'settings.integrations.zotero.connected': 'Verbunden',
+    'settings.integrations.semanticScholar': 'Semantic Scholar',
+    'settings.integrations.semanticScholar.enabled': 'Aktiviert',
+    'settings.integrations.semanticScholarDesc': 'Durchsuche über 200 Millionen wissenschaftliche Publikationen direkt aus der App. Kostenlose API, kein Account nötig.',
+    'settings.integrations.semanticScholarHint': 'Öffne das Panel über das Buch-Icon in der Titelleiste. Für höhere Rate Limits kann ein kostenloser API-Key unter semanticscholar.org/product/api beantragt werden.',
 
     // Shortcuts
     'settings.shortcuts.description': 'Tastenkürzel-Referenz',
@@ -210,7 +214,29 @@ const translations = {
     'titlebar.smartConnections': 'Smart Connections',
     'titlebar.notesChat': 'Notes Chat (mit Notizen chatten)',
     'titlebar.terminal': 'Terminal ein/ausblenden',
+    'titlebar.semanticScholar': 'Semantic Scholar — Paper-Suche',
     'titlebar.help': 'Hilfe — App-Übersicht',
+
+    // Semantic Scholar Panel
+    'semanticScholar.placeholder': 'Paper suchen (Titel, Autor, Thema)...',
+    'semanticScholar.searching': 'Suche...',
+    'semanticScholar.noResults': 'Keine Paper gefunden',
+    'semanticScholar.error': 'Fehler bei der Suche. Bitte versuche es erneut.',
+    'semanticScholar.hint': 'Suche nach wissenschaftlichen Artikeln auf Semantic Scholar',
+    'semanticScholar.resultsFound': 'Ergebnisse gefunden',
+    'semanticScholar.citations': 'Zitierungen',
+    'semanticScholar.cite': 'Zitieren',
+    'semanticScholar.note': 'Notiz',
+    'semanticScholar.insertCitation': 'Zitation in Editor einfügen',
+    'semanticScholar.createNote': 'Literaturnotiz erstellen',
+    'semanticScholar.openInBrowser': 'Im Browser öffnen',
+    'semanticScholar.filters': 'Filter',
+    'semanticScholar.year': 'Jahr',
+    'semanticScholar.field': 'Fachgebiet',
+    'semanticScholar.allFields': 'Alle Fachgebiete',
+    'semanticScholar.minCitations': 'Min. Zitierungen',
+    'semanticScholar.openAccessOnly': 'Nur Open Access',
+    'semanticScholar.rateLimited': 'Zu viele Anfragen — bitte kurz warten und erneut suchen.',
 
     // Text Split Placeholder
     'textSplit.placeholder.instruction': 'Cmd/Ctrl+Klick auf eine Notiz',
@@ -1385,6 +1411,10 @@ const translations = {
     'settings.integrations.ollama.download': 'Download',
     'settings.integrations.zotero.connect': 'Connect',
     'settings.integrations.zotero.connected': 'Connected',
+    'settings.integrations.semanticScholar': 'Semantic Scholar',
+    'settings.integrations.semanticScholar.enabled': 'Enabled',
+    'settings.integrations.semanticScholarDesc': 'Search over 200 million academic publications directly from the app. Free API, no account required.',
+    'settings.integrations.semanticScholarHint': 'Open the panel via the book icon in the title bar. For higher rate limits, a free API key can be requested at semanticscholar.org/product/api.',
 
     // Shortcuts
     'settings.shortcuts.description': 'Keyboard Shortcuts Reference',
@@ -1523,7 +1553,29 @@ const translations = {
     'titlebar.smartConnections': 'Smart Connections',
     'titlebar.notesChat': 'Notes Chat (chat with notes)',
     'titlebar.terminal': 'Toggle terminal',
+    'titlebar.semanticScholar': 'Semantic Scholar — Paper Search',
     'titlebar.help': 'Help — App overview',
+
+    // Semantic Scholar Panel
+    'semanticScholar.placeholder': 'Search papers (title, author, topic)...',
+    'semanticScholar.searching': 'Searching...',
+    'semanticScholar.noResults': 'No papers found',
+    'semanticScholar.error': 'Search error. Please try again.',
+    'semanticScholar.hint': 'Search for academic papers on Semantic Scholar',
+    'semanticScholar.resultsFound': 'results found',
+    'semanticScholar.citations': 'citations',
+    'semanticScholar.cite': 'Cite',
+    'semanticScholar.note': 'Note',
+    'semanticScholar.insertCitation': 'Insert citation into editor',
+    'semanticScholar.createNote': 'Create literature note',
+    'semanticScholar.openInBrowser': 'Open in browser',
+    'semanticScholar.filters': 'Filters',
+    'semanticScholar.year': 'Year',
+    'semanticScholar.field': 'Field of Study',
+    'semanticScholar.allFields': 'All fields',
+    'semanticScholar.minCitations': 'Min. citations',
+    'semanticScholar.openAccessOnly': 'Open Access only',
+    'semanticScholar.rateLimited': 'Too many requests — please wait a moment and try again.',
 
     // Text Split Placeholder
     'textSplit.placeholder.instruction': 'Cmd/Ctrl+click on a note',
