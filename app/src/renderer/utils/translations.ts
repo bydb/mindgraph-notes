@@ -207,6 +207,7 @@ const translations = {
     'statusbar.links': 'Links',
 
     // Titlebar Buttons
+    'titlebar.sidebar': 'Sidebar umschalten',
     'titlebar.textSplit': 'Text-Split: Zwei Notizen vergleichen',
     'titlebar.settings': 'Einstellungen (Cmd+,)',
     'titlebar.overdue': 'Überfällige Aufgaben',
@@ -216,6 +217,7 @@ const translations = {
     'titlebar.terminal': 'Terminal ein/ausblenden',
     'titlebar.semanticScholar': 'Semantic Scholar — Paper-Suche',
     'titlebar.help': 'Hilfe — App-Übersicht',
+    'titlebar.sync': 'Sync-Status',
 
     // Semantic Scholar Panel
     'semanticScholar.placeholder': 'Paper suchen (Titel, Autor, Thema)...',
@@ -250,6 +252,7 @@ const translations = {
 
     // Panels
     'panel.close': 'Schließen',
+    'panel.back': 'Zurück',
     'panel.overdueTasks': 'Überfällige Tasks',
 
     // Overdue Panel
@@ -580,6 +583,7 @@ const translations = {
     // Editor
     'editor.back': 'Zurück (Cmd+[)',
     'editor.forward': 'Vorwärts (Cmd+])',
+    'editor.exportPdf': 'Als PDF exportieren',
     'editor.closePanel': 'Sekundäres Panel schließen',
     'editor.words': 'Wörter',
     'editor.characters': 'Zeichen',
@@ -593,6 +597,7 @@ const translations = {
 
     // Notes Chat
     'notesChat.socraticMode': 'Sokratischer Dialog - die KI stellt Rückfragen',
+    'notesChat.clearChat': 'Chat leeren',
 
     // Smart Connections
     'smartConnections.folderProximity': 'Ordner-Nähe (5%)',
@@ -1223,6 +1228,19 @@ const translations = {
     'settings.sync.deleted.loading': 'Laden...',
     'settings.sync.deleted.reload': 'Neu laden',
 
+    // Vault Settings
+    'settings.tab.vault': 'Vault',
+    'settings.vault.title': 'Vault-Features',
+    'settings.vault.description': 'Wähle aus, welche Features in diesem Vault aktiv sein sollen. So vermeidest du, dass z.B. E-Mail-Ordner oder Sync-Dateien in Vaults landen, in denen du sie nicht brauchst.',
+    'settings.vault.dailyNote': 'Tägliche Notiz',
+    'settings.vault.dailyNoteDesc': 'Zeigt den Daily-Note-Button in der Sidebar, mit dem du schnell eine Tagesnotiz erstellen kannst.',
+    'settings.vault.readwiseDesc': 'Synchronisiert deine Readwise-Highlights (Bücher, Artikel, Podcasts) automatisch als Markdown-Notizen in dieses Vault.',
+    'settings.vault.emailDesc': 'Ruft E-Mails ab, analysiert sie mit KI und erstellt automatisch Notizen für relevante Nachrichten in diesem Vault.',
+    'settings.vault.edooboxDesc': 'Importiert Veranstaltungsdaten aus Akkreditierungsformularen und sendet sie an die edoobox-API.',
+    'settings.vault.remarkableDesc': 'Ermöglicht den Austausch von Dokumenten mit deinem reMarkable-Tablet per USB.',
+    'settings.vault.goToConfigure': 'Jetzt einrichten \u2192',
+    'settings.vault.enableFirst': 'Dieses Feature muss zuerst eingerichtet werden',
+
     // Agents
     'settings.tab.agents': 'Automationen',
     'settings.agents.edoobox.title': 'edoobox',
@@ -1560,6 +1578,7 @@ const translations = {
     'statusbar.links': 'Links',
 
     // Titlebar Buttons
+    'titlebar.sidebar': 'Toggle sidebar',
     'titlebar.textSplit': 'Text-Split: Compare two notes',
     'titlebar.settings': 'Settings (Cmd+,)',
     'titlebar.overdue': 'Overdue tasks',
@@ -1569,6 +1588,7 @@ const translations = {
     'titlebar.terminal': 'Toggle terminal',
     'titlebar.semanticScholar': 'Semantic Scholar — Paper Search',
     'titlebar.help': 'Help — App overview',
+    'titlebar.sync': 'Sync status',
 
     // Semantic Scholar Panel
     'semanticScholar.placeholder': 'Search papers (title, author, topic)...',
@@ -1603,6 +1623,7 @@ const translations = {
 
     // Panels
     'panel.close': 'Close',
+    'panel.back': 'Back',
     'panel.overdueTasks': 'Overdue tasks',
 
     // Overdue Panel
@@ -1933,6 +1954,7 @@ const translations = {
     // Editor
     'editor.back': 'Back (Cmd+[)',
     'editor.forward': 'Forward (Cmd+])',
+    'editor.exportPdf': 'Export as PDF',
     'editor.closePanel': 'Close secondary panel',
     'editor.words': 'Words',
     'editor.characters': 'Characters',
@@ -1946,6 +1968,7 @@ const translations = {
 
     // Notes Chat
     'notesChat.socraticMode': 'Socratic dialogue - AI asks follow-up questions',
+    'notesChat.clearChat': 'Clear chat',
 
     // Smart Connections
     'smartConnections.folderProximity': 'Folder proximity (5%)',
@@ -2574,6 +2597,19 @@ const translations = {
     'settings.sync.deleted.daysAgo': '{days} days ago',
     'settings.sync.deleted.loading': 'Loading...',
     'settings.sync.deleted.reload': 'Reload',
+
+    // Vault Settings
+    'settings.tab.vault': 'Vault',
+    'settings.vault.title': 'Vault Features',
+    'settings.vault.description': 'Choose which features should be active in this vault. This prevents things like email folders or sync files from being created in vaults where you don\'t need them.',
+    'settings.vault.dailyNote': 'Daily Note',
+    'settings.vault.dailyNoteDesc': 'Shows the Daily Note button in the sidebar to quickly create a daily journal entry.',
+    'settings.vault.readwiseDesc': 'Automatically syncs your Readwise highlights (books, articles, podcasts) as Markdown notes into this vault.',
+    'settings.vault.emailDesc': 'Fetches emails, analyzes them with AI, and automatically creates notes for relevant messages in this vault.',
+    'settings.vault.edooboxDesc': 'Imports event data from accreditation forms and pushes them to the edoobox API.',
+    'settings.vault.remarkableDesc': 'Enables document exchange with your reMarkable tablet via USB.',
+    'settings.vault.goToConfigure': 'Set up now \u2192',
+    'settings.vault.enableFirst': 'This feature needs to be set up first',
 
     // Agents
     'settings.tab.agents': 'Automation',

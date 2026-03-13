@@ -2,6 +2,24 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.3.7-beta] - 2026-03-13
+
+### Features
+- **Tooltip-System** — Alle Icon-Buttons zeigen jetzt beim Hover einen gestylten Tooltip mit Beschreibung
+  - CSS-basiertes Tooltip-System mit Akzentfarben-Styling
+  - Automatische Positionierung (nach unten für Titlebar/Toolbar, nach oben für Panels)
+  - Randkorrektur für Buttons am linken/rechten Bildschirmrand
+  - Alle hardcodierten deutschen Tooltip-Strings durch i18n-Keys ersetzt (DE + EN)
+- **Vault-Settings** — Neuer Settings-Tab "Vault" zur Feature-Steuerung pro Vault
+  - Daily Note, Readwise, E-Mail, edoobox Agent und reMarkable einzeln pro Vault aktivierbar
+  - Deaktivierte Features werden ausgegraut mit Hinweis zur globalen Konfiguration
+  - Einstellungen werden in `.mindgraph/vault-settings.json` gespeichert
+
+### Improvements
+- **Settings-Persistenz verbessert** — Deep-Merge beim Laden von Settings, sodass neue Sub-Properties aus Updates nicht verloren gehen
+  - Merge-Strategie statt Überschreiben beim Speichern (verhindert Datenverlust)
+  - Guard verhindert Speichern bevor Settings geladen wurden (Race-Condition-Fix)
+
 ## [0.3.6-beta] - 2026-03-12
 
 ### Features

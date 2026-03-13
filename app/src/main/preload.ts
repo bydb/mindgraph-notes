@@ -58,6 +58,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   saveGraphData: (vaultPath: string, data: object) => ipcRenderer.invoke('save-graph-data', vaultPath, data),
   loadGraphData: (vaultPath: string) => ipcRenderer.invoke('load-graph-data', vaultPath),
 
+  // Per-Vault Feature Toggles
+  loadVaultSettings: (vaultPath: string) => ipcRenderer.invoke('vault-settings-load', vaultPath),
+  saveVaultSettings: (vaultPath: string, settings: object) => ipcRenderer.invoke('vault-settings-save', vaultPath, settings),
+
   // Notes-Cache für schnelles Laden
   saveNotesCache: (vaultPath: string, cache: object) => ipcRenderer.invoke('save-notes-cache', vaultPath, cache),
   loadNotesCache: (vaultPath: string) => ipcRenderer.invoke('load-notes-cache', vaultPath),

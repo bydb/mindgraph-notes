@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { useUIStore, ACCENT_COLORS, AI_LANGUAGES, FONT_FAMILIES, UI_LANGUAGES, BACKGROUND_COLORS, ICON_SETS, OUTLINE_STYLES, type Language, type FontFamily, type BackgroundColor, type IconSet, type OutlineStyle, type LLMBackend } from '../../stores/uiStore'
 import { useNotesStore, createNoteFromFile } from '../../stores/notesStore'
 import { useSyncStore } from '../../stores/syncStore'
+import { useVaultSettingsStore } from '../../stores/vaultSettingsStore'
 import { useTranslation } from '../../utils/translations'
 import {
   TemplateConfig,
@@ -18,7 +19,7 @@ interface SettingsProps {
   onClose: () => void
 }
 
-type Tab = 'general' | 'editor' | 'templates' | 'integrations' | 'shortcuts' | 'dataview' | 'sync' | 'dailyNote' | 'remarkable' | 'agents'
+type Tab = 'vault' | 'general' | 'editor' | 'templates' | 'integrations' | 'shortcuts' | 'dataview' | 'sync' | 'dailyNote' | 'remarkable' | 'agents'
 
 type BuiltInTemplateKey = 'empty' | 'dailyNote' | 'zettel' | 'meeting'
 
@@ -35,6 +36,100 @@ const BUILTIN_LABELS: Record<BuiltInTemplateKey, string> = {
   dailyNote: 'Daily Note',
   zettel: 'Zettel',
   meeting: 'Meeting'
+}
+
+// Vault-Settings Tab als eigene Komponente (für korrekte Hook-Reaktivität)
+const VaultSettingsTab: React.FC<{ vaultPath: string; t: (key: string) => string; onNavigateToTab: (tab: Tab) => void }> = ({ vaultPath, t, onNavigateToTab }) => {
+  const vaultFeatures = useVaultSettingsStore(state => state.features)
+  const setFeatureActive = useVaultSettingsStore(state => state.setFeatureActive)
+  const readwise = useUIStore(state => state.readwise)
+  const email = useUIStore(state => state.email)
+  const edoobox = useUIStore(state => state.edoobox)
+  const remarkable = useUIStore(state => state.remarkable)
+  const vaultName = vaultPath.split('/').pop() || vaultPath
+
+  const features: Array<{
+    key: keyof typeof vaultFeatures
+    label: string
+    description: string
+    globallyConfigured: boolean
+    configTab: Tab | null
+  }> = [
+    {
+      key: 'dailyNote',
+      label: t('settings.vault.dailyNote'),
+      description: t('settings.vault.dailyNoteDesc'),
+      globallyConfigured: true,
+      configTab: 'dailyNote'
+    },
+    {
+      key: 'readwise',
+      label: 'Readwise',
+      description: t('settings.vault.readwiseDesc'),
+      globallyConfigured: readwise.enabled && readwise.apiKey !== '',
+      configTab: 'integrations'
+    },
+    {
+      key: 'email',
+      label: 'E-Mail',
+      description: t('settings.vault.emailDesc'),
+      globallyConfigured: email.enabled && email.accounts.length > 0,
+      configTab: 'agents'
+    },
+    {
+      key: 'edoobox',
+      label: 'edoobox Agent',
+      description: t('settings.vault.edooboxDesc'),
+      globallyConfigured: edoobox.enabled,
+      configTab: 'agents'
+    },
+    {
+      key: 'remarkable',
+      label: 'reMarkable',
+      description: t('settings.vault.remarkableDesc'),
+      globallyConfigured: remarkable.enabled,
+      configTab: 'remarkable'
+    }
+  ]
+
+  return (
+    <div className="settings-section">
+      <h3>{t('settings.vault.title')}</h3>
+      <p style={{ color: 'var(--text-secondary)', marginBottom: 16, fontSize: 13 }}>
+        {t('settings.vault.description').replace('{vault}', vaultName)}
+      </p>
+
+      {features.map(feature => (
+        <div className="settings-row" key={feature.key} style={{ alignItems: 'flex-start' }}>
+          <div style={{ flex: 1 }}>
+            <label style={{ fontWeight: 500 }}>{feature.label}</label>
+            <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 2 }}>
+              {feature.description}
+            </div>
+            {!feature.globallyConfigured && feature.configTab && (
+              <button
+                onClick={() => onNavigateToTab(feature.configTab!)}
+                style={{
+                  fontSize: 11, color: 'var(--accent-color)', marginTop: 4, background: 'none',
+                  border: 'none', padding: 0, cursor: 'pointer', textDecoration: 'underline'
+                }}
+              >
+                {t('settings.vault.goToConfigure')}
+              </button>
+            )}
+          </div>
+          <input
+            type="checkbox"
+            checked={vaultFeatures[feature.key]}
+            disabled={!feature.globallyConfigured}
+            onChange={e => setFeatureActive(feature.key, e.target.checked)}
+            title={!feature.globallyConfigured ? t('settings.vault.enableFirst') : ''}
+            style={{ marginTop: 6, width: 18, height: 18, cursor: feature.globallyConfigured ? 'pointer' : 'not-allowed' }}
+          />
+        </div>
+      ))}
+    </div>
+  )
 }
 
 export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
@@ -601,7 +696,7 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
       <div className="settings-modal" onClick={e => e.stopPropagation()}>
         <div className="settings-header">
           <h2>{t('settings.title')}</h2>
-          <button className="settings-close" onClick={handleClose}>
+          <button className="settings-close" onClick={handleClose} title={t('panel.close')}>
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
               <path d="M4 4L12 12M4 12L12 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
             </svg>
@@ -610,6 +705,18 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
 
         <div className="settings-body">
           <nav className="settings-nav">
+            {vaultPath && (
+              <button
+                className={`settings-nav-item ${activeTab === 'vault' ? 'active' : ''}`}
+                onClick={() => setActiveTab('vault')}
+              >
+                <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+                  <path d="M2 5L9 2L16 5V13L9 16L2 13V5Z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
+                  <path d="M9 8V16M2 5L9 8L16 5" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
+                </svg>
+                {t('settings.tab.vault')}
+              </button>
+            )}
             <button
               className={`settings-nav-item ${activeTab === 'general' ? 'active' : ''}`}
               onClick={() => setActiveTab('general')}
@@ -719,6 +826,11 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
           </nav>
 
           <div className="settings-content">
+            {/* Vault Tab */}
+            {activeTab === 'vault' && vaultPath && (
+              <VaultSettingsTab vaultPath={vaultPath} t={t} onNavigateToTab={setActiveTab} />
+            )}
+
             {/* Allgemein Tab */}
             {activeTab === 'general' && (
               <div className="settings-section">

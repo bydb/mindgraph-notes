@@ -173,10 +173,19 @@ async function loadUISettings(): Promise<Record<string, unknown>> {
   }
 }
 
-// UI-Settings speichern
+// UI-Settings speichern (merge mit bestehenden Daten um Datenverlust zu vermeiden)
 async function saveUISettings(settings: Record<string, unknown>): Promise<void> {
   try {
-    await fs.writeFile(getUISettingsPath(), JSON.stringify(settings, null, 2), 'utf-8')
+    // Bestehende Settings laden und mergen, damit nicht-übermittelte Felder erhalten bleiben
+    let existing: Record<string, unknown> = {}
+    try {
+      const content = await fs.readFile(getUISettingsPath(), 'utf-8')
+      existing = JSON.parse(content)
+    } catch {
+      // Datei existiert nicht oder ist korrupt — kein Problem
+    }
+    const merged = { ...existing, ...settings }
+    await fs.writeFile(getUISettingsPath(), JSON.stringify(merged, null, 2), 'utf-8')
   } catch (error) {
     console.error('Fehler beim Speichern der UI-Settings:', error)
   }
@@ -2595,6 +2604,34 @@ ipcMain.handle('load-graph-data', async (_event, vaultPath: string) => {
   } catch (error) {
     // Datei existiert nicht oder ist ungültig - leere Daten zurückgeben
     return null
+  }
+})
+
+// ============ VAULT SETTINGS (Per-Vault Feature Toggles) ============
+
+ipcMain.handle('vault-settings-load', async (_event, vaultPath: string) => {
+  try {
+    const settingsFile = path.join(vaultPath, '.mindgraph', 'vault-settings.json')
+    const content = await fs.readFile(settingsFile, 'utf-8')
+    return JSON.parse(content)
+  } catch {
+    return null
+  }
+})
+
+ipcMain.handle('vault-settings-save', async (_event, vaultPath: string, settings: object) => {
+  try {
+    const mindgraphDir = path.join(vaultPath, '.mindgraph')
+    await fs.mkdir(mindgraphDir, { recursive: true })
+    await fs.writeFile(
+      path.join(mindgraphDir, 'vault-settings.json'),
+      JSON.stringify(settings, null, 2),
+      'utf-8'
+    )
+    return true
+  } catch (error) {
+    console.error('Fehler beim Speichern der Vault-Settings:', error)
+    return false
   }
 })
 

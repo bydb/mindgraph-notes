@@ -1,3 +1,17 @@
+// Per-Vault Feature Toggles
+export interface VaultFeatures {
+  readwise: boolean
+  email: boolean
+  dailyNote: boolean
+  edoobox: boolean
+  remarkable: boolean
+}
+
+export interface VaultSettings {
+  schemaVersion: number
+  features: VaultFeatures
+}
+
 // FileTree Icon Customization
 export type IconSet = 'default' | 'minimal' | 'colorful' | 'emoji'
 

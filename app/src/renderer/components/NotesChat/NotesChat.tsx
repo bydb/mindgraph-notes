@@ -580,7 +580,7 @@ export const NotesChat: React.FC<NotesChatProps> = ({ onClose }) => {
                 className="notes-chat-clear"
                 onClick={clearChat}
                 disabled={isStreaming}
-                title="Chat leeren"
+                title={t('notesChat.clearChat')}
               >
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <polyline points="3 6 5 6 21 6"/>

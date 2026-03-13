@@ -838,19 +838,55 @@ export const useUIStore = create<UIState>()((set, get) => ({
   }
 }))
 
+// Guard: Verhindert dass Settings gespeichert werden bevor sie geladen wurden
+let settingsInitialized = false
+
+// Deep merge: Saved settings mit Defaults zusammenführen, sodass neue Sub-Properties
+// aus Updates nicht verloren gehen (z.B. neues Feld in dailyNote, languageTool etc.)
+function deepMergeSettings(defaults: Record<string, unknown>, saved: Record<string, unknown>): Record<string, unknown> {
+  const result = { ...defaults }
+  for (const key of Object.keys(saved)) {
+    if (
+      saved[key] !== null &&
+      typeof saved[key] === 'object' &&
+      !Array.isArray(saved[key]) &&
+      defaults[key] !== null &&
+      typeof defaults[key] === 'object' &&
+      !Array.isArray(defaults[key])
+    ) {
+      // Deep merge für Objekte: Saved values überschreiben Defaults, aber neue Default-Keys bleiben erhalten
+      result[key] = { ...(defaults[key] as Record<string, unknown>), ...(saved[key] as Record<string, unknown>) }
+    } else {
+      result[key] = saved[key]
+    }
+  }
+  return result
+}
+
 // Settings laden beim App-Start
 export async function initializeUISettings(): Promise<void> {
   try {
     const savedSettings = await window.electronAPI.loadUISettings()
     if (savedSettings && Object.keys(savedSettings).length > 0) {
       console.log('[UIStore] Loaded settings from file:', savedSettings)
+
+      // Defaults für persistierte Felder sammeln
+      const defaultValues: Record<string, unknown> = {}
+      for (const key of persistedKeys) {
+        defaultValues[key] = defaultState[key as keyof typeof defaultState]
+      }
+
       // Nur persistierte Felder übernehmen
-      const validSettings: Partial<UIState> = {}
+      const savedPersistedOnly: Record<string, unknown> = {}
       for (const key of persistedKeys) {
         if (key in savedSettings) {
-          (validSettings as Record<string, unknown>)[key] = savedSettings[key]
+          savedPersistedOnly[key] = savedSettings[key]
         }
       }
+
+      // Deep merge: Defaults + gespeicherte Werte (neue Sub-Properties bekommen Defaults)
+      const validSettings = deepMergeSettings(defaultValues, savedPersistedOnly) as Partial<UIState>
+
       // Always start with 'editor' mode on startup
       validSettings.viewMode = 'editor'
       // Migrate edoobox base URL: strip /v1 or /v2 suffix, use app2 for V2
@@ -878,6 +914,10 @@ export async function initializeUISettings(): Promise<void> {
     }
   } catch (error) {
     console.error('[UIStore] Failed to load settings:', error)
+  } finally {
+    // Settings dürfen erst NACH dem Laden gespeichert werden
+    settingsInitialized = true
+    console.log('[UIStore] Settings initialization complete, saving enabled')
   }
 }
 
@@ -905,6 +945,9 @@ function saveSettingsDebounced(): void {
 
 // Store-Änderungen überwachen und automatisch speichern
 useUIStore.subscribe((state, prevState) => {
+  // Nicht speichern bevor Settings geladen wurden (verhindert Überschreiben mit Defaults)
+  if (!settingsInitialized) return
+
   // Prüfen ob sich ein persistiertes Feld geändert hat
   let changed = false
   for (const key of persistedKeys) {

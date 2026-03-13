@@ -129,6 +129,115 @@ body {
   transition: background-color var(--transition-smooth), color var(--transition-smooth);
 }
 
+/* ============ TOOLTIP SYSTEM ============ */
+/* CSS-basierte Tooltips via data-tooltip (title wird per JS konvertiert) */
+[data-tooltip] {
+  position: relative;
+}
+
+[data-tooltip]::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%) scale(0.95);
+  padding: 4px 8px;
+  background: color-mix(in srgb, var(--accent-color) 15%, var(--bg-primary));
+  color: var(--text-primary);
+  border: 1px solid color-mix(in srgb, var(--accent-color) 30%, var(--border-primary));
+  border-radius: var(--radius-xs);
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  z-index: 10000;
+  box-shadow: var(--shadow-md);
+  line-height: 1.3;
+}
+
+[data-tooltip]:hover::after {
+  opacity: 1;
+  transform: translateX(-50%) scale(1);
+}
+
+/* Tooltip nach unten für Titlebar-Buttons */
+.titlebar [data-tooltip]::after {
+  bottom: auto;
+  top: calc(100% + 6px);
+}
+
+/* Tooltip nach unten für Sidebar-Header-Buttons */
+.sidebar-header-actions [data-tooltip]::after {
+  bottom: auto;
+  top: calc(100% + 6px);
+}
+
+/* Tooltip nach unten für Editor-Nav und Toolbar-Buttons */
+.editor-nav-buttons [data-tooltip]::after,
+.editor-toolbar [data-tooltip]::after,
+.formatting-toolbar [data-tooltip]::after,
+.editor-header [data-tooltip]::after,
+.canvas-filter-bar [data-tooltip]::after,
+.canvas-toolbar [data-tooltip]::after,
+.local-canvas-header [data-tooltip]::after,
+.add-note-btn[data-tooltip]::after {
+  bottom: auto;
+  top: calc(100% + 6px);
+}
+
+/* Tooltip rechts-ausgerichtet für Buttons am rechten Rand */
+.titlebar-right [data-tooltip]::after,
+.tags-panel-close[data-tooltip]::after,
+.flashcards-panel-close[data-tooltip]::after,
+.overdue-panel-close[data-tooltip]::after,
+.inbox-panel-close[data-tooltip]::after,
+.agent-panel-close[data-tooltip]::after,
+.notes-chat-close[data-tooltip]::after,
+.smart-connections-close[data-tooltip]::after,
+.semantic-scholar-close[data-tooltip]::after,
+.settings-close[data-tooltip]::after,
+.flashcard-study-close[data-tooltip]::after,
+.flashcard-editor-close[data-tooltip]::after {
+  left: auto;
+  right: 0;
+  transform: scale(0.95);
+}
+
+.titlebar-right [data-tooltip]:hover::after,
+.tags-panel-close[data-tooltip]:hover::after,
+.flashcards-panel-close[data-tooltip]:hover::after,
+.overdue-panel-close[data-tooltip]:hover::after,
+.inbox-panel-close[data-tooltip]:hover::after,
+.agent-panel-close[data-tooltip]:hover::after,
+.notes-chat-close[data-tooltip]:hover::after,
+.smart-connections-close[data-tooltip]:hover::after,
+.semantic-scholar-close[data-tooltip]:hover::after,
+.settings-close[data-tooltip]:hover::after,
+.flashcard-study-close[data-tooltip]:hover::after,
+.flashcard-editor-close[data-tooltip]:hover::after {
+  transform: scale(1);
+}
+
+/* Tooltip links-ausgerichtet für Buttons am linken Rand */
+.titlebar-left [data-tooltip]:first-child::after,
+.add-note-btn[data-tooltip]::after {
+  left: 0;
+  right: auto;
+  transform: scale(0.95);
+}
+
+.titlebar-left [data-tooltip]:first-child:hover::after,
+.add-note-btn[data-tooltip]:hover::after {
+  transform: scale(1);
+}
+
+/* Kein Tooltip für leere data-tooltip */
+[data-tooltip=""]::after {
+  display: none;
+}
+
 /* App Layout */
 .app {
   display: flex;

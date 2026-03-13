@@ -124,7 +124,7 @@ export const AIImageDialog: React.FC<AIImageDialogProps> = ({ onClose, onInsert 
         <div className="ai-image-dialog" onClick={e => e.stopPropagation()}>
           <div className="ai-image-dialog-header">
             <h3>{t('aiImage.title')}</h3>
-            <button className="close-btn" onClick={onClose}>&times;</button>
+            <button className="close-btn" onClick={onClose} title={t('panel.close')}>&times;</button>
           </div>
           <div className="ai-image-dialog-disabled">
             {t('aiImage.disabled')}
@@ -142,7 +142,7 @@ export const AIImageDialog: React.FC<AIImageDialogProps> = ({ onClose, onInsert 
         <div className="ai-image-dialog" onClick={e => e.stopPropagation()}>
           <div className="ai-image-dialog-header">
             <h3>{t('aiImage.title')}</h3>
-            <button className="close-btn" onClick={onClose}>&times;</button>
+            <button className="close-btn" onClick={onClose} title={t('panel.close')}>&times;</button>
           </div>
           <div className="ai-image-dialog-disabled">
             {t('aiImage.noModel')}
@@ -159,7 +159,7 @@ export const AIImageDialog: React.FC<AIImageDialogProps> = ({ onClose, onInsert 
       <div className="ai-image-dialog" onClick={e => e.stopPropagation()}>
         <div className="ai-image-dialog-header">
           <h3>{t('aiImage.title')}</h3>
-          <button className="close-btn" onClick={onClose}>&times;</button>
+          <button className="close-btn" onClick={onClose} title={t('panel.close')}>&times;</button>
         </div>
 
         <div className="ai-image-dialog-content">

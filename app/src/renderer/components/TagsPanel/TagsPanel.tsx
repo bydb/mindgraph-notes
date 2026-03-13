@@ -100,7 +100,7 @@ export const TagsPanel: React.FC<TagsPanelProps> = ({ onClose }) => {
           // Zeige Notizen mit ausgewähltem Tag
           <div className="tags-notes-view">
             <div className="tags-notes-header">
-              <button className="tags-back-btn" onClick={() => setSelectedTag(null)}>
+              <button className="tags-back-btn" onClick={() => setSelectedTag(null)} title={t('panel.back')}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <polyline points="15 18 9 12 15 6"/>
                 </svg>

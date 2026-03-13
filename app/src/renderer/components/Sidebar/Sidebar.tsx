@@ -7,6 +7,7 @@ import { useUIStore } from '../../stores/uiStore'
 import { useGraphStore } from '../../stores/graphStore'
 import { useTabStore } from '../../stores/tabStore'
 import { useDataviewStore } from '../../stores/dataviewStore'
+import { useVaultSettingsStore } from '../../stores/vaultSettingsStore'
 import { useTranslation } from '../../utils/translations'
 import { extractTaskStatsForCache } from '../../utils/linkExtractor'
 import { parseFrontmatter } from '../../utils/metadataExtractor'
@@ -20,6 +21,7 @@ interface SidebarProps {
 export const Sidebar: React.FC<SidebarProps> = ({ onOpenSearch }) => {
   const { vaultPath, fileTree, notes, setVaultPath, setFileTree, setNotes, addNote, selectNote, setLoading } = useNotesStore()
   const { sidebarWidth, sidebarVisible, fileTreeDisplayMode, setFileTreeDisplayMode, dailyNote: dailyNoteSettings } = useUIStore()
+  const vaultDailyNoteActive = useVaultSettingsStore(state => state.features.dailyNote)
   const loadGraphData = useGraphStore((s) => s.loadFromVault)
   const resetGraphStore = useGraphStore((s) => s.reset)
   const fileCustomizations = useGraphStore((s) => s.fileCustomizations)
@@ -387,7 +389,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ onOpenSearch }) => {
               </svg>
             </button>
           )}
-          {dailyNoteSettings.enabled && (
+          {dailyNoteSettings.enabled && vaultDailyNoteActive && (
             <button className="btn-icon" onClick={handleOpenDailyNote} title={t('sidebar.dailyNote')}>
               <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
                 <rect x="2" y="1.5" width="12" height="13" rx="1.5" stroke="currentColor" strokeWidth="1.3"/>
@@ -397,10 +399,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ onOpenSearch }) => {
               </svg>
             </button>
           )}
-          <button className="btn-icon" onClick={handleNewNote} title="Neue Notiz (Cmd+N)">
+          <button className="btn-icon" onClick={handleNewNote} title={`${t('sidebar.newNote')} (Cmd+N)`}>
             +
           </button>
-          <button className="btn-icon" onClick={handleNewFolder} title="Neuer Ordner">
+          <button className="btn-icon" onClick={handleNewFolder} title={t('sidebar.newFolder')}>
             <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
               <path d="M2 4.5A1.5 1.5 0 013.5 3h3.379a1.5 1.5 0 011.06.44l.622.62a.5.5 0 00.354.147H12.5A1.5 1.5 0 0114 5.707V11.5a1.5 1.5 0 01-1.5 1.5h-9A1.5 1.5 0 012 11.5v-7z" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
               <path d="M8 7v4M6 9h4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>

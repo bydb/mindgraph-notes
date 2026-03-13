@@ -37,20 +37,23 @@ import { useTranslation } from './utils/translations'
 import { useNotesStore, createNoteFromFile } from './stores/notesStore'
 import { useReminderStore } from './stores/reminderStore'
 import { useSyncStore } from './stores/syncStore'
+import { useVaultSettingsStore } from './stores/vaultSettingsStore'
 import { getVaultTaskStats } from './utils/linkExtractor'
 import './styles/index.css'
 
 type ViewMode = 'editor' | 'split' | 'canvas'
 
-const ViewModeButton: React.FC<{ 
+const ViewModeButton: React.FC<{
   mode: ViewMode
   currentMode: ViewMode
   onClick: () => void
-  children: React.ReactNode 
-}> = ({ mode, currentMode, onClick, children }) => (
-  <button 
+  title?: string
+  children: React.ReactNode
+}> = ({ mode, currentMode, onClick, title, children }) => (
+  <button
     className={`view-mode-btn ${currentMode === mode ? 'active' : ''}`}
     onClick={onClick}
+    title={title}
   >
     {children}
   </button>
@@ -83,6 +86,10 @@ const App: React.FC = () => {
   const { unreadRelevantCount } = useEmailStore()
   const emailEnabled = useUIStore(state => state.email.enabled)
   const edooboxEnabled = useUIStore(state => state.edoobox.enabled)
+  const vaultReadwiseActive = useVaultSettingsStore(state => state.features.readwise)
+  const vaultEmailActive = useVaultSettingsStore(state => state.features.email)
+  const vaultEdooboxActive = useVaultSettingsStore(state => state.features.edoobox)
+  const vaultSettingsLoaded = useVaultSettingsStore(state => state.isLoaded)
   const [pendingNoteTitle, setPendingNoteTitle] = useState<string | null>(null)
 
   // Helper to switch right panel - clicking opens that panel and closes others
@@ -155,6 +162,19 @@ const App: React.FC = () => {
     return () => clearTimeout(timer)
   }, [notes])
 
+  // title → data-tooltip Konvertierung (verhindert doppelte native Tooltips)
+  useEffect(() => {
+    const convert = (e: MouseEvent) => {
+      const el = (e.target as HTMLElement).closest('[title]') as HTMLElement | null
+      if (el && el.title) {
+        el.dataset.tooltip = el.title
+        el.removeAttribute('title')
+      }
+    }
+    document.addEventListener('mouseover', convert, true)
+    return () => document.removeEventListener('mouseover', convert, true)
+  }, [])
+
   // UI-Settings beim App-Start laden + Onboarding prüfen
   useEffect(() => {
     const init = async () => {
@@ -172,13 +192,15 @@ const App: React.FC = () => {
   useEffect(() => {
     if (vaultPath) {
       useSyncStore.getState().loadForVault(vaultPath)
+      useVaultSettingsStore.getState().loadForVault(vaultPath)
     }
   }, [vaultPath])
 
-  // Readwise Auto-Sync
+  // Readwise Auto-Sync (nur wenn im Vault aktiviert)
   useEffect(() => {
     const { readwise } = useUIStore.getState()
     if (!readwise.enabled || !readwise.autoSync || !readwise.apiKey || !vaultPath) return
+    if (!vaultSettingsLoaded || !vaultReadwiseActive) return
 
     const intervalMs = readwise.autoSyncInterval * 60 * 1000
     console.log(`[Readwise] Auto-sync enabled, interval: ${readwise.autoSyncInterval}min`)
@@ -231,11 +253,12 @@ const App: React.FC = () => {
       clearTimeout(initialTimer)
       clearInterval(interval)
     }
-  }, [vaultPath])
+  }, [vaultPath, vaultSettingsLoaded, vaultReadwiseActive])
 
-  // Email: Setup + Laden beim Vault-Start + Auto-Fetch
+  // Email: Setup + Laden beim Vault-Start + Auto-Fetch (nur wenn im Vault aktiviert)
   useEffect(() => {
     if (!emailEnabled || !vaultPath) return
+    if (!vaultSettingsLoaded || !vaultEmailActive) return
 
     // Setup: Ordner + Instruktions-Notiz erstellen (idempotent)
     useEmailStore.getState().setupEmail(vaultPath)
@@ -262,14 +285,15 @@ const App: React.FC = () => {
       clearTimeout(initialTimer)
       clearInterval(interval)
     }
-  }, [vaultPath, emailEnabled])
+  }, [vaultPath, emailEnabled, vaultSettingsLoaded, vaultEmailActive])
 
-  // edoobox Agent: Events laden beim Vault-Wechsel
+  // edoobox Agent: Events laden beim Vault-Wechsel (nur wenn im Vault aktiviert)
   useEffect(() => {
     if (!edooboxEnabled || !vaultPath) return
+    if (!vaultSettingsLoaded || !vaultEdooboxActive) return
     useAgentStore.getState().loadEvents().catch(() => {})
     useAgentStore.getState().checkConnection().catch(() => {})
-  }, [vaultPath, edooboxEnabled])
+  }, [vaultPath, edooboxEnabled, vaultSettingsLoaded, vaultEdooboxActive])
 
   // Update-Checker & What's New beim App-Start
   useEffect(() => {
@@ -649,7 +673,7 @@ const App: React.FC = () => {
         <div className="titlebar">
           <div className="titlebar-left">
             <div className="view-mode-switcher">
-              <button className="view-mode-btn" onClick={toggleSidebar} title="Sidebar umschalten">
+              <button className="view-mode-btn" onClick={toggleSidebar} title={t('titlebar.sidebar')}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   {sidebarVisible ? (
                     <><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="3" x2="9" y2="21"/></>
@@ -1052,7 +1076,7 @@ const App: React.FC = () => {
                   'syncing'
                 }`}
                 onClick={() => setSettingsOpen(true)}
-                title="Sync"
+                title={t('titlebar.sync')}
               >
                 <svg className={`sync-status-icon ${syncStatus !== 'idle' && syncStatus !== 'done' && syncStatus !== 'error' ? 'syncing' : ''}`} viewBox="0 0 14 14" fill="none">
                   <path d="M2 7C2 4.24 4.24 2 7 2C8.66 2 10.1 2.84 11 4.1" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>

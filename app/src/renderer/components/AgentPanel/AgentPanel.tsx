@@ -19,7 +19,7 @@ const EventDetail: React.FC<{ event: EdooboxEvent; onBack: () => void }> = ({ ev
 
   return (
     <div className="agent-event-detail">
-      <button className="agent-back-btn" onClick={onBack}>
+      <button className="agent-back-btn" onClick={onBack} title={t('panel.back')}>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <path d="M19 12H5" /><path d="m12 19-7-7 7-7" />
         </svg>
@@ -145,7 +145,7 @@ export const AgentPanel: React.FC<AgentPanelProps> = ({ onClose }) => {
             </svg>
             {t('agent.title')}
           </div>
-          <button className="agent-panel-close" onClick={onClose}>
+          <button className="agent-panel-close" onClick={onClose} title={t('panel.close')}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
             </svg>
@@ -190,7 +190,7 @@ export const AgentPanel: React.FC<AgentPanelProps> = ({ onClose }) => {
               </svg>
             )}
           </button>
-          <button className="agent-panel-close" onClick={onClose}>
+          <button className="agent-panel-close" onClick={onClose} title={t('panel.close')}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
             </svg>
