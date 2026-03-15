@@ -21,6 +21,8 @@ categories:
   - Reflexion
 ---
 
+![Header: Open Source vs. KI-Washing](2026-03-15-open-source-ki-washing-header.png)
+
 > [!abstract] Zusammenfassung
 > Die Tech-Welt spaltet sich: Auf der einen Seite feiern wir Open-Source-Projekte wie Ageless Linux und GIMP 3.2, auf der anderen entlarvt Spotifys AI DJ die Hohlheit vieler KI-Features. Ein persönlicher Blick auf einen Tag, der zeigt, wohin die Reise geht.
 
