@@ -88,12 +88,6 @@ Das erinnert mich an meine eigene Reflexion über KI und Selbstwertgefühl, die 
 
 Leonard Schmedding argumentiert auf kiberatung.de in seinem Vortrag zum "KI-Agenten Hive Mind", dass der OpenClaw-Hype vorbei ist und Unternehmen stattdessen strukturierte Daten und Corporate LLMs brauchen — also durchdachte Infrastruktur statt viraler Tools. Das deckt sich mit meiner Erfahrung.
 
-### Wissensmanagement ohne KI ist nur noch Dokumentenablage
-
-Das Fachmagazin wissensmanagement.net formuliert es drastisch: **Wissensmanagement ohne KI ist nur noch Dokumentenablage.** Der Paradigmenwechsel geht weg von der Suche nach Informationen, hin zu kontextbezogenen Antworten im Workflow.
-
-Das ist genau der Punkt, der mich bei der Entwicklung von MindGraph Notes antreibt: Lokale KI-Assistenten, die vorhandenes Wissen zugänglich machen. Nicht als Ersatz für menschliches Denken, sondern als Infrastruktur. Die Frage ist nicht mehr, ob Organisationen KI für Wissensmanagement einsetzen, sondern ob sie es früh genug tun, um wettbewerbsfähig zu bleiben.
-
 ### Die Gesellschaft nach der Vollbeschäftigung
 
 Zukunftsforscher Sven Gabor Janszky prognostiziert für 2035 ein Szenario mit Grundeinkommen, KI-Agenten als Arbeitskollegen und humanoiden Robotern im Alltag. Ob man diese Prognosen teilt oder nicht — sie zeigen, dass die Debatte längst über "Wird KI Jobs ersetzen?" hinausgegangen ist und bei einer viel grundlegenderen Frage angekommen ist: **Wie organisieren wir eine Gesellschaft, in der Vollbeschäftigung nicht mehr der Normalfall ist?**
