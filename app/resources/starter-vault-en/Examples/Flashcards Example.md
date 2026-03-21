@@ -28,3 +28,5 @@ The SM-2 algorithm ensures you review cards right when you'd otherwise forget th
 - One question per card
 - Study regularly, not all at once
 - Use your own words instead of copy-paste
+
+More about AI features: [[04 - AI Features]] | Back to [[Knowledge Hub]]

@@ -2,6 +2,25 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.3.8-beta] - 2026-03-21
+
+### Features
+- **Neues Onboarding (komplett ueberarbeitet)** — 4 Schritte statt 5, fokussiert auf Aha-Momente
+  - **Intent-Step**: 5 Nutzerprofile (Student, Researcher, Professional, Writer, Developer) mit Feature-Badges, Profil- und Vault-Auswahl auf einer Seite
+  - **KI-Features-Step**: Feature-orientierte Darstellung ("Quiz generieren, mit Notizen chatten, Texte verbessern") statt technischem "Integrationen pruefen"
+  - **Missions-Step**: Interaktive Checkliste ("Notiz erstellen, verlinken, Canvas oeffnen") ersetzt den statischen Icon-Dump
+  - **Welcome-Screen**: Neuer Untertitel "Dein Wissen vernetzen. Lokal. Privat. Mit KI." mit animiertem Graph-Logo
+- **Erweiterter Starter Vault** — 12 statt 5 Dateien, alle untereinander verlinkt
+  - Neuer Schnellstart-Ordner mit 4 Anleitungen (Erste Schritte, Verlinken, Canvas, KI-Features)
+  - Hub-Notiz "Wissensnetz" verlinkt auf alle Notizen — Stern-Graph im Canvas beim ersten Oeffnen
+  - Markdown Showcase (Tabellen, Callouts, LaTeX, Mermaid, Code) und Projektplanung (Tasks mit Datum)
+  - Komplett bilingual (DE + EN)
+
+### Improvements
+- **Vault-Wechsel nach Onboarding** — Sidebar laedt jetzt den im Onboarding gewaehlten Vault korrekt, auch nach Reset via Shift+Cmd+O
+- **Profil-Migration** — Alte Profilnamen (schueler/studium/wissensmanagement) werden automatisch auf neue Namen migriert
+- **Help Guide** nutzt jetzt die Missions-Checkliste statt den alten Feature-Guide
+
 ## [0.3.7-beta] - 2026-03-13
 
 ### Features

@@ -247,25 +247,36 @@ export const Sidebar: React.FC<SidebarProps> = ({ onOpenSearch }) => {
   // Beim Start: Letzten Vault automatisch laden (wartet auf onboardingCompleted)
   const onboardingCompleted = useUIStore((s) => s.onboardingCompleted)
   useEffect(() => {
-    if (!onboardingCompleted) return // Warten bis Settings geladen & Onboarding abgeschlossen
+    if (!onboardingCompleted) {
+      // Reset loading guard when onboarding restarts, so vault reloads after completion
+      isLoadingRef.current = false
+      return
+    }
 
     const loadLastVault = async () => {
-      // Guard gegen doppeltes Laden
-      if (!window.electronAPI || vaultPath || isLoadingRef.current) return
+      if (!window.electronAPI || isLoadingRef.current) return
+
+      // Get the vault that should be loaded (set by onboarding or last used)
+      let targetVault: string | null = null
+      try {
+        targetVault = await window.electronAPI.getLastVault()
+      } catch (error) {
+        console.error('[Sidebar] Failed to get last vault:', error)
+      }
+      if (!targetVault) return
+
+      // Skip if already loaded (same vault)
+      if (vaultPath === targetVault) return
+
       isLoadingRef.current = true
 
-      // Determine which vault to load: either already set (from onboarding) or last used
-      let targetVault = vaultPath
-      if (!targetVault) {
-        try {
-          targetVault = await window.electronAPI.getLastVault()
-        } catch (error) {
-          console.error('[Sidebar] Failed to get last vault:', error)
-        }
-      }
-      if (!targetVault) {
-        isLoadingRef.current = false
-        return
+      // Clean up old vault if switching
+      if (vaultPath) {
+        window.electronAPI.unwatchDirectory()
+        resetGraphStore()
+        clearAllTabs()
+        setNotes([])
+        setFileTree([])
       }
 
       try {

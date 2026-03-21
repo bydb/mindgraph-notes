@@ -26,3 +26,6 @@ Check out the other examples too:
 - [[Dataview Example]]
 - [[Flashcards Example]]
 - [[Zotero Example]]
+- [[Knowledge Hub]] — all notes at a glance
+
+More about Canvas: [[03 - Discover Canvas]]

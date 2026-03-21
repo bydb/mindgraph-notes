@@ -65,6 +65,7 @@ function shouldExclude(relativePath: string, fileName: string): boolean {
   if (relativePath.startsWith('.sync-trash/') || relativePath.startsWith('.sync-trash\\')) return true
   if (fileName.startsWith('~')) return true
   if (fileName.endsWith('.tmp')) return true
+  if (fileName.includes('.sync-conflict-')) return true
   return false
 }
 

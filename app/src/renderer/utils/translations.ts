@@ -1083,7 +1083,7 @@ const translations = {
 
     // Onboarding
     'onboarding.welcome.title': 'Willkommen bei MindGraph Notes',
-    'onboarding.welcome.subtitle': 'Die erste Notiz-App mit integriertem KI-Terminal',
+    'onboarding.welcome.subtitle': 'Dein Wissen vernetzen. Lokal. Privat. Mit KI.',
     'onboarding.welcome.setup': 'Einrichtung starten',
     'onboarding.welcome.openVault': 'Notiz-Ordner öffnen',
     'onboarding.vault.title': 'Wo sollen deine Notizen leben?',
@@ -1156,6 +1156,42 @@ const translations = {
     'onboarding.profile.studium.desc': 'Alles aus Schule plus Zotero, PDF-Companion, Dataview und LaTeX',
     'onboarding.profile.wissensmanagement.title': 'Wissensmanagement',
     'onboarding.profile.wissensmanagement.desc': 'Wikilinks, Canvas, Smart Connections, lokale KI und Terminal',
+
+    // Intent Step (new onboarding)
+    'onboarding.intent.title': 'Wie wirst du MindGraph Notes nutzen?',
+    'onboarding.intent.subtitle': 'Wir passen die Einstellungen an deinen Workflow an. Du kannst alles jederzeit in den Einstellungen ändern.',
+    'onboarding.intent.student.title': 'Schule & Lernen',
+    'onboarding.intent.student.badges': 'Karteikarten, Quiz, Spaced Repetition, Erinnerungen',
+    'onboarding.intent.researcher.title': 'Studium & Forschung',
+    'onboarding.intent.researcher.badges': 'Zotero, PDF-Companion, Semantic Scholar, LaTeX',
+    'onboarding.intent.professional.title': 'Beruf & Organisation',
+    'onboarding.intent.professional.badges': 'E-Mail-Analyse, Aufgaben, Templates, Überblick',
+    'onboarding.intent.writer.title': 'Schreiben & Texte',
+    'onboarding.intent.writer.badges': 'Fokussierter Editor, Live-Vorschau, Wortzähler',
+    'onboarding.intent.developer.title': 'Entwicklung & Technik',
+    'onboarding.intent.developer.badges': 'Terminal, Notes Chat, Smart Connections',
+
+    // AI Features Step (new onboarding)
+    'onboarding.aiFeatures.title': 'KI-Features freischalten',
+    'onboarding.aiFeatures.subtitle': 'MindGraph nutzt lokale KI-Modelle — deine Daten bleiben auf deinem Rechner.',
+    'onboarding.aiFeatures.capability.quiz': 'Quiz & Lernkarten aus jeder Notiz generieren',
+    'onboarding.aiFeatures.capability.chat': 'Fragen an dein gesamtes Wissen stellen',
+    'onboarding.aiFeatures.capability.tools': 'Texte zusammenfassen, übersetzen, verbessern',
+    'onboarding.aiFeatures.connectionLabel': 'Verbindungsstatus',
+    'onboarding.aiFeatures.later': 'Später einrichten',
+
+    // Missions Step (new onboarding)
+    'onboarding.missions.title': 'Deine ersten Schritte',
+    'onboarding.missions.subtitle': 'Probiere diese 4 Dinge aus, um MindGraph kennenzulernen.',
+    'onboarding.missions.welcome.title': 'Willkommens-Notiz öffnen',
+    'onboarding.missions.welcome.desc': 'Lerne die Grundlagen kennen',
+    'onboarding.missions.create.title': 'Neue Notiz erstellen',
+    'onboarding.missions.create.desc': 'Erstelle deine erste eigene Notiz',
+    'onboarding.missions.link.title': 'Zwei Notizen verlinken',
+    'onboarding.missions.link.desc': 'Tippe [[ und wähle eine Notiz aus',
+    'onboarding.missions.canvas.title': 'Canvas öffnen',
+    'onboarding.missions.canvas.desc': 'Sieh deinen Wissensgraph als Netzwerk',
+    'onboarding.missions.helpHint': 'Du findest diese Übersicht jederzeit über Cmd+/ (Hilfe).',
 
     // Sync
     'settings.tab.sync': 'Synchronisation',
@@ -2453,7 +2489,7 @@ const translations = {
 
     // Onboarding
     'onboarding.welcome.title': 'Welcome to MindGraph Notes',
-    'onboarding.welcome.subtitle': 'The first note-taking app with an integrated AI terminal',
+    'onboarding.welcome.subtitle': 'Connect your knowledge. Local. Private. AI-powered.',
     'onboarding.welcome.setup': 'Start Setup',
     'onboarding.welcome.openVault': 'Open notes folder',
     'onboarding.vault.title': 'Where should your notes live?',
@@ -2526,6 +2562,42 @@ const translations = {
     'onboarding.profile.studium.desc': 'Everything from School plus Zotero, PDF companion, Dataview and LaTeX',
     'onboarding.profile.wissensmanagement.title': 'Knowledge Management',
     'onboarding.profile.wissensmanagement.desc': 'Wikilinks, canvas, smart connections, local AI and terminal',
+
+    // Intent Step (new onboarding)
+    'onboarding.intent.title': 'How will you use MindGraph Notes?',
+    'onboarding.intent.subtitle': 'We\'ll adjust settings for your workflow. You can change everything anytime in settings.',
+    'onboarding.intent.student.title': 'School & Learning',
+    'onboarding.intent.student.badges': 'Flashcards, Quiz, Spaced Repetition, Reminders',
+    'onboarding.intent.researcher.title': 'University & Research',
+    'onboarding.intent.researcher.badges': 'Zotero, PDF Companion, Semantic Scholar, LaTeX',
+    'onboarding.intent.professional.title': 'Work & Organization',
+    'onboarding.intent.professional.badges': 'Email analysis, Tasks, Templates, Overview',
+    'onboarding.intent.writer.title': 'Writing & Text',
+    'onboarding.intent.writer.badges': 'Focused editor, Live preview, Word count',
+    'onboarding.intent.developer.title': 'Development & Tech',
+    'onboarding.intent.developer.badges': 'Terminal, Notes Chat, Smart Connections',
+
+    // AI Features Step (new onboarding)
+    'onboarding.aiFeatures.title': 'Unlock AI Features',
+    'onboarding.aiFeatures.subtitle': 'MindGraph uses local AI models — your data stays on your machine.',
+    'onboarding.aiFeatures.capability.quiz': 'Generate quizzes & flashcards from any note',
+    'onboarding.aiFeatures.capability.chat': 'Ask questions across all your notes',
+    'onboarding.aiFeatures.capability.tools': 'Summarize, translate, and improve text',
+    'onboarding.aiFeatures.connectionLabel': 'Connection status',
+    'onboarding.aiFeatures.later': 'Set up later',
+
+    // Missions Step (new onboarding)
+    'onboarding.missions.title': 'Your First Steps',
+    'onboarding.missions.subtitle': 'Try these 4 things to get to know MindGraph.',
+    'onboarding.missions.welcome.title': 'Open the Welcome note',
+    'onboarding.missions.welcome.desc': 'Learn the basics',
+    'onboarding.missions.create.title': 'Create a new note',
+    'onboarding.missions.create.desc': 'Create your first own note',
+    'onboarding.missions.link.title': 'Link two notes together',
+    'onboarding.missions.link.desc': 'Type [[ and select a note',
+    'onboarding.missions.canvas.title': 'Open Canvas',
+    'onboarding.missions.canvas.desc': 'See your knowledge graph as a network',
+    'onboarding.missions.helpHint': 'You can find this overview anytime via Cmd+/ (Help).',
 
     // Sync
     'settings.tab.sync': 'Sync',

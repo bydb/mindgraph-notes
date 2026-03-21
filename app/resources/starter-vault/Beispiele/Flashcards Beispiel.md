@@ -24,7 +24,9 @@ Das SM-2 Algorithmus sorgt dafür, dass du Karten genau dann wiederholst, wenn d
 
 ## Tipps
 
-- Halte Karten **kurz und präzise**
+- Halte Karten **kurz und praezise**
 - Eine Frage pro Karte
-- Lerne regelmäßig, nicht alles auf einmal
+- Lerne regelmaessig, nicht alles auf einmal
 - Nutze eigene Worte statt Copy-Paste
+
+Mehr zu KI-Features: [[04 - KI-Features]] | Zurueck zum [[Wissensnetz]]

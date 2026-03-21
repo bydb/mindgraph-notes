@@ -2,19 +2,19 @@ import React, { useState, useCallback, useEffect } from 'react'
 import { useUIStore } from '../../stores/uiStore'
 import type { UserProfile } from '../../stores/uiStore'
 import { WelcomeScreen } from './WelcomeScreen'
-import { ProfileStep } from './steps/ProfileStep'
-import { VaultStep } from './steps/VaultStep'
-import { AISetupStep } from './steps/AISetupStep'
-import { FeaturesStep } from './steps/FeaturesStep'
+import { IntentStep } from './steps/IntentStep'
+import { AIStep } from './steps/AIStep'
+import { MissionsStep } from './steps/MissionsStep'
 import './Onboarding.css'
 
-type OnboardingStep = 'welcome' | 'profile' | 'vault' | 'ai' | 'features'
+type OnboardingStep = 'welcome' | 'intent' | 'ai' | 'missions'
 
 export const Onboarding: React.FC = () => {
   const { onboardingOpen, setOnboardingOpen, setOnboardingCompleted, setUserProfile, applyProfileDefaults } = useUIStore()
   const [step, setStep] = useState<OnboardingStep>('welcome')
   const [vaultPath, setLocalVaultPath] = useState<string | null>(null)
   const [selectedProfile, setSelectedProfile] = useState<UserProfile>(null)
+  const [createdStarterVault, setCreatedStarterVault] = useState(false)
 
   // Reset to first step when onboarding is reopened
   useEffect(() => {
@@ -24,20 +24,26 @@ export const Onboarding: React.FC = () => {
     }
   }, [onboardingOpen])
 
+  const handleSetVaultPath = useCallback((path: string) => {
+    setLocalVaultPath(path)
+    // Track if starter vault was created (for MissionsStep auto-done)
+    setCreatedStarterVault(true)
+  }, [])
+
   const finishWithVault = useCallback(async (path: string) => {
-    // Save as last vault — Sidebar will load it when onboardingCompleted becomes true
     await window.electronAPI.setLastVault(path)
   }, [])
 
   const completeOnboarding = useCallback(async () => {
+    console.log('[Onboarding] completeOnboarding called, vaultPath:', vaultPath, 'profile:', selectedProfile)
     if (vaultPath) {
       try {
         await finishWithVault(vaultPath)
+        console.log('[Onboarding] setLastVault completed for:', vaultPath)
       } catch (error) {
         console.error('[Onboarding] Failed to set vault:', error)
       }
     }
-    // Apply profile defaults before completing
     if (selectedProfile) {
       setUserProfile(selectedProfile)
       applyProfileDefaults(selectedProfile)
@@ -66,39 +72,31 @@ export const Onboarding: React.FC = () => {
       <div className="onboarding-container">
         {step === 'welcome' && (
           <WelcomeScreen
-            onStartWizard={() => setStep('profile')}
+            onStartWizard={() => setStep('intent')}
             onOpenVault={handleOpenVaultDirect}
           />
         )}
-        {step === 'profile' && (
-          <ProfileStep
+        {step === 'intent' && (
+          <IntentStep
             selectedProfile={selectedProfile}
             onSelectProfile={setSelectedProfile}
-            onBack={() => setStep('welcome')}
-            onNext={() => setStep('vault')}
-          />
-        )}
-        {step === 'vault' && (
-          <VaultStep
             vaultPath={vaultPath}
-            setVaultPath={setLocalVaultPath}
-            onBack={() => setStep('profile')}
+            setVaultPath={handleSetVaultPath}
+            onBack={() => setStep('welcome')}
             onNext={() => setStep('ai')}
           />
         )}
         {step === 'ai' && (
-          <AISetupStep
-            onBack={() => setStep('vault')}
-            onNext={() => setStep('features')}
+          <AIStep
+            onBack={() => setStep('intent')}
+            onNext={() => setStep('missions')}
           />
         )}
-        {step === 'features' && (
-          <FeaturesStep
+        {step === 'missions' && (
+          <MissionsStep
             onBack={() => setStep('ai')}
             onFinish={completeOnboarding}
-            showFlashcards={selectedProfile !== 'wissensmanagement'}
-            showSmartConnections={selectedProfile === 'wissensmanagement'}
-            showNotesChat={true}
+            hasStarterVault={createdStarterVault}
           />
         )}
       </div>

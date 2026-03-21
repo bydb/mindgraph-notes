@@ -465,3 +465,212 @@
     transform: translateY(0);
   }
 }
+
+/* ============ INTENT STEP ============ */
+.onboarding-intent-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.onboarding-intent-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  text-align: left;
+  transition: all var(--transition-fast);
+}
+
+.onboarding-intent-card:hover {
+  border-color: var(--accent-color);
+  background: var(--bg-tertiary);
+}
+
+.onboarding-intent-card.selected {
+  border-color: var(--accent-color);
+  background: var(--accent-subtle);
+}
+
+.onboarding-intent-icon {
+  flex-shrink: 0;
+  color: var(--accent-color);
+}
+
+.onboarding-intent-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.onboarding-intent-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.onboarding-intent-badges {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+/* ============ AI CAPABILITY CARDS ============ */
+.onboarding-capability-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 24px;
+}
+
+.onboarding-capability-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+}
+
+.onboarding-capability-icon {
+  flex-shrink: 0;
+  color: var(--accent-color);
+}
+
+.onboarding-capability-text {
+  font-size: 14px;
+  color: var(--text-primary);
+  line-height: 1.4;
+}
+
+/* ============ MISSIONS STEP ============ */
+.onboarding-missions-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.onboarding-mission-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  transition: all var(--transition-fast);
+}
+
+.onboarding-mission-item.auto-done {
+  border-color: #30d158;
+  background: rgba(48, 209, 88, 0.05);
+}
+
+.onboarding-mission-number {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--accent-subtle);
+  color: var(--accent-color);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.onboarding-mission-item.auto-done .onboarding-mission-number {
+  background: rgba(48, 209, 88, 0.15);
+  color: #30d158;
+}
+
+.onboarding-mission-icon {
+  flex-shrink: 0;
+  color: var(--text-secondary);
+}
+
+.onboarding-mission-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+}
+
+.onboarding-mission-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.onboarding-mission-desc {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.onboarding-mission-shortcut {
+  flex-shrink: 0;
+  font-size: 11px;
+  color: var(--text-muted);
+  padding: 2px 8px;
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-xs);
+  font-family: var(--font-mono, monospace);
+}
+
+.onboarding-missions-hint {
+  font-size: 12px;
+  color: var(--text-muted);
+  text-align: center;
+  margin-bottom: 8px;
+}
+
+/* ============ WELCOME ANIMATION ============ */
+.onboarding-welcome-animation .graph-edges line {
+  stroke-dasharray: 100;
+  stroke-dashoffset: 100;
+  animation: draw-edge 1.5s ease forwards;
+}
+
+.onboarding-welcome-animation .graph-nodes circle {
+  opacity: 0;
+  animation: fade-node 0.5s ease forwards;
+}
+
+.onboarding-welcome-animation .graph-nodes circle:nth-child(1) { animation-delay: 0.2s; }
+.onboarding-welcome-animation .graph-nodes circle:nth-child(2) { animation-delay: 0.4s; }
+.onboarding-welcome-animation .graph-nodes circle:nth-child(3) { animation-delay: 0.4s; }
+.onboarding-welcome-animation .graph-nodes circle:nth-child(4) { animation-delay: 0.6s; }
+.onboarding-welcome-animation .graph-nodes circle:nth-child(5) { animation-delay: 0.6s; }
+.onboarding-welcome-animation .graph-nodes circle:nth-child(6) { animation-delay: 0.6s; }
+.onboarding-welcome-animation .graph-nodes circle:nth-child(7) { animation-delay: 0.8s; }
+.onboarding-welcome-animation .graph-nodes circle:nth-child(8) { animation-delay: 0.8s; }
+
+.onboarding-welcome-animation .graph-edges line:nth-child(1) { animation-delay: 0.3s; }
+.onboarding-welcome-animation .graph-edges line:nth-child(2) { animation-delay: 0.3s; }
+.onboarding-welcome-animation .graph-edges line:nth-child(3) { animation-delay: 0.5s; }
+.onboarding-welcome-animation .graph-edges line:nth-child(4) { animation-delay: 0.5s; }
+.onboarding-welcome-animation .graph-edges line:nth-child(5) { animation-delay: 0.5s; }
+.onboarding-welcome-animation .graph-edges line:nth-child(6) { animation-delay: 0.5s; }
+.onboarding-welcome-animation .graph-edges line:nth-child(7) { animation-delay: 0.5s; }
+.onboarding-welcome-animation .graph-edges line:nth-child(8) { animation-delay: 0.7s; }
+.onboarding-welcome-animation .graph-edges line:nth-child(9) { animation-delay: 0.7s; }
+.onboarding-welcome-animation .graph-edges line:nth-child(10) { animation-delay: 0.7s; }
+.onboarding-welcome-animation .graph-edges line:nth-child(11) { animation-delay: 0.7s; }
+.onboarding-welcome-animation .graph-edges line:nth-child(12) { animation-delay: 0.7s; }
+.onboarding-welcome-animation .graph-edges line:nth-child(13) { animation-delay: 0.7s; }
+.onboarding-welcome-animation .graph-edges line:nth-child(14) { animation-delay: 0.9s; }
+
+@keyframes draw-edge {
+  to { stroke-dashoffset: 0; }
+}
+
+@keyframes fade-node {
+  to { opacity: 1; }
+}

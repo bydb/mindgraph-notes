@@ -1,7 +1,7 @@
 import React from 'react'
 import { useUIStore } from '../../stores/uiStore'
 import { useShallow } from 'zustand/react/shallow'
-import { FeaturesStep } from './steps/FeaturesStep'
+import { MissionsStep } from './steps/MissionsStep'
 import './Onboarding.css'
 
 export const HelpGuide: React.FC = () => {
@@ -17,12 +17,9 @@ export const HelpGuide: React.FC = () => {
   return (
     <div className="onboarding-overlay" onClick={() => setHelpGuideOpen(false)}>
       <div className="onboarding-container" onClick={e => e.stopPropagation()}>
-        <FeaturesStep
+        <MissionsStep
           onBack={() => setHelpGuideOpen(false)}
           onFinish={() => setHelpGuideOpen(false)}
-          showFlashcards
-          showSmartConnections
-          showNotesChat
           standalone
         />
       </div>

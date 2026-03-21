@@ -12,7 +12,7 @@ type AIAction = 'translate' | 'summarize' | 'continue' | 'improve'
 export type LLMBackend = 'ollama' | 'lm-studio'
 export type Language = 'de' | 'en'
 export type IconSet = 'default' | 'minimal' | 'colorful' | 'emoji'
-export type UserProfile = 'schueler' | 'studium' | 'wissensmanagement' | null
+export type UserProfile = 'student' | 'researcher' | 'professional' | 'writer' | 'developer' | null
 export type OutlineStyle = 'default' | 'lines' | 'minimal' | 'bullets' | 'dashes'
 export type FontFamily = 'system' | 'inter' | 'source-sans' | 'roboto' | 'open-sans' | 'lato' |
   'jetbrains-mono-nerd' | 'fira-code-nerd' | 'hack-nerd' | 'meslo-nerd' | 'cascadia-code-nerd' | 'iosevka-nerd' | 'victor-mono-nerd' | 'agave-nerd'
@@ -803,7 +803,7 @@ export const useUIStore = create<UIState>()((set, get) => ({
   applyProfileDefaults: (profile) => {
     if (!profile) return
     switch (profile) {
-      case 'schueler':
+      case 'student':
         set({
           flashcardsEnabled: true,
           pdfCompanionEnabled: true,
@@ -815,22 +815,42 @@ export const useUIStore = create<UIState>()((set, get) => ({
           showRawEditor: false
         })
         break
-      case 'studium':
+      case 'researcher':
         set({
           flashcardsEnabled: true,
           pdfCompanionEnabled: true,
+          semanticScholarEnabled: true,
           smartConnectionsEnabled: false,
           notesChatEnabled: true,
           visionOcr: { ...get().visionOcr, enabled: true },
           editorDefaultView: 'preview' as EditorViewMode
         })
         break
-      case 'wissensmanagement':
+      case 'professional':
         set({
           flashcardsEnabled: false,
           pdfCompanionEnabled: false,
+          smartConnectionsEnabled: false,
+          notesChatEnabled: true,
+          editorDefaultView: 'preview' as EditorViewMode
+        })
+        break
+      case 'writer':
+        set({
+          flashcardsEnabled: false,
+          smartConnectionsEnabled: false,
+          notesChatEnabled: true,
+          showFormattingToolbar: true,
+          editorShowWordCount: true,
+          editorDefaultView: 'preview' as EditorViewMode
+        })
+        break
+      case 'developer':
+        set({
+          flashcardsEnabled: false,
           smartConnectionsEnabled: true,
           notesChatEnabled: true,
+          showRawEditor: false,
           editorDefaultView: 'preview' as EditorViewMode
         })
         break
@@ -907,6 +927,15 @@ export async function initializeUISettings(): Promise<void> {
       // → skip onboarding for them
       if (!('onboardingCompleted' in savedSettings)) {
         validSettings.onboardingCompleted = true
+      }
+      // Migrate old profile names to new ones
+      const profileMigration: Record<string, UserProfile> = {
+        'schueler': 'student',
+        'studium': 'researcher',
+        'wissensmanagement': 'professional'
+      }
+      if (validSettings.userProfile && profileMigration[validSettings.userProfile as string]) {
+        validSettings.userProfile = profileMigration[validSettings.userProfile as string]
       }
       useUIStore.setState(validSettings)
     } else {

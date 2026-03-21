@@ -26,3 +26,6 @@ Schau dir auch die anderen Beispiele an:
 - [[Dataview Beispiel]]
 - [[Flashcards Beispiel]]
 - [[Zotero Beispiel]]
+- [[Wissensnetz]] — alle Notizen auf einen Blick
+
+Mehr zum Canvas: [[03 - Canvas entdecken]]
