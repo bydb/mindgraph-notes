@@ -2,6 +2,19 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.4.0-beta] - 2026-03-22
+
+### Features
+- **macOS Auto-Update** — Updates werden automatisch im Hintergrund heruntergeladen und per Klick auf "Neu starten" installiert
+  - Nutzt `electron-updater` mit GitHub Releases als Provider
+  - Fortschrittsanzeige waehrend des Downloads
+  - Drei Zustaende in der UI: "Update verfuegbar" → "Wird heruntergeladen..." → "Jetzt neu starten"
+  - Windows/Linux behalten den manuellen Download-Link (kein Code Signing vorhanden)
+  - `publish`-Config in package.json fuer automatische Update-Erkennung
+
+### Improvements
+- **Update-Benachrichtigung** — Komplett ueberarbeitet mit dynamischen Icons (Info → Download → Checkmark) und kontextsensitiven Buttons
+
 ## [0.3.8-beta] - 2026-03-21
 
 ### Features

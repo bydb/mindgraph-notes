@@ -924,6 +924,9 @@ const translations = {
     // Update Notification
     'update.available': 'Version {version} ist verfügbar!',
     'update.download': 'Herunterladen',
+    'update.downloading': 'Wird heruntergeladen... {percent}%',
+    'update.restart': 'Neu starten',
+    'update.ready': 'Update bereit — jetzt neu starten?',
     'update.checking': 'Suche nach Updates...',
 
     // Quiz / Spaced Repetition
@@ -2331,6 +2334,9 @@ const translations = {
     // Update Notification
     'update.available': 'Version {version} is available!',
     'update.download': 'Download',
+    'update.downloading': 'Downloading... {percent}%',
+    'update.restart': 'Restart',
+    'update.ready': 'Update ready — restart now?',
     'update.checking': 'Checking for updates...',
 
     // Quiz / Spaced Repetition

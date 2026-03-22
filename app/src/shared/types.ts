@@ -63,6 +63,7 @@ export interface UpdateInfo {
   releaseUrl?: string
   body?: string
   error?: boolean
+  autoUpdate?: boolean
 }
 
 // Quiz / Spaced Repetition Types
@@ -702,7 +703,11 @@ export interface ElectronAPI {
   // Update-Checker & What's New
   getAppVersion: () => Promise<string>;
   checkForUpdates: () => Promise<UpdateInfo>;
+  installUpdate: () => Promise<boolean>;
   getWhatsNewContent: (version: string) => Promise<string | null>;
+  onAutoUpdateAvailable: (callback: (info: { version: string }) => void) => void;
+  onAutoUpdateProgress: (callback: (progress: { percent: number }) => void) => void;
+  onAutoUpdateDownloaded: (callback: (info: { version: string }) => void) => void;
 
   // Quiz / Spaced Repetition
   quizGenerateQuestions: (model: string, content: string, count: number, sourcePath: string) => Promise<{

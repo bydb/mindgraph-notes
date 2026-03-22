@@ -239,7 +239,17 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Update-Checker & What's New
   getAppVersion: () => ipcRenderer.invoke('get-app-version'),
   checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
+  installUpdate: () => ipcRenderer.invoke('install-update'),
   getWhatsNewContent: (version: string) => ipcRenderer.invoke('get-whats-new-content', version),
+  onAutoUpdateAvailable: (callback: (info: { version: string }) => void) => {
+    ipcRenderer.on('auto-update-available', (_event, info) => callback(info))
+  },
+  onAutoUpdateProgress: (callback: (progress: { percent: number }) => void) => {
+    ipcRenderer.on('auto-update-progress', (_event, progress) => callback(progress))
+  },
+  onAutoUpdateDownloaded: (callback: (info: { version: string }) => void) => {
+    ipcRenderer.on('auto-update-downloaded', (_event, info) => callback(info))
+  },
 
   // Quiz / Spaced Repetition
   quizGenerateQuestions: (model: string, content: string, count: number, sourcePath: string) =>

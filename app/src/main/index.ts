@@ -1,4 +1,5 @@
-import { app, BrowserWindow, ipcMain, dialog, shell, Notification, safeStorage } from 'electron'
+import { app, BrowserWindow, ipcMain, dialog, shell, Notification, safeStorage, autoUpdater as electronAutoUpdater } from 'electron'
+import { autoUpdater } from 'electron-updater'
 import * as path from 'path'
 import * as fs from 'fs/promises'
 import { FSWatcher, watch } from 'chokidar'
@@ -3819,8 +3820,71 @@ ipcMain.handle('remove-custom-logo', async () => {
   return true
 })
 
-// GitHub Releases auf neue Version prüfen
+// Auto-Update Setup (macOS only — no code signing on Windows/Linux)
+if (process.platform === 'darwin' && process.env.NODE_ENV !== 'development') {
+  autoUpdater.autoDownload = true
+  autoUpdater.autoInstallOnAppQuit = true
+  autoUpdater.logger = {
+    info: (msg: unknown) => console.log('[AutoUpdate]', msg),
+    warn: (msg: unknown) => console.warn('[AutoUpdate]', msg),
+    error: (msg: unknown) => console.error('[AutoUpdate]', msg),
+    debug: (msg: unknown) => console.log('[AutoUpdate:debug]', msg)
+  }
+
+  autoUpdater.on('update-available', (info) => {
+    console.log('[AutoUpdate] Update available:', info.version)
+    mainWindow?.webContents.send('auto-update-available', {
+      version: info.version,
+      releaseNotes: info.releaseNotes
+    })
+  })
+
+  autoUpdater.on('download-progress', (progress) => {
+    mainWindow?.webContents.send('auto-update-progress', {
+      percent: Math.round(progress.percent),
+      bytesPerSecond: progress.bytesPerSecond,
+      transferred: progress.transferred,
+      total: progress.total
+    })
+  })
+
+  autoUpdater.on('update-downloaded', (info) => {
+    console.log('[AutoUpdate] Update downloaded:', info.version)
+    mainWindow?.webContents.send('auto-update-downloaded', {
+      version: info.version
+    })
+  })
+
+  autoUpdater.on('error', (error) => {
+    console.error('[AutoUpdate] Error:', error.message)
+  })
+}
+
+// GitHub Releases auf neue Version prüfen (Fallback für Windows/Linux)
 ipcMain.handle('check-for-updates', async () => {
+  // macOS: Use electron-updater
+  if (process.platform === 'darwin' && process.env.NODE_ENV !== 'development') {
+    try {
+      const result = await autoUpdater.checkForUpdates()
+      if (result?.updateInfo) {
+        const latestVersion = result.updateInfo.version
+        const currentVersion = app.getVersion()
+        if (latestVersion !== currentVersion && compareVersions(latestVersion, currentVersion) > 0) {
+          return {
+            available: true,
+            version: latestVersion,
+            autoUpdate: true
+          }
+        }
+      }
+      return { available: false }
+    } catch (error) {
+      console.error('[AutoUpdate] Check failed:', error)
+      return { available: false, error: true }
+    }
+  }
+
+  // Windows/Linux: Manual check via GitHub API
   try {
     const response = await fetch(
       'https://api.github.com/repos/bydb/mindgraph-notes/releases/latest',
@@ -3841,13 +3905,13 @@ ipcMain.handle('check-for-updates', async () => {
     const latestVersion = release.tag_name.replace(/^v/, '')
     const currentVersion = app.getVersion()
 
-    // Versionen vergleichen (einfacher String-Vergleich für semver)
     if (latestVersion !== currentVersion && compareVersions(latestVersion, currentVersion) > 0) {
       return {
         available: true,
         version: latestVersion,
         releaseUrl: release.html_url,
-        body: release.body
+        body: release.body,
+        autoUpdate: false
       }
     }
 
@@ -3856,6 +3920,15 @@ ipcMain.handle('check-for-updates', async () => {
     console.error('[Update] Check failed:', error)
     return { available: false, error: true }
   }
+})
+
+// Install downloaded update and restart (macOS only)
+ipcMain.handle('install-update', async () => {
+  if (process.platform === 'darwin') {
+    autoUpdater.quitAndInstall(false, true)
+    return true
+  }
+  return false
 })
 
 // Semver-Vergleich: Gibt 1 zurück wenn a > b, -1 wenn a < b, 0 wenn gleich
