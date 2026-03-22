@@ -4,8 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="google-site-verification" content="XuIkFK3V33YXi92ZBbb1AsgrCejIxVlfMPM_Zj0Ny3o">
-  <title>MindGraph Notes - Karteikarten & Spaced Repetition Notiz-App</title>
-  <meta name="description" content="Kostenlose Notiz-App mit Karteikarten, Spaced Repetition (SM-2), KI-Quiz-Generierung, Wissensgraph und Zotero-Integration. Lokal, privat, Open Source. Perfekt für Studium und Wissenschaft.">
+  <title>MindGraph Notes - Notizen, Karteikarten &amp; Wissensgraph</title>
+  <meta name="description" content="Kostenlose Notiz-App mit Karteikarten (SM-2), Wissensgraph, KI-Terminal, PDF Companion und Zotero. Standardm&auml;&szlig;ig lokal und Open Source.">
   <link rel="icon" href="favicon.ico" sizes="48x48">
   <link rel="icon" type="image/png" sizes="48x48" href="favicon-48x48.png">
   <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
@@ -21,8 +21,8 @@
   <!-- Open Graph -->
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://mindgraph-notes.de/">
-  <meta property="og:title" content="MindGraph Notes - Karteikarten & Spaced Repetition Notiz-App">
-  <meta property="og:description" content="Kostenlose Notiz-App mit Karteikarten, Spaced Repetition (SM-2), KI-Quiz-Generierung, Wissensgraph und Zotero-Integration. 100% lokal, Open Source.">
+  <meta property="og:title" content="MindGraph Notes - Notizen, Karteikarten &amp; Wissensgraph">
+  <meta property="og:description" content="Kostenlose Notiz-App mit Karteikarten (SM-2), Wissensgraph, KI-Terminal, PDF Companion und Zotero. Standardm&auml;&szlig;ig lokal und Open Source.">
   <meta property="og:image" content="https://mindgraph-notes.de/screenshot.png">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
@@ -32,8 +32,8 @@
 
   <!-- Twitter Card -->
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="MindGraph Notes - Karteikarten & Spaced Repetition Notiz-App">
-  <meta name="twitter:description" content="Kostenlose Notiz-App mit Karteikarten, Spaced Repetition (SM-2), KI-Quiz-Generierung, Wissensgraph und Zotero-Integration. 100% lokal, Open Source.">
+  <meta name="twitter:title" content="MindGraph Notes - Notizen, Karteikarten &amp; Wissensgraph">
+  <meta name="twitter:description" content="Kostenlose Notiz-App mit Karteikarten (SM-2), Wissensgraph, KI-Terminal, PDF Companion und Zotero. Standardm&auml;&szlig;ig lokal und Open Source.">
   <meta name="twitter:image" content="https://mindgraph-notes.de/screenshot.png">
 
   <!-- Structured Data -->
@@ -49,7 +49,7 @@
       "price": "0",
       "priceCurrency": "EUR"
     },
-    "description": "Notiz-App mit Karteikarten, Spaced Repetition (SM-2), KI-Quiz-Generierung via Ollama, Wissensgraph, Zotero-Integration. 100% lokal und Open Source.",
+    "description": "Notiz-App mit Karteikarten (SM-2), Wissensgraph, KI-Terminal, PDF Companion und Zotero. Standardmäßig lokal und Open Source.",
     "url": "https://mindgraph-notes.de/",
     "downloadUrl": "https://github.com/bydb/mindgraph-notes/releases",
     "screenshot": "https://mindgraph-notes.de/screenshot.png",
@@ -1316,6 +1316,88 @@
       margin-bottom: 0 !important;
     }
 
+    .faq {
+      padding: 5rem 2rem;
+    }
+
+    .faq-grid {
+      max-width: 1100px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 1rem;
+    }
+
+    .faq-item {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.25rem;
+    }
+
+    .faq-item h3 {
+      font-size: 1rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .faq-item p {
+      color: var(--text-muted);
+      font-size: 0.95rem;
+    }
+
+    .agents {
+      padding: 3rem 2rem 5rem;
+    }
+
+    .agents-grid {
+      max-width: 1100px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 1rem;
+    }
+
+    .agent-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.25rem;
+    }
+
+    .agent-card.primary {
+      border-color: rgba(212, 135, 90, 0.35);
+      box-shadow: 0 8px 24px rgba(212, 135, 90, 0.08);
+    }
+
+    .agent-card h3 {
+      font-size: 1rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .agent-card p {
+      color: var(--text-muted);
+      font-size: 0.95rem;
+      margin-bottom: 0.6rem;
+    }
+
+    .agent-card .agent-tag {
+      display: inline-block;
+      font-size: 0.75rem;
+      color: var(--accent);
+      background: rgba(212, 135, 90, 0.12);
+      border: 1px solid rgba(212, 135, 90, 0.22);
+      border-radius: 999px;
+      padding: 0.2rem 0.55rem;
+    }
+
+    .agents-note {
+      max-width: 1100px;
+      margin: 1rem auto 0;
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 0.9rem;
+    }
+
     footer {
       padding: 4rem 2rem;
       text-align: center;
@@ -1337,7 +1419,7 @@
         padding: 1rem;
       }
 
-      .nav-links a:not(.lang-switch) {
+      .nav-links > a {
         display: none;
       }
 
@@ -1442,8 +1524,8 @@
       <a href="#setup" data-i18n="nav.setup">Setup</a>
       <a href="#download" data-i18n="nav.download">Download</a>
       <a href="./blog/" data-i18n="nav.blog">Blog</a>
-      <a href="https://discord.gg/XqayAQdE" target="_blank">Discord</a>
-      <a href="https://github.com/bydb/mindgraph-notes" target="_blank">GitHub</a>
+       <a href="https://discord.gg/XqayAQdE" target="_blank" rel="noopener noreferrer">Discord</a>
+       <a href="https://github.com/bydb/mindgraph-notes" target="_blank" rel="noopener noreferrer">GitHub</a>
       <div class="lang-switch">
         <button onclick="setLanguage('de')" id="lang-de" class="active">DE</button>
         <button onclick="setLanguage('en')" id="lang-en">EN</button>
@@ -1454,14 +1536,14 @@
   <section class="hero">
     <div class="badge">
       <span class="badge-dot"></span>
-      <span data-i18n="hero.badge">Mit integriertem KI-Terminal</span>
+      <span data-i18n="hero.badge">Standardm&auml;&szlig;ig lokal. Open Source.</span>
     </div>
 
-    <h1 data-i18n="hero.title">Notizen treffen<br>KI-Terminal.</h1>
+    <h1 data-i18n="hero.title">Dein Wissen,<br>deine Werkzeuge.</h1>
 
     <p class="subtitle" data-i18n="hero.subtitle">
-      Die erste Notiz-App mit integriertem Terminal für OpenCode, Ollama und andere CLI-Tools.
-      Schreibe, denke und automatisiere - alles in einer App.
+      Notizen, Karteikarten, Wissensgraph und KI-Terminal &ndash; alles in einer App.
+      Ob Schule, Studium oder Wissensmanagement: aktiviere nur, was du brauchst.
     </p>
 
     <div class="cta-group">
@@ -1473,7 +1555,7 @@
         </svg>
         <span data-i18n="hero.cta">Kostenlos herunterladen</span>
       </a>
-      <a href="https://github.com/bydb/mindgraph-notes" target="_blank" class="btn btn-secondary">
+      <a href="https://github.com/bydb/mindgraph-notes" target="_blank" rel="noopener noreferrer" class="btn btn-secondary">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
           <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/>
         </svg>
@@ -1488,35 +1570,34 @@
     </div>
   </section>
 
-  <!-- Download Section moved up -->
-  <section class="alpha-signup" id="download-cards">
+  <section class="alpha-signup" id="download">
     <div class="alpha-signup-card">
       <div class="signup-badge" data-i18n="signup.badge">Open Beta</div>
       <h2 data-i18n="signup.title">Jetzt herunterladen</h2>
-      <p class="signup-desc" data-i18n="signup.desc">MindGraph Notes ist kostenlos und Open Source. Verfügbar für macOS, Linux und Windows.</p>
+      <p class="signup-desc" data-i18n="signup.desc">In 2 Minuten startklar: herunterladen, Vault &ouml;ffnen, loslegen. Kostenlos, Open Source, verf&uuml;gbar f&uuml;r macOS, Linux und Windows.</p>
       <div class="download-options" style="margin-top: 1.5rem;">
-        <a href="https://github.com/bydb/mindgraph-notes/releases/download/v0.4.0-beta/MindGraph.Notes-0.4.0-beta-arm64.dmg" target="_blank" class="download-btn">
+        <a href="https://github.com/bydb/mindgraph-notes/releases/download/v0.4.0-beta/MindGraph.Notes-0.4.0-beta-arm64.dmg" target="_blank" rel="noopener noreferrer" class="download-btn">
           <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg>
           <div class="download-info">
             <div class="platform">macOS (Apple Silicon)</div>
             <div class="version">.dmg · v0.4.0-beta</div>
           </div>
         </a>
-        <a href="https://github.com/bydb/mindgraph-notes/releases/download/v0.4.0-beta/MindGraph.Notes-0.4.0-beta.dmg" target="_blank" class="download-btn">
+        <a href="https://github.com/bydb/mindgraph-notes/releases/download/v0.4.0-beta/MindGraph.Notes-0.4.0-beta.dmg" target="_blank" rel="noopener noreferrer" class="download-btn">
           <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg>
           <div class="download-info">
             <div class="platform">macOS (Intel)</div>
             <div class="version">.dmg · v0.4.0-beta</div>
           </div>
         </a>
-        <a href="https://github.com/bydb/mindgraph-notes/releases/download/v0.4.0-beta/MindGraph.Notes-0.4.0-beta.AppImage" target="_blank" class="download-btn">
+        <a href="https://github.com/bydb/mindgraph-notes/releases/download/v0.4.0-beta/MindGraph.Notes-0.4.0-beta.AppImage" target="_blank" rel="noopener noreferrer" class="download-btn">
           <svg width="32" height="32" viewBox="0 0 256 256" fill="currentColor"><path d="M220,152H36a12,12,0,0,0-12,12v40a12,12,0,0,0,12,12h80v12H96a8,8,0,0,0,0,16h64a8,8,0,0,0,0-16H140V216h80a12,12,0,0,0,12-12V164A12,12,0,0,0,220,152Zm-4,48H40V168H216ZM36,136H220a12,12,0,0,0,12-12V44a12,12,0,0,0-12-12H36A12,12,0,0,0,24,44v80A12,12,0,0,0,36,136ZM40,48H216v72H40Z"/></svg>
           <div class="download-info">
             <div class="platform">Linux</div>
             <div class="version">.AppImage · v0.4.0-beta</div>
           </div>
         </a>
-        <a href="https://github.com/bydb/mindgraph-notes/releases/download/v0.4.0-beta/MindGraph.Notes.Setup.0.4.0-beta.exe" target="_blank" class="download-btn">
+        <a href="https://github.com/bydb/mindgraph-notes/releases/download/v0.4.0-beta/MindGraph.Notes.Setup.0.4.0-beta.exe" target="_blank" rel="noopener noreferrer" class="download-btn">
           <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor"><path d="M0 3.449L9.75 2.1v9.451H0m10.949-9.602L24 0v11.4H10.949M0 12.6h9.75v9.451L0 20.699M10.949 12.6H24V24l-12.9-1.801"/></svg>
           <div class="download-info">
             <div class="platform">Windows</div>
@@ -1524,16 +1605,16 @@
           </div>
         </a>
       </div>
-      <p style="text-align: center; font-size: 0.8rem; color: var(--text-secondary); margin-top: 0.75rem;">
-        <a href="https://github.com/bydb/mindgraph-notes/releases/latest" target="_blank" style="color: var(--text-secondary); text-decoration: underline;" data-i18n="download.allDownloads">Alle Downloads anzeigen (deb, snap, zip...)</a>
+      <p style="text-align: center; font-size: 0.8rem; color: var(--text-muted); margin-top: 0.75rem;">
+        <a href="https://github.com/bydb/mindgraph-notes/releases/latest" target="_blank" rel="noopener noreferrer" style="color: var(--text-muted); text-decoration: underline;" data-i18n="download.allDownloads">Alle Downloads anzeigen (deb, snap, zip...)</a>
       </p>
       <div class="signup-footer" style="margin-top: 1.5rem;">
-        <a href="https://github.com/bydb/mindgraph-notes" target="_blank" class="signup-footer-item">
+        <a href="https://github.com/bydb/mindgraph-notes" target="_blank" rel="noopener noreferrer" class="signup-footer-item">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/></svg>
           Source Code
         </a>
         <span class="separator"></span>
-        <a href="https://discord.gg/XqayAQdE" target="_blank" class="signup-footer-item">
+        <a href="https://discord.gg/XqayAQdE" target="_blank" rel="noopener noreferrer" class="signup-footer-item">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.095 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.095 2.157 2.42 0 1.333-.947 2.418-2.157 2.418z"/></svg>
           <span data-i18n="signup.discord">Discord beitreten</span>
         </a>
@@ -1572,7 +1653,7 @@
           <li><span class="check">&#10003;</span> <span data-i18n="terminal.f1">OpenCode, Claude Code und Ollama direkt nutzen</span></li>
           <li><span class="check">&#10003;</span> <span data-i18n="terminal.f2">KI liest deine Notizen und arbeitet im Kontext</span></li>
           <li><span class="check">&#10003;</span> <span data-i18n="terminal.f3">Grafiken, Zusammenfassungen, Quiz &ndash; alles per Prompt</span></li>
-          <li><span class="check">&#10003;</span> <span data-i18n="terminal.f4">100% lokal m&ouml;glich &ndash; deine Daten bleiben privat</span></li>
+          <li><span class="check">&#10003;</span> <span data-i18n="terminal.f4">Standardm&auml;&szlig;ig lokal &ndash; deine Daten bleiben bei dir</span></li>
         </ul>
       </div>
     </div>
@@ -1581,7 +1662,7 @@
   <section class="features" id="features">
     <div class="section-title">
       <h2 data-i18n="features.title">Mehr als nur Notizen</h2>
-      <p data-i18n="features.subtitle">Alles was du brauchst. Nichts was du nicht willst.</p>
+      <p data-i18n="features.subtitle">Alles was du brauchst &ndash; aktiviere nur, was du willst.</p>
     </div>
 
     <!-- Schule / Lernen -->
@@ -1621,8 +1702,8 @@
         </div>
         <div class="feature-card">
           <div class="feature-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg></div>
-          <h3 data-i18n="features.local.title">100% Lokal</h3>
-          <p data-i18n="features.local.desc">Alle Notizen sind Markdown-Dateien. Keine Cloud, kein Account, keine Telemetrie. Deine Daten geh&ouml;ren dir.</p>
+          <h3 data-i18n="features.local.title">Lokal &amp; transparent</h3>
+          <p data-i18n="features.local.desc">Deine Notizen bleiben als Markdown-Dateien auf deinem Rechner. Keine Telemetrie. Optionale Integrationen aktivierst du bewusst.</p>
         </div>
       </div>
     </div>
@@ -1668,12 +1749,7 @@
         <div class="feature-card">
           <div class="feature-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 16 6-12 6 12"/><path d="M8 12h8"/><path d="m16 20 2 2 4-4"/></svg></div>
           <h3 data-i18n="features.languagetool.title">LanguageTool</h3>
-          <p data-i18n="features.languagetool.desc">NEU: Integrierte Grammatik- und Rechtschreibpr&uuml;fung. Lokal via Docker oder mit LanguageTool Premium API. Fehler werden direkt im Editor markiert.</p>
-        </div>
-        <div class="feature-card">
-          <div class="feature-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="14" height="14" rx="2"/><path d="M8 2h10a2 2 0 0 1 2 2v10"/></svg></div>
-          <h3 data-i18n="features.flashcards.title">Karteikarten &amp; Quiz</h3>
-          <p data-i18n="features.flashcards.desc">Generiere Quiz-Fragen via Ollama, importiere Decks aus Anki (.apkg) und lerne mit Spaced Repetition (SM-2). NEU: Bilder in Karteikarten.</p>
+          <p data-i18n="features.languagetool.desc">Integrierte Grammatik- und Rechtschreibpr&uuml;fung. Lokal via Docker oder mit LanguageTool Premium API. Fehler werden direkt im Editor markiert.</p>
         </div>
         <div class="feature-card">
           <div class="feature-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 7V4H6l6 8-6 8h12v-3"/></svg></div>
@@ -1731,7 +1807,7 @@
         <div class="feature-card featured customization-card">
           <div class="feature-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="13.5" cy="6.5" r="1.5" fill="currentColor" stroke="none"/><circle cx="17.5" cy="10.5" r="1.5" fill="currentColor" stroke="none"/><circle cx="8.5" cy="7.5" r="1.5" fill="currentColor" stroke="none"/><circle cx="6.5" cy="12" r="1.5" fill="currentColor" stroke="none"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/></svg></div>
           <h3 data-i18n="features.customization.title">Deine Farben, dein Logo</h3>
-          <p data-i18n="features.customization.desc">NEU: 12 Akzentfarben, 15 Hintergr&uuml;nde und ein eigenes Logo in der Titelleiste. Mach MindGraph Notes zu deiner App.</p>
+          <p data-i18n="features.customization.desc">13 Akzentfarben, 15 Hintergr&uuml;nde und ein eigenes Logo in der Titelleiste. Mach MindGraph Notes zu deiner App.</p>
           <div class="color-dots">
             <span style="background:#0a84ff"></span>
             <span style="background:#ff9500"></span>
@@ -1947,6 +2023,55 @@ tags: [projekt, arbeit, wichtig]
     </div>
   </section>
 
+  <section class="faq" id="faq">
+    <div class="section-title">
+      <h2 data-i18n="faq.title">H&auml;ufige Fragen</h2>
+      <p data-i18n="faq.subtitle">Das Wichtigste f&uuml;r den schnellen Einstieg</p>
+    </div>
+    <div class="faq-grid">
+      <div class="faq-item">
+        <h3 data-i18n="faq.q1">Brauche ich ein Konto?</h3>
+        <p data-i18n="faq.a1">Nein. Du kannst direkt lokal arbeiten. Deine Notizen bleiben als Markdown-Dateien auf deinem Rechner.</p>
+      </div>
+      <div class="faq-item">
+        <h3 data-i18n="faq.q2">Muss ich Ollama sofort installieren?</h3>
+        <p data-i18n="faq.a2">Nein. Die App funktioniert ohne KI-Setup. Ollama brauchst du nur f&uuml;r optionale KI-Features wie Quiz-Generierung.</p>
+      </div>
+      <div class="faq-item">
+        <h3 data-i18n="faq.q3">Funktioniert mein Obsidian-Vault?</h3>
+        <p data-i18n="faq.a3">Ja. Du kannst bestehende Markdown-Dateien und Wikilinks direkt weiterverwenden.</p>
+      </div>
+      <div class="faq-item">
+        <h3 data-i18n="faq.q4">Ist die App komplett lokal nutzbar?</h3>
+        <p data-i18n="faq.a4">Ja, standardm&auml;&szlig;ig lokal. Externe Integrationen sind optional und werden nur bei Aktivierung verwendet.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="agents" id="agents">
+    <div class="section-title">
+      <h2 data-i18n="agents.title">Integrierte Automationen</h2>
+      <p data-i18n="agents.subtitle">Wiederkehrende Aufgaben automatisieren &ndash; direkt in der App.</p>
+    </div>
+    <div class="agents-grid">
+      <div class="agent-card primary">
+        <h3 data-i18n="agents.learning.title">Lernagent: Quiz + Karteikarten</h3>
+        <p data-i18n="agents.learning.desc">Erstellt Quizfragen aus deinen Notizen und &uuml;berf&uuml;hrt sie direkt in dein Wiederholen mit SM-2.</p>
+        <span class="agent-tag" data-i18n="agents.tag.students">Top f&uuml;r Schule/Studium</span>
+      </div>
+      <div class="agent-card primary">
+        <h3 data-i18n="agents.terminal.title">KI-Terminal</h3>
+        <p data-i18n="agents.terminal.desc">OpenCode, Claude Code oder Ollama direkt neben deinen Notizen. Grafiken, Zusammenfassungen, Quiz &ndash; alles per Prompt.</p>
+        <span class="agent-tag" data-i18n="agents.tag.poweruser">F&uuml;r Power-User</span>
+      </div>
+      <div class="agent-card">
+        <h3 data-i18n="agents.email.title">E-Mail-Analyse</h3>
+        <p data-i18n="agents.email.desc">Analysiert IMAP-Mails via Ollama und erstellt aus relevanten Inhalten automatisch Notizen.</p>
+      </div>
+    </div>
+    <p class="agents-note" data-i18n="agents.note">Weitere Automationen folgen laufend &ndash; z.B. reMarkable-Import und Veranstaltungsmanagement.</p>
+  </section>
+
   <section class="shortcuts" id="shortcuts">
     <div class="section-title">
       <h2 data-i18n="shortcuts.title">Tastaturkürzel</h2>
@@ -2077,13 +2202,13 @@ tags: [projekt, arbeit, wichtig]
           <ol>
             <li data-i18n="setup.claudecode.step1">Node.js installieren: <code>brew install node</code></li>
             <li data-i18n="setup.claudecode.step2">Claude Code installieren: <code>npm i -g @anthropic-ai/claude-code</code></li>
-            <li data-i18n="setup.claudecode.step3">API-Key von <a href="https://console.anthropic.com" target="_blank">console.anthropic.com</a> holen</li>
+            <li data-i18n="setup.claudecode.step3">API-Key von <a href="https://console.anthropic.com" target="_blank" rel="noopener noreferrer">console.anthropic.com</a> holen</li>
             <li data-i18n="setup.claudecode.step4">Key setzen: <code>export ANTHROPIC_API_KEY="sk-ant-..."</code></li>
             <li data-i18n="setup.claudecode.step5">Starten: <code>claude</code></li>
           </ol>
         </div>
         <p class="setup-note" data-i18n="setup.claudecode.note">Tipp: Key permanent speichern mit <code>echo 'export ANTHROPIC_API_KEY="..."' >> ~/.zshrc</code></p>
-        <a href="https://docs.anthropic.com/en/docs/claude-code" target="_blank" class="setup-link" data-i18n="setup.more">Mehr erfahren →</a>
+        <a href="https://docs.anthropic.com/en/docs/claude-code" target="_blank" rel="noopener noreferrer" class="setup-link" data-i18n="setup.more">Mehr erfahren →</a>
       </div>
 
       <div class="setup-card">
@@ -2098,7 +2223,7 @@ tags: [projekt, arbeit, wichtig]
           </ol>
         </div>
         <p class="setup-note" data-i18n="setup.opencode.note">Unterstützt auch lokale Modelle via Ollama - keine API-Kosten!</p>
-        <a href="https://opencode.ai" target="_blank" class="setup-link" data-i18n="setup.more">Mehr erfahren →</a>
+        <a href="https://opencode.ai" target="_blank" rel="noopener noreferrer" class="setup-link" data-i18n="setup.more">Mehr erfahren →</a>
       </div>
 
       <div class="setup-card">
@@ -2110,7 +2235,7 @@ tags: [projekt, arbeit, wichtig]
           <code>brew install ollama</code>
         </div>
         <p class="setup-note" data-i18n="setup.ollama.note">Nach der Installation: <code>ollama pull llama3</code> um ein Modell zu laden.</p>
-        <a href="https://ollama.ai" target="_blank" class="setup-link" data-i18n="setup.more">Mehr erfahren →</a>
+        <a href="https://ollama.ai" target="_blank" rel="noopener noreferrer" class="setup-link" data-i18n="setup.more">Mehr erfahren →</a>
       </div>
 
       <div class="setup-card">
@@ -2119,12 +2244,12 @@ tags: [projekt, arbeit, wichtig]
         <p data-i18n="setup.zotero.desc">Literaturverwaltung für Wissenschaft und Recherche. Füge Zitate direkt in deine Notizen ein.</p>
         <div class="setup-steps">
           <ol>
-            <li data-i18n="setup.zotero.step1">Zotero installieren von <a href="https://www.zotero.org/download/" target="_blank">zotero.org</a></li>
+            <li data-i18n="setup.zotero.step1">Zotero installieren von <a href="https://www.zotero.org/download/" target="_blank" rel="noopener noreferrer">zotero.org</a></li>
             <li data-i18n="setup.zotero.step2">Better BibTeX Plugin installieren für Export</li>
             <li data-i18n="setup.zotero.step3">In MindGraph Notes: Einstellungen → Zotero Pfad setzen</li>
           </ol>
         </div>
-        <a href="https://www.zotero.org" target="_blank" class="setup-link" data-i18n="setup.more">Mehr erfahren →</a>
+        <a href="https://www.zotero.org" target="_blank" rel="noopener noreferrer" class="setup-link" data-i18n="setup.more">Mehr erfahren →</a>
       </div>
 
       <div class="setup-card">
@@ -2136,7 +2261,7 @@ tags: [projekt, arbeit, wichtig]
           <code>ollama run x/flux2-klein</code>
         </div>
         <p class="setup-note" data-i18n="setup.flux.note">Voraussetzung: Ollama muss installiert sein. Das Modell wird beim ersten Start automatisch heruntergeladen.</p>
-        <a href="https://ollama.com/x/flux2-klein" target="_blank" class="setup-link" data-i18n="setup.more">Mehr erfahren →</a>
+        <a href="https://ollama.com/x/flux2-klein" target="_blank" rel="noopener noreferrer" class="setup-link" data-i18n="setup.more">Mehr erfahren →</a>
       </div>
 
       <div class="setup-card">
@@ -2148,7 +2273,7 @@ tags: [projekt, arbeit, wichtig]
           <code>docker run -p 5001:5001 ds4sd/docling-serve</code>
         </div>
         <p class="setup-note" data-i18n="setup.docling.note">Voraussetzung: Docker muss installiert sein. Docling läuft dann auf localhost:5001. Aktiviere OCR in den Einstellungen für gescannte PDFs.</p>
-        <a href="https://github.com/DS4SD/docling" target="_blank" class="setup-link" data-i18n="setup.more">Mehr erfahren →</a>
+        <a href="https://github.com/DS4SD/docling" target="_blank" rel="noopener noreferrer" class="setup-link" data-i18n="setup.more">Mehr erfahren →</a>
       </div>
 
       <div class="setup-card">
@@ -2160,51 +2285,9 @@ tags: [projekt, arbeit, wichtig]
           <code>docker run -d -p 8010:8010 erikvl87/languagetool</code>
         </div>
         <p class="setup-note" data-i18n="setup.languagetool.note">Docker-Version für lokale Nutzung. Alternativ: LanguageTool Premium API mit Username + API-Key in den Einstellungen konfigurieren.</p>
-        <a href="https://languagetool.org/" target="_blank" class="setup-link" data-i18n="setup.more">Mehr erfahren →</a>
+        <a href="https://languagetool.org/" target="_blank" rel="noopener noreferrer" class="setup-link" data-i18n="setup.more">Mehr erfahren →</a>
       </div>
     </div>
-  </section>
-
-  <section class="download" id="download">
-    <h2 data-i18n="download.title">Download</h2>
-    <p data-i18n="download.subtitle">MindGraph Notes ist kostenlos und Open Source. Jetzt herunterladen und loslegen.</p>
-
-    <div class="download-options" style="margin-top: 2rem;">
-      <a href="https://github.com/bydb/mindgraph-notes/releases/download/v0.4.0-beta/MindGraph.Notes-0.4.0-beta-arm64.dmg" target="_blank" class="download-btn">
-        <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg>
-        <div class="download-info">
-          <div class="platform">macOS (Apple Silicon)</div>
-          <div class="version">.dmg · v0.4.0-beta</div>
-        </div>
-      </a>
-      <a href="https://github.com/bydb/mindgraph-notes/releases/download/v0.4.0-beta/MindGraph.Notes-0.4.0-beta.dmg" target="_blank" class="download-btn">
-        <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg>
-        <div class="download-info">
-          <div class="platform">macOS (Intel)</div>
-          <div class="version">.dmg · v0.4.0-beta</div>
-        </div>
-      </a>
-      <a href="https://github.com/bydb/mindgraph-notes/releases/download/v0.4.0-beta/MindGraph.Notes-0.4.0-beta.AppImage" target="_blank" class="download-btn">
-        <svg width="32" height="32" viewBox="0 0 256 256" fill="currentColor"><path d="M220,152H36a12,12,0,0,0-12,12v40a12,12,0,0,0,12,12h80v12H96a8,8,0,0,0,0,16h64a8,8,0,0,0,0-16H140V216h80a12,12,0,0,0,12-12V164A12,12,0,0,0,220,152Zm-4,48H40V168H216ZM36,136H220a12,12,0,0,0,12-12V44a12,12,0,0,0-12-12H36A12,12,0,0,0,24,44v80A12,12,0,0,0,36,136ZM40,48H216v72H40Z"/></svg>
-        <div class="download-info">
-          <div class="platform">Linux</div>
-          <div class="version">.AppImage · v0.4.0-beta</div>
-        </div>
-      </a>
-      <a href="https://github.com/bydb/mindgraph-notes/releases/download/v0.4.0-beta/MindGraph.Notes.Setup.0.4.0-beta.exe" target="_blank" class="download-btn">
-        <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor"><path d="M0 3.449L9.75 2.1v9.451H0m10.949-9.602L24 0v11.4H10.949M0 12.6h9.75v9.451L0 20.699M10.949 12.6H24V24l-12.9-1.801"/></svg>
-        <div class="download-info">
-          <div class="platform">Windows</div>
-          <div class="version">.exe · v0.4.0-beta</div>
-        </div>
-      </a>
-    </div>
-    <p style="text-align: center; font-size: 0.8rem; color: var(--text-muted); margin-top: 1rem;">
-      <a href="https://github.com/bydb/mindgraph-notes/releases/latest" target="_blank" style="color: var(--text-muted); text-decoration: underline;" data-i18n="download.allDownloads">Alle Downloads anzeigen (deb, snap, zip...)</a>
-      &middot;
-      <a href="https://github.com/bydb/mindgraph-notes" target="_blank" style="color: var(--text-muted); text-decoration: underline;">Source Code</a>
-    </p>
-
   </section>
 
   <footer>
@@ -2256,13 +2339,13 @@ tags: [projekt, arbeit, wichtig]
       <p data-i18n="privacy.general.text">Diese Website erhebt keine personenbezogenen Daten. Es werden keine Cookies gesetzt und keine Tracking-Tools verwendet.</p>
 
       <h3 data-i18n="privacy.hosting.title">2. Hosting</h3>
-      <p data-i18n="privacy.hosting.text">Diese Website wird auf GitHub Pages gehostet. GitHub kann beim Aufruf der Seite technische Daten wie IP-Adresse, Browsertyp und Zugriffszeit in Server-Logs speichern. Weitere Informationen finden Sie in der <a href="https://docs.github.com/en/site-policy/privacy-policies/github-privacy-statement" target="_blank">GitHub Privacy Statement</a>.</p>
+      <p data-i18n="privacy.hosting.text">Diese Website wird auf GitHub Pages gehostet. GitHub kann beim Aufruf der Seite technische Daten wie IP-Adresse, Browsertyp und Zugriffszeit in Server-Logs speichern. Weitere Informationen finden Sie in der <a href="https://docs.github.com/en/site-policy/privacy-policies/github-privacy-statement" target="_blank" rel="noopener noreferrer">GitHub Privacy Statement</a>.</p>
 
       <h3 data-i18n="privacy.localstorage.title">3. Lokale Speicherung</h3>
       <p data-i18n="privacy.localstorage.text">Diese Website verwendet localStorage, um Ihre Spracheinstellung (Deutsch/Englisch) zu speichern. Diese Daten verbleiben ausschließlich auf Ihrem Gerät und werden nicht an Server übertragen.</p>
 
       <h3 data-i18n="privacy.app.title">4. MindGraph Notes App</h3>
-      <p data-i18n="privacy.app.text">Die MindGraph Notes Desktop-App speichert alle Daten lokal auf Ihrem Computer. Es werden keine Daten an externe Server gesendet. Die App enthält keine Telemetrie oder Tracking.</p>
+      <p data-i18n="privacy.app.text">Die MindGraph Notes Desktop-App speichert Notizen standardmäßig lokal auf Ihrem Computer und enthält keine Telemetrie oder Tracking. Optionale Integrationen (z. B. KI APIs oder externe Dienste) senden nur dann Daten, wenn Sie diese bewusst aktivieren.</p>
 
       <h3 data-i18n="privacy.rights.title">5. Ihre Rechte</h3>
       <p data-i18n="privacy.rights.text">Sie haben das Recht auf Auskunft, Berichtigung, Löschung und Einschränkung der Verarbeitung Ihrer personenbezogenen Daten. Kontakt: info@bydb.io</p>
@@ -2285,12 +2368,12 @@ tags: [projekt, arbeit, wichtig]
         "nav.setup": "Setup",
         "nav.download": "Download",
         "nav.blog": "Blog",
-        "hero.badge": "Lokal. Privat. Unter deiner Kontrolle.",
+        "hero.badge": "Standardmäßig lokal. Open Source.",
         "hero.title": "Dein Wissen,<br>deine Werkzeuge.",
-        "hero.subtitle": "Eine Notiz-App für Menschen die selbst denken wollen. Lokale Dateien, bidirektionale Links, visuelles Canvas – und ein Terminal für die, die mehr wollen.",
+        "hero.subtitle": "Notizen, Karteikarten, Wissensgraph und KI-Terminal – alles in einer App. Ob Schule, Studium oder Wissensmanagement: aktiviere nur, was du brauchst.",
         "hero.cta": "Kostenlos herunterladen",
         "signup.title": "Jetzt herunterladen",
-        "signup.desc": "MindGraph Notes ist kostenlos und Open Source. Verfügbar für macOS, Linux und Windows.",
+        "signup.desc": "In 2 Minuten startklar: herunterladen, Vault öffnen, loslegen. Kostenlos, Open Source, verfügbar für macOS, Linux und Windows.",
         "signup.namePlaceholder": "Name (optional)",
         "signup.emailPlaceholder": "deine@email.de",
         "signup.submit": "Anmelden",
@@ -2311,15 +2394,15 @@ tags: [projekt, arbeit, wichtig]
         "terminal.f1": "OpenCode, Claude Code und Ollama direkt nutzen",
         "terminal.f2": "KI liest deine Notizen und arbeitet im Kontext",
         "terminal.f3": "Grafiken, Zusammenfassungen, Quiz – alles per Prompt",
-        "terminal.f4": "100% lokal möglich – deine Daten bleiben privat",
+        "terminal.f4": "Standardmäßig lokal – deine Daten bleiben bei dir",
         "features.title": "Mehr als nur Notizen",
-        "features.subtitle": "Alles was du brauchst. Nichts was du nicht willst.",
+        "features.subtitle": "Alles was du brauchst – aktiviere nur, was du willst.",
         "features.canvas.title": "Local Canvas",
         "features.canvas.desc": "Erkunde Notizen visuell im Canvas. Starte mit einer Notiz, erweitere schrittweise über Verbindungen. NEU: Bidirektionale Links zwischen Canvas und Notizen.",
         "features.pdf.title": "PDF Companion + Docling",
         "features.pdf.desc": "PDFs direkt neben deinen Notizen. NEU: Extrahiere Text, Tabellen und Bilder automatisch via Docling. Perfekt für Vorlesungsfolien, Paper und Scans.",
-        "features.local.title": "100% Lokal",
-        "features.local.desc": "Alle Notizen sind Markdown-Dateien. Keine Cloud, kein Account, keine Telemetrie. Deine Daten gehören dir.",
+        "features.local.title": "Lokal & transparent",
+        "features.local.desc": "Deine Notizen bleiben als Markdown-Dateien auf deinem Rechner. Keine Telemetrie. Optionale Integrationen aktivierst du bewusst.",
         "features.wikilinks.title": "Wikilinks",
         "features.wikilinks.desc": "Verlinke Notizen mit [[Wikilinks]]. Bidirektionale Verbindungen, Backlinks-Panel, Obsidian-kompatibel.",
         "features.preview.title": "Live Preview",
@@ -2335,7 +2418,7 @@ tags: [projekt, arbeit, wichtig]
         "features.ai.title": "KI-Funktionen (optional)",
         "features.ai.desc": "NEU: Smart Connections mit konfigurierbaren Gewichtungen (Embedding, Keywords, Wikilinks, Tags, Ordner). Notes Chat, lokale LLMs via Ollama/LM Studio. Aktiviere nur was du brauchst.",
         "features.languagetool.title": "LanguageTool",
-        "features.languagetool.desc": "NEU: Integrierte Grammatik- und Rechtschreibprüfung. Lokal via Docker oder mit LanguageTool Premium API. Fehler werden direkt im Editor markiert – Klick für Korrekturvorschläge.",
+        "features.languagetool.desc": "Integrierte Grammatik- und Rechtschreibprüfung. Lokal via Docker oder mit LanguageTool Premium API. Fehler werden direkt im Editor markiert.",
         "features.flashcards.title": "Karteikarten & Quiz",
         "features.flashcards.desc": "Generiere Quiz-Fragen via Ollama, importiere Decks aus Anki (.apkg) und lerne mit Spaced Repetition (SM-2). NEU: Bilder in Karteikarten.",
         "features.dataview.title": "Dataview Queries",
@@ -2343,7 +2426,7 @@ tags: [projekt, arbeit, wichtig]
         "features.properties.title": "Properties Panel",
         "features.properties.desc": "NEU: Bearbeite YAML-Frontmatter komfortabel. Checkboxen für Booleans, Datumspicker, Arrays – alles ohne YAML-Syntax.",
         "features.customization.title": "Deine Farben, dein Logo",
-        "features.customization.desc": "NEU: 12 Akzentfarben, 15 Hintergründe und ein eigenes Logo in der Titelleiste. Mach MindGraph Notes zu deiner App.",
+        "features.customization.desc": "NEU: 13 Akzentfarben, 15 Hintergründe und ein eigenes Logo in der Titelleiste. Mach MindGraph Notes zu deiner App.",
 
         "usergroup.schule.title": "Schule & Lernen",
         "usergroup.schule.desc": "Karteikarten, Spaced Repetition und KI-Quiz – verwandle Notizen in aktives Lernmaterial",
@@ -2437,7 +2520,7 @@ tags: [projekt, arbeit, wichtig]
         "setup.claudecode.desc": "Anthropics offizieller KI-Coding-Agent. Claude Code ist der mächtigste KI-Assistent für Entwickler.",
         "setup.claudecode.step1": "Node.js installieren: <code>brew install node</code>",
         "setup.claudecode.step2": "Claude Code installieren: <code>npm i -g @anthropic-ai/claude-code</code>",
-        "setup.claudecode.step3": "API-Key von <a href=\"https://console.anthropic.com\" target=\"_blank\">console.anthropic.com</a> holen",
+        "setup.claudecode.step3": "API-Key von <a href=\"https://console.anthropic.com\" target=\"_blank\" rel=\"noopener noreferrer\">console.anthropic.com</a> holen",
         "setup.claudecode.step4": "Key setzen: <code>export ANTHROPIC_API_KEY=\"sk-ant-...\"</code>",
         "setup.claudecode.step5": "Starten: <code>claude</code>",
         "setup.claudecode.note": "Tipp: Key permanent speichern mit <code>echo 'export ANTHROPIC_API_KEY=\"...\"' >> ~/.zshrc</code>",
@@ -2452,7 +2535,7 @@ tags: [projekt, arbeit, wichtig]
         "setup.ollama.note": "Nach der Installation: <code>ollama pull llama3</code> um ein Modell zu laden.",
         "setup.zotero.title": "Zotero",
         "setup.zotero.desc": "Literaturverwaltung für Wissenschaft und Recherche. Füge Zitate direkt in deine Notizen ein.",
-        "setup.zotero.step1": "Zotero installieren von <a href=\"https://www.zotero.org/download/\" target=\"_blank\">zotero.org</a>",
+        "setup.zotero.step1": "Zotero installieren von <a href=\"https://www.zotero.org/download/\" target=\"_blank\" rel=\"noopener noreferrer\">zotero.org</a>",
         "setup.zotero.step2": "Better BibTeX Plugin installieren für Export",
         "setup.zotero.step3": "In MindGraph Notes: Einstellungen → Zotero Pfad setzen",
         "setup.flux.title": "Flux2 Bildgenerierung",
@@ -2501,11 +2584,32 @@ tags: [projekt, arbeit, wichtig]
         "privacy.general.title": "1. Datenschutz auf einen Blick",
         "privacy.general.text": "Diese Website erhebt keine personenbezogenen Daten. Es werden keine Cookies gesetzt und keine Tracking-Tools verwendet.",
         "privacy.hosting.title": "2. Hosting",
-        "privacy.hosting.text": "Diese Website wird auf GitHub Pages gehostet. GitHub kann beim Aufruf der Seite technische Daten wie IP-Adresse, Browsertyp und Zugriffszeit in Server-Logs speichern. Weitere Informationen finden Sie in der <a href=\"https://docs.github.com/en/site-policy/privacy-policies/github-privacy-statement\" target=\"_blank\">GitHub Privacy Statement</a>.",
+        "privacy.hosting.text": "Diese Website wird auf GitHub Pages gehostet. GitHub kann beim Aufruf der Seite technische Daten wie IP-Adresse, Browsertyp und Zugriffszeit in Server-Logs speichern. Weitere Informationen finden Sie in der <a href=\"https://docs.github.com/en/site-policy/privacy-policies/github-privacy-statement\" target=\"_blank\" rel=\"noopener noreferrer\">GitHub Privacy Statement</a>.",
         "privacy.localstorage.title": "3. Lokale Speicherung",
         "privacy.localstorage.text": "Diese Website verwendet localStorage, um Ihre Spracheinstellung (Deutsch/Englisch) zu speichern. Diese Daten verbleiben ausschließlich auf Ihrem Gerät und werden nicht an Server übertragen.",
         "privacy.app.title": "4. MindGraph Notes App",
-        "privacy.app.text": "Die MindGraph Notes Desktop-App speichert alle Daten lokal auf Ihrem Computer. Es werden keine Daten an externe Server gesendet. Die App enthält keine Telemetrie oder Tracking.",
+        "privacy.app.text": "Die MindGraph Notes Desktop-App speichert Notizen standardmäßig lokal auf Ihrem Computer und enthält keine Telemetrie oder Tracking. Optionale Integrationen (z. B. KI APIs oder externe Dienste) senden nur dann Daten, wenn Sie diese bewusst aktivieren.",
+        "faq.title": "Häufige Fragen",
+        "faq.subtitle": "Das Wichtigste für den schnellen Einstieg",
+        "faq.q1": "Brauche ich ein Konto?",
+        "faq.a1": "Nein. Du kannst direkt lokal arbeiten. Deine Notizen bleiben als Markdown-Dateien auf deinem Rechner.",
+        "faq.q2": "Muss ich Ollama sofort installieren?",
+        "faq.a2": "Nein. Die App funktioniert ohne KI-Setup. Ollama brauchst du nur für optionale KI-Features wie Quiz-Generierung.",
+        "faq.q3": "Funktioniert mein Obsidian-Vault?",
+        "faq.a3": "Ja. Du kannst bestehende Markdown-Dateien und Wikilinks direkt weiterverwenden.",
+        "faq.q4": "Ist die App komplett lokal nutzbar?",
+        "faq.a4": "Ja, standardmäßig lokal. Externe Integrationen sind optional und werden nur bei Aktivierung verwendet.",
+        "agents.title": "Integrierte Automationen",
+        "agents.subtitle": "Wiederkehrende Aufgaben automatisieren – direkt in der App.",
+        "agents.learning.title": "Lernagent: Quiz + Karteikarten",
+        "agents.learning.desc": "Erstellt Quizfragen aus deinen Notizen und überführt sie direkt in dein Wiederholen mit SM-2.",
+        "agents.terminal.title": "KI-Terminal",
+        "agents.terminal.desc": "OpenCode, Claude Code oder Ollama direkt neben deinen Notizen. Grafiken, Zusammenfassungen, Quiz – alles per Prompt.",
+        "agents.email.title": "E-Mail-Analyse",
+        "agents.email.desc": "Analysiert IMAP-Mails via Ollama und erstellt aus relevanten Inhalten automatisch Notizen.",
+        "agents.tag.students": "Top für Schule/Studium",
+        "agents.tag.poweruser": "Für Power-User",
+        "agents.note": "Weitere Automationen folgen laufend – z.B. reMarkable-Import und Veranstaltungsmanagement.",
         "privacy.rights.title": "5. Ihre Rechte",
         "privacy.rights.text": "Sie haben das Recht auf Auskunft, Berichtigung, Löschung und Einschränkung der Verarbeitung Ihrer personenbezogenen Daten. Kontakt: info@bydb.io",
         "privacy.contact.title": "6. Verantwortliche Stelle"
@@ -2516,12 +2620,12 @@ tags: [projekt, arbeit, wichtig]
         "nav.setup": "Setup",
         "nav.download": "Download",
         "nav.blog": "Blog",
-        "hero.badge": "Local. Private. Under your control.",
+        "hero.badge": "Local by default. Open source.",
         "hero.title": "Your knowledge,<br>your tools.",
-        "hero.subtitle": "A note-taking app for people who want to think for themselves. Local files, bidirectional links, visual canvas – and a terminal for those who want more.",
+        "hero.subtitle": "Notes, flashcards, knowledge graph and AI terminal – all in one app. Whether for school, university, or knowledge management: enable only what you need.",
         "hero.cta": "Download for free",
         "signup.title": "Download now",
-        "signup.desc": "MindGraph Notes is free and open source. Available for macOS, Linux and Windows.",
+        "signup.desc": "Start in 2 minutes: download, open your vault, go. Free, open source, available for macOS, Linux and Windows.",
         "signup.namePlaceholder": "Name (optional)",
         "signup.emailPlaceholder": "your@email.com",
         "signup.submit": "Sign up",
@@ -2542,15 +2646,15 @@ tags: [projekt, arbeit, wichtig]
         "terminal.f1": "Use OpenCode, Claude Code and Ollama directly",
         "terminal.f2": "AI reads your notes and works in context",
         "terminal.f3": "Diagrams, summaries, quizzes – all via prompt",
-        "terminal.f4": "100% local possible – your data stays private",
+        "terminal.f4": "Local by default – your data stays with you",
         "features.title": "More than just notes",
-        "features.subtitle": "Everything you need. Nothing you don't.",
+        "features.subtitle": "Everything you need – enable only what you want.",
         "features.canvas.title": "Local Canvas",
         "features.canvas.desc": "Explore notes visually in the canvas. Start with one note, expand step by step through connections. NEW: Bidirectional links between canvas and notes.",
         "features.pdf.title": "PDF Companion + Docling",
         "features.pdf.desc": "PDFs right next to your notes. NEW: Automatically extract text, tables, and images via Docling. Perfect for lecture slides, papers, and scans.",
-        "features.local.title": "100% Local",
-        "features.local.desc": "All notes are Markdown files. No cloud, no account, no telemetry. Your data belongs to you.",
+        "features.local.title": "Local & transparent",
+        "features.local.desc": "Your notes stay as Markdown files on your machine. No telemetry. Optional integrations are enabled by you.",
         "features.wikilinks.title": "Wikilinks",
         "features.wikilinks.desc": "Link notes with [[Wikilinks]]. Bidirectional connections, backlinks panel, Obsidian-compatible.",
         "features.preview.title": "Live Preview",
@@ -2566,7 +2670,7 @@ tags: [projekt, arbeit, wichtig]
         "features.ai.title": "AI Features (optional)",
         "features.ai.desc": "NEW: Smart Connections with configurable weights (Embedding, Keywords, Wikilinks, Tags, Folders). Notes Chat, local LLMs via Ollama/LM Studio. Enable only what you need.",
         "features.languagetool.title": "LanguageTool",
-        "features.languagetool.desc": "NEW: Integrated grammar and spell checking. Local via Docker or with LanguageTool Premium API. Errors are highlighted in the editor – click for correction suggestions.",
+        "features.languagetool.desc": "Integrated grammar and spell checking. Local via Docker or with LanguageTool Premium API. Errors are highlighted directly in the editor.",
         "features.flashcards.title": "Flashcards & Quiz",
         "features.flashcards.desc": "Generate quiz questions via Ollama, import decks from Anki (.apkg) and learn with Spaced Repetition (SM-2). NEW: Images in flashcards.",
         "features.dataview.title": "Dataview Queries",
@@ -2574,7 +2678,7 @@ tags: [projekt, arbeit, wichtig]
         "features.properties.title": "Properties Panel",
         "features.properties.desc": "NEW: Edit YAML frontmatter comfortably. Checkboxes for booleans, date pickers, arrays – no YAML syntax needed.",
         "features.customization.title": "Your colors, your logo",
-        "features.customization.desc": "NEW: 12 accent colors, 15 backgrounds and a custom logo in the title bar. Make MindGraph Notes truly yours.",
+        "features.customization.desc": "NEW: 13 accent colors, 15 backgrounds and a custom logo in the title bar. Make MindGraph Notes truly yours.",
 
         "usergroup.schule.title": "School & Learning",
         "usergroup.schule.desc": "Flashcards, spaced repetition and AI quizzes – turn notes into active learning material",
@@ -2668,7 +2772,7 @@ tags: [projekt, arbeit, wichtig]
         "setup.claudecode.desc": "Anthropic's official AI coding agent. Claude Code is the most powerful AI assistant for developers.",
         "setup.claudecode.step1": "Install Node.js: <code>brew install node</code>",
         "setup.claudecode.step2": "Install Claude Code: <code>npm i -g @anthropic-ai/claude-code</code>",
-        "setup.claudecode.step3": "Get API key from <a href=\"https://console.anthropic.com\" target=\"_blank\">console.anthropic.com</a>",
+        "setup.claudecode.step3": "Get API key from <a href=\"https://console.anthropic.com\" target=\"_blank\" rel=\"noopener noreferrer\">console.anthropic.com</a>",
         "setup.claudecode.step4": "Set key: <code>export ANTHROPIC_API_KEY=\"sk-ant-...\"</code>",
         "setup.claudecode.step5": "Start: <code>claude</code>",
         "setup.claudecode.note": "Tip: Save key permanently with <code>echo 'export ANTHROPIC_API_KEY=\"...\"' >> ~/.zshrc</code>",
@@ -2683,7 +2787,7 @@ tags: [projekt, arbeit, wichtig]
         "setup.ollama.note": "After installation: <code>ollama pull llama3</code> to download a model.",
         "setup.zotero.title": "Zotero",
         "setup.zotero.desc": "Reference management for science and research. Insert citations directly into your notes.",
-        "setup.zotero.step1": "Install Zotero from <a href=\"https://www.zotero.org/download/\" target=\"_blank\">zotero.org</a>",
+        "setup.zotero.step1": "Install Zotero from <a href=\"https://www.zotero.org/download/\" target=\"_blank\" rel=\"noopener noreferrer\">zotero.org</a>",
         "setup.zotero.step2": "Install Better BibTeX plugin for export",
         "setup.zotero.step3": "In MindGraph Notes: Settings → Set Zotero path",
         "setup.flux.title": "Flux2 Image Generation",
@@ -2732,11 +2836,32 @@ tags: [projekt, arbeit, wichtig]
         "privacy.general.title": "1. Privacy at a Glance",
         "privacy.general.text": "This website does not collect personal data. No cookies are set and no tracking tools are used.",
         "privacy.hosting.title": "2. Hosting",
-        "privacy.hosting.text": "This website is hosted on GitHub Pages. GitHub may store technical data such as IP address, browser type, and access time in server logs when accessing the site. For more information, see the <a href=\"https://docs.github.com/en/site-policy/privacy-policies/github-privacy-statement\" target=\"_blank\">GitHub Privacy Statement</a>.",
+        "privacy.hosting.text": "This website is hosted on GitHub Pages. GitHub may store technical data such as IP address, browser type, and access time in server logs when accessing the site. For more information, see the <a href=\"https://docs.github.com/en/site-policy/privacy-policies/github-privacy-statement\" target=\"_blank\" rel=\"noopener noreferrer\">GitHub Privacy Statement</a>.",
         "privacy.localstorage.title": "3. Local Storage",
         "privacy.localstorage.text": "This website uses localStorage to save your language preference (German/English). This data remains exclusively on your device and is not transmitted to any servers.",
         "privacy.app.title": "4. MindGraph Notes App",
-        "privacy.app.text": "The MindGraph Notes desktop app stores all data locally on your computer. No data is sent to external servers. The app contains no telemetry or tracking.",
+        "privacy.app.text": "The MindGraph Notes desktop app stores notes locally by default and includes no telemetry or tracking. Optional integrations (e.g. AI APIs or external services) only send data when you explicitly enable them.",
+        "faq.title": "Frequently asked questions",
+        "faq.subtitle": "What new users need to know first",
+        "faq.q1": "Do I need an account?",
+        "faq.a1": "No. You can work locally right away. Your notes remain Markdown files on your machine.",
+        "faq.q2": "Do I need to install Ollama immediately?",
+        "faq.a2": "No. The app works without AI setup. You only need Ollama for optional AI features like quiz generation.",
+        "faq.q3": "Will my Obsidian vault work?",
+        "faq.a3": "Yes. You can continue using your existing Markdown files and wikilinks directly.",
+        "faq.q4": "Can I use the app fully locally?",
+        "faq.a4": "Yes, local by default. External integrations are optional and only used when enabled.",
+        "agents.title": "Built-in automations",
+        "agents.subtitle": "Automate recurring tasks – right inside the app.",
+        "agents.learning.title": "Learning agent: quizzes + flashcards",
+        "agents.learning.desc": "Generates quiz questions from your notes and feeds them directly into SM-2 review.",
+        "agents.terminal.title": "AI Terminal",
+        "agents.terminal.desc": "Run OpenCode, Claude Code, or Ollama right next to your notes. Diagrams, summaries, quizzes – all via prompt.",
+        "agents.email.title": "Email analysis",
+        "agents.email.desc": "Analyzes IMAP emails via Ollama and creates notes automatically from relevant messages.",
+        "agents.tag.students": "Best for school/university",
+        "agents.tag.poweruser": "For power users",
+        "agents.note": "More automations are coming – e.g. reMarkable import and event management.",
         "privacy.rights.title": "5. Your Rights",
         "privacy.rights.text": "You have the right to information, correction, deletion, and restriction of processing of your personal data. Contact: info@bydb.io",
         "privacy.contact.title": "6. Responsible Party"
@@ -2775,8 +2900,8 @@ tags: [projekt, arbeit, wichtig]
 
       // Update page title
       document.title = lang === 'de'
-        ? 'MindGraph Notes - Karteikarten & Spaced Repetition Notiz-App'
-        : 'MindGraph Notes - Flashcard & Spaced Repetition Note-Taking App';
+        ? 'MindGraph Notes - Notizen, Karteikarten & Wissensgraph'
+        : 'MindGraph Notes - Notes, Flashcards & Knowledge Graph';
 
       // Update OG/Twitter meta for language
       const ogTitle = document.querySelector('meta[property="og:title"]');
@@ -2788,8 +2913,8 @@ tags: [projekt, arbeit, wichtig]
       if (twTitle) twTitle.content = document.title;
       if (ogLocale) ogLocale.content = lang === 'de' ? 'de_DE' : 'en_US';
       const descText = lang === 'de'
-        ? 'Kostenlose Notiz-App mit Karteikarten, Spaced Repetition (SM-2), KI-Quiz-Generierung, Wissensgraph und Zotero-Integration. 100% lokal, Open Source.'
-        : 'Free note-taking app with flashcards, spaced repetition (SM-2), AI quiz generation, knowledge graph and Zotero integration. 100% local, open source.';
+        ? 'Kostenlose Notiz-App mit Karteikarten (SM-2), Wissensgraph, KI-Terminal, PDF Companion und Zotero. Standardmäßig lokal und Open Source.'
+        : 'Free note-taking app with flashcards (SM-2), knowledge graph, AI terminal, PDF companion and Zotero. Local by default and open source.';
       if (ogDesc) ogDesc.content = descText;
       if (twDesc) twDesc.content = descText;
     }
