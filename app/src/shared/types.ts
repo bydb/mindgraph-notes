@@ -522,7 +522,7 @@ export interface ElectronAPI {
   getFilesWithMtime: (vaultPath: string) => Promise<Array<{ path: string; mtime: number }>>;
 
   // PDF Export
-  exportPDF: (defaultFileName: string, htmlContent: string, title: string) => Promise<{
+  exportPDF: (defaultFileName: string, htmlContent: string, title: string, vaultPath?: string, notePath?: string) => Promise<{
     success: boolean;
     path?: string;
     error?: string;
@@ -803,10 +803,13 @@ export interface ElectronAPI {
   edooboxLoadCredentials: () => Promise<{ apiKey: string; apiSecret: string } | null>;
   edooboxCheck: (baseUrl: string, apiVersion: string) => Promise<{ success: boolean; error?: string }>;
   edooboxListOffers: (baseUrl: string, apiVersion: string) => Promise<{ success: boolean; offers?: EdooboxOffer[]; error?: string }>;
+  edooboxListCategories: (baseUrl: string, apiVersion: string) => Promise<{ success: boolean; categories?: EdooboxCategory[]; error?: string }>;
   edooboxParseFormular: () => Promise<EdooboxImportResult | null>;
-  edooboxImportEvent: (baseUrl: string, apiVersion: string, event: EdooboxEvent, webhookUrl?: string) => Promise<{ success: boolean; offerId?: string; error?: string }>;
+  edooboxImportEvent: (baseUrl: string, apiVersion: string, event: EdooboxEvent) => Promise<{ success: boolean; offerId?: string; error?: string }>;
   edooboxLoadEvents: (vaultPath: string) => Promise<EdooboxEvent[]>;
   edooboxSaveEvents: (vaultPath: string, events: EdooboxEvent[]) => Promise<boolean>;
+  edooboxListOffersDashboard: (baseUrl: string, apiVersion: string) => Promise<{ success: boolean; offers?: EdooboxOfferDashboard[]; error?: string }>;
+  edooboxListBookings: (baseUrl: string, apiVersion: string, offerId: string) => Promise<{ success: boolean; bookings?: EdooboxBooking[]; error?: string }>;
 }
 
 // Email Integration Types
@@ -912,6 +915,32 @@ export interface EdooboxOffer {
   name: string
   status: string
   dateCount: number
+}
+
+export interface EdooboxCategory {
+  id: string
+  name: string
+}
+
+export interface EdooboxBooking {
+  id: string
+  offerId: string
+  userName: string
+  userEmail: string
+  status: string
+  bookedAt: string  // ISO
+}
+
+export interface EdooboxOfferDashboard {
+  id: string
+  name: string
+  number: string
+  status: string
+  bookingCount: number
+  maxParticipants: number
+  dateStart?: string
+  dateEnd?: string
+  bookings: EdooboxBooking[]
 }
 
 export interface EdooboxImportResult {

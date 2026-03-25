@@ -2741,7 +2741,7 @@ ipcMain.handle('get-files-with-mtime', async (_event, vaultPath: string) => {
 })
 
 // PDF Export - mit verstecktem Fenster für vollständigen Export
-ipcMain.handle('export-pdf', async (_event, defaultFileName: string, htmlContent: string, title: string) => {
+ipcMain.handle('export-pdf', async (_event, defaultFileName: string, htmlContent: string, title: string, vaultPath?: string, notePath?: string) => {
   if (!mainWindow) return { success: false, error: 'Kein Fenster verfügbar' }
 
   // Speicherdialog öffnen
@@ -2756,6 +2756,86 @@ ipcMain.handle('export-pdf', async (_event, defaultFileName: string, htmlContent
   }
 
   try {
+    // Resolve data-src attributes to file:// URLs for images
+    let resolvedHtml = htmlContent
+    if (vaultPath) {
+      const resolvedVaultPath = vaultPath
+      const noteDir = notePath ? path.dirname(notePath) : ''
+      const imageExtensions = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.bmp']
+
+      // Find image in vault recursively (same logic as find-image-in-vault handler)
+      async function findImageFile(imageName: string): Promise<string | null> {
+        const searchName = imageName.toLowerCase().split('/').pop() || imageName.toLowerCase()
+
+        async function searchDir(dirPath: string): Promise<string | null> {
+          try {
+            const entries = await fs.readdir(dirPath, { withFileTypes: true })
+            for (const entry of entries) {
+              const fullPath = path.join(dirPath, entry.name)
+              if (entry.isDirectory()) {
+                if (entry.name.startsWith('.') && entry.name !== '.attachments') continue
+                if (entry.name === 'node_modules') continue
+                const found = await searchDir(fullPath)
+                if (found) return found
+              } else if (entry.isFile()) {
+                if (entry.name.toLowerCase() === searchName) {
+                  const ext = path.extname(entry.name).toLowerCase()
+                  if (imageExtensions.includes(ext)) return fullPath
+                }
+              }
+            }
+          } catch { /* skip inaccessible dirs */ }
+          return null
+        }
+
+        return searchDir(resolvedVaultPath)
+      }
+
+      // Resolve all data-src attributes to absolute file paths
+      const dataSrcRegex = /data-src="([^"]+)"/g
+      const matches: { full: string; src: string }[] = []
+      let match
+      while ((match = dataSrcRegex.exec(resolvedHtml)) !== null) {
+        matches.push({ full: match[0], src: match[1] })
+      }
+
+      for (const { full, src } of matches) {
+        // Skip data URLs (already resolved)
+        if (src.startsWith('data:')) continue
+
+        // Try known paths first (fast), then vault-wide search (slow)
+        const possiblePaths = [
+          src.startsWith('/') ? src : null,
+          noteDir ? path.join(resolvedVaultPath, noteDir, src) : null,
+          path.join(resolvedVaultPath, src),
+          path.join(resolvedVaultPath, '.attachments', src),
+          path.join(resolvedVaultPath, 'attachments', src),
+          path.join(resolvedVaultPath, 'assets', src),
+          path.join(resolvedVaultPath, 'images', src),
+        ].filter(Boolean) as string[]
+
+        let resolved = false
+        for (const imagePath of possiblePaths) {
+          try {
+            await fs.access(imagePath)
+            const fileUrl = `file://${encodeURI(imagePath).replace(/#/g, '%23')}`
+            resolvedHtml = resolvedHtml.replace(full, `src="${fileUrl}"`)
+            resolved = true
+            break
+          } catch { /* file not found, try next */ }
+        }
+
+        // Fallback: vault-wide search
+        if (!resolved) {
+          const foundPath = await findImageFile(src)
+          if (foundPath) {
+            const fileUrl = `file://${encodeURI(foundPath).replace(/#/g, '%23')}`
+            resolvedHtml = resolvedHtml.replace(full, `src="${fileUrl}"`)
+          }
+        }
+      }
+    }
+
     // Erstelle ein verstecktes Fenster für den PDF-Export
     const pdfWindow = new BrowserWindow({
       width: 800,
@@ -2904,36 +2984,62 @@ ipcMain.handle('export-pdf', async (_event, defaultFileName: string, htmlContent
         </style>
       </head>
       <body>
-        ${htmlContent}
+        ${resolvedHtml}
       </body>
       </html>
     `
 
-    // Lade den HTML-Inhalt
-    await pdfWindow.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(fullHtml))
+    // Write HTML to temp file to avoid data URL size limits with large images
+    const tempHtmlPath = path.join(app.getPath('temp'), `mindgraph-pdf-export-${Date.now()}.html`)
+    await fs.writeFile(tempHtmlPath, fullHtml, 'utf-8')
 
-    // Warte kurz bis alles gerendert ist
-    await new Promise(resolve => setTimeout(resolve, 500))
+    try {
+      // Load from file:// so the browser can resolve file:// image URLs
+      await pdfWindow.loadFile(tempHtmlPath)
 
-    // PDF generieren
-    const pdfData = await pdfWindow.webContents.printToPDF({
-      printBackground: true,
-      pageSize: 'A4',
-      margins: {
-        top: 0.5,
-        bottom: 0.5,
-        left: 0.5,
-        right: 0.5
-      }
-    })
+      // Warte bis Bilder geladen sind
+      await pdfWindow.webContents.executeJavaScript(`
+        new Promise((resolve) => {
+          const images = document.querySelectorAll('img');
+          if (images.length === 0) return resolve();
+          let loaded = 0;
+          const total = images.length;
+          const checkDone = () => { if (++loaded >= total) resolve(); };
+          images.forEach(img => {
+            if (img.complete) { checkDone(); }
+            else {
+              img.addEventListener('load', checkDone);
+              img.addEventListener('error', checkDone);
+            }
+          });
+          // Safety timeout
+          setTimeout(resolve, 10000);
+        })
+      `)
 
-    // Fenster schließen
-    pdfWindow.close()
+      // PDF generieren
+      const pdfData = await pdfWindow.webContents.printToPDF({
+        printBackground: true,
+        pageSize: 'A4',
+        margins: {
+          top: 0.5,
+          bottom: 0.5,
+          left: 0.5,
+          right: 0.5
+        }
+      })
 
-    // PDF speichern
-    await fs.writeFile(result.filePath, pdfData)
+      // Fenster schließen
+      pdfWindow.close()
 
-    return { success: true, path: result.filePath }
+      // PDF speichern
+      await fs.writeFile(result.filePath, pdfData)
+
+      return { success: true, path: result.filePath }
+    } finally {
+      // Temp-Datei aufräumen
+      try { await fs.unlink(tempHtmlPath) } catch { /* ignore */ }
+    }
   } catch (error) {
     console.error('PDF Export Fehler:', error)
     return { success: false, error: String(error) }
@@ -5868,40 +5974,33 @@ ipcMain.handle('edoobox-parse-formular', async () => {
   }
 })
 
-// Event an edoobox senden (Offer + Dates erstellen) — via Zapier Webhook oder direkte API
+// Kategorien auflisten
+ipcMain.handle('edoobox-list-categories', async (_event, baseUrl: string, apiVersion: string) => {
+  try {
+    const credPath = getEdooboxCredentialsPath()
+    const exists = await fs.access(credPath).then(() => true).catch(() => false)
+    if (!exists) return { success: false, error: 'Keine Zugangsdaten gespeichert' }
+    const encrypted = await fs.readFile(credPath)
+    const { apiKey, apiSecret } = JSON.parse(safeStorage.decryptString(encrypted))
+
+    const { EdooboxService } = await import('./edooboxService')
+    const service = new EdooboxService(baseUrl, apiKey, apiSecret, apiVersion as 'v1' | 'v2')
+    const categories = await service.listCategories()
+    return { success: true, categories }
+  } catch (error) {
+    console.error('[edoobox] List categories failed:', error)
+    return { success: false, error: error instanceof Error ? error.message : 'Kategorien konnten nicht geladen werden' }
+  }
+})
+
+// Event an edoobox senden (Offer + Dates erstellen)
 ipcMain.handle('edoobox-import-event', async (_event, baseUrl: string, apiVersion: string, event: {
   id?: string; title: string; description: string; maxParticipants?: number;
   dates: Array<{ date: string; startTime: string; endTime: string }>;
   location?: string; speakers?: Array<{ name: string; role?: string; institution?: string }>;
   contact?: string; price?: number; category?: string
-}, webhookUrl?: string) => {
+}) => {
   try {
-    // Zapier Webhook path
-    if (webhookUrl) {
-      const payload = {
-        title: event.title,
-        description: event.description,
-        maxParticipants: event.maxParticipants,
-        location: event.location,
-        price: event.price,
-        category: event.category,
-        dates: event.dates,
-        speakers: event.speakers,
-        contact: event.contact
-      }
-      const response = await fetch(webhookUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      })
-      if (!response.ok) {
-        const text = await response.text().catch(() => '')
-        return { success: false, error: `Webhook responded with ${response.status}: ${text}` }
-      }
-      return { success: true }
-    }
-
-    // Direct edoobox API path (fallback)
     const credPath = getEdooboxCredentialsPath()
     const exists = await fs.access(credPath).then(() => true).catch(() => false)
     if (!exists) return { success: false, error: 'Keine Zugangsdaten gespeichert' }
@@ -5911,23 +6010,90 @@ ipcMain.handle('edoobox-import-event', async (_event, baseUrl: string, apiVersio
     const { EdooboxService } = await import('./edooboxService')
     const service = new EdooboxService(baseUrl, apiKey, apiSecret, apiVersion as 'v1' | 'v2')
 
+    if (!event.category) return { success: false, error: 'Keine Kategorie ausgewählt' }
+
     const offerId = await service.createOffer({
       name: event.title,
-      description: event.description,
-      maxParticipants: event.maxParticipants,
-      location: event.location,
-      price: event.price,
       category: event.category
     })
 
+    // Update offer with additional fields
+    const updateFields: Record<string, unknown> = {}
+    if (event.maxParticipants) updateFields.user_maximum = event.maxParticipants
+    if (event.price !== undefined) updateFields.price = event.price
+
+    // Create or find place for location
+    let placeId: string | undefined
+    if (event.location) {
+      try {
+        const places = await service.listPlaces()
+        const existing = places.find(p => p.name === event.location)
+        if (existing) {
+          placeId = existing.id
+        } else {
+          placeId = await service.createPlace(event.location)
+        }
+        updateFields.place = placeId
+      } catch (e) {
+        console.warn('[edoobox] Could not create/find place:', e)
+      }
+    }
+
+    if (Object.keys(updateFields).length > 0) {
+      await service.updateOffer(offerId, updateFields)
+    }
+
+    // Create description text via POST /v2/text
+    if (event.description) {
+      await service.createOfferText(offerId, 'de', event.description)
+    }
+
     for (const d of event.dates) {
-      await service.createDate(offerId, d)
+      await service.createDate(offerId, { ...d, placeId })
     }
 
     return { success: true, offerId }
   } catch (error) {
     console.error('[edoobox] Import event failed:', error)
     return { success: false, error: error instanceof Error ? error.message : 'Event konnte nicht erstellt werden' }
+  }
+})
+
+// Dashboard: Angebote mit Buchungszahlen
+ipcMain.handle('edoobox-list-offers-dashboard', async (_event, baseUrl: string, apiVersion: string) => {
+  try {
+    const credPath = getEdooboxCredentialsPath()
+    const exists = await fs.access(credPath).then(() => true).catch(() => false)
+    if (!exists) return { success: false, error: 'Keine Zugangsdaten gespeichert' }
+    const encrypted = await fs.readFile(credPath)
+    const { apiKey, apiSecret } = JSON.parse(safeStorage.decryptString(encrypted))
+
+    const { EdooboxService } = await import('./edooboxService')
+    const service = new EdooboxService(baseUrl, apiKey, apiSecret, apiVersion as 'v1' | 'v2')
+    const offers = await service.listOffersForDashboard()
+    return { success: true, offers }
+  } catch (error) {
+    console.error('[edoobox] List offers dashboard failed:', error)
+    return { success: false, error: error instanceof Error ? error.message : 'Dashboard konnte nicht geladen werden' }
+  }
+})
+
+// Dashboard: Buchungen für ein Angebot
+ipcMain.handle('edoobox-list-bookings', async (_event, baseUrl: string, apiVersion: string, offerId: string) => {
+  try {
+    const credPath = getEdooboxCredentialsPath()
+    const exists = await fs.access(credPath).then(() => true).catch(() => false)
+    if (!exists) return { success: false, error: 'Keine Zugangsdaten gespeichert' }
+    const encrypted = await fs.readFile(credPath)
+    const { apiKey, apiSecret } = JSON.parse(safeStorage.decryptString(encrypted))
+
+    const { EdooboxService } = await import('./edooboxService')
+    const service = new EdooboxService(baseUrl, apiKey, apiSecret, apiVersion as 'v1' | 'v2')
+    const bookings = await service.listBookingsForOffer(offerId)
+    return { success: true, bookings }
+  } catch (error) {
+    console.error('[edoobox] List bookings failed:', error)
+    return { success: false, error: error instanceof Error ? error.message : 'Buchungen konnten nicht geladen werden' }
   }
 })
 

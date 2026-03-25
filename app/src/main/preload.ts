@@ -74,8 +74,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('load-embeddings-cache', vaultPath, model),
 
   // PDF Export
-  exportPDF: (defaultFileName: string, htmlContent: string, title: string) =>
-    ipcRenderer.invoke('export-pdf', defaultFileName, htmlContent, title),
+  exportPDF: (defaultFileName: string, htmlContent: string, title: string, vaultPath?: string, notePath?: string) =>
+    ipcRenderer.invoke('export-pdf', defaultFileName, htmlContent, title, vaultPath, notePath),
 
   // Notification API für Reminder-System
   showNotification: (title: string, body: string, noteId?: string) =>
@@ -366,12 +366,18 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('edoobox-check', baseUrl, apiVersion),
   edooboxListOffers: (baseUrl: string, apiVersion: string) =>
     ipcRenderer.invoke('edoobox-list-offers', baseUrl, apiVersion),
+  edooboxListCategories: (baseUrl: string, apiVersion: string) =>
+    ipcRenderer.invoke('edoobox-list-categories', baseUrl, apiVersion),
   edooboxParseFormular: () =>
     ipcRenderer.invoke('edoobox-parse-formular'),
-  edooboxImportEvent: (baseUrl: string, apiVersion: string, event: object, webhookUrl?: string) =>
-    ipcRenderer.invoke('edoobox-import-event', baseUrl, apiVersion, event, webhookUrl),
+  edooboxImportEvent: (baseUrl: string, apiVersion: string, event: object) =>
+    ipcRenderer.invoke('edoobox-import-event', baseUrl, apiVersion, event),
   edooboxLoadEvents: (vaultPath: string) =>
     ipcRenderer.invoke('edoobox-load-events', vaultPath),
   edooboxSaveEvents: (vaultPath: string, events: object[]) =>
-    ipcRenderer.invoke('edoobox-save-events', vaultPath, events)
+    ipcRenderer.invoke('edoobox-save-events', vaultPath, events),
+  edooboxListOffersDashboard: (baseUrl: string, apiVersion: string) =>
+    ipcRenderer.invoke('edoobox-list-offers-dashboard', baseUrl, apiVersion),
+  edooboxListBookings: (baseUrl: string, apiVersion: string, offerId: string) =>
+    ipcRenderer.invoke('edoobox-list-bookings', baseUrl, apiVersion, offerId)
 })

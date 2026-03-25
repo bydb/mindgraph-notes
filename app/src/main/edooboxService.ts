@@ -1,4 +1,4 @@
-import type { EdooboxOffer } from '../shared/types'
+import type { EdooboxOffer, EdooboxOfferDashboard, EdooboxBooking } from '../shared/types'
 
 type ApiVersion = 'v1' | 'v2'
 
@@ -8,8 +8,10 @@ interface EdooboxAuth {
   expiresAt: number
 }
 
-// Static Basic Auth credentials from official edoobox PHP client
-const BASIC_AUTH = 'Basic ' + Buffer.from('edapi:DyivKSgxEifwQi2').toString('base64')
+export interface EdooboxCategory {
+  id: string
+  name: string
+}
 
 function truncateError(text: string, maxLen = 200): string {
   if (text.length <= maxLen) return text
@@ -35,7 +37,7 @@ export class EdooboxService {
     this.apiVersion = apiVersion
   }
 
-  // ---- V2 Auth (JWT) — used for reading ----
+  // ---- V2 Auth (JWT) ----
 
   private async authenticateV2(): Promise<EdooboxAuth> {
     if (this.auth && Date.now() < this.auth.expiresAt) {
@@ -79,50 +81,27 @@ export class EdooboxService {
     return this.auth
   }
 
-  private async requestV2Read(endpoint: string): Promise<unknown> {
+  // ---- V2 request helpers ----
+
+  private async requestV2(method: 'GET' | 'POST' | 'PUT' | 'DELETE', endpoint: string, body?: unknown): Promise<unknown> {
     const auth = await this.authenticateV2()
     const url = `${this.baseUrl}/v2${endpoint}`
-    console.log(`[edoobox] GET ${url}`)
-    const res = await fetch(url, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${auth.token}`,
-        'edid': auth.edid,
-        'grant-type': 'access_token',
-        'Content-Type': 'application/json'
-      }
-    })
+    console.log(`[edoobox] ${method} ${url}`)
 
-    if (!res.ok) {
-      const text = await res.text()
-      throw new Error(`edoobox API error (${res.status}): ${truncateError(text)}`)
+    const headers: Record<string, string> = {
+      'Authorization': `Bearer ${auth.token}`,
+      'edid': auth.edid,
+      'grant-type': 'access_token',
+      'Content-Type': 'application/json'
     }
 
-    const ct = res.headers.get('content-type')
-    return ct?.includes('application/json') ? res.json() : res.text()
-  }
-
-  // ---- Write operations: Basic Auth + api keys in body (official PHP client pattern) ----
-
-  private async requestWrite(method: 'PUT' | 'POST', endpoint: string, data: Record<string, unknown>): Promise<unknown> {
-    const url = `${this.baseUrl}/v1/${endpoint}?`
-    const body = {
-      api1: this.apiKey,
-      api2: this.apiSecret,
-      ...data
+    const options: RequestInit = { method, headers }
+    if (body !== undefined) {
+      options.body = JSON.stringify(body)
+      console.log(`[edoobox] Body:`, JSON.stringify(body).slice(0, 500))
     }
 
-    console.log(`[edoobox] ${method} ${url}`, JSON.stringify(body).slice(0, 300))
-
-    const res = await fetch(url, {
-      method,
-      headers: {
-        'Authorization': BASIC_AUTH,
-        'Content-Type': 'application/json; charset=utf-8',
-        'User-Agent': 'edooboxAPI'
-      },
-      body: JSON.stringify(body)
-    })
+    const res = await fetch(url, options)
 
     if (!res.ok) {
       const text = await res.text()
@@ -133,14 +112,7 @@ export class EdooboxService {
 
     const ct = res.headers.get('content-type')
     const result = ct?.includes('application/json') ? await res.json() : await res.text()
-    console.log(`[edoobox] Response OK from ${url}:`, JSON.stringify(result).slice(0, 300))
-
-    // Check edoobox success flag
-    if (typeof result === 'object' && result !== null && 'success' in result && !(result as Record<string, unknown>).success) {
-      const msg = (result as Record<string, unknown>).message || JSON.stringify(result)
-      throw new Error(`edoobox: ${msg}`)
-    }
-
+    console.log(`[edoobox] Response OK from ${url}:`, JSON.stringify(result).slice(0, 500))
     return result
   }
 
@@ -179,9 +151,19 @@ export class EdooboxService {
     return true
   }
 
+  async listCategories(): Promise<EdooboxCategory[]> {
+    const data = await this.requestV2('GET', '/category/list') as Record<string, unknown>
+    const items = data.data as Record<string, Record<string, unknown>> | unknown[] || {}
+    const arr = Array.isArray(items) ? items : Object.values(items)
+    return arr.map(item => ({
+      id: String((item as Record<string, unknown>).id || ''),
+      name: String((item as Record<string, unknown>).name || '')
+    })).filter(c => c.id && c.name)
+  }
+
   async listOffers(): Promise<EdooboxOffer[]> {
     if (this.apiVersion === 'v2') {
-      const data = await this.requestV2Read('/offer/list') as Record<string, unknown>
+      const data = await this.requestV2('GET', '/offer/list') as Record<string, unknown>
       const items = data.data as Record<string, Record<string, unknown>> | unknown[] || {}
       const arr = Array.isArray(items) ? items : Object.values(items)
       return arr.map(item => ({
@@ -211,46 +193,19 @@ export class EdooboxService {
 
   async createOffer(offer: {
     name: string
-    description: string
-    maxParticipants?: number
-    location?: string
-    price?: number
-    category?: string
+    category: string
+    number?: string
   }): Promise<string> {
-    // Try V2 JWT auth with PUT (now with Super-Admin permissions)
-    const auth = await this.authenticateV2()
-    const url = `${this.baseUrl}/v2/offer`
     const body = {
-      name: offer.name,
-      description: offer.description,
-      user_maximum: offer.maxParticipants,
-      location: offer.location,
-      price: offer.price,
-      category: offer.category
+      data: {
+        category: offer.category,
+        name: offer.name,
+        number: offer.number || '',
+        type: 'offer'
+      }
     }
 
-    console.log(`[edoobox] PUT ${url}`, JSON.stringify(body).slice(0, 300))
-
-    const res = await fetch(url, {
-      method: 'PUT',
-      headers: {
-        'Authorization': `Bearer ${auth.token}`,
-        'edid': auth.edid,
-        'grant-type': 'access_token',
-        'Content-Type': 'application/json; charset=utf-8'
-      },
-      body: JSON.stringify(body)
-    })
-
-    if (!res.ok) {
-      const text = await res.text()
-      const rawPreview = text.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 500)
-      console.error(`[edoobox] Response ${res.status} from ${url}:`, rawPreview)
-      throw new Error(`edoobox API error (${res.status}): ${truncateError(text)}`)
-    }
-
-    const result = await res.json() as Record<string, unknown>
-    console.log(`[edoobox] Create offer response:`, JSON.stringify(result).slice(0, 500))
+    const result = await this.requestV2('POST', '/offer', body) as Record<string, unknown>
 
     const data = result.data as Record<string, unknown> | undefined
     const id = result.id || data?.id || result.offerId || ''
@@ -258,42 +213,170 @@ export class EdooboxService {
     return String(id)
   }
 
+  async getOffer(offerId: string): Promise<Record<string, unknown>> {
+    return await this.requestV2('GET', `/offer/${offerId}`) as Record<string, unknown>
+  }
+
+  async updateOffer(offerId: string, fields: Record<string, unknown>): Promise<void> {
+    const body = {
+      data: {
+        id: offerId,
+        ...fields
+      }
+    }
+    await this.requestV2('PUT', `/offer/${offerId}`, body)
+  }
+
+  async getText(textId: string): Promise<unknown> {
+    return await this.requestV2('GET', `/text/${textId}`)
+  }
+
+  async listPlaces(): Promise<Array<{ id: string; name: string }>> {
+    const data = await this.requestV2('GET', '/place/list') as Record<string, unknown>
+    const items = data.data as Record<string, Record<string, unknown>> | unknown[] || {}
+    const arr = Array.isArray(items) ? items : Object.values(items)
+    return arr.map(item => ({
+      id: String((item as Record<string, unknown>).id || ''),
+      name: String((item as Record<string, unknown>).name || '')
+    })).filter(p => p.id && p.name)
+  }
+
+  async createPlace(name: string): Promise<string> {
+    const body = {
+      data: {
+        name
+      }
+    }
+    const result = await this.requestV2('POST', '/place', body) as Record<string, unknown>
+    const data = result.data as Record<string, unknown> | undefined
+    const id = result.id || data?.id || ''
+    if (!id) throw new Error('No place ID in response: ' + JSON.stringify(result).slice(0, 300))
+    return String(id)
+  }
+
+  async createOfferText(offerId: string, language: string, value: string): Promise<void> {
+    // Wrap plain text in <p> tags if not already HTML
+    const htmlValue = value.startsWith('<') ? value : `<p>${value}</p>`
+    const body = {
+      data: {
+        resource: 'description',
+        resource_id: offerId,
+        language,
+        value: htmlValue
+      }
+    }
+    await this.requestV2('POST', '/text', body)
+  }
+
+  async listOffersForDashboard(): Promise<EdooboxOfferDashboard[]> {
+    const params = new URLSearchParams()
+    params.set('fields', JSON.stringify(['name', 'number', 'count_booking', 'offer_places', 'user_maximum', 'date_start', 'date_end', 'status']))
+    params.set('filter', JSON.stringify([{ property: 'trash', value: false }, { property: 'archive', value: false }]))
+    params.set('limit', JSON.stringify({ start: 0, reply: 200 }))
+    params.set('order', JSON.stringify([{ property: 'id', value: 'DESC' }]))
+    params.set('language', 'de')
+
+    const data = await this.requestV2('GET', `/offer/list/globaltable?${params.toString()}`) as Record<string, unknown>
+    const items = data.data as Record<string, Record<string, unknown>> | unknown[] || {}
+    const arr = Array.isArray(items) ? items : Object.values(items)
+
+    return arr.map(item => {
+      const r = item as Record<string, unknown>
+      return {
+        id: String(r.id || ''),
+        name: String(r.name || ''),
+        number: String(r.number || ''),
+        status: String(r.status || '0'),
+        bookingCount: Number(r.count_booking || 0),
+        maxParticipants: Number(r.user_maximum || 0),
+        dateStart: r.date_start ? String(r.date_start) : undefined,
+        dateEnd: r.date_end ? String(r.date_end) : undefined,
+        bookings: []
+      }
+    }).filter(o => o.id)
+  }
+
+  async listBookingsForOffer(offerId: string): Promise<EdooboxBooking[]> {
+    // Step 1: Get booking IDs for this offer
+    const params = new URLSearchParams()
+    params.set('filter', JSON.stringify([{ property: 'offer', expression: '=', value: offerId }]))
+    params.set('limit', JSON.stringify({ start: 0, reply: 500 }))
+
+    const data = await this.requestV2('GET', `/booking/list?${params.toString()}`) as Record<string, unknown>
+    const items = data.data as Record<string, Record<string, unknown>> | unknown[] || {}
+    const arr = Array.isArray(items) ? items : Object.values(items)
+
+    // Step 2: Fetch booking details + user details
+    const userCache = new Map<string, { name: string; email: string }>()
+    const bookings: EdooboxBooking[] = []
+
+    for (const item of arr) {
+      const bookingId = String((item as Record<string, unknown>).id || '')
+      if (!bookingId) continue
+
+      try {
+        const detail = await this.requestV2('GET', `/booking/${bookingId}`) as Record<string, unknown>
+        const d = detail.data as Record<string, Record<string, unknown>> | undefined
+        const bookingData = d ? (Object.values(d)[0] || {}) as Record<string, unknown> : {}
+
+        const bookedAt = String(bookingData.time || '')
+        const ownerId = String(bookingData.owner || '')
+
+        // Fetch user details if not cached
+        if (ownerId && !userCache.has(ownerId)) {
+          try {
+            const userResp = await this.requestV2('GET', `/user/${ownerId}`) as Record<string, unknown>
+            const ud = userResp.data as Record<string, Record<string, unknown>> | undefined
+            const userData = ud ? (Object.values(ud)[0] || {}) as Record<string, unknown> : {}
+            userCache.set(ownerId, {
+              name: [String(userData.first_name || ''), String(userData.last_name || '')].filter(Boolean).join(' ') || 'Unbekannt',
+              email: String(userData.email || '')
+            })
+          } catch {
+            userCache.set(ownerId, { name: 'Unbekannt', email: '' })
+          }
+        }
+
+        const user = userCache.get(ownerId) || { name: 'Unbekannt', email: '' }
+        bookings.push({
+          id: bookingId,
+          offerId,
+          userName: user.name,
+          userEmail: user.email,
+          status: bookingData.canceled ? 'canceled' : 'active',
+          bookedAt
+        })
+      } catch (e) {
+        console.warn('[edoobox] Could not fetch booking detail:', bookingId, e)
+      }
+    }
+
+    return bookings
+  }
+
   async createDate(offerId: string, date: {
     date: string
     startTime: string
     endTime: string
+    description?: string
+    placeId?: string
   }): Promise<string> {
-    const auth = await this.authenticateV2()
-    const url = `${this.baseUrl}/v2/modules`
+    // Build ISO date-time strings from date + time
+    const dateStart = `${date.date}T${date.startTime}:00+02:00`
+    const dateEnd = `${date.date}T${date.endTime}:00+02:00`
+
     const body = {
-      offerId,
-      date: date.date,
-      startTime: date.startTime,
-      endTime: date.endTime
+      data: {
+        description: date.description || '',
+        date_start: dateStart,
+        date_end: dateEnd,
+        place: date.placeId || false,
+        room: false,
+        offer: offerId
+      }
     }
 
-    console.log(`[edoobox] PUT ${url}`, JSON.stringify(body))
-
-    const res = await fetch(url, {
-      method: 'PUT',
-      headers: {
-        'Authorization': `Bearer ${auth.token}`,
-        'edid': auth.edid,
-        'grant-type': 'access_token',
-        'Content-Type': 'application/json; charset=utf-8'
-      },
-      body: JSON.stringify(body)
-    })
-
-    if (!res.ok) {
-      const text = await res.text()
-      console.error(`[edoobox] Create date error (${res.status}):`, text.slice(0, 300))
-      throw new Error(`edoobox API error (${res.status}): ${truncateError(text)}`)
-    }
-
-    const result = await res.json() as Record<string, unknown>
-    console.log(`[edoobox] Create date response:`, JSON.stringify(result).slice(0, 300))
-
+    const result = await this.requestV2('POST', '/date', body) as Record<string, unknown>
     const data = result.data as Record<string, unknown> | undefined
     return String(result.id || data?.id || '')
   }

@@ -9402,7 +9402,13 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
   gap: 4px;
 }
 
-.agent-import-btn,
+.agent-panel-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.agent-header-icon-btn,
 .agent-panel-close {
   display: flex;
   align-items: center;
@@ -9417,10 +9423,15 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
   transition: all 0.15s ease;
 }
 
-.agent-import-btn:hover,
+.agent-header-icon-btn:hover,
 .agent-panel-close:hover {
   background: var(--bg-hover);
   color: var(--text-primary);
+}
+
+.agent-header-icon-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .agent-panel-content {
@@ -9679,6 +9690,443 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
 .agent-delete-btn:hover {
   border-color: #ef4444;
   color: #ef4444;
+}
+
+.agent-edit-btn,
+.agent-save-btn {
+  padding: 6px 16px;
+  border: 1px solid var(--border-color);
+  background: none;
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 500;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.agent-save-btn {
+  background: var(--accent-color);
+  color: white;
+  border-color: var(--accent-color);
+}
+
+.agent-save-btn:hover {
+  opacity: 0.9;
+}
+
+.agent-edit-btn:hover {
+  border-color: var(--accent-color);
+  color: var(--accent-color);
+}
+
+.agent-edit-input,
+.agent-edit-textarea,
+.agent-edit-select {
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 12px;
+  font-family: inherit;
+  box-sizing: border-box;
+}
+
+.agent-edit-input:focus,
+.agent-edit-textarea:focus,
+.agent-edit-select:focus {
+  outline: none;
+  border-color: var(--accent-color);
+}
+
+.agent-edit-title {
+  font-size: 14px;
+  font-weight: 600;
+  flex: 1;
+}
+
+.agent-edit-textarea {
+  resize: vertical;
+  min-height: 60px;
+}
+
+.agent-detail-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.agent-date-edit {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.agent-date-edit input {
+  padding: 4px 6px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 12px;
+  font-family: inherit;
+}
+
+.agent-date-edit input:focus {
+  outline: none;
+  border-color: var(--accent-color);
+}
+
+.agent-date-edit input[type="date"] {
+  width: 120px;
+}
+
+.agent-date-edit input[type="time"] {
+  width: 80px;
+}
+
+.agent-add-btn,
+.agent-remove-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 0;
+  flex-shrink: 0;
+}
+
+.agent-add-btn:hover {
+  border-color: var(--accent-color);
+  color: var(--accent-color);
+}
+
+.agent-remove-btn:hover {
+  border-color: #ef4444;
+  color: #ef4444;
+}
+
+/* Agent Tab Switcher */
+.agent-tab-switcher {
+  display: flex;
+  border-bottom: 1px solid var(--border-color);
+  padding: 0 12px;
+  gap: 0;
+}
+
+.agent-tab {
+  padding: 8px 16px;
+  border: none;
+  background: none;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  transition: all 0.15s ease;
+}
+
+.agent-tab:hover {
+  color: var(--text-primary);
+}
+
+.agent-tab.active {
+  color: var(--accent-color);
+  border-bottom-color: var(--accent-color);
+}
+
+.agent-panel-subheader {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  gap: 8px;
+}
+
+.agent-panel-subheader .agent-import-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--text-primary);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.agent-panel-subheader .agent-import-btn:hover {
+  border-color: var(--accent-color);
+}
+
+/* Agent Dashboard */
+.agent-dashboard {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.agent-dashboard-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border-color);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.agent-dashboard-refresh {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.agent-dashboard-refresh:hover {
+  border-color: var(--accent-color);
+  color: var(--accent-color);
+}
+
+.agent-dashboard-refresh:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.agent-dashboard-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  gap: 12px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.agent-dashboard-list {
+  overflow-y: auto;
+  flex: 1;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.agent-dashboard-card {
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  transition: box-shadow 0.15s ease;
+}
+
+.agent-dashboard-card:hover {
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+}
+
+.agent-dashboard-card.expanded {
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.08);
+}
+
+.agent-dashboard-card-header {
+  display: flex;
+  align-items: flex-start;
+  width: 100%;
+  border: none;
+  background: none;
+  cursor: pointer;
+  text-align: left;
+  color: var(--text-primary);
+  padding: 10px 8px 10px 12px;
+  gap: 8px;
+}
+
+.agent-dashboard-card-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.agent-dashboard-card-title {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+.agent-dashboard-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 4px;
+  word-break: break-word;
+}
+
+.agent-dashboard-new-badge {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--accent-color) 15%, transparent);
+  color: var(--accent-color);
+  flex-shrink: 0;
+  line-height: 1.5;
+}
+
+/* Occupancy Badge */
+.agent-dashboard-occupancy {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  margin: 0 2px;
+}
+
+.agent-dashboard-ring {
+  display: block;
+  transform: rotate(-90deg);
+  flex-shrink: 0;
+}
+
+.agent-dashboard-occupancy-text {
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  line-height: 1;
+}
+
+.agent-dashboard-occupancy-text strong {
+  font-weight: 700;
+  color: var(--text-primary);
+  font-size: 13px;
+}
+
+.agent-dashboard-chevron {
+  align-self: center;
+  margin-right: 8px;
+  color: var(--text-muted);
+  transition: transform 0.15s ease;
+  flex-shrink: 0;
+}
+
+.agent-dashboard-chevron.expanded {
+  transform: rotate(180deg);
+}
+
+.agent-dashboard-bookings {
+  border-top: 1px solid var(--border-color);
+  padding: 8px 10px 10px 18px;
+}
+
+.agent-dashboard-bookings-header {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  padding-bottom: 6px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.agent-dashboard-loading-bookings {
+  display: flex;
+  justify-content: center;
+  padding: 16px;
+}
+
+.agent-dashboard-no-bookings {
+  font-size: 12px;
+  color: var(--text-muted);
+  padding: 12px 0;
+  text-align: center;
+}
+
+.agent-dashboard-bookings-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.agent-dashboard-booking {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 8px;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  border: 1px solid var(--border-color);
+}
+
+.agent-dashboard-booking.is-new {
+  background: color-mix(in srgb, var(--accent-color) 6%, transparent);
+}
+
+.agent-dashboard-booking-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--border-color);
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.agent-dashboard-booking-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.agent-dashboard-booking-name {
+  font-size: 12px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.agent-dashboard-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent-color);
+  flex-shrink: 0;
+}
+
+.agent-dashboard-booking-email {
+  color: var(--text-muted);
+  font-size: 11px;
+  margin-top: 1px;
+}
+
+.agent-dashboard-booking-date {
+  color: var(--text-muted);
+  font-size: 11px;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 /* Sections */

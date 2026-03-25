@@ -3334,39 +3334,6 @@ LIMIT 10
                       />
                     </div>
 
-                    <div className="settings-row">
-                      <label>{t('settings.agents.edoobox.apiVersion')}</label>
-                      <select
-                        value={edooboxSettings.apiVersion}
-                        onChange={e => setEdoobox({ apiVersion: e.target.value as 'v1' | 'v2' })}
-                      >
-                        <option value="v1">V1 (API Keys in Query)</option>
-                        <option value="v2">V2 (JWT Token)</option>
-                      </select>
-                    </div>
-
-                    <div className="settings-row">
-                      <label>{t('settings.agents.edoobox.baseUrl')}</label>
-                      <input
-                        type="text"
-                        value={edooboxSettings.baseUrl}
-                        onChange={e => setEdoobox({ baseUrl: e.target.value })}
-                        className="settings-input"
-                      />
-                    </div>
-
-                    <div className="settings-row">
-                      <label>{t('settings.agents.edoobox.webhookUrl')}</label>
-                      <input
-                        type="text"
-                        value={edooboxSettings.webhookUrl || ''}
-                        onChange={e => setEdoobox({ webhookUrl: e.target.value })}
-                        className="settings-input"
-                        placeholder="https://hooks.zapier.com/..."
-                      />
-                      <span className="settings-hint">{t('settings.agents.edoobox.webhookHint')}</span>
-                    </div>
-
                     <div className="settings-row" style={{ gap: '8px' }}>
                       <button
                         className="settings-btn"
