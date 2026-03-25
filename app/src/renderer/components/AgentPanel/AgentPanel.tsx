@@ -3,6 +3,8 @@ import { useAgentStore } from '../../stores/agentStore'
 import { useTranslation } from '../../utils/translations'
 import type { EdooboxEvent, EdooboxEventDate, EdooboxOfferDashboard } from '../../../shared/types'
 
+const edooboxLogoUrl = new URL('../../assets/edoobox-logo.png', import.meta.url).href
+
 interface AgentPanelProps {
   onClose: () => void
 }
@@ -162,7 +164,7 @@ const DashboardView: React.FC = () => {
   return (
     <div className="agent-dashboard">
       <div className="agent-dashboard-header">
-        <span>{t('agent.dashboard.bookings')}</span>
+        <img src={edooboxLogoUrl} alt="edoobox" className="agent-dashboard-logo" />
         <button
           className="agent-dashboard-refresh"
           onClick={loadDashboard}

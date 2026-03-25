@@ -2,6 +2,25 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.4.1-beta] - 2026-03-25
+
+### Features
+- **edoobox Veranstaltungen anlegen** — DOCX-Akkreditierungsformulare importieren und direkt als Angebot in edoobox erstellen
+  - Titel, Beschreibung, Termine, Ort, Teilnehmerzahl, Preis werden automatisch aus dem Formular extrahiert
+  - Editierbare Felder im AgentPanel nach Import — alle Werte vor dem Senden anpassen
+  - Kategorie-Dropdown mit edoobox-Kategorien
+  - Korrekte API V2-Integration: Offer + Place + Beschreibungstext (HTML) + Termine
+- **edoobox Booking-Dashboard** — Alle Angebote mit Anmeldezahlen auf einen Blick
+  - Occupancy-Donut-Charts pro Angebot (gruen/gelb/rot je nach Auslastung)
+  - Aufklappbare Teilnehmerlisten mit Name, E-Mail und Buchungsdatum
+  - Neuanmeldungen der letzten 7 Tage hervorgehoben mit Badge und Dot
+  - Tab-Switcher: Import | Dashboard
+  - edoobox-Logo im Dashboard-Header und in den Settings
+
+### Improvements
+- **Vereinfachte edoobox-Settings** — Nur noch API Key und Secret, kein Webhook/API-Version/Base-URL mehr
+- **Website** — Ueberarbeitete Startseite mit verbessertem Messaging, FAQ-Sektion und Agenten-Feature
+
 ## [0.4.0-beta] - 2026-03-22
 
 ### Features

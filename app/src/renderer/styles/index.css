@@ -9881,9 +9881,20 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
   align-items: center;
   padding: 10px 12px;
   border-bottom: 1px solid var(--border-color);
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text-primary);
+}
+
+.agent-dashboard-logo {
+  height: 18px;
+  width: auto;
+}
+
+.settings-section-header-with-logo {
+  margin-bottom: 4px;
+}
+
+.settings-edoobox-logo {
+  height: 24px;
+  width: auto;
 }
 
 .agent-dashboard-refresh {

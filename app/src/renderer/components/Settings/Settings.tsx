@@ -3298,7 +3298,9 @@ LIMIT 10
 
                 <div className="settings-divider" />
 
-                <h3>{t('settings.agents.edoobox.title')}</h3>
+                <div className="settings-section-header-with-logo">
+                  <img src={new URL('../../assets/edoobox-logo.png', import.meta.url).href} alt="edoobox" className="settings-edoobox-logo" />
+                </div>
                 <p className="settings-hint">{t('settings.agents.edoobox.description')}</p>
 
                 <div className="settings-row">
