@@ -53,6 +53,7 @@ jobs:
         env:
           CSC_LINK: ${{ secrets.CSC_LINK }}
           CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: npx electron-builder --mac --${{ matrix.arch }} --publish never
 
       - name: Notarize macOS app
@@ -86,6 +87,8 @@ jobs:
           path: |
             app/dist/*.dmg
             app/dist/*.zip
+            app/dist/*.yml
+            app/dist/*.blockmap
           if-no-files-found: error
 
   build-linux:
@@ -127,6 +130,8 @@ jobs:
             app/dist/*.AppImage
             app/dist/*.deb
             app/dist/*.snap
+            app/dist/*.yml
+            app/dist/*.blockmap
           if-no-files-found: error
 
       - name: Publish to Snap Store
@@ -173,6 +178,8 @@ jobs:
           path: |
             app/dist/*.exe
             app/dist/*.msi
+            app/dist/*.yml
+            app/dist/*.blockmap
           if-no-files-found: warn
 
   release:
@@ -200,6 +207,8 @@ jobs:
             artifacts/**/*.snap
             artifacts/**/*.exe
             artifacts/**/*.msi
+            artifacts/**/*.yml
+            artifacts/**/*.blockmap
           draft: false
           prerelease: false
           generate_release_notes: true
