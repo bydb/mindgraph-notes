@@ -785,6 +785,9 @@ export interface ElectronAPI {
   onEmailAnalysisProgress: (callback: (progress: { current: number; total: number }) => void) => void;
   emailSetup: (vaultPath: string, inboxFolderName?: string) => Promise<{ success: boolean; folderPath?: string; instructionPath?: string; error?: string }>;
   emailCreateNote: (vaultPath: string, email: EmailMessage, inboxFolderName?: string) => Promise<{ success: boolean; path?: string; alreadyExists?: boolean; error?: string }>;
+  emailSend: (composeData: object) => Promise<EmailSendResult>;
+  emailSelectSignatureImage: (vaultPath: string) => Promise<{ success: boolean; path?: string; dataUrl?: string; error?: string }>;
+  emailLoadSignatureImage: (imagePath: string) => Promise<string | null>;
 
   // Apple Reminders (macOS)
   platform: string;
@@ -810,6 +813,17 @@ export interface ElectronAPI {
   edooboxSaveEvents: (vaultPath: string, events: EdooboxEvent[]) => Promise<boolean>;
   edooboxListOffersDashboard: (baseUrl: string, apiVersion: string) => Promise<{ success: boolean; offers?: EdooboxOfferDashboard[]; error?: string }>;
   edooboxListBookings: (baseUrl: string, apiVersion: string, offerId: string) => Promise<{ success: boolean; bookings?: EdooboxBooking[]; error?: string }>;
+
+  // Marketing (WordPress)
+  marketingSaveCredentials: (credentials: { wpAppPassword?: string }) => Promise<boolean>;
+  marketingLoadCredentials: () => Promise<{ wpAppPassword?: string } | null>;
+  marketingCheckWordpress: (siteUrl: string, username: string) => Promise<{ success: boolean; userName?: string; error?: string }>;
+  marketingGenerateContent: (offerData: object, model: string) => Promise<{ success: boolean; blogPost?: string; igCaption?: string; error?: string }>;
+  marketingPublishWordpress: (siteUrl: string, username: string, title: string, content: string, status: 'draft' | 'publish', featuredMediaId?: number) => Promise<{ success: boolean; postId?: number; postUrl?: string; status?: string; error?: string }>;
+  marketingUploadImage: (siteUrl: string, username: string, imagePath: string, caption?: string) => Promise<{ success: boolean; mediaId?: number; imageUrl?: string; error?: string }>;
+  marketingGenerateImage: (prompt: string, apiKey: string) => Promise<{ success: boolean; imagePath?: string; imageBase64?: string; error?: string }>;
+  marketingReadImageBase64: (imagePath: string) => Promise<string | null>;
+  marketingSelectImage: () => Promise<string | null>;
 }
 
 // Email Integration Types
@@ -828,6 +842,9 @@ export interface EmailMessage {
   analysis?: EmailAnalysis
   noteCreated?: boolean   // true wenn Notiz bereits erstellt wurde
   notePath?: string       // Pfad zur erstellten Notiz
+  sent?: boolean          // true fuer vom User gesendete Emails
+  hasAttachments?: boolean
+  attachmentNames?: string[]
 }
 
 export interface EmailSuggestedAction {
@@ -848,6 +865,8 @@ export interface EmailAnalysis {
   extractedInfo: string[]
   categories: string[]
   suggestedActions?: (EmailSuggestedAction | string)[]
+  needsReply?: boolean
+  replyUrgency?: 'low' | 'medium' | 'high'
   analyzedAt: string
   model: string
 }
@@ -868,6 +887,25 @@ export interface EmailAccount {
   port: number
   user: string
   tls: boolean
+  smtpHost: string
+  smtpPort: number
+  smtpTls: boolean
+}
+
+export interface ComposeEmail {
+  to: { name: string; address: string }[]
+  cc?: { name: string; address: string }[]
+  subject: string
+  body: string
+  inReplyTo?: string
+  references?: string
+  accountId: string
+}
+
+export interface EmailSendResult {
+  success: boolean
+  messageId?: string
+  error?: string
 }
 
 export interface EmailFetchResult {
@@ -875,6 +913,18 @@ export interface EmailFetchResult {
   newCount: number
   totalCount: number
   error?: string
+}
+
+export interface AggregatedContact {
+  id: string
+  name: string
+  email: string
+  aliases: string[]
+  sources: ('email' | 'edoobox' | 'vault')[]
+  emailCount: number
+  lastEmailDate?: string
+  edooboxBookings?: { offerId: string; offerName: string; status: string }[]
+  vaultMentions?: string[]
 }
 
 // edoobox Agent Types
@@ -940,6 +990,10 @@ export interface EdooboxOfferDashboard {
   maxParticipants: number
   dateStart?: string
   dateEnd?: string
+  epHash?: string
+  location?: string
+  leaders?: string[]
+  description?: string
   bookings: EdooboxBooking[]
 }
 

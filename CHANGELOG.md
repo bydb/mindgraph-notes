@@ -2,6 +2,31 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.4.2-beta] - 2026-03-26
+
+### Features
+- **Smart Email Client** — Vom passiven Email-Reader zum kontextbewussten Email-Assistenten
+  - **Emails senden** via SMTP (nodemailer) direkt aus der App
+  - **Compose-View** im Apple-Mail-Stil mit Empfaenger-Autocomplete aus Kontakten
+  - **Antworten-Button** in der Email-Detail-Ansicht — Reply mit vorausgefuelltem Betreff und Empfaenger
+  - **KI-Chat** — Emails mit dem Ollama-Assistenten besprechen, Fragen stellen, Kontext verstehen
+  - **Entwurf-Generator** — KI erstellt Antwortentwuerfe basierend auf dem vollen Kontext
+  - **"Als Antwort verwenden"** — KI-Entwurf direkt in die Compose-View uebernehmen
+  - **Kontext-Engine** — KI kennt: Vault-Notizen, edoobox-Veranstaltungen, Kontakt-Historie, offene Tasks
+  - **Kontakt-Aggregation** — Automatische Zusammenfuehrung aus Email-Historie, edoobox-Buchungen, Vault-Wikilinks
+  - **Signatur** mit Bild-Upload und Text (Bild wird als CID-Attachment in HTML-Email eingebettet)
+  - **Absender-Konfiguration** — Name + E-Mail-Adresse pro Account
+  - **"Antwort erwartet"**-Erkennung — KI markiert Emails die eine Antwort brauchen (rot/orange/blau je nach Dringlichkeit)
+  - **Anhang-Erkennung** — Bueroklammer-Icon in der Liste mit Dateinamen
+  - **"Original anzeigen"** — Aufklappbarer Originaltext unter der Analyse
+- **Marketing-Tab** im AgentPanel — WordPress Publishing, Ollama Content-Generierung, Google Imagen Bilder
+
+### Improvements
+- **InboxPanel View-Switcher** — Drei Ansichten: Liste, Compose, KI-Chat ueber Header-Buttons
+- **SMTP-Einstellungen** pro Email-Account (Host, Port, TLS)
+- **Tooltips** fuer alle Inbox-Buttons mit korrekter Positionierung
+- **Senden-Button** deutlich sichtbar in Blau (#2563eb)
+
 ## [0.4.1-beta] - 2026-03-25
 
 ### Features

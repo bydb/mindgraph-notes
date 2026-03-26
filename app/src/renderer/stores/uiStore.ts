@@ -286,7 +286,7 @@ export interface LanguageToolSettings {
 // Email Integration Settings
 export interface EmailSettings {
   enabled: boolean
-  accounts: Array<{ id: string; name: string; host: string; port: number; user: string; tls: boolean }>
+  accounts: Array<{ id: string; name: string; host: string; port: number; user: string; tls: boolean; smtpHost: string; smtpPort: number; smtpTls: boolean; fromAddress: string }>
   fetchIntervalMinutes: number
   instructionNotePath: string
   inboxFolderName: string
@@ -295,6 +295,17 @@ export interface EmailSettings {
   retainDays: number
   autoAnalyze: boolean
   analysisModel: string
+  signature: string
+  signatureImagePath: string
+}
+
+// Marketing Settings (WordPress)
+export interface MarketingSettings {
+  enabled: boolean
+  wordpressUrl: string
+  wordpressUser: string
+  defaultPostStatus: 'draft' | 'publish'
+  googleImagenApiKey: string
 }
 
 // edoobox Agent Settings
@@ -396,6 +407,9 @@ interface UIState {
   // Email Settings
   email: EmailSettings
 
+  // Marketing Settings
+  marketing: MarketingSettings
+
   // edoobox Agent Settings
   edoobox: EdooboxSettings
 
@@ -480,6 +494,7 @@ interface UIState {
   setReadwise: (settings: Partial<ReadwiseSettings>) => void
   setLanguageTool: (settings: Partial<LanguageToolSettings>) => void
   setEmail: (settings: Partial<EmailSettings>) => void
+  setMarketing: (settings: Partial<MarketingSettings>) => void
   setEdoobox: (settings: Partial<EdooboxSettings>) => void
   setRemarkable: (settings: Partial<ReMarkableSettings>) => void
   setDailyNote: (settings: Partial<DailyNoteSettings>) => void
@@ -631,7 +646,18 @@ const defaultState = {
     maxEmailsPerFetch: 50,
     retainDays: 30,
     autoAnalyze: true,
-    analysisModel: ''
+    analysisModel: '',
+    signature: '',
+    signatureImagePath: ''
+  },
+
+  // Marketing (WordPress)
+  marketing: {
+    enabled: false,
+    wordpressUrl: '',
+    wordpressUser: '',
+    defaultPostStatus: 'draft' as const,
+    googleImagenApiKey: ''
   },
 
   // edoobox Agent
@@ -696,7 +722,7 @@ const persistedKeys = [
   'canvasFilterPath', 'canvasViewMode', 'canvasShowEdges', 'canvasShowTags', 'canvasShowLinks', 'canvasShowImages', 'canvasShowSummaries',
   'canvasCompactMode', 'canvasReadMode', 'canvasHoverScale', 'canvasDefaultCardWidth', 'splitPosition', 'fileTreeDisplayMode', 'ollama',
   'pdfCompanionEnabled', 'pdfDisplayMode', 'iconSet',
-  'smartConnectionsEnabled', 'notesChatEnabled', 'flashcardsEnabled', 'semanticScholarEnabled', 'smartConnectionsWeights', 'docling', 'visionOcr', 'readwise', 'languageTool', 'email', 'edoobox', 'remarkable', 'dailyNote',
+  'smartConnectionsEnabled', 'notesChatEnabled', 'flashcardsEnabled', 'semanticScholarEnabled', 'smartConnectionsWeights', 'docling', 'visionOcr', 'readwise', 'languageTool', 'email', 'marketing', 'edoobox', 'remarkable', 'dailyNote',
   'lastSeenVersion',
   'customAccentColor', 'customBackgroundColorLight', 'customBackgroundColorDark',
   'customLogo',
@@ -774,6 +800,9 @@ export const useUIStore = create<UIState>()((set, get) => ({
   })),
   setEmail: (settings) => set((state) => ({
     email: { ...state.email, ...settings }
+  })),
+  setMarketing: (settings) => set((state) => ({
+    marketing: { ...state.marketing, ...settings }
   })),
   setEdoobox: (settings) => set((state) => ({
     edoobox: { ...state.edoobox, ...settings }

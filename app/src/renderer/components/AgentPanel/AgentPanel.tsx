@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { useAgentStore } from '../../stores/agentStore'
+import { useUIStore } from '../../stores/uiStore'
 import { useTranslation } from '../../utils/translations'
 import type { EdooboxEvent, EdooboxEventDate, EdooboxOfferDashboard } from '../../../shared/types'
 
@@ -454,6 +455,275 @@ const EventsView: React.FC = () => {
   )
 }
 
+// ---- Marketing View ----
+
+const MarketingOfferCard: React.FC<{ offer: EdooboxOfferDashboard; onSelect: () => void }> = ({ offer, onSelect }) => {
+  const { marketingPublishStatus } = useAgentStore()
+  const status = marketingPublishStatus[offer.id]
+
+  const formatDate = (iso: string) => {
+    const d = new Date(iso)
+    return d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })
+  }
+
+  return (
+    <button className="agent-marketing-card" onClick={onSelect}>
+      <div className="agent-marketing-card-body">
+        <div className="agent-marketing-card-title">{offer.name}</div>
+        <div className="agent-marketing-card-meta">
+          {offer.dateStart && <span>{formatDate(offer.dateStart)}</span>}
+          {offer.location && <span>{offer.location}</span>}
+          {offer.number && <span>{offer.number}</span>}
+        </div>
+        <div className="agent-marketing-card-status">
+          {status?.wordpress && (
+            <span className="agent-marketing-badge wp" title={status.wordpress.postUrl}>WP</span>
+          )}
+        </div>
+      </div>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="m9 18 6-6-6-6" />
+      </svg>
+    </button>
+  )
+}
+
+const MarketingPublishDetail: React.FC<{ offer: EdooboxOfferDashboard; onBack: () => void }> = ({ offer, onBack }) => {
+  const { t } = useTranslation()
+  const {
+    generatedBlogPost, generatedIgCaption, isGenerating, isPublishing,
+    generateContent, setGeneratedBlogPost, setGeneratedIgCaption,
+    publishToWordpress, selectImage, generateImage, isGeneratingImage,
+    selectedImagePath, imagePreviewDataUrl, imageGeneratedInfo, marketingPublishStatus
+  } = useAgentStore()
+  const marketing = useUIStore(s => s.marketing)
+  const edooboxBaseUrl = useUIStore(s => s.edoobox.baseUrl)
+  const status = marketingPublishStatus[offer.id]
+  const [bookingUrl, setBookingUrl] = useState(
+    offer.epHash ? `${edooboxBaseUrl.replace(/\/$/, '')}/ed/${offer.epHash}` : ''
+  )
+
+  const handleGenerate = useCallback(() => {
+    generateContent(offer, bookingUrl || undefined)
+  }, [offer, bookingUrl, generateContent])
+
+  const handlePublishWp = useCallback(async () => {
+    if (!generatedBlogPost) return
+    await publishToWordpress(offer.id, offer.name, generatedBlogPost)
+  }, [offer.id, offer.name, generatedBlogPost, publishToWordpress])
+
+  const [igCopied, setIgCopied] = useState(false)
+  const handleCopyIgCaption = useCallback(() => {
+    if (!generatedIgCaption) return
+    navigator.clipboard.writeText(generatedIgCaption)
+    setIgCopied(true)
+    setTimeout(() => setIgCopied(false), 2000)
+  }, [generatedIgCaption])
+
+  return (
+    <div className="agent-marketing-detail">
+      <button className="agent-back-btn" onClick={onBack}>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M19 12H5" /><path d="m12 19-7-7 7-7" />
+        </svg>
+        {t('agent.detail.back')}
+      </button>
+
+      <h3 className="agent-marketing-detail-title">{offer.name}</h3>
+
+      <div className="agent-marketing-link-input">
+        <label>{t('agent.marketing.bookingUrl')}</label>
+        <input
+          type="url"
+          value={bookingUrl}
+          onChange={e => setBookingUrl(e.target.value)}
+          placeholder="https://..."
+          className="agent-marketing-url-field"
+        />
+      </div>
+
+      <button
+        className="agent-marketing-generate-btn"
+        onClick={handleGenerate}
+        disabled={isGenerating}
+      >
+        {isGenerating ? (
+          <>
+            <svg className="spinning" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+            </svg>
+            {t('agent.marketing.generating')}
+          </>
+        ) : (
+          <>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z" />
+            </svg>
+            {t('agent.marketing.generate')}
+          </>
+        )}
+      </button>
+
+      {/* Bild-Sektion (für WP Featured Image + IG) */}
+      {(generatedBlogPost || generatedIgCaption) && (
+        <div className="agent-marketing-section">
+          <div className="agent-marketing-section-header">
+            <label>{t('agent.marketing.image')}</label>
+          </div>
+          <div className="agent-marketing-image-row">
+            <button className="agent-marketing-image-btn" onClick={selectImage}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect width="18" height="18" x="3" y="3" rx="2" ry="2" />
+                <circle cx="9" cy="9" r="2" />
+                <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
+              </svg>
+              {selectedImagePath ? selectedImagePath.split('/').pop() : t('agent.marketing.selectImage')}
+            </button>
+            {marketing.googleImagenApiKey && (
+              <button
+                className="agent-marketing-image-btn"
+                onClick={() => generateImage(offer)}
+                disabled={isGeneratingImage}
+              >
+                {isGeneratingImage ? (
+                  <svg className="spinning" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+                  </svg>
+                ) : (
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z" />
+                  </svg>
+                )}
+                {t('agent.marketing.generateImage')}
+              </button>
+            )}
+          </div>
+          {imagePreviewDataUrl && (
+            <div className="agent-marketing-image-preview">
+              <img src={imagePreviewDataUrl} alt="Preview" />
+              {imageGeneratedInfo && (
+                <div className="agent-marketing-image-info">{imageGeneratedInfo}</div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* WordPress Section */}
+      {generatedBlogPost && (
+        <div className="agent-marketing-section">
+          <div className="agent-marketing-section-header">
+            <label>{t('agent.marketing.wordpress')}</label>
+            {status?.wordpress && (
+              <a className="agent-marketing-link" href={status.wordpress.postUrl} target="_blank" rel="noreferrer">
+                {status.wordpress.status === 'draft' ? t('agent.marketing.draft') : t('agent.marketing.published')}
+              </a>
+            )}
+          </div>
+          <textarea
+            className="agent-marketing-textarea"
+            value={generatedBlogPost}
+            onChange={e => setGeneratedBlogPost(e.target.value)}
+            rows={8}
+          />
+          <button
+            className="agent-marketing-publish-btn wp"
+            onClick={handlePublishWp}
+            disabled={isPublishing || !marketing.wordpressUrl}
+          >
+            {isPublishing ? t('agent.marketing.publishing') : t('agent.marketing.publishWp')}
+          </button>
+        </div>
+      )}
+
+      {/* Instagram Caption (Copy & Paste) */}
+      {generatedIgCaption && (
+        <div className="agent-marketing-section">
+          <div className="agent-marketing-section-header">
+            <label>{t('agent.marketing.instagram')}</label>
+          </div>
+          <textarea
+            className="agent-marketing-textarea"
+            value={generatedIgCaption}
+            onChange={e => setGeneratedIgCaption(e.target.value)}
+            rows={6}
+          />
+          <button
+            className="agent-marketing-publish-btn ig"
+            onClick={handleCopyIgCaption}
+          >
+            {igCopied ? t('agent.marketing.copied') : t('agent.marketing.copyCaption')}
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+const MarketingView: React.FC = () => {
+  const { t } = useTranslation()
+  const {
+    marketingOffers, isMarketingLoading, loadMarketingOffers,
+    selectedMarketingOfferId, setSelectedMarketingOfferId
+  } = useAgentStore()
+
+  useEffect(() => {
+    loadMarketingOffers()
+  }, [loadMarketingOffers])
+
+  const selectedOffer = selectedMarketingOfferId
+    ? marketingOffers.find(o => o.id === selectedMarketingOfferId)
+    : null
+
+  if (selectedOffer) {
+    return <MarketingPublishDetail offer={selectedOffer} onBack={() => setSelectedMarketingOfferId(null)} />
+  }
+
+  return (
+    <div className="agent-marketing">
+      <div className="agent-marketing-header">
+        <span className="agent-marketing-header-title">{t('agent.marketing.title')}</span>
+        <button
+          className="agent-dashboard-refresh"
+          onClick={loadMarketingOffers}
+          disabled={isMarketingLoading}
+          title={t('agent.dashboard.refresh')}
+        >
+          <svg
+            className={isMarketingLoading ? 'spinning' : ''}
+            width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+          >
+            <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+          </svg>
+        </button>
+      </div>
+
+      {isMarketingLoading && marketingOffers.length === 0 ? (
+        <div className="agent-dashboard-empty">
+          <svg className="spinning" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+          </svg>
+          <p>{t('agent.dashboard.loading')}</p>
+        </div>
+      ) : marketingOffers.length === 0 ? (
+        <div className="agent-dashboard-empty">
+          <p>{t('agent.marketing.noOffers')}</p>
+        </div>
+      ) : (
+        <div className="agent-marketing-list">
+          {marketingOffers.map(offer => (
+            <MarketingOfferCard
+              key={offer.id}
+              offer={offer}
+              onSelect={() => setSelectedMarketingOfferId(offer.id)}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ---- Main Panel ----
 
 export const AgentPanel: React.FC<AgentPanelProps> = ({ onClose }) => {
@@ -514,10 +784,16 @@ export const AgentPanel: React.FC<AgentPanelProps> = ({ onClose }) => {
         >
           {t('agent.tab.dashboard')}
         </button>
+        <button
+          className={`agent-tab ${dashboardView === 'marketing' ? 'active' : ''}`}
+          onClick={() => setDashboardView('marketing')}
+        >
+          {t('agent.tab.marketing')}
+        </button>
       </div>
 
       <div className="agent-panel-content">
-        {dashboardView === 'events' ? <EventsView /> : <DashboardView />}
+        {dashboardView === 'events' ? <EventsView /> : dashboardView === 'dashboard' ? <DashboardView /> : <MarketingView />}
       </div>
     </div>
   )

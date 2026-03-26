@@ -2801,7 +2801,9 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
     const result = await window.electronAPI.exportPDF(
       fileName,
       htmlContent,
-      frontmatterTitle || selectedNote.title
+      frontmatterTitle || selectedNote.title,
+      vaultPath || undefined,
+      selectedNote.path || undefined
     )
 
     if (result.success) {
@@ -2809,7 +2811,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
     } else if (result.error !== 'Abgebrochen') {
       console.error('PDF Export fehlgeschlagen:', result.error)
     }
-  }, [selectedNote, frontmatterTitle, renderedMarkdown])
+  }, [selectedNote, frontmatterTitle, renderedMarkdown, vaultPath])
 
   if (!selectedNote) {
     return (

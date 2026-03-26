@@ -268,9 +268,23 @@ export class EdooboxService {
     await this.requestV2('POST', '/text', body)
   }
 
+  private extractPlaceName(places: unknown): string | undefined {
+    if (!Array.isArray(places) || places.length === 0) return undefined
+    const p = places[0] as Record<string, unknown>
+    return p.name ? String(p.name) : undefined
+  }
+
+  private extractLeaders(leaders: unknown): string[] {
+    if (!Array.isArray(leaders)) return []
+    return leaders.map((l: Record<string, unknown>) => {
+      const parts = [l.first_name, l.last_name].filter(Boolean).map(String)
+      return parts.join(' ')
+    }).filter(n => n.length > 0)
+  }
+
   async listOffersForDashboard(): Promise<EdooboxOfferDashboard[]> {
     const params = new URLSearchParams()
-    params.set('fields', JSON.stringify(['name', 'number', 'count_booking', 'offer_places', 'user_maximum', 'date_start', 'date_end', 'status']))
+    params.set('fields', JSON.stringify(['name', 'number', 'count_booking', 'offer_places', 'user_maximum', 'date_start', 'date_end', 'status', 'ep_hash', 'leaders', 'description']))
     params.set('filter', JSON.stringify([{ property: 'trash', value: false }, { property: 'archive', value: false }]))
     params.set('limit', JSON.stringify({ start: 0, reply: 200 }))
     params.set('order', JSON.stringify([{ property: 'id', value: 'DESC' }]))
@@ -291,6 +305,10 @@ export class EdooboxService {
         maxParticipants: Number(r.user_maximum || 0),
         dateStart: r.date_start ? String(r.date_start) : undefined,
         dateEnd: r.date_end ? String(r.date_end) : undefined,
+        epHash: r.ep_hash ? String(r.ep_hash) : undefined,
+        location: this.extractPlaceName(r.offer_places),
+        leaders: this.extractLeaders(r.leaders),
+        description: r.description ? String(r.description) : undefined,
         bookings: []
       }
     }).filter(o => o.id)

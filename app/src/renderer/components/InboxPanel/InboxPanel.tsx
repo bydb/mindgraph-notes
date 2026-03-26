@@ -4,6 +4,8 @@ import { useUIStore } from '../../stores/uiStore'
 import { useNotesStore } from '../../stores/notesStore'
 import { useTranslation } from '../../utils/translations'
 import { sanitizeHtml } from '../../utils/sanitize'
+import { ComposeView } from './ComposeView'
+import { EmailAIChatView } from './EmailAIChatView'
 
 const isMac = window.electronAPI.platform === 'darwin'
 
@@ -24,13 +26,19 @@ export const InboxPanel: React.FC<InboxPanelProps> = ({ onClose }) => {
     setFilter,
     fetchEmails,
     selectedEmailId,
-    setSelectedEmail
+    setSelectedEmail,
+    currentView,
+    setCurrentView,
+    startReply,
+    startNewEmail,
+    setAiChatEmail
   } = useEmailStore()
   const { email: emailSettings } = useUIStore()
 
   const emails = useEmailStore(state => state.emails)
   const [searchQuery, setSearchQuery] = useState('')
   const [reminderStatus, setReminderStatus] = useState<Record<number, 'loading' | 'success' | 'error'>>({})
+  const [showOriginal, setShowOriginal] = useState(false)
 
   const filteredEmails = getFilteredEmails()
 
@@ -49,7 +57,6 @@ export const InboxPanel: React.FC<InboxPanelProps> = ({ onClose }) => {
 
   const handleRefresh = useCallback(async () => {
     if (!vaultPath || isFetching) return
-    // Manueller Refresh = voller 30-Tage-Fetch
     await fetchEmails(vaultPath, true)
   }, [vaultPath, isFetching, fetchEmails])
 
@@ -126,29 +133,106 @@ export const InboxPanel: React.FC<InboxPanelProps> = ({ onClose }) => {
     }
   }, [selectedEmail])
 
-  // Detail-Ansicht
-  if (selectedEmail) {
-    return (
-      <div className="inbox-panel">
-        <div className="inbox-panel-header">
-          <div className="inbox-panel-title">
-            <button
-              className="inbox-panel-close"
-              onClick={() => setSelectedEmail(null)}
-              title={t('inbox.detail.back')}
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="15 18 9 12 15 6" />
-              </svg>
-            </button>
-            <span>{t('inbox.detail.back')}</span>
-          </div>
-          <button className="inbox-panel-close" onClick={onClose} title={t('panel.close')}>
+  // View-Switcher Header (shared across all views)
+  const renderHeader = (showBack?: boolean, backAction?: () => void) => (
+    <div className="inbox-panel-header">
+      <div className="inbox-panel-title">
+        {showBack && (
+          <button
+            className="inbox-panel-close"
+            data-tooltip={t('inbox.detail.back')}
+            onClick={backAction}
+          >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+              <polyline points="15 18 9 12 15 6" />
             </svg>
           </button>
+        )}
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <rect width="20" height="16" x="2" y="4" rx="2" />
+          <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
+        </svg>
+        <span>{t('inbox.title')}</span>
+      </div>
+      <div style={{ display: 'flex', gap: '2px' }}>
+        {/* Compose button */}
+        <button
+          className={`inbox-header-btn ${currentView === 'compose' ? 'active' : ''}`}
+          onClick={() => startNewEmail()}
+          data-tooltip={t('inbox.compose')}
+        >
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12 20h9" />
+            <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
+          </svg>
+          <span>{t('inbox.compose.short')}</span>
+        </button>
+        {/* AI Chat button */}
+        <button
+          className={`inbox-header-btn ${currentView === 'aiChat' ? 'active' : ''}`}
+          onClick={() => {
+            useEmailStore.getState().clearAiChat()
+            setCurrentView('aiChat')
+          }}
+          data-tooltip={t('inbox.aiChat.title')}
+        >
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+          </svg>
+          <span>KI</span>
+        </button>
+        {/* Refresh */}
+        <button
+          className="inbox-panel-close"
+          onClick={handleRefresh}
+          disabled={isFetching}
+          data-tooltip={t('inbox.refresh')}
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={isFetching ? 'spinning' : ''}>
+            <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+            <path d="M3 3v5h5" />
+            <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" />
+            <path d="M16 16h5v5" />
+          </svg>
+        </button>
+        <button className="inbox-panel-close" data-tooltip={t('panel.close')} onClick={onClose}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+        </button>
+      </div>
+    </div>
+  )
+
+  // Compose view
+  if (currentView === 'compose') {
+    return (
+      <div className="inbox-panel">
+        {renderHeader(true, () => setCurrentView(selectedEmailId ? 'detail' : 'list'))}
+        <div className="inbox-panel-content">
+          <ComposeView />
         </div>
+      </div>
+    )
+  }
+
+  // AI Chat view
+  if (currentView === 'aiChat') {
+    return (
+      <div className="inbox-panel">
+        {renderHeader(true, () => setCurrentView(selectedEmailId ? 'detail' : 'list'))}
+        <div className="inbox-panel-content" style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+          <EmailAIChatView />
+        </div>
+      </div>
+    )
+  }
+
+  // Detail view
+  if (selectedEmail && currentView === 'detail') {
+    return (
+      <div className="inbox-panel">
+        {renderHeader(true, () => { setSelectedEmail(null); setCurrentView('list') })}
         <div className="inbox-panel-content">
           <div className="inbox-email-detail">
             <div className="inbox-email-detail-header">
@@ -156,6 +240,50 @@ export const InboxPanel: React.FC<InboxPanelProps> = ({ onClose }) => {
               <div className="inbox-email-detail-meta">
                 <span className="inbox-email-from">{selectedEmail.from.name || selectedEmail.from.address}</span>
                 <span className="inbox-email-date">{formatDate(selectedEmail.date)}</span>
+              </div>
+              {/* Needs reply indicator */}
+              {selectedEmail.analysis?.needsReply && (
+                <div className={`inbox-needs-reply ${selectedEmail.analysis.replyUrgency || 'medium'}`}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="9 17 4 12 9 7" />
+                    <path d="M20 18v-2a4 4 0 0 0-4-4H4" />
+                  </svg>
+                  <span>{t(`inbox.needsReply.${selectedEmail.analysis.replyUrgency || 'medium'}`)}</span>
+                </div>
+              )}
+
+              {/* Attachment indicator */}
+              {selectedEmail.hasAttachments && (
+                <div className="inbox-attachment-info">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48" />
+                  </svg>
+                  <span>
+                    {selectedEmail.attachmentNames?.length === 1
+                      ? selectedEmail.attachmentNames[0]
+                      : `${selectedEmail.attachmentNames?.length || ''} ${t('inbox.detail.attachments')}`}
+                  </span>
+                  {selectedEmail.attachmentNames && selectedEmail.attachmentNames.length > 1 && (
+                    <span className="inbox-attachment-names">{selectedEmail.attachmentNames.join(', ')}</span>
+                  )}
+                </div>
+              )}
+
+              {/* Action buttons */}
+              <div className="inbox-email-actions">
+                <button className="inbox-action-btn" onClick={() => startReply(selectedEmail)} data-tooltip={t('inbox.reply.tooltip')}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="9 17 4 12 9 7" />
+                    <path d="M20 18v-2a4 4 0 0 0-4-4H4" />
+                  </svg>
+                  {t('inbox.reply')}
+                </button>
+                <button className="inbox-action-btn" onClick={() => setAiChatEmail(selectedEmail.id)} data-tooltip={t('inbox.discuss.tooltip')}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                  </svg>
+                  {t('inbox.discuss')}
+                </button>
               </div>
             </div>
 
@@ -293,47 +421,36 @@ export const InboxPanel: React.FC<InboxPanelProps> = ({ onClose }) => {
                 </div>
               )
             })()}
+
+            {/* Original-Text Toggle */}
+            <button
+              className="inbox-original-toggle"
+              onClick={() => setShowOriginal(!showOriginal)}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                {showOriginal ? (
+                  <><polyline points="18 15 12 9 6 15" /></>
+                ) : (
+                  <><polyline points="6 9 12 15 18 9" /></>
+                )}
+              </svg>
+              {showOriginal ? t('inbox.detail.hideOriginal') : t('inbox.detail.showOriginal')}
+            </button>
+            {showOriginal && (
+              <div className="inbox-original-text">
+                <pre>{selectedEmail.bodyText}</pre>
+              </div>
+            )}
           </div>
         </div>
       </div>
     )
   }
 
-  // Listen-Ansicht
+  // List view (default)
   return (
     <div className="inbox-panel">
-      <div className="inbox-panel-header">
-        <div className="inbox-panel-title">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <rect width="20" height="16" x="2" y="4" rx="2" />
-            <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
-          </svg>
-          <span>{t('inbox.title')}</span>
-          {displayEmails.length > 0 && (
-            <span className="inbox-count">{displayEmails.length}</span>
-          )}
-        </div>
-        <div style={{ display: 'flex', gap: '4px' }}>
-          <button
-            className="inbox-panel-close"
-            onClick={handleRefresh}
-            disabled={isFetching}
-            title={t('inbox.refresh')}
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={isFetching ? 'spinning' : ''}>
-              <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
-              <path d="M3 3v5h5" />
-              <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" />
-              <path d="M16 16h5v5" />
-            </svg>
-          </button>
-          <button className="inbox-panel-close" onClick={onClose} title={t('panel.close')}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
-            </svg>
-          </button>
-        </div>
-      </div>
+      {renderHeader()}
 
       {/* Experimental Warning */}
       <div className="inbox-experimental-warning">
@@ -399,29 +516,54 @@ export const InboxPanel: React.FC<InboxPanelProps> = ({ onClose }) => {
             {displayEmails.map(email => (
               <div
                 key={email.id}
-                className={`inbox-email-item ${!email.flags.includes('\\Seen') ? 'unread' : ''}`}
-                onClick={() => setSelectedEmail(email.id)}
+                className={`inbox-email-item ${!email.flags.includes('\\Seen') ? 'unread' : ''} ${email.sent ? 'sent' : ''}`}
+                onClick={() => {
+                  setSelectedEmail(email.id)
+                  setCurrentView('detail')
+                }}
               >
                 <div className="inbox-email-avatar">
-                  {(email.from.name || email.from.address).charAt(0).toUpperCase()}
+                  {email.sent ? (
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <line x1="22" y1="2" x2="11" y2="13" />
+                      <polygon points="22 2 15 22 11 13 2 9 22 2" />
+                    </svg>
+                  ) : (
+                    (email.from.name || email.from.address).charAt(0).toUpperCase()
+                  )}
                 </div>
                 <div className="inbox-email-content">
                   <div className="inbox-email-top">
                     <span className="inbox-email-sender">
-                      {email.from.name || email.from.address}
+                      {email.sent ? `An: ${email.to[0]?.name || email.to[0]?.address || ''}` : (email.from.name || email.from.address)}
                     </span>
                     <span className="inbox-email-time">{formatDate(email.date)}</span>
                   </div>
                   <div className="inbox-email-subject">{email.subject}</div>
                   <div className="inbox-email-snippet">{email.snippet}</div>
                 </div>
-                {email.analysis && (
-                  <span
-                    className="inbox-sentiment-dot"
-                    style={{ background: getSentimentColor(email.analysis.sentiment) }}
-                    title={getSentimentLabel(email.analysis.sentiment)}
-                  />
-                )}
+                <div className="inbox-email-indicators">
+                  {email.analysis?.needsReply && (
+                    <span className={`inbox-reply-badge ${email.analysis.replyUrgency || 'medium'}`} title={t('inbox.needsReply')}>
+                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="9 17 4 12 9 7" />
+                        <path d="M20 18v-2a4 4 0 0 0-4-4H4" />
+                      </svg>
+                    </span>
+                  )}
+                  {email.hasAttachments && (
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" title={email.attachmentNames?.join(', ') || 'Anhang'}>
+                      <path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48" />
+                    </svg>
+                  )}
+                  {email.analysis && (
+                    <span
+                      className="inbox-sentiment-dot"
+                      style={{ background: getSentimentColor(email.analysis.sentiment) }}
+                      title={getSentimentLabel(email.analysis.sentiment)}
+                    />
+                  )}
+                </div>
               </div>
             ))}
           </div>

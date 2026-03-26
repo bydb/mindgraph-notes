@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { EmailMessage, EmailFilter, EmailFetchResult } from '../../shared/types'
+import type { EmailMessage, EmailFilter, EmailFetchResult, ComposeEmail, EmailSendResult } from '../../shared/types'
 import { useUIStore } from './uiStore'
 import { useNotesStore } from './notesStore'
 
@@ -13,6 +13,15 @@ interface EmailState {
   activeFilter: EmailFilter
   unreadRelevantCount: number
   selectedEmailId: string | null
+  // Compose
+  composeState: ComposeEmail | null
+  isSending: boolean
+  // AI Chat
+  aiChatMessages: Array<{ role: 'user' | 'assistant'; content: string }>
+  aiChatEmailId: string | null
+  isAiChatLoading: boolean
+  // View
+  currentView: 'list' | 'detail' | 'compose' | 'aiChat'
 
   // Actions
   loadEmails: (vaultPath: string, skipAutoActions?: boolean) => Promise<void>
@@ -25,6 +34,17 @@ interface EmailState {
   setFilter: (filter: Partial<EmailFilter>) => void
   setSelectedEmail: (id: string | null) => void
   updateUnreadRelevantCount: () => void
+  // Compose actions
+  setComposeState: (state: ComposeEmail | null) => void
+  setCurrentView: (view: 'list' | 'detail' | 'compose' | 'aiChat') => void
+  sendEmail: (vaultPath: string) => Promise<EmailSendResult>
+  startReply: (email: EmailMessage) => void
+  startNewEmail: () => void
+  // AI Chat actions
+  setAiChatEmail: (emailId: string | null) => void
+  addAiChatMessage: (msg: { role: 'user' | 'assistant'; content: string }) => void
+  clearAiChat: () => void
+  setAiChatLoading: (loading: boolean) => void
 }
 
 export const useEmailStore = create<EmailState>()((set, get) => ({
@@ -37,6 +57,12 @@ export const useEmailStore = create<EmailState>()((set, get) => ({
   activeFilter: { onlyRelevant: true },
   unreadRelevantCount: 0,
   selectedEmailId: null,
+  composeState: null,
+  isSending: false,
+  aiChatMessages: [],
+  aiChatEmailId: null,
+  isAiChatLoading: false,
+  currentView: 'list' as const,
 
   loadEmails: async (vaultPath: string, skipAutoActions?: boolean) => {
     try {
@@ -295,5 +321,102 @@ export const useEmailStore = create<EmailState>()((set, get) => ({
     ).length
 
     set({ unreadRelevantCount: count })
-  }
+  },
+
+  // Compose actions
+  setComposeState: (state) => set({ composeState: state }),
+
+  setCurrentView: (view) => set({ currentView: view }),
+
+  sendEmail: async (vaultPath: string) => {
+    const { composeState, emails } = get()
+    if (!composeState) return { success: false, error: 'Kein Entwurf' }
+
+    const { email: emailSettings } = useUIStore.getState()
+    const account = emailSettings.accounts.find(a => a.id === composeState.accountId)
+    if (!account) return { success: false, error: 'Account nicht gefunden' }
+
+    set({ isSending: true })
+    try {
+      const result = await window.electronAPI.emailSend({
+        ...composeState,
+        account: {
+          smtpHost: account.smtpHost,
+          smtpPort: account.smtpPort,
+          smtpTls: account.smtpTls,
+          user: account.user,
+          name: account.name,
+          fromAddress: account.fromAddress
+        },
+        signatureImagePath: emailSettings.signatureImagePath || undefined
+      })
+      if (result.success) {
+        // Gesendete Email tracken
+        const sentEmail: EmailMessage = {
+          id: result.messageId || `sent-${Date.now()}`,
+          uid: 0,
+          accountId: composeState.accountId,
+          from: { name: '', address: account.user },
+          to: composeState.to,
+          subject: composeState.subject,
+          date: new Date().toISOString(),
+          snippet: composeState.body.substring(0, 200),
+          bodyText: composeState.body,
+          flags: ['\\Seen'],
+          fetchedAt: new Date().toISOString(),
+          sent: true
+        }
+        set({ emails: [...emails, sentEmail], composeState: null, currentView: 'list' })
+        await get().saveEmails(vaultPath)
+      }
+      return result
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : 'Senden fehlgeschlagen' }
+    } finally {
+      set({ isSending: false })
+    }
+  },
+
+  startReply: (email: EmailMessage) => {
+    const { email: emailSettings } = useUIStore.getState()
+    const account = emailSettings.accounts[0]
+    const sig = emailSettings.signature ? `\n\n--\n${emailSettings.signature}` : ''
+    set({
+      composeState: {
+        to: [{ name: email.from.name, address: email.from.address }],
+        subject: email.subject.startsWith('Re:') ? email.subject : `Re: ${email.subject}`,
+        body: sig,
+        inReplyTo: email.id,
+        references: email.id,
+        accountId: account?.id || ''
+      },
+      currentView: 'compose'
+    })
+  },
+
+  startNewEmail: () => {
+    const { email: emailSettings } = useUIStore.getState()
+    const account = emailSettings.accounts[0]
+    const sig = emailSettings.signature ? `\n\n--\n${emailSettings.signature}` : ''
+    set({
+      composeState: {
+        to: [],
+        subject: '',
+        body: sig,
+        accountId: account?.id || ''
+      },
+      currentView: 'compose'
+    })
+  },
+
+  // AI Chat actions
+  setAiChatEmail: (emailId) => set({ aiChatEmailId: emailId, aiChatMessages: [], currentView: 'aiChat' }),
+
+  addAiChatMessage: (msg) => set((state) => ({
+    aiChatMessages: [...state.aiChatMessages, msg]
+  })),
+
+  clearAiChat: () => set({ aiChatMessages: [], aiChatEmailId: null }),
+
+  setAiChatLoading: (loading) => set({ isAiChatLoading: loading })
 }))

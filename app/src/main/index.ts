@@ -5052,11 +5052,17 @@ ipcMain.handle('email-fetch', async (_event, vaultPath: string, accounts: Array<
 
             // Body-Text extrahieren mit mailparser
             let bodyText = ''
+            let hasAttachments = false
+            let attachmentNames: string[] = []
             if (msg.source) {
               try {
                 const { simpleParser } = await import('mailparser')
                 const parsed = await simpleParser(msg.source)
                 bodyText = parsed.text || ''
+                if (parsed.attachments && parsed.attachments.length > 0) {
+                  hasAttachments = true
+                  attachmentNames = parsed.attachments.map((a: { filename?: string }) => a.filename || 'Anhang').filter(Boolean)
+                }
                 // Fallback: HTML zu Text wenn kein Plain-Text
                 if (!bodyText.trim() && parsed.html) {
                   bodyText = parsed.html
@@ -5096,7 +5102,9 @@ ipcMain.handle('email-fetch', async (_event, vaultPath: string, accounts: Array<
               snippet: bodyText.substring(0, 200),
               bodyText,
               flags: Array.from(msg.flags || []),
-              fetchedAt: new Date().toISOString()
+              fetchedAt: new Date().toISOString(),
+              hasAttachments,
+              attachmentNames: attachmentNames.length > 0 ? attachmentNames : undefined
             })
 
             totalProcessed++
@@ -5213,12 +5221,17 @@ DATUMSREGELN für suggestedActions:
 - Kein Datum erkennbar → "${tomorrowISO}"
 - Bei Terminen: action="Termin: [Betreff/Thema]", date=YYYY-MM-DD, time=HH:mm
 
+ANTWORT-ERKENNUNG (needsReply):
+- needsReply=true wenn: direkte Frage an mich, Bitte um Rueckmeldung/Bestaetigung, Einladung die Antwort erwartet, offene Anfrage
+- needsReply=false wenn: reine Info/Newsletter, automatische Benachrichtigung, Werbung, bereits beantwortete Threads
+- replyUrgency: "high" = Frist innerhalb 2 Tagen oder explizit dringend, "medium" = Antwort erwartet aber kein Zeitdruck, "low" = optional/hoeflich
+
 Von: ${email.from.name} <${email.from.address}>
 Betreff: ${sanitizedSubject}
 Datum: ${email.date}
 Text: ${sanitizedBody}
 
-{"relevant":true,"relevanceScore":85,"sentiment":"neutral","summary":"Zusammenfassung auf Deutsch","extractedInfo":["Termin: 2026-06-23 14:00","Ort: Leipzig","Zoom: https://example.zoom.us/j/123"],"categories":["Fortbildung"],"suggestedActions":[{"action":"Termin: Fortbildung Leipzig","date":"2026-06-23","time":"14:00"},{"action":"Anmelden","date":"2026-06-01","time":""}]}`
+{"relevant":true,"relevanceScore":85,"sentiment":"neutral","summary":"Zusammenfassung auf Deutsch","extractedInfo":["Termin: 2026-06-23 14:00","Ort: Leipzig"],"categories":["Fortbildung"],"needsReply":true,"replyUrgency":"medium","suggestedActions":[{"action":"Termin: Fortbildung Leipzig","date":"2026-06-23","time":"14:00"},{"action":"Anmelden","date":"2026-06-01","time":""}]}`
 
         const controller = new AbortController()
         const timeout = setTimeout(() => controller.abort(), 5 * 60 * 1000) // 5 Minuten Timeout
@@ -5260,6 +5273,8 @@ Text: ${sanitizedBody}
                 extractedInfo: Array.isArray(analysis.extractedInfo) ? analysis.extractedInfo.map((x: unknown) => typeof x === 'string' ? x : JSON.stringify(x)) : [],
                 categories: Array.isArray(analysis.categories) ? analysis.categories.map((x: unknown) => typeof x === 'string' ? x : String(x)) : [],
                 suggestedActions: Array.isArray(analysis.suggestedActions) ? analysis.suggestedActions : [],
+                needsReply: analysis.needsReply === true,
+                replyUrgency: ['low', 'medium', 'high'].includes(analysis.replyUrgency) ? analysis.replyUrgency : undefined,
                 analyzedAt: new Date().toISOString(),
                 model
               }
@@ -5593,6 +5608,157 @@ ipcMain.handle('email-create-note', async (_event, vaultPath: string, email: {
   } catch (error) {
     console.error('[Email] Create note failed:', error)
     return { success: false, error: error instanceof Error ? error.message : 'Notiz-Erstellung fehlgeschlagen' }
+  }
+})
+
+// Signatur-Bild auswaehlen und in .mindgraph speichern
+ipcMain.handle('email-select-signature-image', async (_event, vaultPath: string) => {
+  try {
+    const result = await dialog.showOpenDialog({
+      title: 'Signatur-Bild auswaehlen',
+      filters: [{ name: 'Bilder', extensions: ['jpg', 'jpeg', 'png', 'gif', 'webp'] }],
+      properties: ['openFile']
+    })
+    if (result.canceled || !result.filePaths[0]) return { success: false }
+
+    const sourcePath = result.filePaths[0]
+    const ext = path.extname(sourcePath).toLowerCase()
+    const destDir = path.join(vaultPath, '.mindgraph')
+    await fs.mkdir(destDir, { recursive: true })
+    const destPath = path.join(destDir, `signature-image${ext}`)
+    await fs.copyFile(sourcePath, destPath)
+
+    // Base64 fuer Vorschau
+    const buffer = await fs.readFile(destPath)
+    const mimeTypes: Record<string, string> = { '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.gif': 'image/gif', '.webp': 'image/webp' }
+    const mime = mimeTypes[ext] || 'image/png'
+    const dataUrl = `data:${mime};base64,${buffer.toString('base64')}`
+
+    return { success: true, path: destPath, dataUrl }
+  } catch (error) {
+    console.error('[Email] Signature image selection failed:', error)
+    return { success: false, error: error instanceof Error ? error.message : 'Fehler' }
+  }
+})
+
+// Signatur-Bild als Data-URL laden
+ipcMain.handle('email-load-signature-image', async (_event, imagePath: string) => {
+  try {
+    const buffer = await fs.readFile(imagePath)
+    const ext = path.extname(imagePath).toLowerCase()
+    const mimeTypes: Record<string, string> = { '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.gif': 'image/gif', '.webp': 'image/webp' }
+    const mime = mimeTypes[ext] || 'image/png'
+    return `data:${mime};base64,${buffer.toString('base64')}`
+  } catch {
+    return null
+  }
+})
+
+// Email per SMTP senden
+ipcMain.handle('email-send', async (_event, composeData: {
+  to: { name: string; address: string }[]
+  cc?: { name: string; address: string }[]
+  subject: string
+  body: string
+  inReplyTo?: string
+  references?: string
+  accountId: string
+  account: { smtpHost: string; smtpPort: number; smtpTls: boolean; user: string; name?: string; fromAddress?: string }
+  signatureImagePath?: string
+}) => {
+  try {
+    const nodemailer = await import('nodemailer')
+
+    // Passwort laden (gleich wie IMAP)
+    if (!safeStorage.isEncryptionAvailable()) {
+      return { success: false, error: 'safeStorage nicht verfuegbar' }
+    }
+    let password: string
+    try {
+      const encrypted = await fs.readFile(getEmailCredentialsPath(composeData.accountId))
+      password = safeStorage.decryptString(encrypted)
+    } catch {
+      return { success: false, error: 'Kein Passwort gespeichert' }
+    }
+
+    const { account } = composeData
+    if (!account.smtpHost) {
+      return { success: false, error: 'SMTP-Host nicht konfiguriert' }
+    }
+
+    const transporter = nodemailer.default.createTransport({
+      host: account.smtpHost,
+      port: account.smtpPort || 587,
+      secure: account.smtpTls && account.smtpPort === 465,
+      auth: {
+        user: account.user,
+        pass: password
+      },
+      tls: {
+        rejectUnauthorized: true
+      }
+    })
+
+    // HTML aus Body generieren (Zeilenumbrueche zu <br>)
+    const escapeHtml = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    let htmlBody = `<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; font-size: 14px; color: #333;">`
+    htmlBody += escapeHtml(composeData.body).replace(/\n/g, '<br>')
+    htmlBody += `</div>`
+
+    // Signatur-Bild als CID-Attachment einbetten
+    const attachments: Array<{ filename: string; path: string; cid: string }> = []
+    if (composeData.signatureImagePath) {
+      try {
+        await fs.access(composeData.signatureImagePath)
+        const ext = path.extname(composeData.signatureImagePath).toLowerCase()
+        attachments.push({
+          filename: `signature${ext}`,
+          path: composeData.signatureImagePath,
+          cid: 'signature-image'
+        })
+        const imgTag = `<img src="cid:signature-image" width="250" style="display:block; max-width:250px; height:auto;" />`
+        // Bild direkt nach dem "--" Trennstrich einfuegen
+        const sigMarker = '--<br>'
+        const sigDivider = htmlBody.lastIndexOf(sigMarker)
+        if (sigDivider !== -1) {
+          const afterSig = sigDivider + sigMarker.length
+          htmlBody = htmlBody.substring(0, afterSig) + `<br>${imgTag}<br>` + htmlBody.substring(afterSig)
+        } else {
+          htmlBody += `<br>${imgTag}`
+        }
+      } catch { /* Bild nicht gefunden, ignorieren */ }
+    }
+
+    // fromAddress ist die volle Email-Adresse (user kann nur Username sein)
+    const senderAddress = account.fromAddress || account.user
+    const mailOptions: Record<string, unknown> = {
+      from: account.name ? { name: account.name, address: senderAddress } : senderAddress,
+      sender: senderAddress,
+      envelope: {
+        from: senderAddress,
+        to: composeData.to.map(r => r.address)
+      },
+      to: composeData.to.map(r => r.name ? `"${r.name}" <${r.address}>` : r.address).join(', '),
+      subject: composeData.subject,
+      text: composeData.body,
+      html: htmlBody,
+      attachments
+    }
+
+    if (composeData.cc && composeData.cc.length > 0) {
+      mailOptions.cc = composeData.cc.map(r => r.name ? `"${r.name}" <${r.address}>` : r.address).join(', ')
+    }
+    if (composeData.inReplyTo) {
+      mailOptions.inReplyTo = composeData.inReplyTo
+      mailOptions.references = composeData.references || composeData.inReplyTo
+    }
+
+    const info = await transporter.sendMail(mailOptions)
+    console.log('[Email] Sent successfully:', info.messageId)
+    return { success: true, messageId: info.messageId }
+  } catch (error) {
+    console.error('[Email] Send failed:', error)
+    return { success: false, error: error instanceof Error ? error.message : 'Senden fehlgeschlagen' }
   }
 })
 
@@ -6123,6 +6289,305 @@ ipcMain.handle('edoobox-save-events', async (_event, vaultPath: string, events: 
     return false
   }
 })
+
+// ========================================
+// Marketing (WordPress + Instagram)
+// ========================================
+
+function getMarketingCredentialsPath(): string {
+  return path.join(app.getPath('userData'), 'marketing-credentials.enc')
+}
+
+// Credentials speichern (safeStorage)
+ipcMain.handle('marketing-save-credentials', async (_event, credentials: { wpAppPassword?: string }) => {
+  try {
+    if (!safeStorage.isEncryptionAvailable()) {
+      console.warn('[marketing] safeStorage encryption not available')
+      return false
+    }
+    // Merge with existing credentials
+    let existing: Record<string, string> = {}
+    const credPath = getMarketingCredentialsPath()
+    const fileExists = await fs.access(credPath).then(() => true).catch(() => false)
+    if (fileExists) {
+      try {
+        const encrypted = await fs.readFile(credPath)
+        existing = JSON.parse(safeStorage.decryptString(encrypted))
+      } catch { /* ignore */ }
+    }
+    const merged = { ...existing, ...credentials }
+    const data = JSON.stringify(merged)
+    const encrypted = safeStorage.encryptString(data)
+    await fs.writeFile(credPath, encrypted)
+    return true
+  } catch (error) {
+    console.error('[marketing] Failed to save credentials:', error)
+    return false
+  }
+})
+
+// Credentials laden (safeStorage)
+ipcMain.handle('marketing-load-credentials', async () => {
+  try {
+    if (!safeStorage.isEncryptionAvailable()) return null
+    const credPath = getMarketingCredentialsPath()
+    const exists = await fs.access(credPath).then(() => true).catch(() => false)
+    if (!exists) return null
+    const encrypted = await fs.readFile(credPath)
+    const decrypted = safeStorage.decryptString(encrypted)
+    return JSON.parse(decrypted) as { wpAppPassword?: string; igAccessToken?: string }
+  } catch (error) {
+    console.error('[marketing] Failed to load credentials:', error)
+    return null
+  }
+})
+
+// WordPress Verbindungstest
+ipcMain.handle('marketing-check-wordpress', async (_event, siteUrl: string, username: string) => {
+  try {
+    const creds = await loadMarketingCredentials()
+    if (!creds?.wpAppPassword) return { success: false, error: 'Kein WordPress App-Passwort gespeichert' }
+
+    const { WordPressService } = await import('./marketingService')
+    const wp = new WordPressService(siteUrl, username, creds.wpAppPassword)
+    const user = await wp.checkConnection()
+    return { success: true, userName: user.name }
+  } catch (error) {
+    console.error('[marketing] WordPress check failed:', error)
+    return { success: false, error: error instanceof Error ? error.message : 'Verbindung fehlgeschlagen' }
+  }
+})
+
+// Content generieren via Ollama
+ipcMain.handle('marketing-generate-content', async (_event, offerData: {
+  name: string
+  description?: string
+  dateStart?: string
+  dateEnd?: string
+  location?: string
+  price?: number
+  maxParticipants?: number
+  speakers?: string[]
+  bookingUrl?: string
+}, model: string) => {
+  console.log('[marketing] Generating content for:', offerData.name, 'with model:', model, 'location:', offerData.location, 'dateStart:', offerData.dateStart, 'speakers:', offerData.speakers, 'desc:', offerData.description?.slice(0, 50))
+  try {
+    // Build offer summary for the prompt
+    const details: string[] = []
+    if (offerData.description) details.push(`Beschreibung: ${offerData.description}`)
+    if (offerData.dateStart) {
+      const start = new Date(offerData.dateStart)
+      const dateStr = start.toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })
+      const timeStr = start.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })
+      if (offerData.dateEnd) {
+        const end = new Date(offerData.dateEnd)
+        const endDateStr = end.toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })
+        const endTimeStr = end.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })
+        if (dateStr === endDateStr) {
+          details.push(`Datum: ${dateStr}, ${timeStr} – ${endTimeStr}`)
+        } else {
+          details.push(`Datum: ${dateStr} ${timeStr} – ${endDateStr} ${endTimeStr}`)
+        }
+      } else {
+        details.push(`Datum: ${dateStr}, ${timeStr} Uhr`)
+      }
+    }
+    if (offerData.location) details.push(`Ort: ${offerData.location}`)
+    if (offerData.price) details.push(`Preis: ${offerData.price} EUR`)
+    if (offerData.maxParticipants) details.push(`Max. Teilnehmer: ${offerData.maxParticipants}`)
+    if (offerData.speakers?.length) details.push(`Referent(en): ${offerData.speakers.join(', ')}`)
+    if (offerData.bookingUrl) details.push(`Anmelde-Link: ${offerData.bookingUrl}`)
+
+    const offerSummary = `Titel: ${offerData.name}\n${details.join('\n')}`
+
+    const bookingHint = offerData.bookingUrl
+      ? ` Binde den Anmelde-Link (${offerData.bookingUrl}) prominent als Button oder Link im Call-to-Action ein.`
+      : ''
+
+    // Generate WordPress Blog Post
+    const wpPrompt = `Du bist ein professioneller Marketing-Texter für Fortbildungsveranstaltungen. Erstelle einen ansprechenden Blog-Post im HTML-Format. Verwende <h2>, <p>, <ul> Tags. BEGINNE NICHT mit dem Titel als Überschrift — der Titel wird automatisch von WordPress angezeigt. Starte direkt mit dem Einleitungstext. Der Blog-Post MUSS am Ende einen Abschnitt "Veranstaltungsdetails" mit ALLEN folgenden Infos als <p><strong>-Liste enthalten: Datum, Uhrzeit, Ort, Referent(en), Teilnehmerzahl.${bookingHint} WICHTIG: Verwende KEIN Gendern mit Sternchen, Doppelpunkt oder Unterstrich (NICHT Schüler*innen, Lehrer:innen etc.). Nutze stattdessen neutrale Begriffe wie Lehrkräfte, Teilnehmende oder die ausgeschriebene Form. Gib NUR den HTML-Body zurück, keine Erklärungen.
+
+Veranstaltung:
+${offerSummary}`
+
+    const wpResponse = await fetch(`${OLLAMA_API_URL}/api/generate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model,
+        prompt: wpPrompt,
+        stream: false,
+        think: false,
+        options: { temperature: 0.7, num_predict: 2000 }
+      }),
+      signal: AbortSignal.timeout(120000)
+    })
+
+    if (!wpResponse.ok) throw new Error(`Ollama API Fehler: ${wpResponse.status}`)
+    const wpData = await wpResponse.json()
+    const blogPost = wpData.response?.trim() || ''
+
+    // Generate Instagram Caption
+    const igPrompt = `Du bist ein Social-Media-Experte. Erstelle eine ansprechende Instagram-Caption (max. 2000 Zeichen) für folgende Veranstaltung. Die Caption MUSS Datum, Uhrzeit und Ort der Veranstaltung enthalten. Sie soll Aufmerksamkeit erregen und mit relevanten Hashtags enden. Verwende passende Emojis. WICHTIG: Verwende KEIN Gendern mit Sternchen, Doppelpunkt oder Unterstrich (NICHT Schüler*innen, Lehrer:innen etc.). Nutze stattdessen neutrale Begriffe wie Lehrkräfte, Teilnehmende oder die ausgeschriebene Form. Gib NUR die Caption zurück.
+
+Veranstaltung:
+${offerSummary}`
+
+    const igResponse = await fetch(`${OLLAMA_API_URL}/api/generate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model,
+        prompt: igPrompt,
+        stream: false,
+        think: false,
+        options: { temperature: 0.8, num_predict: 1000 }
+      }),
+      signal: AbortSignal.timeout(120000)
+    })
+
+    if (!igResponse.ok) throw new Error(`Ollama API Fehler (IG): ${igResponse.status}`)
+    const igData = await igResponse.json()
+    const igCaption = igData.response?.trim() || ''
+
+    console.log('[marketing] Content generated:', { blogPostLen: blogPost.length, igCaptionLen: igCaption.length })
+    return { success: true, blogPost, igCaption }
+  } catch (error) {
+    console.error('[marketing] Content generation failed:', error)
+    return { success: false, error: error instanceof Error ? error.message : 'Content-Generierung fehlgeschlagen' }
+  }
+})
+
+// WordPress Post veröffentlichen
+ipcMain.handle('marketing-publish-wordpress', async (_event, siteUrl: string, username: string, title: string, content: string, status: 'draft' | 'publish', featuredMediaId?: number) => {
+  try {
+    const creds = await loadMarketingCredentials()
+    if (!creds?.wpAppPassword) return { success: false, error: 'Kein WordPress App-Passwort gespeichert' }
+
+    const { WordPressService } = await import('./marketingService')
+    const wp = new WordPressService(siteUrl, username, creds.wpAppPassword)
+    const post = await wp.createPost(title, content, status, featuredMediaId)
+    console.log('[marketing] WordPress post created:', post.id, post.link)
+    return { success: true, postId: post.id, postUrl: post.link, status: post.status }
+  } catch (error) {
+    console.error('[marketing] WordPress publish failed:', error)
+    return { success: false, error: error instanceof Error ? error.message : 'Veröffentlichung fehlgeschlagen' }
+  }
+})
+
+// Bild auf WordPress hochladen (für Instagram-URL)
+ipcMain.handle('marketing-upload-image', async (_event, siteUrl: string, username: string, imagePath: string, caption?: string) => {
+  try {
+    const creds = await loadMarketingCredentials()
+    if (!creds?.wpAppPassword) return { success: false, error: 'Kein WordPress App-Passwort gespeichert' }
+
+    const imageBuffer = await fs.readFile(imagePath)
+    const filename = path.basename(imagePath)
+    const ext = path.extname(imagePath).toLowerCase()
+    const mimeTypes: Record<string, string> = {
+      '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png',
+      '.gif': 'image/gif', '.webp': 'image/webp'
+    }
+    const mimeType = mimeTypes[ext] || 'image/jpeg'
+
+    const { WordPressService } = await import('./marketingService')
+    const wp = new WordPressService(siteUrl, username, creds.wpAppPassword)
+    const media = await wp.uploadMedia(imageBuffer, filename, mimeType, caption)
+    console.log('[marketing] Image uploaded:', media.id, media.source_url)
+    return { success: true, mediaId: media.id, imageUrl: media.source_url }
+  } catch (error) {
+    console.error('[marketing] Image upload failed:', error)
+    return { success: false, error: error instanceof Error ? error.message : 'Bild-Upload fehlgeschlagen' }
+  }
+})
+
+// Bild per Google Imagen generieren
+ipcMain.handle('marketing-generate-image', async (_event, prompt: string, apiKey: string) => {
+  console.log('[marketing] Generating image with Imagen, prompt length:', prompt.length, 'prompt:', prompt.slice(0, 200))
+  try {
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict?key=${apiKey}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        instances: [{ prompt }],
+        parameters: {
+          sampleCount: 1,
+          aspectRatio: '16:9',
+          safetyFilterLevel: 'block_only_high'
+        }
+      }),
+      signal: AbortSignal.timeout(120000)
+    })
+
+    if (!response.ok) {
+      const text = await response.text()
+      console.error('[marketing] Imagen API error:', response.status, text.slice(0, 500))
+      throw new Error(`Imagen API Fehler (${response.status}): ${text.slice(0, 200)}`)
+    }
+
+    const data = await response.json()
+    const filtered = data.predictions?.[0]?.safetyAttributes?.blocked
+      ? `BLOCKED (categories: ${JSON.stringify(data.predictions[0].safetyAttributes)})`
+      : data.filteredReason || 'none'
+    console.log('[marketing] Imagen response: predictions:', data.predictions?.length ?? 0, 'filtered:', filtered, 'keys:', Object.keys(data))
+    const predictions = data.predictions?.filter((p: { bytesBase64Encoded?: string }) => p.bytesBase64Encoded)
+    if (!predictions || predictions.length === 0) {
+      const reason = data.filteredReason || filtered || JSON.stringify(data).slice(0, 500)
+      console.error('[marketing] Imagen: no usable images returned. Full response:', JSON.stringify(data).slice(0, 1000))
+      throw new Error(`Keine Bilder generiert: ${reason}`)
+    }
+
+    // Save to temp file
+    const imageBase64 = predictions[0].bytesBase64Encoded
+    const tempPath = path.join(app.getPath('temp'), `mindgraph-imagen-${Date.now()}.png`)
+    await fs.writeFile(tempPath, Buffer.from(imageBase64, 'base64'))
+    console.log('[marketing] Image generated and saved to:', tempPath)
+
+    return { success: true, imagePath: tempPath, imageBase64 }
+  } catch (error) {
+    console.error('[marketing] Image generation failed:', error)
+    return { success: false, error: error instanceof Error ? error.message : 'Bildgenerierung fehlgeschlagen' }
+  }
+})
+
+// Bild als Base64 lesen (für Preview im Renderer)
+ipcMain.handle('marketing-read-image-base64', async (_event, imagePath: string) => {
+  try {
+    const buffer = await fs.readFile(imagePath)
+    return buffer.toString('base64')
+  } catch {
+    return null
+  }
+})
+
+// Bild auswählen (File Dialog)
+ipcMain.handle('marketing-select-image', async () => {
+  try {
+    const result = await dialog.showOpenDialog({
+      title: 'Bild auswählen',
+      filters: [{ name: 'Bilder', extensions: ['jpg', 'jpeg', 'png', 'gif', 'webp'] }],
+      properties: ['openFile']
+    })
+    if (result.canceled || !result.filePaths[0]) return null
+    return result.filePaths[0]
+  } catch {
+    return null
+  }
+})
+
+// Helper: Marketing-Credentials laden
+async function loadMarketingCredentials(): Promise<{ wpAppPassword?: string; igAccessToken?: string } | null> {
+  try {
+    if (!safeStorage.isEncryptionAvailable()) return null
+    const credPath = getMarketingCredentialsPath()
+    const exists = await fs.access(credPath).then(() => true).catch(() => false)
+    if (!exists) return null
+    const encrypted = await fs.readFile(credPath)
+    return JSON.parse(safeStorage.decryptString(encrypted))
+  } catch {
+    return null
+  }
+}
 
 // Cleanup bei App-Beendigung
 app.on('before-quit', () => {

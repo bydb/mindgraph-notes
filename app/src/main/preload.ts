@@ -337,6 +337,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('email-setup', vaultPath, inboxFolderName),
   emailCreateNote: (vaultPath: string, email: object, inboxFolderName?: string) =>
     ipcRenderer.invoke('email-create-note', vaultPath, email, inboxFolderName),
+  emailSend: (composeData: object) =>
+    ipcRenderer.invoke('email-send', composeData),
+  emailSelectSignatureImage: (vaultPath: string) =>
+    ipcRenderer.invoke('email-select-signature-image', vaultPath),
+  emailLoadSignatureImage: (imagePath: string) =>
+    ipcRenderer.invoke('email-load-signature-image', imagePath),
 
   // Apple Reminders (macOS)
   platform: process.platform,
@@ -379,5 +385,25 @@ contextBridge.exposeInMainWorld('electronAPI', {
   edooboxListOffersDashboard: (baseUrl: string, apiVersion: string) =>
     ipcRenderer.invoke('edoobox-list-offers-dashboard', baseUrl, apiVersion),
   edooboxListBookings: (baseUrl: string, apiVersion: string, offerId: string) =>
-    ipcRenderer.invoke('edoobox-list-bookings', baseUrl, apiVersion, offerId)
+    ipcRenderer.invoke('edoobox-list-bookings', baseUrl, apiVersion, offerId),
+
+  // Marketing (WordPress)
+  marketingSaveCredentials: (credentials: { wpAppPassword?: string }) =>
+    ipcRenderer.invoke('marketing-save-credentials', credentials),
+  marketingLoadCredentials: () =>
+    ipcRenderer.invoke('marketing-load-credentials'),
+  marketingCheckWordpress: (siteUrl: string, username: string) =>
+    ipcRenderer.invoke('marketing-check-wordpress', siteUrl, username),
+  marketingGenerateContent: (offerData: object, model: string) =>
+    ipcRenderer.invoke('marketing-generate-content', offerData, model),
+  marketingPublishWordpress: (siteUrl: string, username: string, title: string, content: string, status: 'draft' | 'publish', featuredMediaId?: number) =>
+    ipcRenderer.invoke('marketing-publish-wordpress', siteUrl, username, title, content, status, featuredMediaId),
+  marketingUploadImage: (siteUrl: string, username: string, imagePath: string, caption?: string) =>
+    ipcRenderer.invoke('marketing-upload-image', siteUrl, username, imagePath, caption),
+  marketingGenerateImage: (prompt: string, apiKey: string) =>
+    ipcRenderer.invoke('marketing-generate-image', prompt, apiKey),
+  marketingReadImageBase64: (imagePath: string) =>
+    ipcRenderer.invoke('marketing-read-image-base64', imagePath),
+  marketingSelectImage: () =>
+    ipcRenderer.invoke('marketing-select-image')
 })

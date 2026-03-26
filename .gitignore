@@ -31,5 +31,6 @@ npm-debug.log*
 mindgraph-sync-server/node_modules/
 mindgraph-sync-server/data/
 mindgraph-sync-server/dist/
+mindgraph-sync-server/scripts/
 .claude/
 CLAUDE.md

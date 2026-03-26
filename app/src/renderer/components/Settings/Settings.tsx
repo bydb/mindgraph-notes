@@ -132,6 +132,23 @@ const VaultSettingsTab: React.FC<{ vaultPath: string; t: (key: string) => string
   )
 }
 
+const SignatureImagePreview: React.FC<{ imagePath: string }> = ({ imagePath }) => {
+  const [dataUrl, setDataUrl] = useState<string | null>(null)
+  useEffect(() => {
+    if (imagePath) {
+      window.electronAPI.emailLoadSignatureImage(imagePath).then(url => setDataUrl(url))
+    }
+  }, [imagePath])
+  if (!dataUrl) return null
+  return (
+    <img
+      src={dataUrl}
+      alt="Signatur"
+      style={{ maxWidth: '200px', maxHeight: '80px', objectFit: 'contain', borderRadius: '4px', border: '1px solid var(--border)' }}
+    />
+  )
+}
+
 export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
   const [activeTab, setActiveTab] = useState<Tab>('general')
   const [zoteroStatus, setZoteroStatus] = useState<'checking' | 'connected' | 'disconnected'>('checking')
@@ -155,6 +172,12 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
   const [edooboxTestStatus, setEdooboxTestStatus] = useState<'idle' | 'testing' | 'success' | 'failed'>('idle')
   const [edooboxTestError, setEdooboxTestError] = useState<string | null>(null)
   const [edooboxCredsSaved, setEdooboxCredsSaved] = useState(false)
+
+  // Marketing Credentials State
+  const [wpAppPassword, setWpAppPassword] = useState('')
+  const [wpCredsSaved, setWpCredsSaved] = useState(false)
+  const [wpTestStatus, setWpTestStatus] = useState<'idle' | 'testing' | 'success' | 'failed'>('idle')
+  const [wpTestError, setWpTestError] = useState<string | null>(null)
   const [remarkableStatus, setRemarkableStatus] = useState<'checking' | 'connected' | 'disconnected'>('checking')
   const [remarkableError, setRemarkableError] = useState<string | null>(null)
 
@@ -257,6 +280,8 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
     setShowRawEditor,
     email: emailSettings,
     setEmail,
+    marketing: marketingSettings,
+    setMarketing,
     edoobox: edooboxSettings,
     setEdoobox,
     remarkable: remarkableSettings,
@@ -322,13 +347,18 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
     }
   }, [isOpen, emailSettings.accounts.length])
 
-  // edoobox Credentials laden
+  // edoobox + Marketing Credentials laden
   useEffect(() => {
     if (isOpen && activeTab === 'agents') {
       window.electronAPI.edooboxLoadCredentials().then(creds => {
         if (creds) {
           setEdooboxApiKey(creds.apiKey)
           setEdooboxApiSecret(creds.apiSecret)
+        }
+      })
+      window.electronAPI.marketingLoadCredentials().then(creds => {
+        if (creds) {
+          if (creds.wpAppPassword) setWpAppPassword(creds.wpAppPassword)
         }
       })
     }
@@ -3158,6 +3188,59 @@ LIMIT 10
                                  t('settings.email.testConnection')}
                               </button>
                             </div>
+                            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+                              <input
+                                type="email"
+                                value={account.fromAddress || ''}
+                                onChange={e => {
+                                  const updated = [...emailSettings.accounts]
+                                  updated[idx] = { ...account, fromAddress: e.target.value }
+                                  setEmail({ accounts: updated })
+                                }}
+                                placeholder={t('settings.email.fromAddress')}
+                                style={{ width: '250px' }}
+                              />
+                              <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                                {t('settings.email.fromAddressHint')}
+                              </span>
+                            </div>
+                            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+                              <span style={{ fontSize: '11px', color: 'var(--text-muted)', minWidth: '40px' }}>SMTP:</span>
+                              <input
+                                type="text"
+                                value={account.smtpHost || ''}
+                                onChange={e => {
+                                  const updated = [...emailSettings.accounts]
+                                  updated[idx] = { ...account, smtpHost: e.target.value }
+                                  setEmail({ accounts: updated })
+                                }}
+                                placeholder={t('settings.email.smtpHost')}
+                                style={{ width: '180px' }}
+                              />
+                              <input
+                                type="number"
+                                value={account.smtpPort || 587}
+                                onChange={e => {
+                                  const updated = [...emailSettings.accounts]
+                                  updated[idx] = { ...account, smtpPort: parseInt(e.target.value) || 587 }
+                                  setEmail({ accounts: updated })
+                                }}
+                                placeholder={t('settings.email.smtpPort')}
+                                style={{ width: '70px' }}
+                              />
+                              <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px' }}>
+                                <input
+                                  type="checkbox"
+                                  checked={account.smtpTls !== false}
+                                  onChange={e => {
+                                    const updated = [...emailSettings.accounts]
+                                    updated[idx] = { ...account, smtpTls: e.target.checked }
+                                    setEmail({ accounts: updated })
+                                  }}
+                                />
+                                TLS
+                              </label>
+                            </div>
                           </div>
                         ))}
                         <button
@@ -3165,7 +3248,7 @@ LIMIT 10
                           onClick={() => {
                             const id = `email-${Date.now()}`
                             setEmail({
-                              accounts: [...emailSettings.accounts, { id, name: '', host: '', port: 993, user: '', tls: true }]
+                              accounts: [...emailSettings.accounts, { id, name: '', host: '', port: 993, user: '', tls: true, smtpHost: '', smtpPort: 587, smtpTls: true, fromAddress: '' }]
                             })
                           }}
                         >
@@ -3285,6 +3368,49 @@ LIMIT 10
                       </select>
                     </div>
 
+                    <div className="settings-row">
+                      <label>{t('settings.email.signature')}</label>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        {/* Signatur-Bild */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <button
+                            className="settings-refresh"
+                            onClick={async () => {
+                              if (!vaultPath) return
+                              const result = await window.electronAPI.emailSelectSignatureImage(vaultPath)
+                              if (result.success && result.path) {
+                                setEmail({ signatureImagePath: result.path })
+                              }
+                            }}
+                          >
+                            {t('settings.email.selectImage')}
+                          </button>
+                          {emailSettings.signatureImagePath && (
+                            <button
+                              className="settings-refresh"
+                              style={{ color: 'var(--color-error)', fontSize: '11px' }}
+                              onClick={() => setEmail({ signatureImagePath: '' })}
+                            >
+                              {t('settings.email.removeImage')}
+                            </button>
+                          )}
+                        </div>
+                        {emailSettings.signatureImagePath && (
+                          <SignatureImagePreview imagePath={emailSettings.signatureImagePath} />
+                        )}
+                        {/* Signatur-Text */}
+                        <textarea
+                          value={emailSettings.signature || ''}
+                          onChange={e => setEmail({ signature: e.target.value })}
+                          placeholder={t('settings.email.signaturePlaceholder')}
+                          style={{ width: '300px', minHeight: '80px', resize: 'vertical', fontFamily: 'inherit', fontSize: '12px' }}
+                        />
+                        <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                          {t('settings.email.signatureHint')}
+                        </span>
+                      </div>
+                    </div>
+
                     <div className="settings-info">
                       <p>
                         <strong>E-Mail</strong> {t('settings.email.description')}
@@ -3383,6 +3509,134 @@ LIMIT 10
                         <span className="settings-error-detail">{edooboxTestError}</span>
                       </div>
                     )}
+                  </>
+                )}
+
+                <div className="settings-divider" />
+
+                {/* Marketing (WordPress + Instagram) */}
+                <h4 className="settings-section-title">{t('settings.agents.marketing.title')}</h4>
+                <p className="settings-hint">{t('settings.agents.marketing.description')}</p>
+
+                <div className="settings-row">
+                  <label>{t('settings.agents.marketing.enabled')}</label>
+                  <input
+                    type="checkbox"
+                    checked={marketingSettings.enabled}
+                    onChange={e => setMarketing({ enabled: e.target.checked })}
+                  />
+                </div>
+
+                {marketingSettings.enabled && (
+                  <>
+                    {/* WordPress */}
+                    <h5 className="settings-subsection-title">{t('settings.agents.marketing.wordpress')}</h5>
+
+                    <div className="settings-row">
+                      <label>{t('settings.agents.marketing.wpUrl')}</label>
+                      <input
+                        type="url"
+                        value={marketingSettings.wordpressUrl}
+                        onChange={e => setMarketing({ wordpressUrl: e.target.value })}
+                        placeholder="https://meine-seite.de"
+                        className="settings-input"
+                      />
+                    </div>
+
+                    <div className="settings-row">
+                      <label>{t('settings.agents.marketing.wpUser')}</label>
+                      <input
+                        type="text"
+                        value={marketingSettings.wordpressUser}
+                        onChange={e => setMarketing({ wordpressUser: e.target.value })}
+                        placeholder="admin"
+                        className="settings-input"
+                      />
+                    </div>
+
+                    <div className="settings-row">
+                      <label>{t('settings.agents.marketing.wpAppPassword')}</label>
+                      <input
+                        type="password"
+                        value={wpAppPassword}
+                        onChange={e => { setWpAppPassword(e.target.value); setWpCredsSaved(false) }}
+                        placeholder="xxxx xxxx xxxx xxxx"
+                        className="settings-input"
+                      />
+                    </div>
+
+                    <div className="settings-row" style={{ gap: '8px' }}>
+                      <button
+                        className="settings-btn"
+                        onClick={async () => {
+                          if (wpAppPassword) {
+                            const saved = await window.electronAPI.marketingSaveCredentials({ wpAppPassword })
+                            setWpCredsSaved(saved)
+                          }
+                        }}
+                      >
+                        {wpCredsSaved ? t('settings.agents.edoobox.saved') : t('settings.agents.edoobox.save')}
+                      </button>
+                      <button
+                        className="settings-btn"
+                        disabled={wpTestStatus === 'testing'}
+                        onClick={async () => {
+                          setWpTestError(null)
+                          if (!wpAppPassword || !marketingSettings.wordpressUrl || !marketingSettings.wordpressUser) {
+                            setWpTestStatus('failed')
+                            setWpTestError(t('settings.agents.marketing.wpFillAll'))
+                            return
+                          }
+                          await window.electronAPI.marketingSaveCredentials({ wpAppPassword })
+                          setWpCredsSaved(true)
+                          setWpTestStatus('testing')
+                          const result = await window.electronAPI.marketingCheckWordpress(marketingSettings.wordpressUrl, marketingSettings.wordpressUser)
+                          setWpTestStatus(result.success ? 'success' : 'failed')
+                          setWpTestError(result.success ? null : (result.error || null))
+                        }}
+                      >
+                        {wpTestStatus === 'testing'
+                          ? t('settings.agents.edoobox.testing')
+                          : t('settings.agents.edoobox.testConnection')}
+                      </button>
+                      {wpTestStatus === 'success' && (
+                        <span className="status-connected">{t('settings.agents.edoobox.connected')}</span>
+                      )}
+                      {wpTestStatus === 'failed' && (
+                        <span className="status-disconnected">{t('settings.agents.edoobox.failed')}</span>
+                      )}
+                    </div>
+                    {wpTestError && (
+                      <div className="settings-row">
+                        <span className="settings-error-detail">{wpTestError}</span>
+                      </div>
+                    )}
+
+                    <div className="settings-row">
+                      <label>{t('settings.agents.marketing.defaultStatus')}</label>
+                      <select
+                        value={marketingSettings.defaultPostStatus}
+                        onChange={e => setMarketing({ defaultPostStatus: e.target.value as 'draft' | 'publish' })}
+                        className="settings-select"
+                      >
+                        <option value="draft">{t('settings.agents.marketing.statusDraft')}</option>
+                        <option value="publish">{t('settings.agents.marketing.statusPublish')}</option>
+                      </select>
+                    </div>
+
+                    {/* Google Imagen */}
+                    <h5 className="settings-subsection-title">{t('settings.agents.marketing.imagenTitle')}</h5>
+
+                    <div className="settings-row">
+                      <label>{t('settings.agents.marketing.imagenApiKey')}</label>
+                      <input
+                        type="password"
+                        value={marketingSettings.googleImagenApiKey}
+                        onChange={e => setMarketing({ googleImagenApiKey: e.target.value })}
+                        placeholder="AIzaSy..."
+                        className="settings-input"
+                      />
+                    </div>
                   </>
                 )}
 
