@@ -1,6 +1,6 @@
 {
   "name": "mindgraph-notes",
-  "version": "0.4.3-beta",
+  "version": "0.4.4-beta",
   "description": "Eine minimalistische Markdown-Notizen-App mit editierbarer Graph View",
   "main": "out/main/index.js",
   "scripts": {
@@ -53,6 +53,7 @@
       "repo": "mindgraph-notes"
     },
     "mac": {
+      "artifactName": "MindGraph-Notes-${version}-${arch}.${ext}",
       "icon": "resources/icon.icns",
       "category": "public.app-category.productivity",
       "hardenedRuntime": true,

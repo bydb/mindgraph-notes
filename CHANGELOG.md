@@ -2,6 +2,12 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.4.4-beta] - 2026-03-27
+
+### Fixes
+- **Auto-Update funktioniert jetzt** — macOS Artifact-Name-Mismatch behoben (Punkte vs. Bindestriche in Dateinamen)
+- **Herunterladen-Button im Update-Banner** reagiert jetzt korrekt (triggert Download oder oeffnet Release-Seite)
+
 ## [0.4.3-beta] - 2026-03-27
 
 ### Features
