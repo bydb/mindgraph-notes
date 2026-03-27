@@ -1,10 +1,11 @@
-import type { EmailMessage, AggregatedContact, Note } from '../../shared/types'
+import type { EmailMessage, AggregatedContact, Note, CalendarEvent } from '../../shared/types'
 
 interface ContextOptions {
   maxLength?: number
   includeVaultNotes?: boolean
   includeEdooboxEvents?: boolean
   includeContactHistory?: boolean
+  includeCalendar?: boolean
 }
 
 const STOP_WORDS_DE = new Set([
@@ -82,6 +83,21 @@ function searchNotes(
     .map(s => s.note)
 }
 
+export async function fetchCalendarEvents(daysAhead = 30): Promise<CalendarEvent[]> {
+  try {
+    const today = new Date()
+    const end = new Date(today)
+    end.setDate(end.getDate() + daysAhead)
+    const startDate = today.toISOString().split('T')[0]
+    const endDate = end.toISOString().split('T')[0]
+    const result = await window.electronAPI.calendarGetEvents(startDate, endDate)
+    if (result.success) return result.events
+    return []
+  } catch {
+    return []
+  }
+}
+
 export function buildEmailContext(
   email: EmailMessage,
   allEmails: EmailMessage[],
@@ -96,6 +112,7 @@ export function buildEmailContext(
     leaders?: string[]
     bookings?: Array<{ userName: string; userEmail: string; status: string }>
   }>,
+  calendarEvents?: CalendarEvent[],
   options: ContextOptions = {}
 ): string {
   const maxLength = options.maxLength || 30000
@@ -244,6 +261,60 @@ export function buildEmailContext(
     }
     if (taskLines.length > 0) {
       addSection('OFFENE AUFGABEN (RELEVANT)', taskLines.slice(0, 10).join('\n'))
+    }
+  }
+
+  // 8. Calendar events — only dates mentioned in the email + surrounding days
+  if (calendarEvents && calendarEvents.length > 0) {
+    // Extract dates mentioned in email (YYYY-MM-DD, DD.MM.YYYY, DD.MM.)
+    const emailText = `${email.subject} ${email.bodyText}`
+    const dateMatches = new Set<string>()
+
+    // Match DD.MM.YYYY or DD.MM.YY
+    for (const m of emailText.matchAll(/(\d{1,2})\.(\d{1,2})\.(\d{2,4})/g)) {
+      const year = m[3].length === 2 ? `20${m[3]}` : m[3]
+      dateMatches.add(`${year}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`)
+    }
+    // Match YYYY-MM-DD
+    for (const m of emailText.matchAll(/(\d{4})-(\d{2})-(\d{2})/g)) {
+      dateMatches.add(`${m[1]}-${m[2]}-${m[3]}`)
+    }
+
+    // Filter events: those on mentioned dates (+/- 1 day) + next 7 days for general context
+    const mentionedDates = Array.from(dateMatches)
+    const now = new Date()
+    const weekFromNow = new Date(now)
+    weekFromNow.setDate(weekFromNow.getDate() + 7)
+
+    const relevantEvents = calendarEvents.filter(evt => {
+      const evtDate = evt.startDate.split(' ')[0] // "YYYY-MM-DD"
+      // Event is within next 7 days (general availability)
+      if (evtDate >= now.toISOString().split('T')[0] && evtDate <= weekFromNow.toISOString().split('T')[0]) return true
+      // Event is on/near a date mentioned in the email
+      for (const md of mentionedDates) {
+        const mentioned = new Date(md)
+        const dayBefore = new Date(mentioned); dayBefore.setDate(dayBefore.getDate() - 1)
+        const dayAfter = new Date(mentioned); dayAfter.setDate(dayAfter.getDate() + 1)
+        if (evtDate >= dayBefore.toISOString().split('T')[0] && evtDate <= dayAfter.toISOString().split('T')[0]) return true
+      }
+      return false
+    })
+
+    if (relevantEvents.length > 0) {
+      const calLines = relevantEvents.slice(0, 20).map(evt => {
+        const start = evt.startDate
+        const end = evt.endDate
+        const loc = evt.location ? ` (${evt.location})` : ''
+        const cal = evt.calendar ? ` [${evt.calendar}]` : ''
+        if (evt.allDay) {
+          return `- **${evt.title}** — ganztaegig ${start.split(' ')[0]}${loc}${cal}`
+        }
+        return `- **${evt.title}** — ${start} bis ${end}${loc}${cal}`
+      })
+      const datesInfo = mentionedDates.length > 0
+        ? `\nIn der E-Mail genannte Termine: ${mentionedDates.join(', ')}`
+        : ''
+      addSection('MEINE KALENDER-TERMINE — Pruefe ob Konflikte mit den genannten Terminen bestehen!', datesInfo + '\n' + calLines.join('\n'))
     }
   }
 

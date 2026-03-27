@@ -12,6 +12,7 @@ export const ComposeView: React.FC = () => {
   const { vaultPath } = useNotesStore()
   const { searchContacts } = useContactStore()
 
+  const bodyRef = useRef<HTMLTextAreaElement>(null)
   const [toInput, setToInput] = useState('')
   const [ccInput, setCcInput] = useState('')
   const [sendStatus, setSendStatus] = useState<'idle' | 'success' | 'error'>('idle')
@@ -124,6 +125,49 @@ export const ComposeView: React.FC = () => {
       setShowCcDropdown(false)
     }
   }
+
+  const applyFormat = useCallback((type: 'bold' | 'italic' | 'list' | 'hr') => {
+    const textarea = bodyRef.current
+    if (!textarea) return
+    const start = textarea.selectionStart
+    const end = textarea.selectionEnd
+    const currentState = useEmailStore.getState().composeState
+    if (!currentState) return
+    const text = currentState.body
+    const selected = text.substring(start, end)
+    let replacement = ''
+    let cursorOffset = 0
+
+    switch (type) {
+      case 'bold':
+        replacement = selected ? `**${selected}**` : '**Text**'
+        cursorOffset = selected ? replacement.length : 2
+        break
+      case 'italic':
+        replacement = selected ? `*${selected}*` : '*Text*'
+        cursorOffset = selected ? replacement.length : 1
+        break
+      case 'list':
+        if (selected) {
+          replacement = selected.split('\n').map(line => `• ${line}`).join('\n')
+        } else {
+          replacement = '• '
+        }
+        cursorOffset = replacement.length
+        break
+      case 'hr':
+        replacement = '\n———\n'
+        cursorOffset = replacement.length
+        break
+    }
+
+    const newBody = text.substring(0, start) + replacement + text.substring(end)
+    setComposeState({ ...currentState, body: newBody })
+    setTimeout(() => {
+      textarea.focus()
+      textarea.setSelectionRange(start + cursorOffset, start + cursorOffset)
+    }, 0)
+  }, [setComposeState])
 
   const handleSend = useCallback(async () => {
     if (!vaultPath || !composeState.to.length) return
@@ -272,8 +316,42 @@ export const ComposeView: React.FC = () => {
         />
       </div>
 
-      {/* Body */}
+      {/* Formatting toolbar + Body */}
+      <div className="inbox-compose-format-bar">
+        <button
+          type="button"
+          data-tooltip="Fett"
+          onMouseDown={e => { e.preventDefault(); applyFormat('bold') }}
+        >
+          <strong>F</strong>
+        </button>
+        <button
+          type="button"
+          data-tooltip="Kursiv"
+          onMouseDown={e => { e.preventDefault(); applyFormat('italic') }}
+        >
+          <em>K</em>
+        </button>
+        <button
+          type="button"
+          data-tooltip="Aufzählung"
+          onMouseDown={e => { e.preventDefault(); applyFormat('list') }}
+        >
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="8" y1="6" x2="21" y2="6" /><line x1="8" y1="12" x2="21" y2="12" /><line x1="8" y1="18" x2="21" y2="18" />
+            <line x1="3" y1="6" x2="3.01" y2="6" /><line x1="3" y1="12" x2="3.01" y2="12" /><line x1="3" y1="18" x2="3.01" y2="18" />
+          </svg>
+        </button>
+        <button
+          type="button"
+          data-tooltip="Trennlinie"
+          onMouseDown={e => { e.preventDefault(); applyFormat('hr') }}
+        >
+          —
+        </button>
+      </div>
       <textarea
+        ref={bodyRef}
         className="inbox-compose-body"
         value={composeState.body}
         onChange={e => setComposeState({ ...composeState, body: e.target.value })}

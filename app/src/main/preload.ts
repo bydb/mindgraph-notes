@@ -349,6 +349,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   createAppleReminder: (options: { title: string; notes?: string; dueDate?: string; dueTime?: string; list?: string }) =>
     ipcRenderer.invoke('create-apple-reminder', options),
 
+  // Apple Calendar (macOS)
+  calendarGetEvents: (startDate: string, endDate: string) =>
+    ipcRenderer.invoke('calendar-get-events', startDate, endDate),
+
   // reMarkable (USB)
   remarkableUsbCheck: () =>
     ipcRenderer.invoke('remarkable-usb-check'),

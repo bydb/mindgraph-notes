@@ -544,7 +544,7 @@ export const InboxPanel: React.FC<InboxPanelProps> = ({ onClose }) => {
                 </div>
                 <div className="inbox-email-indicators">
                   {email.analysis?.needsReply && (
-                    <span className={`inbox-reply-badge ${email.analysis.replyUrgency || 'medium'}`} title={t('inbox.needsReply')}>
+                    <span className={`inbox-reply-badge ${email.analysis.replyUrgency || 'medium'}`} data-tooltip={t('inbox.needsReply')}>
                       <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                         <polyline points="9 17 4 12 9 7" />
                         <path d="M20 18v-2a4 4 0 0 0-4-4H4" />

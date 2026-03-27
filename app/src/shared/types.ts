@@ -603,7 +603,7 @@ export interface ElectronAPI {
   ollamaEmbeddingModels: () => Promise<Array<{ name: string; size: number }>>;
 
   // Ollama Chat für Notes Chat
-  ollamaChat: (model: string, messages: Array<{ role: string; content: string }>, context: string, chatMode?: 'direct' | 'socratic') => Promise<{
+  ollamaChat: (model: string, messages: Array<{ role: string; content: string }>, context: string, chatMode?: 'direct' | 'socratic' | 'email') => Promise<{
     success: boolean;
     response?: string;
     error?: string;
@@ -793,6 +793,9 @@ export interface ElectronAPI {
   platform: string;
   createAppleReminder: (options: { title: string; notes?: string; dueDate?: string; dueTime?: string; list?: string }) => Promise<{ success: boolean; error?: string }>;
 
+  // Apple Calendar (macOS)
+  calendarGetEvents: (startDate: string, endDate: string) => Promise<{ success: boolean; events: CalendarEvent[]; error?: string }>;
+
   // reMarkable (USB)
   remarkableUsbCheck: () => Promise<ReMarkableUsbCheckResult>;
   remarkableListDocuments: (folderId?: string) => Promise<{ documents: ReMarkableDocumentSummary[]; error?: string }>;
@@ -925,6 +928,16 @@ export interface AggregatedContact {
   lastEmailDate?: string
   edooboxBookings?: { offerId: string; offerName: string; status: string }[]
   vaultMentions?: string[]
+}
+
+// Apple Calendar Types
+export interface CalendarEvent {
+  title: string
+  startDate: string
+  endDate: string
+  location?: string
+  calendar?: string
+  allDay?: boolean
 }
 
 // edoobox Agent Types

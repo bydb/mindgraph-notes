@@ -6,7 +6,8 @@ import { useContactStore } from '../../stores/contactStore'
 import { useAgentStore } from '../../stores/agentStore'
 import { useTranslation } from '../../utils/translations'
 import { sanitizeHtml } from '../../utils/sanitize'
-import { buildEmailContext } from '../../utils/emailContextBuilder'
+import { buildEmailContext, fetchCalendarEvents } from '../../utils/emailContextBuilder'
+import type { CalendarEvent } from '../../../shared/types'
 
 export const EmailAIChatView: React.FC = () => {
   const { t } = useTranslation()
@@ -28,8 +29,16 @@ export const EmailAIChatView: React.FC = () => {
   const [input, setInput] = useState('')
   const [streamingContent, setStreamingContent] = useState('')
   const [isStreaming, setIsStreaming] = useState(false)
+  const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>([])
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const chatEmail = aiChatEmailId ? emails.find(e => e.id === aiChatEmailId) : null
+
+  // Kalender-Events laden
+  useEffect(() => {
+    if (window.electronAPI.platform === 'darwin') {
+      fetchCalendarEvents(30).then(setCalendarEvents)
+    }
+  }, [chatEmail?.id])
 
   // Streaming-Listener
   useEffect(() => {
@@ -62,9 +71,10 @@ export const EmailAIChatView: React.FC = () => {
       emails,
       contact,
       notes,
-      dashboardOffers
+      dashboardOffers,
+      calendarEvents
     )
-  }, [chatEmail, emails, notes, dashboardOffers, getContactByEmail])
+  }, [chatEmail, emails, notes, dashboardOffers, getContactByEmail, calendarEvents])
 
   const handleSend = useCallback(async () => {
     if (!input.trim() || isAiChatLoading || !ollama.selectedModel) return
@@ -88,7 +98,7 @@ export const EmailAIChatView: React.FC = () => {
         ollama.selectedModel,
         messages,
         context,
-        'direct'
+        'email'
       )
     } catch (error) {
       setIsStreaming(false)
@@ -116,7 +126,7 @@ export const EmailAIChatView: React.FC = () => {
         { role: 'user', content: fakeInput }
       ]
 
-      window.electronAPI.ollamaChat(ollama.selectedModel, messages, context, 'direct')
+      window.electronAPI.ollamaChat(ollama.selectedModel, messages, context, 'email')
         .catch(() => {
           setIsStreaming(false)
           setStreamingContent('')

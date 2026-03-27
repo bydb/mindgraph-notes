@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, dialog, shell, Notification, safeStorage, autoUpdater as electronAutoUpdater } from 'electron'
+import { app, BrowserWindow, ipcMain, dialog, shell, Notification, safeStorage, autoUpdater as electronAutoUpdater, Menu } from 'electron'
 import { autoUpdater } from 'electron-updater'
 import * as path from 'path'
 import * as fs from 'fs/promises'
@@ -246,6 +246,27 @@ function createWindow(): void {
       return { action: 'deny' }
     }
     return { action: 'allow' }
+  })
+
+  // Context menu (Kopieren, Einfügen, Ausschneiden)
+  mainWindow.webContents.on('context-menu', (_event, params) => {
+    const menuItems: Electron.MenuItemConstructorOptions[] = []
+
+    if (params.isEditable) {
+      if (params.selectionText) {
+        menuItems.push({ label: 'Ausschneiden', role: 'cut' })
+      }
+      menuItems.push({ label: 'Einfügen', role: 'paste' })
+    }
+    if (params.selectionText) {
+      menuItems.push({ label: 'Kopieren', role: 'copy' })
+    }
+    if (menuItems.length > 0) {
+      menuItems.push({ type: 'separator' })
+    }
+    menuItems.push({ label: 'Alles auswählen', role: 'selectAll' })
+
+    Menu.buildFromTemplate(menuItems).popup()
   })
 
   // Navigation zu externen URLs abfangen
@@ -1678,7 +1699,7 @@ ipcMain.handle('ollama-embeddings', async (_event, model: string, text: string) 
 })
 
 // Chat mit Kontext (für Notes Chat)
-ipcMain.handle('ollama-chat', async (event, model: string, messages: Array<{ role: string; content: string }>, context: string, chatMode: 'direct' | 'socratic' = 'direct') => {
+ipcMain.handle('ollama-chat', async (event, model: string, messages: Array<{ role: string; content: string }>, context: string, chatMode: 'direct' | 'socratic' | 'email' = 'direct') => {
   console.log('[Ollama] Chat request with model:', model, 'context length:', context.length, 'mode:', chatMode)
 
   try {
@@ -1690,6 +1711,20 @@ ${context}
 
 ---
 Beantworte nun die Fragen des Nutzers basierend auf diesen Notizen. Wenn die Antwort nicht in den Notizen zu finden ist, sage das ehrlich.`
+
+    const emailPrompt = `Du bist ein E-Mail-Assistent. Du hilfst beim Verfassen von Antworten und analysierst E-Mails. Antworte auf Deutsch.
+
+WICHTIGE REGELN:
+- Schreibe IMMER eine FERTIGE, versandfertige E-Mail. Keine Platzhalter wie [Name], [Hier entscheiden], [Position]. Stelle KEINE Rueckfragen an den Nutzer.
+- Pruefe die Kalender-Termine im Kontext: Wenn in der E-Mail ein Datum/Termin vorgeschlagen wird, pruefe ob an diesem Tag bereits Termine existieren. Wenn es Konflikte gibt, erwaehne das KURZ im Entwurf (z.B. "leider habe ich an diesem Tag bereits einen Termin") oder schlage einen Alternativtermin vor.
+- Nutze die Kontakt-Historie fuer den richtigen Ton
+- Der Entwurf soll NUR den E-Mail-Text enthalten (kein Betreff, keine Erklaerungen drumherum)
+
+KONTEXT:
+${context}
+
+---
+Erstelle den E-Mail-Entwurf oder beantworte die Frage des Nutzers.`
 
     const socraticPrompt = `Du bist ein sokratischer Tutor. Deine Aufgabe: Den Nutzer durch EINE gezielte Frage zum Nachdenken anregen.
 
@@ -1705,12 +1740,19 @@ ${context}
 ---
 Stelle EINE kurze Frage, die zum Nachdenken anregt.`
 
+    let promptContent = directPrompt
+    if (chatMode === 'socratic') promptContent = socraticPrompt
+    else if (chatMode === 'email') promptContent = emailPrompt
+
     const systemMessage = {
       role: 'system',
-      content: chatMode === 'socratic' ? socraticPrompt : directPrompt
+      content: promptContent
     }
 
     const allMessages = [systemMessage, ...messages]
+
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 300000) // 5 min timeout
 
     const response = await fetch(`${OLLAMA_API_URL}/api/chat`, {
       method: 'POST',
@@ -1719,7 +1761,8 @@ Stelle EINE kurze Frage, die zum Nachdenken anregt.`
         model,
         messages: allMessages,
         stream: true
-      })
+      }),
+      signal: controller.signal
     })
 
     if (!response.ok) {
@@ -1767,12 +1810,15 @@ Stelle EINE kurze Frage, die zum Nachdenken anregt.`
       }
     }
 
+    clearTimeout(timeout)
     return {
       success: true,
       response: fullResponse
     }
   } catch (error) {
     console.error('[Ollama] Chat error:', error)
+    // Notify renderer that streaming is done so UI doesn't hang
+    event.sender.send('ollama-chat-done')
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unbekannter Fehler'
@@ -5699,10 +5745,21 @@ ipcMain.handle('email-send', async (_event, composeData: {
       }
     })
 
-    // HTML aus Body generieren (Zeilenumbrueche zu <br>)
+    // HTML aus Body generieren (Markdown-artige Formatierung + Zeilenumbrueche)
     const escapeHtml = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    let formatted = escapeHtml(composeData.body)
+    // Bold: **text** → <strong>text</strong>
+    formatted = formatted.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    // Italic: *text* → <em>text</em>
+    formatted = formatted.replace(/\*(.+?)\*/g, '<em>$1</em>')
+    // Bullet: • at line start
+    formatted = formatted.replace(/^• (.+)$/gm, '&bull; $1')
+    // Horizontal rule: ——— → <hr>
+    formatted = formatted.replace(/\n?———\n?/g, '<hr style="border:none;border-top:1px solid #ccc;margin:12px 0;">')
+    // Line breaks
+    formatted = formatted.replace(/\n/g, '<br>')
     let htmlBody = `<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; font-size: 14px; color: #333;">`
-    htmlBody += escapeHtml(composeData.body).replace(/\n/g, '<br>')
+    htmlBody += formatted
     htmlBody += `</div>`
 
     // Signatur-Bild als CID-Attachment einbetten
@@ -5736,7 +5793,10 @@ ipcMain.handle('email-send', async (_event, composeData: {
       sender: senderAddress,
       envelope: {
         from: senderAddress,
-        to: composeData.to.map(r => r.address)
+        to: [
+          ...composeData.to.map(r => r.address),
+          ...(composeData.cc || []).map(r => r.address)
+        ]
       },
       to: composeData.to.map(r => r.name ? `"${r.name}" <${r.address}>` : r.address).join(', '),
       subject: composeData.subject,
@@ -5826,6 +5886,98 @@ end tell`
   } catch (error) {
     console.error('[Reminders] Failed:', error)
     return { success: false, error: error instanceof Error ? error.message : 'Erinnerung konnte nicht erstellt werden' }
+  }
+})
+
+// ========================================
+// Apple Calendar
+// ========================================
+
+ipcMain.handle('calendar-get-events', async (_event, startDate: string, endDate: string) => {
+  if (process.platform !== 'darwin') {
+    return { success: false, events: [], error: 'macOS only' }
+  }
+
+  // Validate date format to prevent code injection in Swift template
+  const dateRegex = /^\d{4}-\d{2}-\d{2}$/
+  if (!dateRegex.test(startDate) || !dateRegex.test(endDate)) {
+    return { success: false, events: [], error: 'Ungültiges Datumsformat' }
+  }
+
+  try {
+    const { execFile } = await import('child_process')
+    const { promisify } = await import('util')
+    const execFileAsync = promisify(execFile)
+
+    // Swift script to read calendar events via EventKit
+    // osascript has no calendar permission, but swift can request it
+    const swiftCode = `
+import EventKit
+import Foundation
+
+let store = EKEventStore()
+let sem = DispatchSemaphore(value: 0)
+var accessGranted = false
+
+if #available(macOS 14.0, *) {
+    store.requestFullAccessToEvents { granted, _ in
+        accessGranted = granted
+        sem.signal()
+    }
+} else {
+    store.requestAccess(to: .event) { granted, _ in
+        accessGranted = granted
+        sem.signal()
+    }
+}
+sem.wait()
+
+guard accessGranted else {
+    print("NO_ACCESS")
+    exit(0)
+}
+
+let df = DateFormatter()
+df.dateFormat = "yyyy-MM-dd"
+df.timeZone = TimeZone.current
+guard let startD = df.date(from: "${startDate}"),
+      let endD = df.date(from: "${endDate}") else { exit(0) }
+let endDPlus = Calendar.current.date(byAdding: .day, value: 1, to: endD)!
+
+let outDF = DateFormatter()
+outDF.dateFormat = "yyyy-MM-dd HH:mm"
+outDF.timeZone = TimeZone.current
+
+let pred = store.predicateForEvents(withStart: startD, end: endDPlus, calendars: nil)
+let events = store.events(matching: pred)
+
+for event in events {
+    let loc = event.location ?? ""
+    let cal = event.calendar.title
+    let allDay = event.isAllDay
+    print("\\(event.title ?? "")|||\\(outDF.string(from: event.startDate))|||\\(outDF.string(from: event.endDate))|||\\(loc)|||\\(cal)|||\\(allDay)")
+}
+`
+
+    const { stdout } = await execFileAsync('swift', ['-e', swiftCode], { timeout: 15000 })
+
+    const events = stdout.trim().split('\n').filter(Boolean).map(line => {
+      const [title, startDate, endDate, location, calendar, allDay] = line.split('|||')
+      return {
+        title: title?.trim() || '',
+        startDate: startDate?.trim() || '',
+        endDate: endDate?.trim() || '',
+        location: location?.trim() || undefined,
+        calendar: calendar?.trim() || undefined,
+        allDay: allDay?.trim() === 'true'
+      }
+    }).filter(e => e.title)
+
+    console.log(`[Calendar] Found ${events.length} events between ${startDate} and ${endDate}`)
+    return { success: true, events }
+  } catch (error) {
+    console.error('[Calendar] Failed:', error)
+    return { success: false, events: [], error: error instanceof Error ? error.message : 'Kalender konnte nicht gelesen werden' }
   }
 })
 

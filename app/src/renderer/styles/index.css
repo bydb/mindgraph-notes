@@ -9369,6 +9369,13 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
   flex-shrink: 0;
 }
 
+.inbox-reply-badge[data-tooltip]::after {
+  bottom: auto;
+  top: calc(100% + 4px);
+  left: auto;
+  right: 0;
+}
+
 .inbox-reply-badge.high {
   background: #fecaca;
   color: #dc2626;
@@ -9682,6 +9689,32 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
   font-size: 13px;
   padding: 0;
   outline: none;
+}
+
+.inbox-compose-format-bar {
+  display: flex;
+  gap: 2px;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.inbox-compose-format-bar button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 26px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.inbox-compose-format-bar button:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
 }
 
 .inbox-compose-body {
