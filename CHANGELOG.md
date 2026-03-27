@@ -2,6 +2,27 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.4.3-beta] - 2026-03-27
+
+### Features
+- **Apple Kalender Integration** — Email-KI prueft automatisch deine Kalender-Termine bei Terminanfragen
+  - Liest Termine per Swift/EventKit direkt aus Apple Calendar (macOS)
+  - Intelligente Filterung: nur relevante Termine (genannte Daten +/- 1 Tag, naechste 7 Tage)
+  - KI erkennt Kalender-Konflikte und weist im Entwurf darauf hin
+- **Rechtsklick-Kontextmenue** — Kopieren, Einfuegen, Ausschneiden, Alles auswaehlen in der gesamten App
+- **Compose Formatierungs-Toolbar** — Fett, Kursiv, Aufzaehlung, Trennlinie beim Email-Verfassen
+  - Markdown-artige Formatierung wird beim Senden in HTML konvertiert
+
+### Improvements
+- **Email-spezifischer KI-Prompt** — Eigener Modus fuer den Email-Chat mit klaren Anweisungen (fertige Entwuerfe, keine Platzhalter)
+- **Ollama Streaming Timeout** — 5-Minuten-Timeout verhindert endloses "Denkt nach..." bei grossen Kontexten
+
+### Fixes
+- **CC-Empfaenger erhielten keine Emails** — CC-Adressen fehlten im SMTP-Envelope
+- **Reply-Badge Tooltip abgeschnitten** — Von nativem `title` auf `data-tooltip` umgestellt
+- **Sicherheitsfix: Kalender-Datums-Validierung** gegen Code-Injection im Swift-Template
+- **npm Dependency Updates** — picomatch (ReDoS), tar (Path Traversal), nodemailer (SMTP Injection)
+
 ## [0.4.2-beta] - 2026-03-26
 
 ### Features
