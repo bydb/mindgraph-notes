@@ -46,16 +46,20 @@ Eine moderne, lokale Notiz-App die Markdown-Notizen mit einem Wissensgraphen, Ka
 - Smart AI-Tool Detection (OpenCode, Claude)
 - Windows + WSL Support
 
-### E-Mail-Inbox
-- IMAP-Abruf von mehreren Accounts
-- Automatische KI-Relevanzanalyse via Ollama
-- Relevante E-Mails werden als Markdown-Notizen gespeichert
+### Smart Email Client
+- IMAP-Abruf von mehreren Accounts mit automatischer KI-Analyse (Relevanz, Sentiment, Zusammenfassung)
+- E-Mails senden via SMTP direkt aus der App (Signatur mit Bild-Upload)
+- KI-Assistent: Emails besprechen, Antwortentwuerfe generieren lassen, Kontext aus Vault + Veranstaltungen
+- Kontakt-Autocomplete aus Email-Historie, edoobox-Buchungen und Vault-Wikilinks
+- "Antwort erwartet"-Erkennung mit Dringlichkeitsstufen (hoch/mittel/niedrig)
+- Anhang-Erkennung und Original-Text-Ansicht
+- Relevante E-Mails werden als Markdown-Notizen mit Tasks und Terminen gespeichert
 
 ### Weitere Integrationen
 - Zotero Integration fuer Literaturverwaltung (Better BibTeX)
 - reMarkable USB-Integration (Dokumente browsen, importieren, PDF exportieren)
 - Readwise Highlight-Sync (Buecher, Artikel, Podcasts)
-- edoobox-Agent (Veranstaltungsimport aus Akkreditierungsformularen)
+- edoobox-Agent (Veranstaltungsimport, Booking-Dashboard, Marketing mit WordPress + Imagen)
 - PDF Viewer mit Docling-Extraktion
 - LanguageTool Grammatik- & Rechtschreibpruefung
 - Apple Erinnerungen aus Tasks erstellen (macOS)
@@ -146,9 +150,9 @@ npm run build
 - **TypeScript 5.9** - Type-safe Development
 - **CodeMirror 6** - Markdown Editor
 - **React Flow** - Graph Visualization
-- **Zustand 5** - State Management (12 Stores)
+- **Zustand 5** - State Management (13 Stores)
 - **xterm.js + node-pty** - Integrated Terminal
-- **imapflow + mailparser** - E-Mail Integration
+- **imapflow + mailparser + nodemailer** - Smart Email Client
 - **DOMPurify** - HTML/SVG Sanitization
 
 ---
