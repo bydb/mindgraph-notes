@@ -4,25 +4,23 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="google-site-verification" content="XuIkFK3V33YXi92ZBbb1AsgrCejIxVlfMPM_Zj0Ny3o">
-  <title>MindGraph Notes - Notizen, Karteikarten &amp; Wissensgraph</title>
-  <meta name="description" content="Kostenlose Notiz-App mit Karteikarten (SM-2), Wissensgraph, KI-Terminal, PDF Companion und Zotero. Standardm&auml;&szlig;ig lokal und Open Source.">
+  <title>MindGraph Notes - Notizen, Email, Karteikarten &amp; KI</title>
+  <meta name="description" content="Kostenlose Desktop-App: Markdown-Notizen, KI-Email-Client, Karteikarten mit Spaced Repetition, Wissensgraph und integriertes Terminal. Lokal, Open Source, E2E-verschl&uuml;sselt.">
   <link rel="icon" href="favicon.ico" sizes="48x48">
   <link rel="icon" type="image/png" sizes="48x48" href="favicon-48x48.png">
   <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
   <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png">
   <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
 
-  <!-- Canonical & hreflang -->
   <link rel="canonical" href="https://mindgraph-notes.de/">
   <link rel="alternate" hreflang="de" href="https://mindgraph-notes.de/">
   <link rel="alternate" hreflang="en" href="https://mindgraph-notes.de/">
   <link rel="alternate" hreflang="x-default" href="https://mindgraph-notes.de/">
 
-  <!-- Open Graph -->
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://mindgraph-notes.de/">
-  <meta property="og:title" content="MindGraph Notes - Notizen, Karteikarten &amp; Wissensgraph">
-  <meta property="og:description" content="Kostenlose Notiz-App mit Karteikarten (SM-2), Wissensgraph, KI-Terminal, PDF Companion und Zotero. Standardm&auml;&szlig;ig lokal und Open Source.">
+  <meta property="og:title" content="MindGraph Notes - Notizen, Email, Karteikarten &amp; KI">
+  <meta property="og:description" content="Kostenlose Desktop-App: Markdown-Notizen, KI-Email-Client, Karteikarten mit Spaced Repetition, Wissensgraph und integriertes Terminal. Lokal, Open Source.">
   <meta property="og:image" content="https://mindgraph-notes.de/screenshot.png">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
@@ -30,1502 +28,327 @@
   <meta property="og:locale:alternate" content="en_US">
   <meta property="og:site_name" content="MindGraph Notes">
 
-  <!-- Twitter Card -->
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="MindGraph Notes - Notizen, Karteikarten &amp; Wissensgraph">
-  <meta name="twitter:description" content="Kostenlose Notiz-App mit Karteikarten (SM-2), Wissensgraph, KI-Terminal, PDF Companion und Zotero. Standardm&auml;&szlig;ig lokal und Open Source.">
+  <meta name="twitter:title" content="MindGraph Notes - Notizen, Email, Karteikarten &amp; KI">
+  <meta name="twitter:description" content="Kostenlose Desktop-App: Markdown-Notizen, KI-Email-Client, Karteikarten mit Spaced Repetition, Wissensgraph und integriertes Terminal. Lokal, Open Source.">
   <meta name="twitter:image" content="https://mindgraph-notes.de/screenshot.png">
 
-  <!-- Structured Data -->
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
     "@type": "SoftwareApplication",
     "name": "MindGraph Notes",
-    "applicationCategory": "EducationalApplication",
+    "applicationCategory": "ProductivityApplication",
     "operatingSystem": "macOS, Windows, Linux",
-    "offers": {
-      "@type": "Offer",
-      "price": "0",
-      "priceCurrency": "EUR"
-    },
-    "description": "Notiz-App mit Karteikarten (SM-2), Wissensgraph, KI-Terminal, PDF Companion und Zotero. Standardmäßig lokal und Open Source.",
+    "offers": { "@type": "Offer", "price": "0", "priceCurrency": "EUR" },
+    "description": "Desktop-App mit Markdown-Notizen, KI-Email-Client, Karteikarten (SM-2), Wissensgraph, integriertem Terminal und E2E-verschluesseltem Sync.",
     "url": "https://mindgraph-notes.de/",
     "downloadUrl": "https://github.com/bydb/mindgraph-notes/releases",
     "screenshot": "https://mindgraph-notes.de/screenshot.png",
     "softwareVersion": "0.4.4-beta",
-    "author": {
-      "@type": "Person",
-      "name": "Jochen Leeder",
-      "url": "https://bydb.io"
-    },
+    "author": { "@type": "Person", "name": "Jochen Leeder", "url": "https://bydb.io" },
     "license": "https://opensource.org/licenses/AGPL-3.0",
     "featureList": [
+      "KI-Email-Client mit Kalender-Integration",
       "Karteikarten mit Spaced Repetition (SM-2)",
-      "KI-Quiz-Generierung via Ollama",
-      "Wissensgraph / Knowledge Graph",
-      "Zotero Integration",
-      "100% Lokale Daten",
+      "Wissensgraph / Knowledge Graph mit KI-Clustering",
+      "Integriertes Terminal (OpenCode, Claude Code, Ollama)",
+      "E2E-verschluesselter Sync",
       "Markdown Editor mit Live Preview",
-      "LaTeX und Mermaid Diagramme",
-      "PDF Companion mit Docling",
+      "Zotero, Semantic Scholar, Readwise, reMarkable",
+      "PDF Companion mit Docling OCR",
       "Dataview Queries",
-      "Integriertes Terminal"
+      "100% Lokale Daten"
     ]
   }
   </script>
 
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300..700;1,9..40,300..700&family=DM+Serif+Display&display=swap" rel="stylesheet">
+
   <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
     :root {
       --bg: #faf8f0;
-      --bg-card: rgba(255, 255, 255, 0.7);
-      --bg-card-hover: rgba(255, 255, 255, 0.9);
-      --text: #2d2d2d;
-      --text-muted: #6b6b6b;
-      --accent: #d4875a;
-      --accent-glow: rgba(212, 135, 90, 0.25);
-      --gradient: linear-gradient(135deg, #d4875a 0%, #e0976a 50%, #c47a4e 100%);
-      --border: rgba(0, 0, 0, 0.08);
+      --bg-warm: #f5f0e4;
+      --card: rgba(255,255,255,0.65);
+      --card-hover: rgba(255,255,255,0.9);
+      --text: #1a1a1a;
+      --text-mid: #4a4540;
+      --text-muted: #8a8278;
+      --accent: #c4764a;
+      --accent-light: rgba(196,118,74,0.12);
+      --accent-glow: rgba(196,118,74,0.2);
+      --gradient: linear-gradient(135deg, #c4764a 0%, #d4905e 50%, #b86a3e 100%);
+      --border: rgba(0,0,0,0.06);
+      --radius: 14px;
+      --font: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      --font-display: 'DM Serif Display', Georgia, serif;
     }
 
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-family: var(--font);
       background: var(--bg);
       color: var(--text);
       line-height: 1.6;
       overflow-x: hidden;
+      -webkit-font-smoothing: antialiased;
     }
 
-    .bg-animation {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      z-index: -1;
-      overflow: hidden;
+    /* --- Background --- */
+    .bg-grain {
+      position: fixed; inset: 0; z-index: -2;
+      background: var(--bg);
     }
-
-    .bg-animation::before {
-      content: '';
-      position: absolute;
-      top: -50%;
-      left: -50%;
-      width: 200%;
-      height: 200%;
-      background: radial-gradient(circle at 30% 30%, rgba(212, 135, 90, 0.08) 0%, transparent 50%),
-                  radial-gradient(circle at 70% 70%, rgba(212, 135, 90, 0.05) 0%, transparent 50%),
-                  radial-gradient(circle at 50% 50%, rgba(212, 135, 90, 0.03) 0%, transparent 50%);
-      animation: bgMove 20s ease-in-out infinite;
+    .bg-grain::after {
+      content: ''; position: absolute; inset: 0;
+      opacity: 0.3;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+      background-size: 256px;
     }
-
-    @keyframes bgMove {
-      0%, 100% { transform: translate(0, 0) rotate(0deg); }
-      33% { transform: translate(2%, 2%) rotate(1deg); }
-      66% { transform: translate(-1%, 1%) rotate(-1deg); }
+    .bg-glow {
+      position: fixed; z-index: -1;
+      width: 600px; height: 600px;
+      border-radius: 50%;
+      filter: blur(120px);
+      opacity: 0.5;
+      pointer-events: none;
     }
+    .bg-glow-1 { top: -200px; right: -100px; background: rgba(196,118,74,0.1); }
+    .bg-glow-2 { bottom: 20%; left: -200px; background: rgba(196,118,74,0.06); }
 
-    .grid-overlay {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      z-index: -1;
-      background-image:
-        linear-gradient(rgba(0,0,0,0.02) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(0,0,0,0.02) 1px, transparent 1px);
-      background-size: 50px 50px;
-    }
-
+    /* --- Nav --- */
     nav {
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      padding: 1.5rem 2rem;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      z-index: 100;
-      backdrop-filter: blur(10px);
-      background: rgba(250, 248, 240, 0.85);
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      padding: 1rem 2rem;
+      display: flex; justify-content: space-between; align-items: center;
+      backdrop-filter: blur(16px) saturate(1.8);
+      background: rgba(250,248,240,0.8);
       border-bottom: 1px solid var(--border);
     }
-
-    .logo {
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-      font-weight: 600;
-      font-size: 1.25rem;
-    }
-
-    .logo-icon {
-      width: 32px;
-      height: 32px;
-      border-radius: 50%;
-      overflow: hidden;
-    }
-
-    .logo-icon img {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-    }
-
-    .nav-links {
-      display: flex;
-      gap: 2rem;
-      align-items: center;
-    }
-
-    .nav-links a {
-      color: var(--text-muted);
-      text-decoration: none;
-      font-size: 0.9rem;
-      transition: color 0.2s;
-    }
-
-    .nav-links a:hover {
-      color: var(--text);
-    }
-
+    .logo { display: flex; align-items: center; gap: 0.6rem; font-weight: 600; font-size: 1.1rem; letter-spacing: -0.01em; }
+    .logo-icon { width: 28px; height: 28px; border-radius: 50%; overflow: hidden; }
+    .logo-icon img { width: 100%; height: 100%; object-fit: cover; }
+    .nav-right { display: flex; gap: 1.5rem; align-items: center; }
+    .nav-right a { color: var(--text-muted); text-decoration: none; font-size: 0.85rem; transition: color 0.2s; }
+    .nav-right a:hover { color: var(--text); }
     .lang-switch {
-      display: flex;
-      gap: 0.25rem;
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 0.25rem;
+      display: flex; gap: 2px; background: var(--card); border: 1px solid var(--border);
+      border-radius: 8px; padding: 2px;
     }
-
     .lang-switch button {
-      background: transparent;
-      border: none;
-      color: var(--text-muted);
-      padding: 0.35rem 0.75rem;
-      border-radius: 6px;
-      cursor: pointer;
-      font-size: 0.85rem;
-      transition: all 0.2s;
+      background: transparent; border: none; color: var(--text-muted);
+      padding: 0.3rem 0.6rem; border-radius: 6px; cursor: pointer; font-size: 0.8rem; transition: all 0.2s;
     }
+    .lang-switch button.active { background: var(--accent); color: white; }
 
-    .lang-switch button.active {
-      background: var(--accent);
-      color: white;
-    }
-
-    .lang-switch button:hover:not(.active) {
-      color: var(--text);
-    }
-
+    /* --- Hero --- */
     .hero {
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
-      text-align: center;
-      padding: 8rem 2rem 4rem;
-      position: relative;
+      min-height: 100vh; display: flex; flex-direction: column;
+      justify-content: center; align-items: center; text-align: center;
+      padding: 7rem 2rem 4rem; max-width: 1000px; margin: 0 auto;
     }
-
-    .badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.5rem;
-      padding: 0.5rem 1rem;
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      border-radius: 100px;
-      font-size: 0.85rem;
-      color: var(--text-muted);
-      margin-bottom: 2rem;
+    .hero-badge {
+      display: inline-flex; align-items: center; gap: 0.5rem;
+      padding: 0.4rem 1rem; background: var(--accent-light); border: 1px solid rgba(196,118,74,0.15);
+      border-radius: 100px; font-size: 0.78rem; color: var(--accent); font-weight: 500;
+      letter-spacing: 0.03em; text-transform: uppercase; margin-bottom: 2rem;
     }
-
-    .badge-dot {
-      width: 8px;
-      height: 8px;
-      background: #22c55e;
-      border-radius: 50%;
-      animation: pulse 2s infinite;
-    }
-
-    @keyframes pulse {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.5; }
-    }
+    .hero-dot { width: 6px; height: 6px; background: #22c55e; border-radius: 50%; animation: pulse 2s infinite; }
+    @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
 
     h1 {
-      font-size: clamp(2.5rem, 8vw, 5rem);
-      font-weight: 700;
-      line-height: 1.1;
-      margin-bottom: 1.5rem;
-      background: var(--gradient);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
+      font-family: var(--font-display); font-size: clamp(2.8rem, 7vw, 4.5rem);
+      font-weight: 400; line-height: 1.08; margin-bottom: 1.5rem;
+      color: var(--text); letter-spacing: -0.02em;
     }
-
-    .subtitle {
-      font-size: clamp(1.1rem, 3vw, 1.4rem);
-      color: var(--text-muted);
-      max-width: 600px;
-      margin-bottom: 3rem;
+    h1 em {
+      font-style: italic;
+      background: var(--gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
     }
-
-    .cta-group {
-      display: flex;
-      gap: 1rem;
-      flex-wrap: wrap;
-      justify-content: center;
+    .hero-sub {
+      font-size: clamp(1rem, 2.5vw, 1.2rem); color: var(--text-mid);
+      max-width: 560px; margin-bottom: 2.5rem; line-height: 1.7;
     }
-
+    .hero-cta { display: flex; gap: 0.75rem; flex-wrap: wrap; justify-content: center; }
     .btn {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.5rem;
-      padding: 1rem 2rem;
-      border-radius: 12px;
-      font-size: 1rem;
-      font-weight: 500;
-      text-decoration: none;
-      transition: all 0.3s ease;
-      cursor: pointer;
-      border: none;
+      display: inline-flex; align-items: center; gap: 0.5rem;
+      padding: 0.85rem 1.8rem; border-radius: 10px; font-size: 0.95rem; font-weight: 500;
+      text-decoration: none; transition: all 0.25s; cursor: pointer; border: none; font-family: var(--font);
     }
-
     .btn-primary {
-      background: var(--gradient);
-      color: white;
-      box-shadow: 0 0 30px var(--accent-glow);
+      background: var(--gradient); color: white;
+      box-shadow: 0 2px 20px var(--accent-glow), 0 1px 3px rgba(0,0,0,0.08);
+    }
+    .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 4px 30px var(--accent-glow); }
+    .btn-ghost {
+      background: transparent; color: var(--text-mid); border: 1px solid var(--border);
+    }
+    .btn-ghost:hover { background: var(--card); border-color: rgba(0,0,0,0.12); }
+
+    .hero-screenshot {
+      margin-top: 3.5rem; max-width: 1000px; width: 100%; padding: 0 1rem;
+    }
+    .hero-screenshot img {
+      width: 100%; border-radius: var(--radius); display: block;
+      box-shadow: 0 40px 80px -20px rgba(0,0,0,0.12), 0 0 0 1px var(--border);
     }
 
-    .btn-primary:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 0 50px var(--accent-glow);
+    /* --- Section common --- */
+    .section-label {
+      font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em;
+      color: var(--accent); margin-bottom: 0.75rem;
     }
-
-    .btn-secondary {
-      background: var(--bg-card);
-      color: var(--text);
-      border: 1px solid var(--border);
+    .section-heading {
+      font-family: var(--font-display); font-size: clamp(1.8rem, 4vw, 2.6rem);
+      font-weight: 400; line-height: 1.15; margin-bottom: 1rem; letter-spacing: -0.01em;
     }
+    .section-sub { color: var(--text-mid); font-size: 1.05rem; max-width: 520px; line-height: 1.65; }
 
-    .btn-secondary:hover {
-      background: var(--bg-card-hover);
-      border-color: rgba(0, 0, 0, 0.15);
+    /* --- Capabilities --- */
+    .capabilities {
+      padding: 6rem 2rem; max-width: 1100px; margin: 0 auto;
     }
-
-    .app-preview {
-      margin-top: 4rem;
-      position: relative;
-      max-width: 1100px;
-      width: 100%;
-      padding: 0 1rem;
+    .capabilities-header { text-align: center; margin-bottom: 4rem; display: flex; flex-direction: column; align-items: center; }
+    .cap-grid {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.25rem;
     }
-
-    .app-screenshot {
-      border-radius: 12px;
-      overflow: hidden;
-      box-shadow: 0 50px 100px -20px rgba(0, 0, 0, 0.15),
-                  0 0 60px var(--accent-glow);
-      border: 1px solid var(--border);
+    .cap-card {
+      background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
+      padding: 2rem 1.75rem; transition: all 0.3s; position: relative; overflow: hidden;
     }
-
-    .app-screenshot img {
-      width: 100%;
-      height: auto;
-      display: block;
+    .cap-card:hover { background: var(--card-hover); transform: translateY(-2px); box-shadow: 0 12px 40px rgba(0,0,0,0.06); }
+    .cap-card::before {
+      content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+      background: var(--gradient); opacity: 0; transition: opacity 0.3s;
     }
-
-    /* Alpha Signup */
-    .alpha-signup {
-      padding: 4rem 2rem 2rem;
-      display: flex;
-      justify-content: center;
-    }
-
-    .alpha-signup-card {
-      max-width: 560px;
-      width: 100%;
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      padding: 2.5rem 3rem;
-      text-align: center;
-      position: relative;
-      overflow: hidden;
-    }
-
-    .alpha-signup-card::before {
-      content: '';
-      position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      height: 3px;
-      background: var(--gradient);
-    }
-
-    .signup-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.4rem;
-      padding: 0.35rem 0.85rem;
-      background: rgba(212, 135, 90, 0.1);
-      border: 1px solid rgba(212, 135, 90, 0.2);
-      border-radius: 100px;
-      font-size: 0.75rem;
-      font-weight: 600;
-      color: var(--accent);
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      margin-bottom: 1.25rem;
-    }
-
-    .alpha-signup-card h2 {
-      color: var(--text);
-      font-size: 1.6rem;
-      margin-bottom: 0.5rem;
-      font-weight: 700;
-    }
-
-    .alpha-signup-card .signup-desc {
-      color: var(--text-muted);
-      font-size: 0.95rem;
-      margin-bottom: 2rem;
-      line-height: 1.5;
-    }
-
-    .alpha-signup-card .signup-access-note {
-      color: var(--text-muted);
-      font-size: 0.85rem;
-      margin: -1rem 0 1.25rem;
-      line-height: 1.45;
-    }
-
-    .alpha-signup-form {
-      display: flex;
-      flex-direction: column;
-      gap: 0.6rem;
-    }
-
-    .signup-field {
-      position: relative;
-    }
-
-    .signup-field .field-icon {
-      position: absolute;
-      left: 0.85rem;
-      top: 50%;
-      transform: translateY(-50%);
-      color: var(--text-muted);
-      pointer-events: none;
-      display: flex;
-    }
-
-    .alpha-signup-form input,
-    .alpha-signup-card select {
-      width: 100%;
-      padding: 0.8rem 1rem 0.8rem 2.6rem;
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      font-size: 0.95rem;
-      background: white;
-      color: var(--text);
-      transition: all 0.2s ease;
-      box-sizing: border-box;
-    }
-
-    .alpha-signup-card select {
-      cursor: pointer;
-      appearance: none;
-      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b6b6b' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
-      background-repeat: no-repeat;
-      background-position: right 1rem center;
-    }
-
-    .alpha-signup-form input:focus,
-    .alpha-signup-card select:focus {
-      outline: none;
-      border-color: var(--accent);
-      box-shadow: 0 0 0 3px rgba(212, 135, 90, 0.1);
-    }
-
-    .alpha-signup-form button {
-      width: 100%;
-      margin-top: 0.4rem;
-      padding: 0.85rem 2rem;
-      font-size: 1rem;
-      font-weight: 600;
-      letter-spacing: 0.01em;
-    }
-
-    .os-hint {
-      margin-top: 0.75rem;
-      padding: 1rem 1.25rem;
-      border-radius: 10px;
-      font-size: 0.85rem;
-      text-align: left;
-      line-height: 1.6;
-    }
-
-    .os-hint-windows {
-      background: rgba(212, 135, 90, 0.06);
-      border: 1px solid rgba(212, 135, 90, 0.15);
-      color: var(--text);
-    }
-
-    .os-hint code {
-      background: rgba(0, 0, 0, 0.06);
-      padding: 0.2rem 0.5rem;
-      border-radius: 4px;
-      font-size: 0.8rem;
-      font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
-    }
-
-    .signup-footer {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 1.25rem;
-      margin-top: 1.5rem;
-      padding-top: 1.25rem;
-      border-top: 1px solid var(--border);
-      font-size: 0.8rem;
-      color: var(--text-muted);
-    }
-
-    .signup-footer-item {
-      display: flex;
-      align-items: center;
-      gap: 0.4rem;
-    }
-
-    .signup-footer a {
-      color: var(--text-muted);
-      text-decoration: none;
-      transition: color 0.2s ease;
-    }
-
-    .signup-footer a:hover {
+    .cap-card:hover::before { opacity: 1; }
+    .cap-icon {
+      width: 40px; height: 40px; border-radius: 10px; background: var(--accent-light);
+      display: flex; align-items: center; justify-content: center; margin-bottom: 1.25rem;
       color: var(--accent);
     }
-
-    .signup-footer .separator {
-      width: 1px;
-      height: 14px;
-      background: var(--border);
-    }
-
-    .signup-message {
-      padding: 1.25rem;
-      border-radius: 10px;
-      font-size: 0.95rem;
-    }
-
-    .signup-success {
-      background: rgba(34, 197, 94, 0.08);
-      color: #16a34a;
-      border: 1px solid rgba(34, 197, 94, 0.15);
-    }
-
-    .signup-error {
-      background: rgba(239, 68, 68, 0.08);
-      color: #dc2626;
-      border: 1px solid rgba(239, 68, 68, 0.15);
-    }
-
-    @media (max-width: 768px) {
-      .alpha-signup-card {
-        padding: 2rem 1.5rem;
-      }
-      .signup-footer {
-        flex-direction: column;
-        gap: 0.5rem;
-      }
-      .signup-footer .separator {
-        display: none;
-      }
-    }
-
-    .terminal-prompt {
-      color: #22c55e;
-    }
-
-    .terminal-command {
-      color: #e4e4e7;
-    }
-
-    .terminal-highlight {
-      padding: 6rem 2rem;
-      background: linear-gradient(180deg, transparent 0%, rgba(212, 135, 90, 0.05) 50%, transparent 100%);
-    }
-
-    .terminal-showcase {
-      max-width: 1100px;
-      margin: 0 auto;
-      display: grid;
-      grid-template-columns: 1.2fr 1fr;
-      gap: 4rem;
-      align-items: center;
-    }
-
-    .terminal-window {
-      background: #1a1a1a;
-      border-radius: 12px;
-      border: 1px solid rgba(0, 0, 0, 0.12);
-      overflow: hidden;
-      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.15);
-    }
-
-    .terminal-bar {
-      padding: 0.75rem 1rem;
-      background: rgba(255, 255, 255, 0.08);
-      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-      font-size: 0.8rem;
-      color: #999;
-    }
-
-    .terminal-body {
-      padding: 1.5rem;
-      font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
-      font-size: 0.9rem;
-      line-height: 1.8;
-    }
-
-    .terminal-line {
-      margin-bottom: 0.25rem;
-    }
-
-    .terminal-line.output {
-      color: #999;
-      padding-left: 1rem;
-    }
-
-    .terminal-info h2 {
-      font-size: 2rem;
-      margin-bottom: 1rem;
-    }
-
-    .terminal-info p {
-      color: var(--text-muted);
-      font-size: 1.1rem;
-      margin-bottom: 1.5rem;
-      line-height: 1.7;
-    }
-
-    .terminal-features {
-      list-style: none;
-    }
-
-    .terminal-features li {
-      padding: 0.5rem 0;
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-      font-size: 1rem;
-    }
-
-    .terminal-features .check {
-      color: #22c55e;
-      font-weight: bold;
-    }
-
-    @media (max-width: 900px) {
-      .terminal-showcase {
-        grid-template-columns: 1fr;
-        gap: 2rem;
-      }
-
-      .terminal-info {
-        text-align: center;
-      }
-
-      .terminal-features {
-        display: inline-block;
-        text-align: left;
-      }
-    }
-
-    .features {
-      padding: 8rem 2rem;
-      max-width: 1200px;
-      margin: 0 auto;
-    }
-
-    .section-title {
-      text-align: center;
-      margin-bottom: 4rem;
-    }
-
-    .section-title h2 {
-      font-size: 2.5rem;
-      margin-bottom: 1rem;
-    }
-
-    .section-title p {
-      color: var(--text-muted);
-      font-size: 1.1rem;
-    }
-
-    .features-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-      gap: 1.5rem;
-    }
-
-    .feature-card {
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      padding: 2rem;
-      transition: all 0.3s ease;
-    }
-
-    .feature-card:hover {
-      background: var(--bg-card-hover);
-      border-color: rgba(212, 135, 90, 0.3);
-      transform: translateY(-4px);
-    }
-
-    .feature-icon {
-      width: 48px;
-      height: 48px;
-      background: var(--gradient);
-      border-radius: 12px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: white;
-      margin-bottom: 1rem;
-    }
-
-    .feature-card h3 {
-      font-size: 1.25rem;
-      margin-bottom: 0.5rem;
-    }
-
-    .feature-card p {
-      color: var(--text-muted);
-      font-size: 0.95rem;
-    }
-
-    .feature-card.featured {
-      background: linear-gradient(135deg, rgba(212, 135, 90, 0.08) 0%, rgba(212, 135, 90, 0.03) 100%);
-      border-color: rgba(212, 135, 90, 0.3);
-    }
-
-    .feature-card.featured:hover {
-      border-color: rgba(212, 135, 90, 0.5);
-      box-shadow: 0 0 30px rgba(212, 135, 90, 0.15);
-    }
-
-    .color-dots {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 6px;
-      margin-top: 1rem;
-    }
-
-    .color-dots span {
-      width: 20px;
-      height: 20px;
-      border-radius: 50%;
-      display: inline-block;
-      transition: transform 0.2s;
-    }
-
-    .color-dots span:hover {
-      transform: scale(1.3);
-    }
-
-    .customization-card {
-      background: linear-gradient(135deg, rgba(244, 114, 182, 0.06) 0%, rgba(192, 132, 252, 0.06) 33%, rgba(52, 211, 153, 0.06) 66%, rgba(251, 191, 36, 0.06) 100%) !important;
-      border-color: rgba(192, 132, 252, 0.2) !important;
-    }
-
-    .customization-card:hover {
-      border-color: rgba(244, 114, 182, 0.4) !important;
-      box-shadow: 0 0 30px rgba(192, 132, 252, 0.1) !important;
-    }
-
-    /* User Group Sections */
-    .user-group {
-      margin-bottom: 4rem;
-    }
-
-    .user-group:last-child {
-      margin-bottom: 0;
-    }
-
-    .user-group-header {
-      display: flex;
-      align-items: center;
-      gap: 1.25rem;
-      margin-bottom: 2rem;
-      padding-bottom: 1.5rem;
-      border-bottom: 1px solid var(--border);
-    }
-
-    .user-group-icon {
-      width: 56px;
-      height: 56px;
-      background: var(--gradient);
-      border-radius: 14px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      flex-shrink: 0;
-      color: white;
-    }
-
-    .user-group-info h3 {
-      font-size: 1.5rem;
-      font-weight: 700;
-      margin-bottom: 0.25rem;
-      color: var(--text);
-    }
-
-    .user-group-info p {
-      color: var(--text-muted);
-      font-size: 0.95rem;
-      margin: 0;
-    }
-
-    /* Dataview & Properties Documentation */
-    .dataview-docs,
-    .properties-docs {
-      padding: 6rem 2rem;
-      max-width: 1200px;
-      margin: 0 auto;
-    }
-
-    .docs-container {
-      margin-top: 2rem;
-    }
-
-    .docs-intro {
-      text-align: center;
-      max-width: 700px;
-      margin: 0 auto 3rem;
-      color: var(--text-muted);
-      font-size: 1.1rem;
-      line-height: 1.6;
-    }
-
-    .docs-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-      gap: 1.5rem;
-    }
-
-    .docs-card {
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      padding: 1.5rem;
-    }
-
-    .docs-card.wide {
-      grid-column: 1 / -1;
-    }
-
-    .docs-card h3 {
-      color: var(--accent);
-      font-size: 1.1rem;
-      margin-bottom: 1rem;
-      padding-bottom: 0.75rem;
-      border-bottom: 1px solid var(--border);
-    }
-
-    .code-example {
-      margin-bottom: 1rem;
-    }
-
-    .code-example:last-child {
-      margin-bottom: 0;
-    }
-
-    .code-example pre {
-      background: rgba(0, 0, 0, 0.05);
-      border-radius: 8px;
-      padding: 0.75rem 1rem;
-      margin: 0 0 0.5rem 0;
-      overflow-x: auto;
-    }
-
-    .code-example code {
-      font-family: 'SF Mono', Monaco, Consolas, monospace;
-      font-size: 0.85rem;
-      color: #4a4a4a;
-    }
-
-    .code-desc {
-      font-size: 0.85rem;
-      color: var(--text-muted);
-      display: block;
-    }
-
-    .fields-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-      gap: 1.5rem;
-    }
-
-    .field-group h4 {
-      color: var(--text);
-      font-size: 0.95rem;
-      margin-bottom: 0.75rem;
-    }
-
-    .field-group p {
-      font-size: 0.85rem;
-      color: var(--text-muted);
-      margin-bottom: 0.5rem;
-    }
-
-    .field-group ul {
-      list-style: none;
-      padding: 0;
-      margin: 0;
-    }
-
-    .field-group li {
-      font-size: 0.85rem;
-      color: var(--text-muted);
-      padding: 0.25rem 0;
-    }
-
-    .field-group code {
-      background: rgba(212, 135, 90, 0.12);
-      color: var(--accent);
-      padding: 0.15rem 0.4rem;
-      border-radius: 4px;
-      font-size: 0.8rem;
-    }
-
-    .example-card .full-example {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 2rem;
-      align-items: center;
-    }
-
-    .example-card .full-example pre {
-      background: rgba(0, 0, 0, 0.05);
-      border-radius: 8px;
-      padding: 1rem 1.25rem;
-      margin: 0;
-    }
-
-    .example-desc {
-      color: var(--text-muted);
-      font-size: 0.95rem;
-      line-height: 1.6;
-    }
-
-    /* Properties Documentation */
-    .properties-features {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-      gap: 1.5rem;
-      margin-bottom: 2rem;
-    }
-
-    .property-type {
-      display: flex;
-      gap: 1rem;
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 1.25rem;
-    }
-
-    .property-icon {
-      flex-shrink: 0;
-      color: var(--accent);
-      display: flex;
-      align-items: center;
-    }
-
-    .property-info h4 {
-      color: var(--text);
-      font-size: 1rem;
-      margin-bottom: 0.25rem;
-    }
-
-    .property-info p {
-      color: var(--text-muted);
-      font-size: 0.85rem;
-      margin: 0;
-    }
-
-    .property-info code {
-      background: rgba(212, 135, 90, 0.12);
-      color: var(--accent);
-      padding: 0.1rem 0.3rem;
-      border-radius: 3px;
-      font-size: 0.8rem;
-    }
-
-    .properties-example {
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      padding: 1.5rem;
-    }
-
-    .properties-example h3 {
-      color: var(--accent);
-      font-size: 1.1rem;
-      margin-bottom: 1rem;
-    }
-
-    .properties-example pre {
-      background: rgba(0, 0, 0, 0.05);
-      border-radius: 8px;
-      padding: 1rem 1.25rem;
-      margin: 0 0 1rem 0;
-      overflow-x: auto;
-    }
-
-    .properties-example code {
-      font-family: 'SF Mono', Monaco, Consolas, monospace;
-      font-size: 0.85rem;
-      color: #4a4a4a;
-    }
-
-    .example-note {
-      color: var(--text-muted);
-      font-size: 0.9rem;
-      margin: 0;
-    }
-
-    @media (max-width: 768px) {
-      .example-card .full-example {
-        grid-template-columns: 1fr;
-      }
-    }
-
-    .shortcuts {
-      padding: 6rem 2rem;
-      max-width: 1200px;
-      margin: 0 auto;
-    }
-
-    .shortcuts-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-      gap: 2rem;
-      margin-top: 2rem;
-    }
-
-    .shortcuts-category {
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      padding: 1.5rem;
-    }
-
-    .shortcuts-category h3 {
-      color: var(--accent);
-      font-size: 1.1rem;
-      margin-bottom: 1rem;
-      padding-bottom: 0.75rem;
-      border-bottom: 1px solid var(--border);
-    }
-
-    .shortcut-list {
-      display: flex;
-      flex-direction: column;
-      gap: 0.75rem;
-    }
-
-    .shortcut-item {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 1rem;
-    }
-
-    .shortcut-keys {
-      display: flex;
-      gap: 0.25rem;
-      flex-shrink: 0;
-    }
-
-    .shortcut-keys kbd {
-      background: rgba(212, 135, 90, 0.12);
-      color: var(--accent);
-      padding: 0.25rem 0.5rem;
-      border-radius: 6px;
-      font-size: 0.8rem;
-      font-family: -apple-system, BlinkMacSystemFont, 'SF Mono', Monaco, monospace;
-      border: 1px solid rgba(212, 135, 90, 0.3);
-      min-width: 1.5rem;
-      text-align: center;
-    }
-
-    .shortcut-desc {
-      color: var(--text-muted);
-      font-size: 0.9rem;
-      text-align: right;
-    }
-
-    .shortcuts-note {
-      text-align: center;
-      color: var(--text-muted);
-      font-size: 0.85rem;
-      margin-top: 2rem;
-    }
-
-    .setup {
-      padding: 6rem 2rem;
-      max-width: 1200px;
-      margin: 0 auto;
-    }
-
-    .setup-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-      gap: 2rem;
-      margin-top: 2rem;
-    }
-
-    .setup-card {
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      padding: 2rem;
-      transition: all 0.3s ease;
-    }
-
-    .setup-card:hover {
-      border-color: rgba(212, 135, 90, 0.3);
-      transform: translateY(-2px);
-    }
-
-    .setup-icon {
-      color: var(--accent);
-      margin-bottom: 1rem;
-      display: flex;
-    }
-
-    .setup-card h3 {
-      font-size: 1.5rem;
-      margin-bottom: 0.75rem;
-      color: var(--accent);
-    }
-
-    .setup-card p {
-      color: var(--text-muted);
-      margin-bottom: 1rem;
-      line-height: 1.6;
-    }
-
-    .setup-install {
-      background: rgba(0, 0, 0, 0.05);
-      border-radius: 8px;
-      padding: 1rem;
-      margin: 1rem 0;
-    }
-
-    .setup-install span {
-      display: block;
-      font-size: 0.85rem;
-      color: var(--text-muted);
-      margin-bottom: 0.5rem;
-    }
-
-    .setup-install code {
-      display: block;
-      background: rgba(212, 135, 90, 0.08);
-      color: var(--accent);
-      padding: 0.75rem;
-      border-radius: 6px;
-      font-size: 0.9rem;
-      word-break: break-all;
-    }
-
-    .setup-note {
-      font-size: 0.85rem;
-      background: rgba(212, 135, 90, 0.04);
-      padding: 0.75rem;
-      border-radius: 6px;
-      border-left: 3px solid var(--accent);
-    }
-
-    .setup-note code {
-      background: rgba(0, 0, 0, 0.04);
-      padding: 0.2rem 0.4rem;
-      border-radius: 4px;
-    }
-
-    .setup-steps ol {
-      margin: 1rem 0;
-      padding-left: 1.25rem;
-      color: var(--text-muted);
-    }
-
-    .setup-steps li {
-      margin-bottom: 0.5rem;
-      line-height: 1.5;
-    }
-
-    .setup-steps a {
-      color: var(--accent);
-    }
-
-    .setup-link {
-      display: inline-block;
-      color: var(--accent);
-      text-decoration: none;
-      font-size: 0.9rem;
-      margin-top: 0.5rem;
-      transition: opacity 0.2s;
-    }
-
-    .setup-link:hover {
-      opacity: 0.8;
-      text-decoration: underline;
-    }
-
+    .cap-card h3 { font-size: 1.1rem; font-weight: 600; margin-bottom: 0.6rem; letter-spacing: -0.01em; }
+    .cap-card p { font-size: 0.88rem; color: var(--text-mid); line-height: 1.6; margin-bottom: 1rem; }
+    .cap-tags { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+    .cap-tag {
+      font-size: 0.7rem; padding: 0.2rem 0.55rem; border-radius: 5px;
+      background: rgba(0,0,0,0.04); color: var(--text-muted); font-weight: 500;
+    }
+    .cap-card.featured { grid-column: span 2; }
+    .cap-card.featured .cap-inner { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; align-items: start; }
+    .cap-card.featured .cap-features { list-style: none; }
+    .cap-card.featured .cap-features li {
+      font-size: 0.85rem; color: var(--text-mid); padding: 0.35rem 0;
+      border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 0.5rem;
+    }
+    .cap-card.featured .cap-features li:last-child { border: none; }
+    .cap-check { color: var(--accent); flex-shrink: 0; }
+
+    /* --- Download --- */
     .download {
-      padding: 8rem 2rem;
-      text-align: center;
-      position: relative;
+      padding: 5rem 2rem; max-width: 700px; margin: 0 auto; text-align: center;
     }
-
-    .download::before {
-      content: '';
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      width: 600px;
-      height: 600px;
-      background: radial-gradient(circle, var(--accent-glow) 0%, transparent 70%);
-      z-index: -1;
+    .download-header { margin-bottom: 2.5rem; display: flex; flex-direction: column; align-items: center; }
+    .dl-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.75rem; margin-bottom: 1rem; }
+    .dl-btn {
+      display: flex; align-items: center; gap: 0.85rem; padding: 1rem 1.25rem;
+      background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+      text-decoration: none; color: var(--text); transition: all 0.2s;
     }
+    .dl-btn:hover { background: var(--card-hover); border-color: rgba(0,0,0,0.12); transform: translateY(-1px); }
+    .dl-btn svg { flex-shrink: 0; color: var(--text-mid); }
+    .dl-info { text-align: left; }
+    .dl-platform { font-weight: 600; font-size: 0.9rem; }
+    .dl-version { font-size: 0.75rem; color: var(--text-muted); }
+    .dl-more { font-size: 0.8rem; color: var(--text-muted); }
+    .dl-more a { color: var(--text-muted); text-decoration: underline; transition: color 0.2s; }
+    .dl-more a:hover { color: var(--accent); }
 
-    .download h2 {
-      font-size: 2.5rem;
-      margin-bottom: 1rem;
-    }
-
-    .download > p {
-      color: var(--text-muted);
-      margin-bottom: 2rem;
-    }
-
-    .download-options {
-      display: flex;
-      justify-content: center;
-      gap: 1rem;
-      flex-wrap: wrap;
-    }
-
-    .download-btn {
-      display: flex;
-      align-items: center;
-      gap: 1rem;
-      padding: 1.25rem 2rem;
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      text-decoration: none;
-      color: var(--text);
-      transition: all 0.3s ease;
-    }
-
-    .download-btn:hover {
-      background: var(--bg-card-hover);
-      border-color: var(--accent);
-    }
-
-    .download-btn svg {
-      width: 32px;
-      height: 32px;
-    }
-
-    .download-info {
-      text-align: left;
-    }
-
-    .download-info .platform {
-      font-weight: 600;
-    }
-
-    .download-info .version {
-      font-size: 0.85rem;
-      color: var(--text-muted);
-    }
-
-    .install-note {
-      margin-top: 3rem;
-      padding: 1.5rem 2rem;
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      max-width: 500px;
-      margin-left: auto;
-      margin-right: auto;
-      text-align: left;
-    }
-
-    .install-note h4 {
-      margin-bottom: 0.75rem;
-      font-size: 1rem;
-    }
-
-    .install-note p {
-      font-size: 0.9rem;
-      margin-bottom: 0.75rem;
-    }
-
-    .install-note ol {
-      margin: 0.75rem 0;
-      padding-left: 1.25rem;
-      font-size: 0.9rem;
-    }
-
-    .install-note li {
-      margin-bottom: 0.5rem;
-    }
-
-    .install-note code {
-      background: rgba(212, 135, 90, 0.1);
-      padding: 0.2rem 0.5rem;
-      border-radius: 4px;
-      font-size: 0.8rem;
-    }
-
-    .install-alt {
-      color: var(--text-muted);
-      font-size: 0.85rem !important;
-      margin-top: 1rem !important;
-      margin-bottom: 0 !important;
-    }
-
-    .faq {
-      padding: 5rem 2rem;
-    }
-
-    .faq-grid {
-      max-width: 1100px;
-      margin: 0 auto;
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-      gap: 1rem;
-    }
-
+    /* --- FAQ --- */
+    .faq { padding: 5rem 2rem; max-width: 700px; margin: 0 auto; }
+    .faq-header { text-align: center; margin-bottom: 3rem; display: flex; flex-direction: column; align-items: center; }
     .faq-item {
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 1.25rem;
+      border-bottom: 1px solid var(--border); padding: 1.5rem 0;
     }
+    .faq-item:first-child { border-top: 1px solid var(--border); }
+    .faq-item h3 { font-size: 1rem; font-weight: 600; margin-bottom: 0.5rem; }
+    .faq-item p { font-size: 0.9rem; color: var(--text-mid); line-height: 1.65; }
 
-    .faq-item h3 {
-      font-size: 1rem;
-      margin-bottom: 0.5rem;
-    }
-
-    .faq-item p {
-      color: var(--text-muted);
-      font-size: 0.95rem;
-    }
-
-    .agents {
-      padding: 3rem 2rem 5rem;
-    }
-
-    .agents-grid {
-      max-width: 1100px;
-      margin: 0 auto;
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-      gap: 1rem;
-    }
-
-    .agent-card {
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 1.25rem;
-    }
-
-    .agent-card.primary {
-      border-color: rgba(212, 135, 90, 0.35);
-      box-shadow: 0 8px 24px rgba(212, 135, 90, 0.08);
-    }
-
-    .agent-card h3 {
-      font-size: 1rem;
-      margin-bottom: 0.5rem;
-    }
-
-    .agent-card p {
-      color: var(--text-muted);
-      font-size: 0.95rem;
-      margin-bottom: 0.6rem;
-    }
-
-    .agent-card .agent-tag {
-      display: inline-block;
-      font-size: 0.75rem;
-      color: var(--accent);
-      background: rgba(212, 135, 90, 0.12);
-      border: 1px solid rgba(212, 135, 90, 0.22);
-      border-radius: 999px;
-      padding: 0.2rem 0.55rem;
-    }
-
-    .agents-note {
-      max-width: 1100px;
-      margin: 1rem auto 0;
-      text-align: center;
-      color: var(--text-muted);
-      font-size: 0.9rem;
-    }
-
+    /* --- Footer --- */
     footer {
-      padding: 4rem 2rem;
-      text-align: center;
+      padding: 3rem 2rem; text-align: center; font-size: 0.8rem; color: var(--text-muted);
       border-top: 1px solid var(--border);
     }
+    footer a { color: var(--text-muted); text-decoration: none; transition: color 0.2s; }
+    footer a:hover { color: var(--accent); }
 
-    footer p {
-      color: var(--text-muted);
-      font-size: 0.9rem;
-    }
-
-    footer a {
-      color: var(--accent);
-      text-decoration: none;
-    }
-
-    @media (max-width: 768px) {
-      nav {
-        padding: 1rem;
-      }
-
-      .nav-links > a {
-        display: none;
-      }
-
-      .hero {
-        padding: 6rem 1rem 2rem;
-      }
-
-      .features {
-        padding: 4rem 1rem;
-      }
-
-      .download {
-        padding: 4rem 1rem;
-      }
-    }
-
-    /* Modal styles */
+    /* --- Modal --- */
     .modal {
-      display: none;
-      position: fixed;
-      z-index: 1000;
-      left: 0;
-      top: 0;
-      width: 100%;
-      height: 100%;
-      background: rgba(0, 0, 0, 0.4);
-      backdrop-filter: blur(5px);
-      overflow-y: auto;
+      display: none; position: fixed; inset: 0; z-index: 200;
+      background: rgba(0,0,0,0.5); backdrop-filter: blur(4px);
+      align-items: center; justify-content: center; padding: 2rem;
     }
-
+    .modal.active { display: flex; }
     .modal-content {
-      background: #ffffff;
-      margin: 5% auto;
-      padding: 2rem 3rem;
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      max-width: 700px;
-      width: 90%;
-      position: relative;
-      box-shadow: 0 25px 50px rgba(0, 0, 0, 0.15);
+      background: var(--bg); border-radius: var(--radius); padding: 2.5rem;
+      max-width: 600px; width: 100%; max-height: 80vh; overflow-y: auto; position: relative;
     }
-
     .modal-close {
-      position: absolute;
-      right: 1.5rem;
-      top: 1rem;
-      font-size: 2rem;
-      color: var(--text-muted);
-      cursor: pointer;
-      transition: color 0.2s;
+      position: absolute; top: 1rem; right: 1.5rem; font-size: 1.5rem;
+      cursor: pointer; color: var(--text-muted); background: none; border: none; line-height: 1;
+    }
+    .modal-content h2 { font-family: var(--font-display); font-size: 1.5rem; margin-bottom: 1.5rem; }
+    .modal-content h3 { font-size: 1rem; font-weight: 600; margin: 1.25rem 0 0.5rem; }
+    .modal-content h4 { font-size: 0.9rem; font-weight: 600; margin: 1rem 0 0.4rem; }
+    .modal-content p { font-size: 0.9rem; color: var(--text-mid); margin-bottom: 0.75rem; line-height: 1.6; }
+    .modal-content a { color: var(--accent); }
+
+    /* --- Responsive --- */
+    @media (max-width: 768px) {
+      nav { padding: 0.75rem 1rem; }
+      .nav-right a:not(:last-child) { display: none; }
+      .hero { padding: 6rem 1.5rem 3rem; }
+      .cap-grid { grid-template-columns: 1fr; }
+      .cap-card.featured { grid-column: span 1; }
+      .cap-card.featured .cap-inner { grid-template-columns: 1fr; }
+      .dl-grid { grid-template-columns: 1fr; }
+    }
+    @media (min-width: 769px) and (max-width: 1024px) {
+      .cap-grid { grid-template-columns: repeat(2, 1fr); }
     }
 
-    .modal-close:hover {
-      color: var(--text);
+    /* --- Animations --- */
+    .fade-in {
+      opacity: 0; transform: translateY(20px);
+      transition: opacity 0.6s ease, transform 0.6s ease;
     }
-
-    .modal-content h2 {
-      font-size: 1.75rem;
-      margin-bottom: 1.5rem;
-      color: var(--accent);
-    }
-
-    .modal-content h3 {
-      font-size: 1.1rem;
-      margin-top: 1.5rem;
-      margin-bottom: 0.5rem;
-    }
-
-    .modal-content h4 {
-      font-size: 1rem;
-      margin-top: 1rem;
-      margin-bottom: 0.5rem;
-      color: var(--text-muted);
-    }
-
-    .modal-content p {
-      color: var(--text-muted);
-      margin-bottom: 0.75rem;
-      font-size: 0.95rem;
-    }
-
-    .modal-content a {
-      color: var(--accent);
-    }
-
+    .fade-in.visible { opacity: 1; transform: translateY(0); }
+    .cap-card:nth-child(2) { transition-delay: 0.08s; }
+    .cap-card:nth-child(3) { transition-delay: 0.16s; }
+    .cap-card:nth-child(4) { transition-delay: 0.24s; }
+    .cap-card:nth-child(5) { transition-delay: 0.32s; }
+    .cap-card:nth-child(6) { transition-delay: 0.4s; }
   </style>
 </head>
 <body>
-  <div class="bg-animation"></div>
-  <div class="grid-overlay"></div>
+  <div class="bg-grain"></div>
+  <div class="bg-glow bg-glow-1"></div>
+  <div class="bg-glow bg-glow-2"></div>
 
   <nav>
     <div class="logo">
-      <div class="logo-icon">
-        <img src="icon.png" alt="MindGraph Notes">
-      </div>
+      <div class="logo-icon"><img src="icon.png" alt="MindGraph Notes"></div>
       MindGraph Notes
     </div>
-    <div class="nav-links">
+    <div class="nav-right">
       <a href="#features" data-i18n="nav.features">Features</a>
-      <a href="#shortcuts" data-i18n="nav.shortcuts">Shortcuts</a>
-      <a href="#setup" data-i18n="nav.setup">Setup</a>
       <a href="#download" data-i18n="nav.download">Download</a>
       <a href="./blog/" data-i18n="nav.blog">Blog</a>
-       <a href="https://discord.gg/XqayAQdE" target="_blank" rel="noopener noreferrer">Discord</a>
-       <a href="https://github.com/bydb/mindgraph-notes" target="_blank" rel="noopener noreferrer">GitHub</a>
+      <a href="https://discord.gg/XqayAQdE" target="_blank" rel="noopener noreferrer">Discord</a>
+      <a href="https://github.com/bydb/mindgraph-notes" target="_blank" rel="noopener noreferrer">GitHub</a>
       <div class="lang-switch">
         <button onclick="setLanguage('de')" id="lang-de" class="active">DE</button>
         <button onclick="setLanguage('en')" id="lang-en">EN</button>
@@ -1533,773 +356,207 @@
     </div>
   </nav>
 
+  <!-- Hero -->
   <section class="hero">
-    <div class="badge">
-      <span class="badge-dot"></span>
-      <span data-i18n="hero.badge">Standardm&auml;&szlig;ig lokal. Open Source.</span>
+    <div class="hero-badge">
+      <span class="hero-dot"></span>
+      <span data-i18n="hero.badge">Open Source &middot; Lokal &middot; Kostenlos</span>
     </div>
 
-    <h1 data-i18n="hero.title">Dein Wissen,<br>deine Werkzeuge.</h1>
+    <h1 data-i18n="hero.title">Notizen, Emails &amp; Lernen &ndash;<br><em>eine App, dein Kontext.</em></h1>
 
-    <p class="subtitle" data-i18n="hero.subtitle">
-      Notizen, Karteikarten, Wissensgraph und KI-Terminal &ndash; alles in einer App.
-      Ob Schule, Studium oder Wissensmanagement: aktiviere nur, was du brauchst.
+    <p class="hero-sub" data-i18n="hero.sub">
+      Markdown-Editor, KI-Email-Client, Karteikarten mit Spaced Repetition, Wissensgraph und integriertes Terminal. Alles lokal, alles verbunden.
     </p>
 
-    <div class="cta-group">
+    <div class="hero-cta">
       <a href="#download" class="btn btn-primary">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-          <polyline points="7 10 12 15 17 10"/>
-          <line x1="12" y1="15" x2="12" y2="3"/>
-        </svg>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
         <span data-i18n="hero.cta">Kostenlos herunterladen</span>
       </a>
-      <a href="https://github.com/bydb/mindgraph-notes" target="_blank" rel="noopener noreferrer" class="btn btn-secondary">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-          <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/>
-        </svg>
+      <a href="https://github.com/bydb/mindgraph-notes" target="_blank" rel="noopener noreferrer" class="btn btn-ghost">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
         Source Code
       </a>
     </div>
 
-    <div class="app-preview">
-      <div class="app-screenshot">
-        <img src="screenshot.png" alt="MindGraph Notes - Editor, Wissensgraph und OpenCode Terminal">
-      </div>
+    <div class="hero-screenshot">
+      <img src="screenshot.png" alt="MindGraph Notes" loading="lazy">
     </div>
   </section>
 
-  <section class="alpha-signup" id="download">
-    <div class="alpha-signup-card">
-      <div class="signup-badge" data-i18n="signup.badge">Open Beta</div>
-      <h2 data-i18n="signup.title">Jetzt herunterladen</h2>
-      <p class="signup-desc" data-i18n="signup.desc">In 2 Minuten startklar: herunterladen, Vault &ouml;ffnen, loslegen. Kostenlos, Open Source, verf&uuml;gbar f&uuml;r macOS, Linux und Windows.</p>
-      <div class="download-options" style="margin-top: 1.5rem;">
-        <a href="https://github.com/bydb/mindgraph-notes/releases/download/v0.4.4-beta/MindGraph-Notes-0.4.4-beta-arm64.dmg" target="_blank" rel="noopener noreferrer" class="download-btn">
-          <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg>
-          <div class="download-info">
-            <div class="platform">macOS (Apple Silicon)</div>
-            <div class="version">.dmg · v0.4.4-beta</div>
-          </div>
-        </a>
-        <a href="https://github.com/bydb/mindgraph-notes/releases/download/v0.4.4-beta/MindGraph-Notes-0.4.4-beta-x64.dmg" target="_blank" rel="noopener noreferrer" class="download-btn">
-          <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg>
-          <div class="download-info">
-            <div class="platform">macOS (Intel)</div>
-            <div class="version">.dmg · v0.4.4-beta</div>
-          </div>
-        </a>
-        <a href="https://github.com/bydb/mindgraph-notes/releases/download/v0.4.4-beta/MindGraph.Notes-0.4.4-beta.AppImage" target="_blank" rel="noopener noreferrer" class="download-btn">
-          <svg width="32" height="32" viewBox="0 0 256 256" fill="currentColor"><path d="M220,152H36a12,12,0,0,0-12,12v40a12,12,0,0,0,12,12h80v12H96a8,8,0,0,0,0,16h64a8,8,0,0,0,0-16H140V216h80a12,12,0,0,0,12-12V164A12,12,0,0,0,220,152Zm-4,48H40V168H216ZM36,136H220a12,12,0,0,0,12-12V44a12,12,0,0,0-12-12H36A12,12,0,0,0,24,44v80A12,12,0,0,0,36,136ZM40,48H216v72H40Z"/></svg>
-          <div class="download-info">
-            <div class="platform">Linux</div>
-            <div class="version">.AppImage · v0.4.4-beta</div>
-          </div>
-        </a>
-        <a href="https://github.com/bydb/mindgraph-notes/releases/download/v0.4.4-beta/MindGraph.Notes.Setup.0.4.4-beta.exe" target="_blank" rel="noopener noreferrer" class="download-btn">
-          <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor"><path d="M0 3.449L9.75 2.1v9.451H0m10.949-9.602L24 0v11.4H10.949M0 12.6h9.75v9.451L0 20.699M10.949 12.6H24V24l-12.9-1.801"/></svg>
-          <div class="download-info">
-            <div class="platform">Windows</div>
-            <div class="version">.exe · v0.4.4-beta</div>
-          </div>
-        </a>
-      </div>
-      <p style="text-align: center; font-size: 0.8rem; color: var(--text-muted); margin-top: 0.75rem;">
-        <a href="https://github.com/bydb/mindgraph-notes/releases/latest" target="_blank" rel="noopener noreferrer" style="color: var(--text-muted); text-decoration: underline;" data-i18n="download.allDownloads">Alle Downloads anzeigen (deb, snap, zip...)</a>
-      </p>
-      <div class="signup-footer" style="margin-top: 1.5rem;">
-        <a href="https://github.com/bydb/mindgraph-notes" target="_blank" rel="noopener noreferrer" class="signup-footer-item">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/></svg>
-          Source Code
-        </a>
-        <span class="separator"></span>
-        <a href="https://discord.gg/XqayAQdE" target="_blank" rel="noopener noreferrer" class="signup-footer-item">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.095 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.095 2.157 2.42 0 1.333-.947 2.418-2.157 2.418z"/></svg>
-          <span data-i18n="signup.discord">Discord beitreten</span>
-        </a>
-      </div>
-    </div>
-  </section>
-
-  <section class="terminal-highlight">
-    <div class="terminal-showcase">
-      <div class="terminal-window">
-        <div class="terminal-bar">
-          <span data-i18n="terminal.bar">Terminal</span>
-        </div>
-        <div class="terminal-body">
-          <div class="terminal-line">
-            <span class="terminal-prompt">~/Organische Chemie $</span>
-            <span class="terminal-command" data-i18n="terminal.cmd1"> opencode "Erstelle mir anschauliche Grafiken zum Thema Alkane"</span>
-          </div>
-          <div class="terminal-line output">
-            <span style="color: #f97316;">&#9679;</span> <span data-i18n="terminal.out1">Lese [[Alkane.md]], [[Bindungstypen.md]] und 3 weitere Notizen...</span>
-          </div>
-          <div class="terminal-line output">
-            <span style="color: #22c55e;">&#10003;</span> <span data-i18n="terminal.out2">SVG-Strukturformeln f&uuml;r Methan, Ethan, Propan erstellt</span>
-          </div>
-          <div class="terminal-line output">
-            <span style="color: #22c55e;">&#10003;</span> <span data-i18n="terminal.out3">Bilder in [[Alkane.md]] eingebettet</span>
-          </div>
-        </div>
-      </div>
-      <div class="terminal-info">
-        <h2 data-i18n="terminal.title">KI direkt in deinen Notizen</h2>
-        <p data-i18n="terminal.desc">
-          Das integrierte Terminal macht MindGraph Notes einzigartig: Starte <strong>OpenCode</strong>, <strong>Claude Code</strong> oder <strong>Ollama</strong> direkt neben deinen Notizen. Lass dir Grafiken erstellen, Zusammenfassungen schreiben oder Quiz-Fragen generieren &ndash; ohne Kontextwechsel.
-        </p>
-        <ul class="terminal-features">
-          <li><span class="check">&#10003;</span> <span data-i18n="terminal.f1">OpenCode, Claude Code und Ollama direkt nutzen</span></li>
-          <li><span class="check">&#10003;</span> <span data-i18n="terminal.f2">KI liest deine Notizen und arbeitet im Kontext</span></li>
-          <li><span class="check">&#10003;</span> <span data-i18n="terminal.f3">Grafiken, Zusammenfassungen, Quiz &ndash; alles per Prompt</span></li>
-          <li><span class="check">&#10003;</span> <span data-i18n="terminal.f4">Standardm&auml;&szlig;ig lokal &ndash; deine Daten bleiben bei dir</span></li>
-        </ul>
-      </div>
-    </div>
-  </section>
-
-  <section class="features" id="features">
-    <div class="section-title">
-      <h2 data-i18n="features.title">Mehr als nur Notizen</h2>
-      <p data-i18n="features.subtitle">Alles was du brauchst &ndash; aktiviere nur, was du willst.</p>
+  <!-- Capabilities -->
+  <section class="capabilities" id="features">
+    <div class="capabilities-header">
+      <div class="section-label" data-i18n="cap.label">Was MindGraph Notes kann</div>
+      <h2 class="section-heading" data-i18n="cap.heading">Sechs Werkzeuge,<br>ein Wissenssystem.</h2>
+      <p class="section-sub" data-i18n="cap.sub">Aktiviere nur, was du brauchst. Jedes Modul arbeitet eigenstaendig &ndash; zusammen entfalten sie ihr volles Potenzial.</p>
     </div>
 
-    <!-- Schule / Lernen -->
-    <div class="user-group" id="schueler">
-      <div class="user-group-header">
-        <div class="user-group-icon">
-          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M22 10v6M2 10l10-5 10 5-10 5z"/>
-            <path d="M6 12v5c0 1.66 2.69 3 6 3s6-1.34 6-3v-5"/>
-          </svg>
-        </div>
-        <div class="user-group-info">
-          <h3 data-i18n="usergroup.schule.title">Schule &amp; Lernen</h3>
-          <p data-i18n="usergroup.schule.desc">Karteikarten, Spaced Repetition und KI-Quiz &ndash; verwandle Notizen in aktives Lernmaterial</p>
-        </div>
-      </div>
-      <div class="features-grid">
-        <div class="feature-card featured">
-          <div class="feature-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="14" height="14" rx="2"/><path d="M8 2h10a2 2 0 0 1 2 2v10"/></svg></div>
-          <h3 data-i18n="features.flashcards.title">Karteikarten &amp; Quiz</h3>
-          <p data-i18n="features.flashcards.desc">Generiere Quiz-Fragen via Ollama, importiere Decks aus Anki (.apkg) und lerne mit Spaced Repetition (SM-2). NEU: Bilder in Karteikarten.</p>
-        </div>
-        <div class="feature-card featured">
-          <div class="feature-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/></svg></div>
-          <h3 data-i18n="features.spaced.title">Spaced Repetition (SM-2)</h3>
-          <p data-i18n="features.spaced.desc">Wissenschaftlich bewiesene Lernmethode. Der SM-2 Algorithmus plant automatisch optimale Wiederholungsintervalle f&uuml;r Langzeitged&auml;chtnis.</p>
-        </div>
-        <div class="feature-card">
-          <div class="feature-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg></div>
-          <h3 data-i18n="features.preview.title">Live Preview</h3>
-          <p data-i18n="features.preview.desc">Schreibe in Markdown mit sofortiger Vorschau. LaTeX, Mermaid-Diagramme, Callouts und mehr.</p>
-        </div>
-        <div class="feature-card">
-          <div class="feature-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg></div>
-          <h3 data-i18n="features.reminders.title">Erinnerungen</h3>
-          <p data-i18n="features.reminders.desc">&Uuml;berf&auml;llige Aufgaben und Lernkarten im Blick. Automatische Erinnerungen halten deinen Lernplan auf Kurs.</p>
-        </div>
-        <div class="feature-card">
-          <div class="feature-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg></div>
-          <h3 data-i18n="features.local.title">Lokal &amp; transparent</h3>
-          <p data-i18n="features.local.desc">Deine Notizen bleiben als Markdown-Dateien auf deinem Rechner. Keine Telemetrie. Optionale Integrationen aktivierst du bewusst.</p>
-        </div>
-      </div>
-    </div>
-
-    <!-- Studium & Wissenschaft -->
-    <div class="user-group" id="studium">
-      <div class="user-group-header">
-        <div class="user-group-icon">
-          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="12" cy="12" r="2"/>
-            <path d="M12 2v4"/><path d="m15 5.2-1.8 3.2"/><path d="m19.4 8-3.2 1.8"/>
-            <path d="M22 12h-4"/><path d="m19.4 16-3.2-1.8"/><path d="m15 18.8-1.8-3.2"/>
-            <path d="M12 22v-4"/><path d="m9 18.8 1.8-3.2"/><path d="m4.6 16 3.2-1.8"/>
-            <path d="M2 12h4"/><path d="m4.6 8 3.2 1.8"/><path d="m9 5.2 1.8 3.2"/>
-          </svg>
-        </div>
-        <div class="user-group-info">
-          <h3 data-i18n="usergroup.studium.title">Studium &amp; Wissenschaft</h3>
-          <p data-i18n="usergroup.studium.desc">Zotero, PDF Companion, Dataview und LaTeX &ndash; gebaut f&uuml;r den akademischen Alltag</p>
-        </div>
-      </div>
-      <div class="features-grid">
-        <div class="feature-card featured">
-          <div class="feature-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg></div>
-          <h3 data-i18n="features.zotero.title">Zotero Integration</h3>
-          <p data-i18n="features.zotero.desc">F&uuml;ge Literatur direkt aus Zotero ein. Perfekt f&uuml;r akademisches Arbeiten und Recherche.</p>
-        </div>
-        <div class="feature-card featured">
-          <div class="feature-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg></div>
-          <h3 data-i18n="features.pdf.title">PDF Companion + Docling</h3>
-          <p data-i18n="features.pdf.desc">PDFs direkt neben deinen Notizen. NEU: Extrahiere Text, Tabellen und Bilder automatisch via Docling. Perfekt f&uuml;r Vorlesungsfolien, Paper und Scans.</p>
-        </div>
-        <div class="feature-card featured">
-          <div class="feature-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14a9 3 0 0 0 18 0V5"/><path d="M3 12a9 3 0 0 0 18 0"/></svg></div>
-          <h3 data-i18n="features.dataview.title">Dataview Queries</h3>
-          <p data-i18n="features.dataview.desc">NEU: Frage deine Notizen ab wie eine Datenbank. LIST und TABLE Queries mit FROM, WHERE, SORT. Filtere nach Tags, Ordnern und YAML-Frontmatter.</p>
-        </div>
-        <div class="feature-card">
-          <div class="feature-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21v-7"/><path d="M4 10V3"/><path d="M12 21v-9"/><path d="M12 8V3"/><path d="M20 21v-5"/><path d="M20 12V3"/><path d="M2 14h4"/><path d="M10 8h4"/><path d="M18 16h4"/></svg></div>
-          <h3 data-i18n="features.properties.title">Properties Panel</h3>
-          <p data-i18n="features.properties.desc">NEU: Bearbeite YAML-Frontmatter komfortabel. Checkboxen f&uuml;r Booleans, Datumspicker, Arrays &ndash; alles ohne YAML-Syntax.</p>
-        </div>
-        <div class="feature-card">
-          <div class="feature-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 16 6-12 6 12"/><path d="M8 12h8"/><path d="m16 20 2 2 4-4"/></svg></div>
-          <h3 data-i18n="features.languagetool.title">LanguageTool</h3>
-          <p data-i18n="features.languagetool.desc">Integrierte Grammatik- und Rechtschreibpr&uuml;fung. Lokal via Docker oder mit LanguageTool Premium API. Fehler werden direkt im Editor markiert.</p>
-        </div>
-        <div class="feature-card">
-          <div class="feature-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 7V4H6l6 8-6 8h12v-3"/></svg></div>
-          <h3 data-i18n="features.latex.title">LaTeX &amp; Mermaid</h3>
-          <p data-i18n="features.latex.desc">Mathematische Formeln mit LaTeX und Diagramme mit Mermaid direkt in der Vorschau. Perfekt f&uuml;r MINT-F&auml;cher.</p>
-        </div>
-      </div>
-    </div>
-
-    <!-- Wissensmanagement / PKM -->
-    <div class="user-group" id="pkm">
-      <div class="user-group-header">
-        <div class="user-group-icon">
-          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M12 2a8 8 0 0 0-8 8c0 3.4 2.1 6.3 5 7.4V20h6v-2.6c2.9-1.1 5-4 5-7.4a8 8 0 0 0-8-8z"/>
-            <path d="M9 22h6"/><path d="M12 2v4"/><path d="M8 10h8"/><path d="M10 14h4"/>
-          </svg>
-        </div>
-        <div class="user-group-info">
-          <h3 data-i18n="usergroup.pkm.title">Wissensmanagement</h3>
-          <p data-i18n="usergroup.pkm.desc">Wikilinks, Canvas, Smart Connections und lokale KI &ndash; dein pers&ouml;nliches Wissensnetz</p>
-        </div>
-      </div>
-      <div class="features-grid">
-        <div class="feature-card featured">
-          <div class="feature-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg></div>
-          <h3 data-i18n="features.wikilinks.title">Wikilinks</h3>
-          <p data-i18n="features.wikilinks.desc">Verlinke Notizen mit [[Wikilinks]]. Bidirektionale Verbindungen, Backlinks-Panel, Obsidian-kompatibel.</p>
-        </div>
-        <div class="feature-card featured">
-          <div class="feature-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg></div>
-          <h3 data-i18n="features.canvas.title">Local Canvas</h3>
-          <p data-i18n="features.canvas.desc">Erkunde Notizen visuell im Canvas. Starte mit einer Notiz, erweitere schrittweise &uuml;ber Verbindungen. NEU: Bidirektionale Links zwischen Canvas und Notizen.</p>
-        </div>
-        <div class="feature-card featured">
-          <div class="feature-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.287 1.288L3 12l5.8 1.9a2 2 0 0 1 1.288 1.287L12 21l1.9-5.8a2 2 0 0 1 1.287-1.288L21 12l-5.8-1.9a2 2 0 0 1-1.288-1.287Z"/><path d="M5 3v4"/><path d="M19 17v4"/><path d="M3 5h4"/><path d="M17 19h4"/></svg></div>
-          <h3 data-i18n="features.ai.title">KI-Funktionen (optional)</h3>
-          <p data-i18n="features.ai.desc">NEU: Smart Connections mit konfigurierbaren Gewichtungen (Embedding, Keywords, Wikilinks, Tags, Ordner). Notes Chat, lokale LLMs via Ollama/LM Studio. Aktiviere nur was du brauchst.</p>
-        </div>
-        <div class="feature-card">
-          <div class="feature-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg></div>
-          <h3 data-i18n="features.terminal.title">Integriertes Terminal</h3>
-          <p data-i18n="features.terminal.desc">Vollwertiges Terminal in der App. Git, npm, Python &ndash; jedes CLI-Tool direkt neben deinen Notizen.</p>
-        </div>
-        <div class="feature-card">
-          <div class="feature-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="m9 12 2 2 4-4"/></svg></div>
-          <h3 data-i18n="features.tasks.title">Task Management</h3>
-          <p data-i18n="features.tasks.desc">Aufgaben mit F&auml;lligkeiten direkt in Notizen. Erinnerungen, &Uuml;berf&auml;llig-Panel, Fortschritt auf Karten &ndash; alles ohne Extra-App.</p>
-        </div>
-        <div class="feature-card">
-          <div class="feature-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg></div>
-          <h3 data-i18n="features.graph.title">Canvas &Uuml;bersicht</h3>
-          <p data-i18n="features.graph.desc">Alle Notizen auf einen Blick. Filter nach Ordnern, ordne frei an, entdecke Zusammenh&auml;nge.</p>
-        </div>
-        <div class="feature-card featured customization-card">
-          <div class="feature-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="13.5" cy="6.5" r="1.5" fill="currentColor" stroke="none"/><circle cx="17.5" cy="10.5" r="1.5" fill="currentColor" stroke="none"/><circle cx="8.5" cy="7.5" r="1.5" fill="currentColor" stroke="none"/><circle cx="6.5" cy="12" r="1.5" fill="currentColor" stroke="none"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/></svg></div>
-          <h3 data-i18n="features.customization.title">Deine Farben, dein Logo</h3>
-          <p data-i18n="features.customization.desc">13 Akzentfarben, 15 Hintergr&uuml;nde und ein eigenes Logo in der Titelleiste. Mach MindGraph Notes zu deiner App.</p>
-          <div class="color-dots">
-            <span style="background:#0a84ff"></span>
-            <span style="background:#ff9500"></span>
-            <span style="background:#30d158"></span>
-            <span style="background:#bf5af2"></span>
-            <span style="background:#ff375f"></span>
-            <span style="background:#5ac8fa"></span>
-            <span style="background:#f472b6"></span>
-            <span style="background:#fb7185"></span>
-            <span style="background:#c084fc"></span>
-            <span style="background:#34d399"></span>
-            <span style="background:#a3e635"></span>
-            <span style="background:#fbbf24"></span>
-          </div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- Keep lernen anchor for backwards compatibility -->
-  <div id="lernen"></div>
-
-  <!-- Dataview Documentation Section -->
-  <section class="dataview-docs" id="dataview">
-    <div class="section-title">
-      <h2 data-i18n="dataview.title">Dataview Queries</h2>
-      <p data-i18n="dataview.subtitle">Frage deine Notizen ab wie eine Datenbank</p>
-    </div>
-
-    <div class="docs-container">
-      <div class="docs-intro">
-        <p data-i18n="dataview.intro">Mit Dataview kannst du Notizen nach Metadaten abfragen und als Listen oder Tabellen darstellen. Schreibe Queries im Edit-Modus und wechsle zu Live-Preview, um die Ergebnisse zu sehen.</p>
-      </div>
-
-      <div class="docs-grid">
-        <!-- Grundsyntax -->
-        <div class="docs-card">
-          <h3 data-i18n="dataview.basic.title">Grundsyntax</h3>
-          <div class="code-example">
-            <pre><code>```dataview
-LIST
-```</code></pre>
-            <span class="code-desc" data-i18n="dataview.basic.list">Listet alle Notizen auf</span>
-          </div>
-          <div class="code-example">
-            <pre><code>```dataview
-TABLE status, priority, deadline
-```</code></pre>
-            <span class="code-desc" data-i18n="dataview.basic.table">Tabelle mit Frontmatter-Spalten</span>
-          </div>
-        </div>
-
-        <!-- FROM Clause -->
-        <div class="docs-card">
-          <h3 data-i18n="dataview.from.title">FROM - Quellen filtern</h3>
-          <div class="code-example">
-            <pre><code>LIST FROM #projekt</code></pre>
-            <span class="code-desc" data-i18n="dataview.from.tag">Nach Tag filtern</span>
-          </div>
-          <div class="code-example">
-            <pre><code>LIST FROM "Work/Projects"</code></pre>
-            <span class="code-desc" data-i18n="dataview.from.folder">Nach Ordner filtern</span>
-          </div>
-          <div class="code-example">
-            <pre><code>LIST FROM #projekt AND "Work"</code></pre>
-            <span class="code-desc" data-i18n="dataview.from.combine">Quellen kombinieren</span>
-          </div>
-        </div>
-
-        <!-- WHERE Clause -->
-        <div class="docs-card">
-          <h3 data-i18n="dataview.where.title">WHERE - Bedingungen</h3>
-          <div class="code-example">
-            <pre><code>LIST WHERE status = "active"</code></pre>
-            <span class="code-desc" data-i18n="dataview.where.text">Text vergleichen</span>
-          </div>
-          <div class="code-example">
-            <pre><code>LIST WHERE priority >= 2</code></pre>
-            <span class="code-desc" data-i18n="dataview.where.number">Zahlen vergleichen</span>
-          </div>
-          <div class="code-example">
-            <pre><code>LIST WHERE completed = false</code></pre>
-            <span class="code-desc" data-i18n="dataview.where.bool">Boolean prüfen</span>
-          </div>
-          <div class="code-example">
-            <pre><code>LIST WHERE contains(tags, "urgent")</code></pre>
-            <span class="code-desc" data-i18n="dataview.where.contains">In Arrays suchen</span>
-          </div>
-        </div>
-
-        <!-- SORT & LIMIT -->
-        <div class="docs-card">
-          <h3 data-i18n="dataview.sort.title">SORT & LIMIT</h3>
-          <div class="code-example">
-            <pre><code>LIST SORT file.mtime DESC</code></pre>
-            <span class="code-desc" data-i18n="dataview.sort.date">Nach Datum sortieren</span>
-          </div>
-          <div class="code-example">
-            <pre><code>LIST SORT priority ASC LIMIT 10</code></pre>
-            <span class="code-desc" data-i18n="dataview.sort.limit">Sortieren und begrenzen</span>
-          </div>
-        </div>
-
-        <!-- Verfügbare Felder -->
-        <div class="docs-card wide">
-          <h3 data-i18n="dataview.fields.title">Verfügbare Felder</h3>
-          <div class="fields-grid">
-            <div class="field-group">
-              <h4 data-i18n="dataview.fields.file">Datei-Felder</h4>
-              <ul>
-                <li><code>file.name</code> - <span data-i18n="dataview.fields.filename">Dateiname ohne Endung</span></li>
-                <li><code>file.path</code> - <span data-i18n="dataview.fields.filepath">Relativer Pfad</span></li>
-                <li><code>file.folder</code> - <span data-i18n="dataview.fields.folder">Übergeordneter Ordner</span></li>
-                <li><code>file.ctime</code> - <span data-i18n="dataview.fields.ctime">Erstelldatum</span></li>
-                <li><code>file.mtime</code> - <span data-i18n="dataview.fields.mtime">Änderungsdatum</span></li>
-                <li><code>file.tags</code> - <span data-i18n="dataview.fields.tags">Alle Tags</span></li>
-              </ul>
-            </div>
-            <div class="field-group">
-              <h4 data-i18n="dataview.fields.frontmatter">Frontmatter-Felder</h4>
-              <p data-i18n="dataview.fields.frontmatterDesc">Alle Felder aus dem YAML-Header sind direkt verfügbar:</p>
-              <ul>
-                <li><code>status</code>, <code>priority</code>, <code>deadline</code></li>
-                <li><code>author</code>, <code>tags</code>, <code>category</code></li>
-                <li><span data-i18n="dataview.fields.custom">...und alle eigenen Felder</span></li>
-              </ul>
+    <div class="cap-grid">
+      <!-- Smart Notes -->
+      <div class="cap-card featured fade-in">
+        <div class="cap-inner">
+          <div>
+            <div class="cap-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg></div>
+            <h3 data-i18n="cap.notes.title">Smart Notes</h3>
+            <p data-i18n="cap.notes.desc">Markdown-Editor mit Live Preview, Wikilinks, Backlinks, Canvas-Ansicht mit KI-Clustering, Dataview-Abfragen und Slash Commands. Obsidian-kompatibel.</p>
+            <div class="cap-tags">
+              <span class="cap-tag">Markdown</span>
+              <span class="cap-tag">Wikilinks</span>
+              <span class="cap-tag">Canvas</span>
+              <span class="cap-tag">LaTeX</span>
+              <span class="cap-tag">Mermaid</span>
+              <span class="cap-tag">Dataview</span>
             </div>
           </div>
+          <ul class="cap-features">
+            <li><span class="cap-check">&#10003;</span> <span data-i18n="cap.notes.f1">Live Preview mit Syntax-Highlighting</span></li>
+            <li><span class="cap-check">&#10003;</span> <span data-i18n="cap.notes.f2">Canvas mit KI-gestuetzter Anordnung</span></li>
+            <li><span class="cap-check">&#10003;</span> <span data-i18n="cap.notes.f3">28+ Slash Commands</span></li>
+            <li><span class="cap-check">&#10003;</span> <span data-i18n="cap.notes.f4">PDF Companion mit Docling OCR</span></li>
+            <li><span class="cap-check">&#10003;</span> <span data-i18n="cap.notes.f5">Properties Panel fuer YAML-Frontmatter</span></li>
+            <li><span class="cap-check">&#10003;</span> <span data-i18n="cap.notes.f6">LanguageTool Grammatikpruefung</span></li>
+          </ul>
         </div>
+      </div>
 
-        <!-- Vollständiges Beispiel -->
-        <div class="docs-card wide example-card">
-          <h3 data-i18n="dataview.example.title">Vollständiges Beispiel</h3>
-          <div class="full-example">
-            <pre><code>```dataview
-TABLE status, deadline, priority
-FROM "Work/Projects"
-WHERE !completed AND priority >= 2
-SORT deadline ASC
-LIMIT 10
-```</code></pre>
-            <div class="example-desc">
-              <p data-i18n="dataview.example.desc">Zeigt eine Tabelle mit Status, Deadline und Priorität für alle nicht abgeschlossenen Projekte mit Priorität ≥ 2, sortiert nach Deadline.</p>
-            </div>
-          </div>
+      <!-- Smart Email -->
+      <div class="cap-card fade-in">
+        <div class="cap-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 01-2.06 0L2 7"/></svg></div>
+        <h3 data-i18n="cap.email.title">Smart Email</h3>
+        <p data-i18n="cap.email.desc">KI-gestuetzter Email-Client mit IMAP &amp; SMTP. Analysiert Relevanz, erkennt Termine, prueft deinen Apple-Kalender auf Konflikte und generiert Antwortentwuerfe.</p>
+        <div class="cap-tags">
+          <span class="cap-tag">IMAP/SMTP</span>
+          <span class="cap-tag">KI-Analyse</span>
+          <span class="cap-tag">Kalender</span>
+          <span class="cap-tag">Kontakte</span>
+        </div>
+      </div>
+
+      <!-- Smart Learning -->
+      <div class="cap-card fade-in">
+        <div class="cap-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="14" height="14" rx="2"/><path d="M8 2h10a2 2 0 012 2v10"/></svg></div>
+        <h3 data-i18n="cap.learn.title">Smart Learning</h3>
+        <p data-i18n="cap.learn.desc">Karteikarten mit Spaced Repetition (SM-2), KI-Quiz-Generierung, Anki-Import (.apkg), Statistik-Dashboard mit Lernstreak und Aktivitaets-Heatmap.</p>
+        <div class="cap-tags">
+          <span class="cap-tag">SM-2</span>
+          <span class="cap-tag">Anki Import</span>
+          <span class="cap-tag">Quiz</span>
+          <span class="cap-tag">Statistiken</span>
+        </div>
+      </div>
+
+      <!-- AI -->
+      <div class="cap-card fade-in">
+        <div class="cap-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.9 5.8a2 2 0 01-1.287 1.288L3 12l5.8 1.9a2 2 0 011.288 1.287L12 21l1.9-5.8a2 2 0 011.287-1.288L21 12l-5.8-1.9a2 2 0 01-1.288-1.287Z"/></svg></div>
+        <h3 data-i18n="cap.ai.title">Lokale KI</h3>
+        <p data-i18n="cap.ai.desc">Integriertes Terminal mit OpenCode, Claude Code oder Ollama. Smart Connections, Notes Chat, Vision OCR &ndash; alles optional, alles lokal moeglich.</p>
+        <div class="cap-tags">
+          <span class="cap-tag">Ollama</span>
+          <span class="cap-tag">Terminal</span>
+          <span class="cap-tag">Smart Connections</span>
+          <span class="cap-tag">OCR</span>
+        </div>
+      </div>
+
+      <!-- Integrations -->
+      <div class="cap-card fade-in">
+        <div class="cap-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 000 20 14.5 14.5 0 000-20"/><path d="M2 12h20"/></svg></div>
+        <h3 data-i18n="cap.integrations.title">Integrationen</h3>
+        <p data-i18n="cap.integrations.desc">Zotero, Semantic Scholar, Readwise, reMarkable USB, edoobox Veranstaltungsmanagement, Apple Reminders und WordPress-Publishing.</p>
+        <div class="cap-tags">
+          <span class="cap-tag">Zotero</span>
+          <span class="cap-tag">Semantic Scholar</span>
+          <span class="cap-tag">reMarkable</span>
+          <span class="cap-tag">Readwise</span>
+        </div>
+      </div>
+
+      <!-- Security -->
+      <div class="cap-card fade-in">
+        <div class="cap-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>
+        <h3 data-i18n="cap.security.title">Sicherheit &amp; Sync</h3>
+        <p data-i18n="cap.security.desc">Standardmaessig lokal. Optionaler E2E-verschluesselter Sync (AES-256-GCM, Zero-Knowledge). Keine Telemetrie, keine Tracker. DOMPurify-Sanitization.</p>
+        <div class="cap-tags">
+          <span class="cap-tag">E2E Sync</span>
+          <span class="cap-tag">AES-256</span>
+          <span class="cap-tag">Zero-Knowledge</span>
+          <span class="cap-tag">Local-first</span>
         </div>
       </div>
     </div>
   </section>
 
-  <!-- Properties Panel Documentation -->
-  <section class="properties-docs" id="properties">
-    <div class="section-title">
-      <h2 data-i18n="properties.title">Properties Panel</h2>
-      <p data-i18n="properties.subtitle">YAML-Frontmatter komfortabel bearbeiten</p>
+  <!-- Download -->
+  <section class="download" id="download">
+    <div class="download-header">
+      <div class="section-label" data-i18n="dl.label">Download</div>
+      <h2 class="section-heading" data-i18n="dl.heading">Jetzt starten.</h2>
+      <p class="section-sub" data-i18n="dl.sub">Kostenlos, Open Source, in 2 Minuten startklar. Oeffne einen bestehenden Vault oder starte mit dem Starter-Vault.</p>
     </div>
 
-    <div class="docs-container">
-      <div class="docs-intro">
-        <p data-i18n="properties.intro">Das Properties Panel zeigt alle YAML-Frontmatter-Felder oberhalb des Editors an. Bearbeite Metadaten ohne YAML-Syntax – mit passenden Eingabefeldern für jeden Datentyp.</p>
-      </div>
-
-      <div class="properties-features">
-        <div class="property-type">
-          <div class="property-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="m9 12 2 2 4-4"/></svg></div>
-          <div class="property-info">
-            <h4 data-i18n="properties.bool.title">Booleans</h4>
-            <p data-i18n="properties.bool.desc">Checkboxen für true/false Werte wie <code>completed</code> oder <code>published</code></p>
-          </div>
-        </div>
-        <div class="property-type">
-          <div class="property-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></div>
-          <div class="property-info">
-            <h4 data-i18n="properties.date.title">Datum</h4>
-            <p data-i18n="properties.date.desc">Datumspicker für Felder im ISO-Format (YYYY-MM-DD)</p>
-          </div>
-        </div>
-        <div class="property-type">
-          <div class="property-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="9" x2="20" y2="9"/><line x1="4" y1="15" x2="20" y2="15"/><line x1="10" y1="3" x2="8" y2="21"/><line x1="16" y1="3" x2="14" y2="21"/></svg></div>
-          <div class="property-info">
-            <h4 data-i18n="properties.number.title">Zahlen</h4>
-            <p data-i18n="properties.number.desc">Zahlenfelder für <code>priority</code>, <code>rating</code> etc.</p>
-          </div>
-        </div>
-        <div class="property-type">
-          <div class="property-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/></svg></div>
-          <div class="property-info">
-            <h4 data-i18n="properties.text.title">Text & Arrays</h4>
-            <p data-i18n="properties.text.desc">Textfelder für Strings, kommagetrennte Listen für Arrays</p>
-          </div>
-        </div>
-        <div class="property-type">
-          <div class="property-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z"/><circle cx="7.5" cy="7.5" r="1.5" fill="currentColor" stroke="none"/></svg></div>
-          <div class="property-info">
-            <h4 data-i18n="properties.tags.title">Tag-Autocomplete</h4>
-            <p data-i18n="properties.tags.desc">Beim Tags-Feld werden alle existierenden Vault-Tags als Vorschläge angezeigt</p>
-          </div>
-        </div>
-      </div>
-
-      <div class="properties-example">
-        <h3 data-i18n="properties.example.title">Beispiel Frontmatter</h3>
-        <pre><code>---
-title: Mein Projekt
-status: active
-priority: 2
-deadline: 2026-03-15
-completed: false
-tags: [projekt, arbeit, wichtig]
----</code></pre>
-        <p class="example-note" data-i18n="properties.example.note">Diese Felder werden im Properties Panel als Textfeld, Dropdown, Zahl, Datumspicker, Checkbox und Array-Input angezeigt.</p>
-      </div>
+    <div class="dl-grid">
+      <a href="https://github.com/bydb/mindgraph-notes/releases/download/v0.4.4-beta/MindGraph-Notes-0.4.4-beta-arm64.dmg" target="_blank" rel="noopener noreferrer" class="dl-btn">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg>
+        <div class="dl-info"><div class="dl-platform">macOS (Apple Silicon)</div><div class="dl-version">.dmg &middot; v0.4.4-beta</div></div>
+      </a>
+      <a href="https://github.com/bydb/mindgraph-notes/releases/download/v0.4.4-beta/MindGraph-Notes-0.4.4-beta-x64.dmg" target="_blank" rel="noopener noreferrer" class="dl-btn">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg>
+        <div class="dl-info"><div class="dl-platform">macOS (Intel)</div><div class="dl-version">.dmg &middot; v0.4.4-beta</div></div>
+      </a>
+      <a href="https://github.com/bydb/mindgraph-notes/releases/download/v0.4.4-beta/MindGraph.Notes-0.4.4-beta.AppImage" target="_blank" rel="noopener noreferrer" class="dl-btn">
+        <svg width="28" height="28" viewBox="0 0 256 256" fill="currentColor"><path d="M220,152H36a12,12,0,0,0-12,12v40a12,12,0,0,0,12,12h80v12H96a8,8,0,0,0,0,16h64a8,8,0,0,0,0-16H140V216h80a12,12,0,0,0,12-12V164A12,12,0,0,0,220,152Zm-4,48H40V168H216ZM36,136H220a12,12,0,0,0,12-12V44a12,12,0,0,0-12-12H36A12,12,0,0,0,24,44v80A12,12,0,0,0,36,136ZM40,48H216v72H40Z"/></svg>
+        <div class="dl-info"><div class="dl-platform">Linux</div><div class="dl-version">.AppImage &middot; v0.4.4-beta</div></div>
+      </a>
+      <a href="https://github.com/bydb/mindgraph-notes/releases/download/v0.4.4-beta/MindGraph.Notes.Setup.0.4.4-beta.exe" target="_blank" rel="noopener noreferrer" class="dl-btn">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor"><path d="M0 3.449L9.75 2.1v9.451H0m10.949-9.602L24 0v11.4H10.949M0 12.6h9.75v9.451L0 20.699M10.949 12.6H24V24l-12.9-1.801"/></svg>
+        <div class="dl-info"><div class="dl-platform">Windows</div><div class="dl-version">.exe &middot; v0.4.4-beta</div></div>
+      </a>
     </div>
+    <p class="dl-more">
+      <a href="https://github.com/bydb/mindgraph-notes/releases/latest" target="_blank" rel="noopener noreferrer" data-i18n="dl.all">Alle Downloads (deb, snap, zip...)</a>
+    </p>
   </section>
 
+  <!-- FAQ -->
   <section class="faq" id="faq">
-    <div class="section-title">
-      <h2 data-i18n="faq.title">H&auml;ufige Fragen</h2>
-      <p data-i18n="faq.subtitle">Das Wichtigste f&uuml;r den schnellen Einstieg</p>
+    <div class="faq-header">
+      <div class="section-label" data-i18n="faq.label">FAQ</div>
+      <h2 class="section-heading" data-i18n="faq.heading">Haeufige Fragen</h2>
     </div>
-    <div class="faq-grid">
-      <div class="faq-item">
-        <h3 data-i18n="faq.q1">Brauche ich ein Konto?</h3>
-        <p data-i18n="faq.a1">Nein. Du kannst direkt lokal arbeiten. Deine Notizen bleiben als Markdown-Dateien auf deinem Rechner.</p>
-      </div>
-      <div class="faq-item">
-        <h3 data-i18n="faq.q2">Muss ich Ollama sofort installieren?</h3>
-        <p data-i18n="faq.a2">Nein. Die App funktioniert ohne KI-Setup. Ollama brauchst du nur f&uuml;r optionale KI-Features wie Quiz-Generierung.</p>
-      </div>
-      <div class="faq-item">
-        <h3 data-i18n="faq.q3">Funktioniert mein Obsidian-Vault?</h3>
-        <p data-i18n="faq.a3">Ja. Du kannst bestehende Markdown-Dateien und Wikilinks direkt weiterverwenden.</p>
-      </div>
-      <div class="faq-item">
-        <h3 data-i18n="faq.q4">Ist die App komplett lokal nutzbar?</h3>
-        <p data-i18n="faq.a4">Ja, standardm&auml;&szlig;ig lokal. Externe Integrationen sind optional und werden nur bei Aktivierung verwendet.</p>
-      </div>
+    <div class="faq-item">
+      <h3 data-i18n="faq.q1">Brauche ich ein Konto?</h3>
+      <p data-i18n="faq.a1">Nein. Alles laeuft lokal. Deine Notizen sind Markdown-Dateien auf deinem Rechner. Der optionale Sync braucht nur eine Passphrase.</p>
     </div>
-  </section>
-
-  <section class="agents" id="agents">
-    <div class="section-title">
-      <h2 data-i18n="agents.title">Integrierte Automationen</h2>
-      <p data-i18n="agents.subtitle">Wiederkehrende Aufgaben automatisieren &ndash; direkt in der App.</p>
+    <div class="faq-item">
+      <h3 data-i18n="faq.q2">Funktioniert mein Obsidian-Vault?</h3>
+      <p data-i18n="faq.a2">Ja. Markdown-Dateien, Wikilinks, Tags und Frontmatter werden direkt unterstuetzt.</p>
     </div>
-    <div class="agents-grid">
-      <div class="agent-card primary">
-        <h3 data-i18n="agents.learning.title">Lernagent: Quiz + Karteikarten</h3>
-        <p data-i18n="agents.learning.desc">Erstellt Quizfragen aus deinen Notizen und &uuml;berf&uuml;hrt sie direkt in dein Wiederholen mit SM-2.</p>
-        <span class="agent-tag" data-i18n="agents.tag.students">Top f&uuml;r Schule/Studium</span>
-      </div>
-      <div class="agent-card primary">
-        <h3 data-i18n="agents.terminal.title">KI-Terminal</h3>
-        <p data-i18n="agents.terminal.desc">OpenCode, Claude Code oder Ollama direkt neben deinen Notizen. Grafiken, Zusammenfassungen, Quiz &ndash; alles per Prompt.</p>
-        <span class="agent-tag" data-i18n="agents.tag.poweruser">F&uuml;r Power-User</span>
-      </div>
-      <div class="agent-card">
-        <h3 data-i18n="agents.email.title">E-Mail-Analyse</h3>
-        <p data-i18n="agents.email.desc">Analysiert IMAP-Mails via Ollama und erstellt aus relevanten Inhalten automatisch Notizen.</p>
-      </div>
+    <div class="faq-item">
+      <h3 data-i18n="faq.q3">Brauche ich Ollama?</h3>
+      <p data-i18n="faq.a3">Nein. Die App funktioniert komplett ohne KI. Ollama ist optional fuer Features wie Email-Analyse, Quiz-Generierung und Smart Connections.</p>
     </div>
-    <p class="agents-note" data-i18n="agents.note">Weitere Automationen folgen laufend &ndash; z.B. reMarkable-Import und Veranstaltungsmanagement.</p>
-  </section>
-
-  <section class="shortcuts" id="shortcuts">
-    <div class="section-title">
-      <h2 data-i18n="shortcuts.title">Tastaturkürzel</h2>
-      <p data-i18n="shortcuts.subtitle">Arbeite schneller mit diesen Shortcuts</p>
+    <div class="faq-item">
+      <h3 data-i18n="faq.q4">Wo liegen meine Daten?</h3>
+      <p data-i18n="faq.a4">Auf deinem Rechner. Keine Cloud, keine Telemetrie. Der optionale Sync ist Ende-zu-Ende verschluesselt (AES-256-GCM) &ndash; der Server sieht nur verschluesselte Daten.</p>
     </div>
-
-    <div class="shortcuts-grid">
-      <div class="shortcuts-category">
-        <h3 data-i18n="shortcuts.general">Allgemein</h3>
-        <div class="shortcut-list">
-          <div class="shortcut-item">
-            <span class="shortcut-keys"><kbd>⌘</kbd><kbd>N</kbd></span>
-            <span class="shortcut-desc" data-i18n="shortcuts.newNote">Neue Notiz</span>
-          </div>
-          <div class="shortcut-item">
-            <span class="shortcut-keys"><kbd>⌘</kbd><kbd>O</kbd></span>
-            <span class="shortcut-desc" data-i18n="shortcuts.openVault">Vault öffnen</span>
-          </div>
-          <div class="shortcut-item">
-            <span class="shortcut-keys"><kbd>⌘</kbd><kbd>P</kbd></span>
-            <span class="shortcut-desc" data-i18n="shortcuts.quickSearch">Schnellsuche</span>
-          </div>
-          <div class="shortcut-item">
-            <span class="shortcut-keys"><kbd>⌘</kbd><kbd>K</kbd></span>
-            <span class="shortcut-desc" data-i18n="shortcuts.quickSwitcher">Quick Switcher</span>
-          </div>
-          <div class="shortcut-item">
-            <span class="shortcut-keys"><kbd>⌘</kbd><kbd>,</kbd></span>
-            <span class="shortcut-desc" data-i18n="shortcuts.settings">Einstellungen</span>
-          </div>
-        </div>
-      </div>
-
-      <div class="shortcuts-category">
-        <h3 data-i18n="shortcuts.formatting">Formatierung</h3>
-        <div class="shortcut-list">
-          <div class="shortcut-item">
-            <span class="shortcut-keys"><kbd>⌘</kbd><kbd>B</kbd></span>
-            <span class="shortcut-desc" data-i18n="shortcuts.bold">Fett</span>
-          </div>
-          <div class="shortcut-item">
-            <span class="shortcut-keys"><kbd>⌘</kbd><kbd>I</kbd></span>
-            <span class="shortcut-desc" data-i18n="shortcuts.italic">Kursiv</span>
-          </div>
-          <div class="shortcut-item">
-            <span class="shortcut-keys"><kbd>⌘</kbd><kbd>`</kbd></span>
-            <span class="shortcut-desc" data-i18n="shortcuts.code">Code</span>
-          </div>
-          <div class="shortcut-item">
-            <span class="shortcut-keys"><kbd>⌘</kbd><kbd>K</kbd></span>
-            <span class="shortcut-desc" data-i18n="shortcuts.link">Link einfügen</span>
-          </div>
-          <div class="shortcut-item">
-            <span class="shortcut-keys"><kbd>⌘</kbd><kbd>E</kbd></span>
-            <span class="shortcut-desc" data-i18n="shortcuts.toggleView">Ansicht wechseln</span>
-          </div>
-        </div>
-      </div>
-
-      <div class="shortcuts-category">
-        <h3 data-i18n="shortcuts.ai">KI & Tools</h3>
-        <div class="shortcut-list">
-          <div class="shortcut-item">
-            <span class="shortcut-keys"><kbd>⌘</kbd><kbd>⇧</kbd><kbd>A</kbd></span>
-            <span class="shortcut-desc" data-i18n="shortcuts.aiMenu">KI-Menü</span>
-          </div>
-          <div class="shortcut-item">
-            <span class="shortcut-keys"><kbd>⌘</kbd><kbd>⇧</kbd><kbd>I</kbd></span>
-            <span class="shortcut-desc" data-i18n="shortcuts.aiImage">KI-Bildgenerierung</span>
-          </div>
-          <div class="shortcut-item">
-            <span class="shortcut-keys"><kbd>⌘</kbd><kbd>⇧</kbd><kbd>F</kbd></span>
-            <span class="shortcut-desc" data-i18n="shortcuts.formatMenu">Format-Menü</span>
-          </div>
-          <div class="shortcut-item">
-            <span class="shortcut-keys"><kbd>⌘</kbd><kbd>⇧</kbd><kbd>Z</kbd></span>
-            <span class="shortcut-desc" data-i18n="shortcuts.zotero">Zotero-Suche</span>
-          </div>
-          <div class="shortcut-item">
-            <span class="shortcut-keys"><kbd>⌘</kbd><kbd>⇧</kbd><kbd>T</kbd></span>
-            <span class="shortcut-desc" data-i18n="shortcuts.templates">Template-Auswahl</span>
-          </div>
-        </div>
-      </div>
-
-      <div class="shortcuts-category">
-        <h3 data-i18n="shortcuts.special">Spezial</h3>
-        <div class="shortcut-list">
-          <div class="shortcut-item">
-            <span class="shortcut-keys"><kbd>Alt</kbd><kbd>Rechtsklick</kbd></span>
-            <span class="shortcut-desc" data-i18n="shortcuts.aiContext">KI-Kontextmenü</span>
-          </div>
-          <div class="shortcut-item">
-            <span class="shortcut-keys"><kbd>⌘</kbd><kbd>↵</kbd></span>
-            <span class="shortcut-desc" data-i18n="shortcuts.generateImage">Bild generieren</span>
-          </div>
-          <div class="shortcut-item">
-            <span class="shortcut-keys"><kbd>↑</kbd><kbd>↓</kbd></span>
-            <span class="shortcut-desc" data-i18n="shortcuts.navigate">In Listen navigieren</span>
-          </div>
-          <div class="shortcut-item">
-            <span class="shortcut-keys"><kbd>↵</kbd></span>
-            <span class="shortcut-desc" data-i18n="shortcuts.select">Auswahl bestätigen</span>
-          </div>
-          <div class="shortcut-item">
-            <span class="shortcut-keys"><kbd>Esc</kbd></span>
-            <span class="shortcut-desc" data-i18n="shortcuts.close">Dialog schließen</span>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <p class="shortcuts-note" data-i18n="shortcuts.note">Auf Windows/Linux: ⌘ = Ctrl</p>
-  </section>
-
-  <section class="setup" id="setup">
-    <div class="section-title">
-      <h2 data-i18n="setup.title">Tools einrichten</h2>
-      <p data-i18n="setup.subtitle">So holst du das Maximum aus MindGraph Notes heraus</p>
-    </div>
-
-    <div class="setup-grid">
-      <div class="setup-card">
-        <div class="setup-icon"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.287 1.288L3 12l5.8 1.9a2 2 0 0 1 1.288 1.287L12 21l1.9-5.8a2 2 0 0 1 1.287-1.288L21 12l-5.8-1.9a2 2 0 0 1-1.288-1.287Z"/><path d="M5 3v4"/><path d="M19 17v4"/><path d="M3 5h4"/><path d="M17 19h4"/></svg></div>
-        <h3 data-i18n="setup.claudecode.title">Claude Code</h3>
-        <p data-i18n="setup.claudecode.desc">Anthropics offizieller KI-Coding-Agent. Claude Code ist der mächtigste KI-Assistent für Entwickler.</p>
-        <div class="setup-steps">
-          <ol>
-            <li data-i18n="setup.claudecode.step1">Node.js installieren: <code>brew install node</code></li>
-            <li data-i18n="setup.claudecode.step2">Claude Code installieren: <code>npm i -g @anthropic-ai/claude-code</code></li>
-            <li data-i18n="setup.claudecode.step3">API-Key von <a href="https://console.anthropic.com" target="_blank" rel="noopener noreferrer">console.anthropic.com</a> holen</li>
-            <li data-i18n="setup.claudecode.step4">Key setzen: <code>export ANTHROPIC_API_KEY="sk-ant-..."</code></li>
-            <li data-i18n="setup.claudecode.step5">Starten: <code>claude</code></li>
-          </ol>
-        </div>
-        <p class="setup-note" data-i18n="setup.claudecode.note">Tipp: Key permanent speichern mit <code>echo 'export ANTHROPIC_API_KEY="..."' >> ~/.zshrc</code></p>
-        <a href="https://docs.anthropic.com/en/docs/claude-code" target="_blank" rel="noopener noreferrer" class="setup-link" data-i18n="setup.more">Mehr erfahren →</a>
-      </div>
-
-      <div class="setup-card">
-        <div class="setup-icon"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg></div>
-        <h3 data-i18n="setup.opencode.title">OpenCode</h3>
-        <p data-i18n="setup.opencode.desc">Open-Source KI-Coding-Agent. Unterstützt verschiedene LLM-Anbieter wie OpenAI, Anthropic, Gemini und lokale Modelle.</p>
-        <div class="setup-steps">
-          <ol>
-            <li data-i18n="setup.opencode.step1">OpenCode installieren: <code>curl -fsSL https://opencode.ai/install | bash</code></li>
-            <li data-i18n="setup.opencode.step2">API-Key setzen (z.B. OpenAI): <code>export OPENAI_API_KEY="sk-..."</code></li>
-            <li data-i18n="setup.opencode.step3">Starten: <code>opencode</code></li>
-          </ol>
-        </div>
-        <p class="setup-note" data-i18n="setup.opencode.note">Unterstützt auch lokale Modelle via Ollama - keine API-Kosten!</p>
-        <a href="https://opencode.ai" target="_blank" rel="noopener noreferrer" class="setup-link" data-i18n="setup.more">Mehr erfahren →</a>
-      </div>
-
-      <div class="setup-card">
-        <div class="setup-icon"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M15 2v2"/><path d="M15 20v2"/><path d="M2 15h2"/><path d="M2 9h2"/><path d="M20 15h2"/><path d="M20 9h2"/><path d="M9 2v2"/><path d="M9 20v2"/></svg></div>
-        <h3 data-i18n="setup.ollama.title">Ollama</h3>
-        <p data-i18n="setup.ollama.desc">Lokale LLMs wie Llama, Mistral oder Gemma auf deinem Mac. Keine Cloud, keine API-Kosten, volle Privatsphäre.</p>
-        <div class="setup-install">
-          <span data-i18n="setup.install">Installation:</span>
-          <code>brew install ollama</code>
-        </div>
-        <p class="setup-note" data-i18n="setup.ollama.note">Nach der Installation: <code>ollama pull llama3</code> um ein Modell zu laden.</p>
-        <a href="https://ollama.ai" target="_blank" rel="noopener noreferrer" class="setup-link" data-i18n="setup.more">Mehr erfahren →</a>
-      </div>
-
-      <div class="setup-card">
-        <div class="setup-icon"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg></div>
-        <h3 data-i18n="setup.zotero.title">Zotero</h3>
-        <p data-i18n="setup.zotero.desc">Literaturverwaltung für Wissenschaft und Recherche. Füge Zitate direkt in deine Notizen ein.</p>
-        <div class="setup-steps">
-          <ol>
-            <li data-i18n="setup.zotero.step1">Zotero installieren von <a href="https://www.zotero.org/download/" target="_blank" rel="noopener noreferrer">zotero.org</a></li>
-            <li data-i18n="setup.zotero.step2">Better BibTeX Plugin installieren für Export</li>
-            <li data-i18n="setup.zotero.step3">In MindGraph Notes: Einstellungen → Zotero Pfad setzen</li>
-          </ol>
-        </div>
-        <a href="https://www.zotero.org" target="_blank" rel="noopener noreferrer" class="setup-link" data-i18n="setup.more">Mehr erfahren →</a>
-      </div>
-
-      <div class="setup-card">
-        <div class="setup-icon"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg></div>
-        <h3 data-i18n="setup.flux.title">Flux2 Bildgenerierung</h3>
-        <p data-i18n="setup.flux.desc">Generiere Bilder direkt im Terminal mit Flux2. Lokale KI-Bildgenerierung für deine Notizen - läuft über Ollama.</p>
-        <div class="setup-install">
-          <span data-i18n="setup.usage">Verwendung:</span>
-          <code>ollama run x/flux2-klein</code>
-        </div>
-        <p class="setup-note" data-i18n="setup.flux.note">Voraussetzung: Ollama muss installiert sein. Das Modell wird beim ersten Start automatisch heruntergeladen.</p>
-        <a href="https://ollama.com/x/flux2-klein" target="_blank" rel="noopener noreferrer" class="setup-link" data-i18n="setup.more">Mehr erfahren →</a>
-      </div>
-
-      <div class="setup-card">
-        <div class="setup-icon"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10V7.5L14.5 2H6a2 2 0 0 0-2 2v16c0 1.1.9 2 2 2h4.5"/><polyline points="14 2 14 8 20 8"/><path d="M16 22a2 2 0 0 1-2-2"/><path d="M20 22a2 2 0 0 0 2-2"/><path d="M20 14a2 2 0 0 1 2 2"/><path d="M16 14a2 2 0 0 0-2 2"/></svg></div>
-        <h3 data-i18n="setup.docling.title">Docling PDF-Extraktion</h3>
-        <p data-i18n="setup.docling.desc">Extrahiere automatisch Text, Tabellen und Bilder aus PDFs. Konvertiert zu sauberem Markdown – lokal auf deinem Rechner.</p>
-        <div class="setup-install">
-          <span data-i18n="setup.install">Installation:</span>
-          <code>docker run -p 5001:5001 ds4sd/docling-serve</code>
-        </div>
-        <p class="setup-note" data-i18n="setup.docling.note">Voraussetzung: Docker muss installiert sein. Docling läuft dann auf localhost:5001. Aktiviere OCR in den Einstellungen für gescannte PDFs.</p>
-        <a href="https://github.com/DS4SD/docling" target="_blank" rel="noopener noreferrer" class="setup-link" data-i18n="setup.more">Mehr erfahren →</a>
-      </div>
-
-      <div class="setup-card">
-        <div class="setup-icon"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="m6 16 6-12 6 12"/><path d="M8 12h8"/><path d="m16 20 2 2 4-4"/></svg></div>
-        <h3 data-i18n="setup.languagetool.title">LanguageTool Grammatikprüfung</h3>
-        <p data-i18n="setup.languagetool.desc">Prüfe deine Texte auf Grammatik, Rechtschreibung und Stil. Lokal via Docker oder mit LanguageTool Premium für erweiterte Funktionen.</p>
-        <div class="setup-install">
-          <span data-i18n="setup.install">Installation:</span>
-          <code>docker run -d -p 8010:8010 erikvl87/languagetool</code>
-        </div>
-        <p class="setup-note" data-i18n="setup.languagetool.note">Docker-Version für lokale Nutzung. Alternativ: LanguageTool Premium API mit Username + API-Key in den Einstellungen konfigurieren.</p>
-        <a href="https://languagetool.org/" target="_blank" rel="noopener noreferrer" class="setup-link" data-i18n="setup.more">Mehr erfahren →</a>
-      </div>
+    <div class="faq-item">
+      <h3 data-i18n="faq.q5">Ist die App wirklich kostenlos?</h3>
+      <p data-i18n="faq.a5">Ja. Open Source unter AGPL-3.0. Keine versteckten Kosten, keine Abo-Modelle.</p>
     </div>
   </section>
 
   <footer>
     <p>
-      Made with <svg width="14" height="14" viewBox="0 0 24 24" fill="var(--accent)" stroke="none" style="vertical-align: -2px; display: inline-block;"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></svg> by <a href="https://bydb.io">bydb.io</a> ·
-      <a href="https://github.com/bydb/mindgraph-notes">GitHub</a> ·
-      <a href="https://discord.gg/XqayAQdE">Discord</a> ·
+      Made with <svg width="14" height="14" viewBox="0 0 24 24" fill="var(--accent)" stroke="none" style="vertical-align:-2px;display:inline-block;"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0016.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 002 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></svg> by <a href="https://bydb.io">bydb.io</a> &middot;
+      <a href="https://github.com/bydb/mindgraph-notes">GitHub</a> &middot;
+      <a href="https://discord.gg/XqayAQdE">Discord</a> &middot;
       AGPL-3.0
     </p>
-    <p style="margin-top: 1rem;">
-      <a href="#" onclick="openModal('impressum'); return false;" data-i18n="footer.impressum">Impressum</a> ·
-      <a href="#" onclick="openModal('datenschutz'); return false;" data-i18n="footer.privacy">Datenschutz</a>
+    <p style="margin-top:0.75rem;">
+      <a href="#" onclick="openModal('impressum');return false;" data-i18n="footer.impressum">Impressum</a> &middot;
+      <a href="#" onclick="openModal('datenschutz');return false;" data-i18n="footer.privacy">Datenschutz</a>
     </p>
   </footer>
 
@@ -2308,24 +565,19 @@ tags: [projekt, arbeit, wichtig]
     <div class="modal-content">
       <span class="modal-close" onclick="closeModal('impressum')">&times;</span>
       <h2 data-i18n="impressum.title">Impressum</h2>
-      <h3 data-i18n="impressum.info">Angaben gemäß § 5 TMG</h3>
-      <p>
-        Jochen Leeder<br>
-        Kirschenweg 1<br>
-        35444 Biebertal<br>
-        <span data-i18n="impressum.country">Deutschland</span>
-      </p>
+      <h3 data-i18n="impressum.info">Angaben gemaess &sect; 5 TMG</h3>
+      <p>Jochen Leeder<br>Kirschenweg 1<br>35444 Biebertal<br><span data-i18n="impressum.country">Deutschland</span></p>
       <h3 data-i18n="impressum.contact">Kontakt</h3>
       <p>E-Mail: info@bydb.io</p>
-      <h3 data-i18n="impressum.responsible">Verantwortlich für den Inhalt nach § 55 Abs. 2 RStV</h3>
+      <h3 data-i18n="impressum.responsible">Verantwortlich fuer den Inhalt nach &sect; 55 Abs. 2 RStV</h3>
       <p>Jochen Leeder</p>
       <h3 data-i18n="impressum.liability">Haftungsausschluss</h3>
-      <h4 data-i18n="impressum.liability.content">Haftung für Inhalte</h4>
-      <p data-i18n="impressum.liability.content.text">Die Inhalte dieser Seiten wurden mit größter Sorgfalt erstellt. Für die Richtigkeit, Vollständigkeit und Aktualität der Inhalte kann jedoch keine Gewähr übernommen werden.</p>
-      <h4 data-i18n="impressum.liability.links">Haftung für Links</h4>
-      <p data-i18n="impressum.liability.links.text">Dieses Angebot enthält Links zu externen Websites Dritter, auf deren Inhalte kein Einfluss genommen werden kann. Für die Inhalte der verlinkten Seiten ist stets der jeweilige Anbieter oder Betreiber verantwortlich.</p>
+      <h4 data-i18n="impressum.liability.content">Haftung fuer Inhalte</h4>
+      <p data-i18n="impressum.liability.content.text">Die Inhalte dieser Seiten wurden mit groesster Sorgfalt erstellt. Fuer die Richtigkeit, Vollstaendigkeit und Aktualitaet der Inhalte kann jedoch keine Gewaehr uebernommen werden.</p>
+      <h4 data-i18n="impressum.liability.links">Haftung fuer Links</h4>
+      <p data-i18n="impressum.liability.links.text">Dieses Angebot enthaelt Links zu externen Websites Dritter, auf deren Inhalte kein Einfluss genommen werden kann.</p>
       <h3 data-i18n="impressum.copyright">Urheberrecht</h3>
-      <p data-i18n="impressum.copyright.text">Die durch den Seitenbetreiber erstellten Inhalte und Werke auf diesen Seiten unterliegen dem deutschen Urheberrecht. Beiträge Dritter sind als solche gekennzeichnet.</p>
+      <p data-i18n="impressum.copyright.text">Die durch den Seitenbetreiber erstellten Inhalte und Werke auf diesen Seiten unterliegen dem deutschen Urheberrecht.</p>
     </div>
   </div>
 
@@ -2333,30 +585,19 @@ tags: [projekt, arbeit, wichtig]
   <div id="datenschutz-modal" class="modal">
     <div class="modal-content">
       <span class="modal-close" onclick="closeModal('datenschutz')">&times;</span>
-      <h2 data-i18n="privacy.title">Datenschutzerklärung</h2>
-
+      <h2 data-i18n="privacy.title">Datenschutzerklaerung</h2>
       <h3 data-i18n="privacy.general.title">1. Datenschutz auf einen Blick</h3>
       <p data-i18n="privacy.general.text">Diese Website erhebt keine personenbezogenen Daten. Es werden keine Cookies gesetzt und keine Tracking-Tools verwendet.</p>
-
       <h3 data-i18n="privacy.hosting.title">2. Hosting</h3>
-      <p data-i18n="privacy.hosting.text">Diese Website wird auf GitHub Pages gehostet. GitHub kann beim Aufruf der Seite technische Daten wie IP-Adresse, Browsertyp und Zugriffszeit in Server-Logs speichern. Weitere Informationen finden Sie in der <a href="https://docs.github.com/en/site-policy/privacy-policies/github-privacy-statement" target="_blank" rel="noopener noreferrer">GitHub Privacy Statement</a>.</p>
-
+      <p data-i18n="privacy.hosting.text">Diese Website wird auf GitHub Pages gehostet. GitHub kann beim Aufruf technische Daten in Server-Logs speichern. Siehe <a href="https://docs.github.com/en/site-policy/privacy-policies/github-privacy-statement" target="_blank" rel="noopener noreferrer">GitHub Privacy Statement</a>.</p>
       <h3 data-i18n="privacy.localstorage.title">3. Lokale Speicherung</h3>
-      <p data-i18n="privacy.localstorage.text">Diese Website verwendet localStorage, um Ihre Spracheinstellung (Deutsch/Englisch) zu speichern. Diese Daten verbleiben ausschließlich auf Ihrem Gerät und werden nicht an Server übertragen.</p>
-
+      <p data-i18n="privacy.localstorage.text">Diese Website verwendet localStorage fuer die Spracheinstellung. Diese Daten verbleiben auf Ihrem Geraet.</p>
       <h3 data-i18n="privacy.app.title">4. MindGraph Notes App</h3>
-      <p data-i18n="privacy.app.text">Die MindGraph Notes Desktop-App speichert Notizen standardmäßig lokal auf Ihrem Computer und enthält keine Telemetrie oder Tracking. Optionale Integrationen (z. B. KI APIs oder externe Dienste) senden nur dann Daten, wenn Sie diese bewusst aktivieren.</p>
-
+      <p data-i18n="privacy.app.text">Die App speichert Notizen lokal und enthaelt keine Telemetrie. Optionale Integrationen senden nur bei Aktivierung Daten.</p>
       <h3 data-i18n="privacy.rights.title">5. Ihre Rechte</h3>
-      <p data-i18n="privacy.rights.text">Sie haben das Recht auf Auskunft, Berichtigung, Löschung und Einschränkung der Verarbeitung Ihrer personenbezogenen Daten. Kontakt: info@bydb.io</p>
-
+      <p data-i18n="privacy.rights.text">Sie haben das Recht auf Auskunft, Berichtigung und Loeschung. Kontakt: info@bydb.io</p>
       <h3 data-i18n="privacy.contact.title">6. Verantwortliche Stelle</h3>
-      <p>
-        Jochen Leeder<br>
-        Kirschenweg 1<br>
-        35444 Biebertal<br>
-        E-Mail: info@bydb.io
-      </p>
+      <p>Jochen Leeder<br>Kirschenweg 1<br>35444 Biebertal<br>E-Mail: info@bydb.io</p>
     </div>
   </div>
 
@@ -2364,592 +605,185 @@ tags: [projekt, arbeit, wichtig]
     const translations = {
       de: {
         "nav.features": "Features",
-        "nav.shortcuts": "Shortcuts",
-        "nav.setup": "Setup",
         "nav.download": "Download",
         "nav.blog": "Blog",
-        "hero.badge": "Standardmäßig lokal. Open Source.",
-        "hero.title": "Dein Wissen,<br>deine Werkzeuge.",
-        "hero.subtitle": "Notizen, Karteikarten, Wissensgraph und KI-Terminal – alles in einer App. Ob Schule, Studium oder Wissensmanagement: aktiviere nur, was du brauchst.",
+        "hero.badge": "Open Source \u00b7 Lokal \u00b7 Kostenlos",
+        "hero.title": "Notizen, Emails & Lernen \u2013<br><em>eine App, dein Kontext.</em>",
+        "hero.sub": "Markdown-Editor, KI-Email-Client, Karteikarten mit Spaced Repetition, Wissensgraph und integriertes Terminal. Alles lokal, alles verbunden.",
         "hero.cta": "Kostenlos herunterladen",
-        "signup.title": "Jetzt herunterladen",
-        "signup.desc": "In 2 Minuten startklar: herunterladen, Vault öffnen, loslegen. Kostenlos, Open Source, verfügbar für macOS, Linux und Windows.",
-        "signup.namePlaceholder": "Name (optional)",
-        "signup.emailPlaceholder": "deine@email.de",
-        "signup.submit": "Anmelden",
-        "signup.success": "Danke! Du bist dabei. \u2705",
-        "signup.error": "Fehler beim Senden. Bitte versuche es erneut.",
-        "signup.osPlaceholder": "Betriebssystem w\u00e4hlen",
-        "signup.windowsHint": "<strong>Hinweis f\u00fcr Windows:</strong> MindGraph Notes funktioniert auf Windows, aber das integrierte KI-Terminal entfaltet sein volles Potenzial mit WSL (Windows Subsystem for Linux). OpenCode wird automatisch bevorzugt, Claude Code dient als Fallback.<br><br><strong>Schnellstart mit WSL (empfohlen):</strong><br><code>wsl --install</code> \u2192 Neustart \u2192 <code>curl -fsSL https://opencode.ai/install | bash</code> <em>(optional zus\u00e4tzlich: <code>npm i -g @anthropic-ai/claude-code</code>)</em><br><a href=\"#setup\">Alle Setup-Schritte anzeigen</a>",
-        "signup.badge": "Open Beta",
-        "signup.privacy": "Kein Spam, jederzeit abmelden",
-        "signup.discord": "Discord beitreten",
-        "terminal.cmd1": " opencode \"Erstelle mir anschauliche Grafiken zum Thema Alkane\"",
-        "terminal.out1": "Lese [[Alkane.md]], [[Bindungstypen.md]] und 3 weitere Notizen...",
-        "terminal.out2": "SVG-Strukturformeln für Methan, Ethan, Propan erstellt",
-        "terminal.out3": "Bilder in [[Alkane.md]] eingebettet",
-        "terminal.bar": "Terminal",
-        "terminal.title": "KI direkt in deinen Notizen",
-        "terminal.desc": "Das integrierte Terminal macht MindGraph Notes einzigartig: Starte <strong>OpenCode</strong>, <strong>Claude Code</strong> oder <strong>Ollama</strong> direkt neben deinen Notizen. Lass dir Grafiken erstellen, Zusammenfassungen schreiben oder Quiz-Fragen generieren – ohne Kontextwechsel.",
-        "terminal.f1": "OpenCode, Claude Code und Ollama direkt nutzen",
-        "terminal.f2": "KI liest deine Notizen und arbeitet im Kontext",
-        "terminal.f3": "Grafiken, Zusammenfassungen, Quiz – alles per Prompt",
-        "terminal.f4": "Standardmäßig lokal – deine Daten bleiben bei dir",
-        "features.title": "Mehr als nur Notizen",
-        "features.subtitle": "Alles was du brauchst – aktiviere nur, was du willst.",
-        "features.canvas.title": "Local Canvas",
-        "features.canvas.desc": "Erkunde Notizen visuell im Canvas. Starte mit einer Notiz, erweitere schrittweise über Verbindungen. NEU: Bidirektionale Links zwischen Canvas und Notizen.",
-        "features.pdf.title": "PDF Companion + Docling",
-        "features.pdf.desc": "PDFs direkt neben deinen Notizen. NEU: Extrahiere Text, Tabellen und Bilder automatisch via Docling. Perfekt für Vorlesungsfolien, Paper und Scans.",
-        "features.local.title": "Lokal & transparent",
-        "features.local.desc": "Deine Notizen bleiben als Markdown-Dateien auf deinem Rechner. Keine Telemetrie. Optionale Integrationen aktivierst du bewusst.",
-        "features.wikilinks.title": "Wikilinks",
-        "features.wikilinks.desc": "Verlinke Notizen mit [[Wikilinks]]. Bidirektionale Verbindungen, Backlinks-Panel, Obsidian-kompatibel.",
-        "features.preview.title": "Live Preview",
-        "features.preview.desc": "Schreibe in Markdown mit sofortiger Vorschau. LaTeX, Mermaid-Diagramme, Callouts und mehr.",
-        "features.graph.title": "Canvas Übersicht",
-        "features.graph.desc": "Alle Notizen auf einen Blick. Filter nach Ordnern, ordne frei an, entdecke Zusammenhänge.",
-        "features.zotero.title": "Zotero Integration",
-        "features.zotero.desc": "Füge Literatur direkt aus Zotero ein. Perfekt für akademisches Arbeiten und Recherche.",
-        "features.tasks.title": "Task Management",
-        "features.tasks.desc": "Aufgaben mit Fälligkeiten direkt in Notizen. Erinnerungen, Überfällig-Panel, Fortschritt auf Karten – alles ohne Extra-App.",
-        "features.terminal.title": "Integriertes Terminal",
-        "features.terminal.desc": "Vollwertiges Terminal in der App. Git, npm, Python – jedes CLI-Tool direkt neben deinen Notizen.",
-        "features.ai.title": "KI-Funktionen (optional)",
-        "features.ai.desc": "NEU: Smart Connections mit konfigurierbaren Gewichtungen (Embedding, Keywords, Wikilinks, Tags, Ordner). Notes Chat, lokale LLMs via Ollama/LM Studio. Aktiviere nur was du brauchst.",
-        "features.languagetool.title": "LanguageTool",
-        "features.languagetool.desc": "Integrierte Grammatik- und Rechtschreibprüfung. Lokal via Docker oder mit LanguageTool Premium API. Fehler werden direkt im Editor markiert.",
-        "features.flashcards.title": "Karteikarten & Quiz",
-        "features.flashcards.desc": "Generiere Quiz-Fragen via Ollama, importiere Decks aus Anki (.apkg) und lerne mit Spaced Repetition (SM-2). NEU: Bilder in Karteikarten.",
-        "features.dataview.title": "Dataview Queries",
-        "features.dataview.desc": "NEU: Frage deine Notizen ab wie eine Datenbank. LIST und TABLE Queries mit FROM, WHERE, SORT. Filtere nach Tags, Ordnern und YAML-Frontmatter.",
-        "features.properties.title": "Properties Panel",
-        "features.properties.desc": "NEU: Bearbeite YAML-Frontmatter komfortabel. Checkboxen für Booleans, Datumspicker, Arrays – alles ohne YAML-Syntax.",
-        "features.customization.title": "Deine Farben, dein Logo",
-        "features.customization.desc": "NEU: 13 Akzentfarben, 15 Hintergründe und ein eigenes Logo in der Titelleiste. Mach MindGraph Notes zu deiner App.",
-
-        "usergroup.schule.title": "Schule & Lernen",
-        "usergroup.schule.desc": "Karteikarten, Spaced Repetition und KI-Quiz – verwandle Notizen in aktives Lernmaterial",
-        "usergroup.studium.title": "Studium & Wissenschaft",
-        "usergroup.studium.desc": "Zotero, PDF Companion, Dataview und LaTeX – gebaut für den akademischen Alltag",
-        "usergroup.pkm.title": "Wissensmanagement",
-        "usergroup.pkm.desc": "Wikilinks, Canvas, Smart Connections und lokale KI – dein persönliches Wissensnetz",
-        "features.spaced.title": "Spaced Repetition (SM-2)",
-        "features.spaced.desc": "Wissenschaftlich bewiesene Lernmethode. Der SM-2 Algorithmus plant automatisch optimale Wiederholungsintervalle für Langzeitgedächtnis.",
-        "features.reminders.title": "Erinnerungen",
-        "features.reminders.desc": "Überfällige Aufgaben und Lernkarten im Blick. Automatische Erinnerungen halten deinen Lernplan auf Kurs.",
-        "features.latex.title": "LaTeX & Mermaid",
-        "features.latex.desc": "Mathematische Formeln mit LaTeX und Diagramme mit Mermaid direkt in der Vorschau. Perfekt für MINT-Fächer.",
-
-        "dataview.title": "Dataview Queries",
-        "dataview.subtitle": "Frage deine Notizen ab wie eine Datenbank",
-        "dataview.intro": "Mit Dataview kannst du Notizen nach Metadaten abfragen und als Listen oder Tabellen darstellen. Schreibe Queries im Edit-Modus und wechsle zu Live-Preview, um die Ergebnisse zu sehen.",
-        "dataview.basic.title": "Grundsyntax",
-        "dataview.basic.list": "Listet alle Notizen auf",
-        "dataview.basic.table": "Tabelle mit Frontmatter-Spalten",
-        "dataview.from.title": "FROM - Quellen filtern",
-        "dataview.from.tag": "Nach Tag filtern",
-        "dataview.from.folder": "Nach Ordner filtern",
-        "dataview.from.combine": "Quellen kombinieren",
-        "dataview.where.title": "WHERE - Bedingungen",
-        "dataview.where.text": "Text vergleichen",
-        "dataview.where.number": "Zahlen vergleichen",
-        "dataview.where.bool": "Boolean prüfen",
-        "dataview.where.contains": "In Arrays suchen",
-        "dataview.sort.title": "SORT & LIMIT",
-        "dataview.sort.date": "Nach Datum sortieren",
-        "dataview.sort.limit": "Sortieren und begrenzen",
-        "dataview.fields.title": "Verfügbare Felder",
-        "dataview.fields.file": "Datei-Felder",
-        "dataview.fields.filename": "Dateiname ohne Endung",
-        "dataview.fields.filepath": "Relativer Pfad",
-        "dataview.fields.folder": "Übergeordneter Ordner",
-        "dataview.fields.ctime": "Erstelldatum",
-        "dataview.fields.mtime": "Änderungsdatum",
-        "dataview.fields.tags": "Alle Tags",
-        "dataview.fields.frontmatter": "Frontmatter-Felder",
-        "dataview.fields.frontmatterDesc": "Alle Felder aus dem YAML-Header sind direkt verfügbar:",
-        "dataview.fields.custom": "...und alle eigenen Felder",
-        "dataview.example.title": "Vollständiges Beispiel",
-        "dataview.example.desc": "Zeigt eine Tabelle mit Status, Deadline und Priorität für alle nicht abgeschlossenen Projekte mit Priorität ≥ 2, sortiert nach Deadline.",
-        "properties.title": "Properties Panel",
-        "properties.subtitle": "YAML-Frontmatter komfortabel bearbeiten",
-        "properties.intro": "Das Properties Panel zeigt alle YAML-Frontmatter-Felder oberhalb des Editors an. Bearbeite Metadaten ohne YAML-Syntax – mit passenden Eingabefeldern für jeden Datentyp.",
-        "properties.bool.title": "Booleans",
-        "properties.bool.desc": "Checkboxen für true/false Werte wie completed oder published",
-        "properties.date.title": "Datum",
-        "properties.date.desc": "Datumspicker für Felder im ISO-Format (YYYY-MM-DD)",
-        "properties.number.title": "Zahlen",
-        "properties.number.desc": "Zahlenfelder für priority, rating etc.",
-        "properties.text.title": "Text & Arrays",
-        "properties.text.desc": "Textfelder für Strings, kommagetrennte Listen für Arrays",
-        "properties.tags.title": "Tag-Autocomplete",
-        "properties.tags.desc": "Beim Tags-Feld werden alle existierenden Vault-Tags als Vorschläge angezeigt",
-        "properties.example.title": "Beispiel Frontmatter",
-        "properties.example.note": "Diese Felder werden im Properties Panel als Textfeld, Dropdown, Zahl, Datumspicker, Checkbox und Array-Input angezeigt.",
-        "shortcuts.title": "Tastaturkürzel",
-        "shortcuts.subtitle": "Arbeite schneller mit diesen Shortcuts",
-        "shortcuts.general": "Allgemein",
-        "shortcuts.formatting": "Formatierung",
-        "shortcuts.ai": "KI & Tools",
-        "shortcuts.special": "Spezial",
-        "shortcuts.newNote": "Neue Notiz",
-        "shortcuts.openVault": "Vault öffnen",
-        "shortcuts.quickSearch": "Schnellsuche",
-        "shortcuts.quickSwitcher": "Quick Switcher",
-        "shortcuts.settings": "Einstellungen",
-        "shortcuts.bold": "Fett",
-        "shortcuts.italic": "Kursiv",
-        "shortcuts.code": "Code",
-        "shortcuts.link": "Link einfügen",
-        "shortcuts.toggleView": "Ansicht wechseln",
-        "shortcuts.aiMenu": "KI-Menü",
-        "shortcuts.aiImage": "KI-Bildgenerierung",
-        "shortcuts.formatMenu": "Format-Menü",
-        "shortcuts.zotero": "Zotero-Suche",
-        "shortcuts.templates": "Template-Auswahl",
-        "shortcuts.aiContext": "KI-Kontextmenü",
-        "shortcuts.generateImage": "Bild generieren",
-        "shortcuts.navigate": "In Listen navigieren",
-        "shortcuts.select": "Auswahl bestätigen",
-        "shortcuts.close": "Dialog schließen",
-        "shortcuts.note": "Auf Windows/Linux: ⌘ = Ctrl",
-        "setup.title": "Tools einrichten",
-        "setup.subtitle": "So holst du das Maximum aus MindGraph Notes heraus",
-        "setup.claudecode.title": "Claude Code",
-        "setup.claudecode.desc": "Anthropics offizieller KI-Coding-Agent. Claude Code ist der mächtigste KI-Assistent für Entwickler.",
-        "setup.claudecode.step1": "Node.js installieren: <code>brew install node</code>",
-        "setup.claudecode.step2": "Claude Code installieren: <code>npm i -g @anthropic-ai/claude-code</code>",
-        "setup.claudecode.step3": "API-Key von <a href=\"https://console.anthropic.com\" target=\"_blank\" rel=\"noopener noreferrer\">console.anthropic.com</a> holen",
-        "setup.claudecode.step4": "Key setzen: <code>export ANTHROPIC_API_KEY=\"sk-ant-...\"</code>",
-        "setup.claudecode.step5": "Starten: <code>claude</code>",
-        "setup.claudecode.note": "Tipp: Key permanent speichern mit <code>echo 'export ANTHROPIC_API_KEY=\"...\"' >> ~/.zshrc</code>",
-        "setup.opencode.title": "OpenCode",
-        "setup.opencode.desc": "Open-Source KI-Coding-Agent. Unterstützt verschiedene LLM-Anbieter wie OpenAI, Anthropic, Gemini und lokale Modelle.",
-        "setup.opencode.step1": "OpenCode installieren: <code>curl -fsSL https://opencode.ai/install | bash</code>",
-        "setup.opencode.step2": "API-Key setzen (z.B. OpenAI): <code>export OPENAI_API_KEY=\"sk-...\"</code>",
-        "setup.opencode.step3": "Starten: <code>opencode</code>",
-        "setup.opencode.note": "Unterstützt auch lokale Modelle via Ollama - keine API-Kosten!",
-        "setup.ollama.title": "Ollama",
-        "setup.ollama.desc": "Lokale LLMs wie Llama, Mistral oder Gemma auf deinem Mac. Keine Cloud, keine API-Kosten, volle Privatsphäre.",
-        "setup.ollama.note": "Nach der Installation: <code>ollama pull llama3</code> um ein Modell zu laden.",
-        "setup.zotero.title": "Zotero",
-        "setup.zotero.desc": "Literaturverwaltung für Wissenschaft und Recherche. Füge Zitate direkt in deine Notizen ein.",
-        "setup.zotero.step1": "Zotero installieren von <a href=\"https://www.zotero.org/download/\" target=\"_blank\" rel=\"noopener noreferrer\">zotero.org</a>",
-        "setup.zotero.step2": "Better BibTeX Plugin installieren für Export",
-        "setup.zotero.step3": "In MindGraph Notes: Einstellungen → Zotero Pfad setzen",
-        "setup.flux.title": "Flux2 Bildgenerierung",
-        "setup.flux.desc": "Generiere Bilder direkt im Terminal mit Flux2. Lokale KI-Bildgenerierung für deine Notizen - läuft über Ollama.",
-        "setup.flux.note": "Voraussetzung: Ollama muss installiert sein. Das Modell wird beim ersten Start automatisch heruntergeladen.",
-        "setup.docling.title": "Docling PDF-Extraktion",
-        "setup.docling.desc": "Extrahiere automatisch Text, Tabellen und Bilder aus PDFs. Konvertiert zu sauberem Markdown – lokal auf deinem Rechner.",
-        "setup.docling.note": "Voraussetzung: Docker muss installiert sein. Docling läuft dann auf localhost:5001. Aktiviere OCR in den Einstellungen für gescannte PDFs.",
-        "setup.languagetool.title": "LanguageTool Grammatikprüfung",
-        "setup.languagetool.desc": "Prüfe deine Texte auf Grammatik, Rechtschreibung und Stil. Lokal via Docker oder mit LanguageTool Premium für erweiterte Funktionen.",
-        "setup.languagetool.note": "Docker-Version für lokale Nutzung. Alternativ: LanguageTool Premium API mit Username + API-Key in den Einstellungen konfigurieren.",
-        "setup.usage": "Verwendung:",
-        "setup.install": "Installation:",
-        "setup.more": "Mehr erfahren →",
-        "download.title": "Download",
-        "download.subtitle": "MindGraph Notes ist kostenlos und Open Source. Jetzt herunterladen und loslegen.",
-        "download.allDownloads": "Alle Downloads anzeigen (deb, snap, zip...)",
-        "install.title": "Installation auf macOS",
-        "install.desc": "Die App ist signiert und notarisiert. Einfach installieren und loslegen.",
-        "install.step1": "DMG öffnen und App in Programme ziehen",
-        "install.settings1": "App normal starten (Warnung erscheint, auf \"OK\" klicken)",
-        "install.settings2": "<strong>Systemeinstellungen</strong> → <strong>Datenschutz & Sicherheit</strong>",
-        "install.settings3": "Nach unten scrollen → <strong>Dennoch öffnen</strong> klicken",
-        "install.alt": "Terminal-Alternative:",
-        "install.linux.title": "Installation auf Linux",
-        "install.linux.appimage": "<strong>AppImage:</strong>",
-        "install.linux.deb": "<strong>Debian/Ubuntu:</strong>",
-        "install.windows.title": "Installation auf Windows",
-        "install.windows.installer": "<strong>Installer:</strong> Doppelklick auf die .exe Datei und den Anweisungen folgen.",
-        "install.windows.note": "Windows SmartScreen kann beim ersten Start eine Warnung anzeigen. Klicke auf \"Weitere Informationen\" → \"Trotzdem ausführen\".",
+        "cap.label": "Was MindGraph Notes kann",
+        "cap.heading": "Sechs Werkzeuge,<br>ein Wissenssystem.",
+        "cap.sub": "Aktiviere nur, was du brauchst. Jedes Modul arbeitet eigenst\u00e4ndig \u2013 zusammen entfalten sie ihr volles Potenzial.",
+        "cap.notes.title": "Smart Notes",
+        "cap.notes.desc": "Markdown-Editor mit Live Preview, Wikilinks, Backlinks, Canvas-Ansicht mit KI-Clustering, Dataview-Abfragen und Slash Commands. Obsidian-kompatibel.",
+        "cap.notes.f1": "Live Preview mit Syntax-Highlighting",
+        "cap.notes.f2": "Canvas mit KI-gest\u00fctzter Anordnung",
+        "cap.notes.f3": "28+ Slash Commands",
+        "cap.notes.f4": "PDF Companion mit Docling OCR",
+        "cap.notes.f5": "Properties Panel f\u00fcr YAML-Frontmatter",
+        "cap.notes.f6": "LanguageTool Grammatikpr\u00fcfung",
+        "cap.email.title": "Smart Email",
+        "cap.email.desc": "KI-gest\u00fctzter Email-Client mit IMAP & SMTP. Analysiert Relevanz, erkennt Termine, pr\u00fcft deinen Apple-Kalender auf Konflikte und generiert Antwortentwuerfe.",
+        "cap.learn.title": "Smart Learning",
+        "cap.learn.desc": "Karteikarten mit Spaced Repetition (SM-2), KI-Quiz-Generierung, Anki-Import (.apkg), Statistik-Dashboard mit Lernstreak und Aktivitaets-Heatmap.",
+        "cap.ai.title": "Lokale KI",
+        "cap.ai.desc": "Integriertes Terminal mit OpenCode, Claude Code oder Ollama. Smart Connections, Notes Chat, Vision OCR \u2013 alles optional, alles lokal m\u00f6glich.",
+        "cap.integrations.title": "Integrationen",
+        "cap.integrations.desc": "Zotero, Semantic Scholar, Readwise, reMarkable USB, edoobox Veranstaltungsmanagement, Apple Reminders und WordPress-Publishing.",
+        "cap.security.title": "Sicherheit & Sync",
+        "cap.security.desc": "Standardm\u00e4\u00dfig lokal. Optionaler E2E-verschl\u00fcsselter Sync (AES-256-GCM, Zero-Knowledge). Keine Telemetrie, keine Tracker. DOMPurify-Sanitization.",
+        "dl.label": "Download",
+        "dl.heading": "Jetzt starten.",
+        "dl.sub": "Kostenlos, Open Source, in 2 Minuten startklar. \u00d6ffne einen bestehenden Vault oder starte mit dem Starter-Vault.",
+        "dl.all": "Alle Downloads (deb, snap, zip...)",
+        "faq.label": "FAQ",
+        "faq.heading": "H\u00e4ufige Fragen",
+        "faq.q1": "Brauche ich ein Konto?",
+        "faq.a1": "Nein. Alles l\u00e4uft lokal. Deine Notizen sind Markdown-Dateien auf deinem Rechner. Der optionale Sync braucht nur eine Passphrase.",
+        "faq.q2": "Funktioniert mein Obsidian-Vault?",
+        "faq.a2": "Ja. Markdown-Dateien, Wikilinks, Tags und Frontmatter werden direkt unterst\u00fctzt.",
+        "faq.q3": "Brauche ich Ollama?",
+        "faq.a3": "Nein. Die App funktioniert komplett ohne KI. Ollama ist optional f\u00fcr Features wie Email-Analyse, Quiz-Generierung und Smart Connections.",
+        "faq.q4": "Wo liegen meine Daten?",
+        "faq.a4": "Auf deinem Rechner. Keine Cloud, keine Telemetrie. Der optionale Sync ist Ende-zu-Ende verschl\u00fcsselt (AES-256-GCM) \u2013 der Server sieht nur verschl\u00fcsselte Daten.",
+        "faq.q5": "Ist die App wirklich kostenlos?",
+        "faq.a5": "Ja. Open Source unter AGPL-3.0. Keine versteckten Kosten, keine Abo-Modelle.",
         "footer.impressum": "Impressum",
         "footer.privacy": "Datenschutz",
         "impressum.title": "Impressum",
-        "impressum.info": "Angaben gemäß § 5 TMG",
+        "impressum.info": "Angaben gem\u00e4\u00df \u00a7 5 TMG",
         "impressum.country": "Deutschland",
         "impressum.contact": "Kontakt",
-        "impressum.responsible": "Verantwortlich für den Inhalt nach § 55 Abs. 2 RStV",
+        "impressum.responsible": "Verantwortlich f\u00fcr den Inhalt nach \u00a7 55 Abs. 2 RStV",
         "impressum.liability": "Haftungsausschluss",
-        "impressum.liability.content": "Haftung für Inhalte",
-        "impressum.liability.content.text": "Die Inhalte dieser Seiten wurden mit größter Sorgfalt erstellt. Für die Richtigkeit, Vollständigkeit und Aktualität der Inhalte kann jedoch keine Gewähr übernommen werden.",
-        "impressum.liability.links": "Haftung für Links",
-        "impressum.liability.links.text": "Dieses Angebot enthält Links zu externen Websites Dritter, auf deren Inhalte kein Einfluss genommen werden kann. Für die Inhalte der verlinkten Seiten ist stets der jeweilige Anbieter oder Betreiber verantwortlich.",
+        "impressum.liability.content": "Haftung f\u00fcr Inhalte",
+        "impressum.liability.content.text": "Die Inhalte dieser Seiten wurden mit gr\u00f6\u00dfter Sorgfalt erstellt. F\u00fcr die Richtigkeit, Vollst\u00e4ndigkeit und Aktualit\u00e4t der Inhalte kann jedoch keine Gew\u00e4hr \u00fcbernommen werden.",
+        "impressum.liability.links": "Haftung f\u00fcr Links",
+        "impressum.liability.links.text": "Dieses Angebot enth\u00e4lt Links zu externen Websites Dritter, auf deren Inhalte kein Einfluss genommen werden kann.",
         "impressum.copyright": "Urheberrecht",
-        "impressum.copyright.text": "Die durch den Seitenbetreiber erstellten Inhalte und Werke auf diesen Seiten unterliegen dem deutschen Urheberrecht. Beiträge Dritter sind als solche gekennzeichnet.",
-        "privacy.title": "Datenschutzerklärung",
+        "impressum.copyright.text": "Die durch den Seitenbetreiber erstellten Inhalte und Werke auf diesen Seiten unterliegen dem deutschen Urheberrecht.",
+        "privacy.title": "Datenschutzerkl\u00e4rung",
         "privacy.general.title": "1. Datenschutz auf einen Blick",
         "privacy.general.text": "Diese Website erhebt keine personenbezogenen Daten. Es werden keine Cookies gesetzt und keine Tracking-Tools verwendet.",
         "privacy.hosting.title": "2. Hosting",
-        "privacy.hosting.text": "Diese Website wird auf GitHub Pages gehostet. GitHub kann beim Aufruf der Seite technische Daten wie IP-Adresse, Browsertyp und Zugriffszeit in Server-Logs speichern. Weitere Informationen finden Sie in der <a href=\"https://docs.github.com/en/site-policy/privacy-policies/github-privacy-statement\" target=\"_blank\" rel=\"noopener noreferrer\">GitHub Privacy Statement</a>.",
+        "privacy.hosting.text": "Diese Website wird auf GitHub Pages gehostet. GitHub kann beim Aufruf technische Daten in Server-Logs speichern. Siehe <a href=\"https://docs.github.com/en/site-policy/privacy-policies/github-privacy-statement\" target=\"_blank\" rel=\"noopener noreferrer\">GitHub Privacy Statement</a>.",
         "privacy.localstorage.title": "3. Lokale Speicherung",
-        "privacy.localstorage.text": "Diese Website verwendet localStorage, um Ihre Spracheinstellung (Deutsch/Englisch) zu speichern. Diese Daten verbleiben ausschließlich auf Ihrem Gerät und werden nicht an Server übertragen.",
+        "privacy.localstorage.text": "Diese Website verwendet localStorage f\u00fcr die Spracheinstellung. Diese Daten verbleiben auf Ihrem Ger\u00e4t.",
         "privacy.app.title": "4. MindGraph Notes App",
-        "privacy.app.text": "Die MindGraph Notes Desktop-App speichert Notizen standardmäßig lokal auf Ihrem Computer und enthält keine Telemetrie oder Tracking. Optionale Integrationen (z. B. KI APIs oder externe Dienste) senden nur dann Daten, wenn Sie diese bewusst aktivieren.",
-        "faq.title": "Häufige Fragen",
-        "faq.subtitle": "Das Wichtigste für den schnellen Einstieg",
-        "faq.q1": "Brauche ich ein Konto?",
-        "faq.a1": "Nein. Du kannst direkt lokal arbeiten. Deine Notizen bleiben als Markdown-Dateien auf deinem Rechner.",
-        "faq.q2": "Muss ich Ollama sofort installieren?",
-        "faq.a2": "Nein. Die App funktioniert ohne KI-Setup. Ollama brauchst du nur für optionale KI-Features wie Quiz-Generierung.",
-        "faq.q3": "Funktioniert mein Obsidian-Vault?",
-        "faq.a3": "Ja. Du kannst bestehende Markdown-Dateien und Wikilinks direkt weiterverwenden.",
-        "faq.q4": "Ist die App komplett lokal nutzbar?",
-        "faq.a4": "Ja, standardmäßig lokal. Externe Integrationen sind optional und werden nur bei Aktivierung verwendet.",
-        "agents.title": "Integrierte Automationen",
-        "agents.subtitle": "Wiederkehrende Aufgaben automatisieren – direkt in der App.",
-        "agents.learning.title": "Lernagent: Quiz + Karteikarten",
-        "agents.learning.desc": "Erstellt Quizfragen aus deinen Notizen und überführt sie direkt in dein Wiederholen mit SM-2.",
-        "agents.terminal.title": "KI-Terminal",
-        "agents.terminal.desc": "OpenCode, Claude Code oder Ollama direkt neben deinen Notizen. Grafiken, Zusammenfassungen, Quiz – alles per Prompt.",
-        "agents.email.title": "E-Mail-Analyse",
-        "agents.email.desc": "Analysiert IMAP-Mails via Ollama und erstellt aus relevanten Inhalten automatisch Notizen.",
-        "agents.tag.students": "Top für Schule/Studium",
-        "agents.tag.poweruser": "Für Power-User",
-        "agents.note": "Weitere Automationen folgen laufend – z.B. reMarkable-Import und Veranstaltungsmanagement.",
+        "privacy.app.text": "Die App speichert Notizen lokal und enth\u00e4lt keine Telemetrie. Optionale Integrationen senden nur bei Aktivierung Daten.",
         "privacy.rights.title": "5. Ihre Rechte",
-        "privacy.rights.text": "Sie haben das Recht auf Auskunft, Berichtigung, Löschung und Einschränkung der Verarbeitung Ihrer personenbezogenen Daten. Kontakt: info@bydb.io",
+        "privacy.rights.text": "Sie haben das Recht auf Auskunft, Berichtigung und L\u00f6schung. Kontakt: info@bydb.io",
         "privacy.contact.title": "6. Verantwortliche Stelle"
       },
       en: {
         "nav.features": "Features",
-        "nav.shortcuts": "Shortcuts",
-        "nav.setup": "Setup",
         "nav.download": "Download",
         "nav.blog": "Blog",
-        "hero.badge": "Local by default. Open source.",
-        "hero.title": "Your knowledge,<br>your tools.",
-        "hero.subtitle": "Notes, flashcards, knowledge graph and AI terminal – all in one app. Whether for school, university, or knowledge management: enable only what you need.",
+        "hero.badge": "Open Source \u00b7 Local \u00b7 Free",
+        "hero.title": "Notes, Email & Learning \u2013<br><em>one app, your context.</em>",
+        "hero.sub": "Markdown editor, AI email client, flashcards with spaced repetition, knowledge graph, and integrated terminal. All local, all connected.",
         "hero.cta": "Download for free",
-        "signup.title": "Download now",
-        "signup.desc": "Start in 2 minutes: download, open your vault, go. Free, open source, available for macOS, Linux and Windows.",
-        "signup.namePlaceholder": "Name (optional)",
-        "signup.emailPlaceholder": "your@email.com",
-        "signup.submit": "Sign up",
-        "signup.success": "Thanks! You're in. \u2705",
-        "signup.error": "Error sending. Please try again.",
-        "signup.osPlaceholder": "Select operating system",
-        "signup.windowsHint": "<strong>Note for Windows:</strong> MindGraph Notes works on Windows, but the integrated AI terminal reaches its full potential with WSL (Windows Subsystem for Linux). OpenCode is preferred automatically, with Claude Code as fallback.<br><br><strong>Quick start with WSL (recommended):</strong><br><code>wsl --install</code> \u2192 Restart \u2192 <code>curl -fsSL https://opencode.ai/install | bash</code> <em>(optional add-on: <code>npm i -g @anthropic-ai/claude-code</code>)</em><br><a href=\"#setup\">See all setup steps</a>",
-        "signup.badge": "Open Beta",
-        "signup.privacy": "No spam, unsubscribe anytime",
-        "signup.discord": "Join Discord",
-        "terminal.cmd1": " opencode \"Create visual diagrams about alkanes for my chemistry notes\"",
-        "terminal.out1": "Reading [[Alkanes.md]], [[Bond Types.md]] and 3 more notes...",
-        "terminal.out2": "SVG structural formulas for methane, ethane, propane created",
-        "terminal.out3": "Images embedded in [[Alkanes.md]]",
-        "terminal.bar": "Terminal",
-        "terminal.title": "AI right inside your notes",
-        "terminal.desc": "The integrated terminal makes MindGraph Notes unique: Run <strong>OpenCode</strong>, <strong>Claude Code</strong> or <strong>Ollama</strong> right next to your notes. Generate diagrams, write summaries or create quiz questions – without switching context.",
-        "terminal.f1": "Use OpenCode, Claude Code and Ollama directly",
-        "terminal.f2": "AI reads your notes and works in context",
-        "terminal.f3": "Diagrams, summaries, quizzes – all via prompt",
-        "terminal.f4": "Local by default – your data stays with you",
-        "features.title": "More than just notes",
-        "features.subtitle": "Everything you need – enable only what you want.",
-        "features.canvas.title": "Local Canvas",
-        "features.canvas.desc": "Explore notes visually in the canvas. Start with one note, expand step by step through connections. NEW: Bidirectional links between canvas and notes.",
-        "features.pdf.title": "PDF Companion + Docling",
-        "features.pdf.desc": "PDFs right next to your notes. NEW: Automatically extract text, tables, and images via Docling. Perfect for lecture slides, papers, and scans.",
-        "features.local.title": "Local & transparent",
-        "features.local.desc": "Your notes stay as Markdown files on your machine. No telemetry. Optional integrations are enabled by you.",
-        "features.wikilinks.title": "Wikilinks",
-        "features.wikilinks.desc": "Link notes with [[Wikilinks]]. Bidirectional connections, backlinks panel, Obsidian-compatible.",
-        "features.preview.title": "Live Preview",
-        "features.preview.desc": "Write in Markdown with instant preview. LaTeX, Mermaid diagrams, callouts, and more.",
-        "features.graph.title": "Canvas Overview",
-        "features.graph.desc": "All notes at a glance. Filter by folder, arrange freely, discover connections.",
-        "features.zotero.title": "Zotero Integration",
-        "features.zotero.desc": "Insert references directly from Zotero. Perfect for academic work and research.",
-        "features.tasks.title": "Task Management",
-        "features.tasks.desc": "Tasks with due dates right in your notes. Reminders, overdue panel, progress on cards – no extra app needed.",
-        "features.terminal.title": "Integrated Terminal",
-        "features.terminal.desc": "Full-featured terminal in the app. Git, npm, Python – any CLI tool right next to your notes.",
-        "features.ai.title": "AI Features (optional)",
-        "features.ai.desc": "NEW: Smart Connections with configurable weights (Embedding, Keywords, Wikilinks, Tags, Folders). Notes Chat, local LLMs via Ollama/LM Studio. Enable only what you need.",
-        "features.languagetool.title": "LanguageTool",
-        "features.languagetool.desc": "Integrated grammar and spell checking. Local via Docker or with LanguageTool Premium API. Errors are highlighted directly in the editor.",
-        "features.flashcards.title": "Flashcards & Quiz",
-        "features.flashcards.desc": "Generate quiz questions via Ollama, import decks from Anki (.apkg) and learn with Spaced Repetition (SM-2). NEW: Images in flashcards.",
-        "features.dataview.title": "Dataview Queries",
-        "features.dataview.desc": "NEW: Query your notes like a database. LIST and TABLE queries with FROM, WHERE, SORT. Filter by tags, folders and YAML frontmatter.",
-        "features.properties.title": "Properties Panel",
-        "features.properties.desc": "NEW: Edit YAML frontmatter comfortably. Checkboxes for booleans, date pickers, arrays – no YAML syntax needed.",
-        "features.customization.title": "Your colors, your logo",
-        "features.customization.desc": "NEW: 13 accent colors, 15 backgrounds and a custom logo in the title bar. Make MindGraph Notes truly yours.",
-
-        "usergroup.schule.title": "School & Learning",
-        "usergroup.schule.desc": "Flashcards, spaced repetition and AI quizzes – turn notes into active learning material",
-        "usergroup.studium.title": "University & Research",
-        "usergroup.studium.desc": "Zotero, PDF Companion, Dataview and LaTeX – built for academic workflows",
-        "usergroup.pkm.title": "Knowledge Management",
-        "usergroup.pkm.desc": "Wikilinks, Canvas, Smart Connections and local AI – your personal knowledge network",
-        "features.spaced.title": "Spaced Repetition (SM-2)",
-        "features.spaced.desc": "Scientifically proven learning method. The SM-2 algorithm automatically plans optimal review intervals for long-term memory.",
-        "features.reminders.title": "Reminders",
-        "features.reminders.desc": "Keep track of overdue tasks and flashcards. Automatic reminders keep your study plan on track.",
-        "features.latex.title": "LaTeX & Mermaid",
-        "features.latex.desc": "Mathematical formulas with LaTeX and diagrams with Mermaid right in the preview. Perfect for STEM subjects.",
-
-        "dataview.title": "Dataview Queries",
-        "dataview.subtitle": "Query your notes like a database",
-        "dataview.intro": "Dataview lets you query notes by metadata and display them as lists or tables. Write queries in Edit mode and switch to Live-Preview to see results.",
-        "dataview.basic.title": "Basic Syntax",
-        "dataview.basic.list": "Lists all notes",
-        "dataview.basic.table": "Table with frontmatter columns",
-        "dataview.from.title": "FROM - Filter Sources",
-        "dataview.from.tag": "Filter by tag",
-        "dataview.from.folder": "Filter by folder",
-        "dataview.from.combine": "Combine sources",
-        "dataview.where.title": "WHERE - Conditions",
-        "dataview.where.text": "Compare text",
-        "dataview.where.number": "Compare numbers",
-        "dataview.where.bool": "Check boolean",
-        "dataview.where.contains": "Search in arrays",
-        "dataview.sort.title": "SORT & LIMIT",
-        "dataview.sort.date": "Sort by date",
-        "dataview.sort.limit": "Sort and limit results",
-        "dataview.fields.title": "Available Fields",
-        "dataview.fields.file": "File Fields",
-        "dataview.fields.filename": "Filename without extension",
-        "dataview.fields.filepath": "Relative path",
-        "dataview.fields.folder": "Parent folder",
-        "dataview.fields.ctime": "Creation date",
-        "dataview.fields.mtime": "Modification date",
-        "dataview.fields.tags": "All tags",
-        "dataview.fields.frontmatter": "Frontmatter Fields",
-        "dataview.fields.frontmatterDesc": "All fields from the YAML header are directly available:",
-        "dataview.fields.custom": "...and all custom fields",
-        "dataview.example.title": "Full Example",
-        "dataview.example.desc": "Shows a table with status, deadline and priority for all incomplete projects with priority ≥ 2, sorted by deadline.",
-        "properties.title": "Properties Panel",
-        "properties.subtitle": "Edit YAML frontmatter comfortably",
-        "properties.intro": "The Properties Panel displays all YAML frontmatter fields above the editor. Edit metadata without YAML syntax – with appropriate input fields for each data type.",
-        "properties.bool.title": "Booleans",
-        "properties.bool.desc": "Checkboxes for true/false values like completed or published",
-        "properties.date.title": "Date",
-        "properties.date.desc": "Date picker for fields in ISO format (YYYY-MM-DD)",
-        "properties.number.title": "Numbers",
-        "properties.number.desc": "Number fields for priority, rating etc.",
-        "properties.text.title": "Text & Arrays",
-        "properties.text.desc": "Text fields for strings, comma-separated lists for arrays",
-        "properties.tags.title": "Tag Autocomplete",
-        "properties.tags.desc": "The tags field shows suggestions from all existing vault tags",
-        "properties.example.title": "Example Frontmatter",
-        "properties.example.note": "These fields are displayed in the Properties Panel as text field, dropdown, number, date picker, checkbox and array input.",
-        "shortcuts.title": "Keyboard Shortcuts",
-        "shortcuts.subtitle": "Work faster with these shortcuts",
-        "shortcuts.general": "General",
-        "shortcuts.formatting": "Formatting",
-        "shortcuts.ai": "AI & Tools",
-        "shortcuts.special": "Special",
-        "shortcuts.newNote": "New Note",
-        "shortcuts.openVault": "Open Vault",
-        "shortcuts.quickSearch": "Quick Search",
-        "shortcuts.quickSwitcher": "Quick Switcher",
-        "shortcuts.settings": "Settings",
-        "shortcuts.bold": "Bold",
-        "shortcuts.italic": "Italic",
-        "shortcuts.code": "Code",
-        "shortcuts.link": "Insert Link",
-        "shortcuts.toggleView": "Toggle View",
-        "shortcuts.aiMenu": "AI Menu",
-        "shortcuts.aiImage": "AI Image Generation",
-        "shortcuts.formatMenu": "Format Menu",
-        "shortcuts.zotero": "Zotero Search",
-        "shortcuts.templates": "Template Picker",
-        "shortcuts.aiContext": "AI Context Menu",
-        "shortcuts.generateImage": "Generate Image",
-        "shortcuts.navigate": "Navigate Lists",
-        "shortcuts.select": "Confirm Selection",
-        "shortcuts.close": "Close Dialog",
-        "shortcuts.note": "On Windows/Linux: ⌘ = Ctrl",
-        "setup.title": "Setup Tools",
-        "setup.subtitle": "Get the most out of MindGraph Notes",
-        "setup.claudecode.title": "Claude Code",
-        "setup.claudecode.desc": "Anthropic's official AI coding agent. Claude Code is the most powerful AI assistant for developers.",
-        "setup.claudecode.step1": "Install Node.js: <code>brew install node</code>",
-        "setup.claudecode.step2": "Install Claude Code: <code>npm i -g @anthropic-ai/claude-code</code>",
-        "setup.claudecode.step3": "Get API key from <a href=\"https://console.anthropic.com\" target=\"_blank\" rel=\"noopener noreferrer\">console.anthropic.com</a>",
-        "setup.claudecode.step4": "Set key: <code>export ANTHROPIC_API_KEY=\"sk-ant-...\"</code>",
-        "setup.claudecode.step5": "Start: <code>claude</code>",
-        "setup.claudecode.note": "Tip: Save key permanently with <code>echo 'export ANTHROPIC_API_KEY=\"...\"' >> ~/.zshrc</code>",
-        "setup.opencode.title": "OpenCode",
-        "setup.opencode.desc": "Open-source AI coding agent. Supports various LLM providers like OpenAI, Anthropic, Gemini, and local models.",
-        "setup.opencode.step1": "Install OpenCode: <code>curl -fsSL https://opencode.ai/install | bash</code>",
-        "setup.opencode.step2": "Set API key (e.g. OpenAI): <code>export OPENAI_API_KEY=\"sk-...\"</code>",
-        "setup.opencode.step3": "Start: <code>opencode</code>",
-        "setup.opencode.note": "Also supports local models via Ollama - no API costs!",
-        "setup.ollama.title": "Ollama",
-        "setup.ollama.desc": "Local LLMs like Llama, Mistral or Gemma on your Mac. No cloud, no API costs, full privacy.",
-        "setup.ollama.note": "After installation: <code>ollama pull llama3</code> to download a model.",
-        "setup.zotero.title": "Zotero",
-        "setup.zotero.desc": "Reference management for science and research. Insert citations directly into your notes.",
-        "setup.zotero.step1": "Install Zotero from <a href=\"https://www.zotero.org/download/\" target=\"_blank\" rel=\"noopener noreferrer\">zotero.org</a>",
-        "setup.zotero.step2": "Install Better BibTeX plugin for export",
-        "setup.zotero.step3": "In MindGraph Notes: Settings → Set Zotero path",
-        "setup.flux.title": "Flux2 Image Generation",
-        "setup.flux.desc": "Generate images directly in the terminal with Flux2. Local AI image generation for your notes - runs via Ollama.",
-        "setup.flux.note": "Prerequisite: Ollama must be installed. The model is downloaded automatically on first run.",
-        "setup.docling.title": "Docling PDF Extraction",
-        "setup.docling.desc": "Automatically extract text, tables, and images from PDFs. Converts to clean Markdown – locally on your machine.",
-        "setup.docling.note": "Prerequisite: Docker must be installed. Docling then runs on localhost:5001. Enable OCR in settings for scanned PDFs.",
-        "setup.languagetool.title": "LanguageTool Grammar Check",
-        "setup.languagetool.desc": "Check your texts for grammar, spelling, and style. Local via Docker or with LanguageTool Premium for advanced features.",
-        "setup.languagetool.note": "Docker version for local use. Alternatively: Configure LanguageTool Premium API with username + API key in settings.",
-        "setup.usage": "Usage:",
-        "setup.install": "Installation:",
-        "setup.more": "Learn more →",
-        "download.title": "Download",
-        "download.subtitle": "MindGraph Notes is free and open source. Download now and get started.",
-        "download.allDownloads": "All downloads (deb, snap, zip...)",
-        "install.title": "Installation on macOS",
-        "install.desc": "The app is signed and notarized. Simply install and get started.",
-        "install.step1": "Open DMG and drag app to Applications",
-        "install.settings1": "Try to open the app normally (warning appears, click \"OK\")",
-        "install.settings2": "<strong>System Settings</strong> → <strong>Privacy & Security</strong>",
-        "install.settings3": "Scroll down → Click <strong>Open Anyway</strong>",
-        "install.alt": "Terminal alternative:",
-        "install.linux.title": "Installation on Linux",
-        "install.linux.appimage": "<strong>AppImage:</strong>",
-        "install.linux.deb": "<strong>Debian/Ubuntu:</strong>",
-        "install.windows.title": "Installation on Windows",
-        "install.windows.installer": "<strong>Installer:</strong> Double-click the .exe file and follow the instructions.",
-        "install.windows.note": "Windows SmartScreen may show a warning on first launch. Click \"More info\" → \"Run anyway\".",
+        "cap.label": "What MindGraph Notes can do",
+        "cap.heading": "Six tools,<br>one knowledge system.",
+        "cap.sub": "Enable only what you need. Each module works independently \u2013 together they unlock their full potential.",
+        "cap.notes.title": "Smart Notes",
+        "cap.notes.desc": "Markdown editor with live preview, wikilinks, backlinks, canvas with AI clustering, dataview queries and slash commands. Obsidian-compatible.",
+        "cap.notes.f1": "Live preview with syntax highlighting",
+        "cap.notes.f2": "Canvas with AI-powered layout",
+        "cap.notes.f3": "28+ slash commands",
+        "cap.notes.f4": "PDF Companion with Docling OCR",
+        "cap.notes.f5": "Properties panel for YAML frontmatter",
+        "cap.notes.f6": "LanguageTool grammar checking",
+        "cap.email.title": "Smart Email",
+        "cap.email.desc": "AI-powered email client with IMAP & SMTP. Analyzes relevance, detects appointments, checks your Apple Calendar for conflicts and generates reply drafts.",
+        "cap.learn.title": "Smart Learning",
+        "cap.learn.desc": "Flashcards with spaced repetition (SM-2), AI quiz generation, Anki import (.apkg), statistics dashboard with learning streak and activity heatmap.",
+        "cap.ai.title": "Local AI",
+        "cap.ai.desc": "Integrated terminal with OpenCode, Claude Code or Ollama. Smart Connections, Notes Chat, Vision OCR \u2013 all optional, all local.",
+        "cap.integrations.title": "Integrations",
+        "cap.integrations.desc": "Zotero, Semantic Scholar, Readwise, reMarkable USB, edoobox event management, Apple Reminders and WordPress publishing.",
+        "cap.security.title": "Security & Sync",
+        "cap.security.desc": "Local by default. Optional E2E encrypted sync (AES-256-GCM, zero-knowledge). No telemetry, no trackers. DOMPurify sanitization.",
+        "dl.label": "Download",
+        "dl.heading": "Get started.",
+        "dl.sub": "Free, open source, ready in 2 minutes. Open an existing vault or start with the starter vault.",
+        "dl.all": "All downloads (deb, snap, zip...)",
+        "faq.label": "FAQ",
+        "faq.heading": "Frequently Asked Questions",
+        "faq.q1": "Do I need an account?",
+        "faq.a1": "No. Everything runs locally. Your notes are Markdown files on your computer. The optional sync only needs a passphrase.",
+        "faq.q2": "Does my Obsidian vault work?",
+        "faq.a2": "Yes. Markdown files, wikilinks, tags and frontmatter are directly supported.",
+        "faq.q3": "Do I need Ollama?",
+        "faq.a3": "No. The app works without AI. Ollama is optional for features like email analysis, quiz generation and smart connections.",
+        "faq.q4": "Where is my data stored?",
+        "faq.a4": "On your computer. No cloud, no telemetry. The optional sync is end-to-end encrypted (AES-256-GCM) \u2013 the server only sees encrypted data.",
+        "faq.q5": "Is the app really free?",
+        "faq.a5": "Yes. Open source under AGPL-3.0. No hidden costs, no subscription models.",
         "footer.impressum": "Legal Notice",
         "footer.privacy": "Privacy Policy",
         "impressum.title": "Legal Notice",
-        "impressum.info": "Information according to § 5 TMG",
+        "impressum.info": "Information according to \u00a7 5 TMG",
         "impressum.country": "Germany",
         "impressum.contact": "Contact",
-        "impressum.responsible": "Responsible for content according to § 55 Abs. 2 RStV",
+        "impressum.responsible": "Responsible for content according to \u00a7 55 Abs. 2 RStV",
         "impressum.liability": "Disclaimer",
         "impressum.liability.content": "Liability for Content",
-        "impressum.liability.content.text": "The contents of these pages were created with the greatest care. However, no guarantee can be given for the accuracy, completeness, and timeliness of the content.",
+        "impressum.liability.content.text": "The contents of these pages were created with the greatest care. However, no guarantee can be given for the correctness, completeness and timeliness of the content.",
         "impressum.liability.links": "Liability for Links",
-        "impressum.liability.links.text": "This website contains links to external third-party websites, over whose content we have no influence. Therefore, the respective provider or operator is always responsible for the content of the linked pages.",
+        "impressum.liability.links.text": "This site contains links to external third-party websites over whose content we have no influence.",
         "impressum.copyright": "Copyright",
-        "impressum.copyright.text": "The content and works created by the site operator on these pages are subject to German copyright law. Contributions by third parties are marked as such.",
+        "impressum.copyright.text": "The content and works on these pages created by the site operator are subject to German copyright law.",
         "privacy.title": "Privacy Policy",
         "privacy.general.title": "1. Privacy at a Glance",
         "privacy.general.text": "This website does not collect personal data. No cookies are set and no tracking tools are used.",
         "privacy.hosting.title": "2. Hosting",
-        "privacy.hosting.text": "This website is hosted on GitHub Pages. GitHub may store technical data such as IP address, browser type, and access time in server logs when accessing the site. For more information, see the <a href=\"https://docs.github.com/en/site-policy/privacy-policies/github-privacy-statement\" target=\"_blank\" rel=\"noopener noreferrer\">GitHub Privacy Statement</a>.",
+        "privacy.hosting.text": "This website is hosted on GitHub Pages. GitHub may store technical data in server logs. See <a href=\"https://docs.github.com/en/site-policy/privacy-policies/github-privacy-statement\" target=\"_blank\" rel=\"noopener noreferrer\">GitHub Privacy Statement</a>.",
         "privacy.localstorage.title": "3. Local Storage",
-        "privacy.localstorage.text": "This website uses localStorage to save your language preference (German/English). This data remains exclusively on your device and is not transmitted to any servers.",
+        "privacy.localstorage.text": "This website uses localStorage for language settings. This data stays on your device.",
         "privacy.app.title": "4. MindGraph Notes App",
-        "privacy.app.text": "The MindGraph Notes desktop app stores notes locally by default and includes no telemetry or tracking. Optional integrations (e.g. AI APIs or external services) only send data when you explicitly enable them.",
-        "faq.title": "Frequently asked questions",
-        "faq.subtitle": "What new users need to know first",
-        "faq.q1": "Do I need an account?",
-        "faq.a1": "No. You can work locally right away. Your notes remain Markdown files on your machine.",
-        "faq.q2": "Do I need to install Ollama immediately?",
-        "faq.a2": "No. The app works without AI setup. You only need Ollama for optional AI features like quiz generation.",
-        "faq.q3": "Will my Obsidian vault work?",
-        "faq.a3": "Yes. You can continue using your existing Markdown files and wikilinks directly.",
-        "faq.q4": "Can I use the app fully locally?",
-        "faq.a4": "Yes, local by default. External integrations are optional and only used when enabled.",
-        "agents.title": "Built-in automations",
-        "agents.subtitle": "Automate recurring tasks – right inside the app.",
-        "agents.learning.title": "Learning agent: quizzes + flashcards",
-        "agents.learning.desc": "Generates quiz questions from your notes and feeds them directly into SM-2 review.",
-        "agents.terminal.title": "AI Terminal",
-        "agents.terminal.desc": "Run OpenCode, Claude Code, or Ollama right next to your notes. Diagrams, summaries, quizzes – all via prompt.",
-        "agents.email.title": "Email analysis",
-        "agents.email.desc": "Analyzes IMAP emails via Ollama and creates notes automatically from relevant messages.",
-        "agents.tag.students": "Best for school/university",
-        "agents.tag.poweruser": "For power users",
-        "agents.note": "More automations are coming – e.g. reMarkable import and event management.",
+        "privacy.app.text": "The app stores notes locally and contains no telemetry. Optional integrations only send data when activated.",
         "privacy.rights.title": "5. Your Rights",
-        "privacy.rights.text": "You have the right to information, correction, deletion, and restriction of processing of your personal data. Contact: info@bydb.io",
-        "privacy.contact.title": "6. Responsible Party"
+        "privacy.rights.text": "You have the right to access, rectification and deletion. Contact: info@bydb.io",
+        "privacy.contact.title": "6. Responsible Authority"
       }
     };
 
-    function setLanguage(lang) {
-      localStorage.setItem('lang', lang);
-      document.documentElement.lang = lang;
+    let currentLang = localStorage.getItem('lang') || 'de';
 
+    function setLanguage(lang) {
+      currentLang = lang;
+      localStorage.setItem('lang', lang);
       document.getElementById('lang-de').classList.toggle('active', lang === 'de');
       document.getElementById('lang-en').classList.toggle('active', lang === 'en');
-
+      document.documentElement.lang = lang;
       document.querySelectorAll('[data-i18n]').forEach(el => {
         const key = el.getAttribute('data-i18n');
-        if (translations[lang][key]) {
-          el.innerHTML = translations[lang][key];
-        }
+        const t = translations[lang]?.[key];
+        if (t) el.innerHTML = t;
       });
-
-      // Update placeholders
-      document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
-        const key = el.getAttribute('data-i18n-placeholder');
-        if (translations[lang][key]) {
-          el.placeholder = translations[lang][key];
-        }
-      });
-
-      // Update select option text
-      document.querySelectorAll('option[data-i18n]').forEach(el => {
-        const key = el.getAttribute('data-i18n');
-        if (translations[lang][key]) {
-          el.textContent = translations[lang][key];
-        }
-      });
-
-      // Update page title
-      document.title = lang === 'de'
-        ? 'MindGraph Notes - Notizen, Karteikarten & Wissensgraph'
-        : 'MindGraph Notes - Notes, Flashcards & Knowledge Graph';
-
-      // Update OG/Twitter meta for language
-      const ogTitle = document.querySelector('meta[property="og:title"]');
-      const ogDesc = document.querySelector('meta[property="og:description"]');
-      const twTitle = document.querySelector('meta[name="twitter:title"]');
-      const twDesc = document.querySelector('meta[name="twitter:description"]');
-      const ogLocale = document.querySelector('meta[property="og:locale"]');
-      if (ogTitle) ogTitle.content = document.title;
-      if (twTitle) twTitle.content = document.title;
-      if (ogLocale) ogLocale.content = lang === 'de' ? 'de_DE' : 'en_US';
-      const descText = lang === 'de'
-        ? 'Kostenlose Notiz-App mit Karteikarten (SM-2), Wissensgraph, KI-Terminal, PDF Companion und Zotero. Standardmäßig lokal und Open Source.'
-        : 'Free note-taking app with flashcards (SM-2), knowledge graph, AI terminal, PDF companion and Zotero. Local by default and open source.';
-      if (ogDesc) ogDesc.content = descText;
-      if (twDesc) twDesc.content = descText;
     }
 
-    // Initialize language
-    const savedLang = localStorage.getItem('lang') || 'de';
-    setLanguage(savedLang);
-
-    // Modal functions
-    function openModal(name) {
-      document.getElementById(name + '-modal').style.display = 'block';
-      document.body.style.overflow = 'hidden';
+    function openModal(id) {
+      document.getElementById(id + '-modal').classList.add('active');
+    }
+    function closeModal(id) {
+      document.getElementById(id + '-modal').classList.remove('active');
     }
 
-    function closeModal(name) {
-      document.getElementById(name + '-modal').style.display = 'none';
-      document.body.style.overflow = '';
-    }
+    // Scroll fade-in
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('visible'); });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+    document.querySelectorAll('.fade-in').forEach(el => observer.observe(el));
 
-    // Close modal on outside click
-    window.onclick = function(event) {
-      if (event.target.classList.contains('modal')) {
-        event.target.style.display = 'none';
-        document.body.style.overflow = '';
-      }
-    }
-
-    // Close modal on Escape key
-    document.addEventListener('keydown', function(e) {
-      if (e.key === 'Escape') {
-        document.querySelectorAll('.modal').forEach(m => m.style.display = 'none');
-        document.body.style.overflow = '';
-      }
+    // Close modal on backdrop click
+    document.querySelectorAll('.modal').forEach(m => {
+      m.addEventListener('click', (e) => { if (e.target === m) m.classList.remove('active'); });
     });
 
+    // Init language
+    setLanguage(currentLang);
   </script>
 </body>
 </html>
