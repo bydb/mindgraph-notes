@@ -30,9 +30,12 @@ export const UpdateNotification: React.FC = () => {
     if (updateReady && updateAvailable.autoUpdate) {
       // macOS: Install and restart
       window.electronAPI.installUpdate()
+    } else if (updateAvailable.autoUpdate) {
+      // macOS: Auto-download in progress or not started yet — trigger download
+      window.electronAPI.downloadUpdate?.()
     } else if (updateAvailable.releaseUrl) {
-      // Windows/Linux: Open download page
-      window.open(updateAvailable.releaseUrl, '_blank')
+      // Windows/Linux: Open download page in external browser
+      window.electronAPI.openExternal?.(updateAvailable.releaseUrl)
     }
   }
 

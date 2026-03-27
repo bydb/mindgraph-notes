@@ -4083,6 +4083,24 @@ ipcMain.handle('install-update', async () => {
   return false
 })
 
+ipcMain.handle('download-update', async () => {
+  try {
+    await autoUpdater.downloadUpdate()
+    return true
+  } catch (error) {
+    console.error('[AutoUpdate] Download failed:', error)
+    return false
+  }
+})
+
+ipcMain.handle('open-external', async (_event, url: string) => {
+  if (url.startsWith('https://')) {
+    await shell.openExternal(url)
+    return true
+  }
+  return false
+})
+
 // Semver-Vergleich: Gibt 1 zurück wenn a > b, -1 wenn a < b, 0 wenn gleich
 function compareVersions(a: string, b: string): number {
   const partsA = a.split('.').map(n => parseInt(n, 10))
