@@ -143,18 +143,20 @@ export function storeFile(
 export function getFile(
   vaultId: string,
   filePath: string
-): { iv: Buffer; authTag: Buffer; encryptedData: Buffer } | null {
+): { iv: Buffer; authTag: Buffer; encryptedData: Buffer; fileHash: string; fileSize: number } | null {
   const row = db.prepare(`
-    SELECT iv, auth_tag, encrypted_data FROM files WHERE vault_id = ? AND file_path = ? AND deleted_at IS NULL
+    SELECT iv, auth_tag, encrypted_data, file_hash, file_size FROM files WHERE vault_id = ? AND file_path = ? AND deleted_at IS NULL
   `).get(vaultId, filePath) as
-    | { iv: Buffer; auth_tag: Buffer; encrypted_data: Buffer }
+    | { iv: Buffer; auth_tag: Buffer; encrypted_data: Buffer; file_hash: string; file_size: number }
     | undefined
 
   if (!row) return null
   return {
     iv: row.iv,
     authTag: row.auth_tag,
-    encryptedData: row.encrypted_data
+    encryptedData: row.encrypted_data,
+    fileHash: row.file_hash,
+    fileSize: row.file_size
   }
 }
 

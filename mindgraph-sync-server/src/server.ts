@@ -1,4 +1,5 @@
 import http from 'http'
+import crypto from 'crypto'
 import { WebSocketServer, WebSocket } from 'ws'
 import { initDatabase, registerVault, getManifest, getDeletedManifest, storeFile, getFile, deleteFile, getDeletedFiles, restoreFile, purgeDeletedFiles, closeDatabase, vaultExists, validateActivationKey, claimActivationKey, addActivationKey, listActivationKeys, deactivateActivationKey, deleteVault, listVaults } from './storage'
 import { checkRateLimit } from './rateLimit'
@@ -129,6 +130,21 @@ function handleMessage(ws: WebSocket, ip: string, raw: string): void {
         const tag = Buffer.from(msg.tag, 'base64')
         const data = Buffer.from(msg.data, 'base64')
 
+        // Integrity check: verify plaintext size matches declared size
+        // The client sends the plaintext size — encrypted data is slightly larger due to AES padding,
+        // but if data was truncated during transport, the encrypted size will be much smaller.
+        if (msg.size && msg.hash) {
+          // AES-256-GCM ciphertext is same length as plaintext (no padding in GCM mode)
+          if (data.length !== msg.size) {
+            console.error(`[Server] INTEGRITY FAIL: ${msg.originalPath || msg.path} — expected ${msg.size} bytes encrypted, got ${data.length}`)
+            sendJson(ws, {
+              type: 'error',
+              message: `Upload integrity check failed: expected ${msg.size} bytes, received ${data.length} bytes. File may have been truncated during transport.`
+            })
+            return
+          }
+        }
+
         storeFile(
           msg.vaultId,
           msg.path,
@@ -174,7 +190,9 @@ function handleMessage(ws: WebSocket, ip: string, raw: string): void {
         path: msg.path,
         iv: file.iv.toString('base64'),
         tag: file.authTag.toString('base64'),
-        data: file.encryptedData.toString('base64')
+        data: file.encryptedData.toString('base64'),
+        hash: file.fileHash,
+        size: file.fileSize
       })
       break
     }

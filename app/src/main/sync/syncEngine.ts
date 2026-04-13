@@ -28,6 +28,8 @@ interface ServerMessage {
   iv?: string
   tag?: string
   data?: string
+  hash?: string
+  size?: number
   event?: string
   message?: string
   error?: string
@@ -685,6 +687,21 @@ export class SyncEngine {
 
     const plaintext = decryptFile(ciphertext, this.key, iv, tag)
 
+    // Integrity check: verify downloaded file matches expected hash and size
+    if (fileData.hash && fileData.size) {
+      const actualHash = hashContent(plaintext)
+      if (plaintext.length !== fileData.size) {
+        console.error(`[SyncEngine] INTEGRITY FAIL: ${relativePath} — expected ${fileData.size} bytes, got ${plaintext.length}`)
+        this.sendLog({ type: 'error', message: `Integrity check failed for ${relativePath}: size mismatch (expected ${fileData.size}, got ${plaintext.length})`, fileName: relativePath })
+        return
+      }
+      if (actualHash !== fileData.hash) {
+        console.error(`[SyncEngine] INTEGRITY FAIL: ${relativePath} — hash mismatch`)
+        this.sendLog({ type: 'error', message: `Integrity check failed for ${relativePath}: hash mismatch — file may be corrupted on server`, fileName: relativePath })
+        return
+      }
+    }
+
     const absPath = path.join(this.vaultPath, relativePath)
 
     // SAFETY: verify the resolved path is inside the vault
@@ -842,7 +859,7 @@ export class SyncEngine {
 
   private requestFile(
     relativePath: string
-  ): Promise<{ data: string; iv: string; tag: string } | null> {
+  ): Promise<{ data: string; iv: string; tag: string; hash?: string; size?: number } | null> {
     return new Promise((resolve, reject) => {
       if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
         return reject(new Error('Not connected'))
@@ -858,7 +875,9 @@ export class SyncEngine {
             resolve({
               data: msg.data!,
               iv: msg.iv!,
-              tag: msg.tag!
+              tag: msg.tag!,
+              hash: msg.hash,
+              size: msg.size
             })
           } else if (msg.type === 'error') {
             this.ws?.removeListener('message', handler)

@@ -2,6 +2,19 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.4.5-beta] - 2026-04-13
+
+### Fixes
+- **Sync: PDF-Korruption behoben** — Dateien wurden bei der Uebertragung abgeschnitten (truncated bei ~512KB), was 141 PDFs im Vault zerstoert hat
+  - Server prueft jetzt beim Upload die Datenintegritaet (Groesse muss mit deklarierter Groesse uebereinstimmen)
+  - Server liefert beim Download Hash und Groesse mit, damit der Client validieren kann
+  - Client prueft nach Entschluesselung SHA-256-Hash und Dateigroesse — beschaedigte Dateien werden nicht mehr auf die Platte geschrieben
+  - Caddy Reverse-Proxy: `flush_interval -1` fuer sofortige WebSocket-Durchleitung konfiguriert
+
+### Improvements
+- **Website Redesign** — Fokus auf Funktionen und Faehigkeiten, technische Dokumentation entfernt
+- **Neuer Blog-Artikel** — "Weltmodelle, fragile Agenten und die Seele der Maschine"
+
 ## [0.4.4-beta] - 2026-03-27
 
 ### Fixes
