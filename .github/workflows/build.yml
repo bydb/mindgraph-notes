@@ -207,7 +207,7 @@ jobs:
             artifacts/**/*.snap
             artifacts/**/*.exe
             artifacts/**/*.msi
-            artifacts/**/*.yml
+            artifacts/**/latest*.yml
             artifacts/**/*.blockmap
           draft: false
           prerelease: false
