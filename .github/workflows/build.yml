@@ -80,7 +80,10 @@ jobs:
         if: always()
         run: rm -f "$HOME/private_keys/AuthKey_"*.p8
 
-      - name: Upload macOS artifacts
+      # yml (latest-mac.yml) ist identisch zwischen x64/arm64 → nur von arm64 uploaden
+      # um doppelte Uploads im release-Step (GitHub API 404 bei Duplikaten) zu vermeiden
+      - name: Upload macOS artifacts (arm64 incl. yml)
+        if: matrix.arch == 'arm64'
         uses: actions/upload-artifact@v4
         with:
           name: macos-${{ matrix.arch }}
@@ -88,6 +91,17 @@ jobs:
             app/dist/*.dmg
             app/dist/*.zip
             app/dist/*.yml
+            app/dist/*.blockmap
+          if-no-files-found: error
+
+      - name: Upload macOS artifacts (x64 without yml)
+        if: matrix.arch == 'x64'
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-${{ matrix.arch }}
+          path: |
+            app/dist/*.dmg
+            app/dist/*.zip
             app/dist/*.blockmap
           if-no-files-found: error
 
