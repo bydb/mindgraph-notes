@@ -7,6 +7,7 @@ import { GraphCanvas } from './components/Canvas/GraphCanvas'
 import { LocalCanvas } from './components/Canvas/LocalCanvas'
 import { PDFViewer } from './components/PDFViewer/PDFViewer'
 import { ImageViewer } from './components/ImageViewer/ImageViewer'
+import { OfficeViewer } from './components/OfficeViewer/OfficeViewer'
 import { Terminal } from './components/Terminal/Terminal'
 import { QuickSearch } from './components/QuickSearch/QuickSearch'
 import { ZoteroSearch } from './components/ZoteroSearch/ZoteroSearch'
@@ -61,7 +62,7 @@ const ViewModeButton: React.FC<{
 
 const App: React.FC = () => {
   const { viewMode, setViewMode, toggleSidebar, sidebarVisible, splitPosition, setSplitPosition, sidebarWidth, setSidebarWidth, theme, setTheme, accentColor, backgroundColor, fontFamily, setPendingTemplateInsert, textSplitEnabled, setTextSplitEnabled, textSplitPosition, setTextSplitPosition, smartConnectionsEnabled, notesChatEnabled, flashcardsEnabled, semanticScholarEnabled, customLogo, customAccentColor, customBackgroundColorLight, customBackgroundColorDark, setHelpGuideOpen } = useUIStore()
-  const { notes, vaultPath, selectNote, selectedPdfPath, selectedImagePath, secondarySelectedNoteId, navigateBack, navigateForward, selectedNoteId } = useNotesStore()
+  const { notes, vaultPath, selectNote, selectedPdfPath, selectedImagePath, selectedOfficePath, selectedOfficeType, secondarySelectedNoteId, navigateBack, navigateForward, selectedNoteId } = useNotesStore()
   const { tabs, activeTabId, openEditorTab, setActiveTab, closeTab } = useTabStore()
   const activeTab = tabs.find(t => t.id === activeTabId)
   const { t } = useTranslation()
@@ -937,6 +938,13 @@ const App: React.FC = () => {
                   <PDFViewer filePath={`${vaultPath}/${selectedPdfPath}`} fileName={selectedPdfPath.split('/').pop() || selectedPdfPath} relativePath={selectedPdfPath} />
                 ) : selectedImagePath && vaultPath ? (
                   <ImageViewer filePath={`${vaultPath}/${selectedImagePath}`} fileName={selectedImagePath.split('/').pop() || selectedImagePath} />
+                ) : selectedOfficePath && selectedOfficeType && vaultPath ? (
+                  <OfficeViewer
+                    filePath={`${vaultPath}/${selectedOfficePath}`}
+                    fileName={selectedOfficePath.split('/').pop() || selectedOfficePath}
+                    relativePath={selectedOfficePath}
+                    type={selectedOfficeType}
+                  />
                 ) : (
                   <>
                     <MarkdownEditor />

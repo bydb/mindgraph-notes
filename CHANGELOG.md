@@ -2,6 +2,26 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.4.6-beta] - 2026-04-15
+
+### Features
+- **Office-Formate** — Excel, Word und PowerPoint werden jetzt nativ unterstuetzt
+  - 📊 **Excel (.xlsx, .xls)**: Eingebauter Sheet-Viewer mit Tab-Navigation pro Arbeitsblatt, „Als Markdown kopieren" und „In aktive Notiz einfuegen"
+  - 📝 **Word (.docx)**: Sauberer Viewer mit mammoth-Rendering + DOMPurify-Sanitization, „Als Notiz importieren" (Bilder werden nach `.attachments/` extrahiert)
+  - 📽️ **PowerPoint (.pptx)**: Slide-Navigator mit Texten, eingebetteten Bildern und Vortragsnotizen, „Als Slides-Notiz importieren"
+  - **DOCX-Export**: Neuer Button im Editor-Header exportiert die aktuelle Notiz als `.docx`
+  - **Wikilink-Embeds**: `![[datei.xlsx]]`, `![[datei.docx]]`, `![[datei.pptx]]` rendern klickbare Karten, die den jeweiligen Viewer oeffnen
+  - **FileTree**: Office-Dateien bekommen eigene farbige Icons (XLS gruen, DOC blau, PPT orange)
+
+### Improvements
+- **DOCX-Import: Struktur-bewusster Parser** — statt flachem Text werden Formularfelder erkannt und in Obsidian-Callouts umgewandelt
+  - Schattierte Word-Tabellenzellen werden basierend auf ihrer Hintergrundfarbe zu passenden Callouts (gruen → tip, blau → info, gelb → example, orange → warning, rot → danger)
+  - Word-Titel-Style und bold+grosse Schrift werden als Heading-1/2 erkannt
+  - Literale Bullet-Zeichen (`• ● ○ ▪`) werden in korrekte Markdown-Listen konvertiert
+  - Leere „Ihre Eingabe"-Tabellen werden zu aufklappbaren Note-Callouts mit sichtbarem Platz zum Eintippen
+  - Hyperlinks, Bold/Italic-Runs und eingebettete Bilder bleiben erhalten
+  - Benachbarte Word-Runs mit gleicher Formatierung werden zusammengefuehrt (keine `**foo****bar**`-Artefakte mehr)
+
 ## [0.4.5-beta] - 2026-04-13
 
 ### Fixes

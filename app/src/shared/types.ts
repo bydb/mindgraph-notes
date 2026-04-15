@@ -375,7 +375,7 @@ export interface FileEntry {
   path: string;
   isDirectory: boolean;
   children?: FileEntry[];
-  fileType?: 'markdown' | 'pdf' | 'image';
+  fileType?: 'markdown' | 'pdf' | 'image' | 'excel' | 'word' | 'powerpoint';
 }
 
 // PDF-Dokument
@@ -827,6 +827,39 @@ export interface ElectronAPI {
   marketingGenerateImage: (prompt: string, apiKey: string) => Promise<{ success: boolean; imagePath?: string; imageBase64?: string; error?: string }>;
   marketingReadImageBase64: (imagePath: string) => Promise<string | null>;
   marketingSelectImage: () => Promise<string | null>;
+
+  // Office-Formate
+  officeParseExcel: (filePath: string) => Promise<{ success: boolean; data?: ExcelData; error?: string }>;
+  officeExcelToMarkdown: (filePath: string, sheetName?: string) => Promise<{ success: boolean; markdown?: string; error?: string }>;
+  officeParseDocx: (filePath: string) => Promise<{ success: boolean; data?: WordData; error?: string }>;
+  officeImportDocx: (vaultPath: string, sourcePath: string, targetFolder?: string) => Promise<{ success: boolean; relativePath?: string; error?: string }>;
+  officeExportDocx: (markdownContent: string, suggestedName: string) => Promise<{ success: boolean; filePath?: string; canceled?: boolean; error?: string }>;
+  officeParsePptx: (filePath: string) => Promise<{ success: boolean; data?: PowerPointData; error?: string }>;
+  officeImportPptx: (vaultPath: string, sourcePath: string, targetFolder?: string) => Promise<{ success: boolean; relativePath?: string; error?: string }>;
+}
+
+// Office-Formate
+export interface ExcelSheet {
+  name: string;
+  rows: string[][];
+}
+export interface ExcelData {
+  sheets: ExcelSheet[];
+}
+export interface WordData {
+  html: string;
+  markdown: string;
+  messages: string[];
+}
+export interface PowerPointSlide {
+  index: number;
+  title: string;
+  text: string;
+  notes?: string;
+  images: { name: string; dataUrl: string }[];
+}
+export interface PowerPointData {
+  slides: PowerPointSlide[];
 }
 
 // Email Integration Types

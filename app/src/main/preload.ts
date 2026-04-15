@@ -411,5 +411,21 @@ contextBridge.exposeInMainWorld('electronAPI', {
   marketingReadImageBase64: (imagePath: string) =>
     ipcRenderer.invoke('marketing-read-image-base64', imagePath),
   marketingSelectImage: () =>
-    ipcRenderer.invoke('marketing-select-image')
+    ipcRenderer.invoke('marketing-select-image'),
+
+  // Office-Formate
+  officeParseExcel: (filePath: string) =>
+    ipcRenderer.invoke('office-parse-excel', filePath),
+  officeExcelToMarkdown: (filePath: string, sheetName?: string) =>
+    ipcRenderer.invoke('office-excel-to-markdown', filePath, sheetName),
+  officeParseDocx: (filePath: string) =>
+    ipcRenderer.invoke('office-parse-docx', filePath),
+  officeImportDocx: (vaultPath: string, sourcePath: string, targetFolder?: string) =>
+    ipcRenderer.invoke('office-import-docx', vaultPath, sourcePath, targetFolder),
+  officeExportDocx: (markdownContent: string, suggestedName: string) =>
+    ipcRenderer.invoke('office-export-docx', markdownContent, suggestedName),
+  officeParsePptx: (filePath: string) =>
+    ipcRenderer.invoke('office-parse-pptx', filePath),
+  officeImportPptx: (vaultPath: string, sourcePath: string, targetFolder?: string) =>
+    ipcRenderer.invoke('office-import-pptx', vaultPath, sourcePath, targetFolder)
 })

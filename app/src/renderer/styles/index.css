@@ -8461,6 +8461,37 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
   background: var(--bg-secondary);
 }
 
+.office-embed {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0;
+  padding: 8px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--bg-secondary);
+  cursor: pointer;
+  font-size: 13px;
+  transition: background 0.15s;
+}
+
+.office-embed:hover {
+  background: var(--bg-tertiary);
+}
+
+.office-embed-icon {
+  font-size: 16px;
+}
+
+.office-embed-label {
+  color: var(--text-muted);
+}
+
+.office-embed-name {
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
 .pdf-embed-loading {
   padding: 16px;
   color: var(--text-muted);

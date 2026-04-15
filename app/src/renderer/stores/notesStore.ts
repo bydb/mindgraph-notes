@@ -10,6 +10,8 @@ interface NotesState {
   secondarySelectedNoteId: string | null  // Für Text-Split View
   selectedPdfPath: string | null  // Relativer Pfad zum ausgewählten PDF
   selectedImagePath: string | null  // Relativer Pfad zum ausgewählten Bild
+  selectedOfficePath: string | null  // Relativer Pfad zur ausgewählten Office-Datei
+  selectedOfficeType: 'excel' | 'word' | 'powerpoint' | null
   isLoading: boolean
 
   // Multi-Select
@@ -32,6 +34,7 @@ interface NotesState {
   selectSecondaryNote: (id: string | null) => void  // Für Text-Split View
   selectPdf: (path: string | null) => void
   selectImage: (path: string | null) => void
+  selectOffice: (path: string | null, type: 'excel' | 'word' | 'powerpoint' | null) => void
   setLoading: (loading: boolean) => void
 
   // Multi-Select Actions
@@ -62,6 +65,8 @@ export const useNotesStore = create<NotesState>((set, get) => ({
   secondarySelectedNoteId: null,
   selectedPdfPath: null,
   selectedImagePath: null,
+  selectedOfficePath: null,
+  selectedOfficeType: null,
   isLoading: false,
   selectedPaths: new Set<string>(),
   lastClickedPath: null,
@@ -148,7 +153,7 @@ export const useNotesStore = create<NotesState>((set, get) => ({
   selectNote: (id, addToHistory = true) => set((state) => {
     // Wenn keine ID oder gleiche wie aktuelle, nur State updaten
     if (!id || id === state.selectedNoteId) {
-      return { selectedNoteId: id, selectedPdfPath: null, selectedImagePath: null }
+      return { selectedNoteId: id, selectedPdfPath: null, selectedImagePath: null, selectedOfficePath: null, selectedOfficeType: null }
     }
 
     // Navigation History updaten (nur wenn addToHistory true)
@@ -165,19 +170,23 @@ export const useNotesStore = create<NotesState>((set, get) => ({
         selectedNoteId: id,
         selectedPdfPath: null,
         selectedImagePath: null,
+        selectedOfficePath: null,
+        selectedOfficeType: null,
         navigationHistory: newHistory,
         navigationIndex: newHistory.length - 1
       }
     }
 
-    return { selectedNoteId: id, selectedPdfPath: null, selectedImagePath: null }
+    return { selectedNoteId: id, selectedPdfPath: null, selectedImagePath: null, selectedOfficePath: null, selectedOfficeType: null }
   }),
 
   selectSecondaryNote: (id) => set({ secondarySelectedNoteId: id }),
 
-  selectPdf: (path) => set({ selectedPdfPath: path, selectedNoteId: null, selectedImagePath: null }),
+  selectPdf: (path) => set({ selectedPdfPath: path, selectedNoteId: null, selectedImagePath: null, selectedOfficePath: null, selectedOfficeType: null }),
 
-  selectImage: (path) => set({ selectedImagePath: path, selectedNoteId: null, selectedPdfPath: null }),
+  selectImage: (path) => set({ selectedImagePath: path, selectedNoteId: null, selectedPdfPath: null, selectedOfficePath: null, selectedOfficeType: null }),
+
+  selectOffice: (path, type) => set({ selectedOfficePath: path, selectedOfficeType: type, selectedNoteId: null, selectedPdfPath: null, selectedImagePath: null }),
 
   setLoading: (loading) => set({ isLoading: loading }),
 
@@ -213,6 +222,8 @@ export const useNotesStore = create<NotesState>((set, get) => ({
       selectedNoteId: noteId,
       selectedPdfPath: null,
       selectedImagePath: null,
+      selectedOfficePath: null,
+      selectedOfficeType: null,
       navigationIndex: newIndex
     }
   }),
@@ -225,6 +236,8 @@ export const useNotesStore = create<NotesState>((set, get) => ({
       selectedNoteId: noteId,
       selectedPdfPath: null,
       selectedImagePath: null,
+      selectedOfficePath: null,
+      selectedOfficeType: null,
       navigationIndex: newIndex
     }
   }),

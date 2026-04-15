@@ -174,6 +174,27 @@ const ImageIcon: React.FC = () => (
   </svg>
 )
 
+const ExcelIcon: React.FC = () => (
+  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+    <path d="M4 2C3.45 2 3 2.45 3 3V13C3 13.55 3.45 14 4 14H12C12.55 14 13 13.55 13 13V5.41C13 5.15 12.89 4.9 12.71 4.71L10.29 2.29C10.1 2.11 9.85 2 9.59 2H4Z" fill="#e8f5e9" stroke="#2e7d32" strokeWidth="0.5"/>
+    <text x="8" y="11" textAnchor="middle" fontSize="5" fontWeight="bold" fill="#2e7d32">XLS</text>
+  </svg>
+)
+
+const WordIcon: React.FC = () => (
+  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+    <path d="M4 2C3.45 2 3 2.45 3 3V13C3 13.55 3.45 14 4 14H12C12.55 14 13 13.55 13 13V5.41C13 5.15 12.89 4.9 12.71 4.71L10.29 2.29C10.1 2.11 9.85 2 9.59 2H4Z" fill="#e3f2fd" stroke="#1565c0" strokeWidth="0.5"/>
+    <text x="8" y="11" textAnchor="middle" fontSize="5" fontWeight="bold" fill="#1565c0">DOC</text>
+  </svg>
+)
+
+const PowerPointIcon: React.FC = () => (
+  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+    <path d="M4 2C3.45 2 3 2.45 3 3V13C3 13.55 3.45 14 4 14H12C12.55 14 13 13.55 13 13V5.41C13 5.15 12.89 4.9 12.71 4.71L10.29 2.29C10.1 2.11 9.85 2 9.59 2H4Z" fill="#fff3e0" stroke="#e65100" strokeWidth="0.5"/>
+    <text x="8" y="11" textAnchor="middle" fontSize="5" fontWeight="bold" fill="#e65100">PPT</text>
+  </svg>
+)
+
 const FileItem: React.FC<FileItemProps> = ({ entry, level, onDrop, displayMode }) => {
   const { t } = useTranslation()
   // Ordner standardmäßig ZU für schnellstes initiales Rendering
@@ -257,7 +278,7 @@ const FileItem: React.FC<FileItemProps> = ({ entry, level, onDrop, displayMode }
     setMenuReady(true)
   }, [contextMenu])
 
-  const { selectedNoteId, secondarySelectedNoteId, selectedPdfPath, selectedImagePath, selectNote, selectSecondaryNote, selectPdf, selectImage, removeNote, setFileTree, vaultPath, notes, updateNotePath, fileTree, selectedPaths, togglePathSelection, clearSelection, addPathToSelection } = useNotesStore()
+  const { selectedNoteId, secondarySelectedNoteId, selectedPdfPath, selectedImagePath, selectedOfficePath, selectNote, selectSecondaryNote, selectPdf, selectImage, selectOffice, removeNote, setFileTree, vaultPath, notes, updateNotePath, fileTree, selectedPaths, togglePathSelection, clearSelection, addPathToSelection } = useNotesStore()
   const { iconSet, textSplitEnabled, setTextSplitEnabled, flashcardsEnabled, setViewMode, setCanvasFilterPath } = useUIStore()
   const { fileCustomizations, setFileCustomization, removeFileCustomization, toggleFolderHidden, toggleFolderPinned, showHiddenFolders } = useGraphStore()
   const { openCanvasTab } = useTabStore()
@@ -265,21 +286,28 @@ const FileItem: React.FC<FileItemProps> = ({ entry, level, onDrop, displayMode }
 
   const isPdf = entry.fileType === 'pdf'
   const isImage = entry.fileType === 'image'
+  const isExcel = entry.fileType === 'excel'
+  const isWord = entry.fileType === 'word'
+  const isPowerPoint = entry.fileType === 'powerpoint'
+  const isOffice = isExcel || isWord || isPowerPoint
+  const officeType: 'excel' | 'word' | 'powerpoint' | null = isExcel ? 'excel' : isWord ? 'word' : isPowerPoint ? 'powerpoint' : null
   const noteId = generateNoteId(entry.path)
   const isMultiSelected = selectedPaths.has(entry.path)
   const isSelected = isMultiSelected || (isPdf
     ? selectedPdfPath === entry.path
     : isImage
       ? selectedImagePath === entry.path
-      : selectedNoteId === noteId)
-  const isSecondarySelected = !entry.isDirectory && !isPdf && !isImage && secondarySelectedNoteId === noteId
+      : isOffice
+        ? selectedOfficePath === entry.path
+        : selectedNoteId === noteId)
+  const isSecondarySelected = !entry.isDirectory && !isPdf && !isImage && !isOffice && secondarySelectedNoteId === noteId
 
   // Finde die Notiz um Link-Count zu zeigen
   const note = notes.find(n => n.id === noteId)
   const linkCount = note ? note.outgoingLinks.filter(l => !/\.(png|jpe?g|gif|svg|webp|bmp|ico|tiff?)$/i.test(l)).length : 0
 
   // Bookmark Status (nur für Markdown-Notizen)
-  const noteIsBookmarked = !entry.isDirectory && !isPdf && !isImage && isBookmarked(noteId)
+  const noteIsBookmarked = !entry.isDirectory && !isPdf && !isImage && !isOffice && isBookmarked(noteId)
 
   // Hole Customization für diesen Eintrag (nur für Ordner)
   const customization = entry.isDirectory ? fileCustomizations[entry.path] : undefined
@@ -295,8 +323,8 @@ const FileItem: React.FC<FileItemProps> = ({ entry, level, onDrop, displayMode }
       // Ordner: immer nur den Ordnernamen anzeigen
       return entry.name
     }
-    // Für Bilder: vollständigen Namen mit Endung anzeigen
-    if (isImage) {
+    // Für Bilder und Office-Dateien: vollständigen Namen mit Endung anzeigen
+    if (isImage || isOffice) {
       if (displayMode === 'path') {
         return entry.path
       }
@@ -349,7 +377,7 @@ const FileItem: React.FC<FileItemProps> = ({ entry, level, onDrop, displayMode }
     }
 
     // Cmd/Ctrl+Click: Split-View (Secondary Note)
-    if ((e.metaKey || e.ctrlKey) && !entry.isDirectory && !isPdf && !isImage) {
+    if ((e.metaKey || e.ctrlKey) && !entry.isDirectory && !isPdf && !isImage && !isOffice) {
       e.preventDefault()
       setTextSplitEnabled(true)
       selectSecondaryNote(noteId)
@@ -362,6 +390,8 @@ const FileItem: React.FC<FileItemProps> = ({ entry, level, onDrop, displayMode }
       selectPdf(entry.path)
     } else if (isImage) {
       selectImage(entry.path)
+    } else if (isOffice && officeType) {
+      selectOffice(entry.path, officeType)
     } else {
       selectNote(noteId)
     }
@@ -978,7 +1008,7 @@ const FileItem: React.FC<FileItemProps> = ({ entry, level, onDrop, displayMode }
               <ChevronIcon open={false} />
             </span>
             <span className="file-icon-wrapper">
-              {isPdf ? <PdfIcon /> : isImage ? <ImageIcon /> : <FileIcon />}
+              {isPdf ? <PdfIcon /> : isImage ? <ImageIcon /> : isExcel ? <ExcelIcon /> : isWord ? <WordIcon /> : isPowerPoint ? <PowerPointIcon /> : <FileIcon />}
             </span>
             {isEditing ? (
               <input

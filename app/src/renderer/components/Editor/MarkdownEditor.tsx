@@ -302,6 +302,20 @@ md.renderer.rules.text = (tokens, idx, options, env, self) => {
       </div>`
     }
 
+    // Office-Dateien: Excel/Word/PowerPoint — Platzhalter mit Link zum Öffnen
+    const lowerLink = linkText.toLowerCase()
+    const officeMatch = /\.(xlsx|xls|docx|doc|pptx|ppt)(#.*)?$/.exec(lowerLink)
+    if (officeMatch) {
+      const ext = officeMatch[1]
+      const icon = (ext === 'xlsx' || ext === 'xls') ? '📊' : (ext === 'docx' || ext === 'doc') ? '📝' : '📽️'
+      const typeLabel = (ext === 'xlsx' || ext === 'xls') ? 'Excel' : (ext === 'docx' || ext === 'doc') ? 'Word' : 'PowerPoint'
+      return `<div class="office-embed" data-filename="${md.utils.escapeHtml(linkText)}" data-ext="${ext}">
+        <span class="office-embed-icon">${icon}</span>
+        <span class="office-embed-label">${typeLabel}-Datei:</span>
+        <span class="office-embed-name">${md.utils.escapeHtml(linkText)}</span>
+      </div>`
+    }
+
     // Notiz-Embed: ![[noteName]] oder ![[noteName#heading]] oder ![[noteName#^blockid]]
     const hashIndex = linkText.indexOf('#')
     const noteName = hashIndex > -1 ? linkText.substring(0, hashIndex) : linkText
@@ -1714,6 +1728,43 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
       return
     }
 
+    // Office-Embed Click: öffnet die Datei im OfficeViewer
+    const officeEmbed = target.closest('.office-embed') as HTMLElement | null
+    if (officeEmbed) {
+      e.preventDefault()
+      const filename = officeEmbed.getAttribute('data-filename') || ''
+      const ext = (officeEmbed.getAttribute('data-ext') || '').toLowerCase()
+      const officeType: 'excel' | 'word' | 'powerpoint' | null =
+        ext === 'xlsx' || ext === 'xls' ? 'excel' :
+        ext === 'docx' || ext === 'doc' ? 'word' :
+        ext === 'pptx' || ext === 'ppt' ? 'powerpoint' : null
+      if (!filename || !officeType || !vaultPath) return
+
+      // Suche die Datei im Vault (relative zum Notizverzeichnis, dann root, dann fuzzy)
+      const noteDir = selectedNote?.path ? selectedNote.path.substring(0, selectedNote.path.lastIndexOf('/')) : ''
+      const candidates = [
+        noteDir ? `${noteDir}/${filename}` : null,
+        filename,
+      ].filter(Boolean) as string[]
+      ;(async () => {
+        for (const rel of candidates) {
+          try {
+            await window.electronAPI.readFileBinary(`${vaultPath}/${rel}`)
+            useNotesStore.getState().selectOffice(rel, officeType)
+            return
+          } catch {
+            // next
+          }
+        }
+        const found = await window.electronAPI.findImageInVault(vaultPath, filename)
+        if (found.success && found.path) {
+          const rel = found.path.startsWith(vaultPath + '/') ? found.path.slice(vaultPath.length + 1) : found.path
+          useNotesStore.getState().selectOffice(rel, officeType)
+        }
+      })()
+      return
+    }
+
     // Wikilink click handling
     if (target.classList.contains('wikilink')) {
       e.preventDefault()
@@ -2786,6 +2837,17 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
   }, [viewMode])
 
   // PDF Export
+  const handleExportDocx = useCallback(async () => {
+    if (!selectedNote) return
+    const baseName = (selectedNote.path.split('/').pop() || 'notiz').replace(/\.md$/, '')
+    const res = await window.electronAPI.officeExportDocx(selectedNote.content, baseName)
+    if (res.success) {
+      console.log('DOCX exportiert nach:', res.filePath)
+    } else if (!res.canceled) {
+      console.error('DOCX Export fehlgeschlagen:', res.error)
+    }
+  }, [selectedNote])
+
   const handleExportPDF = useCallback(async () => {
     if (!selectedNote) return
 
@@ -2910,6 +2972,17 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
               <path d="M8 2V10M8 10L5 7M8 10L11 7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
             PDF
+          </button>
+          <button
+            className="export-btn"
+            onClick={handleExportDocx}
+            title="Als Word-Dokument exportieren (.docx)"
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <path d="M14 10V13C14 13.5523 13.5523 14 13 14H3C2.44772 14 2 13.5523 2 13V10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M8 2V10M8 10L5 7M8 10L11 7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+            DOCX
           </button>
           <div className="view-mode-toggle">
             {showRawEditor && (

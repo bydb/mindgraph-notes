@@ -480,11 +480,14 @@ ipcMain.handle('create-note', async (_event, filePath: string) => {
 // Supported image extensions for file tree display
 const IMAGE_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.bmp', '.ico']
 
-function getFileType(fileName: string): 'markdown' | 'pdf' | 'image' | null {
+function getFileType(fileName: string): 'markdown' | 'pdf' | 'image' | 'excel' | 'word' | 'powerpoint' | null {
   const ext = path.extname(fileName).toLowerCase()
   if (ext === '.md') return 'markdown'
   if (ext === '.pdf') return 'pdf'
   if (IMAGE_EXTENSIONS.includes(ext)) return 'image'
+  if (ext === '.xlsx' || ext === '.xls') return 'excel'
+  if (ext === '.docx' || ext === '.doc') return 'word'
+  if (ext === '.pptx' || ext === '.ppt') return 'powerpoint'
   return null
 }
 
@@ -6758,6 +6761,134 @@ async function loadMarketingCredentials(): Promise<{ wpAppPassword?: string; igA
     return null
   }
 }
+
+// === Office-Formate (Excel / Word / PowerPoint) ===
+
+ipcMain.handle('office-parse-excel', async (_event, filePath: string) => {
+  try {
+    const { parseExcel } = await import('./office/officeService')
+    const data = await parseExcel(filePath)
+    return { success: true, data }
+  } catch (error) {
+    console.error('[office] parse-excel failed:', error)
+    return { success: false, error: error instanceof Error ? error.message : String(error) }
+  }
+})
+
+ipcMain.handle('office-excel-to-markdown', async (_event, filePath: string, sheetName?: string) => {
+  try {
+    const { parseExcel, sheetToMarkdownTable } = await import('./office/officeService')
+    const data = await parseExcel(filePath)
+    const sheet = sheetName ? data.sheets.find((s) => s.name === sheetName) : data.sheets[0]
+    if (!sheet) return { success: false, error: 'Sheet not found' }
+    return { success: true, markdown: sheetToMarkdownTable(sheet) }
+  } catch (error) {
+    console.error('[office] excel-to-markdown failed:', error)
+    return { success: false, error: error instanceof Error ? error.message : String(error) }
+  }
+})
+
+ipcMain.handle('office-parse-docx', async (_event, filePath: string) => {
+  try {
+    const { parseDocx } = await import('./office/officeService')
+    const data = await parseDocx(filePath)
+    return { success: true, data }
+  } catch (error) {
+    console.error('[office] parse-docx failed:', error)
+    return { success: false, error: error instanceof Error ? error.message : String(error) }
+  }
+})
+
+ipcMain.handle('office-import-docx', async (_event, vaultPath: string, sourcePath: string, targetFolder?: string) => {
+  try {
+    const { docxToStructuredMarkdown, docxToMarkdownWithImages } = await import('./office/officeService')
+    const baseName = path.basename(sourcePath, path.extname(sourcePath))
+    const folder = targetFolder ? path.join(vaultPath, targetFolder) : vaultPath
+    await fs.mkdir(folder, { recursive: true })
+    const attachmentsDir = path.join(vaultPath, '.attachments')
+
+    // Zuerst strukturierter Parser (shading-aware, liefert Callouts). Bei Fehlern: mammoth-Fallback.
+    let markdown = ''
+    try {
+      const structured = await docxToStructuredMarkdown(sourcePath, attachmentsDir, baseName)
+      markdown = structured.markdown
+      if (!markdown || markdown.length < 20) {
+        const fb = await docxToMarkdownWithImages(sourcePath, attachmentsDir, baseName)
+        markdown = fb.markdown
+      }
+    } catch (e) {
+      console.warn('[office] structured docx parser failed, falling back to mammoth:', e)
+      const fb = await docxToMarkdownWithImages(sourcePath, attachmentsDir, baseName)
+      markdown = fb.markdown
+    }
+
+    let targetPath = path.join(folder, `${baseName}.md`)
+    let i = 1
+    while (await fs.access(targetPath).then(() => true).catch(() => false)) {
+      targetPath = path.join(folder, `${baseName}-${i}.md`)
+      i++
+    }
+    await fs.writeFile(targetPath, markdown, 'utf-8')
+    const relativePath = path.relative(vaultPath, targetPath)
+    return { success: true, relativePath }
+  } catch (error) {
+    console.error('[office] import-docx failed:', error)
+    return { success: false, error: error instanceof Error ? error.message : String(error) }
+  }
+})
+
+ipcMain.handle('office-export-docx', async (_event, markdownContent: string, suggestedName: string) => {
+  try {
+    const { dialog } = await import('electron')
+    const result = await dialog.showSaveDialog({
+      title: 'Als Word-Dokument speichern',
+      defaultPath: `${suggestedName}.docx`,
+      filters: [{ name: 'Word-Dokument', extensions: ['docx'] }]
+    })
+    if (result.canceled || !result.filePath) return { success: false, canceled: true }
+    const { markdownToDocx } = await import('./office/officeService')
+    await markdownToDocx(markdownContent, result.filePath)
+    return { success: true, filePath: result.filePath }
+  } catch (error) {
+    console.error('[office] export-docx failed:', error)
+    return { success: false, error: error instanceof Error ? error.message : String(error) }
+  }
+})
+
+ipcMain.handle('office-parse-pptx', async (_event, filePath: string) => {
+  try {
+    const { parsePptx } = await import('./office/officeService')
+    const data = await parsePptx(filePath)
+    return { success: true, data }
+  } catch (error) {
+    console.error('[office] parse-pptx failed:', error)
+    return { success: false, error: error instanceof Error ? error.message : String(error) }
+  }
+})
+
+ipcMain.handle('office-import-pptx', async (_event, vaultPath: string, sourcePath: string, targetFolder?: string) => {
+  try {
+    const { importPptxAsMarkdown } = await import('./office/officeService')
+    const baseName = path.basename(sourcePath, path.extname(sourcePath))
+    const folder = targetFolder ? path.join(vaultPath, targetFolder) : vaultPath
+    await fs.mkdir(folder, { recursive: true })
+    const attachmentsDir = path.join(vaultPath, '.attachments')
+    const { markdown } = await importPptxAsMarkdown(sourcePath, attachmentsDir, baseName)
+
+    let targetPath = path.join(folder, `${baseName}.md`)
+    let i = 1
+    while (await fs.access(targetPath).then(() => true).catch(() => false)) {
+      targetPath = path.join(folder, `${baseName}-${i}.md`)
+      i++
+    }
+    await fs.writeFile(targetPath, markdown, 'utf-8')
+    const relativePath = path.relative(vaultPath, targetPath)
+    return { success: true, relativePath }
+  } catch (error) {
+    console.error('[office] import-pptx failed:', error)
+    return { success: false, error: error instanceof Error ? error.message : String(error) }
+  }
+})
 
 // Cleanup bei App-Beendigung
 app.on('before-quit', () => {

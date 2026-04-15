@@ -1,0 +1,230 @@
+.office-viewer {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  overflow: hidden;
+}
+
+.office-viewer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.office-viewer-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 500;
+  font-size: 13px;
+}
+
+.office-viewer-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.office-action-btn {
+  padding: 4px 10px;
+  font-size: 12px;
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.office-action-btn:hover:not(:disabled) {
+  background: var(--bg-hover);
+}
+
+.office-action-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.office-action-btn.primary {
+  background: var(--accent-color, #1976d2);
+  color: white;
+  border-color: transparent;
+}
+
+.office-action-btn.primary:hover:not(:disabled) {
+  background: var(--accent-color-hover, #1565c0);
+  color: white;
+  filter: brightness(1.08);
+}
+
+.office-viewer-body {
+  flex: 1;
+  overflow: auto;
+  padding: 16px;
+}
+
+.office-loading,
+.office-error {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 32px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.office-error {
+  color: #e53935;
+}
+
+/* Excel */
+.excel-sheet-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 4px 12px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-color);
+  overflow-x: auto;
+}
+
+.excel-sheet-tab {
+  padding: 4px 10px;
+  font-size: 12px;
+  background: transparent;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  cursor: pointer;
+  white-space: nowrap;
+  color: var(--text-primary);
+}
+
+.excel-sheet-tab.active {
+  background: var(--accent-color, #1976d2);
+  color: white;
+  border-color: transparent;
+}
+
+.excel-table-wrapper {
+  overflow: auto;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background: var(--bg-primary);
+}
+
+.excel-table {
+  border-collapse: collapse;
+  font-size: 12px;
+  font-family: var(--font-mono, monospace);
+}
+
+.excel-table th,
+.excel-table td {
+  border: 1px solid var(--border-color);
+  padding: 4px 8px;
+  text-align: left;
+  min-width: 60px;
+  max-width: 300px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.excel-table th {
+  background: var(--bg-secondary);
+  font-weight: 600;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+/* Word */
+.word-preview {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 24px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  line-height: 1.6;
+}
+
+.word-preview h1, .word-preview h2, .word-preview h3 {
+  color: var(--text-primary);
+  margin-top: 1em;
+}
+
+.word-preview table {
+  border-collapse: collapse;
+  margin: 12px 0;
+}
+.word-preview table td, .word-preview table th {
+  border: 1px solid var(--border-color);
+  padding: 4px 8px;
+}
+.word-preview img {
+  max-width: 100%;
+  height: auto;
+}
+
+/* PowerPoint */
+.pptx-nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 8px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.pptx-slide {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 24px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  min-height: 400px;
+}
+
+.pptx-slide h2 {
+  margin-top: 0;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.pptx-slide-text {
+  white-space: pre-wrap;
+  margin: 12px 0;
+}
+
+.pptx-slide-images {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.pptx-slide-images img {
+  max-width: 400px;
+  max-height: 300px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+}
+
+.pptx-slide-notes {
+  margin-top: 16px;
+  padding: 12px;
+  background: var(--bg-secondary);
+  border-left: 3px solid var(--accent-color, #1976d2);
+  font-size: 13px;
+  color: var(--text-muted);
+  white-space: pre-wrap;
+}
