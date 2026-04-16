@@ -348,37 +348,51 @@ export function extractTasks(content: string): TaskSummary {
 }
 
 // Extrahiert Task-Statistiken für den Cache (wird beim Parsen aufgerufen)
-export function extractTaskStatsForCache(content: string): { total: number; completed: number; critical: number; overdue: number } {
+// overdue wird NICHT gecacht sondern live berechnet (→ getVaultTaskStats),
+// damit tagesübergreifend keine stale Werte entstehen.
+// Stattdessen: uncompletedDueDates für Live-Auswertung speichern.
+export function extractTaskStatsForCache(content: string): { total: number; completed: number; critical: number; overdue: number; uncompletedDueDates?: string[] } {
   const summary = extractTasks(content)
+  const dueDates = summary.tasks
+    .filter(t => !t.completed && t.dueDate)
+    .map(t => t.dueDate!.toISOString())
   return {
     total: summary.total,
     completed: summary.completed,
     critical: summary.critical,
-    overdue: summary.tasks.filter(t => !t.completed && t.dueDate && isOverdueByDay(t.dueDate)).length
+    overdue: 0,
+    uncompletedDueDates: dueDates.length > 0 ? dueDates : undefined
   }
 }
 
 // Berechnet Vault-weite Task-Statistiken aus allen Notizen
 // Unterstützt sowohl Notes mit content als auch CachedNoteMetadata mit taskStats
-export function getVaultTaskStats(notes: Array<{ content?: string; taskStats?: { total: number; completed: number; critical: number; overdue: number } }>): VaultTaskStats {
+// overdue wird IMMER live gegen das aktuelle Datum geprüft (nicht aus Cache gelesen)
+export function getVaultTaskStats(notes: Array<{ content?: string; taskStats?: { total: number; completed: number; critical: number; overdue: number; uncompletedDueDates?: string[] } }>): VaultTaskStats {
   let total = 0
   let completed = 0
   let critical = 0
   let overdue = 0
 
+  const todayStart = new Date()
+  todayStart.setHours(0, 0, 0, 0)
+
   for (const note of notes) {
-    // Priorität: geladenes Content Parsing > gecachte taskStats
     if (note.content) {
       const summary = extractTasks(note.content)
       total += summary.total
       completed += summary.completed
       critical += summary.critical
-      overdue += summary.tasks.filter(t => !t.completed && t.dueDate && isOverdueByDay(t.dueDate)).length
+      overdue += summary.tasks.filter(t => !t.completed && t.dueDate && t.dueDate < todayStart).length
     } else if (note.taskStats) {
       total += note.taskStats.total
       completed += note.taskStats.completed
       critical += note.taskStats.critical
-      overdue += note.taskStats.overdue
+      if (note.taskStats.uncompletedDueDates) {
+        overdue += note.taskStats.uncompletedDueDates.filter(d => new Date(d) < todayStart).length
+      } else {
+        overdue += note.taskStats.overdue
+      }
     }
   }
 

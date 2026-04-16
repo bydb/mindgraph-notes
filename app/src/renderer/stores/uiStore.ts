@@ -390,6 +390,9 @@ interface UIState {
   flashcardsEnabled: boolean
   semanticScholarEnabled: boolean
 
+  // Task-Zählung: Ordner ausschließen
+  taskExcludedFolders: string[]
+
   // Smart Connections Gewichtungen
   smartConnectionsWeights: SmartConnectionsWeights
 
@@ -488,6 +491,7 @@ interface UIState {
   setNotesChatEnabled: (enabled: boolean) => void
   setFlashcardsEnabled: (enabled: boolean) => void
   setSemanticScholarEnabled: (enabled: boolean) => void
+  toggleTaskExcludedFolder: (folderPath: string) => void
   setSmartConnectionsWeights: (weights: Partial<SmartConnectionsWeights>) => void
   setDocling: (settings: Partial<DoclingSettings>) => void
   setVisionOcr: (settings: Partial<VisionOcrSettings>) => void
@@ -574,6 +578,9 @@ const defaultState = {
 
   // FileTree Icon Settings
   iconSet: 'default' as IconSet,
+
+  // Task-Zählung: Ordner ausschließen
+  taskExcludedFolders: [] as string[],
 
   // KI-Features (opt-in - Human in the Loop)
   smartConnectionsEnabled: false,
@@ -722,7 +729,7 @@ const persistedKeys = [
   'canvasFilterPath', 'canvasViewMode', 'canvasShowEdges', 'canvasShowTags', 'canvasShowLinks', 'canvasShowImages', 'canvasShowSummaries',
   'canvasCompactMode', 'canvasReadMode', 'canvasHoverScale', 'canvasDefaultCardWidth', 'splitPosition', 'fileTreeDisplayMode', 'ollama',
   'pdfCompanionEnabled', 'pdfDisplayMode', 'iconSet',
-  'smartConnectionsEnabled', 'notesChatEnabled', 'flashcardsEnabled', 'semanticScholarEnabled', 'smartConnectionsWeights', 'docling', 'visionOcr', 'readwise', 'languageTool', 'email', 'marketing', 'edoobox', 'remarkable', 'dailyNote',
+  'smartConnectionsEnabled', 'notesChatEnabled', 'flashcardsEnabled', 'semanticScholarEnabled', 'smartConnectionsWeights', 'docling', 'visionOcr', 'readwise', 'languageTool', 'email', 'marketing', 'edoobox', 'remarkable', 'dailyNote', 'taskExcludedFolders',
   'lastSeenVersion',
   'customAccentColor', 'customBackgroundColorLight', 'customBackgroundColorDark',
   'customLogo',
@@ -782,6 +789,11 @@ export const useUIStore = create<UIState>()((set, get) => ({
   setSmartConnectionsEnabled: (enabled) => set({ smartConnectionsEnabled: enabled }),
   setNotesChatEnabled: (enabled) => set({ notesChatEnabled: enabled }),
   setFlashcardsEnabled: (enabled) => set({ flashcardsEnabled: enabled }),
+  toggleTaskExcludedFolder: (folderPath) => set((state) => {
+    const current = state.taskExcludedFolders
+    const isExcluded = current.includes(folderPath)
+    return { taskExcludedFolders: isExcluded ? current.filter(f => f !== folderPath) : [...current, folderPath] }
+  }),
   setSemanticScholarEnabled: (enabled) => set({ semanticScholarEnabled: enabled }),
   setSmartConnectionsWeights: (weights) => set((state) => ({
     smartConnectionsWeights: { ...state.smartConnectionsWeights, ...weights }

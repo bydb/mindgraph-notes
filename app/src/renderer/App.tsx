@@ -61,7 +61,7 @@ const ViewModeButton: React.FC<{
 )
 
 const App: React.FC = () => {
-  const { viewMode, setViewMode, toggleSidebar, sidebarVisible, splitPosition, setSplitPosition, sidebarWidth, setSidebarWidth, theme, setTheme, accentColor, backgroundColor, fontFamily, setPendingTemplateInsert, textSplitEnabled, setTextSplitEnabled, textSplitPosition, setTextSplitPosition, smartConnectionsEnabled, notesChatEnabled, flashcardsEnabled, semanticScholarEnabled, customLogo, customAccentColor, customBackgroundColorLight, customBackgroundColorDark, setHelpGuideOpen } = useUIStore()
+  const { viewMode, setViewMode, toggleSidebar, sidebarVisible, splitPosition, setSplitPosition, sidebarWidth, setSidebarWidth, theme, setTheme, accentColor, backgroundColor, fontFamily, setPendingTemplateInsert, textSplitEnabled, setTextSplitEnabled, textSplitPosition, setTextSplitPosition, smartConnectionsEnabled, notesChatEnabled, flashcardsEnabled, semanticScholarEnabled, customLogo, customAccentColor, customBackgroundColorLight, customBackgroundColorDark, setHelpGuideOpen, taskExcludedFolders } = useUIStore()
   const { notes, vaultPath, selectNote, selectedPdfPath, selectedImagePath, selectedOfficePath, selectedOfficeType, secondarySelectedNoteId, navigateBack, navigateForward, selectedNoteId } = useNotesStore()
   const { tabs, activeTabId, openEditorTab, setActiveTab, closeTab } = useTabStore()
   const activeTab = tabs.find(t => t.id === activeTabId)
@@ -155,13 +155,16 @@ const App: React.FC = () => {
       const count = notes.reduce((acc, note) => acc + note.outgoingLinks.length, 0)
       setLinkCount(count)
 
-      // Task-Stats
-      const stats = getVaultTaskStats(notes)
+      // Task-Stats (ausgeschlossene Ordner filtern)
+      const filteredNotes = taskExcludedFolders.length > 0
+        ? notes.filter(n => !taskExcludedFolders.some(f => n.path.startsWith(f + '/')))
+        : notes
+      const stats = getVaultTaskStats(filteredNotes)
       setTaskStats(stats)
     }, 100) // Kurze Verzögerung, UI first
 
     return () => clearTimeout(timer)
-  }, [notes])
+  }, [notes, taskExcludedFolders])
 
   // title → data-tooltip Konvertierung (verhindert doppelte native Tooltips)
   useEffect(() => {

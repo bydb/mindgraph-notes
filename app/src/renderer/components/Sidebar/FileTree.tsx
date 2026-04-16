@@ -279,7 +279,7 @@ const FileItem: React.FC<FileItemProps> = ({ entry, level, onDrop, displayMode }
   }, [contextMenu])
 
   const { selectedNoteId, secondarySelectedNoteId, selectedPdfPath, selectedImagePath, selectedOfficePath, selectNote, selectSecondaryNote, selectPdf, selectImage, selectOffice, removeNote, setFileTree, vaultPath, notes, updateNotePath, fileTree, selectedPaths, togglePathSelection, clearSelection, addPathToSelection } = useNotesStore()
-  const { iconSet, textSplitEnabled, setTextSplitEnabled, flashcardsEnabled, setViewMode, setCanvasFilterPath } = useUIStore()
+  const { iconSet, textSplitEnabled, setTextSplitEnabled, flashcardsEnabled, setViewMode, setCanvasFilterPath, taskExcludedFolders, toggleTaskExcludedFolder } = useUIStore()
   const { fileCustomizations, setFileCustomization, removeFileCustomization, toggleFolderHidden, toggleFolderPinned, showHiddenFolders } = useGraphStore()
   const { openCanvasTab } = useTabStore()
   const { isBookmarked, toggleBookmark } = useBookmarkStore()
@@ -726,6 +726,14 @@ const FileItem: React.FC<FileItemProps> = ({ entry, level, onDrop, displayMode }
     setContextMenu(null)
   }, [contextMenu, toggleFolderPinned])
 
+  const isFolderTaskExcluded = contextMenu?.entry.isDirectory && taskExcludedFolders.some(f => contextMenu.entry.path === f || contextMenu.entry.path.startsWith(f + '/'))
+
+  const handleToggleTaskExcluded = useCallback(() => {
+    if (!contextMenu || !contextMenu.entry.isDirectory) return
+    toggleTaskExcludedFolder(contextMenu.entry.path)
+    setContextMenu(null)
+  }, [contextMenu, toggleTaskExcludedFolder])
+
   // Show folder in canvas view
   const handleShowFolderInCanvas = useCallback(() => {
     if (!contextMenu || !contextMenu.entry.isDirectory) return
@@ -1094,6 +1102,9 @@ const FileItem: React.FC<FileItemProps> = ({ entry, level, onDrop, displayMode }
               </button>
               <button onClick={handleToggleFolderPinned} className="context-menu-item">
                 {isFolderPinned ? t('fileTree.unpinFolder') : t('fileTree.pinFolder')}
+              </button>
+              <button onClick={handleToggleTaskExcluded} className="context-menu-item">
+                {isFolderTaskExcluded ? t('fileTree.includeInTaskCount') : t('fileTree.excludeFromTaskCount')}
               </button>
               <div className="context-menu-divider" />
               <button onClick={handleCopyRelativePath} className="context-menu-item">

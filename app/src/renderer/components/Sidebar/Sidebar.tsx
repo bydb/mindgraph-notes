@@ -518,7 +518,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ onOpenSearch }) => {
 async function loadAllNotes(basePath: string, entries: any[]): Promise<Note[]> {
   const startTime = Date.now()
   const notes: Note[] = []
-  const NOTES_CACHE_VERSION = 3
+  const NOTES_CACHE_VERSION = 4
 
   // 1. Cache und Dateien mit mtime laden (parallel)
   console.log('[Sidebar] Starte Laden...')

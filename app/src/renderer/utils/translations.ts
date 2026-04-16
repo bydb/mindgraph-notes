@@ -570,6 +570,8 @@ const translations = {
     'fileTree.showFolder': 'Ordner einblenden',
     'fileTree.pinFolder': 'An Sidebar anpinnen',
     'fileTree.unpinFolder': 'Aus Sidebar lösen',
+    'fileTree.excludeFromTaskCount': 'Von Task-Zählung ausschließen',
+    'fileTree.includeInTaskCount': 'In Task-Zählung einschließen',
     'fileTree.pinnedFolders': 'Angepinnt',
 
     // Canvas
@@ -2066,6 +2068,8 @@ const translations = {
     'fileTree.showFolder': 'Show folder',
     'fileTree.pinFolder': 'Pin to sidebar',
     'fileTree.unpinFolder': 'Unpin from sidebar',
+    'fileTree.excludeFromTaskCount': 'Exclude from task count',
+    'fileTree.includeInTaskCount': 'Include in task count',
     'fileTree.pinnedFolders': 'Pinned',
 
     // Canvas

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { useNotesStore } from '../../stores/notesStore'
+import { useUIStore } from '../../stores/uiStore'
 import { useTranslation } from '../../utils/translations'
 import { extractTasks, type ExtractedTask } from '../../utils/linkExtractor'
 
@@ -16,6 +17,7 @@ interface OverduePanelProps {
 export const OverduePanel: React.FC<OverduePanelProps> = ({ onClose }) => {
   const { t } = useTranslation()
   const { notes, vaultPath, selectNote } = useNotesStore()
+  const { taskExcludedFolders } = useUIStore()
   const [allTasks, setAllTasks] = useState<OverdueTask[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
@@ -29,9 +31,10 @@ export const OverduePanel: React.FC<OverduePanelProps> = ({ onClose }) => {
 
       const tasks: OverdueTask[] = []
 
-      // Finde Notes die Tasks haben könnten
+      // Finde Notes die Tasks haben könnten (ausgeschlossene Ordner filtern)
       const notesWithPotentialTasks = notes.filter(note =>
-        (note.taskStats?.total && note.taskStats.total > 0) || note.content
+        ((note.taskStats?.total && note.taskStats.total > 0) || note.content) &&
+        !taskExcludedFolders.some(f => note.path.startsWith(f + '/'))
       )
 
       // Lade Content für Notes die keinen haben

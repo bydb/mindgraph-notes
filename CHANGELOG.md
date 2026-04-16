@@ -2,6 +2,16 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.4.7-beta] - 2026-04-16
+
+### Features
+- **Ordner von Task-Zaehlung ausschliessen** — Rechtsklick auf Ordner im FileTree → „Von Task-Zaehlung ausschliessen". Ausgeschlossene Ordner werden in Header-Badge, Footer-Stats und OverduePanel ignoriert. Setting wird persistiert. Ideal fuer alte Archiv-Ordner mit vielen historischen Tasks.
+
+### Fixes
+- **Ueberfaellige Tasks: Badge-Zaehlung stimmte nicht mit OverduePanel ueberein** — Der gecachte `overdue`-Wert wurde zum Zeitpunkt des Notiz-Ladens berechnet und nie aktualisiert. Tasks die nach dem Laden ueberfaellig wurden, fehlten im Badge. Fix: Faelligkeitsdaten werden jetzt als ISO-Strings im Cache gespeichert und bei jedem Anzeigen live gegen das aktuelle Datum geprueft.
+- **CI: Release-Step schlug seit v0.4.3 fehl** — `builder-debug.yml` und `latest-mac.yml` wurden von mehreren Plattform-Jobs mit identischem Namen hochgeladen, was zu GitHub API 404 fuehrte. Fix: `builder-debug.yml` ausgeschlossen, `latest-mac.yml` nur von einem Job uploaden.
+- **CI: Apple Notarization repariert** — Abgelaufenes Developer Agreement verhinderte Notarisierung seit v0.4.3. DMGs sind jetzt wieder signiert und notarisiert.
+
 ## [0.4.6-beta] - 2026-04-15
 
 ### Features
