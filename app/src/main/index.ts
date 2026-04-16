@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, dialog, shell, Notification, safeStorage, autoUpdater as electronAutoUpdater, Menu } from 'electron'
+import { app, BrowserWindow, ipcMain, dialog, shell, Notification, safeStorage, autoUpdater as electronAutoUpdater, Menu, globalShortcut } from 'electron'
 import { autoUpdater } from 'electron-updater'
 import * as path from 'path'
 import * as fs from 'fs/promises'
@@ -7,6 +7,7 @@ import * as pty from 'node-pty'
 import type { FileEntry } from '../shared/types'
 import { SyncEngine } from './sync/syncEngine'
 import { ReMarkableService } from './remarkable/service'
+import { setupTray, hideTransportWindow, getTransportWindow } from './transport/trayManager'
 
 // Globale Fehlerbehandlung für unhandled exceptions (z.B. IMAP Socket-Timeouts)
 process.on('uncaughtException', (error) => {
@@ -310,6 +311,18 @@ app.whenReady().then(async () => {
   }
 
   createWindow()
+
+  // Tray-Icon + Quick Capture (nur macOS)
+  if (process.platform === 'darwin') {
+    const resourcesPath = app.isPackaged
+      ? path.join(__dirname, '../../resources')
+      : path.join(app.getAppPath(), 'resources')
+
+    setupTray({
+      getMainWindow: () => mainWindow,
+      resourcesPath
+    })
+  }
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
@@ -6888,6 +6901,144 @@ ipcMain.handle('office-import-pptx', async (_event, vaultPath: string, sourcePat
     console.error('[office] import-pptx failed:', error)
     return { success: false, error: error instanceof Error ? error.message : String(error) }
   }
+})
+
+// ============ TRANSPORT (Quick Capture) ============
+
+// Transport: Config laden (Vault-Pfad + Transport-Settings)
+ipcMain.handle('transport-get-config', async () => {
+  const settings = await loadSettings()
+  const uiSettings = await loadUISettings()
+  return {
+    vaultPath: settings.lastVaultPath || null,
+    transport: (uiSettings as Record<string, unknown>).transport || null
+  }
+})
+
+// Transport: Vault-Unterordner rekursiv auflisten
+ipcMain.handle('transport-list-vault-subdirs', async () => {
+  try {
+    const settings = await loadSettings()
+    const vaultPath = settings.lastVaultPath
+    if (!vaultPath) return []
+
+    const results: string[] = []
+
+    async function walkDirs(dirPath: string, prefix: string): Promise<void> {
+      const entries = await fs.readdir(dirPath, { withFileTypes: true })
+      for (const entry of entries) {
+        if (!entry.isDirectory() || entry.name.startsWith('.') || entry.name === 'node_modules') continue
+        const relativePath = prefix ? `${prefix}/${entry.name}` : entry.name
+        results.push(relativePath)
+        await walkDirs(path.join(dirPath, entry.name), relativePath)
+      }
+    }
+
+    await walkDirs(vaultPath, '')
+    return results.sort()
+  } catch {
+    return []
+  }
+})
+
+// Transport: Notiz speichern
+ipcMain.handle('transport-save-note', async (_event, data: {
+  title: string
+  category: string
+  tags: string[]
+  content: string
+  destinationFolder: string
+}) => {
+  try {
+    const settings = await loadSettings()
+    const vaultPath = settings.lastVaultPath
+    if (!vaultPath) throw new Error('Kein Vault geöffnet')
+
+    const { title, category, tags, content, destinationFolder } = data
+
+    // Sicherheitscheck: Pfad muss innerhalb des Vaults bleiben
+    const destPath = validatePath(vaultPath, destinationFolder)
+
+    // Verzeichnis sicherstellen
+    await fs.mkdir(destPath, { recursive: true })
+
+    // Titel extrahieren und bereinigen
+    const cleanTitle = (title || content.split('\n')[0] || 'Unbenannt')
+      .replace(/^#+\s*/, '')
+      .trim()
+      .substring(0, 100) || 'Unbenannt'
+
+    // Dateinamen generieren
+    const now = new Date()
+    const timestamp = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}`
+    const safeTitle = cleanTitle
+      .replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue')
+      .replace(/Ä/g, 'Ae').replace(/Ö/g, 'Oe').replace(/Ü/g, 'Ue')
+      .replace(/ß/g, 'ss')
+      .replace(/[<>:"/\\|?*]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .substring(0, 80) || 'Notiz'
+
+    const categoryEmoji = category || '🟢'
+    let filename = `${timestamp} - ${categoryEmoji} ${safeTitle}.md`
+
+    // YAML Frontmatter
+    const frontmatterLines = ['---']
+    frontmatterLines.push(`title: "${cleanTitle.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`)
+    frontmatterLines.push(`date: ${now.toISOString()}`)
+    if (tags.length > 0) {
+      frontmatterLines.push('tags:')
+      for (const tag of tags) {
+        const safeTag = tag.replace(/[\r\n:{}[\]|>&*!,#"']/g, '').trim()
+        if (safeTag) frontmatterLines.push(`  - ${safeTag}`)
+      }
+    }
+    frontmatterLines.push(`category: ${categoryEmoji}`)
+    frontmatterLines.push('---')
+    frontmatterLines.push('')
+    const frontmatter = frontmatterLines.join('\n')
+
+    // Datei schreiben
+    let filePath = path.join(destPath, filename)
+
+    // Eindeutigen Pfad sicherstellen
+    let counter = 1
+    while (await fs.access(filePath).then(() => true).catch(() => false)) {
+      const base = filename.endsWith('.md') ? filename.slice(0, -3) : filename
+      filePath = path.join(destPath, `${base}-${counter}.md`)
+      counter++
+      if (counter > 999) break
+    }
+
+    await fs.writeFile(filePath, frontmatter + content, 'utf-8')
+
+    const relativePath = path.relative(vaultPath, filePath)
+
+    // Hauptfenster benachrichtigen, dass eine neue Notiz erstellt wurde
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('transport-note-created', { relativePath })
+    }
+
+    return { success: true, relativePath, filePath }
+  } catch (error) {
+    console.error('[Transport] Fehler beim Speichern:', error)
+    return { success: false, error: error instanceof Error ? error.message : String(error) }
+  }
+})
+
+// Transport: Notiz im Hauptfenster öffnen
+ipcMain.handle('transport-open-in-main', (_event, relativePath: string) => {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.show()
+    mainWindow.focus()
+    mainWindow.webContents.send('transport-open-note', relativePath)
+  }
+})
+
+// Transport: Capture-Fenster schließen
+ipcMain.handle('transport-close', () => {
+  hideTransportWindow()
 })
 
 // Cleanup bei App-Beendigung

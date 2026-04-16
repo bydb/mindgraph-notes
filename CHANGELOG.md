@@ -2,6 +2,22 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.5.0-beta] - 2026-04-16
+
+### Features
+- **Transport (Quick Capture)** — Schnelle Notizerfassung ueber die macOS-Menuleiste
+  - **Tray-Icon** in der macOS-Menuleiste (immer sichtbar, Rechtsklick-Menue: Quick Capture / MindGraph oeffnen / Beenden)
+  - **Schwebendes Capture-Fenster** (zentriert, always-on-top, schliesst bei Fokusverlust)
+  - **Globaler Shortcut** `Cmd+Shift+N` — funktioniert auch wenn MindGraph nicht im Vordergrund ist
+  - **Kategorie-System**: 🔴 Aktion, 🟢 Wissen, 🔵 Info (Emoji im Dateinamen)
+  - **Tag-Auswahl** aus vordefinierten Tags + freie Tag-Eingabe direkt im Capture-Fenster
+  - **Task-Einfuegung** mit Datum/Uhrzeit (`- [ ] Aufgabe (@[[YYYY-MM-DD]] HH:MM)`)
+  - **Zielordner-Auswahl** — alle Vault-Unterordner rekursiv verfuegbar, konfigurierbare Favoriten in Settings
+  - **YAML-Frontmatter** (title, date, tags, category) + Dateinamen-Format: `YYYYMMDDHHMM - {emoji} {Titel}.md`
+  - **Auto-Oeffnung** der Notiz im Hauptfenster nach Transport
+  - **Settings-Tab** fuer Zielordner, Tags und Shortcut-Konfiguration
+  - Basiert auf der standalone Transport-App, jetzt vollstaendig in MindGraph integriert
+
 ## [0.4.8-beta] - 2026-04-16
 
 ### Improvements

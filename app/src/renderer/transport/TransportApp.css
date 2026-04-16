@@ -1,0 +1,382 @@
+/* Transport Quick Capture Window */
+
+:root {
+  --transport-bg: #1a1a1a;
+  --transport-surface: #2a2a2a;
+  --transport-border: #3a3a3a;
+  --transport-text: #e0e0e0;
+  --transport-text-secondary: #888;
+  --transport-accent: #0a84ff;
+  --transport-accent-hover: #0070e0;
+  --transport-radius: 10px;
+  --transport-radius-sm: 6px;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --transport-bg: #f5f5f5;
+    --transport-surface: #ffffff;
+    --transport-border: #e0e0e0;
+    --transport-text: #1a1a1a;
+    --transport-text-secondary: #666;
+  }
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  background: var(--transport-bg);
+  color: var(--transport-text);
+  overflow: hidden;
+  border-radius: var(--transport-radius);
+}
+
+.transport-app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+  border-radius: var(--transport-radius);
+}
+
+/* Titlebar (Drag-Bereich) */
+.transport-titlebar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 36px;
+  -webkit-app-region: drag;
+  user-select: none;
+  flex-shrink: 0;
+}
+
+.transport-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--transport-text-secondary);
+  letter-spacing: 0.02em;
+}
+
+/* Body */
+.transport-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 0 20px 16px;
+  gap: 12px;
+  overflow: hidden;
+}
+
+/* Kategorie-Buttons */
+.transport-categories {
+  display: flex;
+  gap: 6px;
+}
+
+.transport-category-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1px solid var(--transport-border);
+  border-radius: var(--transport-radius-sm);
+  background: transparent;
+  color: var(--transport-text);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  -webkit-app-region: no-drag;
+}
+
+.transport-category-btn:hover {
+  background: var(--transport-surface);
+}
+
+.transport-category-btn.selected {
+  border-color: var(--transport-accent);
+  background: color-mix(in srgb, var(--transport-accent) 15%, transparent);
+}
+
+.category-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* Destination Select */
+.transport-destination {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.transport-destination label {
+  font-size: 12px;
+  color: var(--transport-text-secondary);
+  white-space: nowrap;
+}
+
+.transport-destination select {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 10px;
+  border: 1px solid var(--transport-border);
+  border-radius: var(--transport-radius-sm);
+  background: var(--transport-surface);
+  color: var(--transport-text);
+  font-size: 13px;
+  outline: none;
+  -webkit-appearance: none;
+  -webkit-app-region: no-drag;
+}
+
+.transport-destination select:focus {
+  border-color: var(--transport-accent);
+}
+
+/* Editor Textarea */
+.transport-editor {
+  flex: 1;
+  min-height: 120px;
+  padding: 10px 12px;
+  border: 1px solid var(--transport-border);
+  border-radius: var(--transport-radius-sm);
+  background: var(--transport-surface);
+  color: var(--transport-text);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  resize: none;
+  outline: none;
+  -webkit-app-region: no-drag;
+}
+
+.transport-editor:focus {
+  border-color: var(--transport-accent);
+}
+
+.transport-editor::placeholder {
+  color: var(--transport-text-secondary);
+}
+
+/* Tag Chips */
+.transport-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.transport-tag-chip {
+  padding: 4px 10px;
+  border: 1px solid var(--transport-border);
+  border-radius: 100px;
+  background: transparent;
+  color: var(--transport-text);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  -webkit-app-region: no-drag;
+}
+
+.transport-tag-chip:hover {
+  background: var(--transport-surface);
+}
+
+.transport-tag-chip.selected {
+  border-color: var(--transport-accent);
+  background: color-mix(in srgb, var(--transport-accent) 15%, transparent);
+  color: var(--transport-accent);
+}
+
+.transport-tag-input {
+  padding: 4px 10px;
+  border: 1px dashed var(--transport-border);
+  border-radius: 100px;
+  background: transparent;
+  color: var(--transport-text);
+  font-size: 12px;
+  width: 80px;
+  outline: none;
+  transition: all 0.15s ease;
+  -webkit-app-region: no-drag;
+}
+
+.transport-tag-input:focus {
+  border-color: var(--transport-accent);
+  border-style: solid;
+  width: 120px;
+}
+
+.transport-tag-input::placeholder {
+  color: var(--transport-text-secondary);
+}
+
+/* Actions (Footer) */
+.transport-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.transport-btn {
+  padding: 7px 16px;
+  border: none;
+  border-radius: var(--transport-radius-sm);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  -webkit-app-region: no-drag;
+}
+
+.transport-btn-secondary {
+  background: var(--transport-surface);
+  color: var(--transport-text);
+  border: 1px solid var(--transport-border);
+}
+
+.transport-btn-secondary:hover {
+  background: var(--transport-border);
+}
+
+.transport-btn-primary {
+  background: var(--transport-accent);
+  color: white;
+}
+
+.transport-btn-primary:hover {
+  background: var(--transport-accent-hover);
+}
+
+.transport-btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Task Insert Button (inline) */
+.transport-task-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border: 1px solid var(--transport-border);
+  border-radius: var(--transport-radius-sm);
+  background: transparent;
+  color: var(--transport-text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  -webkit-app-region: no-drag;
+}
+
+.transport-task-btn:hover {
+  background: var(--transport-surface);
+  color: var(--transport-text);
+}
+
+/* Task Modal */
+.transport-task-modal {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(4px);
+  z-index: 100;
+}
+
+.transport-task-content {
+  background: var(--transport-bg);
+  border: 1px solid var(--transport-border);
+  border-radius: var(--transport-radius);
+  padding: 20px;
+  width: 320px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.transport-task-content h3 {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.transport-task-content input {
+  padding: 8px 10px;
+  border: 1px solid var(--transport-border);
+  border-radius: var(--transport-radius-sm);
+  background: var(--transport-surface);
+  color: var(--transport-text);
+  font-size: 13px;
+  outline: none;
+}
+
+.transport-task-content input:focus {
+  border-color: var(--transport-accent);
+}
+
+.transport-task-row {
+  display: flex;
+  gap: 8px;
+}
+
+.transport-task-row input {
+  flex: 1;
+}
+
+.transport-task-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+/* Toolbar row */
+.transport-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* Status Toast */
+.transport-status {
+  position: fixed;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 8px 16px;
+  border-radius: var(--transport-radius-sm);
+  font-size: 13px;
+  font-weight: 500;
+  z-index: 200;
+  animation: transport-toast-in 0.2s ease;
+}
+
+.transport-status.success {
+  background: #34c759;
+  color: white;
+}
+
+.transport-status.error {
+  background: #ff3b30;
+  color: white;
+}
+
+@keyframes transport-toast-in {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}

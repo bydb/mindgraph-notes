@@ -1364,6 +1364,21 @@ const translations = {
     'sidebar.dailyNote': 'Tägliche Notiz öffnen',
 
     'settings.agents.moreAgents': 'Weitere Automationen folgen (WhatsApp, Kalender, ...)',
+
+    // Transport (Quick Capture)
+    'settings.transport.title': 'Transport',
+    'settings.transport.description': 'Schnellerfassung von Notizen über die macOS-Menüleiste. Globaler Shortcut und Tray-Icon.',
+    'settings.transport.enabled': 'Transport aktiviert',
+    'settings.transport.shortcut': 'Tastenkürzel',
+    'settings.transport.destinations': 'Zielordner',
+    'settings.transport.destinationsHint': 'Ordner im Vault, in die Notizen transportiert werden können.',
+    'settings.transport.destLabelPlaceholder': 'Bezeichnung',
+    'settings.transport.destFolderPlaceholder': 'Ordner (z.B. 00 - Inbox)',
+    'settings.transport.defaultDestination': 'Standard-Zielordner',
+    'settings.transport.tags': 'Vordefinierte Tags',
+    'settings.transport.tagsHint': 'Tags die im Quick Capture zur Auswahl stehen. Klicke auf einen Tag um ihn zu entfernen.',
+    'settings.transport.tagPlaceholder': 'Neuer Tag',
+
     'agent.title': 'Veranstaltungen',
     'agent.import': 'Formular importieren',
     'agent.empty': 'Noch keine Veranstaltungen importiert',
@@ -2861,6 +2876,21 @@ const translations = {
     'sidebar.dailyNote': 'Open daily note',
 
     'settings.agents.moreAgents': 'More automation integrations coming soon (WhatsApp, Calendar, ...)',
+
+    // Transport (Quick Capture)
+    'settings.transport.title': 'Transport',
+    'settings.transport.description': 'Quick note capture via the macOS menu bar. Global shortcut and tray icon.',
+    'settings.transport.enabled': 'Transport enabled',
+    'settings.transport.shortcut': 'Keyboard shortcut',
+    'settings.transport.destinations': 'Destination folders',
+    'settings.transport.destinationsHint': 'Folders in the vault where notes can be transported to.',
+    'settings.transport.destLabelPlaceholder': 'Label',
+    'settings.transport.destFolderPlaceholder': 'Folder (e.g. 00 - Inbox)',
+    'settings.transport.defaultDestination': 'Default destination',
+    'settings.transport.tags': 'Predefined tags',
+    'settings.transport.tagsHint': 'Tags available for selection in Quick Capture. Click a tag to remove it.',
+    'settings.transport.tagPlaceholder': 'New tag',
+
     'agent.title': 'Events',
     'agent.import': 'Import form',
     'agent.empty': 'No events imported yet',

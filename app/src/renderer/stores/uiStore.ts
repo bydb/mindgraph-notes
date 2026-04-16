@@ -333,6 +333,19 @@ export interface DailyNoteSettings {
 // Legacy type alias for backward compatibility
 type OllamaSettings = LLMSettings
 
+export interface TransportDestination {
+  label: string
+  folder: string
+}
+
+export interface TransportSettings {
+  enabled: boolean
+  shortcut: string
+  destinations: TransportDestination[]
+  predefinedTags: string[]
+  defaultDestinationIndex: number
+}
+
 interface UIState {
   // Allgemein
   viewMode: ViewMode
@@ -519,6 +532,10 @@ interface UIState {
   setShowRawEditor: (show: boolean) => void
   setUserProfile: (profile: UserProfile) => void
   applyProfileDefaults: (profile: UserProfile) => void
+
+  // Transport (Quick Capture)
+  transport: TransportSettings
+  setTransport: (settings: Partial<TransportSettings>) => void
 }
 
 // Default-Werte für den Store
@@ -717,7 +734,18 @@ const defaultState = {
   showRawEditor: false,
 
   // User Profile
-  userProfile: null as UserProfile
+  userProfile: null as UserProfile,
+
+  // Transport (Quick Capture)
+  transport: {
+    enabled: true,
+    shortcut: 'CommandOrControl+Shift+N',
+    destinations: [
+      { label: 'Inbox', folder: '00 - Inbox' }
+    ],
+    predefinedTags: ['idee', 'todo', 'frage', 'wichtig'],
+    defaultDestinationIndex: 0
+  } as TransportSettings
 }
 
 // Felder die persistiert werden sollen (keine Funktionen, keine transienten Werte)
@@ -738,7 +766,8 @@ const persistedKeys = [
   'slashCommandDateFormat',
   'slashCommandTimeFormat',
   'showFormattingToolbar',
-  'showRawEditor'
+  'showRawEditor',
+  'transport'
 ] as const
 
 export const useUIStore = create<UIState>()((set, get) => ({
@@ -841,6 +870,9 @@ export const useUIStore = create<UIState>()((set, get) => ({
   setShowFormattingToolbar: (show) => set({ showFormattingToolbar: show }),
   setShowRawEditor: (show) => set({ showRawEditor: show }),
   setUserProfile: (profile) => set({ userProfile: profile }),
+  setTransport: (settings) => set((state) => ({
+    transport: { ...state.transport, ...settings }
+  })),
   applyProfileDefaults: (profile) => {
     if (!profile) return
     switch (profile) {

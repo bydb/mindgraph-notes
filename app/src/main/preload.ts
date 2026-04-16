@@ -427,5 +427,29 @@ contextBridge.exposeInMainWorld('electronAPI', {
   officeParsePptx: (filePath: string) =>
     ipcRenderer.invoke('office-parse-pptx', filePath),
   officeImportPptx: (vaultPath: string, sourcePath: string, targetFolder?: string) =>
-    ipcRenderer.invoke('office-import-pptx', vaultPath, sourcePath, targetFolder)
+    ipcRenderer.invoke('office-import-pptx', vaultPath, sourcePath, targetFolder),
+
+  // Transport (Quick Capture)
+  transportGetConfig: () =>
+    ipcRenderer.invoke('transport-get-config'),
+  transportListVaultSubdirs: () =>
+    ipcRenderer.invoke('transport-list-vault-subdirs'),
+  transportSaveNote: (data: { title: string; category: string; tags: string[]; content: string; destinationFolder: string }) =>
+    ipcRenderer.invoke('transport-save-note', data),
+  transportOpenInMain: (relativePath: string) =>
+    ipcRenderer.invoke('transport-open-in-main', relativePath),
+  transportClose: () =>
+    ipcRenderer.invoke('transport-close'),
+  onTransportNoteCreated: (callback: (data: { relativePath: string }) => void) => {
+    ipcRenderer.removeAllListeners('transport-note-created')
+    ipcRenderer.on('transport-note-created', (_event, data) => callback(data))
+  },
+  onTransportOpenNote: (callback: (relativePath: string) => void) => {
+    ipcRenderer.removeAllListeners('transport-open-note')
+    ipcRenderer.on('transport-open-note', (_event, relativePath) => callback(relativePath))
+  },
+  onTransportWindowShown: (callback: () => void) => {
+    ipcRenderer.removeAllListeners('transport-window-shown')
+    ipcRenderer.on('transport-window-shown', () => callback())
+  }
 })

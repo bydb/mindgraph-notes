@@ -365,6 +365,22 @@ const App: React.FC = () => {
     })
   }, [selectNote])
 
+  // Transport: Notiz öffnen wenn via Quick Capture erstellt
+  useEffect(() => {
+    window.electronAPI.onTransportOpenNote((relativePath: string) => {
+      // Kurz warten, damit der File Watcher die Datei erkennen kann
+      const trySelect = (retries = 0): void => {
+        const note = useNotesStore.getState().getNoteByPath(relativePath)
+        if (note) {
+          useNotesStore.getState().selectNote(note.id)
+        } else if (retries < 10) {
+          setTimeout(() => trySelect(retries + 1), 200)
+        }
+      }
+      trySelect()
+    })
+  }, [])
+
   // Tab-System: Bidirektionaler Sync zwischen Tabs und Notiz-Auswahl
   // Verwendet getState() um Loops zu vermeiden
   const syncTabsWithNotes = useCallback(() => {

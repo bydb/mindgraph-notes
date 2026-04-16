@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { useUIStore, ACCENT_COLORS, AI_LANGUAGES, FONT_FAMILIES, UI_LANGUAGES, BACKGROUND_COLORS, ICON_SETS, OUTLINE_STYLES, type Language, type FontFamily, type BackgroundColor, type IconSet, type OutlineStyle, type LLMBackend } from '../../stores/uiStore'
+import { useUIStore, ACCENT_COLORS, AI_LANGUAGES, FONT_FAMILIES, UI_LANGUAGES, BACKGROUND_COLORS, ICON_SETS, OUTLINE_STYLES, type Language, type FontFamily, type BackgroundColor, type IconSet, type OutlineStyle, type LLMBackend, type TransportSettings, type TransportDestination } from '../../stores/uiStore'
 import { useNotesStore, createNoteFromFile } from '../../stores/notesStore'
 import { useSyncStore } from '../../stores/syncStore'
 import { useVaultSettingsStore } from '../../stores/vaultSettingsStore'
@@ -19,7 +19,7 @@ interface SettingsProps {
   onClose: () => void
 }
 
-type Tab = 'vault' | 'general' | 'editor' | 'templates' | 'integrations' | 'shortcuts' | 'dataview' | 'sync' | 'dailyNote' | 'remarkable' | 'agents'
+type Tab = 'vault' | 'general' | 'editor' | 'templates' | 'integrations' | 'shortcuts' | 'dataview' | 'sync' | 'dailyNote' | 'remarkable' | 'agents' | 'transport'
 
 type BuiltInTemplateKey = 'empty' | 'dailyNote' | 'zettel' | 'meeting'
 
@@ -36,6 +36,176 @@ const BUILTIN_LABELS: Record<BuiltInTemplateKey, string> = {
   dailyNote: 'Daily Note',
   zettel: 'Zettel',
   meeting: 'Meeting'
+}
+
+// Transport-Settings Tab
+const TransportSettingsTab: React.FC<{ t: (key: string) => string }> = ({ t }) => {
+  const transport = useUIStore(state => state.transport)
+  const setTransport = useUIStore(state => state.setTransport)
+  const [newTag, setNewTag] = useState('')
+  const [newDestLabel, setNewDestLabel] = useState('')
+  const [newDestFolder, setNewDestFolder] = useState('')
+
+  const addDestination = (): void => {
+    if (!newDestLabel.trim() || !newDestFolder.trim()) return
+    const dest: TransportDestination = { label: newDestLabel.trim(), folder: newDestFolder.trim() }
+    setTransport({ destinations: [...transport.destinations, dest] })
+    setNewDestLabel('')
+    setNewDestFolder('')
+  }
+
+  const removeDestination = (index: number): void => {
+    const updated = transport.destinations.filter((_, i) => i !== index)
+    setTransport({ destinations: updated })
+  }
+
+  const addTag = (): void => {
+    if (!newTag.trim() || transport.predefinedTags.includes(newTag.trim())) return
+    setTransport({ predefinedTags: [...transport.predefinedTags, newTag.trim()] })
+    setNewTag('')
+  }
+
+  const removeTag = (tag: string): void => {
+    setTransport({ predefinedTags: transport.predefinedTags.filter(t => t !== tag) })
+  }
+
+  return (
+    <div className="settings-section">
+      <h3>{t('settings.transport.title')}</h3>
+      <p className="settings-hint">{t('settings.transport.description')}</p>
+
+      <div className="settings-row">
+        <label>{t('settings.transport.enabled')}</label>
+        <input
+          type="checkbox"
+          checked={transport.enabled}
+          onChange={e => setTransport({ enabled: e.target.checked })}
+        />
+      </div>
+
+      <div className="settings-row">
+        <label>{t('settings.transport.shortcut')}</label>
+        <input
+          type="text"
+          value={transport.shortcut}
+          onChange={e => setTransport({ shortcut: e.target.value })}
+          className="settings-input"
+          placeholder="CommandOrControl+Shift+N"
+          style={{ fontFamily: 'monospace', fontSize: '12px' }}
+        />
+      </div>
+
+      <div className="settings-divider" />
+
+      <h3>{t('settings.transport.destinations')}</h3>
+      <p className="settings-hint">{t('settings.transport.destinationsHint')}</p>
+
+      {transport.destinations.map((dest, i) => (
+        <div key={i} className="settings-row" style={{ gap: '8px' }}>
+          <span style={{ flex: 1 }}>
+            <strong>{dest.label}</strong> — <code style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{dest.folder}</code>
+          </span>
+          <button
+            className="settings-btn-danger"
+            onClick={() => removeDestination(i)}
+            style={{ padding: '2px 8px', fontSize: '12px' }}
+          >
+            ✕
+          </button>
+        </div>
+      ))}
+
+      <div className="settings-row" style={{ gap: '8px' }}>
+        <input
+          type="text"
+          value={newDestLabel}
+          onChange={e => setNewDestLabel(e.target.value)}
+          placeholder={t('settings.transport.destLabelPlaceholder')}
+          className="settings-input"
+          style={{ flex: 1 }}
+        />
+        <input
+          type="text"
+          value={newDestFolder}
+          onChange={e => setNewDestFolder(e.target.value)}
+          placeholder={t('settings.transport.destFolderPlaceholder')}
+          className="settings-input"
+          style={{ flex: 1 }}
+          onKeyDown={e => e.key === 'Enter' && addDestination()}
+        />
+        <button
+          className="settings-btn-primary"
+          onClick={addDestination}
+          disabled={!newDestLabel.trim() || !newDestFolder.trim()}
+          style={{ padding: '4px 12px', fontSize: '12px' }}
+        >
+          +
+        </button>
+      </div>
+
+      <div className="settings-row">
+        <label>{t('settings.transport.defaultDestination')}</label>
+        <select
+          value={transport.defaultDestinationIndex}
+          onChange={e => setTransport({ defaultDestinationIndex: parseInt(e.target.value) })}
+          className="settings-select"
+        >
+          {transport.destinations.map((dest, i) => (
+            <option key={i} value={i}>{dest.label}</option>
+          ))}
+        </select>
+      </div>
+
+      <div className="settings-divider" />
+
+      <h3>{t('settings.transport.tags')}</h3>
+      <p className="settings-hint">{t('settings.transport.tagsHint')}</p>
+
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '8px' }}>
+        {transport.predefinedTags.map(tag => (
+          <span
+            key={tag}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '4px',
+              padding: '3px 8px',
+              border: '1px solid var(--border-color)',
+              borderRadius: '100px',
+              fontSize: '12px',
+              cursor: 'pointer'
+            }}
+            onClick={() => removeTag(tag)}
+            title={`${tag} entfernen`}
+          >
+            {tag} <span style={{ opacity: 0.5 }}>✕</span>
+          </span>
+        ))}
+      </div>
+
+      <div className="settings-row" style={{ gap: '8px' }}>
+        <input
+          type="text"
+          value={newTag}
+          onChange={e => setNewTag(e.target.value)}
+          placeholder={t('settings.transport.tagPlaceholder')}
+          className="settings-input"
+          style={{ flex: 1 }}
+          onKeyDown={e => {
+            if (e.key === 'Enter') addTag()
+          }}
+        />
+        <button
+          className="settings-btn-primary"
+          onClick={addTag}
+          disabled={!newTag.trim()}
+          style={{ padding: '4px 12px', fontSize: '12px' }}
+        >
+          +
+        </button>
+      </div>
+    </div>
+  )
 }
 
 // Vault-Settings Tab als eigene Komponente (für korrekte Hook-Reaktivität)
@@ -852,6 +1022,15 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
                 <path d="M9 6v6M6 9h6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
               </svg>
               {t('settings.tab.agents')}
+            </button>
+            <button
+              className={`settings-nav-item ${activeTab === 'transport' ? 'active' : ''}`}
+              onClick={() => setActiveTab('transport')}
+            >
+              <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+                <path d="M3 9l6-6 6 6M9 3v12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+              Transport
             </button>
           </nav>
 
@@ -3643,6 +3822,11 @@ LIMIT 10
                 <div className="settings-divider" />
                 <p className="settings-hint">{t('settings.agents.moreAgents')}</p>
               </div>
+            )}
+
+            {/* Transport Tab */}
+            {activeTab === 'transport' && (
+              <TransportSettingsTab t={t} />
             )}
           </div>
         </div>
