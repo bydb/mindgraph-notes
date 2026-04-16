@@ -416,6 +416,23 @@ body {
   stroke: white;
 }
 
+/* Kategorie-Farben fuer Titlebar-Buttons (Hover + Active) */
+.view-mode-btn.cat-editor:hover { background-color: rgba(74, 158, 255, 0.12); }
+.view-mode-btn.cat-editor:hover svg { stroke: #4a9eff; }
+.view-mode-btn.cat-editor.active { background-color: #4a9eff; }
+
+.view-mode-btn.cat-ai:hover { background-color: rgba(168, 85, 247, 0.12); }
+.view-mode-btn.cat-ai:hover svg { stroke: #a855f7; }
+.view-mode-btn.cat-ai.active { background-color: #a855f7; }
+
+.view-mode-btn.cat-organize:hover { background-color: rgba(245, 158, 11, 0.12); }
+.view-mode-btn.cat-organize:hover svg { stroke: #f59e0b; }
+.view-mode-btn.cat-organize.active { background-color: #f59e0b; }
+
+.view-mode-btn.cat-integrate:hover { background-color: rgba(16, 185, 129, 0.12); }
+.view-mode-btn.cat-integrate:hover svg { stroke: #10b981; }
+.view-mode-btn.cat-integrate.active { background-color: #10b981; }
+
 /* Emoji in Buttons (Theme Toggle) */
 .view-mode-btn:has(svg:only-child),
 .view-mode-btn:not(:has(svg)) {

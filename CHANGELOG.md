@@ -2,6 +2,22 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.5.1-beta] - 2026-04-16
+
+### Features
+- **Interaktive Hilfeseite (Wissensgraph)** — Die Hilfe (⌘/) ist jetzt ein interaktiver Graph mit React Flow
+  - Features als Knoten, Verbindungen zeigen Zusammenhaenge
+  - Klick auf Knoten oeffnet Detail-Panel mit Beschreibung und Shortcuts
+  - Knoten sind draggbar, zoombar, mit Kategorie-Farbcodierung
+  - Ersetzt die bisherige statische "Erste Schritte"-Seite
+
+### Improvements
+- **Kategorie-Farben in der Titelleiste** — Titlebar-Buttons haben jetzt farbige Hover-Effekte die Feature-Gruppen visuell kennzeichnen
+  - 🔵 Blau: Editor/Einstellungen
+  - 🟣 Violett: KI-Features (Smart Connections, Notes Chat)
+  - 🟡 Amber: Organisation (Tasks, Tags, Flashcards)
+  - 🟢 Gruen: Integrationen (Email, Semantic Scholar, Terminal, edoobox)
+
 ## [0.5.0-beta] - 2026-04-16
 
 ### Features

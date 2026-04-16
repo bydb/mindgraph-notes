@@ -1,0 +1,333 @@
+/* ============ HELP GUIDE — GRAPH-BASED ============ */
+
+.help-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(12px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  animation: help-fade-in 0.2s ease;
+}
+
+@keyframes help-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.help-container {
+  width: 92%;
+  max-width: 1000px;
+  height: 80vh;
+  max-height: 700px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-xl, 16px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.4);
+  animation: help-slide-in 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes help-slide-in {
+  from { opacity: 0; transform: scale(0.95) translateY(16px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+/* ============ GRAPH WRAPPER ============ */
+.help-graph-wrapper {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  position: relative;
+}
+
+/* Header */
+.help-graph-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border-color);
+  flex-shrink: 0;
+}
+
+.help-graph-header h1 {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.help-graph-hint {
+  font-size: 12px;
+  color: var(--text-secondary);
+  flex: 1;
+}
+
+.help-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: none;
+  border-radius: var(--radius-sm, 6px);
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.help-close:hover {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
+/* Canvas area */
+.help-graph-canvas {
+  flex: 1;
+  position: relative;
+}
+
+.help-graph-canvas .react-flow__renderer {
+  border-radius: 0;
+}
+
+.help-graph-canvas .react-flow__controls {
+  bottom: 12px;
+  left: 12px;
+}
+
+.help-graph-canvas .react-flow__controls-button {
+  background: var(--bg-secondary);
+  border-color: var(--border-color);
+  color: var(--text-primary);
+  width: 26px;
+  height: 26px;
+}
+
+.help-graph-canvas .react-flow__controls-button:hover {
+  background: var(--bg-tertiary, var(--bg-secondary));
+}
+
+.help-graph-canvas .react-flow__controls-button svg {
+  fill: var(--text-primary);
+}
+
+/* ============ GRAPH NODES ============ */
+.help-graph-node {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 12px 8px;
+  background: var(--bg-primary);
+  border: 2px solid var(--border-color);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  user-select: none;
+  text-align: center;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.help-graph-node:hover {
+  border-color: var(--node-color);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px color-mix(in srgb, var(--node-color) 20%, transparent);
+}
+
+.help-graph-node.center {
+  border-width: 3px;
+  border-color: var(--node-color);
+  background: color-mix(in srgb, var(--node-color) 8%, var(--bg-primary));
+}
+
+.help-graph-node-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: color-mix(in srgb, currentColor 10%, transparent);
+}
+
+.center .help-graph-node-icon {
+  width: 42px;
+  height: 42px;
+}
+
+.help-graph-node-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-primary);
+  line-height: 1.2;
+  max-width: 100px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.center .help-graph-node-label {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.help-graph-node-kbd {
+  display: inline-flex;
+  padding: 1px 5px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 3px;
+  font-family: -apple-system, 'SF Mono', Menlo, monospace;
+  font-size: 9px;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
+/* ============ DETAIL PANEL ============ */
+.help-detail {
+  position: absolute;
+  right: 16px;
+  top: 70px;
+  width: 280px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+  overflow: hidden;
+  animation: help-detail-in 0.2s ease;
+  z-index: 10;
+}
+
+@keyframes help-detail-in {
+  from { opacity: 0; transform: translateX(8px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+.help-detail-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 16px;
+  border-bottom: 2px solid var(--border-color);
+}
+
+.help-detail-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: color-mix(in srgb, currentColor 10%, transparent);
+  flex-shrink: 0;
+}
+
+.help-detail-header h3 {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+  flex: 1;
+}
+
+.help-detail-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.help-detail-close:hover {
+  background: var(--bg-secondary);
+}
+
+.help-detail-list {
+  list-style: none;
+  padding: 12px 16px;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.help-detail-list li {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.45;
+  padding-left: 16px;
+  position: relative;
+}
+
+.help-detail-list li::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 7px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent-color);
+  opacity: 0.5;
+}
+
+/* Keyboard shortcut badge */
+.help-kbd {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 6px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  font-family: -apple-system, 'SF Mono', Menlo, monospace;
+  font-size: 11px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* ============ LEGEND ============ */
+.help-graph-legend {
+  position: absolute;
+  bottom: 12px;
+  right: 12px;
+  display: flex;
+  gap: 12px;
+  padding: 6px 12px;
+  background: color-mix(in srgb, var(--bg-primary) 90%, transparent);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  backdrop-filter: blur(8px);
+  z-index: 5;
+}
+
+.help-graph-legend span {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+/* React Flow overrides */
+.help-graph-canvas .react-flow__background {
+  opacity: 0.5;
+}
+
+.help-graph-canvas .react-flow__edge-path {
+  cursor: default;
+}

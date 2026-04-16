@@ -777,7 +777,7 @@ const App: React.FC = () => {
           <div className="titlebar-right">
             <div className="view-mode-switcher">
               <button
-                className="view-mode-btn"
+                className="view-mode-btn cat-editor"
                 onClick={() => setSettingsOpen(true)}
                 title={t('titlebar.settings')}
               >
@@ -787,7 +787,7 @@ const App: React.FC = () => {
                 </svg>
               </button>
               <button
-                className={`view-mode-btn overdue-btn ${overduePanelOpen ? 'active' : ''} ${taskStats.overdue > 0 ? 'has-overdue' : ''}`}
+                className={`view-mode-btn cat-organize overdue-btn ${overduePanelOpen ? 'active' : ''} ${taskStats.overdue > 0 ? 'has-overdue' : ''}`}
                 onClick={() => switchRightPanel('overdue')}
                 title={`${t('titlebar.overdue')} (${taskStats.overdue})`}
               >
@@ -800,7 +800,7 @@ const App: React.FC = () => {
                 )}
               </button>
               <button
-                className={`view-mode-btn ${tagsPanelOpen ? 'active' : ''}`}
+                className={`view-mode-btn cat-organize ${tagsPanelOpen ? 'active' : ''}`}
                 onClick={() => switchRightPanel('tags')}
                 title={t('titlebar.tags')}
               >
@@ -811,7 +811,7 @@ const App: React.FC = () => {
               </button>
               {smartConnectionsEnabled && (
                 <button
-                  className={`view-mode-btn ${smartConnectionsOpen ? 'active' : ''}`}
+                  className={`view-mode-btn cat-ai ${smartConnectionsOpen ? 'active' : ''}`}
                   onClick={() => switchRightPanel('smartConnections')}
                   title={t('titlebar.smartConnections')}
                 >
@@ -830,7 +830,7 @@ const App: React.FC = () => {
               )}
               {notesChatEnabled && (
                 <button
-                  className={`view-mode-btn ${notesChatOpen ? 'active' : ''}`}
+                  className={`view-mode-btn cat-ai ${notesChatOpen ? 'active' : ''}`}
                   onClick={() => switchRightPanel('notesChat')}
                   title={t('titlebar.notesChat')}
                 >
@@ -841,7 +841,7 @@ const App: React.FC = () => {
               )}
               {flashcardsEnabled && (
                 <button
-                  className={`view-mode-btn ${flashcardsPanelOpen ? 'active' : ''}`}
+                  className={`view-mode-btn cat-organize ${flashcardsPanelOpen ? 'active' : ''}`}
                   onClick={() => switchRightPanel('flashcards')}
                   title={t('titlebar.flashcards')}
                 >
@@ -854,7 +854,7 @@ const App: React.FC = () => {
               )}
               {emailEnabled && (
                 <button
-                  className={`view-mode-btn inbox-btn ${inboxPanelOpen ? 'active' : ''} ${unreadRelevantCount > 0 ? 'has-emails' : ''}`}
+                  className={`view-mode-btn cat-integrate inbox-btn ${inboxPanelOpen ? 'active' : ''} ${unreadRelevantCount > 0 ? 'has-emails' : ''}`}
                   onClick={() => switchRightPanel('inbox')}
                   title={t('titlebar.inbox')}
                 >
@@ -869,7 +869,7 @@ const App: React.FC = () => {
               )}
               {edooboxEnabled && (
                 <button
-                  className={`view-mode-btn ${agentPanelOpen ? 'active' : ''}`}
+                  className={`view-mode-btn cat-integrate ${agentPanelOpen ? 'active' : ''}`}
                   onClick={() => switchRightPanel('agent')}
                   title={t('titlebar.agents')}
                 >
@@ -883,7 +883,7 @@ const App: React.FC = () => {
               )}
               {semanticScholarEnabled && (
                 <button
-                  className={`view-mode-btn ${semanticScholarOpen ? 'active' : ''}`}
+                  className={`view-mode-btn cat-integrate ${semanticScholarOpen ? 'active' : ''}`}
                   onClick={() => switchRightPanel('semanticScholar')}
                   title={t('titlebar.semanticScholar')}
                 >
@@ -894,7 +894,7 @@ const App: React.FC = () => {
                 </button>
               )}
               <button
-                className={`view-mode-btn ${terminalVisible ? 'active' : ''}`}
+                className={`view-mode-btn cat-integrate ${terminalVisible ? 'active' : ''}`}
                 onClick={() => setTerminalVisible(!terminalVisible)}
                 title={t('titlebar.terminal')}
               >
