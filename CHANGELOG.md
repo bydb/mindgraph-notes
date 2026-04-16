@@ -2,6 +2,11 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.4.8-beta] - 2026-04-16
+
+### Improvements
+- **Vision-Modell-Erkennung erweitert** — Qwen 3.x und Gemma 4 werden jetzt als Vision-faehige Modelle erkannt und im Vision-OCR-Dropdown angezeigt (vorher nur llava, glm-ocr, qwen2.x)
+
 ## [0.4.7-beta] - 2026-04-16
 
 ### Features

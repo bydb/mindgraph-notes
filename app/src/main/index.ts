@@ -1888,7 +1888,7 @@ ipcMain.handle('vision-ocr-models', async () => {
     })
     if (!response.ok) return []
     const data = await response.json()
-    const visionPatterns = ['llava', 'minicpm', 'qwen2-vl', 'qwen2.5-vl', 'qwen2.5vl', 'pixtral', 'bakllava', 'moondream', 'cogvlm', 'phi3-vision', 'phi-3-vision', 'glm-ocr', 'olmocr', 'gemma3', 'internvl']
+    const visionPatterns = ['llava', 'minicpm', 'qwen2-vl', 'qwen2.5-vl', 'qwen2.5vl', 'qwen3', 'pixtral', 'bakllava', 'moondream', 'cogvlm', 'phi3-vision', 'phi-3-vision', 'glm-ocr', 'olmocr', 'gemma3', 'gemma4', 'internvl']
     return data.models?.filter((m: { name: string }) =>
       visionPatterns.some(p => m.name.toLowerCase().includes(p))
     ).map((m: { name: string; size: number }) => ({ name: m.name, size: m.size })) || []
