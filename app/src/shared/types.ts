@@ -814,8 +814,11 @@ export interface ElectronAPI {
   edooboxImportEvent: (baseUrl: string, apiVersion: string, event: EdooboxEvent) => Promise<{ success: boolean; offerId?: string; error?: string }>;
   edooboxLoadEvents: (vaultPath: string) => Promise<EdooboxEvent[]>;
   edooboxSaveEvents: (vaultPath: string, events: EdooboxEvent[]) => Promise<boolean>;
-  edooboxListOffersDashboard: (baseUrl: string, apiVersion: string) => Promise<{ success: boolean; offers?: EdooboxOfferDashboard[]; error?: string }>;
+  edooboxListOffersDashboard: (baseUrl: string, apiVersion: string, scope?: 'active' | 'past' | 'all') => Promise<{ success: boolean; offers?: EdooboxOfferDashboard[]; error?: string }>;
   edooboxListBookings: (baseUrl: string, apiVersion: string, offerId: string) => Promise<{ success: boolean; bookings?: EdooboxBooking[]; error?: string }>;
+
+  // IQ-Auswertung
+  iqGenerateReport: (data: IqReportData, suggestedFileName: string) => Promise<{ success: boolean; filePath?: string; canceled?: boolean; error?: string }>;
 
   // Marketing (WordPress)
   marketingSaveCredentials: (credentials: { wpAppPassword?: string }) => Promise<boolean>;
@@ -1032,6 +1035,7 @@ export interface EdooboxBooking {
   userEmail: string
   status: string
   bookedAt: string  // ISO
+  present?: boolean
 }
 
 export interface EdooboxOfferDashboard {
@@ -1053,6 +1057,24 @@ export interface EdooboxOfferDashboard {
 export interface EdooboxImportResult {
   event: EdooboxEvent
   warnings: string[]
+}
+
+export interface IqReportData {
+  title: string
+  dateStart?: string
+  dateEnd?: string
+  location?: string
+  laNr?: string
+  veranstaltungsNr?: string
+  countTotal: number
+  countTeachers: number
+  countPrincipals: number
+  checkFragebogen: boolean
+  checkZielscheibe: boolean
+  checkPositionieren: boolean
+  checkMuendlich: boolean
+  checkSonstiges: boolean
+  checkDokumentiert: boolean
 }
 
 // Docling Options for PDF conversion

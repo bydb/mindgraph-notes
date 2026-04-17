@@ -390,10 +390,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('edoobox-load-events', vaultPath),
   edooboxSaveEvents: (vaultPath: string, events: object[]) =>
     ipcRenderer.invoke('edoobox-save-events', vaultPath, events),
-  edooboxListOffersDashboard: (baseUrl: string, apiVersion: string) =>
-    ipcRenderer.invoke('edoobox-list-offers-dashboard', baseUrl, apiVersion),
+  edooboxListOffersDashboard: (baseUrl: string, apiVersion: string, scope?: 'active' | 'past' | 'all') =>
+    ipcRenderer.invoke('edoobox-list-offers-dashboard', baseUrl, apiVersion, scope),
   edooboxListBookings: (baseUrl: string, apiVersion: string, offerId: string) =>
     ipcRenderer.invoke('edoobox-list-bookings', baseUrl, apiVersion, offerId),
+
+  // IQ-Auswertung
+  iqGenerateReport: (data: object, suggestedFileName: string) =>
+    ipcRenderer.invoke('iq-generate-report', data, suggestedFileName),
 
   // Marketing (WordPress)
   marketingSaveCredentials: (credentials: { wpAppPassword?: string }) =>

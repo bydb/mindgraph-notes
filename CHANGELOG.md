@@ -2,6 +2,21 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.5.3-beta] - 2026-04-17
+
+### Features
+- **IQ-Auswertung (Hessen)** — Neuer Tab im Agenten-Panel zum Erstellen der offiziellen IQ-Rückmeldung als .docx
+  - Gebündelte Word-Vorlage (`iq-template.docx`) mit Platzhaltern und benannten FORMCHECKBOX-Formfields
+  - Prefill aus edoobox: Titel, Beginn/Ende, Ort, LA-Nr. (Prefix automatisch entfernt), Teilnehmerzahl
+  - Auswahl vergangener Veranstaltungen (Filter `date_end < heute`)
+  - Editierbares Formular mit Evaluations-Checkboxen und "Download .docx"
+  - Hessische Lehrkräfte werden automatisch mit der Gesamt-Teilnehmerzahl synchronisiert
+  - Veranstaltungsnummer und Beitrag pro Teilnehmer verwenden `/` als Standard
+
+### Improvements
+- **edoobox Dashboard-Scope** — `listOffersForDashboard` akzeptiert jetzt `scope: 'active' | 'past' | 'all'` (IQ-Tab nutzt `past`, Dashboard + Marketing weiterhin `active`)
+- **Präsenz-Feld auf Buchungen** — `EdooboxBooking.present?` kartiert `present` / `presence` / `attended` / `anwesend` Felder der Booking-Detail-API; rohe Feldnamen werden beim ersten Aufruf geloggt für spätere Auswertung
+
 ## [0.5.2-beta] - 2026-04-17
 
 ### Features

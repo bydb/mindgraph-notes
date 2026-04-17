@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { EdooboxEvent, EdooboxOffer, EdooboxCategory, EdooboxOfferDashboard, EdooboxBooking } from '../../shared/types'
+import type { EdooboxEvent, EdooboxOffer, EdooboxCategory, EdooboxOfferDashboard, EdooboxBooking, IqReportData } from '../../shared/types'
 import { useUIStore } from './uiStore'
 import { useNotesStore } from './notesStore'
 
@@ -17,9 +17,17 @@ interface AgentState {
   selectedEventId: string | null
 
   // Dashboard
-  dashboardView: 'events' | 'dashboard' | 'marketing'
+  dashboardView: 'events' | 'dashboard' | 'marketing' | 'iq'
   dashboardOffers: EdooboxOfferDashboard[]
   isDashboardLoading: boolean
+
+  // IQ-Auswertung
+  iqOffers: EdooboxOfferDashboard[]
+  isIqLoading: boolean
+  selectedIqOfferId: string | null
+  iqForm: Partial<IqReportData>
+  isGeneratingIq: boolean
+  iqLastFilePath: string | null
 
   // Marketing
   marketingOffers: EdooboxOfferDashboard[]
@@ -45,9 +53,15 @@ interface AgentState {
   deleteEvent: (eventId: string) => Promise<void>
 
   // Dashboard Actions
-  setDashboardView: (view: 'events' | 'dashboard' | 'marketing') => void
+  setDashboardView: (view: 'events' | 'dashboard' | 'marketing' | 'iq') => void
   loadDashboard: () => Promise<void>
   loadBookingsForOffer: (offerId: string) => Promise<void>
+
+  // IQ Actions
+  loadIqOffers: () => Promise<void>
+  selectIqOffer: (offerId: string | null) => void
+  updateIqForm: (patch: Partial<IqReportData>) => void
+  generateIqReport: () => Promise<void>
 
   // Marketing Actions
   setSelectedMarketingOfferId: (id: string | null) => void
@@ -76,6 +90,14 @@ export const useAgentStore = create<AgentState>()((set, get) => ({
   dashboardView: 'events',
   dashboardOffers: [],
   isDashboardLoading: false,
+
+  // IQ-Auswertung
+  iqOffers: [],
+  isIqLoading: false,
+  selectedIqOfferId: null,
+  iqForm: {},
+  isGeneratingIq: false,
+  iqLastFilePath: null,
 
   // Marketing
   marketingOffers: [],
@@ -386,6 +408,108 @@ export const useAgentStore = create<AgentState>()((set, get) => ({
       }
     } catch {
       set({ isGeneratingImage: false })
+    }
+  },
+
+  // IQ-Auswertung
+  loadIqOffers: async () => {
+    set({ isIqLoading: true })
+    try {
+      const { baseUrl, apiVersion } = useUIStore.getState().edoobox
+      const result = await window.electronAPI.edooboxListOffersDashboard(baseUrl, apiVersion, 'past')
+      if (result.success && result.offers) {
+        set({ iqOffers: result.offers, isIqLoading: false })
+      } else {
+        set({ isIqLoading: false })
+      }
+    } catch {
+      set({ isIqLoading: false })
+    }
+  },
+
+  selectIqOffer: (offerId) => {
+    if (!offerId) {
+      set({ selectedIqOfferId: null, iqForm: {}, iqLastFilePath: null })
+      return
+    }
+    const offer = get().iqOffers.find(o => o.id === offerId)
+    if (!offer) {
+      set({ selectedIqOfferId: offerId, iqForm: {}, iqLastFilePath: null })
+      return
+    }
+    const presentCount = offer.bookings.filter(b => b.present === true).length
+    const total = presentCount > 0 ? presentCount : offer.bookingCount
+    // edoobox liefert typ. "LA-Nr. 0261626301" — für IQ-Form nur die Nummer
+    const stripLaPrefix = (s: string) => s.replace(/^\s*LA[\s.-]*Nr\.?\s*/i, '').trim()
+    const initial: Partial<IqReportData> = {
+      title: offer.name,
+      dateStart: offer.dateStart,
+      dateEnd: offer.dateEnd,
+      location: offer.location || '',
+      laNr: stripLaPrefix(offer.number || ''),
+      veranstaltungsNr: '/',
+      countTotal: total,
+      countTeachers: total,
+      countPrincipals: 0,
+      checkFragebogen: true,
+      checkZielscheibe: false,
+      checkPositionieren: false,
+      checkMuendlich: false,
+      checkSonstiges: false,
+      checkDokumentiert: true
+    }
+    set({ selectedIqOfferId: offerId, iqForm: initial, iqLastFilePath: null })
+  },
+
+  updateIqForm: (patch) => {
+    set((state) => {
+      const next = { ...state.iqForm, ...patch }
+      // Hessen: Lehrkräfte sind immer = Gesamtteilnehmer
+      if (patch.countTotal !== undefined) {
+        next.countTeachers = patch.countTotal
+      }
+      return { iqForm: next }
+    })
+  },
+
+  generateIqReport: async () => {
+    const { iqForm, selectedIqOfferId, iqOffers } = get()
+    if (!selectedIqOfferId) return
+    const offer = iqOffers.find(o => o.id === selectedIqOfferId)
+    if (!offer) return
+
+    const countTotal = iqForm.countTotal ?? 0
+    const data: IqReportData = {
+      title: iqForm.title || offer.name,
+      dateStart: iqForm.dateStart,
+      dateEnd: iqForm.dateEnd,
+      location: iqForm.location || '',
+      laNr: iqForm.laNr || '',
+      veranstaltungsNr: iqForm.veranstaltungsNr || '/',
+      countTotal,
+      countTeachers: countTotal,
+      countPrincipals: iqForm.countPrincipals ?? 0,
+      checkFragebogen: iqForm.checkFragebogen ?? true,
+      checkZielscheibe: iqForm.checkZielscheibe ?? false,
+      checkPositionieren: iqForm.checkPositionieren ?? false,
+      checkMuendlich: iqForm.checkMuendlich ?? false,
+      checkSonstiges: iqForm.checkSonstiges ?? false,
+      checkDokumentiert: iqForm.checkDokumentiert ?? true
+    }
+
+    const safeName = (data.title || 'IQ-Auswertung').replace(/[/\\?%*:|"<>]/g, '-').slice(0, 80)
+    const suggested = `IQ-Auswertung-${safeName}.docx`
+
+    set({ isGeneratingIq: true })
+    try {
+      const result = await window.electronAPI.iqGenerateReport(data, suggested)
+      if (result.success && result.filePath) {
+        set({ isGeneratingIq: false, iqLastFilePath: result.filePath })
+      } else {
+        set({ isGeneratingIq: false })
+      }
+    } catch {
+      set({ isGeneratingIq: false })
     }
   }
 }))

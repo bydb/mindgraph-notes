@@ -724,6 +724,243 @@ const MarketingView: React.FC = () => {
   )
 }
 
+// ---- IQ-Auswertung View ----
+
+const IqOfferCard: React.FC<{ offer: EdooboxOfferDashboard; onSelect: () => void }> = ({ offer, onSelect }) => {
+  const formatDate = (iso: string) => {
+    const d = new Date(iso)
+    return d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })
+  }
+  return (
+    <button className="agent-marketing-card" onClick={onSelect}>
+      <div className="agent-marketing-card-body">
+        <div className="agent-marketing-card-title">{offer.name}</div>
+        <div className="agent-marketing-card-meta">
+          {offer.dateStart && <span>{formatDate(offer.dateStart)}</span>}
+          {offer.location && <span>{offer.location}</span>}
+          {offer.number && <span>LA-Nr. {offer.number}</span>}
+        </div>
+      </div>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="m9 18 6-6-6-6" />
+      </svg>
+    </button>
+  )
+}
+
+const IqReportDetail: React.FC<{ offer: EdooboxOfferDashboard; onBack: () => void }> = ({ offer, onBack }) => {
+  const { t } = useTranslation()
+  const { iqForm, updateIqForm, generateIqReport, isGeneratingIq, iqLastFilePath } = useAgentStore()
+
+  const toLocalDT = (iso?: string): string => {
+    if (!iso) return ''
+    const d = new Date(iso)
+    if (isNaN(d.getTime())) return ''
+    const pad = (n: number) => String(n).padStart(2, '0')
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+  }
+  const fromLocalDT = (v: string): string | undefined => {
+    if (!v) return undefined
+    const d = new Date(v)
+    return isNaN(d.getTime()) ? undefined : d.toISOString()
+  }
+
+  return (
+    <div className="agent-event-detail">
+      <button className="agent-back-btn" onClick={onBack}>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M19 12H5" /><path d="m12 19-7-7 7-7" />
+        </svg>
+        {t('agent.detail.back')}
+      </button>
+
+      <div className="agent-detail-header">
+        <h3>{offer.name}</h3>
+      </div>
+
+      <div className="agent-detail-section">
+        <label>{t('agent.iq.fieldTitle')}</label>
+        <input
+          className="agent-edit-input"
+          value={iqForm.title || ''}
+          onChange={e => updateIqForm({ title: e.target.value })}
+        />
+      </div>
+
+      <div className="agent-detail-section">
+        <label>{t('agent.iq.fieldStart')}</label>
+        <div className="agent-date-edit">
+          <input
+            type="datetime-local"
+            value={toLocalDT(iqForm.dateStart)}
+            onChange={e => updateIqForm({ dateStart: fromLocalDT(e.target.value) })}
+          />
+          <span>–</span>
+          <input
+            type="datetime-local"
+            value={toLocalDT(iqForm.dateEnd)}
+            onChange={e => updateIqForm({ dateEnd: fromLocalDT(e.target.value) })}
+          />
+        </div>
+      </div>
+
+      <div className="agent-detail-section">
+        <label>{t('agent.iq.fieldLocation')}</label>
+        <input
+          className="agent-edit-input"
+          value={iqForm.location || ''}
+          onChange={e => updateIqForm({ location: e.target.value })}
+        />
+      </div>
+
+      <div className="agent-detail-section">
+        <label>{t('agent.iq.fieldLaNr')}</label>
+        <input
+          className="agent-edit-input"
+          value={iqForm.laNr || ''}
+          onChange={e => updateIqForm({ laNr: e.target.value })}
+          placeholder="z.B. 0261694101"
+        />
+      </div>
+
+      <div className="agent-detail-section">
+        <label>{t('agent.iq.fieldVeranstaltungsNr')}</label>
+        <input
+          className="agent-edit-input"
+          value={iqForm.veranstaltungsNr || ''}
+          onChange={e => updateIqForm({ veranstaltungsNr: e.target.value })}
+          placeholder="optional"
+        />
+      </div>
+
+      <div className="agent-detail-section">
+        <label>{t('agent.iq.fieldCountTotal')}</label>
+        <input
+          className="agent-edit-input"
+          type="number"
+          min={0}
+          value={iqForm.countTotal ?? 0}
+          onChange={e => updateIqForm({ countTotal: parseInt(e.target.value, 10) || 0 })}
+        />
+        <div className="agent-iq-hint">{t('agent.iq.teachersNote')}</div>
+      </div>
+
+      <div className="agent-detail-section">
+        <label>{t('agent.iq.fieldCountPrincipals')}</label>
+        <input
+          className="agent-edit-input"
+          type="number"
+          min={0}
+          value={iqForm.countPrincipals ?? 0}
+          onChange={e => updateIqForm({ countPrincipals: parseInt(e.target.value, 10) || 0 })}
+        />
+      </div>
+
+      <div className="agent-detail-section">
+        <label>{t('agent.iq.evaluationInstruments')}</label>
+        <label className="agent-iq-checkbox">
+          <input type="checkbox" checked={iqForm.checkFragebogen ?? true} onChange={e => updateIqForm({ checkFragebogen: e.target.checked })} />
+          <span>{t('agent.iq.instrFragebogen')}</span>
+        </label>
+        <label className="agent-iq-checkbox">
+          <input type="checkbox" checked={iqForm.checkZielscheibe ?? false} onChange={e => updateIqForm({ checkZielscheibe: e.target.checked })} />
+          <span>{t('agent.iq.instrZielscheibe')}</span>
+        </label>
+        <label className="agent-iq-checkbox">
+          <input type="checkbox" checked={iqForm.checkPositionieren ?? false} onChange={e => updateIqForm({ checkPositionieren: e.target.checked })} />
+          <span>{t('agent.iq.instrPositionieren')}</span>
+        </label>
+        <label className="agent-iq-checkbox">
+          <input type="checkbox" checked={iqForm.checkMuendlich ?? false} onChange={e => updateIqForm({ checkMuendlich: e.target.checked })} />
+          <span>{t('agent.iq.instrMuendlich')}</span>
+        </label>
+        <label className="agent-iq-checkbox">
+          <input type="checkbox" checked={iqForm.checkSonstiges ?? false} onChange={e => updateIqForm({ checkSonstiges: e.target.checked })} />
+          <span>{t('agent.iq.instrSonstiges')}</span>
+        </label>
+      </div>
+
+      <div className="agent-detail-section">
+        <label className="agent-iq-checkbox">
+          <input type="checkbox" checked={iqForm.checkDokumentiert ?? true} onChange={e => updateIqForm({ checkDokumentiert: e.target.checked })} />
+          <span>{t('agent.iq.checkDokumentiert')}</span>
+        </label>
+      </div>
+
+      <div className="agent-detail-actions">
+        <button
+          className="agent-push-btn"
+          onClick={generateIqReport}
+          disabled={isGeneratingIq}
+        >
+          {isGeneratingIq ? t('agent.iq.generating') : t('agent.iq.download')}
+        </button>
+      </div>
+
+      {iqLastFilePath && (
+        <div className="agent-iq-success">
+          {t('agent.iq.saved')}: {iqLastFilePath}
+        </div>
+      )}
+    </div>
+  )
+}
+
+const IqView: React.FC = () => {
+  const { t } = useTranslation()
+  const { iqOffers, isIqLoading, loadIqOffers, selectedIqOfferId, selectIqOffer } = useAgentStore()
+
+  useEffect(() => {
+    loadIqOffers()
+  }, [loadIqOffers])
+
+  const selectedOffer = selectedIqOfferId ? iqOffers.find(o => o.id === selectedIqOfferId) : null
+
+  if (selectedOffer) {
+    return <IqReportDetail offer={selectedOffer} onBack={() => selectIqOffer(null)} />
+  }
+
+  return (
+    <div className="agent-marketing">
+      <div className="agent-marketing-header">
+        <span className="agent-marketing-header-title">{t('agent.iq.title')}</span>
+        <button
+          className="agent-dashboard-refresh"
+          onClick={loadIqOffers}
+          disabled={isIqLoading}
+          title={t('agent.dashboard.refresh')}
+        >
+          <svg
+            className={isIqLoading ? 'spinning' : ''}
+            width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+          >
+            <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+          </svg>
+        </button>
+      </div>
+
+      {isIqLoading && iqOffers.length === 0 ? (
+        <div className="agent-dashboard-empty">
+          <svg className="spinning" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+          </svg>
+          <p>{t('agent.dashboard.loading')}</p>
+        </div>
+      ) : iqOffers.length === 0 ? (
+        <div className="agent-dashboard-empty">
+          <p>{t('agent.iq.noOffers')}</p>
+        </div>
+      ) : (
+        <div className="agent-marketing-list">
+          {iqOffers.map(offer => (
+            <IqOfferCard key={offer.id} offer={offer} onSelect={() => selectIqOffer(offer.id)} />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ---- Main Panel ----
 
 export const AgentPanel: React.FC<AgentPanelProps> = ({ onClose }) => {
@@ -790,10 +1027,19 @@ export const AgentPanel: React.FC<AgentPanelProps> = ({ onClose }) => {
         >
           {t('agent.tab.marketing')}
         </button>
+        <button
+          className={`agent-tab ${dashboardView === 'iq' ? 'active' : ''}`}
+          onClick={() => setDashboardView('iq')}
+        >
+          {t('agent.tab.iq')}
+        </button>
       </div>
 
       <div className="agent-panel-content">
-        {dashboardView === 'events' ? <EventsView /> : dashboardView === 'dashboard' ? <DashboardView /> : <MarketingView />}
+        {dashboardView === 'events' ? <EventsView />
+          : dashboardView === 'dashboard' ? <DashboardView />
+          : dashboardView === 'marketing' ? <MarketingView />
+          : <IqView />}
       </div>
     </div>
   )

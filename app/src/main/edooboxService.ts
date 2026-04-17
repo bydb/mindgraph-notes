@@ -282,11 +282,16 @@ export class EdooboxService {
     }).filter(n => n.length > 0)
   }
 
-  async listOffersForDashboard(): Promise<EdooboxOfferDashboard[]> {
+  async listOffersForDashboard(scope: 'active' | 'past' | 'all' = 'active'): Promise<EdooboxOfferDashboard[]> {
+    const filter: Array<Record<string, unknown>> = [{ property: 'trash', value: false }]
+    if (scope === 'active') {
+      filter.push({ property: 'archive', value: false })
+    }
+
     const params = new URLSearchParams()
     params.set('fields', JSON.stringify(['name', 'number', 'count_booking', 'offer_places', 'user_maximum', 'date_start', 'date_end', 'status', 'ep_hash', 'leaders', 'description']))
-    params.set('filter', JSON.stringify([{ property: 'trash', value: false }, { property: 'archive', value: false }]))
-    params.set('limit', JSON.stringify({ start: 0, reply: 200 }))
+    params.set('filter', JSON.stringify(filter))
+    params.set('limit', JSON.stringify({ start: 0, reply: 500 }))
     params.set('order', JSON.stringify([{ property: 'id', value: 'DESC' }]))
     params.set('language', 'de')
 
@@ -294,7 +299,7 @@ export class EdooboxService {
     const items = data.data as Record<string, Record<string, unknown>> | unknown[] || {}
     const arr = Array.isArray(items) ? items : Object.values(items)
 
-    return arr.map(item => {
+    const offers = arr.map(item => {
       const r = item as Record<string, unknown>
       return {
         id: String(r.id || ''),
@@ -312,6 +317,19 @@ export class EdooboxService {
         bookings: []
       }
     }).filter(o => o.id)
+
+    if (scope === 'past') {
+      // Nur Veranstaltungen, deren End-Datum in der Vergangenheit liegt
+      const now = Date.now()
+      return offers.filter(o => {
+        const ref = o.dateEnd || o.dateStart
+        if (!ref) return false
+        const t = Date.parse(ref)
+        return !isNaN(t) && t < now
+      })
+    }
+
+    return offers
   }
 
   async listBookingsForOffer(offerId: string): Promise<EdooboxBooking[]> {
@@ -337,8 +355,18 @@ export class EdooboxService {
         const d = detail.data as Record<string, Record<string, unknown>> | undefined
         const bookingData = d ? (Object.values(d)[0] || {}) as Record<string, unknown> : {}
 
+        if (bookings.length === 0) {
+          console.log('[edoobox] Raw booking fields (first):', Object.keys(bookingData))
+        }
+
         const bookedAt = String(bookingData.time || '')
         const ownerId = String(bookingData.owner || '')
+
+        let present: boolean | undefined
+        const presenceField = (bookingData.present ?? bookingData.presence ?? bookingData.attended ?? bookingData.anwesend) as unknown
+        if (presenceField !== undefined && presenceField !== null) {
+          present = Boolean(presenceField) && presenceField !== '0' && presenceField !== 0
+        }
 
         // Fetch user details if not cached
         if (ownerId && !userCache.has(ownerId)) {
@@ -362,7 +390,8 @@ export class EdooboxService {
           userName: user.name,
           userEmail: user.email,
           status: bookingData.canceled ? 'canceled' : 'active',
-          bookedAt
+          bookedAt,
+          present
         })
       } catch (e) {
         console.warn('[edoobox] Could not fetch booking detail:', bookingId, e)

@@ -6448,7 +6448,7 @@ ipcMain.handle('edoobox-import-event', async (_event, baseUrl: string, apiVersio
 })
 
 // Dashboard: Angebote mit Buchungszahlen
-ipcMain.handle('edoobox-list-offers-dashboard', async (_event, baseUrl: string, apiVersion: string) => {
+ipcMain.handle('edoobox-list-offers-dashboard', async (_event, baseUrl: string, apiVersion: string, scope?: 'active' | 'past' | 'all') => {
   try {
     const credPath = getEdooboxCredentialsPath()
     const exists = await fs.access(credPath).then(() => true).catch(() => false)
@@ -6458,7 +6458,7 @@ ipcMain.handle('edoobox-list-offers-dashboard', async (_event, baseUrl: string, 
 
     const { EdooboxService } = await import('./edooboxService')
     const service = new EdooboxService(baseUrl, apiKey, apiSecret, apiVersion as 'v1' | 'v2')
-    const offers = await service.listOffersForDashboard()
+    const offers = await service.listOffersForDashboard(scope || 'active')
     return { success: true, offers }
   } catch (error) {
     console.error('[edoobox] List offers dashboard failed:', error)
@@ -6509,6 +6509,33 @@ ipcMain.handle('edoobox-save-events', async (_event, vaultPath: string, events: 
   } catch (error) {
     console.error('[edoobox] Save events failed:', error)
     return false
+  }
+})
+
+// ========================================
+// IQ-Auswertung (Hessen IQ Rückmeldung)
+// ========================================
+
+ipcMain.handle('iq-generate-report', async (_event, data: import('./iqReportService').IqReportData, suggestedFileName: string) => {
+  try {
+    if (!mainWindow) return { success: false, error: 'No main window' }
+
+    const result = await dialog.showSaveDialog(mainWindow, {
+      title: 'IQ-Auswertung speichern',
+      defaultPath: suggestedFileName,
+      filters: [{ name: 'Word-Dokument', extensions: ['docx'] }]
+    })
+
+    if (result.canceled || !result.filePath) {
+      return { success: false, canceled: true }
+    }
+
+    const { generateIqReport } = await import('./iqReportService')
+    await generateIqReport(data, result.filePath)
+    return { success: true, filePath: result.filePath }
+  } catch (error) {
+    console.error('[iq] Generate report failed:', error)
+    return { success: false, error: error instanceof Error ? error.message : 'IQ-Auswertung konnte nicht erstellt werden' }
   }
 })
 
