@@ -2,6 +2,22 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.5.2-beta] - 2026-04-17
+
+### Features
+- **Email-Anhaenge** — Dateien an Emails anhaengen (Bueroklammer-Button in der Compose-Toolbar)
+  - Mehrfachauswahl per nativem Datei-Dialog
+  - Anhaenge-Liste mit Dateiname, Groesse und Entfernen-Button
+  - Dateien werden als nodemailer-Attachments versendet
+- **LanguageTool im Email-Compose** — Rechtschreib- und Grammatikpruefung direkt in der Compose-Ansicht
+  - Stift-Button korrigiert alle Fehler sofort im Text (erster Vorschlag wird angewandt)
+  - Korrigierte Stellen werden gruen hervorgehoben (blendet nach 4s aus)
+  - Badge zeigt Anzahl der Korrekturen
+- **Email-Antwort mit Zitat** — Beim Antworten wird die Original-Email zitiert
+  - Zitat-Header mit Datum und Absender
+  - Jede Zeile mit `>` zitiert (Standard-Email-Format)
+  - Im HTML als gestylte Blockquotes mit grauer Linie
+
 ## [0.5.1-beta] - 2026-04-16
 
 ### Features

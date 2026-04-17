@@ -5735,6 +5735,29 @@ ipcMain.handle('email-load-signature-image', async (_event, imagePath: string) =
 })
 
 // Email per SMTP senden
+// Email: Anhaenge auswaehlen (Datei-Dialog)
+ipcMain.handle('email-select-attachments', async () => {
+  if (!mainWindow) return []
+  const result = await dialog.showOpenDialog(mainWindow, {
+    properties: ['openFile', 'multiSelections'],
+    title: 'Anhaenge auswaehlen'
+  })
+  if (result.canceled || result.filePaths.length === 0) return []
+
+  const attachments: { path: string; filename: string; size: number }[] = []
+  for (const filePath of result.filePaths) {
+    try {
+      const stat = await fs.stat(filePath)
+      attachments.push({
+        path: filePath,
+        filename: path.basename(filePath),
+        size: stat.size
+      })
+    } catch { /* Datei nicht lesbar, ueberspringen */ }
+  }
+  return attachments
+})
+
 ipcMain.handle('email-send', async (_event, composeData: {
   to: { name: string; address: string }[]
   cc?: { name: string; address: string }[]
@@ -5745,6 +5768,7 @@ ipcMain.handle('email-send', async (_event, composeData: {
   accountId: string
   account: { smtpHost: string; smtpPort: number; smtpTls: boolean; user: string; name?: string; fromAddress?: string }
   signatureImagePath?: string
+  attachments?: { path: string; filename: string }[]
 }) => {
   try {
     const nodemailer = await import('nodemailer')
@@ -5790,6 +5814,8 @@ ipcMain.handle('email-send', async (_event, composeData: {
     formatted = formatted.replace(/^• (.+)$/gm, '&bull; $1')
     // Horizontal rule: ——— → <hr>
     formatted = formatted.replace(/\n?———\n?/g, '<hr style="border:none;border-top:1px solid #ccc;margin:12px 0;">')
+    // Quoted lines: > text → styled blockquote
+    formatted = formatted.replace(/^&gt; (.+)$/gm, '<span style="color:#666;border-left:3px solid #ccc;padding-left:8px;display:block;margin:2px 0;">$1</span>')
     // Line breaks
     formatted = formatted.replace(/\n/g, '<br>')
     let htmlBody = `<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; font-size: 14px; color: #333;">`
@@ -5797,7 +5823,17 @@ ipcMain.handle('email-send', async (_event, composeData: {
     htmlBody += `</div>`
 
     // Signatur-Bild als CID-Attachment einbetten
-    const attachments: Array<{ filename: string; path: string; cid: string }> = []
+    const attachments: Array<{ filename: string; path: string; cid?: string }> = []
+
+    // File-Anhaenge hinzufuegen
+    if (composeData.attachments && composeData.attachments.length > 0) {
+      for (const att of composeData.attachments) {
+        try {
+          await fs.access(att.path)
+          attachments.push({ filename: att.filename, path: att.path })
+        } catch { /* Datei nicht gefunden, ueberspringen */ }
+      }
+    }
     if (composeData.signatureImagePath) {
       try {
         await fs.access(composeData.signatureImagePath)

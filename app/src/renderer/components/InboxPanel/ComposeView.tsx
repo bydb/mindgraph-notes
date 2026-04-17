@@ -4,11 +4,12 @@ import { useUIStore } from '../../stores/uiStore'
 import { useNotesStore } from '../../stores/notesStore'
 import { useContactStore } from '../../stores/contactStore'
 import { useTranslation } from '../../utils/translations'
+import type { ComposeAttachment } from '../../../shared/types'
 
 export const ComposeView: React.FC = () => {
   const { t } = useTranslation()
   const { composeState, setComposeState, sendEmail, isSending, setCurrentView } = useEmailStore()
-  const { email: emailSettings } = useUIStore()
+  const { email: emailSettings, languageTool: ltSettings } = useUIStore()
   const { vaultPath } = useNotesStore()
   const { searchContacts } = useContactStore()
 
@@ -18,6 +19,10 @@ export const ComposeView: React.FC = () => {
   const [sendStatus, setSendStatus] = useState<'idle' | 'success' | 'error'>('idle')
   const [errorMsg, setErrorMsg] = useState('')
   const [signatureImageUrl, setSignatureImageUrl] = useState<string | null>(null)
+  const [ltChecking, setLtChecking] = useState(false)
+  const [ltCorrectionCount, setLtCorrectionCount] = useState(0)
+  const [ltHighlights, setLtHighlights] = useState<{ offset: number; length: number }[]>([])
+  const ltCheckTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   // Signatur-Bild laden
   useEffect(() => {
@@ -168,6 +173,69 @@ export const ComposeView: React.FC = () => {
       textarea.setSelectionRange(start + cursorOffset, start + cursorOffset)
     }, 0)
   }, [setComposeState])
+
+  // LanguageTool: Text pruefen und direkt korrigieren
+  const checkAndCorrect = useCallback(async () => {
+    if (!composeState?.body.trim() || !ltSettings.enabled) return
+    setLtChecking(true)
+    setLtCorrectionCount(0)
+    try {
+      const result = await window.electronAPI.languagetoolAnalyze(
+        composeState.body,
+        ltSettings.language || 'auto',
+        ltSettings.mode,
+        ltSettings.url,
+        ltSettings.apiUsername,
+        ltSettings.apiKey
+      )
+      if (result.success && result.matches && result.matches.length > 0) {
+        // Korrekturen vorwaerts sammeln, dann rueckwaerts anwenden
+        let correctedText = composeState.body
+        const sorted = [...result.matches]
+          .filter((m: { replacements: { value: string }[] }) => m.replacements && m.replacements.length > 0)
+          .sort((a: { offset: number }, b: { offset: number }) => b.offset - a.offset)
+
+        // Positionen der Korrekturen im neuen Text tracken
+        const corrections: { offset: number; length: number }[] = []
+        let count = 0
+        for (const match of sorted) {
+          const replacement = match.replacements[0].value
+          correctedText =
+            correctedText.substring(0, match.offset) +
+            replacement +
+            correctedText.substring(match.offset + match.length)
+          corrections.push({ offset: match.offset, length: replacement.length })
+          count++
+        }
+
+        // Offsets korrigieren (vorwaerts berechnen fuer die Highlights)
+        // Da wir rueckwaerts angewandt haben, sind die Offsets im finalen Text verschoben
+        // Sortiere vorwaerts und berechne kumulative Verschiebung
+        const forwardSorted = [...result.matches]
+          .filter((m: { replacements: { value: string }[] }) => m.replacements && m.replacements.length > 0)
+          .sort((a: { offset: number }, b: { offset: number }) => a.offset - b.offset)
+        const highlights: { offset: number; length: number }[] = []
+        let shift = 0
+        for (const match of forwardSorted) {
+          const replacement = match.replacements[0].value
+          highlights.push({ offset: match.offset + shift, length: replacement.length })
+          shift += replacement.length - match.length
+        }
+
+        if (count > 0) {
+          setComposeState({ ...composeState, body: correctedText })
+          setLtCorrectionCount(count)
+          setLtHighlights(highlights)
+          // Highlights + Badge nach 4s ausblenden
+          setTimeout(() => {
+            setLtCorrectionCount(0)
+            setLtHighlights([])
+          }, 4000)
+        }
+      }
+    } catch { /* ignore */ }
+    setLtChecking(false)
+  }, [composeState, ltSettings, setComposeState])
 
   const handleSend = useCallback(async () => {
     if (!vaultPath || !composeState.to.length) return
@@ -349,14 +417,105 @@ export const ComposeView: React.FC = () => {
         >
           —
         </button>
+        <span style={{ flex: 1 }} />
+        {ltSettings.enabled && (
+          <button
+            type="button"
+            className={ltCorrectionCount > 0 ? 'lt-corrected' : ''}
+            data-tooltip={ltChecking ? t('inbox.compose.ltChecking') : t('inbox.compose.ltCheck')}
+            onMouseDown={e => { e.preventDefault(); checkAndCorrect() }}
+            disabled={ltChecking}
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
+            </svg>
+            {ltCorrectionCount > 0 && <span className="lt-corrected-badge">{ltCorrectionCount} korrigiert</span>}
+          </button>
+        )}
+        <button
+          type="button"
+          data-tooltip={t('inbox.compose.addAttachment')}
+          onMouseDown={async e => {
+            e.preventDefault()
+            const files: ComposeAttachment[] = await window.electronAPI.emailSelectAttachments()
+            if (files.length > 0 && composeState) {
+              setComposeState({
+                ...composeState,
+                attachments: [...(composeState.attachments || []), ...files]
+              })
+            }
+          }}
+        >
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
+          </svg>
+        </button>
       </div>
-      <textarea
-        ref={bodyRef}
-        className="inbox-compose-body"
-        value={composeState.body}
-        onChange={e => setComposeState({ ...composeState, body: e.target.value })}
-        placeholder={t('inbox.compose.body')}
-      />
+      <div className="inbox-compose-body-wrapper">
+        {/* Highlight-Overlay fuer LanguageTool Korrekturen */}
+        {ltHighlights.length > 0 && (
+          <div className="inbox-compose-lt-overlay" aria-hidden="true">
+            {(() => {
+              const text = composeState.body
+              const parts: React.ReactNode[] = []
+              let lastEnd = 0
+              const sorted = [...ltHighlights].sort((a, b) => a.offset - b.offset)
+              sorted.forEach((h, i) => {
+                if (h.offset > lastEnd) {
+                  parts.push(<span key={`t${i}`}>{text.substring(lastEnd, h.offset)}</span>)
+                }
+                parts.push(
+                  <mark key={`h${i}`} className="lt-correction-mark">
+                    {text.substring(h.offset, h.offset + h.length)}
+                  </mark>
+                )
+                lastEnd = h.offset + h.length
+              })
+              if (lastEnd < text.length) {
+                parts.push(<span key="end">{text.substring(lastEnd)}</span>)
+              }
+              return parts
+            })()}
+          </div>
+        )}
+        <textarea
+          ref={bodyRef}
+          className="inbox-compose-body"
+          value={composeState.body}
+          onChange={e => {
+            setComposeState({ ...composeState, body: e.target.value })
+            setLtHighlights([])
+          }}
+          placeholder={t('inbox.compose.body')}
+        />
+      </div>
+
+      {/* Anhaenge */}
+      {composeState.attachments && composeState.attachments.length > 0 && (
+        <div className="inbox-compose-attachments">
+          {composeState.attachments.map((att, i) => (
+            <div key={i} className="inbox-compose-attachment">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
+              </svg>
+              <span className="inbox-compose-attachment-name">{att.filename}</span>
+              <span className="inbox-compose-attachment-size">
+                {att.size < 1024 ? `${att.size} B` : att.size < 1048576 ? `${(att.size / 1024).toFixed(0)} KB` : `${(att.size / 1048576).toFixed(1)} MB`}
+              </span>
+              <button
+                className="inbox-compose-attachment-remove"
+                onClick={() => setComposeState({
+                  ...composeState,
+                  attachments: composeState.attachments!.filter((_, idx) => idx !== i)
+                })}
+                title={t('inbox.compose.removeAttachment')}
+              >
+                &times;
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Signatur-Bild Vorschau */}
       {signatureImageUrl && (

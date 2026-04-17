@@ -340,6 +340,7 @@ export const useEmailStore = create<EmailState>()((set, get) => ({
     try {
       const result = await window.electronAPI.emailSend({
         ...composeState,
+        attachments: composeState.attachments || [],
         account: {
           smtpHost: account.smtpHost,
           smtpPort: account.smtpPort,
@@ -381,11 +382,19 @@ export const useEmailStore = create<EmailState>()((set, get) => ({
     const { email: emailSettings } = useUIStore.getState()
     const account = emailSettings.accounts[0]
     const sig = emailSettings.signature ? `\n\n--\n${emailSettings.signature}` : ''
+
+    // Original-Email zitieren
+    const date = email.date ? new Date(email.date).toLocaleString() : ''
+    const sender = email.from.name ? `${email.from.name} <${email.from.address}>` : email.from.address
+    const quotedHeader = `\n\nAm ${date} schrieb ${sender}:\n`
+    const originalText = (email.bodyText || email.snippet || '').trim()
+    const quotedBody = originalText.split('\n').map(line => `> ${line}`).join('\n')
+
     set({
       composeState: {
         to: [{ name: email.from.name, address: email.from.address }],
         subject: email.subject.startsWith('Re:') ? email.subject : `Re: ${email.subject}`,
-        body: sig,
+        body: sig + quotedHeader + quotedBody,
         inReplyTo: email.id,
         references: email.id,
         accountId: account?.id || ''

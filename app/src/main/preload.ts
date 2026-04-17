@@ -341,6 +341,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('email-create-note', vaultPath, email, inboxFolderName),
   emailSend: (composeData: object) =>
     ipcRenderer.invoke('email-send', composeData),
+  emailSelectAttachments: () =>
+    ipcRenderer.invoke('email-select-attachments'),
   emailSelectSignatureImage: (vaultPath: string) =>
     ipcRenderer.invoke('email-select-signature-image', vaultPath),
   emailLoadSignatureImage: (imagePath: string) =>

@@ -928,6 +928,12 @@ export interface EmailAccount {
   smtpTls: boolean
 }
 
+export interface ComposeAttachment {
+  path: string
+  filename: string
+  size: number
+}
+
 export interface ComposeEmail {
   to: { name: string; address: string }[]
   cc?: { name: string; address: string }[]
@@ -936,6 +942,7 @@ export interface ComposeEmail {
   inReplyTo?: string
   references?: string
   accountId: string
+  attachments?: ComposeAttachment[]
 }
 
 export interface EmailSendResult {
