@@ -2,6 +2,11 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.5.4-beta] - 2026-04-17
+
+### Improvements
+- **IQ-Auswertung: Sortierung** — Vergangene Veranstaltungen werden jetzt nach Start-Datum absteigend sortiert (neueste zuerst) statt nach interner ID
+
 ## [0.5.3-beta] - 2026-04-17
 
 ### Features

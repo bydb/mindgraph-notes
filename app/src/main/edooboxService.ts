@@ -319,14 +319,20 @@ export class EdooboxService {
     }).filter(o => o.id)
 
     if (scope === 'past') {
-      // Nur Veranstaltungen, deren End-Datum in der Vergangenheit liegt
+      // Nur Veranstaltungen, deren End-Datum in der Vergangenheit liegt; neueste zuerst
       const now = Date.now()
-      return offers.filter(o => {
-        const ref = o.dateEnd || o.dateStart
-        if (!ref) return false
-        const t = Date.parse(ref)
-        return !isNaN(t) && t < now
-      })
+      return offers
+        .filter(o => {
+          const ref = o.dateEnd || o.dateStart
+          if (!ref) return false
+          const t = Date.parse(ref)
+          return !isNaN(t) && t < now
+        })
+        .sort((a, b) => {
+          const ta = Date.parse(a.dateStart || a.dateEnd || '') || 0
+          const tb = Date.parse(b.dateStart || b.dateEnd || '') || 0
+          return tb - ta
+        })
     }
 
     return offers
