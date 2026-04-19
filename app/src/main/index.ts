@@ -6100,24 +6100,57 @@ import EventKit
 import Foundation
 
 let store = EKEventStore()
-let sem = DispatchSemaphore(value: 0)
-var accessGranted = false
+
+// Prüfe aktuellen Autorisierungsstatus (read + write sind auf macOS 14+ getrennt)
+let rawStatus = EKEventStore.authorizationStatus(for: .event)
+var needsRequest = false
+var hasFullAccess = false
 
 if #available(macOS 14.0, *) {
-    store.requestFullAccessToEvents { granted, _ in
-        accessGranted = granted
-        sem.signal()
+    // Auf macOS 14+ gibt es .fullAccess, .writeOnly, .authorized (veraltet)
+    if rawStatus == .fullAccess {
+        hasFullAccess = true
+    } else if rawStatus.rawValue == 2 { // .authorized (legacy)
+        hasFullAccess = true
+    } else if rawStatus == .notDetermined {
+        needsRequest = true
+    } else if rawStatus == .writeOnly {
+        // Schreibzugriff vorhanden — reicht uns
+        hasFullAccess = true
+    } else {
+        // .denied oder .restricted
+        print("NO_ACCESS|||denied")
+        exit(0)
     }
 } else {
-    store.requestAccess(to: .event) { granted, _ in
-        accessGranted = granted
-        sem.signal()
+    if rawStatus.rawValue == 2 { // .authorized
+        hasFullAccess = true
+    } else if rawStatus == .notDetermined {
+        needsRequest = true
+    } else {
+        print("NO_ACCESS|||denied")
+        exit(0)
     }
 }
-sem.wait()
 
-guard accessGranted else {
-    print("NO_ACCESS")
+if needsRequest {
+    let sem = DispatchSemaphore(value: 0)
+    if #available(macOS 14.0, *) {
+        store.requestFullAccessToEvents { granted, _ in
+            hasFullAccess = granted
+            sem.signal()
+        }
+    } else {
+        store.requestAccess(to: .event) { granted, _ in
+            hasFullAccess = granted
+            sem.signal()
+        }
+    }
+    sem.wait()
+}
+
+guard hasFullAccess else {
+    print("NO_ACCESS|||denied")
     exit(0)
 }
 
@@ -6126,7 +6159,12 @@ event.title = "${safeTitle}"
 event.notes = "${safeNotes}"
 event.startDate = Date(timeIntervalSince1970: ${startEpoch})
 event.endDate = Date(timeIntervalSince1970: ${endEpoch})
-event.calendar = store.defaultCalendarForNewEvents
+
+guard let cal = store.defaultCalendarForNewEvents else {
+    print("ERR|||Kein Standard-Kalender verfügbar")
+    exit(0)
+}
+event.calendar = cal
 
 do {
     try store.save(event, span: .thisEvent)
@@ -6138,8 +6176,12 @@ do {
 
     const { stdout } = await execFileAsync('swift', ['-e', swiftCode], { timeout: 15000 })
     const result = stdout.trim()
-    if (result === 'NO_ACCESS') {
-      return { success: false, error: 'Kein Kalender-Zugriff gewährt' }
+    if (result.startsWith('NO_ACCESS')) {
+      return {
+        success: false,
+        error: 'Kein Kalender-Schreibzugriff. Systemeinstellungen → Datenschutz & Sicherheit → Kalender → MindGraph (oder „swift") aktivieren und App neu starten.',
+        needsPermission: true
+      }
     }
     if (result.startsWith('ERR|||')) {
       return { success: false, error: result.slice(6) }

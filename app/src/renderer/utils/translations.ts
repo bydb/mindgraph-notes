@@ -322,6 +322,7 @@ const translations = {
     'dashboard.focus.cancel': 'Abbrechen',
     'dashboard.focus.create': 'Im Kalender anlegen',
     'dashboard.focus.creating': 'Lege an…',
+    'dashboard.focus.openSettings': 'Systemeinstellungen öffnen',
 
     // Morning Briefing
     'briefing.title': 'Guten Morgen',
@@ -2156,6 +2157,7 @@ const translations = {
     'dashboard.focus.cancel': 'Cancel',
     'dashboard.focus.create': 'Create in calendar',
     'dashboard.focus.creating': 'Creating…',
+    'dashboard.focus.openSettings': 'Open System Settings',
 
     // Morning Briefing
     'briefing.title': 'Good morning',

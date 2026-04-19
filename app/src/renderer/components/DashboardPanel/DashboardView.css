@@ -601,3 +601,19 @@
   opacity: 0.5;
   cursor: not-allowed;
 }
+
+.dv-modal-permission-btn {
+  margin-top: 10px;
+  padding: 6px 12px;
+  background: transparent;
+  border: 1px solid var(--color-error, #e55);
+  color: var(--color-error, #e55);
+  border-radius: 5px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.dv-modal-permission-btn:hover {
+  background: var(--color-error, #e55);
+  color: white;
+}

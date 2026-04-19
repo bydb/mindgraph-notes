@@ -795,7 +795,7 @@ export interface ElectronAPI {
 
   // Apple Calendar (macOS)
   calendarGetEvents: (startDate: string, endDate: string) => Promise<{ success: boolean; events: CalendarEvent[]; error?: string }>;
-  calendarCreateEvent: (params: { title: string; startIso: string; durationMinutes: number; notes?: string }) => Promise<{ success: boolean; eventId?: string; error?: string }>;
+  calendarCreateEvent: (params: { title: string; startIso: string; durationMinutes: number; notes?: string }) => Promise<{ success: boolean; eventId?: string; error?: string; needsPermission?: boolean }>;
 
   // reMarkable (USB)
   remarkableUsbCheck: () => Promise<ReMarkableUsbCheckResult>;

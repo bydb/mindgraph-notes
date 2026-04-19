@@ -399,10 +399,12 @@ const TimeblockModal: React.FC<TimeblockModalProps> = ({ task, calendar, onClose
 
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [needsPermission, setNeedsPermission] = useState(false)
 
   const submit = async () => {
     setBusy(true)
     setError(null)
+    setNeedsPermission(false)
     const start = new Date(startInput)
     if (isNaN(start.getTime())) { setError(t('dashboard.focus.invalidStart')); setBusy(false); return }
     const res = await window.electronAPI.calendarCreateEvent({
@@ -415,8 +417,13 @@ const TimeblockModal: React.FC<TimeblockModalProps> = ({ task, calendar, onClose
       onCreated()
     } else {
       setError(res.error || 'Unbekannter Fehler')
+      setNeedsPermission(res.needsPermission === true)
       setBusy(false)
     }
+  }
+
+  const openSystemSettings = () => {
+    window.electronAPI.openExternal('x-apple.systempreferences:com.apple.preference.security?Privacy_Calendars')
   }
 
   return (
@@ -457,7 +464,20 @@ const TimeblockModal: React.FC<TimeblockModalProps> = ({ task, calendar, onClose
             </p>
           )}
 
-          {error && <p className="dv-modal-error">{error}</p>}
+          {error && (
+            <div className="dv-modal-error">
+              <p style={{ margin: 0 }}>{error}</p>
+              {needsPermission && (
+                <button
+                  type="button"
+                  className="dv-modal-permission-btn"
+                  onClick={openSystemSettings}
+                >
+                  {t('dashboard.focus.openSettings')}
+                </button>
+              )}
+            </div>
+          )}
         </div>
         <footer className="dv-modal-footer">
           <button className="dv-modal-btn-secondary" onClick={onClose} disabled={busy}>

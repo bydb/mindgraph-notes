@@ -2,6 +2,13 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.5.6-beta] - 2026-04-19
+
+### Fixes
+- **Kalender-Zugriff auf macOS 14+** — `NSCalendarsUsageDescription` + `NSCalendarsFullAccessUsageDescription` (und Reminders/AppleEvents) in `extendInfo` ergänzt. Ohne diese Strings zeigte macOS den Permission-Prompt stumm nicht an, die App erschien nicht in der Privacy-Liste — Dashboard-Kalender und Timeblocking blieben stumm. Nach dem Update erscheint beim ersten Kalender-Zugriff der Prompt, und MindGraph Notes taucht in Systemeinstellungen → Datenschutz → Kalender auf
+- **Timeblock-Handler**: Swift-Helper prüft jetzt `authorizationStatus` vor dem Request, unterscheidet sauber zwischen `fullAccess` / `writeOnly` / `notDetermined` / `denied`, gibt `needsPermission`-Flag zurück
+- **Timeblock-Modal** zeigt bei verweigertem Zugriff einen "Systemeinstellungen öffnen"-Button, der direkt zum Kalender-Privacy-Panel springt
+
 ## [0.5.5-beta] - 2026-04-19
 
 ### Features
