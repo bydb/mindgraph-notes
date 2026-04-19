@@ -795,6 +795,7 @@ export interface ElectronAPI {
 
   // Apple Calendar (macOS)
   calendarGetEvents: (startDate: string, endDate: string) => Promise<{ success: boolean; events: CalendarEvent[]; error?: string }>;
+  calendarCreateEvent: (params: { title: string; startIso: string; durationMinutes: number; notes?: string }) => Promise<{ success: boolean; eventId?: string; error?: string }>;
 
   // reMarkable (USB)
   remarkableUsbCheck: () => Promise<ReMarkableUsbCheckResult>;
@@ -839,6 +840,30 @@ export interface ElectronAPI {
   officeExportDocx: (markdownContent: string, suggestedName: string) => Promise<{ success: boolean; filePath?: string; canceled?: boolean; error?: string }>;
   officeParsePptx: (filePath: string) => Promise<{ success: boolean; data?: PowerPointData; error?: string }>;
   officeImportPptx: (vaultPath: string, sourcePath: string, targetFolder?: string) => Promise<{ success: boolean; relativePath?: string; error?: string }>;
+
+  // Vault Settings
+  loadVaultSettings: (vaultPath: string) => Promise<Record<string, unknown> | null>;
+  saveVaultSettings: (vaultPath: string, settings: object) => Promise<boolean>;
+
+  // Embeddings Cache
+  saveEmbeddingsCache: (vaultPath: string, model: string, cache: object) => Promise<boolean>;
+  loadEmbeddingsCache: (vaultPath: string, model: string) => Promise<object | null>;
+
+  // Update & External
+  downloadUpdate: () => Promise<{ success: boolean; error?: string }>;
+  openExternal: (url: string) => Promise<void>;
+
+  // Email attachments
+  emailSelectAttachments: () => Promise<ComposeAttachment[]>;
+
+  // Transport (Quick Capture)
+  transportGetConfig: () => Promise<{ vaultPath: string | null; transport: { destinations: { label: string; folder: string }[]; predefinedTags: string[]; defaultDestinationIndex: number } | null }>;
+  transportListVaultSubdirs: () => Promise<string[]>;
+  transportSaveNote: (data: { title: string; category: string; tags: string[]; content: string; destinationFolder: string }) => Promise<{ success: boolean; relativePath?: string; error?: string }>;
+  transportOpenInMain: (relativePath: string) => Promise<void>;
+  transportClose: () => Promise<void>;
+  onTransportOpenNote: (callback: (relativePath: string) => void) => void;
+  onTransportWindowShown: (callback: () => void) => void;
 }
 
 // Office-Formate

@@ -1,4 +1,4 @@
-import { EditorView, ViewPlugin, ViewUpdate, Decoration, DecorationSet, WidgetType } from '@codemirror/view'
+import { EditorView, Decoration, DecorationSet, WidgetType } from '@codemirror/view'
 import { EditorState, RangeSetBuilder, Facet, StateField, StateEffect } from '@codemirror/state'
 
 // Configuration facet for folding options

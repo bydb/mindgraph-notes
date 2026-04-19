@@ -11,7 +11,7 @@ interface IntentStepProps {
   onNext: () => void
 }
 
-const profiles: { id: Exclude<UserProfile, null>; icon: JSX.Element }[] = [
+const profiles: { id: Exclude<UserProfile, null>; icon: React.ReactNode }[] = [
   {
     id: 'student',
     icon: (
@@ -144,9 +144,10 @@ export const IntentStep: React.FC<IntentStepProps> = ({
   return (
     <div className="onboarding-step">
       <div className="onboarding-step-header">
-        <span className="onboarding-step-indicator">{t('onboarding.step', { current: '1', total: '3' })}</span>
+        <span className="onboarding-step-indicator">{t('onboarding.step', { current: '1', total: '4' })}</span>
         <div className="onboarding-progress">
           <div className="onboarding-progress-dot active" />
+          <div className="onboarding-progress-dot" />
           <div className="onboarding-progress-dot" />
           <div className="onboarding-progress-dot" />
         </div>

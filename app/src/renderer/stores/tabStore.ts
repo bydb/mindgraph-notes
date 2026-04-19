@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 
-export type TabType = 'editor' | 'canvas' | 'global-canvas'
+export type TabType = 'editor' | 'canvas' | 'global-canvas' | 'dashboard'
 
 export interface Tab {
   id: string
@@ -25,6 +25,7 @@ interface TabState {
   openEditorTab: (noteId: string, title: string) => void
   openCanvasTab: (rootNoteId: string, title: string) => void
   openGlobalCanvasTab: () => void
+  openDashboardTab: () => void
   closeTab: (tabId: string) => void
   setActiveTab: (tabId: string) => void
 
@@ -125,6 +126,28 @@ export const useTabStore = create<TabState>()((set, get) => ({
       type: 'global-canvas',
       noteId: '',  // Not used for global canvas
       title: 'Alle Notizen'
+    }
+
+    set({
+      tabs: [...state.tabs, newTab],
+      activeTabId: newTab.id
+    })
+  },
+
+  openDashboardTab: () => {
+    const state = get()
+
+    const existingTab = state.tabs.find(t => t.type === 'dashboard')
+    if (existingTab) {
+      set({ activeTabId: existingTab.id })
+      return
+    }
+
+    const newTab: Tab = {
+      id: generateTabId(),
+      type: 'dashboard',
+      noteId: '',
+      title: 'Dashboard'
     }
 
     set({

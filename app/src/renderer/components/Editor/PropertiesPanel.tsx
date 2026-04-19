@@ -363,9 +363,6 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
   const handleFieldChange = useCallback((key: string, value: unknown) => {
     const newFrontmatter = { ...frontmatter }
 
-    // Find the original key (preserve casing)
-    const originalKey = originalKeys.find(k => k.toLowerCase() === key.toLowerCase()) || key
-
     // Update with original casing
     const updatedFrontmatter: NoteFrontmatter = {}
     for (const origKey of originalKeys) {
@@ -432,7 +429,7 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
     <div className={`properties-panel ${collapsed ? 'collapsed' : ''}`}>
       <div className="properties-header" onClick={onToggleCollapsed}>
         <span className="properties-toggle">{collapsed ? '▶' : '▼'}</span>
-        <span className="properties-title">{t('properties', 'Properties')}</span>
+        <span className="properties-title">{t('properties')}</span>
         {hasProperties && <span className="properties-count">{Object.keys(frontmatter).length}</span>}
       </div>
 
@@ -457,7 +454,7 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                 <button
                   className="properties-remove"
                   onClick={() => handleRemoveField(key)}
-                  title={t('removeProperty', 'Remove property')}
+                  title={t('removeProperty')}
                 >
                   ×
                 </button>
@@ -471,7 +468,7 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                 type="text"
                 value={newFieldKey}
                 onChange={(e) => setNewFieldKey(e.target.value)}
-                placeholder={t('propertyName', 'Property name')}
+                placeholder={t('propertyName')}
                 className="properties-input"
                 autoFocus
                 onKeyDown={(e) => {
@@ -490,10 +487,10 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                 <option value="date">Date</option>
               </select>
               <button onClick={handleAddField} className="properties-btn-add">
-                {t('add', 'Add')}
+                {t('add')}
               </button>
               <button onClick={() => setIsAddingField(false)} className="properties-btn-cancel">
-                {t('cancel', 'Cancel')}
+                {t('cancel')}
               </button>
             </div>
           ) : (
@@ -501,7 +498,7 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
               className="properties-add-btn"
               onClick={() => setIsAddingField(true)}
             >
-              + {t('addProperty', 'Add property')}
+              + {t('addProperty')}
             </button>
           )}
         </div>
@@ -538,10 +535,10 @@ function rebuildFrontmatterWithOriginalKeys(
  */
 function replaceFrontmatterPreservingKeys(
   content: string,
-  currentFrontmatter: NoteFrontmatter,
+  _currentFrontmatter: NoteFrontmatter,
   changedKey: string,
   newValue: unknown,
-  originalKeys: string[]
+  _originalKeys: string[]
 ): string {
   const frontmatterRegex = /^---\s*\n([\s\S]*?)\n---/
   const match = content.match(frontmatterRegex)
@@ -559,7 +556,6 @@ function replaceFrontmatterPreservingKeys(
   const newLines: string[] = []
   let found = false
   let skipDashLines = false
-  let currentKeyForSkipping = ''
 
   for (let i = 0; i < yamlLines.length; i++) {
     const line = yamlLines[i]
@@ -570,7 +566,6 @@ function replaceFrontmatterPreservingKeys(
         continue // Skip this dash line, it belongs to the key we're replacing
       } else {
         skipDashLines = false // End of block array
-        currentKeyForSkipping = ''
       }
     }
 
@@ -592,7 +587,6 @@ function replaceFrontmatterPreservingKeys(
         // Skip any following dash lines (whether original was block or inline format)
         // Also skip if there was an inline array - the next lines might be orphaned dashes
         skipDashLines = true
-        currentKeyForSkipping = lineKey.toLowerCase()
         // Check if next line is a dash line OR if current line had inline array
         const valueAfterColon = keyMatch[2].trim()
         if (valueAfterColon && !valueAfterColon.startsWith('[')) {

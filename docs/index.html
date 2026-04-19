@@ -4,8 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="google-site-verification" content="XuIkFK3V33YXi92ZBbb1AsgrCejIxVlfMPM_Zj0Ny3o">
-  <title>MindGraph Notes - Notizen, Email, Karteikarten &amp; KI</title>
-  <meta name="description" content="Kostenlose Desktop-App: Markdown-Notizen, KI-Email-Client, Karteikarten mit Spaced Repetition, Wissensgraph und integriertes Terminal. Lokal, Open Source, E2E-verschl&uuml;sselt.">
+  <title>MindGraph Notes - Dashboard, Notizen, Email &amp; KI</title>
+  <meta name="description" content="Kostenlose Desktop-App mit t&auml;glichem Dashboard, Markdown-Notizen, KI-Email-Client, Wissensgraph und Karteikarten. Lokal, Open Source, E2E-verschl&uuml;sselt. Module aktivierst du nach Bedarf.">
   <link rel="icon" href="favicon.ico" sizes="48x48">
   <link rel="icon" type="image/png" sizes="48x48" href="favicon-48x48.png">
   <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
@@ -19,8 +19,8 @@
 
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://mindgraph-notes.de/">
-  <meta property="og:title" content="MindGraph Notes - Notizen, Email, Karteikarten &amp; KI">
-  <meta property="og:description" content="Kostenlose Desktop-App: Markdown-Notizen, KI-Email-Client, Karteikarten mit Spaced Repetition, Wissensgraph und integriertes Terminal. Lokal, Open Source.">
+  <meta property="og:title" content="MindGraph Notes - Dashboard, Notizen, Email &amp; KI">
+  <meta property="og:description" content="Desktop-App mit t&auml;glichem Dashboard, Markdown-Notizen, KI-Email-Client und Wissensgraph. Lokal, Open Source, E2E-verschl&uuml;sselt. Module nach Bedarf aktivierbar.">
   <meta property="og:image" content="https://mindgraph-notes.de/screenshot.png">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
@@ -29,8 +29,8 @@
   <meta property="og:site_name" content="MindGraph Notes">
 
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="MindGraph Notes - Notizen, Email, Karteikarten &amp; KI">
-  <meta name="twitter:description" content="Kostenlose Desktop-App: Markdown-Notizen, KI-Email-Client, Karteikarten mit Spaced Repetition, Wissensgraph und integriertes Terminal. Lokal, Open Source.">
+  <meta name="twitter:title" content="MindGraph Notes - Dashboard, Notizen, Email &amp; KI">
+  <meta name="twitter:description" content="Desktop-App mit t&auml;glichem Dashboard, Markdown-Notizen, KI-Email-Client und Wissensgraph. Lokal, Open Source, E2E-verschl&uuml;sselt.">
   <meta name="twitter:image" content="https://mindgraph-notes.de/screenshot.png">
 
   <script type="application/ld+json">
@@ -41,24 +41,24 @@
     "applicationCategory": "ProductivityApplication",
     "operatingSystem": "macOS, Windows, Linux",
     "offers": { "@type": "Offer", "price": "0", "priceCurrency": "EUR" },
-    "description": "Desktop-App mit Markdown-Notizen, KI-Email-Client, Karteikarten (SM-2), Wissensgraph, integriertem Terminal und E2E-verschluesseltem Sync.",
+    "description": "Desktop-App mit taeglichem Dashboard, Morning Briefing, Markdown-Notizen, KI-Email-Client, Wissensgraph, Karteikarten und E2E-verschluesseltem Sync. Module nach Bedarf aktivierbar.",
     "url": "https://mindgraph-notes.de/",
     "downloadUrl": "https://github.com/bydb/mindgraph-notes/releases",
     "screenshot": "https://mindgraph-notes.de/screenshot.png",
-    "softwareVersion": "0.5.4-beta",
+    "softwareVersion": "0.5.5-beta",
     "author": { "@type": "Person", "name": "Jochen Leeder", "url": "https://bydb.io" },
     "license": "https://opensource.org/licenses/AGPL-3.0",
     "featureList": [
+      "Dashboard mit Tagesueberblick und Morning Briefing",
+      "Markdown Editor mit Live Preview und Wissensgraph",
       "KI-Email-Client mit Kalender-Integration",
       "Karteikarten mit Spaced Repetition (SM-2)",
-      "Wissensgraph / Knowledge Graph mit KI-Clustering",
-      "Integriertes Terminal (OpenCode, Claude Code, Ollama)",
-      "E2E-verschluesselter Sync",
-      "Markdown Editor mit Live Preview",
+      "E2E-verschluesselter Sync (AES-256-GCM)",
+      "Modular aktivierbare Plugins statt Feature-Ueberladung",
+      "Lokale KI (Ollama, LM Studio) ohne Cloud-Zwang",
       "Zotero, Semantic Scholar, Readwise, reMarkable",
       "PDF Companion mit Docling OCR",
-      "Dataview Queries",
-      "100% Lokale Daten"
+      "100% lokale Daten, keine Telemetrie"
     ]
   }
   </script>
@@ -247,6 +247,37 @@
     .cap-card.featured .cap-features li:last-child { border: none; }
     .cap-check { color: var(--accent); flex-shrink: 0; }
 
+    /* --- Vergleich --- */
+    .compare { padding: 5rem 2rem; max-width: 1100px; margin: 0 auto; }
+    .compare-header { text-align: center; margin-bottom: 3rem; display: flex; flex-direction: column; align-items: center; }
+    .compare-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.25rem;
+    }
+    .compare-card {
+      background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
+      padding: 1.75rem; backdrop-filter: blur(10px);
+    }
+    .compare-card h3 {
+      font-family: var(--font-display); font-size: 1.3rem; font-weight: 400;
+      margin-bottom: 0.75rem; color: var(--text);
+    }
+    .compare-card p { color: var(--text-mid); font-size: 0.95rem; line-height: 1.55; }
+    .compare-card strong { color: var(--text); font-weight: 600; }
+    .compare-card.accent { border-color: rgba(196,118,74,0.3); background: linear-gradient(135deg, rgba(196,118,74,0.06), transparent); }
+
+    /* --- Modules strip --- */
+    .modules-strip { padding: 3rem 2rem 4rem; max-width: 1100px; margin: 0 auto; }
+    .modules-strip-label { text-align: center; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-muted); margin-bottom: 1.5rem; }
+    .modules-chips { display: flex; flex-wrap: wrap; gap: 0.5rem; justify-content: center; max-width: 900px; margin: 0 auto; }
+    .module-chip {
+      display: inline-flex; align-items: center; gap: 0.5rem;
+      padding: 0.5rem 0.9rem; background: var(--card); border: 1px solid var(--border);
+      border-radius: 100px; font-size: 0.82rem; color: var(--text-mid); font-weight: 500;
+    }
+    .module-chip .chip-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); opacity: 0.7; }
+    .module-chip.core { border-color: rgba(196,118,74,0.35); background: rgba(196,118,74,0.06); color: var(--accent); font-weight: 600; }
+    .module-chip.core .chip-dot { background: var(--accent); opacity: 1; }
+
     /* --- Download --- */
     .download {
       padding: 5rem 2rem; max-width: 700px; margin: 0 auto; text-align: center;
@@ -345,6 +376,7 @@
     </div>
     <div class="nav-right">
       <a href="#features" data-i18n="nav.features">Features</a>
+      <a href="#why" data-i18n="nav.why">Warum</a>
       <a href="#download" data-i18n="nav.download">Download</a>
       <a href="./blog/" data-i18n="nav.blog">Blog</a>
       <a href="https://discord.gg/XqayAQdE" target="_blank" rel="noopener noreferrer">Discord</a>
@@ -363,10 +395,10 @@
       <span data-i18n="hero.badge">Open Source &middot; Lokal &middot; Kostenlos</span>
     </div>
 
-    <h1 data-i18n="hero.title">Notizen, Emails &amp; Lernen &ndash;<br><em>eine App, dein Kontext.</em></h1>
+    <h1 data-i18n="hero.title">Dein Tag im Blick.<br><em>Dein Wissen verbunden.</em></h1>
 
     <p class="hero-sub" data-i18n="hero.sub">
-      Markdown-Editor, KI-Email-Client, Karteikarten mit Spaced Repetition, Wissensgraph und integriertes Terminal. Alles lokal, alles verbunden.
+      MindGraph Notes startet mit einem t&auml;glichen Dashboard: Aufgaben, Emails, Termine, Anmeldungen &ndash; alles an einer Stelle. Darunter liegt ein vollst&auml;ndiger Markdown-Editor mit Wissensgraph. KI-Module, Email-Client und Lernen aktivierst du nach Bedarf.
     </p>
 
     <div class="hero-cta">
@@ -381,7 +413,7 @@
     </div>
 
     <div class="hero-screenshot">
-      <img src="screenshot.png" alt="MindGraph Notes" loading="lazy">
+      <img src="app-mockup.svg" alt="MindGraph Notes Dashboard mit Aufgaben, Emails und Kalender" loading="lazy">
     </div>
   </section>
 
@@ -389,61 +421,74 @@
   <section class="capabilities" id="features">
     <div class="capabilities-header">
       <div class="section-label" data-i18n="cap.label">Was MindGraph Notes kann</div>
-      <h2 class="section-heading" data-i18n="cap.heading">Sechs Werkzeuge,<br>ein Wissenssystem.</h2>
-      <p class="section-sub" data-i18n="cap.sub">Aktiviere nur, was du brauchst. Jedes Modul arbeitet eigenstaendig &ndash; zusammen entfalten sie ihr volles Potenzial.</p>
+      <h2 class="section-heading" data-i18n="cap.heading">Schlanker Kern,<br>Module nach Bedarf.</h2>
+      <p class="section-sub" data-i18n="cap.sub">Dashboard, Editor und Wissensgraph sind immer dabei. Alles andere &ndash; Email, Lernen, KI, Ger&auml;te &ndash; schaltest du pro Modul an, wenn du es brauchst.</p>
     </div>
 
     <div class="cap-grid">
-      <!-- Smart Notes -->
+      <!-- Dashboard (featured/neu) -->
       <div class="cap-card featured fade-in">
         <div class="cap-inner">
           <div>
-            <div class="cap-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg></div>
-            <h3 data-i18n="cap.notes.title">Smart Notes</h3>
-            <p data-i18n="cap.notes.desc">Markdown-Editor mit Live Preview, Wikilinks, Backlinks, Canvas-Ansicht mit KI-Clustering, Dataview-Abfragen und Slash Commands. Obsidian-kompatibel.</p>
+            <div class="cap-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></div>
+            <h3 data-i18n="cap.dashboard.title">Dashboard &amp; Morning Briefing</h3>
+            <p data-i18n="cap.dashboard.desc">Der Tab, den du morgens &ouml;ffnest. &Uuml;berf&auml;llige Aufgaben, Emails die Antwort erwarten, heutige Termine und neue Anmeldungen &ndash; auf einen Blick. Einmal am Tag erscheint automatisch ein kurzes Briefing.</p>
             <div class="cap-tags">
-              <span class="cap-tag">Markdown</span>
-              <span class="cap-tag">Wikilinks</span>
-              <span class="cap-tag">Canvas</span>
-              <span class="cap-tag">LaTeX</span>
-              <span class="cap-tag">Mermaid</span>
-              <span class="cap-tag">Dataview</span>
+              <span class="cap-tag">Widgets</span>
+              <span class="cap-tag">Briefing</span>
+              <span class="cap-tag">Kalender</span>
+              <span class="cap-tag">Fokus</span>
             </div>
           </div>
           <ul class="cap-features">
-            <li><span class="cap-check">&#10003;</span> <span data-i18n="cap.notes.f1">Live Preview mit Syntax-Highlighting</span></li>
-            <li><span class="cap-check">&#10003;</span> <span data-i18n="cap.notes.f2">Canvas mit KI-gestuetzter Anordnung</span></li>
-            <li><span class="cap-check">&#10003;</span> <span data-i18n="cap.notes.f3">28+ Slash Commands</span></li>
-            <li><span class="cap-check">&#10003;</span> <span data-i18n="cap.notes.f4">PDF Companion mit Docling OCR</span></li>
-            <li><span class="cap-check">&#10003;</span> <span data-i18n="cap.notes.f5">Properties Panel fuer YAML-Frontmatter</span></li>
-            <li><span class="cap-check">&#10003;</span> <span data-i18n="cap.notes.f6">LanguageTool Grammatikpruefung</span></li>
+            <li><span class="cap-check">&#10003;</span> <span data-i18n="cap.dashboard.f1">Aufgaben, &uuml;berf&auml;llig &middot; heute &middot; diese Woche</span></li>
+            <li><span class="cap-check">&#10003;</span> <span data-i18n="cap.dashboard.f2">Emails mit Antwort-Dringlichkeit (Ollama)</span></li>
+            <li><span class="cap-check">&#10003;</span> <span data-i18n="cap.dashboard.f3">Kalender via EventKit / lokaler API</span></li>
+            <li><span class="cap-check">&#10003;</span> <span data-i18n="cap.dashboard.f4">Widgets frei konfigurierbar pro Profil</span></li>
+            <li><span class="cap-check">&#10003;</span> <span data-i18n="cap.dashboard.f5">Tab im Workspace &ndash; nicht Side-Panel</span></li>
+            <li><span class="cap-check">&#10003;</span> <span data-i18n="cap.dashboard.f6">Morgen-Briefing einmal pro Tag</span></li>
           </ul>
+        </div>
+      </div>
+
+      <!-- Smart Notes -->
+      <div class="cap-card fade-in">
+        <div class="cap-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg></div>
+        <h3 data-i18n="cap.notes.title">Editor &amp; Wissensgraph</h3>
+        <p data-i18n="cap.notes.desc">Markdown mit Live Preview, Wikilinks, Backlinks, Canvas-Ansicht, Dataview-Abfragen, 28+ Slash Commands. Obsidian-Vault &ouml;ffnet 1:1 &ndash; ohne Migration.</p>
+        <div class="cap-tags">
+          <span class="cap-tag">Markdown</span>
+          <span class="cap-tag">Wikilinks</span>
+          <span class="cap-tag">Canvas</span>
+          <span class="cap-tag">LaTeX</span>
+          <span class="cap-tag">Mermaid</span>
+          <span class="cap-tag">Dataview</span>
         </div>
       </div>
 
       <!-- Smart Email -->
       <div class="cap-card fade-in">
         <div class="cap-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 01-2.06 0L2 7"/></svg></div>
-        <h3 data-i18n="cap.email.title">Smart Email</h3>
-        <p data-i18n="cap.email.desc">KI-gestuetzter Email-Client mit IMAP &amp; SMTP. Analysiert Relevanz, erkennt Termine, prueft deinen Apple-Kalender auf Konflikte und generiert Antwortentwuerfe.</p>
+        <h3 data-i18n="cap.email.title">Email-Client</h3>
+        <p data-i18n="cap.email.desc">IMAP + SMTP. Lokales Ollama bewertet Relevanz, erkennt Termine, pr&uuml;ft Kalender-Konflikte, generiert Antwort-Entw&uuml;rfe &ndash; alles ohne Cloud-Analyse. Optional aktivierbar.</p>
         <div class="cap-tags">
           <span class="cap-tag">IMAP/SMTP</span>
-          <span class="cap-tag">KI-Analyse</span>
+          <span class="cap-tag">Lokale KI</span>
           <span class="cap-tag">Kalender</span>
-          <span class="cap-tag">Kontakte</span>
+          <span class="cap-tag">Entw&uuml;rfe</span>
         </div>
       </div>
 
       <!-- Smart Learning -->
       <div class="cap-card fade-in">
         <div class="cap-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="14" height="14" rx="2"/><path d="M8 2h10a2 2 0 012 2v10"/></svg></div>
-        <h3 data-i18n="cap.learn.title">Smart Learning</h3>
-        <p data-i18n="cap.learn.desc">Karteikarten mit Spaced Repetition (SM-2), KI-Quiz-Generierung, Anki-Import (.apkg), Statistik-Dashboard mit Lernstreak und Aktivitaets-Heatmap.</p>
+        <h3 data-i18n="cap.learn.title">Lernen &amp; Flashcards</h3>
+        <p data-i18n="cap.learn.desc">Karteikarten mit Spaced Repetition (SM-2), KI-Quiz-Generierung direkt aus deinen Notizen, Anki-Import, Lernstreak und Aktivit&auml;ts-Heatmap.</p>
         <div class="cap-tags">
           <span class="cap-tag">SM-2</span>
           <span class="cap-tag">Anki Import</span>
           <span class="cap-tag">Quiz</span>
-          <span class="cap-tag">Statistiken</span>
+          <span class="cap-tag">Heatmap</span>
         </div>
       </div>
 
@@ -451,12 +496,12 @@
       <div class="cap-card fade-in">
         <div class="cap-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.9 5.8a2 2 0 01-1.287 1.288L3 12l5.8 1.9a2 2 0 011.288 1.287L12 21l1.9-5.8a2 2 0 011.287-1.288L21 12l-5.8-1.9a2 2 0 01-1.288-1.287Z"/></svg></div>
         <h3 data-i18n="cap.ai.title">Lokale KI</h3>
-        <p data-i18n="cap.ai.desc">Integriertes Terminal mit OpenCode, Claude Code oder Ollama. Smart Connections, Notes Chat, Vision OCR &ndash; alles optional, alles lokal moeglich.</p>
+        <p data-i18n="cap.ai.desc">Notes-Chat, Smart Connections, LanguageTool, Vision OCR &ndash; alles gegen Ollama oder LM Studio auf deinem Rechner. Terminal mit OpenCode oder Claude Code integriert.</p>
         <div class="cap-tags">
           <span class="cap-tag">Ollama</span>
-          <span class="cap-tag">Terminal</span>
+          <span class="cap-tag">LM Studio</span>
           <span class="cap-tag">Smart Connections</span>
-          <span class="cap-tag">OCR</span>
+          <span class="cap-tag">Terminal</span>
         </div>
       </div>
 
@@ -464,12 +509,13 @@
       <div class="cap-card fade-in">
         <div class="cap-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 000 20 14.5 14.5 0 000-20"/><path d="M2 12h20"/></svg></div>
         <h3 data-i18n="cap.integrations.title">Integrationen</h3>
-        <p data-i18n="cap.integrations.desc">Zotero, Semantic Scholar, Readwise, reMarkable USB, edoobox Veranstaltungsmanagement, Apple Reminders und WordPress-Publishing.</p>
+        <p data-i18n="cap.integrations.desc">Zotero, Semantic Scholar, Readwise, reMarkable USB, WordPress-Publishing, edoobox-Agent f&uuml;r Veranstaltungsmanagement. Jede Integration ein Toggle.</p>
         <div class="cap-tags">
           <span class="cap-tag">Zotero</span>
           <span class="cap-tag">Semantic Scholar</span>
           <span class="cap-tag">reMarkable</span>
           <span class="cap-tag">Readwise</span>
+          <span class="cap-tag">WordPress</span>
         </div>
       </div>
 
@@ -477,7 +523,7 @@
       <div class="cap-card fade-in">
         <div class="cap-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>
         <h3 data-i18n="cap.security.title">Sicherheit &amp; Sync</h3>
-        <p data-i18n="cap.security.desc">Standardmaessig lokal. Optionaler E2E-verschluesselter Sync (AES-256-GCM, Zero-Knowledge). Keine Telemetrie, keine Tracker. DOMPurify-Sanitization.</p>
+        <p data-i18n="cap.security.desc">Standardm&auml;&szlig;ig lokal. Optionaler E2E-verschl&uuml;sselter Sync (AES-256-GCM, Zero-Knowledge). Keine Telemetrie. DOMPurify-Sanitization und geh&auml;rteter Prompt-Injection-Schutz im KI-Modul.</p>
         <div class="cap-tags">
           <span class="cap-tag">E2E Sync</span>
           <span class="cap-tag">AES-256</span>
@@ -485,6 +531,59 @@
           <span class="cap-tag">Local-first</span>
         </div>
       </div>
+    </div>
+  </section>
+
+  <!-- Vergleich -->
+  <section class="compare" id="why">
+    <div class="compare-header">
+      <div class="section-label" data-i18n="compare.label">Warum MindGraph Notes</div>
+      <h2 class="section-heading" data-i18n="compare.heading">Ein integriertes System &mdash;<br>statt acht Apps und 30 Plugins.</h2>
+      <p class="section-sub" data-i18n="compare.sub">MindGraph Notes ist f&uuml;r Leute, die ihre Notizen, Emails und t&auml;gliche Aufgaben nicht in zehn Tools verteilen wollen. Kein Plugin-Store &ndash; Module schaltest du in den Einstellungen an.</p>
+    </div>
+
+    <div class="compare-grid">
+      <div class="compare-card accent">
+        <h3 data-i18n="compare.c1.title">Dashboard als Startpunkt</h3>
+        <p data-i18n="compare.c1.desc">Obsidian-&Auml;hnliches zeigt dir eine leere Notiz. MindGraph zeigt dir <strong>was heute wichtig ist</strong>: &uuml;berf&auml;llige Tasks, Emails mit Antwort-Pflicht, heutige Termine. Einmal pro Tag ein Briefing.</p>
+      </div>
+      <div class="compare-card">
+        <h3 data-i18n="compare.c2.title">Email direkt im Wissenssystem</h3>
+        <p data-i18n="compare.c2.desc">Relevante Mails werden automatisch zu Markdown-Notizen mit Tasks und Wikilinks &mdash; direkt in deinem Vault. Kein Copy&amp;Paste aus Thunderbird. Alles lokal, kein Cloud-Leak.</p>
+      </div>
+      <div class="compare-card">
+        <h3 data-i18n="compare.c3.title">Lokale KI als Standard</h3>
+        <p data-i18n="compare.c3.desc">Ollama oder LM Studio auf deinem Rechner. Kein OpenAI-Key, kein Datenabfluss. Notes-Chat, Email-Analyse, Smart Connections, Grammatikpr&uuml;fung &mdash; alles auf deiner Hardware.</p>
+      </div>
+      <div class="compare-card">
+        <h3 data-i18n="compare.c4.title">Obsidian-kompatibel</h3>
+        <p data-i18n="compare.c4.desc">Dein bestehender Vault &ouml;ffnet 1:1: Markdown, Wikilinks, Tags, Frontmatter, Canvas, Dataview. Wenn MindGraph nicht passt, nimmst du deine Daten ohne Migration mit.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Module strip -->
+  <section class="modules-strip">
+    <div class="modules-strip-label" data-i18n="modules.label">Kern immer aktiv &middot; Module nach Bedarf</div>
+    <div class="modules-chips">
+      <span class="module-chip core"><span class="chip-dot"></span><span data-i18n="modules.core.dashboard">Dashboard</span></span>
+      <span class="module-chip core"><span class="chip-dot"></span><span data-i18n="modules.core.editor">Editor &amp; Graph</span></span>
+      <span class="module-chip core"><span class="chip-dot"></span><span data-i18n="modules.core.tasks">Aufgaben</span></span>
+      <span class="module-chip core"><span class="chip-dot"></span><span data-i18n="modules.core.templates">Templates</span></span>
+      <span class="module-chip core"><span class="chip-dot"></span><span data-i18n="modules.core.transport">Quick Capture</span></span>
+      <span class="module-chip core"><span class="chip-dot"></span><span data-i18n="modules.core.sync">E2E Sync</span></span>
+      <span class="module-chip"><span class="chip-dot"></span><span data-i18n="modules.opt.noteschat">Notes-Chat</span></span>
+      <span class="module-chip"><span class="chip-dot"></span><span data-i18n="modules.opt.smartconn">Smart Connections</span></span>
+      <span class="module-chip"><span class="chip-dot"></span><span data-i18n="modules.opt.languagetool">LanguageTool</span></span>
+      <span class="module-chip"><span class="chip-dot"></span><span data-i18n="modules.opt.email">Email-Client</span></span>
+      <span class="module-chip"><span class="chip-dot"></span><span data-i18n="modules.opt.mz">Medienzentrum-Suite</span></span>
+      <span class="module-chip"><span class="chip-dot"></span><span data-i18n="modules.opt.flashcards">Flashcards &amp; Quiz</span></span>
+      <span class="module-chip"><span class="chip-dot"></span><span data-i18n="modules.opt.semanticscholar">Semantic Scholar</span></span>
+      <span class="module-chip"><span class="chip-dot"></span><span data-i18n="modules.opt.readwise">Readwise</span></span>
+      <span class="module-chip"><span class="chip-dot"></span><span data-i18n="modules.opt.remarkable">reMarkable</span></span>
+      <span class="module-chip"><span class="chip-dot"></span><span data-i18n="modules.opt.docling">Docling</span></span>
+      <span class="module-chip"><span class="chip-dot"></span><span data-i18n="modules.opt.vision">Vision OCR</span></span>
+      <span class="module-chip"><span class="chip-dot"></span><span data-i18n="modules.opt.terminal">Terminal</span></span>
     </div>
   </section>
 
@@ -497,21 +596,21 @@
     </div>
 
     <div class="dl-grid">
-      <a href="https://github.com/bydb/mindgraph-notes/releases/download/v0.5.4-beta/MindGraph-Notes-0.5.4-beta-arm64.dmg" target="_blank" rel="noopener noreferrer" class="dl-btn">
+      <a href="https://github.com/bydb/mindgraph-notes/releases/download/v0.5.5-beta/MindGraph-Notes-0.5.5-beta-arm64.dmg" target="_blank" rel="noopener noreferrer" class="dl-btn">
         <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg>
-        <div class="dl-info"><div class="dl-platform">macOS (Apple Silicon)</div><div class="dl-version">.dmg &middot; v0.5.4-beta</div></div>
+        <div class="dl-info"><div class="dl-platform">macOS (Apple Silicon)</div><div class="dl-version">.dmg &middot; v0.5.5-beta</div></div>
       </a>
-      <a href="https://github.com/bydb/mindgraph-notes/releases/download/v0.5.4-beta/MindGraph-Notes-0.5.4-beta-x64.dmg" target="_blank" rel="noopener noreferrer" class="dl-btn">
+      <a href="https://github.com/bydb/mindgraph-notes/releases/download/v0.5.5-beta/MindGraph-Notes-0.5.5-beta-x64.dmg" target="_blank" rel="noopener noreferrer" class="dl-btn">
         <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg>
-        <div class="dl-info"><div class="dl-platform">macOS (Intel)</div><div class="dl-version">.dmg &middot; v0.5.4-beta</div></div>
+        <div class="dl-info"><div class="dl-platform">macOS (Intel)</div><div class="dl-version">.dmg &middot; v0.5.5-beta</div></div>
       </a>
-      <a href="https://github.com/bydb/mindgraph-notes/releases/download/v0.5.4-beta/MindGraph.Notes-0.5.4-beta.AppImage" target="_blank" rel="noopener noreferrer" class="dl-btn">
+      <a href="https://github.com/bydb/mindgraph-notes/releases/download/v0.5.5-beta/MindGraph.Notes-0.5.5-beta.AppImage" target="_blank" rel="noopener noreferrer" class="dl-btn">
         <svg width="28" height="28" viewBox="0 0 256 256" fill="currentColor"><path d="M220,152H36a12,12,0,0,0-12,12v40a12,12,0,0,0,12,12h80v12H96a8,8,0,0,0,0,16h64a8,8,0,0,0,0-16H140V216h80a12,12,0,0,0,12-12V164A12,12,0,0,0,220,152Zm-4,48H40V168H216ZM36,136H220a12,12,0,0,0,12-12V44a12,12,0,0,0-12-12H36A12,12,0,0,0,24,44v80A12,12,0,0,0,36,136ZM40,48H216v72H40Z"/></svg>
-        <div class="dl-info"><div class="dl-platform">Linux</div><div class="dl-version">.AppImage &middot; v0.5.4-beta</div></div>
+        <div class="dl-info"><div class="dl-platform">Linux</div><div class="dl-version">.AppImage &middot; v0.5.5-beta</div></div>
       </a>
-      <a href="https://github.com/bydb/mindgraph-notes/releases/download/v0.5.4-beta/MindGraph.Notes.Setup.0.5.4-beta.exe" target="_blank" rel="noopener noreferrer" class="dl-btn">
+      <a href="https://github.com/bydb/mindgraph-notes/releases/download/v0.5.5-beta/MindGraph.Notes.Setup.0.5.5-beta.exe" target="_blank" rel="noopener noreferrer" class="dl-btn">
         <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor"><path d="M0 3.449L9.75 2.1v9.451H0m10.949-9.602L24 0v11.4H10.949M0 12.6h9.75v9.451L0 20.699M10.949 12.6H24V24l-12.9-1.801"/></svg>
-        <div class="dl-info"><div class="dl-platform">Windows</div><div class="dl-version">.exe &middot; v0.5.4-beta</div></div>
+        <div class="dl-info"><div class="dl-platform">Windows</div><div class="dl-version">.exe &middot; v0.5.5-beta</div></div>
       </a>
     </div>
     <p class="dl-more">
@@ -527,23 +626,31 @@
     </div>
     <div class="faq-item">
       <h3 data-i18n="faq.q1">Brauche ich ein Konto?</h3>
-      <p data-i18n="faq.a1">Nein. Alles laeuft lokal. Deine Notizen sind Markdown-Dateien auf deinem Rechner. Der optionale Sync braucht nur eine Passphrase.</p>
+      <p data-i18n="faq.a1">Nein. Alles l&auml;uft lokal. Deine Notizen sind Markdown-Dateien auf deinem Rechner. Der optionale Sync braucht nur eine Passphrase.</p>
     </div>
     <div class="faq-item">
       <h3 data-i18n="faq.q2">Funktioniert mein Obsidian-Vault?</h3>
-      <p data-i18n="faq.a2">Ja. Markdown-Dateien, Wikilinks, Tags und Frontmatter werden direkt unterstuetzt.</p>
+      <p data-i18n="faq.a2">Ja. Markdown-Dateien, Wikilinks, Tags, Frontmatter, Dataview und Canvas werden direkt unterst&uuml;tzt. Obsidian-Plugins selbst laufen nicht &ndash; die Kernfunktionen der h&auml;ufigsten Plugins sind aber fest eingebaut (LanguageTool, Smart Connections, Flashcards, Dataview, Tasks).</p>
     </div>
     <div class="faq-item">
-      <h3 data-i18n="faq.q3">Brauche ich Ollama?</h3>
-      <p data-i18n="faq.a3">Nein. Die App funktioniert komplett ohne KI. Ollama ist optional fuer Features wie Email-Analyse, Quiz-Generierung und Smart Connections.</p>
+      <h3 data-i18n="faq.q3">Brauche ich Ollama oder eine KI?</h3>
+      <p data-i18n="faq.a3">Nein. Editor, Wissensgraph, Dashboard, Aufgaben und Sync funktionieren komplett ohne KI. Ollama oder LM Studio sind optional f&uuml;r Module wie Email-Analyse, Notes-Chat und Smart Connections.</p>
     </div>
     <div class="faq-item">
-      <h3 data-i18n="faq.q4">Wo liegen meine Daten?</h3>
-      <p data-i18n="faq.a4">Auf deinem Rechner. Keine Cloud, keine Telemetrie. Der optionale Sync ist Ende-zu-Ende verschluesselt (AES-256-GCM) &ndash; der Server sieht nur verschluesselte Daten.</p>
+      <h3 data-i18n="faq.q4">Was unterscheidet MindGraph von Obsidian?</h3>
+      <p data-i18n="faq.a4">Obsidian ist ein Markdown-Editor, der via Plugins erweitert wird. MindGraph ist ein integriertes System: Dashboard, Email-Client, KI, Flashcards, Sync und Wissensgraph sind vom Kern vorgesehen. Du aktivierst pro Modul, was du brauchst &ndash; ohne Plugin-Store.</p>
     </div>
     <div class="faq-item">
-      <h3 data-i18n="faq.q5">Ist die App wirklich kostenlos?</h3>
-      <p data-i18n="faq.a5">Ja. Open Source unter AGPL-3.0. Keine versteckten Kosten, keine Abo-Modelle.</p>
+      <h3 data-i18n="faq.q5">Wo liegen meine Daten?</h3>
+      <p data-i18n="faq.a5">Auf deinem Rechner. Keine Cloud, keine Telemetrie, keine Tracker. Der optionale Sync ist Ende-zu-Ende verschl&uuml;sselt (AES-256-GCM, scrypt-Key-Derivation) &ndash; der Server sieht nur verschl&uuml;sselte Daten, die Passphrase verl&auml;sst nie dein Ger&auml;t.</p>
+    </div>
+    <div class="faq-item">
+      <h3 data-i18n="faq.q6">Ist die App stabil? Sie ist im Beta.</h3>
+      <p data-i18n="faq.a6">Sie wird t&auml;glich produktiv genutzt &ndash; Vaults mit 3000+ Notizen laufen stabil. Das Beta-Label bedeutet: neue Features kommen regelm&auml;&szlig;ig, das Datenformat (Markdown) ist aber stabil und offen. Kein Risiko eines Lock-in.</p>
+    </div>
+    <div class="faq-item">
+      <h3 data-i18n="faq.q7">Ist die App wirklich kostenlos?</h3>
+      <p data-i18n="faq.a7">Ja. Open Source unter AGPL-3.0. Keine versteckten Kosten, keine Abo-Modelle. Wenn du den Sync-Server selbst hosten willst: auch dessen Code liegt offen.</p>
     </div>
   </section>
 
@@ -605,33 +712,66 @@
     const translations = {
       de: {
         "nav.features": "Features",
+        "nav.why": "Warum",
         "nav.download": "Download",
         "nav.blog": "Blog",
         "hero.badge": "Open Source \u00b7 Lokal \u00b7 Kostenlos",
-        "hero.title": "Notizen, Emails & Lernen \u2013<br><em>eine App, dein Kontext.</em>",
-        "hero.sub": "Markdown-Editor, KI-Email-Client, Karteikarten mit Spaced Repetition, Wissensgraph und integriertes Terminal. Alles lokal, alles verbunden.",
+        "hero.title": "Dein Tag im Blick.<br><em>Dein Wissen verbunden.</em>",
+        "hero.sub": "MindGraph Notes startet mit einem t\u00e4glichen Dashboard: Aufgaben, Emails, Termine, Anmeldungen \u2013 alles an einer Stelle. Darunter liegt ein vollst\u00e4ndiger Markdown-Editor mit Wissensgraph. KI-Module, Email-Client und Lernen aktivierst du nach Bedarf.",
         "hero.cta": "Kostenlos herunterladen",
         "cap.label": "Was MindGraph Notes kann",
-        "cap.heading": "Sechs Werkzeuge,<br>ein Wissenssystem.",
-        "cap.sub": "Aktiviere nur, was du brauchst. Jedes Modul arbeitet eigenst\u00e4ndig \u2013 zusammen entfalten sie ihr volles Potenzial.",
-        "cap.notes.title": "Smart Notes",
-        "cap.notes.desc": "Markdown-Editor mit Live Preview, Wikilinks, Backlinks, Canvas-Ansicht mit KI-Clustering, Dataview-Abfragen und Slash Commands. Obsidian-kompatibel.",
-        "cap.notes.f1": "Live Preview mit Syntax-Highlighting",
-        "cap.notes.f2": "Canvas mit KI-gest\u00fctzter Anordnung",
-        "cap.notes.f3": "28+ Slash Commands",
-        "cap.notes.f4": "PDF Companion mit Docling OCR",
-        "cap.notes.f5": "Properties Panel f\u00fcr YAML-Frontmatter",
-        "cap.notes.f6": "LanguageTool Grammatikpr\u00fcfung",
-        "cap.email.title": "Smart Email",
-        "cap.email.desc": "KI-gest\u00fctzter Email-Client mit IMAP & SMTP. Analysiert Relevanz, erkennt Termine, pr\u00fcft deinen Apple-Kalender auf Konflikte und generiert Antwortentwuerfe.",
-        "cap.learn.title": "Smart Learning",
-        "cap.learn.desc": "Karteikarten mit Spaced Repetition (SM-2), KI-Quiz-Generierung, Anki-Import (.apkg), Statistik-Dashboard mit Lernstreak und Aktivitaets-Heatmap.",
+        "cap.heading": "Schlanker Kern,<br>Module nach Bedarf.",
+        "cap.sub": "Dashboard, Editor und Wissensgraph sind immer dabei. Alles andere \u2013 Email, Lernen, KI, Ger\u00e4te \u2013 schaltest du pro Modul an, wenn du es brauchst.",
+        "cap.dashboard.title": "Dashboard & Morning Briefing",
+        "cap.dashboard.desc": "Der Tab, den du morgens \u00f6ffnest. \u00dcberf\u00e4llige Aufgaben, Emails die Antwort erwarten, heutige Termine und neue Anmeldungen \u2013 auf einen Blick. Einmal am Tag erscheint automatisch ein kurzes Briefing.",
+        "cap.dashboard.f1": "Aufgaben, \u00fcberf\u00e4llig \u00b7 heute \u00b7 diese Woche",
+        "cap.dashboard.f2": "Emails mit Antwort-Dringlichkeit (Ollama)",
+        "cap.dashboard.f3": "Kalender via EventKit / lokaler API",
+        "cap.dashboard.f4": "Widgets frei konfigurierbar pro Profil",
+        "cap.dashboard.f5": "Tab im Workspace \u2013 nicht Side-Panel",
+        "cap.dashboard.f6": "Morgen-Briefing einmal pro Tag",
+        "cap.notes.title": "Editor & Wissensgraph",
+        "cap.notes.desc": "Markdown mit Live Preview, Wikilinks, Backlinks, Canvas-Ansicht, Dataview-Abfragen, 28+ Slash Commands. Obsidian-Vault \u00f6ffnet 1:1 \u2013 ohne Migration.",
+        "cap.email.title": "Email-Client",
+        "cap.email.desc": "IMAP + SMTP. Lokales Ollama bewertet Relevanz, erkennt Termine, pr\u00fcft Kalender-Konflikte, generiert Antwort-Entw\u00fcrfe \u2013 alles ohne Cloud-Analyse. Optional aktivierbar.",
+        "cap.learn.title": "Lernen & Flashcards",
+        "cap.learn.desc": "Karteikarten mit Spaced Repetition (SM-2), KI-Quiz-Generierung direkt aus deinen Notizen, Anki-Import, Lernstreak und Aktivit\u00e4ts-Heatmap.",
         "cap.ai.title": "Lokale KI",
-        "cap.ai.desc": "Integriertes Terminal mit OpenCode, Claude Code oder Ollama. Smart Connections, Notes Chat, Vision OCR \u2013 alles optional, alles lokal m\u00f6glich.",
+        "cap.ai.desc": "Notes-Chat, Smart Connections, LanguageTool, Vision OCR \u2013 alles gegen Ollama oder LM Studio auf deinem Rechner. Terminal mit OpenCode oder Claude Code integriert.",
         "cap.integrations.title": "Integrationen",
-        "cap.integrations.desc": "Zotero, Semantic Scholar, Readwise, reMarkable USB, edoobox Veranstaltungsmanagement, Apple Reminders und WordPress-Publishing.",
+        "cap.integrations.desc": "Zotero, Semantic Scholar, Readwise, reMarkable USB, WordPress-Publishing, edoobox-Agent f\u00fcr Veranstaltungsmanagement. Jede Integration ein Toggle.",
         "cap.security.title": "Sicherheit & Sync",
-        "cap.security.desc": "Standardm\u00e4\u00dfig lokal. Optionaler E2E-verschl\u00fcsselter Sync (AES-256-GCM, Zero-Knowledge). Keine Telemetrie, keine Tracker. DOMPurify-Sanitization.",
+        "cap.security.desc": "Standardm\u00e4\u00dfig lokal. Optionaler E2E-verschl\u00fcsselter Sync (AES-256-GCM, Zero-Knowledge). Keine Telemetrie. DOMPurify-Sanitization und geh\u00e4rteter Prompt-Injection-Schutz im KI-Modul.",
+        "compare.label": "Warum MindGraph Notes",
+        "compare.heading": "Ein integriertes System \u2014<br>statt acht Apps und 30 Plugins.",
+        "compare.sub": "MindGraph Notes ist f\u00fcr Leute, die ihre Notizen, Emails und t\u00e4gliche Aufgaben nicht in zehn Tools verteilen wollen. Kein Plugin-Store \u2013 Module schaltest du in den Einstellungen an.",
+        "compare.c1.title": "Dashboard als Startpunkt",
+        "compare.c1.desc": "Obsidian-\u00c4hnliches zeigt dir eine leere Notiz. MindGraph zeigt dir <strong>was heute wichtig ist</strong>: \u00fcberf\u00e4llige Tasks, Emails mit Antwort-Pflicht, heutige Termine. Einmal pro Tag ein Briefing.",
+        "compare.c2.title": "Email direkt im Wissenssystem",
+        "compare.c2.desc": "Relevante Mails werden automatisch zu Markdown-Notizen mit Tasks und Wikilinks \u2014 direkt in deinem Vault. Kein Copy&Paste aus Thunderbird. Alles lokal, kein Cloud-Leak.",
+        "compare.c3.title": "Lokale KI als Standard",
+        "compare.c3.desc": "Ollama oder LM Studio auf deinem Rechner. Kein OpenAI-Key, kein Datenabfluss. Notes-Chat, Email-Analyse, Smart Connections, Grammatikpr\u00fcfung \u2014 alles auf deiner Hardware.",
+        "compare.c4.title": "Obsidian-kompatibel",
+        "compare.c4.desc": "Dein bestehender Vault \u00f6ffnet 1:1: Markdown, Wikilinks, Tags, Frontmatter, Canvas, Dataview. Wenn MindGraph nicht passt, nimmst du deine Daten ohne Migration mit.",
+        "modules.label": "Kern immer aktiv \u00b7 Module nach Bedarf",
+        "modules.core.dashboard": "Dashboard",
+        "modules.core.editor": "Editor & Graph",
+        "modules.core.tasks": "Aufgaben",
+        "modules.core.templates": "Templates",
+        "modules.core.transport": "Quick Capture",
+        "modules.core.sync": "E2E Sync",
+        "modules.opt.noteschat": "Notes-Chat",
+        "modules.opt.smartconn": "Smart Connections",
+        "modules.opt.languagetool": "LanguageTool",
+        "modules.opt.email": "Email-Client",
+        "modules.opt.mz": "Medienzentrum-Suite",
+        "modules.opt.flashcards": "Flashcards & Quiz",
+        "modules.opt.semanticscholar": "Semantic Scholar",
+        "modules.opt.readwise": "Readwise",
+        "modules.opt.remarkable": "reMarkable",
+        "modules.opt.docling": "Docling",
+        "modules.opt.vision": "Vision OCR",
+        "modules.opt.terminal": "Terminal",
         "dl.label": "Download",
         "dl.heading": "Jetzt starten.",
         "dl.sub": "Kostenlos, Open Source, in 2 Minuten startklar. \u00d6ffne einen bestehenden Vault oder starte mit dem Starter-Vault.",
@@ -641,13 +781,17 @@
         "faq.q1": "Brauche ich ein Konto?",
         "faq.a1": "Nein. Alles l\u00e4uft lokal. Deine Notizen sind Markdown-Dateien auf deinem Rechner. Der optionale Sync braucht nur eine Passphrase.",
         "faq.q2": "Funktioniert mein Obsidian-Vault?",
-        "faq.a2": "Ja. Markdown-Dateien, Wikilinks, Tags und Frontmatter werden direkt unterst\u00fctzt.",
-        "faq.q3": "Brauche ich Ollama?",
-        "faq.a3": "Nein. Die App funktioniert komplett ohne KI. Ollama ist optional f\u00fcr Features wie Email-Analyse, Quiz-Generierung und Smart Connections.",
-        "faq.q4": "Wo liegen meine Daten?",
-        "faq.a4": "Auf deinem Rechner. Keine Cloud, keine Telemetrie. Der optionale Sync ist Ende-zu-Ende verschl\u00fcsselt (AES-256-GCM) \u2013 der Server sieht nur verschl\u00fcsselte Daten.",
-        "faq.q5": "Ist die App wirklich kostenlos?",
-        "faq.a5": "Ja. Open Source unter AGPL-3.0. Keine versteckten Kosten, keine Abo-Modelle.",
+        "faq.a2": "Ja. Markdown-Dateien, Wikilinks, Tags, Frontmatter, Dataview und Canvas werden direkt unterst\u00fctzt. Obsidian-Plugins selbst laufen nicht \u2013 die Kernfunktionen der h\u00e4ufigsten Plugins sind aber fest eingebaut (LanguageTool, Smart Connections, Flashcards, Dataview, Tasks).",
+        "faq.q3": "Brauche ich Ollama oder eine KI?",
+        "faq.a3": "Nein. Editor, Wissensgraph, Dashboard, Aufgaben und Sync funktionieren komplett ohne KI. Ollama oder LM Studio sind optional f\u00fcr Module wie Email-Analyse, Notes-Chat und Smart Connections.",
+        "faq.q4": "Was unterscheidet MindGraph von Obsidian?",
+        "faq.a4": "Obsidian ist ein Markdown-Editor, der via Plugins erweitert wird. MindGraph ist ein integriertes System: Dashboard, Email-Client, KI, Flashcards, Sync und Wissensgraph sind vom Kern vorgesehen. Du aktivierst pro Modul, was du brauchst \u2013 ohne Plugin-Store.",
+        "faq.q5": "Wo liegen meine Daten?",
+        "faq.a5": "Auf deinem Rechner. Keine Cloud, keine Telemetrie, keine Tracker. Der optionale Sync ist Ende-zu-Ende verschl\u00fcsselt (AES-256-GCM, scrypt-Key-Derivation) \u2013 der Server sieht nur verschl\u00fcsselte Daten, die Passphrase verl\u00e4sst nie dein Ger\u00e4t.",
+        "faq.q6": "Ist die App stabil? Sie ist im Beta.",
+        "faq.a6": "Sie wird t\u00e4glich produktiv genutzt \u2013 Vaults mit 3000+ Notizen laufen stabil. Das Beta-Label bedeutet: neue Features kommen regelm\u00e4\u00dfig, das Datenformat (Markdown) ist aber stabil und offen. Kein Risiko eines Lock-in.",
+        "faq.q7": "Ist die App wirklich kostenlos?",
+        "faq.a7": "Ja. Open Source unter AGPL-3.0. Keine versteckten Kosten, keine Abo-Modelle. Wenn du den Sync-Server selbst hosten willst: auch dessen Code liegt offen.",
         "footer.impressum": "Impressum",
         "footer.privacy": "Datenschutz",
         "impressum.title": "Impressum",
@@ -677,33 +821,66 @@
       },
       en: {
         "nav.features": "Features",
+        "nav.why": "Why",
         "nav.download": "Download",
         "nav.blog": "Blog",
         "hero.badge": "Open Source \u00b7 Local \u00b7 Free",
-        "hero.title": "Notes, Email & Learning \u2013<br><em>one app, your context.</em>",
-        "hero.sub": "Markdown editor, AI email client, flashcards with spaced repetition, knowledge graph, and integrated terminal. All local, all connected.",
+        "hero.title": "Your day in focus.<br><em>Your knowledge connected.</em>",
+        "hero.sub": "MindGraph Notes opens with a daily dashboard: tasks, emails, meetings, registrations \u2013 all in one place. Underneath lives a full Markdown editor with a knowledge graph. AI modules, email client and learning \u2013 enable them when you need them.",
         "hero.cta": "Download for free",
         "cap.label": "What MindGraph Notes can do",
-        "cap.heading": "Six tools,<br>one knowledge system.",
-        "cap.sub": "Enable only what you need. Each module works independently \u2013 together they unlock their full potential.",
-        "cap.notes.title": "Smart Notes",
-        "cap.notes.desc": "Markdown editor with live preview, wikilinks, backlinks, canvas with AI clustering, dataview queries and slash commands. Obsidian-compatible.",
-        "cap.notes.f1": "Live preview with syntax highlighting",
-        "cap.notes.f2": "Canvas with AI-powered layout",
-        "cap.notes.f3": "28+ slash commands",
-        "cap.notes.f4": "PDF Companion with Docling OCR",
-        "cap.notes.f5": "Properties panel for YAML frontmatter",
-        "cap.notes.f6": "LanguageTool grammar checking",
-        "cap.email.title": "Smart Email",
-        "cap.email.desc": "AI-powered email client with IMAP & SMTP. Analyzes relevance, detects appointments, checks your Apple Calendar for conflicts and generates reply drafts.",
-        "cap.learn.title": "Smart Learning",
-        "cap.learn.desc": "Flashcards with spaced repetition (SM-2), AI quiz generation, Anki import (.apkg), statistics dashboard with learning streak and activity heatmap.",
+        "cap.heading": "Lean core,<br>modules on demand.",
+        "cap.sub": "Dashboard, editor and knowledge graph are always there. Everything else \u2013 email, learning, AI, devices \u2013 you switch on per module when you need it.",
+        "cap.dashboard.title": "Dashboard & Morning Briefing",
+        "cap.dashboard.desc": "The tab you open every morning. Overdue tasks, emails awaiting a reply, today's meetings and new registrations \u2013 at a glance. Once a day a short briefing appears automatically.",
+        "cap.dashboard.f1": "Tasks, overdue \u00b7 today \u00b7 this week",
+        "cap.dashboard.f2": "Emails with reply urgency (Ollama)",
+        "cap.dashboard.f3": "Calendar via EventKit / local API",
+        "cap.dashboard.f4": "Widgets freely configurable per profile",
+        "cap.dashboard.f5": "Tab in the workspace \u2013 not a side panel",
+        "cap.dashboard.f6": "Morning briefing once a day",
+        "cap.notes.title": "Editor & Knowledge Graph",
+        "cap.notes.desc": "Markdown with live preview, wikilinks, backlinks, canvas view, dataview queries, 28+ slash commands. Obsidian vault opens 1:1 \u2013 no migration.",
+        "cap.email.title": "Email Client",
+        "cap.email.desc": "IMAP + SMTP. Local Ollama scores relevance, detects appointments, checks calendar conflicts, generates reply drafts \u2013 all without cloud analysis. Optional.",
+        "cap.learn.title": "Learning & Flashcards",
+        "cap.learn.desc": "Flashcards with spaced repetition (SM-2), AI quiz generation straight from your notes, Anki import, streak and activity heatmap.",
         "cap.ai.title": "Local AI",
-        "cap.ai.desc": "Integrated terminal with OpenCode, Claude Code or Ollama. Smart Connections, Notes Chat, Vision OCR \u2013 all optional, all local.",
+        "cap.ai.desc": "Notes Chat, Smart Connections, LanguageTool, Vision OCR \u2013 all against Ollama or LM Studio on your machine. Terminal with OpenCode or Claude Code integrated.",
         "cap.integrations.title": "Integrations",
-        "cap.integrations.desc": "Zotero, Semantic Scholar, Readwise, reMarkable USB, edoobox event management, Apple Reminders and WordPress publishing.",
+        "cap.integrations.desc": "Zotero, Semantic Scholar, Readwise, reMarkable USB, WordPress publishing, edoobox agent for event management. Each integration a toggle.",
         "cap.security.title": "Security & Sync",
-        "cap.security.desc": "Local by default. Optional E2E encrypted sync (AES-256-GCM, zero-knowledge). No telemetry, no trackers. DOMPurify sanitization.",
+        "cap.security.desc": "Local by default. Optional E2E encrypted sync (AES-256-GCM, zero-knowledge). No telemetry. DOMPurify sanitization and hardened prompt injection defense in the AI module.",
+        "compare.label": "Why MindGraph Notes",
+        "compare.heading": "One integrated system \u2014<br>instead of eight apps and 30 plugins.",
+        "compare.sub": "MindGraph Notes is for people who don't want their notes, emails and daily tasks scattered across ten tools. No plugin store \u2013 modules are toggles in settings.",
+        "compare.c1.title": "Dashboard as starting point",
+        "compare.c1.desc": "Obsidian-likes show you an empty note. MindGraph shows you <strong>what matters today</strong>: overdue tasks, emails awaiting reply, today's meetings. Once a day a briefing.",
+        "compare.c2.title": "Email inside your knowledge system",
+        "compare.c2.desc": "Relevant mails become Markdown notes with tasks and wikilinks \u2014 directly in your vault. No copy&paste from Thunderbird. All local, no cloud leak.",
+        "compare.c3.title": "Local AI by default",
+        "compare.c3.desc": "Ollama or LM Studio on your machine. No OpenAI key, no data leak. Notes Chat, email analysis, Smart Connections, grammar check \u2014 all on your hardware.",
+        "compare.c4.title": "Obsidian-compatible",
+        "compare.c4.desc": "Your existing vault opens 1:1: Markdown, wikilinks, tags, frontmatter, canvas, dataview. If MindGraph doesn't fit, you take your data with you without migration.",
+        "modules.label": "Core always active \u00b7 Modules on demand",
+        "modules.core.dashboard": "Dashboard",
+        "modules.core.editor": "Editor & Graph",
+        "modules.core.tasks": "Tasks",
+        "modules.core.templates": "Templates",
+        "modules.core.transport": "Quick Capture",
+        "modules.core.sync": "E2E Sync",
+        "modules.opt.noteschat": "Notes Chat",
+        "modules.opt.smartconn": "Smart Connections",
+        "modules.opt.languagetool": "LanguageTool",
+        "modules.opt.email": "Email Client",
+        "modules.opt.mz": "Media Center Suite",
+        "modules.opt.flashcards": "Flashcards & Quiz",
+        "modules.opt.semanticscholar": "Semantic Scholar",
+        "modules.opt.readwise": "Readwise",
+        "modules.opt.remarkable": "reMarkable",
+        "modules.opt.docling": "Docling",
+        "modules.opt.vision": "Vision OCR",
+        "modules.opt.terminal": "Terminal",
         "dl.label": "Download",
         "dl.heading": "Get started.",
         "dl.sub": "Free, open source, ready in 2 minutes. Open an existing vault or start with the starter vault.",
@@ -713,13 +890,17 @@
         "faq.q1": "Do I need an account?",
         "faq.a1": "No. Everything runs locally. Your notes are Markdown files on your computer. The optional sync only needs a passphrase.",
         "faq.q2": "Does my Obsidian vault work?",
-        "faq.a2": "Yes. Markdown files, wikilinks, tags and frontmatter are directly supported.",
-        "faq.q3": "Do I need Ollama?",
-        "faq.a3": "No. The app works without AI. Ollama is optional for features like email analysis, quiz generation and smart connections.",
-        "faq.q4": "Where is my data stored?",
-        "faq.a4": "On your computer. No cloud, no telemetry. The optional sync is end-to-end encrypted (AES-256-GCM) \u2013 the server only sees encrypted data.",
-        "faq.q5": "Is the app really free?",
-        "faq.a5": "Yes. Open source under AGPL-3.0. No hidden costs, no subscription models.",
+        "faq.a2": "Yes. Markdown files, wikilinks, tags, frontmatter, dataview and canvas are supported directly. Obsidian plugins themselves don't run \u2013 but the core functions of the most common plugins are built in (LanguageTool, Smart Connections, Flashcards, Dataview, Tasks).",
+        "faq.q3": "Do I need Ollama or any AI?",
+        "faq.a3": "No. Editor, knowledge graph, dashboard, tasks and sync work completely without AI. Ollama or LM Studio are optional for modules like email analysis, Notes Chat and Smart Connections.",
+        "faq.q4": "How is MindGraph different from Obsidian?",
+        "faq.a4": "Obsidian is a Markdown editor extended via plugins. MindGraph is an integrated system: dashboard, email client, AI, flashcards, sync and knowledge graph are part of the core design. You toggle per module what you need \u2013 no plugin store.",
+        "faq.q5": "Where is my data stored?",
+        "faq.a5": "On your computer. No cloud, no telemetry, no trackers. The optional sync is end-to-end encrypted (AES-256-GCM, scrypt key derivation) \u2013 the server only sees encrypted data, the passphrase never leaves your device.",
+        "faq.q6": "Is the app stable? It's still in beta.",
+        "faq.a6": "It is used daily in production \u2013 vaults with 3000+ notes run stably. The beta label means: new features ship regularly, but the data format (Markdown) is stable and open. No lock-in risk.",
+        "faq.q7": "Is the app really free?",
+        "faq.a7": "Yes. Open source under AGPL-3.0. No hidden costs, no subscription models. If you want to self-host the sync server, that code is open too.",
         "footer.impressum": "Legal Notice",
         "footer.privacy": "Privacy Policy",
         "impressum.title": "Legal Notice",

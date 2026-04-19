@@ -205,7 +205,7 @@ export const AIImageDialog: React.FC<AIImageDialogProps> = ({ onClose, onInsert 
                   onClick={() => handlePresetSize(preset)}
                   disabled={isLoading}
                 >
-                  {t(`aiImage.${preset.key}` as const)}
+                  {t(`aiImage.${preset.key}` as never)}
                 </button>
               ))}
             </div>

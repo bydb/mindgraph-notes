@@ -124,10 +124,11 @@ export const AIStep: React.FC<AIStepProps> = ({ onBack, onNext }) => {
   return (
     <div className="onboarding-step">
       <div className="onboarding-step-header">
-        <span className="onboarding-step-indicator">{t('onboarding.step', { current: '2', total: '3' })}</span>
+        <span className="onboarding-step-indicator">{t('onboarding.step', { current: '2', total: '4' })}</span>
         <div className="onboarding-progress">
           <div className="onboarding-progress-dot active" />
           <div className="onboarding-progress-dot active" />
+          <div className="onboarding-progress-dot" />
           <div className="onboarding-progress-dot" />
         </div>
       </div>

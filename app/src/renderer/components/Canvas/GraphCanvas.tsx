@@ -665,7 +665,7 @@ const AlignmentToolbar: React.FC<AlignmentToolbarProps> = memo(({ onAlign, onDis
   // Close arrange menu when clicking outside
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
-      if (arrangeMenuRef.current && !arrangeMenuRef.current.contains(e.target as Node)) {
+      if (arrangeMenuRef.current && !arrangeMenuRef.current.contains(e.target as globalThis.Node)) {
         setShowArrangeMenu(false)
       }
     }
@@ -964,7 +964,6 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
   const allNotes = useNotesStore((s) => s.notes)
   const selectNote = useNotesStore((s) => s.selectNote)
   const selectPdf = useNotesStore((s) => s.selectPdf)
-  const selectedNoteId = useNotesStore((s) => s.selectedNoteId)
   const updateNote = useNotesStore((s) => s.updateNote)
   const updateNotePath = useNotesStore((s) => s.updateNotePath)
   const removeNote = useNotesStore((s) => s.removeNote)
@@ -984,7 +983,7 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
     canvasShowLinks, setCanvasShowLinks,
     canvasShowImages, setCanvasShowImages,
     canvasShowSummaries, setCanvasShowSummaries,
-    canvasCompactMode, setCanvasCompactMode,
+    canvasCompactMode,
     canvasReadMode, setCanvasReadMode,
     canvasHoverScale, setCanvasHoverScale,
     canvasDefaultCardWidth
@@ -2312,6 +2311,7 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
     onNodesChange(changes)
 
     changes.forEach((change) => {
+      if (!('id' in change) || typeof change.id !== 'string') return
       const isLabel = change.id.startsWith('label-')
 
       if (change.type === 'position') {
@@ -3046,7 +3046,6 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
 
       groupNodes.forEach(node => {
         const pos = positions[node.id]
-        const width = pos?.width || nodeWidth
         const height = pos?.height || nodeHeight
 
         setNodePosition(node.id, currentX, currentY)

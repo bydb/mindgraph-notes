@@ -273,12 +273,6 @@ function isOverdue(date: Date): boolean {
   return date < new Date()
 }
 
-function isOverdueByDay(date: Date): boolean {
-  const todayStart = new Date()
-  todayStart.setHours(0, 0, 0, 0)
-  return date < todayStart
-}
-
 // Prüft ob ein Task als kritisch markiert ist
 // Erkannte Marker: #critical, #kritisch, @critical, @urgent, @dringend, !!, !!!
 function isCriticalTask(text: string): boolean {

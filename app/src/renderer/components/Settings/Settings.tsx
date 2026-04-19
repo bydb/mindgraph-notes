@@ -1,9 +1,12 @@
 import React, { useState, useEffect } from 'react'
-import { useUIStore, ACCENT_COLORS, AI_LANGUAGES, FONT_FAMILIES, UI_LANGUAGES, BACKGROUND_COLORS, ICON_SETS, OUTLINE_STYLES, type Language, type FontFamily, type BackgroundColor, type IconSet, type OutlineStyle, type LLMBackend, type TransportSettings, type TransportDestination } from '../../stores/uiStore'
+import { useUIStore, ACCENT_COLORS, AI_LANGUAGES, FONT_FAMILIES, UI_LANGUAGES, BACKGROUND_COLORS, ICON_SETS, OUTLINE_STYLES, MODULES, MODULE_CATEGORIES, type Language, type FontFamily, type BackgroundColor, type IconSet, type OutlineStyle, type LLMBackend, type TransportDestination, type ModuleCategory, type ModuleDescriptor } from '../../stores/uiStore'
+import { isModuleEnabled, setModuleEnabled } from '../../utils/modules'
 import { useNotesStore, createNoteFromFile } from '../../stores/notesStore'
 import { useSyncStore } from '../../stores/syncStore'
 import { useVaultSettingsStore } from '../../stores/vaultSettingsStore'
-import { useTranslation } from '../../utils/translations'
+import { useTranslation, type TranslationKey } from '../../utils/translations'
+
+type TabTFn = (key: TranslationKey, params?: Record<string, string | number>) => string
 import {
   TemplateConfig,
   CustomTemplate,
@@ -17,9 +20,10 @@ import {
 interface SettingsProps {
   isOpen: boolean
   onClose: () => void
+  initialTab?: Tab
 }
 
-type Tab = 'vault' | 'general' | 'editor' | 'templates' | 'integrations' | 'shortcuts' | 'dataview' | 'sync' | 'dailyNote' | 'remarkable' | 'agents' | 'transport'
+type Tab = 'vault' | 'general' | 'editor' | 'templates' | 'integrations' | 'shortcuts' | 'dataview' | 'sync' | 'dailyNote' | 'remarkable' | 'agents' | 'transport' | 'dashboard' | 'modules'
 
 type BuiltInTemplateKey = 'empty' | 'dailyNote' | 'zettel' | 'meeting'
 
@@ -39,7 +43,7 @@ const BUILTIN_LABELS: Record<BuiltInTemplateKey, string> = {
 }
 
 // Transport-Settings Tab
-const TransportSettingsTab: React.FC<{ t: (key: string) => string }> = ({ t }) => {
+const TransportSettingsTab: React.FC<{ t: TabTFn }> = ({ t }) => {
   const transport = useUIStore(state => state.transport)
   const setTransport = useUIStore(state => state.setTransport)
   const [newTag, setNewTag] = useState('')
@@ -209,7 +213,7 @@ const TransportSettingsTab: React.FC<{ t: (key: string) => string }> = ({ t }) =
 }
 
 // Vault-Settings Tab als eigene Komponente (für korrekte Hook-Reaktivität)
-const VaultSettingsTab: React.FC<{ vaultPath: string; t: (key: string) => string; onNavigateToTab: (tab: Tab) => void }> = ({ vaultPath, t, onNavigateToTab }) => {
+const VaultSettingsTab: React.FC<{ vaultPath: string; t: TabTFn; onNavigateToTab: (tab: Tab) => void }> = ({ vaultPath, t, onNavigateToTab }) => {
   const vaultFeatures = useVaultSettingsStore(state => state.features)
   const setFeatureActive = useVaultSettingsStore(state => state.setFeatureActive)
   const readwise = useUIStore(state => state.readwise)
@@ -302,6 +306,174 @@ const VaultSettingsTab: React.FC<{ vaultPath: string; t: (key: string) => string
   )
 }
 
+const ModulesTab: React.FC<{ t: TabTFn }> = ({ t }) => {
+  // useUIStore als Abhängigkeit einbinden, damit der Tab bei Flag-Änderungen rerendert
+  const _tick = useUIStore(s => `${s.notesChatEnabled}${s.smartConnectionsEnabled}${s.flashcardsEnabled}${s.semanticScholarEnabled}${s.languageTool.enabled}${s.email.enabled}${s.edoobox.enabled}${s.marketing.enabled}${s.readwise.enabled}${s.remarkable.enabled}${s.docling.enabled}${s.visionOcr.enabled}`)
+  void _tick
+
+  const grouped: Record<ModuleCategory, ModuleDescriptor[]> = {
+    ai: [], communication: [], business: [], learning: [], research: [], devices: [], documents: []
+  }
+  for (const mod of MODULES) grouped[mod.category].push(mod)
+
+  const orderedCategories: ModuleCategory[] = ['ai', 'communication', 'business', 'learning', 'research', 'devices', 'documents']
+
+  return (
+    <div className="settings-section">
+      <h3>{t('settings.modules.title')}</h3>
+      <p className="settings-hint">{t('settings.modules.hint')}</p>
+
+      {orderedCategories.map(cat => (
+        <div key={cat} className="modules-category">
+          <h4 className="modules-category-title">{MODULE_CATEGORIES[cat]}</h4>
+          <div className="modules-list">
+            {grouped[cat].map(mod => {
+              const enabled = isModuleEnabled(mod.id)
+              return (
+                <label key={mod.id} className={`module-row ${enabled ? 'active' : ''}`}>
+                  <div className="module-row-body">
+                    <div className="module-row-label">{mod.label}</div>
+                    <div className="module-row-desc">{mod.description}</div>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={enabled}
+                    onChange={e => setModuleEnabled(mod.id, e.target.checked)}
+                  />
+                </label>
+              )
+            })}
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+const DashboardSettingsTab: React.FC<{ t: TabTFn }> = ({ t }) => {
+  const dashboard = useUIStore(state => state.dashboard)
+  const setDashboard = useUIStore(state => state.setDashboard)
+
+  const widgetLabels: Record<string, string> = {
+    focus: t('dashboard.widgets.focus'),
+    tasks: t('dashboard.widgets.tasks'),
+    emails: t('dashboard.widgets.emails'),
+    calendar: t('dashboard.widgets.calendar'),
+    bookings: t('dashboard.widgets.bookings')
+  }
+  const allWidgetIds = ['focus', 'tasks', 'emails', 'calendar', 'bookings'] as const
+
+  const toggleWidget = (id: typeof allWidgetIds[number]) => {
+    const active = dashboard.widgets.includes(id)
+    if (active) {
+      setDashboard({ widgets: dashboard.widgets.filter(w => w !== id) })
+    } else {
+      setDashboard({ widgets: [...dashboard.widgets, id] })
+    }
+  }
+
+  const moveWidget = (id: typeof allWidgetIds[number], direction: -1 | 1) => {
+    const idx = dashboard.widgets.indexOf(id)
+    if (idx < 0) return
+    const target = idx + direction
+    if (target < 0 || target >= dashboard.widgets.length) return
+    const next = [...dashboard.widgets]
+    ;[next[idx], next[target]] = [next[target], next[idx]]
+    setDashboard({ widgets: next })
+  }
+
+  return (
+    <div className="settings-section">
+      <h3>{t('settings.dashboard.title')}</h3>
+
+      <div className="settings-row">
+        <label>{t('settings.dashboard.enabled')}</label>
+        <input
+          type="checkbox"
+          checked={dashboard.enabled}
+          onChange={e => setDashboard({ enabled: e.target.checked })}
+        />
+      </div>
+
+      <h3>{t('settings.dashboard.widgets')}</h3>
+      <p className="settings-hint">{t('settings.dashboard.widgetsHint')}</p>
+      <div className="dashboard-widget-config-list">
+        {allWidgetIds.map(id => {
+          const active = dashboard.widgets.includes(id)
+          const position = dashboard.widgets.indexOf(id)
+          return (
+            <div key={id} className={`dashboard-widget-config-row ${active ? 'active' : ''}`}>
+              <label className="dashboard-widget-config-label">
+                <input
+                  type="checkbox"
+                  checked={active}
+                  onChange={() => toggleWidget(id)}
+                />
+                <span>{widgetLabels[id]}</span>
+              </label>
+              <div className="dashboard-widget-config-order">
+                <button
+                  type="button"
+                  className="dashboard-widget-config-btn"
+                  disabled={!active || position <= 0}
+                  onClick={() => moveWidget(id, -1)}
+                  aria-label="up"
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="18 15 12 9 6 15"/>
+                  </svg>
+                </button>
+                <button
+                  type="button"
+                  className="dashboard-widget-config-btn"
+                  disabled={!active || position < 0 || position >= dashboard.widgets.length - 1}
+                  onClick={() => moveWidget(id, 1)}
+                  aria-label="down"
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="6 9 12 15 18 9"/>
+                  </svg>
+                </button>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+
+      <h3>{t('settings.dashboard.briefing')}</h3>
+
+      <div className="settings-row">
+        <label>{t('settings.dashboard.briefingEnabled')}</label>
+        <input
+          type="checkbox"
+          checked={dashboard.briefingEnabled}
+          onChange={e => setDashboard({ briefingEnabled: e.target.checked })}
+        />
+      </div>
+
+      <div className="settings-row">
+        <label>{t('settings.dashboard.briefingIncludeCalendar')}</label>
+        <input
+          type="checkbox"
+          checked={dashboard.briefingIncludeCalendar}
+          onChange={e => setDashboard({ briefingIncludeCalendar: e.target.checked })}
+        />
+      </div>
+
+      <div className="settings-row">
+        <label>{t('settings.dashboard.calendarDaysAhead')}</label>
+        <input
+          type="number"
+          min={0}
+          max={14}
+          value={dashboard.calendarDaysAhead}
+          onChange={e => setDashboard({ calendarDaysAhead: Math.max(0, Math.min(14, Number(e.target.value) || 0)) })}
+        />
+      </div>
+    </div>
+  )
+}
+
 const SignatureImagePreview: React.FC<{ imagePath: string }> = ({ imagePath }) => {
   const [dataUrl, setDataUrl] = useState<string | null>(null)
   useEffect(() => {
@@ -319,8 +491,13 @@ const SignatureImagePreview: React.FC<{ imagePath: string }> = ({ imagePath }) =
   )
 }
 
-export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
-  const [activeTab, setActiveTab] = useState<Tab>('general')
+export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab }) => {
+  const [activeTab, setActiveTab] = useState<Tab>(initialTab ?? 'general')
+
+  // Wenn der initialTab sich ändert (z.B. vom HelpGuide), übernehmen
+  useEffect(() => {
+    if (isOpen && initialTab) setActiveTab(initialTab)
+  }, [isOpen, initialTab])
   const [zoteroStatus, setZoteroStatus] = useState<'checking' | 'connected' | 'disconnected'>('checking')
   const [ollamaStatus, setOllamaStatus] = useState<'checking' | 'connected' | 'disconnected'>('checking')
   const [lmstudioStatus, setLmstudioStatus] = useState<'checking' | 'connected' | 'disconnected'>('checking')
@@ -442,7 +619,6 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
     setCustomAccentColor,
     customBackgroundColorLight,
     setCustomBackgroundColorLight,
-    customBackgroundColorDark,
     setCustomBackgroundColorDark,
     showFormattingToolbar,
     setShowFormattingToolbar,
@@ -905,6 +1081,7 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
 
         <div className="settings-body">
           <nav className="settings-nav">
+            {/* Vault (immer ganz oben, wenn geladen) */}
             {vaultPath && (
               <button
                 className={`settings-nav-item ${activeTab === 'vault' ? 'active' : ''}`}
@@ -917,6 +1094,9 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
                 {t('settings.tab.vault')}
               </button>
             )}
+
+            {/* Section: Grundlagen */}
+            <div className="settings-nav-section-label">{t('settings.nav.basics')}</div>
             <button
               className={`settings-nav-item ${activeTab === 'general' ? 'active' : ''}`}
               onClick={() => setActiveTab('general')}
@@ -947,19 +1127,6 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
               {t('settings.tab.templates')}
             </button>
             <button
-              className={`settings-nav-item ${activeTab === 'integrations' ? 'active' : ''}`}
-              onClick={() => setActiveTab('integrations')}
-            >
-              <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-                <path d="M6 9H12M9 6V12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-                <rect x="2" y="2" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.5"/>
-                <rect x="11" y="2" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.5"/>
-                <rect x="2" y="11" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.5"/>
-                <rect x="11" y="11" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.5"/>
-              </svg>
-              {t('settings.tab.integrations')}
-            </button>
-            <button
               className={`settings-nav-item ${activeTab === 'shortcuts' ? 'active' : ''}`}
               onClick={() => setActiveTab('shortcuts')}
             >
@@ -968,6 +1135,42 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
                 <path d="M4 8H5M7 8H8M10 8H11M13 8H14M5 11H13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
               </svg>
               {t('settings.tab.shortcuts')}
+            </button>
+
+            {/* Section: Workflow */}
+            <div className="settings-nav-section-label">{t('settings.nav.workflow')}</div>
+            <button
+              className={`settings-nav-item ${activeTab === 'dashboard' ? 'active' : ''}`}
+              onClick={() => setActiveTab('dashboard')}
+            >
+              <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+                <rect x="2" y="2" width="6" height="6" rx="1" stroke="currentColor" strokeWidth="1.5"/>
+                <rect x="10" y="2" width="6" height="6" rx="1" stroke="currentColor" strokeWidth="1.5"/>
+                <rect x="2" y="10" width="6" height="6" rx="1" stroke="currentColor" strokeWidth="1.5"/>
+                <rect x="10" y="10" width="6" height="6" rx="1" stroke="currentColor" strokeWidth="1.5"/>
+              </svg>
+              {t('settings.dashboard.title')}
+            </button>
+            <button
+              className={`settings-nav-item ${activeTab === 'dailyNote' ? 'active' : ''}`}
+              onClick={() => setActiveTab('dailyNote')}
+            >
+              <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+                <rect x="3" y="2" width="12" height="14" rx="2" stroke="currentColor" strokeWidth="1.5"/>
+                <path d="M6 6h6M6 9h6M6 12h3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                <circle cx="13" cy="13" r="4" fill="var(--bg-primary)" stroke="currentColor" strokeWidth="1.5"/>
+                <path d="M13 11v2h2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+              {t('settings.tab.dailyNote')}
+            </button>
+            <button
+              className={`settings-nav-item ${activeTab === 'transport' ? 'active' : ''}`}
+              onClick={() => setActiveTab('transport')}
+            >
+              <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+                <path d="M3 9l6-6 6 6M9 3v12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+              Transport
             </button>
             <button
               className={`settings-nav-item ${activeTab === 'dataview' ? 'active' : ''}`}
@@ -991,47 +1194,59 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose }) => {
               </svg>
               {t('settings.tab.sync')}
             </button>
+
+            {/* Section: Module */}
+            <div className="settings-nav-section-label">{t('settings.nav.modules')}</div>
             <button
-              className={`settings-nav-item ${activeTab === 'dailyNote' ? 'active' : ''}`}
-              onClick={() => setActiveTab('dailyNote')}
+              className={`settings-nav-item ${activeTab === 'modules' ? 'active' : ''}`}
+              onClick={() => setActiveTab('modules')}
             >
               <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-                <rect x="3" y="2" width="12" height="14" rx="2" stroke="currentColor" strokeWidth="1.5"/>
-                <path d="M6 6h6M6 9h6M6 12h3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-                <circle cx="13" cy="13" r="4" fill="var(--bg-primary)" stroke="currentColor" strokeWidth="1.5"/>
-                <path d="M13 11v2h2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M9 2L2 6l7 4 7-4-7-4z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
+                <path d="M2 12l7 4 7-4M2 9l7 4 7-4" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
               </svg>
-              {t('settings.tab.dailyNote')}
+              {t('settings.tab.modules')}
             </button>
+            {/* Integrationen bleibt sichtbar, da es Ollama/LM Studio als KI-Backend enthält */}
             <button
-              className={`settings-nav-item ${activeTab === 'remarkable' ? 'active' : ''}`}
-              onClick={() => setActiveTab('remarkable')}
+              className={`settings-nav-item ${activeTab === 'integrations' ? 'active' : ''}`}
+              onClick={() => setActiveTab('integrations')}
             >
               <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-                <rect x="3" y="1" width="12" height="16" rx="2" stroke="currentColor" strokeWidth="1.5"/>
-                <path d="M7 5h4M7 8h4M7 11h2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                <path d="M6 9H12M9 6V12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                <rect x="2" y="2" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.5"/>
+                <rect x="11" y="2" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.5"/>
+                <rect x="2" y="11" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.5"/>
+                <rect x="11" y="11" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.5"/>
               </svg>
-              reMarkable
+              {t('settings.tab.integrations')}
             </button>
-            <button
-              className={`settings-nav-item ${activeTab === 'agents' ? 'active' : ''}`}
-              onClick={() => setActiveTab('agents')}
-            >
-              <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-                <circle cx="9" cy="9" r="7" stroke="currentColor" strokeWidth="1.5"/>
-                <path d="M9 6v6M6 9h6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-              </svg>
-              {t('settings.tab.agents')}
-            </button>
-            <button
-              className={`settings-nav-item ${activeTab === 'transport' ? 'active' : ''}`}
-              onClick={() => setActiveTab('transport')}
-            >
-              <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-                <path d="M3 9l6-6 6 6M9 3v12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-              Transport
-            </button>
+            {/* MZ-Suite-Tab: nur wenn Modul aktiv */}
+            {isModuleEnabled('mz-suite') && (
+              <button
+                className={`settings-nav-item ${activeTab === 'agents' ? 'active' : ''}`}
+                onClick={() => setActiveTab('agents')}
+              >
+                <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+                  <circle cx="9" cy="9" r="7" stroke="currentColor" strokeWidth="1.5"/>
+                  <path d="M9 6v6M6 9h6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                </svg>
+                {t('settings.tab.agents')}
+              </button>
+            )}
+            {/* reMarkable-Tab: nur wenn Modul aktiv */}
+            {isModuleEnabled('remarkable') && (
+              <button
+                className={`settings-nav-item ${activeTab === 'remarkable' ? 'active' : ''}`}
+                onClick={() => setActiveTab('remarkable')}
+              >
+                <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+                  <rect x="3" y="1" width="12" height="16" rx="2" stroke="currentColor" strokeWidth="1.5"/>
+                  <path d="M7 5h4M7 8h4M7 11h2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                </svg>
+                reMarkable
+              </button>
+            )}
           </nav>
 
           <div className="settings-content">
@@ -3827,6 +4042,16 @@ LIMIT 10
             {/* Transport Tab */}
             {activeTab === 'transport' && (
               <TransportSettingsTab t={t} />
+            )}
+
+            {/* Dashboard Tab */}
+            {activeTab === 'dashboard' && (
+              <DashboardSettingsTab t={t} />
+            )}
+
+            {/* Modules Tab */}
+            {activeTab === 'modules' && (
+              <ModulesTab t={t} />
             )}
           </div>
         </div>

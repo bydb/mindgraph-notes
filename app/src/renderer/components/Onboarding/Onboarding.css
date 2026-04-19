@@ -674,3 +674,100 @@
 @keyframes fade-node {
   to { opacity: 1; }
 }
+
+/* ===== Dashboard Step ===== */
+.onboarding-dashboard-section-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--text-secondary);
+  margin: 20px 0 10px;
+}
+
+.onboarding-dashboard-toggle {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 14px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--bg-secondary);
+}
+
+.onboarding-dashboard-toggle label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  font-size: 14px;
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.onboarding-dashboard-toggle input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent-color);
+  cursor: pointer;
+}
+
+.onboarding-dashboard-hint {
+  font-size: 12px;
+  color: var(--text-secondary);
+  padding-left: 26px;
+}
+
+.onboarding-dashboard-widgets {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+
+.onboarding-widget-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  background: var(--bg-secondary);
+  border: 1.5px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+}
+
+.onboarding-widget-card:hover {
+  border-color: var(--border-color);
+}
+
+.onboarding-widget-card.active {
+  border-color: var(--accent-color);
+  background: color-mix(in srgb, var(--accent-color) 8%, var(--bg-secondary));
+}
+
+.onboarding-widget-check {
+  width: 20px;
+  height: 20px;
+  border: 1.5px solid var(--border-color);
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: white;
+  background: transparent;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.onboarding-widget-card.active .onboarding-widget-check {
+  background: var(--accent-color);
+  border-color: var(--accent-color);
+}
+
+.onboarding-widget-label {
+  font-size: 14px;
+  font-weight: 500;
+}

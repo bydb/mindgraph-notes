@@ -114,9 +114,14 @@ async function walkDirectory(
   files: Map<string, { absPath: string }>,
   excludeConfig?: ExcludeConfig
 ): Promise<void> {
-  let entries: Awaited<ReturnType<typeof fs.readdir>>
+  let entries: Array<{ name: string; isDirectory: () => boolean; isFile: () => boolean }>
   try {
-    entries = await fs.readdir(dirPath, { withFileTypes: true })
+    const raw = await fs.readdir(dirPath, { withFileTypes: true })
+    entries = raw.map(e => ({
+      name: typeof e.name === 'string' ? e.name : String(e.name),
+      isDirectory: () => e.isDirectory(),
+      isFile: () => e.isFile()
+    }))
   } catch {
     return
   }

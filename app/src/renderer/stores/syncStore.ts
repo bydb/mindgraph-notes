@@ -193,6 +193,7 @@ export const useSyncStore = create<SyncState>()((set, get) => ({
   lastSyncTime: null,
   excludeFolders: [],
   excludeExtensions: [],
+  savedForVault: '',
 
   // Transient
   currentVaultPath: '',

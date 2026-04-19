@@ -24,7 +24,7 @@ interface BookmarkItemProps {
   onRemove: () => void
 }
 
-const BookmarkItem: React.FC<BookmarkItemProps> = memo(({ noteId, title, onSelect, onRemove }) => {
+const BookmarkItem: React.FC<BookmarkItemProps> = memo(({ title, onSelect, onRemove }) => {
   const handleRemove = (e: React.MouseEvent) => {
     e.stopPropagation()
     onRemove()

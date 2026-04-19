@@ -2,6 +2,49 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.5.5-beta] - 2026-04-19
+
+### Features
+- **Dashboard als Tab-Typ** — neuer zentraler Workspace-View neben Editor/Split/Canvas, nicht mehr rechts-Panel
+  - Vier Kern-Widgets: Aufgaben (überfällig/heute/Woche), Zu beantworten (Emails mit KI-Urgency), Kalender (EventKit), Neue Anmeldungen (edoobox)
+  - Responsive Grid (auto-fit), Refresh-Button, Click-to-navigate zu Notizen
+  - Konfigurierbare Widget-Reihenfolge + Sichtbarkeit im neuen Settings-Tab
+- **Morning Briefing** — einmal pro Tag beim App-Start als Modal mit Tages-Überblick (Tasks / Emails / Termine / Anmeldungen). Deaktivierbar, `lastBriefingDate`-Tracking
+- **Heute im Fokus + Timeblocking** — neues Focus-Widget mit Top-5 Tasks (kritisch > überfällig > heute) + dynamischer Tages-Narrative
+  - Pro Task ein **"Zeit blocken"-Button** → Modal mit Dauer-Pills (30/45/60/90/120 min) und automatisch vorgeschlagenem nächsten freien Kalender-Slot
+  - Neuer IPC-Handler `calendar-create-event` via EventKit-Swift-Helper
+- **Modul-Konzept (Kern vs. Plugins)** — Dashboard, Editor, Wissensgraph, Tasks, Templates, Transport, Sync sind Kern; 11 weitere Module (Email, MZ-Suite, Flashcards, Smart Connections, Notes-Chat, LanguageTool, Semantic Scholar, Readwise, reMarkable, Docling, Vision OCR) sind aktivierbar
+  - Neuer Settings-Tab "Module" mit Toggle-Liste gruppiert nach 7 Kategorien
+  - Modul-spezifische Config-Tabs (Medienzentrum, reMarkable) nur sichtbar wenn Modul aktiv
+- **Settings-Navigation neu strukturiert** — Sections "Grundlagen", "Workflow", "Module" mit visuellen Labels; "Automationen" umbenannt zu "Medienzentrum"
+- **Onboarding 4-Schritte-Flow** — Welcome → Intent → AI → **Dashboard-Setup (neu)** → Missions. Widgets und Morning-Briefing werden direkt beim Setup konfiguriert, mit Profil-abhängigen Defaults
+- **HelpGuide erweitert** — neue Knoten für Dashboard, Morning Briefing, Agent (bisher nur "Business"). Detail-Popup bekommt farbigen "Öffnen"-Button mit Deep-Link zum Feature oder Settings-Tab
+- **Prompt-Injection-Schutz gehärtet** — Email-Analyse und Email-KI-Chat-Kontext werden jetzt HTML-/Control-Char-/Zero-Width-/Bidi-gestrippt und in `BEGIN_UNTRUSTED_CONTEXT`-Marker eingerahmt. System-Prompt weist das Modell explizit an, keine Instruktionen aus externen Mails zu befolgen
+- **Website (mindgraph-notes.de) komplett aufgefrischt**
+  - Neuer Hero mit Dashboard-Fokus ("Dein Tag im Blick. Dein Wissen verbunden.")
+  - Stilisierter SVG-Screenshot als Hero-Visual (verlustfrei skalierend, Dummy-Daten)
+  - Capability-Section von 6 auf 7 Karten — Dashboard als featured Kachel
+  - Neue "Warum MindGraph?"-Section mit 4 USP-Vergleichskarten
+  - Modul-Chip-Strip visualisiert Kern vs. Plugins
+  - FAQ um Obsidian-Vergleich und Stabilitäts-Aussage erweitert
+  - SEO: `featureList` im JSON-LD, og/twitter-Tags, title/description aktualisiert
+
+### Improvements
+- **TypeScript: 131 → 0 Errors** — kompletter Typecheck-Pass, @types/sql.js/mailparser/nodemailer + ambient-declarations für markdown-it-Plugins, ElectronAPI-Interface vervollständigt, ungenutzte Imports/Vars aufgeräumt
+- **CI-Gate `tsc --noEmit`** — neuer `.github/workflows/typecheck.yml` läuft bei Push/PR; `prebuild`-npm-Hook verhindert Build mit TS-Errors; neues `npm run typecheck` Script
+- **Dev-Erkundung**: tote Onboarding-Dateien entfernt (ProfileStep, VaultStep, FeaturesStep, AISetupStep) — nur noch aktive Schritte im Code
+
+### Fixes
+- **Kalender-Widget**: vergangene Events (dayOffset < 0) und Events mit ungültigem Datum werden korrekt herausgefiltert — keine "IN -3 TAGEN" oder "IN NAN TAGEN" mehr
+- **reactflow Node-Type-Kollision** in GraphCanvas (target: e.target as `globalThis.Node`)
+- **NodeChange-Union**: Typeguard bevor `change.id` gelesen wird
+- **sync/fileTracker Dirent-Typkompatibilität** mit Node 20+
+- **uiStore** `ACCENT_COLORS`/`BACKGROUND_COLORS`: fehlender `custom`-Eintrag ergänzt
+- **PropertiesPanel**: `t(key, fallback)` → `t(key)` auf 6 Aufrufstellen (API-Drift)
+- **Flashcards/Quiz MarkdownContent**: `vaultPath ?? undefined` gegen `null`-Typ-Mismatch
+- **PDFViewer page.render** um fehlendes `canvas`-Param ergänzt
+- **SmartConnectionsPanel**: `currentEmbedding` Typ auf `number[] | undefined` mit `?? undefined` statt `|| undefined`
+
 ## [0.5.4-beta] - 2026-04-17
 
 ### Improvements

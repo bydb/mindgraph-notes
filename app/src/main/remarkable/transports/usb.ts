@@ -166,7 +166,7 @@ export class USBTransport implements ReMarkableTransport {
         const statusCode = response.statusCode
         if (statusCode < 200 || statusCode >= 300) {
           clearTimeout(timeout)
-          response.resume()
+          ;(response as unknown as NodeJS.ReadableStream).resume()
           resolve({ ok: false, statusCode })
           return
         }
@@ -346,20 +346,5 @@ export class USBTransport implements ReMarkableTransport {
 
   private sleep(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms))
-  }
-
-  private async fetchWithTimeout(
-    url: string,
-    timeoutMs = 8000,
-    options?: RequestInit
-  ): Promise<Response> {
-    const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(), timeoutMs)
-
-    try {
-      return await fetch(url, { ...options, signal: controller.signal })
-    } finally {
-      clearTimeout(timeout)
-    }
   }
 }

@@ -64,14 +64,6 @@ const DashboardOfferCard: React.FC<{ offer: EdooboxOfferDashboard }> = ({ offer 
     setExpanded(!expanded)
   }, [expanded, offer.id, offer.bookings.length, offer.bookingCount, loadBookingsForOffer])
 
-  const occupancyPercent = offer.maxParticipants > 0
-    ? Math.min(100, Math.round((offer.bookingCount / offer.maxParticipants) * 100))
-    : 0
-
-  const freePlaces = offer.maxParticipants > 0
-    ? offer.maxParticipants - offer.bookingCount
-    : null
-
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
   const newBookings = offer.bookings.filter(b => b.bookedAt > sevenDaysAgo)
 

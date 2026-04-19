@@ -246,16 +246,7 @@ export function generateImageFileName(prefix: string = 'image'): string {
   return `${prefix}-${timestamp}`
 }
 
-/**
- * FileEntry type for tree traversal (matches shared/types.ts)
- */
-interface FileEntry {
-  name: string
-  path: string
-  isDirectory: boolean
-  children?: FileEntry[]
-  fileType?: 'markdown' | 'pdf' | 'image'
-}
+import type { FileEntry } from '../../shared/types'
 
 /**
  * Search the entire vault for an image file by name (Obsidian-style search)

@@ -22,6 +22,17 @@ const missions = [
     )
   },
   {
+    id: 'dashboard',
+    icon: (
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="3" y="3" width="7" height="7" rx="1"/>
+        <rect x="14" y="3" width="7" height="7" rx="1"/>
+        <rect x="3" y="14" width="7" height="7" rx="1"/>
+        <rect x="14" y="14" width="7" height="7" rx="1"/>
+      </svg>
+    )
+  },
+  {
     id: 'create',
     shortcut: 'Cmd+N',
     icon: (
@@ -67,8 +78,9 @@ export const MissionsStep: React.FC<MissionsStepProps> = ({
     <div className="onboarding-step">
       {!standalone && (
         <div className="onboarding-step-header">
-          <span className="onboarding-step-indicator">{t('onboarding.step', { current: '3', total: '3' })}</span>
+          <span className="onboarding-step-indicator">{t('onboarding.step', { current: '4', total: '4' })}</span>
           <div className="onboarding-progress">
+            <div className="onboarding-progress-dot active" />
             <div className="onboarding-progress-dot active" />
             <div className="onboarding-progress-dot active" />
             <div className="onboarding-progress-dot active" />

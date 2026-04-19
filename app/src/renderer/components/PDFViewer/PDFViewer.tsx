@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useMemo } from 'react'
+import React, { useState, useCallback, useEffect } from 'react'
 import { Document, Page, pdfjs } from 'react-pdf'
 import 'react-pdf/dist/Page/AnnotationLayer.css'
 import 'react-pdf/dist/Page/TextLayer.css'
@@ -230,7 +230,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ filePath, fileName, relati
         canvas.height = scaledViewport.height
         const ctx = canvas.getContext('2d')!
 
-        await page.render({ canvasContext: ctx, viewport: scaledViewport }).promise
+        await page.render({ canvasContext: ctx, viewport: scaledViewport, canvas }).promise
 
         // Get base64 image (strip data URL prefix for Ollama)
         const base64 = canvas.toDataURL('image/png').replace(/^data:image\/png;base64,/, '')

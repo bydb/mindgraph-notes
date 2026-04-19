@@ -164,9 +164,6 @@ export const Terminal: React.FC<TerminalProps> = ({ visible, onToggle }) => {
     // Daten vom Terminal empfangen
     console.log('[Terminal] Setting up IPC listeners...')
 
-    // Speichere term in xtermRef BEVOR wir den Listener setzen
-    const termInstance = term
-
     window.electronAPI.onTerminalData((data: string) => {
       console.log('[Terminal] Received data from PTY, length:', data.length)
       console.log('[Terminal] Writing to xterm, instance valid:', !!xtermRef.current)

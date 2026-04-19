@@ -66,11 +66,12 @@ export const EmailAIChatView: React.FC = () => {
   const getContext = useCallback(() => {
     if (!chatEmail) return ''
     const contact = getContactByEmail(chatEmail.from.address)
+    const notesRecord = Object.fromEntries(notes.map(n => [n.id, n]))
     return buildEmailContext(
       chatEmail,
       emails,
       contact,
-      notes,
+      notesRecord,
       dashboardOffers,
       calendarEvents
     )

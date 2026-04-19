@@ -647,7 +647,7 @@ function eliminateCrossings(
     if (improved) continue
 
     // Strategy 4: Random perturbation with acceptance (simulated annealing style)
-    const temperature = Math.max(0.1, 1 - iteration / maxIterations)
+    const temperature = Math.max(0.1, 1 - iteration / effectiveMaxIterations)
     const randomNode = movableNodes[Math.floor(Math.random() * movableNodes.length)]
     const originalPos = { ...result[randomNode] }
     const perturbation = 200 * temperature
@@ -750,7 +750,6 @@ function compactLayout(
   const centroidX = sumX / count
   const centroidY = sumY / count
 
-  const pinnedNodes = new Set(nodes.filter(n => n.pinned).map(n => n.id))
   const movableNodeIds = nodes.filter(n => !n.pinned).map(n => n.id)
 
   // Try to move each node closer to centroid without creating crossings or overlaps
@@ -822,7 +821,7 @@ function compactLayout(
  */
 function forceUncross<N extends SimulationNodeDatum & { id: string }>(
   links: SimulationLinkDatum<N>[]
-): Force<N, SimulationLinkDatum<N>> {
+): Force<N, SimulationLinkDatum<N>> & { strength: (s?: number) => Force<N, SimulationLinkDatum<N>> | number } {
   let nodes: N[] = []
   let strength = 1.0
 
@@ -959,7 +958,6 @@ export function forceDirectedLayout(
 
   // Scale canvas based on node count
   const nodeCount = nodes.length
-  const edgeCount = edges.length
   const scaleFactor = Math.max(1, Math.sqrt(nodeCount / 6))
   const canvasWidth = 2000 * scaleFactor
   const canvasHeight = 1600 * scaleFactor
@@ -990,7 +988,6 @@ export function forceDirectedLayout(
   // Phase 2: Force simulation with edge uncrossing
   // Adjust parameters based on graph size for performance
   const isLargeGraph = nodeCount > 30
-  const isMediumGraph = nodeCount > 15
 
   const simulation = forceSimulation<ForceNode>(simNodes)
     .force('link', forceLink<ForceNode, SimulationLinkDatum<ForceNode>>(simLinks)
@@ -1014,7 +1011,7 @@ export function forceDirectedLayout(
 
   // Only add expensive uncrossing force for small graphs
   if (!isLargeGraph) {
-    simulation.force('uncross', forceUncross<ForceNode>(simLinks).strength(1.5))
+    simulation.force('uncross', forceUncross<ForceNode>(simLinks).strength(1.5) as Force<ForceNode, undefined>)
   }
 
   // Run simulation - adjust based on graph size for performance
@@ -1291,10 +1288,8 @@ export function hierarchicalLayout(
   options: LayoutOptions
 ): LayoutResult {
   const {
-    width = 1600,
     height = 1200,
-    padding = 80,
-    nodeSpacing = 80
+    padding = 80
   } = options
 
   if (nodes.length === 0) {
@@ -1449,7 +1444,7 @@ export function hierarchicalLayout(
   // Calculate x positions for each layer
   const layerXPositions: number[] = []
   let currentX = padding
-  layerWidths.forEach((w, idx) => {
+  layerWidths.forEach((w) => {
     layerXPositions.push(currentX + w / 2)
     currentX += w
   })
@@ -1739,7 +1734,7 @@ export function radialLayout(
 
 export function clusterLayout(
   nodes: LayoutNode[],
-  edges: LayoutEdge[],
+  _edges: LayoutEdge[],
   options: LayoutOptions,
   groupBy: 'folder' | 'tag' = 'folder'
 ): LayoutResult {

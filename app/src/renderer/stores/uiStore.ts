@@ -8,7 +8,6 @@ type FileTreeDisplayMode = 'name' | 'path'  // 'name' = nur Dateiname, 'path' = 
 type EditorViewMode = 'edit' | 'live-preview' | 'preview'
 type PdfDisplayMode = 'both' | 'companion-only' | 'pdf-only'  // Anzeige von PDF/Companion im FileTree
 type AccentColor = 'blue' | 'orange' | 'green' | 'purple' | 'pink' | 'teal' | 'rose' | 'coral' | 'mauve' | 'mint' | 'lime' | 'gold' | 'terracotta' | 'custom'
-type AIAction = 'translate' | 'summarize' | 'continue' | 'improve'
 export type LLMBackend = 'ollama' | 'lm-studio'
 export type Language = 'de' | 'en'
 export type IconSet = 'default' | 'minimal' | 'colorful' | 'emoji'
@@ -68,7 +67,8 @@ export const ACCENT_COLORS: Record<AccentColor, { name: string; color: string; h
   mint: { name: 'Mint', color: '#34d399', hover: '#10b981' },
   lime: { name: 'Limette', color: '#a3e635', hover: '#84cc16' },
   gold: { name: 'Gold', color: '#fbbf24', hover: '#f59e0b' },
-  terracotta: { name: 'Terracotta', color: '#d4875a', hover: '#c47a4e' }
+  terracotta: { name: 'Terracotta', color: '#d4875a', hover: '#c47a4e' },
+  custom: { name: 'Custom', color: '#d4875a', hover: '#c47a4e' }
 }
 
 // Hintergrundfarben (Pastelltöne)
@@ -89,7 +89,8 @@ export const BACKGROUND_COLORS: Record<BackgroundColor, { name: string; light: s
   seafoam: { name: 'Meeresschaum', light: '#e8f5f0', dark: '#111815' },
   pistachio: { name: 'Pistazie', light: '#f0f7ee', dark: '#141712' },
   lemonade: { name: 'Limonade', light: '#fefce8', dark: '#191812' },
-  cotton: { name: 'Baumwolle', light: '#faf5ff', dark: '#161218' }
+  cotton: { name: 'Baumwolle', light: '#faf5ff', dark: '#161218' },
+  custom: { name: 'Custom', light: '#ffffff', dark: '#0d0d0d' }
 }
 
 // Icon Sets für FileTree
@@ -330,8 +331,6 @@ export interface DailyNoteSettings {
   dateFormat: string
 }
 
-// Legacy type alias for backward compatibility
-type OllamaSettings = LLMSettings
 
 export interface TransportDestination {
   label: string
@@ -345,6 +344,56 @@ export interface TransportSettings {
   predefinedTags: string[]
   defaultDestinationIndex: number
 }
+
+// Dashboard Widgets — identifier-basiert, Reihenfolge im Array = Anzeigereihenfolge
+export type DashboardWidgetId = 'focus' | 'tasks' | 'emails' | 'calendar' | 'bookings' | 'sync'
+
+export interface DashboardSettings {
+  enabled: boolean
+  widgets: DashboardWidgetId[]         // aktive Widgets in Anzeigereihenfolge
+  briefingEnabled: boolean             // Morning Briefing beim ersten Öffnen am Tag anzeigen
+  briefingIncludeCalendar: boolean
+  lastBriefingDate: string             // YYYY-MM-DD; leer = nie gezeigt
+  calendarDaysAhead: number            // wie viele Tage Kalender voraus zeigen (default 1)
+}
+
+export const DASHBOARD_ALL_WIDGETS: DashboardWidgetId[] = ['focus', 'tasks', 'emails', 'calendar', 'bookings', 'sync']
+
+// ===== Module-Registry (Kern vs. Plugins) =====
+// Kern-Features sind immer aktiv und nicht in dieser Liste.
+// Jedes Modul wrapt bestehende uiStore-Flags — der Toggle im Settings-Tab delegiert an diese.
+export type ModuleCategory = 'ai' | 'communication' | 'business' | 'learning' | 'research' | 'devices' | 'documents'
+
+export interface ModuleDescriptor {
+  id: string
+  label: string
+  description: string
+  category: ModuleCategory
+}
+
+export const MODULE_CATEGORIES: Record<ModuleCategory, string> = {
+  ai: 'Lokale KI',
+  communication: 'Kommunikation',
+  business: 'Business & Automatisierung',
+  learning: 'Lernen',
+  research: 'Forschung & Wissen',
+  devices: 'Geräte',
+  documents: 'Dokument-Verarbeitung'
+}
+
+export const MODULES: ModuleDescriptor[] = [
+  { id: 'notes-chat',       label: 'Notes-Chat',       description: 'Chat mit deinen Notizen als Kontext', category: 'ai' },
+  { id: 'smart-connections',label: 'Smart Connections',description: 'Semantisch ähnliche Notizen finden', category: 'ai' },
+  { id: 'language-tool',    label: 'LanguageTool',     description: 'Grammatik- und Rechtschreibprüfung im Editor', category: 'ai' },
+  { id: 'email',            label: 'Email-Client',     description: 'IMAP/SMTP + KI-Analyse + Entwurfshilfe', category: 'communication' },
+  { id: 'mz-suite',         label: 'Medienzentrum-Suite',description: 'edoobox + Marketing (WordPress) + IQ-Auswertung + Formularimport', category: 'business' },
+  { id: 'flashcards',       label: 'Flashcards & Quiz',description: 'Karteikarten mit Spaced Repetition und Quiz-Modus', category: 'learning' },
+  { id: 'semantic-scholar', label: 'Semantic Scholar', description: 'Wissenschaftliche Paper durchsuchen und zitieren', category: 'research' },
+  { id: 'readwise',         label: 'Readwise',         description: 'Highlights aus Readwise synchronisieren', category: 'research' },
+  { id: 'remarkable',       label: 'reMarkable',       description: 'Dokumente mit dem reMarkable-Tablet austauschen', category: 'devices' },
+  { id: 'docling',          label: 'Docling',          description: 'PDF-Textextraktion via Docling-Server', category: 'documents' },
+  { id: 'vision-ocr',       label: 'Vision OCR',       description: 'Bilder und Scans per Vision-Modell in Text umwandeln', category: 'documents' }
+]
 
 interface UIState {
   // Allgemein
@@ -487,11 +536,14 @@ interface UIState {
   setTextSplitPosition: (position: number) => void
   setCanvasFilterPath: (path: string | null) => void
   setCanvasViewMode: (mode: CanvasViewMode) => void
+  setCanvasShowEdges: (show: boolean) => void
   setCanvasShowTags: (show: boolean) => void
   setCanvasShowLinks: (show: boolean) => void
   setCanvasShowImages: (show: boolean) => void
   setCanvasShowSummaries: (show: boolean) => void
   setCanvasCompactMode: (compact: boolean) => void
+  setCanvasReadMode: (read: boolean) => void
+  setCanvasHoverScale: (scale: number) => void
   setCanvasDefaultCardWidth: (width: number) => void
   setSplitPosition: (position: number) => void
   setFileTreeDisplayMode: (mode: FileTreeDisplayMode) => void
@@ -536,6 +588,9 @@ interface UIState {
   // Transport (Quick Capture)
   transport: TransportSettings
   setTransport: (settings: Partial<TransportSettings>) => void
+
+  dashboard: DashboardSettings
+  setDashboard: (settings: Partial<DashboardSettings>) => void
 }
 
 // Default-Werte für den Store
@@ -745,7 +800,17 @@ const defaultState = {
     ],
     predefinedTags: ['idee', 'todo', 'frage', 'wichtig'],
     defaultDestinationIndex: 0
-  } as TransportSettings
+  } as TransportSettings,
+
+  // Dashboard
+  dashboard: {
+    enabled: true,
+    widgets: ['focus', 'tasks', 'emails', 'calendar', 'bookings'],
+    briefingEnabled: true,
+    briefingIncludeCalendar: true,
+    lastBriefingDate: '',
+    calendarDaysAhead: 1
+  } as DashboardSettings
 }
 
 // Felder die persistiert werden sollen (keine Funktionen, keine transienten Werte)
@@ -767,7 +832,8 @@ const persistedKeys = [
   'slashCommandTimeFormat',
   'showFormattingToolbar',
   'showRawEditor',
-  'transport'
+  'transport',
+  'dashboard'
 ] as const
 
 export const useUIStore = create<UIState>()((set, get) => ({
@@ -799,14 +865,14 @@ export const useUIStore = create<UIState>()((set, get) => ({
   setTextSplitPosition: (position) => set({ textSplitPosition: Math.max(20, Math.min(80, position)) }),
   setCanvasFilterPath: (path) => set({ canvasFilterPath: path }),
   setCanvasViewMode: (mode) => set({ canvasViewMode: mode }),
-  setCanvasShowEdges: (show) => set({ canvasShowEdges: show }),
-  setCanvasShowTags: (show) => set({ canvasShowTags: show }),
-  setCanvasShowLinks: (show) => set({ canvasShowLinks: show }),
-  setCanvasShowImages: (show) => set({ canvasShowImages: show }),
-  setCanvasShowSummaries: (show) => set({ canvasShowSummaries: show }),
-  setCanvasCompactMode: (compact) => set({ canvasCompactMode: compact }),
-  setCanvasReadMode: (read) => set({ canvasReadMode: read }),
-  setCanvasHoverScale: (scale) => set({ canvasHoverScale: Math.max(1, Math.min(8, scale)) }),
+  setCanvasShowEdges: (show: boolean) => set({ canvasShowEdges: show }),
+  setCanvasShowTags: (show: boolean) => set({ canvasShowTags: show }),
+  setCanvasShowLinks: (show: boolean) => set({ canvasShowLinks: show }),
+  setCanvasShowImages: (show: boolean) => set({ canvasShowImages: show }),
+  setCanvasShowSummaries: (show: boolean) => set({ canvasShowSummaries: show }),
+  setCanvasCompactMode: (compact: boolean) => set({ canvasCompactMode: compact }),
+  setCanvasReadMode: (read: boolean) => set({ canvasReadMode: read }),
+  setCanvasHoverScale: (scale: number) => set({ canvasHoverScale: Math.max(1, Math.min(8, scale)) }),
   setCanvasDefaultCardWidth: (width) => set({ canvasDefaultCardWidth: Math.max(150, Math.min(500, width)) }),
   setSplitPosition: (position) => set({ splitPosition: Math.max(20, Math.min(80, position)) }),
   setFileTreeDisplayMode: (mode) => set({ fileTreeDisplayMode: mode }),
@@ -872,6 +938,9 @@ export const useUIStore = create<UIState>()((set, get) => ({
   setUserProfile: (profile) => set({ userProfile: profile }),
   setTransport: (settings) => set((state) => ({
     transport: { ...state.transport, ...settings }
+  })),
+  setDashboard: (settings) => set((state) => ({
+    dashboard: { ...state.dashboard, ...settings }
   })),
   applyProfileDefaults: (profile) => {
     if (!profile) return
@@ -982,6 +1051,13 @@ export async function initializeUISettings(): Promise<void> {
 
       // Always start with 'editor' mode on startup
       validSettings.viewMode = 'editor'
+      // Migrate Dashboard-Widgets: Focus-Widget nachtragen wenn Nutzer vor der Einführung gespeichert hat
+      if (validSettings.dashboard) {
+        const dash = validSettings.dashboard as DashboardSettings
+        if (Array.isArray(dash.widgets) && !dash.widgets.includes('focus')) {
+          dash.widgets = ['focus', ...dash.widgets]
+        }
+      }
       // Migrate edoobox base URL: strip /v1 or /v2 suffix, use app2 for V2
       if (validSettings.edoobox) {
         const edoobox = validSettings.edoobox as EdooboxSettings

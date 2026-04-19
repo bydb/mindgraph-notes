@@ -356,6 +356,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Apple Calendar (macOS)
   calendarGetEvents: (startDate: string, endDate: string) =>
     ipcRenderer.invoke('calendar-get-events', startDate, endDate),
+  calendarCreateEvent: (params: { title: string; startIso: string; durationMinutes: number; notes?: string }) =>
+    ipcRenderer.invoke('calendar-create-event', params),
 
   // reMarkable (USB)
   remarkableUsbCheck: () =>

@@ -269,12 +269,11 @@ md.renderer.rules.image = (tokens, idx, options, env, self) => {
 }
 
 // Custom renderer für [[wikilinks]], ![[embeds]] und ![[images]]
-const defaultRender = md.renderer.rules.text || ((tokens, idx) => tokens[idx].content)
-md.renderer.rules.text = (tokens, idx, options, env, self) => {
+md.renderer.rules.text = (tokens, idx) => {
   const content = tokens[idx].content
 
   // Konvertiere ![[embeds]] - unterscheide zwischen Bildern, PDFs und Notiz-Embeds
-  let result = content.replace(/!\[\[([^\]|]+)(?:\|([^\]]*))?\]\]/g, (match, linkText, sizeOrAlias) => {
+  let result = content.replace(/!\[\[([^\]|]+)(?:\|([^\]]*))?\]\]/g, (_match, linkText, sizeOrAlias) => {
     // Prüfe ob es sich um ein Bild handelt
     if (isImageFile(linkText)) {
       // Bild-Embed: ![[bild.png]] oder ![[bild.png|300]] oder ![[bild.png|300x200]]
@@ -428,7 +427,7 @@ function processFigures(html: string): string {
   // Wrap in <figure> with <figcaption>
   return html.replace(
     /(<img[^>]*class="md-image"[^>]*>)\s*(?:<br\s*\/?>)?\s*<em>([^<]+)<\/em>/gi,
-    (match, imgTag, caption) => {
+    (_match, imgTag, caption) => {
       return `<figure class="md-figure">${imgTag}<figcaption>${caption}</figcaption></figure>`
     }
   )
@@ -471,7 +470,7 @@ function processCallouts(content: string): string {
   // Gefolgt von > content lines
   const calloutRegex = /^>\s*\[!(\w+)\]([+-])?(?:\s+(.+))?\n((?:>.*\n?)*)/gm
 
-  const result = content.replace(calloutRegex, (match, type, foldModifier, customTitle, body) => {
+  const result = content.replace(calloutRegex, (_match, type, foldModifier, customTitle, body) => {
     const calloutType = type.toLowerCase()
     const title = customTitle || type.charAt(0).toUpperCase() + type.slice(1)
     const isFoldable = foldModifier === '+' || foldModifier === '-'
@@ -534,8 +533,8 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
   const { vaultPath, selectedNoteId, secondarySelectedNoteId, notes, updateNote, selectNote, selectSecondaryNote, addNote, fileTree, setFileTree, navigateBack, navigateForward, canNavigateBack, canNavigateForward } = useNotesStore(
     useShallow(s => ({ vaultPath: s.vaultPath, selectedNoteId: s.selectedNoteId, secondarySelectedNoteId: s.secondarySelectedNoteId, notes: s.notes, updateNote: s.updateNote, selectNote: s.selectNote, selectSecondaryNote: s.selectSecondaryNote, addNote: s.addNote, fileTree: s.fileTree, setFileTree: s.setFileTree, navigateBack: s.navigateBack, navigateForward: s.navigateForward, canNavigateBack: s.canNavigateBack, canNavigateForward: s.canNavigateForward }))
   )
-  const { pendingTemplateInsert, setPendingTemplateInsert, ollama, editorHeadingFolding, editorOutlining, outlineStyle, editorShowWordCount, languageTool, setLanguageTool, editorDefaultView, showFormattingToolbar, setShowFormattingToolbar, showRawEditor } = useUIStore(
-    useShallow(s => ({ pendingTemplateInsert: s.pendingTemplateInsert, setPendingTemplateInsert: s.setPendingTemplateInsert, ollama: s.ollama, editorHeadingFolding: s.editorHeadingFolding, editorOutlining: s.editorOutlining, outlineStyle: s.outlineStyle, editorShowWordCount: s.editorShowWordCount, languageTool: s.languageTool, setLanguageTool: s.setLanguageTool, editorDefaultView: s.editorDefaultView, showFormattingToolbar: s.showFormattingToolbar, setShowFormattingToolbar: s.setShowFormattingToolbar, showRawEditor: s.showRawEditor }))
+  const { pendingTemplateInsert, setPendingTemplateInsert, ollama, editorHeadingFolding, outlineStyle, editorShowWordCount, languageTool, setLanguageTool, editorDefaultView, showFormattingToolbar, setShowFormattingToolbar, showRawEditor } = useUIStore(
+    useShallow(s => ({ pendingTemplateInsert: s.pendingTemplateInsert, setPendingTemplateInsert: s.setPendingTemplateInsert, ollama: s.ollama, editorHeadingFolding: s.editorHeadingFolding, outlineStyle: s.outlineStyle, editorShowWordCount: s.editorShowWordCount, languageTool: s.languageTool, setLanguageTool: s.setLanguageTool, editorDefaultView: s.editorDefaultView, showFormattingToolbar: s.showFormattingToolbar, setShowFormattingToolbar: s.setShowFormattingToolbar, showRawEditor: s.showRawEditor }))
   )
 
   // Verwende die übergebene noteId oder die primary/secondary Selection
@@ -1655,7 +1654,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
   // Listen for insert-footnote events (from Zotero citations as footnotes)
   useEffect(() => {
     const handleInsertFootnote = (e: CustomEvent<{ citation: string; citekey: string }>) => {
-      const { citation, citekey } = e.detail
+      const { citation } = e.detail
       if (!viewRef.current || !citation) return
 
       const view = viewRef.current

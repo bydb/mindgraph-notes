@@ -15,9 +15,12 @@ import ReactFlow, {
 } from 'reactflow'
 import 'reactflow/dist/style.css'
 import { useUIStore } from '../../stores/uiStore'
+import { useTabStore } from '../../stores/tabStore'
 import { useShallow } from 'zustand/react/shallow'
 import { useTranslation } from '../../utils/translations'
 import './HelpGuide.css'
+
+type ActionId = 'openDashboard' | 'openSettings' | 'openSettingsTab' | 'showBriefing'
 
 // ============ SVG ICONS (aus der App) ============
 const icons: Record<string, React.ReactNode> = {
@@ -45,6 +48,9 @@ const icons: Record<string, React.ReactNode> = {
   remarkable: <><rect x="3" y="1" width="12" height="16" rx="2"/><path d="M7 5h4M7 8h4M7 11h2"/></>,
   bookmark: <><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></>,
   task: <><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><path d="M9 12l2 2 4-4"/></>,
+  dashboard: <><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></>,
+  briefing: <><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/></>,
+  agent: <><path d="M12 8V4H8"/><rect x="4" y="12" width="16" height="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 16h.01"/><path d="M9 16h.01"/></>,
 }
 
 const Icon: React.FC<{ name: string; size?: number }> = ({ name, size = 16 }) => (
@@ -62,6 +68,7 @@ interface HelpTopic {
   category: 'core' | 'editor' | 'ai' | 'organize' | 'integrate'
   shortcut?: string
   details: string[]
+  action?: { id: ActionId; label: string; settingsTab?: string }
 }
 
 const helpTopics: HelpTopic[] = [
@@ -86,6 +93,12 @@ const helpTopics: HelpTopic[] = [
     details: ['Grammatik- und Rechtschreibpruefung', 'Direkt im Editor integriert', 'Unterstuetzt Deutsch und Englisch', 'Konfigurierbar in den Einstellungen'] },
 
   // Organize cluster
+  { id: 'dashboard', label: 'Dashboard', icon: 'dashboard', color: '#f59e0b', category: 'organize',
+    details: ['Zentrale Übersicht als Tab neben Editor/Canvas', 'Widgets: Aufgaben, Emails, Kalender, Anmeldungen', 'Reihenfolge und Sichtbarkeit in Einstellungen wählbar', 'Klick auf Eintrag öffnet zugehörige Notiz oder Panel'],
+    action: { id: 'openDashboard', label: 'Dashboard öffnen' } },
+  { id: 'briefing', label: 'Morning Briefing', icon: 'briefing', color: '#f59e0b', category: 'organize',
+    details: ['Einmal pro Tag beim Start: Tages-Überblick als Modal', 'Zeigt Tasks (inkl. überfällig), Emails, heutige Termine, neue Anmeldungen', 'In Dashboard-Einstellungen deaktivierbar', '"Dashboard öffnen" springt zum vollen Tab'],
+    action: { id: 'openSettingsTab', label: 'Einstellungen öffnen', settingsTab: 'dashboard' } },
   { id: 'flashcards', label: 'Flashcards', icon: 'flashcards', color: '#f59e0b', category: 'organize',
     details: ['Karteikarten mit Spaced Repetition', 'Quiz-Modus aus deinen Notizen', 'Anki-Import (AnkiDroid-Format)', 'Lernstatistiken und Fortschritt'] },
   { id: 'tasks', label: 'Aufgaben', icon: 'clock', color: '#f59e0b', category: 'organize',
@@ -95,17 +108,20 @@ const helpTopics: HelpTopic[] = [
   { id: 'tags', label: 'Tags & Ordner', icon: 'tags', color: '#f59e0b', category: 'organize',
     details: ['Tags-Panel: Alle Tags durchsuchen', 'Ordner per Rechtsklick erstellen', 'Templates fuer neue Notizen (⌘⇧T)', 'Lesezeichen fuer Schnellzugriff'] },
   { id: 'sync', label: 'E2E Sync', icon: 'sync', color: '#f59e0b', category: 'organize',
-    details: ['Ende-zu-Ende-verschluesselt', 'Zero-Knowledge: Server sieht nichts', 'Passphrase verlasst nie dein Geraet', 'Konflikte: neuerer Timestamp gewinnt'] },
+    details: ['Ende-zu-Ende-verschluesselt', 'Zero-Knowledge: Server sieht nichts', 'Passphrase verlasst nie dein Geraet', 'Konflikte: neuerer Timestamp gewinnt'],
+    action: { id: 'openSettingsTab', label: 'Sync konfigurieren', settingsTab: 'sync' } },
 
   // Integrations cluster
   { id: 'email', label: 'Email', icon: 'email', color: '#10b981', category: 'integrate',
-    details: ['IMAP-Empfang direkt in MindGraph', 'KI-Analyse: Relevanz, Sentiment, Tasks', 'Emails schreiben und per SMTP senden', 'KI-Chat ueber einzelne Emails'] },
+    details: ['IMAP-Empfang direkt in MindGraph', 'KI-Analyse: Relevanz, Sentiment, Tasks', 'Emails schreiben und per SMTP senden', 'KI-Chat ueber einzelne Emails'],
+    action: { id: 'openSettingsTab', label: 'Email einrichten', settingsTab: 'integrations' } },
+  { id: 'agent', label: 'Agent', icon: 'agent', color: '#10b981', category: 'integrate',
+    details: ['edoobox: Veranstaltungen importieren und pflegen', 'WordPress: Blog-Posts automatisch publizieren', 'KI-Content-Generierung mit Ollama', 'IQ-Auswertung aus vergangenen Veranstaltungen'],
+    action: { id: 'openSettingsTab', label: 'Agent einrichten', settingsTab: 'agents' } },
   { id: 'research', label: 'Forschung', icon: 'book', color: '#10b981', category: 'integrate',
     details: ['Semantic Scholar: Paper suchen', 'Zotero-Bibliothek durchsuchen (⌘⇧Z)', 'Readwise-Highlights synchronisieren', 'Zitate direkt in Notizen einfuegen'] },
   { id: 'devices', label: 'Geraete', icon: 'remarkable', color: '#10b981', category: 'integrate',
     details: ['reMarkable-Tablet: Dokumente importieren', 'Integriertes Terminal mit Shell-Zugriff', 'KI-Tool-Erkennung (Claude, opencode)', 'PDF-Export und -Optimierung'] },
-  { id: 'business', label: 'Business', icon: 'calendar', color: '#10b981', category: 'integrate',
-    details: ['edoobox: Veranstaltungen verwalten', 'WordPress: Blog-Posts publizieren', 'KI-Content-Generierung', 'Google Imagen fuer Bilder'] },
 ]
 
 // ============ GRAPH LAYOUT ============
@@ -138,7 +154,7 @@ function buildGraph(): { nodes: Node[]; edges: Edge[] } {
   }
 
   // Place cluster nodes
-  for (const [category, cluster] of Object.entries(clusters)) {
+  for (const [, cluster] of Object.entries(clusters)) {
     const count = cluster.topics.length
     const radius = 100
     cluster.topics.forEach((topic, i) => {
@@ -215,7 +231,11 @@ HelpNode.displayName = 'HelpNode'
 const nodeTypes = { helpNode: HelpNode } as const
 
 // ============ DETAIL PANEL ============
-const DetailPanel: React.FC<{ topic: HelpTopic | null; onClose: () => void }> = ({ topic, onClose }) => {
+const DetailPanel: React.FC<{
+  topic: HelpTopic | null
+  onClose: () => void
+  onAction: (topic: HelpTopic) => void
+}> = ({ topic, onClose, onAction }) => {
   if (!topic) return null
 
   return (
@@ -237,6 +257,17 @@ const DetailPanel: React.FC<{ topic: HelpTopic | null; onClose: () => void }> = 
           <li key={i}>{detail}</li>
         ))}
       </ul>
+      {topic.action && (
+        <div className="help-detail-action">
+          <button
+            className="help-detail-action-btn"
+            style={{ background: topic.color }}
+            onClick={() => onAction(topic)}
+          >
+            {topic.action.label}
+          </button>
+        </div>
+      )}
     </div>
   )
 }
@@ -248,6 +279,7 @@ const HelpGraphInner: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   const { nodes: initialNodes, edges: initialEdges } = useMemo(() => buildGraph(), [])
   const [nodes, , onNodesChange] = useNodesState(initialNodes)
   const [edges] = useEdgesState(initialEdges)
+  const openDashboardTab = useTabStore(s => s.openDashboardTab)
 
   const handleNodeClick = useCallback((_: React.MouseEvent, node: Node) => {
     const topic = helpTopics.find(t => t.id === node.id) || null
@@ -257,6 +289,29 @@ const HelpGraphInner: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   const handlePaneClick = useCallback(() => {
     setSelectedTopic(null)
   }, [])
+
+  const handleAction = useCallback((topic: HelpTopic) => {
+    if (!topic.action) return
+    switch (topic.action.id) {
+      case 'openDashboard':
+        useUIStore.getState().setViewMode('editor')
+        openDashboardTab()
+        onClose()
+        break
+      case 'openSettings':
+      case 'openSettingsTab':
+        // Settings als Event öffnen — HelpGuide ist geschlossen, App hört darauf
+        onClose()
+        window.dispatchEvent(new CustomEvent('mindgraph:openSettings', {
+          detail: { tab: topic.action.settingsTab }
+        }))
+        break
+      case 'showBriefing':
+        onClose()
+        window.dispatchEvent(new CustomEvent('mindgraph:showBriefing'))
+        break
+    }
+  }, [openDashboardTab, onClose])
 
   return (
     <div className="help-graph-wrapper">
@@ -295,7 +350,7 @@ const HelpGraphInner: React.FC<{ onClose: () => void }> = ({ onClose }) => {
       </div>
 
       {/* Detail Panel */}
-      <DetailPanel topic={selectedTopic} onClose={() => setSelectedTopic(null)} />
+      <DetailPanel topic={selectedTopic} onClose={() => setSelectedTopic(null)} onAction={handleAction} />
 
       {/* Legend */}
       <div className="help-graph-legend">

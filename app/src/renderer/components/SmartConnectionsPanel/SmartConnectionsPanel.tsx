@@ -592,10 +592,10 @@ export const SmartConnectionsPanel: React.FC<SmartConnectionsPanelProps> = ({ on
       console.log(`[SmartConnections] Keywords extrahiert: ${currentKeywords.slice(0, 10).join(', ')}...`)
 
       // Embedding für aktuelle Notiz (generiere falls nicht gecacht)
-      let currentEmbedding = embeddingsCache.files[currentNote.id]?.embedding
+      let currentEmbedding: number[] | undefined = embeddingsCache.files[currentNote.id]?.embedding
       if (!currentEmbedding) {
         console.log(`[SmartConnections] Generating embedding for current note "${currentNote.title}"`)
-        currentEmbedding = await getEmbedding(currentContent) || undefined
+        currentEmbedding = (await getEmbedding(currentContent)) ?? undefined
         if (!currentEmbedding) {
           setError(`${t('smartConnections.errorGeneratingEmbedding')}`)
           setIsCalculating(false)

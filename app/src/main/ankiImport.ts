@@ -1,7 +1,7 @@
 import * as path from 'path'
 import * as fs from 'fs/promises'
 import AdmZip from 'adm-zip'
-import initSqlJs from 'sql.js'
+import initSqlJs, { type Database } from 'sql.js'
 
 export interface AnkiImportResult {
   cards: Array<{
@@ -92,7 +92,7 @@ export async function parseAnkiPackage(
 // ---------------------------------------------------------------------------
 
 function parseCards(
-  db: ReturnType<InstanceType<Awaited<ReturnType<typeof initSqlJs>>['Database']>['prototype']['constructor']>,
+  db: Database,
   models: Record<string, AnkiModel>,
   decks: Record<string, AnkiDeck>,
   mediaMapping: Record<string, string>
@@ -332,7 +332,7 @@ function decodeHtmlEntities(text: string): string {
 // ---------------------------------------------------------------------------
 
 async function extractMedia(
-  zip: AdmZip,
+  _zip: AdmZip,
   mediaMapping: Record<string, string>,
   vaultPath: string,
   entries: AdmZip.IZipEntry[]

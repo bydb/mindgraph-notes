@@ -93,7 +93,7 @@ export function setNoteClickHandler(handler: ((path: string) => void) | undefine
 const selectionVersionField = StateField.define<number>({
   create: () => 0,
   update: (version, tr) => {
-    if (tr.selectionSet) return version + 1
+    if (tr.selection && !tr.selection.eq(tr.startState.selection)) return version + 1
     return version
   }
 })

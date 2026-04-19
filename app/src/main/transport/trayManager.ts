@@ -62,7 +62,7 @@ export function setupTray(opts: {
   })
 }
 
-function createTransportWindow(resourcesPath: string): BrowserWindow {
+function createTransportWindow(_resourcesPath: string): BrowserWindow {
   const { width: screenWidth, height: screenHeight } = screen.getPrimaryDisplay().workAreaSize
 
   const winWidth = 560

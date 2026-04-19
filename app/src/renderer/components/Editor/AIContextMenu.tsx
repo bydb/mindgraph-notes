@@ -70,7 +70,7 @@ export const AIContextMenu: React.FC<AIContextMenuProps> = ({
       const requestParams = {
         model: ollama.selectedModel,
         prompt: customPrompt || '',
-        action: action === 'custom' ? 'custom' : action,
+        action: (action === 'custom' ? 'custom' : action) as 'translate' | 'summarize' | 'continue' | 'improve' | 'custom',
         targetLanguage: targetLanguage || (action === 'translate' ? getLanguageName(ollama.defaultTranslateLanguage) : undefined),
         originalText: selectedText,
         customPrompt: customPrompt

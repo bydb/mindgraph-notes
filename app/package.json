@@ -1,6 +1,6 @@
 {
   "name": "mindgraph-notes",
-  "version": "0.5.4-beta",
+  "version": "0.5.5-beta",
   "description": "Eine minimalistische Markdown-Notizen-App mit editierbarer Graph View",
   "main": "out/main/index.js",
   "scripts": {
@@ -10,7 +10,9 @@
     "start": "electron .",
     "pack": "electron-vite build && electron-builder --dir",
     "dist": "electron-vite build && electron-builder",
-    "dist:mac": "electron-vite build && electron-builder --mac"
+    "dist:mac": "electron-vite build && electron-builder --mac",
+    "typecheck": "tsc --noEmit",
+    "prebuild": "tsc --noEmit"
   },
   "keywords": [
     "markdown",
@@ -102,9 +104,12 @@
   "devDependencies": {
     "@types/adm-zip": "^0.5.7",
     "@types/dompurify": "^3.0.5",
+    "@types/mailparser": "^3.4.6",
     "@types/markdown-it": "^14.1.2",
+    "@types/nodemailer": "^8.0.0",
     "@types/react": "^19.2.8",
     "@types/react-dom": "^19.2.3",
+    "@types/sql.js": "^1.4.11",
     "@types/ws": "^8.5.13",
     "electron": "^40.0.0",
     "electron-builder": "^26.4.0",

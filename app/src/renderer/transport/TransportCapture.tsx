@@ -1,32 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react'
 import TaskInsertModal from './TaskInsertModal'
 
-declare global {
-  interface Window {
-    electronAPI: {
-      transportGetConfig: () => Promise<{
-        vaultPath: string | null
-        transport: {
-          destinations: { label: string; folder: string }[]
-          predefinedTags: string[]
-          defaultDestinationIndex: number
-        } | null
-      }>
-      transportListVaultSubdirs: () => Promise<string[]>
-      transportSaveNote: (data: {
-        title: string
-        category: string
-        tags: string[]
-        content: string
-        destinationFolder: string
-      }) => Promise<{ success: boolean; relativePath?: string; error?: string }>
-      transportOpenInMain: (relativePath: string) => Promise<void>
-      transportClose: () => Promise<void>
-      onTransportWindowShown: (callback: () => void) => void
-    }
-  }
-}
-
 interface Category {
   emoji: string
   label: string

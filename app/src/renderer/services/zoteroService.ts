@@ -229,7 +229,7 @@ ${item.abstractNote || '*Kein Abstract verfügbar*'}
 
 // Generiert Dateinamen für Literaturnotiz
 export function generateLiteratureNoteFilename(result: ZoteroSearchResult): string {
-  const { item, citekey } = result
+  const { item } = result
   const year = formatYear(item)
   const firstAuthor = item.creators?.[0]?.lastName || item.creators?.[0]?.name || 'Unknown'
 

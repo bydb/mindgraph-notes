@@ -1,0 +1,364 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1400 900" role="img" aria-label="MindGraph Notes — Dashboard mit Aufgaben, Emails und Kalender">
+  <title>MindGraph Notes — Dashboard</title>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#fdfbf5"/>
+      <stop offset="100%" stop-color="#f5f0e4"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#d4905e"/>
+      <stop offset="100%" stop-color="#b86a3e"/>
+    </linearGradient>
+    <filter id="shadow" x="-5%" y="-5%" width="110%" height="110%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="6"/>
+      <feOffset dx="0" dy="8" result="offsetBlur"/>
+      <feComponentTransfer>
+        <feFuncA type="linear" slope="0.08"/>
+      </feComponentTransfer>
+      <feMerge>
+        <feMergeNode/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <style>
+      .mono { font-family: 'SF Mono', 'JetBrains Mono', Menlo, monospace; }
+      .sans { font-family: 'DM Sans', -apple-system, sans-serif; }
+    </style>
+  </defs>
+
+  <!-- Window shadow + body -->
+  <rect x="40" y="40" width="1320" height="820" rx="18" fill="#ffffff" filter="url(#shadow)"/>
+  <rect x="40" y="40" width="1320" height="820" rx="18" fill="url(#bg)"/>
+
+  <!-- Titlebar -->
+  <rect x="40" y="40" width="1320" height="56" rx="18" fill="#ffffff" fill-opacity="0.9"/>
+  <rect x="40" y="80" width="1320" height="16" fill="#ffffff" fill-opacity="0.9"/>
+
+  <!-- mac traffic lights -->
+  <circle cx="68" cy="68" r="7" fill="#ff5f57"/>
+  <circle cx="90" cy="68" r="7" fill="#ffbd2e"/>
+  <circle cx="112" cy="68" r="7" fill="#28c940"/>
+
+  <!-- sidebar-toggle icon -->
+  <g transform="translate(150,56)" stroke="#8a8278" stroke-width="1.6" fill="none" stroke-linecap="round">
+    <rect x="0" y="0" width="18" height="18" rx="3"/>
+    <line x1="6" y1="0" x2="6" y2="18"/>
+  </g>
+
+  <!-- app logo -->
+  <g transform="translate(192,56)">
+    <rect x="0" y="0" width="26" height="26" rx="6" fill="url(#accent)"/>
+    <g stroke="#fff" stroke-width="1.5" fill="none" stroke-linecap="round">
+      <circle cx="8" cy="10" r="2.5"/>
+      <circle cx="18" cy="10" r="2.5"/>
+      <circle cx="13" cy="18" r="2.5"/>
+      <line x1="10" y1="10" x2="16" y2="10"/>
+      <line x1="9" y1="12" x2="12" y2="16"/>
+      <line x1="17" y1="12" x2="14" y2="16"/>
+    </g>
+  </g>
+  <text x="228" y="73" class="sans" font-size="14" font-weight="600" fill="#1a1a1a">MindGraph Notes</text>
+  <rect x="344" y="60" width="40" height="18" rx="4" fill="#f5f0e4" stroke="#c4764a" stroke-opacity="0.3"/>
+  <text x="364" y="73" class="sans" font-size="10" font-weight="600" fill="#c4764a" text-anchor="middle">BETA</text>
+
+  <!-- View-Mode-Switcher (center) — Dashboard aktiv -->
+  <g transform="translate(620,54)">
+    <!-- Editor icon -->
+    <g transform="translate(0,0)" stroke="#8a8278" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="8" y="5" width="14" height="20" rx="2"/>
+      <line x1="12" y1="12" x2="18" y2="12"/>
+      <line x1="12" y1="17" x2="18" y2="17"/>
+      <line x1="12" y1="22" x2="16" y2="22"/>
+    </g>
+    <!-- Split -->
+    <g transform="translate(40,0)" stroke="#8a8278" stroke-width="1.5" fill="none" stroke-linecap="round">
+      <rect x="5" y="6" width="20" height="18" rx="2"/>
+      <line x1="15" y1="6" x2="15" y2="24"/>
+    </g>
+    <!-- Canvas -->
+    <g transform="translate(80,0)" stroke="#8a8278" stroke-width="1.5" fill="none" stroke-linecap="round">
+      <circle cx="10" cy="10" r="3"/>
+      <circle cx="22" cy="10" r="3"/>
+      <circle cx="16" cy="22" r="3"/>
+      <line x1="12" y1="10" x2="20" y2="10"/>
+      <line x1="11" y1="12" x2="14" y2="20"/>
+      <line x1="21" y1="12" x2="18" y2="20"/>
+    </g>
+    <!-- Dashboard (active) -->
+    <rect x="115" y="3" width="36" height="26" rx="13" fill="url(#accent)"/>
+    <g transform="translate(121,10)" stroke="#fff" stroke-width="1.8" fill="none">
+      <rect x="0" y="0" width="9" height="9" rx="1.5"/>
+      <rect x="14" y="0" width="9" height="9" rx="1.5"/>
+      <rect x="0" y="14" width="9" height="9" rx="1.5"/>
+      <rect x="14" y="14" width="9" height="9" rx="1.5"/>
+    </g>
+  </g>
+
+  <!-- Titlebar right icons -->
+  <g transform="translate(1200,66)" fill="#8a8278">
+    <circle cx="0" cy="0" r="3"/>
+    <circle cx="20" cy="0" r="3"/>
+    <circle cx="40" cy="0" r="3"/>
+    <circle cx="60" cy="0" r="3"/>
+    <rect x="78" y="-4" width="10" height="8" rx="1.5" fill="url(#accent)"/>
+    <text x="83" y="-8" class="sans" font-size="8" font-weight="700" fill="#c4764a" text-anchor="middle">12</text>
+    <circle cx="108" cy="0" r="3"/>
+    <circle cx="128" cy="0" r="3"/>
+  </g>
+
+  <!-- Sidebar -->
+  <rect x="40" y="96" width="260" height="764" fill="#faf8f0" fill-opacity="0.55"/>
+  <line x1="300" y1="96" x2="300" y2="860" stroke="#e6dfd0" stroke-width="1"/>
+
+  <text x="70" y="132" class="sans" font-size="10" font-weight="600" fill="#8a8278" letter-spacing="1.2">MINDGRAPH NOTES</text>
+
+  <g transform="translate(70,150)" fill="#8a8278">
+    <circle cx="0" cy="8" r="6" fill="none" stroke="#8a8278" stroke-width="1.3"/>
+    <circle cx="-2.5" cy="6" r="0.8" fill="#8a8278"/>
+    <circle cx="2.5" cy="6" r="0.8" fill="#8a8278"/>
+    <path d="M-3 10 Q0 13 3 10" stroke="#8a8278" stroke-width="1.3" fill="none" stroke-linecap="round"/>
+    <rect x="20" y="3" width="14" height="2" rx="1"/>
+    <rect x="40" y="3" width="14" height="2" rx="1"/>
+    <rect x="60" y="3" width="14" height="2" rx="1"/>
+    <rect x="80" y="3" width="14" height="2" rx="1"/>
+  </g>
+
+  <text x="70" y="192" class="sans" font-size="14" font-weight="600" fill="#1a1a1a">2026</text>
+  <text x="270" y="192" class="sans" font-size="10" fill="#8a8278" text-anchor="end">3.454 Notizen</text>
+
+  <text x="70" y="228" class="sans" font-size="9" font-weight="600" fill="#8a8278" letter-spacing="1">ANGEPINNT</text>
+
+  <!-- Folder entries -->
+  <g class="sans" font-size="12" fill="#4a4540">
+    <g transform="translate(70,252)">
+      <polygon points="0,0 6,4 0,8" fill="#8a8278"/>
+      <text x="16" y="7" font-weight="500">✏️ 211 - Journal</text>
+      <rect x="200" y="-3" width="18" height="14" rx="3" fill="#f0ebe0"/>
+      <text x="209" y="7" font-size="10" fill="#8a8278" text-anchor="middle">5</text>
+    </g>
+    <g transform="translate(70,282)">
+      <polygon points="0,0 6,4 0,8" fill="#8a8278"/>
+      <text x="16" y="7" font-weight="500">📌 010 - Notes</text>
+      <rect x="200" y="-3" width="18" height="14" rx="3" fill="#f0ebe0"/>
+      <text x="209" y="7" font-size="10" fill="#8a8278" text-anchor="middle">25</text>
+    </g>
+    <g transform="translate(70,312)">
+      <polygon points="0,0 6,4 0,8" fill="#8a8278"/>
+      <text x="16" y="7" font-weight="500">‼️📧 - emails</text>
+      <rect x="200" y="-3" width="18" height="14" rx="3" fill="#fde4d4"/>
+      <text x="209" y="7" font-size="10" fill="#c4764a" text-anchor="middle">34</text>
+    </g>
+    <g transform="translate(70,342)">
+      <polygon points="0,0 6,4 0,8" fill="#8a8278"/>
+      <text x="16" y="7" font-weight="500">📁 100 - ✅ Projekte</text>
+    </g>
+    <g transform="translate(70,372)">
+      <polygon points="0,0 6,4 0,8" fill="#8a8278"/>
+      <text x="16" y="7" font-weight="500">📁 300 - 📦 Ressourcen</text>
+    </g>
+    <g transform="translate(86,406)" fill-opacity="0.85">
+      <text y="7" font-weight="500">📄 19.04.26 - Journal</text>
+    </g>
+    <g transform="translate(86,432)" fill-opacity="0.7">
+      <text y="7">📄 Email-Instruktionen</text>
+    </g>
+  </g>
+
+  <!-- Main area: Dashboard -->
+  <g transform="translate(320,120)">
+    <!-- Tab bar -->
+    <rect x="0" y="0" width="150" height="34" rx="8" fill="#ffffff" stroke="#e6dfd0"/>
+    <g transform="translate(14,17)">
+      <rect x="0" y="-5" width="10" height="10" rx="2" fill="url(#accent)"/>
+    </g>
+    <text x="36" y="22" class="sans" font-size="12" font-weight="500" fill="#c4764a">Dashboard</text>
+
+    <!-- Header -->
+    <text x="0" y="90" class="sans" font-size="34" font-weight="700" fill="#1a1a1a">Dashboard</text>
+    <text x="0" y="118" class="sans" font-size="14" fill="#8a8278">Sonntag, 19. April 2026</text>
+
+    <!-- Refresh icon -->
+    <g transform="translate(1000,72)" stroke="#8a8278" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="-16" y="-16" width="32" height="32" rx="6" fill="#ffffff" stroke="#e6dfd0" stroke-width="1"/>
+      <polyline points="4,-8 10,-8 10,-2"/>
+      <path d="M8,2 a8,8 0 1,1 -2.8,-10.4 L10,-8"/>
+    </g>
+
+    <!-- Widget grid: 3 columns -->
+    <!-- Widget 1: Aufgaben -->
+    <g transform="translate(0,150)">
+      <rect width="325" height="360" rx="14" fill="#ffffff" stroke="#e6dfd0"/>
+      <rect width="325" height="44" rx="14" fill="#faf8f0"/>
+      <rect y="30" width="325" height="14" fill="#faf8f0"/>
+      <text x="20" y="29" class="sans" font-size="11" font-weight="700" fill="#8a8278" letter-spacing="1.1">AUFGABEN</text>
+      <rect x="280" y="13" width="28" height="18" rx="9" fill="#f0ebe0"/>
+      <text x="294" y="26" class="sans" font-size="11" font-weight="600" fill="#4a4540" text-anchor="middle">5</text>
+
+      <!-- Überfällig section -->
+      <text x="20" y="74" class="sans" font-size="9" font-weight="700" fill="#c4764a" letter-spacing="1.2">ÜBERFÄLLIG</text>
+
+      <g transform="translate(20,86)">
+        <rect x="0" y="0" width="12" height="12" rx="2" fill="none" stroke="#c4764a" stroke-width="1.3"/>
+        <text x="22" y="10" class="sans" font-size="12.5" fill="#1a1a1a" font-weight="500">Angebot fertigstellen</text>
+        <text x="22" y="26" class="sans" font-size="12.5" fill="#1a1a1a" font-weight="500">und verschicken</text>
+        <text x="22" y="44" class="sans" font-size="10.5" fill="#8a8278">Projekt A  ·  17.04.</text>
+      </g>
+      <g transform="translate(20,148)">
+        <rect x="0" y="0" width="12" height="12" rx="2" fill="none" stroke="#c4764a" stroke-width="1.3"/>
+        <text x="22" y="10" class="sans" font-size="12.5" fill="#1a1a1a" font-weight="500">Rückruf: Lieferant</text>
+        <text x="22" y="26" class="sans" font-size="10.5" fill="#8a8278">Einkauf  ·  17.04.</text>
+      </g>
+
+      <!-- Heute section -->
+      <text x="20" y="204" class="sans" font-size="9" font-weight="700" fill="#8a8278" letter-spacing="1.2">HEUTE</text>
+      <g transform="translate(20,216)">
+        <rect x="0" y="0" width="12" height="12" rx="2" fill="none" stroke="#c0b5a0" stroke-width="1.3"/>
+        <text x="22" y="10" class="sans" font-size="12.5" fill="#1a1a1a" font-weight="500">Formular ausfüllen</text>
+        <text x="22" y="26" class="sans" font-size="10.5" fill="#8a8278">Beschaffung  ·  23:59</text>
+      </g>
+
+      <!-- Diese Woche -->
+      <text x="20" y="272" class="sans" font-size="9" font-weight="700" fill="#8a8278" letter-spacing="1.2">DIESE WOCHE</text>
+      <g transform="translate(20,284)">
+        <rect x="0" y="0" width="12" height="12" rx="2" fill="none" stroke="#c0b5a0" stroke-width="1.3"/>
+        <text x="22" y="10" class="sans" font-size="12.5" fill="#1a1a1a" font-weight="500">Teamrunde zum</text>
+        <text x="22" y="26" class="sans" font-size="12.5" fill="#1a1a1a" font-weight="500">Quartalsziel</text>
+        <text x="22" y="44" class="sans" font-size="10.5" fill="#8a8278">Meeting  ·  23.04.</text>
+      </g>
+    </g>
+
+    <!-- Widget 2: Zu beantworten (Emails) -->
+    <g transform="translate(345,150)">
+      <rect width="325" height="360" rx="14" fill="#ffffff" stroke="#e6dfd0"/>
+      <rect width="325" height="44" rx="14" fill="#faf8f0"/>
+      <rect y="30" width="325" height="14" fill="#faf8f0"/>
+      <text x="20" y="29" class="sans" font-size="11" font-weight="700" fill="#8a8278" letter-spacing="1.1">ZU BEANTWORTEN</text>
+      <rect x="272" y="13" width="36" height="18" rx="9" fill="#f0ebe0"/>
+      <text x="290" y="26" class="sans" font-size="11" font-weight="600" fill="#4a4540" text-anchor="middle">22</text>
+
+      <!-- Email rows (Dummy-Daten) -->
+      <g transform="translate(20,70)">
+        <circle cx="4" cy="8" r="4" fill="#c4764a"/>
+        <text x="20" y="6" class="sans" font-size="12.5" fill="#1a1a1a" font-weight="600">Max Mustermann</text>
+        <text x="20" y="22" class="sans" font-size="11" fill="#8a8278">Fwd: Workshop-Einladung ...</text>
+      </g>
+      <line x1="20" y1="108" x2="305" y2="108" stroke="#f0ebe0"/>
+
+      <g transform="translate(20,124)">
+        <circle cx="4" cy="8" r="4" fill="#c4764a"/>
+        <text x="20" y="6" class="sans" font-size="12.5" fill="#1a1a1a" font-weight="600">Erika Beispiel</text>
+        <text x="20" y="22" class="sans" font-size="11" fill="#8a8278">AW: Kick-Off Meeting ...</text>
+      </g>
+      <line x1="20" y1="162" x2="305" y2="162" stroke="#f0ebe0"/>
+
+      <g transform="translate(20,178)">
+        <circle cx="4" cy="8" r="4" fill="#d4905e"/>
+        <text x="20" y="6" class="sans" font-size="12.5" fill="#1a1a1a" font-weight="600">Lisa Beispielfrau</text>
+        <text x="20" y="22" class="sans" font-size="11" fill="#8a8278">Projekt-Update: Meilenstein 2</text>
+      </g>
+      <line x1="20" y1="216" x2="305" y2="216" stroke="#f0ebe0"/>
+
+      <g transform="translate(20,232)">
+        <circle cx="4" cy="8" r="4" fill="#d4905e"/>
+        <text x="20" y="6" class="sans" font-size="12.5" fill="#1a1a1a" font-weight="600">Peter Platzhalter</text>
+        <text x="20" y="22" class="sans" font-size="11" fill="#8a8278">Frage zur Konfiguration ...</text>
+      </g>
+      <line x1="20" y1="270" x2="305" y2="270" stroke="#f0ebe0"/>
+
+      <g transform="translate(20,286)">
+        <circle cx="4" cy="8" r="4" fill="#c0b5a0"/>
+        <text x="20" y="6" class="sans" font-size="12.5" fill="#1a1a1a" font-weight="600">Anna Demo</text>
+        <text x="20" y="22" class="sans" font-size="11" fill="#8a8278">Newsletter: Neue Features ...</text>
+      </g>
+    </g>
+
+    <!-- Widget 3: Kalender -->
+    <g transform="translate(690,150)">
+      <rect width="325" height="360" rx="14" fill="#ffffff" stroke="#e6dfd0"/>
+      <rect width="325" height="44" rx="14" fill="#faf8f0"/>
+      <rect y="30" width="325" height="14" fill="#faf8f0"/>
+      <text x="20" y="29" class="sans" font-size="11" font-weight="700" fill="#8a8278" letter-spacing="1.1">KALENDER</text>
+      <rect x="280" y="13" width="28" height="18" rx="9" fill="#f0ebe0"/>
+      <text x="294" y="26" class="sans" font-size="11" font-weight="600" fill="#4a4540" text-anchor="middle">3</text>
+
+      <g transform="translate(20,70)">
+        <text y="6" class="sans" font-size="10" font-weight="700" fill="#c4764a" letter-spacing="1.1">MORGEN</text>
+        <text x="80" y="6" class="sans" font-size="12.5" fill="#1a1a1a" font-weight="500">🟢 Biotonne</text>
+        <text x="80" y="22" class="sans" font-size="10.5" fill="#8a8278">06:00</text>
+      </g>
+      <line x1="20" y1="110" x2="305" y2="110" stroke="#f0ebe0"/>
+
+      <g transform="translate(20,126)">
+        <text y="6" class="sans" font-size="10" font-weight="700" fill="#c4764a" letter-spacing="1.1">MORGEN</text>
+        <text x="80" y="6" class="sans" font-size="12.5" fill="#1a1a1a" font-weight="500">Arzttermin</text>
+        <text x="80" y="22" class="sans" font-size="10.5" fill="#8a8278">09:00</text>
+      </g>
+      <line x1="20" y1="166" x2="305" y2="166" stroke="#f0ebe0"/>
+
+      <g transform="translate(20,182)">
+        <text y="6" class="sans" font-size="10" font-weight="700" fill="#c4764a" letter-spacing="1.1">MORGEN</text>
+        <text x="80" y="6" class="sans" font-size="12.5" fill="#1a1a1a" font-weight="500">Workshop: Projekt-</text>
+        <text x="80" y="22" class="sans" font-size="12.5" fill="#1a1a1a" font-weight="500">planung Q2</text>
+        <text x="80" y="44" class="sans" font-size="10.5" fill="#8a8278">14:30  ·  Konferenzraum</text>
+      </g>
+    </g>
+
+    <!-- Widget 4: Neue Anmeldungen (bottom row) -->
+    <g transform="translate(0,530)">
+      <rect width="325" height="165" rx="14" fill="#ffffff" stroke="#e6dfd0"/>
+      <rect width="325" height="44" rx="14" fill="#faf8f0"/>
+      <rect y="30" width="325" height="14" fill="#faf8f0"/>
+      <text x="20" y="29" class="sans" font-size="11" font-weight="700" fill="#8a8278" letter-spacing="1.1">NEUE ANMELDUNGEN</text>
+      <rect x="280" y="13" width="28" height="18" rx="9" fill="#f0ebe0"/>
+      <text x="294" y="26" class="sans" font-size="11" font-weight="600" fill="#4a4540" text-anchor="middle">2</text>
+
+      <g transform="translate(20,70)">
+        <text y="6" class="sans" font-size="12.5" font-weight="600" fill="#1a1a1a">Erika Mustermann</text>
+        <text y="22" class="sans" font-size="11" fill="#8a8278">Einführung Workshop · 27.05.26</text>
+      </g>
+      <line x1="20" y1="108" x2="305" y2="108" stroke="#f0ebe0"/>
+      <g transform="translate(20,124)">
+        <text y="6" class="sans" font-size="12.5" font-weight="600" fill="#1a1a1a">John Doe</text>
+        <text y="22" class="sans" font-size="11" fill="#8a8278">Aufbau-Seminar</text>
+      </g>
+    </g>
+
+    <!-- Small stats + sync line right side -->
+    <g transform="translate(345,530)">
+      <rect width="670" height="165" rx="14" fill="#ffffff" stroke="#e6dfd0"/>
+      <text x="30" y="36" class="sans" font-size="11" font-weight="700" fill="#8a8278" letter-spacing="1.1">HEUTE IM FOKUS</text>
+      <text x="30" y="72" class="sans" font-size="15" fill="#1a1a1a" font-weight="500">Drei überfällige Aufgaben, 22 Emails warten auf</text>
+      <text x="30" y="92" class="sans" font-size="15" fill="#1a1a1a" font-weight="500">Antwort, drei Termine morgen.</text>
+      <text x="30" y="124" class="sans" font-size="12.5" fill="#8a8278">Dashboard, Canvas und Editor teilen sich einen Workspace.</text>
+      <text x="30" y="142" class="sans" font-size="12.5" fill="#8a8278">Module aktivierst du nach Bedarf — Kern bleibt schlank.</text>
+
+      <!-- decorative "graph" mini preview -->
+      <g transform="translate(480,45)" stroke="#c4764a" stroke-opacity="0.6" fill="#c4764a" fill-opacity="0.1" stroke-width="1">
+        <circle cx="30" cy="40" r="14"/>
+        <circle cx="90" cy="20" r="10"/>
+        <circle cx="120" cy="75" r="12"/>
+        <circle cx="55" cy="90" r="8"/>
+        <circle cx="155" cy="40" r="9"/>
+        <line x1="30" y1="40" x2="90" y2="20" stroke-opacity="0.4"/>
+        <line x1="30" y1="40" x2="55" y2="90" stroke-opacity="0.4"/>
+        <line x1="90" y1="20" x2="120" y2="75" stroke-opacity="0.4"/>
+        <line x1="120" y1="75" x2="155" y2="40" stroke-opacity="0.4"/>
+        <line x1="55" y1="90" x2="120" y2="75" stroke-opacity="0.4"/>
+      </g>
+    </g>
+  </g>
+
+  <!-- Status bar -->
+  <line x1="40" y1="824" x2="1360" y2="824" stroke="#e6dfd0"/>
+  <g transform="translate(60,846)" class="sans" font-size="10" fill="#8a8278">
+    <text>2026</text>
+    <text x="80">3454 Notizen</text>
+    <text x="180">4032 Links</text>
+    <text x="270" fill="#3a8a3a">✓ 132/165</text>
+    <text x="360">33 offen</text>
+    <text x="440" fill="#c4764a">· 3 überfällig</text>
+  </g>
+  <g transform="translate(1290,846)" class="sans" font-size="10" fill="#8a8278">
+    <text>▲ Terminal</text>
+  </g>
+</svg>

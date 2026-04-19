@@ -21,47 +21,6 @@ function getText(view: EditorView, from: number, to: number): string {
 }
 
 /**
- * Create decoration to hide syntax markers
- */
-function hideDecoration(from: number, to: number): { from: number; to: number; decoration: Decoration } {
-  return {
-    from,
-    to,
-    decoration: Decoration.replace({}),
-  }
-}
-
-/**
- * Create decoration with a CSS class for formatting
- */
-function markDecoration(
-  from: number,
-  to: number,
-  className: string
-): { from: number; to: number; decoration: Decoration } {
-  return {
-    from,
-    to,
-    decoration: Decoration.mark({ class: className }),
-  }
-}
-
-/**
- * Create widget decoration
- */
-function widgetDecoration(
-  from: number,
-  to: number,
-  widget: import('@codemirror/view').WidgetType
-): { from: number; to: number; decoration: Decoration } {
-  return {
-    from,
-    to,
-    decoration: Decoration.replace({ widget }),
-  }
-}
-
-/**
  * Decoration builder context
  */
 interface DecoratorContext {
@@ -325,7 +284,7 @@ export function decorateTaskList(ctx: DecoratorContext, node: SyntaxNode): void 
   const match = text.match(/^(\s*[-*+]\s+)\[([ xX])\](\s*)/)
   if (!match) return
 
-  const [fullMatch, prefix, checkChar, space] = match
+  const [, prefix, checkChar, space] = match
   const isChecked = checkChar.toLowerCase() === 'x'
   const checkboxStart = node.from + prefix.length
   const checkboxEnd = checkboxStart + 3 + space.length // [x] + space

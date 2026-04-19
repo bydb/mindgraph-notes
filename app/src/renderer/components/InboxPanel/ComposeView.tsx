@@ -22,7 +22,6 @@ export const ComposeView: React.FC = () => {
   const [ltChecking, setLtChecking] = useState(false)
   const [ltCorrectionCount, setLtCorrectionCount] = useState(0)
   const [ltHighlights, setLtHighlights] = useState<{ offset: number; length: number }[]>([])
-  const ltCheckTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   // Signatur-Bild laden
   useEffect(() => {

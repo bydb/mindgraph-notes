@@ -24,6 +24,8 @@ import { FlashcardsPanel, FlashcardStudy, FlashcardEditor } from './components/F
 import { useFlashcardStore } from './stores/flashcardStore'
 import { OverduePanel } from './components/OverduePanel/OverduePanel'
 import { InboxPanel } from './components/InboxPanel/InboxPanel'
+import { DashboardView } from './components/DashboardPanel/DashboardView'
+import { MorningBriefing } from './components/DashboardPanel/MorningBriefing'
 import { AgentPanel } from './components/AgentPanel/AgentPanel'
 import { SemanticScholarPanel } from './components/SemanticScholarPanel/SemanticScholarPanel'
 import { useEmailStore } from './stores/emailStore'
@@ -63,7 +65,7 @@ const ViewModeButton: React.FC<{
 const App: React.FC = () => {
   const { viewMode, setViewMode, toggleSidebar, sidebarVisible, splitPosition, setSplitPosition, sidebarWidth, setSidebarWidth, theme, setTheme, accentColor, backgroundColor, fontFamily, setPendingTemplateInsert, textSplitEnabled, setTextSplitEnabled, textSplitPosition, setTextSplitPosition, smartConnectionsEnabled, notesChatEnabled, flashcardsEnabled, semanticScholarEnabled, customLogo, customAccentColor, customBackgroundColorLight, customBackgroundColorDark, setHelpGuideOpen, taskExcludedFolders } = useUIStore()
   const { notes, vaultPath, selectNote, selectedPdfPath, selectedImagePath, selectedOfficePath, selectedOfficeType, secondarySelectedNoteId, navigateBack, navigateForward, selectedNoteId } = useNotesStore()
-  const { tabs, activeTabId, openEditorTab, setActiveTab, closeTab } = useTabStore()
+  const { tabs, activeTabId } = useTabStore()
   const activeTab = tabs.find(t => t.id === activeTabId)
   const { t } = useTranslation()
   const { startChecking, stopChecking } = useReminderStore()
@@ -76,6 +78,7 @@ const App: React.FC = () => {
   const [templatePickerOpen, setTemplatePickerOpen] = useState(false)
   const [templateSettingsOpen, setTemplateSettingsOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [settingsInitialTab, setSettingsInitialTab] = useState<string | undefined>(undefined)
   const [overduePanelOpen, setOverduePanelOpen] = useState(false)
   const [tagsPanelOpen, setTagsPanelOpen] = useState(false)
   const [smartConnectionsOpen, setSmartConnectionsOpen] = useState(false)
@@ -84,6 +87,9 @@ const App: React.FC = () => {
   const [inboxPanelOpen, setInboxPanelOpen] = useState(false)
   const [agentPanelOpen, setAgentPanelOpen] = useState(false)
   const [semanticScholarOpen, setSemanticScholarOpen] = useState(false)
+  const [briefingOpen, setBriefingOpen] = useState(false)
+  const dashboardEnabled = useUIStore(state => state.dashboard.enabled)
+  const openDashboardTab = useTabStore(state => state.openDashboardTab)
   const { unreadRelevantCount } = useEmailStore()
   const emailEnabled = useUIStore(state => state.email.enabled)
   const edooboxEnabled = useUIStore(state => state.edoobox.enabled)
@@ -179,14 +185,37 @@ const App: React.FC = () => {
     return () => document.removeEventListener('mouseover', convert, true)
   }, [])
 
+  // Deep-Links aus HelpGuide/Briefing: Settings-Tab öffnen, Briefing anzeigen
+  useEffect(() => {
+    const handleOpenSettings = (e: Event) => {
+      const detail = (e as CustomEvent<{ tab?: string }>).detail
+      if (detail?.tab) setSettingsInitialTab(detail.tab)
+      setSettingsOpen(true)
+    }
+    const handleShowBriefing = () => setBriefingOpen(true)
+    window.addEventListener('mindgraph:openSettings', handleOpenSettings)
+    window.addEventListener('mindgraph:showBriefing', handleShowBriefing)
+    return () => {
+      window.removeEventListener('mindgraph:openSettings', handleOpenSettings)
+      window.removeEventListener('mindgraph:showBriefing', handleShowBriefing)
+    }
+  }, [])
+
   // UI-Settings beim App-Start laden + Onboarding prüfen
   useEffect(() => {
     const init = async () => {
       await initializeUISettings()
       // Nach dem Laden prüfen ob Onboarding abgeschlossen ist
-      const { onboardingCompleted, setOnboardingOpen } = useUIStore.getState()
+      const { onboardingCompleted, setOnboardingOpen, dashboard } = useUIStore.getState()
       if (!onboardingCompleted) {
         setOnboardingOpen(true)
+        return
+      }
+      // Morning Briefing: einmal pro Tag, nur wenn aktiviert und Vault bereit
+      const todayIso = new Date().toISOString().slice(0, 10)
+      if (dashboard.enabled && dashboard.briefingEnabled && dashboard.lastBriefingDate !== todayIso) {
+        // Kleine Verzögerung, damit Notes/Emails erst laden
+        setTimeout(() => setBriefingOpen(true), 1500)
       }
     }
     init()
@@ -750,15 +779,47 @@ const App: React.FC = () => {
           
           <div className="titlebar-center">
             <div className="view-mode-switcher">
-              <ViewModeButton mode="editor" currentMode={viewMode} onClick={() => setViewMode('editor')}>
-                {t('viewMode.editor')}
+              <ViewModeButton mode="editor" currentMode={viewMode} onClick={() => setViewMode('editor')} title={t('viewMode.editor')}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                  <polyline points="14 2 14 8 20 8"/>
+                  <line x1="16" y1="13" x2="8" y2="13"/>
+                  <line x1="16" y1="17" x2="8" y2="17"/>
+                </svg>
               </ViewModeButton>
-              <ViewModeButton mode="split" currentMode={viewMode} onClick={() => setViewMode('split')}>
-                {t('viewMode.split')}
+              <ViewModeButton mode="split" currentMode={viewMode} onClick={() => setViewMode('split')} title={t('viewMode.split')}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="4" width="18" height="16" rx="2"/>
+                  <line x1="12" y1="4" x2="12" y2="20"/>
+                </svg>
               </ViewModeButton>
-              <ViewModeButton mode="canvas" currentMode={viewMode} onClick={() => setViewMode('canvas')}>
-                Canvas
+              <ViewModeButton mode="canvas" currentMode={viewMode} onClick={() => setViewMode('canvas')} title="Canvas">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="5" cy="6" r="2"/>
+                  <circle cx="19" cy="6" r="2"/>
+                  <circle cx="12" cy="18" r="2"/>
+                  <line x1="7" y1="6" x2="17" y2="6"/>
+                  <line x1="6" y1="8" x2="11" y2="16"/>
+                  <line x1="18" y1="8" x2="13" y2="16"/>
+                </svg>
               </ViewModeButton>
+              {dashboardEnabled && (
+                <button
+                  className={`view-mode-btn ${activeTab?.type === 'dashboard' ? 'active' : ''}`}
+                  onClick={() => {
+                    setViewMode('editor')
+                    openDashboardTab()
+                  }}
+                  title={t('dashboard.title')}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="3" y="3" width="7" height="7" rx="1"/>
+                    <rect x="14" y="3" width="7" height="7" rx="1"/>
+                    <rect x="3" y="14" width="7" height="7" rx="1"/>
+                    <rect x="14" y="14" width="7" height="7" rx="1"/>
+                  </svg>
+                </button>
+              )}
               <span className="view-mode-separator" />
               <button
                 className={`view-mode-btn ${textSplitEnabled ? 'active' : ''}`}
@@ -943,7 +1004,7 @@ const App: React.FC = () => {
               <div
                 className="editor-panel"
                 style={{
-                  display: viewMode === 'canvas' ? 'none' : 'flex',
+                  display: (viewMode === 'canvas' && activeTab?.type !== 'dashboard') ? 'none' : 'flex',
                   flex: viewMode === 'editor'
                     ? ((textSplitEnabled || overduePanelOpen || tagsPanelOpen || (smartConnectionsOpen && smartConnectionsEnabled) || (notesChatOpen && notesChatEnabled) || (flashcardsPanelOpen && flashcardsEnabled) || inboxPanelOpen || agentPanelOpen || (semanticScholarOpen && semanticScholarEnabled))
                         ? `0 0 ${textSplitPosition}%`
@@ -953,7 +1014,12 @@ const App: React.FC = () => {
                     : `0 0 ${splitPosition}%`
                 }}
               >
-                {selectedPdfPath && vaultPath ? (
+                {activeTab?.type === 'dashboard' ? (
+                  <DashboardView
+                    onOpenInbox={() => switchRightPanel('inbox')}
+                    onOpenAgent={() => switchRightPanel('agent')}
+                  />
+                ) : selectedPdfPath && vaultPath ? (
                   <PDFViewer filePath={`${vaultPath}/${selectedPdfPath}`} fileName={selectedPdfPath.split('/').pop() || selectedPdfPath} relativePath={selectedPdfPath} />
                 ) : selectedImagePath && vaultPath ? (
                   <ImageViewer filePath={`${vaultPath}/${selectedImagePath}`} fileName={selectedImagePath.split('/').pop() || selectedImagePath} />
@@ -1035,8 +1101,8 @@ const App: React.FC = () => {
                 <div className="split-divider" onMouseDown={handleDividerMouseDown} />
               )}
 
-              {/* Canvas Panel - only render when in split or canvas mode */}
-              {(viewMode === 'split' || viewMode === 'canvas') && (
+              {/* Canvas Panel - only render when in split or canvas mode AND no dashboard tab */}
+              {(viewMode === 'split' || viewMode === 'canvas') && activeTab?.type !== 'dashboard' && (
                 <div
                   key={`canvas-${viewMode}`}
                   className={`canvas-panel ${viewMode === 'canvas' ? 'canvas-fullwidth' : ''}`}
@@ -1168,7 +1234,8 @@ const App: React.FC = () => {
       {/* Settings Modal (Cmd+,) */}
       <Settings
         isOpen={settingsOpen}
-        onClose={() => setSettingsOpen(false)}
+        onClose={() => { setSettingsOpen(false); setSettingsInitialTab(undefined) }}
+        initialTab={settingsInitialTab as never}
       />
 
       {/* What's New Modal (shown after update) */}
@@ -1188,6 +1255,18 @@ const App: React.FC = () => {
       <Onboarding />
       {/* Help Guide (jederzeit aufrufbar) */}
       <HelpGuide />
+
+      {/* Morning Briefing */}
+      {briefingOpen && (
+        <MorningBriefing
+          onClose={() => setBriefingOpen(false)}
+          onOpenDashboard={() => {
+            setBriefingOpen(false)
+            setViewMode('editor')
+            openDashboardTab()
+          }}
+        />
+      )}
     </ReactFlowProvider>
   )
 }

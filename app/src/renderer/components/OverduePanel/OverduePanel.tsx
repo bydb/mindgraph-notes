@@ -87,7 +87,6 @@ export const OverduePanel: React.FC<OverduePanelProps> = ({ onClose }) => {
   const now = new Date()
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
   const tomorrow = new Date(today.getTime() + 24 * 60 * 60 * 1000)
-  const nextWeek = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000)
 
   const overdueTasks = allTasks.filter(t => t.dueDate && t.dueDate < today)
   const todayTasks = allTasks.filter(t => t.dueDate && t.dueDate >= today && t.dueDate < tomorrow)

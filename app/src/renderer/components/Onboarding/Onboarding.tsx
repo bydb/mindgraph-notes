@@ -4,10 +4,11 @@ import type { UserProfile } from '../../stores/uiStore'
 import { WelcomeScreen } from './WelcomeScreen'
 import { IntentStep } from './steps/IntentStep'
 import { AIStep } from './steps/AIStep'
+import { DashboardStep } from './steps/DashboardStep'
 import { MissionsStep } from './steps/MissionsStep'
 import './Onboarding.css'
 
-type OnboardingStep = 'welcome' | 'intent' | 'ai' | 'missions'
+type OnboardingStep = 'welcome' | 'intent' | 'ai' | 'dashboard' | 'missions'
 
 export const Onboarding: React.FC = () => {
   const { onboardingOpen, setOnboardingOpen, setOnboardingCompleted, setUserProfile, applyProfileDefaults } = useUIStore()
@@ -89,12 +90,19 @@ export const Onboarding: React.FC = () => {
         {step === 'ai' && (
           <AIStep
             onBack={() => setStep('intent')}
+            onNext={() => setStep('dashboard')}
+          />
+        )}
+        {step === 'dashboard' && (
+          <DashboardStep
+            profile={selectedProfile}
+            onBack={() => setStep('ai')}
             onNext={() => setStep('missions')}
           />
         )}
         {step === 'missions' && (
           <MissionsStep
-            onBack={() => setStep('ai')}
+            onBack={() => setStep('dashboard')}
             onFinish={completeOnboarding}
             hasStarterVault={createdStarterVault}
           />

@@ -285,6 +285,31 @@
   opacity: 0.5;
 }
 
+.help-detail-action {
+  padding: 0 16px 14px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.help-detail-action-btn {
+  padding: 7px 14px;
+  border: none;
+  border-radius: var(--radius-md);
+  color: white;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: filter 0.15s, transform 0.1s;
+}
+
+.help-detail-action-btn:hover {
+  filter: brightness(1.08);
+}
+
+.help-detail-action-btn:active {
+  transform: translateY(1px);
+}
+
 /* Keyboard shortcut badge */
 .help-kbd {
   display: inline-flex;

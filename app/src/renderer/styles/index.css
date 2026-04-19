@@ -7262,6 +7262,19 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.settings-nav-section-label {
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.7px;
+  color: var(--text-muted, var(--text-secondary));
+  opacity: 0.65;
+  padding: 14px 14px 4px;
+  user-select: none;
 }
 
 .settings-nav-item {
@@ -7375,6 +7388,77 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
 .settings-input-group span {
   color: var(--text-secondary);
   font-size: 14px;
+}
+
+/* Dashboard Widget Config (Settings → Dashboard) */
+.dashboard-widget-config-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.dashboard-widget-config-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--bg-secondary);
+  transition: border-color 0.15s;
+}
+
+.dashboard-widget-config-row.active {
+  border-color: var(--border-color);
+}
+
+.dashboard-widget-config-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  cursor: pointer;
+  font-size: 14px;
+  color: var(--text-primary);
+}
+
+.dashboard-widget-config-label input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent-color);
+  cursor: pointer;
+}
+
+.dashboard-widget-config-order {
+  display: flex;
+  gap: 4px;
+}
+
+.dashboard-widget-config-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background: var(--bg-primary);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.dashboard-widget-config-btn:hover:not(:disabled) {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+  border-color: var(--accent-color);
+}
+
+.dashboard-widget-config-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
 }
 
 .settings-status {
@@ -16588,4 +16672,76 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
 @keyframes syncSpin {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
+}
+
+/* ===== Settings → Modules Tab ===== */
+.modules-category {
+  margin-top: 24px;
+}
+
+.modules-category:first-of-type {
+  margin-top: 14px;
+}
+
+.modules-category-title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--text-secondary);
+  margin: 0 0 8px 0;
+}
+
+.modules-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.module-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--bg-secondary);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.module-row:hover {
+  border-color: var(--border-color);
+}
+
+.module-row.active {
+  border-color: var(--accent-color);
+  background: color-mix(in srgb, var(--accent-color) 6%, var(--bg-secondary));
+}
+
+.module-row-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.module-row-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  line-height: 1.3;
+}
+
+.module-row-desc {
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  margin-top: 2px;
+  line-height: 1.4;
+}
+
+.module-row input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent-color);
+  cursor: pointer;
+  flex-shrink: 0;
 }

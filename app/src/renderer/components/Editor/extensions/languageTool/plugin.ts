@@ -94,8 +94,6 @@ export function updateDecorations(
   view: EditorView,
   matches: LanguageToolMatch[]
 ): void {
-  const decorations = buildDecorations(view, matches)
-
   // We dispatch a transaction effect to update decorations
   view.dispatch({
     effects: setLanguageToolMatches.of(matches)
