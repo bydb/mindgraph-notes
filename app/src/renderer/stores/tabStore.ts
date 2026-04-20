@@ -90,7 +90,7 @@ export const useTabStore = create<TabState>()((set, get) => ({
       id: generateTabId(),
       type: 'canvas',
       noteId: rootNoteId,
-      title: `Canvas: ${title}`
+      title: `MindGraph: ${title}`
     }
 
     // Initialize canvas state for this tab

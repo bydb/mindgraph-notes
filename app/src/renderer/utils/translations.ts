@@ -9,7 +9,7 @@ const translations = {
     'settings.tab.general': 'Allgemein',
     'settings.tab.modules': 'Module',
     'settings.modules.title': 'Module',
-    'settings.modules.hint': 'Aktiviere nur, was du wirklich nutzt. Kern-Funktionen (Editor, Canvas, Dashboard, Tasks) sind immer verfügbar.',
+    'settings.modules.hint': 'Aktiviere nur, was du wirklich nutzt. Kern-Funktionen (Editor, MindGraph, Dashboard, Tasks) sind immer verfügbar.',
     'settings.tab.editor': 'Editor',
     'settings.tab.templates': 'Templates',
     'settings.tab.integrations': 'Integrationen',
@@ -88,7 +88,7 @@ const translations = {
     // View Modes
     'viewMode.editor': 'Editor',
     'viewMode.split': 'Split',
-    'viewMode.canvas': 'Canvas',
+    'viewMode.canvas': 'MindGraph',
 
     // Sidebar
     'sidebar.files': 'Dateien',
@@ -425,9 +425,9 @@ const translations = {
     'settings.pdf.description': 'PDF Companion erstellt automatisch Markdown-Dateien für PDFs, die Tagging, Verlinkung und Notizen ermöglichen.',
 
     // Settings Canvas
-    'settings.canvas.title': 'Canvas',
+    'settings.canvas.title': 'MindGraph',
     'settings.canvas.cardWidth': 'Standard-Kartenbreite',
-    'settings.canvas.cardWidthDesc': 'Kartenbreite bestimmt die Mindestbreite für Karten im Canvas. Größere Werte zeigen mehr Inhalt, kleinere Werte ermöglichen kompaktere Darstellung.',
+    'settings.canvas.cardWidthDesc': 'Kartenbreite bestimmt die Mindestbreite für Karten im MindGraph. Größere Werte zeigen mehr Inhalt, kleinere Werte ermöglichen kompaktere Darstellung.',
 
     // Settings File Tree
     'settings.fileTree.title': 'Dateibaum',
@@ -498,7 +498,7 @@ const translations = {
     'settings.shortcuts.openWikilink': 'Wikilink öffnen - Zur verlinkten Notiz springen',
     'settings.shortcuts.view': 'Ansicht',
     'settings.shortcuts.toggleSidebar': 'Sidebar ein-/ausblenden',
-    'settings.shortcuts.switchViews': 'Zwischen Editor, Split und Canvas wechseln',
+    'settings.shortcuts.switchViews': 'Zwischen Editor, Split und MindGraph wechseln',
     'settings.shortcuts.tip': 'Tipp: Verwende Wikilinks [[Notizname]] um deine Notizen miteinander zu verbinden und einen Knowledge Graph aufzubauen.',
 
     // Settings Footer
@@ -622,12 +622,12 @@ const translations = {
     'fileTree.copyAbsolutePath': 'Absoluten Pfad kopieren',
     'fileTree.rename': 'Umbenennen',
     'fileTree.showInFinder': 'Im Finder zeigen',
-    'fileTree.showInCanvas': 'Im Canvas anzeigen',
+    'fileTree.showInCanvas': 'Im MindGraph anzeigen',
     'fileTree.stripWikilinks': 'Wikilinks entfernen',
     'fileTree.deleteFolder': 'Ordner löschen',
     'fileTree.removeBookmark': 'Lesezeichen entfernen',
     'fileTree.addBookmark': 'Lesezeichen hinzufügen',
-    'fileTree.exploreInCanvas': 'Im Canvas erkunden',
+    'fileTree.exploreInCanvas': 'Im MindGraph erkunden',
     'fileTree.duplicate': 'Duplizieren',
     'fileTree.deleteNote': 'Notiz löschen',
     'fileTree.createAppleReminder': 'Apple Erinnerungen erstellen',
@@ -1281,7 +1281,7 @@ const translations = {
     'onboarding.profile.studium.title': 'Studium & Wissenschaft',
     'onboarding.profile.studium.desc': 'Alles aus Schule plus Zotero, PDF-Companion, Dataview und LaTeX',
     'onboarding.profile.wissensmanagement.title': 'Wissensmanagement',
-    'onboarding.profile.wissensmanagement.desc': 'Wikilinks, Canvas, Smart Connections, lokale KI und Terminal',
+    'onboarding.profile.wissensmanagement.desc': 'Wikilinks, MindGraph, Smart Connections, lokale KI und Terminal',
 
     // Intent Step (new onboarding)
     'onboarding.intent.title': 'Wie wirst du MindGraph Notes nutzen?',
@@ -1326,7 +1326,7 @@ const translations = {
     'onboarding.missions.create.desc': 'Erstelle deine erste eigene Notiz',
     'onboarding.missions.link.title': 'Zwei Notizen verlinken',
     'onboarding.missions.link.desc': 'Tippe [[ und wähle eine Notiz aus',
-    'onboarding.missions.canvas.title': 'Canvas öffnen',
+    'onboarding.missions.canvas.title': 'MindGraph öffnen',
     'onboarding.missions.canvas.desc': 'Sieh deinen Wissensgraph als Netzwerk',
     'onboarding.missions.helpHint': 'Du findest diese Übersicht jederzeit über Cmd+/ (Hilfe).',
 
@@ -1480,7 +1480,7 @@ const translations = {
     'help.graphHint': 'Klicke auf einen Knoten fuer Details. Ziehe zum Verschieben.',
     'help.tab.start': 'Grundlagen',
     'help.tab.editor': 'Editor',
-    'help.tab.canvas': 'Canvas',
+    'help.tab.canvas': 'MindGraph',
     'help.tab.ai': 'KI-Features',
     'help.tab.organize': 'Organisation',
     'help.tab.integrations': 'Integrationen',
@@ -1501,8 +1501,8 @@ const translations = {
     'help.start.viewEditor': 'Editor-Ansicht',
     'help.start.viewEditorDesc': 'Reiner Editor mit Live-Preview oder Raw-Markdown.',
     'help.start.viewSplit': 'Split-Ansicht',
-    'help.start.viewSplitDesc': 'Editor und Canvas-Graph nebeneinander.',
-    'help.start.viewCanvas': 'Canvas-Ansicht',
+    'help.start.viewSplitDesc': 'Editor und MindGraph nebeneinander.',
+    'help.start.viewCanvas': 'MindGraph-Ansicht',
     'help.start.viewCanvasDesc': 'Dein gesamter Wissensgraph als interaktives Netzwerk.',
     'help.start.textSplit': 'Text-Split',
     'help.start.textSplitDesc': 'Zwei Notizen nebeneinander bearbeiten.',
@@ -1843,7 +1843,7 @@ const translations = {
     'settings.tab.general': 'General',
     'settings.tab.modules': 'Modules',
     'settings.modules.title': 'Modules',
-    'settings.modules.hint': 'Enable only what you actually use. Core features (editor, canvas, dashboard, tasks) are always available.',
+    'settings.modules.hint': 'Enable only what you actually use. Core features (editor, MindGraph, dashboard, tasks) are always available.',
     'settings.tab.editor': 'Editor',
     'settings.tab.templates': 'Templates',
     'settings.tab.integrations': 'Integrations',
@@ -1923,7 +1923,7 @@ const translations = {
     // View Modes
     'viewMode.editor': 'Editor',
     'viewMode.split': 'Split',
-    'viewMode.canvas': 'Canvas',
+    'viewMode.canvas': 'MindGraph',
 
     // Sidebar
     'sidebar.files': 'Files',
@@ -2260,9 +2260,9 @@ const translations = {
     'settings.pdf.description': 'PDF Companion automatically creates Markdown files for PDFs, enabling tagging, linking, and notes.',
 
     // Settings Canvas
-    'settings.canvas.title': 'Canvas',
+    'settings.canvas.title': 'MindGraph',
     'settings.canvas.cardWidth': 'Default card width',
-    'settings.canvas.cardWidthDesc': 'Card width determines the minimum width for cards in Canvas. Larger values show more content, smaller values allow more compact display.',
+    'settings.canvas.cardWidthDesc': 'Card width determines the minimum width for cards in MindGraph. Larger values show more content, smaller values allow more compact display.',
 
     // Settings File Tree
     'settings.fileTree.title': 'File Tree',
@@ -2333,7 +2333,7 @@ const translations = {
     'settings.shortcuts.openWikilink': 'Open wikilink - Jump to linked note',
     'settings.shortcuts.view': 'View',
     'settings.shortcuts.toggleSidebar': 'Toggle sidebar',
-    'settings.shortcuts.switchViews': 'Switch between Editor, Split, and Canvas',
+    'settings.shortcuts.switchViews': 'Switch between Editor, Split, and MindGraph',
     'settings.shortcuts.tip': 'Tip: Use wikilinks [[Note name]] to connect your notes and build a knowledge graph.',
 
     // Settings Footer
@@ -2457,12 +2457,12 @@ const translations = {
     'fileTree.copyAbsolutePath': 'Copy absolute path',
     'fileTree.rename': 'Rename',
     'fileTree.showInFinder': 'Show in Finder',
-    'fileTree.showInCanvas': 'Show in Canvas',
+    'fileTree.showInCanvas': 'Show in MindGraph',
     'fileTree.stripWikilinks': 'Remove wikilinks',
     'fileTree.deleteFolder': 'Delete folder',
     'fileTree.removeBookmark': 'Remove bookmark',
     'fileTree.addBookmark': 'Add bookmark',
-    'fileTree.exploreInCanvas': 'Explore in Canvas',
+    'fileTree.exploreInCanvas': 'Explore in MindGraph',
     'fileTree.duplicate': 'Duplicate',
     'fileTree.deleteNote': 'Delete note',
     'fileTree.createAppleReminder': 'Create Apple Reminders',
@@ -3160,7 +3160,7 @@ const translations = {
     'onboarding.missions.create.desc': 'Create your first own note',
     'onboarding.missions.link.title': 'Link two notes together',
     'onboarding.missions.link.desc': 'Type [[ and select a note',
-    'onboarding.missions.canvas.title': 'Open Canvas',
+    'onboarding.missions.canvas.title': 'Open MindGraph',
     'onboarding.missions.canvas.desc': 'See your knowledge graph as a network',
     'onboarding.missions.helpHint': 'You can find this overview anytime via Cmd+/ (Help).',
 
@@ -3314,7 +3314,7 @@ const translations = {
     'help.graphHint': 'Click a node for details. Drag to rearrange.',
     'help.tab.start': 'Basics',
     'help.tab.editor': 'Editor',
-    'help.tab.canvas': 'Canvas',
+    'help.tab.canvas': 'MindGraph',
     'help.tab.ai': 'AI Features',
     'help.tab.organize': 'Organization',
     'help.tab.integrations': 'Integrations',
@@ -3336,7 +3336,7 @@ const translations = {
     'help.start.viewEditorDesc': 'Pure editor with live preview or raw markdown.',
     'help.start.viewSplit': 'Split View',
     'help.start.viewSplitDesc': 'Editor and canvas graph side by side.',
-    'help.start.viewCanvas': 'Canvas View',
+    'help.start.viewCanvas': 'MindGraph View',
     'help.start.viewCanvasDesc': 'Your entire knowledge graph as an interactive network.',
     'help.start.textSplit': 'Text Split',
     'help.start.textSplitDesc': 'Edit two notes side by side.',

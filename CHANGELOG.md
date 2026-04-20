@@ -2,6 +2,15 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.5.7-beta] - 2026-04-19
+
+### Features
+- **Canvas → MindGraph umbenannt** — konsistentes Branding in der gesamten UI (View-Mode-Button, Settings-Tab, Help-Tab, Context-Menü "Im MindGraph erkunden", Tab-Prefix "MindGraph: Notiz", Mission "MindGraph öffnen"). Code-interne Identifier (`viewMode: 'canvas'`, `type: 'canvas'`, `GraphCanvas`-Komponente) bleiben unverändert — kein Migrations-Aufwand
+- **Logo-Konsistenz** — View-Mode-Button und HelpGuide-Zentrum nutzen jetzt dasselbe 8-Knoten-Netzwerk-Muster wie das App-Icon/Titlebar-Logo. Vorher: 3-Kreise-Dreieck bzw. ⌘-artiges 4-Ecken-X — jetzt einheitlich
+
+### Fixes
+- **MindGraph-Ansicht öffnet nicht bei aktivem Dashboard-Tab** — Canvas-Panel wurde explizit ausgeblendet, wenn `activeTab.type === 'dashboard'`. Klick auf den MindGraph-Button im Titlebar hatte keinen sichtbaren Effekt. Fix: `viewMode === 'canvas'` blendet jetzt den Editor-Bereich (inkl. Dashboard) zuverlässig aus; Split-Modus zeigt Dashboard links + Graph rechts
+
 ## [0.5.6-beta] - 2026-04-19
 
 ### Fixes

@@ -793,14 +793,30 @@ const App: React.FC = () => {
                   <line x1="12" y1="4" x2="12" y2="20"/>
                 </svg>
               </ViewModeButton>
-              <ViewModeButton mode="canvas" currentMode={viewMode} onClick={() => setViewMode('canvas')} title="Canvas">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="5" cy="6" r="2"/>
-                  <circle cx="19" cy="6" r="2"/>
-                  <circle cx="12" cy="18" r="2"/>
-                  <line x1="7" y1="6" x2="17" y2="6"/>
-                  <line x1="6" y1="8" x2="11" y2="16"/>
-                  <line x1="18" y1="8" x2="13" y2="16"/>
+              <ViewModeButton mode="canvas" currentMode={viewMode} onClick={() => setViewMode('canvas')} title={t('viewMode.canvas')}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="12" y1="3" x2="7" y2="8"/>
+                  <line x1="12" y1="3" x2="17" y2="8"/>
+                  <line x1="7" y1="8" x2="17" y2="8"/>
+                  <line x1="7" y1="8" x2="3" y2="14"/>
+                  <line x1="7" y1="8" x2="12" y2="13"/>
+                  <line x1="17" y1="8" x2="21" y2="14"/>
+                  <line x1="17" y1="8" x2="12" y2="13"/>
+                  <line x1="3" y1="14" x2="12" y2="13"/>
+                  <line x1="21" y1="14" x2="12" y2="13"/>
+                  <line x1="3" y1="14" x2="8" y2="21"/>
+                  <line x1="12" y1="13" x2="8" y2="21"/>
+                  <line x1="12" y1="13" x2="16" y2="21"/>
+                  <line x1="21" y1="14" x2="16" y2="21"/>
+                  <line x1="8" y1="21" x2="16" y2="21"/>
+                  <circle cx="12" cy="3" r="1.6" fill="currentColor" stroke="none"/>
+                  <circle cx="7" cy="8" r="1.6" fill="currentColor" stroke="none"/>
+                  <circle cx="17" cy="8" r="1.6" fill="currentColor" stroke="none"/>
+                  <circle cx="3" cy="14" r="1.6" fill="currentColor" stroke="none"/>
+                  <circle cx="12" cy="13" r="1.6" fill="currentColor" stroke="none"/>
+                  <circle cx="21" cy="14" r="1.6" fill="currentColor" stroke="none"/>
+                  <circle cx="8" cy="21" r="1.6" fill="currentColor" stroke="none"/>
+                  <circle cx="16" cy="21" r="1.6" fill="currentColor" stroke="none"/>
                 </svg>
               </ViewModeButton>
               {dashboardEnabled && (
@@ -1004,7 +1020,7 @@ const App: React.FC = () => {
               <div
                 className="editor-panel"
                 style={{
-                  display: (viewMode === 'canvas' && activeTab?.type !== 'dashboard') ? 'none' : 'flex',
+                  display: viewMode === 'canvas' ? 'none' : 'flex',
                   flex: viewMode === 'editor'
                     ? ((textSplitEnabled || overduePanelOpen || tagsPanelOpen || (smartConnectionsOpen && smartConnectionsEnabled) || (notesChatOpen && notesChatEnabled) || (flashcardsPanelOpen && flashcardsEnabled) || inboxPanelOpen || agentPanelOpen || (semanticScholarOpen && semanticScholarEnabled))
                         ? `0 0 ${textSplitPosition}%`
@@ -1101,8 +1117,8 @@ const App: React.FC = () => {
                 <div className="split-divider" onMouseDown={handleDividerMouseDown} />
               )}
 
-              {/* Canvas Panel - only render when in split or canvas mode AND no dashboard tab */}
-              {(viewMode === 'split' || viewMode === 'canvas') && activeTab?.type !== 'dashboard' && (
+              {/* Canvas Panel - render in split or canvas mode (canvas hides dashboard, split shows both) */}
+              {(viewMode === 'split' || viewMode === 'canvas') && (
                 <div
                   key={`canvas-${viewMode}`}
                   className={`canvas-panel ${viewMode === 'canvas' ? 'canvas-fullwidth' : ''}`}
