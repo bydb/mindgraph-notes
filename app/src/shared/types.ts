@@ -931,6 +931,8 @@ export interface EmailAnalysis {
   suggestedActions?: (EmailSuggestedAction | string)[]
   needsReply?: boolean
   replyUrgency?: 'low' | 'medium' | 'high'
+  replyHandled?: boolean   // true wenn User die Antwort anderweitig erledigt hat (z.B. Telefon)
+  replyHandledAt?: string  // ISO-Timestamp wann markiert
   analyzedAt: string
   model: string
 }

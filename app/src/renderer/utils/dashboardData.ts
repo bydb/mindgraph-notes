@@ -98,6 +98,7 @@ export function collectEmailActions(emails: EmailMessage[]): EmailActionItem[] {
     if (email.sent) continue
     const a = email.analysis
     if (!a?.needsReply) continue
+    if (a.replyHandled) continue
     const urgency = (a.replyUrgency ?? 'medium') as 'high' | 'medium' | 'low'
     const relevance = a.relevanceScore ?? 50
     // Sortier-Score: Urgency dominiert, Relevanz refined, Datum tiebreak (neuer zuerst)

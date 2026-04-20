@@ -34,6 +34,7 @@ interface EmailState {
   setFilter: (filter: Partial<EmailFilter>) => void
   setSelectedEmail: (id: string | null) => void
   updateUnreadRelevantCount: () => void
+  markReplyHandled: (vaultPath: string, emailId: string, handled: boolean) => Promise<void>
   // Compose actions
   setComposeState: (state: ComposeEmail | null) => void
   setCurrentView: (view: 'list' | 'detail' | 'compose' | 'aiChat') => void
@@ -321,6 +322,23 @@ export const useEmailStore = create<EmailState>()((set, get) => ({
     ).length
 
     set({ unreadRelevantCount: count })
+  },
+
+  markReplyHandled: async (vaultPath: string, emailId: string, handled: boolean) => {
+    const { emails } = get()
+    const next = emails.map(e => {
+      if (e.id !== emailId || !e.analysis) return e
+      return {
+        ...e,
+        analysis: {
+          ...e.analysis,
+          replyHandled: handled,
+          replyHandledAt: handled ? new Date().toISOString() : undefined
+        }
+      }
+    })
+    set({ emails: next })
+    await get().saveEmails(vaultPath)
   },
 
   // Compose actions

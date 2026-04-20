@@ -296,6 +296,9 @@ const translations = {
     'dashboard.urgency.high': 'Hoch',
     'dashboard.urgency.medium': 'Mittel',
     'dashboard.urgency.low': 'Niedrig',
+    'dashboard.emailHandled': 'Als erledigt markieren',
+    'inbox.markHandled': 'Als erledigt markieren',
+    'inbox.markUnhandled': 'Als unerledigt markieren',
 
     // Focus-Widget
     'dashboard.focus.allClear': 'Keine Deadlines, kein Rückstau. Nutze den Freiraum.',
@@ -2151,6 +2154,9 @@ const translations = {
     'dashboard.urgency.high': 'High',
     'dashboard.urgency.medium': 'Medium',
     'dashboard.urgency.low': 'Low',
+    'dashboard.emailHandled': 'Mark as handled',
+    'inbox.markHandled': 'Mark as handled',
+    'inbox.markUnhandled': 'Mark as unhandled',
 
     // Focus widget
     'dashboard.focus.allClear': 'No deadlines, no backlog. Use the room.',

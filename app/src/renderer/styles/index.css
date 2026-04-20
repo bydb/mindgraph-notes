@@ -9629,6 +9629,12 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
   border: 1px solid #e0e7ff;
 }
 
+.inbox-needs-reply.handled {
+  background: #ecfdf5;
+  color: #059669;
+  border: 1px solid #a7f3d0;
+}
+
 .inbox-attachment-info {
   display: flex;
   align-items: center;

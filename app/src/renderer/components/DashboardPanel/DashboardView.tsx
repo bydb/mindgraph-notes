@@ -76,6 +76,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onOpenInbox, onOpe
     if (onOpenAgent) onOpenAgent()
   }
 
+  const markReplyHandled = useEmailStore(state => state.markReplyHandled)
+  const handleEmailHandled = useCallback((item: EmailActionItem) => {
+    if (!vaultPath) return
+    markReplyHandled(vaultPath, item.email.id, true)
+    loadSnapshot()
+  }, [vaultPath, markReplyHandled, loadSnapshot])
+
   const renderWidget = (id: DashboardWidgetId) => {
     if (!snapshot) return null
     switch (id) {
@@ -84,7 +91,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onOpenInbox, onOpe
       case 'tasks':
         return <TasksWidget key={id} snapshot={snapshot} onTaskClick={handleTaskClick} t={t} />
       case 'emails':
-        return <EmailsWidget key={id} snapshot={snapshot} onEmailClick={handleEmailClick} t={t} />
+        return <EmailsWidget key={id} snapshot={snapshot} onEmailClick={handleEmailClick} onEmailHandled={handleEmailHandled} t={t} />
       case 'calendar':
         return <CalendarWidget key={id} snapshot={snapshot} t={t} />
       case 'bookings':
@@ -139,6 +146,7 @@ interface WidgetProps {
   t: TFn
   onTaskClick?: (task: DashboardTask) => void
   onEmailClick?: (item: EmailActionItem) => void
+  onEmailHandled?: (item: EmailActionItem) => void
   onBookingClick?: (item: BookingItem) => void
 }
 
@@ -217,7 +225,7 @@ const TaskRow: React.FC<{ task: DashboardTask; onClick: () => void; showDate?: b
   </div>
 )
 
-const EmailsWidget: React.FC<WidgetProps> = ({ snapshot, onEmailClick, t }) => {
+const EmailsWidget: React.FC<WidgetProps> = ({ snapshot, onEmailClick, onEmailHandled, t }) => {
   const items = snapshot.emails
   return (
     <section className="dv-widget">
@@ -243,6 +251,18 @@ const EmailsWidget: React.FC<WidgetProps> = ({ snapshot, onEmailClick, t }) => {
                     <div className="dv-email-from">{item.email.from.name || item.email.from.address}</div>
                     <div className="dv-email-subject">{item.email.subject}</div>
                   </div>
+                  {onEmailHandled && (
+                    <button
+                      className="dv-email-done-btn"
+                      onClick={e => { e.stopPropagation(); onEmailHandled(item) }}
+                      data-tooltip={t('dashboard.emailHandled')}
+                      aria-label={t('dashboard.emailHandled')}
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="20 6 9 17 4 12"/>
+                      </svg>
+                    </button>
+                  )}
                 </div>
               )
             })}

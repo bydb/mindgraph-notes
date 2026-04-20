@@ -5363,6 +5363,7 @@ END_EMAIL_DATA
             // In emails-Array updaten
             const idx = emails.findIndex((e: { id: string }) => e.id === email.id)
             if (idx >= 0) {
+              const prev = emails[idx].analysis as { replyHandled?: boolean; replyHandledAt?: string } | undefined
               emails[idx].analysis = {
                 relevant: (Number(analysis.relevanceScore) || 0) >= 30,
                 relevanceScore: Number(analysis.relevanceScore) || 0,
@@ -5373,6 +5374,8 @@ END_EMAIL_DATA
                 suggestedActions: Array.isArray(analysis.suggestedActions) ? analysis.suggestedActions : [],
                 needsReply: analysis.needsReply === true,
                 replyUrgency: ['low', 'medium', 'high'].includes(analysis.replyUrgency) ? analysis.replyUrgency : undefined,
+                replyHandled: prev?.replyHandled,
+                replyHandledAt: prev?.replyHandledAt,
                 analyzedAt: new Date().toISOString(),
                 model
               }

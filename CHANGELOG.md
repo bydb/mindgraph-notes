@@ -2,6 +2,12 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.5.9-beta] - 2026-04-20
+
+### Features
+- **Emails im Dashboard als erledigt markieren** — im Widget "Zu beantworten" erscheint beim Hover ein grüner Häkchen-Button, mit dem eine Mail sofort aus der Liste genommen werden kann (z. B. wenn sie telefonisch beantwortet wurde). Der Status wird persistent in `emails.json` gespeichert (`analysis.replyHandled`) und bleibt auch nach einer KI-Reanalyse erhalten
+- **Toggle in der Inbox-Detail-Ansicht** — Button "Als erledigt markieren" neben Antworten/Diskutieren. Erledigte Mails zeigen statt des roten/orangefarbenen "Antwort erwartet"-Badges einen grünen "Erledigt"-Badge. Toggle-Verhalten: Klick rückgängig machen macht sie wieder unerledigt
+
 ## [0.5.8-beta] - 2026-04-20
 
 ### Features

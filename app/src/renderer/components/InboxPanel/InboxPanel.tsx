@@ -31,7 +31,8 @@ export const InboxPanel: React.FC<InboxPanelProps> = ({ onClose }) => {
     setCurrentView,
     startReply,
     startNewEmail,
-    setAiChatEmail
+    setAiChatEmail,
+    markReplyHandled
   } = useEmailStore()
   const { email: emailSettings } = useUIStore()
 
@@ -242,13 +243,21 @@ export const InboxPanel: React.FC<InboxPanelProps> = ({ onClose }) => {
                 <span className="inbox-email-date">{formatDate(selectedEmail.date)}</span>
               </div>
               {/* Needs reply indicator */}
-              {selectedEmail.analysis?.needsReply && (
+              {selectedEmail.analysis?.needsReply && !selectedEmail.analysis.replyHandled && (
                 <div className={`inbox-needs-reply ${selectedEmail.analysis.replyUrgency || 'medium'}`}>
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <polyline points="9 17 4 12 9 7" />
                     <path d="M20 18v-2a4 4 0 0 0-4-4H4" />
                   </svg>
                   <span>{t(`inbox.needsReply.${selectedEmail.analysis.replyUrgency || 'medium'}`)}</span>
+                </div>
+              )}
+              {selectedEmail.analysis?.replyHandled && (
+                <div className="inbox-needs-reply handled">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                  <span>{t('inbox.markHandled')}</span>
                 </div>
               )}
 
@@ -284,6 +293,18 @@ export const InboxPanel: React.FC<InboxPanelProps> = ({ onClose }) => {
                   </svg>
                   {t('inbox.discuss')}
                 </button>
+                {selectedEmail.analysis?.needsReply && (
+                  <button
+                    className="inbox-action-btn"
+                    onClick={() => vaultPath && markReplyHandled(vaultPath, selectedEmail.id, !selectedEmail.analysis?.replyHandled)}
+                    data-tooltip={selectedEmail.analysis?.replyHandled ? t('inbox.markUnhandled') : t('inbox.markHandled')}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="20 6 9 17 4 12" />
+                    </svg>
+                    {selectedEmail.analysis?.replyHandled ? t('inbox.markUnhandled') : t('inbox.markHandled')}
+                  </button>
+                )}
               </div>
             </div>
 
