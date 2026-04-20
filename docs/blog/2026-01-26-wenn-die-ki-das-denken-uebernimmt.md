@@ -84,4 +84,3 @@ Beides zusammen – Faszination und Unbehagen – treibt mich an, Tools zu bauen
 
 - [[Vom Zettelkasten zum KI-Agenten]]
 - [[Die Krise des wissenschaftlichen Publizierens]]
-- [[Wir sollten über unser Selbstwertgefühl nachdenken]]

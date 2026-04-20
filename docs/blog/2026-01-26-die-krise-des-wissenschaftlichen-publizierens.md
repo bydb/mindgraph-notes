@@ -91,4 +91,3 @@ Die Frage der Provenienz – woher stammt eine Information? – wird zum zentral
 
 - [[Vom Zettelkasten zum KI-Agenten]]
 - [[Wenn die KI das Denken übernimmt]]
-- [[Wir sollten über unser Selbstwertgefühl nachdenken]]

@@ -101,7 +101,7 @@ Die neuen Sicherheitsbenchmarks zeigen uns etwas Wichtiges: KI-Modelle sind nich
 
 Wenn ich KI für persönliche Gespräche nutze, will ich keinen digitalen Ja-Sager. Ich will einen Gesprächspartner, der mir auch mal sagt, dass meine Idee vielleicht nicht so brillant ist, wie ich gerade denke. Die gute Nachricht: Einige Modelle werden darin besser. Die Frage ist, ob wir als Nutzer bereit sind, diese Ehrlichkeit auch anzunehmen – oder ob wir insgeheim doch lieber bestätigt werden wollen.
 
-Am Ende bleibt das, was ich schon in meinem Artikel über Selbstwertgefühl und KI geschrieben habe: **KI sollte ein Verstärker sein, kein Ersatz.** Und manchmal bedeutet das, dass sie uns herausfordern muss, nicht bestätigen.
+Am Ende gilt: **KI sollte ein Verstärker sein, kein Ersatz.** Und manchmal bedeutet das, dass sie uns herausfordern muss, nicht bestätigen.
 
 ---
 

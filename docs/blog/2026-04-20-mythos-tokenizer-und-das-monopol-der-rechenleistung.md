@@ -111,7 +111,7 @@ Die Anbieter haben mehr Informationen über ihre Modelle als die Nutzer. Sie kö
 
 **Vertrauen ist kein Infrastruktur-Feature, das sich einkaufen lässt.** Es muss durch Transparenz und Konsistenz aufgebaut werden. Genau das wird in dieser Woche auf mehreren Ebenen gleichzeitig beschädigt. Die Entwickler-Community merkt es zuerst, weil sie am unmittelbarsten betroffen ist. Aber die gleiche Dynamik wird sich auf Unternehmen ausbreiten, die KI produktiv einsetzen, und am Ende auf Endnutzer, die nie erfahren werden, warum ihr Chatbot heute anders antwortet als gestern.
 
-In meinem Artikel über Selbstwertgefühl und KI hatte ich geschrieben, dass KI ein Verstärker sein sollte, kein Ersatz. Diese Woche erweitert diese These um eine zweite Ebene: **KI muss auch transparent bleiben, damit wir ihr vertrauen können.** Wenn ein Modell im April anders antwortet als im Mai, wenn dasselbe Eingabe-Byte plötzlich 35 Prozent teurer wird, wenn das beste Modell nur hinter einer NDA erhältlich ist — dann arbeiten wir nicht mehr mit einem Werkzeug. Wir arbeiten mit einem System, dessen Regeln sich unter uns verschieben.
+Hinzu kommt eine zweite Ebene: **KI muss auch transparent bleiben, damit wir ihr vertrauen können.** Wenn ein Modell im April anders antwortet als im Mai, wenn dasselbe Eingabe-Byte plötzlich 35 Prozent teurer wird, wenn das beste Modell nur hinter einer NDA erhältlich ist — dann arbeiten wir nicht mehr mit einem Werkzeug. Wir arbeiten mit einem System, dessen Regeln sich unter uns verschieben.
 
 Die Antwort darauf kann nicht darin bestehen, KI nicht zu nutzen. Sie liegt aber darin, kritisch zu bleiben. Eigene Benchmarks zu führen. Mehrere Anbieter parallel zu beobachten. Bei Kostenrechnungen Puffer einzuplanen. Und bei jedem neuen Launch nicht nur die Benchmark-Zahlen zu lesen, sondern auch die Fußnoten zu den Tokenizer-Änderungen.
 
@@ -133,4 +133,4 @@ Denn am Ende geht es nicht darum, welches Modell in welchem Benchmark gewinnt. E
 
 - [[2026-04-16-mathematik-werkzeuge-und-die-neue-infrastruktur-der-intelligenz]]
 - [[2026-04-13-weltmodelle-fragile-agenten-und-die-seele-der-maschine]]
-- [[🤖🧠 Wir sollten über unser Selbstwertgefühl nachdenken]]
+- [[2026-02-14-preiskampf-sicherheitskrise-web-als-ki-datenbank]]

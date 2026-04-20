@@ -80,6 +80,5 @@ Die Technologie ist nicht das Problem. Sie war es nie. Die Frage ist und bleibt:
 
 ## 🔗 Verwandte Beiträge
 
-- [[🤖🧠 Wir sollten über unser Selbstwertgefühl nachdenken]]
 - [[🤖🔍 Wenn Ki Nutzung zur Gewohnheit wird]]
 - [[🤖💭 Meine Sichtweise auf LLM Modelle und AI]]

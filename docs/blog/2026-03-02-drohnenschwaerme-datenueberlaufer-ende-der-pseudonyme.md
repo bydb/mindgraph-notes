@@ -106,6 +106,5 @@ Die Wahrheit liegt, wie so oft, irgendwo dazwischen. Und genau deshalb lohnt es 
 
 ## 🔗 Verwandte Beiträge
 
-- [[🤖🧠 Wir sollten über unser Selbstwertgefühl nachdenken]]
 - [[2026-03-01 - KI-Wochenrückblick - Anonymität, Gedächtnisverlust und die hohle Zivilisation der Maschinen]]
 - [[2026-02-20 - KI-Wochenrückblick - Milliarden, Modelle und das Ende der Kontrolle]]

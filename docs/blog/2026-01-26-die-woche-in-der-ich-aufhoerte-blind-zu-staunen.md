@@ -95,6 +95,5 @@ Ich habe beschlossen, weniger zu staunen und mehr zu fragen. Weniger zu delegier
 
 ## 🔗 Verwandte Beiträge
 
-- [[Wir sollten über unser Selbstwertgefühl nachdenken]]
 - [[Wenn KI Nutzung zur Gewohnheit wird]]
 - [[Meine Sichtweise auf LLM Modelle und AI]]

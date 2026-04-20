@@ -118,7 +118,7 @@ Denn genau diese Langsamkeit — die Fähigkeit, innezuhalten, abzuwägen, Konte
 
 Bob Blume hat auf seinem Blog einen Gedanken formuliert, der in eine ähnliche Richtung geht: In seinem Konzept "#kAIneEntwertung" argumentiert er, dass Lernen berühren muss — dass der Wert von Bildung nicht in der Informationsvermittlung liegt, sondern in der emotionalen und kognitiven Tiefe. Das ist eine Perspektive, die in der Agenten-Euphorie leicht untergeht.
 
-Und es ist eine Perspektive, die mich an meinen eigenen Blogbeitrag über Selbstwertgefühl und KI-Nutzung erinnert. Vor genau einem Jahr habe ich darüber geschrieben, wie die ständige Nutzung von KI unser Gefühl dafür verändert, was wir selbst können. Die Agenten-Studie liefert jetzt das wissenschaftliche Pendant: Auch die Maschinen profitieren nicht davon, wenn man ihnen das Denken abnimmt.
+Die Agenten-Studie liefert nun gewissermaßen das technische Gegenstück zu dieser pädagogischen Beobachtung: Auch Maschinen profitieren nicht davon, wenn man ihnen das Denken abnimmt. Wer Skills nur abruft, ohne sie im Kontext abzuwägen, wird schnell — und bleibt oberflächlich.
 
 ## Was bleibt
 

@@ -84,7 +84,7 @@ Ob man das als visionär oder als Umsatzoptimierung des größten GPU-Hersteller
 
 Eine britische Studie zeigt: **95% der Studierenden nutzen mittlerweile generative KI.** Doch die Erfahrungen könnten unterschiedlicher nicht sein. Einige berichten von vertieftem Lernen, andere sorgen sich um schwindende Fähigkeiten zum kritischen Denken.
 
-Das erinnert mich an meine eigene Reflexion über KI und Selbstwertgefühl, die ich vor einem Jahr geschrieben habe. Die Wahrheit liegt nicht in der Mitte, sondern in der **Art der Nutzung**: Wer KI als Denkpartner einsetzt, profitiert. Wer sie als Abkürzung nutzt, verliert. Das gilt im Studium genauso wie in der Softwareentwicklung oder im Wissensmanagement.
+Die Wahrheit liegt nicht in der Mitte, sondern in der **Art der Nutzung**: Wer KI als Denkpartner einsetzt, profitiert. Wer sie als Abkürzung nutzt, verliert. Das gilt im Studium genauso wie in der Softwareentwicklung oder im Wissensmanagement.
 
 Leonard Schmedding argumentiert auf kiberatung.de in seinem Vortrag zum "KI-Agenten Hive Mind", dass der OpenClaw-Hype vorbei ist und Unternehmen stattdessen strukturierte Daten und Corporate LLMs brauchen — also durchdachte Infrastruktur statt viraler Tools. Das deckt sich mit meiner Erfahrung.
 

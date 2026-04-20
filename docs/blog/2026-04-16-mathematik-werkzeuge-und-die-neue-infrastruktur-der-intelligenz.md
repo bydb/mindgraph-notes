@@ -44,7 +44,7 @@ GPT-5.4 Pro brauchte etwa 80 Minuten. Und der Weg zur Lösung ist das eigentlich
 
 Ich muss zugeben: Als ich das las, war mein erster Gedanke nicht Bewunderung, sondern etwas, das sich anfühlte wie ein leiser Stich. Wenn eine Maschine in 80 Minuten schafft, woran brillante Köpfe jahrelang gescheitert sind — was sagt das über den Wert menschlicher Denkarbeit?
 
-Aber dann erinnerte ich mich an etwas, das ich in meinem Artikel über Selbstwertgefühl und KI geschrieben hatte: **KI-Modelle werden nicht nur besser darin, bekannte Methoden schneller anzuwenden. Sie entwickeln methodische Ansätze, die den Horizont menschlicher Forschung erweitern.** Das ist qualitativ etwas anderes als ein Schachcomputer, der durch Bruteforce gewinnt. Hier geht es um eine Art von Kreativität, die in der Rekombination von Wissensdomänen liegt.
+Beim zweiten Nachdenken wird jedoch deutlich: **KI-Modelle werden nicht nur besser darin, bekannte Methoden schneller anzuwenden. Sie entwickeln methodische Ansätze, die den Horizont menschlicher Forschung erweitern.** Das ist qualitativ etwas anderes als ein Schachcomputer, der durch Bruteforce gewinnt. Hier geht es um eine Art von Kreativität, die in der Rekombination von Wissensdomänen liegt.
 
 Gleichzeitig sollte man die Euphorie dämpfen. Claude hatte in derselben Woche bei einer Alignment-Aufgabe menschliche Forscher geschlagen — nur um dann in der Produktionsumgebung zu versagen. Die Ergebnisse "verschwanden", wie The Decoder berichtet. Das wirft eine unbequeme Frage auf: **Wenn KI-Leistungen nicht reproduzierbar sind, was sind sie dann wert?**
 

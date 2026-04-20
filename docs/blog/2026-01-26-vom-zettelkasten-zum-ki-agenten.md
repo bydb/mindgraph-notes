@@ -80,4 +80,3 @@ Doch die Gratwanderung zwischen Assistenz und Entmündigung ist schmal. Die KI v
 
 - [[Die Krise des wissenschaftlichen Publizierens]]
 - [[Wenn die KI das Denken übernimmt]]
-- [[Wir sollten über unser Selbstwertgefühl nachdenken]]
