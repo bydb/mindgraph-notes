@@ -8221,6 +8221,83 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
   cursor: not-allowed;
 }
 
+/* Publish to WordPress Modal */
+.publish-wp-dialog {
+  width: 640px;
+}
+
+.publish-wp-dialog .ai-image-field input[type="text"] {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font-size: 14px;
+  font-family: inherit;
+  transition: border-color var(--transition-fast);
+}
+
+.publish-wp-dialog .ai-image-field input[type="text"]:focus {
+  outline: none;
+  border-color: var(--accent-color);
+}
+
+.publish-wp-status-group {
+  display: flex;
+  gap: 16px;
+}
+
+.publish-wp-status-option {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.publish-wp-preview {
+  max-height: 260px;
+  overflow-y: auto;
+  padding: 12px 14px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--bg-secondary);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.publish-wp-preview h1,
+.publish-wp-preview h2,
+.publish-wp-preview h3 {
+  margin-top: 12px;
+}
+
+.publish-wp-preview img {
+  max-width: 100%;
+  height: auto;
+}
+
+.publish-wp-progress {
+  padding: 8px 12px;
+  background: var(--bg-secondary);
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-bottom: 12px;
+}
+
+.publish-wp-error {
+  padding: 8px 12px;
+  background: rgba(220, 38, 38, 0.1);
+  border: 1px solid rgba(220, 38, 38, 0.3);
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  color: #dc2626;
+  margin-bottom: 12px;
+}
+
 /* Templates Section */
 .settings-templates {
   display: flex;

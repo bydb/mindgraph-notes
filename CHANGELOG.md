@@ -2,6 +2,12 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.5.8-beta] - 2026-04-20
+
+### Features
+- **Notizen direkt in WordPress veröffentlichen** — neuer **WP**-Button im Editor-Header (neben PDF/DOCX) öffnet einen Publish-Dialog mit Titel (aus Frontmatter oder Notiz-Titel), Status-Auswahl (Entwurf/Veröffentlichen) und HTML-Vorschau. Referenzierte Bilder (Obsidian `![[…]]` und Standard `![](…)`) werden automatisch in die WP-Medienbibliothek hochgeladen und URLs ersetzt. Button erscheint nur bei aktivem Marketing-Modul + konfigurierter WordPress-URL
+- **KI-Funktionen im Rechtsklick-Kontextmenü** — der AI-Assistent (Übersetzen, Zusammenfassen, Fortsetzen, Verbessern, eigener Prompt), bisher nur über Cmd+Shift+A erreichbar, taucht jetzt als erster Eintrag (🤖 KI-Assistent) im Format-Menü auf, wenn Text selektiert ist und Ollama aktiv. Alt+Rechtsklick öffnet weiterhin direkt das AI-Menü
+
 ## [0.5.7-beta] - 2026-04-19
 
 ### Features

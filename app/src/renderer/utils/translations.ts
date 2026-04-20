@@ -669,6 +669,26 @@ const translations = {
     'editor.charactersTooltip': 'Zeichen (mit/ohne Leerzeichen)',
     'editor.readTime': 'Geschätzte Lesezeit',
     'editor.readTimeMin': 'min Lesezeit',
+    'editor.publishWp': 'In WordPress veröffentlichen',
+
+    // Publish to WordPress
+    'publishWp.title': 'Notiz in WordPress veröffentlichen',
+    'publishWp.notConfigured': 'WordPress ist noch nicht konfiguriert. Trage URL, Benutzer und App-Passwort unter Einstellungen › Agenten › Marketing ein.',
+    'publishWp.postTitle': 'Titel',
+    'publishWp.postTitlePlaceholder': 'Titel des Blog-Posts',
+    'publishWp.status': 'Status',
+    'publishWp.statusDraft': 'Entwurf',
+    'publishWp.statusPublish': 'Veröffentlichen',
+    'publishWp.preview': 'Vorschau',
+    'publishWp.cancel': 'Abbrechen',
+    'publishWp.publish': 'Veröffentlichen',
+    'publishWp.publishing': 'Wird veröffentlicht…',
+    'publishWp.converting': 'Konvertiere Markdown…',
+    'publishWp.uploadingImage': 'Lade Bild {current} von {total} hoch…',
+    'publishWp.successDraft': 'Entwurf erfolgreich in WordPress gespeichert.',
+    'publishWp.successPublished': 'Beitrag erfolgreich veröffentlicht.',
+    'publishWp.close': 'Schließen',
+    'publishWp.unknownError': 'Unbekannter Fehler',
 
     // Template Settings
     'templates.resetDefault': 'Auf Standard zurücksetzen',
@@ -2504,6 +2524,26 @@ const translations = {
     'editor.charactersTooltip': 'Characters (with/without spaces)',
     'editor.readTime': 'Estimated reading time',
     'editor.readTimeMin': 'min read',
+    'editor.publishWp': 'Publish to WordPress',
+
+    // Publish to WordPress
+    'publishWp.title': 'Publish note to WordPress',
+    'publishWp.notConfigured': 'WordPress is not configured yet. Enter URL, username and app password under Settings › Agents › Marketing.',
+    'publishWp.postTitle': 'Title',
+    'publishWp.postTitlePlaceholder': 'Blog post title',
+    'publishWp.status': 'Status',
+    'publishWp.statusDraft': 'Draft',
+    'publishWp.statusPublish': 'Publish',
+    'publishWp.preview': 'Preview',
+    'publishWp.cancel': 'Cancel',
+    'publishWp.publish': 'Publish',
+    'publishWp.publishing': 'Publishing…',
+    'publishWp.converting': 'Converting markdown…',
+    'publishWp.uploadingImage': 'Uploading image {current} of {total}…',
+    'publishWp.successDraft': 'Draft saved to WordPress successfully.',
+    'publishWp.successPublished': 'Post published successfully.',
+    'publishWp.close': 'Close',
+    'publishWp.unknownError': 'Unknown error',
 
     // Template Settings
     'templates.resetDefault': 'Reset to default',

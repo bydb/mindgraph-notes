@@ -33,6 +33,7 @@ import { PropertiesPanel } from './PropertiesPanel'
 import { FormattingToolbar } from './FormattingToolbar'
 import { AIContextMenu, AIResult } from './AIContextMenu'
 import { AIImageDialog } from './AIImageDialog'
+import { PublishToWordPressModal } from './PublishToWordPressModal'
 import { insertAIResultWithFootnote } from '../../utils/aiFootnote'
 import { isImageFile, findImageInVault } from '../../utils/imageUtils'
 import { highlightCode } from '../../utils/highlightSetup'
@@ -82,9 +83,10 @@ interface FormatMenuProps {
   onFormat: (type: string) => void
   onClose: () => void
   previewMode?: boolean
+  onOpenAI?: () => void
 }
 
-const FormatMenu: React.FC<FormatMenuProps> = memo(({ x, y, onFormat, onClose, previewMode }) => {
+const FormatMenu: React.FC<FormatMenuProps> = memo(({ x, y, onFormat, onClose, previewMode, onOpenAI }) => {
   const { t } = useTranslation()
   const menuRef = useRef<HTMLDivElement>(null)
   const [adjustedPos, setAdjustedPos] = useState({ x, y })
@@ -189,6 +191,20 @@ const FormatMenu: React.FC<FormatMenuProps> = memo(({ x, y, onFormat, onClose, p
         zIndex: 1000
       }}
     >
+      {onOpenAI && (
+        <>
+          <button
+            className="format-menu-item"
+            onClick={() => { onOpenAI(); onClose() }}
+            title={t('ai.assistant')}
+          >
+            <span className="format-menu-icon">🤖</span>
+            <span className="format-menu-label">{t('ai.assistant')}</span>
+            <span className="format-menu-shortcut">Cmd+Shift+A</span>
+          </button>
+          <div className="format-menu-divider" />
+        </>
+      )}
       {formatOptions.map((option, index) => (
         option.type === 'divider' ? (
           <div key={index} className="format-menu-divider" />
@@ -533,8 +549,8 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
   const { vaultPath, selectedNoteId, secondarySelectedNoteId, notes, updateNote, selectNote, selectSecondaryNote, addNote, fileTree, setFileTree, navigateBack, navigateForward, canNavigateBack, canNavigateForward } = useNotesStore(
     useShallow(s => ({ vaultPath: s.vaultPath, selectedNoteId: s.selectedNoteId, secondarySelectedNoteId: s.secondarySelectedNoteId, notes: s.notes, updateNote: s.updateNote, selectNote: s.selectNote, selectSecondaryNote: s.selectSecondaryNote, addNote: s.addNote, fileTree: s.fileTree, setFileTree: s.setFileTree, navigateBack: s.navigateBack, navigateForward: s.navigateForward, canNavigateBack: s.canNavigateBack, canNavigateForward: s.canNavigateForward }))
   )
-  const { pendingTemplateInsert, setPendingTemplateInsert, ollama, editorHeadingFolding, outlineStyle, editorShowWordCount, languageTool, setLanguageTool, editorDefaultView, showFormattingToolbar, setShowFormattingToolbar, showRawEditor } = useUIStore(
-    useShallow(s => ({ pendingTemplateInsert: s.pendingTemplateInsert, setPendingTemplateInsert: s.setPendingTemplateInsert, ollama: s.ollama, editorHeadingFolding: s.editorHeadingFolding, outlineStyle: s.outlineStyle, editorShowWordCount: s.editorShowWordCount, languageTool: s.languageTool, setLanguageTool: s.setLanguageTool, editorDefaultView: s.editorDefaultView, showFormattingToolbar: s.showFormattingToolbar, setShowFormattingToolbar: s.setShowFormattingToolbar, showRawEditor: s.showRawEditor }))
+  const { pendingTemplateInsert, setPendingTemplateInsert, ollama, editorHeadingFolding, outlineStyle, editorShowWordCount, languageTool, setLanguageTool, editorDefaultView, showFormattingToolbar, setShowFormattingToolbar, showRawEditor, marketing } = useUIStore(
+    useShallow(s => ({ pendingTemplateInsert: s.pendingTemplateInsert, setPendingTemplateInsert: s.setPendingTemplateInsert, ollama: s.ollama, editorHeadingFolding: s.editorHeadingFolding, outlineStyle: s.outlineStyle, editorShowWordCount: s.editorShowWordCount, languageTool: s.languageTool, setLanguageTool: s.setLanguageTool, editorDefaultView: s.editorDefaultView, showFormattingToolbar: s.showFormattingToolbar, setShowFormattingToolbar: s.setShowFormattingToolbar, showRawEditor: s.showRawEditor, marketing: s.marketing }))
   )
 
   // Verwende die übergebene noteId oder die primary/secondary Selection
@@ -547,11 +563,12 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
   const [contentVersion, setContentVersion] = useState(0)
   const loadedImagesRef = useRef<Map<string, string>>(new Map())
   const [imagesLoadedVersion, setImagesLoadedVersion] = useState(0)
-  const [formatMenu, setFormatMenu] = useState<{ x: number; y: number } | null>(null)
+  const [formatMenu, setFormatMenu] = useState<{ x: number; y: number; ai?: { selectedText: string; selectionStart: number; selectionEnd: number } } | null>(null)
   const [propertiesCollapsed, setPropertiesCollapsed] = useState(false)
   const [foldedHeadings, setFoldedHeadings] = useState<Set<string>>(new Set())
   const [aiMenu, setAiMenu] = useState<{ x: number; y: number; selectedText: string; selectionStart: number; selectionEnd: number } | null>(null)
   const [showAIImageDialog, setShowAIImageDialog] = useState(false)
+  const [showPublishWpModal, setShowPublishWpModal] = useState(false)
 
   // LanguageTool State
   const [ltMatches, setLtMatches] = useState<LanguageToolMatch[]>([])
@@ -2760,7 +2777,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
     const { from, to } = view.state.selection.main
     const selectedText = view.state.doc.sliceString(from, to)
 
-    // Alt+Rechtsklick mit Text selektiert und Ollama verfügbar: AI-Menü anzeigen
+    // Alt+Rechtsklick mit Text selektiert und Ollama verfügbar: direkt AI-Menü
     if (e.altKey && selectedText.length > 0 && ollama.enabled && ollama.selectedModel) {
       setAiMenu({
         x: e.clientX,
@@ -2770,11 +2787,15 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
         selectionEnd: to
       })
       setFormatMenu(null)
-    } else {
-      // Normaler Rechtsklick: Format-Menü anzeigen
-      setFormatMenu({ x: e.clientX, y: e.clientY })
-      setAiMenu(null)
+      return
     }
+
+    // Normaler Rechtsklick: Format-Menü (mit optionalem KI-Eintrag, wenn Text selektiert + Ollama aktiv)
+    const aiInfo = selectedText.length > 0 && ollama.enabled && ollama.selectedModel
+      ? { selectedText, selectionStart: from, selectionEnd: to }
+      : undefined
+    setFormatMenu({ x: e.clientX, y: e.clientY, ai: aiInfo })
+    setAiMenu(null)
   }, [viewMode, ollama.enabled, ollama.selectedModel])
 
   // Tastenkombinationen: Cmd+Shift+F = Format-Menü, Cmd+Shift+A = AI-Menü
@@ -2983,6 +3004,19 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
             </svg>
             DOCX
           </button>
+          {marketing.enabled && marketing.wordpressUrl && (
+            <button
+              className="export-btn"
+              onClick={() => setShowPublishWpModal(true)}
+              title={t('editor.publishWp')}
+            >
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.5"/>
+                <path d="M2.5 8h11M8 2.5c1.8 2 2.8 3.8 2.8 5.5S9.8 11.5 8 13.5M8 2.5C6.2 4.5 5.2 6.3 5.2 8S6.2 11.5 8 13.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+              </svg>
+              WP
+            </button>
+          )}
           <div className="view-mode-toggle">
             {showRawEditor && (
               <button
@@ -3078,6 +3112,10 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
           onFormat={applyFormat}
           onClose={() => setFormatMenu(null)}
           previewMode={viewMode === 'preview'}
+          onOpenAI={formatMenu.ai ? () => {
+            const ai = formatMenu.ai!
+            setAiMenu({ x: formatMenu.x, y: formatMenu.y, selectedText: ai.selectedText, selectionStart: ai.selectionStart, selectionEnd: ai.selectionEnd })
+          } : undefined}
         />
       )}
 
@@ -3097,6 +3135,16 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
         <AIImageDialog
           onClose={() => setShowAIImageDialog(false)}
           onInsert={handleAIImageInsert}
+        />
+      )}
+
+      {/* Publish to WordPress Modal */}
+      {showPublishWpModal && selectedNote && vaultPath && (
+        <PublishToWordPressModal
+          note={selectedNote}
+          vaultPath={vaultPath}
+          fileTree={fileTree}
+          onClose={() => setShowPublishWpModal(false)}
         />
       )}
 
