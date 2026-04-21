@@ -6,6 +6,8 @@ import { BacklinksPanel } from './components/Editor/BacklinksPanel'
 import { GraphCanvas } from './components/Canvas/GraphCanvas'
 import { LocalCanvas } from './components/Canvas/LocalCanvas'
 import { PDFViewer } from './components/PDFViewer/PDFViewer'
+import { CodeViewer } from './components/CodeViewer/CodeViewer'
+import './components/CodeViewer/CodeViewer.css'
 import { ImageViewer } from './components/ImageViewer/ImageViewer'
 import { OfficeViewer } from './components/OfficeViewer/OfficeViewer'
 import { Terminal } from './components/Terminal/Terminal'
@@ -93,6 +95,10 @@ const App: React.FC = () => {
   const { unreadRelevantCount } = useEmailStore()
   const emailEnabled = useUIStore(state => state.email.enabled)
   const edooboxEnabled = useUIStore(state => state.edoobox.enabled)
+  const transportTitlebarButtonVisible = useUIStore(
+    state => state.transport.enabled && state.transport.showTitlebarButton
+  )
+  const zoteroModuleEnabled = useUIStore(state => state.zoteroEnabled)
   const vaultReadwiseActive = useVaultSettingsStore(state => state.features.readwise)
   const vaultEmailActive = useVaultSettingsStore(state => state.features.email)
   const vaultEdooboxActive = useVaultSettingsStore(state => state.features.edoobox)
@@ -536,8 +542,9 @@ const App: React.FC = () => {
         e.preventDefault()
         setQuickSearchOpen(true)
       }
-      // Cmd+Shift+Z / Ctrl+Shift+Z für Zotero-Suche
+      // Cmd+Shift+Z / Ctrl+Shift+Z für Zotero-Suche (nur wenn Modul aktiv)
       if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'z') {
+        if (!useUIStore.getState().zoteroEnabled) return
         e.preventDefault()
         setZoteroSearchOpen(true)
       }
@@ -853,6 +860,18 @@ const App: React.FC = () => {
           
           <div className="titlebar-right">
             <div className="view-mode-switcher">
+              {transportTitlebarButtonVisible && (
+                <button
+                  className="view-mode-btn cat-editor"
+                  onClick={() => window.electronAPI.transportShow()}
+                  title={t('titlebar.transport')}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M12 5v14"/>
+                    <path d="M5 12h14"/>
+                  </svg>
+                </button>
+              )}
               <button
                 className="view-mode-btn cat-editor"
                 onClick={() => setSettingsOpen(true)}
@@ -866,7 +885,7 @@ const App: React.FC = () => {
               <button
                 className={`view-mode-btn cat-organize overdue-btn ${overduePanelOpen ? 'active' : ''} ${taskStats.overdue > 0 ? 'has-overdue' : ''}`}
                 onClick={() => switchRightPanel('overdue')}
-                title={`${t('titlebar.overdue')} (${taskStats.overdue})`}
+                title={`${t('tasks.title')} (${taskStats.overdue})`}
               >
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <circle cx="12" cy="12" r="10"/>
@@ -970,6 +989,26 @@ const App: React.FC = () => {
                   </svg>
                 </button>
               )}
+              {zoteroModuleEnabled && (
+                <button
+                  className="view-mode-btn zotero-btn"
+                  onClick={() => setZoteroSearchOpen(true)}
+                  title={t('titlebar.zotero')}
+                  aria-label="Zotero"
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                    <text
+                      x="12"
+                      y="18"
+                      textAnchor="middle"
+                      fill="#cc2936"
+                      fontFamily="'Georgia', 'Times New Roman', serif"
+                      fontWeight="700"
+                      fontSize="18"
+                    >Z</text>
+                  </svg>
+                </button>
+              )}
               <button
                 className={`view-mode-btn cat-integrate ${terminalVisible ? 'active' : ''}`}
                 onClick={() => setTerminalVisible(!terminalVisible)}
@@ -1035,6 +1074,8 @@ const App: React.FC = () => {
                     onOpenInbox={() => switchRightPanel('inbox')}
                     onOpenAgent={() => switchRightPanel('agent')}
                   />
+                ) : activeTab?.type === 'code' && activeTab.codePath && vaultPath ? (
+                  <CodeViewer vaultPath={vaultPath} relativePath={activeTab.codePath} />
                 ) : selectedPdfPath && vaultPath ? (
                   <PDFViewer filePath={`${vaultPath}/${selectedPdfPath}`} fileName={selectedPdfPath.split('/').pop() || selectedPdfPath} relativePath={selectedPdfPath} />
                 ) : selectedImagePath && vaultPath ? (

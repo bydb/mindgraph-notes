@@ -369,11 +369,13 @@ export const Sidebar: React.FC<SidebarProps> = ({ onOpenSearch }) => {
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'n') {
+      // Nur reines Ctrl/Cmd+N — Shift/Alt-Kombinationen nicht abfangen,
+      // damit globale Shortcuts wie CommandOrControl+Shift+N (Transport) nicht kollidieren.
+      if ((e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'n') {
         e.preventDefault()
         handleNewNote()
       }
-      if ((e.metaKey || e.ctrlKey) && e.key === 'o') {
+      if ((e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'o') {
         e.preventDefault()
         handleOpenVault()
       }

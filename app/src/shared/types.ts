@@ -375,7 +375,7 @@ export interface FileEntry {
   path: string;
   isDirectory: boolean;
   children?: FileEntry[];
-  fileType?: 'markdown' | 'pdf' | 'image' | 'excel' | 'word' | 'powerpoint';
+  fileType?: 'markdown' | 'pdf' | 'image' | 'excel' | 'word' | 'powerpoint' | 'code';
 }
 
 // PDF-Dokument
@@ -862,6 +862,21 @@ export interface ElectronAPI {
   transportSaveNote: (data: { title: string; category: string; tags: string[]; content: string; destinationFolder: string }) => Promise<{ success: boolean; relativePath?: string; error?: string }>;
   transportOpenInMain: (relativePath: string) => Promise<void>;
   transportClose: () => Promise<void>;
+  transportShow: () => Promise<void>;
+  transportUpdateShortcut: (shortcut: string) => Promise<{ success: boolean; error?: string }>;
+  openInVSCode: (absolutePath: string) => Promise<{ success: boolean; error?: string }>;
+  tasksUpdateLine: (data: {
+    vaultPath: string;
+    relativePath: string;
+    lineIndex: number;
+    expectedOldLine: string;
+    newLine: string;
+  }) => Promise<{ success: boolean; error?: string }>;
+  tasksCreate: (data: {
+    vaultPath: string;
+    relativePath: string;
+    taskLine: string;
+  }) => Promise<{ success: boolean; relativePath?: string; error?: string }>;
   onTransportOpenNote: (callback: (relativePath: string) => void) => void;
   onTransportWindowShown: (callback: () => void) => void;
 }

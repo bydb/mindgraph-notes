@@ -1,0 +1,219 @@
+.code-viewer {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--bg-primary);
+  overflow: hidden;
+}
+
+.code-viewer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+  flex-shrink: 0;
+}
+
+.code-viewer-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.code-viewer-filename {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.code-viewer-lang {
+  font-size: 10px;
+  font-weight: 500;
+  text-transform: uppercase;
+  padding: 2px 6px;
+  border-radius: 3px;
+  background: rgba(74, 158, 255, 0.15);
+  color: var(--accent-color, #4a9eff);
+  letter-spacing: 0.5px;
+  flex-shrink: 0;
+}
+
+.code-viewer-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.code-viewer-lines {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.code-viewer-copy-btn,
+.code-viewer-action-btn {
+  padding: 4px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.code-viewer-copy-btn:hover:not(:disabled),
+.code-viewer-action-btn:hover:not(:disabled) {
+  background: var(--bg-primary);
+  border-color: var(--accent-color, #4a9eff);
+  color: var(--accent-color, #4a9eff);
+}
+
+.code-viewer-copy-btn:disabled,
+.code-viewer-action-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.code-viewer-body {
+  display: flex;
+  flex: 1;
+  overflow: auto;
+  font-family: var(--font-mono, 'SF Mono', 'Menlo', 'Monaco', 'Consolas', 'Courier New', monospace);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.code-viewer-linenums {
+  padding: 12px 8px 12px 16px;
+  text-align: right;
+  color: var(--text-muted);
+  opacity: 0.5;
+  user-select: none;
+  border-right: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+  flex-shrink: 0;
+  min-width: 40px;
+}
+
+.code-viewer-linenums > div {
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.code-viewer-pre {
+  flex: 1;
+  margin: 0;
+  padding: 12px 16px;
+  overflow: auto;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+.code-viewer-pre code {
+  background: transparent !important;
+  padding: 0 !important;
+  font-family: inherit;
+  font-size: inherit;
+  white-space: pre;
+  color: var(--text-primary);
+}
+
+/* wrapLines() aus highlightSetup.ts liefert eine <span.code-line> pro Zeile.
+   Ohne display:block laufen alle Zeilen ineinander. */
+.code-viewer-pre code .code-line {
+  display: block;
+  min-height: 1.5em;
+}
+
+/* ============ Syntax Highlighting — Light Theme (GitHub Light inspiriert) ============ */
+.code-viewer-pre code .hljs-keyword,
+.code-viewer-pre code .hljs-selector-tag,
+.code-viewer-pre code .hljs-built_in,
+.code-viewer-pre code .hljs-name { color: #cf222e; }
+
+.code-viewer-pre code .hljs-string,
+.code-viewer-pre code .hljs-attr,
+.code-viewer-pre code .hljs-selector-class,
+.code-viewer-pre code .hljs-selector-id { color: #0a3069; }
+
+.code-viewer-pre code .hljs-comment,
+.code-viewer-pre code .hljs-quote { color: #6e7781; font-style: italic; }
+
+.code-viewer-pre code .hljs-number,
+.code-viewer-pre code .hljs-literal,
+.code-viewer-pre code .hljs-variable,
+.code-viewer-pre code .hljs-template-variable { color: #0550ae; }
+
+.code-viewer-pre code .hljs-tag { color: #116329; }
+
+.code-viewer-pre code .hljs-title,
+.code-viewer-pre code .hljs-section,
+.code-viewer-pre code .hljs-function .hljs-title { color: #8250df; }
+
+.code-viewer-pre code .hljs-type,
+.code-viewer-pre code .hljs-class .hljs-title { color: #953800; }
+
+.code-viewer-pre code .hljs-meta,
+.code-viewer-pre code .hljs-meta .hljs-keyword { color: #116329; }
+
+.code-viewer-pre code .hljs-params { color: #24292f; }
+
+.code-viewer-pre code .hljs-addition { color: #116329; background: rgba(46, 160, 67, 0.15); }
+.code-viewer-pre code .hljs-deletion { color: #cf222e; background: rgba(207, 34, 46, 0.15); }
+.code-viewer-pre code .hljs-symbol,
+.code-viewer-pre code .hljs-bullet { color: var(--text-primary); }
+
+/* ============ Syntax Highlighting — Dark Theme (VS Code Dark+ inspiriert) ============ */
+[data-theme="dark"] .code-viewer-pre code .hljs-keyword,
+[data-theme="dark"] .code-viewer-pre code .hljs-selector-tag,
+[data-theme="dark"] .code-viewer-pre code .hljs-built_in,
+[data-theme="dark"] .code-viewer-pre code .hljs-name { color: #c586c0; }
+
+[data-theme="dark"] .code-viewer-pre code .hljs-string,
+[data-theme="dark"] .code-viewer-pre code .hljs-attr,
+[data-theme="dark"] .code-viewer-pre code .hljs-selector-class,
+[data-theme="dark"] .code-viewer-pre code .hljs-selector-id { color: #ce9178; }
+
+[data-theme="dark"] .code-viewer-pre code .hljs-comment,
+[data-theme="dark"] .code-viewer-pre code .hljs-quote { color: #6a9955; font-style: italic; }
+
+[data-theme="dark"] .code-viewer-pre code .hljs-number,
+[data-theme="dark"] .code-viewer-pre code .hljs-literal,
+[data-theme="dark"] .code-viewer-pre code .hljs-variable,
+[data-theme="dark"] .code-viewer-pre code .hljs-template-variable { color: #b5cea8; }
+
+[data-theme="dark"] .code-viewer-pre code .hljs-tag { color: #569cd6; }
+
+[data-theme="dark"] .code-viewer-pre code .hljs-title,
+[data-theme="dark"] .code-viewer-pre code .hljs-section,
+[data-theme="dark"] .code-viewer-pre code .hljs-function .hljs-title { color: #dcdcaa; }
+
+[data-theme="dark"] .code-viewer-pre code .hljs-type,
+[data-theme="dark"] .code-viewer-pre code .hljs-class .hljs-title { color: #4ec9b0; }
+
+[data-theme="dark"] .code-viewer-pre code .hljs-meta,
+[data-theme="dark"] .code-viewer-pre code .hljs-meta .hljs-keyword { color: #569cd6; }
+
+[data-theme="dark"] .code-viewer-pre code .hljs-params { color: #9cdcfe; }
+
+[data-theme="dark"] .code-viewer-pre code .hljs-addition { color: #b5cea8; background: rgba(75, 160, 75, 0.15); }
+[data-theme="dark"] .code-viewer-pre code .hljs-deletion { color: #ce9178; background: rgba(200, 50, 50, 0.15); }
+
+.code-viewer-loading,
+.code-viewer-error {
+  padding: 24px;
+  text-align: center;
+  color: var(--text-secondary);
+}
+
+.code-viewer-error {
+  color: #dc2626;
+}

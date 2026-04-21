@@ -45,10 +45,25 @@ export default function TransportCapture(): React.ReactElement {
       if (config.transport) {
         setDestinations(config.transport.destinations || [])
         setPredefinedTags(config.transport.predefinedTags || [])
-        const defaultIdx = config.transport.defaultDestinationIndex || 0
-        if (config.transport.destinations?.length > 0) {
-          setDestinationFolder(config.transport.destinations[defaultIdx]?.folder || config.transport.destinations[0].folder)
+
+        // Bevorzugt: direkt gespeicherter Zielordner. Fallback: alter Index in destinations.
+        const rawCfg = config.transport as unknown as {
+          defaultDestinationFolder?: string
+          defaultDestinationIndex?: number
+          destinations?: { folder: string }[]
         }
+        let defaultFolder = rawCfg.defaultDestinationFolder || ''
+        if (!defaultFolder && typeof rawCfg.defaultDestinationIndex === 'number' && rawCfg.destinations?.length) {
+          const idx = Math.min(Math.max(rawCfg.defaultDestinationIndex, 0), rawCfg.destinations.length - 1)
+          defaultFolder = rawCfg.destinations[idx]?.folder || ''
+        }
+        if (!defaultFolder && rawCfg.destinations?.length) {
+          defaultFolder = rawCfg.destinations[0].folder
+        }
+        if (!defaultFolder && subdirs.length > 0) {
+          defaultFolder = subdirs[0]
+        }
+        if (defaultFolder) setDestinationFolder(defaultFolder)
       }
     } catch (err) {
       console.error('[Transport] Config laden fehlgeschlagen:', err)
@@ -165,7 +180,7 @@ export default function TransportCapture(): React.ReactElement {
       })
 
       if (result.success && result.relativePath) {
-        showStatusToast('Transportiert!', 'success')
+        showStatusToast('Erfasst!', 'success')
 
         // Notiz im Hauptfenster öffnen
         await window.electronAPI.transportOpenInMain(result.relativePath)
@@ -312,7 +327,7 @@ export default function TransportCapture(): React.ReactElement {
             onClick={handleSubmit}
             disabled={!content.trim() || !destinationFolder || isSubmitting}
           >
-            {isSubmitting ? 'Transportiere...' : 'Transport ⌘↵'}
+            {isSubmitting ? 'Erfasse…' : 'Erfassen ⌘↵'}
           </button>
         </div>
       </div>

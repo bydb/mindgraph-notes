@@ -4,29 +4,49 @@ import * as path from 'path'
 let tray: Tray | null = null
 let transportWindow: BrowserWindow | null = null
 let currentShortcut: string = 'CommandOrControl+Shift+N'
+let cachedResourcesPath: string = ''
 
 export function getTransportWindow(): BrowserWindow | null {
   return transportWindow
 }
 
+export function getCurrentShortcut(): string {
+  return currentShortcut
+}
+
 export function setupTray(opts: {
   getMainWindow: () => BrowserWindow | null
   resourcesPath: string
+  initialShortcut?: string
 }): void {
-  const { getMainWindow, resourcesPath } = opts
+  const { getMainWindow, resourcesPath, initialShortcut } = opts
+  cachedResourcesPath = resourcesPath
+  if (initialShortcut && initialShortcut.trim().length > 0) {
+    currentShortcut = initialShortcut.trim()
+  }
 
   // Tray-Icon erstellen (Template-Images für automatische Hell/Dunkel-Anpassung)
   const trayIconPath = path.join(resourcesPath, 'trayIconTemplate.png')
   const trayIcon = nativeImage.createFromPath(trayIconPath)
-  trayIcon.setTemplateImage(true)
+  // Template-Image ist nur auf macOS sinnvoll (automatische Hell/Dunkel-Anpassung)
+  if (process.platform === 'darwin') {
+    trayIcon.setTemplateImage(true)
+  }
 
-  tray = new Tray(trayIcon)
-  tray.setToolTip('MindGraph Notes')
+  try {
+    tray = new Tray(trayIcon)
+    tray.setToolTip('MindGraph Notes')
+  } catch (err) {
+    console.warn('[Transport] Tray konnte nicht erstellt werden (Desktop-Umgebung ohne Tray-Support?):', err)
+    // Trotzdem globalen Shortcut registrieren — der funktioniert auch ohne Tray
+    registerShortcut(resourcesPath)
+    return
+  }
 
   // Rechtsklick-Kontextmenü
   const contextMenu = Menu.buildFromTemplate([
     {
-      label: 'Quick Capture',
+      label: 'Schnellerfassung',
       click: () => showTransportWindow(resourcesPath)
     },
     {
@@ -48,7 +68,7 @@ export function setupTray(opts: {
 
   tray.setContextMenu(contextMenu)
 
-  // Linksklick öffnet Quick Capture
+  // Linksklick öffnet Schnellerfassung
   tray.on('click', () => {
     showTransportWindow(resourcesPath)
   })
@@ -79,6 +99,9 @@ function createTransportWindow(_resourcesPath: string): BrowserWindow {
     transparent: false,
     alwaysOnTop: true,
     resizable: false,
+    maximizable: false,
+    minimizable: false,
+    fullscreenable: false,
     skipTaskbar: true,
     show: false,
     vibrancy: 'popover',
@@ -88,6 +111,19 @@ function createTransportWindow(_resourcesPath: string): BrowserWindow {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: false
+    }
+  })
+
+  // Sicherheitsnetz: Falls das Fenster-Manager trotzdem maximiert/fullscreen triggert,
+  // sofort zurück auf die gewünschte Popover-Größe.
+  transportWindow.on('maximize', () => {
+    if (transportWindow && !transportWindow.isDestroyed()) {
+      transportWindow.unmaximize()
+    }
+  })
+  transportWindow.on('enter-full-screen', () => {
+    if (transportWindow && !transportWindow.isDestroyed()) {
+      transportWindow.setFullScreen(false)
     }
   })
 
@@ -136,18 +172,20 @@ export function hideTransportWindow(): void {
 }
 
 function registerShortcut(resourcesPath: string): void {
-  currentShortcut = 'CommandOrControl+Shift+N'
   const success = globalShortcut.register(currentShortcut, () => {
     showTransportWindow(resourcesPath)
   })
 
   if (!success) {
     console.warn(`[Transport] Global shortcut ${currentShortcut} konnte nicht registriert werden`)
+  } else {
+    console.log(`[Transport] Global shortcut ${currentShortcut} registriert`)
   }
 }
 
-export function updateShortcut(newShortcut: string, resourcesPath: string): boolean {
-  // Nur den eigenen Shortcut deregistrieren, nicht alle
+export function updateShortcut(newShortcut: string, resourcesPath?: string): boolean {
+  const targetPath = resourcesPath ?? cachedResourcesPath
+
   try {
     globalShortcut.unregister(currentShortcut)
   } catch {
@@ -155,15 +193,17 @@ export function updateShortcut(newShortcut: string, resourcesPath: string): bool
   }
 
   const success = globalShortcut.register(newShortcut, () => {
-    showTransportWindow(resourcesPath)
+    showTransportWindow(targetPath)
   })
 
   if (success) {
     currentShortcut = newShortcut
+    console.log(`[Transport] Global shortcut ${currentShortcut} registriert`)
   } else {
+    console.warn(`[Transport] Shortcut ${newShortcut} konnte nicht registriert werden — Fallback auf ${currentShortcut}`)
     // Fallback auf vorherigen Shortcut
     globalShortcut.register(currentShortcut, () => {
-      showTransportWindow(resourcesPath)
+      showTransportWindow(targetPath)
     })
   }
 

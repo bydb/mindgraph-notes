@@ -215,12 +215,14 @@ export function extractFirstCardCallout(content: string): ExtractedCallout | nul
 // ============ TASK EXTRACTION ============
 
 export interface ExtractedTask {
-  text: string           // Task-Text ohne Checkbox
+  text: string           // Task-Text (ohne Datum, ohne #tags, clean für Anzeige)
   completed: boolean     // [x] = true, [ ] = false
-  line: number           // Zeilennummer im Dokument
+  line: number           // Zeilennummer im Dokument (1-basiert)
+  rawLine: string        // Ursprüngliche Markdown-Zeile (für Write-Back / Konfliktschutz)
   dueDate?: Date         // Aus @[[YYYY-MM-DD]] HH:MM
   isOverdue?: boolean    // Heute > dueDate
   isCritical?: boolean   // Enthält #critical, @urgent, !!, etc.
+  tags: string[]         // Inline-Tags aus der Task-Zeile (#tag), ohne #
 }
 
 export interface TaskSummary {
@@ -263,9 +265,28 @@ function parseReminderDate(text: string): Date | undefined {
   return new Date(year, month - 1, day, 0, 0, 0)
 }
 
-// Entfernt das Reminder-Format aus dem Task-Text für die Anzeige
+// Regex für Inline-Tags in der Task-Zeile: #tag (alphanumerisch + Umlaute, -, /)
+// Nicht match auf #critical etc. — die werden als Tag UND als isCritical erkannt.
+const TASK_TAG_REGEX = /(?:^|\s)#([\p{L}0-9][\p{L}0-9\-/_]*)/gu
+
+// Extrahiert alle Inline-Tags aus einer Task-Zeile
+function extractInlineTags(text: string): string[] {
+  const tags: string[] = []
+  TASK_TAG_REGEX.lastIndex = 0
+  let match: RegExpExecArray | null
+  while ((match = TASK_TAG_REGEX.exec(text)) !== null) {
+    tags.push(match[1])
+  }
+  return tags
+}
+
+// Entfernt das Reminder-Format und Inline-Tags aus dem Task-Text für die Anzeige
 function cleanTaskText(text: string): string {
-  return text.replace(REMINDER_REGEX, '').trim()
+  return text
+    .replace(REMINDER_REGEX, '')
+    .replace(TASK_TAG_REGEX, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
 }
 
 // Prüft ob ein Datum überfällig ist
@@ -304,6 +325,7 @@ export function extractTasks(content: string): TaskSummary {
       const completed = match[1].toLowerCase() === 'x'
       const fullText = match[2]
       const dueDate = parseReminderDate(fullText)
+      const tags = extractInlineTags(fullText)
       const text = cleanTaskText(fullText)
       const isCritical = isCriticalTask(fullText)
 
@@ -311,9 +333,11 @@ export function extractTasks(content: string): TaskSummary {
         text,
         completed,
         line: index + 1,
+        rawLine: line,
         dueDate,
         isOverdue: dueDate ? isOverdue(dueDate) : false,
-        isCritical
+        isCritical,
+        tags
       })
     }
   })
@@ -339,6 +363,42 @@ export function extractTasks(content: string): TaskSummary {
     nextDue,
     critical: criticalCount
   }
+}
+
+// Baut eine Task-Markdown-Zeile aus Komponenten auf.
+// Behält Einrückung und Listen-Marker (`-` oder `*`) der rawLine bei, damit
+// User-Formatierung erhalten bleibt. Neue Tasks nutzen `- [ ]`.
+export function buildTaskLine(opts: {
+  rawLine?: string         // bestehende Zeile (für Einrückungs-Erhaltung)
+  completed: boolean
+  text: string             // sauberer Text (ohne Datum, ohne Tags)
+  tags: string[]
+  dueDate?: Date
+}): string {
+  let prefix = '- '
+  if (opts.rawLine) {
+    const m = opts.rawLine.match(/^(\s*[-*])\s*\[[ xX]\]\s*/)
+    if (m) prefix = m[1] + ' '
+  }
+
+  const checkbox = opts.completed ? '[x]' : '[ ]'
+  const textPart = opts.text.trim()
+  const tagPart = opts.tags.length > 0 ? ' ' + opts.tags.map(t => `#${t}`).join(' ') : ''
+
+  let datePart = ''
+  if (opts.dueDate) {
+    const y = opts.dueDate.getFullYear()
+    const m = String(opts.dueDate.getMonth() + 1).padStart(2, '0')
+    const d = String(opts.dueDate.getDate()).padStart(2, '0')
+    const hh = opts.dueDate.getHours()
+    const mm = opts.dueDate.getMinutes()
+    const hasTime = hh !== 0 || mm !== 0
+    datePart = hasTime
+      ? ` (@[[${y}-${m}-${d}]] ${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')})`
+      : ` (@[[${y}-${m}-${d}]])`
+  }
+
+  return `${prefix}${checkbox} ${textPart}${tagPart}${datePart}`.trimEnd()
 }
 
 // Extrahiert Task-Statistiken für den Cache (wird beim Parsen aufgerufen)

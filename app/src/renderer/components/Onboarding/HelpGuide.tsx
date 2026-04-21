@@ -104,8 +104,8 @@ const helpTopics: HelpTopic[] = [
     details: ['Karteikarten mit Spaced Repetition', 'Quiz-Modus aus deinen Notizen', 'Anki-Import (AnkiDroid-Format)', 'Lernstatistiken und Fortschritt'] },
   { id: 'tasks', label: 'Aufgaben', icon: 'clock', color: '#f59e0b', category: 'organize',
     details: ['- [ ] Checkbox-Tasks im Markdown', 'Faelligkeitsdatum: @[[2026-04-16]]', 'Desktop-Erinnerungen bei Faelligkeit', 'Ueberfaellige Tasks in der Titelleiste'] },
-  { id: 'transport', label: 'Transport', icon: 'transport', color: '#f59e0b', category: 'organize', shortcut: '⌘⇧N',
-    details: ['Quick Capture via macOS-Menuleiste', 'Globaler Shortcut: ⌘⇧N', 'Kategorien: 🔴 Aktion 🟢 Wissen 🔵 Info', 'Tags, Zielordner, YAML-Frontmatter'] },
+  { id: 'transport', label: 'Schnellerfassung', icon: 'transport', color: '#f59e0b', category: 'organize', shortcut: '⌘⇧N',
+    details: ['Schnelles Erfassen ueber Tray-Icon oder Titelleisten-Button', 'Globaler Shortcut: ⌘⇧N (in Einstellungen konfigurierbar)', 'Kategorien: 🔴 Aktion 🟢 Wissen 🔵 Info', 'Tags, Zielordner, YAML-Frontmatter'] },
   { id: 'tags', label: 'Tags & Ordner', icon: 'tags', color: '#f59e0b', category: 'organize',
     details: ['Tags-Panel: Alle Tags durchsuchen', 'Ordner per Rechtsklick erstellen', 'Templates fuer neue Notizen (⌘⇧T)', 'Lesezeichen fuer Schnellzugriff'] },
   { id: 'sync', label: 'E2E Sync', icon: 'sync', color: '#f59e0b', category: 'organize',
@@ -320,6 +320,23 @@ const HelpGraphInner: React.FC<{ onClose: () => void }> = ({ onClose }) => {
       <div className="help-graph-header">
         <h1>{t('help.title')}</h1>
         <span className="help-graph-hint">{t('help.graphHint')}</span>
+        <button
+          className="help-restart-onboarding"
+          title={t('help.restartOnboardingTitle')}
+          onClick={() => {
+            const { setOnboardingCompleted, setOnboardingOpen, setUserProfile } = useUIStore.getState()
+            setOnboardingCompleted(false)
+            setUserProfile(null)
+            setOnboardingOpen(true)
+            onClose()
+          }}
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M21 12a9 9 0 1 1-3-6.7"/>
+            <polyline points="21 3 21 9 15 9"/>
+          </svg>
+          <span>{t('help.restartOnboarding')}</span>
+        </button>
         <button className="help-close" onClick={onClose}>
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>

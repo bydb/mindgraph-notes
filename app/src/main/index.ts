@@ -7,7 +7,7 @@ import * as pty from 'node-pty'
 import type { FileEntry } from '../shared/types'
 import { SyncEngine } from './sync/syncEngine'
 import { ReMarkableService } from './remarkable/service'
-import { setupTray, hideTransportWindow } from './transport/trayManager'
+import { setupTray, hideTransportWindow, updateShortcut, showTransportWindow } from './transport/trayManager'
 
 // Globale Fehlerbehandlung für unhandled exceptions (z.B. IMAP Socket-Timeouts)
 process.on('uncaughtException', (error) => {
@@ -314,16 +314,25 @@ app.whenReady().then(async () => {
 
   createWindow()
 
-  // Tray-Icon + Quick Capture (nur macOS)
-  if (process.platform === 'darwin') {
+  // Tray-Icon + Schnellerfassung (plattformübergreifend)
+  {
     const resourcesPath = app.isPackaged
       ? path.join(__dirname, '../../resources')
       : path.join(app.getAppPath(), 'resources')
 
-    setupTray({
-      getMainWindow: () => mainWindow,
-      resourcesPath
-    })
+    // Gespeicherten Shortcut aus UI-Settings lesen
+    const uiSettings = await loadUISettings()
+    const transportSettings = uiSettings.transport as { shortcut?: string; enabled?: boolean } | undefined
+    const savedShortcut = transportSettings?.shortcut
+    const transportEnabled = transportSettings?.enabled !== false
+
+    if (transportEnabled) {
+      setupTray({
+        getMainWindow: () => mainWindow,
+        resourcesPath,
+        initialShortcut: savedShortcut
+      })
+    }
   }
 
   app.on('activate', () => {
@@ -495,7 +504,34 @@ ipcMain.handle('create-note', async (_event, filePath: string) => {
 // Supported image extensions for file tree display
 const IMAGE_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.bmp', '.ico']
 
-function getFileType(fileName: string): 'markdown' | 'pdf' | 'image' | 'excel' | 'word' | 'powerpoint' | null {
+// Code-Extensions — spiegelt codeLanguages.ts im Renderer (bewusste Duplikation, Main ↔ Renderer
+// dürfen keinen Code teilen, der DOM/hljs importiert). Nur Reine Text-Dateien, die mit highlight.js
+// gehighlighted werden können.
+const CODE_FILE_EXTENSIONS_MAIN = new Set([
+  'js', 'mjs', 'cjs', 'jsx', 'ts', 'tsx',
+  'py', 'pyw',
+  'html', 'htm', 'xml', 'svg',
+  'css', 'scss', 'sass', 'less',
+  'json', 'jsonc',
+  'yaml', 'yml',
+  'sh', 'bash', 'zsh', 'fish',
+  'markdown', 'mdx',
+  'sql',
+  'java', 'kt', 'kts',
+  'c', 'h', 'cpp', 'cxx', 'cc', 'hpp', 'hxx',
+  'cs',
+  'go', 'rs', 'php', 'rb', 'swift',
+  'diff', 'patch',
+  'txt', 'log', 'conf', 'ini', 'toml', 'env'
+])
+
+const IGNORED_DIRECTORY_NAMES = new Set([
+  'node_modules', '.git', '.svn', '.hg', 'dist', 'build', 'out', 'target',
+  '.next', '.nuxt', '.turbo', '.cache', '__pycache__', '.pytest_cache',
+  '.venv', 'venv', 'env', '.idea', '.vscode'
+])
+
+function getFileType(fileName: string): 'markdown' | 'pdf' | 'image' | 'excel' | 'word' | 'powerpoint' | 'code' | null {
   const ext = path.extname(fileName).toLowerCase()
   if (ext === '.md') return 'markdown'
   if (ext === '.pdf') return 'pdf'
@@ -503,6 +539,11 @@ function getFileType(fileName: string): 'markdown' | 'pdf' | 'image' | 'excel' |
   if (ext === '.xlsx' || ext === '.xls') return 'excel'
   if (ext === '.docx' || ext === '.doc') return 'word'
   if (ext === '.pptx' || ext === '.ppt') return 'powerpoint'
+  // Code-Dateien: Extension ohne führenden Punkt prüfen
+  if (ext && CODE_FILE_EXTENSIONS_MAIN.has(ext.slice(1))) return 'code'
+  // Spezial-Dateinamen ohne Extension (Dockerfile, Makefile)
+  const lower = fileName.toLowerCase()
+  if (lower === 'dockerfile' || lower === 'makefile' || lower === '.gitignore' || lower === '.env') return 'code'
   return null
 }
 
@@ -511,7 +552,14 @@ async function readDirectoryRecursive(dirPath: string, basePath: string): Promis
   const items = await fs.readdir(dirPath, { withFileTypes: true })
 
   for (const item of items) {
-    if (item.name.startsWith('.')) continue
+    // Versteckte Dateien überspringen, AUSSER die paar speziellen Code-Files (.gitignore, .env).
+    if (item.name.startsWith('.')) {
+      const lower = item.name.toLowerCase()
+      if (lower !== '.gitignore' && lower !== '.env') continue
+    }
+
+    // Bekannt „toxische" Ordner (node_modules, .git, __pycache__, …) komplett ignorieren.
+    if (item.isDirectory() && IGNORED_DIRECTORY_NAMES.has(item.name)) continue
 
     const fullPath = path.join(dirPath, item.name)
     const relativePath = path.relative(basePath, fullPath)
@@ -608,6 +656,69 @@ ipcMain.handle('write-file', async (_event, filePath: string, content: string) =
   } catch (error) {
     console.error('Fehler beim Schreiben der Datei:', error)
     throw error
+  }
+})
+
+// ============ TASK EDITING ============
+// Einzelne Task-Zeile ersetzen. Konfliktschutz: expectedOldLine muss noch übereinstimmen.
+ipcMain.handle('tasks-update-line', async (_event, data: {
+  vaultPath: string
+  relativePath: string
+  lineIndex: number          // 1-basiert (wie in ExtractedTask.line)
+  expectedOldLine: string
+  newLine: string
+}) => {
+  try {
+    const fullPath = validatePath(data.vaultPath, data.relativePath)
+    const content = await fs.readFile(fullPath, 'utf-8')
+    const lines = content.split('\n')
+
+    const idx = data.lineIndex - 1
+    if (idx < 0 || idx >= lines.length) {
+      return { success: false, error: 'Zeile nicht gefunden (Notiz wurde geändert)' }
+    }
+
+    if (lines[idx] !== data.expectedOldLine) {
+      return { success: false, error: 'Notiz wurde zwischenzeitlich geändert — Task nicht überschrieben' }
+    }
+
+    lines[idx] = data.newLine
+    await fs.writeFile(fullPath, lines.join('\n'), 'utf-8')
+    return { success: true }
+  } catch (error) {
+    console.error('[tasks-update-line] Fehler:', error)
+    return { success: false, error: error instanceof Error ? error.message : String(error) }
+  }
+})
+
+// Neue Task an Zielnotiz anhängen (Datei wird bei Bedarf angelegt).
+ipcMain.handle('tasks-create', async (_event, data: {
+  vaultPath: string
+  relativePath: string       // Ziel-Note innerhalb des Vaults
+  taskLine: string           // Fertig gebaute Markdown-Zeile, z. B. "- [ ] foo #tag (@[[2026-04-21]])"
+}) => {
+  try {
+    const fullPath = validatePath(data.vaultPath, data.relativePath)
+
+    // Zielverzeichnis anlegen, falls nötig
+    await fs.mkdir(path.dirname(fullPath), { recursive: true })
+
+    let existing = ''
+    try {
+      existing = await fs.readFile(fullPath, 'utf-8')
+    } catch {
+      // Datei existiert noch nicht — wird mit minimalem Header angelegt
+      const title = path.basename(data.relativePath).replace(/\.md$/, '')
+      existing = `# ${title}\n\n`
+    }
+
+    const separator = existing.length === 0 || existing.endsWith('\n') ? '' : '\n'
+    const newContent = existing + separator + data.taskLine + '\n'
+    await fs.writeFile(fullPath, newContent, 'utf-8')
+    return { success: true, relativePath: data.relativePath }
+  } catch (error) {
+    console.error('[tasks-create] Fehler:', error)
+    return { success: false, error: error instanceof Error ? error.message : String(error) }
   }
 })
 
@@ -7116,7 +7227,7 @@ ipcMain.handle('office-import-pptx', async (_event, vaultPath: string, sourcePat
   }
 })
 
-// ============ TRANSPORT (Quick Capture) ============
+// ============ SCHNELLERFASSUNG (interne ID: transport) ============
 
 // Transport: Config laden (Vault-Pfad + Transport-Settings)
 ipcMain.handle('transport-get-config', async () => {
@@ -7252,6 +7363,103 @@ ipcMain.handle('transport-open-in-main', (_event, relativePath: string) => {
 // Transport: Capture-Fenster schließen
 ipcMain.handle('transport-close', () => {
   hideTransportWindow()
+})
+
+// Datei in VS Code öffnen. Robuste zweistufige Strategie:
+// 1. `code <path>` via child_process mit erweitertem PATH (funktioniert wenn "code" CLI im PATH ist —
+//    bei den meisten Installationen der Fall, auf macOS zusätzlich nach „Shell Command: Install 'code'").
+// 2. Fallback: vscode://file/<path> via shell.openExternal (Protocol-Handler, wird von VS Code
+//    automatisch registriert — funktioniert aber nur wenn VS Code auch wirklich installiert ist
+//    und das OS den Protocol-Handler übernommen hat).
+ipcMain.handle('open-in-vscode', async (_event, absolutePath: string) => {
+  const { execFile } = await import('child_process')
+  const { promisify } = await import('util')
+  const execFileAsync = promisify(execFile)
+
+  // Erweiterter PATH (gleich wie Terminal-CLI-Detection), damit `code` gefunden wird,
+  // auch wenn der Electron-Prozess mit einem minimalen PATH gestartet wurde (macOS-GUI-Launcher).
+  const isWindows = process.platform === 'win32'
+  let extendedPath: string
+  if (isWindows) {
+    const homeDir = process.env.USERPROFILE || ''
+    const additionalPaths = [
+      `${homeDir}\\AppData\\Local\\Programs\\Microsoft VS Code\\bin`,
+      `C:\\Program Files\\Microsoft VS Code\\bin`,
+      `C:\\Program Files (x86)\\Microsoft VS Code\\bin`
+    ].filter(Boolean)
+    const currentPath = process.env.PATH || ''
+    extendedPath = [...additionalPaths, ...currentPath.split(';')].join(';')
+  } else {
+    const homeDir = process.env.HOME || '/Users/' + process.env.USER
+    const additionalPaths = [
+      '/usr/local/bin',
+      '/opt/homebrew/bin',
+      '/Applications/Visual Studio Code.app/Contents/Resources/app/bin',
+      `${homeDir}/.local/bin`,
+      '/snap/bin'
+    ]
+    const currentPath = process.env.PATH || '/usr/bin:/bin:/usr/sbin:/sbin'
+    extendedPath = [...additionalPaths, ...currentPath.split(':')].join(':')
+  }
+
+  // Schritt 1: `code <path>` versuchen
+  try {
+    await execFileAsync('code', [absolutePath], {
+      env: { ...process.env, PATH: extendedPath },
+      timeout: 8000
+    })
+    console.log('[open-in-vscode] geöffnet via code CLI:', absolutePath)
+    return { success: true, method: 'cli' }
+  } catch (cliErr) {
+    console.warn('[open-in-vscode] code CLI nicht verfügbar, Fallback auf vscode:// Protocol:', cliErr instanceof Error ? cliErr.message : cliErr)
+  }
+
+  // Schritt 2: Fallback vscode:// Protocol
+  try {
+    // URL korrekt bauen:
+    // macOS/Linux: "/Users/foo/bar.py" → "vscode://file//Users/foo/bar.py" (doppelter Slash — host-empty + absolute path)
+    // Windows: "C:\\Users\\foo\\bar.py" → "vscode://file/C:/Users/foo/bar.py"
+    let urlPath: string
+    if (isWindows) {
+      urlPath = '/' + absolutePath.replace(/\\/g, '/')
+    } else {
+      urlPath = '/' + (absolutePath.startsWith('/') ? absolutePath : '/' + absolutePath)
+    }
+    const url = `vscode://file${urlPath}`
+    console.log('[open-in-vscode] Fallback via Protocol:', url)
+    await shell.openExternal(url)
+    return { success: true, method: 'protocol' }
+  } catch (protoErr) {
+    console.error('[open-in-vscode] Beide Methoden fehlgeschlagen:', protoErr)
+    return {
+      success: false,
+      error: 'VS Code konnte nicht geöffnet werden. Prüfe ob VS Code installiert ist und der "code"-Befehl im PATH liegt (macOS: Command Palette → "Shell Command: Install \'code\' command in PATH").'
+    }
+  }
+})
+
+// Transport: Capture-Fenster aus dem Renderer heraus öffnen (z. B. Titlebar-Button)
+ipcMain.handle('transport-show', () => {
+  const resourcesPath = app.isPackaged
+    ? path.join(__dirname, '../../resources')
+    : path.join(app.getAppPath(), 'resources')
+  showTransportWindow(resourcesPath)
+})
+
+// Transport: Globalen Shortcut aktualisieren
+ipcMain.handle('transport-update-shortcut', async (_event, newShortcut: string) => {
+  if (!newShortcut || typeof newShortcut !== 'string' || newShortcut.trim().length === 0) {
+    return { success: false, error: 'Ungültiger Shortcut' }
+  }
+  try {
+    const success = updateShortcut(newShortcut.trim())
+    if (!success) {
+      return { success: false, error: 'Shortcut bereits vergeben oder ungültig' }
+    }
+    return { success: true }
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) }
+  }
 })
 
 // Cleanup bei App-Beendigung

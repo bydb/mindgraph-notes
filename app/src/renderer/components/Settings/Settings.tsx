@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { useUIStore, ACCENT_COLORS, AI_LANGUAGES, FONT_FAMILIES, UI_LANGUAGES, BACKGROUND_COLORS, ICON_SETS, OUTLINE_STYLES, MODULES, MODULE_CATEGORIES, type Language, type FontFamily, type BackgroundColor, type IconSet, type OutlineStyle, type LLMBackend, type TransportDestination, type ModuleCategory, type ModuleDescriptor } from '../../stores/uiStore'
-import { isModuleEnabled, setModuleEnabled } from '../../utils/modules'
+import { isModuleEnabled, setModuleEnabled, useIsModuleEnabled } from '../../utils/modules'
 import { useNotesStore, createNoteFromFile } from '../../stores/notesStore'
 import { useSyncStore } from '../../stores/syncStore'
 import { useVaultSettingsStore } from '../../stores/vaultSettingsStore'
@@ -42,13 +42,216 @@ const BUILTIN_LABELS: Record<BuiltInTemplateKey, string> = {
   meeting: 'Meeting'
 }
 
+// Konvertiert einen Browser-KeyboardEvent in einen Electron-Accelerator-String.
+// Gibt null zurück, wenn die Kombination ungültig ist (z. B. nur Modifier, oder
+// überhaupt kein Modifier — globalShortcut.register() lehnt solche Kombinationen ab).
+function keyboardEventToAccelerator(e: React.KeyboardEvent<HTMLButtonElement>): string | null {
+  const parts: string[] = []
+
+  // Modifier in Electron-Reihenfolge
+  if (e.ctrlKey || e.metaKey) parts.push('CommandOrControl')
+  if (e.altKey) parts.push('Alt')
+  if (e.shiftKey) parts.push('Shift')
+
+  const key = e.key
+
+  // Reine Modifier-Keys ignorieren — User muss noch eine "richtige" Taste drücken
+  if (['Control', 'Shift', 'Alt', 'Meta', 'OS', 'AltGraph'].includes(key)) {
+    return null
+  }
+
+  // Key-Name in Electron-Accelerator konvertieren
+  let keyName: string
+  if (key.length === 1) {
+    // Einzelnes Zeichen: Buchstaben groß, Ziffern unverändert, Sonderzeichen weitgehend passthrough
+    const upper = key.toUpperCase()
+    if (/^[A-Z0-9]$/.test(upper)) {
+      keyName = upper
+    } else if (key === ' ') {
+      keyName = 'Space'
+    } else if (key === '+') {
+      keyName = 'Plus'
+    } else if (key === '-') {
+      keyName = '-'
+    } else if (key === '=') {
+      keyName = '='
+    } else if (key === ',') {
+      keyName = ','
+    } else if (key === '.') {
+      keyName = '.'
+    } else if (key === '/') {
+      keyName = '/'
+    } else if (key === '\\') {
+      keyName = '\\'
+    } else if (key === ';') {
+      keyName = ';'
+    } else if (key === "'") {
+      keyName = "'"
+    } else if (key === '[') {
+      keyName = '['
+    } else if (key === ']') {
+      keyName = ']'
+    } else if (key === '`') {
+      keyName = '`'
+    } else {
+      // Fallback: unbekanntes Sonderzeichen — Key-Code als Anhaltspunkt nutzen
+      keyName = upper
+    }
+  } else {
+    // Named keys: Pfeile, Funktionstasten, Escape, …
+    const map: Record<string, string> = {
+      'ArrowUp': 'Up',
+      'ArrowDown': 'Down',
+      'ArrowLeft': 'Left',
+      'ArrowRight': 'Right',
+      'Escape': 'Esc',
+      'Enter': 'Return',
+      'Delete': 'Delete',
+      'Backspace': 'Backspace',
+      'Tab': 'Tab',
+      'Home': 'Home',
+      'End': 'End',
+      'PageUp': 'PageUp',
+      'PageDown': 'PageDown',
+      'Insert': 'Insert'
+    }
+    if (map[key]) {
+      keyName = map[key]
+    } else if (/^F([1-9]|1[0-9]|2[0-4])$/.test(key)) {
+      keyName = key // F1..F24
+    } else {
+      return null
+    }
+  }
+
+  parts.push(keyName)
+
+  // Mindestens ein Modifier ist unter Linux/Windows für nicht-Funktionstasten quasi Pflicht
+  // (F1..F24 und Medien-Keys gehen ohne — der Rest nicht). Wir erlauben's für Funktionstasten.
+  const isFunctionKey = /^F([1-9]|1[0-9]|2[0-4])$/.test(keyName)
+  const hasModifier = parts.length > 1 // mind. ein Modifier + key
+  if (!isFunctionKey && !hasModifier) {
+    return null
+  }
+
+  return parts.join('+')
+}
+
+// Hübsche Anzeige eines Accelerator-Strings auf Linux/Windows
+function formatAcceleratorForDisplay(accelerator: string): string {
+  return accelerator
+    .split('+')
+    .map(part => {
+      if (part === 'CommandOrControl') return navigator.platform.toLowerCase().includes('mac') ? '⌘' : 'Ctrl'
+      if (part === 'Control') return 'Ctrl'
+      if (part === 'Alt') return 'Alt'
+      if (part === 'Shift') return 'Shift'
+      if (part === 'Super' || part === 'Meta') return 'Super'
+      return part
+    })
+    .join(' + ')
+}
+
 // Transport-Settings Tab
+// Zeigt unter einem Integrations-Modul-Header einen Hinweis, dass das Modul deaktiviert ist,
+// mit einem Link zum Modul-Tab. Konfiguration darunter bleibt via bestehenden `disabled={...}` Attributen gesperrt.
+const ModuleDisabledHint: React.FC<{
+  moduleId: string
+  onGoToModules: () => void
+  t: TabTFn
+}> = ({ moduleId, onGoToModules, t }) => {
+  const enabled = useIsModuleEnabled(moduleId)
+  if (enabled) return null
+  return (
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: '12px',
+        padding: '8px 12px',
+        margin: '8px 0 12px',
+        background: 'var(--bg-secondary)',
+        border: '1px dashed var(--border-color)',
+        borderRadius: 'var(--radius-md, 6px)',
+        fontSize: '12px',
+        color: 'var(--text-secondary)'
+      }}
+    >
+      <span>{t('settings.moduleGate.disabledHint')}</span>
+      <button
+        className="settings-btn-secondary"
+        onClick={onGoToModules}
+        style={{ padding: '4px 10px', fontSize: '12px', whiteSpace: 'nowrap' }}
+      >
+        {t('settings.moduleGate.goToModules')} →
+      </button>
+    </div>
+  )
+}
+
 const TransportSettingsTab: React.FC<{ t: TabTFn }> = ({ t }) => {
   const transport = useUIStore(state => state.transport)
   const setTransport = useUIStore(state => state.setTransport)
   const [newTag, setNewTag] = useState('')
   const [newDestLabel, setNewDestLabel] = useState('')
   const [newDestFolder, setNewDestFolder] = useState('')
+  const [vaultSubdirs, setVaultSubdirs] = useState<string[]>([])
+
+  // Vault-Unterordner für Ordner-Dropdown laden
+  useEffect(() => {
+    let cancelled = false
+    window.electronAPI.transportListVaultSubdirs()
+      .then(dirs => {
+        if (!cancelled) setVaultSubdirs(Array.isArray(dirs) ? dirs : [])
+      })
+      .catch(err => console.error('[Settings] Vault-Subdirs laden fehlgeschlagen:', err))
+    return () => { cancelled = true }
+  }, [])
+  const [recordingShortcut, setRecordingShortcut] = useState(false)
+  const [shortcutStatus, setShortcutStatus] = useState<{ type: 'idle' | 'success' | 'error'; message?: string }>({ type: 'idle' })
+
+  const handleShortcutCapture = async (e: React.KeyboardEvent<HTMLButtonElement>): Promise<void> => {
+    e.preventDefault()
+    e.stopPropagation()
+
+    // Escape bricht das Recording ab, ohne zu speichern
+    if (e.key === 'Escape' && !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey) {
+      setRecordingShortcut(false)
+      setShortcutStatus({ type: 'idle' })
+      ;(e.target as HTMLButtonElement).blur()
+      return
+    }
+
+    const accelerator = keyboardEventToAccelerator(e)
+    if (!accelerator) {
+      // Noch nicht genug gedrückt (z. B. nur Ctrl) — weiter warten
+      return
+    }
+
+    // Sofort speichern
+    setTransport({ shortcut: accelerator })
+    setRecordingShortcut(false)
+    ;(e.target as HTMLButtonElement).blur()
+
+    // An Main-Prozess schicken, um globalShortcut neu zu registrieren
+    try {
+      const result = await window.electronAPI.transportUpdateShortcut(accelerator)
+      if (result.success) {
+        setShortcutStatus({ type: 'success', message: t('settings.transport.shortcutSaved') })
+      } else {
+        setShortcutStatus({
+          type: 'error',
+          message: result.error || t('settings.transport.shortcutFailed')
+        })
+      }
+    } catch (err) {
+      setShortcutStatus({
+        type: 'error',
+        message: err instanceof Error ? err.message : t('settings.transport.shortcutFailed')
+      })
+    }
+  }
 
   const addDestination = (): void => {
     if (!newDestLabel.trim() || !newDestFolder.trim()) return
@@ -89,15 +292,52 @@ const TransportSettingsTab: React.FC<{ t: TabTFn }> = ({ t }) => {
 
       <div className="settings-row">
         <label>{t('settings.transport.shortcut')}</label>
-        <input
-          type="text"
-          value={transport.shortcut}
-          onChange={e => setTransport({ shortcut: e.target.value })}
+        <button
+          type="button"
           className="settings-input"
-          placeholder="CommandOrControl+Shift+N"
-          style={{ fontFamily: 'monospace', fontSize: '12px' }}
+          onKeyDown={handleShortcutCapture}
+          onFocus={() => {
+            setRecordingShortcut(true)
+            setShortcutStatus({ type: 'idle' })
+          }}
+          onBlur={() => setRecordingShortcut(false)}
+          style={{
+            fontFamily: 'monospace',
+            fontSize: '12px',
+            textAlign: 'left',
+            cursor: 'pointer',
+            border: recordingShortcut ? '2px solid var(--accent-color, #3b82f6)' : undefined,
+            background: recordingShortcut ? 'var(--bg-secondary)' : undefined
+          }}
+          title={t('settings.transport.shortcutRecord')}
+        >
+          {recordingShortcut
+            ? t('settings.transport.shortcutRecording')
+            : formatAcceleratorForDisplay(transport.shortcut || 'CommandOrControl+Shift+N')}
+        </button>
+      </div>
+      {shortcutStatus.type !== 'idle' && shortcutStatus.message && (
+        <div
+          className="settings-hint"
+          style={{
+            color: shortcutStatus.type === 'error' ? 'var(--danger-color, #dc2626)' : 'var(--success-color, #16a34a)',
+            marginTop: '-4px',
+            marginBottom: '8px'
+          }}
+        >
+          {shortcutStatus.message}
+        </div>
+      )}
+
+      <div className="settings-row">
+        <label>{t('settings.transport.titlebarButton')}</label>
+        <input
+          type="checkbox"
+          checked={transport.showTitlebarButton}
+          onChange={e => setTransport({ showTitlebarButton: e.target.checked })}
         />
       </div>
+      <p className="settings-hint" style={{ marginTop: '-4px' }}>{t('settings.transport.titlebarButtonHint')}</p>
 
       <div className="settings-divider" />
 
@@ -119,7 +359,7 @@ const TransportSettingsTab: React.FC<{ t: TabTFn }> = ({ t }) => {
         </div>
       ))}
 
-      <div className="settings-row" style={{ gap: '8px' }}>
+      <div className="settings-row" style={{ gap: '8px', alignItems: 'flex-start' }}>
         <input
           type="text"
           value={newDestLabel}
@@ -128,15 +368,20 @@ const TransportSettingsTab: React.FC<{ t: TabTFn }> = ({ t }) => {
           className="settings-input"
           style={{ flex: 1 }}
         />
-        <input
-          type="text"
+        <select
           value={newDestFolder}
           onChange={e => setNewDestFolder(e.target.value)}
-          placeholder={t('settings.transport.destFolderPlaceholder')}
-          className="settings-input"
+          className="settings-select"
           style={{ flex: 1 }}
-          onKeyDown={e => e.key === 'Enter' && addDestination()}
-        />
+        >
+          <option value="">{t('settings.transport.destFolderPlaceholder')}</option>
+          {vaultSubdirs.length === 0 && (
+            <option value="" disabled>{t('settings.transport.noSubdirs')}</option>
+          )}
+          {vaultSubdirs.map(dir => (
+            <option key={dir} value={dir}>{dir}</option>
+          ))}
+        </select>
         <button
           className="settings-btn-primary"
           onClick={addDestination}
@@ -150,13 +395,19 @@ const TransportSettingsTab: React.FC<{ t: TabTFn }> = ({ t }) => {
       <div className="settings-row">
         <label>{t('settings.transport.defaultDestination')}</label>
         <select
-          value={transport.defaultDestinationIndex}
-          onChange={e => setTransport({ defaultDestinationIndex: parseInt(e.target.value) })}
+          value={transport.defaultDestinationFolder || ''}
+          onChange={e => setTransport({ defaultDestinationFolder: e.target.value })}
           className="settings-select"
         >
+          <option value="" disabled>{t('settings.transport.chooseFolder')}</option>
           {transport.destinations.map((dest, i) => (
-            <option key={i} value={i}>{dest.label}</option>
+            <option key={`dest-${i}`} value={dest.folder}>{dest.label} — {dest.folder}</option>
           ))}
+          {vaultSubdirs
+            .filter(dir => !transport.destinations.some(d => d.folder === dir))
+            .map(dir => (
+              <option key={`vault-${dir}`} value={dir}>{dir}</option>
+            ))}
         </select>
       </div>
 
@@ -308,7 +559,7 @@ const VaultSettingsTab: React.FC<{ vaultPath: string; t: TabTFn; onNavigateToTab
 
 const ModulesTab: React.FC<{ t: TabTFn }> = ({ t }) => {
   // useUIStore als Abhängigkeit einbinden, damit der Tab bei Flag-Änderungen rerendert
-  const _tick = useUIStore(s => `${s.notesChatEnabled}${s.smartConnectionsEnabled}${s.flashcardsEnabled}${s.semanticScholarEnabled}${s.languageTool.enabled}${s.email.enabled}${s.edoobox.enabled}${s.marketing.enabled}${s.readwise.enabled}${s.remarkable.enabled}${s.docling.enabled}${s.visionOcr.enabled}`)
+  const _tick = useUIStore(s => `${s.notesChatEnabled}${s.smartConnectionsEnabled}${s.flashcardsEnabled}${s.semanticScholarEnabled}${s.zoteroEnabled}${s.languageTool.enabled}${s.email.enabled}${s.edoobox.enabled}${s.marketing.enabled}${s.readwise.enabled}${s.remarkable.enabled}${s.docling.enabled}${s.visionOcr.enabled}`)
   void _tick
 
   const grouped: Record<ModuleCategory, ModuleDescriptor[]> = {
@@ -331,6 +582,29 @@ const ModulesTab: React.FC<{ t: TabTFn }> = ({ t }) => {
               const enabled = isModuleEnabled(mod.id)
               return (
                 <label key={mod.id} className={`module-row ${enabled ? 'active' : ''}`}>
+                  {mod.iconText && (
+                    <div
+                      className="module-row-icon"
+                      style={{
+                        background: mod.iconColor || 'var(--accent-color, #4a9eff)'
+                      }}
+                      aria-hidden="true"
+                    >
+                      <svg width="28" height="28" viewBox="0 0 28 28" xmlns="http://www.w3.org/2000/svg">
+                        <text
+                          x="14"
+                          y="20"
+                          textAnchor="middle"
+                          fill="white"
+                          fontFamily="'Georgia', 'Times New Roman', serif"
+                          fontWeight="700"
+                          fontSize="18"
+                        >
+                          {mod.iconText}
+                        </text>
+                      </svg>
+                    </div>
+                  )}
                   <div className="module-row-body">
                     <div className="module-row-label">{mod.label}</div>
                     <div className="module-row-desc">{mod.description}</div>
@@ -595,13 +869,7 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab 
     iconSet,
     setIconSet,
     smartConnectionsEnabled,
-    setSmartConnectionsEnabled,
-    notesChatEnabled,
-    setNotesChatEnabled,
     flashcardsEnabled,
-    setFlashcardsEnabled,
-    semanticScholarEnabled,
-    setSemanticScholarEnabled,
     smartConnectionsWeights,
     setSmartConnectionsWeights,
     docling,
@@ -629,7 +897,6 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab 
     marketing: marketingSettings,
     setMarketing,
     edoobox: edooboxSettings,
-    setEdoobox,
     remarkable: remarkableSettings,
     setRemarkable,
     dailyNote: dailyNoteSettings,
@@ -1170,7 +1437,7 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab 
               <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
                 <path d="M3 9l6-6 6 6M9 3v12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
-              Transport
+              {t('settings.transport.title')}
             </button>
             <button
               className={`settings-nav-item ${activeTab === 'dataview' ? 'active' : ''}`}
@@ -2020,17 +2287,9 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab 
                     {t('settings.integrations.aiFeaturesDesc')}
                   </p>
                 </div>
-                <div className="settings-row">
-                  <label>
-                    {t('settings.integrations.smartConnections')}
-                    <span className="settings-hint">{t('settings.integrations.smartConnectionsHint')}</span>
-                  </label>
-                  <input
-                    type="checkbox"
-                    checked={smartConnectionsEnabled}
-                    onChange={e => setSmartConnectionsEnabled(e.target.checked)}
-                  />
-                </div>
+                <h3 style={{ marginTop: '16px' }}>{t('settings.integrations.smartConnections')}</h3>
+                <p className="settings-hint">{t('settings.integrations.smartConnectionsHint')}</p>
+                <ModuleDisabledHint moduleId="smart-connections" onGoToModules={() => setActiveTab('modules')} t={t} />
 
                 {/* Smart Connections Weights Configuration */}
                 {smartConnectionsEnabled && (
@@ -2137,30 +2396,9 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab 
                   </div>
                 )}
 
-                <div className="settings-row">
-                  <label>
-                    {t('settings.integrations.notesChat')}
-                    <span className="settings-hint">{t('settings.integrations.notesChatHint')}</span>
-                  </label>
-                  <input
-                    type="checkbox"
-                    checked={notesChatEnabled}
-                    onChange={e => setNotesChatEnabled(e.target.checked)}
-                  />
-                </div>
+                {/* Notes Chat, Flashcards: Aktivierung erfolgt im Modul-Tab (keine Konfiguration nötig). */}
 
-                <div className="settings-row">
-                  <label>
-                    {t('settings.integrations.flashcards')}
-                    <span className="settings-hint">{t('settings.integrations.flashcardsHint')}</span>
-                  </label>
-                  <input
-                    type="checkbox"
-                    checked={flashcardsEnabled}
-                    onChange={e => setFlashcardsEnabled(e.target.checked)}
-                  />
-                </div>
-
+                {/* Flashcards-Ollama-Warnung bleibt als globaler Hinweis sichtbar, wenn das Modul aktiv ist aber Ollama fehlt */}
                 {flashcardsEnabled && (!ollama.enabled || !ollama.selectedModel) && (
                   <div className="settings-warning" style={{
                     marginTop: '8px',
@@ -2202,36 +2440,10 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab 
                   </p>
                 </div>
 
-                <h3 style={{ marginTop: '32px' }}>{t('settings.integrations.semanticScholar')}</h3>
-                <div className="settings-row">
-                  <label>{t('settings.integrations.semanticScholar.enabled')}</label>
-                  <label className="toggle-switch">
-                    <input
-                      type="checkbox"
-                      checked={semanticScholarEnabled}
-                      onChange={(e) => setSemanticScholarEnabled(e.target.checked)}
-                    />
-                    <span className="toggle-slider"></span>
-                  </label>
-                </div>
-                <div className="settings-info">
-                  <p>
-                    {t('settings.integrations.semanticScholarDesc')}
-                  </p>
-                  <p>
-                    {t('settings.integrations.semanticScholarHint')}
-                  </p>
-                </div>
+                {/* Semantic Scholar: Aktivierung + Beschreibung stehen im Modul-Tab (keine weitere Konfiguration nötig). */}
 
                 <h3 style={{ marginTop: '32px' }}>{t('settings.docling.title')}</h3>
-                <div className="settings-row">
-                  <label>{t('settings.docling.enabled')}</label>
-                  <input
-                    type="checkbox"
-                    checked={docling.enabled}
-                    onChange={e => setDocling({ enabled: e.target.checked })}
-                  />
-                </div>
+                <ModuleDisabledHint moduleId="docling" onGoToModules={() => setActiveTab('modules')} t={t} />
 
                 <div className="settings-row">
                   <label>{t('settings.docling.url')}</label>
@@ -2310,14 +2522,8 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab 
 
                 {/* Vision OCR */}
                 <h3 style={{ marginTop: '32px' }}>{t('settings.visionOcr.title')}</h3>
-                <div className="settings-row">
-                  <label>{t('settings.visionOcr.enabled')}</label>
-                  <input
-                    type="checkbox"
-                    checked={visionOcr.enabled}
-                    onChange={e => setVisionOcr({ enabled: e.target.checked })}
-                  />
-                </div>
+                <ModuleDisabledHint moduleId="vision-ocr" onGoToModules={() => setActiveTab('modules')} t={t} />
+
                 <div className="settings-row">
                   <label>{t('settings.visionOcr.model')}</label>
                   <div className="settings-input-group">
@@ -2360,14 +2566,7 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab 
                 </div>
 
                 <h3 style={{ marginTop: '32px' }}>{t('settings.languagetool.title')}</h3>
-                <div className="settings-row">
-                  <label>{t('settings.languagetool.enabled')}</label>
-                  <input
-                    type="checkbox"
-                    checked={languageTool.enabled}
-                    onChange={e => setLanguageTool({ enabled: e.target.checked })}
-                  />
-                </div>
+                <ModuleDisabledHint moduleId="language-tool" onGoToModules={() => setActiveTab('modules')} t={t} />
 
                 <div className="settings-row">
                   <label>{t('settings.languagetool.mode')}</label>
@@ -2513,14 +2712,7 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab 
                 </div>
 
                 <h3 style={{ marginTop: '32px' }}>{t('settings.readwise.title')}</h3>
-                <div className="settings-row">
-                  <label>{t('settings.readwise.enabled')}</label>
-                  <input
-                    type="checkbox"
-                    checked={readwise.enabled}
-                    onChange={e => setReadwise({ enabled: e.target.checked })}
-                  />
-                </div>
+                <ModuleDisabledHint moduleId="readwise" onGoToModules={() => setActiveTab('modules')} t={t} />
 
                 <div className="settings-row">
                   <label>{t('settings.readwise.apiKey')}</label>
@@ -3400,15 +3592,7 @@ LIMIT 10
               <div className="settings-section">
                 <h3>{t('settings.agents.remarkable.title')}</h3>
                 <p className="settings-hint">{t('settings.agents.remarkable.description')}</p>
-
-                <div className="settings-row">
-                  <label>{t('settings.agents.remarkable.enabled')}</label>
-                  <input
-                    type="checkbox"
-                    checked={remarkableSettings.enabled}
-                    onChange={e => setRemarkable({ enabled: e.target.checked })}
-                  />
-                </div>
+                <ModuleDisabledHint moduleId="remarkable" onGoToModules={() => setActiveTab('modules')} t={t} />
 
                 {remarkableSettings.enabled && (
                   <>
@@ -3460,14 +3644,7 @@ LIMIT 10
               <div className="settings-section">
                 {/* Email Integration */}
                 <h3>{t('settings.email.title')}</h3>
-                <div className="settings-row">
-                  <label>{t('settings.email.enabled')}</label>
-                  <input
-                    type="checkbox"
-                    checked={emailSettings.enabled}
-                    onChange={e => setEmail({ enabled: e.target.checked })}
-                  />
-                </div>
+                <ModuleDisabledHint moduleId="email" onGoToModules={() => setActiveTab('modules')} t={t} />
 
                 {emailSettings.enabled && (
                   <>
@@ -3822,15 +3999,7 @@ LIMIT 10
                   <img src={new URL('../../assets/edoobox-logo.png', import.meta.url).href} alt="edoobox" className="settings-edoobox-logo" />
                 </div>
                 <p className="settings-hint">{t('settings.agents.edoobox.description')}</p>
-
-                <div className="settings-row">
-                  <label>{t('settings.agents.edoobox.enabled')}</label>
-                  <input
-                    type="checkbox"
-                    checked={edooboxSettings.enabled}
-                    onChange={e => setEdoobox({ enabled: e.target.checked })}
-                  />
-                </div>
+                <ModuleDisabledHint moduleId="mz-suite" onGoToModules={() => setActiveTab('modules')} t={t} />
 
                 {edooboxSettings.enabled && (
                   <>
@@ -3908,18 +4077,9 @@ LIMIT 10
 
                 <div className="settings-divider" />
 
-                {/* Marketing (WordPress + Instagram) */}
+                {/* Marketing (WordPress + Instagram) — Teil des mz-suite Moduls */}
                 <h4 className="settings-section-title">{t('settings.agents.marketing.title')}</h4>
                 <p className="settings-hint">{t('settings.agents.marketing.description')}</p>
-
-                <div className="settings-row">
-                  <label>{t('settings.agents.marketing.enabled')}</label>
-                  <input
-                    type="checkbox"
-                    checked={marketingSettings.enabled}
-                    onChange={e => setMarketing({ enabled: e.target.checked })}
-                  />
-                </div>
 
                 {marketingSettings.enabled && (
                   <>

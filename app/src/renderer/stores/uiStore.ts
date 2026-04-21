@@ -11,7 +11,7 @@ type AccentColor = 'blue' | 'orange' | 'green' | 'purple' | 'pink' | 'teal' | 'r
 export type LLMBackend = 'ollama' | 'lm-studio'
 export type Language = 'de' | 'en'
 export type IconSet = 'default' | 'minimal' | 'colorful' | 'emoji'
-export type UserProfile = 'student' | 'researcher' | 'professional' | 'writer' | 'developer' | null
+export type UserProfile = 'student' | 'researcher' | 'professional' | 'writer' | 'developer' | 'viewer' | null
 export type OutlineStyle = 'default' | 'lines' | 'minimal' | 'bullets' | 'dashes'
 export type FontFamily = 'system' | 'inter' | 'source-sans' | 'roboto' | 'open-sans' | 'lato' |
   'jetbrains-mono-nerd' | 'fira-code-nerd' | 'hack-nerd' | 'meslo-nerd' | 'cascadia-code-nerd' | 'iosevka-nerd' | 'victor-mono-nerd' | 'agave-nerd'
@@ -342,7 +342,10 @@ export interface TransportSettings {
   shortcut: string
   destinations: TransportDestination[]
   predefinedTags: string[]
-  defaultDestinationIndex: number
+  /** @deprecated Migriert auf defaultDestinationFolder. Nur noch für Rückwärtskompatibilität. */
+  defaultDestinationIndex?: number
+  defaultDestinationFolder: string   // Pfad zum Ziel-Ordner (aus destinations ODER Vault-Subdir)
+  showTitlebarButton: boolean
 }
 
 // Dashboard Widgets — identifier-basiert, Reihenfolge im Array = Anzeigereihenfolge
@@ -369,6 +372,10 @@ export interface ModuleDescriptor {
   label: string
   description: string
   category: ModuleCategory
+  /** Optional: Markenzeichen/Buchstabe als Icon in der Modul-Liste (z. B. "Z" für Zotero). */
+  iconText?: string
+  /** Optional: Markenfarbe (Hintergrund des Icon-Badges). */
+  iconColor?: string
 }
 
 export const MODULE_CATEGORIES: Record<ModuleCategory, string> = {
@@ -389,6 +396,7 @@ export const MODULES: ModuleDescriptor[] = [
   { id: 'mz-suite',         label: 'Medienzentrum-Suite',description: 'edoobox + Marketing (WordPress) + IQ-Auswertung + Formularimport', category: 'business' },
   { id: 'flashcards',       label: 'Flashcards & Quiz',description: 'Karteikarten mit Spaced Repetition und Quiz-Modus', category: 'learning' },
   { id: 'semantic-scholar', label: 'Semantic Scholar', description: 'Wissenschaftliche Paper durchsuchen und zitieren', category: 'research' },
+  { id: 'zotero',           label: 'Zotero',           description: 'Bibliothek durchsuchen, Zitate einfügen (⌘⇧Z)', category: 'research', iconText: 'Z', iconColor: '#cc2936' },
   { id: 'readwise',         label: 'Readwise',         description: 'Highlights aus Readwise synchronisieren', category: 'research' },
   { id: 'remarkable',       label: 'reMarkable',       description: 'Dokumente mit dem reMarkable-Tablet austauschen', category: 'devices' },
   { id: 'docling',          label: 'Docling',          description: 'PDF-Textextraktion via Docling-Server', category: 'documents' },
@@ -451,6 +459,7 @@ interface UIState {
   notesChatEnabled: boolean
   flashcardsEnabled: boolean
   semanticScholarEnabled: boolean
+  zoteroEnabled: boolean
 
   // Task-Zählung: Ordner ausschließen
   taskExcludedFolders: string[]
@@ -556,6 +565,7 @@ interface UIState {
   setNotesChatEnabled: (enabled: boolean) => void
   setFlashcardsEnabled: (enabled: boolean) => void
   setSemanticScholarEnabled: (enabled: boolean) => void
+  setZoteroEnabled: (enabled: boolean) => void
   toggleTaskExcludedFolder: (folderPath: string) => void
   setSmartConnectionsWeights: (weights: Partial<SmartConnectionsWeights>) => void
   setDocling: (settings: Partial<DoclingSettings>) => void
@@ -659,6 +669,7 @@ const defaultState = {
   notesChatEnabled: false,
   flashcardsEnabled: true,
   semanticScholarEnabled: true,
+  zoteroEnabled: true,
 
   // Smart Connections Gewichtungen (Summe sollte 100 ergeben)
   smartConnectionsWeights: {
@@ -799,7 +810,8 @@ const defaultState = {
       { label: 'Inbox', folder: '00 - Inbox' }
     ],
     predefinedTags: ['idee', 'todo', 'frage', 'wichtig'],
-    defaultDestinationIndex: 0
+    defaultDestinationFolder: '00 - Inbox',
+    showTitlebarButton: true
   } as TransportSettings,
 
   // Dashboard
@@ -822,7 +834,7 @@ const persistedKeys = [
   'canvasFilterPath', 'canvasViewMode', 'canvasShowEdges', 'canvasShowTags', 'canvasShowLinks', 'canvasShowImages', 'canvasShowSummaries',
   'canvasCompactMode', 'canvasReadMode', 'canvasHoverScale', 'canvasDefaultCardWidth', 'splitPosition', 'fileTreeDisplayMode', 'ollama',
   'pdfCompanionEnabled', 'pdfDisplayMode', 'iconSet',
-  'smartConnectionsEnabled', 'notesChatEnabled', 'flashcardsEnabled', 'semanticScholarEnabled', 'smartConnectionsWeights', 'docling', 'visionOcr', 'readwise', 'languageTool', 'email', 'marketing', 'edoobox', 'remarkable', 'dailyNote', 'taskExcludedFolders',
+  'smartConnectionsEnabled', 'notesChatEnabled', 'flashcardsEnabled', 'semanticScholarEnabled', 'zoteroEnabled', 'smartConnectionsWeights', 'docling', 'visionOcr', 'readwise', 'languageTool', 'email', 'marketing', 'edoobox', 'remarkable', 'dailyNote', 'taskExcludedFolders',
   'lastSeenVersion',
   'customAccentColor', 'customBackgroundColorLight', 'customBackgroundColorDark',
   'customLogo',
@@ -890,6 +902,7 @@ export const useUIStore = create<UIState>()((set, get) => ({
     return { taskExcludedFolders: isExcluded ? current.filter(f => f !== folderPath) : [...current, folderPath] }
   }),
   setSemanticScholarEnabled: (enabled) => set({ semanticScholarEnabled: enabled }),
+  setZoteroEnabled: (enabled) => set({ zoteroEnabled: enabled }),
   setSmartConnectionsWeights: (weights) => set((state) => ({
     smartConnectionsWeights: { ...state.smartConnectionsWeights, ...weights }
   })),
@@ -962,6 +975,7 @@ export const useUIStore = create<UIState>()((set, get) => ({
           flashcardsEnabled: true,
           pdfCompanionEnabled: true,
           semanticScholarEnabled: true,
+          zoteroEnabled: true,
           smartConnectionsEnabled: false,
           notesChatEnabled: true,
           visionOcr: { ...get().visionOcr, enabled: true },
@@ -994,6 +1008,30 @@ export const useUIStore = create<UIState>()((set, get) => ({
           notesChatEnabled: true,
           showRawEditor: false,
           editorDefaultView: 'preview' as EditorViewMode
+        })
+        break
+      case 'viewer':
+        // Reiner Read-Only-Modus: alles Schwere aus, nur Preview + Sidebar + Graph
+        set({
+          smartConnectionsEnabled: false,
+          notesChatEnabled: false,
+          flashcardsEnabled: false,
+          semanticScholarEnabled: false,
+          zoteroEnabled: false,
+          pdfCompanionEnabled: false,
+          languageTool: { ...get().languageTool, enabled: false },
+          email: { ...get().email, enabled: false },
+          edoobox: { ...get().edoobox, enabled: false },
+          marketing: { ...get().marketing, enabled: false },
+          readwise: { ...get().readwise, enabled: false },
+          remarkable: { ...get().remarkable, enabled: false },
+          docling: { ...get().docling, enabled: false },
+          visionOcr: { ...get().visionOcr, enabled: false },
+          dashboard: { ...get().dashboard, enabled: false },
+          transport: { ...get().transport, enabled: false, showTitlebarButton: false },
+          editorDefaultView: 'preview' as EditorViewMode,
+          showFormattingToolbar: false,
+          showRawEditor: false
         })
         break
     }
@@ -1051,6 +1089,18 @@ export async function initializeUISettings(): Promise<void> {
 
       // Always start with 'editor' mode on startup
       validSettings.viewMode = 'editor'
+      // Migrate Transport: defaultDestinationIndex → defaultDestinationFolder
+      if (validSettings.transport) {
+        const tr = validSettings.transport as TransportSettings
+        if (!tr.defaultDestinationFolder && typeof tr.defaultDestinationIndex === 'number' && Array.isArray(tr.destinations) && tr.destinations.length > 0) {
+          const idx = Math.min(Math.max(tr.defaultDestinationIndex, 0), tr.destinations.length - 1)
+          tr.defaultDestinationFolder = tr.destinations[idx]?.folder || ''
+        }
+        if (!tr.defaultDestinationFolder && Array.isArray(tr.destinations) && tr.destinations.length > 0) {
+          tr.defaultDestinationFolder = tr.destinations[0].folder
+        }
+      }
+
       // Migrate Dashboard-Widgets: Focus-Widget nachtragen wenn Nutzer vor der Einführung gespeichert hat
       if (validSettings.dashboard) {
         const dash = validSettings.dashboard as DashboardSettings

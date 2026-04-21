@@ -1,12 +1,14 @@
 import { create } from 'zustand'
 
-export type TabType = 'editor' | 'canvas' | 'global-canvas' | 'dashboard'
+export type TabType = 'editor' | 'canvas' | 'global-canvas' | 'dashboard' | 'code'
 
 export interface Tab {
   id: string
   type: TabType
-  noteId: string  // Editor: selected note, Canvas: root note
+  noteId: string   // Editor: selected note, Canvas: root note, Code: synthetischer Pfad-ID
   title: string
+  /** Für Code-Tabs: Vault-relativer Pfad zur Code-Datei */
+  codePath?: string
 }
 
 export interface CanvasTabState {
@@ -26,6 +28,7 @@ interface TabState {
   openCanvasTab: (rootNoteId: string, title: string) => void
   openGlobalCanvasTab: () => void
   openDashboardTab: () => void
+  openCodeTab: (relativePath: string, title: string) => void
   closeTab: (tabId: string) => void
   setActiveTab: (tabId: string) => void
 
@@ -148,6 +151,29 @@ export const useTabStore = create<TabState>()((set, get) => ({
       type: 'dashboard',
       noteId: '',
       title: 'Dashboard'
+    }
+
+    set({
+      tabs: [...state.tabs, newTab],
+      activeTabId: newTab.id
+    })
+  },
+
+  openCodeTab: (relativePath, title) => {
+    const state = get()
+
+    const existingTab = state.tabs.find(t => t.type === 'code' && t.codePath === relativePath)
+    if (existingTab) {
+      set({ activeTabId: existingTab.id })
+      return
+    }
+
+    const newTab: Tab = {
+      id: generateTabId(),
+      type: 'code',
+      noteId: `code:${relativePath}`,
+      codePath: relativePath,
+      title
     }
 
     set({

@@ -448,6 +448,30 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('transport-open-in-main', relativePath),
   transportClose: () =>
     ipcRenderer.invoke('transport-close'),
+  transportShow: () =>
+    ipcRenderer.invoke('transport-show'),
+
+  // In VS Code öffnen (vscode:// Protocol)
+  openInVSCode: (absolutePath: string) =>
+    ipcRenderer.invoke('open-in-vscode', absolutePath),
+
+
+  // Task-Editing (Overdue-Panel / Aufgaben & Termine)
+  tasksUpdateLine: (data: {
+    vaultPath: string
+    relativePath: string
+    lineIndex: number
+    expectedOldLine: string
+    newLine: string
+  }) => ipcRenderer.invoke('tasks-update-line', data),
+  tasksCreate: (data: {
+    vaultPath: string
+    relativePath: string
+    taskLine: string
+  }) => ipcRenderer.invoke('tasks-create', data),
+
+  transportUpdateShortcut: (shortcut: string) =>
+    ipcRenderer.invoke('transport-update-shortcut', shortcut),
   onTransportNoteCreated: (callback: (data: { relativePath: string }) => void) => {
     ipcRenderer.removeAllListeners('transport-note-created')
     ipcRenderer.on('transport-note-created', (_event, data) => callback(data))

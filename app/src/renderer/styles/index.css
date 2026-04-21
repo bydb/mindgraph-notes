@@ -8850,6 +8850,25 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
   border-radius: var(--radius-sm);
 }
 
+.overdue-panel-add {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.overdue-panel-add:hover {
+  background: var(--bg-secondary);
+  color: var(--accent-color, #4a9eff);
+}
+
 .overdue-panel-close {
   display: flex;
   align-items: center;
@@ -9001,6 +9020,341 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
 
 .overdue-btn.active svg {
   stroke: currentColor;
+}
+
+/* ============ Aufgaben & Termine: Erweiterte UI ============ */
+
+/* Checkbox als interaktiver Button */
+.overdue-item .overdue-item-checkbox {
+  padding: 0;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--text-muted);
+}
+
+.overdue-item .overdue-item-checkbox:hover {
+  color: var(--accent-color, #4a9eff);
+}
+
+.overdue-item.completed .overdue-item-text {
+  text-decoration: line-through;
+  opacity: 0.6;
+}
+
+.overdue-item.saving {
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.overdue-item {
+  cursor: default;
+}
+
+.overdue-item-row {
+  display: flex;
+  align-items: center;
+  margin-bottom: 2px;
+}
+
+.overdue-inline-input {
+  flex: 1;
+  width: 100%;
+  padding: 2px 4px;
+  border: 1px solid var(--accent-color, #4a9eff);
+  border-radius: 4px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 500;
+  outline: none;
+}
+
+.overdue-item-text {
+  cursor: text;
+  padding: 2px 4px;
+  border-radius: 4px;
+  display: inline-block;
+  width: 100%;
+}
+
+.overdue-item-text:hover {
+  background: var(--bg-primary);
+}
+
+.overdue-item-empty {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+/* Datum-Editor */
+.overdue-item-date-btn {
+  background: transparent;
+  border: 1px dashed var(--border-color);
+  color: var(--text-muted);
+  padding: 1px 6px;
+  border-radius: 10px;
+  font-size: 11px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.overdue-item-date-btn:hover {
+  border-color: var(--accent-color, #4a9eff);
+  color: var(--accent-color, #4a9eff);
+}
+
+.overdue-item-date-btn.overdue {
+  color: #dc2626;
+  border-color: rgba(220, 38, 38, 0.4);
+  border-style: solid;
+}
+
+.overdue-date-editor {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.overdue-date-input {
+  padding: 1px 4px;
+  border: 1px solid var(--accent-color, #4a9eff);
+  border-radius: 4px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 11px;
+}
+
+.overdue-date-clear {
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 0 4px;
+  font-size: 14px;
+}
+
+.overdue-date-clear:hover {
+  color: #dc2626;
+}
+
+/* Notiz-Link */
+.overdue-item-note {
+  background: transparent;
+  border: none;
+  padding: 0;
+  color: var(--text-muted);
+  font-size: 11px;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.overdue-item-note:hover {
+  color: var(--accent-color, #4a9eff);
+  text-decoration: underline;
+}
+
+/* Tag-Chips */
+.overdue-item-tags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.overdue-tag-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 1px 6px 1px 8px;
+  background: rgba(74, 158, 255, 0.12);
+  color: var(--accent-color, #4a9eff);
+  border-radius: 10px;
+  font-size: 10px;
+  font-weight: 500;
+}
+
+.overdue-tag-remove {
+  border: none;
+  background: transparent;
+  color: inherit;
+  opacity: 0.5;
+  cursor: pointer;
+  padding: 0;
+  font-size: 12px;
+  line-height: 1;
+}
+
+.overdue-tag-remove:hover {
+  opacity: 1;
+}
+
+.overdue-tag-add {
+  background: transparent;
+  border: 1px dashed var(--border-color);
+  color: var(--text-muted);
+  padding: 1px 6px;
+  border-radius: 10px;
+  font-size: 10px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.overdue-tag-add:hover {
+  border-color: var(--accent-color, #4a9eff);
+  color: var(--accent-color, #4a9eff);
+}
+
+.overdue-tag-adder {
+  position: relative;
+  display: inline-block;
+}
+
+.overdue-tag-input {
+  width: 100px;
+  padding: 1px 6px;
+  border: 1px solid var(--accent-color, #4a9eff);
+  border-radius: 10px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 10px;
+  outline: none;
+}
+
+.overdue-tag-suggestions {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: 2px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  z-index: 20;
+  min-width: 120px;
+  display: flex;
+  flex-direction: column;
+  max-height: 160px;
+  overflow-y: auto;
+}
+
+.overdue-tag-suggestion {
+  background: transparent;
+  border: none;
+  padding: 6px 10px;
+  text-align: left;
+  font-size: 11px;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.overdue-tag-suggestion:hover {
+  background: var(--bg-secondary);
+}
+
+/* Quick-Add */
+.overdue-quickadd {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  margin: 8px 12px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+}
+
+.overdue-quickadd-text {
+  padding: 6px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 13px;
+  outline: none;
+}
+
+.overdue-quickadd-text:focus {
+  border-color: var(--accent-color, #4a9eff);
+}
+
+.overdue-quickadd-row {
+  display: flex;
+  gap: 6px;
+}
+
+.overdue-quickadd-date,
+.overdue-quickadd-destination {
+  flex: 1;
+  padding: 4px 8px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 12px;
+  min-width: 0;
+}
+
+.overdue-quickadd-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+}
+
+.overdue-quickadd-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.overdue-quickadd-cancel,
+.overdue-quickadd-submit {
+  padding: 4px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.overdue-quickadd-cancel {
+  background: transparent;
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+}
+
+.overdue-quickadd-cancel:hover {
+  background: var(--bg-primary);
+}
+
+.overdue-quickadd-submit {
+  background: var(--accent-color, #4a9eff);
+  border: 1px solid var(--accent-color, #4a9eff);
+  color: white;
+}
+
+.overdue-quickadd-submit:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Fehler-Banner */
+.overdue-error-banner {
+  padding: 8px 12px;
+  margin: 8px 12px;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: #dc2626;
+  border-radius: var(--radius-md);
+  font-size: 12px;
+}
+
+/* Section „Undatiert" */
+.overdue-section.undated .overdue-section-count {
+  background: var(--bg-tertiary);
+  color: var(--text-muted);
 }
 
 .overdue-btn.active.has-overdue svg {
@@ -16800,6 +17154,17 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
 .module-row.active {
   border-color: var(--accent-color);
   background: color-mix(in srgb, var(--accent-color) 6%, var(--bg-secondary));
+}
+
+.module-row-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  flex-shrink: 0;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
 }
 
 .module-row-body {

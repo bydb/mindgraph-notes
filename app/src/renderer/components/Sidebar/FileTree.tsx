@@ -281,7 +281,7 @@ const FileItem: React.FC<FileItemProps> = ({ entry, level, onDrop, displayMode }
   const { selectedNoteId, secondarySelectedNoteId, selectedPdfPath, selectedImagePath, selectedOfficePath, selectNote, selectSecondaryNote, selectPdf, selectImage, selectOffice, removeNote, setFileTree, vaultPath, notes, updateNotePath, fileTree, selectedPaths, togglePathSelection, clearSelection } = useNotesStore()
   const { iconSet, setTextSplitEnabled, flashcardsEnabled, setViewMode, setCanvasFilterPath, taskExcludedFolders, toggleTaskExcludedFolder } = useUIStore()
   const { fileCustomizations, setFileCustomization, removeFileCustomization, toggleFolderHidden, toggleFolderPinned, showHiddenFolders } = useGraphStore()
-  const { openCanvasTab } = useTabStore()
+  const { openCanvasTab, openCodeTab } = useTabStore()
   const { isBookmarked, toggleBookmark } = useBookmarkStore()
 
   const isPdf = entry.fileType === 'pdf'
@@ -289,6 +289,7 @@ const FileItem: React.FC<FileItemProps> = ({ entry, level, onDrop, displayMode }
   const isExcel = entry.fileType === 'excel'
   const isWord = entry.fileType === 'word'
   const isPowerPoint = entry.fileType === 'powerpoint'
+  const isCode = entry.fileType === 'code'
   const isOffice = isExcel || isWord || isPowerPoint
   const officeType: 'excel' | 'word' | 'powerpoint' | null = isExcel ? 'excel' : isWord ? 'word' : isPowerPoint ? 'powerpoint' : null
   const noteId = generateNoteId(entry.path)
@@ -392,6 +393,8 @@ const FileItem: React.FC<FileItemProps> = ({ entry, level, onDrop, displayMode }
       selectImage(entry.path)
     } else if (isOffice && officeType) {
       selectOffice(entry.path, officeType)
+    } else if (isCode) {
+      openCodeTab(entry.path, entry.name)
     } else {
       selectNote(noteId)
     }
@@ -635,6 +638,13 @@ const FileItem: React.FC<FileItemProps> = ({ entry, level, onDrop, displayMode }
 
     const fullPath = `${vaultPath}/${contextMenu.entry.path}`
     await window.electronAPI.showInFolder(fullPath)
+    setContextMenu(null)
+  }, [contextMenu, vaultPath])
+
+  const handleOpenInVSCode = useCallback(async () => {
+    if (!contextMenu || !vaultPath) return
+    const fullPath = `${vaultPath}/${contextMenu.entry.path}`
+    await window.electronAPI.openInVSCode(fullPath)
     setContextMenu(null)
   }, [contextMenu, vaultPath])
 
@@ -1218,6 +1228,11 @@ const FileItem: React.FC<FileItemProps> = ({ entry, level, onDrop, displayMode }
               <button onClick={handleShowInFinder} className="context-menu-item">
                 {t('fileTree.showInFinder')}
               </button>
+              {isCode && (
+                <button onClick={handleOpenInVSCode} className="context-menu-item">
+                  {t('fileTree.openInVSCode')}
+                </button>
+              )}
               <div className="context-menu-divider" />
               <button onClick={handleDelete} className="context-menu-item danger">
                 {selectedPaths.size > 1 && selectedPaths.has(entry.path)

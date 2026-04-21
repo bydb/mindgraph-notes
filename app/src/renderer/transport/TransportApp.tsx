@@ -6,7 +6,7 @@ export default function TransportApp(): React.ReactElement {
   return (
     <div className="transport-app">
       <div className="transport-titlebar">
-        <span className="transport-title">Quick Capture</span>
+        <span className="transport-title">Schnellerfassung</span>
       </div>
       <TransportCapture />
     </div>

@@ -2,6 +2,33 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.5.10-beta] - 2026-04-21
+
+### Features
+- **Neues „Nur ansehen"-Profil im Onboarding** — reiner Viewer-Modus für alte Laptops. Schaltet alle schweren Features aus (KI, Email, Agent, Dashboard, Transport, Sync, Flashcards, LanguageTool, Readwise, reMarkable, Docling, Vision OCR), Preview ist Standard. Im Vault-Step wird statt „Starter-Vault erstellen" direkt „Bestehenden Ordner öffnen" angeboten — ideal um GitHub-Repos oder beliebige Markdown-Ordner schnell anzusehen
+- **Code-Viewer mit Syntax-Highlighting** — `.py`, `.js`, `.ts`, `.go`, `.rs`, `.sh`, `.json`, `.yaml`, `.sql` und ~20 weitere Sprachen öffnen sich als neuer Tab direkt im FileTree. Read-Only, mit Zeilennummern, Sprach-Badge, Kopieren-Button und GitHub-Light / VS-Code-Dark+-Farben abhängig vom App-Theme. Ignoriert automatisch `node_modules`, `.git`, `dist`, `build`, `__pycache__`, `.venv` etc.
+- **„In VS Code öffnen"** — Button im CodeViewer-Header und Rechtsklick-Eintrag im FileTree für Code-Dateien. Nutzt `code` CLI mit erweitertem PATH (macOS, Linux, Windows), Fallback über `vscode://file`-Protocol
+- **Zotero als offizielles Modul** — in Kategorie „Forschung & Wissen" mit rotem Z-Badge im Modul-Tab. Titlebar-Button öffnet die Zotero-Suche (⌘⇧Z) nur noch wenn das Modul aktiv ist
+- **Quick-Capture-Button in der Titlebar** — „+"-Icon rechts neben dem Zahnrad öffnet das Schnellerfassungs-Fenster aus der App heraus. Aktivierbar in Einstellungen → Schnellerfassung
+- **Aufgaben & Termine als echtes Task-Panel** — bisher nur Read-only Anzeige, jetzt voll editierbar: Checkbox toggelt `[ ]`/`[x]` direkt in die Ursprungsnotiz, Inline-Edit von Text und Datum (datetime-local-Picker), Tag-Chips mit Autocomplete aus allen Vault-Tags, „+"-Button zum Anlegen neuer Aufgaben (Ziel: Daily Note / Inbox / bestehende Task-Notizen). Neue Sektion „Ohne Datum" für Inbox-artige Tasks. Konfliktschutz: zwischenzeitliche Änderungen an der Notiz werden erkannt
+- **Shortcut-Recorder für Schnellerfassung** — im Settings-Feld „Tastenkürzel" kann man jetzt einfach die gewünschte Kombination drücken statt den Electron-Accelerator manuell einzutippen. Live-Feedback ob die Kombi vom OS akzeptiert wurde (rot = bereits vergeben, grün = aktiv). Escape bricht ab
+- **Onboarding-Neustart-Button** — im Hilfe-Graph oben rechts ein neuer „Onboarding neu starten"-Button, der das Profil zurücksetzt und den Einrichtungs-Assistenten wieder öffnet (zusätzlich zum bestehenden ⌘⇧O-Shortcut)
+
+### Improvements
+- **Schnellerfassung (ehemals „Transport") plattformübergreifend** — `setupTray()` läuft jetzt auf Linux/Windows, nicht nur macOS. Tray-Erstellung ist robust gegenüber Desktops ohne StatusNotifier/AppIndicator (Cinnamon etc.) — globaler Shortcut wird auch ohne Tray-Icon registriert
+- **Konsistente Benennung „Schnellerfassung"** — in allen UI-Texten (Settings-Tab, Titlebar-Tooltip, Help-Graph-Node, Tray-Menü, Fenster-Titel). Interne Code-IDs bleiben `transport` für Rückwärtskompatibilität
+- **Module-Tab ist jetzt die einzige Aktivierungsstelle** — Integrations- und Agenten-Tab haben keine Enable-Toggles mehr, zeigen stattdessen einen „Modul deaktiviert → Zum Modul-Tab"-Hinweis wenn das Modul aus ist. Redundante Toggle-Only-Sektionen (Notes Chat, Flashcards, Semantic Scholar) wurden aus Integrations entfernt
+- **Zielordner-Picker in Schnellerfassungs-Settings** — statt Pfad eintippen gibt's jetzt ein Dropdown mit allen Vault-Unterordnern. Standard-Zielordner-Auswahl kombiniert konfigurierte Destinations + alle Vault-Ordner. Schema-Migration von `defaultDestinationIndex` → `defaultDestinationFolder`
+- **Quick-Capture-Fenster ist immer ein Popover** — `fullscreenable: false`, `maximizable: false`, `minimizable: false` plus Sicherheitsnetz bei Maximize/Fullscreen durch den Window-Manager (Cinnamon Super+Up etc.)
+- **Inline-Tags für Tasks** — `#tag`-Syntax in der Task-Zeile wird separat vom Text erkannt und als Chip auf der Karte angezeigt. `buildTaskLine()`-Helper im `linkExtractor` baut Task-Markdown konsistent mit Einrückung, Listen-Marker, Tags und Datum
+- **Sidebar-Shortcut-Konflikt gefixt** — Ctrl/Cmd+N triggert „Neue Notiz" nur noch ohne zusätzliches Shift/Alt, kollidiert nicht mehr mit globalen Schnellerfassungs-Kombinationen wie Ctrl+Shift+N
+- **FileTree ignoriert Code-Junk-Ordner** — `node_modules`, `.git`, `.next`, `dist`, `build`, `target`, `.turbo`, `__pycache__`, `.pytest_cache`, `.venv`, `.idea`, `.vscode` werden beim Vault-Laden komplett übersprungen — GitHub-Repos bleiben übersichtlich
+
+### Fixes
+- **Schnellerfassungs-Shortcut wurde ignoriert** — gespeicherter Shortcut aus den Settings wurde beim App-Start nie gelesen (Hardcode auf `Ctrl+Shift+N`), und Settings-Änderungen wurden nicht an den Main-Prozess weitergereicht. Jetzt: initiales Laden aus UI-Settings + IPC-Handler `transport-update-shortcut` für Live-Updates
+- **„Nur Standard-Zielordner" leer**, wenn keine Destinations konfiguriert — Dropdown kombiniert nun Destinations + Vault-Subdirs und enthält immer wählbare Optionen
+- **Auto-Mode `maximize` / `fullscreen`** für Quick-Capture-Fenster blockiert (Cinnamon / Windows-Snap-Layouts)
+
 ## [0.5.9-beta] - 2026-04-20
 
 ### Features

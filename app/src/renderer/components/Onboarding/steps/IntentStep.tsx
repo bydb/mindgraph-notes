@@ -67,6 +67,15 @@ const profiles: { id: Exclude<UserProfile, null>; icon: React.ReactNode }[] = [
         <polyline points="8 6 2 12 8 18"/>
       </svg>
     )
+  },
+  {
+    id: 'viewer',
+    icon: (
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+        <circle cx="12" cy="12" r="3"/>
+      </svg>
+    )
   }
 ]
 
@@ -211,32 +220,36 @@ export const IntentStep: React.FC<IntentStepProps> = ({
               </div>
             </button>
 
-            <button className="onboarding-vault-option" onClick={handleCreateStarter} disabled={loading}>
-              <div className="onboarding-vault-option-icon">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
-                </svg>
-              </div>
-              <div className="onboarding-vault-option-text">
-                <span className="onboarding-vault-option-title">{t('onboarding.vault.createStarter')}</span>
-                <span className="onboarding-vault-option-desc">{t('onboarding.vault.createStarterDesc')}</span>
-              </div>
-              {loading && <span className="onboarding-vault-loading">...</span>}
-            </button>
+            {selectedProfile !== 'viewer' && (
+              <button className="onboarding-vault-option" onClick={handleCreateStarter} disabled={loading}>
+                <div className="onboarding-vault-option-icon">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+                  </svg>
+                </div>
+                <div className="onboarding-vault-option-text">
+                  <span className="onboarding-vault-option-title">{t('onboarding.vault.createStarter')}</span>
+                  <span className="onboarding-vault-option-desc">{t('onboarding.vault.createStarterDesc')}</span>
+                </div>
+                {loading && <span className="onboarding-vault-loading">...</span>}
+              </button>
+            )}
 
-            <button className="onboarding-vault-option" onClick={handleCreateEmpty} disabled={loading}>
-              <div className="onboarding-vault-option-icon">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
-                  <line x1="12" y1="11" x2="12" y2="17"/>
-                  <line x1="9" y1="14" x2="15" y2="14"/>
-                </svg>
-              </div>
-              <div className="onboarding-vault-option-text">
-                <span className="onboarding-vault-option-title">{t('onboarding.vault.createEmpty')}</span>
-                <span className="onboarding-vault-option-desc">{t('onboarding.vault.createEmptyDesc')}</span>
-              </div>
-            </button>
+            {selectedProfile !== 'viewer' && (
+              <button className="onboarding-vault-option" onClick={handleCreateEmpty} disabled={loading}>
+                <div className="onboarding-vault-option-icon">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+                    <line x1="12" y1="11" x2="12" y2="17"/>
+                    <line x1="9" y1="14" x2="15" y2="14"/>
+                  </svg>
+                </div>
+                <div className="onboarding-vault-option-text">
+                  <span className="onboarding-vault-option-title">{t('onboarding.vault.createEmpty')}</span>
+                  <span className="onboarding-vault-option-desc">{t('onboarding.vault.createEmptyDesc')}</span>
+                </div>
+              </button>
+            )}
           </div>
 
           {error && <div className="onboarding-vault-error">{error}</div>}
