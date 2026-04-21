@@ -2,6 +2,29 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.5.11-beta] - 2026-04-21
+
+### Features
+- **Neues Modul „Sprache" (opt-in)** — Vorlesen (TTS) und Diktieren (STT) in Editor, Preview und Flashcards. Aktivierbar in Einstellungen → Module. Eigener Settings-Tab „Sprache" mit Engine-Auswahl, Voice/Rate/Pitch, Whisper-Konfiguration und Flashcard-Auto-Play
+- **TTS-Engine „System-Stimmen"** — nutzt die lokalen OS-Stimmen (macOS Siri-Voices, Windows SAPI, Linux speech-dispatcher) über die Web Speech API. Keine Cloud, keine Latenz
+- **TTS-Engine „ElevenLabs"** — hochwertige Cloud-Stimmen (v. a. für Deutsch) über api.elevenlabs.io. API-Key wird via `electron.safeStorage` verschlüsselt lokal abgelegt, nie an Dritte gesendet. Stimmen-Liste wird on-demand geladen und nach Kategorie gruppiert (Premade / Professional / Instant Clone / Voice Design), damit Plan-Beschränkungen sofort sichtbar sind. Wählbare Modelle `multilingual v2`, `turbo v2.5`, `flash v2.5` plus Stability/Similarity-Slider
+- **STT mit Whisper** — Diktat per MediaRecorder (WebM/Opus) im Renderer, Transkription durch die Whisper-CLI im Main-Process. Auto-Detect von `whisper` (openai-whisper) und `whisper-ctranslate2` im erweiterten PATH (inkl. Homebrew, pip, pyenv), alternativ absoluter Pfad im Settings-Feld. Sprache wählbar (Auto/de/en/fr/es/it), Modell zwischen `tiny` und `large`
+- **Vorlese-Button im Preview** — schwebender, sticky Button rechts oben im Preview-Modus. Mit Text-Selektion liest er die Auswahl, ohne Selektion die ganze Notiz. Beim Scrollen bleibt er sichtbar
+- **Vorlese- & Diktier-Buttons in der Editor-Toolbar** — Lautsprecher liest Selektion oder gesamte Notiz, Mikrofon startet/stoppt das Diktat und fügt das Transkript an der Cursor-Position ein. Buttons erscheinen nur, wenn das Sprache-Modul aktiv ist
+- **TTS in Flashcards** — Play-Button an Vorder- und Rückseite, optionales Auto-Vorlesen beim Kartenwechsel (Setting)
+- **Voice-Status-Toast** — schwebende Benachrichtigung unten rechts mit Transkriptions-Spinner, Fehlermeldungen und „Zu den Sprach-Einstellungen"-Link bei fehlenden Abhängigkeiten
+
+### Improvements
+- **Audio-Pegel-Check vor Transkription** — AudioContext-Analyser misst während der Aufnahme den RMS-Peak. Stille Aufnahmen (unter Schwelle) werden nicht an Whisper geschickt, sondern zeigen direkt eine Fehlermeldung mit Device-Namen aus macOS — vermeidet minutenlange Whisper-Läufe ohne Ergebnis
+- **ffmpeg-Check im Main** — Whisper braucht ffmpeg zum Dekodieren von WebM; fehlt es, läuft Whisper normalerweise still durch und liefert leeres Transkript. Der neue Check gibt stattdessen eine klare Installations-Anweisung aus
+- **Markdown-zu-Sprechtext** — strippt Code-Blöcke, Wikilinks, Callout-Syntax, Frontmatter und Listenmarker, damit TTS keine „Sternchen Raute Klammer"-Geräusche mehr produziert
+- **CSP erweitert um `media-src blob: data:`** — `<audio>`-Wiedergabe von synthetisiertem ElevenLabs-MP3 funktioniert jetzt zuverlässig ohne „Media load rejected by URL safety check"-Fehler
+- **Debug-Logging für Voice-Pipeline** — Main loggt Whisper-Start/-Finished mit Dauer, stderr, Transkript-Preview und Device-/Blob-Metadaten; Renderer loggt MediaRecorder-Events. Bei leerer Transkription bleibt die WebM-Aufnahme für manuelle Inspektion erhalten
+
+### Fixes
+- **`MEDIA_ERR_SRC_NOT_SUPPORTED` bei Vorlesen** — Audio-Handler (`onplay`/`onended`/`onerror`) werden jetzt vor dem Dispose genullt, damit das Pausieren kein Fehler-Event mehr triggert und der nächste Vorlese-Aufruf sauber startet
+- **Transkription fügte bei Stille nichts ein, ohne Rückmeldung** — jetzt gibt's einen klaren Toast „Keine Sprache erkannt" bzw. „Kein Audio erkannt" mit Device-Name, statt den User rätseln zu lassen
+
 ## [0.5.10-beta] - 2026-04-21
 
 ### Features

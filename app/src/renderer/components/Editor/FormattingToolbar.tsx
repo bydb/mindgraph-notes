@@ -1,6 +1,8 @@
 import React, { memo, useState, useRef, useEffect } from 'react'
 import type { EditorView } from '@codemirror/view'
 import { useTranslation } from '../../utils/translations'
+import { useIsModuleEnabled } from '../../utils/modules'
+import { useVoiceStore } from '../../stores/voiceStore'
 
 interface FormattingToolbarProps {
   onFormat: (type: string) => void
@@ -13,6 +15,11 @@ export const FormattingToolbar: React.FC<FormattingToolbarProps> = memo(({ onFor
   const { t } = useTranslation()
   const [headingOpen, setHeadingOpen] = useState(false)
   const headingRef = useRef<HTMLDivElement>(null)
+  const speechEnabled = useIsModuleEnabled('speech')
+  const voiceStatus = useVoiceStore(s => s.status)
+  const voiceContext = useVoiceStore(s => s.activeContextId)
+  const isEditorSpeaking = voiceStatus === 'speaking' && voiceContext === 'editor'
+  const isEditorDictating = (voiceStatus === 'recording' || voiceStatus === 'transcribing') && voiceContext === 'editor'
 
   useEffect(() => {
     if (!headingOpen) return
@@ -153,6 +160,48 @@ export const FormattingToolbar: React.FC<FormattingToolbarProps> = memo(({ onFor
           <svg {...svgProps}><line x1="2" y1="12" x2="22" y2="12"/></svg>
         </button>
       </div>
+
+      {/* Voice-Gruppe: nur wenn Sprache-Modul aktiv */}
+      {speechEnabled && (
+        <>
+          <div className="formatting-separator" />
+          <div className="formatting-group">
+            <button
+              className={`formatting-btn${isEditorSpeaking ? ' active' : ''}`}
+              onClick={() => onFormat(isEditorSpeaking ? 'voice-stop' : 'voice-speak')}
+              title={isEditorSpeaking ? t('voice.stop') : t('voice.speak')}
+            >
+              {isEditorSpeaking ? (
+                <svg {...svgProps}><rect x="6" y="6" width="12" height="12" rx="1"/></svg>
+              ) : (
+                <svg {...svgProps}>
+                  <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+                  <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/>
+                </svg>
+              )}
+            </button>
+            <button
+              className={`formatting-btn${isEditorDictating ? ' active' : ''}`}
+              onClick={() => onFormat(isEditorDictating ? 'voice-dictate-stop' : 'voice-dictate')}
+              title={isEditorDictating
+                ? (voiceStatus === 'transcribing' ? t('voice.transcribing') : t('voice.dictateStop'))
+                : t('voice.dictate')}
+              disabled={voiceStatus === 'transcribing'}
+            >
+              {isEditorDictating ? (
+                <svg {...svgProps}><rect x="6" y="6" width="12" height="12" rx="1"/></svg>
+              ) : (
+                <svg {...svgProps}>
+                  <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+                  <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+                  <line x1="12" y1="19" x2="12" y2="23"/>
+                  <line x1="8" y1="23" x2="16" y2="23"/>
+                </svg>
+              )}
+            </button>
+          </div>
+        </>
+      )}
     </div>
   )
 })

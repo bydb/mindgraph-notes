@@ -37,6 +37,10 @@ import { PublishToWordPressModal } from './PublishToWordPressModal'
 import { insertAIResultWithFootnote } from '../../utils/aiFootnote'
 import { isImageFile, findImageInVault } from '../../utils/imageUtils'
 import { highlightCode } from '../../utils/highlightSetup'
+import { speak, stopSpeaking } from '../../utils/voice/tts'
+import { startDictation, type DictationHandle } from '../../utils/voice/stt'
+import { useIsModuleEnabled } from '../../utils/modules'
+import { useVoiceStore } from '../../stores/voiceStore'
 
 const markdownCodeLanguages = [
   LanguageDescription.of({
@@ -545,6 +549,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
   const lastSavedContentRef = useRef<string>('')
   const isExternalUpdateRef = useRef(false)
   const currentNoteIdRef = useRef<string | null>(null)  // Track current note ID for async operations
+  const dictationHandleRef = useRef<DictationHandle | null>(null)  // Aktive Diktat-Session, falls vorhanden
 
   const { vaultPath, selectedNoteId, secondarySelectedNoteId, notes, updateNote, selectNote, selectSecondaryNote, addNote, fileTree, setFileTree, navigateBack, navigateForward, canNavigateBack, canNavigateForward } = useNotesStore(
     useShallow(s => ({ vaultPath: s.vaultPath, selectedNoteId: s.selectedNoteId, secondarySelectedNoteId: s.secondarySelectedNoteId, notes: s.notes, updateNote: s.updateNote, selectNote: s.selectNote, selectSecondaryNote: s.selectSecondaryNote, addNote: s.addNote, fileTree: s.fileTree, setFileTree: s.setFileTree, navigateBack: s.navigateBack, navigateForward: s.navigateForward, canNavigateBack: s.canNavigateBack, canNavigateForward: s.canNavigateForward }))
@@ -556,6 +561,12 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
   // Verwende die übergebene noteId oder die primary/secondary Selection
   const effectiveNoteId = noteId ?? (isSecondary ? secondarySelectedNoteId : selectedNoteId)
   const selectedNote = notes.find(n => n.id === effectiveNoteId)
+
+  // Voice: Sprache-Modul + aktueller Status für Preview-Vorlese-Button
+  const speechEnabled = useIsModuleEnabled('speech')
+  const voiceStatus = useVoiceStore(s => s.status)
+  const voiceContext = useVoiceStore(s => s.activeContextId)
+  const isPreviewSpeaking = (voiceStatus === 'speaking' || voiceStatus === 'transcribing') && voiceContext === 'preview'
 
   const [isSaving, setIsSaving] = useState(false)
   const [viewMode, setViewMode] = useState<ViewMode>('edit')
@@ -719,6 +730,53 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
         console.error('Fehler beim Einfügen:', error)
       }
       setFormatMenu(null)
+      return
+    }
+
+    // Voice: vorlesen (Auswahl oder ganze Notiz)
+    if (type === 'voice-speak') {
+      const textToRead = selectedText.trim() || view.state.doc.toString()
+      if (textToRead.trim()) speak(textToRead, { contextId: 'editor' })
+      setFormatMenu(null)
+      return
+    }
+    if (type === 'voice-stop') {
+      stopSpeaking()
+      setFormatMenu(null)
+      return
+    }
+
+    // Voice: diktieren (Toggle)
+    if (type === 'voice-dictate') {
+      setFormatMenu(null)
+      try {
+        const handle = await startDictation({
+          contextId: 'editor',
+          onTranscript: (text) => {
+            const v = viewRef.current
+            if (!v) return
+            const cursor = v.state.selection.main
+            const insertText = cursor.from === cursor.to ? text : text
+            v.dispatch({
+              changes: { from: cursor.from, to: cursor.to, insert: insertText },
+              selection: { anchor: cursor.from + insertText.length }
+            })
+            v.focus()
+          }
+        })
+        dictationHandleRef.current = handle
+      } catch (err) {
+        console.error('[voice-dictate] start failed:', err)
+      }
+      return
+    }
+    if (type === 'voice-dictate-stop') {
+      setFormatMenu(null)
+      const handle = dictationHandleRef.current
+      dictationHandleRef.current = null
+      if (handle) {
+        try { await handle.stop() } catch (err) { console.error('[voice-dictate] stop failed:', err) }
+      }
       return
     }
 
@@ -1044,6 +1102,16 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
       }
     }
   }, [languageTool.enabled, languageTool.autoCheck, languageTool.autoCheckDelay, previewContent, viewMode, checkLanguageTool])
+
+  // Voice: Bei Notizwechsel oder Unmount TTS stoppen und laufende Diktate abbrechen.
+  useEffect(() => {
+    return () => {
+      stopSpeaking()
+      const handle = dictationHandleRef.current
+      dictationHandleRef.current = null
+      if (handle) handle.cancel()
+    }
+  }, [selectedNoteId])
 
   // LanguageTool: Clear matches when note changes
   useEffect(() => {
@@ -3083,6 +3151,44 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
         onContextMenu={handlePreviewContextMenu}
         ref={previewRef}
       >
+        {speechEnabled && viewMode === 'preview' && (
+          <div className="voice-preview-controls">
+            <button
+              className={`voice-preview-btn${isPreviewSpeaking ? ' active' : ''}`}
+              onMouseDown={e => e.preventDefault() /* Selection im Preview erhalten */}
+              onClick={() => {
+                if (isPreviewSpeaking) {
+                  stopSpeaking()
+                  return
+                }
+                const sel = window.getSelection()
+                let text = ''
+                if (sel && previewRef.current && sel.rangeCount > 0) {
+                  // Selection nur verwenden, wenn sie innerhalb der Preview liegt.
+                  const range = sel.getRangeAt(0)
+                  if (previewRef.current.contains(range.commonAncestorContainer)) {
+                    text = sel.toString().trim()
+                  }
+                }
+                if (!text) text = previewContent
+                if (text) speak(text, { contextId: 'preview' })
+              }}
+              title={isPreviewSpeaking ? t('voice.stop') : t('voice.speak')}
+              aria-label={isPreviewSpeaking ? t('voice.stop') : t('voice.speak')}
+            >
+              {isPreviewSpeaking ? (
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="6" y="6" width="12" height="12" rx="1"/>
+                </svg>
+              ) : (
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+                  <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/>
+                </svg>
+              )}
+            </button>
+          </div>
+        )}
         {frontmatterTitle && (
           <h1 className="frontmatter-title">{frontmatterTitle}</h1>
         )}

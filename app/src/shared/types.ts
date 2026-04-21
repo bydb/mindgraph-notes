@@ -655,6 +655,34 @@ export interface ElectronAPI {
     error?: string;
   }>;
 
+  // Voice / Whisper STT
+  voiceCheckWhisper: (command: string) => Promise<{
+    available: boolean;
+    command: string | null;
+    binary: string | null;
+    error?: string;
+  }>;
+  voiceTranscribe: (audio: ArrayBuffer, extension: string, opts: { command: string; model: string; language: string }) => Promise<{
+    success: boolean;
+    text?: string;
+    error?: string;
+  }>;
+
+  // Voice / ElevenLabs TTS
+  elevenlabsSaveKey: (apiKey: string) => Promise<{ success: boolean; error?: string }>;
+  elevenlabsLoadKey: () => Promise<string | null>;
+  elevenlabsDeleteKey: () => Promise<{ success: boolean }>;
+  elevenlabsListVoices: () => Promise<{
+    success: boolean;
+    voices?: Array<{ voice_id: string; name: string; labels?: Record<string, string>; category?: string }>;
+    error?: string;
+  }>;
+  elevenlabsSynthesize: (params: { text: string; voiceId: string; modelId: string; stability: number; similarity: number }) => Promise<{
+    success: boolean;
+    audio?: ArrayBuffer;
+    error?: string;
+  }>;
+
   // Docling PDF Extraction API
   doclingCheck: (baseUrl?: string) => Promise<{
     available: boolean;

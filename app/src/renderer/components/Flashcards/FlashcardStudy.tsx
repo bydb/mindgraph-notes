@@ -1,12 +1,20 @@
 import React, { useEffect, useCallback } from 'react'
 import { useFlashcardStore, getPreviewInterval, type ReviewQuality } from '../../stores/flashcardStore'
 import { useNotesStore } from '../../stores/notesStore'
+import { useUIStore } from '../../stores/uiStore'
+import { useVoiceStore } from '../../stores/voiceStore'
+import { useIsModuleEnabled } from '../../utils/modules'
 import { useTranslation } from '../../utils/translations'
+import { speak, stopSpeaking } from '../../utils/voice/tts'
 import { MarkdownContent } from './MarkdownContent'
 
 export const FlashcardStudy: React.FC = () => {
   const { t } = useTranslation()
   const { vaultPath } = useNotesStore()
+  const speechEnabled = useIsModuleEnabled('speech')
+  const flashcardsAutoPlay = useUIStore(s => s.speech.flashcardsAutoPlay)
+  const voiceStatus = useVoiceStore(s => s.status)
+  const voiceContext = useVoiceStore(s => s.activeContextId)
 
   const {
     isStudying,
@@ -25,6 +33,40 @@ export const FlashcardStudy: React.FC = () => {
     current: currentStudyIndex + 1,
     total: studyQueue.length
   }
+
+  const isSpeakingFront = voiceStatus === 'speaking' && voiceContext === 'flashcard-front'
+  const isSpeakingBack = voiceStatus === 'speaking' && voiceContext === 'flashcard-back'
+
+  const speakFront = useCallback(() => {
+    if (!currentCard) return
+    if (isSpeakingFront) { stopSpeaking(); return }
+    speak(currentCard.front, { contextId: 'flashcard-front' })
+  }, [currentCard, isSpeakingFront])
+
+  const speakBack = useCallback(() => {
+    if (!currentCard) return
+    if (isSpeakingBack) { stopSpeaking(); return }
+    speak(currentCard.back, { contextId: 'flashcard-back' })
+  }, [currentCard, isSpeakingBack])
+
+  // Auto-Play beim Karten-Wechsel: immer die Vorderseite vorlesen.
+  useEffect(() => {
+    if (!speechEnabled || !flashcardsAutoPlay || !isStudying || !currentCard) return
+    stopSpeaking()
+    speak(currentCard.front, { contextId: 'flashcard-front' })
+  }, [speechEnabled, flashcardsAutoPlay, isStudying, currentCard?.id])
+
+  // Auto-Play der Rückseite beim Umdrehen.
+  useEffect(() => {
+    if (!speechEnabled || !flashcardsAutoPlay || !isStudying || !currentCard || !isFlipped) return
+    stopSpeaking()
+    speak(currentCard.back, { contextId: 'flashcard-back' })
+  }, [speechEnabled, flashcardsAutoPlay, isStudying, isFlipped, currentCard?.id])
+
+  // Beim Beenden der Study-Session oder Unmount TTS stoppen.
+  useEffect(() => {
+    return () => { stopSpeaking() }
+  }, [])
 
   // Keyboard shortcuts
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
@@ -128,14 +170,56 @@ export const FlashcardStudy: React.FC = () => {
           {/* Question Section */}
           <div className="flashcard-study-question-section">
             <div className="flashcard-study-card-topic">{currentCard.topic}</div>
-            <div className="flashcard-study-label">{t('flashcards.front')}</div>
+            <div className="flashcard-study-label">
+              {t('flashcards.front')}
+              {speechEnabled && (
+                <button
+                  className={`flashcard-tts-btn${isSpeakingFront ? ' active' : ''}`}
+                  onClick={speakFront}
+                  title={isSpeakingFront ? t('voice.stop') : t('voice.speak')}
+                  aria-label={isSpeakingFront ? t('voice.stop') : t('voice.speak')}
+                >
+                  {isSpeakingFront ? (
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="6" y="6" width="12" height="12" rx="1"/>
+                    </svg>
+                  ) : (
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+                      <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/>
+                    </svg>
+                  )}
+                </button>
+              )}
+            </div>
             <MarkdownContent content={currentCard.front} className="flashcard-study-card-text" vaultPath={vaultPath ?? undefined} />
           </div>
 
           {/* Answer Section - only show when flipped */}
           {isFlipped ? (
             <div className="flashcard-study-answer-section">
-              <div className="flashcard-study-label">{t('flashcards.back')}</div>
+              <div className="flashcard-study-label">
+                {t('flashcards.back')}
+                {speechEnabled && (
+                  <button
+                    className={`flashcard-tts-btn${isSpeakingBack ? ' active' : ''}`}
+                    onClick={speakBack}
+                    title={isSpeakingBack ? t('voice.stop') : t('voice.speak')}
+                    aria-label={isSpeakingBack ? t('voice.stop') : t('voice.speak')}
+                  >
+                    {isSpeakingBack ? (
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <rect x="6" y="6" width="12" height="12" rx="1"/>
+                      </svg>
+                    ) : (
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+                        <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/>
+                      </svg>
+                    )}
+                  </button>
+                )}
+              </div>
               <MarkdownContent content={currentCard.back} className="flashcard-study-answer" vaultPath={vaultPath ?? undefined} />
             </div>
           ) : (

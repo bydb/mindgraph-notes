@@ -23,7 +23,7 @@ interface SettingsProps {
   initialTab?: Tab
 }
 
-type Tab = 'vault' | 'general' | 'editor' | 'templates' | 'integrations' | 'shortcuts' | 'dataview' | 'sync' | 'dailyNote' | 'remarkable' | 'agents' | 'transport' | 'dashboard' | 'modules'
+type Tab = 'vault' | 'general' | 'editor' | 'templates' | 'integrations' | 'shortcuts' | 'dataview' | 'sync' | 'dailyNote' | 'remarkable' | 'agents' | 'transport' | 'dashboard' | 'modules' | 'speech'
 
 type BuiltInTemplateKey = 'empty' | 'dailyNote' | 'zettel' | 'meeting'
 
@@ -559,7 +559,7 @@ const VaultSettingsTab: React.FC<{ vaultPath: string; t: TabTFn; onNavigateToTab
 
 const ModulesTab: React.FC<{ t: TabTFn }> = ({ t }) => {
   // useUIStore als Abhängigkeit einbinden, damit der Tab bei Flag-Änderungen rerendert
-  const _tick = useUIStore(s => `${s.notesChatEnabled}${s.smartConnectionsEnabled}${s.flashcardsEnabled}${s.semanticScholarEnabled}${s.zoteroEnabled}${s.languageTool.enabled}${s.email.enabled}${s.edoobox.enabled}${s.marketing.enabled}${s.readwise.enabled}${s.remarkable.enabled}${s.docling.enabled}${s.visionOcr.enabled}`)
+  const _tick = useUIStore(s => `${s.notesChatEnabled}${s.smartConnectionsEnabled}${s.flashcardsEnabled}${s.semanticScholarEnabled}${s.zoteroEnabled}${s.languageTool.enabled}${s.email.enabled}${s.edoobox.enabled}${s.marketing.enabled}${s.readwise.enabled}${s.remarkable.enabled}${s.docling.enabled}${s.visionOcr.enabled}${s.speech.enabled}`)
   void _tick
 
   const grouped: Record<ModuleCategory, ModuleDescriptor[]> = {
@@ -620,6 +620,460 @@ const ModulesTab: React.FC<{ t: TabTFn }> = ({ t }) => {
           </div>
         </div>
       ))}
+    </div>
+  )
+}
+
+const SpeechSettingsTab: React.FC<{ t: TabTFn }> = ({ t }) => {
+  const speech = useUIStore(s => s.speech)
+  const setSpeech = useUIStore(s => s.setSpeech)
+
+  const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([])
+  const [whisperStatus, setWhisperStatus] = useState<{ available: boolean; command: string | null; error?: string } | null>(null)
+  const [checkingWhisper, setCheckingWhisper] = useState(false)
+
+  // ElevenLabs State
+  const [elApiKey, setElApiKey] = useState('')
+  const [elKeySaved, setElKeySaved] = useState(false)
+  const [elSaving, setElSaving] = useState(false)
+  const [elVoices, setElVoices] = useState<Array<{ voice_id: string; name: string; labels?: Record<string, string>; category?: string }>>([])
+  const [elLoadingVoices, setElLoadingVoices] = useState(false)
+  const [elVoicesError, setElVoicesError] = useState<string | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      const stored = await window.electronAPI.elevenlabsLoadKey()
+      if (cancelled) return
+      if (stored) {
+        setElKeySaved(true)
+        setElApiKey('')  // wir zeigen den gespeicherten Key nicht an
+      }
+    })()
+    return () => { cancelled = true }
+  }, [])
+
+  const saveElKey = async () => {
+    if (!elApiKey.trim()) return
+    setElSaving(true)
+    try {
+      const res = await window.electronAPI.elevenlabsSaveKey(elApiKey.trim())
+      if (res.success) {
+        setElKeySaved(true)
+        setElApiKey('')
+      } else {
+        setElVoicesError(res.error ?? 'Speichern fehlgeschlagen')
+      }
+    } finally {
+      setElSaving(false)
+    }
+  }
+
+  const deleteElKey = async () => {
+    await window.electronAPI.elevenlabsDeleteKey()
+    setElKeySaved(false)
+    setElVoices([])
+    setSpeech({ elevenlabsVoiceId: '', elevenlabsVoiceName: '' })
+  }
+
+  const loadElVoices = async () => {
+    setElLoadingVoices(true)
+    setElVoicesError(null)
+    try {
+      const res = await window.electronAPI.elevenlabsListVoices()
+      if (res.success && res.voices) {
+        setElVoices(res.voices)
+      } else {
+        setElVoicesError(res.error ?? 'Stimmen konnten nicht geladen werden')
+      }
+    } finally {
+      setElLoadingVoices(false)
+    }
+  }
+
+  const testElVoice = async () => {
+    if (!speech.elevenlabsVoiceId) return
+    try {
+      const res = await window.electronAPI.elevenlabsSynthesize({
+        text: t('settings.speech.tts.testSample'),
+        voiceId: speech.elevenlabsVoiceId,
+        modelId: speech.elevenlabsModel || 'eleven_multilingual_v2',
+        stability: speech.elevenlabsStability,
+        similarity: speech.elevenlabsSimilarity
+      })
+      if (!res.success || !res.audio) {
+        setElVoicesError(res.error ?? 'Synthese fehlgeschlagen')
+        return
+      }
+      const bytes = new Uint8Array(res.audio)
+      if (bytes.byteLength === 0) {
+        setElVoicesError('Synthese leer (0 Bytes). API-Key hat evtl. kein text_to_speech-Scope.')
+        return
+      }
+      const blob = new Blob([bytes], { type: 'audio/mpeg' })
+      const url = URL.createObjectURL(blob)
+      const audio = new Audio(url)
+      audio.onended = () => URL.revokeObjectURL(url)
+      audio.onerror = () => {
+        URL.revokeObjectURL(url)
+        setElVoicesError(`Wiedergabe fehlgeschlagen (${bytes.byteLength} bytes empfangen, aber kein gültiges MP3).`)
+      }
+      await audio.play()
+    } catch (err) {
+      setElVoicesError(err instanceof Error ? err.message : String(err))
+    }
+  }
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) return
+    const load = () => setVoices(window.speechSynthesis.getVoices())
+    load()
+    window.speechSynthesis.addEventListener('voiceschanged', load)
+    return () => window.speechSynthesis.removeEventListener('voiceschanged', load)
+  }, [])
+
+  // Auto-check Whisper beim Öffnen des Tabs
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      setCheckingWhisper(true)
+      try {
+        const result = await window.electronAPI.voiceCheckWhisper(speech.whisperCommand || 'auto')
+        if (!cancelled) setWhisperStatus(result)
+      } catch (err) {
+        if (!cancelled) setWhisperStatus({ available: false, command: null, error: err instanceof Error ? err.message : String(err) })
+      } finally {
+        if (!cancelled) setCheckingWhisper(false)
+      }
+    })()
+    return () => { cancelled = true }
+  }, [speech.whisperCommand])
+
+  const testVoice = () => {
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) return
+    window.speechSynthesis.cancel()
+    const utterance = new SpeechSynthesisUtterance(t('settings.speech.tts.testSample'))
+    utterance.rate = speech.ttsRate
+    utterance.pitch = speech.ttsPitch
+    if (speech.ttsVoice) {
+      const voice = voices.find(v => v.voiceURI === speech.ttsVoice)
+      if (voice) utterance.voice = voice
+    }
+    window.speechSynthesis.speak(utterance)
+  }
+
+  const runWhisperCheck = async () => {
+    setCheckingWhisper(true)
+    try {
+      const result = await window.electronAPI.voiceCheckWhisper(speech.whisperCommand || 'auto')
+      setWhisperStatus(result)
+    } finally {
+      setCheckingWhisper(false)
+    }
+  }
+
+  return (
+    <div className="settings-section">
+      <h3>{t('settings.speech.title')}</h3>
+      <p className="settings-hint">{t('settings.speech.hint')}</p>
+
+      <h4 style={{ marginTop: 24 }}>{t('settings.speech.tts.heading')}</h4>
+
+      <div className="settings-row">
+        <label>{t('settings.speech.tts.engine')}</label>
+        <select
+          value={speech.ttsEngine}
+          onChange={e => setSpeech({ ttsEngine: e.target.value as 'system' | 'elevenlabs' })}
+        >
+          <option value="system">{t('settings.speech.tts.engine.system')}</option>
+          <option value="elevenlabs">{t('settings.speech.tts.engine.elevenlabs')}</option>
+        </select>
+      </div>
+
+      {speech.ttsEngine === 'system' && (
+        <>
+          <div className="settings-row">
+            <label>{t('settings.speech.tts.voice')}</label>
+            <select
+              value={speech.ttsVoice}
+              onChange={e => setSpeech({ ttsVoice: e.target.value })}
+              style={{ minWidth: 240 }}
+            >
+              <option value="">{t('settings.speech.tts.voice.default')}</option>
+              {voices.map(v => (
+                <option key={v.voiceURI} value={v.voiceURI}>
+                  {v.name} ({v.lang})
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="settings-row">
+            <label>{t('settings.speech.tts.rate')}: {speech.ttsRate.toFixed(1)}x</label>
+            <input
+              type="range"
+              min={0.5}
+              max={2.0}
+              step={0.1}
+              value={speech.ttsRate}
+              onChange={e => setSpeech({ ttsRate: Number(e.target.value) })}
+              style={{ width: 200 }}
+            />
+          </div>
+
+          <div className="settings-row">
+            <label>{t('settings.speech.tts.pitch')}: {speech.ttsPitch.toFixed(1)}</label>
+            <input
+              type="range"
+              min={0.5}
+              max={2.0}
+              step={0.1}
+              value={speech.ttsPitch}
+              onChange={e => setSpeech({ ttsPitch: Number(e.target.value) })}
+              style={{ width: 200 }}
+            />
+          </div>
+
+          <div className="settings-row">
+            <button className="btn-primary" onClick={testVoice}>{t('settings.speech.tts.test')}</button>
+          </div>
+        </>
+      )}
+
+      {speech.ttsEngine === 'elevenlabs' && (
+        <>
+          <p className="settings-hint" style={{ color: 'var(--warning, #d97706)', marginTop: 8 }}>
+            {t('settings.speech.el.cloudWarning')}
+          </p>
+
+          <div className="settings-row">
+            <label>{t('settings.speech.el.apiKey')}</label>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <input
+                type="password"
+                value={elApiKey}
+                onChange={e => setElApiKey(e.target.value)}
+                placeholder={elKeySaved ? '••••••••' : t('settings.speech.el.apiKey.placeholder')}
+                style={{ minWidth: 260 }}
+              />
+              <button className="btn-primary" onClick={saveElKey} disabled={elSaving || !elApiKey.trim()}>
+                {elSaving ? '…' : t('settings.speech.el.apiKey.save')}
+              </button>
+              {elKeySaved && (
+                <button onClick={deleteElKey} style={{ color: 'var(--danger, #dc2626)' }}>
+                  {t('settings.speech.el.apiKey.delete')}
+                </button>
+              )}
+            </div>
+          </div>
+          <p className="settings-hint">{t('settings.speech.el.apiKey.hint')}</p>
+          {elKeySaved && <p className="settings-hint" style={{ color: 'var(--success, #059669)' }}>✓ {t('settings.speech.el.apiKey.saved')}</p>}
+
+          <div className="settings-row">
+            <label>{t('settings.speech.el.voice')}</label>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <select
+                value={speech.elevenlabsVoiceId}
+                onChange={e => {
+                  const v = elVoices.find(voice => voice.voice_id === e.target.value)
+                  setSpeech({ elevenlabsVoiceId: e.target.value, elevenlabsVoiceName: v?.name ?? '' })
+                }}
+                disabled={!elKeySaved || elVoices.length === 0}
+                style={{ minWidth: 240 }}
+              >
+                <option value="">{t('settings.speech.el.voice.none')}</option>
+                {(() => {
+                  // Gruppiere nach Kategorie — premade ist im Free-Tier verfügbar, cloned/generated braucht Upgrade.
+                  const groups: Record<string, typeof elVoices> = {}
+                  for (const v of elVoices) {
+                    const cat = v.category ?? 'other'
+                    if (!groups[cat]) groups[cat] = []
+                    groups[cat].push(v)
+                  }
+                  const order = ['premade', 'professional', 'cloned', 'generated', 'other']
+                  const labels: Record<string, string> = {
+                    premade: 'Premade (Free)',
+                    professional: 'Professional Clone',
+                    cloned: 'Instant Clone (Paid)',
+                    generated: 'Voice Design (Paid)',
+                    other: 'Other'
+                  }
+                  return order.filter(k => groups[k]?.length).map(cat => (
+                    <optgroup key={cat} label={labels[cat] ?? cat}>
+                      {groups[cat].map(v => (
+                        <option key={v.voice_id} value={v.voice_id}>
+                          {v.name}{v.labels?.language ? ` (${v.labels.language})` : ''}
+                        </option>
+                      ))}
+                    </optgroup>
+                  ))
+                })()}
+                {/* Wenn gespeicherte Voice noch nicht in der Liste ist (weil voices nicht geladen), zeige den Namen trotzdem */}
+                {speech.elevenlabsVoiceId && !elVoices.some(v => v.voice_id === speech.elevenlabsVoiceId) && (
+                  <option value={speech.elevenlabsVoiceId}>{speech.elevenlabsVoiceName || speech.elevenlabsVoiceId}</option>
+                )}
+              </select>
+              <button onClick={loadElVoices} disabled={!elKeySaved || elLoadingVoices}>
+                {elLoadingVoices ? t('settings.speech.el.loadingVoices') : t('settings.speech.el.loadVoices')}
+              </button>
+              <button className="btn-primary" onClick={testElVoice} disabled={!speech.elevenlabsVoiceId}>
+                {t('settings.speech.tts.test')}
+              </button>
+            </div>
+          </div>
+          {!elKeySaved && <p className="settings-hint">{t('settings.speech.el.keyMissing')}</p>}
+          {elVoicesError && <p className="settings-hint" style={{ color: 'var(--danger, #dc2626)' }}>{elVoicesError}</p>}
+
+          <div className="settings-row">
+            <label>{t('settings.speech.el.model')}</label>
+            <select
+              value={speech.elevenlabsModel}
+              onChange={e => setSpeech({ elevenlabsModel: e.target.value })}
+              style={{ minWidth: 280 }}
+            >
+              <option value="eleven_multilingual_v2">{t('settings.speech.el.model.multilingual')}</option>
+              <option value="eleven_turbo_v2_5">{t('settings.speech.el.model.turbo')}</option>
+              <option value="eleven_flash_v2_5">{t('settings.speech.el.model.flash')}</option>
+            </select>
+          </div>
+
+          <div className="settings-row">
+            <label>{t('settings.speech.el.stability')}: {speech.elevenlabsStability.toFixed(2)}</label>
+            <input
+              type="range"
+              min={0}
+              max={1}
+              step={0.05}
+              value={speech.elevenlabsStability}
+              onChange={e => setSpeech({ elevenlabsStability: Number(e.target.value) })}
+              style={{ width: 200 }}
+            />
+          </div>
+
+          <div className="settings-row">
+            <label>{t('settings.speech.el.similarity')}: {speech.elevenlabsSimilarity.toFixed(2)}</label>
+            <input
+              type="range"
+              min={0}
+              max={1}
+              step={0.05}
+              value={speech.elevenlabsSimilarity}
+              onChange={e => setSpeech({ elevenlabsSimilarity: Number(e.target.value) })}
+              style={{ width: 200 }}
+            />
+          </div>
+
+          <div className="settings-row">
+            <label>{t('settings.speech.tts.rate')}: {speech.ttsRate.toFixed(1)}x</label>
+            <input
+              type="range"
+              min={0.5}
+              max={2.0}
+              step={0.1}
+              value={speech.ttsRate}
+              onChange={e => setSpeech({ ttsRate: Number(e.target.value) })}
+              style={{ width: 200 }}
+            />
+          </div>
+        </>
+      )}
+
+      <h4 style={{ marginTop: 32 }}>{t('settings.speech.stt.heading')}</h4>
+
+      <div className="settings-row">
+        <label>{t('settings.speech.stt.language')}</label>
+        <select
+          value={speech.sttLanguage}
+          onChange={e => setSpeech({ sttLanguage: e.target.value })}
+        >
+          <option value="auto">{t('settings.speech.stt.language.auto')}</option>
+          <option value="de">{t('settings.speech.stt.language.de')}</option>
+          <option value="en">{t('settings.speech.stt.language.en')}</option>
+          <option value="fr">{t('settings.speech.stt.language.fr')}</option>
+          <option value="es">{t('settings.speech.stt.language.es')}</option>
+          <option value="it">{t('settings.speech.stt.language.it')}</option>
+        </select>
+      </div>
+
+      <div className="settings-row">
+        <label>{t('settings.speech.stt.model')}</label>
+        <select
+          value={speech.whisperModel}
+          onChange={e => setSpeech({ whisperModel: e.target.value })}
+        >
+          <option value="tiny">tiny</option>
+          <option value="base">base</option>
+          <option value="small">small</option>
+          <option value="medium">medium</option>
+          <option value="large">large</option>
+        </select>
+      </div>
+      <p className="settings-hint">{t('settings.speech.stt.model.hint')}</p>
+
+      <div className="settings-row">
+        <label>{t('settings.speech.stt.command')}</label>
+        <input
+          type="text"
+          value={speech.whisperCommand}
+          onChange={e => setSpeech({ whisperCommand: e.target.value })}
+          placeholder="auto"
+          style={{ minWidth: 240 }}
+        />
+      </div>
+      <p className="settings-hint">{t('settings.speech.stt.command.hint')}</p>
+
+      <div className="settings-row">
+        <button className="btn-primary" onClick={runWhisperCheck} disabled={checkingWhisper}>
+          {checkingWhisper ? t('settings.speech.stt.checking') : t('settings.speech.stt.check')}
+        </button>
+      </div>
+
+      {whisperStatus && (
+        <div style={{
+          marginTop: 12,
+          padding: 12,
+          borderRadius: 6,
+          background: whisperStatus.available ? 'rgba(40, 200, 120, 0.12)' : 'rgba(240, 160, 60, 0.12)',
+          border: `1px solid ${whisperStatus.available ? 'rgba(40, 200, 120, 0.5)' : 'rgba(240, 160, 60, 0.5)'}`
+        }}>
+          {whisperStatus.available ? (
+            <div style={{ fontSize: 13 }}>
+              ✓ {t('settings.speech.stt.installed', { path: whisperStatus.command ?? '' })}
+            </div>
+          ) : (
+            <div style={{ fontSize: 13 }}>
+              <div style={{ fontWeight: 600, marginBottom: 8 }}>{t('settings.speech.stt.notInstalled')}</div>
+              <div style={{ marginBottom: 6 }}>
+                <strong>{t('settings.speech.stt.installMac')}:</strong>{' '}
+                <code>brew install openai-whisper</code>
+              </div>
+              <div>
+                <strong>{t('settings.speech.stt.installPip')}:</strong>{' '}
+                <code>pip install openai-whisper</code>
+              </div>
+              <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid rgba(0,0,0,0.08)' }}>
+                {t('settings.speech.stt.ffmpegHint')}
+              </div>
+            </div>
+          )}
+          {whisperStatus.available && (
+            <div style={{ fontSize: 12, opacity: 0.8, marginTop: 6 }}>
+              {t('settings.speech.stt.ffmpegHint')}
+            </div>
+          )}
+        </div>
+      )}
+
+      <h4 style={{ marginTop: 32 }}>Flashcards</h4>
+      <div className="settings-row">
+        <label>{t('settings.speech.flashcards.autoPlay')}</label>
+        <input
+          type="checkbox"
+          checked={speech.flashcardsAutoPlay}
+          onChange={e => setSpeech({ flashcardsAutoPlay: e.target.checked })}
+        />
+      </div>
+      <p className="settings-hint">{t('settings.speech.flashcards.autoPlay.hint')}</p>
     </div>
   )
 }
@@ -1499,6 +1953,19 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab 
                   <path d="M9 6v6M6 9h6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
                 </svg>
                 {t('settings.tab.agents')}
+              </button>
+            )}
+            {/* Speech-Tab: nur wenn Modul aktiv */}
+            {isModuleEnabled('speech') && (
+              <button
+                className={`settings-nav-item ${activeTab === 'speech' ? 'active' : ''}`}
+                onClick={() => setActiveTab('speech')}
+              >
+                <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+                  <path d="M9 1a3 3 0 0 0-3 3v5a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" stroke="currentColor" strokeWidth="1.5"/>
+                  <path d="M14 8v1a5 5 0 0 1-10 0V8M9 14v3M6 17h6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                </svg>
+                {t('settings.tab.speech')}
               </button>
             )}
             {/* reMarkable-Tab: nur wenn Modul aktiv */}
@@ -4212,6 +4679,11 @@ LIMIT 10
             {/* Modules Tab */}
             {activeTab === 'modules' && (
               <ModulesTab t={t} />
+            )}
+
+            {/* Speech Tab */}
+            {activeTab === 'speech' && (
+              <SpeechSettingsTab t={t} />
             )}
           </div>
         </div>

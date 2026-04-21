@@ -2774,6 +2774,100 @@ ipcMain.handle('check-command-exists', async (_event, command: string, args?: st
   }
 })
 
+// ===== Voice: ElevenLabs TTS =====
+function getElevenLabsKeyPath(): string {
+  return path.join(app.getPath('userData'), 'elevenlabs-key.enc')
+}
+
+ipcMain.handle('elevenlabs-save-key', async (_event, apiKey: string) => {
+  try {
+    if (!safeStorage.isEncryptionAvailable()) {
+      return { success: false, error: 'safeStorage nicht verfügbar' }
+    }
+    const encrypted = safeStorage.encryptString(apiKey)
+    await fs.writeFile(getElevenLabsKeyPath(), encrypted)
+    return { success: true }
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) }
+  }
+})
+
+ipcMain.handle('elevenlabs-load-key', async () => {
+  try {
+    if (!safeStorage.isEncryptionAvailable()) return null
+    const encrypted = await fs.readFile(getElevenLabsKeyPath())
+    return safeStorage.decryptString(encrypted)
+  } catch {
+    return null
+  }
+})
+
+ipcMain.handle('elevenlabs-delete-key', async () => {
+  try {
+    await fs.unlink(getElevenLabsKeyPath())
+    return { success: true }
+  } catch {
+    return { success: true }  // Datei war ohnehin weg
+  }
+})
+
+async function loadElevenLabsKey(): Promise<string | null> {
+  try {
+    if (!safeStorage.isEncryptionAvailable()) return null
+    const encrypted = await fs.readFile(getElevenLabsKeyPath())
+    return safeStorage.decryptString(encrypted)
+  } catch { return null }
+}
+
+ipcMain.handle('elevenlabs-list-voices', async () => {
+  const apiKey = await loadElevenLabsKey()
+  if (!apiKey) return { success: false, error: 'Kein API-Key gespeichert' }
+  try {
+    const { listVoices } = await import('./voice/elevenlabsService')
+    const voices = await listVoices(apiKey)
+    return { success: true, voices }
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) }
+  }
+})
+
+ipcMain.handle('elevenlabs-synthesize', async (_event, params: { text: string; voiceId: string; modelId: string; stability: number; similarity: number }) => {
+  const apiKey = await loadElevenLabsKey()
+  if (!apiKey) return { success: false, error: 'Kein API-Key gespeichert' }
+  if (!params.voiceId) return { success: false, error: 'Keine Stimme ausgewählt' }
+  try {
+    const { synthesize } = await import('./voice/elevenlabsService')
+    const buffer = await synthesize(apiKey, params)
+    // ArrayBuffer via IPC, nicht Buffer (Serialisierung)
+    const arrBuf = buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength)
+    return { success: true, audio: arrBuf as ArrayBuffer }
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) }
+  }
+})
+
+// ===== Voice / Whisper STT =====
+ipcMain.handle('voice-check-whisper', async (_event, command: string) => {
+  const { checkWhisper } = await import('./voice/whisperService')
+  return await checkWhisper(command || 'auto')
+})
+
+ipcMain.handle('voice-transcribe', async (_event, audio: ArrayBuffer, extension: string, opts: { command: string; model: string; language: string }) => {
+  try {
+    const { transcribeBuffer } = await import('./voice/whisperService')
+    const text = await transcribeBuffer(audio, extension, {
+      command: opts.command || 'auto',
+      model: opts.model || 'base',
+      language: opts.language || 'auto'
+    })
+    return { success: true, text }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    console.error('[voice-transcribe]', message)
+    return { success: false, error: message }
+  }
+})
+
 // Graph-Daten speichern (im Vault unter .mindgraph/)
 ipcMain.handle('save-graph-data', async (_event, vaultPath: string, data: object) => {
   try {

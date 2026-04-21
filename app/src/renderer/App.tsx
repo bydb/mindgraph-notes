@@ -21,6 +21,7 @@ import { WhatsNew } from './components/WhatsNew/WhatsNew'
 import { Onboarding } from './components/Onboarding/Onboarding'
 import { HelpGuide } from './components/Onboarding/HelpGuide'
 import { UpdateNotification } from './components/UpdateNotification/UpdateNotification'
+import { VoiceStatusToast } from './components/Voice/VoiceStatusToast'
 import { QuizModal } from './components/Quiz/QuizModal'
 import { FlashcardsPanel, FlashcardStudy, FlashcardEditor } from './components/Flashcards'
 import { useFlashcardStore } from './stores/flashcardStore'
@@ -1307,6 +1308,9 @@ const App: React.FC = () => {
 
       {/* Update Notification Banner */}
       <UpdateNotification />
+
+      {/* Voice Status / Error Toast */}
+      <VoiceStatusToast />
 
       {/* Onboarding (Fullscreen Overlay beim ersten Start) */}
       <Onboarding />

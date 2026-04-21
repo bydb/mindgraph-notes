@@ -17,6 +17,7 @@ export function useIsModuleEnabled(id: ModuleDescriptor['id']): boolean {
       case 'remarkable':        return state.remarkable.enabled
       case 'docling':           return state.docling.enabled
       case 'vision-ocr':        return state.visionOcr.enabled
+      case 'speech':            return state.speech.enabled
       default:                  return false
     }
   })
@@ -39,6 +40,7 @@ export function isModuleEnabled(id: ModuleDescriptor['id']): boolean {
     case 'remarkable':        return s.remarkable.enabled
     case 'docling':           return s.docling.enabled
     case 'vision-ocr':        return s.visionOcr.enabled
+    case 'speech':            return s.speech.enabled
     default:                  return false
   }
 }
@@ -61,5 +63,6 @@ export function setModuleEnabled(id: ModuleDescriptor['id'], enabled: boolean): 
     case 'remarkable':        s.setRemarkable({ enabled }); break
     case 'docling':           s.setDocling({ enabled }); break
     case 'vision-ocr':        s.setVisionOcr({ enabled }); break
+    case 'speech':            s.setSpeech({ enabled }); break
   }
 }

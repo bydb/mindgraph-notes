@@ -400,8 +400,29 @@ export const MODULES: ModuleDescriptor[] = [
   { id: 'readwise',         label: 'Readwise',         description: 'Highlights aus Readwise synchronisieren', category: 'research' },
   { id: 'remarkable',       label: 'reMarkable',       description: 'Dokumente mit dem reMarkable-Tablet austauschen', category: 'devices' },
   { id: 'docling',          label: 'Docling',          description: 'PDF-Textextraktion via Docling-Server', category: 'documents' },
-  { id: 'vision-ocr',       label: 'Vision OCR',       description: 'Bilder und Scans per Vision-Modell in Text umwandeln', category: 'documents' }
+  { id: 'vision-ocr',       label: 'Vision OCR',       description: 'Bilder und Scans per Vision-Modell in Text umwandeln', category: 'documents' },
+  { id: 'speech',           label: 'Sprache',          description: 'Vorlesen (TTS) und Diktieren (STT via Whisper) in Editor & Flashcards', category: 'ai' }
 ]
+
+export type TtsEngine = 'system' | 'elevenlabs'
+
+export interface SpeechSettings {
+  enabled: boolean
+  ttsEngine: TtsEngine       // 'system' = Web Speech API (OS-Stimmen), 'elevenlabs' = Cloud
+  ttsVoice: string           // voiceURI aus speechSynthesis.getVoices(); leer = Default
+  ttsRate: number            // 0.5 – 2.0 (1.0 = normal)
+  ttsPitch: number           // 0.5 – 2.0 (1.0 = normal)
+  sttLanguage: string        // Whisper-Sprachcode: 'de', 'en', 'auto'
+  flashcardsAutoPlay: boolean  // Karten automatisch vorlesen beim Wechsel
+  whisperCommand: string     // CLI-Befehl; 'auto' = automatisch erkennen (whisper, whisper-cpp, whisper-ctranslate2)
+  whisperModel: string       // 'tiny', 'base', 'small', 'medium', 'large'
+  // ElevenLabs
+  elevenlabsVoiceId: string  // voice_id, leer = kein Voice gewählt
+  elevenlabsVoiceName: string // Anzeige-Name (für UI, keine API-Relevanz)
+  elevenlabsModel: string    // 'eleven_multilingual_v2' | 'eleven_turbo_v2_5' | 'eleven_flash_v2_5'
+  elevenlabsStability: number // 0 – 1
+  elevenlabsSimilarity: number // 0 – 1
+}
 
 interface UIState {
   // Allgemein
@@ -460,6 +481,9 @@ interface UIState {
   flashcardsEnabled: boolean
   semanticScholarEnabled: boolean
   zoteroEnabled: boolean
+
+  // Sprache (TTS + STT)
+  speech: SpeechSettings
 
   // Task-Zählung: Ordner ausschließen
   taskExcludedFolders: string[]
@@ -566,6 +590,7 @@ interface UIState {
   setFlashcardsEnabled: (enabled: boolean) => void
   setSemanticScholarEnabled: (enabled: boolean) => void
   setZoteroEnabled: (enabled: boolean) => void
+  setSpeech: (settings: Partial<SpeechSettings>) => void
   toggleTaskExcludedFolder: (folderPath: string) => void
   setSmartConnectionsWeights: (weights: Partial<SmartConnectionsWeights>) => void
   setDocling: (settings: Partial<DoclingSettings>) => void
@@ -670,6 +695,24 @@ const defaultState = {
   flashcardsEnabled: true,
   semanticScholarEnabled: true,
   zoteroEnabled: true,
+
+  // Sprache (TTS + STT) - opt-in, standardmäßig aus
+  speech: {
+    enabled: false,
+    ttsEngine: 'system',
+    ttsVoice: '',
+    ttsRate: 1.0,
+    ttsPitch: 1.0,
+    sttLanguage: 'de',
+    flashcardsAutoPlay: false,
+    whisperCommand: 'auto',
+    whisperModel: 'base',
+    elevenlabsVoiceId: '',
+    elevenlabsVoiceName: '',
+    elevenlabsModel: 'eleven_multilingual_v2',
+    elevenlabsStability: 0.5,
+    elevenlabsSimilarity: 0.75
+  } as SpeechSettings,
 
   // Smart Connections Gewichtungen (Summe sollte 100 ergeben)
   smartConnectionsWeights: {
@@ -834,7 +877,7 @@ const persistedKeys = [
   'canvasFilterPath', 'canvasViewMode', 'canvasShowEdges', 'canvasShowTags', 'canvasShowLinks', 'canvasShowImages', 'canvasShowSummaries',
   'canvasCompactMode', 'canvasReadMode', 'canvasHoverScale', 'canvasDefaultCardWidth', 'splitPosition', 'fileTreeDisplayMode', 'ollama',
   'pdfCompanionEnabled', 'pdfDisplayMode', 'iconSet',
-  'smartConnectionsEnabled', 'notesChatEnabled', 'flashcardsEnabled', 'semanticScholarEnabled', 'zoteroEnabled', 'smartConnectionsWeights', 'docling', 'visionOcr', 'readwise', 'languageTool', 'email', 'marketing', 'edoobox', 'remarkable', 'dailyNote', 'taskExcludedFolders',
+  'smartConnectionsEnabled', 'notesChatEnabled', 'flashcardsEnabled', 'semanticScholarEnabled', 'zoteroEnabled', 'smartConnectionsWeights', 'docling', 'visionOcr', 'readwise', 'languageTool', 'email', 'marketing', 'edoobox', 'remarkable', 'dailyNote', 'taskExcludedFolders', 'speech',
   'lastSeenVersion',
   'customAccentColor', 'customBackgroundColorLight', 'customBackgroundColorDark',
   'customLogo',
@@ -896,6 +939,7 @@ export const useUIStore = create<UIState>()((set, get) => ({
   setSmartConnectionsEnabled: (enabled) => set({ smartConnectionsEnabled: enabled }),
   setNotesChatEnabled: (enabled) => set({ notesChatEnabled: enabled }),
   setFlashcardsEnabled: (enabled) => set({ flashcardsEnabled: enabled }),
+  setSpeech: (settings) => set((state) => ({ speech: { ...state.speech, ...settings } })),
   toggleTaskExcludedFolder: (folderPath) => set((state) => {
     const current = state.taskExcludedFolders
     const isExcluded = current.includes(folderPath)

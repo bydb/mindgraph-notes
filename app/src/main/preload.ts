@@ -162,6 +162,24 @@ contextBridge.exposeInMainWorld('electronAPI', {
   stripWikilinksInFolder: (folderPath: string, vaultPath: string) =>
     ipcRenderer.invoke('strip-wikilinks-in-folder', folderPath, vaultPath),
 
+  // Voice / Whisper STT
+  voiceCheckWhisper: (command: string): Promise<{ available: boolean; command: string | null; binary: string | null; error?: string }> =>
+    ipcRenderer.invoke('voice-check-whisper', command),
+  voiceTranscribe: (audio: ArrayBuffer, extension: string, opts: { command: string; model: string; language: string }): Promise<{ success: boolean; text?: string; error?: string }> =>
+    ipcRenderer.invoke('voice-transcribe', audio, extension, opts),
+
+  // Voice / ElevenLabs TTS
+  elevenlabsSaveKey: (apiKey: string): Promise<{ success: boolean; error?: string }> =>
+    ipcRenderer.invoke('elevenlabs-save-key', apiKey),
+  elevenlabsLoadKey: (): Promise<string | null> =>
+    ipcRenderer.invoke('elevenlabs-load-key'),
+  elevenlabsDeleteKey: (): Promise<{ success: boolean }> =>
+    ipcRenderer.invoke('elevenlabs-delete-key'),
+  elevenlabsListVoices: (): Promise<{ success: boolean; voices?: Array<{ voice_id: string; name: string; labels?: Record<string, string>; category?: string }>; error?: string }> =>
+    ipcRenderer.invoke('elevenlabs-list-voices'),
+  elevenlabsSynthesize: (params: { text: string; voiceId: string; modelId: string; stability: number; similarity: number }): Promise<{ success: boolean; audio?: ArrayBuffer; error?: string }> =>
+    ipcRenderer.invoke('elevenlabs-synthesize', params),
+
   // Docling PDF Extraction API
   doclingCheck: (baseUrl?: string) => ipcRenderer.invoke('docling-check', baseUrl),
   doclingConvertPdf: (pdfPath: string, baseUrl?: string, options?: { ocrEnabled?: boolean; ocrLanguages?: string[] }) =>

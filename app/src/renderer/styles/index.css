@@ -2419,6 +2419,16 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
   color: var(--text-primary);
 }
 
+.formatting-btn.active {
+  background: var(--accent-color, #4a9eff);
+  color: white;
+}
+
+.formatting-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .formatting-btn-wide {
   width: auto;
   padding: 0 6px;
@@ -15212,6 +15222,164 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
   letter-spacing: 0.5px;
   color: var(--text-muted);
   margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.flashcard-tts-btn {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  transition: background-color 120ms ease, color 120ms ease, border-color 120ms ease;
+}
+.flashcard-tts-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+.flashcard-tts-btn.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--bg-primary);
+}
+
+/* Voice Controls in Preview — sticky rechts oben, beim Scrollen sichtbar */
+.voice-preview-controls {
+  position: sticky;
+  top: 12px;
+  z-index: 5;
+  height: 0;              /* nimmt keinen vertikalen Platz weg */
+  display: flex;
+  justify-content: flex-end;
+  pointer-events: none;    /* Klicks gehen durch, außer auf die Buttons */
+}
+.voice-preview-controls > * {
+  pointer-events: auto;
+}
+
+.voice-preview-btn {
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--bg-primary);
+  color: var(--text-muted);
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  transition: background-color 120ms ease, color 120ms ease, border-color 120ms ease;
+  padding: 0;
+}
+.voice-preview-btn:hover {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+}
+.voice-preview-btn.active {
+  background: var(--accent-color, #4a9eff);
+  border-color: var(--accent-color, #4a9eff);
+  color: white;
+}
+
+/* Voice Status Toast — unten rechts, schwebend */
+.voice-toast {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 9999;
+  max-width: 380px;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  font-size: 13px;
+  line-height: 1.4;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+  animation: voice-toast-slide-in 200ms ease-out;
+}
+
+@keyframes voice-toast-slide-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.voice-toast-info {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+}
+
+.voice-toast-error {
+  background: rgba(220, 70, 70, 0.14);
+  color: var(--text-primary);
+  border: 1px solid rgba(220, 70, 70, 0.5);
+}
+
+.voice-toast-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.voice-toast-message {
+  word-break: break-word;
+}
+
+.voice-toast-action {
+  align-self: flex-start;
+  background: transparent;
+  border: 1px solid currentColor;
+  color: inherit;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 120ms ease;
+}
+.voice-toast-action:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.voice-toast-close {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 2px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+}
+.voice-toast-close:hover {
+  background: rgba(0, 0, 0, 0.1);
+  color: var(--text-primary);
+}
+
+.voice-toast-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: voice-toast-spin 800ms linear infinite;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+@keyframes voice-toast-spin {
+  to { transform: rotate(360deg); }
 }
 
 .flashcard-study-card-topic {
