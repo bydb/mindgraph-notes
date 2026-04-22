@@ -5,6 +5,7 @@
 import { promises as fs } from 'fs'
 import path from 'path'
 import { extractTasks, type ExtractedTask } from '../../shared/taskExtractor'
+import { getCalendarEvents, type CalendarEvent } from '../calendar/calendarService'
 
 export interface VaultTaskHit {
   notePath: string          // relativer Pfad zum Vault
@@ -165,6 +166,74 @@ export async function searchVault(
     collectedChars += s.excerpt.length
   }
   return picked
+}
+
+// ─── Calendar Helpers ─────────────────────────────────────────────────────
+
+export interface CalendarWindow {
+  events: CalendarEvent[]
+  needsPermission?: boolean
+  error?: string
+}
+
+function ymd(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+export async function eventsForRange(daysAhead: number): Promise<CalendarWindow> {
+  const today = new Date()
+  const end = new Date(today.getTime() + daysAhead * 24 * 60 * 60 * 1000)
+  const res = await getCalendarEvents(ymd(today), ymd(end))
+  if (res.success) return { events: res.events }
+  return {
+    events: [],
+    needsPermission: res.needsPermission,
+    error: res.error
+  }
+}
+
+export function formatEventList(events: CalendarEvent[], opts: { showDayHeader?: boolean } = {}): string {
+  if (events.length === 0) return '_Keine Termine._'
+
+  const now = new Date()
+  const todayYmd = ymd(now)
+  const tomorrowYmd = ymd(new Date(now.getTime() + 24 * 60 * 60 * 1000))
+
+  // Nach Tag gruppieren (wenn gewünscht)
+  if (opts.showDayHeader) {
+    const byDay = new Map<string, CalendarEvent[]>()
+    for (const e of events) {
+      const day = e.startDate.slice(0, 10)
+      if (!byDay.has(day)) byDay.set(day, [])
+      byDay.get(day)!.push(e)
+    }
+    const parts: string[] = []
+    for (const [day, dayEvents] of Array.from(byDay.entries()).sort()) {
+      let label = day
+      if (day === todayYmd) label = 'Heute'
+      else if (day === tomorrowYmd) label = 'Morgen'
+      else {
+        const d = new Date(day + 'T00:00:00')
+        label = d.toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: '2-digit' })
+      }
+      parts.push(`*${label}*`)
+      for (const e of dayEvents) {
+        parts.push(formatSingleEvent(e))
+      }
+      parts.push('')
+    }
+    return parts.join('\n').trim()
+  }
+
+  return events.map(formatSingleEvent).join('\n')
+}
+
+function formatSingleEvent(e: CalendarEvent): string {
+  const timeLabel = e.allDay
+    ? 'ganztägig'
+    : `${e.startDate.slice(11, 16)}–${e.endDate.slice(11, 16)}`
+  const loc = e.location ? ` · ${e.location}` : ''
+  return `• ${timeLabel}  ${e.title}${loc}`
 }
 
 export function formatTaskList(hits: VaultTaskHit[], opts: { showTime?: boolean } = {}): string {

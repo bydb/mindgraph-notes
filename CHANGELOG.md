@@ -2,6 +2,15 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.5.14-beta] - 2026-04-22
+
+### Features
+- **Kalender im Telegram-Bot** — neuer Command `/agenda` zeigt Termine für heute und morgen aus dem macOS-Kalender, gruppiert nach Tag mit Uhrzeit und Ort
+- **Kalender-Kontext in `/briefing` und `/ask`** — das Morning-Briefing enthält jetzt automatisch heutige + morgige Termine. Freie Fragen via `/ask` kennen zusätzlich die Agenda der nächsten 7 Tage, sodass Fragen wie „was steht nächsten Mittwoch an?" auch Kalender-Termine mit einbeziehen. Fehlt der macOS-Kalender-Zugriff, weist der Bot freundlich auf „Dashboard → Kalender → Zugriff erteilen" hin
+
+### Improvements
+- **Kalender-Service als Shared Module** — die Swift-/EventKit-Logik wurde aus `calendar-get-events` in `main/calendar/calendarService.ts` extrahiert, damit Dashboard und Telegram-Bot die gleiche Implementierung nutzen. Weniger Code-Duplikation, einheitliches Permission-Handling
+
 ## [0.5.13-beta] - 2026-04-22
 
 ### Fixes

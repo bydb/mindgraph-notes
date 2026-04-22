@@ -2,7 +2,7 @@
 // Delegiert an vaultQueries / briefing / chatClient.
 
 import type { Context } from 'grammy'
-import { tasksDueToday, tasksOverdue, tasksThisWeek, searchVault, formatTaskList } from './vaultQueries'
+import { tasksDueToday, tasksOverdue, tasksThisWeek, searchVault, formatTaskList, eventsForRange, formatEventList } from './vaultQueries'
 import { generateBriefing } from './briefing'
 import { chat, type ChatBackend } from '../llm/chatClient'
 
@@ -22,6 +22,7 @@ const HELP_TEXT = `*MindGraph Bot* — Befehle:
 /today — heute fällige Tasks
 /overdue — überfällige Tasks
 /week — Tasks der nächsten 7 Tage
+/agenda — Termine heute + morgen (macOS-Kalender)
 /briefing — kompaktes Morning-Briefing
 /ask <frage> — Frage zum Vault stellen
 /help — diese Hilfe
@@ -74,6 +75,21 @@ export async function handleWeek(ctx: Context, deps: CommandDeps): Promise<void>
   await ctx.reply(header + formatTaskList(hits, { showTime: true }), { parse_mode: 'Markdown' })
 }
 
+export async function handleAgenda(ctx: Context, _deps: CommandDeps): Promise<void> {
+  await ctx.replyWithChatAction('typing')
+  const window = await eventsForRange(1) // heute + morgen
+  if (window.needsPermission) {
+    await ctx.reply('⛔ Kalender-Zugriff fehlt. Bitte in MindGraph → Dashboard → Kalender-Widget → „Zugriff erteilen" klicken und bestätigen.')
+    return
+  }
+  if (window.error) {
+    await ctx.reply(`❌ Kalender-Fehler: ${window.error}`)
+    return
+  }
+  const header = window.events.length === 0 ? '📆 Keine Termine heute oder morgen.' : `📆 *Termine* (${window.events.length}):\n\n`
+  await ctx.reply(header + formatEventList(window.events, { showDayHeader: true }), { parse_mode: 'Markdown' })
+}
+
 export async function handleBriefing(ctx: Context, deps: CommandDeps): Promise<void> {
   const vault = await requireVault(ctx, deps)
   if (!vault) return
@@ -107,13 +123,21 @@ export async function handleAsk(ctx: Context, deps: CommandDeps, question: strin
   }
   await ctx.replyWithChatAction('typing')
   try {
-    const [notesHits, todayHits, overdueHits] = await Promise.all([
+    const [notesHits, todayHits, overdueHits, agenda] = await Promise.all([
       searchVault({ vaultPath: vault, query: question, maxResults: 4, maxChars: 6000 }),
       tasksDueToday({ vaultPath: vault, excludedFolders: deps.excludedFolders() }),
-      tasksOverdue({ vaultPath: vault, excludedFolders: deps.excludedFolders() })
+      tasksOverdue({ vaultPath: vault, excludedFolders: deps.excludedFolders() }),
+      eventsForRange(7)
     ])
 
     const contextParts: string[] = []
+    if (agenda.events.length > 0) {
+      contextParts.push('KALENDER-TERMINE (heute + 7 Tage):\n' + agenda.events.slice(0, 15).map(e => {
+        const time = e.allDay ? 'ganztägig' : `${e.startDate.slice(11, 16)}`
+        const loc = e.location ? ` @ ${e.location}` : ''
+        return `- ${e.startDate.slice(0, 10)} ${time}: ${e.title}${loc}`
+      }).join('\n'))
+    }
     if (todayHits.length > 0) {
       contextParts.push('HEUTE FÄLLIGE TASKS:\n' + todayHits.slice(0, 10).map(h => `- ${h.task.text} (in "${h.noteTitle}")`).join('\n'))
     }

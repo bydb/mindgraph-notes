@@ -6195,110 +6195,12 @@ end tell`
 // ========================================
 
 ipcMain.handle('calendar-get-events', async (_event, startDate: string, endDate: string) => {
-  if (process.platform !== 'darwin') {
-    return { success: false, events: [], error: 'macOS only' }
+  const { getCalendarEvents } = await import('./calendar/calendarService')
+  const result = await getCalendarEvents(startDate, endDate)
+  if (result.success) {
+    console.log(`[Calendar] Found ${result.events.length} events between ${startDate} and ${endDate}`)
   }
-
-  // Validate date format to prevent code injection in Swift template
-  const dateRegex = /^\d{4}-\d{2}-\d{2}$/
-  if (!dateRegex.test(startDate) || !dateRegex.test(endDate)) {
-    return { success: false, events: [], error: 'Ungültiges Datumsformat' }
-  }
-
-  try {
-    const { execFile } = await import('child_process')
-    const { promisify } = await import('util')
-    const execFileAsync = promisify(execFile)
-
-    // Swift script to read calendar events via EventKit.
-    // WICHTIG: Wir rufen requestFullAccessToEvents NICHT mehr blind auf —
-    // das Request-Fenster erscheint bei Silent-Background-Calls oft nicht
-    // zuverlässig. Stattdessen prüfen wir den Status explizit und liefern
-    // NO_ACCESS zurück, damit die UI einen expliziten „Zugriff erteilen"-Button
-    // zeigen kann, der den Dialog über `calendar-request-access` triggert.
-    const swiftCode = `
-import EventKit
-import Foundation
-
-let store = EKEventStore()
-let status = EKEventStore.authorizationStatus(for: .event)
-
-var hasAccess = false
-if #available(macOS 14.0, *) {
-    if status == .fullAccess || status.rawValue == 2 /* .authorized (legacy) */ {
-        hasAccess = true
-    }
-} else {
-    if status.rawValue == 2 /* .authorized */ {
-        hasAccess = true
-    }
-}
-
-guard hasAccess else {
-    // status: 0 = notDetermined, 1 = restricted, 2 = authorized(legacy), 3 = denied, 4 = fullAccess, 5 = writeOnly
-    print("NO_ACCESS|||\\(status.rawValue)")
-    exit(0)
-}
-
-let df = DateFormatter()
-df.dateFormat = "yyyy-MM-dd"
-df.timeZone = TimeZone.current
-guard let startD = df.date(from: "${startDate}"),
-      let endD = df.date(from: "${endDate}") else { exit(0) }
-let endDPlus = Calendar.current.date(byAdding: .day, value: 1, to: endD)!
-
-let outDF = DateFormatter()
-outDF.dateFormat = "yyyy-MM-dd HH:mm"
-outDF.timeZone = TimeZone.current
-
-let pred = store.predicateForEvents(withStart: startD, end: endDPlus, calendars: nil)
-let events = store.events(matching: pred)
-
-for event in events {
-    let loc = event.location ?? ""
-    let cal = event.calendar.title
-    let allDay = event.isAllDay
-    print("\\(event.title ?? "")|||\\(outDF.string(from: event.startDate))|||\\(outDF.string(from: event.endDate))|||\\(loc)|||\\(cal)|||\\(allDay)")
-}
-`
-
-    const { stdout } = await execFileAsync('swift', ['-e', swiftCode], { timeout: 15000 })
-    const trimmed = stdout.trim()
-
-    if (trimmed.startsWith('NO_ACCESS')) {
-      const parts = trimmed.split('|||')
-      const statusCode = parseInt(parts[1] ?? '0', 10)
-      // status 0 = notDetermined (noch nie gefragt), 3 = denied, 1 = restricted
-      const neverAsked = statusCode === 0
-      return {
-        success: false,
-        events: [],
-        needsPermission: true,
-        neverAsked,
-        error: neverAsked
-          ? 'Kalender-Zugriff wurde noch nicht erteilt.'
-          : 'Kalender-Zugriff wurde verweigert. Bitte in Systemeinstellungen → Datenschutz & Sicherheit → Kalender aktivieren.'
-      }
-    }
-
-    const events = trimmed.split('\n').filter(Boolean).map(line => {
-      const [title, startDate, endDate, location, calendar, allDay] = line.split('|||')
-      return {
-        title: title?.trim() || '',
-        startDate: startDate?.trim() || '',
-        endDate: endDate?.trim() || '',
-        location: location?.trim() || undefined,
-        calendar: calendar?.trim() || undefined,
-        allDay: allDay?.trim() === 'true'
-      }
-    }).filter(e => e.title)
-
-    console.log(`[Calendar] Found ${events.length} events between ${startDate} and ${endDate}`)
-    return { success: true, events }
-  } catch (error) {
-    console.error('[Calendar] Failed:', error)
-    return { success: false, events: [], error: error instanceof Error ? error.message : 'Kalender konnte nicht gelesen werden' }
-  }
+  return result
 })
 
 // Triggert explizit den macOS-Permission-Dialog für Kalender-Zugriff.

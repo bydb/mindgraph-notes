@@ -2,7 +2,7 @@
 // Dynamischer Import von grammy, damit die Electron-App beim Start nicht
 // unnötig lädt, wenn der Bot deaktiviert ist.
 
-import { handleStart, handleHelp, handleToday, handleOverdue, handleWeek, handleBriefing, handleAsk, type CommandDeps } from './commands'
+import { handleStart, handleHelp, handleToday, handleOverdue, handleWeek, handleBriefing, handleAsk, handleAgenda, type CommandDeps } from './commands'
 
 export interface BotConfig {
   token: string
@@ -50,6 +50,7 @@ export async function startTelegramBot(config: BotConfig): Promise<BotHandle> {
   bot.command('todos', async (ctx) => handleToday(ctx, config.deps))
   bot.command('overdue', async (ctx) => handleOverdue(ctx, config.deps))
   bot.command('week', async (ctx) => handleWeek(ctx, config.deps))
+  bot.command('agenda', async (ctx) => handleAgenda(ctx, config.deps))
   bot.command('briefing', async (ctx) => handleBriefing(ctx, config.deps))
   bot.command('ask', async (ctx) => handleAsk(ctx, config.deps, ctx.match ?? ''))
 

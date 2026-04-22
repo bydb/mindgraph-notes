@@ -3,7 +3,7 @@
 // und lässt das LLM eine kurze Zusammenfassung erstellen.
 
 import { chat, type ChatBackend } from '../llm/chatClient'
-import { tasksDueToday, tasksOverdue, type VaultTaskHit } from './vaultQueries'
+import { tasksDueToday, tasksOverdue, eventsForRange, type VaultTaskHit } from './vaultQueries'
 import { promises as fs } from 'fs'
 import path from 'path'
 
@@ -16,6 +16,7 @@ export interface BriefingContext {
   ollamaModel?: string
   includeEmails?: boolean
   includeOverdue?: boolean
+  includeCalendar?: boolean
 }
 
 export interface EmailSummary {
@@ -69,14 +70,17 @@ function tasksToPromptLines(hits: VaultTaskHit[]): string {
 }
 
 export async function generateBriefing(ctx: BriefingContext): Promise<string> {
-  const [today, overdue, emails] = await Promise.all([
+  const [today, overdue, emails, agenda] = await Promise.all([
     tasksDueToday({ vaultPath: ctx.vaultPath, excludedFolders: ctx.excludedFolders }),
     ctx.includeOverdue !== false
       ? tasksOverdue({ vaultPath: ctx.vaultPath, excludedFolders: ctx.excludedFolders })
       : Promise.resolve([] as VaultTaskHit[]),
     ctx.includeEmails !== false
       ? loadRelevantEmails(ctx.vaultPath)
-      : Promise.resolve([] as EmailSummary[])
+      : Promise.resolve([] as EmailSummary[]),
+    ctx.includeCalendar !== false
+      ? eventsForRange(1) // heute + morgen
+      : Promise.resolve({ events: [] as Array<{ title: string; startDate: string; endDate: string; location?: string; allDay: boolean }> })
   ])
 
   const now = new Date()
@@ -85,6 +89,24 @@ export async function generateBriefing(ctx: BriefingContext): Promise<string> {
 
   const promptSections: string[] = []
   promptSections.push(`Heute ist ${weekday}, der ${dateStr}.`)
+
+  if (agenda.events.length > 0) {
+    const todayYmd = now.toISOString().slice(0, 10)
+    const tomorrowYmd = new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
+    const todayEvents = agenda.events.filter(e => e.startDate.startsWith(todayYmd))
+    const tomorrowEvents = agenda.events.filter(e => e.startDate.startsWith(tomorrowYmd))
+    const formatEv = (e: { title: string; startDate: string; endDate: string; location?: string; allDay: boolean }) => {
+      const time = e.allDay ? 'ganztägig' : `${e.startDate.slice(11, 16)}-${e.endDate.slice(11, 16)}`
+      const loc = e.location ? ` @ ${e.location}` : ''
+      return `- ${time}: ${e.title}${loc}`
+    }
+    if (todayEvents.length > 0) {
+      promptSections.push(`\nKalender-Termine heute (${todayEvents.length}):\n${todayEvents.map(formatEv).join('\n')}`)
+    }
+    if (tomorrowEvents.length > 0) {
+      promptSections.push(`\nKalender-Termine morgen (${tomorrowEvents.length}):\n${tomorrowEvents.map(formatEv).join('\n')}`)
+    }
+  }
 
   if (today.length > 0) {
     promptSections.push(`\nHeute fällige Tasks (${today.length}):\n${tasksToPromptLines(today)}`)
