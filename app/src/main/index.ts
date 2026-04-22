@@ -6479,7 +6479,10 @@ do {
 }
 `
 
-    const { stdout } = await execFileAsync('swift', ['-e', swiftCode], { timeout: 15000 })
+    // Timeout 120s: wenn der Kalender-Zugriff beim ersten Mal angefragt werden
+    // muss, blockt der Swift-Prozess bis der User im macOS-Dialog klickt.
+    // 15s war zu knapp — führte zu „Command failed: swift -e …"-Fehlern.
+    const { stdout } = await execFileAsync('swift', ['-e', swiftCode], { timeout: 120000 })
     const result = stdout.trim()
     if (result.startsWith('NO_ACCESS')) {
       return {
@@ -6499,7 +6502,19 @@ do {
     return { success: false, error: 'Unerwartete Antwort: ' + result }
   } catch (error) {
     console.error('[Calendar] Create failed:', error)
-    return { success: false, error: error instanceof Error ? error.message : 'Event konnte nicht erstellt werden' }
+    const raw = error instanceof Error ? error.message : String(error)
+    // Häufige Ursachen übersetzen, statt die rohe execFile-Fehlermeldung zu zeigen
+    let friendly = raw
+    if (raw.includes('Command failed') && raw.includes('swift')) {
+      if (raw.includes('timed out') || raw.toLowerCase().includes('killed')) {
+        friendly = 'Kalender-Dialog wurde nicht rechtzeitig beantwortet. Öffne MindGraph im Vordergrund, klicke im Dashboard-Kalender-Widget auf „Zugriff erteilen" und bestätige den macOS-Dialog — danach funktioniert auch das Timeblocking.'
+      } else if (raw.includes('xcode-select') || raw.includes('ENOENT')) {
+        friendly = 'Xcode Command Line Tools fehlen. Im Terminal ausführen: xcode-select --install (dann App neu starten).'
+      } else {
+        friendly = 'Kalender-Zugriff fehlgeschlagen. Erteile den Zugriff zuerst über Dashboard → Kalender → „Zugriff erteilen".'
+      }
+    }
+    return { success: false, error: friendly, needsPermission: true }
   }
 })
 

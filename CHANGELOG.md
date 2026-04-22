@@ -2,6 +2,12 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.5.13-beta] - 2026-04-22
+
+### Fixes
+- **Timeblocking-Fehler „Command failed: swift -e …" bei Erstnutzung** — der Timeout beim Event-Erstellen war mit 15 Sekunden zu knapp: wenn beim allerersten Timeblock der macOS-Permission-Dialog auftauchte, wurde der Swift-Prozess gekillt bevor der User reagieren konnte. Timeout auf 120 Sekunden erhöht (entspricht dem von `calendar-request-access`)
+- **Klartextverständliche Fehlermeldungen im Kalender-Code-Pfad** — statt der rohen Node-Fehlermeldung mit dem kompletten Swift-Quellcode zeigt MindGraph jetzt kontextsensitive Hinweise: „Kalender-Dialog wurde nicht rechtzeitig beantwortet" bei Timeout, „Xcode Command Line Tools fehlen" bei `xcode-select`-/ENOENT-Fehlern, oder den Verweis auf Dashboard → „Zugriff erteilen" für den generischen Fall
+
 ## [0.5.12-beta] - 2026-04-22
 
 ### Features
