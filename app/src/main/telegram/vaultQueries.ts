@@ -168,6 +168,69 @@ export async function searchVault(
   return picked
 }
 
+// ─── Priority-Folder Helpers ───────────────────────────────────────────────
+
+export interface PriorityNote {
+  relativePath: string
+  title: string
+  modifiedAt: Date
+  excerpt: string    // Anfang der Datei, begrenzt auf maxChars
+}
+
+/**
+ * Lädt Notizen aus priorisierten Ordnern, sortiert nach Änderungsdatum (neueste zuerst).
+ * Wird für /inbox und als immer-präsenter Kontext in /ask genutzt.
+ */
+export async function loadPriorityNotes(opts: {
+  vaultPath: string
+  folders: string[]
+  maxNotes?: number
+  maxCharsPerNote?: number
+}): Promise<PriorityNote[]> {
+  const maxNotes = opts.maxNotes ?? 10
+  const maxChars = opts.maxCharsPerNote ?? 1200
+
+  if (opts.folders.length === 0) return []
+
+  const results: Array<PriorityNote & { mtimeMs: number }> = []
+
+  for (const folder of opts.folders) {
+    const absFolder = path.join(opts.vaultPath, folder)
+    const files = await walkMdFiles(absFolder, opts.vaultPath)
+    for (const file of files) {
+      try {
+        const stat = await fs.stat(file)
+        const content = await readFileSafe(file)
+        if (!content) continue
+        const title = path.basename(file, '.md')
+        const excerpt = content.slice(0, maxChars).trim()
+        results.push({
+          relativePath: path.relative(opts.vaultPath, file),
+          title,
+          modifiedAt: stat.mtime,
+          mtimeMs: stat.mtimeMs,
+          excerpt
+        })
+      } catch {
+        // Datei unlesbar → überspringen
+      }
+    }
+  }
+
+  results.sort((a, b) => b.mtimeMs - a.mtimeMs)
+  return results.slice(0, maxNotes).map(({ mtimeMs: _mtimeMs, ...rest }) => rest)
+}
+
+export function formatPriorityNoteList(notes: PriorityNote[]): string {
+  if (notes.length === 0) return '_Keine Notizen in den priorisierten Ordnern._'
+  const now = Date.now()
+  return notes.map(n => {
+    const ageDays = Math.floor((now - n.modifiedAt.getTime()) / (1000 * 60 * 60 * 24))
+    const ageLabel = ageDays === 0 ? 'heute' : ageDays === 1 ? 'gestern' : `vor ${ageDays}d`
+    return `• *${n.title}* _(${ageLabel})_\n  ${n.relativePath}`
+  }).join('\n\n')
+}
+
 // ─── Calendar Helpers ─────────────────────────────────────────────────────
 
 export interface CalendarWindow {

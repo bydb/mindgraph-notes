@@ -1,15 +1,30 @@
 import React, { useEffect, useState } from 'react'
 import { useUIStore } from '../../stores/uiStore'
+import { useNotesStore } from '../../stores/notesStore'
 
 export const TelegramSettings: React.FC = () => {
   const telegramBot = useUIStore(s => s.telegramBot)
   const setTelegramBot = useUIStore(s => s.setTelegramBot)
+  const notes = useNotesStore(s => s.notes)
 
   const [tokenInput, setTokenInput] = useState('')
   const [hasToken, setHasToken] = useState(false)
   const [anthropicKeyInput, setAnthropicKeyInput] = useState('')
   const [hasAnthropicKey, setHasAnthropicKey] = useState(false)
   const [newChatId, setNewChatId] = useState('')
+  const [newPriorityFolder, setNewPriorityFolder] = useState('')
+
+  // Alle Vault-Ordner aus Note-Pfaden extrahieren (relative Pfade)
+  const allFolders = React.useMemo(() => {
+    const set = new Set<string>()
+    for (const n of notes) {
+      const parts = n.path.split('/').slice(0, -1)
+      for (let i = 1; i <= parts.length; i++) {
+        set.add(parts.slice(0, i).join('/'))
+      }
+    }
+    return Array.from(set).filter(Boolean).sort()
+  }, [notes])
   const [active, setActive] = useState(false)
   const [statusMsg, setStatusMsg] = useState<{ text: string; kind: 'info' | 'error' | 'success' } | null>(null)
   const [busy, setBusy] = useState(false)
@@ -38,7 +53,8 @@ export const TelegramSettings: React.FC = () => {
       ollamaModel: telegramBot.ollamaModel,
       includeEmails: telegramBot.briefingIncludeEmails,
       includeOverdue: telegramBot.briefingIncludeOverdue,
-      allowedChatIds: telegramBot.allowedChatIds
+      allowedChatIds: telegramBot.allowedChatIds,
+      priorityFolders: telegramBot.priorityFolders
     })
   }, [
     telegramBot.llmBackend,
@@ -46,7 +62,8 @@ export const TelegramSettings: React.FC = () => {
     telegramBot.ollamaModel,
     telegramBot.briefingIncludeEmails,
     telegramBot.briefingIncludeOverdue,
-    telegramBot.allowedChatIds
+    telegramBot.allowedChatIds,
+    telegramBot.priorityFolders
   ])
 
   const saveToken = async () => {
@@ -91,6 +108,18 @@ export const TelegramSettings: React.FC = () => {
 
   const removeChatId = (id: string) => {
     setTelegramBot({ allowedChatIds: telegramBot.allowedChatIds.filter(x => x !== id) })
+  }
+
+  const addPriorityFolder = () => {
+    const folder = newPriorityFolder.trim().replace(/^\/+|\/+$/g, '')
+    if (!folder) return
+    if (telegramBot.priorityFolders.includes(folder)) return
+    setTelegramBot({ priorityFolders: [...telegramBot.priorityFolders, folder] })
+    setNewPriorityFolder('')
+  }
+
+  const removePriorityFolder = (folder: string) => {
+    setTelegramBot({ priorityFolders: telegramBot.priorityFolders.filter(f => f !== folder) })
   }
 
   const startBot = async () => {
@@ -325,6 +354,56 @@ export const TelegramSettings: React.FC = () => {
         </label>
       </div>
 
+      {/* Priority-Ordner */}
+      <div className="settings-group">
+        <label className="settings-label">Priorisierte Ordner</label>
+        <p className="settings-help">
+          Notizen aus diesen Ordnern fließen automatisch in <code>/ask</code> und <code>/inbox</code> ein —
+          unabhängig davon, ob deine Frage Keywords daraus enthält. Ideal z. B. für Inbox- oder
+          aktuelle Projekt-Ordner. Pfade sind relativ zum Vault.
+        </p>
+        <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+          <input
+            type="text"
+            placeholder="z. B. 000 - 📥 inbox/010 - 📥 Notes"
+            value={newPriorityFolder}
+            onChange={e => setNewPriorityFolder(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addPriorityFolder() } }}
+            className="settings-input"
+            list="priority-folder-suggestions"
+            style={{ flex: 1 }}
+          />
+          <datalist id="priority-folder-suggestions">
+            {allFolders
+              .filter(f => !telegramBot.priorityFolders.includes(f))
+              .slice(0, 200)
+              .map(f => <option key={f} value={f} />)}
+          </datalist>
+          <button className="settings-button" onClick={addPriorityFolder} disabled={!newPriorityFolder.trim()}>Hinzufügen</button>
+        </div>
+        {telegramBot.priorityFolders.length > 0 && (
+          <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+            {telegramBot.priorityFolders.map(folder => (
+              <li
+                key={folder}
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  padding: '6px 10px',
+                  background: 'var(--bg-secondary)',
+                  borderRadius: 4,
+                  marginBottom: 4
+                }}
+              >
+                <code style={{ fontSize: 12 }}>{folder}</code>
+                <button className="settings-button small" onClick={() => removePriorityFolder(folder)}>Entfernen</button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
       {/* Commands-Referenz */}
       <div className="settings-group">
         <label className="settings-label">Verfügbare Befehle</label>
@@ -332,6 +411,8 @@ export const TelegramSettings: React.FC = () => {
           <li><code>/today</code> oder <code>/todos</code> — heute fällige Tasks</li>
           <li><code>/overdue</code> — überfällige Tasks</li>
           <li><code>/week</code> — Tasks der nächsten 7 Tage</li>
+          <li><code>/agenda</code> — Kalender-Termine heute + morgen</li>
+          <li><code>/inbox</code> — neueste Notizen aus priorisierten Ordnern</li>
           <li><code>/briefing</code> — Morning-Briefing (LLM-generiert)</li>
           <li><code>/ask &lt;frage&gt;</code> — Frage an deinen Vault stellen</li>
           <li>Freier Text ohne <code>/</code> — wird als <code>/ask</code> behandelt</li>

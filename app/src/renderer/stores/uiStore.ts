@@ -373,6 +373,7 @@ export interface TelegramBotSettings {
   ollamaModel: string            // fallback / direct choice
   briefingIncludeEmails: boolean
   briefingIncludeOverdue: boolean
+  priorityFolders: string[]     // Vault-relative Ordnerpfade — Notizen dort werden bei /ask + /inbox bevorzugt
   active: boolean                // true = Bot läuft (wird vom Main-Prozess aus gesetzt/gelesen)
 }
 
@@ -894,6 +895,7 @@ const defaultState = {
     ollamaModel: '',
     briefingIncludeEmails: true,
     briefingIncludeOverdue: true,
+    priorityFolders: [],
     active: false
   } as TelegramBotSettings
 }

@@ -2,6 +2,13 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.5.15-beta] - 2026-04-22
+
+### Features
+- **Priorisierte Ordner im Telegram-Bot** — neues Setting im Telegram-Tab: ein oder mehrere Vault-Ordner (z. B. deine Inbox `000 - 📥 inbox/010 - 📥 Notes`), deren Notizen automatisch Kontext für `/ask` liefern — unabhängig davon, ob deine Frage passende Keywords enthält. Autocomplete mit allen Vault-Ordnern als Vorschlag
+- **Neuer Command `/inbox`** — listet die 10 zuletzt geänderten Notizen aus den priorisierten Ordnern mit Titel, Pfad und Alter („heute", „gestern", „vor 3d"). Ohne konfigurierte Ordner gibt der Bot einen freundlichen Hinweis, wie man sie einträgt
+- **Priority-Notizen fließen automatisch in `/ask` ein** — Excerpts (je ~800 Zeichen) der neuesten Priority-Notizen werden als Block „PRIORISIERTE NOTIZEN" in den LLM-Kontext eingebettet, zusätzlich zur normalen Keyword-Suche
+
 ## [0.5.14-beta] - 2026-04-22
 
 ### Features

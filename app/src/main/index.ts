@@ -7582,6 +7582,7 @@ let telegramConfig: {
   includeEmails: boolean
   includeOverdue: boolean
   allowedChatIds: string[]
+  priorityFolders: string[]
 } = {
   backend: 'auto',
   anthropicModel: 'claude-sonnet-4-6',
@@ -7589,7 +7590,8 @@ let telegramConfig: {
   excludedFolders: [],
   includeEmails: true,
   includeOverdue: true,
-  allowedChatIds: []
+  allowedChatIds: [],
+  priorityFolders: []
 }
 
 function getTelegramTokenPath(): string {
@@ -7679,7 +7681,8 @@ ipcMain.handle('telegram-start', async () => {
         anthropicModel: () => telegramConfig.anthropicModel,
         ollamaModel: () => telegramConfig.ollamaModel,
         includeEmails: () => telegramConfig.includeEmails,
-        includeOverdue: () => telegramConfig.includeOverdue
+        includeOverdue: () => telegramConfig.includeOverdue,
+        priorityFolders: () => telegramConfig.priorityFolders
       }
     })
     // Key-Refresh-Interval beim Stop aufräumen

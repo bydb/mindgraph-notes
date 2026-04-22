@@ -922,6 +922,7 @@ export interface ElectronAPI {
     includeEmails?: boolean;
     includeOverdue?: boolean;
     allowedChatIds?: string[];
+    priorityFolders?: string[];
   }) => Promise<boolean>;
   telegramStart: () => Promise<{ success: boolean; error?: string; alreadyRunning?: boolean }>;
   telegramStop: () => Promise<{ success: boolean; alreadyStopped?: boolean }>;

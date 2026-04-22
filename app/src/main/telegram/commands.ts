@@ -2,7 +2,7 @@
 // Delegiert an vaultQueries / briefing / chatClient.
 
 import type { Context } from 'grammy'
-import { tasksDueToday, tasksOverdue, tasksThisWeek, searchVault, formatTaskList, eventsForRange, formatEventList } from './vaultQueries'
+import { tasksDueToday, tasksOverdue, tasksThisWeek, searchVault, formatTaskList, eventsForRange, formatEventList, loadPriorityNotes, formatPriorityNoteList } from './vaultQueries'
 import { generateBriefing } from './briefing'
 import { chat, type ChatBackend } from '../llm/chatClient'
 
@@ -15,6 +15,7 @@ export interface CommandDeps {
   ollamaModel: () => string
   includeEmails: () => boolean
   includeOverdue: () => boolean
+  priorityFolders: () => string[]
 }
 
 const HELP_TEXT = `*MindGraph Bot* — Befehle:
@@ -23,6 +24,7 @@ const HELP_TEXT = `*MindGraph Bot* — Befehle:
 /overdue — überfällige Tasks
 /week — Tasks der nächsten 7 Tage
 /agenda — Termine heute + morgen (macOS-Kalender)
+/inbox — neueste Notizen aus priorisierten Ordnern
 /briefing — kompaktes Morning-Briefing
 /ask <frage> — Frage zum Vault stellen
 /help — diese Hilfe
@@ -75,6 +77,20 @@ export async function handleWeek(ctx: Context, deps: CommandDeps): Promise<void>
   await ctx.reply(header + formatTaskList(hits, { showTime: true }), { parse_mode: 'Markdown' })
 }
 
+export async function handleInbox(ctx: Context, deps: CommandDeps): Promise<void> {
+  const vault = await requireVault(ctx, deps)
+  if (!vault) return
+  const folders = deps.priorityFolders()
+  if (folders.length === 0) {
+    await ctx.reply('⚙️ Keine priorisierten Ordner konfiguriert.\n\nIn MindGraph → Einstellungen → Telegram → _Priorisierte Ordner_ einen Pfad eintragen (z. B. `000 - 📥 inbox/010 - 📥 Notes`).', { parse_mode: 'Markdown' })
+    return
+  }
+  await ctx.replyWithChatAction('typing')
+  const notes = await loadPriorityNotes({ vaultPath: vault, folders, maxNotes: 10 })
+  const header = notes.length === 0 ? '📭 Keine Notizen in den priorisierten Ordnern.' : `📥 *Aktuelle Notizen* (${notes.length}):\n\n`
+  await ctx.reply(header + formatPriorityNoteList(notes), { parse_mode: 'Markdown' })
+}
+
 export async function handleAgenda(ctx: Context, _deps: CommandDeps): Promise<void> {
   await ctx.replyWithChatAction('typing')
   const window = await eventsForRange(1) // heute + morgen
@@ -123,14 +139,22 @@ export async function handleAsk(ctx: Context, deps: CommandDeps, question: strin
   }
   await ctx.replyWithChatAction('typing')
   try {
-    const [notesHits, todayHits, overdueHits, agenda] = await Promise.all([
+    const priorityFolders = deps.priorityFolders()
+    const [notesHits, todayHits, overdueHits, agenda, priorityNotes] = await Promise.all([
       searchVault({ vaultPath: vault, query: question, maxResults: 4, maxChars: 6000 }),
       tasksDueToday({ vaultPath: vault, excludedFolders: deps.excludedFolders() }),
       tasksOverdue({ vaultPath: vault, excludedFolders: deps.excludedFolders() }),
-      eventsForRange(7)
+      eventsForRange(7),
+      priorityFolders.length > 0
+        ? loadPriorityNotes({ vaultPath: vault, folders: priorityFolders, maxNotes: 8, maxCharsPerNote: 800 })
+        : Promise.resolve([])
     ])
 
     const contextParts: string[] = []
+    if (priorityNotes.length > 0) {
+      const block = priorityNotes.map(n => `### ${n.relativePath}\n${n.excerpt}`).join('\n\n')
+      contextParts.push('PRIORISIERTE NOTIZEN (z. B. Inbox — immer einbezogen):\n' + block)
+    }
     if (agenda.events.length > 0) {
       contextParts.push('KALENDER-TERMINE (heute + 7 Tage):\n' + agenda.events.slice(0, 15).map(e => {
         const time = e.allDay ? 'ganztägig' : `${e.startDate.slice(11, 16)}`
