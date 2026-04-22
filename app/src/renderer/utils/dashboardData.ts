@@ -29,11 +29,20 @@ export interface CalendarItem {
   dayOffset: number            // 0=heute, 1=morgen, ...
 }
 
+export interface CalendarResult {
+  items: CalendarItem[]
+  needsPermission?: boolean    // true = UI soll „Zugriff erteilen"-Button zeigen
+  neverAsked?: boolean         // true = notDetermined; false = denied/restricted
+  error?: string
+}
+
 export interface DashboardSnapshot {
   tasks: TaskBuckets
   emails: EmailActionItem[]
   bookings: BookingItem[]
   calendar: CalendarItem[]
+  calendarNeedsPermission?: boolean
+  calendarNeverAsked?: boolean
   generatedAt: Date
 }
 
@@ -130,13 +139,20 @@ export function collectNewBookings(
   )
 }
 
-export async function collectCalendar(daysAhead: number): Promise<CalendarItem[]> {
+export async function collectCalendar(daysAhead: number): Promise<CalendarResult> {
   const today = startOfDay(new Date())
   const end = new Date(today.getTime() + (daysAhead + 1) * MS_PER_DAY)
   const fmt = (d: Date) => d.toISOString().slice(0, 10)
   try {
     const res = await window.electronAPI.calendarGetEvents(fmt(today), fmt(end))
-    if (!res.success) return []
+    if (!res.success) {
+      return {
+        items: [],
+        needsPermission: res.needsPermission,
+        neverAsked: res.neverAsked,
+        error: res.error
+      }
+    }
     const items: CalendarItem[] = []
     for (const event of res.events) {
       const start = new Date(event.startDate.replace(' ', 'T'))
@@ -145,10 +161,11 @@ export async function collectCalendar(daysAhead: number): Promise<CalendarItem[]
       if (dayOffset < 0 || dayOffset > daysAhead) continue
       items.push({ event, dayOffset })
     }
-    return items.sort((a, b) => new Date(a.event.startDate).getTime() - new Date(b.event.startDate).getTime())
+    items.sort((a, b) => new Date(a.event.startDate).getTime() - new Date(b.event.startDate).getTime())
+    return { items }
   } catch (err) {
     console.error('[dashboardData] calendarGetEvents failed', err)
-    return []
+    return { items: [], error: err instanceof Error ? err.message : String(err) }
   }
 }
 
@@ -164,15 +181,17 @@ export interface SnapshotInputs {
 }
 
 export async function buildDashboardSnapshot(input: SnapshotInputs): Promise<DashboardSnapshot> {
-  const [tasks, calendar] = await Promise.all([
+  const [tasks, calendarRes] = await Promise.all([
     collectTasks(input.notes, input.vaultPath, input.excludedFolders),
-    input.includeCalendar ? collectCalendar(input.calendarDaysAhead) : Promise.resolve([] as CalendarItem[])
+    input.includeCalendar ? collectCalendar(input.calendarDaysAhead) : Promise.resolve<CalendarResult>({ items: [] })
   ])
   return {
     tasks,
     emails: collectEmailActions(input.emails),
     bookings: collectNewBookings(input.dashboardOffers, input.bookingsSinceIso),
-    calendar,
+    calendar: calendarRes.items,
+    calendarNeedsPermission: calendarRes.needsPermission,
+    calendarNeverAsked: calendarRes.neverAsked,
     generatedAt: new Date()
   }
 }

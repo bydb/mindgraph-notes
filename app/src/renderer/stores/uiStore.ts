@@ -362,6 +362,20 @@ export interface DashboardSettings {
 
 export const DASHBOARD_ALL_WIDGETS: DashboardWidgetId[] = ['focus', 'tasks', 'emails', 'calendar', 'bookings', 'sync']
 
+// Telegram Bot Settings
+export type TelegramLlmBackend = 'ollama' | 'anthropic' | 'auto'
+
+export interface TelegramBotSettings {
+  enabled: boolean
+  allowedChatIds: string[]      // Whitelist — nur diese Chat-IDs dürfen mit dem Bot reden
+  llmBackend: TelegramLlmBackend // 'auto' = Ollama wenn erreichbar, sonst Anthropic
+  anthropicModel: string         // z.B. 'claude-sonnet-4-6'
+  ollamaModel: string            // fallback / direct choice
+  briefingIncludeEmails: boolean
+  briefingIncludeOverdue: boolean
+  active: boolean                // true = Bot läuft (wird vom Main-Prozess aus gesetzt/gelesen)
+}
+
 // ===== Module-Registry (Kern vs. Plugins) =====
 // Kern-Features sind immer aktiv und nicht in dieser Liste.
 // Jedes Modul wrapt bestehende uiStore-Flags — der Toggle im Settings-Tab delegiert an diese.
@@ -626,6 +640,10 @@ interface UIState {
 
   dashboard: DashboardSettings
   setDashboard: (settings: Partial<DashboardSettings>) => void
+
+  // Telegram Bot
+  telegramBot: TelegramBotSettings
+  setTelegramBot: (settings: Partial<TelegramBotSettings>) => void
 }
 
 // Default-Werte für den Store
@@ -865,7 +883,19 @@ const defaultState = {
     briefingIncludeCalendar: true,
     lastBriefingDate: '',
     calendarDaysAhead: 1
-  } as DashboardSettings
+  } as DashboardSettings,
+
+  // Telegram Bot
+  telegramBot: {
+    enabled: false,
+    allowedChatIds: [],
+    llmBackend: 'auto' as TelegramLlmBackend,
+    anthropicModel: 'claude-sonnet-4-6',
+    ollamaModel: '',
+    briefingIncludeEmails: true,
+    briefingIncludeOverdue: true,
+    active: false
+  } as TelegramBotSettings
 }
 
 // Felder die persistiert werden sollen (keine Funktionen, keine transienten Werte)
@@ -888,7 +918,8 @@ const persistedKeys = [
   'showFormattingToolbar',
   'showRawEditor',
   'transport',
-  'dashboard'
+  'dashboard',
+  'telegramBot'
 ] as const
 
 export const useUIStore = create<UIState>()((set, get) => ({
@@ -998,6 +1029,9 @@ export const useUIStore = create<UIState>()((set, get) => ({
   })),
   setDashboard: (settings) => set((state) => ({
     dashboard: { ...state.dashboard, ...settings }
+  })),
+  setTelegramBot: (settings) => set((state) => ({
+    telegramBot: { ...state.telegramBot, ...settings }
   })),
   applyProfileDefaults: (profile) => {
     if (!profile) return

@@ -351,14 +351,19 @@ app.on('window-all-closed', () => {
 // IPC Handlers
 
 // Letzten Vault-Pfad laden
+// Aktueller Vault-Pfad im Main-Prozess (für Telegram-Bot etc.)
+let lastKnownVaultPath: string | null = null
+
 ipcMain.handle('get-last-vault', async () => {
   const settings = await loadSettings()
+  lastKnownVaultPath = settings.lastVaultPath ?? null
   return settings.lastVaultPath || null
 })
 
 // Vault-Pfad speichern
 ipcMain.handle('set-last-vault', async (_event, vaultPath: string) => {
   await saveSettings({ lastVaultPath: vaultPath })
+  lastKnownVaultPath = vaultPath
   return true
 })
 
@@ -6205,31 +6210,33 @@ ipcMain.handle('calendar-get-events', async (_event, startDate: string, endDate:
     const { promisify } = await import('util')
     const execFileAsync = promisify(execFile)
 
-    // Swift script to read calendar events via EventKit
-    // osascript has no calendar permission, but swift can request it
+    // Swift script to read calendar events via EventKit.
+    // WICHTIG: Wir rufen requestFullAccessToEvents NICHT mehr blind auf —
+    // das Request-Fenster erscheint bei Silent-Background-Calls oft nicht
+    // zuverlässig. Stattdessen prüfen wir den Status explizit und liefern
+    // NO_ACCESS zurück, damit die UI einen expliziten „Zugriff erteilen"-Button
+    // zeigen kann, der den Dialog über `calendar-request-access` triggert.
     const swiftCode = `
 import EventKit
 import Foundation
 
 let store = EKEventStore()
-let sem = DispatchSemaphore(value: 0)
-var accessGranted = false
+let status = EKEventStore.authorizationStatus(for: .event)
 
+var hasAccess = false
 if #available(macOS 14.0, *) {
-    store.requestFullAccessToEvents { granted, _ in
-        accessGranted = granted
-        sem.signal()
+    if status == .fullAccess || status.rawValue == 2 /* .authorized (legacy) */ {
+        hasAccess = true
     }
 } else {
-    store.requestAccess(to: .event) { granted, _ in
-        accessGranted = granted
-        sem.signal()
+    if status.rawValue == 2 /* .authorized */ {
+        hasAccess = true
     }
 }
-sem.wait()
 
-guard accessGranted else {
-    print("NO_ACCESS")
+guard hasAccess else {
+    // status: 0 = notDetermined, 1 = restricted, 2 = authorized(legacy), 3 = denied, 4 = fullAccess, 5 = writeOnly
+    print("NO_ACCESS|||\\(status.rawValue)")
     exit(0)
 }
 
@@ -6256,8 +6263,25 @@ for event in events {
 `
 
     const { stdout } = await execFileAsync('swift', ['-e', swiftCode], { timeout: 15000 })
+    const trimmed = stdout.trim()
 
-    const events = stdout.trim().split('\n').filter(Boolean).map(line => {
+    if (trimmed.startsWith('NO_ACCESS')) {
+      const parts = trimmed.split('|||')
+      const statusCode = parseInt(parts[1] ?? '0', 10)
+      // status 0 = notDetermined (noch nie gefragt), 3 = denied, 1 = restricted
+      const neverAsked = statusCode === 0
+      return {
+        success: false,
+        events: [],
+        needsPermission: true,
+        neverAsked,
+        error: neverAsked
+          ? 'Kalender-Zugriff wurde noch nicht erteilt.'
+          : 'Kalender-Zugriff wurde verweigert. Bitte in Systemeinstellungen → Datenschutz & Sicherheit → Kalender aktivieren.'
+      }
+    }
+
+    const events = trimmed.split('\n').filter(Boolean).map(line => {
       const [title, startDate, endDate, location, calendar, allDay] = line.split('|||')
       return {
         title: title?.trim() || '',
@@ -6274,6 +6298,79 @@ for event in events {
   } catch (error) {
     console.error('[Calendar] Failed:', error)
     return { success: false, events: [], error: error instanceof Error ? error.message : 'Kalender konnte nicht gelesen werden' }
+  }
+})
+
+// Triggert explizit den macOS-Permission-Dialog für Kalender-Zugriff.
+// Wird vom „Zugriff erteilen"-Button im Dashboard/Calendar-Widget aufgerufen.
+// Gibt granted/denied/notDetermined/alreadyGranted zurück.
+ipcMain.handle('calendar-request-access', async () => {
+  if (process.platform !== 'darwin') {
+    return { success: false, status: 'unsupported' as const }
+  }
+
+  try {
+    const { execFile } = await import('child_process')
+    const { promisify } = await import('util')
+    const execFileAsync = promisify(execFile)
+
+    const swiftCode = `
+import EventKit
+import Foundation
+
+let store = EKEventStore()
+let status = EKEventStore.authorizationStatus(for: .event)
+
+// Bereits freigegeben?
+if #available(macOS 14.0, *) {
+    if status == .fullAccess {
+        print("ALREADY_GRANTED")
+        exit(0)
+    }
+} else {
+    if status.rawValue == 2 {
+        print("ALREADY_GRANTED")
+        exit(0)
+    }
+}
+
+// Zuvor explizit abgelehnt → kann nur per Systemeinstellungen geändert werden
+if status.rawValue == 3 /* .denied */ || status.rawValue == 1 /* .restricted */ {
+    print("DENIED_PERSISTENT")
+    exit(0)
+}
+
+// notDetermined → Dialog auslösen
+let sem = DispatchSemaphore(value: 0)
+var granted = false
+if #available(macOS 14.0, *) {
+    store.requestFullAccessToEvents { ok, _ in
+        granted = ok
+        sem.signal()
+    }
+} else {
+    store.requestAccess(to: .event) { ok, _ in
+        granted = ok
+        sem.signal()
+    }
+}
+sem.wait()
+
+print(granted ? "GRANTED" : "DENIED_NOW")
+`
+
+    // Timeout großzügig — der Dialog wartet auf User-Reaktion
+    const { stdout } = await execFileAsync('swift', ['-e', swiftCode], { timeout: 120000 })
+    const result = stdout.trim()
+
+    if (result === 'ALREADY_GRANTED') return { success: true, status: 'alreadyGranted' as const }
+    if (result === 'GRANTED') return { success: true, status: 'granted' as const }
+    if (result === 'DENIED_PERSISTENT') return { success: false, status: 'deniedPersistent' as const }
+    if (result === 'DENIED_NOW') return { success: false, status: 'denied' as const }
+    return { success: false, status: 'unknown' as const, raw: result }
+  } catch (error) {
+    console.error('[Calendar] Request access failed:', error)
+    return { success: false, status: 'error' as const, error: error instanceof Error ? error.message : String(error) }
   }
 })
 
@@ -7556,6 +7653,140 @@ ipcMain.handle('transport-update-shortcut', async (_event, newShortcut: string) 
   }
 })
 
+// ============ Telegram Bot ============
+
+import type { BotHandle } from './telegram/bot'
+let telegramBotHandle: BotHandle | null = null
+let telegramConfig: {
+  backend: 'ollama' | 'anthropic' | 'auto'
+  anthropicModel: string
+  ollamaModel: string
+  excludedFolders: string[]
+  includeEmails: boolean
+  includeOverdue: boolean
+  allowedChatIds: string[]
+} = {
+  backend: 'auto',
+  anthropicModel: 'claude-sonnet-4-6',
+  ollamaModel: '',
+  excludedFolders: [],
+  includeEmails: true,
+  includeOverdue: true,
+  allowedChatIds: []
+}
+
+function getTelegramTokenPath(): string {
+  return path.join(app.getPath('userData'), 'telegram-bot-token.enc')
+}
+function getAnthropicKeyPath(): string {
+  return path.join(app.getPath('userData'), 'anthropic-api-key.enc')
+}
+
+async function loadEncrypted(filePath: string): Promise<string | null> {
+  try {
+    if (!safeStorage.isEncryptionAvailable()) return null
+    const encrypted = await fs.readFile(filePath)
+    return safeStorage.decryptString(encrypted)
+  } catch {
+    return null
+  }
+}
+
+async function saveEncrypted(filePath: string, value: string): Promise<boolean> {
+  try {
+    if (!safeStorage.isEncryptionAvailable()) return false
+    const encrypted = safeStorage.encryptString(value)
+    await fs.writeFile(filePath, encrypted)
+    return true
+  } catch (err) {
+    console.error('[Telegram] saveEncrypted failed:', err)
+    return false
+  }
+}
+
+ipcMain.handle('telegram-save-token', async (_event, token: string) => {
+  return await saveEncrypted(getTelegramTokenPath(), token)
+})
+
+ipcMain.handle('telegram-has-token', async () => {
+  const token = await loadEncrypted(getTelegramTokenPath())
+  return !!token
+})
+
+ipcMain.handle('telegram-save-anthropic-key', async (_event, key: string) => {
+  return await saveEncrypted(getAnthropicKeyPath(), key)
+})
+
+ipcMain.handle('telegram-has-anthropic-key', async () => {
+  const key = await loadEncrypted(getAnthropicKeyPath())
+  return !!key
+})
+
+ipcMain.handle('telegram-update-config', async (_event, config: Partial<typeof telegramConfig>) => {
+  telegramConfig = { ...telegramConfig, ...config }
+  return true
+})
+
+ipcMain.handle('telegram-status', async () => {
+  return { active: telegramBotHandle !== null }
+})
+
+ipcMain.handle('telegram-start', async () => {
+  if (telegramBotHandle) return { success: true, alreadyRunning: true }
+  const token = await loadEncrypted(getTelegramTokenPath())
+  if (!token) return { success: false, error: 'Kein Bot-Token gespeichert' }
+  // Hinweis: Wir erlauben Start auch ohne Chat-IDs — der Bot läuft dann im
+  // "Discovery-Mode" und antwortet jedem Absender mit dessen Chat-ID, damit
+  // der User sie in den Settings eintragen kann.
+  try {
+    const { startTelegramBot } = await import('./telegram/bot')
+    // Anthropic-Key und Vault-Pfad beim Start einlesen; Getter geben live-Werte
+    // zurück, damit Vault-Wechsel und Key-Änderungen den Bot sofort betreffen.
+    let cachedAnthropicKey = await loadEncrypted(getAnthropicKeyPath())
+    const refreshAnthropicKey = () => {
+      loadEncrypted(getAnthropicKeyPath()).then(k => { cachedAnthropicKey = k })
+    }
+    // Refresh alle 60 s, falls der User den Key in den Settings ändert
+    const keyRefreshInterval = setInterval(refreshAnthropicKey, 60000)
+    telegramBotHandle = await startTelegramBot({
+      token,
+      getAllowedChatIds: () => telegramConfig.allowedChatIds,
+      deps: {
+        vaultPath: () => {
+          // Settings live nachlesen, damit Vault-Wechsel greift
+          return lastKnownVaultPath
+        },
+        excludedFolders: () => telegramConfig.excludedFolders,
+        backend: () => telegramConfig.backend,
+        anthropicApiKey: () => cachedAnthropicKey,
+        anthropicModel: () => telegramConfig.anthropicModel,
+        ollamaModel: () => telegramConfig.ollamaModel,
+        includeEmails: () => telegramConfig.includeEmails,
+        includeOverdue: () => telegramConfig.includeOverdue
+      }
+    })
+    // Key-Refresh-Interval beim Stop aufräumen
+    const origStop = telegramBotHandle.stop
+    telegramBotHandle = {
+      stop: async () => {
+        clearInterval(keyRefreshInterval)
+        await origStop()
+      }
+    }
+    return { success: true }
+  } catch (err) {
+    console.error('[Telegram] start failed:', err)
+    return { success: false, error: err instanceof Error ? err.message : String(err) }
+  }
+})
+
+ipcMain.handle('telegram-stop', async () => {
+  if (!telegramBotHandle) return { success: true, alreadyStopped: true }
+  await telegramBotHandle.stop()
+  telegramBotHandle = null
+  return { success: true }
+})
+
 // Cleanup bei App-Beendigung
 app.on('before-quit', () => {
   isQuitting = true
@@ -7580,5 +7811,11 @@ app.on('before-quit', () => {
       // Ignoriere Fehler beim Beenden
     }
     ptyProcess = null
+  }
+
+  // Telegram Bot stoppen
+  if (telegramBotHandle) {
+    telegramBotHandle.stop().catch(() => {})
+    telegramBotHandle = null
   }
 })

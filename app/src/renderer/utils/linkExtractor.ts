@@ -1,4 +1,7 @@
 import type { Note, NoteHeading, NoteBlock } from '../../shared/types'
+import { extractTasks } from '../../shared/taskExtractor'
+export { extractTasks }
+export type { ExtractedTask, TaskSummary } from '../../shared/taskExtractor'
 
 const WIKILINK_REGEX = /(?<!!)\[\[([^\]|]+)(\|[^\]]+)?\]\]/g
 const TAG_REGEX = /#([\p{L}\p{N}_-]+)/gu
@@ -213,156 +216,17 @@ export function extractFirstCardCallout(content: string): ExtractedCallout | nul
 }
 
 // ============ TASK EXTRACTION ============
+// Die Kernfunktion `extractTasks` + Types `ExtractedTask`/`TaskSummary`
+// leben in `shared/taskExtractor.ts` (oben re-exportiert), damit sie auch
+// im Main-Prozess (Telegram-Bot) nutzbar sind.
 
-export interface ExtractedTask {
-  text: string           // Task-Text (ohne Datum, ohne #tags, clean für Anzeige)
-  completed: boolean     // [x] = true, [ ] = false
-  line: number           // Zeilennummer im Dokument (1-basiert)
-  rawLine: string        // Ursprüngliche Markdown-Zeile (für Write-Back / Konfliktschutz)
-  dueDate?: Date         // Aus @[[YYYY-MM-DD]] HH:MM
-  isOverdue?: boolean    // Heute > dueDate
-  isCritical?: boolean   // Enthält #critical, @urgent, !!, etc.
-  tags: string[]         // Inline-Tags aus der Task-Zeile (#tag), ohne #
-}
-
-export interface TaskSummary {
-  total: number
-  completed: number
-  tasks: ExtractedTask[]
-  hasOverdue: boolean
-  nextDue?: Date
-  critical: number       // Anzahl kritischer unerledigter Tasks
-}
-
-// Vault-weite Task-Statistiken
+// Vault-weite Task-Statistiken — bleibt renderer-lokal
 export interface VaultTaskStats {
   total: number
   completed: number
   open: number
-  critical: number       // Kritische unerledigte Tasks
-  overdue: number        // Überfällige unerledigte Tasks
-}
-
-// Regex für Obsidian Reminder Format: (@[[YYYY-MM-DD]] HH:MM) oder (@[[YYYY-MM-DD]])
-const REMINDER_REGEX = /\(@\[\[(\d{4}-\d{2}-\d{2})\]\](?:\s*(\d{1,2}:\d{2}))?\)/
-
-// Parst Obsidian Reminder Format
-function parseReminderDate(text: string): Date | undefined {
-  const match = text.match(REMINDER_REGEX)
-  if (!match) return undefined
-
-  const dateStr = match[1] // YYYY-MM-DD
-  const timeStr = match[2] // HH:MM (optional)
-
-  const [year, month, day] = dateStr.split('-').map(Number)
-
-  if (timeStr) {
-    const [hours, minutes] = timeStr.split(':').map(Number)
-    return new Date(year, month - 1, day, hours, minutes)
-  }
-
-  // Ohne Zeitangabe: Mitternacht des Tages
-  return new Date(year, month - 1, day, 0, 0, 0)
-}
-
-// Regex für Inline-Tags in der Task-Zeile: #tag (alphanumerisch + Umlaute, -, /)
-// Nicht match auf #critical etc. — die werden als Tag UND als isCritical erkannt.
-const TASK_TAG_REGEX = /(?:^|\s)#([\p{L}0-9][\p{L}0-9\-/_]*)/gu
-
-// Extrahiert alle Inline-Tags aus einer Task-Zeile
-function extractInlineTags(text: string): string[] {
-  const tags: string[] = []
-  TASK_TAG_REGEX.lastIndex = 0
-  let match: RegExpExecArray | null
-  while ((match = TASK_TAG_REGEX.exec(text)) !== null) {
-    tags.push(match[1])
-  }
-  return tags
-}
-
-// Entfernt das Reminder-Format und Inline-Tags aus dem Task-Text für die Anzeige
-function cleanTaskText(text: string): string {
-  return text
-    .replace(REMINDER_REGEX, '')
-    .replace(TASK_TAG_REGEX, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
-}
-
-// Prüft ob ein Datum überfällig ist
-function isOverdue(date: Date): boolean {
-  return date < new Date()
-}
-
-// Prüft ob ein Task als kritisch markiert ist
-// Erkannte Marker: #critical, #kritisch, @critical, @urgent, @dringend, !!, !!!
-function isCriticalTask(text: string): boolean {
-  const criticalPatterns = [
-    /#critical/i,
-    /#kritisch/i,
-    /#urgent/i,
-    /#dringend/i,
-    /@critical/i,
-    /@urgent/i,
-    /@dringend/i,
-    /!{2,}/,           // !! oder !!!
-    /\[!\]/,           // [!] Marker
-  ]
-  return criticalPatterns.some(pattern => pattern.test(text))
-}
-
-// Extrahiert alle Tasks aus Content
-export function extractTasks(content: string): TaskSummary {
-  const tasks: ExtractedTask[] = []
-  const lines = content.split('\n')
-
-  // Task Pattern: - [ ] oder - [x] oder * [ ] oder * [x]
-  const taskRegex = /^[\s]*[-*]\s*\[([ xX])\]\s*(.+)$/
-
-  lines.forEach((line, index) => {
-    const match = line.match(taskRegex)
-    if (match) {
-      const completed = match[1].toLowerCase() === 'x'
-      const fullText = match[2]
-      const dueDate = parseReminderDate(fullText)
-      const tags = extractInlineTags(fullText)
-      const text = cleanTaskText(fullText)
-      const isCritical = isCriticalTask(fullText)
-
-      tasks.push({
-        text,
-        completed,
-        line: index + 1,
-        rawLine: line,
-        dueDate,
-        isOverdue: dueDate ? isOverdue(dueDate) : false,
-        isCritical,
-        tags
-      })
-    }
-  })
-
-  const completedCount = tasks.filter(t => t.completed).length
-  const hasOverdue = tasks.some(t => !t.completed && t.isOverdue)
-  const criticalCount = tasks.filter(t => !t.completed && t.isCritical).length
-
-  // Nächstes fälliges Datum finden (nur unerledigte Tasks)
-  const uncompletedWithDue = tasks.filter(t => !t.completed && t.dueDate)
-  const nextDue = uncompletedWithDue.length > 0
-    ? uncompletedWithDue.reduce((min, t) =>
-        t.dueDate! < min ? t.dueDate! : min,
-        uncompletedWithDue[0].dueDate!
-      )
-    : undefined
-
-  return {
-    total: tasks.length,
-    completed: completedCount,
-    tasks,
-    hasOverdue,
-    nextDue,
-    critical: criticalCount
-  }
+  critical: number
+  overdue: number
 }
 
 // Baut eine Task-Markdown-Zeile aus Komponenten auf.

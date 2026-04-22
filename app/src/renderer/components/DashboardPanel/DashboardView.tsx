@@ -93,7 +93,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onOpenInbox, onOpe
       case 'emails':
         return <EmailsWidget key={id} snapshot={snapshot} onEmailClick={handleEmailClick} onEmailHandled={handleEmailHandled} t={t} />
       case 'calendar':
-        return <CalendarWidget key={id} snapshot={snapshot} t={t} />
+        return <CalendarWidget key={id} snapshot={snapshot} t={t} onRefresh={loadSnapshot} />
       case 'bookings':
         return <BookingsWidget key={id} snapshot={snapshot} onBookingClick={handleBookingClick} t={t} />
       case 'sync':
@@ -273,8 +273,38 @@ const EmailsWidget: React.FC<WidgetProps> = ({ snapshot, onEmailClick, onEmailHa
   )
 }
 
-const CalendarWidget: React.FC<WidgetProps> = ({ snapshot, t }) => {
+interface CalendarWidgetProps extends WidgetProps {
+  onRefresh: () => void
+}
+
+const CalendarWidget: React.FC<CalendarWidgetProps> = ({ snapshot, t, onRefresh }) => {
   const events = snapshot.calendar
+  const needsPermission = snapshot.calendarNeedsPermission
+  const neverAsked = snapshot.calendarNeverAsked
+  const [requesting, setRequesting] = useState(false)
+  const [permissionMsg, setPermissionMsg] = useState<string | null>(null)
+
+  const handleRequestAccess = async () => {
+    setRequesting(true)
+    setPermissionMsg(null)
+    try {
+      const res = await window.electronAPI.calendarRequestAccess()
+      if (res.status === 'granted' || res.status === 'alreadyGranted') {
+        onRefresh()
+      } else if (res.status === 'deniedPersistent') {
+        setPermissionMsg('Zugriff wurde früher verweigert. Bitte in Systemeinstellungen → Datenschutz & Sicherheit → Kalender aktivieren und App neu starten.')
+      } else if (res.status === 'denied') {
+        setPermissionMsg('Zugriff abgelehnt.')
+      } else if (res.status === 'unsupported') {
+        setPermissionMsg('Kalender-Integration ist nur unter macOS verfügbar.')
+      } else {
+        setPermissionMsg(res.error ?? 'Zugriff konnte nicht erteilt werden.')
+      }
+    } finally {
+      setRequesting(false)
+    }
+  }
+
   return (
     <section className="dv-widget">
       <header className="dv-widget-header">
@@ -282,7 +312,25 @@ const CalendarWidget: React.FC<WidgetProps> = ({ snapshot, t }) => {
         <span className="dv-widget-count">{events.length}</span>
       </header>
       <div className="dv-widget-body">
-        {events.length === 0 ? (
+        {needsPermission ? (
+          <div className="dv-widget-empty" style={{ display: 'flex', flexDirection: 'column', gap: 10, alignItems: 'flex-start' }}>
+            <div>
+              {neverAsked
+                ? 'MindGraph braucht Zugriff auf deinen Kalender, um Termine hier anzuzeigen.'
+                : 'Kalender-Zugriff wurde verweigert.'}
+            </div>
+            <button
+              className="dv-button dv-button-primary"
+              onClick={handleRequestAccess}
+              disabled={requesting}
+            >
+              {requesting ? 'Warte auf macOS-Dialog …' : 'Zugriff erteilen'}
+            </button>
+            {permissionMsg && (
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>{permissionMsg}</div>
+            )}
+          </div>
+        ) : events.length === 0 ? (
           <div className="dv-widget-empty">{t('dashboard.calendarEmpty')}</div>
         ) : (
           <div className="dv-list">

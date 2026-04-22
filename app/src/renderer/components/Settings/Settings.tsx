@@ -5,6 +5,7 @@ import { useNotesStore, createNoteFromFile } from '../../stores/notesStore'
 import { useSyncStore } from '../../stores/syncStore'
 import { useVaultSettingsStore } from '../../stores/vaultSettingsStore'
 import { useTranslation, type TranslationKey } from '../../utils/translations'
+import { TelegramSettings } from './TelegramSettings'
 
 type TabTFn = (key: TranslationKey, params?: Record<string, string | number>) => string
 import {
@@ -23,7 +24,7 @@ interface SettingsProps {
   initialTab?: Tab
 }
 
-type Tab = 'vault' | 'general' | 'editor' | 'templates' | 'integrations' | 'shortcuts' | 'dataview' | 'sync' | 'dailyNote' | 'remarkable' | 'agents' | 'transport' | 'dashboard' | 'modules' | 'speech'
+type Tab = 'vault' | 'general' | 'editor' | 'templates' | 'integrations' | 'shortcuts' | 'dataview' | 'sync' | 'dailyNote' | 'remarkable' | 'agents' | 'transport' | 'dashboard' | 'modules' | 'speech' | 'telegram'
 
 type BuiltInTemplateKey = 'empty' | 'dailyNote' | 'zettel' | 'meeting'
 
@@ -1981,6 +1982,16 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab 
                 reMarkable
               </button>
             )}
+            {/* Telegram-Tab: immer sichtbar (Bot-Feature) */}
+            <button
+              className={`settings-nav-item ${activeTab === 'telegram' ? 'active' : ''}`}
+              onClick={() => setActiveTab('telegram')}
+            >
+              <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+                <path d="M2 9l14-6-2 13-5-3-3 3v-4l8-6-9 5-3-2z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/>
+              </svg>
+              Telegram
+            </button>
           </nav>
 
           <div className="settings-content">
@@ -4684,6 +4695,11 @@ LIMIT 10
             {/* Speech Tab */}
             {activeTab === 'speech' && (
               <SpeechSettingsTab t={t} />
+            )}
+
+            {/* Telegram Tab */}
+            {activeTab === 'telegram' && (
+              <TelegramSettings />
             )}
           </div>
         </div>

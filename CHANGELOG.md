@@ -2,6 +2,20 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.5.12-beta] - 2026-04-22
+
+### Features
+- **Telegram-Bot für Vault-Zugriff von unterwegs** — Fragen stellen, Tasks abfragen und Morning-Briefings direkt in Telegram empfangen. Bot läuft lokal im Electron-Main-Prozess (grammy), Daten verlassen den Rechner nicht. Neuer Settings-Tab „Telegram" mit Bot-Token (verschlüsselt via `electron.safeStorage`), Whitelist-Chat-IDs, LLM-Backend-Auswahl und Discovery-Mode zum Ermitteln der eigenen Chat-ID
+- **Telegram-Commands** — `/today` / `/todos` für heute fällige Tasks, `/overdue` für überfällige, `/week` für die nächsten 7 Tage, `/briefing` für ein LLM-generiertes Morning-Briefing (Tasks + relevante Emails), `/ask <frage>` für freie Fragen mit Vault-Kontext. Freier Text wird automatisch als `/ask` behandelt
+- **Anthropic-API-Integration** — neuer unified Chat-Client (`main/llm/chatClient.ts`) mit Ollama + Anthropic und „Auto"-Fallback (Ollama bevorzugt, Anthropic wenn nicht erreichbar). Unterstützt Opus 4.7, Sonnet 4.6 und Haiku 4.5. API-Key verschlüsselt via safeStorage
+
+### Improvements
+- **Kalender-Permission-Fix im Dashboard** — bisher konnte der Permission-Dialog beim ersten Dashboard-Aufruf nicht zuverlässig erscheinen; der Zugriff wurde oft erst über das Timeblocking-Feature getriggert und das Widget zeigte stumm „Keine Termine". Jetzt unterscheidet `calendar-get-events` zwischen „leer" und „kein Zugriff", und das Widget zeigt bei fehlendem Zugriff einen expliziten **„Zugriff erteilen"**-Button mit kontextueller Fehlermeldung (z. B. Hinweis auf Systemeinstellungen bei persistenter Ablehnung)
+- **Shared Task-Extractor** — `extractTasks()` und Types `ExtractedTask` / `TaskSummary` wurden aus `renderer/utils/linkExtractor.ts` nach `shared/taskExtractor.ts` verschoben und vom Renderer re-exportiert. Damit können auch Main-Prozess-Komponenten (z. B. der Telegram-Bot) Task-Parsing ohne Code-Duplikation nutzen
+
+### Fixes
+- **Neuer `calendar-request-access`-IPC** — triggert den macOS-Kalender-Permission-Dialog aktiv und wartet bis zu 2 Minuten auf die User-Reaktion. Unterscheidet zwischen `granted`, `alreadyGranted`, `denied`, `deniedPersistent` (nur via Systemeinstellungen lösbar) und liefert der UI klare Status-Codes
+
 ## [0.5.11-beta] - 2026-04-21
 
 ### Features

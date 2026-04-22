@@ -822,8 +822,9 @@ export interface ElectronAPI {
   createAppleReminder: (options: { title: string; notes?: string; dueDate?: string; dueTime?: string; list?: string }) => Promise<{ success: boolean; error?: string }>;
 
   // Apple Calendar (macOS)
-  calendarGetEvents: (startDate: string, endDate: string) => Promise<{ success: boolean; events: CalendarEvent[]; error?: string }>;
+  calendarGetEvents: (startDate: string, endDate: string) => Promise<{ success: boolean; events: CalendarEvent[]; error?: string; needsPermission?: boolean; neverAsked?: boolean }>;
   calendarCreateEvent: (params: { title: string; startIso: string; durationMinutes: number; notes?: string }) => Promise<{ success: boolean; eventId?: string; error?: string; needsPermission?: boolean }>;
+  calendarRequestAccess: () => Promise<{ success: boolean; status: 'granted' | 'alreadyGranted' | 'denied' | 'deniedPersistent' | 'unsupported' | 'error' | 'unknown'; error?: string; raw?: string }>;
 
   // reMarkable (USB)
   remarkableUsbCheck: () => Promise<ReMarkableUsbCheckResult>;
@@ -907,6 +908,24 @@ export interface ElectronAPI {
   }) => Promise<{ success: boolean; relativePath?: string; error?: string }>;
   onTransportOpenNote: (callback: (relativePath: string) => void) => void;
   onTransportWindowShown: (callback: () => void) => void;
+
+  // Telegram Bot
+  telegramSaveToken: (token: string) => Promise<boolean>;
+  telegramHasToken: () => Promise<boolean>;
+  telegramSaveAnthropicKey: (key: string) => Promise<boolean>;
+  telegramHasAnthropicKey: () => Promise<boolean>;
+  telegramUpdateConfig: (config: {
+    backend?: 'ollama' | 'anthropic' | 'auto';
+    anthropicModel?: string;
+    ollamaModel?: string;
+    excludedFolders?: string[];
+    includeEmails?: boolean;
+    includeOverdue?: boolean;
+    allowedChatIds?: string[];
+  }) => Promise<boolean>;
+  telegramStart: () => Promise<{ success: boolean; error?: string; alreadyRunning?: boolean }>;
+  telegramStop: () => Promise<{ success: boolean; alreadyStopped?: boolean }>;
+  telegramStatus: () => Promise<{ active: boolean }>;
 }
 
 // Office-Formate

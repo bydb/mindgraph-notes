@@ -376,6 +376,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('calendar-get-events', startDate, endDate),
   calendarCreateEvent: (params: { title: string; startIso: string; durationMinutes: number; notes?: string }) =>
     ipcRenderer.invoke('calendar-create-event', params),
+  calendarRequestAccess: () =>
+    ipcRenderer.invoke('calendar-request-access'),
 
   // reMarkable (USB)
   remarkableUsbCheck: () =>
@@ -501,5 +503,30 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onTransportWindowShown: (callback: () => void) => {
     ipcRenderer.removeAllListeners('transport-window-shown')
     ipcRenderer.on('transport-window-shown', () => callback())
-  }
+  },
+
+  // Telegram Bot
+  telegramSaveToken: (token: string) =>
+    ipcRenderer.invoke('telegram-save-token', token),
+  telegramHasToken: () =>
+    ipcRenderer.invoke('telegram-has-token'),
+  telegramSaveAnthropicKey: (key: string) =>
+    ipcRenderer.invoke('telegram-save-anthropic-key', key),
+  telegramHasAnthropicKey: () =>
+    ipcRenderer.invoke('telegram-has-anthropic-key'),
+  telegramUpdateConfig: (config: {
+    backend?: 'ollama' | 'anthropic' | 'auto'
+    anthropicModel?: string
+    ollamaModel?: string
+    excludedFolders?: string[]
+    includeEmails?: boolean
+    includeOverdue?: boolean
+    allowedChatIds?: string[]
+  }) => ipcRenderer.invoke('telegram-update-config', config),
+  telegramStart: () =>
+    ipcRenderer.invoke('telegram-start'),
+  telegramStop: () =>
+    ipcRenderer.invoke('telegram-stop'),
+  telegramStatus: () =>
+    ipcRenderer.invoke('telegram-status')
 })
