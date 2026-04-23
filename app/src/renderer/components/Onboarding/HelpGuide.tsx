@@ -123,6 +123,14 @@ const helpTopics: HelpTopic[] = [
     details: ['Semantic Scholar: Paper suchen', 'Zotero-Bibliothek durchsuchen (⌘⇧Z)', 'Readwise-Highlights synchronisieren', 'Zitate direkt in Notizen einfuegen'] },
   { id: 'devices', label: 'Geraete', icon: 'remarkable', color: '#10b981', category: 'integrate',
     details: ['reMarkable-Tablet: Dokumente importieren', 'Integriertes Terminal mit Shell-Zugriff', 'KI-Tool-Erkennung (Claude, opencode)', 'PDF-Export und -Optimierung'] },
+  { id: 'telegram', label: 'Telegram-Bot', icon: 'chat', color: '#10b981', category: 'integrate',
+    details: [
+      'Vault, Tasks und Kalender von unterwegs per Telegram abfragen',
+      'Befehle: /today /overdue /week /agenda /inbox /briefing /ask',
+      'Priorisierte Ordner: z. B. Inbox fließt automatisch in /ask ein',
+      'LLM-Backend wählbar: Ollama lokal oder Anthropic (Auto-Fallback)'
+    ],
+    action: { id: 'openSettingsTab', label: 'Telegram einrichten', settingsTab: 'telegram' } },
 ]
 
 // ============ GRAPH LAYOUT ============
