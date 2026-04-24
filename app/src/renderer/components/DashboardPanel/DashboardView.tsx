@@ -157,6 +157,20 @@ const formatTime = (d: Date | string) => {
 
 const formatDate = (d: Date) => d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })
 
+const formatBookedAt = (iso: string): string => {
+  const d = new Date(iso)
+  if (isNaN(d.getTime())) return ''
+  const now = new Date()
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const startOfBooking = new Date(d.getFullYear(), d.getMonth(), d.getDate())
+  const dayDiff = Math.round((startOfToday.getTime() - startOfBooking.getTime()) / (24 * 60 * 60 * 1000))
+  const time = d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })
+  if (dayDiff === 0) return `heute ${time}`
+  if (dayDiff === 1) return `gestern ${time}`
+  if (dayDiff > 1 && dayDiff < 7) return `vor ${dayDiff} Tagen`
+  return d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: '2-digit' })
+}
+
 const TasksWidget: React.FC<WidgetProps> = ({ snapshot, onTaskClick, t }) => {
   const { overdue, today, upcoming } = snapshot.tasks
   const total = overdue.length + today.length + upcoming.length
@@ -581,7 +595,15 @@ const BookingsWidget: React.FC<WidgetProps> = ({ snapshot, onBookingClick, t }) 
             {items.slice(0, 10).map(item => (
               <div key={item.booking.id} className="dv-booking-row" onClick={() => onBookingClick?.(item)}>
                 <div className="dv-booking-name">{item.booking.userName || item.booking.userEmail}</div>
-                <div className="dv-booking-meta">{item.offer.name}</div>
+                <div className="dv-booking-meta">
+                  <span>{item.offer.name}</span>
+                  {item.booking.bookedAt && (
+                    <>
+                      <span className="sep">•</span>
+                      <span>{formatBookedAt(item.booking.bookedAt)}</span>
+                    </>
+                  )}
+                </div>
               </div>
             ))}
           </div>
