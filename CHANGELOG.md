@@ -2,6 +2,17 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.5.16-beta] - 2026-04-24
+
+### Features
+- **Neuer Settings-Tab „Zugangsdaten"** — zentrale Übersicht aller gespeicherten Credentials (API-Keys, IMAP/SMTP-Passwörter, Bot-Tokens etc.) mit direkter Navigation zum jeweiligen Settings-Tab
+
+### Fixes
+- **Neuanmeldungen aus edoobox im Dashboard** — das Booking-Widget blieb leer, weil `loadDashboard()` zwar die Angebote, nicht aber die zugehörigen Buchungen geladen hat (Bookings wurden bisher nur on-demand beim Aufklappen eines Offers im AgentPanel gefetched). Jetzt werden für alle aktiven Offers mit `bookingCount > 0` und End-Datum innerhalb der letzten 30 Tage die Buchungen parallel nachgeladen, sobald Dashboard oder Morning-Briefing geöffnet wird. Die Ansicht zeigt alle aktiven Anmeldungen der letzten 14 Tage; stornierte Buchungen werden ausgefiltert
+
+### Improvements
+- **Telegram-Bot in Hilfe-Graph und Website dokumentiert** — neuer Hilfe-Eintrag erklärt die Bot-Commands; die Website listet den Telegram-Bot als Feature
+
 ## [0.5.15-beta] - 2026-04-22
 
 ### Features

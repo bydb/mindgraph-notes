@@ -32,28 +32,28 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onOpenInbox, onOpe
   const { notes, vaultPath, selectNote } = useNotesStore()
   const { taskExcludedFolders, dashboard } = useUIStore()
   const emails = useEmailStore(state => state.emails)
-  const dashboardOffers = useAgentStore(state => state.dashboardOffers)
+  const loadDashboardOffers = useAgentStore(state => state.loadDashboard)
 
   const [snapshot, setSnapshot] = useState<DashboardSnapshot | null>(null)
   const [isLoading, setIsLoading] = useState(true)
 
   const loadSnapshot = useCallback(async () => {
     setIsLoading(true)
+    await loadDashboardOffers({ includeBookings: true })
+    const latestOffers = useAgentStore.getState().dashboardOffers
     const snap = await buildDashboardSnapshot({
       notes,
       vaultPath,
       excludedFolders: taskExcludedFolders,
       emails,
-      dashboardOffers,
-      bookingsSinceIso: dashboard.lastBriefingDate
-        ? `${dashboard.lastBriefingDate}T00:00:00.000Z`
-        : new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
+      dashboardOffers: latestOffers,
+      bookingsSinceIso: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString(),
       calendarDaysAhead: dashboard.calendarDaysAhead,
       includeCalendar: true
     })
     setSnapshot(snap)
     setIsLoading(false)
-  }, [notes, vaultPath, taskExcludedFolders, emails, dashboardOffers, dashboard.lastBriefingDate, dashboard.calendarDaysAhead])
+  }, [notes, vaultPath, taskExcludedFolders, emails, loadDashboardOffers, dashboard.calendarDaysAhead])
 
   useEffect(() => {
     loadSnapshot()

@@ -54,7 +54,7 @@ interface AgentState {
 
   // Dashboard Actions
   setDashboardView: (view: 'events' | 'dashboard' | 'marketing' | 'iq') => void
-  loadDashboard: () => Promise<void>
+  loadDashboard: (options?: { includeBookings?: boolean }) => Promise<void>
   loadBookingsForOffer: (offerId: string) => Promise<void>
 
   // IQ Actions
@@ -230,16 +230,38 @@ export const useAgentStore = create<AgentState>()((set, get) => ({
   // Dashboard
   setDashboardView: (view) => set({ dashboardView: view }),
 
-  loadDashboard: async () => {
+  loadDashboard: async (options?: { includeBookings?: boolean }) => {
     set({ isDashboardLoading: true })
     try {
       const { baseUrl, apiVersion } = useUIStore.getState().edoobox
       const result = await window.electronAPI.edooboxListOffersDashboard(baseUrl, apiVersion)
-      if (result.success && result.offers) {
-        set({ dashboardOffers: result.offers, isDashboardLoading: false })
-      } else {
+      if (!result.success || !result.offers) {
         set({ isDashboardLoading: false })
+        return
       }
+      let offers = result.offers
+      if (options?.includeBookings) {
+        const minEnd = Date.now() - 30 * 24 * 60 * 60 * 1000
+        const targets = offers.filter(o => {
+          if (o.bookingCount <= 0) return false
+          const ref = o.dateEnd || o.dateStart
+          if (!ref) return true
+          const t = Date.parse(ref)
+          return isNaN(t) || t >= minEnd
+        })
+        if (targets.length > 0) {
+          const results = await Promise.all(
+            targets.map(o =>
+              window.electronAPI.edooboxListBookings(baseUrl, apiVersion, o.id)
+                .then(r => ({ offerId: o.id, bookings: (r.success && r.bookings) ? r.bookings as EdooboxBooking[] : [] }))
+                .catch(() => ({ offerId: o.id, bookings: [] as EdooboxBooking[] }))
+            )
+          )
+          const byId = new Map(results.map(r => [r.offerId, r.bookings]))
+          offers = offers.map(o => byId.has(o.id) ? { ...o, bookings: byId.get(o.id)! } : o)
+        }
+      }
+      set({ dashboardOffers: offers, isDashboardLoading: false })
     } catch {
       set({ isDashboardLoading: false })
     }

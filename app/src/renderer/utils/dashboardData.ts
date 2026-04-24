@@ -127,6 +127,7 @@ export function collectNewBookings(
     if (!offer.bookings) continue
     for (const booking of offer.bookings) {
       if (!booking.bookedAt) continue
+      if (booking.status === 'canceled') continue
       if (new Date(booking.bookedAt).getTime() <= since) continue
       items.push({
         booking,

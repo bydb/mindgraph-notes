@@ -17,24 +17,32 @@ export const MorningBriefing: React.FC<MorningBriefingProps> = ({ onClose, onOpe
   const { notes, vaultPath } = useNotesStore()
   const { taskExcludedFolders, dashboard, setDashboard } = useUIStore()
   const emails = useEmailStore(state => state.emails)
-  const dashboardOffers = useAgentStore(state => state.dashboardOffers)
+  const loadDashboardOffers = useAgentStore(state => state.loadDashboard)
 
   const [snapshot, setSnapshot] = useState<DashboardSnapshot | null>(null)
 
   useEffect(() => {
-    buildDashboardSnapshot({
-      notes,
-      vaultPath,
-      excludedFolders: taskExcludedFolders,
-      emails,
-      dashboardOffers,
-      bookingsSinceIso: dashboard.lastBriefingDate
-        ? `${dashboard.lastBriefingDate}T00:00:00.000Z`
-        : new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
-      calendarDaysAhead: dashboard.calendarDaysAhead,
-      includeCalendar: dashboard.briefingIncludeCalendar
-    }).then(setSnapshot)
-  }, [notes, vaultPath, taskExcludedFolders, emails, dashboardOffers, dashboard.lastBriefingDate, dashboard.calendarDaysAhead, dashboard.briefingIncludeCalendar])
+    let cancelled = false
+    ;(async () => {
+      await loadDashboardOffers({ includeBookings: true })
+      if (cancelled) return
+      const latestOffers = useAgentStore.getState().dashboardOffers
+      const snap = await buildDashboardSnapshot({
+        notes,
+        vaultPath,
+        excludedFolders: taskExcludedFolders,
+        emails,
+        dashboardOffers: latestOffers,
+        bookingsSinceIso: dashboard.lastBriefingDate
+          ? `${dashboard.lastBriefingDate}T00:00:00.000Z`
+          : new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
+        calendarDaysAhead: dashboard.calendarDaysAhead,
+        includeCalendar: dashboard.briefingIncludeCalendar
+      })
+      if (!cancelled) setSnapshot(snap)
+    })()
+    return () => { cancelled = true }
+  }, [notes, vaultPath, taskExcludedFolders, emails, loadDashboardOffers, dashboard.lastBriefingDate, dashboard.calendarDaysAhead, dashboard.briefingIncludeCalendar])
 
   const markSeen = () => {
     const todayIso = new Date().toISOString().slice(0, 10)

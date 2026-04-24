@@ -160,7 +160,7 @@ const DashboardView: React.FC = () => {
         <img src={edooboxLogoUrl} alt="edoobox" className="agent-dashboard-logo" />
         <button
           className="agent-dashboard-refresh"
-          onClick={loadDashboard}
+          onClick={() => loadDashboard()}
           disabled={isDashboardLoading}
           title={t('agent.dashboard.refresh')}
         >

@@ -6,6 +6,7 @@ import { useSyncStore } from '../../stores/syncStore'
 import { useVaultSettingsStore } from '../../stores/vaultSettingsStore'
 import { useTranslation, type TranslationKey } from '../../utils/translations'
 import { TelegramSettings } from './TelegramSettings'
+import { CredentialsSettings } from './CredentialsSettings'
 
 type TabTFn = (key: TranslationKey, params?: Record<string, string | number>) => string
 import {
@@ -24,7 +25,7 @@ interface SettingsProps {
   initialTab?: Tab
 }
 
-type Tab = 'vault' | 'general' | 'editor' | 'templates' | 'integrations' | 'shortcuts' | 'dataview' | 'sync' | 'dailyNote' | 'remarkable' | 'agents' | 'transport' | 'dashboard' | 'modules' | 'speech' | 'telegram'
+type Tab = 'vault' | 'general' | 'editor' | 'templates' | 'integrations' | 'shortcuts' | 'dataview' | 'sync' | 'dailyNote' | 'remarkable' | 'agents' | 'transport' | 'dashboard' | 'modules' | 'speech' | 'telegram' | 'credentials'
 
 type BuiltInTemplateKey = 'empty' | 'dailyNote' | 'zettel' | 'meeting'
 
@@ -1991,6 +1992,16 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab 
                 <path d="M2 9l14-6-2 13-5-3-3 3v-4l8-6-9 5-3-2z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/>
               </svg>
               Telegram
+            </button>
+            {/* Zugangsdaten-Tab: zentrale Übersicht aller Credentials */}
+            <button
+              className={`settings-nav-item ${activeTab === 'credentials' ? 'active' : ''}`}
+              onClick={() => setActiveTab('credentials')}
+            >
+              <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+                <path d="M12 3a3 3 0 0 1 3 3v2h1v7H2V8h1V6a3 3 0 0 1 3-3h6zm0 1.5H6a1.5 1.5 0 0 0-1.5 1.5v2h9V6A1.5 1.5 0 0 0 12 4.5zM9 10.5a1.5 1.5 0 0 0-.75 2.8V14h1.5v-.7A1.5 1.5 0 0 0 9 10.5z" stroke="currentColor" strokeWidth="1" fill="none"/>
+              </svg>
+              Zugangsdaten
             </button>
           </nav>
 
@@ -4700,6 +4711,11 @@ LIMIT 10
             {/* Telegram Tab */}
             {activeTab === 'telegram' && (
               <TelegramSettings />
+            )}
+
+            {/* Zugangsdaten Tab */}
+            {activeTab === 'credentials' && (
+              <CredentialsSettings onNavigateToTab={(tab) => setActiveTab(tab as Tab)} />
             )}
           </div>
         </div>
