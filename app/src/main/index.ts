@@ -4026,7 +4026,7 @@ ipcMain.handle('readwise-sync', async (_event, apiKey: string, syncFolder: strin
   assertApprovedVault(vaultPath, 'readwise-sync')
 
   try {
-    const syncBasePath = path.join(vaultPath, syncFolder)
+    const syncBasePath = validatePath(vaultPath, syncFolder || '')
     // Unterordner sicherstellen
     await fs.mkdir(syncBasePath, { recursive: true })
 
@@ -4196,7 +4196,7 @@ ipcMain.handle('readwise-sync', async (_event, apiKey: string, syncFolder: strin
 
           await fs.appendFile(filePath, appendLines.join('\n'))
           updatedCount++
-          syncedFiles.push(path.join(syncFolder, categoryFolder, fileName))
+          syncedFiles.push(path.relative(vaultPath, filePath))
           console.log(`[Readwise] Updated: ${fileName} (+${newHighlights.length} highlights)`)
         }
       } else {
@@ -4204,7 +4204,7 @@ ipcMain.handle('readwise-sync', async (_event, apiKey: string, syncFolder: strin
         const content = generateReadwiseMarkdown(book, localCoverPath || undefined)
         await fs.writeFile(filePath, content, 'utf-8')
         newCount++
-        syncedFiles.push(path.join(syncFolder, categoryFolder, fileName))
+        syncedFiles.push(path.relative(vaultPath, filePath))
         console.log(`[Readwise] Created: ${fileName}`)
       }
     }
@@ -5651,7 +5651,7 @@ ipcMain.handle('email-analyze', async (_event, vaultPath: string, model: string,
       const settings = JSON.parse(settingsRaw)
       const instructionNotePath = settings.email?.instructionNotePath
       if (instructionNotePath) {
-        const fullPath = path.join(vaultPath, instructionNotePath)
+        const fullPath = validatePath(vaultPath, instructionNotePath)
         instructionContent = await fs.readFile(fullPath, 'utf-8')
       }
     } catch {
@@ -5800,7 +5800,7 @@ ipcMain.handle('email-setup', async (_event, vaultPath: string, inboxFolderName?
   try {
     assertApprovedVault(vaultPath, 'email-setup')
     const folderName = inboxFolderName || '‼️📧 - emails'
-    const inboxFolder = path.join(vaultPath, folderName)
+    const inboxFolder = validatePath(vaultPath, folderName)
     const instructionPath = path.join(vaultPath, 'Email-Instruktionen.md')
 
     // Ordner erstellen
@@ -5886,7 +5886,8 @@ ipcMain.handle('email-create-note', async (_event, vaultPath: string, email: {
     }
 
     const folderName = inboxFolderName || '‼️📧 - emails'
-    const inboxFolder = path.join(vaultPath, folderName)
+    const inboxFolder = validatePath(vaultPath, folderName)
+    const inboxFolderRelative = path.relative(vaultPath, inboxFolder)
     await fs.mkdir(inboxFolder, { recursive: true })
 
     // Duplikat-Check über Email-ID: Prüfe ob irgendeine Notiz im Ordner diese Email-ID im Frontmatter hat
@@ -5898,7 +5899,7 @@ ipcMain.handle('email-create-note', async (_event, vaultPath: string, email: {
           const content = await fs.readFile(path.join(inboxFolder, file), 'utf-8')
           if (content.includes(`email-id: "${email.id}"`) || content.includes(`email-id: ${email.id}`)) {
             console.log('[Email] Note for email-id already exists:', file)
-            return { success: true, path: `${folderName}/${file}`, alreadyExists: true }
+            return { success: true, path: path.join(inboxFolderRelative, file), alreadyExists: true }
           }
         } catch { /* Datei nicht lesbar, überspringen */ }
       }
@@ -5922,7 +5923,7 @@ ipcMain.handle('email-create-note', async (_event, vaultPath: string, email: {
     try {
       await fs.access(filePath)
       console.log('[Email] Note already exists:', fileName)
-      return { success: true, path: `${folderName}/${fileName}`, alreadyExists: true }
+      return { success: true, path: path.join(inboxFolderRelative, fileName), alreadyExists: true }
     } catch { /* Noch nicht vorhanden */ }
 
     // Helper: JSON-Objekte rekursiv zu lesbarem Text konvertieren
@@ -6097,7 +6098,7 @@ ipcMain.handle('email-create-note', async (_event, vaultPath: string, email: {
     await fs.writeFile(filePath, lines.join('\n'), 'utf-8')
     console.log('[Email] Note created:', fileName)
 
-    return { success: true, path: `${folderName}/${fileName}`, alreadyExists: false }
+    return { success: true, path: path.join(inboxFolderRelative, fileName), alreadyExists: false }
   } catch (error) {
     console.error('[Email] Create note failed:', error)
     return { success: false, error: error instanceof Error ? error.message : 'Notiz-Erstellung fehlgeschlagen' }
@@ -7441,24 +7442,25 @@ ipcMain.handle('office-parse-docx', async (_event, filePath: string) => {
 ipcMain.handle('office-import-docx', async (_event, vaultPath: string, sourcePath: string, targetFolder?: string) => {
   try {
     assertApprovedVault(vaultPath, 'office-import-docx')
+    const safeSource = await assertSafePath(sourcePath, 'office-import-docx (source)')
     const { docxToStructuredMarkdown, docxToMarkdownWithImages } = await import('./office/officeService')
-    const baseName = path.basename(sourcePath, path.extname(sourcePath))
-    const folder = targetFolder ? path.join(vaultPath, targetFolder) : vaultPath
+    const baseName = path.basename(safeSource, path.extname(safeSource))
+    const folder = targetFolder ? validatePath(vaultPath, targetFolder) : path.resolve(vaultPath)
     await fs.mkdir(folder, { recursive: true })
-    const attachmentsDir = path.join(vaultPath, '.attachments')
+    const attachmentsDir = validatePath(vaultPath, '.attachments')
 
     // Zuerst strukturierter Parser (shading-aware, liefert Callouts). Bei Fehlern: mammoth-Fallback.
     let markdown = ''
     try {
-      const structured = await docxToStructuredMarkdown(sourcePath, attachmentsDir, baseName)
+      const structured = await docxToStructuredMarkdown(safeSource, attachmentsDir, baseName)
       markdown = structured.markdown
       if (!markdown || markdown.length < 20) {
-        const fb = await docxToMarkdownWithImages(sourcePath, attachmentsDir, baseName)
+        const fb = await docxToMarkdownWithImages(safeSource, attachmentsDir, baseName)
         markdown = fb.markdown
       }
     } catch (e) {
       console.warn('[office] structured docx parser failed, falling back to mammoth:', e)
-      const fb = await docxToMarkdownWithImages(sourcePath, attachmentsDir, baseName)
+      const fb = await docxToMarkdownWithImages(safeSource, attachmentsDir, baseName)
       markdown = fb.markdown
     }
 
@@ -7497,8 +7499,9 @@ ipcMain.handle('office-export-docx', async (_event, markdownContent: string, sug
 
 ipcMain.handle('office-parse-pptx', async (_event, filePath: string) => {
   try {
+    const safe = await assertSafePath(filePath, 'office-parse-pptx')
     const { parsePptx } = await import('./office/officeService')
-    const data = await parsePptx(filePath)
+    const data = await parsePptx(safe)
     return { success: true, data }
   } catch (error) {
     console.error('[office] parse-pptx failed:', error)
@@ -7508,12 +7511,14 @@ ipcMain.handle('office-parse-pptx', async (_event, filePath: string) => {
 
 ipcMain.handle('office-import-pptx', async (_event, vaultPath: string, sourcePath: string, targetFolder?: string) => {
   try {
+    assertApprovedVault(vaultPath, 'office-import-pptx')
+    const safeSource = await assertSafePath(sourcePath, 'office-import-pptx (source)')
     const { importPptxAsMarkdown } = await import('./office/officeService')
-    const baseName = path.basename(sourcePath, path.extname(sourcePath))
-    const folder = targetFolder ? path.join(vaultPath, targetFolder) : vaultPath
+    const baseName = path.basename(safeSource, path.extname(safeSource))
+    const folder = targetFolder ? validatePath(vaultPath, targetFolder) : path.resolve(vaultPath)
     await fs.mkdir(folder, { recursive: true })
-    const attachmentsDir = path.join(vaultPath, '.attachments')
-    const { markdown } = await importPptxAsMarkdown(sourcePath, attachmentsDir, baseName)
+    const attachmentsDir = validatePath(vaultPath, '.attachments')
+    const { markdown } = await importPptxAsMarkdown(safeSource, attachmentsDir, baseName)
 
     let targetPath = path.join(folder, `${baseName}.md`)
     let i = 1
