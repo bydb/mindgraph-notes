@@ -203,6 +203,80 @@ function validatePath(basePath: string, requestedPath: string): string {
   return resolved
 }
 
+// =====================================================================
+// Defense-in-depth: Whitelist erlaubter Vault-Wurzeln
+// =====================================================================
+// Der Renderer kann beliebige absolute Pfade an FS-IPC-Handler übergeben.
+// Damit eine kompromittierte Renderer-Komponente nicht /etc, ~/.ssh etc.
+// erreichen kann, prüfen wir jeden FS-Zugriff gegen diese Whitelist.
+// Hinzugefügt wird nur über vom Benutzer bestätigte Aktionen (OS-Dialog
+// oder persistierte Settings, die main selbst geschrieben hat).
+const approvedVaultRoots = new Set<string>()
+
+async function addApprovedRoot(root: string | null | undefined): Promise<void> {
+  if (!root || typeof root !== 'string') return
+  try {
+    const resolved = path.resolve(root)
+    approvedVaultRoots.add(resolved)
+    try {
+      const real = await fs.realpath(resolved)
+      if (real !== resolved) approvedVaultRoots.add(real)
+    } catch {
+      // Verzeichnis existiert evtl. noch nicht (Starter-Vault vor mkdir) — OK
+    }
+  } catch (err) {
+    console.warn('[Security] addApprovedRoot fehlgeschlagen:', root, err)
+  }
+}
+
+function isPathInside(child: string, parent: string): boolean {
+  const rel = path.relative(parent, child)
+  return rel === '' || (!rel.startsWith('..') && !path.isAbsolute(rel))
+}
+
+// Synchroner Schnell-Check für Handler, die einen vaultPath-Parameter nehmen.
+// Wirft, wenn der Pfad nicht via Dialog/Settings approved wurde.
+function assertApprovedVault(vaultPath: string, op: string): void {
+  if (!vaultPath || typeof vaultPath !== 'string' || !approvedVaultRoots.has(path.resolve(vaultPath))) {
+    console.warn(`[Security] ${op}: vault-Pfad nicht autorisiert: ${vaultPath}`)
+    throw new Error(`Vault-Pfad nicht autorisiert (${op})`)
+  }
+}
+
+// Async: prüft, dass ein absoluter Pfad innerhalb einer approvedVaultRoots liegt.
+// Symlinks werden via realpath aufgelöst, damit sie nicht zum Ausbruch genutzt
+// werden können. Für nicht-existente Pfade (z. B. write auf neue Datei) wird der
+// realpath des Eltern-Verzeichnisses geprüft.
+async function assertSafePath(requestedPath: string, op: string): Promise<string> {
+  if (!requestedPath || typeof requestedPath !== 'string') {
+    throw new Error(`Ungültiger Pfad (${op})`)
+  }
+  const resolved = path.resolve(requestedPath)
+
+  let canonical: string
+  try {
+    canonical = await fs.realpath(resolved)
+  } catch {
+    const parent = path.dirname(resolved)
+    try {
+      const realParent = await fs.realpath(parent)
+      canonical = path.join(realParent, path.basename(resolved))
+    } catch {
+      throw new Error(`Pfad nicht erreichbar (${op})`)
+    }
+  }
+
+  for (const root of approvedVaultRoots) {
+    if (isPathInside(canonical, root)) return canonical
+  }
+
+  console.warn(
+    `[Security] Verweigert: ${op} "${requestedPath}" (canonical: ${canonical}). ` +
+      `Approved roots: ${[...approvedVaultRoots].join(', ') || '(leer)'}`
+  )
+  throw new Error(`Pfad außerhalb erlaubter Vaults (${op})`)
+}
+
 function createWindow(): void {
   // Icon-Pfad basierend auf Platform
   // Im Dev-Modus: app.getAppPath() zeigt auf das app-Verzeichnis
@@ -357,11 +431,22 @@ let lastKnownVaultPath: string | null = null
 ipcMain.handle('get-last-vault', async () => {
   const settings = await loadSettings()
   lastKnownVaultPath = settings.lastVaultPath ?? null
+  // Persistierter Vault aus unserem eigenen Settings-File ist vertrauenswürdig
+  if (settings.lastVaultPath) await addApprovedRoot(settings.lastVaultPath)
   return settings.lastVaultPath || null
 })
 
-// Vault-Pfad speichern
+// Vault-Pfad speichern. Nur akzeptieren, wenn der Pfad bereits via
+// OS-Dialog (open-vault / select-vault-directory) bestätigt wurde —
+// sonst könnte ein kompromittierter Renderer beliebige Pfade approven.
 ipcMain.handle('set-last-vault', async (_event, vaultPath: string) => {
+  if (!vaultPath || typeof vaultPath !== 'string') {
+    throw new Error('Ungültiger Vault-Pfad')
+  }
+  if (!approvedVaultRoots.has(path.resolve(vaultPath))) {
+    console.warn('[Security] set-last-vault verweigert für nicht-bestätigten Pfad:', vaultPath)
+    throw new Error('Vault-Pfad nicht autorisiert — bitte via Dialog öffnen')
+  }
   await saveSettings({ lastVaultPath: vaultPath })
   lastKnownVaultPath = vaultPath
   return true
@@ -400,6 +485,7 @@ ipcMain.handle('open-vault', async () => {
     return null
   }
 
+  await addApprovedRoot(result.filePaths[0])
   return result.filePaths[0]
 })
 
@@ -418,6 +504,7 @@ ipcMain.handle('select-vault-directory', async () => {
     })
 
     if (result.canceled || result.filePaths.length === 0) return null
+    await addApprovedRoot(result.filePaths[0])
     return result.filePaths[0]
   }
 
@@ -435,13 +522,16 @@ ipcMain.handle('select-vault-directory', async () => {
   // Der gewählte Pfad ist der Zielordner — erstelle ihn falls nötig
   const targetDir = result.filePath
   await fs.mkdir(targetDir, { recursive: true })
+  await addApprovedRoot(targetDir)
   return targetDir
 })
 
 // Prüfen ob ein Verzeichnis leer ist
 ipcMain.handle('check-directory-empty', async (_event, dirPath: string) => {
   try {
-    const entries = await fs.readdir(dirPath)
+    // dirPath wurde via select-vault-directory gewählt → bereits approved
+    const safe = await assertSafePath(dirPath, 'check-directory-empty')
+    const entries = await fs.readdir(safe)
     // Ignoriere versteckte Dateien wie .DS_Store
     const visibleEntries = entries.filter(e => !e.startsWith('.'))
     return visibleEntries.length === 0
@@ -493,12 +583,13 @@ ipcMain.handle('prompt-new-note', async () => {
 
 // Neue Notiz erstellen
 ipcMain.handle('create-note', async (_event, filePath: string) => {
-  const fileName = path.basename(filePath)
+  const safe = await assertSafePath(filePath, 'create-note')
+  const fileName = path.basename(safe)
   const content = `# ${fileName.replace('.md', '')}\n\n`
-  
+
   try {
-    await fs.writeFile(filePath, content, 'utf-8')
-    return { path: filePath, fileName, content }
+    await fs.writeFile(safe, content, 'utf-8')
+    return { path: safe, fileName, content }
   } catch (error) {
     console.error('Fehler beim Erstellen der Notiz:', error)
     throw error
@@ -599,7 +690,8 @@ async function readDirectoryRecursive(dirPath: string, basePath: string): Promis
 
 ipcMain.handle('read-directory', async (_event, dirPath: string) => {
   try {
-    return await readDirectoryRecursive(dirPath, dirPath)
+    const safe = await assertSafePath(dirPath, 'read-directory')
+    return await readDirectoryRecursive(safe, safe)
   } catch (error) {
     console.error('Fehler beim Lesen des Verzeichnisses:', error)
     return []
@@ -609,7 +701,8 @@ ipcMain.handle('read-directory', async (_event, dirPath: string) => {
 // Datei lesen
 ipcMain.handle('read-file', async (_event, filePath: string) => {
   try {
-    return await fs.readFile(filePath, 'utf-8')
+    const safe = await assertSafePath(filePath, 'read-file')
+    return await fs.readFile(safe, 'utf-8')
   } catch (error) {
     console.error('Fehler beim Lesen der Datei:', error)
     throw error
@@ -618,6 +711,7 @@ ipcMain.handle('read-file', async (_event, filePath: string) => {
 
 // Mehrere Dateien auf einmal lesen (für Performance)
 ipcMain.handle('read-files-batch', async (_event, basePath: string, relativePaths: string[]) => {
+  assertApprovedVault(basePath, 'read-files-batch')
   const results: Record<string, string | null> = {}
 
   // Parallel lesen mit Limit
@@ -646,7 +740,8 @@ ipcMain.handle('read-files-batch', async (_event, basePath: string, relativePath
 // Binäre Datei lesen als Base64 (für PDFs etc.)
 ipcMain.handle('read-file-binary', async (_event, filePath: string) => {
   try {
-    const buffer = await fs.readFile(filePath)
+    const safe = await assertSafePath(filePath, 'read-file-binary')
+    const buffer = await fs.readFile(safe)
     return buffer.toString('base64')
   } catch (error) {
     console.error('Fehler beim Lesen der binären Datei:', error)
@@ -657,7 +752,8 @@ ipcMain.handle('read-file-binary', async (_event, filePath: string) => {
 // Datei schreiben
 ipcMain.handle('write-file', async (_event, filePath: string, content: string) => {
   try {
-    await fs.writeFile(filePath, content, 'utf-8')
+    const safe = await assertSafePath(filePath, 'write-file')
+    await fs.writeFile(safe, content, 'utf-8')
   } catch (error) {
     console.error('Fehler beim Schreiben der Datei:', error)
     throw error
@@ -674,6 +770,7 @@ ipcMain.handle('tasks-update-line', async (_event, data: {
   newLine: string
 }) => {
   try {
+    assertApprovedVault(data.vaultPath, 'tasks-update-line')
     const fullPath = validatePath(data.vaultPath, data.relativePath)
     const content = await fs.readFile(fullPath, 'utf-8')
     const lines = content.split('\n')
@@ -703,6 +800,7 @@ ipcMain.handle('tasks-create', async (_event, data: {
   taskLine: string           // Fertig gebaute Markdown-Zeile, z. B. "- [ ] foo #tag (@[[2026-04-21]])"
 }) => {
   try {
+    assertApprovedVault(data.vaultPath, 'tasks-create')
     const fullPath = validatePath(data.vaultPath, data.relativePath)
 
     // Zielverzeichnis anlegen, falls nötig
@@ -730,6 +828,7 @@ ipcMain.handle('tasks-create', async (_event, data: {
 // PDF Companion-Datei erstellen oder lesen
 ipcMain.handle('ensure-pdf-companion', async (_event, pdfPath: string, vaultPath: string) => {
   try {
+    assertApprovedVault(vaultPath, 'ensure-pdf-companion')
     const companionPath = pdfPath + '.md'
     const fullCompanionPath = validatePath(vaultPath, companionPath)
     const pdfFileName = path.basename(pdfPath)
@@ -775,6 +874,7 @@ tags: []
 // PDF Companion synchronisieren (wenn PDF umbenannt wurde)
 ipcMain.handle('sync-pdf-companion', async (_event, oldCompanionPath: string, newPdfPath: string, vaultPath: string) => {
   try {
+    assertApprovedVault(vaultPath, 'sync-pdf-companion')
     const fullOldCompanionPath = validatePath(vaultPath, oldCompanionPath)
     const newPdfFileName = path.basename(newPdfPath)
     const newPdfTitle = newPdfFileName.replace('.pdf', '')
@@ -826,7 +926,8 @@ ipcMain.handle('sync-pdf-companion', async (_event, oldCompanionPath: string, ne
 ipcMain.handle('delete-file', async (_event, filePath: string) => {
   if (!mainWindow) return false
 
-  const fileName = path.basename(filePath)
+  const safe = await assertSafePath(filePath, 'delete-file')
+  const fileName = path.basename(safe)
 
   const { response } = await dialog.showMessageBox(mainWindow, {
     type: 'warning',
@@ -841,7 +942,7 @@ ipcMain.handle('delete-file', async (_event, filePath: string) => {
   if (response === 0) return false
 
   try {
-    await fs.unlink(filePath)
+    await fs.unlink(safe)
     return true
   } catch (error) {
     console.error('Fehler beim Löschen der Datei:', error)
@@ -853,7 +954,14 @@ ipcMain.handle('delete-file', async (_event, filePath: string) => {
 ipcMain.handle('delete-directory', async (_event, dirPath: string) => {
   if (!mainWindow) return false
 
-  const folderName = path.basename(dirPath)
+  const safe = await assertSafePath(dirPath, 'delete-directory')
+
+  // Zusätzlicher Schutz: niemals einen Vault-Root selbst löschen lassen.
+  if (approvedVaultRoots.has(path.resolve(safe))) {
+    throw new Error('Vault-Root kann nicht gelöscht werden')
+  }
+
+  const folderName = path.basename(safe)
 
   // Zähle Dateien im Ordner
   let fileCount = 0
@@ -869,7 +977,7 @@ ipcMain.handle('delete-directory', async (_event, dirPath: string) => {
   }
 
   try {
-    await countFiles(dirPath)
+    await countFiles(safe)
   } catch {
     fileCount = 0
   }
@@ -891,7 +999,7 @@ ipcMain.handle('delete-directory', async (_event, dirPath: string) => {
   if (response === 0) return false
 
   try {
-    await fs.rm(dirPath, { recursive: true, force: true })
+    await fs.rm(safe, { recursive: true, force: true })
     return true
   } catch (error) {
     console.error('Fehler beim Löschen des Ordners:', error)
@@ -903,25 +1011,33 @@ ipcMain.handle('delete-directory', async (_event, dirPath: string) => {
 ipcMain.handle('delete-files', async (_event, filePaths: string[]) => {
   if (!mainWindow || filePaths.length === 0) return { deleted: 0, total: 0 }
 
-  const fileNames = filePaths.map(p => path.basename(p))
+  // Alle Pfade prüfen, bevor irgendwas passiert — schlägt einer fehl, brechen wir komplett ab.
+  const safePaths: string[] = []
+  for (const p of filePaths) {
+    safePaths.push(await assertSafePath(p, 'delete-files'))
+  }
+
+  const fileNames = safePaths.map(p => path.basename(p))
   const listPreview = fileNames.slice(0, 5).join('\n• ')
-  const moreText = filePaths.length > 5 ? `\n... und ${filePaths.length - 5} weitere` : ''
+  const moreText = safePaths.length > 5 ? `\n... und ${safePaths.length - 5} weitere` : ''
 
   const { response } = await dialog.showMessageBox(mainWindow, {
     type: 'warning',
     title: t('dialog.deleteFile.title'),
-    message: `${filePaths.length} Dateien löschen?`,
+    message: `${safePaths.length} Dateien löschen?`,
     detail: `• ${listPreview}${moreText}\n\nDieser Vorgang kann nicht rückgängig gemacht werden.`,
     buttons: [t('btn.cancel'), t('btn.delete')],
     defaultId: 0,
     cancelId: 0
   })
 
-  if (response === 0) return { deleted: 0, total: filePaths.length }
+  if (response === 0) return { deleted: 0, total: safePaths.length }
 
   let deleted = 0
-  for (const filePath of filePaths) {
+  for (const filePath of safePaths) {
     try {
+      // Vault-Roots niemals löschbar machen
+      if (approvedVaultRoots.has(path.resolve(filePath))) continue
       const stat = await fs.stat(filePath)
       if (stat.isDirectory()) {
         await fs.rm(filePath, { recursive: true, force: true })
@@ -934,13 +1050,14 @@ ipcMain.handle('delete-files', async (_event, filePaths: string[]) => {
     }
   }
 
-  return { deleted, total: filePaths.length }
+  return { deleted, total: safePaths.length }
 })
 
 // Datei-Statistiken abrufen
 ipcMain.handle('get-file-stats', async (_event, filePath: string) => {
   try {
-    const stats = await fs.stat(filePath)
+    const safe = await assertSafePath(filePath, 'get-file-stats')
+    const stats = await fs.stat(safe)
     return {
       createdAt: stats.birthtime,
       modifiedAt: stats.mtime
@@ -954,16 +1071,19 @@ ipcMain.handle('get-file-stats', async (_event, filePath: string) => {
 // Datei/Ordner umbenennen
 ipcMain.handle('rename-file', async (_event, oldPath: string, newPath: string) => {
   try {
+    const safeOld = await assertSafePath(oldPath, 'rename-file (source)')
+    const safeNew = await assertSafePath(newPath, 'rename-file (target)')
+
     // Prüfen ob Ziel bereits existiert
     try {
-      await fs.access(newPath)
+      await fs.access(safeNew)
       // Datei existiert bereits
       if (!mainWindow) return { success: false, error: 'exists' }
 
       const { response } = await dialog.showMessageBox(mainWindow, {
         type: 'warning',
         title: t('dialog.fileExists.title'),
-        message: t('dialog.fileExists.messageRename', { name: path.basename(newPath) }),
+        message: t('dialog.fileExists.messageRename', { name: path.basename(safeNew) }),
         detail: t('dialog.fileExists.detail'),
         buttons: [t('btn.cancel'), t('btn.overwrite')],
         defaultId: 0,
@@ -975,8 +1095,8 @@ ipcMain.handle('rename-file', async (_event, oldPath: string, newPath: string) =
       // Datei existiert nicht - gut
     }
 
-    await fs.rename(oldPath, newPath)
-    return { success: true, newPath }
+    await fs.rename(safeOld, safeNew)
+    return { success: true, newPath: safeNew }
   } catch (error) {
     console.error('Fehler beim Umbenennen:', error)
     return { success: false, error: 'failed' }
@@ -986,8 +1106,12 @@ ipcMain.handle('rename-file', async (_event, oldPath: string, newPath: string) =
 // Datei/Ordner verschieben
 ipcMain.handle('move-file', async (_event, sourcePath: string, targetDir: string) => {
   try {
-    const fileName = path.basename(sourcePath)
-    const targetPath = path.join(targetDir, fileName)
+    const safeSource = await assertSafePath(sourcePath, 'move-file (source)')
+    const safeTargetDir = await assertSafePath(targetDir, 'move-file (target dir)')
+    const fileName = path.basename(safeSource)
+    const targetPath = path.join(safeTargetDir, fileName)
+    // Auch der Ziel-Pfad inkl. Dateiname muss in einem erlaubten Vault liegen
+    await assertSafePath(targetPath, 'move-file (target)')
 
     // Prüfen ob Ziel bereits existiert
     try {
@@ -1009,7 +1133,7 @@ ipcMain.handle('move-file', async (_event, sourcePath: string, targetDir: string
       // Datei existiert nicht - gut
     }
 
-    await fs.rename(sourcePath, targetPath)
+    await fs.rename(safeSource, targetPath)
     return { success: true, newPath: targetPath }
   } catch (error) {
     console.error('Fehler beim Verschieben:', error)
@@ -1020,9 +1144,10 @@ ipcMain.handle('move-file', async (_event, sourcePath: string, targetDir: string
 // Datei duplizieren
 ipcMain.handle('duplicate-file', async (_event, filePath: string) => {
   try {
-    const dir = path.dirname(filePath)
-    const ext = path.extname(filePath)
-    const baseName = path.basename(filePath, ext)
+    const safeSource = await assertSafePath(filePath, 'duplicate-file (source)')
+    const dir = path.dirname(safeSource)
+    const ext = path.extname(safeSource)
+    const baseName = path.basename(safeSource, ext)
 
     // Finde einen freien Namen
     let counter = 1
@@ -1037,7 +1162,11 @@ ipcMain.handle('duplicate-file', async (_event, filePath: string) => {
       }
     }
 
-    await fs.copyFile(filePath, newPath)
+    // Ziel muss ebenfalls in einem erlaubten Vault liegen (sollte automatisch gegeben sein,
+    // da newPath im Verzeichnis von safeSource liegt — Prüfung als Defense-in-Depth)
+    await assertSafePath(newPath, 'duplicate-file (target)')
+
+    await fs.copyFile(safeSource, newPath)
     return { success: true, newPath }
   } catch (error) {
     console.error('Fehler beim Duplizieren:', error)
@@ -1047,14 +1176,16 @@ ipcMain.handle('duplicate-file', async (_event, filePath: string) => {
 
 // Im Finder/Explorer zeigen
 ipcMain.handle('show-in-folder', async (_event, filePath: string) => {
-  shell.showItemInFolder(filePath)
+  const safe = await assertSafePath(filePath, 'show-in-folder')
+  shell.showItemInFolder(safe)
   return true
 })
 
 // Ordner erstellen
 ipcMain.handle('create-directory', async (_event, dirPath: string) => {
   try {
-    await fs.mkdir(dirPath, { recursive: true })
+    const safe = await assertSafePath(dirPath, 'create-directory')
+    await fs.mkdir(safe, { recursive: true })
     return true
   } catch (error) {
     console.error('Fehler beim Erstellen des Ordners:', error)
@@ -1065,7 +1196,8 @@ ipcMain.handle('create-directory', async (_event, dirPath: string) => {
 // Ensure directory exists (idempotent - creates if not exists)
 ipcMain.handle('ensure-dir', async (_event, dirPath: string) => {
   try {
-    await fs.mkdir(dirPath, { recursive: true })
+    const safe = await assertSafePath(dirPath, 'ensure-dir')
+    await fs.mkdir(safe, { recursive: true })
     return true
   } catch (error) {
     // If directory already exists, that's fine
@@ -1097,6 +1229,9 @@ async function copyDirectoryRecursive(src: string, dest: string): Promise<void> 
 // Starter-Vault in Zielordner kopieren
 ipcMain.handle('create-starter-vault', async (_event, targetPath: string, language: string) => {
   try {
+    if (!approvedVaultRoots.has(path.resolve(targetPath))) {
+      throw new Error('Vault-Zielpfad nicht autorisiert — bitte via Dialog auswählen')
+    }
     const resourcesBase = app.isPackaged
       ? path.join(process.resourcesPath)
       : path.join(app.getAppPath(), 'resources')
@@ -1113,6 +1248,7 @@ ipcMain.handle('create-starter-vault', async (_event, targetPath: string, langua
     }
 
     await copyDirectoryRecursive(sourcePath, targetPath)
+    await addApprovedRoot(targetPath)
     console.log('[StarterVault] Created at:', targetPath)
     return true
   } catch (error) {
@@ -1124,8 +1260,12 @@ ipcMain.handle('create-starter-vault', async (_event, targetPath: string, langua
 // Leeren Vault erstellen
 ipcMain.handle('create-empty-vault', async (_event, targetPath: string) => {
   try {
+    if (!approvedVaultRoots.has(path.resolve(targetPath))) {
+      throw new Error('Vault-Zielpfad nicht autorisiert — bitte via Dialog auswählen')
+    }
     await fs.mkdir(targetPath, { recursive: true })
     await fs.mkdir(path.join(targetPath, '.mindgraph'), { recursive: true })
+    await addApprovedRoot(targetPath)
     console.log('[EmptyVault] Created at:', targetPath)
     return true
   } catch (error) {
@@ -1140,6 +1280,7 @@ const SUPPORTED_IMAGE_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.
 // Copy image from external source to .attachments folder
 ipcMain.handle('copy-image-to-attachments', async (_event, vaultPath: string, sourcePath: string) => {
   try {
+    assertApprovedVault(vaultPath, 'copy-image-to-attachments')
     const ext = path.extname(sourcePath).toLowerCase()
 
     // Validate image format
@@ -1176,6 +1317,7 @@ ipcMain.handle('copy-image-to-attachments', async (_event, vaultPath: string, so
 // Write image from Base64 data (for clipboard paste)
 ipcMain.handle('write-image-from-base64', async (_event, vaultPath: string, base64Data: string, suggestedName: string) => {
   try {
+    assertApprovedVault(vaultPath, 'write-image-from-base64')
     // Parse base64 data URL if present
     let buffer: Buffer
     let ext = '.png'
@@ -1221,7 +1363,8 @@ ipcMain.handle('write-image-from-base64', async (_event, vaultPath: string, base
 // Read image as Data URL for preview
 ipcMain.handle('read-image-as-data-url', async (_event, imagePath: string) => {
   try {
-    const ext = path.extname(imagePath).toLowerCase()
+    const safe = await assertSafePath(imagePath, 'read-image-as-data-url')
+    const ext = path.extname(safe).toLowerCase()
 
     // Determine MIME type
     const mimeTypes: Record<string, string> = {
@@ -1236,7 +1379,7 @@ ipcMain.handle('read-image-as-data-url', async (_event, imagePath: string) => {
     const mimeType = mimeTypes[ext] || 'image/png'
 
     // Read file as buffer
-    const buffer = await fs.readFile(imagePath)
+    const buffer = await fs.readFile(safe)
     const base64 = buffer.toString('base64')
     const dataUrl = `data:${mimeType};base64,${base64}`
 
@@ -1250,6 +1393,7 @@ ipcMain.handle('read-image-as-data-url', async (_event, imagePath: string) => {
 // Find image anywhere in vault (Obsidian-style search)
 ipcMain.handle('find-image-in-vault', async (_event, vaultPath: string, imageName: string) => {
   try {
+    assertApprovedVault(vaultPath, 'find-image-in-vault')
     const searchName = imageName.toLowerCase()
     const justFileName = searchName.split('/').pop() || searchName
 
@@ -2491,6 +2635,7 @@ ipcMain.handle('lmstudio-embedding-models', async (_event, port: number = LM_STU
 // Dialog für neuen Ordner
 ipcMain.handle('prompt-new-folder', async (_event, basePath: string) => {
   if (!mainWindow) return null
+  assertApprovedVault(basePath, 'prompt-new-folder')
 
   const result = await dialog.showSaveDialog(mainWindow, {
     title: t('dialog.newFolder.title'),
@@ -2503,10 +2648,11 @@ ipcMain.handle('prompt-new-folder', async (_event, basePath: string) => {
     return null
   }
 
-  // Ordner erstellen
+  // Ordner erstellen — nur innerhalb des Vaults (Save-Dialog kann theoretisch nach außen wandern)
   try {
-    await fs.mkdir(result.filePath, { recursive: true })
-    return result.filePath
+    const safeTarget = await assertSafePath(result.filePath, 'prompt-new-folder (target)')
+    await fs.mkdir(safeTarget, { recursive: true })
+    return safeTarget
   } catch (error) {
     console.error('Fehler beim Erstellen des Ordners:', error)
     throw error
@@ -2514,11 +2660,18 @@ ipcMain.handle('prompt-new-folder', async (_event, basePath: string) => {
 })
 
 // File Watcher
-ipcMain.on('watch-directory', (_event, dirPath: string) => {
+ipcMain.on('watch-directory', async (_event, dirPath: string) => {
+  // Nur innerhalb erlaubter Vaults watchen
+  try {
+    await assertSafePath(dirPath, 'watch-directory')
+  } catch (err) {
+    console.warn('[watch-directory] verweigert:', err)
+    return
+  }
   if (fileWatcher) {
     fileWatcher.close()
   }
-  
+
   fileWatcher = watch(dirPath, {
     ignored: /(^|[\/\\])\../,
     persistent: true,
@@ -2876,6 +3029,7 @@ ipcMain.handle('voice-transcribe', async (_event, audio: ArrayBuffer, extension:
 // Graph-Daten speichern (im Vault unter .mindgraph/)
 ipcMain.handle('save-graph-data', async (_event, vaultPath: string, data: object) => {
   try {
+    assertApprovedVault(vaultPath, 'save-graph-data')
     const mindgraphDir = path.join(vaultPath, '.mindgraph')
     const graphFile = path.join(mindgraphDir, 'graph-data.json')
 
@@ -2894,6 +3048,7 @@ ipcMain.handle('save-graph-data', async (_event, vaultPath: string, data: object
 // Graph-Daten laden
 ipcMain.handle('load-graph-data', async (_event, vaultPath: string) => {
   try {
+    assertApprovedVault(vaultPath, 'load-graph-data')
     const graphFile = path.join(vaultPath, '.mindgraph', 'graph-data.json')
     const content = await fs.readFile(graphFile, 'utf-8')
     return JSON.parse(content)
@@ -2907,6 +3062,7 @@ ipcMain.handle('load-graph-data', async (_event, vaultPath: string) => {
 
 ipcMain.handle('vault-settings-load', async (_event, vaultPath: string) => {
   try {
+    assertApprovedVault(vaultPath, 'vault-settings-load')
     const settingsFile = path.join(vaultPath, '.mindgraph', 'vault-settings.json')
     const content = await fs.readFile(settingsFile, 'utf-8')
     return JSON.parse(content)
@@ -2917,6 +3073,7 @@ ipcMain.handle('vault-settings-load', async (_event, vaultPath: string) => {
 
 ipcMain.handle('vault-settings-save', async (_event, vaultPath: string, settings: object) => {
   try {
+    assertApprovedVault(vaultPath, 'vault-settings-save')
     const mindgraphDir = path.join(vaultPath, '.mindgraph')
     await fs.mkdir(mindgraphDir, { recursive: true })
     await fs.writeFile(
@@ -2936,6 +3093,7 @@ ipcMain.handle('vault-settings-save', async (_event, vaultPath: string, settings
 // Notes-Cache speichern
 ipcMain.handle('save-notes-cache', async (_event, vaultPath: string, cache: object) => {
   try {
+    assertApprovedVault(vaultPath, 'save-notes-cache')
     const mindgraphDir = path.join(vaultPath, '.mindgraph')
     const cacheFile = path.join(mindgraphDir, 'notes-cache.json')
 
@@ -2952,6 +3110,7 @@ ipcMain.handle('save-notes-cache', async (_event, vaultPath: string, cache: obje
 // Notes-Cache laden
 ipcMain.handle('load-notes-cache', async (_event, vaultPath: string) => {
   try {
+    assertApprovedVault(vaultPath, 'load-notes-cache')
     const cacheFile = path.join(vaultPath, '.mindgraph', 'notes-cache.json')
     const content = await fs.readFile(cacheFile, 'utf-8')
     const cache = JSON.parse(content)
@@ -2966,6 +3125,7 @@ ipcMain.handle('load-notes-cache', async (_event, vaultPath: string) => {
 // Embeddings-Cache für Smart Connections (separate Datei pro Modell)
 ipcMain.handle('save-embeddings-cache', async (_event, vaultPath: string, model: string, cache: object) => {
   try {
+    assertApprovedVault(vaultPath, 'save-embeddings-cache')
     const mindgraphDir = path.join(vaultPath, '.mindgraph')
     // Sanitize model name for filename (replace / and : with -)
     const safeModelName = model.replace(/[/:]/g, '-')
@@ -2983,6 +3143,7 @@ ipcMain.handle('save-embeddings-cache', async (_event, vaultPath: string, model:
 
 ipcMain.handle('load-embeddings-cache', async (_event, vaultPath: string, model: string) => {
   try {
+    assertApprovedVault(vaultPath, 'load-embeddings-cache')
     const safeModelName = model.replace(/[/:]/g, '-')
     const cacheFile = path.join(vaultPath, '.mindgraph', `embeddings-${safeModelName}.json`)
     const content = await fs.readFile(cacheFile, 'utf-8')
@@ -2997,6 +3158,7 @@ ipcMain.handle('load-embeddings-cache', async (_event, vaultPath: string, model:
 
 // Alle Markdown-Dateien mit mtime abrufen (für Cache-Vergleich)
 ipcMain.handle('get-files-with-mtime', async (_event, vaultPath: string) => {
+  assertApprovedVault(vaultPath, 'get-files-with-mtime')
   const files: Array<{ path: string; mtime: number }> = []
 
   async function scanDirectory(dirPath: string, basePath: string) {
@@ -3038,6 +3200,7 @@ ipcMain.handle('get-files-with-mtime', async (_event, vaultPath: string) => {
 // PDF Export - mit verstecktem Fenster für vollständigen Export
 ipcMain.handle('export-pdf', async (_event, defaultFileName: string, htmlContent: string, title: string, vaultPath?: string, notePath?: string) => {
   if (!mainWindow) return { success: false, error: 'Kein Fenster verfügbar' }
+  if (vaultPath) assertApprovedVault(vaultPath, 'export-pdf')
 
   // Speicherdialog öffnen
   const result = await dialog.showSaveDialog(mainWindow, {
@@ -3443,10 +3606,11 @@ function extractMarkdownFromResult(result: unknown): string {
 // Konvertiert PDF zu Markdown via Docling API
 // Verwendet async-Endpoint wenn OCR aktiviert ist (dann ist Polling erforderlich)
 ipcMain.handle('docling-convert-pdf', async (_event, pdfPath: string, baseUrl?: string, options?: DoclingConvertOptions) => {
+  const safePdfPath = await assertSafePath(pdfPath, 'docling-convert-pdf')
   const url = baseUrl || DOCLING_DEFAULT_URL
-  const pdfFileName = path.basename(pdfPath)
+  const pdfFileName = path.basename(safePdfPath)
   const useAsync = options?.ocrEnabled === true  // OCR erfordert async-Verarbeitung
-  console.log('[Docling] Converting PDF:', pdfPath, 'async:', useAsync)
+  console.log('[Docling] Converting PDF:', safePdfPath, 'async:', useAsync)
 
   // Temporäre Datei erstellen falls Pfad Sonderzeichen enthält
   const os = await import('os')
@@ -3469,7 +3633,7 @@ ipcMain.handle('docling-convert-pdf', async (_event, pdfPath: string, baseUrl?: 
 
   try {
     // Kopiere PDF in temporäres Verzeichnis
-    await fs.copyFile(pdfPath, tempPath)
+    await fs.copyFile(safePdfPath, tempPath)
     console.log('[Docling] Copied to temp:', tempPath)
 
     // Wähle Endpoint basierend auf OCR-Option
@@ -3859,6 +4023,7 @@ function generateReadwiseMarkdown(book: {
 // Readwise Export synchronisieren
 ipcMain.handle('readwise-sync', async (_event, apiKey: string, syncFolder: string, vaultPath: string, lastSyncedAt?: string, syncCategories?: Record<string, boolean>) => {
   if (!mainWindow) return { success: false, error: 'Kein Fenster verfügbar' }
+  assertApprovedVault(vaultPath, 'readwise-sync')
 
   try {
     const syncBasePath = path.join(vaultPath, syncFolder)
@@ -4091,7 +4256,8 @@ function stripWikilinks(content: string): string {
 ipcMain.handle('strip-wikilinks-in-folder', async (_event, folderPath: string, _vaultPath: string) => {
   if (!mainWindow) return { success: false, error: 'Kein Fenster verfügbar' }
 
-  const folderName = path.basename(folderPath)
+  const safeFolder = await assertSafePath(folderPath, 'strip-wikilinks-in-folder')
+  const folderName = path.basename(safeFolder)
 
   // Bestätigungsdialog
   const { response } = await dialog.showMessageBox(mainWindow, {
@@ -4146,9 +4312,9 @@ ipcMain.handle('strip-wikilinks-in-folder', async (_event, folderPath: string, _
       }
     }
 
-    await processDirectory(folderPath)
+    await processDirectory(safeFolder)
 
-    console.log(`[Wikilinks] Stripped in ${folderPath}:`, stats)
+    console.log(`[Wikilinks] Stripped in ${safeFolder}:`, stats)
 
     // Erfolgsmeldung anzeigen
     await dialog.showMessageBox(mainWindow, {
@@ -4849,6 +5015,7 @@ Do NOT use <think> tags or internal reasoning. Output the JSON immediately.`
 // Learning Progress speichern
 ipcMain.handle('save-learning-progress', async (_event, vaultPath: string, progress: object) => {
   try {
+    assertApprovedVault(vaultPath, 'save-learning-progress')
     const progressPath = path.join(vaultPath, '.mindgraph', 'learning-progress.json')
 
     // Verzeichnis erstellen falls nicht vorhanden
@@ -4865,6 +5032,7 @@ ipcMain.handle('save-learning-progress', async (_event, vaultPath: string, progr
 // Learning Progress laden
 ipcMain.handle('load-learning-progress', async (_event, vaultPath: string) => {
   try {
+    assertApprovedVault(vaultPath, 'load-learning-progress')
     const progressPath = path.join(vaultPath, '.mindgraph', 'learning-progress.json')
     const content = await fs.readFile(progressPath, 'utf-8')
     return JSON.parse(content)
@@ -4876,6 +5044,7 @@ ipcMain.handle('load-learning-progress', async (_event, vaultPath: string) => {
 // Flashcards laden
 ipcMain.handle('flashcards-load', async (_event, vaultPath: string) => {
   try {
+    assertApprovedVault(vaultPath, 'flashcards-load')
     const flashcardsPath = path.join(vaultPath, '.mindgraph', 'flashcards.json')
     const content = await fs.readFile(flashcardsPath, 'utf-8')
     return JSON.parse(content)
@@ -4887,6 +5056,7 @@ ipcMain.handle('flashcards-load', async (_event, vaultPath: string) => {
 // Flashcards speichern
 ipcMain.handle('flashcards-save', async (_event, vaultPath: string, flashcards: object[]) => {
   try {
+    assertApprovedVault(vaultPath, 'flashcards-save')
     const flashcardsPath = path.join(vaultPath, '.mindgraph', 'flashcards.json')
 
     // Verzeichnis erstellen falls nicht vorhanden
@@ -4903,6 +5073,7 @@ ipcMain.handle('flashcards-save', async (_event, vaultPath: string, flashcards: 
 // Anki Import
 ipcMain.handle('import-anki', async (_event, vaultPath: string) => {
   if (!mainWindow) return { success: false, error: 'No window' }
+  assertApprovedVault(vaultPath, 'import-anki')
 
   const result = await dialog.showOpenDialog(mainWindow, {
     title: 'Import Anki Deck',
@@ -4951,6 +5122,7 @@ ipcMain.handle('import-anki', async (_event, vaultPath: string) => {
 // Study Statistics laden
 ipcMain.handle('study-stats-load', async (_event, vaultPath: string) => {
   try {
+    assertApprovedVault(vaultPath, 'study-stats-load')
     const statsPath = path.join(vaultPath, '.mindgraph', 'study-stats.json')
     const content = await fs.readFile(statsPath, 'utf-8')
     return JSON.parse(content)
@@ -4962,6 +5134,7 @@ ipcMain.handle('study-stats-load', async (_event, vaultPath: string) => {
 // Study Statistics speichern
 ipcMain.handle('study-stats-save', async (_event, vaultPath: string, data: object) => {
   try {
+    assertApprovedVault(vaultPath, 'study-stats-save')
     const statsPath = path.join(vaultPath, '.mindgraph', 'study-stats.json')
     await fs.mkdir(path.dirname(statsPath), { recursive: true })
     await fs.writeFile(statsPath, JSON.stringify(data, null, 2), 'utf-8')
@@ -4982,6 +5155,7 @@ function getSyncCredentialsPath(): string {
 
 ipcMain.handle('sync-setup', async (_event, vaultPath: string, passphrase: string, relayUrl: string, autoSyncInterval?: number, activationCode?: string) => {
   try {
+    assertApprovedVault(vaultPath, 'sync-setup')
     syncEngine = new SyncEngine()
     const result = await syncEngine.init(vaultPath, passphrase, relayUrl, activationCode || '')
     await syncEngine.connect()
@@ -4997,6 +5171,7 @@ ipcMain.handle('sync-setup', async (_event, vaultPath: string, passphrase: strin
 
 ipcMain.handle('sync-join', async (_event, vaultPath: string, vaultId: string, passphrase: string, relayUrl: string, autoSyncInterval?: number, activationCode?: string) => {
   try {
+    assertApprovedVault(vaultPath, 'sync-join')
     syncEngine = new SyncEngine()
     await syncEngine.join(vaultPath, vaultId, passphrase, relayUrl, activationCode || '')
     await syncEngine.connect()
@@ -5109,6 +5284,7 @@ ipcMain.handle('sync-restore-file', async (_event, filePath: string) => {
 
 ipcMain.handle('sync-restore', async (_event, vaultPath: string, vaultId: string, relayUrl: string, autoSyncInterval?: number) => {
   try {
+    assertApprovedVault(vaultPath, 'sync-restore')
     // Load passphrase from safeStorage
     if (!safeStorage.isEncryptionAvailable()) {
       return false
@@ -5212,6 +5388,7 @@ ipcMain.handle('email-connect', async (_event, account: { host: string; port: nu
 ipcMain.handle('email-load', async (_event, vaultPath: string) => {
   console.log(`[Email] email-load called: vault=${vaultPath}`)
   try {
+    assertApprovedVault(vaultPath, 'email-load')
     const emailsPath = path.join(vaultPath, '.mindgraph', 'emails.json')
     const content = await fs.readFile(emailsPath, 'utf-8')
     const data = JSON.parse(content)
@@ -5245,6 +5422,7 @@ ipcMain.handle('email-load', async (_event, vaultPath: string) => {
 // Emails speichern (JSON-Persistenz)
 ipcMain.handle('email-save', async (_event, vaultPath: string, data: { emails: object[]; lastFetchedAt: Record<string, string> }) => {
   try {
+    assertApprovedVault(vaultPath, 'email-save')
     const emailsPath = path.join(vaultPath, '.mindgraph', 'emails.json')
     await fs.mkdir(path.dirname(emailsPath), { recursive: true })
     await fs.writeFile(emailsPath, JSON.stringify(data, null, 2), 'utf-8')
@@ -5258,6 +5436,7 @@ ipcMain.handle('email-save', async (_event, vaultPath: string, data: { emails: o
 // Emails per IMAP abrufen
 ipcMain.handle('email-fetch', async (_event, vaultPath: string, accounts: Array<{ id: string; host: string; port: number; user: string; tls: boolean }>, lastFetchedAt: Record<string, string>, maxPerAccount: number) => {
   try {
+    assertApprovedVault(vaultPath, 'email-fetch')
     const { ImapFlow } = await import('imapflow')
 
     // Bestehende Emails laden
@@ -5456,6 +5635,7 @@ ipcMain.handle('email-fetch', async (_event, vaultPath: string, accounts: Array<
 ipcMain.handle('email-analyze', async (_event, vaultPath: string, model: string, emailIds?: string[]) => {
   console.log(`[Email] email-analyze called: vault=${vaultPath}, model=${model}, ids=${emailIds?.length ?? 'all'}`)
   try {
+    assertApprovedVault(vaultPath, 'email-analyze')
     // Emails laden
     const emailsPath = path.join(vaultPath, '.mindgraph', 'emails.json')
     const content = await fs.readFile(emailsPath, 'utf-8')
@@ -5618,6 +5798,7 @@ END_EMAIL_DATA
 // Email-Setup: Ordner + Instruktions-Notiz erstellen
 ipcMain.handle('email-setup', async (_event, vaultPath: string, inboxFolderName?: string) => {
   try {
+    assertApprovedVault(vaultPath, 'email-setup')
     const folderName = inboxFolderName || '‼️📧 - emails'
     const inboxFolder = path.join(vaultPath, folderName)
     const instructionPath = path.join(vaultPath, 'Email-Instruktionen.md')
@@ -5697,6 +5878,7 @@ ipcMain.handle('email-create-note', async (_event, vaultPath: string, email: {
   }
 }, inboxFolderName?: string) => {
   try {
+    assertApprovedVault(vaultPath, 'email-create-note')
     // Schneller Check: Wenn noteCreated schon gesetzt, direkt zurück
     if (email.noteCreated) {
       console.log('[Email] Note already created (flag set) for:', email.subject)
@@ -5925,6 +6107,7 @@ ipcMain.handle('email-create-note', async (_event, vaultPath: string, email: {
 // Signatur-Bild auswaehlen und in .mindgraph speichern
 ipcMain.handle('email-select-signature-image', async (_event, vaultPath: string) => {
   try {
+    assertApprovedVault(vaultPath, 'email-select-signature-image')
     const result = await dialog.showOpenDialog({
       title: 'Signatur-Bild auswaehlen',
       filters: [{ name: 'Bilder', extensions: ['jpg', 'jpeg', 'png', 'gif', 'webp'] }],
@@ -5955,8 +6138,9 @@ ipcMain.handle('email-select-signature-image', async (_event, vaultPath: string)
 // Signatur-Bild als Data-URL laden
 ipcMain.handle('email-load-signature-image', async (_event, imagePath: string) => {
   try {
-    const buffer = await fs.readFile(imagePath)
-    const ext = path.extname(imagePath).toLowerCase()
+    const safe = await assertSafePath(imagePath, 'email-load-signature-image')
+    const buffer = await fs.readFile(safe)
+    const ext = path.extname(safe).toLowerCase()
     const mimeTypes: Record<string, string> = { '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.gif': 'image/gif', '.webp': 'image/webp' }
     const mime = mimeTypes[ext] || 'image/png'
     return `data:${mime};base64,${buffer.toString('base64')}`
@@ -6506,6 +6690,7 @@ ipcMain.handle('remarkable-download-document', async (_event, vaultPath: string,
   }
 
   try {
+    assertApprovedVault(vaultPath, 'remarkable-download-document')
     const pdfBuffer = await remarkableService.downloadUsbDocumentPdf(document.id)
     const pdfDir = validatePath(vaultPath, 'reMarkable/pdf')
     await fs.mkdir(pdfDir, { recursive: true })
@@ -6532,6 +6717,7 @@ ipcMain.handle('remarkable-download-document', async (_event, vaultPath: string,
 
 ipcMain.handle('remarkable-upload-pdf', async (_event, vaultPath: string, relativePdfPath: string) => {
   try {
+    assertApprovedVault(vaultPath, 'remarkable-upload-pdf')
     if (!relativePdfPath.toLowerCase().endsWith('.pdf')) {
       return { success: false, error: 'Nur PDF-Dateien koennen exportiert werden' }
     }
@@ -6553,6 +6739,7 @@ ipcMain.handle('remarkable-upload-pdf', async (_event, vaultPath: string, relati
 
 ipcMain.handle('remarkable-optimize-pdf', async (_event, vaultPath: string, relativePdfPath: string) => {
   try {
+    assertApprovedVault(vaultPath, 'remarkable-optimize-pdf')
     if (!relativePdfPath.toLowerCase().endsWith('.pdf')) {
       return { success: false, error: 'Nur PDF-Dateien koennen optimiert werden' }
     }
@@ -6857,6 +7044,7 @@ ipcMain.handle('edoobox-list-bookings', async (_event, baseUrl: string, apiVersi
 // Events laden (JSON-Persistenz)
 ipcMain.handle('edoobox-load-events', async (_event, vaultPath: string) => {
   try {
+    assertApprovedVault(vaultPath, 'edoobox-load-events')
     const eventsPath = path.join(vaultPath, '.mindgraph', 'edoobox-events.json')
     const exists = await fs.access(eventsPath).then(() => true).catch(() => false)
     if (!exists) return []
@@ -6871,6 +7059,7 @@ ipcMain.handle('edoobox-load-events', async (_event, vaultPath: string) => {
 // Events speichern (JSON-Persistenz)
 ipcMain.handle('edoobox-save-events', async (_event, vaultPath: string, events: unknown[]) => {
   try {
+    assertApprovedVault(vaultPath, 'edoobox-save-events')
     const mindgraphDir = path.join(vaultPath, '.mindgraph')
     await fs.mkdir(mindgraphDir, { recursive: true })
     await fs.writeFile(path.join(mindgraphDir, 'edoobox-events.json'), JSON.stringify(events, null, 2))
@@ -7099,9 +7288,10 @@ ipcMain.handle('marketing-upload-image', async (_event, siteUrl: string, usernam
     const creds = await loadMarketingCredentials()
     if (!creds?.wpAppPassword) return { success: false, error: 'Kein WordPress App-Passwort gespeichert' }
 
-    const imageBuffer = await fs.readFile(imagePath)
-    const filename = path.basename(imagePath)
-    const ext = path.extname(imagePath).toLowerCase()
+    const safeImagePath = await assertSafePath(imagePath, 'marketing-upload-image')
+    const imageBuffer = await fs.readFile(safeImagePath)
+    const filename = path.basename(safeImagePath)
+    const ext = path.extname(safeImagePath).toLowerCase()
     const mimeTypes: Record<string, string> = {
       '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png',
       '.gif': 'image/gif', '.webp': 'image/webp'
@@ -7171,7 +7361,8 @@ ipcMain.handle('marketing-generate-image', async (_event, prompt: string, apiKey
 // Bild als Base64 lesen (für Preview im Renderer)
 ipcMain.handle('marketing-read-image-base64', async (_event, imagePath: string) => {
   try {
-    const buffer = await fs.readFile(imagePath)
+    const safe = await assertSafePath(imagePath, 'marketing-read-image-base64')
+    const buffer = await fs.readFile(safe)
     return buffer.toString('base64')
   } catch {
     return null
@@ -7211,8 +7402,9 @@ async function loadMarketingCredentials(): Promise<{ wpAppPassword?: string; igA
 
 ipcMain.handle('office-parse-excel', async (_event, filePath: string) => {
   try {
+    const safe = await assertSafePath(filePath, 'office-parse-excel')
     const { parseExcel } = await import('./office/officeService')
-    const data = await parseExcel(filePath)
+    const data = await parseExcel(safe)
     return { success: true, data }
   } catch (error) {
     console.error('[office] parse-excel failed:', error)
@@ -7222,8 +7414,9 @@ ipcMain.handle('office-parse-excel', async (_event, filePath: string) => {
 
 ipcMain.handle('office-excel-to-markdown', async (_event, filePath: string, sheetName?: string) => {
   try {
+    const safe = await assertSafePath(filePath, 'office-excel-to-markdown')
     const { parseExcel, sheetToMarkdownTable } = await import('./office/officeService')
-    const data = await parseExcel(filePath)
+    const data = await parseExcel(safe)
     const sheet = sheetName ? data.sheets.find((s) => s.name === sheetName) : data.sheets[0]
     if (!sheet) return { success: false, error: 'Sheet not found' }
     return { success: true, markdown: sheetToMarkdownTable(sheet) }
@@ -7235,8 +7428,9 @@ ipcMain.handle('office-excel-to-markdown', async (_event, filePath: string, shee
 
 ipcMain.handle('office-parse-docx', async (_event, filePath: string) => {
   try {
+    const safe = await assertSafePath(filePath, 'office-parse-docx')
     const { parseDocx } = await import('./office/officeService')
-    const data = await parseDocx(filePath)
+    const data = await parseDocx(safe)
     return { success: true, data }
   } catch (error) {
     console.error('[office] parse-docx failed:', error)
@@ -7246,6 +7440,7 @@ ipcMain.handle('office-parse-docx', async (_event, filePath: string) => {
 
 ipcMain.handle('office-import-docx', async (_event, vaultPath: string, sourcePath: string, targetFolder?: string) => {
   try {
+    assertApprovedVault(vaultPath, 'office-import-docx')
     const { docxToStructuredMarkdown, docxToMarkdownWithImages } = await import('./office/officeService')
     const baseName = path.basename(sourcePath, path.extname(sourcePath))
     const folder = targetFolder ? path.join(vaultPath, targetFolder) : vaultPath
