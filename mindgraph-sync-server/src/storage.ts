@@ -104,16 +104,6 @@ export function storeFile(
   modifiedAt: number,
   originalPath: string
 ): void {
-  // Check vault size limit (5 GB)
-  const meta = db.prepare('SELECT total_size FROM vault_meta WHERE vault_id = ?').get(vaultId) as
-    | { total_size: number }
-    | undefined
-
-  const currentSize = meta?.total_size || 0
-  if (currentSize + encryptedData.length > 5 * 1024 * 1024 * 1024) {
-    throw new Error('Vault storage limit exceeded (5 GB)')
-  }
-
   // Check single file size limit (100 MB)
   if (encryptedData.length > 100 * 1024 * 1024) {
     throw new Error('File size limit exceeded (100 MB)')
@@ -124,6 +114,16 @@ export function storeFile(
     'SELECT file_size, deleted_at FROM files WHERE vault_id = ? AND file_path = ?'
   ).get(vaultId, filePath) as { file_size: number; deleted_at: number | null } | undefined
   const oldSize = oldFile ? (oldFile.deleted_at ? 0 : oldFile.file_size) : 0
+
+  // Check vault size limit (5 GB) — subtract old size first so updates near the limit don't fail
+  const meta = db.prepare('SELECT total_size FROM vault_meta WHERE vault_id = ?').get(vaultId) as
+    | { total_size: number }
+    | undefined
+
+  const currentSize = meta?.total_size || 0
+  if (currentSize - oldSize + encryptedData.length > 5 * 1024 * 1024 * 1024) {
+    throw new Error('Vault storage limit exceeded (5 GB)')
+  }
 
   // If file was soft-deleted, hard-delete it first so INSERT OR REPLACE works cleanly
   if (oldFile?.deleted_at) {
