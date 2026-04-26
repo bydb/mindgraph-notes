@@ -2,6 +2,17 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.5.17-beta] - 2026-04-26
+
+### Security
+- **File-System-IPC gegen Renderer-Kompromittierung gehärtet** — die FS-Handler (read-file, write-file, delete-*, rename-file, move-file, etc.) nahmen vorher beliebige absolute Pfade vom Renderer entgegen. Ein kompromittierter Renderer (XSS in fremder Markdown, kompromittiertes npm-Paket, Mermaid-/KaTeX-Bypass) hätte ~/.ssh, Browser-Cookies oder beliebige Dateien lesen/schreiben können. Neue Defense-in-Depth-Schicht: zentrale Whitelist `approvedVaultRoots`, befüllt nur über vom Benutzer bestätigte Aktionen (OS-Dialog, persistierte Settings); `assertSafePath` löst Symlinks via `realpath` und prüft jeden Pfad gegen die Whitelist; `assertApprovedVault` schützt vault-relative Handler. `set-last-vault` lehnt nicht-bestätigte Pfade ab — Renderer kann sich nicht selbst Pfade approven. Vault-Roots können nicht via `delete-directory`/`delete-files` gelöscht werden. Patches in ~50 IPC-Handlern.
+- **Vault-relative IPC-Pfade härter validiert** — wo der Renderer einen relativen Sub-Pfad vorgibt (Email-Inbox-Ordner, Readwise-Sync-Folder, Office-Import-Targetfolder, .attachments), wurde `path.join` durch `validatePath` ersetzt. Schließt Path-Traversal über den relativen Parameter (`../../etc`).
+- **Activation-Codes atomar claimen** — Validierung und Claim erfolgten zweistufig, zwei parallele Connects konnten denselben Sync-Code beanspruchen. Jetzt atomar in einem `UPDATE` mit Bedingung; Code wird nach Claim deaktiviert.
+- **Sync-Speicherlimit bei Datei-Updates** — das 5-GB-Vault-Limit verglich `currentSize + neueGröße` ohne die alte Größe abzuziehen, sodass legitime Updates nahe am Limit fehlschlagen konnten. Jetzt: `currentSize - oldSize + neueGröße`.
+
+### Sonstiges
+- Lizenz von MIT auf AGPL-3.0-or-later geändert.
+
 ## [0.5.16-beta] - 2026-04-24
 
 ### Features
