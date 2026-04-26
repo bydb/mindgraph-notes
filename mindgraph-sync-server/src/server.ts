@@ -1,7 +1,7 @@
 import http from 'http'
 import crypto from 'crypto'
 import { WebSocketServer, WebSocket } from 'ws'
-import { initDatabase, registerVault, getManifest, getDeletedManifest, storeFile, getFile, deleteFile, getDeletedFiles, restoreFile, purgeDeletedFiles, closeDatabase, vaultExists, validateActivationKey, claimActivationKey, addActivationKey, listActivationKeys, deactivateActivationKey, deleteVault, listVaults } from './storage'
+import { initDatabase, registerVault, getManifest, getDeletedManifest, storeFile, getFile, deleteFile, getDeletedFiles, restoreFile, purgeDeletedFiles, closeDatabase, vaultExists, claimActivationKey, addActivationKey, listActivationKeys, deactivateActivationKey, deleteVault, listVaults } from './storage'
 import { checkRateLimit } from './rateLimit'
 
 const PORT = parseInt(process.env.PORT || '8080', 10)
@@ -77,12 +77,11 @@ function handleMessage(ws: WebSocket, ip: string, raw: string): void {
 
       // Activation code check (skip for already registered vaults)
       if (REQUIRE_ACTIVATION && !vaultExists(msg.vaultId)) {
-        if (!msg.activationCode || !validateActivationKey(msg.activationCode)) {
+        if (!msg.activationCode || !claimActivationKey(msg.activationCode, msg.vaultId)) {
           sendJson(ws, { type: 'error', code: 'INVALID_ACTIVATION_KEY', message: 'Invalid activation code' })
           console.log(`[Server] Rejected vault ${msg.vaultId.slice(0, 12)}... — invalid activation code`)
           return
         }
-        claimActivationKey(msg.activationCode, msg.vaultId)
         console.log(`[Server] Activation code used for vault ${msg.vaultId.slice(0, 12)}...`)
       }
 

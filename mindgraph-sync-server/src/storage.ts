@@ -256,12 +256,19 @@ export function vaultExists(vaultId: string): boolean {
 }
 
 export function validateActivationKey(key: string): boolean {
-  const row = db.prepare('SELECT 1 FROM activation_keys WHERE key = ? AND active = 1').get(key)
+  const row = db.prepare(
+    'SELECT 1 FROM activation_keys WHERE key = ? AND active = 1 AND used_by_vault IS NULL'
+  ).get(key)
   return !!row
 }
 
-export function claimActivationKey(key: string, vaultId: string): void {
-  db.prepare('UPDATE activation_keys SET used_by_vault = ? WHERE key = ?').run(vaultId, key)
+export function claimActivationKey(key: string, vaultId: string): boolean {
+  const result = db.prepare(`
+    UPDATE activation_keys
+    SET used_by_vault = ?, active = 0
+    WHERE key = ? AND active = 1 AND used_by_vault IS NULL
+  `).run(vaultId, key)
+  return result.changes === 1
 }
 
 export function addActivationKey(key: string, note: string): void {
