@@ -1,4 +1,4 @@
-import type { EdooboxOffer, EdooboxOfferDashboard, EdooboxBooking } from '../shared/types'
+import type { EdooboxOffer, EdooboxOfferDashboard, EdooboxBooking, EdooboxEventDate } from '../shared/types'
 
 type ApiVersion = 'v1' | 'v2'
 
@@ -349,7 +349,7 @@ export class EdooboxService {
     const arr = Array.isArray(items) ? items : Object.values(items)
 
     // Step 2: Fetch booking details + user details
-    const userCache = new Map<string, { name: string; email: string }>()
+    const userCache = new Map<string, { name: string; email: string; schule: string; personalNr: string }>()
     const bookings: EdooboxBooking[] = []
 
     for (const item of arr) {
@@ -382,22 +382,32 @@ export class EdooboxService {
             const userData = ud ? (Object.values(ud)[0] || {}) as Record<string, unknown> : {}
             userCache.set(ownerId, {
               name: [String(userData.first_name || ''), String(userData.last_name || '')].filter(Boolean).join(' ') || 'Unbekannt',
-              email: String(userData.email || '')
+              email: String(userData.email || ''),
+              schule: String(userData.data_1 || ''),
+              personalNr: String(userData.data_2 || '')
             })
           } catch {
-            userCache.set(ownerId, { name: 'Unbekannt', email: '' })
+            userCache.set(ownerId, { name: 'Unbekannt', email: '', schule: '', personalNr: '' })
           }
         }
 
-        const user = userCache.get(ownerId) || { name: 'Unbekannt', email: '' }
+        const user = userCache.get(ownerId) || { name: 'Unbekannt', email: '', schule: '', personalNr: '' }
+        // Stornierte Buchungen ausblenden — sie zählen nicht zur Anwesenheit
+        // und verfälschen sonst Teilnehmerliste und Dashboard-Zählung.
+        if (bookingData.canceled) {
+          continue
+        }
+
         bookings.push({
           id: bookingId,
           offerId,
           userName: user.name,
           userEmail: user.email,
-          status: bookingData.canceled ? 'canceled' : 'active',
+          status: 'active',
           bookedAt,
-          present
+          present,
+          schule: user.schule || undefined,
+          personalNr: user.personalNr || undefined
         })
       } catch (e) {
         console.warn('[edoobox] Could not fetch booking detail:', bookingId, e)
@@ -405,6 +415,37 @@ export class EdooboxService {
     }
 
     return bookings
+  }
+
+  async listDatesForOffer(offerId: string): Promise<EdooboxEventDate[]> {
+    const params = new URLSearchParams()
+    params.set('filter', JSON.stringify([{ property: 'offer', expression: '=', value: offerId }]))
+    params.set('limit', JSON.stringify({ start: 0, reply: 200 }))
+    params.set('order', JSON.stringify([{ property: 'date_start', value: 'ASC' }]))
+
+    const data = await this.requestV2('GET', `/date/list?${params.toString()}`) as Record<string, unknown>
+    const items = data.data as Record<string, Record<string, unknown>> | unknown[] || {}
+    const arr = Array.isArray(items) ? items : Object.values(items)
+
+    const dates: EdooboxEventDate[] = []
+    for (const item of arr) {
+      const r = item as Record<string, unknown>
+      const startRaw = r.date_start ? String(r.date_start) : ''
+      const endRaw = r.date_end ? String(r.date_end) : ''
+      if (!startRaw) continue
+      const start = new Date(startRaw)
+      const end = endRaw ? new Date(endRaw) : null
+      if (isNaN(start.getTime())) continue
+      const pad = (n: number) => String(n).padStart(2, '0')
+      const isoDate = `${start.getFullYear()}-${pad(start.getMonth() + 1)}-${pad(start.getDate())}`
+      const startTime = `${pad(start.getHours())}:${pad(start.getMinutes())}`
+      const endTime = end && !isNaN(end.getTime())
+        ? `${pad(end.getHours())}:${pad(end.getMinutes())}`
+        : startTime
+      dates.push({ date: isoDate, startTime, endTime })
+    }
+
+    return dates
   }
 
   async createDate(offerId: string, date: {

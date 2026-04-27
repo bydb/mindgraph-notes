@@ -7098,6 +7098,51 @@ ipcMain.handle('iq-generate-report', async (_event, data: import('./iqReportServ
   }
 })
 
+ipcMain.handle('attendance-list-generate', async (
+  _event,
+  data: import('./attendanceListService').AttendanceListData,
+  suggestedFileName: string,
+) => {
+  try {
+    if (!mainWindow) return { success: false, error: 'No main window' }
+
+    const result = await dialog.showSaveDialog(mainWindow, {
+      title: 'Teilnehmerliste speichern',
+      defaultPath: suggestedFileName,
+      filters: [{ name: 'Word-Dokument', extensions: ['docx'] }]
+    })
+
+    if (result.canceled || !result.filePath) {
+      return { success: false, canceled: true }
+    }
+
+    const { generateAttendanceList } = await import('./attendanceListService')
+    await generateAttendanceList(data, result.filePath)
+    return { success: true, filePath: result.filePath }
+  } catch (error) {
+    console.error('[attendance-list] Generate failed:', error)
+    return { success: false, error: error instanceof Error ? error.message : 'Teilnehmerliste konnte nicht erstellt werden' }
+  }
+})
+
+ipcMain.handle('edoobox-list-dates', async (_event, baseUrl: string, apiVersion: string, offerId: string) => {
+  try {
+    const credPath = getEdooboxCredentialsPath()
+    const exists = await fs.access(credPath).then(() => true).catch(() => false)
+    if (!exists) return { success: false, error: 'Keine Zugangsdaten gespeichert' }
+    const encrypted = await fs.readFile(credPath)
+    const { apiKey, apiSecret } = JSON.parse(safeStorage.decryptString(encrypted))
+
+    const { EdooboxService } = await import('./edooboxService')
+    const service = new EdooboxService(baseUrl, apiKey, apiSecret, apiVersion as 'v1' | 'v2')
+    const dates = await service.listDatesForOffer(offerId)
+    return { success: true, dates }
+  } catch (error) {
+    console.error('[edoobox] List dates failed:', error)
+    return { success: false, error: error instanceof Error ? error.message : 'Termine konnten nicht geladen werden' }
+  }
+})
+
 // ========================================
 // Marketing (WordPress + Instagram)
 // ========================================

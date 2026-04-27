@@ -846,9 +846,13 @@ export interface ElectronAPI {
   edooboxSaveEvents: (vaultPath: string, events: EdooboxEvent[]) => Promise<boolean>;
   edooboxListOffersDashboard: (baseUrl: string, apiVersion: string, scope?: 'active' | 'past' | 'all') => Promise<{ success: boolean; offers?: EdooboxOfferDashboard[]; error?: string }>;
   edooboxListBookings: (baseUrl: string, apiVersion: string, offerId: string) => Promise<{ success: boolean; bookings?: EdooboxBooking[]; error?: string }>;
+  edooboxListDates: (baseUrl: string, apiVersion: string, offerId: string) => Promise<{ success: boolean; dates?: EdooboxEventDate[]; error?: string }>;
 
   // IQ-Auswertung
   iqGenerateReport: (data: IqReportData, suggestedFileName: string) => Promise<{ success: boolean; filePath?: string; canceled?: boolean; error?: string }>;
+
+  // Anwesenheitsliste
+  attendanceListGenerate: (data: AttendanceListData, suggestedFileName: string) => Promise<{ success: boolean; filePath?: string; canceled?: boolean; error?: string }>;
 
   // Marketing (WordPress)
   marketingSaveCredentials: (credentials: { wpAppPassword?: string }) => Promise<boolean>;
@@ -1126,6 +1130,8 @@ export interface EdooboxBooking {
   status: string
   bookedAt: string  // ISO
   present?: boolean
+  schule?: string
+  personalNr?: string
 }
 
 export interface EdooboxOfferDashboard {
@@ -1147,6 +1153,23 @@ export interface EdooboxOfferDashboard {
 export interface EdooboxImportResult {
   event: EdooboxEvent
   warnings: string[]
+}
+
+export interface AttendanceParticipant {
+  name: string
+  vorname: string
+  personalNr?: string
+  schule?: string
+}
+
+export interface AttendanceListData {
+  title: string
+  location?: string
+  laNr?: string
+  akkrNr?: string
+  schuljahr?: string
+  dates: string[]  // ISO YYYY-MM-DD
+  participants: AttendanceParticipant[]
 }
 
 export interface IqReportData {

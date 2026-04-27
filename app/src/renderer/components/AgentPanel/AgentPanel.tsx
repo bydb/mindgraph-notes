@@ -2,7 +2,21 @@ import React, { useState, useEffect, useCallback } from 'react'
 import { useAgentStore } from '../../stores/agentStore'
 import { useUIStore } from '../../stores/uiStore'
 import { useTranslation } from '../../utils/translations'
-import type { EdooboxEvent, EdooboxEventDate, EdooboxOfferDashboard } from '../../../shared/types'
+import type { EdooboxEvent, EdooboxEventDate, EdooboxOfferDashboard, AttendanceListData, AttendanceParticipant } from '../../../shared/types'
+
+const MAX_ATTENDANCE_PARTICIPANTS = 9
+const MAX_ATTENDANCE_DATES = 8
+
+function splitFullName(full: string): { name: string; vorname: string } {
+  const parts = (full || '').trim().split(/\s+/).filter(Boolean)
+  if (parts.length === 0) return { name: '', vorname: '' }
+  if (parts.length === 1) return { name: parts[0], vorname: '' }
+  return { name: parts[parts.length - 1], vorname: parts.slice(0, -1).join(' ') }
+}
+
+function sanitizeFileName(value: string): string {
+  return value.replace(/[\\/:*?"<>|]+/g, '_').replace(/\s+/g, ' ').trim().slice(0, 80) || 'Teilnehmerliste'
+}
 
 const edooboxLogoUrl = new URL('../../assets/edoobox-logo.png', import.meta.url).href
 
@@ -52,8 +66,12 @@ const OccupancyBadge: React.FC<{ booked: number; max: number }> = ({ booked, max
 const DashboardOfferCard: React.FC<{ offer: EdooboxOfferDashboard }> = ({ offer }) => {
   const { t } = useTranslation()
   const { loadBookingsForOffer } = useAgentStore()
+  const edooboxBaseUrl = useUIStore(s => s.edoobox.baseUrl)
+  const edooboxApiVersion = useUIStore(s => s.edoobox.apiVersion)
   const [expanded, setExpanded] = useState(false)
   const [loadingBookings, setLoadingBookings] = useState(false)
+  const [generatingList, setGeneratingList] = useState(false)
+  const [listError, setListError] = useState<string | null>(null)
 
   const handleExpand = useCallback(async () => {
     if (!expanded && offer.bookings.length === 0 && offer.bookingCount > 0) {
@@ -63,6 +81,57 @@ const DashboardOfferCard: React.FC<{ offer: EdooboxOfferDashboard }> = ({ offer 
     }
     setExpanded(!expanded)
   }, [expanded, offer.id, offer.bookings.length, offer.bookingCount, loadBookingsForOffer])
+
+  const handleDownloadAttendanceList = useCallback(async (e: React.MouseEvent) => {
+    e.stopPropagation()
+    setListError(null)
+    setGeneratingList(true)
+    try {
+      // Immer frisch nachladen, damit neue Felder (Schule/Personalnummer) sicher
+      // aktuell sind und kein Cache aus älteren Sessions verwendet wird.
+      await loadBookingsForOffer(offer.id)
+      const refreshed = useAgentStore.getState().dashboardOffers.find(o => o.id === offer.id)
+      let bookings = refreshed?.bookings || offer.bookings
+      if (bookings.length > MAX_ATTENDANCE_PARTICIPANTS) {
+        setListError(t('agent.attendanceList.tooMany', { max: String(MAX_ATTENDANCE_PARTICIPANTS), count: String(bookings.length) }))
+        return
+      }
+
+      let dates: string[] = []
+      const datesResult = await window.electronAPI.edooboxListDates(edooboxBaseUrl, edooboxApiVersion, offer.id)
+      if (datesResult.success && datesResult.dates && datesResult.dates.length > 0) {
+        dates = datesResult.dates.slice(0, MAX_ATTENDANCE_DATES).map(d => d.date)
+      } else if (offer.dateStart) {
+        dates = [offer.dateStart]
+      }
+
+      const participants: AttendanceParticipant[] = bookings
+        .map(b => {
+          const { name, vorname } = splitFullName(b.userName)
+          return { name, vorname, personalNr: b.personalNr, schule: b.schule }
+        })
+        .sort((a, b) => a.name.localeCompare(b.name, 'de', { sensitivity: 'base' }))
+
+      const data: AttendanceListData = {
+        title: offer.name,
+        location: offer.location,
+        laNr: offer.number,
+        akkrNr: '',
+        dates,
+        participants
+      }
+
+      const fileName = `Teilnehmerliste - ${sanitizeFileName(offer.name)}.docx`
+      const result = await window.electronAPI.attendanceListGenerate(data, fileName)
+      if (!result.success && !result.canceled) {
+        setListError(result.error || t('agent.attendanceList.generateFailed'))
+      }
+    } catch (err) {
+      setListError(err instanceof Error ? err.message : t('agent.attendanceList.generateFailed'))
+    } finally {
+      setGeneratingList(false)
+    }
+  }, [offer, loadBookingsForOffer, edooboxBaseUrl, edooboxApiVersion, t])
 
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
   const newBookings = offer.bookings.filter(b => b.bookedAt > sevenDaysAgo)
@@ -102,6 +171,29 @@ const DashboardOfferCard: React.FC<{ offer: EdooboxOfferDashboard }> = ({ offer 
 
       {expanded && (
         <div className="agent-dashboard-bookings">
+          <div className="agent-dashboard-actions">
+            <button
+              type="button"
+              className="agent-dashboard-action-btn"
+              onClick={handleDownloadAttendanceList}
+              disabled={generatingList || loadingBookings}
+              title={t('agent.attendanceList.download')}
+            >
+              {generatingList ? (
+                <svg className="spinning" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+                </svg>
+              ) : (
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                  <polyline points="7 10 12 15 17 10" />
+                  <line x1="12" y1="15" x2="12" y2="3" />
+                </svg>
+              )}
+              <span>{t('agent.attendanceList.download')}</span>
+            </button>
+          </div>
+          {listError && <div className="agent-dashboard-action-error">{listError}</div>}
           {loadingBookings ? (
             <div className="agent-dashboard-loading-bookings">
               <svg className="spinning" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">

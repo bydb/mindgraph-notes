@@ -416,10 +416,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('edoobox-list-offers-dashboard', baseUrl, apiVersion, scope),
   edooboxListBookings: (baseUrl: string, apiVersion: string, offerId: string) =>
     ipcRenderer.invoke('edoobox-list-bookings', baseUrl, apiVersion, offerId),
+  edooboxListDates: (baseUrl: string, apiVersion: string, offerId: string) =>
+    ipcRenderer.invoke('edoobox-list-dates', baseUrl, apiVersion, offerId),
 
   // IQ-Auswertung
   iqGenerateReport: (data: object, suggestedFileName: string) =>
     ipcRenderer.invoke('iq-generate-report', data, suggestedFileName),
+
+  // Anwesenheitsliste (Teilnehmerliste)
+  attendanceListGenerate: (data: object, suggestedFileName: string) =>
+    ipcRenderer.invoke('attendance-list-generate', data, suggestedFileName),
 
   // Marketing (WordPress)
   marketingSaveCredentials: (credentials: { wpAppPassword?: string }) =>

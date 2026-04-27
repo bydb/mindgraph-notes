@@ -11426,6 +11426,45 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
   padding: 8px 10px 10px 18px;
 }
 
+.agent-dashboard-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 6px;
+}
+
+.agent-dashboard-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--accent-color);
+  background: color-mix(in srgb, var(--accent-color) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent-color) 30%, transparent);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+
+.agent-dashboard-action-btn:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--accent-color) 16%, transparent);
+}
+
+.agent-dashboard-action-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.agent-dashboard-action-error {
+  font-size: 11px;
+  color: #dc2626;
+  background: color-mix(in srgb, #dc2626 8%, transparent);
+  border-radius: 4px;
+  padding: 6px 8px;
+  margin-bottom: 6px;
+}
+
 .agent-dashboard-bookings-header {
   display: flex;
   justify-content: space-between;

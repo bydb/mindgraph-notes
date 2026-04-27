@@ -2,6 +2,17 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.5.18-beta] - 2026-04-27
+
+### Features
+- **Teilnehmerliste herunterladen** — neuer Button im Veranstaltungs-Dashboard (expandiertes Offer) erzeugt eine vorausgefüllte Anwesenheitsliste als `.docx` auf Basis der gebündelten Schulamt-Vorlage (Staatliches Schulamt für den Landkreis Gießen und den Vogelsbergkreis). Befüllt werden Veranstaltungstitel (Zeilenumbruch nach „Teilnehmerliste für die AG:"), Ort, LA-Nummer, Schuljahr (automatisch aus dem ersten Termin abgeleitet), Sitzungstermine und alle Teilnehmer (Name, Vorname, Personalnummer, Schule). Beide Form-Kopien der Vorlage werden identisch befüllt.
+- **Sitzungstermine pro Offer aus edoobox** — neuer `listDatesForOffer`-Service-Call (`/v2/date/list?filter=offer=…`) liefert alle Termine eines Angebots für die Spaltenüberschriften der Teilnehmerliste.
+- **Personalnummer und Schule aus edoobox** — `listBookingsForOffer` extrahiert jetzt zusätzlich `data_1` (Schule) und `data_2` (Personalnummer) aus dem User-Profil und reicht sie an Buchungen + Teilnehmerliste durch.
+
+### Improvements
+- **Teilnehmer alphabetisch sortiert** — Buchungen in der Anwesenheitsliste werden nach Nachname (`localeCompare` mit deutscher Collation) sortiert.
+- **Stornierte Buchungen werden ausgeblendet** — `listBookingsForOffer` überspringt Buchungen mit `canceled: true`. Dashboard-Liste, Teilnehmerzähler und Teilnehmerliste-DOCX zeigen nur noch aktive Anmeldungen, was die Inkonsistenz zwischen Belegungs-Ring (z. B. 6/15) und sichtbarer Teilnehmerzahl behebt.
+
 ## [0.5.17-beta] - 2026-04-26
 
 ### Security
