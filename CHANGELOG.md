@@ -2,6 +2,17 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.5.20-beta] - 2026-04-29
+
+### Features
+- **Notiz-Kategorien als zentrales UI-Konzept** — neue Utility `utils/noteKind.ts` definiert drei funktionale Kategorien: 🔴 *Problem* (Aktion/Problem), 🟢 *Lösung* (Wissen/Guide), 🔵 *Info* (Info/Reader). Jede Kategorie kennt Emoji, Label, AI-Kategorie-Bezeichnung, Dot-Farbe und Canvas-Hintergrundfarbe. Erkennung aus Frontmatter (`category:`), Titel-Emoji, Pfad — mit Aliassen (red/problem/aktion · green/solution/lösung/wissen/guide · blue/info/reader).
+- **Farbiger Status-Dot überall in der UI** — kompakter 10-px-Dot statt rohes Emoji im Editor-Header, in den NoteNodes des Wissensgraphen, im Hover-Label der DotNodes, in den TabBar-Tabs und im FileTree. Ein-Stelle-Quelle für Farbe und Bedeutung; Workspace wirkt deutlich aufgeräumter.
+- **AI-Layout im Canvas nutzt funktionale Kategorien** — beim AI-Sortieren werden Karten anhand ihrer Notiz-Kategorie eingefärbt (`canvasColor` aus `noteKind`) und mit AI-Kategorie-Label (`Aktion/Problem` / `Wissen/Guide` / `Info/Reader`) ans Layout-Modell durchgereicht. Vorher inline hartkodierte Emoji-Logik in GraphCanvas.tsx.
+- **Transport-Capture nutzt zentrale Kategorien-Definition** — die Schnellerfassung baut ihre Kategorien-Buttons jetzt aus `NOTE_KINDS` statt aus dupliziertem Mapping. Konsistente Farben + Labels.
+
+### Improvements
+- **Website-Positionierung** — Title, OG-Tags, Twitter-Card, JSON-LD-Description und Feature-Liste auf „Lokaler KI-Workspace für Wissen, Projekte & Dokumente" geschärft. Statt Feature-Aufzählung steht das Workspace-Konzept im Vordergrund (local-first, KI, Wissensgraph, Email, Aufgaben, Dokumente).
+
 ## [0.5.19-beta] - 2026-04-29
 
 ### Features
