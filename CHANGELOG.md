@@ -2,7 +2,12 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
-## [0.5.21-beta] - 2026-04-29
+## [0.5.22-beta] - 2026-04-29
+
+### Fixes
+- **CI-Build-Fix für 0.5.21-beta**: ungenutzte `height`-Variable in `hierarchicalLayout` entfernt (`tsc --noEmit` schlug auf macOS, Linux und Windows mit `TS6133` fehl, deshalb wurden für 0.5.21-beta keine Release-Assets gebaut). Inhalt von 0.5.21-beta ist sonst identisch.
+
+## [0.5.21-beta] - 2026-04-29 (broken — no release assets)
 
 ### Features
 - **Hierarchischer Layout-Algorithmus deutlich verbessert** — drei Schwächen behoben, die zusammen für sichtbare Crossings und massiv verschwendeten Whitespace sorgten:

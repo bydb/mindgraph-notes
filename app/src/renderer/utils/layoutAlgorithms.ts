@@ -1416,7 +1416,6 @@ export function hierarchicalLayout(
   options: LayoutOptions
 ): LayoutResult {
   const {
-    height = 1200,
     padding = 80
   } = options
 
