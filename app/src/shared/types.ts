@@ -927,6 +927,11 @@ export interface ElectronAPI {
     includeOverdue?: boolean;
     allowedChatIds?: string[];
     priorityFolders?: string[];
+    agentEnabled?: boolean;
+    agentInboxFolder?: string;
+    agentMaxIterations?: number;
+    agentAllowedTools?: string[];
+    agentConfirmTools?: string[];
   }) => Promise<boolean>;
   telegramStart: () => Promise<{ success: boolean; error?: string; alreadyRunning?: boolean }>;
   telegramStop: () => Promise<{ success: boolean; alreadyStopped?: boolean }>;

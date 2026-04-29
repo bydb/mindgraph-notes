@@ -529,6 +529,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
     includeOverdue?: boolean
     allowedChatIds?: string[]
     priorityFolders?: string[]
+    agentEnabled?: boolean
+    agentInboxFolder?: string
+    agentMaxIterations?: number
+    agentAllowedTools?: string[]
+    agentConfirmTools?: string[]
   }) => ipcRenderer.invoke('telegram-update-config', config),
   telegramStart: () =>
     ipcRenderer.invoke('telegram-start'),

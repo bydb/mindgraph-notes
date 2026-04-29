@@ -2,12 +2,15 @@
 // Dynamischer Import von grammy, damit die Electron-App beim Start nicht
 // unnötig lädt, wenn der Bot deaktiviert ist.
 
-import { handleStart, handleHelp, handleToday, handleOverdue, handleWeek, handleBriefing, handleAsk, handleAgenda, handleInbox, type CommandDeps } from './commands'
+import { handleStart, handleHelp, handleToday, handleOverdue, handleWeek, handleBriefing, handleAsk, handleAgenda, handleInbox, handleAgent, type CommandDeps } from './commands'
+import { resolvePending, clearAllPending } from './agent/confirm'
 
 export interface BotConfig {
   token: string
   getAllowedChatIds: () => string[]   // Live-Lookup — Updates greifen ohne Bot-Neustart
-  deps: CommandDeps
+  // Deps ohne buildConfirmKeyboard — der Bot füllt das selbst, weil er den
+  // grammy-InlineKeyboard-Konstruktor besitzt.
+  deps: Omit<CommandDeps, 'buildConfirmKeyboard'>
 }
 
 export interface BotHandle {
@@ -15,8 +18,18 @@ export interface BotHandle {
 }
 
 export async function startTelegramBot(config: BotConfig): Promise<BotHandle> {
-  const { Bot } = await import('grammy')
+  const { Bot, InlineKeyboard } = await import('grammy')
   const bot = new Bot(config.token)
+
+  const buildConfirmKeyboard = (confirmId: string) =>
+    new InlineKeyboard()
+      .text('✅ Erlauben', `cf:approve:${confirmId}`)
+      .text('❌ Abbrechen', `cf:deny:${confirmId}`)
+
+  const fullDeps: CommandDeps = {
+    ...config.deps,
+    buildConfirmKeyboard
+  }
 
   // Whitelist-Gate: nur Chat-IDs aus dem Live-Getter dürfen reden.
   bot.use(async (ctx, next) => {
@@ -46,20 +59,59 @@ export async function startTelegramBot(config: BotConfig): Promise<BotHandle> {
 
   bot.command('start', async (ctx) => handleStart(ctx))
   bot.command('help', async (ctx) => handleHelp(ctx))
-  bot.command('today', async (ctx) => handleToday(ctx, config.deps))
-  bot.command('todos', async (ctx) => handleToday(ctx, config.deps))
-  bot.command('overdue', async (ctx) => handleOverdue(ctx, config.deps))
-  bot.command('week', async (ctx) => handleWeek(ctx, config.deps))
-  bot.command('agenda', async (ctx) => handleAgenda(ctx, config.deps))
-  bot.command('inbox', async (ctx) => handleInbox(ctx, config.deps))
-  bot.command('briefing', async (ctx) => handleBriefing(ctx, config.deps))
-  bot.command('ask', async (ctx) => handleAsk(ctx, config.deps, ctx.match ?? ''))
+  bot.command('today', async (ctx) => handleToday(ctx, fullDeps))
+  bot.command('todos', async (ctx) => handleToday(ctx, fullDeps))
+  bot.command('overdue', async (ctx) => handleOverdue(ctx, fullDeps))
+  bot.command('week', async (ctx) => handleWeek(ctx, fullDeps))
+  bot.command('agenda', async (ctx) => handleAgenda(ctx, fullDeps))
+  bot.command('inbox', async (ctx) => handleInbox(ctx, fullDeps))
+  bot.command('briefing', async (ctx) => handleBriefing(ctx, fullDeps))
+  bot.command('ask', async (ctx) => handleAsk(ctx, fullDeps, ctx.match ?? ''))
+  bot.command('agent', (ctx) => {
+    void handleAgent(ctx, fullDeps, ctx.match ?? '').catch((err) => {
+      console.error('[Telegram] /agent background failed:', err)
+    })
+  })
 
-  // Freier Text (keine Command) → als /ask behandeln
+  // Confirm-Callbacks vom Agent-Loop verarbeiten.
+  // Format: cf:approve:<id> oder cf:deny:<id>
+  bot.callbackQuery(/^cf:(approve|deny):(.+)$/, async (ctx) => {
+    const decision = ctx.match[1] as 'approve' | 'deny'
+    const id = ctx.match[2]
+    const ok = resolvePending(id, decision)
+    console.log(`[Telegram] callback_query: decision=${decision} id=${id} resolved=${ok}`)
+    try {
+      await ctx.answerCallbackQuery({
+        text: ok
+          ? (decision === 'approve' ? '✅ Erlaubt' : '❌ Abgelehnt')
+          : '⌛ Anfrage abgelaufen',
+        show_alert: false
+      })
+    } catch (err) {
+      console.warn('[Telegram] answerCallbackQuery failed:', err)
+    }
+    // Buttons aus der ursprünglichen Nachricht entfernen, damit man nicht
+    // versehentlich nochmal klickt.
+    try {
+      await ctx.editMessageReplyMarkup({ reply_markup: { inline_keyboard: [] } })
+    } catch (err) {
+      console.warn('[Telegram] editMessageReplyMarkup failed:', err)
+    }
+  })
+
+  // Freier Text (keine Command):
+  // - Agent-Modus AN  → /agent (kann Tools nutzen, Schreib-Tools fragen via Confirm)
+  // - Agent-Modus AUS → /ask (read-only Frage mit Vault-Kontext)
   bot.on('message:text', async (ctx) => {
     const text = ctx.message.text
     if (text.startsWith('/')) return // Commands werden oben verarbeitet
-    await handleAsk(ctx, config.deps, text)
+    if (config.deps.agentEnabled()) {
+      void handleAgent(ctx, fullDeps, text).catch((err) => {
+        console.error('[Telegram] text-agent background failed:', err)
+      })
+    } else {
+      await handleAsk(ctx, fullDeps, text)
+    }
   })
 
   bot.catch((err) => {
@@ -78,6 +130,7 @@ export async function startTelegramBot(config: BotConfig): Promise<BotHandle> {
   return {
     stop: async () => {
       try {
+        clearAllPending()
         await bot.stop()
         console.log('[Telegram] Bot gestoppt')
       } catch (err) {

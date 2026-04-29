@@ -7828,6 +7828,11 @@ let telegramConfig: {
   includeOverdue: boolean
   allowedChatIds: string[]
   priorityFolders: string[]
+  agentEnabled: boolean
+  agentInboxFolder: string
+  agentMaxIterations: number
+  agentAllowedTools: string[]
+  agentConfirmTools: string[]
 } = {
   backend: 'auto',
   anthropicModel: 'claude-sonnet-4-6',
@@ -7836,7 +7841,12 @@ let telegramConfig: {
   includeEmails: true,
   includeOverdue: true,
   allowedChatIds: [],
-  priorityFolders: []
+  priorityFolders: [],
+  agentEnabled: false,
+  agentInboxFolder: '000 - 📥 inbox/010 - 📥 Notes',
+  agentMaxIterations: 8,
+  agentAllowedTools: ['note_search', 'note_read', 'task_list', 'calendar_list'],
+  agentConfirmTools: ['note_create', 'note_append', 'task_toggle']
 }
 
 function getTelegramTokenPath(): string {
@@ -7927,7 +7937,12 @@ ipcMain.handle('telegram-start', async () => {
         ollamaModel: () => telegramConfig.ollamaModel,
         includeEmails: () => telegramConfig.includeEmails,
         includeOverdue: () => telegramConfig.includeOverdue,
-        priorityFolders: () => telegramConfig.priorityFolders
+        priorityFolders: () => telegramConfig.priorityFolders,
+        agentEnabled: () => telegramConfig.agentEnabled,
+        agentMaxIterations: () => telegramConfig.agentMaxIterations,
+        agentInboxFolder: () => telegramConfig.agentInboxFolder,
+        agentAllowedTools: () => telegramConfig.agentAllowedTools,
+        agentConfirmTools: () => telegramConfig.agentConfirmTools
       }
     })
     // Key-Refresh-Interval beim Stop aufräumen

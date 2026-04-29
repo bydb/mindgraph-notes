@@ -54,7 +54,12 @@ export const TelegramSettings: React.FC = () => {
       includeEmails: telegramBot.briefingIncludeEmails,
       includeOverdue: telegramBot.briefingIncludeOverdue,
       allowedChatIds: telegramBot.allowedChatIds,
-      priorityFolders: telegramBot.priorityFolders
+      priorityFolders: telegramBot.priorityFolders,
+      agentEnabled: telegramBot.agentEnabled,
+      agentInboxFolder: telegramBot.agentInboxFolder,
+      agentMaxIterations: telegramBot.agentMaxIterations,
+      agentAllowedTools: telegramBot.agentAllowedTools,
+      agentConfirmTools: telegramBot.agentConfirmTools
     })
   }, [
     telegramBot.llmBackend,
@@ -63,7 +68,12 @@ export const TelegramSettings: React.FC = () => {
     telegramBot.briefingIncludeEmails,
     telegramBot.briefingIncludeOverdue,
     telegramBot.allowedChatIds,
-    telegramBot.priorityFolders
+    telegramBot.priorityFolders,
+    telegramBot.agentEnabled,
+    telegramBot.agentInboxFolder,
+    telegramBot.agentMaxIterations,
+    telegramBot.agentAllowedTools,
+    telegramBot.agentConfirmTools
   ])
 
   const saveToken = async () => {
@@ -404,6 +414,84 @@ export const TelegramSettings: React.FC = () => {
         )}
       </div>
 
+      {/* Agent-Modus */}
+      <div className="settings-group">
+        <label className="settings-label">🤖 Agent-Modus (experimentell)</label>
+        <p className="settings-help">
+          Erlaubt dem Bot, mit Tools zu arbeiten — Notizen suchen, lesen, neu anlegen oder ergänzen,
+          Tasks abhaken. Schreib-Operationen werden im Chat per Bestätigungs-Button abgesichert.
+          Aktuell nur mit Ollama (lokales Modell muss Tool-Calling unterstützen,
+          z. B. <code>llama3.1</code>, <code>qwen2.5-coder:14b</code>, <code>mistral-nemo</code>).
+        </p>
+        <label className="settings-row">
+          <input
+            type="checkbox"
+            checked={telegramBot.agentEnabled}
+            onChange={e => setTelegramBot({ agentEnabled: e.target.checked })}
+          />
+          <span>Agent-Modus aktivieren (<code>/agent &lt;auftrag&gt;</code>)</span>
+        </label>
+
+        {telegramBot.agentEnabled && (
+          <>
+            <label className="settings-label" style={{ marginTop: 12 }}>
+              Inbox-Ordner für neu angelegte Notizen
+            </label>
+            <input
+              type="text"
+              placeholder="z. B. 000 - 📥 inbox/010 - 📥 Notes (leer = Vault-Root)"
+              value={telegramBot.agentInboxFolder}
+              onChange={e => setTelegramBot({ agentInboxFolder: e.target.value })}
+              className="settings-input"
+              list="agent-inbox-suggestions"
+            />
+            <datalist id="agent-inbox-suggestions">
+              {allFolders.slice(0, 200).map(f => <option key={f} value={f} />)}
+            </datalist>
+
+            <label className="settings-label" style={{ marginTop: 12 }}>
+              Maximale Iterationen pro Auftrag: <strong>{telegramBot.agentMaxIterations}</strong>
+            </label>
+            <input
+              type="range"
+              min={1}
+              max={15}
+              value={telegramBot.agentMaxIterations}
+              onChange={e => setTelegramBot({ agentMaxIterations: Number(e.target.value) })}
+              className="settings-input"
+            />
+            <p className="settings-help">
+              Hard-Limit gegen Endlos-Loops. 8 ist ein guter Default.
+            </p>
+
+            <label className="settings-label" style={{ marginTop: 12 }}>Aktive Tools</label>
+            <p className="settings-help">
+              Schreib-Tools (rot) erfordern immer eine Bestätigung im Chat.
+            </p>
+            {AGENT_TOOLS.map(t => {
+              const enabled = telegramBot.agentAllowedTools.includes(t.name)
+              const toggle = () => {
+                const next = enabled
+                  ? telegramBot.agentAllowedTools.filter(n => n !== t.name)
+                  : [...telegramBot.agentAllowedTools, t.name]
+                setTelegramBot({ agentAllowedTools: next })
+              }
+              return (
+                <label key={t.name} className="settings-row" style={{ alignItems: 'flex-start' }}>
+                  <input type="checkbox" checked={enabled} onChange={toggle} />
+                  <span>
+                    <code style={{ color: t.write ? '#d44' : 'inherit' }}>{t.name}</code>
+                    {t.write && <span style={{ fontSize: 11, marginLeft: 6, color: '#d44' }}>(Schreibend, Confirm)</span>}
+                    <br />
+                    <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{t.description}</span>
+                  </span>
+                </label>
+              )
+            })}
+          </>
+        )}
+      </div>
+
       {/* Commands-Referenz */}
       <div className="settings-group">
         <label className="settings-label">Verfügbare Befehle</label>
@@ -415,9 +503,22 @@ export const TelegramSettings: React.FC = () => {
           <li><code>/inbox</code> — neueste Notizen aus priorisierten Ordnern</li>
           <li><code>/briefing</code> — Morning-Briefing (LLM-generiert)</li>
           <li><code>/ask &lt;frage&gt;</code> — Frage an deinen Vault stellen</li>
+          {telegramBot.agentEnabled && (
+            <li><code>/agent &lt;auftrag&gt;</code> — Agent mit Tool-Use (Lesen + Schreiben mit Confirm)</li>
+          )}
           <li>Freier Text ohne <code>/</code> — wird als <code>/ask</code> behandelt</li>
         </ul>
       </div>
     </div>
   )
 }
+
+const AGENT_TOOLS: Array<{ name: string; description: string; write: boolean }> = [
+  { name: 'note_search', description: 'Notizen im Vault per Stichwort suchen.', write: false },
+  { name: 'note_read', description: 'Volltext einer Notiz lesen.', write: false },
+  { name: 'task_list', description: 'Offene Tasks listen (today / overdue / week / all).', write: false },
+  { name: 'calendar_list', description: 'Kalender-Termine auslesen (macOS).', write: false },
+  { name: 'note_create', description: 'Neue Notiz im Inbox-Ordner anlegen.', write: true },
+  { name: 'note_append', description: 'Text an eine bestehende Notiz anhängen.', write: true },
+  { name: 'task_toggle', description: 'Task in einer Notiz abhaken bzw. wieder öffnen.', write: true }
+]

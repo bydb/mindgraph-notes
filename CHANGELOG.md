@@ -2,6 +2,27 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.5.19-beta] - 2026-04-29
+
+### Features
+- **Telegram-Agent-Modus mit Tool-Use (experimentell)** — neuer Command `/agent <auftrag>` (oder freier Text bei aktivem Agent-Modus) mit echtem Tool-Use-Loop. Der Bot kann jetzt Notizen suchen (`note_search`), volltext lesen (`note_read`), neu anlegen (`note_create`), an bestehende Notizen anhängen (`note_append`), Tasks listen (`task_list`), Tasks abhaken (`task_toggle`) und den Kalender abfragen (`calendar_list`). Aktuell nur über Ollama (Modell muss Tool-Calling beherrschen — empfohlen: `mistral-nemo:12b-instruct`, `llama3.1:8b`, `qwen2.5-coder:14b`; Gemma kann es nicht).
+- **Confirm-Flow für Schreib-Operationen** — alle schreibenden Tools (`note_create`, `note_append`, `task_toggle`) lösen vor der Ausführung eine Telegram-Nachricht mit Inline-Buttons „✅ Erlauben / ❌ Abbrechen" aus. Auto-Deny nach 2 Min Timeout. `isWrite`-Flag im Tool selbst ist die harte Sicherheitsgrenze — auch ohne expliziten Eintrag in `agentConfirmTools` wird gefragt.
+- **Settings-Tab „Telegram" → Agent-Modus** — neuer Block: Aktivierung, Inbox-Ordner für `note_create` (mit Vault-Folder-Autocomplete und sinnvollem Default `000 - 📥 inbox/010 - 📥 Notes`), Iterations-Limit (1-15, Default 8), Tool-Allowlist pro Tool mit Beschreibung, klare Markierung schreibender Tools (rot).
+- **Freier Text → Agent bei aktivem Modus** — wenn der Agent-Modus eingeschaltet ist, gehen normale Telegram-Nachrichten ohne `/`-Prefix automatisch durch den Agent statt durch das read-only `/ask`. Schreib-Tools sind durch den Confirm-Flow weiterhin abgesichert.
+
+### Improvements
+- **`safeReplyMarkdown` für LLM-Antworten** — Telegram lehnte bisher LLM-Antworten mit unbalancierten Markdown-Sonderzeichen (`*`, `_`, `` ` ``) hart ab. Neuer Helper retried Plain-Text bei Parse-Fehlern; verwendet in `/briefing`, `/ask` und Agent-Antworten. Behebt „Bad Request: can't parse entities".
+- **Ollama-Modell-Validierung** — `pickDefaultOllamaModel` wirft jetzt einen klaren Fehler, wenn das in den Settings konfigurierte Modell nicht installiert ist (statt still auf irgendein anderes auszuweichen). Tool-fähige Modelle stehen oben in der Auto-Pick-Reihenfolge (`qwen3`, `qwen2.5-coder`, `llama3.1`, `mistral-nemo`).
+- **Bessere Diagnose-Logs** — `[Telegram Agent] start/iteration/run tool` und `[Telegram] requestConfirm/callback_query` machen das Debuggen von Tool-Use-Pfaden im Server-Log einfach.
+- **Agent-Loop nicht mehr blockierend** — `bot.command('agent', …)` und der Free-Text-Handler dispatchen den Agent-Loop jetzt im Hintergrund (`void runAgent(...).catch(...)`). Vorher konnte ein laufender Agent das Polling und damit auch Confirm-Klicks blockieren.
+
+### Architecture
+- **`chatClient.chatWithTools()`** — neue Tool-aware Chat-Funktion parallel zum bestehenden `chat()`. Mappt Ollama-Wire-Format (`role: tool`, `tool_calls.function.{name, arguments}`) auf interne `ToolCall`-Struktur, generiert synthetische IDs für Anthropic-Roundtrips (Anthropic-Tool-Use folgt später).
+- **`main/telegram/agent/`** — neue Module: `loop.ts` (Iterations-Loop mit Progress-Callback + Confirm-Hook + dynamisch gebauter System-Prompt mit Anti-Pseudo-JSON-Regel), `confirm.ts` (Promise-Registry für Pending-Confirmations, Timeout-getrieben), `tools/registry.ts` (zentraler Katalog mit `isWrite`-Flag), `tools/notes.ts`, `tools/tasks.ts`, `tools/calendar.ts`. Path-Traversal-Schutz in jedem Schreib-Tool über `resolveInVault`-Check.
+
+### Repo
+- Untracked `pitch-infografik-briefing.md` ist außerhalb dieses Releases.
+
 ## [0.5.18-beta] - 2026-04-27
 
 ### Features

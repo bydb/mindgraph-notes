@@ -375,6 +375,11 @@ export interface TelegramBotSettings {
   briefingIncludeOverdue: boolean
   priorityFolders: string[]     // Vault-relative Ordnerpfade — Notizen dort werden bei /ask + /inbox bevorzugt
   active: boolean                // true = Bot läuft (wird vom Main-Prozess aus gesetzt/gelesen)
+  agentEnabled: boolean         // /agent verfügbar (Tool-Use-Loop, nur Ollama)
+  agentInboxFolder: string      // Default-Ordner für note_create
+  agentMaxIterations: number    // Hard-Limit gegen Loops (1-15)
+  agentAllowedTools: string[]   // Tool-Namen, die der Agent benutzen darf
+  agentConfirmTools: string[]   // Untermenge — diese erfordern User-Bestätigung
 }
 
 // ===== Module-Registry (Kern vs. Plugins) =====
@@ -896,7 +901,12 @@ const defaultState = {
     briefingIncludeEmails: true,
     briefingIncludeOverdue: true,
     priorityFolders: [],
-    active: false
+    active: false,
+    agentEnabled: false,
+    agentInboxFolder: '000 - 📥 inbox/010 - 📥 Notes',
+    agentMaxIterations: 8,
+    agentAllowedTools: ['note_search', 'note_read', 'task_list', 'calendar_list'],
+    agentConfirmTools: ['note_create', 'note_append', 'task_toggle']
   } as TelegramBotSettings
 }
 
