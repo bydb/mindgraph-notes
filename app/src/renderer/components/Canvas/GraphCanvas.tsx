@@ -3724,7 +3724,11 @@ Antworte NUR mit JSON:
             onClick={handleExportSvg}
             title={t('graphCanvas.exportSVG')}
           >
-            SVG
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+              <path d="M8 2v8M5 7l3 3 3-3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M3 12.5h10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+            </svg>
+            <span>{t('graphCanvas.exportSVG')}</span>
           </button>
         </Panel>
         {focusMode && (

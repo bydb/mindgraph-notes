@@ -1,6 +1,7 @@
 import React, { memo, useState, useCallback } from 'react'
 import { useBookmarkStore } from '../../stores/bookmarkStore'
 import { useNotesStore } from '../../stores/notesStore'
+import { getNoteKindFromText, stripNoteKindMarker } from '../../utils/noteKind'
 
 // Star icon
 const StarIcon: React.FC<{ filled?: boolean }> = ({ filled }) => (
@@ -25,6 +26,9 @@ interface BookmarkItemProps {
 }
 
 const BookmarkItem: React.FC<BookmarkItemProps> = memo(({ title, onSelect, onRemove }) => {
+  const noteKind = getNoteKindFromText(title)
+  const displayTitle = noteKind ? stripNoteKindMarker(title) : title
+
   const handleRemove = (e: React.MouseEvent) => {
     e.stopPropagation()
     onRemove()
@@ -40,12 +44,19 @@ const BookmarkItem: React.FC<BookmarkItemProps> = memo(({ title, onSelect, onRem
       className="bookmark-item"
       onClick={onSelect}
       onContextMenu={handleContextMenu}
-      title={title}
+      title={displayTitle}
     >
       <span className="bookmark-icon">
         <StarIcon filled />
       </span>
-      <span className="bookmark-title">{title}</span>
+      {noteKind && (
+        <span
+          className={`note-kind-dot note-kind-${noteKind.id}`}
+          title={noteKind.label}
+          aria-label={noteKind.label}
+        />
+      )}
+      <span className="bookmark-title">{displayTitle}</span>
       <button
         className="bookmark-remove"
         onClick={handleRemove}

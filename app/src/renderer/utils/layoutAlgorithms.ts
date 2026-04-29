@@ -1085,58 +1085,6 @@ export function forceDirectedLayout(
 // ============================================================================
 
 /**
- * Count edge crossings between two adjacent layers
- */
-function countLayerCrossings(
-  layer1: string[],
-  layer2: string[],
-  edges: LayoutEdge[]
-): number {
-  let crossings = 0
-
-  // Build index maps for O(1) lookups instead of O(n) indexOf
-  const layer1Index = new Map<string, number>()
-  const layer2Index = new Map<string, number>()
-  layer1.forEach((id, idx) => layer1Index.set(id, idx))
-  layer2.forEach((id, idx) => layer2Index.set(id, idx))
-
-  // Get edges between these two layers
-  const layerEdges: Array<{ source: number; target: number }> = []
-
-  for (const edge of edges) {
-    const sourceIdx = layer1Index.get(edge.source)
-    const targetIdx = layer2Index.get(edge.target)
-
-    if (sourceIdx !== undefined && targetIdx !== undefined) {
-      layerEdges.push({ source: sourceIdx, target: targetIdx })
-    }
-
-    // Also check reverse direction
-    const sourceIdx2 = layer1Index.get(edge.target)
-    const targetIdx2 = layer2Index.get(edge.source)
-
-    if (sourceIdx2 !== undefined && targetIdx2 !== undefined) {
-      layerEdges.push({ source: sourceIdx2, target: targetIdx2 })
-    }
-  }
-
-  // Count crossings: edge (s1,t1) crosses (s2,t2) if (s1 < s2 and t1 > t2) or (s1 > s2 and t1 < t2)
-  for (let i = 0; i < layerEdges.length; i++) {
-    for (let j = i + 1; j < layerEdges.length; j++) {
-      const e1 = layerEdges[i]
-      const e2 = layerEdges[j]
-
-      if ((e1.source < e2.source && e1.target > e2.target) ||
-          (e1.source > e2.source && e1.target < e2.target)) {
-        crossings++
-      }
-    }
-  }
-
-  return crossings
-}
-
-/**
  * Calculate barycenter (average position of connected nodes in adjacent layer)
  */
 function calculateBarycenter(
@@ -1161,10 +1109,194 @@ function calculateBarycenter(
   return positions.reduce((a, b) => a + b, 0) / positions.length
 }
 
+function buildLayerIndexes(layers: string[][]): {
+  nodeLayer: Map<string, number>
+  nodeIndex: Map<string, number>
+} {
+  const nodeLayer = new Map<string, number>()
+  const nodeIndex = new Map<string, number>()
+
+  layers.forEach((layer, layerIdx) => {
+    layer.forEach((nodeId, index) => {
+      nodeLayer.set(nodeId, layerIdx)
+      nodeIndex.set(nodeId, index)
+    })
+  })
+
+  return { nodeLayer, nodeIndex }
+}
+
+function countOrderedLayerCrossings(layers: string[][], edges: LayoutEdge[]): number {
+  const { nodeLayer, nodeIndex } = buildLayerIndexes(layers)
+  const orderPositions: Record<string, { x: number; y: number }> = {}
+
+  layers.forEach((layer, layerIdx) => {
+    const layerOffset = (Math.max(...layers.map(l => l.length), 1) - layer.length) / 2
+    layer.forEach((nodeId, index) => {
+      orderPositions[nodeId] = {
+        x: layerIdx * 10,
+        y: (index + layerOffset) * 10
+      }
+    })
+  })
+
+  const orderedEdges = edges.filter(edge => {
+    const sourceLayer = nodeLayer.get(edge.source)
+    const targetLayer = nodeLayer.get(edge.target)
+    return sourceLayer !== undefined &&
+      targetLayer !== undefined &&
+      sourceLayer !== targetLayer &&
+      nodeIndex.has(edge.source) &&
+      nodeIndex.has(edge.target)
+  })
+
+  return countCrossings(orderPositions, orderedEdges)
+}
+
+function calculateGlobalBarycenter(
+  nodeId: string,
+  layers: string[][],
+  edges: LayoutEdge[],
+  direction: 'left' | 'right'
+): number {
+  const { nodeLayer, nodeIndex } = buildLayerIndexes(layers)
+  const currentLayer = nodeLayer.get(nodeId)
+  if (currentLayer === undefined) return -1
+
+  let weightedSum = 0
+  let totalWeight = 0
+
+  for (const edge of edges) {
+    const otherId = edge.source === nodeId
+      ? edge.target
+      : edge.target === nodeId
+        ? edge.source
+        : null
+    if (!otherId) continue
+
+    const otherLayer = nodeLayer.get(otherId)
+    const otherIndex = nodeIndex.get(otherId)
+    if (otherLayer === undefined || otherIndex === undefined || otherLayer === currentLayer) continue
+    if (direction === 'left' && otherLayer >= currentLayer) continue
+    if (direction === 'right' && otherLayer <= currentLayer) continue
+
+    const layer = layers[otherLayer]
+    const normalizedIndex = otherIndex + (Math.max(layers[currentLayer].length, layer.length) - layer.length) / 2
+    const distance = Math.max(1, Math.abs(otherLayer - currentLayer))
+    const weight = 1 / distance
+    weightedSum += normalizedIndex * weight
+    totalWeight += weight
+  }
+
+  return totalWeight > 0 ? weightedSum / totalWeight : -1
+}
+
+function sortLayerByBarycenter(
+  layer: string[],
+  barycenters: Map<string, number>,
+  originalIndex: Map<string, number>
+): string[] {
+  return [...layer].sort((a, b) => {
+    const baryA = barycenters.get(a) ?? -1
+    const baryB = barycenters.get(b) ?? -1
+    const hasA = baryA >= 0
+    const hasB = baryB >= 0
+    if (hasA && hasB && Math.abs(baryA - baryB) > 0.0001) return baryA - baryB
+    if (hasA !== hasB) return hasA ? -1 : 1
+    return (originalIndex.get(a) ?? 0) - (originalIndex.get(b) ?? 0)
+  })
+}
+
+function improveByAdjacentSwaps(layers: string[][], edges: LayoutEdge[]): string[][] {
+  const result = layers.map(layer => [...layer])
+  let bestScore = countOrderedLayerCrossings(result, edges)
+  let improved = true
+  let passes = 0
+
+  while (improved && passes < 6) {
+    improved = false
+    passes++
+
+    for (let layerIdx = 0; layerIdx < result.length; layerIdx++) {
+      const layer = result[layerIdx]
+      for (let i = 0; i < layer.length - 1; i++) {
+        const candidate = result.map(l => [...l])
+        const tmp = candidate[layerIdx][i]
+        candidate[layerIdx][i] = candidate[layerIdx][i + 1]
+        candidate[layerIdx][i + 1] = tmp
+
+        const score = countOrderedLayerCrossings(candidate, edges)
+        if (score < bestScore) {
+          result[layerIdx] = candidate[layerIdx]
+          bestScore = score
+          improved = true
+        }
+      }
+    }
+  }
+
+  return result
+}
+
 /**
  * Minimize crossings using the barycenter heuristic
  * Performance-optimized: scales iterations and skips for very large graphs
  */
+/**
+ * Insert virtual dummy nodes for edges spanning more than one layer.
+ * In Sugiyama-style hierarchical layout, dummies are essential — without them
+ * long edges have nothing to participate in the per-layer barycenter ordering,
+ * so source nodes of long edges end up at arbitrary positions and the long
+ * edge ends up crossing everything between source and target.
+ *
+ * Returns expanded layers + a synthesized edge list (each long edge replaced
+ * by a chain of single-layer edges through dummies). Dummy IDs start with
+ * `__dummy_`.
+ */
+function insertVirtualNodes(
+  layers: string[][],
+  edges: LayoutEdge[]
+): { layers: string[][]; edges: LayoutEdge[]; isDummy: Set<string> } {
+  const layerOf = new Map<string, number>()
+  layers.forEach((layer, idx) => layer.forEach(id => layerOf.set(id, idx)))
+
+  const expanded = layers.map(l => [...l])
+  const expandedEdges: LayoutEdge[] = []
+  const isDummy = new Set<string>()
+  let counter = 0
+
+  for (const edge of edges) {
+    const srcLayer = layerOf.get(edge.source)
+    const tgtLayer = layerOf.get(edge.target)
+    if (srcLayer === undefined || tgtLayer === undefined || srcLayer === tgtLayer) {
+      // Skip same-layer or unknown — the ordering counts only between-layer edges
+      continue
+    }
+
+    const lower = Math.min(srcLayer, tgtLayer)
+    const upper = Math.max(srcLayer, tgtLayer)
+
+    if (upper - lower === 1) {
+      expandedEdges.push(edge)
+      continue
+    }
+
+    // Insert dummies in each intermediate layer; chain them.
+    let prev = srcLayer < tgtLayer ? edge.source : edge.target
+    const finalNode = srcLayer < tgtLayer ? edge.target : edge.source
+    for (let l = lower + 1; l < upper; l++) {
+      const dummyId = `__dummy_${counter++}`
+      expanded[l].push(dummyId)
+      isDummy.add(dummyId)
+      expandedEdges.push({ source: prev, target: dummyId })
+      prev = dummyId
+    }
+    expandedEdges.push({ source: prev, target: finalNode })
+  }
+
+  return { layers: expanded, edges: expandedEdges, isDummy }
+}
+
 function minimizeLayerCrossings(
   layers: string[][],
   edges: LayoutEdge[],
@@ -1188,6 +1320,9 @@ function minimizeLayerCrossings(
     20
   )
 
+  let best = result.map(layer => [...layer])
+  let bestScore = countOrderedLayerCrossings(best, edges)
+
   for (let iter = 0; iter < effectiveMaxIterations; iter++) {
     let improved = false
 
@@ -1195,49 +1330,33 @@ function minimizeLayerCrossings(
     for (let i = 1; i < result.length; i++) {
       const layer = result[i]
       const prevLayer = result[i - 1]
+      const originalIndex = new Map<string, number>()
+      layer.forEach((id, idx) => originalIndex.set(id, idx))
 
       // Build index map for adjacent layer
       const prevLayerIndex = new Map<string, number>()
       prevLayer.forEach((id, idx) => prevLayerIndex.set(id, idx))
 
       // Calculate barycenters
-      const barycenters = layer.map(nodeId => ({
-        nodeId,
-        barycenter: calculateBarycenter(nodeId, prevLayerIndex, edges)
-      }))
+      const barycenters = new Map<string, number>()
+      layer.forEach(nodeId => {
+        const local = calculateBarycenter(nodeId, prevLayerIndex, edges)
+        const global = calculateGlobalBarycenter(nodeId, result, edges, 'left')
+        barycenters.set(nodeId, global >= 0 ? global : local)
+      })
 
-      // Sort by barycenter (nodes without connections keep relative position)
-      const withBarycenter = barycenters.filter(b => b.barycenter >= 0)
-      const withoutBarycenter = barycenters.filter(b => b.barycenter < 0)
-
-      withBarycenter.sort((a, b) => a.barycenter - b.barycenter)
-
-      // Merge back
-      const newLayer: string[] = []
-      let withIdx = 0
-      let withoutIdx = 0
-
-      for (let j = 0; j < layer.length; j++) {
-        if (withIdx < withBarycenter.length &&
-            (withoutIdx >= withoutBarycenter.length ||
-             barycenters.findIndex(b => b.nodeId === withBarycenter[withIdx].nodeId) <=
-             barycenters.findIndex(b => b.nodeId === withoutBarycenter[withoutIdx].nodeId))) {
-          newLayer.push(withBarycenter[withIdx].nodeId)
-          withIdx++
-        } else if (withoutIdx < withoutBarycenter.length) {
-          newLayer.push(withoutBarycenter[withoutIdx].nodeId)
-          withoutIdx++
-        }
-      }
+      const newLayer = sortLayerByBarycenter(layer, barycenters, originalIndex)
 
       // Check if this improved crossings
-      const oldCrossings = i > 0 ? countLayerCrossings(prevLayer, result[i], edges) : 0
-      const newCrossings = i > 0 ? countLayerCrossings(prevLayer, newLayer, edges) : 0
+      const oldCrossings = countOrderedLayerCrossings(result, edges)
+      const candidate = result.map(l => [...l])
+      candidate[i] = newLayer
+      const newCrossings = countOrderedLayerCrossings(candidate, edges)
 
       if (newCrossings < oldCrossings) {
         result[i] = newLayer
         improved = true
-      } else if (newCrossings === oldCrossings && withBarycenter.length > 0) {
+      } else if (newCrossings === oldCrossings && newLayer.some((id, idx) => id !== result[i][idx])) {
         result[i] = newLayer  // Keep for consistency
       }
     }
@@ -1246,29 +1365,25 @@ function minimizeLayerCrossings(
     for (let i = result.length - 2; i >= 0; i--) {
       const layer = result[i]
       const nextLayer = result[i + 1]
+      const originalIndex = new Map<string, number>()
+      layer.forEach((id, idx) => originalIndex.set(id, idx))
 
       // Build index map for adjacent layer
       const nextLayerIndex = new Map<string, number>()
       nextLayer.forEach((id, idx) => nextLayerIndex.set(id, idx))
 
-      const barycenters = layer.map(nodeId => ({
-        nodeId,
-        barycenter: calculateBarycenter(nodeId, nextLayerIndex, edges)
-      }))
-
-      const withBarycenter = barycenters.filter(b => b.barycenter >= 0)
-      withBarycenter.sort((a, b) => a.barycenter - b.barycenter)
-
-      const newLayer = withBarycenter.map(b => b.nodeId)
-      barycenters.filter(b => b.barycenter < 0).forEach(b => {
-        // Insert at original relative position
-        const origIdx = layer.indexOf(b.nodeId)
-        const insertIdx = Math.min(origIdx, newLayer.length)
-        newLayer.splice(insertIdx, 0, b.nodeId)
+      const barycenters = new Map<string, number>()
+      layer.forEach(nodeId => {
+        const local = calculateBarycenter(nodeId, nextLayerIndex, edges)
+        const global = calculateGlobalBarycenter(nodeId, result, edges, 'right')
+        barycenters.set(nodeId, global >= 0 ? global : local)
       })
 
-      const oldCrossings = countLayerCrossings(result[i], nextLayer, edges)
-      const newCrossings = countLayerCrossings(newLayer, nextLayer, edges)
+      const newLayer = sortLayerByBarycenter(layer, barycenters, originalIndex)
+      const oldCrossings = countOrderedLayerCrossings(result, edges)
+      const candidate = result.map(l => [...l])
+      candidate[i] = newLayer
+      const newCrossings = countOrderedLayerCrossings(candidate, edges)
 
       if (newCrossings <= oldCrossings) {
         result[i] = newLayer
@@ -1276,10 +1391,23 @@ function minimizeLayerCrossings(
       }
     }
 
+    const swapped = improveByAdjacentSwaps(result, edges)
+    const swappedScore = countOrderedLayerCrossings(swapped, edges)
+    if (swappedScore < countOrderedLayerCrossings(result, edges)) {
+      swapped.forEach((layer, idx) => { result[idx] = layer })
+      improved = true
+    }
+
+    const currentScore = countOrderedLayerCrossings(result, edges)
+    if (currentScore < bestScore) {
+      best = result.map(layer => [...layer])
+      bestScore = currentScore
+    }
+
     if (!improved) break
   }
 
-  return result
+  return best
 }
 
 export function hierarchicalLayout(
@@ -1396,14 +1524,35 @@ export function hierarchicalLayout(
     layers[level].push(n.id)
   })
 
-  // Step 2: Minimize crossings using barycenter method (with timeout check)
-  if (Date.now() - layoutStartTime > layoutTimeout) {
-    console.log(`[Layout] Hierarchical layout timeout before crossing minimization`)
-    // Skip crossing minimization, use layers as-is
+  // Step 2: Insert virtual dummy nodes for layer-spanning edges, then
+  // minimize crossings on the expanded graph (with timeout check).
+  const expansion = insertVirtualNodes(layers, edges)
+  const minimizationInput = expansion.layers
+  const minimizationEdges = expansion.edges
+  const dummyCount = minimizationInput.reduce((acc, l) => acc + l.filter(id => expansion.isDummy.has(id)).length, 0)
+  const initialCrossings = countOrderedLayerCrossings(minimizationInput, minimizationEdges)
+
+  const optimizedExpanded = (Date.now() - layoutStartTime > layoutTimeout)
+    ? minimizationInput.map(l => [...l])
+    : minimizeLayerCrossings(minimizationInput, minimizationEdges, 30)
+
+  const finalCrossings = countOrderedLayerCrossings(optimizedExpanded, minimizationEdges)
+  console.log(`[Layout] Hierarchical: ${dummyCount} dummies inserted, crossings ${initialCrossings} → ${finalCrossings}`)
+
+  // Diagnostic: per-layer raw widths (pre-cap) — helps spot oversized cards
+  if (process.env.NODE_ENV !== 'production') {
+    const rawWidths = optimizedExpanded.map((layer, i) => {
+      const widths = layer
+        .filter(id => !expansion.isDummy.has(id))
+        .map(id => nodes.find(n => n.id === id)?.width ?? 200)
+      return `L${i}=[${widths.map(w => Math.round(w)).join(', ')}]`
+    })
+    console.log(`[Layout] Hierarchical card widths per layer: ${rawWidths.join(' ')}`)
   }
-  const optimizedLayers = (Date.now() - layoutStartTime > layoutTimeout)
-    ? layers.map(l => [...l])
-    : minimizeLayerCrossings(layers, edges, 30)
+
+  // Strip dummy IDs but remember the per-layer order they imposed (the dummies
+  // pulled real nodes into the right positions during ordering).
+  const optimizedLayers = optimizedExpanded.map(layer => layer.filter(id => !expansion.isDummy.has(id)))
 
   // Step 3: Assign coordinates with proper spacing based on actual node sizes
   const positions: Record<string, { x: number; y: number }> = {}
@@ -1417,65 +1566,128 @@ export function hierarchicalLayout(
     })
   })
 
-  // Calculate the maximum width needed for each layer
-  const layerWidths: number[] = optimizedLayers.map(layer => {
-    let maxWidth = 200
-    layer.forEach(nodeId => {
-      const size = nodeSizes.get(nodeId)
-      if (size) maxWidth = Math.max(maxWidth, size.width)
-    })
-    return maxWidth + 80  // Add padding between layers
+  // Calculate the typical width per layer (for X positioning).
+  // We use the *median* card width with a hard cap of 480 px. A single
+  // oversized card (e.g. user manually resized to 1500 px) would otherwise
+  // blow up layer spacing for the entire graph; better to let that one card
+  // overlap into the gap than push every layer 1500 px to the right.
+  const LAYER_WIDTH_CAP = 480
+  const layerMaxWidths: number[] = optimizedLayers.map(layer => {
+    if (layer.length === 0) return 200
+    const widths = layer
+      .map(nodeId => nodeSizes.get(nodeId)?.width ?? 200)
+      .sort((a, b) => a - b)
+    const median = widths[Math.floor(widths.length / 2)]
+    return Math.min(LAYER_WIDTH_CAP, Math.max(200, median))
   })
 
-  // Calculate total height needed for each layer (sum of node heights + spacing)
-  const verticalPadding = 30  // Space between nodes vertically
-  const layerHeights: number[] = optimizedLayers.map(layer => {
-    let totalHeight = 0
-    layer.forEach(nodeId => {
-      const size = nodeSizes.get(nodeId)
-      totalHeight += (size?.height || 100) + verticalPadding
-    })
-    return totalHeight
-  })
+  // Layer spacing: gap between right edge of one layer and left edge of next.
+  // Was 80 implicitly via `maxWidth + 80` advance; that produced 80 px gap
+  // PLUS half-width on each side which felt enormous. Direct gap is more
+  // predictable and lets graphs look tight without sacrificing edge legibility.
+  const layerGap = 60
 
-  // Find the maximum layer height to ensure all layers have same total height
-  const maxLayerHeight = Math.max(...layerHeights, height - padding * 2)
-
-  // Calculate x positions for each layer
+  // Calculate x positions (centers) for each layer
   const layerXPositions: number[] = []
   let currentX = padding
-  layerWidths.forEach((w) => {
-    layerXPositions.push(currentX + w / 2)
+  layerMaxWidths.forEach((w, idx) => {
+    const center = currentX + w / 2
+    layerXPositions.push(center)
     currentX += w
+    if (idx < layerMaxWidths.length - 1) currentX += layerGap
   })
 
-  // Position nodes in each layer
-  optimizedLayers.forEach((layer, layerIdx) => {
-    // Calculate total height of nodes in this layer
-    let totalNodesHeight = 0
+  // Y-coordinate assignment: median-of-neighbors with min-distance enforcement.
+  // The naive sequential stacking centered each layer in `height - 2*padding`,
+  // wasting vertical space and ignoring connectivity. We instead initialize
+  // sequentially, then iterate: each node moves toward the average y of its
+  // graph-neighbors, with min-distance to its layer-neighbors enforced.
+  const verticalPadding = 30  // Space between nodes vertically
+  const yPos = new Map<string, number>()
+
+  // Initial sequential stacking, top of canvas
+  optimizedLayers.forEach(layer => {
+    let cursor = padding
     layer.forEach(nodeId => {
-      const size = nodeSizes.get(nodeId)
-      totalNodesHeight += (size?.height || 100) + verticalPadding
-    })
-
-    // Start position - center vertically
-    let currentY = padding + (maxLayerHeight - totalNodesHeight) / 2
-
-    layer.forEach((nodeId) => {
-      const node = nodes.find(n => n.id === nodeId)
       const size = nodeSizes.get(nodeId) || { width: 200, height: 100 }
+      yPos.set(nodeId, cursor + size.height / 2)
+      cursor += size.height + verticalPadding
+    })
+  })
 
+  // Build neighbor map (real edges only — dummies are gone)
+  const neighbors = new Map<string, string[]>()
+  edges.forEach(e => {
+    if (!neighbors.has(e.source)) neighbors.set(e.source, [])
+    if (!neighbors.has(e.target)) neighbors.set(e.target, [])
+    neighbors.get(e.source)!.push(e.target)
+    neighbors.get(e.target)!.push(e.source)
+  })
+
+  // Iterative refinement
+  const refinementIters = 24
+  for (let iter = 0; iter < refinementIters; iter++) {
+    let totalShift = 0
+    for (const layer of optimizedLayers) {
+      // Desired y per node = mean of neighbor y's (median is similar but mean
+      // is cheaper and works well in practice).
+      const desired = new Map<string, number>()
+      for (const id of layer) {
+        const ns = (neighbors.get(id) || [])
+          .map(n => yPos.get(n))
+          .filter((v): v is number => v !== undefined)
+        if (ns.length > 0) {
+          desired.set(id, ns.reduce((a, b) => a + b, 0) / ns.length)
+        } else {
+          desired.set(id, yPos.get(id)!)
+        }
+      }
+
+      // Top-down min-distance enforcement
+      let prevBottom = padding - verticalPadding
+      for (const id of layer) {
+        const size = nodeSizes.get(id) || { width: 200, height: 100 }
+        const want = desired.get(id) ?? yPos.get(id)!
+        const minCenter = prevBottom + verticalPadding + size.height / 2
+        const newY = Math.max(want, minCenter)
+        const oldY = yPos.get(id)!
+        totalShift += Math.abs(newY - oldY)
+        yPos.set(id, newY)
+        prevBottom = newY + size.height / 2
+      }
+    }
+    // Converged: stop early
+    if (totalShift < 0.5) break
+  }
+
+  // Translate all Y so the topmost node's top edge sits at `padding`.
+  // The median-of-neighbors refinement has no inherent "pull to top" force,
+  // so it can stabilize at an arbitrary vertical offset; this normalizes it.
+  let minTop = Infinity
+  for (const layer of optimizedLayers) {
+    for (const id of layer) {
+      const size = nodeSizes.get(id) || { width: 200, height: 100 }
+      const top = (yPos.get(id) ?? padding) - size.height / 2
+      if (top < minTop) minTop = top
+    }
+  }
+  if (minTop !== Infinity && Math.abs(minTop - padding) > 1) {
+    const dy = padding - minTop
+    for (const [id, y] of yPos) yPos.set(id, y + dy)
+  }
+
+  // Write final positions
+  optimizedLayers.forEach((layer, layerIdx) => {
+    layer.forEach(nodeId => {
+      const node = nodes.find(n => n.id === nodeId)
       if (node?.pinned && node.x !== undefined && node.y !== undefined) {
         positions[nodeId] = { x: node.x, y: node.y }
       } else {
         positions[nodeId] = {
           x: layerXPositions[layerIdx],
-          y: currentY + size.height / 2
+          y: yPos.get(nodeId) ?? padding
         }
       }
-
-      // Move to next position
-      currentY += size.height + verticalPadding
     })
   })
 

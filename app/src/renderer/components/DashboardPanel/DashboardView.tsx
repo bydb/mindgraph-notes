@@ -175,7 +175,7 @@ const TasksWidget: React.FC<WidgetProps> = ({ snapshot, onTaskClick, t }) => {
   const { overdue, today, upcoming } = snapshot.tasks
   const total = overdue.length + today.length + upcoming.length
   return (
-    <section className="dv-widget">
+    <section className="dv-widget dv-widget-tasks">
       <header className="dv-widget-header">
         <h3>{t('dashboard.widgets.tasks')}</h3>
         <span className="dv-widget-count">{total}</span>
@@ -242,7 +242,7 @@ const TaskRow: React.FC<{ task: DashboardTask; onClick: () => void; showDate?: b
 const EmailsWidget: React.FC<WidgetProps> = ({ snapshot, onEmailClick, onEmailHandled, t }) => {
   const items = snapshot.emails
   return (
-    <section className="dv-widget">
+    <section className="dv-widget dv-widget-emails">
       <header className="dv-widget-header">
         <h3>{t('dashboard.widgets.emails')}</h3>
         <span className="dv-widget-count">{items.length}</span>
@@ -320,7 +320,7 @@ const CalendarWidget: React.FC<CalendarWidgetProps> = ({ snapshot, t, onRefresh 
   }
 
   return (
-    <section className="dv-widget">
+    <section className="dv-widget dv-widget-calendar">
       <header className="dv-widget-header">
         <h3>{t('dashboard.widgets.calendar')}</h3>
         <span className="dv-widget-count">{events.length}</span>
@@ -582,7 +582,7 @@ function toLocalInputValue(d: Date): string {
 const BookingsWidget: React.FC<WidgetProps> = ({ snapshot, onBookingClick, t }) => {
   const items = snapshot.bookings
   return (
-    <section className="dv-widget">
+    <section className="dv-widget dv-widget-bookings">
       <header className="dv-widget-header">
         <h3>{t('dashboard.widgets.bookings')}</h3>
         <span className="dv-widget-count">{items.length}</span>

@@ -412,8 +412,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ onOpenSearch }) => {
               </svg>
             </button>
           )}
-          <button className="btn-icon" onClick={handleNewNote} title={`${t('sidebar.newNote')} (Cmd+N)`}>
-            +
+          <button className="btn-icon sidebar-action-primary" onClick={handleNewNote} title={`${t('sidebar.newNote')} (Cmd+N)`}>
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+              <path d="M8 3v10M3 8h10" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
+            </svg>
           </button>
           <button className="btn-icon" onClick={handleNewFolder} title={t('sidebar.newFolder')}>
             <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
@@ -432,8 +434,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ onOpenSearch }) => {
       {vaultPath ? (
         <>
           <div className="vault-info">
-            <span className="vault-name">{vaultPath.split('/').pop()}</span>
-            <span className="notes-count">{notes.length} {t('sidebar.notesCount')}</span>
+            <div className="vault-meta">
+              <span className="vault-name">{vaultPath.split('/').pop()}</span>
+              <span className="notes-count">{notes.length} {t('sidebar.notesCount')}</span>
+            </div>
             <button
               className={`display-mode-toggle ${fileTreeDisplayMode === 'path' ? 'active' : ''}`}
               onClick={() => setFileTreeDisplayMode(fileTreeDisplayMode === 'name' ? 'path' : 'name')}

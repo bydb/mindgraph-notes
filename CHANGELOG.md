@@ -2,6 +2,27 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.5.21-beta] - 2026-04-29
+
+### Features
+- **Hierarchischer Layout-Algorithmus deutlich verbessert** — drei Schwächen behoben, die zusammen für sichtbare Crossings und massiv verschwendeten Whitespace sorgten:
+  - **Virtuelle Dummy-Nodes für Long-Edges** (`insertVirtualNodes`): Edges, die mehr als ein Layer überspringen (z. B. Layer 0 → Layer 2), werden vor der Crossing-Min in einen Chain aus Single-Layer-Edges durch unsichtbare Dummies verwandelt. Damit beteiligen sich Long-Edges am Barycenter-Ordering — vorher hingen sie quer durchs Layout.
+  - **Median-basierte Y-Koordinaten mit Min-Distance**: ersetzt das naive sequentielle Stapeln. 24 Refinement-Iterationen ziehen jeden Knoten zur mittleren Y-Position seiner Graph-Nachbarn, mit Top-Down-Min-Distance-Constraints zwischen Layer-Nachbarn. Anschließende Translation auf `top = padding`, damit das Layout am oberen Canvas-Rand beginnt.
+  - **Layer-Width = Median mit Cap (480 px)** statt `max(card-widths)`: eine einzelne übergroße Karte (z. B. manuell auf 1500 px gezogen) sprengt nicht mehr das gesamte Layout. Die Riesenkarte überlappt visuell in den Gap, alle anderen Layer bleiben kompakt.
+  - **Horizontaler Layer-Gap auf 60 px** (vorher implizit `cardWidth + 80` → bei breiten Karten >300 px Gap). Layers stehen sichtbar enger zusammen.
+- **Diagnose-Logs für Layout-Debugging**: `[Layout] Hierarchical: N dummies inserted, crossings X → Y` und `[Layout] Hierarchical card widths per layer: L0=[…] L1=[…]` machen Auffälligkeiten (z. B. Outlier-Karten) sofort sichtbar.
+
+### Improvements
+- **Design-Pass quer durchs Workspace** — Übergang vom soliden Pill-Design auf einen ruhigeren, color-mix-basierten Look:
+  - **`color-mix()`-Token überall**: Hintergründe, Borders, Hover-States werden aus den CSS-Variablen gemischt (`color-mix(in srgb, var(--accent-color) 11%, var(--bg-primary))` u. ä.). Theme- und Akzentfarbe färben jetzt automatisch durch alle Subtilitäten durch — keine hartkodierten Hover- und Active-Werte mehr.
+  - **View-Mode-Switcher als Tab-Bar**: Editor / Split / Graph / Dashboard mit Text-Labels neben den Icons, im Container mit Border + Padding + Box-Shadow. Active-State ist farbiger Text + heller Hintergrund + dezenter Schatten statt voller Akzentfarbe als Vollfläche.
+  - **Sidebar polished**: Header höher (44 → 48 px), eigener `bg-primary`-Mix-Background, Letter-Spacing 0.1em. Der `+`-Button wird zum Primary-Action mit Akzent-getöntem Hintergrund + Border. `.btn-icon` einheitlich 28×28 mit 7-px-Radius. Vault-Info in eigenem `.vault-meta`-Container.
+  - **Status-Dot in Bookmarks + FileTree**: Note-Kind-Indikator (🔴 Problem / 🟢 Lösung / 🔵 Info) zieht jetzt auch in Bookmarks und FileTree ein. Bookmark-Titel werden via `stripNoteKindMarker` von rohen Emojis bereinigt.
+  - **Edge-Farben dezenter**: `--edge-color` `#c0c0c0 → #b8bec7`, manuelle Edges `#0a84ff → #3478d4`.
+- **Dashboard-Widgets mit farbigem Akzent-Strich**: jedes Widget hat eine 3-px-Top-Bar in der zugehörigen Akzentfarbe via `inset 0 3px 0` Box-Shadow — Tasks rot, Emails gelb, Calendar accent, Bookings grün. Header-Hintergrund leicht in der Akzentfarbe getönt (5 %), Counter-Badge passt Border + Text-Tönung an. Hover-Background mit Akzent-Tint.
+- **Dashboard-Grid kompakter**: `auto-fill, minmax(320px, 1fr)` → `auto-fit, minmax(320px, 380px)`. Karten werden nicht mehr auf volle Breite gestreckt, behalten ihre natürliche Größe bei großem Fenster.
+- **SVG-Export-Button bekommt Icon + Label** statt nur dem Text „SVG".
+
 ## [0.5.20-beta] - 2026-04-29
 
 ### Features
