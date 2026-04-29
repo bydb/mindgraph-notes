@@ -1,6 +1,7 @@
 import React, { memo } from 'react'
 import { Handle, Position, type NodeProps } from 'reactflow'
 import type { Note } from '../../../shared/types'
+import { getNoteKind, stripNoteKindMarker } from '../../utils/noteKind'
 
 interface DotNodeData {
   title: string
@@ -23,6 +24,8 @@ const colorPalette: Record<string, string> = {
 
 export const DotNode: React.FC<NodeProps<DotNodeData>> = memo(({ data, selected }) => {
   const { title, note, color } = data
+  const noteKind = getNoteKind(note)
+  const displayTitle = noteKind ? stripNoteKindMarker(title) : title
 
   const linkCount = data.linkCount ?? (note.outgoingLinks.length + note.incomingLinks.length)
 
@@ -46,7 +49,7 @@ export const DotNode: React.FC<NodeProps<DotNodeData>> = memo(({ data, selected 
         backgroundColor: dotColor,
         borderColor: selected ? 'var(--accent-color)' : 'transparent',
       }}
-      title={`${title} (${linkCount} Verbindungen)`}
+      title={`${displayTitle} (${linkCount} Verbindungen)`}
     >
       <Handle
         type="target"
@@ -63,7 +66,14 @@ export const DotNode: React.FC<NodeProps<DotNodeData>> = memo(({ data, selected 
 
       {/* Titel als Tooltip bei Hover */}
       <div className="dot-node-label">
-        {title}
+        {noteKind && (
+          <span
+            className={`note-kind-dot note-kind-${noteKind.id}`}
+            title={noteKind.label}
+            aria-label={noteKind.label}
+          />
+        )}
+        {displayTitle}
       </div>
     </div>
   )

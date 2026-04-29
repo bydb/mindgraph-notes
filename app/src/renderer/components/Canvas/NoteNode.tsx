@@ -2,6 +2,7 @@ import React, { memo, useState, useRef, useEffect } from 'react'
 import { Handle, Position, type NodeProps, NodeResizer } from 'reactflow'
 import type { Note } from '../../../shared/types'
 import type { ExtractedCallout, TaskSummary, ExtractedExternalLink, ExtractedImage } from '../../utils/linkExtractor'
+import { getNoteKind, stripNoteKindMarker } from '../../utils/noteKind'
 
 interface NoteNodeData {
   title: string
@@ -150,6 +151,8 @@ export const NoteNode: React.FC<NodeProps<NoteNodeData>> = memo(({ data, selecte
     showTags = true, showLinks = true, showImages = true, showSummaries = true, compactMode = false,
     isLocalRoot = false, isExpanded = false, hiddenConnections = 0, onExpand
   } = data
+  const noteKind = getNoteKind(note)
+  const displayTitle = noteKind ? stripNoteKindMarker(title) : title
 
   const [editValue, setEditValue] = useState(title)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -220,7 +223,7 @@ export const NoteNode: React.FC<NodeProps<NoteNodeData>> = memo(({ data, selecte
           borderColor: selected ? 'var(--accent-color)' : colorStyle.border,
           color: color ? colorStyle.text : 'var(--text-primary)',
         }}
-        data-tooltip={title}
+        data-tooltip={displayTitle}
       >
           <Handle
             type="target"
@@ -249,7 +252,14 @@ export const NoteNode: React.FC<NodeProps<NoteNodeData>> = memo(({ data, selecte
                   <text x="8" y="11" textAnchor="middle" fontSize="5" fontWeight="bold" fill="#e53935">PDF</text>
                 </svg>
               )}
-              {title}
+              {noteKind && (
+                <span
+                  className={`note-kind-dot note-kind-${noteKind.id}`}
+                  title={noteKind.label}
+                  aria-label={noteKind.label}
+                />
+              )}
+              {displayTitle}
             </span>
           )}
 

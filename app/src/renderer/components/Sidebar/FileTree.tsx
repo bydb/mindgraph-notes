@@ -9,6 +9,7 @@ import { useBookmarkStore } from '../../stores/bookmarkStore'
 import { useQuizStore } from '../../stores/quizStore'
 import { generateNoteId, extractTasks } from '../../utils/linkExtractor'
 import { useTranslation } from '../../utils/translations'
+import { getNoteKindFromText, stripNoteKindMarker } from '../../utils/noteKind'
 
 const isMac = window.electronAPI.platform === 'darwin'
 
@@ -340,6 +341,10 @@ const FileItem: React.FC<FileItemProps> = ({ entry, level, onDrop, displayMode }
     return entry.name.replace(extension, '')
   }
   const displayName = getDisplayName()
+  const noteKind = !entry.isDirectory && !isPdf && !isImage && !isOffice
+    ? getNoteKindFromText(displayName) || getNoteKindFromText(entry.path)
+    : null
+  const visibleDisplayName = noteKind ? stripNoteKindMarker(displayName) : displayName
 
   // Ermittle die Dateiendung für Nicht-Verzeichnisse
   // Spezialfall: PDF Companion Dateien haben .pdf.md Endung
@@ -1048,7 +1053,16 @@ const FileItem: React.FC<FileItemProps> = ({ entry, level, onDrop, displayMode }
                 onClick={(e) => e.stopPropagation()}
               />
             ) : (
-              <span className="file-name" onDoubleClick={handleDoubleClick} title={entry.path}>{displayName}</span>
+              <>
+                {noteKind && (
+                  <span
+                    className={`note-kind-dot note-kind-${noteKind.id}`}
+                    title={noteKind.label}
+                    aria-label={noteKind.label}
+                  />
+                )}
+                <span className="file-name" onDoubleClick={handleDoubleClick} title={entry.path}>{visibleDisplayName}</span>
+              </>
             )}
             {linkCount > 0 && !isEditing && (
               <span className="file-link-count" title={`${linkCount} ${t('fileTree.connections')}`}>

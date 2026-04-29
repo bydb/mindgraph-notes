@@ -41,6 +41,7 @@ import { speak, stopSpeaking } from '../../utils/voice/tts'
 import { startDictation, type DictationHandle } from '../../utils/voice/stt'
 import { useIsModuleEnabled } from '../../utils/modules'
 import { useVoiceStore } from '../../stores/voiceStore'
+import { getNoteKind, stripNoteKindMarker } from '../../utils/noteKind'
 
 const markdownCodeLanguages = [
   LanguageDescription.of({
@@ -2971,6 +2972,8 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
       </div>
     )
   }
+  const selectedNoteKind = getNoteKind(selectedNote)
+  const selectedNoteDisplayTitle = selectedNoteKind ? stripNoteKindMarker(selectedNote.title) : selectedNote.title
 
   return (
     <div className="editor-container">
@@ -2999,7 +3002,16 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
             </button>
           </div>
         )}
-        <h3>{selectedNote.title}</h3>
+        <h3 title={selectedNoteDisplayTitle}>
+          {selectedNoteKind && (
+            <span
+              className={`note-kind-dot note-kind-${selectedNoteKind.id}`}
+              title={selectedNoteKind.label}
+              aria-label={selectedNoteKind.label}
+            />
+          )}
+          {selectedNoteDisplayTitle}
+        </h3>
         <div className="editor-header-right">
           {isSaving && <span className="saving-indicator">Speichern...</span>}
           {isSecondary && (

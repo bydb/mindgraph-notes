@@ -1,6 +1,7 @@
 import React, { memo } from 'react'
 import { useTabStore, type Tab } from '../../stores/tabStore'
 import { useTranslation } from '../../utils/translations'
+import { getNoteKindFromText, stripNoteKindMarker } from '../../utils/noteKind'
 
 interface TabBarProps {
   className?: string
@@ -67,7 +68,11 @@ const TabItem: React.FC<TabItemProps> = memo(({ tab, isActive, onActivate, onClo
   const isCanvasType = tab.type === 'canvas' || tab.type === 'global-canvas'
 
   // Translate title for global-canvas tabs
-  const displayTitle = tab.type === 'global-canvas' ? t('tabs.allNotes') : tab.title
+  const rawTitle = tab.type === 'global-canvas' ? t('tabs.allNotes') : tab.title
+  const noteKind = tab.type === 'editor' || tab.type === 'canvas'
+    ? getNoteKindFromText(rawTitle)
+    : null
+  const displayTitle = noteKind ? stripNoteKindMarker(rawTitle) : rawTitle
 
   return (
     <div
@@ -79,6 +84,13 @@ const TabItem: React.FC<TabItemProps> = memo(({ tab, isActive, onActivate, onClo
       <span className="tab-icon">
         {isCanvasType ? <CanvasIcon /> : <FileIcon />}
       </span>
+      {noteKind && (
+        <span
+          className={`note-kind-dot note-kind-${noteKind.id}`}
+          title={noteKind.label}
+          aria-label={noteKind.label}
+        />
+      )}
       <span className="tab-title">{displayTitle}</span>
       <button
         className="tab-close"

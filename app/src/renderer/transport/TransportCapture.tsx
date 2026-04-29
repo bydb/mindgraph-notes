@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react'
 import TaskInsertModal from './TaskInsertModal'
+import { NOTE_KINDS } from '../utils/noteKind'
 
 interface Category {
   emoji: string
@@ -8,9 +9,9 @@ interface Category {
 }
 
 const CATEGORIES: Category[] = [
-  { emoji: '🔴', label: 'Aktion', color: '#ff3b30' },
-  { emoji: '🟢', label: 'Wissen', color: '#34c759' },
-  { emoji: '🔵', label: 'Info', color: '#0a84ff' }
+  { emoji: NOTE_KINDS.problem.emoji, label: NOTE_KINDS.problem.label, color: NOTE_KINDS.problem.dotColor },
+  { emoji: NOTE_KINDS.solution.emoji, label: NOTE_KINDS.solution.label, color: NOTE_KINDS.solution.dotColor },
+  { emoji: NOTE_KINDS.info.emoji, label: NOTE_KINDS.info.label, color: NOTE_KINDS.info.dotColor }
 ]
 
 export default function TransportCapture(): React.ReactElement {

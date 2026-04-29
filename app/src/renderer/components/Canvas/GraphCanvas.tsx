@@ -30,6 +30,7 @@ import type { FileEntry } from '../../../shared/types'
 import { resolveLink, extractLinks, generateNoteId, extractFirstCardCallout, extractTasks, extractExternalLinks, extractFirstImage } from '../../utils/linkExtractor'
 import { applyLayout, type LayoutAlgorithm, type LayoutNode, type LayoutEdge } from '../../utils/layoutAlgorithms'
 import { useTranslation } from '../../utils/translations'
+import { getNoteKind } from '../../utils/noteKind'
 
 // Verfügbare Farben für Nodes
 const nodeColors = [
@@ -3195,18 +3196,14 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
 
     setAiLayoutLoading(true)
     try {
-      // Detect emoji dots in titles and auto-color cards
-      const emojiColorMap: Record<string, string> = { '🔴': '#ffcdd2', '🟢': '#c8e6c9', '🔵': '#bbdefb' }
-      const dotCategories = new Map<string, string>() // nodeId → emoji
+      // Detect functional note categories and auto-color cards
+      const dotCategories = new Map<string, string>() // nodeId → AI category label
       nodesToArrange.forEach(node => {
         const noteData = notes.find(n => n.id === node.id)
-        const title = noteData?.title || ''
-        for (const emoji of Object.keys(emojiColorMap)) {
-          if (title.includes(emoji)) {
-            dotCategories.set(node.id, emoji)
-            setNodeColor(node.id, emojiColorMap[emoji])
-            break
-          }
+        const noteKind = getNoteKind(noteData)
+        if (noteKind) {
+          dotCategories.set(node.id, noteKind.aiCategory)
+          setNodeColor(node.id, noteKind.canvasColor)
         }
       })
 
@@ -3216,8 +3213,7 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
         const shortId = `n${i}`
         idMap.set(shortId, node.id)
         const noteData = notes.find(n => n.id === node.id)
-        const dot = dotCategories.get(node.id)
-        const category = dot === '🔴' ? 'Aktion/Problem' : dot === '🟢' ? 'Wissen/Guide' : dot === '🔵' ? 'Info/Reader' : ''
+        const category = dotCategories.get(node.id) || ''
         return { id: shortId, title: noteData?.title || node.id, tags: noteData?.tags || [], category }
       })
 
