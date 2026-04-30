@@ -816,6 +816,12 @@ const RadarWidget: React.FC<RadarWidgetProps> = ({ snapshot, notes, vaultPath, o
     const refreshMs = radarAiRefreshIntervalHours * 60 * 60 * 1000
     const now = Date.now()
 
+    // Self-Trigger-Schutz: der Worker selbst setzt beim Schreiben des relevanceScore-Frontmatters
+    // `modifiedAt: new Date()`. Ohne Toleranz wäre `modifiedMs > checkedAtMs` immer true (ms-Differenz)
+    // → jede gerade analysierte Notiz würde sofort wieder als "modified" gelten und beim nächsten
+    // Mount erneut analysiert. Wir tolerieren bis zu 60 Sekunden Differenz als „selbst geschrieben".
+    const SELF_WRITE_TOLERANCE_MS = 60 * 1000
+
     const candidates = notesRef.current.filter(note => {
       const kind = getNoteKindFromContent(note.content) || getNoteKindFromTitleStrict(note.title)
       if (kind?.id !== 'problem') return false
@@ -827,7 +833,7 @@ const RadarWidget: React.FC<RadarWidgetProps> = ({ snapshot, notes, vaultPath, o
       if (Number.isNaN(checkedAtMs)) return true
       if (now - checkedAtMs > refreshMs) return true
       const modifiedMs = new Date(note.modifiedAt).getTime()
-      if (!Number.isNaN(modifiedMs) && modifiedMs > checkedAtMs) return true
+      if (!Number.isNaN(modifiedMs) && modifiedMs > checkedAtMs + SELF_WRITE_TOLERANCE_MS) return true
       return false
     })
 
@@ -1039,7 +1045,7 @@ const RadarWidget: React.FC<RadarWidgetProps> = ({ snapshot, notes, vaultPath, o
             className="dv-radar-ai-refresh"
             onClick={() => setForceRefreshTick(prev => prev + 1)}
             disabled={analyzingIds.size > 0}
-            title={analyzingIds.size > 0 ? t('dashboard.radar.aiRunning', { count: analyzingIds.size }) : t('dashboard.radar.aiRefresh')}
+            data-tooltip={analyzingIds.size > 0 ? t('dashboard.radar.aiRunning', { count: analyzingIds.size }) : t('dashboard.radar.aiRefresh')}
             aria-label={t('dashboard.radar.aiRefresh')}
           >
             {analyzingIds.size > 0 ? (

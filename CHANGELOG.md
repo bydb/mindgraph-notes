@@ -2,6 +2,12 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.5.25-beta] - 2026-04-30
+
+### Fixes
+- **KI-Analyse-Loop bei Tab-Wechsel zum Dashboard**: der Worker schreibt beim Cachen seines `relevanceScore` ins Frontmatter auch `modifiedAt: new Date()`. Der Re-Analyze-Filter prüfte `modifiedAt > checkedAt` — und genau das war nach jedem eigenen Schreibvorgang true (1 ms Differenz). Folge: jedes Öffnen des Dashboards triggerte sofort eine vollständige Re-Analyse aller 🔴-Notizen, was unter Last bis zum Render-Crash führen konnte. Fix: 60-Sekunden-Toleranz im Filter — Self-Writes werden ignoriert, echte User-Edits weiter erkannt.
+- **Tooltip am KI-Refresh-Button im Radar-Header unleserlich**: das App-Tooltip-System zeichnet Tooltips standardmäßig oberhalb des Elements, im Widget-Header lag das auf dem akzent-getönten Hintergrund und wurde abgeschnitten. Tooltips im Widget-Header rendern jetzt nach unten (analog Titlebar / Sidebar-Header / Editor-Toolbar).
+
 ## [0.5.24-beta] - 2026-04-30
 
 ### Fixes

@@ -691,6 +691,14 @@
   align-items: center;
   justify-content: center;
   margin-right: 6px;
+  position: relative;
+}
+
+/* Widget-Header-Tooltips nach UNTEN rendern, sonst werden sie über die Karten-Border
+   hinaus gezeichnet und auf dem Akzent-getönten Header unleserlich. */
+.dv-widget-header [data-tooltip]::after {
+  bottom: auto;
+  top: calc(100% + 6px);
 }
 .dv-radar-ai-refresh:hover:not(:disabled) {
   color: var(--text-primary);
