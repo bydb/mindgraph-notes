@@ -144,7 +144,7 @@
     "highlight.js": "^11.11.1",
     "html-to-image": "^1.11.13",
     "imapflow": "^1.2.9",
-    "katex": "^0.16.27",
+    "katex": "^0.16.45",
     "mailparser": "^3.9.3",
     "mammoth": "^1.11.0",
     "markdown-it": "^14.1.0",
