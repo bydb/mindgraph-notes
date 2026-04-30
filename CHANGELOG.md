@@ -2,6 +2,12 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.5.26-beta] - 2026-04-30
+
+### Fixes
+- **KI-Analyse-Self-Trigger endgültig behoben**: die 60s-Toleranz aus 0.5.25-beta war zu knapp. Watcher-Echo, Sync-Engine-Pushs und andere Hintergrund-Updates konnten `modifiedAt` von bereits analysierten Notizen mehrere Minuten nach unserer Frontmatter-Schreibung anstoßen, was dazu führte dass beim Tab-Wechsel ohne erkennbaren Auslöser eine bereits gerenderte Notiz erneut analysiert wurde — und dabei der Render-Crash auftrat. Wir entfernen jetzt das modifiedAt-basierte Re-Triggering komplett: Re-Analyse erfolgt nur noch (a) wenn die Notiz noch nie analysiert wurde, (b) wenn der Cache älter als das konfigurierte Refresh-Intervall ist (Default 6h), oder (c) wenn der User den Refresh-Button im Radar-Header klickt. User-Edits werden so verlässlich nach 6h oder via Knopfdruck erfasst, ohne false-positive-Trigger durch Hintergrund-Schreibungen.
+- **Worker setzt modifiedAt auf checkedAt-Zeitpunkt**: das selbst geschriebene Update erzeugt jetzt keine künstliche Differenz mehr zwischen `modifiedAt` und `relevanceCheckedAt`.
+
 ## [0.5.25-beta] - 2026-04-30
 
 ### Fixes

@@ -816,12 +816,16 @@ const RadarWidget: React.FC<RadarWidgetProps> = ({ snapshot, notes, vaultPath, o
     const refreshMs = radarAiRefreshIntervalHours * 60 * 60 * 1000
     const now = Date.now()
 
-    // Self-Trigger-Schutz: der Worker selbst setzt beim Schreiben des relevanceScore-Frontmatters
-    // `modifiedAt: new Date()`. Ohne Toleranz wäre `modifiedMs > checkedAtMs` immer true (ms-Differenz)
-    // → jede gerade analysierte Notiz würde sofort wieder als "modified" gelten und beim nächsten
-    // Mount erneut analysiert. Wir tolerieren bis zu 60 Sekunden Differenz als „selbst geschrieben".
-    const SELF_WRITE_TOLERANCE_MS = 60 * 1000
-
+    // Re-Analyze-Bedingungen (vereinfacht & robust):
+    // 1. Notiz hat kein relevanceCheckedAt im Frontmatter → noch nie analysiert
+    // 2. relevanceCheckedAt älter als refreshIntervalHours (Default 6h) → Cache abgelaufen
+    // 3. forceRefreshTick gesetzt → User hat manuellen Refresh-Button geklickt
+    //
+    // Modified-At-basiertes Re-Trigger absichtlich NICHT mehr drin: jeder Disk-Write des Workers
+    // bzw. jedes Watcher-Echo bzw. jeder Sync-Push erzeugt frisches modifiedAt — das hat in
+    // mehreren Hotfix-Iterationen zu Self-Trigger-Loops und Render-Crashes beim Tab-Wechsel
+    // geführt. User-Edits werden nun verlässlich nach Cache-Expiry (6h) oder via Refresh-Button
+    // analysiert; bei sofortigem Bedarf einfach den Refresh klicken.
     const candidates = notesRef.current.filter(note => {
       const kind = getNoteKindFromContent(note.content) || getNoteKindFromTitleStrict(note.title)
       if (kind?.id !== 'problem') return false
@@ -832,8 +836,6 @@ const RadarWidget: React.FC<RadarWidgetProps> = ({ snapshot, notes, vaultPath, o
       const checkedAtMs = new Date(ai.checkedAt).getTime()
       if (Number.isNaN(checkedAtMs)) return true
       if (now - checkedAtMs > refreshMs) return true
-      const modifiedMs = new Date(note.modifiedAt).getTime()
-      if (!Number.isNaN(modifiedMs) && modifiedMs > checkedAtMs + SELF_WRITE_TOLERANCE_MS) return true
       return false
     })
 
@@ -900,7 +902,10 @@ const RadarWidget: React.FC<RadarWidgetProps> = ({ snapshot, notes, vaultPath, o
               model: result.model
             })
             await window.electronAPI.writeFile(fullPath, nextContent)
-            updateNote(note.id, { content: nextContent, modifiedAt: new Date() })
+            // modifiedAt explizit auf checkedAt setzen (statt new Date()), damit das Worker-Update
+            // selbst keine modifiedAt > checkedAt-Differenz erzeugt. Watcher kann später drüber
+            // schreiben, aber dafür gibt es die 5-Minuten-Toleranz im Filter.
+            updateNote(note.id, { content: nextContent, modifiedAt: new Date(result.checkedAt) })
           } catch (err) {
             console.error('[Radar] AI analyze threw for', note.path, err)
           } finally {
