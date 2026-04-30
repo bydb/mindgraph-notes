@@ -118,8 +118,15 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onOpenInbox, onOpe
     }
   }, [vaultPath])
 
+  // Refs für robustes Reload-Verhalten:
+  // - isInitialLoadRef: setIsLoading(true) nur beim ersten Load, sonst silent reload
+  // - loadDebounceTimer: viele schnelle updateNote-Calls (KI-Worker) lösen sonst pro Notiz einen Full-Reload
+  //   aus → Dashboard flackert permanent. Debounce sammelt Updates auf 800ms.
+  const isInitialLoadRef = useRef(true)
+  const loadDebounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
   const loadSnapshot = useCallback(async () => {
-    setIsLoading(true)
+    if (isInitialLoadRef.current) setIsLoading(true)
     await loadDashboardOffers({ includeBookings: true })
     const latestOffers = useAgentStore.getState().dashboardOffers
     const snap = await buildDashboardSnapshot({
@@ -133,11 +140,23 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onOpenInbox, onOpe
       includeCalendar: true
     })
     setSnapshot(snap)
-    setIsLoading(false)
+    if (isInitialLoadRef.current) {
+      setIsLoading(false)
+      isInitialLoadRef.current = false
+    }
   }, [notes, vaultPath, taskExcludedFolders, emails, loadDashboardOffers, dashboard.calendarDaysAhead])
 
   useEffect(() => {
-    loadSnapshot()
+    // Initial: sofort laden. Re-Triggers (z.B. durch updateNote vom KI-Worker): 800ms debounce.
+    if (loadDebounceTimer.current) clearTimeout(loadDebounceTimer.current)
+    if (isInitialLoadRef.current) {
+      loadSnapshot()
+    } else {
+      loadDebounceTimer.current = setTimeout(() => loadSnapshot(), 800)
+    }
+    return () => {
+      if (loadDebounceTimer.current) clearTimeout(loadDebounceTimer.current)
+    }
   }, [loadSnapshot])
 
   const handleTaskClick = (task: DashboardTask) => selectNote(task.noteId)
