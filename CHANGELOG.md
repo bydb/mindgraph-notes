@@ -2,6 +2,11 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.5.24-beta] - 2026-04-30
+
+### Fixes
+- **Dashboard flackerte permanent während KI-Relevance-Analyse**: der Worker rief beim Schreiben jedes Frontmatter-Updates `updateNote` auf, was den `notes`-State änderte, der `loadSnapshot`-Callback wurde neu erzeugt, useEffect feuerte den Reload mit `setIsLoading(true)` — sichtbar als Reset-Schleife alle paar Sekunden. Fix: `setIsLoading(true)` nur beim initialen Mount, alle weiteren Reloads laufen silent. Plus 800ms-Debounce auf den Re-Trigger, damit viele schnelle Worker-Updates zu einem einzigen Reload zusammengefasst werden.
+
 ## [0.5.23-beta] - 2026-04-30
 
 ### Features
