@@ -1294,6 +1294,8 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab 
     setBackgroundColor,
     loadLastVaultOnStart,
     setLoadLastVaultOnStart,
+    notesRootFolder,
+    setNotesRootFolder,
     language,
     setLanguage,
     fontFamily,
@@ -1365,7 +1367,7 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab 
 
   const { t } = useTranslation()
 
-  const { vaultPath } = useNotesStore()
+  const { vaultPath, setFileTree } = useNotesStore()
 
   // App Version
   const [appVersion, setAppVersion] = useState<string>('')
@@ -2195,6 +2197,46 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab 
                     checked={loadLastVaultOnStart}
                     onChange={e => setLoadLastVaultOnStart(e.target.checked)}
                   />
+                </div>
+                <div className="settings-row">
+                  <div>
+                    <label>Standard-Notizenordner</label>
+                    <div className="settings-hint">
+                      {notesRootFolder || 'Nicht festgelegt'} · Neue Notizen werden hier angelegt.
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                    <button
+                      className="settings-refresh"
+                      disabled={!vaultPath}
+                      onClick={async () => {
+                        if (!vaultPath) return
+                        const folder = await window.electronAPI.selectFolderInVault(vaultPath)
+                        if (folder !== null) setNotesRootFolder(folder)
+                      }}
+                    >
+                      Ordner wählen
+                    </button>
+                    <button
+                      className="settings-refresh"
+                      disabled={!vaultPath}
+                      onClick={async () => {
+                        if (!vaultPath) return
+                        await window.electronAPI.ensureDir(`${vaultPath}/Notes`)
+                        const tree = await window.electronAPI.readDirectory(vaultPath)
+                        setFileTree(tree)
+                        setNotesRootFolder('Notes')
+                      }}
+                    >
+                      Notes anlegen
+                    </button>
+                    <button
+                      className="settings-refresh"
+                      onClick={() => setNotesRootFolder('')}
+                    >
+                      Zurücksetzen
+                    </button>
+                  </div>
                 </div>
               </div>
             )}

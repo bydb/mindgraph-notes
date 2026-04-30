@@ -9,11 +9,15 @@ import { useBookmarkStore } from '../../stores/bookmarkStore'
 import { useQuizStore } from '../../stores/quizStore'
 import { generateNoteId, extractTasks } from '../../utils/linkExtractor'
 import { useTranslation } from '../../utils/translations'
-import { getNoteKindFromText, stripNoteKindMarker } from '../../utils/noteKind'
+import { getNoteKind, getNoteKindFromText, NOTE_KINDS, setNoteKindInContent, stripNoteKindMarker, type NoteKindId } from '../../utils/noteKind'
 
 const isMac = window.electronAPI.platform === 'darwin'
+const NOTE_KIND_ORDER: NoteKindId[] = ['problem', 'solution', 'info']
 
 type DisplayMode = 'name' | 'path'
+type PdfDisplayMode = 'both' | 'companion-only' | 'pdf-only'
+type NoteKindIndex = Map<string, NoteKindId>
+type FileCustomizations = ReturnType<typeof useGraphStore.getState>['fileCustomizations']
 
 interface FileTreeProps {
   entries: FileEntry[]
@@ -22,11 +26,34 @@ interface FileTreeProps {
   displayMode?: DisplayMode
 }
 
+interface FileTreeInnerProps extends FileTreeProps {
+  pdfCompanionEnabled: boolean
+  pdfDisplayMode: PdfDisplayMode
+  fileCustomizations: FileCustomizations
+  showHiddenFolders: boolean
+  noteKindIndex: NoteKindIndex
+  activeKindSet: Set<NoteKindId>
+  isKindFilterActive: boolean
+  kindCounts: Record<NoteKindId, number>
+  toggleFileTreeKindFilter?: (kindId: NoteKindId) => void
+  showOnlyFileTreeKind?: (kindId: NoteKindId) => void
+}
+
 interface FileItemProps {
   entry: FileEntry
   level: number
   onDrop?: (sourcePath: string, targetPath: string) => void
   displayMode: DisplayMode
+  noteKindIndex: NoteKindIndex
+  activeKindSet: Set<NoteKindId>
+  isKindFilterActive: boolean
+  kindCounts: Record<NoteKindId, number>
+  pdfCompanionEnabled: boolean
+  pdfDisplayMode: PdfDisplayMode
+  fileCustomizationsForTree: FileCustomizations
+  showHiddenFoldersForTree: boolean
+  toggleFileTreeKindFilter?: (kindId: NoteKindId) => void
+  showOnlyFileTreeKind?: (kindId: NoteKindId) => void
 }
 
 interface ContextMenuState {
@@ -74,6 +101,23 @@ const darkenColor = (color: string): string => {
     return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`
   }
   return color
+}
+
+const buildNoteKindIndex = (notes: ReturnType<typeof useNotesStore.getState>['notes']): NoteKindIndex => {
+  const index: NoteKindIndex = new Map()
+  notes.forEach(note => {
+    const kind = getNoteKind(note)
+    if (kind) index.set(note.path, kind.id)
+  })
+  return index
+}
+
+const countNoteKinds = (index: NoteKindIndex): Record<NoteKindId, number> => {
+  const counts: Record<NoteKindId, number> = { problem: 0, solution: 0, info: 0 }
+  index.forEach(kindId => {
+    counts[kindId]++
+  })
+  return counts
 }
 
 interface FolderIconProps {
@@ -196,7 +240,22 @@ const PowerPointIcon: React.FC = () => (
   </svg>
 )
 
-const FileItem: React.FC<FileItemProps> = ({ entry, level, onDrop, displayMode }) => {
+const FileItem: React.FC<FileItemProps> = ({
+  entry,
+  level,
+  onDrop,
+  displayMode,
+  noteKindIndex,
+  activeKindSet,
+  isKindFilterActive,
+  kindCounts,
+  pdfCompanionEnabled,
+  pdfDisplayMode,
+  fileCustomizationsForTree,
+  showHiddenFoldersForTree,
+  toggleFileTreeKindFilter,
+  showOnlyFileTreeKind
+}) => {
   const { t } = useTranslation()
   // Ordner standardmäßig ZU für schnellstes initiales Rendering
   const [isOpen, setIsOpen] = useState(false)
@@ -281,6 +340,7 @@ const FileItem: React.FC<FileItemProps> = ({ entry, level, onDrop, displayMode }
 
   const { selectedNoteId, secondarySelectedNoteId, selectedPdfPath, selectedImagePath, selectedOfficePath, selectNote, selectSecondaryNote, selectPdf, selectImage, selectOffice, removeNote, setFileTree, vaultPath, notes, updateNotePath, fileTree, selectedPaths, togglePathSelection, clearSelection } = useNotesStore()
   const { iconSet, setTextSplitEnabled, flashcardsEnabled, setViewMode, setCanvasFilterPath, taskExcludedFolders, toggleTaskExcludedFolder } = useUIStore()
+  const updateNote = useNotesStore(state => state.updateNote)
   const { fileCustomizations, setFileCustomization, removeFileCustomization, toggleFolderHidden, toggleFolderPinned, showHiddenFolders } = useGraphStore()
   const { openCanvasTab, openCodeTab } = useTabStore()
   const { isBookmarked, toggleBookmark } = useBookmarkStore()
@@ -341,8 +401,9 @@ const FileItem: React.FC<FileItemProps> = ({ entry, level, onDrop, displayMode }
     return entry.name.replace(extension, '')
   }
   const displayName = getDisplayName()
+  const indexedKindId = noteKindIndex.get(entry.path)
   const noteKind = !entry.isDirectory && !isPdf && !isImage && !isOffice
-    ? getNoteKindFromText(displayName) || getNoteKindFromText(entry.path)
+    ? (indexedKindId ? NOTE_KINDS[indexedKindId] : getNoteKindFromText(displayName) || getNoteKindFromText(entry.path))
     : null
   const visibleDisplayName = noteKind ? stripNoteKindMarker(displayName) : displayName
 
@@ -689,6 +750,29 @@ const FileItem: React.FC<FileItemProps> = ({ entry, level, onDrop, displayMode }
     toggleBookmark(noteId)
     setContextMenu(null)
   }, [contextMenu, isPdf, isImage, toggleBookmark])
+
+  const handleSetNoteKind = useCallback(async (kindId: NoteKindId) => {
+    if (!contextMenu || contextMenu.entry.isDirectory || !vaultPath) return
+
+    const targetNoteId = generateNoteId(contextMenu.entry.path)
+    const existingNote = notes.find(n => n.id === targetNoteId)
+    const fullPath = `${vaultPath}/${contextMenu.entry.path}`
+
+    try {
+      const content = existingNote?.content || await window.electronAPI.readFile(fullPath)
+      const nextContent = setNoteKindInContent(content, kindId)
+      await window.electronAPI.writeFile(fullPath, nextContent)
+      updateNote(targetNoteId, {
+        content: nextContent,
+        title: existingNote?.title || contextMenu.entry.name.replace(/\.md$/, ''),
+        modifiedAt: new Date()
+      })
+    } catch (error) {
+      console.error('Fehler beim Ändern der Notizfarbe:', error)
+    }
+
+    setContextMenu(null)
+  }, [contextMenu, vaultPath, notes, updateNote])
 
   // Folder Customization Handlers
   const handleSetFolderColor = useCallback((colorId: string, path: string) => {
@@ -1075,7 +1159,22 @@ const FileItem: React.FC<FileItemProps> = ({ entry, level, onDrop, displayMode }
 
       {entry.isDirectory && isOpen && entry.children && (
         <div className="file-children">
-          <FileTree entries={entry.children} level={level + 1} onDrop={onDrop} displayMode={displayMode} />
+          <FileTreeInner
+            entries={entry.children}
+            level={level + 1}
+            onDrop={onDrop}
+            displayMode={displayMode}
+            pdfCompanionEnabled={pdfCompanionEnabled}
+            pdfDisplayMode={pdfDisplayMode}
+            fileCustomizations={fileCustomizationsForTree}
+            showHiddenFolders={showHiddenFoldersForTree}
+            noteKindIndex={noteKindIndex}
+            activeKindSet={activeKindSet}
+            isKindFilterActive={isKindFilterActive}
+            kindCounts={kindCounts}
+            toggleFileTreeKindFilter={toggleFileTreeKindFilter}
+            showOnlyFileTreeKind={showOnlyFileTreeKind}
+          />
         </div>
       )}
 
@@ -1193,6 +1292,23 @@ const FileItem: React.FC<FileItemProps> = ({ entry, level, onDrop, displayMode }
                   <button onClick={handleOpenInCanvas} className="context-menu-item">
                     {t('fileTree.exploreInCanvas')}
                   </button>
+                  <div className="context-menu-item with-submenu">
+                    <span>{t('fileTree.changeNoteKind')}</span>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <polyline points="9 18 15 12 9 6" />
+                    </svg>
+                    <div className="context-submenu">
+                      {NOTE_KIND_ORDER.map(kindId => {
+                        const kind = NOTE_KINDS[kindId]
+                        return (
+                          <button key={kindId} onClick={() => handleSetNoteKind(kindId)} className="context-menu-item note-kind-menu-item">
+                            <span className={`note-kind-dot note-kind-${kind.id}`} aria-hidden="true" />
+                            <span>{kind.label}</span>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
                   {/* Quiz für Datei - nur wenn Flashcards und Ollama aktiviert */}
                   {flashcardsEnabled && ollama.enabled && ollama.selectedModel && (
                     <div className="context-menu-item with-submenu">
@@ -1411,10 +1527,39 @@ function findEntryByPath(entries: FileEntry[], targetPath: string): FileEntry | 
   return null
 }
 
-export const FileTree: React.FC<FileTreeProps> = ({ entries, level = 0, onDrop, displayMode = 'name' }) => {
+function FileTreeInner({
+  entries,
+  level = 0,
+  onDrop,
+  displayMode = 'name',
+  pdfCompanionEnabled,
+  pdfDisplayMode,
+  fileCustomizations,
+  showHiddenFolders,
+  noteKindIndex,
+  activeKindSet,
+  isKindFilterActive,
+  kindCounts,
+  toggleFileTreeKindFilter,
+  showOnlyFileTreeKind
+}: FileTreeInnerProps) {
   const { t } = useTranslation()
-  const { pdfCompanionEnabled, pdfDisplayMode } = useUIStore()
-  const { fileCustomizations, showHiddenFolders } = useGraphStore()
+
+  const matchesKindFilter = useCallback((entry: FileEntry): FileEntry | null => {
+    if (!isKindFilterActive) return entry
+
+    if (entry.isDirectory) {
+      const children = (entry.children || [])
+        .map(child => matchesKindFilter(child))
+        .filter((child): child is FileEntry => child !== null)
+      return { ...entry, children }
+    }
+
+    if (entry.fileType && entry.fileType !== 'markdown') return null
+    const kindId = noteKindIndex.get(entry.path)
+    const kind = kindId ? NOTE_KINDS[kindId] : getNoteKindFromText(entry.name) || getNoteKindFromText(entry.path)
+    return kind && activeKindSet.has(kind.id) ? entry : null
+  }, [activeKindSet, isKindFilterActive, noteKindIndex])
 
   // Filter entries based on PDF settings and hidden folders
   const filteredEntries = useMemo(() => {
@@ -1429,13 +1574,16 @@ export const FileTree: React.FC<FileTreeProps> = ({ entries, level = 0, onDrop, 
 
     if (!pdfCompanionEnabled) {
       // If companion is disabled, show only PDFs (hide .pdf.md files)
-      return filtered.filter(entry => !entry.name.endsWith('.pdf.md'))
+      filtered = filtered.filter(entry => !entry.name.endsWith('.pdf.md'))
+      return filtered
+        .map(entry => matchesKindFilter(entry))
+        .filter((entry): entry is FileEntry => entry !== null)
     }
 
     // Collect all entry names for lookup
     const entryNames = new Set(filtered.map(e => e.name))
 
-    return filtered.filter(entry => {
+    filtered = filtered.filter(entry => {
       const name = entry.name.toLowerCase()
 
       if (pdfDisplayMode === 'companion-only') {
@@ -1453,7 +1601,11 @@ export const FileTree: React.FC<FileTreeProps> = ({ entries, level = 0, onDrop, 
       // 'both' mode shows everything
       return true
     })
-  }, [entries, pdfCompanionEnabled, pdfDisplayMode, showHiddenFolders, fileCustomizations])
+
+    return filtered
+      .map(entry => matchesKindFilter(entry))
+      .filter((entry): entry is FileEntry => entry !== null)
+  }, [entries, pdfCompanionEnabled, pdfDisplayMode, showHiddenFolders, fileCustomizations, matchesKindFilter])
 
   // Pinned folders (only at root level)
   const pinnedEntries = useMemo(() => {
@@ -1466,6 +1618,31 @@ export const FileTree: React.FC<FileTreeProps> = ({ entries, level = 0, onDrop, 
 
   return (
     <div className="file-tree">
+      {level === 0 && (
+        <div className="file-kind-filter" aria-label={t('fileTree.kindFilter')}>
+          {NOTE_KIND_ORDER.map(kindId => {
+            const kind = NOTE_KINDS[kindId]
+            const active = activeKindSet.has(kindId)
+            return (
+              <button
+                key={kindId}
+                type="button"
+                className={`file-kind-filter-btn ${active ? 'active' : ''}`}
+                onClick={() => toggleFileTreeKindFilter?.(kindId)}
+                onContextMenu={(event) => {
+                  event.preventDefault()
+                  showOnlyFileTreeKind?.(kindId)
+                }}
+                aria-label={`${kind.label} (${kindCounts[kindId]})`}
+                data-tooltip={`${kind.label} (${kindCounts[kindId]})`}
+              >
+                <span className={`note-kind-dot note-kind-${kind.id}`} aria-hidden="true" />
+                <span className="file-kind-filter-count">{kindCounts[kindId]}</span>
+              </button>
+            )
+          })}
+        </div>
+      )}
       {level === 0 && pinnedEntries.length > 0 && (
         <div className="pinned-folders-section">
           <div className="pinned-folders-header">
@@ -1475,14 +1652,76 @@ export const FileTree: React.FC<FileTreeProps> = ({ entries, level = 0, onDrop, 
             <span>{t('fileTree.pinnedFolders')}</span>
           </div>
           {pinnedEntries.map((entry) => (
-            <FileItem key={`pinned-${entry.path}`} entry={entry} level={0} onDrop={onDrop} displayMode={displayMode} />
+            <FileItem
+              key={`pinned-${entry.path}`}
+              entry={entry}
+              level={0}
+              onDrop={onDrop}
+              displayMode={displayMode}
+              noteKindIndex={noteKindIndex}
+              activeKindSet={activeKindSet}
+              isKindFilterActive={isKindFilterActive}
+              kindCounts={kindCounts}
+              pdfCompanionEnabled={pdfCompanionEnabled}
+              pdfDisplayMode={pdfDisplayMode}
+              fileCustomizationsForTree={fileCustomizations}
+              showHiddenFoldersForTree={showHiddenFolders}
+              toggleFileTreeKindFilter={toggleFileTreeKindFilter}
+              showOnlyFileTreeKind={showOnlyFileTreeKind}
+            />
           ))}
           <div className="pinned-folders-divider" />
         </div>
       )}
       {filteredEntries.map((entry) => (
-        <FileItem key={entry.path} entry={entry} level={level} onDrop={onDrop} displayMode={displayMode} />
+        <FileItem
+          key={entry.path}
+          entry={entry}
+          level={level}
+          onDrop={onDrop}
+          displayMode={displayMode}
+          noteKindIndex={noteKindIndex}
+          activeKindSet={activeKindSet}
+          isKindFilterActive={isKindFilterActive}
+          kindCounts={kindCounts}
+          pdfCompanionEnabled={pdfCompanionEnabled}
+          pdfDisplayMode={pdfDisplayMode}
+          fileCustomizationsForTree={fileCustomizations}
+          showHiddenFoldersForTree={showHiddenFolders}
+          toggleFileTreeKindFilter={toggleFileTreeKindFilter}
+          showOnlyFileTreeKind={showOnlyFileTreeKind}
+        />
       ))}
     </div>
+  )
+}
+
+export const FileTree: React.FC<FileTreeProps> = ({ entries, level = 0, onDrop, displayMode = 'name' }) => {
+  const { pdfCompanionEnabled, pdfDisplayMode, fileTreeKindFilter, toggleFileTreeKindFilter, showOnlyFileTreeKind } = useUIStore()
+  const { fileCustomizations, showHiddenFolders } = useGraphStore()
+  const notes = useNotesStore(state => state.notes)
+
+  const noteKindIndex = useMemo(() => buildNoteKindIndex(notes), [notes])
+  const kindCounts = useMemo(() => countNoteKinds(noteKindIndex), [noteKindIndex])
+  const activeKindSet = useMemo(() => new Set(fileTreeKindFilter), [fileTreeKindFilter])
+  const isKindFilterActive = fileTreeKindFilter.length < NOTE_KIND_ORDER.length
+
+  return (
+    <FileTreeInner
+      entries={entries}
+      level={level}
+      onDrop={onDrop}
+      displayMode={displayMode}
+      pdfCompanionEnabled={pdfCompanionEnabled}
+      pdfDisplayMode={pdfDisplayMode}
+      fileCustomizations={fileCustomizations}
+      showHiddenFolders={showHiddenFolders}
+      noteKindIndex={noteKindIndex}
+      activeKindSet={activeKindSet}
+      isKindFilterActive={isKindFilterActive}
+      kindCounts={kindCounts}
+      toggleFileTreeKindFilter={toggleFileTreeKindFilter}
+      showOnlyFileTreeKind={showOnlyFileTreeKind}
+    />
   )
 }

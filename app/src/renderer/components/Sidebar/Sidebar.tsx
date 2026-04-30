@@ -20,7 +20,7 @@ interface SidebarProps {
 
 export const Sidebar: React.FC<SidebarProps> = ({ onOpenSearch }) => {
   const { vaultPath, fileTree, notes, setVaultPath, setFileTree, setNotes, addNote, selectNote, setLoading } = useNotesStore()
-  const { sidebarWidth, sidebarVisible, fileTreeDisplayMode, setFileTreeDisplayMode, dailyNote: dailyNoteSettings } = useUIStore()
+  const { sidebarWidth, sidebarVisible, fileTreeDisplayMode, setFileTreeDisplayMode, notesRootFolder, setNotesRootFolder, dailyNote: dailyNoteSettings } = useUIStore()
   const vaultDailyNoteActive = useVaultSettingsStore(state => state.features.dailyNote)
   const loadGraphData = useGraphStore((s) => s.loadFromVault)
   const resetGraphStore = useGraphStore((s) => s.reset)
@@ -38,6 +38,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ onOpenSearch }) => {
 
   // Guard gegen doppeltes Laden (React Strict Mode)
   const isLoadingRef = useRef(false)
+  const notesRootLabel = notesRootFolder
+    ? notesRootFolder.split('/').filter(Boolean).at(-1) || notesRootFolder
+    : ''
 
   const handleOpenVault = useCallback(async () => {
     if (!window.electronAPI) {
@@ -146,9 +149,14 @@ export const Sidebar: React.FC<SidebarProps> = ({ onOpenSearch }) => {
     const name = newNoteName.trim()
     // Immer .md Endung erzwingen
     const fileName = name.endsWith('.md') ? name : `${name}.md`
-    const filePath = `${vaultPath}/${fileName}`
+    const targetFolder = notesRootFolder.trim().replace(/^\/+|\/+$/g, '')
+    const relativePath = targetFolder ? `${targetFolder}/${fileName}` : fileName
+    const filePath = `${vaultPath}/${relativePath}`
 
     try {
+      if (targetFolder) {
+        await window.electronAPI.ensureDir(`${vaultPath}/${targetFolder}`)
+      }
       // Notiz erstellen
       const result = await window.electronAPI.createNote(filePath)
 
@@ -157,7 +165,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ onOpenSearch }) => {
       setFileTree(tree)
 
       // Notiz zum Store hinzufügen
-      const note = await createNoteFromFile(filePath, fileName, result.content)
+      const note = await createNoteFromFile(filePath, relativePath, result.content)
       addNote(note)
       selectNote(note.id)
 
@@ -166,7 +174,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ onOpenSearch }) => {
     } catch (error) {
       console.error('Fehler beim Erstellen der Notiz:', error)
     }
-  }, [vaultPath, newNoteName, setFileTree, addNote, selectNote])
+  }, [vaultPath, newNoteName, notesRootFolder, setFileTree, addNote, selectNote])
 
   const handleNewFolder = useCallback(async () => {
     if (!window.electronAPI) return
@@ -436,7 +444,14 @@ export const Sidebar: React.FC<SidebarProps> = ({ onOpenSearch }) => {
           <div className="vault-info">
             <div className="vault-meta">
               <span className="vault-name">{vaultPath.split('/').pop()}</span>
-              <span className="notes-count">{notes.length} {t('sidebar.notesCount')}</span>
+              <span className="notes-count">
+                {notes.length} {t('sidebar.notesCount')}
+                {notesRootFolder && (
+                  <span className="notes-root-badge" title={notesRootFolder}>
+                    Notes: {notesRootLabel.replace(/^[0-9]+\s*-\s*/, '').replace(/^[^\wÄÖÜäöüß]+/u, '').trim() || notesRootLabel}
+                  </span>
+                )}
+              </span>
             </div>
             <button
               className={`display-mode-toggle ${fileTreeDisplayMode === 'path' ? 'active' : ''}`}
@@ -474,6 +489,33 @@ export const Sidebar: React.FC<SidebarProps> = ({ onOpenSearch }) => {
               </button>
             )}
           </div>
+          {!notesRootFolder && (
+            <div className="notes-root-setup">
+              <span>Notizen-Ordner festlegen</span>
+              <button
+                type="button"
+                onClick={async () => {
+                  if (!vaultPath) return
+                  const folder = await window.electronAPI.selectFolderInVault(vaultPath)
+                  if (folder !== null) setNotesRootFolder(folder)
+                }}
+              >
+                Wählen
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  if (!vaultPath) return
+                  await window.electronAPI.ensureDir(`${vaultPath}/Notes`)
+                  const tree = await window.electronAPI.readDirectory(vaultPath)
+                  setFileTree(tree)
+                  setNotesRootFolder('Notes')
+                }}
+              >
+                Notes
+              </button>
+            </div>
+          )}
           <RemarkablePanel />
           <BookmarksBar />
           <div className="sidebar-content">
