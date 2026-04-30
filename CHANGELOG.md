@@ -2,6 +2,32 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.5.23-beta] - 2026-04-30
+
+### Features
+
+- **Neues Dashboard-Widget „Relevante Notizen"** — sammelt 🔴-Problem-Notizen aus dem Vault und scort sie nach mehreren Signal-Quellen, damit vergessene oder still gewordene Probleme wieder ins Sichtfeld kommen:
+  - **Heuristik-Score**: offene Tasks (overdue ×8, today ×5, critical ×4, upcoming ×2), Backlinks von 🟢/🔵 (×2), Mail-Bezug (×4 pro passender Mail der letzten 7 Tage), Termin-Bezug (×5 pro Kalender-Match in 7 Tagen), Stille (>7 Tage ohne Bewegung trotz offener Tasks +3), Frische (modifiedAt < 3 Tage +6, < 7 Tage +3) und Datum-im-Titel-Heuristik (`Fachforum 27.05` → +1 bis +6 je nach Abstand).
+  - **KI-Relevanz-Analyse via Ollama** pro 🔴-Notiz: schreibt `relevanceScore` (0-100) und `relevanceReason` (1-Satz-Begründung) ins Frontmatter. Refresh alle 6h, Concurrency-Lock + Batches á 2 verhindert Ollama-Überlast. KI-Score überschreibt Heuristik-Score wenn aussagekräftig (≥40), sonst zählt der Heuristik-Score weiter als Floor. Notizen mit hohem KI-Score erscheinen auch ohne Heuristik-Trigger im Radar.
+  - **Smart-Pairing**: pro 🔴 wird die thematisch passendste 🟢 (Lösung) und 🔵 (Kontext) automatisch ermittelt — Keyword-Tokenizer mit Stop-Words, Title-Match, Backlink-Bonus, Folder-Bonus. Pro Pairing `✓ × …`-Buttons als persistentes Feedback (localStorage), `…` öffnet Korrektur-Picker für manuelle Auswahl. Pairing zählt nur als Score-Booster, nicht als eigenständiger Relevanz-Trigger.
+  - **Closing-Workflow** (`✓✓ als gelöst`): Dialog mit zwei Optionen — Backlink in der Lösung anlegen, offene Tasks in der Notiz erledigen. Schreibt `status: solved` + `solvedBy` + `solvedAt` ins Frontmatter, optional `solvedFor: [...]` in die Lösung. Solved-Counter im Footer („Diese Woche gelöst: 3"). 🔴 bleibt rot, verschwindet nur aus dem aktiven Radar.
+  - **Sleeping-Bucket** (💤): rote Notizen ohne aktiven Trigger und seit > 14 Tagen unangefasst landen in einer kollabierbaren Sub-Sektion, sortiert nach Stille-Dauer. Verhindert dass das Dashboard mit Karteileichen verstopft, aber wirft sie nicht weg.
+  - **Δ-Druck (Trend-Anzeige)**: pro Tag wird ein Score-Snapshot in localStorage abgelegt (max 7 Tage). Im UI dezenter monochromer Indikator: `▴ 5` (Score gestiegen), `▾ 3` (gefallen), `·` (unverändert), `★` (neu im Radar).
+- **FileTree-Farbfilter** — drei Chip-Buttons 🔴🟢🔵 in der FileTree-Header-Leiste filtern nach Notiz-Kategorie. Click toggelt, Right-Click setzt nur diese eine Farbe. Counter-Badge zeigt Anzahl pro Kategorie. Zustand persistiert in `uiStore.fileTreeKindFilter`.
+- **„Relevanz ändern"-Submenu** im Datei-Kontextmenü: drei Einträge (🔴 Problem / 🟢 Lösung / 🔵 Info) schreiben `category:` direkt ins Frontmatter, ohne dass der Datei-Name angefasst werden muss.
+- **Standard-Notizenordner** als eigenes Setting (`notesRootFolder`) — neue Notizen aus dem Sidebar-Plus landen automatisch im konfigurierten Ordner. Sidebar zeigt Setup-Banner wenn leer, neuer IPC-Handler `select-folder-in-vault` validiert per `assertSafePath`, dass die Auswahl innerhalb des Vaults liegt.
+
+### Improvements
+
+- **Strikte 🔴-Erkennung im Radar**: nur Frontmatter `category:` ODER Titel mit Emoji-Marker am Anfang oder direkt nach " - " (matched z. B. `202604221336 - 🔴 Digitalwoche`). Pfad-Fallback und Inline-Emoji-Match werden bewusst ausgeschlossen, damit Zettelkasten-Notizen mit zufälligen Emojis im Inhalt/Pfad nicht versehentlich als Probleme klassifiziert werden.
+- **Frontmatter-Helper-Bibliothek** in `noteKind.ts`: `getNoteStatus`, `markProblemSolvedInContent`, `addSolvedForBacklinkInContent`, `completeOpenTasksInContent`, `getNoteRelevance`, `setNoteRelevanceInContent`, `getNoteKindFromTitleStrict` — saubere YAML-Manipulation mit Quote-Escaping und List-Merge für `solvedFor`.
+- **`category|noteKind|kind`-Aliasing**: Frontmatter-Erkennung akzeptiert jetzt alle drei Schreibweisen für die Notiz-Kategorie.
+
+### Settings
+
+- Neue Felder in `dashboard`-Block: `radarAiEnabled`, `radarAiRefreshIntervalHours` (Default 6h), `radarAiModel` (leer = nutzt `ollama.selectedModel`). Migration für bestehende Configs ergänzt fehlende Defaults beim ersten Start.
+- Neuer Top-Level-Key `notesRootFolder` (persistiert), Setup-UI in Settings („Ordner wählen / Notes anlegen / Zurücksetzen").
+
 ## [0.5.22-beta] - 2026-04-29
 
 ### Fixes
