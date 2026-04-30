@@ -51,6 +51,7 @@
     "featureList": [
       "Local-first KI-Workspace fuer Wissen, Projekte und Dokumente",
       "Dashboard mit Tagesueberblick und Morning Briefing",
+      "Relevante Notizen: KI-bewertete Aktualitaet pro Problem-Notiz mit Begruendungstext",
       "Markdown-Arbeitsraum mit Live Preview und Wissensgraph",
       "KI-Email-Client mit Kalender-Integration",
       "Karteikarten mit Spaced Repetition (SM-2)",
@@ -432,12 +433,13 @@
         <div class="cap-inner">
           <div>
             <div class="cap-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></div>
-            <h3 data-i18n="cap.dashboard.title">Dashboard &amp; Morning Briefing</h3>
-            <p data-i18n="cap.dashboard.desc">Der Tab, den du morgens &ouml;ffnest. &Uuml;berf&auml;llige Aufgaben, Emails die Antwort erwarten, heutige Termine und neue Anmeldungen &ndash; auf einen Blick. Einmal am Tag erscheint automatisch ein kurzes Briefing.</p>
+            <h3 data-i18n="cap.dashboard.title">Dashboard, Morning Briefing &amp; Relevante Notizen</h3>
+            <p data-i18n="cap.dashboard.desc">Der Tab, den du morgens &ouml;ffnest. &Uuml;berf&auml;llige Aufgaben, Emails die Antwort erwarten, heutige Termine, neue Anmeldungen &ndash; und 🔴-Probleme, deren Aktualit&auml;t eine lokale KI laufend bewertet, damit vergessene Notizen wieder ins Sichtfeld kommen.</p>
             <div class="cap-tags">
               <span class="cap-tag">Widgets</span>
               <span class="cap-tag">Briefing</span>
               <span class="cap-tag">Kalender</span>
+              <span class="cap-tag">KI-Relevanz</span>
               <span class="cap-tag">Fokus</span>
             </div>
           </div>
@@ -445,6 +447,9 @@
             <li><span class="cap-check">&#10003;</span> <span data-i18n="cap.dashboard.f1">Aufgaben, &uuml;berf&auml;llig &middot; heute &middot; diese Woche</span></li>
             <li><span class="cap-check">&#10003;</span> <span data-i18n="cap.dashboard.f2">Emails mit Antwort-Dringlichkeit (Ollama)</span></li>
             <li><span class="cap-check">&#10003;</span> <span data-i18n="cap.dashboard.f3">Kalender via EventKit / lokaler API</span></li>
+            <li><span class="cap-check">&#10003;</span> <span data-i18n="cap.dashboard.f7">Relevante Notizen mit KI-Begr&uuml;ndung statt nur Schlagworten</span></li>
+            <li><span class="cap-check">&#10003;</span> <span data-i18n="cap.dashboard.f8">Smart-Pairing 🔴 Problem &harr; 🟢 L&ouml;sung &middot; Closing-Workflow</span></li>
+            <li><span class="cap-check">&#10003;</span> <span data-i18n="cap.dashboard.f9">Schl&auml;ft-Bucket f&uuml;r still gewordene Notizen (&gt; 14 Tage)</span></li>
             <li><span class="cap-check">&#10003;</span> <span data-i18n="cap.dashboard.f4">Widgets frei konfigurierbar pro Profil</span></li>
             <li><span class="cap-check">&#10003;</span> <span data-i18n="cap.dashboard.f5">Tab im Workspace &ndash; nicht Side-Panel</span></li>
             <li><span class="cap-check">&#10003;</span> <span data-i18n="cap.dashboard.f6">Morgen-Briefing einmal pro Tag</span></li>
@@ -560,7 +565,7 @@
     <div class="compare-grid">
       <div class="compare-card accent">
         <h3 data-i18n="compare.c1.title">Dashboard als Startpunkt</h3>
-        <p data-i18n="compare.c1.desc">Klassische Notiz-Apps zeigen dir eine leere Seite. MindGraph zeigt dir <strong>was heute wichtig ist</strong>: &uuml;berf&auml;llige Tasks, Emails mit Antwort-Pflicht, heutige Termine. Einmal pro Tag ein Briefing.</p>
+        <p data-i18n="compare.c1.desc">Klassische Notiz-Apps zeigen dir eine leere Seite. MindGraph zeigt dir <strong>was heute wichtig ist</strong>: &uuml;berf&auml;llige Tasks, Emails mit Antwort-Pflicht, heutige Termine &mdash; und 🔴-Probleme, deren Relevanz eine lokale KI laufend bewertet, damit nichts in Vergessenheit ger&auml;t.</p>
       </div>
       <div class="compare-card">
         <h3 data-i18n="compare.c2.title">Email direkt im Arbeitsraum</h3>
@@ -738,14 +743,17 @@
         "cap.label": "Was der Workspace kann",
         "cap.heading": "Ein Arbeitsraum,<br>Module nach Bedarf.",
         "cap.sub": "Dashboard, Editor, Aufgaben und Wissensgraph sind immer dabei. Email, Lernen, KI, Ger\u00e4te und Fachintegrationen schaltest du pro Modul an, wenn du sie brauchst.",
-        "cap.dashboard.title": "Dashboard & Morning Briefing",
-        "cap.dashboard.desc": "Der Tab, den du morgens \u00f6ffnest. \u00dcberf\u00e4llige Aufgaben, Emails die Antwort erwarten, heutige Termine und neue Anmeldungen \u2013 auf einen Blick. Einmal am Tag erscheint automatisch ein kurzes Briefing.",
+        "cap.dashboard.title": "Dashboard, Morning Briefing & Relevante Notizen",
+        "cap.dashboard.desc": "Der Tab, den du morgens \u00f6ffnest. \u00dcberf\u00e4llige Aufgaben, Emails die Antwort erwarten, heutige Termine, neue Anmeldungen \u2013 und \ud83d\udd34-Probleme, deren Aktualit\u00e4t eine lokale KI laufend bewertet, damit vergessene Notizen wieder ins Sichtfeld kommen.",
         "cap.dashboard.f1": "Aufgaben, \u00fcberf\u00e4llig \u00b7 heute \u00b7 diese Woche",
         "cap.dashboard.f2": "Emails mit Antwort-Dringlichkeit (Ollama)",
         "cap.dashboard.f3": "Kalender via EventKit / lokaler API",
         "cap.dashboard.f4": "Widgets frei konfigurierbar pro Profil",
         "cap.dashboard.f5": "Tab im Workspace \u2013 nicht Side-Panel",
         "cap.dashboard.f6": "Morgen-Briefing einmal pro Tag",
+        "cap.dashboard.f7": "Relevante Notizen mit KI-Begr\u00fcndung statt nur Schlagworten",
+        "cap.dashboard.f8": "Smart-Pairing \ud83d\udd34 Problem \u2194 \ud83d\udfe2 L\u00f6sung \u00b7 Closing-Workflow",
+        "cap.dashboard.f9": "Schl\u00e4ft-Bucket f\u00fcr still gewordene Notizen (> 14 Tage)",
         "cap.notes.title": "Wissensraum & Graph",
         "cap.notes.desc": "Markdown, Projektnotizen, Wikilinks, Backlinks, Canvas-Ansicht, Dataview-Abfragen und 28+ Slash Commands. Obsidian-Vaults \u00f6ffnen 1:1 \u2013 ohne Migration.",
         "cap.email.title": "Email-Client",
@@ -764,7 +772,7 @@
         "compare.heading": "Ein integrierter Arbeitsplatz \u2014<br>statt acht Apps und 30 Plugins.",
         "compare.sub": "MindGraph ist f\u00fcr Teams und Power-User, die Wissen, Emails, Aufgaben, Dokumente und KI nicht in zehn Tools verteilen wollen. Kein Plugin-Store \u2013 Module schaltest du in den Einstellungen an.",
         "compare.c1.title": "Dashboard als Startpunkt",
-        "compare.c1.desc": "Klassische Notiz-Apps zeigen dir eine leere Seite. MindGraph zeigt dir <strong>was heute wichtig ist</strong>: \u00fcberf\u00e4llige Tasks, Emails mit Antwort-Pflicht, heutige Termine. Einmal pro Tag ein Briefing.",
+        "compare.c1.desc": "Klassische Notiz-Apps zeigen dir eine leere Seite. MindGraph zeigt dir <strong>was heute wichtig ist</strong>: \u00fcberf\u00e4llige Tasks, Emails mit Antwort-Pflicht, heutige Termine \u2014 und \ud83d\udd34-Probleme, deren Relevanz eine lokale KI laufend bewertet, damit nichts in Vergessenheit ger\u00e4t.",
         "compare.c2.title": "Email direkt im Arbeitsraum",
         "compare.c2.desc": "Relevante Mails werden automatisch zu Markdown-Notizen mit Tasks und Wikilinks \u2014 direkt in deinem Vault. Kein Copy&Paste aus Thunderbird. Alles lokal, kein Cloud-Leak.",
         "compare.c3.title": "Lokale KI als Standard",
@@ -850,14 +858,17 @@
         "cap.label": "What the workspace can do",
         "cap.heading": "One workspace,<br>modules on demand.",
         "cap.sub": "Dashboard, editor, tasks and knowledge graph are always there. Email, learning, AI, devices and domain integrations are switched on per module when you need them.",
-        "cap.dashboard.title": "Dashboard & Morning Briefing",
-        "cap.dashboard.desc": "The tab you open every morning. Overdue tasks, emails awaiting a reply, today's meetings and new registrations \u2013 at a glance. Once a day a short briefing appears automatically.",
+        "cap.dashboard.title": "Dashboard, Morning Briefing & Relevant Notes",
+        "cap.dashboard.desc": "The tab you open every morning. Overdue tasks, emails awaiting a reply, today's meetings, new registrations \u2013 and \ud83d\udd34-problems whose currency a local AI continuously evaluates, so forgotten notes resurface.",
         "cap.dashboard.f1": "Tasks, overdue \u00b7 today \u00b7 this week",
         "cap.dashboard.f2": "Emails with reply urgency (Ollama)",
         "cap.dashboard.f3": "Calendar via EventKit / local API",
         "cap.dashboard.f4": "Widgets freely configurable per profile",
         "cap.dashboard.f5": "Tab in the workspace \u2013 not a side panel",
         "cap.dashboard.f6": "Morning briefing once a day",
+        "cap.dashboard.f7": "Relevant notes with AI rationale instead of just keywords",
+        "cap.dashboard.f8": "Smart-pairing \ud83d\udd34 problem \u2194 \ud83d\udfe2 solution \u00b7 closing workflow",
+        "cap.dashboard.f9": "Sleeping bucket for notes gone quiet (> 14 days)",
         "cap.notes.title": "Knowledge Space & Graph",
         "cap.notes.desc": "Markdown, project notes, wikilinks, backlinks, canvas view, dataview queries and 28+ slash commands. Obsidian vaults open 1:1 \u2013 no migration.",
         "cap.email.title": "Email Client",
@@ -876,7 +887,7 @@
         "compare.heading": "One integrated workplace \u2014<br>instead of eight apps and 30 plugins.",
         "compare.sub": "MindGraph is for teams and power users who do not want knowledge, email, tasks, documents and AI scattered across ten tools. No plugin store \u2013 modules are toggles in settings.",
         "compare.c1.title": "Dashboard as starting point",
-        "compare.c1.desc": "Classic note apps show you an empty page. MindGraph shows you <strong>what matters today</strong>: overdue tasks, emails awaiting reply, today's meetings. Once a day a briefing.",
+        "compare.c1.desc": "Classic note apps show you an empty page. MindGraph shows you <strong>what matters today</strong>: overdue tasks, emails awaiting reply, today's meetings — and 🔴-problems whose relevance a local AI continuously evaluates, so nothing falls off the radar.",
         "compare.c2.title": "Email inside your workspace",
         "compare.c2.desc": "Relevant mails become Markdown notes with tasks and wikilinks \u2014 directly in your vault. No copy&paste from Thunderbird. All local, no cloud leak.",
         "compare.c3.title": "Local AI by default",
