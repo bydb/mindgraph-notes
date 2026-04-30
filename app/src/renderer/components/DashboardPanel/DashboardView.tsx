@@ -1,4 +1,5 @@
-import React, { useEffect, useState, useCallback } from 'react'
+import React, { useEffect, useState, useCallback, useRef } from 'react'
+import { useShallow } from 'zustand/react/shallow'
 import { useNotesStore } from '../../stores/notesStore'
 import { useUIStore } from '../../stores/uiStore'
 import { useEmailStore } from '../../stores/emailStore'
@@ -18,9 +19,79 @@ import {
 } from '../../utils/dashboardData'
 import type { DashboardWidgetId } from '../../stores/uiStore'
 import type { TranslationKey } from '../../utils/translations'
+import type { Note } from '../../../shared/types'
+import {
+  getNoteKind,
+  getNoteKindFromContent,
+  getNoteKindFromTitleStrict,
+  stripNoteKindMarker,
+  getNoteStatus,
+  getNoteRelevance,
+  setNoteRelevanceInContent,
+  markProblemSolvedInContent,
+  addSolvedForBacklinkInContent,
+  completeOpenTasksInContent
+} from '../../utils/noteKind'
 import './DashboardView.css'
 
 type TFn = (key: TranslationKey, params?: Record<string, string | number>) => string
+
+type RadarFeedbackValue = 'positive' | 'negative'
+type RadarFeedback = Record<string, RadarFeedbackValue>
+
+const SLEEPING_THRESHOLD_DAYS = 14
+const RADAR_HISTORY_RETAIN_DAYS = 7
+
+const getRadarFeedbackKey = (vaultPath: string | null): string => `mindgraph:radar-feedback:${vaultPath || 'default'}`
+
+const getRadarFeedbackId = (sourceId: string, targetId: string, role: 'solution' | 'context'): string =>
+  `${sourceId}::${role}::${targetId}`
+
+const getRadarHistoryKey = (vaultPath: string | null): string => `mindgraph:radar-history:${vaultPath || 'default'}`
+
+const getRadarUiKey = (vaultPath: string | null): string => `mindgraph:radar-ui:${vaultPath || 'default'}`
+
+interface RadarHistoryEntry {
+  date: string  // YYYY-MM-DD
+  scores: Record<string, number>
+}
+
+const todayKey = (): string => {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+const loadRadarHistory = (vaultPath: string | null): RadarHistoryEntry[] => {
+  try {
+    const raw = localStorage.getItem(getRadarHistoryKey(vaultPath))
+    if (!raw) return []
+    const parsed = JSON.parse(raw)
+    return Array.isArray(parsed) ? parsed.filter(e => e && typeof e.date === 'string' && e.scores) : []
+  } catch {
+    return []
+  }
+}
+
+const persistRadarSnapshot = (vaultPath: string | null, scores: Record<string, number>): void => {
+  const history = loadRadarHistory(vaultPath)
+  const today = todayKey()
+  const filtered = history.filter(e => e.date !== today)
+  filtered.push({ date: today, scores })
+  // Nur die letzten N Tage behalten
+  filtered.sort((a, b) => a.date.localeCompare(b.date))
+  const trimmed = filtered.slice(-RADAR_HISTORY_RETAIN_DAYS)
+  try {
+    localStorage.setItem(getRadarHistoryKey(vaultPath), JSON.stringify(trimmed))
+  } catch {
+    // localStorage voll oder gesperrt — kein kritisches Problem
+  }
+}
+
+const getPreviousScores = (history: RadarHistoryEntry[]): Record<string, number> | null => {
+  const today = todayKey()
+  const older = history.filter(e => e.date !== today).sort((a, b) => b.date.localeCompare(a.date))
+  return older.length > 0 ? older[0].scores : null
+}
 
 interface DashboardViewProps {
   onOpenInbox?: () => void
@@ -36,6 +107,16 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onOpenInbox, onOpe
 
   const [snapshot, setSnapshot] = useState<DashboardSnapshot | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [radarFeedback, setRadarFeedback] = useState<RadarFeedback>({})
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(getRadarFeedbackKey(vaultPath))
+      setRadarFeedback(raw ? JSON.parse(raw) : {})
+    } catch {
+      setRadarFeedback({})
+    }
+  }, [vaultPath])
 
   const loadSnapshot = useCallback(async () => {
     setIsLoading(true)
@@ -88,6 +169,26 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onOpenInbox, onOpe
     switch (id) {
       case 'focus':
         return <FocusWidget key={id} snapshot={snapshot} onTaskClick={handleTaskClick} onRefresh={loadSnapshot} t={t} />
+      case 'radar':
+        return (
+          <RadarWidget
+            key={id}
+            snapshot={snapshot}
+            notes={notes}
+            vaultPath={vaultPath}
+            onNoteClick={selectNote}
+            onProblemSolved={loadSnapshot}
+            t={t}
+            feedback={radarFeedback}
+            onFeedback={(sourceId, targetId, role, value) => {
+              setRadarFeedback(current => {
+                const next = { ...current, [getRadarFeedbackId(sourceId, targetId, role)]: value }
+                localStorage.setItem(getRadarFeedbackKey(vaultPath), JSON.stringify(next))
+                return next
+              })
+            }}
+          />
+        )
       case 'tasks':
         return <TasksWidget key={id} snapshot={snapshot} onTaskClick={handleTaskClick} t={t} />
       case 'emails':
@@ -148,6 +249,320 @@ interface WidgetProps {
   onEmailClick?: (item: EmailActionItem) => void
   onEmailHandled?: (item: EmailActionItem) => void
   onBookingClick?: (item: BookingItem) => void
+}
+
+interface RadarItem {
+  note: Note
+  score: number
+  triggers: string[]
+  solution?: RadarConnection
+  context?: RadarConnection
+  delta: number | null   // null = neu im Radar oder keine History
+  isNew: boolean
+  aiScore?: number       // 0-100 von Ollama (Stufe 2)
+  aiReason?: string      // 1-Satz-Begründung von Ollama
+  aiCheckedAt?: string   // ISO-Timestamp der KI-Analyse
+}
+
+interface SleepingItem {
+  note: Note
+  daysSilent: number
+}
+
+interface RadarSnapshot {
+  active: RadarItem[]
+  sleeping: SleepingItem[]
+  solvedThisWeek: number
+}
+
+interface RadarConnection {
+  note: Note
+  score: number
+  label: string
+  role: 'solution' | 'context'
+  feedback?: RadarFeedbackValue
+}
+
+const getCleanNoteTitle = (note: Note): string => stripNoteKindMarker(note.title).trim() || note.title
+
+const RADAR_STOP_WORDS = new Set([
+  'infos', 'info', 'termine', 'termin', 'login', 'zugang', 'zugänge', 'daten',
+  'mail', 'mails', 'email', 'emails', 'team', 'update', 'projekt', 'notiz',
+  'notes', 'frage', 'fragen', 'angebot', 'angebote', 'jahren', 'woche',
+  'what', 'long', 'goal', 'tech'
+])
+
+const tokenizeRadarText = (text: string): string[] => text
+  .toLowerCase()
+  .replace(/\d{8,14}/g, ' ')
+  .replace(/[^\p{L}\p{N}\s-]/gu, ' ')
+  .split(/\s+/)
+  .map(word => word.trim().replace(/^-+|-+$/g, ''))
+  .filter(word => word.length >= 4 && !RADAR_STOP_WORDS.has(word))
+
+const getRadarKeywords = (note: Note): string[] => {
+  const base = tokenizeRadarText(`${note.title} ${note.path} ${note.content.slice(0, 1600)}`)
+  return Array.from(new Set(base)).slice(0, 8)
+}
+
+const scoreNoteConnection = (source: Note, target: Note, sourceKeywords: string[]): number => {
+  const haystack = `${target.title} ${target.path} ${target.content.slice(0, 2200)}`.toLowerCase()
+  const keywordHits = sourceKeywords.filter(keyword => haystack.includes(keyword)).length
+  const targetTitleTokens = new Set(tokenizeRadarText(getCleanNoteTitle(target)))
+  const sourceTitleTokens = tokenizeRadarText(getCleanNoteTitle(source))
+  const titleHits = sourceTitleTokens.filter(token => targetTitleTokens.has(token)).length
+  let score = keywordHits / Math.max(1, sourceKeywords.length)
+
+  if (keywordHits < 2 && titleHits === 0) score *= 0.25
+  if (titleHits > 0) score += Math.min(0.35, titleHits * 0.18)
+
+  if (source.outgoingLinks.includes(target.id) || source.outgoingLinks.includes(target.path) || source.outgoingLinks.includes(target.title)) score += 0.35
+  if (source.incomingLinks.includes(target.id)) score += 0.25
+
+  const sourceFolder = source.path.split('/').slice(0, -1).join('/')
+  const targetFolder = target.path.split('/').slice(0, -1).join('/')
+  if (sourceFolder && sourceFolder === targetFolder) score += 0.12
+
+  return Math.min(1, score)
+}
+
+const findRadarConnection = (
+  source: Note,
+  notes: Note[],
+  kindId: 'solution' | 'info',
+  label: string,
+  sourceKeywords: string[],
+  feedback: RadarFeedback
+): RadarConnection | undefined => {
+  const role: 'solution' | 'context' = kindId === 'solution' ? 'solution' : 'context'
+  return notes
+    .filter(candidate => candidate.id !== source.id && getNoteKind(candidate)?.id === kindId)
+    .map(candidate => {
+      const feedbackValue = feedback[getRadarFeedbackId(source.id, candidate.id, role)]
+      const baseScore = scoreNoteConnection(source, candidate, sourceKeywords)
+      const adjustedScore = feedbackValue === 'positive'
+        ? Math.max(baseScore, 0.92)
+        : feedbackValue === 'negative'
+          ? Math.min(baseScore, 0.02)
+          : baseScore
+      return {
+        note: candidate,
+        score: adjustedScore,
+        label,
+        role,
+        feedback: feedbackValue
+      }
+    })
+    .filter(connection => connection.feedback === 'positive' || connection.score >= 0.32)
+    .sort((a, b) => b.score - a.score)[0]
+}
+
+const textMatchesNote = (text: string, keywords: string[]) => {
+  const haystack = text.toLowerCase()
+  return keywords.some(keyword => haystack.includes(keyword))
+}
+
+const collectRadarSnapshot = (
+  notes: Note[],
+  snapshot: DashboardSnapshot,
+  t: TFn,
+  feedback: RadarFeedback,
+  previousScores: Record<string, number> | null
+): RadarSnapshot => {
+  const notesById = new Map(notes.map(note => [note.id, note]))
+  const tasksByNote = new Map<string, { overdue: number; today: number; upcoming: number; critical: number }>()
+
+  const addTask = (task: DashboardTask, bucket: 'overdue' | 'today' | 'upcoming') => {
+    const current = tasksByNote.get(task.noteId) || { overdue: 0, today: 0, upcoming: 0, critical: 0 }
+    current[bucket]++
+    if (task.isCritical) current.critical++
+    tasksByNote.set(task.noteId, current)
+  }
+  snapshot.tasks.overdue.forEach(task => addTask(task, 'overdue'))
+  snapshot.tasks.today.forEach(task => addTask(task, 'today'))
+  snapshot.tasks.upcoming.forEach(task => addTask(task, 'upcoming'))
+
+  const now = Date.now()
+  const sevenDaysAgo = now - 7 * 24 * 60 * 60 * 1000
+  const sleepingThresholdMs = SLEEPING_THRESHOLD_DAYS * 24 * 60 * 60 * 1000
+
+  // Alle Problem-Notizen mit Status.
+  // Strikte Erkennung für den Radar: nur Frontmatter-`category:` ODER Titel der mit `🔴` BEGINNT.
+  // Pfad-Fallback und Inline-Emoji-Match werden bewusst ausgeschlossen, damit Zettelkasten-Notizen
+  // mit zufälligen Emojis im Inhalt/Pfad nicht im Radar landen.
+  const problems = notes
+    .filter(note => {
+      const kind = getNoteKindFromContent(note.content) || getNoteKindFromTitleStrict(note.title)
+      return kind?.id === 'problem'
+    })
+    .map(note => ({ note, status: getNoteStatus(note) }))
+
+  // Solved-Counter (letzte 7 Tage)
+  let solvedThisWeek = 0
+  for (const { status } of problems) {
+    if (status.status !== 'solved' || !status.solvedAt) continue
+    const solvedAtMs = new Date(status.solvedAt).getTime()
+    if (Number.isNaN(solvedAtMs)) continue
+    if (solvedAtMs >= sevenDaysAgo) solvedThisWeek++
+  }
+
+  // Nur offene Probleme für aktive + schlafende Buckets
+  const openProblems = problems.filter(({ status }) => status.status === 'open')
+
+  const candidates = openProblems.map(({ note }) => {
+    const triggers: string[] = []
+    let score = 0
+    let hasActionSignal = false
+    const taskStats = tasksByNote.get(note.id)
+    if (taskStats) {
+      score += taskStats.overdue * 8 + taskStats.today * 5 + taskStats.upcoming * 2 + taskStats.critical * 4
+      hasActionSignal = true
+      if (taskStats.overdue > 0) triggers.push(t('dashboard.radar.trigger.overdue', { count: taskStats.overdue }))
+      if (taskStats.today > 0) triggers.push(t('dashboard.radar.trigger.today', { count: taskStats.today }))
+      if (taskStats.critical > 0) triggers.push(t('dashboard.radar.trigger.critical', { count: taskStats.critical }))
+    }
+
+    const semanticBacklinks = note.incomingLinks
+      .map(id => notesById.get(id))
+      .filter((source): source is Note => {
+        const kind = getNoteKind(source)
+        return kind?.id === 'solution' || kind?.id === 'info'
+      }).length
+    if (semanticBacklinks > 0) {
+      score += semanticBacklinks * 2
+      hasActionSignal = true
+      triggers.push(t('dashboard.radar.trigger.backlinks', { count: semanticBacklinks }))
+    }
+
+    const keywords = getRadarKeywords(note)
+    const solution = findRadarConnection(note, notes, 'solution', t('dashboard.radar.label.solution'), keywords, feedback)
+    const context = findRadarConnection(note, notes, 'info', t('dashboard.radar.label.context'), keywords, feedback)
+    const hasPositiveFeedback = solution?.feedback === 'positive' || context?.feedback === 'positive'
+
+    const matchingEmails = snapshot.emails.filter(item => {
+      const emailTime = new Date(item.email.date).getTime()
+      if (Number.isNaN(emailTime) || emailTime < sevenDaysAgo) return false
+      return textMatchesNote(`${item.email.subject} ${item.email.snippet} ${item.email.from.name}`, keywords)
+    }).length
+    if (matchingEmails > 0) {
+      score += matchingEmails * 4
+      hasActionSignal = true
+      triggers.push(t('dashboard.radar.trigger.emails', { count: matchingEmails }))
+    }
+
+    const matchingEvents = snapshot.calendar.filter(item =>
+      item.dayOffset >= 0 &&
+      item.dayOffset <= 7 &&
+      textMatchesNote(`${item.event.title} ${item.event.location || ''}`, keywords)
+    ).length
+    if (matchingEvents > 0) {
+      score += matchingEvents * 5
+      hasActionSignal = true
+      triggers.push(t('dashboard.radar.trigger.calendar', { count: matchingEvents }))
+    }
+
+    const modifiedAt = new Date(note.modifiedAt).getTime()
+    const hasOpenTasks = !!taskStats && (taskStats.overdue + taskStats.today + taskStats.upcoming) > 0
+    if (hasOpenTasks && !Number.isNaN(modifiedAt) && now - modifiedAt > 7 * 24 * 60 * 60 * 1000) {
+      score += 3
+      triggers.push(t('dashboard.radar.trigger.stale'))
+    }
+
+    // Frische als Action-Signal: kürzlich erstellte/bearbeitete 🔴 sind aktuell, auch ohne Tasks/Mails
+    const ageMs = Number.isNaN(modifiedAt) ? Infinity : now - modifiedAt
+    if (ageMs < 3 * 24 * 60 * 60 * 1000) {
+      score += 6
+      hasActionSignal = true
+      triggers.push(t('dashboard.radar.trigger.fresh'))
+    } else if (ageMs < 7 * 24 * 60 * 60 * 1000) {
+      score += 3
+      hasActionSignal = true
+      triggers.push(t('dashboard.radar.trigger.recent'))
+    }
+
+    // Datum-im-Titel-Heuristik: TT.MM erkennt implizite Termine wie "Fachforum 27.05"
+    const dateMatch = note.title.match(/\b(\d{1,2})\.(\d{1,2})(?:\.(\d{2,4}))?\b/)
+    if (dateMatch) {
+      const day = parseInt(dateMatch[1], 10)
+      const month = parseInt(dateMatch[2], 10) - 1
+      const yearRaw = dateMatch[3]
+      const currentYear = new Date(now).getFullYear()
+      const year = yearRaw
+        ? (yearRaw.length === 2 ? 2000 + parseInt(yearRaw, 10) : parseInt(yearRaw, 10))
+        : currentYear
+      if (day >= 1 && day <= 31 && month >= 0 && month <= 11) {
+        const titleDate = new Date(year, month, day).getTime()
+        const daysAhead = Math.round((titleDate - now) / (24 * 60 * 60 * 1000))
+        if (daysAhead >= 0 && daysAhead <= 30) {
+          const boost = daysAhead <= 7 ? 6 : daysAhead <= 14 ? 3 : 1
+          score += boost
+          hasActionSignal = true
+          triggers.push(t('dashboard.radar.trigger.titleDate', {
+            date: `${String(day).padStart(2, '0')}.${String(month + 1).padStart(2, '0')}.`
+          }))
+        }
+      }
+    }
+
+    // Smart-Pairing zählt nur als Score-Booster, nicht als eigenständiger Relevanz-Trigger.
+    // Wird bewusst NACH allen anderen Signal-Quellen ausgewertet, damit hasActionSignal final ist.
+    const inScope = hasActionSignal || hasPositiveFeedback
+    if (inScope && solution) score += Math.round(solution.score * 5)
+    if (inScope && context) score += Math.round(context.score * 3)
+
+    // KI-Relevanz aus Frontmatter (Stufe 2): wenn Ollama die Notiz analysiert hat,
+    // nutze den KI-Score als Primär-Wert. Heuristik bleibt als Floor (max(ki, heuristik)).
+    // Wichtig: hoher KI-Score (>=40) zählt selbst als Action-Signal — so können auch Notizen
+    // ohne Tasks/Mails/Termine in den Radar, wenn die KI sie als aktuell einstuft.
+    const ai = getNoteRelevance(note)
+    const aiScore = typeof ai.score === 'number' ? ai.score : undefined
+    const heuristicScore = inScope ? score : 0
+    const hasMeaningfulAi = aiScore !== undefined && aiScore >= 40
+    const finalScore = aiScore !== undefined
+      ? Math.max(aiScore, heuristicScore)
+      : heuristicScore
+
+    const previousScore = previousScores ? previousScores[note.id] : undefined
+    const delta = previousScore === undefined ? null : finalScore - previousScore
+    const isNew = previousScores !== null && previousScore === undefined && finalScore > 0
+
+    return {
+      note,
+      score: finalScore,
+      triggers,
+      solution,
+      context,
+      delta,
+      isNew,
+      aiScore,
+      aiReason: ai.reason,
+      aiCheckedAt: ai.checkedAt,
+      hasOpenTasks: !!taskStats && (taskStats.overdue + taskStats.today + taskStats.upcoming) > 0,
+      modifiedAt,
+      hasMeaningfulAi
+    }
+  })
+
+  const active: RadarItem[] = candidates
+    .filter(item => item.score > 0 || item.hasMeaningfulAi)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 5)
+    .map(({ note, score, triggers, solution, context, delta, isNew, aiScore, aiReason, aiCheckedAt }) =>
+      ({ note, score, triggers, solution, context, delta, isNew, aiScore, aiReason, aiCheckedAt })
+    )
+
+  const activeIds = new Set(active.map(item => item.note.id))
+  const sleeping: SleepingItem[] = candidates
+    .filter(item => !activeIds.has(item.note.id) && item.score === 0)
+    .filter(item => !item.hasOpenTasks)
+    .filter(item => !Number.isNaN(item.modifiedAt) && now - item.modifiedAt > sleepingThresholdMs)
+    .map(item => ({
+      note: item.note,
+      daysSilent: Math.floor((now - item.modifiedAt) / (24 * 60 * 60 * 1000))
+    }))
+    .sort((a, b) => b.daysSilent - a.daysSilent)
+
+  return { active, sleeping, solvedThisWeek }
 }
 
 const formatTime = (d: Date | string) => {
@@ -284,6 +699,499 @@ const EmailsWidget: React.FC<WidgetProps> = ({ snapshot, onEmailClick, onEmailHa
         )}
       </div>
     </section>
+  )
+}
+
+interface RadarWidgetProps {
+  snapshot: DashboardSnapshot
+  notes: Note[]
+  vaultPath: string | null
+  onNoteClick: (id: string) => void
+  onProblemSolved: () => void
+  t: TFn
+  feedback: RadarFeedback
+  onFeedback: (sourceId: string, targetId: string, role: 'solution' | 'context', value: RadarFeedbackValue) => void
+}
+
+const renderDelta = (delta: number | null, isNew: boolean): React.ReactNode => {
+  if (isNew) return <span className="dv-radar-delta new" aria-label="neu im Radar">★</span>
+  if (delta === null || delta === 0) return <span className="dv-radar-delta neutral" aria-hidden="true">·</span>
+  if (delta > 0) return <span className="dv-radar-delta up" aria-label={`${delta} mehr Druck als gestern`}>▴ {delta}</span>
+  return <span className="dv-radar-delta down" aria-label={`${Math.abs(delta)} weniger Druck als gestern`}>▾ {Math.abs(delta)}</span>
+}
+
+const RadarWidget: React.FC<RadarWidgetProps> = ({ snapshot, notes, vaultPath, onNoteClick, onProblemSolved, t, feedback, onFeedback }) => {
+  const updateNote = useNotesStore(state => state.updateNote)
+  const radarHistory = React.useMemo(() => loadRadarHistory(vaultPath), [vaultPath])
+  const previousScores = React.useMemo(() => getPreviousScores(radarHistory), [radarHistory])
+  const radarSnapshot = React.useMemo(
+    () => collectRadarSnapshot(notes, snapshot, t, feedback, previousScores),
+    [notes, snapshot, t, feedback, previousScores]
+  )
+
+  // Heutigen Snapshot persistieren (max 1× pro Tag — die Funktion dedupliziert intern)
+  useEffect(() => {
+    if (!vaultPath) return
+    const todaysScores: Record<string, number> = {}
+    radarSnapshot.active.forEach(item => { todaysScores[item.note.id] = item.score })
+    if (Object.keys(todaysScores).length > 0) {
+      persistRadarSnapshot(vaultPath, todaysScores)
+    }
+  }, [vaultPath, radarSnapshot])
+
+  const [correction, setCorrection] = useState<{ sourceId: string; role: 'solution' | 'context'; currentTargetId?: string; query: string } | null>(null)
+  const [solveDialog, setSolveDialog] = useState<{ item: RadarItem; connection: RadarConnection } | null>(null)
+  const [sleepingOpen, setSleepingOpen] = useState<boolean>(() => {
+    try {
+      const ui = localStorage.getItem(getRadarUiKey(vaultPath))
+      return ui ? JSON.parse(ui)?.sleepingOpen === true : false
+    } catch { return false }
+  })
+
+  const toggleSleeping = () => {
+    setSleepingOpen(prev => {
+      const next = !prev
+      try { localStorage.setItem(getRadarUiKey(vaultPath), JSON.stringify({ sleepingOpen: next })) } catch {/* */}
+      return next
+    })
+  }
+
+  // ─── KI-Relevanz Auto-Analyse (Stufe 2) ────────────────────────────────────
+  // Selektive Subscriptions mit useShallow, damit der Effect nur bei tatsächlichen Setting-Änderungen re-triggert.
+  // Vorher: state.dashboard als ganzes Objekt → bei jedem dashboard-Field-Update neue Ref → Effect läuft mehrfach parallel.
+  const { radarAiEnabled, radarAiModel, radarAiRefreshIntervalHours } = useUIStore(useShallow(s => ({
+    radarAiEnabled: s.dashboard.radarAiEnabled,
+    radarAiModel: s.dashboard.radarAiModel,
+    radarAiRefreshIntervalHours: s.dashboard.radarAiRefreshIntervalHours
+  })))
+  const { ollamaEnabled, ollamaSelectedModel } = useUIStore(useShallow(s => ({
+    ollamaEnabled: s.ollama.enabled,
+    ollamaSelectedModel: s.ollama.selectedModel
+  })))
+  const aiModel = radarAiModel || ollamaSelectedModel
+  const aiEnabled = !!(radarAiEnabled && ollamaEnabled && aiModel)
+
+  const [analyzingIds, setAnalyzingIds] = useState<Set<string>>(new Set())
+  const [forceRefreshTick, setForceRefreshTick] = useState(0)
+
+  // Refs für aktuellste Werte ohne Effect-Re-Trigger
+  const notesRef = useRef(notes)
+  notesRef.current = notes
+  const snapshotRef = useRef(snapshot)
+  snapshotRef.current = snapshot
+
+  // Concurrency-Lock: nur ein Batch gleichzeitig — verhindert parallele Aufrufe an Ollama
+  const isRunningRef = useRef(false)
+
+  useEffect(() => {
+    if (!aiEnabled || !vaultPath) {
+      console.log('[Radar] AI worker idle:', { aiEnabled, hasVault: !!vaultPath, model: aiModel, ollamaEnabled })
+      return
+    }
+    if (isRunningRef.current) {
+      console.log('[Radar] AI worker already running, skipping re-trigger')
+      return
+    }
+
+    let cancelled = false
+    const refreshMs = radarAiRefreshIntervalHours * 60 * 60 * 1000
+    const now = Date.now()
+
+    const candidates = notesRef.current.filter(note => {
+      const kind = getNoteKindFromContent(note.content) || getNoteKindFromTitleStrict(note.title)
+      if (kind?.id !== 'problem') return false
+      if (getNoteStatus(note).status !== 'open') return false
+      if (forceRefreshTick > 0) return true
+      const ai = getNoteRelevance(note)
+      if (!ai.checkedAt) return true
+      const checkedAtMs = new Date(ai.checkedAt).getTime()
+      if (Number.isNaN(checkedAtMs)) return true
+      if (now - checkedAtMs > refreshMs) return true
+      const modifiedMs = new Date(note.modifiedAt).getTime()
+      if (!Number.isNaN(modifiedMs) && modifiedMs > checkedAtMs) return true
+      return false
+    })
+
+    console.log(`[Radar] AI worker: ${candidates.length} candidates, model=${aiModel}, refreshIntervalH=${radarAiRefreshIntervalHours}, force=${forceRefreshTick > 0}`)
+    if (candidates.length === 0) return
+
+    const todayIso = new Date().toISOString().split('T')[0]
+    const calendar = snapshotRef.current.calendar.slice(0, 8).map(c => ({
+      title: c.event.title,
+      startIso: typeof c.event.startDate === 'string' ? c.event.startDate : new Date(c.event.startDate).toISOString(),
+      daysAhead: c.dayOffset,
+      location: c.event.location
+    }))
+    const emails = snapshotRef.current.emails.slice(0, 6).map(e => ({
+      from: e.email.from.name || e.email.from.address,
+      subject: e.email.subject,
+      snippet: e.email.snippet,
+      date: e.email.date
+    }))
+    const fourteenDaysAgo = now - 14 * 24 * 60 * 60 * 1000
+    const recentNoteTitles = notesRef.current
+      .filter(n => {
+        const m = new Date(n.modifiedAt).getTime()
+        return !Number.isNaN(m) && m > fourteenDaysAgo
+      })
+      .sort((a, b) => new Date(b.modifiedAt).getTime() - new Date(a.modifiedAt).getTime())
+      .slice(0, 8)
+      .map(n => stripNoteKindMarker(n.title))
+
+    const candidateIds = candidates.map(c => c.id)
+    setAnalyzingIds(prev => {
+      const next = new Set(prev)
+      candidateIds.forEach(id => next.add(id))
+      return next
+    })
+
+    isRunningRef.current = true
+    const runBatch = async () => {
+      // Reduzierte Parallelität: 2 statt 3, damit Ollama nicht überlastet
+      const batchSize = 2
+      for (let i = 0; i < candidates.length; i += batchSize) {
+        if (cancelled) break
+        const batch = candidates.slice(i, i + batchSize)
+        await Promise.all(batch.map(async (note) => {
+          try {
+            const result = await window.electronAPI.noteAnalyzeRelevance({
+              vaultPath,
+              noteRelativePath: note.path,
+              model: aiModel,
+              context: { todayIso, calendar, emails, recentNoteTitles }
+            })
+            if (cancelled) return
+            if (!result.success) {
+              console.warn('[Radar] AI analyze failed for', note.path, result.error)
+              return
+            }
+            console.log(`[Radar] AI analyzed "${note.title}" → score=${result.score}, reason="${result.reason}"`)
+            const fullPath = `${vaultPath}/${note.path}`
+            const currentContent = note.content || await window.electronAPI.readFile(fullPath)
+            const nextContent = setNoteRelevanceInContent(currentContent, {
+              score: result.score,
+              reason: result.reason,
+              isoDate: result.checkedAt,
+              model: result.model
+            })
+            await window.electronAPI.writeFile(fullPath, nextContent)
+            updateNote(note.id, { content: nextContent, modifiedAt: new Date() })
+          } catch (err) {
+            console.error('[Radar] AI analyze threw for', note.path, err)
+          } finally {
+            setAnalyzingIds(prev => {
+              const next = new Set(prev)
+              next.delete(note.id)
+              return next
+            })
+          }
+        }))
+      }
+    }
+    runBatch().finally(() => {
+      isRunningRef.current = false
+      console.log('[Radar] AI worker batch finished')
+    })
+
+    return () => {
+      cancelled = true
+      // Lock NICHT hier zurücksetzen — der Batch läuft im Hintergrund weiter, sonst würde
+      // ein parallel gestarteter Batch Ollama doch wieder überlasten. Lock wird im finally
+      // freigegeben, wenn der Batch wirklich durch ist.
+    }
+  }, [vaultPath, aiEnabled, aiModel, forceRefreshTick, radarAiRefreshIntervalHours, updateNote])
+
+  const correctionCandidates = React.useMemo(() => {
+    if (!correction) return []
+    const wantedKind = correction.role === 'solution' ? 'solution' : 'info'
+    const query = correction.query.trim().toLowerCase()
+    return notes
+      .filter(note => note.id !== correction.sourceId && getNoteKind(note)?.id === wantedKind)
+      .filter(note => {
+        if (!query) return true
+        const haystack = `${getCleanNoteTitle(note)} ${note.path}`.toLowerCase()
+        return query.split(/\s+/).every(part => haystack.includes(part))
+      })
+      .slice(0, 7)
+  }, [correction, notes])
+
+  const renderConnection = (item: RadarItem, connection: RadarConnection) => (
+    <span className={`dv-radar-connection ${connection.role} ${connection.feedback || ''}`}>
+      <span className="dv-radar-connection-text">
+        {connection.label}: {getCleanNoteTitle(connection.note)}
+      </span>
+      <span className="dv-radar-feedback" onClick={event => event.stopPropagation()}>
+        <button
+          type="button"
+          className={connection.feedback === 'positive' ? 'active' : ''}
+          aria-label={t('dashboard.radar.feedback.fits')}
+          title={t('dashboard.radar.feedback.fits')}
+          onClick={() => onFeedback(item.note.id, connection.note.id, connection.role, 'positive')}
+        >
+          ✓
+        </button>
+        <button
+          type="button"
+          className={connection.feedback === 'negative' ? 'active' : ''}
+          aria-label={t('dashboard.radar.feedback.notFits')}
+          title={t('dashboard.radar.feedback.notFits')}
+          onClick={() => onFeedback(item.note.id, connection.note.id, connection.role, 'negative')}
+        >
+          ×
+        </button>
+        <button
+          type="button"
+          aria-label={t('dashboard.radar.feedback.better')}
+          title={t('dashboard.radar.feedback.better')}
+          onClick={() => setCorrection({
+            sourceId: item.note.id,
+            role: connection.role,
+            currentTargetId: connection.note.id,
+            query: ''
+          })}
+        >
+          …
+        </button>
+        {connection.role === 'solution' && (
+          <button
+            type="button"
+            className="solve-btn"
+            aria-label={t('dashboard.radar.solveAria')}
+            title={t('dashboard.radar.solve')}
+            onClick={() => setSolveDialog({ item, connection })}
+          >
+            ✓✓
+          </button>
+        )}
+      </span>
+    </span>
+  )
+
+  const handleConfirmSolve = useCallback(async (
+    item: RadarItem,
+    connection: RadarConnection,
+    options: { addBacklink: boolean; closeTasks: boolean }
+  ) => {
+    if (!vaultPath) return
+    const isoDate = new Date().toISOString().slice(0, 10)
+    const problemFullPath = `${vaultPath}/${item.note.path}`
+    const solutionFullPath = `${vaultPath}/${connection.note.path}`
+    const solutionTitle = getCleanNoteTitle(connection.note)
+    const problemTitle = getCleanNoteTitle(item.note)
+
+    try {
+      // Problem-Notiz: status=solved + tasks (optional)
+      let problemContent = item.note.content || await window.electronAPI.readFile(problemFullPath)
+      let completedCount = 0
+      if (options.closeTasks) {
+        const result = completeOpenTasksInContent(problemContent)
+        problemContent = result.content
+        completedCount = result.completedCount
+      }
+      problemContent = markProblemSolvedInContent(problemContent, solutionTitle, isoDate)
+      await window.electronAPI.writeFile(problemFullPath, problemContent)
+      updateNote(item.note.id, { content: problemContent, modifiedAt: new Date() })
+
+      // Solution-Notiz: solvedFor-Backlink (optional)
+      if (options.addBacklink) {
+        const solutionContent = connection.note.content || await window.electronAPI.readFile(solutionFullPath)
+        const nextSolutionContent = addSolvedForBacklinkInContent(solutionContent, problemTitle)
+        if (nextSolutionContent !== solutionContent) {
+          await window.electronAPI.writeFile(solutionFullPath, nextSolutionContent)
+          updateNote(connection.note.id, { content: nextSolutionContent, modifiedAt: new Date() })
+        }
+      }
+
+      console.log(`[Radar] solved "${problemTitle}" via "${solutionTitle}", closed ${completedCount} tasks`)
+      setSolveDialog(null)
+      onProblemSolved()
+    } catch (error) {
+      console.error('[Radar] markProblemSolved failed:', error)
+    }
+  }, [vaultPath, updateNote, onProblemSolved])
+
+  return (
+    <section className="dv-widget dv-widget-radar">
+      <header className="dv-widget-header">
+        <h3>{t('dashboard.widgets.radar')}</h3>
+        {aiEnabled && (
+          <button
+            type="button"
+            className="dv-radar-ai-refresh"
+            onClick={() => setForceRefreshTick(prev => prev + 1)}
+            disabled={analyzingIds.size > 0}
+            title={analyzingIds.size > 0 ? t('dashboard.radar.aiRunning', { count: analyzingIds.size }) : t('dashboard.radar.aiRefresh')}
+            aria-label={t('dashboard.radar.aiRefresh')}
+          >
+            {analyzingIds.size > 0 ? (
+              <span className="dv-radar-ai-refresh-spinner" />
+            ) : (
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="23 4 23 10 17 10"/>
+                <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+              </svg>
+            )}
+          </button>
+        )}
+        <span className="dv-widget-count">{radarSnapshot.active.length}</span>
+      </header>
+      <div className="dv-widget-body">
+        {radarSnapshot.active.length === 0 && radarSnapshot.sleeping.length === 0 ? (
+          <div className="dv-widget-empty">{t('dashboard.radar.empty')}</div>
+        ) : (
+          <div className="dv-list">
+            {radarSnapshot.active.map(item => (
+              <div
+                key={item.note.id}
+                className={`dv-radar-row ${item.aiReason ? 'with-ai' : ''} ${analyzingIds.has(item.note.id) ? 'analyzing' : ''}`}
+                role="button"
+                tabIndex={0}
+                onClick={() => onNoteClick(item.note.id)}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onNoteClick(item.note.id) } }}
+              >
+                <span className="dv-radar-score">{item.score}</span>
+                {renderDelta(item.delta, item.isNew)}
+                <span className="dv-radar-body">
+                  <span className="dv-radar-title">{getCleanNoteTitle(item.note)}</span>
+                  {item.aiReason ? (
+                    <span className="dv-radar-ai-reason" title={item.aiCheckedAt ? `KI-Analyse: ${new Date(item.aiCheckedAt).toLocaleString('de-DE')}` : undefined}>
+                      <span className="dv-radar-ai-badge">KI</span>
+                      {item.aiReason}
+                    </span>
+                  ) : (
+                    <span className="dv-radar-triggers">
+                      {item.triggers.slice(0, 2).join(' · ')}
+                    </span>
+                  )}
+                  {(item.solution || item.context) && (
+                    <span className="dv-radar-connections">
+                      {item.solution && renderConnection(item, item.solution)}
+                      {item.context && renderConnection(item, item.context)}
+                    </span>
+                  )}
+                  {correction?.sourceId === item.note.id && (
+                    <span className="dv-radar-correction" onClick={event => event.stopPropagation()}>
+                      <input
+                        value={correction.query}
+                        onChange={event => setCorrection({ ...correction, query: event.target.value })}
+                        placeholder={correction.role === 'solution' ? t('dashboard.radar.searchSolution') : t('dashboard.radar.searchContext')}
+                        autoFocus
+                      />
+                      <span className="dv-radar-correction-list">
+                        {correctionCandidates.map(candidate => (
+                          <button
+                            key={candidate.id}
+                            type="button"
+                            onClick={() => {
+                              if (correction.currentTargetId) {
+                                onFeedback(item.note.id, correction.currentTargetId, correction.role, 'negative')
+                              }
+                              onFeedback(item.note.id, candidate.id, correction.role, 'positive')
+                              setCorrection(null)
+                            }}
+                          >
+                            {getCleanNoteTitle(candidate)}
+                          </button>
+                        ))}
+                        {correctionCandidates.length === 0 && (
+                          <span className="dv-radar-correction-empty">{t('dashboard.radar.noMatch')}</span>
+                        )}
+                      </span>
+                    </span>
+                  )}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {radarSnapshot.sleeping.length > 0 && (
+          <div className={`dv-radar-sleeping ${sleepingOpen ? 'open' : ''}`}>
+            <button type="button" className="dv-radar-sleeping-toggle" onClick={toggleSleeping}>
+              <span className="dv-radar-sleeping-chevron">{sleepingOpen ? '▾' : '▸'}</span>
+              <span>💤 {t('dashboard.radar.sleeping.title')} ({radarSnapshot.sleeping.length})</span>
+            </button>
+            {sleepingOpen && (
+              <div className="dv-radar-sleeping-list">
+                {radarSnapshot.sleeping.slice(0, 12).map(({ note, daysSilent }) => (
+                  <button key={note.id} className="dv-radar-sleeping-row" onClick={() => onNoteClick(note.id)}>
+                    <span className="dv-radar-sleeping-title">{getCleanNoteTitle(note)}</span>
+                    <span className="dv-radar-sleeping-days">{t('dashboard.radar.sleeping.days', { count: daysSilent })}</span>
+                  </button>
+                ))}
+                {radarSnapshot.sleeping.length > 12 && (
+                  <div className="dv-radar-sleeping-more">{t('dashboard.radar.sleeping.more', { count: radarSnapshot.sleeping.length - 12 })}</div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {radarSnapshot.solvedThisWeek > 0 && (
+          <div className="dv-radar-solved-footer">
+            ✓ {t('dashboard.radar.solvedThisWeek', { count: radarSnapshot.solvedThisWeek })}
+          </div>
+        )}
+      </div>
+      {solveDialog && (
+        <SolveProblemDialog
+          item={solveDialog.item}
+          connection={solveDialog.connection}
+          onClose={() => setSolveDialog(null)}
+          onConfirm={handleConfirmSolve}
+          t={t}
+        />
+      )}
+    </section>
+  )
+}
+
+interface SolveProblemDialogProps {
+  item: RadarItem
+  connection: RadarConnection
+  onClose: () => void
+  onConfirm: (item: RadarItem, connection: RadarConnection, options: { addBacklink: boolean; closeTasks: boolean }) => void
+  t: TFn
+}
+
+const SolveProblemDialog: React.FC<SolveProblemDialogProps> = ({ item, connection, onClose, onConfirm, t }) => {
+  const [addBacklink, setAddBacklink] = useState(true)
+  const [closeTasks, setCloseTasks] = useState(false)
+
+  return (
+    <div className="dv-modal-overlay" onClick={onClose}>
+      <div className="dv-modal dv-modal-narrow" onClick={e => e.stopPropagation()}>
+        <header className="dv-modal-header">
+          <h3>{t('dashboard.radar.solveDialog.title')}</h3>
+          <button className="dv-modal-close" onClick={onClose} aria-label="close">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </header>
+        <div className="dv-modal-body">
+          <div className="dv-modal-task">{getCleanNoteTitle(item.note)}</div>
+          <div className="dv-modal-task-note">
+            {t('dashboard.radar.solveDialog.via')}: {getCleanNoteTitle(connection.note)}
+          </div>
+
+          <label className="dv-modal-checkbox">
+            <input type="checkbox" checked={addBacklink} onChange={e => setAddBacklink(e.target.checked)} />
+            <span>{t('dashboard.radar.solveDialog.backlink')}</span>
+          </label>
+          <label className="dv-modal-checkbox">
+            <input type="checkbox" checked={closeTasks} onChange={e => setCloseTasks(e.target.checked)} />
+            <span>{t('dashboard.radar.solveDialog.closeTasks')}</span>
+          </label>
+        </div>
+        <footer className="dv-modal-footer">
+          <button className="dv-modal-btn-secondary" onClick={onClose}>
+            {t('dashboard.radar.solveDialog.cancel')}
+          </button>
+          <button className="dv-modal-btn-primary" onClick={() => onConfirm(item, connection, { addBacklink, closeTasks })}>
+            {t('dashboard.radar.solveDialog.confirm')}
+          </button>
+        </footer>
+      </div>
+    </div>
   )
 }
 

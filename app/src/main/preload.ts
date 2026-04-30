@@ -11,6 +11,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   setMainLanguage: (lang: string) => ipcRenderer.invoke('set-main-language', lang),
 
   openVault: () => ipcRenderer.invoke('open-vault'),
+  selectFolderInVault: (vaultPath: string) => ipcRenderer.invoke('select-folder-in-vault', vaultPath),
   readDirectory: (dirPath: string) => ipcRenderer.invoke('read-directory', dirPath),
   readFile: (filePath: string) => ipcRenderer.invoke('read-file', filePath),
   readFilesBatch: (basePath: string, relativePaths: string[]) => ipcRenderer.invoke('read-files-batch', basePath, relativePaths),
@@ -337,6 +338,17 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('email-fetch', vaultPath, accounts, lastFetchedAt, maxPerAccount),
   emailAnalyze: (vaultPath: string, model: string, emailIds?: string[]) =>
     ipcRenderer.invoke('email-analyze', vaultPath, model, emailIds),
+  noteAnalyzeRelevance: (payload: {
+    vaultPath: string
+    noteRelativePath: string
+    model: string
+    context: {
+      todayIso: string
+      calendar: Array<{ title: string; startIso: string; daysAhead: number; location?: string }>
+      emails: Array<{ from: string; subject: string; snippet: string; date: string }>
+      recentNoteTitles: string[]
+    }
+  }) => ipcRenderer.invoke('note-analyze-relevance', payload),
   emailLoad: (vaultPath: string) =>
     ipcRenderer.invoke('email-load', vaultPath),
   emailSave: (vaultPath: string, data: { emails: object[]; lastFetchedAt: Record<string, string> }) =>

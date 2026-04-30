@@ -447,6 +447,7 @@ export interface ElectronAPI {
   setMainLanguage: (lang: string) => Promise<boolean>;
 
   openVault: () => Promise<string | null>;
+  selectFolderInVault: (vaultPath: string) => Promise<string | null>;
   selectVaultDirectory: () => Promise<string | null>;
   checkDirectoryEmpty: (dirPath: string) => Promise<boolean>;
   createStarterVault: (targetPath: string, language: string) => Promise<boolean>;
@@ -805,6 +806,17 @@ export interface ElectronAPI {
   emailConnect: (account: EmailAccount) => Promise<{ success: boolean; error?: string }>;
   emailFetch: (vaultPath: string, accounts: EmailAccount[], lastFetchedAt: Record<string, string>, maxPerAccount: number) => Promise<EmailFetchResult>;
   emailAnalyze: (vaultPath: string, model: string, emailIds?: string[]) => Promise<{ success: boolean; analyzed: number; error?: string }>;
+  noteAnalyzeRelevance: (payload: {
+    vaultPath: string
+    noteRelativePath: string
+    model: string
+    context: {
+      todayIso: string
+      calendar: Array<{ title: string; startIso: string; daysAhead: number; location?: string }>
+      emails: Array<{ from: string; subject: string; snippet: string; date: string }>
+      recentNoteTitles: string[]
+    }
+  }) => Promise<{ success: true; score: number; reason: string; model: string; checkedAt: string } | { success: false; error: string; raw?: string }>;
   emailLoad: (vaultPath: string) => Promise<{ emails: EmailMessage[]; lastFetchedAt: Record<string, string> } | null>;
   emailSave: (vaultPath: string, data: { emails: EmailMessage[]; lastFetchedAt: Record<string, string> }) => Promise<boolean>;
   emailSavePassword: (accountId: string, password: string) => Promise<boolean>;

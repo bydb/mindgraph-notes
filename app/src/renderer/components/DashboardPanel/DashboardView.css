@@ -107,6 +107,10 @@
   --widget-accent: var(--color-error, #e55);
 }
 
+.dv-widget-radar {
+  --widget-accent: #d93d42;
+}
+
 .dv-widget-emails {
   --widget-accent: var(--color-warning, #f59e0b);
 }
@@ -335,6 +339,431 @@
   overflow: hidden;
   text-overflow: ellipsis;
   margin-top: 1px;
+}
+
+/* Action radar */
+.dv-radar-row {
+  width: 100%;
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  padding: 11px 15px;
+  border: none;
+  border-bottom: 1px solid var(--border-subtle);
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.12s;
+  font-family: inherit;
+}
+
+.dv-radar-row:last-child { border-bottom: none; }
+.dv-radar-row:hover { background: color-mix(in srgb, #d93d42 6%, var(--bg-hover)); }
+
+.dv-radar-score {
+  flex: 0 0 auto;
+  min-width: 30px;
+  height: 24px;
+  padding: 0 7px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: color-mix(in srgb, #d93d42 12%, var(--bg-primary));
+  border: 1px solid color-mix(in srgb, #d93d42 24%, transparent);
+  color: #b8272d;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.dv-radar-body {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.dv-radar-title {
+  font-size: 13px;
+  font-weight: 650;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dv-radar-triggers {
+  font-size: 11.5px;
+  color: var(--text-secondary);
+  line-height: 1.35;
+}
+
+.dv-radar-connections {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 2px;
+}
+
+.dv-radar-connection {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  padding: 3px 7px;
+  border-radius: 999px;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-primary);
+  color: var(--text-secondary);
+  font-size: 10.5px;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dv-radar-connection-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dv-radar-connection.solution {
+  border-color: color-mix(in srgb, #21a340 24%, var(--border-subtle));
+  background: color-mix(in srgb, #21a340 7%, var(--bg-primary));
+}
+
+.dv-radar-connection.info {
+  border-color: color-mix(in srgb, #3478d4 22%, var(--border-subtle));
+  background: color-mix(in srgb, #3478d4 6%, var(--bg-primary));
+}
+
+.dv-radar-connection.positive {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, #21a340 22%, transparent);
+}
+
+.dv-radar-connection.negative {
+  opacity: 0.45;
+  text-decoration: line-through;
+}
+
+.dv-radar-feedback {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+
+.dv-radar-row:hover .dv-radar-feedback,
+.dv-radar-connection.positive .dv-radar-feedback,
+.dv-radar-connection.negative .dv-radar-feedback {
+  opacity: 1;
+}
+
+.dv-radar-feedback button {
+  width: 17px;
+  height: 17px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border-subtle);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--bg-primary) 92%, transparent);
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.dv-radar-feedback button:hover,
+.dv-radar-feedback button.active {
+  border-color: var(--border-color);
+  color: var(--text-primary);
+  background: var(--bg-primary);
+}
+
+.dv-radar-correction {
+  margin-top: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 7px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--bg-primary) 88%, var(--bg-secondary));
+}
+
+.dv-radar-correction input {
+  width: 100%;
+  height: 26px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 7px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  padding: 0 8px;
+  font: inherit;
+  font-size: 11.5px;
+  outline: none;
+}
+
+.dv-radar-correction input:focus {
+  border-color: color-mix(in srgb, var(--accent-color) 36%, var(--border-color));
+}
+
+.dv-radar-correction-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.dv-radar-correction-list button {
+  width: 100%;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-secondary);
+  padding: 5px 7px;
+  text-align: left;
+  font: inherit;
+  font-size: 11.5px;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dv-radar-correction-list button:hover {
+  background: var(--bg-secondary);
+  border-color: var(--border-subtle);
+  color: var(--text-primary);
+}
+
+.dv-radar-correction-empty {
+  color: var(--text-muted);
+  font-size: 11.5px;
+  padding: 4px 7px;
+}
+
+/* Δ-Druck (Trend-Pfeile) — dezent monochrom */
+.dv-radar-delta {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--text-muted);
+  min-width: 22px;
+  text-align: center;
+  flex-shrink: 0;
+  letter-spacing: 0.2px;
+  font-variant-numeric: tabular-nums;
+}
+.dv-radar-delta.up { color: color-mix(in srgb, var(--text-primary) 80%, transparent); }
+.dv-radar-delta.down { color: color-mix(in srgb, var(--text-muted) 70%, transparent); }
+.dv-radar-delta.neutral {
+  color: color-mix(in srgb, var(--text-muted) 50%, transparent);
+  font-weight: 400;
+}
+.dv-radar-delta.new {
+  color: color-mix(in srgb, var(--text-primary) 70%, transparent);
+  font-size: 11px;
+}
+
+/* Solve-Button (✓✓ als gelöst) im Connection-Feedback */
+.dv-radar-feedback button.solve-btn {
+  font-size: 10px;
+  letter-spacing: -0.5px;
+  padding: 2px 5px;
+  font-weight: 700;
+  color: color-mix(in srgb, var(--text-primary) 75%, transparent);
+}
+.dv-radar-feedback button.solve-btn:hover {
+  background: color-mix(in srgb, var(--accent-color) 18%, var(--bg-hover));
+  color: var(--text-primary);
+}
+
+/* Sleeping-Bucket (💤) */
+.dv-radar-sleeping {
+  margin-top: 4px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.dv-radar-sleeping-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 9px 15px;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+}
+.dv-radar-sleeping-toggle:hover { background: var(--bg-hover); color: var(--text-secondary); }
+
+.dv-radar-sleeping-chevron {
+  font-size: 10px;
+  width: 10px;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+.dv-radar-sleeping-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.dv-radar-sleeping-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 15px 8px 31px;
+  background: transparent;
+  border: none;
+  border-top: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+}
+.dv-radar-sleeping-row:hover { background: var(--bg-hover); color: var(--text-primary); }
+
+.dv-radar-sleeping-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dv-radar-sleeping-days {
+  font-size: 10.5px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.dv-radar-sleeping-more {
+  padding: 6px 15px 8px 31px;
+  font-size: 10.5px;
+  color: var(--text-muted);
+  border-top: 1px solid var(--border-subtle);
+}
+
+/* KI-Reason im Radar-Item: ersetzt die jetzigen Trigger-Zähler wenn KI-Analyse vorliegt */
+.dv-radar-ai-reason {
+  font-size: 11.5px;
+  color: var(--text-secondary);
+  line-height: 1.35;
+  display: block;
+  white-space: normal;
+  word-wrap: break-word;
+}
+
+.dv-radar-ai-badge {
+  display: inline-block;
+  margin-right: 6px;
+  padding: 1px 5px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--accent-color) 15%, transparent);
+  color: color-mix(in srgb, var(--accent-color) 85%, var(--text-primary));
+  text-transform: uppercase;
+  vertical-align: middle;
+}
+
+/* Refresh-Button im Radar-Header */
+.dv-radar-ai-refresh {
+  background: transparent;
+  border: 1px solid var(--border-subtle);
+  border-radius: 5px;
+  cursor: pointer;
+  color: var(--text-muted);
+  padding: 3px 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 6px;
+}
+.dv-radar-ai-refresh:hover:not(:disabled) {
+  color: var(--text-primary);
+  border-color: var(--border-color);
+  background: var(--bg-hover);
+}
+.dv-radar-ai-refresh:disabled {
+  cursor: progress;
+  opacity: 0.85;
+}
+
+.dv-radar-ai-refresh-spinner {
+  width: 11px;
+  height: 11px;
+  border: 1.5px solid color-mix(in srgb, var(--text-muted) 35%, transparent);
+  border-top-color: var(--text-secondary);
+  border-radius: 50%;
+  animation: dv-radar-ai-spin 0.85s linear infinite;
+}
+
+@keyframes dv-radar-ai-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Item, das gerade analysiert wird: dezenter Pulse statt blockierender Overlay */
+.dv-radar-row.analyzing {
+  position: relative;
+}
+.dv-radar-row.analyzing::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(90deg,
+    transparent 0%,
+    color-mix(in srgb, var(--accent-color) 6%, transparent) 50%,
+    transparent 100%);
+  background-size: 200% 100%;
+  animation: dv-radar-shimmer 1.4s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes dv-radar-shimmer {
+  0% { background-position: -100% 0; }
+  100% { background-position: 200% 0; }
+}
+
+/* Solved-Counter Footer */
+.dv-radar-solved-footer {
+  padding: 9px 15px;
+  border-top: 1px solid var(--border-subtle);
+  font-size: 11.5px;
+  color: color-mix(in srgb, var(--text-secondary) 90%, transparent);
+}
+
+/* Solve-Dialog Modal-Variante */
+.dv-modal.dv-modal-narrow { max-width: 380px; }
+
+.dv-modal-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0;
+  font-size: 12.5px;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+.dv-modal-checkbox input[type="checkbox"] {
+  width: 14px;
+  height: 14px;
+  cursor: pointer;
 }
 
 /* Calendar */

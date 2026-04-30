@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import type { UpdateInfo } from '../../shared/types'
+import type { NoteKindId } from '../utils/noteKind'
 
 type ViewMode = 'editor' | 'split' | 'canvas'
 type Theme = 'light' | 'dark' | 'system'
@@ -349,7 +350,7 @@ export interface TransportSettings {
 }
 
 // Dashboard Widgets — identifier-basiert, Reihenfolge im Array = Anzeigereihenfolge
-export type DashboardWidgetId = 'focus' | 'tasks' | 'emails' | 'calendar' | 'bookings' | 'sync'
+export type DashboardWidgetId = 'focus' | 'radar' | 'tasks' | 'emails' | 'calendar' | 'bookings' | 'sync'
 
 export interface DashboardSettings {
   enabled: boolean
@@ -358,9 +359,14 @@ export interface DashboardSettings {
   briefingIncludeCalendar: boolean
   lastBriefingDate: string             // YYYY-MM-DD; leer = nie gezeigt
   calendarDaysAhead: number            // wie viele Tage Kalender voraus zeigen (default 1)
+  radarAiEnabled: boolean              // KI-basierte Relevanz-Analyse pro 🔴 aktivieren
+  radarAiRefreshIntervalHours: number  // wie oft wird die KI-Analyse pro Notiz aufgefrischt (1/6/24)
+  radarAiModel: string                 // Ollama-Modell für Notiz-Analyse; leer = nutze ollama.selectedModel
 }
 
-export const DASHBOARD_ALL_WIDGETS: DashboardWidgetId[] = ['focus', 'tasks', 'emails', 'calendar', 'bookings', 'sync']
+export const DASHBOARD_ALL_WIDGETS: DashboardWidgetId[] = ['focus', 'radar', 'tasks', 'emails', 'calendar', 'bookings', 'sync']
+
+const normalizeVaultFolder = (folder: string): string => folder.trim().replace(/^\/+|\/+$/g, '')
 
 // Telegram Bot Settings
 export type TelegramLlmBackend = 'ollama' | 'anthropic' | 'auto'
@@ -483,6 +489,8 @@ interface UIState {
   canvasDefaultCardWidth: number // Standard-Kartenbreite (150-500)
   splitPosition: number // Prozent für Editor-Breite im Split-Modus (0-100)
   fileTreeDisplayMode: FileTreeDisplayMode // 'name' = nur Dateiname, 'path' = voller Pfad
+  fileTreeKindFilter: NoteKindId[]
+  notesRootFolder: string // Relativer Pfad im Vault für neue Arbeitsnotizen
   pendingTemplateInsert: PendingTemplateInsert | null // Template das in Editor eingefügt werden soll
 
   // LLM AI Settings (Ollama & LM Studio)
@@ -600,6 +608,10 @@ interface UIState {
   setCanvasDefaultCardWidth: (width: number) => void
   setSplitPosition: (position: number) => void
   setFileTreeDisplayMode: (mode: FileTreeDisplayMode) => void
+  setFileTreeKindFilter: (kinds: NoteKindId[]) => void
+  toggleFileTreeKindFilter: (kind: NoteKindId) => void
+  showOnlyFileTreeKind: (kind: NoteKindId) => void
+  setNotesRootFolder: (folder: string) => void
   setPendingTemplateInsert: (template: PendingTemplateInsert | null) => void
   setOllama: (settings: Partial<LLMSettings>) => void
   setPdfCompanionEnabled: (enabled: boolean) => void
@@ -692,6 +704,8 @@ const defaultState = {
   canvasDefaultCardWidth: 280, // Standard: 280px
   splitPosition: 50,
   fileTreeDisplayMode: 'name' as FileTreeDisplayMode,
+  fileTreeKindFilter: ['problem', 'solution', 'info'] as NoteKindId[],
+  notesRootFolder: '',
   pendingTemplateInsert: null as PendingTemplateInsert | null,
 
   // LLM AI Settings (Ollama & LM Studio)
@@ -884,11 +898,14 @@ const defaultState = {
   // Dashboard
   dashboard: {
     enabled: true,
-    widgets: ['focus', 'tasks', 'emails', 'calendar', 'bookings'],
+    widgets: ['focus', 'radar', 'tasks', 'emails', 'calendar', 'bookings'],
     briefingEnabled: true,
     briefingIncludeCalendar: true,
     lastBriefingDate: '',
-    calendarDaysAhead: 1
+    calendarDaysAhead: 1,
+    radarAiEnabled: true,
+    radarAiRefreshIntervalHours: 6,
+    radarAiModel: ''
   } as DashboardSettings,
 
   // Telegram Bot
@@ -917,7 +934,7 @@ const persistedKeys = [
   'autoSaveInterval', 'editorHeadingFolding', 'editorOutlining', 'outlineStyle', 'editorShowWordCount',
   'sidebarWidth', 'sidebarVisible', 'editorPreviewSplit', 'textSplitEnabled', 'textSplitPosition',
   'canvasFilterPath', 'canvasViewMode', 'canvasShowEdges', 'canvasShowTags', 'canvasShowLinks', 'canvasShowImages', 'canvasShowSummaries',
-  'canvasCompactMode', 'canvasReadMode', 'canvasHoverScale', 'canvasDefaultCardWidth', 'splitPosition', 'fileTreeDisplayMode', 'ollama',
+  'canvasCompactMode', 'canvasReadMode', 'canvasHoverScale', 'canvasDefaultCardWidth', 'splitPosition', 'fileTreeDisplayMode', 'fileTreeKindFilter', 'notesRootFolder', 'ollama',
   'pdfCompanionEnabled', 'pdfDisplayMode', 'iconSet',
   'smartConnectionsEnabled', 'notesChatEnabled', 'flashcardsEnabled', 'semanticScholarEnabled', 'zoteroEnabled', 'smartConnectionsWeights', 'docling', 'visionOcr', 'readwise', 'languageTool', 'email', 'marketing', 'edoobox', 'remarkable', 'dailyNote', 'taskExcludedFolders', 'speech',
   'lastSeenVersion',
@@ -974,6 +991,30 @@ export const useUIStore = create<UIState>()((set, get) => ({
   setCanvasDefaultCardWidth: (width) => set({ canvasDefaultCardWidth: Math.max(150, Math.min(500, width)) }),
   setSplitPosition: (position) => set({ splitPosition: Math.max(20, Math.min(80, position)) }),
   setFileTreeDisplayMode: (mode) => set({ fileTreeDisplayMode: mode }),
+  setFileTreeKindFilter: (kinds) => set({ fileTreeKindFilter: kinds }),
+  toggleFileTreeKindFilter: (kind) => set((state) => {
+    const current = state.fileTreeKindFilter
+    if (current.length === 1 && current.includes(kind)) {
+      return { fileTreeKindFilter: ['problem', 'solution', 'info'] }
+    }
+    const next = current.includes(kind)
+      ? current.filter(k => k !== kind)
+      : [...current, kind]
+    return { fileTreeKindFilter: next }
+  }),
+  showOnlyFileTreeKind: (kind) => set({ fileTreeKindFilter: [kind] }),
+  setNotesRootFolder: (folder) => set((state) => {
+    const notesRootFolder = normalizeVaultFolder(folder)
+    if (!notesRootFolder) return { notesRootFolder }
+
+    return {
+      notesRootFolder,
+      transport: {
+        ...state.transport,
+        defaultDestinationFolder: notesRootFolder
+      }
+    }
+  }),
   setPendingTemplateInsert: (template) => set({ pendingTemplateInsert: template }),
   setOllama: (settings) => set((state) => ({ ollama: { ...state.ollama, ...settings } })),
   setPdfCompanionEnabled: (enabled) => set({ pdfCompanionEnabled: enabled }),
@@ -1197,6 +1238,17 @@ export async function initializeUISettings(): Promise<void> {
         if (Array.isArray(dash.widgets) && !dash.widgets.includes('focus')) {
           dash.widgets = ['focus', ...dash.widgets]
         }
+        if (Array.isArray(dash.widgets) && !dash.widgets.includes('radar')) {
+          const focusIndex = dash.widgets.indexOf('focus')
+          dash.widgets = focusIndex >= 0
+            ? [...dash.widgets.slice(0, focusIndex + 1), 'radar', ...dash.widgets.slice(focusIndex + 1)]
+            : ['radar', ...dash.widgets]
+        }
+        if (typeof dash.radarAiEnabled !== 'boolean') dash.radarAiEnabled = true
+        if (typeof dash.radarAiRefreshIntervalHours !== 'number' || dash.radarAiRefreshIntervalHours <= 0) {
+          dash.radarAiRefreshIntervalHours = 6
+        }
+        if (typeof dash.radarAiModel !== 'string') dash.radarAiModel = ''
       }
       // Migrate edoobox base URL: strip /v1 or /v2 suffix, use app2 for V2
       if (validSettings.edoobox) {
