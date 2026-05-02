@@ -17,7 +17,7 @@ tags:
   - blog
 status: publish
 type: post
-summary: "Kem Laurin hat eine Frage formuliert, die mich seit Tagen nicht loslässt: Was ist eigentlich das Langziel der Tech-Industrie? Der KI-Plattformbruch dieser Woche zeigt eine Branche, die viele Richtungen kennt, aber keinen Endpunkt benennt. Eine Suche nach dem, was 'genug' heißen könnte — bis hinein in meine eigene Bildungsarbeit."
+summary: "Schneller, kleiner, smarter, billiger — die KI-Industrie weiß, wohin sie zeigt, aber nicht, wo sie ankommt. Kem Laurin nennt das eine Industrie ohne Stoppbedingung. Eine Suche danach, was 'genug' heißen könnte, bis hinein in Lernszenarien für die Schule."
 categories:
   - KI
   - Reflexion
@@ -27,17 +27,17 @@ categories:
 ![Header](2026-05-02-eine-richtung-ist-kein-ziel-header.png)
 
 > [!abstract] Zusammenfassung
-> Kem Laurin hat eine Frage formuliert, die mich seit Tagen nicht loslässt: Was ist eigentlich das Langziel der Tech-Industrie? Der KI-Plattformbruch dieser Woche zeigt eine Branche, die viele Richtungen kennt, aber keinen Endpunkt benennt. Eine Suche nach dem, was "genug" heißen könnte — bis hinein in meine eigene Bildungsarbeit.
+> Schneller, kleiner, smarter, billiger — die KI-Industrie weiß, wohin sie zeigt, aber nicht, wo sie ankommt. Kem Laurin nennt das eine Industrie ohne Stoppbedingung. Eine Suche danach, was "genug" heißen könnte, bis hinein in Lernszenarien für die Schule.
 
 ## Einleitung
 
-In den Tech-Diskursen dieser Woche begegnet mir eine sprachliche Leerstelle, die Kem Laurin sehr scharf benannt hat. Begriffe wie *transformativ*, *produktiv*, *growth* werden routiniert verwendet, ohne dass jemand den Satz zu Ende denkt. Transformativ **wofür**, produktiv **für wen**, Wachstum **um welchen Preis**.
+„Schneller, kleiner, smarter, billiger." So beschreibt sich die Tech-Industrie selbst, wenn man sie nach ihrer Richtung fragt. Kem Laurin hält dem in einem kurzen Medium-Beitrag etwas entgegen, das so simpel ist, dass es fast peinlich wird, es aussprechen zu müssen: **Eine Richtung ist kein Ziel.**
 
-Laurins zentrale Unterscheidung trifft mich, weil sie so einfach ist: **Eine Richtung ist kein Ziel.** „Schneller, kleiner, smarter, billiger" beschreibt nur, wohin der Pfeil zeigt — nicht, wo er ankommt, warum, oder wann man aufhören darf. Das de-facto Langziel der Tech-Industrie sei genau dieses Fehlen eines Ziels: eine Dauerexpansion ohne eingebaute Stoppbedingung.
+Begriffe wie *transformativ*, *produktiv*, *growth* werden routiniert verwendet, ohne dass jemand den Satz zu Ende denkt. Transformativ **wofür**, produktiv **für wen**, Wachstum **um welchen Preis**. Das de-facto Langziel der Tech-Industrie sei, schreibt Laurin, genau dieses Fehlen eines Ziels: eine Dauerexpansion ohne eingebaute Stoppbedingung.
 
-Ich habe in dieser Woche einen [Wochenrückblick zum KI-Plattformbruch](2026-04-29-ki-wochenrueckblick-plattformbruch-mythos-und-verantwortung.md) geschrieben. Dort ging es um Microsoft und OpenAI, die ihre Exklusivität auflösen, um Anthropics Mythos-Modell als politische Verhandlungsmasse, um fünf Konzerne, die 71 Prozent der globalen KI-Rechenkapazität kontrollieren, und um Energie, die zum eigentlichen Engpass wird. Laurins Frage liegt unter all dem wie ein Grundton, den ich erst jetzt höre: **Wofür eigentlich das alles?**
+Der Punkt sitzt, weil er sich am [Wochenrückblick zum KI-Plattformbruch](2026-04-29-ki-wochenrueckblick-plattformbruch-mythos-und-verantwortung.md) prüfen lässt, den ich vor wenigen Tagen geschrieben habe. Microsoft und OpenAI lösen ihre Exklusivität auf. Anthropics Mythos-Modell wird zur Verhandlungsmasse zwischen Pentagon und Weißem Haus. Fünf Konzerne kontrollieren 71 Prozent der globalen KI-Rechenkapazität. Energie wird zum eigentlichen Engpass. Lauter Bewegungen — und keine sagt, wofür eigentlich.
 
-Dieser Beitrag ist mein Versuch, ihre Frage in meine Praxis zu übersetzen — bis hinein in die Lernszenarien, die ich für Schule und Medienzentrum entwickle. Was wäre ein „ehrliches Langziel" für KI, das *capability* und *consequence* im selben Satz trägt? Und welche Stoppbedingung baue **ich** in meine eigene Arbeit ein?
+Was ich versuche: Laurins Diagnose ernst nehmen und in meine Praxis übersetzen, bis hinein in die Lernszenarien, die ich für Schule und Medienzentrum entwickle. Was wäre ein „ehrliches Langziel" für KI, das *capability* und *consequence* im selben Satz trägt? Welche Stoppbedingung baue **ich** in meine eigene Arbeit ein?
 
 ## Hauptteil
 
