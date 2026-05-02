@@ -15,7 +15,7 @@ tags:
   - reflexion
   - infrastruktur
   - blog
-status: draft
+status: publish
 type: post
 summary: "Kati Lubin hat eine Frage formuliert, die mich seit Tagen nicht loslässt: Was ist eigentlich das Langziel der Tech-Industrie? Der KI-Plattformbruch dieser Woche zeigt eine Branche, die viele Richtungen kennt, aber keinen Endpunkt benennt. Eine Suche nach dem, was 'genug' heißen könnte — bis hinein in meine eigene Bildungsarbeit."
 categories:
