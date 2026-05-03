@@ -58,6 +58,7 @@
       "E2E-verschluesselter Sync (AES-256-GCM)",
       "Modular aktivierbare Plugins statt Feature-Ueberladung",
       "Lokale KI (Ollama, LM Studio) ohne Cloud-Zwang",
+      "Diktieren mit Whisper offline im Editor und in Flashcards (kein Cloud-Service, keine Extra-Installation)",
       "Zotero, Semantic Scholar, Readwise, reMarkable",
       "PDF Companion mit Docling OCR",
       "100% lokale Daten, keine Telemetrie"
@@ -516,11 +517,12 @@
       <div class="cap-card fade-in">
         <div class="cap-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.9 5.8a2 2 0 01-1.287 1.288L3 12l5.8 1.9a2 2 0 011.288 1.287L12 21l1.9-5.8a2 2 0 011.287-1.288L21 12l-5.8-1.9a2 2 0 01-1.288-1.287Z"/></svg></div>
         <h3 data-i18n="cap.ai.title">Lokale KI</h3>
-        <p data-i18n="cap.ai.desc">Notes-Chat, Smart Connections, LanguageTool, Vision OCR &ndash; alles gegen Ollama oder LM Studio auf deinem Rechner. Terminal mit OpenCode oder Claude Code integriert.</p>
+        <p data-i18n="cap.ai.desc">Notes-Chat, Smart Connections, LanguageTool, Vision OCR und Whisper-Diktat &ndash; alles gegen Ollama oder LM Studio auf deinem Rechner. Diktieren l&auml;uft offline im Browser, ohne Installation. Terminal mit OpenCode oder Claude Code integriert.</p>
         <div class="cap-tags">
           <span class="cap-tag">Ollama</span>
           <span class="cap-tag">LM Studio</span>
           <span class="cap-tag">Smart Connections</span>
+          <span class="cap-tag">Whisper-Diktat</span>
           <span class="cap-tag">Terminal</span>
         </div>
       </div>
@@ -603,6 +605,7 @@
       <span class="module-chip"><span class="chip-dot"></span><span data-i18n="modules.opt.remarkable">reMarkable</span></span>
       <span class="module-chip"><span class="chip-dot"></span><span data-i18n="modules.opt.docling">Docling</span></span>
       <span class="module-chip"><span class="chip-dot"></span><span data-i18n="modules.opt.vision">Vision OCR</span></span>
+      <span class="module-chip"><span class="chip-dot"></span><span data-i18n="modules.opt.speech">Diktat &amp; Vorlesen</span></span>
       <span class="module-chip"><span class="chip-dot"></span><span data-i18n="modules.opt.terminal">Terminal</span></span>
     </div>
   </section>
@@ -763,7 +766,7 @@
         "cap.learn.title": "Lernen & Flashcards",
         "cap.learn.desc": "Karteikarten mit Spaced Repetition (SM-2), KI-Quiz-Generierung direkt aus deinen Notizen, Anki-Import, Lernstreak und Aktivit\u00e4ts-Heatmap.",
         "cap.ai.title": "Lokale KI",
-        "cap.ai.desc": "Notes-Chat, Smart Connections, LanguageTool, Vision OCR \u2013 alles gegen Ollama oder LM Studio auf deinem Rechner. Terminal mit OpenCode oder Claude Code integriert.",
+        "cap.ai.desc": "Notes-Chat, Smart Connections, LanguageTool, Vision OCR und Whisper-Diktat \u2013 alles gegen Ollama oder LM Studio auf deinem Rechner. Diktieren l\u00e4uft offline im Browser, ohne Installation. Terminal mit OpenCode oder Claude Code integriert.",
         "cap.integrations.title": "Integrationen",
         "cap.integrations.desc": "Zotero, Semantic Scholar, Readwise, reMarkable USB, WordPress-Publishing, edoobox-Agent f\u00fcr Veranstaltungsmanagement. Jede Integration ein Toggle.",
         "cap.security.title": "Sicherheit & Sync",
@@ -797,6 +800,7 @@
         "modules.opt.remarkable": "reMarkable",
         "modules.opt.docling": "Docling",
         "modules.opt.vision": "Vision OCR",
+        "modules.opt.speech": "Diktat & Vorlesen",
         "modules.opt.terminal": "Terminal",
         "dl.label": "Download",
         "dl.heading": "Jetzt starten.",
@@ -878,7 +882,7 @@
         "cap.learn.title": "Learning & Flashcards",
         "cap.learn.desc": "Flashcards with spaced repetition (SM-2), AI quiz generation straight from your notes, Anki import, streak and activity heatmap.",
         "cap.ai.title": "Local AI",
-        "cap.ai.desc": "Notes Chat, Smart Connections, LanguageTool, Vision OCR \u2013 all against Ollama or LM Studio on your machine. Terminal with OpenCode or Claude Code integrated.",
+        "cap.ai.desc": "Notes Chat, Smart Connections, LanguageTool, Vision OCR and Whisper dictation \u2013 all against Ollama or LM Studio on your machine. Dictation runs offline in the browser, no installation. Terminal with OpenCode or Claude Code integrated.",
         "cap.integrations.title": "Integrations",
         "cap.integrations.desc": "Zotero, Semantic Scholar, Readwise, reMarkable USB, WordPress publishing, edoobox agent for event management. Each integration a toggle.",
         "cap.security.title": "Security & Sync",
@@ -912,6 +916,7 @@
         "modules.opt.remarkable": "reMarkable",
         "modules.opt.docling": "Docling",
         "modules.opt.vision": "Vision OCR",
+        "modules.opt.speech": "Dictation & TTS",
         "modules.opt.terminal": "Terminal",
         "dl.label": "Download",
         "dl.heading": "Get started.",
