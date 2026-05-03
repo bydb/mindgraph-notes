@@ -2,6 +2,16 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.5.28-beta] - 2026-05-03
+
+### Fixes
+
+- **Radar AI Worker startet keine Doppelläufe mehr beim schnellen Wechsel ins Dashboard**: der Concurrency-Lock lag bisher als `useRef` am Widget. Beim Unmount/Remount (z. B. wenn man das Dashboard zumacht und kurz danach wieder öffnet) bekam jeder neue Mount einen frischen Ref → der laufende Ollama-Batch lief im Hintergrund weiter, parallel startete eine neue Schleife. Lock liegt jetzt als Modul-Singleton (`radarAiWorkerRunning`) und überlebt Mount/Unmount; lokale State-Updates werden nach Unmount per `canUpdateLocalState`-Flag verworfen, damit React keine Set-State-Aufrufe auf einer abgemeldeten Komponente bekommt.
+
+### Docs
+
+- **Whisper-Diktat auf der Webseite sichtbar gemacht**: neuer Module-Chip „Diktat & Vorlesen" (DE) / „Dictation & TTS" (EN), Erweiterung der „Lokale KI"-Kapability-Card und JSON-LD-`featureList`-Eintrag — vorher kam Whisper auf mindgraph-notes.de gar nicht vor.
+
 ## [0.5.27-beta] - 2026-05-03
 
 ### Features

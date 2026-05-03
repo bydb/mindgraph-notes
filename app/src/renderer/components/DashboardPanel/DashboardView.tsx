@@ -42,6 +42,11 @@ type RadarFeedback = Record<string, RadarFeedbackValue>
 const SLEEPING_THRESHOLD_DAYS = 14
 const RADAR_HISTORY_RETAIN_DAYS = 7
 
+// The radar widget can be mounted/unmounted quickly when the user switches views.
+// Keep the expensive Ollama relevance worker singleton at module level so a new
+// widget instance does not start a second batch while the previous one is still running.
+let radarAiWorkerRunning = false
+
 const getRadarFeedbackKey = (vaultPath: string | null): string => `mindgraph:radar-feedback:${vaultPath || 'default'}`
 
 const getRadarFeedbackId = (sourceId: string, targetId: string, role: 'solution' | 'context'): string =>
@@ -799,8 +804,6 @@ const RadarWidget: React.FC<RadarWidgetProps> = ({ snapshot, notes, vaultPath, o
   const snapshotRef = useRef(snapshot)
   snapshotRef.current = snapshot
 
-  // Concurrency-Lock: nur ein Batch gleichzeitig — verhindert parallele Aufrufe an Ollama
-  const isRunningRef = useRef(false)
   const consumedForceRefreshTickRef = useRef(0)
 
   useEffect(() => {
@@ -808,12 +811,12 @@ const RadarWidget: React.FC<RadarWidgetProps> = ({ snapshot, notes, vaultPath, o
       console.log('[Radar] AI worker idle:', { aiEnabled, hasVault: !!vaultPath, model: aiModel, ollamaEnabled })
       return
     }
-    if (isRunningRef.current) {
+    if (radarAiWorkerRunning) {
       console.log('[Radar] AI worker already running, skipping re-trigger')
       return
     }
 
-    let cancelled = false
+    let canUpdateLocalState = true
     const refreshMs = radarAiRefreshIntervalHours * 60 * 60 * 1000
     const now = Date.now()
     const forceRefresh = forceRefreshTick !== consumedForceRefreshTickRef.current
@@ -875,12 +878,11 @@ const RadarWidget: React.FC<RadarWidgetProps> = ({ snapshot, notes, vaultPath, o
       return next
     })
 
-    isRunningRef.current = true
+    radarAiWorkerRunning = true
     const runBatch = async () => {
       // Reduzierte Parallelität: 2 statt 3, damit Ollama nicht überlastet
       const batchSize = 2
       for (let i = 0; i < candidates.length; i += batchSize) {
-        if (cancelled) break
         const batch = candidates.slice(i, i + batchSize)
         await Promise.all(batch.map(async (note) => {
           try {
@@ -890,7 +892,6 @@ const RadarWidget: React.FC<RadarWidgetProps> = ({ snapshot, notes, vaultPath, o
               model: aiModel,
               context: { todayIso, calendar, emails, recentNoteTitles }
             })
-            if (cancelled) return
             if (!result.success) {
               console.warn('[Radar] AI analyze failed for', note.path, result.error)
               return
@@ -912,25 +913,26 @@ const RadarWidget: React.FC<RadarWidgetProps> = ({ snapshot, notes, vaultPath, o
           } catch (err) {
             console.error('[Radar] AI analyze threw for', note.path, err)
           } finally {
-            setAnalyzingIds(prev => {
-              const next = new Set(prev)
-              next.delete(note.id)
-              return next
-            })
+            if (canUpdateLocalState) {
+              setAnalyzingIds(prev => {
+                const next = new Set(prev)
+                next.delete(note.id)
+                return next
+              })
+            }
           }
         }))
       }
     }
     runBatch().finally(() => {
-      isRunningRef.current = false
+      radarAiWorkerRunning = false
       console.log('[Radar] AI worker batch finished')
     })
 
     return () => {
-      cancelled = true
-      // Lock NICHT hier zurücksetzen — der Batch läuft im Hintergrund weiter, sonst würde
-      // ein parallel gestarteter Batch Ollama doch wieder überlasten. Lock wird im finally
-      // freigegeben, wenn der Batch wirklich durch ist.
+      canUpdateLocalState = false
+      // The batch intentionally keeps running after unmount. A quick dashboard re-open should
+      // reuse the singleton lock instead of aborting and starting another Ollama batch.
     }
   }, [vaultPath, aiEnabled, aiModel, forceRefreshTick, radarAiRefreshIntervalHours, updateNote])
 
