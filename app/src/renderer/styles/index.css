@@ -4282,6 +4282,22 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
   box-shadow: var(--shadow-md);
 }
 
+.voice-model-status-chip {
+  padding: 9px 16px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  border-radius: var(--radius-lg);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: default;
+  box-shadow: none;
+}
+
+.voice-model-status-chip:disabled {
+  opacity: 1;
+}
+
 /* ============ REACT FLOW OVERRIDES ============ */
 .react-flow__attribution {
   display: none;

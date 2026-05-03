@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useRef, useEffect, useLayoutEffect, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import type { FileEntry } from '../../../shared/types'
-import { useNotesStore } from '../../stores/notesStore'
+import { useNotesStore, createNoteFromFile } from '../../stores/notesStore'
 import { useUIStore, FOLDER_COLORS, FOLDER_ICONS, type IconSet } from '../../stores/uiStore'
 import { useGraphStore } from '../../stores/graphStore'
 import { useTabStore } from '../../stores/tabStore'
@@ -338,7 +338,7 @@ const FileItem: React.FC<FileItemProps> = ({
     setMenuReady(true)
   }, [contextMenu])
 
-  const { selectedNoteId, secondarySelectedNoteId, selectedPdfPath, selectedImagePath, selectedOfficePath, selectNote, selectSecondaryNote, selectPdf, selectImage, selectOffice, removeNote, setFileTree, vaultPath, notes, updateNotePath, fileTree, selectedPaths, togglePathSelection, clearSelection } = useNotesStore()
+  const { selectedNoteId, secondarySelectedNoteId, selectedPdfPath, selectedImagePath, selectedOfficePath, selectNote, selectSecondaryNote, selectPdf, selectImage, selectOffice, removeNote, setFileTree, vaultPath, notes, addNote, updateNotePath, fileTree, selectedPaths, togglePathSelection, clearSelection } = useNotesStore()
   const { iconSet, setTextSplitEnabled, flashcardsEnabled, setViewMode, setCanvasFilterPath, taskExcludedFolders, toggleTaskExcludedFolder } = useUIStore()
   const updateNote = useNotesStore(state => state.updateNote)
   const { fileCustomizations, setFileCustomization, removeFileCustomization, toggleFolderHidden, toggleFolderPinned, showHiddenFolders } = useGraphStore()
@@ -668,18 +668,26 @@ const FileItem: React.FC<FileItemProps> = ({
   const handleSubmitNewNote = useCallback(async () => {
     if (!newNoteDialog || !newNoteName.trim() || !vaultPath) return
 
-    const filePath = `${newNoteDialog.folderPath}/${newNoteName.trim()}.md`
+    const name = newNoteName.trim()
+    const fileName = name.endsWith('.md') ? name : `${name}.md`
+    const filePath = `${newNoteDialog.folderPath}/${fileName}`
     try {
-      await window.electronAPI.writeFile(filePath, `# ${newNoteName.trim()}\n\n`)
+      const title = fileName.replace(/\.md$/i, '')
+      const content = `# ${title}\n\n`
+      await window.electronAPI.writeFile(filePath, content)
       const tree = await window.electronAPI.readDirectory(vaultPath)
       setFileTree(tree)
+      const relativePath = filePath.replace(`${vaultPath}/`, '')
+      const note = await createNoteFromFile(filePath, relativePath, content)
+      addNote(note)
+      selectNote(note.id)
     } catch (error) {
       console.error('Fehler beim Erstellen der Notiz:', error)
     }
 
     setNewNoteDialog(null)
     setNewNoteName('')
-  }, [newNoteDialog, newNoteName, vaultPath, setFileTree])
+  }, [newNoteDialog, newNoteName, vaultPath, setFileTree, addNote, selectNote])
 
   const handleDuplicate = useCallback(async () => {
     if (!contextMenu || !vaultPath) return
@@ -1558,6 +1566,7 @@ function FileTreeInner({
     if (entry.fileType && entry.fileType !== 'markdown') return null
     const kindId = noteKindIndex.get(entry.path)
     const kind = kindId ? NOTE_KINDS[kindId] : getNoteKindFromText(entry.name) || getNoteKindFromText(entry.path)
+    if (!kind) return entry
     return kind && activeKindSet.has(kind.id) ? entry : null
   }, [activeKindSet, isKindFilterActive, noteKindIndex])
 

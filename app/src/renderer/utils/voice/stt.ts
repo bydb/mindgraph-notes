@@ -1,8 +1,10 @@
-// Speech-to-Text via MediaRecorder (Renderer) + Whisper-CLI (Main).
-// Die Audio-Aufnahme läuft im Renderer; Transkription geschieht im Main-Process.
+// Speech-to-Text via MediaRecorder (Renderer).
+// Standardmäßig läuft Whisper komplett im Renderer (transformers.js + ONNX);
+// optional kann ein lokal installiertes Whisper-CLI über den Main-Prozess genutzt werden.
 
 import { useUIStore } from '../../stores/uiStore'
 import { useVoiceStore } from '../../stores/voiceStore'
+import { transcribeWithTransformers } from './transformersStt'
 
 export interface DictationHandle {
   /** Stoppt die Aufnahme und liefert das Transkript (leeren String bei Abbruch). */
@@ -127,24 +129,36 @@ export async function startDictation(cb: DictationCallbacks): Promise<DictationH
           resolve('')
           return
         }
-        voiceStore.setTranscribing(cb.contextId)
         try {
-          const buffer = await blob.arrayBuffer()
-          const result = await window.electronAPI.voiceTranscribe(buffer, extensionFor(mimeType), {
-            command: settings.whisperCommand || 'auto',
-            model: settings.whisperModel || 'base',
-            language: settings.sttLanguage || 'auto'
-          })
-          voiceStore.setIdle()
-          console.log('[stt] whisper result:', result)
-          if (!result.success) {
-            const msg = result.error ?? 'Transkription fehlgeschlagen'
-            voiceStore.setError(msg)
-            cb.onError?.(msg)
-            reject(new Error(msg))
-            return
+          let text: string
+          if (settings.sttEngine === 'whisper-cli') {
+            voiceStore.setTranscribing(cb.contextId)
+            const buffer = await blob.arrayBuffer()
+            const result = await window.electronAPI.voiceTranscribe(buffer, extensionFor(mimeType), {
+              command: settings.whisperCommand || 'auto',
+              model: settings.whisperModel || 'base',
+              language: settings.sttLanguage || 'auto'
+            })
+            console.log('[stt] whisper-cli result:', result)
+            if (!result.success) {
+              const msg = result.error ?? 'Transkription fehlgeschlagen'
+              voiceStore.setIdle()
+              voiceStore.setError(msg)
+              cb.onError?.(msg)
+              reject(new Error(msg))
+              return
+            }
+            text = (result.text ?? '').trim()
+          } else {
+            // 'transformers' — läuft im Renderer, kein lokales Whisper nötig.
+            text = await transcribeWithTransformers(blob, {
+              model: settings.transformersModel || 'base',
+              language: settings.sttLanguage || 'auto',
+              contextId: cb.contextId
+            })
+            console.log('[stt] transformers result:', text)
           }
-          const text = (result.text ?? '').trim()
+          voiceStore.setIdle()
           if (text) {
             cb.onTranscript?.(text)
           } else {

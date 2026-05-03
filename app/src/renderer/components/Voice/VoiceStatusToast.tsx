@@ -10,6 +10,8 @@ export const VoiceStatusToast: React.FC = () => {
   const speechEnabled = useIsModuleEnabled('speech')
   const status = useVoiceStore(s => s.status)
   const lastError = useVoiceStore(s => s.lastError)
+  const loadingLabel = useVoiceStore(s => s.loadingLabel)
+  const loadingProgress = useVoiceStore(s => s.loadingProgress)
   const setError = useVoiceStore(s => s.setError)
 
   // Fehler nach 6 Sekunden automatisch wegblenden
@@ -26,6 +28,35 @@ export const VoiceStatusToast: React.FC = () => {
   const openSpeechSettings = () => {
     window.dispatchEvent(new CustomEvent('mindgraph:openSettings', { detail: { tab: 'speech' } }))
     setError(null)
+  }
+
+  // Modell-Download / Initialisierung (transformers.js erste Nutzung)
+  if (status === 'loading') {
+    const percent = typeof loadingProgress === 'number' ? Math.max(0, Math.min(100, loadingProgress)) : null
+    return (
+      <div className="voice-toast voice-toast-info">
+        <div className="voice-toast-spinner" />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 200 }}>
+          <span>{loadingLabel ?? t('voice.transcribing')}</span>
+          {percent !== null && (
+            <div style={{
+              width: '100%',
+              height: 4,
+              background: 'rgba(255,255,255,0.2)',
+              borderRadius: 2,
+              overflow: 'hidden'
+            }}>
+              <div style={{
+                width: `${percent}%`,
+                height: '100%',
+                background: 'currentColor',
+                transition: 'width 0.2s ease'
+              }} />
+            </div>
+          )}
+        </div>
+      </div>
+    )
   }
 
   // Transkriptions-Indikator

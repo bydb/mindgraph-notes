@@ -922,6 +922,7 @@ export interface ElectronAPI {
     relativePath: string;
     taskLine: string;
   }) => Promise<{ success: boolean; relativePath?: string; error?: string }>;
+  onTransportNoteCreated: (callback: (data: { relativePath: string }) => void) => void;
   onTransportOpenNote: (callback: (relativePath: string) => void) => void;
   onTransportWindowShown: (callback: () => void) => void;
 

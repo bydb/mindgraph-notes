@@ -427,10 +427,12 @@ export const MODULES: ModuleDescriptor[] = [
   { id: 'remarkable',       label: 'reMarkable',       description: 'Dokumente mit dem reMarkable-Tablet austauschen', category: 'devices' },
   { id: 'docling',          label: 'Docling',          description: 'PDF-Textextraktion via Docling-Server', category: 'documents' },
   { id: 'vision-ocr',       label: 'Vision OCR',       description: 'Bilder und Scans per Vision-Modell in Text umwandeln', category: 'documents' },
-  { id: 'speech',           label: 'Sprache',          description: 'Vorlesen (TTS) und Diktieren (STT via Whisper) in Editor & Flashcards', category: 'ai' }
+  { id: 'speech',           label: 'Sprache',          description: 'Vorlesen (TTS) und Diktieren (Whisper, läuft offline in der App) in Editor & Flashcards', category: 'ai' }
 ]
 
 export type TtsEngine = 'system' | 'elevenlabs'
+export type SttEngine = 'transformers' | 'whisper-cli'
+export type TransformersWhisperModel = 'tiny' | 'base' | 'small'
 
 export interface SpeechSettings {
   enabled: boolean
@@ -439,6 +441,8 @@ export interface SpeechSettings {
   ttsRate: number            // 0.5 – 2.0 (1.0 = normal)
   ttsPitch: number           // 0.5 – 2.0 (1.0 = normal)
   sttLanguage: string        // Whisper-Sprachcode: 'de', 'en', 'auto'
+  sttEngine: SttEngine       // 'transformers' = im Browser via WebGPU/WASM, 'whisper-cli' = lokales CLI (Power-User)
+  transformersModel: TransformersWhisperModel  // Modellgröße fürs eingebaute Whisper (tiny ~39MB / base ~80MB / small ~244MB)
   flashcardsAutoPlay: boolean  // Karten automatisch vorlesen beim Wechsel
   whisperCommand: string     // CLI-Befehl; 'auto' = automatisch erkennen (whisper, whisper-cpp, whisper-ctranslate2)
   whisperModel: string       // 'tiny', 'base', 'small', 'medium', 'large'
@@ -742,6 +746,8 @@ const defaultState = {
     ttsRate: 1.0,
     ttsPitch: 1.0,
     sttLanguage: 'de',
+    sttEngine: 'transformers',
+    transformersModel: 'base',
     flashcardsAutoPlay: false,
     whisperCommand: 'auto',
     whisperModel: 'base',

@@ -7,6 +7,7 @@ import { useVaultSettingsStore } from '../../stores/vaultSettingsStore'
 import { useTranslation, type TranslationKey } from '../../utils/translations'
 import { TelegramSettings } from './TelegramSettings'
 import { CredentialsSettings } from './CredentialsSettings'
+import { ensureTransformersModel, isTransformersModelReady } from '../../utils/voice/transformersStt'
 
 type TabTFn = (key: TranslationKey, params?: Record<string, string | number>) => string
 import {
@@ -774,6 +775,31 @@ const SpeechSettingsTab: React.FC<{ t: TabTFn }> = ({ t }) => {
     }
   }
 
+  const [preloadingModel, setPreloadingModel] = useState(false)
+  const [preloadStatus, setPreloadStatus] = useState<string | null>(null)
+  const [preloadError, setPreloadError] = useState<string | null>(null)
+  const transformersReady = isTransformersModelReady(speech.transformersModel || 'base')
+
+  useEffect(() => {
+    setPreloadError(null)
+    setPreloadStatus(transformersReady ? t('settings.speech.stt.preloaded') : null)
+  }, [speech.transformersModel, transformersReady, t])
+
+  const preloadTransformersModel = async () => {
+    setPreloadingModel(true)
+    setPreloadError(null)
+    setPreloadStatus(t('settings.speech.stt.preloading'))
+    try {
+      await ensureTransformersModel(speech.transformersModel || 'base')
+      setPreloadStatus(t('settings.speech.stt.preloaded'))
+    } catch (err) {
+      setPreloadStatus(null)
+      setPreloadError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setPreloadingModel(false)
+    }
+  }
+
   return (
     <div className="settings-section">
       <h3>{t('settings.speech.title')}</h3>
@@ -983,6 +1009,23 @@ const SpeechSettingsTab: React.FC<{ t: TabTFn }> = ({ t }) => {
       <h4 style={{ marginTop: 32 }}>{t('settings.speech.stt.heading')}</h4>
 
       <div className="settings-row">
+        <label>{t('settings.speech.stt.engine')}</label>
+        <select
+          value={speech.sttEngine}
+          onChange={e => setSpeech({ sttEngine: e.target.value as 'transformers' | 'whisper-cli' })}
+          style={{ minWidth: 240 }}
+        >
+          <option value="transformers">{t('settings.speech.stt.engine.transformers')}</option>
+          <option value="whisper-cli">{t('settings.speech.stt.engine.cli')}</option>
+        </select>
+      </div>
+      <p className="settings-hint">
+        {speech.sttEngine === 'transformers'
+          ? t('settings.speech.stt.engine.transformers.hint')
+          : t('settings.speech.stt.engine.cli.hint')}
+      </p>
+
+      <div className="settings-row">
         <label>{t('settings.speech.stt.language')}</label>
         <select
           value={speech.sttLanguage}
@@ -997,73 +1040,111 @@ const SpeechSettingsTab: React.FC<{ t: TabTFn }> = ({ t }) => {
         </select>
       </div>
 
-      <div className="settings-row">
-        <label>{t('settings.speech.stt.model')}</label>
-        <select
-          value={speech.whisperModel}
-          onChange={e => setSpeech({ whisperModel: e.target.value })}
-        >
-          <option value="tiny">tiny</option>
-          <option value="base">base</option>
-          <option value="small">small</option>
-          <option value="medium">medium</option>
-          <option value="large">large</option>
-        </select>
-      </div>
-      <p className="settings-hint">{t('settings.speech.stt.model.hint')}</p>
+      {speech.sttEngine === 'transformers' && (
+        <>
+          <div className="settings-row">
+            <label>{t('settings.speech.stt.model')}</label>
+            <select
+              value={speech.transformersModel}
+              onChange={e => setSpeech({ transformersModel: e.target.value as 'tiny' | 'base' | 'small' })}
+              style={{ minWidth: 240 }}
+            >
+              <option value="tiny">{t('settings.speech.stt.transformersModel.tiny')}</option>
+              <option value="base">{t('settings.speech.stt.transformersModel.base')}</option>
+              <option value="small">{t('settings.speech.stt.transformersModel.small')}</option>
+            </select>
+          </div>
+          <p className="settings-hint">{t('settings.speech.stt.transformersModel.hint')}</p>
 
-      <div className="settings-row">
-        <label>{t('settings.speech.stt.command')}</label>
-        <input
-          type="text"
-          value={speech.whisperCommand}
-          onChange={e => setSpeech({ whisperCommand: e.target.value })}
-          placeholder="auto"
-          style={{ minWidth: 240 }}
-        />
-      </div>
-      <p className="settings-hint">{t('settings.speech.stt.command.hint')}</p>
+          <div className="settings-row">
+            <button
+              className={transformersReady ? 'voice-model-status-chip' : 'btn-primary'}
+              onClick={preloadTransformersModel}
+              disabled={preloadingModel || transformersReady}
+            >
+              {transformersReady ? t('settings.speech.stt.prepared') : (preloadingModel ? t('settings.speech.stt.preloading') : t('settings.speech.stt.preload'))}
+            </button>
+            {preloadStatus && (
+              <span style={{ marginLeft: 12, fontSize: 13, opacity: 0.85 }}>{preloadStatus}</span>
+            )}
+          </div>
+          {preloadError && (
+            <p className="settings-hint" style={{ color: 'var(--danger, #dc2626)' }}>{preloadError}</p>
+          )}
+        </>
+      )}
 
-      <div className="settings-row">
-        <button className="btn-primary" onClick={runWhisperCheck} disabled={checkingWhisper}>
-          {checkingWhisper ? t('settings.speech.stt.checking') : t('settings.speech.stt.check')}
-        </button>
-      </div>
+      {speech.sttEngine === 'whisper-cli' && (
+        <>
+          <div className="settings-row">
+            <label>{t('settings.speech.stt.model')}</label>
+            <select
+              value={speech.whisperModel}
+              onChange={e => setSpeech({ whisperModel: e.target.value })}
+            >
+              <option value="tiny">tiny</option>
+              <option value="base">base</option>
+              <option value="small">small</option>
+              <option value="medium">medium</option>
+              <option value="large">large</option>
+            </select>
+          </div>
+          <p className="settings-hint">{t('settings.speech.stt.model.hint')}</p>
 
-      {whisperStatus && (
-        <div style={{
-          marginTop: 12,
-          padding: 12,
-          borderRadius: 6,
-          background: whisperStatus.available ? 'rgba(40, 200, 120, 0.12)' : 'rgba(240, 160, 60, 0.12)',
-          border: `1px solid ${whisperStatus.available ? 'rgba(40, 200, 120, 0.5)' : 'rgba(240, 160, 60, 0.5)'}`
-        }}>
-          {whisperStatus.available ? (
-            <div style={{ fontSize: 13 }}>
-              ✓ {t('settings.speech.stt.installed', { path: whisperStatus.command ?? '' })}
-            </div>
-          ) : (
-            <div style={{ fontSize: 13 }}>
-              <div style={{ fontWeight: 600, marginBottom: 8 }}>{t('settings.speech.stt.notInstalled')}</div>
-              <div style={{ marginBottom: 6 }}>
-                <strong>{t('settings.speech.stt.installMac')}:</strong>{' '}
-                <code>brew install openai-whisper</code>
-              </div>
-              <div>
-                <strong>{t('settings.speech.stt.installPip')}:</strong>{' '}
-                <code>pip install openai-whisper</code>
-              </div>
-              <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid rgba(0,0,0,0.08)' }}>
-                {t('settings.speech.stt.ffmpegHint')}
-              </div>
+          <div className="settings-row">
+            <label>{t('settings.speech.stt.command')}</label>
+            <input
+              type="text"
+              value={speech.whisperCommand}
+              onChange={e => setSpeech({ whisperCommand: e.target.value })}
+              placeholder="auto"
+              style={{ minWidth: 240 }}
+            />
+          </div>
+          <p className="settings-hint">{t('settings.speech.stt.command.hint')}</p>
+
+          <div className="settings-row">
+            <button className="btn-primary" onClick={runWhisperCheck} disabled={checkingWhisper}>
+              {checkingWhisper ? t('settings.speech.stt.checking') : t('settings.speech.stt.check')}
+            </button>
+          </div>
+
+          {whisperStatus && (
+            <div style={{
+              marginTop: 12,
+              padding: 12,
+              borderRadius: 6,
+              background: whisperStatus.available ? 'rgba(40, 200, 120, 0.12)' : 'rgba(240, 160, 60, 0.12)',
+              border: `1px solid ${whisperStatus.available ? 'rgba(40, 200, 120, 0.5)' : 'rgba(240, 160, 60, 0.5)'}`
+            }}>
+              {whisperStatus.available ? (
+                <div style={{ fontSize: 13 }}>
+                  ✓ {t('settings.speech.stt.installed', { path: whisperStatus.command ?? '' })}
+                </div>
+              ) : (
+                <div style={{ fontSize: 13 }}>
+                  <div style={{ fontWeight: 600, marginBottom: 8 }}>{t('settings.speech.stt.notInstalled')}</div>
+                  <div style={{ marginBottom: 6 }}>
+                    <strong>{t('settings.speech.stt.installMac')}:</strong>{' '}
+                    <code>brew install openai-whisper</code>
+                  </div>
+                  <div>
+                    <strong>{t('settings.speech.stt.installPip')}:</strong>{' '}
+                    <code>pip install openai-whisper</code>
+                  </div>
+                  <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid rgba(0,0,0,0.08)' }}>
+                    {t('settings.speech.stt.ffmpegHint')}
+                  </div>
+                </div>
+              )}
+              {whisperStatus.available && (
+                <div style={{ fontSize: 12, opacity: 0.8, marginTop: 6 }}>
+                  {t('settings.speech.stt.ffmpegHint')}
+                </div>
+              )}
             </div>
           )}
-          {whisperStatus.available && (
-            <div style={{ fontSize: 12, opacity: 0.8, marginTop: 6 }}>
-              {t('settings.speech.stt.ffmpegHint')}
-            </div>
-          )}
-        </div>
+        </>
       )}
 
       <h4 style={{ marginTop: 32 }}>Flashcards</h4>
@@ -1086,12 +1167,13 @@ const DashboardSettingsTab: React.FC<{ t: TabTFn }> = ({ t }) => {
 
   const widgetLabels: Record<string, string> = {
     focus: t('dashboard.widgets.focus'),
+    radar: t('dashboard.widgets.radar'),
     tasks: t('dashboard.widgets.tasks'),
     emails: t('dashboard.widgets.emails'),
     calendar: t('dashboard.widgets.calendar'),
     bookings: t('dashboard.widgets.bookings')
   }
-  const allWidgetIds = ['focus', 'tasks', 'emails', 'calendar', 'bookings'] as const
+  const allWidgetIds = ['focus', 'radar', 'tasks', 'emails', 'calendar', 'bookings'] as const
 
   const toggleWidget = (id: typeof allWidgetIds[number]) => {
     const active = dashboard.widgets.includes(id)

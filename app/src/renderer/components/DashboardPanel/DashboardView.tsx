@@ -801,6 +801,7 @@ const RadarWidget: React.FC<RadarWidgetProps> = ({ snapshot, notes, vaultPath, o
 
   // Concurrency-Lock: nur ein Batch gleichzeitig — verhindert parallele Aufrufe an Ollama
   const isRunningRef = useRef(false)
+  const consumedForceRefreshTickRef = useRef(0)
 
   useEffect(() => {
     if (!aiEnabled || !vaultPath) {
@@ -815,6 +816,7 @@ const RadarWidget: React.FC<RadarWidgetProps> = ({ snapshot, notes, vaultPath, o
     let cancelled = false
     const refreshMs = radarAiRefreshIntervalHours * 60 * 60 * 1000
     const now = Date.now()
+    const forceRefresh = forceRefreshTick !== consumedForceRefreshTickRef.current
 
     // Re-Analyze-Bedingungen (vereinfacht & robust):
     // 1. Notiz hat kein relevanceCheckedAt im Frontmatter → noch nie analysiert
@@ -830,7 +832,7 @@ const RadarWidget: React.FC<RadarWidgetProps> = ({ snapshot, notes, vaultPath, o
       const kind = getNoteKindFromContent(note.content) || getNoteKindFromTitleStrict(note.title)
       if (kind?.id !== 'problem') return false
       if (getNoteStatus(note).status !== 'open') return false
-      if (forceRefreshTick > 0) return true
+      if (forceRefresh) return true
       const ai = getNoteRelevance(note)
       if (!ai.checkedAt) return true
       const checkedAtMs = new Date(ai.checkedAt).getTime()
@@ -839,7 +841,8 @@ const RadarWidget: React.FC<RadarWidgetProps> = ({ snapshot, notes, vaultPath, o
       return false
     })
 
-    console.log(`[Radar] AI worker: ${candidates.length} candidates, model=${aiModel}, refreshIntervalH=${radarAiRefreshIntervalHours}, force=${forceRefreshTick > 0}`)
+    console.log(`[Radar] AI worker: ${candidates.length} candidates, model=${aiModel}, refreshIntervalH=${radarAiRefreshIntervalHours}, force=${forceRefresh}`)
+    if (forceRefresh) consumedForceRefreshTickRef.current = forceRefreshTick
     if (candidates.length === 0) return
 
     const todayIso = new Date().toISOString().split('T')[0]

@@ -10,6 +10,8 @@ interface DashboardStepProps {
 }
 
 const ALL_WIDGETS: { id: DashboardWidgetId; labelKey: string }[] = [
+  { id: 'focus', labelKey: 'dashboard.widgets.focus' },
+  { id: 'radar', labelKey: 'dashboard.widgets.radar' },
   { id: 'tasks', labelKey: 'dashboard.widgets.tasks' },
   { id: 'emails', labelKey: 'dashboard.widgets.emails' },
   { id: 'calendar', labelKey: 'dashboard.widgets.calendar' },
@@ -20,17 +22,17 @@ const ALL_WIDGETS: { id: DashboardWidgetId; labelKey: string }[] = [
 const profileDefaults = (profile: UserProfile): DashboardWidgetId[] => {
   switch (profile) {
     case 'student':
-      return ['tasks', 'calendar']
+      return ['focus', 'radar', 'tasks', 'calendar']
     case 'researcher':
-      return ['tasks', 'emails']
+      return ['focus', 'radar', 'tasks', 'emails']
     case 'professional':
-      return ['tasks', 'emails', 'calendar', 'bookings']
+      return ['focus', 'radar', 'tasks', 'emails', 'calendar', 'bookings']
     case 'writer':
-      return ['tasks']
+      return ['focus', 'radar', 'tasks']
     case 'developer':
-      return ['tasks', 'emails']
+      return ['focus', 'radar', 'tasks', 'emails']
     default:
-      return ['tasks', 'emails', 'calendar', 'bookings']
+      return ['focus', 'radar', 'tasks', 'emails', 'calendar', 'bookings']
   }
 }
 

@@ -2,6 +2,34 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.5.27-beta] - 2026-05-03
+
+### Features
+
+- **Diktieren ohne lokale Whisper-Installation**: neue eingebaute STT-Engine läuft direkt im Renderer via `@huggingface/transformers` v4 + ONNX Runtime — kein `pip install`, kein PATH-Geraffel, keine ffmpeg-Abhängigkeit mehr für Endkundinnen. Modell wird beim ersten Diktat einmalig von HuggingFace geladen (~80 MB `tiny`, ~175 MB `base`, ~480 MB `small`) und im Browser-Cache offline behalten.
+- **Engine-Switch in Settings → Sprache**: Default ist *Eingebaut (empfohlen)*; Power-User können auf *Lokales Whisper-CLI* umstellen, wenn sie Whisper selbst installiert haben. „Modell vorbereiten"-Button + Status-Chip zeigen, ob das Modell schon im Speicher liegt.
+- **Voice-Toast mit Download-Fortschritt**: während des Erst-Downloads zeigt der Toast unten rechts welche Datei gerade lädt und einen Progress-Bar.
+
+### Improvements
+
+- **macOS-Mic-Permission im signierten Build**: `NSMicrophoneUsageDescription` ergänzt — sonst kann die ausgelieferte App nicht aufs Mikrofon zugreifen.
+- **CSP gehärtet** für Modell-Download: `connect-src` erlaubt `huggingface.co`, `cas-bridge.xethub.hf.co`, `cdn.jsdelivr.net`; `script-src` erlaubt `wasm-unsafe-eval` + `blob:` für den Worker; `worker-src 'self' blob:`.
+- **Onboarding & Dashboard**: `focus`- und `radar`-Widget sind jetzt für alle Profile (student/researcher/professional/writer/developer) Default — vorher fehlten sie in allen Profil-Voreinstellungen.
+- **Radar AI Worker**: `forceRefreshTick` wird nur einmal verbraucht statt endlos neu auszulösen, wenn der Refresh-Button geklickt wird.
+- **Schnellerfassung & FileTree**: neue Notizen aus Quick-Capture (Transport) und aus dem FileTree werden sofort in den notesStore eingefügt + selektiert, sodass keine manuelle Watcher-Wartezeit mehr nötig ist.
+
+### Fixes
+
+- **ONNX-Runtime-Inkompatibilität mit quantisiertem Whisper-Decoder**: Xenova-`q8`-Decoder vermisst beim Laden mit aktuellem onnxruntime-web `MatMulNBits`-Scales und startet gar nicht. Fix: Encoder bleibt quantisiert (`q8`, ~25 MB), Decoder läuft als `fp32` (~150 MB) — Modellgröße bleibt akzeptabel, aber Initialisierung läuft jetzt durch.
+- **Whisper-Worker hing in „Modell wird initialisiert"**: WebGPU-Init im Electron-Worker terminierte nicht zuverlässig. Fix: explizit `device: 'wasm'` mit `numThreads: 1` (Electron-Renderer hat ohne COOP/COEP keinen SharedArrayBuffer für Multi-Thread-WASM).
+- **`setIdle()` nach erfolgreichem Modell-Load**: Status-Toast blieb sonst auf „Modell wird initialisiert …" stehen, obwohl die Pipeline bereit war.
+- **FileTree-Filter bei unbekanntem Note-Kind**: Einträge ohne erkennbares `kind` wurden komplett ausgeblendet. Jetzt werden sie wieder durchgereicht (statt verschluckt).
+
+### Security & Privacy
+
+- **STT-Audio-Datei wird jetzt immer gelöscht**: vorher blieb der temporäre WebM-Mitschnitt bei leerem Transkript / Fehler im `tmpdir` liegen. Aus Datenschutzgründen wird er jetzt unbedingt entfernt; Debug-Erhalt nur noch via `MINDGRAPH_KEEP_STT_AUDIO=1`.
+- **Whisper-CLI-Pfad-Allowlist**: auch absoluter `whisperCommand`-Pfad wird gegen `ALLOWED_COMMAND_NAMES` (`whisper`, `whisper-ctranslate2`, `whisper-cpp`, `whisper-cli`) geprüft — verhindert das Ausführen beliebiger Binaries via Settings.
+
 ## [0.5.26-beta] - 2026-04-30
 
 ### Fixes

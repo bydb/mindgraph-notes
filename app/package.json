@@ -1,6 +1,6 @@
 {
   "name": "mindgraph-notes",
-  "version": "0.5.26-beta",
+  "version": "0.5.27-beta",
   "description": "Eine minimalistische Markdown-Notizen-App mit editierbarer Graph View",
   "main": "out/main/index.js",
   "scripts": {
@@ -66,6 +66,7 @@
       "extendInfo": {
         "NSCalendarsUsageDescription": "MindGraph Notes zeigt deine Termine im Dashboard und legt Timeblocks für Aufgaben in deinem Kalender an.",
         "NSCalendarsFullAccessUsageDescription": "MindGraph Notes zeigt deine Termine im Dashboard und legt Timeblocks für Aufgaben in deinem Kalender an.",
+        "NSMicrophoneUsageDescription": "MindGraph Notes nutzt das Mikrofon, um Diktate lokal in Text umzuwandeln.",
         "NSAppleEventsUsageDescription": "MindGraph Notes kann optional mit Kalender und Erinnerungen interagieren.",
         "NSRemindersUsageDescription": "MindGraph Notes kann optional Aufgaben mit Apple Reminders synchronisieren."
       },
@@ -130,6 +131,7 @@
     "@codemirror/language": "^6.12.1",
     "@codemirror/state": "^6.5.4",
     "@codemirror/view": "^6.39.11",
+    "@huggingface/transformers": "^4.2.0",
     "@types/react-window": "^1.8.8",
     "@types/turndown": "^5.0.6",
     "@vitejs/plugin-react": "^5.1.2",

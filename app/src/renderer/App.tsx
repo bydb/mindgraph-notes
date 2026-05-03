@@ -405,6 +405,21 @@ const App: React.FC = () => {
 
   // Transport: Notiz öffnen wenn via Quick Capture erstellt
   useEffect(() => {
+    window.electronAPI.onTransportNoteCreated(async ({ relativePath }: { relativePath: string }) => {
+      const currentVaultPath = useNotesStore.getState().vaultPath
+      if (!currentVaultPath) return
+
+      try {
+        const content = await window.electronAPI.readFile(`${currentVaultPath}/${relativePath}`)
+        const note = await createNoteFromFile(`${currentVaultPath}/${relativePath}`, relativePath, content)
+        useNotesStore.getState().addNote(note)
+        const tree = await window.electronAPI.readDirectory(currentVaultPath)
+        useNotesStore.getState().setFileTree(tree)
+      } catch (error) {
+        console.error('[Transport] Store-Update nach Schnellerfassung fehlgeschlagen:', error)
+      }
+    })
+
     window.electronAPI.onTransportOpenNote((relativePath: string) => {
       // Kurz warten, damit der File Watcher die Datei erkennen kann
       const trySelect = (retries = 0): void => {

@@ -79,10 +79,14 @@ async function resolveCommand(binary: string): Promise<string | null> {
  */
 export async function checkWhisper(configured: string): Promise<WhisperCheckResult> {
   if (configured !== 'auto' && path.isAbsolute(configured)) {
+    const binary = path.basename(configured)
+    if (!ALLOWED_COMMAND_NAMES.has(binary)) {
+      return { available: false, command: null, binary: null, error: `Nicht erlaubtes Whisper-Binary: ${binary}` }
+    }
     // Absoluter Pfad — nur existieren + ausführbar prüfen
     try {
       await fs.access(configured, fs.constants.X_OK)
-      return { available: true, command: configured, binary: path.basename(configured) }
+      return { available: true, command: configured, binary }
     } catch {
       return { available: false, command: null, binary: null, error: `Pfad nicht ausführbar: ${configured}` }
     }
@@ -189,7 +193,8 @@ export async function transcribeFile(audioPath: string, opts: TranscribeOptions)
 
 /**
  * Transkribiert einen Audio-Buffer (WebM o.ä.) direkt.
- * Bei leerem Transkript bleibt die Audio-Datei für Debug-Zwecke erhalten.
+ * Bei leerem Transkript/Fehler wird die Audio-Datei nur mit MINDGRAPH_KEEP_STT_AUDIO=1
+ * für Debug-Zwecke behalten. Standardmäßig löschen wir sie aus Datenschutzgründen.
  */
 export async function transcribeBuffer(audio: ArrayBuffer | Buffer, extension: string, opts: TranscribeOptions): Promise<string> {
   const safeExt = extension.replace(/[^a-z0-9]/gi, '').slice(0, 6) || 'webm'
@@ -197,16 +202,19 @@ export async function transcribeBuffer(audio: ArrayBuffer | Buffer, extension: s
   const buf = Buffer.isBuffer(audio) ? audio : Buffer.from(audio)
   await fs.writeFile(tmp, buf)
   console.log(`[whisper] saved recording to ${tmp} (${buf.byteLength} bytes)`)
-  let keepFile = false
+  let keepFile = process.env.MINDGRAPH_KEEP_STT_AUDIO === '1'
   try {
     const result = await transcribeFile(tmp, opts)
     if (!result) {
-      keepFile = true
-      console.warn(`[whisper] empty transcript — keeping audio at ${tmp} for inspection`)
+      if (keepFile) {
+        console.warn(`[whisper] empty transcript — keeping audio at ${tmp} for inspection`)
+      } else {
+        console.warn('[whisper] empty transcript')
+      }
     }
     return result
   } catch (err) {
-    keepFile = true
+    if (keepFile) console.warn(`[whisper] transcription failed — keeping audio at ${tmp} for inspection`)
     throw err
   } finally {
     if (!keepFile) {
