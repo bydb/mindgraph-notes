@@ -1345,11 +1345,26 @@ body {
   gap: 8px;
 }
 
+/* Spezifisch fürs Submenu: dort überschreibt `.context-submenu .context-menu-item { display: block }`
+   den flex-Container und damit auch `gap`. Hier explizit flex+gap zurückholen, sonst kleben Punkt und Label. */
+.context-submenu .note-kind-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .note-kind-menu-item .note-kind-dot {
   width: 9px;
   height: 9px;
   flex: 0 0 9px;
   box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.12);
+}
+
+.note-kind-none {
+  background: transparent;
+  border: 1px dashed var(--text-secondary, #999);
+  box-shadow: none !important;
+  opacity: 0.7;
 }
 
 .note-kind-problem {

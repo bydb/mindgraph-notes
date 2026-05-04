@@ -796,6 +796,7 @@ const translations = {
     'fileTree.pinnedFolders': 'Angepinnt',
     'fileTree.kindFilter': 'Relevanz-Filter',
     'fileTree.changeNoteKind': 'Relevanz ändern',
+    'fileTree.clearNoteKind': 'Relevanz entfernen',
 
     // Canvas
     'canvas.reset': 'Zurücksetzen',
@@ -2812,6 +2813,7 @@ const translations = {
     'fileTree.pinnedFolders': 'Pinned',
     'fileTree.kindFilter': 'Relevance filter',
     'fileTree.changeNoteKind': 'Change relevance',
+    'fileTree.clearNoteKind': 'Clear relevance',
 
     // Canvas
     'canvas.reset': 'Reset',

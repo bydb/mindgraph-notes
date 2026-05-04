@@ -9,7 +9,7 @@ import { useBookmarkStore } from '../../stores/bookmarkStore'
 import { useQuizStore } from '../../stores/quizStore'
 import { generateNoteId, extractTasks } from '../../utils/linkExtractor'
 import { useTranslation } from '../../utils/translations'
-import { getNoteKind, getNoteKindFromText, NOTE_KINDS, setNoteKindInContent, stripNoteKindMarker, type NoteKindId } from '../../utils/noteKind'
+import { getNoteKind, getNoteKindFromText, NOTE_KINDS, setNoteKindInContent, clearNoteKindInContent, stripNoteKindMarker, type NoteKindId } from '../../utils/noteKind'
 
 const isMac = window.electronAPI.platform === 'darwin'
 const NOTE_KIND_ORDER: NoteKindId[] = ['problem', 'solution', 'info']
@@ -782,6 +782,31 @@ const FileItem: React.FC<FileItemProps> = ({
     setContextMenu(null)
   }, [contextMenu, vaultPath, notes, updateNote])
 
+  const handleClearNoteKind = useCallback(async () => {
+    if (!contextMenu || contextMenu.entry.isDirectory || !vaultPath) return
+
+    const targetNoteId = generateNoteId(contextMenu.entry.path)
+    const existingNote = notes.find(n => n.id === targetNoteId)
+    const fullPath = `${vaultPath}/${contextMenu.entry.path}`
+
+    try {
+      const content = existingNote?.content || await window.electronAPI.readFile(fullPath)
+      const nextContent = clearNoteKindInContent(content)
+      if (nextContent !== content) {
+        await window.electronAPI.writeFile(fullPath, nextContent)
+        updateNote(targetNoteId, {
+          content: nextContent,
+          title: existingNote?.title || contextMenu.entry.name.replace(/\.md$/, ''),
+          modifiedAt: new Date()
+        })
+      }
+    } catch (error) {
+      console.error('Fehler beim Entfernen der Notizfarbe:', error)
+    }
+
+    setContextMenu(null)
+  }, [contextMenu, vaultPath, notes, updateNote])
+
   // Folder Customization Handlers
   const handleSetFolderColor = useCallback((colorId: string, path: string) => {
     console.log('[FileTree] handleSetFolderColor called:', colorId, path)
@@ -1315,6 +1340,11 @@ const FileItem: React.FC<FileItemProps> = ({
                           </button>
                         )
                       })}
+                      <div className="context-menu-divider" />
+                      <button onClick={handleClearNoteKind} className="context-menu-item note-kind-menu-item">
+                        <span className="note-kind-dot note-kind-none" aria-hidden="true" />
+                        <span>{t('fileTree.clearNoteKind')}</span>
+                      </button>
                     </div>
                   </div>
                   {/* Quiz für Datei - nur wenn Flashcards und Ollama aktiviert */}
@@ -1706,12 +1736,24 @@ function FileTreeInner({
 }
 
 export const FileTree: React.FC<FileTreeProps> = ({ entries, level = 0, onDrop, displayMode = 'name' }) => {
-  const { pdfCompanionEnabled, pdfDisplayMode, fileTreeKindFilter, toggleFileTreeKindFilter, showOnlyFileTreeKind } = useUIStore()
+  const { pdfCompanionEnabled, pdfDisplayMode, fileTreeKindFilter, toggleFileTreeKindFilter, showOnlyFileTreeKind, notesRootFolder } = useUIStore()
   const { fileCustomizations, showHiddenFolders } = useGraphStore()
   const notes = useNotesStore(state => state.notes)
 
+  // Index für Dot-Anzeige (jede Notiz im Tree, vault-weit) bleibt unverändert — sonst würden Punkte
+  // an Notizen außerhalb des Notes-Root verschwinden.
   const noteKindIndex = useMemo(() => buildNoteKindIndex(notes), [notes])
-  const kindCounts = useMemo(() => countNoteKinds(noteKindIndex), [noteKindIndex])
+  // Counts auf den Filter-Chips dagegen scopen wir auf den konfigurierten Notes-Stammordner: wenn
+  // eine Notiz aus „Notes" rausgeschoben wird, zählt sie hier nicht mehr mit. Ohne konfigurierten
+  // Notes-Root fallen wir auf vault-weit zurück.
+  const scopedNotes = useMemo(() => {
+    const root = notesRootFolder.trim().replace(/^\/+|\/+$/g, '')
+    if (!root) return notes
+    const prefix = `${root}/`
+    return notes.filter(n => n.path === root || n.path.startsWith(prefix))
+  }, [notes, notesRootFolder])
+  const scopedKindIndex = useMemo(() => buildNoteKindIndex(scopedNotes), [scopedNotes])
+  const kindCounts = useMemo(() => countNoteKinds(scopedKindIndex), [scopedKindIndex])
   const activeKindSet = useMemo(() => new Set(fileTreeKindFilter), [fileTreeKindFilter])
   const isKindFilterActive = fileTreeKindFilter.length < NOTE_KIND_ORDER.length
 

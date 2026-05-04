@@ -2,6 +2,17 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.5.30-beta] - 2026-05-04
+
+### Improvements
+
+- **Relevanz-Counter im Sidebar-Header zählt nur noch den konfigurierten Notes-Stammordner**: vorher waren die 🔴/🟢/🔵-Chips vault-weit, was unintuitiv wirkte — wer eine Notiz aus „Notes" rausgeschoben hatte, sah sie nicht mehr im Tree, aber der Counter zählte sie weiter. Counter scoped jetzt auf `notesRootFolder` (das, was im „Notes: …"-Badge steht); Punkte an einzelnen Notizen außerhalb des Stammordners bleiben sichtbar wie bisher. Ohne konfigurierten Notes-Root fällt das Verhalten auf vault-weit zurück.
+- **„Relevanz entfernen"-Eintrag im Kontextmenü**: das Submenu „Relevanz ändern" hatte bisher nur Problem/Lösung/Info — jetzt gibt es darunter (mit Trenner) den Eintrag „Relevanz entfernen", der `category|noteKind|kind:` aus dem Frontmatter rausnimmt. Wenn der Frontmatter-Block dadurch leer wird, wird er ganz entfernt.
+
+### Fixes
+
+- **Submenu-Layout: fehlender Abstand zwischen Punkt und Label**: `.context-submenu .context-menu-item` setzt `display: block` und überschreibt damit das `gap: 8px` von `.note-kind-menu-item`. Im Submenu klebte der farbige Punkt direkt am Wort („●Problem"). Jetzt explizit Flex-Layout im Submenu wiederhergestellt.
+
 ## [0.5.29-beta] - 2026-05-04
 
 ### Fixes

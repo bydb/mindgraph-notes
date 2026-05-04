@@ -133,6 +133,23 @@ export function setNoteKindInContent(content: string, kindId: NoteKindId): strin
   return `---\n${categoryLine}\n---\n\n${content}`
 }
 
+export function clearNoteKindInContent(content: string): string {
+  const frontmatterMatch = content.match(/^---\s*\n([\s\S]*?)\n---/)
+  if (!frontmatterMatch) return content
+
+  const frontmatter = frontmatterMatch[1]
+  const bodyStart = frontmatterMatch[0].length
+
+  // Entferne alle drei möglichen Kind-Keys (category, noteKind, kind), je inkl. nachfolgendem Newline.
+  const stripped = frontmatter.replace(/^(?:category|noteKind|kind):\s*.*$\n?/gm, '')
+
+  // Wenn der Frontmatter-Block dadurch leer wird, ihn komplett entfernen.
+  if (stripped.trim() === '') {
+    return content.slice(bodyStart).replace(/^\n+/, '')
+  }
+  return `---\n${stripped.replace(/\n+$/, '')}\n---${content.slice(bodyStart)}`
+}
+
 // ─── Status (open / solved / archived) ──────────────────────────────────────
 
 export type NoteStatus = 'open' | 'solved' | 'archived'
