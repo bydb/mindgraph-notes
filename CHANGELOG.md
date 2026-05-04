@@ -2,6 +2,16 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.5.29-beta] - 2026-05-04
+
+### Fixes
+
+- **Radar-Widget („Relevante Notizen") stabilisiert**: das Modul stürzte regelmäßig nach Refresh ab, weil mehrere ineinandergreifende useEffects + localStorage-Writes in eine Recompute-Schleife liefen. Drei zusammenhängende Fixes: (1) `t` aus `useTranslation` ist jetzt per `useCallback` stabil — vorher war es bei jedem Render eine neue Funktion, wodurch das `radarSnapshot`-`useMemo` pro Render neu lief und der Persist-Effect localStorage-Writes auf jeden Render auslöste. (2) `persistRadarSnapshot` dedupliziert über einen Ref — identische Score-Maps schreiben nicht mehr. (3) `loadSnapshot` ist in try/catch/finally gewrappt — ein einzelner kaputter Sub-Call (edoobox-Timeout, korruptes Frontmatter, Kalender-Permission-Race) crasht nicht mehr die ganze Snapshot-Promise.
+- **ErrorBoundary pro Dashboard-Widget**: ein Render-Crash im Radar zog vorher das ganze Dashboard mit (weiße Fläche). Jeder Widget-Slot hat jetzt seine eigene Boundary mit „Erneut versuchen"-Button — Fehler im Radar lassen Tasks/Mails/Kalender unberührt.
+- **Verlorener Force-Refresh-Klick im Radar-AI-Worker**: wer während eines laufenden Ollama-Batches nochmal den Refresh-Button drückte, dessen Klick verschluckte sich (consumed-Tick wurde im Early-Return-Pfad nicht gespiegelt). Der Batch-`finally` gleicht jetzt Tick-Mismatch ab und holt einen ausstehenden Refresh nach.
+- **Anwesenheitsliste mit >9 Teilnehmern**: das DOCX-Template hat 9 Zeilen pro Seite, die Erzeugung war hart auf 9 begrenzt und warf für größere Veranstaltungen einen Fehler. Generator hängt bei Bedarf zusätzliche Seiten an (Page-Break + Tabellen-Replikat), Obergrenze jetzt 100 Teilnehmer gesamt. Konstante im Renderer (`AgentPanel`) entsprechend erhöht.
+- **InboxPanel-Übersetzung**: „markiert als bearbeitet"-Indikator nutzte fälschlich den Aktions-Key `inbox.markHandled` (Verb) statt des Status-Keys `inbox.markedHandled` (Partizip).
+
 ## [0.5.28-beta] - 2026-05-03
 
 ### Fixes

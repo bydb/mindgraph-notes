@@ -32,6 +32,7 @@ import {
   addSolvedForBacklinkInContent,
   completeOpenTasksInContent
 } from '../../utils/noteKind'
+import { ErrorBoundary } from '../ErrorBoundary'
 import './DashboardView.css'
 
 type TFn = (key: TranslationKey, params?: Record<string, string | number>) => string
@@ -132,22 +133,31 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onOpenInbox, onOpe
 
   const loadSnapshot = useCallback(async () => {
     if (isInitialLoadRef.current) setIsLoading(true)
-    await loadDashboardOffers({ includeBookings: true })
-    const latestOffers = useAgentStore.getState().dashboardOffers
-    const snap = await buildDashboardSnapshot({
-      notes,
-      vaultPath,
-      excludedFolders: taskExcludedFolders,
-      emails,
-      dashboardOffers: latestOffers,
-      bookingsSinceIso: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString(),
-      calendarDaysAhead: dashboard.calendarDaysAhead,
-      includeCalendar: true
-    })
-    setSnapshot(snap)
-    if (isInitialLoadRef.current) {
-      setIsLoading(false)
-      isInitialLoadRef.current = false
+    try {
+      await loadDashboardOffers({ includeBookings: true })
+      const latestOffers = useAgentStore.getState().dashboardOffers
+      const snap = await buildDashboardSnapshot({
+        notes,
+        vaultPath,
+        excludedFolders: taskExcludedFolders,
+        emails,
+        dashboardOffers: latestOffers,
+        bookingsSinceIso: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString(),
+        calendarDaysAhead: dashboard.calendarDaysAhead,
+        includeCalendar: true
+      })
+      setSnapshot(snap)
+    } catch (error) {
+      // Defensive: ein einzelner fehlerhafter Sub-Call (edoobox-Timeout, Kalender-Permission-Race,
+      // korruptes Frontmatter in einer Notiz) hat vorher die ganze Promise abgebrochen — der Effect
+      // nicht await-ete sie, also wurde es eine Unhandled Rejection und der Loading-Spinner blieb
+      // hängen. Jetzt loggen wir und behalten den letzten gültigen Snapshot.
+      console.error('[Dashboard] loadSnapshot failed', error)
+    } finally {
+      if (isInitialLoadRef.current) {
+        setIsLoading(false)
+        isInitialLoadRef.current = false
+      }
     }
   }, [notes, vaultPath, taskExcludedFolders, emails, loadDashboardOffers, dashboard.calendarDaysAhead])
 
@@ -190,13 +200,19 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onOpenInbox, onOpe
 
   const renderWidget = (id: DashboardWidgetId) => {
     if (!snapshot) return null
+    // Jedes Widget bekommt seine eigene ErrorBoundary, damit ein Render-Crash in z.B. dem Radar
+    // nicht die anderen Widgets mitreißt. Ohne Boundary war ein einzelner Exception-Pfad genug,
+    // um die ganze Dashboard-Sicht weiß zu setzen.
+    let inner: React.ReactNode = null
+    let label = id as string
     switch (id) {
       case 'focus':
-        return <FocusWidget key={id} snapshot={snapshot} onTaskClick={handleTaskClick} onRefresh={loadSnapshot} t={t} />
+        inner = <FocusWidget snapshot={snapshot} onTaskClick={handleTaskClick} onRefresh={loadSnapshot} t={t} />
+        label = t('dashboard.widgets.focus')
+        break
       case 'radar':
-        return (
+        inner = (
           <RadarWidget
-            key={id}
             snapshot={snapshot}
             notes={notes}
             vaultPath={vaultPath}
@@ -213,17 +229,28 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onOpenInbox, onOpe
             }}
           />
         )
+        label = t('dashboard.widgets.radar')
+        break
       case 'tasks':
-        return <TasksWidget key={id} snapshot={snapshot} onTaskClick={handleTaskClick} t={t} />
+        inner = <TasksWidget snapshot={snapshot} onTaskClick={handleTaskClick} t={t} />
+        label = t('dashboard.widgets.tasks')
+        break
       case 'emails':
-        return <EmailsWidget key={id} snapshot={snapshot} onEmailClick={handleEmailClick} onEmailHandled={handleEmailHandled} t={t} />
+        inner = <EmailsWidget snapshot={snapshot} onEmailClick={handleEmailClick} onEmailHandled={handleEmailHandled} t={t} />
+        label = t('dashboard.widgets.emails')
+        break
       case 'calendar':
-        return <CalendarWidget key={id} snapshot={snapshot} t={t} onRefresh={loadSnapshot} />
+        inner = <CalendarWidget snapshot={snapshot} t={t} onRefresh={loadSnapshot} />
+        label = t('dashboard.widgets.calendar')
+        break
       case 'bookings':
-        return <BookingsWidget key={id} snapshot={snapshot} onBookingClick={handleBookingClick} t={t} />
+        inner = <BookingsWidget snapshot={snapshot} onBookingClick={handleBookingClick} t={t} />
+        label = t('dashboard.widgets.bookings')
+        break
       case 'sync':
         return null
     }
+    return <ErrorBoundary key={id} label={label}>{inner}</ErrorBoundary>
   }
 
   const today = new Date()
@@ -753,14 +780,19 @@ const RadarWidget: React.FC<RadarWidgetProps> = ({ snapshot, notes, vaultPath, o
     [notes, snapshot, t, feedback, previousScores]
   )
 
-  // Heutigen Snapshot persistieren (max 1× pro Tag — die Funktion dedupliziert intern)
+  // Heutigen Snapshot persistieren — mit Dedupe-Ref, damit identische Score-Maps nicht jeden Render
+  // einen localStorage-Write auslösen. Vorher: bei instabilem `t` aus useTranslation wurde
+  // radarSnapshot pro Render neu gebaut → Effect feuerte ständig → Schreib-Storm in localStorage.
+  const lastPersistedKeyRef = useRef<string>('')
   useEffect(() => {
     if (!vaultPath) return
     const todaysScores: Record<string, number> = {}
     radarSnapshot.active.forEach(item => { todaysScores[item.note.id] = item.score })
-    if (Object.keys(todaysScores).length > 0) {
-      persistRadarSnapshot(vaultPath, todaysScores)
-    }
+    if (Object.keys(todaysScores).length === 0) return
+    const key = `${vaultPath}::${JSON.stringify(todaysScores)}`
+    if (key === lastPersistedKeyRef.current) return
+    lastPersistedKeyRef.current = key
+    persistRadarSnapshot(vaultPath, todaysScores)
   }, [vaultPath, radarSnapshot])
 
   const [correction, setCorrection] = useState<{ sourceId: string; role: 'solution' | 'context'; currentTargetId?: string; query: string } | null>(null)
@@ -805,6 +837,10 @@ const RadarWidget: React.FC<RadarWidgetProps> = ({ snapshot, notes, vaultPath, o
   snapshotRef.current = snapshot
 
   const consumedForceRefreshTickRef = useRef(0)
+  // Spiegel des aktuellen Tick-Werts, damit der Batch-Finally erkennen kann, ob während des Laufs
+  // ein weiterer Refresh-Klick eingegangen ist (und entsprechend einen erneuten Lauf triggern muss).
+  const forceRefreshTickRef = useRef(forceRefreshTick)
+  forceRefreshTickRef.current = forceRefreshTick
 
   useEffect(() => {
     if (!aiEnabled || !vaultPath) {
@@ -927,6 +963,13 @@ const RadarWidget: React.FC<RadarWidgetProps> = ({ snapshot, notes, vaultPath, o
     runBatch().finally(() => {
       radarAiWorkerRunning = false
       console.log('[Radar] AI worker batch finished')
+      // Wenn während des Batches ein weiterer Force-Refresh-Klick einging (Tick > consumed),
+      // diesen jetzt nachholen — sonst geht der Klick verloren, weil der Effect beim Klick
+      // wegen radarAiWorkerRunning early-returnt hatte ohne consumed zu aktualisieren.
+      if (canUpdateLocalState && forceRefreshTickRef.current !== consumedForceRefreshTickRef.current) {
+        console.log('[Radar] Pending force-refresh detected, re-triggering')
+        setForceRefreshTick(prev => prev + 1)
+      }
     })
 
     return () => {

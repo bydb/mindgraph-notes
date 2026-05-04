@@ -4,7 +4,7 @@ import { useUIStore } from '../../stores/uiStore'
 import { useTranslation } from '../../utils/translations'
 import type { EdooboxEvent, EdooboxEventDate, EdooboxOfferDashboard, AttendanceListData, AttendanceParticipant } from '../../../shared/types'
 
-const MAX_ATTENDANCE_PARTICIPANTS = 9
+const MAX_ATTENDANCE_PARTICIPANTS = 100
 const MAX_ATTENDANCE_DATES = 8
 
 function splitFullName(full: string): { name: string; vorname: string } {

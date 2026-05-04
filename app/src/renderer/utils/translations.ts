@@ -438,6 +438,7 @@ const translations = {
     'dashboard.radar.aiRunning': 'KI prüft {count} Notizen…',
     'inbox.markHandled': 'Als erledigt markieren',
     'inbox.markUnhandled': 'Als unerledigt markieren',
+    'inbox.markedHandled': 'Als erledigt markiert',
 
     // Focus-Widget
     'dashboard.focus.allClear': 'Keine Deadlines, kein Rückstau. Nutze den Freiraum.',
@@ -1895,7 +1896,7 @@ const translations = {
     'agent.dashboard.places': 'Plätze',
     'agent.dashboard.loading': 'Lade Dashboard...',
     'agent.attendanceList.download': 'Teilnehmerliste herunterladen',
-    'agent.attendanceList.tooMany': 'Zu viele Teilnehmer ({count}). Vorlage unterstützt maximal {max}.',
+    'agent.attendanceList.tooMany': 'Zu viele Teilnehmer ({count}). Maximal {max} pro Liste.',
     'agent.attendanceList.generateFailed': 'Teilnehmerliste konnte nicht erstellt werden.',
     'agent.tab.marketing': 'Marketing',
     'agent.marketing.title': 'Marketing',
@@ -2453,6 +2454,7 @@ const translations = {
     'dashboard.radar.aiRunning': 'AI analyzing {count} notes…',
     'inbox.markHandled': 'Mark as handled',
     'inbox.markUnhandled': 'Mark as unhandled',
+    'inbox.markedHandled': 'Marked as handled',
 
     // Focus widget
     'dashboard.focus.allClear': 'No deadlines, no backlog. Use the room.',
@@ -3909,7 +3911,7 @@ const translations = {
     'agent.dashboard.places': 'Places',
     'agent.dashboard.loading': 'Loading dashboard...',
     'agent.attendanceList.download': 'Download attendance list',
-    'agent.attendanceList.tooMany': 'Too many participants ({count}). Template supports up to {max}.',
+    'agent.attendanceList.tooMany': 'Too many participants ({count}). Maximum {max} per list.',
     'agent.attendanceList.generateFailed': 'Could not create attendance list.',
     'agent.tab.marketing': 'Marketing',
     'agent.marketing.title': 'Marketing',
@@ -4047,14 +4049,20 @@ export function t(key: TranslationKey, language: Language, params?: Record<strin
 
 // Hook for easy usage in components
 import { useUIStore } from '../stores/uiStore'
+import { useCallback } from 'react'
 
 export function useTranslation() {
   const language = useUIStore((state) => state.language)
 
-  return {
-    t: (key: TranslationKey, params?: Record<string, string | number>) => t(key, language, params),
-    language
-  }
+  // useCallback bindet t an die aktuelle Sprache, hält die Funktions-Referenz aber stabil zwischen
+  // Renders mit gleicher Sprache. Ohne dieses Memo wäre t bei jedem Render eine neue Funktion und
+  // useMemo/useEffect-Dependencies, die t enthalten, würden bei jedem Render neu feuern.
+  const tFn = useCallback(
+    (key: TranslationKey, params?: Record<string, string | number>) => t(key, language, params),
+    [language]
+  )
+
+  return { t: tFn, language }
 }
 
 export { translations }
