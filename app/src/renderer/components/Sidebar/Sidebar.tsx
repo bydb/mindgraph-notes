@@ -41,6 +41,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ onOpenSearch }) => {
   const notesRootLabel = notesRootFolder
     ? notesRootFolder.split('/').filter(Boolean).at(-1) || notesRootFolder
     : ''
+  const notesRootDisplayLabel = notesRootLabel
+    ? notesRootLabel.replace(/^[0-9]+\s*-\s*/, '').trim() || notesRootLabel
+    : ''
 
   const handleOpenVault = useCallback(async () => {
     if (!window.electronAPI) {
@@ -446,9 +449,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ onOpenSearch }) => {
               <span className="vault-name">{vaultPath.split('/').pop()}</span>
               <span className="notes-count">
                 {notes.length} {t('sidebar.notesCount')}
-                {notesRootFolder && (
-                  <span className="notes-root-badge" title={notesRootFolder}>
-                    Notes: {notesRootLabel.replace(/^[0-9]+\s*-\s*/, '').replace(/^[^\wÄÖÜäöüß]+/u, '').trim() || notesRootLabel}
+                {notesRootFolder && notesRootDisplayLabel && (
+                  <span className="notes-root-badge" aria-label={`Standardordner: ${notesRootFolder}`}>
+                    <svg width="10" height="10" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                      <path d="M2 4.5A1.5 1.5 0 013.5 3h3.1a1.5 1.5 0 011.06.44l.54.54a.75.75 0 00.53.22h3.77A1.5 1.5 0 0114 5.7v5.8A1.5 1.5 0 0112.5 13h-9A1.5 1.5 0 012 11.5v-7z" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                    <span>{notesRootDisplayLabel}</span>
                   </span>
                 )}
               </span>

@@ -608,15 +608,26 @@ body {
 .notes-root-badge {
   display: inline-flex;
   align-items: center;
-  max-width: 142px;
+  gap: 4px;
+  max-width: 132px;
   min-width: 0;
-  padding: 2px 6px;
-  border: 1px solid color-mix(in srgb, var(--accent-color) 18%, var(--border-subtle));
+  padding: 1px 6px 1px 5px;
+  border: 1px solid var(--border-subtle);
   border-radius: var(--radius-full);
-  background: color-mix(in srgb, var(--accent-color) 7%, var(--bg-primary));
-  color: var(--text-secondary);
+  background: color-mix(in srgb, var(--bg-primary) 72%, transparent);
+  color: var(--text-muted);
   font-size: 10px;
-  font-weight: 650;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.notes-root-badge svg {
+  flex: 0 0 auto;
+  opacity: 0.72;
+}
+
+.notes-root-badge span {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -4474,6 +4485,13 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
 
 .context-submenu .context-menu-item:hover {
   background-color: var(--bg-tertiary);
+}
+
+.context-submenu .note-kind-menu-item {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
 }
 
 .submenu-arrow {

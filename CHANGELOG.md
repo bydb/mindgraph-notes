@@ -2,6 +2,17 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.5.31-beta] - 2026-05-04
+
+### Fixes
+
+- **„Relevanz entfernen" wirkt jetzt wirklich**: vorher wurde nur der `category|noteKind|kind:`-Eintrag aus dem Frontmatter genommen — der farbige Punkt blieb trotzdem stehen, weil `getNoteKind` als Fallback das Emoji im Dateinamen/Pfad matched. Jetzt strippt der Handler zusätzlich das 🔴/🟢/🔵-Emoji aus dem Dateinamen via `stripNoteKindMarker` und benennt die Datei via `renameFile` um (`updateNotePath` aktualisiert die Note-ID im Store, anschließend Tree-Refresh).
+
+### Improvements
+
+- **Notes-Stammordner-Badge im Sidebar-Header**: das frühere `Notes: <Name>` produzierte bei Folder-Namen wie „Notes" das tautologische `Notes: Notes`. Badge zeigt jetzt ein dezentes Folder-Icon (SVG) + den ID-Präfix-bereinigten Folder-Namen, ohne hardcodiertes englisches „Notes:"-Prefix. Ellipsen + Tooltip mit vollem Pfad bleiben.
+- **Badge-Styling angepasst**: subtilerer Border (kein accent-Mix mehr), `gap: 4px` zwischen Icon und Label, `padding: 1px 6px 1px 5px`, Icon mit `opacity: 0.72`. Wirkt aufgeräumter neben der Notiz-Anzahl.
+
 ## [0.5.30-beta] - 2026-05-04
 
 ### Improvements

@@ -792,20 +792,46 @@ const FileItem: React.FC<FileItemProps> = ({
     try {
       const content = existingNote?.content || await window.electronAPI.readFile(fullPath)
       const nextContent = clearNoteKindInContent(content)
-      if (nextContent !== content) {
-        await window.electronAPI.writeFile(fullPath, nextContent)
-        updateNote(targetNoteId, {
-          content: nextContent,
-          title: existingNote?.title || contextMenu.entry.name.replace(/\.md$/, ''),
-          modifiedAt: new Date()
-        })
+      let nextRelativePath = contextMenu.entry.path
+
+      const parentPath = contextMenu.entry.path.includes('/')
+        ? contextMenu.entry.path.substring(0, contextMenu.entry.path.lastIndexOf('/'))
+        : ''
+      const extension = fileExtension
+      const baseName = extension
+        ? contextMenu.entry.name.slice(0, -extension.length)
+        : contextMenu.entry.name
+      const cleanedBaseName = stripNoteKindMarker(baseName)
+      const nextName = cleanedBaseName && cleanedBaseName !== baseName
+        ? `${cleanedBaseName}${extension}`
+        : contextMenu.entry.name
+
+      await window.electronAPI.writeFile(fullPath, nextContent)
+
+      if (nextName !== contextMenu.entry.name) {
+        nextRelativePath = parentPath ? `${parentPath}/${nextName}` : nextName
+        const result = await window.electronAPI.renameFile(fullPath, `${vaultPath}/${nextRelativePath}`)
+        if (result.success) {
+          updateNotePath(targetNoteId, nextRelativePath, generateNoteId(nextRelativePath))
+        } else {
+          nextRelativePath = contextMenu.entry.path
+        }
       }
+
+      updateNote(generateNoteId(nextRelativePath), {
+        content: nextContent,
+        title: stripNoteKindMarker(existingNote?.title || contextMenu.entry.name.replace(/\.md$/, '')),
+        modifiedAt: new Date()
+      })
+
+      const tree = await window.electronAPI.readDirectory(vaultPath)
+      setFileTree(tree)
     } catch (error) {
       console.error('Fehler beim Entfernen der Notizfarbe:', error)
     }
 
     setContextMenu(null)
-  }, [contextMenu, vaultPath, notes, updateNote])
+  }, [contextMenu, vaultPath, notes, updateNote, updateNotePath, setFileTree, fileExtension])
 
   // Folder Customization Handlers
   const handleSetFolderColor = useCallback((colorId: string, path: string) => {
