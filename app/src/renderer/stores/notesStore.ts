@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import type { Note, FileEntry } from '../../shared/types'
 import { extractLinks, extractTags, extractTitle, generateNoteId, extractHeadings, extractBlocks, extractTaskStatsForCache } from '../utils/linkExtractor'
+import { trackContextEvent } from '../utils/contextMemory'
 
 interface NotesState {
   vaultPath: string | null
@@ -96,6 +97,13 @@ export const useNotesStore = create<NotesState>((set, get) => ({
       newNotes[existingIndex] = { ...newNotes[existingIndex], ...note }
       return { notes: recalculateBacklinks(newNotes) }
     }
+    trackContextEvent(state.vaultPath, {
+      type: 'note_created',
+      noteId: note.id,
+      notePath: note.path,
+      noteTitle: note.title,
+      source: 'notesStore'
+    }, { throttleMs: 10 * 60 * 1000 })
     const newNotes = [...state.notes, note]
     return { notes: recalculateBacklinks(newNotes) }
   }),
@@ -123,9 +131,22 @@ export const useNotesStore = create<NotesState>((set, get) => ({
       }
     }
 
+    const noteBeforeUpdate = state.notes.find(n => n.id === id)
+    const shouldTrackUpdate = !!noteBeforeUpdate &&
+      typeof normalizedUpdates.content === 'string' &&
+      normalizedUpdates.content !== noteBeforeUpdate.content
     const newNotes = state.notes.map(n =>
       n.id === id ? { ...n, ...normalizedUpdates } : n
     )
+    if (shouldTrackUpdate && noteBeforeUpdate) {
+      trackContextEvent(state.vaultPath, {
+        type: 'note_updated',
+        noteId: noteBeforeUpdate.id,
+        notePath: noteBeforeUpdate.path,
+        noteTitle: noteBeforeUpdate.title,
+        source: 'notesStore'
+      }, { throttleMs: 60 * 1000 })
+    }
     // Immer Backlinks neu berechnen, da sich Links geändert haben könnten
     return { notes: recalculateBacklinks(newNotes) }
   }),
@@ -146,6 +167,16 @@ export const useNotesStore = create<NotesState>((set, get) => ({
   }),
 
   removeNote: (id) => set((state) => {
+    const note = state.notes.find(n => n.id === id)
+    if (note) {
+      trackContextEvent(state.vaultPath, {
+        type: 'note_deleted',
+        noteId: note.id,
+        notePath: note.path,
+        noteTitle: note.title,
+        source: 'notesStore'
+      })
+    }
     const newNotes = state.notes.filter(n => n.id !== id)
     return { notes: recalculateBacklinks(newNotes) }
   }),
@@ -154,6 +185,17 @@ export const useNotesStore = create<NotesState>((set, get) => ({
     // Wenn keine ID oder gleiche wie aktuelle, nur State updaten
     if (!id || id === state.selectedNoteId) {
       return { selectedNoteId: id, selectedPdfPath: null, selectedImagePath: null, selectedOfficePath: null, selectedOfficeType: null }
+    }
+
+    const openedNote = state.notes.find(n => n.id === id)
+    if (openedNote) {
+      trackContextEvent(state.vaultPath, {
+        type: 'note_opened',
+        noteId: openedNote.id,
+        notePath: openedNote.path,
+        noteTitle: openedNote.title,
+        source: 'navigation'
+      }, { throttleMs: 30 * 1000 })
     }
 
     // Navigation History updaten (nur wenn addToHistory true)

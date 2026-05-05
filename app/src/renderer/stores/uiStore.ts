@@ -350,7 +350,7 @@ export interface TransportSettings {
 }
 
 // Dashboard Widgets — identifier-basiert, Reihenfolge im Array = Anzeigereihenfolge
-export type DashboardWidgetId = 'focus' | 'radar' | 'tasks' | 'emails' | 'calendar' | 'bookings' | 'sync'
+export type DashboardWidgetId = 'focus' | 'radar' | 'activity' | 'tasks' | 'emails' | 'calendar' | 'bookings' | 'sync'
 
 export interface DashboardSettings {
   enabled: boolean
@@ -364,7 +364,7 @@ export interface DashboardSettings {
   radarAiModel: string                 // Ollama-Modell für Notiz-Analyse; leer = nutze ollama.selectedModel
 }
 
-export const DASHBOARD_ALL_WIDGETS: DashboardWidgetId[] = ['focus', 'radar', 'tasks', 'emails', 'calendar', 'bookings', 'sync']
+export const DASHBOARD_ALL_WIDGETS: DashboardWidgetId[] = ['focus', 'radar', 'activity', 'tasks', 'emails', 'calendar', 'bookings', 'sync']
 
 const normalizeVaultFolder = (folder: string): string => folder.trim().replace(/^\/+|\/+$/g, '')
 
@@ -904,7 +904,7 @@ const defaultState = {
   // Dashboard
   dashboard: {
     enabled: true,
-    widgets: ['focus', 'radar', 'tasks', 'emails', 'calendar', 'bookings'],
+    widgets: ['focus', 'radar', 'activity', 'tasks', 'emails', 'calendar', 'bookings'],
     briefingEnabled: true,
     briefingIncludeCalendar: true,
     lastBriefingDate: '',
@@ -1249,6 +1249,12 @@ export async function initializeUISettings(): Promise<void> {
           dash.widgets = focusIndex >= 0
             ? [...dash.widgets.slice(0, focusIndex + 1), 'radar', ...dash.widgets.slice(focusIndex + 1)]
             : ['radar', ...dash.widgets]
+        }
+        if (Array.isArray(dash.widgets) && !dash.widgets.includes('activity')) {
+          const radarIndex = dash.widgets.indexOf('radar')
+          dash.widgets = radarIndex >= 0
+            ? [...dash.widgets.slice(0, radarIndex + 1), 'activity', ...dash.widgets.slice(radarIndex + 1)]
+            : ['activity', ...dash.widgets]
         }
         if (typeof dash.radarAiEnabled !== 'boolean') dash.radarAiEnabled = true
         if (typeof dash.radarAiRefreshIntervalHours !== 'number' || dash.radarAiRefreshIntervalHours <= 0) {

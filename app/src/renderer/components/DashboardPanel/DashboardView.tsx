@@ -231,6 +231,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onOpenInbox, onOpe
         )
         label = t('dashboard.widgets.radar')
         break
+      case 'activity':
+        inner = <ActivityWidget snapshot={snapshot} t={t} />
+        label = t('dashboard.widgets.activity')
+        break
       case 'tasks':
         inner = <TasksWidget snapshot={snapshot} onTaskClick={handleTaskClick} t={t} />
         label = t('dashboard.widgets.tasks')
@@ -300,6 +304,163 @@ interface WidgetProps {
   onEmailClick?: (item: EmailActionItem) => void
   onEmailHandled?: (item: EmailActionItem) => void
   onBookingClick?: (item: BookingItem) => void
+}
+
+const ActivityWidget: React.FC<WidgetProps> = ({ snapshot, t }) => {
+  const activity = snapshot.activity
+  const memory = activity.memory
+  const maxFolderCount = Math.max(1, ...activity.topFolders.map(folder => folder.changed))
+  const maxContextCount = Math.max(1, ...memory.topNotes7d.map(note => note.count))
+  const { ollamaEnabled, ollamaSelectedModel } = useUIStore(useShallow(s => ({
+    ollamaEnabled: s.ollama.enabled,
+    ollamaSelectedModel: s.ollama.selectedModel
+  })))
+  const [insight, setInsight] = useState<string>('')
+  const [insightError, setInsightError] = useState<string>('')
+  const [insightLoading, setInsightLoading] = useState(false)
+
+  const runLocalInsight = async () => {
+    if (!ollamaEnabled || !ollamaSelectedModel || insightLoading) return
+    setInsightLoading(true)
+    setInsightError('')
+    try {
+      const topFolders = activity.topFolders.map(folder => `- ${folder.folder}: ${folder.changed}`).join('\n') || '- keine'
+      const topContexts = memory.topNotes7d.map(note => `- ${note.title}: ${note.count}`).join('\n') || '- keine'
+      const prompt = `Du analysierst ein lokales Kontextgedächtnis einer Markdown-Notizen-App. Antworte auf Deutsch, knapp und konkret.
+
+Aufgabe:
+- Benenne den wahrscheinlich aktiven Arbeitskontext.
+- Nenne 2-3 Muster.
+- Nenne maximal 2 sinnvolle nächste Schritte.
+- Keine Erfindungen, keine langen Erklärungen.
+
+Statistik:
+- Notizen gesamt: ${activity.totalNotes}
+- Heute berührt: ${activity.touchedToday}
+- Neu in 7 Tagen: ${activity.created7d}
+- Geändert in 7 Tagen: ${activity.changed7d}
+- Geändert in 30 Tagen: ${activity.changed30d}
+- Kontextsignale 7 Tage: ${memory.events7d}
+- Geöffnete Notizen 7 Tage: ${memory.opened7d}
+- Bearbeitete Notizen 7 Tage: ${memory.edited7d}
+- Aufgabenaktionen 7 Tage: ${memory.taskEvents7d}
+
+Aktive Ordner:
+${topFolders}
+
+Häufig berührte Kontexte:
+${topContexts}`
+
+      const result = await window.electronAPI.ollamaGenerate({
+        model: ollamaSelectedModel,
+        action: 'custom',
+        prompt: '',
+        originalText: prompt,
+        customPrompt: 'Analysiere die folgenden lokalen Aktivitätsdaten und gib eine kurze Context Summary aus. Antworte als Markdown mit maximal 5 Bulletpoints.'
+      })
+      if (result.success && result.result) {
+        setInsight(result.result)
+      } else {
+        setInsightError(result.error || t('dashboard.activity.aiError'))
+      }
+    } catch (error) {
+      setInsightError(error instanceof Error ? error.message : t('dashboard.activity.aiError'))
+    } finally {
+      setInsightLoading(false)
+    }
+  }
+
+  return (
+    <section className="dv-widget dv-activity">
+      <header className="dv-widget-header">
+        <h3>{t('dashboard.widgets.activity')}</h3>
+        <span className="dv-widget-count">{activity.changed7d}</span>
+      </header>
+      <div className="dv-widget-body">
+        <div className="dv-activity-stats">
+          <div className="dv-activity-stat">
+            <span>{activity.totalNotes}</span>
+            <small>{t('dashboard.activity.total')}</small>
+          </div>
+          <div className="dv-activity-stat">
+            <span>{activity.touchedToday}</span>
+            <small>{t('dashboard.activity.today')}</small>
+          </div>
+          <div className="dv-activity-stat">
+            <span>{activity.created7d}</span>
+            <small>{t('dashboard.activity.created7d')}</small>
+          </div>
+          <div className="dv-activity-stat">
+            <span>{activity.changed30d}</span>
+            <small>{t('dashboard.activity.changed30d')}</small>
+          </div>
+          <div className="dv-activity-stat">
+            <span>{memory.events7d}</span>
+            <small>{t('dashboard.activity.contextEvents7d')}</small>
+          </div>
+          <div className="dv-activity-stat">
+            <span>{memory.taskEvents7d}</span>
+            <small>{t('dashboard.activity.taskEvents7d')}</small>
+          </div>
+        </div>
+
+        <div className="dv-activity-section-title">{t('dashboard.activity.changed7d')}</div>
+        {activity.topFolders.length === 0 ? (
+          <div className="dv-widget-empty">{t('dashboard.activity.empty')}</div>
+        ) : (
+          <div className="dv-activity-folders">
+            {activity.topFolders.map(folder => (
+              <div key={folder.folder} className="dv-activity-folder">
+                <div className="dv-activity-folder-row">
+                  <span>{folder.folder}</span>
+                  <strong>{folder.changed}</strong>
+                </div>
+                <div className="dv-activity-bar">
+                  <div style={{ width: `${Math.max(8, (folder.changed / maxFolderCount) * 100)}%` }} />
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div className="dv-activity-section-title">{t('dashboard.activity.contextTitle')}</div>
+        {memory.topNotes7d.length === 0 ? (
+          <div className="dv-widget-empty">{t('dashboard.activity.contextEmpty')}</div>
+        ) : (
+          <div className="dv-activity-folders">
+            {memory.topNotes7d.map(note => (
+              <div key={`${note.noteId || note.path || note.title}`} className="dv-activity-folder">
+                <div className="dv-activity-folder-row">
+                  <span>{note.title}</span>
+                  <strong>{note.count}</strong>
+                </div>
+                <div className="dv-activity-bar context">
+                  <div style={{ width: `${Math.max(8, (note.count / maxContextCount) * 100)}%` }} />
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div className="dv-activity-ai">
+          <button
+            className="dv-activity-ai-btn"
+            onClick={runLocalInsight}
+            disabled={!ollamaEnabled || !ollamaSelectedModel || insightLoading || memory.events7d === 0}
+          >
+            {insightLoading ? t('dashboard.activity.aiRunning') : t('dashboard.activity.aiButton')}
+          </button>
+          {!ollamaEnabled || !ollamaSelectedModel ? (
+            <div className="dv-activity-ai-hint">{t('dashboard.activity.aiNeedsModel')}</div>
+          ) : insightError ? (
+            <div className="dv-activity-ai-error">{insightError}</div>
+          ) : insight ? (
+            <div className="dv-activity-ai-result">{insight}</div>
+          ) : null}
+        </div>
+      </div>
+    </section>
+  )
 }
 
 interface RadarItem {

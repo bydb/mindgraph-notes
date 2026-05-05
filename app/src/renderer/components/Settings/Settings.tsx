@@ -1168,12 +1168,13 @@ const DashboardSettingsTab: React.FC<{ t: TabTFn }> = ({ t }) => {
   const widgetLabels: Record<string, string> = {
     focus: t('dashboard.widgets.focus'),
     radar: t('dashboard.widgets.radar'),
+    activity: t('dashboard.widgets.activity'),
     tasks: t('dashboard.widgets.tasks'),
     emails: t('dashboard.widgets.emails'),
     calendar: t('dashboard.widgets.calendar'),
     bookings: t('dashboard.widgets.bookings')
   }
-  const allWidgetIds = ['focus', 'radar', 'tasks', 'emails', 'calendar', 'bookings'] as const
+  const allWidgetIds = ['focus', 'radar', 'activity', 'tasks', 'emails', 'calendar', 'bookings'] as const
 
   const toggleWidget = (id: typeof allWidgetIds[number]) => {
     const active = dashboard.widgets.includes(id)

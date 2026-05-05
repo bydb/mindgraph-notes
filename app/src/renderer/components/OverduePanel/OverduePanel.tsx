@@ -4,6 +4,7 @@ import { useNotesStore } from '../../stores/notesStore'
 import { useUIStore } from '../../stores/uiStore'
 import { useTranslation } from '../../utils/translations'
 import { extractTasks, buildTaskLine, type ExtractedTask } from '../../utils/linkExtractor'
+import { trackContextEvent } from '../../utils/contextMemory'
 
 interface TaskEntry extends ExtractedTask {
   noteId: string
@@ -516,6 +517,14 @@ export const OverduePanel: React.FC<OverduePanelProps> = ({ onClose }) => {
       return
     }
 
+    trackContextEvent(vaultPath, {
+      type: 'task_updated',
+      noteId: task.noteId,
+      notePath: task.notePath,
+      noteTitle: task.noteTitle,
+      source: 'tasks'
+    }, { throttleMs: 30 * 1000 })
+
     // Content im Store aktualisieren, damit nächstes Rendering frisch ist
     try {
       const content = await window.electronAPI.readFile(`${vaultPath}/${task.notePath}`) as string
@@ -546,6 +555,13 @@ export const OverduePanel: React.FC<OverduePanelProps> = ({ onClose }) => {
       setTimeout(() => setErrorBanner(null), 4000)
       return
     }
+
+    trackContextEvent(vaultPath, {
+      type: 'task_created',
+      notePath: result.relativePath || destinationPath,
+      noteTitle: destinationPath.split('/').pop()?.replace(/\.md$/, '') || destinationPath,
+      source: 'tasks'
+    })
 
     setQuickAddOpen(false)
     setReloadTick(x => x + 1)

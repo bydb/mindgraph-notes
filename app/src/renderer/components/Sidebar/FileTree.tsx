@@ -1619,7 +1619,9 @@ function FileTreeInner({
       return { ...entry, children }
     }
 
-    if (entry.fileType && entry.fileType !== 'markdown') return null
+    // Der Notizart-Filter gilt nur fuer Markdown-Notizen. Andere Dateitypen
+    // wie PDF, DOCX, XLSX oder Bilder muessen im Dateibaum sichtbar bleiben.
+    if (entry.fileType && entry.fileType !== 'markdown') return entry
     const kindId = noteKindIndex.get(entry.path)
     const kind = kindId ? NOTE_KINDS[kindId] : getNoteKindFromText(entry.name) || getNoteKindFromText(entry.path)
     if (!kind) return entry

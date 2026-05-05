@@ -2,6 +2,17 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.5.33-beta] - 2026-05-05
+
+### Features
+
+- **Neues „Aktivität"-Dashboard-Widget**: Statistik-Grid (Notizen gesamt, heute berührt, neu in 7 Tagen, geändert in 30 Tagen, Kontext-Events 7d, Aufgaben-Events 7d) plus zwei Bar-Charts: Top-Ordner nach Änderungen + Top-Notizen nach Aufrufen/Bearbeitungen. Optionaler „Local Insight"-Button schickt die Statistik an Ollama und gibt eine Markdown-Bullet-Zusammenfassung des aktiven Arbeitskontexts zurück (max 5 Punkte, deutsch). Default-aktiv für alle Profile (Student/Researcher/Professional/Writer/Developer); Migration ergänzt das Widget bei bestehenden Vaults direkt hinter „Relevante Notizen".
+- **Lokales Kontextgedächtnis (`contextMemory.ts`)**: localStorage-basiertes Event-Log (`note_opened`, `note_created`, `note_updated`, `note_deleted`, `task_created`, `task_updated`) mit Throttling pro Event-Typ + Note (z.B. `note_opened` 30s, `note_updated` 60s). 90-Tage-Retention, max 2500 Events. Zero-Backend, alles im Renderer. Speist die Top-Notes-Bars im Aktivität-Widget und ist der Datenstand für die Ollama-Insight.
+
+### Fixes
+
+- **Nicht-Markdown-Dateien wurden vom Notizart-Filter verschluckt**: in `FileTree.tsx` sortierte der Filter PDFs, DOCX/XLSX und Bilder mit `return null` aus, sobald irgendein Kind-Filter aktiv war — die Dateien verschwanden sichtbar aus dem Tree, obwohl der Filter logisch nur für Markdown-Notizen gilt. Jetzt werden Nicht-Markdown-Einträge unbedingt durchgereicht (`return entry`).
+
 ## [0.5.32-beta] - 2026-05-05
 
 ### Improvements

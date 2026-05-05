@@ -1,5 +1,6 @@
 import type { EmailMessage, EdooboxOfferDashboard, EdooboxBooking, CalendarEvent, Note } from '../../shared/types'
 import { extractTasks, type ExtractedTask } from './linkExtractor'
+import { getContextMemorySummary, type ContextMemorySummary } from './contextMemory'
 
 export interface DashboardTask extends ExtractedTask {
   noteId: string
@@ -36,11 +37,27 @@ export interface CalendarResult {
   error?: string
 }
 
+export interface ActivityFolderStat {
+  folder: string
+  changed: number
+}
+
+export interface ActivitySnapshot {
+  totalNotes: number
+  created7d: number
+  changed7d: number
+  changed30d: number
+  touchedToday: number
+  topFolders: ActivityFolderStat[]
+  memory: ContextMemorySummary
+}
+
 export interface DashboardSnapshot {
   tasks: TaskBuckets
   emails: EmailActionItem[]
   bookings: BookingItem[]
   calendar: CalendarItem[]
+  activity: ActivitySnapshot
   calendarNeedsPermission?: boolean
   calendarNeverAsked?: boolean
   generatedAt: Date
@@ -140,6 +157,61 @@ export function collectNewBookings(
   )
 }
 
+function toTime(value: Date | string | number | undefined): number {
+  if (!value) return 0
+  const date = value instanceof Date ? value : new Date(value)
+  const time = date.getTime()
+  return Number.isFinite(time) ? time : 0
+}
+
+function getTopFolder(notePath: string): string {
+  const clean = notePath.replace(/\\/g, '/')
+  const parts = clean.split('/').filter(Boolean)
+  return parts.length > 1 ? parts[0] : '(Root)'
+}
+
+export function collectActivity(notes: Note[], vaultPath: string | null): ActivitySnapshot {
+  const now = Date.now()
+  const today = startOfDay(new Date()).getTime()
+  const since7d = now - 7 * MS_PER_DAY
+  const since30d = now - 30 * MS_PER_DAY
+  const folderCounts = new Map<string, number>()
+
+  let created7d = 0
+  let changed7d = 0
+  let changed30d = 0
+  let touchedToday = 0
+
+  for (const note of notes) {
+    const createdAt = toTime(note.createdAt)
+    const modifiedAt = toTime(note.modifiedAt)
+
+    if (createdAt >= since7d) created7d++
+    if (modifiedAt >= since7d) {
+      changed7d++
+      const folder = getTopFolder(note.path)
+      folderCounts.set(folder, (folderCounts.get(folder) || 0) + 1)
+    }
+    if (modifiedAt >= since30d) changed30d++
+    if (modifiedAt >= today) touchedToday++
+  }
+
+  const topFolders = Array.from(folderCounts.entries())
+    .map(([folder, changed]) => ({ folder, changed }))
+    .sort((a, b) => b.changed - a.changed || a.folder.localeCompare(b.folder))
+    .slice(0, 4)
+
+  return {
+    totalNotes: notes.length,
+    created7d,
+    changed7d,
+    changed30d,
+    touchedToday,
+    topFolders,
+    memory: getContextMemorySummary(notes, vaultPath)
+  }
+}
+
 export async function collectCalendar(daysAhead: number): Promise<CalendarResult> {
   const today = startOfDay(new Date())
   const end = new Date(today.getTime() + (daysAhead + 1) * MS_PER_DAY)
@@ -191,6 +263,7 @@ export async function buildDashboardSnapshot(input: SnapshotInputs): Promise<Das
     emails: collectEmailActions(input.emails),
     bookings: collectNewBookings(input.dashboardOffers, input.bookingsSinceIso),
     calendar: calendarRes.items,
+    activity: collectActivity(input.notes, input.vaultPath),
     calendarNeedsPermission: calendarRes.needsPermission,
     calendarNeverAsked: calendarRes.neverAsked,
     generatedAt: new Date()
