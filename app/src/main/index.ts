@@ -2656,7 +2656,10 @@ ipcMain.handle('lmstudio-embedding-models', async (_event, port: number = LM_STU
 // Dialog für neuen Ordner
 ipcMain.handle('prompt-new-folder', async (_event, basePath: string) => {
   if (!mainWindow) return null
-  assertApprovedVault(basePath, 'prompt-new-folder')
+  // basePath ist häufig ein Unterordner (Rechtsklick auf bel. Folder im Tree). assertApprovedVault
+  // würde nur den Vault-Root selbst durchlassen → Regression seit FS-IPC-Hardening. assertSafePath
+  // prüft rekursiv gegen approvedVaultRoots und akzeptiert damit jede Tiefe innerhalb des Vaults.
+  await assertSafePath(basePath, 'prompt-new-folder (base)')
 
   const result = await dialog.showSaveDialog(mainWindow, {
     title: t('dialog.newFolder.title'),

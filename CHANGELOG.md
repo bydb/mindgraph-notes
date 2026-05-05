@@ -2,6 +2,12 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.5.35-beta] - 2026-05-05
+
+### Fixes
+
+- **Unterordner anlegen schlug fehl**: Regression aus dem FS-IPC-Hardening (Commit 98c8595, v0.5.13-beta). Der `prompt-new-folder`-Handler prüfte den `basePath` mit `assertApprovedVault`, das nur Vault-Roots akzeptiert — beim Rechtsklick auf einen beliebigen Unterordner war `basePath = {vault}/{subfolder}` und damit nicht in `approvedVaultRoots`, also wurde der Save-Dialog mit „Vault-Pfad nicht autorisiert" verweigert. Handler nutzt jetzt `assertSafePath`, das rekursiv gegen die Vault-Roots prüft (Symlink-aware via realpath) und damit jede Tiefe innerhalb des Vaults durchlässt — Defense-in-Depth bleibt erhalten.
+
 ## [0.5.34-beta] - 2026-05-05
 
 ### Fixes
