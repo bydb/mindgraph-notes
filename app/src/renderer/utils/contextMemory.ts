@@ -24,8 +24,9 @@ export interface ContextMemorySummary {
   edited7d: number
   created7d: number
   taskEvents7d: number
-  topNotes7d: Array<{ noteId?: string; title: string; path?: string; count: number }>
-  topFolders7d: Array<{ folder: string; count: number }>
+  topNotes7d: Array<{ noteId?: string; title: string; path?: string; count: number; score: number }>
+  recentNotes7d: Array<{ noteId?: string; title: string; path?: string; count: number; score: number }>
+  topFolders7d: Array<{ folder: string; count: number; score: number }>
 }
 
 const MAX_EVENTS = 2500
@@ -43,6 +44,24 @@ const getTopFolder = (notePath: string | undefined): string => {
   const clean = normalizePath(notePath) || ''
   const parts = clean.split('/').filter(Boolean)
   return parts.length > 1 ? parts[0] : '(Root)'
+}
+
+function isTransitContext(notePath: string | undefined): boolean {
+  const clean = (normalizePath(notePath) || '').toLowerCase()
+  return /(^|\/)([^/]*inbox|[^/]*emails?|[^/]*e-mail|[^/]*mail|[^/]*eingang)(\/|$)/.test(clean)
+}
+
+function eventWeight(event: ContextEvent): number {
+  const baseWeight: Record<ContextEventType, number> = {
+    note_opened: 3,
+    note_created: 2,
+    note_updated: 2,
+    note_deleted: 0.5,
+    task_created: 4,
+    task_updated: 3
+  }
+  const base = baseWeight[event.type] ?? 1
+  return isTransitContext(event.notePath) ? base * 0.35 : base
 }
 
 function loadEvents(vaultPath: string | null | undefined): ContextEvent[] {
@@ -92,29 +111,44 @@ export function getContextMemorySummary(notes: Note[], vaultPath: string | null 
   const since7d = Date.now() - 7 * MS_PER_DAY
   const events = loadEvents(vaultPath).filter(e => new Date(e.at).getTime() >= since7d)
   const noteById = new Map(notes.map(note => [note.id, note]))
-  const noteCounts = new Map<string, { noteId?: string; title: string; path?: string; count: number }>()
-  const folderCounts = new Map<string, number>()
+  const noteCounts = new Map<string, { noteId?: string; title: string; path?: string; count: number; score: number; lastAt: number }>()
+  const folderCounts = new Map<string, { folder: string; count: number; score: number }>()
 
   for (const event of events) {
     const note = event.noteId ? noteById.get(event.noteId) : undefined
     const notePath = normalizePath(event.notePath || note?.path)
     const title = event.noteTitle || note?.title || notePath || event.type
     const noteKey = event.noteId || notePath || title
-    const current = noteCounts.get(noteKey) || { noteId: event.noteId, title, path: notePath, count: 0 }
+    const weight = eventWeight({ ...event, notePath })
+    const eventTime = new Date(event.at).getTime()
+    const current = noteCounts.get(noteKey) || { noteId: event.noteId, title, path: notePath, count: 0, score: 0, lastAt: 0 }
     current.count++
+    current.score += weight
+    current.lastAt = Math.max(current.lastAt, Number.isFinite(eventTime) ? eventTime : 0)
     noteCounts.set(noteKey, current)
 
     const folder = getTopFolder(notePath)
-    folderCounts.set(folder, (folderCounts.get(folder) || 0) + 1)
+    const folderCurrent = folderCounts.get(folder) || { folder, count: 0, score: 0 }
+    folderCurrent.count++
+    folderCurrent.score += weight
+    folderCounts.set(folder, folderCurrent)
   }
 
-  const topNotes7d = Array.from(noteCounts.values())
-    .sort((a, b) => b.count - a.count || a.title.localeCompare(b.title))
+  const rankedNotes = Array.from(noteCounts.values())
+    .map(({ lastAt, ...note }) => note)
+    .sort((a, b) => b.score - a.score || b.count - a.count || a.title.localeCompare(b.title))
+
+  const topNotes7d = rankedNotes
+    .filter(note => note.count >= 2 || note.score >= 4)
     .slice(0, 4)
 
-  const topFolders7d = Array.from(folderCounts.entries())
-    .map(([folder, count]) => ({ folder, count }))
-    .sort((a, b) => b.count - a.count || a.folder.localeCompare(b.folder))
+  const recentNotes7d = Array.from(noteCounts.values())
+    .sort((a, b) => b.lastAt - a.lastAt)
+    .map(({ lastAt, ...note }) => note)
+    .slice(0, 4)
+
+  const topFolders7d = Array.from(folderCounts.values())
+    .sort((a, b) => b.score - a.score || b.count - a.count || a.folder.localeCompare(b.folder))
     .slice(0, 4)
 
   return {
@@ -124,6 +158,7 @@ export function getContextMemorySummary(notes: Note[], vaultPath: string | null 
     created7d: events.filter(e => e.type === 'note_created').length,
     taskEvents7d: events.filter(e => e.type === 'task_created' || e.type === 'task_updated').length,
     topNotes7d,
+    recentNotes7d,
     topFolders7d
   }
 }

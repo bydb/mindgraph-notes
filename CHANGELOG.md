@@ -2,6 +2,17 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.5.36-beta] - 2026-05-05
+
+### Fixes
+
+- **CI-Build für 0.5.34/0.5.35 schlug fehl, weil halb-committete Änderungen am Aktivitäts-Widget einkompiliert wurden**: das `DashboardView.tsx` aus 0.5.33 referenzierte bereits `memory.recentNotes7d`, `note.score` und den Translation-Key `dashboard.activity.recentContextTitle` — die zugehörigen Erweiterungen in `contextMemory.ts` (gewichtetes Event-Scoring + `recentNotes7d`-Fallback-Feld) und `translations.ts` lagen aber nur im Working-Tree und wurden nie gepusht. Lokal lief tsc grün, im CI brach der Build mit fünf TS-Fehlern ab. Die fehlenden Stücke sind jetzt drin.
+
+### Improvements (rückwirkend wirksam, weil mit Fix gleich nachgeliefert)
+
+- **Aktivitäts-Widget bekommt gewichtetes Event-Scoring**: statt reiner Event-Count-Sortierung wird jetzt nach Score gewichtet — `task_created`/`task_updated` zählen am stärksten (4/3), `note_opened` mittel (3), `note_created`/`note_updated` (2), `note_deleted` schwach (0.5). Inbox-/E-Mail-/Eingang-Folder werden mit Faktor 0.35 abgewertet, weil dort Notizen nur „durchwandern" und nicht den Arbeitskontext darstellen.
+- **„Wahrscheinlicher Arbeitskontext" + „Zuletzt berührt"-Fallback**: bei genug Daten zeigt das Widget die top-bewerteten Kontexte (≥2 Events oder Score ≥4); bei dünner Datenlage fällt es auf die zuletzt berührten Notizen zurück, statt einer leeren Liste. Title-Label im UI wechselt entsprechend.
+
 ## [0.5.35-beta] - 2026-05-05
 
 ### Fixes
