@@ -26,7 +26,7 @@ interface SettingsProps {
   initialTab?: Tab
 }
 
-type Tab = 'vault' | 'general' | 'editor' | 'templates' | 'integrations' | 'shortcuts' | 'dataview' | 'sync' | 'dailyNote' | 'remarkable' | 'email' | 'agents' | 'transport' | 'dashboard' | 'modules' | 'speech' | 'telegram' | 'credentials'
+type Tab = 'vault' | 'general' | 'editor' | 'templates' | 'integrations' | 'shortcuts' | 'dataview' | 'sync' | 'dailyNote' | 'remarkable' | 'email' | 'agents' | 'transport' | 'dashboard' | 'modules' | 'speech' | 'telegram' | 'credentials' | 'brain'
 
 type BuiltInTemplateKey = 'empty' | 'dailyNote' | 'zettel' | 'meeting'
 
@@ -1442,6 +1442,8 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab 
     setRemarkable,
     dailyNote: dailyNoteSettings,
     setDailyNote,
+    brain: brainSettings,
+    setBrain,
     slashCommandDateFormat,
     setSlashCommandDateFormat,
     slashCommandTimeFormat,
@@ -1970,6 +1972,16 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab 
                 <path d="M13 11v2h2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
               {t('settings.tab.dailyNote')}
+            </button>
+            <button
+              className={`settings-nav-item ${activeTab === 'brain' ? 'active' : ''}`}
+              onClick={() => setActiveTab('brain')}
+            >
+              <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+                <path d="M9 2.5C7 2.5 5.5 4 5.5 6c0 .4.05.8.16 1.17C4.36 7.66 3.5 8.74 3.5 10c0 1.04.6 1.95 1.5 2.43C5 13.4 5.84 14 6.8 14c.43 0 .82-.12 1.16-.32C8.31 14.5 9.13 15 10 15c1.66 0 3-1.12 3-2.5 0-.18-.02-.36-.06-.53.94-.46 1.56-1.32 1.56-2.32 0-1.07-.7-1.99-1.7-2.42.13-.4.2-.81.2-1.23 0-2-1.5-3.5-3.5-3.5-.36 0-.7.05-1 .15-.3-.1-.65-.15-1-.15z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
+                <path d="M9 6v8M7 9c1 1 3 1 4 0" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+              </svg>
+              {t('settings.tab.brain')}
             </button>
             <button
               className={`settings-nav-item ${activeTab === 'transport' ? 'active' : ''}`}
@@ -4211,6 +4223,41 @@ LIMIT 10
                     </div>
                   </>
                 )}
+              </div>
+            )}
+
+            {/* Brain Tab — Lokales Tagesgedächtnis */}
+            {activeTab === 'brain' && (
+              <div className="settings-section">
+                <h3>{t('settings.brain.title')}</h3>
+                <p className="settings-hint">{t('settings.brain.description')}</p>
+
+                <div className="settings-info" style={{ marginBottom: '16px' }}>
+                  {t('settings.brain.privacyNote')}
+                </div>
+
+                <div className="settings-row">
+                  <label>{t('settings.brain.folderPath')}</label>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <input
+                      type="text"
+                      value={brainSettings.folderPath}
+                      onChange={e => setBrain({ folderPath: e.target.value })}
+                      placeholder="800 - 🧠 brain"
+                      style={{ width: '300px' }}
+                    />
+                    <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                      {t('settings.brain.folderPathHint')}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="settings-row" style={{ alignItems: 'flex-start' }}>
+                  <label>{t('settings.brain.howItWorks')}</label>
+                  <div style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: 1.6, maxWidth: '500px' }}>
+                    {t('settings.brain.howItWorksBody')}
+                  </div>
+                </div>
               </div>
             )}
 

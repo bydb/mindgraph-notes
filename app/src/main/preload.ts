@@ -552,5 +552,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   telegramStop: () =>
     ipcRenderer.invoke('telegram-stop'),
   telegramStatus: () =>
-    ipcRenderer.invoke('telegram-status')
+    ipcRenderer.invoke('telegram-status'),
+
+  // Brain (lokales Tagesgedächtnis — ausschließlich lokal via Ollama)
+  brainConsolidateDay: (input: unknown) =>
+    ipcRenderer.invoke('brain-consolidate-day', input)
 })

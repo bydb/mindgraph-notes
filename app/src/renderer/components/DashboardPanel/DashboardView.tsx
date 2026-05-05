@@ -1,5 +1,6 @@
-import React, { useEffect, useState, useCallback, useRef } from 'react'
+import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import { useShallow } from 'zustand/react/shallow'
+import { buildBrainSensors, getDayBoundsMs } from '../../utils/brainSensors'
 import { useNotesStore } from '../../stores/notesStore'
 import { useUIStore } from '../../stores/uiStore'
 import { useEmailStore } from '../../stores/emailStore'
@@ -265,7 +266,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onOpenInbox, onOpe
         label = t('dashboard.widgets.radar')
         break
       case 'activity':
-        inner = <ActivityWidget snapshot={snapshot} t={t} />
+        inner = <ActivityWidget snapshot={snapshot} t={t} vaultPath={vaultPath} notes={notes} emails={emails} onNoteOpen={selectNote} />
         label = t('dashboard.widgets.activity')
         break
       case 'tasks':
@@ -339,79 +340,154 @@ interface WidgetProps {
   onBookingClick?: (item: BookingItem) => void
 }
 
-const ActivityWidget: React.FC<WidgetProps> = ({ snapshot, t }) => {
+interface ActivityWidgetProps extends WidgetProps {
+  vaultPath: string | null
+  notes: Note[]
+  emails: import('../../../shared/types').EmailMessage[]
+  onNoteOpen: (id: string) => void
+}
+
+const ActivityWidget: React.FC<ActivityWidgetProps> = ({ snapshot, t, vaultPath, notes, emails, onNoteOpen }) => {
   const activity = snapshot.activity
   const memory = activity.memory
   const maxFolderCount = Math.max(1, ...activity.topFolders.map(folder => folder.changed))
   const hasFrequentContexts = memory.topNotes7d.length > 0
   const visibleContexts = hasFrequentContexts ? memory.topNotes7d : memory.recentNotes7d
   const maxContextScore = Math.max(1, ...visibleContexts.map(note => note.score))
-  const { ollamaEnabled, ollamaSelectedModel } = useUIStore(useShallow(s => ({
+  const { ollamaEnabled, ollamaSelectedModel, language, brainFolderPath, dailyNoteFolderPath, dailyNoteDateFormat } = useUIStore(useShallow(s => ({
     ollamaEnabled: s.ollama.enabled,
-    ollamaSelectedModel: s.ollama.selectedModel
+    ollamaSelectedModel: s.ollama.selectedModel,
+    language: s.language,
+    brainFolderPath: s.brain.folderPath,
+    dailyNoteFolderPath: s.dailyNote.folderPath,
+    dailyNoteDateFormat: s.dailyNote.dateFormat
   })))
-  const [insight, setInsight] = useState<string>('')
-  const [insightError, setInsightError] = useState<string>('')
-  const [insightLoading, setInsightLoading] = useState(false)
+  const [brainLoading, setBrainLoading] = useState(false)
+  const [brainError, setBrainError] = useState<string>('')
+  const [brainNotePath, setBrainNotePath] = useState<string>('')
 
-  const runLocalInsight = async () => {
-    if (!ollamaEnabled || !ollamaSelectedModel || insightLoading) return
-    setInsightLoading(true)
-    setInsightError('')
+  const runBrainConsolidation = async () => {
+    if (!vaultPath || !ollamaEnabled || !ollamaSelectedModel || brainLoading) return
+    setBrainLoading(true)
+    setBrainError('')
+    setBrainNotePath('')
     try {
-      const topFolders = activity.topFolders.map(folder => `- ${folder.folder}: ${folder.changed}`).join('\n') || '- keine'
-      const topContexts = visibleContexts.map(note => `- ${note.title}: score=${note.score.toFixed(1)}, signale=${note.count}`).join('\n') || '- keine'
-      const prompt = `Du analysierst ein lokales Kontextgedächtnis einer Markdown-Notizen-App. Antworte auf Deutsch, knapp und konkret.
-
-Aufgabe:
-- Benenne den wahrscheinlich aktiven Arbeitskontext.
-- Nenne 2-3 Muster.
-- Nenne maximal 2 sinnvolle nächste Schritte.
-- Keine Erfindungen, keine langen Erklärungen.
-
-Statistik:
-- Notizen gesamt: ${activity.totalNotes}
-- Heute berührt: ${activity.touchedToday}
-- Neu in 7 Tagen: ${activity.created7d}
-- Geändert in 7 Tagen: ${activity.changed7d}
-- Geändert in 30 Tagen: ${activity.changed30d}
-- Kontextsignale 7 Tage: ${memory.events7d}
-- Geöffnete Notizen 7 Tage: ${memory.opened7d}
-- Bearbeitete Notizen 7 Tage: ${memory.edited7d}
-- Aufgabenaktionen 7 Tage: ${memory.taskEvents7d}
-
-Aktive Ordner:
-${topFolders}
-
-Arbeitskontexte:
-${topContexts}`
-
-      const result = await window.electronAPI.ollamaGenerate({
-        model: ollamaSelectedModel,
-        action: 'custom',
-        prompt: '',
-        originalText: prompt,
-        customPrompt: 'Analysiere die folgenden lokalen Aktivitätsdaten und gib eine kurze Context Summary aus. Antworte als Markdown mit maximal 5 Bulletpoints.'
+      const { startMs, endMs, isoDate } = getDayBoundsMs()
+      const { sensors, hasContent } = buildBrainSensors({
+        notes, emails, vaultPath, dayStartMs: startMs, dayEndMs: endMs,
+        dailyNote: { folderPath: dailyNoteFolderPath, dateFormat: dailyNoteDateFormat }
       })
-      if (result.success && result.result) {
-        setInsight(result.result)
+      if (!hasContent) {
+        setBrainError(t('dashboard.activity.brainEmpty'))
+        return
+      }
+      const result = await window.electronAPI.brainConsolidateDay({
+        vaultPath,
+        folderPath: brainFolderPath || '800 - 🧠 brain',
+        date: isoDate,
+        generatedAtIso: new Date().toISOString(),
+        model: ollamaSelectedModel,
+        language,
+        sensors
+      })
+      if (result.success && result.notePath) {
+        setBrainNotePath(result.notePath)
       } else {
-        setInsightError(result.error || t('dashboard.activity.aiError'))
+        setBrainError(result.error || t('dashboard.activity.brainError'))
       }
     } catch (error) {
-      setInsightError(error instanceof Error ? error.message : t('dashboard.activity.aiError'))
+      setBrainError(error instanceof Error ? error.message : t('dashboard.activity.brainError'))
     } finally {
-      setInsightLoading(false)
+      setBrainLoading(false)
     }
   }
 
+  const openBrainNoteInEditor = (notePath: string) => {
+    if (!notePath) return
+    // Notiz im Store finden — Path-Vergleich tolerant gegen absolute/relative Varianten.
+    const note = notes.find(n => n.path === notePath || notePath.endsWith(n.path) || n.path.endsWith(notePath))
+    if (note) {
+      onNoteOpen(note.id)
+      return
+    }
+    // Fallback: Datei wurde gerade geschrieben, Watcher hat sie noch nicht aufgenommen
+    window.electronAPI.showInFolder(notePath).catch(() => {})
+  }
+
+  const openBrainNote = () => {
+    if (brainNotePath) openBrainNoteInEditor(brainNotePath)
+  }
+
+  // Status: hat heute schon eine Brain-Notiz? — leitet sich aus den geladenen Notizen ab
+  const todayBrainNote = useMemo(() => {
+    if (!brainFolderPath) return null
+    const { isoDate, startMs, endMs } = getDayBoundsMs()
+    const [year, month, day] = isoDate.split('-')
+    const dirSuffix = `${brainFolderPath}/${year}/${month}/`
+    const todayNotes = notes.filter(n => {
+      if (!n.path.includes(dirSuffix)) return false
+      const filename = n.path.split('/').pop() || ''
+      return filename === `${day}.md` || filename.startsWith(`${day} (`)
+    })
+    if (todayNotes.length === 0) return null
+    const latest = todayNotes
+      .map(n => ({
+        n,
+        time: n.modifiedAt instanceof Date ? n.modifiedAt.getTime() : new Date(n.modifiedAt as unknown as string).getTime()
+      }))
+      .filter(x => Number.isFinite(x.time) && x.time >= startMs && x.time < endMs)
+      .sort((a, b) => b.time - a.time)[0]
+    return latest ? { note: latest.n, time: latest.time } : null
+  }, [notes, brainFolderPath])
+
+  const formatStatusTime = (ms: number): string => {
+    const d = new Date(ms)
+    return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+  }
+
+  const openTodayBrainNote = () => {
+    if (todayBrainNote?.note) onNoteOpen(todayBrainNote.note.id)
+  }
+
   return (
-    <section className="dv-widget dv-activity">
-      <header className="dv-widget-header">
-        <h3>{t('dashboard.widgets.activity')}</h3>
+    <section className="dv-widget dv-activity dv-brain">
+      <header className="dv-widget-header dv-brain-header">
+        <div className="dv-brain-header-title">
+          <span className="dv-brain-icon" aria-hidden="true">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+              <path d="M12 3.5c-2.5 0-4 1.7-4 3.6 0 .5.1 1 .3 1.4-1.5.5-2.5 1.8-2.5 3.3 0 1.2.6 2.3 1.6 3 0 1.5 1.2 2.7 2.7 2.7.6 0 1.2-.2 1.7-.5.5.7 1.4 1.2 2.5 1.2 1.7 0 3-1.2 3-2.7 0-.2 0-.4-.1-.6 1.1-.5 1.9-1.6 1.9-2.9 0-1.3-.7-2.5-1.9-3 .1-.4.2-.8.2-1.2 0-2-1.6-3.6-3.6-3.6-.4 0-.8.1-1.2.2-.4-.5-1-.9-1.6-.9z"
+                stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
+              <path d="M12 7v10M9.5 10c1.2 1.2 3.8 1.2 5 0M9.5 14c1.2 1.2 3.8 1.2 5 0"
+                stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+            </svg>
+          </span>
+          <div className="dv-brain-header-text">
+            <h3>{t('dashboard.brain.title')}</h3>
+            <span className="dv-brain-subtitle">{t('dashboard.brain.subtitle')}</span>
+          </div>
+        </div>
         <span className="dv-widget-count">{activity.changed7d}</span>
       </header>
+      <div className="dv-brain-status">
+        {todayBrainNote ? (
+          <>
+            <span className="dv-brain-status-dot dv-brain-status-dot-ready" aria-hidden="true" />
+            <span className="dv-brain-status-text">
+              {t('dashboard.brain.statusReady', { time: formatStatusTime(todayBrainNote.time) })}
+            </span>
+            <button className="dv-brain-status-link" onClick={openTodayBrainNote}>
+              {t('dashboard.brain.statusOpen')}
+            </button>
+          </>
+        ) : (
+          <>
+            <span className="dv-brain-status-dot dv-brain-status-dot-pending" aria-hidden="true" />
+            <span className="dv-brain-status-text">{t('dashboard.brain.statusPending')}</span>
+          </>
+        )}
+      </div>
       <div className="dv-widget-body">
+        <div className="dv-brain-section-label">{t('dashboard.brain.statsLabel')}</div>
         <div className="dv-activity-stats">
           <div className="dv-activity-stat">
             <span>{activity.totalNotes}</span>
@@ -480,19 +556,28 @@ ${topContexts}`
         )}
 
         <div className="dv-activity-ai">
-          <button
-            className="dv-activity-ai-btn"
-            onClick={runLocalInsight}
-            disabled={!ollamaEnabled || !ollamaSelectedModel || insightLoading || memory.events7d === 0}
-          >
-            {insightLoading ? t('dashboard.activity.aiRunning') : t('dashboard.activity.aiButton')}
-          </button>
+          <div className="dv-activity-ai-buttons">
+            <button
+              className="dv-activity-ai-btn dv-activity-ai-btn-primary"
+              onClick={runBrainConsolidation}
+              disabled={!ollamaEnabled || !ollamaSelectedModel || brainLoading || !vaultPath}
+            >
+              {brainLoading ? t('dashboard.activity.brainRunning') : t('dashboard.activity.brainButton')}
+            </button>
+          </div>
+          {brainNotePath ? (
+            <div className="dv-activity-ai-result dv-activity-ai-success">
+              {t('dashboard.activity.brainDone')}
+              {' · '}
+              <button className="dv-activity-ai-link" onClick={openBrainNote}>
+                {t('dashboard.activity.brainOpen')}
+              </button>
+            </div>
+          ) : brainError ? (
+            <div className="dv-activity-ai-error">{brainError}</div>
+          ) : null}
           {!ollamaEnabled || !ollamaSelectedModel ? (
             <div className="dv-activity-ai-hint">{t('dashboard.activity.aiNeedsModel')}</div>
-          ) : insightError ? (
-            <div className="dv-activity-ai-error">{insightError}</div>
-          ) : insight ? (
-            <div className="dv-activity-ai-result">{insight}</div>
           ) : null}
         </div>
       </div>

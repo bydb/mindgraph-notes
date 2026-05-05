@@ -226,6 +226,11 @@ interface LLMSettings {
   lmStudioPort: number  // Default: 1234
 }
 
+// Brain (lokales Tagesgedächtnis — speichert Tageszusammenfassungen im Vault)
+export interface BrainSettings {
+  folderPath: string  // Relativer Pfad im Vault, z.B. '800 - 🧠 brain'
+}
+
 // Smart Connections Gewichtungen (User-konfigurierbar)
 export interface SmartConnectionsWeights {
   embedding: number   // Semantische Ähnlichkeit (0-100)
@@ -500,6 +505,9 @@ interface UIState {
   // LLM AI Settings (Ollama & LM Studio)
   ollama: LLMSettings
 
+  // Brain (lokales Tagesgedächtnis — Phase 1)
+  brain: BrainSettings
+
   // PDF Companion Settings
   pdfCompanionEnabled: boolean  // PDF Companion-Dateien automatisch erstellen
   pdfDisplayMode: PdfDisplayMode  // Anzeige im FileTree: 'both', 'companion-only', 'pdf-only'
@@ -618,6 +626,7 @@ interface UIState {
   setNotesRootFolder: (folder: string) => void
   setPendingTemplateInsert: (template: PendingTemplateInsert | null) => void
   setOllama: (settings: Partial<LLMSettings>) => void
+  setBrain: (settings: Partial<BrainSettings>) => void
   setPdfCompanionEnabled: (enabled: boolean) => void
   setPdfDisplayMode: (mode: PdfDisplayMode) => void
   setIconSet: (set: IconSet) => void
@@ -720,6 +729,11 @@ const defaultState = {
     defaultTranslateLanguage: 'en' as AILanguageCode,
     lmStudioPort: 1234
   },
+
+  // Brain (lokales Tagesgedächtnis)
+  brain: {
+    folderPath: '800 - 🧠 brain'
+  } as BrainSettings,
 
   // PDF Companion Settings
   pdfCompanionEnabled: true,
@@ -940,7 +954,7 @@ const persistedKeys = [
   'autoSaveInterval', 'editorHeadingFolding', 'editorOutlining', 'outlineStyle', 'editorShowWordCount',
   'sidebarWidth', 'sidebarVisible', 'editorPreviewSplit', 'textSplitEnabled', 'textSplitPosition',
   'canvasFilterPath', 'canvasViewMode', 'canvasShowEdges', 'canvasShowTags', 'canvasShowLinks', 'canvasShowImages', 'canvasShowSummaries',
-  'canvasCompactMode', 'canvasReadMode', 'canvasHoverScale', 'canvasDefaultCardWidth', 'splitPosition', 'fileTreeDisplayMode', 'fileTreeKindFilter', 'notesRootFolder', 'ollama',
+  'canvasCompactMode', 'canvasReadMode', 'canvasHoverScale', 'canvasDefaultCardWidth', 'splitPosition', 'fileTreeDisplayMode', 'fileTreeKindFilter', 'notesRootFolder', 'ollama', 'brain',
   'pdfCompanionEnabled', 'pdfDisplayMode', 'iconSet',
   'smartConnectionsEnabled', 'notesChatEnabled', 'flashcardsEnabled', 'semanticScholarEnabled', 'zoteroEnabled', 'smartConnectionsWeights', 'docling', 'visionOcr', 'readwise', 'languageTool', 'email', 'marketing', 'edoobox', 'remarkable', 'dailyNote', 'taskExcludedFolders', 'speech',
   'lastSeenVersion',
@@ -1023,6 +1037,7 @@ export const useUIStore = create<UIState>()((set, get) => ({
   }),
   setPendingTemplateInsert: (template) => set({ pendingTemplateInsert: template }),
   setOllama: (settings) => set((state) => ({ ollama: { ...state.ollama, ...settings } })),
+  setBrain: (settings) => set((state) => ({ brain: { ...state.brain, ...settings } })),
   setPdfCompanionEnabled: (enabled) => set({ pdfCompanionEnabled: enabled }),
   setPdfDisplayMode: (mode) => set({ pdfDisplayMode: mode }),
   setIconSet: (iconSet) => set({ iconSet }),

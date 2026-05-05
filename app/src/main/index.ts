@@ -7,6 +7,8 @@ import * as pty from 'node-pty'
 import type { FileEntry } from '../shared/types'
 import { SyncEngine } from './sync/syncEngine'
 import { ReMarkableService } from './remarkable/service'
+import { consolidateDay } from './brain/dailyConsolidation'
+import type { BrainConsolidateInput } from './brain/types'
 import { setupTray, hideTransportWindow, updateShortcut, showTransportWindow } from './transport/trayManager'
 
 // Globale Fehlerbehandlung für unhandled exceptions (z.B. IMAP Socket-Timeouts)
@@ -1952,6 +1954,29 @@ ipcMain.handle('ollama-generate', async (_event, request: OllamaRequest) => {
       error: error instanceof Error ? error.message : 'Unbekannter Fehler',
       model: request.model,
       action: request.action
+    }
+  }
+})
+
+// Brain: Tagesverdichtung. Ruft AUSSCHLIESSLICH lokales Ollama (localhost:11434)
+// und schreibt eine neue Markdown-Notiz ins Vault. Niemals Cloud-APIs.
+ipcMain.handle('brain-consolidate-day', async (_event, input: BrainConsolidateInput) => {
+  try {
+    if (!input || typeof input !== 'object') {
+      return { success: false, error: 'Ungültige Eingabe' }
+    }
+    if (!input.vaultPath || typeof input.vaultPath !== 'string') {
+      return { success: false, error: 'vaultPath fehlt' }
+    }
+    assertApprovedVault(input.vaultPath, 'brain-consolidate-day')
+    if (!input.model || typeof input.model !== 'string') {
+      return { success: false, error: 'Modell fehlt' }
+    }
+    return await consolidateDay(input, assertSafePath)
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : 'Unbekannter Fehler'
     }
   }
 })

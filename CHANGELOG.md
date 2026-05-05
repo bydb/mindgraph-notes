@@ -2,6 +2,26 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.6.0-beta] - 2026-05-05
+
+### Features
+
+- **Brain — lokales Tagesgedächtnis (Phase 1)**: Neuer Button „Tag abschließen" im Aktivitäts-Widget verdichtet den heutigen Tag in eine strukturierte Markdown-Notiz im Vault (Default: `800 - 🧠 brain/JJJJ/MM/TT.md`). Drei Sensoren werden eingelesen: berührte Notizen (aus `contextMemory` + Datei-mtime), erledigte Aufgaben, empfangene/beantwortete Mails — plus optional die heutige Daily-Note als „Journal"-Quelle (Body bis 2000 Zeichen, Frontmatter abgeschnitten). Der Output folgt einem festen 4-Sektionen-Schema (Heute im Fokus / Was ich gemacht habe / Offene Fäden / Beobachtung) und ist über Frontmatter (`type: brain-day`, `sources`, `counts`, `themes`) maschinenlesbar.
+- **Privacy als Code-Eigenschaft**: Brain-IPC-Handler ruft ausschließlich `localhost:11434` (Ollama) — hardcoded, nicht über die generischen LLM-Provider-Switche. Kein Cloud-API-Pfad, kein Telemetrie-Versand. Marketing-Aussage „verlässt nie deinen Rechner" ist damit verifizierbar.
+- **Eigener Settings-Tab „Gehirn"**: konfigurierbarer Speicherort, Erklärung der Funktionsweise, Privacy-Hinweis. `brain.folderPath` ist im uiStore persistiert und wird über die IPC-Pipeline an den Main-Prozess gegeben (sanitisiert gegen absolute Pfade und `..`-Komponenten).
+- **Aktivitäts-Widget → Gehirn-Identität**: Titel zweizeilig (`GEHIRN` + Untertitel „Lokales Tagesgedächtnis"), SVG-Hirn-Icon im Akzent-Kreis, Akzentstreifen links, Status-Streifen unter dem Header (`Heute um HH:MM Uhr verdichtet · Notiz öffnen` bei vorhandener Tagesnotiz, sonst pulsierendes „Heute noch nicht verdichtet").
+
+### Improvements
+
+- **Wikilink-Disziplin im Brain-Prompt**: Regeln stehen jetzt am Ende des Prompts (modellfreundlicher), nummeriert, mit konkreten Richtig/Falsch-Beispielen für Wikilinks, „Offene Fäden" (keine Mikrotasks, max 3 Punkte) und „Beobachtung" (deskriptiv, nicht bewertend). Zusätzlicher Postprocessor wickelt exakte Notiz-Titel im Output nachträglich in `[[…]]`, falls das Modell die Regel ignoriert. Temperatur auf 0.2 für strikteres Format-Following.
+- **Tageszusammenfassungen werden nie überschrieben**: bestehende Brain-Notizen bleiben unangetastet — wiederholte Klicks erzeugen `TT (2).md`, `TT (3).md` usw. Human-in-the-Loop-Garantie als Architektur-Eigenschaft.
+- **„Notiz öffnen" springt direkt in den Editor**: Status-Link findet die Brain-Notiz path-tolerant im Notes-Store und öffnet sie via `selectNote(id)` im Editor; nur Fallback auf Finder-Reveal, falls der Watcher die frisch geschriebene Datei noch nicht aufgenommen hat.
+- **Markdown-Rendering im Aktivitäts-Insight (Vorgänger-Feature)**: Bullets und `**fett**` werden jetzt korrekt gerendert statt als Roh-Markdown angezeigt — über `markdown-it` + `sanitizeHtml`. (Inzwischen durch das Brain ersetzt.)
+
+### Removed
+
+- **„Lokal einordnen"-Button entfernt**: redundant zu „Tag abschließen", das dasselbe tut und das Ergebnis als persistente, durchsuchbare, verlinkbare Notiz im Vault ablegt. Modul ist damit eindeutig: ein Knopf, eine Geste, eine Notiz.
+
 ## [0.5.36-beta] - 2026-05-05
 
 ### Fixes

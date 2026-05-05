@@ -115,6 +115,117 @@
   --widget-accent: #0f9f8f;
 }
 
+/* Brain — Lokales Tagesgedächtnis (Identität auf Aktivitäts-Widget) */
+.dv-brain {
+  position: relative;
+}
+.dv-brain::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: linear-gradient(180deg,
+    color-mix(in srgb, var(--widget-accent) 80%, transparent) 0%,
+    color-mix(in srgb, var(--widget-accent) 40%, transparent) 100%);
+  border-top-left-radius: var(--radius-md, 8px);
+  border-bottom-left-radius: var(--radius-md, 8px);
+}
+.dv-brain-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.dv-brain-header-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.dv-brain-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--widget-accent) 12%, var(--bg-primary));
+  color: var(--widget-accent);
+  flex-shrink: 0;
+}
+.dv-brain-header-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+.dv-brain-header-text h3 {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-secondary);
+}
+.dv-brain-subtitle {
+  font-size: 10px;
+  color: var(--text-muted);
+  letter-spacing: 0.02em;
+  text-transform: none;
+  font-weight: 400;
+}
+.dv-brain-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 15px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  background: color-mix(in srgb, var(--widget-accent) 4%, var(--bg-primary));
+  border-bottom: 1px solid var(--border-subtle);
+}
+.dv-brain-status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.dv-brain-status-dot-pending {
+  background: var(--widget-accent);
+  animation: dv-brain-pulse 2.4s ease-in-out infinite;
+}
+.dv-brain-status-dot-ready {
+  background: var(--color-success, #22a06b);
+}
+@keyframes dv-brain-pulse {
+  0%, 100% { opacity: 0.45; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.2); }
+}
+.dv-brain-status-text {
+  flex: 1;
+  min-width: 0;
+}
+.dv-brain-status-link {
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  color: var(--widget-accent);
+  cursor: pointer;
+  font-size: inherit;
+  text-decoration: underline;
+}
+.dv-brain-section-label {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  padding: 12px 15px 6px;
+}
+
 .dv-widget-emails {
   --widget-accent: var(--color-warning, #f59e0b);
 }
@@ -394,10 +505,76 @@
 }
 
 .dv-activity-ai-result {
-  white-space: pre-wrap;
   color: var(--text-secondary);
   background: color-mix(in srgb, var(--widget-accent) 5%, var(--bg-secondary));
   border: 1px solid var(--border-subtle);
+}
+
+.dv-activity-ai-result p {
+  margin: 0 0 6px 0;
+}
+
+.dv-activity-ai-result p:last-child {
+  margin-bottom: 0;
+}
+
+.dv-activity-ai-result ul,
+.dv-activity-ai-result ol {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.dv-activity-ai-result li {
+  margin-bottom: 4px;
+}
+
+.dv-activity-ai-result li:last-child {
+  margin-bottom: 0;
+}
+
+.dv-activity-ai-result strong {
+  color: var(--text-primary);
+}
+
+.dv-activity-ai-buttons {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.dv-activity-ai-buttons .dv-activity-ai-btn {
+  flex: 1 1 auto;
+}
+
+.dv-activity-ai-btn-primary {
+  background: var(--widget-accent, var(--color-primary, #2f7d6f));
+  color: var(--bg-primary, #fff);
+  border-color: transparent;
+}
+
+.dv-activity-ai-btn-primary:hover:not(:disabled) {
+  filter: brightness(1.05);
+}
+
+.dv-activity-ai-btn-primary:disabled {
+  opacity: 0.5;
+}
+
+.dv-activity-ai-success {
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.dv-activity-ai-link {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--widget-accent, var(--color-primary, #2f7d6f));
+  cursor: pointer;
+  font-size: inherit;
+  text-decoration: underline;
 }
 
 /* Email row */

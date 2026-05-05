@@ -949,6 +949,65 @@ export interface ElectronAPI {
   telegramStart: () => Promise<{ success: boolean; error?: string; alreadyRunning?: boolean }>;
   telegramStop: () => Promise<{ success: boolean; alreadyStopped?: boolean }>;
   telegramStatus: () => Promise<{ active: boolean }>;
+
+  // Brain (lokales Tagesgedächtnis)
+  brainConsolidateDay: (input: BrainConsolidateInput) => Promise<BrainConsolidateResult>;
+}
+
+// Brain (lokales Tagesgedächtnis — Phase 1)
+export interface BrainSensorNote {
+  title: string;
+  path: string;
+  tags: string[];
+  events: { opened: number; updated: number; created: boolean };
+}
+
+export interface BrainSensorTasks {
+  completed: number;
+  created: number;
+  examples: string[];
+}
+
+export interface BrainSensorEmail {
+  from: string;
+  subject: string;
+  relevance: number;
+  needsReply: boolean;
+}
+
+export interface BrainSensorEmails {
+  received: number;
+  replied: number;
+  topRelevant: BrainSensorEmail[];
+}
+
+export interface BrainSensorJournal {
+  title: string;
+  path: string;
+  excerpt: string;  // Body ohne Frontmatter, gekürzt auf ~2000 Zeichen
+}
+
+export interface BrainSensors {
+  notes: BrainSensorNote[];
+  tasks: BrainSensorTasks;
+  emails: BrainSensorEmails;
+  journal?: BrainSensorJournal;
+}
+
+export interface BrainConsolidateInput {
+  vaultPath: string;
+  folderPath: string;          // Relativer Pfad im Vault, z.B. '800 - 🧠 brain'
+  date: string;
+  generatedAtIso: string;
+  model: string;
+  language: 'de' | 'en';
+  sensors: BrainSensors;
+}
+
+export interface BrainConsolidateResult {
+  success: boolean;
+  notePath?: string;
+  error?: string;
 }
 
 // Office-Formate

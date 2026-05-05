@@ -107,6 +107,17 @@ export function trackContextEvent(
   saveEvents(vaultPath, events.slice(-MAX_EVENTS))
 }
 
+export function getDayEvents(
+  vaultPath: string | null | undefined,
+  dayStartMs: number,
+  dayEndMs: number
+): ContextEvent[] {
+  return loadEvents(vaultPath).filter(e => {
+    const t = new Date(e.at).getTime()
+    return Number.isFinite(t) && t >= dayStartMs && t < dayEndMs
+  })
+}
+
 export function getContextMemorySummary(notes: Note[], vaultPath: string | null | undefined): ContextMemorySummary {
   const since7d = Date.now() - 7 * MS_PER_DAY
   const events = loadEvents(vaultPath).filter(e => new Date(e.at).getTime() >= since7d)
