@@ -2,6 +2,12 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.5.34-beta] - 2026-05-05
+
+### Fixes
+
+- **Sync-Konflikte auf 🔴-Notizen behoben**: der Radar-AI-Worker schrieb sein Analyse-Ergebnis (`relevanceScore`/`relevanceReason`/`relevanceCheckedAt`/`relevanceModel`) bisher direkt ins Frontmatter der jeweiligen 🔴-Notiz. Bei Multi-Device-Setups analysieren beide Geräte unabhängig dieselben Notizen → beide schreiben → Sync-Engine produziert `.sync-conflict-YYYY-MM-DD`-Dateien. Auch auf einem Gerät provozierte jeder 6h-Refresh einen `change`-Watcher → `pushFile` → Race-Risiko bei laufendem Sync. Der KI-Score wandert jetzt in einen deviceinternen `localStorage`-Cache (`mindgraph:relevance-cache:{vaultPath}`); die Notiz-Datei wird durch eine Analyse nicht mehr verändert. Frontmatter-Reader bleibt als Fallback für vor 0.5.34-beta analysierte Notizen — bestehende Relevanzfelder werden nicht migriert (würde wieder Sync-Push triggern), sondern erst durch die nächste Analyse vom Cache überschrieben.
+
 ## [0.5.33-beta] - 2026-05-05
 
 ### Features

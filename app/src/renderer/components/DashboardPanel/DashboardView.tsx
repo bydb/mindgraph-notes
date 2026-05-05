@@ -27,7 +27,6 @@ import {
   stripNoteKindMarker,
   getNoteStatus,
   getNoteRelevance,
-  setNoteRelevanceInContent,
   markProblemSolvedInContent,
   addSolvedForBacklinkInContent,
   completeOpenTasksInContent
@@ -56,6 +55,40 @@ const getRadarFeedbackId = (sourceId: string, targetId: string, role: 'solution'
 const getRadarHistoryKey = (vaultPath: string | null): string => `mindgraph:radar-history:${vaultPath || 'default'}`
 
 const getRadarUiKey = (vaultPath: string | null): string => `mindgraph:radar-ui:${vaultPath || 'default'}`
+
+// KI-Relevanz wird pro Gerät lokal in localStorage gehalten — vorher schrieb der AI-Worker die
+// Felder direkt ins Notiz-Frontmatter, was bei Multi-Device-Setups Sync-Konflikte produzierte
+// (jedes Gerät analysiert unabhängig → beide schreiben → Konflikt). Der Cache ist deviceintern,
+// die Notiz-Datei selbst wird durch eine Analyse nicht mehr verändert. Frontmatter-Reader bleibt
+// als Fallback für vor 0.5.34-beta analysierte Notizen.
+interface RelevanceCacheEntry {
+  score: number
+  reason: string
+  checkedAt: string
+  model: string
+}
+type RelevanceCacheMap = Record<string, RelevanceCacheEntry>
+
+const getRelevanceCacheKey = (vaultPath: string | null): string => `mindgraph:relevance-cache:${vaultPath || 'default'}`
+
+const loadRelevanceCache = (vaultPath: string | null): RelevanceCacheMap => {
+  try {
+    const raw = localStorage.getItem(getRelevanceCacheKey(vaultPath))
+    if (!raw) return {}
+    const parsed = JSON.parse(raw)
+    return parsed && typeof parsed === 'object' ? parsed : {}
+  } catch {
+    return {}
+  }
+}
+
+const saveRelevanceCache = (vaultPath: string | null, cache: RelevanceCacheMap): void => {
+  try {
+    localStorage.setItem(getRelevanceCacheKey(vaultPath), JSON.stringify(cache))
+  } catch {
+    // localStorage voll/gesperrt — kein kritisches Problem
+  }
+}
 
 interface RadarHistoryEntry {
   date: string  // YYYY-MM-DD
@@ -310,7 +343,9 @@ const ActivityWidget: React.FC<WidgetProps> = ({ snapshot, t }) => {
   const activity = snapshot.activity
   const memory = activity.memory
   const maxFolderCount = Math.max(1, ...activity.topFolders.map(folder => folder.changed))
-  const maxContextCount = Math.max(1, ...memory.topNotes7d.map(note => note.count))
+  const hasFrequentContexts = memory.topNotes7d.length > 0
+  const visibleContexts = hasFrequentContexts ? memory.topNotes7d : memory.recentNotes7d
+  const maxContextScore = Math.max(1, ...visibleContexts.map(note => note.score))
   const { ollamaEnabled, ollamaSelectedModel } = useUIStore(useShallow(s => ({
     ollamaEnabled: s.ollama.enabled,
     ollamaSelectedModel: s.ollama.selectedModel
@@ -325,7 +360,7 @@ const ActivityWidget: React.FC<WidgetProps> = ({ snapshot, t }) => {
     setInsightError('')
     try {
       const topFolders = activity.topFolders.map(folder => `- ${folder.folder}: ${folder.changed}`).join('\n') || '- keine'
-      const topContexts = memory.topNotes7d.map(note => `- ${note.title}: ${note.count}`).join('\n') || '- keine'
+      const topContexts = visibleContexts.map(note => `- ${note.title}: score=${note.score.toFixed(1)}, signale=${note.count}`).join('\n') || '- keine'
       const prompt = `Du analysierst ein lokales Kontextgedächtnis einer Markdown-Notizen-App. Antworte auf Deutsch, knapp und konkret.
 
 Aufgabe:
@@ -348,7 +383,7 @@ Statistik:
 Aktive Ordner:
 ${topFolders}
 
-Häufig berührte Kontexte:
+Arbeitskontexte:
 ${topContexts}`
 
       const result = await window.electronAPI.ollamaGenerate({
@@ -423,19 +458,21 @@ ${topContexts}`
           </div>
         )}
 
-        <div className="dv-activity-section-title">{t('dashboard.activity.contextTitle')}</div>
-        {memory.topNotes7d.length === 0 ? (
+        <div className="dv-activity-section-title">
+          {hasFrequentContexts ? t('dashboard.activity.contextTitle') : t('dashboard.activity.recentContextTitle')}
+        </div>
+        {visibleContexts.length === 0 ? (
           <div className="dv-widget-empty">{t('dashboard.activity.contextEmpty')}</div>
         ) : (
           <div className="dv-activity-folders">
-            {memory.topNotes7d.map(note => (
+            {visibleContexts.map(note => (
               <div key={`${note.noteId || note.path || note.title}`} className="dv-activity-folder">
                 <div className="dv-activity-folder-row">
                   <span>{note.title}</span>
                   <strong>{note.count}</strong>
                 </div>
                 <div className="dv-activity-bar context">
-                  <div style={{ width: `${Math.max(8, (note.count / maxContextCount) * 100)}%` }} />
+                  <div style={{ width: `${Math.max(8, (note.score / maxContextScore) * 100)}%` }} />
                 </div>
               </div>
             ))}
@@ -579,7 +616,8 @@ const collectRadarSnapshot = (
   snapshot: DashboardSnapshot,
   t: TFn,
   feedback: RadarFeedback,
-  previousScores: Record<string, number> | null
+  previousScores: Record<string, number> | null,
+  relevanceCache: RelevanceCacheMap
 ): RadarSnapshot => {
   const notesById = new Map(notes.map(note => [note.id, note]))
   const tasksByNote = new Map<string, { overdue: number; today: number; upcoming: number; critical: number }>()
@@ -722,11 +760,13 @@ const collectRadarSnapshot = (
     if (inScope && solution) score += Math.round(solution.score * 5)
     if (inScope && context) score += Math.round(context.score * 3)
 
-    // KI-Relevanz aus Frontmatter (Stufe 2): wenn Ollama die Notiz analysiert hat,
-    // nutze den KI-Score als Primär-Wert. Heuristik bleibt als Floor (max(ki, heuristik)).
-    // Wichtig: hoher KI-Score (>=40) zählt selbst als Action-Signal — so können auch Notizen
-    // ohne Tasks/Mails/Termine in den Radar, wenn die KI sie als aktuell einstuft.
-    const ai = getNoteRelevance(note)
+    // KI-Relevanz aus dem deviceintern persistierten Cache (Stufe 2): primäre Quelle ist
+    // localStorage, weil das Frontmatter sonst pro Analyse churnt und Sync-Konflikte produziert.
+    // Frontmatter-Reader bleibt als Fallback für Notizen, die vor 0.5.34-beta analysiert wurden.
+    const cached = relevanceCache[note.path]
+    const ai = cached
+      ? { score: cached.score, reason: cached.reason, checkedAt: cached.checkedAt, model: cached.model }
+      : getNoteRelevance(note)
     const aiScore = typeof ai.score === 'number' ? ai.score : undefined
     const heuristicScore = inScope ? score : 0
     const hasMeaningfulAi = aiScore !== undefined && aiScore >= 40
@@ -936,9 +976,17 @@ const RadarWidget: React.FC<RadarWidgetProps> = ({ snapshot, notes, vaultPath, o
   const updateNote = useNotesStore(state => state.updateNote)
   const radarHistory = React.useMemo(() => loadRadarHistory(vaultPath), [vaultPath])
   const previousScores = React.useMemo(() => getPreviousScores(radarHistory), [radarHistory])
+
+  // Deviceinterner Relevanz-Cache. Wird beim AI-Worker-Lauf gefüllt; das Notiz-File wird nicht
+  // mehr durch eine Analyse verändert (vorher Sync-Konflikte auf 🔴-Notizen).
+  const [relevanceCache, setRelevanceCache] = useState<RelevanceCacheMap>(() => loadRelevanceCache(vaultPath))
+  useEffect(() => {
+    setRelevanceCache(loadRelevanceCache(vaultPath))
+  }, [vaultPath])
+
   const radarSnapshot = React.useMemo(
-    () => collectRadarSnapshot(notes, snapshot, t, feedback, previousScores),
-    [notes, snapshot, t, feedback, previousScores]
+    () => collectRadarSnapshot(notes, snapshot, t, feedback, previousScores, relevanceCache),
+    [notes, snapshot, t, feedback, previousScores, relevanceCache]
   )
 
   // Heutigen Snapshot persistieren — mit Dedupe-Ref, damit identische Score-Maps nicht jeden Render
@@ -1028,14 +1076,18 @@ const RadarWidget: React.FC<RadarWidgetProps> = ({ snapshot, notes, vaultPath, o
     // mehreren Hotfix-Iterationen zu Self-Trigger-Loops und Render-Crashes beim Tab-Wechsel
     // geführt. User-Edits werden nun verlässlich nach Cache-Expiry (6h) oder via Refresh-Button
     // analysiert; bei sofortigem Bedarf einfach den Refresh klicken.
+    // Re-Analyze-Bedingung prüft primär den Cache (jetzige Wahrheit), fällt für Altdaten auf
+    // das Frontmatter zurück.
+    const cacheAtTrigger = loadRelevanceCache(vaultPath)
     const candidates = notesRef.current.filter(note => {
       const kind = getNoteKindFromContent(note.content) || getNoteKindFromTitleStrict(note.title)
       if (kind?.id !== 'problem') return false
       if (getNoteStatus(note).status !== 'open') return false
       if (forceRefresh) return true
-      const ai = getNoteRelevance(note)
-      if (!ai.checkedAt) return true
-      const checkedAtMs = new Date(ai.checkedAt).getTime()
+      const cached = cacheAtTrigger[note.path]
+      const checkedAtIso = cached?.checkedAt ?? getNoteRelevance(note).checkedAt
+      if (!checkedAtIso) return true
+      const checkedAtMs = new Date(checkedAtIso).getTime()
       if (Number.isNaN(checkedAtMs)) return true
       if (now - checkedAtMs > refreshMs) return true
       return false
@@ -1094,19 +1146,25 @@ const RadarWidget: React.FC<RadarWidgetProps> = ({ snapshot, notes, vaultPath, o
               return
             }
             console.log(`[Radar] AI analyzed "${note.title}" → score=${result.score}, reason="${result.reason}"`)
-            const fullPath = `${vaultPath}/${note.path}`
-            const currentContent = note.content || await window.electronAPI.readFile(fullPath)
-            const nextContent = setNoteRelevanceInContent(currentContent, {
-              score: result.score,
-              reason: result.reason,
-              isoDate: result.checkedAt,
-              model: result.model
-            })
-            await window.electronAPI.writeFile(fullPath, nextContent)
-            // modifiedAt explizit auf checkedAt setzen (statt new Date()), damit das Worker-Update
-            // selbst keine modifiedAt > checkedAt-Differenz erzeugt. Watcher kann später drüber
-            // schreiben, aber dafür gibt es die 5-Minuten-Toleranz im Filter.
-            updateNote(note.id, { content: nextContent, modifiedAt: new Date(result.checkedAt) })
+            // Statt das Notiz-Frontmatter zu schreiben (vorher: Sync-Konflikt-Quelle Nr. 1 bei
+            // Multi-Device-Setups), legen wir das Ergebnis nur lokal in localStorage ab. Die Datei
+            // selbst wird durch eine Analyse nicht mehr verändert → kein modifiedAt-Bump → kein
+            // Sync-Push. State-Update triggert Re-Render des Radar-Snapshots.
+            if (canUpdateLocalState) {
+              setRelevanceCache(prev => {
+                const next = {
+                  ...prev,
+                  [note.path]: {
+                    score: result.score,
+                    reason: result.reason,
+                    checkedAt: result.checkedAt,
+                    model: result.model
+                  }
+                }
+                saveRelevanceCache(vaultPath, next)
+                return next
+              })
+            }
           } catch (err) {
             console.error('[Radar] AI analyze threw for', note.path, err)
           } finally {
@@ -1138,7 +1196,7 @@ const RadarWidget: React.FC<RadarWidgetProps> = ({ snapshot, notes, vaultPath, o
       // The batch intentionally keeps running after unmount. A quick dashboard re-open should
       // reuse the singleton lock instead of aborting and starting another Ollama batch.
     }
-  }, [vaultPath, aiEnabled, aiModel, forceRefreshTick, radarAiRefreshIntervalHours, updateNote])
+  }, [vaultPath, aiEnabled, aiModel, forceRefreshTick, radarAiRefreshIntervalHours])
 
   const correctionCandidates = React.useMemo(() => {
     if (!correction) return []
