@@ -115,10 +115,10 @@ const helpTopics: HelpTopic[] = [
   // Integrations cluster
   { id: 'email', label: 'Email', icon: 'email', color: '#10b981', category: 'integrate',
     details: ['IMAP-Empfang direkt in MindGraph', 'KI-Analyse: Relevanz, Sentiment, Tasks', 'Emails schreiben und per SMTP senden', 'KI-Chat ueber einzelne Emails'],
-    action: { id: 'openSettingsTab', label: 'Email einrichten', settingsTab: 'integrations' } },
-  { id: 'agent', label: 'Agent', icon: 'agent', color: '#10b981', category: 'integrate',
+    action: { id: 'openSettingsTab', label: 'Email einrichten', settingsTab: 'email' } },
+  { id: 'agent', label: 'Edoobox', icon: 'agent', color: '#10b981', category: 'integrate',
     details: ['edoobox: Veranstaltungen importieren und pflegen', 'WordPress: Blog-Posts automatisch publizieren', 'KI-Content-Generierung mit Ollama', 'IQ-Auswertung aus vergangenen Veranstaltungen'],
-    action: { id: 'openSettingsTab', label: 'Agent einrichten', settingsTab: 'agents' } },
+    action: { id: 'openSettingsTab', label: 'Edoobox einrichten', settingsTab: 'agents' } },
   { id: 'research', label: 'Forschung', icon: 'book', color: '#10b981', category: 'integrate',
     details: ['Semantic Scholar: Paper suchen', 'Zotero-Bibliothek durchsuchen (⌘⇧Z)', 'Readwise-Highlights synchronisieren', 'Zitate direkt in Notizen einfuegen'] },
   { id: 'devices', label: 'Geraete', icon: 'remarkable', color: '#10b981', category: 'integrate',

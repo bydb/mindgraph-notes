@@ -199,6 +199,12 @@ body {
   transform: scale(1);
 }
 
+/* Aufgaben & Termine sitzt direkt unter der App-Header-Leiste: Header-Tooltips nach unten anzeigen. */
+.overdue-panel-header [data-tooltip]::after {
+  bottom: auto;
+  top: calc(100% + 6px);
+}
+
 /* Inbox Detail-Action Tooltips nach unten, links-ausgerichtet */
 .inbox-action-btn[data-tooltip]::after {
   bottom: auto;
@@ -9644,11 +9650,50 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  padding: 12px;
-  margin: 8px 12px;
+  padding: 14px;
+  margin: 0;
   background: var(--bg-secondary);
+  border: none;
+  border-radius: 0 0 var(--radius-md) var(--radius-md);
+}
+
+.overdue-quickadd-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2100;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 92px 20px 20px;
+  background: rgba(0, 0, 0, 0.18);
+}
+
+.overdue-quickadd-modal {
+  width: min(520px, calc(100vw - 40px));
+  max-height: calc(100vh - 120px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--bg-primary);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
+  box-shadow: var(--shadow-xl);
+}
+
+.overdue-quickadd-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 44px;
+  padding: 0 14px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.overdue-quickadd-modal-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
 }
 
 .overdue-quickadd-text {
@@ -9666,7 +9711,8 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
 }
 
 .overdue-quickadd-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
   gap: 6px;
 }
 
@@ -9735,6 +9781,22 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
   color: #dc2626;
   border-radius: var(--radius-md);
   font-size: 12px;
+}
+
+@media (max-width: 640px) {
+  .overdue-quickadd-overlay {
+    align-items: stretch;
+    padding: 72px 12px 12px;
+  }
+
+  .overdue-quickadd-modal {
+    width: 100%;
+    max-height: calc(100vh - 84px);
+  }
+
+  .overdue-quickadd-row {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* Section „Undatiert" */
@@ -9862,6 +9924,91 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
 .inbox-panel-close:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.inbox-panel-compose-shell {
+  min-height: 220px;
+}
+
+.inbox-compose-shell-empty {
+  flex: 1;
+  display: grid;
+  place-items: center;
+  gap: 10px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.inbox-compose-shell-empty svg {
+  opacity: 0.55;
+}
+
+.inbox-compose-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px;
+  background: rgba(18, 18, 20, 0.28);
+  backdrop-filter: blur(2px);
+}
+
+.inbox-compose-modal {
+  width: min(860px, calc(100vw - 64px));
+  height: min(760px, calc(100vh - 64px));
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.28);
+}
+
+.inbox-compose-modal-header {
+  height: 46px;
+  min-height: 46px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 14px 0 18px;
+  border-bottom: 1px solid var(--border-color);
+  background: color-mix(in srgb, var(--bg-primary) 88%, var(--bg-secondary));
+}
+
+.inbox-compose-modal-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.inbox-compose-modal-title svg {
+  color: var(--text-muted);
+  flex: 0 0 auto;
+}
+
+.inbox-compose-modal-body {
+  flex: 1;
+  min-height: 0;
+}
+
+@media (max-width: 760px) {
+  .inbox-compose-overlay {
+    padding: 12px;
+  }
+
+  .inbox-compose-modal {
+    width: calc(100vw - 24px);
+    height: calc(100vh - 24px);
+  }
 }
 
 .inbox-filter-bar {

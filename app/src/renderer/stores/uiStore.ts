@@ -419,7 +419,7 @@ export const MODULES: ModuleDescriptor[] = [
   { id: 'smart-connections',label: 'Smart Connections',description: 'Semantisch ähnliche Notizen finden', category: 'ai' },
   { id: 'language-tool',    label: 'LanguageTool',     description: 'Grammatik- und Rechtschreibprüfung im Editor', category: 'ai' },
   { id: 'email',            label: 'Email-Client',     description: 'IMAP/SMTP + KI-Analyse + Entwurfshilfe', category: 'communication' },
-  { id: 'mz-suite',         label: 'Medienzentrum-Suite',description: 'edoobox + Marketing (WordPress) + IQ-Auswertung + Formularimport', category: 'business' },
+  { id: 'mz-suite',         label: 'Edoobox Modul',description: 'edoobox + Marketing (WordPress) + IQ-Auswertung + Formularimport', category: 'business' },
   { id: 'flashcards',       label: 'Flashcards & Quiz',description: 'Karteikarten mit Spaced Repetition und Quiz-Modus', category: 'learning' },
   { id: 'semantic-scholar', label: 'Semantic Scholar', description: 'Wissenschaftliche Paper durchsuchen und zitieren', category: 'research' },
   { id: 'zotero',           label: 'Zotero',           description: 'Bibliothek durchsuchen, Zitate einfügen (⌘⇧Z)', category: 'research', iconText: 'Z', iconColor: '#cc2936' },

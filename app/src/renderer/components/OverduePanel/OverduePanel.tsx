@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { useNotesStore } from '../../stores/notesStore'
 import { useUIStore } from '../../stores/uiStore'
 import { useTranslation } from '../../utils/translations'
@@ -31,6 +32,15 @@ function fromDatetimeLocal(s: string): Date | undefined {
   return isNaN(parsed.getTime()) ? undefined : parsed
 }
 
+function getTodayStart(): Date {
+  const now = new Date()
+  return new Date(now.getFullYear(), now.getMonth(), now.getDate())
+}
+
+function isBeforeToday(date: Date): boolean {
+  return date < getTodayStart()
+}
+
 // ============ TASK CARD ============
 const TaskCard: React.FC<{
   task: TaskEntry
@@ -61,7 +71,7 @@ const TaskCard: React.FC<{
       .slice(0, 5)
   }, [tagDraft, availableTags, task.tags])
 
-  const isOverdueNow = task.dueDate ? task.dueDate < new Date() : false
+  const isOverdueNow = task.dueDate ? isBeforeToday(task.dueDate) : false
 
   const commit = async (updates: Partial<ExtractedTask>): Promise<void> => {
     setSaving(true)
@@ -471,8 +481,7 @@ export const OverduePanel: React.FC<OverduePanelProps> = ({ onClose }) => {
     loadTasks()
   }, [notes, vaultPath, taskExcludedFolders, reloadTick])
 
-  const now = new Date()
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const today = getTodayStart()
   const tomorrow = new Date(today.getTime() + 24 * 60 * 60 * 1000)
 
   const overdueTasks = allTasks.filter(t => t.dueDate && t.dueDate < today)
@@ -608,14 +617,28 @@ export const OverduePanel: React.FC<OverduePanelProps> = ({ onClose }) => {
         <div className="overdue-error-banner">{errorBanner}</div>
       )}
 
-      {quickAddOpen && (
-        <QuickAdd
-          availableTags={availableTags}
-          destinationOptions={destinationOptions}
-          defaultDestination={destinationOptions[0]?.path || '00 - Inbox/Tasks.md'}
-          onAdd={handleCreateTask}
-          onCancel={() => setQuickAddOpen(false)}
-        />
+      {quickAddOpen && createPortal(
+        <div className="overdue-quickadd-overlay" onMouseDown={() => setQuickAddOpen(false)}>
+          <div className="overdue-quickadd-modal" onMouseDown={e => e.stopPropagation()}>
+            <div className="overdue-quickadd-modal-header">
+              <div className="overdue-quickadd-modal-title">{t('tasks.addNew')}</div>
+              <button className="overdue-panel-close" onClick={() => setQuickAddOpen(false)} title={t('panel.close')}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18"/>
+                  <line x1="6" y1="6" x2="18" y2="18"/>
+                </svg>
+              </button>
+            </div>
+            <QuickAdd
+              availableTags={availableTags}
+              destinationOptions={destinationOptions}
+              defaultDestination={destinationOptions[0]?.path || '00 - Inbox/Tasks.md'}
+              onAdd={handleCreateTask}
+              onCancel={() => setQuickAddOpen(false)}
+            />
+          </div>
+        </div>,
+        document.body
       )}
 
       <div className="overdue-panel-content">

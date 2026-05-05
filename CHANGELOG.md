@@ -2,6 +2,26 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.5.32-beta] - 2026-05-05
+
+### Improvements
+
+- **Settings-Tabs entkoppelt: „Email" und „Edoobox" sind jetzt eigene Tabs**: vorher steckten beide unter einem gemeinsamen „Agenten"-Tab, was die Email-Settings de facto unauffindbar machte. Email hat jetzt einen eigenen Sidebar-Eintrag mit Briefumschlag-Icon (sichtbar nur wenn `email`-Modul aktiv); der frühere Tab heißt nun „Edoobox" und enthält nur noch edoobox/Marketing/IQ. Routing aus dem Credentials-Health-Check zeigt entsprechend auf den neuen `email`-Tab.
+- **Modul-Naming entpersonalisiert: „Medienzentrum-Suite" → „Edoobox Modul"**: konsistent durchgezogen über Modul-Liste, Settings-Tab-Label, Help-Guide und beide Sprachen. „Medienzentrum" war ein interner Branchenbegriff, „Edoobox" beschreibt das, was das Modul tatsächlich macht.
+- **Tasks-Panel umbenannt: „Überfällige Tasks" → „Aufgaben & Termine"**: das Panel zeigte schon immer überfällig + heute + morgen + undatiert — der alte Titel suggerierte fälschlich „nur Überfälliges". Titlebar-Tooltip, Panel-Header, Loading-State und Empty-State alle synchronisiert (DE+EN).
+- **Compose & Quick-Add als Modal-Overlays via `createPortal`**: vorher wurde der Compose-View in das schmale rechte Inbox-Panel gequetscht — kaum nutzbar. Jetzt zentriertes Modal (860×760, Blur-Backdrop), das ursprüngliche Panel zeigt einen Empty-State mit Stift-Icon. Quick-Add im Tasks-Panel analog (520×max, top-aligned, responsive). Portal hängt am `document.body`, damit weder Panel-Container noch Sidebar das Overlay clippen.
+- **Email-Instruktionen-Template entpersonalisiert**: das beim ersten Email-Setup angelegte `Email-Instruktionen.md` enthielt fest verdrahtet „Name: Jochen Leeder" und „Medienzentrum"-Spezifika als Relevanz-Kriterien. Jetzt generischer Platzhalter („Persönliche Ansprache", „Projekt-/Organisationsbezug", „Eigene Schlüsselwörter"). Bestehende Vaults sind nicht betroffen — nur Neueinrichtungen.
+- **Prompt-Injection-Warnbanner aus Inbox-Panel entfernt**, durch dezenteren Hinweis im Email-Settings-Tab ersetzt („KI-Hinweis — E-Mails sind untrusted Input. Lokale KI empfohlen.").
+
+### Fixes
+
+- **„Heute fällig" wurde ab Nachmittag fälschlich als „überfällig" markiert**: `isOverdue(date)` verglich gegen `new Date()` statt gegen den Tagesanfang — eine Aufgabe mit Fälligkeit heute 00:00 galt ab 00:01 als überfällig. Vergleicht jetzt gegen `todayStart` (Mitternacht heute), womit Tasks erst ab dem Folgetag rotzeigend werden. Fix in `taskExtractor.ts` (vault-weit, betrifft auch Dashboard-Counter) + `OverduePanel.tsx`.
+
+### Internal
+
+- **`main/index.ts`-Email-Sektion entboilerplatet**: vier IPC-Handler hatten je ihren eigenen safeStorage- und Settings-Lese-Boilerplate inline. Zentrale Helper (`loadEmailPassword`, `loadEmailSettings`, `getEmailRetainDays`, `sendEmailWindowEvent`) plus Konstanten (`DEFAULT_EMAIL_RETAIN_DAYS`, `DEFAULT_EMAIL_INSTRUCTION_NOTE`, `DEFAULT_EMAIL_INSTRUCTIONS`) ersetzen ~120 Zeilen Duplikation. Kein Verhaltens-Change.
+- **`EmailAccount.fromAddress?: string`** im Type — Vorbereitung für separate From-Address vs. IMAP-User in einem späteren Schritt.
+
 ## [0.5.31-beta] - 2026-05-04
 
 ### Fixes

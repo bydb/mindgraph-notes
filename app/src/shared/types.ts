@@ -1037,6 +1037,7 @@ export interface EmailAccount {
   host: string
   port: number
   user: string
+  fromAddress?: string
   tls: boolean
   smtpHost: string
   smtpPort: number

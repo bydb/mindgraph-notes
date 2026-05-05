@@ -5339,6 +5339,80 @@ function getEmailCredentialsPath(accountId: string): string {
   return path.join(app.getPath('userData'), `email-${accountId}.enc`)
 }
 
+type EmailSettingsSnapshot = {
+  retainDays?: number
+  instructionNotePath?: string
+}
+
+const DEFAULT_EMAIL_RETAIN_DAYS = 30
+const DEFAULT_EMAIL_INSTRUCTION_NOTE = 'Email-Instruktionen.md'
+const DEFAULT_EMAIL_INSTRUCTIONS = `---
+tags:
+  - system
+  - email
+---
+
+# Email-Analyse Instruktionen
+
+Diese Notiz steuert, wie die KI eingehende E-Mails bewertet. Passe die Kriterien an deine Bedürfnisse an.
+
+## Relevanz-Kriterien
+
+Eine E-Mail ist **relevant**, wenn mindestens eines der folgenden Kriterien zutrifft:
+
+1. **Termine & Fristen**: Die E-Mail enthält konkrete Termine, Deadlines oder zeitliche Verbindlichkeiten
+2. **Verbindlichkeiten**: Es werden Aufgaben, Zusagen oder Handlungsaufforderungen an mich gerichtet
+3. **Veranstaltungen**: Der Kontext hat mit Veranstaltungen, Events, Konferenzen oder Fortbildungen zu tun
+4. **Persönliche Ansprache**: Ich werde namentlich oder direkt angesprochen
+5. **Projekt-/Organisationsbezug**: Die E-Mail erwähnt eines meiner aktiven Projekte, Teams oder Verantwortungsbereiche
+6. **Eigene Schlüsselwörter**: Trage hier Begriffe ein, die für dich immer relevant sind
+
+## Was NICHT relevant ist
+
+- Newsletter und automatische Benachrichtigungen
+- Allgemeine Rundmails ohne persönlichen Bezug
+- Werbung und Spam
+- Automatische Bestätigungen (Versand, Registrierung etc.)
+
+## Gewünschte Aktionen
+
+Wenn eine E-Mail relevant ist, extrahiere:
+- **Termine** mit Datum und Uhrzeit
+- **Aufgaben** die ich erledigen muss
+- **Kontaktpersonen** und deren Rolle
+- **Orte** von Veranstaltungen
+- **Fristen** bis wann etwas erledigt sein muss
+`
+
+async function loadEmailPassword(accountId: string): Promise<string | null> {
+  if (!safeStorage.isEncryptionAvailable()) return null
+  try {
+    const encrypted = await fs.readFile(getEmailCredentialsPath(accountId))
+    return safeStorage.decryptString(encrypted)
+  } catch {
+    return null
+  }
+}
+
+async function loadEmailSettings(): Promise<EmailSettingsSnapshot> {
+  try {
+    const settingsRaw = await fs.readFile(getUISettingsPath(), 'utf-8')
+    const settings = JSON.parse(settingsRaw) as { email?: EmailSettingsSnapshot }
+    return settings.email || {}
+  } catch {
+    return {}
+  }
+}
+
+async function getEmailRetainDays(): Promise<number> {
+  const settings = await loadEmailSettings()
+  return settings.retainDays || DEFAULT_EMAIL_RETAIN_DAYS
+}
+
+function sendEmailWindowEvent(channel: string, payload: object): void {
+  mainWindow?.webContents.send(channel, payload)
+}
+
 // Email-Passwort speichern (safeStorage)
 ipcMain.handle('email-save-password', async (_event, accountId: string, password: string) => {
   try {
@@ -5357,28 +5431,14 @@ ipcMain.handle('email-save-password', async (_event, accountId: string, password
 
 // Email-Passwort laden (safeStorage)
 ipcMain.handle('email-load-password', async (_event, accountId: string) => {
-  try {
-    if (!safeStorage.isEncryptionAvailable()) {
-      return null
-    }
-    const encrypted = await fs.readFile(getEmailCredentialsPath(accountId))
-    return safeStorage.decryptString(encrypted)
-  } catch {
-    return null
-  }
+  return loadEmailPassword(accountId)
 })
 
 // Email-Verbindungstest
 ipcMain.handle('email-connect', async (_event, account: { host: string; port: number; user: string; tls: boolean; id: string }) => {
   try {
     const { ImapFlow } = await import('imapflow')
-    const password = await (async () => {
-      if (!safeStorage.isEncryptionAvailable()) return null
-      try {
-        const encrypted = await fs.readFile(getEmailCredentialsPath(account.id))
-        return safeStorage.decryptString(encrypted)
-      } catch { return null }
-    })()
+    const password = await loadEmailPassword(account.id)
 
     if (!password) {
       return { success: false, error: 'Kein Passwort gespeichert' }
@@ -5415,13 +5475,7 @@ ipcMain.handle('email-load', async (_event, vaultPath: string) => {
     const data = JSON.parse(content)
 
     // Alte E-Mails nach retainDays bereinigen
-    let retainDays = 30
-    try {
-      const settingsPath = path.join(app.getPath('userData'), 'ui-settings.json')
-      const settingsRaw = await fs.readFile(settingsPath, 'utf-8')
-      const settings = JSON.parse(settingsRaw)
-      retainDays = settings.email?.retainDays || 30
-    } catch { /* Default 30 */ }
+    const retainDays = await getEmailRetainDays()
 
     if (Array.isArray(data.emails)) {
       const cutoff = new Date(Date.now() - retainDays * 24 * 60 * 60 * 1000).toISOString()
@@ -5477,22 +5531,14 @@ ipcMain.handle('email-fetch', async (_event, vaultPath: string, accounts: Array<
     for (const account of accounts) {
       try {
         // Passwort laden
-        const password = await (async () => {
-          if (!safeStorage.isEncryptionAvailable()) return null
-          try {
-            const encrypted = await fs.readFile(getEmailCredentialsPath(account.id))
-            return safeStorage.decryptString(encrypted)
-          } catch { return null }
-        })()
+        const password = await loadEmailPassword(account.id)
 
         if (!password) {
           console.warn(`[Email] No password for account ${account.id}`)
           continue
         }
 
-        if (mainWindow) {
-          mainWindow.webContents.send('email-fetch-progress', { current: 0, total: 0, status: `Verbinde mit ${account.host}...` })
-        }
+        sendEmailWindowEvent('email-fetch-progress', { current: 0, total: 0, status: `Verbinde mit ${account.host}...` })
 
         const client = new ImapFlow({
           host: account.host,
@@ -5514,13 +5560,7 @@ ipcMain.handle('email-fetch', async (_event, vaultPath: string, accounts: Array<
 
         try {
           // retainDays als harte Grenze — niemals ältere E-Mails abrufen
-          let retainDays = 30
-          try {
-            const settingsPath = path.join(app.getPath('userData'), 'ui-settings.json')
-            const settingsRaw = await fs.readFile(settingsPath, 'utf-8')
-            const settings = JSON.parse(settingsRaw)
-            retainDays = settings.email?.retainDays || 30
-          } catch { /* Default 30 */ }
+          const retainDays = await getEmailRetainDays()
           const retainLimit = new Date(Date.now() - retainDays * 24 * 60 * 60 * 1000)
           const lastFetched = lastFetchedAt[account.id] ? new Date(lastFetchedAt[account.id]) : null
           // Bei Ersteinrichtung (kein lastFetched): nur letzte 3 Tage laden
@@ -5553,9 +5593,7 @@ ipcMain.handle('email-fetch', async (_event, vaultPath: string, accounts: Array<
             messages.sort((a, b) => b.uid - a.uid)
           }
 
-          if (mainWindow) {
-            mainWindow.webContents.send('email-fetch-progress', { current: 0, total: messages.length, status: `${messages.length} Nachrichten verarbeiten...` })
-          }
+          sendEmailWindowEvent('email-fetch-progress', { current: 0, total: messages.length, status: `${messages.length} Nachrichten verarbeiten...` })
 
           for (let i = 0; i < messages.length; i++) {
             const msg = messages[i]
@@ -5621,9 +5659,7 @@ ipcMain.handle('email-fetch', async (_event, vaultPath: string, accounts: Array<
             })
 
             totalProcessed++
-            if (mainWindow) {
-              mainWindow.webContents.send('email-fetch-progress', { current: i + 1, total: messages.length, status: `Nachricht ${i + 1}/${messages.length}` })
-            }
+            sendEmailWindowEvent('email-fetch-progress', { current: i + 1, total: messages.length, status: `Nachricht ${i + 1}/${messages.length}` })
           }
 
           updatedLastFetchedAt[account.id] = new Date().toISOString()
@@ -5667,10 +5703,8 @@ ipcMain.handle('email-analyze', async (_event, vaultPath: string, model: string,
     // Settings werden über den Store geladen - hier lesen wir die Instruktions-Notiz
     let instructionContent = ''
     try {
-      const settingsPath = path.join(app.getPath('userData'), 'ui-settings.json')
-      const settingsRaw = await fs.readFile(settingsPath, 'utf-8')
-      const settings = JSON.parse(settingsRaw)
-      const instructionNotePath = settings.email?.instructionNotePath
+      const settings = await loadEmailSettings()
+      const instructionNotePath = settings.instructionNotePath
       if (instructionNotePath) {
         const fullPath = validatePath(vaultPath, instructionNotePath)
         instructionContent = await fs.readFile(fullPath, 'utf-8')
@@ -5690,9 +5724,7 @@ ipcMain.handle('email-analyze', async (_event, vaultPath: string, model: string,
     for (let i = 0; i < toAnalyze.length; i++) {
       const email = toAnalyze[i] as { id: string; from: { name: string; address: string }; subject: string; date: string; bodyText: string }
 
-      if (mainWindow) {
-        mainWindow.webContents.send('email-analysis-progress', { current: i + 1, total: toAnalyze.length })
-      }
+      sendEmailWindowEvent('email-analysis-progress', { current: i + 1, total: toAnalyze.length })
 
       try {
         const sanitizedBody = sanitizeUntrustedText(email.bodyText.substring(0, 3000))
@@ -5951,7 +5983,7 @@ ipcMain.handle('email-setup', async (_event, vaultPath: string, inboxFolderName?
     assertApprovedVault(vaultPath, 'email-setup')
     const folderName = inboxFolderName || '‼️📧 - emails'
     const inboxFolder = validatePath(vaultPath, folderName)
-    const instructionPath = path.join(vaultPath, 'Email-Instruktionen.md')
+    const instructionPath = path.join(vaultPath, DEFAULT_EMAIL_INSTRUCTION_NOTE)
 
     // Ordner erstellen
     await fs.mkdir(inboxFolder, { recursive: true })
@@ -5962,47 +5994,11 @@ ipcMain.handle('email-setup', async (_event, vaultPath: string, inboxFolderName?
       await fs.access(instructionPath)
       console.log('[Email] Instruction note already exists')
     } catch {
-      const instructionContent = `---
-tags:
-  - system
-  - email
----
-
-# Email-Analyse Instruktionen
-
-Diese Notiz steuert, wie die KI eingehende E-Mails bewertet. Passe die Kriterien an deine Bedürfnisse an.
-
-## Relevanz-Kriterien
-
-Eine E-Mail ist **relevant**, wenn mindestens eines der folgenden Kriterien zutrifft:
-
-1. **Termine & Fristen**: Die E-Mail enthält konkrete Termine, Deadlines oder zeitliche Verbindlichkeiten
-2. **Verbindlichkeiten**: Es werden Aufgaben, Zusagen oder Handlungsaufforderungen an mich gerichtet
-3. **Veranstaltungen**: Der Kontext hat mit Veranstaltungen, Events, Konferenzen oder Fortbildungen zu tun
-4. **Persönliche Ansprache**: Ich werde namentlich angesprochen (Name: Jochen Leeder)
-5. **Medienzentrum**: Das Wort "Medienzentrum" taucht im Betreff oder Text auf
-
-## Was NICHT relevant ist
-
-- Newsletter und automatische Benachrichtigungen
-- Allgemeine Rundmails ohne persönlichen Bezug
-- Werbung und Spam
-- Automatische Bestätigungen (Versand, Registrierung etc.)
-
-## Gewünschte Aktionen
-
-Wenn eine E-Mail relevant ist, extrahiere:
-- **Termine** mit Datum und Uhrzeit
-- **Aufgaben** die ich erledigen muss
-- **Kontaktpersonen** und deren Rolle
-- **Orte** von Veranstaltungen
-- **Fristen** bis wann etwas erledigt sein muss
-`
-      await fs.writeFile(instructionPath, instructionContent, 'utf-8')
+      await fs.writeFile(instructionPath, DEFAULT_EMAIL_INSTRUCTIONS, 'utf-8')
       console.log('[Email] Instruction note created:', instructionPath)
     }
 
-    return { success: true, folderPath: folderName, instructionPath: 'Email-Instruktionen.md' }
+    return { success: true, folderPath: folderName, instructionPath: DEFAULT_EMAIL_INSTRUCTION_NOTE }
   } catch (error) {
     console.error('[Email] Setup failed:', error)
     return { success: false, error: error instanceof Error ? error.message : 'Setup fehlgeschlagen' }
@@ -6340,14 +6336,8 @@ ipcMain.handle('email-send', async (_event, composeData: {
     const nodemailer = await import('nodemailer')
 
     // Passwort laden (gleich wie IMAP)
-    if (!safeStorage.isEncryptionAvailable()) {
-      return { success: false, error: 'safeStorage nicht verfuegbar' }
-    }
-    let password: string
-    try {
-      const encrypted = await fs.readFile(getEmailCredentialsPath(composeData.accountId))
-      password = safeStorage.decryptString(encrypted)
-    } catch {
+    const password = await loadEmailPassword(composeData.accountId)
+    if (!password) {
       return { success: false, error: 'Kein Passwort gespeichert' }
     }
 

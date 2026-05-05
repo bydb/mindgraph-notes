@@ -26,7 +26,7 @@ interface SettingsProps {
   initialTab?: Tab
 }
 
-type Tab = 'vault' | 'general' | 'editor' | 'templates' | 'integrations' | 'shortcuts' | 'dataview' | 'sync' | 'dailyNote' | 'remarkable' | 'agents' | 'transport' | 'dashboard' | 'modules' | 'speech' | 'telegram' | 'credentials'
+type Tab = 'vault' | 'general' | 'editor' | 'templates' | 'integrations' | 'shortcuts' | 'dataview' | 'sync' | 'dailyNote' | 'remarkable' | 'email' | 'agents' | 'transport' | 'dashboard' | 'modules' | 'speech' | 'telegram' | 'credentials'
 
 type BuiltInTemplateKey = 'empty' | 'dailyNote' | 'zettel' | 'meeting'
 
@@ -1469,7 +1469,7 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab 
 
   // Zotero Status prüfen
   useEffect(() => {
-    if (isOpen && (activeTab === 'integrations' || activeTab === 'agents')) {
+    if (isOpen && (activeTab === 'integrations' || activeTab === 'email' || activeTab === 'agents')) {
       checkZoteroConnection()
       checkOllamaConnection()
       checkLmstudioConnection()
@@ -2028,7 +2028,20 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab 
               </svg>
               {t('settings.tab.integrations')}
             </button>
-            {/* MZ-Suite-Tab: nur wenn Modul aktiv */}
+            {/* Email-Tab: nur wenn Modul aktiv */}
+            {isModuleEnabled('email') && (
+              <button
+                className={`settings-nav-item ${activeTab === 'email' ? 'active' : ''}`}
+                onClick={() => setActiveTab('email')}
+              >
+                <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+                  <rect x="2.5" y="4" width="13" height="10" rx="1.8" stroke="currentColor" strokeWidth="1.5"/>
+                  <path d="M3.5 5.5L8.2 9.1a1.3 1.3 0 001.6 0l4.7-3.6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+                {t('settings.email.title')}
+              </button>
+            )}
+            {/* Edoobox-Tab: nur wenn Modul aktiv */}
             {isModuleEnabled('mz-suite') && (
               <button
                 className={`settings-nav-item ${activeTab === 'agents' ? 'active' : ''}`}
@@ -4252,8 +4265,8 @@ LIMIT 10
               </div>
             )}
 
-            {/* Agenten Tab */}
-            {activeTab === 'agents' && (
+            {/* Email Tab */}
+            {activeTab === 'email' && (
               <div className="settings-section">
                 {/* Email Integration */}
                 <h3>{t('settings.email.title')}</h3>
@@ -4605,9 +4618,12 @@ LIMIT 10
                     </div>
                   </>
                 )}
+              </div>
+            )}
 
-                <div className="settings-divider" />
-
+            {/* Edoobox Tab */}
+            {activeTab === 'agents' && (
+              <div className="settings-section">
                 <div className="settings-section-header-with-logo">
                   <img src={new URL('../../assets/edoobox-logo.png', import.meta.url).href} alt="edoobox" className="settings-edoobox-logo" />
                 </div>

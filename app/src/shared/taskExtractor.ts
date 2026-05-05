@@ -56,7 +56,9 @@ function cleanTaskText(text: string): string {
 }
 
 function isOverdue(date: Date): boolean {
-  return date < new Date()
+  const todayStart = new Date()
+  todayStart.setHours(0, 0, 0, 0)
+  return date < todayStart
 }
 
 function isCriticalTask(text: string): boolean {

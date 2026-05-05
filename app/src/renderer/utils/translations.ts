@@ -298,7 +298,7 @@ const translations = {
     'titlebar.textSplit': 'Text-Split: Zwei Notizen vergleichen',
     'titlebar.settings': 'Einstellungen (Cmd+,)',
     'titlebar.transport': 'Schnellerfassung (Notiz schnell erfassen)',
-    'titlebar.overdue': 'Überfällige Aufgaben',
+    'titlebar.overdue': 'Aufgaben & Termine',
     'titlebar.tags': 'Tags anzeigen',
     'titlebar.smartConnections': 'Smart Connections',
     'titlebar.notesChat': 'Notes Chat (mit Notizen chatten)',
@@ -342,12 +342,12 @@ const translations = {
     // Panels
     'panel.close': 'Schließen',
     'panel.back': 'Zurück',
-    'panel.overdueTasks': 'Überfällige Tasks',
+    'panel.overdueTasks': 'Aufgaben & Termine',
 
     // Overdue Panel
-    'overdue.title': 'Termine',
-    'overdue.loading': 'Lade Termine...',
-    'overdue.noAppointments': 'Keine Termine',
+    'overdue.title': 'Aufgaben & Termine',
+    'overdue.loading': 'Lade Aufgaben...',
+    'overdue.noAppointments': 'Keine Aufgaben',
     'overdue.allDone': 'Alle Aufgaben sind erledigt!',
     'overdue.overdue': 'Überfällig',
     'overdue.today': 'Heute',
@@ -1129,7 +1129,7 @@ const translations = {
     'settings.email.analysisModel': 'Analyse-Modell',
     'settings.email.analysisModelDefault': 'Standard (globales Modell)',
     'settings.email.gmailHint': 'Gmail benötigt ein App-Passwort (Google-Konto → Sicherheit → App-Passwörter)',
-    'settings.email.warning': '⚠️ Experimentell — E-Mail-Inhalte werden an das KI-Modell weitergeleitet. Es besteht ein Prompt-Injection-Risiko: Bösartige E-Mails könnten die Analyse manipulieren. Nur zu Testzwecken mit lokaler KI verwenden (empfohlen: Ministral).',
+    'settings.email.warning': 'KI-Hinweis — E-Mails sind untrusted Input. Lokale KI empfohlen.',
 
     // Inbox Panel
     'inbox.title': 'Posteingang',
@@ -1584,7 +1584,7 @@ const translations = {
     'settings.vault.enableFirst': 'Dieses Feature muss zuerst eingerichtet werden',
 
     // Agents
-    'settings.tab.agents': 'Medienzentrum',
+    'settings.tab.agents': 'Edoobox',
     'settings.nav.basics': 'Grundlagen',
     'settings.nav.workflow': 'Workflow',
     'settings.nav.modules': 'Module',
@@ -2315,7 +2315,7 @@ const translations = {
     'titlebar.textSplit': 'Text-Split: Compare two notes',
     'titlebar.settings': 'Settings (Cmd+,)',
     'titlebar.transport': 'Quick Capture (capture a note fast)',
-    'titlebar.overdue': 'Overdue tasks',
+    'titlebar.overdue': 'Tasks & Due Dates',
     'titlebar.tags': 'Show tags',
     'titlebar.smartConnections': 'Smart Connections',
     'titlebar.notesChat': 'Notes Chat (chat with notes)',
@@ -2359,12 +2359,12 @@ const translations = {
     // Panels
     'panel.close': 'Close',
     'panel.back': 'Back',
-    'panel.overdueTasks': 'Overdue tasks',
+    'panel.overdueTasks': 'Tasks & Due Dates',
 
     // Overdue Panel
-    'overdue.title': 'Appointments',
-    'overdue.loading': 'Loading appointments...',
-    'overdue.noAppointments': 'No appointments',
+    'overdue.title': 'Tasks & Due Dates',
+    'overdue.loading': 'Loading tasks...',
+    'overdue.noAppointments': 'No tasks',
     'overdue.allDone': 'All tasks are done!',
     'overdue.overdue': 'Overdue',
     'overdue.today': 'Today',
@@ -3146,7 +3146,7 @@ const translations = {
     'settings.email.analysisModel': 'Analysis model',
     'settings.email.analysisModelDefault': 'Default (global model)',
     'settings.email.gmailHint': 'Gmail requires an App Password (Google Account → Security → App Passwords)',
-    'settings.email.warning': '⚠️ Experimental — Email contents are forwarded to the AI model. There is a prompt injection risk: malicious emails could manipulate the analysis. Use only for testing with local AI (recommended: Ministral).',
+    'settings.email.warning': 'AI note — emails are untrusted input. Local AI recommended.',
 
     // Inbox Panel
     'inbox.title': 'Inbox',
@@ -3600,7 +3600,7 @@ const translations = {
     'settings.vault.enableFirst': 'This feature needs to be set up first',
 
     // Agents
-    'settings.tab.agents': 'Media Center',
+    'settings.tab.agents': 'Edoobox',
     'settings.nav.basics': 'Basics',
     'settings.nav.workflow': 'Workflow',
     'settings.nav.modules': 'Modules',

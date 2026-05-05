@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react'
 import { useUIStore } from '../../stores/uiStore'
 
-type TabId = 'integrations' | 'agents' | 'telegram' | 'speech' | 'sync' | 'dashboard'
+type TabId = 'integrations' | 'email' | 'agents' | 'telegram' | 'speech' | 'sync' | 'dashboard'
 
 interface CredentialRow {
   id: string
@@ -86,7 +86,7 @@ export const CredentialsSettings: React.FC<Props> = ({ onNavigateToTab }) => {
         label: `Email-Passwort (${acc.name || acc.user})`,
         category: 'Kommunikation',
         note: `IMAP ${acc.host} · SMTP ${acc.smtpHost}`,
-        settingsTab: 'integrations',
+        settingsTab: 'email',
         checkSet: async () => {
           const pw = await window.electronAPI.emailLoadPassword(acc.id)
           return !!pw
