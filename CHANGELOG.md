@@ -2,6 +2,15 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.6.1-beta] - 2026-05-06
+
+### Improvements
+
+- **Dashboard-Refresh liest den Vault frisch von Disk**: Der Refresh-Button rebuildet nicht mehr nur den Snapshot aus dem In-Memory-Cache, sondern liest das Verzeichnis neu ein (`readDirectory` + `readFilesBatch`) und ersetzt die Notes im `notesStore`. Wichtig, wenn extern (anderes Gerät, Sync, externer Editor) geschrieben wurde und der Watcher das noch nicht aufgenommen hat — das Dashboard zeigt dann sofort den aktuellen Stand statt veraltete Karten.
+- **Race-Condition beim Refresh entschärft**: Über eine `loadRequestId` schreibt nur das letzte angeforderte Snapshot in den State. Schnelles Mehrfach-Klicken auf den Refresh-Button kann den jüngeren Snapshot nicht mehr durch einen älteren überschreiben.
+- **Visuelles Feedback während Refresh**: Das Refresh-Icon rotiert während des Reloads (bestehende `dashboard-view-spin`-Keyframe wiederverwendet), der Button ist `disabled` mit `cursor: progress` und 0.65 Opacity. Damit ist sichtbar, dass der Reload läuft — bei großen Vaults dauert das `readFilesBatch` spürbar.
+- **`pdfCompanionEnabled` wird respektiert**: Beim Refresh werden `.pdf.md`-Companions nur eingelesen, wenn das entsprechende Setting aktiv ist — konsistent mit dem regulären Vault-Load in der Sidebar.
+
 ## [0.6.0-beta] - 2026-05-05
 
 ### Features

@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { buildBrainSensors, getDayBoundsMs } from '../../utils/brainSensors'
-import { useNotesStore } from '../../stores/notesStore'
+import { createNoteFromFile, useNotesStore } from '../../stores/notesStore'
 import { useUIStore } from '../../stores/uiStore'
 import { useEmailStore } from '../../stores/emailStore'
 import { useAgentStore } from '../../stores/agentStore'
@@ -20,7 +20,7 @@ import {
 } from '../../utils/dashboardData'
 import type { DashboardWidgetId } from '../../stores/uiStore'
 import type { TranslationKey } from '../../utils/translations'
-import type { Note } from '../../../shared/types'
+import type { FileEntry, Note } from '../../../shared/types'
 import {
   getNoteKind,
   getNoteKindFromContent,
@@ -138,6 +138,46 @@ interface DashboardViewProps {
   onOpenAgent?: () => void
 }
 
+const collectMarkdownPaths = (entries: FileEntry[], includePdfCompanions: boolean): string[] => {
+  const paths: string[] = []
+  const walk = (items: FileEntry[]) => {
+    for (const item of items) {
+      if (item.isDirectory) {
+        if (item.children) walk(item.children)
+        continue
+      }
+      if (!item.path.endsWith('.md')) continue
+      if (!includePdfCompanions && item.path.endsWith('.pdf.md')) continue
+      paths.push(item.path)
+    }
+  }
+  walk(entries)
+  return paths
+}
+
+const reloadVaultNotesForDashboard = async (vaultPath: string): Promise<Note[]> => {
+  const tree = await window.electronAPI.readDirectory(vaultPath) as FileEntry[]
+  useNotesStore.getState().setFileTree(tree)
+
+  const includePdfCompanions = useUIStore.getState().pdfCompanionEnabled
+  const paths = collectMarkdownPaths(tree, includePdfCompanions)
+  const contents = await window.electronAPI.readFilesBatch(vaultPath, paths) as Record<string, string | null>
+  const notes = (await Promise.all(paths.map(async (relativePath) => {
+    const content = contents[relativePath]
+    if (content === null || content === undefined) return null
+    try {
+      return await createNoteFromFile(`${vaultPath}/${relativePath}`, relativePath, content)
+    } catch (error) {
+      console.error('[Dashboard] failed to refresh note from disk', relativePath, error)
+      return null
+    }
+  }))).filter((note): note is Note => note !== null)
+
+  notes.sort((a, b) => a.path.localeCompare(b.path))
+  useNotesStore.getState().setNotes(notes)
+  return notes
+}
+
 export const DashboardView: React.FC<DashboardViewProps> = ({ onOpenInbox, onOpenAgent }) => {
   const { t } = useTranslation()
   const { notes, vaultPath, selectNote } = useNotesStore()
@@ -147,6 +187,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onOpenInbox, onOpe
 
   const [snapshot, setSnapshot] = useState<DashboardSnapshot | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [isRefreshing, setIsRefreshing] = useState(false)
   const [radarFeedback, setRadarFeedback] = useState<RadarFeedback>({})
 
   useEffect(() => {
@@ -164,14 +205,20 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onOpenInbox, onOpe
   //   aus → Dashboard flackert permanent. Debounce sammelt Updates auf 800ms.
   const isInitialLoadRef = useRef(true)
   const loadDebounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const loadRequestIdRef = useRef(0)
 
-  const loadSnapshot = useCallback(async () => {
+  const loadSnapshot = useCallback(async (options?: { reloadVault?: boolean }) => {
+    const requestId = ++loadRequestIdRef.current
     if (isInitialLoadRef.current) setIsLoading(true)
+    if (options?.reloadVault) setIsRefreshing(true)
     try {
+      const snapshotNotes = options?.reloadVault && vaultPath
+        ? await reloadVaultNotesForDashboard(vaultPath)
+        : notes
       await loadDashboardOffers({ includeBookings: true })
       const latestOffers = useAgentStore.getState().dashboardOffers
       const snap = await buildDashboardSnapshot({
-        notes,
+        notes: snapshotNotes,
         vaultPath,
         excludedFolders: taskExcludedFolders,
         emails,
@@ -180,7 +227,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onOpenInbox, onOpe
         calendarDaysAhead: dashboard.calendarDaysAhead,
         includeCalendar: true
       })
-      setSnapshot(snap)
+      if (requestId === loadRequestIdRef.current) setSnapshot(snap)
     } catch (error) {
       // Defensive: ein einzelner fehlerhafter Sub-Call (edoobox-Timeout, Kalender-Permission-Race,
       // korruptes Frontmatter in einer Notiz) hat vorher die ganze Promise abgebrochen — der Effect
@@ -188,6 +235,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onOpenInbox, onOpe
       // hängen. Jetzt loggen wir und behalten den letzten gültigen Snapshot.
       console.error('[Dashboard] loadSnapshot failed', error)
     } finally {
+      if (requestId === loadRequestIdRef.current) setIsRefreshing(false)
       if (isInitialLoadRef.current) {
         setIsLoading(false)
         isInitialLoadRef.current = false
@@ -301,8 +349,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onOpenInbox, onOpe
           <h1 className="dashboard-view-title">{t('dashboard.title')}</h1>
           <p className="dashboard-view-date">{dateStr}</p>
         </div>
-        <button className="dashboard-view-refresh" onClick={loadSnapshot} title={t('dashboard.refresh')}>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <button className="dashboard-view-refresh" onClick={() => loadSnapshot({ reloadVault: true })} disabled={isRefreshing} title={t('dashboard.refresh')}>
+          <svg className={isRefreshing ? 'spinning' : undefined} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <polyline points="23 4 23 10 17 10"/>
             <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
           </svg>
