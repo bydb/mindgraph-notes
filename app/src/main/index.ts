@@ -279,6 +279,59 @@ async function assertSafePath(requestedPath: string, op: string): Promise<string
   throw new Error(`Pfad außerhalb erlaubter Vaults (${op})`)
 }
 
+function findApprovedRootForPath(filePath: string): string | null {
+  const resolved = path.resolve(filePath)
+  const roots = [...approvedVaultRoots].sort((a, b) => b.length - a.length)
+  return roots.find(root => isPathInside(resolved, root)) ?? null
+}
+
+function backupTimestamp(date = new Date()): string {
+  const pad = (value: number, length = 2) => String(value).padStart(length, '0')
+  return [
+    date.getFullYear(),
+    pad(date.getMonth() + 1),
+    pad(date.getDate()),
+    '-',
+    pad(date.getHours()),
+    pad(date.getMinutes()),
+    pad(date.getSeconds()),
+    '-',
+    pad(date.getMilliseconds(), 3)
+  ].join('')
+}
+
+async function backupMarkdownBeforeWrite(filePath: string, nextContent: string): Promise<void> {
+  if (path.extname(filePath).toLowerCase() !== '.md') return
+
+  let existingContent: string
+  try {
+    const stats = await fs.stat(filePath)
+    if (stats.size === 0) return
+    existingContent = await fs.readFile(filePath, 'utf-8')
+  } catch {
+    return
+  }
+
+  if (existingContent === nextContent) return
+
+  const root = findApprovedRootForPath(filePath)
+  if (!root) return
+
+  const now = new Date()
+  const relativePath = path.relative(root, filePath)
+  const backupDir = path.join(
+    root,
+    '.mindgraph',
+    'backups',
+    now.toISOString().slice(0, 10),
+    path.dirname(relativePath)
+  )
+  const backupName = `${path.basename(filePath)}.${backupTimestamp(now)}.bak`
+
+  await fs.mkdir(backupDir, { recursive: true })
+  await fs.writeFile(path.join(backupDir, backupName), existingContent, 'utf-8')
+}
+
 function createWindow(): void {
   // Icon-Pfad basierend auf Platform
   // Im Dev-Modus: app.getAppPath() zeigt auf das app-Verzeichnis
@@ -776,6 +829,22 @@ ipcMain.handle('read-file-binary', async (_event, filePath: string) => {
 ipcMain.handle('write-file', async (_event, filePath: string, content: string) => {
   try {
     const safe = await assertSafePath(filePath, 'write-file')
+    const isMarkdown = path.extname(safe).toLowerCase() === '.md'
+
+    if (isMarkdown && content.length === 0) {
+      try {
+        const existing = await fs.stat(safe)
+        if (existing.size > 0) {
+          throw new Error(`Blocked empty write to non-empty Markdown file: ${safe}`)
+        }
+      } catch (error) {
+        if (error instanceof Error && error.message.startsWith('Blocked empty write')) {
+          throw error
+        }
+      }
+    }
+
+    await backupMarkdownBeforeWrite(safe, content)
     await fs.writeFile(safe, content, 'utf-8')
   } catch (error) {
     console.error('Fehler beim Schreiben der Datei:', error)

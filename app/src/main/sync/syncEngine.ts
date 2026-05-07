@@ -740,6 +740,36 @@ export class SyncEngine {
       return
     }
 
+    const absPath = path.join(this.vaultPath, relativePath)
+
+    if (localFile.hash === remoteFile.hash) {
+      localManifest.files[relativePath].syncedAt = Date.now()
+      return
+    }
+
+    try {
+      const fileData = await this.requestFile(relativePath)
+      if (fileData) {
+        const ciphertext = Buffer.from(fileData.data, 'base64')
+        const iv = Buffer.from(fileData.iv, 'base64')
+        const tag = Buffer.from(fileData.tag, 'base64')
+        const remotePlaintext = decryptFile(ciphertext, this.key!, iv, tag)
+        const localPlaintext = await fs.readFile(absPath)
+
+        if (hashContent(localPlaintext) === hashContent(remotePlaintext)) {
+          localManifest.files[relativePath] = {
+            hash: hashContent(localPlaintext),
+            size: localPlaintext.length,
+            modifiedAt: Math.floor((await fs.stat(absPath)).mtimeMs),
+            syncedAt: Date.now()
+          }
+          return
+        }
+      }
+    } catch (error) {
+      console.warn('[Sync] Could not verify conflict identity:', relativePath, error)
+    }
+
     if (remoteFile.modifiedAt >= localFile.modifiedAt) {
       // Remote is newer — save local as conflict copy, then download remote
       const ext = path.extname(relativePath)
@@ -747,7 +777,6 @@ export class SyncEngine {
       const date = new Date().toISOString().split('T')[0]
       const conflictPath = `${base}.sync-conflict-${date}${ext}`
 
-      const absPath = path.join(this.vaultPath, relativePath)
       const conflictAbsPath = path.join(this.vaultPath, conflictPath)
 
       try {

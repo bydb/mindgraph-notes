@@ -369,9 +369,6 @@ md.renderer.rules.fence = (tokens, idx, options, env, self) => {
   const token = tokens[idx]
   const info = token.info.trim().toLowerCase()
 
-  // Debug logging
-  console.log('[FenceRenderer] info:', info, 'content length:', token.content.length)
-
   if (info === 'mermaid') {
     const code = token.content.trim()
     const id = `mermaid-${idx}-${Date.now()}`
@@ -585,6 +582,8 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
   // LanguageTool State
   const [ltMatches, setLtMatches] = useState<LanguageToolMatch[]>([])
   const [ltIsChecking, setLtIsChecking] = useState(false)
+  const [ltStatus, setLtStatus] = useState<'idle' | 'ok' | 'error'>('idle')
+  const [ltErrorMessage, setLtErrorMessage] = useState<string | null>(null)
   const [ltPopup, setLtPopup] = useState<{ x: number; y: number; match: LanguageToolPopupMatch } | null>(null)
   const ltCheckTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
@@ -942,6 +941,10 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
   const saveContent = useCallback(async (content: string) => {
     if (!selectedNote || !vaultPath) return
     if (content === lastSavedContentRef.current) return
+    if (content.length === 0 && lastSavedContentRef.current.length > 0) {
+      console.error('[MarkdownEditor] Blocked empty autosave for non-empty note:', selectedNote.path)
+      return
+    }
 
     setIsSaving(true)
 
@@ -1016,6 +1019,11 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
     const content = viewRef.current.state.doc.toString()
     if (!content.trim()) {
       setLtMatches([])
+      setLtStatus('idle')
+      setLtErrorMessage(null)
+      viewRef.current.dispatch({
+        effects: setLanguageToolMatches.of([])
+      })
       return
     }
 
@@ -1030,10 +1038,16 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
 
     if (!textToCheck.trim()) {
       setLtMatches([])
+      setLtStatus('idle')
+      setLtErrorMessage(null)
+      viewRef.current.dispatch({
+        effects: setLanguageToolMatches.of([])
+      })
       return
     }
 
     setLtIsChecking(true)
+    setLtErrorMessage(null)
     try {
       const mode = languageTool.mode || 'local'
       const result = await window.electronAPI.languagetoolAnalyze(
@@ -1061,6 +1075,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
         })
 
         setLtMatches(filteredMatches)
+        setLtStatus('ok')
         // Update CodeMirror decorations
         if (viewRef.current) {
           viewRef.current.dispatch({
@@ -1068,14 +1083,18 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
           })
         }
       } else {
+        setLtStatus('error')
+        setLtErrorMessage(result.error || t('languagetool.error'))
         console.error('[LanguageTool] Error:', result.error)
       }
     } catch (error) {
+      setLtStatus('error')
+      setLtErrorMessage(error instanceof Error ? error.message : t('languagetool.error'))
       console.error('[LanguageTool] Check failed:', error)
     } finally {
       setLtIsChecking(false)
     }
-  }, [languageTool.enabled, languageTool.language, languageTool.url, languageTool.mode, languageTool.apiUsername, languageTool.apiKey, languageTool.ignoredRules])
+  }, [languageTool.enabled, languageTool.language, languageTool.url, languageTool.mode, languageTool.apiUsername, languageTool.apiKey, languageTool.ignoredRules, t])
 
   // LanguageTool: Auto-Check bei Änderungen
   useEffect(() => {
@@ -1117,6 +1136,8 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
   // LanguageTool: Clear matches when note changes
   useEffect(() => {
     setLtMatches([])
+    setLtStatus('idle')
+    setLtErrorMessage(null)
     setLtPopup(null)
     if (viewRef.current) {
       viewRef.current.dispatch({
@@ -3032,7 +3053,11 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
               className={`lt-check-btn ${ltIsChecking ? 'checking' : ''}`}
               onClick={checkLanguageTool}
               disabled={ltIsChecking}
-              title={t('languagetool.check')}
+              title={ltErrorMessage || (ltStatus === 'ok'
+                ? (ltMatches.length > 0
+                  ? t('languagetool.errorsFound', { count: ltMatches.length })
+                  : t('languagetool.noErrors'))
+                : t('languagetool.check'))}
             >
               {ltIsChecking ? (
                 <svg width="16" height="16" viewBox="0 0 16 16" className="lt-spinner">
@@ -3043,8 +3068,15 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
                   <path d="M13.5 4.5L6 12L2.5 8.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
               )}
-              {t('languagetool.check')}
-              {ltMatches.length > 0 && (
+              {ltIsChecking
+                ? t('languagetool.checking')
+                : ltStatus === 'ok' && ltMatches.length === 0
+                  ? t('languagetool.noErrors')
+                  : t('languagetool.check')}
+              {ltStatus === 'error' && (
+                <span className="lt-error-badge">!</span>
+              )}
+              {ltStatus !== 'error' && ltMatches.length > 0 && (
                 <span className="lt-error-badge">{ltMatches.length}</span>
               )}
             </button>
