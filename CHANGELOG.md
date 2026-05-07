@@ -2,6 +2,18 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.6.2-beta] - 2026-05-07
+
+### Fixes
+
+- **Editor blockt leeren Autosave**: Wenn der Editor-State während einer Notiz auf "leer" zurückfällt (etwa durch einen UI-Glitch beim Tab-Wechsel oder ein Race beim Laden), schreibt der Autosave nicht mehr 0 Bytes über den vorherigen Inhalt. Stattdessen wird der Save verworfen und der Vorfall in der Konsole protokolliert.
+- **Phantom-Sync-Konflikte vermieden**: Bevor die Sync-Engine eine `.sync-conflict-YYYY-MM-DD`-Kopie erzeugt, wird die Remote-Datei jetzt entschlüsselt und der Plaintext-Hash mit der lokalen Datei verglichen. Identischer Inhalt → kein Conflict-File, nur Manifest-Update. Verhindert, dass nach einem Sync-Roundtrip identische Dateien als Konflikt aufschlagen.
+
+### Improvements
+
+- **Automatische Markdown-Backups vor jedem Schreiben**: Der `write-file`-IPC-Handler legt vor jedem Überschreiben einer `.md`-Datei eine Kopie unter `<vault>/.mindgraph/backups/JJJJ-MM-TT/<relpath>/<dateiname>.<timestamp>.bak` ab. Zusätzlich blockt der Handler leere Writes auf nicht-leere Markdown-Dateien hart auf Main-Prozess-Ebene — zweite Verteidigungslinie unabhängig vom Editor. Backups sind vom Sync ausgeschlossen, bleiben also lokal.
+- **LanguageTool-Button mit Status**: Der Prüfen-Button zeigt jetzt drei Zustände — "Prüft…" während der Anfrage, "Keine Fehler" nach einem sauberen Durchlauf, ein rotes `!`-Badge mit Fehlermeldung im Tooltip wenn der LanguageTool-Server nicht erreichbar war. Vorher gab es nur die Fehler-Anzahl, sonst stiller Fallback.
+
 ## [0.6.1-beta] - 2026-05-06
 
 ### Improvements
