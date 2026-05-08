@@ -2023,6 +2023,17 @@ body {
   outline: none;
 }
 
+/* Im Lesen-Modus signalisieren wir klickbare Elemente per Hand-Cursor —
+   sonst zeigt der Browser im contentEditable ständig den Text-Cursor. */
+.editor-preview-editable a,
+.editor-preview-editable .wikilink,
+.editor-preview-editable .pdf-embed,
+.editor-preview-editable .office-embed,
+.editor-preview-editable .task-list-item-checkbox,
+.editor-preview-editable input[type="checkbox"] {
+  cursor: pointer;
+}
+
 .preview-edit-toolbar {
   position: fixed;
   z-index: 1200;
@@ -2055,6 +2066,35 @@ body {
 .preview-edit-toolbar button:hover {
   background: var(--bg-secondary);
   color: var(--text-primary);
+}
+
+.preview-edit-toolbar-input {
+  width: 220px;
+  height: 26px;
+  padding: 0 8px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 12px;
+  outline: none;
+}
+
+.preview-edit-toolbar-input:focus {
+  border-color: var(--accent-color, #4a9eff);
+}
+
+/* Wikilink-Vorschläge in der Toolbar — überschreibt die Positionierung
+   der gemeinsamen .wikilink-autocomplete-Klasse (die fixed positioniert ist),
+   Look & Feel bleiben gleich. Doppelte Klasse für höhere Specificity. */
+.preview-edit-toolbar .preview-wikilink-suggestions.wikilink-autocomplete {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: auto;
+  min-width: 280px;
+  max-width: 360px;
+  max-height: 240px;
 }
 
 .editor-preview h1 {

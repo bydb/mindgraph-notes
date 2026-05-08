@@ -442,15 +442,21 @@ md.renderer.rules.text = (tokens, idx) => {
     </div>`
   })
 
-  // Konvertiere [[wikilinks]] zu klickbaren Links
+  // Konvertiere [[wikilinks]] zu klickbaren Links — inklusive Pipe-Alias-Syntax
+  // [[target|displayText]] (Obsidian-kompatibel).
   result = result.replace(/\[\[([^\]]+)\]\]/g, (_, linkText) => {
-    // Parse link: noteName#heading oder noteName#^blockid
-    const hashIndex = linkText.indexOf('#')
-    const noteName = hashIndex > -1 ? linkText.substring(0, hashIndex) : linkText
-    const fragment = hashIndex > -1 ? linkText.substring(hashIndex + 1) : ''
+    // Pipe trennt Ziel und Anzeigetext: [[target|display]]
+    const pipeIndex = linkText.indexOf('|')
+    const targetPart = pipeIndex > -1 ? linkText.substring(0, pipeIndex) : linkText
+    const explicitDisplay = pipeIndex > -1 ? linkText.substring(pipeIndex + 1) : null
 
-    // Display text: nur Notizname wenn Fragment vorhanden
-    const displayText = linkText
+    // Parse target: noteName#heading oder noteName#^blockid
+    const hashIndex = targetPart.indexOf('#')
+    const noteName = hashIndex > -1 ? targetPart.substring(0, hashIndex) : targetPart
+    const fragment = hashIndex > -1 ? targetPart.substring(hashIndex + 1) : ''
+
+    // Display: explizit gesetzt → den nehmen, sonst den vollen Target-Part (mit Fragment)
+    const displayText = explicitDisplay !== null ? explicitDisplay : targetPart
 
     return `<a href="#" class="wikilink" data-link="${md.utils.escapeHtml(noteName)}" data-fragment="${md.utils.escapeHtml(fragment)}">${md.utils.escapeHtml(displayText)}</a>`
   })
@@ -679,6 +685,9 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
   const [showAIImageDialog, setShowAIImageDialog] = useState(false)
   const [showPublishWpModal, setShowPublishWpModal] = useState(false)
   const [previewToolbar, setPreviewToolbar] = useState<{ x: number; y: number } | null>(null)
+  const [previewLinkInput, setPreviewLinkInput] = useState<{ kind: 'url' | 'wiki'; value: string } | null>(null)
+  const [previewWikilinkIndex, setPreviewWikilinkIndex] = useState(0)
+  const savedPreviewRangeRef = useRef<Range | null>(null)
 
   // LanguageTool State
   const [ltMatches, setLtMatches] = useState<LanguageToolMatch[]>([])
@@ -1998,19 +2007,27 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
     const root = editablePreviewRef.current
     if (!root) return
 
+    // Solange der User die Link-URL eingibt, Toolbar an Ort und Stelle lassen.
+    if (previewLinkInput !== null) return
+
     const selection = window.getSelection()
-    let rect: DOMRect | null = null
-    if (selection && selection.rangeCount > 0 && root.contains(selection.anchorNode)) {
-      const rangeRect = selection.getRangeAt(0).getBoundingClientRect()
-      if (rangeRect.width || rangeRect.height) rect = rangeRect
+    if (!selection || selection.rangeCount === 0 || selection.isCollapsed || !root.contains(selection.anchorNode)) {
+      setPreviewToolbar(null)
+      return
     }
 
-    const fallback = root.getBoundingClientRect()
+    const range = selection.getRangeAt(0)
+    const rect = range.getBoundingClientRect()
+    if (!rect.width && !rect.height) {
+      setPreviewToolbar(null)
+      return
+    }
+
     setPreviewToolbar({
-      x: Math.max(12, Math.min(window.innerWidth - 260, (rect?.left ?? fallback.left) + (rect?.width ?? 0) / 2 - 120)),
-      y: Math.max(56, (rect?.top ?? fallback.top) - 42)
+      x: Math.max(12, Math.min(window.innerWidth - 260, rect.left + rect.width / 2 - 120)),
+      y: Math.max(56, rect.top - 42)
     })
-  }, [])
+  }, [previewLinkInput])
 
   const commitEditablePreview = useCallback((refreshPreview: boolean) => {
     const root = editablePreviewRef.current
@@ -2052,11 +2069,113 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
     updatePreviewToolbarPosition()
   }, [scheduleEditablePreviewCommit, updatePreviewToolbarPosition])
 
-  const applyPreviewLink = useCallback(() => {
-    const href = window.prompt('Link URL')
-    if (!href) return
-    applyPreviewCommand('createLink', href)
-  }, [applyPreviewCommand])
+  const openPreviewLinkInput = useCallback((kind: 'url' | 'wiki') => {
+    // Range jetzt speichern — sobald das Input fokussiert ist, geht die Selection
+    // im editable verloren und das spätere Einfügen hätte kein Ziel mehr.
+    const sel = window.getSelection()
+    if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return
+    savedPreviewRangeRef.current = sel.getRangeAt(0).cloneRange()
+    setPreviewLinkInput({ kind, value: '' })
+    setPreviewWikilinkIndex(0)
+  }, [])
+
+  // Wikilink-Vorschläge analog zum CodeMirror-Autocomplete: Filter über notes,
+  // dazu ggf. eine "Neue Notiz erstellen"-Option, falls der Query keinen exakten
+  // Treffer hat. Nur aktiv wenn das Wikilink-Input offen ist.
+  const previewWikilinkSuggestions = useMemo(() => {
+    if (previewLinkInput?.kind !== 'wiki') return [] as Array<{ id: string; label: string; sublabel: string; value: string; isCreate: boolean }>
+    const q = previewLinkInput.value.toLowerCase().trim()
+    const matching = notes
+      .filter(n => {
+        if (!q) return true
+        return n.title.toLowerCase().includes(q) || n.path.toLowerCase().includes(q)
+      })
+      .slice(0, 8)
+      .map(n => ({ id: n.id, label: n.title, sublabel: n.path, value: n.title, isCreate: false }))
+
+    const exactMatch = q.length > 0 && notes.some(n => {
+      const titleLower = n.title.toLowerCase()
+      const fileLower = n.path.split('/').pop()?.replace('.md', '').toLowerCase() || ''
+      return titleLower === q || fileLower === q
+    })
+
+    if (q && !exactMatch) {
+      matching.unshift({
+        id: '__create__',
+        label: previewLinkInput.value.trim(),
+        sublabel: 'Neue Notiz erstellen',
+        value: previewLinkInput.value.trim(),
+        isCreate: true
+      })
+    }
+    return matching
+  }, [previewLinkInput, notes])
+
+  const insertPreviewWikilink = useCallback((target: string, displayFromRange: string) => {
+    const safeTarget = target.replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    const display = displayFromRange.trim() || target
+    const safeDisplay = display.replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    document.execCommand('insertHTML', false,
+      `<a href="#" class="wikilink" data-link="${safeTarget}" data-fragment="">${safeDisplay}</a>`)
+  }, [])
+
+  const confirmPreviewLink = useCallback((overrideValue?: string, overrideIsCreate?: boolean) => {
+    const range = savedPreviewRangeRef.current
+    const state = previewLinkInput
+    if (!state) return
+    const value = (overrideValue ?? state.value).trim()
+    const isCreate = overrideIsCreate ?? false
+
+    setPreviewLinkInput(null)
+    savedPreviewRangeRef.current = null
+    if (!range || !value) return
+
+    const sel = window.getSelection()
+    sel?.removeAllRanges()
+    sel?.addRange(range)
+    editablePreviewRef.current?.focus()
+    const rangeText = range.toString()
+
+    if (state.kind === 'url') {
+      document.execCommand('createLink', false, value)
+    } else {
+      insertPreviewWikilink(value, rangeText)
+
+      // Wenn eine neue Notiz angelegt werden soll: physisch im Vault erstellen,
+      // analog zum bestehenden CodeMirror-Autocomplete-Flow.
+      if (isCreate && vaultPath) {
+        ;(async () => {
+          try {
+            const currentFolder = selectedNote?.path
+              ? selectedNote.path.substring(0, selectedNote.path.lastIndexOf('/'))
+              : ''
+            const fileName = value.endsWith('.md') ? value : `${value}.md`
+            const relativePath = currentFolder ? `${currentFolder}/${fileName}` : fileName
+            const fullPath = `${vaultPath}/${relativePath}`
+            const initialContent = `# ${value}\n\n`
+            await window.electronAPI.writeFile(fullPath, initialContent)
+            const newNote = await createNoteFromFile(fullPath, relativePath, initialContent)
+            addNote(newNote)
+            const tree = await window.electronAPI.readDirectory(vaultPath)
+            setFileTree(tree)
+          } catch (error) {
+            console.error('Fehler beim Erstellen der neuen Notiz:', error)
+          }
+        })()
+      }
+    }
+    scheduleEditablePreviewCommit()
+  }, [previewLinkInput, scheduleEditablePreviewCommit, insertPreviewWikilink, vaultPath, selectedNote, addNote, setFileTree])
+
+  const cancelPreviewLink = useCallback(() => {
+    setPreviewLinkInput(null)
+    savedPreviewRangeRef.current = null
+  }, [])
+
+  // Beim Tippen den Auswahl-Index zurücksetzen, damit immer das oberste Item highlighted ist.
+  useEffect(() => {
+    setPreviewWikilinkIndex(0)
+  }, [previewLinkInput?.value, previewWikilinkSuggestions.length])
 
   // Handle wikilink and checkbox clicks in preview
   const handlePreviewClick = useCallback((e: React.MouseEvent) => {
@@ -2128,6 +2247,23 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
         }
       })()
       return
+    }
+
+    // Externe Links (Markdown [text](url)) — im contentEditable folgt der Browser
+    // einem Klick nicht automatisch; daher hier explizit via shell.openExternal öffnen.
+    const anchor = target.closest('a') as HTMLAnchorElement | null
+    if (anchor && !anchor.classList.contains('wikilink')) {
+      const href = anchor.getAttribute('href') || ''
+      if (href.startsWith('http://') || href.startsWith('https://') || href.startsWith('mailto:') || href.startsWith('tel:')) {
+        e.preventDefault()
+        e.stopPropagation()
+        if (window.electronAPI?.openExternal) {
+          window.electronAPI.openExternal(href)
+        } else {
+          window.open(href, '_blank', 'noopener,noreferrer')
+        }
+        return
+      }
     }
 
     // Wikilink click handling
@@ -3384,13 +3520,86 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
             style={{ left: previewToolbar.x, top: previewToolbar.y }}
             onMouseDown={e => e.preventDefault()}
           >
-            <button onClick={() => applyPreviewCommand('bold')} title="Fett">B</button>
-            <button onClick={() => applyPreviewCommand('italic')} title="Kursiv"><em>I</em></button>
-            <button onClick={() => applyPreviewCommand('formatBlock', 'h1')} title="Überschrift 1">H1</button>
-            <button onClick={() => applyPreviewCommand('formatBlock', 'h2')} title="Überschrift 2">H2</button>
-            <button onClick={() => applyPreviewCommand('insertUnorderedList')} title="Liste">•</button>
-            <button onClick={() => applyPreviewCommand('insertOrderedList')} title="Nummerierte Liste">1.</button>
-            <button onClick={applyPreviewLink} title="Link">⌘</button>
+            {previewLinkInput !== null ? (
+              <>
+                <input
+                  type={previewLinkInput.kind === 'url' ? 'url' : 'text'}
+                  className="preview-edit-toolbar-input"
+                  placeholder={previewLinkInput.kind === 'url' ? 'https://...' : 'Notizname'}
+                  autoFocus
+                  value={previewLinkInput.value}
+                  onChange={e => setPreviewLinkInput({ kind: previewLinkInput.kind, value: e.target.value })}
+                  onKeyDown={e => {
+                    // Wikilink-Modus: Pfeiltasten navigieren durch die Vorschläge,
+                    // Enter wählt das aktuelle Item (oder fügt den freien Text ein, wenn keine Items).
+                    if (previewLinkInput.kind === 'wiki' && previewWikilinkSuggestions.length > 0) {
+                      if (e.key === 'ArrowDown') {
+                        e.preventDefault()
+                        setPreviewWikilinkIndex(i => Math.min(i + 1, previewWikilinkSuggestions.length - 1))
+                        return
+                      }
+                      if (e.key === 'ArrowUp') {
+                        e.preventDefault()
+                        setPreviewWikilinkIndex(i => Math.max(i - 1, 0))
+                        return
+                      }
+                    }
+                    if (e.key === 'Enter') {
+                      e.preventDefault()
+                      if (previewLinkInput.kind === 'wiki' && previewWikilinkSuggestions[previewWikilinkIndex]) {
+                        const item = previewWikilinkSuggestions[previewWikilinkIndex]
+                        confirmPreviewLink(item.value, item.isCreate)
+                      } else {
+                        confirmPreviewLink()
+                      }
+                    } else if (e.key === 'Escape') {
+                      e.preventDefault()
+                      cancelPreviewLink()
+                    }
+                  }}
+                />
+                <button onClick={() => confirmPreviewLink()} title={previewLinkInput.kind === 'url' ? 'Link einfügen' : 'Wikilink einfügen'}>✓</button>
+                <button onClick={cancelPreviewLink} title="Abbrechen">✕</button>
+                {previewLinkInput.kind === 'wiki' && previewWikilinkSuggestions.length > 0 && (
+                  <div className="preview-wikilink-suggestions wikilink-autocomplete">
+                    <div className="wikilink-autocomplete-list">
+                      {previewWikilinkSuggestions.map((item, idx) => (
+                        <div
+                          key={item.id}
+                          className={`wikilink-autocomplete-item ${idx === previewWikilinkIndex ? 'selected' : ''} ${item.isCreate ? 'create-new' : ''}`}
+                          onMouseDown={e => {
+                            // mousedown statt click — sonst stiehlt der Klick den Fokus,
+                            // und der Input-onBlur cancelt vor dem Confirm.
+                            e.preventDefault()
+                            confirmPreviewLink(item.value, item.isCreate)
+                          }}
+                          onMouseEnter={() => setPreviewWikilinkIndex(idx)}
+                        >
+                          <span className={`wikilink-autocomplete-icon ${item.isCreate ? 'create-new' : ''}`}>
+                            {item.isCreate ? '➕' : '📄'}
+                          </span>
+                          <span className="wikilink-autocomplete-label">{item.label}</span>
+                          {item.sublabel && (
+                            <span className={`wikilink-autocomplete-sublabel ${item.isCreate ? 'create-new' : ''}`}>{item.sublabel}</span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </>
+            ) : (
+              <>
+                <button onClick={() => applyPreviewCommand('bold')} title="Fett">B</button>
+                <button onClick={() => applyPreviewCommand('italic')} title="Kursiv"><em>I</em></button>
+                <button onClick={() => applyPreviewCommand('formatBlock', 'h1')} title="Überschrift 1">H1</button>
+                <button onClick={() => applyPreviewCommand('formatBlock', 'h2')} title="Überschrift 2">H2</button>
+                <button onClick={() => applyPreviewCommand('insertUnorderedList')} title="Liste">•</button>
+                <button onClick={() => applyPreviewCommand('insertOrderedList')} title="Nummerierte Liste">1.</button>
+                <button onClick={() => openPreviewLinkInput('url')} title="Externer Link">🔗</button>
+                <button onClick={() => openPreviewLinkInput('wiki')} title="Wikilink (Notiz verlinken)">[[ ]]</button>
+              </>
+            )}
           </div>
         )}
         {speechEnabled && viewMode === 'preview' && (
@@ -3444,7 +3653,12 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
           onInput={scheduleEditablePreviewCommit}
           onKeyUp={updatePreviewToolbarPosition}
           onMouseUp={updatePreviewToolbarPosition}
-          onBlur={() => {
+          onBlur={(e) => {
+            // Wenn der Fokus innerhalb der Toolbar landet (z.B. URL-Input), nicht committen
+            // und Toolbar nicht ausblenden — der User ist mitten in einer Aktion.
+            const next = e.relatedTarget as HTMLElement | null
+            if (next && next.closest('.preview-edit-toolbar')) return
+
             if (previewEditTimeoutRef.current) {
               clearTimeout(previewEditTimeoutRef.current)
               previewEditTimeoutRef.current = null

@@ -2,6 +2,24 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.6.31-beta] - 2026-05-08
+
+### Features
+
+- **Externe Links und Wikilinks im Lesen-Modus klickbar**: Im neuen WYSIWYG-Lesen-Modus blockierte das `contentEditable` bisher den Default-Klick auf Links — der Cursor wurde gesetzt, statt dem Link zu folgen. Markdown-Links (`[text](url)`), `mailto:` und `tel:` öffnen jetzt direkt via `shell.openExternal` im System-Browser/Mail-Client. Wikilinks öffnen weiterhin per Cmd/Ctrl+Klick (damit man im Wikilink-Text noch editieren kann), externe Links per einfachem Klick.
+- **Wikilinks aus der Floating-Toolbar einfügen**: Neuer `[[ ]]`-Button neben dem 🔗-Link-Button. Text markieren → Button → Notiznamen tippen → Live-Filter zeigt passende Notizen aus dem Vault, ↑/↓ navigiert, Enter wählt. Bei keinem exakten Treffer steht „Neue Notiz erstellen" oben in der Liste — wird beim Auswählen physisch im Vault angelegt (gleicher Flow wie das CodeMirror-Autocomplete im Schreiben-Modus).
+- **Pointer-Cursor auf klickbaren Elementen** im Lesen-Modus: Externe Links, Wikilinks, PDF- und Office-Embeds sowie Checkboxen zeigen jetzt eine Hand statt des Text-Cursors aus dem `contentEditable`.
+
+### Improvements
+
+- **Floating-Toolbar nur bei aktiver Markierung**: Im Lesen-Modus erschien die Format-Toolbar bisher schon beim reinen Fokussieren — auch wenn man nur den Cursor setzen wollte. Jetzt taucht sie erst auf, sobald wirklich Text markiert ist (Notion/Medium-Style), und verschwindet wieder, wenn die Markierung kollabiert.
+- **Inline-URL-Input statt `window.prompt`**: Der Link-Button öffnete bisher einen Browser-Prompt-Dialog, der in Electron-Renderern blockiert ist und daher nichts tat. Jetzt erscheint stattdessen ein Eingabefeld direkt in der Toolbar — Enter bestätigt, Escape bricht ab. Die ursprüngliche Markierung wird gespeichert und vor dem `createLink`-Befehl wiederhergestellt, damit der Link tatsächlich auf der gewünschten Stelle landet.
+- **Toolbar bleibt aktiv beim Bearbeiten in Sub-Inputs**: Der Blur-Handler ignoriert jetzt Fokus-Wechsel innerhalb der Toolbar (z.B. ins URL-Input) — der Editier-Commit wird nicht ausgelöst, die Toolbar nicht weggenommen, solange der User mitten in einer Aktion ist.
+
+### Fixes
+
+- **Wikilink-Pipe-Alias-Syntax wird jetzt gerendert**: `[[Notiz|Anzeigetext]]` zeigte bisher die Pipe und das `|Anzeigetext`-Suffix als Teil des Link-Texts — der markdown-it-Renderer parste die Obsidian-Standard-Pipe-Syntax gar nicht. Jetzt wird der Anzeigetext korrekt extrahiert, das Link-Ziel zeigt nur auf den Notiznamen vor dem `|`. Betrifft alle Wikilinks im Vault, die je mit Alias geschrieben wurden — auch über das CodeMirror-Autocomplete im Schreiben-Modus eingefügte.
+
 ## [0.6.3-beta] - 2026-05-08
 
 ### Features
