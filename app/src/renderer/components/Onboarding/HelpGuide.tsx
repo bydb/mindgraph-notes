@@ -79,7 +79,7 @@ const helpTopics: HelpTopic[] = [
 
   // Editor cluster
   { id: 'editor', label: 'Editor', icon: 'editor', color: '#4a9eff', category: 'editor', shortcut: '⌘N',
-    details: ['Live Preview mit CodeMirror 6', 'Slash Commands: /date /task /table /code', 'Rechtsklick-Kontextmenue mit KI-Aktionen', 'Formatting-Toolbar aktivierbar'] },
+    details: ['Cleanes Schreiben mit CodeMirror 6', 'Slash Commands: /date /task /table /code', 'Rechtsklick-Kontextmenue mit KI-Aktionen', 'Formatting-Toolbar aktivierbar'] },
   { id: 'media', label: 'Medien', icon: 'image', color: '#4a9eff', category: 'editor',
     details: ['Bilder per Drag & Drop einfuegen', 'PDF-Viewer mit OCR-Extraktion', 'Office-Dateien (Excel, Word, PPT)', '![[datei]] fuer Inline-Embeds'] },
   { id: 'formatting', label: 'Formatierung', icon: 'bold', color: '#4a9eff', category: 'editor',

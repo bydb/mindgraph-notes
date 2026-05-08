@@ -34,7 +34,7 @@ export const vaultPathField = StateField.define<string>({
  * Provides Obsidian-style live preview where:
  * - Markdown formatting is rendered (bold, italic, headers, etc.)
  * - Syntax markers are hidden (**text** shows as bold text)
- * - When cursor is on a line, raw markdown is shown for that line only
+ * - Raw markdown stays hidden in writing mode; source editing lives in Markdown mode
  * - Images are rendered inline (![[image.png|300]])
  *
  * Usage:
@@ -83,7 +83,7 @@ export function livePreviewExtension(config: LivePreviewConfig = {}): Extension 
     vaultPathField.init(() => config.vaultPath || ''),
     livePreviewTheme,
     frontmatterField,
-    createLivePreviewPlugin()
+    createLivePreviewPlugin(),
   ]
 }
 

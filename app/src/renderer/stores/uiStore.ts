@@ -691,7 +691,7 @@ const defaultState = {
   // Editor Settings
   editorFontSize: 15,
   editorLineNumbers: true,
-  editorDefaultView: 'preview' as EditorViewMode,
+  editorDefaultView: 'live-preview' as EditorViewMode,
   autoSaveInterval: 500,
   editorHeadingFolding: false,
   editorOutlining: false,
@@ -1117,7 +1117,7 @@ export const useUIStore = create<UIState>()((set, get) => ({
           smartConnectionsEnabled: false,
           notesChatEnabled: true,
           visionOcr: { ...get().visionOcr, enabled: true },
-          editorDefaultView: 'preview' as EditorViewMode,
+          editorDefaultView: 'live-preview' as EditorViewMode,
           showFormattingToolbar: true,
           showRawEditor: false
         })
@@ -1131,7 +1131,7 @@ export const useUIStore = create<UIState>()((set, get) => ({
           smartConnectionsEnabled: false,
           notesChatEnabled: true,
           visionOcr: { ...get().visionOcr, enabled: true },
-          editorDefaultView: 'preview' as EditorViewMode
+          editorDefaultView: 'live-preview' as EditorViewMode
         })
         break
       case 'professional':
@@ -1140,7 +1140,7 @@ export const useUIStore = create<UIState>()((set, get) => ({
           pdfCompanionEnabled: false,
           smartConnectionsEnabled: false,
           notesChatEnabled: true,
-          editorDefaultView: 'preview' as EditorViewMode
+          editorDefaultView: 'live-preview' as EditorViewMode
         })
         break
       case 'writer':
@@ -1150,7 +1150,7 @@ export const useUIStore = create<UIState>()((set, get) => ({
           notesChatEnabled: true,
           showFormattingToolbar: true,
           editorShowWordCount: true,
-          editorDefaultView: 'preview' as EditorViewMode
+          editorDefaultView: 'live-preview' as EditorViewMode
         })
         break
       case 'developer':
@@ -1159,7 +1159,7 @@ export const useUIStore = create<UIState>()((set, get) => ({
           smartConnectionsEnabled: true,
           notesChatEnabled: true,
           showRawEditor: false,
-          editorDefaultView: 'preview' as EditorViewMode
+          editorDefaultView: 'live-preview' as EditorViewMode
         })
         break
       case 'viewer':
@@ -1241,6 +1241,11 @@ export async function initializeUISettings(): Promise<void> {
 
       // Always start with 'editor' mode on startup
       validSettings.viewMode = 'editor'
+      // Obsidian-style writing is now the default. Preserve explicit raw/source defaults,
+      // but migrate the old read-only preview default to the clean writing view.
+      if (validSettings.editorDefaultView === 'preview' && validSettings.userProfile !== 'viewer') {
+        validSettings.editorDefaultView = 'live-preview'
+      }
       // Migrate Transport: defaultDestinationIndex → defaultDestinationFolder
       if (validSettings.transport) {
         const tr = validSettings.transport as TransportSettings

@@ -2425,7 +2425,13 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab 
                   <input
                     type="checkbox"
                     checked={showRawEditor}
-                    onChange={e => setShowRawEditor(e.target.checked)}
+                    onChange={e => {
+                      const enabled = e.target.checked
+                      setShowRawEditor(enabled)
+                      if (!enabled && editorDefaultView === 'edit') {
+                        setEditorDefaultView('live-preview')
+                      }
+                    }}
                   />
                 </div>
 
@@ -2433,10 +2439,10 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab 
                 <div className="settings-row">
                   <label>{t('settings.editor.defaultViewLabel')}</label>
                   <select
-                    value={editorDefaultView}
+                    value={!showRawEditor && editorDefaultView === 'edit' ? 'live-preview' : editorDefaultView}
                     onChange={e => setEditorDefaultView(e.target.value as 'edit' | 'live-preview' | 'preview')}
                   >
-                    <option value="edit">{t('settings.editor.viewEdit')}</option>
+                    {showRawEditor && <option value="edit">{t('settings.editor.viewEdit')}</option>}
                     <option value="live-preview">{t('settings.editor.viewLivePreview')}</option>
                     <option value="preview">{t('settings.editor.viewPreview')}</option>
                   </select>

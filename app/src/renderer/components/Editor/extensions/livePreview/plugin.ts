@@ -152,6 +152,46 @@ export function createLivePreviewPlugin() {
     },
     {
       decorations: (v) => v.decorations,
+      eventHandlers: {
+        click: (event: MouseEvent, view: EditorView) => {
+          const target = event.target as HTMLElement | null
+          if (!target) return false
+
+          if (target.classList.contains('lp-checkbox')) {
+            event.preventDefault()
+            const pos = Number(target.getAttribute('data-pos'))
+            if (!Number.isFinite(pos)) return true
+
+            const current = view.state.doc.sliceString(pos, pos + 3)
+            const replacement = /^\[[xX]\]$/.test(current) ? '[ ]' : '[x]'
+            view.dispatch({
+              changes: { from: pos, to: pos + 3, insert: replacement }
+            })
+            return true
+          }
+
+          const openModifier = event.metaKey || event.ctrlKey
+          if (openModifier && target.classList.contains('lp-wikilink')) {
+            event.preventDefault()
+            window.dispatchEvent(new CustomEvent('live-preview-wikilink-open', {
+              detail: {
+                target: target.getAttribute('data-target') || '',
+                fragment: target.getAttribute('data-fragment') || ''
+              }
+            }))
+            return true
+          }
+
+          if (openModifier && target.classList.contains('lp-link')) {
+            event.preventDefault()
+            const url = target.getAttribute('data-url')
+            if (url) window.open(url, '_blank', 'noopener,noreferrer')
+            return true
+          }
+
+          return false
+        },
+      },
     }
   )
 }

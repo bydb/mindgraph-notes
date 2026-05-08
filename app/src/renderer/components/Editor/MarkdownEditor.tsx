@@ -11,6 +11,7 @@ import MarkdownIt from 'markdown-it'
 import taskLists from 'markdown-it-task-lists'
 import footnote from 'markdown-it-footnote'
 import texmath from 'markdown-it-texmath'
+import TurndownService from 'turndown'
 import katex from 'katex'
 import 'katex/dist/katex.min.css'
 import 'katex/contrib/mhchem/mhchem.js'  // Chemie-Support (mhchem)
@@ -257,6 +258,100 @@ const katexOptions = { throwOnError: false, trust: false, strict: false }
 md.use(texmath, { engine: katex, delimiters: 'dollars', katexOptions })
 md.use(texmath, { engine: katex, delimiters: 'brackets', katexOptions })
 
+const wysiwygTurndown = new TurndownService({
+  headingStyle: 'atx',
+  codeBlockStyle: 'fenced',
+  bulletListMarker: '-',
+})
+
+wysiwygTurndown.addRule('wikilink', {
+  filter: (node) => node.nodeName === 'A' && (node as HTMLElement).classList.contains('wikilink'),
+  replacement: (content, node) => {
+    const el = node as HTMLElement
+    const target = el.getAttribute('data-link') || content
+    const fragment = el.getAttribute('data-fragment') || ''
+    const linkTarget = `${target}${fragment ? `#${fragment}` : ''}`
+    return content && content !== linkTarget ? `[[${linkTarget}|${content}]]` : `[[${linkTarget}]]`
+  }
+})
+
+wysiwygTurndown.addRule('taskCheckbox', {
+  filter: (node) => node.nodeName === 'INPUT' && (node as HTMLInputElement).type === 'checkbox',
+  replacement: (_content, node) => ((node as HTMLInputElement).checked ? '[x] ' : '[ ] ')
+})
+
+wysiwygTurndown.addRule('wikiImage', {
+  filter: (node) => node.nodeName === 'IMG' && Boolean((node as HTMLElement).getAttribute('data-src')),
+  replacement: (_content, node) => {
+    const el = node as HTMLElement
+    const src = el.getAttribute('data-src') || el.getAttribute('alt') || ''
+    const width = (el as HTMLImageElement).style.width?.replace('px', '')
+    return src ? `![[${src}${width ? `|${width}` : ''}]]` : ''
+  }
+})
+
+// Embed-Rekonstruktion: Die markdown-it-Renderer ersetzen `![[file.pdf]]`, ` ```mermaid`-Blöcke etc.
+// durch dekorierte DOM-Container. Beim WYSIWYG-Roundtrip müssen wir die Original-Syntax aus den
+// data-Attributen wiederherstellen, sonst gehen die Embeds beim Speichern verloren.
+wysiwygTurndown.addRule('pdfEmbed', {
+  filter: (node) => node.nodeName === 'DIV' && (node as HTMLElement).classList.contains('pdf-embed'),
+  replacement: (_content, node) => {
+    const filename = (node as HTMLElement).getAttribute('data-filename') || ''
+    return filename ? `\n\n![[${filename}]]\n\n` : ''
+  }
+})
+
+wysiwygTurndown.addRule('officeEmbed', {
+  filter: (node) => node.nodeName === 'DIV' && (node as HTMLElement).classList.contains('office-embed'),
+  replacement: (_content, node) => {
+    const filename = (node as HTMLElement).getAttribute('data-filename') || ''
+    return filename ? `\n\n![[${filename}]]\n\n` : ''
+  }
+})
+
+wysiwygTurndown.addRule('mermaidContainer', {
+  filter: (node) => node.nodeName === 'DIV' && (node as HTMLElement).classList.contains('mermaid-container'),
+  replacement: (_content, node) => {
+    const el = node as HTMLElement
+    // Nach Mermaid-Render ist der <pre>-Inhalt durch SVG ersetzt → data-source nutzen
+    const source = el.getAttribute('data-source') ||
+      el.querySelector('pre.mermaid')?.textContent?.trim() || ''
+    return source ? `\n\n\`\`\`mermaid\n${source}\n\`\`\`\n\n` : ''
+  }
+})
+
+wysiwygTurndown.addRule('dataviewContainer', {
+  filter: (node) => node.nodeName === 'DIV' && (node as HTMLElement).classList.contains('dataview-preview-container'),
+  replacement: (_content, node) => {
+    const query = (node as HTMLElement).getAttribute('data-query') || ''
+    return query ? `\n\n\`\`\`dataview\n${query}\n\`\`\`\n\n` : ''
+  }
+})
+
+function stripFrontmatterRaw(content: string): { frontmatter: string; body: string } {
+  const match = content.match(/^(---\s*\n[\s\S]*?\n---\s*\n?)/)
+  if (!match) return { frontmatter: '', body: content }
+  return { frontmatter: match[1], body: content.slice(match[1].length) }
+}
+
+function editablePreviewHtmlToMarkdown(root: HTMLElement, currentContent: string): string {
+  const clone = root.cloneNode(true) as HTMLElement
+  // Nur reine UI-Artefakte entfernen (Copy-Buttons, Fold-Toggles). Die Embed-Container
+  // bleiben drin und werden von den Turndown-Regeln in Original-Markdown rekonstruiert.
+  clone.querySelectorAll('.code-copy-btn, .fold-toggle').forEach(el => el.remove())
+  // Turndown's blankRule fängt leere Block-Elemente vor den Custom-Rules ab. In Production
+  // haben unsere Embeds immer Inhalt (Loading-Spinner, Icons, SVG), aber als Sicherheitsnetz
+  // injizieren wir ein Zero-Width-Space, falls ein Container doch mal leer ist.
+  clone.querySelectorAll('.pdf-embed, .office-embed, .mermaid-container, .dataview-preview-container').forEach(el => {
+    if (!el.textContent || !el.textContent.trim()) {
+      el.appendChild(document.createTextNode('​'))
+    }
+  })
+  const bodyMarkdown = wysiwygTurndown.turndown(clone).replace(/\n{3,}/g, '\n\n').trim()
+  const { frontmatter } = stripFrontmatterRaw(currentContent)
+  return `${frontmatter}${bodyMarkdown}${bodyMarkdown ? '\n' : ''}`
+}
+
 // Custom image renderer für Standard-Markdown ![alt](url) Syntax
 const defaultImageRender = md.renderer.rules.image
 md.renderer.rules.image = (tokens, idx, options, env, self) => {
@@ -372,7 +467,9 @@ md.renderer.rules.fence = (tokens, idx, options, env, self) => {
   if (info === 'mermaid') {
     const code = token.content.trim()
     const id = `mermaid-${idx}-${Date.now()}`
-    return `<div class="mermaid-container"><pre class="mermaid" id="${id}">${code}</pre></div>`
+    // data-source preserves the original code even after Mermaid replaces the <pre> with SVG —
+    // the WYSIWYG round-trip needs it to reconstruct the ```mermaid block.
+    return `<div class="mermaid-container" data-source="${md.utils.escapeHtml(code)}"><pre class="mermaid" id="${id}">${code}</pre></div>`
   }
 
   // Dataview code blocks - render as placeholder, will be processed after render
@@ -542,8 +639,11 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
   const { t } = useTranslation()
   const editorRef = useRef<HTMLDivElement>(null)
   const previewRef = useRef<HTMLDivElement>(null)
+  const editablePreviewRef = useRef<HTMLDivElement>(null)
   const viewRef = useRef<EditorView | null>(null)
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const previewEditTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const isPreviewDomEditingRef = useRef(false)
   const lastSavedContentRef = useRef<string>('')
   const isExternalUpdateRef = useRef(false)
   const currentNoteIdRef = useRef<string | null>(null)  // Track current note ID for async operations
@@ -578,6 +678,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
   const [aiMenu, setAiMenu] = useState<{ x: number; y: number; selectedText: string; selectionStart: number; selectionEnd: number } | null>(null)
   const [showAIImageDialog, setShowAIImageDialog] = useState(false)
   const [showPublishWpModal, setShowPublishWpModal] = useState(false)
+  const [previewToolbar, setPreviewToolbar] = useState<{ x: number; y: number } | null>(null)
 
   // LanguageTool State
   const [ltMatches, setLtMatches] = useState<LanguageToolMatch[]>([])
@@ -1066,13 +1167,25 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
           offset: match.offset + frontmatterOffset
         }))
 
-        // Filter out ignored matches
         const ignoredRules = languageTool.ignoredRules || []
-        const filteredMatches = adjustedMatches.filter(match => {
-          const matchText = content.substring(match.offset, match.offset + match.length)
-          const isIgnored = ignoredRules.some(r => r.ruleId === match.rule.id && r.text === matchText)
-          return !isIgnored
-        })
+        const filteredMatches = adjustedMatches
+          .map(match => {
+            const matchText = content.substring(match.offset, match.offset + match.length)
+            // Drop replacements whose only difference is leading/trailing whitespace —
+            // those look identical to the original text in the suggestion button and
+            // tricked users into accepting silent newline insertions/removals.
+            const meaningful = (match.replacements || []).filter(
+              r => r.value.trim() !== matchText.trim()
+            )
+            return { ...match, replacements: meaningful }
+          })
+          .filter(match => {
+            // Drop matches with no meaningful replacements left
+            if (!match.replacements || match.replacements.length === 0) return false
+            // Drop user-ignored rules
+            const matchText = content.substring(match.offset, match.offset + match.length)
+            return !ignoredRules.some(r => r.ruleId === match.rule.id && r.text === matchText)
+          })
 
         setLtMatches(filteredMatches)
         setLtStatus('ok')
@@ -1148,12 +1261,27 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
 
   // LanguageTool: Apply suggestion
   const applyLtSuggestion = useCallback((replacement: string, from: number, to: number) => {
-    if (!viewRef.current) return
+    const view = viewRef.current
+    if (!view) return
 
-    viewRef.current.dispatch({
-      changes: { from, to, insert: replacement }
+    // Cursor erhalten: bisherige Position durch die Korrektur mappen, ohne ans Ende des
+    // korrigierten Worts zu springen. Lag der Cursor in der korrigierten Range, landet er
+    // hinter der Einfügung; sonst bleibt er relativ wo er war.
+    const prev = view.state.selection.main
+    const lengthDiff = replacement.length - (to - from)
+    const mapPos = (pos: number): number => {
+      if (pos <= from) return pos
+      if (pos >= to) return pos + lengthDiff
+      return from + replacement.length
+    }
+
+    view.dispatch({
+      changes: { from, to, insert: replacement },
+      selection: { anchor: mapPos(prev.anchor), head: mapPos(prev.head) },
+      scrollIntoView: false,
     })
     setLtPopup(null)
+    view.focus()
 
     // Re-check after applying
     if (languageTool.autoCheck) {
@@ -1530,7 +1658,9 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
             if (update.docChanged) {
               const newContent = update.state.doc.toString()
               handleDocChange(newContent)
-              setPreviewContent(newContent)
+              if (!isPreviewDomEditingRef.current) {
+                setPreviewContent(newContent)
+              }
             }
 
             // Slash Command & Wikilink Autocomplete Trigger-Erkennung
@@ -1728,6 +1858,9 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
       if (saveTimeoutRef.current) {
         clearTimeout(saveTimeoutRef.current)
       }
+      if (previewEditTimeoutRef.current) {
+        clearTimeout(previewEditTimeoutRef.current)
+      }
       if (viewRef.current) {
         viewRef.current.destroy()
       }
@@ -1798,6 +1931,132 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
       window.removeEventListener('insert-footnote', handleInsertFootnote as EventListener)
     }
   }, [])
+
+  // Live writing mode: Cmd/Ctrl-click opens wikilinks, normal click keeps editing.
+  useEffect(() => {
+    const handleLivePreviewWikilinkOpen = (e: CustomEvent<{ target: string; fragment: string }>) => {
+      const linkText = e.detail.target
+      const fragment = e.detail.fragment || ''
+      if (!linkText) return
+
+      const linkedNote = notes.find(n => {
+        const titleLower = n.title.toLowerCase()
+        const linkLower = linkText.toLowerCase()
+        const fileNameWithoutExt = n.path.split('/').pop()?.replace('.md', '').toLowerCase() || ''
+        return titleLower === linkLower || fileNameWithoutExt === linkLower
+      })
+      if (!linkedNote) return
+
+      if (isSecondary) {
+        selectSecondaryNote(linkedNote.id)
+      } else {
+        selectNote(linkedNote.id)
+      }
+
+      if (!fragment || !vaultPath) return
+
+      setTimeout(async () => {
+        try {
+          const fullPath = `${vaultPath}/${linkedNote.path}`
+          const content = await window.electronAPI.readFile(fullPath)
+          const lines = content.split('\n')
+          let targetLine = -1
+
+          if (fragment.startsWith('^')) {
+            const blockId = fragment.substring(1)
+            targetLine = lines.findIndex(line =>
+              line.match(new RegExp(`\\^${blockId}\\s*$`))
+            )
+          } else {
+            targetLine = lines.findIndex(line => {
+              const match = line.match(/^#{1,6}\s+(.+)$/)
+              return match && match[1].trim().toLowerCase() === fragment.toLowerCase()
+            })
+          }
+
+          if (targetLine >= 0 && viewRef.current) {
+            const view = viewRef.current
+            const lineInfo = view.state.doc.line(targetLine + 1)
+            view.dispatch({
+              selection: { anchor: lineInfo.from },
+              scrollIntoView: true
+            })
+          }
+        } catch (error) {
+          console.error('Fehler beim Navigieren zum Fragment:', error)
+        }
+      }, 100)
+    }
+
+    window.addEventListener('live-preview-wikilink-open', handleLivePreviewWikilinkOpen as EventListener)
+    return () => {
+      window.removeEventListener('live-preview-wikilink-open', handleLivePreviewWikilinkOpen as EventListener)
+    }
+  }, [notes, isSecondary, selectNote, selectSecondaryNote, vaultPath])
+
+  const updatePreviewToolbarPosition = useCallback(() => {
+    const root = editablePreviewRef.current
+    if (!root) return
+
+    const selection = window.getSelection()
+    let rect: DOMRect | null = null
+    if (selection && selection.rangeCount > 0 && root.contains(selection.anchorNode)) {
+      const rangeRect = selection.getRangeAt(0).getBoundingClientRect()
+      if (rangeRect.width || rangeRect.height) rect = rangeRect
+    }
+
+    const fallback = root.getBoundingClientRect()
+    setPreviewToolbar({
+      x: Math.max(12, Math.min(window.innerWidth - 260, (rect?.left ?? fallback.left) + (rect?.width ?? 0) / 2 - 120)),
+      y: Math.max(56, (rect?.top ?? fallback.top) - 42)
+    })
+  }, [])
+
+  const commitEditablePreview = useCallback((refreshPreview: boolean) => {
+    const root = editablePreviewRef.current
+    const view = viewRef.current
+    if (!root || !view) return
+
+    const currentContent = view.state.doc.toString()
+    const nextContent = editablePreviewHtmlToMarkdown(root, currentContent)
+    if (nextContent === currentContent) {
+      if (refreshPreview) isPreviewDomEditingRef.current = false
+      return
+    }
+
+    isPreviewDomEditingRef.current = true
+    view.dispatch({
+      changes: { from: 0, to: currentContent.length, insert: nextContent }
+    })
+    saveContent(nextContent)
+
+    if (refreshPreview) {
+      isPreviewDomEditingRef.current = false
+      setPreviewContent(nextContent)
+    }
+  }, [saveContent])
+
+  const scheduleEditablePreviewCommit = useCallback(() => {
+    isPreviewDomEditingRef.current = true
+    updatePreviewToolbarPosition()
+    if (previewEditTimeoutRef.current) clearTimeout(previewEditTimeoutRef.current)
+    previewEditTimeoutRef.current = setTimeout(() => {
+      commitEditablePreview(false)
+    }, 1200)
+  }, [commitEditablePreview, updatePreviewToolbarPosition])
+
+  const applyPreviewCommand = useCallback((command: string, value?: string) => {
+    editablePreviewRef.current?.focus()
+    document.execCommand(command, false, value)
+    scheduleEditablePreviewCommit()
+    updatePreviewToolbarPosition()
+  }, [scheduleEditablePreviewCommit, updatePreviewToolbarPosition])
+
+  const applyPreviewLink = useCallback(() => {
+    const href = window.prompt('Link URL')
+    if (!href) return
+    applyPreviewCommand('createLink', href)
+  }, [applyPreviewCommand])
 
   // Handle wikilink and checkbox clicks in preview
   const handlePreviewClick = useCallback((e: React.MouseEvent) => {
@@ -1873,6 +2132,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
 
     // Wikilink click handling
     if (target.classList.contains('wikilink')) {
+      if (!(e.metaKey || e.ctrlKey)) return
       e.preventDefault()
       const linkText = target.getAttribute('data-link')
       const fragment = target.getAttribute('data-fragment') || ''
@@ -1983,89 +2243,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
       }
       return
     }
-
   }, [notes, selectNote, selectSecondaryNote, isSecondary, vaultPath, previewContent, saveContent, t])
-
-  // Double-click on preview text → switch to live-preview and position cursor
-  const handlePreviewDoubleClick = useCallback((e: React.MouseEvent) => {
-    const target = e.target as HTMLElement
-
-    // Don't switch for interactive elements
-    if (target.classList.contains('wikilink') ||
-        !!target.closest('.code-copy-btn') ||
-        target.classList.contains('task-checkbox') ||
-        target.classList.contains('task-list-item-checkbox') ||
-        (target.tagName === 'INPUT') ||
-        target.tagName === 'A') return
-
-    if (!viewRef.current || !previewRef.current) return
-
-    // Get the word selected by double-click (browser auto-selects the word)
-    const selection = window.getSelection()
-    const clickedWord = selection?.toString().trim() || ''
-
-    const docText = viewRef.current.state.doc.toString()
-
-    // Skip past YAML frontmatter
-    let searchStart = 0
-    if (docText.startsWith('---')) {
-      const endIdx = docText.indexOf('\n---', 3)
-      if (endIdx !== -1) {
-        searchStart = endIdx + 4
-        if (docText[searchStart] === '\n') searchStart++
-      }
-    }
-
-    // Estimate source line via click Y relative to preview scroll height
-    const previewEl = previewRef.current
-    const previewRect = previewEl.getBoundingClientRect()
-    const clickY = e.clientY - previewRect.top + previewEl.scrollTop
-    const totalHeight = previewEl.scrollHeight
-    const ratio = totalHeight > 0 ? clickY / totalHeight : 0
-
-    const doc = viewRef.current.state.doc
-    // Estimate which line we're on (map ratio to line number, skipping frontmatter lines)
-    const firstBodyLine = doc.lineAt(searchStart).number
-    const totalLines = doc.lines
-    const bodyLines = totalLines - firstBodyLine + 1
-    const estimatedLineNum = firstBodyLine + Math.floor(bodyLines * ratio)
-    const clampedLineNum = Math.max(firstBodyLine, Math.min(totalLines, estimatedLineNum))
-    const estimatedLine = doc.line(clampedLineNum)
-
-    // Search for the clicked word on the estimated line and nearby lines (±5)
-    let cursorPos = estimatedLine.from
-    if (clickedWord && clickedWord.length > 1) {
-      const searchRadius = 5
-      let found = false
-      for (let delta = 0; delta <= searchRadius && !found; delta++) {
-        const offsets = delta === 0 ? [0] : [-delta, delta]
-        for (const d of offsets) {
-          const lineNum = clampedLineNum + d
-          if (lineNum < firstBodyLine || lineNum > totalLines) continue
-          const line = doc.line(lineNum)
-          const idx = line.text.indexOf(clickedWord)
-          if (idx >= 0) {
-            cursorPos = line.from + idx
-            found = true
-            break
-          }
-        }
-      }
-    }
-
-    // Collapse properties panel and switch to live-preview
-    setPropertiesCollapsed(true)
-    setViewMode('live-preview')
-
-    setTimeout(() => {
-      if (!viewRef.current) return
-      viewRef.current.dispatch({
-        selection: { anchor: cursorPos },
-        scrollIntoView: true
-      })
-      viewRef.current.focus()
-    }, 50)
-  }, [])
 
   // Process headings to add fold toggles
   const processHeadingFolds = useCallback((html: string): string => {
@@ -2610,6 +2788,12 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
     return () => clearTimeout(timer)
   }, [renderedMarkdown, viewMode, vaultPath, selectedNote?.path, contentVersion])
 
+  useEffect(() => {
+    const editable = editablePreviewRef.current
+    if (!editable || isPreviewDomEditingRef.current) return
+    editable.innerHTML = sanitizeHtml(renderedMarkdown)
+  }, [renderedMarkdown, contentVersion])
+
   // Wikilink Hover Preview
   useEffect(() => {
     if (viewMode !== 'preview' || !previewRef.current) return
@@ -3134,7 +3318,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
               <button
                 className={`toggle-btn ${viewMode === 'edit' ? 'active' : ''}`}
                 onClick={() => setViewMode('edit')}
-                title="Bearbeiten (Cmd+E)"
+                title="Markdown"
               >
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                   <path d="M11.5 2.5L13.5 4.5L5 13H3V11L11.5 2.5Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
@@ -3144,7 +3328,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
             <button
               className={`toggle-btn ${viewMode === 'live-preview' ? 'active' : ''}`}
               onClick={() => setViewMode('live-preview')}
-              title="Live Preview (Cmd+E)"
+              title="Schreiben (Cmd+E)"
             >
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                 <path d="M8 3C4.5 3 1.5 8 1.5 8C1.5 8 4.5 13 8 13C11.5 13 14.5 8 14.5 8C14.5 8 11.5 3 8 3Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
@@ -3154,7 +3338,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
             <button
               className={`toggle-btn ${viewMode === 'preview' ? 'active' : ''}`}
               onClick={() => setViewMode('preview')}
-              title="Vorschau (Cmd+E)"
+              title="Lesen (Cmd+E)"
             >
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                 <path d="M8 3C4.5 3 1.5 8 1.5 8C1.5 8 4.5 13 8 13C11.5 13 14.5 8 14.5 8C14.5 8 11.5 3 8 3Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
@@ -3191,10 +3375,24 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
       <div
         className={`editor-preview ${viewMode === 'preview' ? 'visible' : 'hidden'}${outlineStyle !== 'default' ? ` outline-${outlineStyle}` : ''}`}
         onClick={handlePreviewClick}
-        onDoubleClick={handlePreviewDoubleClick}
         onContextMenu={handlePreviewContextMenu}
         ref={previewRef}
       >
+        {previewToolbar && viewMode === 'preview' && (
+          <div
+            className="preview-edit-toolbar"
+            style={{ left: previewToolbar.x, top: previewToolbar.y }}
+            onMouseDown={e => e.preventDefault()}
+          >
+            <button onClick={() => applyPreviewCommand('bold')} title="Fett">B</button>
+            <button onClick={() => applyPreviewCommand('italic')} title="Kursiv"><em>I</em></button>
+            <button onClick={() => applyPreviewCommand('formatBlock', 'h1')} title="Überschrift 1">H1</button>
+            <button onClick={() => applyPreviewCommand('formatBlock', 'h2')} title="Überschrift 2">H2</button>
+            <button onClick={() => applyPreviewCommand('insertUnorderedList')} title="Liste">•</button>
+            <button onClick={() => applyPreviewCommand('insertOrderedList')} title="Nummerierte Liste">1.</button>
+            <button onClick={applyPreviewLink} title="Link">⌘</button>
+          </div>
+        )}
         {speechEnabled && viewMode === 'preview' && (
           <div className="voice-preview-controls">
             <button
@@ -3236,7 +3434,25 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
         {frontmatterTitle && (
           <h1 className="frontmatter-title">{frontmatterTitle}</h1>
         )}
-        <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(renderedMarkdown) }} />
+        <div
+          ref={editablePreviewRef}
+          className="editor-preview-editable"
+          contentEditable={viewMode === 'preview'}
+          suppressContentEditableWarning
+          spellCheck
+          onFocus={updatePreviewToolbarPosition}
+          onInput={scheduleEditablePreviewCommit}
+          onKeyUp={updatePreviewToolbarPosition}
+          onMouseUp={updatePreviewToolbarPosition}
+          onBlur={() => {
+            if (previewEditTimeoutRef.current) {
+              clearTimeout(previewEditTimeoutRef.current)
+              previewEditTimeoutRef.current = null
+            }
+            commitEditablePreview(true)
+            setPreviewToolbar(null)
+          }}
+        />
       </div>
 
       {/* Editor Footer mit Statistiken */}

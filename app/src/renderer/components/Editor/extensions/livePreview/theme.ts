@@ -158,7 +158,10 @@ export const livePreviewTheme = EditorView.theme({
     color: 'var(--text-secondary)',
   },
 
-  // Hidden syntax markers
+  // Hidden syntax markers — same approach as `codemirror-rich-markdoc`:
+  // Decoration.mark with display:none. Mark-decorations let CodeMirror's
+  // pointer-selection logic respect token boundaries correctly, while
+  // Decoration.replace({}) confused selectByMouse around hidden ranges.
   '.lp-hidden': {
     display: 'none',
   },

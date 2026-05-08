@@ -31,15 +31,13 @@ interface DecoratorContext {
 }
 
 /**
- * Check if a position is on a cursor line
+ * Writing mode intentionally stays syntax-free. The raw Markdown remains available
+ * in the separate Markdown mode, so live-preview decorations never reveal markers.
  */
-function isOnCursorLine(ctx: DecoratorContext, from: number, to: number): boolean {
-  const doc = ctx.view.state.doc
-  const startLine = doc.lineAt(from).number
-  const endLine = doc.lineAt(to).number
-  for (let line = startLine; line <= endLine; line++) {
-    if (ctx.cursorLines.has(line)) return true
-  }
+function isCursorInRange(ctx: DecoratorContext, from: number, to: number): boolean {
+  void ctx
+  void from
+  void to
   return false
 }
 
@@ -67,7 +65,7 @@ function addDecoration(
  * Decorate ATX headers (# Heading)
  */
 export function decorateHeader(ctx: DecoratorContext, node: SyntaxNode): void {
-  if (isOnCursorLine(ctx, node.from, node.to)) return
+  if (isCursorInRange(ctx, node.from, node.to)) return
 
   const text = getText(ctx.view, node.from, node.to)
   const match = text.match(/^(#{1,6})\s+/)
@@ -77,7 +75,7 @@ export function decorateHeader(ctx: DecoratorContext, node: SyntaxNode): void {
   const level = match[1].length
 
   // Hide the marker (# symbols and space)
-  addDecoration(ctx, node.from, markerEnd, Decoration.replace({}))
+  addDecoration(ctx, node.from, markerEnd, Decoration.mark({ class: 'lp-hidden' }))
 
   // Apply header styling to content
   addDecoration(
@@ -92,7 +90,7 @@ export function decorateHeader(ctx: DecoratorContext, node: SyntaxNode): void {
  * Decorate emphasis (bold/italic)
  */
 export function decorateEmphasis(ctx: DecoratorContext, node: SyntaxNode): void {
-  if (isOnCursorLine(ctx, node.from, node.to)) return
+  if (isCursorInRange(ctx, node.from, node.to)) return
 
   const text = getText(ctx.view, node.from, node.to)
 
@@ -102,8 +100,8 @@ export function decorateEmphasis(ctx: DecoratorContext, node: SyntaxNode): void 
 
   if (isBold) {
     // Bold: hide ** markers on both sides
-    addDecoration(ctx, node.from, node.from + 2, Decoration.replace({}))
-    addDecoration(ctx, node.to - 2, node.to, Decoration.replace({}))
+    addDecoration(ctx, node.from, node.from + 2, Decoration.mark({ class: 'lp-hidden' }))
+    addDecoration(ctx, node.to - 2, node.to, Decoration.mark({ class: 'lp-hidden' }))
     addDecoration(
       ctx,
       node.from + 2,
@@ -112,8 +110,8 @@ export function decorateEmphasis(ctx: DecoratorContext, node: SyntaxNode): void 
     )
   } else if (isItalic) {
     // Italic: hide * markers on both sides
-    addDecoration(ctx, node.from, node.from + 1, Decoration.replace({}))
-    addDecoration(ctx, node.to - 1, node.to, Decoration.replace({}))
+    addDecoration(ctx, node.from, node.from + 1, Decoration.mark({ class: 'lp-hidden' }))
+    addDecoration(ctx, node.to - 1, node.to, Decoration.mark({ class: 'lp-hidden' }))
     addDecoration(
       ctx,
       node.from + 1,
@@ -127,11 +125,11 @@ export function decorateEmphasis(ctx: DecoratorContext, node: SyntaxNode): void 
  * Decorate strong emphasis (bold)
  */
 export function decorateStrongEmphasis(ctx: DecoratorContext, node: SyntaxNode): void {
-  if (isOnCursorLine(ctx, node.from, node.to)) return
+  if (isCursorInRange(ctx, node.from, node.to)) return
 
   // Hide ** markers on both sides
-  addDecoration(ctx, node.from, node.from + 2, Decoration.replace({}))
-  addDecoration(ctx, node.to - 2, node.to, Decoration.replace({}))
+  addDecoration(ctx, node.from, node.from + 2, Decoration.mark({ class: 'lp-hidden' }))
+  addDecoration(ctx, node.to - 2, node.to, Decoration.mark({ class: 'lp-hidden' }))
   addDecoration(
     ctx,
     node.from + 2,
@@ -144,14 +142,14 @@ export function decorateStrongEmphasis(ctx: DecoratorContext, node: SyntaxNode):
  * Decorate inline code
  */
 export function decorateInlineCode(ctx: DecoratorContext, node: SyntaxNode): void {
-  if (isOnCursorLine(ctx, node.from, node.to)) return
+  if (isCursorInRange(ctx, node.from, node.to)) return
 
   const text = getText(ctx.view, node.from, node.to)
   const markerLen = text.startsWith('``') ? 2 : 1
 
   // Hide backticks
-  addDecoration(ctx, node.from, node.from + markerLen, Decoration.replace({}))
-  addDecoration(ctx, node.to - markerLen, node.to, Decoration.replace({}))
+  addDecoration(ctx, node.from, node.from + markerLen, Decoration.mark({ class: 'lp-hidden' }))
+  addDecoration(ctx, node.to - markerLen, node.to, Decoration.mark({ class: 'lp-hidden' }))
   addDecoration(
     ctx,
     node.from + markerLen,
@@ -164,11 +162,11 @@ export function decorateInlineCode(ctx: DecoratorContext, node: SyntaxNode): voi
  * Decorate strikethrough
  */
 export function decorateStrikethrough(ctx: DecoratorContext, node: SyntaxNode): void {
-  if (isOnCursorLine(ctx, node.from, node.to)) return
+  if (isCursorInRange(ctx, node.from, node.to)) return
 
   // Hide ~~ markers
-  addDecoration(ctx, node.from, node.from + 2, Decoration.replace({}))
-  addDecoration(ctx, node.to - 2, node.to, Decoration.replace({}))
+  addDecoration(ctx, node.from, node.from + 2, Decoration.mark({ class: 'lp-hidden' }))
+  addDecoration(ctx, node.to - 2, node.to, Decoration.mark({ class: 'lp-hidden' }))
   addDecoration(
     ctx,
     node.from + 2,
@@ -181,7 +179,7 @@ export function decorateStrikethrough(ctx: DecoratorContext, node: SyntaxNode): 
  * Decorate standard markdown links [text](url)
  */
 export function decorateLink(ctx: DecoratorContext, node: SyntaxNode): void {
-  if (isOnCursorLine(ctx, node.from, node.to)) return
+  if (isCursorInRange(ctx, node.from, node.to)) return
 
   const text = getText(ctx.view, node.from, node.to)
   const match = text.match(/^\[([^\]]*)\]\(([^)]*)\)$/)
@@ -200,7 +198,7 @@ export function decorateLink(ctx: DecoratorContext, node: SyntaxNode): void {
  * Decorate wikilinks [[target]] or [[target|alias]]
  */
 export function decorateWikilink(ctx: DecoratorContext, from: number, to: number): void {
-  if (isOnCursorLine(ctx, from, to)) return
+  if (isCursorInRange(ctx, from, to)) return
 
   const text = getText(ctx.view, from, to)
   const match = text.match(/^\[\[([^\]|#]+)(?:#([^\]|]+))?(?:\|([^\]]+))?\]\]$/)
@@ -219,7 +217,7 @@ export function decorateWikilink(ctx: DecoratorContext, from: number, to: number
  * Decorate tags #tag
  */
 export function decorateTag(ctx: DecoratorContext, from: number, to: number): void {
-  if (isOnCursorLine(ctx, from, to)) return
+  if (isCursorInRange(ctx, from, to)) return
 
   const text = getText(ctx.view, from, to)
   if (!text.startsWith('#') || text.match(/^#{1,6}\s/)) return // Not a tag if it's a header
@@ -231,7 +229,7 @@ export function decorateTag(ctx: DecoratorContext, from: number, to: number): vo
  * Decorate blockquotes
  */
 export function decorateBlockquote(ctx: DecoratorContext, node: SyntaxNode): void {
-  if (isOnCursorLine(ctx, node.from, node.to)) return
+  if (isCursorInRange(ctx, node.from, node.to)) return
 
   const text = getText(ctx.view, node.from, node.to)
 
@@ -266,7 +264,7 @@ export function decorateBlockquote(ctx: DecoratorContext, node: SyntaxNode): voi
   const lineMatch = text.match(/^>\s?/)
   if (lineMatch) {
     const markerEnd = node.from + lineMatch[0].length
-    addDecoration(ctx, node.from, markerEnd, Decoration.replace({}))
+    addDecoration(ctx, node.from, markerEnd, Decoration.mark({ class: 'lp-hidden' }))
     // Apply blockquote styling only to content after the marker
     if (markerEnd < node.to) {
       addDecoration(ctx, markerEnd, node.to, Decoration.mark({ class: 'lp-blockquote' }))
@@ -278,7 +276,7 @@ export function decorateBlockquote(ctx: DecoratorContext, node: SyntaxNode): voi
  * Decorate task list items
  */
 export function decorateTaskList(ctx: DecoratorContext, node: SyntaxNode): void {
-  if (isOnCursorLine(ctx, node.from, node.to)) return
+  if (isCursorInRange(ctx, node.from, node.to)) return
 
   const text = getText(ctx.view, node.from, node.to)
   const match = text.match(/^(\s*[-*+]\s+)\[([ xX])\](\s*)/)
@@ -312,7 +310,7 @@ export function decorateTaskList(ctx: DecoratorContext, node: SyntaxNode): void 
  * Decorate horizontal rules
  */
 export function decorateHorizontalRule(ctx: DecoratorContext, node: SyntaxNode): void {
-  if (isOnCursorLine(ctx, node.from, node.to)) return
+  if (isCursorInRange(ctx, node.from, node.to)) return
 
   // Clamp to line end — the syntax tree node may include a trailing newline
   const line = ctx.view.state.doc.lineAt(node.from)
@@ -414,7 +412,7 @@ export function createDecoratorContext(
  * Handles both images and PDFs
  */
 export function decorateImage(ctx: DecoratorContext, from: number, to: number): void {
-  if (isOnCursorLine(ctx, from, to)) return
+  if (isCursorInRange(ctx, from, to)) return
 
   const text = getText(ctx.view, from, to)
   const parsed = parseObsidianEmbedSyntax(text)

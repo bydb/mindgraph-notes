@@ -2,6 +2,25 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.6.3-beta] - 2026-05-08
+
+### Features
+
+- **Neuer „Schreiben"-Modus als Standard**: Die Editor-Ansichten heißen jetzt **Markdown** (Quelltext, optional), **Schreiben** (formatierte Live-Ansicht, neuer Default) und **Lesen** (read-only mit Inline-Edit). Der Schreiben-Modus zeigt nur noch das fertige Schriftbild — Markdown-Marker (`**`, `_`, `#`, `[[…]]`) sind komplett ausgeblendet, statt nur auf der Cursor-Zeile sichtbar zu werden. Wer den reinen Quelltext braucht, aktiviert den Markdown-Modus über den Schalter in den Einstellungen.
+- **Lesen-Modus mit Inline-Editing**: Die bisher rein gerenderte Vorschau ist jetzt direkt editierbar. Beim Markieren erscheint eine Floating-Toolbar mit Bold/Kursiv/Überschriften/Listen/Link, die Änderungen werden via `turndown` zurück in Markdown konvertiert und gespeichert. Damit lassen sich kleine Korrekturen an einer fertig formatierten Notiz machen, ohne die Ansicht zu wechseln.
+- **Cmd/Ctrl+Click öffnet Wikilinks und externe Links** im Schreiben-Modus, normale Klicks bleiben fürs Bearbeiten reserviert. Inline-Checkboxen lassen sich per Klick togglen.
+
+### Improvements
+
+- **LanguageTool-Vorschläge sind ehrlicher**: Vorschläge, die nur Whitespace ändern (z.B. ein verstecktes Leerzeichen einfügen oder entfernen), sehen im Button identisch zum Original aus und haben User in der Vergangenheit zu unbeabsichtigten Annahmen verleitet. Solche Replacements werden jetzt rausgefiltert.
+- **LanguageTool: Cursor bleibt nach „Übernehmen" stehen**, statt ans Ende des korrigierten Worts zu springen. Wer mitten im Satz korrigiert, kann ohne Maus-Reach weiterschreiben.
+- **Settings-Schutz**: Wer den Markdown-Modus deaktiviert, hat ihn nicht mehr versehentlich als Default ausgewählt — die Voreinstellung springt automatisch auf „Schreiben". Migration für Bestandsuser: alter `preview`-Default wird beim Start auf `live-preview` umgeschrieben (außer beim Profil „Nur ansehen").
+- **UI durchgängig auf neue Modus-Bezeichnungen**: Buttons, Tooltips, Settings-Labels, Onboarding-Guide und Hilfe-Texte wurden auf Deutsch und Englisch konsistent umgestellt.
+
+### Fixes
+
+- **WYSIWYG-Roundtrip schützt PDF-, Office-, Mermaid- und Dataview-Embeds**: Wer im Lesen-Modus Text neben einem PDF-Embed bearbeitete, hat das Embed beim Speichern stillschweigend verloren — der HTML→Markdown-Roundtrip strippte den Embed-Container, bevor `turndown` ihn überhaupt zu sehen bekam. Jetzt rekonstruieren vier neue Turndown-Regeln die Original-Syntax aus den `data`-Attributen (`data-filename` für PDF/Office, `data-query` für Dataview, neu `data-source` für Mermaid, da der `<pre>` beim SVG-Render verschwindet). Round-Trip mit 14 Szenarien getestet — auch Edits zwischen mehreren Embeds, Sonderzeichen im Mermaid-Code und Multiline-Dataview-Queries sind sicher.
+
 ## [0.6.2-beta] - 2026-05-07
 
 ### Fixes
