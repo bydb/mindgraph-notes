@@ -2,6 +2,16 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.6.32-beta] - 2026-05-09
+
+### Fixes
+
+- **Wikilinks im Lesen-Modus öffnen wieder die Zielnotiz**: In v0.6.31-beta wurde versehentlich Cmd/Ctrl als Voraussetzung eingeführt, damit man im Wikilink-Text editieren kann — in der Praxis hat ein normaler Klick aber einfach nichts mehr getan, weil der Lesen-Modus zum Lesen, nicht Editieren gedacht ist. Jetzt öffnet jeder Klick die verlinkte Notiz, analog zu externen Links und konsistent mit Obsidians Read-View. Wer im Wikilink-Text etwas ändern will, wechselt in den Schreiben- oder Markdown-Modus.
+
+### Improvements
+
+- **Wikilink-Klick-Handler ist robuster gegen verschachtelte Formatierung**: Statt nur direkte `target.classList`-Treffer zu zählen, sucht der Handler jetzt via `closest('.wikilink')` nach dem nächsten Wikilink-Anker im Klick-Pfad. Damit funktioniert der Klick auch zuverlässig, wenn der Wikilink-Text fett, kursiv oder anderweitig geschachtelt ist.
+
 ## [0.6.31-beta] - 2026-05-08
 
 ### Features

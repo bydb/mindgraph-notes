@@ -2266,12 +2266,15 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
       }
     }
 
-    // Wikilink click handling
-    if (target.classList.contains('wikilink')) {
-      if (!(e.metaKey || e.ctrlKey)) return
+    // Wikilink click handling — closest() statt direkter classList-Check, damit auch
+    // verschachtelte Formatierung im Linktext (z.B. fett/kursiv) den Wikilink trifft.
+    // Im Lesen-Modus öffnet jeder Klick die Notiz (analog zu externen Links).
+    const wikilinkEl = (target.closest('.wikilink') as HTMLAnchorElement | null)
+    if (wikilinkEl) {
       e.preventDefault()
-      const linkText = target.getAttribute('data-link')
-      const fragment = target.getAttribute('data-fragment') || ''
+      e.stopPropagation()
+      const linkText = wikilinkEl.getAttribute('data-link')
+      const fragment = wikilinkEl.getAttribute('data-fragment') || ''
 
       if (linkText) {
         // Find note by title or filename
