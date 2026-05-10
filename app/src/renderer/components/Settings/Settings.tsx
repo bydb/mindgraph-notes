@@ -1283,7 +1283,40 @@ const DashboardSettingsTab: React.FC<{ t: TabTFn }> = ({ t }) => {
           onChange={e => setDashboard({ calendarDaysAhead: Math.max(0, Math.min(14, Number(e.target.value) || 0)) })}
         />
       </div>
+
+      <h3>{t('settings.tasks.leadTime.title')}</h3>
+      <p className="settings-hint">{t('settings.tasks.leadTime.hint')}</p>
+      <TaskLeadTimeRows t={t} />
     </div>
+  )
+}
+
+const TaskLeadTimeRows: React.FC<{ t: TabTFn }> = ({ t }) => {
+  const taskLeadTime = useUIStore(state => state.taskLeadTime)
+  const setTaskLeadTime = useUIStore(state => state.setTaskLeadTime)
+  return (
+    <>
+      <div className="settings-row">
+        <label>{t('settings.tasks.leadTime.critical')}</label>
+        <input
+          type="number"
+          min={0}
+          max={30}
+          value={taskLeadTime.critical}
+          onChange={e => setTaskLeadTime({ critical: Math.max(0, Math.min(30, Number(e.target.value) || 0)) })}
+        />
+      </div>
+      <div className="settings-row">
+        <label>{t('settings.tasks.leadTime.normal')}</label>
+        <input
+          type="number"
+          min={0}
+          max={30}
+          value={taskLeadTime.normal}
+          onChange={e => setTaskLeadTime({ normal: Math.max(0, Math.min(30, Number(e.target.value) || 0)) })}
+        />
+      </div>
+    </>
   )
 }
 

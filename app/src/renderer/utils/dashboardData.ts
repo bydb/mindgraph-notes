@@ -1,6 +1,8 @@
 import type { EmailMessage, EdooboxOfferDashboard, EdooboxBooking, CalendarEvent, Note } from '../../shared/types'
 import { extractTasks, type ExtractedTask } from './linkExtractor'
 import { getContextMemorySummary, type ContextMemorySummary } from './contextMemory'
+import { bucketForTask } from './taskBuckets'
+import type { TaskLeadTime } from '../stores/uiStore'
 
 export interface DashboardTask extends ExtractedTask {
   noteId: string
@@ -11,7 +13,8 @@ export interface DashboardTask extends ExtractedTask {
 export interface TaskBuckets {
   overdue: DashboardTask[]
   today: DashboardTask[]
-  upcoming: DashboardTask[]   // > heute, < 7 Tage
+  soon: DashboardTask[]       // innerhalb Lead-Time
+  later: DashboardTask[]      // dahinter, max 14 Tage Voraus
 }
 
 export interface EmailActionItem {
@@ -72,9 +75,10 @@ function startOfDay(d: Date): Date {
 export async function collectTasks(
   notes: Note[],
   vaultPath: string | null,
-  excludedFolders: string[]
+  excludedFolders: string[],
+  leadTime: TaskLeadTime
 ): Promise<TaskBuckets> {
-  const empty: TaskBuckets = { overdue: [], today: [], upcoming: [] }
+  const empty: TaskBuckets = { overdue: [], today: [], soon: [], later: [] }
   if (!vaultPath) return empty
 
   const relevant = notes.filter(note =>
@@ -104,17 +108,22 @@ export async function collectTasks(
   }
 
   const today = startOfDay(new Date())
-  const tomorrow = new Date(today.getTime() + MS_PER_DAY)
-  const inOneWeek = new Date(today.getTime() + 7 * MS_PER_DAY)
+  const horizon = new Date(today.getTime() + 14 * MS_PER_DAY)
 
   const byDue = (a: DashboardTask, b: DashboardTask) =>
     (a.dueDate!.getTime()) - (b.dueDate!.getTime())
 
-  return {
-    overdue: all.filter(t => t.dueDate! < today).sort(byDue),
-    today: all.filter(t => t.dueDate! >= today && t.dueDate! < tomorrow).sort(byDue),
-    upcoming: all.filter(t => t.dueDate! >= tomorrow && t.dueDate! < inOneWeek).sort(byDue)
+  const buckets: TaskBuckets = { overdue: [], today: [], soon: [], later: [] }
+  for (const task of all) {
+    if (task.dueDate! >= horizon) continue
+    const bucket = bucketForTask(task, leadTime, today)
+    buckets[bucket].push(task)
   }
+  buckets.overdue.sort(byDue)
+  buckets.today.sort(byDue)
+  buckets.soon.sort(byDue)
+  buckets.later.sort(byDue)
+  return buckets
 }
 
 export function collectEmailActions(emails: EmailMessage[]): EmailActionItem[] {
@@ -251,11 +260,12 @@ export interface SnapshotInputs {
   bookingsSinceIso: string | null
   calendarDaysAhead: number
   includeCalendar: boolean
+  taskLeadTime: TaskLeadTime
 }
 
 export async function buildDashboardSnapshot(input: SnapshotInputs): Promise<DashboardSnapshot> {
   const [tasks, calendarRes] = await Promise.all([
-    collectTasks(input.notes, input.vaultPath, input.excludedFolders),
+    collectTasks(input.notes, input.vaultPath, input.excludedFolders, input.taskLeadTime),
     input.includeCalendar ? collectCalendar(input.calendarDaysAhead) : Promise.resolve<CalendarResult>({ items: [] })
   ])
   return {

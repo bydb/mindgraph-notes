@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react'
 import { ReactFlowProvider } from 'reactflow'
 import { Sidebar } from './components/Sidebar/Sidebar'
+import { QuickEventModal } from './components/Sidebar/QuickEventModal'
 import { MarkdownEditor } from './components/Editor/MarkdownEditor'
 import { BacklinksPanel } from './components/Editor/BacklinksPanel'
 import { GraphCanvas } from './components/Canvas/GraphCanvas'
@@ -1092,6 +1093,10 @@ const App: React.FC = () => {
                   <DashboardView
                     onOpenInbox={() => switchRightPanel('inbox')}
                     onOpenAgent={() => switchRightPanel('agent')}
+                    onOpenSmartConnections={smartConnectionsEnabled ? (noteId) => {
+                      selectNote(noteId)
+                      switchRightPanel('smartConnections')
+                    } : undefined}
                   />
                 ) : activeTab?.type === 'code' && activeTab.codePath && vaultPath ? (
                   <CodeViewer vaultPath={vaultPath} relativePath={activeTab.codePath} />
@@ -1346,6 +1351,9 @@ const App: React.FC = () => {
           }}
         />
       )}
+
+      {/* Quick-Event Modal — global gemountet, getriggert via uiStore.quickEventModalOpen */}
+      <QuickEventModal />
     </ReactFlowProvider>
   )
 }

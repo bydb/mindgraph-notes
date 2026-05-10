@@ -2,6 +2,29 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.6.33-beta] - 2026-05-10
+
+### Features
+
+- **Quick-Event-Modal**: Neue Komponente (`Sidebar/QuickEventModal.tsx`), erreichbar u.a. über den Kalender-Button im Overdue-Panel. Einen Termin in einem Schritt anlegen — Titel, Datum, Uhrzeit, Dauer, Ort — die App schreibt eine Markdown-Notiz mit korrektem Frontmatter und kopiert ggf. zum konfigurierten Transport-Ziel. Der Modal hängt jetzt in `App.tsx` statt in der Sidebar, damit er auch bei zugeklappter Sidebar erreichbar bleibt.
+- **Konfigurierbare Aufgaben-Lead-Time**: Im Dashboard-Tab der Einstellungen lässt sich pro Stufe (kritisch / normal) festlegen, wie viele Tage vor Fälligkeit eine Aufgabe in den „Bald fällig"-Bucket rückt. Default: kritisch=7, normal=1. Der Aufgaben-Bucket im Dashboard-Widget heißt jetzt **Bald** (innerhalb Lead-Time) und **Später** (dahinter, bis 14 Tage Voraus) statt eines pauschalen 7-Tage-Fensters.
+- **Soft-Highlight für dringende Tasks im Editor**: Tasks mit `#dringend`, `#kritisch`, `#urgent`, `!!`, `[!]` o.ä. bekommen im Live-Preview-Modus einen leichten roten Hintergrund. Das Pattern liegt in `shared/taskExtractor.ts` (`CRITICAL_TASK_PATTERN`) und wird sowohl vom Parser als auch vom Editor-Decorator wiederverwendet.
+- **Email-Notizen erben Reply-Urgency**: Wenn die KI-Analyse `replyUrgency='high'` liefert, taggt die Email-Notiz die generierten Tasks mit `#dringend` und ergänzt das Frontmatter-Tag. Damit wandern dringende Email-Antworten automatisch in den kritischen Lead-Time-Bucket.
+- **Web-Recherche- und Smart-Connections-Buttons im Radar**: Pro Radar-Zeile zwei dezente Action-Buttons (erscheinen beim Hover): 🌐 öffnet Google mit dem bereinigten Notiz-Titel als Suchquery (Zettelkasten-ID-Präfix wird vorher entfernt), 🧠 wählt die Notiz aus und öffnet das SmartConnections-Panel. Bewusst on-demand statt Auto-Vorschlägen.
+
+### Improvements
+
+- **Dashboard-Initial-Load lädt Vault frisch**: Beim ersten Mount des Dashboards läuft jetzt einmalig dieselbe Reload-Operation wie beim „Aktualisieren"-Button. Vorher kamen nach Cmd+R die Notizen ohne Content aus dem Sidebar-Cache, frontmatter-markierte Problem-Notizen wurden nicht erkannt, und der Radar zeigte einen anderen Stand als nach Klick auf den Refresh-Knopf. Jetzt sehen beide Wege denselben Daten-Pool.
+- **Radar-Score-Mischung statt `Math.max`**: KI-Score (0–100) ist die Hauptbewertung, Heuristik (Termin heute, kritische Tasks, frische Bearbeitung) addiert einen gedeckelten Boost (max +25). Vorher hat `Math.max` die Heuristik-Skala plattgebügelt — jede Notiz mit aiScore ≥ 40 landete oben, aktuelle Tagessignale wurden unsichtbar. Notizen ohne KI-Analyse mit aktivem Trigger bekommen einen Default-Sockel von 35, damit sie nicht systematisch hinter analysierten Altlasten landen.
+- **Auto-Lösungsvorschläge im Radar entfernt**: Die grünen „Lösung:"- und „Kontext:"-Badges (Keyword-/später Embedding-basiert) waren bei Notizen wie „Termin mit Jens" reine Spekulation, weil die App das Weltwissen nicht hat. Stattdessen entscheidet der Nutzer explizit über die neuen Action-Buttons. Auch der Smart-Pairing-Score-Booster ist weg, der auf demselben unzuverlässigen Signal lief.
+- **Radar-AI-Worker: Kandidaten einmalig vorgefiltert**: Bei großen Vaults (4000+ Notizen) hat die alte Per-Render-Kandidaten-Filterung das Dashboard sekundenlang einfrieren lassen. Jetzt werden problem-/solution-/info-Notizen einmal pro Snapshot gefiltert.
+- **Radar-AI-Spinner-State zuverlässig**: Wenn der Effect während eines laufenden KI-Batches re-fired (z.B. weil sich `aiEnabled` kurzzeitig ändert), wurde im alten Closure `canUpdateLocalState=false` gesetzt — damit liefen die per-Notiz-`setAnalyzingIds(...delete)`-Aufrufe ins Leere und der Spinner drehte endlos, obwohl der `[Radar] AI worker batch finished`-Log längst erschien. Am Batch-Ende werden jetzt defensiv alle eigenen Kandidaten-IDs aus dem Set entfernt.
+
+### Cleanup
+
+- **Tote Pfade nach Lösungs-UI-Entfernung**: `findRadarConnection`, `scoreEmbeddingConnection`, `cosineSimilarity`, `EmbeddingsCache`-Typen, `correction`-State + `correctionCandidates`-Memo, `renderConnection`, `solveDialog`-State + `SolveProblemDialog`-Komponente, `handleConfirmSolve`-Callback und der Embeddings-Cache-Loader im RadarWidget — alle nicht mehr erreichbar, alle entfernt.
+- **`CRITICAL_TASK_PATTERN` zentralisiert**: Das Regex-Pattern für kritische Tasks wandert aus `isCriticalTask` heraus und wird von Parser und Editor-Decorator gemeinsam genutzt — vorher war es zweimal hingeschrieben, hatte das Risiko auseinanderzulaufen.
+
 ## [0.6.32-beta] - 2026-05-09
 
 ### Fixes

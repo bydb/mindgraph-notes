@@ -337,6 +337,15 @@ export interface DailyNoteSettings {
   dateFormat: string
 }
 
+// Vorlauf in Tagen, ab wann eine Aufgabe in den "Bald fällig"-Bucket rückt.
+// Mapping: kritisch (#dringend etc.) → critical, sonst → normal.
+// `high` ist als Reserve-Stufe für künftige Differenzierung vorhanden.
+export interface TaskLeadTime {
+  critical: number
+  high: number
+  normal: number
+}
+
 
 export interface TransportDestination {
   label: string
@@ -675,6 +684,14 @@ interface UIState {
   // Telegram Bot
   telegramBot: TelegramBotSettings
   setTelegramBot: (settings: Partial<TelegramBotSettings>) => void
+
+  // Aufgaben-Vorlauf (Lead Time)
+  taskLeadTime: TaskLeadTime
+  setTaskLeadTime: (settings: Partial<TaskLeadTime>) => void
+
+  // Quick-Event-Modal (transient)
+  quickEventModalOpen: boolean
+  setQuickEventModalOpen: (open: boolean) => void
 }
 
 // Default-Werte für den Store
@@ -944,7 +961,17 @@ const defaultState = {
     agentMaxIterations: 8,
     agentAllowedTools: ['note_search', 'note_read', 'task_list', 'calendar_list'],
     agentConfirmTools: ['note_create', 'note_append', 'task_toggle']
-  } as TelegramBotSettings
+  } as TelegramBotSettings,
+
+  // Aufgaben-Vorlauf
+  taskLeadTime: {
+    critical: 7,
+    high: 3,
+    normal: 1
+  } as TaskLeadTime,
+
+  // Quick-Event-Modal (transient — nicht persisted)
+  quickEventModalOpen: false
 }
 
 // Felder die persistiert werden sollen (keine Funktionen, keine transienten Werte)
@@ -968,7 +995,8 @@ const persistedKeys = [
   'showRawEditor',
   'transport',
   'dashboard',
-  'telegramBot'
+  'telegramBot',
+  'taskLeadTime'
 ] as const
 
 export const useUIStore = create<UIState>()((set, get) => ({
@@ -1107,6 +1135,10 @@ export const useUIStore = create<UIState>()((set, get) => ({
   setTelegramBot: (settings) => set((state) => ({
     telegramBot: { ...state.telegramBot, ...settings }
   })),
+  setTaskLeadTime: (settings) => set((state) => ({
+    taskLeadTime: { ...state.taskLeadTime, ...settings }
+  })),
+  setQuickEventModalOpen: (open) => set({ quickEventModalOpen: open }),
   applyProfileDefaults: (profile) => {
     if (!profile) return
     switch (profile) {

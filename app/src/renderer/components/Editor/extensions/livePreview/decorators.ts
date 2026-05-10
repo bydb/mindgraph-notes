@@ -12,6 +12,7 @@ import {
   PdfEmbedWidget,
 } from './widgets'
 import { parseObsidianEmbedSyntax } from '../../../../utils/imageUtils'
+import { CRITICAL_TASK_PATTERN } from '../../../../../shared/taskExtractor'
 
 /**
  * Get text content for a node range
@@ -303,6 +304,12 @@ export function decorateTaskList(ctx: DecoratorContext, node: SyntaxNode): void 
       node.to,
       Decoration.mark({ class: 'lp-task-checked' })
     )
+  }
+
+  // Soft-Highlight bei kritischen/dringenden Tasks (Pattern aus shared/taskExtractor.ts)
+  if (!isChecked && CRITICAL_TASK_PATTERN.test(text)) {
+    const lineStart = ctx.view.state.doc.lineAt(node.from).from
+    addDecoration(ctx, lineStart, lineStart, Decoration.line({ class: 'cm-task-urgent' }))
   }
 }
 

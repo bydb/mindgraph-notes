@@ -6118,6 +6118,8 @@ ipcMain.handle('email-create-note', async (_event, vaultPath: string, email: {
     extractedInfo: string[]
     categories: string[]
     suggestedActions?: (Record<string, unknown> | string)[]
+    needsReply?: boolean
+    replyUrgency?: 'low' | 'medium' | 'high'
   }
 }, inboxFolderName?: string) => {
   try {
@@ -6219,7 +6221,7 @@ ipcMain.handle('email-create-note', async (_event, vaultPath: string, email: {
     lines.push(`von: "[[${email.from.name || email.from.address}]]"`)
     lines.push('tags:')
     lines.push('  - email')
-    if (email.analysis?.sentiment === 'urgent') {
+    if (email.analysis?.sentiment === 'urgent' || email.analysis?.replyUrgency === 'high') {
       lines.push('  - dringend')
     }
     lines.push('---')
@@ -6292,6 +6294,7 @@ ipcMain.handle('email-create-note', async (_event, vaultPath: string, email: {
         fallbackDate = emailDate.toISOString().split('T')[0]
       }
 
+      const urgentSuffix = email.analysis.replyUrgency === 'high' ? ' #dringend' : ''
       const actionLines: string[] = []
       for (const item of email.analysis.suggestedActions) {
         if (typeof item === 'object' && item !== null) {
@@ -6308,7 +6311,7 @@ ipcMain.handle('email-create-note', async (_event, vaultPath: string, email: {
             const finalDate = dateMatch ? actionDate : fallbackDate
             const finalTime = actionTime || fallbackTime
             const timePart = finalTime ? ` ${finalTime}` : ''
-            actionLines.push(`- [ ] ${action} (@[[${finalDate}]]${timePart})`)
+            actionLines.push(`- [ ] ${action} (@[[${finalDate}]]${timePart})${urgentSuffix}`)
           }
         } else if (typeof item === 'string' && item.length > 0 && item !== '{}') {
           // Fallback: Versuche Datum aus String zu extrahieren (DD.MM.YYYY)
@@ -6318,7 +6321,7 @@ ipcMain.handle('email-create-note', async (_event, vaultPath: string, email: {
           const timeInStr = item.match(/(\d{1,2}:\d{2})/)
           const finalTime = timeInStr ? timeInStr[1] : fallbackTime
           const timePart = finalTime ? ` ${finalTime}` : ''
-          actionLines.push(`- [ ] ${item} (@[[${finalDate}]]${timePart})`)
+          actionLines.push(`- [ ] ${item} (@[[${finalDate}]]${timePart})${urgentSuffix}`)
         }
       }
       if (actionLines.length > 0) {

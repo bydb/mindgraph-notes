@@ -538,6 +538,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ onOpenSearch }) => {
       )}
 
       {/* Dialog für neue Notiz */}
+      {/* QuickEventModal ist in App.tsx gemountet, damit er auch bei geschlossener Sidebar erreichbar bleibt. */}
       {newNoteDialogOpen && (
         <div className="new-note-dialog-overlay" onClick={() => setNewNoteDialogOpen(false)}>
           <div className="new-note-dialog" onClick={(e) => e.stopPropagation()}>
@@ -564,6 +565,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ onOpenSearch }) => {
           </div>
         </div>
       )}
+
     </div>
   )
 }

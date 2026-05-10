@@ -61,8 +61,28 @@ function isOverdue(date: Date): boolean {
   return date < todayStart
 }
 
+/**
+ * Anzahl Tage bis zum Fälligkeitsdatum, gerechnet auf Tagesgrenzen (00:00).
+ * Negative Werte = überfällig, 0 = heute, positive Werte = in der Zukunft.
+ */
+export function daysUntilDue(due: Date, now: Date = new Date()): number {
+  const dueStart = new Date(due.getFullYear(), due.getMonth(), due.getDate()).getTime()
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()
+  return Math.round((dueStart - todayStart) / 86_400_000)
+}
+
+// Mustern, an denen eine Aufgabe als kritisch/dringend markiert ist.
+// Wird vom Parser (isCriticalTask) UND vom Editor-Decorator wiederverwendet,
+// damit Anzeige und Bucket-Logik nicht auseinanderlaufen.
+export const CRITICAL_TASK_PATTERN = /#critical|#kritisch|#urgent|#dringend|@critical|@urgent|@dringend|!{2,}|\[!\]/i
+
 function isCriticalTask(text: string): boolean {
-  return /#critical|#kritisch|#urgent|#dringend|@critical|@urgent|@dringend|!{2,}|\[!\]/i.test(text)
+  return CRITICAL_TASK_PATTERN.test(text)
+}
+
+export function isCriticalLine(line: string): boolean {
+  if (!TASK_LINE_REGEX.test(line)) return false
+  return CRITICAL_TASK_PATTERN.test(line)
 }
 
 export function extractTasks(content: string): TaskSummary {

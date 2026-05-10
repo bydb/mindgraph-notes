@@ -375,6 +375,14 @@
   flex-shrink: 0;
 }
 
+.dv-task-row.dv-task-urgent {
+  background: rgba(255, 0, 0, 0.08);
+}
+
+.dv-task-row.dv-task-urgent:hover {
+  background: rgba(255, 0, 0, 0.14);
+}
+
 /* Shared list */
 .dv-list {
   display: flex;
@@ -625,6 +633,43 @@
   cursor: pointer;
   opacity: 0;
   transition: opacity 0.12s, background 0.12s, color 0.12s, border-color 0.12s;
+}
+
+/* Radar-Row Action-Buttons (Web-Recherche, Smart Connections) — bewusst dezent, nur on-demand
+ * vom User klickbar. Auto-Vorschläge der „Lösung" wurden 2026-05 entfernt, weil sie ohne
+ * Weltwissen nur Quatsch produzierten. */
+.dv-radar-actions {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+  align-self: center;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+
+.dv-radar-row:hover .dv-radar-actions,
+.dv-radar-row:focus-within .dv-radar-actions {
+  opacity: 1;
+}
+
+.dv-radar-action {
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border-subtle);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+}
+
+.dv-radar-action:hover {
+  background: var(--accent-color, #ff6b6b);
+  color: white;
+  border-color: var(--accent-color, #ff6b6b);
 }
 
 .dv-email-row:hover .dv-email-done-btn {

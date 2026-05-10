@@ -27,10 +27,7 @@ import {
   getNoteKindFromTitleStrict,
   stripNoteKindMarker,
   getNoteStatus,
-  getNoteRelevance,
-  markProblemSolvedInContent,
-  addSolvedForBacklinkInContent,
-  completeOpenTasksInContent
+  getNoteRelevance
 } from '../../utils/noteKind'
 import { ErrorBoundary } from '../ErrorBoundary'
 import './DashboardView.css'
@@ -38,7 +35,6 @@ import './DashboardView.css'
 type TFn = (key: TranslationKey, params?: Record<string, string | number>) => string
 
 type RadarFeedbackValue = 'positive' | 'negative'
-type RadarFeedback = Record<string, RadarFeedbackValue>
 
 const SLEEPING_THRESHOLD_DAYS = 14
 const RADAR_HISTORY_RETAIN_DAYS = 7
@@ -47,11 +43,6 @@ const RADAR_HISTORY_RETAIN_DAYS = 7
 // Keep the expensive Ollama relevance worker singleton at module level so a new
 // widget instance does not start a second batch while the previous one is still running.
 let radarAiWorkerRunning = false
-
-const getRadarFeedbackKey = (vaultPath: string | null): string => `mindgraph:radar-feedback:${vaultPath || 'default'}`
-
-const getRadarFeedbackId = (sourceId: string, targetId: string, role: 'solution' | 'context'): string =>
-  `${sourceId}::${role}::${targetId}`
 
 const getRadarHistoryKey = (vaultPath: string | null): string => `mindgraph:radar-history:${vaultPath || 'default'}`
 
@@ -90,6 +81,7 @@ const saveRelevanceCache = (vaultPath: string | null, cache: RelevanceCacheMap):
     // localStorage voll/gesperrt — kein kritisches Problem
   }
 }
+
 
 interface RadarHistoryEntry {
   date: string  // YYYY-MM-DD
@@ -136,6 +128,7 @@ const getPreviousScores = (history: RadarHistoryEntry[]): Record<string, number>
 interface DashboardViewProps {
   onOpenInbox?: () => void
   onOpenAgent?: () => void
+  onOpenSmartConnections?: (noteId: string) => void
 }
 
 const collectMarkdownPaths = (entries: FileEntry[], includePdfCompanions: boolean): string[] => {
@@ -178,32 +171,26 @@ const reloadVaultNotesForDashboard = async (vaultPath: string): Promise<Note[]> 
   return notes
 }
 
-export const DashboardView: React.FC<DashboardViewProps> = ({ onOpenInbox, onOpenAgent }) => {
+export const DashboardView: React.FC<DashboardViewProps> = ({ onOpenInbox, onOpenAgent, onOpenSmartConnections }) => {
   const { t } = useTranslation()
   const { notes, vaultPath, selectNote } = useNotesStore()
-  const { taskExcludedFolders, dashboard } = useUIStore()
+  const { taskExcludedFolders, dashboard, taskLeadTime } = useUIStore()
   const emails = useEmailStore(state => state.emails)
   const loadDashboardOffers = useAgentStore(state => state.loadDashboard)
 
   const [snapshot, setSnapshot] = useState<DashboardSnapshot | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isRefreshing, setIsRefreshing] = useState(false)
-  const [radarFeedback, setRadarFeedback] = useState<RadarFeedback>({})
-
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem(getRadarFeedbackKey(vaultPath))
-      setRadarFeedback(raw ? JSON.parse(raw) : {})
-    } catch {
-      setRadarFeedback({})
-    }
-  }, [vaultPath])
 
   // Refs für robustes Reload-Verhalten:
   // - isInitialLoadRef: setIsLoading(true) nur beim ersten Load, sonst silent reload
   // - loadDebounceTimer: viele schnelle updateNote-Calls (KI-Worker) lösen sonst pro Notiz einen Full-Reload
   //   aus → Dashboard flackert permanent. Debounce sammelt Updates auf 800ms.
+  // - didInitialReloadRef: beim ersten Mount einmalig den Vault frisch von Disk laden, damit auch
+  //   Notizen mit `category: problem` im Frontmatter (ohne 🔴-Prefix im Titel) im Radar erscheinen.
+  //   Ohne das hatte Cmd+R systematisch weniger Kandidaten als der Aktualisieren-Button.
   const isInitialLoadRef = useRef(true)
+  const didInitialReloadRef = useRef(false)
   const loadDebounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const loadRequestIdRef = useRef(0)
 
@@ -225,7 +212,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onOpenInbox, onOpe
         dashboardOffers: latestOffers,
         bookingsSinceIso: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString(),
         calendarDaysAhead: dashboard.calendarDaysAhead,
-        includeCalendar: true
+        includeCalendar: true,
+        taskLeadTime
       })
       if (requestId === loadRequestIdRef.current) setSnapshot(snap)
     } catch (error) {
@@ -241,12 +229,17 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onOpenInbox, onOpe
         isInitialLoadRef.current = false
       }
     }
-  }, [notes, vaultPath, taskExcludedFolders, emails, loadDashboardOffers, dashboard.calendarDaysAhead])
+  }, [notes, vaultPath, taskExcludedFolders, emails, loadDashboardOffers, dashboard.calendarDaysAhead, taskLeadTime])
 
   useEffect(() => {
-    // Initial: sofort laden. Re-Triggers (z.B. durch updateNote vom KI-Worker): 800ms debounce.
+    // Initial: sofort laden, einmalig mit reloadVault damit alle Notizen Content haben (sonst
+    // werden frontmatter-markierte Probleme nicht erkannt). Re-Triggers (z.B. durch updateNote
+    // vom KI-Worker): 800ms debounce, ohne reloadVault.
     if (loadDebounceTimer.current) clearTimeout(loadDebounceTimer.current)
-    if (isInitialLoadRef.current) {
+    if (!didInitialReloadRef.current) {
+      didInitialReloadRef.current = true
+      loadSnapshot({ reloadVault: true })
+    } else if (isInitialLoadRef.current) {
       loadSnapshot()
     } else {
       loadDebounceTimer.current = setTimeout(() => loadSnapshot(), 800)
@@ -299,16 +292,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onOpenInbox, onOpe
             notes={notes}
             vaultPath={vaultPath}
             onNoteClick={selectNote}
-            onProblemSolved={loadSnapshot}
+            onOpenSmartConnections={onOpenSmartConnections}
             t={t}
-            feedback={radarFeedback}
-            onFeedback={(sourceId, targetId, role, value) => {
-              setRadarFeedback(current => {
-                const next = { ...current, [getRadarFeedbackId(sourceId, targetId, role)]: value }
-                localStorage.setItem(getRadarFeedbackKey(vaultPath), JSON.stringify(next))
-                return next
-              })
-            }}
           />
         )
         label = t('dashboard.widgets.radar')
@@ -687,58 +672,6 @@ const getRadarKeywords = (note: Note): string[] => {
   return Array.from(new Set(base)).slice(0, 8)
 }
 
-const scoreNoteConnection = (source: Note, target: Note, sourceKeywords: string[]): number => {
-  const haystack = `${target.title} ${target.path} ${target.content.slice(0, 2200)}`.toLowerCase()
-  const keywordHits = sourceKeywords.filter(keyword => haystack.includes(keyword)).length
-  const targetTitleTokens = new Set(tokenizeRadarText(getCleanNoteTitle(target)))
-  const sourceTitleTokens = tokenizeRadarText(getCleanNoteTitle(source))
-  const titleHits = sourceTitleTokens.filter(token => targetTitleTokens.has(token)).length
-  let score = keywordHits / Math.max(1, sourceKeywords.length)
-
-  if (keywordHits < 2 && titleHits === 0) score *= 0.25
-  if (titleHits > 0) score += Math.min(0.35, titleHits * 0.18)
-
-  if (source.outgoingLinks.includes(target.id) || source.outgoingLinks.includes(target.path) || source.outgoingLinks.includes(target.title)) score += 0.35
-  if (source.incomingLinks.includes(target.id)) score += 0.25
-
-  const sourceFolder = source.path.split('/').slice(0, -1).join('/')
-  const targetFolder = target.path.split('/').slice(0, -1).join('/')
-  if (sourceFolder && sourceFolder === targetFolder) score += 0.12
-
-  return Math.min(1, score)
-}
-
-const findRadarConnection = (
-  source: Note,
-  notes: Note[],
-  kindId: 'solution' | 'info',
-  label: string,
-  sourceKeywords: string[],
-  feedback: RadarFeedback
-): RadarConnection | undefined => {
-  const role: 'solution' | 'context' = kindId === 'solution' ? 'solution' : 'context'
-  return notes
-    .filter(candidate => candidate.id !== source.id && getNoteKind(candidate)?.id === kindId)
-    .map(candidate => {
-      const feedbackValue = feedback[getRadarFeedbackId(source.id, candidate.id, role)]
-      const baseScore = scoreNoteConnection(source, candidate, sourceKeywords)
-      const adjustedScore = feedbackValue === 'positive'
-        ? Math.max(baseScore, 0.92)
-        : feedbackValue === 'negative'
-          ? Math.min(baseScore, 0.02)
-          : baseScore
-      return {
-        note: candidate,
-        score: adjustedScore,
-        label,
-        role,
-        feedback: feedbackValue
-      }
-    })
-    .filter(connection => connection.feedback === 'positive' || connection.score >= 0.32)
-    .sort((a, b) => b.score - a.score)[0]
-}
-
 const textMatchesNote = (text: string, keywords: string[]) => {
   const haystack = text.toLowerCase()
   return keywords.some(keyword => haystack.includes(keyword))
@@ -748,7 +681,6 @@ const collectRadarSnapshot = (
   notes: Note[],
   snapshot: DashboardSnapshot,
   t: TFn,
-  feedback: RadarFeedback,
   previousScores: Record<string, number> | null,
   relevanceCache: RelevanceCacheMap
 ): RadarSnapshot => {
@@ -763,7 +695,9 @@ const collectRadarSnapshot = (
   }
   snapshot.tasks.overdue.forEach(task => addTask(task, 'overdue'))
   snapshot.tasks.today.forEach(task => addTask(task, 'today'))
-  snapshot.tasks.upcoming.forEach(task => addTask(task, 'upcoming'))
+  // 'upcoming' im Radar-Score = soon + later kombiniert
+  snapshot.tasks.soon.forEach(task => addTask(task, 'upcoming'))
+  snapshot.tasks.later.forEach(task => addTask(task, 'upcoming'))
 
   const now = Date.now()
   const sevenDaysAgo = now - 7 * 24 * 60 * 60 * 1000
@@ -818,9 +752,14 @@ const collectRadarSnapshot = (
     }
 
     const keywords = getRadarKeywords(note)
-    const solution = findRadarConnection(note, notes, 'solution', t('dashboard.radar.label.solution'), keywords, feedback)
-    const context = findRadarConnection(note, notes, 'info', t('dashboard.radar.label.context'), keywords, feedback)
-    const hasPositiveFeedback = solution?.feedback === 'positive' || context?.feedback === 'positive'
+    // Lösungs-/Kontext-Vorschläge wurden 2026-05 entfernt — sowohl die Keyword-Variante als auch
+    // die Embedding-Variante haben für das Radar-UI keinen Mehrwert geliefert (z.B. „Termin mit
+    // Jens" — die App weiß nichts über die Person, ein Vorschlag ist Spekulation). Stattdessen
+    // gibt es jetzt pro Radar-Item Buttons für Web-Recherche und Smart-Connections, die der
+    // Nutzer bewusst klickt, wenn er nach einer Lösung sucht.
+    const solution: RadarConnection | undefined = undefined
+    const context: RadarConnection | undefined = undefined
+    const hasPositiveFeedback = false
 
     const matchingEmails = snapshot.emails.filter(item => {
       const emailTime = new Date(item.email.date).getTime()
@@ -887,11 +826,10 @@ const collectRadarSnapshot = (
       }
     }
 
-    // Smart-Pairing zählt nur als Score-Booster, nicht als eigenständiger Relevanz-Trigger.
-    // Wird bewusst NACH allen anderen Signal-Quellen ausgewertet, damit hasActionSignal final ist.
+    // Smart-Pairing-Score-Booster wurde 2026-05 zusammen mit den Auto-Lösungsvorschlägen entfernt:
+    // er hatte die unzuverlässigen Keyword/Embedding-Treffer ins Ranking gehoben und damit den
+    // gleichen Quatsch wie das UI produziert.
     const inScope = hasActionSignal || hasPositiveFeedback
-    if (inScope && solution) score += Math.round(solution.score * 5)
-    if (inScope && context) score += Math.round(context.score * 3)
 
     // KI-Relevanz aus dem deviceintern persistierten Cache (Stufe 2): primäre Quelle ist
     // localStorage, weil das Frontmatter sonst pro Analyse churnt und Sync-Konflikte produziert.
@@ -903,9 +841,19 @@ const collectRadarSnapshot = (
     const aiScore = typeof ai.score === 'number' ? ai.score : undefined
     const heuristicScore = inScope ? score : 0
     const hasMeaningfulAi = aiScore !== undefined && aiScore >= 40
-    const finalScore = aiScore !== undefined
-      ? Math.max(aiScore, heuristicScore)
-      : heuristicScore
+    // Score-Mischung: KI liefert die Hauptbewertung (Skala 0–100), Heuristik addiert einen
+    // gedeckelten Tagesdringlichkeits-Bonus oben drauf. Vorher Math.max — KI dominierte alles,
+    // Tagessignale unsichtbar. Erste Iteration mit Multiplikator 3 ohne Deckel — Heuristik
+    // explodierte (40+ Rohpunkte × 3 = +120), Endscores >150, KI hatte keinen Einfluss mehr.
+    // Jetzt: Boost mit Cap, sodass die KI-Skala intakt bleibt und der Bonus klar erkennbar oben
+    // draufkommt. Notizen ohne KI-Analyse mit aktivem Trigger bekommen einen Default-Sockel.
+    const heuristicBoostCap = 25
+    const aiFallback = 35
+    const heuristicBoost = Math.min(heuristicScore, heuristicBoostCap)
+    const aiBase = aiScore !== undefined
+      ? aiScore
+      : (heuristicScore > 0 ? aiFallback : 0)
+    const finalScore = aiBase + heuristicBoost
 
     const previousScore = previousScores ? previousScores[note.id] : undefined
     const delta = previousScore === undefined ? null : finalScore - previousScore
@@ -972,8 +920,8 @@ const formatBookedAt = (iso: string): string => {
 }
 
 const TasksWidget: React.FC<WidgetProps> = ({ snapshot, onTaskClick, t }) => {
-  const { overdue, today, upcoming } = snapshot.tasks
-  const total = overdue.length + today.length + upcoming.length
+  const { overdue, today, soon, later } = snapshot.tasks
+  const total = overdue.length + today.length + soon.length + later.length
   return (
     <section className="dv-widget dv-widget-tasks">
       <header className="dv-widget-header">
@@ -999,9 +947,16 @@ const TasksWidget: React.FC<WidgetProps> = ({ snapshot, onTaskClick, t }) => {
                 ))}
               </Group>
             )}
-            {upcoming.length > 0 && (
-              <Group label={t('dashboard.upcoming')}>
-                {upcoming.slice(0, 6).map(task => (
+            {soon.length > 0 && (
+              <Group label={t('dashboard.soon')}>
+                {soon.slice(0, 6).map(task => (
+                  <TaskRow key={`${task.noteId}-${task.line}`} task={task} onClick={() => onTaskClick?.(task)} showDate />
+                ))}
+              </Group>
+            )}
+            {later.length > 0 && (
+              <Group label={t('dashboard.later')}>
+                {later.slice(0, 6).map(task => (
                   <TaskRow key={`${task.noteId}-${task.line}`} task={task} onClick={() => onTaskClick?.(task)} showDate />
                 ))}
               </Group>
@@ -1021,7 +976,7 @@ const Group: React.FC<{ label: string; tone?: 'overdue'; children: React.ReactNo
 )
 
 const TaskRow: React.FC<{ task: DashboardTask; onClick: () => void; showDate?: boolean }> = ({ task, onClick, showDate }) => (
-  <div className="dv-task-row" onClick={onClick}>
+  <div className={`dv-task-row${task.isCritical ? ' dv-task-urgent' : ''}`} onClick={onClick}>
     <div className="dv-task-checkbox"/>
     <div className="dv-task-body">
       <div className="dv-task-text">{task.text}</div>
@@ -1092,10 +1047,8 @@ interface RadarWidgetProps {
   notes: Note[]
   vaultPath: string | null
   onNoteClick: (id: string) => void
-  onProblemSolved: () => void
+  onOpenSmartConnections?: (noteId: string) => void
   t: TFn
-  feedback: RadarFeedback
-  onFeedback: (sourceId: string, targetId: string, role: 'solution' | 'context', value: RadarFeedbackValue) => void
 }
 
 const renderDelta = (delta: number | null, isNew: boolean): React.ReactNode => {
@@ -1105,8 +1058,7 @@ const renderDelta = (delta: number | null, isNew: boolean): React.ReactNode => {
   return <span className="dv-radar-delta down" aria-label={`${Math.abs(delta)} weniger Druck als gestern`}>▾ {Math.abs(delta)}</span>
 }
 
-const RadarWidget: React.FC<RadarWidgetProps> = ({ snapshot, notes, vaultPath, onNoteClick, onProblemSolved, t, feedback, onFeedback }) => {
-  const updateNote = useNotesStore(state => state.updateNote)
+const RadarWidget: React.FC<RadarWidgetProps> = ({ snapshot, notes, vaultPath, onNoteClick, onOpenSmartConnections, t }) => {
   const radarHistory = React.useMemo(() => loadRadarHistory(vaultPath), [vaultPath])
   const previousScores = React.useMemo(() => getPreviousScores(radarHistory), [radarHistory])
 
@@ -1118,8 +1070,8 @@ const RadarWidget: React.FC<RadarWidgetProps> = ({ snapshot, notes, vaultPath, o
   }, [vaultPath])
 
   const radarSnapshot = React.useMemo(
-    () => collectRadarSnapshot(notes, snapshot, t, feedback, previousScores, relevanceCache),
-    [notes, snapshot, t, feedback, previousScores, relevanceCache]
+    () => collectRadarSnapshot(notes, snapshot, t, previousScores, relevanceCache),
+    [notes, snapshot, t, previousScores, relevanceCache]
   )
 
   // Heutigen Snapshot persistieren — mit Dedupe-Ref, damit identische Score-Maps nicht jeden Render
@@ -1137,8 +1089,6 @@ const RadarWidget: React.FC<RadarWidgetProps> = ({ snapshot, notes, vaultPath, o
     persistRadarSnapshot(vaultPath, todaysScores)
   }, [vaultPath, radarSnapshot])
 
-  const [correction, setCorrection] = useState<{ sourceId: string; role: 'solution' | 'context'; currentTargetId?: string; query: string } | null>(null)
-  const [solveDialog, setSolveDialog] = useState<{ item: RadarItem; connection: RadarConnection } | null>(null)
   const [sleepingOpen, setSleepingOpen] = useState<boolean>(() => {
     try {
       const ui = localStorage.getItem(getRadarUiKey(vaultPath))
@@ -1314,6 +1264,21 @@ const RadarWidget: React.FC<RadarWidgetProps> = ({ snapshot, notes, vaultPath, o
     }
     runBatch().finally(() => {
       radarAiWorkerRunning = false
+      // Defensive Spinner-Aufräumung: wenn der Effect während des Batches ein zweites Mal
+      // gefeuert hat (z.B. weil sich aiEnabled/aiModel kurzzeitig ändert), wird canUpdateLocalState
+      // im ALTEN Closure auf false gesetzt — dadurch sprangen die per-Note `setAnalyzingIds(...delete)`
+      // ins Leere, und der Spinner-Counter blieb endlos hochgezählt, obwohl die Analyse längst
+      // durch war. Am Batch-Ende garantiert alle eigenen Kandidaten-IDs entfernen, damit der
+      // Spinner zuverlässig verschwindet.
+      setAnalyzingIds(prev => {
+        if (prev.size === 0) return prev
+        const next = new Set(prev)
+        let changed = false
+        for (const id of candidateIds) {
+          if (next.delete(id)) changed = true
+        }
+        return changed ? next : prev
+      })
       console.log('[Radar] AI worker batch finished')
       // Wenn während des Batches ein weiterer Force-Refresh-Klick einging (Tick > consumed),
       // diesen jetzt nachholen — sonst geht der Klick verloren, weil der Effect beim Klick
@@ -1330,115 +1295,6 @@ const RadarWidget: React.FC<RadarWidgetProps> = ({ snapshot, notes, vaultPath, o
       // reuse the singleton lock instead of aborting and starting another Ollama batch.
     }
   }, [vaultPath, aiEnabled, aiModel, forceRefreshTick, radarAiRefreshIntervalHours])
-
-  const correctionCandidates = React.useMemo(() => {
-    if (!correction) return []
-    const wantedKind = correction.role === 'solution' ? 'solution' : 'info'
-    const query = correction.query.trim().toLowerCase()
-    return notes
-      .filter(note => note.id !== correction.sourceId && getNoteKind(note)?.id === wantedKind)
-      .filter(note => {
-        if (!query) return true
-        const haystack = `${getCleanNoteTitle(note)} ${note.path}`.toLowerCase()
-        return query.split(/\s+/).every(part => haystack.includes(part))
-      })
-      .slice(0, 7)
-  }, [correction, notes])
-
-  const renderConnection = (item: RadarItem, connection: RadarConnection) => (
-    <span className={`dv-radar-connection ${connection.role} ${connection.feedback || ''}`}>
-      <span className="dv-radar-connection-text">
-        {connection.label}: {getCleanNoteTitle(connection.note)}
-      </span>
-      <span className="dv-radar-feedback" onClick={event => event.stopPropagation()}>
-        <button
-          type="button"
-          className={connection.feedback === 'positive' ? 'active' : ''}
-          aria-label={t('dashboard.radar.feedback.fits')}
-          title={t('dashboard.radar.feedback.fits')}
-          onClick={() => onFeedback(item.note.id, connection.note.id, connection.role, 'positive')}
-        >
-          ✓
-        </button>
-        <button
-          type="button"
-          className={connection.feedback === 'negative' ? 'active' : ''}
-          aria-label={t('dashboard.radar.feedback.notFits')}
-          title={t('dashboard.radar.feedback.notFits')}
-          onClick={() => onFeedback(item.note.id, connection.note.id, connection.role, 'negative')}
-        >
-          ×
-        </button>
-        <button
-          type="button"
-          aria-label={t('dashboard.radar.feedback.better')}
-          title={t('dashboard.radar.feedback.better')}
-          onClick={() => setCorrection({
-            sourceId: item.note.id,
-            role: connection.role,
-            currentTargetId: connection.note.id,
-            query: ''
-          })}
-        >
-          …
-        </button>
-        {connection.role === 'solution' && (
-          <button
-            type="button"
-            className="solve-btn"
-            aria-label={t('dashboard.radar.solveAria')}
-            title={t('dashboard.radar.solve')}
-            onClick={() => setSolveDialog({ item, connection })}
-          >
-            ✓✓
-          </button>
-        )}
-      </span>
-    </span>
-  )
-
-  const handleConfirmSolve = useCallback(async (
-    item: RadarItem,
-    connection: RadarConnection,
-    options: { addBacklink: boolean; closeTasks: boolean }
-  ) => {
-    if (!vaultPath) return
-    const isoDate = new Date().toISOString().slice(0, 10)
-    const problemFullPath = `${vaultPath}/${item.note.path}`
-    const solutionFullPath = `${vaultPath}/${connection.note.path}`
-    const solutionTitle = getCleanNoteTitle(connection.note)
-    const problemTitle = getCleanNoteTitle(item.note)
-
-    try {
-      // Problem-Notiz: status=solved + tasks (optional)
-      let problemContent = item.note.content || await window.electronAPI.readFile(problemFullPath)
-      let completedCount = 0
-      if (options.closeTasks) {
-        const result = completeOpenTasksInContent(problemContent)
-        problemContent = result.content
-        completedCount = result.completedCount
-      }
-      problemContent = markProblemSolvedInContent(problemContent, solutionTitle, isoDate)
-      await window.electronAPI.writeFile(problemFullPath, problemContent)
-      updateNote(item.note.id, { content: problemContent, modifiedAt: new Date() })
-
-      // Solution-Notiz: solvedFor-Backlink (optional)
-      if (options.addBacklink) {
-        const solutionContent = connection.note.content || await window.electronAPI.readFile(solutionFullPath)
-        const nextSolutionContent = addSolvedForBacklinkInContent(solutionContent, problemTitle)
-        if (nextSolutionContent !== solutionContent) {
-          await window.electronAPI.writeFile(solutionFullPath, nextSolutionContent)
-          updateNote(connection.note.id, { content: nextSolutionContent, modifiedAt: new Date() })
-        }
-      }
-
-      console.log(`[Radar] solved "${problemTitle}" via "${solutionTitle}", closed ${completedCount} tasks`)
-      setSolveDialog(null)
-      onProblemSolved()
-    } catch (error) {
-      console.error('[Radar] markProblemSolved failed:', error)
-    }
-  }, [vaultPath, updateNote, onProblemSolved])
 
   return (
     <section className="dv-widget dv-widget-radar">
@@ -1493,41 +1349,44 @@ const RadarWidget: React.FC<RadarWidgetProps> = ({ snapshot, notes, vaultPath, o
                       {item.triggers.slice(0, 2).join(' · ')}
                     </span>
                   )}
-                  {(item.solution || item.context) && (
-                    <span className="dv-radar-connections">
-                      {item.solution && renderConnection(item, item.solution)}
-                      {item.context && renderConnection(item, item.context)}
-                    </span>
-                  )}
-                  {correction?.sourceId === item.note.id && (
-                    <span className="dv-radar-correction" onClick={event => event.stopPropagation()}>
-                      <input
-                        value={correction.query}
-                        onChange={event => setCorrection({ ...correction, query: event.target.value })}
-                        placeholder={correction.role === 'solution' ? t('dashboard.radar.searchSolution') : t('dashboard.radar.searchContext')}
-                        autoFocus
-                      />
-                      <span className="dv-radar-correction-list">
-                        {correctionCandidates.map(candidate => (
-                          <button
-                            key={candidate.id}
-                            type="button"
-                            onClick={() => {
-                              if (correction.currentTargetId) {
-                                onFeedback(item.note.id, correction.currentTargetId, correction.role, 'negative')
-                              }
-                              onFeedback(item.note.id, candidate.id, correction.role, 'positive')
-                              setCorrection(null)
-                            }}
-                          >
-                            {getCleanNoteTitle(candidate)}
-                          </button>
-                        ))}
-                        {correctionCandidates.length === 0 && (
-                          <span className="dv-radar-correction-empty">{t('dashboard.radar.noMatch')}</span>
-                        )}
-                      </span>
-                    </span>
+                </span>
+                <span className="dv-radar-actions" onClick={event => event.stopPropagation()}>
+                  <button
+                    type="button"
+                    className="dv-radar-action"
+                    title={t('dashboard.radar.actionWebSearch')}
+                    aria-label={t('dashboard.radar.actionWebSearch')}
+                    onClick={() => {
+                      // Zettelkasten-ID-Präfix (12-stellige Zahl + optionaler Bindestrich) raus,
+                      // sonst sucht Google nach der ID statt nach dem Thema.
+                      const cleanTitle = getCleanNoteTitle(item.note).replace(/^\d{12}\s*-?\s*/, '').trim()
+                      const q = encodeURIComponent(cleanTitle || getCleanNoteTitle(item.note))
+                      window.electronAPI.openExternal(`https://www.google.com/search?q=${q}`)
+                    }}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="12" cy="12" r="10"/>
+                      <line x1="2" y1="12" x2="22" y2="12"/>
+                      <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+                    </svg>
+                  </button>
+                  {onOpenSmartConnections && (
+                    <button
+                      type="button"
+                      className="dv-radar-action"
+                      title={t('dashboard.radar.actionSmartConnections')}
+                      aria-label={t('dashboard.radar.actionSmartConnections')}
+                      onClick={() => onOpenSmartConnections(item.note.id)}
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <circle cx="6" cy="6" r="2"/>
+                        <circle cx="18" cy="6" r="2"/>
+                        <circle cx="12" cy="18" r="2"/>
+                        <line x1="6" y1="8" x2="11" y2="16"/>
+                        <line x1="18" y1="8" x2="13" y2="16"/>
+                        <line x1="8" y1="6" x2="16" y2="6"/>
+                      </svg>
+                    </button>
                   )}
                 </span>
               </div>
@@ -1563,65 +1422,7 @@ const RadarWidget: React.FC<RadarWidgetProps> = ({ snapshot, notes, vaultPath, o
           </div>
         )}
       </div>
-      {solveDialog && (
-        <SolveProblemDialog
-          item={solveDialog.item}
-          connection={solveDialog.connection}
-          onClose={() => setSolveDialog(null)}
-          onConfirm={handleConfirmSolve}
-          t={t}
-        />
-      )}
     </section>
-  )
-}
-
-interface SolveProblemDialogProps {
-  item: RadarItem
-  connection: RadarConnection
-  onClose: () => void
-  onConfirm: (item: RadarItem, connection: RadarConnection, options: { addBacklink: boolean; closeTasks: boolean }) => void
-  t: TFn
-}
-
-const SolveProblemDialog: React.FC<SolveProblemDialogProps> = ({ item, connection, onClose, onConfirm, t }) => {
-  const [addBacklink, setAddBacklink] = useState(true)
-  const [closeTasks, setCloseTasks] = useState(false)
-
-  return (
-    <div className="dv-modal-overlay" onClick={onClose}>
-      <div className="dv-modal dv-modal-narrow" onClick={e => e.stopPropagation()}>
-        <header className="dv-modal-header">
-          <h3>{t('dashboard.radar.solveDialog.title')}</h3>
-          <button className="dv-modal-close" onClick={onClose} aria-label="close">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-          </button>
-        </header>
-        <div className="dv-modal-body">
-          <div className="dv-modal-task">{getCleanNoteTitle(item.note)}</div>
-          <div className="dv-modal-task-note">
-            {t('dashboard.radar.solveDialog.via')}: {getCleanNoteTitle(connection.note)}
-          </div>
-
-          <label className="dv-modal-checkbox">
-            <input type="checkbox" checked={addBacklink} onChange={e => setAddBacklink(e.target.checked)} />
-            <span>{t('dashboard.radar.solveDialog.backlink')}</span>
-          </label>
-          <label className="dv-modal-checkbox">
-            <input type="checkbox" checked={closeTasks} onChange={e => setCloseTasks(e.target.checked)} />
-            <span>{t('dashboard.radar.solveDialog.closeTasks')}</span>
-          </label>
-        </div>
-        <footer className="dv-modal-footer">
-          <button className="dv-modal-btn-secondary" onClick={onClose}>
-            {t('dashboard.radar.solveDialog.cancel')}
-          </button>
-          <button className="dv-modal-btn-primary" onClick={() => onConfirm(item, connection, { addBacklink, closeTasks })}>
-            {t('dashboard.radar.solveDialog.confirm')}
-          </button>
-        </footer>
-      </div>
-    </div>
   )
 }
 

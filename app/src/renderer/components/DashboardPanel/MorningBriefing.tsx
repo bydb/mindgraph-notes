@@ -15,7 +15,7 @@ interface MorningBriefingProps {
 export const MorningBriefing: React.FC<MorningBriefingProps> = ({ onClose, onOpenDashboard }) => {
   const { t } = useTranslation()
   const { notes, vaultPath } = useNotesStore()
-  const { taskExcludedFolders, dashboard, setDashboard } = useUIStore()
+  const { taskExcludedFolders, dashboard, setDashboard, taskLeadTime } = useUIStore()
   const emails = useEmailStore(state => state.emails)
   const loadDashboardOffers = useAgentStore(state => state.loadDashboard)
 
@@ -37,12 +37,13 @@ export const MorningBriefing: React.FC<MorningBriefingProps> = ({ onClose, onOpe
           ? `${dashboard.lastBriefingDate}T00:00:00.000Z`
           : new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
         calendarDaysAhead: dashboard.calendarDaysAhead,
-        includeCalendar: dashboard.briefingIncludeCalendar
+        includeCalendar: dashboard.briefingIncludeCalendar,
+        taskLeadTime
       })
       if (!cancelled) setSnapshot(snap)
     })()
     return () => { cancelled = true }
-  }, [notes, vaultPath, taskExcludedFolders, emails, loadDashboardOffers, dashboard.lastBriefingDate, dashboard.calendarDaysAhead, dashboard.briefingIncludeCalendar])
+  }, [notes, vaultPath, taskExcludedFolders, emails, loadDashboardOffers, dashboard.lastBriefingDate, dashboard.calendarDaysAhead, dashboard.briefingIncludeCalendar, taskLeadTime])
 
   const markSeen = () => {
     const todayIso = new Date().toISOString().slice(0, 10)

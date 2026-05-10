@@ -18013,3 +18013,13 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
   cursor: pointer;
   flex-shrink: 0;
 }
+
+/* Dringende Aufgaben — Soft-Highlight (siehe taskExtractor.ts CRITICAL_PATTERN) */
+.task-urgent {
+  background: rgba(255, 0, 0, 0.08);
+  border-radius: 4px;
+}
+
+.cm-task-urgent {
+  background: rgba(255, 0, 0, 0.08) !important;
+}
