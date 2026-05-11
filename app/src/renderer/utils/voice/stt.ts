@@ -66,23 +66,39 @@ export async function startDictation(cb: DictationCallbacks): Promise<DictationH
   let canceled = false
 
   // Input-Device-Info für Debug
-  const trackLabel = stream.getAudioTracks()[0]?.label ?? 'unknown'
-  console.log(`[stt] recording from device: "${trackLabel}" (mime=${mimeType})`)
+  const audioTrack = stream.getAudioTracks()[0]
+  const trackLabel = audioTrack?.label ?? 'unknown'
+  console.log(`[stt] recording from device: "${trackLabel}" (mime=${mimeType}), trackMuted=${audioTrack?.muted}, trackEnabled=${audioTrack?.enabled}, readyState=${audioTrack?.readyState}`)
 
   // Audio-Level-Analyse: RMS-Peak messen, damit wir stille Aufnahmen erkennen.
+  // analyserUsable=false bedeutet, dass die Pegelmessung nicht funktioniert hat (z.B. weil
+  // der AudioContext suspended ist und der Browser ihn auch nach resume() nicht startet).
+  // In dem Fall wird der Peak-Check beim Stop übersprungen — die MediaRecorder-Aufnahme
+  // selbst läuft unabhängig vom AudioContext und enthält trotzdem Audio.
   let peakLevel = 0
+  let analyserUsable = false
   let audioCtx: AudioContext | null = null
   let analyser: AnalyserNode | null = null
   let rafId = 0
   try {
     audioCtx = new AudioContext()
+    // Chromium startet den AudioContext nicht zuverlässig automatisch — auch nach
+    // getUserMedia kann er im 'suspended'-State bleiben, was die analyser-Daten konstant
+    // auf 0 hält. Konsequenz: "Kein Audio erkannt (Pegel 0.000)" trotz funktionierendem Mic.
+    // Resume() ohne await, weil ein Reject hier nicht die Aufnahme blockieren soll.
+    audioCtx.resume().then(() => {
+      console.log(`[stt] AudioContext state after resume: ${audioCtx?.state}`)
+    }).catch(err => {
+      console.warn('[stt] AudioContext.resume() rejected:', err)
+    })
     const source = audioCtx.createMediaStreamSource(stream)
     analyser = audioCtx.createAnalyser()
     analyser.fftSize = 2048
     source.connect(analyser)
     const buffer = new Float32Array(analyser.fftSize)
     const tick = () => {
-      if (!analyser) return
+      if (!analyser || !audioCtx) return
+      if (audioCtx.state === 'running') analyserUsable = true
       analyser.getFloatTimeDomainData(buffer)
       let sum = 0
       for (let i = 0; i < buffer.length; i++) sum += buffer[i] * buffer[i]
@@ -115,15 +131,18 @@ export async function startDictation(cb: DictationCallbacks): Promise<DictationH
           return
         }
         const blob = new Blob(chunks, { type: mimeType || 'audio/webm' })
-        console.log(`[stt] recording stopped; blob size=${blob.size} bytes; peak RMS=${peakLevel.toFixed(4)} (near 0 = stille)`)
+        console.log(`[stt] recording stopped; blob size=${blob.size} bytes; peak RMS=${peakLevel.toFixed(4)} (near 0 = stille); analyserUsable=${analyserUsable}`)
         if (blob.size < 512) {
           voiceStore.setIdle()
           voiceStore.setError('Aufnahme zu kurz. Bitte mindestens eine Sekunde sprechen.')
           resolve('')
           return
         }
-        if (peakLevel < 0.005) {
-          // Praktisch stille Aufnahme — wir schicken es nicht an Whisper
+        // Peak-Check nur wenn der AudioContext lief — sonst ist `peakLevel === 0` kein
+        // Beweis für Stille, sondern ein Indiz, dass die Analyser-Pipeline nicht aktiv war.
+        // Die MediaRecorder-Aufnahme selbst läuft davon unabhängig und enthält trotzdem Audio;
+        // wir geben sie an Whisper, statt fälschlich „Kein Audio erkannt" zu melden.
+        if (analyserUsable && peakLevel < 0.005) {
           voiceStore.setIdle()
           voiceStore.setError(`Kein Audio erkannt (Pegel ${peakLevel.toFixed(3)}). Prüfe macOS → Ton → Eingabe (${trackLabel}).`)
           resolve('')

@@ -2,6 +2,12 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.6.35-beta] - 2026-05-11
+
+### Fixes
+
+- **Spracheingabe meldet nicht mehr fälschlich „Kein Audio erkannt"**: Chromium startet den `AudioContext` nach `getUserMedia` nicht zuverlässig — er bleibt im `suspended`-State, und die RMS-Pegelmessung liefert konstant 0, obwohl das Mikrofon Audio sendet. Der MediaRecorder lief unabhängig davon weiter und hätte verwertbares Audio gehabt, wurde aber wegen `peakLevel < 0.005` verworfen. Jetzt wird der AudioContext direkt nach dem Erzeugen via `resume()` aktiv geweckt, und ein `analyserUsable`-Flag merkt sich, ob der Context überhaupt im `running`-State Daten geliefert hat. Der „Kein Audio erkannt"-Reject greift nur noch, wenn die Pegelmessung tatsächlich funktioniert hat — ansonsten geht die Aufnahme an Whisper, statt verworfen zu werden. Zusätzlich loggt das STT-Modul jetzt `trackMuted`, `trackEnabled`, `readyState` und den `AudioContext`-State, um echte Mikrofon-Probleme besser diagnostizieren zu können.
+
 ## [0.6.34-beta] - 2026-05-11
 
 ### Fixes
