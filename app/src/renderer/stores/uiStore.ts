@@ -435,7 +435,7 @@ export const MODULES: ModuleDescriptor[] = [
   { id: 'email',            label: 'Email-Client',     description: 'IMAP/SMTP + KI-Analyse + Entwurfshilfe', category: 'communication' },
   { id: 'mz-suite',         label: 'Edoobox Modul',description: 'edoobox + Marketing (WordPress) + IQ-Auswertung + Formularimport', category: 'business' },
   { id: 'flashcards',       label: 'Flashcards & Quiz',description: 'Karteikarten mit Spaced Repetition und Quiz-Modus', category: 'learning' },
-  { id: 'semantic-scholar', label: 'Semantic Scholar', description: 'Wissenschaftliche Paper durchsuchen und zitieren', category: 'research' },
+  { id: 'semantic-scholar', label: 'Research', description: 'Paper via Semantic Scholar und OpenAlex durchsuchen und zitieren', category: 'research' },
   { id: 'zotero',           label: 'Zotero',           description: 'Bibliothek durchsuchen, Zitate einfügen (⌘⇧Z)', category: 'research', iconText: 'Z', iconColor: '#cc2936' },
   { id: 'readwise',         label: 'Readwise',         description: 'Highlights aus Readwise synchronisieren', category: 'research' },
   { id: 'remarkable',       label: 'reMarkable',       description: 'Dokumente mit dem reMarkable-Tablet austauschen', category: 'devices' },

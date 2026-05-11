@@ -6427,6 +6427,40 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
   white-space: nowrap;
 }
 
+.zotero-style-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 20px;
+  border-bottom: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+}
+
+.zotero-style-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.zotero-style-select {
+  flex: 1;
+  min-width: 0;
+  height: 30px;
+  padding: 0 28px 0 10px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  font-size: 12px;
+  outline: none;
+}
+
+.zotero-style-select:focus {
+  border-color: var(--accent-color);
+  box-shadow: 0 0 0 2px var(--accent-subtle);
+}
+
 .zotero-search-results {
   flex: 1;
   overflow-y: auto;
@@ -12831,6 +12865,37 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
   flex-shrink: 0;
 }
 
+.semantic-scholar-source-toggle {
+  display: flex;
+  gap: 4px;
+  padding: 3px;
+  margin-bottom: 10px;
+  background: var(--bg-secondary);
+  border-radius: var(--radius-md);
+}
+
+.semantic-scholar-source-toggle button {
+  flex: 1;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  border-radius: var(--radius-sm);
+  padding: 6px 8px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.semantic-scholar-source-toggle button:hover {
+  color: var(--text-primary);
+}
+
+.semantic-scholar-source-toggle button.active {
+  background: var(--accent-color);
+  color: white;
+}
+
 .semantic-scholar-search-row {
   display: flex;
   gap: 8px;
@@ -12926,6 +12991,11 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
 .semantic-scholar-filter-row input[type="number"]:focus,
 .semantic-scholar-filter-row select:focus {
   border-color: var(--accent-color);
+}
+
+.semantic-scholar-filter-row select:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 
 .semantic-scholar-year-range {
@@ -13062,6 +13132,11 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
 .semantic-scholar-badge.oa {
   background: rgba(46, 204, 113, 0.15);
   color: #2ecc71;
+}
+
+.semantic-scholar-badge.source {
+  background: var(--accent-subtle);
+  color: var(--accent-color);
 }
 
 .semantic-scholar-result-details {

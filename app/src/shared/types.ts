@@ -548,11 +548,21 @@ export interface ElectronAPI {
   // Zotero / Better BibTeX API
   zoteroCheck: () => Promise<boolean>;
   zoteroSearch: (query: string) => Promise<Array<{ item: object; citekey: string }>>;
+  zoteroListCitationStyles: () => Promise<Array<{ id: string; label: string; description: string; format?: string }>>;
+  zoteroFormatBibliography: (citekey: string, styleId: string, locale?: string) => Promise<string>;
   zoteroGetNotes: (citekey: string) => Promise<unknown>;
 
   // Semantic Scholar API
-  semanticScholarSearch: (query: string, filters?: object) => Promise<{ total: number; papers: Array<object> }>;
+  semanticScholarSearch: (query: string, filters?: object) => Promise<{ total: number; papers: Array<object>; error?: string; retryAfterMs?: number }>;
   semanticScholarGetPaper: (paperId: string) => Promise<object | null>;
+  openAlexSearch: (query: string, filters?: object) => Promise<{ total: number; papers: Array<object>; error?: string; retryAfterMs?: number; warning?: string }>;
+  openAlexSaveKey: (apiKey: string) => Promise<{ success: boolean; error?: string }>;
+  openAlexLoadKey: () => Promise<string | null>;
+  openAlexDeleteKey: () => Promise<{ success: boolean; error?: string }>;
+  openAlexSaveMailto: (mailto: string) => Promise<{ success: boolean; error?: string }>;
+  openAlexLoadMailto: () => Promise<string | null>;
+  openAlexDeleteMailto: () => Promise<{ success: boolean; error?: string }>;
+  openAlexCheck: () => Promise<{ available: boolean; authenticated: boolean; remaining?: string; error?: string }>;
 
   // Ollama Local AI API
   ollamaCheck: () => Promise<boolean>;

@@ -17,11 +17,15 @@ export interface ZoteroItem {
   }>
   date?: string
   year?: string
+  dateParts?: number[]
   itemType: string
   abstractNote?: string
   DOI?: string
   URL?: string
   publicationTitle?: string
+  genre?: string
+  number?: string
+  archive?: string
   journalAbbreviation?: string
   volume?: string
   issue?: string
@@ -35,6 +39,23 @@ export interface ZoteroSearchResult {
   item: ZoteroItem
   citekey: string
 }
+
+export type CitationStyle = string
+
+export interface CitationStyleOption {
+  id: CitationStyle
+  label: string
+  description: string
+  format?: string
+}
+
+export const CITATION_STYLE_OPTIONS: CitationStyleOption[] = [
+  { id: 'mindgraph', label: 'MindGraph', description: 'Autor, Jahr, Titel' },
+  { id: 'bibtex', label: 'BibTeX', description: '@citekey' },
+  { id: 'pandoc', label: 'Pandoc', description: '[@citekey]' }
+]
+
+export const DEFAULT_CITATION_STYLE = 'http://www.zotero.org/styles/apa'
 
 // Prüft ob Zotero/Better BibTeX läuft (via IPC -> Main Process)
 export async function isZoteroAvailable(): Promise<boolean> {
@@ -56,6 +77,16 @@ export async function searchZotero(query: string): Promise<ZoteroSearchResult[]>
   } catch (error) {
     console.error('[Zotero] Search error:', error)
     return []
+  }
+}
+
+export async function listCitationStyles(): Promise<CitationStyleOption[]> {
+  try {
+    const styles = await window.electronAPI.zoteroListCitationStyles()
+    return styles.length > 0 ? styles : CITATION_STYLE_OPTIONS
+  } catch (error) {
+    console.error('[Zotero] Citation style list error:', error)
+    return CITATION_STYLE_OPTIONS
   }
 }
 
@@ -88,18 +119,167 @@ export function formatYear(item: ZoteroItem): string {
   return ''
 }
 
+function getAuthorNames(item: ZoteroItem): string[] {
+  return item.creators
+    ?.filter(c => c.creatorType === 'author')
+    .map(c => c.lastName || c.name)
+    .filter((name): name is string => Boolean(name?.trim())) || []
+}
+
+function formatApaAuthors(item: ZoteroItem): string {
+  const authors = getAuthorNames(item)
+  if (authors.length === 0) return 'Unbekannt'
+  if (authors.length === 1) return authors[0]
+  if (authors.length === 2) return `${authors[0]} & ${authors[1]}`
+  return `${authors[0]} et al.`
+}
+
+function formatApaReferenceAuthors(item: ZoteroItem): string {
+  const authors = item.creators?.filter(c => c.creatorType === 'author') || []
+  if (authors.length === 0) return 'Unbekannt'
+
+  const formattedAuthors = authors.map(author => {
+    if (author.name) return author.name
+
+    const lastName = author.lastName || 'Unbekannt'
+    const initials = author.firstName
+      ?.split(/\s+/)
+      .filter(Boolean)
+      .map(name => `${name.charAt(0).toUpperCase()}.`)
+      .join(' ')
+
+    return initials ? `${lastName}, ${initials}` : lastName
+  })
+
+  if (formattedAuthors.length === 1) return formattedAuthors[0]
+  if (formattedAuthors.length === 2) return `${formattedAuthors[0]}, & ${formattedAuthors[1]}`
+  return `${formattedAuthors.slice(0, -1).join(', ')}, & ${formattedAuthors[formattedAuthors.length - 1]}`
+}
+
+function formatMlaAuthors(item: ZoteroItem): string {
+  const authors = getAuthorNames(item)
+  if (authors.length === 0) return 'Unbekannt'
+  if (authors.length === 1) return authors[0]
+  if (authors.length === 2) return `${authors[0]} and ${authors[1]}`
+  return `${authors[0]} et al.`
+}
+
+function shortenTitle(title: string, maxLength = 50): string {
+  if (title.length <= maxLength) return title
+  return title.substring(0, maxLength - 3) + '...'
+}
+
+function sentenceWithPeriod(text?: string): string {
+  const trimmed = text?.trim()
+  if (!trimmed) return ''
+  return /[.!?]$/.test(trimmed) ? trimmed : `${trimmed}.`
+}
+
+function formatApaReferenceDate(item: ZoteroItem): string {
+  const parts = item.dateParts
+  if (parts?.[0]) {
+    const [year, month, day] = parts
+    const monthNames = [
+      'Januar',
+      'Februar',
+      'März',
+      'April',
+      'Mai',
+      'Juni',
+      'Juli',
+      'August',
+      'September',
+      'Oktober',
+      'November',
+      'Dezember'
+    ]
+
+    if (month && day) return `${year}, ${monthNames[month - 1]} ${day}`
+    if (month) return `${year}, ${monthNames[month - 1]}`
+    return `${year}`
+  }
+
+  return formatYear(item) || 'n.d.'
+}
+
+function isArxivIdentifier(value?: string): boolean {
+  return Boolean(value?.trim().match(/^arxiv:/i))
+}
+
+function formatApaTitle(item: ZoteroItem): string {
+  const title = item.title?.trim()
+  if (!title) return ''
+
+  const arxivIdentifier = [item.genre, item.number, item.archive]
+    .find(value => isArxivIdentifier(value))
+
+  if (arxivIdentifier) {
+    return `${title} (${arxivIdentifier}).`
+  }
+
+  if (item.genre) {
+    return `${title} [${item.genre}].`
+  }
+
+  return sentenceWithPeriod(title)
+}
+
+function formatApaSource(item: ZoteroItem): string {
+  if (item.publicationTitle) return sentenceWithPeriod(item.publicationTitle)
+  if (
+    item.publisher?.toLowerCase() === 'arxiv' ||
+    item.archive?.toLowerCase() === 'arxiv' ||
+    isArxivIdentifier(item.genre) ||
+    isArxivIdentifier(item.number)
+  ) {
+    return 'arXiv.'
+  }
+  if (item.publisher) return sentenceWithPeriod(item.publisher)
+  return ''
+}
+
+function formatApaReference(result: ZoteroSearchResult): string {
+  const { item } = result
+  const parts = [
+    `${sentenceWithPeriod(formatApaReferenceAuthors(item))} (${formatApaReferenceDate(item)}).`,
+    formatApaTitle(item)
+  ]
+  const source = formatApaSource(item)
+  if (source) parts.push(source)
+
+  if (item.DOI) {
+    parts.push(`https://doi.org/${item.DOI}`)
+  } else if (item.URL) {
+    parts.push(item.URL)
+  }
+
+  return parts.filter(Boolean).join(' ')
+}
+
 // Generiert Markdown-Zitation im Format (Autor, Jahr, "Titel")
-export function generateCitation(result: ZoteroSearchResult): string {
+export function generateCitation(result: ZoteroSearchResult, style: CitationStyle = 'mindgraph'): string {
   const { item } = result
   const authors = formatAuthors(item)
   const year = formatYear(item)
+  const title = item.title || ''
+  const shortTitle = shortenTitle(title)
 
-  // Kürze den Titel auf max 50 Zeichen
-  let shortTitle = item.title || ''
-  if (shortTitle.length > 50) {
-    shortTitle = shortTitle.substring(0, 47) + '...'
+  switch (style) {
+    case 'mla':
+      return `(${formatMlaAuthors(item)})`
+    case 'chicago':
+      if (shortTitle) return `${formatApaAuthors(item)}, "${shortTitle}"`
+      return formatApaAuthors(item)
+    case 'bibtex':
+      return `@${result.citekey}`
+    case 'pandoc':
+      return `[@${result.citekey}]`
+    case 'mindgraph':
+    default:
+      break
   }
 
+  // Kürze den Titel auf max 50 Zeichen
   if (year && shortTitle) {
     return `(${authors}, ${year}, "${shortTitle}")`
   } else if (year) {
@@ -108,6 +288,25 @@ export function generateCitation(result: ZoteroSearchResult): string {
     return `(${authors}, "${shortTitle}")`
   }
   return `(${authors})`
+}
+
+export async function generateStyledCitation(result: ZoteroSearchResult, style: CitationStyle): Promise<string> {
+  if (style === 'mindgraph' || style === 'bibtex' || style === 'pandoc') {
+    return generateCitation(result, style)
+  }
+
+  try {
+    const bibliography = await window.electronAPI.zoteroFormatBibliography(result.citekey, style, 'de-DE')
+    if (bibliography) return bibliography
+  } catch (error) {
+    console.error('[Zotero] Styled citation error:', error)
+  }
+
+  if (style.endsWith('/apa') || style === 'apa') {
+    return formatApaReference(result)
+  }
+
+  return generateCitation(result, 'mindgraph')
 }
 
 // Generiert Literaturnotiz-Template

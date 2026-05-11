@@ -1353,6 +1353,12 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab 
 
   const [languageToolStatus, setLanguageToolStatus] = useState<'checking' | 'connected' | 'disconnected'>('checking')
   const [readwiseStatus, setReadwiseStatus] = useState<'checking' | 'connected' | 'disconnected'>('checking')
+  const [openAlexStatus, setOpenAlexStatus] = useState<'checking' | 'connected' | 'disconnected'>('checking')
+  const [openAlexApiKey, setOpenAlexApiKey] = useState('')
+  const [openAlexKeySaved, setOpenAlexKeySaved] = useState(false)
+  const [openAlexMessage, setOpenAlexMessage] = useState<string | null>(null)
+  const [openAlexMailto, setOpenAlexMailto] = useState('')
+  const [openAlexMailtoSaved, setOpenAlexMailtoSaved] = useState<string | null>(null)
   const [readwiseSyncing, setReadwiseSyncing] = useState(false)
   const [readwiseSyncProgress, setReadwiseSyncProgress] = useState<{ current: number; total: number; status: string; title?: string } | null>(null)
   const [readwiseSyncResult, setReadwiseSyncResult] = useState<string | null>(null)
@@ -1443,6 +1449,7 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab 
     iconSet,
     setIconSet,
     smartConnectionsEnabled,
+    semanticScholarEnabled,
     flashcardsEnabled,
     smartConnectionsWeights,
     setSmartConnectionsWeights,
@@ -1512,6 +1519,15 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab 
       checkDoclingConnection()
       checkLanguageToolConnection()
       checkReadwiseConnection()
+      checkOpenAlexConnection()
+      window.electronAPI.openAlexLoadKey().then(key => {
+        setOpenAlexKeySaved(Boolean(key))
+        setOpenAlexApiKey('')
+      }).catch(() => {})
+      window.electronAPI.openAlexLoadMailto().then(mailto => {
+        setOpenAlexMailtoSaved(mailto)
+        setOpenAlexMailto('')
+      }).catch(() => {})
       // Load vision OCR models
       window.electronAPI.visionOcrModels().then(setVisionOcrModelList).catch(() => {})
     }
@@ -1728,6 +1744,70 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab 
     } catch {
       setReadwiseStatus('disconnected')
     }
+  }
+
+  const checkOpenAlexConnection = async () => {
+    setOpenAlexStatus('checking')
+    setOpenAlexMessage(null)
+    try {
+      const result = await window.electronAPI.openAlexCheck()
+      setOpenAlexStatus(result.available ? 'connected' : 'disconnected')
+      if (result.available) {
+        setOpenAlexMessage(result.authenticated
+          ? t('settings.integrations.openAlexConnectedWithKey')
+          : t('settings.integrations.openAlexConnectedDemo'))
+      } else {
+        setOpenAlexMessage(result.error || t('settings.notConnected'))
+      }
+    } catch {
+      setOpenAlexStatus('disconnected')
+      setOpenAlexMessage(t('settings.notConnected'))
+    }
+  }
+
+  const saveOpenAlexKey = async () => {
+    const key = openAlexApiKey.trim()
+    if (!key) return
+    const result = await window.electronAPI.openAlexSaveKey(key)
+    if (result.success) {
+      setOpenAlexKeySaved(true)
+      setOpenAlexApiKey('')
+      setOpenAlexMessage(t('settings.integrations.openAlexSaved'))
+      await checkOpenAlexConnection()
+    } else {
+      setOpenAlexStatus('disconnected')
+      setOpenAlexMessage(result.error || t('settings.integrations.openAlexSaveFailed'))
+    }
+  }
+
+  const deleteOpenAlexKey = async () => {
+    await window.electronAPI.openAlexDeleteKey()
+    setOpenAlexKeySaved(false)
+    setOpenAlexApiKey('')
+    setOpenAlexMessage(t('settings.integrations.openAlexDeleted'))
+    await checkOpenAlexConnection()
+  }
+
+  const saveOpenAlexMailto = async () => {
+    const mailto = openAlexMailto.trim()
+    if (!mailto) return
+    const result = await window.electronAPI.openAlexSaveMailto(mailto)
+    if (result.success) {
+      setOpenAlexMailtoSaved(mailto)
+      setOpenAlexMailto('')
+      setOpenAlexMessage(t('settings.integrations.openAlexMailtoSaved'))
+      await checkOpenAlexConnection()
+    } else {
+      setOpenAlexMessage(result.error || t('settings.integrations.openAlexMailtoSaveFailed'))
+    }
+  }
+
+  const deleteOpenAlexMailto = async () => {
+    await window.electronAPI.openAlexDeleteMailto()
+    setOpenAlexMailtoSaved(null)
+    setOpenAlexMailto('')
+    setOpenAlexMessage(t('settings.integrations.openAlexMailtoDeleted'))
+    await checkOpenAlexConnection()
   }
 
   const triggerReadwiseSync = async () => {
@@ -3118,7 +3198,92 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab 
                   </p>
                 </div>
 
-                {/* Semantic Scholar: Aktivierung + Beschreibung stehen im Modul-Tab (keine weitere Konfiguration nötig). */}
+                <h3 style={{ marginTop: '32px' }}>{t('settings.integrations.research')}</h3>
+                <ModuleDisabledHint moduleId="semantic-scholar" onGoToModules={() => setActiveTab('modules')} t={t} />
+
+                <div className="settings-info">
+                  <p>{t('settings.integrations.researchDesc')}</p>
+                  <p>{t('settings.integrations.openAlexHint')}</p>
+                </div>
+
+                <div className="settings-row">
+                  <label>{t('settings.integrations.openAlexApiKey')}</label>
+                  <div className="settings-input-group">
+                    <input
+                      type="password"
+                      value={openAlexApiKey}
+                      onChange={e => setOpenAlexApiKey(e.target.value)}
+                      placeholder={openAlexKeySaved ? t('settings.integrations.openAlexKeySaved') : 'OPENALEX_API_KEY'}
+                      disabled={!semanticScholarEnabled}
+                      style={{ width: '260px' }}
+                    />
+                    <button
+                      className="settings-refresh"
+                      onClick={saveOpenAlexKey}
+                      disabled={!openAlexApiKey.trim() || !semanticScholarEnabled}
+                    >
+                      {t('settings.integrations.openAlexSave')}
+                    </button>
+                    {openAlexKeySaved && (
+                      <button className="settings-refresh" onClick={deleteOpenAlexKey}>
+                        {t('settings.integrations.openAlexDelete')}
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                <div className="settings-row">
+                  <label>{t('settings.integrations.openAlexMailto')}</label>
+                  <div className="settings-input-group">
+                    <input
+                      type="email"
+                      value={openAlexMailto}
+                      onChange={e => setOpenAlexMailto(e.target.value)}
+                      placeholder={openAlexMailtoSaved || 'mail@example.com'}
+                      disabled={!semanticScholarEnabled}
+                      style={{ width: '260px' }}
+                    />
+                    <button
+                      className="settings-refresh"
+                      onClick={saveOpenAlexMailto}
+                      disabled={!openAlexMailto.trim() || !semanticScholarEnabled}
+                    >
+                      {t('settings.integrations.openAlexSave')}
+                    </button>
+                    {openAlexMailtoSaved && (
+                      <button className="settings-refresh" onClick={deleteOpenAlexMailto}>
+                        {t('settings.integrations.openAlexDelete')}
+                      </button>
+                    )}
+                  </div>
+                </div>
+                <p className="settings-hint" style={{ marginTop: '-4px', marginLeft: 0 }}>
+                  {t('settings.integrations.openAlexMailtoHint')}
+                </p>
+
+                <div className="settings-row">
+                  <label>Status</label>
+                  <div className="settings-status">
+                    {openAlexStatus === 'checking' && (
+                      <span className="status-checking">{t('settings.checkingConnection')}</span>
+                    )}
+                    {openAlexStatus === 'connected' && (
+                      <span className="status-connected">{t('settings.connected')}</span>
+                    )}
+                    {openAlexStatus === 'disconnected' && (
+                      <span className="status-disconnected">{t('settings.notConnected')}</span>
+                    )}
+                    <button className="settings-refresh" onClick={checkOpenAlexConnection}>
+                      {t('settings.refresh')}
+                    </button>
+                  </div>
+                </div>
+
+                {openAlexMessage && (
+                  <div className="settings-info">
+                    <p>{openAlexMessage}</p>
+                  </div>
+                )}
 
                 <h3 style={{ marginTop: '32px' }}>{t('settings.docling.title')}</h3>
                 <ModuleDisabledHint moduleId="docling" onGoToModules={() => setActiveTab('modules')} t={t} />

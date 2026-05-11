@@ -281,12 +281,31 @@ wysiwygTurndown.addRule('taskCheckbox', {
 })
 
 wysiwygTurndown.addRule('wikiImage', {
-  filter: (node) => node.nodeName === 'IMG' && Boolean((node as HTMLElement).getAttribute('data-src')),
+  filter: (node) => {
+    if (node.nodeName !== 'IMG') return false
+    const el = node as HTMLElement
+    const dataSrc = el.getAttribute('data-src')
+    const src = el.getAttribute('src') || ''
+    const alt = el.getAttribute('alt') || ''
+    return Boolean(dataSrc) || (src.startsWith('data:image') && isImageFile(alt))
+  },
   replacement: (_content, node) => {
     const el = node as HTMLElement
     const src = el.getAttribute('data-src') || el.getAttribute('alt') || ''
     const width = (el as HTMLImageElement).style.width?.replace('px', '')
     return src ? `![[${src}${width ? `|${width}` : ''}]]` : ''
+  }
+})
+
+wysiwygTurndown.addRule('math', {
+  filter: (node) => node.nodeName === 'SPAN' && (node as HTMLElement).classList.contains('katex'),
+  replacement: (_content, node) => {
+    const el = node as HTMLElement
+    const tex = el.querySelector('annotation[encoding="application/x-tex"]')?.textContent || ''
+    if (!tex) return ''
+
+    const display = Boolean(el.closest('.katex-display'))
+    return display ? `\n\n$$\n${tex}\n$$\n\n` : `$${tex}$`
   }
 })
 
@@ -1876,71 +1895,6 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
     }
   }, [])
 
-  // Listen for insert-text-at-cursor events (e.g. from Zotero citations)
-  useEffect(() => {
-    const handleInsertText = (e: CustomEvent<string>) => {
-      const text = e.detail
-      if (!viewRef.current || !text) return
-
-      const view = viewRef.current
-      const { from, to } = view.state.selection.main
-
-      view.dispatch({
-        changes: { from, to, insert: text },
-        selection: { anchor: from + text.length }
-      })
-
-      // Focus the editor
-      view.focus()
-    }
-
-    window.addEventListener('insert-text-at-cursor', handleInsertText as EventListener)
-    return () => {
-      window.removeEventListener('insert-text-at-cursor', handleInsertText as EventListener)
-    }
-  }, [])
-
-  // Listen for insert-footnote events (from Zotero citations as footnotes)
-  useEffect(() => {
-    const handleInsertFootnote = (e: CustomEvent<{ citation: string; citekey: string }>) => {
-      const { citation } = e.detail
-      if (!viewRef.current || !citation) return
-
-      const view = viewRef.current
-      const docContent = view.state.doc.toString()
-
-      // Finde die nächste freie Fußnoten-Nummer
-      const existingFootnotes = docContent.match(/\[\^(\d+)\]/g) || []
-      const usedNumbers = existingFootnotes.map(fn => parseInt(fn.match(/\d+/)?.[0] || '0'))
-      let nextNumber = 1
-      while (usedNumbers.includes(nextNumber)) {
-        nextNumber++
-      }
-
-      const footnoteRef = `[^${nextNumber}]`
-      const footnoteDefinition = `\n\n[^${nextNumber}]: ${citation}`
-
-      const { from, to } = view.state.selection.main
-      const docLength = view.state.doc.length
-
-      // Einfügen: Referenz an Cursor, Definition am Ende
-      view.dispatch({
-        changes: [
-          { from, to, insert: footnoteRef },
-          { from: docLength, to: docLength, insert: footnoteDefinition }
-        ],
-        selection: { anchor: from + footnoteRef.length }
-      })
-
-      view.focus()
-    }
-
-    window.addEventListener('insert-footnote', handleInsertFootnote as EventListener)
-    return () => {
-      window.removeEventListener('insert-footnote', handleInsertFootnote as EventListener)
-    }
-  }, [])
-
   // Live writing mode: Cmd/Ctrl-click opens wikilinks, normal click keeps editing.
   useEffect(() => {
     const handleLivePreviewWikilinkOpen = (e: CustomEvent<{ target: string; fragment: string }>) => {
@@ -2052,6 +2006,128 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
       setPreviewContent(nextContent)
     }
   }, [saveContent])
+
+  const rememberPreviewSelection = useCallback(() => {
+    const root = editablePreviewRef.current
+    const selection = window.getSelection()
+    if (!root || !selection || selection.rangeCount === 0) return
+
+    const range = selection.getRangeAt(0)
+    if (root.contains(range.commonAncestorContainer)) {
+      savedPreviewRangeRef.current = range.cloneRange()
+    }
+  }, [])
+
+  const insertTextInPreviewAtSelection = useCallback((text: string): boolean => {
+    const root = editablePreviewRef.current
+    if (viewMode !== 'preview' || !root || !text) return false
+
+    const selection = window.getSelection()
+    const activeRange = selection && selection.rangeCount > 0 ? selection.getRangeAt(0) : null
+    const range = activeRange && root.contains(activeRange.commonAncestorContainer)
+      ? activeRange.cloneRange()
+      : savedPreviewRangeRef.current
+
+    if (!range || !root.contains(range.commonAncestorContainer)) return false
+
+    root.focus()
+    selection?.removeAllRanges()
+    selection?.addRange(range)
+
+    if (document.queryCommandSupported?.('insertText')) {
+      document.execCommand('insertText', false, text)
+    } else {
+      range.deleteContents()
+      const textNode = document.createTextNode(text)
+      range.insertNode(textNode)
+      range.setStartAfter(textNode)
+      range.setEndAfter(textNode)
+      selection?.removeAllRanges()
+      selection?.addRange(range)
+    }
+
+    rememberPreviewSelection()
+    commitEditablePreview(true)
+    return true
+  }, [commitEditablePreview, rememberPreviewSelection, viewMode])
+
+  // Listen for insert-text-at-cursor events (e.g. from Zotero citations)
+  useEffect(() => {
+    const handleInsertText = (e: CustomEvent<string>) => {
+      const text = e.detail
+      if (!viewRef.current || !text) return
+
+      if (insertTextInPreviewAtSelection(text)) return
+
+      const view = viewRef.current
+      const { from, to } = view.state.selection.main
+
+      view.dispatch({
+        changes: { from, to, insert: text },
+        selection: { anchor: from + text.length }
+      })
+
+      // Focus the editor
+      view.focus()
+    }
+
+    window.addEventListener('insert-text-at-cursor', handleInsertText as EventListener)
+    return () => {
+      window.removeEventListener('insert-text-at-cursor', handleInsertText as EventListener)
+    }
+  }, [insertTextInPreviewAtSelection])
+
+  // Listen for insert-footnote events (from Zotero citations as footnotes)
+  useEffect(() => {
+    const handleInsertFootnote = (e: CustomEvent<{ citation: string; citekey: string }>) => {
+      const { citation } = e.detail
+      if (!viewRef.current || !citation) return
+
+      const view = viewRef.current
+      const docContent = view.state.doc.toString()
+
+      // Finde die nächste freie Fußnoten-Nummer
+      const existingFootnotes = docContent.match(/\[\^(\d+)\]/g) || []
+      const usedNumbers = existingFootnotes.map(fn => parseInt(fn.match(/\d+/)?.[0] || '0'))
+      let nextNumber = 1
+      while (usedNumbers.includes(nextNumber)) {
+        nextNumber++
+      }
+
+      const footnoteRef = `[^${nextNumber}]`
+      const footnoteDefinition = `\n\n[^${nextNumber}]: ${citation}`
+
+      if (insertTextInPreviewAtSelection(footnoteRef)) {
+        const updatedContent = view.state.doc.toString()
+        view.dispatch({
+          changes: { from: updatedContent.length, to: updatedContent.length, insert: footnoteDefinition }
+        })
+        const finalContent = view.state.doc.toString()
+        setPreviewContent(finalContent)
+        saveContent(finalContent)
+        return
+      }
+
+      const { from, to } = view.state.selection.main
+      const docLength = view.state.doc.length
+
+      // Einfügen: Referenz an Cursor, Definition am Ende
+      view.dispatch({
+        changes: [
+          { from, to, insert: footnoteRef },
+          { from: docLength, to: docLength, insert: footnoteDefinition }
+        ],
+        selection: { anchor: from + footnoteRef.length }
+      })
+
+      view.focus()
+    }
+
+    window.addEventListener('insert-footnote', handleInsertFootnote as EventListener)
+    return () => {
+      window.removeEventListener('insert-footnote', handleInsertFootnote as EventListener)
+    }
+  }, [insertTextInPreviewAtSelection, saveContent])
 
   const scheduleEditablePreviewCommit = useCallback(() => {
     isPreviewDomEditingRef.current = true
@@ -2454,7 +2530,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
       finalHtml = finalHtml.replace(/(<img\s+class="md-image"\s+)data-src="([^"]+)"/g, (match, prefix, dataSrc) => {
         const cachedUrl = loadedImagesRef.current.get(dataSrc)
         if (cachedUrl) {
-          return `${prefix}src="${cachedUrl}"`
+          return `${prefix}data-src="${dataSrc}" src="${cachedUrl}"`
         }
         return match
       })
@@ -3652,10 +3728,19 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
           contentEditable={viewMode === 'preview'}
           suppressContentEditableWarning
           spellCheck
-          onFocus={updatePreviewToolbarPosition}
+          onFocus={() => {
+            rememberPreviewSelection()
+            updatePreviewToolbarPosition()
+          }}
           onInput={scheduleEditablePreviewCommit}
-          onKeyUp={updatePreviewToolbarPosition}
-          onMouseUp={updatePreviewToolbarPosition}
+          onKeyUp={() => {
+            rememberPreviewSelection()
+            updatePreviewToolbarPosition()
+          }}
+          onMouseUp={() => {
+            rememberPreviewSelection()
+            updatePreviewToolbarPosition()
+          }}
           onBlur={(e) => {
             // Wenn der Fokus innerhalb der Toolbar landet (z.B. URL-Input), nicht committen
             // und Toolbar nicht ausblenden — der User ist mitten in einer Aktion.

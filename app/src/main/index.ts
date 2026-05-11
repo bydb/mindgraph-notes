@@ -1531,6 +1531,34 @@ ipcMain.handle('find-image-in-vault', async (_event, vaultPath: string, imageNam
 
 // ============ ZOTERO / BETTER BIBTEX API ============
 const ZOTERO_API_URL = 'http://localhost:23119/better-bibtex/json-rpc'
+const BUILT_IN_ZOTERO_STYLES = new Set(['mindgraph', 'bibtex', 'pandoc'])
+
+function extractCslValue(csl: string, tagName: string): string {
+  const match = csl.match(new RegExp(`<${tagName}[^>]*>([\\s\\S]*?)<\\/${tagName}>`, 'i'))
+  return match?.[1]?.trim() || ''
+}
+
+function extractCslAttribute(csl: string, tagName: string, attributeName: string): string {
+  const tagMatch = csl.match(new RegExp(`<${tagName}\\b([^>]*)>`, 'i'))
+  if (!tagMatch) return ''
+  const attributeMatch = tagMatch[1].match(new RegExp(`${attributeName}="([^"]+)"`, 'i'))
+  return attributeMatch?.[1]?.trim() || ''
+}
+
+function stripHtml(html: string): string {
+  return html
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/p>/gi, '\n')
+    .replace(/<\/div>/gi, '\n')
+    .replace(/<[^>]*>/g, '')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&quot;/g, '"')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+}
 
 // Prüft ob Zotero/Better BibTeX läuft
 ipcMain.handle('zotero-check', async () => {
@@ -1603,11 +1631,15 @@ ipcMain.handle('zotero-search', async (_event, query: string) => {
         })) || [],
         date: item.issued?.['date-parts']?.[0]?.[0]?.toString(),
         year: item.issued?.['date-parts']?.[0]?.[0]?.toString(),
+        dateParts: item.issued?.['date-parts']?.[0],
         itemType: item.type || 'document',
         abstractNote: item.abstract,
         DOI: item.DOI,
         URL: item.URL,
         publicationTitle: item['container-title'],
+        genre: item.genre,
+        number: item.number,
+        archive: item.archive,
         journalAbbreviation: item.journalAbbreviation,
         volume: item.volume,
         issue: item.issue,
@@ -1628,6 +1660,154 @@ ipcMain.handle('zotero-search', async (_event, query: string) => {
   } catch (error) {
     console.error('[Zotero] Search error:', error)
     return []
+  }
+})
+
+// Liefert plattformspezifische Default-Pfade für das Zotero-Style-Verzeichnis
+function getZoteroStyleDirCandidates(): string[] {
+  const home = app.getPath('home')
+  const candidates: string[] = []
+
+  if (process.env.ZOTERO_DATA_DIR) {
+    candidates.push(path.join(process.env.ZOTERO_DATA_DIR, 'styles'))
+  }
+
+  // Zotero 5+ Default-Datenverzeichnis (alle Plattformen)
+  candidates.push(path.join(home, 'Zotero', 'styles'))
+
+  // Plattform-Fallbacks für vereinzelt davon abweichende Installationen
+  if (process.platform === 'darwin') {
+    candidates.push(path.join(home, 'Library', 'Application Support', 'Zotero', 'styles'))
+  } else if (process.platform === 'win32') {
+    const appData = process.env.APPDATA
+    if (appData) candidates.push(path.join(appData, 'Zotero', 'Zotero', 'styles'))
+  } else {
+    candidates.push(path.join(home, '.zotero', 'zotero', 'styles'))
+  }
+
+  return Array.from(new Set(candidates))
+}
+
+// Liest Styles aus Better-BibTeX über JSON-RPC (kennt das tatsächliche Zotero-Datenverzeichnis)
+async function fetchStylesFromBetterBibTeX(): Promise<Array<{ id: string; label: string }>> {
+  try {
+    const response = await fetch(ZOTERO_API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ jsonrpc: '2.0', method: 'cayw.styles', params: [], id: 1 }),
+      signal: AbortSignal.timeout(2000)
+    })
+    if (!response.ok) return []
+    const data = await response.json()
+    if (!Array.isArray(data.result)) return []
+    return data.result
+      .map((entry: any) => ({
+        id: typeof entry === 'string' ? entry : entry?.id || entry?.styleID || '',
+        label: typeof entry === 'string' ? entry : entry?.label || entry?.title || entry?.name || ''
+      }))
+      .filter((entry: { id: string; label: string }) => Boolean(entry.id) && Boolean(entry.label))
+  } catch {
+    return []
+  }
+}
+
+// Listet lokal installierte Zotero-CSL-Styles
+ipcMain.handle('zotero-list-citation-styles', async () => {
+  const styles: Array<{ id: string; label: string; description: string; format?: string }> = [
+    { id: 'mindgraph', label: 'MindGraph', description: 'Autor, Jahr, Titel' },
+    { id: 'bibtex', label: 'BibTeX', description: '@citekey' },
+    { id: 'pandoc', label: 'Pandoc', description: '[@citekey]' }
+  ]
+  const seenIds = new Set<string>(BUILT_IN_ZOTERO_STYLES)
+
+  // 1) Versuche Better-BibTeX RPC — der kennt das aktuelle Zotero-Datenverzeichnis verlässlich
+  const rpcStyles = await fetchStylesFromBetterBibTeX()
+  for (const entry of rpcStyles) {
+    if (seenIds.has(entry.id)) continue
+    seenIds.add(entry.id)
+    styles.push({ id: entry.id, label: entry.label, description: 'CSL' })
+  }
+
+  // 2) FS-Fallback: scanne alle plausiblen Zotero-Datenverzeichnisse parallel
+  if (rpcStyles.length === 0) {
+    const candidates = getZoteroStyleDirCandidates()
+    const dirResults = await Promise.allSettled(candidates.map(async dir => {
+      const entries = await fs.readdir(dir, { withFileTypes: true })
+      return entries
+        .filter(entry => entry.isFile() && entry.name.endsWith('.csl'))
+        .map(entry => path.join(dir, entry.name))
+    }))
+    const cslFiles = dirResults
+      .flatMap(result => result.status === 'fulfilled' ? result.value : [])
+
+    const fileResults = await Promise.allSettled(cslFiles.map(async filePath => {
+      const csl = await fs.readFile(filePath, 'utf8')
+      const id = extractCslValue(csl, 'id') || `file://${filePath}`
+      const label = extractCslValue(csl, 'title') || path.basename(filePath, '.csl')
+      const format = extractCslAttribute(csl, 'category', 'citation-format')
+      const locale = extractCslAttribute(csl, 'style', 'default-locale')
+      const descriptionParts = [format, locale].filter(Boolean)
+      return {
+        id,
+        label,
+        description: descriptionParts.length ? descriptionParts.join(', ') : 'CSL',
+        format
+      }
+    }))
+
+    for (const result of fileResults) {
+      if (result.status !== 'fulfilled') continue
+      if (seenIds.has(result.value.id)) continue
+      seenIds.add(result.value.id)
+      styles.push(result.value)
+    }
+  }
+
+  return styles.sort((a, b) => {
+    const aBuiltIn = BUILT_IN_ZOTERO_STYLES.has(a.id)
+    const bBuiltIn = BUILT_IN_ZOTERO_STYLES.has(b.id)
+    if (aBuiltIn && !bBuiltIn) return -1
+    if (!aBuiltIn && bBuiltIn) return 1
+    return a.label.localeCompare(b.label, 'de')
+  })
+})
+
+// Formatiert eine Bibliographie über Zotero/Better BibTeX mit echtem CSL-Style
+ipcMain.handle('zotero-format-bibliography', async (_event, citekey: string, styleId: string, locale = 'de-DE') => {
+  if (!citekey || !styleId || BUILT_IN_ZOTERO_STYLES.has(styleId)) return ''
+
+  try {
+    const response = await fetch(ZOTERO_API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        method: 'item.bibliography',
+        params: [[citekey], {
+          contentType: 'text',
+          id: styleId,
+          locale,
+          quickCopy: false
+        }],
+        id: 1
+      })
+    })
+
+    if (!response.ok) {
+      console.error('[Zotero] Bibliography failed:', response.status)
+      return ''
+    }
+
+    const data = await response.json()
+    if (data.error) {
+      console.error('[Zotero] Bibliography API error:', data.error)
+      return ''
+    }
+
+    return typeof data.result === 'string' ? stripHtml(data.result) : ''
+  } catch (error) {
+    console.error('[Zotero] Bibliography error:', error)
+    return ''
   }
 })
 
@@ -1694,18 +1874,70 @@ ipcMain.handle('zotero-get-notes', async (_event, citekey: string) => {
 
 // ============ SEMANTIC SCHOLAR API ============
 const SEMANTIC_SCHOLAR_API_URL = 'https://api.semanticscholar.org/graph/v1'
+const SEMANTIC_SCHOLAR_CACHE_TTL_MS = 10 * 60 * 1000
+const SEMANTIC_SCHOLAR_MIN_INTERVAL_MS = 1200
 
-// Rate limiter: max 1 request per second (free tier limit)
+type SemanticScholarSearchResponse = {
+  total: number
+  papers: Array<object>
+  error?: 'rate_limited' | 'error'
+  retryAfterMs?: number
+}
+
+const semanticScholarCache = new Map<string, { expiresAt: number; value: SemanticScholarSearchResponse }>()
+const semanticScholarInFlight = new Map<string, Promise<SemanticScholarSearchResponse>>()
+
+// Rate limiter: keep one active request lane and respect 429 Retry-After.
 let semanticScholarLastRequest = 0
+let semanticScholarBlockedUntil = 0
 
-async function semanticScholarFetch(url: string): Promise<Response> {
-  const now = Date.now()
-  const elapsed = now - semanticScholarLastRequest
-  if (elapsed < 1100) {
-    await new Promise(resolve => setTimeout(resolve, 1100 - elapsed))
+function semanticScholarHeaders(): HeadersInit {
+  const headers: HeadersInit = { 'Accept': 'application/json' }
+  const apiKey = process.env.SEMANTIC_SCHOLAR_API_KEY || process.env.S2_API_KEY
+  if (apiKey) headers['x-api-key'] = apiKey
+  return headers
+}
+
+function getRetryAfterMs(response: Response, fallbackMs: number): number {
+  const retryAfter = response.headers.get('retry-after')
+  if (!retryAfter) return fallbackMs
+
+  const retryAfterSeconds = Number(retryAfter)
+  if (Number.isFinite(retryAfterSeconds)) {
+    return Math.max(0, retryAfterSeconds * 1000)
   }
+
+  const retryAfterDate = Date.parse(retryAfter)
+  if (Number.isFinite(retryAfterDate)) {
+    return Math.max(0, retryAfterDate - Date.now())
+  }
+
+  return fallbackMs
+}
+
+async function semanticScholarFetch(url: string, attempt = 0): Promise<Response> {
+  const now = Date.now()
+  const waitForBlock = Math.max(0, semanticScholarBlockedUntil - now)
+  const elapsed = now - semanticScholarLastRequest
+  const waitForLane = elapsed < SEMANTIC_SCHOLAR_MIN_INTERVAL_MS ? SEMANTIC_SCHOLAR_MIN_INTERVAL_MS - elapsed : 0
+  const waitMs = Math.max(waitForBlock, waitForLane)
+
+  if (waitMs > 0) {
+    await new Promise(resolve => setTimeout(resolve, waitMs))
+  }
+
   semanticScholarLastRequest = Date.now()
-  return fetch(url, { headers: { 'Accept': 'application/json' } })
+  const response = await fetch(url, { headers: semanticScholarHeaders() })
+
+  if (response.status === 429 && attempt < 2) {
+    const retryAfterMs = getRetryAfterMs(response, 4000 * (attempt + 1))
+    semanticScholarBlockedUntil = Date.now() + retryAfterMs
+    console.log('[SemanticScholar] Rate limited, retrying in', retryAfterMs, 'ms')
+    await new Promise(resolve => setTimeout(resolve, retryAfterMs))
+    return semanticScholarFetch(url, attempt + 1)
+  }
+
+  return response
 }
 
 ipcMain.handle('semantic-scholar-search', async (_event, query: string, filters?: {
@@ -1731,33 +1963,51 @@ ipcMain.handle('semantic-scholar-search', async (_event, query: string, filters?
     if (filters?.openAccessPdf) params.set('openAccessPdf', '')
 
     const url = `${SEMANTIC_SCHOLAR_API_URL}/paper/search?${params}`
+    const cacheKey = url
+    const cached = semanticScholarCache.get(cacheKey)
+    if (cached && cached.expiresAt > Date.now()) {
+      console.log('[SemanticScholar] Cache hit')
+      return cached.value
+    }
+
+    const inFlight = semanticScholarInFlight.get(cacheKey)
+    if (inFlight) {
+      console.log('[SemanticScholar] Reusing in-flight request')
+      return inFlight
+    }
+
     console.log('[SemanticScholar] Fetching:', url)
 
-    let response = await semanticScholarFetch(url)
+    const request = (async (): Promise<SemanticScholarSearchResponse> => {
+      const response = await semanticScholarFetch(url)
 
-    // Retry once on 429
-    if (response.status === 429) {
-      console.log('[SemanticScholar] Rate limited, retrying in 2s...')
-      await new Promise(resolve => setTimeout(resolve, 2000))
-      semanticScholarLastRequest = Date.now()
-      response = await fetch(url, { headers: { 'Accept': 'application/json' } })
-    }
+      if (!response.ok) {
+        const retryAfterMs = response.status === 429 ? getRetryAfterMs(response, 5000) : undefined
+        if (retryAfterMs) semanticScholarBlockedUntil = Date.now() + retryAfterMs
+        console.error('[SemanticScholar] Search failed:', response.status, response.statusText)
+        return { total: 0, papers: [], error: response.status === 429 ? 'rate_limited' : 'error', retryAfterMs }
+      }
 
-    if (!response.ok) {
-      console.error('[SemanticScholar] Search failed:', response.status, response.statusText)
-      return { total: 0, papers: [], error: response.status === 429 ? 'rate_limited' : 'error' }
-    }
+      const data = await response.json()
+      const value = {
+        total: data.total || 0,
+        papers: data.data || []
+      }
 
-    const data = await response.json()
-    console.log('[SemanticScholar] Found', data.total, 'results, returning', data.data?.length || 0)
+      console.log('[SemanticScholar] Found', value.total, 'results, returning', value.papers.length)
+      semanticScholarCache.set(cacheKey, { expiresAt: Date.now() + SEMANTIC_SCHOLAR_CACHE_TTL_MS, value })
+      return value
+    })()
 
-    return {
-      total: data.total || 0,
-      papers: data.data || []
+    semanticScholarInFlight.set(cacheKey, request)
+    try {
+      return await request
+    } finally {
+      semanticScholarInFlight.delete(cacheKey)
     }
   } catch (error) {
     console.error('[SemanticScholar] Search error:', error)
-    return { total: 0, papers: [] }
+    return { total: 0, papers: [], error: 'error' }
   }
 })
 
@@ -1777,6 +2027,308 @@ ipcMain.handle('semantic-scholar-get-paper', async (_event, paperId: string) => 
   } catch (error) {
     console.error('[SemanticScholar] Get paper error:', error)
     return null
+  }
+})
+
+// ============ OPENALEX API ============
+const OPENALEX_API_URL = 'https://api.openalex.org'
+const OPENALEX_CACHE_TTL_MS = 10 * 60 * 1000
+const openAlexCache = new Map<string, { expiresAt: number; value: SemanticScholarSearchResponse & { warning?: string } }>()
+const openAlexInFlight = new Map<string, Promise<SemanticScholarSearchResponse & { warning?: string }>>()
+
+function getOpenAlexKeyPath(): string {
+  return path.join(app.getPath('userData'), 'openalex-key.enc')
+}
+
+function getOpenAlexMailtoPath(): string {
+  return path.join(app.getPath('userData'), 'openalex-mailto.txt')
+}
+
+async function loadOpenAlexKey(): Promise<string | null> {
+  const envKey = process.env.OPENALEX_API_KEY
+  if (envKey) return envKey
+
+  try {
+    if (!safeStorage.isEncryptionAvailable()) return null
+    const encrypted = await fs.readFile(getOpenAlexKeyPath())
+    return safeStorage.decryptString(encrypted)
+  } catch {
+    return null
+  }
+}
+
+async function loadOpenAlexMailto(): Promise<string | null> {
+  const envMailto = process.env.OPENALEX_MAILTO
+  if (envMailto) return envMailto.trim() || null
+
+  try {
+    const value = await fs.readFile(getOpenAlexMailtoPath(), 'utf8')
+    return value.trim() || null
+  } catch {
+    return null
+  }
+}
+
+function reconstructOpenAlexAbstract(index?: Record<string, number[]> | null): string | null {
+  if (!index) return null
+
+  const entries: Array<[number, string]> = []
+  for (const [word, positions] of Object.entries(index)) {
+    for (const position of positions) {
+      entries.push([position, word])
+    }
+  }
+
+  return entries
+    .sort((a, b) => a[0] - b[0])
+    .map(([, word]) => word)
+    .join(' ') || null
+}
+
+function getOpenAlexRetryAfterMs(response: Response, fallbackMs: number): number {
+  const reset = response.headers.get('x-ratelimit-reset')
+  const resetSeconds = reset ? Number(reset) : NaN
+  if (Number.isFinite(resetSeconds) && resetSeconds > 0) return resetSeconds * 1000
+  return getRetryAfterMs(response, fallbackMs)
+}
+
+function mapOpenAlexWork(work: any): object {
+  const authors = Array.isArray(work.authorships)
+    ? work.authorships
+      .map((authorship: any) => ({
+        authorId: authorship.author?.id,
+        name: authorship.author?.display_name
+      }))
+      .filter((author: { name?: string }) => Boolean(author.name))
+    : []
+
+  const doi = typeof work.doi === 'string'
+    ? work.doi.replace(/^https?:\/\/doi\.org\//i, '')
+    : undefined
+
+  const source = work.primary_location?.source?.display_name
+  const pdfUrl = work.primary_location?.pdf_url || work.best_oa_location?.pdf_url
+  const landingPageUrl = work.primary_location?.landing_page_url || work.best_oa_location?.landing_page_url
+  const topics = [
+    work.primary_topic?.display_name,
+    ...(Array.isArray(work.topics) ? work.topics.slice(0, 4).map((topic: any) => topic.display_name) : [])
+  ].filter(Boolean)
+
+  return {
+    source: 'openalex',
+    paperId: work.id,
+    openAlexId: work.id,
+    title: work.display_name || work.title || 'Untitled',
+    abstract: reconstructOpenAlexAbstract(work.abstract_inverted_index),
+    authors,
+    year: work.publication_year,
+    citationCount: work.cited_by_count || 0,
+    url: landingPageUrl || work.id,
+    venue: source,
+    publicationTypes: work.type ? [work.type] : [],
+    openAccessPdf: pdfUrl ? { url: pdfUrl, status: work.open_access?.oa_status || null } : null,
+    externalIds: {
+      DOI: doi,
+      OpenAlex: work.id
+    },
+    topics
+  }
+}
+
+ipcMain.handle('openalex-search', async (_event, query: string, filters?: {
+  year?: string
+  minCitationCount?: number
+  limit?: number
+  openAccessPdf?: boolean
+}) => {
+  console.log('[OpenAlex] Search called with query:', query, 'filters:', filters)
+  if (!query.trim()) return { total: 0, papers: [] }
+
+  try {
+    const params = new URLSearchParams({
+      search: query,
+      per_page: String(Math.min(filters?.limit || 20, 25)),
+      sort: 'relevance_score:desc',
+      select: [
+        'id',
+        'doi',
+        'display_name',
+        'title',
+        'publication_year',
+        'publication_date',
+        'type',
+        'cited_by_count',
+        'authorships',
+        'primary_location',
+        'best_oa_location',
+        'open_access',
+        'abstract_inverted_index',
+        'primary_topic',
+        'topics'
+      ].join(',')
+    })
+
+    const openAlexApiKey = await loadOpenAlexKey()
+    if (openAlexApiKey) params.set('api_key', openAlexApiKey)
+    const openAlexMailto = await loadOpenAlexMailto()
+    if (openAlexMailto) params.set('mailto', openAlexMailto)
+
+    const openAlexFilters: string[] = []
+    if (filters?.year) {
+      const [fromYear, toYear] = filters.year.split('-')
+      if (fromYear) openAlexFilters.push(`from_publication_date:${fromYear}-01-01`)
+      if (toYear) openAlexFilters.push(`to_publication_date:${toYear}-12-31`)
+    }
+    if (filters?.minCitationCount) openAlexFilters.push(`cited_by_count:>${Math.max(filters.minCitationCount - 1, 0)}`)
+    if (filters?.openAccessPdf) openAlexFilters.push('open_access.is_oa:true')
+    if (openAlexFilters.length > 0) params.set('filter', openAlexFilters.join(','))
+
+    const url = `${OPENALEX_API_URL}/works?${params}`
+    const cached = openAlexCache.get(url)
+    if (cached && cached.expiresAt > Date.now()) {
+      console.log('[OpenAlex] Cache hit')
+      return cached.value
+    }
+
+    const inFlight = openAlexInFlight.get(url)
+    if (inFlight) {
+      console.log('[OpenAlex] Reusing in-flight request')
+      return inFlight
+    }
+
+    const request = (async (): Promise<SemanticScholarSearchResponse & { warning?: string }> => {
+      const response = await fetch(url, { headers: { 'Accept': 'application/json' } })
+
+      if (!response.ok) {
+        const retryAfterMs = response.status === 429 ? getOpenAlexRetryAfterMs(response, 5000) : undefined
+        console.error('[OpenAlex] Search failed:', response.status, response.statusText)
+        return {
+          total: 0,
+          papers: [],
+          error: response.status === 429 || response.status === 403 ? 'rate_limited' : 'error',
+          retryAfterMs,
+          warning: openAlexApiKey ? undefined : 'missing_api_key'
+        }
+      }
+
+      const data = await response.json()
+      const value = {
+        total: data.meta?.count || 0,
+        papers: Array.isArray(data.results) ? data.results.map(mapOpenAlexWork) : [],
+        warning: openAlexApiKey ? undefined : 'missing_api_key'
+      }
+
+      console.log('[OpenAlex] Found', value.total, 'results, returning', value.papers.length)
+      openAlexCache.set(url, { expiresAt: Date.now() + OPENALEX_CACHE_TTL_MS, value })
+      return value
+    })()
+
+    openAlexInFlight.set(url, request)
+    try {
+      return await request
+    } finally {
+      openAlexInFlight.delete(url)
+    }
+  } catch (error) {
+    console.error('[OpenAlex] Search error:', error)
+    return { total: 0, papers: [], error: 'error' }
+  }
+})
+
+ipcMain.handle('openalex-save-key', async (_event, apiKey: string) => {
+  try {
+    if (!safeStorage.isEncryptionAvailable()) {
+      return { success: false, error: 'safeStorage nicht verfügbar' }
+    }
+    const encrypted = safeStorage.encryptString(apiKey)
+    await fs.writeFile(getOpenAlexKeyPath(), encrypted)
+    openAlexCache.clear()
+    return { success: true }
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) }
+  }
+})
+
+ipcMain.handle('openalex-load-key', async () => {
+  try {
+    if (process.env.OPENALEX_API_KEY) return 'env'
+    if (!safeStorage.isEncryptionAvailable()) return null
+    const encrypted = await fs.readFile(getOpenAlexKeyPath())
+    return safeStorage.decryptString(encrypted)
+  } catch {
+    return null
+  }
+})
+
+ipcMain.handle('openalex-delete-key', async () => {
+  try {
+    await fs.unlink(getOpenAlexKeyPath())
+    openAlexCache.clear()
+    return { success: true }
+  } catch {
+    return { success: true }
+  }
+})
+
+ipcMain.handle('openalex-save-mailto', async (_event, mailto: string) => {
+  const trimmed = mailto.trim()
+  if (!trimmed) return { success: false, error: 'Mailto darf nicht leer sein' }
+  // Minimal-Validierung — OpenAlex erwartet eine echte Mailadresse für den polite pool
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
+    return { success: false, error: 'Bitte eine gültige E-Mail-Adresse angeben' }
+  }
+  try {
+    await fs.writeFile(getOpenAlexMailtoPath(), trimmed, 'utf8')
+    openAlexCache.clear()
+    return { success: true }
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) }
+  }
+})
+
+ipcMain.handle('openalex-load-mailto', async () => {
+  return await loadOpenAlexMailto()
+})
+
+ipcMain.handle('openalex-delete-mailto', async () => {
+  try {
+    await fs.unlink(getOpenAlexMailtoPath())
+    openAlexCache.clear()
+    return { success: true }
+  } catch {
+    return { success: true }
+  }
+})
+
+ipcMain.handle('openalex-check', async () => {
+  try {
+    const apiKey = await loadOpenAlexKey()
+    const mailto = await loadOpenAlexMailto()
+    const params = new URLSearchParams({ per_page: '1', select: 'id' })
+    if (apiKey) params.set('api_key', apiKey)
+    if (mailto) params.set('mailto', mailto)
+
+    const response = await fetch(`${OPENALEX_API_URL}/works?${params}`, { headers: { 'Accept': 'application/json' } })
+
+    if (!response.ok) {
+      return {
+        available: false,
+        authenticated: Boolean(apiKey),
+        error: `${response.status} ${response.statusText}`.trim()
+      }
+    }
+
+    return {
+      available: true,
+      authenticated: Boolean(apiKey),
+      remaining: response.headers.get('x-ratelimit-remaining') || undefined
+    }
+  } catch (error) {
+    return {
+      available: false,
+      authenticated: false,
+      error: error instanceof Error ? error.message : String(error)
+    }
   }
 })
 

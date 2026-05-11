@@ -11,7 +11,9 @@ export interface SemanticScholarAuthor {
 }
 
 export interface SemanticScholarPaper {
+  source?: 'semantic-scholar' | 'openalex'
   paperId: string
+  openAlexId?: string
   title: string
   abstract?: string | null
   authors: SemanticScholarAuthor[]
@@ -27,7 +29,9 @@ export interface SemanticScholarPaper {
   externalIds?: {
     DOI?: string
     ArXiv?: string
+    OpenAlex?: string
   }
+  topics?: string[]
 }
 
 export interface SemanticScholarSearchFilters {
@@ -41,7 +45,12 @@ export interface SemanticScholarSearchFilters {
 export interface SemanticScholarSearchResult {
   total: number
   papers: SemanticScholarPaper[]
+  error?: 'rate_limited' | 'error'
+  retryAfterMs?: number
+  warning?: 'missing_api_key' | string
 }
+
+export type ResearchSource = 'semantic-scholar' | 'openalex'
 
 // Sucht Papers über IPC -> Main Process
 export async function searchSemanticScholar(
@@ -56,6 +65,21 @@ export async function searchSemanticScholar(
   } catch (error) {
     console.error('[SemanticScholar] Search error:', error)
     return { total: 0, papers: [] }
+  }
+}
+
+export async function searchOpenAlex(
+  query: string,
+  filters?: SemanticScholarSearchFilters
+): Promise<SemanticScholarSearchResult> {
+  if (!query.trim()) return { total: 0, papers: [] }
+
+  try {
+    const result = await window.electronAPI.openAlexSearch(query, filters)
+    return result as SemanticScholarSearchResult
+  } catch (error) {
+    console.error('[OpenAlex] Search error:', error)
+    return { total: 0, papers: [], error: 'error' }
   }
 }
 
@@ -102,6 +126,19 @@ function formatAuthorIEEE(fullName: string): string {
 
 // Generiert Inline-Zitation (IEEE-Style)
 export function generateCitation(paper: SemanticScholarPaper): string {
+  if (paper.source === 'openalex') {
+    const authors = paper.authors?.map(a => a.name).filter(Boolean) || []
+    const authorStr = authors.length === 0
+      ? 'Unknown'
+      : authors.length <= 7
+        ? authors.join(', ')
+        : `${authors.slice(0, 6).join(', ')}, et al.`
+    const year = paper.year ? ` (${paper.year}).` : ' (n.d.).'
+    const venue = paper.venue ? ` ${paper.venue}.` : ''
+    const doi = paper.externalIds?.DOI ? ` https://doi.org/${paper.externalIds.DOI}` : paper.url ? ` ${paper.url}` : ''
+    return `${authorStr}.${year} ${paper.title}.${venue}${doi}`.replace(/\s+/g, ' ').trim()
+  }
+
   const authors = paper.authors || []
   const year = paper.year || ''
 
@@ -128,11 +165,13 @@ export function generateLiteratureNote(paper: SemanticScholarPaper): string {
 
   let note = `---
 title: "${paper.title.replace(/"/g, '\\"')}"
+source: ${paper.source || 'semantic-scholar'}
+${paper.openAlexId ? `openalex_id: ${paper.openAlexId}` : ''}
 authors: ${authors}
 year: ${year}
 citations: ${paper.citationCount || 0}
 ${doi ? `doi: ${doi}` : ''}
-tags: [literatur, paper]
+tags: [literatur, paper${paper.topics?.map(topic => `, ${topic.toLowerCase().replace(/\s+/g, '-')}`).join('') || ''}]
 ---
 
 **Autoren:** ${authors}
@@ -154,6 +193,14 @@ tags: [literatur, paper]
 
   if (paper.openAccessPdf?.url) {
     note += `**PDF:** ${paper.openAccessPdf.url}\n`
+  }
+
+  if (paper.openAlexId) {
+    note += `**OpenAlex:** ${paper.openAlexId}\n`
+  }
+
+  if (paper.topics && paper.topics.length > 0) {
+    note += `**Topics:** ${paper.topics.join(', ')}\n`
   }
 
   note += `

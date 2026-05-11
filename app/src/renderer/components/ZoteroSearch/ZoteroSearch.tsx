@@ -5,9 +5,14 @@ import {
   isZoteroAvailable,
   formatAuthors,
   formatYear,
-  generateCitation,
+  generateStyledCitation,
   generateLiteratureNoteWithAnnotations,
   generateLiteratureNoteFilename,
+  CITATION_STYLE_OPTIONS,
+  DEFAULT_CITATION_STYLE,
+  listCitationStyles,
+  type CitationStyle,
+  type CitationStyleOption,
   type ZoteroSearchResult
 } from '../../services/zoteroService'
 
@@ -18,6 +23,13 @@ interface ZoteroSearchProps {
 }
 
 type ActionMode = 'citation' | 'footnote' | 'note'
+const CITATION_STYLE_STORAGE_KEY = 'mindgraph.zotero.citationStyle'
+
+function loadCitationStyle(): CitationStyle {
+  const savedStyle = localStorage.getItem(CITATION_STYLE_STORAGE_KEY)
+  if (savedStyle === 'apa') return DEFAULT_CITATION_STYLE
+  return savedStyle || DEFAULT_CITATION_STYLE
+}
 
 export const ZoteroSearch: React.FC<ZoteroSearchProps> = ({ isOpen, onClose, onInsertCitation }) => {
   const [query, setQuery] = useState('')
@@ -26,6 +38,8 @@ export const ZoteroSearch: React.FC<ZoteroSearchProps> = ({ isOpen, onClose, onI
   const [isLoading, setIsLoading] = useState(false)
   const [zoteroAvailable, setZoteroAvailable] = useState<boolean | null>(null)
   const [actionMode, setActionMode] = useState<ActionMode>('citation')
+  const [citationStyle, setCitationStyle] = useState<CitationStyle>(loadCitationStyle)
+  const [citationStyles, setCitationStyles] = useState<CitationStyleOption[]>(CITATION_STYLE_OPTIONS)
   const inputRef = useRef<HTMLInputElement>(null)
   const resultsRef = useRef<HTMLDivElement>(null)
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null)
@@ -43,6 +57,17 @@ export const ZoteroSearch: React.FC<ZoteroSearchProps> = ({ isOpen, onClose, onI
 
       isZoteroAvailable().then(available => {
         setZoteroAvailable(available)
+      })
+
+      listCitationStyles().then(styles => {
+        setCitationStyles(styles)
+
+        setCitationStyle(currentStyle => {
+          if (styles.some(style => style.id === currentStyle)) return currentStyle
+          const defaultStyle = styles.find(style => style.id === DEFAULT_CITATION_STYLE)?.id || styles[0]?.id || 'mindgraph'
+          localStorage.setItem(CITATION_STYLE_STORAGE_KEY, defaultStyle)
+          return defaultStyle
+        })
       })
     }
   }, [isOpen])
@@ -81,7 +106,7 @@ export const ZoteroSearch: React.FC<ZoteroSearchProps> = ({ isOpen, onClose, onI
 
   // Zitation einfügen
   const insertCitation = useCallback(async (result: ZoteroSearchResult) => {
-    const citation = generateCitation(result)
+    const citation = await generateStyledCitation(result, citationStyle)
     console.log('[ZoteroSearch] Inserting citation:', citation)
 
     if (onInsertCitation) {
@@ -91,11 +116,11 @@ export const ZoteroSearch: React.FC<ZoteroSearchProps> = ({ isOpen, onClose, onI
       window.dispatchEvent(new CustomEvent('insert-text-at-cursor', { detail: citation }))
     }
     onClose()
-  }, [onInsertCitation, onClose])
+  }, [citationStyle, onInsertCitation, onClose])
 
   // Fußnote einfügen
   const insertFootnote = useCallback(async (result: ZoteroSearchResult) => {
-    const citation = generateCitation(result)
+    const citation = await generateStyledCitation(result, citationStyle)
     console.log('[ZoteroSearch] Inserting footnote for:', citation)
 
     // Dispatch event to insert footnote (editor will handle the logic)
@@ -103,7 +128,12 @@ export const ZoteroSearch: React.FC<ZoteroSearchProps> = ({ isOpen, onClose, onI
       detail: { citation, citekey: result.citekey }
     }))
     onClose()
-  }, [onClose])
+  }, [citationStyle, onClose])
+
+  const handleCitationStyleChange = useCallback((style: CitationStyle) => {
+    setCitationStyle(style)
+    localStorage.setItem(CITATION_STYLE_STORAGE_KEY, style)
+  }, [])
 
   // Literaturnotiz erstellen
   const createLiteratureNote = useCallback(async (result: ZoteroSearchResult) => {
@@ -267,6 +297,24 @@ export const ZoteroSearch: React.FC<ZoteroSearchProps> = ({ isOpen, onClose, onI
             disabled={zoteroAvailable === false}
           />
           <span className="zotero-search-hint">TAB wechselt Modus</span>
+        </div>
+
+        <div className="zotero-style-row">
+          <label className="zotero-style-label" htmlFor="zotero-citation-style">
+            Zitierstil
+          </label>
+          <select
+            id="zotero-citation-style"
+            className="zotero-style-select"
+            value={citationStyle}
+            onChange={(e) => handleCitationStyleChange(e.target.value as CitationStyle)}
+          >
+            {citationStyles.map(option => (
+              <option key={option.id} value={option.id}>
+                {option.label} - {option.description}
+              </option>
+            ))}
+          </select>
         </div>
 
         {zoteroAvailable === false && (

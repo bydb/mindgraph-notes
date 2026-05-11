@@ -3,11 +3,13 @@ import { useNotesStore, createNoteFromFile } from '../../stores/notesStore'
 import { useTranslation } from '../../utils/translations'
 import {
   searchSemanticScholar,
+  searchOpenAlex,
   formatAuthors,
   generateCitation,
   generateLiteratureNote,
   generateLiteratureNoteFilename,
   FIELDS_OF_STUDY,
+  type ResearchSource,
   type SemanticScholarPaper,
   type SemanticScholarSearchFilters
 } from '../../services/semanticScholarService'
@@ -24,6 +26,7 @@ export const SemanticScholarPanel: React.FC<SemanticScholarPanelProps> = ({ onCl
   const [error, setError] = useState<string | null>(null)
   const [expandedPaper, setExpandedPaper] = useState<string | null>(null)
   const [showFilters, setShowFilters] = useState(false)
+  const [source, setSource] = useState<ResearchSource>('semantic-scholar')
   const [filters, setFilters] = useState<SemanticScholarSearchFilters>({
     limit: 10,
     minCitationCount: 0
@@ -34,6 +37,7 @@ export const SemanticScholarPanel: React.FC<SemanticScholarPanelProps> = ({ onCl
   const [openAccessOnly, setOpenAccessOnly] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const latestSearchRef = useRef(0)
 
   const { vaultPath, addNote, selectNote: selectNoteInStore } = useNotesStore()
   const { t } = useTranslation()
@@ -45,7 +49,7 @@ export const SemanticScholarPanel: React.FC<SemanticScholarPanelProps> = ({ onCl
 
   // Build current filters from state
   const minCitations = filters.minCitationCount || 0
-  const filterKey = `${yearFrom}|${yearTo}|${fieldOfStudy}|${minCitations}|${openAccessOnly}`
+  const filterKey = `${source}|${yearFrom}|${yearTo}|${fieldOfStudy}|${minCitations}|${openAccessOnly}`
 
   const buildCurrentFilters = useCallback((): SemanticScholarSearchFilters => {
     const f: SemanticScholarSearchFilters = { limit: 20 }
@@ -64,25 +68,43 @@ export const SemanticScholarPanel: React.FC<SemanticScholarPanelProps> = ({ onCl
       setTotalResults(0)
       return
     }
+    const searchId = latestSearchRef.current + 1
+    latestSearchRef.current = searchId
     setIsLoading(true)
     setError(null)
     try {
       const f = buildCurrentFilters()
-      const result = await searchSemanticScholar(searchQuery, f) as any
+      const result = source === 'openalex'
+        ? await searchOpenAlex(searchQuery, f)
+        : await searchSemanticScholar(searchQuery, f)
+      if (searchId !== latestSearchRef.current) return
+
       if (result.error === 'rate_limited') {
-        setError(t('semanticScholar.rateLimited'))
+        setError(source === 'openalex' ? t('semanticScholar.openAlexRateLimited') : t('semanticScholar.rateLimited'))
+        setResults([])
+        setTotalResults(0)
+      } else if (result.error) {
+        setError(t('semanticScholar.error'))
+        setResults([])
+        setTotalResults(0)
       } else {
         setResults(result.papers)
         setTotalResults(result.total)
+        if (result.warning === 'missing_api_key') {
+          setError(t('semanticScholar.openAlexApiHint'))
+        }
       }
     } catch (err) {
+      if (searchId !== latestSearchRef.current) return
       console.error('[SemanticScholar] Search error:', err)
       setError(t('semanticScholar.error'))
       setResults([])
     } finally {
-      setIsLoading(false)
+      if (searchId === latestSearchRef.current) {
+        setIsLoading(false)
+      }
     }
-  }, [buildCurrentFilters])
+  }, [buildCurrentFilters, source, t])
 
   // Store performSearch in a ref so handleKeyDown always has the latest version
   const performSearchRef = useRef(performSearch)
@@ -100,9 +122,10 @@ export const SemanticScholarPanel: React.FC<SemanticScholarPanelProps> = ({ onCl
       return
     }
 
+    const debounceMs = filterKey === 'semantic-scholar||||0|false' ? 1200 : 1800
     searchTimeoutRef.current = setTimeout(() => {
       performSearchRef.current(query)
-    }, 1200)
+    }, debounceMs)
 
     return () => {
       if (searchTimeoutRef.current) {
@@ -159,7 +182,7 @@ export const SemanticScholarPanel: React.FC<SemanticScholarPanelProps> = ({ onCl
             <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/>
             <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>
           </svg>
-          Semantic Scholar
+          Research
         </div>
         <button className="semantic-scholar-close" onClick={onClose} title={t('panel.close')}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -170,6 +193,21 @@ export const SemanticScholarPanel: React.FC<SemanticScholarPanelProps> = ({ onCl
       </div>
 
       <div className="semantic-scholar-search">
+        <div className="semantic-scholar-source-toggle">
+          <button
+            className={source === 'semantic-scholar' ? 'active' : ''}
+            onClick={() => setSource('semantic-scholar')}
+          >
+            Semantic Scholar
+          </button>
+          <button
+            className={source === 'openalex' ? 'active' : ''}
+            onClick={() => setSource('openalex')}
+          >
+            OpenAlex
+          </button>
+        </div>
+
         <div className="semantic-scholar-search-row">
           <div className="semantic-scholar-input-wrapper">
             <svg className="semantic-scholar-search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -180,7 +218,7 @@ export const SemanticScholarPanel: React.FC<SemanticScholarPanelProps> = ({ onCl
               ref={inputRef}
               type="text"
               className="semantic-scholar-input"
-              placeholder={t('semanticScholar.placeholder')}
+              placeholder={source === 'openalex' ? t('semanticScholar.openAlexPlaceholder') : t('semanticScholar.placeholder')}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={handleKeyDown}
@@ -226,6 +264,8 @@ export const SemanticScholarPanel: React.FC<SemanticScholarPanelProps> = ({ onCl
               <select
                 value={fieldOfStudy}
                 onChange={(e) => setFieldOfStudy(e.target.value)}
+                disabled={source === 'openalex'}
+                title={source === 'openalex' ? t('semanticScholar.openAlexFieldHint') : undefined}
               >
                 <option value="">{t('semanticScholar.allFields')}</option>
                 {FIELDS_OF_STUDY.map(field => (
@@ -272,7 +312,7 @@ export const SemanticScholarPanel: React.FC<SemanticScholarPanelProps> = ({ onCl
           <>
             {totalResults > 0 && (
               <div className="semantic-scholar-result-count">
-                {totalResults.toLocaleString()} {t('semanticScholar.resultsFound')}
+                {totalResults.toLocaleString()} {t('semanticScholar.resultsFound')} · {source === 'openalex' ? 'OpenAlex' : 'Semantic Scholar'}
               </div>
             )}
             {results.map((paper) => (
@@ -296,6 +336,9 @@ export const SemanticScholarPanel: React.FC<SemanticScholarPanelProps> = ({ onCl
                     {paper.openAccessPdf?.url && (
                       <span className="semantic-scholar-badge oa">OA</span>
                     )}
+                    {paper.source === 'openalex' && (
+                      <span className="semantic-scholar-badge source">OpenAlex</span>
+                    )}
                   </div>
                 </div>
 
@@ -310,6 +353,11 @@ export const SemanticScholarPanel: React.FC<SemanticScholarPanelProps> = ({ onCl
                     {paper.venue && (
                       <div className="semantic-scholar-venue">
                         <strong>Venue:</strong> {paper.venue}
+                      </div>
+                    )}
+                    {paper.topics && paper.topics.length > 0 && (
+                      <div className="semantic-scholar-venue">
+                        <strong>Topics:</strong> {paper.topics.join(', ')}
                       </div>
                     )}
                     <div className="semantic-scholar-actions">

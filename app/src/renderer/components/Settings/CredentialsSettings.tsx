@@ -122,6 +122,18 @@ export const CredentialsSettings: React.FC<Props> = ({ onNavigateToTab }) => {
 
     // uiStore-basierte Credentials (NICHT safeStorage — Sicherheits-Hinweis)
     rows.push({
+      id: 'openalex-key',
+      label: 'OpenAlex API-Key',
+      category: 'Forschung',
+      note: 'Höhere Limits im Research-Panel',
+      settingsTab: 'integrations',
+      checkSet: async () => {
+        const k = await window.electronAPI.openAlexLoadKey()
+        return !!k
+      }
+    })
+
+    rows.push({
       id: 'readwise',
       label: 'Readwise API-Key',
       category: 'Forschung',

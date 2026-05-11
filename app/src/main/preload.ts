@@ -85,6 +85,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Zotero / Better BibTeX API
   zoteroCheck: () => ipcRenderer.invoke('zotero-check'),
   zoteroSearch: (query: string) => ipcRenderer.invoke('zotero-search', query),
+  zoteroListCitationStyles: () => ipcRenderer.invoke('zotero-list-citation-styles'),
+  zoteroFormatBibliography: (citekey: string, styleId: string, locale?: string) =>
+    ipcRenderer.invoke('zotero-format-bibliography', citekey, styleId, locale),
   zoteroGetNotes: (citekey: string) => ipcRenderer.invoke('zotero-get-notes', citekey),
 
   // Semantic Scholar API
@@ -92,6 +95,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('semantic-scholar-search', query, filters),
   semanticScholarGetPaper: (paperId: string) =>
     ipcRenderer.invoke('semantic-scholar-get-paper', paperId),
+  openAlexSearch: (query: string, filters?: object) =>
+    ipcRenderer.invoke('openalex-search', query, filters),
+  openAlexSaveKey: (apiKey: string) => ipcRenderer.invoke('openalex-save-key', apiKey),
+  openAlexLoadKey: () => ipcRenderer.invoke('openalex-load-key'),
+  openAlexDeleteKey: () => ipcRenderer.invoke('openalex-delete-key'),
+  openAlexSaveMailto: (mailto: string) => ipcRenderer.invoke('openalex-save-mailto', mailto),
+  openAlexLoadMailto: () => ipcRenderer.invoke('openalex-load-mailto'),
+  openAlexDeleteMailto: () => ipcRenderer.invoke('openalex-delete-mailto'),
+  openAlexCheck: () => ipcRenderer.invoke('openalex-check'),
 
   // Ollama Local AI API
   ollamaCheck: () => ipcRenderer.invoke('ollama-check'),

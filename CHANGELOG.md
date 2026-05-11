@@ -2,6 +2,22 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.6.36-beta] - 2026-05-11
+
+### Features
+
+- **Research-Panel mit OpenAlex als zweiter Quelle**: Das bisherige Semantic-Scholar-Panel heißt jetzt **Research** und kann zwischen Semantic Scholar und OpenAlex umschalten. OpenAlex liefert über 240 Mio. wissenschaftliche Werke inkl. Topics, Open-Access-PDFs und DOIs. Abstracts werden aus dem `abstract_inverted_index` rekonstruiert. Sucht parallel mit Race-Condition-Schutz (`latestSearchRef`) — alte Antworten überschreiben neuere Ergebnisse nicht mehr. Settings-Tab "Integrationen" hat einen neuen "Research"-Block mit OpenAlex-API-Key (verschlüsselt via `safeStorage`) und Mailto-Adresse (Plain-Text, für den "polite pool" mit höheren Rate-Limits ohne API-Key). Beide Werte können auch via `OPENALEX_API_KEY` / `OPENALEX_MAILTO`-Env überschrieben werden.
+- **Echte CSL-Zitierstile in der Zotero-Suche**: Statt nur des hardcodierten MindGraph-Formats lässt sich jetzt jeder in Zotero installierte CSL-Style auswählen. Das Style-Dropdown lädt primär über Better-BibTeX JSON-RPC (`cayw.styles`) — funktioniert plattformunabhängig, egal wo Zotero seine Daten liegen hat. Fallback: paralleler FS-Scan über die Default-Pfade auf macOS/Windows/Linux plus optionalem `ZOTERO_DATA_DIR`-Override. Die Bibliographie wird dann von Better-BibTeX in echtem APA/MLA/Chicago/etc. zurückgegeben (`item.bibliography` JSON-RPC). Eingebaute Built-in-Stile bleiben verfügbar: MindGraph (Autor, Jahr, Titel), BibTeX (`@citekey`), Pandoc (`[@citekey]`). Die Auswahl wird in `localStorage` persistiert.
+- **Zitate funktionieren jetzt auch im Lesen-Modus**: Zitate und Fußnoten aus Zotero/Research lassen sich an der Cursor-Position einfügen, während die Notiz im Preview-Modus offen ist (vorher nur im Source-Mode). Die DOM-Selection wird via `rememberPreviewSelection` über Toolbar-Klicks hinweg festgehalten, `execCommand('insertText')` mit Range-Fallback handhabt das eigentliche Einfügen, der Commit-Pipeline schreibt zurück durch CodeMirror.
+
+### Improvements
+
+- **Semantic-Scholar-Suche gehärtet**: Response-Cache (10 Min), In-Flight-Deduplication (parallele Re-Renders erzeugen nicht mehr mehrere API-Calls), Rate-Limiter respektiert jetzt den `Retry-After`-Header statt einer fixen 1100ms-Sperre. Optionaler API-Key via `SEMANTIC_SCHOLAR_API_KEY` / `S2_API_KEY`-Env hebt das Rate-Limit deutlich.
+- **WYSIWYG-Editor: KaTeX-Math-Roundtrip**: Math-Ausdrücke (`$...$` / `$$...$$`) überleben jetzt den Lese-Modus-Roundtrip. Neue Turndown-Regel liest die LaTeX-Quelle aus dem KaTeX-`annotation`-Tag und erkennt Block- vs. Inline-Math über die `.katex-display`-Klasse.
+- **Bilder im Live-Preview-Cache behalten data-src**: Bilder, die mit aufgelöstem `src="data:..."`-URL aus dem Cache geladen wurden, bleiben mit `data-src`-Attribut versehen, damit die WYSIWYG-Turndown-Konvertierung sie zurück zu Wikilinks (`![[bild.png]]`) macht. Zusätzlicher Fallback für Bilder ohne `data-src` über das `alt`-Attribut (Original-Filename).
+- **`/openalex-check` hittet jetzt einen existierenden Endpoint**: Vorher wurde `/rate-limit` abgefragt — der existiert in der OpenAlex-API gar nicht und antwortete immer mit 404. Jetzt geht eine billige Probe-Query gegen `/works?per_page=1&select=id` raus und liest das Rate-Limit aus dem `x-ratelimit-remaining`-Header.
+- **Zotero-Styles laden parallel statt seriell**: Statt jede CSL-Datei nacheinander zu lesen, wird der gesamte Style-Ordner via `Promise.allSettled` parallelisiert — spürbar bei Power-Usern mit 100+ installierten Styles.
+
 ## [0.6.35-beta] - 2026-05-11
 
 ### Fixes
