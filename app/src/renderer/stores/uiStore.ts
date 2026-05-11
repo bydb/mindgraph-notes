@@ -708,7 +708,7 @@ const defaultState = {
   // Editor Settings
   editorFontSize: 15,
   editorLineNumbers: true,
-  editorDefaultView: 'live-preview' as EditorViewMode,
+  editorDefaultView: 'preview' as EditorViewMode,
   autoSaveInterval: 500,
   editorHeadingFolding: false,
   editorOutlining: false,
@@ -1273,11 +1273,6 @@ export async function initializeUISettings(): Promise<void> {
 
       // Always start with 'editor' mode on startup
       validSettings.viewMode = 'editor'
-      // Obsidian-style writing is now the default. Preserve explicit raw/source defaults,
-      // but migrate the old read-only preview default to the clean writing view.
-      if (validSettings.editorDefaultView === 'preview' && validSettings.userProfile !== 'viewer') {
-        validSettings.editorDefaultView = 'live-preview'
-      }
       // Migrate Transport: defaultDestinationIndex → defaultDestinationFolder
       if (validSettings.transport) {
         const tr = validSettings.transport as TransportSettings

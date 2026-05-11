@@ -457,8 +457,21 @@ const App: React.FC = () => {
   }, [activeTabId, syncTabsWithNotes])
 
   // Wenn Notiz ausgewählt wird → Tab öffnen/aktivieren (direkter Zugriff ohne Loop)
+  // Wichtig: `notes` ist als Dependency drin, damit ein gerade geladenes Note-Objekt nicht
+  // verpasst wird. Aber dadurch feuert der Effect ALSO bei jedem `setNotes(...)` — z.B. wenn
+  // der DashboardView beim Mount den Vault frisch lädt. War selectedNoteId zu dem Zeitpunkt
+  // noch gesetzt (letzte geöffnete Notiz), riss `openEditorTab` den User vom Dashboard zurück
+  // in den Editor — sah aus wie ein Dashboard-Crash. Daher: wenn sich selectedNoteId seit dem
+  // letzten Lauf nicht geändert hat, ist der Re-Run nur ein notes-Update — dann darf ein
+  // bewusst aktiver Non-Editor-Tab (Dashboard, Canvas, Code) nicht überschrieben werden.
+  const lastSelectedNoteIdRef = useRef<string | null>(null)
   useEffect(() => {
-    if (!selectedNoteId) return
+    if (!selectedNoteId) {
+      lastSelectedNoteIdRef.current = null
+      return
+    }
+    const selectionChanged = lastSelectedNoteIdRef.current !== selectedNoteId
+    lastSelectedNoteIdRef.current = selectedNoteId
 
     const { tabs: currentTabs, activeTabId: currentActiveTabId, openEditorTab: openTab } = useTabStore.getState()
 
@@ -466,6 +479,12 @@ const App: React.FC = () => {
     const existingTab = currentTabs.find(t => t.type === 'editor' && t.noteId === selectedNoteId)
     if (existingTab && existingTab.id === currentActiveTabId) {
       return // Schon aktiv, nichts tun
+    }
+
+    // Re-Run nur wegen notes-Update? Aktiven Non-Editor-Tab nicht überschreiben.
+    if (!selectionChanged) {
+      const activeTab = currentTabs.find(t => t.id === currentActiveTabId)
+      if (activeTab && activeTab.type !== 'editor') return
     }
 
     const selectedNote = notes.find(n => n.id === selectedNoteId)

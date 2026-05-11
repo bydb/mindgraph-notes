@@ -2,6 +2,16 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.6.34-beta] - 2026-05-11
+
+### Fixes
+
+- **Dashboard verschwindet nicht mehr nach dem Mount**: Seit 0.6.33-beta ruft der DashboardView beim ersten Öffnen einmalig `reloadVaultNotesForDashboard()` auf — das setzt die `notes`-Liste neu und triggert in `App.tsx` einen `useEffect`, der bei jedem `notes`-Update den `selectedNoteId`-Tab aktiviert. Konsequenz: wer das Dashboard öffnete, sah einen kurzen Moment das Dashboard und dann wieder die zuletzt geöffnete Notiz — wie ein Crash. Der Effect merkt sich jetzt via Ref die letzte `selectedNoteId` und überschreibt bewusst aktive Non-Editor-Tabs (Dashboard, Canvas, Code) nicht mehr, wenn der Re-Run nur durch ein `notes`-Update kam.
+
+### Improvements
+
+- **„Lesen" ist jetzt der Standard-Editor-Modus**: Default für `editorDefaultView` ist von `live-preview` auf `preview` geändert. Wer eine Notiz öffnet, landet im fertig formatierten Lesen-Modus statt im Schreiben-Modus — passt besser zu typischer Vault-Nutzung (90% Lesen, 10% Editieren). Die alte Migration, die jeden gespeicherten `preview`-Wert wieder auf `live-preview` zurücksetzte (außer beim Viewer-Profil), wurde entfernt — die Einstellung greift jetzt wirklich.
+
 ## [0.6.33-beta] - 2026-05-10
 
 ### Features
