@@ -22,7 +22,13 @@ export interface TaskSummary {
   critical: number
 }
 
-const REMINDER_REGEX = /\(@\[\[(\d{4}-\d{2}-\d{2})\]\](?:\s*(\d{1,2}:\d{2}))?\)/
+// Reminder-Wikilink im Task. Toleriert beliebig viele Backslashes vor `[` und `]`,
+// damit Tasks wie `(@\[\[2026-05-08\]\])` oder `(@\\\[\\\[…\\\]\\\])` (Schaden durch
+// frühere LLM/Markdown-Roundtrips) trotzdem geparst werden. Eckige Klammern UND
+// Klammerpaar `(…)` müssen weiterhin vorhanden sein.
+const REMINDER_REGEX = /\(@\\*\[\\*\[(\d{4}-\d{2}-\d{2})\\*\]\\*\](?:\s*(\d{1,2}:\d{2}))?\)/
+// Für `cleanTaskText`: dieselbe Toleranz, aber global, ohne Capture-Gruppen.
+const REMINDER_REGEX_GLOBAL = /\(@\\*\[\\*\[\d{4}-\d{2}-\d{2}\\*\]\\*\](?:\s*\d{1,2}:\d{2})?\)/g
 const TASK_TAG_REGEX = /(?:^|\s)#([\p{L}0-9][\p{L}0-9\-/_]*)/gu
 const TASK_LINE_REGEX = /^[\s]*[-*]\s*\[([ xX])\]\s*(.+)$/
 
@@ -49,7 +55,7 @@ function extractInlineTags(text: string): string[] {
 
 function cleanTaskText(text: string): string {
   return text
-    .replace(REMINDER_REGEX, '')
+    .replace(REMINDER_REGEX_GLOBAL, '')
     .replace(TASK_TAG_REGEX, ' ')
     .replace(/\s+/g, ' ')
     .trim()

@@ -2,6 +2,14 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.6.40-beta] - 2026-05-13
+
+### Fixes
+
+- **Task-Datums-Korruption im WYSIWYG-Preview gestoppt**: Beim Bearbeiten von Notizen im Preview-Modus hat der HTML→Markdown-Roundtrip (Turndown) systematisch Wikilink-Brackets in Task-Datumsmarkern escaped — aus `(@[[2026-05-08]])` wurde `(@\[\[2026-05-08\]\])`, beim nächsten Commit `(@\\\[\\\[2026-05-08\\\]\\\])`, dann `(@\\\\\\\[\\\\\\\[2026-05-08\\\\\\\]\\\\\\\])` — Backslash-Zahl wuchs exponentiell mit `2ⁿ−1`. Folge: das „Aufgaben & Termine"-Panel erkannte das Datum nicht mehr, Termine verschwanden in den „kein Datum"-Bucket, Tags wurden mehrfach dupliziert. Ursache: `wysiwygTurndown` benutzte das Default-Escape, das `[`, `]` und `\` mit Backslashes verfremdet — bei jedem Commit wurden bereits eingefügte Backslashes ein weiteres Mal escaped. Fix: Turndown-Escape selektiv konfiguriert — `[`, `]`, `\`, `_` bleiben jetzt unangetastet (Wikilinks und Identifier überleben), Block-Start-Marker (`#`, `>`, `-`, `+`, `1.`, ``` ``` ```, `==`, `~~~`) und Inline-Emphasis (`*`, `` ` ``) werden weiter escaped, damit Klartext nicht versehentlich zu Markdown-Syntax aufgewertet wird.
+- **Auto-Heal für bereits korrupte Wikilinks**: Falls eine Notiz das eskalierte Muster noch enthält oder ein anderer Schreiber das Verhalten reproduziert, heilen die IPC-Handler `write-file`, `tasks-update-line` und `tasks-create` jeden `.md`-Write transparent zurück: `\[\[…\]\]`, `\\\[\\\[…\\\]\\\]`, `\\\\\\\[\\\\\\\[…\\\\\\\]\\\\\\\]` etc. werden vor dem Schreiben zu sauberem `[[…]]` zurückgebaut. Der vorherige Inhalt landet wie üblich unter `.mindgraph/backups/`. Kein Klick-Error im Editor mehr, kein erneutes Eskalieren.
+- **REMINDER_REGEX im Task-Parser tolerant gemacht**: Der Datums-Regex in `taskExtractor.ts` erkennt jetzt auch `(@\[\[YYYY-MM-DD\]\])`, `(@\\\[\\\[…\\\]\\\])` usw. und akzeptiert beliebig viele Backslashes vor jedem Bracket. Damit zeigen vorhandene, leicht beschädigte Tasks im Panel sofort wieder das richtige Datum, und beim ersten Save über `buildTaskLine` schreibt sich die Zeile von alleine in die saubere Form zurück. Die globale Variante (`REMINDER_REGEX_GLOBAL`) strippt zusätzlich mehrfach-Vorkommen pro Zeile, falls mehrere Fragmente entstanden waren.
+
 ## [0.6.39-beta] - 2026-05-13
 
 ### Fixes

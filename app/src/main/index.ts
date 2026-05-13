@@ -874,6 +874,19 @@ ipcMain.handle('read-file-binary', async (_event, filePath: string) => {
   }
 })
 
+// Heilt das bekannte Wikilink-Korruptionsmuster (`\[\[…\]\]`, `\\\[\\\[…\\\]\\\]`,
+// …) zurück zu sauberem `[[…]]`. Tritt nur durch fehlerhafte Markdown-Roundtrips
+// auf — echter User-Input produziert das Muster nicht. Statt den Write zu rejecten
+// reparieren wir die Inhalte transparent: kein Klick-Error, keine Re-Eskalation.
+const CORRUPTED_WIKILINK_PATTERN = /\\+\[\\+\[([^\]\\]+)\\+\]\\+\]/g
+
+function healCorruptedMarkdown(content: string): { healed: string; changed: boolean } {
+  if (!CORRUPTED_WIKILINK_PATTERN.test(content)) return { healed: content, changed: false }
+  CORRUPTED_WIKILINK_PATTERN.lastIndex = 0
+  const healed = content.replace(CORRUPTED_WIKILINK_PATTERN, '[[$1]]')
+  return { healed, changed: healed !== content }
+}
+
 // Datei schreiben
 ipcMain.handle('write-file', async (_event, filePath: string, content: string) => {
   try {
@@ -893,8 +906,17 @@ ipcMain.handle('write-file', async (_event, filePath: string, content: string) =
       }
     }
 
-    await backupMarkdownBeforeWrite(safe, content)
-    await fs.writeFile(safe, content, 'utf-8')
+    let finalContent = content
+    if (isMarkdown) {
+      const { healed, changed } = healCorruptedMarkdown(content)
+      if (changed) {
+        console.warn('[write-file] Auto-healed corrupted wikilink escapes in', safe)
+        finalContent = healed
+      }
+    }
+
+    await backupMarkdownBeforeWrite(safe, finalContent)
+    await fs.writeFile(safe, finalContent, 'utf-8')
   } catch (error) {
     console.error('Fehler beim Schreiben der Datei:', error)
     throw error
@@ -926,7 +948,9 @@ ipcMain.handle('tasks-update-line', async (_event, data: {
     }
 
     lines[idx] = data.newLine
-    await fs.writeFile(fullPath, lines.join('\n'), 'utf-8')
+    const joined = lines.join('\n')
+    const { healed } = healCorruptedMarkdown(joined)
+    await fs.writeFile(fullPath, healed, 'utf-8')
     return { success: true }
   } catch (error) {
     console.error('[tasks-update-line] Fehler:', error)
@@ -958,7 +982,8 @@ ipcMain.handle('tasks-create', async (_event, data: {
 
     const separator = existing.length === 0 || existing.endsWith('\n') ? '' : '\n'
     const newContent = existing + separator + data.taskLine + '\n'
-    await fs.writeFile(fullPath, newContent, 'utf-8')
+    const { healed } = healCorruptedMarkdown(newContent)
+    await fs.writeFile(fullPath, healed, 'utf-8')
     return { success: true, relativePath: data.relativePath }
   } catch (error) {
     console.error('[tasks-create] Fehler:', error)
@@ -7057,6 +7082,142 @@ async function findSentMailbox(client: unknown): Promise<string | null> {
   }
 }
 
+function escapeEmailHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
+function normalizeEmailUrl(value: string): string {
+  const trimmed = value.trim()
+  if (/^(https?:\/\/|mailto:|tel:|cid:)/i.test(trimmed)) return trimmed
+  return `https://${trimmed}`
+}
+
+function isSafeEmailUrl(value: string): boolean {
+  return /^(https?:\/\/|mailto:|tel:|cid:)/i.test(value.trim())
+}
+
+function sanitizeEmailStyle(value: string): string {
+  return value
+    .split(';')
+    .map(part => part.trim())
+    .filter(part => part && !/expression\s*\(|url\s*\(|javascript:/i.test(part))
+    .join('; ')
+}
+
+function sanitizeEmailHtml(html: string): string {
+  const allowedTags = new Set([
+    'a', 'br', 'p', 'div', 'span', 'strong', 'b', 'em', 'i', 'u', 's',
+    'ul', 'ol', 'li', 'blockquote', 'hr', 'table', 'thead', 'tbody', 'tfoot',
+    'tr', 'td', 'th', 'img', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'pre', 'code'
+  ])
+  const globalAttrs = new Set(['style', 'title', 'class'])
+  const tagAttrs: Record<string, Set<string>> = {
+    a: new Set(['href', 'target', 'rel']),
+    img: new Set(['src', 'alt', 'width', 'height']),
+    td: new Set(['colspan', 'rowspan', 'align', 'valign']),
+    th: new Set(['colspan', 'rowspan', 'align', 'valign']),
+    table: new Set(['cellpadding', 'cellspacing', 'border', 'width']),
+    div: new Set(['align']),
+    p: new Set(['align'])
+  }
+
+  return html
+    .replace(/<!--[\s\S]*?-->/g, '')
+    .replace(/<\s*(script|style|iframe|object|embed|form|input|button|meta|link)[^>]*>[\s\S]*?<\s*\/\s*\1\s*>/gi, '')
+    .replace(/<\s*\/?\s*(script|style|iframe|object|embed|form|input|button|meta|link)[^>]*>/gi, '')
+    .replace(/<\s*(\/?)\s*([a-z][a-z0-9-]*)([^>]*)>/gi, (_match, closing: string, rawTag: string, rawAttrs: string) => {
+      const tag = rawTag.toLowerCase()
+      if (!allowedTags.has(tag)) return ''
+      if (closing) return `</${tag}>`
+
+      const attrs: string[] = []
+      const attrPattern = /([a-zA-Z_:][\w:.-]*)(?:\s*=\s*("([^"]*)"|'([^']*)'|([^\s"'=<>`]+)))?/g
+      let attrMatch: RegExpExecArray | null
+      while ((attrMatch = attrPattern.exec(rawAttrs)) !== null) {
+        const name = attrMatch[1].toLowerCase()
+        const value = attrMatch[3] ?? attrMatch[4] ?? attrMatch[5] ?? ''
+        if (name.startsWith('on')) continue
+        if (!globalAttrs.has(name) && !tagAttrs[tag]?.has(name)) continue
+
+        let safeValue = value
+        if ((name === 'href' || name === 'src') && !isSafeEmailUrl(safeValue)) continue
+        if (name === 'style') {
+          safeValue = sanitizeEmailStyle(safeValue)
+          if (!safeValue) continue
+        }
+        if (name === 'target' && !['_blank', '_self'].includes(safeValue)) continue
+        attrs.push(`${name}="${escapeEmailHtml(safeValue)}"`)
+      }
+
+      if (tag === 'a' && !attrs.some(attr => attr.startsWith('rel='))) {
+        attrs.push('rel="noopener noreferrer"')
+      }
+
+      const suffix = ['br', 'hr', 'img'].includes(tag) ? ' /' : ''
+      return `<${tag}${attrs.length ? ` ${attrs.join(' ')}` : ''}${suffix}>`
+    })
+}
+
+function decodeEscapedEmailTag(value: string): string {
+  return value
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&amp;/g, '&')
+}
+
+function linkifyEmailText(value: string): string {
+  const tokens: string[] = []
+  const stash = (html: string): string => {
+    const key = `\u0000EMAIL_HTML_${tokens.length}\u0000`
+    tokens.push(html)
+    return key
+  }
+
+  let output = value.replace(/<a\b[\s\S]*?<\/a>/gi, stash)
+  output = output.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+|mailto:[^\s)]+|tel:[^\s)]+)\)/gi, (_match, label: string, url: string) => {
+    const safeUrl = normalizeEmailUrl(url)
+    return stash(`<a href="${escapeEmailHtml(safeUrl)}" style="color:#1976d2;text-decoration:underline;" rel="noopener noreferrer">${label}</a>`)
+  })
+  output = output.replace(/\bhttps?:\/\/[^\s<>"]+/gi, url =>
+    stash(`<a href="${escapeEmailHtml(url)}" style="color:#1976d2;text-decoration:underline;" rel="noopener noreferrer">${url}</a>`)
+  )
+  output = output.replace(/\bwww\.[^\s<>"]+/gi, url => {
+    const href = normalizeEmailUrl(url)
+    return stash(`<a href="${escapeEmailHtml(href)}" style="color:#1976d2;text-decoration:underline;" rel="noopener noreferrer">${url}</a>`)
+  })
+  output = output.replace(/(?<![:/])\b[\w.+-]+@[\w-]+\.[\w.-]+\b/g, email =>
+    stash(`<a href="mailto:${escapeEmailHtml(email)}" style="color:#1976d2;text-decoration:underline;">${email}</a>`)
+  )
+
+  return output.replace(/\u0000EMAIL_HTML_(\d+)\u0000/g, (_match, index: string) => tokens[Number(index)] || '')
+}
+
+function renderEmailHtml(body: string): string {
+  const escaped = escapeEmailHtml(body)
+  let formatted = escaped
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g, '<em>$1</em>')
+    .replace(/^• (.+)$/gm, '&bull; $1')
+    .replace(/\n?———\n?/g, '<hr style="border:none;border-top:1px solid #ccc;margin:12px 0;">')
+    .replace(/^&gt; (.+)$/gm, '<span style="color:#666;border-left:3px solid #ccc;padding-left:8px;display:block;margin:2px 0;">$1</span>')
+
+  formatted = formatted.replace(/&lt;([\s\S]+?)&gt;/g, (match: string, maybeTag: string) => {
+    const decoded = decodeEscapedEmailTag(maybeTag)
+    if (!/^\/?\s*[a-z][a-z0-9-]*(\s|\/|$)/i.test(decoded)) return match
+    return sanitizeEmailHtml(`<${decoded}>`)
+  })
+  formatted = linkifyEmailText(formatted)
+  formatted = sanitizeEmailHtml(formatted)
+  formatted = formatted.replace(/\n/g, '<br>')
+
+  return `<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; font-size: 14px; color: #333;">${formatted}</div>`
+}
+
 ipcMain.handle('email-send', async (_event, composeData: {
   to: { name: string; address: string }[]
   cc?: { name: string; address: string }[]
@@ -7107,32 +7268,9 @@ ipcMain.handle('email-send', async (_event, composeData: {
       }
     })
 
-    // HTML aus Body generieren (Markdown-artige Formatierung + Zeilenumbrueche)
-    const escapeHtml = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-    let formatted = escapeHtml(composeData.body)
-    // Markdown-Links: [text](url) → <a href="url">text</a> (vor Bold/Italic, damit URL-Inhalt geschuetzt ist)
-    formatted = formatted.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" style="color:#1976d2;text-decoration:underline;">$1</a>')
-    // Markdown-Links mit mailto: [text](mailto:...)
-    formatted = formatted.replace(/\[([^\]]+)\]\((mailto:[^\s)]+)\)/g, '<a href="$2" style="color:#1976d2;text-decoration:underline;">$1</a>')
-    // Auto-Link nackte URLs (nicht innerhalb bestehender <a>-Tags, erkannt am vorangehenden " = >)
-    formatted = formatted.replace(/(?<!["'=>])(https?:\/\/[^\s<>"]+)/g, '<a href="$1" style="color:#1976d2;text-decoration:underline;">$1</a>')
-    // Auto-Link E-Mail-Adressen (nicht innerhalb bestehender Tags oder URL-Parameter)
-    formatted = formatted.replace(/(?<!["'>:=\/])\b([\w.+-]+@[\w-]+\.[\w.-]+)\b/g, '<a href="mailto:$1" style="color:#1976d2;text-decoration:underline;">$1</a>')
-    // Bold: **text** → <strong>text</strong>
-    formatted = formatted.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-    // Italic: *text* → <em>text</em>
-    formatted = formatted.replace(/\*(.+?)\*/g, '<em>$1</em>')
-    // Bullet: • at line start
-    formatted = formatted.replace(/^• (.+)$/gm, '&bull; $1')
-    // Horizontal rule: ——— → <hr>
-    formatted = formatted.replace(/\n?———\n?/g, '<hr style="border:none;border-top:1px solid #ccc;margin:12px 0;">')
-    // Quoted lines: > text → styled blockquote
-    formatted = formatted.replace(/^&gt; (.+)$/gm, '<span style="color:#666;border-left:3px solid #ccc;padding-left:8px;display:block;margin:2px 0;">$1</span>')
-    // Line breaks
-    formatted = formatted.replace(/\n/g, '<br>')
-    let htmlBody = `<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; font-size: 14px; color: #333;">`
-    htmlBody += formatted
-    htmlBody += `</div>`
+    // HTML aus Body generieren: Plain Text/Markdown-Links werden gerendert,
+    // explizites HTML aus Body/Signatur wird auf eine sichere E-Mail-Teilmenge reduziert.
+    let htmlBody = renderEmailHtml(composeData.body)
 
     // Signatur-Bild als CID-Attachment einbetten
     const attachments: Array<{ filename: string; path: string; cid?: string }> = []

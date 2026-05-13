@@ -265,6 +265,24 @@ const wysiwygTurndown = new TurndownService({
   bulletListMarker: '-',
 })
 
+// Turndown's Default-Escape macht aus `[`, `]` und `\` Backslash-Escapes — im
+// WYSIWYG-Roundtrip zerstört das Wikilinks und Task-Datumsmarker
+// (`(@[[2026-05-08]])`) und verdoppelt bei jedem Commit die Backslashes
+// (Korruptionsmuster 0 → 1 → 3 → 7 …). Auch `_` escapen wir nicht, weil es in
+// Dateinamen/Identifiern omnipräsent ist. Block-Start-Marker (Headings, Quotes,
+// Listen) bleiben escaped, damit Klartext nicht plötzlich zu Block-Syntax wird.
+wysiwygTurndown.escape = (input: string) =>
+  input
+    .replace(/\*/g, '\\*')
+    .replace(/^-/g, '\\-')
+    .replace(/^\+ /g, '\\+ ')
+    .replace(/^(=+)/g, '\\$1')
+    .replace(/^(#{1,6}) /g, '\\$1 ')
+    .replace(/`/g, '\\`')
+    .replace(/^~~~/g, '\\~~~')
+    .replace(/^>/g, '\\>')
+    .replace(/^(\d+)\. /g, '$1\\. ')
+
 wysiwygTurndown.addRule('wikilink', {
   filter: (node) => node.nodeName === 'A' && (node as HTMLElement).classList.contains('wikilink'),
   replacement: (content, node) => {
