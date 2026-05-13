@@ -2,6 +2,12 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.6.38-beta] - 2026-05-13
+
+### Fixes
+
+- **macOS Mikrofon-Zugriff fürs Diktieren**: Auf macOS schlug das Diktieren im Transport-Fenster und im Hauptfenster mit „permission denied" fehl — ohne dass je ein System-Permission-Dialog erschien. Ursache: Bei aktiviertem Hardened Runtime reicht der `NSMicrophoneUsageDescription`-Eintrag in der Info.plist alleine nicht aus, das passende Entitlement `com.apple.security.device.audio-input` muss zusätzlich in `entitlements.mac.plist` stehen. Fehlt es, blockiert macOS den Zugriff stumm. Mit dem Fix erscheint jetzt beim ersten Diktat-Versuch der erwartete macOS-Dialog „MindGraph Notes möchte auf das Mikrofon zugreifen". Via `entitlementsInherit` wird das Recht automatisch an alle Renderer- und Helper-Prozesse vererbt, also auch ans Schnellerfassungs-Fenster.
+
 ## [0.6.37-beta] - 2026-05-13
 
 ### Features
