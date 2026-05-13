@@ -2,6 +2,12 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.6.39-beta] - 2026-05-13
+
+### Fixes
+
+- **Links in E-Mail-Signatur und -Body funktionieren jetzt**: Bisher landeten URLs und E-Mail-Adressen in der Signatur sowie im Mail-Body als unklickbarer Plain Text beim Empfänger — der HTML-Konverter beim Versand unterstützte zwar Bold/Italic, aber keine Links. Der Konverter erkennt jetzt vier Link-Varianten und wandelt sie in echte `<a>`-Tags um: Markdown-Links `[Text](https://url)`, Markdown-Mailto-Links `[Text](mailto:...)`, nackte URLs (`https://…`) und nackte E-Mail-Adressen (`name@domain.tld`). Negative Lookbehinds verhindern Doppel-Linking innerhalb bereits gerenderter Tags und schützen E-Mails in URL-Query-Parametern. Der Hinweistext unter dem Signatur-Feld (Einstellungen → Agenten → E-Mail) erklärt die Syntax. Das Signatur-Feld selbst bleibt ein einfaches Textarea — die Konvertierung passiert beim Senden.
+
 ## [0.6.38-beta] - 2026-05-13
 
 ### Fixes

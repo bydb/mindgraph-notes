@@ -7110,6 +7110,14 @@ ipcMain.handle('email-send', async (_event, composeData: {
     // HTML aus Body generieren (Markdown-artige Formatierung + Zeilenumbrueche)
     const escapeHtml = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
     let formatted = escapeHtml(composeData.body)
+    // Markdown-Links: [text](url) → <a href="url">text</a> (vor Bold/Italic, damit URL-Inhalt geschuetzt ist)
+    formatted = formatted.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" style="color:#1976d2;text-decoration:underline;">$1</a>')
+    // Markdown-Links mit mailto: [text](mailto:...)
+    formatted = formatted.replace(/\[([^\]]+)\]\((mailto:[^\s)]+)\)/g, '<a href="$2" style="color:#1976d2;text-decoration:underline;">$1</a>')
+    // Auto-Link nackte URLs (nicht innerhalb bestehender <a>-Tags, erkannt am vorangehenden " = >)
+    formatted = formatted.replace(/(?<!["'=>])(https?:\/\/[^\s<>"]+)/g, '<a href="$1" style="color:#1976d2;text-decoration:underline;">$1</a>')
+    // Auto-Link E-Mail-Adressen (nicht innerhalb bestehender Tags oder URL-Parameter)
+    formatted = formatted.replace(/(?<!["'>:=\/])\b([\w.+-]+@[\w-]+\.[\w.-]+)\b/g, '<a href="mailto:$1" style="color:#1976d2;text-decoration:underline;">$1</a>')
     // Bold: **text** → <strong>text</strong>
     formatted = formatted.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
     // Italic: *text* → <em>text</em>
