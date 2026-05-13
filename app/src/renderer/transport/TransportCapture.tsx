@@ -1,6 +1,10 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react'
 import TaskInsertModal from './TaskInsertModal'
 import { NOTE_KINDS } from '../utils/noteKind'
+import { startDictation, type DictationHandle } from '../utils/voice/stt'
+import { useVoiceStore } from '../stores/voiceStore'
+import { useUIStore } from '../stores/uiStore'
+import { ensureTransformersModel } from '../utils/voice/transformersStt'
 
 interface Category {
   emoji: string
@@ -23,6 +27,7 @@ export default function TransportCapture(): React.ReactElement {
   const [showTaskModal, setShowTaskModal] = useState(false)
   const [status, setStatus] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
   const [newTagInput, setNewTagInput] = useState('')
+  const [isPreparingModel, setIsPreparingModel] = useState(false)
 
   // Config aus Main Process
   const [destinations, setDestinations] = useState<{ label: string; folder: string }[]>([])
@@ -31,6 +36,17 @@ export default function TransportCapture(): React.ReactElement {
   const [hasVault, setHasVault] = useState(false)
 
   const editorRef = useRef<HTMLTextAreaElement>(null)
+  const contentRef = useRef(content)
+  const dictationHandleRef = useRef<DictationHandle | null>(null)
+  const voiceStatus = useVoiceStore(s => s.status)
+  const activeVoiceContextId = useVoiceStore(s => s.activeContextId)
+  const lastVoiceError = useVoiceStore(s => s.lastError)
+  const setVoiceError = useVoiceStore(s => s.setError)
+  const isDictating = activeVoiceContextId === 'transport' && (voiceStatus === 'recording' || voiceStatus === 'transcribing' || voiceStatus === 'loading')
+
+  useEffect(() => {
+    contentRef.current = content
+  }, [content])
 
   // Config laden
   const loadConfig = useCallback(async () => {
@@ -76,6 +92,8 @@ export default function TransportCapture(): React.ReactElement {
 
     // Bei jedem Fenster-Anzeigen: Reset + Config neu laden
     window.electronAPI.onTransportWindowShown(() => {
+      dictationHandleRef.current?.cancel()
+      dictationHandleRef.current = null
       setContent('')
       setSelectedTags(new Set())
       setCategory('🟢')
@@ -90,6 +108,13 @@ export default function TransportCapture(): React.ReactElement {
   // Auto-Focus beim Laden
   useEffect(() => {
     editorRef.current?.focus()
+  }, [])
+
+  useEffect(() => {
+    return () => {
+      dictationHandleRef.current?.cancel()
+      dictationHandleRef.current = null
+    }
   }, [])
 
   // Keyboard Shortcuts
@@ -112,11 +137,17 @@ export default function TransportCapture(): React.ReactElement {
         e.preventDefault()
         setShowTaskModal(true)
       }
+
+      // Cmd+D: Diktat starten/stoppen
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'd' && !showTaskModal) {
+        e.preventDefault()
+        void toggleDictation()
+      }
     }
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [content, destinationFolder, selectedTags, category, showTaskModal])
+  }, [content, destinationFolder, selectedTags, category, showTaskModal, isDictating, voiceStatus])
 
   const toggleTag = (tag: string): void => {
     setSelectedTags(prev => {
@@ -159,6 +190,97 @@ export default function TransportCapture(): React.ReactElement {
   const showStatusToast = (message: string, type: 'success' | 'error'): void => {
     setStatus({ message, type })
     setTimeout(() => setStatus(null), 2500)
+  }
+
+  const insertTranscript = (text: string): void => {
+    const trimmed = text.trim()
+    if (!trimmed) return
+
+    const textarea = editorRef.current
+    const current = contentRef.current
+    if (!textarea) {
+      const insertion = current ? `\n${trimmed}` : trimmed
+      const next = current + insertion
+      contentRef.current = next
+      setContent(next)
+      return
+    }
+
+    const start = textarea.selectionStart
+    const end = textarea.selectionEnd
+    const before = current.substring(0, start)
+    const after = current.substring(end)
+    const needsSpaceBefore = before.length > 0 && !/[\s\n]$/.test(before)
+    const needsSpaceAfter = after.length > 0 && !/^[\s\n.,;:!?]/.test(after)
+    const insertion = `${needsSpaceBefore ? ' ' : ''}${trimmed}${needsSpaceAfter ? ' ' : ''}`
+    const next = before + insertion + after
+    const newPos = before.length + insertion.length
+
+    contentRef.current = next
+    setContent(next)
+
+    setTimeout(() => {
+      textarea.selectionStart = newPos
+      textarea.selectionEnd = newPos
+      textarea.focus()
+    }, 0)
+  }
+
+  const toggleDictation = async (): Promise<void> => {
+    if (voiceStatus === 'transcribing' || voiceStatus === 'loading') return
+
+    if (isDictating) {
+      const handle = dictationHandleRef.current
+      dictationHandleRef.current = null
+      if (handle) {
+        try {
+          showStatusToast('Transkribiere…', 'success')
+          const transcript = await handle.stop()
+          if (!transcript.trim()) {
+            const error = useVoiceStore.getState().lastError || lastVoiceError
+            showStatusToast(error || 'Keine Sprache erkannt.', 'error')
+          }
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err)
+          showStatusToast(message, 'error')
+        }
+      }
+      return
+    }
+
+    if (voiceStatus !== 'idle') {
+      showStatusToast('Es läuft bereits eine andere Sprachaktion.', 'error')
+      return
+    }
+
+    try {
+      setVoiceError(null)
+      if (!navigator.mediaDevices?.getUserMedia) {
+        throw new Error('Mikrofonzugriff ist in diesem Fenster nicht verfügbar.')
+      }
+
+      const speech = useUIStore.getState().speech
+      if (speech.sttEngine !== 'whisper-cli') {
+        showStatusToast('Whisper wird vorbereitet…', 'success')
+        setIsPreparingModel(true)
+        try {
+          await ensureTransformersModel(speech.transformersModel || 'base')
+        } finally {
+          setIsPreparingModel(false)
+        }
+      }
+
+      const handle = await startDictation({
+        contextId: 'transport',
+        onStart: () => showStatusToast('Diktat läuft…', 'success'),
+        onTranscript: insertTranscript,
+        onError: (error) => showStatusToast(error, 'error')
+      })
+      dictationHandleRef.current = handle
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      showStatusToast(message, 'error')
+    }
   }
 
   const handleSubmit = async (): Promise<void> => {
@@ -302,17 +424,42 @@ export default function TransportCapture(): React.ReactElement {
               }}
             />
           </div>
-          <button
-            className="transport-task-btn"
-            onClick={() => setShowTaskModal(true)}
-            title="Task einfügen (⌘T)"
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-              <path d="M9 12l2 2 4-4" />
-            </svg>
-            Task
-          </button>
+          <div className="transport-tool-actions">
+            <button
+              className={`transport-task-btn transport-dictation-btn ${isDictating ? 'active' : ''}`}
+              onClick={() => void toggleDictation()}
+              title={isDictating ? 'Diktat beenden (⌘D)' : 'Diktat starten (⌘D)'}
+              disabled={voiceStatus === 'transcribing' || voiceStatus === 'loading' || isPreparingModel}
+            >
+              {isDictating ? (
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="6" y="6" width="12" height="12" rx="1" />
+                </svg>
+              ) : (
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
+                  <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                  <line x1="12" y1="19" x2="12" y2="23" />
+                  <line x1="8" y1="23" x2="16" y2="23" />
+                </svg>
+              )}
+              {isPreparingModel
+                ? 'Modell lädt'
+                : voiceStatus === 'transcribing' || voiceStatus === 'loading' ? 'Transkribiere'
+                : isDictating ? 'Stop' : 'Diktat'}
+            </button>
+            <button
+              className="transport-task-btn"
+              onClick={() => setShowTaskModal(true)}
+              title="Task einfügen (⌘T)"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                <path d="M9 12l2 2 4-4" />
+              </svg>
+              Task
+            </button>
+          </div>
         </div>
 
         {/* Actions */}

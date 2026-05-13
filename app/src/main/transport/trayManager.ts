@@ -134,11 +134,6 @@ function createTransportWindow(_resourcesPath: string): BrowserWindow {
     transportWindow.loadFile(path.join(__dirname, '../renderer/transport.html'))
   }
 
-  // Fenster verstecken wenn Fokus verloren geht
-  transportWindow.on('blur', () => {
-    hideTransportWindow()
-  })
-
   transportWindow.on('closed', () => {
     transportWindow = null
   })

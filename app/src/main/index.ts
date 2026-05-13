@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, dialog, shell, Notification, safeStorage, Menu } from 'electron'
+import { app, BrowserWindow, ipcMain, dialog, shell, Notification, safeStorage, Menu, session, systemPreferences, clipboard } from 'electron'
 import { autoUpdater } from 'electron-updater'
 import * as path from 'path'
 import * as fs from 'fs/promises'
@@ -245,6 +245,44 @@ function assertApprovedVault(vaultPath: string, op: string): void {
   }
 }
 
+function isTrustedRendererUrl(url: string): boolean {
+  return url.startsWith('file://') ||
+    url === 'http://localhost:5173' ||
+    url.startsWith('http://localhost:5173/') ||
+    url === 'http://127.0.0.1:5173' ||
+    url.startsWith('http://127.0.0.1:5173/')
+}
+
+function setupMediaPermissions(): void {
+  session.defaultSession.setPermissionRequestHandler((webContents, permission, callback, details) => {
+    const url = webContents.getURL()
+    if (permission === 'media' && isTrustedRendererUrl(url)) {
+      const mediaTypes = (details as { mediaTypes?: string[] }).mediaTypes ?? []
+      if (!mediaTypes.includes('audio')) {
+        callback(false)
+        return
+      }
+
+      if (process.platform === 'darwin') {
+        void systemPreferences.askForMediaAccess('microphone')
+          .then(granted => callback(granted))
+          .catch(() => callback(false))
+        return
+      }
+
+      callback(true)
+      return
+    }
+    callback(false)
+  })
+
+  session.defaultSession.setPermissionCheckHandler((_webContents, permission, requestingOrigin, details) => {
+    if (permission !== 'media' || !isTrustedRendererUrl(requestingOrigin)) return false
+    const mediaType = details?.mediaType
+    return mediaType == null || mediaType === 'audio'
+  })
+}
+
 // Async: prüft, dass ein absoluter Pfad innerhalb einer approvedVaultRoots liegt.
 // Symlinks werden via realpath aufgelöst, damit sie nicht zum Ausbruch genutzt
 // werden können. Für nicht-existente Pfade (z. B. write auf neue Datei) wird der
@@ -425,6 +463,8 @@ if (process.platform === 'linux') {
 }
 
 app.whenReady().then(async () => {
+  setupMediaPermissions()
+
   // Sprache aus persistierten UI-Settings laden
   try {
     const uiSettings = await loadUISettings()
@@ -478,6 +518,15 @@ app.on('window-all-closed', () => {
 })
 
 // IPC Handlers
+
+ipcMain.handle('clipboard-write-text', (_event, text: string) => {
+  clipboard.writeText(String(text ?? ''))
+  return true
+})
+
+ipcMain.handle('clipboard-read-text', () => {
+  return clipboard.readText()
+})
 
 // Letzten Vault-Pfad laden
 // Aktueller Vault-Pfad im Main-Prozess (für Telegram-Bot etc.)
@@ -6972,6 +7021,42 @@ ipcMain.handle('email-select-attachments', async () => {
   return attachments
 })
 
+// Findet den passenden "Gesendet"-Ordner via IMAP SPECIAL-USE Flag oder bekannten Namen.
+// Reihenfolge: \Sent SPECIAL-USE > bekannte Namen (case-insensitive Vergleich auf path/name).
+// Gibt den IMAP-Pfad zurueck (z.B. 'INBOX.Sent') oder null wenn nichts gefunden wurde.
+async function findSentMailbox(client: unknown): Promise<string | null> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const c = client as any
+  try {
+    const list: Array<{ path: string; name?: string; specialUse?: string }> = await c.list()
+    // 1. SPECIAL-USE Flag (RFC 6154)
+    const bySpecialUse = list.find(box => box.specialUse === '\\Sent')
+    if (bySpecialUse) return bySpecialUse.path
+
+    // 2. Bekannte Namen (deutsch + englisch, mit/ohne INBOX-Prefix)
+    const candidates = [
+      'INBOX.Sent',
+      'INBOX.Gesendet',
+      'Sent',
+      'Gesendet',
+      'Sent Items',
+      'Sent Messages',
+      'Gesendete Objekte',
+      'Gesendete Elemente',
+      'Gesendete Nachrichten'
+    ]
+    const lowered = list.map(box => ({ box, key: (box.path || box.name || '').toLowerCase() }))
+    for (const candidate of candidates) {
+      const match = lowered.find(entry => entry.key === candidate.toLowerCase())
+      if (match) return match.box.path
+    }
+    return null
+  } catch (error) {
+    console.warn('[Email] findSentMailbox failed:', error instanceof Error ? error.message : error)
+    return null
+  }
+}
+
 ipcMain.handle('email-send', async (_event, composeData: {
   to: { name: string; address: string }[]
   cc?: { name: string; address: string }[]
@@ -6980,7 +7065,18 @@ ipcMain.handle('email-send', async (_event, composeData: {
   inReplyTo?: string
   references?: string
   accountId: string
-  account: { smtpHost: string; smtpPort: number; smtpTls: boolean; user: string; name?: string; fromAddress?: string }
+  account: {
+    id?: string
+    smtpHost: string
+    smtpPort: number
+    smtpTls: boolean
+    imapHost?: string
+    imapPort?: number
+    imapTls?: boolean
+    user: string
+    name?: string
+    fromAddress?: string
+  }
   signatureImagePath?: string
   attachments?: { path: string; filename: string }[]
 }) => {
@@ -7091,9 +7187,68 @@ ipcMain.handle('email-send', async (_event, composeData: {
       mailOptions.references = composeData.references || composeData.inReplyTo
     }
 
+    // Konsistente Message-ID setzen, damit SMTP-Versand und IMAP-Append dieselbe Mail referenzieren
+    const messageIdHost = (account.fromAddress || account.user || account.smtpHost || 'mindgraph').split('@').pop() || 'mindgraph'
+    const { randomUUID } = await import('crypto')
+    const explicitMessageId = `<${randomUUID()}@${messageIdHost}>`
+    mailOptions.messageId = explicitMessageId
+
     const info = await transporter.sendMail(mailOptions)
     console.log('[Email] Sent successfully:', info.messageId)
-    return { success: true, messageId: info.messageId }
+
+    // IMAP-Append in den Gesendet-Ordner, damit die Mail in Webmail/anderen Clients sichtbar ist.
+    // Apple Mail macht das automatisch nach SMTP-Send; nodemailer nicht. Fehler hier duerfen den
+    // Send-Erfolg NICHT umkehren — die Mail ist schon zugestellt.
+    let appendWarning: string | undefined
+    let sentMailbox: string | undefined
+
+    if (account.imapHost && account.imapPort && account.id) {
+      try {
+        const imapPassword = await loadEmailPassword(account.id)
+        if (!imapPassword) {
+          appendWarning = 'Mail gesendet, aber IMAP-Passwort fehlt — Kopie im Gesendet-Ordner uebersprungen.'
+        } else {
+          // Raw RFC-822 Bytes mit demselben mailOptions-Objekt erzeugen
+          const rawTransporter = nodemailer.default.createTransport({ streamTransport: true, buffer: true, newline: 'unix' })
+          const rawInfo = await rawTransporter.sendMail(mailOptions)
+          const rawMessage: Buffer = Buffer.isBuffer(rawInfo.message) ? rawInfo.message : Buffer.from(String(rawInfo.message))
+
+          const { ImapFlow } = await import('imapflow')
+          const imapClient = new ImapFlow({
+            host: account.imapHost,
+            port: account.imapPort,
+            secure: !!account.imapTls,
+            auth: { user: account.user, pass: imapPassword },
+            logger: false,
+            socketTimeout: 15000,
+            greetingTimeout: 10000
+          })
+          imapClient.on('error', () => { /* ignore */ })
+
+          try {
+            await imapClient.connect()
+            const target = await findSentMailbox(imapClient)
+            if (!target) {
+              appendWarning = 'Mail gesendet, aber kein "Gesendet"-Ordner gefunden.'
+            } else {
+              await imapClient.append(target, rawMessage, ['\\Seen'])
+              sentMailbox = target
+              console.log(`[Email] Appended to IMAP folder: ${target}`)
+            }
+          } finally {
+            try { await imapClient.logout() } catch { /* ignore */ }
+          }
+        }
+      } catch (appendError) {
+        const msg = appendError instanceof Error ? appendError.message : String(appendError)
+        console.error('[Email] IMAP append failed:', msg)
+        appendWarning = `Mail gesendet, aber Speichern im Gesendet-Ordner schlug fehl: ${msg}`
+      }
+    } else {
+      appendWarning = 'Mail gesendet, aber IMAP-Daten fehlen — Kopie im Gesendet-Ordner uebersprungen.'
+    }
+
+    return { success: true, messageId: info.messageId || explicitMessageId, appendWarning, sentMailbox }
   } catch (error) {
     console.error('[Email] Send failed:', error)
     return { success: false, error: error instanceof Error ? error.message : 'Senden fehlgeschlagen' }

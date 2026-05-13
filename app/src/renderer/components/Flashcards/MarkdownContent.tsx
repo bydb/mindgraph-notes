@@ -8,6 +8,7 @@ import 'katex/contrib/mhchem/mhchem.js'
 import mermaid from 'mermaid'
 import { highlightCode } from '../../utils/highlightSetup'
 import { useTranslation } from '../../utils/translations'
+import { writeClipboardText } from '../../utils/clipboard'
 
 // Mermaid initialisieren
 mermaid.initialize({
@@ -175,7 +176,7 @@ export const MarkdownContent: React.FC<MarkdownContentProps> = ({ content, class
     if (!codeText) return
 
     try {
-      await navigator.clipboard.writeText(codeText)
+      await writeClipboardText(codeText)
       copyButton.textContent = t('settings.sync.copied')
       copyButton.classList.add('copied')
 

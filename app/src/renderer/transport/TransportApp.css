@@ -282,6 +282,28 @@ body {
   color: var(--transport-text);
 }
 
+.transport-task-btn:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.transport-tool-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.transport-dictation-btn.active {
+  border-color: #ff3b30;
+  background: color-mix(in srgb, #ff3b30 16%, transparent);
+  color: #ff453a;
+}
+
+.transport-dictation-btn.active:hover {
+  background: color-mix(in srgb, #ff3b30 24%, transparent);
+}
+
 /* Task Modal */
 .transport-task-modal {
   position: fixed;

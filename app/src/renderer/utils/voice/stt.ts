@@ -133,8 +133,10 @@ export async function startDictation(cb: DictationCallbacks): Promise<DictationH
         const blob = new Blob(chunks, { type: mimeType || 'audio/webm' })
         console.log(`[stt] recording stopped; blob size=${blob.size} bytes; peak RMS=${peakLevel.toFixed(4)} (near 0 = stille); analyserUsable=${analyserUsable}`)
         if (blob.size < 512) {
+          const msg = 'Aufnahme zu kurz. Bitte mindestens eine Sekunde sprechen.'
           voiceStore.setIdle()
-          voiceStore.setError('Aufnahme zu kurz. Bitte mindestens eine Sekunde sprechen.')
+          voiceStore.setError(msg)
+          cb.onError?.(msg)
           resolve('')
           return
         }
@@ -143,8 +145,11 @@ export async function startDictation(cb: DictationCallbacks): Promise<DictationH
         // Die MediaRecorder-Aufnahme selbst läuft davon unabhängig und enthält trotzdem Audio;
         // wir geben sie an Whisper, statt fälschlich „Kein Audio erkannt" zu melden.
         if (analyserUsable && peakLevel < 0.005) {
+          const msg = `Kein Ton erkannt (Pegel ${peakLevel.toFixed(3)}, Mikrofon: ${trackLabel}). Prüfe macOS → Datenschutz & Sicherheit → Mikrofon und Ton → Eingabe.`
+          console.warn(`[stt] ${msg}`)
           voiceStore.setIdle()
-          voiceStore.setError(`Kein Audio erkannt (Pegel ${peakLevel.toFixed(3)}). Prüfe macOS → Ton → Eingabe (${trackLabel}).`)
+          voiceStore.setError(msg)
+          cb.onError?.(msg)
           resolve('')
           return
         }
@@ -181,7 +186,9 @@ export async function startDictation(cb: DictationCallbacks): Promise<DictationH
           if (text) {
             cb.onTranscript?.(text)
           } else {
-            voiceStore.setError('Keine Sprache erkannt. Bitte lauter oder länger sprechen.')
+            const msg = 'Keine Sprache erkannt. Bitte lauter oder länger sprechen.'
+            voiceStore.setError(msg)
+            cb.onError?.(msg)
           }
           resolve(text)
         } catch (err) {

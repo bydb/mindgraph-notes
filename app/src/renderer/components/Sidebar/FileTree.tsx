@@ -10,6 +10,7 @@ import { useQuizStore } from '../../stores/quizStore'
 import { generateNoteId, extractTasks } from '../../utils/linkExtractor'
 import { useTranslation } from '../../utils/translations'
 import { getNoteKind, getNoteKindFromText, NOTE_KINDS, setNoteKindInContent, clearNoteKindInContent, stripNoteKindMarker, type NoteKindId } from '../../utils/noteKind'
+import { writeClipboardText } from '../../utils/clipboard'
 
 const isMac = window.electronAPI.platform === 'darwin'
 const NOTE_KIND_ORDER: NoteKindId[] = ['problem', 'solution', 'info']
@@ -725,14 +726,14 @@ const FileItem: React.FC<FileItemProps> = ({
   // Pfad in Zwischenablage kopieren
   const handleCopyRelativePath = useCallback(() => {
     if (!contextMenu) return
-    navigator.clipboard.writeText(contextMenu.entry.path)
+    writeClipboardText(contextMenu.entry.path)
     setContextMenu(null)
   }, [contextMenu])
 
   const handleCopyAbsolutePath = useCallback(() => {
     if (!contextMenu || !vaultPath) return
     const fullPath = `${vaultPath}/${contextMenu.entry.path}`
-    navigator.clipboard.writeText(fullPath)
+    writeClipboardText(fullPath)
     setContextMenu(null)
   }, [contextMenu, vaultPath])
 

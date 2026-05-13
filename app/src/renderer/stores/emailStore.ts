@@ -360,9 +360,13 @@ export const useEmailStore = create<EmailState>()((set, get) => ({
         ...composeState,
         attachments: composeState.attachments || [],
         account: {
+          id: account.id,
           smtpHost: account.smtpHost,
           smtpPort: account.smtpPort,
           smtpTls: account.smtpTls,
+          imapHost: account.host,
+          imapPort: account.port,
+          imapTls: account.tls,
           user: account.user,
           name: account.name,
           fromAddress: account.fromAddress

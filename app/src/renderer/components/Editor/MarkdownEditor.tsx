@@ -43,6 +43,7 @@ import { startDictation, type DictationHandle } from '../../utils/voice/stt'
 import { useIsModuleEnabled } from '../../utils/modules'
 import { useVoiceStore } from '../../stores/voiceStore'
 import { getNoteKind, stripNoteKindMarker } from '../../utils/noteKind'
+import { readClipboardText, writeClipboardText } from '../../utils/clipboard'
 
 const markdownCodeLanguages = [
   LanguageDescription.of({
@@ -831,7 +832,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
     // Clipboard-Aktionen
     if (type === 'copy') {
       if (selectedText) {
-        await navigator.clipboard.writeText(selectedText)
+        await writeClipboardText(selectedText)
       }
       setFormatMenu(null)
       return
@@ -839,7 +840,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
 
     if (type === 'cut') {
       if (selectedText) {
-        await navigator.clipboard.writeText(selectedText)
+        await writeClipboardText(selectedText)
         view.dispatch({
           changes: { from, to, insert: '' }
         })
@@ -850,7 +851,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
 
     if (type === 'paste') {
       try {
-        const clipboardText = await navigator.clipboard.readText()
+        const clipboardText = await readClipboardText()
         view.dispatch({
           changes: { from, to, insert: clipboardText },
           selection: { anchor: from + clipboardText.length }
@@ -2269,7 +2270,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
 
       if (!codeText) return
 
-      navigator.clipboard.writeText(codeText)
+      writeClipboardText(codeText)
         .then(() => {
           const copyLabel = t('format.copy')
           const copiedLabel = t('settings.sync.copied')
@@ -3235,7 +3236,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
     copyBtn.className = 'format-menu-item'
     copyBtn.innerHTML = '<span class="format-menu-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></span><span class="format-menu-label">' + t('format.copy') + '</span><span class="format-menu-shortcut">Cmd+C</span>'
     copyBtn.onclick = async () => {
-      await navigator.clipboard.writeText(selectedText)
+      await writeClipboardText(selectedText)
       menu.remove()
     }
     menu.appendChild(copyBtn)

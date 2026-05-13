@@ -18,6 +18,7 @@ export const ComposeView: React.FC = () => {
   const [ccInput, setCcInput] = useState('')
   const [sendStatus, setSendStatus] = useState<'idle' | 'success' | 'error'>('idle')
   const [errorMsg, setErrorMsg] = useState('')
+  const [sendWarning, setSendWarning] = useState('')
   const [signatureImageUrl, setSignatureImageUrl] = useState<string | null>(null)
   const [ltChecking, setLtChecking] = useState(false)
   const [ltCorrectionCount, setLtCorrectionCount] = useState(0)
@@ -240,11 +241,17 @@ export const ComposeView: React.FC = () => {
     if (!vaultPath || !composeState.to.length) return
     setSendStatus('idle')
     setErrorMsg('')
+    setSendWarning('')
 
     const result = await sendEmail(vaultPath)
     if (result.success) {
       setSendStatus('success')
-      setTimeout(() => setSendStatus('idle'), 2000)
+      if (result.appendWarning) {
+        setSendWarning(result.appendWarning)
+        setTimeout(() => { setSendStatus('idle'); setSendWarning('') }, 6000)
+      } else {
+        setTimeout(() => setSendStatus('idle'), 2000)
+      }
     } else {
       setSendStatus('error')
       setErrorMsg(result.error || t('inbox.compose.error'))
@@ -537,6 +544,11 @@ export const ComposeView: React.FC = () => {
       {sendStatus === 'success' && (
         <div style={{ padding: '0 4px' }}>
           <span className="inbox-compose-success">{t('inbox.compose.sent')}</span>
+          {sendWarning && (
+            <div style={{ marginTop: 4, fontSize: 12, color: '#b87a00' }}>
+              ⚠️ {sendWarning}
+            </div>
+          )}
         </div>
       )}
 

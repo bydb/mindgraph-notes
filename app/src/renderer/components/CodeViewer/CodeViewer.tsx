@@ -2,6 +2,7 @@ import React, { useEffect, useState, useMemo } from 'react'
 import { detectLanguage } from '../../utils/codeLanguages'
 import { highlightCode } from '../../utils/highlightSetup'
 import { sanitizeHtml } from '../../utils/sanitize'
+import { writeClipboardText } from '../../utils/clipboard'
 
 interface CodeViewerProps {
   vaultPath: string
@@ -49,7 +50,7 @@ export const CodeViewer: React.FC<CodeViewerProps> = ({ vaultPath, relativePath 
   const handleCopy = async (): Promise<void> => {
     if (content === null) return
     try {
-      await navigator.clipboard.writeText(content)
+      await writeClipboardText(content)
       setCopied(true)
       setTimeout(() => setCopied(false), 1500)
     } catch {

@@ -2,6 +2,25 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.6.37-beta] - 2026-05-13
+
+### Features
+
+- **Diktat direkt in der Schnellerfassung (⌘D)**: Das Transport-Capture-Fenster hat jetzt einen eigenen Diktat-Button neben „Task einfügen". `⌘D` startet/stoppt die Whisper-Aufnahme, das Transkript wird an der Cursor-Position eingefügt — mit automatischer Whitespace-Heuristik vor/nach der Einfügung. Das Whisper-Modell wird beim ersten Diktat im Transport-Fenster on-demand vorbereitet (eigener Renderer-Prozess, eigener RAM-Cache). Status wird über Toasts angezeigt („Modell lädt", „Diktat läuft", „Transkribiere").
+- **Gesendete Mails landen jetzt auch im IMAP-„Gesendet"-Ordner**: Bislang hat MindGraph Notes Mails nur über SMTP versendet — die Mail kam beim Empfänger an, war aber nicht im Webmail (z. B. all-inkl) oder auf anderen Geräten sichtbar. Apple Mail macht nach jedem Send automatisch einen IMAP-`APPEND` in den Sent-Folder; MindGraph jetzt auch. Nach erfolgreichem `sendMail` baut nodemailer die Mail per `streamTransport` als RFC-822-Buffer, imapflow verbindet sich zum IMAP-Account und lädt die Kopie hoch. Sent-Folder-Detection via `\Sent` SPECIAL-USE-Flag (RFC 6154) mit Fallbacks auf bekannte Namen (`INBOX.Sent`, `Gesendet`, `INBOX.Gesendet`, `Sent Items`, `Gesendete Objekte`, etc.). Konsistente `Message-ID` zwischen SMTP-Versand und IMAP-Kopie. Fehler beim Append kippen den Send-Erfolg nicht — stattdessen erscheint eine gelbe Warnung („Mail gesendet, aber Speichern im Gesendet-Ordner schlug fehl: …") unter dem grünen Status.
+
+### Improvements
+
+- **Mikrofon-Permissions explizit gemanaged**: Neue `setupMediaPermissions()`-Funktion im Main-Process whitelistet `file://` + `localhost:5173` für Audio-Zugriff, lehnt alles andere ab. Auf macOS wird `systemPreferences.askForMediaAccess('microphone')` aufgerufen, sodass der System-Dialog erscheint statt einer stummen Verweigerung.
+- **Transport-Fenster bleibt bei Fokus-Verlust offen**: Der bisherige `on('blur', hide)`-Listener ist entfernt — nötig, damit der macOS-Mic-Permission-Dialog das Schnellerfassungs-Fenster nicht wegnimmt. Außerdem bequemer beim Diktieren mit längeren Pausen.
+- **STT-Fehler propagieren an den Aufrufer**: `cb.onError?.()` wird jetzt in allen drei Fehlerpfaden (`Aufnahme zu kurz`, `Kein Ton erkannt`, `Keine Sprache erkannt`) aufgerufen, nicht nur im voiceStore gesetzt. Damit landen Fehler in den Toast-Notifications der Aufrufer (z. B. TransportCapture) statt unsichtbar zu bleiben. Bessere Mikrofon-Fehlermeldung verweist auf macOS Datenschutz & Ton-Eingabe.
+- **Robusterer Clipboard-Zugriff**: Neuer `utils/clipboard.ts`-Helper nutzt bevorzugt Electron's native Clipboard-API (`electronAPI.clipboardReadText`/`WriteText`) und fällt nur auf `navigator.clipboard` zurück, wenn der IPC-Pfad fehlt. Wird konsistent in MarkdownEditor, AgentPanel, CodeViewer, Flashcards, NotesChat, OfficeViewer, Settings, Sidebar/FileTree verwendet.
+- **Transport-UI: Settings im Schnellerfassungs-Fenster**: `initializeUISettings()` wird im Bootstrap des Transport-Renderers aufgerufen, sodass `speech.sttEngine`/`transformersModel` und andere globale UI-Settings im separaten Renderer-Prozess verfügbar sind.
+
+### Fixes
+
+- **STT-Übersetzungstexte präzisiert**: Hinweistexte für „Modell vorbereiten" stellen jetzt klar, dass das Vorladen pro Fenster wirkt — der Transport-Renderer ist ein eigener Process mit eigenem RAM-Cache, das Vorladen im Settings-Tab des Hauptfensters wirkt dort nicht automatisch.
+
 ## [0.6.36-beta] - 2026-05-11
 
 ### Features

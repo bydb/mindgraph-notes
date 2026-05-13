@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react'
 import { useAgentStore } from '../../stores/agentStore'
 import { useUIStore } from '../../stores/uiStore'
 import { useTranslation } from '../../utils/translations'
+import { writeClipboardText } from '../../utils/clipboard'
 import type { EdooboxEvent, EdooboxEventDate, EdooboxOfferDashboard, AttendanceListData, AttendanceParticipant } from '../../../shared/types'
 
 const MAX_ATTENDANCE_PARTICIPANTS = 100
@@ -599,7 +600,7 @@ const MarketingPublishDetail: React.FC<{ offer: EdooboxOfferDashboard; onBack: (
   const [igCopied, setIgCopied] = useState(false)
   const handleCopyIgCaption = useCallback(() => {
     if (!generatedIgCaption) return
-    navigator.clipboard.writeText(generatedIgCaption)
+    writeClipboardText(generatedIgCaption)
     setIgCopied(true)
     setTimeout(() => setIgCopied(false), 2000)
   }, [generatedIgCaption])

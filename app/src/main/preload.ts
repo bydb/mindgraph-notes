@@ -10,6 +10,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   saveUISettings: (settings: object) => ipcRenderer.invoke('save-ui-settings', settings),
   setMainLanguage: (lang: string) => ipcRenderer.invoke('set-main-language', lang),
 
+  // Clipboard über Electron, robuster als navigator.clipboard in separaten Fenstern
+  clipboardWriteText: (text: string) => ipcRenderer.invoke('clipboard-write-text', text),
+  clipboardReadText: () => ipcRenderer.invoke('clipboard-read-text'),
+
   openVault: () => ipcRenderer.invoke('open-vault'),
   selectFolderInVault: (vaultPath: string) => ipcRenderer.invoke('select-folder-in-vault', vaultPath),
   readDirectory: (dirPath: string) => ipcRenderer.invoke('read-directory', dirPath),

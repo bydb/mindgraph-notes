@@ -2,6 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react'
 import type { ExcelData, WordData, PowerPointData } from '../../../shared/types'
 import { useNotesStore, createNoteFromFile } from '../../stores/notesStore'
 import { sanitizeHtml } from '../../utils/sanitize'
+import { writeClipboardText } from '../../utils/clipboard'
 import './OfficeViewer.css'
 
 type OfficeType = 'excel' | 'word' | 'powerpoint'
@@ -73,7 +74,7 @@ const ExcelViewer: React.FC<OfficeViewerProps> = ({ filePath, fileName, relative
     if (!sheet) return
     const res = await window.electronAPI.officeExcelToMarkdown(filePath, sheet.name)
     if (res.success && res.markdown) {
-      await navigator.clipboard.writeText(res.markdown)
+      await writeClipboardText(res.markdown)
     }
   }, [sheet, filePath])
 

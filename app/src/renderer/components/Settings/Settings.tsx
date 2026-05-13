@@ -8,6 +8,7 @@ import { useTranslation, type TranslationKey } from '../../utils/translations'
 import { TelegramSettings } from './TelegramSettings'
 import { CredentialsSettings } from './CredentialsSettings'
 import { ensureTransformersModel, isTransformersModelReady } from '../../utils/voice/transformersStt'
+import { writeClipboardText } from '../../utils/clipboard'
 
 type TabTFn = (key: TranslationKey, params?: Record<string, string | number>) => string
 import {
@@ -4041,7 +4042,7 @@ LIMIT 10
                         <button
                           className="sync-copy-btn"
                           onClick={() => {
-                            navigator.clipboard.writeText(syncState.vaultId)
+                            writeClipboardText(syncState.vaultId)
                             setSyncCopied(true)
                             setTimeout(() => setSyncCopied(false), 2000)
                           }}

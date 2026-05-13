@@ -3,6 +3,7 @@ import { sanitizeHtml } from '../../utils/sanitize'
 import { useNotesStore } from '../../stores/notesStore'
 import { useUIStore } from '../../stores/uiStore'
 import { useTranslation } from '../../utils/translations'
+import { writeClipboardText } from '../../utils/clipboard'
 import MarkdownIt from 'markdown-it'
 import texmath from 'markdown-it-texmath'
 import katex from 'katex'
@@ -167,7 +168,7 @@ export const NotesChat: React.FC<NotesChatProps> = ({ onClose }) => {
     const codeText = code?.textContent ?? ''
     if (!codeText) return
 
-    navigator.clipboard.writeText(codeText)
+    writeClipboardText(codeText)
       .then(() => {
         copyButton.textContent = t('settings.sync.copied')
         copyButton.classList.add('copied')
@@ -348,7 +349,7 @@ export const NotesChat: React.FC<NotesChatProps> = ({ onClose }) => {
       }
       copyText += `> **Modell:** ${msg.model || 'unbekannt'} | ${dateStr}, ${timeStr}`
 
-      await navigator.clipboard.writeText(copyText)
+      await writeClipboardText(copyText)
       setCopiedIndex(index)
       setTimeout(() => setCopiedIndex(null), 2000)
     } catch (err) {

@@ -445,6 +445,8 @@ export interface ElectronAPI {
   loadUISettings: () => Promise<Record<string, unknown>>;
   saveUISettings: (settings: Record<string, unknown>) => Promise<boolean>;
   setMainLanguage: (lang: string) => Promise<boolean>;
+  clipboardWriteText: (text: string) => Promise<boolean>;
+  clipboardReadText: () => Promise<string>;
 
   openVault: () => Promise<string | null>;
   selectFolderInVault: (vaultPath: string) => Promise<string | null>;
@@ -1134,6 +1136,8 @@ export interface EmailSendResult {
   success: boolean
   messageId?: string
   error?: string
+  appendWarning?: string  // Send erfolgreich, aber Speichern im Gesendet-Ordner schlug fehl
+  sentMailbox?: string    // Name des verwendeten Sent-Folders bei erfolgreichem Append
 }
 
 export interface EmailFetchResult {
