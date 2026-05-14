@@ -122,12 +122,12 @@ Vier von fünf KIs haben das ignoriert:
 | KI-Modell | Verhalten bei einem ruhigen Tag |
 |---|---|
 | qwen3.5:9b | Schreibt: „Keine offenen Fäden" – Regel ignoriert |
-| qwen3.6:36b | **Erfindet zwei Aufgaben**, z.B. *„Die Quantencomputer-Notizen brauchen mehr Verdichtung"* |
+| qwen3.6:36b | Leitet einen offenen Faden ab, obwohl keiner vorgegeben war, z.B. *„Die Quantencomputer-Notizen brauchen mehr Verdichtung"* |
 | gemma4:8b | Erfindet irgendwas |
 | llama3.1:8b | Schreibt einen Platzhalter |
 | **ministral-3:8b** | **Lässt den Teil weg** – Regel befolgt |
 
-Die qwen3.6-Antwort ist die schlimmste. Das Modell ist groß und schreibt elegant. Aber der Inhalt ist **frei erfunden**. Es gab keine Quantencomputer-Notizen an diesem Tag. Die KI fühlt sich verpflichtet, alle vier Teile zu füllen – auch wenn es nichts zu sagen gibt. Das größere Modell macht es eloquenter. Nicht ehrlicher.
+Die qwen3.6-Antwort ist interessant, weil sie auf den ersten Blick gut klingt. Das Modell ist groß und schreibt elegant. Und streng genommen ist der Satz nicht frei erfunden: Die Quantencomputer-Notiz gab es – ich hatte sie selbst verfasst. Der Punkt ist ein anderer. Im Test sollte die KI eine leere Sektion weglassen, wenn kein offener Faden vorgegeben war. qwen3.6 hat trotzdem einen möglichen nächsten Schritt abgeleitet. Das ist als Schreibassistenz vielleicht hilfreich. Als verlässliche Tageszusammenfassung ist es heikel, weil aus Beobachtung plötzlich Interpretation wird.
 
 Der Überraschungssieger: das kleinste Modell. Acht Milliarden Parameter, nur 6 GB Speicher, fertig in 11 Sekunden. Es kann andere Sachen schlechter. Aber bei dieser Aufgabe war es das einzige, dem ich vertrauen konnte.
 
