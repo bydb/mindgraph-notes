@@ -2,6 +2,26 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.6.41-beta] - 2026-05-14
+
+### Features
+
+- **Modell-Kompatibilitäts-Matrix für lokale Modelle**: Neuer „Beipackzettel" in den Einstellungen (Integrationen → Ollama) zeigt pro Modul (Brain, Mail-Task-Extraktion, Mail-Zusammenfassung, Dashboard-Snapshot, Smart Connections) klar an, wie gut das aktuell aktive Modell für die jeweilige Funktion geeignet ist — vier Verdicts (✅ geeignet / ⚠️ eingeschränkt / 🔴 Modul gesperrt / ⚪ nicht getestet) plus Metriken (Format-Treue, Latenz, RAM-Bedarf, Wikilink-Halluzinationen, Recall, Richtungs-Erkennung). Datengrundlage sind 160 Benchmark-Läufe (5 Modelle × {Task-Extraktion v1+v2, Brain-Regression, Mail-Summary, Dashboard-Snapshot}) vom 14.05.2026 im externen Test-Harness `~/dev/brain-model-benchmark/`. Single-Source-of-Truth: `app/src/shared/modelCompatibility.ts` (`MODEL_COMPATIBILITY`, `getModelVerdict`, `greenModelsForModule`, `isHardLocked`, `RECOMMENDED_DEFAULTS`).
+- **Pro-Modul Modell-Override**: Power-User können in den Einstellungen pro Modul ein anderes Modell als das globale „aktive Modell" wählen — sinnvoll, weil kein einzelnes 7–14B-Modell in allen vier getesteten Klassen Top-Performer ist (z.B. `ministral-3:8b` ist Brain-Champion, `gemma4:latest` schnellster Task-Extractor). Override-Felder im `uiStore.ts` (`ollama.moduleModelOverrides`), Migration für Bestands-Settings ergänzt fehlende Felder mit leeren Defaults. Prio-Reihenfolge im Code: Tab-spezifisches Setting (z.B. `email.analysisModel`) → Modul-Override → globales `selectedModel`.
+- **Hard-Lock für schadensrelevante Module**: `damageRelevant: true` auf `task-extraction` und `dashboard-snapshot` — bei `verdict: 'red'` wird das Modul für dieses Modell **im Code** deaktiviert (`isHardLocked()` returnt true). Beispiel: `llama3.1:8b` ist beim Dashboard-Snapshot hard-locked, weil es im Bench auf einen Prompt-Injection-Versuch („Yarr! Aktualität ist nicht relevant…") reinfiel und 100/100 Score mit Pirate-Reason zurückgab — bei UNTRUSTED Notiz-Inhalt ein Sicherheitsrisiko. `emailStore.analyzeEmails()` prüft `isHardLocked(model, 'task-extraction')` und überspringt die Analyse mit Warning. `RadarWidget` prüft `isHardLocked(model, 'dashboard-snapshot')` und deaktiviert die KI-Analyse im Radar.
+- **`ActiveModelStatusBadge`** unter dem Modell-Picker in den Einstellungen (Ollama + LM Studio): kompakter Status-Indikator, der auf einen Blick zeigt, ob das gewählte Modell für die wichtigsten Module geeignet ist.
+
+### Improvements
+
+- **Empirische Korrektur von Datenmismatches**: Zwei Werte in `modelCompatibility.ts` an die Roh-Benchmark-Daten angepasst — `brain.llama3.1:8b.criticalTitlesLinkedPct` 30 → 50 (Aggregat aus `brain-regression-2026-05-14.md`), `task-extraction.qwen3.6:latest.directionAccuracyPct` 95 → 100 (`task-extraction-v2-2026-05-14.md`, Befund 3: nur das 36B-Modell hat die Richtungs-Erkennung in c08 korrekt).
+- **Dashboard-RadarWidget — Override-Prio konsistent**: `aiModel = radarAiModel || moduleOverride || ollamaSelectedModel`. Vorher gab es nur den Dashboard-spezifischen `radarAiModel` und das globale Modell; das neue Modul-Override-Feld liegt jetzt sauber dazwischen.
+- **Brain-Aktivitäts-Widget — gleiche Override-Logik**: `brainModel = brainModelOverride || ollamaSelectedModel`. Der Button „Tag abschließen" und alle disabled-Checks beziehen sich jetzt auf `brainModel`, nicht mehr direkt auf `ollamaSelectedModel`.
+- **64 neue Translation-Keys** (DE + EN) unter `settings.integrations.compatibility.*` — Titel, Beschreibung, Verdict-Labels, Metric-Labels, Modul-Bezeichnungen, Halluzinations-Stufen, Untested-Hinweis, Hard-Lock-Begründung.
+
+### Docs
+
+- **`CLAUDE.md` umfassend aktualisiert** (Stand 14.05.2026): 13 → 15 Zustand-Stores aufgezählt, `main/index.ts` ~6000 → ~9000 Zeilen, neue Sektionen zu Notiz-Kategorien (🔴🟢🔵), drei Editor-Modi mit Turndown-Escape-Constraint, Modell-Kompatibilitäts-Matrix, Brain-Modul (hardcoded localhost:11434), Relevanz-Radar, lokalem Kontextgedächtnis, Telegram-Agent (Tool-Use mit Confirm-Flow), automatische Backups, eingebautes Whisper STT, FS-IPC-Security-Model erweitert. Email-Sektion um IMAP-Sent-Append (v0.6.37) und Link-Konverter (v0.6.39) ergänzt; Sync-Sektion um Plaintext-Hash-Vergleich und Tombstone-Retention.
+
 ## [0.6.40-beta] - 2026-05-13
 
 ### Fixes

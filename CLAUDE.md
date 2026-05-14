@@ -1,49 +1,72 @@
 # MindGraph Notes
 
-Obsidian-ähnliche Markdown-Notiz-App mit Wissensgraph, Flashcards, Spaced Repetition, Agent-Features und E2E-verschlüsseltem Sync.
+Obsidian-ähnliche Markdown-Notiz-App mit Wissensgraph, Flashcards, Spaced Repetition, Agent-Features, lokalem Brain-Tagesgedächtnis, Relevanz-Radar, Notiz-Kategorien (🔴🟢🔵) und E2E-verschlüsseltem Sync.
 
 ## Tech Stack
 
 - **Electron** + **electron-vite** + **React 19** + **TypeScript**
-- **CodeMirror 6** als Markdown-Editor
-- **Zustand** für State Management (13 Stores)
+- **CodeMirror 6** als Markdown-Editor (drei Modi: Markdown, Schreiben, Lesen)
+- **turndown** für WYSIWYG-Roundtrip im Lesen-Modus (HTML → Markdown)
+- **Zustand** für State Management (15 Stores)
 - **markdown-it** für Rendering
 - **xterm.js + node-pty** für integriertes Terminal
-- **imapflow + mailparser + nodemailer + Ollama** für Email-Client (Empfang, Analyse, Versand)
-- CSS mit globalen Variablen (kein CSS-in-JS Framework)
+- **imapflow + mailparser + nodemailer + Ollama** für Email-Client (Empfang, Analyse, Versand, IMAP-Sent-Append)
+- **@huggingface/transformers + ONNX Runtime** für eingebautes Whisper STT (Renderer)
+- **grammy** + eigener Tool-Use-Loop für Telegram-Agent
+- CSS mit globalen Variablen (color-mix-Tokens, kein CSS-in-JS Framework)
 
 ## Projektstruktur
 
 ```
 app/
 ├── src/
+│   ├── shared/          # Geteilte Types/Utilities (Main <-> Renderer)
+│   │   ├── modelCompatibility.ts  # Per-Modul Verdict-Matrix + isHardLocked
+│   │   └── taskExtractor.ts       # Task-Parser + CRITICAL_TASK_PATTERN + REMINDER_REGEX
 │   ├── main/            # Electron Main Process
-│   │   ├── index.ts     # IPC-Handler (~6000 Zeilen)
+│   │   ├── index.ts     # IPC-Handler (~9000 Zeilen, ~200 Handler)
 │   │   ├── preload.ts  # contextBridge API
-│   │   ├── edooboxService.ts  # edoobox API-Client
+│   │   ├── edooboxService.ts  # edoobox V2-Client (+ listDatesForOffer für Teilnehmerliste)
 │   │   ├── marketingService.ts # WordPress REST API Client
 │   │   ├── formularParser.ts  # DOCX-Akkreditierungsformular-Parser
+│   │   ├── brain/      # Lokales Tagesgedächtnis (dailyConsolidation.ts, hardcoded localhost:11434)
+│   │   ├── calendar/   # macOS EventKit (Swift-Helper)
+│   │   ├── llm/        # Unified Chat-Client (Ollama + Anthropic) + chatWithTools()
+│   │   ├── telegram/   # Bot (grammy)
+│   │   │   └── agent/  # Tool-Use-Loop (loop.ts, confirm.ts, tools/registry|notes|tasks|calendar.ts)
+│   │   ├── office/     # DOCX/XLSX/PPTX + Teilnehmerliste-Generator (Schulamt-Vorlage)
+│   │   ├── remarkable/ # reMarkable USB (service + transports)
+│   │   ├── transport/  # Schnellerfassung (Tray, Shortcut, ⌘D-Diktat)
+│   │   ├── voice/      # Whisper-CLI (Fallback zum eingebauten Renderer-STT)
 │   │   └── sync/       # E2E Sync (crypto, fileTracker, syncEngine)
 │   ├── renderer/
 │       ├── components/  # React-Komponenten
-│       │   ├── Editor/  # MarkdownEditor + CodeMirror Extensions
-│       │   ├── Sidebar/ # FileTree, Suche
-│       │   ├── Canvas/  # Graph View (React Flow)
+│       │   ├── Editor/  # MarkdownEditor + CodeMirror Extensions + WYSIWYG-Lesemodus (turndown)
+│       │   ├── Sidebar/ # FileTree (Farbfilter 🔴🟢🔵), Suche, QuickEventModal
+│       │   ├── Canvas/  # Graph View (React Flow, hierarchisches Layout mit Dummy-Nodes)
+│       │   ├── DashboardPanel/  # Dashboard-Tab + RadarWidget + ActivityWidget (Brain)
 │       │   ├── Flashcards/ Quiz/ # Lern-Features
-│       │   ├── InboxPanel/  # Smart Email Client (Inbox, Compose, KI-Chat)
-│       │   ├── AgentPanel/  # Veranstaltungs-Agent (edoobox) + Marketing
+│       │   ├── InboxPanel/  # Smart Email Client (Inbox, Compose-Modal via createPortal, KI-Chat)
+│       │   ├── AgentPanel/  # Veranstaltungs-Agent (edoobox) + Marketing + IQ
 │       │   ├── Terminal/    # Integriertes Terminal (xterm.js + PTY)
+│       │   ├── ResearchPanel/  # Semantic Scholar + OpenAlex + Zotero CSL
 │       │   ├── NotesChat/ SmartConnectionsPanel/ ZoteroSearch/ ...
-│       │   └── Settings/ Onboarding/ ...
-│       ├── stores/      # Zustand Stores
-│       ├── styles/      # index.css (globale Styles + Variablen)
-│       └── utils/       # Hilfsfunktionen (translations, sanitize, emailContextBuilder)
-│   └── shared/           # Geteilte Types/Utilities (Main <-> Renderer)
-├── resources/           # Bundled Assets (Starter-Vaults, Icons)
+│       │   └── Settings/ # inkl. ModelCompatibilitySection + ActiveModelStatusBadge
+│       │       └── Onboarding/ ...
+│       ├── stores/      # Zustand Stores (15)
+│       ├── styles/      # index.css (globale Styles + color-mix-Tokens)
+│       └── utils/       # Hilfsfunktionen
+│           ├── noteKind.ts        # 🔴🟢🔵-Kategorien zentral (NOTE_KINDS, canvasColor, ...)
+│           ├── contextMemory.ts   # localStorage Event-Log (90d Retention, 6 Event-Typen)
+│           ├── translations.ts, sanitize.ts, emailContextBuilder.ts, ...
+│           └── stt/transformersStt.ts  # Eingebautes Whisper via @huggingface/transformers
+├── resources/           # Bundled Assets (Starter-Vaults, Icons, Schulamt-Vorlage)
 └── package.json
 docs/                    # Website (mindgraph-notes.de)
-mindgraph-sync-server/   # Separater Sync-Server (Docker)
+mindgraph-sync-server/   # Separater Sync-Server (Docker, Hetzner CX23)
 ```
+
+> Externer Test-Harness für Modell-Benchmarks: `~/dev/brain-model-benchmark/` (außerhalb des Repos).
 
 ## Befehle
 
@@ -63,20 +86,22 @@ npm run dist:mac     # Nur macOS Installer
 ### IPC-Kommunikation
 Neuer IPC-Handler: `ipcMain.handle()` in `main/index.ts` + `contextBridge.exposeInMainWorld()` in `preload.ts`.
 
-### State Management (Zustand)
-- **uiStore**: UI-Einstellungen, persisted via `persistedKeys` Array
+### State Management (Zustand, 15 Stores)
+- **uiStore**: UI-Einstellungen, persisted via `persistedKeys` Array. Enthält u.a. `ollama.moduleModelOverrides`, `brain.folderPath`, `notesRootFolder`, `fileTreeKindFilter`, `dashboard.radarAi*`, `editorDefaultView`
 - **notesStore**: Notizen, Vault-Daten
-- **tabStore**: Tab-Verwaltung
+- **tabStore**: Tab-Verwaltung (Editor, Canvas, Dashboard, Code-Viewer)
 - **graphStore**: Graph-Canvas Positionen, Edges
 - **flashcardStore / quizStore**: Lern-Features
 - **dataviewStore**: Dataview-Query-Ergebnisse
 - **bookmarkStore**: Lesezeichen
 - **reminderStore**: Erinnerungen für Tasks
 - **syncStore**: Sync-Status (localStorage, key: `mindgraph-sync`)
-- **emailStore**: Email-Abruf, Analyse, Compose, KI-Chat, Senden
-- **agentStore**: Veranstaltungs-Import, edoobox-Push, Marketing, Status-Tracking
+- **emailStore**: Email-Abruf, Analyse, Compose, KI-Chat, Senden. Modul-Override + `isHardLocked('task-extraction')`-Check
+- **agentStore**: Veranstaltungs-Import, edoobox-Push, Marketing, Status-Tracking, IQ-Export
 - **contactStore**: Kontakt-Aggregation (Email + edoobox + Vault)
-- Selektoren: `useShallow` aus `zustand/react/shallow` verwenden
+- **vaultSettingsStore**: Pro-Vault-Feature-Toggles (`vault-settings.json`)
+- **voiceStore**: STT/TTS-State (Engine, Modell-Lade-Status, Aufnahme-State)
+- Selektoren: `useShallow` aus `zustand/react/shallow` verwenden — siehe `MarkdownEditor.tsx` und `DashboardView.tsx` als Referenz
 
 ### Modals
 Boolean-State in uiStore, `if (!open) return null` im Component.
@@ -93,6 +118,79 @@ Globale Variablen in `styles/index.css`. Komponenten-CSS ist colocated.
 - Für Features, die echten Markdown-Inhalt brauchen (Callouts, Tasks, externe Links), muss Content bei Bedarf nachgeladen werden (`readFilesBatch` + `updateNote`).
 - Anzeige-Toggles in `uiStore`: `canvasShowTags`, `canvasShowLinks`, `canvasShowImages`, `canvasShowSummaries`, `canvasCompactMode`.
 - Callout-Zusammenfassungen auf Karten werden auf maximal 100 Wörter begrenzt und die Kartenhöhe dynamisch berechnet.
+- **Hierarchisches Layout** in `utils/layouts/hierarchicalLayout.ts`: virtuelle Dummy-Nodes für Long-Edges (Layer X → Layer X+n), Median-basierte Y-Koordinaten mit Min-Distance, Layer-Width = Median mit 480-px-Cap, horizontaler Gap 60 px. Diagnose-Logs `[Layout] Hierarchical: N dummies inserted, crossings X → Y`.
+
+### Notiz-Kategorien (🔴🟢🔵) — zentrales UI-Konzept
+- Alle Kategorien-Logik in `utils/noteKind.ts`. **Niemals duplizieren** — wenn ein neuer UI-Punkt Farbe/Label braucht, `NOTE_KINDS[kind]` nutzen.
+- Drei funktionale Kategorien: 🔴 *Problem* (Aktion), 🟢 *Lösung* (Wissen/Guide), 🔵 *Info* (Reader).
+- Erkennung in **dieser Reihenfolge**: Frontmatter (`category|noteKind|kind` mit Aliassen red/green/blue/problem/...) → Titel-Emoji am Anfang oder direkt nach " - " (matched z.B. `202604221336 - 🔴 Digitalwoche`). **Pfad-Fallback und Inline-Emoji bewusst nicht** — sonst werden Zettelkasten-Notizen mit zufälligen Emojis fälschlich kategorisiert.
+- Frontmatter-Manipulation via Helper aus `noteKind.ts`: `setNoteRelevanceInContent`, `getNoteStatus`, `markProblemSolvedInContent`, `addSolvedForBacklinkInContent`, `completeOpenTasksInContent`.
+- UI-Komponenten zeigen 10-px-Status-Dot, nicht das rohe Emoji — siehe `NoteNodes`, `TabBar`, `FileTree`, `Bookmarks`, Editor-Header.
+
+### Editor-Modi (drei): Markdown / Schreiben / Lesen
+- **Schreiben** (`live-preview`) ist der Default für Editing, **Lesen** (`preview`) ist der Default beim Öffnen einer Notiz (90% Lesen, 10% Editieren).
+- **Lesen-Modus** ist **WYSIWYG mit Inline-Editing** — Änderungen gehen via `turndown` zurück zu Markdown.
+- **Turndown-Escape MUSS selektiv konfiguriert sein**: `[`, `]`, `\`, `_` bleiben unangetastet (sonst exponentielle Wikilink-Korruption mit `2ⁿ−1`-Backslash-Wachstum, siehe v0.6.40-Fix). Nur Block-Start-Marker und Inline-Emphasis werden escaped.
+- **WYSIWYG-Roundtrip-Regeln für Embeds**: PDF/Office (`data-filename`), Mermaid (`data-source`), Dataview (`data-query`). Embeds werden aus diesen Attributen rekonstruiert, sonst stillschweigend gestrippt.
+- **Auto-Heal** für korrupte Wikilinks läuft in jedem `.md`-Write-Pfad (`write-file`, `tasks-update-line`, `tasks-create`) — strippt beliebig viele Backslashes vor `[` und `]`.
+- **REMINDER_REGEX in `shared/taskExtractor.ts`** ist tolerant gegenüber `\[\[`, `\\\[\\\[`, etc. — Tasks werden auch in leicht beschädigten Notizen sichtbar.
+
+### Modell-Kompatibilitäts-Matrix
+- **Single-Source-of-Truth**: `app/src/shared/modelCompatibility.ts`. Datenstand im File-Header dokumentiert (`version: '2026-05-14'`).
+- 5 Module: `brain`, `task-extraction`, `mail-summary`, `dashboard-snapshot`, `smart-connections`.
+- 4 Verdicts: `green` (geeignet), `yellow` (Vorbehalt), `red` (Hard-Lock), `untested` (Default für unbekannte Modelle).
+- **`damageRelevant: true`** für `task-extraction` und `dashboard-snapshot` → bei `red` echter Code-Lock via `isHardLocked()`.
+- **Prio-Reihenfolge im Code**: tab-spezifisches Modell (z.B. `email.analysisModel`) → `ollama.moduleModelOverrides[module]` → globales `selectedModel`.
+- **UI**: `ModelCompatibilitySection` in Settings → Integrationen → Ollama; `ActiveModelStatusBadge` neben Modell-Picker.
+- **Empirische Grundlage**: `~/dev/brain-model-benchmark/results/`. Aktuelle Werte aus 160 Läufen vom 14.05.2026 (siehe Analyse-Dokument `~/2026/100 - ✅ Projekte/110 - MindGraph-Notes/Modell-Kompatibilitaets-Analyse.md`).
+- **Bei neuen Benchmarks**: Daten in `modelCompatibility.ts` einpflegen, `version` updaten, Analyse-Dokument updaten.
+
+### Brain — lokales Tagesgedächtnis
+- Pfad: `main/brain/dailyConsolidation.ts`.
+- **Hardcoded `localhost:11434` (Ollama)** — Privacy-Constraint. **Niemals** auf den generischen LLM-Provider-Switch umstellen, sonst geht die Marketing-Aussage „verlässt nie deinen Rechner" verloren.
+- Sensoren: berührte Notizen (aus `contextMemory` + Datei-mtime), erledigte Tasks, empfangene/beantwortete Mails, optional Daily-Note-Body (≤2000 Zeichen).
+- Output: 4-Sektionen-Schema (Heute im Fokus / Was ich gemacht habe / Offene Fäden / Beobachtung) mit Frontmatter `type: brain-day`.
+- **Wikilink-Postprocessor** in `dailyConsolidation.ts`: wickelt exakte Titel im Output in `[[…]]`, falls Modell die Regel ignoriert.
+- **Tageszusammenfassungen werden nie überschrieben** — wiederholte Klicks erzeugen `TT (2).md`, `TT (3).md`. Human-in-the-Loop ist Architektur, kein Setting.
+- Default-Ordner: `800 - 🧠 brain/JJJJ/MM/TT.md` (konfigurierbar via `brain.folderPath`).
+
+### Relevanz-Radar (Dashboard-Widget „Relevante Notizen")
+- `DashboardPanel/DashboardView.tsx` → `RadarWidget`.
+- **KI-Score in localStorage**, nicht im Frontmatter (`mindgraph:relevance-cache:{vaultPath}`) — sonst Multi-Device-Sync-Konflikte.
+- Score-Mischung: KI-Score + heuristik-Boost (gedeckelt +25), **kein `Math.max`**. Sonst überstrahlt KI alle Tagessignale.
+- Concurrency-Lock als **Modul-Singleton** (`radarAiWorkerRunning`), nicht als `useRef` — sonst Doppelläufe bei schnellem Dashboard-Mount/Unmount.
+- ErrorBoundary pro Widget — ein Render-Crash im Radar darf nicht das ganze Dashboard mitnehmen.
+- **Nur 🔴-Notizen** kommen ins Radar (Frontmatter `category:` **oder** strikter Titel-Match nach `getNoteKindFromTitleStrict`).
+
+### Lokales Kontextgedächtnis (`utils/contextMemory.ts`)
+- localStorage-Event-Log mit 6 Typen: `note_opened`, `note_created`, `note_updated`, `note_deleted`, `task_created`, `task_updated`.
+- Throttling pro Event-Typ + Note (z.B. `note_opened` 30s, `note_updated` 60s).
+- 90-Tage-Retention, max 2500 Events. Zero-Backend.
+- Wird vom **Aktivität-Widget** (Top-Notes-Bars + Top-Folders) und von **Brain** (Sensor „berührte Notizen") gelesen.
+- Gewichtetes Event-Scoring: `task_*` ×4/×3, `note_opened` ×3, `note_updated` ×2, `note_deleted` ×0.5. Inbox-/Eingang-Folder Faktor 0.35.
+
+### Telegram-Agent (Tool-Use)
+- `main/telegram/agent/loop.ts` mit Iterations-Limit (Default 8, max 15).
+- 7 Tools: `note_search`, `note_read`, `note_create`, `note_append`, `task_list`, `task_toggle`, `calendar_list`.
+- **`isWrite: true` ist die harte Sicherheitsgrenze** — jedes Tool mit dieser Flag löst automatisch den Confirm-Flow aus, unabhängig von `agentConfirmTools`-Settings.
+- Confirm-Promise-Registry in `confirm.ts`, Auto-Deny nach 2 Min Timeout.
+- **Pfad-Schutz**: jedes Schreib-Tool nutzt `resolveInVault()` — kein Path-Traversal über Tool-Args möglich.
+- `chatClient.chatWithTools()` mapped Ollama-Wire-Format (`role: tool`, `tool_calls.function`) auf interne `ToolCall`-Struktur. Tool-fähige Ollama-Modelle bevorzugt: `qwen3`, `qwen2.5-coder`, `llama3.1`, `mistral-nemo`. Gemma kann **kein** Tool-Calling.
+- `safeReplyMarkdown` retried Plain-Text bei Markdown-Parse-Fehlern (Telegram lehnt unbalancierte `*`/`_`/`` ` `` ab).
+
+### Automatische Backups
+- `<vault>/.mindgraph/backups/JJJJ-MM-TT/<relpath>/<dateiname>.<timestamp>.bak` vor jedem `.md`-Write.
+- **Hard-Block für leere Writes** auf nicht-leere Markdown-Dateien im `write-file`-Handler — zweite Verteidigungslinie unabhängig vom Editor.
+- Backups **vom Sync ausgeschlossen** (bleiben lokal).
+
+### Eingebautes Whisper STT
+- `utils/stt/transformersStt.ts` läuft im Renderer via `@huggingface/transformers` v4 + ONNX Runtime.
+- **Modell-Konfiguration**: Encoder `q8` (~25 MB), Decoder `fp32` (~150 MB). Wichtig: quantisierter Decoder bricht ONNX-Runtime mit „MatMulNBits-Scales fehlen". Nicht ändern ohne Test.
+- **`device: 'wasm'` + `numThreads: 1`** — Electron-Renderer hat ohne COOP/COEP keinen SharedArrayBuffer für Multi-Thread-WASM. WebGPU-Init terminiert nicht zuverlässig.
+- **CSP**: `connect-src` für `huggingface.co`, `cas-bridge.xethub.hf.co`, `cdn.jsdelivr.net`; `script-src` mit `wasm-unsafe-eval` + `blob:`; `worker-src 'self' blob:`.
+- macOS: Entitlement `com.apple.security.device.audio-input` in `entitlements.mac.plist` **muss** gesetzt sein — ohne blockiert Hardened Runtime stumm.
+- Transport-Capture (Schnellerfassung ⌘D) ist ein **eigener Renderer-Prozess** mit eigenem RAM-Cache. „Modell vorbereiten" im Hauptfenster wirkt dort nicht.
+- STT-Audio-Datei wird **immer** gelöscht (auch bei Fehler/leerem Transkript). Debug-Erhalt nur via `MINDGRAPH_KEEP_STT_AUDIO=1`.
 
 ## Sicherheit
 
@@ -161,11 +259,28 @@ Oder: `/release` Command verwenden.
 - Module: `app/src/main/sync/` (crypto.ts, fileTracker.ts, syncEngine.ts)
 - Passphrase lokal via `electron.safeStorage`, wird nie zum Server gesendet
 - Konfliktstrategie: neuerer Timestamp gewinnt, ältere als `.sync-conflict-YYYY-MM-DD`
+- **Plaintext-Hash-Vergleich vor Conflict-Erzeugung** (v0.6.2): bevor `.sync-conflict-*`-Datei angelegt wird, wird Remote entschlüsselt und mit lokal verglichen — identischer Inhalt → kein Conflict-File, nur Manifest-Update. Verhindert Phantom-Konflikte.
 - Mass-Deletion-Schutz: >10% und >=10 Dateien → SAFETY-Fehler, `sync(force=true)` überspringt Check
 - Force Sync UI: Button in Settings bei SAFETY-Fehlern, ruft `triggerSync(true)` auf
 - **Tombstones**: Server speichert Löschungen (`deleted_at`), Client prüft bei `diffManifests()` ob Datei auf Server gelöscht wurde → verhindert Re-Upload gelöschter Dateien
 - **`getDeletedManifest()`** in `mindgraph-sync-server/src/storage.ts` liefert gelöschte Dateien
 - **`lastServerTombstones`** in `syncEngine.ts` wird an `diffManifests()` übergeben
+- **Server-Tombstone-Retention**: 90 Tage (v0.3.2+).
+- **Activation-Codes atomar claimen** (v0.5.17): Validierung + Claim in einem `UPDATE` mit Bedingung. Vorher zwei parallele Connects konnten denselben Code beanspruchen.
+- **Sync-Speicherlimit bei Updates** (v0.5.17): Limit-Vergleich subtrahiert jetzt die alte Größe (`currentSize - oldSize + neueGröße`); legitime Updates nahe am 5-GB-Limit schlagen nicht mehr fehl.
+- **Was NICHT in den Sync wandert**: `.mindgraph/backups/` (Auto-Backups), `.mindgraph/embeddings-*.json`, `.mindgraph/notes-cache.json`, alles in der `excludePatterns`-Liste der Sync-Settings.
+
+## FS-IPC Security (`approvedVaultRoots`)
+
+- **Defense-in-Depth gegen kompromittierten Renderer** (XSS in fremder Markdown, kompromittiertes npm-Paket, Mermaid-/KaTeX-Bypass).
+- Whitelist `approvedVaultRoots: Set<string>` in `main/index.ts`. Befüllt nur durch User-bestätigte Aktionen: `get-last-vault` (persistierte Settings), `open-vault`/`select-vault-directory` (OS-Dialog), `create-starter-vault`/`create-empty-vault`.
+- `set-last-vault` lehnt nicht-bestätigte Pfade ab — Renderer kann sich nicht selbst Pfade approven.
+- **Helper für neue Handler**:
+  - Handler mit absolutem Pfad: `const safe = await assertSafePath(p, 'op-name')` → ab dann **nur `safe`** verwenden. Async, löst Symlinks via `realpath` auf.
+  - Handler mit `(vaultPath, relPath)`: `assertApprovedVault(vaultPath, 'op-name')` (sync) → dann `validatePath(vaultPath, relPath)` für den relativen Teil.
+  - Neue Vaults erstellen: nach `mkdir` `await addApprovedRoot(targetPath)`.
+- **Wichtige Regression-Falle** (v0.5.35): `assertApprovedVault` akzeptiert **nur** Vault-Roots. Für beliebige Tiefen innerhalb des Vaults `assertSafePath` nutzen.
+- Vault-Roots können nicht via `delete-directory`/`delete-files` gelöscht werden.
 
 ## Smart Email Client
 
@@ -180,13 +295,14 @@ Oder: `/release` Command verwenden.
 - Passwörter via `electron.safeStorage`, nie im Klartext gespeichert
 - Persistenz: `{vault}/.mindgraph/emails.json`
 
-### Versand (SMTP + nodemailer)
+### Versand (SMTP + nodemailer + IMAP-Sent-Append)
 - SMTP-Senden via `nodemailer` (dynamic import in main/index.ts, IPC: `email-send`)
 - Account-Settings: `smtpHost`, `smtpPort`, `smtpTls`, `fromAddress` (volle Absender-Adresse), `name` (Anzeigename)
-- HTML-Email: Body wird zu HTML konvertiert (Zeilenumbrüche → `<br>`)
+- HTML-Email: Body wird zu HTML konvertiert. **Link-Konverter** erkennt 4 Varianten: Markdown-Links `[Text](https://url)`, Markdown-Mailto, nackte URLs, nackte E-Mail-Adressen. Negative Lookbehinds verhindern Doppel-Linking innerhalb bereits gerenderter Tags.
 - Signatur: Text (`signature`) + optionales Bild (`signatureImagePath`) als CID-Attachment eingebettet
 - Signatur-Bild: Wird nach `{vault}/.mindgraph/signature-image.ext` kopiert, IPC: `email-select-signature-image`, `email-load-signature-image`
 - Gesendete Emails werden in `emailStore.emails` mit `sent: true` getrackt
+- **IMAP-Sent-Append** (v0.6.37): nach erfolgreichem `sendMail` baut nodemailer per `streamTransport` einen RFC-822-Buffer, imapflow lädt Kopie in den `\Sent`-Folder hoch. Sent-Folder-Detection via SPECIAL-USE-Flag (RFC 6154) mit Fallbacks auf bekannte Namen (`INBOX.Sent`, `Gesendet`, `INBOX.Gesendet`, `Sent Items`, `Gesendete Objekte`). **Konsistente `Message-ID`** zwischen SMTP und IMAP-Kopie. Fehler beim Append kippt Send-Erfolg nicht — gelbe Warnung unter grünem Status.
 
 ### KI-Chat & Kontext-Engine
 - **EmailAIChatView.tsx**: Chat-Interface mit Ollama-Streaming (nutzt bestehenden `ollama-chat` IPC-Handler)
@@ -207,9 +323,10 @@ Oder: `/release` Command verwenden.
 
 ### UI (InboxPanel)
 - View-Switcher: Liste | Detail | Compose | KI-Chat (über Header-Buttons "Neu" + "KI")
-- Detail-View: Analyse + "Antwort erwartet"-Badge (rot/orange/blau) + Anhang-Info + "Original anzeigen"-Toggle + Reply/Discuss-Buttons
-- ComposeView: Apple-Mail-Stil (Felder mit Trennlinien), Empfänger-Autocomplete, Signatur-Bild-Vorschau, Senden-Button
-- Settings: Im **Agenten-Tab** — IMAP + SMTP pro Account, Absender-Adresse, Signatur (Text + Bild-Upload)
+- Detail-View: Analyse + "Antwort erwartet"-Badge (rot/orange/blau) + Anhang-Info + "Original anzeigen"-Toggle + Reply/Discuss-Buttons + "Erledigt"-Toggle
+- ComposeView: **Modal-Overlay via `createPortal`** (am `document.body`), 860×760, Blur-Backdrop. Vorher als View ins schmale Inbox-Panel gequetscht.
+- Settings: **Eigener Settings-Tab „Email"** (seit v0.5.32) — vorher unter „Agenten" versteckt. Mit Briefumschlag-Icon, nur sichtbar bei aktivem `email`-Modul. IMAP + SMTP pro Account, Absender-Adresse, Signatur (Text + Bild-Upload).
+- **`replyHandled`** auf Mails (persistent in `emails.json` als `analysis.replyHandled`) — übersteht KI-Reanalyse. Hover-Häkchen im „Zu beantworten"-Widget setzt es.
 
 ## edoobox-Agent
 

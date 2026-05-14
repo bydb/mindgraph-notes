@@ -156,9 +156,16 @@ export const useEmailStore = create<EmailState>()((set, get) => ({
     if (get().isAnalyzing) return
 
     const { email, ollama } = useUIStore.getState()
-    const model = email.analysisModel || ollama.selectedModel
+    // Priorität: email.analysisModel (Email-Tab) → Modul-Override (Kompatibilitäts-Sektion) → globales selectedModel.
+    const moduleOverride = ollama.moduleModelOverrides?.['task-extraction'] || ''
+    const model = email.analysisModel || moduleOverride || ollama.selectedModel
     if (!model) {
       console.warn('[EmailStore] No model configured for analysis')
+      return
+    }
+    const { isHardLocked } = await import('../../shared/modelCompatibility')
+    if (isHardLocked(model, 'task-extraction')) {
+      console.warn(`[EmailStore] Modell ${model} ist für Mail-Task-Extraktion gesperrt (Hard-Lock). Analyse übersprungen — bitte in den Einstellungen ein anderes Modell wählen.`)
       return
     }
 

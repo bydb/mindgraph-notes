@@ -30,6 +30,7 @@ import {
   getNoteRelevance
 } from '../../utils/noteKind'
 import { ErrorBoundary } from '../ErrorBoundary'
+import { isHardLocked } from '../../../shared/modelCompatibility'
 import './DashboardView.css'
 
 type TFn = (key: TranslationKey, params?: Record<string, string | number>) => string
@@ -387,20 +388,22 @@ const ActivityWidget: React.FC<ActivityWidgetProps> = ({ snapshot, t, vaultPath,
   const hasFrequentContexts = memory.topNotes7d.length > 0
   const visibleContexts = hasFrequentContexts ? memory.topNotes7d : memory.recentNotes7d
   const maxContextScore = Math.max(1, ...visibleContexts.map(note => note.score))
-  const { ollamaEnabled, ollamaSelectedModel, language, brainFolderPath, dailyNoteFolderPath, dailyNoteDateFormat } = useUIStore(useShallow(s => ({
+  const { ollamaEnabled, ollamaSelectedModel, brainModelOverride, language, brainFolderPath, dailyNoteFolderPath, dailyNoteDateFormat } = useUIStore(useShallow(s => ({
     ollamaEnabled: s.ollama.enabled,
     ollamaSelectedModel: s.ollama.selectedModel,
+    brainModelOverride: s.ollama.moduleModelOverrides?.brain || '',
     language: s.language,
     brainFolderPath: s.brain.folderPath,
     dailyNoteFolderPath: s.dailyNote.folderPath,
     dailyNoteDateFormat: s.dailyNote.dateFormat
   })))
+  const brainModel = brainModelOverride || ollamaSelectedModel
   const [brainLoading, setBrainLoading] = useState(false)
   const [brainError, setBrainError] = useState<string>('')
   const [brainNotePath, setBrainNotePath] = useState<string>('')
 
   const runBrainConsolidation = async () => {
-    if (!vaultPath || !ollamaEnabled || !ollamaSelectedModel || brainLoading) return
+    if (!vaultPath || !ollamaEnabled || !brainModel || brainLoading) return
     setBrainLoading(true)
     setBrainError('')
     setBrainNotePath('')
@@ -419,7 +422,7 @@ const ActivityWidget: React.FC<ActivityWidgetProps> = ({ snapshot, t, vaultPath,
         folderPath: brainFolderPath || '800 - 🧠 brain',
         date: isoDate,
         generatedAtIso: new Date().toISOString(),
-        model: ollamaSelectedModel,
+        model: brainModel,
         language,
         sensors
       })
@@ -593,7 +596,7 @@ const ActivityWidget: React.FC<ActivityWidgetProps> = ({ snapshot, t, vaultPath,
             <button
               className="dv-activity-ai-btn dv-activity-ai-btn-primary"
               onClick={runBrainConsolidation}
-              disabled={!ollamaEnabled || !ollamaSelectedModel || brainLoading || !vaultPath}
+              disabled={!ollamaEnabled || !brainModel || brainLoading || !vaultPath}
             >
               {brainLoading ? t('dashboard.activity.brainRunning') : t('dashboard.activity.brainButton')}
             </button>
@@ -609,7 +612,7 @@ const ActivityWidget: React.FC<ActivityWidgetProps> = ({ snapshot, t, vaultPath,
           ) : brainError ? (
             <div className="dv-activity-ai-error">{brainError}</div>
           ) : null}
-          {!ollamaEnabled || !ollamaSelectedModel ? (
+          {!ollamaEnabled || !brainModel ? (
             <div className="dv-activity-ai-hint">{t('dashboard.activity.aiNeedsModel')}</div>
           ) : null}
         </div>
@@ -1112,12 +1115,15 @@ const RadarWidget: React.FC<RadarWidgetProps> = ({ snapshot, notes, vaultPath, o
     radarAiModel: s.dashboard.radarAiModel,
     radarAiRefreshIntervalHours: s.dashboard.radarAiRefreshIntervalHours
   })))
-  const { ollamaEnabled, ollamaSelectedModel } = useUIStore(useShallow(s => ({
+  const { ollamaEnabled, ollamaSelectedModel, dashboardOverride } = useUIStore(useShallow(s => ({
     ollamaEnabled: s.ollama.enabled,
-    ollamaSelectedModel: s.ollama.selectedModel
+    ollamaSelectedModel: s.ollama.selectedModel,
+    dashboardOverride: s.ollama.moduleModelOverrides?.['dashboard-snapshot'] || ''
   })))
-  const aiModel = radarAiModel || ollamaSelectedModel
-  const aiEnabled = !!(radarAiEnabled && ollamaEnabled && aiModel)
+  // Priorität: radarAiModel (Dashboard-Tab) → Modul-Override (Kompatibilitäts-Sektion) → globales selectedModel.
+  const aiModel = radarAiModel || dashboardOverride || ollamaSelectedModel
+  const aiHardLocked = aiModel ? isHardLocked(aiModel, 'dashboard-snapshot') : false
+  const aiEnabled = !!(radarAiEnabled && ollamaEnabled && aiModel && !aiHardLocked)
 
   const [analyzingIds, setAnalyzingIds] = useState<Set<string>>(new Set())
   const [forceRefreshTick, setForceRefreshTick] = useState(0)

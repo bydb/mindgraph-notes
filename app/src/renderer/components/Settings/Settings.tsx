@@ -7,6 +7,7 @@ import { useVaultSettingsStore } from '../../stores/vaultSettingsStore'
 import { useTranslation, type TranslationKey } from '../../utils/translations'
 import { TelegramSettings } from './TelegramSettings'
 import { CredentialsSettings } from './CredentialsSettings'
+import { ModelCompatibilitySection, ActiveModelStatusBadge } from './ModelCompatibilitySection'
 import { ensureTransformersModel, isTransformersModelReady } from '../../utils/voice/transformersStt'
 import { writeClipboardText } from '../../utils/clipboard'
 
@@ -2837,33 +2838,36 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab 
                     </div>
 
                     {ollamaStatus === 'connected' && (
-                      <div className="settings-row">
-                        <label>{t('settings.integrations.ollama.model')}</label>
-                        <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flex: 1 }}>
-                          <select
-                            value={ollama.selectedModel}
-                            onChange={e => setOllama({ selectedModel: e.target.value })}
-                            disabled={!ollama.enabled}
-                            style={{ flex: 1 }}
-                          >
-                            <option value="">{t('settings.selectModel')}</option>
-                            {ollamaModels.map(model => (
-                              <option key={model.name} value={model.name}>
-                                {model.name}
-                              </option>
-                            ))}
-                          </select>
-                          {ollama.selectedModel && (
-                            <button
-                              className="settings-refresh"
-                              onClick={() => handleDeleteModel(ollama.selectedModel)}
-                              title={t('settings.integrations.ollama.deleteModel')}
-                              style={{ color: 'var(--text-error, #e53935)', flexShrink: 0 }}
+                      <div className="settings-row" style={{ flexDirection: 'column', alignItems: 'stretch', gap: '4px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <label style={{ minWidth: '120px' }}>{t('settings.integrations.ollama.model')}</label>
+                          <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flex: 1 }}>
+                            <select
+                              value={ollama.selectedModel}
+                              onChange={e => setOllama({ selectedModel: e.target.value })}
+                              disabled={!ollama.enabled}
+                              style={{ flex: 1 }}
                             >
-                              ✕
-                            </button>
-                          )}
+                              <option value="">{t('settings.selectModel')}</option>
+                              {ollamaModels.map(model => (
+                                <option key={model.name} value={model.name}>
+                                  {model.name}
+                                </option>
+                              ))}
+                            </select>
+                            {ollama.selectedModel && (
+                              <button
+                                className="settings-refresh"
+                                onClick={() => handleDeleteModel(ollama.selectedModel)}
+                                title={t('settings.integrations.ollama.deleteModel')}
+                                style={{ color: 'var(--text-error, #e53935)', flexShrink: 0 }}
+                              >
+                                ✕
+                              </button>
+                            )}
+                          </div>
                         </div>
+                        <ActiveModelStatusBadge model={ollama.selectedModel} />
                       </div>
                     )}
 
@@ -2985,20 +2989,24 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab 
                     </div>
 
                     {lmstudioStatus === 'connected' && (
-                      <div className="settings-row">
-                        <label>{t('settings.integrations.ollama.model')}</label>
-                        <select
-                          value={ollama.selectedModel}
-                          onChange={e => setOllama({ selectedModel: e.target.value })}
-                          disabled={!ollama.enabled}
-                        >
-                          <option value="">{t('settings.selectModel')}</option>
-                          {lmstudioModels.map(model => (
-                            <option key={model.name} value={model.name}>
-                              {model.name}
-                            </option>
-                          ))}
-                        </select>
+                      <div className="settings-row" style={{ flexDirection: 'column', alignItems: 'stretch', gap: '4px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <label style={{ minWidth: '120px' }}>{t('settings.integrations.ollama.model')}</label>
+                          <select
+                            value={ollama.selectedModel}
+                            onChange={e => setOllama({ selectedModel: e.target.value })}
+                            disabled={!ollama.enabled}
+                            style={{ flex: 1 }}
+                          >
+                            <option value="">{t('settings.selectModel')}</option>
+                            {lmstudioModels.map(model => (
+                              <option key={model.name} value={model.name}>
+                                {model.name}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <ActiveModelStatusBadge model={ollama.selectedModel} />
                       </div>
                     )}
 
@@ -3015,6 +3023,10 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab 
                     </div>
                   </>
                 )}
+
+                <ModelCompatibilitySection
+                  availableModels={ollama.backend === 'ollama' ? ollamaModels : lmstudioModels}
+                />
 
                 <div className="settings-row">
                   <label>{t('settings.integrations.defaultTranslation')}</label>

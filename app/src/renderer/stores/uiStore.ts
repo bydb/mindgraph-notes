@@ -224,6 +224,15 @@ interface LLMSettings {
   selectedModel: string
   defaultTranslateLanguage: AILanguageCode
   lmStudioPort: number  // Default: 1234
+  // Pro-Modul-Override: leer = nutze selectedModel.
+  // Quelle: shared/modelCompatibility.ts (Stand 2026-05-14).
+  moduleModelOverrides: {
+    brain: string
+    'task-extraction': string
+    'mail-summary': string
+    'dashboard-snapshot': string
+    'smart-connections': string
+  }
 }
 
 // Brain (lokales Tagesgedächtnis — speichert Tageszusammenfassungen im Vault)
@@ -744,7 +753,14 @@ const defaultState = {
     backend: 'ollama' as LLMBackend,
     selectedModel: '',
     defaultTranslateLanguage: 'en' as AILanguageCode,
-    lmStudioPort: 1234
+    lmStudioPort: 1234,
+    moduleModelOverrides: {
+      brain: '',
+      'task-extraction': '',
+      'mail-summary': '',
+      'dashboard-snapshot': '',
+      'smart-connections': ''
+    }
   },
 
   // Brain (lokales Tagesgedächtnis)
@@ -1308,6 +1324,16 @@ export async function initializeUISettings(): Promise<void> {
           dash.radarAiRefreshIntervalHours = 6
         }
         if (typeof dash.radarAiModel !== 'string') dash.radarAiModel = ''
+      }
+      // Migrate ollama: moduleModelOverrides ergänzen (eingeführt 2026-05-14)
+      if (validSettings.ollama) {
+        const ll = validSettings.ollama as LLMSettings
+        const defaults = (defaultState.ollama as LLMSettings).moduleModelOverrides
+        if (!ll.moduleModelOverrides || typeof ll.moduleModelOverrides !== 'object') {
+          ll.moduleModelOverrides = { ...defaults }
+        } else {
+          ll.moduleModelOverrides = { ...defaults, ...ll.moduleModelOverrides }
+        }
       }
       // Migrate edoobox base URL: strip /v1 or /v2 suffix, use app2 for V2
       if (validSettings.edoobox) {
