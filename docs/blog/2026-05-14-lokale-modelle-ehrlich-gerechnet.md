@@ -37,6 +37,10 @@ Ich baue seit Januar an [MindGraph Notes](https://mindgraph-notes.de). Eine Noti
 
 Das klingt gut. Bis man tatsächlich anfängt, eine App zu bauen, die darauf basiert.
 
+Ein besonders empfindlicher Teil davon ist das E-Mail-Modul. Es holt E-Mails per IMAP ab, bewertet ihre Relevanz, erkennt Aufgaben und Termine, prüft mögliche Kalenderkonflikte und kann Antwortentwürfe vorbereiten. Die Idee dahinter ist nicht, dass die KI meine Post übernimmt. Sie soll das mechanische Vorsortieren erledigen: Was muss ich beantworten? Wo steckt ein Termin? Welche Aufgabe gehört auf meine Liste? Welche Nachricht kann warten?
+
+Genau dort soll die App entlasten. Nicht durch noch mehr Benachrichtigungen, sondern durch weniger Sucharbeit. Aus einem Posteingang voller kleiner Verpflichtungen soll eine überschaubare Liste werden: heute wichtig, später wichtig, erledigt, ignorierbar.
+
 Diese Woche fielen mir Fehler auf, die ich erst nicht einordnen konnte. Die KI erfand Aufgaben, wo gar keine waren. Sie las eine E-Mail mit „bis nächsten Freitag" und schrieb mir den Termin auf einen **Dienstag**. In einer Tageszusammenfassung tauchten Punkte auf, die so nie in meinen Notizen standen.
 
 Ich wollte verstehen, was da los ist. Also habe ich angefangen, systematisch zu testen. Fünf verschiedene KI-Modelle, vier verschiedene Aufgaben, 160 Durchläufe. Getestet habe ich konkrete Produktpfade meiner App: E-Mail-Aufgaben, Terminextraktion, Tageszusammenfassungen und die Bewertung von Notizen. Was dabei herauskam, hat meine Sicht auf lokale KI ziemlich verändert.
