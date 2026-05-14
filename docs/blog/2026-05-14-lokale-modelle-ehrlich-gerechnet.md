@@ -19,7 +19,7 @@ tags:
   - blog
 status: publish
 type: post
-summary: "Kleine KI-Modelle auf dem eigenen Rechner können vieles. Aber sie rechnen schlecht mit Datumsangaben, fallen auf Tricks rein und erfinden Inhalte, wenn ihnen langweilig ist. Was 160 Tests an meiner App gezeigt haben – und warum ich seither anders über Privatsphäre und KI denke."
+summary: "Kleine KI-Modelle auf dem eigenen Rechner können vieles. Aber in meinen Tests rechneten sie schlecht mit Datumsangaben, fielen auf Tricks rein und erfanden Inhalte, wenn ihnen langweilig war. Was 160 Tests an meiner App gezeigt haben – und warum ich seither anders über Privatsphäre und KI denke."
 categories:
   - KI
   - Lokale KI
@@ -29,7 +29,7 @@ categories:
 ![Header](2026-05-14-lokale-modelle-ehrlich-gerechnet-header.png)
 
 > [!abstract] Kurz zusammengefasst
-> Kleine KI-Modelle auf dem eigenen Rechner haben verlässliche Schwächen. Sie können nicht gut rechnen, sie lassen sich austricksen, und sie erfinden Inhalte. Das ist kein Modell-Versagen, sondern eine Eigenschaft. 160 Testläufe haben mir gezeigt, wo genau die Grenzen liegen – und wie meine App damit umgehen muss.
+> Kleine KI-Modelle auf dem eigenen Rechner haben verlässliche Schwächen. In meinen Tests rechneten sie schlecht, ließen sich teils austricksen und erfanden Inhalte. Das ist nicht einfach Modell-Versagen, sondern eine Eigenschaft, mit der ein Produkt umgehen muss. 160 Testläufe haben mir gezeigt, wo genau die Grenzen liegen – und wie meine App damit umgehen muss.
 
 ## Worum es geht
 
@@ -39,7 +39,7 @@ Das klingt gut. Bis man tatsächlich anfängt, eine App zu bauen, die darauf bas
 
 Diese Woche fielen mir Fehler auf, die ich erst nicht einordnen konnte. Die KI erfand Aufgaben, wo gar keine waren. Sie las eine E-Mail mit „bis nächsten Freitag" und schrieb mir den Termin auf einen **Dienstag**. In einer Tageszusammenfassung tauchten Punkte auf, die so nie in meinen Notizen standen.
 
-Ich wollte verstehen, was da los ist. Also habe ich angefangen, systematisch zu testen. Fünf verschiedene KI-Modelle, vier verschiedene Aufgaben, 160 Durchläufe. Was dabei herauskam, hat meine Sicht auf lokale KI ziemlich verändert.
+Ich wollte verstehen, was da los ist. Also habe ich angefangen, systematisch zu testen. Fünf verschiedene KI-Modelle, vier verschiedene Aufgaben, 160 Durchläufe. Getestet habe ich konkrete Produktpfade meiner App: E-Mail-Aufgaben, Terminextraktion, Tageszusammenfassungen und die Bewertung von Notizen. Was dabei herauskam, hat meine Sicht auf lokale KI ziemlich verändert.
 
 ## Mein erster Verdacht war falsch
 
@@ -55,25 +55,25 @@ Das war eine ernüchternde Erkenntnis. Das Problem liegt nicht am Platz. Es lieg
 
 ## Was lokale KI wirklich nicht kann
 
-Der Test, der mich am meisten überrascht hat: Ich habe der KI eine ganz normale E-Mail gegeben. Da stand: *„Kannst du mir die Adressen bis nächsten Freitag schicken?"* Das Datum heute: Donnerstag, der 14. Mai. „Nächsten Freitag" heißt im Deutschen: der Freitag der nächsten Woche, also der 22. Mai.
+Der Test, der mich am meisten überrascht hat: Ich habe der KI eine ganz normale E-Mail gegeben. Da stand: *„Kannst du mir die Adressen bis nächsten Freitag schicken?"* Das Datum heute: Donnerstag, der 14. Mai. Für meine App habe ich die Regel festgelegt: „nächsten Freitag" meint den Freitag der nächsten Woche, also den 22. Mai. Das ist wichtig, weil die Formulierung im Alltag mehrdeutig sein kann.
 
-Ich habe fünf KIs gefragt. Vier davon haben gar keinen Freitag genannt:
+Ich habe fünf KIs gefragt. Vier davon haben nicht einmal einen Freitag genannt:
 
-| KI-Modell | Antwort | Tatsächlicher Wochentag |
-|---|---|---|
-| qwen3.5:9b | 19. Mai | **Dienstag** |
-| qwen3.6:36b | 15. Mai | Freitag (richtig) |
-| gemma4:8b | 19. Mai | **Dienstag** |
-| llama3.1:8b | 19. Mai | **Dienstag** |
-| ministral-3:8b | 16. Mai | **Samstag** |
+| KI-Modell | Antwort | Wochentag | Bewertung nach App-Regel |
+|---|---|---|---|
+| qwen3.5:9b | 19. Mai | **Dienstag** | falsch |
+| qwen3.6:36b | 15. Mai | Freitag | falsche Woche |
+| gemma4:8b | 19. Mai | **Dienstag** | falsch |
+| llama3.1:8b | 19. Mai | **Dienstag** | falsch |
+| ministral-3:8b | 16. Mai | **Samstag** | falsch |
 
-Vier von fünf Modellen sagen einen Wochentag, der gar kein Freitag ist. Obwohl das Wort „Freitag" direkt in der Frage steht. Keine der KIs merkt den Widerspruch.
+Vier von fünf Modellen sagen einen Wochentag, der gar kein Freitag ist. Obwohl das Wort „Freitag" direkt in der Frage steht. Keine dieser vier KIs merkt den Widerspruch. Das fünfte Modell bleibt beim Freitag, nimmt aber die falsche Woche.
 
-Das ist kein Zufall. Lokale KIs in dieser Größenordnung **können einfach nicht mit Datumsangaben rechnen.** Auch wenn ich der KI vorher genau sage: „Heute ist Donnerstag, der 14.05.2026, bitte rechne sorgfältig." Sie raten. Und sie raten falsch.
+Das ist kein Zufall. Die getesteten lokalen KIs in dieser Größenordnung **waren bei Datumsangaben nicht zuverlässig genug.** Auch wenn ich der KI vorher genau sage: „Heute ist Donnerstag, der 14.05.2026, bitte rechne sorgfältig." Sie wirken, als würden sie rechnen. In Wahrheit produzieren sie oft nur ein plausibles Datum.
 
 Noch eine Schwäche: Bei einer anderen E-Mail stand: *„Ich werde dir das Material bis spätestens Montag zusenden."* Klar: Der **Absender** schickt etwas. Nicht ich. Nur eine einzige KI hat das richtig verstanden. Die anderen wollten mir eine Aufgabe „Material zusenden" auf meine Liste packen.
 
-Zwei Sätze hängen seitdem an meiner Wand: **Lokale KIs haben keinen Kalender. Und sie sind sich nicht sicher, wer was tut.**
+Zwei Sätze hängen seitdem an meiner Wand: **Diese lokalen KIs haben keinen Kalender. Und sie sind sich nicht immer sicher, wer was tut.**
 
 Wenn meine App jede zweite E-Mail-Aufgabe falsch einsortiert, ist das kein Schönheitsfehler. Das ist ein Schaden. Ein verpasster Termin ist ein verpasster Termin.
 
@@ -89,7 +89,7 @@ Die Arbeitsteilung in meiner App sieht jetzt so aus:
 
 Ergebnis: Das Modell gemma4 ist bei Terminen von **67 Prozent richtig** auf **100 Prozent** gesprungen. Vier von fünf Modellen liegen jetzt immer richtig.
 
-Die Faustregel daraus: **Lokale KIs sind gut darin, Wörter zu erkennen. Sie sind keine Taschenrechner.** Alles, was berechnet oder geprüft werden kann (Datum, E-Mail-Adresse, IBAN, Telefonnummer), soll mein Code machen. Nicht die KI.
+Die Faustregel daraus: **Lokale KIs sind gut darin, Wörter zu erkennen. Sie sind keine Taschenrechner.** Alles, was berechnet oder formal geprüft werden kann (Datum, E-Mail-Adresse, IBAN, Telefonnummer), soll mein Code machen. Nicht die KI.
 
 ## Als eine KI plötzlich wie ein Pirat antwortete
 
@@ -123,9 +123,9 @@ Vier von fünf KIs haben das ignoriert:
 
 Die qwen3.6-Antwort ist die schlimmste. Das Modell ist groß und schreibt elegant. Aber der Inhalt ist **frei erfunden**. Es gab keine Quantencomputer-Notizen an diesem Tag. Die KI fühlt sich verpflichtet, alle vier Teile zu füllen – auch wenn es nichts zu sagen gibt. Das größere Modell macht es eloquenter. Nicht ehrlicher.
 
-Der Überraschungssieger: das kleinste Modell. Acht Milliarden Parameter, nur 6 GB Speicher, fertig in 11 Sekunden. Es kann andere Sachen schlechter. Aber bei dieser Aufgabe ist es das einzige, das ich vertrauen kann.
+Der Überraschungssieger: das kleinste Modell. Acht Milliarden Parameter, nur 6 GB Speicher, fertig in 11 Sekunden. Es kann andere Sachen schlechter. Aber bei dieser Aufgabe war es das einzige, dem ich vertrauen konnte.
 
-**Das ist die wichtigste Erkenntnis aus dem ganzen Test:** Es gibt nicht „die beste lokale KI". Es gibt nur „die beste KI für genau diese Aufgabe". Wer ein einziges Modell für alles anbietet, kann diese Unterschiede nicht weitergeben.
+**Das ist die wichtigste Erkenntnis aus dem ganzen Test:** Es gibt für meine App nicht „die beste lokale KI". Es gibt nur „die beste KI für genau diese Aufgabe". Wer ein einziges Modell für alles anbietet, kann diese Unterschiede nicht weitergeben.
 
 ## Was das für die App bedeutet
 
@@ -151,9 +151,9 @@ Wer in den Einstellungen ein anderes Modell wählt, sieht sofort, welche Funktio
 
 Wenn mich jemand fragt: „Lokal oder Cloud?" – dann gebe ich nicht mehr die übliche Antwort („Privates lokal, alles andere Cloud"). Das ist zu einfach.
 
-Ich sage stattdessen: **Lokale KI ist gut im Erkennen, mittelmäßig im Schreiben, schlecht im Rechnen und unzuverlässig im Aufpassen.** Wer ein Produkt darauf baut, muss diese Eigenschaften kennen. Sonst baut er ein Versprechen, das die KI nicht halten kann.
+Ich sage stattdessen: **Die getesteten lokalen Modelle waren gut im Erkennen, brauchbar im Schreiben, schwach im Rechnen und nicht durchgehend zuverlässig im Aufpassen.** Wer ein Produkt darauf baut, muss diese Eigenschaften kennen. Sonst baut er ein Versprechen, das die KI nicht halten kann.
 
-Große Cloud-KIs wie ChatGPT, Claude oder Gemini haben diese Schwächen weniger. Sie rechnen besser. Sie fallen seltener auf Tricks rein. Aber sie sehen jedes Wort, das Sie tippen. Das ist der wahre Trade-off. Nicht „lokal gegen Cloud". Nicht „kostenlos gegen teuer". Sondern: **Wieviel von Ihrem Denken sind Sie bereit, an OpenAI, Anthropic oder Google zu schicken?**
+Große Cloud-KIs wie ChatGPT, Claude oder Gemini sind bei solchen Aufgaben oft robuster. Sie rechnen nicht fehlerfrei, und auch sie können auf Prompt-Injection hereinfallen. Aber in vielen Alltagssituationen machen sie weniger offensichtliche Fehler. Dafür sehen sie jedes Wort, das Sie tippen. Das ist der wahre Trade-off. Nicht „lokal gegen Cloud". Nicht „kostenlos gegen teuer". Sondern: **Wieviel von Ihrem Denken sind Sie bereit, an OpenAI, Anthropic oder Google zu schicken?**
 
 Mein Job ist es nicht, diese Frage für Sie zu beantworten. Mein Job ist es, Ihnen das Werkzeug in die Hand zu geben, mit dem Sie selbst entscheiden können.
 
@@ -163,7 +163,7 @@ Diese Woche habe ich aufgehört, lokale KI zu romantisieren. Sie ist kein „kle
 
 „Privatsphäre durch lokale KI" heißt nicht: „Alles ist gut, weil die Daten lokal bleiben." Es heißt: **„Wir haben gemessen, wo die lokale KI schwach ist, und im Produkt vorgesorgt."**
 
-Die 160 Testläufe liegen in einer eigenen Werkstatt, getrennt von der App. Die Bewertungs-Tabelle in der App bekommt bei jedem Update einen frischen Stempel. Die nächsten Tests sind schon geplant.
+Die 160 Testläufe liegen in einer eigenen Werkstatt, getrennt von der App. Getestet wurden fünf Ollama-Modelle gegen feste Fälle; Temperatur, Prompts und Auswertung sind dort dokumentiert. Die Bewertungs-Tabelle in der App bekommt bei jedem Update einen frischen Stempel. Die nächsten Tests sind schon geplant.
 
 Das ist die Arbeit, die dazugehört, wenn man Datenschutz ernst meint. Es ist mehr Arbeit, als auf einer Marketing-Folie steht. Aber sie ist der einzige Weg, das Versprechen ehrlich zu halten.
 
