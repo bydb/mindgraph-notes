@@ -49,15 +49,15 @@ Ich wollte verstehen, was da los ist. Also habe ich angefangen, systematisch zu 
 
 ## Mein erster Verdacht war falsch
 
-Mein erster Gedanke: Die KI hat zu wenig Platz im Kopf. Stellen Sie sich vor, jemand soll Ihnen aus einem dicken Buch das Wesentliche zusammenfassen – aber er darf immer nur eine Seite gleichzeitig lesen. Da bleibt nicht viel hängen.
+Mein erster Gedanke: Das Kontextfenster ist zu klein. Stellen Sie sich vor, jemand soll Ihnen aus einem dicken Buch das Wesentliche zusammenfassen – aber er darf immer nur eine Seite gleichzeitig lesen. Da bleibt nicht viel hängen.
 
 Bei KI-Modellen heißt das „Kontextfenster". Je größer, desto mehr Information passt rein.
 
-Ich habe das nachgemessen. Für einen normalen Tag in meiner App – 12 Notizen, 11 E-Mails, ein bisschen Tagebuch – braucht die KI Platz für etwa 1.600 Wörter. Sie hätte aber Platz für 260.000.
+Ich habe das nachgemessen. Für einen normalen Tag in meiner App – 12 Notizen, 11 E-Mails, ein bisschen Tagebuch – braucht die KI Kontext für etwa 1.600 Wörter. Das verwendete Modell hätte aber Platz für rund 260.000 Wörter.
 
 Auslastung: **unter ein Prozent.**
 
-Das war eine ernüchternde Erkenntnis. Das Problem liegt nicht am Platz. Es liegt woanders. Hätte ich auf den falschen Verdacht gehört, hätte ich Wochen damit verbracht, das Falsche zu reparieren.
+Das war eine ernüchternde Erkenntnis. Das Problem liegt nicht am Kontextfenster. Es liegt woanders. Hätte ich auf den falschen Verdacht gehört, hätte ich Wochen damit verbracht, das Falsche zu reparieren.
 
 ## Was lokale KI wirklich nicht kann
 
@@ -151,7 +151,7 @@ Für Organisationen ist diese Grenze besonders wichtig: Die KI-Funktionen in Min
 
 > [!tip] Drei Dinge, die ich gelernt habe
 >
-> **1. Speicherplatz im Kopf der KI ist meistens nicht das Problem.** Es geht nicht darum, dass die KI „zu wenig sieht". Es geht darum, was sie damit anfängt.
+> **1. Das Kontextfenster ist meistens nicht das Problem.** Es geht nicht darum, dass die KI „zu wenig sieht". Es geht darum, was sie mit dem sichtbaren Kontext anfängt.
 >
 > **2. Was berechnet werden kann, sollte berechnet werden.** Datum, IBAN, Telefonnummer – das gehört in normalen Code, nicht in eine KI. Die KI erkennt nur die Wörter. Das Rechnen macht das Programm.
 >
