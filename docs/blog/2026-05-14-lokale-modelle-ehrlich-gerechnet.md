@@ -37,9 +37,7 @@ Ich baue seit Januar an [MindGraph Notes](https://mindgraph-notes.de). Eine Noti
 
 Das klingt gut. Bis man tatsächlich anfängt, eine App zu bauen, die darauf basiert.
 
-Diese Woche fielen mir Sachen auf, die ich erst gar nicht einordnen konnte. Die KI in meiner App schrieb in mein Tagesgedächtnis, ich sei „durch das Thema Sport mental begrenzt" gewesen. Als ich das las, war mein erster Reflex: *Das habe ich nie geschrieben.* Stimmte aber nicht ganz. Im Journal stand verstreut über zwei Antworten etwas über Erschöpfung, Druck, verlorene Motivation. Die KI hatte nichts erfunden – sie hatte verdichtet. Nur eben so kühl und so weit interpretierend, dass es sich falsch anfühlte. Wie wenn jemand mein Tagebuch liest und mir am Abend in einem Satz erklärt, was mit mir los ist.
-
-Daneben gab es aber auch handfeste Fehler. Die KI erfand Aufgaben, wo gar keine waren. Sie las eine E-Mail mit „bis nächsten Freitag" und schrieb mir den Termin auf einen **Dienstag**.
+Diese Woche fielen mir Fehler auf, die ich erst nicht einordnen konnte. Die KI erfand Aufgaben, wo gar keine waren. Sie las eine E-Mail mit „bis nächsten Freitag" und schrieb mir den Termin auf einen **Dienstag**. In einer Tageszusammenfassung tauchten Punkte auf, die so nie in meinen Notizen standen.
 
 Ich wollte verstehen, was da los ist. Also habe ich angefangen, systematisch zu testen. Fünf verschiedene KI-Modelle, vier verschiedene Aufgaben, 160 Durchläufe. Was dabei herauskam, hat meine Sicht auf lokale KI ziemlich verändert.
 
