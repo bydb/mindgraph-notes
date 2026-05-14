@@ -167,13 +167,17 @@ Mein Job ist es nicht, diese Frage für Sie zu beantworten. Mein Job ist es, Ihn
 
 ## Zum Schluss
 
-Diese Woche habe ich aufgehört, lokale KI zu romantisieren. Sie ist kein „kleines ChatGPT". Sie ist etwas Eigenes. Mit eigenen Stärken und eigenen Schwächen. Wer das nicht versteht und im Code abbildet, baut ein Marketingversprechen statt eines Produkts.
+Diese Woche habe ich aufgehört, lokale KI zu romantisieren. Aber ich habe nicht aufgehört, an sie zu glauben. Lokale KI ist kein „kleines ChatGPT". Sie ist etwas Eigenes. Mit eigenen Stärken und eigenen Schwächen. Wer das nicht versteht und im Code abbildet, baut ein Marketingversprechen statt eines Produkts.
 
 „Privatsphäre durch lokale KI" heißt nicht: „Alles ist gut, weil die Daten lokal bleiben." Es heißt: **„Wir haben gemessen, wo die lokale KI schwach ist, und im Produkt vorgesorgt."**
 
+Gleichzeitig entwickeln sich lokale Modelle gerade enorm schnell. Der Abstand zu den großen Frontier-Modellen wirkt nicht mehr wie eine Frage von vielen Jahren, sondern eher wie eine Frage von Monaten – vielleicht sechs oder sieben, je nach Aufgabe. Was heute noch wackelt, kann in einem halben Jahr schon Alltag sein.
+
+Gerade für den Mittelstand kann das ein Beschleuniger werden. Nicht, weil man einmal ein Modell installiert und dann fertig ist. Sondern weil Unternehmen anfangen können, aktiv mit ihren eigenen Arbeitsprozessen zu forschen: Welche Aufgaben lassen sich lokal gut unterstützen? Wo braucht es Regeln, Tests und menschliche Kontrolle? Welche Modelle passen zu welchen Abteilungen, Datenarten und Risiken?
+
 Die 160 Testläufe liegen in einer eigenen Werkstatt, getrennt von der App. Getestet wurden fünf Ollama-Modelle gegen feste Fälle; Temperatur, Prompts und Auswertung sind dort dokumentiert. Die Bewertungs-Tabelle in der App bekommt bei jedem Update einen frischen Stempel. Die nächsten Tests sind schon geplant.
 
-Das ist die Arbeit, die dazugehört, wenn man Datenschutz ernst meint. Es ist mehr Arbeit, als auf einer Marketing-Folie steht. Aber sie ist der einzige Weg, das Versprechen ehrlich zu halten.
+Das ist die Arbeit, die dazugehört, wenn man Datenschutz ernst meint. Es ist mehr Arbeit, als auf einer Marketing-Folie steht. Aber sie ist auch eine Chance: Wer sich fortbildet, misst, ausprobiert und die eigenen Prozesse ernst nimmt, muss nicht einfach auf Frontier-Modelle warten. Er kann lokale KI Schritt für Schritt zu einem echten Werkzeug machen – nicht irgendwann, sondern jetzt beginnend.
 
 ---
 
