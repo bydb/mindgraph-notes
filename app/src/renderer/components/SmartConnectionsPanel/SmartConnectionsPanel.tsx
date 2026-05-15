@@ -66,7 +66,7 @@ function extractKeywords(text: string, title: string): string[] {
     .replace(/^\d{12}\s*-?\s*/, '')  // Entferne Datums-Präfix
     .replace(/[\u{1F300}-\u{1F9FF}]/gu, '')  // Entferne Emojis
     .toLowerCase()
-    .split(/[\s\-_.,;:!?()[\]{}]+/)
+    .split(/[\s\-_.,;:!?()[\]{}*]+/)
     .filter(w => w.length > 3 && !STOP_WORDS.has(w))
 
   keywords.push(...titleWords)
@@ -77,7 +77,7 @@ function extractKeywords(text: string, title: string): string[] {
     const words = heading
       .replace(/^#+\s*/, '')
       .toLowerCase()
-      .split(/[\s\-_.,;:!?()[\]{}]+/)
+      .split(/[\s\-_.,;:!?()[\]{}*]+/)
       .filter(w => w.length > 3 && !STOP_WORDS.has(w))
     keywords.push(...words)
   }
@@ -113,6 +113,12 @@ function extractKeywords(text: string, title: string): string[] {
     .map(([kw]) => kw)
 }
 
+// Regex-Sonderzeichen im Keyword neutralisieren, sonst kippt die RegExp-Konstruktion
+// (siehe `**frühstück**`-Vorfall: Markdown-Sternchen wurden als Quantor interpretiert).
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
 // Berechne Keyword-Überlappung zwischen zwei Texten
 function calculateKeywordMatch(keywords1: string[], text2: string, title2: string): number {
   if (keywords1.length === 0) return 0
@@ -122,7 +128,7 @@ function calculateKeywordMatch(keywords1: string[], text2: string, title2: strin
 
   for (const kw of keywords1) {
     // Prüfe ob Keyword im Text vorkommt (als ganzes Wort)
-    const regex = new RegExp(`\\b${kw}\\b`, 'i')
+    const regex = new RegExp(`\\b${escapeRegExp(kw)}\\b`, 'i')
     if (regex.test(text2Lower)) {
       matches++
     }

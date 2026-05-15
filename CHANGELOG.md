@@ -2,6 +2,12 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.6.43-beta] - 2026-05-15
+
+### Fixes
+
+- **Smart Connections crasht nicht mehr an Markdown-Bold in Headings**: Wenn eine Notiz im Vault eine Überschrift wie `## **Frühstück**` enthielt, brach die Ähnlichkeits-Berechnung mit `SyntaxError: Invalid regular expression: /\b**frühstück**\b/i: Nothing to repeat` ab — das Smart-Connections-Panel zeigte stumpf „Fehler bei der Berechnung", obwohl Ollama, das Embedding-Modell und der Cache alle in Ordnung waren. Ursache: der Heading-Tokenizer in `extractKeywords()` (`SmartConnectionsPanel.tsx`) hatte `*` nicht in seiner Zeichenklasse, dadurch landete `**frühstück**` als ein einzelnes Token im Keyword-Array. Beim anschließenden `new RegExp('\\b' + kw + '\\b')` in `calculateKeywordMatch()` wurden die `**` als Quantor interpretiert → Exception, gesamter Berechnungs-Lauf verworfen. Fix in zwei Schichten: (a) Splitter um `*` erweitert, damit Markdown-Formatierung gleich beim Tokenisieren wegfällt; (b) neuer `escapeRegExp()`-Helper neutralisiert Sonderzeichen vor der RegExp-Konstruktion — damit kann auch ein zukünftiger Tokenizer-Bug oder ein Keyword mit Sonderzeichen (`.`, `?`, `(`, `[` etc.) das Panel nicht mehr aushebeln.
+
 ## [0.6.42-beta] - 2026-05-15
 
 ### Fixes
