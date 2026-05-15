@@ -11,6 +11,7 @@ import { generateNoteId, extractTasks } from '../../utils/linkExtractor'
 import { useTranslation } from '../../utils/translations'
 import { getNoteKind, getNoteKindFromText, NOTE_KINDS, setNoteKindInContent, clearNoteKindInContent, stripNoteKindMarker, type NoteKindId } from '../../utils/noteKind'
 import { writeClipboardText } from '../../utils/clipboard'
+import { getFilePathsFromDataTransfer } from '../../utils/imageUtils'
 
 const isMac = window.electronAPI.platform === 'darwin'
 const NOTE_KIND_ORDER: NoteKindId[] = ['problem', 'solution', 'info']
@@ -1066,7 +1067,9 @@ const FileItem: React.FC<FileItemProps> = ({
   const handleDragOver = (e: React.DragEvent) => {
     if (!entry.isDirectory) return
     e.preventDefault()
-    e.dataTransfer.dropEffect = 'move'
+    // External Finder/Desktop-Drops haben `Files` im types-Set — dann ist es ein Copy.
+    const hasExternalFiles = e.dataTransfer.types.includes('Files')
+    e.dataTransfer.dropEffect = hasExternalFiles ? 'copy' : 'move'
     setIsDragOver(true)
   }
 
@@ -1080,6 +1083,28 @@ const FileItem: React.FC<FileItemProps> = ({
 
     if (!entry.isDirectory || !vaultPath) return
 
+    // 1) External drop from Finder/Desktop: copy file(s) into this folder
+    const externalPaths = getFilePathsFromDataTransfer(e.dataTransfer)
+    if (externalPaths.length > 0) {
+      let copied = 0
+      for (const src of externalPaths) {
+        try {
+          const result = await window.electronAPI.copyFileToVault(vaultPath, src, entry.path)
+          if (result.success) copied++
+          else console.warn('[FileTree] External copy failed:', src, result.error)
+        } catch (err) {
+          console.error('[FileTree] External copy error:', src, err)
+        }
+      }
+      if (copied > 0) {
+        const tree = await window.electronAPI.readDirectory(vaultPath)
+        setFileTree(tree)
+        setIsOpen(true)
+      }
+      return
+    }
+
+    // 2) Internal move (existing behavior)
     const sourcePath = e.dataTransfer.getData('text/plain')
     if (!sourcePath || sourcePath === entry.path) return
 

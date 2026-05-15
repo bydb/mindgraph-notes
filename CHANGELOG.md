@@ -2,6 +2,19 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.6.44-beta] - 2026-05-15
+
+### Features
+
+- **Drag & Drop aus dem Finder in den FileTree**: Beliebige Dateien können jetzt aus dem macOS/Linux/Windows-Datei-Manager direkt auf einen Ordner im FileTree gezogen werden — sie werden als Kopie ins Vault übernommen. Multi-File-Drops werden unterstützt; Name-Konflikte werden automatisch mit `-1`, `-2`, ... aufgelöst. Sicherheit: `assertApprovedVault` + `validatePath` + `realpath` für die Source, damit keine Symlink-Tricks ins Vault wandern. Externe Drops zeigen den `copy`-Cursor, interne Drag-Aktionen (Notiz von Ordner A nach Ordner B) bleiben weiterhin `move`.
+- **Bild-Drop im Lesen-Modus**: Bilder können jetzt auch im Lesen-Modus (WYSIWYG-Preview) per Drag & Drop direkt in die Notiz gezogen werden — bisher ging das nur im Schreiben-Modus. Sofortige Darstellung via inline Data-URL, gleichzeitiger Commit an die Markdown-Source mit korrektem Wikilink (`![[…]]`). Leerzeichen vor und nach dem Bild werden automatisch ergänzt, damit der Image-Wikilink valide bleibt — markdown-it ist strikt: `Text![[file]]` ohne Whitespace wird nicht als Bild erkannt.
+- **Konfigurierbarer Bilder-Ordner**: Einstellungen → Editor → „Bilder-Ordner". Standard ist `.attachments` (versteckt, sync-eingeschlossen); kann auf jeden vault-relativen Pfad geändert werden, z.B. `Bilder` oder `300 - 📦 Ressourcen/380 - 🏞 Bilder`. Bei nicht-Standard-Pfaden enthält der Image-Wikilink den vollen relativen Pfad — sonst kann der Lesen-Modus-Image-Loader das frisch kopierte Bild nicht finden, weil das fileTree noch nicht neu eingelesen ist.
+
+### Fixes
+
+- **macOS Quick Look kapert keine Datei-Drops mehr**: Beim Drag & Drop einer Datei auf das App-Fenster öffnete macOS bisher die Datei mit dem Standard-Viewer (Vorschau / Quick Look), wenn der Drop nicht von einem spezifischen Component-Handler abgefangen wurde — selbst wenn der dragover preventDefault gemacht hatte. Fix: globaler Window-Level Drag-Default-Killer in `App.tsx`, der bei jedem Drop mit `Files`-MIME-Type `preventDefault` aufruft. Spezifische Handler (FileTree, Editor, Preview-Drop) laufen in capture-Phase davor und übernehmen die eigentliche Logik unverändert.
+- **Bild im Lesen-Modus klebte am Text**: Der eingefügte `<img>` wurde direkt an den vorigen Text gehängt → im Markdown stand `Text!![[file]]` mit doppeltem `!` (`![` als Image-Marker + vorheriges Zeichen ohne Whitespace). markdown-it parst das nicht als Image, daher zeigte der Lesen-Modus nur ein kaputtes Image-Icon mit Dateinamen statt des Bildes. Fix: vor und nach dem `<img>` automatisch Whitespace ergänzen, falls die Umgebung kein Whitespace ist. Plus sofortige Bildanzeige via inline Data-URL und Prefill des `loadedImagesRef`-Caches.
+
 ## [0.6.43-beta] - 2026-05-15
 
 ### Fixes

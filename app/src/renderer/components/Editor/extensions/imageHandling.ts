@@ -13,6 +13,8 @@ import {
 
 export interface ImageHandlingConfig {
   vaultPath: string
+  /** Lazy read: getter so dass Setting-Änderungen live wirken, ohne Editor-Rebuild */
+  getImagesFolder?: () => string
   onImageInserted?: (markdown: string) => void
 }
 
@@ -27,18 +29,26 @@ async function handleDrop(
   const dt = event.dataTransfer
   if (!dt) return false
 
+  const imagesFolder = config.getImagesFolder?.() || '.attachments'
+
   // Try to get a file path first (drag from Finder)
   const filePath = getFilePathFromDataTransfer(dt)
   if (filePath && isImageFile(filePath)) {
     try {
       const result = await window.electronAPI.copyImageToAttachments(
         config.vaultPath,
-        filePath
+        filePath,
+        imagesFolder
       )
 
-      if (result.success && result.fileName) {
-        insertImageAtCursor(view, event, result.fileName)
-        config.onImageInserted?.(generateImageMarkdown(result.fileName))
+      if (result.success && (result.relativePath || result.fileName)) {
+        // Bei .attachments reicht der Dateiname (Image-Loader probiert .attachments automatisch).
+        // Bei jedem anderen images folder (z.B. „300 - Ressourcen/380 - Bilder") muss der volle
+        // relativePath im Wikilink stehen, sonst kann der Lesen-Modus-Loader das Bild nicht resolven
+        // und das fileTree ist nach dem frischen Copy noch nicht neu eingelesen.
+        const linkTarget = (imagesFolder === '.attachments') ? (result.fileName || '') : (result.relativePath || result.fileName || '')
+        insertImageAtCursor(view, event, linkTarget)
+        config.onImageInserted?.(generateImageMarkdown(linkTarget))
         return true
       } else {
         console.error('[ImageHandling] Copy failed:', result.error)
@@ -59,12 +69,18 @@ async function handleDrop(
       const result = await window.electronAPI.writeImageFromBase64(
         config.vaultPath,
         base64,
-        suggestedName
+        suggestedName,
+        imagesFolder
       )
 
-      if (result.success && result.fileName) {
-        insertImageAtCursor(view, event, result.fileName)
-        config.onImageInserted?.(generateImageMarkdown(result.fileName))
+      if (result.success && (result.relativePath || result.fileName)) {
+        // Bei .attachments reicht der Dateiname (Image-Loader probiert .attachments automatisch).
+        // Bei jedem anderen images folder (z.B. „300 - Ressourcen/380 - Bilder") muss der volle
+        // relativePath im Wikilink stehen, sonst kann der Lesen-Modus-Loader das Bild nicht resolven
+        // und das fileTree ist nach dem frischen Copy noch nicht neu eingelesen.
+        const linkTarget = (imagesFolder === '.attachments') ? (result.fileName || '') : (result.relativePath || result.fileName || '')
+        insertImageAtCursor(view, event, linkTarget)
+        config.onImageInserted?.(generateImageMarkdown(linkTarget))
         return true
       } else {
         console.error('[ImageHandling] Write failed:', result.error)
@@ -88,6 +104,8 @@ async function handlePaste(
   const dt = event.clipboardData
   if (!dt) return false
 
+  const imagesFolder = config.getImagesFolder?.() || '.attachments'
+
   // Try to get an image file from clipboard
   const imageFile = await extractImageFromDataTransfer(dt)
   if (imageFile) {
@@ -98,12 +116,14 @@ async function handlePaste(
       const result = await window.electronAPI.writeImageFromBase64(
         config.vaultPath,
         base64,
-        suggestedName
+        suggestedName,
+        imagesFolder
       )
 
-      if (result.success && result.fileName) {
-        insertImageAtPosition(view, view.state.selection.main.head, result.fileName)
-        config.onImageInserted?.(generateImageMarkdown(result.fileName))
+      if (result.success && (result.relativePath || result.fileName)) {
+        const linkTarget = (imagesFolder === '.attachments') ? (result.fileName || '') : (result.relativePath || result.fileName || '')
+        insertImageAtPosition(view, view.state.selection.main.head, linkTarget)
+        config.onImageInserted?.(generateImageMarkdown(linkTarget))
         return true
       } else {
         console.error('[ImageHandling] Paste failed:', result.error)

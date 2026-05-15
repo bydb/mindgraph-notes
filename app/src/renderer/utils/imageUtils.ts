@@ -221,6 +221,32 @@ export function getFilePathFromDataTransfer(dt: DataTransfer): string | null {
 }
 
 /**
+ * Get all file paths from a DataTransfer (multi-file drop from Finder/Desktop).
+ * Electron 32+ has removed `File.path`, so we rely on `text/uri-list` and the
+ * `Files` type marker — both reliably carry the absolute paths on macOS/Linux/Windows.
+ */
+export function getFilePathsFromDataTransfer(dt: DataTransfer): string[] {
+  const paths: string[] = []
+  const uriList = dt.getData('text/uri-list')
+  if (uriList) {
+    for (const line of uriList.split(/\r?\n/)) {
+      const trimmed = line.trim()
+      if (!trimmed || trimmed.startsWith('#')) continue
+      if (trimmed.startsWith('file://')) {
+        try { paths.push(decodeURIComponent(trimmed.replace('file://', ''))) } catch { /* skip */ }
+      }
+    }
+  }
+  if (paths.length === 0) {
+    const plain = dt.getData('text/plain')
+    if (plain && plain.startsWith('file://')) {
+      try { paths.push(decodeURIComponent(plain.replace('file://', ''))) } catch { /* skip */ }
+    }
+  }
+  return paths
+}
+
+/**
  * Convert a File to Base64 data URL
  */
 export function fileToBase64(file: File): Promise<string> {

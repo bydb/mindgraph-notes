@@ -496,6 +496,7 @@ interface UIState {
   editorOutlining: boolean // Einrückungsbasiertes Outlining (Listen etc.)
   outlineStyle: OutlineStyle // Outlining-Design: 'default', 'lines', 'minimal', 'bullets', 'dashes'
   editorShowWordCount: boolean // Wort-/Zeichenzähler anzeigen
+  imagesFolder: string // Vault-relativer Ordner für Bild-Drops/Pastes (default '.attachments')
 
   // UI State
   sidebarWidth: number
@@ -620,6 +621,7 @@ interface UIState {
   setEditorOutlining: (enabled: boolean) => void
   setOutlineStyle: (style: OutlineStyle) => void
   setEditorShowWordCount: (show: boolean) => void
+  setImagesFolder: (folder: string) => void
   setSidebarWidth: (width: number) => void
   toggleSidebar: () => void
   toggleEditorPreview: () => void
@@ -723,6 +725,7 @@ const defaultState = {
   editorOutlining: false,
   outlineStyle: 'default' as OutlineStyle,
   editorShowWordCount: true,
+  imagesFolder: '.attachments',
 
   // UI State
   sidebarWidth: 250,
@@ -994,7 +997,7 @@ const defaultState = {
 const persistedKeys = [
   'viewMode', 'theme', 'accentColor', 'backgroundColor', 'loadLastVaultOnStart',
   'language', 'fontFamily', 'editorFontSize', 'editorLineNumbers', 'editorDefaultView',
-  'autoSaveInterval', 'editorHeadingFolding', 'editorOutlining', 'outlineStyle', 'editorShowWordCount',
+  'autoSaveInterval', 'editorHeadingFolding', 'editorOutlining', 'outlineStyle', 'editorShowWordCount', 'imagesFolder',
   'sidebarWidth', 'sidebarVisible', 'editorPreviewSplit', 'textSplitEnabled', 'textSplitPosition',
   'canvasFilterPath', 'canvasViewMode', 'canvasShowEdges', 'canvasShowTags', 'canvasShowLinks', 'canvasShowImages', 'canvasShowSummaries',
   'canvasCompactMode', 'canvasReadMode', 'canvasHoverScale', 'canvasDefaultCardWidth', 'splitPosition', 'fileTreeDisplayMode', 'fileTreeKindFilter', 'notesRootFolder', 'ollama', 'brain',
@@ -1037,6 +1040,7 @@ export const useUIStore = create<UIState>()((set, get) => ({
   setEditorOutlining: (enabled) => set({ editorOutlining: enabled }),
   setOutlineStyle: (style) => set({ outlineStyle: style }),
   setEditorShowWordCount: (show) => set({ editorShowWordCount: show }),
+  setImagesFolder: (folder) => set({ imagesFolder: folder }),
   setSidebarWidth: (width) => set({ sidebarWidth: width }),
   toggleSidebar: () => set((state) => ({ sidebarVisible: !state.sidebarVisible })),
   toggleEditorPreview: () => set((state) => ({ editorPreviewSplit: !state.editorPreviewSplit })),

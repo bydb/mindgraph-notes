@@ -36,7 +36,7 @@ import { AIContextMenu, AIResult } from './AIContextMenu'
 import { AIImageDialog } from './AIImageDialog'
 import { PublishToWordPressModal } from './PublishToWordPressModal'
 import { insertAIResultWithFootnote } from '../../utils/aiFootnote'
-import { isImageFile, findImageInVault } from '../../utils/imageUtils'
+import { isImageFile, findImageInVault, getFilePathsFromDataTransfer, extractImageFromDataTransfer, fileToBase64 } from '../../utils/imageUtils'
 import { highlightCode } from '../../utils/highlightSetup'
 import { speak, stopSpeaking } from '../../utils/voice/tts'
 import { startDictation, type DictationHandle } from '../../utils/voice/stt'
@@ -1694,7 +1694,10 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
             ...historyKeymap
           ]),
           // Image handling for drag & drop and paste
-          imageHandlingExtension({ vaultPath: vaultPath || '' }),
+          imageHandlingExtension({
+            vaultPath: vaultPath || '',
+            getImagesFolder: () => useUIStore.getState().imagesFolder || '.attachments'
+          }),
           // Live Preview extension compartment (starts empty, can be reconfigured)
           livePreviewCompartment.of([]),
           // Dataview extension for live query rendering
@@ -2156,6 +2159,167 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
       commitEditablePreview(false)
     }, 1200)
   }, [commitEditablePreview, updatePreviewToolbarPosition])
+
+  // Lesen-Modus Drag&Drop: document-level capture-Listener.
+  // Wichtig in Electron: ohne preventDefault auf dragover **am Window** öffnet macOS die
+  // gedroppte Datei via Quick Look / Vorschau — der Drop kommt nie im JS an. Daher prevent
+  // wir dragover GLOBAL wenn Files dabei sind, sobald wir im Preview-Modus sind. Den Drop
+  // selbst behandeln wir nur, wenn er innerhalb des Editable landet — ansonsten reicht der
+  // dragover-Prevent, damit macOS nichts macht und der Drop verpufft.
+  useEffect(() => {
+    if (viewMode !== 'preview') return
+    const editable = editablePreviewRef.current
+    if (!editable) return
+
+    const isInsidePreview = (target: EventTarget | null): boolean => {
+      if (!(target instanceof Node)) return false
+      return editable.contains(target)
+    }
+
+    const onDragOver = (e: DragEvent) => {
+      const dt = e.dataTransfer
+      if (!dt) return
+      const hasFiles = dt.types.includes('Files') || dt.types.includes('text/uri-list')
+      if (!hasFiles) return
+      // Hart blocken — Default + andere capture-listener (z.B. CodeMirro im hidden Editor).
+      e.preventDefault()
+      e.stopPropagation()
+      e.stopImmediatePropagation()
+      dt.dropEffect = 'copy'
+    }
+
+    const onDrop = async (e: DragEvent) => {
+      const dt = e.dataTransfer
+      if (!dt) return
+      const hasFiles = dt.types.includes('Files') || dt.types.includes('text/uri-list')
+      if (!hasFiles) return
+      // Hart blocken — verhindert macOS Quick Look + andere Listener.
+      e.preventDefault()
+      e.stopPropagation()
+      e.stopImmediatePropagation()
+      if (!isInsidePreview(e.target)) return
+      if (!vaultPath) return
+
+      type DocCaret = Document & { caretRangeFromPoint?: (x: number, y: number) => Range | null }
+      const dropRange: Range | null = (document as DocCaret).caretRangeFromPoint?.(e.clientX, e.clientY) ?? null
+      const imagesFolder = useUIStore.getState().imagesFolder || '.attachments'
+
+      // Strategie 1: file://-Pfade aus dataTransfer (klappt bei manchen Drag-Quellen,
+      // bei Finder-Drops in Electron 40 oft leer).
+      const paths = getFilePathsFromDataTransfer(dt)
+      const directImgPath = paths.find(p => isImageFile(p))
+
+      let relPath: string | null = null
+      let fileName: string | null = null
+
+      try {
+        if (directImgPath) {
+          const result = await window.electronAPI.copyImageToAttachments(vaultPath, directImgPath, imagesFolder)
+          if (!result.success) {
+            console.error('[PreviewDrop] Copy by path failed:', result.error)
+            return
+          }
+          relPath = result.relativePath || null
+          fileName = result.fileName || null
+        } else {
+          // Strategie 2: File-Objekt aus dataTransfer.files → Base64 → main writes it.
+          // Das ist der Pfad, der auch im CodeMirror-Modus für Finder-Drops greift.
+          const imageFile = await extractImageFromDataTransfer(dt)
+          if (!imageFile) {
+            console.log('[PreviewDrop] No image file in dataTransfer')
+            return
+          }
+          const base64 = await fileToBase64(imageFile)
+          const result = await window.electronAPI.writeImageFromBase64(vaultPath, base64, imageFile.name || 'dropped-image', imagesFolder)
+          if (!result.success) {
+            console.error('[PreviewDrop] Write base64 failed:', result.error)
+            return
+          }
+          relPath = result.relativePath || null
+          fileName = result.fileName || null
+        }
+
+        if (!relPath) return
+
+        // Sofortige Bildanzeige: Bild als Data-URL laden und src setzen.
+        // Ohne src würde das <img> erst nach Re-Render aus Markdown sichtbar werden.
+        // Außerdem den Cache prefillen, damit der reguläre Image-Loader nach dem Commit
+        // den Wert nicht erneut von Disk lesen muss.
+        let dataUrl = ''
+        try {
+          const r = await window.electronAPI.readImageAsDataUrl(`${vaultPath}/${relPath}`)
+          if (r.success && r.dataUrl) {
+            dataUrl = r.dataUrl
+            loadedImagesRef.current.set(relPath, r.dataUrl)
+          }
+        } catch (loadErr) {
+          console.warn('[PreviewDrop] Sofort-Load fehlgeschlagen, src bleibt leer:', loadErr)
+        }
+
+        const img = document.createElement('img')
+        img.setAttribute('class', 'md-image')
+        img.setAttribute('data-src', relPath)
+        img.setAttribute('alt', fileName || '')
+        if (dataUrl) img.setAttribute('src', dataUrl)
+
+        // markdown-it im Lesen-Modus parst `Text![[file]]` NICHT als Image-Wikilink —
+        // das `!` muss durch Whitespace vom vorigen Text getrennt sein. Daher Bracketing
+        // mit Leerzeichen vor und nach dem Bild, falls nicht schon Whitespace da ist.
+        const needsLeadingSpace = (() => {
+          if (!dropRange) return false
+          const node = dropRange.startContainer
+          if (node.nodeType !== Node.TEXT_NODE) return false
+          const offset = dropRange.startOffset
+          if (offset === 0) return false
+          const prev = (node as Text).data[offset - 1]
+          return !!prev && !/\s/.test(prev)
+        })()
+        const needsTrailingSpace = (() => {
+          if (!dropRange) return false
+          const node = dropRange.startContainer
+          if (node.nodeType !== Node.TEXT_NODE) return false
+          const offset = dropRange.startOffset
+          const text = (node as Text).data
+          if (offset >= text.length) return false
+          const next = text[offset]
+          return !!next && !/\s/.test(next)
+        })()
+
+        if (dropRange && editable.contains(dropRange.startContainer)) {
+          const fragment = document.createDocumentFragment()
+          if (needsLeadingSpace) fragment.appendChild(document.createTextNode(' '))
+          fragment.appendChild(img)
+          if (needsTrailingSpace) fragment.appendChild(document.createTextNode(' '))
+          dropRange.insertNode(fragment)
+          const sel = window.getSelection()
+          if (sel) {
+            const after = document.createRange()
+            after.setStartAfter(img)
+            after.collapse(true)
+            sel.removeAllRanges()
+            sel.addRange(after)
+          }
+        } else {
+          // Fallback: ans Ende; Block-Image braucht Leerzeile davor
+          editable.appendChild(document.createTextNode(' '))
+          editable.appendChild(img)
+        }
+
+        // Sofort committen statt 1.2s zu warten — sonst sieht der User das Bild nicht
+        // im Markdown-Source und ein anschließender Modus-Wechsel würde es verlieren.
+        commitEditablePreview(true)
+      } catch (err) {
+        console.error('[PreviewDrop] Error:', err)
+      }
+    }
+
+    document.addEventListener('dragover', onDragOver, { capture: true })
+    document.addEventListener('drop', onDrop, { capture: true })
+    return () => {
+      document.removeEventListener('dragover', onDragOver, { capture: true } as EventListenerOptions)
+      document.removeEventListener('drop', onDrop, { capture: true } as EventListenerOptions)
+    }
+  }, [viewMode, vaultPath, commitEditablePreview])
 
   const applyPreviewCommand = useCallback((command: string, value?: string) => {
     editablePreviewRef.current?.focus()

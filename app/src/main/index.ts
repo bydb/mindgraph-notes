@@ -1443,8 +1443,8 @@ ipcMain.handle('create-empty-vault', async (_event, targetPath: string) => {
 // ============ IMAGE HANDLING ============
 const SUPPORTED_IMAGE_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg']
 
-// Copy image from external source to .attachments folder
-ipcMain.handle('copy-image-to-attachments', async (_event, vaultPath: string, sourcePath: string) => {
+// Copy image from external source into the configured images folder (default .attachments)
+ipcMain.handle('copy-image-to-attachments', async (_event, vaultPath: string, sourcePath: string, imagesFolder?: string) => {
   try {
     assertApprovedVault(vaultPath, 'copy-image-to-attachments')
     const ext = path.extname(sourcePath).toLowerCase()
@@ -1454,8 +1454,10 @@ ipcMain.handle('copy-image-to-attachments', async (_event, vaultPath: string, so
       return { success: false, error: `Nicht unterstütztes Bildformat: ${ext}` }
     }
 
-    // Create .attachments directory if it doesn't exist
-    const attachmentsDir = validatePath(vaultPath, '.attachments')
+    // Resolve target folder (caller-supplied or default).
+    // validatePath stellt sicher, dass nichts aus dem Vault ausbricht.
+    const folderRel = (imagesFolder && imagesFolder.trim()) || '.attachments'
+    const attachmentsDir = validatePath(vaultPath, folderRel)
     await fs.mkdir(attachmentsDir, { recursive: true })
 
     // Generate unique filename with timestamp
@@ -1472,7 +1474,7 @@ ipcMain.handle('copy-image-to-attachments', async (_event, vaultPath: string, so
     return {
       success: true,
       fileName,
-      relativePath: `.attachments/${fileName}`
+      relativePath: `${folderRel}/${fileName}`
     }
   } catch (error) {
     console.error('[Image] Copy error:', error)
@@ -1480,8 +1482,47 @@ ipcMain.handle('copy-image-to-attachments', async (_event, vaultPath: string, so
   }
 })
 
+// Copy a file from outside the vault into a vault-relative target directory.
+// Used by FileTree drag&drop from Finder/Desktop. Renames on name collision.
+ipcMain.handle('copy-file-to-vault', async (_event, vaultPath: string, sourcePath: string, targetRelDir: string) => {
+  try {
+    assertApprovedVault(vaultPath, 'copy-file-to-vault')
+    // Source darf alles im FS sein (Drop von außen ist legitim), aber wir resolven Symlinks via realpath.
+    const realSource = await fs.realpath(sourcePath)
+
+    const dirRel = (targetRelDir && targetRelDir.trim()) || ''
+    const targetDir = dirRel ? validatePath(vaultPath, dirRel) : vaultPath
+    await fs.mkdir(targetDir, { recursive: true })
+
+    const origName = path.basename(realSource)
+    // Generate a non-clashing filename. Prefer original name; suffix `-N` on collision.
+    let fileName = origName
+    let i = 1
+    while (true) {
+      try {
+        await fs.access(validatePath(targetDir, fileName))
+        const ext = path.extname(origName)
+        const base = path.basename(origName, ext)
+        fileName = `${base}-${i}${ext}`
+        i++
+      } catch {
+        break
+      }
+    }
+    const targetPath = validatePath(targetDir, fileName)
+    await fs.copyFile(realSource, targetPath)
+
+    console.log('[CopyFileToVault] Copied:', realSource, '->', targetPath)
+    const relPath = dirRel ? `${dirRel}/${fileName}` : fileName
+    return { success: true, fileName, relativePath: relPath }
+  } catch (error) {
+    console.error('[CopyFileToVault] Error:', error)
+    return { success: false, error: String(error) }
+  }
+})
+
 // Write image from Base64 data (for clipboard paste)
-ipcMain.handle('write-image-from-base64', async (_event, vaultPath: string, base64Data: string, suggestedName: string) => {
+ipcMain.handle('write-image-from-base64', async (_event, vaultPath: string, base64Data: string, suggestedName: string, imagesFolder?: string) => {
   try {
     assertApprovedVault(vaultPath, 'write-image-from-base64')
     // Parse base64 data URL if present
@@ -1500,8 +1541,8 @@ ipcMain.handle('write-image-from-base64', async (_event, vaultPath: string, base
       buffer = Buffer.from(base64Data, 'base64')
     }
 
-    // Create .attachments directory if it doesn't exist
-    const attachmentsDir = validatePath(vaultPath, '.attachments')
+    const folderRel = (imagesFolder && imagesFolder.trim()) || '.attachments'
+    const attachmentsDir = validatePath(vaultPath, folderRel)
     await fs.mkdir(attachmentsDir, { recursive: true })
 
     // Generate unique filename
@@ -1518,7 +1559,7 @@ ipcMain.handle('write-image-from-base64', async (_event, vaultPath: string, base
     return {
       success: true,
       fileName,
-      relativePath: `.attachments/${fileName}`
+      relativePath: `${folderRel}/${fileName}`
     }
   } catch (error) {
     console.error('[Image] Write Base64 error:', error)

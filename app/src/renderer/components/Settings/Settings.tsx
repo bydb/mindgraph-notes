@@ -1441,6 +1441,8 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab 
     setEditorDefaultView,
     autoSaveInterval,
     setAutoSaveInterval,
+    imagesFolder,
+    setImagesFolder,
     ollama,
     setOllama,
     pdfCompanionEnabled,
@@ -2575,6 +2577,22 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab 
                     <option value="2000">2 {t('settings.editor.autoSaveSeconds')}</option>
                     <option value="5000">5 {t('settings.editor.autoSaveSeconds')}</option>
                   </select>
+                </div>
+
+                <div className="settings-row">
+                  <label>{t('settings.editor.imagesFolder')}</label>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
+                    <input
+                      type="text"
+                      value={imagesFolder}
+                      onChange={e => setImagesFolder(e.target.value)}
+                      placeholder=".attachments"
+                      style={{ width: '240px' }}
+                    />
+                    <span style={{ fontSize: '11px', color: 'var(--text-muted)', maxWidth: '320px', textAlign: 'right' }}>
+                      {t('settings.editor.imagesFolderHint')}
+                    </span>
+                  </div>
                 </div>
 
                 <h3>{t('settings.editor.slashCommands')}</h3>

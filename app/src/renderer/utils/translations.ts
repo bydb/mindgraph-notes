@@ -131,6 +131,8 @@ const translations = {
     'settings.editor.autoSave': 'Auto-Speichern',
     'settings.editor.autoSave.off': 'Aus',
     'settings.editor.autoSave.ms': 'ms',
+    'settings.editor.imagesFolder': 'Bilder-Ordner',
+    'settings.editor.imagesFolderHint': 'Zielordner für Bilder, die per Drag & Drop oder Einfügen in Notizen landen. Vault-relativ, z.B. „Bilder" oder „.attachments".',
 
     // Templates
     'settings.templates.builtIn': 'Integrierte Templates',
@@ -2271,6 +2273,8 @@ const translations = {
     'settings.editor.autoSave': 'Auto-Save',
     'settings.editor.autoSave.off': 'Off',
     'settings.editor.autoSave.ms': 'ms',
+    'settings.editor.imagesFolder': 'Images folder',
+    'settings.editor.imagesFolderHint': 'Target folder for images dropped or pasted into notes. Vault-relative path, e.g. "Images" or ".attachments".',
 
     // Templates
     'settings.templates.builtIn': 'Built-in Templates',

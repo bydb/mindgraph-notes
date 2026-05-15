@@ -478,13 +478,19 @@ export interface ElectronAPI {
   ensureDir: (dirPath: string) => Promise<boolean>;
 
   // Image Handling
-  copyImageToAttachments: (vaultPath: string, sourcePath: string) => Promise<{
+  copyImageToAttachments: (vaultPath: string, sourcePath: string, imagesFolder?: string) => Promise<{
     success: boolean;
     fileName?: string;
     relativePath?: string;
     error?: string;
   }>;
-  writeImageFromBase64: (vaultPath: string, base64Data: string, suggestedName: string) => Promise<{
+  writeImageFromBase64: (vaultPath: string, base64Data: string, suggestedName: string, imagesFolder?: string) => Promise<{
+    success: boolean;
+    fileName?: string;
+    relativePath?: string;
+    error?: string;
+  }>;
+  copyFileToVault: (vaultPath: string, sourcePath: string, targetRelDir: string) => Promise<{
     success: boolean;
     fileName?: string;
     relativePath?: string;

@@ -44,10 +44,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('create-empty-vault', targetPath),
 
   // Image Handling
-  copyImageToAttachments: (vaultPath: string, sourcePath: string) =>
-    ipcRenderer.invoke('copy-image-to-attachments', vaultPath, sourcePath),
-  writeImageFromBase64: (vaultPath: string, base64Data: string, suggestedName: string) =>
-    ipcRenderer.invoke('write-image-from-base64', vaultPath, base64Data, suggestedName),
+  copyImageToAttachments: (vaultPath: string, sourcePath: string, imagesFolder?: string) =>
+    ipcRenderer.invoke('copy-image-to-attachments', vaultPath, sourcePath, imagesFolder),
+  writeImageFromBase64: (vaultPath: string, base64Data: string, suggestedName: string, imagesFolder?: string) =>
+    ipcRenderer.invoke('write-image-from-base64', vaultPath, base64Data, suggestedName, imagesFolder),
+  copyFileToVault: (vaultPath: string, sourcePath: string, targetRelDir: string) =>
+    ipcRenderer.invoke('copy-file-to-vault', vaultPath, sourcePath, targetRelDir),
   readImageAsDataUrl: (imagePath: string) =>
     ipcRenderer.invoke('read-image-as-data-url', imagePath),
   findImageInVault: (vaultPath: string, imageName: string) =>

@@ -158,6 +158,25 @@ const App: React.FC = () => {
     total: 0, completed: 0, open: 0, critical: 0, overdue: 0
   })
 
+  // Globaler Drag-Default-Killer für Datei-Drops auf das App-Fenster.
+  // Ohne diesen Handler öffnet macOS bei jedem Drop, der nicht von einem spezifischen
+  // Component-Handler abgefangen wird, die Datei via Quick Look / Vorschau-App.
+  // Spezifische Handler (FileTree, CodeMirror imageHandling, Preview-Drop) bleiben
+  // unverändert wirksam — sie laufen in capture-Phase davor und können das Event übernehmen.
+  useEffect(() => {
+    const killDefault = (e: DragEvent) => {
+      if (e.dataTransfer?.types.includes('Files')) {
+        e.preventDefault()
+      }
+    }
+    window.addEventListener('dragover', killDefault)
+    window.addEventListener('drop', killDefault)
+    return () => {
+      window.removeEventListener('dragover', killDefault)
+      window.removeEventListener('drop', killDefault)
+    }
+  }, [])
+
   useEffect(() => {
     if (notes.length === 0) {
       setLinkCount(0)
