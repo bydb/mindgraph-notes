@@ -7,7 +7,8 @@ import { useVaultSettingsStore } from '../../stores/vaultSettingsStore'
 import { useTranslation, type TranslationKey } from '../../utils/translations'
 import { TelegramSettings } from './TelegramSettings'
 import { CredentialsSettings } from './CredentialsSettings'
-import { ModelCompatibilitySection, ActiveModelStatusBadge } from './ModelCompatibilitySection'
+import { ModelCompatibilitySection, ActiveModelStatusBadge, VERDICT_ICON, VERDICT_COLOR } from './ModelCompatibilitySection'
+import { getModelVerdict } from '../../../shared/modelCompatibility'
 import { ensureTransformersModel, isTransformersModelReady } from '../../utils/voice/transformersStt'
 import { writeClipboardText } from '../../utils/clipboard'
 
@@ -4819,15 +4820,42 @@ LIMIT 10
 
                     <div className="settings-row">
                       <label>{t('settings.email.analysisModel')}</label>
-                      <select
-                        value={emailSettings.analysisModel}
-                        onChange={e => setEmail({ analysisModel: e.target.value })}
-                      >
-                        <option value="">{t('settings.email.analysisModelDefault')}</option>
-                        {ollamaModels.map(m => (
-                          <option key={m.name} value={m.name}>{m.name}</option>
-                        ))}
-                      </select>
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
+                        <select
+                          value={emailSettings.analysisModel}
+                          onChange={e => setEmail({ analysisModel: e.target.value })}
+                        >
+                          <option value="">{t('settings.email.analysisModelDefault')}</option>
+                          {ollamaModels.map(m => {
+                            const v = getModelVerdict(m.name, 'task-extraction')
+                            return (
+                              <option key={m.name} value={m.name}>{VERDICT_ICON[v.verdict]} {m.name}</option>
+                            )
+                          })}
+                        </select>
+                        {emailSettings.analysisModel && (() => {
+                          const v = getModelVerdict(emailSettings.analysisModel, 'task-extraction')
+                          return (
+                            <span
+                              title={v.reasons.join(' · ') || t(`settings.integrations.compatibility.verdict.${v.verdict}` as TranslationKey)}
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                padding: '2px 8px',
+                                borderRadius: '10px',
+                                background: 'var(--bg-secondary, rgba(0,0,0,0.04))',
+                                border: `1px solid ${VERDICT_COLOR[v.verdict]}`,
+                                color: VERDICT_COLOR[v.verdict],
+                                fontSize: '11px'
+                              }}
+                            >
+                              {VERDICT_ICON[v.verdict]} {t(`settings.integrations.compatibility.verdict.${v.verdict}` as TranslationKey)}
+                              {v.reasons.length > 0 && ` — ${v.reasons[0]}`}
+                            </span>
+                          )
+                        })()}
+                      </div>
                     </div>
 
                     <div className="settings-row">

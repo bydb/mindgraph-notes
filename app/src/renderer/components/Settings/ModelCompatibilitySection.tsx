@@ -15,14 +15,14 @@ interface Props {
   availableModels: Array<{ name: string; size: number }>
 }
 
-const VERDICT_ICON: Record<Verdict, string> = {
+export const VERDICT_ICON: Record<Verdict, string> = {
   green: '✅',
   yellow: '⚠️',
   red: '🔴',
   untested: '❔'
 }
 
-const VERDICT_COLOR: Record<Verdict, string> = {
+export const VERDICT_COLOR: Record<Verdict, string> = {
   green: 'var(--success, #16a34a)',
   yellow: 'var(--warning, #d97706)',
   red: 'var(--danger, #dc2626)',
@@ -38,6 +38,7 @@ function ModuleRow({
   onChangeOverride,
   isExpanded,
   onToggleExpanded,
+  tabOverride,
   t
 }: {
   moduleId: ModuleId
@@ -47,9 +48,13 @@ function ModuleRow({
   onChangeOverride: (value: string) => void
   isExpanded: boolean
   onToggleExpanded: () => void
+  tabOverride?: { model: string; tabLabel: string }
   t: (key: TranslationKey) => string
 }) {
-  const effectiveModel = override || activeModel
+  // Tab-Felder (z.B. email.analysisModel) haben höchste Prio in der Chain — die Sektion muss
+  // den effektiven Wert reflektieren, sonst zeigt sie grünes Licht, während ein verstecktes
+  // Tab-Feld längst was anderes durchschickt (siehe v0.6.41 fobizz-Vorfall).
+  const effectiveModel = (tabOverride?.model) || override || activeModel
   const verdict = effectiveModel ? getModelVerdict(effectiveModel, moduleId) : { verdict: 'untested' as Verdict, reasons: [] }
   const moduleDescriptor = MODULES.find(m => m.id === moduleId)!
   const isHardLocked = moduleDescriptor.damageRelevant && verdict.verdict === 'red'
@@ -110,6 +115,24 @@ function ModuleRow({
       {recommended && override !== recommended && effectiveModel !== recommended && (
         <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
           {t('settings.integrations.compatibility.recommended')}: <strong>{recommended}</strong>
+        </div>
+      )}
+
+      {tabOverride && tabOverride.model && (
+        <div
+          style={{
+            padding: '8px 10px',
+            background: 'rgba(217, 119, 6, 0.08)',
+            border: `1px solid ${VERDICT_COLOR.yellow}`,
+            borderRadius: '4px',
+            fontSize: '12px',
+            color: 'var(--text-primary)'
+          }}
+        >
+          <strong>{t('settings.integrations.compatibility.tabOverride')}</strong>{' '}
+          {t('settings.integrations.compatibility.tabOverrideHint')
+            .replace('{model}', tabOverride.model)
+            .replace('{tab}', tabOverride.tabLabel)}
         </div>
       )}
 
@@ -267,7 +290,17 @@ export function ModelCompatibilitySection({ availableModels }: Props) {
   const { t } = useTranslation()
   const ollama = useUIStore(state => state.ollama)
   const setOllama = useUIStore(state => state.setOllama)
+  const emailAnalysisModel = useUIStore(state => state.email.analysisModel)
   const [expanded, setExpanded] = useState<Record<string, boolean>>({})
+
+  // Mapping: welches Tab-Feld überstimmt welches Modul?
+  // Tab-Felder haben höchste Prio (siehe architecture-model-compatibility). Hier nur lesen, nicht ändern.
+  const getTabOverride = (moduleId: ModuleId): { model: string; tabLabel: string } | undefined => {
+    if (moduleId === 'task-extraction' && emailAnalysisModel) {
+      return { model: emailAnalysisModel, tabLabel: t('settings.email.title') }
+    }
+    return undefined
+  }
 
   const visibleModules: ModuleId[] = useMemo(() => {
     // Module ohne Daten in der Matrix nicht in der UI zeigen — werden später ergänzt.
@@ -299,6 +332,7 @@ export function ModelCompatibilitySection({ availableModels }: Props) {
           onChangeOverride={value => setOverride(moduleId, value)}
           isExpanded={!!expanded[moduleId]}
           onToggleExpanded={() => setExpanded(prev => ({ ...prev, [moduleId]: !prev[moduleId] }))}
+          tabOverride={getTabOverride(moduleId)}
           t={t}
         />
       ))}

@@ -34,7 +34,8 @@ export const InboxPanel: React.FC<InboxPanelProps> = ({ onClose }) => {
     startReply,
     startNewEmail,
     setAiChatEmail,
-    markReplyHandled
+    markReplyHandled,
+    reanalyzeEmail
   } = useEmailStore()
   const { email: emailSettings } = useUIStore()
 
@@ -390,7 +391,26 @@ export const InboxPanel: React.FC<InboxPanelProps> = ({ onClose }) => {
                   {selectedEmail.analysis.model && (
                     <div className="inbox-analysis-row">
                       <span className="inbox-analysis-label">{t('inbox.detail.model')}</span>
-                      <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{selectedEmail.analysis.model}</span>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: 'var(--text-muted)' }}>
+                        {selectedEmail.analysis.model}
+                        <button
+                          type="button"
+                          onClick={() => vaultPath && reanalyzeEmail(vaultPath, selectedEmail.id)}
+                          disabled={isAnalyzing || !vaultPath}
+                          title={t('inbox.detail.reanalyzeHint')}
+                          style={{
+                            padding: '2px 8px',
+                            fontSize: '11px',
+                            background: 'transparent',
+                            border: '1px solid var(--border-color)',
+                            borderRadius: '4px',
+                            cursor: isAnalyzing ? 'wait' : 'pointer',
+                            opacity: isAnalyzing ? 0.5 : 1
+                          }}
+                        >
+                          🔄 {t('inbox.detail.reanalyze')}
+                        </button>
+                      </span>
                     </div>
                   )}
 

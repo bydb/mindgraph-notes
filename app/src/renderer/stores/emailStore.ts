@@ -28,6 +28,7 @@ interface EmailState {
   saveEmails: (vaultPath: string) => Promise<void>
   fetchEmails: (vaultPath: string, forceRefresh?: boolean) => Promise<EmailFetchResult>
   analyzeEmails: (vaultPath: string, emailIds?: string[]) => Promise<void>
+  reanalyzeEmail: (vaultPath: string, emailId: string) => Promise<void>
   setupEmail: (vaultPath: string) => Promise<boolean>
   createNotesForRelevantEmails: (vaultPath: string) => Promise<number>
   getFilteredEmails: () => EmailMessage[]
@@ -190,6 +191,12 @@ export const useEmailStore = create<EmailState>()((set, get) => ({
     } finally {
       set({ isAnalyzing: false, analysisProgress: null })
     }
+  },
+
+  reanalyzeEmail: async (vaultPath: string, emailId: string) => {
+    // Forciert eine Neu-Analyse einer einzelnen Mail mit dem aktuellen Modell-State.
+    // Der email-analyze-Handler überschreibt analysis bei expliziter emailId, auch wenn schon vorhanden.
+    await get().analyzeEmails(vaultPath, [emailId])
   },
 
   setupEmail: async (vaultPath: string) => {

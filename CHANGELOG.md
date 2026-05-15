@@ -2,6 +2,22 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.6.42-beta] - 2026-05-15
+
+### Fixes
+
+- **Stillschweigendes Auseinanderlaufen von Modell-Einstellungen behoben**: In v0.6.41 wurde die neue Kompatibilitäts-Sektion (Einstellungen → Integrationen) eingeführt, parallel existiert aber weiter das ältere „Analyse-Modell"-Feld pro Modul (z.B. im Email-Tab). Die Architektur ist Absicht — Tab-Felder haben die höchste Priorität in der Chain (`email.analysisModel` → `moduleModelOverrides[task-extraction]` → globales `selectedModel`) und sind für Power-User gedacht, die pro Modul granular einstellen wollen. Problem: das Tab-Feld war **stumm**, die Kompatibilitäts-Sektion zeigte fröhlich „✅ Geeignet" auf einem ganz anderen Modell, und niemand konnte sehen, dass tatsächlich noch das alte qwen3.5 durchläuft. Konkreter Vorfall: eine eingehende Mail wurde am 15.05.2026 mit `qwen3.5:9b-mlx-bf16` analysiert, obwohl global und in der Kompatibilitäts-Sektion längst `gemma4:latest` eingestellt war — weil im Email-Tab noch der alte Wert stand und der Hard-Lock nicht griff (qwen3.5 ist für Task-Extraktion „yellow", nicht „red").
+
+### Improvements
+
+- **Kompatibilitäts-Sektion zeigt Tab-Overrides ehrlich an**: Pro Modul wird jetzt geprüft, ob ein Tab-Feld die Sektion überstimmt. Wenn ja, erscheint eine gelbe Warnung mit dem überschreibenden Modell-Namen und einem Verweis auf den zuständigen Tab — und der Verdict-Indikator + Hard-Lock-Check beziehen sich auf das **effektiv** verwendete Modell, nicht mehr nur auf den Sektion-Override. Damit kann die Sektion nicht mehr falsches Vertrauen erzeugen.
+- **Verdict-Icons im Email-Tab**: Das „Analyse-Modell"-Dropdown (Einstellungen → E-Mail Integration) zeigt jetzt vor jedem Modell die gleichen ✅⚠️🔴❔-Icons wie die Kompatibilitäts-Sektion. Darunter erscheint eine kompakte Verdict-Pill mit Begründung („🟡 Mit Vorbehalt — Richtungs-Erkennung nur 63 %"). Damit sind die Folgen einer Modell-Wahl direkt am Auswahl-Punkt sichtbar.
+- **Re-Analyse einzelner Mails**: Im Mail-Detail-View neben dem Modell-Label gibt es jetzt einen kleinen „🔄 Neu analysieren"-Button. Damit kann eine Mail, die mit einem ungeeigneten Modell ausgewertet wurde, mit dem aktuellen Modell-Setting neu beurteilt werden — vorher gab es keinen Weg, eine falsche Analyse zu reparieren, weil der Auto-Analyse-Filter (`!e.analysis && !e.noteCreated`) bereits analysierte Mails komplett übersprang. `emailStore.reanalyzeEmail(vaultPath, emailId)` als neue Action, IPC-Handler `email-analyze` überschreibt das `analysis`-Feld bei expliziter `emailIds`.
+
+### Docs
+
+- **Blogartikel „Lokale Modelle, ehrlich gerechnet"**: Neuer Artikel zur Modell-Kompatibilitäts-Matrix mit 160 Benchmark-Läufen, Methodik, Befunden und Konsequenzen für die App. In mehreren Iterationen redaktionell überarbeitet — einfachere Sprache, ehrlichere Beispiele (qwen3.6-Output als Interpretation statt Erfindung, persönliches Sport-Beispiel entfernt), präzisere Begriffe (Kontextfenster statt „Platz im Kopf"), Email-Modul als Kontext der Tests, KMU-Perspektive im Schluss. Header-Bild responsiv (`max-width: 100%`).
+
 ## [0.6.41-beta] - 2026-05-14
 
 ### Features
