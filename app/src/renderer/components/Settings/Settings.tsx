@@ -1175,9 +1175,10 @@ const DashboardSettingsTab: React.FC<{ t: TabTFn }> = ({ t }) => {
     tasks: t('dashboard.widgets.tasks'),
     emails: t('dashboard.widgets.emails'),
     calendar: t('dashboard.widgets.calendar'),
-    bookings: t('dashboard.widgets.bookings')
+    bookings: t('dashboard.widgets.bookings'),
+    antares: t('dashboard.widgets.antares')
   }
-  const allWidgetIds = ['focus', 'radar', 'activity', 'tasks', 'emails', 'calendar', 'bookings'] as const
+  const allWidgetIds = ['focus', 'radar', 'activity', 'tasks', 'emails', 'calendar', 'bookings', 'antares'] as const
 
   const toggleWidget = (id: typeof allWidgetIds[number]) => {
     const active = dashboard.widgets.includes(id)
@@ -1375,6 +1376,13 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab 
   const [edooboxTestError, setEdooboxTestError] = useState<string | null>(null)
   const [edooboxCredsSaved, setEdooboxCredsSaved] = useState(false)
 
+  // Antares Credentials State
+  const [antaresUser, setAntaresUser] = useState('')
+  const [antaresPassword, setAntaresPassword] = useState('')
+  const [antaresTestStatus, setAntaresTestStatus] = useState<'idle' | 'testing' | 'success' | 'failed'>('idle')
+  const [antaresTestError, setAntaresTestError] = useState<string | null>(null)
+  const [antaresCredsSaved, setAntaresCredsSaved] = useState(false)
+
   // Marketing Credentials State
   const [wpAppPassword, setWpAppPassword] = useState('')
   const [wpCredsSaved, setWpCredsSaved] = useState(false)
@@ -1485,6 +1493,8 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab 
     marketing: marketingSettings,
     setMarketing,
     edoobox: edooboxSettings,
+    antares: antaresSettings,
+    setAntares,
     remarkable: remarkableSettings,
     setRemarkable,
     dailyNote: dailyNoteSettings,
@@ -1559,7 +1569,7 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab 
     }
   }, [isOpen, emailSettings.accounts.length])
 
-  // edoobox + Marketing Credentials laden
+  // edoobox + Marketing + Antares Credentials laden
   useEffect(() => {
     if (isOpen && activeTab === 'agents') {
       window.electronAPI.edooboxLoadCredentials().then(creds => {
@@ -1571,6 +1581,13 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab 
       window.electronAPI.marketingLoadCredentials().then(creds => {
         if (creds) {
           if (creds.wpAppPassword) setWpAppPassword(creds.wpAppPassword)
+        }
+      })
+      window.electronAPI.antaresLoadCredentials().then(creds => {
+        if (creds) {
+          setAntaresUser(creds.username)
+          setAntaresPassword(creds.password)
+          setAntaresCredsSaved(true)
         }
       })
     }
@@ -5032,6 +5049,110 @@ LIMIT 10
                     {edooboxTestError && (
                       <div className="settings-row">
                         <span className="settings-error-detail">{edooboxTestError}</span>
+                      </div>
+                    )}
+                  </>
+                )}
+
+                <div className="settings-divider" />
+
+                {/* Antares CS (Medienzentrum-Verleih) */}
+                <h4 className="settings-section-title">{t('settings.agents.antares.title')}</h4>
+                <p className="settings-hint">{t('settings.agents.antares.description')}</p>
+                <ModuleDisabledHint moduleId="antares" onGoToModules={() => setActiveTab('modules')} t={t} />
+
+                {antaresSettings.enabled && (
+                  <>
+                    <div className="settings-row">
+                      <label>{t('settings.agents.antares.baseUrl')}</label>
+                      <input
+                        type="text"
+                        value={antaresSettings.baseUrl}
+                        onChange={e => setAntares({ baseUrl: e.target.value })}
+                        placeholder="https://mzantares-he-16.datenbank-bildungsmedien.net"
+                        className="settings-input"
+                      />
+                    </div>
+
+                    <div className="settings-row">
+                      <label>{t('settings.agents.antares.context')}</label>
+                      <input
+                        type="text"
+                        value={antaresSettings.context}
+                        onChange={e => setAntares({ context: e.target.value })}
+                        placeholder="HE/16"
+                        className="settings-input"
+                      />
+                    </div>
+
+                    <div className="settings-row">
+                      <label>{t('settings.agents.antares.username')}</label>
+                      <input
+                        type="text"
+                        value={antaresUser}
+                        onChange={e => { setAntaresUser(e.target.value); setAntaresCredsSaved(false) }}
+                        placeholder={t('settings.agents.antares.username')}
+                        className="settings-input"
+                        autoComplete="username"
+                      />
+                    </div>
+
+                    <div className="settings-row">
+                      <label>{t('settings.agents.antares.password')}</label>
+                      <input
+                        type="password"
+                        value={antaresPassword}
+                        onChange={e => { setAntaresPassword(e.target.value); setAntaresCredsSaved(false) }}
+                        placeholder={t('settings.agents.antares.password')}
+                        className="settings-input"
+                        autoComplete="current-password"
+                      />
+                    </div>
+
+                    <div className="settings-row" style={{ gap: '8px' }}>
+                      <button
+                        className="settings-btn"
+                        onClick={async () => {
+                          if (antaresUser && antaresPassword) {
+                            const saved = await window.electronAPI.antaresSaveCredentials(antaresUser, antaresPassword)
+                            setAntaresCredsSaved(saved)
+                          }
+                        }}
+                      >
+                        {antaresCredsSaved ? t('settings.agents.antares.saved') : t('settings.agents.antares.save')}
+                      </button>
+                      <button
+                        className="settings-btn"
+                        disabled={antaresTestStatus === 'testing'}
+                        onClick={async () => {
+                          setAntaresTestError(null)
+                          if (!antaresUser || !antaresPassword) {
+                            setAntaresTestStatus('failed')
+                            setAntaresTestError(t('settings.agents.antares.saveFirst'))
+                            return
+                          }
+                          await window.electronAPI.antaresSaveCredentials(antaresUser, antaresPassword)
+                          setAntaresCredsSaved(true)
+                          setAntaresTestStatus('testing')
+                          const result = await window.electronAPI.antaresCheck(antaresSettings.baseUrl, antaresSettings.context)
+                          setAntaresTestStatus(result.success ? 'success' : 'failed')
+                          setAntaresTestError(result.success ? null : (result.error || null))
+                        }}
+                      >
+                        {antaresTestStatus === 'testing'
+                          ? t('settings.agents.antares.testing')
+                          : t('settings.agents.antares.testConnection')}
+                      </button>
+                      {antaresTestStatus === 'success' && (
+                        <span className="status-connected">{t('settings.agents.antares.connected')}</span>
+                      )}
+                      {antaresTestStatus === 'failed' && (
+                        <span className="status-disconnected">{t('settings.agents.antares.failed')}</span>
+                      )}
+                    </div>
+                    {antaresTestError && (
+                      <div className="settings-row">
+                        <span className="settings-error-detail">{antaresTestError}</span>
                       </div>
                     )}
                   </>

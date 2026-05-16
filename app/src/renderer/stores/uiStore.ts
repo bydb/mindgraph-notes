@@ -332,6 +332,14 @@ export interface EdooboxSettings {
   webhookUrl: string
 }
 
+// Antares CS (Medienzentrum-Verleih) Settings
+export interface AntaresSettings {
+  enabled: boolean
+  baseUrl: string
+  /** Antares-Kontext, z.B. "HE/16" für Medienzentrum Gießen-Vogelsberg */
+  context: string
+}
+
 export interface ReMarkableSettings {
   enabled: boolean
   transport: 'usb'
@@ -373,7 +381,7 @@ export interface TransportSettings {
 }
 
 // Dashboard Widgets — identifier-basiert, Reihenfolge im Array = Anzeigereihenfolge
-export type DashboardWidgetId = 'focus' | 'radar' | 'activity' | 'tasks' | 'emails' | 'calendar' | 'bookings' | 'sync'
+export type DashboardWidgetId = 'focus' | 'radar' | 'activity' | 'tasks' | 'emails' | 'calendar' | 'bookings' | 'antares' | 'sync'
 
 export interface DashboardSettings {
   enabled: boolean
@@ -387,7 +395,7 @@ export interface DashboardSettings {
   radarAiModel: string                 // Ollama-Modell für Notiz-Analyse; leer = nutze ollama.selectedModel
 }
 
-export const DASHBOARD_ALL_WIDGETS: DashboardWidgetId[] = ['focus', 'radar', 'activity', 'tasks', 'emails', 'calendar', 'bookings', 'sync']
+export const DASHBOARD_ALL_WIDGETS: DashboardWidgetId[] = ['focus', 'radar', 'activity', 'tasks', 'emails', 'calendar', 'bookings', 'antares', 'sync']
 
 const normalizeVaultFolder = (folder: string): string => folder.trim().replace(/^\/+|\/+$/g, '')
 
@@ -443,6 +451,7 @@ export const MODULES: ModuleDescriptor[] = [
   { id: 'language-tool',    label: 'LanguageTool',     description: 'Grammatik- und Rechtschreibprüfung im Editor', category: 'ai' },
   { id: 'email',            label: 'Email-Client',     description: 'IMAP/SMTP + KI-Analyse + Entwurfshilfe', category: 'communication' },
   { id: 'mz-suite',         label: 'Edoobox Modul',description: 'edoobox + Marketing (WordPress) + IQ-Auswertung + Formularimport', category: 'business' },
+  { id: 'antares',          label: 'Antares Medienzentrum', description: 'Verleih-Daten aus Antares CS (Entleiher, Mahnungen Geräte/Medien)', category: 'business' },
   { id: 'flashcards',       label: 'Flashcards & Quiz',description: 'Karteikarten mit Spaced Repetition und Quiz-Modus', category: 'learning' },
   { id: 'semantic-scholar', label: 'Research', description: 'Paper via Semantic Scholar und OpenAlex durchsuchen und zitieren', category: 'research' },
   { id: 'zotero',           label: 'Zotero',           description: 'Bibliothek durchsuchen, Zitate einfügen (⌘⇧Z)', category: 'research', iconText: 'Z', iconColor: '#cc2936' },
@@ -575,6 +584,9 @@ interface UIState {
   // edoobox Agent Settings
   edoobox: EdooboxSettings
 
+  // Antares CS Settings
+  antares: AntaresSettings
+
   // reMarkable Settings
   remarkable: ReMarkableSettings
 
@@ -671,6 +683,7 @@ interface UIState {
   setEmail: (settings: Partial<EmailSettings>) => void
   setMarketing: (settings: Partial<MarketingSettings>) => void
   setEdoobox: (settings: Partial<EdooboxSettings>) => void
+  setAntares: (settings: Partial<AntaresSettings>) => void
   setRemarkable: (settings: Partial<ReMarkableSettings>) => void
   setDailyNote: (settings: Partial<DailyNoteSettings>) => void
   setLastSeenVersion: (version: string) => void
@@ -823,7 +836,6 @@ const defaultState = {
     folder: 0        // Ordner-Nähe (default: 0)
   },
 
-  // Smart Connections Reranker (default aus — opt-in)
   smartConnectionsRerankerEnabled: false,
 
   // Docling PDF Extraction Settings
@@ -904,6 +916,13 @@ const defaultState = {
     webhookUrl: ''
   },
 
+  // Antares CS (Medienzentrum-Verleih)
+  antares: {
+    enabled: false,
+    baseUrl: 'https://mzantares-he-16.datenbank-bildungsmedien.net',
+    context: 'HE/16'
+  },
+
   // reMarkable
   remarkable: {
     enabled: false,
@@ -963,7 +982,7 @@ const defaultState = {
   // Dashboard
   dashboard: {
     enabled: true,
-    widgets: ['focus', 'radar', 'activity', 'tasks', 'emails', 'calendar', 'bookings'],
+    widgets: ['focus', 'radar', 'activity', 'tasks', 'emails', 'calendar', 'bookings', 'antares'],
     briefingEnabled: true,
     briefingIncludeCalendar: true,
     lastBriefingDate: '',
@@ -1011,7 +1030,7 @@ const persistedKeys = [
   'canvasFilterPath', 'canvasViewMode', 'canvasShowEdges', 'canvasShowTags', 'canvasShowLinks', 'canvasShowImages', 'canvasShowSummaries',
   'canvasCompactMode', 'canvasReadMode', 'canvasHoverScale', 'canvasDefaultCardWidth', 'splitPosition', 'fileTreeDisplayMode', 'fileTreeKindFilter', 'notesRootFolder', 'ollama', 'brain',
   'pdfCompanionEnabled', 'pdfDisplayMode', 'iconSet',
-  'smartConnectionsEnabled', 'notesChatEnabled', 'flashcardsEnabled', 'semanticScholarEnabled', 'zoteroEnabled', 'smartConnectionsWeights', 'smartConnectionsRerankerEnabled', 'docling', 'visionOcr', 'readwise', 'languageTool', 'email', 'marketing', 'edoobox', 'remarkable', 'dailyNote', 'taskExcludedFolders', 'speech',
+  'smartConnectionsEnabled', 'notesChatEnabled', 'flashcardsEnabled', 'semanticScholarEnabled', 'zoteroEnabled', 'smartConnectionsWeights', 'smartConnectionsRerankerEnabled', 'docling', 'visionOcr', 'readwise', 'languageTool', 'email', 'marketing', 'edoobox', 'antares', 'remarkable', 'dailyNote', 'taskExcludedFolders', 'speech',
   'lastSeenVersion',
   'customAccentColor', 'customBackgroundColorLight', 'customBackgroundColorDark',
   'customLogo',
@@ -1134,6 +1153,10 @@ export const useUIStore = create<UIState>()((set, get) => ({
   setEdoobox: (settings) => set((state) => ({
     edoobox: { ...state.edoobox, ...settings }
   })),
+
+  setAntares: (settings) => set((state) => ({
+    antares: { ...state.antares, ...settings }
+  })),
   setRemarkable: (settings) => set((state) => ({
     remarkable: { ...state.remarkable, ...settings }
   })),
@@ -1236,6 +1259,7 @@ export const useUIStore = create<UIState>()((set, get) => ({
           languageTool: { ...get().languageTool, enabled: false },
           email: { ...get().email, enabled: false },
           edoobox: { ...get().edoobox, enabled: false },
+          antares: { ...get().antares, enabled: false },
           marketing: { ...get().marketing, enabled: false },
           readwise: { ...get().readwise, enabled: false },
           remarkable: { ...get().remarkable, enabled: false },
@@ -1332,6 +1356,9 @@ export async function initializeUISettings(): Promise<void> {
           dash.widgets = radarIndex >= 0
             ? [...dash.widgets.slice(0, radarIndex + 1), 'activity', ...dash.widgets.slice(radarIndex + 1)]
             : ['activity', ...dash.widgets]
+        }
+        if (Array.isArray(dash.widgets) && !dash.widgets.includes('antares')) {
+          dash.widgets = [...dash.widgets, 'antares']
         }
         if (typeof dash.radarAiEnabled !== 'boolean') dash.radarAiEnabled = true
         if (typeof dash.radarAiRefreshIntervalHours !== 'number' || dash.radarAiRefreshIntervalHours <= 0) {

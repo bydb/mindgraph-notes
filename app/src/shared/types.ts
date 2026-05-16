@@ -885,6 +885,17 @@ export interface ElectronAPI {
   edooboxListBookings: (baseUrl: string, apiVersion: string, offerId: string) => Promise<{ success: boolean; bookings?: EdooboxBooking[]; error?: string }>;
   edooboxListDates: (baseUrl: string, apiVersion: string, offerId: string) => Promise<{ success: boolean; dates?: EdooboxEventDate[]; error?: string }>;
 
+  // Antares CS (Medienzentrum-Verleih)
+  antaresSaveCredentials: (username: string, password: string) => Promise<boolean>;
+  antaresLoadCredentials: () => Promise<{ username: string; password: string } | null>;
+  antaresCheck: (baseUrl: string, context: string) => Promise<{ success: boolean; error?: string }>;
+  antaresListOffeneRegistrierungen: (baseUrl: string, context: string) => Promise<{ success: boolean; rows?: AntaresEntleiher[]; error?: string }>;
+  antaresListEntleiher: (baseUrl: string, context: string, page?: number, rows?: number) => Promise<{ success: boolean; total?: number; rows?: AntaresEntleiher[]; error?: string }>;
+  antaresListMahnungenGeraete: (baseUrl: string, context: string) => Promise<{ success: boolean; total?: number; rows?: AntaresVerleihRow[]; error?: string }>;
+  antaresListMahnungenMedien: (baseUrl: string, context: string) => Promise<{ success: boolean; total?: number; rows?: AntaresVerleihRow[]; error?: string }>;
+  antaresListAusgabeliste: (baseUrl: string, context: string) => Promise<{ success: boolean; total?: number; rows?: AntaresVerleihRow[]; error?: string }>;
+  antaresDashboardCounts: (baseUrl: string, context: string) => Promise<{ success: boolean; counts?: AntaresDashboardCounts; error?: string }>;
+
   // IQ-Auswertung
   iqGenerateReport: (data: IqReportData, suggestedFileName: string) => Promise<{ success: boolean; filePath?: string; canceled?: boolean; error?: string }>;
 
@@ -1333,6 +1344,54 @@ export interface LanguageToolResponse {
       code: string;
     };
   };
+}
+
+// ---- Antares CS (Medienzentrum-Verleihsystem) ----
+
+/** Ein Entleiher aus der Antares-DB (Person, die Medien/Geräte ausleiht). */
+export interface AntaresEntleiher {
+  identifier: string
+  fn_ename: string         // Nachname
+  fn_vorname: string       // Vorname (oft mit trailing whitespace)
+  fn_enr: string           // Entleihernummer
+  fn_schulname: string
+  fn_schulnr: string
+  class: string
+  __fromtable?: string
+}
+
+/** Counts aus dem Antares-Dashboard (geparst aus HTML). */
+export interface AntaresDashboardCounts {
+  offeneRegistrierungen: number
+  offeneAnfragenGeraete: number
+  offeneVorbestellungenGeraete: number
+  stornierteVorbestellungen: number
+  ueberfaelligeGeraete: number
+  offeneVorbestellungenMedien: number
+  ueberfaelligeMedien: number
+}
+
+/** Eine Verleih-Zeile (entliehene Kopie eines Mediums oder Geräts). */
+export interface AntaresVerleihRow {
+  identifier: string
+  fn_leihnr: string        // Leihnummer
+  fn_titel: string
+  fn_info: string          // 'geraete' | 'medien'
+  fn_status: string        // '10','11','20','21','40' etc.
+  fn_mahnstufe?: string
+  fn_kopienummer?: string
+  fn_entldatum: string     // ISO YYYY-MM-DD (Ausleihdatum)
+  fn_rueckdatum: string    // ISO YYYY-MM-DD (Rückgabedatum, fällig)
+  fn_eingdatum?: string    // tatsächliche Rückgabe (oder leer)
+  fn_versanddatum?: string
+  fn_mahndat?: string
+  fn_ename: string         // Entleiher-Nachname
+  fn_vorname: string
+  fn_enr: string
+  fn_schulname: string
+  fn_schulnr: string
+  fn_erfname?: string      // Mitarbeiter der erfasst hat
+  [k: string]: unknown
 }
 
 declare global {

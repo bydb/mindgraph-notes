@@ -8364,6 +8364,121 @@ ipcMain.handle('edoobox-list-dates', async (_event, baseUrl: string, apiVersion:
 })
 
 // ========================================
+// Antares CS (Medienzentrum-Verleih)
+// ========================================
+
+function getAntaresCredentialsPath(): string {
+  return path.join(app.getPath('userData'), 'antares-credentials.enc')
+}
+
+async function loadAntaresCredentials(): Promise<{ username: string; password: string } | null> {
+  const credPath = getAntaresCredentialsPath()
+  const exists = await fs.access(credPath).then(() => true).catch(() => false)
+  if (!exists) return null
+  const encrypted = await fs.readFile(credPath)
+  try {
+    return JSON.parse(safeStorage.decryptString(encrypted))
+  } catch {
+    return null
+  }
+}
+
+async function buildAntaresService(baseUrl: string, context: string) {
+  const creds = await loadAntaresCredentials()
+  if (!creds) throw new Error('Keine Antares-Zugangsdaten gespeichert')
+  const { AntaresService } = await import('./antaresService')
+  return new AntaresService(baseUrl, creds.username, creds.password, context || 'HE/16')
+}
+
+ipcMain.handle('antares-save-credentials', async (_event, username: string, password: string) => {
+  try {
+    if (!safeStorage.isEncryptionAvailable()) {
+      throw new Error('safeStorage ist nicht verfügbar')
+    }
+    const encrypted = safeStorage.encryptString(JSON.stringify({ username, password }))
+    await fs.writeFile(getAntaresCredentialsPath(), encrypted)
+    return true
+  } catch (e) {
+    console.error('[antares] Save credentials failed:', e)
+    return false
+  }
+})
+
+ipcMain.handle('antares-load-credentials', async () => {
+  return loadAntaresCredentials()
+})
+
+ipcMain.handle('antares-check', async (_event, baseUrl: string, context: string) => {
+  try {
+    const service = await buildAntaresService(baseUrl, context)
+    await service.checkConnection()
+    return { success: true }
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : 'Verbindungsfehler' }
+  }
+})
+
+ipcMain.handle('antares-list-offene-registrierungen', async (_event, baseUrl: string, context: string) => {
+  try {
+    const service = await buildAntaresService(baseUrl, context)
+    const rows = await service.listOffeneRegistrierungen()
+    return { success: true, rows }
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : 'Fehler' }
+  }
+})
+
+ipcMain.handle('antares-list-entleiher', async (_event, baseUrl: string, context: string, page?: number, rows?: number) => {
+  try {
+    const service = await buildAntaresService(baseUrl, context)
+    const result = await service.listEntleiher({ page, rows })
+    return { success: true, ...result }
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : 'Fehler' }
+  }
+})
+
+ipcMain.handle('antares-list-mahnungen-geraete', async (_event, baseUrl: string, context: string) => {
+  try {
+    const service = await buildAntaresService(baseUrl, context)
+    const result = await service.listMahnungenGeraete()
+    return { success: true, ...result }
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : 'Fehler' }
+  }
+})
+
+ipcMain.handle('antares-list-mahnungen-medien', async (_event, baseUrl: string, context: string) => {
+  try {
+    const service = await buildAntaresService(baseUrl, context)
+    const result = await service.listMahnungenMedien()
+    return { success: true, ...result }
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : 'Fehler' }
+  }
+})
+
+ipcMain.handle('antares-list-ausgabeliste', async (_event, baseUrl: string, context: string) => {
+  try {
+    const service = await buildAntaresService(baseUrl, context)
+    const result = await service.listAusgabeliste()
+    return { success: true, ...result }
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : 'Fehler' }
+  }
+})
+
+ipcMain.handle('antares-dashboard-counts', async (_event, baseUrl: string, context: string) => {
+  try {
+    const service = await buildAntaresService(baseUrl, context)
+    const counts = await service.fetchDashboardCounts()
+    return { success: true, counts }
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : 'Fehler' }
+  }
+})
+
+// ========================================
 // Marketing (WordPress + Instagram)
 // ========================================
 

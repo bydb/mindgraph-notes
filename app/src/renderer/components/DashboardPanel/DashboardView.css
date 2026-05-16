@@ -1530,3 +1530,142 @@
   background: var(--color-error, #e55);
   color: white;
 }
+
+/* ─── Antares Widget ─────────────────────────────────────────────────── */
+
+.dv-widget-antares {
+  --widget-accent: #0066a2;
+  grid-column: 1 / -1;  /* volle Breite */
+}
+
+.dv-antares-columns {
+  display: grid;
+  grid-template-columns: 1fr 1.5fr 1fr;
+  gap: 16px;
+  padding: 12px 16px;
+}
+
+.dv-antares-column {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.dv-antares-coltitle {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin: 0 0 4px;
+  text-align: center;
+}
+
+.dv-antares-statusbtn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  cursor: default;
+  min-height: 38px;
+}
+
+.dv-antares-statusbtn-accent {
+  border-color: var(--color-error, #c0392b);
+  background: color-mix(in srgb, var(--color-error, #c0392b) 8%, var(--bg-primary));
+}
+
+.dv-antares-statusbtn-count {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-muted);
+  min-width: 28px;
+  text-align: center;
+}
+
+.dv-antares-statusbtn-accent .dv-antares-statusbtn-count {
+  color: var(--color-error, #c0392b);
+}
+
+.dv-antares-statusbtn-label {
+  font-size: 13px;
+  color: var(--text);
+}
+
+.dv-antares-details {
+  padding: 0 16px 16px;
+}
+
+.dv-antares-summary {
+  cursor: pointer;
+  padding: 8px 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  user-select: none;
+}
+
+.dv-antares-summary:hover {
+  color: var(--accent-color);
+}
+
+.dv-antares-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  margin-top: 4px;
+}
+
+.dv-antares-table th {
+  text-align: left;
+  padding: 6px 8px;
+  font-weight: 600;
+  font-size: 11px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.dv-antares-table td {
+  padding: 6px 8px;
+  border-bottom: 1px solid color-mix(in srgb, var(--border-color) 50%, transparent);
+  vertical-align: top;
+}
+
+.dv-antares-table tr:hover td {
+  background: var(--bg-secondary);
+}
+
+.dv-antares-leihnr {
+  font-family: var(--font-mono, monospace);
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.dv-antares-titel {
+  font-weight: 500;
+  max-width: 320px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dv-antares-schule {
+  color: var(--text-muted);
+}
+
+.dv-antares-overdue {
+  color: var(--color-error, #c0392b);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+@media (max-width: 900px) {
+  .dv-antares-columns {
+    grid-template-columns: 1fr;
+  }
+}

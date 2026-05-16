@@ -453,6 +453,26 @@ contextBridge.exposeInMainWorld('electronAPI', {
   edooboxListDates: (baseUrl: string, apiVersion: string, offerId: string) =>
     ipcRenderer.invoke('edoobox-list-dates', baseUrl, apiVersion, offerId),
 
+  // Antares CS (Medienzentrum-Verleih)
+  antaresSaveCredentials: (username: string, password: string) =>
+    ipcRenderer.invoke('antares-save-credentials', username, password),
+  antaresLoadCredentials: () =>
+    ipcRenderer.invoke('antares-load-credentials'),
+  antaresCheck: (baseUrl: string, context: string) =>
+    ipcRenderer.invoke('antares-check', baseUrl, context),
+  antaresListOffeneRegistrierungen: (baseUrl: string, context: string) =>
+    ipcRenderer.invoke('antares-list-offene-registrierungen', baseUrl, context),
+  antaresListEntleiher: (baseUrl: string, context: string, page?: number, rows?: number) =>
+    ipcRenderer.invoke('antares-list-entleiher', baseUrl, context, page, rows),
+  antaresListMahnungenGeraete: (baseUrl: string, context: string) =>
+    ipcRenderer.invoke('antares-list-mahnungen-geraete', baseUrl, context),
+  antaresListMahnungenMedien: (baseUrl: string, context: string) =>
+    ipcRenderer.invoke('antares-list-mahnungen-medien', baseUrl, context),
+  antaresListAusgabeliste: (baseUrl: string, context: string) =>
+    ipcRenderer.invoke('antares-list-ausgabeliste', baseUrl, context),
+  antaresDashboardCounts: (baseUrl: string, context: string) =>
+    ipcRenderer.invoke('antares-dashboard-counts', baseUrl, context),
+
   // IQ-Auswertung
   iqGenerateReport: (data: object, suggestedFileName: string) =>
     ipcRenderer.invoke('iq-generate-report', data, suggestedFileName),

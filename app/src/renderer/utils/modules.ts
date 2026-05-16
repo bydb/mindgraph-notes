@@ -10,6 +10,7 @@ export function useIsModuleEnabled(id: ModuleDescriptor['id']): boolean {
       case 'language-tool':     return state.languageTool.enabled
       case 'email':             return state.email.enabled
       case 'mz-suite':          return state.edoobox.enabled || state.marketing.enabled
+      case 'antares':           return state.antares.enabled
       case 'flashcards':        return state.flashcardsEnabled
       case 'semantic-scholar':  return state.semanticScholarEnabled
       case 'zotero':            return state.zoteroEnabled
@@ -33,6 +34,7 @@ export function isModuleEnabled(id: ModuleDescriptor['id']): boolean {
     case 'language-tool':     return s.languageTool.enabled
     case 'email':             return s.email.enabled
     case 'mz-suite':          return s.edoobox.enabled || s.marketing.enabled
+    case 'antares':           return s.antares.enabled
     case 'flashcards':        return s.flashcardsEnabled
     case 'semantic-scholar':  return s.semanticScholarEnabled
     case 'zotero':            return s.zoteroEnabled
@@ -56,6 +58,7 @@ export function setModuleEnabled(id: ModuleDescriptor['id'], enabled: boolean): 
       s.setEdoobox({ enabled })
       s.setMarketing({ enabled })
       break
+    case 'antares':           s.setAntares({ enabled }); break
     case 'flashcards':        s.setFlashcardsEnabled(enabled); break
     case 'semantic-scholar':  s.setSemanticScholarEnabled(enabled); break
     case 'zotero':            s.setZoteroEnabled(enabled); break
