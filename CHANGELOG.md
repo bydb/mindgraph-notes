@@ -2,6 +2,22 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.6.45-beta] - 2026-05-16
+
+### Features
+
+- **Antares CS Integration für Medienzentren**: Neues Modul „Antares Medienzentrum" liest Entleiher- und Verleih-Daten aus Antares CS 2.0.4 (h+h Software) — dem Verleihsystem vieler deutscher Medienzentren. Verbindet sich über den eigenen Admin-/Mitarbeiter-Account (Cookie+PID-Session wie im Browser), keine offizielle API nötig. Credentials in `electron.safeStorage` verschlüsselt. Dashboard-Widget in voller Breite zeigt das vertraute 3-Spalten-Layout aus dem Antares-Original (Nutzerverwaltung / Technikverleih / Medienverleih) mit Status-Kacheln für offene Registrierungen, offene Anfragen/Vorbestellungen und überfällige Rückgaben — plus aufklappbare Mahnungs-Tabelle mit Leihnr/Titel/Entleiher/Schule/Rückgabedatum. Konfiguration unter Einstellungen → Module → „Antares Medienzentrum" aktivieren, dann Einstellungen → Agenten → Antares-Sektion: URL/Kontext/Credentials + Verbindungstest. Auto-Migrate ergänzt das Widget bei bestehenden Installationen. Doku in `docs/antares-integration.md`.
+- **Smart Connections: LLM-as-Judge-Reranker (opt-in, experimentell)**: Wenn aktiviert, bewertet das aktuell ausgewählte Ollama-Chat-Modell nach der Embedding-Suche die Top-Kandidaten paarweise auf Relevanz und sortiert die Liste um. Hintergrund: Ollama unterstützt aktuell keine nativen Cross-Encoder-Reranker — dedizierte Reranker-GGUFs crashen den Loader oder geben Müll-Tokens aus. Workaround: Standard-Chat-Modell mit strukturiertem JSON-Output (Fallback-Parser für Modelle, die trotz Anweisung Fließtext liefern). Funktioniert mit jedem Modell, das du bereits geladen hast (gemma4, qwen3.6, …) — kein zusätzlicher Download. Trade-off: nicht task-spezifisch trainiert, ~1–3 s pro Kandidat, Scores eher grob in Bändern. Toggle unter Einstellungen → Integrationen → Smart Connections.
+
+### Improvements
+
+- **bge-m3 als bevorzugtes Embedding-Modell**: Smart Connections bevorzugt jetzt `bge-m3` (multilingual) vor `nomic-embed-text`, sofern installiert. bge-m3 liefert deutlich bessere Score-Spreizung für deutsche Vaults — Notizen über verwandte Themen bekommen klarere Similarity-Werte, statt im 0.7–0.85-Brei zu verschwinden. Falls weder bge-m3 noch nomic installiert sind, wird das erste verfügbare Embedding-Modell genutzt.
+- **Email-Metadaten-Block aus Embeddings filtern**: Der Bold-Markdown-Block aus dem Email-Template (`**Von:** …`, `**An:** …`, `**Datum:** …`, `**Relevanz:** …`, `**Stimmung:** …`, `**Kategorien:** …`, `**Betreff:** …`) wird vor dem Embedding rausgekürzt. Vorher zog dieser gemeinsame Header alle Mail-Notizen in einen großen „Metadaten-Cluster", in dem inhaltlich unverwandte Mails fälschlich als ähnlich angezeigt wurden. Verbunden mit `CACHE_VERSION=2`: alte Embeddings werden beim ersten Öffnen einmal neu berechnet.
+
+### Fixes
+
+- **Brain-Tagesgedächtnis: keine Phantom-Notizen mehr**: Der Brain-Sensor sammelte Events (Öffnen/Updaten/Erstellen) anhand des `contextMemory`-Logs, in dem auch Pfade von Notizen stehen, die später gelöscht oder verschoben wurden. Vorher legte der Sensor für solche Events einen synthetischen Eintrag mit aus dem Pfad abgeleitetem Titel an — Brain bekam dann „berührte Notizen" gemeldet, die im aktuellen Vault gar nicht mehr existierten. Fix: nur Events zu Notizen, die das `notesStore` aktuell kennt, werden weitergereicht.
+
 ## [0.6.44-beta] - 2026-05-15
 
 ### Features
