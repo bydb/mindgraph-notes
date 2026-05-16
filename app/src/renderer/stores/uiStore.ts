@@ -550,6 +550,11 @@ interface UIState {
   // Smart Connections Gewichtungen
   smartConnectionsWeights: SmartConnectionsWeights
 
+  // Smart Connections Reranker (bge-reranker-v2-m3 via @huggingface/transformers)
+  // Wenn an: nach Embedding-Sort werden Top-50 Kandidaten per Cross-Encoder neu sortiert.
+  // Erstes Einschalten lädt ~570 MB Modell.
+  smartConnectionsRerankerEnabled: boolean
+
   // Docling PDF Extraction Settings
   docling: DoclingSettings
   // Vision OCR (Ollama Vision Models)
@@ -658,6 +663,7 @@ interface UIState {
   setSpeech: (settings: Partial<SpeechSettings>) => void
   toggleTaskExcludedFolder: (folderPath: string) => void
   setSmartConnectionsWeights: (weights: Partial<SmartConnectionsWeights>) => void
+  setSmartConnectionsRerankerEnabled: (enabled: boolean) => void
   setDocling: (settings: Partial<DoclingSettings>) => void
   setVisionOcr: (settings: Partial<VisionOcrSettings>) => void
   setReadwise: (settings: Partial<ReadwiseSettings>) => void
@@ -816,6 +822,9 @@ const defaultState = {
     tags: 10,        // Tag-Überlappung
     folder: 0        // Ordner-Nähe (default: 0)
   },
+
+  // Smart Connections Reranker (default aus — opt-in)
+  smartConnectionsRerankerEnabled: false,
 
   // Docling PDF Extraction Settings
   docling: {
@@ -1002,7 +1011,7 @@ const persistedKeys = [
   'canvasFilterPath', 'canvasViewMode', 'canvasShowEdges', 'canvasShowTags', 'canvasShowLinks', 'canvasShowImages', 'canvasShowSummaries',
   'canvasCompactMode', 'canvasReadMode', 'canvasHoverScale', 'canvasDefaultCardWidth', 'splitPosition', 'fileTreeDisplayMode', 'fileTreeKindFilter', 'notesRootFolder', 'ollama', 'brain',
   'pdfCompanionEnabled', 'pdfDisplayMode', 'iconSet',
-  'smartConnectionsEnabled', 'notesChatEnabled', 'flashcardsEnabled', 'semanticScholarEnabled', 'zoteroEnabled', 'smartConnectionsWeights', 'docling', 'visionOcr', 'readwise', 'languageTool', 'email', 'marketing', 'edoobox', 'remarkable', 'dailyNote', 'taskExcludedFolders', 'speech',
+  'smartConnectionsEnabled', 'notesChatEnabled', 'flashcardsEnabled', 'semanticScholarEnabled', 'zoteroEnabled', 'smartConnectionsWeights', 'smartConnectionsRerankerEnabled', 'docling', 'visionOcr', 'readwise', 'languageTool', 'email', 'marketing', 'edoobox', 'remarkable', 'dailyNote', 'taskExcludedFolders', 'speech',
   'lastSeenVersion',
   'customAccentColor', 'customBackgroundColorLight', 'customBackgroundColorDark',
   'customLogo',
@@ -1103,6 +1112,7 @@ export const useUIStore = create<UIState>()((set, get) => ({
   setSmartConnectionsWeights: (weights) => set((state) => ({
     smartConnectionsWeights: { ...state.smartConnectionsWeights, ...weights }
   })),
+  setSmartConnectionsRerankerEnabled: (enabled) => set({ smartConnectionsRerankerEnabled: enabled }),
   setDocling: (settings) => set((state) => ({
     docling: { ...state.docling, ...settings }
   })),

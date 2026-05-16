@@ -1458,6 +1458,8 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab 
     flashcardsEnabled,
     smartConnectionsWeights,
     setSmartConnectionsWeights,
+    smartConnectionsRerankerEnabled,
+    setSmartConnectionsRerankerEnabled,
     docling,
     setDocling,
     visionOcr,
@@ -3182,6 +3184,26 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab 
 
                     <div className="settings-info" style={{ marginTop: '8px' }}>
                       <p style={{ fontSize: '12px' }}>{t('smartConnections.weights.hint')}</p>
+                    </div>
+                  </div>
+                )}
+
+                {smartConnectionsEnabled && (
+                  <div className="settings-subsection" style={{ marginLeft: '8px', paddingLeft: '12px', borderLeft: '2px solid var(--border-color)', marginTop: '12px' }}>
+                    <div className="settings-row">
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <input
+                          type="checkbox"
+                          checked={smartConnectionsRerankerEnabled}
+                          onChange={e => setSmartConnectionsRerankerEnabled(e.target.checked)}
+                        />
+                        <span style={{ fontWeight: 500, fontSize: '13px' }}>LLM-Reranker (experimentell)</span>
+                      </label>
+                    </div>
+                    <div className="settings-info" style={{ marginTop: '4px' }}>
+                      <p style={{ fontSize: '12px' }}>
+                        Nach der Embedding-Suche bewertet das aktuell gewählte Ollama-Modell die Top-Kandidaten paarweise auf Relevanz und sortiert um. Läuft im Hintergrund (~1-3s pro Kandidat), die Embedding-Liste wird sofort angezeigt. Kein dedizierter Reranker, sondern LLM-as-Judge — funktioniert mit jedem Chat-Modell, das du eh nutzt.
+                      </p>
                     </div>
                   </div>
                 )}

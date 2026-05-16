@@ -95,14 +95,15 @@ export function buildBrainSensors(args: BuildArgs): { sensors: BrainSensors; has
   const noteList: BrainSensorNote[] = Array.from(noteCounts.entries())
     .map(([key, evs]) => {
       const note = notes.find(n => n.path === key) || notes.find(n => n.id === key)
-      const fallbackTitle = key.split('/').pop()?.replace(/\.md$/i, '') || key
+      if (!note) return null
       return {
-        title: note?.title || fallbackTitle,
-        path: note?.path || key,
-        tags: (note?.tags || []).slice(0, 5),
+        title: note.title,
+        path: note.path,
+        tags: (note.tags || []).slice(0, 5),
         events: evs
       }
     })
+    .filter((n): n is BrainSensorNote => n !== null)
     .filter(n => n.events.opened + n.events.updated > 0 || n.events.created)
     .sort((a, b) => {
       const score = (e: BrainSensorNote['events']) => e.opened + e.updated * 2 + (e.created ? 3 : 0)

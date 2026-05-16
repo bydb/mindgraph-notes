@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react'
 import { useNotesStore } from '../../stores/notesStore'
 import { useUIStore } from '../../stores/uiStore'
 import { useTranslation } from '../../utils/translations'
+import { rerank, type RerankerProgress } from '../../utils/reranker/reranker'
 
 interface EmbeddingModel {
   name: string
@@ -21,17 +22,22 @@ interface EmbeddingsCache {
   files: Record<string, EmbeddingsCacheEntry>
 }
 
+// Cache-Version. Erhöhen, wenn sich `prepareTextForEmbedding` ändert,
+// damit veraltete Embeddings automatisch neu berechnet werden.
+const CACHE_VERSION = 2
+
 interface SimilarNote {
   id: string
   title: string
   path: string
-  similarity: number          // Hybrid-Score (gewichtet)
+  similarity: number          // Hybrid-Score (gewichtet) — bei aktivem Reranker = rerankerScore
   // Score-Komponenten für Transparenz
   embeddingScore: number      // Reine Embedding-Ähnlichkeit
   keywordMatch: number        // Keyword-Überlappung (0-1)
   hasWikilink: boolean        // Expliziter Wikilink vorhanden
   tagOverlap: number          // Tag-Überlappung (0-1)
   folderProximity: number     // Ordner-Nähe (0-1)
+  rerankerScore?: number      // Cross-Encoder-Score (0-1), nur wenn Reranker aktiv
 }
 
 // Default-Gewichtungen (werden von uiStore überschrieben)
@@ -220,6 +226,15 @@ function prepareTextForEmbedding(text: string): string {
   // 1. Entferne YAML Frontmatter (zwischen --- Markern)
   let cleanText = text.replace(/^---[\s\S]*?---\n*/m, '')
 
+  // 1b. Entferne Email-Metadaten-Block (**Von:**, **An:**, **Datum:**, **Relevanz:**,
+  // **Stimmung:**, **Kategorien:**, **Betreff:**). Diese werden vom Email-Note-Template
+  // als Bold-Markdown erzeugt und würden sonst das Embedding aller Mail-Notizen in
+  // einen gemeinsamen "Metadaten-Cluster" ziehen.
+  cleanText = cleanText.replace(
+    /^\*\*(?:Von|An|Datum|Relevanz|Stimmung|Kategorien|Betreff):\*\*.*$/gim,
+    ''
+  )
+
   // 2. Entferne Obsidian-spezifische Syntax
   cleanText = cleanText
     .replace(/>\s*Erstellt am.*?\n/g, '')           // Erstellungsdatum
@@ -327,7 +342,7 @@ function cosineSimilarity(a: number[], b: number[]): number {
 export const SmartConnectionsPanel: React.FC<SmartConnectionsPanelProps> = ({ onClose }) => {
   const { t } = useTranslation()
   const { notes, selectedNoteId, selectNote, vaultPath } = useNotesStore()
-  const { ollama: llmSettings, smartConnectionsWeights } = useUIStore()
+  const { ollama: llmSettings, smartConnectionsWeights, smartConnectionsRerankerEnabled } = useUIStore()
 
   // Gewichtungen aus Settings (als Dezimalwerte 0-1)
   const WEIGHTS = useMemo(() => ({
@@ -347,6 +362,7 @@ export const SmartConnectionsPanel: React.FC<SmartConnectionsPanelProps> = ({ on
   const [embeddingsCache, setEmbeddingsCache] = useState<EmbeddingsCache | null>(null)
   const [pendingNotes, setPendingNotes] = useState<string[]>([]) // IDs of notes needing embedding
   const [isIntegrating, setIsIntegrating] = useState(false)
+  const [rerankerStatus, setRerankerStatus] = useState<RerankerProgress | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   // Aktuelle Notiz
@@ -379,9 +395,13 @@ export const SmartConnectionsPanel: React.FC<SmartConnectionsPanelProps> = ({ on
         setEmbeddingModels(models)
 
         if (models.length > 0) {
-          // Versuche nomic-embed-text als Standard
+          // Bevorzuge bge-m3 (multilingual, deutlich bessere Score-Spreizung für deutsche Vaults),
+          // dann nomic-embed-text als Fallback, sonst erstes verfügbares Modell.
+          const bgeModel = models.find((m: EmbeddingModel) => m.name.includes('bge-m3'))
           const nomicModel = models.find((m: EmbeddingModel) => m.name.includes('nomic'))
-          if (nomicModel) {
+          if (bgeModel) {
+            setSelectedModel(bgeModel.name)
+          } else if (nomicModel) {
             setSelectedModel(nomicModel.name)
           } else {
             setSelectedModel(models[0].name)
@@ -407,6 +427,13 @@ export const SmartConnectionsPanel: React.FC<SmartConnectionsPanelProps> = ({ on
         // Lade separaten Embeddings-Cache
         const cacheFile = await window.electronAPI.loadEmbeddingsCache?.(vaultPath, selectedModel) as EmbeddingsCache | null
 
+        // Cache-Version prüfen — bei Mismatch komplett neu aufbauen
+        if (cacheFile && cacheFile.version !== CACHE_VERSION) {
+          console.log(`[SmartConnections] Cache-Version ${cacheFile.version} !== ${CACHE_VERSION}, rebuild`)
+          setEmbeddingsCache({ model: selectedModel, version: CACHE_VERSION, lastUpdated: 0, files: {} })
+          return
+        }
+
         // Fallback: Alte Struktur aus graph-data.json
         if (!cacheFile) {
           const graphData = await window.electronAPI.loadGraphData(vaultPath) as {
@@ -418,7 +445,7 @@ export const SmartConnectionsPanel: React.FC<SmartConnectionsPanelProps> = ({ on
             const oldCache = graphData.embeddings[selectedModel]
             const migratedCache: EmbeddingsCache = {
               model: selectedModel,
-              version: 1,
+              version: CACHE_VERSION,
               lastUpdated: Date.now(),
               files: {}
             }
@@ -432,7 +459,7 @@ export const SmartConnectionsPanel: React.FC<SmartConnectionsPanelProps> = ({ on
             setEmbeddingsCache(migratedCache)
             console.log('[SmartConnections] Migrated old cache:', Object.keys(migratedCache.files).length)
           } else {
-            setEmbeddingsCache({ model: selectedModel, version: 1, lastUpdated: 0, files: {} })
+            setEmbeddingsCache({ model: selectedModel, version: CACHE_VERSION, lastUpdated: 0, files: {} })
           }
         } else {
           setEmbeddingsCache(cacheFile)
@@ -440,7 +467,7 @@ export const SmartConnectionsPanel: React.FC<SmartConnectionsPanelProps> = ({ on
         }
       } catch (err) {
         console.log('[SmartConnections] No cached embeddings found, starting fresh')
-        setEmbeddingsCache({ model: selectedModel, version: 1, lastUpdated: 0, files: {} })
+        setEmbeddingsCache({ model: selectedModel, version: CACHE_VERSION, lastUpdated: 0, files: {} })
       }
     }
 
@@ -666,7 +693,55 @@ export const SmartConnectionsPanel: React.FC<SmartConnectionsPanelProps> = ({ on
       }
 
       similarities.sort((a, b) => b.similarity - a.similarity)
+
+      // Embedding-Ergebnis SOFORT anzeigen, damit der User nicht 60s vor "Berechne..." sitzt.
       setSimilarNotes(similarities.slice(0, 20))
+      setIsCalculating(false)
+
+      // Reranker läuft im Hintergrund. Wenn fertig: Liste neu sortiert refresh'en.
+      // bge-reranker-v2-m3 auf q8/WASM braucht ~6s/Paar — kein Problem im Background.
+      if (smartConnectionsRerankerEnabled && similarities.length > 0) {
+        const topForRerank = similarities.slice(0, 10)
+        const noteIdAtStart = currentNote.id
+        ;(async () => {
+          try {
+            const candidatePaths = topForRerank.map(s => s.path)
+            const candidateContents = await window.electronAPI.readFilesBatch(vaultPath, candidatePaths)
+
+            const trimForRerank = (s: string) => s.length > 800 ? s.slice(0, 800) : s
+            const candidates = topForRerank.map(s => ({
+              sim: s,
+              text: trimForRerank(prepareTextForEmbedding(candidateContents[s.path] || s.title))
+            }))
+            const queryText = trimForRerank(prepareTextForEmbedding(currentContent))
+
+            console.log(`[SmartConnections] Reranking ${candidates.length} candidates (im Hintergrund) …`)
+            const reranked = await rerank(
+              queryText,
+              candidates,
+              c => c.text,
+              (p) => setRerankerStatus(p)
+            )
+            setRerankerStatus(null)
+
+            if (useNotesStore.getState().selectedNoteId !== noteIdAtStart) {
+              console.log('[SmartConnections] Reranker-Ergebnis verworfen (Notiz gewechselt)')
+              return
+            }
+
+            for (const { item, rerankerScore } of reranked) {
+              item.sim.rerankerScore = rerankerScore
+              item.sim.similarity = rerankerScore
+            }
+            similarities.sort((a, b) => b.similarity - a.similarity)
+            setSimilarNotes(similarities.slice(0, 20))
+          } catch (rerankErr) {
+            console.error('[SmartConnections] Reranker failed:', rerankErr)
+            setRerankerStatus(null)
+          }
+        })()
+      }
+      return
 
     } catch (err) {
       console.error('[SmartConnections] Error calculating similarities:', err)
@@ -674,7 +749,7 @@ export const SmartConnectionsPanel: React.FC<SmartConnectionsPanelProps> = ({ on
     } finally {
       setIsCalculating(false)
     }
-  }, [currentNote, selectedModel, vaultPath, notes, selectedNoteId, embeddingsCache, getEmbedding, t, WEIGHTS])
+  }, [currentNote, selectedModel, vaultPath, notes, selectedNoteId, embeddingsCache, getEmbedding, t, WEIGHTS, smartConnectionsRerankerEnabled])
 
   // Automatisch berechnen wenn Notiz gewechselt wird UND Cache geladen ist
   useEffect(() => {
@@ -818,6 +893,12 @@ export const SmartConnectionsPanel: React.FC<SmartConnectionsPanelProps> = ({ on
                   />
                 </div>
                 <p>{t('smartConnections.calculating')}... {progress.current}/{progress.total}</p>
+                {rerankerStatus && (
+                  <p style={{ fontSize: 12, opacity: 0.7, marginTop: 4 }}>
+                    Reranker: {rerankerStatus.file ?? rerankerStatus.status ?? '…'}
+                    {typeof rerankerStatus.percent === 'number' ? ` (${Math.round(rerankerStatus.percent)}%)` : ''}
+                  </p>
+                )}
               </div>
             ) : error ? (
               <div className="smart-connections-error">

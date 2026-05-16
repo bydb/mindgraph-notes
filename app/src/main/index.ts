@@ -2718,6 +2718,92 @@ ipcMain.handle('brain-consolidate-day', async (_event, input: BrainConsolidateIn
 })
 
 // Generiert Embeddings für Text (für Smart Connections)
+// LLM-as-Judge-Reranker für Smart Connections. Ollama hat keinen nativen Reranker-Endpoint
+// (Stand 2026-05-16, siehe Memory project-reranker-via-ollama.md), deshalb prompten wir
+// einen normalen Chat-Model auf eine Relevanz-Bewertung im JSON-Format.
+ipcMain.handle('ollama-rerank-pair', async (_event, model: string, query: string, document: string) => {
+  try {
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 30000)
+
+    const response = await fetch(`${OLLAMA_API_URL}/api/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model,
+        messages: [
+          {
+            role: 'system',
+            content: 'Du bewertest die thematische Relevanz eines Dokuments für eine Suchanfrage auf einer Skala von 0 (keine Verbindung) bis 1 (identisches Thema). Antworte ausschließlich mit JSON im Format {"relevance": <Zahl zwischen 0 und 1>}. Kein Fließtext, keine Erklärung, keine Markdown-Backticks.'
+          },
+          {
+            role: 'user',
+            // `/no_think` deaktiviert bei Qwen3-Thinking-Modellen die `<think>`-Sektion,
+            // damit num_predict nicht für interne Reasoning-Tokens draufgeht.
+            // Bei Nicht-Thinking-Modellen wie gemma4 wird der String einfach ignoriert.
+            content: `/no_think\n\nAnfrage:\n${query}\n\nDokument:\n${document}`
+          }
+        ],
+        // Kein `format: 'json'` — Ollamas Stream-Constraint hat Gemma4 still abgewürgt
+        // (300 Tokens generiert, message.content="" weil keiner durch den JSON-Validator kam).
+        // Wir vertrauen dem System-Prompt + parsen toleranter im Fallback unten.
+        //
+        // `think: false` schaltet bei Thinking-Modellen (Gemma 4, Qwen3.6, etc.) das
+        // interne Reasoning ab — sonst gehen alle Tokens in `message.thinking` und
+        // `content` bleibt leer. Bei Nicht-Thinking-Modellen wird der Parameter ignoriert.
+        think: false,
+        stream: false,
+        options: { temperature: 0, num_predict: 80 }
+      }),
+      signal: controller.signal
+    })
+
+    clearTimeout(timeoutId)
+
+    if (!response.ok) {
+      return { success: false, error: `Ollama HTTP ${response.status}` }
+    }
+
+    const data = await response.json() as { message?: { content?: string; thinking?: string }; error?: string; done_reason?: string; eval_count?: number }
+    if (data.error) return { success: false, error: data.error }
+
+    // Fallback auf `thinking`-Feld falls `think: false` doch ignoriert wurde (z.B. weil
+    // Ollama-Version zu alt oder Modell anders implementiert).
+    const content = data.message?.content || data.message?.thinking || ''
+
+    // Erste Wahl: sauberes JSON parsen.
+    try {
+      const parsed = JSON.parse(content) as { relevance?: number; score?: number }
+      const raw = typeof parsed.relevance === 'number'
+        ? parsed.relevance
+        : (typeof parsed.score === 'number' ? parsed.score : NaN)
+      if (Number.isFinite(raw)) {
+        return { success: true, score: Math.max(0, Math.min(1, raw)) }
+      }
+    } catch {
+      // Fallback unten versuchen
+    }
+
+    // Fallback: Modell hat trotz format:json Fließtext geliefert (kommt vor wenn `<think>`
+    // das Token-Budget aufgefressen hat) — extrahiere die erste 0-1-Zahl per Regex.
+    const match = content.match(/(?:relevance|score)["':\s]+([01](?:\.\d+)?)/i)
+      ?? content.match(/\b([01]\.\d+|0|1)\b/)
+    if (match) {
+      const raw = parseFloat(match[1])
+      if (Number.isFinite(raw)) {
+        return { success: true, score: Math.max(0, Math.min(1, raw)) }
+      }
+    }
+
+    return { success: false, error: `JSON-Parse-Fehler: ${content.slice(0, 120) || '(leerer Output)'}` }
+  } catch (error) {
+    const message = error instanceof Error
+      ? (error.name === 'AbortError' ? 'Timeout (>30s)' : error.message)
+      : 'Unbekannter Fehler'
+    return { success: false, error: message }
+  }
+})
+
 ipcMain.handle('ollama-embeddings', async (_event, model: string, text: string) => {
   console.log('[Ollama] Embeddings request for model:', model, 'text length:', text.length)
 

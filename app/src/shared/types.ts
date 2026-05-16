@@ -621,6 +621,13 @@ export interface ElectronAPI {
   }>;
   ollamaEmbeddingModels: () => Promise<Array<{ name: string; size: number }>>;
 
+  // LLM-as-Judge-Reranker für Smart Connections
+  ollamaRerankPair: (model: string, query: string, document: string) => Promise<{
+    success: boolean;
+    score?: number;
+    error?: string;
+  }>;
+
   // Ollama Chat für Notes Chat
   ollamaChat: (model: string, messages: Array<{ role: string; content: string }>, context: string, chatMode?: 'direct' | 'socratic' | 'email') => Promise<{
     success: boolean;

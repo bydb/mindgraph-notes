@@ -147,6 +147,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('ollama-embeddings', model, text),
   ollamaEmbeddingModels: () => ipcRenderer.invoke('ollama-embedding-models'),
 
+  // LLM-as-Judge-Reranker (Ollama hat keinen nativen Reranker-Endpoint)
+  ollamaRerankPair: (model: string, query: string, document: string) =>
+    ipcRenderer.invoke('ollama-rerank-pair', model, query, document) as Promise<{ success: boolean; score?: number; error?: string }>,
+
   // Ollama Chat für Notes Chat
   ollamaChat: (model: string, messages: Array<{ role: string; content: string }>, context: string, chatMode: 'direct' | 'socratic' = 'direct') =>
     ipcRenderer.invoke('ollama-chat', model, messages, context, chatMode),
