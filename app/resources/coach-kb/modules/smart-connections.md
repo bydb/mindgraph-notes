@@ -1,7 +1,7 @@
 ---
 id: smart-connections
 moduleId: smart-connections
-keywords: [ähnlich, verwandt, finden, embedding, semantisch, vorschläge, verbinden]
+keywords: [smart, connections, smart-connections, smartconnections, ähnlich, verwandt, finden, embedding, semantisch, vorschläge, verbinden, verknüpfung, vernetzung]
 suggestsModules: [smart-connections]
 ---
 

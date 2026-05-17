@@ -158,7 +158,15 @@ export async function loadKb(): Promise<KbDoc[]> {
 function scoreDoc(doc: KbDoc, queryTokens: string[]): number {
   if (queryTokens.length === 0) return 0
   let score = 0
-  const keywords = new Set((doc.frontmatter.keywords || []).map(k => k.toLowerCase()))
+  // Implizite Keywords: die id (z.B. "smart-connections") und der
+  // Dateiname-Stamm (z.B. "smart-connections" aus "modules/smart-connections.md")
+  // werden tokenisiert und als hochgewichtete Keywords behandelt — sonst
+  // findet "smart connections was ist das" den entsprechenden Eintrag nicht,
+  // wenn der KB-Autor vergessen hat, das Modul-Wort manuell zu listen.
+  const explicitKeywords = (doc.frontmatter.keywords || []).map(k => k.toLowerCase())
+  const idTokens = tokenize(doc.id)
+  const fileTokens = tokenize(doc.relPath.replace(/\.md$/, '').split('/').pop() || '')
+  const keywords = new Set<string>([...explicitKeywords, ...idTokens, ...fileTokens])
   const titleTokens = new Set(tokenize(doc.title))
   const headingTokens = new Set(doc.headings.flatMap(h => tokenize(h)))
   for (const tok of queryTokens) {

@@ -2,6 +2,14 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.6.48-beta] - 2026-05-18
+
+### Improvements
+
+- **Coach-Bot KB-Retriever — implizite Keywords**: Der Retriever zieht jetzt automatisch die Modul-`id` aus dem Frontmatter und den Dateinamen-Stamm als hochgewichtete Keywords rein. Damit findet er einen Modul-Eintrag auch dann, wenn der KB-Autor vergessen hat, das Modul-Wort manuell in `keywords:` zu listen. Robustheit gegen genau die Klasse von Fehlern, bei denen die Frage „Smart Connections was ist das?" keinen Top-K-Treffer mehr lieferte, obwohl die Datei `modules/smart-connections.md` existierte.
+- **KB: Smart Connections** — Keywords um `smart`, `connections`, `smart-connections`, `smartconnections`, `verknüpfung`, `vernetzung` ergänzt.
+- **KB: Edoobox-Modul (Veranstaltungsagent)** — Eintrag deutlich ausgebaut: Alias-Hinweis „auch bekannt als Veranstaltungsagent" prominent oben, Workflow in 6 nummerierten Schritten (DOCX-Import → Prüfen → edoobox-API-Push → WordPress-Marketing-Draft mit Ollama-/Imagen-Generierung → Dashboard-Tracking → IQ-Auswertung), Keywords um `veranstaltungsagent`, `agent`, `agenten`, `fortbildungen`, `formular`, `docx`, `schulamt` erweitert.
+
 ## [0.6.47-beta] - 2026-05-17
 
 ### Features
