@@ -232,6 +232,7 @@ interface LLMSettings {
     'mail-summary': string
     'dashboard-snapshot': string
     'smart-connections': string
+    'project-status': string
   }
 }
 
@@ -381,7 +382,7 @@ export interface TransportSettings {
 }
 
 // Dashboard Widgets — identifier-basiert, Reihenfolge im Array = Anzeigereihenfolge
-export type DashboardWidgetId = 'focus' | 'radar' | 'activity' | 'tasks' | 'emails' | 'calendar' | 'bookings' | 'antares' | 'sync'
+export type DashboardWidgetId = 'focus' | 'radar' | 'activity' | 'tasks' | 'emails' | 'calendar' | 'bookings' | 'antares' | 'project-status' | 'sync'
 
 export interface DashboardSettings {
   enabled: boolean
@@ -395,7 +396,7 @@ export interface DashboardSettings {
   radarAiModel: string                 // Ollama-Modell für Notiz-Analyse; leer = nutze ollama.selectedModel
 }
 
-export const DASHBOARD_ALL_WIDGETS: DashboardWidgetId[] = ['focus', 'radar', 'activity', 'tasks', 'emails', 'calendar', 'bookings', 'antares', 'sync']
+export const DASHBOARD_ALL_WIDGETS: DashboardWidgetId[] = ['focus', 'radar', 'activity', 'tasks', 'emails', 'calendar', 'bookings', 'antares', 'project-status', 'sync']
 
 const normalizeVaultFolder = (folder: string): string => folder.trim().replace(/^\/+|\/+$/g, '')
 
@@ -528,6 +529,7 @@ interface UIState {
   fileTreeDisplayMode: FileTreeDisplayMode // 'name' = nur Dateiname, 'path' = voller Pfad
   fileTreeKindFilter: NoteKindId[]
   notesRootFolder: string // Relativer Pfad im Vault für neue Arbeitsnotizen
+  projectsRootFolder: string // Relativer Pfad im Vault für Projekt-Ordner (Crystallizer)
   pendingTemplateInsert: PendingTemplateInsert | null // Template das in Editor eingefügt werden soll
 
   // LLM AI Settings (Ollama & LM Studio)
@@ -661,6 +663,7 @@ interface UIState {
   toggleFileTreeKindFilter: (kind: NoteKindId) => void
   showOnlyFileTreeKind: (kind: NoteKindId) => void
   setNotesRootFolder: (folder: string) => void
+  setProjectsRootFolder: (folder: string) => void
   setPendingTemplateInsert: (template: PendingTemplateInsert | null) => void
   setOllama: (settings: Partial<LLMSettings>) => void
   setBrain: (settings: Partial<BrainSettings>) => void
@@ -767,6 +770,7 @@ const defaultState = {
   fileTreeDisplayMode: 'name' as FileTreeDisplayMode,
   fileTreeKindFilter: ['problem', 'solution', 'info'] as NoteKindId[],
   notesRootFolder: '',
+  projectsRootFolder: '',
   pendingTemplateInsert: null as PendingTemplateInsert | null,
 
   // LLM AI Settings (Ollama & LM Studio)
@@ -781,7 +785,8 @@ const defaultState = {
       'task-extraction': '',
       'mail-summary': '',
       'dashboard-snapshot': '',
-      'smart-connections': ''
+      'smart-connections': '',
+      'project-status': ''
     }
   },
 
@@ -982,7 +987,7 @@ const defaultState = {
   // Dashboard
   dashboard: {
     enabled: true,
-    widgets: ['focus', 'radar', 'activity', 'tasks', 'emails', 'calendar', 'bookings', 'antares'],
+    widgets: ['focus', 'radar', 'activity', 'tasks', 'emails', 'calendar', 'bookings', 'antares', 'project-status'],
     briefingEnabled: true,
     briefingIncludeCalendar: true,
     lastBriefingDate: '',
@@ -1028,7 +1033,7 @@ const persistedKeys = [
   'autoSaveInterval', 'editorHeadingFolding', 'editorOutlining', 'outlineStyle', 'editorShowWordCount', 'imagesFolder',
   'sidebarWidth', 'sidebarVisible', 'editorPreviewSplit', 'textSplitEnabled', 'textSplitPosition',
   'canvasFilterPath', 'canvasViewMode', 'canvasShowEdges', 'canvasShowTags', 'canvasShowLinks', 'canvasShowImages', 'canvasShowSummaries',
-  'canvasCompactMode', 'canvasReadMode', 'canvasHoverScale', 'canvasDefaultCardWidth', 'splitPosition', 'fileTreeDisplayMode', 'fileTreeKindFilter', 'notesRootFolder', 'ollama', 'brain',
+  'canvasCompactMode', 'canvasReadMode', 'canvasHoverScale', 'canvasDefaultCardWidth', 'splitPosition', 'fileTreeDisplayMode', 'fileTreeKindFilter', 'notesRootFolder', 'projectsRootFolder', 'ollama', 'brain',
   'pdfCompanionEnabled', 'pdfDisplayMode', 'iconSet',
   'smartConnectionsEnabled', 'notesChatEnabled', 'flashcardsEnabled', 'semanticScholarEnabled', 'zoteroEnabled', 'smartConnectionsWeights', 'smartConnectionsRerankerEnabled', 'docling', 'visionOcr', 'readwise', 'languageTool', 'email', 'marketing', 'edoobox', 'antares', 'remarkable', 'dailyNote', 'taskExcludedFolders', 'speech',
   'lastSeenVersion',
@@ -1111,6 +1116,7 @@ export const useUIStore = create<UIState>()((set, get) => ({
       }
     }
   }),
+  setProjectsRootFolder: (folder) => set({ projectsRootFolder: normalizeVaultFolder(folder) }),
   setPendingTemplateInsert: (template) => set({ pendingTemplateInsert: template }),
   setOllama: (settings) => set((state) => ({ ollama: { ...state.ollama, ...settings } })),
   setBrain: (settings) => set((state) => ({ brain: { ...state.brain, ...settings } })),
@@ -1359,6 +1365,10 @@ export async function initializeUISettings(): Promise<void> {
         }
         if (Array.isArray(dash.widgets) && !dash.widgets.includes('antares')) {
           dash.widgets = [...dash.widgets, 'antares']
+        }
+        // Auto-migrate: 'project-status' bei bestehenden Installationen einfügen (eingeführt 2026-05-17)
+        if (Array.isArray(dash.widgets) && !dash.widgets.includes('project-status')) {
+          dash.widgets = [...dash.widgets, 'project-status']
         }
         if (typeof dash.radarAiEnabled !== 'boolean') dash.radarAiEnabled = true
         if (typeof dash.radarAiRefreshIntervalHours !== 'number' || dash.radarAiRefreshIntervalHours <= 0) {

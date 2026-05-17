@@ -19,6 +19,7 @@ export type ModuleId =
   | 'mail-summary'
   | 'dashboard-snapshot'
   | 'smart-connections'
+  | 'project-status'
 
 export interface ModelMetrics {
   formatCompliancePct?: number
@@ -52,7 +53,11 @@ export const MODULES: ModuleDescriptor[] = [
   // (siehe llama3.1 im Bench vom 2026-05-14) den Modell-Output direkt in die
   // sichtbare Radar-Anzeige bringt — bei UNTRUSTED Notiz-Inhalt ein Sicherheitsrisiko.
   { id: 'dashboard-snapshot', damageRelevant: true  },
-  { id: 'smart-connections',  damageRelevant: false }
+  { id: 'smart-connections',  damageRelevant: false },
+  // Project-Status nicht damageRelevant: Output landet in einem klar
+  // markierten Draft (`_STATUS-WW.md`), nie in der kanonischen Statusseite.
+  // Nutzer reviewt vor dem Übernehmen — Halluzinationen sind Cosmetic, kein Sicherheitsrisiko.
+  { id: 'project-status',     damageRelevant: false }
 ]
 
 export interface ModelCompatibilityData {
@@ -181,7 +186,32 @@ export const MODEL_COMPATIBILITY: ModelCompatibilityData = {
         metrics: { recallPct: 100, latencySecondsPerRun: 1, ramGigabytes: 6 }
       }
     },
-    'smart-connections':   {}
+    'smart-connections':   {},
+    // Project-Status — noch keine systematischen Benchmarks. Empirie aus dem
+    // Crystallizer-Bash-Prototyp (Mai 2026, Pre-Demo Startup-Weekend):
+    // gemma4:latest produzierte saubere Status-Drafts mit 0–1 ⚠ pro Lauf,
+    // qwen3.6:latest stärker bei langen Quellenketten, aber 25s/Lauf.
+    // Kleine Modelle (≤8B) neigten zu generischen Floskeln in "Diese Woche".
+    'project-status':      {
+      'gemma4:latest': {
+        verdict: 'green',
+        reasons: [],
+        notes: 'Empirisch sauber, schnell (~30 s/Projekt auf M2). Empfohlener Standard.',
+        metrics: { latencySecondsPerRun: 30, ramGigabytes: 10 }
+      },
+      'qwen3.6:latest': {
+        verdict: 'green',
+        reasons: [],
+        notes: 'Beste Qualität bei vielen Quellen, aber langsam (~90 s/Projekt) und ≥48 GB RAM.',
+        metrics: { latencySecondsPerRun: 90, ramGigabytes: 48 }
+      },
+      'ministral-3:8b': {
+        verdict: 'yellow',
+        reasons: ['Neigt zu Floskeln in "Diese Woche"', 'Wenige Backlinks bei dichten Quellen'],
+        notes: 'Reicht für simple Projekte mit ≤2 Brain-Tagen; bei dichteren Wochen besser gemma4.',
+        metrics: { latencySecondsPerRun: 12, ramGigabytes: 6 }
+      }
+    }
   }
 }
 
@@ -191,7 +221,8 @@ export const RECOMMENDED_DEFAULTS: Partial<Record<ModuleId, string>> = {
   'brain':              'ministral-3:8b',
   'task-extraction':    'gemma4:latest',
   'mail-summary':       'ministral-3:8b',
-  'dashboard-snapshot': 'gemma4:latest'
+  'dashboard-snapshot': 'gemma4:latest',
+  'project-status':     'gemma4:latest'
 }
 
 // Verdict für ein konkretes Modell und Modul nachschlagen.

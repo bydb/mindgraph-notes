@@ -9,6 +9,18 @@ import { SyncEngine } from './sync/syncEngine'
 import { ReMarkableService } from './remarkable/service'
 import { consolidateDay } from './brain/dailyConsolidation'
 import type { BrainConsolidateInput } from './brain/types'
+import { crystallizeProject } from './projectStatus/crystallizer'
+import { cleanupFindings as cleanupProjectStatusFindings, deleteDraftFile } from './projectStatus/cleanup'
+import {
+  discoverProjects,
+  buildStatusMarkerFile,
+  suggestKeywords
+} from './projectStatus/discovery'
+import type {
+  ProjectStatusCrystallizeInput,
+  ProjectPriority,
+  ProjectStatusMarker
+} from './projectStatus/types'
 import { setupTray, hideTransportWindow, updateShortcut, showTransportWindow } from './transport/trayManager'
 
 // Globale Fehlerbehandlung für unhandled exceptions (z.B. IMAP Socket-Timeouts)
@@ -2709,6 +2721,170 @@ ipcMain.handle('brain-consolidate-day', async (_event, input: BrainConsolidateIn
       return { success: false, error: 'Modell fehlt' }
     }
     return await consolidateDay(input, assertSafePath)
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : 'Unbekannter Fehler'
+    }
+  }
+})
+
+// ────────────────────────────────────────────────────────────────────────────
+// Projekt-Status-Crystallizer
+//
+// Vier Handler, alle gegen den approved-vault-Mechanismus geschützt:
+//   - discover        Liste markierter Projekte (mit Brain-Signal-Alter)
+//   - suggest-keywords Vorschläge für Markierungs-Dialog
+//   - mark            Anlegen / Aktualisieren der `_STATUS.md`
+//   - crystallize     Sonntag-Lauf: Wochen-Status erzeugen (Ollama-lokal)
+// ────────────────────────────────────────────────────────────────────────────
+
+ipcMain.handle('project-status-discover', async (_event, vaultPath: string, projectsFolderRel: string) => {
+  try {
+    if (!vaultPath || typeof vaultPath !== 'string') {
+      return { success: false, error: 'vaultPath fehlt' }
+    }
+    if (!projectsFolderRel || typeof projectsFolderRel !== 'string') {
+      return { success: false, error: 'projectsFolderRel fehlt' }
+    }
+    assertApprovedVault(vaultPath, 'project-status-discover')
+    const projects = await discoverProjects(vaultPath, projectsFolderRel)
+    return { success: true, projects }
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : 'Unbekannter Fehler'
+    }
+  }
+})
+
+ipcMain.handle('project-status-suggest-keywords', async (_event, vaultPath: string, projectFolderRel: string) => {
+  try {
+    if (!vaultPath || typeof vaultPath !== 'string') {
+      return { success: false, error: 'vaultPath fehlt' }
+    }
+    if (!projectFolderRel || typeof projectFolderRel !== 'string') {
+      return { success: false, error: 'projectFolderRel fehlt' }
+    }
+    assertApprovedVault(vaultPath, 'project-status-suggest-keywords')
+    const keywords = await suggestKeywords(vaultPath, projectFolderRel)
+    return { success: true, keywords }
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : 'Unbekannter Fehler'
+    }
+  }
+})
+
+ipcMain.handle('project-status-mark', async (
+  _event,
+  vaultPath: string,
+  projectFolderRel: string,
+  keywords: string[],
+  priority: ProjectPriority
+) => {
+  try {
+    if (!vaultPath || typeof vaultPath !== 'string') {
+      return { success: false, error: 'vaultPath fehlt' }
+    }
+    if (!projectFolderRel || typeof projectFolderRel !== 'string') {
+      return { success: false, error: 'projectFolderRel fehlt' }
+    }
+    if (!Array.isArray(keywords) || keywords.length === 0) {
+      return { success: false, error: 'Keywords leer — bitte mindestens einen Begriff angeben.' }
+    }
+    if (priority !== 'high' && priority !== 'med' && priority !== 'low') {
+      return { success: false, error: 'Priority ungültig (high | med | low erwartet)' }
+    }
+    assertApprovedVault(vaultPath, 'project-status-mark')
+
+    const projectAbs = path.join(vaultPath, projectFolderRel)
+    const projectName = path.basename(projectAbs)
+    const targetAbs = path.join(projectAbs, '_STATUS.md')
+    const safeTarget = await assertSafePath(targetAbs, 'project-status-mark:write')
+
+    // Wenn _STATUS.md schon existiert → wir überschreiben sanft, aber nur den Marker-Teil.
+    // Für die MVP-Phase: einfaches Überschreiben mit neuem Marker.
+    const marker: ProjectStatusMarker = { project: projectName, keywords: keywords.map(k => k.trim()).filter(Boolean), priority }
+    const content = buildStatusMarkerFile(marker, 'de')
+    await fs.writeFile(safeTarget, content, 'utf-8')
+
+    return { success: true, statusFilePath: safeTarget }
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : 'Unbekannter Fehler'
+    }
+  }
+})
+
+ipcMain.handle('project-status-crystallize', async (_event, input: ProjectStatusCrystallizeInput) => {
+  try {
+    if (!input || typeof input !== 'object') {
+      return { success: false, error: 'Ungültige Eingabe' }
+    }
+    if (!input.vaultPath || typeof input.vaultPath !== 'string') {
+      return { success: false, error: 'vaultPath fehlt' }
+    }
+    if (!input.projectFolderRel || typeof input.projectFolderRel !== 'string') {
+      return { success: false, error: 'projectFolderRel fehlt' }
+    }
+    if (!input.model || typeof input.model !== 'string') {
+      return { success: false, error: 'Modell fehlt — bitte in den Einstellungen ein Ollama-Modell wählen' }
+    }
+    if (input.language !== 'de' && input.language !== 'en') {
+      return { success: false, error: 'Language ungültig (de | en erwartet)' }
+    }
+    assertApprovedVault(input.vaultPath, 'project-status-crystallize')
+    return await crystallizeProject(input, assertSafePath)
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : 'Unbekannter Fehler'
+    }
+  }
+})
+
+// Aufräumen: vom Nutzer markierte Wikilinks (Halluzinationen oder inhaltlich
+// falsche Verweise) aus einem bereits erstellten _STATUS-Draft entfernen.
+// Frischt die Hinweis-Sektion am Ende neu auf.
+ipcMain.handle('project-status-cleanup', async (_event, vaultPath: string, filePath: string, refsToRemove: string[], language: 'de' | 'en') => {
+  try {
+    if (!vaultPath || typeof vaultPath !== 'string') {
+      return { success: false, error: 'vaultPath fehlt' }
+    }
+    if (!filePath || typeof filePath !== 'string') {
+      return { success: false, error: 'filePath fehlt' }
+    }
+    if (!Array.isArray(refsToRemove)) {
+      return { success: false, error: 'refsToRemove muss ein Array sein' }
+    }
+    if (language !== 'de' && language !== 'en') {
+      return { success: false, error: 'Language ungültig (de | en erwartet)' }
+    }
+    assertApprovedVault(vaultPath, 'project-status-cleanup')
+    return await cleanupProjectStatusFindings(vaultPath, filePath, refsToRemove, language, assertSafePath)
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : 'Unbekannter Fehler'
+    }
+  }
+})
+
+// Status-Draft löschen (`_STATUS-2026-W21.md`, `(2).md`, ...). Die Engine
+// prüft per Dateinamen-Pattern, dass NUR Drafts gelöscht werden.
+ipcMain.handle('project-status-delete-draft', async (_event, vaultPath: string, filePath: string) => {
+  try {
+    if (!vaultPath || typeof vaultPath !== 'string') {
+      return { success: false, error: 'vaultPath fehlt' }
+    }
+    if (!filePath || typeof filePath !== 'string') {
+      return { success: false, error: 'filePath fehlt' }
+    }
+    assertApprovedVault(vaultPath, 'project-status-delete-draft')
+    return await deleteDraftFile(filePath, assertSafePath)
   } catch (err) {
     return {
       success: false,

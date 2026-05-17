@@ -7,12 +7,14 @@ Obsidian-ähnliche Markdown-Notiz-App mit Wissensgraph, Flashcards, Spaced Repet
 - **Electron** + **electron-vite** + **React 19** + **TypeScript**
 - **CodeMirror 6** als Markdown-Editor (drei Modi: Markdown, Schreiben, Lesen)
 - **turndown** für WYSIWYG-Roundtrip im Lesen-Modus (HTML → Markdown)
-- **Zustand** für State Management (15 Stores)
+- **Zustand** für State Management (16 Stores)
 - **markdown-it** für Rendering
 - **xterm.js + node-pty** für integriertes Terminal
 - **imapflow + mailparser + nodemailer + Ollama** für Email-Client (Empfang, Analyse, Versand, IMAP-Sent-Append)
 - **@huggingface/transformers + ONNX Runtime** für eingebautes Whisper STT (Renderer)
 - **grammy** + eigener Tool-Use-Loop für Telegram-Agent
+- **Antares CS** (h+h Software) Reverse-Engineering für Medienzentren-Verleih (Cookie+PID-Session)
+- **bge-m3** Embedding-Modell + Ollama-Chat-Modell als LLM-as-Judge-Reranker (Smart Connections)
 - CSS mit globalen Variablen (color-mix-Tokens, kein CSS-in-JS Framework)
 
 ## Projektstruktur
@@ -29,6 +31,10 @@ app/
 │   │   ├── edooboxService.ts  # edoobox V2-Client (+ listDatesForOffer für Teilnehmerliste)
 │   │   ├── marketingService.ts # WordPress REST API Client
 │   │   ├── formularParser.ts  # DOCX-Akkreditierungsformular-Parser
+│   │   ├── antaresService.ts  # Antares CS 2.0.4 Reverse-Engineering (Cookie+PID, read-only)
+│   │   ├── attendanceListService.ts  # Teilnehmerliste-Generator (DOCX, Schulamt-Vorlage)
+│   │   ├── iqReportService.ts  # IQ-Report-Export (DOCX/XLSX) für Veranstaltungen
+│   │   ├── ankiImport.ts  # .apkg-Import inkl. Medien-Extraktion
 │   │   ├── brain/      # Lokales Tagesgedächtnis (dailyConsolidation.ts, hardcoded localhost:11434)
 │   │   ├── calendar/   # macOS EventKit (Swift-Helper)
 │   │   ├── llm/        # Unified Chat-Client (Ollama + Anthropic) + chatWithTools()
@@ -49,11 +55,12 @@ app/
 │       │   ├── InboxPanel/  # Smart Email Client (Inbox, Compose-Modal via createPortal, KI-Chat)
 │       │   ├── AgentPanel/  # Veranstaltungs-Agent (edoobox) + Marketing + IQ
 │       │   ├── Terminal/    # Integriertes Terminal (xterm.js + PTY)
-│       │   ├── ResearchPanel/  # Semantic Scholar + OpenAlex + Zotero CSL
+│       │   ├── SemanticScholarPanel/  # Semantic Scholar + OpenAlex + Zotero CSL
 │       │   ├── NotesChat/ SmartConnectionsPanel/ ZoteroSearch/ ...
+│       │   ├── DashboardPanel/AntaresWidget  # Verleih-Dashboard für Medienzentren
 │       │   └── Settings/ # inkl. ModelCompatibilitySection + ActiveModelStatusBadge
 │       │       └── Onboarding/ ...
-│       ├── stores/      # Zustand Stores (15)
+│       ├── stores/      # Zustand Stores (16)
 │       ├── styles/      # index.css (globale Styles + color-mix-Tokens)
 │       └── utils/       # Hilfsfunktionen
 │           ├── noteKind.ts        # 🔴🟢🔵-Kategorien zentral (NOTE_KINDS, canvasColor, ...)
@@ -86,8 +93,8 @@ npm run dist:mac     # Nur macOS Installer
 ### IPC-Kommunikation
 Neuer IPC-Handler: `ipcMain.handle()` in `main/index.ts` + `contextBridge.exposeInMainWorld()` in `preload.ts`.
 
-### State Management (Zustand, 15 Stores)
-- **uiStore**: UI-Einstellungen, persisted via `persistedKeys` Array. Enthält u.a. `ollama.moduleModelOverrides`, `brain.folderPath`, `notesRootFolder`, `fileTreeKindFilter`, `dashboard.radarAi*`, `editorDefaultView`
+### State Management (Zustand, 16 Stores)
+- **uiStore**: UI-Einstellungen, persisted via `persistedKeys` Array. Enthält u.a. `ollama.moduleModelOverrides`, `brain.folderPath`, `notesRootFolder`, `fileTreeKindFilter`, `dashboard.radarAi*`, `editorDefaultView`, `imagesFolder`, `smartConnections.useLLMReranker`
 - **notesStore**: Notizen, Vault-Daten
 - **tabStore**: Tab-Verwaltung (Editor, Canvas, Dashboard, Code-Viewer)
 - **graphStore**: Graph-Canvas Positionen, Edges
@@ -96,9 +103,10 @@ Neuer IPC-Handler: `ipcMain.handle()` in `main/index.ts` + `contextBridge.expose
 - **bookmarkStore**: Lesezeichen
 - **reminderStore**: Erinnerungen für Tasks
 - **syncStore**: Sync-Status (localStorage, key: `mindgraph-sync`)
-- **emailStore**: Email-Abruf, Analyse, Compose, KI-Chat, Senden. Modul-Override + `isHardLocked('task-extraction')`-Check
+- **emailStore**: Email-Abruf, Analyse, Compose, KI-Chat, Senden. Modul-Override + `isHardLocked('task-extraction')`-Check + Re-Analyse einzelner Mails (`reanalyzeEmail`)
 - **agentStore**: Veranstaltungs-Import, edoobox-Push, Marketing, Status-Tracking, IQ-Export
 - **contactStore**: Kontakt-Aggregation (Email + edoobox + Vault)
+- **antaresStore**: Antares-CS-Daten (Entleiher, Verleihe, Dashboard-Counts). Geschützt durch `electron.safeStorage` für Credentials.
 - **vaultSettingsStore**: Pro-Vault-Feature-Toggles (`vault-settings.json`)
 - **voiceStore**: STT/TTS-State (Engine, Modell-Lade-Status, Aufnahme-State)
 - Selektoren: `useShallow` aus `zustand/react/shallow` verwenden — siehe `MarkdownEditor.tsx` und `DashboardView.tsx` als Referenz
@@ -151,8 +159,26 @@ Globale Variablen in `styles/index.css`. Komponenten-CSS ist colocated.
 - Sensoren: berührte Notizen (aus `contextMemory` + Datei-mtime), erledigte Tasks, empfangene/beantwortete Mails, optional Daily-Note-Body (≤2000 Zeichen).
 - Output: 4-Sektionen-Schema (Heute im Fokus / Was ich gemacht habe / Offene Fäden / Beobachtung) mit Frontmatter `type: brain-day`.
 - **Wikilink-Postprocessor** in `dailyConsolidation.ts`: wickelt exakte Titel im Output in `[[…]]`, falls Modell die Regel ignoriert.
+- **Phantom-Notiz-Filter** (v0.6.45): Sensor filtert Events aus `contextMemory` zu nicht mehr existierenden Notizen heraus — vorher wurden gelöschte/verschobene Notizen als „berührt" gemeldet.
 - **Tageszusammenfassungen werden nie überschrieben** — wiederholte Klicks erzeugen `TT (2).md`, `TT (3).md`. Human-in-the-Loop ist Architektur, kein Setting.
 - Default-Ordner: `800 - 🧠 brain/JJJJ/MM/TT.md` (konfigurierbar via `brain.folderPath`).
+
+### Smart Connections (Ähnlichkeitssuche)
+- `renderer/components/SmartConnectionsPanel/SmartConnectionsPanel.tsx`.
+- **Embeddings**: bevorzugt `bge-m3` (multilingual, deutlich bessere Score-Spreizung für deutsche Vaults), Fallback `nomic-embed-text`, sonst erstes verfügbares Embedding-Modell.
+- **Score-Mischung**: Embedding-Ähnlichkeit + Keyword-Matching (RegExp mit `escapeRegExp()` gegen Sonderzeichen) + Wikilinks/Tags/Ordner-Nähe, konfigurierbare Gewichte.
+- **LLM-as-Judge-Reranker** (v0.6.45, opt-in via `smartConnections.useLLMReranker`): nach der Embedding-Suche bewertet das aktuelle Ollama-Chat-Modell die Top-Kandidaten paarweise mit strukturiertem JSON-Output (Fallback-Parser für Fließtext-Antworten). Workaround: Ollama hat aktuell keine nativen Cross-Encoder — dedizierte Reranker-GGUFs crashen den Loader. Trade-off: ~1–3 s pro Kandidat, Scores eher grob.
+- **Email-Metadaten-Filter** (v0.6.45): vor dem Embedding wird der Email-Header-Block (`**Von:** …`, `**An:** …`, etc.) entfernt, damit Mails nicht alle in einem „Metadaten-Cluster" landen. `CACHE_VERSION=2` — alte Embeddings einmalig neu berechnet beim ersten Öffnen.
+- **Markdown-Bold in Headings** (v0.6.43 Fix): Heading-Tokenizer in `extractKeywords()` splittet auch an `*` — `## **Frühstück**` crashed vorher die RegExp-Konstruktion mit „Nothing to repeat".
+
+### Antares CS Integration (Medienzentren-Verleih, seit v0.6.45)
+- `main/antaresService.ts` + `renderer/stores/antaresStore.ts` + Dashboard-Widget.
+- **Reverse-engineered gegen Antares CS 2.0.4** (h+h Software / antares.net) — das Verleihsystem vieler deutscher Medienzentren. Keine offizielle API; Cookie+PID-Session wie im Browser. Endpunkte können mit Antares-Upgrades brechen.
+- **Credentials in `electron.safeStorage`** verschlüsselt, IPC: `antares-save-credentials`, `antares-load-credentials`, `antares-test-connection`.
+- **Read-only**: liest Entleiher, Verleihe, offene Anfragen, Mahnungen. **Kein Schreibzugriff** — Sicherheitsentscheidung.
+- **Dashboard-Widget** in voller Breite: 3-Spalten-Layout aus dem Antares-Original (Nutzerverwaltung / Technikverleih / Medienverleih) mit Status-Kacheln + aufklappbare Mahnungs-Tabelle (Leihnr/Titel/Entleiher/Schule/Rückgabedatum).
+- **Aktivierung**: Einstellungen → Module → „Antares Medienzentrum" toggle, dann Einstellungen → Agenten → Antares-Sektion: URL/Kontext/Credentials + Verbindungstest. Auto-Migrate ergänzt das Widget bei bestehenden Installationen.
+- Dokumentation: `docs/antares-integration.md`.
 
 ### Relevanz-Radar (Dashboard-Widget „Relevante Notizen")
 - `DashboardPanel/DashboardView.tsx` → `RadarWidget`.

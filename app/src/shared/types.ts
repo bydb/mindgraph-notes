@@ -988,6 +988,14 @@ export interface ElectronAPI {
 
   // Brain (lokales Tagesgedächtnis)
   brainConsolidateDay: (input: BrainConsolidateInput) => Promise<BrainConsolidateResult>;
+
+  // Projekt-Status-Crystallizer
+  projectStatusDiscover: (vaultPath: string, projectsFolderRel: string) => Promise<{ success: boolean; projects?: DiscoveredProject[]; error?: string }>;
+  projectStatusMark: (vaultPath: string, projectFolderRel: string, keywords: string[], priority: 'high' | 'med' | 'low') => Promise<{ success: boolean; statusFilePath?: string; error?: string }>;
+  projectStatusSuggestKeywords: (vaultPath: string, projectFolderRel: string) => Promise<{ success: boolean; keywords?: string[]; error?: string }>;
+  projectStatusCrystallize: (input: ProjectStatusCrystallizeInput) => Promise<ProjectStatusResult>;
+  projectStatusCleanup: (vaultPath: string, filePath: string, refsToRemove: string[], language: 'de' | 'en') => Promise<{ success: boolean; removedLineCount?: number; remainingFindings?: LintFinding[]; error?: string }>;
+  projectStatusDeleteDraft: (vaultPath: string, filePath: string) => Promise<{ success: boolean; error?: string }>;
 }
 
 // Brain (lokales Tagesgedächtnis — Phase 1)
@@ -1043,6 +1051,90 @@ export interface BrainConsolidateInput {
 export interface BrainConsolidateResult {
   success: boolean;
   notePath?: string;
+  error?: string;
+}
+
+// Projekt-Status-Crystallizer
+//
+// Idee: Aus deinen Tagesnotizen (Brain), Inbox-Mails und Projekt-Dateien
+// destilliert das Modul wöchentlich pro markiertem Projekt einen lebenden
+// Status — lokal via Ollama, mit Wikilink-Lint und Audit-Trail.
+//
+// Markierung pro Projekt:
+//   Frontmatter in `<Projektordner>/_STATUS.md` mit `keywords:` + `priority:`.
+//   Existiert die Datei, ist das Projekt eingeschrieben.
+//
+// Wochen-Output:
+//   `<Projektordner>/_STATUS-<ISO-Woche>.md` (Draft — wird nie überschrieben).
+
+export type ProjectPriority = 'high' | 'med' | 'low';
+
+/** Frontmatter-Marker, der ein Projekt für den Crystallizer aktiviert. */
+export interface ProjectStatusMarker {
+  project: string;        // Anzeigename (in der Regel = Ordnername)
+  keywords: string[];     // Identifikations-Begriffe für Brain-/Inbox-Filterung
+  priority: ProjectPriority;
+}
+
+/** Ein in der Übersicht gefundenes, markiertes Projekt. */
+export interface DiscoveredProject {
+  folderName: string;             // z.B. "134 - AIS chat change"
+  folderRel: string;              // vault-relativer Pfad zum Ordner
+  marker: ProjectStatusMarker;
+  lastBrainSignal: {
+    date: string | null;          // YYYY-MM-DD oder null wenn kein Signal in 60 Tagen
+    ageDays: number | null;       // Tage seit letztem Signal, null = unbekannt/zu alt
+  };
+  currentWeekDraft: string | null; // vault-relativer Pfad zum neuesten `_STATUS-<WW>*.md` oder null
+  currentWeekDrafts: string[];     // alle Drafts der aktuellen Woche, neueste zuerst
+}
+
+/** Ein vorgefilterter Brain-Tag, der das Projekt-Keyword matched. */
+export interface ProjectStatusBrainEntry {
+  date: string;               // YYYY-MM-DD aus Pfad
+  body: string;               // Inhalt ohne YAML-Frontmatter
+  evidence: string[];         // welche Keywords matched haben
+}
+
+/** Eine projektzugehörige Quell-Datei (Projektdatei oder Inbox-Note). */
+export interface ProjectStatusSourceFile {
+  name: string;               // basename ohne .md
+  pathRel: string;            // vault-relativer Pfad
+  content: string;            // ggf. gekürzt auf ~60 Zeilen wenn zu groß
+  origin: 'project' | 'inbox';
+}
+
+/** Eingabe für den Crystallize-Lauf eines Projekts. */
+export interface ProjectStatusCrystallizeInput {
+  vaultPath: string;
+  projectFolderRel: string;   // z.B. "100 - ✅ Projekte/134 - AIS chat change"
+  model: string;              // z.B. "gemma4:latest"
+  language: 'de' | 'en';
+  brainFolderRel?: string;    // optional — Standard "800 - 🧠 brain"
+  inboxFolderRel?: string;    // optional — Standard "000 - 📥 inbox/010 - 📥 Notes"
+}
+
+/** Lint-Findung im erzeugten Status — drei Klassen. */
+export type LintFindingKind =
+  | 'hallucination'            // ⚠ — Wikilink zu nicht existierender Datei
+  | 'suggestion'               // 💡 — Wikilink fast richtig (ZK-ID/Emoji-Präfix fehlt)
+  | 'markdown-link';           // 📝 — `[Text]` wo `[[Text]]` gemeint sein dürfte
+
+export interface LintFinding {
+  kind: LintFindingKind;
+  ref: string;                 // wie es im Text steht
+  count: number;               // Vorkommen im Dokument
+  suggestion?: string;         // Empfehlung (für `suggestion` und `markdown-link`)
+}
+
+/** Ergebnis eines Crystallize-Laufs. */
+export interface ProjectStatusResult {
+  success: boolean;
+  notePath?: string;            // absoluter Pfad zur erstellten `_STATUS-<WW>.md`
+  weekTag?: string;             // z.B. "2026-W21"
+  brainEntriesUsed?: number;
+  inboxNotesUsed?: number;
+  findings?: LintFinding[];
   error?: string;
 }
 

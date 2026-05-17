@@ -31,6 +31,7 @@ import {
   getNoteRelevance
 } from '../../utils/noteKind'
 import { ErrorBoundary } from '../ErrorBoundary'
+import { ProjectStatusWidget } from '../ProjectStatusPanel/ProjectStatusWidget'
 import { isHardLocked } from '../../../shared/modelCompatibility'
 import './DashboardView.css'
 
@@ -323,6 +324,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onOpenInbox, onOpe
       case 'antares':
         inner = <AntaresWidget t={t} />
         label = t('dashboard.widgets.antares')
+        break
+      case 'project-status':
+        inner = <ProjectStatusWidget t={t} />
+        label = t('dashboard.widgets.projectStatus')
         break
       case 'sync':
         return null

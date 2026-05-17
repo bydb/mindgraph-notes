@@ -598,5 +598,19 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // Brain (lokales Tagesgedächtnis — ausschließlich lokal via Ollama)
   brainConsolidateDay: (input: unknown) =>
-    ipcRenderer.invoke('brain-consolidate-day', input)
+    ipcRenderer.invoke('brain-consolidate-day', input),
+
+  // Projekt-Status-Crystallizer
+  projectStatusDiscover: (vaultPath: string, projectsFolderRel: string) =>
+    ipcRenderer.invoke('project-status-discover', vaultPath, projectsFolderRel),
+  projectStatusSuggestKeywords: (vaultPath: string, projectFolderRel: string) =>
+    ipcRenderer.invoke('project-status-suggest-keywords', vaultPath, projectFolderRel),
+  projectStatusMark: (vaultPath: string, projectFolderRel: string, keywords: string[], priority: string) =>
+    ipcRenderer.invoke('project-status-mark', vaultPath, projectFolderRel, keywords, priority),
+  projectStatusCrystallize: (input: unknown) =>
+    ipcRenderer.invoke('project-status-crystallize', input),
+  projectStatusCleanup: (vaultPath: string, filePath: string, refsToRemove: string[], language: string) =>
+    ipcRenderer.invoke('project-status-cleanup', vaultPath, filePath, refsToRemove, language),
+  projectStatusDeleteDraft: (vaultPath: string, filePath: string) =>
+    ipcRenderer.invoke('project-status-delete-draft', vaultPath, filePath)
 })

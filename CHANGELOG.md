@@ -2,6 +2,38 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.6.46-beta] - 2026-05-17
+
+### Features
+
+- **Projekt-Status-Crystallizer**: Neues Dashboard-Widget, das pro markiertem Projekt einen wöchentlichen Status-Entwurf erzeugt — aus deinen Tagesnotizen (Brain), Inbox-Mails und Projekt-Dateien. Komplett lokal via Ollama (`localhost:11434`, hardcoded — keine Cloud-Fallbacks). Markierung pro Projekt durch eine `_STATUS.md`-Datei im Projektordner mit Frontmatter (`keywords`, `priority`). Ergebnis landet als `_STATUS-<ISO-Woche>.md` im Projektordner — nie überschreibend, Drafts der gleichen Woche werden zu `(2)`, `(3)` etc. Engine in `main/projectStatus/` (crystallizer/discovery/wikilinkLint/cleanup), UI in `renderer/components/ProjectStatusPanel/`, Zustand-Store `projectStatusStore.ts`. Sechstes Modul in der Modell-Kompatibilitäts-Matrix (`shared/modelCompatibility.ts`) mit empirischen Verdicts für gemma4:latest (grün), qwen3.6:latest (grün, langsam, 48 GB RAM), ministral-3:8b (gelb — Floskel-Tendenz). Volle Doku in `docs/feature-crystallizer.md`, priorisiertes Backlog in `docs/feature-crystallizer-todo.md`.
+- **Einstellungen → Projekt-Ordner (Crystallizer)**: Eigener Folder-Picker in Einstellungen → Allgemein → Vault, analog zum Notizen-Ordner. Standard ist leer — bei nicht gesetztem Pfad zeigt das Widget eine erklärende Empty-State-Sektion mit Verweis auf die Einstellungen und deaktiviert „+ Projekt markieren". Damit funktioniert das Modul für jedes Vault, nicht nur PARA-Strukturen.
+- **„🛠 Prüfen & aufräumen"-Review-Modal**: Pro Lint-Finding (⚠ Halluzination, 💡 Linkvervollständigung, 📝 Markdown-Syntax-Verdacht) ein 🗑-Knopf, der die betroffene Zeile aus der erzeugten Status-Notiz entfernt — inkl. frischem Lint-Pass nach dem Entfernen. Findings sind nach Klasse gruppiert mit kurzer Erklärung pro Gruppe. Backend in `main/projectStatus/cleanup.ts` mit `cleanupFindings()`.
+- **„🗂 Wochen-Entwürfe aufräumen"-Modal**: Bei ≥2 Drafts pro Woche wird das Badge „N Entwürfe diese Woche" klickbar. Modal listet alle Drafts mit Datum/Zeit, markiert den neuesten, bietet einzeln 🗑 + Bulk-Aktion „Alle bis auf den neuesten löschen". Engine erlaubt nur Dateinamen, die exakt dem `_STATUS-YYYY-WWW(*).md`-Pattern entsprechen — kein Path-Traversal möglich.
+- **Excel-Tabellen als Crystallizer-Quelle**: `.xlsx`-Dateien im Projektordner werden via `parseExcel()` (`office/officeService.ts`) gelesen und pro Sheet als Markdown-Tabelle in den Prompt gegeben. Lock-Files (`~$…`) und versteckte Dateien werden übersprungen. Wichtig u.a. für Rebranding-Checklisten, in denen der User dokumentiert hat, was schon erledigt ist.
+
+### Improvements
+
+- **Sentence-Level Vorfilter** für Brain-Tage und Inbox-Notes: Multi-thematische Quellen (Wochen-Infomailings, die mehrere Projekte mischen) werden vor dem LLM-Aufruf auf Satz-Ebene gefiltert — nur Sätze mit Keyword-Treffer plus optional ein Nachbar-Satz gehen ins Prompt. Off-Topic-Inhalt erreicht das LLM gar nicht erst. Verlässt sich nicht mehr auf Prompt-Anweisungen wie „bitte ignoriere das andere".
+- **Quellen→Sektion-Trennung im Prompt**: „In einem Satz" und „Status" speisen sich aus Projekt-Dateien (was IST das Projekt); „Diese Woche" ausschließlich aus Brain-Tagen (mit Fallback „Diese Woche keine konkrete Bewegung am Projekt sichtbar" wenn nichts da ist); Stakeholder/Wichtige Daten/Risiken primär aus Projekt-Dateien. Faustregel im Prompt: *„Wenn nur Brain dir sagt, worum es im Projekt geht, ist das ein Bug."*
+- **NFC-Unicode-Normalisierung im Wikilink-Lint-Vault-Index**: macOS speichert Filenames als NFD (`a` + Combining Diaeresis), LLM-Output ist NFC (precomposed `ä`). Ohne Normalisierung versagten Byte-Vergleiche bei Umlauten. Python3 `unicodedata.normalize('NFC', …)` läuft beim Index-Aufbau über alle Vault-Basenames — `iconv -f UTF-8-MAC` ist trotz Name kein NFC-Normalisierer (Lessons-Learned vom Bash-Prototyp übernommen).
+- **Wikilink-Lint mit Suffix- und Prefix-Match**: Ein `[[AIS.chat Umstellung Zeitplan]]` wird als 💡-Vorschlag (statt ⚠ Halluzination) markiert, wenn `202605121001 - 🔴 AIS.chat Umstellung Zeitplan.md` existiert (Suffix-Match nach Space). Bei ZK-ID-Targets (`[[202604301437]]`) wird Prefix-Match versucht. Plus Emoji-Strip am Anfang des Targets, damit `[[⏳ Zeitplan & Zuständigkeiten]]` auf `Zeitplan & Zuständigkeiten.md` matcht.
+- **Markdown-Syntax-Verdacht (📝)**: Lint erkennt orphan `[Text]` Single-Bracket-Patterns, die auf eine Vault-Datei zeigen würden, und schlägt die Wikilink-Form vor. Footnotes (`[^1]`), Checkboxen (`[x]`) und echte Markdown-Links (`[Text](url)`) werden korrekt ignoriert.
+- **Auto-Migration für project-status-Widget**: Bestehende Vaults bekommen das Widget bei der nächsten App-Versions-Migration automatisch in die Dashboard-Widget-Liste eingefügt, analog zur Antares-Widget-Migration in v0.6.45.
+- **CLAUDE.md aktualisiert** (Stand 0.6.46-beta): Stores 15 → 16 inkl. `antaresStore`, `ResearchPanel` → `SemanticScholarPanel`, neue Service-Dateien (`antaresService`, `attendanceListService`, `iqReportService`, `ankiImport`) ergänzt, Smart-Connections-Sektion mit bge-m3-Default und LLM-as-Judge-Reranker, neue Antares-CS-Integrations-Sektion, Phantom-Notiz-Filter in der Brain-Sektion.
+
+### Fixes
+
+- **Gemma-„nested"-Wikilink-Reparatur** (`[[Teilversion[[Vollversion]]]`): Wenn das Modell sich beim Wikilink-Schreiben umentscheidet, hängt es manchmal beide Varianten aneinander. Cleanup-Sed-Pass in `crystallizer.ts` extrahiert die innere (gewählte) Variante. Tritt auch bei `think:false` auf — ist kein Streaming-Artefakt, sondern Modell-Eigenheit.
+- **Brain-Tag-Wikilink-Format-Halluzination**: Gemma-Modelle produzierten manchmal `[[Brain-Tag 2026-05-13]]` statt `[[2026-05-13]]`, weil der Prompt-Hinweis „Brain-Tag" als Label interpretiert wurde. Behoben durch (a) Brain-Section-Heading direkt als `### [[2026-05-13]]` zu formatieren, damit das Modell die Form mimt, (b) explizites Anti-Beispiel im Prompt, (c) Sentence-Level-Vorfilter, der die meisten halluzinierten Brain-Tags strukturell verhindert.
+- **Ollama-Streaming-Artefakte beim Wikilink-Schreiben**: Die ursprüngliche CLI-Pipeline (`ollama run`) ließ ANSI-Cursor-Codes durch, die zwischen Token-Updates zerhackte Wörter hinterließen. Umgestellt auf HTTP-API (`http://localhost:11434/api/generate`) mit `stream: false` und `think: false`. Saubere Antwort in einem Rutsch, ~30 % schnellere Latenz.
+- **Brain-Filter berücksichtigt YAML-Frontmatter nicht mehr**: Der Brain-Sensor durchsuchte ursprünglich auch den Frontmatter-Bereich der Tagesdatei. Das matchte z.B. das Keyword „Ollama" im `generated_by: "ollama:gemma4:latest"` von *jedem* Brain-Tag und brachte deshalb für jedes Projekt mit Modell-bezogenen Keywords alle Brain-Tage ins Prompt. Frontmatter wird jetzt vor dem Keyword-Check abgestrippt — sowohl im Crystallizer als auch im Brain-Signal-Alter der Projekt-Übersicht.
+
+### Docs
+
+- **`docs/feature-crystallizer.md`**: Mehrwert-orientierte Feature-Beschreibung für Nicht-KI-Experten — drei Personas (Mittelstand-Geschäftsführerin, Schulleiter, freie Beraterin), konkrete Szenarien, ehrliche Limitations-Liste, Privacy als strukturelles Argument, technische Eckdaten für die Pitch.
+- **`docs/feature-crystallizer-todo.md`**: Priorisiertes Backlog (A vor Pitch, B nach Pitch, C nice-to-have) mit Aufwand-Schätzungen und Demo-Impact-Bewertung. Bereits behobene Punkte abgehakt, offene Punkte mit klarer „Was-warum-wie"-Struktur.
+
 ## [0.6.45-beta] - 2026-05-16
 
 ### Features

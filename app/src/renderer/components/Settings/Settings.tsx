@@ -1176,9 +1176,10 @@ const DashboardSettingsTab: React.FC<{ t: TabTFn }> = ({ t }) => {
     emails: t('dashboard.widgets.emails'),
     calendar: t('dashboard.widgets.calendar'),
     bookings: t('dashboard.widgets.bookings'),
-    antares: t('dashboard.widgets.antares')
+    antares: t('dashboard.widgets.antares'),
+    'project-status': t('dashboard.widgets.projectStatus')
   }
-  const allWidgetIds = ['focus', 'radar', 'activity', 'tasks', 'emails', 'calendar', 'bookings', 'antares'] as const
+  const allWidgetIds = ['focus', 'radar', 'activity', 'tasks', 'emails', 'calendar', 'bookings', 'antares', 'project-status'] as const
 
   const toggleWidget = (id: typeof allWidgetIds[number]) => {
     const active = dashboard.widgets.includes(id)
@@ -1429,6 +1430,8 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab 
     setLoadLastVaultOnStart,
     notesRootFolder,
     setNotesRootFolder,
+    projectsRootFolder,
+    setProjectsRootFolder,
     language,
     setLanguage,
     fontFamily,
@@ -2478,6 +2481,34 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab 
                     <button
                       className="settings-refresh"
                       onClick={() => setNotesRootFolder('')}
+                    >
+                      Zurücksetzen
+                    </button>
+                  </div>
+                </div>
+
+                <div className="settings-row">
+                  <div>
+                    <label>Projekt-Ordner (Crystallizer)</label>
+                    <div className="settings-hint">
+                      {projectsRootFolder || 'Nicht festgelegt'} · Pro Unterordner kann der „Projekt-Status"-Crystallizer einen Wochenstand erzeugen.
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                    <button
+                      className="settings-refresh"
+                      disabled={!vaultPath}
+                      onClick={async () => {
+                        if (!vaultPath) return
+                        const folder = await window.electronAPI.selectFolderInVault(vaultPath)
+                        if (folder !== null) setProjectsRootFolder(folder)
+                      }}
+                    >
+                      Ordner wählen
+                    </button>
+                    <button
+                      className="settings-refresh"
+                      onClick={() => setProjectsRootFolder('')}
                     >
                       Zurücksetzen
                     </button>
