@@ -2,6 +2,26 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.6.47-beta] - 2026-05-17
+
+### Features
+
+- **MindGraph Coach (adaptives Onboarding)**: Komplett neuer Chat-Coach, der vor dem klassischen Persona-Wizard mit einer offenen Frage startet („Was willst du mit MindGraph machen?"), 2–4 Rückfragen stellt und dann *einzeln bestätigte* Aktionen vorschlägt — Vault wählen, Editor-Mode setzen, Module aktivieren, Widgets konfigurieren, Profil empfehlen, Beispielordner/-notizen anlegen. KB-RAG über versionierte Markdown-Wissensbasis in `app/resources/coach-kb/` (14 Module, 7 Workflows, App-Themen). Pflicht-Mini-Brief direkt nach Vault-Wahl zu Markdown und den drei Editor-Modi (Markdown / Schreiben / Lesen) mit `set-editor-mode`-Vorschlag. Privacy-first auto-Backend Ollama → Anthropic via bestehendem `chatClient`. Eigenes IPC-Layer (`coach:precheck`, `coach:start`, `coach:respond`), Renderer-Store `coachStore.ts`, UI in `Onboarding/Coach/`.
+- **CoachBot im Header — dauerhafter Q&A-Helfer**: Kleines Roboter-Icon oben in der Action-Leiste (akzentuiert + sanfter Erstnutzer-Pulse). Klick öffnet Popover mit Chat — beantwortet jede Frage zu MindGraph aus derselben KB wie der Onboarding-Coach. Backend-Toggle **Lokal (Ollama) ↔ Cloud (Claude)** im Header, persistiert in `coachBotBackend`. Default ist **Lokal** — Cloud nur per bewusster User-Wahl (privacy-first). Markdown-Rendering via `markdown-it` + `sanitizeHtml` (Listen, Bold, Code-Blöcke). Differenzierte Antwortlängen: kurz für Faktenfragen, 8–15 Sätze für „Was ist X / Wie funktioniert X", Kurs-Format für „Tutorial / Schritt für Schritt". Anti-Halluzinations-Regel im System-Prompt verhindert generisches Editor-Wissen aus anderen Apps (Split-View, Vorschau-Panel etc.).
+- **Antares-Widget: offene Registrierungen mit Namen**: Aufklappbarer Block unter den Status-Buttons mit Tabelle (Name, Entleiher-Nr, Schule, Klasse). Standardmäßig offen, da neue Registrierungen typischerweise eine Aktion erfordern. Antares-API reverse-engineered via Browser-Inspection: zweischrittiges Pattern (`/result?id=2` mit `autosearch=true` als Body → `/search?table=entleiher&id=2` mit `page=1&rows=50` Pagination). Davor lieferte der Aufruf entweder alle 12 684 Entleiher oder SQL ERROR.
+- **Antares-Widget: ablaufende Lizenzen (365 Tage)**: Neuer aufklappbarer Details-Block listet alle Lizenzen, die in den nächsten 365 Tagen auslaufen — Titel, Quelle, Lizenz-Nr, Ablaufdatum. Neuer Service-Endpoint `listLizenzenAblauf(daysAhead)` mit Filter-Body `endfrom=heute&endto=heute+N&searchtype=e`, IPC `antares-list-lizenzen-ablauf`, Typ `AntaresLizenz` in `shared/types.ts`. Lädt parallel im Store-`loadAll()`.
+- **HelpGuide: drei neue Topics** — Sprache (Voice/TTS/STT), Projekt-Status (Crystallizer-Wochen-Entwurf), Antares (Medienzentrum-Verleih) mit jeweils direkten Sprung-Buttons in die passenden Settings-Tabs. Plus neue Icons (`crystal`, `voice`).
+
+### Improvements
+
+- **Zugangsdaten-Tab vervollständigt**: Antares-Credentials waren bisher nicht aufgeführt, obwohl sie über safeStorage verschlüsselt sind — jetzt sichtbar mit Status (Username + Passwort gesetzt/leer). Anthropic-Key-Note präzisiert: war fälschlich „nur für /ask und /briefing im Telegram-Bot", ist jetzt korrekt „Cloud-LLM (Claude) für Notes-Chat, Coach-Bot, Smart-Connections-Reranker, Email-Analyse, Telegram-Bot" — der Key wird seit längerem von vielen Modulen mitgenutzt, lebt UI-mäßig aber historisch immer noch im Telegram-Tab.
+- **Onboarding-Wizard erweitert**: Neuer Step `coach` zwischen `welcome` und `intent`. WelcomeScreen bekommt drei Buttons (Coach starten / Klassisches Setup / Vault öffnen) mit Pre-Check, der den Coach-Button bei fehlendem Backend deaktiviert. IntentStep zeigt einen Coach-Vorschlags-Hinweis und überspringt die Vault-Subpage, wenn der Coach bereits einen Vault gewählt hat.
+
+### Fixes
+
+- **Antares `listOffeneRegistrierungen`**: Lieferte vorher entweder leer oder den kompletten Datenbestand (12 684 Entleiher). Ursache: falsche Aufteilung von `autosearch=true` zwischen `primeSearchMask` (kein Body) und `/search` (mit `autosearch=true` statt Pagination). Behoben durch Reverse-Engineering der echten Antares-Browser-Requests: `primeSearchMask` sendet jetzt `autosearch=true` plus optionale Filter im Body, `/search` nur noch `page` + `rows`.
+- **`primeSearchMask` allgemein robuster**: Erlaubt jetzt zusätzliche Body-Parameter (`endfrom`, `endto`, `searchtype` u.a.), damit Filter wie „Lizenzen in 365 Tagen" überhaupt möglich werden.
+
 ## [0.6.46-beta] - 2026-05-17
 
 ### Features

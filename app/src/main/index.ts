@@ -22,6 +22,7 @@ import type {
   ProjectStatusMarker
 } from './projectStatus/types'
 import { setupTray, hideTransportWindow, updateShortcut, showTransportWindow } from './transport/trayManager'
+import { registerCoachIpc } from './llm/coach/coachIpc'
 
 // Globale Fehlerbehandlung für unhandled exceptions (z.B. IMAP Socket-Timeouts)
 process.on('uncaughtException', (error) => {
@@ -8654,6 +8655,16 @@ ipcMain.handle('antares-dashboard-counts', async (_event, baseUrl: string, conte
   }
 })
 
+ipcMain.handle('antares-list-lizenzen-ablauf', async (_event, baseUrl: string, context: string, daysAhead?: number) => {
+  try {
+    const service = await buildAntaresService(baseUrl, context)
+    const rows = await service.listLizenzenAblauf(daysAhead ?? 365)
+    return { success: true, rows }
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : 'Fehler' }
+  }
+})
+
 // ========================================
 // Marketing (WordPress + Instagram)
 // ========================================
@@ -9477,6 +9488,11 @@ ipcMain.handle('telegram-stop', async () => {
   telegramBotHandle = null
   return { success: true }
 })
+
+// ─── MindGraph Coach (adaptives Onboarding) ──────────────────────────────
+// Drei Handler: coach:precheck, coach:start, coach:respond. Vollständige Logik
+// liegt in main/llm/coach/, hier nur die Registrierung.
+registerCoachIpc()
 
 // Cleanup bei App-Beendigung
 app.on('before-quit', () => {

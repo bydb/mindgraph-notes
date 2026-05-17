@@ -472,6 +472,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('antares-list-ausgabeliste', baseUrl, context),
   antaresDashboardCounts: (baseUrl: string, context: string) =>
     ipcRenderer.invoke('antares-dashboard-counts', baseUrl, context),
+  antaresListLizenzenAblauf: (baseUrl: string, context: string, daysAhead?: number) =>
+    ipcRenderer.invoke('antares-list-lizenzen-ablauf', baseUrl, context, daysAhead),
 
   // IQ-Auswertung
   iqGenerateReport: (data: object, suggestedFileName: string) =>
@@ -612,5 +614,25 @@ contextBridge.exposeInMainWorld('electronAPI', {
   projectStatusCleanup: (vaultPath: string, filePath: string, refsToRemove: string[], language: string) =>
     ipcRenderer.invoke('project-status-cleanup', vaultPath, filePath, refsToRemove, language),
   projectStatusDeleteDraft: (vaultPath: string, filePath: string) =>
-    ipcRenderer.invoke('project-status-delete-draft', vaultPath, filePath)
+    ipcRenderer.invoke('project-status-delete-draft', vaultPath, filePath),
+
+  // MindGraph Coach (adaptives Onboarding)
+  coachPrecheck: () =>
+    ipcRenderer.invoke('coach:precheck'),
+  coachStart: (args: { language: 'de' | 'en'; isRestart?: boolean }) =>
+    ipcRenderer.invoke('coach:start', args),
+  coachRespond: (payload: {
+    userText: string
+    history: Array<{ role: 'system' | 'user' | 'assistant' | 'tool'; content: string }>
+    vaultReady: boolean
+    acceptedActionIds: string[]
+    acceptedActionTypes: string[]
+    language: 'de' | 'en'
+  }) => ipcRenderer.invoke('coach:respond', payload),
+  coachAsk: (payload: {
+    question: string
+    history: Array<{ role: 'system' | 'user' | 'assistant' | 'tool'; content: string }>
+    language: 'de' | 'en'
+    backend?: 'ollama' | 'anthropic'
+  }) => ipcRenderer.invoke('coach:ask', payload)
 })

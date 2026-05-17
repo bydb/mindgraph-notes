@@ -895,6 +895,7 @@ export interface ElectronAPI {
   antaresListMahnungenMedien: (baseUrl: string, context: string) => Promise<{ success: boolean; total?: number; rows?: AntaresVerleihRow[]; error?: string }>;
   antaresListAusgabeliste: (baseUrl: string, context: string) => Promise<{ success: boolean; total?: number; rows?: AntaresVerleihRow[]; error?: string }>;
   antaresDashboardCounts: (baseUrl: string, context: string) => Promise<{ success: boolean; counts?: AntaresDashboardCounts; error?: string }>;
+  antaresListLizenzenAblauf: (baseUrl: string, context: string, daysAhead?: number) => Promise<{ success: boolean; rows?: AntaresLizenz[]; error?: string }>;
 
   // IQ-Auswertung
   iqGenerateReport: (data: IqReportData, suggestedFileName: string) => Promise<{ success: boolean; filePath?: string; canceled?: boolean; error?: string }>;
@@ -996,6 +997,30 @@ export interface ElectronAPI {
   projectStatusCrystallize: (input: ProjectStatusCrystallizeInput) => Promise<ProjectStatusResult>;
   projectStatusCleanup: (vaultPath: string, filePath: string, refsToRemove: string[], language: 'de' | 'en') => Promise<{ success: boolean; removedLineCount?: number; remainingFindings?: LintFinding[]; error?: string }>;
   projectStatusDeleteDraft: (vaultPath: string, filePath: string) => Promise<{ success: boolean; error?: string }>;
+
+  // MindGraph Coach (adaptives Onboarding)
+  coachPrecheck: () => Promise<{ backend: 'anthropic' | 'ollama' | 'none'; detail: string }>;
+  coachStart: (args: { language: 'de' | 'en'; isRestart?: boolean }) => Promise<{ greeting: string; backend: 'anthropic' | 'ollama' | 'none' }>;
+  coachRespond: (payload: {
+    userText: string;
+    history: Array<{ role: 'system' | 'user' | 'assistant' | 'tool'; content: string }>;
+    vaultReady: boolean;
+    acceptedActionIds: string[];
+    acceptedActionTypes: string[];
+    language: 'de' | 'en';
+  }) => Promise<
+    | { ok: true; text: string; actions: Array<{ actionId: string; type: string; title: string; description: string; payload: Record<string, unknown>; status: string }>; backend: 'ollama' | 'anthropic'; warnings: string[] }
+    | { ok: false; error: string }
+  >;
+  coachAsk: (payload: {
+    question: string;
+    history: Array<{ role: 'system' | 'user' | 'assistant' | 'tool'; content: string }>;
+    language: 'de' | 'en';
+    backend?: 'ollama' | 'anthropic';
+  }) => Promise<
+    | { ok: true; text: string; backend: 'ollama' | 'anthropic' }
+    | { ok: false; error: string }
+  >;
 }
 
 // Brain (lokales Tagesgedächtnis — Phase 1)
@@ -1450,6 +1475,18 @@ export interface AntaresEntleiher {
   fn_schulnr: string
   class: string
   __fromtable?: string
+}
+
+/** Eine Lizenz-Zeile (z.B. ablaufende Lizenz). */
+export interface AntaresLizenz {
+  identifier: string
+  fn_erfdat: string       // ISO YYYY-MM-DD — Erfassungsdatum
+  fn_enddat: string       // ISO YYYY-MM-DD — Ablaufdatum
+  fn_titel: string        // Lizenz-/Medien-Titel
+  fn_prod: string         // Quelle / Produzent
+  fn_nnr: string          // Lizenznummer
+  verf?: string           // Verfügbarkeit
+  [k: string]: unknown
 }
 
 /** Counts aus dem Antares-Dashboard (geparst aus HTML). */

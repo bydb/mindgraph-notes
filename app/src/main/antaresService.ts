@@ -8,7 +8,7 @@
  * No official API exists; endpoints may change with Antares upgrades.
  */
 
-import type { AntaresEntleiher, AntaresVerleihRow } from '../shared/types'
+import type { AntaresEntleiher, AntaresVerleihRow, AntaresLizenz } from '../shared/types'
 
 interface AntaresAuth {
   pid: string
@@ -92,7 +92,11 @@ export class AntaresService {
     })
     const cookie2 = extractCookies(r2.headers.get('set-cookie'), cookie1)
 
-    // 3) Sanity: Dashboard abrufen — wenn Login fehlschlug, kommt eine Login-Seite zurueck
+    // 3) Sanity: Dashboard abrufen — wenn Login fehlschlug, kommt eine Login-Seite zurueck.
+    //    WICHTIG: der Dashboard-Aufruf setzt weitere Session-State-Cookies
+    //    (UI-Filter-State, Such-Defaults), die wir für nachfolgende /search-
+    //    Calls brauchen. Ohne diese Cookies antwortet `/search?id=2` mit
+    //    "SQL ERROR".
     const check = await fetch(`${this.baseUrl}/dashboard?template=plain&pid=${initialPid}`, {
       method: 'GET',
       headers: { 'Cookie': cookie2 }
@@ -101,9 +105,11 @@ export class AntaresService {
     if (check.status !== 200 || /id="loginform"|name="password"/.test(checkText.slice(0, 2000))) {
       throw new Error('Antares Login fehlgeschlagen — Benutzername oder Passwort falsch')
     }
+    const cookie3 = extractCookies(check.headers.get('set-cookie'), cookie2)
+    console.log(`[antares-auth] cookie chain: c1=${cookie1.length}b, c2=${cookie2.length}b, c3=${cookie3.length}b`)
 
     // Session ist ~30 min gueltig (Heuristik). Wir cachen 25 min.
-    this.auth = { pid: initialPid, cookie: cookie2, expiresAt: Date.now() + 25 * 60 * 1000 }
+    this.auth = { pid: initialPid, cookie: cookie3, expiresAt: Date.now() + 25 * 60 * 1000 }
     return this.auth
   }
 
@@ -144,42 +150,44 @@ export class AntaresService {
     }
   }
 
-  /** Wärmt die Such-Maske auf, indem das HTML-Skelett geladen wird. Manche Endpunkte
-   *  benötigen vorher einen Session-State, sonst antwortet Antares mit "SQL ERROR". */
-  private async primeSearchMask(table: string, id: string): Promise<void> {
+  /** Initialisiert den serverseitigen Filter-State für die nachfolgende
+   *  /search-Abfrage. Die Antares-UI macht beim Anklicken eines Dashboard-
+   *  Widgets genau diesen Call ZUERST (POST mit Body `autosearch=true` plus
+   *  optionale Filter wie `endfrom`/`endto`) — ohne ihn antwortet /search
+   *  mit "SQL ERROR" oder einem leeren Ergebnis. */
+  private async primeSearchMask(table: string, id: string, extraBody: Record<string, string> = {}): Promise<void> {
     const auth = await this.authenticate()
     const url = `${this.baseUrl}/result?template=partplain&id=${encodeURIComponent(id)}&type=${encodeURIComponent(table)}&pid=${auth.pid}`
     await fetch(url, {
       method: 'POST',
       headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Accept': 'application/json, text/plain, */*',
         'Cookie': auth.cookie,
         'X-Requested-With': 'XMLHttpRequest',
         'Referer': `${this.baseUrl}/`
-      }
+      },
+      body: new URLSearchParams({ autosearch: 'true', ...extraBody }).toString()
     }).catch(() => {})  // best effort
   }
 
   // ---- Domain methods ----
 
-  /** Offene Registrierungen — Count aus dem Dashboard-HTML.
-   *  (Der direkte /search-Endpoint liefert ohne UI-State alle Entleiher,
-   *  daher parsen wir den vorgerenderten Dashboard-Count.) */
+  /** Offene Registrierungen — exakt das Zweischritt-Pattern der Antares-UI:
+   *  1) primeSearchMask setzt serverseitig den Filter-State für id=2
+   *  2) /search holt die Daten mit Pagination-Parametern (KEIN autosearch
+   *     mehr — das gehörte in Schritt 1). Dieses Pattern haben wir per
+   *     Reverse-Engineering der echten Browser-Requests verifiziert. */
   async listOffeneRegistrierungen(): Promise<AntaresEntleiher[]> {
-    // Best effort: versuche den direkten Search-Call, der nur in einer
-    // "warmen" Session sauber gefiltert antwortet. Wenn Count > 100 zurück­kommt,
-    // ist die Session kalt → fallback auf 0 (Count steht trotzdem im Dashboard).
     try {
       await this.primeSearchMask('entleiher', '2')
       const data = await this.post<{ rows?: AntaresEntleiher[]; total?: number }>(
         `/search?table=entleiher&id=2&context=${encodeURIComponent(this.context)}`,
-        { autosearch: 'true' }
+        { page: '1', rows: '50' }
       )
-      const total = Number(data.total || 0)
-      if (total > 0 && total < 100) {
-        return data.rows || []
-      }
-      return []
-    } catch {
+      return data.rows || []
+    } catch (err) {
+      console.warn('[antares] listOffeneRegistrierungen failed:', err instanceof Error ? err.message : err)
       return []
     }
   }
@@ -301,5 +309,30 @@ export class AntaresService {
       ausgabe: today,
       status: '20,21'
     }, opts)
+  }
+
+  /** Lizenzen, die in den nächsten N Tagen auslaufen.
+   *  Browser-Pattern reverse-engineered: primeSearchMask mit endfrom=heute,
+   *  endto=heute+N, searchtype=e — dann /search?table=lizenzen&id=3. */
+  async listLizenzenAblauf(daysAhead = 365, opts: { page?: number; rows?: number } = {}): Promise<AntaresLizenz[]> {
+    try {
+      const today = new Date()
+      const future = new Date(today.getTime() + daysAhead * 24 * 60 * 60 * 1000)
+      const isoToday = today.toISOString().slice(0, 10)
+      const isoFuture = future.toISOString().slice(0, 10)
+      await this.primeSearchMask('lizenzen', '3', {
+        endfrom: isoToday,
+        endto: isoFuture,
+        searchtype: 'e'
+      })
+      const data = await this.post<{ rows?: AntaresLizenz[]; total?: number }>(
+        `/search?table=lizenzen&id=3&context=${encodeURIComponent(this.context)}`,
+        { page: String(opts.page ?? 1), rows: String(opts.rows ?? 50) }
+      )
+      return data.rows || []
+    } catch (err) {
+      console.warn('[antares] listLizenzenAblauf failed:', err instanceof Error ? err.message : err)
+      return []
+    }
   }
 }

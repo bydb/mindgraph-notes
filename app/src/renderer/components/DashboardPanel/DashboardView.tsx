@@ -1778,16 +1778,20 @@ const AntaresWidget: React.FC<AntaresWidgetProps> = ({ t }) => {
   const antaresEnabled = useUIStore(s => s.antares.enabled)
   const {
     counts,
+    offeneRegistrierungen,
     mahnungenGeraete,
     mahnungenMedien,
+    lizenzenAblauf365,
     loading,
     lastError,
     lastFetchedAt,
     loadAll
   } = useAntaresStore(useShallow(s => ({
     counts: s.counts,
+    offeneRegistrierungen: s.offeneRegistrierungen,
     mahnungenGeraete: s.mahnungenGeraete,
     mahnungenMedien: s.mahnungenMedien,
+    lizenzenAblauf365: s.lizenzenAblauf365,
     loading: s.loading,
     lastError: s.lastError,
     lastFetchedAt: s.lastFetchedAt,
@@ -1863,9 +1867,36 @@ const AntaresWidget: React.FC<AntaresWidgetProps> = ({ t }) => {
         </div>
       </div>
 
-      {/* Mahnungs-Details */}
-      {(mahnungenGeraete.length > 0 || mahnungenMedien.length > 0) && (
+      {/* Details: offene Registrierungen + Mahnungen + ablaufende Lizenzen */}
+      {(offeneRegistrierungen.length > 0 || mahnungenGeraete.length > 0 || mahnungenMedien.length > 0 || lizenzenAblauf365.length > 0) && (
         <div className="dv-antares-details">
+          {offeneRegistrierungen.length > 0 && (
+            <details open>
+              <summary className="dv-antares-summary">
+                {t('dashboard.antares.offeneRegistrierungen')} ({offeneRegistrierungen.length})
+              </summary>
+              <table className="dv-antares-table">
+                <thead>
+                  <tr>
+                    <th>{t('dashboard.antares.colName')}</th>
+                    <th>{t('dashboard.antares.colEntleihernr')}</th>
+                    <th>{t('dashboard.antares.colSchule')}</th>
+                    <th>{t('dashboard.antares.colKlasse')}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {offeneRegistrierungen.map(e => (
+                    <tr key={e.identifier}>
+                      <td>{(e.fn_vorname || '').trim()} {e.fn_ename}</td>
+                      <td className="dv-antares-leihnr">{e.fn_enr}</td>
+                      <td>{e.fn_schulname}</td>
+                      <td>{e.class}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </details>
+          )}
           {mahnungenGeraete.length > 0 && (
             <details open>
               <summary className="dv-antares-summary">
@@ -1905,6 +1936,34 @@ const AntaresWidget: React.FC<AntaresWidgetProps> = ({ t }) => {
                 </thead>
                 <tbody>
                   {mahnungenMedien.map(v => <AntaresVerleihRow key={v.identifier} row={v} />)}
+                </tbody>
+              </table>
+            </details>
+          )}
+
+          {lizenzenAblauf365.length > 0 && (
+            <details>
+              <summary className="dv-antares-summary">
+                {t('dashboard.antares.lizenzenAblauf')} ({lizenzenAblauf365.length})
+              </summary>
+              <table className="dv-antares-table">
+                <thead>
+                  <tr>
+                    <th>{t('dashboard.antares.colTitel')}</th>
+                    <th>{t('dashboard.antares.colQuelle')}</th>
+                    <th>{t('dashboard.antares.colLizenznr')}</th>
+                    <th>{t('dashboard.antares.colAblauf')}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {lizenzenAblauf365.map(l => (
+                    <tr key={l.identifier}>
+                      <td className="dv-antares-titel" title={l.fn_titel}>{l.fn_titel}</td>
+                      <td>{l.fn_prod}</td>
+                      <td className="dv-antares-leihnr">{l.fn_nnr}</td>
+                      <td className="dv-antares-leihnr">{l.fn_enddat}</td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </details>

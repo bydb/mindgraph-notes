@@ -52,6 +52,8 @@ const icons: Record<string, React.ReactNode> = {
   dashboard: <><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></>,
   briefing: <><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/></>,
   agent: <><path d="M12 8V4H8"/><rect x="4" y="12" width="16" height="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 16h.01"/><path d="M9 16h.01"/></>,
+  crystal: <><path d="M12 2l7 4v8l-7 8-7-8V6z"/><path d="M5 6l7 4 7-4"/><path d="M12 10v12"/><path d="M5 14l7-4 7 4"/></>,
+  voice: <><path d="M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v1a7 7 0 0 1-14 0v-1"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="8" y1="22" x2="16" y2="22"/></>,
 }
 
 const Icon: React.FC<{ name: string; size?: number }> = ({ name, size = 16 }) => (
@@ -92,14 +94,20 @@ const helpTopics: HelpTopic[] = [
     details: ['Semantische Aehnlichkeit berechnen', 'Verwandte Notizen automatisch finden', 'Hybrid-Scoring: Embeddings + Keywords', 'Gewichtung individuell anpassbar'] },
   { id: 'languagetool', label: 'LanguageTool', icon: 'task', color: '#a855f7', category: 'ai',
     details: ['Grammatik- und Rechtschreibpruefung', 'Direkt im Editor integriert', 'Unterstuetzt Deutsch und Englisch', 'Konfigurierbar in den Einstellungen'] },
+  { id: 'voice', label: 'Sprache', icon: 'voice', color: '#a855f7', category: 'ai',
+    details: ['Notizen oder markierten Text vorlesen lassen', 'Diktat per Whisper lokal transkribieren', 'Systemstimmen oder ElevenLabs konfigurieren', 'Sprachfunktionen in Einstellungen → Sprache einrichten'],
+    action: { id: 'openSettingsTab', label: 'Sprache einrichten', settingsTab: 'speech' } },
 
   // Organize cluster
   { id: 'dashboard', label: 'Dashboard', icon: 'dashboard', color: '#f59e0b', category: 'organize',
-    details: ['Zentrale Übersicht als Tab neben Editor/Canvas', 'Widgets: Aufgaben, Emails, Kalender, Anmeldungen', 'Reihenfolge und Sichtbarkeit in Einstellungen wählbar', 'Klick auf Eintrag öffnet zugehörige Notiz oder Panel'],
+    details: ['Zentrale Übersicht als Tab neben Editor/Canvas', 'Widgets: Fokus, Radar, Aktivität, Tasks, Emails, Kalender, Anmeldungen, Antares, Projekt-Status und Sync', 'Reihenfolge und Sichtbarkeit in Einstellungen wählbar', 'Klick auf Eintrag öffnet zugehörige Notiz oder Panel'],
     action: { id: 'openDashboard', label: 'Dashboard öffnen' } },
   { id: 'briefing', label: 'Morning Briefing', icon: 'briefing', color: '#f59e0b', category: 'organize',
     details: ['Einmal pro Tag beim Start: Tages-Überblick als Modal', 'Zeigt Tasks (inkl. überfällig), Emails, heutige Termine, neue Anmeldungen', 'In Dashboard-Einstellungen deaktivierbar', '"Dashboard öffnen" springt zum vollen Tab'],
     action: { id: 'openSettingsTab', label: 'Einstellungen öffnen', settingsTab: 'dashboard' } },
+  { id: 'projectstatus', label: 'Projekt-Status', icon: 'crystal', color: '#f59e0b', category: 'organize',
+    details: ['Wochen-Crystallizer für laufende Projekte', 'Markierte Projektordner enthalten eine _STATUS.md mit Keywords und Priorität', 'Erzeugt lokale Markdown-Drafts wie _STATUS-2026-W21.md', 'Nutzt Brain-Tage, Inbox-Notizen und Projektdateien mit Wikilink-Prüfung'],
+    action: { id: 'openSettingsTab', label: 'Projekt-Ordner wählen', settingsTab: 'general' } },
   { id: 'flashcards', label: 'Flashcards', icon: 'flashcards', color: '#f59e0b', category: 'organize',
     details: ['Karteikarten mit Spaced Repetition', 'Quiz-Modus aus deinen Notizen', 'Anki-Import (AnkiDroid-Format)', 'Lernstatistiken und Fortschritt'] },
   { id: 'tasks', label: 'Aufgaben', icon: 'clock', color: '#f59e0b', category: 'organize',
@@ -119,6 +127,9 @@ const helpTopics: HelpTopic[] = [
   { id: 'agent', label: 'Edoobox', icon: 'agent', color: '#10b981', category: 'integrate',
     details: ['edoobox: Veranstaltungen importieren und pflegen', 'WordPress: Blog-Posts automatisch publizieren', 'KI-Content-Generierung mit Ollama', 'IQ-Auswertung aus vergangenen Veranstaltungen'],
     action: { id: 'openSettingsTab', label: 'Edoobox einrichten', settingsTab: 'agents' } },
+  { id: 'antares', label: 'Antares', icon: 'book', color: '#10b981', category: 'integrate',
+    details: ['Medienzentrum-Daten aus Antares CS im Dashboard sichtbar machen', 'Zeigt offene Registrierungen, Anfragen, Vorbestellungen und Mahnungen', 'Nutzt deinen eigenen Antares-Account lokal in MindGraph', 'Zugangsdaten in Einstellungen → Agenten hinterlegen'],
+    action: { id: 'openSettingsTab', label: 'Antares einrichten', settingsTab: 'agents' } },
   { id: 'research', label: 'Forschung', icon: 'book', color: '#10b981', category: 'integrate',
     details: ['Semantic Scholar: Paper suchen', 'Zotero-Bibliothek durchsuchen (⌘⇧Z)', 'Readwise-Highlights synchronisieren', 'Zitate direkt in Notizen einfuegen'] },
   { id: 'devices', label: 'Geraete', icon: 'remarkable', color: '#10b981', category: 'integrate',

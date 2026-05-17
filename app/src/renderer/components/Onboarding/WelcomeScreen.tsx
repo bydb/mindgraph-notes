@@ -1,15 +1,32 @@
-import React from 'react'
+import React, { useEffect, useState } from 'react'
 import { useTranslation } from '../../utils/translations'
 import { useUIStore, type Language } from '../../stores/uiStore'
 
 interface WelcomeScreenProps {
+  onStartCoach: () => void
   onStartWizard: () => void
   onOpenVault: () => void
 }
 
-export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onStartWizard, onOpenVault }) => {
+export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onStartCoach, onStartWizard, onOpenVault }) => {
   const { t } = useTranslation()
   const { language, setLanguage } = useUIStore()
+  const [coachAvailable, setCoachAvailable] = useState<boolean | null>(null)
+
+  // Pre-Check: läuft Ollama oder ist Anthropic-Key da? — entscheidet, ob der
+  // Coach-Button aktiv ist. Bei null (noch unbekannt): aktiv lassen, der Coach
+  // zeigt dann selbst seinen Fehlerzustand.
+  useEffect(() => {
+    let cancelled = false
+    window.electronAPI.coachPrecheck()
+      .then((res: { backend: 'anthropic' | 'ollama' | 'none' }) => {
+        if (!cancelled) setCoachAvailable(res.backend !== 'none')
+      })
+      .catch(() => {
+        if (!cancelled) setCoachAvailable(null)
+      })
+    return () => { cancelled = true }
+  }, [])
 
   return (
     <div className="onboarding-welcome">
@@ -51,15 +68,26 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onStartWizard, onO
       <p className="onboarding-welcome-subtitle">{t('onboarding.welcome.subtitle')}</p>
 
       <div className="onboarding-welcome-actions">
-        <button className="onboarding-btn-primary" onClick={onStartWizard}>
-          {t('onboarding.welcome.setup')}
+        <button
+          className="onboarding-btn-primary"
+          onClick={onStartCoach}
+          disabled={coachAvailable === false}
+          title={coachAvailable === false ? t('onboarding.welcome.coachUnavailable') : undefined}
+        >
+          {t('onboarding.welcome.startCoach')}
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <polyline points="9 18 15 12 9 6"/>
           </svg>
         </button>
+        <button className="onboarding-btn-secondary" onClick={onStartWizard}>
+          {t('onboarding.welcome.setup')}
+        </button>
         <button className="onboarding-btn-secondary" onClick={onOpenVault}>
           {t('onboarding.welcome.openVault')}
         </button>
+        {coachAvailable === false && (
+          <p className="onboarding-coach-pre-hint">{t('onboarding.welcome.coachUnavailable')}</p>
+        )}
       </div>
 
       <div className="onboarding-language-switcher">

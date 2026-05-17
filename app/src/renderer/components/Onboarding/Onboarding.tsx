@@ -1,17 +1,20 @@
 import React, { useState, useCallback, useEffect } from 'react'
 import { useUIStore } from '../../stores/uiStore'
 import type { UserProfile } from '../../stores/uiStore'
+import { useCoachStore } from '../../stores/coachStore'
 import { WelcomeScreen } from './WelcomeScreen'
 import { IntentStep } from './steps/IntentStep'
 import { AIStep } from './steps/AIStep'
 import { DashboardStep } from './steps/DashboardStep'
 import { MissionsStep } from './steps/MissionsStep'
+import { CoachStep } from './Coach/CoachStep'
 import './Onboarding.css'
 
-type OnboardingStep = 'welcome' | 'intent' | 'ai' | 'dashboard' | 'missions'
+type OnboardingStep = 'welcome' | 'coach' | 'intent' | 'ai' | 'dashboard' | 'missions'
 
 export const Onboarding: React.FC = () => {
-  const { onboardingOpen, setOnboardingOpen, setOnboardingCompleted, setUserProfile, applyProfileDefaults } = useUIStore()
+  const { onboardingOpen, setOnboardingOpen, setOnboardingCompleted, setUserProfile, applyProfileDefaults, coach } = useUIStore()
+  const resetCoachStore = useCoachStore(s => s.reset)
   const [step, setStep] = useState<OnboardingStep>('welcome')
   const [vaultPath, setLocalVaultPath] = useState<string | null>(null)
   const [selectedProfile, setSelectedProfile] = useState<UserProfile>(null)
@@ -22,8 +25,9 @@ export const Onboarding: React.FC = () => {
     if (onboardingOpen) {
       setStep('welcome')
       setSelectedProfile(null)
+      resetCoachStore()
     }
-  }, [onboardingOpen])
+  }, [onboardingOpen, resetCoachStore])
 
   const handleSetVaultPath = useCallback((path: string) => {
     setLocalVaultPath(path)
@@ -66,6 +70,22 @@ export const Onboarding: React.FC = () => {
     }
   }, [finishWithVault, setOnboardingCompleted, setOnboardingOpen])
 
+  const handleStartCoach = useCallback(() => {
+    setStep('coach')
+  }, [])
+
+  const handleSkipCoach = useCallback(() => {
+    setStep('intent')
+  }, [])
+
+  const handleCoachFinish = useCallback(() => {
+    // Coach hat (möglicherweise) Vault + Profile vorbelegt. Übergabe an IntentStep:
+    if (coach.suggestedProfile) {
+      setSelectedProfile(coach.suggestedProfile)
+    }
+    setStep('intent')
+  }, [coach.suggestedProfile])
+
   if (!onboardingOpen) return null
 
   return (
@@ -73,8 +93,17 @@ export const Onboarding: React.FC = () => {
       <div className="onboarding-container">
         {step === 'welcome' && (
           <WelcomeScreen
+            onStartCoach={handleStartCoach}
             onStartWizard={() => setStep('intent')}
             onOpenVault={handleOpenVaultDirect}
+          />
+        )}
+        {step === 'coach' && (
+          <CoachStep
+            vaultPath={vaultPath}
+            onVaultChosen={handleSetVaultPath}
+            onSkipToClassic={handleSkipCoach}
+            onFinish={handleCoachFinish}
           />
         )}
         {step === 'intent' && (
@@ -85,6 +114,7 @@ export const Onboarding: React.FC = () => {
             setVaultPath={handleSetVaultPath}
             onBack={() => setStep('welcome')}
             onNext={() => setStep('ai')}
+            coachPreFilled={coach.suggestedProfile !== null || vaultPath !== null}
           />
         )}
         {step === 'ai' && (

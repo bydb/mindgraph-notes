@@ -9,6 +9,8 @@ interface IntentStepProps {
   setVaultPath: (path: string) => void
   onBack: () => void
   onNext: () => void
+  /** True wenn der Coach schon Vault + Profil vorbelegt hat — UI wird dann reduziert. */
+  coachPreFilled?: boolean
 }
 
 const profiles: { id: Exclude<UserProfile, null>; icon: React.ReactNode }[] = [
@@ -85,11 +87,15 @@ export const IntentStep: React.FC<IntentStepProps> = ({
   vaultPath,
   setVaultPath,
   onBack,
-  onNext
+  onNext,
+  coachPreFilled = false
 }) => {
   const { t, language } = useTranslation()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // Wenn der Coach Vault + Profil vorbelegt hat, überspringen wir die Vault-
+  // Subpage komplett — der User landet sofort in der Persona-Bestätigung.
+  const skipVaultPage = coachPreFilled && !!vaultPath
   const [showVault, setShowVault] = useState(false)
 
   const handleOpenExisting = async () => {
@@ -167,6 +173,12 @@ export const IntentStep: React.FC<IntentStepProps> = ({
           <h2 className="onboarding-step-title">{t('onboarding.intent.title')}</h2>
           <p className="onboarding-step-desc">{t('onboarding.intent.subtitle')}</p>
 
+          {coachPreFilled && (
+            <div className="onboarding-intent-coach-hint">
+              <span>{t('onboarding.intent.coachHint')}</span>
+            </div>
+          )}
+
           <div className="onboarding-intent-grid">
             {profiles.map(({ id, icon }) => (
               <button
@@ -192,12 +204,15 @@ export const IntentStep: React.FC<IntentStepProps> = ({
               {t('onboarding.back')}
             </button>
             <div style={{ display: 'flex', gap: '8px' }}>
-              {!selectedProfile && (
+              {!selectedProfile && !skipVaultPage && (
                 <button className="onboarding-btn-text" onClick={() => setShowVault(true)}>
                   {t('onboarding.profile.skip')}
                 </button>
               )}
-              <button className="onboarding-btn-primary" onClick={() => setShowVault(true)}>
+              <button
+                className="onboarding-btn-primary"
+                onClick={() => skipVaultPage ? onNext() : setShowVault(true)}
+              >
                 {t('onboarding.next')}
               </button>
             </div>

@@ -613,6 +613,24 @@ interface UIState {
   onboardingOpen: boolean
   helpGuideOpen: boolean
 
+  // MindGraph Coach (adaptives Onboarding) — persisted Endzustand
+  coach: {
+    completed: boolean
+    acceptedActionIds: string[]
+    suggestedProfile: UserProfile
+    finishedAt: number | null
+  }
+
+  // CoachBot (Q&A im Header — transient, nicht persistiert)
+  coachBotOpen: boolean
+  // Persistent: wurde der CoachBot schon mal geöffnet? Steuert den
+  // Erstnutzer-Pulse-Hinweis am Header-Button.
+  coachBotEverOpened: boolean
+  // Backend-Wahl für den CoachBot. Privacy-first: Default 'ollama'.
+  // 'anthropic' nur wenn der User es bewusst umschaltet (und einen Key
+  // hinterlegt hat).
+  coachBotBackend: 'ollama' | 'anthropic'
+
   // Slash Commands
   slashCommandDateFormat: string
   slashCommandTimeFormat: string
@@ -700,6 +718,10 @@ interface UIState {
   setOnboardingCompleted: (completed: boolean) => void
   setOnboardingOpen: (open: boolean) => void
   setHelpGuideOpen: (open: boolean) => void
+  setCoachCompleted: (completed: boolean, extra?: { acceptedActionIds?: string[]; suggestedProfile?: UserProfile; finishedAt?: number | null }) => void
+  resetCoachState: () => void
+  setCoachBotOpen: (open: boolean) => void
+  setCoachBotBackend: (backend: 'ollama' | 'anthropic') => void
   setSlashCommandDateFormat: (format: string) => void
   setSlashCommandTimeFormat: (format: string) => void
   setShowFormattingToolbar: (show: boolean) => void
@@ -961,6 +983,19 @@ const defaultState = {
   onboardingOpen: false,
   helpGuideOpen: false,
 
+  // Coach (Endzustand)
+  coach: {
+    completed: false,
+    acceptedActionIds: [] as string[],
+    suggestedProfile: null as UserProfile,
+    finishedAt: null as number | null
+  },
+
+  // CoachBot (transient)
+  coachBotOpen: false,
+  coachBotEverOpened: false,
+  coachBotBackend: 'ollama' as 'ollama' | 'anthropic',
+
   // Slash Commands
   slashCommandDateFormat: 'DD.MM.YYYY',
   slashCommandTimeFormat: 'HH:mm',
@@ -1041,6 +1076,9 @@ const persistedKeys = [
   'customLogo',
   'onboardingCompleted',
   'userProfile',
+  'coach',
+  'coachBotEverOpened',
+  'coachBotBackend',
   'slashCommandDateFormat',
   'slashCommandTimeFormat',
   'showFormattingToolbar',
@@ -1180,6 +1218,24 @@ export const useUIStore = create<UIState>()((set, get) => ({
   setOnboardingCompleted: (completed) => set({ onboardingCompleted: completed }),
   setOnboardingOpen: (open) => set({ onboardingOpen: open }),
   setHelpGuideOpen: (open) => set({ helpGuideOpen: open }),
+  setCoachCompleted: (completed, extra) => set((state) => ({
+    coach: {
+      completed,
+      acceptedActionIds: extra?.acceptedActionIds ?? state.coach.acceptedActionIds,
+      suggestedProfile: extra?.suggestedProfile !== undefined ? extra.suggestedProfile : state.coach.suggestedProfile,
+      finishedAt: extra?.finishedAt !== undefined ? extra.finishedAt : state.coach.finishedAt
+    }
+  })),
+  resetCoachState: () => set({
+    coach: {
+      completed: false,
+      acceptedActionIds: [],
+      suggestedProfile: null,
+      finishedAt: null
+    }
+  }),
+  setCoachBotOpen: (open) => set({ coachBotOpen: open }),
+  setCoachBotBackend: (backend) => set({ coachBotBackend: backend }),
   setSlashCommandDateFormat: (format) => set({ slashCommandDateFormat: format }),
   setSlashCommandTimeFormat: (format) => set({ slashCommandTimeFormat: format }),
   setShowFormattingToolbar: (show) => set({ showFormattingToolbar: show }),

@@ -48,7 +48,7 @@ export const CredentialsSettings: React.FC<Props> = ({ onNavigateToTab }) => {
       id: 'anthropic-key',
       label: 'Anthropic API-Key',
       category: 'KI-Cloud',
-      note: 'Für /ask und /briefing im Telegram-Bot (Claude)',
+      note: 'Cloud-LLM (Claude) für Notes-Chat, Coach-Bot, Smart-Connections-Reranker, Email-Analyse, Telegram-Bot (/ask, /briefing). Eingabe aktuell im Telegram-Tab.',
       settingsTab: 'telegram',
       checkSet: () => window.electronAPI.telegramHasAnthropicKey()
     })
@@ -104,6 +104,19 @@ export const CredentialsSettings: React.FC<Props> = ({ onNavigateToTab }) => {
       checkSet: async () => {
         const creds = await window.electronAPI.edooboxLoadCredentials()
         return !!(creds && creds.apiKey && creds.apiSecret)
+      }
+    })
+
+    // Antares CS (Medienzentrum-Verleih)
+    rows.push({
+      id: 'antares',
+      label: 'Antares Zugangsdaten',
+      category: 'Business',
+      note: 'Username + Passwort für Antares CS (Medienzentrum-Verleih). Read-only.',
+      settingsTab: 'agents',
+      checkSet: async () => {
+        const creds = await window.electronAPI.antaresLoadCredentials()
+        return !!(creds && creds.username && creds.password)
       }
     })
 
