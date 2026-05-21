@@ -9,6 +9,7 @@ import { sanitizeHtml } from '../../utils/sanitize'
 import { matchEmailToProjects } from '../../utils/projectMatch'
 import { ComposeView } from './ComposeView'
 import { EmailAIChatView } from './EmailAIChatView'
+import { FolderPicker } from './FolderPicker'
 
 const isMac = window.electronAPI.platform === 'darwin'
 
@@ -50,10 +51,15 @@ export const InboxPanel: React.FC<InboxPanelProps> = ({ onClose }) => {
   const setEmailProject = useEmailStore(s => s.setEmailProject)
 
   const emails = useEmailStore(state => state.emails)
+  const folders = useEmailStore(s => s.folders)
+  const moveEmail = useEmailStore(s => s.moveEmail)
   const [searchQuery, setSearchQuery] = useState('')
   const [reminderStatus, setReminderStatus] = useState<Record<number, 'loading' | 'success' | 'error'>>({})
   const [showSummary, setShowSummary] = useState(false)
   const [showProjectDropdown, setShowProjectDropdown] = useState(false)
+  const [showMoveDropdown, setShowMoveDropdown] = useState(false)
+  const [moveStatus, setMoveStatus] = useState<'idle' | 'moving' | 'error'>('idle')
+  const [moveError, setMoveError] = useState<string>('')
 
   useEffect(() => {
     if (vaultPath && projectsRootFolder && projectsLastLoadedAt === null) {
@@ -66,6 +72,15 @@ export const InboxPanel: React.FC<InboxPanelProps> = ({ onClose }) => {
       loadAllSynonyms(vaultPath)
     }
   }, [vaultPath, projects, loadAllSynonyms])
+
+  // Folder-Liste pro Account beim Öffnen des Panels einmal laden.
+  const loadFolders = useEmailStore(s => s.loadFolders)
+  const accountIds = useMemo(() => emailSettings.accounts.map(a => a.id), [emailSettings.accounts])
+  useEffect(() => {
+    for (const id of accountIds) {
+      loadFolders(id).catch(() => { /* Fehler ist im Store gespeichert */ })
+    }
+  }, [accountIds, loadFolders])
 
   const filteredEmails = getFilteredEmails()
 
@@ -117,7 +132,61 @@ export const InboxPanel: React.FC<InboxPanelProps> = ({ onClose }) => {
 
   useEffect(() => {
     setShowProjectDropdown(false)
+    setShowMoveDropdown(false)
+    setMoveStatus('idle')
+    setMoveError('')
   }, [selectedEmailId])
+
+  // Klick außerhalb schließt das Move-Dropdown.
+  useEffect(() => {
+    if (!showMoveDropdown) return
+    const handler = (e: MouseEvent) => {
+      const target = e.target as HTMLElement
+      if (!target.closest('.inbox-move-wrapper')) {
+        setShowMoveDropdown(false)
+      }
+    }
+    window.addEventListener('mousedown', handler)
+    return () => window.removeEventListener('mousedown', handler)
+  }, [showMoveDropdown])
+
+  // Folder-Liste für den "Verschieben"-Picker — kommt aus dem schon geladenen Folders-State
+  // (FolderPicker triggert das auf Panel-Mount). Source-Folder rausfiltern + sortieren.
+  const moveCandidates = useMemo(() => {
+    if (!selectedEmail) return []
+    const list = folders[selectedEmail.accountId] || []
+    const source = selectedEmail.folder || 'INBOX'
+    const SPECIAL_ORDER: Record<string, number> = {
+      '\\Inbox': 0, '\\Drafts': 1, '\\Sent': 2, '\\Junk': 3, '\\Trash': 4, '\\Archive': 5, '\\All': 6
+    }
+    return list
+      .filter(f => f.selectable !== false && f.path !== source)
+      .sort((a, b) => {
+        const aIsInbox = a.path === 'INBOX' || a.specialUse === '\\Inbox'
+        const bIsInbox = b.path === 'INBOX' || b.specialUse === '\\Inbox'
+        if (aIsInbox && !bIsInbox) return -1
+        if (bIsInbox && !aIsInbox) return 1
+        const aS = a.specialUse ? (SPECIAL_ORDER[a.specialUse] ?? 99) : 99
+        const bS = b.specialUse ? (SPECIAL_ORDER[b.specialUse] ?? 99) : 99
+        if (aS !== bS) return aS - bS
+        return a.path.localeCompare(b.path, undefined, { sensitivity: 'base', numeric: true })
+      })
+  }, [selectedEmail, folders])
+
+  const handleMove = useCallback(async (destination: string) => {
+    if (!vaultPath || !selectedEmail) return
+    setShowMoveDropdown(false)
+    setMoveStatus('moving')
+    setMoveError('')
+    const result = await moveEmail(vaultPath, selectedEmail.id, destination)
+    if (!result.success) {
+      setMoveStatus('error')
+      setMoveError(result.error || 'Fehler')
+      setTimeout(() => { setMoveStatus('idle'); setMoveError('') }, 4000)
+    } else {
+      setMoveStatus('idle')
+    }
+  }, [vaultPath, selectedEmail, moveEmail])
 
   const handleOpenProjectStatus = useCallback((folderRel: string) => {
     const statusRel = `${folderRel}/_STATUS.md`
@@ -439,7 +508,57 @@ export const InboxPanel: React.FC<InboxPanelProps> = ({ onClose }) => {
                     {selectedEmail.analysis?.replyHandled ? t('inbox.markUnhandled') : t('inbox.markHandled')}
                   </button>
                 )}
+                {/* Move-to-folder */}
+                {selectedEmail.uid > 0 && (
+                  <div className="inbox-move-wrapper">
+                    <button
+                      className={`inbox-action-btn ${showMoveDropdown ? 'is-open' : ''}`}
+                      onClick={() => setShowMoveDropdown(v => !v)}
+                      disabled={moveStatus === 'moving' || moveCandidates.length === 0}
+                      data-tooltip={moveCandidates.length === 0 ? t('inbox.move.noFolders') : t('inbox.move.tooltip')}
+                    >
+                      {moveStatus === 'moving' ? (
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="spinning">
+                          <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+                        </svg>
+                      ) : (
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+                          <polyline points="12 11 12 17" />
+                          <polyline points="9 14 12 17 15 14" />
+                        </svg>
+                      )}
+                      {t('inbox.move')}
+                    </button>
+                    {showMoveDropdown && moveCandidates.length > 0 && (
+                      <div className="inbox-move-dropdown" role="menu">
+                        <div className="inbox-move-dropdown-header">{t('inbox.move.header')}</div>
+                        {moveCandidates.map(f => {
+                          const segs = f.path.split(f.delimiter || '/').filter(Boolean)
+                          const display = f.path === 'INBOX' ? 'Inbox' : (segs[segs.length - 1] || f.path)
+                          return (
+                            <button
+                              key={f.path}
+                              type="button"
+                              className="inbox-move-dropdown-item"
+                              onClick={() => handleMove(f.path)}
+                              title={f.path}
+                            >
+                              <span>{display}</span>
+                              {f.path !== display && (
+                                <span className="inbox-move-dropdown-path">{f.path}</span>
+                              )}
+                            </button>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
+              {moveStatus === 'error' && (
+                <div className="inbox-move-error" role="alert">{moveError}</div>
+              )}
             </div>
 
             {selectedEmail.analysis && (() => {
@@ -718,6 +837,15 @@ export const InboxPanel: React.FC<InboxPanelProps> = ({ onClose }) => {
   return (
     <div className="inbox-panel">
       {renderHeader()}
+
+      {/* Folder picker (one per account) */}
+      {emailSettings.accounts.length > 0 && (
+        <FolderPicker
+          onFolderChange={() => {
+            if (vaultPath) fetchEmails(vaultPath, true)
+          }}
+        />
+      )}
 
       {/* Filter Bar */}
       <div className="inbox-filter-bar">

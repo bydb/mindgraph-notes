@@ -314,6 +314,8 @@ export interface EmailSettings {
   analysisModel: string
   signature: string
   signatureImagePath: string
+  /** IMAP-Folder pro Account (accountId → Folder-Pfad). Fehlend = 'INBOX'. */
+  activeFolders: Record<string, string>
 }
 
 // Marketing Settings (WordPress)
@@ -923,7 +925,8 @@ const defaultState = {
     autoAnalyze: true,
     analysisModel: '',
     signature: '',
-    signatureImagePath: ''
+    signatureImagePath: '',
+    activeFolders: {}
   },
 
   // Marketing (WordPress)

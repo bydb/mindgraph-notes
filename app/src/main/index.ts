@@ -6546,6 +6546,127 @@ ipcMain.handle('email-connect', async (_event, account: { host: string; port: nu
   }
 })
 
+// IMAP-Folder eines Accounts auflisten (Mailbox-Tree).
+ipcMain.handle('email-list-folders', async (_event, account: { id: string; host: string; port: number; user: string; tls: boolean }) => {
+  try {
+    const { ImapFlow } = await import('imapflow')
+    const password = await loadEmailPassword(account.id)
+    if (!password) {
+      return { success: false, error: 'Kein Passwort gespeichert', folders: [] }
+    }
+
+    const client = new ImapFlow({
+      host: account.host,
+      port: account.port,
+      secure: account.tls,
+      auth: { user: account.user, pass: password },
+      logger: false,
+      socketTimeout: 15000,
+      greetingTimeout: 10000
+    })
+    client.on('error', () => { /* ignore */ })
+
+    try {
+      await client.connect()
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const raw: Array<any> = await (client as any).list()
+      const folders = raw.map(box => {
+        const flagsArr: string[] = Array.isArray(box.flags)
+          ? box.flags
+          : (box.flags && typeof box.flags[Symbol.iterator] === 'function' ? Array.from(box.flags) : [])
+        const noselect = flagsArr.some((f: string) => /\\Noselect/i.test(f))
+        const lastSeg = (box.path || '').split(box.delimiter || '/').filter(Boolean).pop() || box.path || ''
+        return {
+          path: String(box.path || ''),
+          name: String(box.name || lastSeg),
+          delimiter: String(box.delimiter || '/'),
+          specialUse: box.specialUse ? String(box.specialUse) : undefined,
+          selectable: !noselect,
+          subscribed: box.subscribed !== false
+        }
+      }).filter(f => f.path.length > 0)
+      return { success: true, folders }
+    } finally {
+      try { await client.logout() } catch { /* ignore */ }
+    }
+  } catch (error) {
+    console.error('[Email] List folders failed:', error instanceof Error ? error.message : error)
+    return { success: false, error: error instanceof Error ? error.message : 'Folder-Liste fehlgeschlagen', folders: [] }
+  }
+})
+
+// Eine Mail in einen anderen IMAP-Folder verschieben (imapflow messageMove).
+// Akzeptiert Account-Credentials direkt damit der Renderer nicht das ganze Account-Object
+// rumreichen muss; Passwort kommt sicher aus safeStorage.
+ipcMain.handle('email-move', async (
+  _event,
+  payload: {
+    accountId: string
+    host: string
+    port: number
+    user: string
+    tls: boolean
+    sourceFolder: string
+    uid: number
+    destinationFolder: string
+  }
+) => {
+  try {
+    if (!payload.uid || !payload.sourceFolder || !payload.destinationFolder) {
+      return { success: false, error: 'Unvollständige Parameter' }
+    }
+    if (payload.sourceFolder === payload.destinationFolder) {
+      return { success: false, error: 'Quell- und Zielordner identisch' }
+    }
+
+    const { ImapFlow } = await import('imapflow')
+    const password = await loadEmailPassword(payload.accountId)
+    if (!password) {
+      return { success: false, error: 'Kein Passwort gespeichert' }
+    }
+
+    const client = new ImapFlow({
+      host: payload.host,
+      port: payload.port,
+      secure: payload.tls,
+      auth: { user: payload.user, pass: password },
+      logger: false,
+      socketTimeout: 15000,
+      greetingTimeout: 10000
+    })
+    client.on('error', () => { /* ignore */ })
+
+    try {
+      await client.connect()
+      const lock = await client.getMailboxLock(payload.sourceFolder)
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const result: any = await (client as any).messageMove(
+          String(payload.uid),
+          payload.destinationFolder,
+          { uid: true }
+        )
+        // imapflow gibt { path, uidMap: Map<srcUid, destUid>, uidValidity } oder ähnlich zurück.
+        // Bei Servern ohne MOVE-Extension fällt imapflow intern auf COPY+EXPUNGE zurück.
+        let newUid: number | undefined
+        if (result?.uidMap) {
+          const mapped = result.uidMap.get?.(payload.uid) ?? result.uidMap[payload.uid]
+          if (typeof mapped === 'number') newUid = mapped
+        }
+        console.log(`[Email] Moved uid ${payload.uid} from ${payload.sourceFolder} to ${payload.destinationFolder}`)
+        return { success: true, newUid, destinationFolder: payload.destinationFolder }
+      } finally {
+        lock.release()
+      }
+    } finally {
+      try { await client.logout() } catch { /* ignore */ }
+    }
+  } catch (error) {
+    console.error('[Email] Move failed:', error instanceof Error ? error.message : error)
+    return { success: false, error: error instanceof Error ? error.message : 'Move fehlgeschlagen' }
+  }
+})
+
 // Emails laden (JSON-Persistenz) — bereinigt alte E-Mails nach retainDays
 ipcMain.handle('email-load', async (_event, vaultPath: string) => {
   console.log(`[Email] email-load called: vault=${vaultPath}`)
@@ -6590,13 +6711,13 @@ ipcMain.handle('email-save', async (_event, vaultPath: string, data: { emails: o
 })
 
 // Emails per IMAP abrufen
-ipcMain.handle('email-fetch', async (_event, vaultPath: string, accounts: Array<{ id: string; host: string; port: number; user: string; tls: boolean }>, lastFetchedAt: Record<string, string>, maxPerAccount: number) => {
+ipcMain.handle('email-fetch', async (_event, vaultPath: string, accounts: Array<{ id: string; host: string; port: number; user: string; tls: boolean; folder?: string }>, lastFetchedAt: Record<string, string>, maxPerAccount: number) => {
   try {
     assertApprovedVault(vaultPath, 'email-fetch')
     const { ImapFlow } = await import('imapflow')
 
     // Bestehende Emails laden
-    let existingEmails: Array<{ id: string }> = []
+    let existingEmails: Array<{ id: string; folder?: string }> = []
     try {
       const emailsPath = path.join(vaultPath, '.mindgraph', 'emails.json')
       const content = await fs.readFile(emailsPath, 'utf-8')
@@ -6605,11 +6726,15 @@ ipcMain.handle('email-fetch', async (_event, vaultPath: string, accounts: Array<
     } catch { /* Keine existierenden Emails */ }
 
     const existingIds = new Set(existingEmails.map(e => e.id))
+    const existingFolders = new Map(existingEmails.map(e => [e.id, e.folder]))
     const newEmails: object[] = []
     const updatedLastFetchedAt = { ...lastFetchedAt }
+    const folderUpdates: Array<{ id: string; folder: string }> = []
     let totalProcessed = 0
 
     for (const account of accounts) {
+      const fetchFolder = (account.folder && account.folder.trim()) || 'INBOX'
+      const fetchKey = fetchFolder === 'INBOX' ? account.id : `${account.id}::${fetchFolder}`
       try {
         // Passwort laden
         const password = await loadEmailPassword(account.id)
@@ -6619,7 +6744,7 @@ ipcMain.handle('email-fetch', async (_event, vaultPath: string, accounts: Array<
           continue
         }
 
-        sendEmailWindowEvent('email-fetch-progress', { current: 0, total: 0, status: `Verbinde mit ${account.host}...` })
+        sendEmailWindowEvent('email-fetch-progress', { current: 0, total: 0, status: `Verbinde mit ${account.host} (${fetchFolder})...` })
 
         const client = new ImapFlow({
           host: account.host,
@@ -6637,13 +6762,15 @@ ipcMain.handle('email-fetch', async (_event, vaultPath: string, accounts: Array<
         })
 
         await client.connect()
-        const lock = await client.getMailboxLock('INBOX')
+        const lock = await client.getMailboxLock(fetchFolder)
 
         try {
           // retainDays als harte Grenze — niemals ältere E-Mails abrufen
           const retainDays = await getEmailRetainDays()
           const retainLimit = new Date(Date.now() - retainDays * 24 * 60 * 60 * 1000)
-          const lastFetched = lastFetchedAt[account.id] ? new Date(lastFetchedAt[account.id]) : null
+          // Per-Folder lastFetched, mit Legacy-Fallback auf account-id (INBOX).
+          const lastFetchedRaw = lastFetchedAt[fetchKey] || (fetchFolder === 'INBOX' ? lastFetchedAt[account.id] : undefined)
+          const lastFetched = lastFetchedRaw ? new Date(lastFetchedRaw) : null
           // Bei Ersteinrichtung (kein lastFetched): nur letzte 3 Tage laden
           const initialFetchLimit = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000)
           const sinceDate = lastFetched
@@ -6680,7 +6807,13 @@ ipcMain.handle('email-fetch', async (_event, vaultPath: string, accounts: Array<
             const msg = messages[i]
             const messageId = msg.envelope?.messageId || `${account.id}-${msg.uid}`
 
-            if (existingIds.has(messageId)) continue
+            if (existingIds.has(messageId)) {
+              // Bekannte Mail kann den Folder gewechselt haben — Folder-Feld aktualisieren.
+              if (existingFolders.get(messageId) !== fetchFolder) {
+                folderUpdates.push({ id: messageId, folder: fetchFolder })
+              }
+              continue
+            }
 
             // Body-Text extrahieren mit mailparser
             let bodyText = ''
@@ -6727,6 +6860,7 @@ ipcMain.handle('email-fetch', async (_event, vaultPath: string, accounts: Array<
               id: messageId,
               uid: msg.uid,
               accountId: account.id,
+              folder: fetchFolder,
               from: { name: from.name || '', address: from.address || '' },
               to,
               subject: msg.envelope?.subject || '(Kein Betreff)',
@@ -6743,7 +6877,12 @@ ipcMain.handle('email-fetch', async (_event, vaultPath: string, accounts: Array<
             sendEmailWindowEvent('email-fetch-progress', { current: i + 1, total: messages.length, status: `Nachricht ${i + 1}/${messages.length}` })
           }
 
-          updatedLastFetchedAt[account.id] = new Date().toISOString()
+          const nowIso = new Date().toISOString()
+          updatedLastFetchedAt[fetchKey] = nowIso
+          // Legacy-Kompatibilität: lastFetchedAt[accountId] bleibt das INBOX-Datum
+          if (fetchFolder === 'INBOX') {
+            updatedLastFetchedAt[account.id] = nowIso
+          }
         } finally {
           lock.release()
         }
@@ -6752,6 +6891,15 @@ ipcMain.handle('email-fetch', async (_event, vaultPath: string, accounts: Array<
       } catch (error) {
         console.error(`[Email] Fetch failed for account ${account.id}:`, error instanceof Error ? error.message : error)
       }
+    }
+
+    // Folder-Updates für bereits bekannte Mails anwenden (z.B. wenn eine Mail im Server verschoben wurde).
+    if (folderUpdates.length > 0) {
+      const updateMap = new Map(folderUpdates.map(u => [u.id, u.folder]))
+      existingEmails = (existingEmails as Array<{ id: string; folder?: string }>).map(e => {
+        const next = updateMap.get(e.id)
+        return next && next !== e.folder ? { ...e, folder: next } : e
+      })
     }
 
     // Zusammenführen und deduplizieren (nach ID)

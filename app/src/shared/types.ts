@@ -829,7 +829,9 @@ export interface ElectronAPI {
 
   // Email Integration
   emailConnect: (account: EmailAccount) => Promise<{ success: boolean; error?: string }>;
-  emailFetch: (vaultPath: string, accounts: EmailAccount[], lastFetchedAt: Record<string, string>, maxPerAccount: number) => Promise<EmailFetchResult>;
+  emailListFolders: (account: EmailAccount) => Promise<{ success: boolean; folders: EmailFolder[]; error?: string }>;
+  emailMove: (payload: { accountId: string; host: string; port: number; user: string; tls: boolean; sourceFolder: string; uid: number; destinationFolder: string }) => Promise<{ success: boolean; newUid?: number; destinationFolder?: string; error?: string }>;
+  emailFetch: (vaultPath: string, accounts: Array<EmailAccount & { folder?: string }>, lastFetchedAt: Record<string, string>, maxPerAccount: number) => Promise<EmailFetchResult>;
   emailAnalyze: (vaultPath: string, model: string, emailIds?: string[]) => Promise<{ success: boolean; analyzed: number; error?: string }>;
   noteAnalyzeRelevance: (payload: {
     vaultPath: string
@@ -1219,6 +1221,23 @@ export interface EmailMessage {
   /** Vom User manuell zugewiesener Projektordner (vault-relativer Pfad).
    *  null = explizit "kein Projekt"; undefined = auto-Match aktiv. */
   userProject?: string | null
+  /** IMAP-Folder, aus dem die Mail abgerufen wurde. Default 'INBOX' (für Legacy-Mails ohne Feld). */
+  folder?: string
+}
+
+export interface EmailFolder {
+  /** Voller IMAP-Pfad inkl. Delimiter (z.B. 'INBOX.Archive.2025') — eindeutig pro Account. */
+  path: string
+  /** Anzeigename (letztes Pfad-Segment). */
+  name: string
+  /** IMAP-Hierarchie-Trennzeichen ('.' bei Courier/Dovecot mit Prefix, '/' bei Gmail). */
+  delimiter: string
+  /** RFC 6154 SPECIAL-USE (\\Inbox, \\Sent, \\Drafts, \\Trash, \\Junk, \\Archive, \\All, \\Flagged). */
+  specialUse?: string
+  /** \\Noselect-Folder können keine Mails enthalten (nur Container für Subfolder). */
+  selectable?: boolean
+  /** Subscription-Status (RFC 3501). */
+  subscribed?: boolean
 }
 
 export interface EmailSuggestedAction {

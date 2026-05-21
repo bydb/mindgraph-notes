@@ -10195,6 +10195,265 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
   100% { transform: translateX(200%); }
 }
 
+/* === Folder Picker (IMAP-Ordner pro Account) === */
+.inbox-folder-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--border-color);
+  background: color-mix(in srgb, var(--bg-secondary) 60%, transparent);
+}
+
+.inbox-folder-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.inbox-folder-account {
+  font-size: 10px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  flex-shrink: 0;
+  max-width: 40%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.inbox-folder-toggle {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-size: 12px;
+  cursor: pointer;
+  text-align: left;
+  min-width: 0;
+}
+
+.inbox-folder-toggle:hover {
+  background: color-mix(in srgb, var(--bg-tertiary) 50%, var(--bg-secondary));
+  border-color: color-mix(in srgb, var(--accent-color) 35%, var(--border-color));
+}
+
+.inbox-folder-toggle.open {
+  border-color: var(--accent-color);
+}
+
+.inbox-folder-toggle svg {
+  flex-shrink: 0;
+  color: var(--text-muted);
+}
+
+.inbox-folder-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+}
+
+.inbox-folder-chevron {
+  flex-shrink: 0;
+  color: var(--text-muted);
+}
+
+.inbox-folder-spinner {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  border: 1.5px solid color-mix(in srgb, var(--accent-color) 35%, transparent);
+  border-top-color: var(--accent-color);
+  animation: inbox-folder-spin 0.8s linear infinite;
+}
+
+@keyframes inbox-folder-spin {
+  to { transform: rotate(360deg); }
+}
+
+.inbox-folder-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 20;
+  max-height: 320px;
+  overflow-y: auto;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+  padding: 4px 0;
+}
+
+.inbox-folder-dropdown-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 10px;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border-color);
+  margin-bottom: 4px;
+}
+
+.inbox-folder-refresh {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.inbox-folder-refresh:hover:not(:disabled) {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+.inbox-folder-refresh:disabled {
+  cursor: not-allowed;
+}
+
+.inbox-folder-refresh .spinning {
+  animation: inbox-folder-spin 1s linear infinite;
+}
+
+.inbox-folder-error {
+  padding: 6px 10px;
+  font-size: 11px;
+  color: var(--accent-red, #ef4444);
+}
+
+.inbox-folder-empty {
+  padding: 8px 10px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.inbox-folder-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  background: transparent;
+  border: none;
+  color: var(--text-primary);
+  font-size: 12px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.inbox-folder-item:hover {
+  background: var(--bg-tertiary);
+}
+
+.inbox-folder-item.is-current {
+  background: color-mix(in srgb, var(--accent-color) 12%, transparent);
+  color: var(--accent-color);
+  font-weight: 500;
+}
+
+.inbox-folder-item svg {
+  flex-shrink: 0;
+  color: currentColor;
+  opacity: 0.75;
+}
+
+.inbox-folder-item-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* === Move-to-folder Dropdown im Detail-View === */
+.inbox-move-wrapper {
+  position: relative;
+  display: inline-flex;
+}
+
+.inbox-action-btn.is-open {
+  background: var(--bg-tertiary);
+  border-color: var(--accent-color);
+}
+
+.inbox-move-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 30;
+  min-width: 220px;
+  max-width: 320px;
+  max-height: 320px;
+  overflow-y: auto;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+  padding: 4px 0;
+}
+
+.inbox-move-dropdown-header {
+  padding: 4px 10px;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border-color);
+  margin-bottom: 4px;
+}
+
+.inbox-move-dropdown-item {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 6px 10px;
+  background: transparent;
+  border: none;
+  color: var(--text-primary);
+  font-size: 12px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.inbox-move-dropdown-item:hover {
+  background: var(--bg-tertiary);
+}
+
+.inbox-move-dropdown-path {
+  font-size: 10px;
+  color: var(--text-muted);
+  font-family: var(--font-mono, monospace);
+}
+
+.inbox-move-error {
+  margin-top: 6px;
+  padding: 4px 8px;
+  font-size: 11px;
+  background: color-mix(in srgb, var(--accent-red, #ef4444) 12%, transparent);
+  color: var(--accent-red, #ef4444);
+  border-radius: var(--radius-sm);
+}
+
 .inbox-panel-content {
   flex: 1;
   overflow-y: auto;

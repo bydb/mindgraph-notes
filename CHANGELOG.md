@@ -2,6 +2,25 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.6.50-beta] - 2026-05-21
+
+### Features
+
+- **IMAP-Ordner werden im Email-Modul angezeigt — nicht mehr nur INBOX**: Neuer Folder-Picker oberhalb der Filter-Leiste im Inbox-Panel zeigt pro Account die komplette Mailbox-Struktur vom Server (INBOX, Sent/Gesendet, Drafts, Junk, Trash, Archive, eigene Unterordner). Sortierung: INBOX immer oben, dann nach RFC-6154-SPECIAL-USE-Flag (Drafts → Sent → Junk → Trash → Archive), dann alphabetisch. Hierarchische Pfade (z.B. `INBOX.Archive.2025`) werden eingerückt dargestellt. Folder-Wechsel triggert sofort einen Fetch des neuen Ordners.
+- **Neuer IPC-Handler `email-list-folders`**: Listet IMAP-Mailboxen via `ImapFlow.list()` inkl. SPECIAL-USE-Flags, Subscription-Status und `\Noselect`-Erkennung. Folder-Liste wird beim Panel-Mount pro Account einmal geladen und cached transient im emailStore (kein Sync, kein Persist).
+- **Mails per IMAP zwischen Ordnern verschieben**: Neuer „Verschieben"-Button in der Mail-Detail-Ansicht öffnet ein Dropdown mit allen Ordnern des Accounts (außer dem aktuellen). Klick verschiebt die Mail per `imapflow.messageMove()` server-seitig. Fallback auf COPY+EXPUNGE bei IMAP-Servern ohne MOVE-Extension. Bei Erfolg wandert die Mail in den Ziel-Ordner und die View springt zurück zur Liste, wenn der Zielordner nicht der gerade aktive ist.
+
+### Improvements
+
+- **`email-fetch` ist folder-aware**: Der Handler akzeptiert jetzt pro Account ein optionales `folder`-Feld (Default `'INBOX'`). `getMailboxLock(fetchFolder)` ersetzt das hardcoded `'INBOX'`. `lastFetchedAt`-Keys laufen pro `${accountId}::${folder}` für Nicht-INBOX, INBOX-Datum bleibt backward-compatible unter `accountId`.
+- **`EmailMessage.folder`-Feld + Filter im Store**: Jede Mail wird mit ihrem Quell-Ordner getaggt. `getFilteredEmails()` zeigt nur Mails aus dem aktiven Folder pro Account. Legacy-Mails ohne Folder-Feld werden als `INBOX` behandelt — keine Datenmigration nötig.
+- **Gesendete Mails landen im richtigen Sent-Folder**: Beim Senden wird das `folder`-Feld auf den `sentMailbox`-Pfad aus dem IMAP-Append gesetzt (z.B. `INBOX.Sent`). Damit erscheinen gesendete Mails nur im Sent-Folder-View und leaken nicht mehr durch andere Ordner.
+- **`EmailSettings.activeFolders`** wird in `uiStore.email` persistiert — die Folder-Auswahl überlebt App-Restart.
+
+### Fixes
+
+- **Sent-Mails leakten durch alle Folder-Views**: Vor dem Fix waren gesendete Mails (`sent: true`) im Folder-Filter pauschal durchgelassen — sie erschienen damit auch im Kontaktformular-, Archive- oder eigenen Unterordnern. Jetzt werden sie korrekt nach `folder`-Feld gefiltert; Legacy-Sent-Mails ohne Folder-Feld erscheinen nur noch in der INBOX-Ansicht.
+
 ## [0.6.49-beta] - 2026-05-21
 
 ### Features

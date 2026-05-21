@@ -356,6 +356,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Email Integration
   emailConnect: (account: { id: string; host: string; port: number; user: string; tls: boolean }) =>
     ipcRenderer.invoke('email-connect', account),
+  emailListFolders: (account: { id: string; host: string; port: number; user: string; tls: boolean }) =>
+    ipcRenderer.invoke('email-list-folders', account),
+  emailMove: (payload: { accountId: string; host: string; port: number; user: string; tls: boolean; sourceFolder: string; uid: number; destinationFolder: string }) =>
+    ipcRenderer.invoke('email-move', payload),
   emailFetch: (vaultPath: string, accounts: object[], lastFetchedAt: Record<string, string>, maxPerAccount: number) =>
     ipcRenderer.invoke('email-fetch', vaultPath, accounts, lastFetchedAt, maxPerAccount),
   emailAnalyze: (vaultPath: string, model: string, emailIds?: string[]) =>

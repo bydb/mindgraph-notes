@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { EmailMessage, EmailFilter, EmailFetchResult, ComposeEmail, EmailSendResult } from '../../shared/types'
+import type { EmailMessage, EmailFilter, EmailFetchResult, EmailFolder, ComposeEmail, EmailSendResult } from '../../shared/types'
 import { useUIStore } from './uiStore'
 import { useNotesStore } from './notesStore'
 
@@ -13,6 +13,10 @@ interface EmailState {
   activeFilter: EmailFilter
   unreadRelevantCount: number
   selectedEmailId: string | null
+  // Folders per account (transient, refreshed on panel open)
+  folders: Record<string, EmailFolder[]>
+  foldersLoading: Record<string, boolean>
+  foldersError: Record<string, string>
   // Compose
   composeState: ComposeEmail | null
   isSending: boolean
@@ -27,6 +31,9 @@ interface EmailState {
   loadEmails: (vaultPath: string, skipAutoActions?: boolean) => Promise<void>
   saveEmails: (vaultPath: string) => Promise<void>
   fetchEmails: (vaultPath: string, forceRefresh?: boolean) => Promise<EmailFetchResult>
+  loadFolders: (accountId: string, force?: boolean) => Promise<void>
+  setActiveFolder: (accountId: string, folder: string) => void
+  moveEmail: (vaultPath: string, emailId: string, destinationFolder: string) => Promise<{ success: boolean; error?: string }>
   analyzeEmails: (vaultPath: string, emailIds?: string[]) => Promise<void>
   reanalyzeEmail: (vaultPath: string, emailId: string) => Promise<void>
   setupEmail: (vaultPath: string) => Promise<boolean>
@@ -61,6 +68,9 @@ export const useEmailStore = create<EmailState>()((set, get) => ({
   activeFilter: { onlyRelevant: true },
   unreadRelevantCount: 0,
   selectedEmailId: null,
+  folders: {},
+  foldersLoading: {},
+  foldersError: {},
   composeState: null,
   isSending: false,
   aiChatMessages: [],
@@ -127,9 +137,14 @@ export const useEmailStore = create<EmailState>()((set, get) => ({
     try {
       // Bei forceRefresh: lastFetchedAt ignorieren → volle 30 Tage
       const fetchSince = forceRefresh ? {} : get().lastFetchedAt
+      // Jeder Account fetchet seinen aktiven Folder (Default INBOX).
+      const accountsWithFolder = email.accounts.map(a => ({
+        ...a,
+        folder: email.activeFolders?.[a.id] || 'INBOX'
+      }))
       const result = await window.electronAPI.emailFetch(
         vaultPath,
-        email.accounts,
+        accountsWithFolder,
         fetchSince,
         email.maxEmailsPerFetch
       )
@@ -276,8 +291,22 @@ export const useEmailStore = create<EmailState>()((set, get) => ({
   getFilteredEmails: () => {
     const { emails, activeFilter } = get()
     const { email: emailSettings } = useUIStore.getState()
+    const activeFolders = emailSettings.activeFolders || {}
 
     return emails.filter((email) => {
+      // Folder-Scope: nur Mails aus dem aktuell gewählten Folder des jeweiligen Accounts.
+      // Legacy-Mails ohne folder-Feld werden 'INBOX' zugeordnet.
+      // Gesendete Mails ohne folder-Feld (vor dem Folder-Patch) bleiben sichtbar, sobald
+      // ein Sent-Folder aktiv ist — sonst nur in INBOX, damit sie nicht durch alle Folder leaken.
+      const expected = activeFolders[email.accountId] || 'INBOX'
+      const actual = email.folder || (email.sent ? '__sent_unknown__' : 'INBOX')
+      if (actual === '__sent_unknown__') {
+        // Heuristik für Legacy-sent ohne folder: nur INBOX zeigen (damit sie nicht überall auftauchen).
+        if (expected !== 'INBOX') return false
+      } else if (actual !== expected) {
+        return false
+      }
+
       // Nur relevante
       if (activeFilter.onlyRelevant) {
         if (!email.analysis?.relevant && (email.analysis?.relevanceScore || 0) < emailSettings.relevanceThreshold) {
@@ -325,6 +354,102 @@ export const useEmailStore = create<EmailState>()((set, get) => ({
 
   setSelectedEmail: (id: string | null) => {
     set({ selectedEmailId: id })
+  },
+
+  loadFolders: async (accountId: string, force?: boolean) => {
+    const state = get()
+    if (state.foldersLoading[accountId]) return
+    if (!force && state.folders[accountId]?.length) return
+
+    const { email } = useUIStore.getState()
+    const account = email.accounts.find(a => a.id === accountId)
+    if (!account) return
+
+    set(s => ({
+      foldersLoading: { ...s.foldersLoading, [accountId]: true },
+      foldersError: { ...s.foldersError, [accountId]: '' }
+    }))
+
+    try {
+      const result = await window.electronAPI.emailListFolders(account)
+      if (result.success) {
+        set(s => ({
+          folders: { ...s.folders, [accountId]: result.folders },
+          foldersLoading: { ...s.foldersLoading, [accountId]: false }
+        }))
+      } else {
+        set(s => ({
+          foldersLoading: { ...s.foldersLoading, [accountId]: false },
+          foldersError: { ...s.foldersError, [accountId]: result.error || 'Unbekannter Fehler' }
+        }))
+      }
+    } catch (error) {
+      console.error('[EmailStore] loadFolders failed:', error)
+      set(s => ({
+        foldersLoading: { ...s.foldersLoading, [accountId]: false },
+        foldersError: { ...s.foldersError, [accountId]: error instanceof Error ? error.message : 'Fehler' }
+      }))
+    }
+  },
+
+  setActiveFolder: (accountId: string, folder: string) => {
+    const { setEmail, email } = useUIStore.getState()
+    setEmail({
+      activeFolders: { ...(email.activeFolders || {}), [accountId]: folder }
+    })
+    // Auswahl/Detail zurücksetzen, damit Detail-View keine Mail aus altem Folder zeigt.
+    set({ selectedEmailId: null, currentView: 'list' })
+  },
+
+  moveEmail: async (vaultPath: string, emailId: string, destinationFolder: string) => {
+    const { emails } = get()
+    const email = emails.find(e => e.id === emailId)
+    if (!email) return { success: false, error: 'Mail nicht gefunden' }
+    if (!email.uid) return { success: false, error: 'Mail hat keine IMAP-UID' }
+
+    const { email: emailSettings } = useUIStore.getState()
+    const account = emailSettings.accounts.find(a => a.id === email.accountId)
+    if (!account) return { success: false, error: 'Account nicht gefunden' }
+
+    const sourceFolder = email.folder || 'INBOX'
+    if (sourceFolder === destinationFolder) {
+      return { success: false, error: 'Quell- und Zielordner identisch' }
+    }
+
+    try {
+      const result = await window.electronAPI.emailMove({
+        accountId: account.id,
+        host: account.host,
+        port: account.port,
+        user: account.user,
+        tls: account.tls,
+        sourceFolder,
+        uid: email.uid,
+        destinationFolder
+      })
+      if (!result.success) return { success: false, error: result.error }
+
+      // Lokal: folder + uid aktualisieren, Selektion zurücksetzen wenn nötig.
+      const next = emails.map(e => e.id === emailId
+        ? { ...e, folder: destinationFolder, uid: result.newUid ?? e.uid }
+        : e
+      )
+      const newState: Partial<EmailState> = { emails: next }
+      // Wenn die verschobene Mail gerade selektiert war und der Zielordner nicht aktiv ist:
+      // Selektion droppen + zurück zur Liste.
+      const activeFolders = useUIStore.getState().email.activeFolders || {}
+      const currentActive = activeFolders[account.id] || 'INBOX'
+      if (get().selectedEmailId === emailId && currentActive !== destinationFolder) {
+        newState.selectedEmailId = null
+        newState.currentView = 'list'
+      }
+      set(newState as EmailState)
+      await get().saveEmails(vaultPath)
+      return { success: true }
+    } catch (error) {
+      console.error('[EmailStore] moveEmail failed:', error)
+      return { success: false, error: error instanceof Error ? error.message : 'Move fehlgeschlagen' }
+    }
   },
 
   updateUnreadRelevantCount: () => {
@@ -397,11 +522,13 @@ export const useEmailStore = create<EmailState>()((set, get) => ({
         signatureImagePath: emailSettings.signatureImagePath || undefined
       })
       if (result.success) {
-        // Gesendete Email tracken
+        // Gesendete Email tracken. folder = wo die Mail per IMAP-Append abgelegt wurde
+        // (Sent/Gesendet). Damit erscheint sie nur im Sent-Folder, nicht in jedem.
         const sentEmail: EmailMessage = {
           id: result.messageId || `sent-${Date.now()}`,
           uid: 0,
           accountId: composeState.accountId,
+          folder: result.sentMailbox || 'Sent',
           from: { name: '', address: account.user },
           to: composeState.to,
           subject: composeState.subject,
