@@ -4,7 +4,8 @@ import type {
   ProjectStatusCrystallizeInput,
   ProjectStatusResult,
   ProjectPriority,
-  LintFinding
+  LintFinding,
+  ProjectSynonymCache
 } from '../../shared/types'
 
 // Standard-Pfade. Können später per Settings überschrieben werden.
@@ -24,6 +25,10 @@ interface ProjectStatusState {
   runningJobs: Map<string, RunningJob>
   /** zuletzt erzeugte Status-Drafts pro Projekt (für Toast / Click-to-Open) */
   lastResults: Map<string, ProjectStatusResult>
+  /** Synonym-Cache pro Projekt-Pfad (folderRel) */
+  synonyms: Record<string, ProjectSynonymCache>
+  /** aktuell laufende Synonym-Generierungen (per folderRel) */
+  generatingSynonyms: Set<string>
 
   // Actions
   load: (vaultPath: string, projectsFolderRel?: string) => Promise<void>
@@ -43,6 +48,8 @@ interface ProjectStatusState {
     vaultPath: string,
     projectFolderRel: string
   ) => Promise<string[]>
+  loadAllSynonyms: (vaultPath: string) => Promise<void>
+  generateSynonyms: (vaultPath: string, projectFolderRel: string, model: string) => Promise<{ success: boolean; error?: string }>
   cleanupFindings: (
     vaultPath: string,
     project: DiscoveredProject,
@@ -65,6 +72,8 @@ export const useProjectStatusStore = create<ProjectStatusState>((set, get) => ({
   lastLoadedAt: null,
   runningJobs: new Map(),
   lastResults: new Map(),
+  synonyms: {},
+  generatingSynonyms: new Set(),
 
   load: async (vaultPath: string, projectsFolderRel: string = DEFAULT_PROJECTS_FOLDER) => {
     set({ loading: true, lastError: null })
@@ -172,6 +181,55 @@ export const useProjectStatusStore = create<ProjectStatusState>((set, get) => ({
     }
   },
 
+  loadAllSynonyms: async (vaultPath: string) => {
+    const { projects } = get()
+    if (projects.length === 0) return
+    const updates: Record<string, ProjectSynonymCache> = {}
+    await Promise.all(projects.map(async p => {
+      try {
+        const result = await window.electronAPI.projectStatusLoadSynonyms(vaultPath, p.folderRel)
+        if (result.success && result.cache) {
+          updates[p.folderRel] = result.cache
+        }
+      } catch {
+        // einzelner Fehler kippt die Bulk-Operation nicht
+      }
+    }))
+    set({ synonyms: { ...get().synonyms, ...updates } })
+  },
+
+  generateSynonyms: async (vaultPath, projectFolderRel, model) => {
+    const current = get().generatingSynonyms
+    if (current.has(projectFolderRel)) {
+      return { success: false, error: 'Synonyme werden bereits generiert' }
+    }
+    const next = new Set(current)
+    next.add(projectFolderRel)
+    set({ generatingSynonyms: next })
+    try {
+      const result = await window.electronAPI.projectStatusGenerateSynonyms(vaultPath, projectFolderRel, model)
+      const after = new Set(get().generatingSynonyms)
+      after.delete(projectFolderRel)
+      if (result.success && result.cache) {
+        set({
+          synonyms: { ...get().synonyms, [projectFolderRel]: result.cache },
+          generatingSynonyms: after
+        })
+        return { success: true }
+      }
+      set({ generatingSynonyms: after })
+      return { success: false, error: result.error || 'Generierung fehlgeschlagen' }
+    } catch (err) {
+      const after = new Set(get().generatingSynonyms)
+      after.delete(projectFolderRel)
+      set({ generatingSynonyms: after })
+      return {
+        success: false,
+        error: err instanceof Error ? err.message : 'Unbekannter Fehler'
+      }
+    }
+  },
+
   cleanupFindings: async (vaultPath, project, filePath, refsToRemove, language) => {
     try {
       const result = await window.electronAPI.projectStatusCleanup(vaultPath, filePath, refsToRemove, language)
@@ -234,6 +292,8 @@ export const useProjectStatusStore = create<ProjectStatusState>((set, get) => ({
     lastError: null,
     lastLoadedAt: null,
     runningJobs: new Map(),
-    lastResults: new Map()
+    lastResults: new Map(),
+    synonyms: {},
+    generatingSynonyms: new Set()
   })
 }))

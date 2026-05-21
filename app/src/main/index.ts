@@ -16,6 +16,11 @@ import {
   buildStatusMarkerFile,
   suggestKeywords
 } from './projectStatus/discovery'
+import {
+  generateProjectSynonyms,
+  loadProjectSynonyms,
+  isSynonymCacheStale
+} from './projectStatus/synonymGenerator'
 import type {
   ProjectStatusCrystallizeInput,
   ProjectPriority,
@@ -2838,12 +2843,61 @@ ipcMain.handle('project-status-crystallize', async (_event, input: ProjectStatus
       return { success: false, error: 'Language ungültig (de | en erwartet)' }
     }
     assertApprovedVault(input.vaultPath, 'project-status-crystallize')
-    return await crystallizeProject(input, assertSafePath)
+    const crystallizeResult = await crystallizeProject(input, assertSafePath)
+
+    // Synonyme im Hintergrund regenerieren, wenn Cache fehlt oder älter 7 Tage.
+    // Fehler werden geloggt aber unterdrücken den Crystallize-Erfolg nicht.
+    if (crystallizeResult.success) {
+      try {
+        const existing = await loadProjectSynonyms(input.vaultPath, input.projectFolderRel)
+        if (isSynonymCacheStale(existing)) {
+          await generateProjectSynonyms(input.vaultPath, input.projectFolderRel, input.model)
+        }
+      } catch (synErr) {
+        console.warn('[project-status] Synonym-Generierung fehlgeschlagen:', synErr instanceof Error ? synErr.message : synErr)
+      }
+    }
+
+    return crystallizeResult
   } catch (err) {
     return {
       success: false,
       error: err instanceof Error ? err.message : 'Unbekannter Fehler'
     }
+  }
+})
+
+ipcMain.handle('project-status-generate-synonyms', async (
+  _event,
+  vaultPath: string,
+  projectFolderRel: string,
+  model: string
+) => {
+  try {
+    if (!vaultPath || typeof vaultPath !== 'string') return { success: false, error: 'vaultPath fehlt' }
+    if (!projectFolderRel || typeof projectFolderRel !== 'string') return { success: false, error: 'projectFolderRel fehlt' }
+    if (!model || typeof model !== 'string') return { success: false, error: 'Modell fehlt' }
+    assertApprovedVault(vaultPath, 'project-status-generate-synonyms')
+    const cache = await generateProjectSynonyms(vaultPath, projectFolderRel, model)
+    return { success: true, cache }
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : 'Unbekannter Fehler' }
+  }
+})
+
+ipcMain.handle('project-status-load-synonyms', async (
+  _event,
+  vaultPath: string,
+  projectFolderRel: string
+) => {
+  try {
+    if (!vaultPath || typeof vaultPath !== 'string') return { success: false, error: 'vaultPath fehlt' }
+    if (!projectFolderRel || typeof projectFolderRel !== 'string') return { success: false, error: 'projectFolderRel fehlt' }
+    assertApprovedVault(vaultPath, 'project-status-load-synonyms')
+    const cache = await loadProjectSynonyms(vaultPath, projectFolderRel)
+    return { success: true, cache }
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : 'Unbekannter Fehler' }
   }
 })
 

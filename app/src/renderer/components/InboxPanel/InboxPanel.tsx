@@ -1,10 +1,12 @@
-import React, { useState, useCallback } from 'react'
+import React, { useState, useCallback, useEffect, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import { useEmailStore } from '../../stores/emailStore'
 import { useUIStore } from '../../stores/uiStore'
 import { useNotesStore } from '../../stores/notesStore'
+import { useProjectStatusStore } from '../../stores/projectStatusStore'
 import { useTranslation } from '../../utils/translations'
 import { sanitizeHtml } from '../../utils/sanitize'
+import { matchEmailToProjects } from '../../utils/projectMatch'
 import { ComposeView } from './ComposeView'
 import { EmailAIChatView } from './EmailAIChatView'
 
@@ -32,17 +34,38 @@ export const InboxPanel: React.FC<InboxPanelProps> = ({ onClose }) => {
     setCurrentView,
     setComposeState,
     startReply,
+    startForward,
     startNewEmail,
     setAiChatEmail,
     markReplyHandled,
     reanalyzeEmail
   } = useEmailStore()
   const { email: emailSettings } = useUIStore()
+  const projectsRootFolder = useUIStore(s => s.projectsRootFolder)
+  const projects = useProjectStatusStore(s => s.projects)
+  const projectsLastLoadedAt = useProjectStatusStore(s => s.lastLoadedAt)
+  const projectSynonyms = useProjectStatusStore(s => s.synonyms)
+  const loadProjects = useProjectStatusStore(s => s.load)
+  const loadAllSynonyms = useProjectStatusStore(s => s.loadAllSynonyms)
+  const setEmailProject = useEmailStore(s => s.setEmailProject)
 
   const emails = useEmailStore(state => state.emails)
   const [searchQuery, setSearchQuery] = useState('')
   const [reminderStatus, setReminderStatus] = useState<Record<number, 'loading' | 'success' | 'error'>>({})
-  const [showOriginal, setShowOriginal] = useState(false)
+  const [showSummary, setShowSummary] = useState(false)
+  const [showProjectDropdown, setShowProjectDropdown] = useState(false)
+
+  useEffect(() => {
+    if (vaultPath && projectsRootFolder && projectsLastLoadedAt === null) {
+      loadProjects(vaultPath, projectsRootFolder)
+    }
+  }, [vaultPath, projectsRootFolder, projectsLastLoadedAt, loadProjects])
+
+  useEffect(() => {
+    if (vaultPath && projects.length > 0) {
+      loadAllSynonyms(vaultPath)
+    }
+  }, [vaultPath, projects, loadAllSynonyms])
 
   const filteredEmails = getFilteredEmails()
 
@@ -58,6 +81,70 @@ export const InboxPanel: React.FC<InboxPanelProps> = ({ onClose }) => {
   const selectedEmail = selectedEmailId
     ? emails.find(e => e.id === selectedEmailId)
     : null
+
+  const projectMatches = useMemo(() => {
+    if (!selectedEmail || projects.length === 0) return []
+    return matchEmailToProjects(
+      { subject: selectedEmail.subject, bodyText: selectedEmail.bodyText },
+      projects,
+      projectSynonyms
+    )
+  }, [selectedEmail, projects, projectSynonyms])
+
+  // Aktives Projekt = User-Override falls gesetzt, sonst Top-1 vom Match.
+  // userProject === null bedeutet "explizit kein Projekt" → keine Anzeige.
+  const activeProject = useMemo(() => {
+    if (!selectedEmail) return null
+    if (selectedEmail.userProject === null) return null
+    if (selectedEmail.userProject) {
+      const explicit = projects.find(p => p.folderRel === selectedEmail.userProject)
+      if (explicit) return explicit
+    }
+    return projectMatches[0]?.project || null
+  }, [selectedEmail, projects, projectMatches])
+
+  const otherProjectCandidates = useMemo(() => {
+    if (!activeProject) return []
+    return projectMatches
+      .map(m => m.project)
+      .filter(p => p.folderRel !== activeProject.folderRel)
+  }, [projectMatches, activeProject])
+
+  const activeMatch = useMemo(() => {
+    if (!activeProject) return null
+    return projectMatches.find(m => m.project.folderRel === activeProject.folderRel) || null
+  }, [projectMatches, activeProject])
+
+  useEffect(() => {
+    setShowProjectDropdown(false)
+  }, [selectedEmailId])
+
+  const handleOpenProjectStatus = useCallback((folderRel: string) => {
+    const statusRel = `${folderRel}/_STATUS.md`
+    const notesState = useNotesStore.getState()
+    const note = notesState.getNoteByPath(statusRel)
+    if (note) {
+      notesState.selectNote(note.id)
+      onClose()
+      return
+    }
+    if (vaultPath) {
+      window.electronAPI.showInFolder(`${vaultPath}/${statusRel}`).catch(() => {})
+    }
+  }, [vaultPath, onClose])
+
+  const handlePickProject = useCallback(async (folderRel: string) => {
+    if (!vaultPath || !selectedEmail) return
+    await setEmailProject(vaultPath, selectedEmail.id, folderRel)
+    setShowProjectDropdown(false)
+    handleOpenProjectStatus(folderRel)
+  }, [vaultPath, selectedEmail, setEmailProject, handleOpenProjectStatus])
+
+  const handleClearProject = useCallback(async () => {
+    if (!vaultPath || !selectedEmail) return
+    await setEmailProject(vaultPath, selectedEmail.id, null)
+    setShowProjectDropdown(false)
+  }, [vaultPath, selectedEmail, setEmailProject])
 
   const handleRefresh = useCallback(async () => {
     if (!vaultPath || isFetching) return
@@ -327,6 +414,13 @@ export const InboxPanel: React.FC<InboxPanelProps> = ({ onClose }) => {
                   </svg>
                   {t('inbox.reply')}
                 </button>
+                <button className="inbox-action-btn" onClick={() => startForward(selectedEmail)} data-tooltip={t('inbox.forward.tooltip')}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="15 17 20 12 15 7" />
+                    <path d="M4 18v-2a4 4 0 0 1 4-4h12" />
+                  </svg>
+                  {t('inbox.forward')}
+                </button>
                 <button className="inbox-action-btn" onClick={() => setAiChatEmail(selectedEmail.id)} data-tooltip={t('inbox.discuss.tooltip')}>
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
@@ -414,15 +508,121 @@ export const InboxPanel: React.FC<InboxPanelProps> = ({ onClose }) => {
                     </div>
                   )}
 
-                  {selectedEmail.analysis.summary && (
-                    <div className="inbox-analysis-section">
-                      <h4>{t('inbox.detail.summary')}</h4>
-                      <p dangerouslySetInnerHTML={{ __html: sanitizeHtml(
-                        selectedEmail.analysis.summary
-                          .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-                          .replace(/\*(.+?)\*/g, '<em>$1</em>')
-                      ) }} />
+                  {activeProject && (
+                    <div className="inbox-analysis-row">
+                      <span className="inbox-analysis-label">{t('inbox.detail.project')}</span>
+                      <div className="inbox-project-row">
+                        <button
+                          type="button"
+                          className={`inbox-project-chip priority-${activeProject.marker.priority} ${selectedEmail.userProject ? 'is-user-set' : ''}`}
+                          onClick={() => handleOpenProjectStatus(activeProject.folderRel)}
+                          title={(() => {
+                            const base = t('inbox.detail.openProjectStatus')
+                            if (selectedEmail.userProject) return `${base}\n${t('inbox.detail.matchManual')}`
+                            if (activeMatch && activeMatch.matchedTerms.length > 0) {
+                              return `${base}\n${t('inbox.detail.matchedTerms')}: ${activeMatch.matchedTerms.join(', ')}`
+                            }
+                            return base
+                          })()}
+                        >
+                          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+                          </svg>
+                          <span>{activeProject.marker.project || activeProject.folderName}</span>
+                        </button>
+                        {(otherProjectCandidates.length > 0 || projects.length > 0) && (
+                          <div className="inbox-project-dropdown-wrapper">
+                            <button
+                              type="button"
+                              className="inbox-project-more-btn"
+                              onClick={() => setShowProjectDropdown(v => !v)}
+                              title={t('inbox.detail.otherProjects')}
+                            >
+                              {showProjectDropdown ? '×' : '+'} {t('inbox.detail.other')}
+                            </button>
+                            {showProjectDropdown && (
+                              <div className="inbox-project-dropdown" role="menu">
+                                {otherProjectCandidates.length > 0 && (
+                                  <div className="inbox-project-dropdown-section">
+                                    <div className="inbox-project-dropdown-heading">{t('inbox.detail.suggestions')}</div>
+                                    {otherProjectCandidates.map(p => (
+                                      <button
+                                        key={p.folderRel}
+                                        type="button"
+                                        className="inbox-project-dropdown-item"
+                                        onClick={() => handlePickProject(p.folderRel)}
+                                      >
+                                        {p.marker.project || p.folderName}
+                                      </button>
+                                    ))}
+                                  </div>
+                                )}
+                                {projects.length > otherProjectCandidates.length + 1 && (
+                                  <div className="inbox-project-dropdown-section">
+                                    <div className="inbox-project-dropdown-heading">{t('inbox.detail.allProjects')}</div>
+                                    {projects
+                                      .filter(p => p.folderRel !== activeProject.folderRel && !otherProjectCandidates.some(c => c.folderRel === p.folderRel))
+                                      .map(p => (
+                                        <button
+                                          key={p.folderRel}
+                                          type="button"
+                                          className="inbox-project-dropdown-item"
+                                          onClick={() => handlePickProject(p.folderRel)}
+                                        >
+                                          {p.marker.project || p.folderName}
+                                        </button>
+                                      ))}
+                                  </div>
+                                )}
+                                <div className="inbox-project-dropdown-section">
+                                  <button
+                                    type="button"
+                                    className="inbox-project-dropdown-item is-clear"
+                                    onClick={handleClearProject}
+                                  >
+                                    {t('inbox.detail.noProject')}
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
                     </div>
+                  )}
+
+                  <div className="inbox-analysis-section">
+                    <div className="inbox-original-text">
+                      <pre>{selectedEmail.bodyText}</pre>
+                    </div>
+                  </div>
+
+                  {selectedEmail.analysis.summary && (
+                    <>
+                      <button
+                        className="inbox-original-toggle"
+                        onClick={() => setShowSummary(!showSummary)}
+                      >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          {showSummary ? (
+                            <polyline points="18 15 12 9 6 15" />
+                          ) : (
+                            <polyline points="6 9 12 15 18 9" />
+                          )}
+                        </svg>
+                        {showSummary ? t('inbox.detail.hideSummary') : t('inbox.detail.showSummary')}
+                      </button>
+                      {showSummary && (
+                        <div className="inbox-analysis-section">
+                          <h4>{t('inbox.detail.summary')}</h4>
+                          <p dangerouslySetInnerHTML={{ __html: sanitizeHtml(
+                            selectedEmail.analysis.summary
+                              .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+                              .replace(/\*(.+?)\*/g, '<em>$1</em>')
+                          ) }} />
+                        </div>
+                      )}
+                    </>
                   )}
 
                   {selectedEmail.analysis.categories.length > 0 && (
@@ -502,25 +702,12 @@ export const InboxPanel: React.FC<InboxPanelProps> = ({ onClose }) => {
               )
             })()}
 
-            {/* Original-Text Toggle */}
-            <button
-              className="inbox-original-toggle"
-              onClick={() => setShowOriginal(!showOriginal)}
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                {showOriginal ? (
-                  <><polyline points="18 15 12 9 6 15" /></>
-                ) : (
-                  <><polyline points="6 9 12 15 18 9" /></>
-                )}
-              </svg>
-              {showOriginal ? t('inbox.detail.hideOriginal') : t('inbox.detail.showOriginal')}
-            </button>
-            {showOriginal && (
+            {!selectedEmail.analysis && (
               <div className="inbox-original-text">
                 <pre>{selectedEmail.bodyText}</pre>
               </div>
             )}
+
           </div>
         </div>
       </div>

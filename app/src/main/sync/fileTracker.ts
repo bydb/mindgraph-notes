@@ -34,6 +34,7 @@ const EXCLUDE_PATTERNS = [
   '*.tmp',
   '~*',
   '.mindgraph/sync-manifest.json',
+  '.project-synonyms.json',
   '.trash',
   '.sync-trash'
 ]

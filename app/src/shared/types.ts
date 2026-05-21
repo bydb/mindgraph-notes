@@ -997,6 +997,8 @@ export interface ElectronAPI {
   projectStatusCrystallize: (input: ProjectStatusCrystallizeInput) => Promise<ProjectStatusResult>;
   projectStatusCleanup: (vaultPath: string, filePath: string, refsToRemove: string[], language: 'de' | 'en') => Promise<{ success: boolean; removedLineCount?: number; remainingFindings?: LintFinding[]; error?: string }>;
   projectStatusDeleteDraft: (vaultPath: string, filePath: string) => Promise<{ success: boolean; error?: string }>;
+  projectStatusGenerateSynonyms: (vaultPath: string, projectFolderRel: string, model: string) => Promise<{ success: boolean; cache?: ProjectSynonymCache; error?: string }>;
+  projectStatusLoadSynonyms: (vaultPath: string, projectFolderRel: string) => Promise<{ success: boolean; cache?: ProjectSynonymCache | null; error?: string }>;
 
   // MindGraph Coach (adaptives Onboarding)
   coachPrecheck: () => Promise<{ backend: 'anthropic' | 'ollama' | 'none'; detail: string }>;
@@ -1152,6 +1154,14 @@ export interface LintFinding {
   suggestion?: string;         // Empfehlung (für `suggestion` und `markdown-link`)
 }
 
+/** Vom Synonym-Generator erzeugter Cache pro Projekt. */
+export interface ProjectSynonymCache {
+  synonyms: string[];
+  generatedAt: string;          // ISO-Timestamp
+  model: string;                // verwendetes Ollama-Modell
+  sourceCount: number;          // Anzahl betrachteter Dateien (inkl. _STATUS.md)
+}
+
 /** Ergebnis eines Crystallize-Laufs. */
 export interface ProjectStatusResult {
   success: boolean;
@@ -1206,6 +1216,9 @@ export interface EmailMessage {
   sent?: boolean          // true fuer vom User gesendete Emails
   hasAttachments?: boolean
   attachmentNames?: string[]
+  /** Vom User manuell zugewiesener Projektordner (vault-relativer Pfad).
+   *  null = explizit "kein Projekt"; undefined = auto-Match aktiv. */
+  userProject?: string | null
 }
 
 export interface EmailSuggestedAction {

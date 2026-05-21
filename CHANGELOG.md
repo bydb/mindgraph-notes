@@ -2,6 +2,28 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.6.49-beta] - 2026-05-21
+
+### Features
+
+- **Email-Detail-Ansicht umgestellt — Original primär, Zusammenfassung optional**: Der Original-Mailtext wird jetzt direkt im Analyse-Block zwischen „Modell" und Kategorien angezeigt (vorher hinter Toggle versteckt). Die KI-Zusammenfassung ist umgekehrt unter einem schmalen „Zusammenfassung anzeigen"-Toggle. Begründung: in der Praxis liest man primär die Original-Mail, die Zusammenfassung dient nur dem Triage. Termin- und Aktivitäts-Extraktion bleibt unverändert sichtbar.
+- **Weiterleiten-Button in der Mail-Detail-Ansicht**: Neuer „Weiterleiten"-Button zwischen „Antworten" und „Mit KI diskutieren". Öffnet das Compose-Modal mit klassischem Forward-Header (Von / Datum / Betreff / An / optional Anhänge namentlich), `Fwd:`-Präfix im Subject, leerem Empfänger-Feld, ohne `inReplyTo`/`references` (Forward ist kein Thread-Reply). Original-Anhänge werden im Forward-Header textuell erwähnt, aber nicht binär mit-angehängt (Minimal-Variante).
+- **Projekt-Zuordnung für Emails (Keyword + LLM-Synonyme)**: Neue Zeile „Projekt" im Email-Analyse-Block zeigt das thematisch passende Projekt als Chip — basierend auf den `keywords:` in der `_STATUS.md` plus automatisch generierten Synonymen. Klick öffnet die `_STATUS.md` des Projekts im neuen Tab. Live-Berechnung im Renderer (keine Persistenz), reagiert sofort auf Keyword-Änderungen. Bei 0 Treffern bleibt die Zeile aus.
+- **Projekt-Synonym-Generator (Ollama, lokal)**: Pro Projekt wird ein Cache `.project-synonyms.json` erzeugt — der LLM extrahiert 8–12 thematisch verwandte Begriffe aus `_STATUS.md` + den 10 neuesten Projektdateien. Dadurch matcht „Fachforum" auch dann, wenn deine Keywords nur „Fachtag" enthalten. Triggerbar manuell pro Projekt im ProjectStatus-Widget (Button „🏷 N") oder automatisch beim wöchentlichen Crystallize-Lauf, wenn der Cache fehlt oder älter als 7 Tage ist. Cache ist Pro-Device (vom Sync ausgeschlossen).
+- **Override-Dropdown für falsche Auto-Zuordnungen**: „+ andere"-Button neben dem Projekt-Chip öffnet ein Dropdown mit alternativen Treffern, allen Projekten und „— Keinem Projekt zuordnen". Manuell gewählte Projekte werden persistent in `emails.json` (`userProject`-Feld) gespeichert und visuell durch gestrichelten Chip-Rand markiert.
+
+### Improvements
+
+- **Stopword-Filter für Projekt-Match**: Generische Wörter (Information, Informationen, Raum, Frau, Mann, Herr, Hallo, Email, Tag, Woche, Termin, Datei, Dokument, OK, etc.) werden beim Matching ignoriert — egal ob sie in den `_STATUS.md`-Keywords oder den LLM-Synonymen stehen. Verhindert Falsch-Treffer durch zu generische Keywords, ohne dass die `_STATUS.md` bereinigt werden muss.
+- **Match-Diagnose im Chip-Tooltip**: Hover über den Projekt-Chip zeigt jetzt die konkreten Begriffe, die zum Treffer geführt haben (z.B. „Gematcht über: Mittelhessen, Fachforum"). Bei manuellem Override: „manuell zugewiesen". Hilft, problematische Keywords schnell zu identifizieren.
+- **IMAP-Sent-Append-Robustheit**: Forward-Mails verwenden denselben SMTP-/IMAP-Pfad wie Reply, inkl. konsistenter `Message-ID` für die Kopie im Gesendet-Ordner.
+- **Dropdown-Positionierung**: Projekt-Override-Dropdown ist rechtsbündig verankert (`right: 0`) statt linksbündig — verhindert Clipping am rechten Inbox-Panel-Rand. Lange Projektnamen wrappen sauber.
+
+### Fixes
+
+- **Email-Body-Schutz vor Wikilink-Korruption bleibt**: Auto-Heal für Backslash-Escape-Folgen (`\[`, `\]`) läuft unverändert in jedem `.md`-Write-Pfad — keine Regression durch den neuen `setEmailProject`-Pfad.
+- **Sync schließt `.project-synonyms.json` aus**: Pro-Device-LLM-Cache bleibt lokal, kein Sync-Konflikt zwischen Geräten.
+
 ## [0.6.48-beta] - 2026-05-18
 
 ### Improvements

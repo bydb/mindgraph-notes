@@ -44,17 +44,28 @@ export const ProjectStatusWidget: React.FC<ProjectStatusWidgetProps> = () => {
   const effectiveModel = moduleOverride || ollama.selectedModel || ''
   const hardLocked = effectiveModel && isHardLocked(effectiveModel, 'project-status')
 
-  const { projects, loading, lastError, runningJobs, lastResults, load, crystallize, cleanupFindings, deleteDraft } = useProjectStatusStore(useShallow(s => ({
+  const { projects, loading, lastError, runningJobs, lastResults, synonyms, generatingSynonyms, load, crystallize, cleanupFindings, deleteDraft, generateSynonyms } = useProjectStatusStore(useShallow(s => ({
     projects: s.projects,
     loading: s.loading,
     lastError: s.lastError,
     runningJobs: s.runningJobs,
     lastResults: s.lastResults,
+    synonyms: s.synonyms,
+    generatingSynonyms: s.generatingSynonyms,
     load: s.load,
     crystallize: s.crystallize,
     cleanupFindings: s.cleanupFindings,
-    deleteDraft: s.deleteDraft
+    deleteDraft: s.deleteDraft,
+    generateSynonyms: s.generateSynonyms
   })))
+
+  const loadAllSynonyms = useProjectStatusStore(s => s.loadAllSynonyms)
+
+  useEffect(() => {
+    if (vaultPath && projects.length > 0) {
+      loadAllSynonyms(vaultPath)
+    }
+  }, [vaultPath, projects, loadAllSynonyms])
 
   const [showMarkDialog, setShowMarkDialog] = useState(false)
   const [reviewProject, setReviewProject] = useState<DiscoveredProject | null>(null)
@@ -120,6 +131,34 @@ export const ProjectStatusWidget: React.FC<ProjectStatusWidgetProps> = () => {
       setToast({
         kind: 'error',
         text: result.error || (lang === 'de' ? 'Unbekannter Fehler' : 'Unknown error')
+      })
+    }
+  }
+
+  const handleGenerateSynonyms = async (project: DiscoveredProject) => {
+    setToast(null)
+    if (!effectiveModel) {
+      setToast({
+        kind: 'error',
+        text: lang === 'de'
+          ? 'Kein lokales Sprachmodell ausgewählt.'
+          : 'No local model selected.'
+      })
+      return
+    }
+    const result = await generateSynonyms(vaultPath, project.folderRel, effectiveModel)
+    if (result.success) {
+      const count = synonyms[project.folderRel]?.synonyms.length || 0
+      setToast({
+        kind: 'success',
+        text: lang === 'de'
+          ? `Synonyme für „${project.folderName}" aktualisiert (${count} Begriffe).`
+          : `Synonyms updated for "${project.folderName}" (${count} terms).`
+      })
+    } else {
+      setToast({
+        kind: 'error',
+        text: result.error || (lang === 'de' ? 'Synonym-Generierung fehlgeschlagen' : 'Synonym generation failed')
       })
     }
   }
@@ -200,7 +239,11 @@ export const ProjectStatusWidget: React.FC<ProjectStatusWidgetProps> = () => {
               lang={lang}
               running={runningJobs.has(p.folderRel)}
               lastResult={lastResults.get(p.folderRel)}
+              synonymCount={synonyms[p.folderRel]?.synonyms.length || 0}
+              synonymsGeneratedAt={synonyms[p.folderRel]?.generatedAt}
+              synonymRunning={generatingSynonyms.has(p.folderRel)}
               onCrystallize={() => handleCrystallize(p)}
+              onGenerateSynonyms={() => handleGenerateSynonyms(p)}
               onOpenStatus={(absPath) => handleOpenStatusFile(absPath)}
               onReview={() => setReviewProject(p)}
               onShowDrafts={() => setDraftsProject(p)}
@@ -390,13 +433,17 @@ interface ProjectRowProps {
   lang: 'de' | 'en'
   running: boolean
   lastResult?: import('../../../shared/types').ProjectStatusResult
+  synonymCount: number
+  synonymsGeneratedAt?: string
+  synonymRunning: boolean
   onCrystallize: () => void
+  onGenerateSynonyms: () => void
   onOpenStatus: (absPath: string) => void
   onReview: () => void
   onShowDrafts: () => void
 }
 
-const ProjectRow: React.FC<ProjectRowProps> = ({ project, lang, running, lastResult, onCrystallize, onOpenStatus, onReview, onShowDrafts }) => {
+const ProjectRow: React.FC<ProjectRowProps> = ({ project, lang, running, lastResult, synonymCount, synonymsGeneratedAt, synonymRunning, onCrystallize, onGenerateSynonyms, onOpenStatus, onReview, onShowDrafts }) => {
   const prio = project.marker.priority
   const prioDot = prio === 'high' ? '🔴' : prio === 'med' ? '🟡' : '🟢'
   const prioLabel = lang === 'de'
@@ -463,6 +510,25 @@ const ProjectRow: React.FC<ProjectRowProps> = ({ project, lang, running, lastRes
             {lang === 'de' ? 'Ansehen' : 'Open'}
           </button>
         )}
+        <button
+          className="psw-btn psw-btn--ghost psw-btn--small"
+          onClick={onGenerateSynonyms}
+          disabled={synonymRunning}
+          title={(() => {
+            if (synonymRunning) return lang === 'de' ? 'Synonyme werden generiert …' : 'Generating synonyms …'
+            if (!synonymsGeneratedAt) return lang === 'de' ? 'Topic-Synonyme für Email-Matching generieren' : 'Generate topic synonyms for email matching'
+            const days = Math.floor((Date.now() - new Date(synonymsGeneratedAt).getTime()) / 86400000)
+            return lang === 'de'
+              ? `${synonymCount} Synonyme · vor ${days} Tag${days === 1 ? '' : 'en'} · Klick: neu generieren`
+              : `${synonymCount} synonyms · ${days} day${days === 1 ? '' : 's'} ago · click to regenerate`
+          })()}
+        >
+          {synonymRunning
+            ? (lang === 'de' ? '🔄 …' : '🔄 …')
+            : synonymCount > 0
+              ? `🏷 ${synonymCount}`
+              : (lang === 'de' ? '🏷 Synonyme' : '🏷 Synonyms')}
+        </button>
         <button
           className="psw-btn psw-btn--primary psw-btn--small"
           onClick={onCrystallize}

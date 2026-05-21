@@ -36,11 +36,13 @@ interface EmailState {
   setSelectedEmail: (id: string | null) => void
   updateUnreadRelevantCount: () => void
   markReplyHandled: (vaultPath: string, emailId: string, handled: boolean) => Promise<void>
+  setEmailProject: (vaultPath: string, emailId: string, folderRel: string | null) => Promise<void>
   // Compose actions
   setComposeState: (state: ComposeEmail | null) => void
   setCurrentView: (view: 'list' | 'detail' | 'compose' | 'aiChat') => void
   sendEmail: (vaultPath: string) => Promise<EmailSendResult>
   startReply: (email: EmailMessage) => void
+  startForward: (email: EmailMessage) => void
   startNewEmail: () => void
   // AI Chat actions
   setAiChatEmail: (emailId: string | null) => void
@@ -355,6 +357,13 @@ export const useEmailStore = create<EmailState>()((set, get) => ({
     await get().saveEmails(vaultPath)
   },
 
+  setEmailProject: async (vaultPath: string, emailId: string, folderRel: string | null) => {
+    const { emails } = get()
+    const next = emails.map(e => e.id === emailId ? { ...e, userProject: folderRel } : e)
+    set({ emails: next })
+    await get().saveEmails(vaultPath)
+  },
+
   // Compose actions
   setComposeState: (state) => set({ composeState: state }),
 
@@ -433,6 +442,32 @@ export const useEmailStore = create<EmailState>()((set, get) => ({
         body: sig + quotedHeader + quotedBody,
         inReplyTo: email.id,
         references: email.id,
+        accountId: account?.id || ''
+      },
+      currentView: 'compose'
+    })
+  },
+
+  startForward: (email: EmailMessage) => {
+    const { email: emailSettings } = useUIStore.getState()
+    const account = emailSettings.accounts[0]
+    const sig = emailSettings.signature ? `\n\n--\n${emailSettings.signature}` : ''
+
+    const date = email.date ? new Date(email.date).toLocaleString() : ''
+    const sender = email.from.name ? `${email.from.name} <${email.from.address}>` : email.from.address
+    const toLine = (email.to || []).map(r => r.name ? `${r.name} <${r.address}>` : r.address).join(', ')
+    const attachLine = email.attachmentNames && email.attachmentNames.length > 0
+      ? `\nAnhänge: ${email.attachmentNames.join(', ')}`
+      : ''
+    const header = `\n\n---------- Weitergeleitete Nachricht ----------\nVon: ${sender}\nDatum: ${date}\nBetreff: ${email.subject}\nAn: ${toLine}${attachLine}\n\n`
+    const originalText = (email.bodyText || email.snippet || '').trim()
+    const subject = /^fwd?:\s/i.test(email.subject) ? email.subject : `Fwd: ${email.subject}`
+
+    set({
+      composeState: {
+        to: [],
+        subject,
+        body: sig + header + originalText,
         accountId: account?.id || ''
       },
       currentView: 'compose'
