@@ -1,8 +1,8 @@
 # MindGraph Notes
 
-**Notizen, Karteikarten, KI und Terminal -- in einer App.**
+**Zeigt dir, was heute wichtig ist.**
 
-Eine moderne, lokale Notiz-App die Markdown-Notizen mit einem Wissensgraphen, Karteikarten (Spaced Repetition), E2E-verschluesseltem Sync, KI-Integration und einem vollwertigen Terminal kombiniert. 100% lokal, Open Source, ohne Cloud-Zwang.
+Lokaler Workspace, der deine Notizen, Aufgaben, E-Mails und Dokumente verbindet und nach Relevanz sortiert. Markdown, Wissensgraph, Karteikarten, E2E-Sync -- alles mit lokaler KI, ohne Cloud-Zwang. Open Source.
 
 [Website](https://mindgraph-notes.de) · [Download](https://mindgraph-notes.de/#download) · [Blog](https://mindgraph-notes.de/blog/) · [GitHub](https://github.com/bydb/mindgraph-notes)
 
