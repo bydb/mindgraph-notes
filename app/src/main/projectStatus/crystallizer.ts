@@ -35,8 +35,10 @@ import { parseExcel, sheetToMarkdownTable } from '../office/officeService'
 const OLLAMA_LOCAL_URL = 'http://localhost:11434'
 const DEFAULT_BRAIN_FOLDER = '800 - 🧠 brain'
 const DEFAULT_INBOX_FOLDER = '000 - 📥 inbox/010 - 📥 Notes'
+const DEFAULT_EMAIL_FOLDER = '‼️📧 - emails'
 const BRAIN_LOOKBACK_DAYS = 7
 const INBOX_LOOKBACK_DAYS = 30
+const EMAIL_LOOKBACK_DAYS = 30
 const LARGE_FILE_THRESHOLD = 20000
 const LARGE_FILE_LINE_CAP = 80
 
@@ -242,6 +244,63 @@ async function gatherInboxNotes(
 }
 
 // ────────────────────────────────────────────────────────────────────────────
+// Email-Notizen einsammeln (analog Inbox; eigener Ordner, da Mails den Großteil
+// projektrelevanter Aktivität tragen — Stakeholder, offene Fäden, Termine).
+// ────────────────────────────────────────────────────────────────────────────
+
+async function gatherEmailNotes(
+  vaultPath: string,
+  emailFolderRel: string,
+  keywords: string[]
+): Promise<ProjectStatusSourceFile[]> {
+  const emailAbs = path.join(vaultPath, emailFolderRel)
+  let files: string[]
+  try {
+    files = await fs.readdir(emailAbs)
+  } catch {
+    return []
+  }
+
+  const cutoffMs = Date.now() - EMAIL_LOOKBACK_DAYS * 86400000
+  const lowerKeywords = keywords.map(k => k.toLowerCase()).filter(k => k.length > 0)
+  if (lowerKeywords.length === 0) return []
+
+  const result: ProjectStatusSourceFile[] = []
+  for (const file of files) {
+    if (!file.endsWith('.md')) continue
+    const full = path.join(emailAbs, file)
+    let stat: import('fs').Stats
+    try {
+      stat = await fs.stat(full)
+    } catch { continue }
+    if (stat.mtimeMs < cutoffMs) continue
+
+    let raw: string
+    try {
+      raw = await fs.readFile(full, 'utf-8')
+    } catch { continue }
+
+    const body = stripFrontmatter(raw)
+    const lower = body.toLowerCase()
+    if (!lowerKeywords.some(k => lower.includes(k))) continue
+
+    // Email-Notizen sind kompakt (Zusammenfassung + Aufgaben + Kategorien);
+    // Sentence-Snippet-Filter analog Inbox, contextSentences=1 für 1 Satz vorher/nachher.
+    const filtered = extractRelevantSnippets(body, keywords, 1)
+    if (filtered.trim().length === 0) continue
+
+    result.push({
+      name: file.slice(0, -3).normalize('NFC'),
+      pathRel: path.join(emailFolderRel, file),
+      content: truncateContent(filtered),
+      origin: 'email'
+    })
+  }
+
+  return result
+}
+
+// ────────────────────────────────────────────────────────────────────────────
 // Projekt-Dateien einsammeln (alle `.md` außer `_STATUS*`)
 // ────────────────────────────────────────────────────────────────────────────
 
@@ -325,6 +384,7 @@ function buildPrompt(
   brainEntries: ProjectStatusBrainEntry[],
   projectFiles: ProjectStatusSourceFile[],
   inboxNotes: ProjectStatusSourceFile[],
+  emailNotes: ProjectStatusSourceFile[],
   language: 'de' | 'en'
 ): string {
   const projectName = marker.project
@@ -382,6 +442,14 @@ function buildPrompt(
         `### [[${f.name}]]${formatEvidence(evidenceFor(f.content))}\n${f.content.trim()}`
       ).join('\n\n')
 
+  const emailBlock = emailNotes.length === 0
+    ? (language === 'de'
+        ? '(keine themenverwandten Email-Notizen in den letzten 30 Tagen)'
+        : '(no related email notes in the last 30 days)')
+    : emailNotes.map(f =>
+        `### [[${f.name}]]${formatEvidence(evidenceFor(f.content))}\n${f.content.trim()}`
+      ).join('\n\n')
+
   if (language === 'de') {
     return `Du bist der Projekt-Status-Crystallizer. Aus den unten gelieferten Quellen schreibst du **einen ehrlichen, knappen Wochenstand** für ein Projekt — so wie ihn ein Geschäftsführer oder Projektleiter Sonntagabend lesen will.
 
@@ -413,9 +481,11 @@ HARTE REGELN:
      "Diese Woche keine konkrete Bewegung am Projekt sichtbar."
      **Niemals** alte Projekt-Notizen (z. B. ein Gespräch vom 27.03.) als „Diese Woche" verkaufen.
 
-   - **„Stakeholder"**, **„Wichtige Daten"**, **„Risiken"** — primär aus **Projekt-Dateien**, auch wenn älter. Personen, Termine, Risiken sind oft länger gültig als eine Woche.
+   - **„Stakeholder"**, **„Wichtige Daten"**, **„Risiken"** — primär aus **Projekt-Dateien** und **Email-Notizen**, auch wenn älter. Personen (Absender/Empfänger der Mails!), Termine und Risiken stehen oft in Emails konkreter als anderswo.
 
-   - **„Offene Fäden"** — aus Brain-Tagen oder Projekt-Dateien, sofern aktuell unerledigt UND projektbezogen.
+   - **„Offene Fäden"** — aus Brain-Tagen, Projekt-Dateien oder **Email-Notizen** (besonders Mails mit offenen Aufgaben oder ohne erkennbare Antwort), sofern aktuell unerledigt UND projektbezogen.
+
+   - **Email-Notizen** (\`## D)\`) sind unsere primäre Quelle für **Wer hat was wann gesagt** — Absender werden im Frontmatter \`von:\` als Wikilink genannt; nutze diese Personen für „Stakeholder". Termine in Email-„Aufgaben"-Sektionen (\`@[[YYYY-MM-DD]]\`) gehören in „Wichtige Daten".
 
    **Faustregel**: Wenn dir nur die Brain-Tage sagen, „worum es im Projekt geht", liegt ein Quellen-Fehler vor — Brain-Tage charakterisieren niemals das Projekt selbst, nur dessen Wochenbewegung.
 5. „Diese Woche": konkrete Aktionen aus Brain-Tagen, nicht Meta-Sätze. "Subdomain telli.mzgivb.de stillgelegt" — nicht "Dokumentation wurde gepflegt".
@@ -463,6 +533,10 @@ ${projectBlock}
 
 ${inboxBlock}
 
+## D) Themenverwandte Email-Notizen
+
+${emailBlock}
+
 ═══════════════════════════════════════════════════════════════════
 
 Beginne sofort mit \`## In einem Satz\`. KEINE Vorrede, KEINE Code-Fences.`
@@ -498,9 +572,11 @@ HARD RULES:
      "No direct project activity visible this week."
      **Never** sell old project notes (e.g. a March 27 meeting) as "this week".
 
-   - **"Stakeholders"**, **"Important dates"**, **"Risks"** — primarily from **project files**, even older ones. People, dates, risks often last longer than a week.
+   - **"Stakeholders"**, **"Important dates"**, **"Risks"** — primarily from **project files** and **email notes**, even older ones. People (email senders/recipients!), dates and risks are often stated more concretely in emails than elsewhere.
 
-   - **"Open threads"** — from brain days or project files, as long as currently unresolved AND project-related.
+   - **"Open threads"** — from brain days, project files, or **email notes** (especially mails with open tasks or no visible reply), as long as currently unresolved AND project-related.
+
+   - **Email notes** (\`## D)\`) are our primary source for **who said what when** — senders appear in the \`von:\` (from) frontmatter as wikilinks; use these people for "Stakeholders". Dates inside email "Aufgaben"/Tasks sections (\`@[[YYYY-MM-DD]]\`) belong in "Important dates".
 
    **Rule of thumb**: If only the brain days tell you "what this project is about", you have a source bug — brain days never characterize the project itself, only its weekly motion.
 5. "This week": concrete actions from brain days, not meta-sentences. "Subdomain telli.mzgivb.de shut down" — not "documentation was maintained".
@@ -547,6 +623,10 @@ ${projectBlock}
 ## C) Topic-related inbox notes
 
 ${inboxBlock}
+
+## D) Topic-related email notes
+
+${emailBlock}
 
 ═══════════════════════════════════════════════════════════════════
 
@@ -645,11 +725,13 @@ function buildDraftFrontmatter(
   model: string,
   brainEntries: ProjectStatusBrainEntry[],
   inboxNotes: ProjectStatusSourceFile[],
+  emailNotes: ProjectStatusSourceFile[],
   language: 'de' | 'en',
   generatedAtIso: string
 ): string {
   const includedBrain = brainEntries.map(b => b.date).join(', ') || '(keine)'
   const inboxList = inboxNotes.map(n => n.name).slice(0, 8).join(' · ') || '(keine)'
+  const emailList = emailNotes.map(n => n.name).slice(0, 8).join(' · ') || '(keine)'
 
   const escapeYaml = (s: string) => s.replace(/"/g, '\\"')
   return `---
@@ -661,6 +743,7 @@ generated_by: "ollama:${escapeYaml(model)}"
 language: ${language}
 brain_days_included: "${escapeYaml(includedBrain)}"
 inbox_notes_included: "${escapeYaml(inboxList)}"
+emails_included: "${escapeYaml(emailList)}"
 ---`
 }
 
@@ -691,23 +774,30 @@ export async function crystallizeProject(
   const weekTag = getISOWeekTag()
   const brainFolderRel = input.brainFolderRel || DEFAULT_BRAIN_FOLDER
   const inboxFolderRel = input.inboxFolderRel || DEFAULT_INBOX_FOLDER
+  const emailFolderRel = input.emailFolderRel || DEFAULT_EMAIL_FOLDER
 
   // 2) Quellen einsammeln
-  const [brainEntries, projectFiles, inboxNotes] = await Promise.all([
+  const [brainEntries, projectFiles, inboxNotes, emailNotes] = await Promise.all([
     gatherBrainEntries(input.vaultPath, brainFolderRel, marker.keywords),
     gatherProjectFiles(projectAbs, input.projectFolderRel),
-    gatherInboxNotes(input.vaultPath, inboxFolderRel, marker.keywords)
+    gatherInboxNotes(input.vaultPath, inboxFolderRel, marker.keywords),
+    gatherEmailNotes(input.vaultPath, emailFolderRel, marker.keywords)
   ])
 
-  if (brainEntries.length === 0 && projectFiles.length === 0 && inboxNotes.length === 0) {
+  if (
+    brainEntries.length === 0 &&
+    projectFiles.length === 0 &&
+    inboxNotes.length === 0 &&
+    emailNotes.length === 0
+  ) {
     return {
       success: false,
-      error: 'Keine Quellen gefunden — keine Brain-Tage, keine Projektdateien, keine themenverwandten Inbox-Notes. Prüfe deine Keywords.'
+      error: 'Keine Quellen gefunden — keine Brain-Tage, keine Projektdateien, keine themenverwandten Inbox- oder Email-Notizen. Prüfe deine Keywords.'
     }
   }
 
   // 3) Prompt + LLM-Call
-  const prompt = buildPrompt(marker, weekTag, brainEntries, projectFiles, inboxNotes, input.language)
+  const prompt = buildPrompt(marker, weekTag, brainEntries, projectFiles, inboxNotes, emailNotes, input.language)
 
   let body: string
   try {
@@ -735,7 +825,7 @@ export async function crystallizeProject(
 
   // 5) Schreiben
   const frontmatter = buildDraftFrontmatter(
-    marker, weekTag, input.model, brainEntries, inboxNotes, input.language, generatedAtIso
+    marker, weekTag, input.model, brainEntries, inboxNotes, emailNotes, input.language, generatedAtIso
   )
   const titlePrefix = input.language === 'de'
     ? `# ${marker.project} · Status ${weekTag}\n\n`
@@ -758,6 +848,7 @@ export async function crystallizeProject(
       weekTag,
       brainEntriesUsed: brainEntries.length,
       inboxNotesUsed: inboxNotes.length,
+      emailNotesUsed: emailNotes.length,
       findings
     }
   } catch (err) {

@@ -7,6 +7,7 @@ import type {
   LintFinding,
   ProjectSynonymCache
 } from '../../shared/types'
+import { useUIStore } from './uiStore'
 
 // Standard-Pfade. Können später per Settings überschrieben werden.
 const DEFAULT_PROJECTS_FOLDER = '100 - ✅ Projekte'
@@ -110,11 +111,17 @@ export const useProjectStatusStore = create<ProjectStatusState>((set, get) => ({
     set({ runningJobs: newRunning })
 
     try {
+      // Email-Folder aus den Email-Settings übernehmen, damit das Project-Status-
+      // Modul die analysierten Mails als 4. Quelle nutzen kann. Fallback auf den
+      // Backend-Default (`‼️📧 - emails`), wenn nicht gesetzt.
+      const emailFolderRel = useUIStore.getState().email?.inboxFolderName?.trim() || undefined
+
       const input: ProjectStatusCrystallizeInput = {
         vaultPath,
         projectFolderRel: project.folderRel,
         model,
-        language
+        language,
+        ...(emailFolderRel ? { emailFolderRel } : {})
       }
       const result = await window.electronAPI.projectStatusCrystallize(input)
 

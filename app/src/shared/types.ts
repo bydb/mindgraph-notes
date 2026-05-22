@@ -1125,12 +1125,12 @@ export interface ProjectStatusBrainEntry {
   evidence: string[];         // welche Keywords matched haben
 }
 
-/** Eine projektzugehörige Quell-Datei (Projektdatei oder Inbox-Note). */
+/** Eine projektzugehörige Quell-Datei (Projektdatei, Inbox-Note oder Email-Notiz). */
 export interface ProjectStatusSourceFile {
   name: string;               // basename ohne .md
   pathRel: string;            // vault-relativer Pfad
   content: string;            // ggf. gekürzt auf ~60 Zeilen wenn zu groß
-  origin: 'project' | 'inbox';
+  origin: 'project' | 'inbox' | 'email';
 }
 
 /** Eingabe für den Crystallize-Lauf eines Projekts. */
@@ -1141,6 +1141,7 @@ export interface ProjectStatusCrystallizeInput {
   language: 'de' | 'en';
   brainFolderRel?: string;    // optional — Standard "800 - 🧠 brain"
   inboxFolderRel?: string;    // optional — Standard "000 - 📥 inbox/010 - 📥 Notes"
+  emailFolderRel?: string;    // optional — Standard "‼️📧 - emails"
 }
 
 /** Lint-Findung im erzeugten Status — drei Klassen. */
@@ -1171,6 +1172,7 @@ export interface ProjectStatusResult {
   weekTag?: string;             // z.B. "2026-W21"
   brainEntriesUsed?: number;
   inboxNotesUsed?: number;
+  emailNotesUsed?: number;
   findings?: LintFinding[];
   error?: string;
 }

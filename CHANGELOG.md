@@ -2,6 +2,18 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.6.51-beta] - 2026-05-22
+
+### Features
+
+- **Email-Notizen als 4. Quelle im Project-Status-Crystallizer**: Der wöchentliche Projekt-Status (`_STATUS.md`) bezieht jetzt zusätzlich zu Brain-Tagen, Projektdateien und Inbox-Notes auch die analysierten Email-Notizen aus dem Email-Ordner mit ein (Default `‼️📧 - emails`, übernommen aus den Email-Settings). 30-Tage-Lookback, Keyword-Match im Mail-Body, ein Satz Kontext-Snippets analog Inbox. Der Crystallizer-Prompt instruiert das LLM explizit, **Absender aus dem `von:`-Frontmatter als Stakeholder** und **`@[[YYYY-MM-DD]]`-Termine aus den Email-„Aufgaben"-Sektionen als „Wichtige Daten"** zu nutzen — Emails sind in der Praxis die konkreteste Quelle für „Wer hat was wann gesagt".
+
+### Improvements
+
+- **Status-Frontmatter zeigt `emails_included:`** — alle in den aktuellen Lauf eingeflossenen Email-Notiztitel (max 8) sind im Output-Frontmatter sichtbar, analog `brain_days_included:` und `inbox_notes_included:`.
+- **`ProjectStatusResult.emailNotesUsed`** wird zurückgeliefert — UI/Telemetrie kann nachvollziehen, wie viele Email-Notizen pro Status-Lauf berücksichtigt wurden.
+- **Fehlertext erweitert**: „Keine Quellen gefunden" nennt jetzt auch Email-Notizen, damit Nutzer beim Debugging die richtige Quelle prüfen.
+
 ## [0.6.50-beta] - 2026-05-21
 
 ### Features
