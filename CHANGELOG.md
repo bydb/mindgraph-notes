@@ -2,6 +2,19 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.6.52-beta] - 2026-05-22
+
+### Features
+
+- **Onboarding: KI ist nie mehr Vorbedingung — drei klare Pfade beim Start**: Bisher konnte der Welcome-Coach in eine Fehlermeldung laufen, wenn weder Ollama noch ein Anthropic-Key vorhanden war (Button grau, kurzer Tooltip). Neuer Flow: Der Coach-Button bleibt immer klickbar. Bei fehlendem Backend routet das Onboarding in einen neuen **AI-Setup-Step** mit drei Karten — (1) **Ollama installieren** (OS-Erkennung mac/win/linux, Copy-Command, 3-s-Polling auf `coach:precheck` mit Auto-Advance bei Erkennung), (2) **Anthropic-API-Key eintragen** (re-used `telegram-save-anthropic-key`-IPC), (3) **Ohne KI weitermachen** (springt in den klassischen Wizard, KI bleibt aus). WelcomeScreen zeigt zusätzlich eine **AI-Status-Pill** (KI bereit / nicht eingerichtet / Prüfe …).
+- **Neue Coach-Q&A-KB-Einträge**: `modules.md` (Kern vs. Module, wo schalte ich sie um, vollständige Modul-Liste nach Kategorie) und `schnellerfassung.md` (drei Wege ins Quick-Capture-Fenster, Diktat-Button ⌘D, Tags, Zielordner). Damit beantwortet der Header-Bot jetzt auch Fragen zu Modul-Verwaltung und Quick Capture korrekt aus der KB statt zu raten.
+
+### Improvements
+
+- **Einheitliche Produktidentität in README, package.json und Website**: Die drei Außentexte beschrieben MindGraph Notes bisher dreifach unterschiedlich („Notiz-App", „minimalistische Markdown-App", „lokaler KI-Workspace") und führten Nutzer mit einer Feature-Liste statt mit einem Verhalten ins Produkt. Neue gemeinsame Lead-Aussage: **„Zeigt dir, was heute wichtig ist."** (EN: „Shows you what matters today.") — was die App tatsächlich tut (Notizen, Aufgaben, Mails, Dokumente nach Relevanz sortieren), nicht was sie technisch enthält. Nav-Logo von „MindGraph Workspace" auf „MindGraph Notes" vereinheitlicht.
+- **Coach Q&A-Bot: KB-First statt vorschnell aufgeben**: Der Bot im App-Header hat zu schnell „weiß ich nicht sicher" gesagt, auch wenn die KB den passenden Eintrag enthielt — nur mit leicht anderer Wortwahl („Widgets einstellen" vs. KB-Heading „Wo stellst du Widgets ein?"). Prompt schärft jetzt: KB muss Wort für Wort geprüft werden, abweichendes Vokabular ist kein Grund zum Abbrechen. „Weiß ich nicht" nur, wenn die KB explizit nichts hat. Anlaufpunkt-Hinweise zeigen jetzt auf **mindgraph-notes.de** statt auf den nicht-existenten Help-Guide oder README.
+- **KB-Eintrag `dashboard.md` erweitert**: Konkretere Antwort auf „Wie konfiguriere ich Widgets?" — vorher nur `Settings → Allgemein → Dashboard` mit einem Satz, jetzt mit Master-Schalter, Widgets-Sektion (Checkbox + ▲/▼-Sortierung), Morning-Briefing-Optionen und Aufgaben-Vorlauf strukturiert ausgeschrieben. Keywords um Synonyme („einstellen", „konfigurieren", „anzeigen", „ausblenden", „sortieren", „aktivieren", „deaktivieren") erweitert.
+
 ## [0.6.51-beta] - 2026-05-22
 
 ### Features
