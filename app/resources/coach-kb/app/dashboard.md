@@ -1,6 +1,6 @@
 ---
 id: app-dashboard
-keywords: [dashboard, widget, übersicht, startseite, focus, radar, aktivität, briefing, kalender]
+keywords: [dashboard, widget, widgets, übersicht, startseite, focus, radar, aktivität, briefing, kalender, einstellen, konfigurieren, anzeigen, ausblenden, reihenfolge, sortieren, aktivieren, deaktivieren, anpassen]
 ---
 
 # Dashboard und Widgets
@@ -24,10 +24,21 @@ in einer Reihenfolge, die du frei festlegst.
 - **Project-Status** — KI-konsolidierter Status pro Projekt-Ordner.
 - **Sync** — Sync-Status zwischen Geräten.
 
-## Konfiguration
+## Wo stellst du Widgets ein?
 
-Settings → Allgemein → Dashboard: Widgets ein-/ausblenden, Reihenfolge
-festlegen, Morning-Briefing aktivieren.
+**Einstellungen → Dashboard** (eigener Tab in den Settings). Dort:
+
+- **Master-Schalter „Dashboard aktivieren"** ganz oben.
+- **Sektion „Widgets"** — pro Widget eine Checkbox zum Ein- bzw.
+  Ausblenden und zwei Pfeile (▲/▼) zum Verschieben in der Anzeige-
+  Reihenfolge. Die Reihenfolge im Settings-Tab = Reihenfolge im
+  Dashboard von oben nach unten.
+- **Sektion „Morning Briefing"** — Briefing ein-/ausschalten,
+  Kalender-Termine einbinden, Anzahl Tage in die Zukunft (0–14).
+- **Sektion „Aufgaben-Vorlauf"** — kritische vs. normale Lead-Time.
+
+Widgets, die ein Modul brauchen (Emails, Bookings, Antares), bleiben
+ausblendbar; ohne aktives Modul zeigen sie nur einen Hinweis.
 
 ## Morning-Briefing
 
