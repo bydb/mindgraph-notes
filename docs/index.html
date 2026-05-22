@@ -199,6 +199,21 @@
       box-shadow: 0 40px 80px -20px rgba(0,0,0,0.12), 0 0 0 1px var(--border);
     }
 
+    /* --- Explainer --- */
+    .explainer {
+      padding: 1rem 2rem 5rem; max-width: 1120px; margin: 0 auto;
+    }
+    .explainer-header {
+      text-align: center; margin-bottom: 2rem; display: flex; flex-direction: column; align-items: center;
+    }
+    .explainer-figure {
+      background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
+      padding: 0.75rem; box-shadow: 0 24px 60px -32px rgba(0,0,0,0.22);
+    }
+    .explainer-figure img {
+      width: 100%; display: block; border-radius: calc(var(--radius) - 6px);
+    }
+
     /* --- Section common --- */
     .section-label {
       font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em;
@@ -345,6 +360,9 @@
       nav { padding: 0.75rem 1rem; }
       .nav-right a:not(:last-child) { display: none; }
       .hero { padding: 6rem 1.5rem 3rem; }
+      .explainer { padding: 0 1rem 4rem; }
+      .explainer-figure { padding: 0.4rem; border-radius: 10px; }
+      .explainer-figure img { border-radius: 7px; }
       .cap-grid { grid-template-columns: 1fr; }
       .cap-card.featured { grid-column: span 1; }
       .cap-card.featured .cap-inner { grid-template-columns: 1fr; }
@@ -418,6 +436,18 @@
     <div class="hero-screenshot">
       <img src="app-mockup.svg" alt="MindGraph Notes Dashboard mit Aufgaben, Emails und Kalender" loading="lazy">
     </div>
+  </section>
+
+  <!-- Explainer -->
+  <section class="explainer" aria-labelledby="explainer-title">
+    <div class="explainer-header">
+      <div class="section-label" data-i18n="explainer.label">Schnell verstanden</div>
+      <h2 class="section-heading" id="explainer-title" data-i18n="explainer.heading">Was ist MindGraph Notes?</h2>
+      <p class="section-sub" data-i18n="explainer.sub">Ein Bild statt zehn Featurelisten: MindGraph ist der lokale Kern, in dem Notizen, Aufgaben, Kontext, KI und Module zusammenlaufen.</p>
+    </div>
+    <figure class="explainer-figure fade-in">
+      <img src="mindgraph-notes-infografik.png" alt="Infografik: MindGraph Notes als lokaler Workspace fuer Wissen, Aufgaben und Kontext mit Notizen, Wissensgraph, Dashboard, lokaler KI und Integrationen" loading="lazy">
+    </figure>
   </section>
 
   <!-- Capabilities -->
@@ -743,6 +773,9 @@
         "hero.title": "Zeigt dir,<br><em>was heute wichtig ist.</em>",
         "hero.sub": "MindGraph Notes verbindet deine Notizen, Aufgaben, E-Mails und Dokumente \u2014 und sortiert sie nach Relevanz. Dashboard, Wissensgraph und lokale KI in einer Desktop-App. Ohne Cloud-Zwang.",
         "hero.cta": "Kostenlos herunterladen",
+        "explainer.label": "Schnell verstanden",
+        "explainer.heading": "Was ist MindGraph Notes?",
+        "explainer.sub": "Ein Bild statt zehn Featurelisten: MindGraph ist der lokale Kern, in dem Notizen, Aufgaben, Kontext, KI und Module zusammenlaufen.",
         "cap.label": "Was der Workspace kann",
         "cap.heading": "Ein Arbeitsraum,<br>Module nach Bedarf.",
         "cap.sub": "Dashboard, Editor, Aufgaben und Wissensgraph sind immer dabei. Email, Lernen, KI, Ger\u00e4te und Fachintegrationen schaltest du pro Modul an, wenn du sie brauchst.",
@@ -859,6 +892,9 @@
         "hero.title": "Shows you<br><em>what matters today.</em>",
         "hero.sub": "MindGraph Notes connects your notes, tasks, emails and documents \u2014 and ranks them by relevance. Dashboard, knowledge graph and local AI in one desktop app. No cloud lock-in.",
         "hero.cta": "Download for free",
+        "explainer.label": "At a glance",
+        "explainer.heading": "What is MindGraph Notes?",
+        "explainer.sub": "One visual instead of ten feature lists: MindGraph is the local core where notes, tasks, context, AI and modules come together.",
         "cap.label": "What the workspace can do",
         "cap.heading": "One workspace,<br>modules on demand.",
         "cap.sub": "Dashboard, editor, tasks and knowledge graph are always there. Email, learning, AI, devices and domain integrations are switched on per module when you need them.",
