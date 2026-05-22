@@ -7,10 +7,11 @@ import { IntentStep } from './steps/IntentStep'
 import { AIStep } from './steps/AIStep'
 import { DashboardStep } from './steps/DashboardStep'
 import { MissionsStep } from './steps/MissionsStep'
+import { OllamaSetupStep } from './steps/OllamaSetupStep'
 import { CoachStep } from './Coach/CoachStep'
 import './Onboarding.css'
 
-type OnboardingStep = 'welcome' | 'coach' | 'intent' | 'ai' | 'dashboard' | 'missions'
+type OnboardingStep = 'welcome' | 'ai-setup' | 'coach' | 'intent' | 'ai' | 'dashboard' | 'missions'
 
 export const Onboarding: React.FC = () => {
   const { onboardingOpen, setOnboardingOpen, setOnboardingCompleted, setUserProfile, applyProfileDefaults, coach } = useUIStore()
@@ -70,11 +71,34 @@ export const Onboarding: React.FC = () => {
     }
   }, [finishWithVault, setOnboardingCompleted, setOnboardingOpen])
 
-  const handleStartCoach = useCallback(() => {
+  const handleStartCoach = useCallback(async () => {
+    // Bevor wir in den Coach-Chat springen, prüfen wir, ob überhaupt ein
+    // Backend da ist. Sonst landet der User in einer Fehlermeldung.
+    try {
+      const pre = await window.electronAPI.coachPrecheck()
+      if (pre.backend === 'none') {
+        setStep('ai-setup')
+        return
+      }
+    } catch {
+      // Precheck-Fehler: lieber den Setup-Pfad anbieten als blind weiterspringen
+      setStep('ai-setup')
+      return
+    }
     setStep('coach')
   }, [])
 
   const handleSkipCoach = useCallback(() => {
+    setStep('intent')
+  }, [])
+
+  // Aus dem AI-Setup heraus: Backend ist jetzt da → in den Coach
+  const handleBackendReady = useCallback(() => {
+    setStep('coach')
+  }, [])
+
+  // Aus dem AI-Setup heraus: bewusst ohne KI → klassischer Wizard
+  const handleSkipAISetup = useCallback(() => {
     setStep('intent')
   }, [])
 
@@ -96,6 +120,13 @@ export const Onboarding: React.FC = () => {
             onStartCoach={handleStartCoach}
             onStartWizard={() => setStep('intent')}
             onOpenVault={handleOpenVaultDirect}
+          />
+        )}
+        {step === 'ai-setup' && (
+          <OllamaSetupStep
+            onBackendReady={handleBackendReady}
+            onSkip={handleSkipAISetup}
+            onBack={() => setStep('welcome')}
           />
         )}
         {step === 'coach' && (

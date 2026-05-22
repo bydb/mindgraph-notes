@@ -11,22 +11,34 @@ interface WelcomeScreenProps {
 export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onStartCoach, onStartWizard, onOpenVault }) => {
   const { t } = useTranslation()
   const { language, setLanguage } = useUIStore()
-  const [coachAvailable, setCoachAvailable] = useState<boolean | null>(null)
+  const [backend, setBackend] = useState<'anthropic' | 'ollama' | 'none' | null>(null)
 
-  // Pre-Check: läuft Ollama oder ist Anthropic-Key da? — entscheidet, ob der
-  // Coach-Button aktiv ist. Bei null (noch unbekannt): aktiv lassen, der Coach
-  // zeigt dann selbst seinen Fehlerzustand.
+  // Pre-Check informiert nur noch über den Status — der Coach-Button bleibt
+  // immer klickbar. Bei fehlendem Backend routet das Onboarding zum
+  // AI-Setup-Step statt in einen Fehlerzustand.
   useEffect(() => {
     let cancelled = false
     window.electronAPI.coachPrecheck()
       .then((res: { backend: 'anthropic' | 'ollama' | 'none' }) => {
-        if (!cancelled) setCoachAvailable(res.backend !== 'none')
+        if (!cancelled) setBackend(res.backend)
       })
       .catch(() => {
-        if (!cancelled) setCoachAvailable(null)
+        if (!cancelled) setBackend(null)
       })
     return () => { cancelled = true }
   }, [])
+
+  const statusLabel =
+    backend === null ? t('onboarding.welcome.aiStatusChecking')
+    : backend === 'none' ? t('onboarding.welcome.aiStatusSetupNeeded')
+    : t('onboarding.welcome.aiStatusReady').replace(
+        '{backend}',
+        backend === 'anthropic' ? 'Claude' : 'Ollama'
+      )
+  const statusClass =
+    backend === null ? 'checking'
+    : backend === 'none' ? 'pending'
+    : 'ready'
 
   return (
     <div className="onboarding-welcome">
@@ -67,12 +79,15 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onStartCoach, onSt
       <h1 className="onboarding-welcome-title">{t('onboarding.welcome.title')}</h1>
       <p className="onboarding-welcome-subtitle">{t('onboarding.welcome.subtitle')}</p>
 
+      <div className={`onboarding-welcome-ai-status ${statusClass}`} role="status" aria-live="polite">
+        <span className="onboarding-welcome-ai-status-dot" />
+        {statusLabel}
+      </div>
+
       <div className="onboarding-welcome-actions">
         <button
           className="onboarding-btn-primary"
           onClick={onStartCoach}
-          disabled={coachAvailable === false}
-          title={coachAvailable === false ? t('onboarding.welcome.coachUnavailable') : undefined}
         >
           {t('onboarding.welcome.startCoach')}
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -85,9 +100,6 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onStartCoach, onSt
         <button className="onboarding-btn-secondary" onClick={onOpenVault}>
           {t('onboarding.welcome.openVault')}
         </button>
-        {coachAvailable === false && (
-          <p className="onboarding-coach-pre-hint">{t('onboarding.welcome.coachUnavailable')}</p>
-        )}
       </div>
 
       <div className="onboarding-language-switcher">
