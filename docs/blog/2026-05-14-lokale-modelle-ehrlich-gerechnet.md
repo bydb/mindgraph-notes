@@ -28,8 +28,8 @@ categories:
 
 ![Header](2026-05-14-lokale-modelle-ehrlich-gerechnet-header.png)
 
-> [!abstract] Kurz zusammengefasst
-> Kleine KI-Modelle auf dem eigenen Rechner haben verlässliche Schwächen. In meinen Tests rechneten sie schlecht, ließen sich teils austricksen und erfanden Inhalte. Das ist nicht einfach Modell-Versagen, sondern eine Eigenschaft, mit der ein Produkt umgehen muss. 160 Testläufe haben mir gezeigt, wo genau die Grenzen liegen – und wie meine App damit umgehen muss.
+> [!summary] 📄 Kurz zusammengefasst
+> Kleine KI-Modelle auf dem eigenen Rechner haben Schwächen. In meinen Tests rechneten sie teils unzuverlässig, ließen sich teils austricksen und halluzinierten. Dies als Modellversagen abzukanzeln, wäre aus meiner Sicht zu einfach, sondern aktuelle noch eine Besonderheit. In 160 Testläufen konnte Claude identifizieren, wo genau die Grenzen liegen – und wie meine App damit umgehen muss.
 
 ## Worum es geht
 
@@ -53,7 +53,7 @@ Ich habe den tatsächlichen Workflow nachmessen lassen. Für einen normalen Tag 
 
 Auslastung: **unter ein Prozent.**
 
-Das war eine ernüchternde Erkenntnis. Das Problem liegt nicht am Kontextfenster. Es liegt woanders. 
+Das war eine ernüchternde Erkenntnis. Das Problem liegt nicht am Kontextfenster. Es liegt woanders.
 
 ## Was lokale KI wirklich nicht kann
 
@@ -86,6 +86,7 @@ Aus dem Problem ergibt sich eine simple Regel: **Wenn etwas eindeutig richtig od
 Datum ausrechnen ist so eine Sache. „Nächsten Freitag", „in zwei Wochen", „bis Monatsende" – das kann man programmieren. Da gibt es eine eindeutige Antwort. Ich habe genau dafür ein kleines Programm geschrieben, mit 114 Testfällen. Alle bestehen.
 
 Die Arbeitsteilung in meiner App sieht jetzt so aus:
+
 - **Die KI** erkennt nur die Wörter: „Aha, hier steht 'nächsten Freitag'."
 - **Mein Programm** rechnet daraus das richtige Datum aus: „Das ist der 22. Mai 2026."
 
@@ -109,7 +110,7 @@ Konsequenz: llama3.1:8b darf in diesem Teil meiner App nicht mehr eingesetzt wer
 
 Wenn mich irgendwann jemand fragt: „Warum hat Ihre App das angezeigt?" – dann will ich antworten können: „Dieses Modell durfte das gar nicht. Steht im Code, mit Datum."
 
-## Nennen wir es mal Halluzination 
+## Nennen wir es mal Halluzination
 
 In meiner App soll die KI am Ende des Arbeitstages eine Tageszusammenfassung schreiben, die aus allen angefassten und erzeugten Dateien besteht, mit der ich später eine Art eigenes Gehirn erstellen möchte. Die Zusammenfassung hat mehrere Abschnitte; einer davon heißt „Offene Fäden". Ich habe der KI klar gesagt: **„Wenn ein Teil leer wäre, lass ihn weg."**
 
@@ -134,6 +135,7 @@ Der Überraschungssieger: das kleinste Modell. Acht Milliarden Parameter, nur 6 
 Im neuen Release v0.6.41-beta, den ich heute Nachmittag veröffentlicht habe, steckt das Ergebnis in den Einstellungen. Wie ein Beipackzettel.
 
 Vier mögliche Bewertungen pro KI-Modell und Funktion:
+
 - ✅ **geeignet** – funktioniert gut
 - ⚠️ **eingeschränkt** – funktioniert mit Vorbehalt
 - 🔴 **gesperrt** – wird im Code blockiert
@@ -145,7 +147,7 @@ Für Organisationen ist diese Grenze besonders wichtig: Die KI-Funktionen in Min
 
 ## Wie ich jetzt über lokale KI denke
 
-> [!tip] Drei Dinge, die ich gelernt habe
+> [!tip] 💡 Drei Dinge, die ich gelernt habe
 >
 > **1. Das Kontextfenster ist meistens nicht das Problem.** Es geht nicht darum, dass die KI „zu wenig sieht". Es geht darum, was sie mit dem sichtbaren Kontext anfängt.
 >
