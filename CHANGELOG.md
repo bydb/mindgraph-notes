@@ -2,6 +2,15 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.6.55-beta] - 2026-05-24
+
+### Fixes
+
+- **Email-Zuordnung zu Projekten: Subject-Treffer schlagen jetzt Priority**: Mails wurden bislang dem falschen Projekt zugeordnet, sobald ein `priority: high`-Projekt mit schwachen Stopwort-artigen Keywords (z.B. `fragt, nach, Teilnahme`) zufällig im Body matchete — selbst wenn das Subject einer Mail eindeutig auf ein anderes `priority: med`-Projekt zeigte (Beispiel: „Re: Roll-Up Marslandschaft" landete bei „143 - Digitaltag" statt bei „160 - Mars Abenteuer", obwohl `Marslandschaft` direkt im Subject stand). Drei zusammenhängende Änderungen in `utils/projectMatch.ts`:
+  - **Subject-Hits werden 5× gewichtet** (vorher: gleiche Gewichtung wie Body). Ein Projektname im Subject ist Absicht; im Body/Footer/Quoted-Text ist er meistens Rauschen.
+  - **Priority ist jetzt Tiebreaker, nicht Hauptsortierung**. Vorher dominierte Priority unbedingt — `high` schlug `med` bei beliebigem hitCount-Unterschied. Jetzt: hitCount entscheidet, Priority nur bei Gleichstand.
+  - **Stopword-Liste erweitert** um häufige Crystallizer-Füllwörter (`nach, teilnahme, fragt, einen, sendet, erstentwurf, bitte, gerne, soll, will, kommt, geht` + Konjugationen). Diese kommen aus dem Project-Status-Crystallizer-Output und sollten gar nicht erst matchen.
+
 ## [0.6.54-beta] - 2026-05-24
 
 ### Fixes

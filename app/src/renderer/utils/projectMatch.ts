@@ -23,8 +23,20 @@ const GENERIC_STOPWORDS = new Set<string>([
   'termin', 'beispiel', 'punkt',
   'datei', 'dokument',
   'gespraech', 'gesprach',
-  'ok', 'ja', 'nein', 'danke', 'gruss', 'grüsse'
+  'ok', 'ja', 'nein', 'danke', 'gruss', 'grüsse',
+  // Häufige Crystallizer-Füllwörter (keine Projekt-Identifikatoren):
+  'nach', 'teilnahme', 'fragt', 'fragen', 'frage', 'antwort', 'antwortet',
+  'einen', 'eine', 'einer', 'eines',
+  'sendet', 'senden', 'gesendet', 'schickt', 'schicken',
+  'erstentwurf', 'entwurf', 'entwürfe',
+  'bitte', 'gerne', 'kurz', 'noch',
+  'macht', 'machen', 'gemacht',
+  'soll', 'sollen', 'sollte', 'will', 'wollen', 'wollte',
+  'kommt', 'kommen', 'kam',
+  'geht', 'gehen', 'ging'
 ])
+
+const SUBJECT_WEIGHT = 5
 
 function escapeRegex(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
@@ -62,8 +74,9 @@ export function matchEmailToProjects(
   projects: DiscoveredProject[],
   synonymsByFolder: Record<string, ProjectSynonymCache> = {}
 ): ProjectMatch[] {
-  const haystack = `${email.subject || ''}\n${email.bodyText || ''}`
-  if (!haystack.trim()) return []
+  const subject = email.subject || ''
+  const body = email.bodyText || ''
+  if (!subject.trim() && !body.trim()) return []
 
   const matches: ProjectMatch[] = []
 
@@ -75,9 +88,11 @@ export function matchEmailToProjects(
     const matched: string[] = []
     for (const term of terms) {
       const re = new RegExp(`\\b${escapeRegex(term)}\\b`, 'gi')
-      const m = haystack.match(re)
-      if (m && m.length > 0) {
-        hitCount += m.length
+      const subjectHits = subject.match(re)?.length || 0
+      const bodyHits = body.match(re)?.length || 0
+      const termHits = subjectHits * SUBJECT_WEIGHT + bodyHits
+      if (termHits > 0) {
+        hitCount += termHits
         matched.push(term)
       }
     }
@@ -85,11 +100,15 @@ export function matchEmailToProjects(
     if (hitCount > 0) matches.push({ project, hitCount, matchedTerms: matched })
   }
 
+  // hitCount ist primäres Signal (Subject-Hits sind 5× gewichtet),
+  // Priority nur als Tiebreaker. Vorher dominierte Priority bedingungslos —
+  // dadurch gewannen `high`-Projekte mit schwachen Stopwort-artigen Keywords
+  // gegen `med`-Projekte mit eindeutigen Subject-Treffern.
   matches.sort((a, b) => {
+    if (b.hitCount !== a.hitCount) return b.hitCount - a.hitCount
     const pa = PRIORITY_ORDER[a.project.marker.priority] ?? 99
     const pb = PRIORITY_ORDER[b.project.marker.priority] ?? 99
-    if (pa !== pb) return pa - pb
-    return b.hitCount - a.hitCount
+    return pa - pb
   })
 
   return matches
