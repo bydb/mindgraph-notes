@@ -213,6 +213,19 @@ export const useEmailStore = create<EmailState>()((set, get) => ({
   reanalyzeEmail: async (vaultPath: string, emailId: string) => {
     // Forciert eine Neu-Analyse einer einzelnen Mail mit dem aktuellen Modell-State.
     // Der email-analyze-Handler überschreibt analysis bei expliziter emailId, auch wenn schon vorhanden.
+    // Vor der Analyse einen evtl. vorhandenen manuellen Projekt-Override löschen, damit
+    // das frische Auto-Match (matchEmailToProjects) wieder greift. Wer „Neu analysieren"
+    // klickt, will explizit alles neu berechnen lassen — inkl. Projekt-Zuordnung.
+    const { emails } = get()
+    const hadOverride = emails.some(e => e.id === emailId && e.userProject !== undefined)
+    if (hadOverride) {
+      set({
+        emails: emails.map(e =>
+          e.id === emailId ? { ...e, userProject: undefined } : e
+        )
+      })
+      await get().saveEmails(vaultPath)
+    }
     await get().analyzeEmails(vaultPath, [emailId])
   },
 

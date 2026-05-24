@@ -2,6 +2,12 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.6.56-beta] - 2026-05-24
+
+### Improvements
+
+- **„Neu analysieren" setzt manuellen Projekt-Override zurück**: Bisher rechnete der „🔄 Neu analysieren"-Button im Email-Detail nur die KI-Analyse (Relevanz, Sentiment, Summary, Tasks) neu — eine evtl. vorhandene manuelle Projekt-Zuordnung (`userProject`) blieb aber bestehen und schlug das Auto-Match weiterhin. Damit konnte z.B. eine Mail mit `Marslandschaft` im Subject hartnäckig dem falschen Projekt zugeordnet bleiben, selbst nach Reanalyse. Wer „Neu analysieren" klickt, will explizit alles neu berechnen lassen — inkl. Projekt-Zuordnung. Wenn ein Override existierte, wird er vor der Analyse gelöscht, und das frische Auto-Match (mit der in 0.6.55 korrigierten Subject-/Priority-Sortierung) greift wieder. Bulk-Analyse von vielen Mails lässt manuelle Zuordnungen weiterhin in Ruhe — nur der explizite Reanalyse-Klick einer einzelnen Mail löscht den Override.
+
 ## [0.6.55-beta] - 2026-05-24
 
 ### Fixes
