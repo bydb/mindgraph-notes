@@ -34,3 +34,7 @@ mindgraph-sync-server/dist/
 mindgraph-sync-server/scripts/
 .claude/
 CLAUDE.md
+
+# MindGraph vault state (entsteht, wenn ein Ordner als Vault geöffnet wird)
+**/.mindgraph/
+docs/blog/Email-Instruktionen.md
