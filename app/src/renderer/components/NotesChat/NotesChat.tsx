@@ -8,6 +8,16 @@ import MarkdownIt from 'markdown-it'
 import texmath from 'markdown-it-texmath'
 import katex from 'katex'
 import 'katex/dist/katex.min.css'
+import mermaid from 'mermaid'
+
+mermaid.initialize({
+  startOnLoad: false,
+  theme: 'dark',
+  securityLevel: 'strict',
+  fontFamily: 'ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif'
+})
+
+let notesChatMermaidCounter = 0
 
 interface ChatMessage {
   role: 'user' | 'assistant'
@@ -58,6 +68,19 @@ export const NotesChat: React.FC<NotesChatProps> = ({ onClose }) => {
     const katexOptions = { throwOnError: false, trust: false, strict: false, displayMode: false }
     instance.use(texmath, { engine: katex, delimiters: 'dollars', katexOptions })
     instance.use(texmath, { engine: katex, delimiters: 'brackets', katexOptions })
+
+    const defaultFence = instance.renderer.rules.fence
+    instance.renderer.rules.fence = (tokens, idx, options, env, self) => {
+      const token = tokens[idx]
+      const info = token.info.trim().toLowerCase()
+      if (info === 'mermaid') {
+        notesChatMermaidCounter++
+        const id = `notes-chat-mermaid-${notesChatMermaidCounter}-${Date.now()}`
+        return `<div class="mermaid-container"><pre class="mermaid" id="${id}">${token.content.trim()}</pre></div>`
+      }
+      if (defaultFence) return defaultFence(tokens, idx, options, env, self)
+      return `<pre><code class="language-${info}">${instance.utils.escapeHtml(token.content)}</code></pre>`
+    }
     return instance
   }, [])
 
@@ -127,6 +150,22 @@ export const NotesChat: React.FC<NotesChatProps> = ({ onClose }) => {
       messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight
     }
   }, [messages, streamingContent])
+
+  // Mermaid-Diagramme rendern (nur auf finalen messages, nicht während Streaming)
+  useEffect(() => {
+    if (!messagesContainerRef.current) return
+    const els = messagesContainerRef.current.querySelectorAll('.mermaid:not([data-processed])')
+    if (els.length === 0) return
+    const timeoutId = setTimeout(async () => {
+      try {
+        await mermaid.run({ nodes: els as NodeListOf<HTMLElement> })
+        els.forEach(el => el.setAttribute('data-processed', 'true'))
+      } catch (error) {
+        console.error('[NotesChat] Mermaid render error:', error)
+      }
+    }, 50)
+    return () => clearTimeout(timeoutId)
+  }, [messages])
 
   // Add copy buttons to markdown code blocks in chat messages
   useEffect(() => {
