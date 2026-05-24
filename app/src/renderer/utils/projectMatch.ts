@@ -3,7 +3,14 @@ import type { DiscoveredProject, ProjectSynonymCache } from '../../shared/types'
 export interface ProjectMatch {
   project: DiscoveredProject
   hitCount: number
+  subjectHitCount: number
   matchedTerms: string[]
+}
+
+interface MatchTerm {
+  term: string
+  /** Erlaubt Treffer am Anfang deutscher Komposita, z.B. "Mars" in "Marslandschaft". */
+  compoundPrefix: boolean
 }
 
 const PRIORITY_ORDER: Record<string, number> = { high: 0, med: 1, low: 2 }
@@ -46,26 +53,66 @@ function isStopword(term: string): boolean {
   return GENERIC_STOPWORDS.has(term.toLowerCase().trim())
 }
 
+function stripFolderPrefix(name: string): string {
+  return name
+    .replace(/^\s*\d+\s*[-–—]\s*/, '')
+    .replace(/[_-]+/g, ' ')
+    .trim()
+}
+
+function splitIdentityTokens(value: string): string[] {
+  return stripFolderPrefix(value)
+    .split(/[^\p{L}\p{N}]+/gu)
+    .map(s => s.trim())
+    .filter(s => s.length >= 4 && !isStopword(s))
+}
+
+function countMatches(text: string, term: string, compoundPrefix = false): number {
+  if (!text.trim()) return 0
+  const escaped = escapeRegex(term)
+  if (!compoundPrefix) {
+    return text.match(new RegExp(`\\b${escaped}\\b`, 'gi'))?.length || 0
+  }
+  const matches = text.match(new RegExp(`(^|[^\\p{L}\\p{N}])${escaped}[\\p{L}\\p{N}]*`, 'giu'))
+  return matches?.length || 0
+}
+
 function effectiveTerms(
   project: DiscoveredProject,
   synonymsByFolder: Record<string, ProjectSynonymCache>
-): string[] {
+): MatchTerm[] {
   const seen = new Set<string>()
-  const out: string[] = []
-  const push = (term: string) => {
+  const out: MatchTerm[] = []
+  const push = (term: string, compoundPrefix = false) => {
     const trimmed = term.trim()
     if (!trimmed) return
     if (isStopword(trimmed)) return
-    const key = trimmed.toLowerCase()
+    const key = `${trimmed.toLowerCase()}::${compoundPrefix ? 'compound' : 'exact'}`
     if (seen.has(key)) return
     seen.add(key)
-    out.push(trimmed)
+    out.push({ term: trimmed, compoundPrefix })
   }
+
   for (const kw of project.marker?.keywords || []) push(kw)
+
   const cache = synonymsByFolder[project.folderRel]
   if (cache) {
     for (const syn of cache.synonyms || []) push(syn)
   }
+
+  // Projektname und Ordnername sind starke Identitätssignale. Gerade bei
+  // deutschen Komposita steht im Betreff oft "Marslandschaft", während das
+  // Projekt "Mars Abenteuer" heißt. Deshalb dürfen einzelne Namens-Tokens im
+  // Subject als Kompositum-Präfix matchen.
+  const identityNames = [project.marker?.project || '', project.folderName || '']
+  for (const name of identityNames) {
+    const cleanName = stripFolderPrefix(name)
+    push(cleanName)
+    for (const token of splitIdentityTokens(cleanName)) {
+      push(token, true)
+    }
+  }
+
   return out
 }
 
@@ -85,26 +132,30 @@ export function matchEmailToProjects(
     if (terms.length === 0) continue
 
     let hitCount = 0
+    let subjectHitCount = 0
     const matched: string[] = []
     for (const term of terms) {
-      const re = new RegExp(`\\b${escapeRegex(term)}\\b`, 'gi')
-      const subjectHits = subject.match(re)?.length || 0
-      const bodyHits = body.match(re)?.length || 0
+      const subjectHits = countMatches(subject, term.term, term.compoundPrefix)
+      const bodyHits = term.compoundPrefix
+        ? 0
+        : countMatches(body, term.term, false)
       const termHits = subjectHits * SUBJECT_WEIGHT + bodyHits
       if (termHits > 0) {
         hitCount += termHits
-        matched.push(term)
+        subjectHitCount += subjectHits
+        matched.push(term.term)
       }
     }
 
-    if (hitCount > 0) matches.push({ project, hitCount, matchedTerms: matched })
+    if (hitCount > 0) matches.push({ project, hitCount, subjectHitCount, matchedTerms: matched })
   }
 
-  // hitCount ist primäres Signal (Subject-Hits sind 5× gewichtet),
-  // Priority nur als Tiebreaker. Vorher dominierte Priority bedingungslos —
-  // dadurch gewannen `high`-Projekte mit schwachen Stopwort-artigen Keywords
-  // gegen `med`-Projekte mit eindeutigen Subject-Treffern.
+  // Subject-Hits sind das stärkste Signal. Body-/Signatur-Treffer können
+  // zahlreich sein ("Medienzentrum", "Rückmeldung" etc.), dürfen aber keinen
+  // eindeutigen Betreff wie "Roll-Up Marslandschaft" überstimmen.
+  // Priority ist nur Tiebreaker.
   matches.sort((a, b) => {
+    if (b.subjectHitCount !== a.subjectHitCount) return b.subjectHitCount - a.subjectHitCount
     if (b.hitCount !== a.hitCount) return b.hitCount - a.hitCount
     const pa = PRIORITY_ORDER[a.project.marker.priority] ?? 99
     const pb = PRIORITY_ORDER[b.project.marker.priority] ?? 99

@@ -2,6 +2,15 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.6.57-beta] - 2026-05-24
+
+### Improvements
+
+- **Email→Projekt-Zuordnung: Komposita und Auto-Identitäts-Keywords**: Das Projekt-Matching in `utils/projectMatch.ts` ist deutlich robuster geworden:
+  - **Auto-Identitäts-Keywords aus Projektname + Ordnername**: Jedes Projekt wird ab sofort immer über seinen eigenen Namen erkannt — unabhängig davon, was der Crystallizer ins `_STATUS.md` schreibt. `stripFolderPrefix` entfernt das `NNN - `-Präfix, dann werden sowohl der ganze Name (z.B. „Mars Abenteuer") als auch einzelne Tokens (≥4 Zeichen, z.B. `Mars`, `Abenteuer`) als Match-Terms registriert. Schlechte Crystallizer-Keywords wie `fragt, nach, Teilnahme` können das echte Projekt-Signal damit nicht mehr überdecken.
+  - **Komposita-Match für deutsche Wörter**: Neuer `compoundPrefix`-Modus mit `(^|[^\p{L}\p{N}])TERM[\p{L}\p{N}]*`-RegExp lässt einzelne Identitäts-Tokens am Anfang deutscher Komposita matchen — z.B. `Mars` in `Marslandschaft`. Suffix-Matches wie `landMars` werden ausgeschlossen. **Schutz**: Compound-Match feuert nur im Subject, nicht im Body — sonst würden Newsletter-Footer mit Wörtern wie „Marshmallow" fälschlich matchen.
+  - **Dreistufige Sortierung**: `subjectHitCount` → `hitCount` total → Priority als Tiebreaker. Ein einziger Subject-Treffer schlägt jetzt beliebig viele Body-Treffer. „Roll-Up Marslandschaft" im Subject wird also nie wieder von einer Body-/Signatur-Mailflut eines anderen Projekts überstimmt.
+
 ## [0.6.56-beta] - 2026-05-24
 
 ### Improvements
