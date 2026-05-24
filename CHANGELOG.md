@@ -2,6 +2,23 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.6.53-beta] - 2026-05-24
+
+### Features
+
+- **Mermaid-Diagramme im Notes-Chat**: Wenn der Notes-Chat (Header-Button „KI") eine Antwort mit einem ` ```mermaid `-Block produziert, wird der Block jetzt als gerendertes Diagramm angezeigt — nicht mehr als roher Code. Funktioniert mit allen von Mermaid unterstützten Diagrammtypen (Flowchart, Sequence, Mindmap, Timeline, Pie, Quadrant, Sankey, Class, ER, State, …). Sicherheit über `securityLevel: 'strict'` analog Editor und Flashcards. Rendering läuft nur auf finalen Messages, nicht während des Streamings — verhindert Render-Errors auf unvollständigem SVG-Output.
+
+### Improvements
+
+- **Tabellen-Styling im Reading-Modus, Flashcards und Notes-Chat modernisiert**: Vereinheitlichtes Tabellen-Look-and-Feel über drei bisher separat gestylte Render-Pfade. Konsistente Border-, Header- und Zell-Tokens via `color-mix()`-Variablen — Tabellen wirken jetzt in allen drei Kontexten gleichwertig hochwertig, statt sich je nach Rendering-Pipeline zu unterscheiden.
+- **Blog: Tabellen-Styling und summary-Callout im Stylesheet**: Die Blog-Seiten (`docs/blog/`) bekommen dasselbe Tabellen-Styling wie die App, plus eine neue `[!summary]`-Callout-Variante. Damit Tabellen und Zusammenfassungs-Boxen in MindGraph-Notes-Artikeln (`mindgraph-notes.de/blog`) optisch ankommen.
+- **Blog: Lokale-Modelle-Artikel überarbeitet**: Der Artikel „Lokale Modelle, ehrlich gerechnet" wurde inhaltlich präzisiert und mit zusätzlichen Datenpunkten aus den 160 Benchmark-Läufen vom Mai untermauert.
+
+### Security
+
+- **20 Dependency-Vulnerabilities gepatcht**: `npm audit fix` schließt unter anderem DOMPurify-XSS-Bypasses (genutzt in `sanitizeHtml()` überall — Editor, Notes-Chat, Email-Analyse), Mermaid-CSS-Injection (relevant durch den neuen Notes-Chat-Mermaid-Renderer), nodemailer-SMTP-Command-Injection im Absender-Name-Feld (Email-Send-Pfad), xmldom-XML-Injection (via mailparser-Dependency-Tree — Email-Receive-Pfad), `ws`-Uninitialized-Memory-Disclosure und mehrere Lodash-Prototype-Pollution-Pfade. Alle Updates blieben in den bestehenden Semver-Ranges, nur `package-lock.json` verändert. Reduktion von 22 offenen Alerts auf 1 lokal.
+- **`@anthropic-ai/sdk` 0.91 → 0.98**: Schließt die letzte verbliebene Memory-Tool-File-Permission-Vulnerability (von uns nicht genutzt). Unsere SDK-Surface ist minimal (ein `messages.create`-Call in `main/llm/chatClient.ts`, kein Streaming, kein Tool-Use), Breaking-Changes zwischen 0.91 und 0.98 betreffen ausschließlich Managed-Agents- und Auth-Features — kein Code-Anpassung nötig. Übrig: nur noch `xlsx` (SheetJS), für den es keinen npm-Fix-Pfad gibt (kein attacker-controlled Input in unserem Code, Risiko akzeptiert).
+
 ## [0.6.52-beta] - 2026-05-22
 
 ### Features
