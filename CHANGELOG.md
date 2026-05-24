@@ -2,6 +2,12 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.6.54-beta] - 2026-05-24
+
+### Fixes
+
+- **Callouts überleben WYSIWYG-Roundtrip**: Im Lesen-Modus wurden Callouts (`> [!note]`, `> [!summary]`, `> [!warning]`, …) bei jedem Save stillschweigend zerlegt — aus einem mehrzeiligen Callout-Block wurde Klartext mit Emoji-Präfix, der Callout verschwand. Ursache: Turndown's Default-Behandlung von `<details>`- und `<div class="callout">`-Knoten hat die Callout-Struktur nicht erkannt. Neue Turndown-Regel `callout` liest jetzt `data-callout-type`/`data-callout-fold`/`data-callout-title`-Attribute (in `processCallouts` gesetzt) und rekonstruiert daraus `> [!type][+-] title\n> body…`-Markdown. Body-HTML wird rekursiv durch Turndown gejagt und mit `> `-Präfix versehen. Faltbare Callouts (`[!type]+`/`[!type]-`) und custom Titel bleiben erhalten.
+
 ## [0.6.53-beta] - 2026-05-24
 
 ### Features

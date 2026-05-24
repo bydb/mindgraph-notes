@@ -366,6 +366,39 @@ wysiwygTurndown.addRule('dataviewContainer', {
   }
 })
 
+// Callout-Roundtrip: Liest die in `processCallouts` gesetzten data-Attribute, rekonstruiert
+// `> [!type][+-] title\n> body…`. Body-HTML wird rekursiv durch Turndown gejagt und mit
+// `> `-Präfix versehen. Ohne diese Regel zerlegt Turndown <details>/<div class="callout">
+// in Klartext und der Callout verschwindet bei jedem WYSIWYG-Save.
+wysiwygTurndown.addRule('callout', {
+  filter: (node) => {
+    if (node.nodeName !== 'DETAILS' && node.nodeName !== 'DIV') return false
+    return (node as HTMLElement).hasAttribute('data-callout-type')
+  },
+  replacement: (_content, node) => {
+    const el = node as HTMLElement
+    const type = el.getAttribute('data-callout-type') || 'note'
+    const fold = el.getAttribute('data-callout-fold') || ''
+    const title = el.getAttribute('data-callout-title') || ''
+
+    const bodyEl = el.querySelector(':scope > .callout-content') as HTMLElement | null
+    let bodyMarkdown = ''
+    if (bodyEl) {
+      bodyMarkdown = wysiwygTurndown.turndown(bodyEl.innerHTML).trim()
+    }
+
+    const titleLine = `> [!${type}]${fold}${title ? ' ' + title : ''}`
+    const bodyLines = bodyMarkdown
+      ? bodyMarkdown
+          .split('\n')
+          .map((line) => (line.length > 0 ? `> ${line}` : '>'))
+          .join('\n')
+      : ''
+
+    return '\n\n' + titleLine + (bodyLines ? '\n' + bodyLines : '') + '\n\n'
+  }
+})
+
 function stripFrontmatterRaw(content: string): { frontmatter: string; body: string } {
   const match = content.match(/^(---\s*\n[\s\S]*?\n---\s*\n?)/)
   if (!match) return { frontmatter: '', body: content }
@@ -651,14 +684,23 @@ function processCallouts(content: string): string {
     const renderedTitle = md.renderInline(title)
     const renderedBody = md.render(processedBody)
 
+    // Roundtrip-Metadaten: Beim WYSIWYG-Speichern liest die Turndown-`callout`-Regel
+    // diese Attribute, um `> [!type][+-] title`-Markdown rekonstruieren zu können.
+    // Ohne sie strippt Turndown's Default-Behandlung von <details>/<div> die Callout-
+    // Struktur stillschweigend (Bug: lange Callouts mit mehrzeiligem Body wurden zu
+    // Klartext mit Emoji-Präfix reduziert).
+    const escapedTitle = md.utils.escapeHtml(customTitle || '')
+    const foldAttr = isFoldable ? (isCollapsed ? '-' : '+') : ''
+    const dataAttrs = `data-callout-type="${escapedType}" data-callout-fold="${foldAttr}" data-callout-title="${escapedTitle}"`
+
     if (isFoldable) {
-      return `<details class="callout callout-${escapedType}"${isCollapsed ? '' : ' open'}>
+      return `<details class="callout callout-${escapedType}"${isCollapsed ? '' : ' open'} ${dataAttrs}>
       <summary class="callout-title">${icon} ${renderedTitle}<span class="callout-fold-indicator"></span></summary>
       <div class="callout-content">${renderedBody}</div>
     </details>\n`
     }
 
-    return `<div class="callout callout-${escapedType}">
+    return `<div class="callout callout-${escapedType}" ${dataAttrs}>
       <div class="callout-title">${icon} ${renderedTitle}</div>
       <div class="callout-content">${renderedBody}</div>
     </div>\n`
