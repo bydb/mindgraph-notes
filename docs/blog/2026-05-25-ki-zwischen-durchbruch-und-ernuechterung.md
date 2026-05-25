@@ -17,6 +17,8 @@ tags:
   - anthropic
   - bildung
   - blog
+
+summary: "DeepMind löst 56 Jahre alte Matheprobleme, George Hotz erklärt Coding-Agenten zum teuersten Fehler der Branche, und DeepSeek verkauft Inferenz 34-mal billiger als OpenAI. Drei Meldungen, die nicht zusammenpassen — und was sie über den Zustand der KI verraten."
 status: publish
 type: post
 author: Jochen Leeder
