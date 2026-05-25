@@ -54,6 +54,7 @@
       "Relevante Notizen: KI-bewertete Aktualitaet pro Problem-Notiz mit Begruendungstext",
       "Markdown-Arbeitsraum mit Live Preview und Wissensgraph",
       "KI-Email-Client mit Kalender-Integration",
+      "Workflow Canvas: Module als verbindbare Bausteine fuer lokale Automationen mit menschlicher Freigabe",
       "Karteikarten mit Spaced Repetition (SM-2)",
       "E2E-verschluesselter Sync (AES-256-GCM)",
       "Modular aktivierbare Plugins statt Feature-Ueberladung",
@@ -458,6 +459,20 @@
         </div>
       </div>
 
+      <!-- Workflow Canvas (neu in 0.7.0) -->
+      <div class="cap-card fade-in">
+        <div class="cap-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="6" height="6" rx="1"/><rect x="15" y="15" width="6" height="6" rx="1"/><path d="M9 6h6a3 3 0 013 3v6"/></svg></div>
+        <h3 data-i18n="cap.workflow.title">Workflow Canvas</h3>
+        <p data-i18n="cap.workflow.desc">Verbinde deine Module zu Abl&auml;ufen: E-Mail, Projekte, lokale KI und Notizen werden zu Bausteinen mit typisierten Ports auf einem Canvas. Trockenlauf zum Pr&uuml;fen, echte L&auml;ufe gegen lokales Ollama &ndash; und menschliche Freigabe als bewusster Halt. Opt-in-Modul.</p>
+        <div class="cap-tags">
+          <span class="cap-tag">Bausteine</span>
+          <span class="cap-tag">Typisierte Ports</span>
+          <span class="cap-tag">Lokale KI</span>
+          <span class="cap-tag">Simulieren</span>
+          <span class="cap-tag">Human-in-the-Loop</span>
+        </div>
+      </div>
+
       <!-- Smart Notes -->
       <div class="cap-card fade-in">
         <div class="cap-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg></div>
@@ -761,6 +776,8 @@
         "cap.notes.desc": "Markdown, Projektnotizen, Wikilinks, Backlinks, Canvas-Ansicht, Dataview-Abfragen und 28+ Slash Commands. Obsidian-Vaults \u00f6ffnen 1:1 \u2013 ohne Migration.",
         "cap.email.title": "Email-Client",
         "cap.email.desc": "IMAP + SMTP. Lokales Ollama bewertet Relevanz, erkennt Termine, pr\u00fcft Kalender-Konflikte, generiert Antwort-Entw\u00fcrfe \u2013 alles ohne Cloud-Analyse. Optional aktivierbar.",
+        "cap.workflow.title": "Workflow Canvas",
+        "cap.workflow.desc": "Verbinde deine Module zu Abl\u00e4ufen: E-Mail, Projekte, lokale KI und Notizen werden zu Bausteinen mit typisierten Ports auf einem Canvas. Trockenlauf zum Pr\u00fcfen, echte L\u00e4ufe gegen lokales Ollama \u2013 und menschliche Freigabe als bewusster Halt. Opt-in-Modul.",
         "cap.telegram.title": "Telegram-Bot",
         "cap.telegram.desc": "Dein Vault, deine Tasks, dein Kalender \u2013 unterwegs per Telegram abfragen. Bot l\u00e4uft lokal in MindGraph, Daten verlassen den Rechner nicht. Ollama oder Anthropic als LLM-Backend, frei w\u00e4hlbar.",
         "cap.learn.title": "Lernen & Flashcards",
@@ -877,6 +894,8 @@
         "cap.notes.desc": "Markdown, project notes, wikilinks, backlinks, canvas view, dataview queries and 28+ slash commands. Obsidian vaults open 1:1 \u2013 no migration.",
         "cap.email.title": "Email Client",
         "cap.email.desc": "IMAP + SMTP. Local Ollama scores relevance, detects appointments, checks calendar conflicts, generates reply drafts \u2013 all without cloud analysis. Optional.",
+        "cap.workflow.title": "Workflow Canvas",
+        "cap.workflow.desc": "Wire your modules into flows: email, projects, local AI and notes become building blocks with typed ports on a canvas. Dry-run to preview, real runs against local Ollama \u2013 with human approval as a deliberate checkpoint. Opt-in module.",
         "cap.telegram.title": "Telegram Bot",
         "cap.telegram.desc": "Your vault, your tasks, your calendar \u2013 query them on the go via Telegram. The bot runs locally inside MindGraph, data never leaves your machine. Ollama or Anthropic as LLM backend, freely selectable.",
         "cap.learn.title": "Learning & Flashcards",
