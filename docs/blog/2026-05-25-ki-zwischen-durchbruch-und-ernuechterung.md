@@ -1,8 +1,8 @@
 ---
 title: "KI zwischen Durchbruch und Ernüchterung"
-date: 2025-05-25
-created: 2025-05-25 12:00:00
-modified: 2025-05-25 12:00:00
+date: 2026-05-25
+created: 2026-05-25 12:00:00
+modified: 2026-05-25 12:00:00
 tags:
   - ki
   - llm
@@ -22,7 +22,7 @@ type: post
 author: Jochen Leeder
 ---
 
-![Header](2025-05-25-ki-zwischen-durchbruch-und-ernuechterung-header.png)
+![Header](2026-05-25-ki-zwischen-durchbruch-und-ernuechterung-header.png)
 
 > [!abstract] Worum es geht
 > Google DeepMind löst 56 Jahre alte Matheprobleme für ein paar hundert Dollar. George Hotz sagt, Coding-Agenten sind der teuerste Fehler, den die Branche je gemacht hat. Und DeepSeek verkauft KI-Inferenz 34-mal billiger als OpenAI. Das passt nicht zusammen. Und genau deshalb schreibe ich das hier.
