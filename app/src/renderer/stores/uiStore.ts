@@ -455,6 +455,7 @@ export const MODULES: ModuleDescriptor[] = [
   { id: 'email',            label: 'Email-Client',     description: 'IMAP/SMTP + KI-Analyse + Entwurfshilfe', category: 'communication' },
   { id: 'mz-suite',         label: 'Edoobox Modul',description: 'edoobox + Marketing (WordPress) + IQ-Auswertung + Formularimport', category: 'business' },
   { id: 'antares',          label: 'Antares Medienzentrum', description: 'Verleih-Daten aus Antares CS (Entleiher, Mahnungen Geräte/Medien)', category: 'business' },
+  { id: 'workflow-canvas',  label: 'Workflow Canvas',  description: 'Module als verbindbare Bausteine auf einem Canvas — visuelle Prozesse mit lokaler KI', category: 'business' },
   { id: 'flashcards',       label: 'Flashcards & Quiz',description: 'Karteikarten mit Spaced Repetition und Quiz-Modus', category: 'learning' },
   { id: 'semantic-scholar', label: 'Research', description: 'Paper via Semantic Scholar und OpenAlex durchsuchen und zitieren', category: 'research' },
   { id: 'zotero',           label: 'Zotero',           description: 'Bibliothek durchsuchen, Zitate einfügen (⌘⇧Z)', category: 'research', iconText: 'Z', iconColor: '#cc2936' },
@@ -551,6 +552,7 @@ interface UIState {
   smartConnectionsEnabled: boolean
   notesChatEnabled: boolean
   flashcardsEnabled: boolean
+  workflowCanvasEnabled: boolean
   semanticScholarEnabled: boolean
   zoteroEnabled: boolean
 
@@ -693,6 +695,7 @@ interface UIState {
   setSmartConnectionsEnabled: (enabled: boolean) => void
   setNotesChatEnabled: (enabled: boolean) => void
   setFlashcardsEnabled: (enabled: boolean) => void
+  setWorkflowCanvasEnabled: (enabled: boolean) => void
   setSemanticScholarEnabled: (enabled: boolean) => void
   setZoteroEnabled: (enabled: boolean) => void
   setSpeech: (settings: Partial<SpeechSettings>) => void
@@ -833,6 +836,7 @@ const defaultState = {
   smartConnectionsEnabled: false,
   notesChatEnabled: false,
   flashcardsEnabled: true,
+  workflowCanvasEnabled: false,
   semanticScholarEnabled: true,
   zoteroEnabled: true,
 
@@ -1073,7 +1077,7 @@ const persistedKeys = [
   'canvasFilterPath', 'canvasViewMode', 'canvasShowEdges', 'canvasShowTags', 'canvasShowLinks', 'canvasShowImages', 'canvasShowSummaries',
   'canvasCompactMode', 'canvasReadMode', 'canvasHoverScale', 'canvasDefaultCardWidth', 'splitPosition', 'fileTreeDisplayMode', 'fileTreeKindFilter', 'notesRootFolder', 'projectsRootFolder', 'ollama', 'brain',
   'pdfCompanionEnabled', 'pdfDisplayMode', 'iconSet',
-  'smartConnectionsEnabled', 'notesChatEnabled', 'flashcardsEnabled', 'semanticScholarEnabled', 'zoteroEnabled', 'smartConnectionsWeights', 'smartConnectionsRerankerEnabled', 'docling', 'visionOcr', 'readwise', 'languageTool', 'email', 'marketing', 'edoobox', 'antares', 'remarkable', 'dailyNote', 'taskExcludedFolders', 'speech',
+  'smartConnectionsEnabled', 'notesChatEnabled', 'flashcardsEnabled', 'workflowCanvasEnabled', 'semanticScholarEnabled', 'zoteroEnabled', 'smartConnectionsWeights', 'smartConnectionsRerankerEnabled', 'docling', 'visionOcr', 'readwise', 'languageTool', 'email', 'marketing', 'edoobox', 'antares', 'remarkable', 'dailyNote', 'taskExcludedFolders', 'speech',
   'lastSeenVersion',
   'customAccentColor', 'customBackgroundColorLight', 'customBackgroundColorDark',
   'customLogo',
@@ -1167,6 +1171,7 @@ export const useUIStore = create<UIState>()((set, get) => ({
   setSmartConnectionsEnabled: (enabled) => set({ smartConnectionsEnabled: enabled }),
   setNotesChatEnabled: (enabled) => set({ notesChatEnabled: enabled }),
   setFlashcardsEnabled: (enabled) => set({ flashcardsEnabled: enabled }),
+  setWorkflowCanvasEnabled: (enabled) => set({ workflowCanvasEnabled: enabled }),
   setSpeech: (settings) => set((state) => ({ speech: { ...state.speech, ...settings } })),
   toggleTaskExcludedFolder: (folderPath) => set((state) => {
     const current = state.taskExcludedFolders

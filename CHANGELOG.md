@@ -2,6 +2,29 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.7.0-beta] - 2026-05-25
+
+### Features
+
+- **Workflow Canvas — visuelle Automations- und Integrationsschicht (neues Modul, opt-in)**: Module werden als verbindbare Bausteine mit typisierten Ports auf einem Canvas platziert (React Flow). Aktivierung über Einstellungen → Module → „Workflow Canvas", danach erscheint der „Workflow"-Tab.
+  - **Bausteine** für 5 Module: E-Mail (Auslöser, analysieren), Projekt (erkennen via Keyword-Matcher, Kontext aus `_STATUS.md` laden), Ollama (Zusammenfassen, Antwort entwerfen, Aufgaben extrahieren, Klassifizieren, Freier Prompt), Notiz (erstellen, suchen, anhängen), Menschliche Prüfung.
+  - **Typisierte Ports mit Validierung**: kompatible Eingänge leuchten beim Verbinden, unpassende werden blockiert; Pflicht-Eingänge und Zyklen werden geprüft.
+  - **Simulieren** (deterministischer Trockenlauf mit Beispielausgaben) und **Ausführen** (echter Lauf gegen lokales Ollama). Das Lauf-Panel zeigt die Schrittfolge inklusive tatsächlicher Ausgaben (z.B. extrahierte Aufgaben).
+  - **Auslöser**: manuell (Seed = ausgewählte Mail) oder automatisch bei neuer relevanter Mail (exactly-once über einen `emails.json`-Marker, hart gedeckelte Batch-Größe gegen Last-Spitzen).
+  - **Menschliche Prüfung als Hand-off**: bei manuellem Lauf öffnet sich das Compose-Fenster mit dem Ollama-Antwortentwurf (die Antwortadresse wird bei Formular-Mails aus dem Body gezogen); bei einem Event-Lauf entsteht eine Aufgabe. Das Senden bleibt immer beim Menschen.
+  - **Sicherheit**: schreibende Aktionen laufen über die abgesicherte Schreibgrenze (`assertSafePath` + Backup); LLM-Aktionen auf untrusted Mail-Inhalt respektieren die Modell-Hard-Locks; Bausteine deaktivierter Module stoppen den Lauf sauber.
+  - **Notizen aus Workflows** werden im Vault-Format angelegt (Zettelkasten-ID `YYYYMMDDhhmm`, YAML-Frontmatter) und als Workflow-erzeugt gekennzeichnet (`source: workflow`, `workflow: "<Name>"`, Hinweiszeile im Body). Bestehende Notizen werden nie überschrieben.
+- **E-Mail-Markdown-Vorschau**: Das Compose-Fenster hat einen Vorschau-Umschalter, der exakt das gesendete HTML rendert (fett, kursiv, Listen, Trennlinien, Überschriften).
+
+### Improvements
+
+- **Abgesicherte Schreibgrenze `writeFileSafe`** zentral aus dem `write-file`-Handler extrahiert (`assertSafePath` + Auto-Heal + Backup + Empty-Write-Block) — vom Handler und vom Workflow-Runner gemeinsam genutzt, sodass es nur einen Schreibpfad gibt.
+- **`matchEmailToProjects`** als geteilter Keyword-Matcher nach `shared/projectMatch.ts` portiert (von Inbox und Workflow-Runner genutzt).
+
+### Fixes
+
+- **`##`-Überschriften in gesendeten E-Mails** werden jetzt als fette Zeile gerendert statt als Rohtext angezeigt.
+
 ## [0.6.57-beta] - 2026-05-24
 
 ### Improvements

@@ -43,6 +43,7 @@ interface EmailState {
   setSelectedEmail: (id: string | null) => void
   updateUnreadRelevantCount: () => void
   markReplyHandled: (vaultPath: string, emailId: string, handled: boolean) => Promise<void>
+  markWorkflowRun: (vaultPath: string, emailId: string, workflowId: string, runId: string) => Promise<void>
   setEmailProject: (vaultPath: string, emailId: string, folderRel: string | null) => Promise<void>
   // Compose actions
   setComposeState: (state: ComposeEmail | null) => void
@@ -488,6 +489,23 @@ export const useEmailStore = create<EmailState>()((set, get) => ({
           ...e.analysis,
           replyHandled: handled,
           replyHandledAt: handled ? new Date().toISOString() : undefined
+        }
+      }
+    })
+    set({ emails: next })
+    await get().saveEmails(vaultPath)
+  },
+
+  // Exactly-once-Marker für Workflow-Auslösung (Decision #5).
+  markWorkflowRun: async (vaultPath: string, emailId: string, workflowId: string, runId: string) => {
+    const { emails } = get()
+    const next = emails.map(e => {
+      if (e.id !== emailId || !e.analysis) return e
+      return {
+        ...e,
+        analysis: {
+          ...e.analysis,
+          workflowRuns: { ...(e.analysis.workflowRuns || {}), [workflowId]: runId }
         }
       }
     })

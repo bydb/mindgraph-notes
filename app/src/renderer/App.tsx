@@ -5,6 +5,7 @@ import { QuickEventModal } from './components/Sidebar/QuickEventModal'
 import { MarkdownEditor } from './components/Editor/MarkdownEditor'
 import { BacklinksPanel } from './components/Editor/BacklinksPanel'
 import { GraphCanvas } from './components/Canvas/GraphCanvas'
+import { WorkflowCanvasView } from './components/WorkflowCanvas/WorkflowCanvasView'
 import { LocalCanvas } from './components/Canvas/LocalCanvas'
 import { PDFViewer } from './components/PDFViewer/PDFViewer'
 import { CodeViewer } from './components/CodeViewer/CodeViewer'
@@ -46,6 +47,7 @@ import { useNotesStore, createNoteFromFile } from './stores/notesStore'
 import { useReminderStore } from './stores/reminderStore'
 import { useSyncStore } from './stores/syncStore'
 import { useVaultSettingsStore } from './stores/vaultSettingsStore'
+import { useIsModuleEnabled } from './utils/modules'
 import { getVaultTaskStats } from './utils/linkExtractor'
 import './styles/index.css'
 
@@ -97,6 +99,7 @@ const App: React.FC = () => {
   const [briefingOpen, setBriefingOpen] = useState(false)
   const dashboardEnabled = useUIStore(state => state.dashboard.enabled)
   const openDashboardTab = useTabStore(state => state.openDashboardTab)
+  const openWorkflowCanvasTab = useTabStore(state => state.openWorkflowCanvasTab)
   const { unreadRelevantCount } = useEmailStore()
   const emailEnabled = useUIStore(state => state.email.enabled)
   const edooboxEnabled = useUIStore(state => state.edoobox.enabled)
@@ -107,6 +110,7 @@ const App: React.FC = () => {
   const vaultReadwiseActive = useVaultSettingsStore(state => state.features.readwise)
   const vaultEmailActive = useVaultSettingsStore(state => state.features.email)
   const vaultEdooboxActive = useVaultSettingsStore(state => state.features.edoobox)
+  const vaultWorkflowCanvasActive = useIsModuleEnabled('workflow-canvas')
   const vaultSettingsLoaded = useVaultSettingsStore(state => state.isLoaded)
   const [pendingNoteTitle, setPendingNoteTitle] = useState<string | null>(null)
 
@@ -902,6 +906,23 @@ const App: React.FC = () => {
                   <span className="view-mode-label">Dashboard</span>
                 </button>
               )}
+              {vaultWorkflowCanvasActive && (
+                <button
+                  className={`view-mode-btn ${activeTab?.type === 'workflow-canvas' ? 'active' : ''}`}
+                  onClick={() => {
+                    setViewMode('editor')
+                    openWorkflowCanvasTab()
+                  }}
+                  title="Workflow Canvas"
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="3" y="3" width="6" height="6" rx="1"/>
+                    <rect x="15" y="15" width="6" height="6" rx="1"/>
+                    <path d="M9 6h6a3 3 0 0 1 3 3v6"/>
+                  </svg>
+                  <span className="view-mode-label">Workflow</span>
+                </button>
+              )}
               <span className="view-mode-separator" />
               <button
                 className={`view-mode-btn ${textSplitEnabled ? 'active' : ''}`}
@@ -1140,7 +1161,9 @@ const App: React.FC = () => {
                     : `0 0 ${splitPosition}%`
                 }}
               >
-                {activeTab?.type === 'dashboard' ? (
+                {activeTab?.type === 'workflow-canvas' ? (
+                  <WorkflowCanvasView onOpenInbox={() => switchRightPanel('inbox')} />
+                ) : activeTab?.type === 'dashboard' ? (
                   <DashboardView
                     onOpenInbox={() => switchRightPanel('inbox')}
                     onOpenAgent={() => switchRightPanel('agent')}

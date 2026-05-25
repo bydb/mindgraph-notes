@@ -12,6 +12,7 @@ export function useIsModuleEnabled(id: ModuleDescriptor['id']): boolean {
       case 'mz-suite':          return state.edoobox.enabled || state.marketing.enabled
       case 'antares':           return state.antares.enabled
       case 'flashcards':        return state.flashcardsEnabled
+      case 'workflow-canvas':   return state.workflowCanvasEnabled
       case 'semantic-scholar':  return state.semanticScholarEnabled
       case 'zotero':            return state.zoteroEnabled
       case 'readwise':          return state.readwise.enabled
@@ -36,6 +37,7 @@ export function isModuleEnabled(id: ModuleDescriptor['id']): boolean {
     case 'mz-suite':          return s.edoobox.enabled || s.marketing.enabled
     case 'antares':           return s.antares.enabled
     case 'flashcards':        return s.flashcardsEnabled
+    case 'workflow-canvas':   return s.workflowCanvasEnabled
     case 'semantic-scholar':  return s.semanticScholarEnabled
     case 'zotero':            return s.zoteroEnabled
     case 'readwise':          return s.readwise.enabled
@@ -60,6 +62,7 @@ export function setModuleEnabled(id: ModuleDescriptor['id'], enabled: boolean): 
       break
     case 'antares':           s.setAntares({ enabled }); break
     case 'flashcards':        s.setFlashcardsEnabled(enabled); break
+    case 'workflow-canvas':   s.setWorkflowCanvasEnabled(enabled); break
     case 'semantic-scholar':  s.setSemanticScholarEnabled(enabled); break
     case 'zotero':            s.setZoteroEnabled(enabled); break
     case 'readwise':          s.setReadwise({ enabled }); break

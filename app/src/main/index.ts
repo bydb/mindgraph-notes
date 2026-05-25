@@ -21,6 +21,11 @@ import {
   loadProjectSynonyms,
   isSynonymCacheStale
 } from './projectStatus/synonymGenerator'
+import { runWorkflow, type RunnerServices, type SeedEmail } from './workflows/runner'
+import { matchEmailToProjects } from '../shared/projectMatch'
+import { isHardLocked as isModelHardLocked } from '../shared/modelCompatibility'
+import { MODULE_FEATURE_GATE } from '../shared/workflow/types'
+import type { Workflow, WorkflowFile } from '../shared/workflow/model'
 import type {
   ProjectStatusCrystallizeInput,
   ProjectPriority,
@@ -906,39 +911,210 @@ function healCorruptedMarkdown(content: string): { healed: string; changed: bool
 }
 
 // Datei schreiben
+// Einzige abgesicherte Schreibgrenze für .md/Dateien: assertSafePath +
+// Empty-Write-Block + Auto-Heal + Backup. Wird vom write-file-IPC-Handler UND
+// vom Workflow-Runner genutzt (Decision #3 — kein zweiter Schreibpfad).
+async function writeFileSafe(filePath: string, content: string): Promise<void> {
+  const safe = await assertSafePath(filePath, 'write-file')
+  const isMarkdown = path.extname(safe).toLowerCase() === '.md'
+
+  if (isMarkdown && content.length === 0) {
+    try {
+      const existing = await fs.stat(safe)
+      if (existing.size > 0) {
+        throw new Error(`Blocked empty write to non-empty Markdown file: ${safe}`)
+      }
+    } catch (error) {
+      if (error instanceof Error && error.message.startsWith('Blocked empty write')) {
+        throw error
+      }
+    }
+  }
+
+  let finalContent = content
+  if (isMarkdown) {
+    const { healed, changed } = healCorruptedMarkdown(content)
+    if (changed) {
+      console.warn('[write-file] Auto-healed corrupted wikilink escapes in', safe)
+      finalContent = healed
+    }
+  }
+
+  await backupMarkdownBeforeWrite(safe, finalContent)
+  await fs.writeFile(safe, finalContent, 'utf-8')
+}
+
 ipcMain.handle('write-file', async (_event, filePath: string, content: string) => {
   try {
-    const safe = await assertSafePath(filePath, 'write-file')
-    const isMarkdown = path.extname(safe).toLowerCase() === '.md'
-
-    if (isMarkdown && content.length === 0) {
-      try {
-        const existing = await fs.stat(safe)
-        if (existing.size > 0) {
-          throw new Error(`Blocked empty write to non-empty Markdown file: ${safe}`)
-        }
-      } catch (error) {
-        if (error instanceof Error && error.message.startsWith('Blocked empty write')) {
-          throw error
-        }
-      }
-    }
-
-    let finalContent = content
-    if (isMarkdown) {
-      const { healed, changed } = healCorruptedMarkdown(content)
-      if (changed) {
-        console.warn('[write-file] Auto-healed corrupted wikilink escapes in', safe)
-        finalContent = healed
-      }
-    }
-
-    await backupMarkdownBeforeWrite(safe, finalContent)
-    await fs.writeFile(safe, finalContent, 'utf-8')
+    await writeFileSafe(filePath, content)
   } catch (error) {
     console.error('Fehler beim Schreiben der Datei:', error)
     throw error
   }
+})
+
+// ============ WORKFLOW CANVAS ============
+function getWorkflowsPath(vaultPath: string): string {
+  return path.join(vaultPath, '.mindgraph', 'workflows.json')
+}
+
+ipcMain.handle('workflow-load', async (_event, vaultPath: string): Promise<WorkflowFile | null> => {
+  try {
+    assertApprovedVault(vaultPath, 'workflow-load')
+    try {
+      const raw = await fs.readFile(getWorkflowsPath(vaultPath), 'utf-8')
+      return JSON.parse(raw) as WorkflowFile
+    } catch {
+      return null
+    }
+  } catch (error) {
+    console.error('[workflow-load]', error)
+    return null
+  }
+})
+
+ipcMain.handle('workflow-save', async (_event, vaultPath: string, file: WorkflowFile) => {
+  try {
+    assertApprovedVault(vaultPath, 'workflow-save')
+    await fs.mkdir(path.join(vaultPath, '.mindgraph'), { recursive: true })
+    await fs.writeFile(getWorkflowsPath(vaultPath), JSON.stringify(file, null, 2), 'utf-8')
+    return { success: true }
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : String(error) }
+  }
+})
+
+interface WorkflowRunPayload {
+  workflow: Workflow
+  vaultPath: string
+  trigger?: 'manual' | 'event-email'
+  seedEmail?: SeedEmail | null
+  models?: { selected: string; overrides: Record<string, string> }
+  features?: Record<string, boolean>
+  projectsFolderRel?: string
+}
+
+ipcMain.handle('workflow-run', async (_event, payload: WorkflowRunPayload) => {
+  const { workflow, vaultPath } = payload
+  assertApprovedVault(vaultPath, 'workflow-run')
+  const models = payload.models || { selected: '', overrides: {} }
+  const features = payload.features || {}
+  const projectsFolderRel = payload.projectsFolderRel || '100 - ✅ Projekte'
+
+  const ollamaGenerate = async (prompt: string, model: string): Promise<string> => {
+    if (!model) throw new Error('Kein Ollama-Modell konfiguriert.')
+    const res = await fetch(`${OLLAMA_API_URL}/api/generate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model, prompt, stream: false, think: false, options: { temperature: 0.4, num_predict: 1200 } })
+    })
+    if (!res.ok) throw new Error(`Ollama Fehler: ${res.status}`)
+    const data = await res.json()
+    return (data.response || '').trim()
+  }
+
+  const services: RunnerServices = {
+    resolveModel: (override, hint) =>
+      (override && override.trim()) || (hint && models.overrides[hint]) || models.selected,
+    isHardLocked: (model, moduleId) => isModelHardLocked(model, moduleId),
+    isModuleActive: (workflowModuleId) => {
+      const gate = MODULE_FEATURE_GATE[workflowModuleId as keyof typeof MODULE_FEATURE_GATE]
+      return gate ? Boolean(features[gate]) : true
+    },
+    ollamaGenerate,
+    matchProject: async (email) => {
+      try {
+        const projects = await discoverProjects(vaultPath, projectsFolderRel)
+        const matches = matchEmailToProjects({ subject: email.subject, bodyText: email.bodyText }, projects, {})
+        const best = matches[0]?.project
+        return best ? { folderName: best.folderName, folderRel: best.folderRel } : null
+      } catch (e) {
+        console.warn('[workflow] matchProject:', e)
+        return null
+      }
+    },
+    loadProjectContext: async (folderRel) => {
+      try {
+        const abs = validatePath(vaultPath, folderRel)
+        const entries = await fs.readdir(abs)
+        const statusFiles = entries.filter(f => f.startsWith('_STATUS') && f.endsWith('.md')).sort().reverse()
+        const pick = statusFiles[0] || entries.find(f => f.endsWith('.md'))
+        if (!pick) return ''
+        return (await fs.readFile(path.join(abs, pick), 'utf-8')).slice(0, 1800)
+      } catch {
+        return ''
+      }
+    },
+    createNote: async (folder, title, content) => {
+      // Vault-Konvention: Zettelkasten-ID `YYYYMMDDhhmm - Titel.md` + YAML-Frontmatter.
+      const now = new Date()
+      const p = (n: number) => String(n).padStart(2, '0')
+      const id = `${now.getFullYear()}${p(now.getMonth() + 1)}${p(now.getDate())}${p(now.getHours())}${p(now.getMinutes())}`
+      const dateHuman = `${p(now.getDate())}.${p(now.getMonth() + 1)}.${now.getFullYear()} um ${p(now.getHours())}:${p(now.getMinutes())}`
+      const safeTitle = (title || 'Workflow-Notiz').replace(/[\\/:*?"<>|]/g, '-').slice(0, 80)
+      const wfName = workflow.name || 'Workflow'
+
+      await fs.mkdir(path.join(vaultPath, folder), { recursive: true })
+      // Bestehende Notiz NIE überschreiben — bei Kollision " (n)" anhängen.
+      let rel = `${folder}/${id} - ${safeTitle}.md`
+      let n = 2
+      // eslint-disable-next-line no-constant-condition
+      while (true) {
+        try {
+          await fs.access(path.join(vaultPath, rel))
+          rel = `${folder}/${id} - ${safeTitle} (${n++}).md`
+        } catch {
+          break
+        }
+      }
+
+      const fm = [
+        '---',
+        'type: Note',
+        `date: ${id}`,
+        'status: inbox',
+        'source: workflow',
+        `workflow: ${JSON.stringify(wfName)}`,
+        'tags:',
+        '  - Note',
+        '  - inbox',
+        '  - workflow',
+        'cssclasses:',
+        '  - note',
+        '---'
+      ].join('\n')
+      const body = `${fm}\n\n# ${safeTitle}\n\n> 🔁 Erstellt am ${dateHuman} per Workflow „${wfName}"\n\n${content}\n`
+      await writeFileSafe(path.join(vaultPath, rel), body)
+      return rel
+    },
+    appendNote: async (noteRel, text) => {
+      const abs = path.join(vaultPath, noteRel)
+      let existing = ''
+      try { existing = await fs.readFile(abs, 'utf-8') } catch { existing = '' }
+      const sep = existing.length === 0 || existing.endsWith('\n') ? '' : '\n'
+      await fs.mkdir(path.dirname(abs), { recursive: true })
+      await writeFileSafe(abs, existing + sep + text + '\n')
+      return noteRel
+    },
+    searchNotes: async () => [],
+    createTask: async (taskLine) => {
+      const rel = '000 - 📥 inbox/Workflow-Aufgaben.md'
+      const abs = path.join(vaultPath, rel)
+      let existing = ''
+      try { existing = await fs.readFile(abs, 'utf-8') } catch { existing = '# Workflow-Aufgaben\n\n' }
+      const sep = existing.endsWith('\n') ? '' : '\n'
+      await fs.mkdir(path.dirname(abs), { recursive: true })
+      await writeFileSafe(abs, existing + sep + taskLine + '\n')
+      return rel
+    }
+  }
+
+  return runWorkflow(workflow, {
+    mode: 'execute',
+    trigger: payload.trigger === 'event-email' ? 'event-email' : 'manual',
+    seedEmail: payload.seedEmail ?? null,
+    services
+  })
 })
 
 // ============ TASK EDITING ============
@@ -7706,6 +7882,7 @@ function linkifyEmailText(value: string): string {
 function renderEmailHtml(body: string): string {
   const escaped = escapeEmailHtml(body)
   let formatted = escaped
+    .replace(/^#{1,6}\s+(.+)$/gm, '<strong>$1</strong>')   // ## Überschrift → fette Zeile
     .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
     .replace(/\*(.+?)\*/g, '<em>$1</em>')
     .replace(/^• (.+)$/gm, '&bull; $1')
@@ -7723,6 +7900,11 @@ function renderEmailHtml(body: string): string {
 
   return `<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; font-size: 14px; color: #333;">${formatted}</div>`
 }
+
+// Vorschau: liefert exakt das HTML, das beim Senden erzeugt würde (für Compose-Preview).
+ipcMain.handle('email-render-html', async (_event, body: string) => {
+  return renderEmailHtml(body || '')
+})
 
 ipcMain.handle('email-send', async (_event, composeData: {
   to: { name: string; address: string }[]

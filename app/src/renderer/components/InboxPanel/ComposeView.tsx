@@ -4,6 +4,7 @@ import { useUIStore } from '../../stores/uiStore'
 import { useNotesStore } from '../../stores/notesStore'
 import { useContactStore } from '../../stores/contactStore'
 import { useTranslation } from '../../utils/translations'
+import { sanitizeHtml } from '../../utils/sanitize'
 import type { ComposeAttachment } from '../../../shared/types'
 
 export const ComposeView: React.FC = () => {
@@ -23,6 +24,17 @@ export const ComposeView: React.FC = () => {
   const [ltChecking, setLtChecking] = useState(false)
   const [ltCorrectionCount, setLtCorrectionCount] = useState(0)
   const [ltHighlights, setLtHighlights] = useState<{ offset: number; length: number }[]>([])
+  const [previewOpen, setPreviewOpen] = useState(false)
+  const [previewHtml, setPreviewHtml] = useState('')
+
+  // Markdown-Vorschau: rendert genau das HTML, das beim Senden erzeugt wird.
+  useEffect(() => {
+    if (!previewOpen) return
+    let cancelled = false
+    window.electronAPI.emailRenderHtml(useEmailStore.getState().composeState?.body || '')
+      .then(html => { if (!cancelled) setPreviewHtml(html) })
+    return () => { cancelled = true }
+  }, [previewOpen, composeState?.body])
 
   // Signatur-Bild laden
   useEffect(() => {
@@ -423,6 +435,16 @@ export const ComposeView: React.FC = () => {
         >
           —
         </button>
+        <button
+          type="button"
+          className={previewOpen ? 'lt-corrected' : ''}
+          data-tooltip={previewOpen ? 'Bearbeiten' : 'Vorschau (gerendertes Markdown)'}
+          onMouseDown={e => { e.preventDefault(); setPreviewOpen(o => !o) }}
+        >
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
+          </svg>
+        </button>
         <span style={{ flex: 1 }} />
         {ltSettings.enabled && (
           <button
@@ -458,6 +480,14 @@ export const ComposeView: React.FC = () => {
         </button>
       </div>
       <div className="inbox-compose-body-wrapper">
+        {previewOpen ? (
+          <div
+            className="inbox-compose-body inbox-compose-preview"
+            style={{ overflowY: 'auto', padding: '12px', whiteSpace: 'normal' }}
+            dangerouslySetInnerHTML={{ __html: sanitizeHtml(previewHtml) }}
+          />
+        ) : (
+        <>
         {/* Highlight-Overlay fuer LanguageTool Korrekturen */}
         {ltHighlights.length > 0 && (
           <div className="inbox-compose-lt-overlay" aria-hidden="true">
@@ -494,6 +524,8 @@ export const ComposeView: React.FC = () => {
           }}
           placeholder={t('inbox.compose.body')}
         />
+        </>
+        )}
       </div>
 
       {/* Anhaenge */}

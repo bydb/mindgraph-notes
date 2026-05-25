@@ -69,6 +69,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
   loadVaultSettings: (vaultPath: string) => ipcRenderer.invoke('vault-settings-load', vaultPath),
   saveVaultSettings: (vaultPath: string, settings: object) => ipcRenderer.invoke('vault-settings-save', vaultPath, settings),
 
+  // E-Mail Markdown-Vorschau (exakt das gesendete HTML)
+  emailRenderHtml: (body: string) => ipcRenderer.invoke('email-render-html', body),
+
+  // Workflow Canvas
+  workflowLoad: (vaultPath: string) => ipcRenderer.invoke('workflow-load', vaultPath),
+  workflowSave: (vaultPath: string, file: object) => ipcRenderer.invoke('workflow-save', vaultPath, file),
+  workflowRun: (payload: object) => ipcRenderer.invoke('workflow-run', payload),
+
   // Notes-Cache für schnelles Laden
   saveNotesCache: (vaultPath: string, cache: object) => ipcRenderer.invoke('save-notes-cache', vaultPath, cache),
   loadNotesCache: (vaultPath: string) => ipcRenderer.invoke('load-notes-cache', vaultPath),

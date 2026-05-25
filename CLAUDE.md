@@ -24,7 +24,9 @@ app/
 ├── src/
 │   ├── shared/          # Geteilte Types/Utilities (Main <-> Renderer)
 │   │   ├── modelCompatibility.ts  # Per-Modul Verdict-Matrix + isHardLocked
-│   │   └── taskExtractor.ts       # Task-Parser + CRITICAL_TASK_PATTERN + REMINDER_REGEX
+│   │   ├── taskExtractor.ts       # Task-Parser + CRITICAL_TASK_PATTERN + REMINDER_REGEX
+│   │   ├── projectMatch.ts        # Keyword-Matcher Mail→Projekt (Renderer + Workflow-Runner)
+│   │   └── workflow/              # Workflow Canvas: types, model, registry (Metadaten-only), validation, simulation
 │   ├── main/            # Electron Main Process
 │   │   ├── index.ts     # IPC-Handler (~9000 Zeilen, ~200 Handler)
 │   │   ├── preload.ts  # contextBridge API
@@ -44,7 +46,8 @@ app/
 │   │   ├── remarkable/ # reMarkable USB (service + transports)
 │   │   ├── transport/  # Schnellerfassung (Tray, Shortcut, ⌘D-Diktat)
 │   │   ├── voice/      # Whisper-CLI (Fallback zum eingebauten Renderer-STT)
-│   │   └── sync/       # E2E Sync (crypto, fileTracker, syncEngine)
+│   │   ├── sync/       # E2E Sync (crypto, fileTracker, syncEngine)
+│   │   └── workflows/  # Workflow-Runner (DI via RunnerServices, Hard-Lock, Hand-off)
 │   ├── renderer/
 │       ├── components/  # React-Komponenten
 │       │   ├── Editor/  # MarkdownEditor + CodeMirror Extensions + WYSIWYG-Lesemodus (turndown)
@@ -56,11 +59,11 @@ app/
 │       │   ├── AgentPanel/  # Veranstaltungs-Agent (edoobox) + Marketing + IQ
 │       │   ├── Terminal/    # Integriertes Terminal (xterm.js + PTY)
 │       │   ├── SemanticScholarPanel/  # Semantic Scholar + OpenAlex + Zotero CSL
-│       │   ├── NotesChat/ SmartConnectionsPanel/ ZoteroSearch/ ...
+│       │   ├── NotesChat/ SmartConnectionsPanel/ ZoteroSearch/ WorkflowCanvas/ ...
 │       │   ├── DashboardPanel/AntaresWidget  # Verleih-Dashboard für Medienzentren
 │       │   └── Settings/ # inkl. ModelCompatibilitySection + ActiveModelStatusBadge
 │       │       └── Onboarding/ ...
-│       ├── stores/      # Zustand Stores (16)
+│       ├── stores/      # Zustand Stores (17, inkl. workflowStore)
 │       ├── styles/      # index.css (globale Styles + color-mix-Tokens)
 │       └── utils/       # Hilfsfunktionen
 │           ├── noteKind.ts        # 🔴🟢🔵-Kategorien zentral (NOTE_KINDS, canvasColor, ...)
@@ -86,7 +89,10 @@ npm run start        # Gebaute App starten
 npm run pack         # Unpacked Build erzeugen
 npm run dist         # Installer erstellen (electron-builder)
 npm run dist:mac     # Nur macOS Installer
+npm run typecheck    # tsc --noEmit (läuft auch als prebuild) — schnellster Korrektheits-Check
 ```
+
+> Kein Test-Runner im Projekt. Nach Änderungen: `npm run typecheck` (deckt main+renderer+shared ab), bei Bedarf `npm run build` (bündelt die drei Prozesse getrennt → fängt Prozessgrenzen-Fehler). Verifikation sonst manuell via `npm run dev`.
 
 ## Architektur-Patterns
 
@@ -109,6 +115,7 @@ Neuer IPC-Handler: `ipcMain.handle()` in `main/index.ts` + `contextBridge.expose
 - **antaresStore**: Antares-CS-Daten (Entleiher, Verleihe, Dashboard-Counts). Geschützt durch `electron.safeStorage` für Credentials.
 - **vaultSettingsStore**: Pro-Vault-Feature-Toggles (`vault-settings.json`)
 - **voiceStore**: STT/TTS-State (Engine, Modell-Lade-Status, Aufnahme-State)
+- **workflowStore**: Workflow Canvas (Nodes/Edges, Validierung, lokale Simulation, `execute`/`runForNewEmails` via IPC, Autosave nach `workflows.json`)
 - Selektoren: `useShallow` aus `zustand/react/shallow` verwenden — siehe `MarkdownEditor.tsx` und `DashboardView.tsx` als Referenz
 
 ### Modals
@@ -127,6 +134,21 @@ Globale Variablen in `styles/index.css`. Komponenten-CSS ist colocated.
 - Anzeige-Toggles in `uiStore`: `canvasShowTags`, `canvasShowLinks`, `canvasShowImages`, `canvasShowSummaries`, `canvasCompactMode`.
 - Callout-Zusammenfassungen auf Karten werden auf maximal 100 Wörter begrenzt und die Kartenhöhe dynamisch berechnet.
 - **Hierarchisches Layout** in `utils/layouts/hierarchicalLayout.ts`: virtuelle Dummy-Nodes für Long-Edges (Layer X → Layer X+n), Median-basierte Y-Koordinaten mit Min-Distance, Layer-Width = Median mit 480-px-Cap, horizontaler Gap 60 px. Diagnose-Logs `[Layout] Hierarchical: N dummies inserted, crossings X → Y`.
+
+### Workflow Canvas (visuelle Automationsschicht, opt-in Modul)
+Module als verbindbare Bausteine mit **typisierten Ports** auf einem React-Flow-Canvas. Konzept + 11 Architektur-Entscheidungen: `docs/workflow-canvas-plan.md` (Abschnitt „Beschlossener Stand"). Eigener `TabType 'workflow-canvas'`, gegated durch Modul-Registry-Eintrag `workflow-canvas` (uiStore `MODULES` + `workflowCanvasEnabled`, Toggle in Settings → Module).
+
+- **`shared/workflow/` ist Single-Source und prozessübergreifend**: `types.ts` (Ports, `WorkflowActionDefinition`, `MODULE_FEATURE_GATE`), `model.ts`, `registry.ts` (**Metadaten-only, KEIN `run()`** — von Renderer-Palette/Validierung UND Main-Runner gelesen), `validation.ts` (`canConnect` strikte Allowlist + `topoSort`), `simulation.ts` (Renderer-Trockenlauf), `examples.ts`.
+- **Runner** (`main/workflows/runner.ts`): reine Logik per **Dependency Injection** (`RunnerServices`) — kennt weder `fs` noch Ollama direkt. Dispatch über `actionId` → Executor-Map. `index.ts` baut die Services (Ollama direkt `localhost:11434`, `discoverProjects`, `matchEmailToProjects`) und registriert IPC `workflow-load/save/run`.
+- **Eine Schreibgrenze**: `writeFileSafe()` in `index.ts` (aus dem `write-file`-Handler extrahiert, mit `assertSafePath` + Backup + Empty-Block) — Runner-Schreib-Actions delegieren dorthin, nie eigenes `fs`.
+- **`project.match`** = geteilter Keyword-Matcher `shared/projectMatch.ts` (auch von InboxPanel genutzt); nutzt die `_STATUS.md`-Marker-Keywords. **`project.context`** liest `_STATUS*.md` des Projekts. Crystallizer (Dashboard → Projekt-Status-Widget) reichert diese an.
+- **Hard-Lock im Runner**: vor LLM-Actions auf untrusted Input prüft der Runner `isHardLocked(model, action.hardLockModule)` (z.B. `task-extraction`) — kein Prompt-Injection-Backdoor um die Modell-Matrix herum.
+- **Human-Review = terminaler Hand-off, KEIN Pause/Resume**: manueller Lauf → `ComposeView` öffnet automatisch (via `onOpenInbox`-Prop + `emailStore.startReply`); Event-Lauf → Task „✉️ Entwurf prüfen". Antwort-Empfänger wird bei Formular-Mails aus dem Body gezogen (`E-Mail:`-Zeile), sonst From.
+- **Trigger**: manuell (▶ Ausführen, Seed = ausgewählte Mail) + Event (neue relevante Mail, feuert solange der Canvas-Tab offen ist). **Exactly-once** via `EmailAnalysis.workflowRuns` (workflowId→runId) in `emails.json`, analog `replyHandled`. `runForNewEmails` ist auf `MAX_TRIGGER_BATCH` gedeckelt + eng gefiltert (sonst feuert ein Klick gegen den ganzen Backlog → Ollama-/CPU-Sturm).
+- **Persistenz**: `.mindgraph/workflows.json` (geräte-lokal). Aktuell wird nur **EIN** Workflow gehalten/gespeichert (`workflows[0]`). Multi-Workflow-Verwaltung ist offen.
+- **Loop-Fallen (real aufgetreten, hart einhalten)**: (1) Zustand-Selektoren dürfen **kein** `.filter()/.map()` zurückgeben (neues Array/Render → „Maximum update depth"); stabile Referenz selektieren, im Render filtern. (2) Autosave **nur bei geändertem Inhalt** schreiben (`lastSavedWorkflowJson`) — sonst Write↔Vault-Watcher↔Reload-Loop. (3) `nodeTypes` als Modul-Konstante.
+- **E-Mail-Markdown**: Compose-Body ist Markdown; `renderEmailHtml` (main) rendert beim Senden zu HTML (`**`, `*`, `•`, `———`, `> Zitat`, `##`→fett). ComposeView hat einen Vorschau-Toggle via IPC `email-render-html` (zeigt exakt das gesendete HTML).
+- **Dev-Falle**: Dev-App und installierte App teilen denselben Vault, haben aber **getrennte userData** → jeder Schreibvorgang triggert den Vault-Watcher der anderen App (CPU-Spitze). Beim Entwickeln nur EINE App auf dem Vault offen halten.
 
 ### Notiz-Kategorien (🔴🟢🔵) — zentrales UI-Konzept
 - Alle Kategorien-Logik in `utils/noteKind.ts`. **Niemals duplizieren** — wenn ein neuer UI-Punkt Farbe/Label braucht, `NOTE_KINDS[kind]` nutzen.

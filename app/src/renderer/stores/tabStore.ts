@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 
-export type TabType = 'editor' | 'canvas' | 'global-canvas' | 'dashboard' | 'code'
+export type TabType = 'editor' | 'canvas' | 'global-canvas' | 'dashboard' | 'code' | 'workflow-canvas'
 
 export interface Tab {
   id: string
@@ -28,6 +28,7 @@ interface TabState {
   openCanvasTab: (rootNoteId: string, title: string) => void
   openGlobalCanvasTab: () => void
   openDashboardTab: () => void
+  openWorkflowCanvasTab: () => void
   openCodeTab: (relativePath: string, title: string) => void
   closeTab: (tabId: string) => void
   setActiveTab: (tabId: string) => void
@@ -151,6 +152,28 @@ export const useTabStore = create<TabState>()((set, get) => ({
       type: 'dashboard',
       noteId: '',
       title: 'Dashboard'
+    }
+
+    set({
+      tabs: [...state.tabs, newTab],
+      activeTabId: newTab.id
+    })
+  },
+
+  openWorkflowCanvasTab: () => {
+    const state = get()
+
+    const existingTab = state.tabs.find(t => t.type === 'workflow-canvas')
+    if (existingTab) {
+      set({ activeTabId: existingTab.id })
+      return
+    }
+
+    const newTab: Tab = {
+      id: generateTabId(),
+      type: 'workflow-canvas',
+      noteId: '',
+      title: 'Workflow Canvas'
     }
 
     set({

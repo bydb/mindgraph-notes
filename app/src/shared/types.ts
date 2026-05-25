@@ -992,6 +992,14 @@ export interface ElectronAPI {
   // Brain (lokales Tagesgedächtnis)
   brainConsolidateDay: (input: BrainConsolidateInput) => Promise<BrainConsolidateResult>;
 
+  // E-Mail Markdown-Vorschau
+  emailRenderHtml: (body: string) => Promise<string>;
+
+  // Workflow Canvas
+  workflowLoad: (vaultPath: string) => Promise<import('./workflow/model').WorkflowFile | null>;
+  workflowSave: (vaultPath: string, file: import('./workflow/model').WorkflowFile) => Promise<{ success: boolean; error?: string }>;
+  workflowRun: (payload: import('./workflow/model').WorkflowRunPayload) => Promise<import('./workflow/model').WorkflowRun>;
+
   // Projekt-Status-Crystallizer
   projectStatusDiscover: (vaultPath: string, projectsFolderRel: string) => Promise<{ success: boolean; projects?: DiscoveredProject[]; error?: string }>;
   projectStatusMark: (vaultPath: string, projectFolderRel: string, keywords: string[], priority: 'high' | 'med' | 'low') => Promise<{ success: boolean; statusFilePath?: string; error?: string }>;
@@ -1264,6 +1272,9 @@ export interface EmailAnalysis {
   replyUrgency?: 'low' | 'medium' | 'high'
   replyHandled?: boolean   // true wenn User die Antwort anderweitig erledigt hat (z.B. Telefon)
   replyHandledAt?: string  // ISO-Timestamp wann markiert
+  /** Exactly-once-Marker: workflowId → runId. Verhindert Mehrfach-Auslösung
+   *  desselben Workflows für dieselbe Mail über Re-Analyse/Neustart (Decision #5). */
+  workflowRuns?: Record<string, string>
   analyzedAt: string
   model: string
 }

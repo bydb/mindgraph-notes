@@ -1,0 +1,308 @@
+// Workflow Canvas — Runner (Main-Prozess).
+//
+// Reine Ausführungslogik: topologische Reihenfolge, Input-Sammlung, Dispatch
+// über eine Executor-Map, Hard-Lock-Enforce (Decision #11), Modul-aktiv-Check
+// (#11b), terminaler Hand-off (#6). Fähigkeiten kommen per Dependency Injection
+// (RunnerServices) — der Runner kennt weder fs noch Ollama direkt.
+//
+// Schreibende Aktionen laufen ausschließlich über die injizierten Services, die
+// in index.ts an den abgesicherten Schreibpfad (assertSafePath + Backup) gebunden
+// sind — eine einzige Schreibgrenze (Decision #3).
+
+import type { ModuleId as CompatModuleId } from '../../shared/modelCompatibility'
+import {
+  getActionById
+} from '../../shared/workflow/registry'
+import { topoSort } from '../../shared/workflow/validation'
+import type {
+  Workflow,
+  WorkflowNode,
+  WorkflowRun,
+  WorkflowRunStep,
+  WorkflowRunMode,
+  WorkflowRunTrigger,
+  WorkflowHandoff
+} from '../../shared/workflow/model'
+
+export interface SeedEmail {
+  id?: string
+  subject?: string
+  bodyText?: string
+  from?: string
+}
+
+export interface RunnerServices {
+  /** node.config.model → Modul-Override → globales Modell. */
+  resolveModel: (override: string | undefined, hint?: CompatModuleId) => string
+  isHardLocked: (model: string, moduleId: CompatModuleId) => boolean
+  /** Ist das Workflow-Modul (email/project/…) im Vault aktiv? */
+  isModuleActive: (workflowModuleId: string) => boolean
+
+  ollamaGenerate: (prompt: string, model: string) => Promise<string>
+  matchProject: (email: SeedEmail) => Promise<{ folderName: string; folderRel: string } | null>
+  loadProjectContext: (folderRel: string) => Promise<string>
+  createNote: (folder: string, title: string, content: string) => Promise<string>
+  appendNote: (noteRel: string, text: string) => Promise<string>
+  searchNotes: (query: string) => Promise<string[]>
+  createTask: (taskLine: string) => Promise<string>
+}
+
+export interface RunOptions {
+  mode: WorkflowRunMode
+  trigger: WorkflowRunTrigger
+  seedEmail?: SeedEmail | null
+  services: RunnerServices
+}
+
+interface ExecResult {
+  outputs: Record<string, unknown>
+  log: string[]
+  handoff?: WorkflowHandoff
+}
+
+type NodeOutputs = Map<string, Record<string, unknown>>
+
+function nowIso() { return new Date().toISOString() }
+function genId(p: string) { return `${p}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}` }
+
+/** Sammelt die Eingangswerte eines Nodes aus den Ausgaben der Vorgänger. */
+function gatherInputs(node: WorkflowNode, workflow: Workflow, outputs: NodeOutputs): Record<string, unknown> {
+  const inputs: Record<string, unknown> = {}
+  for (const edge of workflow.edges) {
+    if (edge.toNodeId !== node.id) continue
+    const srcOut = outputs.get(edge.fromNodeId)
+    if (srcOut && edge.fromPortId in srcOut) {
+      inputs[edge.toPortId] = srcOut[edge.fromPortId]
+    }
+  }
+  return inputs
+}
+
+function asEmail(v: unknown): SeedEmail {
+  return (v && typeof v === 'object') ? (v as SeedEmail) : {}
+}
+function asText(v: unknown): string {
+  if (typeof v === 'string') return v
+  if (v && typeof v === 'object') return JSON.stringify(v)
+  return String(v ?? '')
+}
+
+/** actionId → Implementierung. */
+const EXECUTORS: Record<
+  string,
+  (node: WorkflowNode, inputs: Record<string, unknown>, opts: RunOptions) => Promise<ExecResult>
+> = {
+  'email.selectedEmail': async (_node, _inputs, opts) => {
+    const email = opts.seedEmail
+    if (!email) throw new Error('Keine Eingangs-Mail (im Mail-Client eine Mail auswählen).')
+    return { outputs: { email }, log: [`Eingabe: ${email.subject || '(ohne Betreff)'}`] }
+  },
+
+  'email.analyze': async (node, inputs, opts) => {
+    const email = asEmail(inputs.email)
+    const model = opts.services.resolveModel(node.config.model as string | undefined, 'task-extraction')
+    const prompt = `Analysiere die folgende E-Mail. Gib eine kurze Zusammenfassung (1 Satz) und liste erkannte Aufgaben als Bulletpoints.\n\nBetreff: ${email.subject || ''}\n\n${email.bodyText || ''}`
+    const out = await opts.services.ollamaGenerate(prompt, model)
+    return {
+      outputs: { analysis: { summary: out.slice(0, 400) }, text: email.bodyText || out },
+      log: [`Analyse mit ${model}: ${out.split('\n')[0].slice(0, 80)}`]
+    }
+  },
+
+  'project.match': async (_node, inputs, opts) => {
+    const email = asEmail(inputs.email)
+    const project = await opts.services.matchProject(email)
+    return {
+      outputs: { project },
+      log: [project ? `Projekt erkannt: ${project.folderName}` : 'Kein Projekt erkannt']
+    }
+  },
+
+  'project.context': async (_node, inputs, opts) => {
+    const project = inputs.project as { folderRel?: string; folderName?: string } | null
+    if (!project?.folderRel) return { outputs: { context: '', summary: '' }, log: ['Kein Projekt — kein Kontext.'] }
+    const ctx = await opts.services.loadProjectContext(project.folderRel)
+    return { outputs: { context: ctx, summary: ctx.slice(0, 300) }, log: [`Kontext geladen: ${project.folderName}`] }
+  },
+
+  'ollama.summarize': async (node, inputs, opts) => {
+    const model = opts.services.resolveModel(node.config.model as string | undefined, 'mail-summary')
+    const out = await opts.services.ollamaGenerate(`Fasse den folgenden Text prägnant zusammen:\n\n${asText(inputs.text)}`, model)
+    return { outputs: { text: out }, log: [`Zusammengefasst mit ${model}`] }
+  },
+
+  'ollama.generateReply': async (node, inputs, opts) => {
+    const model = opts.services.resolveModel(node.config.model as string | undefined, 'mail-summary')
+    const email = asEmail(inputs.email)
+    const context = asText(inputs.context)
+    const prompt = `Entwirf eine freundliche, professionelle Antwort auf die folgende E-Mail. Nutze den Projektkontext, wenn hilfreich.\nDu darfst leichte Formatierung verwenden (Markdown: **fett**, *kursiv*, Listen mit "• "). KEINE "Betreff:"-Zeile, beginne direkt mit der Anrede. Gib NUR den Antworttext zurück.\n\n=== E-Mail ===\nBetreff: ${email.subject || ''}\n${email.bodyText || ''}\n\n=== Projektkontext ===\n${context || '(keiner)'}`
+    const out = await opts.services.ollamaGenerate(prompt, model)
+    return { outputs: { draft: out }, log: [`Antwortentwurf mit ${model} erzeugt`] }
+  },
+
+  'ollama.extractTasks': async (node, inputs, opts) => {
+    const model = opts.services.resolveModel(node.config.model as string | undefined, 'task-extraction')
+    const out = await opts.services.ollamaGenerate(
+      `Extrahiere konkrete, umsetzbare Aufgaben aus dem folgenden Text. Gib NUR eine Liste, eine Aufgabe pro Zeile. Keine Einleitung, keine Überschrift. Wenn keine Aufgaben enthalten sind, antworte mit einer leeren Zeile.\n\n${asText(inputs.text)}`,
+      model
+    )
+    // Robust normalisieren: beliebiges Format (•, *, 1., - [ ], Klartext) → "- [ ] …".
+    const tasks = out
+      .split('\n')
+      .map(l => l.trim())
+      .filter(Boolean)
+      .filter(l => !/[:：]\s*$/.test(l))                 // Header-/Einleitungszeilen ("Aufgaben:") weg
+      .map(l =>
+        l
+          .replace(/^[-*•▪‣·]\s*/, '')                   // führendes Bullet
+          .replace(/^\[[ xX]\]\s*/, '')                  // führende Checkbox
+          .replace(/^\d+[.)]\s*/, '')                    // führende Nummerierung
+          .trim()
+      )
+      .filter(Boolean)
+      .map(l => `- [ ] ${l}`)
+    return {
+      outputs: { tasks, text: tasks.join('\n') },
+      log: [`${tasks.length} Aufgabe(n) extrahiert (${model})`]
+    }
+  },
+
+  'ollama.classify': async (node, inputs, opts) => {
+    const model = opts.services.resolveModel(node.config.model as string | undefined)
+    const out = await opts.services.ollamaGenerate(`Klassifiziere den folgenden Text in eine Kategorie. Antworte knapp.\n\n${asText(inputs.text)}`, model)
+    return { outputs: { result: { raw: out } }, log: [`Klassifiziert mit ${model}`] }
+  },
+
+  'ollama.transformText': async (node, inputs, opts) => {
+    const model = opts.services.resolveModel(node.config.model as string | undefined)
+    const userPrompt = (node.config.prompt as string) || 'Bearbeite den folgenden Text.'
+    const out = await opts.services.ollamaGenerate(`${userPrompt}\n\n${asText(inputs.text)}`, model)
+    return { outputs: { text: out }, log: [`Text transformiert mit ${model}`] }
+  },
+
+  'notes.create': async (node, inputs, opts) => {
+    const folder = (node.config.folder as string) || '000 - 📥 inbox/010 - 📥 Notes'
+    const title = (node.config.title as string) || 'Workflow-Notiz'
+    const rel = await opts.services.createNote(folder, title, asText(inputs.text))
+    return { outputs: { note: rel }, log: [`Notiz angelegt: ${rel}`] }
+  },
+
+  'notes.append': async (_node, inputs, opts) => {
+    const noteRel = asText(inputs.note)
+    const rel = await opts.services.appendNote(noteRel, asText(inputs.text))
+    return { outputs: { note: rel }, log: [`An Notiz angehängt: ${rel}`] }
+  },
+
+  'notes.search': async (_node, inputs, opts) => {
+    const results = await opts.services.searchNotes(asText(inputs.text))
+    return { outputs: { notes: results }, log: [`${results.length} Treffer`] }
+  },
+
+  'human.reviewText': async (_node, inputs, opts) => {
+    const text = asText(inputs.text)
+    if (opts.trigger === 'event-email') {
+      const taskRel = await opts.services.createTask(`- [ ] 📝 Prüfen: ${text.slice(0, 80)}`)
+      return { outputs: { approval: 'pending' }, log: ['Aufgabe zur Prüfung angelegt'], handoff: { kind: 'task', payload: { taskRel, text } } }
+    }
+    return { outputs: { approval: 'pending' }, log: ['Wartet auf Prüfung durch den Menschen'], handoff: { kind: 'note', payload: { text } } }
+  },
+
+  'human.reviewDraftReply': async (_node, inputs, opts) => {
+    const draft = asText(inputs.draft)
+    if (opts.trigger === 'event-email') {
+      const taskRel = await opts.services.createTask(`- [ ] ✉️ Entwurf prüfen und senden`)
+      return {
+        outputs: { approval: 'pending' },
+        log: ['Aufgabe „Entwurf prüfen" angelegt'],
+        handoff: { kind: 'task', payload: { taskRel, draft } }
+      }
+    }
+    return {
+      outputs: { approval: 'pending' },
+      log: ['Entwurf bereit zur Prüfung im Compose-Fenster'],
+      handoff: { kind: 'compose', payload: { draft, emailId: opts.seedEmail?.id } }
+    }
+  }
+}
+
+export async function runWorkflow(workflow: Workflow, opts: RunOptions): Promise<WorkflowRun> {
+  const startedAt = nowIso()
+  const order = topoSort(workflow)
+  const baseRun: WorkflowRun = {
+    id: genId('run'),
+    workflowId: workflow.id,
+    mode: opts.mode,
+    trigger: opts.trigger,
+    status: 'running',
+    startedAt,
+    steps: []
+  }
+
+  if (order === null) {
+    return { ...baseRun, status: 'failed', finishedAt: nowIso(), error: 'Zyklus — keine ausführbare Reihenfolge.' }
+  }
+
+  const nodeById = new Map(workflow.nodes.map(n => [n.id, n]))
+  const outputs: NodeOutputs = new Map()
+  const steps: WorkflowRunStep[] = []
+  let handoff: WorkflowHandoff | undefined
+
+  for (const nodeId of order) {
+    const node = nodeById.get(nodeId)
+    if (!node) continue
+    const action = getActionById(node.actionId)
+    const step: WorkflowRunStep = {
+      nodeId, actionId: node.actionId, label: action?.label || node.actionId,
+      status: 'running', startedAt: nowIso(), log: []
+    }
+
+    if (!action) {
+      step.status = 'failed'; step.error = 'Unbekannte Action'; step.finishedAt = nowIso(); steps.push(step)
+      return { ...baseRun, status: 'failed', finishedAt: nowIso(), steps, error: step.error }
+    }
+
+    // Modul aktiv?
+    if (!opts.services.isModuleActive(action.moduleId)) {
+      step.status = 'failed'; step.error = `Modul „${action.moduleId}" ist deaktiviert.`; step.finishedAt = nowIso(); steps.push(step)
+      return { ...baseRun, status: 'failed', finishedAt: nowIso(), steps, error: step.error }
+    }
+
+    // Hard-Lock auf LLM-Aktionen mit untrusted Input.
+    if (action.hardLockModule) {
+      const model = opts.services.resolveModel(node.config.model as string | undefined, action.hardLockModule)
+      if (opts.services.isHardLocked(model, action.hardLockModule)) {
+        step.status = 'failed'
+        step.error = `Modell „${model}" ist für ${action.hardLockModule} gesperrt (Prompt-Injection-Schutz).`
+        step.finishedAt = nowIso(); steps.push(step)
+        return { ...baseRun, status: 'failed', finishedAt: nowIso(), steps, error: step.error }
+      }
+    }
+
+    const executor = EXECUTORS[node.actionId]
+    if (!executor) {
+      step.status = 'skipped'; step.log.push('Keine Implementierung (Phase 2).'); step.finishedAt = nowIso(); steps.push(step)
+      outputs.set(nodeId, {})
+      continue
+    }
+
+    try {
+      const inputs = gatherInputs(node, workflow, outputs)
+      const result = await executor(node, inputs, opts)
+      outputs.set(nodeId, result.outputs)
+      step.outputs = result.outputs
+      step.log = result.log
+      step.status = 'success'
+      step.finishedAt = nowIso()
+      if (result.handoff) handoff = result.handoff
+      steps.push(step)
+    } catch (e) {
+      step.status = 'failed'
+      step.error = e instanceof Error ? e.message : String(e)
+      step.finishedAt = nowIso()
+      steps.push(step)
+      return { ...baseRun, status: 'failed', finishedAt: nowIso(), steps, error: step.error }
+    }
+  }
+
+  return { ...baseRun, status: 'success', finishedAt: nowIso(), steps, handoff }
+}

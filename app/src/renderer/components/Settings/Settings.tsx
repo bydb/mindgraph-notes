@@ -565,7 +565,7 @@ const VaultSettingsTab: React.FC<{ vaultPath: string; t: TabTFn; onNavigateToTab
 
 const ModulesTab: React.FC<{ t: TabTFn }> = ({ t }) => {
   // useUIStore als Abhängigkeit einbinden, damit der Tab bei Flag-Änderungen rerendert
-  const _tick = useUIStore(s => `${s.notesChatEnabled}${s.smartConnectionsEnabled}${s.flashcardsEnabled}${s.semanticScholarEnabled}${s.zoteroEnabled}${s.languageTool.enabled}${s.email.enabled}${s.edoobox.enabled}${s.marketing.enabled}${s.readwise.enabled}${s.remarkable.enabled}${s.docling.enabled}${s.visionOcr.enabled}${s.speech.enabled}`)
+  const _tick = useUIStore(s => `${s.notesChatEnabled}${s.smartConnectionsEnabled}${s.flashcardsEnabled}${s.workflowCanvasEnabled}${s.semanticScholarEnabled}${s.zoteroEnabled}${s.languageTool.enabled}${s.email.enabled}${s.edoobox.enabled}${s.marketing.enabled}${s.readwise.enabled}${s.remarkable.enabled}${s.docling.enabled}${s.visionOcr.enabled}${s.speech.enabled}`)
   void _tick
 
   const grouped: Record<ModuleCategory, ModuleDescriptor[]> = {
