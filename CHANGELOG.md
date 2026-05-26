@@ -2,6 +2,16 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.7.1-beta] - 2026-05-26
+
+### Fixes
+
+- **Sync: Reconnect-Sturm durch „Zombie"-Verbindungen behoben** — Wiederholtes „Sync neu einrichten" oder fehlgeschlagene Einrichtungsversuche konnten mehrere Sync-Verbindungen hinterlassen, die endlos im Hintergrund weiterliefen und sich pausenlos (erfolglos) beim Server neu anzumelden versuchten („Invalid activation code"). Das konnte sogar laufende, funktionierende Vaults verdrängen. Jetzt wird vor jeder neuen Verbindung die alte sauber beendet, und eine abgelehnte Anmeldung löst keinen automatischen Wiederverbindungs-Versuch mehr aus.
+
+### Sonstiges
+
+- Website: Blog-Beitrag „KI zwischen Durchbruch und Ernüchterung" veröffentlicht; Workflow-Canvas-Abschnitt auf der Website ergänzt.
+
 ## [0.7.0-beta] - 2026-05-25
 
 ### Features
