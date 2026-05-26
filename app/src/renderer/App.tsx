@@ -890,7 +890,7 @@ const App: React.FC = () => {
               </ViewModeButton>
               {dashboardEnabled && (
                 <button
-                  className={`view-mode-btn ${activeTab?.type === 'dashboard' ? 'active' : ''}`}
+                  className={`view-mode-btn cat-organize ${activeTab?.type === 'dashboard' ? 'active' : ''}`}
                   onClick={() => {
                     setViewMode('editor')
                     openDashboardTab()
@@ -908,7 +908,7 @@ const App: React.FC = () => {
               )}
               {vaultWorkflowCanvasActive && (
                 <button
-                  className={`view-mode-btn ${activeTab?.type === 'workflow-canvas' ? 'active' : ''}`}
+                  className={`view-mode-btn cat-ai ${activeTab?.type === 'workflow-canvas' ? 'active' : ''}`}
                   onClick={() => {
                     setViewMode('editor')
                     openWorkflowCanvasTab()
@@ -925,7 +925,7 @@ const App: React.FC = () => {
               )}
               <span className="view-mode-separator" />
               <button
-                className={`view-mode-btn ${textSplitEnabled ? 'active' : ''}`}
+                className={`view-mode-btn cat-editor ${textSplitEnabled ? 'active' : ''}`}
                 onClick={() => setTextSplitEnabled(!textSplitEnabled)}
                 disabled={viewMode !== 'editor'}
                 title={t('titlebar.textSplit')}

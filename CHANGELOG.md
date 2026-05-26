@@ -2,6 +2,15 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.7.2-beta] - 2026-05-26
+
+### Improvements
+
+- **Semantische Farbtokens als ruhige Wegweiser**: Neue zentrale Farbvariablen (`--color-editor`, `--color-ai`, `--color-organize`, `--color-integrate`, `--color-danger`, `--color-warning`, `--color-success`, `--color-info`) für helle und dunkle Themes. Zahlreiche zuvor fest verdrahtete Hex-Farben (Aufgaben, Überfällig-Panel, Notiz-Kategorie-Punkte) nutzen jetzt diese Tokens und reagieren konsistent auf das Theme.
+- **Farbkodierte Titelleisten-Buttons**: Die Ansichts-Buttons in der Titelleiste sind nach Funktionsbereich eingefärbt (Editor, KI, Organisieren, Integrieren) — mit dezentem Unterstrich beim aktiven Button statt nur einer Hintergrundfärbung.
+- **Farbtöne für Tabs**: Jeder Tab erhält je nach Typ einen farbigen Markierungsstreifen (Dashboard, Workflow, Code, Canvas, Editor), sodass sich Tab-Arten auf einen Blick unterscheiden lassen.
+- **Workflow Canvas in der Hilfe**: Neuer Hilfe-Eintrag „Workflow Canvas" im KI-Cluster mit Direkt-Schaltfläche, die den Workflow-Tab öffnet.
+
 ## [0.7.1-beta] - 2026-05-26
 
 ### Fixes

@@ -33,6 +33,17 @@
   --accent-hover: #0070e0;
   --accent-subtle: rgba(10, 132, 255, 0.12);
 
+  /* Semantic UI colors - used as quiet wayfinding, not decoration */
+  --color-editor: #2f7dd1;
+  --color-ai: #8b5cf6;
+  --color-organize: #d97706;
+  --color-integrate: #0f9f8f;
+  --color-danger: #dc2626;
+  --color-warning: #d97706;
+  --color-success: #15803d;
+  --color-info: #256fd1;
+  --color-muted-accent: #8a8f98;
+
   /* Backlink Colors - Warm Orange */
   --backlink-color: #d4875a;
   --backlink-bg: #1a1a1a;
@@ -83,6 +94,15 @@
   --node-bg: color-mix(in srgb, var(--bg-primary-custom-dark, #0d0d0d) 90%, #fff);
   --node-border: #333333;
   --minimap-mask: rgba(13, 13, 13, 0.9);
+  --color-editor: #5aa9ff;
+  --color-ai: #b48cff;
+  --color-organize: #f5a524;
+  --color-integrate: #27c7b8;
+  --color-danger: #ff6b6b;
+  --color-warning: #f59e0b;
+  --color-success: #34d399;
+  --color-info: #6aa9ff;
+  --color-muted-accent: #9aa3af;
 }
 
 /* System preference fallback */
@@ -102,6 +122,15 @@
     --node-bg: #1a1a1a;
     --node-border: #333333;
     --minimap-mask: rgba(13, 13, 13, 0.9);
+    --color-editor: #5aa9ff;
+    --color-ai: #b48cff;
+    --color-organize: #f5a524;
+    --color-integrate: #27c7b8;
+    --color-danger: #ff6b6b;
+    --color-warning: #f59e0b;
+    --color-success: #34d399;
+    --color-info: #6aa9ff;
+    --color-muted-accent: #9aa3af;
   }
 }
 
@@ -181,6 +210,7 @@ body {
 .editor-header [data-tooltip]::after,
 .canvas-filter-bar [data-tooltip]::after,
 .canvas-toolbar [data-tooltip]::after,
+.wf-toolbar [data-tooltip]::after,
 .local-canvas-header [data-tooltip]::after,
 .add-note-btn[data-tooltip]::after {
   bottom: auto;
@@ -380,6 +410,7 @@ body {
 }
 
 .view-mode-btn {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -457,25 +488,53 @@ body {
 }
 
 /* Kategorie-Farben fuer Titlebar-Buttons (Hover + Active) */
-.view-mode-btn.cat-editor:hover { background-color: rgba(74, 158, 255, 0.12); }
-.view-mode-btn.cat-editor:hover svg { stroke: #4a9eff; }
-.view-mode-btn.cat-editor.active { background-color: rgba(74, 158, 255, 0.14); color: #2b7dcc; }
-.view-mode-btn.cat-editor.active svg { stroke: #2b7dcc; }
+.view-mode-btn.cat-editor { --category-color: var(--color-editor); }
+.view-mode-btn.cat-ai { --category-color: var(--color-ai); }
+.view-mode-btn.cat-organize { --category-color: var(--color-organize); }
+.view-mode-btn.cat-integrate { --category-color: var(--color-integrate); }
 
-.view-mode-btn.cat-ai:hover { background-color: rgba(168, 85, 247, 0.12); }
-.view-mode-btn.cat-ai:hover svg { stroke: #a855f7; }
-.view-mode-btn.cat-ai.active { background-color: rgba(168, 85, 247, 0.14); color: #8b3fd6; }
-.view-mode-btn.cat-ai.active svg { stroke: #8b3fd6; }
+.view-mode-btn.cat-editor:hover,
+.view-mode-btn.cat-ai:hover,
+.view-mode-btn.cat-organize:hover,
+.view-mode-btn.cat-integrate:hover {
+  background-color: color-mix(in srgb, var(--category-color) 12%, transparent);
+}
 
-.view-mode-btn.cat-organize:hover { background-color: rgba(245, 158, 11, 0.12); }
-.view-mode-btn.cat-organize:hover svg { stroke: #f59e0b; }
-.view-mode-btn.cat-organize.active { background-color: rgba(245, 158, 11, 0.15); color: #b86900; }
-.view-mode-btn.cat-organize.active svg { stroke: #b86900; }
+.view-mode-btn.cat-editor:hover svg,
+.view-mode-btn.cat-ai:hover svg,
+.view-mode-btn.cat-organize:hover svg,
+.view-mode-btn.cat-integrate:hover svg {
+  stroke: var(--category-color);
+}
 
-.view-mode-btn.cat-integrate:hover { background-color: rgba(16, 185, 129, 0.12); }
-.view-mode-btn.cat-integrate:hover svg { stroke: #10b981; }
-.view-mode-btn.cat-integrate.active { background-color: rgba(16, 185, 129, 0.14); color: #07865e; }
-.view-mode-btn.cat-integrate.active svg { stroke: #07865e; }
+.view-mode-btn.cat-editor.active,
+.view-mode-btn.cat-ai.active,
+.view-mode-btn.cat-organize.active,
+.view-mode-btn.cat-integrate.active {
+  background-color: color-mix(in srgb, var(--category-color) 14%, var(--bg-primary));
+  color: var(--category-color);
+}
+
+.view-mode-btn.cat-editor.active svg,
+.view-mode-btn.cat-ai.active svg,
+.view-mode-btn.cat-organize.active svg,
+.view-mode-btn.cat-integrate.active svg {
+  stroke: var(--category-color);
+}
+
+.titlebar-right .view-mode-btn.cat-editor.active::after,
+.titlebar-right .view-mode-btn.cat-ai.active::after,
+.titlebar-right .view-mode-btn.cat-organize.active::after,
+.titlebar-right .view-mode-btn.cat-integrate.active::after {
+  content: '';
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: -4px;
+  height: 2px;
+  border-radius: 999px;
+  background: var(--category-color);
+}
 
 /* Emoji in Buttons (Theme Toggle) */
 .view-mode-btn:has(svg:only-child),
@@ -1385,15 +1444,15 @@ body {
 }
 
 .note-kind-problem {
-  background: #d93d42;
+  background: var(--color-danger);
 }
 
 .note-kind-solution {
-  background: #208f4f;
+  background: var(--color-success);
 }
 
 .note-kind-info {
-  background: #256fd1;
+  background: var(--color-info);
 }
 
 .file-count {
@@ -4363,12 +4422,12 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
 }
 
 .task-critical {
-  color: #c94343;
+  color: var(--color-danger);
   font-weight: 500;
 }
 
 .task-overdue {
-  color: #c56f00;
+  color: var(--color-warning);
   font-weight: 500;
 }
 
@@ -9262,7 +9321,7 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(var(--accent-rgb), 0.1);
+  background: color-mix(in srgb, var(--accent-color) 10%, transparent);
   border: 2px dashed var(--accent-color);
   border-radius: var(--radius-md);
   display: flex;
@@ -9304,12 +9363,12 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
 }
 
 .overdue-btn.has-overdue {
-  color: #ef4444;
+  color: var(--color-danger);
   z-index: 1;
 }
 
 .overdue-btn.has-overdue svg {
-  stroke: #ef4444;
+  stroke: var(--color-danger);
 }
 
 .titlebar-mini-badge {
@@ -9335,7 +9394,7 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
 }
 
 .overdue-badge {
-  background: #ef4444;
+  background: var(--color-danger);
 }
 
 .overdue-panel {
@@ -9375,8 +9434,8 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
 }
 
 .overdue-count {
-  background: rgba(239, 68, 68, 0.15);
-  color: #ef4444;
+  background: color-mix(in srgb, var(--color-danger) 15%, transparent);
+  color: var(--color-danger);
   font-size: 11px;
   font-weight: 600;
   padding: 2px 8px;
@@ -9439,7 +9498,7 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
 }
 
 .overdue-empty svg {
-  color: #22c55e;
+  color: var(--color-success);
   margin-bottom: 16px;
 }
 
@@ -9522,7 +9581,7 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
 }
 
 .overdue-item-date {
-  color: #dc2626;
+  color: var(--color-danger);
   font-weight: 500;
   opacity: 0.9;
 }
@@ -9534,7 +9593,7 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #ef4444;
+  background: var(--color-danger);
   color: white;
   font-weight: 700;
   font-size: 12px;
@@ -9548,7 +9607,7 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
 }
 
 .overdue-btn.active.has-overdue {
-  background-color: rgba(239, 68, 68, 0.15);
+  background-color: color-mix(in srgb, var(--color-danger) 15%, var(--bg-primary));
 }
 
 .overdue-btn.active svg {
@@ -9638,8 +9697,9 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
 }
 
 .overdue-item-date-btn.overdue {
-  color: #dc2626;
-  border-color: rgba(220, 38, 38, 0.4);
+  color: var(--color-danger);
+  border-color: color-mix(in srgb, var(--color-danger) 40%, transparent);
+  background: color-mix(in srgb, var(--color-danger) 7%, transparent);
   border-style: solid;
 }
 
@@ -9668,7 +9728,7 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
 }
 
 .overdue-date-clear:hover {
-  color: #dc2626;
+  color: var(--color-danger);
 }
 
 /* Notiz-Link */
@@ -9917,9 +9977,9 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
 .overdue-error-banner {
   padding: 8px 12px;
   margin: 8px 12px;
-  background: rgba(239, 68, 68, 0.1);
-  border: 1px solid rgba(239, 68, 68, 0.3);
-  color: #dc2626;
+  background: color-mix(in srgb, var(--color-danger) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-danger) 30%, transparent);
+  color: var(--color-danger);
   border-radius: var(--radius-md);
   font-size: 12px;
 }
@@ -9947,7 +10007,7 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
 }
 
 .overdue-btn.active.has-overdue svg {
-  stroke: #ef4444;
+  stroke: var(--color-danger);
 }
 
 /* Loading State */
@@ -12935,7 +12995,7 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
 }
 
 .overdue-section.overdue .overdue-section-title {
-  color: #dc2626;
+  color: var(--color-danger);
 }
 
 .overdue-section-count {
@@ -12948,13 +13008,13 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
 }
 
 .overdue-section-count.overdue {
-  background: rgba(220, 38, 38, 0.15);
-  color: #dc2626;
+  background: color-mix(in srgb, var(--color-danger) 15%, transparent);
+  color: var(--color-danger);
 }
 
 .overdue-section-count.today {
-  background: rgba(var(--accent-rgb), 0.15);
-  color: var(--accent-color);
+  background: color-mix(in srgb, var(--color-warning) 15%, transparent);
+  color: var(--color-warning);
 }
 
 .overdue-section-empty {
@@ -12985,7 +13045,7 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
 }
 
 .overdue-item-time.overdue {
-  color: #dc2626;
+  color: var(--color-danger);
 }
 
 .overdue-item-future-date {
@@ -14574,6 +14634,7 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
 }
 
 .tab-item {
+  --tab-tone: var(--color-editor);
   display: flex;
   align-items: center;
   gap: 6px;
@@ -14592,21 +14653,32 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
 }
 
 .tab-item:hover {
-  background-color: var(--bg-tertiary);
+  background-color: color-mix(in srgb, var(--tab-tone) 8%, var(--bg-tertiary));
   color: var(--text-primary);
 }
 
 .tab-item.active {
-  background-color: var(--accent-subtle);
-  color: var(--accent-color);
+  background-color: color-mix(in srgb, var(--tab-tone) 14%, var(--bg-primary));
+  color: var(--tab-tone);
 }
 
-.tab-item.canvas-tab {
-  border-left: 2px solid var(--accent-color);
+.tab-item.tab-tone-editor { --tab-tone: var(--color-editor); }
+.tab-item.tab-tone-canvas { --tab-tone: var(--color-integrate); }
+.tab-item.tab-tone-organize { --tab-tone: var(--color-organize); }
+.tab-item.tab-tone-ai { --tab-tone: var(--color-ai); }
+.tab-item.tab-tone-integrate { --tab-tone: var(--color-integrate); }
+
+.tab-item::before {
+  content: '';
+  width: 3px;
+  height: 14px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--tab-tone) 45%, transparent);
+  flex: 0 0 3px;
 }
 
-.tab-item.canvas-tab.active {
-  background-color: var(--accent-subtle);
+.tab-item.active::before {
+  background: var(--tab-tone);
 }
 
 .tab-icon {

@@ -113,15 +113,15 @@
 }
 
 .dv-widget-tasks {
-  --widget-accent: var(--color-error, #e55);
+  --widget-accent: var(--color-danger, #e55);
 }
 
 .dv-widget-radar {
-  --widget-accent: #d93d42;
+  --widget-accent: var(--color-danger, #d93d42);
 }
 
 .dv-activity {
-  --widget-accent: #0f9f8f;
+  --widget-accent: var(--color-integrate, #0f9f8f);
 }
 
 /* Brain — Lokales Tagesgedächtnis (Identität auf Aktivitäts-Widget) */
@@ -236,11 +236,11 @@
 }
 
 .dv-widget-emails {
-  --widget-accent: var(--color-warning, #f59e0b);
+  --widget-accent: var(--color-integrate, #0f9f8f);
 }
 
 .dv-widget-calendar {
-  --widget-accent: var(--accent-color);
+  --widget-accent: var(--color-editor, var(--accent-color));
 }
 
 .dv-widget-bookings {

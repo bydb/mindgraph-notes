@@ -20,7 +20,7 @@ import { useShallow } from 'zustand/react/shallow'
 import { useTranslation } from '../../utils/translations'
 import './HelpGuide.css'
 
-type ActionId = 'openDashboard' | 'openSettings' | 'openSettingsTab' | 'showBriefing'
+type ActionId = 'openDashboard' | 'openWorkflow' | 'openSettings' | 'openSettingsTab' | 'showBriefing'
 
 // ============ SVG ICONS (aus der App) ============
 const icons: Record<string, React.ReactNode> = {
@@ -50,6 +50,7 @@ const icons: Record<string, React.ReactNode> = {
   bookmark: <><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></>,
   task: <><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><path d="M9 12l2 2 4-4"/></>,
   dashboard: <><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></>,
+  workflow: <><rect x="3" y="3" width="6" height="6" rx="1"/><rect x="15" y="15" width="6" height="6" rx="1"/><path d="M9 6h6a3 3 0 0 1 3 3v6"/><path d="M7 9v3a3 3 0 0 0 3 3h5"/></>,
   briefing: <><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/></>,
   agent: <><path d="M12 8V4H8"/><rect x="4" y="12" width="16" height="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 16h.01"/><path d="M9 16h.01"/></>,
   crystal: <><path d="M12 2l7 4v8l-7 8-7-8V6z"/><path d="M5 6l7 4 7-4"/><path d="M12 10v12"/><path d="M5 14l7-4 7 4"/></>,
@@ -97,6 +98,9 @@ const helpTopics: HelpTopic[] = [
   { id: 'voice', label: 'Sprache', icon: 'voice', color: '#a855f7', category: 'ai',
     details: ['Notizen oder markierten Text vorlesen lassen', 'Diktat per Whisper lokal transkribieren', 'Systemstimmen oder ElevenLabs konfigurieren', 'Sprachfunktionen in Einstellungen → Sprache einrichten'],
     action: { id: 'openSettingsTab', label: 'Sprache einrichten', settingsTab: 'speech' } },
+  { id: 'workflow', label: 'Workflow Canvas', icon: 'workflow', color: '#a855f7', category: 'ai',
+    details: ['Visuelle Automationen aus Bausteinen zusammenstellen', 'Knoten verbinden: Eingaben, KI-Schritte, Transformationen und Ausgaben', 'Simulation prueft Ablauf und Datenfluss vor dem Ausfuehren', 'Workflows bleiben lokal im Vault und lassen sich iterativ verfeinern'],
+    action: { id: 'openWorkflow', label: 'Workflow öffnen' } },
 
   // Organize cluster
   { id: 'dashboard', label: 'Dashboard', icon: 'dashboard', color: '#f59e0b', category: 'organize',
@@ -300,6 +304,7 @@ const HelpGraphInner: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   const [nodes, , onNodesChange] = useNodesState(initialNodes)
   const [edges] = useEdgesState(initialEdges)
   const openDashboardTab = useTabStore(s => s.openDashboardTab)
+  const openWorkflowCanvasTab = useTabStore(s => s.openWorkflowCanvasTab)
 
   const handleNodeClick = useCallback((_: React.MouseEvent, node: Node) => {
     const topic = helpTopics.find(t => t.id === node.id) || null
@@ -318,6 +323,11 @@ const HelpGraphInner: React.FC<{ onClose: () => void }> = ({ onClose }) => {
         openDashboardTab()
         onClose()
         break
+      case 'openWorkflow':
+        useUIStore.getState().setViewMode('editor')
+        openWorkflowCanvasTab()
+        onClose()
+        break
       case 'openSettings':
       case 'openSettingsTab':
         // Settings als Event öffnen — HelpGuide ist geschlossen, App hört darauf
@@ -331,7 +341,7 @@ const HelpGraphInner: React.FC<{ onClose: () => void }> = ({ onClose }) => {
         window.dispatchEvent(new CustomEvent('mindgraph:showBriefing'))
         break
     }
-  }, [openDashboardTab, onClose])
+  }, [openDashboardTab, openWorkflowCanvasTab, onClose])
 
   return (
     <div className="help-graph-wrapper">
