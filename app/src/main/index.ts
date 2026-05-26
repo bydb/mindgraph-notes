@@ -6434,6 +6434,9 @@ function getSyncCredentialsPath(): string {
 ipcMain.handle('sync-setup', async (_event, vaultPath: string, passphrase: string, relayUrl: string, autoSyncInterval?: number, activationCode?: string) => {
   try {
     assertApprovedVault(vaultPath, 'sync-setup')
+    // Stop any previous engine first — otherwise its reconnect loop lives on as a
+    // zombie (repeated setups → reconnect storm with "invalid activation code").
+    syncEngine?.disconnect()
     syncEngine = new SyncEngine()
     const result = await syncEngine.init(vaultPath, passphrase, relayUrl, activationCode || '')
     await syncEngine.connect()
@@ -6450,6 +6453,9 @@ ipcMain.handle('sync-setup', async (_event, vaultPath: string, passphrase: strin
 ipcMain.handle('sync-join', async (_event, vaultPath: string, vaultId: string, passphrase: string, relayUrl: string, autoSyncInterval?: number, activationCode?: string) => {
   try {
     assertApprovedVault(vaultPath, 'sync-join')
+    // Stop any previous engine first — otherwise its reconnect loop lives on as a
+    // zombie (repeated setups → reconnect storm with "invalid activation code").
+    syncEngine?.disconnect()
     syncEngine = new SyncEngine()
     await syncEngine.join(vaultPath, vaultId, passphrase, relayUrl, activationCode || '')
     await syncEngine.connect()
@@ -6571,7 +6577,9 @@ ipcMain.handle('sync-restore', async (_event, vaultPath: string, vaultId: string
     const passphrase = safeStorage.decryptString(encrypted)
     if (!passphrase) return false
 
-    // Re-initialize sync engine
+    // Re-initialize sync engine — stop the previous one first to avoid a lingering
+    // zombie engine with its own reconnect loop.
+    syncEngine?.disconnect()
     syncEngine = new SyncEngine()
     await syncEngine.join(vaultPath, vaultId, passphrase, relayUrl)
     await syncEngine.connect()

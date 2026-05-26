@@ -180,6 +180,10 @@ export class SyncEngine {
               console.error('[Sync] Registration rejected:', msg.message || msg.code)
               this.status = 'error'
               this.sendProgress({ status: 'error', error: msg.message || 'Registration rejected' })
+              // Mark as intentional so the 'close' handler below does NOT schedule a
+              // reconnect — otherwise a rejected vault (e.g. invalid activation code)
+              // keeps re-registering forever (zombie engine / reconnect storm).
+              this.intentionalDisconnect = true
               this.ws?.close()
               reject(new Error(msg.message || msg.code || 'Registration rejected'))
               return
