@@ -1007,6 +1007,7 @@ const translations = {
     // Smart Connections
     'smartConnections.folderProximity': 'Ordner-Nähe (5%)',
     'smartConnections.similarNotes': 'Ähnliche Notizen',
+    'smartConnections.reranking': 'KI-Neugewichtung',
     'smartConnections.noSimilar': 'Keine ähnlichen Notizen gefunden',
     'smartConnections.clickRefresh': 'Klicke auf Aktualisieren um zu suchen',
     'smartConnections.selectNote': 'Wähle eine Notiz um ähnliche zu finden',
@@ -3272,6 +3273,7 @@ const translations = {
     // Smart Connections
     'smartConnections.folderProximity': 'Folder proximity (5%)',
     'smartConnections.similarNotes': 'Similar Notes',
+    'smartConnections.reranking': 'AI re-ranking',
     'smartConnections.noSimilar': 'No similar notes found',
     'smartConnections.clickRefresh': 'Click refresh to search',
     'smartConnections.selectNote': 'Select a note to find similar ones',

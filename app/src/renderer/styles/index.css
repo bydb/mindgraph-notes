@@ -13913,10 +13913,36 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
   padding: 0 4px;
 }
 
-.smart-connections-results-header span:first-child {
+.smart-connections-results-header > span:first-child {
   font-size: 12px;
   font-weight: 600;
   color: var(--text-secondary);
+}
+
+.smart-connections-results-header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Reranking-Fortschrittsring (KI-Neugewichtung im Hintergrund) */
+.smart-connections-rerank-ring {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--color-ai);
+}
+
+.smart-connections-rerank-ring svg {
+  display: block;
+}
+
+.smart-connections-rerank-secs {
+  font-size: 10px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-ai);
+  opacity: 0.85;
 }
 
 .smart-connections-results-count {

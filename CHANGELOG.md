@@ -2,6 +2,16 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.7.3-beta] - 2026-05-27
+
+### Improvements
+
+- **Sichtbarer Fortschritt beim KI-Reranking in den Ähnlichen Notizen**: Der LLM-Reranker (Einstellungen → Smart Connections → LLM-Reranker) lief bisher unsichtbar im Hintergrund — man sah weder, dass er arbeitete, noch wie lange es dauert. Jetzt zeigt ein kleiner Fortschrittsring im Ergebnis-Header die laufende Neugewichtung an, inklusive Sekunden-Zähler, und verschwindet automatisch, sobald die Liste neu sortiert ist.
+
+### Fixes
+
+- **Farblicher Fehlerhinweis in den Einstellungen wieder sichtbar**: An mehreren Stellen wurde auf eine nicht definierte Farbvariable verwiesen (`--color-error`/`--color-primary`). In den Einstellungen führte das dazu, dass Fehler- und „Entfernen"-Texte gar nicht mehr rot, sondern in normaler Textfarbe erschienen. Alle Verweise nutzen jetzt die echten, theme-fähigen Farbtokens — Dashboard, Terminkonflikt-Hinweise und Einstellungen färben im hellen wie im dunklen Modus konsistent.
+
 ## [0.7.2-beta] - 2026-05-26
 
 ### Improvements

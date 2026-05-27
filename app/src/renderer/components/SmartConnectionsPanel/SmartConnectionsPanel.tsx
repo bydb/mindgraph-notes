@@ -339,6 +339,34 @@ function cosineSimilarity(a: number[], b: number[]): number {
   return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB))
 }
 
+// Radialer Fortschrittsring für das Hintergrund-Reranking (KI-Schritt → --color-ai).
+// Reranking läuft pro Kandidat (~1-3s/Paar), daher determinierter Ring + Sekunden-Zähler.
+const RerankRing: React.FC<{ percent: number; seconds: number; label: string }> = ({ percent, seconds, label }) => {
+  const r = 7
+  const circumference = 2 * Math.PI * r
+  const clamped = Math.min(100, Math.max(0, percent))
+  const offset = circumference * (1 - clamped / 100)
+  return (
+    <span
+      className="smart-connections-rerank-ring"
+      title={`${label} ${Math.round(clamped)}% · ${seconds}s`}
+      aria-label={`${label} ${Math.round(clamped)} Prozent`}
+    >
+      <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
+        <circle cx="9" cy="9" r={r} fill="none" stroke="var(--border-color)" strokeWidth="2" />
+        <circle
+          cx="9" cy="9" r={r} fill="none"
+          stroke="var(--color-ai)" strokeWidth="2" strokeLinecap="round"
+          strokeDasharray={circumference} strokeDashoffset={offset}
+          transform="rotate(-90 9 9)"
+          style={{ transition: 'stroke-dashoffset 0.3s ease' }}
+        />
+      </svg>
+      <span className="smart-connections-rerank-secs">{seconds}s</span>
+    </span>
+  )
+}
+
 export const SmartConnectionsPanel: React.FC<SmartConnectionsPanelProps> = ({ onClose }) => {
   const { t } = useTranslation()
   const { notes, selectedNoteId, selectNote, vaultPath } = useNotesStore()
@@ -363,7 +391,25 @@ export const SmartConnectionsPanel: React.FC<SmartConnectionsPanelProps> = ({ on
   const [pendingNotes, setPendingNotes] = useState<string[]>([]) // IDs of notes needing embedding
   const [isIntegrating, setIsIntegrating] = useState(false)
   const [rerankerStatus, setRerankerStatus] = useState<RerankerProgress | null>(null)
+  const [rerankerElapsed, setRerankerElapsed] = useState(0)
   const [error, setError] = useState<string | null>(null)
+
+  // Sekunden-Zähler nur, solange der Reranker tatsächlich läuft. Dependency ist
+  // bewusst der Bool (nicht rerankerStatus selbst) — sonst würde jeder Prozent-Tick
+  // den Startzeitpunkt zurücksetzen.
+  const isReranking = rerankerStatus !== null
+  useEffect(() => {
+    if (!isReranking) {
+      setRerankerElapsed(0)
+      return
+    }
+    const start = Date.now()
+    setRerankerElapsed(0)
+    const id = setInterval(() => {
+      setRerankerElapsed(Math.round((Date.now() - start) / 1000))
+    }, 500)
+    return () => clearInterval(id)
+  }, [isReranking])
 
   // Aktuelle Notiz
   const currentNote = useMemo(() => {
@@ -893,12 +939,6 @@ export const SmartConnectionsPanel: React.FC<SmartConnectionsPanelProps> = ({ on
                   />
                 </div>
                 <p>{t('smartConnections.calculating')}... {progress.current}/{progress.total}</p>
-                {rerankerStatus && (
-                  <p style={{ fontSize: 12, opacity: 0.7, marginTop: 4 }}>
-                    Reranker: {rerankerStatus.file ?? rerankerStatus.status ?? '…'}
-                    {typeof rerankerStatus.percent === 'number' ? ` (${Math.round(rerankerStatus.percent)}%)` : ''}
-                  </p>
-                )}
               </div>
             ) : error ? (
               <div className="smart-connections-error">
@@ -918,7 +958,16 @@ export const SmartConnectionsPanel: React.FC<SmartConnectionsPanelProps> = ({ on
               <div className="smart-connections-results">
                 <div className="smart-connections-results-header">
                   <span>{t('smartConnections.similarNotes')}</span>
-                  <span className="smart-connections-results-count">{similarNotes.length}</span>
+                  <div className="smart-connections-results-header-right">
+                    {rerankerStatus && (
+                      <RerankRing
+                        percent={rerankerStatus.percent ?? 0}
+                        seconds={rerankerElapsed}
+                        label={t('smartConnections.reranking')}
+                      />
+                    )}
+                    <span className="smart-connections-results-count">{similarNotes.length}</span>
+                  </div>
                 </div>
                 <div className="smart-connections-legend">
                   <span className="smart-connections-legend-item" title={t('smartConnections.keywordMatchTooltip')}>
