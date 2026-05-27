@@ -5,13 +5,96 @@ import { useUIStore } from '../../stores/uiStore'
 import { useNotesStore } from '../../stores/notesStore'
 import { useProjectStatusStore } from '../../stores/projectStatusStore'
 import { useTranslation } from '../../utils/translations'
-import { sanitizeHtml } from '../../utils/sanitize'
+import { sanitizeHtml, sanitizeEmailHtml } from '../../utils/sanitize'
 import { matchEmailToProjects } from '../../utils/projectMatch'
 import { ComposeView } from './ComposeView'
 import { EmailAIChatView } from './EmailAIChatView'
 import { FolderPicker } from './FolderPicker'
+import type { EmailMessage } from '../../../shared/types'
 
 const isMac = window.electronAPI.platform === 'darwin'
+
+// URLs und E-Mail-Adressen im Klartext-Body anklickbar machen. Bewusst tolerant, aber
+// ohne Satzzeichen am Ende in die URL zu ziehen.
+const BODY_LINK_RE = /(https?:\/\/[^\s<>"']+)|(www\.[^\s<>"']+)|([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,})/g
+
+function linkifyText(text: string, onLink: (href: string) => void): React.ReactNode[] {
+  const nodes: React.ReactNode[] = []
+  let last = 0
+  let key = 0
+  let m: RegExpExecArray | null
+  BODY_LINK_RE.lastIndex = 0
+  while ((m = BODY_LINK_RE.exec(text)) !== null) {
+    if (m.index > last) nodes.push(text.slice(last, m.index))
+    const raw = m[0]
+    const trail = raw.match(/[.,;:!?)\]}>"']+$/)?.[0] || ''
+    const core = trail ? raw.slice(0, raw.length - trail.length) : raw
+    const href = m[3] ? `mailto:${core}` : (m[2] ? `https://${core}` : core)
+    nodes.push(
+      <a key={`lnk-${key++}`} href={href} className="inbox-body-link" onClick={(e) => { e.preventDefault(); onLink(href) }}>{core}</a>
+    )
+    if (trail) nodes.push(trail)
+    last = m.index + raw.length
+  }
+  if (last < text.length) nodes.push(text.slice(last))
+  return nodes
+}
+
+function base64ToUtf8(b64: string): string {
+  try {
+    const bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0))
+    return new TextDecoder('utf-8').decode(bytes)
+  } catch {
+    return ''
+  }
+}
+
+interface ParsedIcsEvent { title: string; startIso: string; durationMinutes: number; notes: string }
+
+function parseIcsDate(value: string): Date | null {
+  const m = value.trim().match(/^(\d{4})(\d{2})(\d{2})(?:T(\d{2})(\d{2})(\d{2})(Z)?)?$/)
+  if (!m) return null
+  const [, y, mo, d, hh, mi, ss, z] = m
+  if (!hh) return new Date(+y, +mo - 1, +d, 0, 0, 0) // reines Datum
+  if (z) return new Date(Date.UTC(+y, +mo - 1, +d, +hh, +mi, +(ss || '0')))
+  // Ohne Z (auch bei TZID): als lokale Zeit interpretieren — pragmatisch, deckt Buchungssysteme ab.
+  return new Date(+y, +mo - 1, +d, +hh, +mi, +(ss || '0'))
+}
+
+// Erstes VEVENT aus einer .ics-Datei in ein Kalender-Event übersetzen.
+function parseIcsEvent(ics: string): ParsedIcsEvent | null {
+  const unfolded = ics.replace(/\r?\n[ \t]/g, '') // RFC5545 line-unfolding
+  const lines = unfolded.split(/\r?\n/)
+  let inEvent = false
+  const fields: Record<string, string> = {}
+  for (const line of lines) {
+    if (line === 'BEGIN:VEVENT') { inEvent = true; continue }
+    if (line === 'END:VEVENT') break
+    if (!inEvent) continue
+    const idx = line.indexOf(':')
+    if (idx === -1) continue
+    const left = line.slice(0, idx)
+    const semi = left.indexOf(';')
+    const name = (semi === -1 ? left : left.slice(0, semi)).toUpperCase()
+    if (!(name in fields)) fields[name] = line.slice(idx + 1)
+  }
+  const decode = (s: string) => s.replace(/\\n/gi, '\n').replace(/\\,/g, ',').replace(/\\;/g, ';').replace(/\\\\/g, '\\')
+  if (!fields['DTSTART']) return null
+  const start = parseIcsDate(fields['DTSTART'])
+  if (!start || isNaN(start.getTime())) return null
+  let durationMinutes = 60
+  if (fields['DTEND']) {
+    const end = parseIcsDate(fields['DTEND'])
+    if (end && !isNaN(end.getTime())) {
+      const diff = Math.round((end.getTime() - start.getTime()) / 60000)
+      if (diff > 0) durationMinutes = diff
+    }
+  }
+  const title = decode(fields['SUMMARY'] || 'Termin')
+  const loc = fields['LOCATION'] ? `Ort: ${decode(fields['LOCATION'])}` : ''
+  const desc = fields['DESCRIPTION'] ? decode(fields['DESCRIPTION']) : ''
+  return { title, startIso: start.toISOString(), durationMinutes, notes: [loc, desc].filter(Boolean).join('\n\n') }
+}
 
 interface InboxPanelProps {
   onClose: () => void
@@ -53,6 +136,7 @@ export const InboxPanel: React.FC<InboxPanelProps> = ({ onClose }) => {
   const emails = useEmailStore(state => state.emails)
   const folders = useEmailStore(s => s.folders)
   const moveEmail = useEmailStore(s => s.moveEmail)
+  const fetchAttachments = useEmailStore(s => s.fetchAttachments)
   const [searchQuery, setSearchQuery] = useState('')
   const [reminderStatus, setReminderStatus] = useState<Record<number, 'loading' | 'success' | 'error'>>({})
   const [showSummary, setShowSummary] = useState(false)
@@ -60,6 +144,123 @@ export const InboxPanel: React.FC<InboxPanelProps> = ({ onClose }) => {
   const [showMoveDropdown, setShowMoveDropdown] = useState(false)
   const [moveStatus, setMoveStatus] = useState<'idle' | 'moving' | 'error'>('idle')
   const [moveError, setMoveError] = useState<string>('')
+  // Body-Ansicht (Text mit klickbaren Links ↔ sanitisiertes HTML) + Anhang-Handling.
+  const [bodyHtmlView, setBodyHtmlView] = useState(false)
+  const [attachmentList, setAttachmentList] = useState<Array<{ filename: string; contentType: string; size: number; contentBase64: string | null; tooLarge: boolean }> | null>(null)
+  const [attachmentError, setAttachmentError] = useState('')
+  const [attachmentAction, setAttachmentAction] = useState<Record<number, 'busy' | 'done' | 'error'>>({})
+  const [icsMsg, setIcsMsg] = useState('')
+
+  // Body-/Anhang-State bei Mailwechsel zurücksetzen (sonst Leak aus der vorherigen Mail).
+  useEffect(() => {
+    setBodyHtmlView(false)
+    setAttachmentList(null)
+    setAttachmentError('')
+    setAttachmentAction({})
+    setIcsMsg('')
+  }, [selectedEmailId])
+
+  const openLink = useCallback((href: string) => {
+    if (/^https?:\/\//i.test(href) || /^mailto:/i.test(href)) {
+      window.electronAPI.openExternal(href)
+    }
+  }, [])
+
+  // Links im sanitisierten HTML-Body abfangen → immer extern öffnen, nie In-App-Navigation.
+  const handleBodyHtmlClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    const el = (e.target as HTMLElement).closest('a[href]') as HTMLAnchorElement | null
+    if (!el) return
+    e.preventDefault()
+    openLink(el.getAttribute('href') || '')
+  }, [openLink])
+
+  const renderEmailBody = useCallback((email: EmailMessage) => {
+    if (bodyHtmlView && email.bodyHtml) {
+      return (
+        <div
+          className="inbox-body-html"
+          onClick={handleBodyHtmlClick}
+          dangerouslySetInnerHTML={{ __html: sanitizeEmailHtml(email.bodyHtml) }}
+        />
+      )
+    }
+    return <pre>{linkifyText(email.bodyText, openLink)}</pre>
+  }, [bodyHtmlView, handleBodyHtmlClick, openLink])
+
+  const renderBodyBlock = useCallback((email: EmailMessage) => (
+    <div className="inbox-analysis-section">
+      {email.bodyHtml && (
+        <button
+          className="inbox-bodyview-toggle"
+          onClick={() => setBodyHtmlView(v => !v)}
+          data-tooltip={bodyHtmlView ? t('inbox.detail.textView') : t('inbox.detail.htmlView')}
+        >
+          {bodyHtmlView ? t('inbox.detail.textView') : t('inbox.detail.htmlView')}
+        </button>
+      )}
+      <div className="inbox-original-text">
+        {renderEmailBody(email)}
+      </div>
+    </div>
+  ), [bodyHtmlView, renderEmailBody, t])
+
+  // Anhänge bei Bedarf vom Server nachladen (Inhalt wird beim Abruf nicht gespeichert).
+  const ensureAttachments = useCallback(async () => {
+    if (attachmentList) return attachmentList
+    if (!selectedEmailId) return null
+    setAttachmentError('')
+    const res = await fetchAttachments(selectedEmailId)
+    if (!res.success || !res.attachments) {
+      setAttachmentError(res.error || t('inbox.detail.attachmentError'))
+      return null
+    }
+    setAttachmentList(res.attachments)
+    return res.attachments
+  }, [attachmentList, selectedEmailId, fetchAttachments, t])
+
+  const handleAttachment = useCallback(async (index: number, action: 'save' | 'calendar') => {
+    setAttachmentAction(s => ({ ...s, [index]: 'busy' }))
+    setIcsMsg('')
+    setAttachmentError('')
+    try {
+      const list = await ensureAttachments()
+      const att = list?.[index]
+      if (!att || !att.contentBase64) {
+        setAttachmentError(att?.tooLarge ? t('inbox.detail.attachmentTooLarge') : t('inbox.detail.attachmentError'))
+        setAttachmentAction(s => ({ ...s, [index]: 'error' }))
+        return
+      }
+      if (action === 'calendar') {
+        const ev = parseIcsEvent(base64ToUtf8(att.contentBase64))
+        if (!ev) {
+          setAttachmentError(t('inbox.detail.icsParseError'))
+          setAttachmentAction(s => ({ ...s, [index]: 'error' }))
+          return
+        }
+        const r = await window.electronAPI.calendarCreateEvent(ev)
+        if (r.success) {
+          setIcsMsg(t('inbox.detail.icsAdded'))
+          setAttachmentAction(s => ({ ...s, [index]: 'done' }))
+        } else {
+          setAttachmentError(r.error || t('inbox.detail.icsParseError'))
+          setAttachmentAction(s => ({ ...s, [index]: 'error' }))
+        }
+      } else {
+        const r = await window.electronAPI.emailSaveAttachment(att.filename, att.contentBase64)
+        if (r.success) {
+          setAttachmentAction(s => ({ ...s, [index]: 'done' }))
+        } else if (r.canceled) {
+          setAttachmentAction(s => { const n = { ...s }; delete n[index]; return n })
+        } else {
+          setAttachmentError(r.error || t('inbox.detail.attachmentError'))
+          setAttachmentAction(s => ({ ...s, [index]: 'error' }))
+        }
+      }
+    } catch (e) {
+      setAttachmentError(e instanceof Error ? e.message : t('inbox.detail.attachmentError'))
+      setAttachmentAction(s => ({ ...s, [index]: 'error' }))
+    }
+  }, [ensureAttachments, t])
 
   useEffect(() => {
     if (vaultPath && projectsRootFolder && projectsLastLoadedAt === null) {
@@ -457,20 +658,49 @@ export const InboxPanel: React.FC<InboxPanelProps> = ({ onClose }) => {
                 </div>
               )}
 
-              {/* Attachment indicator */}
-              {selectedEmail.hasAttachments && (
+              {/* Attachments: Inhalt wird on-demand vom Server geladen (siehe handleAttachment) */}
+              {selectedEmail.hasAttachments && selectedEmail.attachmentNames && selectedEmail.attachmentNames.length > 0 && (
                 <div className="inbox-attachment-info">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48" />
-                  </svg>
-                  <span>
-                    {selectedEmail.attachmentNames?.length === 1
-                      ? selectedEmail.attachmentNames[0]
-                      : `${selectedEmail.attachmentNames?.length || ''} ${t('inbox.detail.attachments')}`}
-                  </span>
-                  {selectedEmail.attachmentNames && selectedEmail.attachmentNames.length > 1 && (
-                    <span className="inbox-attachment-names">{selectedEmail.attachmentNames.join(', ')}</span>
-                  )}
+                  <div className="inbox-attachment-header">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48" />
+                    </svg>
+                    <span>{selectedEmail.attachmentNames.length} {t('inbox.detail.attachments')}</span>
+                  </div>
+                  <div className="inbox-attachment-list">
+                    {selectedEmail.attachmentNames.map((name, i) => {
+                      const loaded = attachmentList?.[i]
+                      const displayName = loaded?.filename || name
+                      const isIcs = /\.ics$/i.test(displayName) || !!loaded?.contentType?.toLowerCase().includes('calendar')
+                      const status = attachmentAction[i]
+                      const busy = status === 'busy'
+                      return (
+                        <div key={i} className="inbox-attachment-row">
+                          <span className="inbox-attachment-name" title={displayName}>{displayName}</span>
+                          <span className="inbox-attachment-actions">
+                            {isIcs && isMac && (
+                              <button
+                                className="inbox-attachment-btn"
+                                onClick={() => handleAttachment(i, 'calendar')}
+                                disabled={busy}
+                              >
+                                {status === 'done' ? '✓' : '📅'} {t('inbox.detail.addToCalendar')}
+                              </button>
+                            )}
+                            <button
+                              className="inbox-attachment-btn"
+                              onClick={() => handleAttachment(i, 'save')}
+                              disabled={busy}
+                            >
+                              {busy ? '…' : '💾'} {t('inbox.detail.saveAttachment')}
+                            </button>
+                          </span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                  {icsMsg && <div className="inbox-attachment-ok">{icsMsg}</div>}
+                  {attachmentError && <div className="inbox-attachment-err">{attachmentError}</div>}
                 </div>
               )}
 
@@ -710,11 +940,7 @@ export const InboxPanel: React.FC<InboxPanelProps> = ({ onClose }) => {
                     </div>
                   )}
 
-                  <div className="inbox-analysis-section">
-                    <div className="inbox-original-text">
-                      <pre>{selectedEmail.bodyText}</pre>
-                    </div>
-                  </div>
+                  {renderBodyBlock(selectedEmail)}
 
                   {selectedEmail.analysis.summary && (
                     <>
@@ -821,11 +1047,7 @@ export const InboxPanel: React.FC<InboxPanelProps> = ({ onClose }) => {
               )
             })()}
 
-            {!selectedEmail.analysis && (
-              <div className="inbox-original-text">
-                <pre>{selectedEmail.bodyText}</pre>
-              </div>
-            )}
+            {!selectedEmail.analysis && renderBodyBlock(selectedEmail)}
 
           </div>
         </div>

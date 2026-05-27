@@ -61,6 +61,48 @@ export function sanitizeHtml(dirty: string): string {
   })
 }
 
+// Erlaubte Tags/Attribute für die optionale HTML-Ansicht empfangener E-Mails.
+// Bewusst OHNE img/iframe/svg/style/script/form: keine Remote-Ressourcen → keine Tracking-Pixel,
+// kein Nachladen externer Inhalte. Links bleiben erhalten, werden aber im Renderer abgefangen
+// und über open-external im Browser geöffnet (nie In-App-Navigation).
+const EMAIL_ALLOWED_TAGS = [
+  'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'div', 'span', 'pre', 'code',
+  'blockquote', 'ul', 'ol', 'li', 'hr', 'br', 'wbr',
+  'table', 'thead', 'tbody', 'tfoot', 'tr', 'th', 'td', 'caption', 'colgroup', 'col',
+  'a', 'strong', 'em', 'b', 'i', 'u', 's', 'strike', 'del', 'ins', 'mark', 'sub', 'sup',
+  'abbr', 'small', 'center', 'font', 'figure', 'figcaption',
+]
+const EMAIL_ALLOWED_ATTR = [
+  'href', 'title', 'target', 'rel', 'class', 'style', 'align', 'valign',
+  'width', 'height', 'colspan', 'rowspan', 'bgcolor', 'color', 'face', 'size', 'dir', 'lang',
+]
+
+/**
+ * Sanitize the HTML body of a received email for the opt-in "HTML view".
+ * Strips all remote-loading elements (img/iframe/style/svg) so no tracking pixels or
+ * external resources are fetched, and neutralizes url(...) inside inline styles.
+ * Links survive but should be opened via open-external on click, never navigated in-app.
+ */
+export function sanitizeEmailHtml(dirty: string): string {
+  const stripUrlInStyle = (node: Element) => {
+    const style = node.getAttribute?.('style')
+    if (style && /url\s*\(/i.test(style)) {
+      node.setAttribute('style', style.replace(/url\s*\([^)]*\)/gi, ''))
+    }
+  }
+  DOMPurify.addHook('afterSanitizeAttributes', stripUrlInStyle)
+  try {
+    return DOMPurify.sanitize(dirty, {
+      ALLOWED_TAGS: EMAIL_ALLOWED_TAGS,
+      ALLOWED_ATTR: EMAIL_ALLOWED_ATTR,
+      FORBID_TAGS: ['img', 'iframe', 'script', 'style', 'link', 'meta', 'object', 'embed', 'video', 'audio', 'source', 'svg', 'form', 'input', 'button', 'textarea', 'select', 'base'],
+      ALLOW_DATA_ATTR: false,
+    })
+  } finally {
+    DOMPurify.removeHook('afterSanitizeAttributes')
+  }
+}
+
 /**
  * Sanitize SVG content specifically.
  * More restrictive — strips foreignObject and any non-SVG elements.

@@ -2,6 +2,13 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.7.4-beta] - 2026-05-27
+
+### Features
+
+- **Klickbare Links in empfangenen E-Mails**: Links im Mail-Text lassen sich jetzt direkt anklicken und öffnen im Standard-Browser — bisher war der Mail-Inhalt reiner, toter Text. Zusätzlich gibt es einen Umschalter zwischen Text- und HTML-Ansicht: Die HTML-Ansicht zeigt die Mail formatiert und macht auch Links sichtbar, die hinter einem Linktext wie „hier buchen" versteckt sind. Bilder und externe Inhalte werden dabei bewusst blockiert, damit keine Tracking-Pixel nachgeladen werden.
+- **Anhänge öffnen und speichern**: E-Mail-Anhänge können jetzt gespeichert werden — der Inhalt wird bei Bedarf direkt vom Postfach nachgeladen und landet nicht dauerhaft in der lokalen Datenbank. Kalender-Einladungen (`.ics`) bieten auf macOS zusätzlich „In Kalender": Titel, Zeit und Ort werden ausgelesen und der Termin direkt im Kalender angelegt. Anhänge ohne eigenen Dateinamen erhalten automatisch die passende Dateiendung (z. B. `.ics`, `.pdf`), damit sie sich überhaupt öffnen lassen.
+
 ## [0.7.3-beta] - 2026-05-27
 
 ### Improvements

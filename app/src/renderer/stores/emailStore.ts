@@ -34,6 +34,7 @@ interface EmailState {
   loadFolders: (accountId: string, force?: boolean) => Promise<void>
   setActiveFolder: (accountId: string, folder: string) => void
   moveEmail: (vaultPath: string, emailId: string, destinationFolder: string) => Promise<{ success: boolean; error?: string }>
+  fetchAttachments: (emailId: string) => Promise<{ success: boolean; attachments?: Array<{ filename: string; contentType: string; size: number; contentBase64: string | null; tooLarge: boolean }>; error?: string }>
   analyzeEmails: (vaultPath: string, emailIds?: string[]) => Promise<void>
   reanalyzeEmail: (vaultPath: string, emailId: string) => Promise<void>
   setupEmail: (vaultPath: string) => Promise<boolean>
@@ -463,6 +464,32 @@ export const useEmailStore = create<EmailState>()((set, get) => ({
     } catch (error) {
       console.error('[EmailStore] moveEmail failed:', error)
       return { success: false, error: error instanceof Error ? error.message : 'Move fehlgeschlagen' }
+    }
+  },
+
+  fetchAttachments: async (emailId: string) => {
+    const { emails } = get()
+    const email = emails.find(e => e.id === emailId)
+    if (!email) return { success: false, error: 'Mail nicht gefunden' }
+    if (!email.uid) return { success: false, error: 'Mail hat keine IMAP-UID' }
+
+    const { email: emailSettings } = useUIStore.getState()
+    const account = emailSettings.accounts.find(a => a.id === email.accountId)
+    if (!account) return { success: false, error: 'Account nicht gefunden' }
+
+    try {
+      return await window.electronAPI.emailFetchAttachments({
+        accountId: account.id,
+        host: account.host,
+        port: account.port,
+        user: account.user,
+        tls: account.tls,
+        folder: email.folder || 'INBOX',
+        uid: email.uid
+      })
+    } catch (error) {
+      console.error('[EmailStore] fetchAttachments failed:', error)
+      return { success: false, error: error instanceof Error ? error.message : 'Anhänge konnten nicht geladen werden' }
     }
   },
 

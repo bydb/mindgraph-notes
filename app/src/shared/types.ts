@@ -939,6 +939,8 @@ export interface ElectronAPI {
 
   // Email attachments
   emailSelectAttachments: () => Promise<ComposeAttachment[]>;
+  emailFetchAttachments: (payload: { accountId: string; host: string; port: number; user: string; tls: boolean; folder: string; uid: number }) => Promise<{ success: boolean; attachments?: Array<{ filename: string; contentType: string; size: number; contentBase64: string | null; tooLarge: boolean }>; error?: string }>;
+  emailSaveAttachment: (filename: string, contentBase64: string) => Promise<{ success: boolean; path?: string; canceled?: boolean; error?: string }>;
 
   // Transport (Quick Capture)
   transportGetConfig: () => Promise<{ vaultPath: string | null; transport: { destinations: { label: string; folder: string }[]; predefinedTags: string[]; defaultDestinationIndex: number } | null }>;
@@ -1220,6 +1222,9 @@ export interface EmailMessage {
   date: string            // ISO
   snippet: string         // Erste ~200 Zeichen
   bodyText: string
+  /** Original-HTML-Body (gekappt), nur für die optionale HTML-Ansicht in der Detail-View.
+   *  Wird im Renderer via sanitizeEmailHtml() entschärft (Remote-Bilder blockiert). */
+  bodyHtml?: string
   flags: string[]         // \Seen, \Flagged etc.
   fetchedAt: string
   analysis?: EmailAnalysis

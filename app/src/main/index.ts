@@ -5787,7 +5787,9 @@ ipcMain.handle('download-update', async () => {
 })
 
 ipcMain.handle('open-external', async (_event, url: string) => {
-  if (url.startsWith('https://')) {
+  // Nur Protokolle freigeben, die gefahrlos an die OS-Shell gehen dürfen.
+  // https/http → Browser, mailto → Standard-Mailprogramm. file:/javascript: etc. bleiben blockiert.
+  if (/^https?:\/\//i.test(url) || /^mailto:/i.test(url)) {
     await shell.openExternal(url)
     return true
   }
@@ -6851,6 +6853,140 @@ ipcMain.handle('email-move', async (
   }
 })
 
+// Sinnvolle Dateiendung aus dem MIME-ContentType ableiten (für Anhänge ohne filename).
+function extensionForContentType(ct?: string): string {
+  const type = (ct || '').split(';')[0].trim().toLowerCase()
+  const map: Record<string, string> = {
+    'text/calendar': 'ics',
+    'text/html': 'html',
+    'text/plain': 'txt',
+    'text/csv': 'csv',
+    'application/pdf': 'pdf',
+    'application/msword': 'doc',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',
+    'application/vnd.ms-excel': 'xls',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'xlsx',
+    'application/vnd.ms-powerpoint': 'ppt',
+    'application/vnd.openxmlformats-officedocument.presentationml.presentation': 'pptx',
+    'application/zip': 'zip',
+    'application/json': 'json',
+    'application/xml': 'xml',
+    'image/png': 'png',
+    'image/jpeg': 'jpg',
+    'image/gif': 'gif',
+    'image/webp': 'webp',
+    'image/svg+xml': 'svg',
+  }
+  if (map[type]) return map[type]
+  const sub = type.split('/')[1]
+  if (sub && sub !== 'octet-stream' && /^[a-z0-9.+-]{1,12}$/.test(sub)) {
+    return sub.split('+')[0] // z.B. 'svg+xml' → 'svg'
+  }
+  return 'bin'
+}
+
+// Anzeigename für einen Anhang: echter Dateiname, sonst 'Anhang-N.<ext>' aus dem ContentType.
+function attachmentNameFor(filename: string | undefined, contentType: string | undefined, index: number): string {
+  if (filename && filename.trim()) return filename.trim()
+  return `Anhang-${index + 1}.${extensionForContentType(contentType)}`
+}
+
+// Anhänge einer einzelnen Mail on-demand vom Server holen.
+// Begründung: Beim Abruf (email-fetch) werden nur die Anhang-Dateinamen gespeichert, nicht der Inhalt
+// (sonst würde emails.json explodieren). Zum Öffnen/Speichern holen wir die Nachricht per UID neu.
+ipcMain.handle('email-fetch-attachments', async (
+  _event,
+  payload: {
+    accountId: string
+    host: string
+    port: number
+    user: string
+    tls: boolean
+    folder: string
+    uid: number
+  }
+) => {
+  try {
+    if (!payload.uid || !payload.folder) {
+      return { success: false, error: 'Unvollständige Parameter' }
+    }
+    const { ImapFlow } = await import('imapflow')
+    const password = await loadEmailPassword(payload.accountId)
+    if (!password) {
+      return { success: false, error: 'Kein Passwort gespeichert' }
+    }
+
+    const client = new ImapFlow({
+      host: payload.host,
+      port: payload.port,
+      secure: payload.tls,
+      auth: { user: payload.user, pass: password },
+      logger: false,
+      socketTimeout: 30000,
+      greetingTimeout: 10000
+    })
+    client.on('error', () => { /* ignore */ })
+
+    try {
+      await client.connect()
+      const lock = await client.getMailboxLock(payload.folder)
+      try {
+        let source: Buffer | null = null
+        for await (const msg of client.fetch({ uid: String(payload.uid) }, { source: true, uid: true })) {
+          if (msg.source) source = msg.source as Buffer
+        }
+        if (!source) {
+          return { success: false, error: 'Nachricht nicht gefunden' }
+        }
+        const { simpleParser } = await import('mailparser')
+        const parsed = await simpleParser(source)
+        const MAX_ATTACHMENT_BYTES = 30 * 1024 * 1024 // 30 MB pro Anhang
+        const attachments = (parsed.attachments || []).map((a: { filename?: string; contentType?: string; size?: number; content?: Buffer }, idx: number) => {
+          const buf = a.content
+          const size = a.size ?? (buf ? buf.length : 0)
+          const tooLarge = size > MAX_ATTACHMENT_BYTES
+          return {
+            filename: attachmentNameFor(a.filename, a.contentType, idx),
+            contentType: a.contentType || 'application/octet-stream',
+            size,
+            // Bei Überschreitung nur Metadaten zurückgeben (kein Riesen-Payload über IPC).
+            contentBase64: tooLarge || !buf ? null : buf.toString('base64'),
+            tooLarge
+          }
+        })
+        return { success: true, attachments }
+      } finally {
+        lock.release()
+      }
+    } finally {
+      try { await client.logout() } catch { /* ignore */ }
+    }
+  } catch (error) {
+    console.error('[Email] Fetch attachments failed:', error instanceof Error ? error.message : error)
+    return { success: false, error: error instanceof Error ? error.message : 'Anhänge konnten nicht geladen werden' }
+  }
+})
+
+// Einen (bereits via email-fetch-attachments geholten) Anhang über einen Speichern-Dialog ablegen.
+ipcMain.handle('email-save-attachment', async (_event, filename: string, contentBase64: string) => {
+  try {
+    if (!contentBase64) return { success: false, error: 'Kein Inhalt' }
+    const safeName = (filename || 'Anhang').replace(/[/\\]/g, '_')
+    const win = BrowserWindow.getFocusedWindow() || BrowserWindow.getAllWindows()[0]
+    const result = win
+      ? await dialog.showSaveDialog(win, { defaultPath: safeName })
+      : await dialog.showSaveDialog({ defaultPath: safeName })
+    if (result.canceled || !result.filePath) {
+      return { success: false, canceled: true }
+    }
+    await fs.writeFile(result.filePath, Buffer.from(contentBase64, 'base64'))
+    return { success: true, path: result.filePath }
+  } catch (error) {
+    console.error('[Email] Save attachment failed:', error instanceof Error ? error.message : error)
+    return { success: false, error: error instanceof Error ? error.message : 'Speichern fehlgeschlagen' }
+  }
+})
+
 // Emails laden (JSON-Persistenz) — bereinigt alte E-Mails nach retainDays
 ipcMain.handle('email-load', async (_event, vaultPath: string) => {
   console.log(`[Email] email-load called: vault=${vaultPath}`)
@@ -7001,6 +7137,7 @@ ipcMain.handle('email-fetch', async (_event, vaultPath: string, accounts: Array<
 
             // Body-Text extrahieren mit mailparser
             let bodyText = ''
+            let bodyHtml = ''
             let hasAttachments = false
             let attachmentNames: string[] = []
             if (msg.source) {
@@ -7008,9 +7145,14 @@ ipcMain.handle('email-fetch', async (_event, vaultPath: string, accounts: Array<
                 const { simpleParser } = await import('mailparser')
                 const parsed = await simpleParser(msg.source)
                 bodyText = parsed.text || ''
+                // Original-HTML für die optionale HTML-Ansicht aufbewahren (gekappt gegen emails.json-Bloat).
+                // Sanitisierung passiert erst im Renderer (sanitizeEmailHtml) — hier nur Rohdaten.
+                if (typeof parsed.html === 'string' && parsed.html) {
+                  bodyHtml = parsed.html.length > 600000 ? parsed.html.slice(0, 600000) : parsed.html
+                }
                 if (parsed.attachments && parsed.attachments.length > 0) {
                   hasAttachments = true
-                  attachmentNames = parsed.attachments.map((a: { filename?: string }) => a.filename || 'Anhang').filter(Boolean)
+                  attachmentNames = parsed.attachments.map((a: { filename?: string; contentType?: string }, idx: number) => attachmentNameFor(a.filename, a.contentType, idx))
                 }
                 // Fallback: HTML zu Text wenn kein Plain-Text
                 if (!bodyText.trim() && parsed.html) {
@@ -7051,6 +7193,7 @@ ipcMain.handle('email-fetch', async (_event, vaultPath: string, accounts: Array<
               date: msg.envelope?.date ? new Date(msg.envelope.date).toISOString() : new Date().toISOString(),
               snippet: bodyText.substring(0, 200),
               bodyText,
+              bodyHtml: bodyHtml || undefined,
               flags: Array.from(msg.flags || []),
               fetchedAt: new Date().toISOString(),
               hasAttachments,

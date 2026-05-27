@@ -11111,9 +11111,9 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
 
 .inbox-attachment-info {
   display: flex;
-  align-items: center;
+  flex-direction: column;
   gap: 6px;
-  padding: 6px 10px;
+  padding: 8px 10px;
   background: var(--bg-secondary);
   border-radius: var(--radius-sm);
   font-size: 12px;
@@ -11121,9 +11121,127 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
   margin-top: 4px;
 }
 
-.inbox-attachment-names {
-  color: var(--text-muted);
+.inbox-attachment-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-secondary);
+}
+
+.inbox-attachment-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.inbox-attachment-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: space-between;
+  padding: 4px 6px;
+  background: var(--bg-primary);
+  border-radius: var(--radius-sm);
+}
+
+.inbox-attachment-name {
+  color: var(--text-primary);
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+}
+
+.inbox-attachment-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.inbox-attachment-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border: 1px solid var(--border);
+  background: var(--bg-secondary);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
   font-size: 11px;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+  white-space: nowrap;
+}
+
+.inbox-attachment-btn:hover:not(:disabled) {
+  color: var(--text-primary);
+  border-color: var(--accent);
+}
+
+.inbox-attachment-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.inbox-attachment-ok {
+  color: var(--success, #16a34a);
+  font-size: 11px;
+}
+
+.inbox-attachment-err {
+  color: var(--danger, #dc2626);
+  font-size: 11px;
+}
+
+.inbox-bodyview-toggle {
+  align-self: flex-end;
+  padding: 4px 10px;
+  margin-bottom: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg-secondary);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  font-size: 11px;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.inbox-bodyview-toggle:hover {
+  color: var(--text-primary);
+  border-color: var(--accent);
+}
+
+.inbox-body-link {
+  color: var(--accent);
+  text-decoration: underline;
+  cursor: pointer;
+  word-break: break-all;
+}
+
+.inbox-body-html {
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--text-primary);
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+.inbox-body-html a {
+  color: var(--accent);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.inbox-body-html table {
+  max-width: 100%;
+  border-collapse: collapse;
+}
+
+.inbox-body-html td,
+.inbox-body-html th {
+  padding: 2px 6px;
 }
 
 .inbox-original-toggle {

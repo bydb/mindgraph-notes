@@ -407,6 +407,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('email-send', composeData),
   emailSelectAttachments: () =>
     ipcRenderer.invoke('email-select-attachments'),
+  emailFetchAttachments: (payload: { accountId: string; host: string; port: number; user: string; tls: boolean; folder: string; uid: number }) =>
+    ipcRenderer.invoke('email-fetch-attachments', payload),
+  emailSaveAttachment: (filename: string, contentBase64: string) =>
+    ipcRenderer.invoke('email-save-attachment', filename, contentBase64),
   emailSelectSignatureImage: (vaultPath: string) =>
     ipcRenderer.invoke('email-select-signature-image', vaultPath),
   emailLoadSignatureImage: (imagePath: string) =>
