@@ -305,7 +305,7 @@
 }
 
 .dv-group.overdue .dv-group-label {
-  color: var(--color-error, #e55);
+  color: var(--color-danger, #e55);
 }
 
 /* Task row */
@@ -332,7 +332,7 @@
 }
 
 .dv-group.overdue .dv-task-checkbox {
-  border-color: var(--color-error, #e55);
+  border-color: var(--color-danger, #e55);
 }
 
 .dv-task-body {
@@ -362,7 +362,7 @@
 }
 
 .dv-task-critical {
-  background: var(--color-error, #e55);
+  background: var(--color-danger, #e55);
   color: white;
   font-size: 11px;
   font-weight: bold;
@@ -517,8 +517,8 @@
 }
 
 .dv-activity-ai-error {
-  color: var(--color-error, #dc2626);
-  background: color-mix(in srgb, var(--color-error, #dc2626) 9%, var(--bg-primary));
+  color: var(--color-danger, #dc2626);
+  background: color-mix(in srgb, var(--color-danger, #dc2626) 9%, var(--bg-primary));
 }
 
 .dv-activity-ai-result {
@@ -564,7 +564,7 @@
 }
 
 .dv-activity-ai-btn-primary {
-  background: var(--widget-accent, var(--color-primary, #2f7d6f));
+  background: var(--widget-accent, var(--accent-color, #2f7d6f));
   color: var(--bg-primary, #fff);
   border-color: transparent;
 }
@@ -588,7 +588,7 @@
   background: none;
   border: none;
   padding: 0;
-  color: var(--widget-accent, var(--color-primary, #2f7d6f));
+  color: var(--widget-accent, var(--accent-color, #2f7d6f));
   cursor: pointer;
   font-size: inherit;
   text-decoration: underline;
@@ -615,7 +615,7 @@
   flex-shrink: 0;
 }
 
-.dv-email-row.urgency-high .dv-email-badge { background: var(--color-error, #e55); }
+.dv-email-row.urgency-high .dv-email-badge { background: var(--color-danger, #e55); }
 .dv-email-row.urgency-medium .dv-email-badge { background: var(--color-warning, #f90); }
 .dv-email-row.urgency-low .dv-email-badge { background: var(--text-secondary); opacity: 0.5; }
 
@@ -1268,7 +1268,7 @@
 
 .dv-focus-row.reason-critical::before,
 .dv-focus-row.reason-overdue::before {
-  background: var(--color-error, #e55);
+  background: var(--color-danger, #e55);
 }
 
 .dv-focus-row-body {
@@ -1304,12 +1304,12 @@
 
 .dv-focus-badge.reason-critical {
   background: rgba(229, 85, 85, 0.12);
-  color: var(--color-error, #e55);
+  color: var(--color-danger, #e55);
 }
 
 .dv-focus-badge.reason-overdue {
   background: rgba(229, 85, 85, 0.08);
-  color: var(--color-error, #e55);
+  color: var(--color-danger, #e55);
 }
 
 .dv-focus-badge.reason-today {
@@ -1474,7 +1474,7 @@
   background: rgba(229, 85, 85, 0.1);
   border: 1px solid rgba(229, 85, 85, 0.3);
   border-radius: 5px;
-  color: var(--color-error, #e55);
+  color: var(--color-danger, #e55);
   font-size: 12px;
 }
 
@@ -1519,15 +1519,15 @@
   margin-top: 10px;
   padding: 6px 12px;
   background: transparent;
-  border: 1px solid var(--color-error, #e55);
-  color: var(--color-error, #e55);
+  border: 1px solid var(--color-danger, #e55);
+  color: var(--color-danger, #e55);
   border-radius: 5px;
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
 }
 .dv-modal-permission-btn:hover {
-  background: var(--color-error, #e55);
+  background: var(--color-danger, #e55);
   color: white;
 }
 
@@ -1574,8 +1574,8 @@
 }
 
 .dv-antares-statusbtn-accent {
-  border-color: var(--color-error, #c0392b);
-  background: color-mix(in srgb, var(--color-error, #c0392b) 8%, var(--bg-primary));
+  border-color: var(--color-danger, #c0392b);
+  background: color-mix(in srgb, var(--color-danger, #c0392b) 8%, var(--bg-primary));
 }
 
 .dv-antares-statusbtn-count {
@@ -1587,7 +1587,7 @@
 }
 
 .dv-antares-statusbtn-accent .dv-antares-statusbtn-count {
-  color: var(--color-error, #c0392b);
+  color: var(--color-danger, #c0392b);
 }
 
 .dv-antares-statusbtn-label {
@@ -1659,7 +1659,7 @@
 }
 
 .dv-antares-overdue {
-  color: var(--color-error, #c0392b);
+  color: var(--color-danger, #c0392b);
   font-weight: 600;
   white-space: nowrap;
 }

@@ -105,7 +105,7 @@
 .quick-event-conflicts strong {
   display: block;
   margin-bottom: 4px;
-  color: var(--color-error, #d97706);
+  color: var(--color-warning, #d97706);
 }
 
 .quick-event-conflicts ul {
@@ -120,7 +120,7 @@
 .quick-event-error {
   background: rgba(255, 0, 0, 0.08);
   border: 1px solid rgba(255, 0, 0, 0.25);
-  color: var(--color-error, #b00);
+  color: var(--color-danger, #b00);
   padding: 8px 10px;
   border-radius: 5px;
   font-size: 12.5px;

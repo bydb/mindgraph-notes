@@ -138,7 +138,7 @@
 }
 
 .briefing-card.tasks .briefing-card-value { color: var(--color-warning, #f90); }
-.briefing-card.emails .briefing-card-value { color: var(--color-error, #e55); }
+.briefing-card.emails .briefing-card-value { color: var(--color-danger, #e55); }
 .briefing-card.calendar .briefing-card-value { color: var(--accent-color); }
 .briefing-card.bookings .briefing-card-value { color: var(--color-success, #3a3); }
 
@@ -177,10 +177,10 @@
 }
 
 .briefing-card-list li.overdue {
-  color: var(--color-error, #e55);
+  color: var(--color-danger, #e55);
 }
 .briefing-card-list li.overdue::before {
-  background: var(--color-error, #e55);
+  background: var(--color-danger, #e55);
 }
 
 .briefing-footer {

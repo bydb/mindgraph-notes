@@ -3800,7 +3800,7 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab 
                 {readwiseSyncResult && (
                   <div className="settings-row">
                     <label></label>
-                    <span style={{ fontSize: '12px', color: readwiseSyncResult.startsWith('Fehler') ? 'var(--color-error)' : 'var(--color-success)' }}>
+                    <span style={{ fontSize: '12px', color: readwiseSyncResult.startsWith('Fehler') ? 'var(--color-danger)' : 'var(--color-success)' }}>
                       {readwiseSyncResult}
                     </span>
                   </div>
@@ -4650,7 +4650,7 @@ LIMIT 10
                               />
                               <button
                                 className="settings-refresh"
-                                style={{ color: 'var(--color-error)', fontSize: '11px' }}
+                                style={{ color: 'var(--color-danger)', fontSize: '11px' }}
                                 onClick={() => {
                                   const updated = emailSettings.accounts.filter((_, i) => i !== idx)
                                   setEmail({ accounts: updated })
@@ -4966,7 +4966,7 @@ LIMIT 10
                           {emailSettings.signatureImagePath && (
                             <button
                               className="settings-refresh"
-                              style={{ color: 'var(--color-error)', fontSize: '11px' }}
+                              style={{ color: 'var(--color-danger)', fontSize: '11px' }}
                               onClick={() => setEmail({ signatureImagePath: '' })}
                             >
                               {t('settings.email.removeImage')}
