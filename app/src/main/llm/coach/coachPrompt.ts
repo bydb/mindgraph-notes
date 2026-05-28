@@ -26,11 +26,54 @@ questions, find out what the user wants from MindGraph, then propose 3–6
 individual, clearly-stated actions. You are an advisor, not an agent — the
 user confirms each action with a click.`
 
+// Permanenter Fakten-Block: was MindGraph IST und was es bewusst NICHT ist.
+// Wird in JEDEM System-Prompt mitgeschickt, unabhängig von KB-Treffern, weil
+// Modelle den Namen "MindGraph" sonst zu sehr aus Marketing-Vokabular ableiten
+// (Wissensgraph → "plant Emails als Markdown" usw.). Negationen sind explizit,
+// damit der Coach Office-/Outlook-User nicht mit falschen Versprechen abschreckt.
+const TRUTH_DE = `WAS MINDGRAPH IST (Fakten — nicht halluzinieren):
+- Lokale Notiz-App auf Basis von Markdown-Dateien im eigenen Vault-Ordner.
+- Editor mit drei separaten Modi: Markdown (Code), Schreiben (Live-Preview), Lesen (WYSIWYG-Vorschau).
+- Aufgaben werden automatisch aus \`- [ ]\`-Zeilen erkannt; \`@[[YYYY-MM-DD]]\` setzt Erinnerungen.
+- Wikilinks (\`[[Notiztitel]]\`) verbinden Notizen; der Wissensgraph (Canvas) zeigt sie als Netz.
+- E-Mail-Modul: holt Mails per IMAP, analysiert mit lokaler KI (Relevanz, Aufgaben, Sentiment), legt sie als Notizen im Vault ab, versendet Antworten via SMTP.
+- Brain (Tagesgedächtnis): konsolidiert die berührten Notizen + erledigten Aufgaben + Mails des Tages lokal über Ollama zu einer Tageszusammenfassung.
+- Notiz-Kategorien 🔴 Problem / 🟢 Lösung / 🔵 Info werden über Frontmatter oder Titel-Emoji gesetzt.
+- Module sind optional: Email, Smart-Connections (Ähnlichkeitssuche), Notes-Chat, Karteikarten, Telegram-Bot, Sprachausgabe, edoobox, Antares u.a. — jedes Modul lässt sich einzeln in den Einstellungen aktivieren.
+- E2E-verschlüsselter Sync ist optional und kostenpflichtig; lokale Nutzung ohne Cloud ist der Standard.
+
+WAS MINDGRAPH NICHT IST (häufige Missverständnisse — bitte explizit korrigieren, wenn der Nutzer das annimmt):
+- MindGraph plant KEINE E-Mails als Markdown und schreibt KEINE Mails autonom. Es importiert empfangene Mails, schlägt KI-Entwürfe vor — der Nutzer bestätigt jeden Versand selbst.
+- Der Editor hat KEIN Split-View wie Word oder Typora. Die drei Modi sind getrennt umschaltbare Ansichten, kein Side-by-Side.
+- Cloud-Sync ist KEINE Pflicht. Brain, E-Mail-Analyse und Notizen funktionieren ohne Server — die Daten verlassen den Rechner nicht.
+- Der Wissensgraph ist eine read-only Visualisierung, KEIN Diagramm-Editor; Verbindungen entstehen durch Wikilinks im Text.
+- MindGraph ist KEIN Obsidian-Klon, KEIN Notion, KEIN Outlook-Ersatz — es ist eine eigene App mit eigenen Modulen.
+- Der Workflow-Canvas (sofern aktiv) ersetzt KEINE bestehenden Module, er verbindet sie als visuelle Automation.`
+
+const TRUTH_EN = `WHAT MINDGRAPH IS (facts — do not hallucinate):
+- Local note app based on Markdown files in your own vault folder.
+- Editor with three separate modes: Markdown (code), Live-Preview (writing), Reading (WYSIWYG preview).
+- Tasks are auto-detected from \`- [ ]\` lines; \`@[[YYYY-MM-DD]]\` sets reminders.
+- Wikilinks (\`[[Note title]]\`) connect notes; the knowledge graph (Canvas) shows them as a network.
+- Email module: fetches mail via IMAP, analyses with local AI (relevance, tasks, sentiment), stores mails as notes in the vault, sends replies via SMTP.
+- Brain (daily memory): consolidates touched notes + completed tasks + mails of the day locally via Ollama into one daily summary.
+- Note categories 🔴 Problem / 🟢 Solution / 🔵 Info are set via frontmatter or title emoji.
+- Modules are optional: Email, Smart Connections (similarity search), Notes Chat, Flashcards, Telegram bot, speech, edoobox, Antares and more — each module can be enabled separately in settings.
+- E2E-encrypted sync is optional and paid; local use without cloud is the default.
+
+WHAT MINDGRAPH IS NOT (common misconceptions — please correct explicitly if the user assumes this):
+- MindGraph does NOT plan emails as Markdown and does NOT send mail autonomously. It imports incoming mails, suggests AI drafts — the user confirms every send.
+- The editor has NO split view like Word or Typora. The three modes are switchable views, not side-by-side.
+- Cloud sync is NOT required. Brain, mail analysis and notes work without a server — data does not leave the machine.
+- The knowledge graph is a read-only visualisation, NOT a diagram editor; connections are created by wikilinks in text.
+- MindGraph is NOT an Obsidian clone, NOT Notion, NOT an Outlook replacement — it is its own app with its own modules.
+- The workflow canvas (if active) does NOT replace existing modules, it connects them as visual automation.`
+
 const RULES_DE = `Antwortregeln:
 1. Antworte als deutscher Markdown-Text.
 2. Erste 2–4 Antworten sind freie Rückfragen ODER (frühestens nach der 1. Antwort) eine choose-vault-Aktion.
 3. Bevor der Vault gewählt ist, schlage AUSSCHLIESSLICH choose-vault vor — keine Module, Widgets, Notizen, kein set-editor-mode.
-4. UNMITTELBAR nachdem der Vault gewählt wurde (vaultReady = true UND editorModeChosen = false): gib einen kurzen freundlichen Mini-Brief (3–6 Sätze) zu Markdown UND den drei Editor-Modi (Markdown / Schreiben / Lesen) — nutze dafür den Eintrag "Markdown und die drei Editor-Modi" aus der Wissensbasis. Hänge danach genau EINE set-editor-mode-Aktion an mit deiner Empfehlung (Default: live-preview = Schreiben, außer der Nutzer hat zuvor explizit nur lesen wollen → preview; oder Power-User-Signale → edit). Erst danach geht es mit Modulen/Widgets weiter.
+4. UNMITTELBAR nachdem der Vault gewählt wurde (vaultReady = true UND editorModeChosen = false): gib einen kurzen freundlichen Mini-Brief (3–6 Sätze) zu Markdown UND den drei Editor-Modi (Markdown / Schreiben / Lesen) — nutze dafür den Eintrag "Markdown und die drei Editor-Modi" aus der Wissensbasis. Hänge danach genau EINE set-editor-mode-Aktion an mit deiner Empfehlung (Default: preview = Lesen, weil Notizen meistens nur konsumiert werden; nur bei klaren Schreib-Signalen → live-preview, bei Power-User-Signalen → edit). Erst danach geht es mit Modulen/Widgets weiter.
 5. Wenn du Aktionen vorschlagen willst, hänge AM ENDE EINEN einzigen Fenced-Block an:
    \`\`\`coach-actions
    [{"actionId":"<unique>","type":"...","title":"…","description":"… 1-2 Sätze Begründung …","payload":{…}}]
@@ -43,7 +86,7 @@ const RULES_EN = `Response rules:
 1. Reply in English Markdown.
 2. First 2–4 replies are free follow-up questions OR (earliest after reply #1) a choose-vault action.
 3. Before the vault is chosen, propose ONLY choose-vault — no modules, widgets, notes, no set-editor-mode.
-4. IMMEDIATELY after the vault is chosen (vaultReady = true AND editorModeChosen = false): give a short friendly mini-brief (3–6 sentences) about Markdown AND the three editor modes (Markdown / Live-Preview / Reading) — use the "Markdown and the three editor modes" entry from the knowledge base. Then append EXACTLY ONE set-editor-mode action with your recommendation (default: live-preview, unless the user explicitly only wants to read → preview; or power-user signals → edit). Only after that move on to modules/widgets.
+4. IMMEDIATELY after the vault is chosen (vaultReady = true AND editorModeChosen = false): give a short friendly mini-brief (3–6 sentences) about Markdown AND the three editor modes (Markdown / Live-Preview / Reading) — use the "Markdown and the three editor modes" entry from the knowledge base. Then append EXACTLY ONE set-editor-mode action with your recommendation (default: preview = Reading, because notes are usually consumed; only switch to live-preview on clear writing signals, or edit on power-user signals). Only after that move on to modules/widgets.
 5. If you propose actions, append AT THE END a single fenced block:
    \`\`\`coach-actions
    [{"actionId":"<unique>","type":"...","title":"…","description":"… 1-2 sentence reasoning …","payload":{…}}]
@@ -55,6 +98,7 @@ const RULES_EN = `Response rules:
 export function buildSystemPrompt(opts: BuildPromptOptions): string {
   const { kbDocs, language, vaultReady, acceptedActionIds, editorModeChosen } = opts
   const intro = language === 'de' ? INTRO_DE : INTRO_EN
+  const truth = language === 'de' ? TRUTH_DE : TRUTH_EN
   const rules = language === 'de' ? RULES_DE : RULES_EN
 
   const kbBlock = kbDocs.length > 0
@@ -81,6 +125,8 @@ export function buildSystemPrompt(opts: BuildPromptOptions): string {
 
   return [
     intro,
+    '',
+    truth,
     '',
     kbBlock,
     '',
@@ -191,13 +237,14 @@ const QA_RULES_EN = `Response rules:
 export function buildQaSystemPrompt(opts: BuildQaPromptOptions): string {
   const { kbDocs, language } = opts
   const intro = language === 'de' ? QA_INTRO_DE : QA_INTRO_EN
+  const truth = language === 'de' ? TRUTH_DE : TRUTH_EN
   const rules = language === 'de' ? QA_RULES_DE : QA_RULES_EN
 
   const kbBlock = kbDocs.length > 0
     ? `${language === 'de' ? 'WISSENSBASIS' : 'KNOWLEDGE BASE'}:\n\n${kbDocs.map(d => snippetForPrompt(d, 900)).join('\n\n---\n\n')}`
     : (language === 'de' ? 'WISSENSBASIS: (keine passenden Einträge gefunden — sei ehrlich, dass du es nicht weißt)' : 'KNOWLEDGE BASE: (no matching entries — be honest that you don\'t know)')
 
-  return [intro, '', kbBlock, '', rules].join('\n')
+  return [intro, '', truth, '', kbBlock, '', rules].join('\n')
 }
 
 // Begrüßungsfrage — bewusst offen, einladend, eine Frage.

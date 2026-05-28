@@ -182,6 +182,11 @@ export interface KbRetrievalResult {
   score: number
 }
 
+// Diese KB-Einträge werden zu jeder Coach-Antwort dazugehängt, unabhängig vom
+// Keyword-Score. Sie sind die Anker gegen Halluzinationen (Capability-Liste,
+// Negationen) — siehe ausführliche Begründung in coachPrompt.ts.
+const ALWAYS_ON_IDS = ['capabilities-truth']
+
 export async function retrieveKb(query: string, topK = 3): Promise<KbRetrievalResult[]> {
   const docs = await loadKb()
   const tokens = tokenize(query)
@@ -190,7 +195,16 @@ export async function retrieveKb(query: string, topK = 3): Promise<KbRetrievalRe
     .filter(s => s.score > 0)
     .sort((a, b) => b.score - a.score)
     .slice(0, topK)
-  return scored
+
+  // Always-on-Docs vorne anhängen, falls sie nicht schon durch das Scoring
+  // eingegangen sind. Score bleibt absichtlich auf +Infinity, damit Konsumenten
+  // sie als "fest" erkennen, falls sie sortieren wollen.
+  const presentIds = new Set(scored.map(s => s.doc.id))
+  const alwaysOn = docs
+    .filter(d => ALWAYS_ON_IDS.includes(d.id) && !presentIds.has(d.id))
+    .map(doc => ({ doc, score: Number.POSITIVE_INFINITY }))
+
+  return [...alwaysOn, ...scored]
 }
 
 // Liefert ein kompaktes Snippet für den System-Prompt: Titel + Frontmatter-Hints

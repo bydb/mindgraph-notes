@@ -8,10 +8,16 @@ import { AIStep } from './steps/AIStep'
 import { DashboardStep } from './steps/DashboardStep'
 import { MissionsStep } from './steps/MissionsStep'
 import { OllamaSetupStep } from './steps/OllamaSetupStep'
+import { EmailSetupStep } from './steps/EmailSetupStep'
 import { CoachStep } from './Coach/CoachStep'
 import './Onboarding.css'
 
-type OnboardingStep = 'welcome' | 'ai-setup' | 'coach' | 'intent' | 'ai' | 'dashboard' | 'missions'
+type OnboardingStep = 'welcome' | 'ai-setup' | 'coach' | 'intent' | 'email-setup' | 'ai' | 'dashboard' | 'missions'
+
+// Profile, für die der Email-Setup-Step im Onboarding eingeblendet wird. Andere
+// Profile sollen den Step nicht sehen — sonst kommt der Demo-Pfad bei einem
+// Studenten aus dem Tritt, wenn er kein IMAP-Account hat.
+const EMAIL_SETUP_PROFILES = new Set(['office', 'professional'])
 
 export const Onboarding: React.FC = () => {
   const { onboardingOpen, setOnboardingOpen, setOnboardingCompleted, setUserProfile, applyProfileDefaults, coach } = useUIStore()
@@ -144,13 +150,33 @@ export const Onboarding: React.FC = () => {
             vaultPath={vaultPath}
             setVaultPath={handleSetVaultPath}
             onBack={() => setStep('welcome')}
-            onNext={() => setStep('ai')}
+            onNext={() => {
+              // Office-/Professional-User landen erst im E-Mail-Setup; alle
+              // anderen Profile springen direkt zum KI-Features-Schritt.
+              if (selectedProfile && EMAIL_SETUP_PROFILES.has(selectedProfile)) {
+                setStep('email-setup')
+              } else {
+                setStep('ai')
+              }
+            }}
             coachPreFilled={coach.suggestedProfile !== null || vaultPath !== null}
+          />
+        )}
+        {step === 'email-setup' && (
+          <EmailSetupStep
+            onBack={() => setStep('intent')}
+            onNext={() => setStep('ai')}
           />
         )}
         {step === 'ai' && (
           <AIStep
-            onBack={() => setStep('intent')}
+            onBack={() => {
+              if (selectedProfile && EMAIL_SETUP_PROFILES.has(selectedProfile)) {
+                setStep('email-setup')
+              } else {
+                setStep('intent')
+              }
+            }}
             onNext={() => setStep('dashboard')}
           />
         )}

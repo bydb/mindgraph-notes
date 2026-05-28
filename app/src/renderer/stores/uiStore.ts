@@ -12,7 +12,7 @@ type AccentColor = 'blue' | 'orange' | 'green' | 'purple' | 'pink' | 'teal' | 'r
 export type LLMBackend = 'ollama' | 'lm-studio'
 export type Language = 'de' | 'en'
 export type IconSet = 'default' | 'minimal' | 'colorful' | 'emoji'
-export type UserProfile = 'student' | 'researcher' | 'professional' | 'writer' | 'developer' | 'viewer' | null
+export type UserProfile = 'office' | 'student' | 'researcher' | 'professional' | 'writer' | 'developer' | 'viewer' | null
 export type OutlineStyle = 'default' | 'lines' | 'minimal' | 'bullets' | 'dashes'
 export type FontFamily = 'system' | 'inter' | 'source-sans' | 'roboto' | 'open-sans' | 'lato' |
   'jetbrains-mono-nerd' | 'fira-code-nerd' | 'hack-nerd' | 'meslo-nerd' | 'cascadia-code-nerd' | 'iosevka-nerd' | 'victor-mono-nerd' | 'agave-nerd'
@@ -599,6 +599,12 @@ interface UIState {
   // Daily Note Settings
   dailyNote: DailyNoteSettings
 
+  // Migration-Marker: einmalige Resets, die bei bestehenden Usern beim
+  // App-Start nachgezogen werden. Aktuell nur ein Eintrag — beim ersten Start
+  // nach diesem Build wird editorDefaultView hart auf 'preview' gesetzt
+  // (Direktive: Markdown-Editing ist out-of-the-box für niemanden lesbar).
+  editorDefaultViewForcedToPreview: boolean
+
   // Update-Checker & What's New
   lastSeenVersion: string
   updateAvailable: UpdateInfo | null
@@ -973,6 +979,7 @@ const defaultState = {
   },
 
   // Update-Checker & What's New
+  editorDefaultViewForcedToPreview: false,
   lastSeenVersion: '',
   updateAvailable: null as UpdateInfo | null,
   whatsNewOpen: false,
@@ -1078,6 +1085,7 @@ const persistedKeys = [
   'canvasCompactMode', 'canvasReadMode', 'canvasHoverScale', 'canvasDefaultCardWidth', 'splitPosition', 'fileTreeDisplayMode', 'fileTreeKindFilter', 'notesRootFolder', 'projectsRootFolder', 'ollama', 'brain',
   'pdfCompanionEnabled', 'pdfDisplayMode', 'iconSet',
   'smartConnectionsEnabled', 'notesChatEnabled', 'flashcardsEnabled', 'workflowCanvasEnabled', 'semanticScholarEnabled', 'zoteroEnabled', 'smartConnectionsWeights', 'smartConnectionsRerankerEnabled', 'docling', 'visionOcr', 'readwise', 'languageTool', 'email', 'marketing', 'edoobox', 'antares', 'remarkable', 'dailyNote', 'taskExcludedFolders', 'speech',
+  'editorDefaultViewForcedToPreview',
   'lastSeenVersion',
   'customAccentColor', 'customBackgroundColorLight', 'customBackgroundColorDark',
   'customLogo',
@@ -1265,6 +1273,19 @@ export const useUIStore = create<UIState>()((set, get) => ({
   applyProfileDefaults: (profile) => {
     if (!profile) return
     switch (profile) {
+      case 'office':
+        set({
+          flashcardsEnabled: false,
+          pdfCompanionEnabled: false,
+          smartConnectionsEnabled: false,
+          notesChatEnabled: true,
+          editorDefaultView: 'preview' as EditorViewMode,
+          showFormattingToolbar: true,
+          showRawEditor: false,
+          email: { ...get().email, enabled: true },
+          dashboard: { ...get().dashboard, enabled: true }
+        })
+        break
       case 'student':
         set({
           flashcardsEnabled: true,
@@ -1272,7 +1293,7 @@ export const useUIStore = create<UIState>()((set, get) => ({
           smartConnectionsEnabled: false,
           notesChatEnabled: true,
           visionOcr: { ...get().visionOcr, enabled: true },
-          editorDefaultView: 'live-preview' as EditorViewMode,
+          editorDefaultView: 'preview' as EditorViewMode,
           showFormattingToolbar: true,
           showRawEditor: false
         })
@@ -1286,7 +1307,7 @@ export const useUIStore = create<UIState>()((set, get) => ({
           smartConnectionsEnabled: false,
           notesChatEnabled: true,
           visionOcr: { ...get().visionOcr, enabled: true },
-          editorDefaultView: 'live-preview' as EditorViewMode
+          editorDefaultView: 'preview' as EditorViewMode
         })
         break
       case 'professional':
@@ -1295,7 +1316,7 @@ export const useUIStore = create<UIState>()((set, get) => ({
           pdfCompanionEnabled: false,
           smartConnectionsEnabled: false,
           notesChatEnabled: true,
-          editorDefaultView: 'live-preview' as EditorViewMode
+          editorDefaultView: 'preview' as EditorViewMode
         })
         break
       case 'writer':
@@ -1305,7 +1326,7 @@ export const useUIStore = create<UIState>()((set, get) => ({
           notesChatEnabled: true,
           showFormattingToolbar: true,
           editorShowWordCount: true,
-          editorDefaultView: 'live-preview' as EditorViewMode
+          editorDefaultView: 'preview' as EditorViewMode
         })
         break
       case 'developer':
@@ -1314,7 +1335,7 @@ export const useUIStore = create<UIState>()((set, get) => ({
           smartConnectionsEnabled: true,
           notesChatEnabled: true,
           showRawEditor: false,
-          editorDefaultView: 'live-preview' as EditorViewMode
+          editorDefaultView: 'preview' as EditorViewMode
         })
         break
       case 'viewer':
@@ -1468,6 +1489,15 @@ export async function initializeUISettings(): Promise<void> {
       // → skip onboarding for them
       if (!('onboardingCompleted' in savedSettings)) {
         validSettings.onboardingCompleted = true
+      }
+      // Force editorDefaultView to 'preview' once for all existing users (2026-05-28).
+      // Markdown-Editing ist nichts, was Office-/Mittelstands-User out-of-the-box
+      // bedienen können — sie sollen mit dem Lesen-Modus starten und bei Bedarf
+      // umschalten. Migration nur einmal pro User; danach respektieren wir die
+      // bewusste Wahl wieder.
+      if (!validSettings.editorDefaultViewForcedToPreview) {
+        validSettings.editorDefaultView = 'preview'
+        validSettings.editorDefaultViewForcedToPreview = true
       }
       // Migrate old profile names to new ones
       const profileMigration: Record<string, UserProfile> = {

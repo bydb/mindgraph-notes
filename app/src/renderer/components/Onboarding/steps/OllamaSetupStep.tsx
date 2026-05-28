@@ -32,6 +32,10 @@ const INSTALL_COMMANDS: Record<OS, string> = {
   linux: 'curl -fsSL https://ollama.com/install.sh | sh'
 }
 
+// Empfohlenes Default-Modell für Office-User: 8B-Klasse, läuft auf 16-GB-RAM-
+// Maschinen, Tool-fähig, gute Email-Analyse-Werte in der Modell-Compat-Matrix.
+const DEFAULT_OLLAMA_MODEL = 'ministral'
+
 export const OllamaSetupStep: React.FC<OllamaSetupStepProps> = ({
   onBackendReady,
   onSkip,
@@ -45,7 +49,10 @@ export const OllamaSetupStep: React.FC<OllamaSetupStepProps> = ({
   const [anthropicKey, setAnthropicKey] = useState('')
   const [savingKey, setSavingKey] = useState(false)
   const [keyError, setKeyError] = useState<string | null>(null)
+  const [modelPulling, setModelPulling] = useState(false)
+  const [modelReady, setModelReady] = useState(false)
   const stoppedRef = useRef(false)
+  const modelPullStartedRef = useRef(false)
 
   // Polling: alle 3 s `coach:precheck` neu aufrufen. Sobald ein Backend da ist,
   // wird auto-Advance ausgelöst (mit 1.2 s Verzögerung, damit der "erkannt"-
@@ -64,6 +71,21 @@ export const OllamaSetupStep: React.FC<OllamaSetupStepProps> = ({
           stoppedRef.current = true
           setDetected(true)
           setPolling(false)
+          // Bei Ollama: Default-Modell im Hintergrund pullen, damit Brain/
+          // E-Mail-Analyse direkt nach dem Onboarding funktionieren. Wir warten
+          // bewusst NICHT auf den Pull, sondern lassen den User durchklicken —
+          // er kann den Coach starten, während der Download läuft.
+          if (backend === 'ollama' && !modelPullStartedRef.current) {
+            modelPullStartedRef.current = true
+            setModelPulling(true)
+            window.electronAPI
+              .ollamaPullModel(DEFAULT_OLLAMA_MODEL)
+              .then(result => {
+                setModelPulling(false)
+                if (result?.success) setModelReady(true)
+              })
+              .catch(() => setModelPulling(false))
+          }
           setTimeout(() => onBackendReady(backend), 1200)
           return
         }
@@ -103,6 +125,17 @@ export const OllamaSetupStep: React.FC<OllamaSetupStepProps> = ({
         setDetected(true)
         setPolling(false)
         stoppedRef.current = true
+        if (backend === 'ollama' && !modelPullStartedRef.current) {
+          modelPullStartedRef.current = true
+          setModelPulling(true)
+          window.electronAPI
+            .ollamaPullModel(DEFAULT_OLLAMA_MODEL)
+            .then(result => {
+              setModelPulling(false)
+              if (result?.success) setModelReady(true)
+            })
+            .catch(() => setModelPulling(false))
+        }
         setTimeout(() => onBackendReady(backend), 1200)
       } else {
         setPolling(false)
@@ -213,6 +246,12 @@ export const OllamaSetupStep: React.FC<OllamaSetupStepProps> = ({
         >
           {t('onboarding.aiSetup.openOllamaSite')} ↗
         </button>
+
+        {(modelPulling || modelReady) && (
+          <p className="onboarding-ai-setup-os-hint" style={{ marginTop: '8px' }}>
+            {modelReady ? `✓ ${t('onboarding.aiSetup.modelReady')}` : t('onboarding.aiSetup.modelPulling')}
+          </p>
+        )}
       </section>
 
       {/* Variante 2: Anthropic-Key */}

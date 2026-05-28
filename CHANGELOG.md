@@ -2,6 +2,25 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.7.6-beta] - 2026-05-28
+
+### Features
+
+- **Neue Persona „Büro & Mittelstand" im Onboarding**: Eigene Profil-Karte ganz oben mit Aktenkoffer-Icon und dem Versprechen „E-Mails, Meetings, Projekte, Aufgaben, Kunden". Aktiviert beim Anwenden direkt das Mail-Modul, das Dashboard, die Formatierungsleiste und „Lesen" als Standard-Ansicht; das Dashboard zeigt von Anfang an Aufgaben und E-Mails ganz oben. Klingt klein, ändert aber, wer die App nach 30 Sekunden noch versteht.
+- **E-Mail-Konto direkt im Onboarding einrichten**: Office- und Professional-Profile bekommen einen neuen Schritt zwischen Profil-Wahl und KI-Setup, in dem ein IMAP-/SMTP-Konto angelegt und mit einem Klick getestet werden kann. Anbieter-Voreinstellungen für Gmail, Outlook / Microsoft 365, iCloud, web.de, GMX und Strato füllen Host, Port und TLS automatisch; Server-Details lassen sich aufklappen und ändern. Das Passwort wird verschlüsselt im Betriebssystem-Schlüsselbund abgelegt, der Schritt ist jederzeit überspringbar.
+- **Office-Starter-Vault**: Wer beim Anlegen das Profil „Büro & Mittelstand" wählt, bekommt jetzt einen eigenen, kompakten Starter-Vault mit deutscher Mittelstands-Sprache: Schnellstart-Notizen (Erste Schritte, Mails als Notizen, Aufgaben & Erinnerungen, Wissen verlinken), vier Vorlagen (Meeting-Protokoll, Projektakte, Kundenmappe, Telefonnotiz) und zwei ausgefüllte Demo-Notizen. Kein Karpathy-Wiki, kein Markdown-Showcase — alles ist auf einen typischen Büroalltag zugeschnitten.
+- **Ollama lädt das empfohlene Modell beim Erkennen automatisch nach**: Sobald das Onboarding eine laufende Ollama-Instanz findet, startet im Hintergrund der Download des Standard-Modells (ministral). Eine kleine Statusmeldung zeigt den Fortschritt und wechselt am Ende auf „Empfohlenes Modell ist da" — der Nutzer kann während der Vorbereitung schon im Onboarding weiterklicken.
+
+### Improvements
+
+- **Coach nennt seine Fähigkeiten ehrlich**: Im System-Prompt des Onboarding-Coachs und des Coach-Bots steht jetzt ein fester Faktenblock „Was MindGraph IST / IST NICHT" — inklusive expliziter Negationen („MindGraph plant KEINE E-Mails als Markdown", „kein Split-View wie Word", „Cloud-Sync ist nicht Pflicht", „kein Obsidian-Klon"). Begleitet von zwei neuen, immer mitgeladenen Wissensbasis-Einträgen mit Capabilities und Office-Use-Cases. Die häufigsten Halluzinationen aus dem Onboarding-Chat (falsche Auto-Send-Annahmen, fingierte Split-Views) sind damit unterbunden.
+- **„Lesen" ist überall der Standardmodus**: Bisher öffneten sich Notizen je nach Profil im Schreib- oder Live-Preview-Modus — für Office-User aus Word/Outlook ein Schock, weil sie zuerst rohen Markdown-Code sahen. Jetzt ist der Lesen-Modus überall der Default: bei jedem Profil im Onboarding, im Editor selbst beim ersten Render, und einmalig bei bestehenden Installationen wird die gespeicherte Standardansicht beim ersten Start nach diesem Update auf „Lesen" gesetzt. Wer bewusst auf „Schreiben" oder „Markdown" umstellt, behält diese Wahl beim nächsten Start.
+- **Welche Widgets in welchem Profil**: Die Profil-Anwendung wurde entrümpelt — Office-User bekommen „Fokus, Aufgaben, E-Mails, Kalender, Aktivität, Radar" in genau dieser Reihenfolge (Aufgaben und E-Mails ganz oben), andere Profile bleiben unverändert.
+
+### Sonstiges
+
+- Website: FAQ neu positioniert — Ollama im Mittelpunkt, weniger Obsidian-Vergleich.
+
 ## [0.7.5-beta] - 2026-05-28
 
 ### Features

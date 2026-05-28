@@ -40,7 +40,7 @@ export const COACH_WIDGET_IDS = [
 ] as const
 
 export const COACH_PROFILES = [
-  'student', 'researcher', 'professional', 'writer', 'developer', 'viewer'
+  'office', 'student', 'researcher', 'professional', 'writer', 'developer', 'viewer'
 ] as const
 
 export const COACH_SETTINGS_SECTIONS = [

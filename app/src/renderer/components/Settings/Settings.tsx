@@ -2597,7 +2597,7 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab 
                       const enabled = e.target.checked
                       setShowRawEditor(enabled)
                       if (!enabled && editorDefaultView === 'edit') {
-                        setEditorDefaultView('live-preview')
+                        setEditorDefaultView('preview')
                       }
                     }}
                   />

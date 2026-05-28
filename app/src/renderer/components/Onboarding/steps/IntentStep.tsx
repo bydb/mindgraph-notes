@@ -15,6 +15,18 @@ interface IntentStepProps {
 
 const profiles: { id: Exclude<UserProfile, null>; icon: React.ReactNode }[] = [
   {
+    id: 'office',
+    icon: (
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
+        <path d="M8 21h8"/>
+        <path d="M12 17v4"/>
+        <path d="M6 8h4"/>
+        <path d="M6 12h6"/>
+      </svg>
+    )
+  },
+  {
     id: 'student',
     icon: (
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -128,7 +140,11 @@ export const IntentStep: React.FC<IntentStepProps> = ({
       const confirmed = await confirmIfNotEmpty(result)
       if (!confirmed) return
       setLoading(true)
-      await window.electronAPI.createStarterVault(result, language)
+      // Office-Profile bekommen einen eigenen Starter-Vault mit Mittelstands-
+      // Vorlagen (Meeting-Protokoll, Projektakte, Kundenmappe). Andere Profile
+      // wie gewohnt den Sprachen-Vault.
+      const variant = selectedProfile === 'office' ? 'office' : language
+      await window.electronAPI.createStarterVault(result, variant)
       setVaultPath(result)
     } catch (err) {
       console.error('[Onboarding] Failed to create starter vault:', err)

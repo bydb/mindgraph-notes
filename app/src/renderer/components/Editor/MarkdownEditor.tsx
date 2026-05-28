@@ -753,7 +753,9 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
   const isPreviewSpeaking = (voiceStatus === 'speaking' || voiceStatus === 'transcribing') && voiceContext === 'preview'
 
   const [isSaving, setIsSaving] = useState(false)
-  const [viewMode, setViewMode] = useState<ViewMode>('edit')
+  // Initial-Wert aus dem konfigurierten Standardmodus, damit der erste Render
+  // schon im richtigen Modus ist (nicht erst nach dem Notiz-Load-Effekt).
+  const [viewMode, setViewMode] = useState<ViewMode>(editorDefaultView)
   const [previewContent, setPreviewContent] = useState('')
   const [contentVersion, setContentVersion] = useState(0)
   const loadedImagesRef = useRef<Map<string, string>>(new Map())

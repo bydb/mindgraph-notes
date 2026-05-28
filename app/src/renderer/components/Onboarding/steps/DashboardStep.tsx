@@ -22,6 +22,8 @@ const ALL_WIDGETS: { id: DashboardWidgetId; labelKey: string }[] = [
 // Profil-spezifische Widget-Voreinstellungen
 const profileDefaults = (profile: UserProfile): DashboardWidgetId[] => {
   switch (profile) {
+    case 'office':
+      return ['focus', 'tasks', 'emails', 'calendar', 'activity', 'radar']
     case 'student':
       return ['focus', 'radar', 'activity', 'tasks', 'calendar']
     case 'researcher':

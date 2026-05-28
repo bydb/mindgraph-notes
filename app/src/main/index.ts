@@ -1587,7 +1587,11 @@ async function copyDirectoryRecursive(src: string, dest: string): Promise<void> 
 }
 
 // Starter-Vault in Zielordner kopieren
-ipcMain.handle('create-starter-vault', async (_event, targetPath: string, language: string) => {
+// Der `variant`-Parameter wählt das Quell-Verzeichnis: 'office' → der
+// Mittelstands-Starter-Vault, 'en' → englischer Vault, alles andere ('de' o.ä.)
+// → der deutsche Standard-Vault. Frühere Renderer-Aufrufer übergeben hier eine
+// Sprache ('de'/'en'); neuere zusätzlich 'office'.
+ipcMain.handle('create-starter-vault', async (_event, targetPath: string, variant: string) => {
   try {
     if (!approvedVaultRoots.has(path.resolve(targetPath))) {
       throw new Error('Vault-Zielpfad nicht autorisiert — bitte via Dialog auswählen')
@@ -1596,7 +1600,10 @@ ipcMain.handle('create-starter-vault', async (_event, targetPath: string, langua
       ? path.join(process.resourcesPath)
       : path.join(app.getAppPath(), 'resources')
 
-    const vaultName = language === 'en' ? 'starter-vault-en' : 'starter-vault'
+    const vaultName =
+      variant === 'office' ? 'starter-vault-office'
+      : variant === 'en' ? 'starter-vault-en'
+      : 'starter-vault'
     const sourcePath = path.join(resourcesBase, vaultName)
 
     // Prüfen ob Quellverzeichnis existiert
