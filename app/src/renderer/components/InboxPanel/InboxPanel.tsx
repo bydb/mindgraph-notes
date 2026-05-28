@@ -10,6 +10,7 @@ import { matchEmailToProjects } from '../../utils/projectMatch'
 import { ComposeView } from './ComposeView'
 import { EmailAIChatView } from './EmailAIChatView'
 import { FolderPicker } from './FolderPicker'
+import { IconCalendar } from '../Shared/Icons'
 import type { EmailMessage } from '../../../shared/types'
 
 const isMac = window.electronAPI.platform === 'darwin'
@@ -683,8 +684,10 @@ export const InboxPanel: React.FC<InboxPanelProps> = ({ onClose }) => {
                                 className="inbox-attachment-btn"
                                 onClick={() => handleAttachment(i, 'calendar')}
                                 disabled={busy}
+                                style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}
                               >
-                                {status === 'done' ? '✓' : '📅'} {t('inbox.detail.addToCalendar')}
+                                {status === 'done' ? <span>✓</span> : <IconCalendar size={12} />}
+                                {t('inbox.detail.addToCalendar')}
                               </button>
                             )}
                             <button
@@ -842,6 +845,9 @@ export const InboxPanel: React.FC<InboxPanelProps> = ({ onClose }) => {
                           disabled={isAnalyzing || !vaultPath}
                           title={t('inbox.detail.reanalyzeHint')}
                           style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
                             padding: '2px 8px',
                             fontSize: '11px',
                             background: 'transparent',
@@ -851,7 +857,11 @@ export const InboxPanel: React.FC<InboxPanelProps> = ({ onClose }) => {
                             opacity: isAnalyzing ? 0.5 : 1
                           }}
                         >
-                          🔄 {t('inbox.detail.reanalyze')}
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                            <polyline points="23 4 23 10 17 10"/>
+                            <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+                          </svg>
+                          {t('inbox.detail.reanalyze')}
                         </button>
                       </span>
                     </div>

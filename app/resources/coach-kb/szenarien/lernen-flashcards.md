@@ -1,12 +1,12 @@
 ---
-id: workflow-lernen
+id: szenario-lernen
 keywords: [lernen, schule, prüfung, klausur, abitur, vokabeln, karteikarten, üben, wiederholen, spaced]
 suggestsModules: [flashcards, speech]
 suggestsWidgets: [focus, activity]
 suggestsProfile: student
 ---
 
-# Workflow: Lernen mit Karteikarten
+# Szenario: Lernen mit Karteikarten
 
 ## Für wen
 Schülerinnen, Studierende, alle, die regelmäßig auf Prüfungen lernen

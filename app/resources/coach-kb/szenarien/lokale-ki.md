@@ -1,11 +1,11 @@
 ---
-id: workflow-lokale-ki
+id: szenario-lokale-ki
 keywords: [lokal, datenschutz, ollama, privacy, offline, ki, cloud, vertraulich, sensibel]
 suggestsModules: [notes-chat, smart-connections, vision-ocr, speech]
 suggestsWidgets: [focus, activity, radar]
 ---
 
-# Workflow: Lokales KI-Wissenssystem
+# Szenario: Lokales KI-Wissenssystem
 
 ## Für wen
 Wer KI auf eigenen Notizen will, aber nichts in die Cloud schicken

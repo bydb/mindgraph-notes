@@ -33,6 +33,7 @@ import {
 import { ErrorBoundary } from '../ErrorBoundary'
 import { ProjectStatusWidget } from '../ProjectStatusPanel/ProjectStatusWidget'
 import { isHardLocked } from '../../../shared/modelCompatibility'
+import { ActiveModelBadge } from '../Shared/ActiveModelBadge'
 import './DashboardView.css'
 
 type TFn = (key: TranslationKey, params?: Record<string, string | number>) => string
@@ -272,9 +273,16 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onOpenInbox, onOpe
   const markReplyHandled = useEmailStore(state => state.markReplyHandled)
   const handleEmailHandled = useCallback((item: EmailActionItem) => {
     if (!vaultPath) return
-    markReplyHandled(vaultPath, item.email.id, true)
-    loadSnapshot()
-  }, [vaultPath, markReplyHandled, loadSnapshot])
+    // Optimistisches Lokalpatch: Eintrag sofort aus dem Snapshot filtern,
+    // damit das Häkchen wirkt, bevor saveEmails() durchläuft.
+    setSnapshot(prev => prev
+      ? { ...prev, emails: prev.emails.filter(e => e.email.id !== item.email.id) }
+      : prev)
+    // Async im Hintergrund: Store-Update + Persistenz nach emails.json.
+    // Fehler werden ignoriert — Snapshot wird beim nächsten regulären
+    // loadSnapshot() ohnehin aus dem persistierten Stand rekonstruiert.
+    void markReplyHandled(vaultPath, item.email.id, true)
+  }, [vaultPath, markReplyHandled])
 
   const renderWidget = (id: DashboardWidgetId) => {
     if (!snapshot) return null
@@ -512,7 +520,10 @@ const ActivityWidget: React.FC<ActivityWidgetProps> = ({ snapshot, t, vaultPath,
             <span className="dv-brain-subtitle">{t('dashboard.brain.subtitle')}</span>
           </div>
         </div>
-        <span className="dv-widget-count">{activity.changed7d}</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <ActiveModelBadge moduleId="brain" />
+          <span className="dv-widget-count">{activity.changed7d}</span>
+        </div>
       </header>
       <div className="dv-brain-status">
         {todayBrainNote ? (
@@ -1316,6 +1327,11 @@ const RadarWidget: React.FC<RadarWidgetProps> = ({ snapshot, notes, vaultPath, o
     <section className="dv-widget dv-widget-radar">
       <header className="dv-widget-header">
         <h3>{t('dashboard.widgets.radar')}</h3>
+        <ActiveModelBadge
+          moduleId="dashboard-snapshot"
+          tabOverride={radarAiModel || undefined}
+          tabOverrideLabel="Radar-AI-Einstellung"
+        />
         {aiEnabled && (
           <button
             type="button"

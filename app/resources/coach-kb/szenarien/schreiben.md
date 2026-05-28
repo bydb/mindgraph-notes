@@ -1,12 +1,12 @@
 ---
-id: workflow-schreiben
+id: szenario-schreiben
 keywords: [schreiben, text, artikel, blog, buch, autor, schriftsteller, lektor, langform]
 suggestsModules: [language-tool, notes-chat, speech]
 suggestsWidgets: [focus, activity]
 suggestsProfile: writer
 ---
 
-# Workflow: Langform-Schreiben
+# Szenario: Langform-Schreiben
 
 ## Für wen
 Wer lange Texte schreibt — Blogposts, Artikel, Kapitel, Konzepte — und

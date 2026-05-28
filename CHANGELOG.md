@@ -2,6 +2,23 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.7.5-beta] - 2026-05-28
+
+### Features
+
+- **Modell-Stempel direkt am Modul**: In Brain-Widget, Radar-Widget und Projekt-Status-Widget steht jetzt unaufdringlich neben dem Titel ein kleiner Stempel, der zeigt, welches Modell dort gerade tatsächlich arbeitet — inklusive Verdict-Farbpunkt (grün/gelb/rot/grau aus der Kompatibilitäts-Matrix). Tooltip nennt die Quelle (Tab-Override, Modul-Override oder globales Standardmodell); Klick öffnet direkt die Integrationen-Einstellungen. So lässt sich auf einen Blick erkennen, womit eine Funktion läuft, ohne erst in die Einstellungen wechseln zu müssen.
+- **Projekt-Status mit qwen3.6:27b-mlx benchmarkt**: Das MLX-quantisierte 27B-Modell ist jetzt in der Modell-Kompatibilitäts-Matrix für den Projekt-Status-Crystallizer als „geeignet" (green) hinterlegt — sauberer Output mit konsistenten Wikilinks, keine Halluzinationen, ~32 Sekunden pro Projekt. Damit erscheint im Kompatibilitäts-Beipackzettel kein „nicht getestet" mehr, wenn 27b-mlx als globales Modell gewählt ist.
+
+### Improvements
+
+- **Häkchen im „Zu beantworten"-Widget reagiert sofort**: Bisher dauerte es bis zu mehreren Sekunden, bis ein als erledigt markierter Eintrag aus dem Dashboard verschwand — die ganze Snapshot-Berechnung lief jedes Mal neu durch. Jetzt wird der Eintrag sofort lokal aus der Liste entfernt; das Persistieren nach `emails.json` läuft im Hintergrund, ohne dass die Oberfläche darauf wartet.
+- **Coach-Bot kennt das Workflow-Canvas-Modul**: Auf die Frage „Was kann ich mit Workflow machen?" hat der eingebaute Helfer-Bot bisher die generischen Anwendungsfall-Anleitungen zusammengefasst, weil ihm ein eigener Eintrag zum Workflow-Canvas-Modul fehlte. Neue Wissensbasis-Seite mit den echten Bausteinen (E-Mail-Auslöser, Analyse, Ollama-Aktionen, Notizen, Mensch-in-der-Schleife), Trigger-Varianten, Beispiel-Flows und ehrlichen Grenzen. Die alten Anleitungen heißen intern jetzt „Szenarien" statt „Workflows", damit der Name nicht doppelt belegt ist.
+- **Weniger Emojis in der App-Oberfläche**: Buttons und Modul-Köpfe nutzten an mehreren Stellen farbige Emoji-Glyphen (Mail, Ordner, Hirn, Mülleimer, Refresh, Schloss-Symbol, Wolke etc.) — gut auf Marketing-Folien, aber unruhig im Arbeitsalltag. Workflow-Canvas (Modul-Icons der acht Bausteinkategorien, alle sechs Status-Badges am Knoten, Hard-Lock-Hinweis im Inspector), Projekt-Status-Widget (Kopf, Synonyme-Button, beide Lösch-Buttons) und der „Neu analysieren"- sowie „In Kalender"-Button im Posteingang verwenden jetzt schlanke SVG-Icons in Textfarbe. Funktionale Status-Punkte (rot/grün/blau-Kategorien) und Markdown-Callouts im Editor bleiben unverändert.
+
+### Fixes
+
+- **Fehlende Übersetzung „Projekt-Status" in der Modell-Kompatibilitäts-Anzeige**: In der Modul-Kompatibilitäts-Sektion der Einstellungen tauchte für den Projekt-Status der Übersetzungs-Key statt eines Klartext-Namens auf. Deutsche und englische Bezeichnung ergänzt.
+
 ## [0.7.4-beta] - 2026-05-27
 
 ### Features

@@ -1,11 +1,11 @@
 ---
-id: workflow-email-uebersicht
+id: szenario-email-uebersicht
 keywords: [mail, email, überblick, posteingang, antworten, dringend, termine, kalender, aufgaben]
 suggestsModules: [email]
 suggestsWidgets: [emails, focus, tasks, calendar]
 ---
 
-# Workflow: Tagesüberblick Mail/Termine/Aufgaben
+# Szenario: Tagesüberblick Mail/Termine/Aufgaben
 
 ## Für wen
 Wer morgens beim Aufschlagen sehen will: was ist dringend zu

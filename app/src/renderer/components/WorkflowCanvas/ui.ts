@@ -1,6 +1,6 @@
 // Workflow Canvas — UI-Metadaten (Farben/Icons). Bewusst getrennt von der
 // reinen shared-Registry. Farben nach Plan-Abschnitt „UX-Details / Port-Farben".
-import type { WorkflowPortKind, WorkflowModuleId } from '../../../shared/workflow/types'
+import type { WorkflowPortKind } from '../../../shared/workflow/types'
 
 export const PORT_COLORS: Record<WorkflowPortKind, string> = {
   email: '#3b82f6',           // Blau
@@ -23,15 +23,4 @@ export const PORT_COLORS: Record<WorkflowPortKind, string> = {
 
 export function portColor(kind: WorkflowPortKind): string {
   return PORT_COLORS[kind] || '#9ca3af'
-}
-
-export const MODULE_ICONS: Record<WorkflowModuleId, string> = {
-  email: '📧',
-  project: '📁',
-  ollama: '🧠',
-  notes: '📝',
-  human: '👤',
-  calendar: '📅',
-  edoobox: '🎓',
-  antares: '📦'
 }

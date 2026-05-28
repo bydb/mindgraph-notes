@@ -18,6 +18,8 @@ import { useNotesStore } from '../../stores/notesStore'
 import { useUIStore } from '../../stores/uiStore'
 import type { DiscoveredProject, ProjectPriority } from '../../../shared/types'
 import { isHardLocked } from '../../../shared/modelCompatibility'
+import { ActiveModelBadge } from '../Shared/ActiveModelBadge'
+import { IconClipboard, IconRefresh, IconTag, IconTrash } from '../Shared/Icons'
 import './ProjectStatusWidget.css'
 
 const STALE_THRESHOLD_DAYS = 14
@@ -187,10 +189,12 @@ export const ProjectStatusWidget: React.FC<ProjectStatusWidgetProps> = () => {
   return (
     <div className="project-status-widget">
       <div className="psw-header">
-        <h3 className="psw-title">
-          {lang === 'de' ? '📋 Projekt-Status' : '📋 Project status'}
+        <h3 className="psw-title" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+          <IconClipboard size={16} />
+          <span>{lang === 'de' ? 'Projekt-Status' : 'Project status'}</span>
         </h3>
         <div className="psw-header-actions">
+          <ActiveModelBadge moduleId="project-status" />
           <button
             className="psw-btn psw-btn--ghost"
             onClick={() => projectsRootFolder && load(vaultPath, projectsRootFolder)}
@@ -523,11 +527,11 @@ const ProjectRow: React.FC<ProjectRowProps> = ({ project, lang, running, lastRes
               : `${synonymCount} synonyms · ${days} day${days === 1 ? '' : 's'} ago · click to regenerate`
           })()}
         >
-          {synonymRunning
-            ? (lang === 'de' ? '🔄 …' : '🔄 …')
-            : synonymCount > 0
-              ? `🏷 ${synonymCount}`
-              : (lang === 'de' ? '🏷 Synonyme' : '🏷 Synonyms')}
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+            {synonymRunning
+              ? <><IconRefresh size={12} /> …</>
+              : <><IconTag size={12} /> {synonymCount > 0 ? synonymCount : (lang === 'de' ? 'Synonyme' : 'Synonyms')}</>}
+          </span>
         </button>
         <button
           className="psw-btn psw-btn--primary psw-btn--small"
@@ -744,9 +748,11 @@ const FindingGroup: React.FC<FindingGroupProps> = ({ title, description, finding
               onClick={() => onRemove(f.ref)}
               disabled={busyRef !== null}
             >
-              {busyRef === f.ref
-                ? (lang === 'de' ? 'entferne …' : 'removing …')
-                : (lang === 'de' ? '🗑 Aus Notiz entfernen' : '🗑 Remove from note')}
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                {busyRef === f.ref
+                  ? (lang === 'de' ? 'entferne …' : 'removing …')
+                  : <><IconTrash size={12} /> {lang === 'de' ? 'Aus Notiz entfernen' : 'Remove from note'}</>}
+              </span>
             </button>
           </li>
         ))}
@@ -1125,9 +1131,11 @@ const DraftsCleanupModal: React.FC<DraftsCleanupModalProps> = ({ vaultPath, proj
                         onClick={() => handleDelete(r.rel)}
                         disabled={busyRel === r.rel || bulkBusy}
                       >
-                        {busyRel === r.rel
-                          ? (lang === 'de' ? 'löschen …' : 'deleting …')
-                          : (lang === 'de' ? '🗑 Löschen' : '🗑 Delete')}
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                          {busyRel === r.rel
+                            ? (lang === 'de' ? 'löschen …' : 'deleting …')
+                            : <><IconTrash size={12} /> {lang === 'de' ? 'Löschen' : 'Delete'}</>}
+                        </span>
                       </button>
                     </div>
                   </li>

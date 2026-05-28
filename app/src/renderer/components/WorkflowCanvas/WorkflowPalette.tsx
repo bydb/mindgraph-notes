@@ -2,7 +2,7 @@ import { actionsByModule, WORKFLOW_MODULE_LABELS } from '../../../shared/workflo
 import { MODULE_FEATURE_GATE, type WorkflowModuleId } from '../../../shared/workflow/types'
 import type { VaultFeatures } from '../../../shared/types'
 import { useVaultSettingsStore } from '../../stores/vaultSettingsStore'
-import { MODULE_ICONS } from './ui'
+import { ModuleIcon } from './ModuleIcon'
 
 interface Props {
   onAdd: (actionId: string) => void
@@ -28,7 +28,9 @@ export function WorkflowPalette({ onAdd }: Props) {
         return (
           <div className={`wf-palette__group ${active ? '' : 'wf-palette__group--disabled'}`} key={moduleId}>
             <div className="wf-palette__group-title">
-              <span>{MODULE_ICONS[moduleId]}</span>
+              <span aria-hidden="true" style={{ display: 'inline-flex', alignItems: 'center' }}>
+                <ModuleIcon moduleId={moduleId} size={14} />
+              </span>
               <span>{WORKFLOW_MODULE_LABELS[moduleId]}</span>
               {!active && <span className="wf-palette__off" title="Modul in Einstellungen deaktiviert">aus</span>}
             </div>

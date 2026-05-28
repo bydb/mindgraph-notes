@@ -2,7 +2,9 @@ import { Handle, Position, type NodeProps } from 'reactflow'
 import type { WorkflowActionDefinition } from '../../../shared/workflow/types'
 import { canConnect } from '../../../shared/workflow/validation'
 import { useWorkflowStore } from '../../stores/workflowStore'
-import { portColor, MODULE_ICONS } from './ui'
+import { portColor } from './ui'
+import { ModuleIcon } from './ModuleIcon'
+import { IconWarning, IconLock, IconBrain, IconShield, IconCloud, IconFlag } from '../Shared/Icons'
 
 export interface WorkflowNodeData {
   action: WorkflowActionDefinition
@@ -27,15 +29,17 @@ export function WorkflowNodeCard({ id, data, selected }: NodeProps<WorkflowNodeD
   return (
     <div className={`wf-node ${selected ? 'wf-node--selected' : ''} ${hasError ? 'wf-node--error' : ''}`}>
       <div className="wf-node__header">
-        <span className="wf-node__icon">{MODULE_ICONS[action.moduleId]}</span>
+        <span className="wf-node__icon" aria-hidden="true">
+          <ModuleIcon moduleId={action.moduleId} size={14} />
+        </span>
         <span className="wf-node__label">{action.label}</span>
         <span className="wf-node__badges">
-          {hasError && <span title="Konfiguration unvollständig">⚠️</span>}
-          {action.isWrite && <span title="Schreibende Aktion — braucht Freigabe">🔒</span>}
-          {action.privacy?.localOnly && <span title="Läuft lokal (Ollama)">🧠</span>}
-          {action.privacy?.containsPersonalData && <span title="Personenbezogene Daten">🛡️</span>}
-          {action.privacy?.sendsExternalRequest && <span title="Externe API">☁️</span>}
-          {action.isTerminal && <span title="Endpunkt: Mensch übernimmt">🏁</span>}
+          {hasError && <span title="Konfiguration unvollständig" style={{ color: 'var(--warning, #d97706)' }}><IconWarning size={12} /></span>}
+          {action.isWrite && <span title="Schreibende Aktion — braucht Freigabe"><IconLock size={12} /></span>}
+          {action.privacy?.localOnly && <span title="Läuft lokal (Ollama)"><IconBrain size={12} /></span>}
+          {action.privacy?.containsPersonalData && <span title="Personenbezogene Daten"><IconShield size={12} /></span>}
+          {action.privacy?.sendsExternalRequest && <span title="Externe API"><IconCloud size={12} /></span>}
+          {action.isTerminal && <span title="Endpunkt: Mensch übernimmt"><IconFlag size={12} /></span>}
         </span>
       </div>
 

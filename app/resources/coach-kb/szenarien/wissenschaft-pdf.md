@@ -1,12 +1,12 @@
 ---
-id: workflow-wissenschaft
+id: szenario-wissenschaft
 keywords: [wissenschaft, forschung, paper, pdf, literatur, doktorarbeit, masterarbeit, recherche, bibliographie]
 suggestsModules: [zotero, semantic-scholar, smart-connections, docling, readwise]
 suggestsWidgets: [focus, activity, project-status]
 suggestsProfile: researcher
 ---
 
-# Workflow: Wissenschaft & PDF-Berge
+# Szenario: Wissenschaft & PDF-Berge
 
 ## Für wen
 Wer mit vielen PDFs arbeitet, regelmäßig Paper sucht, zitiert und

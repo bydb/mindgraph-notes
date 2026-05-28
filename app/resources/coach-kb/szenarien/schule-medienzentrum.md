@@ -1,12 +1,12 @@
 ---
-id: workflow-schule-medienzentrum
+id: szenario-schule-medienzentrum
 keywords: [schule, lehrer, medienzentrum, unterricht, klasse, fortbildung, schulamt, mz, verleih]
 suggestsModules: [antares, mz-suite, email]
 suggestsWidgets: [antares, emails, focus, tasks]
 suggestsProfile: professional
 ---
 
-# Workflow: Schule & Medienzentrum
+# Szenario: Schule & Medienzentrum
 
 ## Für wen
 Lehrkräfte und Medienzentrums-Mitarbeitende, die Verleih, Fortbildungs-

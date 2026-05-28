@@ -1,12 +1,12 @@
 ---
-id: workflow-projektmgmt
+id: szenario-projektmgmt
 keywords: [projekt, projekte, leitung, überblick, status, fortschritt, koordination, team, kanban]
 suggestsModules: [notes-chat]
 suggestsWidgets: [focus, tasks, project-status, calendar]
 suggestsProfile: professional
 ---
 
-# Workflow: Projekte koordinieren
+# Szenario: Projekte koordinieren
 
 ## Für wen
 Wer mehrere Projekte parallel führt und den Überblick über Aufgaben,

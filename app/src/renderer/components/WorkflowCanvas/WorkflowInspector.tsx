@@ -2,6 +2,7 @@ import { useWorkflowStore } from '../../stores/workflowStore'
 import { useUIStore } from '../../stores/uiStore'
 import { getActionById } from '../../../shared/workflow/registry'
 import type { WorkflowConfigField } from '../../../shared/workflow/types'
+import { IconWarning } from '../Shared/Icons'
 
 export function WorkflowInspector() {
   const selectedNodeId = useWorkflowStore(s => s.selectedNodeId)
@@ -79,9 +80,14 @@ export function WorkflowInspector() {
       {action.description && <p className="wf-inspector__desc">{action.description}</p>}
 
       {action.hardLockModule && (
-        <p className="wf-inspector__note">
-          ⚠️ Verarbeitet untrusted Inhalt mit einem LLM — der Runner prüft die Modell-Freigabe
-          (Modul <code>{action.hardLockModule}</code>) und blockiert rot-gelockte Modelle.
+        <p className="wf-inspector__note" style={{ display: 'flex', alignItems: 'flex-start', gap: '6px' }}>
+          <span style={{ color: 'var(--warning, #d97706)', flexShrink: 0, marginTop: '2px' }}>
+            <IconWarning size={14} />
+          </span>
+          <span>
+            Verarbeitet untrusted Inhalt mit einem LLM — der Runner prüft die Modell-Freigabe
+            (Modul <code>{action.hardLockModule}</code>) und blockiert rot-gelockte Modelle.
+          </span>
         </p>
       )}
 

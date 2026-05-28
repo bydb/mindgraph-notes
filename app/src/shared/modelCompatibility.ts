@@ -1,9 +1,10 @@
 // Modell-Kompatibilitäts-Matrix für lokale Ollama-Modelle in MindGraph Notes.
 // Quelle der Wahrheit für die Settings-UI ("Beipackzettel" pro Modul).
 //
-// Datenstand: 2026-05-14 — basierend auf Benchmarks in
+// Datenstand: 2026-05-28 — basierend auf Benchmarks in
 // /Users/jochenleeder/dev/brain-model-benchmark/ und
 // "Modell-Kompatibilitaets-Analyse.md".
+// 2026-05-28: qwen3.6:27b-mlx ergänzt (MLX-quantisiertes 27B, ~19 GB).
 //
 // "verdict":
 //   - "green":     Für dieses Modul produktiv geeignet.
@@ -66,7 +67,7 @@ export interface ModelCompatibilityData {
 }
 
 export const MODEL_COMPATIBILITY: ModelCompatibilityData = {
-  version: '2026-05-14',
+  version: '2026-05-28',
   modules: {
     brain: {
       'qwen3.5:9b-mlx-bf16': {
@@ -95,6 +96,12 @@ export const MODEL_COMPATIBILITY: ModelCompatibilityData = {
         reasons: [],
         notes: 'Einziges Modell, das Regel 5 (leere Sektionen weglassen) korrekt befolgt.',
         metrics: { formatCompliancePct: 100, wikilinkHallucinations: 'none', criticalTitlesLinkedPct: 80, rule5CompliancePct: 100, latencySecondsPerRun: 11, ramGigabytes: 6 }
+      },
+      'qwen3.6:27b-mlx': {
+        verdict: 'green',
+        reasons: ['Regel 5 in 1/4 Fällen verletzt (leere "Offene Fäden"-Sektion bei stillem Tag)'],
+        notes: '0 Halluzinationen, 0 unangebrachte Bewertungen — sehr sauber. Aber ~47 s/Lauf (langsamstes Brain-Modell der Matrix).',
+        metrics: { wikilinkHallucinations: 'none', criticalTitlesLinkedPct: 70, rule5CompliancePct: 25, latencySecondsPerRun: 47, ramGigabytes: 22 }
       }
     },
     'task-extraction': {
@@ -123,6 +130,12 @@ export const MODEL_COMPATIBILITY: ModelCompatibilityData = {
         verdict: 'yellow',
         reasons: ['Recall nur 88 % — gelegentlich vergessene Aufgaben'],
         metrics: { directionAccuracyPct: 88, recallPct: 88 }
+      },
+      'qwen3.6:27b-mlx': {
+        verdict: 'green',
+        reasons: [],
+        notes: 'Beste for_whom-Genauigkeit der Matrix (100 %, 10/10). 9/10 Reply-Erkennung. ~9 s/Mail (langsamer als gemma4/ministral, aber präziser).',
+        metrics: { directionAccuracyPct: 100, recallPct: 100, latencySecondsPerRun: 9, ramGigabytes: 22 }
       }
     },
     'mail-summary': {
@@ -154,6 +167,12 @@ export const MODEL_COMPATIBILITY: ModelCompatibilityData = {
         reasons: [],
         notes: 'Beste Relevance-Range-Compliance (7/8), schnell.',
         metrics: { recallPct: 96, latencySecondsPerRun: 6, ramGigabytes: 6 }
+      },
+      'qwen3.6:27b-mlx': {
+        verdict: 'yellow',
+        reasons: ['Relevance-Range nur 6/8 (überschätzt klare Anfragen, unterschätzt Reservierungs-Bestätigungen)', 'Halluzinations-Token-Ratio 31.8 % — höchste der getesteten Modelle', '~14 s/Mail (langsamstes Modell der Matrix für mail-summary)'],
+        notes: 'Sentiment + needsReply perfekt (8/8). Für Sicherheit relevant, aber zu langsam und zu kreativ für Produktiv-Einsatz.',
+        metrics: { recallPct: 97, latencySecondsPerRun: 14, ramGigabytes: 22 }
       }
     },
     'dashboard-snapshot': {
@@ -184,6 +203,12 @@ export const MODEL_COMPATIBILITY: ModelCompatibilityData = {
         reasons: [],
         notes: 'Perfekter Lauf (8/8), erkennt Injection, präzise Skala.',
         metrics: { recallPct: 100, latencySecondsPerRun: 1, ramGigabytes: 6 }
+      },
+      'qwen3.6:27b-mlx': {
+        verdict: 'green',
+        reasons: ['1/8 Range-Drift: überfällige Deadline (d02) als "nicht mehr akut" gewertet, Score 0 statt 81–100 — Interpretations-Sache, kein Bug'],
+        notes: 'Prompt-Injection sauber erkannt (8/8). 7/8 Score in Range, 7/8 Reason-Match. ~5 s/Notiz — langsamer als gemma4/ministral, schneller als qwen3.6:latest.',
+        metrics: { recallPct: 95, latencySecondsPerRun: 5, ramGigabytes: 22 }
       }
     },
     'smart-connections':   {},
@@ -192,6 +217,10 @@ export const MODEL_COMPATIBILITY: ModelCompatibilityData = {
     // gemma4:latest produzierte saubere Status-Drafts mit 0–1 ⚠ pro Lauf,
     // qwen3.6:latest stärker bei langen Quellenketten, aber 25s/Lauf.
     // Kleine Modelle (≤8B) neigten zu generischen Floskeln in "Diese Woche".
+    // 2026-05-28: qwen3.6:27b-mlx ergänzt — 4 Runs gegen Crystallizer-Prompt
+    // (`bench-project-status.mjs`): saubere Struktur, korrekte Wikilink-Form
+    // ([[YYYY-MM-DD]]), keine Halluzinationen, keine Floskeln. Latenz
+    // 18–49 s/Projekt (Ø ~32 s), ~2,5× langsamer als gemma4:latest.
     'project-status':      {
       'gemma4:latest': {
         verdict: 'green',
@@ -204,6 +233,12 @@ export const MODEL_COMPATIBILITY: ModelCompatibilityData = {
         reasons: [],
         notes: 'Beste Qualität bei vielen Quellen, aber langsam (~90 s/Projekt) und ≥48 GB RAM.',
         metrics: { latencySecondsPerRun: 90, ramGigabytes: 48 }
+      },
+      'qwen3.6:27b-mlx': {
+        verdict: 'green',
+        reasons: [],
+        notes: 'Sauberer Output mit konsistenten Wikilinks, keine Halluzinationen. ~32 s/Projekt — etwa 2,5× langsamer als gemma4:latest, aber deutlich schneller als qwen3.6:latest. ~19 GB RAM.',
+        metrics: { latencySecondsPerRun: 32, ramGigabytes: 19 }
       },
       'ministral-3:8b': {
         verdict: 'yellow',
