@@ -94,7 +94,7 @@ export const CoachStep: React.FC<CoachStepProps> = ({
         <h2 className="onboarding-step-title">{t('onboarding.coach.title')}</h2>
         {coach.backend && (
           <span className="onboarding-coach-backend" title={coach.backendDetail}>
-            {coach.backend === 'anthropic' ? 'Claude (Cloud)' : 'Ollama (lokal)'}
+            Ollama
           </span>
         )}
       </div>

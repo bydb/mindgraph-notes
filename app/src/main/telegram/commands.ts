@@ -4,9 +4,9 @@
 import type { Context, InlineKeyboard } from 'grammy'
 import { promises as fs } from 'fs'
 import path from 'path'
-import { tasksDueToday, tasksOverdue, tasksThisWeek, searchVault, formatTaskList, eventsForRange, formatEventList, loadPriorityNotes, formatPriorityNoteList } from './vaultQueries'
+import { tasksDueToday, tasksOverdue, tasksThisWeek, searchVault, formatTaskList, eventsForRange, formatEventList, loadPriorityNotes, formatPriorityNoteList, findProjectStatusDrafts, loadRecentBrainEntry } from './vaultQueries'
 import { generateBriefing } from './briefing'
-import { chat, type ChatBackend } from '../llm/chatClient'
+import { chat } from '../llm/chatClient'
 import { runAgent } from './agent/loop'
 import { ToolRegistry } from './agent/tools/registry'
 import { noteSearchTool, noteReadTool, noteCreateTool, noteAppendTool } from './agent/tools/notes'
@@ -19,9 +19,6 @@ const DEFAULT_AGENT_INBOX_FOLDER = '000 - 📥 inbox/010 - 📥 Notes'
 export interface CommandDeps {
   vaultPath: () => string | null
   excludedFolders: () => string[]
-  backend: () => ChatBackend
-  anthropicApiKey: () => string | null
-  anthropicModel: () => string
   ollamaModel: () => string
   includeEmails: () => boolean
   includeOverdue: () => boolean
@@ -42,7 +39,9 @@ const HELP_TEXT = `*MindGraph Bot* — Befehle:
 /week — Tasks der nächsten 7 Tage
 /agenda — Termine heute + morgen (macOS-Kalender)
 /inbox — neueste Notizen aus priorisierten Ordnern
-/briefing — kompaktes Morning-Briefing
+/briefing — kompaktes Morning-Briefing (mit Brain-Tagesgedächtnis)
+/brain — heutiges Tagesgedächtnis (oder gestriges, falls noch nichts da)
+/status [suche] — aktuelle Projekt-Status-Drafts (\`_STATUS-*.md\`)
 /ask <frage> — Frage zum Vault stellen
 /agent <auftrag> — Agent kann lesen + (mit Bestätigung) schreiben
 /help — diese Hilfe
@@ -158,9 +157,6 @@ export async function handleBriefing(ctx: Context, deps: CommandDeps): Promise<v
     const briefing = await generateBriefing({
       vaultPath: vault,
       excludedFolders: deps.excludedFolders(),
-      backend: deps.backend(),
-      anthropicApiKey: deps.anthropicApiKey() ?? undefined,
-      anthropicModel: deps.anthropicModel(),
       ollamaModel: deps.ollamaModel(),
       includeEmails: deps.includeEmails(),
       includeOverdue: deps.includeOverdue()
@@ -169,6 +165,70 @@ export async function handleBriefing(ctx: Context, deps: CommandDeps): Promise<v
   } catch (err) {
     console.error('[Telegram] briefing failed:', err)
     await ctx.reply(`❌ Briefing fehlgeschlagen: ${err instanceof Error ? err.message : 'unbekannt'}`)
+  }
+}
+
+export async function handleBrain(ctx: Context, deps: CommandDeps): Promise<void> {
+  const vault = await requireVault(ctx, deps)
+  if (!vault) return
+  await ctx.replyWithChatAction('typing')
+  try {
+    // Wir zeigen den Vollinhalt — keine LLM-Verdichtung. /briefing macht die
+    // KI-Sicht, /brain liefert das Original-Tagebuch zum Nachlesen.
+    const brain = await loadRecentBrainEntry(vault, undefined, 3500)
+    if (!brain) {
+      await ctx.reply(
+        '🧠 Noch kein Tagesgedächtnis für heute oder gestern.\n\nIn MindGraph: Dashboard → Brain-Widget → „Tag konsolidieren".',
+        { parse_mode: 'Markdown' }
+      )
+      return
+    }
+    const heading = brain.isToday
+      ? `🧠 *Brain — heute* (${brain.date})`
+      : `🧠 *Brain — gestern* (${brain.date}, heute noch nicht geschrieben)`
+    await safeReplyMarkdown(ctx, `${heading}\n\n${brain.content}`)
+  } catch (err) {
+    console.error('[Telegram] brain failed:', err)
+    await ctx.reply(`❌ Brain-Abruf fehlgeschlagen: ${err instanceof Error ? err.message : 'unbekannt'}`)
+  }
+}
+
+export async function handleStatus(ctx: Context, deps: CommandDeps, filter: string): Promise<void> {
+  const vault = await requireVault(ctx, deps)
+  if (!vault) return
+  await ctx.replyWithChatAction('typing')
+  try {
+    const drafts = await findProjectStatusDrafts({
+      vaultPath: vault,
+      excludedFolders: deps.excludedFolders(),
+      filter: filter.trim() || undefined,
+      maxResults: 8
+    })
+    if (drafts.length === 0) {
+      const hint = filter.trim()
+        ? `📋 Keine _STATUS-Drafts mit „${filter.trim()}" im Pfad gefunden.`
+        : '📋 Keine _STATUS-Drafts im Vault gefunden.\n\nDie Drafts entstehen im Dashboard → Projekt-Status-Widget → „Status erzeugen".'
+      await ctx.reply(hint, { parse_mode: 'Markdown' })
+      return
+    }
+    const formatRelative = (ms: number): string => {
+      const diffMin = Math.floor((Date.now() - ms) / 60000)
+      if (diffMin < 60) return `${diffMin} min`
+      const diffHours = Math.floor(diffMin / 60)
+      if (diffHours < 24) return `${diffHours} h`
+      const diffDays = Math.floor(diffHours / 24)
+      return `${diffDays} d`
+    }
+    const header = filter.trim()
+      ? `📋 *Status-Drafts* (${drafts.length}, Filter „${filter.trim()}"):\n`
+      : `📋 *Status-Drafts* (${drafts.length}):\n`
+    const blocks = drafts.map(d => {
+      return `*${d.projectFolder}* · _${d.fileName}_ · ${formatRelative(d.mtimeMs)} alt\n${d.excerpt}`
+    })
+    await safeReplyMarkdown(ctx, `${header}\n${blocks.join('\n\n———\n\n')}`)
+  } catch (err) {
+    console.error('[Telegram] status failed:', err)
+    await ctx.reply(`❌ Status-Abruf fehlgeschlagen: ${err instanceof Error ? err.message : 'unbekannt'}`)
   }
 }
 
@@ -232,9 +292,6 @@ ${context}`
         { role: 'user', content: question }
       ],
       {
-        backend: deps.backend(),
-        anthropicApiKey: deps.anthropicApiKey() ?? undefined,
-        anthropicModel: deps.anthropicModel(),
         ollamaModel: deps.ollamaModel(),
         maxTokens: 800
       }
@@ -281,9 +338,6 @@ export async function handleAgent(ctx: Context, deps: CommandDeps, instruction: 
       confirmRequiredTools: confirmTools,
       maxIterations: Math.max(1, Math.min(15, deps.agentMaxIterations())),
       chatOptions: {
-        backend: deps.backend(),
-        anthropicApiKey: deps.anthropicApiKey() ?? undefined,
-        anthropicModel: deps.anthropicModel(),
         ollamaModel: deps.ollamaModel(),
         maxTokens: 1500
       },

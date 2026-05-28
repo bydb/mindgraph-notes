@@ -38,7 +38,7 @@ export interface CoachMessage {
 }
 
 export type CoachPhase = 'idle' | 'precheck' | 'asking' | 'planning' | 'done' | 'error'
-export type CoachBackend = 'anthropic' | 'ollama' | 'none' | null
+export type CoachBackend = 'ollama' | 'none' | null
 
 interface CoachState {
   phase: CoachPhase
@@ -112,7 +112,7 @@ export const useCoachStore = create<CoachState>((set, get) => ({
       // Bei Restart: vault gilt als bereit, choose-vault wird nicht erneut vorgeschlagen
       set({
         phase: 'asking',
-        backend: start.backend === 'anthropic' || start.backend === 'ollama' ? start.backend : null,
+        backend: start.backend === 'ollama' ? start.backend : null,
         backendDetail: pre.detail,
         conversation: [greetMsg],
         vaultReady: isRestart,

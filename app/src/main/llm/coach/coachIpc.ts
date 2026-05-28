@@ -38,14 +38,12 @@ export function registerCoachIpc(): void {
     question: string
     history: ChatMessage[]
     language: Language
-    backend?: 'ollama' | 'anthropic'
   }) => {
     try {
       const result = await coachAsk({
         question: args.question,
         history: args.history ?? [],
-        language: args?.language === 'en' ? 'en' : 'de',
-        backend: args?.backend === 'anthropic' ? 'anthropic' : 'ollama'
+        language: args?.language === 'en' ? 'en' : 'de'
       })
       return { ok: true as const, text: result.text, backend: result.backend }
     } catch (err) {

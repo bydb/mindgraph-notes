@@ -402,20 +402,16 @@ export const DASHBOARD_ALL_WIDGETS: DashboardWidgetId[] = ['focus', 'radar', 'ac
 
 const normalizeVaultFolder = (folder: string): string => folder.trim().replace(/^\/+|\/+$/g, '')
 
-// Telegram Bot Settings
-export type TelegramLlmBackend = 'ollama' | 'anthropic' | 'auto'
-
+// Telegram Bot Settings — nutzt ausschließlich Ollama (lokal oder -cloud-Modelle).
 export interface TelegramBotSettings {
   enabled: boolean
   allowedChatIds: string[]      // Whitelist — nur diese Chat-IDs dürfen mit dem Bot reden
-  llmBackend: TelegramLlmBackend // 'auto' = Ollama wenn erreichbar, sonst Anthropic
-  anthropicModel: string         // z.B. 'claude-sonnet-4-6'
-  ollamaModel: string            // fallback / direct choice
+  ollamaModel: string            // konkretes Ollama-Modell (lokal oder -cloud)
   briefingIncludeEmails: boolean
   briefingIncludeOverdue: boolean
   priorityFolders: string[]     // Vault-relative Ordnerpfade — Notizen dort werden bei /ask + /inbox bevorzugt
   active: boolean                // true = Bot läuft (wird vom Main-Prozess aus gesetzt/gelesen)
-  agentEnabled: boolean         // /agent verfügbar (Tool-Use-Loop, nur Ollama)
+  agentEnabled: boolean         // /agent verfügbar (Tool-Use-Loop)
   agentInboxFolder: string      // Default-Ordner für note_create
   agentMaxIterations: number    // Hard-Limit gegen Loops (1-15)
   agentAllowedTools: string[]   // Tool-Namen, die der Agent benutzen darf
@@ -636,10 +632,6 @@ interface UIState {
   // Persistent: wurde der CoachBot schon mal geöffnet? Steuert den
   // Erstnutzer-Pulse-Hinweis am Header-Button.
   coachBotEverOpened: boolean
-  // Backend-Wahl für den CoachBot. Privacy-first: Default 'ollama'.
-  // 'anthropic' nur wenn der User es bewusst umschaltet (und einen Key
-  // hinterlegt hat).
-  coachBotBackend: 'ollama' | 'anthropic'
 
   // Slash Commands
   slashCommandDateFormat: string
@@ -732,7 +724,6 @@ interface UIState {
   setCoachCompleted: (completed: boolean, extra?: { acceptedActionIds?: string[]; suggestedProfile?: UserProfile; finishedAt?: number | null }) => void
   resetCoachState: () => void
   setCoachBotOpen: (open: boolean) => void
-  setCoachBotBackend: (backend: 'ollama' | 'anthropic') => void
   setSlashCommandDateFormat: (format: string) => void
   setSlashCommandTimeFormat: (format: string) => void
   setShowFormattingToolbar: (show: boolean) => void
@@ -1008,7 +999,6 @@ const defaultState = {
   // CoachBot (transient)
   coachBotOpen: false,
   coachBotEverOpened: false,
-  coachBotBackend: 'ollama' as 'ollama' | 'anthropic',
 
   // Slash Commands
   slashCommandDateFormat: 'DD.MM.YYYY',
@@ -1050,8 +1040,6 @@ const defaultState = {
   telegramBot: {
     enabled: false,
     allowedChatIds: [],
-    llmBackend: 'auto' as TelegramLlmBackend,
-    anthropicModel: 'claude-sonnet-4-6',
     ollamaModel: '',
     briefingIncludeEmails: true,
     briefingIncludeOverdue: true,
@@ -1093,7 +1081,6 @@ const persistedKeys = [
   'userProfile',
   'coach',
   'coachBotEverOpened',
-  'coachBotBackend',
   'slashCommandDateFormat',
   'slashCommandTimeFormat',
   'showFormattingToolbar',
@@ -1251,7 +1238,6 @@ export const useUIStore = create<UIState>()((set, get) => ({
     }
   }),
   setCoachBotOpen: (open) => set({ coachBotOpen: open }),
-  setCoachBotBackend: (backend) => set({ coachBotBackend: backend }),
   setSlashCommandDateFormat: (format) => set({ slashCommandDateFormat: format }),
   setSlashCommandTimeFormat: (format) => set({ slashCommandTimeFormat: format }),
   setShowFormattingToolbar: (show) => set({ showFormattingToolbar: show }),

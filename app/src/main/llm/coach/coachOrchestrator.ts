@@ -1,32 +1,12 @@
 // Coach-Conversation-Loop. Kombiniert KB-Retrieval, System-Prompt-Build, den
-// bestehenden chatClient (Ollama/Anthropic mit auto-Backend) und parsing der
-// Action-Vorschläge. Liefert {text, actions} pro User-Turn an die IPC-Ebene.
-//
-// Kein Streaming im MVP — chatClient liefert ganze Responses. Latenz auf Ollama
-// (Sonnet ~2-4 s) ist akzeptabel und vereinfacht die IPC erheblich.
+// bestehenden chatClient (Ollama — lokal oder Ollama-Cloud, z.B.
+// `ministral-3:14b-cloud`) und das Parsing der Action-Vorschläge. Liefert
+// {text, actions} pro User-Turn an die IPC-Ebene.
 
-import { app, safeStorage } from 'electron'
-import * as fs from 'node:fs/promises'
-import * as path from 'node:path'
-import { chat, type ChatBackend, type ChatMessage } from '../chatClient'
+import { chat, type ChatMessage } from '../chatClient'
 import { retrieveKb } from './coachKbRetriever'
 import { buildSystemPrompt, buildQaSystemPrompt, greeting, type Language } from './coachPrompt'
 import { extractActionFence, validateAction, type CoachAction } from './coachActions'
-
-// Anthropic-Key wird im Telegram-Modul über safeStorage in
-// userData/anthropic-api-key.enc gespeichert. Wir lesen dieselbe Datei.
-function getAnthropicKeyPath(): string {
-  return path.join(app.getPath('userData'), 'anthropic-api-key.enc')
-}
-async function loadAnthropicKey(): Promise<string | null> {
-  try {
-    if (!safeStorage.isEncryptionAvailable()) return null
-    const encrypted = await fs.readFile(getAnthropicKeyPath())
-    return safeStorage.decryptString(encrypted)
-  } catch {
-    return null
-  }
-}
 
 async function isOllamaReachable(url = 'http://localhost:11434'): Promise<boolean> {
   try {
@@ -37,7 +17,7 @@ async function isOllamaReachable(url = 'http://localhost:11434'): Promise<boolea
   }
 }
 
-export type CoachBackendDetail = 'anthropic' | 'ollama' | 'none'
+export type CoachBackendDetail = 'ollama' | 'none'
 
 export interface CoachPrecheckResult {
   backend: CoachBackendDetail
@@ -45,16 +25,12 @@ export interface CoachPrecheckResult {
 }
 
 export async function coachPrecheck(): Promise<CoachPrecheckResult> {
-  const anthropicKey = await loadAnthropicKey()
-  if (anthropicKey) {
-    return { backend: 'anthropic', detail: 'Anthropic-API-Key vorhanden' }
-  }
   if (await isOllamaReachable()) {
     return { backend: 'ollama', detail: 'Ollama lokal erreichbar' }
   }
   return {
     backend: 'none',
-    detail: 'Weder Anthropic-Key noch Ollama verfügbar. Bitte in den Einstellungen einrichten.'
+    detail: 'Ollama nicht erreichbar. Bitte Ollama starten oder ein -cloud-Modell mit `ollama signin` einrichten.'
   }
 }
 
@@ -71,7 +47,7 @@ export interface CoachTurnResult {
   text: string
   actions: CoachAction[]
   assistantMessage: ChatMessage    // an History anhängen
-  backend: 'ollama' | 'anthropic'
+  backend: 'ollama'
   parseWarnings: string[]          // ungültige Action-Vorschläge wandern hierher
 }
 
@@ -95,10 +71,6 @@ export async function coachTurn(input: CoachTurnInput): Promise<CoachTurnResult>
     editorModeChosen: input.acceptedActionTypes.includes('set-editor-mode')
   })
 
-  // 3. Backend-Auswahl: chatClient mit 'auto' — versucht erst Ollama, sonst Anthropic
-  const anthropicKey = await loadAnthropicKey()
-  const backend: ChatBackend = 'auto'
-
   // History limitieren (max 12 Nachrichten = ~6 Turns) — Context-Window-Schutz
   const limitedHistory = input.history.slice(-12)
 
@@ -108,11 +80,7 @@ export async function coachTurn(input: CoachTurnInput): Promise<CoachTurnResult>
     { role: 'user', content: input.userText }
   ]
 
-  const result = await chat(messages, {
-    backend,
-    anthropicApiKey: anthropicKey ?? undefined,
-    maxTokens: 1200
-  })
+  const result = await chat(messages, { maxTokens: 1200 })
 
   // 4. Action-Fence extrahieren & validieren
   const { text, rawActions } = extractActionFence(result.text)
@@ -162,14 +130,11 @@ export interface CoachAskInput {
   question: string
   history: ChatMessage[]    // ephemerer Verlauf, vom Renderer geliefert
   language: Language
-  /** Bewusste Backend-Wahl vom User. Default-Verhalten: privacy-first lokal.
-   *  Anthropic nur wenn der User explizit umschaltet. */
-  backend?: 'ollama' | 'anthropic'
 }
 
 export interface CoachAskResult {
   text: string
-  backend: 'ollama' | 'anthropic'
+  backend: 'ollama'
 }
 
 export async function coachAsk(input: CoachAskInput): Promise<CoachAskResult> {
@@ -178,20 +143,6 @@ export async function coachAsk(input: CoachAskInput): Promise<CoachAskResult> {
   const kbDocs = kbHits.map(h => h.doc)
 
   const system = buildQaSystemPrompt({ kbDocs, language: input.language })
-  const anthropicKey = await loadAnthropicKey()
-  // Privacy-first: explizite Backend-Wahl respektieren. Default ist 'ollama',
-  // selbst wenn ein Anthropic-Key vorhanden ist — der Cloud-Modus wird erst
-  // aktiv, wenn der User ihn im CoachBot bewusst umschaltet.
-  const backend: ChatBackend = input.backend === 'anthropic' ? 'anthropic' : 'ollama'
-
-  // Wenn der User Cloud will, aber kein Key da ist → klarer Fehler
-  if (backend === 'anthropic' && !anthropicKey) {
-    throw new Error(
-      input.language === 'de'
-        ? 'Cloud-Modus (Claude) gewählt, aber kein Anthropic-API-Key gespeichert. Wechsle auf Lokal oder trage einen Key ein (Settings → Telegram).'
-        : 'Cloud mode (Claude) selected but no Anthropic API key stored. Switch to Local or add a key (Settings → Telegram).'
-    )
-  }
 
   const limitedHistory = input.history.slice(-10)
   const messages: ChatMessage[] = [
@@ -201,8 +152,6 @@ export async function coachAsk(input: CoachAskInput): Promise<CoachAskResult> {
   ]
 
   const result = await chat(messages, {
-    backend,
-    anthropicApiKey: anthropicKey ?? undefined,
     // 1400 reicht für normale Q&A (≈700 Token Antwort) und für Mini-Kurse
     // (Code-Blöcke + Lektionen) ohne abgeschnittene Antworten.
     maxTokens: 1400

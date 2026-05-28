@@ -9884,8 +9884,6 @@ ipcMain.handle('transport-update-shortcut', async (_event, newShortcut: string) 
 import type { BotHandle } from './telegram/bot'
 let telegramBotHandle: BotHandle | null = null
 let telegramConfig: {
-  backend: 'ollama' | 'anthropic' | 'auto'
-  anthropicModel: string
   ollamaModel: string
   excludedFolders: string[]
   includeEmails: boolean
@@ -9898,8 +9896,6 @@ let telegramConfig: {
   agentAllowedTools: string[]
   agentConfirmTools: string[]
 } = {
-  backend: 'auto',
-  anthropicModel: 'claude-sonnet-4-6',
   ollamaModel: '',
   excludedFolders: [],
   includeEmails: true,
@@ -9915,9 +9911,6 @@ let telegramConfig: {
 
 function getTelegramTokenPath(): string {
   return path.join(app.getPath('userData'), 'telegram-bot-token.enc')
-}
-function getAnthropicKeyPath(): string {
-  return path.join(app.getPath('userData'), 'anthropic-api-key.enc')
 }
 
 async function loadEncrypted(filePath: string): Promise<string | null> {
@@ -9951,15 +9944,6 @@ ipcMain.handle('telegram-has-token', async () => {
   return !!token
 })
 
-ipcMain.handle('telegram-save-anthropic-key', async (_event, key: string) => {
-  return await saveEncrypted(getAnthropicKeyPath(), key)
-})
-
-ipcMain.handle('telegram-has-anthropic-key', async () => {
-  const key = await loadEncrypted(getAnthropicKeyPath())
-  return !!key
-})
-
 ipcMain.handle('telegram-update-config', async (_event, config: Partial<typeof telegramConfig>) => {
   telegramConfig = { ...telegramConfig, ...config }
   return true
@@ -9978,14 +9962,6 @@ ipcMain.handle('telegram-start', async () => {
   // der User sie in den Settings eintragen kann.
   try {
     const { startTelegramBot } = await import('./telegram/bot')
-    // Anthropic-Key und Vault-Pfad beim Start einlesen; Getter geben live-Werte
-    // zurück, damit Vault-Wechsel und Key-Änderungen den Bot sofort betreffen.
-    let cachedAnthropicKey = await loadEncrypted(getAnthropicKeyPath())
-    const refreshAnthropicKey = () => {
-      loadEncrypted(getAnthropicKeyPath()).then(k => { cachedAnthropicKey = k })
-    }
-    // Refresh alle 60 s, falls der User den Key in den Settings ändert
-    const keyRefreshInterval = setInterval(refreshAnthropicKey, 60000)
     telegramBotHandle = await startTelegramBot({
       token,
       getAllowedChatIds: () => telegramConfig.allowedChatIds,
@@ -9995,9 +9971,6 @@ ipcMain.handle('telegram-start', async () => {
           return lastKnownVaultPath
         },
         excludedFolders: () => telegramConfig.excludedFolders,
-        backend: () => telegramConfig.backend,
-        anthropicApiKey: () => cachedAnthropicKey,
-        anthropicModel: () => telegramConfig.anthropicModel,
         ollamaModel: () => telegramConfig.ollamaModel,
         includeEmails: () => telegramConfig.includeEmails,
         includeOverdue: () => telegramConfig.includeOverdue,
@@ -10009,14 +9982,6 @@ ipcMain.handle('telegram-start', async () => {
         agentConfirmTools: () => telegramConfig.agentConfirmTools
       }
     })
-    // Key-Refresh-Interval beim Stop aufräumen
-    const origStop = telegramBotHandle.stop
-    telegramBotHandle = {
-      stop: async () => {
-        clearInterval(keyRefreshInterval)
-        await origStop()
-      }
-    }
     return { success: true }
   } catch (err) {
     console.error('[Telegram] start failed:', err)

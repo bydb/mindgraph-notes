@@ -1,6 +1,6 @@
 {
   "name": "mindgraph-notes",
-  "version": "0.7.7-beta",
+  "version": "0.7.8-beta",
   "description": "Lokaler Workspace, der dir täglich zeigt, was in deinen Notizen, Aufgaben und E-Mails wichtig ist — mit Wissensgraph und KI.",
   "main": "out/main/index.js",
   "scripts": {
@@ -125,7 +125,6 @@
     "vite": "^7.3.1"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.98.0",
     "@codemirror/commands": "^6.10.1",
     "@codemirror/lang-markdown": "^6.5.0",
     "@codemirror/language": "^6.12.1",

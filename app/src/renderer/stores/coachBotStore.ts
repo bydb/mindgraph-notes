@@ -1,7 +1,8 @@
 // Renderer-Store für den CoachBot (dauerhafter Q&A-Helfer im Header).
 // Ephemer pro App-Start — Verlauf lebt im Speicher, geht beim Quit verloren.
 // Unabhängig vom Onboarding-Coach (coachStore.ts) — keine Actions, keine
-// Vault-Logik, nur Frage → Antwort.
+// Vault-Logik, nur Frage → Antwort. Läuft ausschließlich über Ollama
+// (lokal oder -cloud-Modelle).
 
 import { create } from 'zustand'
 import { useUIStore } from './uiStore'
@@ -16,7 +17,7 @@ interface CoachBotState {
   messages: CoachBotMessage[]
   loading: boolean
   errorText: string | null
-  backend: 'ollama' | 'anthropic' | null
+  backend: 'ollama' | null
   ask: (question: string) => Promise<void>
   clear: () => void
 }
@@ -42,18 +43,16 @@ export const useCoachBotStore = create<CoachBotState>((set, get) => ({
       const language = useUIStore.getState().language === 'en' ? 'en' : 'de'
       const history = get().messages.map(m => ({ role: m.role, content: m.text }))
 
-      const backend = useUIStore.getState().coachBotBackend
       const response = await window.electronAPI.coachAsk({
         question: trimmed,
         history,
-        language,
-        backend
+        language
       })
 
       if (!response.ok) {
         const errorText = language === 'de'
-          ? `Hm, da ist etwas schiefgelaufen: ${response.error}. Vielleicht ist Ollama gerade aus, oder es ist kein Anthropic-Key in den Telegram-Settings hinterlegt.`
-          : `Hm, something went wrong: ${response.error}. Maybe Ollama is off, or no Anthropic key is set in Telegram settings.`
+          ? `Hm, da ist etwas schiefgelaufen: ${response.error}. Vielleicht ist Ollama gerade aus oder es ist kein -cloud-Modell mit \`ollama signin\` eingerichtet.`
+          : `Hm, something went wrong: ${response.error}. Maybe Ollama is off, or no -cloud model has been set up via \`ollama signin\`.`
         set({
           messages: [...get().messages, { id: makeId(), role: 'assistant', text: errorText }],
           loading: false,

@@ -9,8 +9,6 @@ export const TelegramSettings: React.FC = () => {
 
   const [tokenInput, setTokenInput] = useState('')
   const [hasToken, setHasToken] = useState(false)
-  const [anthropicKeyInput, setAnthropicKeyInput] = useState('')
-  const [hasAnthropicKey, setHasAnthropicKey] = useState(false)
   const [newChatId, setNewChatId] = useState('')
   const [newPriorityFolder, setNewPriorityFolder] = useState('')
 
@@ -30,13 +28,11 @@ export const TelegramSettings: React.FC = () => {
   const [busy, setBusy] = useState(false)
 
   const refreshStatus = async () => {
-    const [tokenRes, anthropicRes, statusRes] = await Promise.all([
+    const [tokenRes, statusRes] = await Promise.all([
       window.electronAPI.telegramHasToken(),
-      window.electronAPI.telegramHasAnthropicKey(),
       window.electronAPI.telegramStatus()
     ])
     setHasToken(tokenRes)
-    setHasAnthropicKey(anthropicRes)
     setActive(statusRes.active)
     setTelegramBot({ active: statusRes.active })
   }
@@ -48,8 +44,6 @@ export const TelegramSettings: React.FC = () => {
   // Config live zum Main-Prozess pushen, damit der laufende Bot sie nutzt
   useEffect(() => {
     window.electronAPI.telegramUpdateConfig({
-      backend: telegramBot.llmBackend,
-      anthropicModel: telegramBot.anthropicModel,
       ollamaModel: telegramBot.ollamaModel,
       includeEmails: telegramBot.briefingIncludeEmails,
       includeOverdue: telegramBot.briefingIncludeOverdue,
@@ -62,8 +56,6 @@ export const TelegramSettings: React.FC = () => {
       agentConfirmTools: telegramBot.agentConfirmTools
     })
   }, [
-    telegramBot.llmBackend,
-    telegramBot.anthropicModel,
     telegramBot.ollamaModel,
     telegramBot.briefingIncludeEmails,
     telegramBot.briefingIncludeOverdue,
@@ -87,20 +79,6 @@ export const TelegramSettings: React.FC = () => {
       setStatusMsg({ text: 'Bot-Token gespeichert.', kind: 'success' })
     } else {
       setStatusMsg({ text: 'Token konnte nicht gespeichert werden.', kind: 'error' })
-    }
-  }
-
-  const saveAnthropicKey = async () => {
-    if (!anthropicKeyInput.trim()) return
-    setBusy(true)
-    const ok = await window.electronAPI.telegramSaveAnthropicKey(anthropicKeyInput.trim())
-    setBusy(false)
-    if (ok) {
-      setAnthropicKeyInput('')
-      setHasAnthropicKey(true)
-      setStatusMsg({ text: 'Anthropic-Key gespeichert.', kind: 'success' })
-    } else {
-      setStatusMsg({ text: 'Anthropic-Key konnte nicht gespeichert werden.', kind: 'error' })
     }
   }
 
@@ -277,71 +255,22 @@ export const TelegramSettings: React.FC = () => {
         )}
       </div>
 
-      {/* LLM-Backend */}
+      {/* Ollama-Modell */}
       <div className="settings-group">
-        <label className="settings-label">LLM-Backend für /ask und /briefing</label>
-        <select
-          value={telegramBot.llmBackend}
-          onChange={e => setTelegramBot({ llmBackend: e.target.value as 'ollama' | 'anthropic' | 'auto' })}
-          className="settings-select"
-        >
-          <option value="auto">Auto (Ollama wenn erreichbar, sonst Anthropic)</option>
-          <option value="ollama">Nur Ollama (lokal)</option>
-          <option value="anthropic">Nur Anthropic (API)</option>
-        </select>
+        <label className="settings-label">Ollama-Modell für /ask, /briefing, /agent</label>
+        <input
+          type="text"
+          placeholder="leer = automatisch wählen"
+          value={telegramBot.ollamaModel}
+          onChange={e => setTelegramBot({ ollamaModel: e.target.value })}
+          className="settings-input"
+        />
+        <p className="settings-help" style={{ marginTop: 4, fontSize: 12 }}>
+          Lokales Ollama-Modell (z. B. <code>qwen3.6:27b-mlx</code>) oder Ollama-Cloud-Modell
+          (z. B. <code>ministral-3:14b-cloud</code> — braucht <code>ollama signin</code>).
+          Leer lassen = MindGraph wählt ein Tool-fähiges Modell automatisch.
+        </p>
       </div>
-
-      <div className="settings-group" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-        <div>
-          <label className="settings-label">Ollama-Modell</label>
-          <input
-            type="text"
-            placeholder="auto"
-            value={telegramBot.ollamaModel}
-            onChange={e => setTelegramBot({ ollamaModel: e.target.value })}
-            className="settings-input"
-          />
-          <p className="settings-help" style={{ marginTop: 4, fontSize: 11 }}>Leer = automatisch wählen (llama3.1 o. ä.)</p>
-        </div>
-        <div>
-          <label className="settings-label">Anthropic-Modell</label>
-          <select
-            value={telegramBot.anthropicModel}
-            onChange={e => setTelegramBot({ anthropicModel: e.target.value })}
-            className="settings-select"
-          >
-            <option value="claude-opus-4-7">Opus 4.7 (beste Qualität)</option>
-            <option value="claude-sonnet-4-6">Sonnet 4.6 (Standard)</option>
-            <option value="claude-haiku-4-5-20251001">Haiku 4.5 (schnell, günstig)</option>
-          </select>
-        </div>
-      </div>
-
-      {/* Anthropic Key */}
-      {(telegramBot.llmBackend === 'anthropic' || telegramBot.llmBackend === 'auto') && (
-        <div className="settings-group">
-          <label className="settings-label">
-            Anthropic API-Key {hasAnthropicKey && <span style={{ color: '#44c767' }}>✓ gespeichert</span>}
-          </label>
-          <p className="settings-help">
-            Hol dir einen Key unter <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener noreferrer">console.anthropic.com</a>.
-            Nur nötig, wenn Anthropic verwendet werden soll.
-          </p>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <input
-              type="password"
-              placeholder={hasAnthropicKey ? 'Neuen Key setzen …' : 'sk-ant-...'}
-              value={anthropicKeyInput}
-              onChange={e => setAnthropicKeyInput(e.target.value)}
-              className="settings-input"
-              style={{ flex: 1 }}
-            />
-            <button className="settings-button" onClick={saveAnthropicKey} disabled={busy || !anthropicKeyInput.trim()}>
-              Speichern
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* Briefing-Optionen */}
       <div className="settings-group">

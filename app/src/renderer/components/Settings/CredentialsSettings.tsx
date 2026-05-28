@@ -44,15 +44,6 @@ export const CredentialsSettings: React.FC<Props> = ({ onNavigateToTab }) => {
       settingsTab: 'telegram',
       checkSet: () => window.electronAPI.telegramHasToken()
     })
-    rows.push({
-      id: 'anthropic-key',
-      label: 'Anthropic API-Key',
-      category: 'KI-Cloud',
-      note: 'Cloud-LLM (Claude) für Notes-Chat, Coach-Bot, Smart-Connections-Reranker, Email-Analyse, Telegram-Bot (/ask, /briefing). Eingabe aktuell im Telegram-Tab.',
-      settingsTab: 'telegram',
-      checkSet: () => window.electronAPI.telegramHasAnthropicKey()
-    })
-
     // ElevenLabs (Speech)
     rows.push({
       id: 'elevenlabs-key',

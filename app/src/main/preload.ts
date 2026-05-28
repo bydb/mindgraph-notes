@@ -588,13 +588,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('telegram-save-token', token),
   telegramHasToken: () =>
     ipcRenderer.invoke('telegram-has-token'),
-  telegramSaveAnthropicKey: (key: string) =>
-    ipcRenderer.invoke('telegram-save-anthropic-key', key),
-  telegramHasAnthropicKey: () =>
-    ipcRenderer.invoke('telegram-has-anthropic-key'),
   telegramUpdateConfig: (config: {
-    backend?: 'ollama' | 'anthropic' | 'auto'
-    anthropicModel?: string
     ollamaModel?: string
     excludedFolders?: string[]
     includeEmails?: boolean
@@ -653,6 +647,5 @@ contextBridge.exposeInMainWorld('electronAPI', {
     question: string
     history: Array<{ role: 'system' | 'user' | 'assistant' | 'tool'; content: string }>
     language: 'de' | 'en'
-    backend?: 'ollama' | 'anthropic'
   }) => ipcRenderer.invoke('coach:ask', payload)
 })

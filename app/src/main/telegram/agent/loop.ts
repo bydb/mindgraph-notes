@@ -28,7 +28,7 @@ export interface AgentRunResult {
   toolCallsExecuted: number
   toolCallsDenied: number
   hitMaxIterations: boolean
-  backend: 'ollama' | 'anthropic'
+  backend: 'ollama'
 }
 
 function buildSystemPrompt(allowedTools: string[]): string {
@@ -115,7 +115,7 @@ export async function runAgent(
   let iterations = 0
   let toolCallsExecuted = 0
   let toolCallsDenied = 0
-  let lastBackend: 'ollama' | 'anthropic' = 'ollama'
+  let lastBackend: 'ollama' = 'ollama'
   let lastText = ''
 
   while (iterations < opts.maxIterations) {

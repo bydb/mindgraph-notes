@@ -291,6 +291,144 @@ export function formatEventList(events: CalendarEvent[], opts: { showDayHeader?:
   return events.map(formatSingleEvent).join('\n')
 }
 
+// ─── Brain-Tagesgedächtnis ────────────────────────────────────────────
+// Lokales Tagesgedächtnis liegt unter `<brain>/JJJJ/MM/TT.md`. Mehrere Läufe
+// pro Tag erzeugen `TT (2).md`, `TT (3).md` (human-in-the-loop, kein Overwrite).
+// Wir nehmen die "Hauptdatei" (TT.md) — Sequel-Versionen ignoriert der Bot,
+// damit der Briefing-Prompt nicht voller doppelter Sektionen ist.
+
+const DEFAULT_BRAIN_FOLDER = '800 - 🧠 brain'
+
+export interface BrainDayEntry {
+  date: string                 // 'JJJJ-MM-TT' (aus Pfad)
+  relativePath: string         // vault-relativ
+  content: string              // Markdown ohne Frontmatter, gekürzt
+  isToday: boolean
+}
+
+function ymdParts(d: Date): { y: string; m: string; day: string } {
+  return {
+    y: String(d.getFullYear()),
+    m: String(d.getMonth() + 1).padStart(2, '0'),
+    day: String(d.getDate()).padStart(2, '0')
+  }
+}
+
+function stripFrontmatter(md: string): string {
+  if (!md.startsWith('---')) return md
+  const end = md.indexOf('\n---', 3)
+  if (end < 0) return md
+  return md.slice(end + 4).replace(/^\s*\n/, '')
+}
+
+// Liest die heutige Brain-Notiz (falls vorhanden), sonst die gestrige.
+// Begrenzt den Inhalt auf maxChars (Default 1500) — Briefing-Prompt soll
+// nicht durch ein 20-Sektionen-Tagebuch gesprengt werden.
+export async function loadRecentBrainEntry(
+  vaultPath: string,
+  brainFolderPath?: string,
+  maxChars = 1500
+): Promise<BrainDayEntry | null> {
+  const folder = (brainFolderPath || DEFAULT_BRAIN_FOLDER).trim().replace(/^[/\\]+|[/\\]+$/g, '')
+  if (!folder || folder.includes('..')) return null
+
+  const candidates: Array<{ date: Date; isToday: boolean }> = [
+    { date: new Date(), isToday: true },
+    { date: new Date(Date.now() - 24 * 60 * 60 * 1000), isToday: false }
+  ]
+
+  for (const { date, isToday } of candidates) {
+    const { y, m, day } = ymdParts(date)
+    const rel = `${folder}/${y}/${m}/${day}.md`
+    const full = path.join(vaultPath, rel)
+    const raw = await readFileSafe(full)
+    if (!raw) continue
+    const body = stripFrontmatter(raw).trim()
+    if (!body) continue
+    const content = body.length > maxChars ? body.slice(0, maxChars).trimEnd() + ' …' : body
+    return {
+      date: `${y}-${m}-${day}`,
+      relativePath: rel,
+      content,
+      isToday
+    }
+  }
+  return null
+}
+
+// ─── Projekt-Status-Drafts (`_STATUS-*.md`) ───────────────────────────
+// Der Crystallizer schreibt pro Projekt `_STATUS-WW.md`-Drafts. Telegram-Bot
+// listet die Drafts mit aktueller mtime, sortiert nach Frische.
+
+export interface ProjectStatusDraft {
+  relativePath: string         // vault-relativ
+  projectFolder: string        // vault-relativer Ordner des Projekts
+  fileName: string             // z.B. '_STATUS-22.md'
+  mtimeMs: number
+  excerpt: string              // erste paar Zeilen Markdown ohne Frontmatter
+}
+
+async function walkStatusFiles(dir: string, vaultRoot: string): Promise<string[]> {
+  const results: string[] = []
+  let entries: Array<import('fs').Dirent>
+  try {
+    entries = await fs.readdir(dir, { withFileTypes: true })
+  } catch {
+    return []
+  }
+  for (const entry of entries) {
+    const full = path.join(dir, entry.name)
+    if (entry.isDirectory()) {
+      if (EXCLUDED_DIRS.has(entry.name)) continue
+      if (entry.name.startsWith('.')) continue
+      results.push(...await walkStatusFiles(full, vaultRoot))
+    } else if (entry.isFile() && /^_STATUS(?:[-_].*)?\.md$/i.test(entry.name)) {
+      results.push(full)
+    }
+  }
+  return results
+}
+
+export async function findProjectStatusDrafts(
+  opts: ScanOptions & { filter?: string; maxResults?: number; maxExcerptChars?: number }
+): Promise<ProjectStatusDraft[]> {
+  const files = await walkStatusFiles(opts.vaultPath, opts.vaultPath)
+  const excluded = new Set(
+    (opts.excludedFolders ?? []).map(p => path.normalize(p).replace(/^[/\\]+|[/\\]+$/g, ''))
+  )
+  const filter = (opts.filter ?? '').toLowerCase().trim()
+  const maxExcerpt = opts.maxExcerptChars ?? 320
+
+  const drafts: ProjectStatusDraft[] = []
+  for (const full of files) {
+    const rel = path.relative(opts.vaultPath, full).replace(/\\/g, '/')
+    const projectFolder = path.dirname(rel)
+    if (Array.from(excluded).some(ex => rel.startsWith(ex + '/') || rel === ex)) continue
+    if (filter && !rel.toLowerCase().includes(filter)) continue
+
+    let stat: import('fs').Stats
+    try {
+      stat = await fs.stat(full)
+    } catch {
+      continue
+    }
+    const raw = await readFileSafe(full)
+    if (!raw) continue
+    const body = stripFrontmatter(raw).trim()
+    const excerpt = body.length > maxExcerpt ? body.slice(0, maxExcerpt).trimEnd() + ' …' : body
+
+    drafts.push({
+      relativePath: rel,
+      projectFolder,
+      fileName: path.basename(rel),
+      mtimeMs: stat.mtimeMs,
+      excerpt
+    })
+  }
+  drafts.sort((a, b) => b.mtimeMs - a.mtimeMs)
+  return typeof opts.maxResults === 'number' ? drafts.slice(0, opts.maxResults) : drafts
+}
+
 function formatSingleEvent(e: CalendarEvent): string {
   const timeLabel = e.allDay
     ? 'ganztägig'

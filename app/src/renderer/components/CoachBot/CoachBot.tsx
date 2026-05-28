@@ -13,8 +13,6 @@ import './CoachBot.css'
 export const CoachBot: React.FC = () => {
   const open = useUIStore(s => s.coachBotOpen)
   const setOpen = useUIStore(s => s.setCoachBotOpen)
-  const backend = useUIStore(s => s.coachBotBackend)
-  const setBackend = useUIStore(s => s.setCoachBotBackend)
   const { t } = useTranslation()
   const bot = useCoachBotStore()
   const [input, setInput] = useState('')
@@ -75,31 +73,6 @@ export const CoachBot: React.FC = () => {
             <span>{t('coachbot.title')}</span>
           </div>
           <div className="coachbot-header-actions">
-            <div
-              className="coachbot-backend-toggle"
-              role="group"
-              aria-label={t('coachbot.backend.label')}
-              title={backend === 'ollama' ? t('coachbot.backend.localHint') : t('coachbot.backend.cloudHint')}
-            >
-              <button
-                className={`coachbot-backend-opt ${backend === 'ollama' ? 'active' : ''}`}
-                onClick={() => setBackend('ollama')}
-                disabled={bot.loading}
-                title={t('coachbot.backend.localHint')}
-              >
-                <span className="coachbot-backend-dot coachbot-backend-dot-local" />
-                {t('coachbot.backend.local')}
-              </button>
-              <button
-                className={`coachbot-backend-opt ${backend === 'anthropic' ? 'active' : ''}`}
-                onClick={() => setBackend('anthropic')}
-                disabled={bot.loading}
-                title={t('coachbot.backend.cloudHint')}
-              >
-                <span className="coachbot-backend-dot coachbot-backend-dot-cloud" />
-                {t('coachbot.backend.cloud')}
-              </button>
-            </div>
             {bot.messages.length > 0 && (
               <button
                 className="coachbot-clear-btn"

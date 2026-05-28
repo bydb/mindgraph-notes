@@ -2,6 +2,25 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.7.8-beta] - 2026-05-28
+
+### Features
+
+- **Telegram-Bot kennt jetzt dein Brain-Tagesgedächtnis und deine Projekt-Status-Drafts**: Zwei neue Befehle und eine erweiterte Briefing-Logik schließen die größte Lücke zwischen App und Bot. `/brain` zeigt das aktuelle Tagesgedächtnis (`800 - 🧠 brain/JJJJ/MM/TT.md`) im Volltext — heute, oder fallback auf gestern, falls heute noch nichts geschrieben wurde. `/status` listet die acht frischesten `_STATUS-*.md`-Drafts des Crystallizers mit Projekt-Ordner, Dateiname, „X min/h/d alt"-Marker und 320-Zeichen-Excerpt; mit Argument (`/status mindgraph`) wird nach Pfad gefiltert. Beide Quellen waren über die Telegram-Oberfläche bisher unsichtbar, obwohl sie längst im Vault standen.
+- **`/briefing` greift jetzt auf das eigene Tagesgedächtnis zurück**: Wenn das heutige (oder gestrige) Brain vorliegt, fließt sein Inhalt als zusätzlicher Kontext in den LLM-Prompt mit ein. Der System-Prompt instruiert das Modell, in der Begrüßung kurz auf offene Fäden oder Fokuspunkte daraus einzugehen — das Briefing fühlt sich dadurch wie eine echte Anschluss-Notiz an deine gestrige Tagesreflexion an, nicht wie eine reine Task-Liste. Wort-Limit von 200 auf 220 angehoben, damit der zusätzliche Kontext nicht abgeschnitten wird.
+
+### Improvements
+
+- **Anthropic-Cloud-Backend komplett aus der App entfernt**: Coach, Onboarding-Coach und Telegram-Bot liefen bisher entweder lokal über Ollama oder per Anthropic-API-Key (Claude). Der Cloud-Pfad ist jetzt **ein einziger** und führt über Ollama-Cloud-Modelle mit dem `-cloud`-Suffix (z. B. `ministral-3:14b-cloud`) — `ollama signin` einmal im Terminal, dann läuft alles über denselben Pfad wie die lokalen Modelle. Konsequenzen: ein Cloud-Anbieter weniger, ein zweiter API-Key-Storage weniger (das verschlüsselte `anthropic-api-key.enc` wird nicht mehr benötigt), `@anthropic-ai/sdk` fliegt aus dem Bundle, kein Backend-Toggle mehr im CoachBot-Header und im Telegram-Tab, keine zweite Modell-Modell-Spalte im Telegram-Settings. Wer Anthropic-Claude weiter nutzen wollte: leider nicht mehr im Coach. Wer Cloud-LLMs in der App will: über Ollama-Cloud, das funktioniert für Coach, Telegram-Bot und Onboarding-Coach gleichermaßen.
+- **CoachBot startet ohne Backend-Wahl**: Der Lokal/Cloud-Toggle oben im CoachBot-Header ist weg — der Bot nimmt einfach das Ollama-Modell, das in den Integrationen-Einstellungen gewählt ist. Wer Cloud will, wählt ein `-cloud`-Modell als globales Standardmodell.
+- **Onboarding-Schritt „KI einrichten" ist auf zwei Optionen geschrumpft**: Bisher gab es drei Karten — Ollama installieren, Anthropic-Key eintragen, ohne KI weiter. Mittlere Karte ist weg. Wer keinen lokalen Rechner mit GPU hat, kann nach dem Ollama-Install in den Einstellungen ein `-cloud`-Modell wählen und sofort loslegen.
+- **Help-Text und Kontakt-Übersicht im Telegram-Bot zeigen die neuen Befehle und einen klaren Hinweis auf Ollama-Cloud-Modelle**: Die Modell-Eingabe im Telegram-Tab (vorher zwei Felder „Ollama-Modell" und „Anthropic-Modell") ist auf ein Feld zusammengeschmolzen, das beides akzeptiert — lokal oder Cloud — und das Beispiel mit `ministral-3:14b-cloud` plus `ollama signin`-Hinweis direkt darunter zeigt.
+
+### Fixes
+
+- **`/briefing` lief mit Fehler `Ollama API 403: ollama cloud is disabled` auf einem Cloud-Modell, das der User gar nicht aktiv wählen wollte**: Der interne Auto-Picker im Chat-Client hatte `ministral-3:14b-cloud` versehentlich an erste Stelle der Default-Liste gesetzt — Briefings, die ohne explizites Modell-Setting liefen, sind dadurch ungewollt in die Cloud geroutet worden und beim nicht eingeloggten Ollama-Account abgeflogen. Plus: ein echtes Privacy-Issue, weil Briefing-Inhalt (Tasks, Mails, Brain) an die Ollama-Cloud gegangen wäre. Der Auto-Picker filtert jetzt **alle** `-cloud`-Modelle aus; Cloud läuft nur, wenn der User es **explizit** als Ollama-Modell einträgt. 403-Antworten von Cloud-Modellen werden außerdem in eine freundliche Fehlermeldung mit Hinweis auf `ollama signin` umgewandelt, statt das rohe JSON durchzureichen.
+- **`/help` im Telegram crashte mit `Can't find end of the entity`**: Der String `_STATUS-*.md` öffnete in Telegram-Markdown eine `_italic_`-Sequenz, die nie geschlossen wurde — Telegram lehnte die ganze Nachricht ab. Mit Backticks als Code-Block neutralisiert.
+
 ## [0.7.7-beta] - 2026-05-28
 
 ### Features

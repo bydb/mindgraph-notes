@@ -1,18 +1,17 @@
-// OllamaSetupStep — Pre-Coach-Pfad, wenn weder Ollama läuft noch ein
-// Anthropic-Key gesetzt ist. Drei Optionen in einer Karte:
+// OllamaSetupStep — Pre-Coach-Pfad, wenn Ollama noch nicht läuft. Zwei Optionen:
 //   1. Ollama installieren (Install-Anleitung pro OS + Live-Polling)
-//   2. Anthropic-API-Key eintragen (reused aus Telegram-Modul)
-//   3. Ohne KI weitermachen (App funktioniert auch so)
+//   2. Ohne KI weitermachen (App funktioniert auch so)
 //
-// Sobald Polling Ollama erkennt oder der Anthropic-Key erfolgreich gespeichert
-// wurde, ruft die Komponente `onBackendReady()` auf — das Onboarding routet
-// dann zum Coach. `onSkip()` springt direkt zum klassischen Wizard ohne KI.
+// Sobald Polling Ollama erkennt, ruft die Komponente `onBackendReady()` auf —
+// das Onboarding routet dann zum Coach. `onSkip()` springt direkt zum
+// klassischen Wizard ohne KI. Ollama-Cloud-Modelle (`-cloud`-Suffix) werden
+// nach Setup direkt im Modell-Picker wählbar.
 
 import React, { useEffect, useRef, useState } from 'react'
 import { useTranslation } from '../../../utils/translations'
 
 interface OllamaSetupStepProps {
-  onBackendReady: (backend: 'ollama' | 'anthropic') => void
+  onBackendReady: (backend: 'ollama') => void
   onSkip: () => void
   onBack: () => void
 }
@@ -46,9 +45,6 @@ export const OllamaSetupStep: React.FC<OllamaSetupStepProps> = ({
   const [copied, setCopied] = useState(false)
   const [polling, setPolling] = useState(true)
   const [detected, setDetected] = useState(false)
-  const [anthropicKey, setAnthropicKey] = useState('')
-  const [savingKey, setSavingKey] = useState(false)
-  const [keyError, setKeyError] = useState<string | null>(null)
   const [modelPulling, setModelPulling] = useState(false)
   const [modelReady, setModelReady] = useState(false)
   const stoppedRef = useRef(false)
@@ -145,26 +141,6 @@ export const OllamaSetupStep: React.FC<OllamaSetupStepProps> = ({
     }
   }
 
-  const handleSaveAnthropic = async () => {
-    if (!anthropicKey.trim() || savingKey) return
-    setSavingKey(true)
-    setKeyError(null)
-    try {
-      const ok = await window.electronAPI.telegramSaveAnthropicKey(anthropicKey.trim())
-      if (ok) {
-        stoppedRef.current = true
-        setDetected(true)
-        setTimeout(() => onBackendReady('anthropic'), 600)
-      } else {
-        setKeyError(t('onboarding.aiSetup.anthropicError'))
-      }
-    } catch (err) {
-      setKeyError(err instanceof Error ? err.message : t('onboarding.aiSetup.anthropicError'))
-    } finally {
-      setSavingKey(false)
-    }
-  }
-
   const instructionKey = (`onboarding.aiSetup.${os}Instructions`) as
     | 'onboarding.aiSetup.macInstructions'
     | 'onboarding.aiSetup.winInstructions'
@@ -254,33 +230,7 @@ export const OllamaSetupStep: React.FC<OllamaSetupStepProps> = ({
         )}
       </section>
 
-      {/* Variante 2: Anthropic-Key */}
-      <section className="onboarding-ai-setup-card">
-        <header className="onboarding-ai-setup-card-head">
-          <h3>{t('onboarding.aiSetup.anthropicHeading')}</h3>
-        </header>
-        <p className="onboarding-ai-setup-os-hint">{t('onboarding.aiSetup.anthropicHint')}</p>
-        <div className="onboarding-ai-setup-anthropic">
-          <input
-            type="password"
-            placeholder={t('onboarding.aiSetup.anthropicPlaceholder')}
-            value={anthropicKey}
-            onChange={e => setAnthropicKey(e.target.value)}
-            disabled={savingKey || detected}
-          />
-          <button
-            type="button"
-            className="onboarding-btn-primary onboarding-btn-small"
-            onClick={handleSaveAnthropic}
-            disabled={!anthropicKey.trim() || savingKey || detected}
-          >
-            {savingKey ? t('onboarding.aiSetup.anthropicSaving') : t('onboarding.aiSetup.anthropicSave')}
-          </button>
-        </div>
-        {keyError && <p className="onboarding-ai-setup-error">{keyError}</p>}
-      </section>
-
-      {/* Variante 3: Ohne KI */}
+      {/* Variante 2: Ohne KI */}
       <section className="onboarding-ai-setup-card onboarding-ai-setup-card-skip">
         <header className="onboarding-ai-setup-card-head">
           <h3>{t('onboarding.aiSetup.skipHeading')}</h3>

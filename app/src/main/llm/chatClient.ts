@@ -1,9 +1,9 @@
-// Einheitlicher Chat-Client für Main-Prozess-Komponenten (z. B. Telegram-Bot).
-// Unterstützt Ollama (lokal) und Anthropic (API). Backend wählbar + 'auto'-Fallback.
+// Einheitlicher Chat-Client für Main-Prozess-Komponenten (Coach, Telegram-Bot,
+// Onboarding-Coach). Nutzt ausschließlich Ollama — sowohl für lokale Modelle
+// als auch für Ollama-Cloud-Modelle (z.B. `ministral-3:14b-cloud`). Kein
+// Anthropic-/Mistral-SDK, kein zweiter API-Key.
 
-import Anthropic from '@anthropic-ai/sdk'
-
-export type ChatBackend = 'ollama' | 'anthropic' | 'auto'
+export type ChatBackend = 'ollama'
 
 export interface ToolCall {
   id: string                              // synthetisch erzeugt (Ollama liefert keine)
@@ -15,7 +15,7 @@ export interface ChatMessage {
   role: 'system' | 'user' | 'assistant' | 'tool'
   content: string
   tool_calls?: ToolCall[]                 // nur auf assistant
-  tool_call_id?: string                   // nur auf tool (für Anthropic-Roundtrip)
+  tool_call_id?: string                   // historisch, von Ollama nicht benötigt
   tool_name?: string                      // nur auf tool (Ollama)
 }
 
@@ -26,28 +26,25 @@ export interface ToolDefinition {
 }
 
 export interface ChatOptions {
-  backend: ChatBackend
+  backend?: ChatBackend                   // optional, immer 'ollama' — Param bleibt für Aufrufer-Kompatibilität
   ollamaUrl?: string                      // default: http://localhost:11434
-  ollamaModel?: string                    // z.B. 'llama3.1'
-  anthropicApiKey?: string
-  anthropicModel?: string                 // default: 'claude-sonnet-4-6'
-  maxTokens?: number                      // default: 1024
+  ollamaModel?: string                    // z.B. 'qwen3.6:27b-mlx' oder 'ministral-3:14b-cloud'
+  maxTokens?: number                      // wird an Ollama nicht übergeben, hier nur dokumentarisch
 }
 
 export interface ChatResult {
   text: string
-  backend: 'ollama' | 'anthropic'
+  backend: 'ollama'
 }
 
 export interface ChatWithToolsResult {
   text: string                            // Text-Anteil (kann leer sein, wenn nur Tools)
   toolCalls: ToolCall[]                   // leer = Modell ist fertig
-  backend: 'ollama' | 'anthropic'
+  backend: 'ollama'
   assistantMessage: ChatMessage           // ans History anhängen, bevor weiter geht
 }
 
 const DEFAULT_OLLAMA_URL = 'http://localhost:11434'
-const DEFAULT_ANTHROPIC_MODEL = 'claude-sonnet-4-6'
 
 async function isOllamaReachable(url: string): Promise<boolean> {
   try {
@@ -58,6 +55,12 @@ async function isOllamaReachable(url: string): Promise<boolean> {
   }
 }
 
+// Cloud-Modelle (`-cloud`-Suffix) werden NIE auto-gewählt:
+// 1. Privacy — Prompt-Inhalte (Briefing, Brain, Mails) sollen nicht ungewollt
+//    zur Ollama-Cloud gehen.
+// 2. Auth — `-cloud`-Modelle brauchen `ollama signin`; ein nicht eingeloggter
+//    User würde sonst auf jeden Call mit 403 fliegen.
+// Wer Cloud will, gibt das Modell explizit an (z.B. via `ollamaModel: 'ministral-3:14b-cloud'`).
 async function pickDefaultOllamaModel(url: string, preferred?: string): Promise<string | null> {
   try {
     const res = await fetch(`${url}/api/tags`, { signal: AbortSignal.timeout(3000) })
@@ -71,12 +74,13 @@ async function pickDefaultOllamaModel(url: string, preferred?: string): Promise<
       if (prefixMatch) return prefixMatch
       throw new Error(`Ollama-Modell "${requested}" nicht gefunden. Installierte Modelle: ${names.join(', ') || '(keine)'}`)
     }
-    // bevorzugt Tool-/Chat-fähige Modelle
+    // Auto-Pick: nur LOKALE Tool-/Chat-fähige Modelle. Cloud-Modelle filtern.
+    const localNames = names.filter(n => !/-cloud$/i.test(n))
     for (const candidate of ['qwen3', 'qwen2.5-coder', 'llama3.1', 'llama3.1:8b', 'llama3', 'qwen2.5:7b-instruct', 'mistral-nemo', 'mistral']) {
-      const match = names.find(n => n === candidate || n.startsWith(candidate + ':'))
+      const match = localNames.find(n => n === candidate || n.startsWith(candidate + ':'))
       if (match) return match
     }
-    return names[0] ?? null
+    return localNames[0] ?? null
   } catch {
     return null
   }
@@ -97,53 +101,23 @@ async function chatViaOllama(messages: ChatMessage[], opts: ChatOptions): Promis
     }),
     signal: AbortSignal.timeout(120000)
   })
-  if (!res.ok) throw new Error(`Ollama API ${res.status}: ${await res.text()}`)
+  if (!res.ok) {
+    const body = await res.text()
+    if (res.status === 403 && /cloud/i.test(body)) {
+      throw new Error(`Ollama-Cloud-Modell nicht verfügbar — bist du eingeloggt? Führe \`ollama signin\` im Terminal aus, oder wähle ein lokales Modell. (Details: ${body})`)
+    }
+    throw new Error(`Ollama API ${res.status}: ${body}`)
+  }
   const json = await res.json() as { message?: { content?: string } }
   return { text: json.message?.content ?? '', backend: 'ollama' }
 }
 
-async function chatViaAnthropic(messages: ChatMessage[], opts: ChatOptions): Promise<ChatResult> {
-  if (!opts.anthropicApiKey) throw new Error('Anthropic API Key fehlt')
-  const client = new Anthropic({ apiKey: opts.anthropicApiKey })
-
-  const system = messages.find(m => m.role === 'system')?.content
-  const userMessages = messages
-    .filter(m => m.role !== 'system')
-    .map(m => ({ role: m.role as 'user' | 'assistant', content: m.content }))
-
-  const response = await client.messages.create({
-    model: opts.anthropicModel ?? DEFAULT_ANTHROPIC_MODEL,
-    max_tokens: opts.maxTokens ?? 1024,
-    system,
-    messages: userMessages
-  })
-
-  const text = response.content
-    .filter(block => block.type === 'text')
-    .map(block => (block as { type: 'text'; text: string }).text)
-    .join('')
-
-  return { text, backend: 'anthropic' }
-}
-
-export async function chat(messages: ChatMessage[], opts: ChatOptions): Promise<ChatResult> {
+export async function chat(messages: ChatMessage[], opts: ChatOptions = {}): Promise<ChatResult> {
   const ollamaUrl = opts.ollamaUrl ?? DEFAULT_OLLAMA_URL
-
-  if (opts.backend === 'ollama') {
-    return chatViaOllama(messages, opts)
+  if (!(await isOllamaReachable(ollamaUrl))) {
+    throw new Error('Ollama ist nicht erreichbar (localhost:11434). Bitte Ollama starten oder ein -cloud-Modell mit `ollama signin` einrichten.')
   }
-  if (opts.backend === 'anthropic') {
-    return chatViaAnthropic(messages, opts)
-  }
-  // auto: Ollama bevorzugt, Anthropic als Fallback
-  if (await isOllamaReachable(ollamaUrl)) {
-    try {
-      return await chatViaOllama(messages, opts)
-    } catch (err) {
-      console.warn('[chatClient] Ollama failed, fallback to Anthropic:', err)
-    }
-  }
-  return chatViaAnthropic(messages, opts)
+  return chatViaOllama(messages, opts)
 }
 
 // ─── Tool-Use ──────────────────────────────────────────────────────────────
@@ -205,7 +179,13 @@ async function chatWithToolsViaOllama(
     }),
     signal: AbortSignal.timeout(180000)
   })
-  if (!res.ok) throw new Error(`Ollama API ${res.status}: ${await res.text()}`)
+  if (!res.ok) {
+    const body = await res.text()
+    if (res.status === 403 && /cloud/i.test(body)) {
+      throw new Error(`Ollama-Cloud-Modell nicht verfügbar — bist du eingeloggt? Führe \`ollama signin\` im Terminal aus, oder wähle ein lokales Modell. (Details: ${body})`)
+    }
+    throw new Error(`Ollama API ${res.status}: ${body}`)
+  }
   const json = await res.json() as {
     message?: {
       role?: string
@@ -253,22 +233,14 @@ async function chatWithToolsViaOllama(
   }
 }
 
-/**
- * Tool-aware Chat-Wrapper. Aktuell nur Ollama implementiert (User-Fokus).
- * Anthropic-Tool-Use folgt später — fällt aktuell mit klarem Fehler aus.
- */
 export async function chatWithTools(
   messages: ChatMessage[],
   tools: ToolDefinition[],
-  opts: ChatOptions
+  opts: ChatOptions = {}
 ): Promise<ChatWithToolsResult> {
   const ollamaUrl = opts.ollamaUrl ?? DEFAULT_OLLAMA_URL
-  const wantOllama = opts.backend === 'ollama' || opts.backend === 'auto'
-
-  if (wantOllama) {
-    if (opts.backend === 'ollama' || await isOllamaReachable(ollamaUrl)) {
-      return chatWithToolsViaOllama(messages, tools, opts)
-    }
+  if (!(await isOllamaReachable(ollamaUrl))) {
+    throw new Error('Ollama ist nicht erreichbar (localhost:11434). Bitte Ollama starten.')
   }
-  throw new Error('Tool-Use ist aktuell nur über Ollama unterstützt. Bitte Backend auf "ollama" stellen und sicherstellen, dass Ollama läuft.')
+  return chatWithToolsViaOllama(messages, tools, opts)
 }

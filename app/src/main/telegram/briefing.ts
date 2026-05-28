@@ -2,21 +2,20 @@
 // Sammelt heute fällige Tasks + Überfällige + (optional) ungelesene Emails
 // und lässt das LLM eine kurze Zusammenfassung erstellen.
 
-import { chat, type ChatBackend } from '../llm/chatClient'
-import { tasksDueToday, tasksOverdue, eventsForRange, type VaultTaskHit } from './vaultQueries'
+import { chat } from '../llm/chatClient'
+import { tasksDueToday, tasksOverdue, eventsForRange, loadRecentBrainEntry, type VaultTaskHit } from './vaultQueries'
 import { promises as fs } from 'fs'
 import path from 'path'
 
 export interface BriefingContext {
   vaultPath: string
   excludedFolders?: string[]
-  backend: ChatBackend
-  anthropicApiKey?: string
-  anthropicModel?: string
   ollamaModel?: string
+  brainFolderPath?: string         // optional, default '800 - 🧠 brain'
   includeEmails?: boolean
   includeOverdue?: boolean
   includeCalendar?: boolean
+  includeBrain?: boolean           // default true
 }
 
 export interface EmailSummary {
@@ -70,7 +69,7 @@ function tasksToPromptLines(hits: VaultTaskHit[]): string {
 }
 
 export async function generateBriefing(ctx: BriefingContext): Promise<string> {
-  const [today, overdue, emails, agenda] = await Promise.all([
+  const [today, overdue, emails, agenda, brain] = await Promise.all([
     tasksDueToday({ vaultPath: ctx.vaultPath, excludedFolders: ctx.excludedFolders }),
     ctx.includeOverdue !== false
       ? tasksOverdue({ vaultPath: ctx.vaultPath, excludedFolders: ctx.excludedFolders })
@@ -80,7 +79,10 @@ export async function generateBriefing(ctx: BriefingContext): Promise<string> {
       : Promise.resolve([] as EmailSummary[]),
     ctx.includeCalendar !== false
       ? eventsForRange(1) // heute + morgen
-      : Promise.resolve({ events: [] as Array<{ title: string; startDate: string; endDate: string; location?: string; allDay: boolean }> })
+      : Promise.resolve({ events: [] as Array<{ title: string; startDate: string; endDate: string; location?: string; allDay: boolean }> }),
+    ctx.includeBrain !== false
+      ? loadRecentBrainEntry(ctx.vaultPath, ctx.brainFolderPath)
+      : Promise.resolve(null)
   ])
 
   const now = new Date()
@@ -126,13 +128,21 @@ export async function generateBriefing(ctx: BriefingContext): Promise<string> {
     promptSections.push(`\nRelevante ungelesene Emails (${emails.length}):\n${emailBlock}`)
   }
 
+  if (brain) {
+    const heading = brain.isToday
+      ? `Eigenes Tagesgedächtnis (heute, ${brain.date}):`
+      : `Eigenes Tagesgedächtnis (gestern, ${brain.date} — heute noch nicht geschrieben):`
+    promptSections.push(`\n${heading}\n${brain.content}`)
+  }
+
   const systemPrompt = `Du bist Jochens persönlicher Assistent. Erstelle ein kompaktes Morning-Briefing auf Deutsch.
 
 REGELN:
-- Maximal 200 Wörter insgesamt
+- Maximal 220 Wörter insgesamt
 - Struktur: kurze Begrüßung → wichtigste 3-5 Punkte heute → optional ein motivierender Satz am Ende
 - Nutze Emojis sparsam (max 3-4)
 - Priorisiere: Überfällige > Termingebundene Tasks > Emails mit Antwortpflicht
+- Wenn das eigene Tagesgedächtnis ("Brain") vorliegt: gehe in der Begrüßung kurz auf die offenen Fäden oder Fokuspunkte daraus ein
 - Keine Markdown-Überschriften (#, ##), nur fette Schrift via *Stern* für Telegram
 - Kein Gendern (keine Sternchen oder Doppelpunkte bei Personenbezeichnungen)`
 
@@ -144,9 +154,6 @@ REGELN:
       { role: 'user', content: userPrompt }
     ],
     {
-      backend: ctx.backend,
-      anthropicApiKey: ctx.anthropicApiKey,
-      anthropicModel: ctx.anthropicModel,
       ollamaModel: ctx.ollamaModel,
       maxTokens: 600
     }

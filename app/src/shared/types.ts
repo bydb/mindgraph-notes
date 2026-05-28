@@ -970,11 +970,7 @@ export interface ElectronAPI {
   // Telegram Bot
   telegramSaveToken: (token: string) => Promise<boolean>;
   telegramHasToken: () => Promise<boolean>;
-  telegramSaveAnthropicKey: (key: string) => Promise<boolean>;
-  telegramHasAnthropicKey: () => Promise<boolean>;
   telegramUpdateConfig: (config: {
-    backend?: 'ollama' | 'anthropic' | 'auto';
-    anthropicModel?: string;
     ollamaModel?: string;
     excludedFolders?: string[];
     includeEmails?: boolean;
@@ -1013,8 +1009,8 @@ export interface ElectronAPI {
   projectStatusLoadSynonyms: (vaultPath: string, projectFolderRel: string) => Promise<{ success: boolean; cache?: ProjectSynonymCache | null; error?: string }>;
 
   // MindGraph Coach (adaptives Onboarding)
-  coachPrecheck: () => Promise<{ backend: 'anthropic' | 'ollama' | 'none'; detail: string }>;
-  coachStart: (args: { language: 'de' | 'en'; isRestart?: boolean }) => Promise<{ greeting: string; backend: 'anthropic' | 'ollama' | 'none' }>;
+  coachPrecheck: () => Promise<{ backend: 'ollama' | 'none'; detail: string }>;
+  coachStart: (args: { language: 'de' | 'en'; isRestart?: boolean }) => Promise<{ greeting: string; backend: 'ollama' | 'none' }>;
   coachRespond: (payload: {
     userText: string;
     history: Array<{ role: 'system' | 'user' | 'assistant' | 'tool'; content: string }>;
@@ -1023,16 +1019,15 @@ export interface ElectronAPI {
     acceptedActionTypes: string[];
     language: 'de' | 'en';
   }) => Promise<
-    | { ok: true; text: string; actions: Array<{ actionId: string; type: string; title: string; description: string; payload: Record<string, unknown>; status: string }>; backend: 'ollama' | 'anthropic'; warnings: string[] }
+    | { ok: true; text: string; actions: Array<{ actionId: string; type: string; title: string; description: string; payload: Record<string, unknown>; status: string }>; backend: 'ollama'; warnings: string[] }
     | { ok: false; error: string }
   >;
   coachAsk: (payload: {
     question: string;
     history: Array<{ role: 'system' | 'user' | 'assistant' | 'tool'; content: string }>;
     language: 'de' | 'en';
-    backend?: 'ollama' | 'anthropic';
   }) => Promise<
-    | { ok: true; text: string; backend: 'ollama' | 'anthropic' }
+    | { ok: true; text: string; backend: 'ollama' }
     | { ok: false; error: string }
   >;
 }
