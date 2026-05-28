@@ -5,6 +5,10 @@ import {
   RECOMMENDED_DEFAULTS,
   getModelVerdict,
   greenModelsForModule,
+  isCloudModel,
+  isHumanFavorite,
+  isMlxModel,
+  modelMarkers,
   type ModuleId,
   type Verdict
 } from '../../../shared/modelCompatibility'
@@ -96,7 +100,7 @@ function ModuleRow({
               const v = getModelVerdict(m.name, moduleId)
               return (
                 <option key={m.name} value={m.name}>
-                  {VERDICT_ICON[v.verdict]} {m.name}
+                  {VERDICT_ICON[v.verdict]} {modelMarkers(m.name)}{m.name}
                 </option>
               )
             })}
@@ -216,8 +220,18 @@ function DetailDrawer({ model, moduleId, t }: { model: string; moduleId: ModuleI
   return (
     <div style={{ fontSize: '12px', padding: '8px 10px', background: 'var(--bg-primary)', borderRadius: '4px' }}>
       <div style={{ fontWeight: 500, marginBottom: '6px' }}>
-        {model}
+        {modelMarkers(model)}{model}
       </div>
+      {isMlxModel(model) && (
+        <div style={{ marginBottom: '6px', color: 'var(--text-secondary)', fontSize: '11px' }}>
+          {t('settings.integrations.ollama.mlxHint')}
+        </div>
+      )}
+      {isHumanFavorite(model) && (
+        <div style={{ marginBottom: '6px', color: 'var(--text-secondary)', fontSize: '11px' }}>
+          {t('settings.integrations.ollama.humanFavoriteHint')}
+        </div>
+      )}
       {rows.length > 0 && (
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <tbody>
@@ -250,12 +264,54 @@ export function ActiveModelStatusBadge({ model }: { model: string }) {
   if (visibleModules.length === 0) return null
 
   return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '6px' }}>
+      {isCloudModel(model) && (
+        <div
+          style={{
+            padding: '6px 10px',
+            background: 'rgba(217, 119, 6, 0.08)',
+            border: `1px solid ${VERDICT_COLOR.yellow}`,
+            borderRadius: '4px',
+            fontSize: '12px',
+            color: 'var(--text-primary)'
+          }}
+        >
+          <strong>{t('settings.integrations.ollama.cloudBadge')}</strong> — {t('settings.integrations.ollama.cloudModelWarning')}
+        </div>
+      )}
+      {isMlxModel(model) && (
+        <div
+          style={{
+            padding: '6px 10px',
+            background: 'rgba(0, 0, 0, 0.03)',
+            border: '1px solid var(--border-color)',
+            borderRadius: '4px',
+            fontSize: '12px',
+            color: 'var(--text-primary)'
+          }}
+        >
+          <strong>🍎 {t('settings.integrations.ollama.mlxBadge')}</strong> — {t('settings.integrations.ollama.mlxHint')}
+        </div>
+      )}
+      {isHumanFavorite(model) && (
+        <div
+          style={{
+            padding: '6px 10px',
+            background: 'rgba(0, 0, 0, 0.03)',
+            border: '1px solid var(--border-color)',
+            borderRadius: '4px',
+            fontSize: '12px',
+            color: 'var(--text-primary)'
+          }}
+        >
+          <strong>⭐ {t('settings.integrations.ollama.humanFavoriteBadge')}</strong> — {t('settings.integrations.ollama.humanFavoriteHint')}
+        </div>
+      )}
     <div
       style={{
         display: 'flex',
         flexWrap: 'wrap',
         gap: '8px',
-        marginTop: '6px',
         fontSize: '12px',
         color: 'var(--text-secondary, #6b7280)'
       }}
@@ -282,6 +338,7 @@ export function ActiveModelStatusBadge({ model }: { model: string }) {
           </span>
         )
       })}
+    </div>
     </div>
   )
 }

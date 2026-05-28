@@ -8,7 +8,7 @@ import { useTranslation, type TranslationKey } from '../../utils/translations'
 import { TelegramSettings } from './TelegramSettings'
 import { CredentialsSettings } from './CredentialsSettings'
 import { ModelCompatibilitySection, ActiveModelStatusBadge, VERDICT_ICON, VERDICT_COLOR } from './ModelCompatibilitySection'
-import { getModelVerdict } from '../../../shared/modelCompatibility'
+import { getModelVerdict, CLOUD_TEST_MODELS, RECOMMENDED_PULL_MODELS, isCloudModel, modelMarkers } from '../../../shared/modelCompatibility'
 import { ensureTransformersModel, isTransformersModelReady } from '../../utils/voice/transformersStt'
 import { writeClipboardText } from '../../utils/clipboard'
 
@@ -1393,7 +1393,7 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab 
   const [remarkableError, setRemarkableError] = useState<string | null>(null)
 
   // Ollama Pull Model State
-  const [pullModelName, setPullModelName] = useState('ministral')
+  const [pullModelName, setPullModelName] = useState('gemma4:latest')
   const [customPullModelName, setCustomPullModelName] = useState('')
   const [isPulling, setIsPulling] = useState(false)
   const [pullProgress, setPullProgress] = useState<{ status: string; completed?: number; total?: number } | null>(null)
@@ -2920,7 +2920,7 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab 
                               <option value="">{t('settings.selectModel')}</option>
                               {ollamaModels.map(model => (
                                 <option key={model.name} value={model.name}>
-                                  {model.name}
+                                  {modelMarkers(model.name)}{model.name}
                                 </option>
                               ))}
                             </select>
@@ -2951,12 +2951,24 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab 
                             disabled={isPulling}
                             style={{ flex: 1 }}
                           >
+                            <optgroup label={t('settings.integrations.ollama.cloudTestGroup')}>
+                              {CLOUD_TEST_MODELS.map(m => (
+                                <option key={m.name} value={m.name}>{m.label}</option>
+                              ))}
+                            </optgroup>
                             <optgroup label={t('settings.integrations.ollama.recommendedModels')}>
-                              <option value="ministral">Ministral 8B (~5 GB, empfohlen)</option>
-                              <option value="gemma3:4b">Gemma 3 4B (~3 GB)</option>
-                              <option value="llama3.2">Llama 3.2 (~2 GB)</option>
-                              <option value="qwen3:4b">Qwen 3 4B (~3 GB)</option>
-                              <option value="mistral">Mistral 7B (~4 GB)</option>
+                              {RECOMMENDED_PULL_MODELS.filter(m => (m.kind ?? 'chat') === 'chat').map(m => (
+                                <option key={m.name} value={m.name}>
+                                  {modelMarkers(m.name)}{m.label}
+                                </option>
+                              ))}
+                            </optgroup>
+                            <optgroup label={t('settings.integrations.ollama.embeddingModels')}>
+                              {RECOMMENDED_PULL_MODELS.filter(m => m.kind === 'embedding').map(m => (
+                                <option key={m.name} value={m.name}>
+                                  {modelMarkers(m.name)}{m.label}
+                                </option>
+                              ))}
                             </optgroup>
                           </select>
                           <button
@@ -2979,6 +2991,14 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab 
                             style={{ flex: 1 }}
                           />
                         </div>
+                        {isCloudModel(customPullModelName || pullModelName) && (
+                          <span style={{ fontSize: '11px', color: 'var(--warning, #d97706)' }}>
+                            {t('settings.integrations.ollama.cloudHint')}
+                          </span>
+                        )}
+                        <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
+                          {t('settings.integrations.ollama.humanFavoriteHint')}
+                        </span>
                         {isPulling && pullProgress && (
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                             <div className="inbox-progress-bar">
@@ -3070,7 +3090,7 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab 
                             <option value="">{t('settings.selectModel')}</option>
                             {lmstudioModels.map(model => (
                               <option key={model.name} value={model.name}>
-                                {model.name}
+                                {modelMarkers(model.name)}{model.name}
                               </option>
                             ))}
                           </select>
@@ -4917,7 +4937,7 @@ LIMIT 10
                           {ollamaModels.map(m => {
                             const v = getModelVerdict(m.name, 'task-extraction')
                             return (
-                              <option key={m.name} value={m.name}>{VERDICT_ICON[v.verdict]} {m.name}</option>
+                              <option key={m.name} value={m.name}>{VERDICT_ICON[v.verdict]} {modelMarkers(m.name)}{m.name}</option>
                             )
                           })}
                         </select>

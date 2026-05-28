@@ -4,7 +4,7 @@
 // das Modell ändern kann.
 
 import { useShallow } from 'zustand/react/shallow'
-import { getModelVerdict, type ModuleId } from '../../../shared/modelCompatibility'
+import { getModelVerdict, isHumanFavorite, isMlxModel, modelMarkers, type ModuleId } from '../../../shared/modelCompatibility'
 import { useUIStore } from '../../stores/uiStore'
 import { VERDICT_COLOR } from '../Settings/ModelCompatibilitySection'
 
@@ -44,9 +44,13 @@ export function ActiveModelBadge({ moduleId, tabOverride, tabOverrideLabel }: Pr
       ? 'Modul-Override (Einstellungen → Integrationen)'
       : 'Globales Standardmodell'
 
+  const favorite = isHumanFavorite(effectiveModel)
+  const mlx = isMlxModel(effectiveModel)
   const tooltip = [
     `Modell: ${effectiveModel}`,
     `Quelle: ${sourceLabel}`,
+    mlx ? '🍎 Apple-Silicon-optimiert (MLX)' : null,
+    favorite ? '⭐ Entwickler-Favorit (Real-Use-Erfahrung)' : null,
     verdict.reasons.length ? `Hinweise: ${verdict.reasons.join(' · ')}` : null,
     'Klick öffnet Einstellungen → Integrationen'
   ]
@@ -90,7 +94,7 @@ export function ActiveModelBadge({ moduleId, tabOverride, tabOverrideLabel }: Pr
           flexShrink: 0
         }}
       />
-      <span>{effectiveModel}</span>
+      <span>{modelMarkers(effectiveModel)}{effectiveModel}</span>
     </button>
   )
 }

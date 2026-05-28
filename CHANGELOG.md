@@ -2,6 +2,22 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.7.7-beta] - 2026-05-28
+
+### Features
+
+- **Ollama-Cloud-Modell zum Testen ohne Download**: Im Modell-Dropdown gibt es jetzt ganz oben eine eigene Gruppe „Cloud (Test — kein Download, kein lokales GPU/RAM)" mit `ministral-3:14b-cloud`. Wer MindGraph in den ersten Minuten ohne lokale GPU oder ohne Lust auf 10-GB-Downloads ausprobieren will, kann damit sofort loslegen — die Anfrage geht über die lokale Ollama-Instanz an Ollamas Cloud. Ein gelber Warn-Block direkt unter dem Modell-Picker erklärt, dass Inhalte mit diesem Modell den Rechner verlassen und das Brain-Versprechen „verlässt nie deinen Rechner" mit Cloud-Modellen nicht greift.
+- **🍎-Stempel für Apple-Silicon-Modelle (MLX)**: Modelle, die Apples MLX-Framework nutzen (`-mlx`-Suffix wie `qwen3.6:27b-mlx`), bekommen jetzt überall in der App einen kleinen Apfel-Marker — im Modell-Picker, in der Kompatibilitäts-Sektion, in den Modul-Pillen der Tabs, beim Pull-Dropdown. MLX-Modelle laufen nativ auf M-Chips, schneller und mit weniger RAM als die GGUF-Varianten. Tooltip und Detail-Hint erklären den Marker in einem Satz.
+- **⭐-Stempel für Entwickler-Favoriten**: Neue Achse neben den Benchmark-Verdicts — Modelle, die sich im echten Vault-Alltag bewährt haben, sind mit einem Stern markiert. Aktuell `qwen3.6:latest` und `qwen3.6:27b-mlx`. Bench-Statistik und persönliche Real-Use-Erfahrung sind damit als zwei getrennte Signale lesbar; ein ⭐ kann ein gelbes Bench-Verdict in einem Modul überstrahlen, wenn die Praxis das hergibt.
+- **bge-m3 als Ein-Klick-Download**: Das multilinguale Embedding-Modell für Smart Connections (~600 MB, deutlich bessere Ähnlichkeits-Scores auf deutschen Vaults als `nomic-embed-text`) hat im Pull-Dropdown jetzt eine eigene Sektion „Embedding-Modelle (Smart Connections)". Bislang musste es per `ollama pull bge-m3` von Hand geholt werden.
+
+### Improvements
+
+- **Pull-Empfehlungen passen jetzt zur Kompatibilitäts-Matrix**: Die Liste der vorgeschlagenen Downloads enthielt bisher Modelle, die nie benchmarkt wurden (`gemma3:4b`, `llama3.2`, `qwen3:4b`, `mistral`, generisches `ministral`) — nach dem Download landete man konsequent bei einem „ungetestet"-Badge. Jetzt stehen ausschließlich Modelle aus der echten Test-Matrix in den Empfehlungen: `gemma4:latest`, `ministral-3:8b`, `qwen3.6:latest`, `qwen3.6:27b-mlx`, `qwen3.5:9b-mlx-bf16`. Ein gepulltes Modell matcht damit 1:1 einen Matrix-Eintrag, und der Kompatibilitäts-Beipackzettel liefert sofort konkrete Aussagen statt grauer Fragezeichen. Default-Auswahl ist nicht mehr das generische `ministral`, sondern `gemma4:latest` — schnell, schlank, in allen Modulen grün.
+- **Llama 3.1 8B aus den Empfehlungen entfernt**: Das Modell ist in der Matrix für Brain und Dashboard-Snapshot „hard-locked" (fällt im Test auf Prompt-Injection rein) und in den anderen Modulen nur Mittelfeld. Im Pull-Dropdown wirkte es deshalb mehr wie eine Falle als eine Empfehlung.
+- **Cloud-Hinweis im aktiven Modell-Badge**: Wenn das aktive Modell ein `-cloud`-Modell ist, erscheint unter dem Modell-Picker ein expliziter Warn-Block — nicht nur in der Modell-Auswahl, sondern dauerhaft sichtbar, solange das Cloud-Modell aktiv ist. So fällt nicht aus dem Blick, dass das Brain-Versprechen in diesem Modus nicht greift.
+- **Tooltip auf den Modul-Pillen liest sich jetzt wie ein Faktenblatt**: Die kleine Modell-Pille in jedem Modul-Tab (E-Mail, Brain, Dashboard, Projekt-Status) listet im Tooltip jetzt eine Zeile pro Signal — Modell, Quelle (Tab/Modul/Global), 🍎 MLX, ⭐ Favorit, Bench-Hinweise — statt alles in einen Satz zu quetschen.
+
 ## [0.7.6-beta] - 2026-05-28
 
 ### Features

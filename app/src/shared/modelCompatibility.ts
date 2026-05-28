@@ -5,6 +5,11 @@
 // /Users/jochenleeder/dev/brain-model-benchmark/ und
 // "Modell-Kompatibilitaets-Analyse.md".
 // 2026-05-28: qwen3.6:27b-mlx ergänzt (MLX-quantisiertes 27B, ~19 GB).
+// 2026-05-28: ministral-3:14b-cloud ergänzt — Ollama-Cloud-Variante,
+//   gedacht als Null-Reibungs-Einstieg für Test-/Demo-User ohne lokale GPU.
+//   Inhalte verlassen den Rechner (Ollama-Cloud). Verdicts konservativ
+//   abgeleitet vom Sibling ministral-3:8b — keine eigenen Benchmark-Runs,
+//   daher überall "yellow" mit Cloud-Privacy-Note (statt grün).
 //
 // "verdict":
 //   - "green":     Für dieses Modul produktiv geeignet.
@@ -67,7 +72,7 @@ export interface ModelCompatibilityData {
 }
 
 export const MODEL_COMPATIBILITY: ModelCompatibilityData = {
-  version: '2026-05-28',
+  version: '2026-05-28b',
   modules: {
     brain: {
       'qwen3.5:9b-mlx-bf16': {
@@ -102,6 +107,11 @@ export const MODEL_COMPATIBILITY: ModelCompatibilityData = {
         reasons: ['Regel 5 in 1/4 Fällen verletzt (leere "Offene Fäden"-Sektion bei stillem Tag)'],
         notes: '0 Halluzinationen, 0 unangebrachte Bewertungen — sehr sauber. Aber ~47 s/Lauf (langsamstes Brain-Modell der Matrix).',
         metrics: { wikilinkHallucinations: 'none', criticalTitlesLinkedPct: 70, rule5CompliancePct: 25, latencySecondsPerRun: 47, ramGigabytes: 22 }
+      },
+      'ministral-3:14b-cloud': {
+        verdict: 'yellow',
+        reasons: ['Cloud: Tagebuch-/Brain-Inhalte werden zur Ollama-Cloud übertragen — Privacy-Promise „verlässt nie deinen Rechner" greift hier nicht'],
+        notes: 'Cloud-Variante (Ollama-Cloud) von ministral-3 — keine lokale GPU/RAM nötig. Verdict abgeleitet vom Sibling ministral-3:8b (✅), nicht eigenständig benchmarkt. Nur für Test-/Demo-Zwecke empfohlen.'
       }
     },
     'task-extraction': {
@@ -136,6 +146,11 @@ export const MODEL_COMPATIBILITY: ModelCompatibilityData = {
         reasons: [],
         notes: 'Beste for_whom-Genauigkeit der Matrix (100 %, 10/10). 9/10 Reply-Erkennung. ~9 s/Mail (langsamer als gemma4/ministral, aber präziser).',
         metrics: { directionAccuracyPct: 100, recallPct: 100, latencySecondsPerRun: 9, ramGigabytes: 22 }
+      },
+      'ministral-3:14b-cloud': {
+        verdict: 'yellow',
+        reasons: ['Cloud: Mail-Inhalte werden zur Ollama-Cloud übertragen', 'Kein eigenständiger Benchmark — Verdict aus 8B-Sibling abgeleitet'],
+        notes: 'Cloud-Variante. Sibling ministral-3:8b ist task-extraction ⚠️ (Recall 88 %). Für Test-/Demo-Zwecke OK, im Live-Betrieb mit echten Mails gut prüfen.'
       }
     },
     'mail-summary': {
@@ -173,6 +188,11 @@ export const MODEL_COMPATIBILITY: ModelCompatibilityData = {
         reasons: ['Relevance-Range nur 6/8 (überschätzt klare Anfragen, unterschätzt Reservierungs-Bestätigungen)', 'Halluzinations-Token-Ratio 31.8 % — höchste der getesteten Modelle', '~14 s/Mail (langsamstes Modell der Matrix für mail-summary)'],
         notes: 'Sentiment + needsReply perfekt (8/8). Für Sicherheit relevant, aber zu langsam und zu kreativ für Produktiv-Einsatz.',
         metrics: { recallPct: 97, latencySecondsPerRun: 14, ramGigabytes: 22 }
+      },
+      'ministral-3:14b-cloud': {
+        verdict: 'yellow',
+        reasons: ['Cloud: Mail-Inhalte werden zur Ollama-Cloud übertragen'],
+        notes: 'Cloud-Variante. Sibling ministral-3:8b ist mail-summary ✅ (Relevance-Range 7/8, schnell). 14b-cloud sollte qualitativ vergleichbar sein, nicht selbst benchmarkt.'
       }
     },
     'dashboard-snapshot': {
@@ -209,6 +229,11 @@ export const MODEL_COMPATIBILITY: ModelCompatibilityData = {
         reasons: ['1/8 Range-Drift: überfällige Deadline (d02) als "nicht mehr akut" gewertet, Score 0 statt 81–100 — Interpretations-Sache, kein Bug'],
         notes: 'Prompt-Injection sauber erkannt (8/8). 7/8 Score in Range, 7/8 Reason-Match. ~5 s/Notiz — langsamer als gemma4/ministral, schneller als qwen3.6:latest.',
         metrics: { recallPct: 95, latencySecondsPerRun: 5, ramGigabytes: 22 }
+      },
+      'ministral-3:14b-cloud': {
+        verdict: 'yellow',
+        reasons: ['Cloud: Notiz-Inhalte werden zur Ollama-Cloud übertragen', 'Prompt-Injection-Resistenz nicht eigenständig benchmarkt'],
+        notes: 'damageRelevant-Modul: Notiz-Inhalt ist UNTRUSTED Input. Sibling ministral-3:8b ist hier ✅ (8/8, Injection erkannt). 14b-cloud sollte mindestens gleich gut sein, aber Live-Output regelmäßig kontrollieren.'
       }
     },
     'smart-connections':   {},
@@ -245,6 +270,11 @@ export const MODEL_COMPATIBILITY: ModelCompatibilityData = {
         reasons: ['Neigt zu Floskeln in "Diese Woche"', 'Wenige Backlinks bei dichten Quellen'],
         notes: 'Reicht für simple Projekte mit ≤2 Brain-Tagen; bei dichteren Wochen besser gemma4.',
         metrics: { latencySecondsPerRun: 12, ramGigabytes: 6 }
+      },
+      'ministral-3:14b-cloud': {
+        verdict: 'yellow',
+        reasons: ['Cloud: Status-Quellen (Brain-Tage, Tasks) werden zur Ollama-Cloud übertragen'],
+        notes: 'Cloud-Variante. Sibling ministral-3:8b ist hier ⚠️ (Floskeln bei dichten Quellen) — 14b sollte etwas robuster sein. Output landet ohnehin in einem Draft (`_STATUS-WW.md`), den der User vor Übernahme reviewt.'
       }
     }
   }
@@ -286,3 +316,80 @@ export function isHardLocked(model: string, moduleId: ModuleId): boolean {
   const v = getModelVerdict(model, moduleId)
   return v.verdict === 'red'
 }
+
+// MLX-Modelle: Apple-Silicon-optimiert (laufen via Apples MLX-Framework nativ
+// auf M-Chips, deutlich schneller + weniger RAM als GGUF/llama.cpp-Varianten).
+// Erkennung: `-mlx` irgendwo im Tag (z.B. `qwen3.6:27b-mlx`, `qwen3.5:9b-mlx-bf16`).
+export function isMlxModel(model: string): boolean {
+  if (!model) return false
+  return /-mlx(?:[-:].*)?$/i.test(model.trim())
+}
+
+// Gemeinsamer Marker-Präfix für Modell-Labels in allen UI-Stellen.
+// Reihenfolge: 🍎 (MLX/Apple-Silicon) zuerst, dann ⭐ (Entwickler-Favorit) —
+// technisches Signal vor Geschmackssignal. Trennzeichen je ein Leerzeichen.
+export function modelMarkers(model: string): string {
+  const parts: string[] = []
+  if (isMlxModel(model)) parts.push('🍎')
+  if (isHumanFavorite(model)) parts.push('⭐')
+  return parts.length > 0 ? parts.join(' ') + ' ' : ''
+}
+
+// Entwickler-Favoriten — Modelle, die im echten Vault-Alltag favorisiert werden.
+// Achse unabhängig von Bench-Verdicts (`green/yellow/red`): ein Modell kann ein
+// gelbes Bench-Verdict in einem Modul haben und trotzdem Favorit sein, wenn
+// die Real-Use-Qualität die statistische Stichprobe schlägt.
+//
+// Quelle: `RECOMMENDED_PULL_MODELS[].humanFavorite`. Helper liest diese Liste,
+// damit der Marker an genau einer Stelle gepflegt wird.
+export function isHumanFavorite(model: string): boolean {
+  if (!model) return false
+  const entry = RECOMMENDED_PULL_MODELS.find(m => m.name === model)
+  return entry?.humanFavorite === true
+}
+
+// Ollama-Cloud-Modelle haben einen `-cloud`-Suffix im Tag (z.B. `ministral-3:14b-cloud`).
+// Die Anfrage geht zwar weiter über localhost:11434, aber die eigentliche Inferenz
+// findet auf Ollama-Servern statt — d.h. die Prompt-Inhalte verlassen den Rechner.
+// Für UI-Hinweise (Privacy-Warnung) gedacht, nicht für Hard-Locks.
+export function isCloudModel(model: string): boolean {
+  if (!model) return false
+  return /-cloud$/i.test(model.trim())
+}
+
+// "Cloud-Test-Modelle": Modelle, die wir als Null-Reibungs-Einstieg für Test-User
+// anbieten (kein Download, keine lokale GPU). Reine UI-Hilfe für Onboarding/Settings.
+export const CLOUD_TEST_MODELS: Array<{ name: string; label: string; description: string }> = [
+  {
+    name: 'ministral-3:14b-cloud',
+    label: 'Ministral 3 14B (Cloud, Test)',
+    description: 'Läuft auf Ollama-Cloud — kein Download, keine GPU. Inhalte verlassen den Rechner.'
+  }
+]
+
+// Empfohlene lokale Pull-Modelle für Onboarding + Settings.
+// Quelle: die Modelle, die wir tatsächlich gegen die Compat-Matrix gebenchmarkt
+// haben — keine Stellvertreter-Tags. So matcht ein Pull aus der UI 1:1 einen
+// Matrix-Eintrag und der User landet nach Download nicht bei "❔ ungetestet".
+//
+// Bench-Verdicts (✅/⚠️/🔴) gehören NICHT ins Pull-Label — Aggregation über
+// 5 Module liest sich wie Rauschen ("✅/⚠️"). Wer Detail-Verdicts will,
+// schaut nach dem Pull in die Kompatibilitäts-Sektion.
+//
+// `humanFavorite`: separates Signal — der Entwickler hat das Modell im
+// echten Vault-Alltag getestet und favorisiert es. Bench-unabhängig.
+export type PullModelKind = 'chat' | 'embedding'
+
+export const RECOMMENDED_PULL_MODELS: Array<{
+  name: string
+  label: string
+  kind?: PullModelKind        // default 'chat'
+  humanFavorite?: boolean
+}> = [
+  { name: 'qwen3.6:27b-mlx',     label: 'Qwen 3.6 27B MLX (~22 GB)',         humanFavorite: true },
+  { name: 'qwen3.6:latest',      label: 'Qwen 3.6 (~48 GB, sehr großer RAM-Bedarf)', humanFavorite: true },
+  { name: 'gemma4:latest',       label: 'Gemma 4 (~10 GB, schnell)' },
+  { name: 'ministral-3:8b',      label: 'Ministral 3 8B (~6 GB, sehr schnell)' },
+  { name: 'qwen3.5:9b-mlx-bf16', label: 'Qwen 3.5 9B MLX (~8 GB)' },
+  { name: 'bge-m3:latest',       label: 'bge-m3 (~600 MB, multilingual — Smart Connections)', kind: 'embedding' }
+]

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useTranslation } from '../../../utils/translations'
 import { useUIStore } from '../../../stores/uiStore'
+import { CLOUD_TEST_MODELS, RECOMMENDED_PULL_MODELS, isCloudModel, modelMarkers } from '../../../../shared/modelCompatibility'
 
 interface AIStepProps {
   onBack: () => void
@@ -42,7 +43,7 @@ export const AIStep: React.FC<AIStepProps> = ({ onBack, onNext }) => {
   const [ollamaModels, setOllamaModels] = useState<string[]>([])
   const [checking, setChecking] = useState(true)
 
-  const [pullModelName, setPullModelName] = useState('ministral')
+  const [pullModelName, setPullModelName] = useState('gemma4:latest')
   const [isPulling, setIsPulling] = useState(false)
   const [pullProgress, setPullProgress] = useState<{ status: string; completed?: number; total?: number } | null>(null)
   const [pullError, setPullError] = useState<string | null>(null)
@@ -166,7 +167,7 @@ export const AIStep: React.FC<AIStepProps> = ({ onBack, onNext }) => {
                 onChange={(e) => handleModelChange(e.target.value)}
               >
                 {ollamaModels.map(model => (
-                  <option key={model} value={model}>{model}</option>
+                  <option key={model} value={model}>{modelMarkers(model)}{model}</option>
                 ))}
               </select>
             </div>
@@ -180,12 +181,24 @@ export const AIStep: React.FC<AIStepProps> = ({ onBack, onNext }) => {
                   disabled={isPulling}
                   style={{ flex: 1, fontSize: '13px' }}
                 >
+                  <optgroup label={t('settings.integrations.ollama.cloudTestGroup')}>
+                    {CLOUD_TEST_MODELS.map(m => (
+                      <option key={m.name} value={m.name}>{m.label}</option>
+                    ))}
+                  </optgroup>
                   <optgroup label={t('settings.integrations.ollama.recommendedModels')}>
-                    <option value="ministral">Ministral 8B (~5 GB)</option>
-                    <option value="gemma3:4b">Gemma 3 4B (~3 GB)</option>
-                    <option value="llama3.2">Llama 3.2 (~2 GB)</option>
-                    <option value="qwen3:4b">Qwen 3 4B (~3 GB)</option>
-                    <option value="mistral">Mistral 7B (~4 GB)</option>
+                    {RECOMMENDED_PULL_MODELS.filter(m => (m.kind ?? 'chat') === 'chat').map(m => (
+                      <option key={m.name} value={m.name}>
+                        {modelMarkers(m.name)}{m.label}
+                      </option>
+                    ))}
+                  </optgroup>
+                  <optgroup label={t('settings.integrations.ollama.embeddingModels')}>
+                    {RECOMMENDED_PULL_MODELS.filter(m => m.kind === 'embedding').map(m => (
+                      <option key={m.name} value={m.name}>
+                        {modelMarkers(m.name)}{m.label}
+                      </option>
+                    ))}
                   </optgroup>
                 </select>
                 <button
@@ -197,6 +210,14 @@ export const AIStep: React.FC<AIStepProps> = ({ onBack, onNext }) => {
                   {isPulling ? t('settings.integrations.ollama.pulling') : t('settings.integrations.ollama.download')}
                 </button>
               </div>
+              {isCloudModel(pullModelName) && (
+                <span style={{ fontSize: '11px', color: 'var(--warning, #d97706)' }}>
+                  {t('settings.integrations.ollama.cloudHint')}
+                </span>
+              )}
+              <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
+                {t('settings.integrations.ollama.humanFavoriteHint')}
+              </span>
               {isPulling && pullProgress && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                   <div className="inbox-progress-bar">
