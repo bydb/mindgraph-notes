@@ -23,6 +23,8 @@ export type WorkflowModuleId =
   | 'calendar'
   | 'edoobox'
   | 'antares'
+  | 'tasks'
+  | 'schedule'
 
 /**
  * Typisierte Port-Arten. Verbindungen sind nur über die strikte Allowlist in
@@ -127,5 +129,7 @@ export const MODULE_FEATURE_GATE: Record<WorkflowModuleId, string | null> = {
   notes: null,
   human: null,
   calendar: null,
-  antares: null
+  antares: null,
+  tasks: null,
+  schedule: null
 }

@@ -36,7 +36,9 @@ export const WORKFLOW_MODULE_LABELS: Record<WorkflowModuleId, string> = {
   human: 'Menschliche Prüfung',
   calendar: 'Kalender',
   edoobox: 'edoobox',
-  antares: 'Antares'
+  antares: 'Antares',
+  tasks: 'Aufgaben',
+  schedule: 'Zeitplan'
 }
 
 export const WORKFLOW_ACTIONS: WorkflowActionDefinition[] = [
@@ -47,6 +49,31 @@ export const WORKFLOW_ACTIONS: WorkflowActionDefinition[] = [
     label: 'E-Mail (Auslöser)',
     description:
       'Startpunkt: die ausgewählte Mail (manuell) bzw. eine neue relevante Mail (Event-Trigger).',
+    isTrigger: true,
+    inputs: [],
+    outputs: [out('email', 'Mail', 'email')],
+    privacy: { containsPersonalData: true }
+  },
+  {
+    // Layer B: feuert, wenn eine eingehende Mail eine Antwort auf eine von dir
+    // gesendete Mail ist (In-Reply-To/References ∈ gesendete Message-IDs).
+    id: 'email.replyReceived',
+    moduleId: 'email',
+    label: 'Antwort eingegangen (Auslöser)',
+    description:
+      'Startpunkt: eine eingehende Antwort auf eine von dir gesendete Mail. Gibt dieselbe Mail aus wie der normale Auslöser — alle Mail-Bausteine sind anschließbar.',
+    isTrigger: true,
+    inputs: [],
+    outputs: [out('email', 'Mail', 'email')],
+    privacy: { containsPersonalData: true }
+  },
+  {
+    // Layer A: feuert bei eingehender Mail mit Kalender-Einladung (.ics).
+    id: 'email.icsReceived',
+    moduleId: 'email',
+    label: 'Termin-Einladung (Auslöser)',
+    description:
+      'Startpunkt: eine eingehende Mail mit einer Kalender-Einladung (.ics-Anhang). Gibt die Mail aus — anschließbar an alle Mail-Bausteine.',
     isTrigger: true,
     inputs: [],
     outputs: [out('email', 'Mail', 'email')],
@@ -226,6 +253,78 @@ export const WORKFLOW_ACTIONS: WorkflowActionDefinition[] = [
     isTerminal: true,
     inputs: [inp('draft', 'Antwortentwurf', 'draft_reply', { required: true })],
     outputs: [out('approval', 'Freigabe', 'human_approval')]
+  },
+
+  // ---------------- ANTARES (Layer C) ----------------
+  {
+    // Feuert bei neuer überfälliger Rückgabe (Mahnung). Gibt eine menschenlesbare
+    // Beschreibung als Text aus → anschließbar an Notiz/Prüfung/Ollama.
+    id: 'antares.mahnung',
+    moduleId: 'antares',
+    label: 'Überfällige Rückgabe (Auslöser)',
+    description:
+      'Startpunkt: eine neue überfällige Rückgabe aus Antares (Mahnung). Gibt Leihnr, Titel, Entleiher, Schule und Rückgabedatum als Text aus.',
+    isTrigger: true,
+    inputs: [],
+    outputs: [out('text', 'Mahnung', 'text')],
+    privacy: { containsPersonalData: true, requiresCredential: true }
+  },
+
+  // ---------------- EDOOBOX (Layer D) ----------------
+  {
+    // Feuert, wenn die Buchungszahl eines Angebots steigt (neue Anmeldung).
+    id: 'edoobox.newBooking',
+    moduleId: 'edoobox',
+    label: 'Neue Anmeldung (Auslöser)',
+    description:
+      'Startpunkt: eine neue Anmeldung in einem edoobox-Angebot. Gibt Angebotsname und Teilnehmer als Text aus.',
+    isTrigger: true,
+    inputs: [],
+    outputs: [out('text', 'Anmeldung', 'text')],
+    privacy: { containsPersonalData: true, requiresCredential: true }
+  },
+
+  // ---------------- TASKS (Layer E) ----------------
+  {
+    // Feuert, wenn eine Vault-Aufgabe in ihr Fälligkeitsfenster rutscht.
+    id: 'tasks.dueSoon',
+    moduleId: 'tasks',
+    label: 'Aufgabe fällig (Auslöser)',
+    description:
+      'Startpunkt: eine Vault-Aufgabe wird fällig oder ist überfällig. Gibt Aufgabentext, Notiz und Fälligkeitsdatum als Text aus.',
+    isTrigger: true,
+    inputs: [],
+    outputs: [out('text', 'Aufgabe', 'text')]
+  },
+
+  // ---------------- SCHEDULE (Layer F) ----------------
+  {
+    // Feuert nach festem Zeitplan (täglich/wöchentlich/monatlich) — auch wenn
+    // der Canvas-Tab geschlossen ist (Main-Prozess-Timer).
+    id: 'schedule.timer',
+    moduleId: 'schedule',
+    label: 'Zeitplan (Auslöser)',
+    description:
+      'Startpunkt: läuft nach festem Zeitplan. Gibt das aktuelle Datum als Text aus — für Tages-/Wochenberichte, Digests usw.',
+    isTrigger: true,
+    inputs: [],
+    outputs: [out('text', 'Datum', 'text')],
+    config: [
+      {
+        key: 'frequency',
+        label: 'Häufigkeit',
+        type: 'select',
+        default: 'daily',
+        options: [
+          { value: 'daily', label: 'Täglich' },
+          { value: 'weekly', label: 'Wöchentlich' },
+          { value: 'monthly', label: 'Monatlich' }
+        ]
+      },
+      { key: 'time', label: 'Uhrzeit (HH:MM)', type: 'text', placeholder: '09:00' },
+      { key: 'weekday', label: 'Wochentag (0=So…6=Sa, nur wöchentlich)', type: 'number' },
+      { key: 'dayOfMonth', label: 'Tag im Monat (1–31, nur monatlich)', type: 'number' }
+    ]
   }
 ]
 

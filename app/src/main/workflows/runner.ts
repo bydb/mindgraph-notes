@@ -31,6 +31,20 @@ export interface SeedEmail {
   from?: string
 }
 
+/** Generischer Seed eines Laufs. Email-Trigger füllen `email`,
+ *  Text-Trigger (Mahnung/Buchung/Aufgabe/Zeitplan) füllen `text` (+ `meta`). */
+export interface RunSeed {
+  email?: SeedEmail
+  text?: string
+  meta?: Record<string, unknown>
+}
+
+/** Event-Lauf (kein manueller ▶-Lauf) → Hand-off legt eine Aufgabe an statt
+ *  das Compose-Fenster zu öffnen. Eine Stelle für alle Event-Trigger. */
+export function isEventTrigger(trigger: WorkflowRunTrigger): boolean {
+  return trigger !== 'manual'
+}
+
 export interface RunnerServices {
   /** node.config.model → Modul-Override → globales Modell. */
   resolveModel: (override: string | undefined, hint?: CompatModuleId) => string
@@ -50,6 +64,9 @@ export interface RunnerServices {
 export interface RunOptions {
   mode: WorkflowRunMode
   trigger: WorkflowRunTrigger
+  /** Generischer Seed (bevorzugt). */
+  seed?: RunSeed | null
+  /** @deprecated Back-Compat-Alias — wird beim Lauf nach seed.email normalisiert. */
   seedEmail?: SeedEmail | null
   services: RunnerServices
 }
@@ -99,16 +116,37 @@ function isEffectivelyEmptyContext(ctx: string): boolean {
   return body.length < 30
 }
 
+type Executor = (node: WorkflowNode, inputs: Record<string, unknown>, opts: RunOptions) => Promise<ExecResult>
+
+/** Email-Trigger (selectedEmail/replyReceived/icsReceived): gibt die geseedete Mail aus. */
+const triggerEmailExecutor: Executor = async (_node, _inputs, opts) => {
+  const email = opts.seed?.email
+  if (!email) throw new Error('Keine Eingangs-Mail (im Mail-Client eine Mail auswählen).')
+  return { outputs: { email }, log: [`Eingabe: ${email.subject || '(ohne Betreff)'}`] }
+}
+
+/** Text-Trigger (Mahnung/Buchung/Aufgabe/Zeitplan): gibt den vorformatierten Seed-Text aus. */
+const triggerTextExecutor: Executor = async (_node, _inputs, opts) => {
+  const text = opts.seed?.text || ''
+  const first = text.split('\n').find(l => l.trim()) || '(leer)'
+  return { outputs: { text }, log: [`Auslöser: ${first.slice(0, 80)}`] }
+}
+
 /** actionId → Implementierung. */
-const EXECUTORS: Record<
-  string,
-  (node: WorkflowNode, inputs: Record<string, unknown>, opts: RunOptions) => Promise<ExecResult>
-> = {
-  'email.selectedEmail': async (_node, _inputs, opts) => {
-    const email = opts.seedEmail
-    if (!email) throw new Error('Keine Eingangs-Mail (im Mail-Client eine Mail auswählen).')
-    return { outputs: { email }, log: [`Eingabe: ${email.subject || '(ohne Betreff)'}`] }
-  },
+const EXECUTORS: Record<string, Executor> = {
+  'email.selectedEmail': triggerEmailExecutor,
+  // Layer A/B: verhalten sich am Port wie email.selectedEmail — sie geben die
+  // geseedete Mail aus. Welche Mails sie seeden, entscheidet das Trigger-Prädikat
+  // im Renderer (workflowStore), nicht der Runner.
+  'email.replyReceived': triggerEmailExecutor,
+  'email.icsReceived': triggerEmailExecutor,
+
+  // Layer C/D/E/F: Text-Trigger — geben den (im Renderer/Main vorformatierten)
+  // Seed-Text aus. Anschließbar an Notiz/Prüfung/Ollama.
+  'antares.mahnung': triggerTextExecutor,
+  'edoobox.newBooking': triggerTextExecutor,
+  'tasks.dueSoon': triggerTextExecutor,
+  'schedule.timer': triggerTextExecutor,
 
   'email.analyze': async (node, inputs, opts) => {
     const email = asEmail(inputs.email)
@@ -231,7 +269,7 @@ const EXECUTORS: Record<
 
   'human.reviewText': async (_node, inputs, opts) => {
     const text = asText(inputs.text)
-    if (opts.trigger === 'event-email') {
+    if (isEventTrigger(opts.trigger)) {
       const taskRel = await opts.services.createTask(`- [ ] 📝 Prüfen: ${text.slice(0, 80)}`)
       return { outputs: { approval: 'pending' }, log: ['Aufgabe zur Prüfung angelegt'], handoff: { kind: 'task', payload: { taskRel, text } } }
     }
@@ -240,7 +278,7 @@ const EXECUTORS: Record<
 
   'human.reviewDraftReply': async (_node, inputs, opts) => {
     const draft = asText(inputs.draft)
-    if (opts.trigger === 'event-email') {
+    if (isEventTrigger(opts.trigger)) {
       const taskRel = await opts.services.createTask(`- [ ] ✉️ Entwurf prüfen und senden`)
       return {
         outputs: { approval: 'pending' },
@@ -251,13 +289,15 @@ const EXECUTORS: Record<
     return {
       outputs: { approval: 'pending' },
       log: ['Entwurf bereit zur Prüfung im Compose-Fenster'],
-      handoff: { kind: 'compose', payload: { draft, emailId: opts.seedEmail?.id } }
+      handoff: { kind: 'compose', payload: { draft, emailId: opts.seed?.email?.id } }
     }
   }
 }
 
 export async function runWorkflow(workflow: Workflow, opts: RunOptions): Promise<WorkflowRun> {
   const startedAt = nowIso()
+  // Seed normalisieren: seedEmail (Back-Compat) → seed.email. Executoren lesen nur opts.seed.
+  if (!opts.seed && opts.seedEmail) opts.seed = { email: opts.seedEmail }
   const order = topoSort(workflow)
   const baseRun: WorkflowRun = {
     id: genId('run'),

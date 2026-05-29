@@ -45,6 +45,7 @@ import { useTabStore } from './stores/tabStore'
 import { useTranslation } from './utils/translations'
 import { useNotesStore, createNoteFromFile } from './stores/notesStore'
 import { useReminderStore } from './stores/reminderStore'
+import { useWorkflowStore } from './stores/workflowStore'
 import { useSyncStore } from './stores/syncStore'
 import { useVaultSettingsStore } from './stores/vaultSettingsStore'
 import { useIsModuleEnabled } from './utils/modules'
@@ -103,6 +104,7 @@ const App: React.FC = () => {
   const { unreadRelevantCount } = useEmailStore()
   const emailEnabled = useUIStore(state => state.email.enabled)
   const edooboxEnabled = useUIStore(state => state.edoobox.enabled)
+  const workflowCanvasEnabled = useUIStore(state => state.workflowCanvasEnabled)
   const transportTitlebarButtonVisible = useUIStore(
     state => state.transport.enabled && state.transport.showTitlebarButton
   )
@@ -361,6 +363,17 @@ const App: React.FC = () => {
     useAgentStore.getState().loadEvents().catch(() => {})
     useAgentStore.getState().checkConnection().catch(() => {})
   }, [vaultPath, edooboxEnabled, vaultSettingsLoaded, vaultEdooboxActive])
+
+  // Workflow-Zeitplan-Trigger (Layer F): tab-unabhängiger Timer. Prüft alle 60s, ob der
+  // persistierte Workflow einen fälligen schedule.timer-Trigger hat (lädt direkt von Platte,
+  // funktioniert also auch, wenn der Canvas-Tab nie geöffnet wurde). Nur bei aktivem Modul.
+  useEffect(() => {
+    if (!workflowCanvasEnabled || !vaultPath) return
+    const tick = () => { useWorkflowStore.getState().runScheduledIfDue(vaultPath) }
+    const initial = setTimeout(tick, 8000) // einmal kurz nach App-Start
+    const iv = setInterval(tick, 60 * 1000)
+    return () => { clearTimeout(initial); clearInterval(iv) }
+  }, [workflowCanvasEnabled, vaultPath])
 
   // Update-Checker & What's New beim App-Start
   useEffect(() => {

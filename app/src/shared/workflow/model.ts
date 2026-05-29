@@ -20,6 +20,19 @@ export interface WorkflowEdge {
   toPortId: string
 }
 
+/** Geparste Zeitplan-Konfiguration des `schedule.timer`-Trigger-Bausteins (Layer F).
+ *  Quelle ist die Node-Config (vom Inspector editiert); lastFiredAt liegt geräte-lokal
+ *  im localStorage (wie das C/D/E-Ledger) — kein Vault-JSON, keine Sync-Konflikte. */
+export interface WorkflowSchedule {
+  frequency: 'daily' | 'weekly' | 'monthly'
+  /** HH:MM (24h, lokale Zeit). Default '09:00'. */
+  time?: string
+  /** 0=So … 6=Sa, nur bei frequency='weekly'. */
+  weekday?: number
+  /** 1–31, nur bei frequency='monthly'. */
+  dayOfMonth?: number
+}
+
 export interface Workflow {
   id: string
   name: string
@@ -34,7 +47,17 @@ export interface Workflow {
 }
 
 export type WorkflowRunMode = 'simulate' | 'execute'
-export type WorkflowRunTrigger = 'manual' | 'event-email'
+/** 'manual' = ▶ Ausführen; alles andere = Event-Lauf (Hand-off → Aufgabe statt Compose).
+ *  Provenienz pro Event-Quelle; die Unterscheidung manuell/Event macht isEventTrigger(). */
+export type WorkflowRunTrigger =
+  | 'manual'
+  | 'event-email'
+  | 'event-reply'
+  | 'event-ics'
+  | 'event-mahnung'
+  | 'event-booking'
+  | 'event-task'
+  | 'event-scheduled'
 export type WorkflowRunStatus = 'running' | 'success' | 'failed' | 'cancelled'
 export type WorkflowStepStatus =
   | 'pending'
@@ -96,11 +119,22 @@ export interface WorkflowFile {
   workflows: Workflow[]
 }
 
+/** Generischer Seed eines Laufs. Email-Trigger (A/B) füllen `email`,
+ *  Text-Trigger (C/D/E/F) füllen `text` (+ `meta` für Exactly-once/Labeling). */
+export interface WorkflowSeed {
+  email?: { id?: string; subject?: string; bodyText?: string; from?: string }
+  text?: string
+  meta?: Record<string, unknown>
+}
+
 /** IPC-Payload für einen echten Lauf (workflow-run). */
 export interface WorkflowRunPayload {
   workflow: Workflow
   vaultPath: string
   trigger?: WorkflowRunTrigger
+  /** Generischer Seed (bevorzugt). */
+  seed?: WorkflowSeed | null
+  /** @deprecated Back-Compat-Alias für seed.email — wird in seed gemappt. */
   seedEmail?: { id?: string; subject?: string; bodyText?: string; from?: string } | null
   models?: { selected: string; overrides: Record<string, string> }
   features?: Record<string, boolean>

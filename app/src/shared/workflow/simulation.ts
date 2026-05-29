@@ -32,6 +32,12 @@ const EXAMPLE_OUTPUT: Record<WorkflowPortKind, unknown> = {
 /** Pro-Action eine sprechende Log-Zeile für die Pitch-Leinwand. */
 const SIM_LINE: Record<string, string> = {
   'email.selectedEmail': 'Eingabe: Re: Roll-Up Marslandschaft',
+  'email.replyReceived': 'Auslöser: Antwort auf gesendete Mail eingegangen',
+  'email.icsReceived': 'Auslöser: Mail mit Kalender-Einladung (.ics)',
+  'antares.mahnung': 'Auslöser: überfällige Rückgabe (Leihnr 4711)',
+  'edoobox.newBooking': 'Auslöser: neue Anmeldung für „Marslandschaft gestalten"',
+  'tasks.dueSoon': 'Auslöser: Aufgabe „Entwurf prüfen" wird heute fällig',
+  'schedule.timer': 'Auslöser: Zeitplan (täglich 09:00)',
   'email.analyze': 'Analyse: Relevanz 82, 1 Aufgabe erkannt',
   'project.match': 'Projekt erkannt: 160 - Mars Abenteuer',
   'project.context': 'Kontext geladen: _STATUS.md + letzte Projektmails',

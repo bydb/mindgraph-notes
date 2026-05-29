@@ -3,7 +3,7 @@ import type { WorkflowActionDefinition } from '../../../shared/workflow/types'
 import { canConnect } from '../../../shared/workflow/validation'
 import { useWorkflowStore } from '../../stores/workflowStore'
 import { portColor } from './ui'
-import { ModuleIcon } from './ModuleIcon'
+import { ActionIcon } from './ModuleIcon'
 import { IconWarning, IconLock, IconBrain, IconShield, IconCloud, IconFlag } from '../Shared/Icons'
 
 export interface WorkflowNodeData {
@@ -30,7 +30,7 @@ export function WorkflowNodeCard({ id, data, selected }: NodeProps<WorkflowNodeD
     <div className={`wf-node ${selected ? 'wf-node--selected' : ''} ${hasError ? 'wf-node--error' : ''}`}>
       <div className="wf-node__header">
         <span className="wf-node__icon" aria-hidden="true">
-          <ModuleIcon moduleId={action.moduleId} size={14} />
+          <ActionIcon actionId={action.id} moduleId={action.moduleId} size={14} />
         </span>
         <span className="wf-node__label">{action.label}</span>
         <span className="wf-node__badges">

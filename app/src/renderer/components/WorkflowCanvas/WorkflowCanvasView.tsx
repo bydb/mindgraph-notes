@@ -76,12 +76,20 @@ function InnerCanvas({ onOpenInbox }: Props) {
   const execute = useWorkflowStore(s => s.execute)
   const setEnabled = useWorkflowStore(s => s.setEnabled)
   const runForNewEmails = useWorkflowStore(s => s.runForNewEmails)
+  const runTrigger = useWorkflowStore(s => s.runTrigger)
   const loadFromDisk = useWorkflowStore(s => s.loadFromDisk)
   const persist = useWorkflowStore(s => s.persist)
   const vaultPath = useNotesStore(s => s.vaultPath)
   const emailActive = useVaultSettingsStore(s => s.features.email)
   // Signal für den Auto-Trigger: ändert sich, wenn Mails dazukommen/neu analysiert werden.
   const emailSignal = useEmailStore(s => s.emails.length + ':' + s.emails.filter(e => e.analysis?.relevant).length)
+
+  // Aktiver Trigger-Baustein → bestimmt Bedienelemente + Poll-Verhalten.
+  const triggerActionId = workflow.nodes.map(n => n.actionId).find(id => getActionById(id)?.isTrigger)
+  const isPollTrigger = Boolean(triggerActionId && ['antares.mahnung', 'edoobox.newBooking', 'tasks.dueSoon'].includes(triggerActionId))
+  const isEmailTrigger = Boolean(triggerActionId && triggerActionId.startsWith('email.'))
+  const isScheduleTrigger = triggerActionId === 'schedule.timer'
+  const showTriggerControls = isPollTrigger || isScheduleTrigger || (isEmailTrigger && emailActive)
 
   const [rfNodes, setRfNodes, onNodesChange] = useNodesState<WorkflowNodeData>([])
   const [rfEdges, setRfEdges, onEdgesChange] = useEdgesState([])
@@ -104,6 +112,16 @@ function InnerCanvas({ onOpenInbox }: Props) {
   useEffect(() => {
     if (workflow.enabled && vaultPath) runForNewEmails(vaultPath)
   }, [emailSignal, workflow.enabled, vaultPath, runForNewEmails])
+
+  // Sanfter Poll für Nicht-Mail-Trigger (antares/edoobox/tasks): sofort + alle 10 Min,
+  // NUR solange der Canvas-Tab offen UND der Workflow aktiviert ist (Decision #4, kein
+  // Leerlauf-Traffic). runTrigger pollt die externe Quelle nur, wenn DIESER Trigger aktiv ist.
+  useEffect(() => {
+    if (!workflow.enabled || !vaultPath || !isPollTrigger) return
+    runTrigger(vaultPath)
+    const iv = setInterval(() => runTrigger(vaultPath), 10 * 60 * 1000)
+    return () => clearInterval(iv)
+  }, [workflow.enabled, vaultPath, isPollTrigger, runTrigger])
 
   // Compose-Hand-off: bei einem echten Lauf (kein Trockenlauf), der einen
   // Antwortentwurf liefert, das Compose-Fenster mit dem Entwurf öffnen (Decision #6).
@@ -220,25 +238,34 @@ function InnerCanvas({ onOpenInbox }: Props) {
         >
           ▶ Ausführen
         </button>
-        {emailActive && (
+        {showTriggerControls && (
           <>
             <span className="view-mode-separator" style={{ margin: '0 4px' }} />
-            <label className="wf-trigger-toggle" title="Workflow automatisch bei neuer relevanter Mail auslösen (exactly-once)">
+            <label
+              className="wf-trigger-toggle"
+              title={isScheduleTrigger
+                ? 'Workflow nach Zeitplan auslösen, solange die App läuft (auch bei geschlossenem Tab, exactly-once)'
+                : isPollTrigger
+                  ? 'Workflow automatisch auslösen, solange dieser Tab offen ist (exactly-once)'
+                  : 'Workflow automatisch bei neuer relevanter Mail auslösen (exactly-once)'}
+            >
               <input
                 type="checkbox"
                 checked={Boolean(workflow.enabled)}
                 onChange={e => setEnabled(e.target.checked)}
               />
-              Auto bei neuer Mail
+              {isScheduleTrigger ? 'Zeitplan aktiv' : isPollTrigger ? 'Auto (Tab offen)' : 'Auto bei neuer Mail'}
             </label>
-            <button
-              className="wf-btn wf-btn--ghost"
-              disabled={!vaultPath || running}
-              title="Den Workflow jetzt für relevante, noch nicht getriggerte Mails ausführen (exactly-once)"
-              onClick={() => vaultPath && runForNewEmails(vaultPath)}
-            >
-              Für neue Mails ausführen
-            </button>
+            {!isScheduleTrigger && (
+              <button
+                className="wf-btn wf-btn--ghost"
+                disabled={!vaultPath || running}
+                title="Den Workflow jetzt für neue, noch nicht getriggerte Auslöser ausführen (exactly-once)"
+                onClick={() => vaultPath && runTrigger(vaultPath)}
+              >
+                {isPollTrigger ? 'Jetzt prüfen' : 'Für neue Mails ausführen'}
+              </button>
+            )}
           </>
         )}
       </div>

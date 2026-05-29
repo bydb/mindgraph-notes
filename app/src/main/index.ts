@@ -25,7 +25,7 @@ import { runWorkflow, type RunnerServices, type SeedEmail } from './workflows/ru
 import { matchEmailToProjects } from '../shared/projectMatch'
 import { isHardLocked as isModelHardLocked } from '../shared/modelCompatibility'
 import { MODULE_FEATURE_GATE } from '../shared/workflow/types'
-import type { Workflow, WorkflowFile } from '../shared/workflow/model'
+import type { Workflow, WorkflowFile, WorkflowRunTrigger } from '../shared/workflow/model'
 import type {
   ProjectStatusCrystallizeInput,
   ProjectPriority,
@@ -987,7 +987,8 @@ ipcMain.handle('workflow-save', async (_event, vaultPath: string, file: Workflow
 interface WorkflowRunPayload {
   workflow: Workflow
   vaultPath: string
-  trigger?: 'manual' | 'event-email'
+  trigger?: WorkflowRunTrigger
+  seed?: { email?: SeedEmail; text?: string; meta?: Record<string, unknown> } | null
   seedEmail?: SeedEmail | null
   models?: { selected: string; overrides: Record<string, string> }
   features?: Record<string, boolean>
@@ -1115,8 +1116,8 @@ ipcMain.handle('workflow-run', async (_event, payload: WorkflowRunPayload) => {
 
   return runWorkflow(workflow, {
     mode: 'execute',
-    trigger: payload.trigger === 'event-email' ? 'event-email' : 'manual',
-    seedEmail: payload.seedEmail ?? null,
+    trigger: payload.trigger || 'manual',
+    seed: payload.seed ?? (payload.seedEmail ? { email: payload.seedEmail } : null),
     services
   })
 })
@@ -7151,11 +7152,19 @@ ipcMain.handle('email-fetch', async (_event, vaultPath: string, accounts: Array<
             let bodyHtml = ''
             let hasAttachments = false
             let attachmentNames: string[] = []
+            let inReplyTo: string | undefined
+            let references: string[] | undefined
             if (msg.source) {
               try {
                 const { simpleParser } = await import('mailparser')
                 const parsed = await simpleParser(msg.source)
                 bodyText = parsed.text || ''
+                // Reply-Trigger (B): In-Reply-To / References aus den Headern ziehen.
+                // ImapFlow-envelope liefert diese MIME-Header nicht — mailparser schon.
+                inReplyTo = parsed.inReplyTo || undefined
+                if (parsed.references) {
+                  references = Array.isArray(parsed.references) ? parsed.references : [parsed.references]
+                }
                 // Original-HTML für die optionale HTML-Ansicht aufbewahren (gekappt gegen emails.json-Bloat).
                 // Sanitisierung passiert erst im Renderer (sanitizeEmailHtml) — hier nur Rohdaten.
                 if (typeof parsed.html === 'string' && parsed.html) {
@@ -7208,7 +7217,9 @@ ipcMain.handle('email-fetch', async (_event, vaultPath: string, accounts: Array<
               flags: Array.from(msg.flags || []),
               fetchedAt: new Date().toISOString(),
               hasAttachments,
-              attachmentNames: attachmentNames.length > 0 ? attachmentNames : undefined
+              attachmentNames: attachmentNames.length > 0 ? attachmentNames : undefined,
+              inReplyTo,
+              references
             })
 
             totalProcessed++

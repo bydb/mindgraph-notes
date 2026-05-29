@@ -1228,6 +1228,11 @@ export interface EmailMessage {
   sent?: boolean          // true fuer vom User gesendete Emails
   hasAttachments?: boolean
   attachmentNames?: string[]
+  /** In-Reply-To-Header: Message-ID der Mail, auf die diese antwortet.
+   *  Für den Reply-Received-Trigger (Match gegen gesendete Message-IDs). */
+  inReplyTo?: string
+  /** References-Header: Kette der Message-IDs im Thread (normalisiert als Array). */
+  references?: string[]
   /** Vom User manuell zugewiesener Projektordner (vault-relativer Pfad).
    *  null = explizit "kein Projekt"; undefined = auto-Match aktiv. */
   userProject?: string | null

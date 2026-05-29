@@ -156,3 +156,17 @@ export const IconClipboard: React.FC<IconProps> = (p) => (
     <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
   </svg>
 )
+
+export const IconReply: React.FC<IconProps> = (p) => (
+  <svg {...svgProps(p)}>
+    <polyline points="9 17 4 12 9 7" />
+    <path d="M20 18v-2a4 4 0 0 0-4-4H4" />
+  </svg>
+)
+
+export const IconClock: React.FC<IconProps> = (p) => (
+  <svg {...svgProps(p)}>
+    <circle cx="12" cy="12" r="10" />
+    <polyline points="12 6 12 12 16 14" />
+  </svg>
+)
