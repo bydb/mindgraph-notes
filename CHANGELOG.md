@@ -2,6 +2,19 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.7.9-beta] - 2026-05-29
+
+### Improvements
+
+- **Workflow „Antwort entwerfen" siezt jetzt standardmäßig**: Die Ollama-Aktion „Antwort entwerfen" im Workflow-Canvas hat einen neuen Anrede-Schalter — **Sie (förmlich)**, **du (informell)** oder **Automatisch** (übernimmt die Anrede der eingegangenen Mail). Voreinstellung ist das förmliche „Sie". Vorher duzte der generierte Entwurf gelegentlich auch Empfänger, die einen selbst siezen — für beruflichen Schriftverkehr die falsche Standardannahme.
+- **Generierte Antworten erfinden keine Freigaben mehr**: Der Antwort-Prompt hat klare Leitplanken bekommen — das Modell darf keine Qualitätsurteile oder Zusagen zu Anhängen treffen, die es gar nicht sehen kann (Bilder, PDFs). Bittet eine Mail um Abnahme von angehängtem Material, bleibt der Entwurf neutral und stellt die Prüfung in Aussicht („ich sehe mir die Entwürfe an und melde mich"), statt eine Freigabe zu fabrizieren. Ohne Projektkontext werden keine projektspezifischen Details erfunden.
+- **Prompt-Injection-Schutz deckt jetzt alle Ollama-Textaktionen im Workflow ab**: Der Hard-Lock, der bei ungeeigneten Modellen LLM-Aufrufe auf nicht vertrauenswürdigem Input blockiert, galt bisher nur für „Mail analysieren" und „Aufgaben extrahieren". Jetzt sichern auch „Zusammenfassen", „Antwort entwerfen", „Klassifizieren" und „Freier Prompt" gegen die Modell-Kompatibilitäts-Matrix ab — und das geprüfte Modell ist garantiert dasselbe, das auch tatsächlich läuft.
+
+### Fixes
+
+- **Workflow lädt jetzt den echten Projekt-Status statt eines leeren Platzhalters**: Die Aktion „Projektkontext laden" griff fälschlich die un-crystallisierte `_STATUS.md` (nur Stichwort-Stub), weil die Datei-Auswahl sie vor die echten Wochen-Drafts (`_STATUS-<Woche>.md`) sortierte. Dadurch entwarf der Workflow Antworten ohne jeden Projektbezug. Jetzt wird der aktuellste crystallisierte Wochen-Status bevorzugt; der Stub ist nur noch Notnagel.
+- **Leerer oder nicht crystallisierter Projektkontext wird im Lauf-Protokoll gemeldet**: Fehlt ein echter Status, steht das jetzt explizit im Workflow-Protokoll („Projektkontext ist leer / nicht crystallisiert — Antwort ohne Projektwissen"), statt still Frontmatter-Rauschen an den Antwort-Generator weiterzureichen.
+
 ## [0.7.8-beta] - 2026-05-28
 
 ### Features
