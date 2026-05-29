@@ -2,6 +2,25 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.7.10-beta] - 2026-05-29
+
+### Features
+
+- **Sechs neue Workflow-Auslöser**: Der Workflow-Canvas startete bisher nur bei einer neuen relevanten E-Mail. Jetzt gibt es sechs weitere Startpunkte als verbindbare Bausteine:
+  - **Antwort eingegangen** — feuert, wenn jemand auf eine zuvor von dir gesendete Mail antwortet.
+  - **Termin-Einladung** — feuert bei einer eingehenden Mail mit Kalender-Einladung (.ics-Anhang).
+  - **Überfällige Rückgabe** — feuert bei einer neuen Mahnung aus Antares (Medienzentren-Verleih).
+  - **Neue Anmeldung** — feuert, wenn die Anmeldezahl eines edoobox-Angebots steigt.
+  - **Aufgabe fällig** — feuert, wenn eine Aufgabe im Vault fällig oder überfällig wird.
+  - **Zeitplan** — feuert nach festem Zeitplan (täglich, wöchentlich oder monatlich), auch bei geschlossenem Canvas-Tab — für Tages- oder Wochenberichte.
+
+### Improvements
+
+- **Reply-Erkennung über den Mail-Thread**: Eingehende Antworten werden anhand der `In-Reply-To`/`References`-Header gegen die selbst gesendeten Nachrichten abgeglichen, damit der Auslöser nur bei echten Antworten im Thread feuert.
+- **Sparsames Polling ohne Leerlauf-Traffic**: Die Auslöser für Mahnungen und Anmeldungen prüfen ihre Quelle nur, solange der Workflow-Tab offen ist (alle 10 Minuten) — im Hintergrund entsteht kein API-Verkehr. Der Zeitplan-Auslöser läuft dagegen tab-unabhängig, solange die App geöffnet ist.
+- **Jeder Auslöser feuert genau einmal pro Ereignis** und übersteht Neustart sowie erneute Analyse. Eine Mahnung kann erneut auslösen, wenn ein zurückgegebenes Medium später wieder überfällig wird; eine neue Anmeldung wird erst nach einem erfolgreichen Lauf als verarbeitet vermerkt.
+- **SVG-Logos statt Emoji**: Jeder neue Auslöser-Baustein hat ein eigenes Icon im einheitlichen Stil der Oberfläche (Rückpfeil, Kalender, Warnung, Ticket, Uhr, Wiederholung).
+
 ## [0.7.9-beta] - 2026-05-29
 
 ### Improvements
