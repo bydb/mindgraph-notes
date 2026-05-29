@@ -98,6 +98,7 @@ export const WORKFLOW_ACTIONS: WorkflowActionDefinition[] = [
     description: 'Fasst einen Text lokal mit Ollama zusammen.',
     inputs: [inp('text', 'Text', 'text', { required: true })],
     outputs: [out('text', 'Zusammenfassung', 'text')],
+    hardLockModule: 'task-extraction',
     privacy: { localOnly: true },
     config: [{ key: 'model', label: 'Modell', type: 'model' }]
   },
@@ -105,14 +106,28 @@ export const WORKFLOW_ACTIONS: WorkflowActionDefinition[] = [
     id: 'ollama.generateReply',
     moduleId: 'ollama',
     label: 'Ollama: Antwort entwerfen',
-    description: 'Entwirft eine Antwort aus Mail + Projektkontext (lokal).',
+    description: 'Entwirft eine Antwort aus Mail + Projektkontext (lokal). Anrede (Sie/du) konfigurierbar, Standard: Sie.',
     inputs: [
       inp('email', 'Mail', 'email', { required: true }),
       inp('context', 'Projektkontext', 'project_context')
     ],
     outputs: [out('draft', 'Antwortentwurf', 'draft_reply')],
+    hardLockModule: 'task-extraction',
     privacy: { containsPersonalData: true, localOnly: true },
-    config: [{ key: 'model', label: 'Modell', type: 'model' }]
+    config: [
+      {
+        key: 'anrede',
+        label: 'Anrede',
+        type: 'select',
+        default: 'sie',
+        options: [
+          { value: 'sie', label: 'Sie (förmlich)' },
+          { value: 'du', label: 'du (informell)' },
+          { value: 'auto', label: 'Automatisch (wie eingegangene Mail)' }
+        ]
+      },
+      { key: 'model', label: 'Modell', type: 'model' }
+    ]
   },
   {
     id: 'ollama.extractTasks',
@@ -135,6 +150,7 @@ export const WORKFLOW_ACTIONS: WorkflowActionDefinition[] = [
     description: 'Ordnet einen Text einer Kategorie zu (lokal, JSON-Ausgabe).',
     inputs: [inp('text', 'Text', 'text', { required: true })],
     outputs: [out('result', 'Ergebnis', 'json')],
+    hardLockModule: 'task-extraction',
     privacy: { localOnly: true },
     config: [{ key: 'model', label: 'Modell', type: 'model' }]
   },
@@ -145,6 +161,7 @@ export const WORKFLOW_ACTIONS: WorkflowActionDefinition[] = [
     description: 'Wendet einen frei konfigurierbaren Prompt auf den Eingangstext an (lokal).',
     inputs: [inp('text', 'Text', 'text', { required: true })],
     outputs: [out('text', 'Ergebnis', 'text')],
+    hardLockModule: 'task-extraction',
     privacy: { localOnly: true },
     config: [
       { key: 'prompt', label: 'Prompt', type: 'textarea', placeholder: 'Was soll Ollama mit dem Text tun?' },

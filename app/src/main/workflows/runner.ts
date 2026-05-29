@@ -86,6 +86,18 @@ function asText(v: unknown): string {
   if (v && typeof v === 'object') return JSON.stringify(v)
   return String(v ?? '')
 }
+/** Erkennt leeren oder un-crystallisierten (Stub-)Projektkontext, damit der Lauf
+ *  das zurückmeldet statt stillschweigend Frontmatter-Rauschen weiterzureichen. */
+function isEffectivelyEmptyContext(ctx: string): boolean {
+  if (!ctx || !ctx.trim()) return true
+  if (/noch nicht crystallisiert|not yet crystallized/i.test(ctx)) return true
+  const body = ctx
+    .replace(/^---[\s\S]*?---/m, '')      // YAML-Frontmatter
+    .replace(/^#{1,6}\s.*$/gm, '')        // Überschriften
+    .replace(/^\s*\*\(.*\)\*\s*$/gm, '')  // *(Platzhalter)*-Zeilen
+    .trim()
+  return body.length < 30
+}
 
 /** actionId → Implementierung. */
 const EXECUTORS: Record<
@@ -120,24 +132,43 @@ const EXECUTORS: Record<
 
   'project.context': async (_node, inputs, opts) => {
     const project = inputs.project as { folderRel?: string; folderName?: string } | null
-    if (!project?.folderRel) return { outputs: { context: '', summary: '' }, log: ['Kein Projekt — kein Kontext.'] }
+    if (!project?.folderRel) return { outputs: { context: '', summary: '' }, log: ['Kein Projekt erkannt — kein Kontext.'] }
     const ctx = await opts.services.loadProjectContext(project.folderRel)
-    return { outputs: { context: ctx, summary: ctx.slice(0, 300) }, log: [`Kontext geladen: ${project.folderName}`] }
+    if (isEffectivelyEmptyContext(ctx)) {
+      return {
+        outputs: { context: '', summary: '' },
+        log: [`Projektkontext für „${project.folderName}" ist leer / nicht crystallisiert — Antwort wird ohne Projektwissen erstellt.`]
+      }
+    }
+    return { outputs: { context: ctx, summary: ctx.slice(0, 300) }, log: [`Kontext geladen: ${project.folderName} (${ctx.length} Zeichen)`] }
   },
 
   'ollama.summarize': async (node, inputs, opts) => {
-    const model = opts.services.resolveModel(node.config.model as string | undefined, 'mail-summary')
+    const model = opts.services.resolveModel(node.config.model as string | undefined, 'task-extraction')
     const out = await opts.services.ollamaGenerate(`Fasse den folgenden Text prägnant zusammen:\n\n${asText(inputs.text)}`, model)
     return { outputs: { text: out }, log: [`Zusammengefasst mit ${model}`] }
   },
 
   'ollama.generateReply': async (node, inputs, opts) => {
-    const model = opts.services.resolveModel(node.config.model as string | undefined, 'mail-summary')
+    const model = opts.services.resolveModel(node.config.model as string | undefined, 'task-extraction')
     const email = asEmail(inputs.email)
     const context = asText(inputs.context)
-    const prompt = `Entwirf eine freundliche, professionelle Antwort auf die folgende E-Mail. Nutze den Projektkontext, wenn hilfreich.\nDu darfst leichte Formatierung verwenden (Markdown: **fett**, *kursiv*, Listen mit "• "). KEINE "Betreff:"-Zeile, beginne direkt mit der Anrede. Gib NUR den Antworttext zurück.\n\n=== E-Mail ===\nBetreff: ${email.subject || ''}\n${email.bodyText || ''}\n\n=== Projektkontext ===\n${context || '(keiner)'}`
+    const anrede = (node.config.anrede as string) || 'sie'
+    const anredeHinweis =
+      anrede === 'du'
+        ? 'Sprich die empfangende Person durchgängig mit "du" an (informell, kollegial).'
+        : anrede === 'auto'
+          ? 'Übernimm die Anrede-Form der eingegangenen Mail: siezt sie, antworte mit "Sie"; duzt sie, mit "du". Im Zweifel die förmliche Höflichkeitsform "Sie".'
+          : 'Sprich die empfangende Person durchgängig mit der förmlichen Höflichkeitsform "Sie"/"Ihnen"/"Ihr" an — niemals "du".'
+    const regeln = [
+      'Stütze dich AUSSCHLIESSLICH auf Fakten aus der E-Mail und dem Projektkontext unten. Erfinde nichts.',
+      'Du hast etwaige Anhänge (Bilder, PDFs, Dateien) NICHT gesehen. Behaupte nicht, Material geprüft, bewertet oder freigegeben zu haben.',
+      'Triff KEINE Zusagen, Freigaben oder Qualitätsurteile, die du nicht belegen kannst. Bittet die Mail um Abnahme/Feedback zu nicht einsehbarem Material, bleib neutral und stelle die Prüfung in Aussicht (z.B. "ich sehe mir die Entwürfe an und melde mich kurz").',
+      'Ist kein Projektkontext vorhanden, schreibe keine projektspezifischen Details.'
+    ].map(r => `- ${r}`).join('\n')
+    const prompt = `Entwirf eine freundliche, professionelle Antwort auf die folgende E-Mail.\n${anredeHinweis}\n\nWichtige Regeln:\n${regeln}\n\nLeichte Formatierung ist erlaubt (Markdown: **fett**, *kursiv*, Listen mit "• "). KEINE "Betreff:"-Zeile, beginne direkt mit der Anrede. Gib NUR den Antworttext zurück.\n\n=== E-Mail ===\nBetreff: ${email.subject || ''}\n${email.bodyText || ''}\n\n=== Projektkontext ===\n${context || '(keiner)'}`
     const out = await opts.services.ollamaGenerate(prompt, model)
-    return { outputs: { draft: out }, log: [`Antwortentwurf mit ${model} erzeugt`] }
+    return { outputs: { draft: out }, log: [`Antwortentwurf mit ${model} erzeugt (Anrede: ${anrede})`] }
   },
 
   'ollama.extractTasks': async (node, inputs, opts) => {
@@ -168,13 +199,13 @@ const EXECUTORS: Record<
   },
 
   'ollama.classify': async (node, inputs, opts) => {
-    const model = opts.services.resolveModel(node.config.model as string | undefined)
+    const model = opts.services.resolveModel(node.config.model as string | undefined, 'task-extraction')
     const out = await opts.services.ollamaGenerate(`Klassifiziere den folgenden Text in eine Kategorie. Antworte knapp.\n\n${asText(inputs.text)}`, model)
     return { outputs: { result: { raw: out } }, log: [`Klassifiziert mit ${model}`] }
   },
 
   'ollama.transformText': async (node, inputs, opts) => {
-    const model = opts.services.resolveModel(node.config.model as string | undefined)
+    const model = opts.services.resolveModel(node.config.model as string | undefined, 'task-extraction')
     const userPrompt = (node.config.prompt as string) || 'Bearbeite den folgenden Text.'
     const out = await opts.services.ollamaGenerate(`${userPrompt}\n\n${asText(inputs.text)}`, model)
     return { outputs: { text: out }, log: [`Text transformiert mit ${model}`] }

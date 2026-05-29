@@ -1038,7 +1038,11 @@ ipcMain.handle('workflow-run', async (_event, payload: WorkflowRunPayload) => {
         const abs = validatePath(vaultPath, folderRel)
         const entries = await fs.readdir(abs)
         const statusFiles = entries.filter(f => f.startsWith('_STATUS') && f.endsWith('.md')).sort().reverse()
-        const pick = statusFiles[0] || entries.find(f => f.endsWith('.md'))
+        // Crystallisierte Wochen-Drafts (`_STATUS-<Woche>.md`) bevorzugen — der bloße
+        // `_STATUS.md` ist nur der un-crystallisierte Stub, sortiert aber nach reverse()
+        // fälschlich vor die echten Wochendateien. Stub nur als letzter Fallback.
+        const weekly = statusFiles.filter(f => f !== '_STATUS.md')
+        const pick = weekly[0] || statusFiles[0] || entries.find(f => f.endsWith('.md'))
         if (!pick) return ''
         return (await fs.readFile(path.join(abs, pick), 'utf-8')).slice(0, 1800)
       } catch {
