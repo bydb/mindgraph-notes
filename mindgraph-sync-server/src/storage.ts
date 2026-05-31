@@ -15,6 +15,9 @@ export function initDatabase(): void {
   db = new Database(DB_PATH)
   db.pragma('journal_mode = WAL')
   db.pragma('synchronous = NORMAL')
+  // busy_timeout: bei Lock-Kollision (z.B. scripts/*.js Admin-Tools via `docker exec`
+  // oder WAL-Checkpoint) bis zu 5 s warten statt sofort SQLITE_BUSY zu werfen.
+  db.pragma('busy_timeout = 5000')
 
   db.exec(`
     CREATE TABLE IF NOT EXISTS files (

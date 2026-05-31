@@ -10943,6 +10943,90 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
   opacity: 0.75;
 }
 
+/* Konfidenz-Gate: Vorschlag (niedrige Konfidenz, nicht automatisch zugeordnet) */
+.inbox-project-suggestion {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.inbox-project-suggestion-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  padding: 3px 8px;
+  background: transparent;
+  border: 1px dashed color-mix(in srgb, var(--accent-color) 40%, var(--border-color));
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+}
+
+.inbox-project-suggestion-label svg {
+  flex-shrink: 0;
+  opacity: 0.7;
+}
+
+.inbox-project-suggestion-accept,
+.inbox-project-suggestion-dismiss {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  font-size: 13px;
+  line-height: 1;
+  background: transparent;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.inbox-project-suggestion-accept {
+  color: var(--success-color, #22c55e);
+}
+
+.inbox-project-suggestion-accept:hover {
+  background: color-mix(in srgb, var(--success-color, #22c55e) 16%, transparent);
+  border-color: color-mix(in srgb, var(--success-color, #22c55e) 45%, transparent);
+}
+
+.inbox-project-suggestion-dismiss {
+  color: var(--text-muted);
+}
+
+.inbox-project-suggestion-dismiss:hover {
+  color: var(--text-primary);
+  border-color: var(--text-muted);
+}
+
+/* Konfidenz-Gate: mehrdeutig (mehrere Projekte gleichauf) */
+.inbox-project-ambiguous {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.inbox-project-ambiguous-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.inbox-project-chip.is-candidate {
+  border-style: dashed;
+  opacity: 0.92;
+}
+
+/* Konfidenz-Gate: kein Projekt erkannt */
+.inbox-project-none {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
 .inbox-analysis-critical {
   border: 1px solid rgba(239, 68, 68, 0.3);
   border-radius: var(--radius-md);

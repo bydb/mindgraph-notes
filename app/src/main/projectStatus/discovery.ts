@@ -11,6 +11,7 @@
 
 import * as path from 'path'
 import * as fs from 'fs/promises'
+import { GENERIC_STOPWORDS } from '../../shared/projectMatch'
 import type {
   DiscoveredProject,
   ProjectStatusMarker,
@@ -384,14 +385,20 @@ async function listCurrentWeekDrafts(
  *   - ZK-IDs (12-stellige Zahlen am Anfang) als eigene Keywords
  *   - Ordnername selbst (ohne ID-Präfix)
  */
-const STOPWORDS = new Set([
+// Erweitert die geteilte GENERIC_STOPWORDS-Basis (shared/projectMatch.ts: Generika +
+// Domänen-/Anrede-Begriffe) um Wörter, die NUR bei der Keyword-Ableitung aus
+// Dateinamen stören (Artikel, Datei-/Struktur-Begriffe). Eine Quelle für die
+// Domänen-/Generika-Begriffe — sie hier nicht erneut auflisten.
+const STOPWORDS = new Set<string>([
+  ...GENERIC_STOPWORDS,
+  // Artikel / Funktionswörter (de/en)
   'die', 'der', 'das', 'und', 'oder', 'mit', 'für', 'fur', 'von', 'zur', 'zum',
   'the', 'and', 'for', 'with', 'from', 'into', 'over',
+  // Datei- / Dokument-Struktur (nur für Dateinamen-Vorschläge relevant)
   'notiz', 'notizen', 'note', 'notes',
   'dokumentation', 'documentation', 'doc', 'docs',
-  'datei', 'files', 'file', 'pdf', 'screenshot',
+  'files', 'file', 'pdf', 'screenshot',
   'projekt', 'projekte', 'project', 'projects',
-  'info', 'infos', 'information',
   'inventar', 'inventory', 'liste', 'list', 'kompakt', 'kompakte', 'übersicht'
 ])
 

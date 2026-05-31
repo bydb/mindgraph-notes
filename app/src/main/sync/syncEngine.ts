@@ -37,6 +37,11 @@ interface ServerMessage {
 
 const RECONNECT_BASE_DELAY = 2000
 const RECONNECT_MAX_DELAY = 60000
+// Heartbeat: ping every 30s. If no pong arrives before the next tick, the socket
+// is silently dead (laptop sleep / network change / NAT idle) and gets terminated
+// so the close handler schedules a reconnect — instead of a sync hanging 15s into
+// a "Manifest request timeout" and the status getting stuck red.
+const HEARTBEAT_INTERVAL = 30000
 
 export class SyncEngine {
   private ws: WebSocket | null = null
@@ -54,6 +59,8 @@ export class SyncEngine {
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null
   private autoSyncInterval: ReturnType<typeof setInterval> | null = null
   private syncDebounceTimer: ReturnType<typeof setTimeout> | null = null
+  private heartbeatTimer: ReturnType<typeof setInterval> | null = null
+  private wsAlive: boolean = true
   private excludeConfig: { folders: string[]; extensions: string[] } = { folders: [], extensions: [] }
 
   private sendLog(entry: { type: string; message: string; fileName?: string }): void {
@@ -154,6 +161,10 @@ export class SyncEngine {
     return new Promise((resolve, reject) => {
       this.ws = new WebSocket(this.relayUrl)
 
+      this.ws.on('pong', () => {
+        this.wsAlive = true
+      })
+
       this.ws.on('open', () => {
         console.log('[Sync] Connected to relay server')
         this.reconnectAttempts = 0
@@ -170,6 +181,7 @@ export class SyncEngine {
             if (msg.type === 'registered') {
               this.registered = true
               this.status = 'idle'
+              this.startHeartbeat()
               this.sendProgress({ status: 'idle' })
               this.sendLog({ type: 'connect', message: 'Connected' })
               console.log('[Sync] Vault registered on server')
@@ -198,6 +210,7 @@ export class SyncEngine {
 
       this.ws.on('close', () => {
         console.log('[Sync] Disconnected from relay server')
+        this.stopHeartbeat()
         this.sendLog({ type: 'disconnect', message: 'Disconnected' })
         this.ws = null
         this.registered = false
@@ -259,6 +272,35 @@ export class SyncEngine {
         // close handler will schedule next attempt
       }
     }, delay)
+  }
+
+  private startHeartbeat(): void {
+    this.stopHeartbeat()
+    this.wsAlive = true
+    this.heartbeatTimer = setInterval(() => {
+      if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return
+      if (!this.wsAlive) {
+        // No pong since the last ping — the connection is silently dead.
+        // terminate() fires the 'close' handler → scheduleReconnect (unless intentional).
+        console.warn('[Sync] Heartbeat timeout — terminating dead socket')
+        this.stopHeartbeat()
+        this.ws.terminate()
+        return
+      }
+      this.wsAlive = false
+      try {
+        this.ws.ping()
+      } catch {
+        // ignore — a failed ping will be caught on the next tick / by close
+      }
+    }, HEARTBEAT_INTERVAL)
+  }
+
+  private stopHeartbeat(): void {
+    if (this.heartbeatTimer) {
+      clearInterval(this.heartbeatTimer)
+      this.heartbeatTimer = null
+    }
   }
 
   private handleServerMessage(msg: ServerMessage): void {
@@ -622,6 +664,12 @@ export class SyncEngine {
 
       setTimeout(() => {
         this.ws?.removeListener('message', handler)
+        // A manifest timeout almost always means the socket is silently dead.
+        // Tear it down so the close handler schedules a reconnect, instead of
+        // leaving a half-open socket that keeps every future sync stuck red.
+        if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+          this.ws.terminate()
+        }
         reject(new Error('Manifest request timeout'))
       }, 15000)
     })
@@ -993,7 +1041,9 @@ export class SyncEngine {
   startAutoSync(intervalSeconds: number): void {
     this.stopAutoSync()
     this.autoSyncInterval = setInterval(() => {
-      if (this.status === 'idle' && !this.syncing) {
+      // Retry from 'error' too — otherwise one failed sync wedges the status red
+      // forever (the timer would never fire again). sync() reconnects if needed.
+      if ((this.status === 'idle' || this.status === 'error') && !this.syncing) {
         this.sync().catch(err => {
           console.error('[Sync] Periodic sync failed:', err)
         })
@@ -1013,6 +1063,7 @@ export class SyncEngine {
     this.intentionalDisconnect = true
     this.syncing = false
     this.stopAutoSync()
+    this.stopHeartbeat()
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer)
       this.reconnectTimer = null

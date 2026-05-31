@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, dialog, shell, Notification, safeStorage, Menu, session, systemPreferences, clipboard } from 'electron'
+import { app, BrowserWindow, ipcMain, dialog, shell, Notification, safeStorage, Menu, session, systemPreferences, clipboard, powerMonitor } from 'electron'
 import { autoUpdater } from 'electron-updater'
 import * as path from 'path'
 import * as fs from 'fs/promises'
@@ -22,7 +22,7 @@ import {
   isSynonymCacheStale
 } from './projectStatus/synonymGenerator'
 import { runWorkflow, type RunnerServices, type SeedEmail } from './workflows/runner'
-import { matchEmailToProjects } from '../shared/projectMatch'
+import { matchEmailToProjects, gateProjectMatch } from '../shared/projectMatch'
 import { isHardLocked as isModelHardLocked } from '../shared/modelCompatibility'
 import { MODULE_FEATURE_GATE } from '../shared/workflow/types'
 import type { Workflow, WorkflowFile, WorkflowRunTrigger } from '../shared/workflow/model'
@@ -486,6 +486,14 @@ if (process.platform === 'linux') {
 }
 
 app.whenReady().then(async () => {
+  // Reconnect + sync when the machine wakes from sleep. The sync WebSocket often
+  // dies silently during suspend; without this nudge the status can stay stuck red
+  // until the next manual sync. The heartbeat also catches it, but this is instant.
+  powerMonitor.on('resume', () => {
+    if (syncEngine && syncEngine.isInitialized()) {
+      syncEngine.sync().catch(err => console.error('[Sync] Resume sync failed:', err))
+    }
+  })
   setupMediaPermissions()
 
   // Sprache aus persistierten UI-Settings laden
@@ -1027,7 +1035,12 @@ ipcMain.handle('workflow-run', async (_event, payload: WorkflowRunPayload) => {
       try {
         const projects = await discoverProjects(vaultPath, projectsFolderRel)
         const matches = matchEmailToProjects({ subject: email.subject, bodyText: email.bodyText }, projects, {})
-        const best = matches[0]?.project
+        // Konfidenz-Gate: autonome Event-Läufe ordnen nur bei eindeutigem Treffer zu —
+        // ein falscher Projektkontext in einem automatisch erzeugten Entwurf ist schlimmer
+        // als gar kein Kontext. Bei 'low'/'ambiguous'/'none' → null (Runner-Pfad ohne Synonyme,
+        // daher bewusst strenger als die Inbox-Anzeige).
+        const gate = gateProjectMatch(matches)
+        const best = gate.confidence === 'high' ? gate.top?.project : null
         return best ? { folderName: best.folderName, folderRel: best.folderRel } : null
       } catch (e) {
         console.warn('[workflow] matchProject:', e)

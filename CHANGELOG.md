@@ -2,6 +2,23 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.7.11-beta] - 2026-05-31
+
+### Fixes
+
+- **Sync bleibt nicht mehr dauerhaft rot**: Nach Standby, Netzwechsel oder einer kurzzeitig toten Verbindung konnte der Sync-Status auf „Fehler" (rot) hängen bleiben und sich erst nach manuellem Eingriff erholen. Ursache war eine still gewordene WebSocket-Verbindung, die nach außen weiter als „offen" galt — der nächste Sync lief dann in einen 15-Sekunden-Timeout („Manifest request timeout"). Behoben durch:
+  - **Heartbeat (Ping/Pong alle 30 s)**: Eine tote Verbindung wird jetzt aktiv erkannt und abgebaut, woraufhin der automatische Reconnect greift — statt in den Timeout zu laufen.
+  - **Selbstheilung nach Fehler**: Der automatische Sync läuft jetzt auch aus dem Fehlerzustand weiter und versucht es beim nächsten Intervall erneut. Ein einzelner Fehler legt den Sync nicht mehr lahm.
+  - **Sofort-Sync beim Aufwachen**: Wacht der Rechner aus dem Standby auf, verbindet sich der Sync sofort neu und gleicht ab, statt auf das nächste Intervall zu warten.
+
+### Improvements
+
+- **Treffsichere Zuordnung von E-Mails zu Projekten**: Der Abgleich eingehender Mails mit Projekten arbeitet mit einem Konfidenz-Gate — unsichere Treffer werden nicht mehr erzwungen zugeordnet. Die Logik liegt als gemeinsame Quelle in der Inbox und im Workflow-Runner, sodass beide identisch entscheiden.
+
+### Server (Sync-Relay)
+
+- **Robustere Datenbank unter Last**: Der Sync-Server wartet bei gleichzeitigem Datenbankzugriff jetzt kurz, statt sofort mit einem Sperrfehler abzubrechen (`busy_timeout`). Reine Härtung der Verfügbarkeit; der Server ist nicht öffentlich.
+
 ## [0.7.10-beta] - 2026-05-29
 
 ### Features

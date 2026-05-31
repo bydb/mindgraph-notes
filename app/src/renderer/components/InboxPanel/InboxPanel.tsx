@@ -6,7 +6,7 @@ import { useNotesStore } from '../../stores/notesStore'
 import { useProjectStatusStore } from '../../stores/projectStatusStore'
 import { useTranslation } from '../../utils/translations'
 import { sanitizeHtml, sanitizeEmailHtml } from '../../utils/sanitize'
-import { matchEmailToProjects } from '../../utils/projectMatch'
+import { matchEmailToProjects, gateProjectMatch } from '../../utils/projectMatch'
 import { ComposeView } from './ComposeView'
 import { EmailAIChatView } from './EmailAIChatView'
 import { FolderPicker } from './FolderPicker'
@@ -308,8 +308,11 @@ export const InboxPanel: React.FC<InboxPanelProps> = ({ onClose }) => {
     )
   }, [selectedEmail, projects, projectSynonyms])
 
-  // Aktives Projekt = User-Override falls gesetzt, sonst Top-1 vom Match.
-  // userProject === null bedeutet "explizit kein Projekt" → keine Anzeige.
+  // Konfidenz-Gate über das Roh-Match (Single-Source, geteilt mit dem Workflow-Runner).
+  const projectGate = useMemo(() => gateProjectMatch(projectMatches), [projectMatches])
+
+  // Aktives Projekt = User-Override falls gesetzt, sonst NUR bei hoher Konfidenz.
+  // userProject === null bedeutet "explizit kein Projekt" → keine Auto-Anzeige.
   const activeProject = useMemo(() => {
     if (!selectedEmail) return null
     if (selectedEmail.userProject === null) return null
@@ -317,20 +320,27 @@ export const InboxPanel: React.FC<InboxPanelProps> = ({ onClose }) => {
       const explicit = projects.find(p => p.folderRel === selectedEmail.userProject)
       if (explicit) return explicit
     }
-    return projectMatches[0]?.project || null
-  }, [selectedEmail, projects, projectMatches])
+    return projectGate.confidence === 'high' ? projectGate.top?.project || null : null
+  }, [selectedEmail, projects, projectGate])
 
+  // Kandidaten fürs Override-Dropdown: alle gematchten Projekte außer dem aktiven.
   const otherProjectCandidates = useMemo(() => {
-    if (!activeProject) return []
     return projectMatches
       .map(m => m.project)
-      .filter(p => p.folderRel !== activeProject.folderRel)
+      .filter(p => !activeProject || p.folderRel !== activeProject.folderRel)
   }, [projectMatches, activeProject])
 
   const activeMatch = useMemo(() => {
     if (!activeProject) return null
     return projectMatches.find(m => m.project.folderRel === activeProject.folderRel) || null
   }, [projectMatches, activeProject])
+
+  // Sichtbare Zustände (nur wenn kein Auto-Projekt zugeordnet ist und der User nicht
+  // explizit "kein Projekt" gewählt hat).
+  const autoCleared = selectedEmail?.userProject === null
+  const showProjectSuggestion = !activeProject && !autoCleared && projectGate.confidence === 'low' && !!projectGate.top
+  const showProjectAmbiguous = !activeProject && !autoCleared && projectGate.confidence === 'ambiguous' && projectGate.candidates.length > 0
+  const showProjectNone = !activeProject && !showProjectSuggestion && !showProjectAmbiguous
 
   useEffect(() => {
     setShowProjectDropdown(false)
@@ -867,44 +877,116 @@ export const InboxPanel: React.FC<InboxPanelProps> = ({ onClose }) => {
                     </div>
                   )}
 
-                  {activeProject && (
+                  {projects.length > 0 && (
                     <div className="inbox-analysis-row">
                       <span className="inbox-analysis-label">{t('inbox.detail.project')}</span>
                       <div className="inbox-project-row">
-                        <button
-                          type="button"
-                          className={`inbox-project-chip priority-${activeProject.marker.priority} ${selectedEmail.userProject ? 'is-user-set' : ''}`}
-                          onClick={() => handleOpenProjectStatus(activeProject.folderRel)}
-                          title={(() => {
-                            const base = t('inbox.detail.openProjectStatus')
-                            if (selectedEmail.userProject) return `${base}\n${t('inbox.detail.matchManual')}`
-                            if (activeMatch && activeMatch.matchedTerms.length > 0) {
-                              return `${base}\n${t('inbox.detail.matchedTerms')}: ${activeMatch.matchedTerms.join(', ')}`
-                            }
-                            return base
-                          })()}
-                        >
-                          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
-                          </svg>
-                          <span>{activeProject.marker.project || activeProject.folderName}</span>
-                        </button>
-                        {(otherProjectCandidates.length > 0 || projects.length > 0) && (
-                          <div className="inbox-project-dropdown-wrapper">
+                        {/* ZUGEORDNET: hohe Konfidenz oder manueller Override */}
+                        {activeProject && (
+                          <button
+                            type="button"
+                            className={`inbox-project-chip priority-${activeProject.marker.priority} ${selectedEmail.userProject ? 'is-user-set' : ''}`}
+                            onClick={() => handleOpenProjectStatus(activeProject.folderRel)}
+                            title={(() => {
+                              const base = t('inbox.detail.openProjectStatus')
+                              if (selectedEmail.userProject) return `${base}\n${t('inbox.detail.matchManual')}`
+                              if (activeMatch && activeMatch.matchedTerms.length > 0) {
+                                return `${base}\n${t('inbox.detail.matchedTerms')}: ${activeMatch.matchedTerms.join(', ')}`
+                              }
+                              return base
+                            })()}
+                          >
+                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+                            </svg>
+                            <span>{activeProject.marker.project || activeProject.folderName}</span>
+                          </button>
+                        )}
+
+                        {/* VORSCHLAG: niedrige Konfidenz, nicht automatisch zugeordnet */}
+                        {showProjectSuggestion && projectGate.top && (
+                          <div className="inbox-project-suggestion">
+                            <span
+                              className="inbox-project-suggestion-label"
+                              title={projectGate.top.matchedTerms.length > 0
+                                ? `${t('inbox.detail.matchedTerms')}: ${projectGate.top.matchedTerms.join(', ')}`
+                                : undefined}
+                            >
+                              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M9 18h6M10 22h4M12 2a7 7 0 0 0-4 12.7c.6.5 1 1.3 1 2.3h6c0-1 .4-1.8 1-2.3A7 7 0 0 0 12 2z" />
+                              </svg>
+                              {t('inbox.detail.suggestion')}: {projectGate.top.project.marker.project || projectGate.top.project.folderName}
+                            </span>
                             <button
                               type="button"
-                              className="inbox-project-more-btn"
-                              onClick={() => setShowProjectDropdown(v => !v)}
-                              title={t('inbox.detail.otherProjects')}
-                            >
-                              {showProjectDropdown ? '×' : '+'} {t('inbox.detail.other')}
-                            </button>
-                            {showProjectDropdown && (
-                              <div className="inbox-project-dropdown" role="menu">
-                                {otherProjectCandidates.length > 0 && (
-                                  <div className="inbox-project-dropdown-section">
-                                    <div className="inbox-project-dropdown-heading">{t('inbox.detail.suggestions')}</div>
-                                    {otherProjectCandidates.map(p => (
+                              className="inbox-project-suggestion-accept"
+                              onClick={() => projectGate.top && handlePickProject(projectGate.top.project.folderRel)}
+                              title={t('inbox.detail.acceptSuggestion')}
+                            >✓</button>
+                            <button
+                              type="button"
+                              className="inbox-project-suggestion-dismiss"
+                              onClick={handleClearProject}
+                              title={t('inbox.detail.dismissSuggestion')}
+                            >×</button>
+                          </div>
+                        )}
+
+                        {/* MEHRDEUTIG: mehrere Projekte gleichauf — bewusst keine Vorauswahl */}
+                        {showProjectAmbiguous && (
+                          <div className="inbox-project-ambiguous">
+                            <span className="inbox-project-ambiguous-label">{t('inbox.detail.ambiguous')}</span>
+                            {projectGate.candidates.map(m => (
+                              <button
+                                key={m.project.folderRel}
+                                type="button"
+                                className={`inbox-project-chip is-candidate priority-${m.project.marker.priority}`}
+                                onClick={() => handlePickProject(m.project.folderRel)}
+                              >
+                                <span>{m.project.marker.project || m.project.folderName}</span>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* KEIN PROJEKT erkannt */}
+                        {showProjectNone && (
+                          <span className="inbox-project-none">{t('inbox.detail.noMatch')}</span>
+                        )}
+
+                        {/* Override-Dropdown — in ALLEN Zuständen erreichbar */}
+                        <div className="inbox-project-dropdown-wrapper">
+                          <button
+                            type="button"
+                            className="inbox-project-more-btn"
+                            onClick={() => setShowProjectDropdown(v => !v)}
+                            title={t('inbox.detail.otherProjects')}
+                          >
+                            {showProjectDropdown ? '×' : '+'} {activeProject ? t('inbox.detail.other') : t('inbox.detail.assignProject')}
+                          </button>
+                          {showProjectDropdown && (
+                            <div className="inbox-project-dropdown" role="menu">
+                              {otherProjectCandidates.length > 0 && (
+                                <div className="inbox-project-dropdown-section">
+                                  <div className="inbox-project-dropdown-heading">{t('inbox.detail.suggestions')}</div>
+                                  {otherProjectCandidates.map(p => (
+                                    <button
+                                      key={p.folderRel}
+                                      type="button"
+                                      className="inbox-project-dropdown-item"
+                                      onClick={() => handlePickProject(p.folderRel)}
+                                    >
+                                      {p.marker.project || p.folderName}
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
+                              {projects.some(p => (!activeProject || p.folderRel !== activeProject.folderRel) && !otherProjectCandidates.some(c => c.folderRel === p.folderRel)) && (
+                                <div className="inbox-project-dropdown-section">
+                                  <div className="inbox-project-dropdown-heading">{t('inbox.detail.allProjects')}</div>
+                                  {projects
+                                    .filter(p => (!activeProject || p.folderRel !== activeProject.folderRel) && !otherProjectCandidates.some(c => c.folderRel === p.folderRel))
+                                    .map(p => (
                                       <button
                                         key={p.folderRel}
                                         type="button"
@@ -914,25 +996,9 @@ export const InboxPanel: React.FC<InboxPanelProps> = ({ onClose }) => {
                                         {p.marker.project || p.folderName}
                                       </button>
                                     ))}
-                                  </div>
-                                )}
-                                {projects.length > otherProjectCandidates.length + 1 && (
-                                  <div className="inbox-project-dropdown-section">
-                                    <div className="inbox-project-dropdown-heading">{t('inbox.detail.allProjects')}</div>
-                                    {projects
-                                      .filter(p => p.folderRel !== activeProject.folderRel && !otherProjectCandidates.some(c => c.folderRel === p.folderRel))
-                                      .map(p => (
-                                        <button
-                                          key={p.folderRel}
-                                          type="button"
-                                          className="inbox-project-dropdown-item"
-                                          onClick={() => handlePickProject(p.folderRel)}
-                                        >
-                                          {p.marker.project || p.folderName}
-                                        </button>
-                                      ))}
-                                  </div>
-                                )}
+                                </div>
+                              )}
+                              {(activeProject || selectedEmail.userProject !== null) && (
                                 <div className="inbox-project-dropdown-section">
                                   <button
                                     type="button"
@@ -942,10 +1008,10 @@ export const InboxPanel: React.FC<InboxPanelProps> = ({ onClose }) => {
                                     {t('inbox.detail.noProject')}
                                   </button>
                                 </div>
-                              </div>
-                            )}
-                          </div>
-                        )}
+                              )}
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </div>
                   )}
