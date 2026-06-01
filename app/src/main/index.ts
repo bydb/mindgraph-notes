@@ -23,7 +23,7 @@ import {
 } from './projectStatus/synonymGenerator'
 import { runWorkflow, type RunnerServices, type SeedEmail } from './workflows/runner'
 import { matchEmailToProjects, gateProjectMatch } from '../shared/projectMatch'
-import { parseRelevanceConfig, stripConfigBlock, buildReplyStats, computeHardSignals, combineRelevance } from '../shared/emailRelevance'
+import { parseRelevanceConfig, stripConfigBlock, buildReplyStats, computeHardSignals, combineRelevance, extractConfigBlock, upsertConfigBlock, emptyRelevanceConfig, DEFAULT_VIP_WEIGHT, DEFAULT_DOMAIN_WEIGHT, DEFAULT_KEYWORD_BOOST } from '../shared/emailRelevance'
 import { isHardLocked as isModelHardLocked } from '../shared/modelCompatibility'
 import { MODULE_FEATURE_GATE } from '../shared/workflow/types'
 import type { Workflow, WorkflowFile, WorkflowRunTrigger } from '../shared/workflow/model'
@@ -7809,6 +7809,78 @@ ipcMain.handle('email-setup', async (_event, vaultPath: string, inboxFolderName?
   } catch (error) {
     console.error('[Email] Setup failed:', error)
     return { success: false, error: error instanceof Error ? error.message : 'Setup fehlgeschlagen' }
+  }
+})
+
+// Hybrid-Scorer-Regeln: lesen/schreiben des email-relevance-config-Blocks in der
+// Instruktions-Notiz. Die Notiz bleibt Single-Source (synct mit); die Settings-UI
+// ist nur eine zweite Sicht auf denselben Block.
+const clampWeight = (v: unknown, def: number): number => {
+  const n = Math.round(Number(v))
+  return Number.isFinite(n) ? Math.max(0, Math.min(100, n)) : def
+}
+const trimStr = (v: unknown): string => (typeof v === 'string' ? v.trim() : '')
+
+// Eingehende Config aus dem Renderer säubern, bevor sie in die Notiz geschrieben wird.
+function sanitizeRelevanceConfigInput(input: unknown): ReturnType<typeof emptyRelevanceConfig> {
+  const cfg = emptyRelevanceConfig()
+  const obj = (input && typeof input === 'object') ? input as Record<string, unknown> : {}
+  if (Array.isArray(obj.vipSenders)) {
+    for (const raw of obj.vipSenders) {
+      const v = (raw && typeof raw === 'object') ? raw as Record<string, unknown> : {}
+      const name = trimStr(v.name)
+      const email = trimStr(v.email).toLowerCase()
+      if (!name && !email) continue
+      cfg.vipSenders.push({ name: name || undefined, email: email || undefined, weight: clampWeight(v.weight, DEFAULT_VIP_WEIGHT) })
+    }
+  }
+  if (Array.isArray(obj.domains)) {
+    for (const raw of obj.domains) {
+      const d = (raw && typeof raw === 'object') ? raw as Record<string, unknown> : {}
+      const domain = trimStr(d.domain).replace(/^@/, '').toLowerCase()
+      if (!domain) continue
+      cfg.domains.push({ domain, weight: clampWeight(d.weight, DEFAULT_DOMAIN_WEIGHT) })
+    }
+  }
+  if (Array.isArray(obj.keywords)) {
+    for (const raw of obj.keywords) {
+      const k = (raw && typeof raw === 'object') ? raw as Record<string, unknown> : {}
+      const term = trimStr(k.term)
+      if (!term) continue
+      cfg.keywords.push({ term, weight: clampWeight(k.weight, DEFAULT_KEYWORD_BOOST) })
+    }
+  }
+  return cfg
+}
+
+ipcMain.handle('email-relevance-config-load', async (_event, vaultPath: string) => {
+  try {
+    assertApprovedVault(vaultPath, 'email-relevance-config-load')
+    const settings = await loadEmailSettings()
+    const noteRel = settings.instructionNotePath || DEFAULT_EMAIL_INSTRUCTION_NOTE
+    const full = validatePath(vaultPath, noteRel)
+    let content = ''
+    try { content = await fs.readFile(full, 'utf-8') } catch { /* Notiz existiert noch nicht */ }
+    return { success: true, config: parseRelevanceConfig(content), hasBlock: extractConfigBlock(content) !== null, notePath: noteRel }
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : 'Laden fehlgeschlagen' }
+  }
+})
+
+ipcMain.handle('email-relevance-config-save', async (_event, vaultPath: string, config: unknown) => {
+  try {
+    assertApprovedVault(vaultPath, 'email-relevance-config-save')
+    const settings = await loadEmailSettings()
+    const noteRel = settings.instructionNotePath || DEFAULT_EMAIL_INSTRUCTION_NOTE
+    const full = validatePath(vaultPath, noteRel)
+    let content = ''
+    try { content = await fs.readFile(full, 'utf-8') } catch { content = DEFAULT_EMAIL_INSTRUCTIONS }
+    const updated = upsertConfigBlock(content, sanitizeRelevanceConfigInput(config))
+    await writeFileSafe(full, updated)
+    return { success: true, notePath: noteRel }
+  } catch (error) {
+    console.error('[Email] Relevance-Config save failed:', error)
+    return { success: false, error: error instanceof Error ? error.message : 'Speichern fehlgeschlagen' }
   }
 })
 

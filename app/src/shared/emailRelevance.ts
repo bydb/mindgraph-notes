@@ -263,3 +263,46 @@ export function combineRelevance(
   const reasons = [...hard.signals.map((s) => s.label), ...matchedCriteria.filter(Boolean)]
   return { relevanceScore, relevant: relevanceScore >= threshold, reasons, hardFloor: hard.floor }
 }
+
+// ─── Serialisierung: Config → Notiz-Block ────────────────────────────────────
+// Gegenstück zu parseRelevanceConfig — damit die Settings-UI denselben Block
+// schreiben kann, den der Parser liest (Round-Trip). Default-Gewichte werden
+// weggelassen, damit der Block schlank bleibt.
+
+function vipLine(v: VipSender): string {
+  const base = v.name && v.email ? `${v.name} <${v.email}>` : (v.email || v.name || '')
+  return v.weight !== DEFAULT_VIP_WEIGHT ? `- ${base} = ${v.weight}` : `- ${base}`
+}
+
+/** Erzeugt den INNEREN Text des Config-Blocks (ohne ```-Fences). */
+export function serializeConfigBlockInner(cfg: RelevanceConfig): string {
+  const lines: string[] = []
+  lines.push('VIP-Absender:')
+  for (const v of cfg.vipSenders) { const l = vipLine(v); if (l.trim() !== '-') lines.push(l) }
+  lines.push('')
+  lines.push('Domains:')
+  for (const d of cfg.domains) {
+    if (!d.domain) continue
+    lines.push(d.weight !== DEFAULT_DOMAIN_WEIGHT ? `- ${d.domain} = ${d.weight}` : `- ${d.domain}`)
+  }
+  lines.push('')
+  lines.push('Schlüsselwörter:')
+  for (const k of cfg.keywords) {
+    if (!k.term) continue
+    lines.push(k.weight !== DEFAULT_KEYWORD_BOOST ? `- ${k.term} = ${k.weight}` : `- ${k.term}`)
+  }
+  return lines.join('\n')
+}
+
+/** Ersetzt den bestehenden Config-Block in der Notiz oder hängt einen neuen an.
+ *  Der Rest der Notiz (weiche Kriterien etc.) bleibt unangetastet. */
+export function upsertConfigBlock(note: string, cfg: RelevanceConfig): string {
+  const block = '```' + RELEVANCE_CONFIG_FENCE + '\n' + serializeConfigBlockInner(cfg) + '\n```'
+  const re = new RegExp('```\\s*' + RELEVANCE_CONFIG_FENCE + '\\s*\\n[\\s\\S]*?```', 'i')
+  if (re.test(note)) return note.replace(re, block)
+  const section =
+    '\n\n## Feste Regeln (deterministisch, im Code geprüft)\n\n' +
+    'VIP-Absender und Domains setzen eine Mindest-Relevanz; Schlüsselwörter geben einen additiven Boost.\n\n' +
+    block + '\n'
+  return (note ? note.trimEnd() : '') + section
+}
