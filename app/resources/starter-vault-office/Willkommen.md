@@ -9,7 +9,7 @@ Schön, dass du da bist. Diese Sammlung ist auf den Büroalltag im Mittelstand z
 
 ## Was findest du hier?
 
-- **Schnellstart** ([[01 - Schnellstart/Erste Schritte im Büro|Erste Schritte]]) — vier kurze Notizen, die zeigen, wie du im Alltag arbeitest.
+- **Schnellstart** ([[01 - Schnellstart/Erste Schritte im Buero|Erste Schritte]]) — vier kurze Notizen, die zeigen, wie du im Alltag arbeitest.
 - **Vorlagen** ([[02 - Vorlagen/Meeting-Protokoll|Meeting-Protokoll]], [[02 - Vorlagen/Projektakte|Projektakte]], [[02 - Vorlagen/Kundenmappe|Kundenmappe]], [[02 - Vorlagen/Telefonnotiz|Telefonnotiz]]) — kopiere sie und passe sie an.
 - **Beispiele** ([[03 - Demo/Beispiel - Projektakte Pitchtag|Pitchtag-Projektakte]], [[03 - Demo/Beispiel - Meeting Vorstandssitzung|Vorstands-Meeting]]) — so sehen die Vorlagen ausgefüllt aus.
 

@@ -56,25 +56,48 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: npx electron-builder --mac --${{ matrix.arch }} --publish never
 
+      # Fängt eine ungültige Code-Signatur (z.B. Unicode-Dateinamen, die das Bundle-Siegel
+      # brechen → "a sealed resource is missing or invalid") SOFORT ab, mit der exakten Datei —
+      # statt erst Minuten später an Apples "Invalid"-Notarisierung zu scheitern.
+      - name: Verify code signature
+        working-directory: app
+        run: |
+          set -euo pipefail
+          APP=$(ls -d dist/mac*/*.app 2>/dev/null | head -1)
+          if [ -z "$APP" ]; then echo "::error::Keine .app zum Verifizieren gefunden"; exit 1; fi
+          echo "Verifiziere Signatur: $APP"
+          codesign --verify --deep --strict --verbose=2 "$APP"
+          echo "Signatur OK"
+
+      # Kein continue-on-error mehr: schlägt die Notarisierung fehl, FÄLLT das Release —
+      # damit nie wieder ein nicht-notarisiertes ("beschädigtes") DMG ausgeliefert wird.
       - name: Notarize macOS app
-        continue-on-error: true
         env:
           APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
           APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
         run: |
+          set -uo pipefail
           DMG_FILE=$(ls app/dist/*.dmg 2>/dev/null | head -1)
-          if [ -z "$DMG_FILE" ]; then
-            echo "No DMG found, skipping notarization"
-            exit 0
-          fi
+          if [ -z "$DMG_FILE" ]; then echo "::error::Kein DMG zum Notarisieren gefunden"; exit 1; fi
+          KEY="$HOME/private_keys/AuthKey_${APPLE_API_KEY_ID}.p8"
           echo "Notarizing: $DMG_FILE"
-          xcrun notarytool submit "$DMG_FILE" \
-            --key "$HOME/private_keys/AuthKey_${APPLE_API_KEY_ID}.p8" \
-            --key-id "$APPLE_API_KEY_ID" \
-            --issuer "$APPLE_API_ISSUER" \
-            --wait --timeout 30m
-          echo "Stapling..."
-          xcrun stapler staple "$DMG_FILE"
+          for attempt in 1 2; do
+            OUT=$(xcrun notarytool submit "$DMG_FILE" \
+              --key "$KEY" --key-id "$APPLE_API_KEY_ID" --issuer "$APPLE_API_ISSUER" \
+              --wait --timeout 30m 2>&1) || true
+            echo "$OUT"
+            if echo "$OUT" | grep -q "status: Accepted"; then
+              echo "Stapling..."
+              xcrun stapler staple "$DMG_FILE"
+              xcrun stapler validate "$DMG_FILE"
+              echo "Notarisierung + Stapling erfolgreich."
+              exit 0
+            fi
+            echo "::warning::Notarisierungs-Versuch $attempt nicht 'Accepted'"
+            sleep 30
+          done
+          echo "::error::Notarisierung fehlgeschlagen (nicht 'Accepted') — Release wird abgebrochen."
+          exit 1
 
       - name: Cleanup Apple API Key
         if: always()
