@@ -2,6 +2,17 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.7.13-beta] - 2026-06-01
+
+### Features
+
+- **Hybrid E-Mail-Relevanz-Bewertung**: VIP-Absender, Domains und Schlüsselwörter werden jetzt exakt im Code geprüft (statt vom KI-Modell geraten) und setzen eine verlässliche Mindest-Relevanz; zusätzlich werden Kontakte, denen du regelmäßig antwortest, automatisch höher bewertet. Das KI-Modell übernimmt nur noch die inhaltliche Beurteilung. Ergebnis: Die Bewertung ist **stabil** (gleiche Mail → gleicher Score, kein Schwanken mehr) und **erklärbar** — in der Mail-Detailansicht zeigen „Warum"-Chips, welche Regel/Kriterien gegriffen haben.
+- **Neue Einstellungs-Oberfläche „Feste Relevanz-Regeln"** (Einstellungen → Email): VIP-Absender, Domains und Schlüsselwörter bequem per Formular pflegen, statt die Instruktions-Notiz von Hand zu bearbeiten. Die Notiz bleibt dabei die Single-Source und synct weiter.
+
+### Improvements
+
+- **Robustere Auswertung der KI-Analyse**: Modell-Antworten werden toleranter verarbeitet — verschachtelte Infos, deutsche Datums-/Uhrzeit-Felder und gelegentlich fehlerhaftes JSON (mit automatischem zweiten Versuch) gehen nicht mehr verloren. Dadurch werden Termine und Aufgaben zuverlässiger erkannt.
+
 ## [0.7.12-beta] - 2026-06-01
 
 ### Fixes
