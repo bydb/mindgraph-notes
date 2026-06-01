@@ -1275,6 +1275,12 @@ export interface EmailAnalysis {
   suggestedActions?: (EmailSuggestedAction | string)[]
   needsReply?: boolean
   replyUrgency?: 'low' | 'medium' | 'high'
+  /** Hybrid-Scorer: vom LLM als zutreffend beurteilte (weiche) Kriterien — für Erklärbarkeit. */
+  matchedCriteria?: string[]
+  /** Hybrid-Scorer: zusammengeführte, menschenlesbare Gründe (harte Signale + weiche Kriterien). */
+  relevanceReasons?: string[]
+  /** Hybrid-Scorer: deterministischer Code-Floor aus VIP/Domain/Keyword/Antwort-Häufigkeit. */
+  hardFloor?: number
   replyHandled?: boolean   // true wenn User die Antwort anderweitig erledigt hat (z.B. Telefon)
   replyHandledAt?: string  // ISO-Timestamp wann markiert
   /** Exactly-once-Marker: workflowId → runId. Verhindert Mehrfach-Auslösung

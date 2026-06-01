@@ -836,6 +836,30 @@ export const InboxPanel: React.FC<InboxPanelProps> = ({ onClose }) => {
                     </div>
                   </div>
 
+                  {selectedEmail.analysis.relevanceReasons && selectedEmail.analysis.relevanceReasons.length > 0 && (
+                    <div className="inbox-analysis-row" style={{ alignItems: 'flex-start' }}>
+                      <span className="inbox-analysis-label">{t('inbox.detail.relevanceReasons')}</span>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', flex: 1 }}>
+                        {selectedEmail.analysis.relevanceReasons.map((reason, i) => (
+                          <span
+                            key={i}
+                            style={{
+                              fontSize: '11px',
+                              padding: '2px 8px',
+                              borderRadius: '10px',
+                              background: 'color-mix(in srgb, var(--accent-color) 14%, transparent)',
+                              color: 'var(--text-secondary, var(--text-muted))',
+                              border: '1px solid color-mix(in srgb, var(--accent-color) 25%, transparent)',
+                              whiteSpace: 'nowrap',
+                            }}
+                          >
+                            {reason}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                   <div className="inbox-analysis-row">
                     <span className="inbox-analysis-label">{t('inbox.detail.sentiment')}</span>
                     <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
