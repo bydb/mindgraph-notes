@@ -2,6 +2,13 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.7.12-beta] - 2026-06-01
+
+### Fixes
+
+- **macOS: „MindGraph Notes ist beschädigt" behoben**: Seit v0.7.6 ließen sich neu heruntergeladene Versionen auf dem Mac nicht mehr öffnen („… ist beschädigt und kann nicht geöffnet werden"). Ursache war ein Umlaut im Dateinamen einer mitgelieferten Beispiel-Notiz („Erste Schritte im Büro"): durch unterschiedliche Unicode-Normalisierung zwischen Code-Signatur und DMG-Dateisystem wurde die Signatur des App-Bundles ungültig, Apples Notarisierung schlug fehl, und die App wurde unsigniert ausgeliefert. Die Datei heißt jetzt „Erste Schritte im Buero" (die Überschrift im Inhalt bleibt „Büro").
+- **Release-Pipeline gehärtet**: Der Build prüft die Code-Signatur jetzt explizit vor der Notarisierung und bricht ab, wenn Signatur oder Notarisierung fehlschlagen — so kann nie wieder eine „beschädigte" (nicht notarisierte) Version veröffentlicht werden.
+
 ## [0.7.11-beta] - 2026-05-31
 
 ### Fixes
