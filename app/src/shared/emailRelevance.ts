@@ -41,7 +41,11 @@ export const DEFAULT_REPLY_HISTORY: ReplyHistoryConfig = {
 }
 export const DEFAULT_VIP_WEIGHT = 90
 export const DEFAULT_DOMAIN_WEIGHT = 80
-export const DEFAULT_KEYWORD_WEIGHT = 70
+// Keyword ist ein BOOST (additiv auf den LLM-Score), KEIN Floor — sonst hebt eine
+// Erwähnung in Signatur/Adresse (z.B. "Medienzentrum" in einer UPS-Lieferadresse)
+// irrelevante Mails über die Schwelle. Ein korrektes niedriges LLM-Urteil bleibt niedrig.
+export const DEFAULT_KEYWORD_BOOST = 20
+export const MAX_KEYWORD_BOOST = 30
 export const DEFAULT_RELEVANCE_THRESHOLD = 30
 
 /** Fence-Tag des optionalen Konfig-Blocks in der Instruktions-Notiz. */
@@ -125,7 +129,7 @@ export function parseRelevanceConfig(instruction: string): RelevanceConfig {
       const domain = text.replace(/^@/, '').toLowerCase().trim()
       if (domain) cfg.domains.push({ domain, weight })
     } else if (section === 'keyword') {
-      const { text, weight } = parseWeight(entry, DEFAULT_KEYWORD_WEIGHT)
+      const { text, weight } = parseWeight(entry, DEFAULT_KEYWORD_BOOST)
       if (text) cfg.keywords.push({ term: text, weight })
     }
   }
@@ -177,8 +181,11 @@ export function buildReplyStats(emails: MailLike[], cfg: ReplyHistoryConfig, now
 // ─── Harte Signale berechnen ─────────────────────────────────────────────────
 
 export type HardSignalKind = 'vip' | 'domain' | 'keyword' | 'reply'
-export interface HardSignal { kind: HardSignalKind; label: string; weight: number }
-export interface HardSignalResult { floor: number; signals: HardSignal[] }
+export type HardSignalMode = 'floor' | 'boost'
+export interface HardSignal { kind: HardSignalKind; label: string; weight: number; mode: HardSignalMode }
+// floor = Identitäts-/Verhaltens-Signale (VIP/Domain/Kontakt) → setzen Mindest-Score.
+// boost = Keyword → additiver Zuschlag (gedeckelt), kein Mindest-Score.
+export interface HardSignalResult { floor: number; boost: number; signals: HardSignal[] }
 
 const lc = (s: string | undefined): string => (s || '').toLowerCase()
 
@@ -191,39 +198,40 @@ export function computeHardSignals(
   const fromAddr = lc(email.from.address)
   const fromName = lc(email.from.name)
 
-  // VIP-Absender (exakter Address-Match ODER Name-Enthält-Match)
+  // VIP-Absender (exakter Address-Match ODER Name-Enthält-Match) → Floor
   for (const v of cfg.vipSenders) {
     const emailHit = !!v.email && fromAddr === v.email.toLowerCase()
     const nameHit = !!v.name && fromName.length > 0 && fromName.includes(v.name.toLowerCase())
     if (emailHit || nameHit) {
-      signals.push({ kind: 'vip', label: `VIP-Absender: ${v.name || v.email}`, weight: v.weight })
+      signals.push({ kind: 'vip', label: `VIP-Absender: ${v.name || v.email}`, weight: v.weight, mode: 'floor' })
       break // ein VIP-Treffer reicht
     }
   }
-  // Domain (exakte Domain oder Subdomain)
+  // Domain (exakte Domain oder Subdomain) → Floor
   for (const d of cfg.domains) {
     const dom = d.domain.toLowerCase()
     if (fromAddr.endsWith('@' + dom) || fromAddr.endsWith('.' + dom)) {
-      signals.push({ kind: 'domain', label: `Domain: ${d.domain}`, weight: d.weight })
+      signals.push({ kind: 'domain', label: `Domain: ${d.domain}`, weight: d.weight, mode: 'floor' })
       break
     }
   }
-  // Schlüsselwörter (Betreff + Body, case-insensitiv, deterministisch)
+  // Schlüsselwörter (Betreff + Body, case-insensitiv) → Boost, kein Floor
   const haystack = lc((email.subject || '') + '\n' + (email.bodyText || ''))
   for (const k of cfg.keywords) {
     const term = k.term.toLowerCase().trim()
     if (term && haystack.includes(term)) {
-      signals.push({ kind: 'keyword', label: `Schlüsselwort: ${k.term}`, weight: k.weight })
+      signals.push({ kind: 'keyword', label: `Schlüsselwort: ${k.term}`, weight: k.weight, mode: 'boost' })
     }
   }
-  // Antwort-Häufigkeit
+  // Antwort-Häufigkeit → Floor (bekannter Kontakt)
   if (reply && reply.frequency !== 'none') {
     const weight = reply.frequency === 'high' ? cfg.replyHistory.highWeight : cfg.replyHistory.mediumWeight
-    signals.push({ kind: 'reply', label: `Häufiger Kontakt (${reply.sentTo}× geantwortet)`, weight })
+    signals.push({ kind: 'reply', label: `Häufiger Kontakt (${reply.sentTo}× geantwortet)`, weight, mode: 'floor' })
   }
 
-  const floor = signals.reduce((mx, s) => Math.max(mx, s.weight), 0)
-  return { floor, signals }
+  const floor = signals.filter((s) => s.mode === 'floor').reduce((mx, s) => Math.max(mx, s.weight), 0)
+  const boost = Math.min(MAX_KEYWORD_BOOST, signals.filter((s) => s.mode === 'boost').reduce((sum, s) => sum + s.weight, 0))
+  return { floor, boost, signals }
 }
 
 // ─── Zusammenführung ─────────────────────────────────────────────────────────
@@ -241,16 +249,17 @@ export function combineRelevance(
   matchedCriteria: string[],
   threshold: number = DEFAULT_RELEVANCE_THRESHOLD,
 ): CombinedRelevance {
-  // WICHTIG: zwischen "LLM hat EXPLIZIT 0 vergeben" und "kein/kaputter Score" unterscheiden.
-  // Nur Ersteres ist ein Injection-/Spam-Veto. Ein fehlender Score (null) — etwa weil gemma
-  // ein leeres {} liefert — darf den harten Floor NICHT auf 0 ziehen, sonst verschwindet
-  // genau die wichtige VIP-Mail, die der Floor schützen soll.
+  // null/kaputt (z.B. gemma liefert {}) → wie 0 behandeln, aber Floor greift trotzdem.
   const hasLlmScore = typeof llmScore === 'number' && Number.isFinite(llmScore)
   const safeLlm = hasLlmScore ? Math.max(0, Math.min(100, Math.round(llmScore as number))) : 0
-  const veto = hasLlmScore && safeLlm === 0 // gespoofter VIP-Header darf nicht floren
-  const floor = veto ? 0 : hard.floor
-  const relevanceScore = Math.max(safeLlm, floor)
-  // Bei Veto keine „Gründe" zeigen — die harten Signale haben ja gerade NICHT gegriffen.
-  const reasons = veto ? [] : [...hard.signals.map((s) => s.label), ...matchedCriteria.filter(Boolean)]
-  return { relevanceScore, relevant: relevanceScore >= threshold, reasons, hardFloor: floor }
+  // „Bekannte Identität gewinnt": Floor-Signale (VIP/Domain/Kontakt) gelten IMMER — auch wenn
+  // das LLM 0 (Injection-Verdacht) meldet. Schwache lokale Modelle flaggen echte Kollegen-Mails
+  // fälschlich als Injection; ein bekannter Absender soll dann nicht verschwinden. Der
+  // Injection-Hinweis bleibt in der summary sichtbar — der User beurteilt die Mail selbst.
+  // Keyword ist nur ein additiver Boost (gedeckelt), kein Floor → hebt irrelevante Mails
+  // (z.B. "Medienzentrum" in einer Lieferadresse) nicht über die Schwelle.
+  const base = Math.max(safeLlm, hard.floor)
+  const relevanceScore = Math.min(100, base + hard.boost)
+  const reasons = [...hard.signals.map((s) => s.label), ...matchedCriteria.filter(Boolean)]
+  return { relevanceScore, relevant: relevanceScore >= threshold, reasons, hardFloor: hard.floor }
 }

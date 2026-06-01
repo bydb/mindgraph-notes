@@ -6678,9 +6678,10 @@ Wenn eine E-Mail relevant ist, extrahiere:
 
 ## Feste Regeln (deterministisch)
 
-Diese werden NICHT vom KI-Modell geraten, sondern exakt im Code geprüft (Absender, Domain,
-Schlüsselwort) und setzen eine Mindest-Relevanz. Trage hier deine "immer wichtig"-Regeln ein —
-Namen, E-Mail-Adressen, Domains oder Stichworte. Optionales Gewicht mit \`= Zahl\` (0-100).
+Diese werden NICHT vom KI-Modell geraten, sondern exakt im Code geprüft. Trage hier deine
+"immer wichtig"-Regeln ein — Namen, E-Mail-Adressen, Domains oder Stichworte.
+VIP-Absender und Domains setzen eine Mindest-Relevanz (Floor); Schlüsselwörter geben nur einen
+additiven Boost (Standard +20). Optionales Gewicht mit \`= Zahl\` (0-100).
 
 \`\`\`email-relevance-config
 VIP-Absender:
@@ -7628,7 +7629,7 @@ END_EMAIL_DATA
               model
             }
             if (hard.signals.length > 0) {
-              console.log(`[Email] ${email.id}: LLM=${llmScore ?? 'n/a'} Floor=${hard.floor} → ${combined.relevanceScore} (${hard.signals.map(s => s.kind).join(',')})`)
+              console.log(`[Email] ${email.id}: LLM=${llmScore ?? 'n/a'} Floor=${hard.floor} Boost=${hard.boost} → ${combined.relevanceScore} (${hard.signals.map(s => `${s.kind}:${s.mode}`).join(',')})`)
             }
             analyzed++
           }
