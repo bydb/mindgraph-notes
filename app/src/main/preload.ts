@@ -372,6 +372,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('email-fetch', vaultPath, accounts, lastFetchedAt, maxPerAccount),
   emailAnalyze: (vaultPath: string, model: string, emailIds?: string[]) =>
     ipcRenderer.invoke('email-analyze', vaultPath, model, emailIds),
+  emailRelevanceConfigLoad: (vaultPath: string) =>
+    ipcRenderer.invoke('email-relevance-config-load', vaultPath),
+  emailRelevanceConfigSave: (vaultPath: string, config: unknown) =>
+    ipcRenderer.invoke('email-relevance-config-save', vaultPath, config),
   noteAnalyzeRelevance: (payload: {
     vaultPath: string
     noteRelativePath: string

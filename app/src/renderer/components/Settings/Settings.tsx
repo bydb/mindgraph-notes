@@ -8,6 +8,7 @@ import { useTranslation, type TranslationKey } from '../../utils/translations'
 import { TelegramSettings } from './TelegramSettings'
 import { CredentialsSettings } from './CredentialsSettings'
 import { ModelCompatibilitySection, ActiveModelStatusBadge, VERDICT_ICON, VERDICT_COLOR } from './ModelCompatibilitySection'
+import { EmailRelevanceRulesSection } from './EmailRelevanceRulesSection'
 import { getModelVerdict, CLOUD_TEST_MODELS, RECOMMENDED_PULL_MODELS, isCloudModel, modelMarkers } from '../../../shared/modelCompatibility'
 import { ensureTransformersModel, isTransformersModelReady } from '../../utils/voice/transformersStt'
 import { writeClipboardText } from '../../utils/clipboard'
@@ -4861,6 +4862,8 @@ LIMIT 10
                     <div className="settings-info" style={{ whiteSpace: 'pre-line', fontSize: '11px', lineHeight: '1.5' }}>
                       {t('settings.email.instructionTips')}
                     </div>
+
+                    {vaultPath && <EmailRelevanceRulesSection vaultPath={vaultPath} />}
 
                     <div className="settings-row">
                       <label>{t('settings.email.inboxFolder')}</label>

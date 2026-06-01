@@ -1,3 +1,5 @@
+import type { RelevanceConfig } from './emailRelevance'
+
 // Per-Vault Feature Toggles
 export interface VaultFeatures {
   readwise: boolean
@@ -833,6 +835,8 @@ export interface ElectronAPI {
   emailMove: (payload: { accountId: string; host: string; port: number; user: string; tls: boolean; sourceFolder: string; uid: number; destinationFolder: string }) => Promise<{ success: boolean; newUid?: number; destinationFolder?: string; error?: string }>;
   emailFetch: (vaultPath: string, accounts: Array<EmailAccount & { folder?: string }>, lastFetchedAt: Record<string, string>, maxPerAccount: number) => Promise<EmailFetchResult>;
   emailAnalyze: (vaultPath: string, model: string, emailIds?: string[]) => Promise<{ success: boolean; analyzed: number; error?: string }>;
+  emailRelevanceConfigLoad: (vaultPath: string) => Promise<{ success: boolean; config?: RelevanceConfig; hasBlock?: boolean; notePath?: string; error?: string }>;
+  emailRelevanceConfigSave: (vaultPath: string, config: RelevanceConfig) => Promise<{ success: boolean; notePath?: string; error?: string }>;
   noteAnalyzeRelevance: (payload: {
     vaultPath: string
     noteRelativePath: string
@@ -1275,6 +1279,12 @@ export interface EmailAnalysis {
   suggestedActions?: (EmailSuggestedAction | string)[]
   needsReply?: boolean
   replyUrgency?: 'low' | 'medium' | 'high'
+  /** Hybrid-Scorer: vom LLM als zutreffend beurteilte (weiche) Kriterien — für Erklärbarkeit. */
+  matchedCriteria?: string[]
+  /** Hybrid-Scorer: zusammengeführte, menschenlesbare Gründe (harte Signale + weiche Kriterien). */
+  relevanceReasons?: string[]
+  /** Hybrid-Scorer: deterministischer Code-Floor aus VIP/Domain/Keyword/Antwort-Häufigkeit. */
+  hardFloor?: number
   replyHandled?: boolean   // true wenn User die Antwort anderweitig erledigt hat (z.B. Telefon)
   replyHandledAt?: string  // ISO-Timestamp wann markiert
   /** Exactly-once-Marker: workflowId → runId. Verhindert Mehrfach-Auslösung
