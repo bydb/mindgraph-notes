@@ -2,6 +2,13 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.7.14-beta] - 2026-06-02
+
+### Improvements
+
+- **E-Mail-Analyse meldet Fehler jetzt sichtbar**: Wenn die KI-Analyse einer Mail fehlschlägt — etwa weil das gewählte Modell nicht installiert ist, zu groß für den verfügbaren Arbeitsspeicher ist (häufig auf Geräten mit 8 GB RAM) oder zu lange braucht —, erscheint jetzt ein deutlicher Hinweis im Posteingang. Bisher meldete die App stillschweigend Erfolg, obwohl gar keine Analyse stattgefunden hatte.
+- **Klare Modell-Empfehlung für die E-Mail-Funktion**: Die Modell-Kompatibilitätsliste empfiehlt jetzt eindeutig die Qwen-Modelle. Für Geräte mit wenig Arbeitsspeicher (ab 8 GB) wird **qwen3.5:4b** empfohlen (~3,4 GB; im Test zuverlässig bei Relevanz, Aufgaben-Erkennung, Spam und Schutz vor manipulativen Mails). Gemma- und Ministral-Modelle wurden aus den Empfehlungen und Standard-Vorschlägen entfernt, da sie für die E-Mail-Analyse nicht verlässlich genug sind.
+
 ## [0.7.13-beta] - 2026-06-01
 
 ### Features
