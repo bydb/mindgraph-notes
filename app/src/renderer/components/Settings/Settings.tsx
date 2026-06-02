@@ -4901,8 +4901,8 @@ LIMIT 10
                       <input
                         type="number"
                         value={emailSettings.maxEmailsPerFetch}
-                        onChange={e => setEmail({ maxEmailsPerFetch: parseInt(e.target.value) || 50 })}
-                        min={10}
+                        onChange={e => setEmail({ maxEmailsPerFetch: parseInt(e.target.value) || 2 })}
+                        min={1}
                         max={200}
                         style={{ width: '80px' }}
                       />

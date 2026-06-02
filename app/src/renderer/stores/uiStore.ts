@@ -923,7 +923,7 @@ const defaultState = {
     instructionNotePath: '',
     inboxFolderName: '‼️📧 - emails',
     relevanceThreshold: 30,
-    maxEmailsPerFetch: 50,
+    maxEmailsPerFetch: 2, // konservativ: kleine Analyse-Batches → schwache Hardware (8 GB) steigt nicht aus. Power-User hochsetzen.
     retainDays: 30,
     autoAnalyze: true,
     lowPowerMode: false,
