@@ -2,6 +2,12 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.7.15-beta] - 2026-06-02
+
+### Verbesserungen
+
+- **Schonmodus für schwache Hardware (E-Mail-Analyse).** Auf leistungsschwachen Geräten (z. B. Mac mini mit 8 GB RAM) konnte die Analyse vieler E-Mails am Stück das Gerät überhitzen und abbrechen. Der neue Schonmodus (Einstellungen → Email) legt eine kurze Pause zwischen die einzelnen Mails — das verhindert Überhitzung und Abbrüche und hält das KI-Modell vollständig **lokal** (keine Cloud, keine Datenweitergabe). Etwas langsamer, dafür zuverlässig.
+
 ## [0.7.14-beta] - 2026-06-02
 
 ### Improvements
