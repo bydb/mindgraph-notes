@@ -43,7 +43,7 @@ export const AIStep: React.FC<AIStepProps> = ({ onBack, onNext }) => {
   const [ollamaModels, setOllamaModels] = useState<string[]>([])
   const [checking, setChecking] = useState(true)
 
-  const [pullModelName, setPullModelName] = useState('gemma4:latest')
+  const [pullModelName, setPullModelName] = useState('qwen3.5:4b')
   const [isPulling, setIsPulling] = useState(false)
   const [pullProgress, setPullProgress] = useState<{ status: string; completed?: number; total?: number } | null>(null)
   const [pullError, setPullError] = useState<string | null>(null)

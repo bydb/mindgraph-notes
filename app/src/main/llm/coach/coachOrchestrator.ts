@@ -1,6 +1,6 @@
 // Coach-Conversation-Loop. Kombiniert KB-Retrieval, System-Prompt-Build, den
 // bestehenden chatClient (Ollama — lokal oder Ollama-Cloud, z.B.
-// `ministral-3:14b-cloud`) und das Parsing der Action-Vorschläge. Liefert
+// `qwen3.5:cloud`) und das Parsing der Action-Vorschläge. Liefert
 // {text, actions} pro User-Turn an die IPC-Ebene.
 
 import { chat, type ChatMessage } from '../chatClient'

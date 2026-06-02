@@ -1394,7 +1394,7 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab 
   const [remarkableError, setRemarkableError] = useState<string | null>(null)
 
   // Ollama Pull Model State
-  const [pullModelName, setPullModelName] = useState('gemma4:latest')
+  const [pullModelName, setPullModelName] = useState('qwen3.5:4b')
   const [customPullModelName, setCustomPullModelName] = useState('')
   const [isPulling, setIsPulling] = useState(false)
   const [pullProgress, setPullProgress] = useState<{ status: string; completed?: number; total?: number } | null>(null)

@@ -267,7 +267,7 @@ export const TelegramSettings: React.FC = () => {
         />
         <p className="settings-help" style={{ marginTop: 4, fontSize: 12 }}>
           Lokales Ollama-Modell (z. B. <code>qwen3.6:27b-mlx</code>) oder Ollama-Cloud-Modell
-          (z. B. <code>ministral-3:14b-cloud</code> — braucht <code>ollama signin</code>).
+          (z. B. <code>qwen3.5:cloud</code> — braucht <code>ollama signin</code>).
           Leer lassen = MindGraph wählt ein Tool-fähiges Modell automatisch.
         </p>
       </div>

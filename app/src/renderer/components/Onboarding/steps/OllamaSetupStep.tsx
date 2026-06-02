@@ -31,9 +31,9 @@ const INSTALL_COMMANDS: Record<OS, string> = {
   linux: 'curl -fsSL https://ollama.com/install.sh | sh'
 }
 
-// Empfohlenes Default-Modell für Office-User: 8B-Klasse, läuft auf 16-GB-RAM-
-// Maschinen, Tool-fähig, gute Email-Analyse-Werte in der Modell-Compat-Matrix.
-const DEFAULT_OLLAMA_MODEL = 'ministral'
+// Empfohlenes Default-Modell für Office-User: qwen3.5:4b (~3,4 GB) läuft auf
+// 8-GB-RAM-Maschinen, gute Email-Analyse-Werte (getestet) in der Modell-Compat-Matrix.
+const DEFAULT_OLLAMA_MODEL = 'qwen3.5:4b'
 
 export const OllamaSetupStep: React.FC<OllamaSetupStepProps> = ({
   onBackendReady,

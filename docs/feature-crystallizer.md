@@ -228,11 +228,12 @@ deine Status-Notizen lesbar.
 
 ## Technische Eckdaten für die Pitch
 
-- **Lokales Sprachmodell** via Ollama (z. B. `gemma4`, `qwen3.6`,
-  `ministral-3:8b`). Standard-Empfehlung: gemma4 — schnell, mehrsprachig,
-  kein Cloud-Account nötig.
-- **Hardware-Anforderung:** macOS / Windows / Linux mit ≥16 GB RAM, M1/M2
-  oder vergleichbar (heute Standard-Geschäfts-Notebook).
+- **Lokales Sprachmodell** via Ollama (z. B. `qwen3.5:4b`, `qwen3.6`).
+  Standard-Empfehlung: `qwen3.5:4b` (~3,4 GB, läuft auf 8-GB-Geräten) bzw.
+  `qwen3.6` bei mehr RAM — mehrsprachig, kein Cloud-Account nötig. Ohne lokal
+  taugliche Hardware: Cloud-Test-Modell `qwen3.5:cloud` (`ollama signin`).
+- **Hardware-Anforderung:** macOS / Windows / Linux ab 8 GB RAM (M1/M2 oder
+  vergleichbar); für die großen `qwen3.6`-Modelle entsprechend mehr.
 - **Datenfluss:** Notizen → Filter (lokal, keine KI) → Sprachmodell (lokal,
   via `http://localhost:11434`) → Markdown-Datei → Editor-Anzeige.
 - **Audit-Trail:** jede Status-Notiz dokumentiert in ihrem Frontmatter,

@@ -1,15 +1,18 @@
 // Modell-Kompatibilitäts-Matrix für lokale Ollama-Modelle in MindGraph Notes.
 // Quelle der Wahrheit für die Settings-UI ("Beipackzettel" pro Modul).
 //
-// Datenstand: 2026-05-28 — basierend auf Benchmarks in
+// Datenstand: 2026-06-02 — basierend auf Benchmarks in
 // /Users/jochenleeder/dev/brain-model-benchmark/ und
 // "Modell-Kompatibilitaets-Analyse.md".
 // 2026-05-28: qwen3.6:27b-mlx ergänzt (MLX-quantisiertes 27B, ~19 GB).
-// 2026-05-28: ministral-3:14b-cloud ergänzt — Ollama-Cloud-Variante,
-//   gedacht als Null-Reibungs-Einstieg für Test-/Demo-User ohne lokale GPU.
-//   Inhalte verlassen den Rechner (Ollama-Cloud). Verdicts konservativ
-//   abgeleitet vom Sibling ministral-3:8b — keine eigenen Benchmark-Runs,
-//   daher überall "yellow" mit Cloud-Privacy-Note (statt grün).
+// 2026-06-02: Produkt-Entscheidung — gemma4 und ministral (inkl. Cloud-Variante)
+//   aus Matrix, Defaults und Pull-Liste entfernt. Das Mail-Modul läuft erst ab
+//   qwen verlässlich. Klare Empfehlung: qwen3.5:4b (8-GB-tauglich, ~3,4 GB) und
+//   qwen3.6. qwen3.5:4b ergänzt — einziges getestetes qwen, das auf 8-GB-Macs
+//   vollständig in den RAM passt (Live-Test E-Mail: JSON ok, Badges, injektionsfest).
+//   llama3.1 bleibt (andere Familie; sein red-Verdict im Dashboard ist eine Warnung).
+//   Das Cloud-Test-Szenario (Kunden ohne lokal taugliche Hardware) bleibt erhalten —
+//   Cloud-Modell jetzt qwen3.5:cloud statt ministral-3:14b-cloud.
 //
 // "verdict":
 //   - "green":     Für dieses Modul produktiv geeignet.
@@ -72,7 +75,7 @@ export interface ModelCompatibilityData {
 }
 
 export const MODEL_COMPATIBILITY: ModelCompatibilityData = {
-  version: '2026-05-28b',
+  version: '2026-06-02',
   modules: {
     brain: {
       'qwen3.5:9b-mlx-bf16': {
@@ -86,21 +89,10 @@ export const MODEL_COMPATIBILITY: ModelCompatibilityData = {
         notes: '36B-Modell — überall stark, aber langsam (~25 s/Lauf) und ≥48 GB RAM.',
         metrics: { criticalTitlesLinkedPct: 90, rule5CompliancePct: 0, latencySecondsPerRun: 25, ramGigabytes: 48 }
       },
-      'gemma4:latest': {
-        verdict: 'green',
-        reasons: ['Erfindet gelegentlich leere Sektionen (Regel-5-Konflikt im Prompt)'],
-        metrics: { criticalTitlesLinkedPct: 80, rule5CompliancePct: 25, latencySecondsPerRun: 7, ramGigabytes: 10 }
-      },
       'llama3.1:8b': {
         verdict: 'red',
         reasons: ['In Szenario s3 wurden 0 Wikilinks produziert', 'Subtile Bewertungs-Drift in Reflexion'],
         metrics: { criticalTitlesLinkedPct: 50, rule5CompliancePct: 0, latencySecondsPerRun: 8, ramGigabytes: 8 }
-      },
-      'ministral-3:8b': {
-        verdict: 'green',
-        reasons: [],
-        notes: 'Einziges Modell, das Regel 5 (leere Sektionen weglassen) korrekt befolgt.',
-        metrics: { formatCompliancePct: 100, wikilinkHallucinations: 'none', criticalTitlesLinkedPct: 80, rule5CompliancePct: 100, latencySecondsPerRun: 11, ramGigabytes: 6 }
       },
       'qwen3.6:27b-mlx': {
         verdict: 'green',
@@ -108,13 +100,19 @@ export const MODEL_COMPATIBILITY: ModelCompatibilityData = {
         notes: '0 Halluzinationen, 0 unangebrachte Bewertungen — sehr sauber. Aber ~47 s/Lauf (langsamstes Brain-Modell der Matrix).',
         metrics: { wikilinkHallucinations: 'none', criticalTitlesLinkedPct: 70, rule5CompliancePct: 25, latencySecondsPerRun: 47, ramGigabytes: 22 }
       },
-      'ministral-3:14b-cloud': {
+      'qwen3.5:cloud': {
         verdict: 'yellow',
-        reasons: ['Cloud: Tagebuch-/Brain-Inhalte werden zur Ollama-Cloud übertragen — Privacy-Promise „verlässt nie deinen Rechner" greift hier nicht'],
-        notes: 'Cloud-Variante (Ollama-Cloud) von ministral-3 — keine lokale GPU/RAM nötig. Verdict abgeleitet vom Sibling ministral-3:8b (✅), nicht eigenständig benchmarkt. Nur für Test-/Demo-Zwecke empfohlen.'
+        reasons: ['Cloud: Inhalte werden zur Ollama-Cloud übertragen — Privacy-Promise „verlässt nie deinen Rechner" greift hier nicht', 'Nicht eigenständig benchmarkt — abgeleitet von der lokal getesteten qwen3.5-Familie'],
+        notes: 'Cloud-Test-Modell (Ollama-Cloud, `ollama signin`) — kein Download, keine lokale GPU/RAM. Null-Reibungs-Einstieg für Kunden ohne lokal taugliche Hardware. Nur Test/Demo; im Alltag ein lokales qwen.'
       }
     },
     'task-extraction': {
+      'qwen3.5:4b': {
+        verdict: 'green',
+        reasons: [],
+        notes: '8-GB-tauglich (~3,4 GB) — einziges getestetes qwen, das auf 8-GB-Macs vollständig in den RAM passt. Live-Test 2026-06-02 (echte App-Analyse-Logik): valides JSON 3/3, Badges/matchedCriteria, Prompt-Injection 3/3 abgewehrt, Spam korrekt als irrelevant erkannt. Erkannte 3/4 weiche Kriterien (Hybrid-Scorer floort Relevanz über harte Signale). Begrenzte Stichprobe.',
+        metrics: { latencySecondsPerRun: 12, ramGigabytes: 4 }
+      },
       'qwen3.5:9b-mlx-bf16': {
         verdict: 'yellow',
         reasons: ['Richtungs-Erkennung (for_whom) nur 63 %'],
@@ -125,35 +123,30 @@ export const MODEL_COMPATIBILITY: ModelCompatibilityData = {
         reasons: [],
         metrics: { directionAccuracyPct: 100, recallPct: 100, latencySecondsPerRun: 7 }
       },
-      'gemma4:latest': {
-        verdict: 'green',
-        reasons: [],
-        notes: 'Mit Two-Pass-Resolver: Deadline-Genauigkeit 67 % → 100 %.',
-        metrics: { directionAccuracyPct: 90, recallPct: 100, latencySecondsPerRun: 3 }
-      },
       'llama3.1:8b': {
         verdict: 'yellow',
         reasons: ['Richtungs-Erkennung 63 %', 'Bei seltenen Mustern Recall-Einbruch'],
         metrics: { directionAccuracyPct: 63, recallPct: 80 }
       },
-      'ministral-3:8b': {
-        verdict: 'yellow',
-        reasons: ['Recall nur 88 % — gelegentlich vergessene Aufgaben'],
-        metrics: { directionAccuracyPct: 88, recallPct: 88 }
-      },
       'qwen3.6:27b-mlx': {
         verdict: 'green',
         reasons: [],
-        notes: 'Beste for_whom-Genauigkeit der Matrix (100 %, 10/10). 9/10 Reply-Erkennung. ~9 s/Mail (langsamer als gemma4/ministral, aber präziser).',
+        notes: 'Beste for_whom-Genauigkeit der Matrix (100 %, 10/10). 9/10 Reply-Erkennung. ~9 s/Mail, ~22 GB RAM — präzise, aber nicht 8-GB-tauglich.',
         metrics: { directionAccuracyPct: 100, recallPct: 100, latencySecondsPerRun: 9, ramGigabytes: 22 }
       },
-      'ministral-3:14b-cloud': {
+      'qwen3.5:cloud': {
         verdict: 'yellow',
-        reasons: ['Cloud: Mail-Inhalte werden zur Ollama-Cloud übertragen', 'Kein eigenständiger Benchmark — Verdict aus 8B-Sibling abgeleitet'],
-        notes: 'Cloud-Variante. Sibling ministral-3:8b ist task-extraction ⚠️ (Recall 88 %). Für Test-/Demo-Zwecke OK, im Live-Betrieb mit echten Mails gut prüfen.'
+        reasons: ['Cloud: Mail-Inhalte werden zur Ollama-Cloud übertragen', 'Nicht eigenständig benchmarkt — abgeleitet von der lokal getesteten qwen3.5-Familie'],
+        notes: 'Cloud-Test-Modell (Ollama-Cloud, `ollama signin`) — kein Download, keine lokale GPU/RAM. Null-Reibungs-Einstieg für Kunden ohne lokal taugliche Hardware. Nur Test/Demo; im Alltag ein lokales qwen.'
       }
     },
     'mail-summary': {
+      'qwen3.5:4b': {
+        verdict: 'green',
+        reasons: [],
+        notes: '8-GB-tauglich (~3,4 GB). Live-Test 2026-06-02: korrekte, knappe Zusammenfassungen ohne Halluzination; Spam zuverlässig als irrelevant (Score 0). Empfehlung für 8-GB-Geräte. Begrenzte Stichprobe.',
+        metrics: { latencySecondsPerRun: 6, ramGigabytes: 4 }
+      },
       'qwen3.5:9b-mlx-bf16': {
         verdict: 'yellow',
         reasons: ['Relevance-Skala wird oft überschätzt (5/8 Fällen in Range)'],
@@ -165,23 +158,11 @@ export const MODEL_COMPATIBILITY: ModelCompatibilityData = {
         notes: 'Beste Gesamtgenauigkeit (97 %), aber 12 s/Mail.',
         metrics: { recallPct: 97, latencySecondsPerRun: 12, ramGigabytes: 48 }
       },
-      'gemma4:latest': {
-        verdict: 'green',
-        reasons: ['Relevance leicht überschätzt'],
-        notes: 'Schnellster (5 s/Mail).',
-        metrics: { recallPct: 93, latencySecondsPerRun: 5, ramGigabytes: 10 }
-      },
       'llama3.1:8b': {
         verdict: 'green',
         reasons: [],
         notes: 'Niedrigste Halluzinations-Ratio (13 %).',
         metrics: { recallPct: 95, latencySecondsPerRun: 6, ramGigabytes: 8 }
-      },
-      'ministral-3:8b': {
-        verdict: 'green',
-        reasons: [],
-        notes: 'Beste Relevance-Range-Compliance (7/8), schnell.',
-        metrics: { recallPct: 96, latencySecondsPerRun: 6, ramGigabytes: 6 }
       },
       'qwen3.6:27b-mlx': {
         verdict: 'yellow',
@@ -189,10 +170,10 @@ export const MODEL_COMPATIBILITY: ModelCompatibilityData = {
         notes: 'Sentiment + needsReply perfekt (8/8). Für Sicherheit relevant, aber zu langsam und zu kreativ für Produktiv-Einsatz.',
         metrics: { recallPct: 97, latencySecondsPerRun: 14, ramGigabytes: 22 }
       },
-      'ministral-3:14b-cloud': {
+      'qwen3.5:cloud': {
         verdict: 'yellow',
-        reasons: ['Cloud: Mail-Inhalte werden zur Ollama-Cloud übertragen'],
-        notes: 'Cloud-Variante. Sibling ministral-3:8b ist mail-summary ✅ (Relevance-Range 7/8, schnell). 14b-cloud sollte qualitativ vergleichbar sein, nicht selbst benchmarkt.'
+        reasons: ['Cloud: Mail-Inhalte werden zur Ollama-Cloud übertragen', 'Nicht eigenständig benchmarkt — abgeleitet von der lokal getesteten qwen3.5-Familie'],
+        notes: 'Cloud-Test-Modell (Ollama-Cloud, `ollama signin`) — kein Download, keine lokale GPU/RAM. Null-Reibungs-Einstieg für Kunden ohne lokal taugliche Hardware. Nur Test/Demo; im Alltag ein lokales qwen.'
       }
     },
     'dashboard-snapshot': {
@@ -207,52 +188,31 @@ export const MODEL_COMPATIBILITY: ModelCompatibilityData = {
         notes: 'Perfekter Lauf (8/8), erkennt Prompt-Injection sauber.',
         metrics: { recallPct: 100, latencySecondsPerRun: 5, ramGigabytes: 48 }
       },
-      'gemma4:latest': {
-        verdict: 'green',
-        reasons: [],
-        notes: 'Schnellster (~1 s/Notiz), Score-Kalibrierung solide.',
-        metrics: { recallPct: 98, latencySecondsPerRun: 1, ramGigabytes: 10 }
-      },
       'llama3.1:8b': {
         verdict: 'red',
         reasons: ['Fällt auf Prompt-Injection rein (Score=100 und "Yarr!"-Output bei manipulierter Notiz)', 'Sehr enge Score-Bandbreite (oft 81), schlechte Skala-Auflösung'],
         notes: 'Sicherheitsrelevant: Notiz-Inhalt ist UNTRUSTED Input. Hard-Lock empfohlen.'
       },
-      'ministral-3:8b': {
-        verdict: 'green',
-        reasons: [],
-        notes: 'Perfekter Lauf (8/8), erkennt Injection, präzise Skala.',
-        metrics: { recallPct: 100, latencySecondsPerRun: 1, ramGigabytes: 6 }
-      },
       'qwen3.6:27b-mlx': {
         verdict: 'green',
         reasons: ['1/8 Range-Drift: überfällige Deadline (d02) als "nicht mehr akut" gewertet, Score 0 statt 81–100 — Interpretations-Sache, kein Bug'],
-        notes: 'Prompt-Injection sauber erkannt (8/8). 7/8 Score in Range, 7/8 Reason-Match. ~5 s/Notiz — langsamer als gemma4/ministral, schneller als qwen3.6:latest.',
+        notes: 'Prompt-Injection sauber erkannt (8/8). 7/8 Score in Range, 7/8 Reason-Match. ~5 s/Notiz, ~22 GB RAM.',
         metrics: { recallPct: 95, latencySecondsPerRun: 5, ramGigabytes: 22 }
       },
-      'ministral-3:14b-cloud': {
+      'qwen3.5:cloud': {
         verdict: 'yellow',
-        reasons: ['Cloud: Notiz-Inhalte werden zur Ollama-Cloud übertragen', 'Prompt-Injection-Resistenz nicht eigenständig benchmarkt'],
-        notes: 'damageRelevant-Modul: Notiz-Inhalt ist UNTRUSTED Input. Sibling ministral-3:8b ist hier ✅ (8/8, Injection erkannt). 14b-cloud sollte mindestens gleich gut sein, aber Live-Output regelmäßig kontrollieren.'
+        reasons: ['Cloud: Notiz-Inhalte (UNTRUSTED) werden zur Ollama-Cloud übertragen', 'Prompt-Injection-Resistenz im Cloud-Betrieb nicht eigenständig benchmarkt'],
+        notes: 'damageRelevant-Modul: Notiz-Inhalt ist UNTRUSTED Input. Cloud-Test-Modell (`ollama signin`) — kein Download/GPU. Für Kunden ohne lokal taugliche Hardware; Live-Output kontrollieren. Nur Test/Demo.'
       }
     },
     'smart-connections':   {},
     // Project-Status — noch keine systematischen Benchmarks. Empirie aus dem
     // Crystallizer-Bash-Prototyp (Mai 2026, Pre-Demo Startup-Weekend):
-    // gemma4:latest produzierte saubere Status-Drafts mit 0–1 ⚠ pro Lauf,
-    // qwen3.6:latest stärker bei langen Quellenketten, aber 25s/Lauf.
-    // Kleine Modelle (≤8B) neigten zu generischen Floskeln in "Diese Woche".
-    // 2026-05-28: qwen3.6:27b-mlx ergänzt — 4 Runs gegen Crystallizer-Prompt
-    // (`bench-project-status.mjs`): saubere Struktur, korrekte Wikilink-Form
-    // ([[YYYY-MM-DD]]), keine Halluzinationen, keine Floskeln. Latenz
-    // 18–49 s/Projekt (Ø ~32 s), ~2,5× langsamer als gemma4:latest.
+    // qwen3.6 stark bei langen Quellenketten. 2026-05-28: qwen3.6:27b-mlx gegen
+    // Crystallizer-Prompt (`bench-project-status.mjs`) — saubere Struktur, korrekte
+    // Wikilink-Form ([[YYYY-MM-DD]]), keine Halluzinationen. Latenz ~32 s/Projekt.
+    // 2026-06-02: gemma4/ministral entfernt — Empfehlung qwen3.6.
     'project-status':      {
-      'gemma4:latest': {
-        verdict: 'green',
-        reasons: [],
-        notes: 'Empirisch sauber, schnell (~30 s/Projekt auf M2). Empfohlener Standard.',
-        metrics: { latencySecondsPerRun: 30, ramGigabytes: 10 }
-      },
       'qwen3.6:latest': {
         verdict: 'green',
         reasons: [],
@@ -262,32 +222,28 @@ export const MODEL_COMPATIBILITY: ModelCompatibilityData = {
       'qwen3.6:27b-mlx': {
         verdict: 'green',
         reasons: [],
-        notes: 'Sauberer Output mit konsistenten Wikilinks, keine Halluzinationen. ~32 s/Projekt — etwa 2,5× langsamer als gemma4:latest, aber deutlich schneller als qwen3.6:latest. ~19 GB RAM.',
+        notes: 'Sauberer Output mit konsistenten Wikilinks, keine Halluzinationen. ~32 s/Projekt, ~19 GB RAM.',
         metrics: { latencySecondsPerRun: 32, ramGigabytes: 19 }
       },
-      'ministral-3:8b': {
+      'qwen3.5:cloud': {
         verdict: 'yellow',
-        reasons: ['Neigt zu Floskeln in "Diese Woche"', 'Wenige Backlinks bei dichten Quellen'],
-        notes: 'Reicht für simple Projekte mit ≤2 Brain-Tagen; bei dichteren Wochen besser gemma4.',
-        metrics: { latencySecondsPerRun: 12, ramGigabytes: 6 }
-      },
-      'ministral-3:14b-cloud': {
-        verdict: 'yellow',
-        reasons: ['Cloud: Status-Quellen (Brain-Tage, Tasks) werden zur Ollama-Cloud übertragen'],
-        notes: 'Cloud-Variante. Sibling ministral-3:8b ist hier ⚠️ (Floskeln bei dichten Quellen) — 14b sollte etwas robuster sein. Output landet ohnehin in einem Draft (`_STATUS-WW.md`), den der User vor Übernahme reviewt.'
+        reasons: ['Cloud: Status-Quellen (Brain-Tage, Tasks) werden zur Ollama-Cloud übertragen', 'Nicht eigenständig benchmarkt — abgeleitet von der lokal getesteten qwen3.5-Familie'],
+        notes: 'Cloud-Test-Modell (`ollama signin`) — kein Download/GPU. Output landet ohnehin in einem Draft (`_STATUS-WW.md`), den der User reviewt. Für Kunden ohne lokal taugliche Hardware; nur Test/Demo.'
       }
     }
   }
 }
 
-// Empfohlene Default-Modelle pro Modul (Stand 2026-05-14).
+// Empfohlene Default-Modelle pro Modul (Stand 2026-06-02).
 // Werden im Settings-UI als "Empfehlung" markiert; greifen aber nicht automatisch ein.
+// qwen3.5:4b für die E-Mail-Module (8-GB-tauglich, getestet); qwen3.6:27b-mlx für die
+// schwereren/qualitätskritischen Module (kein 8-GB-taugliches qwen dafür getestet).
 export const RECOMMENDED_DEFAULTS: Partial<Record<ModuleId, string>> = {
-  'brain':              'ministral-3:8b',
-  'task-extraction':    'gemma4:latest',
-  'mail-summary':       'ministral-3:8b',
-  'dashboard-snapshot': 'gemma4:latest',
-  'project-status':     'gemma4:latest'
+  'brain':              'qwen3.6:27b-mlx',
+  'task-extraction':    'qwen3.5:4b',
+  'mail-summary':       'qwen3.5:4b',
+  'dashboard-snapshot': 'qwen3.6:27b-mlx',
+  'project-status':     'qwen3.6:27b-mlx'
 }
 
 // Verdict für ein konkretes Modell und Modul nachschlagen.
@@ -348,7 +304,7 @@ export function isHumanFavorite(model: string): boolean {
   return entry?.humanFavorite === true
 }
 
-// Ollama-Cloud-Modelle haben einen `-cloud`-Suffix im Tag (z.B. `ministral-3:14b-cloud`).
+// Ollama-Cloud-Modelle haben einen `-cloud`-Suffix im Tag (z.B. `qwen3.5:cloud`).
 // Die Anfrage geht zwar weiter über localhost:11434, aber die eigentliche Inferenz
 // findet auf Ollama-Servern statt — d.h. die Prompt-Inhalte verlassen den Rechner.
 // Für UI-Hinweise (Privacy-Warnung) gedacht, nicht für Hard-Locks.
@@ -359,11 +315,13 @@ export function isCloudModel(model: string): boolean {
 
 // "Cloud-Test-Modelle": Modelle, die wir als Null-Reibungs-Einstieg für Test-User
 // anbieten (kein Download, keine lokale GPU). Reine UI-Hilfe für Onboarding/Settings.
+// 2026-06-02: ministral-3:14b-cloud (mistral/ministral-Abbau) ersetzt durch qwen3.5:cloud —
+// gleiches Cloud-Test-Szenario für Kunden ohne lokal taugliche Hardware, aber qwen-Familie.
 export const CLOUD_TEST_MODELS: Array<{ name: string; label: string; description: string }> = [
   {
-    name: 'ministral-3:14b-cloud',
-    label: 'Ministral 3 14B (Cloud, Test)',
-    description: 'Läuft auf Ollama-Cloud — kein Download, keine GPU. Inhalte verlassen den Rechner.'
+    name: 'qwen3.5:cloud',
+    label: 'Qwen 3.5 (Cloud, Test)',
+    description: 'Läuft auf Ollama-Cloud (`ollama signin`) — kein Download, keine GPU. Inhalte verlassen den Rechner. Für erste Tests gedacht; im Alltag ein lokales qwen.'
   }
 ]
 
@@ -386,10 +344,9 @@ export const RECOMMENDED_PULL_MODELS: Array<{
   kind?: PullModelKind        // default 'chat'
   humanFavorite?: boolean
 }> = [
+  { name: 'qwen3.5:4b',          label: 'Qwen 3.5 4B (~3,4 GB — läuft auf 8 GB RAM, Empfehlung für kleine Macs)' },
   { name: 'qwen3.6:27b-mlx',     label: 'Qwen 3.6 27B MLX (~22 GB)',         humanFavorite: true },
   { name: 'qwen3.6:latest',      label: 'Qwen 3.6 (~48 GB, sehr großer RAM-Bedarf)', humanFavorite: true },
-  { name: 'gemma4:latest',       label: 'Gemma 4 (~10 GB, schnell)' },
-  { name: 'ministral-3:8b',      label: 'Ministral 3 8B (~6 GB, sehr schnell)' },
   { name: 'qwen3.5:9b-mlx-bf16', label: 'Qwen 3.5 9B MLX (~8 GB)' },
   { name: 'bge-m3:latest',       label: 'bge-m3 (~600 MB, multilingual — Smart Connections)', kind: 'embedding' }
 ]

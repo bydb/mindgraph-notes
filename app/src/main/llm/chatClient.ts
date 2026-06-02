@@ -1,6 +1,6 @@
 // Einheitlicher Chat-Client für Main-Prozess-Komponenten (Coach, Telegram-Bot,
 // Onboarding-Coach). Nutzt ausschließlich Ollama — sowohl für lokale Modelle
-// als auch für Ollama-Cloud-Modelle (z.B. `ministral-3:14b-cloud`). Kein
+// als auch für Ollama-Cloud-Modelle (z.B. `qwen3.5:cloud`). Kein
 // Anthropic-/Mistral-SDK, kein zweiter API-Key.
 
 export type ChatBackend = 'ollama'
@@ -28,7 +28,7 @@ export interface ToolDefinition {
 export interface ChatOptions {
   backend?: ChatBackend                   // optional, immer 'ollama' — Param bleibt für Aufrufer-Kompatibilität
   ollamaUrl?: string                      // default: http://localhost:11434
-  ollamaModel?: string                    // z.B. 'qwen3.6:27b-mlx' oder 'ministral-3:14b-cloud'
+  ollamaModel?: string                    // z.B. 'qwen3.6:27b-mlx' oder 'qwen3.5:cloud'
   maxTokens?: number                      // wird an Ollama nicht übergeben, hier nur dokumentarisch
 }
 
@@ -60,7 +60,7 @@ async function isOllamaReachable(url: string): Promise<boolean> {
 //    zur Ollama-Cloud gehen.
 // 2. Auth — `-cloud`-Modelle brauchen `ollama signin`; ein nicht eingeloggter
 //    User würde sonst auf jeden Call mit 403 fliegen.
-// Wer Cloud will, gibt das Modell explizit an (z.B. via `ollamaModel: 'ministral-3:14b-cloud'`).
+// Wer Cloud will, gibt das Modell explizit an (z.B. via `ollamaModel: 'qwen3.5:cloud'`).
 async function pickDefaultOllamaModel(url: string, preferred?: string): Promise<string | null> {
   try {
     const res = await fetch(`${url}/api/tags`, { signal: AbortSignal.timeout(3000) })
