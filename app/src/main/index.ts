@@ -14,7 +14,9 @@ import { cleanupFindings as cleanupProjectStatusFindings, deleteDraftFile } from
 import {
   discoverProjects,
   buildStatusMarkerFile,
-  suggestKeywords
+  suggestKeywords,
+  parseStatusMarker,
+  setMarkerStatus
 } from './projectStatus/discovery'
 import {
   generateProjectSynonyms,
@@ -3142,6 +3144,55 @@ ipcMain.handle('project-status-delete-draft', async (_event, vaultPath: string, 
     }
     assertApprovedVault(vaultPath, 'project-status-delete-draft')
     return await deleteDraftFile(filePath, assertSafePath)
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : 'Unbekannter Fehler'
+    }
+  }
+})
+
+// Lebenszyklus-Zustand eines Projekts setzen (active ↔ done). Bewusst NICHT
+// destruktiv: nur das `status:`-Frontmatter der `_STATUS.md` wird umgeschrieben,
+// Keywords/Priority/Body bleiben erhalten — ein „abgeschlossenes" Projekt kann
+// jederzeit reaktiviert werden, ohne dass Synonyme oder Drafts verloren gehen.
+ipcMain.handle('project-status-set-status', async (
+  _event,
+  vaultPath: string,
+  projectFolderRel: string,
+  status: 'active' | 'done'
+) => {
+  try {
+    if (!vaultPath || typeof vaultPath !== 'string') {
+      return { success: false, error: 'vaultPath fehlt' }
+    }
+    if (!projectFolderRel || typeof projectFolderRel !== 'string') {
+      return { success: false, error: 'projectFolderRel fehlt' }
+    }
+    if (status !== 'active' && status !== 'done') {
+      return { success: false, error: 'status ungültig (active | done erwartet)' }
+    }
+    assertApprovedVault(vaultPath, 'project-status-set-status')
+
+    const targetAbs = path.join(vaultPath, projectFolderRel, '_STATUS.md')
+    const safeTarget = await assertSafePath(targetAbs, 'project-status-set-status')
+
+    let existing: string
+    try {
+      existing = await fs.readFile(safeTarget, 'utf-8')
+    } catch {
+      return { success: false, error: 'Keine _STATUS.md gefunden — Projekt ist nicht markiert.' }
+    }
+    if (!parseStatusMarker(existing)) {
+      return { success: false, error: 'Ungültiger _STATUS.md-Marker.' }
+    }
+    const updated = setMarkerStatus(existing, status)
+    if (updated === null) {
+      return { success: false, error: 'Frontmatter konnte nicht aktualisiert werden.' }
+    }
+    await fs.writeFile(safeTarget, updated, 'utf-8')
+
+    return { success: true }
   } catch (err) {
     return {
       success: false,

@@ -46,7 +46,7 @@ export const ProjectStatusWidget: React.FC<ProjectStatusWidgetProps> = () => {
   const effectiveModel = moduleOverride || ollama.selectedModel || ''
   const hardLocked = effectiveModel && isHardLocked(effectiveModel, 'project-status')
 
-  const { projects, loading, lastError, runningJobs, lastResults, synonyms, generatingSynonyms, load, crystallize, cleanupFindings, deleteDraft, generateSynonyms } = useProjectStatusStore(useShallow(s => ({
+  const { projects, loading, lastError, runningJobs, lastResults, synonyms, generatingSynonyms, load, crystallize, cleanupFindings, deleteDraft, generateSynonyms, setProjectStatus } = useProjectStatusStore(useShallow(s => ({
     projects: s.projects,
     loading: s.loading,
     lastError: s.lastError,
@@ -58,7 +58,8 @@ export const ProjectStatusWidget: React.FC<ProjectStatusWidgetProps> = () => {
     crystallize: s.crystallize,
     cleanupFindings: s.cleanupFindings,
     deleteDraft: s.deleteDraft,
-    generateSynonyms: s.generateSynonyms
+    generateSynonyms: s.generateSynonyms,
+    setProjectStatus: s.setProjectStatus
   })))
 
   const loadAllSynonyms = useProjectStatusStore(s => s.loadAllSynonyms)
@@ -72,6 +73,7 @@ export const ProjectStatusWidget: React.FC<ProjectStatusWidgetProps> = () => {
   const [showMarkDialog, setShowMarkDialog] = useState(false)
   const [reviewProject, setReviewProject] = useState<DiscoveredProject | null>(null)
   const [draftsProject, setDraftsProject] = useState<DiscoveredProject | null>(null)
+  const [showDone, setShowDone] = useState(false)
   const [toast, setToast] = useState<{ kind: 'success' | 'error'; text: string; href?: string; projectKey?: string } | null>(null)
 
   // Beim Mount und bei Vault- oder Projekt-Ordner-Wechsel laden
@@ -81,10 +83,18 @@ export const ProjectStatusWidget: React.FC<ProjectStatusWidgetProps> = () => {
     }
   }, [vaultPath, projectsRootFolder, load])
 
-  const sorted = useMemo(() => {
-    // Schon im Store nach priority sortiert. Hier nur Anzeige.
-    return projects
-  }, [projects])
+  // Aktiv vs. abgeschlossen trennen. Store liefert schon nach Priority sortiert;
+  // abgeschlossene Projekte wandern in eine eingeklappte Sektion, statt die Liste
+  // mit toten Projekten zuzumüllen (und „stale" nicht mehr mit „fertig" zu
+  // verwechseln).
+  const activeProjects = useMemo(
+    () => projects.filter(p => p.marker.status !== 'done'),
+    [projects]
+  )
+  const doneProjects = useMemo(
+    () => projects.filter(p => p.marker.status === 'done'),
+    [projects]
+  )
 
   if (!vaultPath) {
     return (
@@ -184,6 +194,51 @@ export const ProjectStatusWidget: React.FC<ProjectStatusWidgetProps> = () => {
     }
   }
 
+  const handleToggleStatus = async (project: DiscoveredProject) => {
+    setToast(null)
+    const next = project.marker.status === 'done' ? 'active' : 'done'
+    const result = await setProjectStatus(vaultPath, project, next)
+    if (!result.success) {
+      setToast({
+        kind: 'error',
+        text: result.error || (lang === 'de' ? 'Status konnte nicht geändert werden' : 'Could not change status')
+      })
+      return
+    }
+    if (next === 'done') {
+      setShowDone(true) // damit der Nutzer sieht, wohin das Projekt gewandert ist
+    }
+    setToast({
+      kind: 'success',
+      text: next === 'done'
+        ? (lang === 'de'
+          ? `„${project.folderName}" als abgeschlossen markiert.`
+          : `"${project.folderName}" marked as completed.`)
+        : (lang === 'de'
+          ? `„${project.folderName}" wieder aktiv.`
+          : `"${project.folderName}" reactivated.`)
+    })
+  }
+
+  const renderRow = (p: DiscoveredProject) => (
+    <ProjectRow
+      key={p.folderRel}
+      project={p}
+      lang={lang}
+      running={runningJobs.has(p.folderRel)}
+      lastResult={lastResults.get(p.folderRel)}
+      synonymCount={synonyms[p.folderRel]?.synonyms.length || 0}
+      synonymsGeneratedAt={synonyms[p.folderRel]?.generatedAt}
+      synonymRunning={generatingSynonyms.has(p.folderRel)}
+      onCrystallize={() => handleCrystallize(p)}
+      onGenerateSynonyms={() => handleGenerateSynonyms(p)}
+      onOpenStatus={(absPath) => handleOpenStatusFile(absPath)}
+      onReview={() => setReviewProject(p)}
+      onShowDrafts={() => setDraftsProject(p)}
+      onToggleStatus={() => handleToggleStatus(p)}
+    />
+  )
+
   const noProjectsFolder = !projectsRootFolder
 
   return (
@@ -234,25 +289,30 @@ export const ProjectStatusWidget: React.FC<ProjectStatusWidgetProps> = () => {
         <EmptyState lang={lang} onMarkClick={() => setShowMarkDialog(true)} />
       )}
 
-      {sorted.length > 0 && (
+      {activeProjects.length > 0 && (
         <div className="psw-list">
-          {sorted.map(p => (
-            <ProjectRow
-              key={p.folderRel}
-              project={p}
-              lang={lang}
-              running={runningJobs.has(p.folderRel)}
-              lastResult={lastResults.get(p.folderRel)}
-              synonymCount={synonyms[p.folderRel]?.synonyms.length || 0}
-              synonymsGeneratedAt={synonyms[p.folderRel]?.generatedAt}
-              synonymRunning={generatingSynonyms.has(p.folderRel)}
-              onCrystallize={() => handleCrystallize(p)}
-              onGenerateSynonyms={() => handleGenerateSynonyms(p)}
-              onOpenStatus={(absPath) => handleOpenStatusFile(absPath)}
-              onReview={() => setReviewProject(p)}
-              onShowDrafts={() => setDraftsProject(p)}
-            />
-          ))}
+          {activeProjects.map(renderRow)}
+        </div>
+      )}
+
+      {doneProjects.length > 0 && (
+        <div className="psw-done-section">
+          <button
+            type="button"
+            className="psw-done-toggle"
+            onClick={() => setShowDone(v => !v)}
+            aria-expanded={showDone}
+          >
+            <span className="psw-done-caret">{showDone ? '▾' : '▸'}</span>
+            {lang === 'de'
+              ? `Abgeschlossen (${doneProjects.length})`
+              : `Completed (${doneProjects.length})`}
+          </button>
+          {showDone && (
+            <div className="psw-list psw-list--done">
+              {doneProjects.map(renderRow)}
+            </div>
+          )}
         </div>
       )}
 
@@ -445,17 +505,21 @@ interface ProjectRowProps {
   onOpenStatus: (absPath: string) => void
   onReview: () => void
   onShowDrafts: () => void
+  onToggleStatus: () => void
 }
 
-const ProjectRow: React.FC<ProjectRowProps> = ({ project, lang, running, lastResult, synonymCount, synonymsGeneratedAt, synonymRunning, onCrystallize, onGenerateSynonyms, onOpenStatus, onReview, onShowDrafts }) => {
+const ProjectRow: React.FC<ProjectRowProps> = ({ project, lang, running, lastResult, synonymCount, synonymsGeneratedAt, synonymRunning, onCrystallize, onGenerateSynonyms, onOpenStatus, onReview, onShowDrafts, onToggleStatus }) => {
   const prio = project.marker.priority
   const prioDot = prio === 'high' ? '🔴' : prio === 'med' ? '🟡' : '🟢'
   const prioLabel = lang === 'de'
     ? (prio === 'high' ? 'Hoch' : prio === 'med' ? 'Mittel' : 'Niedrig')
     : (prio === 'high' ? 'High' : prio === 'med' ? 'Med' : 'Low')
 
+  const isDone = project.marker.status === 'done'
   const signalAge = project.lastBrainSignal.ageDays
-  const isStale = signalAge === null || signalAge > STALE_THRESHOLD_DAYS
+  // „Abgeschlossen" erklärt fehlende Aktivität bereits — dann NICHT zusätzlich als
+  // „stale/verwaist" einfärben (das war vorher die Doppeldeutigkeit).
+  const isStale = !isDone && (signalAge === null || signalAge > STALE_THRESHOLD_DAYS)
 
   const signalLabel = (() => {
     if (signalAge === null) {
@@ -468,13 +532,18 @@ const ProjectRow: React.FC<ProjectRowProps> = ({ project, lang, running, lastRes
   const currentWeekDraftCount = project.currentWeekDrafts?.length || (project.currentWeekDraft ? 1 : 0)
 
   return (
-    <div className={`psw-row ${isStale ? 'psw-row--stale' : ''}`}>
+    <div className={`psw-row ${isStale ? 'psw-row--stale' : ''} ${isDone ? 'psw-row--done' : ''}`}>
       <div className="psw-row-main">
         <div className="psw-row-name">
           <span className="psw-row-dot" title={prioLabel}>{prioDot}</span>
           <span className="psw-row-title">{project.folderName}</span>
         </div>
         <div className="psw-row-meta">
+          {isDone && (
+            <span className="psw-row-done-pill">
+              {lang === 'de' ? '✓ abgeschlossen' : '✓ completed'}
+            </span>
+          )}
           <span className="psw-row-signal">{signalLabel}</span>
           {currentWeekDraftCount > 0 && (
             <button
@@ -494,6 +563,17 @@ const ProjectRow: React.FC<ProjectRowProps> = ({ project, lang, running, lastRes
         </div>
       </div>
       <div className="psw-row-actions">
+        <button
+          className="psw-btn psw-btn--ghost psw-btn--small"
+          onClick={onToggleStatus}
+          title={isDone
+            ? (lang === 'de' ? 'Projekt wieder aktiv setzen' : 'Reactivate project')
+            : (lang === 'de' ? 'Projekt als abgeschlossen markieren (reversibel)' : 'Mark project as completed (reversible)')}
+        >
+          {isDone
+            ? (lang === 'de' ? '↩ Reaktivieren' : '↩ Reactivate')
+            : (lang === 'de' ? '✓ Abschließen' : '✓ Complete')}
+        </button>
         {lastResult?.success && (lastResult.findings?.length || 0) > 0 && (
           <button
             className="psw-btn psw-btn--ghost psw-btn--small"

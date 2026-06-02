@@ -1009,6 +1009,7 @@ export interface ElectronAPI {
   projectStatusCrystallize: (input: ProjectStatusCrystallizeInput) => Promise<ProjectStatusResult>;
   projectStatusCleanup: (vaultPath: string, filePath: string, refsToRemove: string[], language: 'de' | 'en') => Promise<{ success: boolean; removedLineCount?: number; remainingFindings?: LintFinding[]; error?: string }>;
   projectStatusDeleteDraft: (vaultPath: string, filePath: string) => Promise<{ success: boolean; error?: string }>;
+  projectStatusSetStatus: (vaultPath: string, projectFolderRel: string, status: 'active' | 'done') => Promise<{ success: boolean; error?: string }>;
   projectStatusGenerateSynonyms: (vaultPath: string, projectFolderRel: string, model: string) => Promise<{ success: boolean; cache?: ProjectSynonymCache; error?: string }>;
   projectStatusLoadSynonyms: (vaultPath: string, projectFolderRel: string) => Promise<{ success: boolean; cache?: ProjectSynonymCache | null; error?: string }>;
 
@@ -1107,11 +1108,21 @@ export interface BrainConsolidateResult {
 
 export type ProjectPriority = 'high' | 'med' | 'low';
 
+/**
+ * Lebenszyklus-Zustand eines markierten Projekts.
+ *   - `active` (Default, auch bei fehlendem Feld): wird verfolgt, erscheint oben.
+ *   - `done`: abgeschlossen — bleibt erfasst (Keywords/Synonyme/Drafts intakt),
+ *     wird aber in eine eingeklappte „Abgeschlossen"-Sektion einsortiert.
+ * Reversibel: `done` lässt sich jederzeit wieder auf `active` setzen.
+ */
+export type ProjectStatus = 'active' | 'done';
+
 /** Frontmatter-Marker, der ein Projekt für den Crystallizer aktiviert. */
 export interface ProjectStatusMarker {
   project: string;        // Anzeigename (in der Regel = Ordnername)
   keywords: string[];     // Identifikations-Begriffe für Brain-/Inbox-Filterung
   priority: ProjectPriority;
+  status?: ProjectStatus; // optional; fehlt = 'active' (Rückwärtskompatibilität)
 }
 
 /** Ein in der Übersicht gefundenes, markiertes Projekt. */
