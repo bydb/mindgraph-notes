@@ -1,6 +1,6 @@
 {
   "name": "mindgraph-notes",
-  "version": "0.7.16-beta",
+  "version": "0.7.17-beta",
   "description": "Lokaler Workspace, der dir täglich zeigt, was in deinen Notizen, Aufgaben und E-Mails wichtig ist — mit Wissensgraph und KI.",
   "main": "out/main/index.js",
   "scripts": {
@@ -121,6 +121,7 @@
     "electron": "^40.0.0",
     "electron-builder": "^26.4.0",
     "electron-vite": "^5.0.0",
+    "turndown-plugin-gfm": "^1.0.2",
     "typescript": "^5.9.3",
     "vite": "^7.3.1"
   },

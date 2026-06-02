@@ -2,6 +2,13 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.7.17-beta] - 2026-06-02
+
+### Fixes
+
+- **Keine erfundenen Termine mehr in der E-Mail-Analyse.** Bei kleineren KI-Modellen tauchte regelmäßig ein erfundener Phantom-Termin in den aus Mails erstellten Notizen auf (immer wieder „Fortbildung Leipzig" mit festem Datum) — obwohl die jeweilige Mail damit nichts zu tun hatte. Ursache war kein „Halluzinieren", sondern ein vollständig ausgefülltes Beispiel im Analyse-Prompt: schwächere Modelle haben dessen Werte wörtlich abgeschrieben, statt es als Vorlage zu behandeln. Das Beispiel wurde durch ein neutrales Platzhalter-Schema ersetzt, sodass alle Werte ausschließlich aus der tatsächlichen Mail stammen. (Dasselbe Muster wurde auch in der Quiz-Funktion behoben.) Hinweis: Bereits analysierte Mails werden nicht automatisch korrigiert — bei Bedarf die betroffene Mail neu analysieren.
+- **Tabellen bleiben im Lesen-Modus erhalten.** Wurde eine Notiz mit Tabellen im Lesen-Modus (WYSIWYG) bearbeitet und gespeichert, zerfielen die Tabellen in einzelne Zeilen. Tabellen überstehen das Bearbeiten jetzt unverändert.
+
 ## [0.7.16-beta] - 2026-06-02
 
 ### Verbesserungen

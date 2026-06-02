@@ -5910,8 +5910,8 @@ Rules for question and answer content:
 - Answers should be detailed (2-4 sentences) and use proper formatting with LaTeX for math
 - Questions should be in the same language as the source text
 
-You MUST respond with ONLY a valid JSON array containing EXACTLY ${count} objects:
-[{"question":"Was ist...?","expectedAnswer":"Die Antwort ist $x^2 + bx + c = 0$ weil...","topic":"Thema","difficulty":"easy"},{"question":"Erkläre...","expectedAnswer":"...","topic":"Thema","difficulty":"medium"}]
+You MUST respond with ONLY a valid JSON array containing EXACTLY ${count} objects. Do NOT copy the <placeholders> below — derive every value from the provided text:
+[{"question":"<question from the text>","expectedAnswer":"<detailed answer, math as LaTeX e.g. $x^2$>","topic":"<topic>","difficulty":"easy"},{"question":"<question from the text>","expectedAnswer":"<detailed answer>","topic":"<topic>","difficulty":"medium"}]
 
 CRITICAL: Output EXACTLY ${count} question objects. No markdown fences, no explanation, just the JSON array.`
 
@@ -6265,9 +6265,9 @@ ${topicAverages.map(t => `- ${t.topic}: ${t.average}%`).join('\n')}
 
 Gesamtscore: ${overallScore}%
 
-WICHTIG: Antworte ausschließlich mit validem JSON:
+WICHTIG: Antworte ausschließlich mit validem JSON. Die <Platzhalter> NICHT abschreiben — formuliere konkrete Empfehlungen aus den obigen Themen-Scores:
 {
-  "recommendations": ["Empfehlung 1", "Empfehlung 2", "Empfehlung 3"]
+  "recommendations": ["<konkrete Empfehlung>", "<konkrete Empfehlung>"]
 }
 
 Keine Erklärungen, kein Markdown, nur das JSON-Objekt.
@@ -7525,7 +7525,7 @@ TERMIN-EXTRAKTION (WICHTIG):
 - Durchsuche den GESAMTEN E-Mail-Text nach Terminen, Uhrzeiten, Zoom/Teams/Meet-Links
 - Auch bei weitergeleiteten E-Mails: der eigentliche Termin steht oft im weitergeleiteten Teil
 - Datumsformate erkennen: "13. März 2026", "13.03.2026", "2026-03-13", "nächsten Freitag"
-- Jeder erkannte Termin MUSS in extractedInfo UND als suggestedAction erscheinen
+- Jeder TATSÄCHLICH im Text genannte Termin MUSS in extractedInfo UND als suggestedAction erscheinen — erfinde KEINE Termine
 - Meeting-Links (Zoom, Teams, Meet) immer in extractedInfo aufnehmen
 
 DATUMSREGELN für suggestedActions:
@@ -7549,7 +7549,10 @@ Datum: ${email.date}
 Text: ${sanitizedBody}
 END_EMAIL_DATA
 
-{"relevant":true,"relevanceScore":85,"sentiment":"neutral","summary":"Zusammenfassung auf Deutsch","matchedCriteria":["Termine & Fristen","Veranstaltungen"],"extractedInfo":["Termin: 2026-06-23 14:00","Ort: Leipzig"],"categories":["Fortbildung"],"needsReply":true,"replyUrgency":"medium","suggestedActions":[{"action":"Termin: Fortbildung Leipzig","date":"2026-06-23","time":"14:00"},{"action":"Anmelden","date":"2026-06-01","time":""}]}`
+WICHTIG: Übernimm KEINE Werte aus dem folgenden Schema. ALLE Werte (Orte, Titel, Daten, Uhrzeiten, Namen) MÜSSEN aus dem E-Mail-Text zwischen BEGIN_EMAIL_DATA und END_EMAIL_DATA stammen. Kommt eine Information dort nicht vor, lasse das Feld leer ("" bzw. []). Erfinde nichts.
+
+AUSGABEFORMAT (NUR Schema — die <Platzhalter> NICHT abschreiben, sondern aus der obigen E-Mail füllen):
+{"relevant":<true|false>,"relevanceScore":<Ganzzahl 0-100>,"sentiment":"<positive|neutral|negative|urgent>","summary":"<kurze Zusammenfassung auf Deutsch>","matchedCriteria":["<zutreffendes Kriterium>"],"extractedInfo":["<Info aus dieser E-Mail, Termine im Format YYYY-MM-DD HH:mm>"],"categories":["<Kategorie>"],"needsReply":<true|false>,"replyUrgency":"<high|medium|low>","suggestedActions":[{"action":"<Handlung aus dieser E-Mail>","date":"<YYYY-MM-DD oder leer>","time":"<HH:mm oder leer>"}]}`
 
         // HTTP-Fehlergrund dieses Mail-Durchlaufs (404 Modell fehlt, 500 OOM, …)
         let httpError: string | null = null

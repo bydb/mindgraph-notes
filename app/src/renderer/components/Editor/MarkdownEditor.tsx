@@ -12,6 +12,7 @@ import taskLists from 'markdown-it-task-lists'
 import footnote from 'markdown-it-footnote'
 import texmath from 'markdown-it-texmath'
 import TurndownService from 'turndown'
+import { tables as turndownTables } from 'turndown-plugin-gfm'
 import katex from 'katex'
 import 'katex/dist/katex.min.css'
 import 'katex/contrib/mhchem/mhchem.js'  // Chemie-Support (mhchem)
@@ -264,6 +265,12 @@ const wysiwygTurndown = new TurndownService({
   codeBlockStyle: 'fenced',
   bulletListMarker: '-',
 })
+
+// GFM-Tabellen müssen den WYSIWYG-Roundtrip überstehen. Ohne diese Regel hat Turndown
+// keine Tabellen-Behandlung und flacht das gerenderte <table> zu Einzelzeilen ab
+// (Datenverlust). Nur `tables` einbinden — NICHT das volle `gfm`-Bundle, dessen
+// `taskListItems` mit der Custom-`taskCheckbox`-Regel unten kollidieren würde.
+wysiwygTurndown.use(turndownTables)
 
 // Turndown's Default-Escape macht aus `[`, `]` und `\` Backslash-Escapes — im
 // WYSIWYG-Roundtrip zerstört das Wikilinks und Task-Datumsmarker
