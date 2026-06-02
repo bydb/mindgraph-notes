@@ -7487,6 +7487,10 @@ ipcMain.handle('email-analyze', async (_event, vaultPath: string, model: string,
 
     console.log(`[Email] ${emails.length} total, ${toAnalyze.length} to analyze`)
     let analyzed = 0
+    let failed = 0
+    // Letzter Fehlergrund für die UI — sonst scheitert die Analyse (OOM, fehlendes Modell,
+    // Timeout) komplett lautlos und der Datensatz behält ein evtl. gesyncten Fremd-Modell.
+    let lastError: string | null = null
     for (let i = 0; i < toAnalyze.length; i++) {
       const email = toAnalyze[i] as { id: string; from: { name: string; address: string }; subject: string; date: string; bodyText: string }
 
@@ -7544,6 +7548,8 @@ END_EMAIL_DATA
 
 {"relevant":true,"relevanceScore":85,"sentiment":"neutral","summary":"Zusammenfassung auf Deutsch","matchedCriteria":["Termine & Fristen","Veranstaltungen"],"extractedInfo":["Termin: 2026-06-23 14:00","Ort: Leipzig"],"categories":["Fortbildung"],"needsReply":true,"replyUrgency":"medium","suggestedActions":[{"action":"Termin: Fortbildung Leipzig","date":"2026-06-23","time":"14:00"},{"action":"Anmelden","date":"2026-06-01","time":""}]}`
 
+        // HTTP-Fehlergrund dieses Mail-Durchlaufs (404 Modell fehlt, 500 OOM, …)
+        let httpError: string | null = null
         // /api/chat statt /api/generate — kompatibel mit Reasoning-Modellen (Qwen3.5, DeepSeek)
         const requestAnalysis = async (): Promise<Record<string, unknown> | null> => {
           const controller = new AbortController()
@@ -7565,7 +7571,23 @@ END_EMAIL_DATA
               }),
               signal: controller.signal
             })
-            if (!response.ok) return null
+            if (!response.ok) {
+              // Ollama liefert bei Fehlern meist {"error":"…"} — Status + Body für die UI festhalten.
+              let detail = ''
+              try {
+                const errBody = await response.text()
+                try { detail = ((JSON.parse(errBody) as { error?: string })?.error) || errBody } catch { detail = errBody }
+              } catch { /* Body nicht lesbar */ }
+              detail = (detail || '').replace(/\s+/g, ' ').trim().slice(0, 300)
+              if (response.status === 404) {
+                httpError = `Modell „${model}" ist in Ollama nicht installiert (404).${detail ? ' ' + detail : ''}`
+              } else if (response.status === 500) {
+                httpError = `Ollama-Fehler 500 — häufig zu wenig RAM für „${model}".${detail ? ' ' + detail : ''}`
+              } else {
+                httpError = `Ollama antwortete mit HTTP ${response.status}.${detail ? ' ' + detail : ''}`
+              }
+              return null
+            }
             // Fallback auf `thinking`, falls `think:false` ignoriert wurde.
             const result = await response.json() as { message?: { content?: string; thinking?: string } }
             return parseEmailAnalysisJson(result.message?.content || result.message?.thinking || '')
@@ -7634,12 +7656,18 @@ END_EMAIL_DATA
             analyzed++
           }
         } else {
-          console.warn(`[Email] Failed to parse analysis for email ${email.id} (auch nach Retry)`)
+          failed++
+          lastError = httpError || 'Antwort des Modells war kein gültiges JSON (auch nach Retry).'
+          console.warn(`[Email] Analyse fehlgeschlagen für ${email.id}: ${lastError}`)
         }
       } catch (error) {
+        failed++
         if (error instanceof Error && error.name === 'AbortError') {
+          lastError = `Zeitüberschreitung (>5 Min) bei „${model}" — Modell zu langsam oder ausgelastet.`
           console.error(`[Email] Analysis timeout for email ${email.id} (>5min)`)
         } else {
+          const msg = error instanceof Error ? error.message : String(error)
+          lastError = `Ollama nicht erreichbar (${OLLAMA_API_URL}): ${msg}`
           console.error(`[Email] Analysis failed for email ${email.id}:`, error)
         }
       }
@@ -7648,10 +7676,10 @@ END_EMAIL_DATA
     // Aktualisierte Emails speichern
     await fs.writeFile(emailsPath, JSON.stringify(data, null, 2), 'utf-8')
 
-    return { success: true, analyzed }
+    return { success: true, analyzed, failed, total: toAnalyze.length, lastError }
   } catch (error) {
     console.error('[Email] Analysis error:', error)
-    return { success: false, analyzed: 0, error: error instanceof Error ? error.message : 'Analyse fehlgeschlagen' }
+    return { success: false, analyzed: 0, failed: 0, total: 0, error: error instanceof Error ? error.message : 'Analyse fehlgeschlagen' }
   }
 })
 

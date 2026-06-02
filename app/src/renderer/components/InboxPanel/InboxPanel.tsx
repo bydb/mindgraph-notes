@@ -109,6 +109,8 @@ export const InboxPanel: React.FC<InboxPanelProps> = ({ onClose }) => {
     isAnalyzing,
     fetchProgress,
     analysisProgress,
+    analysisError,
+    clearAnalysisError,
     activeFilter,
     getFilteredEmails,
     setFilter,
@@ -1205,6 +1207,40 @@ export const InboxPanel: React.FC<InboxPanelProps> = ({ onClose }) => {
           <div className="inbox-progress-bar">
             <div style={{ width: `${(analysisProgress.current / analysisProgress.total) * 100}%` }} />
           </div>
+        </div>
+      )}
+      {analysisError && (
+        <div
+          className="inbox-progress"
+          style={{
+            display: 'flex',
+            alignItems: 'flex-start',
+            justifyContent: 'space-between',
+            gap: '8px',
+            background: 'color-mix(in srgb, #e5484d 14%, var(--bg-secondary, transparent))',
+            border: '1px solid color-mix(in srgb, #e5484d 35%, transparent)',
+            borderRadius: '6px',
+            padding: '8px 10px',
+          }}
+        >
+          <span style={{ fontSize: '12px', lineHeight: 1.4, color: 'var(--text-primary)' }}>⚠️ {analysisError}</span>
+          <button
+            type="button"
+            onClick={clearAnalysisError}
+            title={t('common.close')}
+            style={{
+              flexShrink: 0,
+              background: 'transparent',
+              border: 'none',
+              color: 'var(--text-muted)',
+              cursor: 'pointer',
+              fontSize: '14px',
+              lineHeight: 1,
+              padding: '2px',
+            }}
+          >
+            ✕
+          </button>
         </div>
       )}
 

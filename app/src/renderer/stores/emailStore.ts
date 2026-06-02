@@ -10,6 +10,7 @@ interface EmailState {
   isAnalyzing: boolean
   fetchProgress: { current: number; total: number; status: string } | null
   analysisProgress: { current: number; total: number } | null
+  analysisError: string | null
   activeFilter: EmailFilter
   unreadRelevantCount: number
   selectedEmailId: string | null
@@ -37,6 +38,7 @@ interface EmailState {
   fetchAttachments: (emailId: string) => Promise<{ success: boolean; attachments?: Array<{ filename: string; contentType: string; size: number; contentBase64: string | null; tooLarge: boolean }>; error?: string }>
   analyzeEmails: (vaultPath: string, emailIds?: string[]) => Promise<void>
   reanalyzeEmail: (vaultPath: string, emailId: string) => Promise<void>
+  clearAnalysisError: () => void
   setupEmail: (vaultPath: string) => Promise<boolean>
   createNotesForRelevantEmails: (vaultPath: string) => Promise<number>
   getFilteredEmails: () => EmailMessage[]
@@ -67,6 +69,7 @@ export const useEmailStore = create<EmailState>()((set, get) => ({
   isAnalyzing: false,
   fetchProgress: null,
   analysisProgress: null,
+  analysisError: null,
   activeFilter: { onlyRelevant: true },
   unreadRelevantCount: 0,
   selectedEmailId: null,
@@ -189,16 +192,28 @@ export const useEmailStore = create<EmailState>()((set, get) => ({
       return
     }
 
-    set({ isAnalyzing: true, analysisProgress: { current: 0, total: 0 } })
+    set({ isAnalyzing: true, analysisProgress: { current: 0, total: 0 }, analysisError: null })
 
     window.electronAPI.onEmailAnalysisProgress((progress) => {
       set({ analysisProgress: progress })
     })
 
     try {
-      await window.electronAPI.emailAnalyze(vaultPath, model, emailIds)
+      const result = await window.electronAPI.emailAnalyze(vaultPath, model, emailIds) as
+        | { success: boolean; analyzed?: number; failed?: number; total?: number; lastError?: string | null; error?: string }
+        | undefined
       // Neu laden nach Analyse (skipAutoActions: verhindert erneuten analyzeEmails-Aufruf)
       await get().loadEmails(vaultPath, true)
+
+      // Stilles Scheitern (OOM, fehlendes Modell, Timeout) sichtbar machen — sonst behält
+      // die Mail still ein evtl. gesyncten Fremd-Modell-Datensatz und der Nutzer merkt nichts.
+      if (result && result.success === false) {
+        set({ analysisError: result.error || `Analyse mit „${model}" fehlgeschlagen.` })
+      } else if (result && typeof result.failed === 'number' && result.failed > 0) {
+        const total = result.total ?? (result.failed + (result.analyzed || 0))
+        const detail = result.lastError ? ` ${result.lastError}` : ''
+        set({ analysisError: `${result.failed} von ${total} Mails konnten mit „${model}" nicht analysiert werden.${detail}` })
+      }
 
       // Notizen für relevante Emails erstellen
       const created = await get().createNotesForRelevantEmails(vaultPath)
@@ -207,10 +222,13 @@ export const useEmailStore = create<EmailState>()((set, get) => ({
       }
     } catch (error) {
       console.error('[EmailStore] Analysis failed:', error)
+      set({ analysisError: error instanceof Error ? error.message : 'Analyse fehlgeschlagen.' })
     } finally {
       set({ isAnalyzing: false, analysisProgress: null })
     }
   },
+
+  clearAnalysisError: () => set({ analysisError: null }),
 
   reanalyzeEmail: async (vaultPath: string, emailId: string) => {
     // Forciert eine Neu-Analyse einer einzelnen Mail mit dem aktuellen Modell-State.
