@@ -15,7 +15,8 @@ import { GENERIC_STOPWORDS } from '../../shared/projectMatch'
 import type {
   DiscoveredProject,
   ProjectStatusMarker,
-  ProjectPriority
+  ProjectPriority,
+  ProjectStatus
 } from './types'
 
 const DEFAULT_BRAIN_FOLDER = '800 - 🧠 brain'
@@ -60,6 +61,7 @@ export function parseStatusMarker(content: string): ProjectStatusMarker | null {
   let project = ''
   let keywords: string[] = []
   let priority: ProjectPriority = 'med'
+  let status: ProjectStatus | undefined
 
   let i = 0
   while (i < lines.length) {
@@ -78,6 +80,11 @@ export function parseStatusMarker(content: string): ProjectStatusMarker | null {
       const v = unquote(value).toLowerCase()
       if (v === 'high' || v === 'med' || v === 'low') {
         priority = v as ProjectPriority
+      }
+    } else if (key === 'status') {
+      const v = unquote(value).toLowerCase()
+      if (v === 'active' || v === 'done') {
+        status = v as ProjectStatus
       }
     } else if (key === 'keywords') {
       if (value) {
@@ -103,7 +110,7 @@ export function parseStatusMarker(content: string): ProjectStatusMarker | null {
   }
 
   if (keywords.length === 0) return null
-  return { project: project || '(unnamed)', keywords, priority }
+  return { project: project || '(unnamed)', keywords, priority, ...(status ? { status } : {}) }
 }
 
 function unquote(value: string): string {
@@ -139,11 +146,59 @@ type: project-status
 project: ${marker.project}
 keywords: ${kwInline}
 priority: ${marker.priority}
+status: ${marker.status || 'active'}
 ---
 ${heading}
 
 ${placeholder}
 `
+}
+
+/**
+ * Setzt/ersetzt das `status:`-Feld im Frontmatter einer bestehenden
+ * `_STATUS.md`, ohne den Rest anzutasten (Keywords, Priority, Body, vom Nutzer
+ * ergänzte Notizen bleiben erhalten). Anders als `buildStatusMarkerFile`
+ * überschreibt es NICHT die ganze Datei — genau das brauchen wir, um ein
+ * Projekt reversibel als „abgeschlossen" zu markieren.
+ *
+ * Hat die Datei eine `status:`-Zeile, wird deren Wert ersetzt; sonst wird die
+ * Zeile direkt nach `priority:` (Fallback: am Ende des Frontmatters) eingefügt.
+ * Gibt `null` zurück, wenn kein parsebares Frontmatter vorhanden ist.
+ */
+export function setMarkerStatus(content: string, status: ProjectStatus): string | null {
+  const leading = content.match(/^\s*/)?.[0] ?? ''
+  const t = content.slice(leading.length)
+  if (!t.startsWith('---')) return null
+
+  const afterOpen = t.slice(3) // behält das führende \n des FM-Blocks
+  const fmEnd = afterOpen.indexOf('\n---')
+  if (fmEnd === -1) return null
+
+  const fmBlock = afterOpen.slice(0, fmEnd) // z.B. "\ntype: ...\npriority: ..."
+  const rest = afterOpen.slice(fmEnd)       // beginnt mit "\n---" + Body
+
+  const lines = fmBlock.split('\n')
+  let replaced = false
+  const updated = lines.map(line => {
+    const colon = line.indexOf(':')
+    if (colon === -1) return line
+    if (line.slice(0, colon).trim() === 'status') {
+      replaced = true
+      return `status: ${status}`
+    }
+    return line
+  })
+
+  if (!replaced) {
+    const prioIdx = updated.findIndex(l => {
+      const c = l.indexOf(':')
+      return c !== -1 && l.slice(0, c).trim() === 'priority'
+    })
+    if (prioIdx >= 0) updated.splice(prioIdx + 1, 0, `status: ${status}`)
+    else updated.push(`status: ${status}`)
+  }
+
+  return `${leading}---${updated.join('\n')}${rest}`
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -322,7 +377,8 @@ export async function discoverProjects(
       marker: {
         project: marker.project || entry.name,
         keywords: marker.keywords,
-        priority: marker.priority
+        priority: marker.priority,
+        status: marker.status || 'active'
       },
       lastBrainSignal: signal,
       currentWeekDraft: draftRel,

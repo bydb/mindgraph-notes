@@ -490,3 +490,60 @@ button.psw-row-badge--clickable:hover:not(:disabled) {
   font-size: 0.8rem;
   color: var(--text-secondary, #555);
 }
+
+/* ── Lebenszyklus: abgeschlossene Projekte ─────────────────────────────── */
+
+.psw-row--done {
+  opacity: 0.7;
+  background: color-mix(in srgb, var(--text-tertiary, #888) 5%, var(--background-primary, #fff));
+}
+
+.psw-row--done .psw-row-title {
+  color: var(--text-secondary, #555);
+}
+
+.psw-row-done-pill {
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: color-mix(in srgb, #22c55e 14%, transparent);
+  color: color-mix(in srgb, #16a34a 90%, var(--text-primary, #111));
+  font-size: 0.75rem;
+  white-space: nowrap;
+  line-height: 1.4;
+}
+
+.psw-done-section {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.psw-done-toggle {
+  align-self: flex-start;
+  background: none;
+  border: none;
+  padding: 4px 2px;
+  font-family: inherit;
+  font-size: 0.8rem;
+  color: var(--text-tertiary, #888);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.psw-done-toggle:hover {
+  color: var(--text-secondary, #555);
+}
+
+.psw-done-caret {
+  font-size: 0.7rem;
+  width: 0.8em;
+  display: inline-block;
+}
+
+.psw-list--done {
+  /* etwas eingerückt, damit die Sektion visuell als Untergruppe lesbar ist */
+  padding-left: 4px;
+}

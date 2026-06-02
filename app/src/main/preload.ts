@@ -629,6 +629,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('project-status-cleanup', vaultPath, filePath, refsToRemove, language),
   projectStatusDeleteDraft: (vaultPath: string, filePath: string) =>
     ipcRenderer.invoke('project-status-delete-draft', vaultPath, filePath),
+  projectStatusSetStatus: (vaultPath: string, projectFolderRel: string, status: 'active' | 'done') =>
+    ipcRenderer.invoke('project-status-set-status', vaultPath, projectFolderRel, status),
   projectStatusGenerateSynonyms: (vaultPath: string, projectFolderRel: string, model: string) =>
     ipcRenderer.invoke('project-status-generate-synonyms', vaultPath, projectFolderRel, model),
   projectStatusLoadSynonyms: (vaultPath: string, projectFolderRel: string) =>

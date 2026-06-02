@@ -4,6 +4,7 @@ import type {
   ProjectStatusCrystallizeInput,
   ProjectStatusResult,
   ProjectPriority,
+  ProjectStatus,
   LintFinding,
   ProjectSynonymCache
 } from '../../shared/types'
@@ -62,6 +63,11 @@ interface ProjectStatusState {
     vaultPath: string,
     project: DiscoveredProject,
     draftRel: string
+  ) => Promise<{ success: boolean; error?: string }>
+  setProjectStatus: (
+    vaultPath: string,
+    project: DiscoveredProject,
+    status: ProjectStatus
   ) => Promise<{ success: boolean; error?: string }>
   reset: () => void
 }
@@ -284,6 +290,29 @@ export const useProjectStatusStore = create<ProjectStatusState>((set, get) => ({
           lastResults.delete(project.folderRel)
         }
         set({ projects, lastResults })
+      }
+      return result
+    } catch (err) {
+      return {
+        success: false,
+        error: err instanceof Error ? err.message : 'Unbekannter Fehler'
+      }
+    }
+  },
+
+  setProjectStatus: async (vaultPath, project, status) => {
+    try {
+      const result = await window.electronAPI.projectStatusSetStatus(vaultPath, project.folderRel, status)
+      if (result.success) {
+        // Optimistisches lokales Update — kein Re-Discover nötig (würde Brain-
+        // Signal neu berechnen). Nur das Marker-Statusfeld nachziehen.
+        set({
+          projects: get().projects.map(p =>
+            p.folderRel === project.folderRel
+              ? { ...p, marker: { ...p.marker, status } }
+              : p
+          )
+        })
       }
       return result
     } catch (err) {
