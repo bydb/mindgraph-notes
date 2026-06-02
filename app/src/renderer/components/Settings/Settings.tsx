@@ -4930,6 +4930,15 @@ LIMIT 10
                     </div>
 
                     <div className="settings-row">
+                      <label title={t('settings.email.lowPowerModeHint')}>{t('settings.email.lowPowerMode')}</label>
+                      <input
+                        type="checkbox"
+                        checked={emailSettings.lowPowerMode}
+                        onChange={e => setEmail({ lowPowerMode: e.target.checked })}
+                      />
+                    </div>
+
+                    <div className="settings-row">
                       <label>{t('settings.email.analysisModel')}</label>
                       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
                         <select

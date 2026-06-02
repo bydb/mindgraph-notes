@@ -7447,8 +7447,8 @@ function parseEmailAnalysisJson(raw: string): Record<string, unknown> | null {
   return null
 }
 
-ipcMain.handle('email-analyze', async (_event, vaultPath: string, model: string, emailIds?: string[]) => {
-  console.log(`[Email] email-analyze called: vault=${vaultPath}, model=${model}, ids=${emailIds?.length ?? 'all'}`)
+ipcMain.handle('email-analyze', async (_event, vaultPath: string, model: string, emailIds?: string[], lowPowerMode: boolean = false) => {
+  console.log(`[Email] email-analyze called: vault=${vaultPath}, model=${model}, ids=${emailIds?.length ?? 'all'}, lowPower=${lowPowerMode}`)
   try {
     assertApprovedVault(vaultPath, 'email-analyze')
     // Emails laden
@@ -7491,6 +7491,9 @@ ipcMain.handle('email-analyze', async (_event, vaultPath: string, model: string,
     // Letzter Fehlergrund für die UI — sonst scheitert die Analyse (OOM, fehlendes Modell,
     // Timeout) komplett lautlos und der Datensatz behält ein evtl. gesyncten Fremd-Modell.
     let lastError: string | null = null
+    // Schonmodus: Pause zwischen Mails, damit schwache Hardware (z.B. 8-GB-Mac) bei
+    // Batch-Analyse nicht thermisch hochläuft und abbricht — bricht die Dauerlast.
+    const LOW_POWER_COOLDOWN_MS = 8000
     for (let i = 0; i < toAnalyze.length; i++) {
       const email = toAnalyze[i] as { id: string; from: { name: string; address: string }; subject: string; date: string; bodyText: string }
 
@@ -7670,6 +7673,10 @@ END_EMAIL_DATA
           lastError = `Ollama nicht erreichbar (${OLLAMA_API_URL}): ${msg}`
           console.error(`[Email] Analysis failed for email ${email.id}:`, error)
         }
+      }
+      // Schonmodus: nach jeder Mail (außer der letzten) kurz abkühlen lassen.
+      if (lowPowerMode && i < toAnalyze.length - 1) {
+        await new Promise((resolve) => setTimeout(resolve, LOW_POWER_COOLDOWN_MS))
       }
     }
 

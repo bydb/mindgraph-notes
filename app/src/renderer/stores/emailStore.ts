@@ -199,7 +199,7 @@ export const useEmailStore = create<EmailState>()((set, get) => ({
     })
 
     try {
-      const result = await window.electronAPI.emailAnalyze(vaultPath, model, emailIds) as
+      const result = await window.electronAPI.emailAnalyze(vaultPath, model, emailIds, email.lowPowerMode) as
         | { success: boolean; analyzed?: number; failed?: number; total?: number; lastError?: string | null; error?: string }
         | undefined
       // Neu laden nach Analyse (skipAutoActions: verhindert erneuten analyzeEmails-Aufruf)

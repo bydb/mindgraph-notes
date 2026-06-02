@@ -311,6 +311,8 @@ export interface EmailSettings {
   maxEmailsPerFetch: number
   retainDays: number
   autoAnalyze: boolean
+  /** Schonmodus für schwache Hardware: Cooldown zwischen Mails bei Batch-Analyse (gegen Überhitzung). */
+  lowPowerMode: boolean
   analysisModel: string
   signature: string
   signatureImagePath: string
@@ -924,6 +926,7 @@ const defaultState = {
     maxEmailsPerFetch: 50,
     retainDays: 30,
     autoAnalyze: true,
+    lowPowerMode: false,
     analysisModel: '',
     signature: '',
     signatureImagePath: '',

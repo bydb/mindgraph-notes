@@ -834,7 +834,7 @@ export interface ElectronAPI {
   emailListFolders: (account: EmailAccount) => Promise<{ success: boolean; folders: EmailFolder[]; error?: string }>;
   emailMove: (payload: { accountId: string; host: string; port: number; user: string; tls: boolean; sourceFolder: string; uid: number; destinationFolder: string }) => Promise<{ success: boolean; newUid?: number; destinationFolder?: string; error?: string }>;
   emailFetch: (vaultPath: string, accounts: Array<EmailAccount & { folder?: string }>, lastFetchedAt: Record<string, string>, maxPerAccount: number) => Promise<EmailFetchResult>;
-  emailAnalyze: (vaultPath: string, model: string, emailIds?: string[]) => Promise<{ success: boolean; analyzed: number; error?: string }>;
+  emailAnalyze: (vaultPath: string, model: string, emailIds?: string[], lowPowerMode?: boolean) => Promise<{ success: boolean; analyzed: number; failed?: number; total?: number; lastError?: string | null; error?: string }>;
   emailRelevanceConfigLoad: (vaultPath: string) => Promise<{ success: boolean; config?: RelevanceConfig; hasBlock?: boolean; notePath?: string; error?: string }>;
   emailRelevanceConfigSave: (vaultPath: string, config: RelevanceConfig) => Promise<{ success: boolean; notePath?: string; error?: string }>;
   noteAnalyzeRelevance: (payload: {

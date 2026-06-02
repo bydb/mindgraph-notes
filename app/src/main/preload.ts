@@ -370,8 +370,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('email-move', payload),
   emailFetch: (vaultPath: string, accounts: object[], lastFetchedAt: Record<string, string>, maxPerAccount: number) =>
     ipcRenderer.invoke('email-fetch', vaultPath, accounts, lastFetchedAt, maxPerAccount),
-  emailAnalyze: (vaultPath: string, model: string, emailIds?: string[]) =>
-    ipcRenderer.invoke('email-analyze', vaultPath, model, emailIds),
+  emailAnalyze: (vaultPath: string, model: string, emailIds?: string[], lowPowerMode?: boolean) =>
+    ipcRenderer.invoke('email-analyze', vaultPath, model, emailIds, lowPowerMode),
   emailRelevanceConfigLoad: (vaultPath: string) =>
     ipcRenderer.invoke('email-relevance-config-load', vaultPath),
   emailRelevanceConfigSave: (vaultPath: string, config: unknown) =>
