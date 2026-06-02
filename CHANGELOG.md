@@ -2,6 +2,12 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.7.16-beta] - 2026-06-02
+
+### Verbesserungen
+
+- **Sichereres Standard-Abruflimit (E-Mail).** Die Voreinstellung „Max. E-Mails pro Abruf" wurde von 50 auf **2** gesenkt. Dadurch werden pro Abruf nur wenige Mails auf einmal analysiert — leistungsschwache Geräte (z. B. Mac mini mit 8 GB RAM) laufen so gar nicht erst in Überlastung/Überhitzung. Wer leistungsfähige Hardware hat, kann den Wert in den Einstellungen jederzeit hochsetzen. (Bereits gespeicherte Einstellungen bleiben unverändert.)
+
 ## [0.7.15-beta] - 2026-06-02
 
 ### Verbesserungen
