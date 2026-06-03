@@ -2,6 +2,12 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.7.19-beta] - 2026-06-03
+
+### Features
+
+- **Projekte abschließen und wieder reaktivieren (Projekt-Status).** Markierte Projekte im Projekt-Status-Widget lassen sich jetzt per Klick als **abgeschlossen** markieren — sie wandern in eine eigene, eingeklappte „Abgeschlossen"-Sektion und verstopfen nicht länger die aktive Liste. Bisher ließ sich ein einmal markiertes Projekt nur durch manuelles Löschen einer versteckten Datei wieder aus der Verfolgung nehmen. Das Abschließen ist **nicht destruktiv und jederzeit umkehrbar**: Stichwörter, Synonyme und bisherige Wochenstände bleiben vollständig erhalten, ein Klick auf „Reaktivieren" holt das Projekt zurück in die aktive Liste. Abgeschlossene Projekte werden außerdem nicht mehr fälschlich als „verwaist" eingefärbt, nur weil zuletzt keine Aktivität verzeichnet war.
+
 ## [0.7.18-beta] - 2026-06-03
 
 ### Verbesserungen
