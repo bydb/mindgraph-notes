@@ -13,6 +13,14 @@
 //   llama3.1 bleibt (andere Familie; sein red-Verdict im Dashboard ist eine Warnung).
 //   Das Cloud-Test-Szenario (Kunden ohne lokal taugliche Hardware) bleibt erhalten —
 //   Cloud-Modell jetzt qwen3.5:cloud statt ministral-3:14b-cloud.
+// 2026-06-03: ministral-3:8b UND gemma4:latest wieder aufgenommen. Grund: (1) der
+//   Rauswurf-Grund war das E-Mail-Few-Shot-Abschreiben — seit 2026-06-02 an der Prompt-
+//   Quelle gefixt (Platzhalter-Schema); (2) ministral war im Bench der Brain-Champion
+//   (Rule-5 100 %, 0 Halluzinationen) und ✅ für mail-summary/dashboard, bei ~6 GB statt
+//   22 GB. Die 22-GB-Defaults (qwen3.6:27b-mlx) für brain/dashboard/project-status waren
+//   auf ≤32-GB-Hardware ein RAM-Killer; Defaults daher auf ministral-3:8b gesenkt.
+//   gemma4 war der Few-Shot-Hauptabschreiber (Leipzig) — als Option ok, aber seine Prompts
+//   MÜSSEN Platzhalter statt konkrete Beispielwerte nutzen. Defaults bleiben ministral/qwen.
 //
 // "verdict":
 //   - "green":     Für dieses Modul produktiv geeignet.
@@ -75,9 +83,21 @@ export interface ModelCompatibilityData {
 }
 
 export const MODEL_COMPATIBILITY: ModelCompatibilityData = {
-  version: '2026-06-02',
+  version: '2026-06-03',
   modules: {
     brain: {
+      'ministral-3:8b': {
+        verdict: 'green',
+        reasons: [],
+        notes: 'Brain-Champion im Bench 14.05.: einziges Modell, das leere Sektionen weglässt (Rule-5 100 %), 0 Halluzinationen, 80 % kritische Titel verlinkt. Nur ~6 GB RAM. Wieder aufgenommen 2026-06-03 (Rauswurf-Grund war E-Mail-Few-Shot, an der Prompt-Quelle gefixt).',
+        metrics: { criticalTitlesLinkedPct: 80, rule5CompliancePct: 100, wikilinkHallucinations: 'none', latencySecondsPerRun: 11, ramGigabytes: 6 }
+      },
+      'gemma4:latest': {
+        verdict: 'green',
+        reasons: ['Erfindet bei stillem Tag Inhalt für die leere „Offene Fäden"-Sektion (s4)'],
+        notes: 'Schnellstes Brain-Modell (~7 s), 0 Halluzinationen im Aggregat, 70 % kritische Titel. ~10 GB RAM. Wieder aufgenommen 2026-06-03.',
+        metrics: { criticalTitlesLinkedPct: 70, rule5CompliancePct: 0, wikilinkHallucinations: 'none', latencySecondsPerRun: 7, ramGigabytes: 10 }
+      },
       'qwen3.5:9b-mlx-bf16': {
         verdict: 'red',
         reasons: ['Nur 50 % kritische Titel verlinkt', 'Erfindet Inhalte für leere Sektionen'],
@@ -107,9 +127,21 @@ export const MODEL_COMPATIBILITY: ModelCompatibilityData = {
       }
     },
     'task-extraction': {
+      'ministral-3:8b': {
+        verdict: 'yellow',
+        reasons: ['Recall 88 % — vergisst in Mehrfach-Task-Mails gelegentlich eine Aufgabe'],
+        notes: 'JSON 100 %, Deadlines 100 % (Two-Pass). ~6 GB RAM. Für die schadensrelevante Extraktion qwen bevorzugen; läuft als Brain/Dashboard-Modell aber ohnehin schon im RAM.',
+        metrics: { recallPct: 88, latencySecondsPerRun: 3, ramGigabytes: 6 }
+      },
+      'gemma4:latest': {
+        verdict: 'yellow',
+        reasons: ['T-Recall 75 % (niedrigste der getesteten 8B)', 'Richtung „wer macht was" (c08) verfehlt — legte die Aufgabe des Absenders auf den User-Stack'],
+        notes: 'JSON 100 %, Deadlines 67 %→100 % (größter Two-Pass-Sprung), ~2,5 s, ~10 GB. Damage-relevant: bei Mehrfach-Mails for_whom prüfen. Few-Shot-sensibel — Prompts brauchen Platzhalter statt Beispielwerte.',
+        metrics: { directionAccuracyPct: 83, recallPct: 75, latencySecondsPerRun: 3, ramGigabytes: 10 }
+      },
       'qwen3.5:4b': {
         verdict: 'green',
-        reasons: [],
+        reasons: ['Termin-Aktionen oft nur generisch ("Termin" + korrektes Datum) — verliert das „mit wem/Thema". Feld 2026-06-03: Besuchsanfrage → nur "Termin", das große qwen zog die Person heraus. Prompt-Schärfung (Person muss in die Aktion) seit 2026-06-03 mildert das, schließt die Lücke aber nicht ganz.'],
         notes: '8-GB-tauglich (~3,4 GB) — einziges getestetes qwen, das auf 8-GB-Macs vollständig in den RAM passt. Live-Test 2026-06-02 (echte App-Analyse-Logik): valides JSON 3/3, Badges/matchedCriteria, Prompt-Injection 3/3 abgewehrt, Spam korrekt als irrelevant erkannt. Erkannte 3/4 weiche Kriterien (Hybrid-Scorer floort Relevanz über harte Signale). Begrenzte Stichprobe.',
         metrics: { latencySecondsPerRun: 12, ramGigabytes: 4 }
       },
@@ -141,6 +173,18 @@ export const MODEL_COMPATIBILITY: ModelCompatibilityData = {
       }
     },
     'mail-summary': {
+      'ministral-3:8b': {
+        verdict: 'green',
+        reasons: [],
+        notes: 'Beste Relevance-Kalibrierung der Matrix (7/8 in Range), 96 % Avg-Score, ~5,5 s/Mail, ~6 GB RAM.',
+        metrics: { recallPct: 96, latencySecondsPerRun: 6, ramGigabytes: 6 }
+      },
+      'gemma4:latest': {
+        verdict: 'green',
+        reasons: ['Höchste Halluzinations-Token-Ratio der Matrix (39 %)'],
+        notes: '93 % Avg-Score, Sentiment + needsReply 8/8, schnell (~5 s), ~10 GB. Relevance-Range 5/8 (mittel). Wenn die Zusammenfassung als Notiz-Inhalt landet, Halluz.-Ratio bedenken.',
+        metrics: { recallPct: 93, latencySecondsPerRun: 5, ramGigabytes: 10 }
+      },
       'qwen3.5:4b': {
         verdict: 'green',
         reasons: [],
@@ -177,6 +221,18 @@ export const MODEL_COMPATIBILITY: ModelCompatibilityData = {
       }
     },
     'dashboard-snapshot': {
+      'ministral-3:8b': {
+        verdict: 'green',
+        reasons: [],
+        notes: 'Perfekter Lauf (8/8 Score in Range), Prompt-Injection sauber abgewehrt, schnellstes brauchbares Modell (~1,4 s/Notiz), ~6 GB RAM.',
+        metrics: { recallPct: 100, latencySecondsPerRun: 1, ramGigabytes: 6 }
+      },
+      'gemma4:latest': {
+        verdict: 'green',
+        reasons: [],
+        notes: 'Schnellstes Modell (~1,1 s/Notiz), 98 % Avg, Prompt-Injection sauber ignoriert (Score 10 statt Übernahme). ~10 GB RAM.',
+        metrics: { recallPct: 98, latencySecondsPerRun: 1, ramGigabytes: 10 }
+      },
       'qwen3.5:9b-mlx-bf16': {
         verdict: 'green',
         reasons: ['Leichte Score-Range-Drift in zwei von acht Fällen'],
@@ -239,11 +295,13 @@ export const MODEL_COMPATIBILITY: ModelCompatibilityData = {
 // qwen3.5:4b für die E-Mail-Module (8-GB-tauglich, getestet); qwen3.6:27b-mlx für die
 // schwereren/qualitätskritischen Module (kein 8-GB-taugliches qwen dafür getestet).
 export const RECOMMENDED_DEFAULTS: Partial<Record<ModuleId, string>> = {
-  'brain':              'qwen3.6:27b-mlx',
+  'brain':              'ministral-3:8b',
   'task-extraction':    'qwen3.5:4b',
   'mail-summary':       'qwen3.5:4b',
-  'dashboard-snapshot': 'qwen3.6:27b-mlx',
-  'project-status':     'qwen3.6:27b-mlx'
+  'dashboard-snapshot': 'ministral-3:8b',
+  // project-status: ministral extrapoliert vom Brain-Bench (ähnliche Lang-Kontext-Aufgabe),
+  // für project-status selbst noch nicht eigenständig benchmarkt — aber ~6 GB statt 22 GB.
+  'project-status':     'ministral-3:8b'
 }
 
 // Verdict für ein konkretes Modell und Modul nachschlagen.
@@ -345,6 +403,8 @@ export const RECOMMENDED_PULL_MODELS: Array<{
   humanFavorite?: boolean
 }> = [
   { name: 'qwen3.5:4b',          label: 'Qwen 3.5 4B (~3,4 GB — läuft auf 8 GB RAM, Empfehlung für kleine Macs)' },
+  { name: 'ministral-3:8b',      label: 'Ministral 3 8B (~6 GB — Brain/Dashboard-Empfehlung, läuft auf 16 GB RAM)' },
+  { name: 'gemma4:latest',       label: 'Gemma 4 (~10 GB — schnell; Prompts brauchen Platzhalter statt Beispielwerte)' },
   { name: 'qwen3.6:27b-mlx',     label: 'Qwen 3.6 27B MLX (~22 GB)',         humanFavorite: true },
   { name: 'qwen3.6:latest',      label: 'Qwen 3.6 (~48 GB, sehr großer RAM-Bedarf)', humanFavorite: true },
   { name: 'qwen3.5:9b-mlx-bf16', label: 'Qwen 3.5 9B MLX (~8 GB)' },

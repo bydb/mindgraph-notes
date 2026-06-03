@@ -7526,6 +7526,7 @@ TERMIN-EXTRAKTION (WICHTIG):
 - Auch bei weitergeleiteten E-Mails: der eigentliche Termin steht oft im weitergeleiteten Teil
 - Datumsformate erkennen: "13. März 2026", "13.03.2026", "2026-03-13", "nächsten Freitag"
 - Jeder TATSÄCHLICH im Text genannte Termin MUSS in extractedInfo UND als suggestedAction erscheinen — erfinde KEINE Termine
+- Wer den Termin will oder kommt (Absender bzw. im Text genannte Person) gehört in den Aktionstext — "Termin mit <Name>", nicht generisch "Termin"
 - Meeting-Links (Zoom, Teams, Meet) immer in extractedInfo aufnehmen
 
 DATUMSREGELN für suggestedActions:
@@ -7533,7 +7534,7 @@ DATUMSREGELN für suggestedActions:
 - "nächsten Freitag" → konkretes Datum berechnen (heute ist ${todayISO})
 - "sofort"/"kurzfristig" → "${tomorrowISO}"
 - Kein Datum erkennbar → "${tomorrowISO}"
-- Bei Terminen: action="Termin: [Betreff/Thema]", date=YYYY-MM-DD, time=HH:mm
+- Bei Terminen: action MUSS konkret sein — bei Treffen/Besuch die Person nennen ("Termin mit <Name aus der Mail>"), sonst das Thema ("Termin: <Thema>"); NIE nur "Termin". date=YYYY-MM-DD, time=HH:mm
 
 ANTWORT-ERKENNUNG (needsReply):
 - needsReply=true wenn: direkte Frage an mich, Bitte um Rueckmeldung/Bestaetigung, Einladung die Antwort erwartet, offene Anfrage

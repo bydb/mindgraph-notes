@@ -2,6 +2,14 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.7.18-beta] - 2026-06-03
+
+### Verbesserungen
+
+- **Schlankere Standard-Modellempfehlungen (weniger RAM-Hunger).** Für Tagesgedächtnis (Brain), Dashboard und Projekt-Status wurde als Empfehlung ein ~22-GB-Modell vorgeschlagen — das überlastet selbst Macs mit 32 GB, wenn parallel noch ein zweites großes Modell für die E-Mail-Analyse läuft. Die Empfehlungen sind jetzt schlank: **Ministral 3 8B (~6 GB)** für Brain/Dashboard, **Qwen 3.5 4B (~3,4 GB)** für E-Mail. (Bereits gewählte Modelle bleiben unverändert — die Empfehlung greift nicht automatisch ein.)
+- **Mehr Modelle mit ehrlicher Eignungs-Bewertung.** Ministral 3 8B und Gemma 4 sind wieder in der Modell-Kompatibilitätsliste — mit ihren tatsächlichen Benchmark-Ergebnissen pro Modul (Ministral ist z. B. das stärkste Modell fürs Tagesgedächtnis). Sie waren zuvor wegen eines Prompt-Problems entfernt worden, das inzwischen behoben ist (siehe 0.7.17). Hinweis bei Gemma 4: reagiert empfindlich auf Beispielwerte in Prompts.
+- **Präzisere Termin-Erkennung in E-Mails.** Bei Treffen oder Besuchen nimmt die Analyse jetzt die Person mit in die vorgeschlagene Aufgabe auf („Termin mit …") statt nur ein generisches „Termin". Hilft besonders kleineren Modellen, die das „mit wem" sonst verlieren.
+
 ## [0.7.17-beta] - 2026-06-02
 
 ### Fixes
