@@ -2,6 +2,12 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.7.20-beta] - 2026-06-03
+
+### Verbesserungen
+
+- **Geprüfte Modell-Empfehlung für den Projekt-Status.** Im Modul „Projekt-Status" wurde bisher ein Modell empfohlen, das im Eignungs-Check zugleich als „nicht getestet" (❔) markiert war — ein Widerspruch. Das empfohlene Modell ist jetzt mit echten Benchmarks hinterlegt: Empfehlung ist **Qwen 3.5 4B** (~3,4 GB, läuft auch auf 8-GB-Geräten und ist zugleich das empfohlene E-Mail-Modell — ein kleines Modell für beides). Der Modell-Picker zeigt für Projekt-Status jetzt die tatsächliche Eignung statt eines Fragezeichens; Ministral 3 8B bleibt eine getestete Alternative.
+
 ## [0.7.19-beta] - 2026-06-03
 
 ### Features
