@@ -21,6 +21,13 @@
 //   auf ≤32-GB-Hardware ein RAM-Killer; Defaults daher auf ministral-3:8b gesenkt.
 //   gemma4 war der Few-Shot-Hauptabschreiber (Leipzig) — als Option ok, aber seine Prompts
 //   MÜSSEN Platzhalter statt konkrete Beispielwerte nutzen. Defaults bleiben ministral/qwen.
+// 2026-06-03 (2): project-status eigenständig gebenchmarkt (bench-project-status.mjs,
+//   7 Modelle, 2 Cases × 5 Reps). Strikt-Scorer (Exakt-String-Match) deckelte alle
+//   lokalen Modelle künstlich bei 5/10 → als Benchmark-Artefakt erkannt, Scorer auf
+//   Ehrlichkeits-Kriterium umgestellt. Fair: qwen3.5:4b 9/10, ministral 10/10, gemma4 9/10
+//   (gleichauf). DEFAULT project-status ministral-3:8b → qwen3.5:4b (3,4 GB statt 6 GB,
+//   = Mail-Modell). qwen3.5:4b + ministral-3:8b als yellow-Einträge → schließt den
+//   "Empfohlen aber ❔ untested"-Widerspruch im Projekt-Status-Panel.
 //
 // "verdict":
 //   - "green":     Für dieses Modul produktiv geeignet.
@@ -262,13 +269,31 @@ export const MODEL_COMPATIBILITY: ModelCompatibilityData = {
       }
     },
     'smart-connections':   {},
-    // Project-Status — noch keine systematischen Benchmarks. Empirie aus dem
-    // Crystallizer-Bash-Prototyp (Mai 2026, Pre-Demo Startup-Weekend):
-    // qwen3.6 stark bei langen Quellenketten. 2026-05-28: qwen3.6:27b-mlx gegen
-    // Crystallizer-Prompt (`bench-project-status.mjs`) — saubere Struktur, korrekte
-    // Wikilink-Form ([[YYYY-MM-DD]]), keine Halluzinationen. Latenz ~32 s/Projekt.
-    // 2026-06-02: gemma4/ministral entfernt — Empfehlung qwen3.6.
+    // Project-Status — Empirie aus dem Crystallizer-Bash-Prototyp (Mai 2026) +
+    // `bench-project-status.mjs`. 2026-05-28: qwen3.6:27b-mlx — saubere Struktur,
+    // korrekte Wikilink-Form ([[YYYY-MM-DD]]), keine Halluzinationen, ~32 s/Projekt.
+    // 2026-06-03: 7 kleine/mittlere Modelle gebenchmarkt (2 Cases × 5 Reps). Der erste
+    // Scorer prüfte Exakt-String-Match des "keine konkrete Bewegung"-Satzes → deckelte
+    // ALLE lokalen Modelle künstlich bei 5/10 (Benchmark-Artefakt: dünne-Woche-Case hat
+    // Trivial-Aktivität, Modelle bullet-en sie ehrlich statt den starren Satz). Scorer
+    // auf Ehrlichkeits-Kriterium umgestellt (keine Erfindung + ehrliches "kein
+    // Fortschritt"-Signal). Fair gemessen: qwen3.5:4b 9/10, ministral-3:8b 10/10,
+    // gemma4:latest 9/10 — qualitativ gleichauf (je ~1/15 thin-week-Fabrikation
+    // "Theme ausgewählt"). olmo-3:7b-think unbrauchbar (0/10, kein Format, ~74 s).
+    // DEFAULT auf qwen3.5:4b (3,4 GB, 8-GB-tauglich, = Mail-Modell) statt ministral (6 GB).
     'project-status':      {
+      'qwen3.5:4b': {
+        verdict: 'yellow',
+        reasons: ['Seltene Halluzination auf dünnen Wochen (~1/10: erfand einmal „Theme ausgewählt" für eine laut Quelle OFFENE Aufgabe) — auf normalen Wochen 0', 'Setzt den exakt vorgegebenen „keine konkrete Bewegung"-Satz bei dünner Woche nicht (beschreibt die Lage aber ehrlich) — gilt für alle getesteten lokalen Modelle'],
+        notes: 'Empfohlener Default: 8-GB-tauglich (~3,4 GB) und bereits das Mail-Modell (task-extraction/mail-summary) → ein kleines Modell über Mail UND Projekt-Status. Gebenchmarkt (bench-project-status.mjs, 2026-06-03, Honesty-Scorer, 2 Cases × 5 Reps): 9/10, normale Woche 5/5 sauber ohne Format-Warnungen, ~13 s/Projekt. Qualitativ gleichauf mit ministral-3:8b (Run-zu-Run-Varianz); gewinnt über RAM + Modell-Kohärenz.',
+        metrics: { latencySecondsPerRun: 13, ramGigabytes: 4 }
+      },
+      'ministral-3:8b': {
+        verdict: 'yellow',
+        reasons: ['„In einem Satz" läuft regelmäßig zu lang (27–30 statt ≤25 Wörter, 7/10 Läufe)', 'Seltene Halluzination auf dünnen Wochen (~1/15: „Theme ausgewählt" für offene Aufgabe), wie auch qwen3.5:4b'],
+        notes: 'Solide Option (~6 GB). Gebenchmarkt (bench-project-status.mjs, 2026-06-03, Honesty-Scorer): 10/10 ehrlich, 0 Halluzinationen in dieser Serie (1 in der Vorserie mit Strikt-Scorer), ~9 s/Projekt. Nicht mehr Default — qwen3.5:4b ist kleiner (3,4 GB) und deckt zugleich die Mail-Module ab.',
+        metrics: { latencySecondsPerRun: 9, ramGigabytes: 6 }
+      },
       'qwen3.6:latest': {
         verdict: 'green',
         reasons: [],
@@ -299,9 +324,10 @@ export const RECOMMENDED_DEFAULTS: Partial<Record<ModuleId, string>> = {
   'task-extraction':    'qwen3.5:4b',
   'mail-summary':       'qwen3.5:4b',
   'dashboard-snapshot': 'ministral-3:8b',
-  // project-status: ministral extrapoliert vom Brain-Bench (ähnliche Lang-Kontext-Aufgabe),
-  // für project-status selbst noch nicht eigenständig benchmarkt — aber ~6 GB statt 22 GB.
-  'project-status':     'ministral-3:8b'
+  // project-status: qwen3.5:4b — gebenchmarkt 2026-06-03 (9/10, Honesty-Scorer), gleichauf
+  // mit ministral, aber 3,4 GB (8-GB-tauglich) + zugleich das Mail-Modell → ein Modell für
+  // Mail UND Projekt-Status. ministral-3:8b bleibt als getestete Option (yellow) in der Matrix.
+  'project-status':     'qwen3.5:4b'
 }
 
 // Verdict für ein konkretes Modell und Modul nachschlagen.
