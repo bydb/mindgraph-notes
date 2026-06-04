@@ -530,6 +530,37 @@ const App: React.FC = () => {
     }
   }, [selectedNoteId, notes])
 
+  // PDF/Bild/Office haben — anders als .md — KEINEN eigenen Tab; sie sind nur
+  // notesStore-State (selectedPdfPath/…). Die Haupt-Render-Kette (s. unten) prüft
+  // aber Dashboard-/Workflow-/Code-Tabs ZUERST und erreicht den Viewer-Zweig nicht,
+  // solange so ein Tab aktiv ist → Klick auf ein PDF/PNG täte scheinbar nichts.
+  // .md entkommt dem Schatten, weil es einen Editor-Tab aktiv macht (Effekt oben).
+  // Symmetrisch dazu: bei NEUER Viewer-Auswahl aus einem verdeckenden Tab heraus auf
+  // einen Editor-Tab schalten (sonst keinen aktiven Tab), damit der Viewer sichtbar wird.
+  const lastViewerSelectionRef = useRef<string | null>(null)
+  useEffect(() => {
+    const sel = selectedPdfPath || selectedImagePath || selectedOfficePath
+    if (!sel) {
+      lastViewerSelectionRef.current = null
+      return
+    }
+    if (lastViewerSelectionRef.current === sel) return // nur bei neuer Auswahl reagieren
+    lastViewerSelectionRef.current = sel
+
+    const { tabs: currentTabs, activeTabId: currentActiveTabId, setActiveTab } = useTabStore.getState()
+    const activeTab = currentTabs.find(t => t.id === currentActiveTabId)
+    const shadowsViewer = !!activeTab && (
+      activeTab.type === 'dashboard' || activeTab.type === 'workflow-canvas' || activeTab.type === 'code'
+    )
+    if (!shadowsViewer) return // Viewer ist bereits sichtbar — nichts tun
+
+    // Zuletzt geöffneten Editor-Tab bevorzugen; existiert keiner, gar keinen Tab aktiv
+    // lassen (activeTab undefined → Kette fällt zum Viewer-Zweig durch).
+    const editorTab = [...currentTabs].reverse().find(t => t.type === 'editor')
+    if (editorTab) setActiveTab(editorTab.id)
+    else useTabStore.setState({ activeTabId: null })
+  }, [selectedPdfPath, selectedImagePath, selectedOfficePath])
+
   // Theme auf document anwenden
   useEffect(() => {
     const root = document.documentElement
