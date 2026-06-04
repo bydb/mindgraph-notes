@@ -2,6 +2,20 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.7.23-beta] - 2026-06-04
+
+### Features
+
+- **Aufgaben & Termine: Karten nach Dringlichkeit eingefärbt.** Das Panel „Aufgaben & Termine" färbt die Kärtchen jetzt vollflächig nach Dringlichkeit — überfällig rot, heute orange, geplant blau, mit farbiger Kante, passendem Häkchen und farbcodierten Abschnittstiteln. Auf einen Blick erkennbar, was brennt. Funktioniert in hellem und dunklem Design.
+- **„Geplant" feiner untergliedert.** Die lange „Geplant"-Liste ist jetzt in **Diese Woche / Nächste Woche / Später** aufgeteilt (Wochengrenze montags), nah liegende Aufgaben ohne Jahresangabe, weiter entfernte mit. Aufgaben ohne Fälligkeitsdatum werden im Panel ausgeblendet, damit der Fokus auf den terminierten Dingen bleibt.
+- **KI-Tags für Aufgaben (vollständig lokal).** Neuer Button „Tags füllen" sowie ein „✨" pro Karte schlagen mit dem lokalen Ollama-Modell passende Schlagwörter vor und schreiben sie direkt in die Aufgabe. Bestehende Vault-Tags werden bevorzugt (konsistenter Tag-Bestand), generische Tags gefiltert. Läuft ausschließlich über `localhost` — Mail-Inhalte verlassen den Rechner nie — und wird durch die Modell-Eignungsmatrix abgesichert (ungeeignete Modelle werden abgewiesen). Hardware-schonend: sequenziell, abbrechbar, mit Fortschrittsanzeige, kein Hintergrund-Sturm.
+- **Morning-Briefing: Wochen-Fokus & Timeblocking.** Das „Guten Morgen"-Briefing zeigt jetzt zwei neue Abschnitte: **„Diese Woche im Fokus"** (die wichtigsten Aufgaben der Woche, priorisiert, plus die Termine der nächsten sieben Tage) und **„Timeblocking-Vorschlag (heute)"** — konkrete Zeitblöcke für deine wichtigsten Aufgaben, um deine echten Termine herum geplant. Sofort und ohne KI-Last beim App-Start.
+
+### Fixes
+
+- **PDF-, Bild- und Office-Dateien öffnen wieder zuverlässig.** Wenn zuletzt ein Dashboard-, Workflow- oder Code-Tab aktiv war, schien ein Klick auf eine PDF/Bild/Office-Datei nichts zu tun — der Viewer blieb hinter dem aktiven Tab verborgen. Bei neuer Auswahl wird jetzt korrekt auf die Viewer-Ansicht umgeschaltet.
+- **Timeblocking respektiert Feiertage.** Ganztägige Kalender-Einträge (z. B. Feiertage) galten irrtümlich als „ganzer Tag belegt", sodass an solchen Tagen kein Zeitblock vorgeschlagen wurde. Ganztägige Marker blockieren jetzt keine Uhrzeiten mehr.
+
 ## [0.7.22-beta] - 2026-06-04
 
 ### Fixes
