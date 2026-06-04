@@ -2,6 +2,12 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.7.22-beta] - 2026-06-04
+
+### Fixes
+
+- **Auch aus dem Server-Ordner „Gesendet" geladene Mails werden nicht mehr analysiert.** Der vorige Fix (0.7.21) stoppte die Analyse nur für direkt aus der App versendete Mails. Beim Öffnen des Ordners „Gesendet" lädt die App diesen jedoch vom Server — diese Kopien trugen keine interne „gesendet"-Markierung und wurden weiterhin auf Relevanz und Antwortbedarf untersucht (mit denselben Zeitüberschreitungen bei langsamen Modellen). Gesendete Mails werden jetzt zuverlässig an ihrem Ordner erkannt und übersprungen — egal ob lokal versendet oder vom Server geladen.
+
 ## [0.7.21-beta] - 2026-06-04
 
 ### Fixes
