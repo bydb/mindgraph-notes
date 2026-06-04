@@ -99,7 +99,8 @@ export const useEmailStore = create<EmailState>()((set, get) => ({
         // Unanalysierte E-Mails automatisch analysieren (auch ohne IMAP-Fetch)
         const isCurrentlyAnalyzing = get().isAnalyzing
         const { email: emailSettings } = useUIStore.getState()
-        const unanalyzed = (data.emails || []).filter((e: { analysis?: unknown }) => !e.analysis)
+        // Gesendete Mails nicht auto-analysieren — Relevanz/needsReply ist für eigene Mails sinnlos.
+        const unanalyzed = (data.emails || []).filter((e: { analysis?: unknown; sent?: boolean }) => !e.analysis && !e.sent)
         if (!isCurrentlyAnalyzing && emailSettings.autoAnalyze && unanalyzed.length > 0) {
           setTimeout(() => get().analyzeEmails(vaultPath), 1000)
         }

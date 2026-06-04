@@ -7531,10 +7531,12 @@ ipcMain.handle('email-analyze', async (_event, vaultPath: string, model: string,
     console.log(`[Email] Hybrid-Scorer: ${relevanceConfig.vipSenders.length} VIP, ${relevanceConfig.domains.length} Domains, ${relevanceConfig.keywords.length} Keywords, ${replyStats.size} Kontakte`)
 
     // Zu analysierende Emails filtern
-    // Ohne emailIds: nur unanalysierte Emails (keine Re-Analyse bereits verarbeiteter)
+    // Ohne emailIds: nur unanalysierte Emails (keine Re-Analyse bereits verarbeiteter).
+    // Gesendete Mails (sent) sind ausgeschlossen — Relevanz/needsReply für eine selbst
+    // gesendete Mail ist sinnlos und verbrennt nur Analyse-Zeit (Timeout bei langsamem Modell).
     const toAnalyze = emailIds
       ? emails.filter((e: { id: string; analysis?: object }) => emailIds.includes(e.id))
-      : emails.filter((e: { analysis?: object; noteCreated?: boolean }) => !e.analysis && !e.noteCreated)
+      : emails.filter((e: { analysis?: object; noteCreated?: boolean; sent?: boolean }) => !e.analysis && !e.noteCreated && !e.sent)
 
     console.log(`[Email] ${emails.length} total, ${toAnalyze.length} to analyze`)
     let analyzed = 0
