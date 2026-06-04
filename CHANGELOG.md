@@ -2,6 +2,12 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.7.21-beta] - 2026-06-04
+
+### Fixes
+
+- **Gesendete Mails werden nicht mehr analysiert.** Eigene gesendete E-Mails (Ordner „Gesendet") wurden fälschlich auf Relevanz und Antwortbedarf untersucht — das ist sinnlos und führte bei langsameren KI-Modellen zur Fehlmeldung „1 von 1 Mails konnten nicht analysiert werden / Zeitüberschreitung (>5 Min)". Nebenbei legte die Analyse sogar Notizen über die eigenen Antworten an. Die automatische Analyse überspringt gesendete Mails jetzt vollständig; eingehende Mails sind unberührt, und „Neu analysieren" auf einer einzelnen Mail funktioniert weiterhin. (Bereits analysierte gesendete Mails behalten ihre Einträge — ein mitgeliefertes Aufräum-Skript kann sie bei Bedarf entfernen.)
+
 ## [0.7.20-beta] - 2026-06-03
 
 ### Verbesserungen
