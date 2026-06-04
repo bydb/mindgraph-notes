@@ -13255,6 +13255,114 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
   font-weight: 500;
 }
 
+/* ============ Farbige Karten nach Dringlichkeit ============ */
+/* Doppelte Klasse (.overdue-item.overdue-item--X) für robuste Spezifität
+   gegenüber `.overdue-item:hover` — unabhängig von der Quellreihenfolge. */
+.overdue-item.overdue-item--overdue {
+  background: color-mix(in srgb, var(--color-danger) 12%, var(--bg-primary));
+  border-left: 3px solid var(--color-danger);
+}
+.overdue-item.overdue-item--overdue:hover {
+  background: color-mix(in srgb, var(--color-danger) 18%, var(--bg-primary));
+}
+
+.overdue-item.overdue-item--today {
+  background: color-mix(in srgb, var(--color-warning) 13%, var(--bg-primary));
+  border-left: 3px solid var(--color-warning);
+}
+.overdue-item.overdue-item--today:hover {
+  background: color-mix(in srgb, var(--color-warning) 20%, var(--bg-primary));
+}
+
+.overdue-item.overdue-item--future {
+  background: color-mix(in srgb, var(--color-info) 10%, var(--bg-primary));
+  border-left: 3px solid var(--color-info);
+}
+.overdue-item.overdue-item--future:hover {
+  background: color-mix(in srgb, var(--color-info) 16%, var(--bg-primary));
+}
+
+.overdue-item.overdue-item--undated {
+  background: var(--bg-secondary);
+  border-left: 3px solid var(--border-color);
+}
+.overdue-item.overdue-item--undated:hover {
+  background: var(--bg-tertiary);
+}
+
+/* Checkbox-Akzent zieht die Kartenfarbe durch (Hover bleibt Accent-Highlight) */
+.overdue-item--overdue .overdue-item-checkbox { color: var(--color-danger); }
+.overdue-item--today .overdue-item-checkbox { color: var(--color-warning); }
+.overdue-item--future .overdue-item-checkbox { color: var(--color-info); }
+
+/* ============ KI-Tag-Befüllung ============ */
+.overdue-panel-ai svg { color: var(--accent-color, #0a84ff); }
+.overdue-panel-ai.busy { color: var(--color-danger); }
+.overdue-panel-ai.busy svg { color: var(--color-danger); }
+
+/* Per-Karte „✨"-Button neben „+ Tag" */
+.overdue-tag-ai {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px dashed color-mix(in srgb, var(--accent-color, #0a84ff) 45%, transparent);
+  background: transparent;
+  color: var(--accent-color, #0a84ff);
+  border-radius: 10px;
+  padding: 1px 6px;
+  font-size: 11px;
+  line-height: 1.4;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+.overdue-tag-ai:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--accent-color, #0a84ff) 12%, transparent);
+  border-style: solid;
+}
+.overdue-tag-ai:disabled { opacity: 0.5; cursor: default; }
+.overdue-tag-ai.busy { animation: overdue-pulse 1s ease-in-out infinite; }
+
+/* Fortschritts-Banner während der Batch-Befüllung */
+.overdue-tagging-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 12px 0;
+  padding: 6px 10px;
+  font-size: 12px;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--accent-color, #0a84ff) 12%, var(--bg-primary));
+  color: var(--text-primary);
+}
+.overdue-tagging-spinner {
+  width: 12px;
+  height: 12px;
+  border: 2px solid color-mix(in srgb, var(--accent-color, #0a84ff) 30%, transparent);
+  border-top-color: var(--accent-color, #0a84ff);
+  border-radius: 50%;
+  animation: overdue-spin 0.8s linear infinite;
+  flex-shrink: 0;
+}
+.overdue-tagging-stop {
+  margin-left: auto;
+  border: none;
+  background: transparent;
+  color: var(--color-danger);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+@keyframes overdue-spin { to { transform: rotate(360deg); } }
+@keyframes overdue-pulse { 50% { opacity: 0.45; } }
+
+/* Sektionstitel farbcodiert (overdue ist bereits oben gesetzt) */
+.overdue-section.today .overdue-section-title { color: var(--color-warning); }
+.overdue-section.future .overdue-section-title { color: var(--color-info); }
+.overdue-section.future .overdue-section-count {
+  background: color-mix(in srgb, var(--color-info) 15%, transparent);
+  color: var(--color-info);
+}
+
 /* ============ TAGS PANEL ============ */
 .tags-panel {
   display: flex;

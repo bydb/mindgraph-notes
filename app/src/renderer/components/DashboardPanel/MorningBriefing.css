@@ -183,6 +183,47 @@
   background: var(--color-danger, #e55);
 }
 
+/* Wochen-Fokus & Timeblocking — als breite Sektions-Karten oben */
+.briefing-card--wide {
+  grid-column: 1 / -1;
+}
+
+.briefing-card.weekfocus {
+  background: color-mix(in srgb, var(--accent-color) 8%, var(--bg-secondary));
+  border-color: color-mix(in srgb, var(--accent-color) 30%, var(--border-color));
+}
+.briefing-card.weekfocus .briefing-card-label {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.briefing-card-list li.appt::before {
+  background: var(--accent-color);
+}
+
+.briefing-card.timeblock {
+  background: color-mix(in srgb, var(--color-success, #3a3) 8%, var(--bg-secondary));
+  border-color: color-mix(in srgb, var(--color-success, #3a3) 30%, var(--border-color));
+}
+.briefing-card.timeblock .briefing-card-label {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.briefing-card-list li.block::before {
+  background: var(--color-success, #3a3);
+}
+.briefing-card-list li.block strong {
+  font-variant-numeric: tabular-nums;
+  color: var(--color-success, #3a3);
+}
+.briefing-card-hint {
+  margin-top: 8px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
 .briefing-footer {
   padding: 16px 28px;
   border-top: 1px solid var(--border-color);

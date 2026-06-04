@@ -43,13 +43,18 @@ function isBeforeToday(date: Date): boolean {
 }
 
 // ============ TASK CARD ============
+type UrgencyVariant = 'overdue' | 'today' | 'future' | 'undated'
+
 const TaskCard: React.FC<{
   task: TaskEntry
   showDate: boolean
-  onSave: (task: TaskEntry, updates: Partial<ExtractedTask>) => Promise<void>
+  variant: UrgencyVariant
+  onSave: (task: TaskEntry, updates: Partial<ExtractedTask>) => Promise<void | boolean>
   onOpenNote: (task: TaskEntry) => void
+  onTag?: (task: TaskEntry) => void
+  tagging?: boolean
   availableTags: string[]
-}> = ({ task, showDate, onSave, onOpenNote, availableTags }) => {
+}> = ({ task, showDate, variant, onSave, onOpenNote, onTag, tagging, availableTags }) => {
   const { t } = useTranslation()
   const [editingText, setEditingText] = useState(false)
   const [textDraft, setTextDraft] = useState(task.text)
@@ -126,7 +131,7 @@ const TaskCard: React.FC<{
   }
 
   return (
-    <div className={`overdue-item ${task.completed ? 'completed' : ''} ${saving ? 'saving' : ''}`}>
+    <div className={`overdue-item overdue-item--${variant} ${task.completed ? 'completed' : ''} ${saving ? 'saving' : ''}`}>
       <button
         className="overdue-item-checkbox"
         onClick={handleToggleComplete}
@@ -252,6 +257,16 @@ const TaskCard: React.FC<{
           ) : (
             <button className="overdue-tag-add" onClick={() => setAddingTag(true)} title={t('tasks.addTag')}>
               + Tag
+            </button>
+          )}
+          {onTag && !addingTag && (
+            <button
+              className={`overdue-tag-ai ${tagging ? 'busy' : ''}`}
+              onClick={() => onTag(task)}
+              disabled={tagging}
+              title={t('tasks.aiTagOne')}
+            >
+              {tagging ? '⋯' : '✨'}
             </button>
           )}
         </div>
@@ -386,13 +401,21 @@ const QuickAdd: React.FC<{
 export const OverduePanel: React.FC<OverduePanelProps> = ({ onClose }) => {
   const { t } = useTranslation()
   const { notes, vaultPath, selectNote, updateNote } = useNotesStore()
-  const { taskExcludedFolders } = useUIStore()
+  const { taskExcludedFolders, email, ollama } = useUIStore()
   const setQuickEventModalOpen = useUIStore(state => state.setQuickEventModalOpen)
   const [allTasks, setAllTasks] = useState<TaskEntry[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [reloadTick, setReloadTick] = useState(0)
   const [quickAddOpen, setQuickAddOpen] = useState(false)
   const [errorBanner, setErrorBanner] = useState<string | null>(null)
+  // KI-Tag-Befüllung (läuft lokal über Ollama, nutzer-ausgelöst, sequenziell, abbrechbar)
+  const [taggingBusy, setTaggingBusy] = useState(false)
+  const [taggingProgress, setTaggingProgress] = useState<{ done: number; total: number } | null>(null)
+  const [singleTaggingKey, setSingleTaggingKey] = useState<string | null>(null)
+  const taggingCancelRef = useRef(false)
+
+  // Modell für die Tag-Analyse: Email-Tab → Modul-Override (task-extraction) → globales Modell.
+  const taggingModel = email.analysisModel || ollama.moduleModelOverrides?.['task-extraction'] || ollama.selectedModel || ''
 
   // Alle im Vault bekannten Tags einmal aggregieren (für Autocomplete)
   const availableTags = useMemo(() => {
@@ -401,6 +424,13 @@ export const OverduePanel: React.FC<OverduePanelProps> = ({ onClose }) => {
       note.tags?.forEach(tg => set.add(tg))
     }
     return Array.from(set).sort()
+  }, [notes])
+
+  // Häufigste Vault-Tags als bevorzugtes Vokabular für die KI (hält Tags konsistent).
+  const topTags = useMemo(() => {
+    const freq = new Map<string, number>()
+    for (const note of notes) note.tags?.forEach(tg => freq.set(tg, (freq.get(tg) || 0) + 1))
+    return Array.from(freq.entries()).sort((a, b) => b[1] - a[1]).slice(0, 40).map(([tg]) => tg)
   }, [notes])
 
   // Ziel-Optionen für Quick-Add: Daily Note (heute) + Inbox/Tasks.md + bereits bekannte Task-Notizen
@@ -489,10 +519,23 @@ export const OverduePanel: React.FC<OverduePanelProps> = ({ onClose }) => {
   const overdueTasks = allTasks.filter(t => t.dueDate && t.dueDate < today)
   const todayTasks = allTasks.filter(t => t.dueDate && t.dueDate >= today && t.dueDate < tomorrow)
   const futureTasks = allTasks.filter(t => t.dueDate && t.dueDate >= tomorrow)
-  const undatedTasks = allTasks.filter(t => !t.dueDate)
+  // Aufgaben ohne Fälligkeitsdatum werden bewusst nicht im Panel gezeigt.
+  const hasDatedTasks = overdueTasks.length > 0 || todayTasks.length > 0 || futureTasks.length > 0
 
-  const handleSaveTask = useCallback(async (task: TaskEntry, updates: Partial<ExtractedTask>): Promise<void> => {
-    if (!vaultPath) return
+  // „Geplant" feiner untergliedern: Diese Woche / Nächste Woche / Später.
+  // Wochengrenze = nächster Montag 00:00 (DE-Woche beginnt montags).
+  const DAY_MS = 24 * 60 * 60 * 1000
+  const dow = today.getDay() // 0=So .. 6=Sa
+  const daysUntilNextMonday = ((8 - dow) % 7) || 7
+  const startOfNextWeek = new Date(today.getTime() + daysUntilNextMonday * DAY_MS)
+  const startOfWeekAfterNext = new Date(startOfNextWeek.getTime() + 7 * DAY_MS)
+
+  const thisWeekTasks = futureTasks.filter(t => t.dueDate! < startOfNextWeek)
+  const nextWeekTasks = futureTasks.filter(t => t.dueDate! >= startOfNextWeek && t.dueDate! < startOfWeekAfterNext)
+  const laterTasks = futureTasks.filter(t => t.dueDate! >= startOfWeekAfterNext)
+
+  const handleSaveTask = useCallback(async (task: TaskEntry, updates: Partial<ExtractedTask>, opts?: { skipReload?: boolean }): Promise<boolean> => {
+    if (!vaultPath) return false
     const merged: ExtractedTask = { ...task, ...updates }
     const newLine = buildTaskLine({
       rawLine: task.rawLine,
@@ -502,7 +545,7 @@ export const OverduePanel: React.FC<OverduePanelProps> = ({ onClose }) => {
       dueDate: merged.dueDate
     })
 
-    if (newLine === task.rawLine) return
+    if (newLine === task.rawLine) return false
 
     const result = await window.electronAPI.tasksUpdateLine({
       vaultPath,
@@ -515,7 +558,7 @@ export const OverduePanel: React.FC<OverduePanelProps> = ({ onClose }) => {
     if (!result.success) {
       setErrorBanner(result.error || t('tasks.saveError'))
       setTimeout(() => setErrorBanner(null), 4000)
-      return
+      return false
     }
 
     trackContextEvent(vaultPath, {
@@ -526,6 +569,10 @@ export const OverduePanel: React.FC<OverduePanelProps> = ({ onClose }) => {
       source: 'tasks'
     }, { throttleMs: 30 * 1000 })
 
+    // Im Batch (skipReload) sparen wir uns das teure Reload pro Aufgabe — der
+    // Aufrufer frischt die berührten Notizen am Ende einmal auf.
+    if (opts?.skipReload) return true
+
     // Content im Store aktualisieren, damit nächstes Rendering frisch ist
     try {
       const content = await window.electronAPI.readFile(`${vaultPath}/${task.notePath}`) as string
@@ -534,6 +581,7 @@ export const OverduePanel: React.FC<OverduePanelProps> = ({ onClose }) => {
       // Fallback: einfach neu laden
     }
     setReloadTick(x => x + 1)
+    return true
   }, [vaultPath, updateNote, t])
 
   const handleCreateTask = useCallback(async (
@@ -572,8 +620,94 @@ export const OverduePanel: React.FC<OverduePanelProps> = ({ onClose }) => {
     selectNote(task.noteId)
   }
 
-  const renderSection = (title: string, tasks: TaskEntry[], type: 'overdue' | 'today' | 'future' | 'undated') => {
-    const showDate = type === 'future'
+  // Kandidaten-Tags für die KI: direkt im Text/Titel vorkommende Vault-Tags + häufigste Tags.
+  const pickCandidateTags = useCallback((task: TaskEntry): string[] => {
+    const hay = `${task.text} ${task.noteTitle}`.toLowerCase()
+    const relevant = availableTags.filter(tg => tg.length >= 3 && hay.includes(tg.toLowerCase()))
+    return Array.from(new Set([...relevant, ...topTags])).slice(0, 60)
+  }, [availableTags, topTags])
+
+  // Ein Task taggen: lokales Ollama fragen, vorgeschlagene Tags in die Notiz schreiben.
+  const requestTagsForTask = useCallback(async (task: TaskEntry): Promise<string[] | null> => {
+    const res = await window.electronAPI.tasksSuggestTags({
+      model: taggingModel,
+      taskText: task.text,
+      noteTitle: task.noteTitle,
+      candidateTags: pickCandidateTags(task),
+      existingTags: task.tags
+    })
+    if (!res.success) {
+      setErrorBanner(res.error || t('tasks.tagError'))
+      setTimeout(() => setErrorBanner(null), 5000)
+      return null
+    }
+    return (res.tags || []).filter(tg => !task.tags.includes(tg))
+  }, [taggingModel, pickCandidateTags, t])
+
+  const handleTagSingle = useCallback(async (task: TaskEntry): Promise<void> => {
+    if (!taggingModel) {
+      setErrorBanner(t('tasks.noModel'))
+      setTimeout(() => setErrorBanner(null), 5000)
+      return
+    }
+    const key = `${task.noteId}-${task.line}`
+    setSingleTaggingKey(key)
+    try {
+      const newTags = await requestTagsForTask(task)
+      if (newTags && newTags.length > 0) {
+        await handleSaveTask(task, { tags: [...task.tags, ...newTags] })
+      }
+    } finally {
+      setSingleTaggingKey(null)
+    }
+  }, [taggingModel, requestTagsForTask, handleSaveTask, t])
+
+  // Alle noch ungetaggten Aufgaben sequenziell befüllen (schont schwache Hardware,
+  // ein Ollama-Call nach dem anderen, jederzeit abbrechbar). Reload erst am Ende.
+  const handleTagAll = useCallback(async (): Promise<void> => {
+    if (taggingBusy) { taggingCancelRef.current = true; return }
+    if (!taggingModel) {
+      setErrorBanner(t('tasks.noModel'))
+      setTimeout(() => setErrorBanner(null), 5000)
+      return
+    }
+    // Nur sichtbare (datierte) Aufgaben taggen — die ausgeblendeten undatierten
+    // bleiben außen vor (sonst liefe der Batch über zig unsichtbare Tasks).
+    const targets = allTasks.filter(tk => tk.dueDate && tk.tags.length === 0)
+    if (targets.length === 0) return
+    setTaggingBusy(true)
+    taggingCancelRef.current = false
+    setTaggingProgress({ done: 0, total: targets.length })
+    const touched = new Map<string, string>()
+    try {
+      for (let i = 0; i < targets.length; i++) {
+        if (taggingCancelRef.current) break
+        const target = targets[i]
+        const newTags = await requestTagsForTask(target)
+        if (newTags && newTags.length > 0) {
+          const ok = await handleSaveTask(target, { tags: [...target.tags, ...newTags] }, { skipReload: true })
+          if (ok) touched.set(target.noteId, target.notePath)
+        }
+        setTaggingProgress({ done: i + 1, total: targets.length })
+      }
+      // Berührte Notizen einmalig im Store auffrischen, dann ein einziges Reload.
+      if (vaultPath) {
+        for (const [noteId, notePath] of touched) {
+          try {
+            const content = await window.electronAPI.readFile(`${vaultPath}/${notePath}`) as string
+            updateNote(noteId, { content })
+          } catch { /* Reload fängt es auf */ }
+        }
+      }
+    } finally {
+      setTaggingBusy(false)
+      setTaggingProgress(null)
+      setReloadTick(x => x + 1)
+    }
+  }, [taggingBusy, taggingModel, allTasks, requestTagsForTask, handleSaveTask, vaultPath, updateNote, t])
+
+  const renderSection = (title: string, tasks: TaskEntry[], type: UrgencyVariant, showDateOverride?: boolean) => {
+    const showDate = showDateOverride ?? (type === 'future')
     return (
       <div className={`overdue-section ${type}`}>
         <div className="overdue-section-header">
@@ -591,8 +725,11 @@ export const OverduePanel: React.FC<OverduePanelProps> = ({ onClose }) => {
                 key={`${task.noteId}-${task.line}`}
                 task={task}
                 showDate={showDate}
+                variant={type}
                 onSave={handleSaveTask}
                 onOpenNote={handleOpenNote}
+                onTag={handleTagSingle}
+                tagging={taggingBusy || singleTaggingKey === `${task.noteId}-${task.line}`}
                 availableTags={availableTags}
               />
             ))}
@@ -636,6 +773,15 @@ export const OverduePanel: React.FC<OverduePanelProps> = ({ onClose }) => {
             <line x1="10" y1="15" x2="14" y2="15"/>
           </svg>
         </button>
+        <button
+          className={`overdue-panel-add overdue-panel-ai ${taggingBusy ? 'busy' : ''}`}
+          onClick={handleTagAll}
+          title={taggingBusy ? t('tasks.tagAllStop') : t('tasks.tagAll')}
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/>
+          </svg>
+        </button>
         <button className="overdue-panel-close" onClick={onClose} title={t('panel.close')}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <line x1="18" y1="6" x2="6" y2="18"/>
@@ -643,6 +789,18 @@ export const OverduePanel: React.FC<OverduePanelProps> = ({ onClose }) => {
           </svg>
         </button>
       </div>
+
+      {taggingProgress && (
+        <div className="overdue-tagging-banner">
+          <span className="overdue-tagging-spinner" />
+          {t('tasks.taggingProgress')
+            .replace('{done}', String(taggingProgress.done))
+            .replace('{total}', String(taggingProgress.total))}
+          <button className="overdue-tagging-stop" onClick={() => { taggingCancelRef.current = true }}>
+            {t('tasks.tagAllStop')}
+          </button>
+        </div>
+      )}
 
       {errorBanner && (
         <div className="overdue-error-banner">{errorBanner}</div>
@@ -678,7 +836,7 @@ export const OverduePanel: React.FC<OverduePanelProps> = ({ onClose }) => {
             <div className="overdue-spinner"></div>
             <p>{t('overdue.loading')}</p>
           </div>
-        ) : allTasks.length === 0 ? (
+        ) : !hasDatedTasks ? (
           <div className="overdue-empty">
             <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
               <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
@@ -691,8 +849,9 @@ export const OverduePanel: React.FC<OverduePanelProps> = ({ onClose }) => {
           <>
             {overdueTasks.length > 0 && renderSection(t('overdue.overdue'), overdueTasks, 'overdue')}
             {todayTasks.length > 0 && renderSection(t('overdue.today'), todayTasks, 'today')}
-            {futureTasks.length > 0 && renderSection(t('overdue.scheduled'), futureTasks, 'future')}
-            {undatedTasks.length > 0 && renderSection(t('tasks.undated'), undatedTasks, 'undated')}
+            {thisWeekTasks.length > 0 && renderSection(t('overdue.thisWeek'), thisWeekTasks, 'future', false)}
+            {nextWeekTasks.length > 0 && renderSection(t('overdue.nextWeek'), nextWeekTasks, 'future', false)}
+            {laterTasks.length > 0 && renderSection(t('overdue.later'), laterTasks, 'future', true)}
           </>
         )}
       </div>

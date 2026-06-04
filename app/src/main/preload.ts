@@ -571,6 +571,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
     relativePath: string
     taskLine: string
   }) => ipcRenderer.invoke('tasks-create', data),
+  tasksSuggestTags: (request: {
+    model: string
+    taskText: string
+    noteTitle?: string
+    candidateTags?: string[]
+    existingTags?: string[]
+  }) => ipcRenderer.invoke('tasks-suggest-tags', request),
 
   transportUpdateShortcut: (shortcut: string) =>
     ipcRenderer.invoke('transport-update-shortcut', shortcut),

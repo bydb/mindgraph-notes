@@ -4,7 +4,7 @@ import { useUIStore } from '../../stores/uiStore'
 import { useEmailStore } from '../../stores/emailStore'
 import { useAgentStore } from '../../stores/agentStore'
 import { useTranslation } from '../../utils/translations'
-import { buildDashboardSnapshot, formatRelativeDay, type DashboardSnapshot } from '../../utils/dashboardData'
+import { buildDashboardSnapshot, formatRelativeDay, collectWeekFocus, collectFocusTasks, proposeTimeBlocks, type DashboardSnapshot } from '../../utils/dashboardData'
 import './MorningBriefing.css'
 
 interface MorningBriefingProps {
@@ -77,7 +77,13 @@ export const MorningBriefing: React.FC<MorningBriefingProps> = ({ onClose, onOpe
   const calendarToday = snapshot.calendar.filter(c => c.dayOffset === 0).length
   const bookingsTotal = snapshot.bookings.length
 
-  const nothing = tasksTotal === 0 && emailsTotal === 0 && calendarToday === 0 && bookingsTotal === 0
+  // Wochen-Fokus + Timeblocking (heuristisch, sofort — kein LLM)
+  const weekFocus = collectWeekFocus(snapshot.tasks, snapshot.calendar)
+  const todaysEvents = snapshot.calendar.filter(c => c.dayOffset === 0).map(c => c.event)
+  const timeBlocks = proposeTimeBlocks(collectFocusTasks(snapshot.tasks), todaysEvents)
+  const hasWeekFocus = weekFocus.tasks.length > 0 || weekFocus.appointments.length > 0
+
+  const nothing = tasksTotal === 0 && emailsTotal === 0 && calendarToday === 0 && bookingsTotal === 0 && !hasWeekFocus
 
   const formatTime = (iso: string) => {
     const d = new Date(iso.replace(' ', 'T'))
@@ -108,6 +114,38 @@ export const MorningBriefing: React.FC<MorningBriefingProps> = ({ onClose, onOpe
             <p className="briefing-empty">{t('briefing.nothingToday')}</p>
           ) : (
             <div className="briefing-grid">
+              {hasWeekFocus && (
+                <div className="briefing-card weekfocus briefing-card--wide">
+                  <div className="briefing-card-label">{t('briefing.weekFocusTitle')}</div>
+                  <ul className="briefing-card-list">
+                    {weekFocus.tasks.map(task => (
+                      <li key={`${task.noteId}-${task.line}`} className={task.reason === 'critical' || task.reason === 'overdue' ? 'overdue' : ''}>
+                        {task.text}
+                      </li>
+                    ))}
+                    {weekFocus.appointments.slice(0, 4).map((item, i) => (
+                      <li key={`appt-${i}`} className="appt">
+                        <strong>{formatRelativeDay(item.dayOffset, t)}{item.event.allDay ? '' : ` · ${formatTime(item.event.startDate)}`}</strong> — {item.event.title}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {timeBlocks.length > 0 && (
+                <div className="briefing-card timeblock briefing-card--wide">
+                  <div className="briefing-card-label">{t('briefing.timeblockTitle')}</div>
+                  <ul className="briefing-card-list">
+                    {timeBlocks.map((b, i) => (
+                      <li key={`tb-${i}`} className="block">
+                        <strong>{formatTime(b.start.toISOString())}–{formatTime(b.end.toISOString())}</strong> — {b.task.text}
+                      </li>
+                    ))}
+                  </ul>
+                  <div className="briefing-card-hint">{t('briefing.timeblockHint')}</div>
+                </div>
+              )}
+
               {tasksTotal > 0 && (
                 <div className="briefing-card tasks">
                   <div className="briefing-card-value">{tasksTotal}</div>

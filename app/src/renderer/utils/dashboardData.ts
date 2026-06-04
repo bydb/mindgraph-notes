@@ -361,3 +361,70 @@ export function findNextFreeSlot(
   }
   return null
 }
+
+// ─── Wochen-Fokus & Timeblocking (Morning-Briefing) ──────────────────────────
+
+export interface WeekFocusTask extends DashboardTask {
+  reason: 'critical' | 'overdue' | 'today' | 'soon'
+}
+
+export interface WeekFocus {
+  tasks: WeekFocusTask[]
+  appointments: CalendarItem[]   // Termine diese Woche (dayOffset 0..6)
+}
+
+/**
+ * Die wichtigsten Dinge der Woche: priorisierte Aufgaben (kritisch > überfällig >
+ * heute > anstehend) plus die Termine der nächsten 7 Tage.
+ */
+export function collectWeekFocus(tasks: TaskBuckets, calendar: CalendarItem[], cap = 5): WeekFocus {
+  const result: WeekFocusTask[] = []
+  const seen = new Set<string>()
+  const push = (task: DashboardTask, reason: WeekFocusTask['reason']) => {
+    const key = `${task.noteId}-${task.line}`
+    if (seen.has(key) || result.length >= cap) return
+    seen.add(key)
+    result.push({ ...task, reason })
+  }
+  for (const t of [...tasks.overdue, ...tasks.today, ...tasks.soon]) if (t.isCritical) push(t, 'critical')
+  for (const t of tasks.overdue) push(t, 'overdue')
+  for (const t of tasks.today) push(t, 'today')
+  for (const t of tasks.soon) push(t, 'soon')
+  const appointments = calendar.filter(c => c.dayOffset >= 0 && c.dayOffset <= 6)
+  return { tasks: result, appointments }
+}
+
+export interface TimeBlock {
+  start: Date
+  end: Date
+  task: DashboardTask
+}
+
+/**
+ * Schlägt Zeitblöcke für die wichtigsten Aufgaben in die heutigen Freiräume vor.
+ * Respektiert bestehende Kalender-Events; aufeinanderfolgende Blöcke überlappen
+ * nicht (jeder startet frühestens am Ende des vorigen). Start frühestens 9:00 Uhr.
+ */
+export function proposeTimeBlocks(
+  focusTasks: DashboardTask[],
+  todaysEvents: CalendarEvent[],
+  now: Date = new Date(),
+  durationMinutes = 45,
+  maxBlocks = 3
+): TimeBlock[] {
+  const blocks: TimeBlock[] = []
+  // Ganztägige Events (Feiertage, „ganztägig"-Marker) blockieren keine Uhrzeit —
+  // sonst gäbe es an einem Feiertag nie einen freien Slot.
+  const timedEvents = todaysEvents.filter(e => !e.allDay)
+  let from = new Date(now)
+  if (from.getHours() < 9) from.setHours(9, 0, 0, 0)
+  for (const task of focusTasks) {
+    if (blocks.length >= maxBlocks) break
+    const slot = findNextFreeSlot(timedEvents, durationMinutes, from)
+    if (!slot) break
+    const end = new Date(slot.getTime() + durationMinutes * 60 * 1000)
+    blocks.push({ start: slot, end, task })
+    from = end
+  }
+  return blocks
+}
