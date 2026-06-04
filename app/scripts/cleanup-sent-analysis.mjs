@@ -61,13 +61,18 @@ try {
   process.exit(1)
 }
 
+// Sent-Erkennung wie shared/emailRelevance.ts: sent-Flag ODER Sent-Ordnername.
+// Per IMAP aus „Gesendet"/„Sent" gefetchte Mails tragen kein sent-Flag, nur folder.
+const isSentFolderName = (f) => !!f && /(^|[./])(sent|gesendet)/i.test(f)
+const isSentMail = (e) => e.sent === true || isSentFolderName(e.folder)
+
 const emails = Array.isArray(data.emails) ? data.emails : []
-const sent = emails.filter((e) => e && e.sent === true)
+const sent = emails.filter((e) => e && isSentMail(e))
 const withAnalysis = sent.filter((e) => e.analysis)
 const withNoteFlags = sent.filter((e) => e.noteCreated || e.notePath)
 
 console.log(`Vault:        ${vaultPath}`)
-console.log(`emails.json:  ${emails.length} Mails gesamt, ${sent.length} gesendet (sent:true)`)
+console.log(`emails.json:  ${emails.length} Mails gesamt, ${sent.length} gesendet (sent-Flag oder Sent-Ordner)`)
 console.log(`Zu bereinigen: ${withAnalysis.length} Sent-Mails mit analysis-Objekt`)
 if (clearNoteFlags) {
   console.log(`               + ${withNoteFlags.length} Sent-Mails mit noteCreated/notePath (--clear-note-flags)`)

@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import type { EmailMessage, EmailFilter, EmailFetchResult, EmailFolder, ComposeEmail, EmailSendResult } from '../../shared/types'
+import { isSentMail } from '../../shared/emailRelevance'
 import { useUIStore } from './uiStore'
 import { useNotesStore } from './notesStore'
 
@@ -100,7 +101,8 @@ export const useEmailStore = create<EmailState>()((set, get) => ({
         const isCurrentlyAnalyzing = get().isAnalyzing
         const { email: emailSettings } = useUIStore.getState()
         // Gesendete Mails nicht auto-analysieren — Relevanz/needsReply ist für eigene Mails sinnlos.
-        const unanalyzed = (data.emails || []).filter((e: { analysis?: unknown; sent?: boolean }) => !e.analysis && !e.sent)
+        // isSentMail erkennt auch IMAP-gefetchte Sent-Mails (folder=Gesendet ohne sent-Flag).
+        const unanalyzed = (data.emails || []).filter((e: EmailMessage) => !e.analysis && !isSentMail(e))
         if (!isCurrentlyAnalyzing && emailSettings.autoAnalyze && unanalyzed.length > 0) {
           setTimeout(() => get().analyzeEmails(vaultPath), 1000)
         }

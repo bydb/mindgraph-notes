@@ -25,7 +25,7 @@ import {
 } from './projectStatus/synonymGenerator'
 import { runWorkflow, type RunnerServices, type SeedEmail } from './workflows/runner'
 import { matchEmailToProjects, gateProjectMatch } from '../shared/projectMatch'
-import { parseRelevanceConfig, stripConfigBlock, buildReplyStats, computeHardSignals, combineRelevance, extractConfigBlock, upsertConfigBlock, emptyRelevanceConfig, DEFAULT_VIP_WEIGHT, DEFAULT_DOMAIN_WEIGHT, DEFAULT_KEYWORD_BOOST } from '../shared/emailRelevance'
+import { parseRelevanceConfig, stripConfigBlock, buildReplyStats, computeHardSignals, combineRelevance, extractConfigBlock, upsertConfigBlock, emptyRelevanceConfig, isSentMail, isSentFolderName, DEFAULT_VIP_WEIGHT, DEFAULT_DOMAIN_WEIGHT, DEFAULT_KEYWORD_BOOST } from '../shared/emailRelevance'
 import { isHardLocked as isModelHardLocked } from '../shared/modelCompatibility'
 import { MODULE_FEATURE_GATE } from '../shared/workflow/types'
 import type { Workflow, WorkflowFile, WorkflowRunTrigger } from '../shared/workflow/model'
@@ -7295,6 +7295,10 @@ ipcMain.handle('email-fetch', async (_event, vaultPath: string, accounts: Array<
               uid: msg.uid,
               accountId: account.id,
               folder: fetchFolder,
+              // Aus einem Sent-Ordner gefetchte Mails als gesendet markieren — sonst fehlt
+              // ihnen das sent-Flag (nur der lokale Sende-Flow setzt es) und sie liefen beim
+              // Öffnen von „Gesendet" erneut in die Analyse.
+              sent: isSentFolderName(fetchFolder) || undefined,
               from: { name: from.name || '', address: from.address || '' },
               to,
               subject: msg.envelope?.subject || '(Kein Betreff)',
@@ -7532,11 +7536,13 @@ ipcMain.handle('email-analyze', async (_event, vaultPath: string, model: string,
 
     // Zu analysierende Emails filtern
     // Ohne emailIds: nur unanalysierte Emails (keine Re-Analyse bereits verarbeiteter).
-    // Gesendete Mails (sent) sind ausgeschlossen — Relevanz/needsReply für eine selbst
-    // gesendete Mail ist sinnlos und verbrennt nur Analyse-Zeit (Timeout bei langsamem Modell).
+    // Gesendete Mails sind ausgeschlossen — Relevanz/needsReply für eine selbst gesendete
+    // Mail ist sinnlos und verbrennt nur Analyse-Zeit (Timeout bei langsamem Modell).
+    // isSentMail prüft sent-Flag UND Ordnername: per IMAP aus „Gesendet" gefetchte Mails
+    // tragen kein sent-Flag, würden sonst beim Wechsel in den Sent-Ordner analysiert.
     const toAnalyze = emailIds
       ? emails.filter((e: { id: string; analysis?: object }) => emailIds.includes(e.id))
-      : emails.filter((e: { analysis?: object; noteCreated?: boolean; sent?: boolean }) => !e.analysis && !e.noteCreated && !e.sent)
+      : emails.filter((e: { analysis?: object; noteCreated?: boolean; sent?: boolean; folder?: string }) => !e.analysis && !e.noteCreated && !isSentMail(e))
 
     console.log(`[Email] ${emails.length} total, ${toAnalyze.length} to analyze`)
     let analyzed = 0

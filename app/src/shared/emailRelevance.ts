@@ -306,3 +306,21 @@ export function upsertConfigBlock(note: string, cfg: RelevanceConfig): string {
     block + '\n'
   return (note ? note.trimEnd() : '') + section
 }
+
+// ── Sent-Mail-Erkennung (prozessübergreifend) ────────────────────────────────
+// Gesendete Mails dürfen NIE in die Relevanz-/needsReply-Analyse: für eine eigene
+// Mail ist das sinnlos und verbrennt bei langsamen Modellen Analyse-Zeit (Timeouts).
+// Zwei Quellen, beide nötig:
+//   1. das explizite sent-Flag (lokaler Sende-Flow setzt es)
+//   2. der Ordnername — per IMAP aus „Gesendet"/„Sent" gefetchte Mails tragen KEIN
+//      sent-Flag, nur folder. Genau die liefen sonst weiter in die Analyse.
+// Deckt die bekannten Sent-Ordnernamen ab (vgl. findSentMailbox): Sent, Gesendet,
+// INBOX.Sent, INBOX.Gesendet, Sent Items/Messages, Gesendete Objekte/Elemente/Nachrichten.
+export function isSentFolderName(folder?: string | null): boolean {
+  if (!folder) return false
+  return /(^|[./])(sent|gesendet)/i.test(folder)
+}
+
+export function isSentMail(e: { sent?: boolean; folder?: string | null }): boolean {
+  return e.sent === true || isSentFolderName(e.folder)
+}
