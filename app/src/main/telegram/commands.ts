@@ -12,6 +12,7 @@ import { ToolRegistry } from './agent/tools/registry'
 import { noteSearchTool, noteReadTool, noteCreateTool, noteAppendTool } from './agent/tools/notes'
 import { taskListTool, taskToggleTool } from './agent/tools/tasks'
 import { calendarListTool } from './agent/tools/calendar'
+import { projectAskTool } from './agent/tools/project'
 import { registerPending } from './agent/confirm'
 
 const DEFAULT_AGENT_INBOX_FOLDER = '000 - 📥 inbox/010 - 📥 Notes'
@@ -28,6 +29,8 @@ export interface CommandDeps {
   agentInboxFolder: () => string
   agentAllowedTools: () => string[]
   agentConfirmTools: () => string[]
+  projectsRootFolder: () => string
+  embeddingModel: () => string
   /** Wird vom Bot bereitgestellt — baut einen Inline-Keyboard mit Approve/Deny-Buttons. */
   buildConfirmKeyboard: (confirmId: string) => InlineKeyboard
 }
@@ -57,6 +60,7 @@ toolRegistry.register(noteAppendTool)
 toolRegistry.register(taskListTool)
 toolRegistry.register(taskToggleTool)
 toolRegistry.register(calendarListTool)
+toolRegistry.register(projectAskTool)
 
 export function getToolRegistry(): ToolRegistry {
   return toolRegistry
@@ -332,7 +336,9 @@ export async function handleAgent(ctx: Context, deps: CommandDeps, instruction: 
       toolContext: {
         vaultPath: vault,
         excludedFolders: deps.excludedFolders(),
-        inboxFolder: await resolveAgentInboxFolder(vault, deps.agentInboxFolder())
+        inboxFolder: await resolveAgentInboxFolder(vault, deps.agentInboxFolder()),
+        projectsRootFolder: deps.projectsRootFolder(),
+        embeddingModel: deps.embeddingModel()
       },
       allowedTools,
       confirmRequiredTools: confirmTools,

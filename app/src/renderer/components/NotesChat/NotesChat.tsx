@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { sanitizeHtml } from '../../utils/sanitize'
 import { useNotesStore } from '../../stores/notesStore'
 import { useUIStore } from '../../stores/uiStore'
+import { useIsModuleEnabled } from '../../utils/modules'
 import { useTranslation } from '../../utils/translations'
 import { writeClipboardText } from '../../utils/clipboard'
 import MarkdownIt from 'markdown-it'
@@ -19,6 +20,25 @@ mermaid.initialize({
 
 let notesChatMermaidCounter = 0
 
+// Minimales Un-/Escaping fürs Wikilink-Linkifying (arbeitet auf bereits sanitisiertem HTML).
+function ncUnescape(s: string): string {
+  return s.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'")
+}
+function ncEscapeAttr(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+}
+
+// Wandelt `[[Titel]]` im gerenderten HTML in klickbare Spans um — aber NUR, wenn
+// der Link auf eine existierende Notiz auflösbar ist (sonst bleibt es Klartext,
+// kein toter Link). Die Auflösung liefert die Notiz-ID, die der Klick-Handler nutzt.
+function linkifyWikilinks(html: string, resolve: (text: string) => string | null): string {
+  return html.replace(/\[\[([^\]\n]+?)\]\]/g, (full, inner: string) => {
+    const id = resolve(ncUnescape(inner))
+    if (!id) return full
+    return `<span class="nc-wikilink" role="link" tabindex="0" data-note-id="${ncEscapeAttr(id)}">${inner}</span>`
+  })
+}
+
 interface ChatMessage {
   role: 'user' | 'assistant'
   content: string
@@ -32,8 +52,13 @@ interface OllamaModel {
   size: number
 }
 
-type ContextMode = 'current' | 'folder' | 'all'
+type ContextMode = 'current' | 'folder' | 'all' | 'project'
 type ChatMode = 'direct' | 'socratic'
+
+interface ProjectOption {
+  folderRel: string
+  folderName: string
+}
 
 interface NotesChatProps {
   onClose: () => void
@@ -43,6 +68,10 @@ export const NotesChat: React.FC<NotesChatProps> = ({ onClose }) => {
   const { t } = useTranslation()
   const { notes, selectedNoteId, vaultPath } = useNotesStore()
   const { ollama: llmSettings } = useUIStore()
+  const language = useUIStore(s => s.language)
+  const lang: 'de' | 'en' = language === 'en' ? 'en' : 'de'
+  const projectsRootFolder = useUIStore(s => s.projectsRootFolder)
+  const projectRagEnabled = useIsModuleEnabled('project-rag')
   const [models, setModels] = useState<OllamaModel[]>([])
   const [selectedModel, setSelectedModel] = useState<string>('')
   const [isBackendAvailable, setIsBackendAvailable] = useState(false)
@@ -50,6 +79,8 @@ export const NotesChat: React.FC<NotesChatProps> = ({ onClose }) => {
   const [contextMode, setContextMode] = useState<ContextMode>('current')
   const [chatMode, setChatMode] = useState<ChatMode>('direct')
   const [selectedFolder, setSelectedFolder] = useState<string>('')
+  const [projectList, setProjectList] = useState<ProjectOption[]>([])
+  const [selectedProject, setSelectedProject] = useState<string>('')
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [inputValue, setInputValue] = useState('')
   const [isStreaming, setIsStreaming] = useState(false)
@@ -194,8 +225,31 @@ export const NotesChat: React.FC<NotesChatProps> = ({ onClose }) => {
     applyCodeCopyButtons()
   }, [messages, streamingContent, t])
 
+  // Löst einen Wikilink-Text auf eine Notiz-ID auf (Titel- bzw. Dateinamen-Match).
+  const resolveNoteId = useCallback((text: string): string | null => {
+    const norm = (s: string) => (s || '').toLowerCase().replace(/\.md$/i, '').trim()
+    const t = norm(text)
+    if (!t) return null
+    const base = (p: string) => norm(p.split('/').pop() || '')
+    let n = notes.find(x => norm(x.title) === t)
+    if (!n) n = notes.find(x => base(x.path) === t)
+    if (!n) n = notes.find(x => { const b = base(x.path); return b !== '' && (b.includes(t) || t.includes(b)) })
+    return n ? n.id : null
+  }, [notes])
+
   const handleMessagesClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     const target = e.target as HTMLElement
+
+    // Klickbarer Wikilink → Notiz im Editor öffnen (Chat-Panel bleibt offen).
+    const wikilink = target.closest('.nc-wikilink') as HTMLElement | null
+    if (wikilink) {
+      e.preventDefault()
+      e.stopPropagation()
+      const id = wikilink.getAttribute('data-note-id')
+      if (id) useNotesStore.getState().selectNote(id)
+      return
+    }
+
     const copyButton = target.closest('.code-copy-btn') as HTMLButtonElement | null
     if (!copyButton) return
 
@@ -222,12 +276,20 @@ export const NotesChat: React.FC<NotesChatProps> = ({ onClose }) => {
       })
   }, [t])
 
-  // Streaming-Listener einrichten
+  // Letzte Projekt-RAG-Quellen (werden nach dem Streaming an die Antwort gehängt)
+  const lastSourcesRef = useRef<Array<{ fileRel: string; heading: string }>>([])
+
+  // Streaming-Listener einrichten — sowohl normaler Notiz-Chat als auch
+  // Projekt-RAG speisen denselben streamingContent/isStreaming-Fluss (nur jeweils
+  // ein Kanal feuert pro Nachricht).
+  // Hinweis: Die Projekt-RAG-Listener werden NICHT hier (bei Mount) registriert,
+  // sondern frisch pro Anfrage in sendMessage — sonst kann eine andere Fläche
+  // (Dashboard „Projekt befragen"-Modal) sie via removeAllListeners abräumen und
+  // dieser Chat bekäme kein „done"/„chunk" mehr (P1, Codex-Review).
   useEffect(() => {
     window.electronAPI.onOllamaChatChunk((chunk) => {
       setStreamingContent(prev => prev + chunk)
     })
-
     window.electronAPI.onOllamaChatDone(() => {
       setIsStreaming(false)
     })
@@ -236,19 +298,45 @@ export const NotesChat: React.FC<NotesChatProps> = ({ onClose }) => {
   // Letzte User-Frage speichern für Metadaten
   const lastUserQuestion = useRef<string>('')
 
+  // Projekte für den „Projekt"-Kontextmodus laden
+  useEffect(() => {
+    if (!vaultPath || !projectsRootFolder) return
+    let cancelled = false
+    ;(async () => {
+      try {
+        const res = await window.electronAPI.projectStatusDiscover(vaultPath, projectsRootFolder)
+        if (!cancelled && res?.success && Array.isArray(res.projects)) {
+          setProjectList(res.projects.map((p) => ({ folderRel: p.folderRel, folderName: p.folderName })))
+        }
+      } catch {
+        /* Projekte optional — Modus bleibt nutzbar, Dropdown leer */
+      }
+    })()
+    return () => { cancelled = true }
+  }, [vaultPath, projectsRootFolder])
+
   // Wenn Streaming endet, Nachricht zu Messages hinzufügen
   useEffect(() => {
     if (!isStreaming && streamingContent) {
+      let content = streamingContent
+      if (lastSourcesRef.current.length > 0) {
+        const lines = lastSourcesRef.current.map(s => {
+          const base = (s.fileRel.split('/').pop() || s.fileRel).replace(/\.md$/i, '')
+          return `- [[${base}]]${s.heading ? ` § ${s.heading}` : ''}`
+        })
+        content += `\n\n---\n**${lang === 'de' ? 'Quellen' : 'Sources'}:**\n${lines.join('\n')}`
+        lastSourcesRef.current = []
+      }
       setMessages(prev => [...prev, {
         role: 'assistant',
-        content: streamingContent,
+        content,
         question: lastUserQuestion.current,
         model: selectedModel,
         timestamp: new Date()
       }])
       setStreamingContent('')
     }
-  }, [isStreaming, streamingContent, selectedModel])
+  }, [isStreaming, streamingContent, selectedModel, lang])
 
   // Kontext-Text basierend auf Modus generieren
   const getContextText = useCallback(async (): Promise<string> => {
@@ -317,6 +405,55 @@ export const NotesChat: React.FC<NotesChatProps> = ({ onClose }) => {
     setMessages(prev => [...prev, { role: 'user', content: userMessage }])
     setIsStreaming(true)
     setStreamingContent('')
+
+    // Projekt-RAG-Pfad: semantisches Retrieval + verankerte Antwort (nur lokal).
+    if (contextMode === 'project') {
+      if (!vaultPath || !selectedProject) {
+        setMessages(prev => [...prev, {
+          role: 'assistant',
+          content: lang === 'de' ? 'Bitte zuerst ein Projekt wählen.' : 'Please select a project first.'
+        }])
+        setIsStreaming(false)
+        return
+      }
+      try {
+        lastSourcesRef.current = []
+        // Stream-Listener FRISCH registrieren → dieser Chat besitzt den Kanal für
+        // diese Anfrage (falls eine andere Fläche ihn zwischenzeitlich übernahm).
+        let streamDone = false
+        window.electronAPI.onProjectRagAnswerChunk((chunk) => setStreamingContent(prev => prev + chunk))
+        window.electronAPI.onProjectRagAnswerSources((sources) => {
+          lastSourcesRef.current = sources.map(s => ({ fileRel: s.fileRel, heading: s.heading }))
+        })
+        window.electronAPI.onProjectRagAnswerDone(() => { streamDone = true; setIsStreaming(false) })
+
+        const embedModel = llmSettings.projectRagEmbeddingModel || 'bge-m3'
+        const res = await window.electronAPI.projectRagAnswer(
+          vaultPath, selectedProject, userMessage, embedModel, selectedModel, lang
+        )
+        if (!res.success) {
+          setMessages(prev => [...prev, {
+            role: 'assistant',
+            content: (lang === 'de' ? 'Fehler: ' : 'Error: ') + (res.error || (lang === 'de' ? 'Unbekannt' : 'Unknown'))
+          }])
+          setIsStreaming(false)
+        } else if (!streamDone) {
+          // Backstop: „done" ging verloren (Kanal von anderer Fläche überschrieben).
+          // Der await ist nach Stream-Ende aufgelöst → Volltext nachziehen, falls keine
+          // Chunks ankamen, damit der Streaming-Ende-Effekt die Antwort rendert.
+          setStreamingContent(prev => prev || res.response || '')
+          setIsStreaming(false)
+        }
+      } catch (err) {
+        console.error('[NotesChat] Projekt-RAG Fehler:', err)
+        setMessages(prev => [...prev, {
+          role: 'assistant',
+          content: lang === 'de' ? 'Fehler bei der Projekt-Abfrage.' : 'Project query failed.'
+        }])
+        setIsStreaming(false)
+      }
+      return
+    }
 
     try {
       const context = await getContextText()
@@ -409,6 +546,11 @@ export const NotesChat: React.FC<NotesChatProps> = ({ onClose }) => {
         return t('notesChat.noFolderSelected')
       case 'all':
         return `${t('notesChat.allNotes')} (${Math.min(notes.length, 50)} ${t('notesChat.ofNotes')} ${notes.length})`
+      case 'project': {
+        if (!selectedProject) return lang === 'de' ? 'Kein Projekt gewählt' : 'No project selected'
+        const proj = projectList.find(p => p.folderRel === selectedProject)
+        return `${lang === 'de' ? 'Projekt' : 'Project'}: ${proj?.folderName || selectedProject}`
+      }
     }
   }
 
@@ -518,6 +660,19 @@ export const NotesChat: React.FC<NotesChatProps> = ({ onClose }) => {
                     <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
                   </svg>
                 </button>
+                {projectRagEnabled && (
+                  <button
+                    className={contextMode === 'project' ? 'active' : ''}
+                    onClick={() => setContextMode('project')}
+                    disabled={isStreaming}
+                    title={lang === 'de' ? 'Projekt (semantisches RAG, lokal)' : 'Project (semantic RAG, local)'}
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+                      <circle cx="12" cy="13" r="2.5"/>
+                    </svg>
+                  </button>
+                )}
               </div>
               {contextMode === 'folder' && (
                 <select
@@ -530,6 +685,21 @@ export const NotesChat: React.FC<NotesChatProps> = ({ onClose }) => {
                   {folders.map(folder => (
                     <option key={folder} value={folder}>
                       {folder}
+                    </option>
+                  ))}
+                </select>
+              )}
+              {contextMode === 'project' && (
+                <select
+                  className="notes-chat-folder-select"
+                  value={selectedProject}
+                  onChange={(e) => setSelectedProject(e.target.value)}
+                  disabled={isStreaming}
+                >
+                  <option value="">{lang === 'de' ? 'Projekt wählen…' : 'Choose project…'}</option>
+                  {projectList.map(p => (
+                    <option key={p.folderRel} value={p.folderRel}>
+                      {p.folderName}
                     </option>
                   ))}
                 </select>
@@ -579,7 +749,7 @@ export const NotesChat: React.FC<NotesChatProps> = ({ onClose }) => {
                   <div key={idx} className={`notes-chat-message ${msg.role}`}>
                     <div
                       className="notes-chat-message-content markdown-content"
-                      dangerouslySetInnerHTML={{ __html: sanitizeHtml(md.render(msg.content)) }}
+                      dangerouslySetInnerHTML={{ __html: linkifyWikilinks(sanitizeHtml(md.render(msg.content)), resolveNoteId) }}
                     />
                     {msg.role === 'assistant' && (
                       <button
@@ -605,7 +775,7 @@ export const NotesChat: React.FC<NotesChatProps> = ({ onClose }) => {
                   <div className="notes-chat-message assistant streaming">
                     <div
                       className="notes-chat-message-content markdown-content"
-                      dangerouslySetInnerHTML={{ __html: sanitizeHtml(md.render(streamingContent)) + '<span class="notes-chat-cursor">|</span>' }}
+                      dangerouslySetInnerHTML={{ __html: linkifyWikilinks(sanitizeHtml(md.render(streamingContent)), resolveNoteId) + '<span class="notes-chat-cursor">|</span>' }}
                     />
                   </div>
                 )}

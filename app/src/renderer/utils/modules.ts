@@ -6,6 +6,7 @@ export function useIsModuleEnabled(id: ModuleDescriptor['id']): boolean {
   return useUIStore(state => {
     switch (id) {
       case 'notes-chat':        return state.notesChatEnabled
+      case 'project-rag':       return state.projectRagEnabled
       case 'smart-connections': return state.smartConnectionsEnabled
       case 'language-tool':     return state.languageTool.enabled
       case 'email':             return state.email.enabled
@@ -31,6 +32,7 @@ export function isModuleEnabled(id: ModuleDescriptor['id']): boolean {
   const s = useUIStore.getState()
   switch (id) {
     case 'notes-chat':        return s.notesChatEnabled
+    case 'project-rag':       return s.projectRagEnabled
     case 'smart-connections': return s.smartConnectionsEnabled
     case 'language-tool':     return s.languageTool.enabled
     case 'email':             return s.email.enabled
@@ -53,6 +55,7 @@ export function setModuleEnabled(id: ModuleDescriptor['id'], enabled: boolean): 
   const s = useUIStore.getState()
   switch (id) {
     case 'notes-chat':        s.setNotesChatEnabled(enabled); break
+    case 'project-rag':       s.setProjectRagEnabled(enabled); break
     case 'smart-connections': s.setSmartConnectionsEnabled(enabled); break
     case 'language-tool':     s.setLanguageTool({ enabled }); break
     case 'email':             s.setEmail({ enabled }); break

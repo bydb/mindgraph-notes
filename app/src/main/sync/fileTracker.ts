@@ -63,6 +63,9 @@ function shouldExclude(relativePath: string, fileName: string): boolean {
   if (relativePath === '.mindgraph/sync-manifest.json') return true
   if (relativePath === '.mindgraph/notes-cache.json') return true
   if (relativePath.startsWith('.mindgraph/backups/') || relativePath.startsWith('.mindgraph\\backups\\')) return true
+  // Projekt-RAG-Indizes sind geräte-lokal abgeleitete Daten (große Embeddings,
+  // modellabhängig) — wie die Backups vom Sync ausgeschlossen.
+  if (relativePath.startsWith('.mindgraph/rag/') || relativePath.startsWith('.mindgraph\\rag\\')) return true
   if (relativePath.startsWith('.trash/') || relativePath.startsWith('.trash\\')) return true
   if (relativePath.startsWith('.sync-trash/') || relativePath.startsWith('.sync-trash\\')) return true
   if (fileName.startsWith('~')) return true

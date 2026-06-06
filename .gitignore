@@ -39,3 +39,7 @@ CLAUDE.md
 **/.mindgraph/
 docs/blog/Email-Instruktionen.md
 pitch/__pycache__/
+
+# Persönliche Projekt-RAG-Eval-Testsets (echte Namen/Projektdaten) — nur example.json wird versioniert
+app/scripts/rag-eval.*.json
+!app/scripts/rag-eval.example.json

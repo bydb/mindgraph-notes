@@ -1,4 +1,5 @@
 import type { RelevanceConfig } from './emailRelevance'
+import type { RagIndexStatus, RagQueryResult, RetrievedChunk } from './rag/types'
 
 // Per-Vault Feature Toggles
 export interface VaultFeatures {
@@ -639,6 +640,17 @@ export interface ElectronAPI {
   onOllamaChatChunk: (callback: (chunk: string) => void) => void;
   onOllamaChatDone: (callback: () => void) => void;
 
+  // Projekt-RAG: Projektordner semantisch befragen (lokal)
+  projectRagStatus: (vaultPath: string, projectFolderRel: string, embedModel: string) => Promise<RagIndexStatus>;
+  projectRagIndex: (vaultPath: string, projectFolderRel: string, embedModel: string) => Promise<{ success: boolean; chunkCount?: number; fileCount?: number; error?: string }>;
+  onProjectRagIndexProgress: (callback: (progress: { done: number; total: number }) => void) => void;
+  projectRagQuery: (vaultPath: string, projectFolderRel: string, query: string, embedModel: string, opts?: object) => Promise<RagQueryResult>;
+  projectRagAnswer: (vaultPath: string, projectFolderRel: string, query: string, embedModel: string, chatModel: string, language?: 'de' | 'en') => Promise<{ success: boolean; response?: string; sources?: RetrievedChunk[]; error?: string }>;
+  onProjectRagAnswerChunk: (callback: (chunk: string) => void) => void;
+  onProjectRagAnswerDone: (callback: () => void) => void;
+  onProjectRagAnswerSources: (callback: (sources: RetrievedChunk[]) => void) => void;
+  projectRagRerankCandidates: (vaultPath: string, queryText: string, candidateFolderRels: string[], embedModel: string) => Promise<{ success: boolean; ranking: Array<{ folderRel: string; score: number | null }>; error?: string }>;
+
   // LM Studio Local AI API (OpenAI-kompatibel)
   lmstudioCheck: (port?: number) => Promise<boolean>;
   lmstudioModels: (port?: number) => Promise<Array<{ name: string; size: number }>>;
@@ -993,6 +1005,8 @@ export interface ElectronAPI {
     agentMaxIterations?: number;
     agentAllowedTools?: string[];
     agentConfirmTools?: string[];
+    projectsRootFolder?: string;
+    projectRagEmbeddingModel?: string;
   }) => Promise<boolean>;
   telegramStart: () => Promise<{ success: boolean; error?: string; alreadyRunning?: boolean }>;
   telegramStop: () => Promise<{ success: boolean; alreadyStopped?: boolean }>;
@@ -1169,6 +1183,7 @@ export interface ProjectStatusCrystallizeInput {
   brainFolderRel?: string;    // optional — Standard "800 - 🧠 brain"
   inboxFolderRel?: string;    // optional — Standard "000 - 📥 inbox/010 - 📥 Notes"
   emailFolderRel?: string;    // optional — Standard "‼️📧 - emails"
+  ragEmbeddingModel?: string; // optional — wenn gesetzt, ergänzt Projekt-RAG (Unterordner) die Quellen
 }
 
 /** Lint-Findung im erzeugten Status — drei Klassen. */

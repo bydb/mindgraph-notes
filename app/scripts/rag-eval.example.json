@@ -1,0 +1,17 @@
+{
+  "model": "bge-m3",
+  "cases": [
+    {
+      "query": "Wie ist der aktuelle Rollout-Stand?",
+      "expected": ["Rollout", "Status"]
+    },
+    {
+      "query": "Welche technischen Anforderungen wurden festgelegt?",
+      "expected": ["Anforderungen"]
+    },
+    {
+      "query": "Wer ist der Ansprechpartner und wie ist der Kontakt?",
+      "expected": ["Kontakt", "Ansprechpartner"]
+    }
+  ]
+}

@@ -566,7 +566,7 @@ const VaultSettingsTab: React.FC<{ vaultPath: string; t: TabTFn; onNavigateToTab
 
 const ModulesTab: React.FC<{ t: TabTFn }> = ({ t }) => {
   // useUIStore als Abhängigkeit einbinden, damit der Tab bei Flag-Änderungen rerendert
-  const _tick = useUIStore(s => `${s.notesChatEnabled}${s.smartConnectionsEnabled}${s.flashcardsEnabled}${s.workflowCanvasEnabled}${s.semanticScholarEnabled}${s.zoteroEnabled}${s.languageTool.enabled}${s.email.enabled}${s.edoobox.enabled}${s.marketing.enabled}${s.readwise.enabled}${s.remarkable.enabled}${s.docling.enabled}${s.visionOcr.enabled}${s.speech.enabled}`)
+  const _tick = useUIStore(s => `${s.notesChatEnabled}${s.projectRagEnabled}${s.smartConnectionsEnabled}${s.flashcardsEnabled}${s.workflowCanvasEnabled}${s.semanticScholarEnabled}${s.zoteroEnabled}${s.languageTool.enabled}${s.email.enabled}${s.edoobox.enabled}${s.marketing.enabled}${s.readwise.enabled}${s.remarkable.enabled}${s.docling.enabled}${s.visionOcr.enabled}${s.speech.enabled}`)
   void _tick
 
   const grouped: Record<ModuleCategory, ModuleDescriptor[]> = {
@@ -2941,6 +2941,40 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab 
                       </div>
                     )}
 
+                    {/* Projekt-RAG: zentrales Embedding-Modell (nur wenn Modul aktiv) */}
+                    {ollamaStatus === 'connected' && isModuleEnabled('project-rag') && (
+                      <div className="settings-row" style={{ flexDirection: 'column', alignItems: 'stretch', gap: '4px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <label style={{ minWidth: '120px' }}>
+                            {language === 'en' ? 'Project-RAG embedding' : 'Projekt-RAG Embedding'}
+                          </label>
+                          <select
+                            value={ollama.projectRagEmbeddingModel || 'bge-m3'}
+                            onChange={e => setOllama({ projectRagEmbeddingModel: e.target.value })}
+                            disabled={!ollama.enabled}
+                            style={{ flex: 1 }}
+                          >
+                            {(() => {
+                              const patterns = ['embed', 'minilm', 'bge', 'gte', 'e5', 'nomic']
+                              const embs = ollamaModels.filter(m => patterns.some(p => m.name.toLowerCase().includes(p)))
+                              const cur = ollama.projectRagEmbeddingModel || 'bge-m3'
+                              if (!embs.some(m => m.name === cur)) embs.unshift({ name: cur, size: 0 })
+                              return embs.map(m => (
+                                <option key={m.name} value={m.name}>
+                                  {m.name}{m.size === 0 ? (language === 'en' ? ' (not installed)' : ' (nicht installiert)') : ''}
+                                </option>
+                              ))
+                            })()}
+                          </select>
+                        </div>
+                        <p className="settings-hint" style={{ fontSize: '11px' }}>
+                          {language === 'en'
+                            ? 'Local embedding model for Project-RAG (bge-m3 recommended for German vaults). Answers use the chat model selected above. Everything stays local.'
+                            : 'Lokales Embedding-Modell fürs Projekt-RAG (bge-m3 für deutsche Vaults empfohlen). Antworten nutzen das oben gewählte Chat-Modell. Alles bleibt lokal.'}
+                        </p>
+                      </div>
+                    )}
+
                     {/* Model Download Section */}
                     {ollamaStatus === 'connected' && (
                       <div className="settings-row" style={{ flexDirection: 'column', alignItems: 'stretch', gap: '8px' }}>
@@ -4578,6 +4612,32 @@ LIMIT 10
                     </span>
                   </div>
                 </div>
+
+                <div className="settings-row">
+                  <label>{t('settings.brain.autoConsolidate')}</label>
+                  <input
+                    type="checkbox"
+                    checked={brainSettings.autoConsolidateEnabled}
+                    onChange={e => setBrain({ autoConsolidateEnabled: e.target.checked })}
+                  />
+                </div>
+
+                {brainSettings.autoConsolidateEnabled && (
+                  <div className="settings-row">
+                    <label>{t('settings.brain.autoConsolidateTime')}</label>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <input
+                        type="time"
+                        value={brainSettings.autoConsolidateTime || '21:30'}
+                        onChange={e => setBrain({ autoConsolidateTime: e.target.value || '21:30' })}
+                        style={{ width: '140px' }}
+                      />
+                      <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                        {t('settings.brain.autoConsolidateHint')}
+                      </span>
+                    </div>
+                  </div>
+                )}
 
                 <div className="settings-row" style={{ alignItems: 'flex-start' }}>
                   <label>{t('settings.brain.howItWorks')}</label>

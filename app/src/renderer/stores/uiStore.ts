@@ -234,11 +234,18 @@ interface LLMSettings {
     'smart-connections': string
     'project-status': string
   }
+  // Embedding-Modell fürs Projekt-RAG. EIN zentrales Setting — alle Surfaces
+  // (Dashboard, NotesChat, Telegram, Workflow, loadProjectContext, Crystallizer)
+  // MÜSSEN dasselbe lesen, sonst invalidiert ein Modell-Mismatch den Index bei
+  // jedem Cross-Surface-Aufruf (Dauer-Rebuild). Default: bge-m3.
+  projectRagEmbeddingModel: string
 }
 
 // Brain (lokales Tagesgedächtnis — speichert Tageszusammenfassungen im Vault)
 export interface BrainSettings {
   folderPath: string  // Relativer Pfad im Vault, z.B. '800 - 🧠 brain'
+  autoConsolidateEnabled: boolean
+  autoConsolidateTime: string // HH:mm, lokale Zeit
 }
 
 // Smart Connections Gewichtungen (User-konfigurierbar)
@@ -461,7 +468,8 @@ export const MODULES: ModuleDescriptor[] = [
   { id: 'remarkable',       label: 'reMarkable',       description: 'Dokumente mit dem reMarkable-Tablet austauschen', category: 'devices' },
   { id: 'docling',          label: 'Docling',          description: 'PDF-Textextraktion via Docling-Server', category: 'documents' },
   { id: 'vision-ocr',       label: 'Vision OCR',       description: 'Bilder und Scans per Vision-Modell in Text umwandeln', category: 'documents' },
-  { id: 'speech',           label: 'Sprache',          description: 'Vorlesen (TTS) und Diktieren (Whisper, läuft offline in der App) in Editor & Flashcards', category: 'ai' }
+  { id: 'speech',           label: 'Sprache',          description: 'Vorlesen (TTS) und Diktieren (Whisper, läuft offline in der App) in Editor & Flashcards', category: 'ai' },
+  { id: 'project-rag',      label: 'Projekt-RAG',      description: 'Projektordner semantisch befragen — On-demand-Index, Embedding & Antwort lokal', category: 'ai' }
 ]
 
 export type TtsEngine = 'system' | 'elevenlabs'
@@ -549,6 +557,7 @@ interface UIState {
   // KI-Features (für ältere Rechner ohne Ollama deaktivierbar)
   smartConnectionsEnabled: boolean
   notesChatEnabled: boolean
+  projectRagEnabled: boolean
   flashcardsEnabled: boolean
   workflowCanvasEnabled: boolean
   semanticScholarEnabled: boolean
@@ -694,6 +703,7 @@ interface UIState {
   setIconSet: (set: IconSet) => void
   setSmartConnectionsEnabled: (enabled: boolean) => void
   setNotesChatEnabled: (enabled: boolean) => void
+  setProjectRagEnabled: (enabled: boolean) => void
   setFlashcardsEnabled: (enabled: boolean) => void
   setWorkflowCanvasEnabled: (enabled: boolean) => void
   setSemanticScholarEnabled: (enabled: boolean) => void
@@ -813,12 +823,15 @@ const defaultState = {
       'dashboard-snapshot': '',
       'smart-connections': '',
       'project-status': ''
-    }
+    },
+    projectRagEmbeddingModel: 'bge-m3'
   },
 
   // Brain (lokales Tagesgedächtnis)
   brain: {
-    folderPath: '800 - 🧠 brain'
+    folderPath: '800 - 🧠 brain',
+    autoConsolidateEnabled: true,
+    autoConsolidateTime: '21:30'
   } as BrainSettings,
 
   // PDF Companion Settings
@@ -834,6 +847,7 @@ const defaultState = {
   // KI-Features (opt-in - Human in the Loop)
   smartConnectionsEnabled: false,
   notesChatEnabled: false,
+  projectRagEnabled: false,
   flashcardsEnabled: true,
   workflowCanvasEnabled: false,
   semanticScholarEnabled: true,
@@ -1075,7 +1089,7 @@ const persistedKeys = [
   'canvasFilterPath', 'canvasViewMode', 'canvasShowEdges', 'canvasShowTags', 'canvasShowLinks', 'canvasShowImages', 'canvasShowSummaries',
   'canvasCompactMode', 'canvasReadMode', 'canvasHoverScale', 'canvasDefaultCardWidth', 'splitPosition', 'fileTreeDisplayMode', 'fileTreeKindFilter', 'notesRootFolder', 'projectsRootFolder', 'ollama', 'brain',
   'pdfCompanionEnabled', 'pdfDisplayMode', 'iconSet',
-  'smartConnectionsEnabled', 'notesChatEnabled', 'flashcardsEnabled', 'workflowCanvasEnabled', 'semanticScholarEnabled', 'zoteroEnabled', 'smartConnectionsWeights', 'smartConnectionsRerankerEnabled', 'docling', 'visionOcr', 'readwise', 'languageTool', 'email', 'marketing', 'edoobox', 'antares', 'remarkable', 'dailyNote', 'taskExcludedFolders', 'speech',
+  'smartConnectionsEnabled', 'notesChatEnabled', 'projectRagEnabled', 'flashcardsEnabled', 'workflowCanvasEnabled', 'semanticScholarEnabled', 'zoteroEnabled', 'smartConnectionsWeights', 'smartConnectionsRerankerEnabled', 'docling', 'visionOcr', 'readwise', 'languageTool', 'email', 'marketing', 'edoobox', 'antares', 'remarkable', 'dailyNote', 'taskExcludedFolders', 'speech',
   'editorDefaultViewForcedToPreview',
   'lastSeenVersion',
   'customAccentColor', 'customBackgroundColorLight', 'customBackgroundColorDark',
@@ -1168,6 +1182,7 @@ export const useUIStore = create<UIState>()((set, get) => ({
   setIconSet: (iconSet) => set({ iconSet }),
   setSmartConnectionsEnabled: (enabled) => set({ smartConnectionsEnabled: enabled }),
   setNotesChatEnabled: (enabled) => set({ notesChatEnabled: enabled }),
+  setProjectRagEnabled: (enabled) => set({ projectRagEnabled: enabled }),
   setFlashcardsEnabled: (enabled) => set({ flashcardsEnabled: enabled }),
   setWorkflowCanvasEnabled: (enabled) => set({ workflowCanvasEnabled: enabled }),
   setSpeech: (settings) => set((state) => ({ speech: { ...state.speech, ...settings } })),
@@ -1458,6 +1473,18 @@ export async function initializeUISettings(): Promise<void> {
           ll.moduleModelOverrides = { ...defaults }
         } else {
           ll.moduleModelOverrides = { ...defaults, ...ll.moduleModelOverrides }
+        }
+        // Projekt-RAG-Embedding-Modell ergänzen (eingeführt 2026-06-06)
+        if (typeof ll.projectRagEmbeddingModel !== 'string' || !ll.projectRagEmbeddingModel) {
+          ll.projectRagEmbeddingModel = 'bge-m3'
+        }
+      }
+      // Migrate Brain: automatische Tagesverdichtung ergänzen (eingeführt 2026-06-06)
+      if (validSettings.brain) {
+        const brain = validSettings.brain as BrainSettings
+        if (typeof brain.autoConsolidateEnabled !== 'boolean') brain.autoConsolidateEnabled = true
+        if (typeof brain.autoConsolidateTime !== 'string' || !/^\d{2}:\d{2}$/.test(brain.autoConsolidateTime)) {
+          brain.autoConsolidateTime = '21:30'
         }
       }
       // Migrate edoobox base URL: strip /v1 or /v2 suffix, use app2 for V2

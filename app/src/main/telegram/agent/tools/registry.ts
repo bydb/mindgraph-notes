@@ -12,6 +12,8 @@ export interface ToolContext {
   vaultPath: string
   excludedFolders: string[]
   inboxFolder: string                       // Default-Ordner für note_create (relativ zum Vault)
+  projectsRootFolder: string                // Root für Projekt-Discovery (z.B. "100 - ✅ Projekte")
+  embeddingModel: string                    // zentrales Projekt-RAG-Embedding-Modell (z.B. "bge-m3")
 }
 
 export interface ToolResult {

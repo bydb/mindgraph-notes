@@ -55,6 +55,8 @@ export interface RunnerServices {
   ollamaGenerate: (prompt: string, model: string) => Promise<string>
   matchProject: (email: SeedEmail) => Promise<{ folderName: string; folderRel: string } | null>
   loadProjectContext: (folderRel: string) => Promise<string>
+  /** Projekt-RAG: semantisches Retrieval über den Projektordner (lokal). */
+  ragRetrieve: (folderRel: string, query: string) => Promise<{ contextText: string; chunkCount: number }>
   createNote: (folder: string, title: string, content: string) => Promise<string>
   appendNote: (noteRel: string, text: string) => Promise<string>
   searchNotes: (query: string) => Promise<string[]>
@@ -179,6 +181,23 @@ const EXECUTORS: Record<string, Executor> = {
       }
     }
     return { outputs: { context: ctx, summary: ctx.slice(0, 300) }, log: [`Kontext geladen: ${project.folderName} (${ctx.length} Zeichen)`] }
+  },
+
+  'project.rag': async (_node, inputs, opts) => {
+    const project = inputs.project as { folderRel?: string; folderName?: string } | null
+    const query = asText(inputs.query)
+    if (!project?.folderRel) return { outputs: { context: '', text: '' }, log: ['Kein Projekt — kein RAG-Kontext.'] }
+    if (!query.trim()) return { outputs: { context: '', text: '' }, log: ['Keine Frage — kein RAG-Kontext.'] }
+    try {
+      const res = await opts.services.ragRetrieve(project.folderRel, query)
+      return {
+        outputs: { context: res.contextText, text: res.contextText },
+        log: [`Projekt-RAG: ${res.chunkCount} Auszüge aus „${project.folderName}".`]
+      }
+    } catch (e) {
+      // RAG-Fehler (Ollama down / Modell fehlt) darf den Workflow nicht brechen.
+      return { outputs: { context: '', text: '' }, log: [`Projekt-RAG übersprungen: ${e instanceof Error ? e.message : 'Fehler'}`] }
+    }
   },
 
   'ollama.summarize': async (node, inputs, opts) => {

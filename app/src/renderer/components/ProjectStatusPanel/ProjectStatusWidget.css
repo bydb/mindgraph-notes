@@ -547,3 +547,100 @@ button.psw-row-badge--clickable:hover:not(:disabled) {
   /* etwas eingerückt, damit die Sektion visuell als Untergruppe lesbar ist */
   padding-left: 4px;
 }
+
+/* ──────────────────────────────────────────────────────────────────────────
+   Projekt-RAG-Modal ("Projekt befragen")
+   ────────────────────────────────────────────────────────────────────────── */
+.psw-rag-statusbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.psw-rag-status {
+  font-size: 12px;
+  color: var(--text-secondary, #888);
+}
+.psw-rag-privacy {
+  font-size: 11px;
+  color: var(--text-secondary, #888);
+  margin: 0 0 12px 0;
+}
+.psw-rag-ask {
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+}
+.psw-rag-input {
+  flex: 1;
+  resize: vertical;
+  min-height: 44px;
+  font-family: inherit;
+}
+.psw-rag-answer {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--bg-secondary, color-mix(in srgb, var(--bg-primary, #1e1e1e) 80%, #fff 4%));
+  border: 1px solid var(--border-color, #333);
+}
+.psw-rag-answer-text {
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 14px;
+  line-height: 1.5;
+}
+.psw-rag-cursor {
+  opacity: 0.6;
+  animation: psw-rag-blink 1s step-start infinite;
+}
+@keyframes psw-rag-blink {
+  50% { opacity: 0; }
+}
+.psw-rag-sources {
+  margin-top: 12px;
+}
+.psw-rag-sources-title {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary, #888);
+  margin-bottom: 4px;
+}
+.psw-rag-sources-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.psw-rag-source-link {
+  background: none;
+  border: none;
+  color: var(--accent-color, #4a9eff);
+  cursor: pointer;
+  font-size: 13px;
+  padding: 2px 0;
+  text-align: left;
+}
+.psw-rag-source-link:hover {
+  text-decoration: underline;
+}
+
+/* Klickbare [[…]]-Zitate im RAG-Antworttext (inline, wie ein Link) */
+.psw-rag-inline-link {
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  color: var(--accent-color, #4a9eff);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.psw-rag-inline-link:hover {
+  color: color-mix(in srgb, var(--accent-color, #4a9eff) 75%, #fff 25%);
+}

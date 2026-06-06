@@ -116,6 +116,25 @@ export const WORKFLOW_ACTIONS: WorkflowActionDefinition[] = [
       out('summary', 'Status-Zusammenfassung', 'text')
     ]
   },
+  {
+    id: 'project.rag',
+    moduleId: 'project',
+    label: 'Projekt-RAG abfragen',
+    description:
+      'Semantische Abfrage des Projektordners (lokales RAG). Liefert die relevantesten Auszüge als Kontext für z.B. einen Antwortentwurf.',
+    inputs: [
+      inp('project', 'Projekt', 'project', { required: true }),
+      inp('query', 'Frage', 'text', { required: true })
+    ],
+    outputs: [
+      out('context', 'Retrieval-Kontext', 'project_context'),
+      out('text', 'Kontext (Text)', 'text')
+    ],
+    // Embedding läuft lokal; Retrieval ist kein generativer Schritt auf untrusted
+    // Input → kein Hard-Lock nötig. Embedding-Modell = zentrales Setting (kein
+    // Per-Node-Override, sonst Index-Rebuild-Mismatch).
+    privacy: { localOnly: true }
+  },
 
   // ---------------- OLLAMA ----------------
   {

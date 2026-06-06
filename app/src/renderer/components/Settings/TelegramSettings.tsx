@@ -5,6 +5,8 @@ import { useNotesStore } from '../../stores/notesStore'
 export const TelegramSettings: React.FC = () => {
   const telegramBot = useUIStore(s => s.telegramBot)
   const setTelegramBot = useUIStore(s => s.setTelegramBot)
+  const projectsRootFolder = useUIStore(s => s.projectsRootFolder)
+  const projectRagEmbeddingModel = useUIStore(s => s.ollama.projectRagEmbeddingModel)
   const notes = useNotesStore(s => s.notes)
 
   const [tokenInput, setTokenInput] = useState('')
@@ -53,7 +55,9 @@ export const TelegramSettings: React.FC = () => {
       agentInboxFolder: telegramBot.agentInboxFolder,
       agentMaxIterations: telegramBot.agentMaxIterations,
       agentAllowedTools: telegramBot.agentAllowedTools,
-      agentConfirmTools: telegramBot.agentConfirmTools
+      agentConfirmTools: telegramBot.agentConfirmTools,
+      projectsRootFolder,
+      projectRagEmbeddingModel
     })
   }, [
     telegramBot.ollamaModel,
@@ -65,7 +69,9 @@ export const TelegramSettings: React.FC = () => {
     telegramBot.agentInboxFolder,
     telegramBot.agentMaxIterations,
     telegramBot.agentAllowedTools,
-    telegramBot.agentConfirmTools
+    telegramBot.agentConfirmTools,
+    projectsRootFolder,
+    projectRagEmbeddingModel
   ])
 
   const saveToken = async () => {

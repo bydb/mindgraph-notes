@@ -34,6 +34,20 @@ import type {
   ProjectPriority,
   ProjectStatusMarker
 } from './projectStatus/types'
+import {
+  buildOrUpdateIndex as ragBuildOrUpdateIndex,
+  getIndexStatus as ragGetIndexStatus,
+  loadIndex as ragLoadIndex
+} from './rag/index'
+import {
+  ensureIndex as ragEnsureIndex,
+  retrieve as ragRetrieve,
+  buildRagPrompt,
+  chunksToContext as ragChunksToContext
+} from './rag/retrieve'
+import { embedText as ragEmbedText } from './rag/embed'
+import { cosineSimilarity as ragCosineSimilarity } from '../shared/rag/similarity'
+import type { RagIndexStatus, RagQueryResult, RagRetrieveOptions } from '../shared/rag/types'
 import { setupTray, hideTransportWindow, updateShortcut, showTransportWindow } from './transport/trayManager'
 import { registerCoachIpc } from './llm/coach/coachIpc'
 
@@ -1051,6 +1065,8 @@ ipcMain.handle('workflow-run', async (_event, payload: WorkflowRunPayload) => {
       }
     },
     loadProjectContext: async (folderRel) => {
+      // 1. Status-Kontext (wie bisher): bevorzugt neuesten Wochen-Draft.
+      let statusContext = ''
       try {
         const abs = validatePath(vaultPath, folderRel)
         const entries = await fs.readdir(abs)
@@ -1060,11 +1076,51 @@ ipcMain.handle('workflow-run', async (_event, payload: WorkflowRunPayload) => {
         // fälschlich vor die echten Wochendateien. Stub nur als letzter Fallback.
         const weekly = statusFiles.filter(f => f !== '_STATUS.md')
         const pick = weekly[0] || statusFiles[0] || entries.find(f => f.endsWith('.md'))
-        if (!pick) return ''
-        return (await fs.readFile(path.join(abs, pick), 'utf-8')).slice(0, 1800)
+        if (pick) statusContext = (await fs.readFile(path.join(abs, pick), 'utf-8')).slice(0, 1800)
       } catch {
-        return ''
+        statusContext = ''
       }
+      // Un-crystallisierten Stub als „kein Status" behandeln — sonst tript der
+      // Runner-Check `isEffectivelyEmptyContext` (Stub-Regex) trotz RAG-Treffern.
+      if (statusContext && /noch nicht crystallisiert|not yet crystallized/i.test(statusContext)) {
+        statusContext = ''
+      }
+
+      // 2. RAG-Augmentierung (additiv, mit Fallback): die relevantesten Auszüge
+      //    aus den Projektdateien anhängen, damit Antwortentwürfe echtes Projekt-
+      //    wissen statt nur den _STATUS-Auszug bekommen. Embedding-Modell = zentrales
+      //    Setting. Fehler (Ollama down / Modell fehlt) → nur Status-Kontext.
+      let ragContext = ''
+      try {
+        const ui = await loadUISettings().catch(() => ({} as Record<string, unknown>))
+        const embedModel = (ui.ollama as { projectRagEmbeddingModel?: string } | undefined)?.projectRagEmbeddingModel || 'bge-m3'
+        let query = folderRel.split('/').pop() || folderRel
+        try {
+          const markerRaw = await fs.readFile(path.join(vaultPath, folderRel, '_STATUS.md'), 'utf-8')
+          const marker = parseStatusMarker(markerRaw)
+          if (marker?.keywords?.length) query = marker.keywords.join(' ')
+        } catch { /* kein Marker — Ordnername als Query */ }
+        const index = await ragEnsureIndex(vaultPath, folderRel, embedModel, assertSafePath)
+        const chunks = await ragRetrieve(index, query, embedModel, { topK: 5 })
+        if (chunks.length > 0) {
+          ragContext = '## Relevante Projektquellen\n\n' + ragChunksToContext(chunks, 2500)
+        }
+      } catch {
+        ragContext = ''
+      }
+
+      if (statusContext && ragContext) return `${statusContext}\n\n${ragContext}`
+      return statusContext || ragContext
+    },
+    ragRetrieve: async (folderRel, query) => {
+      // Embedding-Modell = zentrales Setting (alle Surfaces lesen dasselbe),
+      // sonst Index-Rebuild-Mismatch. Persistierte UI-Settings lesen, Fallback bge-m3.
+      const ui = await loadUISettings().catch(() => ({} as Record<string, unknown>))
+      const ollamaSettings = ui.ollama as { projectRagEmbeddingModel?: string } | undefined
+      const embedModel = ollamaSettings?.projectRagEmbeddingModel || 'bge-m3'
+      const index = await ragEnsureIndex(vaultPath, folderRel, embedModel, assertSafePath)
+      const chunks = await ragRetrieve(index, query, embedModel)
+      return { contextText: ragChunksToContext(chunks), chunkCount: chunks.length }
     },
     createNote: async (folder, title, content) => {
       // Vault-Konvention: Zettelkasten-ID `YYYYMMDDhhmm - Titel.md` + YAML-Frontmatter.
@@ -3140,6 +3196,17 @@ ipcMain.handle('project-status-crystallize', async (_event, input: ProjectStatus
       return { success: false, error: 'Language ungültig (de | en erwartet)' }
     }
     assertApprovedVault(input.vaultPath, 'project-status-crystallize')
+    // Projekt-RAG als zusätzliche Quelle nur, wenn das opt-in Modul aktiv ist.
+    // Embedding-Modell = zentrales Setting; Default bge-m3.
+    if (!input.ragEmbeddingModel) {
+      try {
+        const ui = await loadUISettings()
+        if (ui.projectRagEnabled === true) {
+          const ollamaSettings = ui.ollama as { projectRagEmbeddingModel?: string } | undefined
+          input.ragEmbeddingModel = ollamaSettings?.projectRagEmbeddingModel || 'bge-m3'
+        }
+      } catch { /* UI-Settings nicht lesbar — RAG bleibt aus, Keyword-Pipeline läuft */ }
+    }
     const crystallizeResult = await crystallizeProject(input, assertSafePath)
 
     // Synonyme im Hintergrund regenerieren, wenn Cache fehlt oder älter 7 Tage.
@@ -4643,6 +4710,151 @@ ipcMain.handle('get-files-with-mtime', async (_event, vaultPath: string) => {
   await scanDirectory(vaultPath, vaultPath)
   console.log(`[Cache] ${files.length} Markdown-Dateien in ${Date.now() - startTime}ms gescannt`)
   return files
+})
+
+// ============ PROJEKT-RAG ============
+// Projektordner als On-demand-RAG (Chunking + lokale Embeddings + Retrieval).
+// Privacy: Embedding UND Antwort laufen ausschließlich gegen lokales Ollama.
+// Doppelter FS-Schutz: assertApprovedVault (sync) hier + assertSafePath (async,
+// realpath) pro Datei in der RAG-Engine.
+
+ipcMain.handle('project-rag-status', async (_event, vaultPath: string, projectFolderRel: string, embedModel: string): Promise<RagIndexStatus> => {
+  assertApprovedVault(vaultPath, 'project-rag-status')
+  return ragGetIndexStatus(vaultPath, projectFolderRel, embedModel, assertSafePath)
+})
+
+ipcMain.handle('project-rag-index', async (event, vaultPath: string, projectFolderRel: string, embedModel: string) => {
+  try {
+    assertApprovedVault(vaultPath, 'project-rag-index')
+    if (!projectFolderRel || typeof projectFolderRel !== 'string') return { success: false, error: 'Projektordner fehlt' }
+    if (!embedModel || typeof embedModel !== 'string') return { success: false, error: 'Embedding-Modell fehlt' }
+    const idx = await ragBuildOrUpdateIndex(vaultPath, projectFolderRel, embedModel, assertSafePath, (done, total) => {
+      event.sender.send('project-rag-index-progress', { done, total })
+    })
+    const fileCount = new Set(idx.chunks.map(c => c.fileRel)).size
+    return { success: true, chunkCount: idx.chunks.length, fileCount }
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : 'Unbekannter Fehler' }
+  }
+})
+
+ipcMain.handle('project-rag-query', async (_event, vaultPath: string, projectFolderRel: string, query: string, embedModel: string, opts?: RagRetrieveOptions): Promise<RagQueryResult> => {
+  try {
+    assertApprovedVault(vaultPath, 'project-rag-query')
+    const index = await ragEnsureIndex(vaultPath, projectFolderRel, embedModel, assertSafePath)
+    const chunks = await ragRetrieve(index, query, embedModel, opts)
+    return { success: true, chunks, usedModel: embedModel }
+  } catch (error) {
+    return { success: false, chunks: [], error: error instanceof Error ? error.message : 'Unbekannter Fehler' }
+  }
+})
+
+// Antwort-Streaming — spiegelt 'ollama-chat', aber mit eigenen Channels und einem
+// '-sources'-Event (die zitierten Chunks für die Quellen-UI).
+ipcMain.handle('project-rag-answer', async (event, vaultPath: string, projectFolderRel: string, query: string, embedModel: string, chatModel: string, language: 'de' | 'en' = 'de') => {
+  try {
+    assertApprovedVault(vaultPath, 'project-rag-answer')
+    const index = await ragEnsureIndex(vaultPath, projectFolderRel, embedModel, assertSafePath)
+    const chunks = await ragRetrieve(index, query, embedModel)
+    event.sender.send('project-rag-answer-sources', chunks)
+    const systemPrompt = buildRagPrompt(query, chunks, language)
+
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 300000) // 5 min
+    const response = await fetch(`${OLLAMA_API_URL}/api/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: chatModel,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: query }
+        ],
+        stream: true,
+        // think:false ist für Reasoning-Modelle (Qwen3.x / Gemma4) Pflicht — sonst
+        // landet die Ausgabe in message.thinking und message.content bleibt leer
+        // (→ leere Antwort trotz korrekter Quellen). Siehe CLAUDE.md / rerank-Handler.
+        think: false
+      }),
+      signal: controller.signal
+    })
+
+    if (!response.ok || !response.body) {
+      clearTimeout(timeout)
+      event.sender.send('project-rag-answer-done')
+      return { success: false, error: `Ollama API Fehler: ${response.status}`, sources: chunks }
+    }
+
+    const reader = response.body.getReader()
+    const decoder = new TextDecoder()
+    let full = ''
+    let buffer = ''
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      buffer += decoder.decode(value, { stream: true })
+      const lines = buffer.split('\n')
+      buffer = lines.pop() || ''
+      for (const line of lines) {
+        const t = line.trim()
+        if (!t) continue
+        try {
+          const json = JSON.parse(t)
+          if (json.message?.content) {
+            full += json.message.content
+            event.sender.send('project-rag-answer-chunk', json.message.content)
+          }
+        } catch {
+          // ungültige JSON-Zeile ignorieren
+        }
+      }
+    }
+    clearTimeout(timeout)
+    event.sender.send('project-rag-answer-done')
+    return { success: true, response: full, sources: chunks }
+  } catch (error) {
+    event.sender.send('project-rag-answer-done')
+    return { success: false, error: error instanceof Error ? error.message : 'Unbekannter Fehler' }
+  }
+})
+
+// Semantisches Re-Ranking ambiger Projekt-Kandidaten (Mail→Projekt).
+// WICHTIG: Das deterministische Gate (gateProjectMatch) bleibt die Quelle der
+// Wahrheit — dieser Handler ordnet NUR die UI-Kandidatenliste um, er ordnet NIE
+// autonom zu. Nutzt ausschließlich BEREITS gebaute Indizes (kein Auto-Build →
+// kein Ollama-Sturm beim Mail-Klick). Query wird genau EINMAL eingebettet.
+ipcMain.handle('project-rag-rerank-candidates', async (_event, vaultPath: string, queryText: string, candidateFolderRels: string[], embedModel: string) => {
+  try {
+    assertApprovedVault(vaultPath, 'project-rag-rerank-candidates')
+    if (!Array.isArray(candidateFolderRels) || candidateFolderRels.length === 0 || !queryText?.trim()) {
+      return { success: true, ranking: [] as Array<{ folderRel: string; score: number | null }> }
+    }
+    const limited = candidateFolderRels.slice(0, 5) // Deckel: max 5 Kandidaten bewerten
+    const queryVec = await ragEmbedText(embedModel, queryText.slice(0, 4000))
+    const ranking: Array<{ folderRel: string; score: number | null }> = []
+    for (const folderRel of limited) {
+      try {
+        const index = await ragLoadIndex(vaultPath, folderRel)
+        // Nur vorhandene, modellkompatible Indizes bewerten — sonst score=null
+        // (Reihenfolge dieser Kandidaten bleibt unverändert).
+        if (!index || index.model !== embedModel || index.chunks.length === 0) {
+          ranking.push({ folderRel, score: null })
+          continue
+        }
+        let best = 0
+        for (const c of index.chunks) {
+          const s = ragCosineSimilarity(queryVec, c.embedding)
+          if (s > best) best = s
+        }
+        ranking.push({ folderRel, score: best })
+      } catch {
+        ranking.push({ folderRel, score: null })
+      }
+    }
+    return { success: true, ranking }
+  } catch (error) {
+    return { success: false, ranking: [], error: error instanceof Error ? error.message : 'Unbekannter Fehler' }
+  }
 })
 
 // PDF Export - mit verstecktem Fenster für vollständigen Export
@@ -10402,6 +10614,8 @@ let telegramConfig: {
   agentMaxIterations: number
   agentAllowedTools: string[]
   agentConfirmTools: string[]
+  projectsRootFolder: string
+  projectRagEmbeddingModel: string
 } = {
   ollamaModel: '',
   excludedFolders: [],
@@ -10412,8 +10626,10 @@ let telegramConfig: {
   agentEnabled: false,
   agentInboxFolder: '000 - 📥 inbox/010 - 📥 Notes',
   agentMaxIterations: 8,
-  agentAllowedTools: ['note_search', 'note_read', 'task_list', 'calendar_list'],
-  agentConfirmTools: ['note_create', 'note_append', 'task_toggle']
+  agentAllowedTools: ['note_search', 'note_read', 'task_list', 'calendar_list', 'project_ask'],
+  agentConfirmTools: ['note_create', 'note_append', 'task_toggle'],
+  projectsRootFolder: '100 - ✅ Projekte',
+  projectRagEmbeddingModel: 'bge-m3'
 }
 
 function getTelegramTokenPath(): string {
@@ -10486,7 +10702,9 @@ ipcMain.handle('telegram-start', async () => {
         agentMaxIterations: () => telegramConfig.agentMaxIterations,
         agentInboxFolder: () => telegramConfig.agentInboxFolder,
         agentAllowedTools: () => telegramConfig.agentAllowedTools,
-        agentConfirmTools: () => telegramConfig.agentConfirmTools
+        agentConfirmTools: () => telegramConfig.agentConfirmTools,
+        projectsRootFolder: () => telegramConfig.projectsRootFolder,
+        embeddingModel: () => telegramConfig.projectRagEmbeddingModel
       }
     })
     return { success: true }

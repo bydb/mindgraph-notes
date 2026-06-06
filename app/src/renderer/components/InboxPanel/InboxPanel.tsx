@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { useEmailStore } from '../../stores/emailStore'
 import { useUIStore } from '../../stores/uiStore'
 import { useNotesStore } from '../../stores/notesStore'
+import { useIsModuleEnabled } from '../../utils/modules'
 import { useProjectStatusStore } from '../../stores/projectStatusStore'
 import { useTranslation } from '../../utils/translations'
 import { sanitizeHtml, sanitizeEmailHtml } from '../../utils/sanitize'
@@ -129,6 +130,10 @@ export const InboxPanel: React.FC<InboxPanelProps> = ({ onClose }) => {
   } = useEmailStore()
   const { email: emailSettings } = useUIStore()
   const projectsRootFolder = useUIStore(s => s.projectsRootFolder)
+  const projectRagEnabled = useIsModuleEnabled('project-rag')
+  const ragEmbedModel = useUIStore(s => s.ollama.projectRagEmbeddingModel)
+  // Semantisches Re-Ranking ambiger Projekt-Kandidaten (nur Sortierung, kein Auto-Assign).
+  const [ambiguousRank, setAmbiguousRank] = useState<Record<string, number | null>>({})
   const projects = useProjectStatusStore(s => s.projects)
   const projectsLastLoadedAt = useProjectStatusStore(s => s.lastLoadedAt)
   const projectSynonyms = useProjectStatusStore(s => s.synonyms)
@@ -342,6 +347,48 @@ export const InboxPanel: React.FC<InboxPanelProps> = ({ onClose }) => {
   const autoCleared = selectedEmail?.userProject === null
   const showProjectSuggestion = !activeProject && !autoCleared && projectGate.confidence === 'low' && !!projectGate.top
   const showProjectAmbiguous = !activeProject && !autoCleared && projectGate.confidence === 'ambiguous' && projectGate.candidates.length > 0
+
+  // Semantisches Re-Ranking NUR bei ambiger Lage: ordnet die Kandidatenliste per
+  // bestehendem Projekt-Index um (kein Auto-Build, kein Sturm). Das Verdikt bleibt
+  // 'ambiguous' — der User wählt weiterhin manuell. Identität/Gate unangetastet.
+  useEffect(() => {
+    if (!showProjectAmbiguous || !projectRagEnabled || !vaultPath || !selectedEmail) {
+      setAmbiguousRank({})
+      return
+    }
+    let cancelled = false
+    const folderRels = projectGate.candidates.map(c => c.project.folderRel)
+    const queryText = `${selectedEmail.subject || ''}\n${selectedEmail.bodyText || ''}`.trim()
+    ;(async () => {
+      try {
+        const res = await window.electronAPI.projectRagRerankCandidates(vaultPath, queryText, folderRels, ragEmbedModel || 'bge-m3')
+        if (cancelled || !res?.success) return
+        const map: Record<string, number | null> = {}
+        for (const r of res.ranking) map[r.folderRel] = r.score
+        setAmbiguousRank(map)
+      } catch {
+        if (!cancelled) setAmbiguousRank({})
+      }
+    })()
+    return () => { cancelled = true }
+  }, [showProjectAmbiguous, projectRagEnabled, vaultPath, selectedEmail, projectGate, ragEmbedModel])
+
+  // Kandidaten in Anzeige-Reihenfolge: bewertete (Score) zuerst absteigend,
+  // unbewertete (kein Index) behalten ihre ursprüngliche relative Reihenfolge.
+  const orderedAmbiguousCandidates = useMemo(() => {
+    const cands = projectGate.candidates
+    if (Object.keys(ambiguousRank).length === 0) return cands
+    return cands
+      .map((c, i) => ({ c, i, score: ambiguousRank[c.project.folderRel] }))
+      .sort((a, b) => {
+        const sa = a.score, sb = b.score
+        if (sa == null && sb == null) return a.i - b.i
+        if (sa == null) return 1
+        if (sb == null) return -1
+        return sb - sa
+      })
+      .map(x => x.c)
+  }, [projectGate, ambiguousRank])
   const showProjectNone = !activeProject && !showProjectSuggestion && !showProjectAmbiguous
 
   useEffect(() => {
@@ -962,7 +1009,7 @@ export const InboxPanel: React.FC<InboxPanelProps> = ({ onClose }) => {
                         {showProjectAmbiguous && (
                           <div className="inbox-project-ambiguous">
                             <span className="inbox-project-ambiguous-label">{t('inbox.detail.ambiguous')}</span>
-                            {projectGate.candidates.map(m => (
+                            {orderedAmbiguousCandidates.map(m => (
                               <button
                                 key={m.project.folderRel}
                                 type="button"

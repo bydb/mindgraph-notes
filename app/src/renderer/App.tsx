@@ -50,9 +50,55 @@ import { useSyncStore } from './stores/syncStore'
 import { useVaultSettingsStore } from './stores/vaultSettingsStore'
 import { useIsModuleEnabled } from './utils/modules'
 import { getVaultTaskStats } from './utils/linkExtractor'
+import { buildBrainSensors, getDayBoundsMs } from './utils/brainSensors'
 import './styles/index.css'
 
 type ViewMode = 'editor' | 'split' | 'canvas'
+
+const AUTO_BRAIN_CHECK_INTERVAL_MS = 5 * 60 * 1000
+const AUTO_BRAIN_RETRY_COOLDOWN_MS = 60 * 60 * 1000
+
+function autoBrainKey(vaultPath: string): string {
+  return `mindgraph:auto-brain:${vaultPath}`
+}
+
+function readAutoBrainState(vaultPath: string): { date?: string; status?: string; attemptedAt?: string; notePath?: string } {
+  try {
+    const raw = localStorage.getItem(autoBrainKey(vaultPath))
+    return raw ? JSON.parse(raw) : {}
+  } catch {
+    return {}
+  }
+}
+
+function writeAutoBrainState(vaultPath: string, state: { date: string; status: string; attemptedAt: string; notePath?: string }): void {
+  try {
+    localStorage.setItem(autoBrainKey(vaultPath), JSON.stringify(state))
+  } catch {
+    // Auto-Brain ist best-effort; ein voller localStorage darf die App nicht stoeren.
+  }
+}
+
+function scheduledTimePassed(dayStartMs: number, hhmm: string, now: Date): boolean {
+  const [hhRaw, mmRaw] = hhmm.split(':')
+  const hh = Math.max(0, Math.min(23, Number(hhRaw) || 0))
+  const mm = Math.max(0, Math.min(59, Number(mmRaw) || 0))
+  const scheduled = new Date(dayStartMs)
+  scheduled.setHours(hh, mm, 0, 0)
+  return now.getTime() >= scheduled.getTime()
+}
+
+function hasBrainNoteForDate(notes: import('../shared/types').Note[], folderPath: string, isoDate: string): boolean {
+  const [year, month, day] = isoDate.split('-')
+  if (!year || !month || !day) return false
+  const cleanFolder = (folderPath || '800 - 🧠 brain').replace(/^\/+|\/+$/g, '')
+  const dirSuffix = `${cleanFolder}/${year}/${month}/`
+  return notes.some(n => {
+    if (!n.path.includes(dirSuffix)) return false
+    const filename = n.path.split('/').pop() || ''
+    return filename === `${day}.md` || filename.startsWith(`${day} (`)
+  })
+}
 
 const ViewModeButton: React.FC<{
   mode: ViewMode
@@ -355,6 +401,139 @@ const App: React.FC = () => {
       clearInterval(interval)
     }
   }, [vaultPath, emailEnabled, vaultSettingsLoaded, vaultEmailActive])
+
+  // Brain: automatischer Tagesabschluss. Läuft app-weit, nicht nur wenn das
+  // Dashboard offen ist. Die Sensoren leben im Renderer (contextMemory +
+  // Notes/Emails), der eigentliche Write bleibt im Main-Prozess.
+  const autoBrainRunningRef = useRef(false)
+  useEffect(() => {
+    if (!vaultPath) return
+
+    const runIfDue = async () => {
+      if (autoBrainRunningRef.current) return
+      const state = useUIStore.getState()
+      const currentVaultPath = useNotesStore.getState().vaultPath
+      if (!currentVaultPath) return
+      const brain = state.brain
+      if (!brain.autoConsolidateEnabled) return
+      if (!state.ollama.enabled) return
+      const model = state.ollama.moduleModelOverrides?.brain || state.ollama.selectedModel
+      if (!model) return
+
+      const now = new Date()
+      const { startMs, endMs, isoDate } = getDayBoundsMs(now)
+      const schedule = brain.autoConsolidateTime || '21:30'
+      if (!scheduledTimePassed(startMs, schedule, now)) return
+
+      const folderPath = brain.folderPath || '800 - 🧠 brain'
+      const currentNotes = useNotesStore.getState().notes
+      if (hasBrainNoteForDate(currentNotes, folderPath, isoDate)) {
+        writeAutoBrainState(currentVaultPath, {
+          date: isoDate,
+          status: 'exists',
+          attemptedAt: now.toISOString()
+        })
+        return
+      }
+      const [year, month, day] = isoDate.split('-')
+      const expectedRel = `${folderPath.replace(/^\/+|\/+$/g, '')}/${year}/${month}/${day}.md`
+      try {
+        await window.electronAPI.readFile(`${currentVaultPath}/${expectedRel}`)
+        writeAutoBrainState(currentVaultPath, {
+          date: isoDate,
+          status: 'exists',
+          attemptedAt: now.toISOString(),
+          notePath: `${currentVaultPath}/${expectedRel}`
+        })
+        return
+      } catch {
+        // Keine Hauptdatei vorhanden; die Automatik darf fortfahren.
+      }
+
+      const previous = readAutoBrainState(currentVaultPath)
+      if (previous.date === isoDate && (previous.status === 'success' || previous.status === 'exists')) return
+      if (previous.date === isoDate && previous.attemptedAt) {
+        const lastAttempt = new Date(previous.attemptedAt).getTime()
+        if (Number.isFinite(lastAttempt) && now.getTime() - lastAttempt < AUTO_BRAIN_RETRY_COOLDOWN_MS) return
+      }
+
+      autoBrainRunningRef.current = true
+      try {
+        const emails = useEmailStore.getState().emails
+        const { sensors, hasContent } = buildBrainSensors({
+          notes: currentNotes,
+          emails,
+          vaultPath: currentVaultPath,
+          dayStartMs: startMs,
+          dayEndMs: endMs,
+          dailyNote: {
+            folderPath: state.dailyNote.folderPath,
+            dateFormat: state.dailyNote.dateFormat
+          }
+        })
+        if (!hasContent) {
+          writeAutoBrainState(currentVaultPath, { date: isoDate, status: 'empty', attemptedAt: now.toISOString() })
+          return
+        }
+
+        writeAutoBrainState(currentVaultPath, { date: isoDate, status: 'running', attemptedAt: now.toISOString() })
+        const result = await window.electronAPI.brainConsolidateDay({
+          vaultPath: currentVaultPath,
+          folderPath,
+          date: isoDate,
+          generatedAtIso: new Date().toISOString(),
+          model,
+          language: state.language,
+          sensors
+        })
+
+        if (result.success && result.notePath) {
+          writeAutoBrainState(currentVaultPath, {
+            date: isoDate,
+            status: 'success',
+            attemptedAt: new Date().toISOString(),
+            notePath: result.notePath
+          })
+          try {
+            const relativePath = result.notePath.startsWith(currentVaultPath)
+              ? result.notePath.slice(currentVaultPath.length + 1)
+              : result.notePath
+            const content = await window.electronAPI.readFile(result.notePath)
+            const note = await createNoteFromFile(result.notePath, relativePath, content)
+            useNotesStore.getState().addNote(note)
+            const tree = await window.electronAPI.readDirectory(currentVaultPath)
+            useNotesStore.getState().setFileTree(tree)
+          } catch (error) {
+            console.warn('[Brain] Auto-Tagesabschluss gespeichert, Store-Update fehlgeschlagen:', error)
+          }
+          console.log(`[Brain] Automatischer Tagesabschluss gespeichert: ${result.notePath}`)
+        } else {
+          writeAutoBrainState(currentVaultPath, {
+            date: isoDate,
+            status: 'error',
+            attemptedAt: new Date().toISOString()
+          })
+          console.warn('[Brain] Automatischer Tagesabschluss fehlgeschlagen:', result.error)
+        }
+      } catch (error) {
+        writeAutoBrainState(currentVaultPath, {
+          date: isoDate,
+          status: 'error',
+          attemptedAt: new Date().toISOString()
+        })
+        console.warn('[Brain] Automatischer Tagesabschluss fehlgeschlagen:', error)
+      } finally {
+        autoBrainRunningRef.current = false
+      }
+    }
+
+    const initialTimer = setTimeout(runIfDue, 30000)
+    const interval = setInterval(runIfDue, AUTO_BRAIN_CHECK_INTERVAL_MS)
+    return () => {
+      clearTimeout(initialTimer)
+      clearInterval(interval)
+    }
+  }, [vaultPath])
 
   // edoobox Agent: Events laden beim Vault-Wechsel (nur wenn im Vault aktiviert)
   useEffect(() => {

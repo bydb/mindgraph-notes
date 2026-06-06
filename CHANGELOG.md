@@ -2,6 +2,18 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.7.24-beta] - 2026-06-06
+
+### Features
+
+- **Projekt-RAG: deine Projektordner semantisch befragen (vollständig lokal).** Neues opt-in Modul „Projekt-RAG". Der Inhalt eines Projektordners wird gechunkt und lokal eingebettet (bge-m3), sodass du den Ordner in natürlicher Sprache befragen kannst — und eine fundierte Antwort mit **klickbaren Quellenangaben** bekommst, die direkt zur Notiz springen. Erreichbar an vier Stellen: im **Dashboard** („💬 Fragen" pro Projekt), im **Notes-Chat** (neuer Kontext-Modus „Projekt"), als **Telegram-Tool** (`project_ask`) und als **Workflow-Baustein** (`Projekt-RAG abfragen`). Der Index entsteht on-demand pro Projekt, aktualisiert sich inkrementell und bleibt gerätelokal (vom Sync ausgeschlossen). Embedding **und** Antwort laufen ausschließlich über `localhost` — kein Cloud-Dienst, deine Projektinhalte verlassen den Rechner nie. Die Trefferqualität wurde mit einem eigenen Mess-Harness datengetrieben optimiert (reines semantisches Ranking schlägt das frühere Keyword-Mischen).
+- **Projektwissen fließt in bestehende Funktionen.** Mail-Antwortentwürfe und der wöchentliche Projekt-Status („Crystallizer") ziehen jetzt die relevantesten Auszüge aus dem Projektordner heran (inklusive Unterordner-Notizen), und bei mehrdeutiger Mail→Projekt-Zuordnung werden die Vorschläge semantisch sortiert — alles additiv, mit der bisherigen Keyword-Logik als Sicherheitsnetz.
+- **Automatischer Brain-Tagesabschluss.** Das Brain kann den Tagesabschluss jetzt automatisch zu einer einstellbaren Uhrzeit erzeugen (Einstellungen → Brain). Läuft die App zu dem Zeitpunkt nicht, wird er beim nächsten Start nachgeholt; pro Tag entsteht nur eine automatische Notiz, bestehende werden nie überschrieben. Der manuelle Button bleibt als Fallback. Wie immer ausschließlich lokal über Ollama.
+
+### Fixes
+
+- **Antworten mit Reasoning-Modellen (Qwen 3.x / Gemma 4).** Bei der Projekt-Abfrage kam mit Reasoning-Modellen die richtige Quelle, aber kein Antworttext — die Ausgabe landete im internen „Thinking"-Kanal. Das Denken wird für diesen Schritt jetzt deaktiviert, sodass eine vollständige Antwort erscheint.
+
 ## [0.7.23-beta] - 2026-06-04
 
 ### Features

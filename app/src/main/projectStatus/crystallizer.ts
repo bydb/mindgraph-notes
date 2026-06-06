@@ -31,6 +31,7 @@ import type {
 import { parseStatusMarker, stripFrontmatter, getISOWeekTag } from './discovery'
 import { buildVaultIndex, lintContent, appendFindingsSection } from './wikilinkLint'
 import { parseExcel, sheetToMarkdownTable } from '../office/officeService'
+import { ensureIndex as ragEnsureIndex, retrieve as ragRetrieve } from '../rag/retrieve'
 
 const OLLAMA_LOCAL_URL = 'http://localhost:11434'
 const DEFAULT_BRAIN_FOLDER = '800 - 🧠 brain'
@@ -372,6 +373,42 @@ function truncateContent(raw: string): string {
   if (raw.length <= LARGE_FILE_THRESHOLD) return raw
   const lines = raw.split('\n').slice(0, LARGE_FILE_LINE_CAP)
   return lines.join('\n') + '\n\n[… gekürzt — Originalfile sehr groß]'
+}
+
+/**
+ * Projekt-RAG als ZUSÄTZLICHE Quelle: der Index erfasst auch Unterordner, die
+ * `gatherProjectFiles` (nur Top-Level) übersieht. Liefert die relevantesten
+ * Auszüge als `ProjectStatusSourceFile[]`, gruppiert pro Datei. Rein additiv —
+ * Fehler (Ollama down / Modell fehlt) werfen, der Aufrufer fängt sie und behält
+ * die Keyword-Pipeline (Sicherheitsnetz).
+ */
+async function gatherViaRag(
+  vaultPath: string,
+  projectFolderRel: string,
+  keywords: string[],
+  model: string,
+  safePath: (p: string, op: string) => Promise<string>
+): Promise<ProjectStatusSourceFile[]> {
+  const query = keywords.join(' ').trim() || (projectFolderRel.split('/').pop() || projectFolderRel)
+  const index = await ragEnsureIndex(vaultPath, projectFolderRel, model, safePath)
+  const chunks = await ragRetrieve(index, query, model, { topK: 8 })
+  // Chunks pro Quelldatei bündeln.
+  const byFile = new Map<string, string[]>()
+  for (const c of chunks) {
+    const arr = byFile.get(c.fileRel) ?? []
+    arr.push(c.heading ? `### ${c.heading}\n${c.text}` : c.text)
+    byFile.set(c.fileRel, arr)
+  }
+  const result: ProjectStatusSourceFile[] = []
+  for (const [fileRel, parts] of byFile) {
+    result.push({
+      name: (fileRel.split('/').pop() || fileRel).replace(/\.md$/i, '').normalize('NFC'),
+      pathRel: fileRel,
+      content: truncateContent(parts.join('\n\n')),
+      origin: 'project'
+    })
+  }
+  return result
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -783,6 +820,24 @@ export async function crystallizeProject(
     gatherInboxNotes(input.vaultPath, inboxFolderRel, marker.keywords),
     gatherEmailNotes(input.vaultPath, emailFolderRel, marker.keywords)
   ])
+
+  // 2b) Projekt-RAG (additiv, optional): bringt relevante Auszüge aus Unterordnern,
+  //     die der Top-Level-Scan übersieht. Dedupe per pathRel — kein Doppeln bereits
+  //     gesammelter Top-Level-Dateien. Fehler → Keyword-Pipeline bleibt unverändert.
+  if (input.ragEmbeddingModel) {
+    try {
+      const ragFiles = await gatherViaRag(input.vaultPath, input.projectFolderRel, marker.keywords, input.ragEmbeddingModel, safePath)
+      const seen = new Set(projectFiles.map(f => f.pathRel))
+      for (const rf of ragFiles) {
+        if (!seen.has(rf.pathRel)) {
+          projectFiles.push(rf)
+          seen.add(rf.pathRel)
+        }
+      }
+    } catch (e) {
+      console.warn('[Crystallizer] Projekt-RAG übersprungen:', e instanceof Error ? e.message : e)
+    }
+  }
 
   if (
     brainEntries.length === 0 &&

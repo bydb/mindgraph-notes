@@ -20,6 +20,8 @@ import type { DiscoveredProject, ProjectPriority } from '../../../shared/types'
 import { isHardLocked } from '../../../shared/modelCompatibility'
 import { ActiveModelBadge } from '../Shared/ActiveModelBadge'
 import { IconClipboard, IconRefresh, IconTag, IconTrash } from '../Shared/Icons'
+import { ProjectRagModal } from './ProjectRagModal'
+import { useIsModuleEnabled } from '../../utils/modules'
 import './ProjectStatusWidget.css'
 
 const STALE_THRESHOLD_DAYS = 14
@@ -73,7 +75,15 @@ export const ProjectStatusWidget: React.FC<ProjectStatusWidgetProps> = () => {
   const [showMarkDialog, setShowMarkDialog] = useState(false)
   const [reviewProject, setReviewProject] = useState<DiscoveredProject | null>(null)
   const [draftsProject, setDraftsProject] = useState<DiscoveredProject | null>(null)
+  const [askProject, setAskProject] = useState<DiscoveredProject | null>(null)
   const [showDone, setShowDone] = useState(false)
+
+  // Projekt-RAG: zentrales Embedding-Modell (alle Surfaces lesen dasselbe),
+  // Chat-Modell = das fürs Projekt-Modul aktive Modell. Nur sichtbar, wenn das
+  // opt-in Modul „Projekt-RAG" aktiv ist.
+  const projectRagEnabled = useIsModuleEnabled('project-rag')
+  const ragEmbedModel = ollama.projectRagEmbeddingModel || 'bge-m3'
+  const ragChatModel = effectiveModel
   const [toast, setToast] = useState<{ kind: 'success' | 'error'; text: string; href?: string; projectKey?: string } | null>(null)
 
   // Beim Mount und bei Vault- oder Projekt-Ordner-Wechsel laden
@@ -236,6 +246,8 @@ export const ProjectStatusWidget: React.FC<ProjectStatusWidgetProps> = () => {
       onReview={() => setReviewProject(p)}
       onShowDrafts={() => setDraftsProject(p)}
       onToggleStatus={() => handleToggleStatus(p)}
+      onAsk={() => setAskProject(p)}
+      ragEnabled={projectRagEnabled}
     />
   )
 
@@ -378,6 +390,18 @@ export const ProjectStatusWidget: React.FC<ProjectStatusWidgetProps> = () => {
         />
       )}
 
+      {askProject && projectRagEnabled && (
+        <ProjectRagModal
+          vaultPath={vaultPath}
+          project={askProject}
+          embedModel={ragEmbedModel}
+          chatModel={ragChatModel}
+          lang={lang}
+          onClose={() => setAskProject(null)}
+          onOpenSource={(fileRel) => { setAskProject(null); handleOpenStatusFile(`${vaultPath}/${fileRel}`) }}
+        />
+      )}
+
       {showMarkDialog && (
         <MarkProjectDialog
           vaultPath={vaultPath}
@@ -506,9 +530,11 @@ interface ProjectRowProps {
   onReview: () => void
   onShowDrafts: () => void
   onToggleStatus: () => void
+  onAsk: () => void
+  ragEnabled: boolean
 }
 
-const ProjectRow: React.FC<ProjectRowProps> = ({ project, lang, running, lastResult, synonymCount, synonymsGeneratedAt, synonymRunning, onCrystallize, onGenerateSynonyms, onOpenStatus, onReview, onShowDrafts, onToggleStatus }) => {
+const ProjectRow: React.FC<ProjectRowProps> = ({ project, lang, running, lastResult, synonymCount, synonymsGeneratedAt, synonymRunning, onCrystallize, onGenerateSynonyms, onOpenStatus, onReview, onShowDrafts, onToggleStatus, onAsk, ragEnabled }) => {
   const prio = project.marker.priority
   const prioDot = prio === 'high' ? '🔴' : prio === 'med' ? '🟡' : '🟢'
   const prioLabel = lang === 'de'
@@ -613,6 +639,15 @@ const ProjectRow: React.FC<ProjectRowProps> = ({ project, lang, running, lastRes
               : <><IconTag size={12} /> {synonymCount > 0 ? synonymCount : (lang === 'de' ? 'Synonyme' : 'Synonyms')}</>}
           </span>
         </button>
+        {ragEnabled && (
+          <button
+            className="psw-btn psw-btn--ghost psw-btn--small"
+            onClick={onAsk}
+            title={lang === 'de' ? 'Projektordner semantisch befragen (lokal)' : 'Ask the project folder semantically (local)'}
+          >
+            💬 {lang === 'de' ? 'Fragen' : 'Ask'}
+          </button>
+        )}
         <button
           className="psw-btn psw-btn--primary psw-btn--small"
           onClick={onCrystallize}

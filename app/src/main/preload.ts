@@ -171,6 +171,34 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('ollama-chat-done', () => callback())
   },
 
+  // Projekt-RAG: Projektordner semantisch befragen (lokal)
+  projectRagStatus: (vaultPath: string, projectFolderRel: string, embedModel: string) =>
+    ipcRenderer.invoke('project-rag-status', vaultPath, projectFolderRel, embedModel),
+  projectRagIndex: (vaultPath: string, projectFolderRel: string, embedModel: string) =>
+    ipcRenderer.invoke('project-rag-index', vaultPath, projectFolderRel, embedModel),
+  onProjectRagIndexProgress: (callback: (progress: { done: number; total: number }) => void) => {
+    ipcRenderer.removeAllListeners('project-rag-index-progress')
+    ipcRenderer.on('project-rag-index-progress', (_event, progress) => callback(progress))
+  },
+  projectRagQuery: (vaultPath: string, projectFolderRel: string, query: string, embedModel: string, opts?: object) =>
+    ipcRenderer.invoke('project-rag-query', vaultPath, projectFolderRel, query, embedModel, opts),
+  projectRagAnswer: (vaultPath: string, projectFolderRel: string, query: string, embedModel: string, chatModel: string, language: 'de' | 'en' = 'de') =>
+    ipcRenderer.invoke('project-rag-answer', vaultPath, projectFolderRel, query, embedModel, chatModel, language),
+  onProjectRagAnswerChunk: (callback: (chunk: string) => void) => {
+    ipcRenderer.removeAllListeners('project-rag-answer-chunk')
+    ipcRenderer.on('project-rag-answer-chunk', (_event, chunk) => callback(chunk))
+  },
+  onProjectRagAnswerDone: (callback: () => void) => {
+    ipcRenderer.removeAllListeners('project-rag-answer-done')
+    ipcRenderer.on('project-rag-answer-done', () => callback())
+  },
+  onProjectRagAnswerSources: (callback: (sources: unknown[]) => void) => {
+    ipcRenderer.removeAllListeners('project-rag-answer-sources')
+    ipcRenderer.on('project-rag-answer-sources', (_event, sources) => callback(sources))
+  },
+  projectRagRerankCandidates: (vaultPath: string, queryText: string, candidateFolderRels: string[], embedModel: string) =>
+    ipcRenderer.invoke('project-rag-rerank-candidates', vaultPath, queryText, candidateFolderRels, embedModel),
+
   // LM Studio Local AI API (OpenAI-kompatibel)
   lmstudioCheck: (port?: number) => ipcRenderer.invoke('lmstudio-check', port),
   lmstudioModels: (port?: number) => ipcRenderer.invoke('lmstudio-models', port),
@@ -611,6 +639,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     agentMaxIterations?: number
     agentAllowedTools?: string[]
     agentConfirmTools?: string[]
+    projectsRootFolder?: string
+    projectRagEmbeddingModel?: string
   }) => ipcRenderer.invoke('telegram-update-config', config),
   telegramStart: () =>
     ipcRenderer.invoke('telegram-start'),

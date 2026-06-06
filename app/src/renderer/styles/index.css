@@ -18948,3 +18948,14 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
 .cm-task-urgent {
   background: rgba(255, 0, 0, 0.08) !important;
 }
+
+/* Klickbare [[Wikilinks]] in Notes-Chat-Antworten */
+.nc-wikilink {
+  color: var(--accent-color, #4a9eff);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.nc-wikilink:hover {
+  color: color-mix(in srgb, var(--accent-color, #4a9eff) 75%, #fff 25%);
+}

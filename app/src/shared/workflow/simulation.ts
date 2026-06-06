@@ -41,6 +41,7 @@ const SIM_LINE: Record<string, string> = {
   'email.analyze': 'Analyse: Relevanz 82, 1 Aufgabe erkannt',
   'project.match': 'Projekt erkannt: 160 - Mars Abenteuer',
   'project.context': 'Kontext geladen: _STATUS.md + letzte Projektmails',
+  'project.rag': 'Projekt-RAG: 6 relevante Auszüge aus dem Projektordner',
   'ollama.generateReply': 'Ollama-Schritt: Antwortentwurf würde erzeugt',
   'ollama.summarize': 'Ollama-Schritt: Zusammenfassung würde erzeugt',
   'ollama.extractTasks': 'Ollama-Schritt: Aufgaben würden extrahiert',
