@@ -2,6 +2,25 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.7.25-beta] - 2026-06-07
+
+### Features
+
+- **Workflow Canvas: mehrere Workflows verwalten.** Du kannst jetzt beliebig viele Workflows nebeneinander pflegen — ein Auswahl-Menü in der Werkzeugleiste zum Wechseln, plus „+ Neu", „Duplizieren", „Beispiel" und „Löschen". Alle Workflows werden gemeinsam gespeichert; der zuletzt aktive wird beim Öffnen wiederhergestellt.
+- **Alle aktivierten Workflows reagieren auf ihre Auslöser — nicht nur der gerade geöffnete.** Bisher feuerten Mail-/Termin-/Mahnungs-/Buchungs-/Aufgaben-Auslöser nur für den im Canvas ausgewählten Workflow. Jetzt laufen alle aktivierten Workflows mit, solange der Canvas-Tab offen ist (Zeitpläne ohnehin im Hintergrund). Externe Quellen werden dabei nur einmal abgefragt.
+- **edoobox & Antares: persönlicher Entwurf pro Vorgang.** Bei einer neuen edoobox-Anmeldung entsteht ein Bestätigungsentwurf mit Teilnehmer-Kontakt (Name/E-Mail), bei einer überfälligen Antares-Rückgabe ein höflicher Erinnerungsentwurf — beide landen wie gewohnt zur menschlichen Prüfung im Compose-Fenster, du sendest selbst.
+
+### Verbesserungen
+
+- **Privacy: Cloud-Modelle für Workflow-KI mit persönlichen Daten gesperrt.** Gehostete Ollama-Cloud-Modelle (`:cloud`/`-cloud`) würden Prompt-Inhalte an Ollama-Server schicken. KI-Schritte in Workflows weisen solche Modelle jetzt ab — deine Mail-/Buchungs-/Mahnungs-Inhalte verlassen den Rechner nicht. Lokale **und** selbst-gehostete (On-Prem/Edge) Modelle laufen unverändert weiter, da der Schutz am Modell-Tag und nicht am Server-Standort ansetzt.
+- **Bausteine-Palette aufgeräumt.** Verstellbare Breite, farbige Port-Punkte (gleiche Farbe = verbindbar) und ausführliche Tooltips. Ein Baustein wird nur dann als verfügbar angezeigt, wenn das zugehörige Modul **aktiviert UND eingerichtet** ist.
+
+### Fixes
+
+- **Fehlgeschlagene Läufe blockieren eine Mail nicht mehr dauerhaft.** Ein Vorgang wird erst als „erledigt" markiert, wenn der Lauf erfolgreich war — ein vorübergehender Fehler (Ollama aus, ungeeignetes Modell) lässt die Mail beim nächsten Versuch wieder erscheinen.
+- **Antwort-Entwürfe gehen an die richtige Adresse.** Der Empfänger wird aus der beschrifteten Kontaktzeile bzw. dem korrekten Absender übernommen; eine zufällig im Mailtext stehende Adresse wird nicht mehr fälschlich als Empfänger gesetzt, und ein Lauf ohne Quell-Mail adressiert nicht mehr an die gerade markierte Inbox-Mail.
+- **„Beispiel" fügt genau einen Workflow hinzu** (statt aller Vorlagen auf einmal); manuelle Testläufe der edoobox-/Antares-Beispiele erzeugen jetzt einen sinnvollen Entwurf statt eines leeren.
+
 ## [0.7.24-beta] - 2026-06-06
 
 ### Features
