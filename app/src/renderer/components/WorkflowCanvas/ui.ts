@@ -24,3 +24,27 @@ export const PORT_COLORS: Record<WorkflowPortKind, string> = {
 export function portColor(kind: WorkflowPortKind): string {
   return PORT_COLORS[kind] || '#9ca3af'
 }
+
+/** Menschenlesbare Bezeichnung der Port-Art (für Palette-Tooltips). */
+export const PORT_KIND_LABELS: Record<WorkflowPortKind, string> = {
+  email: 'E-Mail',
+  email_analysis: 'Mail-Analyse',
+  text: 'Text',
+  project: 'Projekt',
+  project_context: 'Projektkontext',
+  task: 'Aufgabe',
+  calendar_event: 'Termin',
+  note: 'Notiz',
+  draft_reply: 'Antwortentwurf',
+  booking: 'Buchung',
+  course: 'Kurs',
+  participant: 'Teilnehmer',
+  media_item: 'Medium',
+  availability: 'Verfügbarkeit',
+  human_approval: 'Freigabe',
+  json: 'JSON'
+}
+
+export function portKindLabel(kind: WorkflowPortKind): string {
+  return PORT_KIND_LABELS[kind] || kind
+}

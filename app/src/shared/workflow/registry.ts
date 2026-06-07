@@ -94,6 +94,19 @@ export const WORKFLOW_ACTIONS: WorkflowActionDefinition[] = [
     hardLockModule: 'task-extraction',
     privacy: { containsPersonalData: true, localOnly: true }
   },
+  {
+    id: 'email.composeDraft',
+    moduleId: 'email',
+    label: 'E-Mail-Entwurf vorbereiten',
+    description:
+      'Bereitet aus Kontakt und Text einen E-Mail-Entwurf vor. Für edoobox-/Antares-Trigger: Kontakt-Port + Text-Port verbinden, danach „Mensch prüft (Antwort)".',
+    inputs: [
+      inp('email', 'Kontakt', 'email', { required: true }),
+      inp('text', 'Inhalt', 'text', { required: true })
+    ],
+    outputs: [out('draft', 'E-Mail-Entwurf', 'draft_reply')],
+    privacy: { containsPersonalData: true }
+  },
 
   // ---------------- PROJECT ----------------
   {
@@ -270,7 +283,10 @@ export const WORKFLOW_ACTIONS: WorkflowActionDefinition[] = [
     description:
       'Terminal: der Antwortentwurf landet im Compose-Fenster (manuell) bzw. als Aufgabe „✉️ Entwurf prüfen" (Event). Der Mensch sendet selbst.',
     isTerminal: true,
-    inputs: [inp('draft', 'Antwortentwurf', 'draft_reply', { required: true })],
+    inputs: [
+      inp('draft', 'Antwortentwurf', 'draft_reply', { required: true }),
+      inp('email', 'Kontakt', 'email')
+    ],
     outputs: [out('approval', 'Freigabe', 'human_approval')]
   },
 
@@ -282,10 +298,13 @@ export const WORKFLOW_ACTIONS: WorkflowActionDefinition[] = [
     moduleId: 'antares',
     label: 'Überfällige Rückgabe (Auslöser)',
     description:
-      'Startpunkt: eine neue überfällige Rückgabe aus Antares (Mahnung). Gibt Leihnr, Titel, Entleiher, Schule und Rückgabedatum als Text aus.',
+      'Startpunkt: eine neue überfällige Rückgabe aus Antares (Mahnung). Gibt Leihnr, Titel, Entleiher, Schule, Rückgabedatum und - falls vorhanden - die E-Mail-Adresse aus.',
     isTrigger: true,
     inputs: [],
-    outputs: [out('text', 'Mahnung', 'text')],
+    outputs: [
+      out('text', 'Mahnung', 'text'),
+      out('email', 'Kontakt', 'email')
+    ],
     privacy: { containsPersonalData: true, requiresCredential: true }
   },
 
@@ -296,24 +315,43 @@ export const WORKFLOW_ACTIONS: WorkflowActionDefinition[] = [
     moduleId: 'edoobox',
     label: 'Neue Anmeldung (Auslöser)',
     description:
-      'Startpunkt: eine neue Anmeldung in einem edoobox-Angebot. Gibt Angebotsname und Teilnehmer als Text aus.',
+      'Startpunkt: eine neue Anmeldung in einem edoobox-Angebot. Gibt Angebotsname, Teilnehmer und E-Mail-Adresse aus.',
     isTrigger: true,
     inputs: [],
-    outputs: [out('text', 'Anmeldung', 'text')],
+    outputs: [
+      out('text', 'Anmeldung', 'text'),
+      out('email', 'Teilnehmer', 'email')
+    ],
     privacy: { containsPersonalData: true, requiresCredential: true }
   },
 
   // ---------------- TASKS (Layer E) ----------------
   {
-    // Feuert, wenn eine Vault-Aufgabe in ihr Fälligkeitsfenster rutscht.
+    // Feuert, wenn eine Vault-Aufgabe heute fällig ist.
     id: 'tasks.dueSoon',
     moduleId: 'tasks',
-    label: 'Aufgabe fällig (Auslöser)',
+    label: 'Aufgabe heute fällig (Auslöser)',
     description:
-      'Startpunkt: eine Vault-Aufgabe wird fällig oder ist überfällig. Gibt Aufgabentext, Notiz und Fälligkeitsdatum als Text aus.',
+      'Startpunkt: eine Vault-Aufgabe ist heute fällig. Gibt Aufgabentext, Notiz und Fälligkeitsdatum als Text aus.',
     isTrigger: true,
     inputs: [],
     outputs: [out('text', 'Aufgabe', 'text')]
+  },
+  {
+    // Abnehmer für den `task`-Ausgang (z.B. „Ollama: Aufgaben extrahieren"):
+    // hängt die Aufgaben als Markdown-Checkboxen an eine bestehende Notiz an.
+    id: 'tasks.writeToNote',
+    moduleId: 'tasks',
+    label: 'Aufgaben in Notiz schreiben',
+    description:
+      'Hängt extrahierte Aufgaben (als Markdown-Checkboxen) an eine bestehende Notiz an. Verbinde den Aufgaben-Ausgang von „Ollama: Aufgaben extrahieren" + eine Notiz (z.B. aus „Notiz erstellen"/„Notizen suchen").',
+    isWrite: true,
+    inputs: [
+      inp('tasks', 'Aufgaben', 'task', { required: true }),
+      inp('note', 'Notiz', 'note', { required: true })
+    ],
+    outputs: [out('note', 'Notiz', 'note')],
+    privacy: { writesToDisk: true }
   },
 
   // ---------------- SCHEDULE (Layer F) ----------------

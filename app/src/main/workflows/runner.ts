@@ -29,6 +29,7 @@ export interface SeedEmail {
   subject?: string
   bodyText?: string
   from?: string
+  name?: string
 }
 
 /** Generischer Seed eines Laufs. Email-Trigger füllen `email`,
@@ -49,6 +50,9 @@ export interface RunnerServices {
   /** node.config.model → Modul-Override → globales Modell. */
   resolveModel: (override: string | undefined, hint?: CompatModuleId) => string
   isHardLocked: (model: string, moduleId: CompatModuleId) => boolean
+  /** Ist `model` ein gehostetes Ollama-Cloud-Modell (`:cloud`/`-cloud`)? Tag-basiert,
+   *  NICHT endpunkt-basiert — On-Prem/Edge-Server mit normalen Modellen zählen nicht. */
+  isCloudModel: (model: string) => boolean
   /** Ist das Workflow-Modul (email/project/…) im Vault aktiv? */
   isModuleActive: (workflowModuleId: string) => boolean
 
@@ -105,6 +109,10 @@ function asText(v: unknown): string {
   if (v && typeof v === 'object') return JSON.stringify(v)
   return String(v ?? '')
 }
+function asNoteRel(v: unknown): string {
+  if (Array.isArray(v)) return v.map(item => asText(item).trim()).find(Boolean) || ''
+  return asText(v).trim()
+}
 /** Erkennt leeren oder un-crystallisierten (Stub-)Projektkontext, damit der Lauf
  *  das zurückmeldet statt stillschweigend Frontmatter-Rauschen weiterzureichen. */
 function isEffectivelyEmptyContext(ctx: string): boolean {
@@ -131,7 +139,23 @@ const triggerEmailExecutor: Executor = async (_node, _inputs, opts) => {
 const triggerTextExecutor: Executor = async (_node, _inputs, opts) => {
   const text = opts.seed?.text || ''
   const first = text.split('\n').find(l => l.trim()) || '(leer)'
-  return { outputs: { text }, log: [`Auslöser: ${first.slice(0, 80)}`] }
+  return {
+    outputs: { text, ...(opts.seed?.email ? { email: opts.seed.email } : {}) },
+    log: [`Auslöser: ${first.slice(0, 80)}`]
+  }
+}
+
+function seededRecipient(opts: RunOptions, inputs: Record<string, unknown> = {}): { to?: string; toName?: string; subject?: string } {
+  const meta = opts.seed?.meta || {}
+  const email = { ...opts.seed?.email, ...asEmail(inputs.email) }
+  const to = String(meta.recipientEmail || meta.userEmail || meta.email || email?.from || '').trim()
+  const toName = String(meta.recipientName || meta.userName || email?.name || '').trim()
+  const subject = String(meta.subject || email?.subject || '').trim()
+  return {
+    ...(to ? { to } : {}),
+    ...(toName ? { toName } : {}),
+    ...(subject ? { subject } : {})
+  }
 }
 
 /** actionId → Implementierung. */
@@ -158,6 +182,16 @@ const EXECUTORS: Record<string, Executor> = {
     return {
       outputs: { analysis: { summary: out.slice(0, 400) }, text: email.bodyText || out },
       log: [`Analyse mit ${model}: ${out.split('\n')[0].slice(0, 80)}`]
+    }
+  },
+
+  'email.composeDraft': async (_node, inputs) => {
+    const email = asEmail(inputs.email)
+    const text = asText(inputs.text).trim()
+    const subject = email.subject ? `Betreff: ${email.subject}\n\n` : ''
+    return {
+      outputs: { draft: `${subject}${text}`.trim() },
+      log: [`E-Mail-Entwurf vorbereitet${email.from ? ` für ${email.from}` : ''}`]
     }
   },
 
@@ -276,9 +310,23 @@ const EXECUTORS: Record<string, Executor> = {
   },
 
   'notes.append': async (_node, inputs, opts) => {
-    const noteRel = asText(inputs.note)
+    const noteRel = asNoteRel(inputs.note)
     const rel = await opts.services.appendNote(noteRel, asText(inputs.text))
     return { outputs: { note: rel }, log: [`An Notiz angehängt: ${rel}`] }
+  },
+
+  // Abnehmer für den `task`-Ausgang: hängt die Aufgaben als Markdown-Checkboxen
+  // an eine bestehende Notiz an (delegiert an die eine Schreibgrenze appendNote).
+  'tasks.writeToNote': async (_node, inputs, opts) => {
+    const noteRel = asNoteRel(inputs.note)
+    const raw = inputs.tasks
+    const list = Array.isArray(raw)
+      ? raw.map(t => String(t).trim()).filter(Boolean)
+      : asText(raw).split('\n').map(s => s.trim()).filter(Boolean)
+    // extractTasks liefert bereits „- [ ] …"; fremde Quellen ggf. zur Checkbox normalisieren.
+    const lines = list.map(l => (/^[-*]\s*\[[ xX]\]/.test(l) ? l : `- [ ] ${l.replace(/^[-*]\s+/, '')}`))
+    const rel = await opts.services.appendNote(noteRel, lines.join('\n'))
+    return { outputs: { note: rel }, log: [`${lines.length} Aufgabe(n) an Notiz angehängt: ${rel}`] }
   },
 
   'notes.search': async (_node, inputs, opts) => {
@@ -297,18 +345,20 @@ const EXECUTORS: Record<string, Executor> = {
 
   'human.reviewDraftReply': async (_node, inputs, opts) => {
     const draft = asText(inputs.draft)
+    const recipient = seededRecipient(opts, inputs)
     if (isEventTrigger(opts.trigger)) {
-      const taskRel = await opts.services.createTask(`- [ ] ✉️ Entwurf prüfen und senden`)
+      const suffix = recipient.to ? ` an ${recipient.to}` : ''
+      const taskRel = await opts.services.createTask(`- [ ] ✉️ Entwurf prüfen und senden${suffix}`)
       return {
         outputs: { approval: 'pending' },
         log: ['Aufgabe „Entwurf prüfen" angelegt'],
-        handoff: { kind: 'task', payload: { taskRel, draft } }
+        handoff: { kind: 'task', payload: { taskRel, draft, ...recipient } }
       }
     }
     return {
       outputs: { approval: 'pending' },
       log: ['Entwurf bereit zur Prüfung im Compose-Fenster'],
-      handoff: { kind: 'compose', payload: { draft, emailId: opts.seed?.email?.id } }
+      handoff: { kind: 'compose', payload: { draft, emailId: opts.seed?.email?.id, ...recipient } }
     }
   }
 }
@@ -363,6 +413,18 @@ export async function runWorkflow(workflow: Workflow, opts: RunOptions): Promise
       if (opts.services.isHardLocked(model, action.hardLockModule)) {
         step.status = 'failed'
         step.error = `Modell „${model}" ist für ${action.hardLockModule} gesperrt (Prompt-Injection-Schutz).`
+        step.finishedAt = nowIso(); steps.push(step)
+        return { ...baseRun, status: 'failed', finishedAt: nowIso(), steps, error: step.error }
+      }
+      // Privacy-Hard-Lock: gehostete Ollama-Cloud-Modelle (`:cloud`/`-cloud`) leiten die
+      // Inferenz an Ollama-Server weiter → personenbezogene Mail-/Buchungs-/Mahnungs-
+      // Inhalte würden den Rechner verlassen. Der Block hängt am Modell-TAG, nicht am
+      // Endpunkt: lokale UND selbst-gehostete (On-Prem/Edge) Modelle laufen normal weiter.
+      // Setzt die harte Regel „keine personenbezogenen Daten in die Cloud" im Code durch
+      // (unabhängig vom Verdict der Matrix, der Cloud-Modelle nur als 'yellow' warnt).
+      if (opts.services.isCloudModel(model)) {
+        step.status = 'failed'
+        step.error = `Modell „${model}" ist ein Ollama-Cloud-Modell und für Workflow-Schritte mit personenbezogenen Inhalten gesperrt — die Inhalte würden den Rechner verlassen. Bitte ein lokales oder selbst-gehostetes Modell wählen.`
         step.finishedAt = nowIso(); steps.push(step)
         return { ...baseRun, status: 'failed', finishedAt: nowIso(), steps, error: step.error }
       }

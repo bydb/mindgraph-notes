@@ -117,12 +117,15 @@ export interface WorkflowValidationResult {
 export interface WorkflowFile {
   schemaVersion: number
   workflows: Workflow[]
+  /** ID des zuletzt aktiven Workflows (Multi-Workflow-Auswahl). Optional für
+   *  Back-Compat: fehlt das Feld, gilt workflows[0] als aktiv. */
+  activeId?: string
 }
 
 /** Generischer Seed eines Laufs. Email-Trigger (A/B) füllen `email`,
  *  Text-Trigger (C/D/E/F) füllen `text` (+ `meta` für Exactly-once/Labeling). */
 export interface WorkflowSeed {
-  email?: { id?: string; subject?: string; bodyText?: string; from?: string }
+  email?: { id?: string; subject?: string; bodyText?: string; from?: string; name?: string }
   text?: string
   meta?: Record<string, unknown>
 }

@@ -39,6 +39,7 @@ const SIM_LINE: Record<string, string> = {
   'tasks.dueSoon': 'Auslöser: Aufgabe „Entwurf prüfen" wird heute fällig',
   'schedule.timer': 'Auslöser: Zeitplan (täglich 09:00)',
   'email.analyze': 'Analyse: Relevanz 82, 1 Aufgabe erkannt',
+  'email.composeDraft': 'E-Mail-Entwurf aus Kontakt und Text vorbereitet',
   'project.match': 'Projekt erkannt: 160 - Mars Abenteuer',
   'project.context': 'Kontext geladen: _STATUS.md + letzte Projektmails',
   'project.rag': 'Projekt-RAG: 6 relevante Auszüge aus dem Projektordner',

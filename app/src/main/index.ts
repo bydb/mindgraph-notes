@@ -26,7 +26,7 @@ import {
 import { runWorkflow, type RunnerServices, type SeedEmail } from './workflows/runner'
 import { matchEmailToProjects, gateProjectMatch } from '../shared/projectMatch'
 import { parseRelevanceConfig, stripConfigBlock, buildReplyStats, computeHardSignals, combineRelevance, extractConfigBlock, upsertConfigBlock, emptyRelevanceConfig, isSentMail, isSentFolderName, DEFAULT_VIP_WEIGHT, DEFAULT_DOMAIN_WEIGHT, DEFAULT_KEYWORD_BOOST } from '../shared/emailRelevance'
-import { isHardLocked as isModelHardLocked } from '../shared/modelCompatibility'
+import { isHardLocked as isModelHardLocked, isCloudModel as isModelIsCloud } from '../shared/modelCompatibility'
 import { MODULE_FEATURE_GATE } from '../shared/workflow/types'
 import type { Workflow, WorkflowFile, WorkflowRunTrigger } from '../shared/workflow/model'
 import type {
@@ -983,6 +983,118 @@ function getWorkflowsPath(vaultPath: string): string {
   return path.join(vaultPath, '.mindgraph', 'workflows.json')
 }
 
+const WORKFLOW_NOTE_SEARCH_EXCLUDED_DIRS = new Set([
+  '.git',
+  '.hg',
+  '.mindgraph',
+  '.obsidian',
+  '.trash',
+  'node_modules',
+  'dist',
+  'build',
+  'out'
+])
+const WORKFLOW_NOTE_SEARCH_MAX_FILES = 3000
+const WORKFLOW_NOTE_SEARCH_MAX_FILE_CHARS = 200_000
+const WORKFLOW_NOTE_SEARCH_MAX_RESULTS = 10
+
+function normalizeSearchText(value: string): string {
+  return value.toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '')
+}
+
+function workflowSearchTerms(query: string): string[] {
+  return Array.from(new Set(
+    normalizeSearchText(query)
+      .split(/[^a-z0-9äöüß]+/i)
+      .map(term => term.trim())
+      .filter(term => term.length >= 2)
+  ))
+}
+
+async function walkWorkflowMarkdownFiles(dir: string, vaultRoot: string, files: string[]): Promise<void> {
+  if (files.length >= WORKFLOW_NOTE_SEARCH_MAX_FILES) return
+  let entries: Array<import('fs').Dirent>
+  try {
+    entries = await fs.readdir(dir, { withFileTypes: true })
+  } catch {
+    return
+  }
+
+  for (const entry of entries) {
+    if (files.length >= WORKFLOW_NOTE_SEARCH_MAX_FILES) return
+    const full = path.join(dir, entry.name)
+    if (entry.isDirectory()) {
+      if (WORKFLOW_NOTE_SEARCH_EXCLUDED_DIRS.has(entry.name)) continue
+      if (entry.name.startsWith('.')) continue
+      await walkWorkflowMarkdownFiles(full, vaultRoot, files)
+    } else if (entry.isFile() && entry.name.toLowerCase().endsWith('.md')) {
+      validatePath(vaultRoot, path.relative(vaultRoot, full))
+      files.push(full)
+    }
+  }
+}
+
+function workflowNoteSearchScore(queryNorm: string, terms: string[], relPath: string, content: string): number {
+  const title = path.basename(relPath, '.md')
+  const titleNorm = normalizeSearchText(title)
+  const pathNorm = normalizeSearchText(relPath)
+  const contentNorm = normalizeSearchText(content)
+  let score = 0
+
+  if (titleNorm === queryNorm) score += 200
+  if (titleNorm.includes(queryNorm)) score += 80
+  if (pathNorm.includes(queryNorm)) score += 35
+  if (contentNorm.includes(queryNorm)) score += 20
+
+  for (const term of terms) {
+    if (titleNorm.includes(term)) score += 30
+    if (pathNorm.includes(term)) score += 12
+    const first = contentNorm.indexOf(term)
+    if (first >= 0) {
+      score += 4
+      if (first < 1000) score += 4
+    }
+  }
+
+  return score
+}
+
+async function searchWorkflowNotes(vaultPath: string, query: string): Promise<string[]> {
+  const trimmed = query.trim()
+  if (!trimmed) return []
+  const safeVault = await assertSafePath(vaultPath, 'workflow-notes-search')
+  const queryNorm = normalizeSearchText(trimmed)
+  const terms = workflowSearchTerms(trimmed)
+  if (!queryNorm || terms.length === 0) return []
+
+  const files: string[] = []
+  await walkWorkflowMarkdownFiles(safeVault, safeVault, files)
+
+  const hits: Array<{ rel: string; score: number; mtimeMs: number }> = []
+  const CONCURRENCY = 32
+  for (let i = 0; i < files.length; i += CONCURRENCY) {
+    const batch = files.slice(i, i + CONCURRENCY)
+    const scored = await Promise.all(batch.map(async (file) => {
+      try {
+        const stat = await fs.stat(file)
+        if (stat.size > WORKFLOW_NOTE_SEARCH_MAX_FILE_CHARS) return null
+        const content = await fs.readFile(file, 'utf-8')
+        const rel = path.relative(safeVault, file)
+        const score = workflowNoteSearchScore(queryNorm, terms, rel, content)
+        return score > 0 ? { rel, score, mtimeMs: stat.mtimeMs } : null
+      } catch {
+        return null
+      }
+    }))
+    for (const hit of scored) if (hit) hits.push(hit)
+  }
+
+  return hits
+    .sort((a, b) => b.score - a.score || b.mtimeMs - a.mtimeMs || a.rel.localeCompare(b.rel))
+    .slice(0, WORKFLOW_NOTE_SEARCH_MAX_RESULTS)
+    .map(hit => hit.rel)
+}
+
 ipcMain.handle('workflow-load', async (_event, vaultPath: string): Promise<WorkflowFile | null> => {
   try {
     assertApprovedVault(vaultPath, 'workflow-load')
@@ -1043,6 +1155,7 @@ ipcMain.handle('workflow-run', async (_event, payload: WorkflowRunPayload) => {
     resolveModel: (override, hint) =>
       (override && override.trim()) || (hint && models.overrides[hint]) || models.selected,
     isHardLocked: (model, moduleId) => isModelHardLocked(model, moduleId),
+    isCloudModel: (model) => isModelIsCloud(model),
     isModuleActive: (workflowModuleId) => {
       const gate = MODULE_FEATURE_GATE[workflowModuleId as keyof typeof MODULE_FEATURE_GATE]
       return gate ? Boolean(features[gate]) : true
@@ -1173,7 +1286,7 @@ ipcMain.handle('workflow-run', async (_event, payload: WorkflowRunPayload) => {
       await writeFileSafe(abs, existing + sep + text + '\n')
       return noteRel
     },
-    searchNotes: async () => [],
+    searchNotes: async (query) => searchWorkflowNotes(vaultPath, query),
     createTask: async (taskLine) => {
       const rel = '000 - 📥 inbox/Workflow-Aufgaben.md'
       const abs = path.join(vaultPath, rel)

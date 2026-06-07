@@ -388,13 +388,16 @@ export function isHumanFavorite(model: string): boolean {
   return entry?.humanFavorite === true
 }
 
-// Ollama-Cloud-Modelle haben einen `-cloud`-Suffix im Tag (z.B. `qwen3.5:cloud`).
-// Die Anfrage geht zwar weiter über localhost:11434, aber die eigentliche Inferenz
-// findet auf Ollama-Servern statt — d.h. die Prompt-Inhalte verlassen den Rechner.
-// Für UI-Hinweise (Privacy-Warnung) gedacht, nicht für Hard-Locks.
+// Ollama-Cloud-Modelle tragen einen Cloud-Suffix im Tag — entweder `:cloud`
+// (z.B. `qwen3.5:cloud`) oder `-cloud` (z.B. `gpt-oss:120b-cloud`). Die Anfrage geht
+// zwar weiter über localhost:11434, aber die eigentliche Inferenz findet auf Ollama-
+// Servern statt — d.h. die Prompt-Inhalte verlassen den Rechner. Wichtig: das hängt am
+// Modell-TAG, NICHT am Endpunkt — ein selbst-gehosteter/On-Prem-Ollama-Server mit
+// normalen Modellen ist KEIN Cloud-Modell. Genutzt für UI-Privacy-Hinweise UND als
+// Hard-Lock im Workflow-Runner (keine personenbezogenen Daten in die Cloud).
 export function isCloudModel(model: string): boolean {
   if (!model) return false
-  return /-cloud$/i.test(model.trim())
+  return /[:-]cloud$/i.test(model.trim())
 }
 
 // "Cloud-Test-Modelle": Modelle, die wir als Null-Reibungs-Einstieg für Test-User
