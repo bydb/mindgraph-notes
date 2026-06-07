@@ -269,6 +269,25 @@
     .compare-card strong { color: var(--text); font-weight: 600; }
     .compare-card.accent { border-color: rgba(196,118,74,0.3); background: linear-gradient(135deg, rgba(196,118,74,0.06), transparent); }
 
+    /* --- Model quality --- */
+    .model-quality { padding: 5rem 2rem; max-width: 1100px; margin: 0 auto; }
+    .model-quality-header {
+      display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2rem;
+      align-items: end; margin-bottom: 2rem;
+    }
+    .model-quality-actions { display: flex; gap: 0.75rem; align-items: center; justify-content: flex-end; }
+    .model-quality-figure {
+      background: rgba(255,255,255,0.72); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 0.75rem;
+      box-shadow: 0 26px 70px rgba(0,0,0,0.08);
+    }
+    .model-quality-figure img {
+      display: block; width: 100%; height: auto; border-radius: 10px;
+    }
+    .model-quality-note {
+      margin-top: 1rem; color: var(--text-muted); font-size: 0.85rem; text-align: center;
+    }
+
     /* --- Modules strip --- */
     .modules-strip { padding: 3rem 2rem 4rem; max-width: 1100px; margin: 0 auto; }
     .modules-strip-label { text-align: center; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-muted); margin-bottom: 1.5rem; }
@@ -349,6 +368,8 @@
       .cap-grid { grid-template-columns: 1fr; }
       .cap-card.featured { grid-column: span 1; }
       .cap-card.featured .cap-inner { grid-template-columns: 1fr; }
+      .model-quality-header { grid-template-columns: 1fr; align-items: start; }
+      .model-quality-actions { justify-content: flex-start; flex-wrap: wrap; }
       .dl-grid { grid-template-columns: 1fr; }
     }
     @media (min-width: 769px) and (max-width: 1024px) {
@@ -599,6 +620,24 @@
     </div>
   </section>
 
+  <!-- Modellqualität -->
+  <section class="model-quality" id="model-quality">
+    <div class="model-quality-header">
+      <div>
+        <div class="section-label" data-i18n="modelq.label">Qualitätsnachweis</div>
+        <h2 class="section-heading" data-i18n="modelq.heading">Lokale KI-Modelle,<br>getestet pro Modul.</h2>
+        <p class="section-sub" data-i18n="modelq.sub">MindGraph nutzt nicht einfach irgendein lokales Modell. E-Mail-Analyse, Task-Extraktion, Dashboard-Radar, Brain und Projekt-Status werden gegen eine dokumentierte Kompatibilit&auml;tsmatrix gepr&uuml;ft.</p>
+      </div>
+      <div class="model-quality-actions">
+        <a href="model-quality.pdf" class="btn btn-ghost" target="_blank" rel="noopener noreferrer" data-i18n="modelq.pdf">PDF &ouml;ffnen</a>
+      </div>
+    </div>
+    <figure class="model-quality-figure fade-in">
+      <img src="model-quality.png" alt="MindGraph Notes Modellqualit&auml;t lokaler KI: Kompatibilit&auml;tsmatrix f&uuml;r Brain, Tasks, Mail, Radar, Projekt-Status und Smart Connections" loading="lazy">
+    </figure>
+    <p class="model-quality-note" data-i18n="modelq.note">Datenstand 07.06.2026. Quelle: produktive Modell-Kompatibilit&auml;tsmatrix und lokale Benchmark-Reports.</p>
+  </section>
+
   <!-- Module strip -->
   <section class="modules-strip">
     <div class="modules-strip-label" data-i18n="modules.label">Kern immer aktiv &middot; Module nach Bedarf</div>
@@ -799,6 +838,11 @@
         "compare.c3.desc": "Ollama oder LM Studio auf deinem Rechner. Kein OpenAI-Key, kein Datenabfluss. Notes-Chat, Email-Analyse, Smart Connections, Grammatikpr\u00fcfung \u2014 alles auf deiner Hardware.",
         "compare.c4.title": "Offene Daten statt Lock-in",
         "compare.c4.desc": "Dein bestehender Vault \u00f6ffnet 1:1: Markdown, Wikilinks, Tags, Frontmatter, Canvas, Dataview. Wenn MindGraph nicht passt, nimmst du deine Daten ohne Migration mit.",
+        "modelq.label": "Qualit\u00e4tsnachweis",
+        "modelq.heading": "Lokale KI-Modelle,<br>getestet pro Modul.",
+        "modelq.sub": "MindGraph nutzt nicht einfach irgendein lokales Modell. E-Mail-Analyse, Task-Extraktion, Dashboard-Radar, Brain und Projekt-Status werden gegen eine dokumentierte Kompatibilit\u00e4tsmatrix gepr\u00fcft.",
+        "modelq.pdf": "PDF \u00f6ffnen",
+        "modelq.note": "Datenstand 07.06.2026. Quelle: produktive Modell-Kompatibilit\u00e4tsmatrix und lokale Benchmark-Reports.",
         "modules.label": "Kern immer aktiv \u00b7 Module nach Bedarf",
         "modules.core.dashboard": "Dashboard",
         "modules.core.editor": "Editor & Graph",
@@ -917,6 +961,11 @@
         "compare.c3.desc": "Ollama or LM Studio on your machine. No OpenAI key, no data leak. Notes Chat, email analysis, Smart Connections, grammar check \u2014 all on your hardware.",
         "compare.c4.title": "Open data instead of lock-in",
         "compare.c4.desc": "Your existing vault opens 1:1: Markdown, wikilinks, tags, frontmatter, canvas, dataview. If MindGraph doesn't fit, you take your data with you without migration.",
+        "modelq.label": "Quality proof",
+        "modelq.heading": "Local AI models,<br>tested per module.",
+        "modelq.sub": "MindGraph does not just use any local model. Email analysis, task extraction, dashboard radar, brain and project status are checked against a documented compatibility matrix.",
+        "modelq.pdf": "Open PDF",
+        "modelq.note": "Data as of 07 June 2026. Source: production model compatibility matrix and local benchmark reports.",
         "modules.label": "Core always active \u00b7 Modules on demand",
         "modules.core.dashboard": "Dashboard",
         "modules.core.editor": "Editor & Graph",
