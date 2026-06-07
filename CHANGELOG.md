@@ -2,6 +2,12 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.7.26-beta] - 2026-06-07
+
+### Verbesserungen
+
+- **Neues lokales Modell bewertet: Gemma 4 12B (MLX).** Das Apple-Silicon-optimierte `gemma4:12b-mlx` (~10 GB) wurde komplett gegen alle Modul-Benchmarks getestet und ist jetzt mit echten Eignungs-Badges im Modell-Picker hinterlegt — kein „❔ ungetestet" mehr. Ergebnis: **geeignet** für Mail-Task-Extraktion, Mail-Zusammenfassung, Dashboard-Snapshot und Projekt-Status (bei der Aufgaben-Extraktion das bisher stärkste Gemma — inkl. korrekter „wer macht was"-Zuordnung und sauber abgewehrter Prompt-Injection), **mit Vorbehalt** fürs Brain-Tagesresümee. Außerdem in die Empfehlungs-/Download-Liste aufgenommen.
+
 ## [0.7.25-beta] - 2026-06-07
 
 ### Features

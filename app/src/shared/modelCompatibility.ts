@@ -28,6 +28,18 @@
 //   (gleichauf). DEFAULT project-status ministral-3:8b → qwen3.5:4b (3,4 GB statt 6 GB,
 //   = Mail-Modell). qwen3.5:4b + ministral-3:8b als yellow-Einträge → schließt den
 //   "Empfohlen aber ❔ untested"-Widerspruch im Projekt-Status-Panel.
+// 2026-06-07: gemma4:12b-mlx (13B, nvfp4, ~10 GB, Apple-Silicon/MLX) komplett gebenchmarkt
+//   (alle 5 Chat-Module, je 3 Reps + gemma4:latest als Kalibrierungs-Anker). Ergebnis:
+//   task-extraction/mail-summary/dashboard-snapshot/project-status green, brain yellow.
+//   Stärker als das GGUF-Schwester gemma4:latest bei task-extraction (Recall + for_whom
+//   je 100 % statt 75 %/83 %) und mit niedrigerer Mail-Halluzination (24 % vs 38 %);
+//   Dashboard-Injection in allen 3 Reps sauber abgewehrt (Score 0). brain nur yellow,
+//   weil es bei stillem Tag in 2/3 Reps eine Platzhalter-„Offene Fäden"-Sektion schreibt
+//   (Regel 5) — sonst sauber, qualitativ auf Augenhöhe mit gemma4:latest. Tempo ~2–3×
+//   langsamer als latest (~3–15 s/Modul) + vereinzelte nvfp4/MLX-Latenz-Spitzen (50–77 s).
+//   Defaults UNVERÄNDERT (gemma4:12b-mlx ist ~10 GB, nicht 8-GB-tauglich), aber in die
+//   Pull-Liste aufgenommen (Apple-Silicon/MLX-Option). smart-connections nicht anwendbar
+//   (Chat-Modell, kein Embedding).
 //
 // "verdict":
 //   - "green":     Für dieses Modul produktiv geeignet.
@@ -90,7 +102,7 @@ export interface ModelCompatibilityData {
 }
 
 export const MODEL_COMPATIBILITY: ModelCompatibilityData = {
-  version: '2026-06-03',
+  version: '2026-06-07',
   modules: {
     brain: {
       'ministral-3:8b': {
@@ -104,6 +116,12 @@ export const MODEL_COMPATIBILITY: ModelCompatibilityData = {
         reasons: ['Erfindet bei stillem Tag Inhalt für die leere „Offene Fäden"-Sektion (s4)'],
         notes: 'Schnellstes Brain-Modell (~7 s), 0 Halluzinationen im Aggregat, 70 % kritische Titel. ~10 GB RAM. Wieder aufgenommen 2026-06-03.',
         metrics: { criticalTitlesLinkedPct: 70, rule5CompliancePct: 0, wikilinkHallucinations: 'none', latencySecondsPerRun: 7, ramGigabytes: 10 }
+      },
+      'gemma4:12b-mlx': {
+        verdict: 'yellow',
+        reasons: ['Regel 5 in 2/3 Läufen verletzt: schreibt bei stillem Tag eine Platzhalter-Sektion „Offene Fäden" („keine offenen Fäden …") statt sie wegzulassen'],
+        notes: 'Bench 2026-06-07 (3 Reps): Format ✓, Reihenfolge 100 %, 0 Halluzinationen, 0 unangebrachte Bewertungen, kritische Titel ~73–80 % verlinkt. ~8 s/Lauf, ~11 GB RAM (13B, nvfp4). Qualitativ auf Augenhöhe mit gemma4:latest (green) — Unterschied nur die Platzhalter-Sektion auf stillen Tagen. Brain ist nicht schadensrelevant.',
+        metrics: { criticalTitlesLinkedPct: 73, rule5CompliancePct: 33, wikilinkHallucinations: 'none', latencySecondsPerRun: 8, ramGigabytes: 11 }
       },
       'qwen3.5:9b-mlx-bf16': {
         verdict: 'red',
@@ -145,6 +163,12 @@ export const MODEL_COMPATIBILITY: ModelCompatibilityData = {
         reasons: ['T-Recall 75 % (niedrigste der getesteten 8B)', 'Richtung „wer macht was" (c08) verfehlt — legte die Aufgabe des Absenders auf den User-Stack'],
         notes: 'JSON 100 %, Deadlines 67 %→100 % (größter Two-Pass-Sprung), ~2,5 s, ~10 GB. Damage-relevant: bei Mehrfach-Mails for_whom prüfen. Few-Shot-sensibel — Prompts brauchen Platzhalter statt Beispielwerte.',
         metrics: { directionAccuracyPct: 83, recallPct: 75, latencySecondsPerRun: 3, ramGigabytes: 10 }
+      },
+      'gemma4:12b-mlx': {
+        verdict: 'green',
+        reasons: ['needsReply-Erkennung nur 70 % (3/10 Mails falsch — an der Schwelle)', 'Task-Precision 80 % — extrahiert gelegentlich eine Aufgabe zu viel (2 Über-Extraktionen über 30 Fall-Läufe)'],
+        notes: 'Bench 2026-06-07 (3 Reps, 10 Fälle): JSON 100 %, Task-Recall 100 %, Deadlines 100 %, Termin-Recall/-Datum 100 % und for_whom 100 % — inkl. der Richtungsfalle c08 („wer macht was") in allen 3 Reps korrekt. Klar stärker als gemma4:latest (Recall 75 %, for_whom 83 %, yellow). ~6 s/Mail, ~11 GB. Few-Shot-sensibel wie die ganze gemma-Familie — Prompts brauchen Platzhalter statt Beispielwerte.',
+        metrics: { directionAccuracyPct: 100, recallPct: 100, latencySecondsPerRun: 6, ramGigabytes: 11 }
       },
       'qwen3.5:4b': {
         verdict: 'green',
@@ -191,6 +215,12 @@ export const MODEL_COMPATIBILITY: ModelCompatibilityData = {
         reasons: ['Höchste Halluzinations-Token-Ratio der Matrix (39 %)'],
         notes: '93 % Avg-Score, Sentiment + needsReply 8/8, schnell (~5 s), ~10 GB. Relevance-Range 5/8 (mittel). Wenn die Zusammenfassung als Notiz-Inhalt landet, Halluz.-Ratio bedenken.',
         metrics: { recallPct: 93, latencySecondsPerRun: 5, ramGigabytes: 10 }
+      },
+      'gemma4:12b-mlx': {
+        verdict: 'green',
+        reasons: ['Relevance-Score nur ~5/8 in Range — Kalibrierung auf ~3 Mails daneben (wie gemma4:latest)'],
+        notes: 'Bench 2026-06-07 (3 Reps): Avg ~95 %, Sentiment 8/8, needsReply 8/8. Halluzinations-Token-Ratio ~24 % — deutlich niedriger als gemma4:latest (38 %). ~6,7 s/Mail (gemma4:latest ~3,7 s — die MLX-Variante ist hier langsamer). ~11 GB. Vereinzelte Latenz-Spitzen (50–73 s, nvfp4/MLX-Stalls).',
+        metrics: { recallPct: 95, latencySecondsPerRun: 7, ramGigabytes: 11 }
       },
       'qwen3.5:4b': {
         verdict: 'green',
@@ -239,6 +269,12 @@ export const MODEL_COMPATIBILITY: ModelCompatibilityData = {
         reasons: [],
         notes: 'Schnellstes Modell (~1,1 s/Notiz), 98 % Avg, Prompt-Injection sauber ignoriert (Score 10 statt Übernahme). ~10 GB RAM.',
         metrics: { recallPct: 98, latencySecondsPerRun: 1, ramGigabytes: 10 }
+      },
+      'gemma4:12b-mlx': {
+        verdict: 'green',
+        reasons: [],
+        notes: 'Bench 2026-06-07 (3 Reps): perfekt — 100 % Avg, 8/8 Score in Range, 8/8 Reason-Match in allen 3 Reps. Prompt-Injection in allen 3 Reps sauber abgewehrt (manipulierte Notiz → Score 0 statt Übernahme); damageRelevant-Modul, daher zentral. ~3 s/Notiz (sporadische Stalls bis ~77 s, nvfp4/MLX). ~11 GB RAM.',
+        metrics: { recallPct: 100, latencySecondsPerRun: 3, ramGigabytes: 11 }
       },
       'qwen3.5:9b-mlx-bf16': {
         verdict: 'green',
@@ -305,6 +341,12 @@ export const MODEL_COMPATIBILITY: ModelCompatibilityData = {
         reasons: [],
         notes: 'Sauberer Output mit konsistenten Wikilinks, keine Halluzinationen. ~32 s/Projekt, ~19 GB RAM.',
         metrics: { latencySecondsPerRun: 32, ramGigabytes: 19 }
+      },
+      'gemma4:12b-mlx': {
+        verdict: 'green',
+        reasons: [],
+        notes: 'Bench 2026-06-07 (bench-project-status.mjs, Honesty-Scorer, 2 Cases × 3 Reps): 6/6 PASS, 0 Warnungen — sauberer als gemma4:latest (6/6 PASS, aber 3 Format-Warnungen) und setzt auf dünnen Wochen das ehrliche „kein Fortschritt"-Signal korrekt. ~15 s/Projekt (eine ~74-s-Kaltstart-Spitze in Rep 1), ~11 GB RAM. Output landet im reviewbaren Draft (_STATUS-WW.md).',
+        metrics: { latencySecondsPerRun: 15, ramGigabytes: 11 }
       },
       'qwen3.5:cloud': {
         verdict: 'yellow',
@@ -434,6 +476,7 @@ export const RECOMMENDED_PULL_MODELS: Array<{
   { name: 'qwen3.5:4b',          label: 'Qwen 3.5 4B (~3,4 GB — läuft auf 8 GB RAM, Empfehlung für kleine Macs)' },
   { name: 'ministral-3:8b',      label: 'Ministral 3 8B (~6 GB — Brain/Dashboard-Empfehlung, läuft auf 16 GB RAM)' },
   { name: 'gemma4:latest',       label: 'Gemma 4 (~10 GB — schnell; Prompts brauchen Platzhalter statt Beispielwerte)' },
+  { name: 'gemma4:12b-mlx',      label: 'Gemma 4 12B MLX (~10 GB — Apple-Silicon/MLX, stark bei Task-Extraktion; Prompts brauchen Platzhalter statt Beispielwerte)' },
   { name: 'qwen3.6:27b-mlx',     label: 'Qwen 3.6 27B MLX (~22 GB)',         humanFavorite: true },
   { name: 'qwen3.6:latest',      label: 'Qwen 3.6 (~48 GB, sehr großer RAM-Bedarf)', humanFavorite: true },
   { name: 'qwen3.5:9b-mlx-bf16', label: 'Qwen 3.5 9B MLX (~8 GB)' },
