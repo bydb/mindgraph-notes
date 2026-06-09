@@ -11,7 +11,7 @@ tags:
   - Token-Ökonomie
   - Kostenmanagement
   - KI-Agenten
-status: draft
+status: publish
 type: post
 summary: KI-Agenten arbeiten ohne natürliche Begrenzung und fressen Tokens in Schleifen. Unternehmen verbrennen ihre KI-Budgets in Rekordzeit, während die Anbieter von Flatrates auf nutzungsbasierte Modelle umstellen. Ein Blick auf die neue betriebswirtschaftliche Realität der Token-Ökonomie.
 categories:
