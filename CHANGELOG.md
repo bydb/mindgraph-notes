@@ -2,6 +2,15 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.7.28-beta] - 2026-06-09
+
+### Fixes
+
+- **Arbeitszeit-Berechnung erkennt jetzt das gängige Journal-Format.** Die in 0.7.27 eingeführte automatische Arbeitszeit-Berechnung griff nur bei `Start:`/`Ende:`-Zeilen mit der Zeit außerhalb der Fett-Markierung. Sie erkennt jetzt auch `Startzeit:`/`Endzeit:`, die Zeit innerhalb der Sternchen (`**Startzeit: 07:53**`), zieht die `Pause:`-Zeile ab und findet das Arbeitszeit-Feld auch, wenn die Pause-Zeile dazwischen steht.
+- **Arbeitszeit bleibt im Lesen-Modus erhalten.** Im WYSIWYG-Lesemodus wurde ein berechneter Wert vom HTML→Markdown-Roundtrip wieder mit Leer überschrieben. Die Berechnung läuft jetzt auch in diesem Pfad, die Ansicht wird aktualisiert, und vor dem Wert steht genau ein Leerzeichen.
+- **`{{date:…}}`-Vorlagen-Token liefert wieder ein korrektes Datum.** Das Format wurde komplett kleingeschrieben, wodurch z. B. `{{date:YYYYMMDDHHmm}}` zu kaputten Werten wie `yyyy44ddhh44` führte. Großbuchstaben-Formate (`YYYY`, `MM`, `DD`, `HH`) bleiben jetzt case-sensitiv erhalten.
+- **Tagesnotiz wird nicht mehr überschrieben.** Der „Tagesnotiz öffnen"-Button erkannte eine bereits vorhandene Notiz nicht (Pfad-Vergleich absolut statt vault-relativ) und legte sie bei jedem Klick neu aus der Vorlage an — der Tageseintrag ging dabei verloren. Zusätzlich wurde die Notiz mit falschem (wurzel-relativem) Pfad geführt, was zu Speichern im Vault-Wurzelordner und Nachlade-Fehlern führte. Beides behoben.
+
 ## [0.7.27-beta] - 2026-06-09
 
 ### Features
