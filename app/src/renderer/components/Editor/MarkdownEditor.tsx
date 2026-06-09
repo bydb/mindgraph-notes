@@ -76,6 +76,56 @@ const markdownCodeLanguages = [
   }),
 ]
 
+function parseWorkTimeLine(line: string, label: 'Start' | 'Ende'): number | null {
+  const match = line.match(new RegExp(`^\\s*(?:[-*]\\s*)?(?:\\*\\*|__)?${label}\\s*:\\s*(?:\\*\\*|__)?\\s*(\\d{1,2})[:.](\\d{2})\\s*$`, 'i'))
+  if (!match) return null
+
+  const hours = Number(match[1])
+  const minutes = Number(match[2])
+  if (hours > 23 || minutes > 59) return null
+
+  return hours * 60 + minutes
+}
+
+function formatWorkDuration(totalMinutes: number): string {
+  const hours = Math.floor(totalMinutes / 60)
+  const minutes = totalMinutes % 60
+  return `${hours}h ${minutes}m`
+}
+
+function updateWorkTimeFields(content: string): string {
+  const newline = content.includes('\r\n') ? '\r\n' : '\n'
+  const lines = content.split(/\r?\n/)
+  let changed = false
+
+  for (let startIndex = 0; startIndex < lines.length; startIndex++) {
+    const startMinutes = parseWorkTimeLine(lines[startIndex], 'Start')
+    if (startMinutes === null) continue
+
+    const endIndex = startIndex + 1
+    const workTimeIndex = startIndex + 2
+    if (workTimeIndex >= lines.length) continue
+
+    const endMinutes = parseWorkTimeLine(lines[endIndex], 'Ende')
+    if (endMinutes === null) continue
+
+    const workTimeMatch = lines[workTimeIndex].match(/^(\s*(?:[-*]\s*)?(?:\*\*|__)?Arbeitszeit\s*:\s*(?:\*\*|__)?\s*)(.*)$/i)
+    if (!workTimeMatch) continue
+
+    const durationMinutes = endMinutes >= startMinutes
+      ? endMinutes - startMinutes
+      : endMinutes + (24 * 60) - startMinutes
+    const nextLine = `${workTimeMatch[1]}${formatWorkDuration(durationMinutes)}`
+
+    if (lines[workTimeIndex] !== nextLine) {
+      lines[workTimeIndex] = nextLine
+      changed = true
+    }
+  }
+
+  return changed ? lines.join(newline) : content
+}
+
 // Mermaid initialisieren
 mermaid.initialize({
   startOnLoad: false,
@@ -1758,6 +1808,18 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
           EditorView.updateListener.of((update) => {
             if (update.docChanged) {
               const newContent = update.state.doc.toString()
+              const contentWithWorkTime = updateWorkTimeFields(newContent)
+              if (contentWithWorkTime !== newContent) {
+                update.view.dispatch({
+                  changes: {
+                    from: 0,
+                    to: newContent.length,
+                    insert: contentWithWorkTime
+                  }
+                })
+                return
+              }
+
               handleDocChange(newContent)
               if (!isPreviewDomEditingRef.current) {
                 setPreviewContent(newContent)

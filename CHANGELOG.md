@@ -2,6 +2,12 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.7.27-beta] - 2026-06-09
+
+### Features
+
+- **Automatische Arbeitszeit-Berechnung im Editor.** Stehen in einer Notiz direkt untereinander die Zeilen `Start: HH:MM`, `Ende: HH:MM` und `Arbeitszeit:`, füllt der Editor das Arbeitszeit-Feld beim Tippen automatisch mit der berechneten Dauer (z. B. `8h 30m`). Die Berechnung läuft auch über Mitternacht hinweg korrekt, und Markdown-Auszeichnungen (Aufzählungspunkte, **fett**) an den Zeilen bleiben erhalten.
+
 ## [0.7.26-beta] - 2026-06-07
 
 ### Verbesserungen
