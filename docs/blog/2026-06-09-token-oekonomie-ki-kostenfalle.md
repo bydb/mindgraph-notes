@@ -19,6 +19,8 @@ categories:
   - Technologie
 ---
 
+![Header](2026-06-09-token-oekonomie-ki-kostenfalle-header.png)
+
 > [!abstract] Zusammenfassung
 > KI-Agenten arbeiten ohne natürliche Begrenzung und fressen Tokens in Schleifen. Unternehmen verbrennen ihre KI-Budgets in Rekordzeit, während die Anbieter von Flatrates auf nutzungsbasierte Modelle umstellen. Ein Blick auf die neue betriebswirtschaftliche Realität der Token-Ökonomie.
 
