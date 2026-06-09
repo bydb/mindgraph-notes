@@ -122,11 +122,16 @@ function parseTemplateVariables(
 ): string {
   // Pattern: {{variable}} oder {{date:FORMAT}}
   return text.replace(/\{\{([^}]+)\}\}/g, (match, variable) => {
-    const trimmed = variable.trim().toLowerCase()
+    const raw = variable.trim()
+    const lower = raw.toLowerCase()
 
     // Prüfe auf Formatierung (z.B. {{date:DD.MM.YYYY}})
-    if (trimmed.includes(':')) {
-      const [varName, format] = trimmed.split(':').map((s: string) => s.trim())
+    // WICHTIG: nur den Variablennamen kleinschreiben — das Format MUSS case-sensitiv
+    // bleiben, sonst werden YYYY/MM/DD/HH zerstört (Ergebnis sonst z.B. "yyyy44ddhh44").
+    const colonIndex = raw.indexOf(':')
+    if (colonIndex !== -1) {
+      const varName = raw.slice(0, colonIndex).trim().toLowerCase()
+      const format = raw.slice(colonIndex + 1).trim()
 
       if (varName === 'date' || varName === 'time' || varName === 'datetime') {
         return formatDate(new Date(), format)
@@ -134,13 +139,13 @@ function parseTemplateVariables(
     }
 
     // Built-in Variable
-    if (builtInVars[trimmed]) {
-      return builtInVars[trimmed]()
+    if (builtInVars[lower]) {
+      return builtInVars[lower]()
     }
 
     // Custom Variable
-    if (customVariables && customVariables[trimmed]) {
-      return customVariables[trimmed]
+    if (customVariables && customVariables[lower]) {
+      return customVariables[lower]
     }
 
     // Unbekannte Variable - behalte Original

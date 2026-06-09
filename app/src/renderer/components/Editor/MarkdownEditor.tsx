@@ -76,8 +76,11 @@ const markdownCodeLanguages = [
   }),
 ]
 
+// Akzeptiert "Start"/"Startzeit" bzw. "Ende"/"Endzeit", die Zeit außerhalb (**Start:** 07:53)
+// ODER innerhalb der Fett-Markierung (**Startzeit: 07:53**), optional als Listenpunkt, inkl. NBSP.
 function parseWorkTimeLine(line: string, label: 'Start' | 'Ende'): number | null {
-  const match = line.match(new RegExp(`^\\s*(?:[-*]\\s*)?(?:\\*\\*|__)?${label}\\s*:\\s*(?:\\*\\*|__)?\\s*(\\d{1,2})[:.](\\d{2})\\s*$`, 'i'))
+  const labelPattern = label === 'Start' ? 'Start(?:zeit)?' : 'End(?:e|zeit)'
+  const match = line.match(new RegExp(`^\\s*(?:[-*]\\s*)?(?:\\*\\*|__)?${labelPattern}\\s*:\\s*(?:\\*\\*|__)?\\s*(\\d{1,2})[:.](\\d{2})\\s*(?:\\*\\*|__)?\\s*$`, 'i'))
   if (!match) return null
 
   const hours = Number(match[1])
@@ -93,6 +96,15 @@ function formatWorkDuration(totalMinutes: number): string {
   return `${hours}h ${minutes}m`
 }
 
+// Liest eine "**Pause:** 30 min"-Zeile im angegebenen Zeilenfenster; 0 wenn keine gefunden.
+function parseWorkTimePause(lines: string[], from: number, to: number): number {
+  for (let i = Math.max(0, from); i <= to && i < lines.length; i++) {
+    const m = lines[i].match(/^\s*(?:[-*]\s*)?(?:\*\*|__)?Pause\s*:\s*(?:\*\*|__)?\s*(\d+)\s*min/i)
+    if (m) return Number(m[1])
+  }
+  return 0
+}
+
 function updateWorkTimeFields(content: string): string {
   const newline = content.includes('\r\n') ? '\r\n' : '\n'
   const lines = content.split(/\r?\n/)
@@ -102,20 +114,34 @@ function updateWorkTimeFields(content: string): string {
     const startMinutes = parseWorkTimeLine(lines[startIndex], 'Start')
     if (startMinutes === null) continue
 
-    const endIndex = startIndex + 1
-    const workTimeIndex = startIndex + 2
-    if (workTimeIndex >= lines.length) continue
-
-    const endMinutes = parseWorkTimeLine(lines[endIndex], 'Ende')
+    const endMinutes = parseWorkTimeLine(lines[startIndex + 1] ?? '', 'Ende')
     if (endMinutes === null) continue
 
-    const workTimeMatch = lines[workTimeIndex].match(/^(\s*(?:[-*]\s*)?(?:\*\*|__)?Arbeitszeit\s*:\s*(?:\*\*|__)?\s*)(.*)$/i)
-    if (!workTimeMatch) continue
+    // Arbeitszeit-Zeile in den nächsten Zeilen suchen (eine Pause-/Leerzeile darf dazwischen liegen)
+    let workTimeIndex = -1
+    let workTimePrefix = ''
+    for (let i = startIndex + 2; i <= startIndex + 5 && i < lines.length; i++) {
+      const m = lines[i].match(/^(\s*(?:[-*]\s*)?(?:\*\*|__)?Arbeitszeit\s*:\s*(?:\*\*|__)?\s*).*$/i)
+      if (m) {
+        workTimeIndex = i
+        workTimePrefix = m[1]
+        break
+      }
+      // Bei der nächsten Start-Zeile abbrechen, um nicht in den Folgetag zu greifen
+      if (parseWorkTimeLine(lines[i], 'Start') !== null) break
+    }
+    if (workTimeIndex === -1) continue
 
-    const durationMinutes = endMinutes >= startMinutes
+    // Pause kann vor der Arbeitszeit-Zeile (Start/Ende/Pause/Arbeitszeit) oder darunter
+    // (Arbeitszeit/Leerzeile/Pause) stehen → großzügiges Fenster um den Block herum.
+    const pauseMinutes = parseWorkTimePause(lines, startIndex + 1, workTimeIndex + 2)
+    const grossMinutes = endMinutes >= startMinutes
       ? endMinutes - startMinutes
       : endMinutes + (24 * 60) - startMinutes
-    const nextLine = `${workTimeMatch[1]}${formatWorkDuration(durationMinutes)}`
+    const durationMinutes = Math.max(0, grossMinutes - pauseMinutes)
+    // Genau ein Leerzeichen vor dem Wert — turndown strippt den Template-Space sonst → "…:**9h 12m"
+    const prefix = workTimePrefix.replace(/[ \t\u00a0]+$/, '')
+    const nextLine = `${prefix} ${formatWorkDuration(durationMinutes)}`
 
     if (lines[workTimeIndex] !== nextLine) {
       lines[workTimeIndex] = nextLine
@@ -2124,11 +2150,18 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
     if (!root || !view) return
 
     const currentContent = view.state.doc.toString()
-    const nextContent = editablePreviewHtmlToMarkdown(root, currentContent)
+    const turndowned = editablePreviewHtmlToMarkdown(root, currentContent)
+    // Arbeitszeit auch im WYSIWYG-/Lesen-Pfad berechnen — sonst überschreibt dieser
+    // turndown-Roundtrip einen zuvor (im Editor) berechneten Wert wieder mit leer.
+    const nextContent = updateWorkTimeFields(turndowned)
     if (nextContent === currentContent) {
       if (refreshPreview) isPreviewDomEditingRef.current = false
       return
     }
+
+    // Hat die Berechnung den Inhalt verändert, MUSS die Vorschau neu rendern: damit der
+    // berechnete Wert sichtbar wird und der nächste Roundtrip ihn nicht erneut löscht.
+    const mustRefresh = refreshPreview || nextContent !== turndowned
 
     isPreviewDomEditingRef.current = true
     view.dispatch({
@@ -2136,7 +2169,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
     })
     saveContent(nextContent)
 
-    if (refreshPreview) {
+    if (mustRefresh) {
       isPreviewDomEditingRef.current = false
       setPreviewContent(nextContent)
     }

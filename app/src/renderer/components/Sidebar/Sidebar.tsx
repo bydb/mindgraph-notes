@@ -206,13 +206,18 @@ export const Sidebar: React.FC<SidebarProps> = ({ onOpenSearch }) => {
     const dateStr = formatDate(now, dailyNoteSettings.dateFormat)
 
     const fileName = `${dateStr} - Journal.md`
+    // Vault-RELATIVER Pfad (mit Ordner) — das ist der `path` der Note. NICHT der absolute Pfad.
+    const relativePath = dailyNoteSettings.folderPath
+      ? `${dailyNoteSettings.folderPath}/${fileName}`
+      : fileName
     const folder = dailyNoteSettings.folderPath
       ? `${vaultPath}/${dailyNoteSettings.folderPath}`
       : vaultPath
     const filePath = `${folder}/${fileName}`
 
-    // Check if file already exists by looking in notes
-    const existingNote = notes.find(n => n.path === filePath)
+    // Prüfen ob die Notiz schon existiert — `n.path` ist vault-relativ, NICHT der absolute filePath
+    // (sonst matcht es nie → die Tagesnotiz würde bei jedem Klick aus der Vorlage überschrieben).
+    const existingNote = notes.find(n => n.path === relativePath)
     if (existingNote) {
       selectNote(existingNote.id)
       return
@@ -247,7 +252,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ onOpenSearch }) => {
       setFileTree(tree)
 
       // Add note to store and select it
-      const note = await createNoteFromFile(filePath, fileName, content)
+      const note = await createNoteFromFile(filePath, relativePath, content)
       addNote(note)
       selectNote(note.id)
     } catch (error) {
