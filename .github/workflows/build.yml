@@ -183,7 +183,10 @@ jobs:
           done
 
   build-windows:
-    runs-on: windows-latest
+    # windows-latest wurde auf VS 2026 umgestellt → node-gyp (für node-pty-Rebuild) findet
+    # die VS-Installation nicht mehr ("Could not find any Visual Studio installation").
+    # windows-2022 (VS 2022) ist die bekannt-funktionierende Umgebung (v0.7.26 lief damit durch).
+    runs-on: windows-2022
 
     steps:
       - name: Checkout code
