@@ -862,6 +862,7 @@ export interface ElectronAPI {
   }) => Promise<{ success: true; score: number; reason: string; model: string; checkedAt: string } | { success: false; error: string; raw?: string }>;
   emailLoad: (vaultPath: string) => Promise<{ emails: EmailMessage[]; lastFetchedAt: Record<string, string> } | null>;
   emailSave: (vaultPath: string, data: { emails: EmailMessage[]; lastFetchedAt: Record<string, string> }) => Promise<boolean>;
+  emailContactsLoad: (vaultPath: string) => Promise<SavedEmailContact[]>;
   emailSavePassword: (accountId: string, password: string) => Promise<boolean>;
   emailLoadPassword: (accountId: string) => Promise<string | null>;
   onEmailFetchProgress: (callback: (progress: { current: number; total: number; status: string }) => void) => void;
@@ -1379,6 +1380,15 @@ export interface EmailFetchResult {
   newCount: number
   totalCount: number
   error?: string
+}
+
+/** Persistenter Kontakt-Speicher ({vault}/.mindgraph/contacts.json).
+ *  Empfänger gesendeter Mails — überlebt das retainDays-Pruning von emails.json,
+ *  damit selten angeschriebene Adressen im Compose-Autocomplete bleiben. */
+export interface SavedEmailContact {
+  email: string
+  name?: string
+  lastUsedAt?: string  // ISO-Datum der letzten gesendeten Mail an diese Adresse
 }
 
 export interface AggregatedContact {

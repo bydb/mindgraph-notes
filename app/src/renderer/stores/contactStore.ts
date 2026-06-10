@@ -7,7 +7,7 @@ import { useNotesStore } from './notesStore'
 interface ContactState {
   contacts: AggregatedContact[]
   isBuilding: boolean
-  buildContacts: () => void
+  buildContacts: (vaultPath?: string) => Promise<void>
   searchContacts: (query: string) => AggregatedContact[]
   getContactByEmail: (email: string) => AggregatedContact | undefined
 }
@@ -18,7 +18,7 @@ export const useContactStore = create<ContactState>()((set, get) => ({
   contacts: [],
   isBuilding: false,
 
-  buildContacts: () => {
+  buildContacts: async (vaultPath?: string) => {
     set({ isBuilding: true })
 
     try {
@@ -112,6 +112,21 @@ export const useContactStore = create<ContactState>()((set, get) => ({
             if (!contact.vaultMentions.includes(note.path)) {
               contact.vaultMentions.push(note.path)
             }
+          }
+        }
+      }
+
+      // Source 4: Persistenter Kontakt-Speicher (.mindgraph/contacts.json) —
+      // Empfänger gesendeter Mails, überlebt das retainDays-Pruning von emails.json
+      if (vaultPath) {
+        const saved = await window.electronAPI.emailContactsLoad(vaultPath)
+        for (const s of saved) {
+          if (!s.email) continue
+          const contact = getOrCreate(s.email, s.name || '')
+          if (!contact.sources.includes('email')) contact.sources.push('email')
+          if (s.name && contact.name === contact.email) contact.name = s.name
+          if (s.lastUsedAt && (!contact.lastEmailDate || s.lastUsedAt > contact.lastEmailDate)) {
+            contact.lastEmailDate = s.lastUsedAt
           }
         }
       }

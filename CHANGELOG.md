@@ -2,6 +2,19 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.7.29-beta] - 2026-06-10
+
+### Verbesserungen
+
+- **Windows-Terminal grundlegend verbessert.** Das integrierte Terminal nutzt jetzt PowerShell 7 (`pwsh`), falls installiert — deutlich sauberere Darstellung und besseres UTF-8-Verhalten als die alte Windows PowerShell 5.1, die weiterhin als Fallback dient. Außerdem startet das Terminal auf allen Plattformen direkt im Vault-Ordner statt im Benutzerverzeichnis.
+- **KI-Tool-Erkennung unter Windows: natives Claude Code zuerst.** Claude Code läuft inzwischen nativ unter Windows und ist dort die zuverlässigste Wahl — der 🤖-Button bevorzugt jetzt natives `claude`, dann natives `opencode`, und erst danach den Umweg über WSL. Der Installationsordner des nativen Claude-Code-Installers (`%USERPROFILE%\.local\bin`) wird im Suchpfad berücksichtigt.
+- **WSL-Start direkt im Vault.** Kommt doch WSL zum Einsatz, wird das KI-Tool mit `wsl --cd "<Vault>"` gestartet und arbeitet sofort auf dem Windows-Vault (via `/mnt/…`), statt im WSL-Home zu landen.
+
+### Fixes
+
+- **„Zum Vault wechseln"-Button (📁) funktionierte unter Windows nicht.** Der Befehl nutzte `&&`, das Windows PowerShell 5.1 nicht versteht — jetzt shell-neutral mit `;`.
+- **Compose-Autocomplete vergisst keine Empfänger mehr.** Empfänger gesendeter Mails werden dauerhaft in `.mindgraph/contacts.json` gespeichert und überleben damit die Aufbewahrungsfrist von `emails.json` — selten angeschriebene Adressen verschwinden nicht mehr nach 30 Tagen aus dem Vorschlags-Dropdown. Die Kontaktliste wird zudem bei jedem Öffnen des Compose-Fensters neu aufgebaut, sodass frisch verwendete Adressen sofort auftauchen.
+
 ## [0.7.28-beta] - 2026-06-09
 
 ### Fixes

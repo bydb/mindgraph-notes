@@ -43,10 +43,23 @@ export const Terminal: React.FC<TerminalProps> = ({ visible, onToggle }) => {
         const isWindows = navigator.platform === 'Win32' || navigator.userAgent.includes('Windows')
 
         if (isWindows) {
-          // Check if WSL is available first
+          // Native CLIs zuerst: Claude Code läuft inzwischen nativ unter Windows
+          // und ist zuverlässiger als opencode oder der Umweg über WSL
+          const claude = await window.electronAPI.checkCommandExists('claude')
+          if (claude.exists) {
+            setAvailableTool('claude')
+            setToolChecked(true)
+            return
+          }
+          const opencode = await window.electronAPI.checkCommandExists('opencode')
+          if (opencode.exists) {
+            setAvailableTool('opencode')
+            setToolChecked(true)
+            return
+          }
+          // Fallback: Tools innerhalb von WSL (Vault ist via /mnt/<drive> erreichbar)
           const wsl = await window.electronAPI.checkCommandExists('wsl')
           if (wsl.exists) {
-            // Check for tools inside WSL
             const wslOpencode = await window.electronAPI.checkCommandExists('wsl', ['which', 'opencode'])
             if (wslOpencode.exists) {
               setAvailableTool('wsl opencode')
@@ -59,19 +72,6 @@ export const Terminal: React.FC<TerminalProps> = ({ visible, onToggle }) => {
               setToolChecked(true)
               return
             }
-          }
-          // Fallback: check native Windows PATH
-          const opencode = await window.electronAPI.checkCommandExists('opencode')
-          if (opencode.exists) {
-            setAvailableTool('opencode')
-            setToolChecked(true)
-            return
-          }
-          const claude = await window.electronAPI.checkCommandExists('claude')
-          if (claude.exists) {
-            setAvailableTool('claude')
-            setToolChecked(true)
-            return
           }
         } else {
           // macOS / Linux: direct check
@@ -353,7 +353,8 @@ export const Terminal: React.FC<TerminalProps> = ({ visible, onToggle }) => {
             className="btn-icon"
             onClick={() => {
               if (vaultPath) {
-                window.electronAPI.terminalWrite(`cd "${vaultPath}" && clear\n`)
+                // `;` statt `&&` — funktioniert in bash/zsh UND PowerShell (5.1 kennt kein `&&`)
+                window.electronAPI.terminalWrite(`cd "${vaultPath}"; clear\n`)
               }
             }}
             title={t('terminal.goToVault')}
@@ -364,7 +365,13 @@ export const Terminal: React.FC<TerminalProps> = ({ visible, onToggle }) => {
             className="btn-icon"
             onClick={() => {
               if (availableTool) {
-                window.electronAPI.terminalWrite(availableTool + '\n')
+                let command = availableTool
+                if (availableTool.startsWith('wsl ') && vaultPath) {
+                  // wsl.exe übersetzt den Windows-Pfad nach /mnt/<drive>/… —
+                  // so startet das Tool direkt im Vault statt im WSL-Home
+                  command = `wsl --cd "${vaultPath}" ${availableTool.slice(4)}`
+                }
+                window.electronAPI.terminalWrite(command + '\n')
               }
             }}
             disabled={!availableTool && toolChecked}

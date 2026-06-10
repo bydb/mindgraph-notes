@@ -52,11 +52,11 @@ export const ComposeView: React.FC = () => {
   const toDropdownRef = useRef<HTMLDivElement>(null)
   const ccDropdownRef = useRef<HTMLDivElement>(null)
 
-  // Build contacts on mount
+  // Kontakte bei jedem Öffnen neu aufbauen — sonst fehlen seit dem letzten
+  // Build gesendete/abgerufene Adressen (Liste ist flüchtig, kein Cache nötig)
   useEffect(() => {
-    const { contacts, buildContacts } = useContactStore.getState()
-    if (contacts.length === 0) buildContacts()
-  }, [])
+    void useContactStore.getState().buildContacts(vaultPath || undefined)
+  }, [vaultPath])
 
   if (!composeState) return null
 

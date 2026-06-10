@@ -365,7 +365,8 @@ Oder: `/release` Command verwenden.
 - **Entwurf-Generator**: KI-Antwort → "Als Antwort verwenden" → ComposeView mit vorausgefüllten Reply-Headers + Signatur
 
 ### Kontakt-Aggregation
-- **contactStore.ts**: Mergt Kontakte aus 3 Quellen (Email from/to, edoobox Bookings, Vault Wikilinks/Email-Regex)
+- **contactStore.ts**: Mergt Kontakte aus 4 Quellen (Email from/to, edoobox Bookings, Vault Wikilinks/Email-Regex, persistenter Kontakt-Speicher)
+- **Persistenter Kontakt-Speicher** `{vault}/.mindgraph/contacts.json`: Empfänger gesendeter Mails werden in `email-load` **vor** dem retainDays-Pruning und in `email-save` geharvestet (`harvestSentRecipients` in main/index.ts) — sonst verschwinden selten angeschriebene Adressen nach 30 Tagen aus dem Compose-Autocomplete. IPC: `email-contacts-load`
 - Autocomplete in ComposeView mit Source-Indikatoren (📧📅📝)
 - Kontakt-Profil in Detail-View (Email-Anzahl, Buchungen, Vault-Notizen)
 
@@ -408,9 +409,11 @@ Oder: `/release` Command verwenden.
 ## Terminal (xterm.js + PTY)
 
 - Integriertes Terminal via `node-pty` (Main) + `@xterm/xterm` (Renderer)
-- Smart AI-Tool Detection: prüft `opencode` (bevorzugt) → `claude` (Fallback) via `checkCommandExists`
-- Windows-Support: prüft zusätzlich WSL (`wsl opencode` / `wsl claude`) und nutzt gefundene CLI direkt
-- Erweiterter PATH in `main/index.ts` (sowohl `terminal-create` als auch `check-command-exists`): enthält `/opt/homebrew/bin`, `~/.local/bin`, `~/.cargo/bin`, `~/.opencode/bin`, `~/.nvm/...`
+- Smart AI-Tool Detection via `checkCommandExists` — macOS/Linux: `opencode` (bevorzugt) → `claude`; **Windows: natives `claude` → natives `opencode` → WSL** (`wsl opencode` / `wsl claude`), da Claude Code nativ unter Windows läuft und opencode dort unzuverlässig ist
+- WSL-Start des AI-Tools nutzt `wsl --cd "<vaultPath>"` — Tool startet direkt im Vault (via `/mnt/<drive>/…`), nicht im WSL-Home
+- Shell unter Windows: `pwsh.exe` (PowerShell 7) bevorzugt, Fallback `powershell.exe` (5.1) — Detection gecacht in `resolveWindowsShell()`
+- Terminal startet im Vault-Verzeichnis (vom Renderer übergebenes `cwd`, validiert via `existsSync`), Fallback Home
+- Erweiterter PATH in `main/index.ts` (sowohl `terminal-create` als auch `check-command-exists`): enthält `/opt/homebrew/bin`, `~/.local/bin`, `~/.cargo/bin`, `~/.opencode/bin`, `~/.nvm/...`; Windows zusätzlich `%USERPROFILE%\.local\bin` (Claude-Code-Installer), `\.cargo\bin`, `\AppData\Roaming\npm`, `\scoop\shims`
 - Bei neuen CLI-Tools: Pfad in **beiden** `additionalPaths`-Arrays in `main/index.ts` ergänzen
 - **Terminal-Reset**: `handleRestart()` muss Mouse-Tracking-Modi deaktivieren (`\x1b[?1000l` etc.) und `term.reset()` aufrufen (nicht nur `clear()`), sonst werden Escape-Sequenzen als Klartext angezeigt nach Programmen wie opencode/claude
 

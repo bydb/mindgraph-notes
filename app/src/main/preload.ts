@@ -419,6 +419,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('email-load', vaultPath),
   emailSave: (vaultPath: string, data: { emails: object[]; lastFetchedAt: Record<string, string> }) =>
     ipcRenderer.invoke('email-save', vaultPath, data),
+  emailContactsLoad: (vaultPath: string) =>
+    ipcRenderer.invoke('email-contacts-load', vaultPath),
   emailSavePassword: (accountId: string, password: string) =>
     ipcRenderer.invoke('email-save-password', accountId, password),
   emailLoadPassword: (accountId: string) =>

@@ -2,6 +2,7 @@ import { app, BrowserWindow, ipcMain, dialog, shell, Notification, safeStorage, 
 import { autoUpdater } from 'electron-updater'
 import * as path from 'path'
 import * as fs from 'fs/promises'
+import { existsSync } from 'fs'
 import { FSWatcher, watch } from 'chokidar'
 import * as pty from 'node-pty'
 import type { FileEntry } from '../shared/types'
@@ -4337,7 +4338,23 @@ ipcMain.on('unwatch-directory', () => {
 // Terminal (PTY) Handlers
 let lastPtyCreateTime = 0
 
-ipcMain.on('terminal-create', (_event, cwd: string) => {
+// PowerShell 7 (pwsh) bevorzugen — deutlich besseres ConPTY-/UTF-8-Verhalten als Windows PowerShell 5.1
+let cachedWindowsShell: string | null = null
+async function resolveWindowsShell(): Promise<string> {
+  if (cachedWindowsShell) return cachedWindowsShell
+  try {
+    const { execFile } = await import('child_process')
+    const { promisify } = await import('util')
+    await promisify(execFile)('where.exe', ['pwsh.exe'], { timeout: 3000 })
+    cachedWindowsShell = 'pwsh.exe'
+  } catch {
+    cachedWindowsShell = 'powershell.exe'
+  }
+  console.log('[Terminal] Windows shell resolved:', cachedWindowsShell)
+  return cachedWindowsShell
+}
+
+ipcMain.on('terminal-create', async (_event, cwd: string) => {
   const now = Date.now()
 
   // Debounce: Ignoriere Aufrufe die innerhalb von 500ms kommen
@@ -4356,13 +4373,20 @@ ipcMain.on('terminal-create', (_event, cwd: string) => {
   }
 
   const isWindows = process.platform === 'win32'
-  const shell = isWindows ? 'powershell.exe' : (process.env.SHELL || '/bin/bash')
+  const shell = isWindows ? await resolveWindowsShell() : (process.env.SHELL || '/bin/bash')
   console.log('[Terminal] Using shell:', shell)
 
-  // Resolve ~ to HOME - IMMER Home-Verzeichnis verwenden um Probleme mit Leerzeichen zu vermeiden
-  const workingDir = isWindows
+  // Im angeforderten Verzeichnis (Vault) starten, Fallback aufs Home-Verzeichnis
+  const homeDir = isWindows
     ? (process.env.USERPROFILE || 'C:\\Users\\' + process.env.USERNAME)
     : (process.env.HOME || '/')
+  let workingDir = homeDir
+  if (cwd && cwd !== '~') {
+    const resolved = cwd.startsWith('~') ? path.join(homeDir, cwd.slice(1)) : cwd
+    if (existsSync(resolved)) {
+      workingDir = resolved
+    }
+  }
   console.log('[Terminal] Working directory:', workingDir, '(requested:', cwd, ')')
 
   try {
@@ -4380,6 +4404,7 @@ ipcMain.on('terminal-create', (_event, cwd: string) => {
         `${homeDir}\\AppData\\Local\\Programs\\Python\\Python311`,
         `${homeDir}\\AppData\\Local\\Programs\\Python\\Python311\\Scripts`,
         `${homeDir}\\.cargo\\bin`,
+        `${homeDir}\\.local\\bin`, // Claude Code native Installer
         `${homeDir}\\AppData\\Roaming\\npm`,
         `${homeDir}\\scoop\\shims`,
       ].filter(p => p) // Leere Pfade entfernen
@@ -4519,6 +4544,7 @@ ipcMain.handle('check-command-exists', async (_event, command: string, args?: st
         `${homeDir}\\AppData\\Local\\Programs\\Python\\Python311`,
         `${homeDir}\\AppData\\Local\\Programs\\Python\\Python311\\Scripts`,
         `${homeDir}\\.cargo\\bin`,
+        `${homeDir}\\.local\\bin`, // Claude Code native Installer
         `${homeDir}\\AppData\\Roaming\\npm`,
         `${homeDir}\\scoop\\shims`,
       ].filter(p => p)
@@ -7505,6 +7531,68 @@ ipcMain.handle('email-save-attachment', async (_event, filename: string, content
   }
 })
 
+// Persistenter Kontakt-Speicher ({vault}/.mindgraph/contacts.json):
+// Empfänger gesendeter Mails werden VOR dem retainDays-Pruning gesichert,
+// sonst verschwinden selten angeschriebene Adressen aus dem Compose-Autocomplete.
+interface SavedEmailContact { email: string; name?: string; lastUsedAt?: string }
+
+async function harvestSentRecipients(
+  vaultPath: string,
+  emails: Array<{ sent?: boolean; folder?: string; date?: string; to?: Array<{ name?: string; address?: string }> }>
+): Promise<void> {
+  try {
+    const contactsPath = path.join(vaultPath, '.mindgraph', 'contacts.json')
+    let saved: SavedEmailContact[] = []
+    try {
+      const data = JSON.parse(await fs.readFile(contactsPath, 'utf-8'))
+      if (Array.isArray(data.contacts)) saved = data.contacts
+    } catch { /* noch kein Kontakt-Speicher */ }
+
+    const byEmail = new Map<string, SavedEmailContact>()
+    for (const c of saved) {
+      if (c.email) byEmail.set(c.email.trim().toLowerCase(), c)
+    }
+
+    let changed = false
+    for (const mail of emails) {
+      if (!(mail.sent === true || isSentFolderName(mail.folder))) continue
+      for (const recipient of mail.to || []) {
+        const address = recipient.address?.trim().toLowerCase()
+        if (!address || !address.includes('@')) continue
+        const existing = byEmail.get(address)
+        if (!existing) {
+          byEmail.set(address, { email: address, name: recipient.name || undefined, lastUsedAt: mail.date })
+          changed = true
+        } else {
+          if (!existing.name && recipient.name) { existing.name = recipient.name; changed = true }
+          if (mail.date && (!existing.lastUsedAt || mail.date > existing.lastUsedAt)) {
+            existing.lastUsedAt = mail.date
+            changed = true
+          }
+        }
+      }
+    }
+
+    if (changed) {
+      await fs.mkdir(path.dirname(contactsPath), { recursive: true })
+      await fs.writeFile(contactsPath, JSON.stringify({ version: 1, contacts: Array.from(byEmail.values()) }, null, 2), 'utf-8')
+    }
+  } catch (error) {
+    console.warn('[Email] Kontakt-Harvest fehlgeschlagen:', error instanceof Error ? error.message : error)
+  }
+}
+
+ipcMain.handle('email-contacts-load', async (_event, vaultPath: string) => {
+  try {
+    assertApprovedVault(vaultPath, 'email-contacts-load')
+    const contactsPath = path.join(vaultPath, '.mindgraph', 'contacts.json')
+    const data = JSON.parse(await fs.readFile(contactsPath, 'utf-8'))
+    return Array.isArray(data.contacts) ? data.contacts : []
+  } catch {
+    return []
+  }
+})
+
 // Emails laden (JSON-Persistenz) — bereinigt alte E-Mails nach retainDays
 ipcMain.handle('email-load', async (_event, vaultPath: string) => {
   console.log(`[Email] email-load called: vault=${vaultPath}`)
@@ -7518,6 +7606,8 @@ ipcMain.handle('email-load', async (_event, vaultPath: string) => {
     const retainDays = await getEmailRetainDays()
 
     if (Array.isArray(data.emails)) {
+      // Empfänger gesendeter Mails VOR dem Pruning in contacts.json sichern
+      await harvestSentRecipients(vaultPath, data.emails)
       const cutoff = new Date(Date.now() - retainDays * 24 * 60 * 60 * 1000).toISOString()
       const before = data.emails.length
       data.emails = data.emails.filter((e: { date?: string }) => !e.date || e.date >= cutoff)
@@ -7541,6 +7631,10 @@ ipcMain.handle('email-save', async (_event, vaultPath: string, data: { emails: o
     const emailsPath = path.join(vaultPath, '.mindgraph', 'emails.json')
     await fs.mkdir(path.dirname(emailsPath), { recursive: true })
     await fs.writeFile(emailsPath, JSON.stringify(data, null, 2), 'utf-8')
+    // Frisch gesendete Mails sofort in den Kontakt-Speicher übernehmen
+    if (Array.isArray(data.emails)) {
+      await harvestSentRecipients(vaultPath, data.emails as Array<{ sent?: boolean; folder?: string; date?: string; to?: Array<{ name?: string; address?: string }> }>)
+    }
     return true
   } catch (error) {
     console.error('[Email] Failed to save:', error)
