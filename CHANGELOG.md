@@ -2,6 +2,23 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.7.30-beta] - 2026-06-12
+
+### Fixes
+
+- **Schreiben-Modus korrumpiert Dokumente nicht mehr beim Tippen.** Der schwerwiegendste Editor-Bug bisher: Versteckte Syntax-Marker (z. B. das `## ` einer Überschrift) ließen den Browser-Cursor vor den unsichtbaren Bereich kollabieren — die nächste Eingabe landete an der falschen Stelle im Dokument. `## Gliederung` wurde so zu `Gliederung`, Zeilen verschmolzen miteinander und verwaiste `## `-Marker sammelten sich unsichtbar am Dateiende. Syntax-Marker werden jetzt auf der aktiven Zeile angezeigt (wie in Obsidian) und beim Verlassen der Zeile wieder versteckt.
+- **`##`-Überschriften lassen sich im Schreiben-Modus wieder tippen.** Das Tag-Vorschlags-Popup öffnete bei `#` am Zeilenanfang, schloss wegen eines Stale-State-Bugs nie wieder und fing Enter/Tab ab — statt eines Zeilenumbruchs wurde ein Tag eingefügt. Das Popup schließt jetzt zuverlässig und öffnet am Zeilenanfang erst, wenn ein Tag-Zeichen folgt (`#tag` geht weiterhin, `## ` triggert nichts mehr).
+- **Keine verschluckten Zeichen mehr durch den Datei-Watcher.** Speichert die App während des Tippens automatisch, kam der Watcher-Roundtrip (Speichern → Dateiüberwachung → Store) teils mitten in der Eingabe an und überschrieb das Dokument mit einem veralteten Stand. Der Editor ist jetzt die Autorität, solange er ungespeicherte Änderungen hat.
+- **Neue Notizen öffnen direkt im Schreiben-Modus.** Frisch erstellte (leere) Notizen öffneten im Lesen-Modus — dort getipptes Markdown wurde vom WYSIWYG-Roundtrip escaped (`\##`) und war damit dauerhaft kaputt. Leere Notizen starten jetzt editierbar; gefüllte Notizen öffnen weiterhin im Lesen-Modus.
+- **Dateibaum im Pfad-Modus zeigt den Dateinamen wieder an.** Bei tiefen Ordnern wurde der volle Pfad rechts abgeschnitten und jede Zeile zeigte nur dasselbe Ordner-Präfix. Jetzt schrumpft das gedimmte Präfix zuerst, der Dateiname bleibt immer lesbar; Endung und 🔴🟢🔵-Marker werden wieder korrekt behandelt.
+- **Email-Relevanz-Scoring gehärtet.** Der „Nur relevante"-Filter nutzt die eingestellte Schwelle statt eines eingefrorenen Flags, gesendete Mails aus dem IMAP-Sent-Ordner zählen als Antwort-Evidenz, Sende-Zeitpunkte überleben die 30-Tage-Aufbewahrung, und der VIP-Floor greift nur noch bei Adress-Match — ein gespoofter Anzeigename kann das Injection-Veto nicht mehr aushebeln. Analyse-Läufe schreiben zudem per Merge statt Komplett-Rückschreib: Erledigt-Häkchen und frisch abgerufene Mails gehen bei langen Läufen nicht mehr verloren, und die neuesten Mails werden zuerst analysiert.
+
+### Verbesserungen
+
+- **Email-KI-Chat und Notes-Chat funken sich nicht mehr dazwischen.** Der Email-Chat streamt auf eigenen Kanälen — beide Chats können gleichzeitig offen sein. Außerdem findet der Email-Chat-Kontext jetzt auch Notizen, deren Inhalt noch nicht geladen war, und behandelt Umlaute sowie Grußfloskeln bei der Stichwort-Suche korrekt.
+- **Falt-Steuerung im Editor modernisiert.** Überschriften-/Listen-Faltung nutzt jetzt CodeMirrors eingebaute Fold-Infrastruktur (Pfeile in der Gutter statt Elemente im Textfluss) — robuster gegen Eingabefehler im Editor.
+- **Erste automatisierte Tests im Projekt.** Vitest eingeführt; 19 Regressionstests decken den Hybrid-Relevanz-Scorer ab (Floors vs. Boosts, Injection-Veto, VIP-Spoofing-Schutz, Antwort-Statistiken).
+
 ## [0.7.29-beta] - 2026-06-10
 
 ### Verbesserungen
