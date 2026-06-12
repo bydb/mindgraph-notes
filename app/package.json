@@ -13,6 +13,8 @@
     "dist:mac": "electron-vite build && electron-builder --mac",
     "typecheck": "tsc --noEmit",
     "prebuild": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "rag:eval": "node scripts/run-ts.mjs scripts/rag-eval.ts"
   },
   "keywords": [
@@ -124,7 +126,8 @@
     "electron-vite": "^5.0.0",
     "turndown-plugin-gfm": "^1.0.2",
     "typescript": "^5.9.3",
-    "vite": "^7.3.1"
+    "vite": "^7.3.1",
+    "vitest": "^4.1.8"
   },
   "dependencies": {
     "@codemirror/commands": "^6.10.1",

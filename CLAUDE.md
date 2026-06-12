@@ -90,9 +90,10 @@ npm run pack         # Unpacked Build erzeugen
 npm run dist         # Installer erstellen (electron-builder)
 npm run dist:mac     # Nur macOS Installer
 npm run typecheck    # tsc --noEmit (läuft auch als prebuild) — schnellster Korrektheits-Check
+npm run test         # vitest run — Unit-Tests für pure shared/-Logik
 ```
 
-> Kein Test-Runner im Projekt. Nach Änderungen: `npm run typecheck` (deckt main+renderer+shared ab), bei Bedarf `npm run build` (bündelt die drei Prozesse getrennt → fängt Prozessgrenzen-Fehler). Verifikation sonst manuell via `npm run dev`.
+> Test-Runner: vitest, bewusst nur für pure `shared/`-Logik (aktuell `shared/emailRelevance.test.ts` — Hybrid-Scorer). Nach Änderungen: `npm run typecheck` (deckt main+renderer+shared ab) + `npm run test`, bei Bedarf `npm run build` (bündelt die drei Prozesse getrennt → fängt Prozessgrenzen-Fehler). UI-Verifikation manuell via `npm run dev`.
 
 ## Architektur-Patterns
 
