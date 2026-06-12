@@ -32,13 +32,24 @@ interface DecoratorContext {
 }
 
 /**
- * Writing mode intentionally stays syntax-free. The raw Markdown remains available
- * in the separate Markdown mode, so live-preview decorations never reveal markers.
+ * Marker auf der aktiven Zeile MÜSSEN sichtbar werden (Obsidian-Verhalten).
+ *
+ * Vorher gab diese Funktion absichtlich immer false zurück ("Schreibmodus bleibt
+ * syntax-frei"). Das korrumpierte aber beim Tippen das Dokument: die Marker werden
+ * per Mark-Decoration mit display:none versteckt; steht der Cursor in/hinter so
+ * einem versteckten Span (z.B. direkt nach dem Space von "## "), kollabiert der
+ * Browser-Caret VOR den unsichtbaren Bereich und die nächste Eingabe landet im
+ * Modell vor den Markern — "## Gliederung" wurde zu "Gliederung" + verwaistem
+ * "## " (v0.7.30-Fix, per CodeMirror-Transaktionslog verifiziert: "G" landete auf
+ * Position 14 statt 18). Reveal-on-active-line ist der etablierte Trade-off.
  */
 function isCursorInRange(ctx: DecoratorContext, from: number, to: number): boolean {
-  void ctx
-  void from
-  void to
+  const doc = ctx.view.state.doc
+  const startLine = doc.lineAt(from).number
+  const endLine = doc.lineAt(to).number
+  for (let line = startLine; line <= endLine; line++) {
+    if (ctx.cursorLines.has(line)) return true
+  }
   return false
 }
 
