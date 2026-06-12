@@ -1394,6 +1394,33 @@ body {
   color: var(--text-secondary);
 }
 
+/* Pfad-Modus: Ordner-Präfix gedimmt und zuerst schrumpfend — der Dateiname bleibt sichtbar */
+.file-name.has-path-prefix {
+  display: flex;
+  align-items: baseline;
+  min-width: 0;
+}
+
+.file-path-prefix {
+  flex: 0 1 auto;
+  flex-shrink: 1000;
+  /* nie ganz verschwinden — mindestens die Ellipsis als Hinweis behalten */
+  min-width: 2.5ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 400;
+  color: var(--text-muted);
+}
+
+.file-basename {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .file-item-row:hover .file-name,
 .file-item-row.selected .file-name {
   color: var(--text-primary);

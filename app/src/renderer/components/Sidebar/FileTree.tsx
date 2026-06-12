@@ -381,7 +381,9 @@ const FileItem: React.FC<FileItemProps> = ({
   const isFolderPinned = entry.isDirectory && customization?.pinned === true
   const hasCustomization = folderColor || folderIcon
 
-  // Display-Name basierend auf displayMode
+  // Display-Name: Dateiname und Ordner-Präfix (Pfad-Modus) getrennt halten — als ein
+  // String würde die Ellipsis bei langen Pfaden genau den Dateinamen abschneiden und
+  // alle Zeilen zeigen nur noch dasselbe Ordner-Präfix.
   const getDisplayName = () => {
     if (entry.isDirectory) {
       // Ordner: immer nur den Ordnernamen anzeigen
@@ -389,20 +391,16 @@ const FileItem: React.FC<FileItemProps> = ({
     }
     // Für Bilder und Office-Dateien: vollständigen Namen mit Endung anzeigen
     if (isImage || isOffice) {
-      if (displayMode === 'path') {
-        return entry.path
-      }
       return entry.name
     }
+    // Endung nur am Ende strippen (replace() träfe das erste Vorkommen im Pfad)
     const extension = isPdf ? '.pdf' : '.md'
-    if (displayMode === 'path') {
-      // Voller Pfad ohne Endung
-      return entry.path.replace(extension, '')
-    }
-    // Nur Dateiname ohne Endung
-    return entry.name.replace(extension, '')
+    return entry.name.endsWith(extension) ? entry.name.slice(0, -extension.length) : entry.name
   }
   const displayName = getDisplayName()
+  const pathPrefix = displayMode === 'path' && !entry.isDirectory && entry.path.includes('/')
+    ? entry.path.slice(0, entry.path.lastIndexOf('/') + 1)
+    : ''
   const indexedKindId = noteKindIndex.get(entry.path)
   const noteKind = !entry.isDirectory && !isPdf && !isImage && !isOffice
     ? (indexedKindId ? NOTE_KINDS[indexedKindId] : getNoteKindFromText(displayName) || getNoteKindFromText(entry.path))
@@ -1230,7 +1228,10 @@ const FileItem: React.FC<FileItemProps> = ({
                     aria-label={noteKind.label}
                   />
                 )}
-                <span className="file-name" onDoubleClick={handleDoubleClick} title={entry.path}>{visibleDisplayName}</span>
+                <span className={`file-name${pathPrefix ? ' has-path-prefix' : ''}`} onDoubleClick={handleDoubleClick} title={entry.path}>
+                  {pathPrefix && <span className="file-path-prefix">{pathPrefix}</span>}
+                  <span className="file-basename">{visibleDisplayName}</span>
+                </span>
               </>
             )}
             {linkCount > 0 && !isEditing && (
