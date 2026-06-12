@@ -1755,7 +1755,11 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
 
       // Set preview content and apply configured default view mode
       setPreviewContent(content)
-      setViewMode(editorDefaultView)
+      // Leere bzw. frisch erstellte Notizen (nur "# Titel") direkt im Schreiben-Modus
+      // öffnen: im Lesen-Modus würde getipptes Markdown vom Turndown-Roundtrip
+      // escaped (\## …) und ist damit dauerhaft kaputt — Erstkontakt-Falle.
+      const isEffectivelyEmpty = content.replace(/^#\s.*$/m, '').trim() === ''
+      setViewMode(editorDefaultView === 'preview' && isEffectivelyEmpty ? 'live-preview' : editorDefaultView)
       setContentVersion(v => v + 1)
 
       if (!editorRef.current) return
@@ -1867,10 +1871,10 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
                   triggerPos: slashPos,
                   query: slashMatch[1]
                 })
-                // Close wikilink autocomplete if open
-                if (autocomplete?.isOpen) {
-                  setAutocomplete(null)
-                }
+                // Close wikilink autocomplete if open. Funktionales Update zwingend:
+                // `autocomplete` im Listener-Closure ist der Stand bei Editor-Erstellung
+                // (immer null) — ein direkter Read würde das Schließen dauerhaft skippen.
+                setAutocomplete(prev => (prev ? null : prev))
                 return
               }
 
@@ -1926,8 +1930,12 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
                 const lineStart = textBefore.lastIndexOf('\n') + 1
                 const lineText = textBefore.substring(lineStart)
                 const isHeading = /^#{1,6}\s/.test(lineText)
+                // Einzelnes # am Zeilenanfang ist meist eine werdende Überschrift —
+                // Popup erst öffnen, sobald ein Tag-Zeichen folgt (#tag geht weiterhin,
+                // "## " und "# " öffnen nie und Enter tippt ungestört weiter).
+                const couldBeHeading = lineText === '#'
 
-                if (!isHeading) {
+                if (!isHeading && !couldBeHeading) {
                   setAutocomplete({
                     isOpen: true,
                     mode: 'tag',
@@ -1940,10 +1948,9 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
                 }
               }
 
-              // Schließen wenn kein Match
-              if (autocomplete?.isOpen) {
-                setAutocomplete(null)
-              }
+              // Schließen wenn kein Match. Funktionales Update zwingend (stale closure,
+              // siehe oben) — sonst bleibt das Popup offen und fängt Enter/Tab ab.
+              setAutocomplete(prev => (prev ? null : prev))
             }
           }),
           EditorView.theme({
@@ -2007,6 +2014,14 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
 
     const currentEditorContent = viewRef.current.state.doc.toString()
 
+    // Editor ist Autorität, solange lokale Änderungen nicht persistiert sind
+    // (Debounce-Save ausstehend oder Doc dem letzten Save voraus). Sonst
+    // überschreibt der Save→Watcher→Store-Roundtrip beim schnellen Tippen das
+    // Doc mit veraltetem Disk-Stand: frische Zeichen verschwinden und der
+    // Cursor springt ans Dokumentende. Die isExternalUpdateRef-Schutzfrist
+    // (100 ms) ist kürzer als die Watcher-Latenz und reicht allein nicht.
+    if (saveTimeoutRef.current || currentEditorContent !== lastSavedContentRef.current) return
+
     // Nur aktualisieren wenn der Content sich unterscheidet UND
     // es nicht vom Editor selbst kommt
     if (selectedNote.content !== currentEditorContent &&
@@ -2021,13 +2036,20 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
           const fullPath = `${vaultPath}/${selectedNote.path}`
           const fileContent = await window.electronAPI.readFile(fullPath)
 
-          if (fileContent !== currentEditorContent && viewRef.current) {
+          if (!viewRef.current) return
+
+          // Re-Check nach dem async read: während readFile lief, kann der User
+          // weitergetippt haben — dann gewinnt der Editor (siehe Guard oben).
+          const nowContent = viewRef.current.state.doc.toString()
+          if (saveTimeoutRef.current || nowContent !== lastSavedContentRef.current) return
+
+          if (fileContent !== nowContent) {
             lastSavedContentRef.current = fileContent
             setPreviewContent(fileContent)
             viewRef.current.dispatch({
               changes: {
                 from: 0,
-                to: currentEditorContent.length,
+                to: nowContent.length,
                 insert: fileContent
               }
             })
