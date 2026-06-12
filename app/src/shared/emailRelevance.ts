@@ -47,6 +47,10 @@ export const DEFAULT_DOMAIN_WEIGHT = 80
 export const DEFAULT_KEYWORD_BOOST = 20
 export const MAX_KEYWORD_BOOST = 30
 export const DEFAULT_RELEVANCE_THRESHOLD = 30
+// Reiner Name-Treffer (Adresse unbestätigt) gibt nur diesen festen Boost — bewusst so
+// klein, dass er allein weder das Injection-Veto (LLM 0 + 15 < Schwelle 30) noch eine
+// vom LLM korrekt als irrelevant erkannte Mail über die Schwelle hebt.
+export const VIP_NAME_BOOST = 15
 
 /** Fence-Tag des optionalen Konfig-Blocks in der Instruktions-Notiz. */
 export const RELEVANCE_CONFIG_FENCE = 'email-relevance-config'
@@ -146,30 +150,59 @@ interface MailLike {
   to?: { address?: string }[]
   date?: string
   sent?: boolean
+  folder?: string | null
 }
 
-/** address(lowercased) → Statistik, gerechnet über den gesamten Bestand im Zeitfenster. */
-export function buildReplyStats(emails: MailLike[], cfg: ReplyHistoryConfig, nowMs: number): Map<string, SenderReplyInfo> {
+/** address(lowercased) → Statistik, gerechnet über den gesamten Bestand im Zeitfenster.
+ *
+ *  persistedSentDates: Sende-Zeitpunkte pro Empfänger-Adresse aus contacts.json — Evidenz,
+ *  die das retainDays-Pruning von emails.json (Default 30 Tage) überlebt. Ohne sie wäre
+ *  das windowDays-Fenster (Default 90 Tage) effektiv nie größer als die Retention.
+ *  Dedup zwischen live und persistiert läuft über den exakten Datums-String: dieselbe
+ *  Mail trägt in beiden Quellen denselben ISO-Timestamp. */
+export function buildReplyStats(
+  emails: MailLike[],
+  cfg: ReplyHistoryConfig,
+  nowMs: number,
+  persistedSentDates?: ReadonlyMap<string, readonly string[]>,
+): Map<string, SenderReplyInfo> {
   const windowMs = cfg.windowDays * 86400000
-  const sentTo = new Map<string, number>()
+  // Unparsebares/fehlendes Datum NICHT mitzählen (sonst würde es das Fenster umgehen).
+  const inWindow = (iso: string | undefined): boolean => {
+    const t = iso ? Date.parse(iso) : NaN
+    return !Number.isNaN(t) && nowMs - t <= windowMs
+  }
+  const sentDates = new Map<string, Set<string>>()
+  const addSent = (addr: string | undefined, date: string): void => {
+    const a = addr?.toLowerCase().trim()
+    if (!a) return
+    let set = sentDates.get(a)
+    if (!set) { set = new Set(); sentDates.set(a, set) }
+    set.add(date)
+  }
   const received = new Map<string, number>()
   for (const m of emails) {
-    const t = m.date ? Date.parse(m.date) : NaN
-    // Unparsebares/fehlendes Datum NICHT mitzählen (sonst würde es das Fenster umgehen).
-    if (Number.isNaN(t) || nowMs - t > windowMs) continue
-    if (m.sent) {
-      for (const r of m.to || []) {
-        const a = r.address?.toLowerCase().trim()
-        if (a) sentTo.set(a, (sentTo.get(a) || 0) + 1)
-      }
+    if (!inWindow(m.date)) continue
+    // isSentMail statt nur sent-Flag: per IMAP aus „Gesendet" gefetchte Mails tragen
+    // kein sent-Flag, nur folder — sie sind aber genauso „ich habe geantwortet"-Evidenz
+    // und landeten vorher fälschlich im received-Zweig (unter der eigenen Adresse).
+    if (isSentMail(m)) {
+      for (const r of m.to || []) addSent(r.address, m.date as string)
     } else {
       const a = m.from?.address?.toLowerCase().trim()
       if (a) received.set(a, (received.get(a) || 0) + 1)
     }
   }
+  if (persistedSentDates) {
+    for (const [addr, dates] of persistedSentDates) {
+      for (const d of dates) {
+        if (inWindow(d)) addSent(addr, d)
+      }
+    }
+  }
   const out = new Map<string, SenderReplyInfo>()
-  for (const a of new Set<string>([...sentTo.keys(), ...received.keys()])) {
-    const s = sentTo.get(a) || 0
+  for (const a of new Set<string>([...sentDates.keys(), ...received.keys()])) {
+    const s = sentDates.get(a)?.size || 0
     const r = received.get(a) || 0
     const frequency: SenderReplyInfo['frequency'] =
       s >= cfg.highCount ? 'high' : s >= cfg.mediumCount ? 'medium' : 'none'
@@ -198,13 +231,21 @@ export function computeHardSignals(
   const fromAddr = lc(email.from.address)
   const fromName = lc(email.from.name)
 
-  // VIP-Absender (exakter Address-Match ODER Name-Enthält-Match) → Floor
+  // VIP-Absender: Floor NUR bei exaktem Adress-Match. Der Anzeigename ist vollständig
+  // absenderkontrolliert (trivial spoofbar) — ein reiner Name-Treffer würde sonst über
+  // „bekannte Identität gewinnt" das Injection-Veto des LLM aushebeln und gefälschte
+  // Mails in Notiz-Erstellung + Task-Extraktion schleusen. Name-Match (z.B. VIP schreibt
+  // von neuer Adresse) gibt darum nur noch einen kleinen additiven Boost.
   for (const v of cfg.vipSenders) {
     const emailHit = !!v.email && fromAddr === v.email.toLowerCase()
     const nameHit = !!v.name && fromName.length > 0 && fromName.includes(v.name.toLowerCase())
-    if (emailHit || nameHit) {
+    if (emailHit) {
       signals.push({ kind: 'vip', label: `VIP-Absender: ${v.name || v.email}`, weight: v.weight, mode: 'floor' })
       break // ein VIP-Treffer reicht
+    }
+    if (nameHit) {
+      signals.push({ kind: 'vip', label: `VIP-Name (Adresse unbestätigt): ${v.name}`, weight: VIP_NAME_BOOST, mode: 'boost' })
+      break
     }
   }
   // Domain (exakte Domain oder Subdomain) → Floor

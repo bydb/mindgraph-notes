@@ -7539,7 +7539,15 @@ ipcMain.handle('email-save-attachment', async (_event, filename: string, content
 // Persistenter Kontakt-Speicher ({vault}/.mindgraph/contacts.json):
 // Empfänger gesendeter Mails werden VOR dem retainDays-Pruning gesichert,
 // sonst verschwinden selten angeschriebene Adressen aus dem Compose-Autocomplete.
-interface SavedEmailContact { email: string; name?: string; lastUsedAt?: string }
+// sentDates: Sende-Zeitpunkte pro Adresse — Reply-Evidenz für buildReplyStats, die das
+// emails.json-Pruning (Default 30 Tage) überlebt; sonst wäre das 90-Tage-Fenster der
+// Antwort-Häufigkeit effektiv auf die Retention gedeckelt.
+interface SavedEmailContact { email: string; name?: string; lastUsedAt?: string; sentDates?: string[] }
+
+// Länger als windowDays (90) aufbewahren, damit eine künftig konfigurierbare Fenstergröße
+// nicht sofort an fehlender Historie scheitert; Kappung hält contacts.json klein.
+const SENT_DATES_RETAIN_DAYS = 180
+const SENT_DATES_MAX_PER_CONTACT = 40
 
 async function harvestSentRecipients(
   vaultPath: string,
@@ -7575,6 +7583,29 @@ async function harvestSentRecipients(
             changed = true
           }
         }
+        // Sende-Zeitpunkt als Reply-Evidenz festhalten. Dedup über den exakten
+        // Datums-String — der Harvest läuft wiederholt über denselben Mailbestand
+        // (email-load UND email-save), dieselbe Mail darf nur einmal zählen.
+        if (mail.date) {
+          const contact = byEmail.get(address)!
+          const dates = contact.sentDates || []
+          if (!dates.includes(mail.date)) {
+            dates.push(mail.date)
+            contact.sentDates = dates
+            changed = true
+          }
+        }
+      }
+    }
+
+    // Größen-Hygiene: alte Sende-Zeitpunkte abschneiden (ISO-Strings sortieren chronologisch).
+    const sentCutoff = new Date(Date.now() - SENT_DATES_RETAIN_DAYS * 24 * 60 * 60 * 1000).toISOString()
+    for (const contact of byEmail.values()) {
+      if (!contact.sentDates?.length) continue
+      const pruned = contact.sentDates.filter(d => d >= sentCutoff).sort().slice(-SENT_DATES_MAX_PER_CONTACT)
+      if (pruned.length !== contact.sentDates.length) {
+        contact.sentDates = pruned
+        changed = true
       }
     }
 
@@ -7585,6 +7616,23 @@ async function harvestSentRecipients(
   } catch (error) {
     console.warn('[Email] Kontakt-Harvest fehlgeschlagen:', error instanceof Error ? error.message : error)
   }
+}
+
+// Persistierte Sende-Zeitpunkte (address → ISO-Dates) für buildReplyStats lesen.
+async function loadPersistedSentDates(vaultPath: string): Promise<Map<string, string[]>> {
+  const out = new Map<string, string[]>()
+  try {
+    const contactsPath = path.join(vaultPath, '.mindgraph', 'contacts.json')
+    const data = JSON.parse(await fs.readFile(contactsPath, 'utf-8'))
+    if (Array.isArray(data.contacts)) {
+      for (const c of data.contacts as SavedEmailContact[]) {
+        if (c?.email && Array.isArray(c.sentDates) && c.sentDates.length > 0) {
+          out.set(c.email.trim().toLowerCase(), c.sentDates.filter((d) => typeof d === 'string'))
+        }
+      }
+    }
+  } catch { /* noch kein Kontakt-Speicher */ }
+  return out
 }
 
 ipcMain.handle('email-contacts-load', async (_event, vaultPath: string) => {
@@ -8048,7 +8096,9 @@ ipcMain.handle('email-analyze', async (_event, vaultPath: string, model: string,
     // dem gesamten Mailbestand vorberechnen ("wem antworte ich tatsächlich").
     const relevanceConfig = parseRelevanceConfig(instructionContent)
     const softInstruction = stripConfigBlock(instructionContent)
-    const replyStats = buildReplyStats(emails, relevanceConfig.replyHistory, Date.now())
+    // Persistierte Sende-Zeitpunkte aus contacts.json dazu: emails.json hält per Default
+    // nur 30 Tage, das Antwort-Häufigkeits-Fenster ist aber 90 Tage.
+    const replyStats = buildReplyStats(emails, relevanceConfig.replyHistory, Date.now(), await loadPersistedSentDates(vaultPath))
     console.log(`[Email] Hybrid-Scorer: ${relevanceConfig.vipSenders.length} VIP, ${relevanceConfig.domains.length} Domains, ${relevanceConfig.keywords.length} Keywords, ${replyStats.size} Kontakte`)
 
     // Zu analysierende Emails filtern
@@ -8060,8 +8110,42 @@ ipcMain.handle('email-analyze', async (_event, vaultPath: string, model: string,
     const toAnalyze = emailIds
       ? emails.filter((e: { id: string; analysis?: object }) => emailIds.includes(e.id))
       : emails.filter((e: { analysis?: object; noteCreated?: boolean; sent?: boolean; folder?: string }) => !e.analysis && !e.noteCreated && !isSentMail(e))
+    // Neueste zuerst: auf langsamer Hardware (Minuten pro Mail) soll die Mail von heute
+    // Morgen nicht hinter einem alten Backlog warten — die aktuellsten Ergebnisse sind
+    // die wertvollsten und so zuerst in der Inbox sichtbar.
+    toAnalyze.sort((a: { date?: string }, b: { date?: string }) => (b.date || '').localeCompare(a.date || ''))
 
     console.log(`[Email] ${emails.length} total, ${toAnalyze.length} to analyze`)
+
+    // ── Merge-Write statt Komplett-Rückschreib ──────────────────────────────
+    // Der Batch kann Minuten bis Stunden laufen (5-Min-Timeout × Retry pro Mail,
+    // Schonmodus +8 s). Den beim Start gelesenen Bestand am Ende komplett zurück-
+    // zuschreiben würde alles verlieren, was zwischenzeitlich geschrieben wurde
+    // (Erledigt-Toggle, neu gefetchte Mails, Flag-Änderungen). Stattdessen werden
+    // fertige Analysen gesammelt und vor jedem Write frisch in die Datei gemergt.
+    // Die Map wird bewusst NIE geleert: Schreibt der Renderer zwischendurch seinen
+    // (analyse-losen) Store-Stand, stellt der nächste Merge alle Analysen wieder her.
+    const pendingAnalyses = new Map<string, Record<string, unknown>>()
+    const persistAnalyses = async (): Promise<void> => {
+      if (pendingAnalyses.size === 0) return
+      let target = data
+      try {
+        target = JSON.parse(await fs.readFile(emailsPath, 'utf-8'))
+      } catch { /* Datei weg/korrupt → Start-Snapshot als Fallback */ }
+      const targetEmails: Array<{ id: string; analysis?: { replyHandled?: boolean; replyHandledAt?: string } }> =
+        Array.isArray(target.emails) ? target.emails : []
+      for (const [id, analysisData] of pendingAnalyses) {
+        const t = targetEmails.find((e) => e.id === id)
+        if (!t) continue // Mail wurde zwischenzeitlich geprunt/gelöscht
+        // replyHandled aus dem FRISCHEN Bestand — der User kann während des Laufs
+        // getoggelt haben; der Stand vom Batch-Start wäre hier eine Lost-Update-Quelle.
+        t.analysis = { ...analysisData, replyHandled: t.analysis?.replyHandled, replyHandledAt: t.analysis?.replyHandledAt }
+      }
+      await fs.writeFile(emailsPath, JSON.stringify(target, null, 2), 'utf-8')
+    }
+    // Crash-Schutz: alle N fertigen Analysen zwischenspeichern, nicht erst am Batch-Ende.
+    const PERSIST_EVERY = 5
+
     let analyzed = 0
     let failed = 0
     // Letzter Fehlergrund für die UI — sonst scheitert die Analyse (OOM, fehlendes Modell,
@@ -8185,58 +8269,61 @@ AUSGABEFORMAT (NUR Schema — die <Platzhalter> NICHT abschreiben, sondern aus d
         if (!analysis) analysis = await requestAnalysis()
 
         if (analysis) {
-          // In emails-Array updaten
-          const idx = emails.findIndex((e: { id: string }) => e.id === email.id)
-          if (idx >= 0) {
-            const prev = emails[idx].analysis as { replyHandled?: boolean; replyHandledAt?: string } | undefined
-            const sentiment = analysis.sentiment as string
-            const replyUrgency = analysis.replyUrgency as string
+          const sentiment = analysis.sentiment as string
+          const replyUrgency = analysis.replyUrgency as string
 
-            // ── Hybrid-Scoring ──────────────────────────────────────────────
-            // LLM liefert nur die semantische Beurteilung; die harten Signale
-            // (VIP/Domain/Keyword/Antwort-Häufigkeit) rechnet der Code deterministisch
-            // und floort den Score. reasons[] macht die Bewertung erklärbar.
-            const replyInfo = replyStats.get((email.from.address || '').toLowerCase().trim())
-            const hard = computeHardSignals(
-              { from: email.from, subject: email.subject, bodyText: email.bodyText },
-              relevanceConfig,
-              replyInfo,
-            )
-            const matchedCriteria = Array.isArray(analysis.matchedCriteria)
-              ? (analysis.matchedCriteria as unknown[]).map((x) => String(x).trim()).filter(Boolean).slice(0, 12)
-              : []
-            // number|null: fehlender/kaputter Score (z.B. leeres {} von gemma) ist KEINE explizite 0
-            // und darf daher den harten Floor nicht als Injection-Veto auf 0 ziehen.
-            const rawScore = analysis.relevanceScore
-            const llmScore: number | null =
-              typeof rawScore === 'number' && Number.isFinite(rawScore) ? rawScore
-                : typeof rawScore === 'string' && rawScore.trim() !== '' && Number.isFinite(Number(rawScore)) ? Number(rawScore)
-                  : null
-            const combined = combineRelevance(llmScore, hard, matchedCriteria)
+          // ── Hybrid-Scoring ──────────────────────────────────────────────
+          // LLM liefert nur die semantische Beurteilung; die harten Signale
+          // (VIP/Domain/Keyword/Antwort-Häufigkeit) rechnet der Code deterministisch
+          // und floort den Score. reasons[] macht die Bewertung erklärbar.
+          const replyInfo = replyStats.get((email.from.address || '').toLowerCase().trim())
+          const hard = computeHardSignals(
+            { from: email.from, subject: email.subject, bodyText: email.bodyText },
+            relevanceConfig,
+            replyInfo,
+          )
+          const matchedCriteria = Array.isArray(analysis.matchedCriteria)
+            ? (analysis.matchedCriteria as unknown[]).map((x) => String(x).trim()).filter(Boolean).slice(0, 12)
+            : []
+          // number|null: fehlender/kaputter Score (z.B. leeres {} von gemma) ist KEINE explizite 0
+          // und darf daher den harten Floor nicht als Injection-Veto auf 0 ziehen.
+          const rawScore = analysis.relevanceScore
+          const llmScore: number | null =
+            typeof rawScore === 'number' && Number.isFinite(rawScore) ? rawScore
+              : typeof rawScore === 'string' && rawScore.trim() !== '' && Number.isFinite(Number(rawScore)) ? Number(rawScore)
+                : null
+          const combined = combineRelevance(llmScore, hard, matchedCriteria)
 
-            emails[idx].analysis = {
-              relevant: combined.relevant,
-              relevanceScore: combined.relevanceScore,
-              sentiment: ['positive', 'neutral', 'negative', 'urgent'].includes(sentiment) ? sentiment : 'neutral',
-              summary: String(analysis.summary || ''),
-              // normalizeExtractedInfo: akzeptiert flaches Array (qwen) UND verschachteltes Objekt (gemma)
-              extractedInfo: normalizeExtractedInfo(analysis.extractedInfo),
-              categories: Array.isArray(analysis.categories) ? analysis.categories.map((x: unknown) => typeof x === 'string' ? x : String(x)) : [],
-              suggestedActions: normalizeSuggestedActions(analysis.suggestedActions),
-              needsReply: analysis.needsReply === true,
-              replyUrgency: ['low', 'medium', 'high'].includes(replyUrgency) ? replyUrgency : undefined,
-              matchedCriteria,
-              relevanceReasons: combined.reasons,
-              hardFloor: combined.hardFloor,
-              replyHandled: prev?.replyHandled,
-              replyHandledAt: prev?.replyHandledAt,
-              analyzedAt: new Date().toISOString(),
-              model
+          // replyHandled/replyHandledAt werden hier bewusst NICHT gesetzt — die kommen
+          // beim Merge in persistAnalyses aus dem dann frischen Dateibestand.
+          pendingAnalyses.set(email.id, {
+            relevant: combined.relevant,
+            relevanceScore: combined.relevanceScore,
+            sentiment: ['positive', 'neutral', 'negative', 'urgent'].includes(sentiment) ? sentiment : 'neutral',
+            summary: String(analysis.summary || ''),
+            // normalizeExtractedInfo: akzeptiert flaches Array (qwen) UND verschachteltes Objekt (gemma)
+            extractedInfo: normalizeExtractedInfo(analysis.extractedInfo),
+            categories: Array.isArray(analysis.categories) ? analysis.categories.map((x: unknown) => typeof x === 'string' ? x : String(x)) : [],
+            suggestedActions: normalizeSuggestedActions(analysis.suggestedActions),
+            needsReply: analysis.needsReply === true,
+            replyUrgency: ['low', 'medium', 'high'].includes(replyUrgency) ? replyUrgency : undefined,
+            matchedCriteria,
+            relevanceReasons: combined.reasons,
+            hardFloor: combined.hardFloor,
+            analyzedAt: new Date().toISOString(),
+            model
+          })
+          if (hard.signals.length > 0) {
+            console.log(`[Email] ${email.id}: LLM=${llmScore ?? 'n/a'} Floor=${hard.floor} Boost=${hard.boost} → ${combined.relevanceScore} (${hard.signals.map(s => `${s.kind}:${s.mode}`).join(',')})`)
+          }
+          analyzed++
+          if (analyzed % PERSIST_EVERY === 0) {
+            try {
+              await persistAnalyses()
+            } catch (e) {
+              // Zwischenspeichern darf den Batch nicht abbrechen — der finale Persist versucht es erneut.
+              console.warn('[Email] Zwischenspeichern der Analysen fehlgeschlagen:', e instanceof Error ? e.message : e)
             }
-            if (hard.signals.length > 0) {
-              console.log(`[Email] ${email.id}: LLM=${llmScore ?? 'n/a'} Floor=${hard.floor} Boost=${hard.boost} → ${combined.relevanceScore} (${hard.signals.map(s => `${s.kind}:${s.mode}`).join(',')})`)
-            }
-            analyzed++
           }
         } else {
           failed++
@@ -8260,8 +8347,8 @@ AUSGABEFORMAT (NUR Schema — die <Platzhalter> NICHT abschreiben, sondern aus d
       }
     }
 
-    // Aktualisierte Emails speichern
-    await fs.writeFile(emailsPath, JSON.stringify(data, null, 2), 'utf-8')
+    // Finaler Merge-Write: frischen Bestand lesen, nur analysis-Felder hineinmergen.
+    await persistAnalyses()
 
     return { success: true, analyzed, failed, total: toAnalyze.length, lastError }
   } catch (error) {

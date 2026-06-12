@@ -342,9 +342,11 @@ export const useEmailStore = create<EmailState>()((set, get) => ({
         return false
       }
 
-      // Nur relevante
+      // Nur relevante — rein über die User-Schwelle, NICHT über analysis.relevant:
+      // das Flag ist mit der Scorer-Default-Schwelle (30) eingefroren und würde eine
+      // höher gestellte Schwelle überstimmen (Liste ≠ Badge/Notiz-Erstellung).
       if (activeFilter.onlyRelevant) {
-        if (!email.analysis?.relevant && (email.analysis?.relevanceScore || 0) < emailSettings.relevanceThreshold) {
+        if ((email.analysis?.relevanceScore ?? 0) < emailSettings.relevanceThreshold) {
           return false
         }
       }
