@@ -639,6 +639,8 @@ export interface ElectronAPI {
   }>;
   onOllamaChatChunk: (callback: (chunk: string) => void) => void;
   onOllamaChatDone: (callback: () => void) => void;
+  onOllamaEmailChatChunk: (callback: (chunk: string) => void) => void;
+  onOllamaEmailChatDone: (callback: () => void) => void;
 
   // Projekt-RAG: Projektordner semantisch befragen (lokal)
   projectRagStatus: (vaultPath: string, projectFolderRel: string, embedModel: string) => Promise<RagIndexStatus>;

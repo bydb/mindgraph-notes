@@ -59,7 +59,6 @@ interface EmailState {
   // AI Chat actions
   setAiChatEmail: (emailId: string | null) => void
   addAiChatMessage: (msg: { role: 'user' | 'assistant'; content: string }) => void
-  clearAiChat: () => void
   setAiChatLoading: (loading: boolean) => void
 }
 
@@ -701,8 +700,6 @@ export const useEmailStore = create<EmailState>()((set, get) => ({
   addAiChatMessage: (msg) => set((state) => ({
     aiChatMessages: [...state.aiChatMessages, msg]
   })),
-
-  clearAiChat: () => set({ aiChatMessages: [], aiChatEmailId: null }),
 
   setAiChatLoading: (loading) => set({ isAiChatLoading: loading })
 }))

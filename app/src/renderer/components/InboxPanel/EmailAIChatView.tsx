@@ -6,7 +6,7 @@ import { useContactStore } from '../../stores/contactStore'
 import { useAgentStore } from '../../stores/agentStore'
 import { useTranslation } from '../../utils/translations'
 import { sanitizeHtml } from '../../utils/sanitize'
-import { buildEmailContext, fetchCalendarEvents } from '../../utils/emailContextBuilder'
+import { buildEmailContext, fetchCalendarEvents, loadMissingNoteContents } from '../../utils/emailContextBuilder'
 import type { CalendarEvent } from '../../../shared/types'
 
 export const EmailAIChatView: React.FC = () => {
@@ -40,12 +40,13 @@ export const EmailAIChatView: React.FC = () => {
     }
   }, [chatEmail?.id])
 
-  // Streaming-Listener
+  // Streaming-Listener — eigene Channels, damit der Notes-Chat (onOllamaChatChunk)
+  // nicht denselben Listener-Slot überschreibt
   useEffect(() => {
-    window.electronAPI.onOllamaChatChunk((chunk: string) => {
+    window.electronAPI.onOllamaEmailChatChunk((chunk: string) => {
       setStreamingContent(prev => prev + chunk)
     })
-    window.electronAPI.onOllamaChatDone(() => {
+    window.electronAPI.onOllamaEmailChatDone(() => {
       setIsStreaming(false)
     })
   }, [])
@@ -63,10 +64,15 @@ export const EmailAIChatView: React.FC = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [aiChatMessages, streamingContent])
 
-  const getContext = useCallback(() => {
+  const getContext = useCallback(async () => {
     if (!chatEmail) return ''
     const contact = getContactByEmail(chatEmail.from.address)
-    const notesRecord = Object.fromEntries(notes.map(n => [n.id, n]))
+    let notesRecord = Object.fromEntries(notes.map(n => [n.id, n]))
+    // Cache liefert Notizen oft mit content: '' — für die Kontext-Suche nachladen
+    const vaultPath = useNotesStore.getState().vaultPath
+    if (vaultPath) {
+      notesRecord = await loadMissingNoteContents(notesRecord, chatEmail, vaultPath)
+    }
     return buildEmailContext(
       chatEmail,
       emails,
@@ -77,10 +83,10 @@ export const EmailAIChatView: React.FC = () => {
     )
   }, [chatEmail, emails, notes, dashboardOffers, getContactByEmail, calendarEvents])
 
-  const handleSend = useCallback(async () => {
-    if (!input.trim() || isAiChatLoading || !ollama.selectedModel) return
+  const sendMessage = useCallback(async (text: string) => {
+    const userMessage = text.trim()
+    if (!userMessage || isAiChatLoading || !ollama.selectedModel) return
 
-    const userMessage = input.trim()
     setInput('')
     addAiChatMessage({ role: 'user', content: userMessage })
     setAiChatLoading(true)
@@ -88,53 +94,39 @@ export const EmailAIChatView: React.FC = () => {
     setStreamingContent('')
 
     try {
-      const context = getContext()
+      const context = await getContext()
 
       const messages = [
         ...aiChatMessages.map(m => ({ role: m.role, content: m.content })),
         { role: 'user', content: userMessage }
       ]
 
-      await window.electronAPI.ollamaChat(
+      const result = await window.electronAPI.ollamaChat(
         ollama.selectedModel,
         messages,
         context,
         'email'
       )
+      if (!result.success) {
+        setIsStreaming(false)
+        setAiChatLoading(false)
+        addAiChatMessage({ role: 'assistant', content: `Fehler: ${result.error || 'Unbekannter Fehler'}` })
+      }
     } catch (error) {
       setIsStreaming(false)
       setStreamingContent('')
       setAiChatLoading(false)
       addAiChatMessage({ role: 'assistant', content: `Fehler: ${error instanceof Error ? error.message : 'Unbekannter Fehler'}` })
     }
-  }, [input, isAiChatLoading, ollama.selectedModel, aiChatMessages, addAiChatMessage, setAiChatLoading, getContext])
+  }, [isAiChatLoading, ollama.selectedModel, aiChatMessages, addAiChatMessage, setAiChatLoading, getContext])
+
+  const handleSend = useCallback(() => {
+    sendMessage(input)
+  }, [sendMessage, input])
 
   const handleSuggestion = useCallback((text: string) => {
-    setInput(text)
-    // Need small delay so input state updates before handleSend reads it
-    setTimeout(() => {
-      const fakeInput = text
-      if (!fakeInput.trim() || isAiChatLoading || !ollama.selectedModel) return
-      addAiChatMessage({ role: 'user', content: fakeInput })
-      setAiChatLoading(true)
-      setIsStreaming(true)
-      setStreamingContent('')
-      setInput('')
-
-      const context = getContext()
-      const messages = [
-        ...aiChatMessages.map(m => ({ role: m.role, content: m.content })),
-        { role: 'user', content: fakeInput }
-      ]
-
-      window.electronAPI.ollamaChat(ollama.selectedModel, messages, context, 'email')
-        .catch(() => {
-          setIsStreaming(false)
-          setStreamingContent('')
-          setAiChatLoading(false)
-        })
-    }, 50)
-  }, [isAiChatLoading, ollama.selectedModel, aiChatMessages, addAiChatMessage, setAiChatLoading, getContext])
+    sendMessage(text)
+  }, [sendMessage])
 
   const handleUseDraft = useCallback((content: string) => {
     if (!chatEmail) return

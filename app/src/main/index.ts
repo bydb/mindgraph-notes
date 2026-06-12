@@ -3622,6 +3622,11 @@ ipcMain.handle('ollama-embeddings', async (_event, model: string, text: string) 
 ipcMain.handle('ollama-chat', async (event, model: string, messages: Array<{ role: string; content: string }>, context: string, chatMode: 'direct' | 'socratic' | 'email' = 'direct') => {
   console.log('[Ollama] Chat request with model:', model, 'context length:', context.length, 'mode:', chatMode)
 
+  // Email-Chat streamt auf eigenen Channels — Notes-Chat und Email-Chat können
+  // gleichzeitig gemountet sein, und preload erlaubt nur einen Listener pro Channel
+  const chunkChannel = chatMode === 'email' ? 'ollama-email-chat-chunk' : 'ollama-chat-chunk'
+  const doneChannel = chatMode === 'email' ? 'ollama-email-chat-done' : 'ollama-chat-done'
+
   try {
     // System-Prompt basierend auf Modus
     const directPrompt = `Du bist ein hilfreicher Assistent, der Fragen zu den folgenden Notizen beantwortet. Antworte auf Deutsch, sei präzise und beziehe dich auf den Inhalt der Notizen.
@@ -3724,10 +3729,10 @@ Stelle EINE kurze Frage, die zum Nachdenken anregt.`
           if (json.message?.content) {
             fullResponse += json.message.content
             // Sende Chunk an Renderer
-            event.sender.send('ollama-chat-chunk', json.message.content)
+            event.sender.send(chunkChannel, json.message.content)
           }
           if (json.done) {
-            event.sender.send('ollama-chat-done')
+            event.sender.send(doneChannel)
           }
         } catch {
           // Ignoriere ungültige JSON-Zeilen
@@ -3743,7 +3748,7 @@ Stelle EINE kurze Frage, die zum Nachdenken anregt.`
   } catch (error) {
     console.error('[Ollama] Chat error:', error)
     // Notify renderer that streaming is done so UI doesn't hang
-    event.sender.send('ollama-chat-done')
+    event.sender.send(doneChannel)
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unbekannter Fehler'

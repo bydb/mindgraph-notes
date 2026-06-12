@@ -15,6 +15,11 @@ const STOP_WORDS_DE = new Set([
   'fuer', 'ueber', 'unter', 'nach', 'vor', 'bei', 'aus', 'auf', 'in', 'an', 'um', 'bis',
   'nicht', 'auch', 'noch', 'nur', 'schon', 'sehr', 'mehr', 'hier', 'dort', 'dann', 'wie',
   'ich', 'du', 'er', 'sie', 'es', 'wir', 'ihr', 'sie', 'mein', 'dein', 'sein', 'ihr',
+  'für', 'über', 'während', 'würde', 'wäre', 'hätte', 'können', 'müssen', 'sollen', 'wurde',
+  // Gruß-/Anredefloskeln dominieren sonst die Keyword-Frequenz in E-Mails
+  'hallo', 'liebe', 'lieber', 'geehrte', 'geehrter', 'damen', 'herren', 'frau', 'herr',
+  'gruß', 'grüße', 'grüßen', 'freundliche', 'freundlichen', 'herzliche', 'herzlichen',
+  'viele', 'vielen', 'danke', 'beste', 'besten',
   'the', 'a', 'an', 'and', 'or', 'but', 'is', 'are', 'was', 'were', 'be', 'been', 'has',
   'have', 'had', 'do', 'does', 'did', 'will', 'would', 'could', 'should', 'may', 'might',
   'this', 'that', 'these', 'those', 'for', 'from', 'with', 'not', 'all', 'can', 'her',
@@ -22,8 +27,9 @@ const STOP_WORDS_DE = new Set([
 ])
 
 function extractKeywords(text: string, maxCount = 15): string[] {
+  // \w enthält keine Umlaute — äöüß explizit erhalten, sonst zerfällt "Müller" zu "m ller"
   const words = text
-    .replace(/[^\w\saeoeue]/gi, ' ')
+    .replace(/[^\wäöüÄÖÜß\s]/g, ' ')
     .split(/\s+/)
     .filter(w => w.length > 2 && !STOP_WORDS_DE.has(w.toLowerCase()))
     .map(w => w.toLowerCase())
@@ -81,6 +87,59 @@ function searchNotes(
     .sort((a, b) => b.score - a.score)
     .slice(0, maxResults)
     .map(s => s.note)
+}
+
+/**
+ * Lädt fehlenden Notiz-Content für die Kontext-Suche nach.
+ * Notizen kommen beim Initial-Load aus dem Cache mit `content: ''` (Performance,
+ * siehe Sidebar) — ohne Nachladen liefern "Relevante Notizen" und "Offene Aufgaben"
+ * nur leere Treffer. Kandidaten werden über Titel/Tag-Matches vorgefiltert,
+ * damit nicht der ganze Vault gelesen wird.
+ */
+export async function loadMissingNoteContents(
+  notes: Record<string, Note>,
+  email: EmailMessage,
+  vaultPath: string,
+  maxLoad = 40
+): Promise<Record<string, Note>> {
+  const keywords = extractKeywords(
+    `${email.subject} ${email.from.name} ${email.bodyText.substring(0, 500)}`,
+    15
+  )
+  if (keywords.length === 0) return notes
+
+  const candidates: Array<{ note: Note; score: number }> = []
+  for (const note of Object.values(notes)) {
+    if (!note.path || note.path.includes('.mindgraph/')) continue
+    if (note.content) continue
+    let score = 0
+    const titleLower = (note.title || note.path.split('/').pop() || '').toLowerCase()
+    const tags = (note.tags || []).map(t => t.toLowerCase())
+    for (const kw of keywords) {
+      if (titleLower.includes(kw)) score += 5
+      if (tags.some(t => t.includes(kw))) score += 4
+    }
+    if (score > 0) candidates.push({ note, score })
+  }
+  if (candidates.length === 0) return notes
+
+  const toLoad = candidates.sort((a, b) => b.score - a.score).slice(0, maxLoad)
+  try {
+    const contents = await window.electronAPI.readFilesBatch(
+      vaultPath,
+      toLoad.map(c => c.note.path)
+    ) as Record<string, string | null>
+    const result = { ...notes }
+    for (const { note } of toLoad) {
+      const content = contents[note.path]
+      if (typeof content === 'string' && content) {
+        result[note.id] = { ...note, content }
+      }
+    }
+    return result
+  } catch {
+    return notes
+  }
 }
 
 export async function fetchCalendarEvents(daysAhead = 30): Promise<CalendarEvent[]> {

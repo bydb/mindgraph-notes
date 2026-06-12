@@ -160,7 +160,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('ollama-rerank-pair', model, query, document) as Promise<{ success: boolean; score?: number; error?: string }>,
 
   // Ollama Chat für Notes Chat
-  ollamaChat: (model: string, messages: Array<{ role: string; content: string }>, context: string, chatMode: 'direct' | 'socratic' = 'direct') =>
+  ollamaChat: (model: string, messages: Array<{ role: string; content: string }>, context: string, chatMode: 'direct' | 'socratic' | 'email' = 'direct') =>
     ipcRenderer.invoke('ollama-chat', model, messages, context, chatMode),
   onOllamaChatChunk: (callback: (chunk: string) => void) => {
     ipcRenderer.removeAllListeners('ollama-chat-chunk')
@@ -169,6 +169,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onOllamaChatDone: (callback: () => void) => {
     ipcRenderer.removeAllListeners('ollama-chat-done')
     ipcRenderer.on('ollama-chat-done', () => callback())
+  },
+  // Email-KI-Chat: eigene Streaming-Channels (Notes-Chat und Email-Chat können
+  // gleichzeitig gemountet sein, removeAllListeners erlaubt nur einen Listener)
+  onOllamaEmailChatChunk: (callback: (chunk: string) => void) => {
+    ipcRenderer.removeAllListeners('ollama-email-chat-chunk')
+    ipcRenderer.on('ollama-email-chat-chunk', (_event, chunk) => callback(chunk))
+  },
+  onOllamaEmailChatDone: (callback: () => void) => {
+    ipcRenderer.removeAllListeners('ollama-email-chat-done')
+    ipcRenderer.on('ollama-email-chat-done', () => callback())
   },
 
   // Projekt-RAG: Projektordner semantisch befragen (lokal)

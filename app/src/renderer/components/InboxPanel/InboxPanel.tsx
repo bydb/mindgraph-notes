@@ -588,20 +588,6 @@ export const InboxPanel: React.FC<InboxPanelProps> = ({ onClose }) => {
           </svg>
           <span>{t('inbox.compose.short')}</span>
         </button>
-        {/* AI Chat button */}
-        <button
-          className={`inbox-header-btn ${currentView === 'aiChat' ? 'active' : ''}`}
-          onClick={() => {
-            useEmailStore.getState().clearAiChat()
-            setCurrentView('aiChat')
-          }}
-          data-tooltip={t('inbox.aiChat.title')}
-        >
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-          </svg>
-          <span>KI</span>
-        </button>
         {/* Refresh */}
         <button
           className="inbox-panel-close"
