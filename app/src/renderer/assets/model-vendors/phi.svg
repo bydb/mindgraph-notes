@@ -1,6 +1,1 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" role="img" aria-label="Phi (Microsoft)">
-  <rect x="3.5" y="3.5" width="8" height="8" fill="#F25022"/>
-  <rect x="12.5" y="3.5" width="8" height="8" fill="#7FBA00"/>
-  <rect x="3.5" y="12.5" width="8" height="8" fill="#00A4EF"/>
-  <rect x="12.5" y="12.5" width="8" height="8" fill="#FFB900"/>
-</svg>
+<svg height="1em" style="flex:none;line-height:1" viewBox="0 0 24 24" width="1em" xmlns="http://www.w3.org/2000/svg"><title>Azure</title><path d="M11.49 2H2v9.492h9.492V2h-.002z" fill="#F25022"></path><path d="M22 2h-9.492v9.492H22V2z" fill="#7FBA00"></path><path d="M11.49 12.508H2V22h9.492v-9.492h-.002z" fill="#00A4EF"></path><path d="M22 12.508h-9.492V22H22v-9.492z" fill="#FFB900"></path></svg>

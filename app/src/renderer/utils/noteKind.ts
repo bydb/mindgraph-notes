@@ -150,6 +150,81 @@ export function clearNoteKindInContent(content: string): string {
   return `---\n${stripped.replace(/\n+$/, '')}\n---${content.slice(bodyStart)}`
 }
 
+// ─── KI-Provenienz (welches Modell hat zuletzt bearbeitet) ───────────────────
+// Durable, maschinenlesbar im Frontmatter; unsichtbar im Lesen-Modus.
+export function setAiProvenanceInContent(content: string, model: string, date: string): string {
+  const modelLine = `ki-modell: ${model}`
+  const dateLine = `ki-datum: ${date}`
+  const fmMatch = content.match(/^---\s*\n([\s\S]*?)\n---/)
+  if (fmMatch) {
+    let fm = fmMatch[1]
+    const bodyStart = fmMatch[0].length
+    fm = /^ki-modell:\s*.*$/m.test(fm) ? fm.replace(/^ki-modell:\s*.*$/m, modelLine) : `${fm.trimEnd()}\n${modelLine}`
+    fm = /^ki-datum:\s*.*$/m.test(fm) ? fm.replace(/^ki-datum:\s*.*$/m, dateLine) : `${fm.trimEnd()}\n${dateLine}`
+    return `---\n${fm}\n---${content.slice(bodyStart)}`
+  }
+  return `---\n${modelLine}\n${dateLine}\n---\n\n${content}`
+}
+
+export function getAiProvenance(content: string): { model: string; date: string } | null {
+  const fmMatch = content.match(/^---\s*\n([\s\S]*?)\n---/)
+  if (!fmMatch) return null
+  const m = fmMatch[1].match(/^ki-modell:\s*(.+)$/m)
+  if (!m) return null
+  const d = fmMatch[1].match(/^ki-datum:\s*(.+)$/m)
+  return { model: m[1].trim(), date: d ? d[1].trim() : '' }
+}
+
+// ─── Tags (Frontmatter) ──────────────────────────────────────────────────────
+// Liest vorhandene Tags (inline-Array `tags: [a, b]` oder Block-Liste `- a`).
+export function getFrontmatterTags(content: string): string[] {
+  const fmMatch = content.match(/^---\s*\n([\s\S]*?)\n---/)
+  if (!fmMatch) return []
+  const fm = fmMatch[1]
+  const inline = fm.match(/^tags:\s*\[(.*)\]\s*$/m)
+  if (inline) return inline[1].split(',').map(s => s.trim().replace(/^["']|["']$/g, '')).filter(Boolean)
+  // Block-Liste: `tags:` gefolgt von `  - tag`-Zeilen.
+  const block = fm.match(/^tags:\s*\n((?:\s*-\s*.+\n?)+)/m)
+  if (block) return block[1].split('\n').map(l => l.replace(/^\s*-\s*/, '').trim().replace(/^["']|["']$/g, '')).filter(Boolean)
+  // Einzeiler `tags: a, b` (kein Array).
+  const oneLine = fm.match(/^tags:\s*(.+)$/m)
+  if (oneLine && !oneLine[1].includes('[')) return oneLine[1].split(/[,\s]+/).map(s => s.trim()).filter(Boolean)
+  return []
+}
+
+// Fügt einen Tag ins Frontmatter ein (idempotent). Bevorzugt die vorhandene Form;
+// legt sonst eine Block-Liste an (Obsidian-üblich, gut lesbar).
+export function addTagToFrontmatter(content: string, rawTag: string): string {
+  const tag = rawTag.trim().replace(/^#/, '')
+  if (!tag) return content
+  if (getFrontmatterTags(content).map(t => t.toLowerCase()).includes(tag.toLowerCase())) return content
+
+  const fmMatch = content.match(/^---\s*\n([\s\S]*?)\n---/)
+  if (!fmMatch) {
+    return `---\ntags:\n  - ${tag}\n---\n\n${content}`
+  }
+  let fm = fmMatch[1]
+  const bodyStart = fmMatch[0].length
+
+  if (/^tags:\s*\[.*\]\s*$/m.test(fm)) {
+    // inline-Array: vor `]` einfügen
+    fm = fm.replace(/^(tags:\s*\[)(.*)(\]\s*)$/m, (_m, a, inner, c) => {
+      const trimmed = inner.trim()
+      return `${a}${trimmed ? trimmed + ', ' : ''}${tag}${c}`
+    })
+  } else if (/^tags:\s*\n(?:\s*-\s*.+\n?)+/m.test(fm)) {
+    // Block-Liste: neue Zeile nach dem letzten Listeneintrag
+    fm = fm.replace(/^(tags:\s*\n(?:\s*-\s*.+\n?)+)/m, (block) => `${block.replace(/\n?$/, '\n')}  - ${tag}`)
+  } else if (/^tags:\s*.+$/m.test(fm)) {
+    // Einzeiler ohne Array → anhängen
+    fm = fm.replace(/^(tags:\s*.+)$/m, `$1, ${tag}`)
+  } else {
+    // kein tags-Key → Block-Liste anlegen
+    fm = `${fm.trimEnd()}\ntags:\n  - ${tag}`
+  }
+  return `---\n${fm}\n---${content.slice(bodyStart)}`
+}
+
 // ─── Status (open / solved / archived) ──────────────────────────────────────
 
 export type NoteStatus = 'open' | 'solved' | 'archived'

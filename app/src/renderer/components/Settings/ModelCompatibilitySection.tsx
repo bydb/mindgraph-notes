@@ -15,7 +15,7 @@ import {
 import { useUIStore } from '../../stores/uiStore'
 import { useTranslation, type TranslationKey } from '../../utils/translations'
 import { ModelLogo } from '../Shared/ModelLogo'
-import { ModelMarkers } from '../Shared/ModelMarkers'
+import { ModelMarkers, AppleLogo, StarIcon } from '../Shared/ModelMarkers'
 
 interface Props {
   availableModels: Array<{ name: string; size: number }>
@@ -295,7 +295,7 @@ export function ActiveModelStatusBadge({ model }: { model: string }) {
             color: 'var(--text-primary)'
           }}
         >
-          <strong>🍎 {t('settings.integrations.ollama.mlxBadge')}</strong> — {t('settings.integrations.ollama.mlxHint')}
+          <strong style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}><AppleLogo size={13} /> {t('settings.integrations.ollama.mlxBadge')}</strong> — <AppleLogo size={12} /> {t('settings.integrations.ollama.mlxHint')}
         </div>
       )}
       {isHumanFavorite(model) && (
@@ -309,7 +309,7 @@ export function ActiveModelStatusBadge({ model }: { model: string }) {
             color: 'var(--text-primary)'
           }}
         >
-          <strong>⭐ {t('settings.integrations.ollama.humanFavoriteBadge')}</strong> — {t('settings.integrations.ollama.humanFavoriteHint')}
+          <strong style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}><StarIcon size={13} /> {t('settings.integrations.ollama.humanFavoriteBadge')}</strong> — <StarIcon size={12} /> {t('settings.integrations.ollama.humanFavoriteHint')}
         </div>
       )}
     <div

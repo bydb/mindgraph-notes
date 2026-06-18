@@ -3,7 +3,7 @@ import { isHumanFavorite, isMlxModel } from '../../../shared/modelCompatibility'
 // Echte Inline-SVG-Marker statt Emoji (🍎/⭐) — passt zum cleanen Look und
 // rendert auf jeder Plattform identisch.
 
-function AppleLogo({ size = 13 }: { size?: number }) {
+export function AppleLogo({ size = 13 }: { size?: number }) {
   // Klassisches Apple-Logo (monochrom, currentColor).
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -12,7 +12,7 @@ function AppleLogo({ size = 13 }: { size?: number }) {
   )
 }
 
-function StarIcon({ size = 13 }: { size?: number }) {
+export function StarIcon({ size = 13 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
       <path d="M12 2l2.9 6.26 6.1.53-4.6 4.04 1.37 6.17L12 16.9l-5.77 3.1L7.6 12.83 3 8.79l6.1-.53z" />

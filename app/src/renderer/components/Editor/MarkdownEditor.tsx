@@ -29,6 +29,10 @@ import { SlashCommandMenu } from './SlashCommandMenu'
 import { livePreviewExtension } from './extensions/livePreview'
 import { imageHandlingExtension } from './extensions/imageHandling'
 import { languageToolExtension, setLanguageToolMatches, setCorrectionHighlights, setLtErrorClickHandler, type LanguageToolMatch, type LanguageToolPopupMatch } from './extensions/languageTool'
+import { AiActionBar, type AiProposalMeta } from './AiActionBar'
+import { diffLines } from '../../utils/blockDiff'
+import { ModelLogo } from '../Shared/ModelLogo'
+import { HumanIcon } from '../Shared/HumanIcon'
 import { dataviewExtension, setDataviewNotes, setDataviewLanguage, setDataviewViewMode, setNoteClickHandler } from './extensions/dataview'
 import { useDataviewStore } from '../../stores/dataviewStore'
 import { PropertiesPanel } from './PropertiesPanel'
@@ -43,7 +47,7 @@ import { speak, stopSpeaking } from '../../utils/voice/tts'
 import { startDictation, type DictationHandle } from '../../utils/voice/stt'
 import { useIsModuleEnabled } from '../../utils/modules'
 import { useVoiceStore } from '../../stores/voiceStore'
-import { getNoteKind, stripNoteKindMarker } from '../../utils/noteKind'
+import { getNoteKind, stripNoteKindMarker, setAiProvenanceInContent, getAiProvenance, addTagToFrontmatter, getFrontmatterTags } from '../../utils/noteKind'
 import { readClipboardText, writeClipboardText } from '../../utils/clipboard'
 
 const markdownCodeLanguages = [
@@ -847,6 +851,16 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
   const [propertiesCollapsed, setPropertiesCollapsed] = useState(false)
   const [foldedHeadings, setFoldedHeadings] = useState<Set<string>>(new Set())
   const [aiMenu, setAiMenu] = useState<{ x: number; y: number; selectedText: string; selectionStart: number; selectionEnd: number } | null>(null)
+  // Macher-Leiste: Anweisung → KI-Vorschlag als Block-Diff → Übernehmen/Verwerfen.
+  const [aiBarOpen, setAiBarOpen] = useState(false)
+  const [aiPhase, setAiPhase] = useState<'idle' | 'generating' | 'review'>('idle')
+  const [aiProposal, setAiProposal] = useState<(AiProposalMeta & { from: number; to: number; newText: string }) | null>(null)
+  // Ambienter Copilot: Tag-Vorschläge auf Knopf → bestätigen ins Frontmatter.
+  const [aiTagSuggestions, setAiTagSuggestions] = useState<string[]>([])
+  const [aiTagsLoading, setAiTagsLoading] = useState(false)
+  // Modellwahl für die Macher-Leiste (lokales Override; '' = globales Standardmodell).
+  const [aiModel, setAiModel] = useState('')
+  const [aiModels, setAiModels] = useState<Array<{ name: string }>>([])
   const [showAIImageDialog, setShowAIImageDialog] = useState(false)
   const [showPublishWpModal, setShowPublishWpModal] = useState(false)
   const [previewToolbar, setPreviewToolbar] = useState<{ x: number; y: number } | null>(null)
@@ -1680,6 +1694,182 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
     setAiMenu(null)
     view.focus()
   }, [aiMenu])
+
+  // ===== Macher-Leiste: Anweisung → KI-Vorschlag (Block-Diff) → Übernehmen/Verwerfen =====
+  const aiActionLabel = (preset: string | null, instruction: string): string => {
+    switch (preset) {
+      case 'rewrite': return 'Umschreiben'
+      case 'shorten': return 'Kürzen'
+      case 'structure': return 'Strukturieren'
+      case 'tone': return 'Ton anpassen'
+      default: return instruction ? `„${instruction.slice(0, 40)}${instruction.length > 40 ? '…' : ''}"` : 'Bearbeiten'
+    }
+  }
+
+  const aiGenerate = useCallback(async (instruction: string, preset: string | null) => {
+    const view = viewRef.current
+    if (!view || !ollama.enabled) return
+    const model = aiModel || ollama.selectedModel
+    if (!model) return
+
+    // Scope: Auswahl, sonst der ganze Body (Frontmatter ausgeklammert).
+    const sel = view.state.selection.main
+    let from = sel.from
+    let to = sel.to
+    if (from === to) {
+      const content = view.state.doc.toString()
+      const fm = content.match(/^---\n[\s\S]*?\n---\n/)
+      from = fm ? fm[0].length : 0
+      to = view.state.doc.length
+    }
+    const oldText = view.state.doc.sliceString(from, to)
+    if (!oldText.trim()) return
+
+    let action: 'summarize' | 'improve' | 'custom' = 'custom'
+    let customPrompt = instruction.trim()
+    if (preset === 'rewrite') { action = 'improve'; customPrompt = instruction.trim() }
+    else if (preset === 'shorten') { action = 'summarize'; customPrompt = '' }
+    else if (preset === 'structure') { action = 'custom'; customPrompt = `Strukturiere den folgenden Text klarer (sinnvolle Überschriften/Listen, Inhalt und Sprache beibehalten). Gib NUR den überarbeiteten Markdown zurück, ohne Kommentar.${instruction ? '\nZusätzlich: ' + instruction : ''}` }
+    else if (preset === 'tone') { action = 'custom'; customPrompt = `Überarbeite den Ton des folgenden Textes (klar, freundlich-professionell, Inhalt beibehalten). Gib NUR den überarbeiteten Markdown zurück, ohne Kommentar.${instruction ? '\nVorgabe: ' + instruction : ''}` }
+    else { action = 'custom'; customPrompt = instruction.trim() }
+
+    if (action === 'custom' && !customPrompt) return
+
+    setAiPhase('generating')
+    try {
+      const req = {
+        model,
+        prompt: action === 'custom' ? customPrompt : '',
+        action: action as 'translate' | 'summarize' | 'continue' | 'improve' | 'custom',
+        originalText: oldText,
+        customPrompt: action === 'custom' ? customPrompt : undefined
+      }
+      const response = ollama.backend === 'lm-studio'
+        ? await window.electronAPI.lmstudioGenerate({ ...req, port: ollama.lmStudioPort })
+        : await window.electronAPI.ollamaGenerate(req)
+      const result = response as AIResult
+      if (!result.success || !result.result) { setAiPhase('idle'); return }
+      const newText = result.result.trim()
+      const ops = diffLines(oldText, newText)
+      setAiProposal({
+        from,
+        to,
+        newText,
+        ops,
+        action: aiActionLabel(preset, instruction),
+        model,
+        date: (result.timestamp || '').slice(0, 10)
+      })
+      setAiPhase('review')
+    } catch (e) {
+      console.error('[AI-Bar] Generierung fehlgeschlagen:', e)
+      setAiPhase('idle')
+    }
+  }, [ollama, aiModel])
+
+  const aiAcceptProposal = useCallback(() => {
+    const view = viewRef.current
+    const p = aiProposal
+    if (!view || !p) return
+    const content = view.state.doc.toString()
+    // 1. Scope ersetzen, 2. durable Provenienz (Modell/Datum) ins Frontmatter.
+    const afterScope = content.slice(0, p.from) + p.newText + content.slice(p.to)
+    const finalContent = setAiProvenanceInContent(afterScope, p.model, p.date || new Date().toISOString().slice(0, 10))
+    // Frontmatter wird oben eingefügt → Scope verschiebt sich um diesen Delta.
+    const fmDelta = finalContent.length - afterScope.length
+    const newFrom = p.from + fmDelta
+    const newTo = newFrom + p.newText.length
+    view.dispatch({
+      changes: { from: 0, to: content.length, insert: finalContent },
+      effects: setCorrectionHighlights.of([{ from: newFrom, to: newTo }]),
+      scrollIntoView: false
+    })
+    // Lesen-Modus: Vorschau neu rendern.
+    if (viewMode === 'preview') {
+      isPreviewDomEditingRef.current = false
+      setPreviewContent(finalContent)
+    }
+    setTimeout(() => viewRef.current?.dispatch({ effects: setCorrectionHighlights.of([]) }), 4000)
+    setAiProposal(null)
+    setAiPhase('idle')
+    setAiBarOpen(false)
+  }, [aiProposal, viewMode])
+
+  const aiDiscardProposal = useCallback(() => {
+    setAiProposal(null)
+    setAiPhase('idle')
+  }, [])
+
+  const aiSuggestTags = useCallback(async () => {
+    const view = viewRef.current
+    if (!view || !ollama.enabled || !ollama.selectedModel) return
+    const content = view.state.doc.toString()
+    const fm = content.match(/^---\n[\s\S]*?\n---\n/)
+    const body = (fm ? content.slice(fm[0].length) : content).slice(0, 6000)
+    if (!body.trim()) return
+    const existing = new Set(getFrontmatterTags(content).map(t => t.toLowerCase()))
+    setAiTagsLoading(true)
+    try {
+      const req = {
+        model: ollama.selectedModel,
+        prompt: 'Schlage 3–7 prägnante Themen-Tags für den folgenden Text vor. Nur die Tags, kommagetrennt, kleingeschrieben, ohne # und ohne Erklärung.',
+        action: 'custom' as const,
+        originalText: body,
+        customPrompt: 'Schlage 3–7 prägnante Themen-Tags für den folgenden Text vor. Nur die Tags, kommagetrennt, kleingeschrieben, ohne # und ohne Erklärung.'
+      }
+      const response = ollama.backend === 'lm-studio'
+        ? await window.electronAPI.lmstudioGenerate({ ...req, port: ollama.lmStudioPort })
+        : await window.electronAPI.ollamaGenerate(req)
+      const result = response as AIResult
+      if (result.success && result.result) {
+        const tags = result.result
+          .split(/[,\n]+/)
+          .map(s => s.trim().replace(/^[#\-*\d.\s]+/, '').replace(/\s+/g, '-').toLowerCase())
+          .filter(t => t.length >= 2 && t.length <= 40 && !existing.has(t))
+        setAiTagSuggestions(Array.from(new Set(tags)).slice(0, 7))
+      }
+    } catch (e) {
+      console.error('[AI-Bar] Tag-Vorschläge fehlgeschlagen:', e)
+    } finally {
+      setAiTagsLoading(false)
+    }
+  }, [ollama])
+
+  const aiAcceptTag = useCallback((tag: string) => {
+    const view = viewRef.current
+    if (!view) return
+    const content = view.state.doc.toString()
+    const next = addTagToFrontmatter(content, tag)
+    if (next !== content) {
+      view.dispatch({ changes: { from: 0, to: content.length, insert: next }, scrollIntoView: false })
+      if (viewMode === 'preview') {
+        isPreviewDomEditingRef.current = false
+        setPreviewContent(next)
+      }
+    }
+    setAiTagSuggestions(prev => prev.filter(t => t !== tag))
+  }, [viewMode])
+
+  const aiDismissTag = useCallback((tag: string) => {
+    setAiTagSuggestions(prev => prev.filter(t => t !== tag))
+  }, [])
+
+  // Modell-Liste laden, sobald die Leiste geöffnet wird (für den Modell-Picker).
+  useEffect(() => {
+    if (!aiBarOpen || aiModels.length > 0 || !ollama.enabled) return
+    let cancelled = false
+    ;(async () => {
+      try {
+        const list = ollama.backend === 'lm-studio'
+          ? await window.electronAPI.lmstudioModels(ollama.lmStudioPort)
+          : await window.electronAPI.ollamaModels()
+        if (!cancelled && Array.isArray(list)) setAiModels(list)
+      } catch (e) {
+        console.error('[AI-Bar] Modell-Liste laden fehlgeschlagen:', e)
+      }
+    })()
+    return () => { cancelled = true }
+  }, [aiBarOpen, aiModels.length, ollama.enabled, ollama.backend, ollama.lmStudioPort])
 
   // AI-generiertes Bild einfügen
   const handleAIImageInsert = useCallback((markdownImage: string) => {
@@ -3766,7 +3956,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
       if (viewMode === 'preview' || !viewRef.current) return
 
       const view = viewRef.current
-      const { from, to } = view.state.selection.main
+      const { from } = view.state.selection.main
       const coords = view.coordsAtPos(from)
 
       // Cmd+Shift+F für Format-Menü
@@ -3778,19 +3968,13 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
         }
       }
 
-      // Cmd+Shift+A für AI-Menü (nur bei Textauswahl und Ollama aktiv)
+      // Cmd+Shift+A öffnet die Macher-Leiste unten (Auswahl = Scope, sonst ganze Notiz).
       if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 'a') {
         e.preventDefault()
-        const selectedText = view.state.doc.sliceString(from, to)
-        if (selectedText.length > 0 && ollama.enabled && ollama.selectedModel && coords) {
-          setAiMenu({
-            x: coords.left,
-            y: coords.top,
-            selectedText,
-            selectionStart: from,
-            selectionEnd: to
-          })
+        if (ollama.enabled && ollama.selectedModel) {
+          setAiBarOpen(true)
           setFormatMenu(null)
+          setAiMenu(null)
         }
       }
 
@@ -3905,6 +4089,20 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
           )}
           {selectedNoteDisplayTitle}
         </h3>
+        {!isSecondary && ollama.enabled && (() => {
+          const prov = getAiProvenance(previewContent)
+          return prov ? (
+            <span className="note-authorship note-authorship-ai" title={`KI-bearbeitet · ${prov.model}${prov.date ? ' · ' + prov.date : ''}`}>
+              <ModelLogo model={prov.model} size={13} />
+              <span>KI-bearbeitet</span>
+            </span>
+          ) : (
+            <span className="note-authorship note-authorship-human" title={t('aiBar.byYouTitle')}>
+              <HumanIcon size={12} />
+              <span>{t('aiBar.byYou')}</span>
+            </span>
+          )
+        })()}
         <div className="editor-header-right">
           {isSaving && <span className="saving-indicator">Speichern...</span>}
           {isSecondary && (
@@ -4426,6 +4624,25 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
             {t('languagetool.ignore')}
           </button>
         </div>
+      )}
+      {!isSecondary && (
+        <AiActionBar
+          open={aiBarOpen}
+          onOpenChange={setAiBarOpen}
+          phase={aiPhase}
+          proposal={aiProposal}
+          onGenerate={aiGenerate}
+          onAccept={aiAcceptProposal}
+          onDiscard={aiDiscardProposal}
+          tagSuggestions={aiTagSuggestions}
+          tagsLoading={aiTagsLoading}
+          onSuggestTags={aiSuggestTags}
+          onAcceptTag={aiAcceptTag}
+          onDismissTag={aiDismissTag}
+          model={aiModel || ollama.selectedModel}
+          models={aiModels}
+          onModelChange={setAiModel}
+        />
       )}
     </div>
   )

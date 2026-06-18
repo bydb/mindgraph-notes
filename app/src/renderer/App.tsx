@@ -128,6 +128,8 @@ const App: React.FC = () => {
   const syncEnabled = useSyncStore(state => state.syncEnabled)
   const syncStatus = useSyncStore(state => state.syncStatus)
   const [terminalVisible, setTerminalVisible] = useState(false)
+  const [toolsMenuOpen, setToolsMenuOpen] = useState(false)
+  const toolsMenuRef = useRef<HTMLDivElement>(null)
   const [quickSearchOpen, setQuickSearchOpen] = useState(false)
   const [zoteroSearchOpen, setZoteroSearchOpen] = useState(false)
   const [quickSwitcherOpen, setQuickSwitcherOpen] = useState(false)
@@ -198,6 +200,18 @@ const App: React.FC = () => {
       }
     }
   }, [overduePanelOpen, tagsPanelOpen, smartConnectionsOpen, notesChatOpen, flashcardsPanelOpen, setFlashcardsPanelOpen, inboxPanelOpen, agentPanelOpen, semanticScholarOpen])
+
+  // Werkzeuge-Überlaufmenü: bei Klick außerhalb schließen.
+  useEffect(() => {
+    if (!toolsMenuOpen) return
+    const onDocClick = (e: MouseEvent) => {
+      if (toolsMenuRef.current && !toolsMenuRef.current.contains(e.target as Node)) {
+        setToolsMenuOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', onDocClick)
+    return () => document.removeEventListener('mousedown', onDocClick)
+  }, [toolsMenuOpen])
 
   const workspaceRef = useRef<HTMLDivElement>(null)
   const contentAreaRef = useRef<HTMLDivElement>(null)
@@ -1204,59 +1218,6 @@ const App: React.FC = () => {
                   <span className="titlebar-mini-badge overdue-badge">{taskStats.overdue}</span>
                 )}
               </button>
-              <button
-                className={`view-mode-btn cat-organize ${tagsPanelOpen ? 'active' : ''}`}
-                onClick={() => switchRightPanel('tags')}
-                title={t('titlebar.tags')}
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/>
-                  <line x1="7" y1="7" x2="7.01" y2="7"/>
-                </svg>
-              </button>
-              {smartConnectionsEnabled && (
-                <button
-                  className={`view-mode-btn cat-ai ${smartConnectionsOpen ? 'active' : ''}`}
-                  onClick={() => switchRightPanel('smartConnections')}
-                  title={t('titlebar.smartConnections')}
-                >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <circle cx="12" cy="12" r="3"/>
-                    <path d="M12 2v4"/>
-                    <path d="M12 18v4"/>
-                    <path d="M4.93 4.93l2.83 2.83"/>
-                    <path d="M16.24 16.24l2.83 2.83"/>
-                    <path d="M2 12h4"/>
-                    <path d="M18 12h4"/>
-                    <path d="M4.93 19.07l2.83-2.83"/>
-                    <path d="M16.24 7.76l2.83-2.83"/>
-                  </svg>
-                </button>
-              )}
-              {notesChatEnabled && (
-                <button
-                  className={`view-mode-btn cat-ai ${notesChatOpen ? 'active' : ''}`}
-                  onClick={() => switchRightPanel('notesChat')}
-                  title={t('titlebar.notesChat')}
-                >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-                  </svg>
-                </button>
-              )}
-              {flashcardsEnabled && (
-                <button
-                  className={`view-mode-btn cat-organize ${flashcardsPanelOpen ? 'active' : ''}`}
-                  onClick={() => switchRightPanel('flashcards')}
-                  title={t('titlebar.flashcards')}
-                >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <rect x="2" y="4" width="20" height="16" rx="2" />
-                    <path d="M10 4v4" />
-                    <path d="M14 4v4" />
-                  </svg>
-                </button>
-              )}
               {emailEnabled && (
                 <button
                   className={`view-mode-btn cat-integrate inbox-btn ${inboxPanelOpen ? 'active' : ''} ${unreadRelevantCount > 0 ? 'has-emails' : ''}`}
@@ -1272,62 +1233,71 @@ const App: React.FC = () => {
                   )}
                 </button>
               )}
-              {edooboxEnabled && (
+              {/* Werkzeuge-Überlaufmenü: bündelt die selteneren Modul-/Tool-Icons,
+                  hält die obere Leiste ruhig. Handler je Eintrag identisch zu vorher. */}
+              <div className="titlebar-tools" ref={toolsMenuRef}>
                 <button
-                  className={`view-mode-btn cat-integrate ${agentPanelOpen ? 'active' : ''}`}
-                  onClick={() => switchRightPanel('agent')}
-                  title={t('titlebar.agents')}
+                  className={`view-mode-btn ${toolsMenuOpen ? 'active' : ''}`}
+                  onClick={() => setToolsMenuOpen(o => !o)}
+                  title={t('titlebar.more')}
+                  aria-haspopup="menu"
+                  aria-expanded={toolsMenuOpen}
                 >
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
-                    <line x1="16" y1="2" x2="16" y2="6" />
-                    <line x1="8" y1="2" x2="8" y2="6" />
-                    <line x1="3" y1="10" x2="21" y2="10" />
+                    <circle cx="5" cy="12" r="1.6" fill="currentColor" stroke="none"/>
+                    <circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/>
+                    <circle cx="19" cy="12" r="1.6" fill="currentColor" stroke="none"/>
                   </svg>
                 </button>
-              )}
-              {semanticScholarEnabled && (
-                <button
-                  className={`view-mode-btn cat-integrate ${semanticScholarOpen ? 'active' : ''}`}
-                  onClick={() => switchRightPanel('semanticScholar')}
-                  title={t('titlebar.semanticScholar')}
-                >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/>
-                    <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>
-                  </svg>
-                </button>
-              )}
-              {zoteroModuleEnabled && (
-                <button
-                  className="view-mode-btn zotero-btn"
-                  onClick={() => setZoteroSearchOpen(true)}
-                  title={t('titlebar.zotero')}
-                  aria-label="Zotero"
-                >
-                  <svg width="14" height="14" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                    <text
-                      x="12"
-                      y="18"
-                      textAnchor="middle"
-                      fill="#cc2936"
-                      fontFamily="'Georgia', 'Times New Roman', serif"
-                      fontWeight="700"
-                      fontSize="18"
-                    >Z</text>
-                  </svg>
-                </button>
-              )}
-              <button
-                className={`view-mode-btn cat-integrate ${terminalVisible ? 'active' : ''}`}
-                onClick={() => setTerminalVisible(!terminalVisible)}
-                title={t('titlebar.terminal')}
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="4 17 10 11 4 5"/>
-                  <line x1="12" y1="19" x2="20" y2="19"/>
-                </svg>
-              </button>
+                {toolsMenuOpen && (
+                  <div className="titlebar-tools-menu" role="menu">
+                    <button className={`titlebar-tools-item ${tagsPanelOpen ? 'active' : ''}`} role="menuitem" onClick={() => { switchRightPanel('tags'); setToolsMenuOpen(false) }}>
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
+                      <span>{t('titlebar.tags')}</span>
+                    </button>
+                    {smartConnectionsEnabled && (
+                      <button className={`titlebar-tools-item ${smartConnectionsOpen ? 'active' : ''}`} role="menuitem" onClick={() => { switchRightPanel('smartConnections'); setToolsMenuOpen(false) }}>
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v4"/><path d="M12 18v4"/><path d="M4.93 4.93l2.83 2.83"/><path d="M16.24 16.24l2.83 2.83"/><path d="M2 12h4"/><path d="M18 12h4"/><path d="M4.93 19.07l2.83-2.83"/><path d="M16.24 7.76l2.83-2.83"/></svg>
+                        <span>{t('titlebar.smartConnections')}</span>
+                      </button>
+                    )}
+                    {notesChatEnabled && (
+                      <button className={`titlebar-tools-item ${notesChatOpen ? 'active' : ''}`} role="menuitem" onClick={() => { switchRightPanel('notesChat'); setToolsMenuOpen(false) }}>
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                        <span>{t('titlebar.notesChat')}</span>
+                      </button>
+                    )}
+                    {flashcardsEnabled && (
+                      <button className={`titlebar-tools-item ${flashcardsPanelOpen ? 'active' : ''}`} role="menuitem" onClick={() => { switchRightPanel('flashcards'); setToolsMenuOpen(false) }}>
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="4" width="20" height="16" rx="2" /><path d="M10 4v4" /><path d="M14 4v4" /></svg>
+                        <span>{t('titlebar.flashcards')}</span>
+                      </button>
+                    )}
+                    {edooboxEnabled && (
+                      <button className={`titlebar-tools-item ${agentPanelOpen ? 'active' : ''}`} role="menuitem" onClick={() => { switchRightPanel('agent'); setToolsMenuOpen(false) }}>
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg>
+                        <span>{t('titlebar.agents')}</span>
+                      </button>
+                    )}
+                    {semanticScholarEnabled && (
+                      <button className={`titlebar-tools-item ${semanticScholarOpen ? 'active' : ''}`} role="menuitem" onClick={() => { switchRightPanel('semanticScholar'); setToolsMenuOpen(false) }}>
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+                        <span>{t('titlebar.semanticScholar')}</span>
+                      </button>
+                    )}
+                    {zoteroModuleEnabled && (
+                      <button className="titlebar-tools-item" role="menuitem" onClick={() => { setZoteroSearchOpen(true); setToolsMenuOpen(false) }}>
+                        <svg width="15" height="15" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><text x="12" y="18" textAnchor="middle" fill="#cc2936" fontFamily="'Georgia', 'Times New Roman', serif" fontWeight="700" fontSize="18">Z</text></svg>
+                        <span>{t('titlebar.zotero')}</span>
+                      </button>
+                    )}
+                    <button className={`titlebar-tools-item ${terminalVisible ? 'active' : ''}`} role="menuitem" onClick={() => { setTerminalVisible(!terminalVisible); setToolsMenuOpen(false) }}>
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+                      <span>{t('titlebar.terminal')}</span>
+                    </button>
+                  </div>
+                )}
+              </div>
               <button
                 className={`view-mode-btn coachbot-trigger ${coachBotOpen ? 'active' : ''} ${!coachBotEverOpened ? 'coachbot-trigger-pulse' : ''}`}
                 onClick={() => {
