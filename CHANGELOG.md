@@ -2,6 +2,29 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.8.0-beta] - 2026-06-18
+
+Großes Redesign- und KI-Release: hellere Oberfläche, echte Hersteller-Logos und eine neue KI-„Macher-Leiste", die nach dem Prinzip **„Vorschlag statt Autopilot"** arbeitet — die KI schlägt vor, du übernimmst oder verwirfst.
+
+### Neue Features
+
+- **KI-Macher-Leiste unter jeder Notiz (`⌘⇧A`).** Anweisung tippen oder Preset wählen (Umschreiben / Kürzen / Strukturieren / Ton) → die KI erzeugt einen Vorschlag, der als **Block-Diff** (rot raus / grün rein) angezeigt wird. Du **übernimmst oder verwirfst** — nichts wird automatisch ersetzt, alles ist über ⌘Z + Auto-Backup umkehrbar. Standardmäßig eingeklappt, damit das Lesen ruhig bleibt.
+- **Modellwahl direkt in der Leiste.** Wähle pro Umschreibung das Modell (mit Hersteller-Logo), ohne deinen globalen Standard zu ändern.
+- **Provenienz & Authorship.** Jede KI-Bearbeitung schreibt Modell und Datum ins Frontmatter; der Notiz-Kopf zeigt einen Chip „🧑 von dir" bzw. „KI-bearbeitet · <Modell>". Im Diff ist das Entfernte „dein Text", das Neue trägt das Modell-Logo.
+- **Ambiente Tag-Vorschläge (auf Knopf).** „Tags vorschlagen" liest die Notiz und bietet 3–7 Tags als Bestätigungs-Chips an — jeder wird einzeln per Klick ins Frontmatter `tags:` übernommen.
+- **LanguageTool-Ein-Klick-Korrektur.** Neuer „Korrigieren"-Knopf wendet die beste Korrektur auf alle Fehler an (in allen Editor-Modi inkl. Lesen), mit grünem Aufblitzen der korrigierten Stellen.
+
+### Design / Verbesserungen
+
+- **Helleres, ruhigeres „Codex-Clean"-Design.** Weiße/kühle Flächen statt Beige, dezenter Ink-Akzent, blau nur für Links/Fokus, feine Hairline-Rahmen, reduzierte Schatten. Sidebar und rechte Panels heben sich durch einen kühlen Grauton ab, sodass der Editor als „Seite" davor schwebt. Bestehende Nutzer werden einmalig vom alten Beige/Terracotta-Default auf Weiß/Ink migriert; eigene Farbwahl bleibt erhalten.
+- **Echte Hersteller-Logos für Modelle.** Qwen, Gemma, Mistral, DeepSeek, Cohere, Meta (Llama), Microsoft (Phi) und OpenAI als offizielle Marken (MIT-lizenziert) im Modell-Picker, an Provenienz-Chips und in der Kompatibilitäts-Legende. Apple-/Stern-Marker durchgängig als SVG statt Emoji.
+- **Aufgeräumte obere Leiste.** Die selteneren Werkzeug-Icons wandern in ein „⋯"-Überlaufmenü; Schnellerfassung, Posteingang, Überfällig, Einstellungen und Hilfe bleiben sichtbar. Settings-Navigation in vier klarere Gruppen umsortiert (inkl. „Konto & Sync").
+- **E-Mail-Text steht wieder auf weißem Grund** (klar lesbar, klickbare Links).
+
+### Fixes
+
+- **Notizwechsel im Lesen-Modus zeigte den falschen Inhalt.** Beim Umschalten auf eine andere Notiz erschien der neue Titel, aber der alte Text — die Vorschau-Sperre wurde beim Laden nicht zurückgesetzt. Behoben.
+
 ## [0.7.30-beta] - 2026-06-12
 
 ### Fixes
