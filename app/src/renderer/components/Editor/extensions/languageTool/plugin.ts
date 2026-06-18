@@ -119,6 +119,39 @@ export const languageToolMatchesField = StateField.define<LanguageToolMatch[]>({
   }
 })
 
+// Grünes Aufblitzen der gerade auto-korrigierten Stellen (wie im Mail-Compose).
+// Ranges sind in Koordinaten NACH der Korrektur — daher im selben Transaction
+// dispatchen wie die changes, und nach ~4s mit leerem Array wieder löschen.
+export const setCorrectionHighlights = StateEffect.define<Array<{ from: number; to: number }>>()
+
+export const correctionHighlightField = StateField.define<DecorationSet>({
+  create() {
+    return Decoration.none
+  },
+  update(deco, tr) {
+    deco = deco.map(tr.changes)
+    for (const effect of tr.effects) {
+      if (effect.is(setCorrectionHighlights)) {
+        if (!effect.value.length) {
+          deco = Decoration.none
+        } else {
+          const builder = new RangeSetBuilder<Decoration>()
+          const docLength = tr.state.doc.length
+          const sorted = [...effect.value].sort((a, b) => a.from - b.from)
+          for (const r of sorted) {
+            if (r.from >= 0 && r.to <= docLength && r.from < r.to) {
+              builder.add(r.from, r.to, Decoration.mark({ class: 'lt-correction-applied' }))
+            }
+          }
+          deco = builder.finish()
+        }
+      }
+    }
+    return deco
+  },
+  provide: f => EditorView.decorations.from(f)
+})
+
 // Global click handler that can be set from outside
 let onLtErrorClick: ((event: MouseEvent, matchData: string) => void) | null = null
 

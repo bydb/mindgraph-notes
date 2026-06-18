@@ -2,6 +2,7 @@ import { Extension } from '@codemirror/state'
 import { languageToolTheme } from './theme'
 import {
   languageToolMatchesField,
+  correctionHighlightField,
   createLanguageToolDecorationPlugin
 } from './plugin'
 
@@ -42,13 +43,14 @@ export function languageToolExtension(config: LanguageToolConfig = {}): Extensio
 
   return [
     languageToolMatchesField,
+    correctionHighlightField,
     languageToolTheme,
     createLanguageToolDecorationPlugin()
   ]
 }
 
 // Re-exports
-export { setLanguageToolMatches, languageToolMatchesField, setLtErrorClickHandler } from './plugin'
+export { setLanguageToolMatches, languageToolMatchesField, setLtErrorClickHandler, setCorrectionHighlights, correctionHighlightField } from './plugin'
 export { languageToolTheme } from './theme'
 export type { LanguageToolMatch, ErrorCategory, LanguageToolPopupMatch } from './types'
 export { getCategoryType } from './types'

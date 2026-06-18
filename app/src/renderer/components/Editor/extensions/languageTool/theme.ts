@@ -42,4 +42,11 @@ export const languageToolTheme = EditorView.theme({
     backgroundColor: 'rgba(255, 69, 58, 0.1)',
     borderRadius: '2px',
   },
+
+  // Green flash on freshly auto-corrected spans (one-click "Korrigieren").
+  // Die eigentliche Aufblitz-Animation (lt-correction-flash) liegt global in index.css,
+  // damit @keyframes zuverlässig greifen.
+  '.lt-correction-applied': {
+    borderRadius: '2px',
+  },
 })

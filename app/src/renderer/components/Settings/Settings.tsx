@@ -10,6 +10,7 @@ import { CredentialsSettings } from './CredentialsSettings'
 import { ModelCompatibilitySection, ActiveModelStatusBadge, VERDICT_ICON, VERDICT_COLOR } from './ModelCompatibilitySection'
 import { EmailRelevanceRulesSection } from './EmailRelevanceRulesSection'
 import { getModelVerdict, CLOUD_TEST_MODELS, RECOMMENDED_PULL_MODELS, isCloudModel, modelMarkers } from '../../../shared/modelCompatibility'
+import { ModelPicker } from '../Shared/ModelPicker'
 import { ensureTransformersModel, isTransformersModelReady } from '../../utils/voice/transformersStt'
 import { writeClipboardText } from '../../utils/clipboard'
 
@@ -2143,18 +2144,6 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab 
               </svg>
               {t('settings.tab.dataview')}
             </button>
-            <button
-              className={`settings-nav-item ${activeTab === 'sync' ? 'active' : ''}`}
-              onClick={() => setActiveTab('sync')}
-            >
-              <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-                <path d="M3 9C3 5.69 5.69 3 9 3C11.22 3 13.15 4.26 14.13 6.1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-                <path d="M15 9C15 12.31 12.31 15 9 15C6.78 15 4.85 13.74 3.87 11.9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-                <path d="M12 6H15V3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                <path d="M6 12H3V15" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-              {t('settings.tab.sync')}
-            </button>
 
             {/* Section: Module */}
             <div className="settings-nav-section-label">{t('settings.nav.modules')}</div>
@@ -2243,6 +2232,21 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab 
                 <path d="M2 9l14-6-2 13-5-3-3 3v-4l8-6-9 5-3-2z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/>
               </svg>
               Telegram
+            </button>
+
+            {/* Section: Konto & Sync */}
+            <div className="settings-nav-section-label">{t('settings.nav.account')}</div>
+            <button
+              className={`settings-nav-item ${activeTab === 'sync' ? 'active' : ''}`}
+              onClick={() => setActiveTab('sync')}
+            >
+              <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+                <path d="M3 9C3 5.69 5.69 3 9 3C11.22 3 13.15 4.26 14.13 6.1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                <path d="M15 9C15 12.31 12.31 15 9 15C6.78 15 4.85 13.74 3.87 11.9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                <path d="M12 6H15V3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M6 12H3V15" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+              {t('settings.tab.sync')}
             </button>
             {/* Zugangsdaten-Tab: zentrale Übersicht aller Credentials */}
             <button
@@ -2912,19 +2916,16 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab 
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                           <label style={{ minWidth: '120px' }}>{t('settings.integrations.ollama.model')}</label>
                           <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flex: 1 }}>
-                            <select
+                            <ModelPicker
                               value={ollama.selectedModel}
-                              onChange={e => setOllama({ selectedModel: e.target.value })}
+                              models={ollamaModels}
+                              onChange={value => setOllama({ selectedModel: value })}
                               disabled={!ollama.enabled}
+                              placeholder={{ value: '', label: t('settings.selectModel') }}
+                              ariaLabel={t('settings.integrations.ollama.model')}
                               style={{ flex: 1 }}
-                            >
-                              <option value="">{t('settings.selectModel')}</option>
-                              {ollamaModels.map(model => (
-                                <option key={model.name} value={model.name}>
-                                  {modelMarkers(model.name)}{model.name}
-                                </option>
-                              ))}
-                            </select>
+                              maxWidth="none"
+                            />
                             {ollama.selectedModel && (
                               <button
                                 className="settings-refresh"
@@ -2948,24 +2949,27 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab 
                           <label style={{ minWidth: '120px' }}>
                             {language === 'en' ? 'Project-RAG embedding' : 'Projekt-RAG Embedding'}
                           </label>
-                          <select
-                            value={ollama.projectRagEmbeddingModel || 'bge-m3'}
-                            onChange={e => setOllama({ projectRagEmbeddingModel: e.target.value })}
-                            disabled={!ollama.enabled}
-                            style={{ flex: 1 }}
-                          >
-                            {(() => {
-                              const patterns = ['embed', 'minilm', 'bge', 'gte', 'e5', 'nomic']
-                              const embs = ollamaModels.filter(m => patterns.some(p => m.name.toLowerCase().includes(p)))
-                              const cur = ollama.projectRagEmbeddingModel || 'bge-m3'
-                              if (!embs.some(m => m.name === cur)) embs.unshift({ name: cur, size: 0 })
-                              return embs.map(m => (
-                                <option key={m.name} value={m.name}>
-                                  {m.name}{m.size === 0 ? (language === 'en' ? ' (not installed)' : ' (nicht installiert)') : ''}
-                                </option>
-                              ))
-                            })()}
-                          </select>
+                          {(() => {
+                            const patterns = ['embed', 'minilm', 'bge', 'gte', 'e5', 'nomic']
+                            const embs = ollamaModels.filter(m => patterns.some(p => m.name.toLowerCase().includes(p)))
+                            const cur = ollama.projectRagEmbeddingModel || 'bge-m3'
+                            if (!embs.some(m => m.name === cur)) embs.unshift({ name: cur, size: 0 })
+                            return (
+                              <ModelPicker
+                                value={cur}
+                                models={embs}
+                                onChange={value => setOllama({ projectRagEmbeddingModel: value })}
+                                disabled={!ollama.enabled}
+                                getLabel={name => {
+                                  const m = embs.find(e => e.name === name)
+                                  return name + (m && m.size === 0 ? (language === 'en' ? ' (not installed)' : ' (nicht installiert)') : '')
+                                }}
+                                ariaLabel={language === 'en' ? 'Project-RAG embedding' : 'Projekt-RAG Embedding'}
+                                style={{ flex: 1 }}
+                                maxWidth="none"
+                              />
+                            )
+                          })()}
                         </div>
                         <p className="settings-hint" style={{ fontSize: '11px' }}>
                           {language === 'en'
@@ -3116,19 +3120,16 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab 
                       <div className="settings-row" style={{ flexDirection: 'column', alignItems: 'stretch', gap: '4px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                           <label style={{ minWidth: '120px' }}>{t('settings.integrations.ollama.model')}</label>
-                          <select
+                          <ModelPicker
                             value={ollama.selectedModel}
-                            onChange={e => setOllama({ selectedModel: e.target.value })}
+                            models={lmstudioModels}
+                            onChange={value => setOllama({ selectedModel: value })}
                             disabled={!ollama.enabled}
+                            placeholder={{ value: '', label: t('settings.selectModel') }}
+                            ariaLabel={t('settings.integrations.ollama.model')}
                             style={{ flex: 1 }}
-                          >
-                            <option value="">{t('settings.selectModel')}</option>
-                            {lmstudioModels.map(model => (
-                              <option key={model.name} value={model.name}>
-                                {modelMarkers(model.name)}{model.name}
-                              </option>
-                            ))}
-                          </select>
+                            maxWidth="none"
+                          />
                         </div>
                         <ActiveModelStatusBadge model={ollama.selectedModel} />
                       </div>

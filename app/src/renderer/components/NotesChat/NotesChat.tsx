@@ -5,6 +5,7 @@ import { useUIStore } from '../../stores/uiStore'
 import { useIsModuleEnabled } from '../../utils/modules'
 import { useTranslation } from '../../utils/translations'
 import { writeClipboardText } from '../../utils/clipboard'
+import { ModelPicker } from '../Shared/ModelPicker'
 import MarkdownIt from 'markdown-it'
 import texmath from 'markdown-it-texmath'
 import katex from 'katex'
@@ -610,17 +611,13 @@ export const NotesChat: React.FC<NotesChatProps> = ({ onClose }) => {
           <div className="notes-chat-settings">
             <div className="notes-chat-model-row">
               <label>Modell:</label>
-              <select
+              <ModelPicker
                 value={selectedModel}
-                onChange={(e) => setSelectedModel(e.target.value)}
+                models={models}
+                onChange={setSelectedModel}
                 disabled={isStreaming}
-              >
-                {models.map(model => (
-                  <option key={model.name} value={model.name}>
-                    {model.name}
-                  </option>
-                ))}
-              </select>
+                ariaLabel="Modell"
+              />
             </div>
 
             <div className="notes-chat-context-row">

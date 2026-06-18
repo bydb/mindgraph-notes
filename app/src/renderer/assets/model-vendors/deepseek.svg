@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" role="img" aria-label="DeepSeek">
+  <rect x="2.5" y="2.5" width="19" height="19" rx="5" fill="#4D6BFE"/>
+  <path fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round"
+    d="M7 9c2.6 0 3.4 2.4 6 2.4 1.6 0 2.8-1 2.8-2.4M17 14c-2.6 0-3.4-2.4-6-2.4-1.6 0-2.8 1-2.8 2.4"/>
+  <circle cx="16.4" cy="8.6" r="0.9" fill="#fff"/>
+</svg>

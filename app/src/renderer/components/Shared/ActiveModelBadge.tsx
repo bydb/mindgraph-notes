@@ -4,9 +4,11 @@
 // das Modell ändern kann.
 
 import { useShallow } from 'zustand/react/shallow'
-import { getModelVerdict, isHumanFavorite, isMlxModel, modelMarkers, type ModuleId } from '../../../shared/modelCompatibility'
+import { getModelVerdict, isHumanFavorite, isMlxModel, type ModuleId } from '../../../shared/modelCompatibility'
 import { useUIStore } from '../../stores/uiStore'
 import { VERDICT_COLOR } from '../Settings/ModelCompatibilitySection'
+import { ModelLogo } from './ModelLogo'
+import { ModelMarkers } from './ModelMarkers'
 
 interface Props {
   moduleId: ModuleId
@@ -94,7 +96,9 @@ export function ActiveModelBadge({ moduleId, tabOverride, tabOverrideLabel }: Pr
           flexShrink: 0
         }}
       />
-      <span>{modelMarkers(effectiveModel)}{effectiveModel}</span>
+      <ModelLogo model={effectiveModel} size={13} />
+      <ModelMarkers model={effectiveModel} size={12} />
+      <span>{effectiveModel}</span>
     </button>
   )
 }

@@ -14,6 +14,8 @@ import {
 } from '../../../shared/modelCompatibility'
 import { useUIStore } from '../../stores/uiStore'
 import { useTranslation, type TranslationKey } from '../../utils/translations'
+import { ModelLogo } from '../Shared/ModelLogo'
+import { ModelMarkers } from '../Shared/ModelMarkers'
 
 interface Props {
   availableModels: Array<{ name: string; size: number }>
@@ -90,6 +92,7 @@ function ModuleRow({
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: '1 1 auto', justifyContent: 'flex-end' }}>
+          {effectiveModel && <ModelLogo model={effectiveModel} size={16} />}
           <select
             value={override}
             onChange={e => onChangeOverride(e.target.value)}
@@ -219,8 +222,10 @@ function DetailDrawer({ model, moduleId, t }: { model: string; moduleId: ModuleI
 
   return (
     <div style={{ fontSize: '12px', padding: '8px 10px', background: 'var(--bg-primary)', borderRadius: '4px' }}>
-      <div style={{ fontWeight: 500, marginBottom: '6px' }}>
-        {modelMarkers(model)}{model}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 500, marginBottom: '6px' }}>
+        <ModelLogo model={model} size={16} />
+        <ModelMarkers model={model} />
+        <span>{model}</span>
       </div>
       {isMlxModel(model) && (
         <div style={{ marginBottom: '6px', color: 'var(--text-secondary)', fontSize: '11px' }}>

@@ -8,7 +8,7 @@ type CanvasViewMode = 'cards'
 type FileTreeDisplayMode = 'name' | 'path'  // 'name' = nur Dateiname, 'path' = voller Pfad
 type EditorViewMode = 'edit' | 'live-preview' | 'preview'
 type PdfDisplayMode = 'both' | 'companion-only' | 'pdf-only'  // Anzeige von PDF/Companion im FileTree
-type AccentColor = 'blue' | 'orange' | 'green' | 'purple' | 'pink' | 'teal' | 'rose' | 'coral' | 'mauve' | 'mint' | 'lime' | 'gold' | 'terracotta' | 'custom'
+type AccentColor = 'ink' | 'blue' | 'orange' | 'green' | 'purple' | 'pink' | 'teal' | 'rose' | 'coral' | 'mauve' | 'mint' | 'lime' | 'gold' | 'terracotta' | 'custom'
 export type LLMBackend = 'ollama' | 'lm-studio'
 export type Language = 'de' | 'en'
 export type IconSet = 'default' | 'minimal' | 'colorful' | 'emoji'
@@ -56,6 +56,7 @@ export type AILanguageCode = typeof AI_LANGUAGES[number]['code']
 
 // Farbpalette für Akzentfarben
 export const ACCENT_COLORS: Record<AccentColor, { name: string; color: string; hover: string }> = {
+  ink: { name: 'Ink (Standard)', color: '#111111', hover: '#000000' },
   blue: { name: 'Blau', color: '#0a84ff', hover: '#0070e0' },
   orange: { name: 'Orange', color: '#ff9500', hover: '#e68600' },
   green: { name: 'Grün', color: '#30d158', hover: '#28b84c' },
@@ -611,6 +612,8 @@ interface UIState {
   // nach diesem Build wird editorDefaultView hart auf 'preview' gesetzt
   // (Direktive: Markdown-Editing ist out-of-the-box für niemanden lesbar).
   editorDefaultViewForcedToPreview: boolean
+  // einmalige Migration: altes warmes Default-Design (cream/terracotta) → weiß/ink
+  appearanceMigratedToLight: boolean
 
   // Update-Checker & What's New
   lastSeenVersion: string
@@ -768,8 +771,8 @@ const defaultState = {
   // Allgemein
   viewMode: 'split' as ViewMode,
   theme: 'system' as Theme,
-  accentColor: 'terracotta' as AccentColor,
-  backgroundColor: 'cream' as BackgroundColor,
+  accentColor: 'ink' as AccentColor,
+  backgroundColor: 'default' as BackgroundColor,
   loadLastVaultOnStart: true,
   language: 'de' as Language,
   fontFamily: 'system' as FontFamily,
@@ -988,6 +991,7 @@ const defaultState = {
 
   // Update-Checker & What's New
   editorDefaultViewForcedToPreview: false,
+  appearanceMigratedToLight: false,
   lastSeenVersion: '',
   updateAvailable: null as UpdateInfo | null,
   whatsNewOpen: false,
@@ -1091,6 +1095,7 @@ const persistedKeys = [
   'pdfCompanionEnabled', 'pdfDisplayMode', 'iconSet',
   'smartConnectionsEnabled', 'notesChatEnabled', 'projectRagEnabled', 'flashcardsEnabled', 'workflowCanvasEnabled', 'semanticScholarEnabled', 'zoteroEnabled', 'smartConnectionsWeights', 'smartConnectionsRerankerEnabled', 'docling', 'visionOcr', 'readwise', 'languageTool', 'email', 'marketing', 'edoobox', 'antares', 'remarkable', 'dailyNote', 'taskExcludedFolders', 'speech',
   'editorDefaultViewForcedToPreview',
+  'appearanceMigratedToLight',
   'lastSeenVersion',
   'customAccentColor', 'customBackgroundColorLight', 'customBackgroundColorDark',
   'customLogo',
@@ -1514,6 +1519,19 @@ export async function initializeUISettings(): Promise<void> {
       if (!validSettings.editorDefaultViewForcedToPreview) {
         validSettings.editorDefaultView = 'preview'
         validSettings.editorDefaultViewForcedToPreview = true
+      }
+      // Einmalige Migration vom alten warmen Default-Design (cream/terracotta) auf
+      // weiß/ink (2026-06-18). Nur wer noch auf den ALTEN Defaults sitzt, wird
+      // umgestellt — eine bewusste andere Wahl (z.B. Mint, Blau) bleibt erhalten.
+      // Danach respektieren wir die Nutzerwahl wieder (Flag-gesteuert, läuft 1×).
+      if (!validSettings.appearanceMigratedToLight) {
+        if (validSettings.backgroundColor === 'cream') {
+          validSettings.backgroundColor = 'default'
+        }
+        if (validSettings.accentColor === 'terracotta') {
+          validSettings.accentColor = 'ink'
+        }
+        validSettings.appearanceMigratedToLight = true
       }
       // Migrate old profile names to new ones
       const profileMigration: Record<string, UserProfile> = {

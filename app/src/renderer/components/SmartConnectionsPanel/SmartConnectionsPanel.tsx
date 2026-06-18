@@ -3,6 +3,7 @@ import { useNotesStore } from '../../stores/notesStore'
 import { useUIStore } from '../../stores/uiStore'
 import { useTranslation } from '../../utils/translations'
 import { rerank, type RerankerProgress } from '../../utils/reranker/reranker'
+import { ModelPicker } from '../Shared/ModelPicker'
 
 interface EmbeddingModel {
   name: string
@@ -898,17 +899,13 @@ export const SmartConnectionsPanel: React.FC<SmartConnectionsPanelProps> = ({ on
             {/* Modell-Auswahl */}
             <div className="smart-connections-model">
               <label>{t('smartConnections.model')}:</label>
-              <select
+              <ModelPicker
                 value={selectedModel}
-                onChange={(e) => setSelectedModel(e.target.value)}
+                models={embeddingModels}
+                onChange={setSelectedModel}
                 disabled={isCalculating}
-              >
-                {embeddingModels.map(model => (
-                  <option key={model.name} value={model.name}>
-                    {model.name}
-                  </option>
-                ))}
-              </select>
+                ariaLabel={t('smartConnections.model')}
+              />
               <button
                 className="smart-connections-refresh"
                 onClick={calculateSimilarities}

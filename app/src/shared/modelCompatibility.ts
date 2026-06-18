@@ -417,6 +417,38 @@ export function modelMarkers(model: string): string {
   return parts.length > 0 ? parts.join(' ') + ' ' : ''
 }
 
+// Modell-Hersteller (Vendor) aus dem Tag ableiten — rein für UI-Wiedererkennung
+// (Logo + Name neben dem Modell). Heuristik über den Modellnamen, da Ollama-Tags
+// keine strukturierte Vendor-Info tragen. Reihenfolge wichtig: spezifische Familien
+// (ministral/mixtral → Mistral) vor generischen Treffern. Unbekannt → 'generic'.
+export type ModelVendorId =
+  | 'qwen' | 'gemma' | 'mistral' | 'llama' | 'phi' | 'deepseek'
+  | 'openai' | 'nomic' | 'bge' | 'granite' | 'cohere' | 'generic'
+
+const VENDOR_PATTERNS: Array<{ id: ModelVendorId; name: string; re: RegExp }> = [
+  { id: 'qwen',    name: 'Qwen (Alibaba)',     re: /\bqwen|qwq/i },
+  { id: 'gemma',   name: 'Gemma (Google)',      re: /\bgemma|\bgoogle/i },
+  { id: 'mistral', name: 'Mistral AI',          re: /\bmi(?:s|x)tral|\bministral|\bcodestral|\bdevstral|\bmagistral/i },
+  { id: 'llama',   name: 'Llama (Meta)',        re: /\bllama|\bcodellama|\bmeta/i },
+  { id: 'phi',     name: 'Phi (Microsoft)',     re: /\bphi[-\d]/i },
+  { id: 'deepseek',name: 'DeepSeek',            re: /\bdeepseek/i },
+  { id: 'openai',  name: 'OpenAI',              re: /\bgpt[-_]?oss|\bgpt-/i },
+  { id: 'granite', name: 'Granite (IBM)',       re: /\bgranite/i },
+  { id: 'cohere',  name: 'Cohere',              re: /\bcommand-?r|\bcohere|\baya/i },
+  { id: 'bge',     name: 'BAAI (BGE)',          re: /\bbge/i },
+  { id: 'nomic',   name: 'Nomic',               re: /\bnomic/i },
+]
+
+export function getModelVendor(model: string): { id: ModelVendorId; name: string } {
+  const tag = (model || '').trim()
+  if (tag) {
+    for (const p of VENDOR_PATTERNS) {
+      if (p.re.test(tag)) return { id: p.id, name: p.name }
+    }
+  }
+  return { id: 'generic', name: 'Modell' }
+}
+
 // Entwickler-Favoriten — Modelle, die im echten Vault-Alltag favorisiert werden.
 // Achse unabhängig von Bench-Verdicts (`green/yellow/red`): ein Modell kann ein
 // gelbes Bench-Verdict in einem Modul haben und trotzdem Favorit sein, wenn

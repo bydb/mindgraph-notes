@@ -28,7 +28,7 @@ import { WikilinkAutocomplete, AutocompleteMode, BlockSelectionInfo } from './Wi
 import { SlashCommandMenu } from './SlashCommandMenu'
 import { livePreviewExtension } from './extensions/livePreview'
 import { imageHandlingExtension } from './extensions/imageHandling'
-import { languageToolExtension, setLanguageToolMatches, setLtErrorClickHandler, type LanguageToolMatch, type LanguageToolPopupMatch } from './extensions/languageTool'
+import { languageToolExtension, setLanguageToolMatches, setCorrectionHighlights, setLtErrorClickHandler, type LanguageToolMatch, type LanguageToolPopupMatch } from './extensions/languageTool'
 import { dataviewExtension, setDataviewNotes, setDataviewLanguage, setDataviewViewMode, setNoteClickHandler } from './extensions/dataview'
 import { useDataviewStore } from '../../stores/dataviewStore'
 import { PropertiesPanel } from './PropertiesPanel'
@@ -861,6 +861,11 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
   const [ltErrorMessage, setLtErrorMessage] = useState<string | null>(null)
   const [ltPopup, setLtPopup] = useState<{ x: number; y: number; match: LanguageToolPopupMatch } | null>(null)
   const ltCheckTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  // One-click Auto-Korrektur (wie im Mail-Compose): wendet die beste Korrektur auf
+  // alle Treffer an. Funktioniert in allen Modi inkl. Lesen, da auf dem Markdown gearbeitet wird.
+  const [ltAutoCorrecting, setLtAutoCorrecting] = useState(false)
+  const [ltCorrectedCount, setLtCorrectedCount] = useState(0)
+  const ltCorrectedTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   // Wikilink Hover Preview State
   const [hoverPreview, setHoverPreview] = useState<{
@@ -1753,6 +1758,15 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
 
       console.log('[MarkdownEditor] Setting content for:', noteIdAtStart, 'length:', content.length)
 
+      // Notizwechsel: das "wird gerade im Lesen-Modus editiert"-Guard IMMER lösen, sonst
+      // bleibt es von einem vorherigen Commit (refreshPreview=false) auf true hängen und
+      // der innerHTML-Effekt rendert den neuen Body nicht — Titel neu, Body alt (v0.7.x-Bug).
+      isPreviewDomEditingRef.current = false
+      if (previewEditTimeoutRef.current) {
+        clearTimeout(previewEditTimeoutRef.current)
+        previewEditTimeoutRef.current = null
+      }
+
       // Set preview content and apply configured default view mode
       setPreviewContent(content)
       // Leere bzw. frisch erstellte Notizen (nur "# Titel") direkt im Schreiben-Modus
@@ -2196,6 +2210,114 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
       setPreviewContent(nextContent)
     }
   }, [saveContent])
+
+  // One-Klick-Auto-Korrektur wie im Mail-Compose: prüft den Text per LanguageTool und
+  // wendet die beste Korrektur auf ALLE Treffer an (back-to-front, disjunkt). Arbeitet auf
+  // dem Markdown-Dokument → funktioniert in allen Modi inkl. Lesen (Vorschau rendert neu).
+  const autoCorrectLanguageTool = useCallback(async () => {
+    const view = viewRef.current
+    if (!view || !languageTool.enabled || ltAutoCorrecting) return
+
+    // Im Lesen-Modus offene contentEditable-Änderungen zuerst ins Dokument schreiben.
+    if (viewMode === 'preview') {
+      commitEditablePreview(false)
+    }
+
+    const content = view.state.doc.toString()
+    if (!content.trim()) return
+
+    // Frontmatter ausklammern, Offsets später zurückrechnen.
+    let textToCheck = content
+    let frontmatterOffset = 0
+    const yamlMatch = content.match(/^---\n[\s\S]*?\n---\n/)
+    if (yamlMatch) {
+      frontmatterOffset = yamlMatch[0].length
+      textToCheck = content.substring(frontmatterOffset)
+    }
+
+    if (ltCorrectedTimeoutRef.current) {
+      clearTimeout(ltCorrectedTimeoutRef.current)
+      ltCorrectedTimeoutRef.current = null
+    }
+    setLtAutoCorrecting(true)
+    setLtCorrectedCount(0)
+    try {
+      const mode = languageTool.mode || 'local'
+      const result = await window.electronAPI.languagetoolAnalyze(
+        textToCheck,
+        languageTool.language === 'auto' ? undefined : languageTool.language,
+        mode,
+        mode === 'local' ? languageTool.url : undefined,
+        mode === 'api' ? languageTool.apiUsername : undefined,
+        mode === 'api' ? languageTool.apiKey : undefined
+      )
+      if (!result.success || !result.matches || result.matches.length === 0) {
+        return
+      }
+
+      const ignoredRules = languageTool.ignoredRules || []
+      const candidates = result.matches
+        .map(m => ({ ...m, offset: m.offset + frontmatterOffset }))
+        .map(m => {
+          const matchText = content.substring(m.offset, m.offset + m.length)
+          const meaningful = (m.replacements || []).filter(r => r.value.trim() !== matchText.trim())
+          return { match: m, matchText, replacement: meaningful[0]?.value }
+        })
+        .filter(c => c.replacement !== undefined && !ignoredRules.some(r => r.ruleId === c.match.rule.id && r.text === c.matchText))
+        .sort((a, b) => a.match.offset - b.match.offset)
+
+      // Überlappende Treffer entfernen (CM-Changes müssen disjunkt sein) — frühesten behalten.
+      const picks: typeof candidates = []
+      let lastEnd = -1
+      for (const c of candidates) {
+        if (c.match.offset >= lastEnd) {
+          picks.push(c)
+          lastEnd = c.match.offset + c.match.length
+        }
+      }
+      if (picks.length === 0) return
+
+      const changes = picks.map(c => ({
+        from: c.match.offset,
+        to: c.match.offset + c.match.length,
+        insert: c.replacement as string
+      }))
+      // Highlight-Ranges in Koordinaten NACH den Changes (kumulativer Versatz).
+      let shift = 0
+      const highlights = picks.map(c => {
+        const insert = c.replacement as string
+        const from = c.match.offset + shift
+        const to = from + insert.length
+        shift += insert.length - c.match.length
+        return { from, to }
+      })
+
+      // Alte Unterstreichungen leeren (Text ändert sich) + Changes + grünes Aufblitzen.
+      view.dispatch({
+        changes,
+        effects: [setLanguageToolMatches.of([]), setCorrectionHighlights.of(highlights)],
+        scrollIntoView: false
+      })
+      setLtMatches([])
+
+      // Lesen-Modus: Vorschau explizit neu rendern (Guard isPreviewDomEditingRef lösen).
+      if (viewMode === 'preview') {
+        isPreviewDomEditingRef.current = false
+        setPreviewContent(view.state.doc.toString())
+      }
+
+      setLtCorrectedCount(picks.length)
+      ltCorrectedTimeoutRef.current = setTimeout(() => {
+        setLtCorrectedCount(0)
+        viewRef.current?.dispatch({ effects: setCorrectionHighlights.of([]) })
+        ltCorrectedTimeoutRef.current = null
+      }, 4300)
+    } catch (err) {
+      console.error('[LanguageTool] Auto-Korrektur fehlgeschlagen:', err)
+    } finally {
+      setLtAutoCorrecting(false)
+    }
+  }, [languageTool, viewMode, ltAutoCorrecting, commitEditablePreview])
 
   const rememberPreviewSelection = useCallback(() => {
     const root = editablePreviewRef.current
@@ -3829,6 +3951,30 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
               {ltStatus !== 'error' && ltMatches.length > 0 && (
                 <span className="lt-error-badge">{ltMatches.length}</span>
               )}
+            </button>
+          )}
+          {languageTool.enabled && (
+            <button
+              className={`lt-check-btn lt-autocorrect-btn ${ltAutoCorrecting ? 'checking' : ''} ${ltCorrectedCount > 0 ? 'corrected' : ''}`}
+              onClick={autoCorrectLanguageTool}
+              disabled={ltAutoCorrecting}
+              title={t('languagetool.autoCorrectHint')}
+            >
+              {ltAutoCorrecting ? (
+                <svg width="16" height="16" viewBox="0 0 16 16" className="lt-spinner">
+                  <circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" strokeWidth="2" strokeDasharray="20 10" />
+                </svg>
+              ) : (
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                  <path d="M1.5 8.5L4.5 11.5L9 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  <path d="M8.5 10.5L10 12L14.5 6.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              )}
+              {ltAutoCorrecting
+                ? t('languagetool.autoCorrecting')
+                : ltCorrectedCount > 0
+                  ? t('languagetool.corrected', { count: ltCorrectedCount })
+                  : t('languagetool.autoCorrect')}
             </button>
           )}
           {viewMode !== 'preview' && (

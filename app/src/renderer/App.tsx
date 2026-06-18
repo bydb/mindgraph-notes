@@ -753,7 +753,13 @@ const App: React.FC = () => {
   // Akzentfarbe auf document anwenden
   useEffect(() => {
     const root = document.documentElement
-    if (accentColor === 'custom') {
+    if (accentColor === 'ink') {
+      // Ink accent is theme-adaptive: defer to the per-theme CSS tokens
+      // (#111 on light, near-white on dark) by clearing inline overrides.
+      root.style.removeProperty('--accent-color')
+      root.style.removeProperty('--accent-hover')
+      root.style.removeProperty('--accent-subtle')
+    } else if (accentColor === 'custom') {
       root.style.setProperty('--accent-color', customAccentColor)
       root.style.setProperty('--accent-hover', customAccentColor)
       root.style.setProperty('--accent-subtle', `${customAccentColor}20`)
