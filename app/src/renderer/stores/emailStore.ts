@@ -181,17 +181,47 @@ export const useEmailStore = create<EmailState>()((set, get) => ({
     if (get().isAnalyzing) return
 
     const { email, ollama } = useUIStore.getState()
-    // Priorität: email.analysisModel (Email-Tab) → Modul-Override (Kompatibilitäts-Sektion) → globales selectedModel.
+    const { OPENROUTER_MODEL_SENTINEL, isOpenRouterReady } = await import('../../shared/llmBackend')
+
+    // Das Analyse-Modell wird an EINER Stelle gewählt (Email-Tab → Analyse-Modell):
+    // entweder ein lokales Ollama-Modell ODER der Sentinel „OpenRouter". DIESER Wert
+    // ist allein autoritativ fürs Routing — kein zweites `cloudModules`-Gate mehr
+    // (das lief mit analysisModel auseinander → Rückfall aufs alte Modell). Das ⚠️-Opt-in
+    // passiert einmalig beim Auswählen im Picker (Settings). isOpenRouterReady = gemeinsame
+    // Basis-Verfügbarkeitsprüfung (enabled + Key + Modell), identisch zu den Feature-Gates.
+    const analysisChoice = email.analysisModel
+    const useCloud = analysisChoice === OPENROUTER_MODEL_SENTINEL && isOpenRouterReady(ollama.openrouter)
+
+    // Lokales Modell (Sentinel zählt NICHT als lokaler Name): Tab-Wahl → Modul-Override → global.
     const moduleOverride = ollama.moduleModelOverrides?.['task-extraction'] || ''
-    const model = email.analysisModel || moduleOverride || ollama.selectedModel
-    if (!model) {
-      console.warn('[EmailStore] No model configured for analysis')
-      return
-    }
-    const { isHardLocked } = await import('../../shared/modelCompatibility')
-    if (isHardLocked(model, 'task-extraction')) {
-      console.warn(`[EmailStore] Modell ${model} ist für Mail-Task-Extraktion gesperrt (Hard-Lock). Analyse übersprungen — bitte in den Einstellungen ein anderes Modell wählen.`)
-      return
+    const localChoice = analysisChoice && analysisChoice !== OPENROUTER_MODEL_SENTINEL ? analysisChoice : ''
+    const model = localChoice || moduleOverride || ollama.selectedModel
+
+    const cloud = useCloud
+      ? { model: ollama.openrouter.moduleModelOverrides?.['task-extraction']?.trim() || ollama.openrouter.model.trim() }
+      : null
+    // Modellname für Fehler-/Status-Texte: bei Cloud das echte OpenRouter-Modell.
+    const displayModel = cloud ? `openrouter/${cloud.model}` : model
+
+    // Lokales Modell ist nur Pflicht, wenn NICHT in die Cloud geroutet wird.
+    if (!useCloud) {
+      if (!model) {
+        // Häufig: User stand auf „OpenRouter", hat es aber deaktiviert → Sentinel ohne
+        // lokales Fallback-Modell. Nicht still scheitern — sichtbarer Hinweis in der UI.
+        const msg = analysisChoice === OPENROUTER_MODEL_SENTINEL
+          ? 'OpenRouter ist deaktiviert, aber als Analyse-Modell gewählt. Bitte im Email-Tab ein lokales Modell oder wieder OpenRouter wählen.'
+          : 'Kein Analyse-Modell konfiguriert. Bitte in den Einstellungen ein Modell wählen.'
+        console.warn(`[EmailStore] ${msg}`)
+        set({ analysisError: msg })
+        return
+      }
+      const { isHardLocked } = await import('../../shared/modelCompatibility')
+      if (isHardLocked(model, 'task-extraction')) {
+        const msg = `Modell „${model}" ist für die Mail-Analyse gesperrt (Prompt-Injection-Schutz). Bitte ein geeignetes Modell wählen.`
+        console.warn(`[EmailStore] ${msg}`)
+        set({ analysisError: msg })
+        return
+      }
     }
 
     set({ isAnalyzing: true, analysisProgress: { current: 0, total: 0 }, analysisError: null })
@@ -201,7 +231,7 @@ export const useEmailStore = create<EmailState>()((set, get) => ({
     })
 
     try {
-      const result = await window.electronAPI.emailAnalyze(vaultPath, model, emailIds, email.lowPowerMode) as
+      const result = await window.electronAPI.emailAnalyze(vaultPath, model, emailIds, email.lowPowerMode, cloud) as
         | { success: boolean; analyzed?: number; failed?: number; total?: number; lastError?: string | null; error?: string }
         | undefined
       // Neu laden nach Analyse (skipAutoActions: verhindert erneuten analyzeEmails-Aufruf)
@@ -210,11 +240,11 @@ export const useEmailStore = create<EmailState>()((set, get) => ({
       // Stilles Scheitern (OOM, fehlendes Modell, Timeout) sichtbar machen — sonst behält
       // die Mail still ein evtl. gesyncten Fremd-Modell-Datensatz und der Nutzer merkt nichts.
       if (result && result.success === false) {
-        set({ analysisError: result.error || `Analyse mit „${model}" fehlgeschlagen.` })
+        set({ analysisError: result.error || `Analyse mit „${displayModel}" fehlgeschlagen.` })
       } else if (result && typeof result.failed === 'number' && result.failed > 0) {
         const total = result.total ?? (result.failed + (result.analyzed || 0))
         const detail = result.lastError ? ` ${result.lastError}` : ''
-        set({ analysisError: `${result.failed} von ${total} Mails konnten mit „${model}" nicht analysiert werden.${detail}` })
+        set({ analysisError: `${result.failed} von ${total} Mails konnten mit „${displayModel}" nicht analysiert werden.${detail}` })
       }
 
       // Notizen für relevante Emails erstellen

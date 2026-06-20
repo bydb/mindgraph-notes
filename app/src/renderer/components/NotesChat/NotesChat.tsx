@@ -6,6 +6,7 @@ import { useIsModuleEnabled } from '../../utils/modules'
 import { useTranslation } from '../../utils/translations'
 import { writeClipboardText } from '../../utils/clipboard'
 import { ModelPicker } from '../Shared/ModelPicker'
+import { canUseCloudForFeature, OPENROUTER_MODEL_SENTINEL } from '../../../shared/llmBackend'
 import MarkdownIt from 'markdown-it'
 import texmath from 'markdown-it-texmath'
 import katex from 'katex'
@@ -79,6 +80,12 @@ export const NotesChat: React.FC<NotesChatProps> = ({ onClose }) => {
   const [isLoading, setIsLoading] = useState(true)
   const [contextMode, setContextMode] = useState<ContextMode>('current')
   const [chatMode, setChatMode] = useState<ChatMode>('direct')
+  // OpenRouter-Cloud für Notes-Chat: nur verfügbar, wenn in den Einstellungen per
+  // zweitem Opt-in freigeschaltet. Default cloud, wenn verfügbar; pro Sitzung umschaltbar.
+  const orCloudAvailable = canUseCloudForFeature('notes-chat', llmSettings.openrouter)
+  const orCloudModel = llmSettings.openrouter?.model?.trim() || ''
+  const [useCloudChat, setUseCloudChat] = useState(false)
+  useEffect(() => { setUseCloudChat(orCloudAvailable) }, [orCloudAvailable])
   const [selectedFolder, setSelectedFolder] = useState<string>('')
   const [projectList, setProjectList] = useState<ProjectOption[]>([])
   const [selectedProject, setSelectedProject] = useState<string>('')
@@ -398,7 +405,9 @@ export const NotesChat: React.FC<NotesChatProps> = ({ onClose }) => {
 
   // Nachricht senden
   const sendMessage = async () => {
-    if (!inputValue.trim() || !selectedModel || isStreaming) return
+    // selectedModel ist bei Cloud-Routing (OpenRouter) optional — dann zählt das Cloud-Modell.
+    const cloudChatActive = orCloudAvailable && useCloudChat
+    if (!inputValue.trim() || (!selectedModel && !cloudChatActive) || isStreaming) return
 
     const userMessage = inputValue.trim()
     lastUserQuestion.current = userMessage
@@ -474,8 +483,13 @@ export const NotesChat: React.FC<NotesChatProps> = ({ onClose }) => {
       }))
       recentMessages.push({ role: 'user', content: userMessage })
 
-      // Backend-basierte API-Auswahl
-      if (llmSettings.backend === 'lm-studio') {
+      // Cloud-Routing (OpenRouter): nur wenn freigeschaltet UND in dieser Sitzung gewählt.
+      const cloud = orCloudAvailable && useCloudChat ? { model: orCloudModel } : null
+
+      // Backend-basierte API-Auswahl (Cloud hat Vorrang, wenn gewählt)
+      if (cloud) {
+        await window.electronAPI.ollamaChat(selectedModel, recentMessages, context, chatMode, cloud)
+      } else if (llmSettings.backend === 'lm-studio') {
         await window.electronAPI.lmstudioChat(selectedModel, recentMessages, context, chatMode, llmSettings.lmStudioPort)
       } else {
         await window.electronAPI.ollamaChat(selectedModel, recentMessages, context, chatMode)
@@ -577,7 +591,7 @@ export const NotesChat: React.FC<NotesChatProps> = ({ onClose }) => {
           <div className="notes-chat-spinner"></div>
           <p>Prüfe {llmSettings.backend === 'lm-studio' ? 'LM Studio' : 'Ollama'}...</p>
         </div>
-      ) : !isBackendAvailable ? (
+      ) : !isBackendAvailable && !orCloudAvailable ? (
         <div className="notes-chat-unavailable">
           <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
             <circle cx="12" cy="12" r="10"/>
@@ -591,7 +605,7 @@ export const NotesChat: React.FC<NotesChatProps> = ({ onClose }) => {
               : 'Starte Ollama für den Chat mit deinen Notizen'}
           </span>
         </div>
-      ) : models.length === 0 ? (
+      ) : models.length === 0 && !orCloudAvailable ? (
         <div className="notes-chat-unavailable">
           <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
@@ -612,9 +626,13 @@ export const NotesChat: React.FC<NotesChatProps> = ({ onClose }) => {
             <div className="notes-chat-model-row">
               <label>Modell:</label>
               <ModelPicker
-                value={selectedModel}
-                models={models}
-                onChange={setSelectedModel}
+                value={useCloudChat && orCloudAvailable ? OPENROUTER_MODEL_SENTINEL : selectedModel}
+                models={orCloudAvailable ? [{ name: OPENROUTER_MODEL_SENTINEL }, ...models] : models}
+                onChange={(name) => {
+                  if (name === OPENROUTER_MODEL_SENTINEL) { setUseCloudChat(true) }
+                  else { setUseCloudChat(false); setSelectedModel(name) }
+                }}
+                getLabel={(name) => name === OPENROUTER_MODEL_SENTINEL ? `OpenRouter · ${orCloudModel}` : name}
                 disabled={isStreaming}
                 ariaLabel="Modell"
               />

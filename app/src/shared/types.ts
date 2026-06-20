@@ -586,6 +586,7 @@ export interface ElectronAPI {
     targetLanguage?: string;
     originalText: string;
     customPrompt?: string;
+    cloud?: { model: string } | null;
   }) => Promise<{
     success: boolean;
     result?: string;
@@ -632,7 +633,7 @@ export interface ElectronAPI {
   }>;
 
   // Ollama Chat für Notes Chat
-  ollamaChat: (model: string, messages: Array<{ role: string; content: string }>, context: string, chatMode?: 'direct' | 'socratic' | 'email') => Promise<{
+  ollamaChat: (model: string, messages: Array<{ role: string; content: string }>, context: string, chatMode?: 'direct' | 'socratic' | 'email', cloud?: { model: string } | null) => Promise<{
     success: boolean;
     response?: string;
     error?: string;
@@ -772,6 +773,7 @@ export interface ElectronAPI {
 
   // Update-Checker & What's New
   getAppVersion: () => Promise<string>;
+  getSystemMemory: () => Promise<{ totalGB: number; freeGB: number; cpus: number }>;
   checkForUpdates: () => Promise<UpdateInfo>;
   installUpdate: () => Promise<boolean>;
   getWhatsNewContent: (version: string) => Promise<string | null>;
@@ -848,7 +850,7 @@ export interface ElectronAPI {
   emailListFolders: (account: EmailAccount) => Promise<{ success: boolean; folders: EmailFolder[]; error?: string }>;
   emailMove: (payload: { accountId: string; host: string; port: number; user: string; tls: boolean; sourceFolder: string; uid: number; destinationFolder: string }) => Promise<{ success: boolean; newUid?: number; destinationFolder?: string; error?: string }>;
   emailFetch: (vaultPath: string, accounts: Array<EmailAccount & { folder?: string }>, lastFetchedAt: Record<string, string>, maxPerAccount: number) => Promise<EmailFetchResult>;
-  emailAnalyze: (vaultPath: string, model: string, emailIds?: string[], lowPowerMode?: boolean) => Promise<{ success: boolean; analyzed: number; failed?: number; total?: number; lastError?: string | null; error?: string }>;
+  emailAnalyze: (vaultPath: string, model: string, emailIds?: string[], lowPowerMode?: boolean, cloud?: { model: string } | null) => Promise<{ success: boolean; analyzed: number; failed?: number; total?: number; lastError?: string | null; error?: string }>;
   emailRelevanceConfigLoad: (vaultPath: string) => Promise<{ success: boolean; config?: RelevanceConfig; hasBlock?: boolean; notePath?: string; error?: string }>;
   emailRelevanceConfigSave: (vaultPath: string, config: RelevanceConfig) => Promise<{ success: boolean; notePath?: string; error?: string }>;
   noteAnalyzeRelevance: (payload: {
@@ -867,6 +869,12 @@ export interface ElectronAPI {
   emailContactsLoad: (vaultPath: string) => Promise<SavedEmailContact[]>;
   emailSavePassword: (accountId: string, password: string) => Promise<boolean>;
   emailLoadPassword: (accountId: string) => Promise<string | null>;
+  // OpenRouter Cloud-Backend
+  openrouterSaveKey: (apiKey: string) => Promise<{ success: boolean; hasKey?: boolean; error?: string }>;
+  openrouterHasKey: () => Promise<boolean>;
+  openrouterClearKey: () => Promise<{ success: boolean }>;
+  openrouterListModels: () => Promise<{ success: boolean; models: Array<{ id: string; name: string; contextLength?: number; promptPrice?: string }>; error?: string }>;
+  openrouterTest: (model: string) => Promise<{ success: boolean; reply?: string; error?: string }>;
   onEmailFetchProgress: (callback: (progress: { current: number; total: number; status: string }) => void) => void;
   onEmailAnalysisProgress: (callback: (progress: { current: number; total: number }) => void) => void;
   emailSetup: (vaultPath: string, inboxFolderName?: string) => Promise<{ success: boolean; folderPath?: string; instructionPath?: string; error?: string }>;

@@ -31,10 +31,12 @@ interface Props {
   onSuggestTags: () => void
   onAcceptTag: (tag: string) => void
   onDismissTag: (tag: string) => void
-  // Modellwahl für die Umschreibung (lokales Override).
+  // Modellwahl für die Umschreibung (lokales Override + optional OpenRouter-Eintrag).
   model: string
   models: Array<{ name: string }>
   onModelChange: (model: string) => void
+  // Label-Override fürs Dropdown (z.B. „OpenRouter · <modell>" für den Cloud-Eintrag).
+  getModelLabel?: (name: string) => string
 }
 
 const PRESETS = [
@@ -44,7 +46,7 @@ const PRESETS = [
   { id: 'tone', key: 'aiBar.preset.tone' as const },
 ]
 
-export function AiActionBar({ open, onOpenChange, phase, proposal, onGenerate, onAccept, onDiscard, tagSuggestions, tagsLoading, onSuggestTags, onAcceptTag, onDismissTag, model, models, onModelChange }: Props) {
+export function AiActionBar({ open, onOpenChange, phase, proposal, onGenerate, onAccept, onDiscard, tagSuggestions, tagsLoading, onSuggestTags, onAcceptTag, onDismissTag, model, models, onModelChange, getModelLabel }: Props) {
   const { t } = useTranslation()
   const aiEnabled = useUIStore(s => s.ollama.enabled)
   const [instruction, setInstruction] = useState('')
@@ -147,6 +149,7 @@ export function AiActionBar({ open, onOpenChange, phase, proposal, onGenerate, o
             value={model}
             models={models}
             onChange={onModelChange}
+            getLabel={getModelLabel}
             ariaLabel={t('aiBar.model')}
             maxWidth={260}
           />

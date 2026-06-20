@@ -11,11 +11,12 @@ import granite from '../../assets/model-vendors/granite.svg'
 import cohere from '../../assets/model-vendors/cohere.svg'
 import bge from '../../assets/model-vendors/bge.svg'
 import nomic from '../../assets/model-vendors/nomic.svg'
+import openrouter from '../../assets/model-vendors/openrouter.svg'
 import generic from '../../assets/model-vendors/generic.svg'
 
 // Vendor-Logo → Asset-URL. Single source: getModelVendor() in shared/modelCompatibility.
 const VENDOR_LOGOS: Record<ModelVendorId, string> = {
-  qwen, gemma, mistral, llama, phi, deepseek, openai, granite, cohere, bge, nomic, generic
+  qwen, gemma, mistral, llama, phi, deepseek, openai, granite, cohere, bge, nomic, openrouter, generic
 }
 
 interface Props {
