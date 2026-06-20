@@ -6,7 +6,7 @@
 // das eine Telegram-Nachricht mit Inline-Buttons schickt und auf die
 // Entscheidung wartet (siehe confirm.ts).
 
-import { chatWithTools, type ChatMessage, type ChatOptions, type ToolCall } from '../../llm/chatClient'
+import { chatWithTools, type ChatMessage, type ChatOptions, type ToolCall, type ChatBackend } from '../../llm/chatClient'
 import type { ToolRegistry, ToolContext } from './tools/registry'
 
 export interface AgentRunOptions {
@@ -28,7 +28,7 @@ export interface AgentRunResult {
   toolCallsExecuted: number
   toolCallsDenied: number
   hitMaxIterations: boolean
-  backend: 'ollama'
+  backend: ChatBackend
 }
 
 function buildSystemPrompt(allowedTools: string[]): string {
@@ -115,7 +115,7 @@ export async function runAgent(
   let iterations = 0
   let toolCallsExecuted = 0
   let toolCallsDenied = 0
-  let lastBackend: 'ollama' = 'ollama'
+  let lastBackend: ChatBackend = 'ollama'
   let lastText = ''
 
   while (iterations < opts.maxIterations) {

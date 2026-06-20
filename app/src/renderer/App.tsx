@@ -301,6 +301,23 @@ const App: React.FC = () => {
   useEffect(() => {
     const init = async () => {
       await initializeUISettings()
+
+      // Weak-HW-Erkennung: auf <16-GB-Geräten (z.B. 8-GB-M2) den Schonmodus EINMALIG
+      // vorschlagen/aktivieren. Nur reversibles Throttling — kein stiller Modell-Tausch.
+      // `lowPowerModeAutoApplied` verhindert, dass ein bewusstes Aus-Schalten überschrieben wird.
+      try {
+        const { email, setEmail } = useUIStore.getState()
+        if (!email.lowPowerModeAutoApplied) {
+          const mem = await window.electronAPI.getSystemMemory()
+          if (mem && mem.totalGB > 0 && mem.totalGB < 16) {
+            console.log(`[WeakHW] ${mem.totalGB} GB RAM erkannt → Schonmodus aktiviert (einmalig).`)
+            setEmail({ lowPowerMode: true, lowPowerModeAutoApplied: true })
+          } else {
+            setEmail({ lowPowerModeAutoApplied: true })
+          }
+        }
+      } catch { /* Speicher-Abfrage fehlgeschlagen — ignorieren */ }
+
       // Nach dem Laden prüfen ob Onboarding abgeschlossen ist
       const { onboardingCompleted, setOnboardingOpen, dashboard } = useUIStore.getState()
       if (!onboardingCompleted) {

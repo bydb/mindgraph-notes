@@ -3,7 +3,7 @@
 // `qwen3.5:cloud`) und das Parsing der Action-Vorschläge. Liefert
 // {text, actions} pro User-Turn an die IPC-Ebene.
 
-import { chat, type ChatMessage } from '../chatClient'
+import { chat, type ChatMessage, type ChatBackend } from '../chatClient'
 import { retrieveKb } from './coachKbRetriever'
 import { buildSystemPrompt, buildQaSystemPrompt, greeting, type Language } from './coachPrompt'
 import { extractActionFence, validateAction, type CoachAction } from './coachActions'
@@ -47,7 +47,7 @@ export interface CoachTurnResult {
   text: string
   actions: CoachAction[]
   assistantMessage: ChatMessage    // an History anhängen
-  backend: 'ollama'
+  backend: ChatBackend
   parseWarnings: string[]          // ungültige Action-Vorschläge wandern hierher
 }
 
@@ -134,7 +134,7 @@ export interface CoachAskInput {
 
 export interface CoachAskResult {
   text: string
-  backend: 'ollama'
+  backend: ChatBackend
 }
 
 export async function coachAsk(input: CoachAskInput): Promise<CoachAskResult> {

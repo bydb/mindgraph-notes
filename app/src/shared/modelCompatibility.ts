@@ -423,7 +423,7 @@ export function modelMarkers(model: string): string {
 // (ministral/mixtral → Mistral) vor generischen Treffern. Unbekannt → 'generic'.
 export type ModelVendorId =
   | 'qwen' | 'gemma' | 'mistral' | 'llama' | 'phi' | 'deepseek'
-  | 'openai' | 'nomic' | 'bge' | 'granite' | 'cohere' | 'generic'
+  | 'openai' | 'nomic' | 'bge' | 'granite' | 'cohere' | 'openrouter' | 'generic'
 
 const VENDOR_PATTERNS: Array<{ id: ModelVendorId; name: string; re: RegExp }> = [
   { id: 'qwen',    name: 'Qwen (Alibaba)',     re: /\bqwen|qwq/i },
@@ -437,6 +437,10 @@ const VENDOR_PATTERNS: Array<{ id: ModelVendorId; name: string; re: RegExp }> = 
   { id: 'cohere',  name: 'Cohere',              re: /\bcommand-?r|\bcohere|\baya/i },
   { id: 'bge',     name: 'BAAI (BGE)',          re: /\bbge/i },
   { id: 'nomic',   name: 'Nomic',               re: /\bnomic/i },
+  // OpenRouter ZULETZT: ein echtes Cloud-Modell wie `openrouter/google/gemma-3`
+  // matcht oben bereits seinen echten Vendor (gemma). Nur der bare Sentinel
+  // `__openrouter__` (Dropdown-Eintrag) fällt bis hierher durch → OpenRouter-Logo.
+  { id: 'openrouter', name: 'OpenRouter',        re: /openrouter/i },
 ]
 
 export function getModelVendor(model: string): { id: ModelVendorId; name: string } {

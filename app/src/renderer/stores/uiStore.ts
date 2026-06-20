@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import type { UpdateInfo } from '../../shared/types'
 import type { NoteKindId } from '../utils/noteKind'
+import { DEFAULT_OPENROUTER_SETTINGS, type OpenRouterSettings } from '../../shared/llmBackend'
 
 type ViewMode = 'editor' | 'split' | 'canvas'
 type Theme = 'light' | 'dark' | 'system'
@@ -240,6 +241,10 @@ interface LLMSettings {
   // MÜSSEN dasselbe lesen, sonst invalidiert ein Modell-Mismatch den Index bei
   // jedem Cross-Surface-Aufruf (Dauer-Rebuild). Default: bge-m3.
   projectRagEmbeddingModel: string
+  // OpenRouter Cloud-Backend (opt-in). Single-Source-Policy in shared/llmBackend.ts.
+  // Der API-Key selbst liegt NICHT hier, sondern verschlüsselt im Main (safeStorage);
+  // `hasApiKey` spiegelt nur, ob einer hinterlegt ist.
+  openrouter: OpenRouterSettings
 }
 
 // Brain (lokales Tagesgedächtnis — speichert Tageszusammenfassungen im Vault)
@@ -321,6 +326,8 @@ export interface EmailSettings {
   autoAnalyze: boolean
   /** Schonmodus für schwache Hardware: Cooldown zwischen Mails bei Batch-Analyse (gegen Überhitzung). */
   lowPowerMode: boolean
+  /** Einmaliger Auto-Vorschlag des Schonmodus auf <16-GB-Hardware bereits angewandt (verhindert Re-Override eines bewussten Aus-Schaltens). */
+  lowPowerModeAutoApplied: boolean
   analysisModel: string
   signature: string
   signatureImagePath: string
@@ -827,7 +834,8 @@ const defaultState = {
       'smart-connections': '',
       'project-status': ''
     },
-    projectRagEmbeddingModel: 'bge-m3'
+    projectRagEmbeddingModel: 'bge-m3',
+    openrouter: { ...DEFAULT_OPENROUTER_SETTINGS }
   },
 
   // Brain (lokales Tagesgedächtnis)
@@ -944,6 +952,7 @@ const defaultState = {
     retainDays: 30,
     autoAnalyze: true,
     lowPowerMode: false,
+    lowPowerModeAutoApplied: false,
     analysisModel: '',
     signature: '',
     signatureImagePath: '',
@@ -1482,6 +1491,20 @@ export async function initializeUISettings(): Promise<void> {
         // Projekt-RAG-Embedding-Modell ergänzen (eingeführt 2026-06-06)
         if (typeof ll.projectRagEmbeddingModel !== 'string' || !ll.projectRagEmbeddingModel) {
           ll.projectRagEmbeddingModel = 'bge-m3'
+        }
+        // OpenRouter-Cloud-Backend ergänzen (eingeführt 2026-06-19). Default lokal —
+        // bestehende Installationen bekommen es deaktiviert, kein Cloud-Modul aktiv.
+        if (!ll.openrouter || typeof ll.openrouter !== 'object') {
+          ll.openrouter = { ...DEFAULT_OPENROUTER_SETTINGS }
+        } else {
+          ll.openrouter = {
+            ...DEFAULT_OPENROUTER_SETTINGS,
+            ...ll.openrouter,
+            cloudModules: Array.isArray(ll.openrouter.cloudModules) ? ll.openrouter.cloudModules : [],
+            cloudFeatures: Array.isArray(ll.openrouter.cloudFeatures) ? ll.openrouter.cloudFeatures : [],
+            moduleModelOverrides: (ll.openrouter.moduleModelOverrides && typeof ll.openrouter.moduleModelOverrides === 'object')
+              ? ll.openrouter.moduleModelOverrides : {}
+          }
         }
       }
       // Migrate Brain: automatische Tagesverdichtung ergänzen (eingeführt 2026-06-06)

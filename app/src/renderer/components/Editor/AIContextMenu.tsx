@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { useUIStore, AI_LANGUAGES, AILanguageCode } from '../../stores/uiStore'
 import { useTranslation } from '../../utils/translations'
+import { canUseCloudForFeature } from '../../../shared/llmBackend'
 
 type AIAction = 'translate' | 'summarize' | 'continue' | 'improve' | 'custom'
 
@@ -57,7 +58,8 @@ export const AIContextMenu: React.FC<AIContextMenuProps> = ({
   }, [showCustomPrompt])
 
   const handleAction = async (action: AIAction, targetLanguage?: string, customPrompt?: string) => {
-    if (!ollama.enabled || !ollama.selectedModel) {
+    const noteEditCloud = canUseCloudForFeature('note-edit', ollama.openrouter)
+    if (!ollama.enabled || (!ollama.selectedModel && !noteEditCloud)) {
       onClose()
       return
     }
@@ -76,9 +78,12 @@ export const AIContextMenu: React.FC<AIContextMenuProps> = ({
         customPrompt: customPrompt
       }
 
-      const response = ollama.backend === 'lm-studio'
-        ? await window.electronAPI.lmstudioGenerate({ ...requestParams, port: ollama.lmStudioPort })
-        : await window.electronAPI.ollamaGenerate(requestParams)
+      const cloud = noteEditCloud ? { model: ollama.openrouter.model.trim() } : null
+      const response = cloud
+        ? await window.electronAPI.ollamaGenerate({ ...requestParams, cloud })
+        : ollama.backend === 'lm-studio'
+          ? await window.electronAPI.lmstudioGenerate({ ...requestParams, port: ollama.lmStudioPort })
+          : await window.electronAPI.ollamaGenerate(requestParams)
 
       const result = response as AIResult
       if (customPrompt) {

@@ -49,6 +49,7 @@ import { useIsModuleEnabled } from '../../utils/modules'
 import { useVoiceStore } from '../../stores/voiceStore'
 import { getNoteKind, stripNoteKindMarker, setAiProvenanceInContent, getAiProvenance, addTagToFrontmatter, getFrontmatterTags } from '../../utils/noteKind'
 import { readClipboardText, writeClipboardText } from '../../utils/clipboard'
+import { canUseCloudForFeature, OPENROUTER_MODEL_SENTINEL } from '../../../shared/llmBackend'
 
 const markdownCodeLanguages = [
   LanguageDescription.of({
@@ -861,6 +862,11 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
   // Modellwahl für die Macher-Leiste (lokales Override; '' = globales Standardmodell).
   const [aiModel, setAiModel] = useState('')
   const [aiModels, setAiModels] = useState<Array<{ name: string }>>([])
+  // OpenRouter-Cloud für Inline-Notiz-KI: als Eintrag im Modell-Dropdown wählbar.
+  const noteEditCloudAvailable = canUseCloudForFeature('note-edit', ollama.openrouter)
+  const noteEditCloudModel = ollama.openrouter?.model?.trim() || ''
+  const [aiUseCloud, setAiUseCloud] = useState(false)
+  useEffect(() => { setAiUseCloud(noteEditCloudAvailable) }, [noteEditCloudAvailable])
   const [showAIImageDialog, setShowAIImageDialog] = useState(false)
   const [showPublishWpModal, setShowPublishWpModal] = useState(false)
   const [previewToolbar, setPreviewToolbar] = useState<{ x: number; y: number } | null>(null)
@@ -1710,7 +1716,9 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
     const view = viewRef.current
     if (!view || !ollama.enabled) return
     const model = aiModel || ollama.selectedModel
-    if (!model) return
+    // Cloud-Routing (note-edit): aktiv, wenn freigeschaltet UND im Dropdown gewählt.
+    const noteEditCloud = canUseCloudForFeature('note-edit', ollama.openrouter) && aiUseCloud
+    if (!model && !noteEditCloud) return
 
     // Scope: Auswahl, sonst der ganze Body (Frontmatter ausgeklammert).
     const sel = view.state.selection.main
@@ -1744,9 +1752,13 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
         originalText: oldText,
         customPrompt: action === 'custom' ? customPrompt : undefined
       }
-      const response = ollama.backend === 'lm-studio'
-        ? await window.electronAPI.lmstudioGenerate({ ...req, port: ollama.lmStudioPort })
-        : await window.electronAPI.ollamaGenerate(req)
+      // Cloud-Routing (OpenRouter) für Inline-Notiz-KI — nur wenn 'note-edit' per zweitem Opt-in frei.
+      const cloud = noteEditCloud ? { model: ollama.openrouter.model.trim() } : null
+      const response = cloud
+        ? await window.electronAPI.ollamaGenerate({ ...req, cloud })
+        : ollama.backend === 'lm-studio'
+          ? await window.electronAPI.lmstudioGenerate({ ...req, port: ollama.lmStudioPort })
+          : await window.electronAPI.ollamaGenerate(req)
       const result = response as AIResult
       if (!result.success || !result.result) { setAiPhase('idle'); return }
       const newText = result.result.trim()
@@ -1757,7 +1769,8 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
         newText,
         ops,
         action: aiActionLabel(preset, instruction),
-        model,
+        // result.model trägt bei Cloud-Routing `openrouter/<modell>` — sonst das lokale Modell.
+        model: result.model || model,
         date: (result.timestamp || '').slice(0, 10)
       })
       setAiPhase('review')
@@ -1765,7 +1778,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
       console.error('[AI-Bar] Generierung fehlgeschlagen:', e)
       setAiPhase('idle')
     }
-  }, [ollama, aiModel])
+  }, [ollama, aiModel, aiUseCloud])
 
   const aiAcceptProposal = useCallback(() => {
     const view = viewRef.current
@@ -4639,9 +4652,13 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
           onSuggestTags={aiSuggestTags}
           onAcceptTag={aiAcceptTag}
           onDismissTag={aiDismissTag}
-          model={aiModel || ollama.selectedModel}
-          models={aiModels}
-          onModelChange={setAiModel}
+          model={aiUseCloud && noteEditCloudAvailable ? OPENROUTER_MODEL_SENTINEL : (aiModel || ollama.selectedModel)}
+          models={noteEditCloudAvailable ? [{ name: OPENROUTER_MODEL_SENTINEL }, ...aiModels] : aiModels}
+          onModelChange={(name) => {
+            if (name === OPENROUTER_MODEL_SENTINEL) { setAiUseCloud(true) }
+            else { setAiUseCloud(false); setAiModel(name) }
+          }}
+          getModelLabel={(name) => name === OPENROUTER_MODEL_SENTINEL ? `OpenRouter · ${noteEditCloudModel}` : name}
         />
       )}
     </div>

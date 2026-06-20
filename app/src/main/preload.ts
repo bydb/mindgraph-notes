@@ -130,6 +130,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     targetLanguage?: string
     originalText: string
     customPrompt?: string
+    cloud?: { model: string } | null
   }) => ipcRenderer.invoke('ollama-generate', request),
   ollamaGenerateImage: (request: {
     model: string
@@ -160,8 +161,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('ollama-rerank-pair', model, query, document) as Promise<{ success: boolean; score?: number; error?: string }>,
 
   // Ollama Chat für Notes Chat
-  ollamaChat: (model: string, messages: Array<{ role: string; content: string }>, context: string, chatMode: 'direct' | 'socratic' | 'email' = 'direct') =>
-    ipcRenderer.invoke('ollama-chat', model, messages, context, chatMode),
+  ollamaChat: (model: string, messages: Array<{ role: string; content: string }>, context: string, chatMode: 'direct' | 'socratic' | 'email' = 'direct', cloud?: { model: string } | null) =>
+    ipcRenderer.invoke('ollama-chat', model, messages, context, chatMode, cloud),
   onOllamaChatChunk: (callback: (chunk: string) => void) => {
     ipcRenderer.removeAllListeners('ollama-chat-chunk')
     ipcRenderer.on('ollama-chat-chunk', (_event, chunk) => callback(chunk))
@@ -325,6 +326,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // Update-Checker & What's New
   getAppVersion: () => ipcRenderer.invoke('get-app-version'),
+  getSystemMemory: () => ipcRenderer.invoke('get-system-memory'),
   checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
   installUpdate: () => ipcRenderer.invoke('install-update'),
   downloadUpdate: () => ipcRenderer.invoke('download-update'),
@@ -408,8 +410,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('email-move', payload),
   emailFetch: (vaultPath: string, accounts: object[], lastFetchedAt: Record<string, string>, maxPerAccount: number) =>
     ipcRenderer.invoke('email-fetch', vaultPath, accounts, lastFetchedAt, maxPerAccount),
-  emailAnalyze: (vaultPath: string, model: string, emailIds?: string[], lowPowerMode?: boolean) =>
-    ipcRenderer.invoke('email-analyze', vaultPath, model, emailIds, lowPowerMode),
+  emailAnalyze: (vaultPath: string, model: string, emailIds?: string[], lowPowerMode?: boolean, cloud?: { model: string } | null) =>
+    ipcRenderer.invoke('email-analyze', vaultPath, model, emailIds, lowPowerMode, cloud),
   emailRelevanceConfigLoad: (vaultPath: string) =>
     ipcRenderer.invoke('email-relevance-config-load', vaultPath),
   emailRelevanceConfigSave: (vaultPath: string, config: unknown) =>
@@ -435,6 +437,17 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('email-save-password', accountId, password),
   emailLoadPassword: (accountId: string) =>
     ipcRenderer.invoke('email-load-password', accountId),
+  // OpenRouter Cloud-Backend
+  openrouterSaveKey: (apiKey: string) =>
+    ipcRenderer.invoke('openrouter-save-key', apiKey),
+  openrouterHasKey: () =>
+    ipcRenderer.invoke('openrouter-has-key'),
+  openrouterClearKey: () =>
+    ipcRenderer.invoke('openrouter-clear-key'),
+  openrouterListModels: () =>
+    ipcRenderer.invoke('openrouter-list-models'),
+  openrouterTest: (model: string) =>
+    ipcRenderer.invoke('openrouter-test', model),
   onEmailFetchProgress: (callback: (progress: { current: number; total: number; status: string }) => void) => {
     ipcRenderer.removeAllListeners('email-fetch-progress')
     ipcRenderer.on('email-fetch-progress', (_event, progress) => callback(progress))
