@@ -696,24 +696,5 @@ contextBridge.exposeInMainWorld('electronAPI', {
   projectStatusGenerateSynonyms: (vaultPath: string, projectFolderRel: string, model: string) =>
     ipcRenderer.invoke('project-status-generate-synonyms', vaultPath, projectFolderRel, model),
   projectStatusLoadSynonyms: (vaultPath: string, projectFolderRel: string) =>
-    ipcRenderer.invoke('project-status-load-synonyms', vaultPath, projectFolderRel),
-
-  // MindGraph Coach (adaptives Onboarding)
-  coachPrecheck: () =>
-    ipcRenderer.invoke('coach:precheck'),
-  coachStart: (args: { language: 'de' | 'en'; isRestart?: boolean }) =>
-    ipcRenderer.invoke('coach:start', args),
-  coachRespond: (payload: {
-    userText: string
-    history: Array<{ role: 'system' | 'user' | 'assistant' | 'tool'; content: string }>
-    vaultReady: boolean
-    acceptedActionIds: string[]
-    acceptedActionTypes: string[]
-    language: 'de' | 'en'
-  }) => ipcRenderer.invoke('coach:respond', payload),
-  coachAsk: (payload: {
-    question: string
-    history: Array<{ role: 'system' | 'user' | 'assistant' | 'tool'; content: string }>
-    language: 'de' | 'en'
-  }) => ipcRenderer.invoke('coach:ask', payload)
+    ipcRenderer.invoke('project-status-load-synonyms', vaultPath, projectFolderRel)
 })

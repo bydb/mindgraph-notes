@@ -51,7 +51,6 @@ import { embedText as ragEmbedText } from './rag/embed'
 import { cosineSimilarity as ragCosineSimilarity } from '../shared/rag/similarity'
 import type { RagIndexStatus, RagQueryResult, RagRetrieveOptions } from '../shared/rag/types'
 import { setupTray, hideTransportWindow, updateShortcut, showTransportWindow } from './transport/trayManager'
-import { registerCoachIpc } from './llm/coach/coachIpc'
 
 // Globale Fehlerbehandlung für unhandled exceptions (z.B. IMAP Socket-Timeouts)
 process.on('uncaughtException', (error) => {
@@ -113,7 +112,11 @@ const mainTranslations: Record<'de' | 'en', Record<string, string>> = {
     'dialog.selectLogo.filterName': 'Bilder',
     'dialog.edooboxFormular.title': 'Akkreditierungsformular auswählen',
     'dialog.edooboxFormular.filterName': 'Word-Dokumente',
-    'filter.markdown': 'Markdown'
+    'filter.markdown': 'Markdown',
+    'ctx.cut': 'Ausschneiden',
+    'ctx.copy': 'Kopieren',
+    'ctx.paste': 'Einfügen',
+    'ctx.selectAll': 'Alles auswählen'
   },
   en: {
     'btn.cancel': 'Cancel',
@@ -156,7 +159,11 @@ const mainTranslations: Record<'de' | 'en', Record<string, string>> = {
     'dialog.selectLogo.filterName': 'Images',
     'dialog.edooboxFormular.title': 'Select Accreditation Form',
     'dialog.edooboxFormular.filterName': 'Word Documents',
-    'filter.markdown': 'Markdown'
+    'filter.markdown': 'Markdown',
+    'ctx.cut': 'Cut',
+    'ctx.copy': 'Copy',
+    'ctx.paste': 'Paste',
+    'ctx.selectAll': 'Select All'
   }
 }
 
@@ -464,17 +471,17 @@ function createWindow(): void {
 
     if (params.isEditable) {
       if (params.selectionText) {
-        menuItems.push({ label: 'Ausschneiden', role: 'cut' })
+        menuItems.push({ label: t('ctx.cut'), role: 'cut' })
       }
-      menuItems.push({ label: 'Einfügen', role: 'paste' })
+      menuItems.push({ label: t('ctx.paste'), role: 'paste' })
     }
     if (params.selectionText) {
-      menuItems.push({ label: 'Kopieren', role: 'copy' })
+      menuItems.push({ label: t('ctx.copy'), role: 'copy' })
     }
     if (menuItems.length > 0) {
       menuItems.push({ type: 'separator' })
     }
-    menuItems.push({ label: 'Alles auswählen', role: 'selectAll' })
+    menuItems.push({ label: t('ctx.selectAll'), role: 'selectAll' })
 
     Menu.buildFromTemplate(menuItems).popup()
   })
@@ -11200,10 +11207,6 @@ ipcMain.handle('telegram-stop', async () => {
   return { success: true }
 })
 
-// ─── MindGraph Coach (adaptives Onboarding) ──────────────────────────────
-// Drei Handler: coach:precheck, coach:start, coach:respond. Vollständige Logik
-// liegt in main/llm/coach/, hier nur die Registrierung.
-registerCoachIpc()
 
 // Cleanup bei App-Beendigung
 app.on('before-quit', () => {

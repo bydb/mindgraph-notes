@@ -157,7 +157,7 @@ const DashboardOfferCard: React.FC<{ offer: EdooboxOfferDashboard }> = ({ offer 
             )}
             {offer.number && <span>{offer.number}</span>}
             {newBookings.length > 0 && (
-              <span className="agent-dashboard-new-badge">+{newBookings.length} neu</span>
+              <span className="agent-dashboard-new-badge">+{newBookings.length} {t('agent.dashboard.newBadge')}</span>
             )}
           </div>
         </div>
@@ -350,15 +350,15 @@ const EventDetail: React.FC<{ event: EdooboxEvent; onBack: () => void }> = ({ ev
 
       <div className="agent-detail-header">
         {editing ? (
-          <input className="agent-edit-input agent-edit-title" value={title} onChange={e => setTitle(e.target.value)} placeholder={t('agent.detail.titlePlaceholder') || 'Titel'} />
+          <input className="agent-edit-input agent-edit-title" value={title} onChange={e => setTitle(e.target.value)} placeholder={t('agent.detail.titlePlaceholder')} />
         ) : (
-          <h3>{event.title || 'Ohne Titel'}</h3>
+          <h3>{event.title || t('agent.detail.untitled')}</h3>
         )}
         <StatusBadge status={event.status} />
       </div>
 
       <div className="agent-detail-section">
-        <label>{t('agent.detail.description') || 'Beschreibung'}</label>
+        <label>{t('agent.detail.description')}</label>
         {editing ? (
           <textarea className="agent-edit-textarea" value={description} onChange={e => setDescription(e.target.value)} rows={4} />
         ) : (
@@ -367,10 +367,10 @@ const EventDetail: React.FC<{ event: EdooboxEvent; onBack: () => void }> = ({ ev
       </div>
 
       <div className="agent-detail-section">
-        <label>{t('agent.detail.category') || 'Kategorie'}</label>
+        <label>{t('agent.detail.category')}</label>
         {editing ? (
           <select className="agent-edit-select" value={category} onChange={e => setCategory(e.target.value)}>
-            <option value="">{t('agent.detail.selectCategory') || '— Kategorie wählen —'}</option>
+            <option value="">{t('agent.detail.selectCategory')}</option>
             {categories.map(c => (
               <option key={c.id} value={c.id}>{c.name}</option>
             ))}
@@ -384,7 +384,7 @@ const EventDetail: React.FC<{ event: EdooboxEvent; onBack: () => void }> = ({ ev
         <div className="agent-detail-section-header">
           <label>{t('agent.detail.dates')}</label>
           {editing && (
-            <button className="agent-add-btn" onClick={addDate} title="Termin hinzufügen">
+            <button className="agent-add-btn" onClick={addDate} title={t('agent.detail.addDate')}>
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
               </svg>
@@ -400,7 +400,7 @@ const EventDetail: React.FC<{ event: EdooboxEvent; onBack: () => void }> = ({ ev
                 <span>–</span>
                 <input type="time" value={d.endTime} onChange={e => handleDateChange(i, 'endTime', e.target.value)} />
                 {dates.length > 1 && (
-                  <button className="agent-remove-btn" onClick={() => removeDate(i)} title="Entfernen">
+                  <button className="agent-remove-btn" onClick={() => removeDate(i)} title={t('agent.detail.remove')}>
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
                     </svg>
@@ -417,7 +417,7 @@ const EventDetail: React.FC<{ event: EdooboxEvent; onBack: () => void }> = ({ ev
       <div className="agent-detail-section">
         <label>{t('agent.detail.location')}</label>
         {editing ? (
-          <input className="agent-edit-input" value={location} onChange={e => setLocation(e.target.value)} placeholder="Ort" />
+          <input className="agent-edit-input" value={location} onChange={e => setLocation(e.target.value)} placeholder={t('agent.detail.locationPlaceholder')} />
         ) : (
           event.location && <div>{event.location}</div>
         )}
@@ -426,7 +426,7 @@ const EventDetail: React.FC<{ event: EdooboxEvent; onBack: () => void }> = ({ ev
       <div className="agent-detail-section">
         <label>{t('agent.detail.participants')}</label>
         {editing ? (
-          <input className="agent-edit-input" type="number" value={maxParticipants} onChange={e => setMaxParticipants(e.target.value)} placeholder="Max. Teilnehmer" />
+          <input className="agent-edit-input" type="number" value={maxParticipants} onChange={e => setMaxParticipants(e.target.value)} placeholder={t('agent.detail.maxParticipantsPlaceholder')} />
         ) : (
           event.maxParticipants && <div>{event.maxParticipants}</div>
         )}
@@ -435,7 +435,7 @@ const EventDetail: React.FC<{ event: EdooboxEvent; onBack: () => void }> = ({ ev
       <div className="agent-detail-section">
         <label>{t('agent.detail.price')}</label>
         {editing ? (
-          <input className="agent-edit-input" type="number" step="0.01" value={price} onChange={e => setPrice(e.target.value)} placeholder="Preis in €" />
+          <input className="agent-edit-input" type="number" step="0.01" value={price} onChange={e => setPrice(e.target.value)} placeholder={t('agent.detail.pricePlaceholder')} />
         ) : (
           event.price !== undefined && event.price !== null && <div>{event.price} &euro;</div>
         )}
@@ -444,7 +444,7 @@ const EventDetail: React.FC<{ event: EdooboxEvent; onBack: () => void }> = ({ ev
       <div className="agent-detail-section">
         <label>{t('agent.detail.contact')}</label>
         {editing ? (
-          <input className="agent-edit-input" value={contact} onChange={e => setContact(e.target.value)} placeholder="Kontakt" />
+          <input className="agent-edit-input" value={contact} onChange={e => setContact(e.target.value)} placeholder={t('agent.detail.contactPlaceholder')} />
         ) : (
           event.contact && <div>{event.contact}</div>
         )}
@@ -479,13 +479,13 @@ const EventDetail: React.FC<{ event: EdooboxEvent; onBack: () => void }> = ({ ev
 
       <div className="agent-detail-actions">
         {canEdit && editing && (
-          <button className="agent-save-btn" onClick={handleSave}>{t('agent.save') || 'Speichern'}</button>
+          <button className="agent-save-btn" onClick={handleSave}>{t('agent.save')}</button>
         )}
         {canEdit && !editing && (
-          <button className="agent-edit-btn" onClick={() => setEditing(true)}>{t('agent.edit') || 'Bearbeiten'}</button>
+          <button className="agent-edit-btn" onClick={() => setEditing(true)}>{t('agent.edit')}</button>
         )}
         {event.status !== 'pushed' && (
-          <button className="agent-push-btn" onClick={() => pushEvent(event.id)} disabled={isPushing || !category} title={!category ? 'Bitte zuerst eine Kategorie wählen' : ''}>
+          <button className="agent-push-btn" onClick={() => pushEvent(event.id)} disabled={isPushing || !category} title={!category ? t('agent.detail.selectCategoryFirst') : ''}>
             {isPushing ? t('agent.pushing') : t('agent.push')}
           </button>
         )}
@@ -525,7 +525,7 @@ const EventsView: React.FC = () => {
           {events.map(event => (
             <button key={event.id} className="agent-event-item" onClick={() => setSelectedEventId(event.id)}>
               <div className="agent-event-item-main">
-                <div className="agent-event-item-title">{event.title || 'Ohne Titel'}</div>
+                <div className="agent-event-item-title">{event.title || t('agent.detail.untitled')}</div>
                 <div className="agent-event-item-meta">
                   {event.dates[0]?.date}
                   {event.location ? ` · ${event.location}` : ''}

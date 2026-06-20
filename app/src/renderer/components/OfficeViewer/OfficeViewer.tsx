@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react'
 import type { ExcelData, WordData, PowerPointData } from '../../../shared/types'
 import { useNotesStore, createNoteFromFile } from '../../stores/notesStore'
+import { useTranslation } from '../../utils/translations'
 import { sanitizeHtml } from '../../utils/sanitize'
 import { writeClipboardText } from '../../utils/clipboard'
 import './OfficeViewer.css'
@@ -29,6 +30,7 @@ const ExcelViewer: React.FC<OfficeViewerProps> = ({ filePath, fileName, relative
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const { vaultPath, selectedNoteId, notes, updateNote } = useNotesStore()
+  const { t } = useTranslation()
 
   useEffect(() => {
     let cancelled = false
@@ -39,7 +41,7 @@ const ExcelViewer: React.FC<OfficeViewerProps> = ({ filePath, fileName, relative
     window.electronAPI.officeParseExcel(filePath).then((res) => {
       if (cancelled) return
       if (res.success && res.data) setData(res.data)
-      else setError(res.error || 'Excel-Datei konnte nicht gelesen werden')
+      else setError(res.error || t('officeViewer.excelReadError'))
       setLoading(false)
     })
     return () => { cancelled = true }
@@ -51,14 +53,14 @@ const ExcelViewer: React.FC<OfficeViewerProps> = ({ filePath, fileName, relative
     if (!sheet || !vaultPath) return
     const activeNote = notes.find((n) => n.id === selectedNoteId)
     if (!activeNote) {
-      alert('Keine aktive Notiz ausgewählt. Bitte öffne zuerst eine Notiz.')
+      alert(t('officeViewer.noActiveNote'))
       return
     }
     setBusy(true)
     try {
       const res = await window.electronAPI.officeExcelToMarkdown(filePath, sheet.name)
       if (!res.success || !res.markdown) {
-        alert(res.error || 'Konvertierung fehlgeschlagen')
+        alert(res.error || t('officeViewer.conversionFailed'))
         return
       }
       const newContent = activeNote.content + '\n\n' + res.markdown + '\n'
@@ -86,8 +88,8 @@ const ExcelViewer: React.FC<OfficeViewerProps> = ({ filePath, fileName, relative
           <span title={relativePath}>{fileName}</span>
         </div>
         <div className="office-viewer-actions">
-          <button className="office-action-btn" onClick={copyMarkdown} disabled={!sheet || busy}>Als Markdown kopieren</button>
-          <button className="office-action-btn primary" onClick={insertIntoActiveNote} disabled={!sheet || busy}>In aktive Notiz einfügen</button>
+          <button className="office-action-btn" onClick={copyMarkdown} disabled={!sheet || busy}>{t('officeViewer.copyAsMarkdown')}</button>
+          <button className="office-action-btn primary" onClick={insertIntoActiveNote} disabled={!sheet || busy}>{t('officeViewer.insertIntoNote')}</button>
         </div>
       </div>
 
@@ -102,7 +104,7 @@ const ExcelViewer: React.FC<OfficeViewerProps> = ({ filePath, fileName, relative
       )}
 
       <div className="office-viewer-body">
-        {loading && <div className="office-loading">Lade Excel-Datei…</div>}
+        {loading && <div className="office-loading">{t('officeViewer.loadingExcel')}</div>}
         {error && <div className="office-error">⚠️ {error}</div>}
         {sheet && !loading && (
           <div className="excel-table-wrapper">
@@ -142,6 +144,7 @@ const WordViewer: React.FC<OfficeViewerProps> = ({ filePath, fileName, relativeP
   const [busy, setBusy] = useState(false)
   const [importMsg, setImportMsg] = useState<string | null>(null)
   const { vaultPath, setFileTree, selectNote, addNote } = useNotesStore()
+  const { t } = useTranslation()
 
   useEffect(() => {
     let cancelled = false
@@ -151,7 +154,7 @@ const WordViewer: React.FC<OfficeViewerProps> = ({ filePath, fileName, relativeP
     window.electronAPI.officeParseDocx(filePath).then((res) => {
       if (cancelled) return
       if (res.success && res.data) setData(res.data)
-      else setError(res.error || 'Word-Dokument konnte nicht gelesen werden')
+      else setError(res.error || t('officeViewer.wordReadError'))
       setLoading(false)
     })
     return () => { cancelled = true }
@@ -172,9 +175,9 @@ const WordViewer: React.FC<OfficeViewerProps> = ({ filePath, fileName, relativeP
         const note = await createNoteFromFile(fullPath, res.relativePath, content || '')
         addNote(note)
         selectNote(note.id)
-        setImportMsg(`Importiert: ${res.relativePath}`)
+        setImportMsg(t('officeViewer.imported', { path: res.relativePath }))
       } else {
-        setImportMsg(res.error || 'Import fehlgeschlagen')
+        setImportMsg(res.error || t('officeViewer.importFailed'))
       }
     } finally {
       setBusy(false)
@@ -189,11 +192,11 @@ const WordViewer: React.FC<OfficeViewerProps> = ({ filePath, fileName, relativeP
           <span title={relativePath}>{fileName}</span>
         </div>
         <div className="office-viewer-actions">
-          <button className="office-action-btn primary" onClick={importAsNote} disabled={busy || !vaultPath}>Als Notiz importieren</button>
+          <button className="office-action-btn primary" onClick={importAsNote} disabled={busy || !vaultPath}>{t('officeViewer.importAsNote')}</button>
         </div>
       </div>
       <div className="office-viewer-body">
-        {loading && <div className="office-loading">Lade Word-Dokument…</div>}
+        {loading && <div className="office-loading">{t('officeViewer.loadingWord')}</div>}
         {error && <div className="office-error">⚠️ {error}</div>}
         {importMsg && <div className="office-loading">{importMsg}</div>}
         {data && !loading && (
@@ -214,6 +217,7 @@ const PowerPointViewer: React.FC<OfficeViewerProps> = ({ filePath, fileName, rel
   const [busy, setBusy] = useState(false)
   const [importMsg, setImportMsg] = useState<string | null>(null)
   const { vaultPath, setFileTree, selectNote, addNote } = useNotesStore()
+  const { t } = useTranslation()
 
   useEffect(() => {
     let cancelled = false
@@ -224,7 +228,7 @@ const PowerPointViewer: React.FC<OfficeViewerProps> = ({ filePath, fileName, rel
     window.electronAPI.officeParsePptx(filePath).then((res) => {
       if (cancelled) return
       if (res.success && res.data) setData(res.data)
-      else setError(res.error || 'PowerPoint-Datei konnte nicht gelesen werden')
+      else setError(res.error || t('officeViewer.pptxReadError'))
       setLoading(false)
     })
     return () => { cancelled = true }
@@ -245,9 +249,9 @@ const PowerPointViewer: React.FC<OfficeViewerProps> = ({ filePath, fileName, rel
         const note = await createNoteFromFile(fullPath, res.relativePath, content || '')
         addNote(note)
         selectNote(note.id)
-        setImportMsg(`Importiert: ${res.relativePath}`)
+        setImportMsg(t('officeViewer.imported', { path: res.relativePath }))
       } else {
-        setImportMsg(res.error || 'Import fehlgeschlagen')
+        setImportMsg(res.error || t('officeViewer.importFailed'))
       }
     } finally {
       setBusy(false)
@@ -265,18 +269,18 @@ const PowerPointViewer: React.FC<OfficeViewerProps> = ({ filePath, fileName, rel
           <span title={relativePath}>{fileName}</span>
         </div>
         <div className="office-viewer-actions">
-          <button className="office-action-btn primary" onClick={importAsNote} disabled={busy || !vaultPath}>Als Slides-Notiz importieren</button>
+          <button className="office-action-btn primary" onClick={importAsNote} disabled={busy || !vaultPath}>{t('officeViewer.importAsSlidesNote')}</button>
         </div>
       </div>
       {data && total > 0 && (
         <div className="pptx-nav">
           <button className="office-action-btn" onClick={() => setSlideIdx((i) => Math.max(0, i - 1))} disabled={slideIdx === 0}>←</button>
-          <span>Slide {slideIdx + 1} / {total}</span>
+          <span>{t('officeViewer.slide')} {slideIdx + 1} / {total}</span>
           <button className="office-action-btn" onClick={() => setSlideIdx((i) => Math.min(total - 1, i + 1))} disabled={slideIdx >= total - 1}>→</button>
         </div>
       )}
       <div className="office-viewer-body">
-        {loading && <div className="office-loading">Lade PowerPoint-Datei…</div>}
+        {loading && <div className="office-loading">{t('officeViewer.loadingPptx')}</div>}
         {error && <div className="office-error">⚠️ {error}</div>}
         {importMsg && <div className="office-loading">{importMsg}</div>}
         {slide && !loading && (

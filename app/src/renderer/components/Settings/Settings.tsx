@@ -12,6 +12,7 @@ import { OpenRouterSection } from './OpenRouterSection'
 import { EmailRelevanceRulesSection } from './EmailRelevanceRulesSection'
 import { getModelVerdict, CLOUD_TEST_MODELS, RECOMMENDED_PULL_MODELS, isCloudModel, modelMarkers } from '../../../shared/modelCompatibility'
 import { OPENROUTER_MODEL_SENTINEL, isOpenRouterReady } from '../../../shared/llmBackend'
+import { ModelRamWarning } from '../Shared/ModelRamWarning'
 import { ModelPicker } from '../Shared/ModelPicker'
 import { ensureTransformersModel, isTransformersModelReady } from '../../utils/voice/transformersStt'
 import { writeClipboardText } from '../../utils/clipboard'
@@ -2941,6 +2942,7 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab 
                           </div>
                         </div>
                         <ActiveModelStatusBadge model={ollama.selectedModel} />
+                        <ModelRamWarning model={ollama.selectedModel} />
                       </div>
                     )}
 
@@ -3134,6 +3136,7 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab 
                           />
                         </div>
                         <ActiveModelStatusBadge model={ollama.selectedModel} />
+                        <ModelRamWarning model={ollama.selectedModel} />
                       </div>
                     )}
 
@@ -3538,7 +3541,7 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab 
                       disabled={!visionOcr.enabled}
                       style={{ minWidth: '200px' }}
                     >
-                      <option value="">-- Modell wählen --</option>
+                      <option value="">{t('settings.selectModel')}</option>
                       {visionOcrModelList.map(m => (
                         <option key={m.name} value={m.name}>{m.name}</option>
                       ))}
@@ -5072,6 +5075,9 @@ LIMIT 10
                             </span>
                           )
                         })()}
+                        {emailSettings.analysisModel !== OPENROUTER_MODEL_SENTINEL && (
+                          <ModelRamWarning model={emailSettings.analysisModel || ollama.selectedModel} />
+                        )}
                       </div>
                     </div>
 

@@ -696,7 +696,7 @@ export const NotesChat: React.FC<NotesChatProps> = ({ onClose }) => {
                   onChange={(e) => setSelectedFolder(e.target.value)}
                   disabled={isStreaming}
                 >
-                  <option value="">Ordner wählen...</option>
+                  <option value="">{t('notesChat.selectFolder')}</option>
                   {folders.map(folder => (
                     <option key={folder} value={folder}>
                       {folder}
@@ -726,7 +726,7 @@ export const NotesChat: React.FC<NotesChatProps> = ({ onClose }) => {
             </div>
 
             <div className="notes-chat-mode">
-              <label>Modus:</label>
+              <label>{t('notesChat.modeLabel')}</label>
               <div className="notes-chat-mode-buttons">
                 <button
                   className={chatMode === 'direct' ? 'active' : ''}

@@ -1,4 +1,6 @@
 import React from 'react'
+import { t } from './../utils/translations'
+import { useUIStore } from '../stores/uiStore'
 
 interface Props {
   children: React.ReactNode
@@ -26,6 +28,7 @@ export class ErrorBoundary extends React.Component<Props, State> {
   render() {
     if (!this.state.error) return this.props.children
     if (this.props.fallback) return this.props.fallback
+    const lang = useUIStore.getState().language === 'en' ? 'en' : 'de'
     return (
       <div style={{
         padding: '12px 14px',
@@ -37,7 +40,7 @@ export class ErrorBoundary extends React.Component<Props, State> {
         fontSize: 13
       }}>
         <div style={{ fontWeight: 600, marginBottom: 6 }}>
-          {this.props.label || 'Widget'} konnte nicht gerendert werden
+          {t('errorBoundary.renderFailed', lang, { label: this.props.label || 'Widget' })}
         </div>
         <div style={{ marginBottom: 8, fontFamily: 'ui-monospace, monospace', fontSize: 12, opacity: 0.8 }}>
           {this.state.error.message}
@@ -49,7 +52,7 @@ export class ErrorBoundary extends React.Component<Props, State> {
           borderRadius: 4,
           background: 'transparent',
           cursor: 'pointer'
-        }}>Erneut versuchen</button>
+        }}>{t('errorBoundary.retry', lang)}</button>
       </div>
     )
   }

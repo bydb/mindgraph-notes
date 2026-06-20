@@ -16,6 +16,7 @@ import { useUIStore } from '../../stores/uiStore'
 import { useTranslation, type TranslationKey } from '../../utils/translations'
 import { ModelLogo } from '../Shared/ModelLogo'
 import { ModelMarkers, AppleLogo, StarIcon } from '../Shared/ModelMarkers'
+import { ModelRamWarning } from '../Shared/ModelRamWarning'
 
 interface Props {
   availableModels: Array<{ name: string; size: number }>
@@ -124,6 +125,8 @@ function ModuleRow({
           {t('settings.integrations.compatibility.recommended')}: <strong>{recommended}</strong>
         </div>
       )}
+
+      {effectiveModel && <ModelRamWarning model={effectiveModel} />}
 
       {tabOverride && tabOverride.model && (
         <div

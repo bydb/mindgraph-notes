@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from 'react'
 import { useUIStore } from '../../stores/uiStore'
 import { useNotesStore } from '../../stores/notesStore'
+import { useTranslation, type TranslationKey } from '../../utils/translations'
 
 export const TelegramSettings: React.FC = () => {
+  const { t } = useTranslation()
   const telegramBot = useUIStore(s => s.telegramBot)
   const setTelegramBot = useUIStore(s => s.setTelegramBot)
   const projectsRootFolder = useUIStore(s => s.projectsRootFolder)
@@ -82,9 +84,9 @@ export const TelegramSettings: React.FC = () => {
     if (ok) {
       setTokenInput('')
       setHasToken(true)
-      setStatusMsg({ text: 'Bot-Token gespeichert.', kind: 'success' })
+      setStatusMsg({ text: t('telegramSettings.tokenSaved'), kind: 'success' })
     } else {
-      setStatusMsg({ text: 'Token konnte nicht gespeichert werden.', kind: 'error' })
+      setStatusMsg({ text: t('telegramSettings.tokenSaveFailed'), kind: 'error' })
     }
   }
 
@@ -92,7 +94,7 @@ export const TelegramSettings: React.FC = () => {
     const id = newChatId.trim()
     if (!id) return
     if (!/^-?\d+$/.test(id)) {
-      setStatusMsg({ text: 'Chat-ID muss eine Zahl sein.', kind: 'error' })
+      setStatusMsg({ text: t('telegramSettings.chatIdMustBeNumber'), kind: 'error' })
       return
     }
     if (telegramBot.allowedChatIds.includes(id)) return
@@ -118,15 +120,15 @@ export const TelegramSettings: React.FC = () => {
 
   const startBot = async () => {
     setBusy(true)
-    setStatusMsg({ text: 'Starte Bot …', kind: 'info' })
+    setStatusMsg({ text: t('telegramSettings.starting'), kind: 'info' })
     const res = await window.electronAPI.telegramStart()
     setBusy(false)
     if (res.success) {
       setActive(true)
       setTelegramBot({ active: true })
-      setStatusMsg({ text: res.alreadyRunning ? 'Bot lief bereits.' : 'Bot gestartet — schreib /start an deinen Bot.', kind: 'success' })
+      setStatusMsg({ text: res.alreadyRunning ? t('telegramSettings.alreadyRunning') : t('telegramSettings.started'), kind: 'success' })
     } else {
-      setStatusMsg({ text: res.error ?? 'Start fehlgeschlagen.', kind: 'error' })
+      setStatusMsg({ text: res.error ?? t('telegramSettings.startFailed'), kind: 'error' })
     }
   }
 
@@ -137,16 +139,15 @@ export const TelegramSettings: React.FC = () => {
     if (res.success) {
       setActive(false)
       setTelegramBot({ active: false })
-      setStatusMsg({ text: 'Bot gestoppt.', kind: 'info' })
+      setStatusMsg({ text: t('telegramSettings.stopped'), kind: 'info' })
     }
   }
 
   return (
     <div className="settings-section">
-      <h3>Telegram-Bot</h3>
+      <h3>{t('telegramSettings.heading')}</h3>
       <p className="settings-help">
-        Stelle Fragen an dein Vault per Telegram — Tasks abfragen, Morning-Briefings erhalten, Notizen durchsuchen.
-        Der Bot läuft lokal in MindGraph, solange die App geöffnet ist.
+        {t('telegramSettings.intro')}
       </p>
 
       {/* Status */}
@@ -161,14 +162,14 @@ export const TelegramSettings: React.FC = () => {
               background: active ? '#44c767' : '#b0b0b0'
             }}
           />
-          <strong>{active ? 'Bot aktiv' : 'Bot inaktiv'}</strong>
+          <strong>{active ? t('telegramSettings.botActive') : t('telegramSettings.botInactive')}</strong>
           {!active && hasToken && (
             <button className="settings-button primary" onClick={startBot} disabled={busy}>
-              {telegramBot.allowedChatIds.length === 0 ? 'Starten (Chat-ID ermitteln)' : 'Starten'}
+              {telegramBot.allowedChatIds.length === 0 ? t('telegramSettings.startDetectChatId') : t('telegramSettings.start')}
             </button>
           )}
           {active && (
-            <button className="settings-button" onClick={stopBot} disabled={busy}>Stoppen</button>
+            <button className="settings-button" onClick={stopBot} disabled={busy}>{t('telegramSettings.stop')}</button>
           )}
         </div>
         {statusMsg && (
@@ -194,49 +195,47 @@ export const TelegramSettings: React.FC = () => {
             checked={telegramBot.enabled}
             onChange={e => setTelegramBot({ enabled: e.target.checked })}
           />
-          <span>Telegram-Bot-Feature aktivieren</span>
+          <span>{t('telegramSettings.enableFeature')}</span>
         </label>
       </div>
 
       {/* Bot-Token */}
       <div className="settings-group">
-        <label className="settings-label">Bot-Token {hasToken && <span style={{ color: '#44c767' }}>✓ gespeichert</span>}</label>
+        <label className="settings-label">{t('telegramSettings.botToken')} {hasToken && <span style={{ color: '#44c767' }}>{t('telegramSettings.savedCheck')}</span>}</label>
         <p className="settings-help">
-          Erstelle einen Bot bei <a href="https://t.me/BotFather" target="_blank" rel="noopener noreferrer">@BotFather</a> in
-          Telegram — er gibt dir einen Token wie <code>123456:ABC-DEF...</code>.
+          {t('telegramSettings.tokenHelpBefore')} <a href="https://t.me/BotFather" target="_blank" rel="noopener noreferrer">@BotFather</a> {t('telegramSettings.tokenHelpAfter')} <code>123456:ABC-DEF...</code>.
         </p>
         <div style={{ display: 'flex', gap: 8 }}>
           <input
             type="password"
-            placeholder={hasToken ? 'Neuen Token setzen …' : 'Bot-Token hier einfügen'}
+            placeholder={hasToken ? t('telegramSettings.tokenPlaceholderSet') : t('telegramSettings.tokenPlaceholderNew')}
             value={tokenInput}
             onChange={e => setTokenInput(e.target.value)}
             className="settings-input"
             style={{ flex: 1 }}
           />
           <button className="settings-button" onClick={saveToken} disabled={busy || !tokenInput.trim()}>
-            Speichern
+            {t('telegramSettings.save')}
           </button>
         </div>
       </div>
 
       {/* Chat-IDs */}
       <div className="settings-group">
-        <label className="settings-label">Freigeschaltete Chat-IDs</label>
+        <label className="settings-label">{t('telegramSettings.allowedChatIds')}</label>
         <p className="settings-help">
-          Schreibe dem Bot einmal in Telegram — er zeigt dir deine Chat-ID an, wenn du nicht freigeschaltet bist.
-          Trage sie hier ein, damit der Bot dir antwortet.
+          {t('telegramSettings.chatIdsHelp')}
         </p>
         <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
           <input
             type="text"
-            placeholder="z. B. 123456789"
+            placeholder={t('telegramSettings.chatIdPlaceholder')}
             value={newChatId}
             onChange={e => setNewChatId(e.target.value)}
             className="settings-input"
             style={{ flex: 1 }}
           />
-          <button className="settings-button" onClick={addChatId}>Hinzufügen</button>
+          <button className="settings-button" onClick={addChatId}>{t('telegramSettings.add')}</button>
         </div>
         {telegramBot.allowedChatIds.length > 0 && (
           <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
@@ -254,7 +253,7 @@ export const TelegramSettings: React.FC = () => {
                 }}
               >
                 <code>{id}</code>
-                <button className="settings-button small" onClick={() => removeChatId(id)}>Entfernen</button>
+                <button className="settings-button small" onClick={() => removeChatId(id)}>{t('telegramSettings.remove')}</button>
               </li>
             ))}
           </ul>
@@ -263,31 +262,30 @@ export const TelegramSettings: React.FC = () => {
 
       {/* Ollama-Modell */}
       <div className="settings-group">
-        <label className="settings-label">Ollama-Modell für /ask, /briefing, /agent</label>
+        <label className="settings-label">{t('telegramSettings.ollamaModelLabel')}</label>
         <input
           type="text"
-          placeholder="leer = automatisch wählen"
+          placeholder={t('telegramSettings.ollamaModelPlaceholder')}
           value={telegramBot.ollamaModel}
           onChange={e => setTelegramBot({ ollamaModel: e.target.value })}
           className="settings-input"
         />
         <p className="settings-help" style={{ marginTop: 4, fontSize: 12 }}>
-          Lokales Ollama-Modell (z. B. <code>qwen3.6:27b-mlx</code>) oder Ollama-Cloud-Modell
-          (z. B. <code>qwen3.5:cloud</code> — braucht <code>ollama signin</code>).
-          Leer lassen = MindGraph wählt ein Tool-fähiges Modell automatisch.
+          {t('telegramSettings.ollamaModelHelpBefore')} <code>qwen3.6:27b-mlx</code>{t('telegramSettings.ollamaModelHelpMid')} <code>qwen3.5:cloud</code> {t('telegramSettings.ollamaModelHelpSignin')} <code>ollama signin</code>).
+          {t('telegramSettings.ollamaModelHelpAfter')}
         </p>
       </div>
 
       {/* Briefing-Optionen */}
       <div className="settings-group">
-        <label className="settings-label">Morning-Briefing enthält</label>
+        <label className="settings-label">{t('telegramSettings.briefingIncludes')}</label>
         <label className="settings-row">
           <input
             type="checkbox"
             checked={telegramBot.briefingIncludeOverdue}
             onChange={e => setTelegramBot({ briefingIncludeOverdue: e.target.checked })}
           />
-          <span>Überfällige Tasks</span>
+          <span>{t('telegramSettings.overdueTasks')}</span>
         </label>
         <label className="settings-row">
           <input
@@ -295,22 +293,20 @@ export const TelegramSettings: React.FC = () => {
             checked={telegramBot.briefingIncludeEmails}
             onChange={e => setTelegramBot({ briefingIncludeEmails: e.target.checked })}
           />
-          <span>Relevante ungelesene Emails</span>
+          <span>{t('telegramSettings.relevantUnreadEmails')}</span>
         </label>
       </div>
 
       {/* Priority-Ordner */}
       <div className="settings-group">
-        <label className="settings-label">Priorisierte Ordner</label>
+        <label className="settings-label">{t('telegramSettings.priorityFolders')}</label>
         <p className="settings-help">
-          Notizen aus diesen Ordnern fließen automatisch in <code>/ask</code> und <code>/inbox</code> ein —
-          unabhängig davon, ob deine Frage Keywords daraus enthält. Ideal z. B. für Inbox- oder
-          aktuelle Projekt-Ordner. Pfade sind relativ zum Vault.
+          {t('telegramSettings.priorityFoldersHelpBefore')} <code>/ask</code> {t('telegramSettings.priorityFoldersHelpAnd')} <code>/inbox</code> {t('telegramSettings.priorityFoldersHelpAfter')}
         </p>
         <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
           <input
             type="text"
-            placeholder="z. B. 000 - 📥 inbox/010 - 📥 Notes"
+            placeholder={t('telegramSettings.priorityFolderPlaceholder')}
             value={newPriorityFolder}
             onChange={e => setNewPriorityFolder(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addPriorityFolder() } }}
@@ -324,7 +320,7 @@ export const TelegramSettings: React.FC = () => {
               .slice(0, 200)
               .map(f => <option key={f} value={f} />)}
           </datalist>
-          <button className="settings-button" onClick={addPriorityFolder} disabled={!newPriorityFolder.trim()}>Hinzufügen</button>
+          <button className="settings-button" onClick={addPriorityFolder} disabled={!newPriorityFolder.trim()}>{t('telegramSettings.add')}</button>
         </div>
         {telegramBot.priorityFolders.length > 0 && (
           <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
@@ -342,7 +338,7 @@ export const TelegramSettings: React.FC = () => {
                 }}
               >
                 <code style={{ fontSize: 12 }}>{folder}</code>
-                <button className="settings-button small" onClick={() => removePriorityFolder(folder)}>Entfernen</button>
+                <button className="settings-button small" onClick={() => removePriorityFolder(folder)}>{t('telegramSettings.remove')}</button>
               </li>
             ))}
           </ul>
@@ -351,12 +347,9 @@ export const TelegramSettings: React.FC = () => {
 
       {/* Agent-Modus */}
       <div className="settings-group">
-        <label className="settings-label">🤖 Agent-Modus (experimentell)</label>
+        <label className="settings-label">{t('telegramSettings.agentMode')}</label>
         <p className="settings-help">
-          Erlaubt dem Bot, mit Tools zu arbeiten — Notizen suchen, lesen, neu anlegen oder ergänzen,
-          Tasks abhaken. Schreib-Operationen werden im Chat per Bestätigungs-Button abgesichert.
-          Aktuell nur mit Ollama (lokales Modell muss Tool-Calling unterstützen,
-          z. B. <code>llama3.1</code>, <code>qwen2.5-coder:14b</code>, <code>mistral-nemo</code>).
+          {t('telegramSettings.agentModeHelpBefore')} <code>llama3.1</code>, <code>qwen2.5-coder:14b</code>, <code>mistral-nemo</code>).
         </p>
         <label className="settings-row">
           <input
@@ -364,17 +357,17 @@ export const TelegramSettings: React.FC = () => {
             checked={telegramBot.agentEnabled}
             onChange={e => setTelegramBot({ agentEnabled: e.target.checked })}
           />
-          <span>Agent-Modus aktivieren (<code>/agent &lt;auftrag&gt;</code>)</span>
+          <span>{t('telegramSettings.enableAgentMode')} (<code>/agent &lt;{t('telegramSettings.taskArg')}&gt;</code>)</span>
         </label>
 
         {telegramBot.agentEnabled && (
           <>
             <label className="settings-label" style={{ marginTop: 12 }}>
-              Inbox-Ordner für neu angelegte Notizen
+              {t('telegramSettings.inboxFolderLabel')}
             </label>
             <input
               type="text"
-              placeholder="z. B. 000 - 📥 inbox/010 - 📥 Notes (leer = Vault-Root)"
+              placeholder={t('telegramSettings.inboxFolderPlaceholder')}
               value={telegramBot.agentInboxFolder}
               onChange={e => setTelegramBot({ agentInboxFolder: e.target.value })}
               className="settings-input"
@@ -385,7 +378,7 @@ export const TelegramSettings: React.FC = () => {
             </datalist>
 
             <label className="settings-label" style={{ marginTop: 12 }}>
-              Maximale Iterationen pro Auftrag: <strong>{telegramBot.agentMaxIterations}</strong>
+              {t('telegramSettings.maxIterations')} <strong>{telegramBot.agentMaxIterations}</strong>
             </label>
             <input
               type="range"
@@ -396,29 +389,29 @@ export const TelegramSettings: React.FC = () => {
               className="settings-input"
             />
             <p className="settings-help">
-              Hard-Limit gegen Endlos-Loops. 8 ist ein guter Default.
+              {t('telegramSettings.maxIterationsHelp')}
             </p>
 
-            <label className="settings-label" style={{ marginTop: 12 }}>Aktive Tools</label>
+            <label className="settings-label" style={{ marginTop: 12 }}>{t('telegramSettings.activeTools')}</label>
             <p className="settings-help">
-              Schreib-Tools (rot) erfordern immer eine Bestätigung im Chat.
+              {t('telegramSettings.writeToolsHelp')}
             </p>
-            {AGENT_TOOLS.map(t => {
-              const enabled = telegramBot.agentAllowedTools.includes(t.name)
+            {AGENT_TOOLS.map(tool => {
+              const enabled = telegramBot.agentAllowedTools.includes(tool.name)
               const toggle = () => {
                 const next = enabled
-                  ? telegramBot.agentAllowedTools.filter(n => n !== t.name)
-                  : [...telegramBot.agentAllowedTools, t.name]
+                  ? telegramBot.agentAllowedTools.filter(n => n !== tool.name)
+                  : [...telegramBot.agentAllowedTools, tool.name]
                 setTelegramBot({ agentAllowedTools: next })
               }
               return (
-                <label key={t.name} className="settings-row" style={{ alignItems: 'flex-start' }}>
+                <label key={tool.name} className="settings-row" style={{ alignItems: 'flex-start' }}>
                   <input type="checkbox" checked={enabled} onChange={toggle} />
                   <span>
-                    <code style={{ color: t.write ? '#d44' : 'inherit' }}>{t.name}</code>
-                    {t.write && <span style={{ fontSize: 11, marginLeft: 6, color: '#d44' }}>(Schreibend, Confirm)</span>}
+                    <code style={{ color: tool.write ? '#d44' : 'inherit' }}>{tool.name}</code>
+                    {tool.write && <span style={{ fontSize: 11, marginLeft: 6, color: '#d44' }}>{t('telegramSettings.writeConfirm')}</span>}
                     <br />
-                    <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{t.description}</span>
+                    <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{t(`telegramSettings.tool.${tool.name}` as TranslationKey)}</span>
                   </span>
                 </label>
               )
@@ -429,19 +422,19 @@ export const TelegramSettings: React.FC = () => {
 
       {/* Commands-Referenz */}
       <div className="settings-group">
-        <label className="settings-label">Verfügbare Befehle</label>
+        <label className="settings-label">{t('telegramSettings.availableCommands')}</label>
         <ul style={{ fontSize: 13, lineHeight: 1.8, paddingLeft: 20 }}>
-          <li><code>/today</code> oder <code>/todos</code> — heute fällige Tasks</li>
-          <li><code>/overdue</code> — überfällige Tasks</li>
-          <li><code>/week</code> — Tasks der nächsten 7 Tage</li>
-          <li><code>/agenda</code> — Kalender-Termine heute + morgen</li>
-          <li><code>/inbox</code> — neueste Notizen aus priorisierten Ordnern</li>
-          <li><code>/briefing</code> — Morning-Briefing (LLM-generiert)</li>
-          <li><code>/ask &lt;frage&gt;</code> — Frage an deinen Vault stellen</li>
+          <li><code>/today</code> {t('telegramSettings.or')} <code>/todos</code> — {t('telegramSettings.cmdToday')}</li>
+          <li><code>/overdue</code> — {t('telegramSettings.cmdOverdue')}</li>
+          <li><code>/week</code> — {t('telegramSettings.cmdWeek')}</li>
+          <li><code>/agenda</code> — {t('telegramSettings.cmdAgenda')}</li>
+          <li><code>/inbox</code> — {t('telegramSettings.cmdInbox')}</li>
+          <li><code>/briefing</code> — {t('telegramSettings.cmdBriefing')}</li>
+          <li><code>/ask &lt;{t('telegramSettings.questionArg')}&gt;</code> — {t('telegramSettings.cmdAsk')}</li>
           {telegramBot.agentEnabled && (
-            <li><code>/agent &lt;auftrag&gt;</code> — Agent mit Tool-Use (Lesen + Schreiben mit Confirm)</li>
+            <li><code>/agent &lt;{t('telegramSettings.taskArg')}&gt;</code> — {t('telegramSettings.cmdAgent')}</li>
           )}
-          <li>Freier Text ohne <code>/</code> — wird als <code>/ask</code> behandelt</li>
+          <li>{t('telegramSettings.cmdFreeTextBefore')} <code>/</code> — {t('telegramSettings.cmdFreeTextMid')} <code>/ask</code> {t('telegramSettings.cmdFreeTextAfter')}</li>
         </ul>
       </div>
     </div>

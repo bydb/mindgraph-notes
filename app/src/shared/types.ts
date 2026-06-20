@@ -1044,29 +1044,6 @@ export interface ElectronAPI {
   projectStatusSetStatus: (vaultPath: string, projectFolderRel: string, status: 'active' | 'done') => Promise<{ success: boolean; error?: string }>;
   projectStatusGenerateSynonyms: (vaultPath: string, projectFolderRel: string, model: string) => Promise<{ success: boolean; cache?: ProjectSynonymCache; error?: string }>;
   projectStatusLoadSynonyms: (vaultPath: string, projectFolderRel: string) => Promise<{ success: boolean; cache?: ProjectSynonymCache | null; error?: string }>;
-
-  // MindGraph Coach (adaptives Onboarding)
-  coachPrecheck: () => Promise<{ backend: 'ollama' | 'none'; detail: string }>;
-  coachStart: (args: { language: 'de' | 'en'; isRestart?: boolean }) => Promise<{ greeting: string; backend: 'ollama' | 'none' }>;
-  coachRespond: (payload: {
-    userText: string;
-    history: Array<{ role: 'system' | 'user' | 'assistant' | 'tool'; content: string }>;
-    vaultReady: boolean;
-    acceptedActionIds: string[];
-    acceptedActionTypes: string[];
-    language: 'de' | 'en';
-  }) => Promise<
-    | { ok: true; text: string; actions: Array<{ actionId: string; type: string; title: string; description: string; payload: Record<string, unknown>; status: string }>; backend: 'ollama'; warnings: string[] }
-    | { ok: false; error: string }
-  >;
-  coachAsk: (payload: {
-    question: string;
-    history: Array<{ role: 'system' | 'user' | 'assistant' | 'tool'; content: string }>;
-    language: 'de' | 'en';
-  }) => Promise<
-    | { ok: true; text: string; backend: 'ollama' }
-    | { ok: false; error: string }
-  >;
 }
 
 // Brain (lokales Tagesgedächtnis — Phase 1)

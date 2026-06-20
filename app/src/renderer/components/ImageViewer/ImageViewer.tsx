@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { sanitizeSvg } from '../../utils/sanitize'
+import { useTranslation } from '../../utils/translations'
 import './ImageViewer.css'
 
 interface ImageViewerProps {
@@ -8,6 +9,7 @@ interface ImageViewerProps {
 }
 
 export const ImageViewer: React.FC<ImageViewerProps> = ({ filePath, fileName }) => {
+  const { t } = useTranslation()
   const [imageSrc, setImageSrc] = useState<string | null>(null)
   const [svgContent, setSvgContent] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -110,7 +112,7 @@ export const ImageViewer: React.FC<ImageViewerProps> = ({ filePath, fileName }) 
           <button
             className="image-control-btn"
             onClick={handleZoomOut}
-            title="Verkleinern (-)"
+            title={t('imageViewer.zoomOut')}
             disabled={zoom <= 25}
           >
             −
@@ -119,7 +121,7 @@ export const ImageViewer: React.FC<ImageViewerProps> = ({ filePath, fileName }) 
           <button
             className="image-control-btn"
             onClick={handleZoomIn}
-            title="Vergrößern (+)"
+            title={t('imageViewer.zoomIn')}
             disabled={zoom >= 400}
           >
             +
@@ -127,14 +129,14 @@ export const ImageViewer: React.FC<ImageViewerProps> = ({ filePath, fileName }) 
           <button
             className="image-control-btn"
             onClick={handleZoomReset}
-            title="Originalgröße (0)"
+            title={t('imageViewer.actualSize')}
           >
             1:1
           </button>
           <button
             className="image-control-btn"
             onClick={handleZoomFit}
-            title="An Fenster anpassen"
+            title={t('imageViewer.fitToWindow')}
           >
             ⬜
           </button>
@@ -145,7 +147,7 @@ export const ImageViewer: React.FC<ImageViewerProps> = ({ filePath, fileName }) 
         {isLoading && (
           <div className="image-loading">
             <div className="loading-spinner" />
-            <span>Lade Bild...</span>
+            <span>{t('imageViewer.loading')}</span>
           </div>
         )}
 

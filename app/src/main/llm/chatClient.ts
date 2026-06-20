@@ -1,5 +1,5 @@
-// Einheitlicher Chat-Client für Main-Prozess-Komponenten (Coach, Telegram-Bot,
-// Onboarding-Coach, Email-Analyse, …).
+// Einheitlicher Chat-Client für Main-Prozess-Komponenten (Telegram-Bot,
+// Email-Analyse, Notes-Chat, …).
 //
 // Zwei Backends:
 //   - 'ollama'     — lokale Modelle ODER Ollama-Cloud-Modelle (`*:cloud`).

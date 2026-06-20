@@ -54,7 +54,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ filePath, fileName, relati
         setPdfData(dataUrl)
       } catch (err) {
         console.error('PDF Load Error:', err)
-        setError(`Fehler beim Laden: ${err instanceof Error ? err.message : 'Unbekannter Fehler'}`)
+        setError(`${t('pdfViewer.loadError')}: ${err instanceof Error ? err.message : t('pdfViewer.unknownError')}`)
       } finally {
         setLoading(false)
       }
@@ -71,8 +71,8 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ filePath, fileName, relati
 
   const onDocumentLoadError = useCallback((error: Error) => {
     console.error('PDF Document Load Error:', error)
-    setError(`Fehler beim Verarbeiten: ${error.message}`)
-  }, [])
+    setError(`${t('pdfViewer.processError')}: ${error.message}`)
+  }, [t])
 
   const goToPrevPage = () => {
     setCurrentPage((prev) => Math.max(prev - 1, 1))
@@ -248,7 +248,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ filePath, fileName, relati
       pdfDoc.destroy()
 
       if (pageMarkdowns.length === 0) {
-        setVisionError('Keine Inhalte extrahiert')
+        setVisionError(t('pdfViewer.noContentExtracted'))
         setVisionExtracting(false)
         return
       }
@@ -303,7 +303,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ filePath, fileName, relati
       setTimeout(() => setVisionSuccess(false), 3000)
     } catch (err) {
       console.error('Vision OCR extraction error:', err)
-      setVisionError(err instanceof Error ? err.message : 'Unbekannter Fehler')
+      setVisionError(err instanceof Error ? err.message : t('pdfViewer.unknownError'))
     } finally {
       setVisionExtracting(false)
       setVisionProgress(null)
@@ -438,7 +438,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ filePath, fileName, relati
         {loading ? (
           <div className="pdf-viewer-loading">
             <div className="pdf-viewer-spinner"></div>
-            <p>PDF wird geladen...</p>
+            <p>{t('pdfViewer.loading')}</p>
           </div>
         ) : error ? (
           <div className="pdf-viewer-error">
@@ -456,7 +456,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ filePath, fileName, relati
             loading={
               <div className="pdf-viewer-loading">
                 <div className="pdf-viewer-spinner"></div>
-                <p>PDF wird verarbeitet...</p>
+                <p>{t('pdfViewer.processing')}</p>
               </div>
             }
           >

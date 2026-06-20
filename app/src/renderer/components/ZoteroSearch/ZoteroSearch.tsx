@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { useNotesStore, createNoteFromFile } from '../../stores/notesStore'
+import { useTranslation } from '../../utils/translations'
 import {
   searchZotero,
   isZoteroAvailable,
@@ -32,6 +33,7 @@ function loadCitationStyle(): CitationStyle {
 }
 
 export const ZoteroSearch: React.FC<ZoteroSearchProps> = ({ isOpen, onClose, onInsertCitation }) => {
+  const { t } = useTranslation()
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<ZoteroSearchResult[]>([])
   const [selectedIndex, setSelectedIndex] = useState(0)
@@ -257,26 +259,26 @@ export const ZoteroSearch: React.FC<ZoteroSearchProps> = ({ isOpen, onClose, onI
         <div className="zotero-search-header">
           <div className="zotero-search-title">
             <span className="zotero-icon">📚</span>
-            Zotero-Literatursuche
+            {t('zoteroSearch.title')}
           </div>
           <div className="zotero-action-toggle">
             <button
               className={`action-btn ${actionMode === 'citation' ? 'active' : ''}`}
               onClick={() => setActionMode('citation')}
             >
-              Zitation
+              {t('zoteroSearch.citation')}
             </button>
             <button
               className={`action-btn ${actionMode === 'footnote' ? 'active' : ''}`}
               onClick={() => setActionMode('footnote')}
             >
-              Fußnote
+              {t('zoteroSearch.footnote')}
             </button>
             <button
               className={`action-btn ${actionMode === 'note' ? 'active' : ''}`}
               onClick={() => setActionMode('note')}
             >
-              Notiz
+              {t('zoteroSearch.note')}
             </button>
           </div>
         </div>
@@ -290,18 +292,18 @@ export const ZoteroSearch: React.FC<ZoteroSearchProps> = ({ isOpen, onClose, onI
             ref={inputRef}
             type="text"
             className="zotero-search-input"
-            placeholder="Suche nach Autor, Titel, Jahr..."
+            placeholder={t('zoteroSearch.searchPlaceholder')}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleKeyDown}
             disabled={zoteroAvailable === false}
           />
-          <span className="zotero-search-hint">TAB wechselt Modus</span>
+          <span className="zotero-search-hint">{t('zoteroSearch.tabSwitchesMode')}</span>
         </div>
 
         <div className="zotero-style-row">
           <label className="zotero-style-label" htmlFor="zotero-citation-style">
-            Zitierstil
+            {t('zoteroSearch.citationStyle')}
           </label>
           <select
             id="zotero-citation-style"
@@ -321,29 +323,29 @@ export const ZoteroSearch: React.FC<ZoteroSearchProps> = ({ isOpen, onClose, onI
           <div className="zotero-error">
             <span className="error-icon">⚠️</span>
             <div>
-              <strong>Zotero nicht erreichbar</strong>
-              <p>Stelle sicher, dass Zotero läuft und Better BibTeX installiert ist.</p>
+              <strong>{t('zoteroSearch.notReachable')}</strong>
+              <p>{t('zoteroSearch.notReachableHint')}</p>
             </div>
           </div>
         )}
 
         {zoteroAvailable === null && (
           <div className="zotero-loading">
-            Verbinde mit Zotero...
+            {t('zoteroSearch.connecting')}
           </div>
         )}
 
         {zoteroAvailable && (
           <div className="zotero-search-results" ref={resultsRef}>
             {isLoading ? (
-              <div className="zotero-loading">Suche...</div>
+              <div className="zotero-loading">{t('zoteroSearch.searching')}</div>
             ) : results.length === 0 && query ? (
               <div className="zotero-empty">
-                Keine Ergebnisse gefunden
+                {t('zoteroSearch.noResults')}
               </div>
             ) : results.length === 0 ? (
               <div className="zotero-empty">
-                Gib einen Suchbegriff ein (Autor, Titel, Jahr)
+                {t('zoteroSearch.enterSearchTerm')}
               </div>
             ) : (
               results.map((result, index) => (
@@ -381,10 +383,10 @@ export const ZoteroSearch: React.FC<ZoteroSearchProps> = ({ isOpen, onClose, onI
         )}
 
         <div className="zotero-search-footer">
-          <span>↑↓ navigieren</span>
-          <span>↵ {actionMode === 'citation' ? 'Zitation einfügen' : actionMode === 'footnote' ? 'Fußnote einfügen' : 'Notiz erstellen'}</span>
-          <span>TAB Modus</span>
-          <span>ESC schließen</span>
+          <span>↑↓ {t('zoteroSearch.navigate')}</span>
+          <span>↵ {actionMode === 'citation' ? t('zoteroSearch.insertCitation') : actionMode === 'footnote' ? t('zoteroSearch.insertFootnote') : t('zoteroSearch.createNote')}</span>
+          <span>TAB {t('zoteroSearch.mode')}</span>
+          <span>ESC {t('zoteroSearch.close')}</span>
         </div>
       </div>
     </div>

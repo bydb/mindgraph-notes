@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useNotesStore } from '../../stores/notesStore'
+import { useTranslation } from '../../utils/translations'
 import type { Note } from '../../../shared/types'
 
 interface QuickSearchProps {
@@ -14,6 +15,7 @@ interface SearchResult {
 }
 
 export const QuickSearch: React.FC<QuickSearchProps> = ({ isOpen, onClose }) => {
+  const { t } = useTranslation()
   const [query, setQuery] = useState('')
   const [selectedIndex, setSelectedIndex] = useState(0)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -175,18 +177,18 @@ export const QuickSearch: React.FC<QuickSearchProps> = ({ isOpen, onClose }) => 
             ref={inputRef}
             type="text"
             className="quick-search-input"
-            placeholder="Suche nach Notizen, Tags oder Inhalt..."
+            placeholder={t('quickSearch.placeholder')}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleKeyDown}
           />
-          <span className="quick-search-hint">ESC zum Schließen</span>
+          <span className="quick-search-hint">{t('quickSearch.escHint')}</span>
         </div>
 
         <div className="quick-search-results" ref={resultsRef}>
           {results.length === 0 ? (
             <div className="quick-search-empty">
-              Keine Ergebnisse gefunden
+              {t('quickSearch.noResults')}
             </div>
           ) : (
             results.map((result, index) => (
@@ -219,7 +221,7 @@ export const QuickSearch: React.FC<QuickSearchProps> = ({ isOpen, onClose }) => 
 
         {!query && (
           <div className="quick-search-footer">
-            Zuletzt bearbeitet
+            {t('quickSearch.recentlyEdited')}
           </div>
         )}
       </div>

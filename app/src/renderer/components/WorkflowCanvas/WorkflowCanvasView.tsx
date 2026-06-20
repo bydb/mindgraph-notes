@@ -16,6 +16,7 @@ import 'reactflow/dist/style.css'
 import './workflowCanvas.css'
 
 import { useWorkflowStore } from '../../stores/workflowStore'
+import { useTranslation } from '../../utils/translations'
 import { useNotesStore } from '../../stores/notesStore'
 import { useVaultSettingsStore } from '../../stores/vaultSettingsStore'
 import { useEmailStore } from '../../stores/emailStore'
@@ -61,6 +62,7 @@ interface Props {
 }
 
 function InnerCanvas({ onOpenInbox }: Props) {
+  const { t } = useTranslation()
   const workflow = useWorkflowStore(s => s.workflow)
   const selectedNodeId = useWorkflowStore(s => s.selectedNodeId)
   const validation = useWorkflowStore(s => s.validation)
@@ -338,7 +340,7 @@ function InnerCanvas({ onOpenInbox }: Props) {
           ref={pickerBtnRef}
           className="wf-toolbar__select"
           onClick={togglePicker}
-          title="Gespeicherten Workflow auswählen"
+          title={t('workflowCanvas.selectSaved')}
           aria-haspopup="listbox"
           aria-expanded={pickerOpen}
         >
@@ -373,32 +375,32 @@ function InnerCanvas({ onOpenInbox }: Props) {
           className="wf-toolbar__name"
           value={workflow.name}
           onChange={e => setName(e.target.value)}
-          aria-label="Workflow-Name (umbenennen)"
-          title="Aktiven Workflow umbenennen"
+          aria-label={t('workflowCanvas.renameAria')}
+          title={t('workflowCanvas.renameTitle')}
         />
         <div className="wf-toolbar__spacer" />
-        <button className="wf-btn wf-btn--ghost" onClick={() => { setConfirmDel(false); newWorkflow() }} title="Neuen leeren Workflow anlegen">+ Neu</button>
-        <button className="wf-btn wf-btn--ghost" onClick={() => { setConfirmDel(false); duplicateWorkflow() }} title="Aktiven Workflow als Kopie anlegen">Duplizieren</button>
-        <button className="wf-btn wf-btn--ghost" onClick={() => { setConfirmDel(false); loadExample() }} title="Beispiel-Workflow als neuen Eintrag hinzufügen">Beispiel</button>
+        <button className="wf-btn wf-btn--ghost" onClick={() => { setConfirmDel(false); newWorkflow() }} title={t('workflowCanvas.newTitle')}>{t('workflowCanvas.newBtn')}</button>
+        <button className="wf-btn wf-btn--ghost" onClick={() => { setConfirmDel(false); duplicateWorkflow() }} title={t('workflowCanvas.duplicateTitle')}>{t('workflowCanvas.duplicateBtn')}</button>
+        <button className="wf-btn wf-btn--ghost" onClick={() => { setConfirmDel(false); loadExample() }} title={t('workflowCanvas.addExample')}>{t('workflowCanvas.exampleBtn')}</button>
         <button
           className={confirmDel ? 'wf-btn wf-btn--danger' : 'wf-btn wf-btn--ghost'}
           disabled={workflows.length <= 1}
-          title={workflows.length <= 1 ? 'Der letzte Workflow kann nicht gelöscht werden' : 'Aktiven Workflow löschen'}
+          title={workflows.length <= 1 ? t('workflowCanvas.deleteLastTitle') : t('workflowCanvas.deleteTitle')}
           onClick={() => {
             if (confirmDel) { setConfirmDel(false); deleteWorkflow(activeId) }
             else { setConfirmDel(true); window.setTimeout(() => setConfirmDel(false), 3000) }
           }}
         >
-          {confirmDel ? 'Wirklich löschen?' : '🗑 Löschen'}
+          {confirmDel ? t('workflowCanvas.confirmDelete') : t('workflowCanvas.deleteBtn')}
         </button>
-        <button className="wf-btn" onClick={simulate}>▶ Simulieren</button>
+        <button className="wf-btn" onClick={simulate}>{t('workflowCanvas.simulateBtn')}</button>
         <button
           className="wf-btn wf-btn--primary"
           disabled={!canExecute}
-          title={!vaultPath ? 'Kein Vault geöffnet' : !validation.ok ? 'Workflow ist unvollständig' : 'Echten Lauf starten'}
+          title={!vaultPath ? t('workflowCanvas.noVaultTitle') : !validation.ok ? t('workflowCanvas.incompleteTitle') : t('workflowCanvas.executeTitle')}
           onClick={() => vaultPath && execute(vaultPath)}
         >
-          ▶ Ausführen
+          {t('workflowCanvas.executeBtn')}
         </button>
         {showTriggerControls && (
           <>
@@ -406,26 +408,26 @@ function InnerCanvas({ onOpenInbox }: Props) {
             <label
               className="wf-trigger-toggle"
               title={isScheduleTrigger
-                ? 'Workflow nach Zeitplan auslösen, solange die App läuft (auch bei geschlossenem Tab, exactly-once)'
+                ? t('workflowCanvas.triggerScheduleTitle')
                 : isPollTrigger
-                  ? 'Workflow automatisch auslösen, solange dieser Tab offen ist (exactly-once)'
-                  : 'Workflow automatisch bei neuer relevanter Mail auslösen (exactly-once)'}
+                  ? t('workflowCanvas.triggerPollTitle')
+                  : t('workflowCanvas.triggerMailTitle')}
             >
               <input
                 type="checkbox"
                 checked={Boolean(workflow.enabled)}
                 onChange={e => setEnabled(e.target.checked)}
               />
-              {isScheduleTrigger ? 'Zeitplan aktiv' : isPollTrigger ? 'Auto (Tab offen)' : 'Auto bei neuer Mail'}
+              {isScheduleTrigger ? t('workflowCanvas.scheduleActive') : isPollTrigger ? t('workflowCanvas.autoTabOpen') : t('workflowCanvas.autoNewMail')}
             </label>
             {!isScheduleTrigger && (
               <button
                 className="wf-btn wf-btn--ghost"
                 disabled={!vaultPath || running}
-                title="Den Workflow jetzt für neue, noch nicht getriggerte Auslöser ausführen (exactly-once)"
+                title={t('workflowCanvas.runNowTitle')}
                 onClick={() => vaultPath && runTrigger(vaultPath)}
               >
-                {isPollTrigger ? 'Jetzt prüfen' : 'Für neue Mails ausführen'}
+                {isPollTrigger ? t('workflowCanvas.checkNow') : t('workflowCanvas.runForNewMails')}
               </button>
             )}
           </>
@@ -444,7 +446,7 @@ function InnerCanvas({ onOpenInbox }: Props) {
           <div
             className="wf-resizer"
             onMouseDown={startPaletteResize}
-            title="Breite der Bausteine-Palette ziehen"
+            title={t('workflowCanvas.resizePaletteTitle')}
             role="separator"
             aria-orientation="vertical"
           />

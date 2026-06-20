@@ -29,20 +29,20 @@ import { LabelNode } from './LabelNode'
 import type { FileEntry } from '../../../shared/types'
 import { resolveLink, extractLinks, generateNoteId, extractFirstCardCallout, extractTasks, extractExternalLinks, extractFirstImage } from '../../utils/linkExtractor'
 import { applyLayout, type LayoutAlgorithm, type LayoutNode, type LayoutEdge } from '../../utils/layoutAlgorithms'
-import { useTranslation } from '../../utils/translations'
+import { useTranslation, type TranslationKey } from '../../utils/translations'
 import { getNoteKind } from '../../utils/noteKind'
 
-// Verfügbare Farben für Nodes
+// Verfügbare Farben für Nodes (labelKey wird über useTranslation aufgelöst)
 const nodeColors = [
-  { name: 'Standard', value: undefined },
-  { name: 'Rot', value: '#ffcdd2' },
-  { name: 'Orange', value: '#ffe0b2' },
-  { name: 'Gelb', value: '#fff9c4' },
-  { name: 'Grün', value: '#c8e6c9' },
-  { name: 'Blau', value: '#bbdefb' },
-  { name: 'Lila', value: '#e1bee7' },
-  { name: 'Pink', value: '#f8bbd9' },
-  { name: 'Grau', value: '#cfd8dc' },
+  { labelKey: 'graphCanvas.colorDefault', value: undefined },
+  { labelKey: 'graphCanvas.colorRed', value: '#ffcdd2' },
+  { labelKey: 'graphCanvas.colorOrange', value: '#ffe0b2' },
+  { labelKey: 'graphCanvas.colorYellow', value: '#fff9c4' },
+  { labelKey: 'graphCanvas.colorGreen', value: '#c8e6c9' },
+  { labelKey: 'graphCanvas.colorBlue', value: '#bbdefb' },
+  { labelKey: 'graphCanvas.colorPurple', value: '#e1bee7' },
+  { labelKey: 'graphCanvas.colorPink', value: '#f8bbd9' },
+  { labelKey: 'graphCanvas.colorGray', value: '#cfd8dc' },
 ]
 
 // Kontextmenü Komponente
@@ -161,7 +161,7 @@ const ContextMenu: React.FC<ContextMenuProps> = memo(({ x, y, onClose, onDelete,
             <div className="color-picker">
               {nodeColors.map((color) => (
                 <button
-                  key={color.name}
+                  key={color.labelKey}
                   className={`color-option ${currentColor === color.value ? 'selected' : ''}`}
                   style={{ backgroundColor: color.value || 'var(--node-bg)' }}
                   onClick={(e) => {
@@ -169,7 +169,7 @@ const ContextMenu: React.FC<ContextMenuProps> = memo(({ x, y, onClose, onDelete,
                     onColorChange?.(color.value)
                     onClose()
                   }}
-                  title={color.name}
+                  title={t(color.labelKey as TranslationKey)}
                 />
               ))}
             </div>
@@ -208,7 +208,7 @@ const ContextMenu: React.FC<ContextMenuProps> = memo(({ x, y, onClose, onDelete,
             <div className="color-picker">
               {nodeColors.map((color) => (
                 <button
-                  key={color.name}
+                  key={color.labelKey}
                   className={`color-option ${currentColor === color.value ? 'selected' : ''}`}
                   style={{ backgroundColor: color.value || 'var(--node-bg)' }}
                   onClick={(e) => {
@@ -216,7 +216,7 @@ const ContextMenu: React.FC<ContextMenuProps> = memo(({ x, y, onClose, onDelete,
                     onColorChange?.(color.value)
                     onClose()
                   }}
-                  title={color.name}
+                  title={t(color.labelKey as TranslationKey)}
                 />
               ))}
             </div>
@@ -825,7 +825,7 @@ const AlignmentToolbar: React.FC<AlignmentToolbarProps> = memo(({ onAlign, onDis
             {(onAiCluster || onAiLearningPath || onAiSuggestLinks) && (
               <>
                 <div className="arrange-menu-divider" />
-                <div className="arrange-menu-label">🤖 KI-Anordnung</div>
+                <div className="arrange-menu-label">🤖 {t('graphCanvas.aiArrangement')}</div>
 
                 {onAiCluster && (
                   <button
@@ -2461,7 +2461,7 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
       // Prüfen ob Datei bereits existiert
       const existingNote = notes.find(n => n.title.toLowerCase() === noteName.toLowerCase())
       if (existingNote) {
-        alert(`Eine Notiz mit dem Namen "${noteName}" existiert bereits.`)
+        alert(t('graphCanvas.noteExists', { name: noteName }))
         return
       }
 
@@ -3189,7 +3189,7 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
   const handleAiCluster = useCallback(async () => {
     if (aiLayoutLoading) return
     const model = ollama.selectedModel
-    if (!model) { alert('Bitte zuerst ein KI-Modell in den Einstellungen auswählen.'); return }
+    if (!model) { alert(t('graphCanvas.selectModelFirst')); return }
 
     const nodesToArrange = (focusMode ? nodes.filter(n => focusedNodeIds.has(n.id)) : nodes).filter(n => n.type !== 'label')
     if (nodesToArrange.length < 3) return
@@ -3272,7 +3272,7 @@ Antworte NUR mit JSON, kein anderer Text:
   const handleAiLearningPath = useCallback(async () => {
     if (aiLayoutLoading) return
     const model = ollama.selectedModel
-    if (!model) { alert('Bitte zuerst ein KI-Modell in den Einstellungen auswählen.'); return }
+    if (!model) { alert(t('graphCanvas.selectModelFirst')); return }
 
     const nodesToArrange = (focusMode ? nodes.filter(n => focusedNodeIds.has(n.id)) : nodes).filter(n => n.type !== 'label')
     if (nodesToArrange.length < 3) return
@@ -3337,7 +3337,7 @@ Antworte NUR mit JSON, kein anderer Text:
   const handleAiSuggestLinks = useCallback(async () => {
     if (aiLayoutLoading) return
     const model = ollama.selectedModel
-    if (!model) { alert('Bitte zuerst ein KI-Modell in den Einstellungen auswählen.'); return }
+    if (!model) { alert(t('graphCanvas.selectModelFirst')); return }
 
     const nodesToArrange = (focusMode ? nodes.filter(n => focusedNodeIds.has(n.id)) : nodes).filter(n => n.type !== 'label')
     if (nodesToArrange.length < 3) return
@@ -3545,7 +3545,7 @@ Antworte NUR mit JSON:
           )}
         </button>
         {canvasReadMode && (
-          <div className="canvas-hover-scale-slider" title={`Hover-Zoom: ${canvasHoverScale}x`}>
+          <div className="canvas-hover-scale-slider" title={t('graphCanvas.hoverZoom', { scale: String(canvasHoverScale) })}>
             <input
               type="range"
               min="1"
@@ -3999,7 +3999,7 @@ Antworte NUR mit JSON:
                 type="text"
                 value={newNoteTags}
                 onChange={(e) => setNewNoteTags(e.target.value)}
-                placeholder="#tag1 #tag2 oder tag1, tag2"
+                placeholder={t('graphCanvas.tagsPlaceholder')}
               />
             </div>
 

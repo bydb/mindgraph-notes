@@ -4105,9 +4105,9 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
         {!isSecondary && ollama.enabled && (() => {
           const prov = getAiProvenance(previewContent)
           return prov ? (
-            <span className="note-authorship note-authorship-ai" title={`KI-bearbeitet · ${prov.model}${prov.date ? ' · ' + prov.date : ''}`}>
+            <span className="note-authorship note-authorship-ai" title={`${t('editor.aiEdited')} · ${prov.model}${prov.date ? ' · ' + prov.date : ''}`}>
               <ModelLogo model={prov.model} size={13} />
-              <span>KI-bearbeitet</span>
+              <span>{t('editor.aiEdited')}</span>
             </span>
           ) : (
             <span className="note-authorship note-authorship-human" title={t('aiBar.byYouTitle')}>
@@ -4117,12 +4117,12 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
           )
         })()}
         <div className="editor-header-right">
-          {isSaving && <span className="saving-indicator">Speichern...</span>}
+          {isSaving && <span className="saving-indicator">{t('editor.saving')}</span>}
           {isSecondary && (
             <button
               className="close-secondary-btn"
               onClick={() => selectSecondaryNote(null)}
-              title="Sekundäres Panel schließen"
+              title={t('editor.closeSecondaryPanel')}
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <line x1="18" y1="6" x2="6" y2="18"/>
@@ -4215,7 +4215,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
           <button
             className="export-btn"
             onClick={handleExportDocx}
-            title="Als Word-Dokument exportieren (.docx)"
+            title={t('editor.exportDocx')}
           >
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
               <path d="M14 10V13C14 13.5523 13.5523 14 13 14H3C2.44772 14 2 13.5523 2 13V10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
@@ -4241,7 +4241,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
               <button
                 className={`toggle-btn ${viewMode === 'edit' ? 'active' : ''}`}
                 onClick={() => setViewMode('edit')}
-                title="Markdown"
+                title={t('editor.modeMarkdown')}
               >
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                   <path d="M11.5 2.5L13.5 4.5L5 13H3V11L11.5 2.5Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
@@ -4251,7 +4251,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
             <button
               className={`toggle-btn ${viewMode === 'live-preview' ? 'active' : ''}`}
               onClick={() => setViewMode('live-preview')}
-              title="Schreiben (Cmd+E)"
+              title={t('editor.modeWrite')}
             >
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                 <path d="M8 3C4.5 3 1.5 8 1.5 8C1.5 8 4.5 13 8 13C11.5 13 14.5 8 14.5 8C14.5 8 11.5 3 8 3Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
@@ -4261,7 +4261,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
             <button
               className={`toggle-btn ${viewMode === 'preview' ? 'active' : ''}`}
               onClick={() => setViewMode('preview')}
-              title="Lesen (Cmd+E)"
+              title={t('editor.modeRead')}
             >
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                 <path d="M8 3C4.5 3 1.5 8 1.5 8C1.5 8 4.5 13 8 13C11.5 13 14.5 8 14.5 8C14.5 8 11.5 3 8 3Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
@@ -4312,7 +4312,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
                 <input
                   type={previewLinkInput.kind === 'url' ? 'url' : 'text'}
                   className="preview-edit-toolbar-input"
-                  placeholder={previewLinkInput.kind === 'url' ? 'https://...' : 'Notizname'}
+                  placeholder={previewLinkInput.kind === 'url' ? 'https://...' : t('editor.noteName')}
                   autoFocus
                   value={previewLinkInput.value}
                   onChange={e => setPreviewLinkInput({ kind: previewLinkInput.kind, value: e.target.value })}
@@ -4345,8 +4345,8 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
                     }
                   }}
                 />
-                <button onClick={() => confirmPreviewLink()} title={previewLinkInput.kind === 'url' ? 'Link einfügen' : 'Wikilink einfügen'}>✓</button>
-                <button onClick={cancelPreviewLink} title="Abbrechen">✕</button>
+                <button onClick={() => confirmPreviewLink()} title={previewLinkInput.kind === 'url' ? t('editor.insertLink') : t('editor.insertWikilink')}>✓</button>
+                <button onClick={cancelPreviewLink} title={t('editor.cancel')}>✕</button>
                 {previewLinkInput.kind === 'wiki' && previewWikilinkSuggestions.length > 0 && (
                   <div className="preview-wikilink-suggestions wikilink-autocomplete">
                     <div className="wikilink-autocomplete-list">
@@ -4377,14 +4377,14 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
               </>
             ) : (
               <>
-                <button onClick={() => applyPreviewCommand('bold')} title="Fett">B</button>
-                <button onClick={() => applyPreviewCommand('italic')} title="Kursiv"><em>I</em></button>
-                <button onClick={() => applyPreviewCommand('formatBlock', 'h1')} title="Überschrift 1">H1</button>
-                <button onClick={() => applyPreviewCommand('formatBlock', 'h2')} title="Überschrift 2">H2</button>
-                <button onClick={() => applyPreviewCommand('insertUnorderedList')} title="Liste">•</button>
-                <button onClick={() => applyPreviewCommand('insertOrderedList')} title="Nummerierte Liste">1.</button>
-                <button onClick={() => openPreviewLinkInput('url')} title="Externer Link">🔗</button>
-                <button onClick={() => openPreviewLinkInput('wiki')} title="Wikilink (Notiz verlinken)">[[ ]]</button>
+                <button onClick={() => applyPreviewCommand('bold')} title={t('editor.bold')}>B</button>
+                <button onClick={() => applyPreviewCommand('italic')} title={t('editor.italic')}><em>I</em></button>
+                <button onClick={() => applyPreviewCommand('formatBlock', 'h1')} title={t('editor.heading1')}>H1</button>
+                <button onClick={() => applyPreviewCommand('formatBlock', 'h2')} title={t('editor.heading2')}>H2</button>
+                <button onClick={() => applyPreviewCommand('insertUnorderedList')} title={t('editor.bulletList')}>•</button>
+                <button onClick={() => applyPreviewCommand('insertOrderedList')} title={t('editor.numberedList')}>1.</button>
+                <button onClick={() => openPreviewLinkInput('url')} title={t('editor.externalLink')}>🔗</button>
+                <button onClick={() => openPreviewLinkInput('wiki')} title={t('editor.wikilink')}>[[ ]]</button>
               </>
             )}
           </div>

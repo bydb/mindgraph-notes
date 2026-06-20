@@ -6,6 +6,7 @@ import {
   TemplateInfo,
   loadTemplateConfig
 } from '../../utils/templateEngine'
+import { useTranslation } from '../../utils/translations'
 
 interface TemplatePickerProps {
   isOpen: boolean
@@ -23,6 +24,7 @@ export const TemplatePicker: React.FC<TemplatePickerProps> = ({
   noteTitle
 }) => {
   const { notes, vaultPath } = useNotesStore()
+  const { t } = useTranslation()
   const [selectedIndex, setSelectedIndex] = useState(0)
   const [searchQuery, setSearchQuery] = useState('')
   const [builtInTemplates, setBuiltInTemplates] = useState<TemplateInfo[]>([])
@@ -165,7 +167,7 @@ export const TemplatePicker: React.FC<TemplatePickerProps> = ({
             ref={inputRef}
             type="text"
             className="template-picker-search"
-            placeholder="Template suchen..."
+            placeholder={t('templatePicker.searchPlaceholder')}
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
           />
@@ -174,7 +176,7 @@ export const TemplatePicker: React.FC<TemplatePickerProps> = ({
         <div className="template-picker-list" ref={listRef}>
           {filteredTemplates.length === 0 ? (
             <div className="template-picker-empty">
-              Keine Templates gefunden
+              {t('templatePicker.empty')}
             </div>
           ) : (
             filteredTemplates.map((template, index) => (
@@ -197,9 +199,9 @@ export const TemplatePicker: React.FC<TemplatePickerProps> = ({
         </div>
 
         <div className="template-picker-footer">
-          <span>↑↓ navigieren</span>
-          <span>↵ auswählen</span>
-          <span>Esc schließen</span>
+          <span>{t('common.navigate')}</span>
+          <span>{t('common.enterSelect')}</span>
+          <span>{t('wikilink.pressEscToClose')}</span>
           {onOpenSettings && (
             <button
               className="template-picker-settings-btn"
@@ -208,7 +210,7 @@ export const TemplatePicker: React.FC<TemplatePickerProps> = ({
                 onOpenSettings()
               }}
             >
-              Bearbeiten
+              {t('common.edit')}
             </button>
           )}
         </div>

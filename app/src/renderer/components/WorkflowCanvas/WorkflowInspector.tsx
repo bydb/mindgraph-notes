@@ -3,8 +3,10 @@ import { useUIStore } from '../../stores/uiStore'
 import { getActionById } from '../../../shared/workflow/registry'
 import type { WorkflowConfigField } from '../../../shared/workflow/types'
 import { IconWarning } from '../Shared/Icons'
+import { useTranslation } from '../../utils/translations'
 
 export function WorkflowInspector() {
+  const { t } = useTranslation()
   const selectedNodeId = useWorkflowStore(s => s.selectedNodeId)
   const node = useWorkflowStore(s => s.workflow.nodes.find(n => n.id === s.selectedNodeId) || null)
   // Stabile Referenz selektieren, dann im Render filtern (kein neues Array im Selektor).
@@ -17,13 +19,13 @@ export function WorkflowInspector() {
   if (!selectedNodeId || !node) {
     return (
       <div className="wf-inspector wf-inspector--empty">
-        <p>Wähle einen Baustein, um ihn zu konfigurieren.</p>
+        <p>{t('workflowInspector.selectBlock')}</p>
       </div>
     )
   }
 
   const action = getActionById(node.actionId)
-  if (!action) return <div className="wf-inspector">Unbekannte Action.</div>
+  if (!action) return <div className="wf-inspector">{t('workflowInspector.unknownAction')}</div>
 
   const renderField = (field: WorkflowConfigField) => {
     const value = (node.config[field.key] ?? field.default ?? '') as string | number | boolean
@@ -46,7 +48,7 @@ export function WorkflowInspector() {
             className="wf-input"
             type="text"
             value={String(value)}
-            placeholder={globalModel ? `leer = ${globalModel}` : 'globales Modell'}
+            placeholder={globalModel ? t('workflowInspector.emptyEqualsModel', { model: globalModel }) : t('workflowInspector.globalModel')}
             onChange={e => set(e.target.value)}
           />
         )
@@ -85,8 +87,9 @@ export function WorkflowInspector() {
             <IconWarning size={14} />
           </span>
           <span>
-            Verarbeitet untrusted Inhalt mit einem LLM — der Runner prüft die Modell-Freigabe
-            (Modul <code>{action.hardLockModule}</code>) und blockiert rot-gelockte Modelle.
+            {t('workflowInspector.hardLockNotePrefix')}
+            {' ('}{t('workflowInspector.hardLockModule')} <code>{action.hardLockModule}</code>{') '}
+            {t('workflowInspector.hardLockNoteSuffix')}
           </span>
         </p>
       )}
@@ -101,7 +104,7 @@ export function WorkflowInspector() {
           ))}
         </div>
       ) : (
-        <p className="wf-inspector__desc">Keine Konfiguration nötig.</p>
+        <p className="wf-inspector__desc">{t('workflowInspector.noConfigNeeded')}</p>
       )}
 
       {issues.length > 0 && (
@@ -113,7 +116,7 @@ export function WorkflowInspector() {
       )}
 
       <button className="wf-btn wf-btn--danger" onClick={() => removeNode(node.id)}>
-        Baustein entfernen
+        {t('workflowInspector.removeBlock')}
       </button>
     </div>
   )

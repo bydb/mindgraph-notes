@@ -1,5 +1,6 @@
 import { useWorkflowStore } from '../../stores/workflowStore'
 import type { WorkflowStepStatus } from '../../../shared/workflow/model'
+import { useTranslation } from '../../utils/translations'
 
 // Text-Ausgaben lesbar machen (Arrays → Zeilen, Strings direkt; Objekte wie
 // Analyse/Projekt/json bleiben weg, da als Rohtext wenig hilfreich).
@@ -18,17 +19,18 @@ const STEP_ICON: Record<WorkflowStepStatus, string> = {
 }
 
 export function WorkflowRunPanel() {
+  const { t } = useTranslation()
   const run = useWorkflowStore(s => s.run)
   const running = useWorkflowStore(s => s.running)
   const clearRun = useWorkflowStore(s => s.clearRun)
 
   if (running) {
-    return <div className="wf-runpanel"><div className="wf-runpanel__head">Läuft …</div></div>
+    return <div className="wf-runpanel"><div className="wf-runpanel__head">{t('workflowRunPanel.running')}</div></div>
   }
   if (!run) {
     return (
       <div className="wf-runpanel wf-runpanel--empty">
-        <span>„Simulieren" zeigt den Trockenlauf, „Ausführen" startet den echten Lauf.</span>
+        <span>{t('workflowRunPanel.emptyHint')}</span>
       </div>
     )
   }
@@ -37,9 +39,9 @@ export function WorkflowRunPanel() {
     <div className="wf-runpanel">
       <div className="wf-runpanel__head">
         <span className={`wf-run-status wf-run-status--${run.status}`}>
-          {run.mode === 'simulate' ? 'Simulation' : 'Lauf'} · {run.status}
+          {run.mode === 'simulate' ? t('workflowRunPanel.simulation') : t('workflowRunPanel.run')} · {run.status}
         </span>
-        <button className="wf-btn wf-btn--ghost" onClick={clearRun}>schließen</button>
+        <button className="wf-btn wf-btn--ghost" onClick={clearRun}>{t('workflowRunPanel.close')}</button>
       </div>
 
       {run.error && <div className="wf-run-error">{run.error}</div>}
@@ -61,7 +63,7 @@ export function WorkflowRunPanel() {
 
       {run.handoff && (
         <div className="wf-run-handoff">
-          → Hand-off ({run.handoff.kind === 'compose' ? 'Antwort ins Compose-Fenster' : run.handoff.kind === 'task' ? 'Aufgabe „Entwurf prüfen"' : 'Notiz'}): der Mensch übernimmt.
+          {t('workflowRunPanel.handoff', { target: run.handoff.kind === 'compose' ? t('workflowRunPanel.handoffCompose') : run.handoff.kind === 'task' ? t('workflowRunPanel.handoffTask') : t('workflowRunPanel.handoffNote') })}
         </div>
       )}
     </div>

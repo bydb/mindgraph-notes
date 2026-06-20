@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react'
 import { useNotesStore } from '../../stores/notesStore'
 import type { Note } from '../../../shared/types'
+import { useTranslation } from '../../utils/translations'
 
 interface QuickSwitcherProps {
   isOpen: boolean
@@ -22,6 +23,7 @@ export const QuickSwitcher: React.FC<QuickSwitcherProps> = ({
   onCreateNote
 }) => {
   const { notes, selectedNoteId } = useNotesStore()
+  const { t } = useTranslation()
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedIndex, setSelectedIndex] = useState(0)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -165,7 +167,7 @@ export const QuickSwitcher: React.FC<QuickSwitcherProps> = ({
             ref={inputRef}
             type="text"
             className="quick-switcher-search"
-            placeholder="Notiz suchen oder erstellen..."
+            placeholder={t('quickSwitcher.searchPlaceholder')}
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
           />
@@ -174,7 +176,7 @@ export const QuickSwitcher: React.FC<QuickSwitcherProps> = ({
         <div className="quick-switcher-list" ref={listRef}>
           {searchResults.length === 0 && !showCreateOption ? (
             <div className="quick-switcher-empty">
-              {searchQuery ? 'Keine Notizen gefunden' : 'Keine Notizen vorhanden'}
+              {searchQuery ? t('quickSwitcher.noResults') : t('quickSwitcher.noNotes')}
             </div>
           ) : (
             <>
@@ -196,7 +198,7 @@ export const QuickSwitcher: React.FC<QuickSwitcherProps> = ({
                     <span className="quick-switcher-path">{result.note.path}</span>
                   </div>
                   {result.note.id === selectedNoteId && (
-                    <span className="quick-switcher-current-badge">aktuell</span>
+                    <span className="quick-switcher-current-badge">{t('quickSwitcher.current')}</span>
                   )}
                 </div>
               ))}
@@ -213,9 +215,9 @@ export const QuickSwitcher: React.FC<QuickSwitcherProps> = ({
                   <span className="quick-switcher-icon">➕</span>
                   <div className="quick-switcher-info">
                     <span className="quick-switcher-title">
-                      "{searchQuery}" erstellen
+                      {t('quickSwitcher.createNote', { query: searchQuery })}
                     </span>
-                    <span className="quick-switcher-path">Neue Notiz anlegen</span>
+                    <span className="quick-switcher-path">{t('quickSwitcher.createHint')}</span>
                   </div>
                 </div>
               )}
@@ -224,9 +226,9 @@ export const QuickSwitcher: React.FC<QuickSwitcherProps> = ({
         </div>
 
         <div className="quick-switcher-footer">
-          <span>↑↓ navigieren</span>
-          <span>↵ öffnen</span>
-          <span>Esc schließen</span>
+          <span>{t('common.navigate')}</span>
+          <span>{t('common.enterOpen')}</span>
+          <span>{t('wikilink.pressEscToClose')}</span>
         </div>
       </div>
     </div>

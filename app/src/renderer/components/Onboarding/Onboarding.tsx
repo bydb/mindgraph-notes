@@ -1,18 +1,15 @@
 import React, { useState, useCallback, useEffect } from 'react'
 import { useUIStore } from '../../stores/uiStore'
 import type { UserProfile } from '../../stores/uiStore'
-import { useCoachStore } from '../../stores/coachStore'
 import { WelcomeScreen } from './WelcomeScreen'
 import { IntentStep } from './steps/IntentStep'
 import { AIStep } from './steps/AIStep'
 import { DashboardStep } from './steps/DashboardStep'
 import { MissionsStep } from './steps/MissionsStep'
-import { OllamaSetupStep } from './steps/OllamaSetupStep'
 import { EmailSetupStep } from './steps/EmailSetupStep'
-import { CoachStep } from './Coach/CoachStep'
 import './Onboarding.css'
 
-type OnboardingStep = 'welcome' | 'ai-setup' | 'coach' | 'intent' | 'email-setup' | 'ai' | 'dashboard' | 'missions'
+type OnboardingStep = 'welcome' | 'intent' | 'email-setup' | 'ai' | 'dashboard' | 'missions'
 
 // Profile, für die der Email-Setup-Step im Onboarding eingeblendet wird. Andere
 // Profile sollen den Step nicht sehen — sonst kommt der Demo-Pfad bei einem
@@ -20,8 +17,7 @@ type OnboardingStep = 'welcome' | 'ai-setup' | 'coach' | 'intent' | 'email-setup
 const EMAIL_SETUP_PROFILES = new Set(['office', 'professional'])
 
 export const Onboarding: React.FC = () => {
-  const { onboardingOpen, setOnboardingOpen, setOnboardingCompleted, setUserProfile, applyProfileDefaults, coach } = useUIStore()
-  const resetCoachStore = useCoachStore(s => s.reset)
+  const { onboardingOpen, setOnboardingOpen, setOnboardingCompleted, setUserProfile, applyProfileDefaults } = useUIStore()
   const [step, setStep] = useState<OnboardingStep>('welcome')
   const [vaultPath, setLocalVaultPath] = useState<string | null>(null)
   const [selectedProfile, setSelectedProfile] = useState<UserProfile>(null)
@@ -32,9 +28,8 @@ export const Onboarding: React.FC = () => {
     if (onboardingOpen) {
       setStep('welcome')
       setSelectedProfile(null)
-      resetCoachStore()
     }
-  }, [onboardingOpen, resetCoachStore])
+  }, [onboardingOpen])
 
   const handleSetVaultPath = useCallback((path: string) => {
     setLocalVaultPath(path)
@@ -77,45 +72,6 @@ export const Onboarding: React.FC = () => {
     }
   }, [finishWithVault, setOnboardingCompleted, setOnboardingOpen])
 
-  const handleStartCoach = useCallback(async () => {
-    // Bevor wir in den Coach-Chat springen, prüfen wir, ob überhaupt ein
-    // Backend da ist. Sonst landet der User in einer Fehlermeldung.
-    try {
-      const pre = await window.electronAPI.coachPrecheck()
-      if (pre.backend === 'none') {
-        setStep('ai-setup')
-        return
-      }
-    } catch {
-      // Precheck-Fehler: lieber den Setup-Pfad anbieten als blind weiterspringen
-      setStep('ai-setup')
-      return
-    }
-    setStep('coach')
-  }, [])
-
-  const handleSkipCoach = useCallback(() => {
-    setStep('intent')
-  }, [])
-
-  // Aus dem AI-Setup heraus: Backend ist jetzt da → in den Coach
-  const handleBackendReady = useCallback(() => {
-    setStep('coach')
-  }, [])
-
-  // Aus dem AI-Setup heraus: bewusst ohne KI → klassischer Wizard
-  const handleSkipAISetup = useCallback(() => {
-    setStep('intent')
-  }, [])
-
-  const handleCoachFinish = useCallback(() => {
-    // Coach hat (möglicherweise) Vault + Profile vorbelegt. Übergabe an IntentStep:
-    if (coach.suggestedProfile) {
-      setSelectedProfile(coach.suggestedProfile)
-    }
-    setStep('intent')
-  }, [coach.suggestedProfile])
-
   if (!onboardingOpen) return null
 
   return (
@@ -123,24 +79,8 @@ export const Onboarding: React.FC = () => {
       <div className="onboarding-container">
         {step === 'welcome' && (
           <WelcomeScreen
-            onStartCoach={handleStartCoach}
             onStartWizard={() => setStep('intent')}
             onOpenVault={handleOpenVaultDirect}
-          />
-        )}
-        {step === 'ai-setup' && (
-          <OllamaSetupStep
-            onBackendReady={handleBackendReady}
-            onSkip={handleSkipAISetup}
-            onBack={() => setStep('welcome')}
-          />
-        )}
-        {step === 'coach' && (
-          <CoachStep
-            vaultPath={vaultPath}
-            onVaultChosen={handleSetVaultPath}
-            onSkipToClassic={handleSkipCoach}
-            onFinish={handleCoachFinish}
           />
         )}
         {step === 'intent' && (
@@ -159,7 +99,6 @@ export const Onboarding: React.FC = () => {
                 setStep('ai')
               }
             }}
-            coachPreFilled={coach.suggestedProfile !== null || vaultPath !== null}
           />
         )}
         {step === 'email-setup' && (

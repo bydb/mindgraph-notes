@@ -22,7 +22,6 @@ import { Settings } from './components/Settings/Settings'
 import { WhatsNew } from './components/WhatsNew/WhatsNew'
 import { Onboarding } from './components/Onboarding/Onboarding'
 import { HelpGuide } from './components/Onboarding/HelpGuide'
-import { CoachBot, RobotIcon } from './components/CoachBot/CoachBot'
 import { UpdateNotification } from './components/UpdateNotification/UpdateNotification'
 import { VoiceStatusToast } from './components/Voice/VoiceStatusToast'
 import { QuizModal } from './components/Quiz/QuizModal'
@@ -119,7 +118,7 @@ const ViewModeButton: React.FC<{
 )
 
 const App: React.FC = () => {
-  const { viewMode, setViewMode, toggleSidebar, sidebarVisible, splitPosition, setSplitPosition, sidebarWidth, setSidebarWidth, theme, setTheme, accentColor, backgroundColor, fontFamily, setPendingTemplateInsert, textSplitEnabled, setTextSplitEnabled, textSplitPosition, setTextSplitPosition, smartConnectionsEnabled, notesChatEnabled, flashcardsEnabled, semanticScholarEnabled, customLogo, customAccentColor, customBackgroundColorLight, customBackgroundColorDark, setHelpGuideOpen, taskExcludedFolders, coachBotOpen, setCoachBotOpen, coachBotEverOpened } = useUIStore()
+  const { viewMode, setViewMode, toggleSidebar, sidebarVisible, splitPosition, setSplitPosition, sidebarWidth, setSidebarWidth, theme, setTheme, accentColor, backgroundColor, fontFamily, setPendingTemplateInsert, textSplitEnabled, setTextSplitEnabled, textSplitPosition, setTextSplitPosition, smartConnectionsEnabled, notesChatEnabled, flashcardsEnabled, semanticScholarEnabled, customLogo, customAccentColor, customBackgroundColorLight, customBackgroundColorDark, setHelpGuideOpen, taskExcludedFolders } = useUIStore()
   const { notes, vaultPath, selectNote, selectedPdfPath, selectedImagePath, selectedOfficePath, selectedOfficeType, secondarySelectedNoteId, navigateBack, navigateForward, selectedNoteId } = useNotesStore()
   const { tabs, activeTabId } = useTabStore()
   const activeTab = tabs.find(t => t.id === activeTabId)
@@ -302,18 +301,22 @@ const App: React.FC = () => {
     const init = async () => {
       await initializeUISettings()
 
-      // Weak-HW-Erkennung: auf <16-GB-Geräten (z.B. 8-GB-M2) den Schonmodus EINMALIG
-      // vorschlagen/aktivieren. Nur reversibles Throttling — kein stiller Modell-Tausch.
-      // `lowPowerModeAutoApplied` verhindert, dass ein bewusstes Aus-Schalten überschrieben wird.
+      // Weak-HW-Erkennung: System-RAM ermitteln. Wird (a) im Store gehalten für die
+      // Modell-RAM-Warnung an den Pickern und (b) auf <16 GB EINMALIG zum Schonmodus
+      // genutzt. `lowPowerModeAutoApplied` verhindert, dass ein bewusstes Aus-Schalten
+      // überschrieben wird — kein stiller Modell-Tausch.
       try {
-        const { email, setEmail } = useUIStore.getState()
-        if (!email.lowPowerModeAutoApplied) {
-          const mem = await window.electronAPI.getSystemMemory()
-          if (mem && mem.totalGB > 0 && mem.totalGB < 16) {
-            console.log(`[WeakHW] ${mem.totalGB} GB RAM erkannt → Schonmodus aktiviert (einmalig).`)
-            setEmail({ lowPowerMode: true, lowPowerModeAutoApplied: true })
-          } else {
-            setEmail({ lowPowerModeAutoApplied: true })
+        const { email, setEmail, setSystemTotalRamGb } = useUIStore.getState()
+        const mem = await window.electronAPI.getSystemMemory()
+        if (mem && mem.totalGB > 0) {
+          setSystemTotalRamGb(mem.totalGB)
+          if (!email.lowPowerModeAutoApplied) {
+            if (mem.totalGB < 16) {
+              console.log(`[WeakHW] ${mem.totalGB} GB RAM erkannt → Schonmodus aktiviert (einmalig).`)
+              setEmail({ lowPowerMode: true, lowPowerModeAutoApplied: true })
+            } else {
+              setEmail({ lowPowerModeAutoApplied: true })
+            }
           }
         }
       } catch { /* Speicher-Abfrage fehlgeschlagen — ignorieren */ }
@@ -1316,18 +1319,6 @@ const App: React.FC = () => {
                 )}
               </div>
               <button
-                className={`view-mode-btn coachbot-trigger ${coachBotOpen ? 'active' : ''} ${!coachBotEverOpened ? 'coachbot-trigger-pulse' : ''}`}
-                onClick={() => {
-                  setCoachBotOpen(!coachBotOpen)
-                  if (!coachBotEverOpened) {
-                    useUIStore.setState({ coachBotEverOpened: true })
-                  }
-                }}
-                title={t('titlebar.coachBot')}
-              >
-                <RobotIcon size={16} />
-              </button>
-              <button
                 className="view-mode-btn"
                 onClick={() => setHelpGuideOpen(true)}
                 title={t('titlebar.help')}
@@ -1629,8 +1620,6 @@ const App: React.FC = () => {
       <Onboarding />
       {/* Help Guide (jederzeit aufrufbar) */}
       <HelpGuide />
-      {/* CoachBot (Q&A-Helfer im Header) */}
-      <CoachBot />
 
       {/* Morning Briefing */}
       {briefingOpen && (

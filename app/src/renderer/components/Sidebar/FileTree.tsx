@@ -1443,7 +1443,7 @@ const FileItem: React.FC<FileItemProps> = ({
               </button>
               <button onClick={handleOpenMoveDialog} className="context-menu-item">
                 {selectedPaths.size > 1 && selectedPaths.has(entry.path)
-                  ? `${selectedPaths.size} Dateien verschieben`
+                  ? t('fileTree.moveCount', { count: selectedPaths.size })
                   : t('fileTree.moveTo')}
               </button>
               <button onClick={handleShowInFinder} className="context-menu-item">
@@ -1457,7 +1457,7 @@ const FileItem: React.FC<FileItemProps> = ({
               <div className="context-menu-divider" />
               <button onClick={handleDelete} className="context-menu-item danger">
                 {selectedPaths.size > 1 && selectedPaths.has(entry.path)
-                  ? `${selectedPaths.size} Dateien löschen`
+                  ? t('fileTree.deleteCount', { count: selectedPaths.size })
                   : t('fileTree.deleteNote')}
               </button>
             </>
@@ -1544,7 +1544,7 @@ const FileItem: React.FC<FileItemProps> = ({
           <div className="picker-dialog move-dialog" onClick={e => e.stopPropagation()}>
             <div className="picker-dialog-header">
               {moveDialog.entries && moveDialog.entries.length > 1
-                ? `${moveDialog.entries.length} Dateien verschieben`
+                ? t('fileTree.moveCount', { count: moveDialog.entries.length })
                 : t('fileTree.moveToTitle', { name: moveDialog.entry.name })}
             </div>
             <div className="picker-dialog-content move-dialog-content">

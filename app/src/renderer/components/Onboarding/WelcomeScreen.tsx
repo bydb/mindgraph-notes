@@ -3,24 +3,21 @@ import { useTranslation } from '../../utils/translations'
 import { useUIStore, type Language } from '../../stores/uiStore'
 
 interface WelcomeScreenProps {
-  onStartCoach: () => void
   onStartWizard: () => void
   onOpenVault: () => void
 }
 
-export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onStartCoach, onStartWizard, onOpenVault }) => {
+export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onStartWizard, onOpenVault }) => {
   const { t } = useTranslation()
   const { language, setLanguage } = useUIStore()
-  const [backend, setBackend] = useState<'anthropic' | 'ollama' | 'none' | null>(null)
+  const [backend, setBackend] = useState<'ollama' | 'none' | null>(null)
 
-  // Pre-Check informiert nur noch über den Status — der Coach-Button bleibt
-  // immer klickbar. Bei fehlendem Backend routet das Onboarding zum
-  // AI-Setup-Step statt in einen Fehlerzustand.
+  // Pre-Check informiert nur über den KI-Status (Ollama erreichbar?).
   useEffect(() => {
     let cancelled = false
-    window.electronAPI.coachPrecheck()
-      .then((res: { backend: 'anthropic' | 'ollama' | 'none' }) => {
-        if (!cancelled) setBackend(res.backend)
+    window.electronAPI.ollamaCheck()
+      .then((ok: boolean) => {
+        if (!cancelled) setBackend(ok ? 'ollama' : 'none')
       })
       .catch(() => {
         if (!cancelled) setBackend(null)
@@ -31,10 +28,7 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onStartCoach, onSt
   const statusLabel =
     backend === null ? t('onboarding.welcome.aiStatusChecking')
     : backend === 'none' ? t('onboarding.welcome.aiStatusSetupNeeded')
-    : t('onboarding.welcome.aiStatusReady').replace(
-        '{backend}',
-        backend === 'anthropic' ? 'Claude' : 'Ollama'
-      )
+    : t('onboarding.welcome.aiStatusReady').replace('{backend}', 'Ollama')
   const statusClass =
     backend === null ? 'checking'
     : backend === 'none' ? 'pending'
@@ -87,15 +81,12 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onStartCoach, onSt
       <div className="onboarding-welcome-actions">
         <button
           className="onboarding-btn-primary"
-          onClick={onStartCoach}
+          onClick={onStartWizard}
         >
-          {t('onboarding.welcome.startCoach')}
+          {t('onboarding.welcome.setup')}
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <polyline points="9 18 15 12 9 6"/>
           </svg>
-        </button>
-        <button className="onboarding-btn-secondary" onClick={onStartWizard}>
-          {t('onboarding.welcome.setup')}
         </button>
         <button className="onboarding-btn-secondary" onClick={onOpenVault}>
           {t('onboarding.welcome.openVault')}

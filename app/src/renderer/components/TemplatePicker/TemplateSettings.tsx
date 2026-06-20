@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { useNotesStore } from '../../stores/notesStore'
+import { useTranslation } from '../../utils/translations'
 import {
   TemplateConfig,
   CustomTemplate,
@@ -35,6 +36,11 @@ export const TemplateSettings: React.FC<TemplateSettingsProps> = ({
   isOpen,
   onClose
 }) => {
+  const { t } = useTranslation()
+  const builtinLabel = (key: BuiltInTemplateKey): string => {
+    if (key === 'empty') return t('templateSettings.builtin.empty')
+    return BUILTIN_LABELS[key]
+  }
   const { vaultPath } = useNotesStore()
   const [templates, setTemplates] = useState<TemplateConfig>(DEFAULT_TEMPLATES)
   const [selected, setSelected] = useState<SelectedTemplate>({ type: 'builtin', key: 'dailyNote' })
@@ -66,7 +72,7 @@ export const TemplateSettings: React.FC<TemplateSettingsProps> = ({
 
   const getSelectedName = (): string => {
     if (selected.type === 'builtin') {
-      return BUILTIN_LABELS[selected.key]
+      return builtinLabel(selected.key)
     } else {
       const custom = templates.custom.find(t => t.id === selected.id)
       return custom?.name || ''
@@ -105,7 +111,7 @@ export const TemplateSettings: React.FC<TemplateSettingsProps> = ({
   const handleCreateNew = () => {
     const newTemplate: CustomTemplate = {
       id: generateRandomId(8),
-      name: 'Neues Template',
+      name: t('templateSettings.newTemplate'),
       content: `# {{title}}\n\n{{cursor}}`
     }
     setTemplates(prev => ({
@@ -118,7 +124,7 @@ export const TemplateSettings: React.FC<TemplateSettingsProps> = ({
 
   const handleDelete = () => {
     if (selected.type !== 'custom') return
-    if (!confirm('Template wirklich löschen?')) return
+    if (!confirm(t('templateSettings.confirmDelete'))) return
 
     setTemplates(prev => ({
       ...prev,
@@ -152,7 +158,7 @@ export const TemplateSettings: React.FC<TemplateSettingsProps> = ({
 
   const handleClose = () => {
     if (hasChanges) {
-      if (confirm('Ungespeicherte Änderungen verwerfen?')) {
+      if (confirm(t('templateSettings.confirmDiscard'))) {
         onClose()
       }
     } else {
@@ -166,7 +172,7 @@ export const TemplateSettings: React.FC<TemplateSettingsProps> = ({
     <div className="template-settings-overlay" onClick={handleClose}>
       <div className="template-settings" onClick={e => e.stopPropagation()}>
         <div className="template-settings-header">
-          <h2>Template-Einstellungen</h2>
+          <h2>{t('templateSettings.title')}</h2>
           <button className="template-settings-close" onClick={handleClose}>
             ×
           </button>
@@ -174,23 +180,23 @@ export const TemplateSettings: React.FC<TemplateSettingsProps> = ({
 
         <div className="template-settings-content">
           <div className="template-settings-sidebar">
-            <div className="template-settings-section-title">Standard</div>
+            <div className="template-settings-section-title">{t('templateSettings.standard')}</div>
             {(Object.keys(BUILTIN_LABELS) as BuiltInTemplateKey[]).map(key => (
               <button
                 key={key}
                 className={`template-settings-tab ${selected.type === 'builtin' && selected.key === key ? 'active' : ''}`}
                 onClick={() => setSelected({ type: 'builtin', key })}
               >
-                {BUILTIN_LABELS[key]}
+                {builtinLabel(key)}
               </button>
             ))}
 
             <div className="template-settings-section-title">
-              Eigene
+              {t('templateSettings.custom')}
               <button
                 className="template-settings-add-btn"
                 onClick={handleCreateNew}
-                title="Neues Template erstellen"
+                title={t('templateSettings.createNew')}
               >
                 +
               </button>
@@ -206,7 +212,7 @@ export const TemplateSettings: React.FC<TemplateSettingsProps> = ({
             ))}
             {templates.custom.length === 0 && (
               <div className="template-settings-empty">
-                Noch keine eigenen Templates
+                {t('templateSettings.noCustom')}
               </div>
             )}
           </div>
@@ -219,7 +225,7 @@ export const TemplateSettings: React.FC<TemplateSettingsProps> = ({
                   className="template-settings-name-input"
                   value={getSelectedName()}
                   onChange={e => handleNameChange(e.target.value)}
-                  placeholder="Template-Name"
+                  placeholder={t('templateSettings.namePlaceholder')}
                 />
               ) : (
                 <span>{getSelectedName()}</span>
@@ -229,18 +235,18 @@ export const TemplateSettings: React.FC<TemplateSettingsProps> = ({
                   <button
                     className="template-settings-reset"
                     onClick={handleReset}
-                    title="Auf Standard zurücksetzen"
+                    title={t('templateSettings.resetTitle')}
                   >
-                    Standard
+                    {t('templateSettings.standard')}
                   </button>
                 )}
                 {selected.type === 'custom' && (
                   <button
                     className="template-settings-delete"
                     onClick={handleDelete}
-                    title="Template löschen"
+                    title={t('templateSettings.deleteTitle')}
                   >
-                    Löschen
+                    {t('templateSettings.delete')}
                   </button>
                 )}
               </div>
@@ -252,7 +258,7 @@ export const TemplateSettings: React.FC<TemplateSettingsProps> = ({
               spellCheck={false}
             />
             <div className="template-settings-help">
-              <strong>Variablen:</strong> {`{{title}}`}, {`{{date}}`}, {`{{date:DD.MM.YYYY}}`}, {`{{time}}`}, {`{{datetime}}`}, {`{{weekday}}`}, {`{{week}}`}, {`{{timestamp}}`}, {`{{uuid}}`}, {`{{cursor}}`}
+              <strong>{t('templateSettings.variables')}</strong> {`{{title}}`}, {`{{date}}`}, {`{{date:DD.MM.YYYY}}`}, {`{{time}}`}, {`{{datetime}}`}, {`{{weekday}}`}, {`{{week}}`}, {`{{timestamp}}`}, {`{{uuid}}`}, {`{{cursor}}`}
             </div>
           </div>
         </div>
@@ -262,14 +268,14 @@ export const TemplateSettings: React.FC<TemplateSettingsProps> = ({
             className="template-settings-btn secondary"
             onClick={handleClose}
           >
-            Abbrechen
+            {t('templateSettings.cancel')}
           </button>
           <button
             className="template-settings-btn primary"
             onClick={handleSave}
             disabled={!hasChanges || isSaving}
           >
-            {isSaving ? 'Speichern...' : 'Speichern'}
+            {isSaving ? t('templateSettings.saving') : t('templateSettings.save')}
           </button>
         </div>
       </div>

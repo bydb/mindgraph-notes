@@ -3,6 +3,7 @@ import { detectLanguage } from '../../utils/codeLanguages'
 import { highlightCode } from '../../utils/highlightSetup'
 import { sanitizeHtml } from '../../utils/sanitize'
 import { writeClipboardText } from '../../utils/clipboard'
+import { useTranslation } from '../../utils/translations'
 
 interface CodeViewerProps {
   vaultPath: string
@@ -10,6 +11,7 @@ interface CodeViewerProps {
 }
 
 export const CodeViewer: React.FC<CodeViewerProps> = ({ vaultPath, relativePath }) => {
+  const { t } = useTranslation()
   const [content, setContent] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
@@ -78,7 +80,7 @@ export const CodeViewer: React.FC<CodeViewerProps> = ({ vaultPath, relativePath 
                 setTimeout(() => setVscodeMsg(null), 6000)
               }
             }}
-            title="In VS Code öffnen"
+            title={t('fileTree.openInVSCode')}
           >
             In VS Code öffnen
           </button>

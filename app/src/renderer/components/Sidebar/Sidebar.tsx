@@ -502,7 +502,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ onOpenSearch }) => {
           </div>
           {!notesRootFolder && (
             <div className="notes-root-setup">
-              <span>Notizen-Ordner festlegen</span>
+              <span>{t('sidebar.setNotesFolder')}</span>
               <button
                 type="button"
                 onClick={async () => {
@@ -535,9 +535,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ onOpenSearch }) => {
         </>
       ) : (
         <div className="sidebar-empty">
-          <p>Kein Vault geöffnet</p>
+          <p>{t('sidebar.noVaultOpen')}</p>
           <button className="btn-primary" onClick={handleOpenVault}>
-            Vault öffnen
+            {t('sidebar.openVault')}
           </button>
         </div>
       )}

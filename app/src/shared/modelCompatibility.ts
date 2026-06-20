@@ -399,6 +399,57 @@ export function isHardLocked(model: string, moduleId: ModuleId): boolean {
   return v.verdict === 'red'
 }
 
+// ─── RAM-Bedarf eines Modells ────────────────────────────────────────────────
+// Genutzt für die Weak-HW-Warnung: ein Modell, das nicht in den verfügbaren RAM
+// passt, drückt Ollama ins Swap → das ganze (8-GB-)System friert ein (Hang).
+
+// Schätzt den RAM-Bedarf (GB) aus dem Modell-Tag, wenn die Matrix nichts hat.
+// Heuristik über den Parameter-Count (`…Xb…`) × Bytes-pro-Parameter je Quantisierung.
+function estimateModelRamFromName(model: string): number | null {
+  const m = model.toLowerCase()
+  const paramMatch = m.match(/(\d+(?:\.\d+)?)\s*b(?![a-z])/) // 27b, 4b, 0.8b …
+  if (!paramMatch) return null
+  const params = parseFloat(paramMatch[1])
+  if (!Number.isFinite(params) || params <= 0) return null
+  // Bytes pro Parameter je nach Quantisierung im Tag (grobe Obergrenze für die Warnung).
+  let gbPerB = 0.7 // Default ~Q4
+  if (/bf16|fp16|f16/.test(m)) gbPerB = 2.0
+  else if (/q8|8bit|int8/.test(m)) gbPerB = 1.1
+  else if (/mlx/.test(m)) gbPerB = 1.0 // MLX oft 4–8bit, konservativ
+  // + ~1 GB Overhead (KV-Cache, Runtime).
+  return Math.round((params * gbPerB + 1) * 10) / 10
+}
+
+// Liefert den geschätzten RAM-Bedarf (GB) eines Modells: bevorzugt den gemessenen
+// Matrix-Wert (in irgendeinem Modul gepflegt — RAM ist modulunabhängig), sonst
+// die Namens-Heuristik. null = unbekannt (keine Warnung).
+export function getModelRamGb(model: string): number | null {
+  const tag = (model || '').trim()
+  if (!tag) return null
+  for (const moduleMap of Object.values(MODEL_COMPATIBILITY.modules)) {
+    const ram = moduleMap[tag]?.metrics?.ramGigabytes
+    if (typeof ram === 'number' && ram > 0) return ram
+  }
+  return estimateModelRamFromName(tag)
+}
+
+// Passt das Modell in den verfügbaren RAM? Reserve von ~2 GB für OS + Electron + App.
+// `green`-Schwelle so kalibriert, dass das 8-GB-Empfohlene (qwen3.5:4b ≈ 4 GB) NICHT
+// warnt, alles Größere (ministral 6, gemma4 10, qwen3.6:27b 22 …) schon.
+// Cloud-Modelle (`-cloud`/`:cloud`) brauchen keinen lokalen RAM → nie eine Warnung.
+export interface ModelRamFit {
+  fits: boolean
+  modelRamGb: number | null
+  totalRamGb: number
+}
+export function checkModelRamFit(model: string, totalRamGb: number | null | undefined): ModelRamFit {
+  const total = typeof totalRamGb === 'number' && totalRamGb > 0 ? totalRamGb : 0
+  if (!total || isCloudModel(model)) return { fits: true, modelRamGb: null, totalRamGb: total }
+  const ram = getModelRamGb(model)
+  if (ram == null) return { fits: true, modelRamGb: null, totalRamGb: total }
+  return { fits: ram <= total - 2, modelRamGb: ram, totalRamGb: total }
+}
+
 // MLX-Modelle: Apple-Silicon-optimiert (laufen via Apples MLX-Framework nativ
 // auf M-Chips, deutlich schneller + weniger RAM als GGUF/llama.cpp-Varianten).
 // Erkennung: `-mlx` irgendwo im Tag (z.B. `qwen3.6:27b-mlx`, `qwen3.5:9b-mlx-bf16`).

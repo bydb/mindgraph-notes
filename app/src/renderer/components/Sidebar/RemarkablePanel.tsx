@@ -361,7 +361,7 @@ export const RemarkablePanel: React.FC = () => {
 
     setIsOptimizingAndExporting(true)
     setError(null)
-    setInfo('Optimiere PDF fuer reMarkable ...')
+    setInfo(t('remarkable.optimizingPdf'))
 
     try {
       const status = await window.electronAPI.remarkableUsbCheck()
@@ -371,7 +371,7 @@ export const RemarkablePanel: React.FC = () => {
 
       const optimizeResult = await window.electronAPI.remarkableOptimizePdfForUpload(vaultPath, exportCandidatePath)
       if (!optimizeResult.success || !optimizeResult.relativePdfPath) {
-        throw new Error(optimizeResult.error || 'PDF-Optimierung fehlgeschlagen')
+        throw new Error(optimizeResult.error || t('remarkable.optimizeFailed'))
       }
 
       const uploadResult = await window.electronAPI.remarkableUploadPdf(vaultPath, optimizeResult.relativePdfPath)
@@ -383,7 +383,7 @@ export const RemarkablePanel: React.FC = () => {
         ? 'Ghostscript'
         : optimizeResult.method === 'qpdf'
           ? 'qpdf'
-          : 'Originalformat'
+          : t('remarkable.originalFormat')
       const originalKb = optimizeResult.originalSize ? Math.round(optimizeResult.originalSize / 1024) : null
       const optimizedKb = optimizeResult.optimizedSize ? Math.round(optimizeResult.optimizedSize / 1024) : null
       const sizeText = (originalKb !== null && optimizedKb !== null)
@@ -392,7 +392,7 @@ export const RemarkablePanel: React.FC = () => {
 
       setLastExportMode('optimize+export')
       setLastExportDetail(methodText)
-      setInfo(`Export erfolgreich (${methodText})${sizeText}`)
+      setInfo(`${t('remarkable.exportSuccess', { method: methodText })}${sizeText}`)
       await refresh()
     } catch (err) {
       setError(err instanceof Error ? err.message : t('sidebar.remarkable.exportPdfError'))
@@ -433,7 +433,7 @@ export const RemarkablePanel: React.FC = () => {
 
       <div className="remarkable-debug">
         <button className="remarkable-debug-toggle" onClick={() => setDebugOpen((prev) => !prev)}>
-          {debugOpen ? 'Debug ausblenden' : 'Debug anzeigen'}
+          {debugOpen ? t('remarkable.debugHide') : t('remarkable.debugShow')}
         </button>
         {debugOpen && (
           <div className="remarkable-debug-content">
@@ -468,9 +468,9 @@ export const RemarkablePanel: React.FC = () => {
               className="remarkable-export-btn remarkable-export-optimize-btn"
               onClick={optimizeAndExportSelectedPdfToRemarkable}
               disabled={isExportingSelectedPdf || isOptimizingAndExporting || !exportCandidatePath}
-              title="PDF optimieren und exportieren"
+              title={t('remarkable.optimizeExportTitle')}
             >
-              {isOptimizingAndExporting ? 'Optimiere ...' : 'Optimieren + Export'}
+              {isOptimizingAndExporting ? t('remarkable.optimizing') : t('remarkable.optimizeExport')}
             </button>
             <span className="remarkable-export-file" title={exportCandidatePath || t('sidebar.remarkable.noPdfSelected')}>
               {exportCandidateName || t('sidebar.remarkable.noPdfSelected')}
