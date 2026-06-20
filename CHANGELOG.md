@@ -2,6 +2,26 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.8.1-beta] - 2026-06-20
+
+Optionales **Cloud-KI-Backend via OpenRouter** für schwache Hardware (8-GB-Macs etc.), bei der lokale Modelle für komplexe Analysen zu langsam sind. Der Default bleibt strikt lokal — Cloud ist ein **bewusstes Opt-in pro Funktion**, damit die Privacy-Story „du entscheidest, wo deine Daten liegen" intakt bleibt. Das Brain-Modul bleibt **immer lokal**.
+
+### Neue Features
+
+- **OpenRouter als Cloud-Backend (opt-in).** In den Einstellungen → KI aktivierbar: API-Key hinterlegen, Modell wählen (mit Markierung kostenloser `:free`-Modelle + Filter), Verbindung testen. Verfügbar für **Mail-Analyse**, **Notes Chat** (streamend) und die **Inline-Notiz-KI** (Macher-Leiste + Kontextmenü) — jeweils mit klarer Datenschutz-Bestätigung („Inhalte verlassen deinen Rechner"), bevor etwas in die Cloud geht.
+- **OpenRouter direkt im Modell-Picker.** Cloud erscheint als ganz normaler Eintrag „☁️ OpenRouter · <Modell>" zwischen den lokalen Modellen — ein Dropdown, kein versteckter Schalter. Mit echtem OpenRouter-Logo.
+- **Schonmodus automatisch auf schwacher Hardware.** Geräte mit weniger als 16 GB RAM aktivieren den Mail-Schonmodus einmalig selbst (reversibel) — kein stiller Modell-Tausch.
+
+### Verbesserungen
+
+- **Echte Logos statt Emoji im Mail-Analyse-Modell-Picker.** Der Picker zeigt jetzt Hersteller-Logos, Apple-Silicon-(MLX)- und Favoriten-Marker als SVG sowie den Eignungs-Status als farbigen Punkt.
+- **Klare Cloud-Fehlermeldungen.** Rate-Limits (429), fehlendes Guthaben (402) und ungültige Keys (401) werden verständlich erklärt; Reasoning-Modelle, die kein sauberes JSON liefern, geben einen konkreten Hinweis statt einer kryptischen Meldung.
+
+### Fixes
+
+- **Zuverlässiger Wechsel zwischen lokalem Modell und OpenRouter in der Mail-Analyse.** Vorher konnte nach einem Wechsel die alte Einstellung greifen — jetzt ist die Auswahl im Picker die alleinige, eindeutige Quelle.
+- **Sichtbare Hinweise statt stillem Scheitern**, wenn kein Analyse-Modell konfiguriert ist oder ein gesperrtes Modell gewählt wurde.
+
 ## [0.8.0-beta] - 2026-06-18
 
 Großes Redesign- und KI-Release: hellere Oberfläche, echte Hersteller-Logos und eine neue KI-„Macher-Leiste", die nach dem Prinzip **„Vorschlag statt Autopilot"** arbeitet — die KI schlägt vor, du übernimmst oder verwirfst.
