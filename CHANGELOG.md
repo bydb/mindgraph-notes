@@ -2,6 +2,23 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.8.2-beta] - 2026-06-20
+
+Härtungs- und Aufräum-Release mit Fokus auf schwache Hardware (8-GB-Macs) und vollständige englische Übersetzung.
+
+### Neue Features
+
+- **RAM-Warnung am Modell-Picker.** Wählst du ein Modell, das nicht in den verfügbaren Arbeitsspeicher passt (z. B. ein 22-GB-Modell auf einem 8-GB-Gerät), warnt die App jetzt sichtbar — statt dass das System beim Laden ins Swap läuft und einfriert. Die Warnung erscheint an der Mail-Analyse, am globalen Modell und in der Kompatibilitäts-Sektion. Cloud-Modelle (OpenRouter) lösen keine Warnung aus.
+
+### Verbesserungen
+
+- **Vollständige englische Übersetzung.** Zahlreiche bisher fest deutsche UI-Texte folgen jetzt der gewählten Sprache — insbesondere die **Rechtsklick-Kontextmenüs** (Ausschneiden/Kopieren/Einfügen/Alles auswählen) und das Datei-Kontextmenü, außerdem Editor, Viewer (PDF/Office/Bild), Vorlagen-/Schnellauswahl, Workflow-Canvas, Telegram-Einstellungen, Zotero-Suche und weitere. (~227 Texte ergänzt.)
+- **Schlankere App.** Der KI-Onboarding-Coach und der Coach-Chat wurden entfernt — sie setzten ein bereits installiertes KI-Modell voraus (Problem genau beim Erststart) und umgingen die zentrale Modellwahl. Das Onboarding läuft jetzt über den klassischen, verlässlichen Ablauf.
+
+### Fixes
+
+- **Kontextmenüs blieben auf Englisch deutsch.** Das native Rechtsklick-Menü war fest deutsch verdrahtet und ignorierte die Sprachwahl — behoben.
+
 ## [0.8.1-beta] - 2026-06-20
 
 Optionales **Cloud-KI-Backend via OpenRouter** für schwache Hardware (8-GB-Macs etc.), bei der lokale Modelle für komplexe Analysen zu langsam sind. Der Default bleibt strikt lokal — Cloud ist ein **bewusstes Opt-in pro Funktion**, damit die Privacy-Story „du entscheidest, wo deine Daten liegen" intakt bleibt. Das Brain-Modul bleibt **immer lokal**.
