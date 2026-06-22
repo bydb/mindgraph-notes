@@ -2,6 +2,16 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.8.3-beta] - 2026-06-22
+
+Annotieren im Lesen-Modus — Zotero-artig: markieren, einfärben, und alle Markierungen sammeln sich automatisch in einer eigenen Notiz, mit der du im Notes-Chat weiterarbeiten kannst. Dazu eine KI-Aktion, die OCR-Texte aufräumt.
+
+### Neue Features
+
+- **Annotationen im Lesen-Modus.** Text mit der Maus markieren, Rechtsklick → „Annotieren" in vier Farben. Jede Markierung wandert mit Zitat, Seitenzahl und Rückverlinkung in eine co-lokierte Sammeldatei „&lt;Notiz&gt; - Annotationen.md" — direkt im Notes-Chat als Kontext nutzbar. Die Markierungen sind eine reine Anzeigeschicht: deine Quellnotiz bleibt unverändert (wichtig für OCR-Notizen, die du neu übersetzen oder aufräumen willst), und beim erneuten Öffnen erscheinen die Highlights automatisch wieder an Ort und Stelle. Eine Markierung anklicken entfernt sie wieder — aus der Sammeldatei und aus der Ansicht.
+- **Seitengenaue Zitate.** Bei per Vision-OCR erstellten Notizen wird die Seitenzahl automatisch aus den Seitentrennern bestimmt, sodass jede Annotation eine korrekte Quellenangabe (Seite + Rücklink) trägt.
+- **„OCR aufräumen" als KI-Aktion.** Eine neue Aktion im KI-Kontextmenü des Editors glättet OCR-Texte — korrigiert Erkennungsfehler, stellt Absätze und Zeichensetzung wieder her — ohne den Inhalt zu verändern, etwas zu erfinden oder neu zu übersetzen. Lokal (Ollama) oder via LM Studio.
+
 ## [0.8.2-beta] - 2026-06-20
 
 Härtungs- und Aufräum-Release mit Fokus auf schwache Hardware (8-GB-Macs) und vollständige englische Übersetzung.
