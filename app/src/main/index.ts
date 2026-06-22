@@ -987,6 +987,65 @@ ipcMain.handle('write-file', async (_event, filePath: string, content: string) =
   }
 })
 
+// Annotation-Append: hängt eine Lesemodus-Annotation an die co-lokierte
+// „… - Annotationen.md" an (Zotero-artige Sammeldatei, in NotesChat nutzbar).
+// `relPath` stammt aus dem Renderer → erst Vault prüfen, dann Pfad validieren.
+ipcMain.handle('append-annotation', async (
+  _event,
+  vaultPath: string,
+  relPath: string,
+  block: string,
+  headerIfNew: string
+): Promise<{ success: boolean; relPath: string }> => {
+  assertApprovedVault(vaultPath, 'append-annotation')
+  const abs = validatePath(vaultPath, relPath)
+  let existing = ''
+  let isNew = false
+  try {
+    existing = await fs.readFile(abs, 'utf-8')
+  } catch {
+    existing = ''
+    isNew = true
+  }
+  const base = isNew ? headerIfNew : existing
+  const sep = base.length === 0 || base.endsWith('\n') ? '' : '\n'
+  await fs.mkdir(path.dirname(abs), { recursive: true })
+  await writeFileSafe(abs, base + sep + block + '\n')
+  return { success: true, relPath }
+})
+
+// Annotation-Delete: entfernt den Annotations-Block mit der gegebenen id aus der
+// Sammeldatei (Block = `> [!quote]`-Zeilen bis inkl. `<!-- anno: … -->`).
+ipcMain.handle('delete-annotation', async (
+  _event,
+  vaultPath: string,
+  relPath: string,
+  annoId: string
+): Promise<{ success: boolean; removed: boolean }> => {
+  assertApprovedVault(vaultPath, 'delete-annotation')
+  const abs = validatePath(vaultPath, relPath)
+  let content: string
+  try {
+    content = await fs.readFile(abs, 'utf-8')
+  } catch {
+    return { success: false, removed: false }
+  }
+  const lines = content.split('\n')
+  const idNeedle = `"id":"${annoId}"`
+  const commentIdx = lines.findIndex(l => l.includes('<!-- anno:') && l.includes(idNeedle))
+  if (commentIdx === -1) return { success: true, removed: false }
+  // Rückwärts bis zum Block-Start (`> [!quote]`-Zeile) laufen …
+  let start = commentIdx
+  while (start > 0 && !lines[start].startsWith('> [!quote]')) start--
+  // … und eine direkt vorangehende Leerzeile mitnehmen.
+  let removeFrom = start
+  if (removeFrom > 0 && lines[removeFrom - 1].trim() === '') removeFrom--
+  lines.splice(removeFrom, commentIdx - removeFrom + 1)
+  const next = lines.join('\n').replace(/\n{3,}/g, '\n\n')
+  await writeFileSafe(abs, next)
+  return { success: true, removed: true }
+})
+
 // ============ WORKFLOW CANVAS ============
 function getWorkflowsPath(vaultPath: string): string {
   return path.join(vaultPath, '.mindgraph', 'workflows.json')
@@ -3020,7 +3079,7 @@ ipcMain.handle('ollama-delete-model', async (_event, modelName: string) => {
 interface OllamaRequest {
   model: string
   prompt: string
-  action: 'translate' | 'summarize' | 'continue' | 'improve' | 'custom'
+  action: 'translate' | 'summarize' | 'continue' | 'improve' | 'custom' | 'ocr-cleanup'
   targetLanguage?: string
   originalText: string
   customPrompt?: string
@@ -3039,6 +3098,7 @@ ipcMain.handle('ollama-generate', async (_event, request: OllamaRequest) => {
       summarize: 'Du bist ein Experte für Zusammenfassungen. Fasse den folgenden Text prägnant zusammen. Behalte die wichtigsten Punkte bei. Gib NUR die Zusammenfassung zurück.',
       continue: 'Du bist ein kreativer Schreibassistent. Setze den folgenden Text nahtlos und im gleichen Stil fort. Gib NUR die Fortsetzung zurück, ohne den Originaltext zu wiederholen.',
       improve: 'Du bist ein Lektor. Verbessere Grammatik, Stil und Klarheit des folgenden Textes. Behalte die ursprüngliche Bedeutung bei. Gib NUR den verbesserten Text zurück.',
+      'ocr-cleanup': 'Du bist ein sorgfältiger Lektor für OCR-erkannte und maschinell übersetzte Texte. Bereinige den folgenden Text: korrigiere offensichtliche OCR-Fehler (vertauschte oder fehlende Buchstaben, falsch zusammengezogene oder getrennte Wörter, verrutschte Sonderzeichen), stelle sinnvolle Absätze und Zeichensetzung wieder her und glätte die Lesbarkeit. STRIKT: Ändere den Inhalt NICHT, erfinde nichts hinzu, lasse nichts weg und übersetze nicht neu. Erhalte Fachbegriffe, Eigennamen, wörtliche Zitate, Literaturverweise und Seitentrenner (---) unverändert. Gib NUR den bereinigten Text zurück, ohne Vorrede oder Kommentare.',
       custom: request.customPrompt || 'Bearbeite den folgenden Text nach deinem besten Wissen.'
     }
 
@@ -3078,7 +3138,7 @@ ipcMain.handle('ollama-generate', async (_event, request: OllamaRequest) => {
         stream: false,
         think: false,
         options: {
-          temperature: request.action === 'translate' ? 0.3 : 0.7,
+          temperature: (request.action === 'translate' || request.action === 'ocr-cleanup') ? 0.3 : 0.7,
           num_predict: request.action === 'summarize' ? 500 : 2000
         }
       })
@@ -4059,7 +4119,7 @@ ipcMain.handle('lmstudio-models', async (_event, port: number = LM_STUDIO_DEFAUL
 interface LMStudioRequest {
   model: string
   prompt: string
-  action: 'translate' | 'summarize' | 'continue' | 'improve' | 'custom'
+  action: 'translate' | 'summarize' | 'continue' | 'improve' | 'custom' | 'ocr-cleanup'
   targetLanguage?: string
   originalText: string
   customPrompt?: string
@@ -4077,6 +4137,7 @@ ipcMain.handle('lmstudio-generate', async (_event, request: LMStudioRequest) => 
       summarize: 'Du bist ein Experte für Zusammenfassungen. Fasse den folgenden Text prägnant zusammen. Behalte die wichtigsten Punkte bei. Gib NUR die Zusammenfassung zurück.',
       continue: 'Du bist ein kreativer Schreibassistent. Setze den folgenden Text nahtlos und im gleichen Stil fort. Gib NUR die Fortsetzung zurück, ohne den Originaltext zu wiederholen.',
       improve: 'Du bist ein Lektor. Verbessere Grammatik, Stil und Klarheit des folgenden Textes. Behalte die ursprüngliche Bedeutung bei. Gib NUR den verbesserten Text zurück.',
+      'ocr-cleanup': 'Du bist ein sorgfältiger Lektor für OCR-erkannte und maschinell übersetzte Texte. Bereinige den folgenden Text: korrigiere offensichtliche OCR-Fehler (vertauschte oder fehlende Buchstaben, falsch zusammengezogene oder getrennte Wörter, verrutschte Sonderzeichen), stelle sinnvolle Absätze und Zeichensetzung wieder her und glätte die Lesbarkeit. STRIKT: Ändere den Inhalt NICHT, erfinde nichts hinzu, lasse nichts weg und übersetze nicht neu. Erhalte Fachbegriffe, Eigennamen, wörtliche Zitate, Literaturverweise und Seitentrenner (---) unverändert. Gib NUR den bereinigten Text zurück, ohne Vorrede oder Kommentare.',
       custom: request.customPrompt || 'Bearbeite den folgenden Text nach deinem besten Wissen.'
     }
 
@@ -4094,7 +4155,7 @@ ipcMain.handle('lmstudio-generate', async (_event, request: LMStudioRequest) => 
           { role: 'system', content: systemMessage },
           { role: 'user', content: userMessage }
         ],
-        temperature: request.action === 'translate' ? 0.3 : 0.7,
+        temperature: (request.action === 'translate' || request.action === 'ocr-cleanup') ? 0.3 : 0.7,
         max_tokens: request.action === 'summarize' ? 500 : 2000,
         stream: false
       })

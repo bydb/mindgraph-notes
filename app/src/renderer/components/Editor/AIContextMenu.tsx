@@ -3,7 +3,7 @@ import { useUIStore, AI_LANGUAGES, AILanguageCode } from '../../stores/uiStore'
 import { useTranslation } from '../../utils/translations'
 import { canUseCloudForFeature } from '../../../shared/llmBackend'
 
-type AIAction = 'translate' | 'summarize' | 'continue' | 'improve' | 'custom'
+type AIAction = 'translate' | 'summarize' | 'continue' | 'improve' | 'custom' | 'ocr-cleanup'
 
 interface AIContextMenuProps {
   x: number
@@ -31,6 +31,7 @@ const ACTION_ICONS: Record<AIAction, string> = {
   summarize: '📝',
   continue: '✍️',
   improve: '✨',
+  'ocr-cleanup': '🧹',
   custom: '💬'
 }
 
@@ -72,7 +73,7 @@ export const AIContextMenu: React.FC<AIContextMenuProps> = ({
       const requestParams = {
         model: ollama.selectedModel,
         prompt: customPrompt || '',
-        action: (action === 'custom' ? 'custom' : action) as 'translate' | 'summarize' | 'continue' | 'improve' | 'custom',
+        action: (action === 'custom' ? 'custom' : action) as 'translate' | 'summarize' | 'continue' | 'improve' | 'custom' | 'ocr-cleanup',
         targetLanguage: targetLanguage || (action === 'translate' ? getLanguageName(ollama.defaultTranslateLanguage) : undefined),
         originalText: selectedText,
         customPrompt: customPrompt
@@ -190,7 +191,7 @@ export const AIContextMenu: React.FC<AIContextMenuProps> = ({
         </div>
 
         {/* Andere Aktionen */}
-        {(['summarize', 'continue', 'improve'] as AIAction[]).map(action => (
+        {(['summarize', 'continue', 'improve', 'ocr-cleanup'] as AIAction[]).map(action => (
           <div
             key={action}
             className={`ai-context-menu-item ${isLoading && loadingAction === action ? 'loading' : ''}`}

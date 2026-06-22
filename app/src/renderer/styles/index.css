@@ -3123,6 +3123,63 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
   margin: 6px 8px;
 }
 
+/* ============ LESEMODUS-ANNOTATIONEN ============ */
+/* Farbauswahl im Preview-Kontextmenü */
+.anno-menu-row {
+  cursor: default;
+}
+.anno-menu-row:hover {
+  background: none;
+}
+.anno-swatches {
+  display: inline-flex;
+  gap: 6px;
+  margin-left: auto;
+}
+.anno-swatch {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 1px solid var(--border-color);
+  cursor: pointer;
+  padding: 0;
+  transition: transform var(--transition-fast);
+}
+.anno-swatch:hover {
+  transform: scale(1.18);
+}
+
+/* Highlight-Marken in der Lesen-Ansicht (Overlay-Schicht).
+   color-mix hält die Farben theme-tauglich (hell + dunkel). */
+.anno-mark {
+  border-radius: 2px;
+  padding: 0 1px;
+  background: color-mix(in srgb, var(--anno-color) 32%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--anno-color) 22%, transparent);
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+.anno-mark:hover {
+  background: color-mix(in srgb, var(--anno-color) 48%, transparent);
+}
+
+/* Löschmenü für ein Highlight: destruktive Aktion dezent rot beim Hover */
+#anno-delete-menu .format-menu-item:hover {
+  background: color-mix(in srgb, #f0563f 14%, transparent);
+  color: #f0563f;
+}
+#anno-delete-menu .format-menu-item:hover .format-menu-icon {
+  color: #f0563f;
+}
+.anno-mark.anno-yellow, .anno-swatch.anno-yellow { --anno-color: #f6c343; }
+.anno-mark.anno-green,  .anno-swatch.anno-green  { --anno-color: #4caf50; }
+.anno-mark.anno-blue,   .anno-swatch.anno-blue   { --anno-color: #3b9eff; }
+.anno-mark.anno-red,    .anno-swatch.anno-red    { --anno-color: #f0563f; }
+.anno-swatch.anno-yellow { background: #f6c343; }
+.anno-swatch.anno-green  { background: #4caf50; }
+.anno-swatch.anno-blue   { background: #3b9eff; }
+.anno-swatch.anno-red    { background: #f0563f; }
+
 /* ============ WIKILINK AUTOCOMPLETE ============ */
 .wikilink-autocomplete {
   position: fixed;

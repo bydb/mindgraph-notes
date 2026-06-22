@@ -462,6 +462,8 @@ export interface ElectronAPI {
   readFilesBatch: (basePath: string, relativePaths: string[]) => Promise<Record<string, string | null>>;
   readFileBinary: (filePath: string) => Promise<string>;  // Returns Base64
   writeFile: (filePath: string, content: string) => Promise<void>;
+  appendAnnotation: (vaultPath: string, relPath: string, block: string, headerIfNew: string) => Promise<{ success: boolean; relPath: string }>;
+  deleteAnnotation: (vaultPath: string, relPath: string, annoId: string) => Promise<{ success: boolean; removed: boolean }>;
   deleteFile: (filePath: string) => Promise<boolean>;
   deleteFiles: (filePaths: string[]) => Promise<{ deleted: number; total: number }>;
   deleteDirectory: (dirPath: string) => Promise<boolean>;
@@ -582,7 +584,7 @@ export interface ElectronAPI {
   ollamaGenerate: (request: {
     model: string;
     prompt: string;
-    action: 'translate' | 'summarize' | 'continue' | 'improve' | 'custom';
+    action: 'translate' | 'summarize' | 'continue' | 'improve' | 'custom' | 'ocr-cleanup';
     targetLanguage?: string;
     originalText: string;
     customPrompt?: string;
@@ -660,7 +662,7 @@ export interface ElectronAPI {
   lmstudioGenerate: (request: {
     model: string;
     prompt: string;
-    action: 'translate' | 'summarize' | 'continue' | 'improve' | 'custom';
+    action: 'translate' | 'summarize' | 'continue' | 'improve' | 'custom' | 'ocr-cleanup';
     targetLanguage?: string;
     originalText: string;
     customPrompt?: string;

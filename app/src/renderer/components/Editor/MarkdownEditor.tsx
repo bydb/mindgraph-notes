@@ -41,6 +41,20 @@ import { AIContextMenu, AIResult } from './AIContextMenu'
 import { AIImageDialog } from './AIImageDialog'
 import { PublishToWordPressModal } from './PublishToWordPressModal'
 import { insertAIResultWithFootnote } from '../../utils/aiFootnote'
+import {
+  ANNO_COLORS,
+  AnnoColorDef,
+  computePageFromRange,
+  findQuoteLocation,
+  getFrontmatterField,
+  noteBaseName,
+  annotationRelPathFor,
+  buildAnnotationFileHeader,
+  buildAnnotationBlock,
+  makeAnnotationId,
+  parseAnnotationAnchors,
+  applyStoredHighlights
+} from '../../utils/annotations'
 import { isImageFile, findImageInVault, getFilePathsFromDataTransfer, extractImageFromDataTransfer, fileToBase64 } from '../../utils/imageUtils'
 import { highlightCode } from '../../utils/highlightSetup'
 import { speak, stopSpeaking } from '../../utils/voice/tts'
@@ -498,6 +512,14 @@ function editablePreviewHtmlToMarkdown(root: HTMLElement, currentContent: string
   // Nur reine UI-Artefakte entfernen (Copy-Buttons, Fold-Toggles). Die Embed-Container
   // bleiben drin und werden von den Turndown-Regeln in Original-Markdown rekonstruiert.
   clone.querySelectorAll('.code-copy-btn, .fold-toggle').forEach(el => el.remove())
+  // Annotation-Highlights auspacken (Overlay-Schicht, gehört nicht in die Markdown-Quelle):
+  // <mark class="anno-mark …">Text</mark> → Text
+  clone.querySelectorAll('mark.anno-mark').forEach(el => {
+    const parent = el.parentNode
+    if (!parent) return
+    while (el.firstChild) parent.insertBefore(el.firstChild, el)
+    parent.removeChild(el)
+  })
   // Turndown's blankRule fängt leere Block-Elemente vor den Custom-Rules ab. In Production
   // haben unsere Embeds immer Inhalt (Loading-Spinner, Icons, SVG), aber als Sicherheitsnetz
   // injizieren wir ein Zero-Width-Space, falls ein Container doch mal leer ist.
@@ -509,6 +531,40 @@ function editablePreviewHtmlToMarkdown(root: HTMLElement, currentContent: string
   const bodyMarkdown = wysiwygTurndown.turndown(clone).replace(/\n{3,}/g, '\n\n').trim()
   const { frontmatter } = stripFrontmatterRaw(currentContent)
   return `${frontmatter}${bodyMarkdown}${bodyMarkdown ? '\n' : ''}`
+}
+
+// Session-Highlight: umschließt die Selektion mit <mark class="anno-mark …">.
+// Reine Anzeigeschicht — wird im turndown-Clone wieder ausgepackt (s.u.), berührt
+// die Markdown-Quelle also nie. DOM-Mutation via Range löst KEIN onInput aus → kein Commit.
+function applyAnnotationHighlight(range: Range, className: string, annoId: string): void {
+  const make = () => {
+    const mark = document.createElement('mark')
+    mark.className = `anno-mark ${className}`
+    mark.dataset.annoId = annoId
+    return mark
+  }
+  try {
+    range.surroundContents(make())
+  } catch {
+    // Selektion über Element-/Blockgrenzen: extractContents-Fallback
+    try {
+      const mark = make()
+      mark.appendChild(range.extractContents())
+      range.insertNode(mark)
+    } catch {
+      /* Highlight ist optional — die Annotationen-Datei wurde trotzdem geschrieben */
+    }
+  }
+  window.getSelection()?.removeAllRanges()
+}
+
+// Entfernt eine Highlight-Marke aus dem DOM und behält den Text (Auspacken).
+function unwrapAnnotationMark(mark: HTMLElement): void {
+  const parent = mark.parentNode
+  if (!parent) return
+  while (mark.firstChild) parent.insertBefore(mark.firstChild, mark)
+  parent.removeChild(mark)
+  parent.normalize?.()
 }
 
 // Custom image renderer für Standard-Markdown ![alt](url) Syntax
@@ -1748,7 +1804,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
       const req = {
         model,
         prompt: action === 'custom' ? customPrompt : '',
-        action: action as 'translate' | 'summarize' | 'continue' | 'improve' | 'custom',
+        action: action as 'translate' | 'summarize' | 'continue' | 'improve' | 'custom' | 'ocr-cleanup',
         originalText: oldText,
         customPrompt: action === 'custom' ? customPrompt : undefined
       }
@@ -2930,8 +2986,55 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
   }, [previewLinkInput?.value, previewWikilinkSuggestions.length])
 
   // Handle wikilink and checkbox clicks in preview
+  // Annotation löschen: Block per id aus der Sidecar-Datei entfernen + Marke auspacken.
+  const deleteAnnotationById = useCallback(async (mark: HTMLElement) => {
+    const annoId = mark.dataset.annoId
+    if (!annoId || !selectedNote || !vaultPath) return
+    const relPath = annotationRelPathFor(selectedNote.path)
+    try {
+      await window.electronAPI.deleteAnnotation(vaultPath, relPath, annoId)
+      unwrapAnnotationMark(mark)
+    } catch (err) {
+      console.error('[Annotation] Löschen fehlgeschlagen:', err)
+    }
+  }, [selectedNote, vaultPath])
+
   const handlePreviewClick = useCallback((e: React.MouseEvent) => {
     const target = e.target as HTMLElement
+
+    // Klick auf ein Annotations-Highlight → kleines Löschmenü (per DOM, bewahrt Position)
+    const annoMark = target.closest('.anno-mark') as HTMLElement | null
+    if (annoMark) {
+      e.preventDefault()
+      e.stopPropagation()
+      document.getElementById('anno-delete-menu')?.remove()
+      const menu = document.createElement('div')
+      menu.id = 'anno-delete-menu'
+      menu.className = 'format-menu'
+      menu.style.position = 'fixed'
+      menu.style.left = `${e.clientX}px`
+      menu.style.top = `${e.clientY}px`
+      menu.style.zIndex = '10000'
+      menu.onmousedown = ev => ev.preventDefault()
+      const delBtn = document.createElement('button')
+      delBtn.className = 'format-menu-item'
+      delBtn.innerHTML = '<span class="format-menu-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg></span><span class="format-menu-label">' + t('anno.delete') + '</span>'
+      delBtn.onclick = async () => { menu.remove(); await deleteAnnotationById(annoMark) }
+      menu.appendChild(delBtn)
+      const container = target.closest('.editor-container') || document.body
+      container.appendChild(menu)
+      const rect = menu.getBoundingClientRect()
+      if (rect.right > window.innerWidth) menu.style.left = `${window.innerWidth - rect.width - 8}px`
+      if (rect.bottom > window.innerHeight) menu.style.top = `${window.innerHeight - rect.height - 8}px`
+      const handleOutside = (ev: MouseEvent) => {
+        if (!menu.contains(ev.target as Node)) {
+          menu.remove()
+          document.removeEventListener('mousedown', handleOutside)
+        }
+      }
+      setTimeout(() => document.addEventListener('mousedown', handleOutside), 0)
+      return
+    }
 
     // Copy code block to clipboard
     const copyButton = target.closest('.code-copy-btn') as HTMLButtonElement | null
@@ -3134,7 +3237,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
       }
       return
     }
-  }, [notes, selectNote, selectSecondaryNote, isSecondary, vaultPath, previewContent, saveContent, t])
+  }, [notes, selectNote, selectSecondaryNote, isSecondary, vaultPath, previewContent, saveContent, t, deleteAnnotationById])
 
   // Process headings to add fold toggles
   const processHeadingFolds = useCallback((html: string): string => {
@@ -3685,6 +3788,25 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
     editable.innerHTML = sanitizeHtml(renderedMarkdown)
   }, [renderedMarkdown, contentVersion])
 
+  // Phase 2: gespeicherte Annotationen beim Öffnen wieder als Highlight-Overlay einfärben.
+  // Liest die co-lokierte Sidecar-Datei und verankert die Zitate im frisch gerenderten
+  // Preview-DOM. Die Markdown-Quelle bleibt unangetastet; läuft nach jedem Render erneut.
+  useEffect(() => {
+    if (viewMode !== 'preview') return
+    const root = editablePreviewRef.current
+    if (!root || !selectedNote || !vaultPath) return
+    let cancelled = false
+    const abs = `${vaultPath}/${annotationRelPathFor(selectedNote.path)}`
+    window.electronAPI.readFile(abs)
+      .then(content => {
+        if (cancelled || !content || isPreviewDomEditingRef.current) return
+        const anchors = parseAnnotationAnchors(content)
+        if (anchors.length) applyStoredHighlights(root, anchors)
+      })
+      .catch(() => { /* keine Annotationen-Datei → nichts einzufärben */ })
+    return () => { cancelled = true }
+  }, [renderedMarkdown, contentVersion, viewMode, selectedNote?.path, vaultPath])
+
   // Wikilink Hover Preview
   useEffect(() => {
     if (viewMode !== 'preview' || !previewRef.current) return
@@ -3887,6 +4009,41 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [viewMode, applyFormat])
 
+  // Annotation aus dem Lesen-Modus: Zitat + Zitation an die co-lokierte Sammeldatei
+  // anhängen und die Stelle sitzungsweise einfärben. Quelle bleibt unverändert (Overlay).
+  const annotateSelection = useCallback(async (quote: string, range: Range, colorDef: AnnoColorDef) => {
+    if (!selectedNote || !vaultPath) return
+    const root = editablePreviewRef.current
+    const content = viewRef.current?.state.doc.toString() ?? previewContent
+    const page = root ? computePageFromRange(root, range) : null
+    const loc = findQuoteLocation(content, quote)
+    const now = new Date()
+    const id = makeAnnotationId(now)
+    const sourceNoteName = noteBaseName(selectedNote.path)
+    const anchor = {
+      id,
+      color: colorDef.key,
+      page,
+      quote,
+      prefix: loc?.prefix ?? '',
+      suffix: loc?.suffix ?? '',
+      occ: loc?.occ ?? 1
+    }
+    const block = buildAnnotationBlock({ quote, color: colorDef, page, sourceNoteName, anchor, now })
+    const header = buildAnnotationFileHeader({
+      sourceNoteName,
+      sourcePdf: getFrontmatterField(content, 'source'),
+      now
+    })
+    const relPath = annotationRelPathFor(selectedNote.path)
+    try {
+      await window.electronAPI.appendAnnotation(vaultPath, relPath, block, header)
+      applyAnnotationHighlight(range, colorDef.className, id)
+    } catch (err) {
+      console.error('[Annotation] Append fehlgeschlagen:', err)
+    }
+  }, [selectedNote, vaultPath, previewContent])
+
   // Preview-Kontextmenü: Per DOM erzeugen um React-Rerender zu vermeiden (bewahrt Selektion)
   const handlePreviewContextMenu = useCallback((e: React.MouseEvent) => {
     const selection = window.getSelection()
@@ -3894,6 +4051,9 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
     if (!selectedText) return
 
     e.preventDefault()
+
+    // Range jetzt klonen — Klicks im Menü würden die Live-Selektion sonst verlieren.
+    const annoRange = selection && selection.rangeCount > 0 ? selection.getRangeAt(0).cloneRange() : null
 
     // Vorheriges Menü entfernen
     document.getElementById('preview-copy-menu')?.remove()
@@ -3916,6 +4076,36 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
     }
     menu.appendChild(copyBtn)
 
+    // Annotieren ▸ Farben (Zotero-artig): hängt das Zitat + Zitation an die
+    // co-lokierte „… - Annotationen.md" an und färbt die Stelle sitzungsweise ein.
+    if (selectedNote && vaultPath && annoRange) {
+      const divider = document.createElement('div')
+      divider.className = 'format-menu-divider'
+      menu.appendChild(divider)
+
+      const annoRow = document.createElement('div')
+      annoRow.className = 'format-menu-item anno-menu-row'
+      const label = document.createElement('span')
+      label.className = 'format-menu-label'
+      label.textContent = t('anno.annotate')
+      annoRow.appendChild(label)
+
+      const swatches = document.createElement('span')
+      swatches.className = 'anno-swatches'
+      ANNO_COLORS.forEach((colorDef: AnnoColorDef) => {
+        const btn = document.createElement('button')
+        btn.className = `anno-swatch ${colorDef.className}`
+        btn.title = t(colorDef.labelKey)
+        btn.onclick = async () => {
+          menu.remove()
+          await annotateSelection(selectedText, annoRange, colorDef)
+        }
+        swatches.appendChild(btn)
+      })
+      annoRow.appendChild(swatches)
+      menu.appendChild(annoRow)
+    }
+
     // In editor-container einfügen für korrekte CSS-Variablen
     const container = (e.target as HTMLElement).closest('.editor-container') || document.body
     container.appendChild(menu)
@@ -3931,7 +4121,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
       }
     }
     setTimeout(() => document.addEventListener('mousedown', handleOutside), 0)
-  }, [t])
+  }, [t, selectedNote, vaultPath, annotateSelection])
 
   const handleEditorContextMenu = useCallback((e: React.MouseEvent) => {
     if (viewMode === 'preview' || !viewRef.current) return

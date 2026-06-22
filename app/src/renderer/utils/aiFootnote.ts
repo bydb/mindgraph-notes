@@ -5,6 +5,7 @@ const ACTION_LABELS: Record<string, string> = {
   summarize: 'Zusammenfassung',
   continue: 'Fortsetzung',
   improve: 'Verbesserung',
+  'ocr-cleanup': 'OCR-Bereinigung',
   custom: 'Eigener Prompt'
 }
 

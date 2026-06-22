@@ -21,6 +21,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   readFilesBatch: (basePath: string, relativePaths: string[]) => ipcRenderer.invoke('read-files-batch', basePath, relativePaths),
   readFileBinary: (filePath: string) => ipcRenderer.invoke('read-file-binary', filePath),
   writeFile: (filePath: string, content: string) => ipcRenderer.invoke('write-file', filePath, content),
+  appendAnnotation: (vaultPath: string, relPath: string, block: string, headerIfNew: string) =>
+    ipcRenderer.invoke('append-annotation', vaultPath, relPath, block, headerIfNew),
+  deleteAnnotation: (vaultPath: string, relPath: string, annoId: string) =>
+    ipcRenderer.invoke('delete-annotation', vaultPath, relPath, annoId),
   deleteFile: (filePath: string) => ipcRenderer.invoke('delete-file', filePath),
   deleteFiles: (filePaths: string[]) => ipcRenderer.invoke('delete-files', filePaths),
   deleteDirectory: (dirPath: string) => ipcRenderer.invoke('delete-directory', dirPath),
@@ -126,7 +130,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   ollamaGenerate: (request: {
     model: string
     prompt: string
-    action: 'translate' | 'summarize' | 'continue' | 'improve' | 'custom'
+    action: 'translate' | 'summarize' | 'continue' | 'improve' | 'custom' | 'ocr-cleanup'
     targetLanguage?: string
     originalText: string
     customPrompt?: string
@@ -216,7 +220,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   lmstudioGenerate: (request: {
     model: string
     prompt: string
-    action: 'translate' | 'summarize' | 'continue' | 'improve' | 'custom'
+    action: 'translate' | 'summarize' | 'continue' | 'improve' | 'custom' | 'ocr-cleanup'
     targetLanguage?: string
     originalText: string
     customPrompt?: string
