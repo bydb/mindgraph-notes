@@ -2,6 +2,16 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.8.4-beta] - 2026-06-23
+
+Dein lokales Tagesgedächtnis (Brain) wird endlich sichtbar — und rote Arbeitsnotizen bekommen einen ruhigen Kontext-Streifen, der dir zeigt, woran du gerade dran bist.
+
+### Neue Features
+
+- **Arbeitskontext bei roten Notizen.** Öffnest du eine 🔴-Notiz, erscheint leise unter dem Editor ein „Arbeitskontext"-Streifen: das zugeordnete Projekt (per Stichwort erkannt, auch bei Mail-/Inbox-Notizen außerhalb des Projektordners), die dazugehörigen Notizen aus dem Projektordner, deine roten Annotationen und offene Aufgaben. Rein lokal, ohne KI, ohne Wartezeit — und wenn nichts Passendes da ist, bleibt er einfach unsichtbar.
+- **Brain-Notizen sind jetzt erkennbar.** Die Tageszusammenfassungen deines lokalen Gedächtnisses hießen bisher nur „17" und gingen unter. Neu: ein eigenes rosa Gehirn-Symbol und ein sprechendes Datum („17. Mai") überall — in Backlinks, im Editor-Kopf, in der Dateiliste und in den Tabs.
+- **Brain im Kontext.** War eine Notiz Teil eines deiner Brain-Tage, zeigt der Arbeitskontext-Streifen das nun aktiv an („Teil deines Tages am 17. Mai") — ein Klick öffnet die volle Tagessynthese. So kommt dein Tagesgedächtnis zu dir zurück, statt still im Ordner zu liegen.
+
 ## [0.8.3-beta] - 2026-06-22
 
 Annotieren im Lesen-Modus — Zotero-artig: markieren, einfärben, und alle Markierungen sammeln sich automatisch in einer eigenen Notiz, mit der du im Notes-Chat weiterarbeiten kannst. Dazu eine KI-Aktion, die OCR-Texte aufräumt.
