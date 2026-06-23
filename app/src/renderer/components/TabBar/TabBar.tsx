@@ -1,7 +1,11 @@
 import React, { memo } from 'react'
 import { useTabStore, type Tab } from '../../stores/tabStore'
+import { useNotesStore } from '../../stores/notesStore'
+import { useUIStore } from '../../stores/uiStore'
 import { useTranslation } from '../../utils/translations'
 import { getNoteKindFromText, stripNoteKindMarker } from '../../utils/noteKind'
+import { isBrainNote, brainNoteLabel } from '../../utils/brainNote'
+import { BrainIcon } from '../BrainIcon'
 
 interface TabBarProps {
   className?: string
@@ -52,6 +56,9 @@ interface TabItemProps {
 
 const TabItem: React.FC<TabItemProps> = memo(({ tab, isActive, onActivate, onClose }) => {
   const { t } = useTranslation()
+  const notePath = useNotesStore(s => s.notes.find(n => n.id === tab.noteId)?.path)
+  const brainFolder = useUIStore(s => s.brain.folderPath)
+  const isBrain = tab.type === 'editor' && !!notePath && isBrainNote({ path: notePath, content: '' }, brainFolder)
 
   const handleClose = (e: React.MouseEvent) => {
     e.stopPropagation()
@@ -78,7 +85,9 @@ const TabItem: React.FC<TabItemProps> = memo(({ tab, isActive, onActivate, onClo
   const noteKind = tab.type === 'editor' || tab.type === 'canvas'
     ? getNoteKindFromText(rawTitle)
     : null
-  const displayTitle = noteKind ? stripNoteKindMarker(rawTitle) : rawTitle
+  const displayTitle = isBrain && notePath
+    ? brainNoteLabel({ path: notePath, title: rawTitle, content: '' })
+    : noteKind ? stripNoteKindMarker(rawTitle) : rawTitle
 
   return (
     <div
@@ -88,9 +97,9 @@ const TabItem: React.FC<TabItemProps> = memo(({ tab, isActive, onActivate, onClo
       title={displayTitle}
     >
       <span className="tab-icon">
-        {isCanvasType ? <CanvasIcon /> : <FileIcon />}
+        {isBrain ? <BrainIcon size={13} /> : isCanvasType ? <CanvasIcon /> : <FileIcon />}
       </span>
-      {noteKind && (
+      {noteKind && !isBrain && (
         <span
           className={`note-kind-dot note-kind-${noteKind.id}`}
           title={noteKind.label}

@@ -1,6 +1,9 @@
 import React, { useState } from 'react'
 import { useNotesStore } from '../../stores/notesStore'
+import { useUIStore } from '../../stores/uiStore'
 import { useTranslation } from '../../utils/translations'
+import { isBrainNote, brainNoteLabel } from '../../utils/brainNote'
+import { BrainIcon } from '../BrainIcon'
 
 interface BacklinksPanelProps {
   isSecondary?: boolean
@@ -9,6 +12,7 @@ interface BacklinksPanelProps {
 export const BacklinksPanel: React.FC<BacklinksPanelProps> = ({ isSecondary = false }) => {
   const { t } = useTranslation()
   const { notes, getSelectedNote, getSecondarySelectedNote, selectNote, selectSecondaryNote } = useNotesStore()
+  const brainFolder = useUIStore(s => s.brain.folderPath)
   const selectedNote = isSecondary ? getSecondarySelectedNote() : getSelectedNote()
   const [isCollapsed, setIsCollapsed] = useState(false)
 
@@ -46,16 +50,21 @@ export const BacklinksPanel: React.FC<BacklinksPanelProps> = ({ isSecondary = fa
           <p className="no-backlinks">{t('backlinks.none')}</p>
         ) : (
           <ul className="backlinks-list">
-            {backlinks.map(note => (
-              <li
-                key={note!.id}
-                className="backlink-item"
-                onClick={() => handleBacklinkClick(note!.id)}
-              >
-                <span className="backlink-icon">📄</span>
-                <span className="backlink-title">{note!.title}</span>
-              </li>
-            ))}
+            {backlinks.map(note => {
+              const brain = isBrainNote(note!, brainFolder)
+              return (
+                <li
+                  key={note!.id}
+                  className={`backlink-item${brain ? ' backlink-brain' : ''}`}
+                  onClick={() => handleBacklinkClick(note!.id)}
+                >
+                  {brain
+                    ? <BrainIcon size={13} title={t('brain.noteLabel')} />
+                    : <span className="backlink-icon">📄</span>}
+                  <span className="backlink-title">{brain ? brainNoteLabel(note!) : note!.title}</span>
+                </li>
+              )
+            })}
           </ul>
         )}
       </div>

@@ -10,6 +10,8 @@ import { useQuizStore } from '../../stores/quizStore'
 import { generateNoteId, extractTasks } from '../../utils/linkExtractor'
 import { useTranslation } from '../../utils/translations'
 import { getNoteKind, getNoteKindFromText, NOTE_KINDS, setNoteKindInContent, clearNoteKindInContent, stripNoteKindMarker, type NoteKindId } from '../../utils/noteKind'
+import { isBrainNote } from '../../utils/brainNote'
+import { BrainIcon } from '../BrainIcon'
 import { writeClipboardText } from '../../utils/clipboard'
 import { getFilePathsFromDataTransfer } from '../../utils/imageUtils'
 
@@ -341,7 +343,7 @@ const FileItem: React.FC<FileItemProps> = ({
   }, [contextMenu])
 
   const { selectedNoteId, secondarySelectedNoteId, selectedPdfPath, selectedImagePath, selectedOfficePath, selectNote, selectSecondaryNote, selectPdf, selectImage, selectOffice, removeNote, setFileTree, vaultPath, notes, addNote, updateNotePath, fileTree, selectedPaths, togglePathSelection, clearSelection } = useNotesStore()
-  const { iconSet, setTextSplitEnabled, flashcardsEnabled, setViewMode, setCanvasFilterPath, taskExcludedFolders, toggleTaskExcludedFolder } = useUIStore()
+  const { iconSet, setTextSplitEnabled, flashcardsEnabled, setViewMode, setCanvasFilterPath, taskExcludedFolders, toggleTaskExcludedFolder, brain } = useUIStore()
   const updateNote = useNotesStore(state => state.updateNote)
   const { fileCustomizations, setFileCustomization, removeFileCustomization, toggleFolderHidden, toggleFolderPinned, showHiddenFolders } = useGraphStore()
   const { openCanvasTab, openCodeTab } = useTabStore()
@@ -406,6 +408,7 @@ const FileItem: React.FC<FileItemProps> = ({
     ? (indexedKindId ? NOTE_KINDS[indexedKindId] : getNoteKindFromText(displayName) || getNoteKindFromText(entry.path))
     : null
   const visibleDisplayName = noteKind ? stripNoteKindMarker(displayName) : displayName
+  const isBrainEntry = !entry.isDirectory && isBrainNote({ path: entry.path, content: '' }, brain.folderPath)
 
   // Ermittle die Dateiendung für Nicht-Verzeichnisse
   // Spezialfall: PDF Companion Dateien haben .pdf.md Endung
@@ -1198,7 +1201,7 @@ const FileItem: React.FC<FileItemProps> = ({
               <ChevronIcon open={false} />
             </span>
             <span className="file-icon-wrapper">
-              {isPdf ? <PdfIcon /> : isImage ? <ImageIcon /> : isExcel ? <ExcelIcon /> : isWord ? <WordIcon /> : isPowerPoint ? <PowerPointIcon /> : <FileIcon />}
+              {isBrainEntry ? <BrainIcon size={14} /> : isPdf ? <PdfIcon /> : isImage ? <ImageIcon /> : isExcel ? <ExcelIcon /> : isWord ? <WordIcon /> : isPowerPoint ? <PowerPointIcon /> : <FileIcon />}
             </span>
             {isEditing ? (
               <input

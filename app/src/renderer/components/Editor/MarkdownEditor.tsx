@@ -62,6 +62,8 @@ import { startDictation, type DictationHandle } from '../../utils/voice/stt'
 import { useIsModuleEnabled } from '../../utils/modules'
 import { useVoiceStore } from '../../stores/voiceStore'
 import { getNoteKind, stripNoteKindMarker, setAiProvenanceInContent, getAiProvenance, addTagToFrontmatter, getFrontmatterTags } from '../../utils/noteKind'
+import { isBrainNote, brainNoteLabel } from '../../utils/brainNote'
+import { BrainIcon } from '../BrainIcon'
 import { readClipboardText, writeClipboardText } from '../../utils/clipboard'
 import { canUseCloudForFeature, OPENROUTER_MODEL_SENTINEL } from '../../../shared/llmBackend'
 
@@ -4253,7 +4255,10 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
     )
   }
   const selectedNoteKind = getNoteKind(selectedNote)
-  const selectedNoteDisplayTitle = selectedNoteKind ? stripNoteKindMarker(selectedNote.title) : selectedNote.title
+  const selectedNoteIsBrain = isBrainNote(selectedNote)
+  const selectedNoteDisplayTitle = selectedNoteIsBrain
+    ? brainNoteLabel(selectedNote)
+    : selectedNoteKind ? stripNoteKindMarker(selectedNote.title) : selectedNote.title
 
   return (
     <div className="editor-container">
@@ -4283,7 +4288,9 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
           </div>
         )}
         <h3 title={selectedNoteDisplayTitle}>
-          {selectedNoteKind && (
+          {selectedNoteIsBrain ? (
+            <BrainIcon size={15} title={t('brain.noteLabel')} />
+          ) : selectedNoteKind && (
             <span
               className={`note-kind-dot note-kind-${selectedNoteKind.id}`}
               title={selectedNoteKind.label}

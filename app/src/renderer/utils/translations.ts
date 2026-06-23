@@ -965,6 +965,24 @@ const translations = {
     'backlinks.title': 'Backlinks',
     'backlinks.none': 'Keine Backlinks',
 
+    // Arbeitskontext-Streifen (rote Notizen)
+    'workContext.title': 'Arbeitskontext',
+    'workContext.project': 'Projekt',
+    'workContext.statusActive': 'aktiv',
+    'workContext.statusDone': 'erledigt',
+    'workContext.statusUnknown': 'Status nicht erfasst',
+    'workContext.redAnnotations': 'Rot markiert',
+    'workContext.related': 'Verwandte Notizen',
+    'workContext.likely': 'vermutlich',
+    'workContext.openTasks': 'Offene Aufgaben',
+    'workContext.urgent': 'dringend',
+    'workContext.more': 'weitere',
+
+    // Brain (Tagesgedächtnis)
+    'brain.noteLabel': 'Brain-Tagesnotiz',
+    'workContext.brainHeading': 'Tagesgedächtnis',
+    'workContext.partOfDay': 'Teil deines Tages am',
+
     // Footer Task Stats (additional)
     'footer.openTasks': 'Offene Tasks',
     'footer.open': 'offen',
@@ -3543,6 +3561,24 @@ const translations = {
     // Backlinks
     'backlinks.title': 'Backlinks',
     'backlinks.none': 'No backlinks',
+
+    // Work-context strip (red notes)
+    'workContext.title': 'Work context',
+    'workContext.project': 'Project',
+    'workContext.statusActive': 'active',
+    'workContext.statusDone': 'done',
+    'workContext.statusUnknown': 'Status not captured',
+    'workContext.redAnnotations': 'Marked red',
+    'workContext.related': 'Related notes',
+    'workContext.likely': 'likely',
+    'workContext.openTasks': 'Open tasks',
+    'workContext.urgent': 'urgent',
+    'workContext.more': 'more',
+
+    // Brain (daily memory)
+    'brain.noteLabel': 'Brain daily note',
+    'workContext.brainHeading': 'Daily memory',
+    'workContext.partOfDay': 'Part of your day on',
 
     // Footer Task Stats (additional)
     'footer.openTasks': 'Open tasks',

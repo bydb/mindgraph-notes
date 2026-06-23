@@ -4,6 +4,7 @@ import { Sidebar } from './components/Sidebar/Sidebar'
 import { QuickEventModal } from './components/Sidebar/QuickEventModal'
 import { MarkdownEditor } from './components/Editor/MarkdownEditor'
 import { BacklinksPanel } from './components/Editor/BacklinksPanel'
+import { WorkContextStrip } from './components/Editor/WorkContextStrip'
 import { GraphCanvas } from './components/Canvas/GraphCanvas'
 import { WorkflowCanvasView } from './components/WorkflowCanvas/WorkflowCanvasView'
 import { LocalCanvas } from './components/Canvas/LocalCanvas'
@@ -1395,6 +1396,7 @@ const App: React.FC = () => {
                 ) : (
                   <>
                     <MarkdownEditor />
+                    <WorkContextStrip />
                     <BacklinksPanel />
                   </>
                 )}
