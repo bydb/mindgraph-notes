@@ -642,6 +642,7 @@ interface UIState {
   // Onboarding
   onboardingCompleted: boolean
   onboardingOpen: boolean
+  brainLensActive: boolean
   helpGuideOpen: boolean
 
   // Slash Commands
@@ -732,6 +733,7 @@ interface UIState {
   removeCustomLogo: () => void
   setOnboardingCompleted: (completed: boolean) => void
   setOnboardingOpen: (open: boolean) => void
+  setBrainLensActive: (active: boolean) => void
   setSystemTotalRamGb: (gb: number | null) => void
   setHelpGuideOpen: (open: boolean) => void
   setSlashCommandDateFormat: (format: string) => void
@@ -1004,6 +1006,7 @@ const defaultState = {
   // Onboarding
   onboardingCompleted: false,
   onboardingOpen: false,
+  brainLensActive: false,
   systemTotalRamGb: null,
   helpGuideOpen: false,
 
@@ -1227,6 +1230,7 @@ export const useUIStore = create<UIState>()((set, get) => ({
   removeCustomLogo: () => set({ customLogo: null }),
   setOnboardingCompleted: (completed) => set({ onboardingCompleted: completed }),
   setOnboardingOpen: (open) => set({ onboardingOpen: open }),
+  setBrainLensActive: (active) => set({ brainLensActive: active }),
   setSystemTotalRamGb: (gb) => set({ systemTotalRamGb: gb }),
   setHelpGuideOpen: (open) => set({ helpGuideOpen: open }),
   setSlashCommandDateFormat: (format) => set({ slashCommandDateFormat: format }),

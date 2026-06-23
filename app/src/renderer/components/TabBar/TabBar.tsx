@@ -122,6 +122,7 @@ TabItem.displayName = 'TabItem'
 
 export const TabBar: React.FC<TabBarProps> = memo(({ className }) => {
   const { tabs, activeTabId, setActiveTab, closeTab } = useTabStore()
+  const setViewMode = useUIStore(s => s.setViewMode)
 
   // Only show TabBar if there are tabs
   if (tabs.length === 0) {
@@ -136,7 +137,17 @@ export const TabBar: React.FC<TabBarProps> = memo(({ className }) => {
             key={tab.id}
             tab={tab}
             isActive={tab.id === activeTabId}
-            onActivate={() => setActiveTab(tab.id)}
+            onActivate={() => {
+              setActiveTab(tab.id)
+              // Tab-Inhalt sichtbar machen: Canvas-Tabs in den Graph, alles andere
+              // in den Editor — sonst „passiert nichts" (z.B. im Brain-Modus).
+              if (tab.type === 'canvas' || tab.type === 'global-canvas') {
+                useUIStore.getState().setBrainLensActive(false)
+                setViewMode('canvas')
+              } else {
+                setViewMode('editor')
+              }
+            }}
             onClose={() => closeTab(tab.id)}
           />
         ))}

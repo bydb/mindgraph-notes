@@ -899,6 +899,7 @@ const FileItem: React.FC<FileItemProps> = ({
   const handleShowFolderInCanvas = useCallback(() => {
     if (!contextMenu || !contextMenu.entry.isDirectory) return
     setCanvasFilterPath(contextMenu.entry.path)
+    useUIStore.getState().setBrainLensActive(false) // Rechtsklick → echter MindGraph, nicht der Brain-Rückblick
     setViewMode('canvas')
     setContextMenu(null)
   }, [contextMenu, setCanvasFilterPath, setViewMode])

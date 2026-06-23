@@ -6,6 +6,8 @@ import { MarkdownEditor } from './components/Editor/MarkdownEditor'
 import { BacklinksPanel } from './components/Editor/BacklinksPanel'
 import { WorkContextStrip } from './components/Editor/WorkContextStrip'
 import { GraphCanvas } from './components/Canvas/GraphCanvas'
+import { BrainConstellation } from './components/Canvas/BrainConstellation'
+import { BrainIcon } from './components/BrainIcon'
 import { WorkflowCanvasView } from './components/WorkflowCanvas/WorkflowCanvasView'
 import { LocalCanvas } from './components/Canvas/LocalCanvas'
 import { PDFViewer } from './components/PDFViewer/PDFViewer'
@@ -153,6 +155,7 @@ const App: React.FC = () => {
   const emailEnabled = useUIStore(state => state.email.enabled)
   const edooboxEnabled = useUIStore(state => state.edoobox.enabled)
   const workflowCanvasEnabled = useUIStore(state => state.workflowCanvasEnabled)
+  const brainLensActive = useUIStore(state => state.brainLensActive)
   const transportTitlebarButtonVisible = useUIStore(
     state => state.transport.enabled && state.transport.showTitlebarButton
   )
@@ -1126,31 +1129,8 @@ const App: React.FC = () => {
                   <line x1="12" y1="4" x2="12" y2="20"/>
                 </svg>
               </ViewModeButton>
-              <ViewModeButton mode="canvas" currentMode={viewMode} onClick={() => setViewMode('canvas')} title={t('viewMode.canvas')} label="Graph">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="12" y1="3" x2="7" y2="8"/>
-                  <line x1="12" y1="3" x2="17" y2="8"/>
-                  <line x1="7" y1="8" x2="17" y2="8"/>
-                  <line x1="7" y1="8" x2="3" y2="14"/>
-                  <line x1="7" y1="8" x2="12" y2="13"/>
-                  <line x1="17" y1="8" x2="21" y2="14"/>
-                  <line x1="17" y1="8" x2="12" y2="13"/>
-                  <line x1="3" y1="14" x2="12" y2="13"/>
-                  <line x1="21" y1="14" x2="12" y2="13"/>
-                  <line x1="3" y1="14" x2="8" y2="21"/>
-                  <line x1="12" y1="13" x2="8" y2="21"/>
-                  <line x1="12" y1="13" x2="16" y2="21"/>
-                  <line x1="21" y1="14" x2="16" y2="21"/>
-                  <line x1="8" y1="21" x2="16" y2="21"/>
-                  <circle cx="12" cy="3" r="1.6" fill="currentColor" stroke="none"/>
-                  <circle cx="7" cy="8" r="1.6" fill="currentColor" stroke="none"/>
-                  <circle cx="17" cy="8" r="1.6" fill="currentColor" stroke="none"/>
-                  <circle cx="3" cy="14" r="1.6" fill="currentColor" stroke="none"/>
-                  <circle cx="12" cy="13" r="1.6" fill="currentColor" stroke="none"/>
-                  <circle cx="21" cy="14" r="1.6" fill="currentColor" stroke="none"/>
-                  <circle cx="8" cy="21" r="1.6" fill="currentColor" stroke="none"/>
-                  <circle cx="16" cy="21" r="1.6" fill="currentColor" stroke="none"/>
-                </svg>
+              <ViewModeButton mode="canvas" currentMode={viewMode} onClick={() => { setViewMode('canvas'); useUIStore.getState().setBrainLensActive(true) }} title="Brain" label="Brain">
+                <BrainIcon size={14} />
               </ViewModeButton>
               {dashboardEnabled && (
                 <button
@@ -1408,8 +1388,8 @@ const App: React.FC = () => {
               )}
 
               {/* Secondary Panel (Text Split / Overdue / Tags / Flashcards / etc.) - takes priority over canvas tab */}
-              {viewMode === 'editor' && (textSplitEnabled || overduePanelOpen || tagsPanelOpen || (smartConnectionsOpen && smartConnectionsEnabled) || (notesChatOpen && notesChatEnabled) || (flashcardsPanelOpen && flashcardsEnabled) || inboxPanelOpen || agentPanelOpen || (semanticScholarOpen && semanticScholarEnabled)) && (
-                <div className="editor-panel editor-panel-secondary" style={{ flex: `0 0 ${100 - textSplitPosition}%` }}>
+              {((viewMode === 'editor' && (textSplitEnabled || overduePanelOpen || tagsPanelOpen || (smartConnectionsOpen && smartConnectionsEnabled) || (notesChatOpen && notesChatEnabled) || (flashcardsPanelOpen && flashcardsEnabled) || inboxPanelOpen || agentPanelOpen || (semanticScholarOpen && semanticScholarEnabled))) || (viewMode === 'canvas' && (overduePanelOpen || tagsPanelOpen || (smartConnectionsOpen && smartConnectionsEnabled) || (notesChatOpen && notesChatEnabled) || (flashcardsPanelOpen && flashcardsEnabled) || inboxPanelOpen || agentPanelOpen || (semanticScholarOpen && semanticScholarEnabled)))) && (
+                <div className="editor-panel editor-panel-secondary" style={{ flex: `0 0 ${100 - textSplitPosition}%`, order: viewMode === 'canvas' ? 2 : undefined }}>
                   {overduePanelOpen ? (
                     <OverduePanel onClose={() => setOverduePanelOpen(false)} />
                   ) : tagsPanelOpen ? (
@@ -1472,10 +1452,26 @@ const App: React.FC = () => {
                   className={`canvas-panel ${viewMode === 'canvas' ? 'canvas-fullwidth' : ''}`}
                   style={{
                     display: 'flex',
-                    flex: viewMode === 'canvas' ? 1 : `0 0 ${100 - splitPosition}%`
+                    order: viewMode === 'canvas' ? 1 : undefined,
+                    flex: viewMode === 'canvas'
+                      ? ((overduePanelOpen || tagsPanelOpen || (smartConnectionsOpen && smartConnectionsEnabled) || (notesChatOpen && notesChatEnabled) || (flashcardsPanelOpen && flashcardsEnabled) || inboxPanelOpen || agentPanelOpen || (semanticScholarOpen && semanticScholarEnabled)) ? `0 0 ${textSplitPosition}%` : 1)
+                      : `0 0 ${100 - splitPosition}%`
                   }}
                 >
-                  <GraphCanvas key={`graph-${viewMode}`} />
+                  {brainLensActive ? (
+                    <BrainConstellation />
+                  ) : (
+                    <>
+                      <GraphCanvas key={`graph-${viewMode}`} />
+                      <button
+                        className="brain-lens-enter"
+                        onClick={() => useUIStore.getState().setBrainLensActive(true)}
+                        title="Brain"
+                      >
+                        <BrainIcon size={15} /> Brain
+                      </button>
+                    </>
+                  )}
                 </div>
               )}
 
