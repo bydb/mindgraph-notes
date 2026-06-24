@@ -4,6 +4,7 @@
 
 import { chat } from '../llm/chatClient'
 import { tasksDueToday, tasksOverdue, eventsForRange, loadRecentBrainEntry, type VaultTaskHit } from './vaultQueries'
+import { loadAgentMemory, formatAgentMemory } from './agent/memory'
 import { promises as fs } from 'fs'
 import path from 'path'
 
@@ -135,6 +136,12 @@ export async function generateBriefing(ctx: BriefingContext): Promise<string> {
     promptSections.push(`\n${heading}\n${brain.content}`)
   }
 
+  const memory = await loadAgentMemory(ctx.vaultPath)
+  const memoryBlock = formatAgentMemory(memory.entries)
+  const memorySection = memoryBlock
+    ? `\n\nPERSÖNLICHE FAKTEN (berücksichtige diese bei Begrüßung und Tonfall):\n${memoryBlock}`
+    : ''
+
   const systemPrompt = `Du bist Jochens persönlicher Assistent. Erstelle ein kompaktes Morning-Briefing auf Deutsch.
 
 REGELN:
@@ -144,7 +151,7 @@ REGELN:
 - Priorisiere: Überfällige > Termingebundene Tasks > Emails mit Antwortpflicht
 - Wenn das eigene Tagesgedächtnis ("Brain") vorliegt: gehe in der Begrüßung kurz auf die offenen Fäden oder Fokuspunkte daraus ein
 - Keine Markdown-Überschriften (#, ##), nur fette Schrift via *Stern* für Telegram
-- Kein Gendern (keine Sternchen oder Doppelpunkte bei Personenbezeichnungen)`
+- Kein Gendern (keine Sternchen oder Doppelpunkte bei Personenbezeichnungen)${memorySection}`
 
   const userPrompt = promptSections.join('\n')
 

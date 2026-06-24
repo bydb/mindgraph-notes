@@ -31,6 +31,92 @@ export const TelegramSettings: React.FC = () => {
   const [statusMsg, setStatusMsg] = useState<{ text: string; kind: 'info' | 'error' | 'success' } | null>(null)
   const [busy, setBusy] = useState(false)
 
+  // Agent Memory State
+  const [memoryEntries, setMemoryEntries] = useState<Array<{ id: string; key: string; value: string }>>([])
+  const [memorySaved, setMemorySaved] = useState(false)
+
+  // Agent Memory laden
+  useEffect(() => {
+    window.electronAPI.agentMemoryLoad().then(data => {
+      setMemoryEntries(data.entries)
+    }).catch(() => {
+      // Vault evtl. noch nicht geladen — still schweigen
+    })
+  }, [])
+
+  // Agent Memory speichern (debounced)
+  useEffect(() => {
+    if (memoryEntries.length === 0 && !memorySaved) return
+    const timer = setTimeout(() => {
+      window.electronAPI.agentMemorySave({ entries: memoryEntries }).then(ok => {
+        if (ok) {
+          setMemorySaved(true)
+          setTimeout(() => setMemorySaved(false), 2000)
+        }
+      }).catch(() => {})
+    }, 800)
+    return () => clearTimeout(timer)
+  }, [memoryEntries])
+
+  const addMemoryEntry = () => {
+    const id = `mem_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`
+    setMemoryEntries(prev => [...prev, { id, key: '', value: '' }])
+  }
+
+  const updateMemoryEntry = (idx: number, field: 'key' | 'value', value: string) => {
+    setMemoryEntries(prev => prev.map((e, i) => i === idx ? { ...e, [field]: value } : e))
+  }
+
+  const removeMemoryEntry = (idx: number) => {
+    setMemoryEntries(prev => prev.filter((_, i) => i !== idx))
+  }
+
+  // Scheduler State
+  type SchedRule = { id: string; enabled: boolean; action: string; hour: number; minute: number; weekdays: number[]; label?: string }
+  const [scheduleRules, setScheduleRules] = useState<SchedRule[]>([])
+  const [schedulerRunning, setSchedulerRunning] = useState(false)
+
+  // Scheduler laden. Der Toggle spiegelt die persistierte Absicht (enabled),
+  // nicht den Laufzeit-Zustand (running) — nach Neustart kann enabled=true sein,
+  // während der Scheduler erst mit dem Bot-Start wieder anläuft.
+  useEffect(() => {
+    window.electronAPI.schedulerStatus().then(status => {
+      setScheduleRules(status.rules)
+      setSchedulerRunning(status.enabled)
+    }).catch(() => {})
+  }, [])
+
+  // Regeländerungen speichern (debounced). enabled wird mitgesendet, damit ein
+  // bloßes Bearbeiten von Regeln den Master-Zustand nicht kippt und nicht
+  // ungewollt Timer scharf schaltet (setConfig armiert nur bei enabled).
+  useEffect(() => {
+    if (scheduleRules.length === 0 && !schedulerRunning) return
+    const timer = setTimeout(() => {
+      window.electronAPI.schedulerSave({ rules: scheduleRules, enabled: schedulerRunning }).catch(() => {})
+    }, 800)
+    return () => clearTimeout(timer)
+  }, [scheduleRules])
+
+  const addRule = () => {
+    const id = `sched_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`
+    setScheduleRules(prev => [...prev, { id, enabled: true, action: 'briefing', hour: 7, minute: 0, weekdays: [] }])
+  }
+
+  const updateRule = (idx: number, field: string, value: unknown) => {
+    setScheduleRules(prev => prev.map((r, i) => i === idx ? { ...r, [field]: value } : r))
+  }
+
+  const removeRule = (idx: number) => {
+    setScheduleRules(prev => prev.filter((_, i) => i !== idx))
+  }
+
+  const toggleScheduler = async (on: boolean) => {
+    setSchedulerRunning(on)
+    // Über setConfig: persistiert enabled UND gleicht die Laufzeit an (armiert
+    // bei on, baut Timer bei off ab) — eine kohärente Schreibgrenze.
+    await window.electronAPI.schedulerSave({ rules: scheduleRules, enabled: on }).catch(() => {})
+  }
+
   const refreshStatus = async () => {
     const [tokenRes, statusRes] = await Promise.all([
       window.electronAPI.telegramHasToken(),
@@ -345,6 +431,74 @@ export const TelegramSettings: React.FC = () => {
         )}
       </div>
 
+      {/* Scheduler */}
+      <div className="settings-group">
+        <label className="settings-label">{t('telegramSettings.scheduler')}</label>
+        <p className="settings-help">
+          {t('telegramSettings.schedulerHelp')}
+        </p>
+        <label className="settings-row" style={{ marginBottom: 12 }}>
+          <input
+            type="checkbox"
+            checked={schedulerRunning}
+            onChange={e => toggleScheduler(e.target.checked)}
+          />
+          <span>{t('telegramSettings.schedulerActive')}</span>
+        </label>
+        {scheduleRules.map((rule, idx) => (
+          <div key={rule.id} style={{ display: 'flex', gap: 6, marginBottom: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+            <input
+              type="checkbox"
+              checked={rule.enabled}
+              onChange={e => updateRule(idx, 'enabled', e.target.checked)}
+            />
+            <select
+              value={rule.action}
+              onChange={e => updateRule(idx, 'action', e.target.value)}
+              className="settings-input"
+              style={{ width: 130 }}
+            >
+              <option value="briefing">{t('telegramSettings.schedBriefing')}</option>
+              <option value="overdue-check">{t('telegramSettings.schedOverdue')}</option>
+            </select>
+            <input
+              type="number"
+              min={0}
+              max={23}
+              value={rule.hour}
+              onChange={e => updateRule(idx, 'hour', Number(e.target.value))}
+              className="settings-input"
+              style={{ width: 50 }}
+            />
+            <span>:</span>
+            <input
+              type="number"
+              min={0}
+              max={59}
+              value={rule.minute}
+              onChange={e => updateRule(idx, 'minute', Number(e.target.value))}
+              className="settings-input"
+              style={{ width: 50 }}
+            />
+            <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Uhr</span>
+            <button
+              className="settings-button small"
+              onClick={() => removeRule(idx)}
+              title={t('telegramSettings.remove')}
+            >
+              ✕
+            </button>
+          </div>
+        ))}
+        <button
+          className="settings-button"
+          onClick={addRule}
+          style={{ marginTop: 4 }}
+        >
+          + {t('telegramSettings.addSchedule')}
+        </button>
+      </div>
+
       {/* Agent-Modus */}
       <div className="settings-group">
         <label className="settings-label">{t('telegramSettings.agentMode')}</label>
@@ -417,6 +571,53 @@ export const TelegramSettings: React.FC = () => {
               )
             })}
           </>
+        )}
+      </div>
+
+      {/* Agent Memory */}
+      <div className="settings-group">
+        <label className="settings-label">{t('telegramSettings.agentMemory')}</label>
+        <p className="settings-help">
+          {t('telegramSettings.agentMemoryHelp')}
+        </p>
+        {memoryEntries.map((entry, idx) => (
+          <div key={entry.id} style={{ display: 'flex', gap: 6, marginBottom: 6, alignItems: 'flex-start' }}>
+            <input
+              type="text"
+              placeholder={t('telegramSettings.memoryKeyPlaceholder')}
+              value={entry.key}
+              onChange={e => updateMemoryEntry(idx, 'key', e.target.value)}
+              className="settings-input"
+              style={{ width: 140, flexShrink: 0 }}
+            />
+            <input
+              type="text"
+              placeholder={t('telegramSettings.memoryValuePlaceholder')}
+              value={entry.value}
+              onChange={e => updateMemoryEntry(idx, 'value', e.target.value)}
+              className="settings-input"
+              style={{ flex: 1 }}
+            />
+            <button
+              className="settings-button small"
+              onClick={() => removeMemoryEntry(idx)}
+              title={t('telegramSettings.remove')}
+            >
+              ✕
+            </button>
+          </div>
+        ))}
+        <button
+          className="settings-button"
+          onClick={addMemoryEntry}
+          style={{ marginTop: 4 }}
+        >
+          + {t('telegramSettings.addMemoryEntry')}
+        </button>
+        {memorySaved && (
+          <span style={{ fontSize: 12, color: '#44c767', marginLeft: 8 }}>
+            ✓ {t('telegramSettings.memorySaved')}
+          </span>
         )}
       </div>
 

@@ -1025,6 +1025,17 @@ export interface ElectronAPI {
   telegramStop: () => Promise<{ success: boolean; alreadyStopped?: boolean }>;
   telegramStatus: () => Promise<{ active: boolean }>;
 
+  // Agent Memory (persistente Fakten für den Telegram-Agenten)
+  agentMemoryLoad: () => Promise<{ entries: Array<{ id: string; key: string; value: string }> }>;
+  agentMemorySave: (store: { entries: Array<{ id: string; key: string; value: string }> }) => Promise<boolean>;
+
+  // Scheduler (zeitgesteuerte Read-Only-Aktionen)
+  schedulerLoad: () => Promise<{ enabled: boolean; rules: Array<{ id: string; enabled: boolean; action: string; hour: number; minute: number; weekdays: number[]; label?: string }> }>;
+  schedulerSave: (config: { enabled: boolean; rules: Array<{ id: string; enabled: boolean; action: string; hour: number; minute: number; weekdays: number[]; label?: string }> }) => Promise<boolean>;
+  schedulerStart: () => Promise<boolean>;
+  schedulerStop: () => Promise<boolean>;
+  schedulerStatus: () => Promise<{ running: boolean; enabled: boolean; rules: Array<{ id: string; enabled: boolean; action: string; hour: number; minute: number; weekdays: number[]; label?: string }> }>;
+
   // Brain (lokales Tagesgedächtnis)
   brainConsolidateDay: (input: BrainConsolidateInput) => Promise<BrainConsolidateResult>;
 

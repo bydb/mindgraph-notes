@@ -8,6 +8,7 @@
 
 import { chatWithTools, type ChatMessage, type ChatOptions, type ToolCall, type ChatBackend } from '../../llm/chatClient'
 import type { ToolRegistry, ToolContext } from './tools/registry'
+import { loadAgentMemory, formatAgentMemory } from './memory'
 
 export interface AgentRunOptions {
   registry: ToolRegistry
@@ -31,8 +32,13 @@ export interface AgentRunResult {
   backend: ChatBackend
 }
 
-function buildSystemPrompt(allowedTools: string[]): string {
+async function buildSystemPrompt(allowedTools: string[], vaultPath: string): Promise<string> {
   const toolList = allowedTools.length > 0 ? allowedTools.join(', ') : '(keine — beantworte ohne Tools)'
+  const memory = await loadAgentMemory(vaultPath)
+  const memoryBlock = formatAgentMemory(memory.entries)
+  const memorySection = memoryBlock
+    ? `\n\nPERSÖNLICHE FAKTEN ÜBER DEN NUTZER (berücksichtige diese in jeder Antwort):\n${memoryBlock}`
+    : ''
   return `Du bist Jochens MindGraph-Agent. Du kannst Notizen suchen, lesen, neu anlegen, ergänzen und Tasks im Vault verwalten.
 
 VERFÜGBARE TOOLS (exakt diese Namen verwenden, mit Unterstrich!): ${toolList}
@@ -48,7 +54,7 @@ REGELN:
 - Wenn ein Tool fehlschlägt, erkläre kurz das Problem und versuche es nicht stumpf nochmal.
 - Schließe IMMER mit einer kurzen Zusammenfassung (max. 200 Wörter, Telegram-Markdown, *Stern* für fett).
 - Kein Gendern (keine Sternchen oder Doppelpunkte bei Personenbezeichnungen).
-- Keine langen Aufzählungen — fasse zusammen.`
+- Keine langen Aufzählungen — fasse zusammen.${memorySection}`
 }
 
 let fallbackToolCallCounter = 0
@@ -105,8 +111,9 @@ export async function runAgent(
   opts: AgentRunOptions
 ): Promise<AgentRunResult> {
   const allowedToolList = Array.from(opts.allowedTools)
+  const systemPrompt = await buildSystemPrompt(allowedToolList, opts.toolContext.vaultPath)
   const messages: ChatMessage[] = [
-    { role: 'system', content: buildSystemPrompt(allowedToolList) },
+    { role: 'system', content: systemPrompt },
     { role: 'user', content: userInput }
   ]
 

@@ -15,6 +15,8 @@ export interface BotConfig {
 
 export interface BotHandle {
   stop: () => Promise<void>
+  /** Sendet eine Nachricht an alle erlaubten Chat-IDs (für Scheduler). */
+  broadcastMessage: (text: string) => Promise<void>
 }
 
 export async function startTelegramBot(config: BotConfig): Promise<BotHandle> {
@@ -137,6 +139,25 @@ export async function startTelegramBot(config: BotConfig): Promise<BotHandle> {
         console.log('[Telegram] Bot gestoppt')
       } catch (err) {
         console.error('[Telegram] Stop-Fehler:', err)
+      }
+    },
+    broadcastMessage: async (text: string) => {
+      const chatIds = config.getAllowedChatIds()
+      if (chatIds.length === 0) {
+        console.warn('[Telegram] broadcastMessage: keine Chat-IDs konfiguriert')
+        return
+      }
+      for (const chatId of chatIds) {
+        try {
+          await bot.api.sendMessage(chatId, text, { parse_mode: 'Markdown' })
+        } catch (err) {
+          // Fallback ohne Markdown-Parsing
+          try {
+            await bot.api.sendMessage(chatId, text)
+          } catch (err2) {
+            console.error(`[Telegram] broadcastMessage an ${chatId} fehlgeschlagen:`, err2)
+          }
+        }
       }
     }
   }

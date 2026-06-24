@@ -11324,6 +11324,19 @@ ipcMain.handle('telegram-start', async () => {
         embeddingModel: () => telegramConfig.projectRagEmbeddingModel
       }
     })
+    // Scheduler-Resume: der Scheduler kann nur senden, wenn der Bot läuft.
+    // Persistierte Absicht (enabled) nach Bot-Start wieder anwenden → übersteht
+    // App-Neustarts (der Bot wird ohnehin pro Session manuell gestartet).
+    try {
+      const { loadScheduleConfig } = await import('./telegram/scheduler')
+      const schedConfig = await loadScheduleConfig(app.getPath('userData'))
+      if (schedConfig.enabled) {
+        const svc = await ensureScheduler()
+        await svc.start()
+      }
+    } catch (err) {
+      console.error('[Scheduler] Resume nach Bot-Start fehlgeschlagen:', err)
+    }
     return { success: true }
   } catch (err) {
     console.error('[Telegram] start failed:', err)
@@ -11335,7 +11348,113 @@ ipcMain.handle('telegram-stop', async () => {
   if (!telegramBotHandle) return { success: true, alreadyStopped: true }
   await telegramBotHandle.stop()
   telegramBotHandle = null
+  // Bot weg → Scheduler kann nicht mehr senden. Laufzeit stoppen (Timer abbauen),
+  // aber enabled NICHT anfassen, damit der nächste Bot-Start wieder aufsetzt.
+  schedulerService?.stop()
   return { success: true }
+})
+
+// ===== Agent Memory =====
+// Persistente Fakten, die dem Telegram-Agenten und Briefing-Generator als
+// Kontext dienen. Speicherort: <vault>/.mindgraph/agent-memory.json
+
+ipcMain.handle('agent-memory-load', async () => {
+  const vaultPath = lastKnownVaultPath
+  if (!vaultPath) return { entries: [] }
+  try {
+    const { loadAgentMemory } = await import('./telegram/agent/memory')
+    return await loadAgentMemory(vaultPath)
+  } catch (err) {
+    console.error('[Agent Memory] load failed:', err)
+    return { entries: [] }
+  }
+})
+
+ipcMain.handle('agent-memory-save', async (_event, store: { entries: Array<{ id: string; key: string; value: string }> }) => {
+  const vaultPath = lastKnownVaultPath
+  if (!vaultPath) return false
+  try {
+    const { saveAgentMemory } = await import('./telegram/agent/memory')
+    await saveAgentMemory(vaultPath, store)
+    return true
+  } catch (err) {
+    console.error('[Agent Memory] save failed:', err)
+    return false
+  }
+})
+
+// ===== Scheduler =====
+// Zeitgesteuerte Read-Only-Aktionen (Briefing, Überfällig-Check).
+// Läuft im Main Process, solange die App offen ist.
+
+let schedulerService: import('./telegram/scheduler').SchedulerService | null = null
+
+async function ensureScheduler(): Promise<import('./telegram/scheduler').SchedulerService> {
+  if (schedulerService) return schedulerService
+  const { SchedulerService } = await import('./telegram/scheduler')
+  schedulerService = new SchedulerService(
+    {
+      getVaultPath: () => lastKnownVaultPath,
+      getExcludedFolders: () => telegramConfig.excludedFolders,
+      getOllamaModel: () => telegramConfig.ollamaModel,
+      getBriefingIncludeEmails: () => telegramConfig.includeEmails,
+      getBriefingIncludeOverdue: () => telegramConfig.includeOverdue,
+      getBrainFolderPath: () => '800 - 🧠 brain',
+      sendTelegramMessage: async (text: string) => {
+        if (!telegramBotHandle) {
+          console.warn('[Scheduler] keine Telegram-Nachricht möglich — Bot läuft nicht')
+          return
+        }
+        await telegramBotHandle.broadcastMessage(text)
+      },
+      generateBriefing: async (ctx) => {
+        const { generateBriefing } = await import('./telegram/briefing')
+        return generateBriefing(ctx)
+      },
+      loadOverdueTasks: async (opts) => {
+        const { tasksOverdue } = await import('./telegram/vaultQueries')
+        return tasksOverdue(opts)
+      }
+    },
+    app.getPath('userData')
+  )
+  return schedulerService
+}
+
+ipcMain.handle('scheduler-load', async () => {
+  const svc = await ensureScheduler()
+  return svc.getConfig()
+})
+
+ipcMain.handle('scheduler-save', async (_event, config: import('./telegram/scheduler').ScheduleConfig) => {
+  const svc = await ensureScheduler()
+  await svc.setConfig(config)
+  return true
+})
+
+ipcMain.handle('scheduler-start', async () => {
+  const svc = await ensureScheduler()
+  await svc.start()
+  return true
+})
+
+ipcMain.handle('scheduler-stop', async () => {
+  const svc = await ensureScheduler()
+  await svc.disable()
+  return true
+})
+
+ipcMain.handle('scheduler-status', async () => {
+  const { loadScheduleConfig } = await import('./telegram/scheduler')
+  const config = await loadScheduleConfig(app.getPath('userData'))
+  // running = echter Laufzeit-Zustand (Timer armiert), enabled = persistierte
+  // Absicht. Nach Neustart kann enabled=true sein, running aber false, bis der
+  // Bot (und damit der Scheduler) wieder startet.
+  return {
+    running: schedulerService?.isRunning() ?? false,
+    enabled: config.enabled,
+    rules: config.rules
+  }
 })
 
 
@@ -11369,5 +11488,12 @@ app.on('before-quit', () => {
   if (telegramBotHandle) {
     telegramBotHandle.stop().catch(() => {})
     telegramBotHandle = null
+  }
+
+  // Scheduler stoppen (reiner Laufzeit-Stopp, persistiert enabled nicht — der
+  // nächste Bot-Start setzt anhand der gespeicherten Absicht wieder auf)
+  if (schedulerService) {
+    schedulerService.stop()
+    schedulerService = null
   }
 })

@@ -678,6 +678,24 @@ contextBridge.exposeInMainWorld('electronAPI', {
   telegramStatus: () =>
     ipcRenderer.invoke('telegram-status'),
 
+  // Agent Memory (persistente Fakten für den Telegram-Agenten)
+  agentMemoryLoad: () =>
+    ipcRenderer.invoke('agent-memory-load'),
+  agentMemorySave: (store: { entries: Array<{ id: string; key: string; value: string }> }) =>
+    ipcRenderer.invoke('agent-memory-save', store),
+
+  // Scheduler (zeitgesteuerte Read-Only-Aktionen)
+  schedulerLoad: () =>
+    ipcRenderer.invoke('scheduler-load'),
+  schedulerSave: (config: { enabled: boolean; rules: Array<{ id: string; enabled: boolean; action: string; hour: number; minute: number; weekdays: number[]; label?: string }> }) =>
+    ipcRenderer.invoke('scheduler-save', config),
+  schedulerStart: () =>
+    ipcRenderer.invoke('scheduler-start'),
+  schedulerStop: () =>
+    ipcRenderer.invoke('scheduler-stop'),
+  schedulerStatus: () =>
+    ipcRenderer.invoke('scheduler-status'),
+
   // Brain (lokales Tagesgedächtnis — ausschließlich lokal via Ollama)
   brainConsolidateDay: (input: unknown) =>
     ipcRenderer.invoke('brain-consolidate-day', input),
