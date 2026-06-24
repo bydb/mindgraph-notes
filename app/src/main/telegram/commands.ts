@@ -23,6 +23,8 @@ export interface CommandDeps {
   ollamaModel: () => string
   includeEmails: () => boolean
   includeOverdue: () => boolean
+  /** Konfigurierbarer Brain-Ordner (brain.folderPath), Fallback intern. */
+  brainFolderPath: () => string | Promise<string>
   priorityFolders: () => string[]
   agentEnabled: () => boolean
   agentMaxIterations: () => number
@@ -162,6 +164,7 @@ export async function handleBriefing(ctx: Context, deps: CommandDeps): Promise<v
       vaultPath: vault,
       excludedFolders: deps.excludedFolders(),
       ollamaModel: deps.ollamaModel(),
+      brainFolderPath: await deps.brainFolderPath(),
       includeEmails: deps.includeEmails(),
       includeOverdue: deps.includeOverdue()
     })
@@ -179,7 +182,7 @@ export async function handleBrain(ctx: Context, deps: CommandDeps): Promise<void
   try {
     // Wir zeigen den Vollinhalt — keine LLM-Verdichtung. /briefing macht die
     // KI-Sicht, /brain liefert das Original-Tagebuch zum Nachlesen.
-    const brain = await loadRecentBrainEntry(vault, undefined, 3500)
+    const brain = await loadRecentBrainEntry(vault, await deps.brainFolderPath(), 3500)
     if (!brain) {
       await ctx.reply(
         '🧠 Noch kein Tagesgedächtnis für heute oder gestern.\n\nIn MindGraph: Dashboard → Brain-Widget → „Tag konsolidieren".',

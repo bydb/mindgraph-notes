@@ -11314,6 +11314,13 @@ ipcMain.handle('telegram-start', async () => {
         ollamaModel: () => telegramConfig.ollamaModel,
         includeEmails: () => telegramConfig.includeEmails,
         includeOverdue: () => telegramConfig.includeOverdue,
+        brainFolderPath: async () => {
+          // Konfigurierbaren Brain-Ordner aus den UI-Settings lesen (wie /briefing
+          // im Hauptfenster), nicht den internen Default — sonst lesen /briefing
+          // und /brain den falschen Ordner, wenn der Nutzer ihn verlegt hat.
+          const ui = await loadUISettings().catch(() => ({} as Record<string, unknown>))
+          return (ui.brain as { folderPath?: string } | undefined)?.folderPath || '800 - 🧠 brain'
+        },
         priorityFolders: () => telegramConfig.priorityFolders,
         agentEnabled: () => telegramConfig.agentEnabled,
         agentMaxIterations: () => telegramConfig.agentMaxIterations,
@@ -11399,7 +11406,13 @@ async function ensureScheduler(): Promise<import('./telegram/scheduler').Schedul
       getOllamaModel: () => telegramConfig.ollamaModel,
       getBriefingIncludeEmails: () => telegramConfig.includeEmails,
       getBriefingIncludeOverdue: () => telegramConfig.includeOverdue,
-      getBrainFolderPath: () => '800 - 🧠 brain',
+      getBrainFolderPath: async () => {
+        // Konfigurierbaren Brain-Ordner aus den UI-Settings lesen (wie der Rest
+        // der App), nicht hartkodieren — sonst zieht ein geplantes Briefing den
+        // falschen/leeren Pfad, wenn der Nutzer den Brain-Ordner verlegt hat.
+        const ui = await loadUISettings().catch(() => ({} as Record<string, unknown>))
+        return (ui.brain as { folderPath?: string } | undefined)?.folderPath || '800 - 🧠 brain'
+      },
       sendTelegramMessage: async (text: string) => {
         if (!telegramBotHandle) {
           console.warn('[Scheduler] keine Telegram-Nachricht möglich — Bot läuft nicht')

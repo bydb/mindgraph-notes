@@ -36,7 +36,7 @@ export interface SchedulerDeps {
   getOllamaModel: () => string
   getBriefingIncludeEmails: () => boolean
   getBriefingIncludeOverdue: () => boolean
-  getBrainFolderPath: () => string
+  getBrainFolderPath: () => string | Promise<string>
   /** Sendet eine Nachricht an alle erlaubten Telegram-Chats. */
   sendTelegramMessage: (text: string) => Promise<void>
   /** Generiert das Morning-Briefing (aus briefing.ts). */
@@ -250,7 +250,7 @@ export class SchedulerService {
       vaultPath,
       excludedFolders: this.deps.getExcludedFolders(),
       ollamaModel: this.deps.getOllamaModel(),
-      brainFolderPath: this.deps.getBrainFolderPath(),
+      brainFolderPath: await this.deps.getBrainFolderPath(),
       includeEmails: this.deps.getBriefingIncludeEmails(),
       includeOverdue: this.deps.getBriefingIncludeOverdue()
     })
