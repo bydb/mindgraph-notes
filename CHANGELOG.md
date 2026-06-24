@@ -2,6 +2,14 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.8.8-beta] - 2026-06-24
+
+Auto-Updates funktionieren auf dem Mac wieder zuverlässig.
+
+### Behoben
+
+- **Automatische Updates auf macOS.** Beta-Versionen prüften wegen ihres „-beta"-Namens auf einem falschen Update-Kanal und fanden deshalb keine neuen Versionen — der Update-Check lief still ins Leere. Die App liest jetzt immer den richtigen Kanal und akzeptiert Beta-Updates korrekt. (Hinweis: Diese eine Version muss noch einmal von Hand installiert werden; ab dann aktualisiert sich die App wieder von selbst.)
+
 ## [0.8.7-beta] - 2026-06-24
 
 Der Notes-Chat kann dich jetzt nicht nur begleiten, sondern auf den Zahn fühlen — und nimmt längere Eingaben endlich ohne Gequetsche an.

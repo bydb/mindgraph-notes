@@ -43,6 +43,13 @@ async function ensureAutoUpdater(): Promise<import('electron-updater').AppUpdate
     _autoUpdaterConfigured = true
     autoUpdater.autoDownload = true
     autoUpdater.autoInstallOnAppQuit = true
+    // Wir veröffentlichen Beta-Builds (Version mit "-beta") auf den `latest`-Channel
+    // (electron-builder erzeugt nur `latest-mac.yml`). Ohne Override leitet electron-updater
+    // aus dem "-beta"-Suffix der installierten Version den Channel `beta` ab und fragt
+    // `beta-mac.yml` ab → 404 → Update-Check scheitert still. Channel hart auf `latest`
+    // zwingen und Prerelease-Zielversionen erlauben, damit beta→beta-Updates funktionieren.
+    autoUpdater.channel = 'latest'
+    autoUpdater.allowPrerelease = true
     autoUpdater.logger = {
       info: (msg: unknown) => console.log('[AutoUpdate]', msg),
       warn: (msg: unknown) => console.warn('[AutoUpdate]', msg),
