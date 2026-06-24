@@ -2,6 +2,18 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.8.5-beta] - 2026-06-24
+
+Ein ruhigeres, einheitlicheres Bild: alle Seitenpanels tragen jetzt denselben Kopf — dazu eine stille Härtung im verschlüsselten Sync.
+
+### Verbessert
+
+- **Einheitlicher Panel-Look.** Aufgaben, Tags, Notes-Chat, Smart Connections, Recherche, Posteingang, Überfällig und der Veranstaltungs-Agent teilen sich nun einen gemeinsamen Panel-Kopf: farbiges Modul-Symbol links, ruhig gerahmte Aktions-Buttons rechts. Kein Modul tanzt mehr aus der Reihe.
+
+### Sicherheit
+
+- **Größerer Salt-Raum im Sync.** Die Vault-Kennung, aus der der Verschlüsselungs-Salt abgeleitet wird, ist von 64 auf 128 Bit gewachsen — das schließt gezielte Vorberechnungen gegen eine bekannte Kennung aus. Bestehende Vaults bleiben unverändert gültig, es ist keine Neu-Verschlüsselung nötig.
+
 ## [0.8.4-beta] - 2026-06-23
 
 Dein lokales Tagesgedächtnis (Brain) wird endlich sichtbar — und rote Arbeitsnotizen bekommen einen ruhigen Kontext-Streifen, der dir zeigt, woran du gerade dran bist.
