@@ -4,6 +4,7 @@ import { useUIStore } from '../../stores/uiStore'
 import { useTranslation } from '../../utils/translations'
 import { rerank, type RerankerProgress } from '../../utils/reranker/reranker'
 import { ModelPicker } from '../Shared/ModelPicker'
+import { PanelHeader } from '../Shared/PanelHeader'
 
 interface EmbeddingModel {
   name: string
@@ -828,8 +829,8 @@ export const SmartConnectionsPanel: React.FC<SmartConnectionsPanelProps> = ({ on
 
   return (
     <div className="smart-connections-panel">
-      <div className="smart-connections-header">
-        <div className="smart-connections-title">
+      <PanelHeader
+        icon={
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <circle cx="12" cy="12" r="3"/>
             <path d="M12 2v4"/>
@@ -841,15 +842,11 @@ export const SmartConnectionsPanel: React.FC<SmartConnectionsPanelProps> = ({ on
             <path d="M4.93 19.07l2.83-2.83"/>
             <path d="M16.24 7.76l2.83-2.83"/>
           </svg>
-          <span>Smart Connections</span>
-        </div>
-        <button className="smart-connections-close" onClick={onClose} title={t('panel.close')}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="18" y1="6" x2="6" y2="18"/>
-            <line x1="6" y1="6" x2="18" y2="18"/>
-          </svg>
-        </button>
-      </div>
+        }
+        title="Smart Connections"
+        onClose={onClose}
+        closeTitle={t('panel.close')}
+      />
 
       <div className="smart-connections-content">
         {isLoading ? (
@@ -995,7 +992,7 @@ export const SmartConnectionsPanel: React.FC<SmartConnectionsPanelProps> = ({ on
                   {similarNotes.map(note => (
                     <div
                       key={note.id}
-                      className={`smart-connections-item ${note.hasWikilink ? 'has-wikilink' : ''}`}
+                      className={`smart-connections-item panel-card ${note.hasWikilink ? 'has-wikilink' : ''}`}
                       onClick={() => handleNoteClick(note.id)}
                       draggable="true"
                       onDragStart={(e) => {

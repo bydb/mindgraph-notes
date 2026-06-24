@@ -6,6 +6,7 @@ import { useIsModuleEnabled } from '../../utils/modules'
 import { useTranslation } from '../../utils/translations'
 import { writeClipboardText } from '../../utils/clipboard'
 import { ModelPicker } from '../Shared/ModelPicker'
+import { PanelHeader } from '../Shared/PanelHeader'
 import { canUseCloudForFeature, OPENROUTER_MODEL_SENTINEL } from '../../../shared/llmBackend'
 import MarkdownIt from 'markdown-it'
 import texmath from 'markdown-it-texmath'
@@ -571,20 +572,16 @@ export const NotesChat: React.FC<NotesChatProps> = ({ onClose }) => {
 
   return (
     <div className="notes-chat-panel">
-      <div className="notes-chat-header">
-        <div className="notes-chat-title">
+      <PanelHeader
+        icon={
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
           </svg>
-          <span>Notes Chat</span>
-        </div>
-        <button className="notes-chat-close" onClick={onClose} title={t('panel.close')}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="18" y1="6" x2="6" y2="18"/>
-            <line x1="6" y1="6" x2="18" y2="18"/>
-          </svg>
-        </button>
-      </div>
+        }
+        title="Notes Chat"
+        onClose={onClose}
+        closeTitle={t('panel.close')}
+      />
 
       {isLoading ? (
         <div className="notes-chat-loading">

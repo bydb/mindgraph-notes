@@ -1,6 +1,8 @@
 import React, { useMemo, useState } from 'react'
 import { useNotesStore } from '../../stores/notesStore'
 import { useTranslation } from '../../utils/translations'
+import { PanelHeader } from '../Shared/PanelHeader'
+import { IconTag } from '../Shared/Icons'
 
 interface TagCount {
   tag: string
@@ -65,22 +67,13 @@ export const TagsPanel: React.FC<TagsPanelProps> = ({ onClose }) => {
 
   return (
     <div className="tags-panel">
-      <div className="tags-panel-header">
-        <div className="tags-panel-title">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/>
-            <line x1="7" y1="7" x2="7.01" y2="7"/>
-          </svg>
-          <span>{t('tags.title')}</span>
-          <span className="tags-panel-count">{tagCounts.length}</span>
-        </div>
-        <button className="tags-panel-close" onClick={onClose} title={t('panel.close')}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="18" y1="6" x2="6" y2="18"/>
-            <line x1="6" y1="6" x2="18" y2="18"/>
-          </svg>
-        </button>
-      </div>
+      <PanelHeader
+        icon={<IconTag size={14} />}
+        title={t('tags.title')}
+        count={tagCounts.length}
+        onClose={onClose}
+        closeTitle={t('panel.close')}
+      />
 
       <div className="tags-panel-search">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -112,7 +105,7 @@ export const TagsPanel: React.FC<TagsPanelProps> = ({ onClose }) => {
               {notesWithTag.map(note => (
                 <div
                   key={note.id}
-                  className="tags-note-item"
+                  className="tags-note-item panel-card"
                   onClick={() => handleNoteClick(note.id)}
                 >
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -135,7 +128,7 @@ export const TagsPanel: React.FC<TagsPanelProps> = ({ onClose }) => {
               filteredTags.map(({ tag, count }) => (
                 <div
                   key={tag}
-                  className="tags-item"
+                  className="tags-item panel-card"
                   onClick={() => handleTagClick(tag)}
                 >
                   <div className="tags-item-info">

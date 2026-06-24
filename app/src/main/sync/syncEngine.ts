@@ -107,7 +107,9 @@ export class SyncEngine {
   }
 
   private validateVaultId(vaultId: string): void {
-    if (!vaultId || !vaultId.startsWith('mg-') || vaultId.length > 30 || vaultId.includes('://')) {
+    // Cap großzügig genug für die 16-Byte-IDs (mg- + 8×4 Hex + 7 Bindestriche = 42 Zeichen).
+    // Ältere 8-Byte-IDs (19 Zeichen) bleiben gültig — reine Obergrenze gegen Müll-Eingaben.
+    if (!vaultId || !vaultId.startsWith('mg-') || vaultId.length > 50 || vaultId.includes('://')) {
       throw new Error(`Invalid vault ID: "${vaultId.slice(0, 50)}"`)
     }
   }
@@ -682,11 +684,12 @@ export class SyncEngine {
     const plaintext = await fs.readFile(absPath)
     const stats = await fs.stat(absPath)
     const { iv, tag, ciphertext } = encryptFile(plaintext, this.key)
+    const hashedPath = hashPath(relativePath)
 
     this.wsSend({
       type: 'upload',
       vaultId: this.vaultId,
-      path: hashPath(relativePath),
+      path: hashedPath,
       originalPath: relativePath,
       iv: iv.toString('base64'),
       tag: tag.toString('base64'),
@@ -696,17 +699,18 @@ export class SyncEngine {
       modifiedAt: Math.floor(stats.mtimeMs)
     })
 
-    // Wait for acknowledgment
-    await this.waitForAck()
+    // Wait for acknowledgment (per-Pfad korreliert, s. waitForAck)
+    await this.waitForAck(hashedPath)
   }
 
   private async deleteRemoteFile(relativePath: string): Promise<void> {
+    const hashedPath = hashPath(relativePath)
     this.wsSend({
       type: 'delete',
       vaultId: this.vaultId,
-      path: hashPath(relativePath)
+      path: hashedPath
     })
-    await this.waitForAck()
+    await this.waitForAck(hashedPath)
   }
 
   private async downloadFile(relativePath: string): Promise<void> {
@@ -984,26 +988,37 @@ export class SyncEngine {
     })
   }
 
-  private waitForAck(): Promise<void> {
+  // expectedPath = hashPath(relativePath) des zugehörigen Uploads/Deletes. Der Server
+  // echot `path` in jedem ack (server.ts), also korrelieren wir das ack zum konkreten
+  // Request — sonst löst bei PARALLEL_UPLOADS>1 das ERSTE ack ALLE wartenden Uploads
+  // aus (alle würden fälschlich als synced markiert, auch die, deren Speicherung noch
+  // aussteht/fehlschlägt). Analog zu requestFile(), das ebenfalls per Pfad matcht.
+  private waitForAck(expectedPath: string): Promise<void> {
     return new Promise((resolve, reject) => {
       if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
         return reject(new Error('Not connected'))
       }
 
       const handler = (data: WebSocket.Data) => {
+        let msg: ServerMessage
         try {
-          const msg: ServerMessage = JSON.parse(data.toString())
-          if (msg.type === 'ack') {
-            this.ws?.removeListener('message', handler)
-            resolve()
-          } else if (msg.type === 'error') {
-            this.ws?.removeListener('message', handler)
-            reject(new Error(msg.message || msg.error || 'Upload failed'))
-          }
+          msg = JSON.parse(data.toString())
         } catch (err) {
           this.ws?.removeListener('message', handler)
           reject(err)
+          return
         }
+        if (msg.type === 'ack' && msg.path === expectedPath) {
+          this.ws?.removeListener('message', handler)
+          resolve()
+        } else if (msg.type === 'error') {
+          // Server-Fehler tragen keinen Pfad (server.ts) → nicht eindeutig einem Upload
+          // zuordenbar. Konservativ: diesen Waiter ablehnen → die Batch (Promise.all)
+          // schlägt fehl, NICHTS wird fälschlich als synced markiert. Retry beim nächsten Sync.
+          this.ws?.removeListener('message', handler)
+          reject(new Error(msg.message || msg.error || 'Upload failed'))
+        }
+        // Sonst: ack für einen anderen Pfad / notify / unrelated → ignorieren, Listener bleibt.
       }
 
       this.ws.on('message', handler)

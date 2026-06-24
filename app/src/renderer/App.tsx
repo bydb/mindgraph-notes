@@ -303,6 +303,9 @@ const App: React.FC = () => {
   // UI-Settings beim App-Start laden + Onboarding prüfen
   useEffect(() => {
     const init = async () => {
+      // RAM-Abfrage (unabhängiger IPC) parallel zum Settings-Load starten, statt
+      // sequentiell danach — spart einen Roundtrip beim Start.
+      const memPromise = window.electronAPI.getSystemMemory().catch(() => null)
       await initializeUISettings()
 
       // Weak-HW-Erkennung: System-RAM ermitteln. Wird (a) im Store gehalten für die
@@ -310,14 +313,29 @@ const App: React.FC = () => {
       // genutzt. `lowPowerModeAutoApplied` verhindert, dass ein bewusstes Aus-Schalten
       // überschrieben wird — kein stiller Modell-Tausch.
       try {
-        const { email, setEmail, setSystemTotalRamGb } = useUIStore.getState()
-        const mem = await window.electronAPI.getSystemMemory()
+        const {
+          email, setEmail, setSystemTotalRamGb,
+          setBrain, setPdfCompanionEnabled, setSmartConnectionsRerankerEnabled, setReadwise
+        } = useUIStore.getState()
+        const mem = await memPromise
         if (mem && mem.totalGB > 0) {
           setSystemTotalRamGb(mem.totalGB)
           if (!email.lowPowerModeAutoApplied) {
             if (mem.totalGB < 16) {
               console.log(`[WeakHW] ${mem.totalGB} GB RAM erkannt → Schonmodus aktiviert (einmalig).`)
               setEmail({ lowPowerMode: true, lowPowerModeAutoApplied: true })
+
+              // ≤8 GB: zusätzlich RAM-hungrige, nicht-kritische Features einmalig
+              // konservativer voreinstellen. Gegated über dieselbe einmalige Marke
+              // (`lowPowerModeAutoApplied`) — der User kann jederzeit wieder einschalten,
+              // ohne dass es beim nächsten Start zurückgesetzt wird.
+              if (mem.totalGB <= 8) {
+                console.log(`[WeakHW] ${mem.totalGB} GB RAM → aggressiver Sparmodus (PDF-Companion, Brain-Auto, LLM-Reranker aus; Readwise-Intervall hoch).`)
+                setPdfCompanionEnabled(false)
+                setBrain({ autoConsolidateEnabled: false })
+                setSmartConnectionsRerankerEnabled(false)
+                setReadwise({ autoSyncInterval: 120 })
+              }
             } else {
               setEmail({ lowPowerModeAutoApplied: true })
             }

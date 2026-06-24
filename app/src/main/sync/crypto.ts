@@ -6,9 +6,16 @@ const IV_LENGTH = 12
 const AUTH_TAG_LENGTH = 16
 
 export function generateVaultId(): string {
-  const bytes = crypto.randomBytes(8)
-  const hex = bytes.toString('hex')
-  return `mg-${hex.slice(0, 4)}-${hex.slice(4, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}`
+  // 16 Byte (128 Bit) Zufall. Der sha256(vaultId) dient als scrypt-Salt (s. deriveKey):
+  // der vaultId wird im Klartext zum Relay übertragen, ein Salt darf öffentlich sein,
+  // muss aber unvorhersehbar + eindeutig sein. Mit nur 8 Byte (64 Bit) war der Salt-Raum
+  // klein genug für gezielte Vorberechnung gegen einen bekannten vaultId — 128 Bit schließt das.
+  // Bestehende kürzere 8-Byte-IDs bleiben gültig und leiten unverändert denselben Key ab
+  // (kein Migrations-/Re-Encryption-Bedarf).
+  const bytes = crypto.randomBytes(16)
+  const hex = bytes.toString('hex') // 32 hex chars
+  const g = (i: number) => hex.slice(i * 4, i * 4 + 4)
+  return `mg-${g(0)}-${g(1)}-${g(2)}-${g(3)}-${g(4)}-${g(5)}-${g(6)}-${g(7)}`
 }
 
 export function deriveKey(passphrase: string, vaultId: string): Buffer {

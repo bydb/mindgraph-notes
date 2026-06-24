@@ -300,6 +300,13 @@ export const Sidebar: React.FC<SidebarProps> = ({ onOpenSearch }) => {
 
         setVaultPath(targetVault)
 
+        // Cache + mtime parallel zum readDirectory anstoßen (überlappt die IPCs). Die
+        // frühe FileTree-Anzeige bleibt nur durch readDirectory gegated. `.catch(()=>null)`
+        // → kein unhandled-rejection, falls readDirectory zuerst wirft; loadAllNotes
+        // fällt dann auf normalen Fetch zurück.
+        const cachePrefetch = (window.electronAPI.loadNotesCache(targetVault) as Promise<NotesCache | null>).catch(() => null)
+        const mtimePrefetch = (window.electronAPI.getFilesWithMtime(targetVault) as Promise<Array<{ path: string; mtime: number }>>).catch(() => null)
+
         // 1. FileTree SOFORT laden und anzeigen
         const tree = await window.electronAPI.readDirectory(targetVault)
         setFileTree(tree)
@@ -312,7 +319,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ onOpenSearch }) => {
         await new Promise(resolve => setTimeout(resolve, 50))
 
         setLoading(true) // Zeige Lade-Indikator für Notizen
-        const loadedNotes = await loadAllNotes(targetVault, tree)
+        const loadedNotes = await loadAllNotes(targetVault, tree, await cachePrefetch, await mtimePrefetch)
         setNotes(loadedNotes)
         setLoading(false)
 
@@ -576,21 +583,35 @@ export const Sidebar: React.FC<SidebarProps> = ({ onOpenSearch }) => {
 }
 
 // Hilfsfunktion zum rekursiven Laden aller Notizen MIT CACHE
-async function loadAllNotes(basePath: string, entries: any[]): Promise<Note[]> {
+async function loadAllNotes(
+  basePath: string,
+  entries: any[],
+  prefetchedCache?: NotesCache | null,
+  prefetchedMtime?: Array<{ path: string; mtime: number }> | null
+): Promise<Note[]> {
   const startTime = Date.now()
   const notes: Note[] = []
   const NOTES_CACHE_VERSION = 4
 
-  // 1. Cache und Dateien mit mtime laden (parallel)
+  // 1. Cache und Dateien mit mtime — bereits vom Aufrufer parallel vorgeladen verwenden
+  //    (überlappt mit readDirectory), sonst hier laden. mtime===null heißt Prefetch
+  //    fehlgeschlagen → normaler Fetch als Fallback.
   console.log('[Sidebar] Starte Laden...')
-  const [cache, filesWithMtime] = await Promise.all([
-    window.electronAPI.loadNotesCache(basePath) as Promise<NotesCache | null>,
-    window.electronAPI.getFilesWithMtime(basePath) as Promise<Array<{ path: string; mtime: number }>>
-  ])
+  let cache: NotesCache | null
+  let filesWithMtime: Array<{ path: string; mtime: number }>
+  if (Array.isArray(prefetchedMtime)) {
+    cache = prefetchedCache ?? null
+    filesWithMtime = prefetchedMtime
+  } else {
+    [cache, filesWithMtime] = await Promise.all([
+      window.electronAPI.loadNotesCache(basePath) as Promise<NotesCache | null>,
+      window.electronAPI.getFilesWithMtime(basePath) as Promise<Array<{ path: string; mtime: number }>>
+    ])
+  }
   console.log(`[Sidebar] Cache und mtime geladen in ${Date.now() - startTime}ms`)
 
   const hasValidCache = cache?.version === NOTES_CACHE_VERSION && cache.vaultPath === basePath
-  const cachedNotes = hasValidCache ? cache.notes : {}
+  const cachedNotes = hasValidCache && cache ? cache.notes : {}
   const newCache: NotesCache = {
     version: NOTES_CACHE_VERSION,
     vaultPath: basePath,

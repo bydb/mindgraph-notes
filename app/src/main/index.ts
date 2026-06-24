@@ -1,13 +1,81 @@
 import { app, BrowserWindow, ipcMain, dialog, shell, Notification, safeStorage, Menu, session, systemPreferences, clipboard, powerMonitor } from 'electron'
-import { autoUpdater } from 'electron-updater'
 import * as path from 'path'
 import * as fs from 'fs/promises'
 import { existsSync } from 'fs'
-import { FSWatcher, watch } from 'chokidar'
-import * as pty from 'node-pty'
 import type { FileEntry } from '../shared/types'
-import { SyncEngine } from './sync/syncEngine'
-import { ReMarkableService } from './remarkable/service'
+
+// Lazy-loaded native/heavy Module — beim Start nicht eager geladen (8-GB-Startup-Optimierung).
+// node-pty (natives Addon), chokidar (fsevents), electron-updater, SyncEngine (ws) und
+// ReMarkableService werden erst beim ersten Bedarf importiert.
+type FSWatcher = import('chokidar').FSWatcher
+let _chokidar: typeof import('chokidar') | null = null
+async function getChokidar(): Promise<typeof import('chokidar')> {
+  if (!_chokidar) _chokidar = await import('chokidar')
+  return _chokidar
+}
+
+let _pty: typeof import('node-pty') | null = null
+async function getPty(): Promise<typeof import('node-pty')> {
+  if (!_pty) _pty = await import('node-pty')
+  return _pty
+}
+
+type SyncEngine = import('./sync/syncEngine').SyncEngine
+let _SyncEngineClass: typeof import('./sync/syncEngine').SyncEngine | null = null
+async function getSyncEngineClass(): Promise<typeof import('./sync/syncEngine').SyncEngine> {
+  if (!_SyncEngineClass) _SyncEngineClass = (await import('./sync/syncEngine')).SyncEngine
+  return _SyncEngineClass
+}
+
+let _remarkableService: import('./remarkable/service').ReMarkableService | null = null
+async function getRemarkableService(): Promise<import('./remarkable/service').ReMarkableService> {
+  if (!_remarkableService) {
+    _remarkableService = new (await import('./remarkable/service')).ReMarkableService()
+  }
+  return _remarkableService
+}
+
+// electron-updater: Modul lazy + Listener/Config nur einmal aufsetzen.
+let _autoUpdaterConfigured = false
+async function ensureAutoUpdater(): Promise<import('electron-updater').AppUpdater> {
+  const { autoUpdater } = await import('electron-updater')
+  if (!_autoUpdaterConfigured) {
+    _autoUpdaterConfigured = true
+    autoUpdater.autoDownload = true
+    autoUpdater.autoInstallOnAppQuit = true
+    autoUpdater.logger = {
+      info: (msg: unknown) => console.log('[AutoUpdate]', msg),
+      warn: (msg: unknown) => console.warn('[AutoUpdate]', msg),
+      error: (msg: unknown) => console.error('[AutoUpdate]', msg),
+      debug: (msg: unknown) => console.log('[AutoUpdate:debug]', msg)
+    }
+    autoUpdater.on('update-available', (info) => {
+      console.log('[AutoUpdate] Update available:', info.version)
+      mainWindow?.webContents.send('auto-update-available', {
+        version: info.version,
+        releaseNotes: info.releaseNotes
+      })
+    })
+    autoUpdater.on('download-progress', (progress) => {
+      mainWindow?.webContents.send('auto-update-progress', {
+        percent: Math.round(progress.percent),
+        bytesPerSecond: progress.bytesPerSecond,
+        transferred: progress.transferred,
+        total: progress.total
+      })
+    })
+    autoUpdater.on('update-downloaded', (info) => {
+      console.log('[AutoUpdate] Update downloaded:', info.version)
+      mainWindow?.webContents.send('auto-update-downloaded', {
+        version: info.version
+      })
+    })
+    autoUpdater.on('error', (error) => {
+      console.error('[AutoUpdate] Error:', error.message)
+    })
+  }
+  return autoUpdater
+}
 import { consolidateDay } from './brain/dailyConsolidation'
 import type { BrainConsolidateInput } from './brain/types'
 import { crystallizeProject } from './projectStatus/crystallizer'
@@ -62,10 +130,9 @@ process.on('unhandledRejection', (reason) => {
 
 let mainWindow: BrowserWindow | null = null
 let fileWatcher: FSWatcher | null = null
-let ptyProcess: pty.IPty | null = null
+let ptyProcess: import('node-pty').IPty | null = null
 let isQuitting = false
 let syncEngine: SyncEngine | null = null
-const remarkableService = new ReMarkableService()
 
 // Sprache für Main-Process-Dialoge (wird aus ui-settings.json geladen + per IPC aktualisiert)
 let currentLanguage: 'de' | 'en' = 'de'
@@ -450,7 +517,11 @@ function createWindow(): void {
   // In Entwicklung: Vite Dev Server
   if (process.env.NODE_ENV === 'development') {
     mainWindow.loadURL('http://localhost:5173')
-    mainWindow.webContents.openDevTools()
+    // DevTools erst nach dem ersten Render öffnen — sonst blockiert das Devtools-Front-End
+    // den initialen Paint (~500-1000ms) im Dev-Modus.
+    mainWindow.webContents.once('did-finish-load', () => {
+      mainWindow?.webContents.openDevTools({ mode: 'bottom' })
+    })
   } else {
     mainWindow.loadFile(path.join(__dirname, '../renderer/index.html'))
   }
@@ -512,6 +583,8 @@ if (process.platform === 'linux') {
 }
 
 app.whenReady().then(async () => {
+  // Startup-Messung (Testplan Performance-Fix): Zeit bis Fenster erstellt ist.
+  console.time('app-ready')
   // Reconnect + sync when the machine wakes from sleep. The sync WebSocket often
   // dies silently during suspend; without this nudge the status can stay stuck red
   // until the next manual sync. The heartbeat also catches it, but this is instant.
@@ -522,10 +595,12 @@ app.whenReady().then(async () => {
   })
   setupMediaPermissions()
 
-  // Sprache aus persistierten UI-Settings laden
+  // UI-Settings nur EINMAL von Disk laden und unten für Tray/Transport wiederverwenden
+  // (vorher zwei identische Disk-Reads beim Start).
+  let startupUiSettings: Awaited<ReturnType<typeof loadUISettings>> | null = null
   try {
-    const uiSettings = await loadUISettings()
-    if (uiSettings.language === 'en') currentLanguage = 'en'
+    startupUiSettings = await loadUISettings()
+    if (startupUiSettings.language === 'en') currentLanguage = 'en'
   } catch {
     // Fallback: Deutsch
   }
@@ -539,6 +614,7 @@ app.whenReady().then(async () => {
   }
 
   createWindow()
+  console.timeEnd('app-ready')
 
   // Tray-Icon + Schnellerfassung (plattformübergreifend)
   {
@@ -546,8 +622,8 @@ app.whenReady().then(async () => {
       ? path.join(__dirname, '../../resources')
       : path.join(app.getAppPath(), 'resources')
 
-    // Gespeicherten Shortcut aus UI-Settings lesen
-    const uiSettings = await loadUISettings()
+    // Gespeicherten Shortcut aus den bereits geladenen UI-Settings lesen (kein zweiter Disk-Read)
+    const uiSettings = startupUiSettings ?? await loadUISettings()
     const transportSettings = uiSettings.transport as { shortcut?: string; enabled?: boolean } | undefined
     const savedShortcut = transportSettings?.shortcut
     const transportEnabled = transportSettings?.enabled !== false
@@ -1312,14 +1388,17 @@ ipcMain.handle('workflow-run', async (_event, payload: WorkflowRunPayload) => {
       const safeTitle = (title || 'Workflow-Notiz').replace(/[\\/:*?"<>|]/g, '-').slice(0, 80)
       const wfName = workflow.name || 'Workflow'
 
-      await fs.mkdir(path.join(vaultPath, folder), { recursive: true })
+      // `folder` ist untrusted (verkettete Modell-/Port-Ausgabe) — vor dem mkdir
+      // validieren, sonst Arbitrary-mkdir außerhalb des Vaults.
+      const folderAbs = validatePath(vaultPath, folder)
+      await fs.mkdir(folderAbs, { recursive: true })
       // Bestehende Notiz NIE überschreiben — bei Kollision " (n)" anhängen.
       let rel = `${folder}/${id} - ${safeTitle}.md`
       let n = 2
       // eslint-disable-next-line no-constant-condition
       while (true) {
         try {
-          await fs.access(path.join(vaultPath, rel))
+          await fs.access(validatePath(vaultPath, rel))
           rel = `${folder}/${id} - ${safeTitle} (${n++}).md`
         } catch {
           break
@@ -1346,7 +1425,10 @@ ipcMain.handle('workflow-run', async (_event, payload: WorkflowRunPayload) => {
       return rel
     },
     appendNote: async (noteRel, text) => {
-      const abs = path.join(vaultPath, noteRel)
+      // `noteRel` stammt aus untrusted Quellen (note-Port / verkettete Modell-Ausgabe).
+      // Erst validieren (wirft bei Traversal), DANN lesen/mkdir — sonst Info-Disclosure
+      // + Arbitrary-mkdir außerhalb des Vaults, bevor writeFileSafe greift.
+      const abs = validatePath(vaultPath, noteRel)
       let existing = ''
       try { existing = await fs.readFile(abs, 'utf-8') } catch { existing = '' }
       const sep = existing.length === 0 || existing.endsWith('\n') ? '' : '\n'
@@ -1401,8 +1483,8 @@ ipcMain.handle('tasks-update-line', async (_event, data: {
 
     lines[idx] = data.newLine
     const joined = lines.join('\n')
-    const { healed } = healCorruptedMarkdown(joined)
-    await fs.writeFile(fullPath, healed, 'utf-8')
+    // Eine Schreibgrenze: writeFileSafe erledigt Auto-Heal + Backup + Empty-Write-Block.
+    await writeFileSafe(fullPath, joined)
     return { success: true }
   } catch (error) {
     console.error('[tasks-update-line] Fehler:', error)
@@ -1434,8 +1516,8 @@ ipcMain.handle('tasks-create', async (_event, data: {
 
     const separator = existing.length === 0 || existing.endsWith('\n') ? '' : '\n'
     const newContent = existing + separator + data.taskLine + '\n'
-    const { healed } = healCorruptedMarkdown(newContent)
-    await fs.writeFile(fullPath, healed, 'utf-8')
+    // Eine Schreibgrenze: writeFileSafe erledigt Auto-Heal + Backup + Empty-Write-Block.
+    await writeFileSafe(fullPath, newContent)
     return { success: true, relativePath: data.relativePath }
   } catch (error) {
     console.error('[tasks-create] Fehler:', error)
@@ -3775,6 +3857,15 @@ Stelle EINE kurze Frage, die zum Nachdenken anregt.`
 
     const allMessages = [systemMessage, ...messages]
 
+    // E-Mail-Chat zieht weit mehr Personenkontext (Kontakt-Historie, Vault-Notiz-Inhalte,
+    // Kalender) als die reine Analyse — der darf NIE in die Cloud. Cloud-Routing für
+    // chatMode 'email' hart blockieren und lokal bleiben, egal was der Renderer anfordert.
+    // Siehe Privacy-Constraint „keine personenbezogenen Daten in die Cloud".
+    if (chatMode === 'email' && cloud?.model) {
+      console.warn('[Ollama] Cloud-Routing für E-Mail-Chat blockiert — bleibt lokal (Personendaten).')
+      cloud = null
+    }
+
     // Cloud-Routing (OpenRouter) für Notes-Chat: streamt via SSE auf denselben
     // Channels. Nur aktiv, wenn der Renderer es per zweitem Opt-in (canUseCloudForFeature)
     // angefordert hat — Key kommt aus safeStorage, verlässt nie den Renderer.
@@ -4428,6 +4519,7 @@ ipcMain.on('watch-directory', async (_event, dirPath: string) => {
     fileWatcher.close()
   }
 
+  const { watch } = await getChokidar()
   fileWatcher = watch(dirPath, {
     ignored: /(^|[\/\\])\../,
     persistent: true,
@@ -4562,6 +4654,7 @@ ipcMain.on('terminal-create', async (_event, cwd: string) => {
       LC_ALL: 'en_US.UTF-8',
     }
 
+    const pty = await getPty()
     ptyProcess = pty.spawn(shell, shellArgs, {
       name: 'xterm-256color',
       cols: 80,
@@ -6227,7 +6320,9 @@ ipcMain.handle('strip-wikilinks-in-folder', async (_event, folderPath: string, _
 
           // Prüfen ob sich etwas geändert hat
           if (content !== newContent) {
-            await fs.writeFile(fullPath, newContent, 'utf-8')
+            // Eine Schreibgrenze: pro Datei Backup + Auto-Heal + Empty-Write-Block.
+            // Bei einem vault-weiten Strip ist das Backup die entscheidende Absicherung.
+            await writeFileSafe(fullPath, newContent)
             stats.filesModified++
 
             // Zähle entfernte Wikilinks (ungefähr)
@@ -6324,51 +6419,15 @@ ipcMain.handle('remove-custom-logo', async () => {
   return true
 })
 
-// Auto-Update Setup (macOS only — no code signing on Windows/Linux)
-if (process.platform === 'darwin' && process.env.NODE_ENV !== 'development') {
-  autoUpdater.autoDownload = true
-  autoUpdater.autoInstallOnAppQuit = true
-  autoUpdater.logger = {
-    info: (msg: unknown) => console.log('[AutoUpdate]', msg),
-    warn: (msg: unknown) => console.warn('[AutoUpdate]', msg),
-    error: (msg: unknown) => console.error('[AutoUpdate]', msg),
-    debug: (msg: unknown) => console.log('[AutoUpdate:debug]', msg)
-  }
-
-  autoUpdater.on('update-available', (info) => {
-    console.log('[AutoUpdate] Update available:', info.version)
-    mainWindow?.webContents.send('auto-update-available', {
-      version: info.version,
-      releaseNotes: info.releaseNotes
-    })
-  })
-
-  autoUpdater.on('download-progress', (progress) => {
-    mainWindow?.webContents.send('auto-update-progress', {
-      percent: Math.round(progress.percent),
-      bytesPerSecond: progress.bytesPerSecond,
-      transferred: progress.transferred,
-      total: progress.total
-    })
-  })
-
-  autoUpdater.on('update-downloaded', (info) => {
-    console.log('[AutoUpdate] Update downloaded:', info.version)
-    mainWindow?.webContents.send('auto-update-downloaded', {
-      version: info.version
-    })
-  })
-
-  autoUpdater.on('error', (error) => {
-    console.error('[AutoUpdate] Error:', error.message)
-  })
-}
+// Auto-Update: Listener/Config werden lazy in ensureAutoUpdater() aufgesetzt
+// (electron-updater nicht mehr eager beim Start importiert — Startup-Optimierung).
 
 // GitHub Releases auf neue Version prüfen (Fallback für Windows/Linux)
 ipcMain.handle('check-for-updates', async () => {
   // macOS: Use electron-updater
   if (process.platform === 'darwin' && process.env.NODE_ENV !== 'development') {
     try {
+      const autoUpdater = await ensureAutoUpdater()
       const result = await autoUpdater.checkForUpdates()
       if (result?.updateInfo) {
         const latestVersion = result.updateInfo.version
@@ -6429,6 +6488,7 @@ ipcMain.handle('check-for-updates', async () => {
 // Install downloaded update and restart (macOS only)
 ipcMain.handle('install-update', async () => {
   if (process.platform === 'darwin') {
+    const autoUpdater = await ensureAutoUpdater()
     autoUpdater.quitAndInstall(false, true)
     return true
   }
@@ -6437,6 +6497,7 @@ ipcMain.handle('install-update', async () => {
 
 ipcMain.handle('download-update', async () => {
   try {
+    const autoUpdater = await ensureAutoUpdater()
     await autoUpdater.downloadUpdate()
     return true
   } catch (error) {
@@ -7098,7 +7159,8 @@ ipcMain.handle('sync-setup', async (_event, vaultPath: string, passphrase: strin
     // Stop any previous engine first — otherwise its reconnect loop lives on as a
     // zombie (repeated setups → reconnect storm with "invalid activation code").
     syncEngine?.disconnect()
-    syncEngine = new SyncEngine()
+    const SyncEngineClass = await getSyncEngineClass()
+    syncEngine = new SyncEngineClass()
     const result = await syncEngine.init(vaultPath, passphrase, relayUrl, activationCode || '')
     await syncEngine.connect()
     if (autoSyncInterval && autoSyncInterval > 0) {
@@ -7117,7 +7179,8 @@ ipcMain.handle('sync-join', async (_event, vaultPath: string, vaultId: string, p
     // Stop any previous engine first — otherwise its reconnect loop lives on as a
     // zombie (repeated setups → reconnect storm with "invalid activation code").
     syncEngine?.disconnect()
-    syncEngine = new SyncEngine()
+    const SyncEngineClass = await getSyncEngineClass()
+    syncEngine = new SyncEngineClass()
     await syncEngine.join(vaultPath, vaultId, passphrase, relayUrl, activationCode || '')
     await syncEngine.connect()
     if (autoSyncInterval && autoSyncInterval > 0) {
@@ -7241,7 +7304,8 @@ ipcMain.handle('sync-restore', async (_event, vaultPath: string, vaultId: string
     // Re-initialize sync engine — stop the previous one first to avoid a lingering
     // zombie engine with its own reconnect loop.
     syncEngine?.disconnect()
-    syncEngine = new SyncEngine()
+    const SyncEngineClass = await getSyncEngineClass()
+    syncEngine = new SyncEngineClass()
     await syncEngine.join(vaultPath, vaultId, passphrase, relayUrl)
     await syncEngine.connect()
 
@@ -8287,6 +8351,12 @@ ipcMain.handle('email-analyze', async (_event, vaultPath: string, model: string,
       if (!openrouterKey) {
         return { success: false, error: 'OpenRouter-Cloud ist für die Mail-Analyse aktiviert, aber kein API-Key hinterlegt (Einstellungen → KI → OpenRouter).' }
       }
+    } else if (isModelHardLocked(model, 'task-extraction')) {
+      // Defense-in-Depth: Hard-Lock NICHT nur im Renderer-Store erzwingen — der Main-Handler
+      // läuft das Modell direkt gegen untrusted Mail-Bodies. Bei Cloud-Routing greift dieser
+      // lokale Modell-Lock nicht (OpenRouter-Modell ist ein anderes, separat opt-in).
+      console.warn(`[Email] email-analyze abgelehnt: Modell „${model}" ist für task-extraction hard-locked (Prompt-Injection-Risiko).`)
+      return { success: false, error: `Das Modell „${model}" ist für die Mail-/Task-Analyse gesperrt (Prompt-Injection-Anfälligkeit). Bitte in den Einstellungen ein geeignetes Modell wählen.` }
     }
     // Emails laden
     const emailsPath = path.join(vaultPath, '.mindgraph', 'emails.json')
@@ -9815,12 +9885,12 @@ do {
 // ========================================
 
 ipcMain.handle('remarkable-usb-check', async () => {
-  return remarkableService.checkUsbConnection()
+  return (await getRemarkableService()).checkUsbConnection()
 })
 
 ipcMain.handle('remarkable-usb-debug-info', async () => {
   try {
-    const status = await remarkableService.checkUsbConnection()
+    const status = await (await getRemarkableService()).checkUsbConnection()
 
     if (process.platform !== 'darwin') {
       return {
@@ -9877,7 +9947,7 @@ ipcMain.handle('remarkable-usb-debug-info', async () => {
 
 ipcMain.handle('remarkable-list-documents', async (_event, folderId?: string) => {
   try {
-    const documents = await remarkableService.listUsbDocuments(folderId)
+    const documents = await (await getRemarkableService()).listUsbDocuments(folderId)
     return { documents }
   } catch (error) {
     console.error('[reMarkable] Failed to list USB documents:', error)
@@ -9897,7 +9967,7 @@ ipcMain.handle('remarkable-download-document', async (_event, vaultPath: string,
 
   try {
     assertApprovedVault(vaultPath, 'remarkable-download-document')
-    const pdfBuffer = await remarkableService.downloadUsbDocumentPdf(document.id)
+    const pdfBuffer = await (await getRemarkableService()).downloadUsbDocumentPdf(document.id)
     const pdfDir = validatePath(vaultPath, 'reMarkable/pdf')
     await fs.mkdir(pdfDir, { recursive: true })
 
@@ -9932,7 +10002,7 @@ ipcMain.handle('remarkable-upload-pdf', async (_event, vaultPath: string, relati
     const content = await fs.readFile(filePath)
     const fileName = path.basename(relativePdfPath)
 
-    await remarkableService.uploadUsbPdf(fileName, content)
+    await (await getRemarkableService()).uploadUsbPdf(fileName, content)
     return { success: true }
   } catch (error) {
     console.error('[reMarkable] Failed to upload PDF:', { relativePdfPath, error })

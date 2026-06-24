@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { useNotesStore, createNoteFromFile } from '../../stores/notesStore'
 import { useTranslation } from '../../utils/translations'
+import { PanelHeader } from '../Shared/PanelHeader'
 import {
   searchSemanticScholar,
   searchOpenAlex,
@@ -176,21 +177,17 @@ export const SemanticScholarPanel: React.FC<SemanticScholarPanelProps> = ({ onCl
 
   return (
     <div className="semantic-scholar-panel">
-      <div className="semantic-scholar-header">
-        <div className="semantic-scholar-title">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <PanelHeader
+        icon={
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/>
             <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>
           </svg>
-          Research
-        </div>
-        <button className="semantic-scholar-close" onClick={onClose} title={t('panel.close')}>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="18" y1="6" x2="6" y2="18"/>
-            <line x1="6" y1="6" x2="18" y2="18"/>
-          </svg>
-        </button>
-      </div>
+        }
+        title="Research"
+        onClose={onClose}
+        closeTitle={t('panel.close')}
+      />
 
       <div className="semantic-scholar-search">
         <div className="semantic-scholar-source-toggle">
@@ -318,7 +315,7 @@ export const SemanticScholarPanel: React.FC<SemanticScholarPanelProps> = ({ onCl
             {results.map((paper) => (
               <div
                 key={paper.paperId}
-                className={`semantic-scholar-result ${expandedPaper === paper.paperId ? 'expanded' : ''}`}
+                className={`semantic-scholar-result panel-card ${expandedPaper === paper.paperId ? 'expanded' : ''}`}
               >
                 <div
                   className="semantic-scholar-result-header"

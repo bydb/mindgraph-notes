@@ -378,3 +378,15 @@
 .help-graph-canvas .react-flow__edge-path {
   cursor: default;
 }
+
+/* Kopf-Zeile sitzt oben im overflow:hidden-Container → Tooltips nach unten + rechtsbündig. */
+.help-graph-header [data-tooltip]::after {
+  bottom: auto;
+  top: calc(100% + 6px);
+  left: auto;
+  right: 0;
+  transform: scale(0.95);
+}
+.help-graph-header [data-tooltip]:hover::after {
+  transform: scale(1);
+}

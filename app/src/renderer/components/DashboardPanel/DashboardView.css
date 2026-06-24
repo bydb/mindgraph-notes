@@ -682,14 +682,31 @@
   border-color: var(--color-success, #2ecc71);
 }
 
-/* Tooltip rechtsbuendig am Button ausrichten, damit er nicht ueber den Widget-Rand rausragt */
-.dv-email-done-btn[data-tooltip]::after {
+/* Tooltip rechtsbuendig am Button ausrichten, damit er nicht ueber den Widget-Rand rausragt.
+   Gilt für alle Buttons am rechten Rand einer Listenzeile (Radar-Aktionen, Fokus „Zeit blocken"). */
+.dv-email-done-btn[data-tooltip]::after,
+.dv-radar-action[data-tooltip]::after,
+.dv-focus-block-btn[data-tooltip]::after {
   left: auto;
   right: 0;
   transform: translateX(0) scale(0.95);
 }
 
-.dv-email-done-btn[data-tooltip]:hover::after {
+.dv-email-done-btn[data-tooltip]:hover::after,
+.dv-radar-action[data-tooltip]:hover::after,
+.dv-focus-block-btn[data-tooltip]:hover::after {
+  transform: translateX(0) scale(1);
+}
+
+/* Dashboard-Tab-Kopf sitzt oben (overflow:hidden) → Refresh-Tooltip nach unten + rechtsbündig. */
+.dashboard-view-header [data-tooltip]::after {
+  bottom: auto;
+  top: calc(100% + 6px);
+  left: auto;
+  right: 0;
+  transform: translateX(0) scale(0.95);
+}
+.dashboard-view-header [data-tooltip]:hover::after {
   transform: translateX(0) scale(1);
 }
 

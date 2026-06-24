@@ -407,10 +407,16 @@ export async function runWorkflow(workflow: Workflow, opts: RunOptions): Promise
       return { ...baseRun, status: 'failed', finishedAt: nowIso(), steps, error: step.error }
     }
 
-    // Hard-Lock auf LLM-Aktionen mit untrusted Input.
-    if (action.hardLockModule) {
+    // LLM-Guards. Der Cloud-Guard hing früher AUSSCHLIESSLICH an `hardLockModule` —
+    // eine künftige LLM-Action ohne hardLockModule hätte beide Guards still umgangen.
+    // Daher entkoppelt: sobald die Action ein Modell auflöst (hardLockModule ODER ein
+    // konfiguriertes `model`-Feld), läuft der Cloud-Guard. Der Hard-Lock (Prompt-
+    // Injection-Schutz) bleibt korrekt auf untrusted-Input-Actions beschränkt.
+    const usesModel = Boolean(action.hardLockModule) || node.config.model != null
+    if (usesModel) {
       const model = opts.services.resolveModel(node.config.model as string | undefined, action.hardLockModule)
-      if (opts.services.isHardLocked(model, action.hardLockModule)) {
+      // Hard-Lock nur für LLM-Aktionen mit untrusted Input (hardLockModule benannt).
+      if (action.hardLockModule && opts.services.isHardLocked(model, action.hardLockModule)) {
         step.status = 'failed'
         step.error = `Modell „${model}" ist für ${action.hardLockModule} gesperrt (Prompt-Injection-Schutz).`
         step.finishedAt = nowIso(); steps.push(step)

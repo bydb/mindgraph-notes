@@ -3,6 +3,7 @@ import { useFlashcardStore, getDaysUntilReview, type FlashcardFilter } from '../
 import { useNotesStore } from '../../stores/notesStore'
 import { useTranslation } from '../../utils/translations'
 import { FlashcardStats } from './FlashcardStats'
+import { PanelHeader, PanelHeaderIconButton } from '../Shared/PanelHeader'
 import type { Flashcard } from '../../../shared/types'
 
 interface FlashcardsPanelProps {
@@ -148,53 +149,49 @@ export const FlashcardsPanel: React.FC<FlashcardsPanelProps> = ({ onClose }) => 
 
   return (
     <div className="flashcards-panel">
-      <div className="flashcards-panel-header">
-        <div className="flashcards-panel-title">
+      <PanelHeader
+        icon={
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <rect x="2" y="4" width="20" height="16" rx="2" />
             <path d="M10 4v4" />
             <path d="M14 4v4" />
           </svg>
-          <span>{t('flashcards.title')}</span>
-          {stats.total > 0 && (
-            <span className="flashcards-panel-count">{stats.total}</span>
-          )}
-        </div>
-        <button
-          className="flashcards-add-btn"
-          onClick={handleImportAnki}
-          disabled={isImporting}
-          title={t('flashcards.importAnki')}
-        >
-          {isImporting ? (
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="spinning">
-              <path d="M21 12a9 9 0 11-6.219-8.56" />
-            </svg>
-          ) : (
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
-              <polyline points="7 10 12 15 17 10" />
-              <line x1="12" y1="15" x2="12" y2="3" />
-            </svg>
-          )}
-        </button>
-        <button
-          className="flashcards-add-btn"
-          onClick={() => setCreatingCard(true)}
-          title={t('flashcards.createCard')}
-        >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="12" y1="5" x2="12" y2="19" />
-            <line x1="5" y1="12" x2="19" y2="12" />
-          </svg>
-        </button>
-        <button className="flashcards-panel-close" onClick={onClose} title={t('panel.close')}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="18" y1="6" x2="6" y2="18" />
-            <line x1="6" y1="6" x2="18" y2="18" />
-          </svg>
-        </button>
-      </div>
+        }
+        title={t('flashcards.title')}
+        count={stats.total > 0 ? stats.total : undefined}
+        onClose={onClose}
+        closeTitle={t('panel.close')}
+        actions={
+          <>
+            <PanelHeaderIconButton
+              onClick={handleImportAnki}
+              disabled={isImporting}
+              title={t('flashcards.importAnki')}
+            >
+              {isImporting ? (
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="spinning">
+                  <path d="M21 12a9 9 0 11-6.219-8.56" />
+                </svg>
+              ) : (
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
+                  <polyline points="7 10 12 15 17 10" />
+                  <line x1="12" y1="15" x2="12" y2="3" />
+                </svg>
+              )}
+            </PanelHeaderIconButton>
+            <PanelHeaderIconButton
+              onClick={() => setCreatingCard(true)}
+              title={t('flashcards.createCard')}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="12" y1="5" x2="12" y2="19" />
+                <line x1="5" y1="12" x2="19" y2="12" />
+              </svg>
+            </PanelHeaderIconButton>
+          </>
+        }
+      />
 
       {/* Filter Tabs */}
       <div className="flashcards-filters">
@@ -290,7 +287,7 @@ export const FlashcardsPanel: React.FC<FlashcardsPanelProps> = ({ onClose }) => 
                         {cards.map((card) => (
                           <div
                             key={card.id}
-                            className={`flashcards-card-item ${card.status}`}
+                            className={`flashcards-card-item panel-card ${card.status}`}
                             onClick={() => handleCardClick(card)}
                           >
                             <div className="flashcards-card-content">

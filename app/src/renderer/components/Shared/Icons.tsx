@@ -170,3 +170,31 @@ export const IconClock: React.FC<IconProps> = (p) => (
     <polyline points="12 6 12 12 16 14" />
   </svg>
 )
+
+// ─── Header-Chrome-Icons (geteilter PanelHeader) ──────────────────────
+
+export const IconClose: React.FC<IconProps> = (p) => (
+  <svg {...svgProps(p)}>
+    <line x1="18" y1="6" x2="6" y2="18" />
+    <line x1="6" y1="6" x2="18" y2="18" />
+  </svg>
+)
+
+export const IconChevronLeft: React.FC<IconProps> = (p) => (
+  <svg {...svgProps(p)}>
+    <polyline points="15 18 9 12 15 6" />
+  </svg>
+)
+
+export const IconPlus: React.FC<IconProps> = (p) => (
+  <svg {...svgProps(p)}>
+    <line x1="12" y1="5" x2="12" y2="19" />
+    <line x1="5" y1="12" x2="19" y2="12" />
+  </svg>
+)
+
+export const IconSparkle: React.FC<IconProps> = (p) => (
+  <svg {...svgProps(p)}>
+    <path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z" />
+  </svg>
+)

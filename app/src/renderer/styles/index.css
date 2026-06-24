@@ -243,30 +243,79 @@ h2 { letter-spacing: -0.016em; }
 .formatting-toolbar [data-tooltip]::after,
 .editor-header [data-tooltip]::after,
 .canvas-filter-bar [data-tooltip]::after,
-.canvas-toolbar [data-tooltip]::after,
 .wf-toolbar [data-tooltip]::after,
 .local-canvas-header [data-tooltip]::after,
-.add-note-btn[data-tooltip]::after {
+.add-note-btn[data-tooltip]::after,
+/* Weitere Container, die oben anliegen → Tooltip nach unten: */
+.tab-bar [data-tooltip]::after,
+.editor-preview .fold-toggle[data-tooltip]::after,
+.focus-floating-bar [data-tooltip]::after {
   bottom: auto;
   top: calc(100% + 6px);
 }
 
-/* Inbox-Header Tooltips nach unten (sonst von Titlebar verdeckt) */
-.inbox-panel-header [data-tooltip]::after {
+/* Container mit rechtsbündigem Button am oberen Rand → nach unten + rechtsbündig. */
+.agent-dashboard-header [data-tooltip]::after,
+.vault-info [data-tooltip]::after,
+.remarkable-header [data-tooltip]::after,
+.voice-preview-controls [data-tooltip]::after,
+.canvas-export-panel [data-tooltip]::after {
   bottom: auto;
   top: calc(100% + 6px);
   left: auto;
   right: 0;
+  transform: scale(0.95);
 }
-
-.inbox-panel-header [data-tooltip]:hover::after {
+.agent-dashboard-header [data-tooltip]:hover::after,
+.vault-info [data-tooltip]:hover::after,
+.remarkable-header [data-tooltip]:hover::after,
+.voice-preview-controls [data-tooltip]:hover::after,
+.canvas-export-panel [data-tooltip]:hover::after {
   transform: scale(1);
 }
 
-/* Aufgaben & Termine sitzt direkt unter der App-Header-Leiste: Header-Tooltips nach unten anzeigen. */
-.overdue-panel-header [data-tooltip]::after {
+/* Sidebar-Listen sind schmal + overflow:hidden → lange Pfad-/Titel-Tooltips
+   linksbündig + umbrechen, sonst horizontal abgeschnitten. */
+.file-tree [data-tooltip]::after,
+.bookmarks-bar [data-tooltip]::after {
+  left: 0;
+  right: auto;
+  transform: none;
+  white-space: normal;
+  max-width: 220px;
+}
+.file-tree [data-tooltip]:hover::after,
+.bookmarks-bar [data-tooltip]:hover::after {
+  transform: none;
+}
+
+/* Geteilter PanelHeader (ALLE migrierten rechten Panels: Aufgaben/Tags/NotesChat/
+   SmartConn/Research/Flashcards/Agent/Email). Die Köpfe sitzen direkt unter der
+   App-Kopfleiste → Tooltips MÜSSEN nach unten, sonst werden sie abgeschnitten.
+   Ersetzt die alten .inbox-panel-header/.overdue-panel-header-Regeln. */
+.panel-header [data-tooltip]::after {
   bottom: auto;
   top: calc(100% + 6px);
+}
+
+/* Aktions-Buttons sitzen am rechten Panelrand → Tooltip rechtsbündig. */
+.panel-header-actions [data-tooltip]::after {
+  left: auto;
+  right: 0;
+  transform: scale(0.95);
+}
+.panel-header-actions [data-tooltip]:hover::after {
+  transform: scale(1);
+}
+
+/* Zurück-Pfeil sitzt am linken Panelrand → linksbündig. */
+.panel-header-back[data-tooltip]::after {
+  left: 0;
+  right: auto;
+  transform: scale(0.95);
+}
+.panel-header-back[data-tooltip]:hover::after {
+  transform: scale(1);
 }
 
 /* Inbox Detail-Action Tooltips nach unten, links-ausgerichtet */
@@ -283,14 +332,12 @@ h2 { letter-spacing: -0.016em; }
 }
 
 /* Tooltip rechts-ausgerichtet für Buttons am rechten Rand */
+/* Rechtsbündige Tooltips für Buttons am rechten Rand. Die alten
+   .X-panel-close-Klassen wurden durch den geteilten PanelHeader ersetzt
+   (siehe .panel-header-actions oben); hier bleiben nur die noch echten
+   Modal-/Titlebar-Close-Buttons. */
 .titlebar-right [data-tooltip]::after,
-.tags-panel-close[data-tooltip]::after,
-.flashcards-panel-close[data-tooltip]::after,
 .overdue-panel-close[data-tooltip]::after,
-.agent-panel-close[data-tooltip]::after,
-.notes-chat-close[data-tooltip]::after,
-.smart-connections-close[data-tooltip]::after,
-.semantic-scholar-close[data-tooltip]::after,
 .settings-close[data-tooltip]::after,
 .flashcard-study-close[data-tooltip]::after,
 .flashcard-editor-close[data-tooltip]::after {
@@ -300,13 +347,7 @@ h2 { letter-spacing: -0.016em; }
 }
 
 .titlebar-right [data-tooltip]:hover::after,
-.tags-panel-close[data-tooltip]:hover::after,
-.flashcards-panel-close[data-tooltip]:hover::after,
 .overdue-panel-close[data-tooltip]:hover::after,
-.agent-panel-close[data-tooltip]:hover::after,
-.notes-chat-close[data-tooltip]:hover::after,
-.smart-connections-close[data-tooltip]:hover::after,
-.semantic-scholar-close[data-tooltip]:hover::after,
 .settings-close[data-tooltip]:hover::after,
 .flashcard-study-close[data-tooltip]:hover::after,
 .flashcard-editor-close[data-tooltip]:hover::after {
@@ -9660,19 +9701,18 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
   gap: 8px;
 }
 
+/* Chrome (Hintergrund/Rahmen/Radius/Hover) kommt aus .panel-card. */
 .overdue-item {
   display: flex;
   align-items: flex-start;
   gap: 10px;
   padding: 10px 12px;
-  background: var(--bg-secondary);
-  border-radius: var(--radius-md);
   cursor: pointer;
-  transition: all var(--transition-fast);
 }
 
-.overdue-item:hover {
-  background: var(--bg-tertiary);
+/* Dringlichkeits-Punkt mit der ersten Zeile (Checkbox) ausrichten. */
+.overdue-item > .panel-dot {
+  margin-top: 6px;
 }
 
 .overdue-item-checkbox {
@@ -9727,15 +9767,16 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
   opacity: 0.9;
 }
 
+/* Kritisch-Marker dezent (kein gefüllter roter Coin): subtiler Token-Chip. */
 .overdue-item-critical {
   flex-shrink: 0;
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--color-danger);
-  color: white;
+  background: color-mix(in srgb, var(--color-danger) 15%, transparent);
+  color: var(--color-danger);
   font-weight: 700;
   font-size: 12px;
   border-radius: 50%;
@@ -9902,8 +9943,8 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
   align-items: center;
   gap: 2px;
   padding: 1px 6px 1px 8px;
-  background: rgba(74, 158, 255, 0.12);
-  color: var(--accent-color, #4a9eff);
+  background: var(--accent-subtle);
+  color: var(--accent-color);
   border-radius: 10px;
   font-size: 10px;
   font-weight: 500;
@@ -10207,6 +10248,183 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
   border-left: 1px solid var(--border-color);
   border-radius: var(--radius-lg) var(--radius-lg) 0 0;
 }
+
+/* ─── Geteilter PanelHeader (Email-Designsprache als Kanon) ─────────────
+   Eine einzige Header-Optik + Button-Familie für ALLE Modul-Panels.
+   Genutzt via components/Shared/PanelHeader.tsx. */
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  height: 44px;
+  min-height: 44px;
+  padding: 0 16px;
+  background-color: var(--bg-chrome);
+  border-bottom: 1px solid var(--border-color);
+  border-radius: 0;
+}
+
+.panel-header-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--text-primary);
+}
+
+/* Modul-Logo farbig (Akzent) — der „Karteikarten-Standard", nicht muted grau. */
+.panel-header-icon {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  color: var(--accent-color);
+}
+
+.panel-header-icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+.panel-header-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.panel-header-count {
+  flex-shrink: 0;
+  background: var(--accent-subtle);
+  color: var(--accent-color);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+}
+
+.panel-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+/* Icon-only Aktions-Button — gerahmt (Karteikarten-Standard, klare Anmutung). */
+.panel-header-iconbtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--border-color);
+  background: transparent;
+  color: var(--text-muted);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.panel-header-iconbtn:hover {
+  border-color: var(--accent-color);
+  color: var(--accent-color);
+}
+
+.panel-header-iconbtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.panel-header-iconbtn.active {
+  color: var(--accent-color);
+  border-color: var(--accent-color);
+  background: var(--accent-subtle);
+}
+
+/* Randlose Variante — Schließen-× und Zurück-Pfeil (Dismiss/Navigation, keine Aktion). */
+.panel-header-iconbtn.plain {
+  border-color: transparent;
+}
+
+.panel-header-iconbtn.plain:hover {
+  border-color: transparent;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
+.panel-header-back {
+  margin-left: -6px;
+}
+
+/* Beschrifteter Button (Icon + Text, wie .inbox-header-btn) */
+.panel-header-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.panel-header-btn:hover {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  border-color: var(--accent);
+}
+
+.panel-header-btn.active {
+  background: var(--accent-bg, rgba(100, 130, 255, 0.15));
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+/* ─── Geteilte ruhige Karte (Karteikarten-Standard für Listen-Items) ──────
+   EIN Karten-Stil für ALLE Modul-Panels (Aufgaben/Flashcards/Research/
+   SmartConnections/Tags/Agent). Genutzt via class="panel-card" am Listen-Item.
+   Bewusst ruhig: dünner Rahmen + radius, dezenter Hover. Verboten (quiet-UI):
+   farbige Rand-Streifen, getönte Karten-Hintergründe, Box-Shadows, laute
+   Akzent-Rahmen-Hover. Dringlichkeit/Status signalisiert ein kleiner
+   <span class="panel-dot panel-dot--…"> oder ein dezenter, tokenisierter
+   Chip — nie die ganze Kartenfläche. */
+.panel-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  transition: background var(--transition-fast), border-color var(--transition-fast);
+}
+
+.panel-card:hover {
+  background: var(--bg-tertiary);
+}
+
+.panel-card.active,
+.panel-card.expanded,
+.panel-card.selected {
+  background: var(--bg-tertiary);
+  border-color: var(--border-color);
+}
+
+/* Kleiner Status-/Dringlichkeits-Punkt — der app-weite Signal-Standard
+   (vgl. 10-px-Status-Dot in NoteNodes/FileTree), statt Streifen/Tint/Pille. */
+.panel-dot {
+  flex-shrink: 0;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text-muted);
+}
+.panel-dot--danger  { background: var(--color-danger); }
+.panel-dot--warning { background: var(--color-warning); }
+.panel-dot--info    { background: var(--color-info); }
+.panel-dot--success { background: var(--color-success); }
+.panel-dot--accent  { background: var(--accent-color); }
 
 .inbox-panel-header {
   display: flex;
@@ -12274,25 +12492,22 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
 .agent-event-list {
   display: flex;
   flex-direction: column;
+  gap: 6px;
+  padding: 8px 12px;
 }
 
+/* Chrome + Hover aus .panel-card (ruhige Karte) — wie die anderen Module. */
 .agent-event-item {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 10px 16px;
-  border: none;
-  background: none;
+  padding: 10px 12px;
   text-align: left;
   cursor: pointer;
-  border-bottom: 1px solid var(--border-color);
-  transition: background 0.15s ease;
   width: 100%;
-}
-
-.agent-event-item:hover {
-  background: var(--bg-hover);
+  color: inherit;
+  font: inherit;
 }
 
 .agent-event-item-main {
@@ -12330,13 +12545,13 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
 }
 
 .agent-status-pushed {
-  background: rgba(34, 197, 94, 0.1);
-  color: #22c55e;
+  background: color-mix(in srgb, var(--color-success) 12%, transparent);
+  color: var(--color-success);
 }
 
 .agent-status-error {
-  background: rgba(239, 68, 68, 0.1);
-  color: #ef4444;
+  background: color-mix(in srgb, var(--color-danger) 12%, transparent);
+  color: var(--color-danger);
 }
 
 /* Agent Detail View */
@@ -12790,20 +13005,7 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
   gap: 8px;
 }
 
-.agent-dashboard-card {
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  transition: box-shadow 0.15s ease;
-}
-
-.agent-dashboard-card:hover {
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
-}
-
-.agent-dashboard-card.expanded {
-  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.08);
-}
-
+/* Chrome + Hover + expanded-State aus .panel-card (keine Box-Shadow-Elevation). */
 .agent-dashboard-card-header {
   display: flex;
   align-items: flex-start;
@@ -12824,7 +13026,8 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
 
 .agent-dashboard-card-title {
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 500;
+  color: var(--text-primary);
   line-height: 1.4;
   word-break: break-word;
 }
@@ -12843,8 +13046,8 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
   font-size: 10px;
   font-weight: 600;
   padding: 1px 6px;
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--accent-color) 15%, transparent);
+  border-radius: var(--radius-sm);
+  background: var(--accent-subtle);
   color: var(--accent-color);
   flex-shrink: 0;
   line-height: 1.5;
@@ -12972,13 +13175,12 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
   align-items: center;
   gap: 10px;
   padding: 8px 8px;
-  border-radius: var(--radius-sm);
   font-size: 12px;
-  border: 1px solid var(--border-color);
 }
 
-.agent-dashboard-booking.is-new {
-  background: color-mix(in srgb, var(--accent-color) 6%, transparent);
+/* „Neu" trägt der Punkt (.agent-dashboard-dot) + fetter Name, kein Flächen-Tint. */
+.agent-dashboard-booking.is-new .agent-dashboard-booking-name {
+  font-weight: 700;
 }
 
 .agent-dashboard-booking-avatar {
@@ -13033,48 +13235,29 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
 .agent-marketing {
   display: flex;
   flex-direction: column;
-  gap: 8px;
 }
 
-.agent-marketing-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 0 8px 0;
-}
-
-.agent-marketing-header-title {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text-secondary);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
+/* Marketing- & IQ-Tab nutzen jetzt denselben edoobox-Logo-Kopf wie Dashboard
+   (.agent-dashboard-header) — keine eigene graue Großbuchstaben-Überschrift mehr. */
 
 .agent-marketing-list {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 6px;
+  padding: 8px 12px;
 }
 
+/* Chrome + Hover aus .panel-card (ruhige Karte). */
 .agent-marketing-card {
   display: flex;
   align-items: center;
   gap: 8px;
   padding: 10px 12px;
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
   cursor: pointer;
-  transition: border-color 0.15s;
   text-align: left;
   width: 100%;
   color: var(--text-primary);
   font: inherit;
-}
-
-.agent-marketing-card:hover {
-  border-color: var(--accent-color);
 }
 
 .agent-marketing-card-body {
@@ -13085,9 +13268,9 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
 .agent-marketing-card-title {
   font-size: 13px;
   font-weight: 500;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  color: var(--text-primary);
+  line-height: 1.4;
+  word-break: break-word;
 }
 
 .agent-marketing-card-meta {
@@ -13412,45 +13595,10 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
   font-weight: 500;
 }
 
-/* ============ Farbige Karten nach Dringlichkeit ============ */
-/* Doppelte Klasse (.overdue-item.overdue-item--X) für robuste Spezifität
-   gegenüber `.overdue-item:hover` — unabhängig von der Quellreihenfolge. */
-.overdue-item.overdue-item--overdue {
-  background: color-mix(in srgb, var(--color-danger) 12%, var(--bg-primary));
-  border-left: 3px solid var(--color-danger);
-}
-.overdue-item.overdue-item--overdue:hover {
-  background: color-mix(in srgb, var(--color-danger) 18%, var(--bg-primary));
-}
-
-.overdue-item.overdue-item--today {
-  background: color-mix(in srgb, var(--color-warning) 13%, var(--bg-primary));
-  border-left: 3px solid var(--color-warning);
-}
-.overdue-item.overdue-item--today:hover {
-  background: color-mix(in srgb, var(--color-warning) 20%, var(--bg-primary));
-}
-
-.overdue-item.overdue-item--future {
-  background: color-mix(in srgb, var(--color-info) 10%, var(--bg-primary));
-  border-left: 3px solid var(--color-info);
-}
-.overdue-item.overdue-item--future:hover {
-  background: color-mix(in srgb, var(--color-info) 16%, var(--bg-primary));
-}
-
-.overdue-item.overdue-item--undated {
-  background: var(--bg-secondary);
-  border-left: 3px solid var(--border-color);
-}
-.overdue-item.overdue-item--undated:hover {
-  background: var(--bg-tertiary);
-}
-
-/* Checkbox-Akzent zieht die Kartenfarbe durch (Hover bleibt Accent-Highlight) */
-.overdue-item--overdue .overdue-item-checkbox { color: var(--color-danger); }
-.overdue-item--today .overdue-item-checkbox { color: var(--color-warning); }
-.overdue-item--future .overdue-item-checkbox { color: var(--color-info); }
+/* ============ Dringlichkeit nach Variante ============ */
+/* Ruhige Karte (.panel-card) bleibt neutral; die Dringlichkeit trägt allein
+   der kleine führende .panel-dot (Farbe per Variante in der Komponente) plus
+   das rote Datum. KEINE getönten Karten-Flächen, KEINE Rand-Streifen mehr. */
 
 /* ============ KI-Tag-Befüllung ============ */
 .overdue-panel-ai svg { color: var(--accent-color, #0a84ff); }
@@ -13621,16 +13769,10 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
   gap: 4px;
 }
 
+/* Chrome + Hover aus .panel-card (ruhige Karte). */
 .tags-item {
   padding: 8px 10px;
-  background: var(--bg-secondary);
-  border-radius: var(--radius-md);
   cursor: pointer;
-  transition: all var(--transition-fast);
-}
-
-.tags-item:hover {
-  background: var(--bg-tertiary);
 }
 
 .tags-item-info {
@@ -13726,19 +13868,13 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
   gap: 4px;
 }
 
+/* Chrome + Hover aus .panel-card (ruhige Karte). */
 .tags-note-item {
   display: flex;
   align-items: center;
   gap: 8px;
   padding: 8px 10px;
-  background: var(--bg-secondary);
-  border-radius: var(--radius-md);
   cursor: pointer;
-  transition: all var(--transition-fast);
-}
-
-.tags-note-item:hover {
-  background: var(--bg-tertiary);
 }
 
 .tags-note-item svg {
@@ -13994,7 +14130,7 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
 }
 
 .semantic-scholar-error {
-  color: var(--error-color, #e74c3c);
+  color: var(--color-danger);
 }
 
 .semantic-scholar-hint {
@@ -14007,20 +14143,7 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
   padding-bottom: 4px;
 }
 
-.semantic-scholar-result {
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-md);
-  transition: border-color var(--transition-fast);
-}
-
-.semantic-scholar-result:hover {
-  border-color: var(--accent-color);
-}
-
-.semantic-scholar-result.expanded {
-  border-color: var(--accent-color);
-}
-
+/* Chrome + Hover + expanded-State aus .panel-card (ruhige Karte). */
 .semantic-scholar-result-header {
   padding: 10px 12px 8px;
   cursor: pointer;
@@ -14066,8 +14189,8 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
 }
 
 .semantic-scholar-badge.oa {
-  background: rgba(46, 204, 113, 0.15);
-  color: #2ecc71;
+  background: color-mix(in srgb, var(--color-success) 15%, transparent);
+  color: var(--color-success);
 }
 
 .semantic-scholar-badge.source {
@@ -14134,8 +14257,8 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
 }
 
 .semantic-scholar-action-btn:hover {
-  background: var(--accent-color);
-  color: white;
+  background: var(--accent-subtle);
+  color: var(--accent-color);
   border-color: var(--accent-color);
 }
 
@@ -14426,16 +14549,10 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
   gap: 6px;
 }
 
+/* Chrome + Hover aus .panel-card (ruhige Karte). */
 .smart-connections-item {
   padding: 10px 12px;
-  background: var(--bg-secondary);
-  border-radius: var(--radius-md);
   cursor: pointer;
-  transition: all var(--transition-fast);
-}
-
-.smart-connections-item:hover {
-  background: var(--bg-tertiary);
 }
 
 .smart-connections-item-header {
@@ -14474,10 +14591,8 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
   transition: width var(--transition-fast);
 }
 
-/* Wikilink Badge für explizit verlinkte Notizen */
-.smart-connections-item.has-wikilink {
-  border-left: 3px solid var(--backlink-color);
-}
+/* Wikilink-Beziehung trägt das Inline-Badge (.smart-connections-badge.wikilink),
+   nicht mehr ein Rand-Streifen auf der ganzen Karte (quiet-UI). */
 
 /* Score-Badges Container */
 .smart-connections-badges {
@@ -14500,7 +14615,7 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
 }
 
 .smart-connections-badge.wikilink {
-  background: rgba(255, 149, 0, 0.2);
+  background: color-mix(in srgb, var(--backlink-color) 18%, transparent);
   color: var(--backlink-color);
 }
 
@@ -14509,23 +14624,23 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
 }
 
 .smart-connections-badge.tags {
-  background: rgba(10, 132, 255, 0.2);
+  background: var(--accent-subtle);
   color: var(--accent-color);
 }
 
 .smart-connections-badge.keyword {
-  background: rgba(255, 149, 0, 0.2);
-  color: #ff9500;
+  background: color-mix(in srgb, var(--color-warning) 18%, transparent);
+  color: var(--color-warning);
   font-size: 8px;
 }
 
 .smart-connections-badge.folder {
-  background: rgba(52, 199, 89, 0.2);
-  color: #34c759;
+  background: color-mix(in srgb, var(--color-success) 18%, transparent);
+  color: var(--color-success);
 }
 
 .smart-connections-badge.folder svg {
-  stroke: #34c759;
+  stroke: var(--color-success);
 }
 
 /* Legende für Score-Faktoren */
@@ -14893,7 +15008,7 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
 }
 
 .notes-chat-message-content.markdown-content code {
-  background: rgba(0, 0, 0, 0.15);
+  background: var(--bg-tertiary);
   padding: 0.1em 0.3em;
   border-radius: 3px;
   font-family: var(--font-mono);
@@ -14901,7 +15016,7 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
 }
 
 .notes-chat-message-content.markdown-content pre {
-  background: rgba(0, 0, 0, 0.2);
+  background: var(--bg-tertiary);
   padding: 8px 12px;
   border-radius: 6px;
   overflow-x: auto;
@@ -14938,9 +15053,10 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
   margin: 0.75em 0;
 }
 
+/* User-Turn dezent getönt statt voll-Akzent gefüllt (Akzent sparsam, quiet-UI). */
 .notes-chat-message.user .notes-chat-message-content {
-  background: var(--accent-color);
-  color: white;
+  background: var(--accent-subtle);
+  color: var(--text-primary);
   border-bottom-right-radius: var(--radius-sm);
 }
 
@@ -14977,7 +15093,7 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
 
 .notes-chat-copy.copied {
   opacity: 1;
-  color: var(--color-success, #27ae60);
+  color: var(--color-success);
 }
 
 .notes-chat-message.streaming .notes-chat-message-content {
@@ -15020,8 +15136,8 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
 
 .notes-chat-clear:hover {
   background: var(--bg-tertiary);
-  color: var(--color-red, #e74c3c);
-  border-color: var(--color-red, #e74c3c);
+  color: var(--color-danger);
+  border-color: var(--color-danger);
 }
 
 .notes-chat-input-area textarea {
@@ -16617,27 +16733,14 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
   border-color: var(--accent-color);
 }
 
-/* Flashcard Card Item */
+/* Flashcard Card Item — Chrome aus .panel-card; pending zeigt das Status-Pill. */
 .flashcards-card-item {
   display: flex;
   align-items: center;
   gap: 12px;
   padding: 12px 14px;
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
   margin-bottom: 8px;
   cursor: pointer;
-  transition: all var(--transition-fast);
-}
-
-.flashcards-card-item:hover {
-  background: var(--bg-tertiary);
-  border-color: var(--border-color);
-}
-
-.flashcards-card-item.pending {
-  border-left: 3px solid #ff9f0a;
 }
 
 .flashcards-card-item.suspended {
@@ -16650,7 +16753,8 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
 }
 
 .flashcards-card-front {
-  font-size: 14px;
+  font-size: 13px;
+  font-weight: 500;
   color: var(--text-primary);
   line-height: 1.4;
   margin-bottom: 6px;
@@ -16674,13 +16778,13 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
 }
 
 .flashcards-card-status.status-pending {
-  background: rgba(255, 159, 10, 0.15);
-  color: #ff9f0a;
+  background: color-mix(in srgb, var(--color-warning) 15%, transparent);
+  color: var(--color-warning);
 }
 
 .flashcards-card-status.status-active {
-  background: rgba(48, 209, 88, 0.15);
-  color: #30d158;
+  background: color-mix(in srgb, var(--color-success) 15%, transparent);
+  color: var(--color-success);
 }
 
 .flashcards-card-status.status-suspended {
@@ -16746,8 +16850,8 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
 }
 
 .flashcards-topic-due {
-  background: var(--accent-color);
-  color: white;
+  background: var(--accent-subtle);
+  color: var(--accent-color);
   font-size: 11px;
   font-weight: 500;
   padding: 2px 8px;

@@ -1,6 +1,7 @@
 import * as path from 'path'
 import * as fs from 'fs/promises'
 import type { BrainConsolidateInput, BrainConsolidateResult } from './types'
+import { isCloudModel } from '../../shared/modelCompatibility'
 
 const OLLAMA_LOCAL_URL = 'http://localhost:11434'
 const DEFAULT_BRAIN_FOLDER = '800 - 🧠 brain'
@@ -273,6 +274,16 @@ export async function consolidateDay(
   input: BrainConsolidateInput,
   safePath: (p: string, op: string) => Promise<string>
 ): Promise<BrainConsolidateResult> {
+  // Privacy-Hard-Constraint: Brain läuft ausschließlich lokal (localhost:11434).
+  // Ein Cloud-Tag (`:cloud`/`-cloud`) würde Ollama die Tagesinhalte (Notizen, Mails,
+  // Tasks, Journal) an externe Server weiterleiten — niemals zulassen.
+  if (isCloudModel(input.model)) {
+    return {
+      success: false,
+      error: `Brain läuft nur lokal — das Cloud-Modell „${input.model}" ist hier nicht erlaubt (Tagesinhalte dürfen den Rechner nicht verlassen). Bitte ein lokales Modell wählen.`
+    }
+  }
+
   const prompt = buildPrompt(input)
 
   let body: string

@@ -5,6 +5,8 @@ import { useUIStore } from '../../stores/uiStore'
 import { useTranslation } from '../../utils/translations'
 import { extractTasks, buildTaskLine, type ExtractedTask } from '../../utils/linkExtractor'
 import { trackContextEvent } from '../../utils/contextMemory'
+import { PanelHeader, PanelHeaderIconButton } from '../Shared/PanelHeader'
+import { IconClock, IconPlus, IconCalendar, IconSparkle } from '../Shared/Icons'
 
 interface TaskEntry extends ExtractedTask {
   noteId: string
@@ -130,8 +132,16 @@ const TaskCard: React.FC<{
     if (task.dueDate) commit({ dueDate: undefined })
   }
 
+  // Dringlichkeit als kleiner Punkt (statt getönter Karte / Rand-Streifen).
+  const dotTone =
+    variant === 'overdue' ? 'panel-dot--danger'
+    : variant === 'today' ? 'panel-dot--warning'
+    : variant === 'future' ? 'panel-dot--info'
+    : ''
+
   return (
-    <div className={`overdue-item overdue-item--${variant} ${task.completed ? 'completed' : ''} ${saving ? 'saving' : ''}`}>
+    <div className={`overdue-item panel-card overdue-item--${variant} ${task.completed ? 'completed' : ''} ${saving ? 'saving' : ''}`}>
+      <span className={`panel-dot ${dotTone}`} aria-hidden="true" />
       <button
         className="overdue-item-checkbox"
         onClick={handleToggleComplete}
@@ -741,54 +751,29 @@ export const OverduePanel: React.FC<OverduePanelProps> = ({ onClose }) => {
 
   return (
     <div className="overdue-panel">
-      <div className="overdue-panel-header">
-        <div className="overdue-panel-title">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="12" cy="12" r="10"/>
-            <polyline points="12 6 12 12 16 14"/>
-          </svg>
-          <span>{t('tasks.title')}</span>
-        </div>
-        <button
-          className="overdue-panel-add"
-          onClick={() => setQuickAddOpen(v => !v)}
-          title={t('tasks.addNew')}
-        >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="12" y1="5" x2="12" y2="19"/>
-            <line x1="5" y1="12" x2="19" y2="12"/>
-          </svg>
-        </button>
-        <button
-          className="overdue-panel-add"
-          onClick={() => setQuickEventModalOpen(true)}
-          title={t('sidebar.newEvent')}
-        >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="3" y="4" width="18" height="17" rx="2"/>
-            <line x1="3" y1="9" x2="21" y2="9"/>
-            <line x1="8" y1="2" x2="8" y2="6"/>
-            <line x1="16" y1="2" x2="16" y2="6"/>
-            <line x1="12" y1="13" x2="12" y2="17"/>
-            <line x1="10" y1="15" x2="14" y2="15"/>
-          </svg>
-        </button>
-        <button
-          className={`overdue-panel-add overdue-panel-ai ${taggingBusy ? 'busy' : ''}`}
-          onClick={handleTagAll}
-          title={taggingBusy ? t('tasks.tagAllStop') : t('tasks.tagAll')}
-        >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/>
-          </svg>
-        </button>
-        <button className="overdue-panel-close" onClick={onClose} title={t('panel.close')}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="18" y1="6" x2="6" y2="18"/>
-            <line x1="6" y1="6" x2="18" y2="18"/>
-          </svg>
-        </button>
-      </div>
+      <PanelHeader
+        icon={<IconClock size={14} />}
+        title={t('tasks.title')}
+        onClose={onClose}
+        closeTitle={t('panel.close')}
+        actions={
+          <>
+            <PanelHeaderIconButton onClick={() => setQuickAddOpen(v => !v)} title={t('tasks.addNew')}>
+              <IconPlus size={14} />
+            </PanelHeaderIconButton>
+            <PanelHeaderIconButton onClick={() => setQuickEventModalOpen(true)} title={t('sidebar.newEvent')}>
+              <IconCalendar size={14} />
+            </PanelHeaderIconButton>
+            <PanelHeaderIconButton
+              className={`overdue-panel-ai ${taggingBusy ? 'busy' : ''}`}
+              onClick={handleTagAll}
+              title={taggingBusy ? t('tasks.tagAllStop') : t('tasks.tagAll')}
+            >
+              <IconSparkle size={14} />
+            </PanelHeaderIconButton>
+          </>
+        }
+      />
 
       {taggingProgress && (
         <div className="overdue-tagging-banner">

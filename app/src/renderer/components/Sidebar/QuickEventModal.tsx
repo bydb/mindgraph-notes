@@ -213,7 +213,7 @@ export const QuickEventModal: React.FC = () => {
       <div className="quick-event-modal" onClick={e => e.stopPropagation()}>
         <header className="quick-event-header">
           <h3>{t('quickEvent.title')}</h3>
-          <button className="quick-event-close" onClick={handleClose} aria-label={t('quickEvent.close')}>×</button>
+          <button className="quick-event-close" onClick={handleClose} aria-label={t('quickEvent.close')} title={t('quickEvent.close')}>×</button>
         </header>
         <div className="quick-event-body">
           <label className="quick-event-field">
