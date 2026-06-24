@@ -635,7 +635,7 @@ export interface ElectronAPI {
   }>;
 
   // Ollama Chat für Notes Chat
-  ollamaChat: (model: string, messages: Array<{ role: string; content: string }>, context: string, chatMode?: 'direct' | 'socratic' | 'email', cloud?: { model: string } | null) => Promise<{
+  ollamaChat: (model: string, messages: Array<{ role: string; content: string }>, context: string, chatMode?: 'direct' | 'socratic' | 'grill' | 'email', cloud?: { model: string } | null) => Promise<{
     success: boolean;
     response?: string;
     error?: string;
@@ -679,7 +679,7 @@ export interface ElectronAPI {
     customPrompt?: string;
     timestamp?: string;
   }>;
-  lmstudioChat: (model: string, messages: Array<{ role: string; content: string }>, context: string, chatMode?: 'direct' | 'socratic', port?: number) => Promise<{
+  lmstudioChat: (model: string, messages: Array<{ role: string; content: string }>, context: string, chatMode?: 'direct' | 'socratic' | 'grill', port?: number) => Promise<{
     success: boolean;
     response?: string;
     error?: string;

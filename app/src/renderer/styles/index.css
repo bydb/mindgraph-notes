@@ -15143,7 +15143,7 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
 .notes-chat-input-area textarea {
   flex: 1;
   min-height: 36px;
-  max-height: 120px;
+  max-height: 240px;
   padding: 8px 12px;
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);

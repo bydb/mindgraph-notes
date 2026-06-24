@@ -3795,7 +3795,7 @@ ipcMain.handle('ollama-embeddings', async (_event, model: string, text: string) 
 })
 
 // Chat mit Kontext (für Notes Chat)
-ipcMain.handle('ollama-chat', async (event, model: string, messages: Array<{ role: string; content: string }>, context: string, chatMode: 'direct' | 'socratic' | 'email' = 'direct', cloud?: { model: string } | null) => {
+ipcMain.handle('ollama-chat', async (event, model: string, messages: Array<{ role: string; content: string }>, context: string, chatMode: 'direct' | 'socratic' | 'grill' | 'email' = 'direct', cloud?: { model: string } | null) => {
   console.log('[Ollama] Chat request with model:', model, 'context length:', context.length, 'mode:', chatMode, 'cloud:', cloud?.model ?? 'no')
 
   // Email-Chat streamt auf eigenen Channels — Notes-Chat und Email-Chat können
@@ -3846,8 +3846,25 @@ ${context}
 ---
 Stelle EINE kurze Frage, die zum Nachdenken anregt.`
 
+    const grillPrompt = `Du bist ein strenger Prüfer. Deine Aufgabe: testen, ob der Nutzer den Text im Kontext WIRKLICH und vollständig verstanden hat — nicht ihn zu lehren. Der Text ist die Autorität, du prüfst den Nutzer gegen ihn.
+
+REGELN:
+- Stelle pro Antwort genau EINE gezielte Prüf-Frage zum Text. Variiere die Ebene: wörtlich (was steht da?), gemeint (was heißt das?), gefolgert (was folgt daraus, ohne dass es dasteht?), kritisch (wo ist die Argumentation schwach, was wird vorausgesetzt?), Zusammenhang (wie hängt das mit dem Rest zusammen?).
+- Lass vage oder nachgeplapperte Antworten NICHT durchgehen. Bohre nach und verlange Beleg: "Wo genau im Text steht das?"
+- Konfrontiere mit scheinbaren Widersprüchen oder Auslassungen im Text.
+- PRÜFER-MODUS: Ist die Antwort falsch oder lückenhaft, decke die korrekte Lesart MIT Bezug auf die Textstelle auf und mach den Unterschied zur Antwort des Nutzers klar — dann stelle die nächste Frage. (Anders als der sokratische Modus: hier wird aufgedeckt, nicht offengelassen.)
+- Halte dich kurz und prägnant. Kein Lob-Geplänkel, keine Schmeichelei.
+- Wenn der Nutzer "fertig", "Bilanz" oder "Verdikt" sagt, gib ein ehrliches Urteil: ✅ sicher verstanden, 🟡 oberflächlich, 🔴 falsch verstanden, ⬜ übersehen — mit kurzem Fazit, ob der Text komplett sitzt.
+
+ZU PRÜFENDER TEXT (NOTIZEN-KONTEXT):
+${context}
+
+---
+Stelle EINE Prüf-Frage zum Text — oder reagiere als Prüfer auf die letzte Antwort des Nutzers.`
+
     let promptContent = directPrompt
     if (chatMode === 'socratic') promptContent = socraticPrompt
+    else if (chatMode === 'grill') promptContent = grillPrompt
     else if (chatMode === 'email') promptContent = emailPrompt
 
     const systemMessage = {
@@ -4290,7 +4307,7 @@ ipcMain.handle('lmstudio-generate', async (_event, request: LMStudioRequest) => 
 })
 
 // Chat mit Kontext (für Notes Chat) - LM Studio Version
-ipcMain.handle('lmstudio-chat', async (event, model: string, messages: Array<{ role: string; content: string }>, context: string, chatMode: 'direct' | 'socratic' = 'direct', port: number = LM_STUDIO_DEFAULT_PORT) => {
+ipcMain.handle('lmstudio-chat', async (event, model: string, messages: Array<{ role: string; content: string }>, context: string, chatMode: 'direct' | 'socratic' | 'grill' = 'direct', port: number = LM_STUDIO_DEFAULT_PORT) => {
   console.log('[LM Studio] Chat request with model:', model, 'context length:', context.length, 'mode:', chatMode)
 
   try {
@@ -4317,9 +4334,25 @@ ${context}
 ---
 Stelle EINE kurze Frage, die zum Nachdenken anregt.`
 
+    const grillPrompt = `Du bist ein strenger Prüfer. Deine Aufgabe: testen, ob der Nutzer den Text im Kontext WIRKLICH und vollständig verstanden hat — nicht ihn zu lehren. Der Text ist die Autorität, du prüfst den Nutzer gegen ihn.
+
+REGELN:
+- Stelle pro Antwort genau EINE gezielte Prüf-Frage zum Text. Variiere die Ebene: wörtlich (was steht da?), gemeint (was heißt das?), gefolgert (was folgt daraus, ohne dass es dasteht?), kritisch (wo ist die Argumentation schwach, was wird vorausgesetzt?), Zusammenhang (wie hängt das mit dem Rest zusammen?).
+- Lass vage oder nachgeplapperte Antworten NICHT durchgehen. Bohre nach und verlange Beleg: "Wo genau im Text steht das?"
+- Konfrontiere mit scheinbaren Widersprüchen oder Auslassungen im Text.
+- PRÜFER-MODUS: Ist die Antwort falsch oder lückenhaft, decke die korrekte Lesart MIT Bezug auf die Textstelle auf und mach den Unterschied zur Antwort des Nutzers klar — dann stelle die nächste Frage. (Anders als der sokratische Modus: hier wird aufgedeckt, nicht offengelassen.)
+- Halte dich kurz und prägnant. Kein Lob-Geplänkel, keine Schmeichelei.
+- Wenn der Nutzer "fertig", "Bilanz" oder "Verdikt" sagt, gib ein ehrliches Urteil: ✅ sicher verstanden, 🟡 oberflächlich, 🔴 falsch verstanden, ⬜ übersehen — mit kurzem Fazit, ob der Text komplett sitzt.
+
+ZU PRÜFENDER TEXT (NOTIZEN-KONTEXT):
+${context}
+
+---
+Stelle EINE Prüf-Frage zum Text — oder reagiere als Prüfer auf die letzte Antwort des Nutzers.`
+
     const systemMessage = {
       role: 'system',
-      content: chatMode === 'socratic' ? socraticPrompt : directPrompt
+      content: chatMode === 'socratic' ? socraticPrompt : chatMode === 'grill' ? grillPrompt : directPrompt
     }
 
     const allMessages = [systemMessage, ...messages]

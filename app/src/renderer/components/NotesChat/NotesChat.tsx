@@ -56,7 +56,7 @@ interface OllamaModel {
 }
 
 type ContextMode = 'current' | 'folder' | 'all' | 'project'
-type ChatMode = 'direct' | 'socratic'
+type ChatMode = 'direct' | 'socratic' | 'grill'
 
 interface ProjectOption {
   folderRel: string
@@ -97,6 +97,14 @@ export const NotesChat: React.FC<NotesChatProps> = ({ onClose }) => {
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null)
   const messagesContainerRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
+
+  // Eingabefeld wächst mit dem Inhalt (bis max-height aus dem CSS greift, dann interner Scroll)
+  useEffect(() => {
+    const el = inputRef.current
+    if (!el) return
+    el.style.height = 'auto'
+    el.style.height = `${el.scrollHeight}px`
+  }, [inputValue])
 
   // Markdown-Renderer für Chat-Nachrichten
   const md = useMemo(() => {
@@ -740,6 +748,14 @@ export const NotesChat: React.FC<NotesChatProps> = ({ onClose }) => {
                   title={t('notesChat.socraticMode')}
                 >
                   {t('notesChat.modeSocratic')}
+                </button>
+                <button
+                  className={chatMode === 'grill' ? 'active' : ''}
+                  onClick={() => setChatMode('grill')}
+                  disabled={isStreaming}
+                  title={t('notesChat.grillMode')}
+                >
+                  {t('notesChat.modeGrill')}
                 </button>
               </div>
             </div>

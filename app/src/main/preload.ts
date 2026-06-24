@@ -165,7 +165,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('ollama-rerank-pair', model, query, document) as Promise<{ success: boolean; score?: number; error?: string }>,
 
   // Ollama Chat für Notes Chat
-  ollamaChat: (model: string, messages: Array<{ role: string; content: string }>, context: string, chatMode: 'direct' | 'socratic' | 'email' = 'direct', cloud?: { model: string } | null) =>
+  ollamaChat: (model: string, messages: Array<{ role: string; content: string }>, context: string, chatMode: 'direct' | 'socratic' | 'grill' | 'email' = 'direct', cloud?: { model: string } | null) =>
     ipcRenderer.invoke('ollama-chat', model, messages, context, chatMode, cloud),
   onOllamaChatChunk: (callback: (chunk: string) => void) => {
     ipcRenderer.removeAllListeners('ollama-chat-chunk')
@@ -226,7 +226,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     customPrompt?: string
     port?: number
   }) => ipcRenderer.invoke('lmstudio-generate', request),
-  lmstudioChat: (model: string, messages: Array<{ role: string; content: string }>, context: string, chatMode: 'direct' | 'socratic' = 'direct', port?: number) =>
+  lmstudioChat: (model: string, messages: Array<{ role: string; content: string }>, context: string, chatMode: 'direct' | 'socratic' | 'grill' = 'direct', port?: number) =>
     ipcRenderer.invoke('lmstudio-chat', model, messages, context, chatMode, port),
   lmstudioEmbeddings: (model: string, text: string, port?: number) =>
     ipcRenderer.invoke('lmstudio-embeddings', model, text, port),
