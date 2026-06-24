@@ -171,10 +171,11 @@ describe('checkModelRamFit — Weak-HW-Warnung', () => {
     expect(checkModelRamFit('qwen3.6:27b-mlx', 8).fits).toBe(false)   // 22 GB
   })
 
-  it('Schwelle ist ram <= total - 2 (ministral 6 GB liegt auf 8 GB genau auf der Grenze)', () => {
-    // Pinnt das exakte Grenzverhalten: 6 <= 8-2 → passt gerade noch.
+  it('Schwelle ist STRIKT ram < total - 2: ministral 6 GB auf 8 GB warnt (randvoller RAM → Swap)', () => {
+    // Grenzfall, der den freeze auslöst: das Modell füllt den RAM exakt bis auf die
+    // 2-GB-Reserve. 6 < 8-2 ist false → Warnung (bewusst kein <=).
     const fit = checkModelRamFit('ministral-3:8b', 8)
-    expect(fit.fits).toBe(true)
+    expect(fit.fits).toBe(false)
     expect(fit.modelRamGb).toBe(6)
     // auf 16 GB passt es klar
     expect(checkModelRamFit('ministral-3:8b', 16).fits).toBe(true)

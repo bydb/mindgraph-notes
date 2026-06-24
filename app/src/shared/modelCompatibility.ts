@@ -433,9 +433,13 @@ export function getModelRamGb(model: string): number | null {
   return estimateModelRamFromName(tag)
 }
 
-// Passt das Modell in den verfügbaren RAM? Reserve von ~2 GB für OS + Electron + App.
+// Passt das Modell in den verfügbaren RAM? Es müssen STRIKT mehr als ~2 GB für
+// OS + Electron + App frei bleiben (`ram < total - 2`) — ein Modell, das den RAM bis
+// exakt auf die Reserve füllt, kippt unter realer Last (KV-Cache + Kontext wachsen
+// über den Gewichts-Footprint hinaus) trotzdem ins Swap.
 // `green`-Schwelle so kalibriert, dass das 8-GB-Empfohlene (qwen3.5:4b ≈ 4 GB) NICHT
-// warnt, alles Größere (ministral 6, gemma4 10, qwen3.6:27b 22 …) schon.
+// warnt, alles Größere (ministral 6, gemma4 10, qwen3.6:27b 22 …) schon. ministral mit
+// 6 GB auf 8 GB ist der Grenzfall: 6 < 6 ist false → warnt (gewollt, kein <=).
 // Cloud-Modelle (`-cloud`/`:cloud`) brauchen keinen lokalen RAM → nie eine Warnung.
 export interface ModelRamFit {
   fits: boolean
@@ -447,7 +451,7 @@ export function checkModelRamFit(model: string, totalRamGb: number | null | unde
   if (!total || isCloudModel(model)) return { fits: true, modelRamGb: null, totalRamGb: total }
   const ram = getModelRamGb(model)
   if (ram == null) return { fits: true, modelRamGb: null, totalRamGb: total }
-  return { fits: ram <= total - 2, modelRamGb: ram, totalRamGb: total }
+  return { fits: ram < total - 2, modelRamGb: ram, totalRamGb: total }
 }
 
 // MLX-Modelle: Apple-Silicon-optimiert (laufen via Apples MLX-Framework nativ
