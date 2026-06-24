@@ -2,6 +2,24 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.8.6-beta] - 2026-06-24
+
+Dein Telegram-Bot meldet sich jetzt von selbst zur richtigen Zeit — und merkt sich, mit wem er es zu tun hat.
+
+### Neue Features
+
+- **Geplante Briefings & Überfällig-Checks (Telegram).** Lege Zeitpläne an (z. B. werktags um 7:00), zu denen dir der Bot automatisch dein Morning-Briefing oder eine Liste überfälliger Aufgaben schickt. Bewusst nur lesend — der Agent informiert, du entscheidest. Der Zeitplan übersteht jetzt auch App-Neustarts: einmal aktiviert, kommt er beim nächsten Bot-Start von selbst wieder hoch.
+- **Agent-Gedächtnis (Telegram).** Hinterlege feste Fakten über dich (Sprache, Antwort-Stil, Vault-Struktur …), die der Agent bei jeder Antwort berücksichtigt — ohne sie jedes Mal neu erklären zu müssen.
+
+### Verbessert
+
+- **Bot nutzt deinen Brain-Ordner.** `/briefing`, `/brain` und die geplanten Briefings lesen jetzt den in den Einstellungen gewählten Brain-Ordner, statt einen festen Standardpfad anzunehmen — wichtig, wenn du dein Tagesgedächtnis verlegt hast.
+- **Ehrlichere RAM-Warnung.** Ein lokales Modell, das den Arbeitsspeicher bis auf den letzten Rest füllt, wird jetzt korrekt als zu groß gewarnt (vorher rutschte der Grenzfall still durch und konnte das System ins Swap drücken).
+
+### Unter der Haube
+
+- **Sicherheitsnetz für kritische Pfade.** Reine Logik auf den heikelsten Stellen — Sync-Verschlüsselung, Datei-Abgleich, Aufgaben-Parser, Modell-Eignung und der neue Telegram-Scheduler — ist jetzt mit automatisierten Tests abgesichert, damit künftige Änderungen dort nicht still etwas kaputtmachen.
+
 ## [0.8.5-beta] - 2026-06-24
 
 Ein ruhigeres, einheitlicheres Bild: alle Seitenpanels tragen jetzt denselben Kopf — dazu eine stille Härtung im verschlüsselten Sync.
