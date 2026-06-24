@@ -2,6 +2,18 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.8.7-beta] - 2026-06-24
+
+Der Notes-Chat kann dich jetzt nicht nur begleiten, sondern auf den Zahn fühlen — und nimmt längere Eingaben endlich ohne Gequetsche an.
+
+### Neue Features
+
+- **Grill-Modus im Notes-Chat.** Neben „Direkt" und „Sokratisch" gibt es einen dritten Modus: einen strengen Prüfer. Während der sokratische Dialog dich wohlwollend führt, testet der Grill unerbittlich, ob du einen Text wirklich verstanden hast — er verlangt Belege aus dem Text, lässt vage Antworten nicht durchgehen und deckt bei Fehlern oder Lücken die richtige Lesart auf. Auf „Bilanz" gibt er ein ehrliches Verständnis-Urteil (sicher / oberflächlich / falsch / übersehen).
+
+### Verbessert
+
+- **Mitwachsendes Eingabefeld im Notes-Chat.** Das Eingabefeld wächst jetzt mit längerem, zusammenhängendem Text mit, statt auf eine Zeile beschränkt zu bleiben — bis zu einer komfortablen Höhe, danach wird intern gescrollt.
+
 ## [0.8.6-beta] - 2026-06-24
 
 Dein Telegram-Bot meldet sich jetzt von selbst zur richtigen Zeit — und merkt sich, mit wem er es zu tun hat.
