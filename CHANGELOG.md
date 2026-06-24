@@ -2,6 +2,14 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.8.9] - 2026-06-24
+
+Einmalige Version, die alle bisherigen Mac-Installationen wieder ans automatische Update anschließt.
+
+### Behoben
+
+- **Automatische Updates auf macOS — Rettung für bestehende Installationen.** Frühere Beta-Versionen konnten neue Updates auf dem Mac grundsätzlich nicht finden (der Update-Mechanismus übersprang alle Beta-Releases). Diese Version ist bewusst ohne „-beta"-Kennzeichnung veröffentlicht, damit sie von den alten Installationen erkannt und automatisch eingespielt wird. Ab hier funktioniert das automatische Update wieder dauerhaft — auch für künftige Vorabversionen.
+
 ## [0.8.8-beta] - 2026-06-24
 
 Auto-Updates funktionieren auf dem Mac wieder zuverlässig.
