@@ -2,6 +2,14 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.8.10] - 2026-06-25
+
+Behebt den eigentlichen Grund, warum die App auf dem Mac keine Updates mehr fand.
+
+### Behoben
+
+- **Automatische Updates auf macOS — der echte Fix.** Der Update-Check brach intern sofort mit einem Fehler ab und meldete „kein Update verfügbar", obwohl längst eine neuere Version bereitstand. Ursache war ein Lade-Problem des Update-Moduls, das mit der Startbeschleunigung der letzten Versionen eingeschleppt wurde (das Modul wurde nicht mehr korrekt referenziert). Das ist jetzt behoben und der Update-Mechanismus läuft wieder vollständig durch. (Hinweis: Diese eine Version muss noch einmal von Hand installiert werden — alle bisher veröffentlichten Builds waren von dem Fehler betroffen und können sich nicht selbst aktualisieren. Ab dieser Version aktualisiert sich die App wieder von allein.)
+
 ## [0.8.9] - 2026-06-24
 
 Einmalige Version, die alle bisherigen Mac-Installationen wieder ans automatische Update anschließt.

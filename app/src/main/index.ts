@@ -38,7 +38,17 @@ async function getRemarkableService(): Promise<import('./remarkable/service').Re
 // electron-updater: Modul lazy + Listener/Config nur einmal aufsetzen.
 let _autoUpdaterConfigured = false
 async function ensureAutoUpdater(): Promise<import('electron-updater').AppUpdater> {
-  const { autoUpdater } = await import('electron-updater')
+  // electron-updater ist CommonJS und exportiert `autoUpdater` als Laufzeit-Getter
+  // (Object.defineProperty). Beim lazy `await import(...)` erkennt die CJS→ESM-Interop
+  // diesen Getter NICHT als Named Export — er liegt dann nur auf `.default`. Ohne dieses
+  // Fallback ist `autoUpdater` undefined → "Cannot set properties of undefined" → jeder
+  // Update-Check scheitert still (Regression seit Umstellung auf lazy Import).
+  const updaterModule = await import('electron-updater')
+  const autoUpdater = updaterModule.autoUpdater
+    ?? (updaterModule as unknown as { default?: typeof updaterModule }).default?.autoUpdater
+  if (!autoUpdater) {
+    throw new Error('[AutoUpdate] electron-updater: autoUpdater export nicht auflösbar (CJS/ESM-Interop)')
+  }
   if (!_autoUpdaterConfigured) {
     _autoUpdaterConfigured = true
     autoUpdater.autoDownload = true
