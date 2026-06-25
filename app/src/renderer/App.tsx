@@ -1405,9 +1405,14 @@ const App: React.FC = () => {
                 <div className="text-split-divider" onMouseDown={handleTextSplitDividerMouseDown} />
               )}
 
+              {/* Text Split Divider - in canvas (Brain) mode between the canvas and the right module */}
+              {viewMode === 'canvas' && (overduePanelOpen || tagsPanelOpen || (smartConnectionsOpen && smartConnectionsEnabled) || (notesChatOpen && notesChatEnabled) || (flashcardsPanelOpen && flashcardsEnabled) || inboxPanelOpen || agentPanelOpen || (semanticScholarOpen && semanticScholarEnabled)) && (
+                <div className="text-split-divider" style={{ order: 2 }} onMouseDown={handleTextSplitDividerMouseDown} />
+              )}
+
               {/* Secondary Panel (Text Split / Overdue / Tags / Flashcards / etc.) - takes priority over canvas tab */}
               {((viewMode === 'editor' && (textSplitEnabled || overduePanelOpen || tagsPanelOpen || (smartConnectionsOpen && smartConnectionsEnabled) || (notesChatOpen && notesChatEnabled) || (flashcardsPanelOpen && flashcardsEnabled) || inboxPanelOpen || agentPanelOpen || (semanticScholarOpen && semanticScholarEnabled))) || (viewMode === 'canvas' && (overduePanelOpen || tagsPanelOpen || (smartConnectionsOpen && smartConnectionsEnabled) || (notesChatOpen && notesChatEnabled) || (flashcardsPanelOpen && flashcardsEnabled) || inboxPanelOpen || agentPanelOpen || (semanticScholarOpen && semanticScholarEnabled)))) && (
-                <div className="editor-panel editor-panel-secondary" style={{ flex: `0 0 ${100 - textSplitPosition}%`, order: viewMode === 'canvas' ? 2 : undefined }}>
+                <div className="editor-panel editor-panel-secondary" style={{ flex: `0 0 ${100 - textSplitPosition}%`, order: viewMode === 'canvas' ? 3 : undefined }}>
                   {overduePanelOpen ? (
                     <OverduePanel onClose={() => setOverduePanelOpen(false)} />
                   ) : tagsPanelOpen ? (

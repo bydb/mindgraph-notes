@@ -104,13 +104,139 @@ export async function docxToMarkdownWithImages(filePath: string, attachmentsDir:
 
 export async function markdownToDocx(markdownContent: string, outputPath: string): Promise<void> {
   const docxLib = await import('docx')
-  const { Document, Packer, Paragraph, HeadingLevel, TextRun } = docxLib
+  const { Document, Packer, Paragraph, HeadingLevel, TextRun, LevelFormat, AlignmentType, ShadingType, BorderStyle } = docxLib
 
-  const lines = markdownContent.split(/\r?\n/)
+  // Obsidian callout types → German label + fill/border colour. Unknown types
+  // fall back to a neutral grey box (see flushQuote).
+  const CALLOUT_STYLES: Record<string, { label: string; fill: string; border: string }> = {
+    note: { label: 'Notiz', fill: 'EEF3FB', border: '4A90D9' },
+    info: { label: 'Info', fill: 'EEF3FB', border: '4A90D9' },
+    todo: { label: 'To-do', fill: 'EEF3FB', border: '4A90D9' },
+    tip: { label: 'Tipp', fill: 'E8F6F0', border: '2EA77B' },
+    hint: { label: 'Tipp', fill: 'E8F6F0', border: '2EA77B' },
+    important: { label: 'Wichtig', fill: 'E8F6F0', border: '2EA77B' },
+    success: { label: 'Erfolg', fill: 'E8F6F0', border: '2EA77B' },
+    check: { label: 'Erfolg', fill: 'E8F6F0', border: '2EA77B' },
+    done: { label: 'Erfolg', fill: 'E8F6F0', border: '2EA77B' },
+    abstract: { label: 'Zusammenfassung', fill: 'E8F6F0', border: '2EA77B' },
+    summary: { label: 'Zusammenfassung', fill: 'E8F6F0', border: '2EA77B' },
+    tldr: { label: 'Zusammenfassung', fill: 'E8F6F0', border: '2EA77B' },
+    question: { label: 'Frage', fill: 'FFF7E6', border: 'E0A800' },
+    help: { label: 'Frage', fill: 'FFF7E6', border: 'E0A800' },
+    faq: { label: 'Frage', fill: 'FFF7E6', border: 'E0A800' },
+    warning: { label: 'Achtung', fill: 'FFF4E5', border: 'E08A00' },
+    caution: { label: 'Achtung', fill: 'FFF4E5', border: 'E08A00' },
+    attention: { label: 'Achtung', fill: 'FFF4E5', border: 'E08A00' },
+    danger: { label: 'Gefahr', fill: 'FBEAEA', border: 'C0392B' },
+    error: { label: 'Fehler', fill: 'FBEAEA', border: 'C0392B' },
+    failure: { label: 'Fehler', fill: 'FBEAEA', border: 'C0392B' },
+    bug: { label: 'Bug', fill: 'FBEAEA', border: 'C0392B' },
+    example: { label: 'Beispiel', fill: 'F3EEFB', border: '7E57C2' },
+    quote: { label: 'Zitat', fill: 'F2F2F2', border: '9E9E9E' },
+    cite: { label: 'Zitat', fill: 'F2F2F2', border: '9E9E9E' }
+  }
+
+  // Strip wikilinks/embeds and split a line into bold/italic TextRuns.
+  const buildRuns = (text: string, extra: Record<string, unknown> = {}): InstanceType<typeof TextRun>[] => {
+    const runs: InstanceType<typeof TextRun>[] = []
+    const inline = text.replace(/!\[\[[^\]]+\]\]/g, '').replace(/\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g, (_m, p1, p2) => p2 || p1)
+    let remaining = inline
+    while (remaining.length > 0) {
+      const boldM = remaining.match(/^(.*?)\*\*(.+?)\*\*(.*)$/)
+      const italM = remaining.match(/^(.*?)\*(.+?)\*(.*)$/)
+      if (boldM && (!italM || boldM[1].length <= italM[1].length)) {
+        if (boldM[1]) runs.push(new TextRun({ text: boldM[1], ...extra }))
+        runs.push(new TextRun({ text: boldM[2], bold: true, ...extra }))
+        remaining = boldM[3]
+        continue
+      }
+      if (italM) {
+        if (italM[1]) runs.push(new TextRun({ text: italM[1], ...extra }))
+        runs.push(new TextRun({ text: italM[2], italics: true, ...extra }))
+        remaining = italM[3]
+        continue
+      }
+      runs.push(new TextRun({ text: remaining, ...extra }))
+      remaining = ''
+    }
+    if (runs.length === 0) runs.push(new TextRun({ text: '', ...extra }))
+    return runs
+  }
+
+  // Strip a leading YAML frontmatter block — it's metadata, not document body.
+  let body = markdownContent
+  const fm = body.match(/^﻿?---\r?\n[\s\S]*?\r?\n---\r?\n?/)
+  if (fm) body = body.slice(fm[0].length)
+
+  const lines = body.split(/\r?\n/)
   const paragraphs: InstanceType<typeof Paragraph>[] = []
+  let inCodeBlock = false
+  let quoteBuffer: string[] = []
+
+  // Render the accumulated blockquote/callout lines as a shaded, left-bordered box.
+  const flushQuote = () => {
+    if (quoteBuffer.length === 0) return
+    const buffer = quoteBuffer
+    quoteBuffer = []
+
+    const calloutM = (buffer[0] ?? '').match(/^\[!(\w+)\][+-]?\s*(.*)$/)
+    let bodyLines: string[]
+    let style: { label: string; fill: string; border: string }
+    let headerText: string
+    if (calloutM) {
+      const type = calloutM[1].toLowerCase()
+      style = CALLOUT_STYLES[type] || { label: type.charAt(0).toUpperCase() + type.slice(1), fill: 'F2F2F2', border: '9E9E9E' }
+      headerText = calloutM[2].trim() || style.label
+      bodyLines = buffer.slice(1)
+    } else {
+      // Plain markdown blockquote → neutral "Zitat" box, no separate header.
+      style = CALLOUT_STYLES.quote
+      headerText = ''
+      bodyLines = buffer
+    }
+
+    const shading = { type: ShadingType.CLEAR, color: 'auto', fill: style.fill }
+    const border = { left: { style: BorderStyle.SINGLE, size: 18, color: style.border, space: 12 } }
+    const indent = { left: 360 }
+
+    if (headerText) {
+      paragraphs.push(new Paragraph({
+        children: [new TextRun({ text: headerText, bold: true, color: style.border })],
+        shading, border, indent, spacing: { before: 60 }
+      }))
+    }
+    // Drop trailing empty lines so the box doesn't end with blank shaded rows.
+    while (bodyLines.length > 0 && !bodyLines[bodyLines.length - 1].trim()) bodyLines.pop()
+    for (const bl of bodyLines) {
+      paragraphs.push(new Paragraph({ children: buildRuns(bl), shading, border, indent }))
+    }
+    // Spacer so following content separates from the box.
+    paragraphs.push(new Paragraph({ children: [] }))
+  }
 
   for (const raw of lines) {
     const line = raw.trimEnd()
+
+    // Fenced code blocks: toggle on ``` / ```lang, render inner lines verbatim
+    // (monospace, no markdown parsing). The fence markers themselves are dropped.
+    if (/^\s*```/.test(line)) {
+      flushQuote()
+      inCodeBlock = !inCodeBlock
+      continue
+    }
+    if (inCodeBlock) {
+      paragraphs.push(new Paragraph({ children: [new TextRun({ text: raw, font: 'Consolas' })] }))
+      continue
+    }
+
+    // Blockquotes / Obsidian callouts: accumulate consecutive `>` lines.
+    const q = line.match(/^>\s?(.*)$/)
+    if (q) {
+      quoteBuffer.push(q[1])
+      continue
+    }
+    flushQuote()
+
     if (!line) {
       paragraphs.push(new Paragraph({ children: [] }))
       continue
@@ -139,31 +265,28 @@ export async function markdownToDocx(markdownContent: string, outputPath: string
       paragraphs.push(new Paragraph({ text: ol[1], numbering: { reference: 'default-numbering', level: 0 } }))
       continue
     }
-    const runs: InstanceType<typeof TextRun>[] = []
-    const inline = line.replace(/!\[\[[^\]]+\]\]/g, '').replace(/\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g, (_m, p1, p2) => p2 || p1)
-    let remaining = inline
-    while (remaining.length > 0) {
-      const boldM = remaining.match(/^(.*?)\*\*(.+?)\*\*(.*)$/)
-      const italM = remaining.match(/^(.*?)\*(.+?)\*(.*)$/)
-      if (boldM && (!italM || boldM[1].length <= italM[1].length)) {
-        if (boldM[1]) runs.push(new TextRun({ text: boldM[1] }))
-        runs.push(new TextRun({ text: boldM[2], bold: true }))
-        remaining = boldM[3]
-        continue
-      }
-      if (italM) {
-        if (italM[1]) runs.push(new TextRun({ text: italM[1] }))
-        runs.push(new TextRun({ text: italM[2], italics: true }))
-        remaining = italM[3]
-        continue
-      }
-      runs.push(new TextRun({ text: remaining }))
-      remaining = ''
-    }
-    paragraphs.push(new Paragraph({ children: runs }))
+    paragraphs.push(new Paragraph({ children: buildRuns(line) }))
   }
+  // Flush a callout that runs to the end of the document.
+  flushQuote()
 
   const doc = new Document({
+    numbering: {
+      config: [
+        {
+          reference: 'default-numbering',
+          levels: [
+            {
+              level: 0,
+              format: LevelFormat.DECIMAL,
+              text: '%1.',
+              alignment: AlignmentType.START,
+              style: { paragraph: { indent: { left: 720, hanging: 360 } } }
+            }
+          ]
+        }
+      ]
+    },
     sections: [{ properties: {}, children: paragraphs }]
   })
   const buffer = await Packer.toBuffer(doc)

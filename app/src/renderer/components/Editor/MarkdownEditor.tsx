@@ -4211,13 +4211,24 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
   const handleExportDocx = useCallback(async () => {
     if (!selectedNote) return
     const baseName = (selectedNote.path.split('/').pop() || 'notiz').replace(/\.md$/, '')
-    const res = await window.electronAPI.officeExportDocx(selectedNote.content, baseName)
+    // selectedNote.content can still be an empty cache placeholder until the
+    // editor lazy-loads it — read fresh from disk so the export is never blank.
+    let content = selectedNote.content
+    if (vaultPath) {
+      try {
+        const fileContent = await window.electronAPI.readFile(`${vaultPath}/${selectedNote.path}`)
+        if (fileContent) content = fileContent
+      } catch {
+        // keep whatever the store has
+      }
+    }
+    const res = await window.electronAPI.officeExportDocx(content, baseName)
     if (res.success) {
       console.log('DOCX exportiert nach:', res.filePath)
     } else if (!res.canceled) {
       console.error('DOCX Export fehlgeschlagen:', res.error)
     }
-  }, [selectedNote])
+  }, [selectedNote, vaultPath])
 
   const handleExportPDF = useCallback(async () => {
     if (!selectedNote) return

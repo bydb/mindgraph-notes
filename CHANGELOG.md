@@ -2,6 +2,21 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.8.12] - 2026-06-25
+
+Behebt mehrere Probleme im Brain-Modus und repariert den Word-Export von Grund auf.
+
+### Behoben
+
+- **Brain-Modus: Schieber zum rechten Modul.** Im Brain-Modus ließ sich die Trennlinie zwischen dem Brain-Canvas und einem geöffneten Modul (Tags, Smart Connections, Posteingang, Agent …) nicht ziehen – der Schieber wurde dort gar nicht angezeigt und die Modulbreite war nicht veränderbar. Er erscheint jetzt korrekt und funktioniert wie im Editor-Modus.
+- **Brain-Modus: Dateien aus dem Dateibaum öffnen.** Ein Klick auf eine Notiz (oder PDF/Bild/Office/Code) im Dateibaum schien im Brain-Modus nichts zu tun – die Datei wurde zwar ausgewählt, blieb aber hinter dem Brain-Canvas unsichtbar. Ein Klick wechselt jetzt automatisch in den Editor und zeigt die Datei an.
+- **Word-Export (.docx) erzeugte beschädigte Dateien.** Notizen mit nummerierten Listen führten zu einem .docx, das Word mit „Fehler beim Öffnen der Datei" ablehnte (eine intern nicht deklarierte Nummerierung). Nummerierte Listen werden jetzt korrekt erzeugt und die Datei öffnet sich sauber.
+- **Word-Export war leer.** Wurde eine Notiz exportiert, deren Inhalt noch nicht vollständig in die App geladen war, entstand ein leeres Word-Dokument. Der Export liest den Inhalt jetzt direkt von der Festplatte und ist nie mehr leer.
+
+### Verbessert
+
+- **Word-Export: Code-Blöcke, Callouts und Frontmatter.** Code-Blöcke werden jetzt in Monospace-Schrift ausgegeben, Obsidian-Callouts (`> [!info] …`) als farbige Box mit Titel, und der YAML-Kopf (Frontmatter) erscheint nicht mehr als roher Textblock im Dokument.
+
 ## [0.8.11] - 2026-06-25
 
 Bessere Karteikarten, Cloud-Option dafür – und ein wichtiger Schutz gegen Karten-Verlust.

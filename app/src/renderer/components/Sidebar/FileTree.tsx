@@ -343,7 +343,7 @@ const FileItem: React.FC<FileItemProps> = ({
   }, [contextMenu])
 
   const { selectedNoteId, secondarySelectedNoteId, selectedPdfPath, selectedImagePath, selectedOfficePath, selectNote, selectSecondaryNote, selectPdf, selectImage, selectOffice, removeNote, setFileTree, vaultPath, notes, addNote, updateNotePath, fileTree, selectedPaths, togglePathSelection, clearSelection } = useNotesStore()
-  const { iconSet, setTextSplitEnabled, flashcardsEnabled, setViewMode, setCanvasFilterPath, taskExcludedFolders, toggleTaskExcludedFolder, brain } = useUIStore()
+  const { iconSet, setTextSplitEnabled, flashcardsEnabled, viewMode, setViewMode, setCanvasFilterPath, taskExcludedFolders, toggleTaskExcludedFolder, brain } = useUIStore()
   const updateNote = useNotesStore(state => state.updateNote)
   const { fileCustomizations, setFileCustomization, removeFileCustomization, toggleFolderHidden, toggleFolderPinned, showHiddenFolders } = useGraphStore()
   const { openCanvasTab, openCodeTab } = useTabStore()
@@ -456,16 +456,24 @@ const FileItem: React.FC<FileItemProps> = ({
 
     if (entry.isDirectory) {
       setIsOpen(!isOpen)
-    } else if (isPdf) {
-      selectPdf(entry.path)
-    } else if (isImage) {
-      selectImage(entry.path)
-    } else if (isOffice && officeType) {
-      selectOffice(entry.path, officeType)
-    } else if (isCode) {
-      openCodeTab(entry.path, entry.name)
     } else {
-      selectNote(noteId)
+      // Opening a file surfaces it in the editor-panel, which is hidden in
+      // canvas/Brain mode — switch to editor so the file becomes visible
+      // (mirrors the brain node-click behaviour in BrainConstellation).
+      if (viewMode === 'canvas') {
+        setViewMode('editor')
+      }
+      if (isPdf) {
+        selectPdf(entry.path)
+      } else if (isImage) {
+        selectImage(entry.path)
+      } else if (isOffice && officeType) {
+        selectOffice(entry.path, officeType)
+      } else if (isCode) {
+        openCodeTab(entry.path, entry.name)
+      } else {
+        selectNote(noteId)
+      }
     }
   }
 
