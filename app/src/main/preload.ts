@@ -347,12 +347,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
 
   // Quiz / Spaced Repetition
-  quizGenerateQuestions: (model: string, content: string, count: number, sourcePath: string) =>
-    ipcRenderer.invoke('quiz-generate-questions', model, content, count, sourcePath),
-  quizEvaluateAnswer: (model: string, question: string, expectedAnswer: string, userAnswer: string) =>
-    ipcRenderer.invoke('quiz-evaluate-answer', model, question, expectedAnswer, userAnswer),
-  quizAnalyzeResults: (model: string, results: object[], questions: object[]) =>
-    ipcRenderer.invoke('quiz-analyze-results', model, results, questions),
+  quizGenerateQuestions: (model: string, content: string, count: number, sourcePath: string, cloud?: { model: string } | null) =>
+    ipcRenderer.invoke('quiz-generate-questions', model, content, count, sourcePath, cloud),
+  quizEvaluateAnswer: (model: string, question: string, expectedAnswer: string, userAnswer: string, cloud?: { model: string } | null) =>
+    ipcRenderer.invoke('quiz-evaluate-answer', model, question, expectedAnswer, userAnswer, cloud),
+  quizAnalyzeResults: (model: string, results: object[], questions: object[], cloud?: { model: string } | null) =>
+    ipcRenderer.invoke('quiz-analyze-results', model, results, questions, cloud),
+  flashcardsGenerate: (model: string, content: string, count: number, sourcePath: string, cloud?: { model: string } | null) =>
+    ipcRenderer.invoke('flashcards-generate', model, content, count, sourcePath, cloud),
   onQuizProgress: (callback: (progress: { current: number; total: number; status: string }) => void) =>
     ipcRenderer.on('quiz-progress', (_event, progress) => callback(progress)),
 

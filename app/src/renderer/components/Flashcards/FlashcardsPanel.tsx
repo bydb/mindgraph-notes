@@ -1,9 +1,11 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { useFlashcardStore, getDaysUntilReview, type FlashcardFilter } from '../../stores/flashcardStore'
+import { useFlashcardStore, getDaysUntilReview, createFlashcardFromQuiz, type FlashcardFilter } from '../../stores/flashcardStore'
 import { useNotesStore } from '../../stores/notesStore'
+import { useUIStore } from '../../stores/uiStore'
 import { useTranslation } from '../../utils/translations'
 import { FlashcardStats } from './FlashcardStats'
 import { PanelHeader, PanelHeaderIconButton } from '../Shared/PanelHeader'
+import { canUseCloudForFeature } from '../../../shared/llmBackend'
 import type { Flashcard } from '../../../shared/types'
 
 interface FlashcardsPanelProps {
@@ -16,7 +18,8 @@ interface GroupedCards {
 
 export const FlashcardsPanel: React.FC<FlashcardsPanelProps> = ({ onClose }) => {
   const { t } = useTranslation()
-  const { vaultPath } = useNotesStore()
+  const { vaultPath, notes, selectedNoteId } = useNotesStore()
+  const { ollama } = useUIStore()
 
   const {
     flashcards,
@@ -36,6 +39,8 @@ export const FlashcardsPanel: React.FC<FlashcardsPanelProps> = ({ onClose }) => 
 
   const [isImporting, setIsImporting] = useState(false)
   const [importResult, setImportResult] = useState<{ count: number; decks: string[] } | null>(null)
+  const [isGenerating, setIsGenerating] = useState(false)
+  const [genResult, setGenResult] = useState<{ count: number } | { error: string } | null>(null)
 
   // Load flashcards and study stats when vault changes
   useEffect(() => {
@@ -128,6 +133,50 @@ export const FlashcardsPanel: React.FC<FlashcardsPanelProps> = ({ onClose }) => 
     }
   }
 
+  // Karteikarten aus der aktuell geöffneten Notiz generieren (atomarer Prompt im Main).
+  const handleGenerateFromNote = async () => {
+    if (!vaultPath || isGenerating) return
+    const note = notes.find(n => n.id === selectedNoteId)
+    if (!note) {
+      setGenResult({ error: t('flashcards.noNoteSelected') })
+      setTimeout(() => setGenResult(null), 5000)
+      return
+    }
+    setIsGenerating(true)
+    setGenResult(null)
+    try {
+      // Inhalt frisch lesen — Notizen im Store sind oft leer (Cache-Optimierung).
+      const content = await window.electronAPI.readFile(`${vaultPath}/${note.path}`)
+      if (!content || content.trim().length < 40) {
+        setGenResult({ error: t('flashcards.noteTooShort') })
+        setTimeout(() => setGenResult(null), 5000)
+        return
+      }
+      const cloud = canUseCloudForFeature('quiz', ollama.openrouter)
+        ? { model: ollama.openrouter.model.trim() }
+        : null
+      const result = await window.electronAPI.flashcardsGenerate(ollama.selectedModel, content, 20, note.path, cloud)
+      if (result.success && result.cards && result.cards.length > 0) {
+        const cards = result.cards.map(c => createFlashcardFromQuiz(c.front, c.back, c.topic || note.title, note.path))
+        // Erst laden (Merge + loadedVaultPath), dann anhängen und speichern.
+        await loadFlashcards(vaultPath)
+        addFlashcards(cards)
+        await saveFlashcards(vaultPath)
+        setGenResult({ count: cards.length })
+        setTimeout(() => setGenResult(null), 6000)
+      } else {
+        setGenResult({ error: result.error || t('flashcards.generateFailed') })
+        setTimeout(() => setGenResult(null), 6000)
+      }
+    } catch (error) {
+      console.error('[Flashcards] Generate failed:', error)
+      setGenResult({ error: error instanceof Error ? error.message : t('flashcards.generateFailed') })
+      setTimeout(() => setGenResult(null), 6000)
+    } finally {
+      setIsGenerating(false)
+    }
+  }
+
   const getCardStatus = (card: Flashcard): string => {
     if (card.status === 'pending') return t('flashcards.statusPending')
     if (card.status === 'suspended') return t('flashcards.statusSuspended')
@@ -163,6 +212,21 @@ export const FlashcardsPanel: React.FC<FlashcardsPanelProps> = ({ onClose }) => 
         closeTitle={t('panel.close')}
         actions={
           <>
+            <PanelHeaderIconButton
+              onClick={handleGenerateFromNote}
+              disabled={isGenerating}
+              title={t('flashcards.generateFromNote')}
+            >
+              {isGenerating ? (
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="spinning">
+                  <path d="M21 12a9 9 0 11-6.219-8.56" />
+                </svg>
+              ) : (
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 3l1.9 5.8 5.8 1.9-5.8 1.9L12 18.4l-1.9-5.8-5.8-1.9 5.8-1.9z" />
+                </svg>
+              )}
+            </PanelHeaderIconButton>
             <PanelHeaderIconButton
               onClick={handleImportAnki}
               disabled={isImporting}
@@ -217,6 +281,24 @@ export const FlashcardsPanel: React.FC<FlashcardsPanelProps> = ({ onClose }) => 
           </svg>
           <span>{t('flashcards.importSuccess', { count: importResult.count })}</span>
           <button onClick={() => setImportResult(null)} title={t('panel.close')}>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+        </div>
+      )}
+
+      {/* Generate Result Notification */}
+      {genResult && (
+        <div className="flashcards-import-success" style={'error' in genResult ? { color: 'var(--color-danger, #dc2626)' } : undefined}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            {'error' in genResult
+              ? (<><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></>)
+              : (<polyline points="20 6 9 17 4 12" />)}
+          </svg>
+          <span>{'error' in genResult ? genResult.error : t('flashcards.generateSuccess', { count: genResult.count })}</span>
+          <button onClick={() => setGenResult(null)} title={t('panel.close')}>
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <line x1="18" y1="6" x2="6" y2="18" />
               <line x1="6" y1="6" x2="18" y2="18" />

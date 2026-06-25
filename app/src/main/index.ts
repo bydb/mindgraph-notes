@@ -6632,10 +6632,55 @@ function extractVersionSection(changelog: string, version: string): string {
 // Quiz / Spaced Repetition IPC Handlers
 // ============================================
 
+// Quiz-LLM-Aufruf: routet je nach `cloud` über OpenRouter (Unified-Client) oder
+// lokales Ollama und gibt den um <think>-Blöcke bereinigten Antworttext zurück.
+// Fehlt bei aktivem Cloud-Routing der API-Key, harter Fehler (kein stiller Fallback).
+async function quizLlmComplete(
+  model: string,
+  systemPrompt: string,
+  userMessage: string,
+  cloud: { model: string } | null | undefined,
+  opts: { temperature: number; maxTokens: number }
+): Promise<string> {
+  if (cloud?.model) {
+    const orKey = await loadOpenRouterKey()
+    if (!orKey) {
+      throw new Error('OpenRouter-Cloud ist für Karteikarten/Quiz aktiviert, aber kein API-Key hinterlegt (Einstellungen → KI → OpenRouter).')
+    }
+    const result = await llmChat(
+      [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userMessage }
+      ],
+      { backend: 'openrouter', openrouterApiKey: orKey, openrouterModel: cloud.model, temperature: opts.temperature, maxTokens: opts.maxTokens, responseFormat: 'json' }
+    )
+    return result.text.replace(/<think>[\s\S]*?<\/think>/g, '').trim()
+  }
+  const response = await fetch(`${OLLAMA_API_URL}/api/chat`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userMessage }
+      ],
+      stream: false,
+      think: false,
+      options: { temperature: opts.temperature, num_predict: opts.maxTokens }
+    })
+  })
+  if (!response.ok) {
+    throw new Error(`Ollama API error: ${response.status}`)
+  }
+  const data = await response.json() as { message?: { content?: string } }
+  return (data.message?.content || '').replace(/<think>[\s\S]*?<\/think>/g, '').trim()
+}
+
 // Quiz-Fragen aus Notizinhalt generieren
-ipcMain.handle('quiz-generate-questions', async (_event, model: string, content: string, count: number, sourcePath: string) => {
+ipcMain.handle('quiz-generate-questions', async (_event, model: string, content: string, count: number, sourcePath: string, cloud?: { model: string } | null) => {
   console.log(`[Quiz] Generating ${count} questions for: ${sourcePath}`)
-  console.log(`[Quiz] Model: ${model}, Content length: ${content.length} chars`)
+  console.log(`[Quiz] Model: ${cloud?.model ? `openrouter/${cloud.model}` : model}, Content length: ${content.length} chars`)
 
   try {
     // Content kürzen wenn zu lang (max 25000 Zeichen für längere Dokumente/PDFs)
@@ -6659,45 +6704,71 @@ You MUST respond with ONLY a valid JSON array containing EXACTLY ${count} object
 
 CRITICAL: Output EXACTLY ${count} question objects. No markdown fences, no explanation, just the JSON array.`
 
-    // Timeout nach 180 Sekunden (Reasoning-Modelle wie Qwen3.5 brauchen länger)
-    const controller = new AbortController()
-    const timeoutId = setTimeout(() => {
-      console.log('[Quiz] Request timeout after 180s')
-      controller.abort()
-    }, 180000)
+    const userPrompt = `Generate exactly ${count} quiz questions (not fewer!) as a JSON array about this text:\n\n${trimmedContent}`
+    let rawResponse: string
 
-    console.log('[Quiz] Sending request to Ollama...')
-    const startTime = Date.now()
-
-    const response = await fetch(`${OLLAMA_API_URL}/api/chat`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model,
-        messages: [
+    if (cloud?.model) {
+      // Cloud-Routing (OpenRouter): Quiz-Feature muss explizit freigeschaltet sein
+      // (canUseCloudForFeature('quiz', …) im Renderer). Key aus safeStorage, fehlt er,
+      // harter Fehler statt stiller Lokal-Fallback.
+      const orKey = await loadOpenRouterKey()
+      if (!orKey) {
+        return { success: false, error: 'OpenRouter-Cloud ist für Karteikarten/Quiz aktiviert, aber kein API-Key hinterlegt (Einstellungen → KI → OpenRouter).' }
+      }
+      console.log('[Quiz] Sending request to OpenRouter...')
+      const startTime = Date.now()
+      const result = await llmChat(
+        [
           { role: 'system', content: systemPrompt },
-          { role: 'user', content: `Generate exactly ${count} quiz questions (not fewer!) as a JSON array about this text:\n\n${trimmedContent}` }
+          { role: 'user', content: userPrompt }
         ],
-        stream: false,
-        think: false,
-        options: {
-          temperature: 0.7,
-          num_predict: 4000
-        }
-      }),
-      signal: controller.signal
-    })
+        { backend: 'openrouter', openrouterApiKey: orKey, openrouterModel: cloud.model, temperature: 0.7, maxTokens: 4000, responseFormat: 'json' }
+      )
+      console.log(`[Quiz] OpenRouter response received in ${Date.now() - startTime}ms`)
+      rawResponse = result.text
+    } else {
+      // Timeout nach 180 Sekunden (Reasoning-Modelle wie Qwen3.5 brauchen länger)
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => {
+        console.log('[Quiz] Request timeout after 180s')
+        controller.abort()
+      }, 180000)
 
-    clearTimeout(timeoutId)
-    console.log(`[Quiz] Response received in ${Date.now() - startTime}ms, status: ${response.status}`)
+      console.log('[Quiz] Sending request to Ollama...')
+      const startTime = Date.now()
 
-    if (!response.ok) {
-      throw new Error(`Ollama API error: ${response.status}`)
+      const response = await fetch(`${OLLAMA_API_URL}/api/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model,
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userPrompt }
+          ],
+          stream: false,
+          think: false,
+          options: {
+            temperature: 0.7,
+            num_predict: 4000
+          }
+        }),
+        signal: controller.signal
+      })
+
+      clearTimeout(timeoutId)
+      console.log(`[Quiz] Response received in ${Date.now() - startTime}ms, status: ${response.status}`)
+
+      if (!response.ok) {
+        throw new Error(`Ollama API error: ${response.status}`)
+      }
+
+      const data = await response.json() as { message?: { content?: string } }
+      rawResponse = data.message?.content || ''
     }
 
-    const data = await response.json() as { message?: { content?: string } }
     // Strip <think>...</think> blocks from reasoning models (e.g. Qwen3.5, DeepSeek)
-    let responseText = (data.message?.content || '').replace(/<think>[\s\S]*?<\/think>/g, '').trim()
+    let responseText = rawResponse.replace(/<think>[\s\S]*?<\/think>/g, '').trim()
     console.log(`[Quiz] Response text length: ${responseText.length}`)
     console.log(`[Quiz] Response preview: ${responseText.slice(0, 200)}...`)
 
@@ -6870,7 +6941,7 @@ CRITICAL: Output EXACTLY ${count} question objects. No markdown fences, no expla
 })
 
 // Antwort bewerten
-ipcMain.handle('quiz-evaluate-answer', async (_event, model: string, question: string, expectedAnswer: string, userAnswer: string) => {
+ipcMain.handle('quiz-evaluate-answer', async (_event, model: string, question: string, expectedAnswer: string, userAnswer: string, cloud?: { model: string } | null) => {
   try {
     const systemPrompt = `Du bist ein fairer Prüfer. Bewerte die Antwort des Lernenden.
 
@@ -6906,31 +6977,7 @@ Antwort des Lernenden: ${userAnswer || '(keine Antwort gegeben)'}
 
 Bewerte diese Antwort.`
 
-    const response = await fetch(`${OLLAMA_API_URL}/api/chat`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model,
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userMessage }
-        ],
-        stream: false,
-        think: false,
-        options: {
-          temperature: 0.3,
-          num_predict: 2000
-        }
-      })
-    })
-
-    if (!response.ok) {
-      throw new Error(`Ollama API error: ${response.status}`)
-    }
-
-    const data = await response.json() as { message?: { content?: string } }
-    // Strip <think>...</think> blocks from reasoning models
-    const responseText = (data.message?.content || '').replace(/<think>[\s\S]*?<\/think>/g, '').trim()
+    const responseText = await quizLlmComplete(model, systemPrompt, userMessage, cloud, { temperature: 0.3, maxTokens: 2000 })
 
     // JSON aus der Antwort extrahieren
     const jsonMatch = responseText.match(/\{[\s\S]*\}/)
@@ -6957,7 +7004,7 @@ Bewerte diese Antwort.`
 })
 
 // Ergebnisse analysieren und Schwächen identifizieren
-ipcMain.handle('quiz-analyze-results', async (_event, model: string, results: Array<{ questionId: string; score: number; correct: boolean }>, questions: Array<{ id: string; topic: string; sourceFile: string }>) => {
+ipcMain.handle('quiz-analyze-results', async (_event, model: string, results: Array<{ questionId: string; score: number; correct: boolean }>, questions: Array<{ id: string; topic: string; sourceFile: string }>, cloud?: { model: string } | null) => {
   try {
     // Ergebnisse nach Themen gruppieren
     const topicScores: Record<string, { scores: number[]; files: Set<string> }> = {}
@@ -7017,34 +7064,21 @@ WICHTIG: Antworte ausschließlich mit validem JSON. Die <Platzhalter> NICHT absc
 Keine Erklärungen, kein Markdown, nur das JSON-Objekt.
 Do NOT use <think> tags or internal reasoning. Output the JSON immediately.`
 
-    const response = await fetch(`${OLLAMA_API_URL}/api/chat`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model,
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: 'Gib mir Lernempfehlungen basierend auf diesen Ergebnissen.' }
-        ],
-        stream: false,
-        think: false,
-        options: {
-          temperature: 0.5,
-          num_predict: 2000
-        }
-      })
-    })
-
+    // KI-Empfehlungen sind best-effort: scheitert der LLM-Aufruf (lokal oder Cloud),
+    // liefern wir trotzdem die deterministische Analyse (weakTopics/suggestedFiles).
     let recommendations: string[] = []
-    if (response.ok) {
-      const data = await response.json() as { message?: { content?: string } }
-      // Strip <think>...</think> blocks from reasoning models
-      const responseText = (data.message?.content || '').replace(/<think>[\s\S]*?<\/think>/g, '').trim()
+    try {
+      const responseText = await quizLlmComplete(
+        model, systemPrompt, 'Gib mir Lernempfehlungen basierend auf diesen Ergebnissen.', cloud,
+        { temperature: 0.5, maxTokens: 2000 }
+      )
       const jsonMatch = responseText.match(/\{[\s\S]*\}/)
       if (jsonMatch) {
         const parsed = JSON.parse(jsonMatch[0]) as { recommendations?: string[] }
         recommendations = parsed.recommendations || []
       }
+    } catch (err) {
+      console.warn('[Quiz] Empfehlungs-LLM fehlgeschlagen, liefere Analyse ohne Empfehlungen:', err)
     }
 
     return {
@@ -7059,6 +7093,75 @@ Do NOT use <think> tags or internal reasoning. Output the JSON immediately.`
   } catch (error) {
     console.error('[Quiz] Failed to analyze results:', error)
     return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
+  }
+})
+
+// Karteikarten aus Notizinhalt generieren — eigener Pfad mit pädagogisch sauberem
+// Prompt (Atomaritätsprinzip / "minimum information"). BEWUSST getrennt vom Quiz:
+// Quiz-Fragen dürfen komplex/anwendungsorientiert sein, Karteikarten müssen atomar,
+// kurz und einzeln abfragbar sein. Routet wie das Quiz über OpenRouter/Ollama.
+ipcMain.handle('flashcards-generate', async (_event, model: string, content: string, count: number, sourcePath: string, cloud?: { model: string } | null) => {
+  console.log(`[Flashcards] Generating up to ${count} cards for: ${sourcePath} (${cloud?.model ? `openrouter/${cloud.model}` : model})`)
+  try {
+    const maxContentLength = 25000
+    const trimmedContent = content.length > maxContentLength
+      ? content.slice(0, maxContentLength) + '\n\n[... Text gekürzt ...]'
+      : content
+
+    const systemPrompt = `You are an expert at writing high-quality spaced-repetition flashcards, following Piotr Woźniak's "minimum information principle". Create flashcards from the provided text.
+
+STRICT RULES:
+- ATOMIC: exactly ONE fact or idea per card. NEVER join two ideas with "and" or "as well as".
+- MINIMAL: the question is as short and specific as possible; the answer is a single word, a short phrase, or ONE short sentence. NEVER 2–4 sentence explanations.
+- PRECISE: every question must have one clear, unambiguous answer (active recall).
+- FORBIDDEN: enumeration/set questions ("name the six…", "list all…"), compound questions, calculation/application exercises, and essay prompts ("explain why…", "discuss…").
+- DECOMPOSE: break complex ideas into several small atomic cards rather than one large card. Prefer many small cards.
+- Write questions and answers in the SAME language as the source text.
+- Use LaTeX with $...$ ONLY for genuine mathematical symbols, never for normal prose.
+
+You MUST respond with ONLY a valid JSON array (no markdown fences, no commentary). Do NOT copy the <placeholders> — derive every value from the text:
+[{"front":"<short precise question>","back":"<minimal answer: word, phrase or one short sentence>","topic":"<short topic, 1-3 words>"}]
+
+Create as many atomic cards as the text genuinely supports, but at most ${count}. Quality over quantity — skip filler.`
+
+    const userMessage = `Create high-quality atomic flashcards (at most ${count}) from this text:\n\n${trimmedContent}`
+
+    const responseText = await quizLlmComplete(model, systemPrompt, userMessage, cloud, { temperature: 0.4, maxTokens: 4000 })
+
+    // Robuste JSON-Extraktion (Modelle umrahmen das Array gern mit Prosa/Fences).
+    let cards: Array<{ front: string; back: string; topic: string }> = []
+    const tryParse = (s: string): typeof cards | null => {
+      try {
+        const cleaned = s.replace(/,\s*]/g, ']').replace(/,\s*}/g, '}')
+        const parsed = JSON.parse(cleaned)
+        return Array.isArray(parsed) ? parsed : null
+      } catch { return null }
+    }
+    const fence = responseText.match(/```(?:json)?\s*([\s\S]*?)```/)
+    if (fence) cards = tryParse(fence[1].trim()) || []
+    if (cards.length === 0) {
+      const start = responseText.indexOf('[')
+      const end = responseText.lastIndexOf(']')
+      if (start !== -1 && end > start) cards = tryParse(responseText.slice(start, end + 1)) || []
+    }
+
+    // Nur valide, nicht-leere Karten; gegen Atomaritäts-Ausreißer hart kürzen.
+    const cleanCards = cards
+      .filter(c => c && typeof c.front === 'string' && typeof c.back === 'string' && c.front.trim() && c.back.trim())
+      .map(c => ({ front: c.front.trim(), back: c.back.trim(), topic: (c.topic || '').trim() }))
+      .slice(0, count)
+
+    if (cleanCards.length === 0) {
+      console.error('[Flashcards] Parsing fehlgeschlagen. Antwort:', responseText.slice(0, 800))
+      return { success: false, error: 'Konnte keine Karteikarten aus der KI-Antwort extrahieren. Bitte erneut versuchen.' }
+    }
+
+    console.log(`[Flashcards] ${cleanCards.length} Karten generiert`)
+    return { success: true, cards: cleanCards }
+  } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : 'Unknown error'
+    console.error('[Flashcards] Failed to generate:', errorMsg)
+    return { success: false, error: errorMsg }
   }
 })
 
@@ -7108,6 +7211,26 @@ ipcMain.handle('flashcards-save', async (_event, vaultPath: string, flashcards: 
   try {
     assertApprovedVault(vaultPath, 'flashcards-save')
     const flashcardsPath = path.join(vaultPath, '.mindgraph', 'flashcards.json')
+
+    // DATENVERLUST-SCHUTZ: Ein leeres Array darf eine bestehende, gefüllte
+    // flashcards.json NICHT überschreiben. Eine Load/Save-Race im Renderer
+    // (Laden setzt [] → ein Save feuert) hat sonst echte Karten gelöscht — und
+    // diese Datei ist (anders als .md) nicht vom Auto-Backup gedeckt. Zweite
+    // Verteidigungslinie unabhängig vom Renderer (vgl. leere .md-Writes).
+    if (!Array.isArray(flashcards) || flashcards.length === 0) {
+      try {
+        const existing = JSON.parse(await fs.readFile(flashcardsPath, 'utf-8'))
+        if (Array.isArray(existing) && existing.length > 0) {
+          // Sicherheitskopie anlegen, dann den leeren Write verwerfen.
+          const backupPath = `${flashcardsPath}.${Date.now()}.bak`
+          await fs.copyFile(flashcardsPath, backupPath)
+          console.warn(`[Flashcards] Leerer Save auf ${existing.length} vorhandene Karten blockiert. Backup: ${backupPath}`)
+          return false
+        }
+      } catch {
+        // Keine bestehende/gültige Datei → leeres Array ist unbedenklich.
+      }
+    }
 
     // Verzeichnis erstellen falls nicht vorhanden
     await fs.mkdir(path.dirname(flashcardsPath), { recursive: true })

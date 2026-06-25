@@ -2,6 +2,19 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.8.11] - 2026-06-25
+
+Bessere Karteikarten, Cloud-Option dafür – und ein wichtiger Schutz gegen Karten-Verlust.
+
+### Neu
+
+- **Eigener Karteikarten-Generator.** Im Karteikarten-Panel gibt es einen neuen ✨-Button, der aus der aktuell geöffneten Notiz Karteikarten erzeugt – mit einem eigens dafür gebauten Prompt nach dem Atomaritätsprinzip: eine Tatsache pro Karte, kurze Frage, knappe Antwort. Bisher entstanden Karten nur als Nebenprodukt des Quiz und erbten dessen Prüfungsfragen-Stil (lange Verbund- und Aufzählungsfragen mit Fließtext-Antworten).
+- **OpenRouter für Karteikarten & Quiz.** Karteikarten-/Quiz-Generierung, Antwort-Bewertung und Ergebnis-Analyse können jetzt optional über die OpenRouter-Cloud laufen. Aktivierung in Einstellungen → KI → OpenRouter über das neue Häkchen „Karteikarten & Quiz". Standard bleibt lokal (Ollama).
+
+### Behoben
+
+- **Karteikarten-Verlust verhindert.** Unter bestimmten Umständen (z. B. App-Neustart oder Vault-Wechsel zum falschen Zeitpunkt) konnte die Karteikarten-Datei mit einem leeren Stand überschrieben werden – Karten verschwanden. Es gibt jetzt einen doppelten Schutz: Die App speichert Karten nur noch, nachdem sie für den passenden Vault geladen wurden, und ein leerer Speicherstand kann eine gefüllte Datei nicht mehr überschreiben (mit automatischer Sicherungskopie).
+
 ## [0.8.10] - 2026-06-25
 
 Behebt den eigentlichen Grund, warum die App auf dem Mac keine Updates mehr fand.

@@ -784,21 +784,26 @@ export interface ElectronAPI {
   onAutoUpdateDownloaded: (callback: (info: { version: string }) => void) => void;
 
   // Quiz / Spaced Repetition
-  quizGenerateQuestions: (model: string, content: string, count: number, sourcePath: string) => Promise<{
+  quizGenerateQuestions: (model: string, content: string, count: number, sourcePath: string, cloud?: { model: string } | null) => Promise<{
     success: boolean;
     questions?: QuizQuestion[];
     error?: string;
   }>;
-  quizEvaluateAnswer: (model: string, question: string, expectedAnswer: string, userAnswer: string) => Promise<{
+  quizEvaluateAnswer: (model: string, question: string, expectedAnswer: string, userAnswer: string, cloud?: { model: string } | null) => Promise<{
     success: boolean;
     score?: number;
     feedback?: string;
     correct?: boolean;
     error?: string;
   }>;
-  quizAnalyzeResults: (model: string, results: QuizResult[], questions: QuizQuestion[]) => Promise<{
+  quizAnalyzeResults: (model: string, results: QuizResult[], questions: QuizQuestion[], cloud?: { model: string } | null) => Promise<{
     success: boolean;
     analysis?: QuizAnalysis;
+    error?: string;
+  }>;
+  flashcardsGenerate: (model: string, content: string, count: number, sourcePath: string, cloud?: { model: string } | null) => Promise<{
+    success: boolean;
+    cards?: { front: string; back: string; topic: string }[];
     error?: string;
   }>;
   onQuizProgress: (callback: (progress: { current: number; total: number; status: string }) => void) => void;

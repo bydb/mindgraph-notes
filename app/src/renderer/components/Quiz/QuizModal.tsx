@@ -5,6 +5,7 @@ import { useNotesStore } from '../../stores/notesStore'
 import { useFlashcardStore, createFlashcardFromQuiz } from '../../stores/flashcardStore'
 import { useTranslation } from '../../utils/translations'
 import { MarkdownContent } from '../Flashcards/MarkdownContent'
+import { canUseCloudForFeature } from '../../../shared/llmBackend'
 
 export const QuizModal: React.FC = () => {
   const { t } = useTranslation()
@@ -35,8 +36,15 @@ export const QuizModal: React.FC = () => {
 
   const { ollama } = useUIStore()
   const { notes, vaultPath, selectNote } = useNotesStore()
-  const { addFlashcards, saveFlashcards, setPanel: setFlashcardsPanel } = useFlashcardStore()
+  const { addFlashcards, saveFlashcards, loadFlashcards, setPanel: setFlashcardsPanel } = useFlashcardStore()
   const [flashcardsSaved, setFlashcardsSaved] = useState(false)
+
+  // OpenRouter-Cloud für Karteikarten/Quiz nur, wenn global einsatzbereit UND das
+  // 'quiz'-Feature explizit freigeschaltet ist (Einstellungen → KI → OpenRouter).
+  // null = lokal über ollama.selectedModel. Single-Source: canUseCloudForFeature.
+  const quizCloud = canUseCloudForFeature('quiz', ollama.openrouter)
+    ? { model: ollama.openrouter.model.trim() }
+    : null
 
   // Fragen generieren wenn Quiz gestartet wird
   useEffect(() => {
@@ -53,7 +61,8 @@ export const QuizModal: React.FC = () => {
   }, [phase, currentQuestionIndex])
 
   const generateQuestions = async () => {
-    if (!quizConfig || !ollama.selectedModel) {
+    // Bei Cloud-Routing wird kein lokales Modell gebraucht.
+    if (!quizConfig || (!ollama.selectedModel && !quizCloud)) {
       resetQuiz()
       return
     }
@@ -106,7 +115,8 @@ export const QuizModal: React.FC = () => {
         ollama.selectedModel,
         content,
         quizConfig.questionCount,
-        sourcePath
+        sourcePath,
+        quizCloud
       )
 
       if (result.success && result.questions && result.questions.length > 0) {
@@ -123,7 +133,7 @@ export const QuizModal: React.FC = () => {
   }
 
   const handleSubmitAnswer = async () => {
-    if (!currentSession || !ollama.selectedModel) return
+    if (!currentSession || (!ollama.selectedModel && !quizCloud)) return
 
     const question = currentSession.questions[currentQuestionIndex]
     if (!question) return
@@ -135,7 +145,8 @@ export const QuizModal: React.FC = () => {
         ollama.selectedModel,
         question.question,
         question.expectedAnswer,
-        currentAnswer
+        currentAnswer,
+        quizCloud
       )
 
       if (result.success) {
@@ -181,12 +192,13 @@ export const QuizModal: React.FC = () => {
       // Quiz beenden und analysieren
       setPhase('results')
 
-      if (currentSession && ollama.selectedModel) {
+      if (currentSession && (ollama.selectedModel || quizCloud)) {
         try {
           const result = await window.electronAPI.quizAnalyzeResults(
             ollama.selectedModel,
             currentSession.results,
-            currentSession.questions
+            currentSession.questions,
+            quizCloud
           )
 
           if (result.success && result.analysis) {
@@ -260,7 +272,10 @@ export const QuizModal: React.FC = () => {
       )
     })
 
-    // Add to store and save
+    // Bestehende Karten dieses Vaults erst laden (setzt loadedVaultPath +
+    // merged mit Disk-Stand), dann die neuen anhängen und speichern. Ohne das
+    // würde der Save-Guard greifen bzw. der Disk-Stand überschrieben.
+    await loadFlashcards(vaultPath)
     addFlashcards(flashcards)
     await saveFlashcards(vaultPath)
     setFlashcardsSaved(true)

@@ -8,7 +8,8 @@ import {
 // Anzeige-Labels für Nicht-Matrix-Cloud-Features.
 const FEATURE_LABELS: Record<CloudFeatureId, { de: string; en: string }> = {
   'notes-chat': { de: 'Notes Chat', en: 'Notes Chat' },
-  'note-edit': { de: 'Notiz bearbeiten (KI)', en: 'Note editing (AI)' }
+  'note-edit': { de: 'Notiz bearbeiten (KI)', en: 'Note editing (AI)' },
+  'quiz': { de: 'Karteikarten & Quiz', en: 'Flashcards & Quiz' }
 }
 
 // OpenRouter Cloud-Backend (opt-in). Privacy-Modell siehe shared/llmBackend.ts:

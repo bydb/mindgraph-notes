@@ -15,6 +15,10 @@ interface FlashcardState {
   // Data
   flashcards: Flashcard[]
   isLoading: boolean
+  // Pfad des Vaults, dessen Karten erfolgreich geladen wurden. saveFlashcards
+  // schreibt nur, wenn dieser mit dem Ziel-Vault übereinstimmt — verhindert
+  // Save-vor-Load und Save-in-falschen-Vault (Datenverlust-Schutz).
+  loadedVaultPath: string | null
 
   // Filters
   activeFilter: FlashcardFilter
@@ -150,6 +154,7 @@ export const useFlashcardStore = create<FlashcardState>()((set, get) => ({
   // Initial state
   flashcards: [],
   isLoading: false,
+  loadedVaultPath: null,
   activeFilter: 'all',
   isStudying: false,
   studyQueue: [],
@@ -285,15 +290,26 @@ export const useFlashcardStore = create<FlashcardState>()((set, get) => ({
     set({ isLoading: true })
     try {
       const cards = await window.electronAPI.flashcardsLoad(vaultPath)
-      set({ flashcards: cards || [], isLoading: false })
+      // loadedVaultPath erst NACH erfolgreichem Load setzen → ab jetzt sind
+      // Saves für genau diesen Vault freigegeben.
+      set({ flashcards: cards || [], isLoading: false, loadedVaultPath: vaultPath })
     } catch (error) {
       console.error('[Flashcards] Failed to load:', error)
-      set({ flashcards: [], isLoading: false })
+      // Bei Fehler NICHT freigeben — sonst überschreibt ein nachfolgender
+      // Save die echte Datei mit dem leeren Speicher.
+      set({ flashcards: [], isLoading: false, loadedVaultPath: null })
     }
   },
 
   saveFlashcards: async (vaultPath) => {
-    const { flashcards } = get()
+    const { flashcards, loadedVaultPath } = get()
+    // Nur speichern, wenn die Karten dieses Vaults auch wirklich geladen wurden.
+    // Verhindert Save-vor-Load und Save-in-falschen-Vault — die Hauptursache,
+    // dass leere Arrays echte flashcards.json überschrieben haben.
+    if (loadedVaultPath !== vaultPath) {
+      console.warn('[Flashcards] Save übersprungen: Karten für', vaultPath, 'nicht geladen (loaded:', loadedVaultPath, ')')
+      return
+    }
     try {
       await window.electronAPI.flashcardsSave(vaultPath, flashcards)
     } catch (error) {
