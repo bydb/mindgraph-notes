@@ -1,0 +1,649 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Denkst du noch – oder lässt du denken? | MindGraph Notes</title>
+<meta name="description" content="Validierter Need-for-Cognition-Test (Bless et al. 1991) als Begleitung zu MindGraph Notes. Finde heraus, wo du als Wissensarbeiter:in mit KI kognitiv gewinnst – und wo du verlierst.">
+<link rel="canonical" href="https://mindgraph-notes.de/kognition.html">
+<link rel="icon" href="favicon.ico" sizes="48x48">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+
+<meta property="og:type" content="article">
+<meta property="og:url" content="https://mindgraph-notes.de/kognition.html">
+<meta property="og:title" content="Denkst du noch – oder lässt du denken?">
+<meta property="og:description" content="Need-for-Cognition-Test als Begleitung zu MindGraph Notes: Setze KI so ein, dass sie dein Denken erweitert statt ersetzt.">
+<meta property="og:image" content="https://mindgraph-notes.de/screenshot.png">
+<meta name="robots" content="index, follow">
+
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #0c0a09;
+  --bg2: #151010;
+  --surface: rgba(255,255,255,0.035);
+  --surface-2: rgba(255,255,255,0.06);
+  --text: #f6f0e8;
+  --text-mid: #c7bdb1;
+  --text-muted: #8c8276;
+  --border: rgba(255,255,255,0.09);
+  --orange: #ff7a3c;
+  --amber: #ffb24a;
+  --magenta: #ec4d8a;
+  --green: #45e09a;
+  --green-deep: #1f8f5e;
+  --red: #ff5a5f;
+  --brand: linear-gradient(115deg, #ffb24a 0%, #ff7a3c 45%, #ec4d8a 100%);
+  --brand-soft: linear-gradient(115deg, rgba(255,178,74,.16), rgba(236,77,138,.16));
+}
+html { font-size: 16px; scroll-behavior: smooth; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+/* dramatic glow orbs */
+.orb { position: fixed; border-radius: 50%; filter: blur(90px); z-index: 0; pointer-events: none; opacity: .55; }
+.orb-1 { width: 620px; height: 620px; background: radial-gradient(circle, #ff7a3c, transparent 70%); top: -240px; right: -160px; }
+.orb-2 { width: 520px; height: 520px; background: radial-gradient(circle, #ec4d8a, transparent 70%); top: 380px; left: -220px; opacity: .4; }
+.orb-3 { width: 480px; height: 480px; background: radial-gradient(circle, #45e09a, transparent 70%); bottom: 200px; right: -180px; opacity: .22; }
+.grain { position: fixed; inset: 0; z-index: 1; pointer-events: none; opacity: .4;
+  background-image: radial-gradient(rgba(255,255,255,.04) 1px, transparent 1px); background-size: 3px 3px; }
+.container { max-width: 880px; margin: 0 auto; padding: 0 1.3rem; position: relative; z-index: 2; }
+
+nav {
+  position: sticky; top: 0; z-index: 60;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0.85rem 1.5rem;
+  background: rgba(12,10,9,0.72); backdrop-filter: blur(14px) saturate(140%);
+  border-bottom: 1px solid var(--border);
+}
+.logo { display: flex; align-items: center; gap: 0.55rem; font-weight: 800; font-size: 0.95rem; color: var(--text); text-decoration: none; letter-spacing: -0.01em; }
+.logo img { width: 26px; height: 26px; border-radius: 7px; }
+.nav-right { display: flex; align-items: center; gap: 0.8rem; }
+.nav-cta { font-size: 0.82rem; font-weight: 700; text-decoration: none; color: #1a120c;
+  background: var(--brand); padding: 0.5rem 1rem; border-radius: 100px; transition: transform .15s, box-shadow .15s; box-shadow: 0 4px 18px rgba(255,122,60,.35); }
+.nav-cta:hover { transform: translateY(-1px); box-shadow: 0 8px 26px rgba(236,77,138,.45); }
+.lang-switch { display: flex; gap: 2px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 2px; }
+.lang-switch button { background: transparent; border: none; color: var(--text-muted); padding: 0.3rem 0.6rem; border-radius: 6px; cursor: pointer; font-size: 0.8rem; font-weight: 700; transition: all .2s; }
+.lang-switch button.active { background: var(--orange); color: #1a120c; }
+
+/* HERO */
+.hero { padding: 5rem 0 3rem; text-align: center; }
+.eyebrow {
+  display: inline-flex; align-items: center; gap: 0.55rem;
+  padding: 0.45rem 1.1rem; border: 1px solid var(--border); background: var(--surface);
+  border-radius: 100px; font-size: 0.74rem; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--amber); margin-bottom: 1.8rem;
+}
+.eyebrow .pulse { width: 8px; height: 8px; border-radius: 50%; background: var(--orange); box-shadow: 0 0 0 0 rgba(255,122,60,.6); animation: pulse 2s infinite; }
+@keyframes pulse { 0%{box-shadow:0 0 0 0 rgba(255,122,60,.55)} 70%{box-shadow:0 0 0 12px rgba(255,122,60,0)} 100%{box-shadow:0 0 0 0 rgba(255,122,60,0)} }
+h1 {
+  font-size: clamp(2.6rem, 8vw, 5.2rem); font-weight: 900; line-height: 0.98;
+  letter-spacing: -0.035em; margin-bottom: 1.4rem;
+}
+h1 .grad { background: var(--brand); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+.lead { font-size: clamp(1.05rem, 2.4vw, 1.3rem); color: var(--text-mid); max-width: 660px; margin: 0 auto 2.2rem; }
+.lead strong { color: var(--text); }
+.hero-cta { display: flex; gap: 0.9rem; justify-content: center; flex-wrap: wrap; }
+
+.btn { display: inline-flex; align-items: center; gap: 0.55rem; padding: 1rem 2rem; border-radius: 13px; font-weight: 800; font-size: 1rem; text-decoration: none; transition: transform .15s, box-shadow .15s; }
+.btn-primary { background: var(--brand); color: #1a120c; box-shadow: 0 10px 34px rgba(255,122,60,.4); }
+.btn-primary:hover { transform: translateY(-3px) scale(1.02); box-shadow: 0 16px 44px rgba(236,77,138,.5); }
+.btn-ghost { background: var(--surface); color: var(--text); border: 1px solid var(--border); }
+.btn-ghost:hover { background: var(--surface-2); transform: translateY(-2px); }
+
+/* big stats */
+.stats { display: flex; justify-content: center; gap: 2.8rem; flex-wrap: wrap; margin-top: 3.2rem; }
+.stat { text-align: center; }
+.stat .num { font-size: clamp(2.4rem, 6vw, 3.6rem); font-weight: 900; letter-spacing: -0.03em; line-height: 1;
+  background: var(--brand); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 4px 24px rgba(255,122,60,.35)); }
+.stat .cap { font-size: 0.82rem; color: var(--text-muted); margin-top: 0.5rem; max-width: 160px; }
+
+.section { padding: 3rem 0; }
+.section-label { font-size: 0.74rem; font-weight: 800; letter-spacing: 0.16em; text-transform: uppercase;
+  background: var(--brand); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 0.8rem; }
+h2 { font-size: clamp(1.7rem, 4vw, 2.6rem); font-weight: 800; letter-spacing: -0.02em; margin-bottom: 1rem; line-height: 1.08; }
+h3 { font-size: 1.12rem; font-weight: 800; margin-bottom: 0.5rem; }
+p { color: var(--text-mid); }
+.muted { color: var(--text-muted); font-size: 0.9rem; }
+.prose p + p { margin-top: 0.9rem; }
+.prose strong { color: var(--text); }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 20px; padding: 2rem; backdrop-filter: blur(8px); }
+.card + .card { margin-top: 1.4rem; }
+
+.science-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px,1fr)); gap: 1rem; margin-top: 1.6rem; }
+.science-item { background: var(--brand-soft); border: 1px solid var(--border); border-radius: 14px; padding: 1.3rem; }
+.science-item .big { font-size: 2rem; font-weight: 900; letter-spacing: -0.02em;
+  background: var(--brand); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+.science-item .sm { font-size: 0.86rem; color: var(--text-muted); margin-top: 0.3rem; }
+
+/* GAIN / LOSS dramatic split */
+.split { display: grid; grid-template-columns: 1fr 1fr; gap: 1.4rem; }
+.lane { border-radius: 20px; padding: 1.8rem; position: relative; overflow: hidden; }
+.lane.gain { background: linear-gradient(160deg, rgba(69,224,154,.14), rgba(31,143,94,.05)); border: 1px solid rgba(69,224,154,.3); }
+.lane.loss { background: linear-gradient(160deg, rgba(255,90,95,.13), rgba(236,77,138,.05)); border: 1px solid rgba(255,90,95,.28); }
+.lane-tag { font-size: 2.6rem; font-weight: 900; line-height: 1; margin-bottom: 0.3rem; }
+.gain .lane-tag { color: var(--green); filter: drop-shadow(0 0 18px rgba(69,224,154,.5)); }
+.loss .lane-tag { color: var(--red); filter: drop-shadow(0 0 18px rgba(255,90,95,.45)); }
+.lane h3 { font-size: 1.3rem; margin-bottom: 1.1rem; }
+.gain h3 { color: var(--green); }
+.loss h3 { color: var(--red); }
+.lane ul { list-style: none; display: flex; flex-direction: column; gap: 1rem; }
+.lane li { font-size: 0.94rem; color: var(--text-mid); }
+.lane li strong { color: var(--text); display: block; margin-bottom: 0.15rem; }
+.chip { display: inline-block; font-size: 0.68rem; font-weight: 700; padding: 0.12rem 0.55rem; border-radius: 6px; margin-top: 0.4rem; }
+.gain .chip { background: rgba(69,224,154,.16); color: var(--green); }
+
+/* TEST */
+.instruktion { background: var(--brand-soft); border: 1px solid var(--border); border-left: 3px solid var(--orange); padding: 1.1rem 1.3rem; border-radius: 0 12px 12px 0; margin-bottom: 1.8rem; font-size: 0.92rem; color: var(--text-mid); }
+.scale-legend { margin-top: 0.7rem; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 0.3rem; font-weight: 700; font-size: 0.8rem; }
+.scale-legend .pos { color: var(--amber); }
+.scale-legend .neu { color: var(--text-muted); }
+.item { padding: 1rem 0; border-bottom: 1px solid var(--border); }
+.item:last-child { border-bottom: none; }
+.item-header { display: flex; align-items: baseline; gap: 0.5rem; margin-bottom: 0.6rem; }
+.item-nr { font-weight: 900; min-width: 1.9rem; background: var(--brand); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+.item-text { font-size: 0.96rem; flex: 1; color: var(--text); }
+.item-reverse { font-size: 0.64rem; font-weight: 800; color: var(--amber); background: rgba(255,178,74,.13); padding: 0.1rem 0.45rem; border-radius: 4px; white-space: nowrap; }
+.antworten { display: flex; gap: 0.3rem; padding-left: 2.4rem; flex-wrap: wrap; }
+.antworten label { display: flex; flex-direction: column; align-items: center; gap: 0.18rem; cursor: pointer; padding: 0.2rem 0.3rem; min-width: 2.5rem; }
+.antworten input[type="radio"] { display: none; }
+.radio-dot { width: 26px; height: 26px; border-radius: 50%; border: 2px solid rgba(255,255,255,.18); display: flex; align-items: center; justify-content: center; font-size: 0.74rem; font-weight: 800; color: var(--text-muted); transition: all .15s; background: var(--surface); }
+.antworten label:hover .radio-dot { border-color: var(--amber); color: var(--text); }
+.antworten input[type="radio"]:checked + .radio-dot { border-color: transparent; background: var(--brand); color: #1a120c; box-shadow: 0 0 0 4px rgba(255,122,60,.18), 0 4px 16px rgba(236,77,138,.4); transform: scale(1.08); }
+.label-text { font-size: 0.62rem; color: var(--text-muted); text-align: center; line-height: 1.15; white-space: pre-line; }
+
+.progress-container { margin: 1.6rem 0 0; background: var(--surface-2); border-radius: 8px; height: 10px; overflow: hidden; }
+.progress-bar { height: 100%; background: var(--brand); transition: width .35s; width: 0%; box-shadow: 0 0 18px rgba(255,122,60,.6); }
+.progress-text { font-size: 0.82rem; color: var(--text-muted); text-align: right; margin-top: 0.35rem; font-weight: 600; }
+
+.ergebnis-box { background: var(--brand-soft); border: 1.5px solid rgba(255,178,74,.35); border-radius: 18px; padding: 1.6rem; }
+.ergebnis-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin: 0.4rem 0 1rem; }
+.ergebnis-karte { background: rgba(0,0,0,.25); border: 1px solid var(--border); border-radius: 12px; padding: 1.1rem; text-align: center; }
+.ergebnis-karte .wert { font-size: 2.3rem; font-weight: 900; letter-spacing: -0.03em; background: var(--brand); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+.ergebnis-karte .label { font-size: 0.8rem; color: var(--text-muted); margin-top: 0.25rem; }
+.ergebnis-karte.gross { grid-column: 1 / -1; }
+.interpretation { font-size: 1.1rem; font-weight: 800; padding: 0.45rem 1.1rem; border-radius: 10px; display: inline-block; }
+.interpretation.hoch, .interpretation.eher-hoch { background: rgba(69,224,154,.16); color: var(--green); }
+.interpretation.mittel { background: rgba(255,178,74,.16); color: var(--amber); }
+.interpretation.eher-niedrig, .interpretation.niedrig { background: rgba(255,90,95,.16); color: var(--red); }
+.kurzform-hinweis { font-size: 0.85rem; color: var(--text-muted); margin-top: 0.7rem; padding-top: 0.8rem; border-top: 1px solid var(--border); }
+
+/* CTA */
+.cta-card { text-align: center; border: 1px solid var(--border); background:
+  radial-gradient(120% 140% at 50% 0%, rgba(236,77,138,.22), transparent 60%), var(--bg2); padding: 3rem 2rem; }
+.cta-card h2 { font-size: clamp(1.9rem, 5vw, 3rem); }
+.cta-card h2 .grad { background: var(--brand); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+.cta-card p { max-width: 580px; margin: 0 auto 1.8rem; font-size: 1.05rem; }
+
+.quellen { margin: 2.5rem 0 3rem; font-size: 0.8rem; color: var(--text-muted); text-align: center; line-height: 1.8; }
+.quellen a { color: var(--amber); text-decoration: none; }
+.quellen a:hover { text-decoration: underline; }
+footer { text-align: center; padding: 2.2rem 1rem; color: var(--text-muted); font-size: 0.82rem; border-top: 1px solid var(--border); position: relative; z-index: 2; }
+footer a { color: var(--amber); text-decoration: none; }
+
+@media (max-width: 640px) {
+  .split { grid-template-columns: 1fr; }
+  .ergebnis-grid { grid-template-columns: 1fr; }
+  .stats { gap: 1.8rem; }
+  .card { padding: 1.4rem; }
+}
+@media print { nav,.orb,.grain,.cta-card { display: none; } body { background:#fff; color:#000; } }
+</style>
+</head>
+<body>
+<div class="orb orb-1"></div>
+<div class="orb orb-2"></div>
+<div class="orb orb-3"></div>
+<div class="grain"></div>
+
+<nav>
+  <a href="./" class="logo"><img src="icon.png" alt="MindGraph Notes"> MindGraph Notes</a>
+  <div class="nav-right">
+    <a href="./#download" class="nav-cta" data-i18n="nav.cta">App holen &rarr;</a>
+    <div class="lang-switch">
+      <button onclick="setLanguage('de')" id="lang-de" class="active">DE</button>
+      <button onclick="setLanguage('en')" id="lang-en">EN</button>
+    </div>
+  </div>
+</nav>
+
+<div class="container">
+
+  <header class="hero">
+    <div class="eyebrow"><span class="pulse"></span> Need for Cognition</div>
+    <h1 data-i18n="hero.h1">Denkst du noch&nbsp;&ndash;<br>oder <span class="grad">lässt du denken?</span></h1>
+    <p class="lead" data-i18n="hero.lead">
+      Generative KI macht dich <strong>klüger</strong> oder <strong>abhängig</strong> &ndash; dazwischen liegt nur, <em>wie</em> du sie benutzt. Mach den validierten Test, finde deinen Denk-Typ und sieh schwarz auf weiß, wo du gewinnst und wo du verlierst.
+    </p>
+    <div class="hero-cta">
+      <a href="#test" class="btn btn-primary">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M12 2a7 7 0 0 0-4 12.7c.5.4.8 1 .9 1.6h6.2c.1-.6.4-1.2.9-1.6A7 7 0 0 0 12 2z"/></svg>
+        <span data-i18n="hero.ctaStart">Test starten</span>
+      </a>
+      <a href="#science" class="btn btn-ghost" data-i18n="hero.ctaWhy">Warum das zählt</a>
+    </div>
+
+    <div class="stats">
+      <div class="stat"><div class="num" data-i18n="stat1.num">2&nbsp;Min</div><div class="cap" data-i18n="stat1.cap">ehrlicher Selbsttest, lokal ausgewertet</div></div>
+      <div class="stat"><div class="num">33</div><div class="cap" data-i18n="stat2.cap">Fragen der validierten NFC-Skala (α&nbsp;=&nbsp;.86)</div></div>
+      <div class="stat"><div class="num" data-i18n="stat3.num">1&nbsp;Frage</div><div class="cap" data-i18n="stat3.cap">die über deine geistige Zukunft entscheidet</div></div>
+    </div>
+  </header>
+
+  <!-- Science -->
+  <section class="section" id="science">
+    <div class="card prose">
+      <div class="section-label" data-i18n="sci.label">Warum das zählt</div>
+      <h2 data-i18n="sci.h2">Dasselbe Werkzeug.<br>Zwei Richtungen.</h2>
+      <p data-i18n="sci.p1">
+        <strong>Need for Cognition</strong> ist kein IQ &ndash; es ist die Lust am Denken (Cacioppo &amp; Petty, 1982). Und genau diese Lust steht im KI-Zeitalter auf dem Spiel.
+      </p>
+      <p data-i18n="sci.p2">
+        Der Taschenrechner nahm uns das Rechnen ab. Generative KI greift höher: sie übernimmt das <strong>Denken selbst</strong>. Kosmyna et&nbsp;al. (2025) maßen es per EEG &ndash; wer beim Schreiben ein LLM nutzte, zeigte die <strong>schwächste Gehirnaktivität</strong>, und sie blieb schwach, selbst als die KI wieder weg war. <span style="color:var(--text)">Auslagern hat einen Preis. Mitdenken einen Gewinn.</span>
+      </p>
+      <div class="science-grid">
+        <div class="science-item"><div class="big">r&nbsp;=&nbsp;.55</div><div class="sm" data-i18n="sci.k1">Denkfreude &harr; wissenschaftliches Interesse</div></div>
+        <div class="science-item"><div class="big">r&nbsp;=&nbsp;.57</div><div class="sm" data-i18n="sci.k2">Denkfreude &harr; Leistungsmotivation</div></div>
+        <div class="science-item"><div class="big">EEG&nbsp;&darr;</div><div class="sm" data-i18n="sci.k3">schwächste Hirnaktivität bei LLM-Nutzung (Kosmyna 2025)</div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Gain / Loss -->
+  <section class="section">
+    <div class="section-label" data-i18n="gl.label">Gewinn oder Verlust</div>
+    <h2 style="margin-bottom:1.6rem" data-i18n="gl.h2">Die Richtung bestimmst <span class="grad">du</span>.</h2>
+    <div class="split">
+      <div class="lane gain">
+        <div class="lane-tag">↑</div>
+        <h3 data-i18n="gain.title">Du gewinnst</h3>
+        <ul>
+          <li data-i18n="gain.1"><strong>Aktives Erinnern statt Nachschlagen.</strong>Karteikarten mit Spaced Repetition zwingen dich, Wissen selbst abzurufen. <span class="chip">Flashcards</span></li>
+          <li data-i18n="gain.2"><strong>Reflektieren statt auslagern.</strong>Das Brain-Resümee fasst zusammen &ndash; die Schlüsse ziehst du. <span class="chip">Brain</span></li>
+          <li data-i18n="gain.3"><strong>Mensch in der Schleife.</strong>Die KI schlägt vor, du gibst frei. Die Entscheidung bleibt deine. <span class="chip">Workflow</span></li>
+          <li data-i18n="gain.4"><strong>Denken im Dialog.</strong>Notes-Chat ist Sparringspartner, kein Antwort-Automat. <span class="chip">Notes-Chat</span></li>
+        </ul>
+      </div>
+      <div class="lane loss">
+        <div class="lane-tag">↓</div>
+        <h3 data-i18n="loss.title">Du verlierst</h3>
+        <ul>
+          <li data-i18n="loss.1"><strong>Blindes Copy-Paste.</strong>KI-Antworten übernehmen, ohne sie je selbst zu formulieren.</li>
+          <li data-i18n="loss.2"><strong>Verstehen auslagern.</strong>Das Ergebnis kennen, ohne den Weg &ndash; das „Chinesische Zimmer" im Kopf.</li>
+          <li data-i18n="loss.3"><strong>Kognitive Schuld.</strong>Wer nie selbst denkt, baut Denkvermögen ab (Kosmyna 2025).</li>
+          <li data-i18n="loss.4"><strong>Bequemlichkeit als Default.</strong>Immer das Werkzeug greifen, das am wenigsten verlangt.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- Test -->
+  <section class="section" id="test">
+    <div class="card">
+      <div class="section-label" data-i18n="test.label">Der Selbsttest</div>
+      <h2 data-i18n="test.h2">Wie tickst du?</h2>
+      <p class="muted" style="margin-bottom:1.4rem" data-i18n="test.note">Need-for-Cognition-Skala · Bless, Fellhauer, Bohner &amp; Schwarz (1991) · Auswertung läuft lokal in deinem Browser &ndash; nichts wird gesendet.</p>
+
+      <div class="instruktion">
+        <span data-i18n="test.instr"><strong>Anleitung:</strong> Gib für jede Aussage an, inwieweit sie auf dich persönlich zutrifft. Es gibt keine richtigen oder falschen Antworten &ndash; nur ehrliche.</span>
+        <div class="scale-legend">
+          <span class="pos" data-i18n="scale.pos">+3 trifft ganz genau zu</span>
+          <span class="neu" data-i18n="scale.neu">0 neutral</span>
+          <span class="pos" data-i18n="scale.neg">&minus;3 völlig unzutreffend</span>
+        </div>
+      </div>
+
+      <div id="items-container"></div>
+
+      <div class="progress-container"><div class="progress-bar" id="progress-bar"></div></div>
+      <div class="progress-text" id="progress-text">0 / 33</div>
+    </div>
+
+    <div class="card">
+      <h2 style="font-size:1.5rem" data-i18n="res.h2">Dein Ergebnis</h2>
+      <div class="ergebnis-box" id="ergebnis-box">
+        <p class="muted" data-i18n="res.empty">Beantworte alle 33 Aussagen &ndash; dann erscheint hier dein Denk-Profil.</p>
+      </div>
+      <div class="kurzform-hinweis" style="border:none;padding-top:1rem" data-i18n="res.note">
+        <strong>Egal welcher Wert:</strong> ein <em>niedriger</em> ist kein Defizit, sondern ein Signal, KI bewusster einzusetzen, damit Bequemlichkeit nicht zur kognitiven Schuld wird. Ein <em>hoher</em> Wert will gefüttert werden &ndash; mit Werkzeugen, die dich denken lassen.
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <section class="section">
+    <div class="card cta-card">
+      <h2 data-i18n="cta.h2">Nutze KI, die dich <span class="grad">denken lässt.</span></h2>
+      <p data-i18n="cta.p">MindGraph Notes ist für die linke Spalte gebaut: lokal, mit aktivem Erinnern, Reflexion und bewusster Freigabe. Open Source, kostenlos, ohne Cloud-Zwang.</p>
+      <div class="hero-cta">
+        <a href="./#download" class="btn btn-primary">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          <span data-i18n="cta.dl">Kostenlos herunterladen</span>
+        </a>
+        <a href="./" class="btn btn-ghost" data-i18n="cta.more">Mehr über MindGraph</a>
+      </div>
+    </div>
+  </section>
+
+  <div class="quellen" data-i18n="quellen">
+    Quellen: Bless, H., Fellhauer, R.&nbsp;F., Bohner, G., &amp; Schwarz, N. (1991). <em>Need for Cognition: eine Skala zur Erfassung von Engagement und Freude bei Denkaufgaben</em> (ZUMA-Arbeitsbericht 91/06), Mannheim. &middot; Cacioppo, J.&nbsp;T., &amp; Petty, R.&nbsp;E. (1982). The need for cognition. <em>JPSP, 42(1)</em>. &middot; Kosmyna, N. et&nbsp;al. (2025). EEG-Studie zur Gehirnaktivität beim Schreiben mit/ohne LLM.
+  </div>
+</div>
+
+<footer>
+  MindGraph Notes &middot; <a href="./" data-i18n="foot.home">Startseite</a> &middot; <a href="./#download">Download</a> &middot; <a href="https://github.com/bydb/mindgraph-notes" target="_blank" rel="noopener noreferrer">GitHub</a>
+</footer>
+
+<script>
+// ITEMS: [nr, text_de, text_en, reverse]
+const ITEMS = [
+  [ 1, 'Die Aufgabe, neue Lösungen für Probleme zu finden, macht mir wirklich Spaß.', 'I really enjoy the task of finding new solutions to problems.', false ],
+  [ 2, 'Ich würde lieber eine Aufgabe lösen, die Intelligenz erfordert, schwierig und bedeutend ist, als eine Aufgabe, die zwar irgendwie wichtig ist, aber nicht viel Nachdenken erfordert.', 'I would rather tackle a task that is intelligent, difficult and important than one that is somewhat important but requires little thought.', false ],
+  [ 3, 'Ich setze mir eher solche Ziele, die nur mit erheblicher geistiger Anstrengung erreicht werden können.', 'I tend to set goals that can only be reached with considerable mental effort.', false ],
+  [ 4, 'Wenn ich etwas lese, das mich verwirrt, dann lege ich es zur Seite und vergesse es.', 'When I read something that confuses me, I just set it aside and forget about it.', true ],
+  [ 5, 'Ich neige gewöhnlich dazu, mir über eine Aufgabe mehr Gedanken zu machen, als zu ihrer Bewältigung gerade notwendig wäre.', 'I usually end up thinking about a task more than is strictly necessary to get it done.', false ],
+  [ 6, 'Ich finde es nicht sonderlich aufregend, neue Denkweisen zu lernen.', 'I do not find it particularly exciting to learn new ways of thinking.', true ],
+  [ 7, 'Ich lasse den Dingen lieber freien Lauf, als dass ich versuche zu ergründen, warum sie so gelaufen sind.', 'I would rather let things take their course than try to work out why they turned out the way they did.', true ],
+  [ 8, 'Das Denken in neuen und unbekannten Situationen fällt mir schwer.', 'I find it hard to think in new and unfamiliar situations.', true ],
+  [ 9, 'Die Vorstellung, mich auf mein Denkvermögen zu verlassen, um es zu etwas zu bringen, spricht mich nicht an.', 'The idea of relying on my own thinking to get ahead does not appeal to me.', true ],
+  [10, 'Abstrakt zu denken reizt mich nicht.', 'Thinking in abstract terms does not appeal to me.', true ],
+  [11, 'Man könnte mich als Intellektuelle/n bezeichnen.', 'You could describe me as an intellectual.', false ],
+  [12, 'Ich finde es besonders befriedigend, eine bedeutende Aufgabe abzuschließen, die viel Denken und geistige Anstrengung erfordert hat.', 'I find it especially satisfying to finish an important task that took a lot of thinking and mental effort.', false ],
+  [13, 'Ich mag Aufgaben, die, wenn ich sie einmal erlernt habe, wenig Nachdenken erfordern.', 'I like tasks that require little thought once I have learned them.', true ],
+  [14, 'Ich denke lieber über kleine, alltägliche Vorhaben nach, als über langfristige.', 'I prefer to think about small, everyday plans rather than long-term ones.', true ],
+  [15, 'Ich würde lieber etwas tun, das wenig Denken erfordert, als etwas, das mit Sicherheit meine Denkfähigkeit herausfordert.', 'I would rather do something that needs little thought than something that is sure to challenge my thinking.', true ],
+  [16, 'Ich finde wenig Befriedigung darin, angestrengt und stundenlang nachzudenken.', 'I find little satisfaction in thinking hard for hours on end.', true ],
+  [17, 'In erster Linie denke ich, weil ich muss.', 'For the most part, I think because I have to.', true ],
+  [18, 'Ich rede öfter mit anderen Menschen über die Gründe und die möglichen Lösungen für internationale Probleme als über Klatsch und Tratsch berühmter Leute.', 'I talk with others about the causes of and possible solutions to international problems more often than about celebrity gossip.', false ],
+  [19, 'Ich trage nicht gerne die Verantwortung für eine Situation, die sehr viel Denken erfordert.', 'I do not like being responsible for a situation that demands a great deal of thinking.', true ],
+  [20, 'Ich schätze Gelegenheiten, die Stärken und Schwächen meiner eigenen Urteilskraft zu entdecken.', 'I value opportunities to discover the strengths and weaknesses of my own judgement.', false ],
+  [21, 'Wenn ich eine Aufgabe erledigt habe, die viel geistige Anstrengung erfordert hat, fühle ich mich eher erleichtert als befriedigt.', 'After finishing a task that took a lot of mental effort, I feel more relieved than satisfied.', true ],
+  [22, 'Denken entspricht nicht dem, was ich unter Spaß verstehe.', 'Thinking is not my idea of fun.', true ],
+  [23, 'Ich versuche, Situationen vorauszuahnen und zu vermeiden, in denen die Wahrscheinlichkeit groß ist, dass ich intensiv über etwas nachdenken muss.', 'I try to anticipate and avoid situations where I am likely to have to think hard about something.', true ],
+  [24, 'Ich bin nicht gern dafür verantwortlich, mir darüber Gedanken zu machen, wie ich mein Leben gestalten soll.', 'I do not like being responsible for thinking about how to shape my life.', true ],
+  [25, 'Ich würde mir lieber Bildungssendungen anschauen als Unterhaltungssendungen.', 'I would rather watch educational programmes than entertainment shows.', false ],
+  [26, 'Es gelingt mir oft, schwierige Probleme, die ich mir gestellt habe, zu lösen.', 'I often manage to solve difficult problems I have set for myself.', false ],
+  [27, 'Ich bin nicht zufrieden, wenn ich nicht denke.', 'I am not content unless I am thinking.', false ],
+  [28, 'Ich habe es gern, wenn mein Leben voller kniffliger Aufgaben ist, die ich lösen muss.', 'I like my life to be full of tricky problems I have to solve.', false ],
+  [29, 'Ich würde komplizierte Probleme einfachen Problemen vorziehen.', 'I would prefer complex problems to simple ones.', false ],
+  [30, 'Es genügt mir, einfach die Antwort zu kennen, ohne die Gründe für die Antwort eines Problems zu verstehen.', 'It is enough for me to know the answer without understanding the reasons behind it.', true ],
+  [31, 'Es genügt, dass etwas funktioniert, mir ist es egal, wie oder warum.', 'As long as something works, I do not care how or why.', true ],
+  [32, 'Was ich nicht weiß, macht mich nicht heiß.', 'What I do not know does not worry me.', true ],
+  [33, 'Es macht mir Spaß, über ein Problem nachzudenken, sogar dann, wenn die Ergebnisse meines Denkens keinen Einfluss auf die Lösung des Problems haben.', 'I enjoy thinking about a problem even when my thinking has no effect on solving it.', false ]
+];
+const SHORT_FORM = new Set([1,2,3,9,12,15,16,17,19,22,23,28,29,30,31]);
+const VALUES = [-3,-2,-1,0,1,2,3];
+
+let currentLang = 'de';
+
+const translations = {
+  de: {
+    'meta.title': 'Denkst du noch – oder lässt du denken? | MindGraph Notes',
+    'nav.cta': 'App holen &rarr;',
+    'hero.h1': 'Denkst du noch&nbsp;&ndash;<br>oder <span class="grad">lässt du denken?</span>',
+    'hero.lead': 'Generative KI macht dich <strong>klüger</strong> oder <strong>abhängig</strong> &ndash; dazwischen liegt nur, <em>wie</em> du sie benutzt. Mach den validierten Test, finde deinen Denk-Typ und sieh schwarz auf weiß, wo du gewinnst und wo du verlierst.',
+    'hero.ctaStart': 'Test starten',
+    'hero.ctaWhy': 'Warum das zählt',
+    'stat1.num': '2&nbsp;Min',
+    'stat1.cap': 'ehrlicher Selbsttest, lokal ausgewertet',
+    'stat2.cap': 'Fragen der validierten NFC-Skala (α&nbsp;=&nbsp;.86)',
+    'stat3.num': '1&nbsp;Frage',
+    'stat3.cap': 'die über deine geistige Zukunft entscheidet',
+    'sci.label': 'Warum das zählt',
+    'sci.h2': 'Dasselbe Werkzeug.<br>Zwei Richtungen.',
+    'sci.p1': '<strong>Need for Cognition</strong> ist kein IQ &ndash; es ist die Lust am Denken (Cacioppo &amp; Petty, 1982). Und genau diese Lust steht im KI-Zeitalter auf dem Spiel.',
+    'sci.p2': 'Der Taschenrechner nahm uns das Rechnen ab. Generative KI greift höher: sie übernimmt das <strong>Denken selbst</strong>. Kosmyna et&nbsp;al. (2025) maßen es per EEG &ndash; wer beim Schreiben ein LLM nutzte, zeigte die <strong>schwächste Gehirnaktivität</strong>, und sie blieb schwach, selbst als die KI wieder weg war. <span style="color:var(--text)">Auslagern hat einen Preis. Mitdenken einen Gewinn.</span>',
+    'sci.k1': 'Denkfreude &harr; wissenschaftliches Interesse',
+    'sci.k2': 'Denkfreude &harr; Leistungsmotivation',
+    'sci.k3': 'schwächste Hirnaktivität bei LLM-Nutzung (Kosmyna 2025)',
+    'gl.label': 'Gewinn oder Verlust',
+    'gl.h2': 'Die Richtung bestimmst <span class="grad">du</span>.',
+    'gain.title': 'Du gewinnst',
+    'gain.1': '<strong>Aktives Erinnern statt Nachschlagen.</strong>Karteikarten mit Spaced Repetition zwingen dich, Wissen selbst abzurufen. <span class="chip">Flashcards</span>',
+    'gain.2': '<strong>Reflektieren statt auslagern.</strong>Das Brain-Resümee fasst zusammen &ndash; die Schlüsse ziehst du. <span class="chip">Brain</span>',
+    'gain.3': '<strong>Mensch in der Schleife.</strong>Die KI schlägt vor, du gibst frei. Die Entscheidung bleibt deine. <span class="chip">Workflow</span>',
+    'gain.4': '<strong>Denken im Dialog.</strong>Notes-Chat ist Sparringspartner, kein Antwort-Automat. <span class="chip">Notes-Chat</span>',
+    'loss.title': 'Du verlierst',
+    'loss.1': '<strong>Blindes Copy-Paste.</strong>KI-Antworten übernehmen, ohne sie je selbst zu formulieren.',
+    'loss.2': '<strong>Verstehen auslagern.</strong>Das Ergebnis kennen, ohne den Weg &ndash; das „Chinesische Zimmer" im Kopf.',
+    'loss.3': '<strong>Kognitive Schuld.</strong>Wer nie selbst denkt, baut Denkvermögen ab (Kosmyna 2025).',
+    'loss.4': '<strong>Bequemlichkeit als Default.</strong>Immer das Werkzeug greifen, das am wenigsten verlangt.',
+    'test.label': 'Der Selbsttest',
+    'test.h2': 'Wie tickst du?',
+    'test.note': 'Need-for-Cognition-Skala · Bless, Fellhauer, Bohner &amp; Schwarz (1991) · Auswertung läuft lokal in deinem Browser &ndash; nichts wird gesendet.',
+    'test.instr': '<strong>Anleitung:</strong> Gib für jede Aussage an, inwieweit sie auf dich persönlich zutrifft. Es gibt keine richtigen oder falschen Antworten &ndash; nur ehrliche.',
+    'scale.pos': '+3 trifft ganz genau zu',
+    'scale.neu': '0 neutral',
+    'scale.neg': '&minus;3 völlig unzutreffend',
+    'res.h2': 'Dein Ergebnis',
+    'res.empty': 'Beantworte alle 33 Aussagen &ndash; dann erscheint hier dein Denk-Profil.',
+    'res.note': '<strong>Egal welcher Wert:</strong> ein <em>niedriger</em> ist kein Defizit, sondern ein Signal, KI bewusster einzusetzen, damit Bequemlichkeit nicht zur kognitiven Schuld wird. Ein <em>hoher</em> Wert will gefüttert werden &ndash; mit Werkzeugen, die dich denken lassen.',
+    'cta.h2': 'Nutze KI, die dich <span class="grad">denken lässt.</span>',
+    'cta.p': 'MindGraph Notes ist für die linke Spalte gebaut: lokal, mit aktivem Erinnern, Reflexion und bewusster Freigabe. Open Source, kostenlos, ohne Cloud-Zwang.',
+    'cta.dl': 'Kostenlos herunterladen',
+    'cta.more': 'Mehr über MindGraph',
+    'quellen': 'Quellen: Bless, H., Fellhauer, R.&nbsp;F., Bohner, G., &amp; Schwarz, N. (1991). <em>Need for Cognition: eine Skala zur Erfassung von Engagement und Freude bei Denkaufgaben</em> (ZUMA-Arbeitsbericht 91/06), Mannheim. &middot; Cacioppo, J.&nbsp;T., &amp; Petty, R.&nbsp;E. (1982). The need for cognition. <em>JPSP, 42(1)</em>. &middot; Kosmyna, N. et&nbsp;al. (2025). EEG-Studie zur Gehirnaktivität beim Schreiben mit/ohne LLM.',
+    'foot.home': 'Startseite',
+    // JS strings
+    'js.answered': 'beantwortet',
+    'js.ansLow': 'völlig\nunzutreffend',
+    'js.ansHigh': 'trifft ganz\ngenau zu',
+    'js.sumLabel': 'Summenwert (33 Items)',
+    'js.sumRange': 'Spanne −99 bis +99',
+    'js.meanLabel': 'Mittelwert',
+    'js.meanScale': 'Skala −3 bis +3',
+    'js.shortPre': 'Kurzform (15 Items):',
+    'js.shortSum': 'Summe',
+    'js.shortMean': 'Mittelwert',
+    'int.hoch': 'Hohes Need for Cognition – ausgeprägte Freude am Denken',
+    'int.eher-hoch': 'Eher hohes Need for Cognition – überdurchschnittliche Denkfreude',
+    'int.mittel': 'Durchschnittliches Need for Cognition – moderate Ausprägung',
+    'int.eher-niedrig': 'Eher niedriges Need for Cognition – wenig Engagement bei Denkaufgaben',
+    'int.niedrig': 'Niedriges Need for Cognition – geringe Neigung zu aufwändigem Denken'
+  },
+  en: {
+    'meta.title': 'Do you still think – or let it think for you? | MindGraph Notes',
+    'nav.cta': 'Get the app &rarr;',
+    'hero.h1': 'Do you still think&nbsp;&ndash;<br>or <span class="grad">let it think for you?</span>',
+    'hero.lead': 'Generative AI makes you <strong>sharper</strong> or <strong>dependent</strong> &ndash; the only thing in between is <em>how</em> you use it. Take the validated test, find your thinking type and see in black and white where you gain and where you lose.',
+    'hero.ctaStart': 'Start the test',
+    'hero.ctaWhy': 'Why it matters',
+    'stat1.num': '2&nbsp;min',
+    'stat1.cap': 'honest self-test, scored locally',
+    'stat2.cap': 'questions of the validated NFC scale (α&nbsp;=&nbsp;.86)',
+    'stat3.num': '1&nbsp;question',
+    'stat3.cap': 'that shapes the future of your mind',
+    'sci.label': 'Why it matters',
+    'sci.h2': 'The same tool.<br>Two directions.',
+    'sci.p1': '<strong>Need for Cognition</strong> is not IQ &ndash; it is the enjoyment of thinking (Cacioppo &amp; Petty, 1982). And it is exactly this enjoyment that is at stake in the age of AI.',
+    'sci.p2': 'The calculator took arithmetic off our hands. Generative AI reaches higher: it takes over <strong>thinking itself</strong>. Kosmyna et&nbsp;al. (2025) measured it via EEG &ndash; people who wrote with an LLM showed the <strong>weakest brain activity</strong>, and it stayed weak even after the AI was gone. <span style="color:var(--text)">Offloading has a price. Thinking along has a payoff.</span>',
+    'sci.k1': 'enjoyment of thinking &harr; scientific interest',
+    'sci.k2': 'enjoyment of thinking &harr; achievement motivation',
+    'sci.k3': 'weakest brain activity when using an LLM (Kosmyna 2025)',
+    'gl.label': 'Gain or loss',
+    'gl.h2': 'You decide the <span class="grad">direction</span>.',
+    'gain.title': 'You gain',
+    'gain.1': '<strong>Active recall instead of looking up.</strong>Flashcards with spaced repetition force you to retrieve knowledge yourself. <span class="chip">Flashcards</span>',
+    'gain.2': '<strong>Reflect instead of offload.</strong>The Brain summary sums things up &ndash; you draw the conclusions. <span class="chip">Brain</span>',
+    'gain.3': '<strong>Human in the loop.</strong>The AI suggests, you approve. The decision stays yours. <span class="chip">Workflow</span>',
+    'gain.4': '<strong>Thinking in dialogue.</strong>Notes Chat is a sparring partner, not an answer machine. <span class="chip">Notes Chat</span>',
+    'loss.title': 'You lose',
+    'loss.1': '<strong>Blind copy-paste.</strong>Taking AI answers without ever phrasing them yourself.',
+    'loss.2': '<strong>Outsourcing understanding.</strong>Knowing the answer without the path &ndash; the &bdquo;Chinese Room&ldquo; in your head.',
+    'loss.3': '<strong>Cognitive debt.</strong>Those who never think for themselves erode their thinking ability (Kosmyna 2025).',
+    'loss.4': '<strong>Convenience as the default.</strong>Always reaching for the tool that demands the least.',
+    'test.label': 'The self-test',
+    'test.h2': 'How do you tick?',
+    'test.note': 'Need for Cognition scale · Bless, Fellhauer, Bohner &amp; Schwarz (1991) · scored locally in your browser &ndash; nothing is sent.',
+    'test.instr': '<strong>Instructions:</strong> For each statement, indicate how far it applies to you personally. There are no right or wrong answers &ndash; only honest ones.',
+    'scale.pos': '+3 applies completely',
+    'scale.neu': '0 neutral',
+    'scale.neg': '&minus;3 does not apply at all',
+    'res.h2': 'Your result',
+    'res.empty': 'Answer all 33 statements &ndash; your thinking profile will appear here.',
+    'res.note': '<strong>Whatever the score:</strong> a <em>low</em> one is not a deficit but a signal to use AI more deliberately, so convenience does not turn into cognitive debt. A <em>high</em> one needs feeding &ndash; with tools that let you think.',
+    'cta.h2': 'Use AI that <span class="grad">lets you think.</span>',
+    'cta.p': 'MindGraph Notes is built for the left column: local, with active recall, reflection and deliberate approval. Open source, free, no forced cloud.',
+    'cta.dl': 'Download for free',
+    'cta.more': 'More about MindGraph',
+    'quellen': 'Sources: Bless, H., Fellhauer, R.&nbsp;F., Bohner, G., &amp; Schwarz, N. (1991). <em>Need for Cognition: a scale measuring engagement and enjoyment in thinking tasks</em> (ZUMA working paper 91/06), Mannheim &ndash; the items here are an English rendering of this validated German scale. &middot; Cacioppo, J.&nbsp;T., &amp; Petty, R.&nbsp;E. (1982). The need for cognition. <em>JPSP, 42(1)</em>. &middot; Kosmyna, N. et&nbsp;al. (2025). EEG study on brain activity when writing with/without an LLM.',
+    'foot.home': 'Home',
+    // JS strings
+    'js.answered': 'answered',
+    'js.ansLow': 'does not\napply at all',
+    'js.ansHigh': 'applies\ncompletely',
+    'js.sumLabel': 'Total score (33 items)',
+    'js.sumRange': 'Range −99 to +99',
+    'js.meanLabel': 'Mean',
+    'js.meanScale': 'Scale −3 to +3',
+    'js.shortPre': 'Short form (15 items):',
+    'js.shortSum': 'Sum',
+    'js.shortMean': 'Mean',
+    'int.hoch': 'High Need for Cognition – a strong enjoyment of thinking',
+    'int.eher-hoch': 'Fairly high Need for Cognition – above-average enjoyment of thinking',
+    'int.mittel': 'Average Need for Cognition – a moderate level',
+    'int.eher-niedrig': 'Fairly low Need for Cognition – little engagement with mental tasks',
+    'int.niedrig': 'Low Need for Cognition – little inclination toward effortful thinking'
+  }
+};
+
+function T(key) { return translations[currentLang][key]; }
+
+function applyI18n() {
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    const v = translations[currentLang][el.getAttribute('data-i18n')];
+    if (v != null) el.innerHTML = v;
+  });
+}
+
+function labelText(v) {
+  if (v === -3) return T('js.ansLow');
+  if (v === 3) return T('js.ansHigh');
+  return '';
+}
+
+function renderItems() {
+  const prev = getAnswers();
+  const c = document.getElementById('items-container');
+  c.innerHTML = '';
+  ITEMS.forEach(([nr, de, en, reverse]) => {
+    const text = currentLang === 'en' ? en : de;
+    const d = document.createElement('div');
+    d.className = 'item';
+    d.innerHTML = `
+      <div class="item-header">
+        <span class="item-nr">${nr}.</span>
+        <span class="item-text">${text}</span>
+        ${reverse ? '<span class="item-reverse">(R)</span>' : ''}
+      </div>
+      <div class="antworten" data-nr="${nr}">
+        ${VALUES.map(v => `
+          <label>
+            <input type="radio" name="item${nr}" value="${v}" onchange="update()">
+            <span class="radio-dot">${v < 0 ? '−' + Math.abs(v) : v > 0 ? '+' + v : '0'}</span>
+            <span class="label-text">${labelText(v)}</span>
+          </label>
+        `).join('')}
+      </div>
+    `;
+    c.appendChild(d);
+    if (prev[nr] !== null && prev[nr] !== undefined) {
+      const el = d.querySelector(`input[name="item${nr}"][value="${prev[nr]}"]`);
+      if (el) el.checked = true;
+    }
+  });
+  updateProgress();
+}
+function getAnswers() {
+  const ans = {};
+  ITEMS.forEach(([nr]) => { const el = document.querySelector(`input[name="item${nr}"]:checked`); ans[nr] = el ? parseInt(el.value) : null; });
+  return ans;
+}
+function countAnswered() { let n = 0; ITEMS.forEach(([nr]) => { if (document.querySelector(`input[name="item${nr}"]:checked`)) n++; }); return n; }
+function updateProgress() {
+  const n = countAnswered();
+  document.getElementById('progress-bar').style.width = (n / ITEMS.length * 100).toFixed(0) + '%';
+  document.getElementById('progress-text').textContent = `${n} / ${ITEMS.length} ${T('js.answered')}`;
+}
+function compute() {
+  const ans = getAnswers();
+  const answeredCount = ITEMS.filter(([nr]) => ans[nr] !== null).length;
+  if (answeredCount < ITEMS.length) return { incomplete: true, n: answeredCount, total: ITEMS.length };
+  let sum = 0;
+  ITEMS.forEach(([nr, , , reverse]) => { let v = ans[nr]; if (reverse) v = -v; sum += v; });
+  const mean = sum / ITEMS.length;
+  let sfSum = 0;
+  ITEMS.forEach(([nr, , , reverse]) => { if (!SHORT_FORM.has(nr)) return; let v = ans[nr]; if (reverse) v = -v; sfSum += v; });
+  const sfMean = sfSum / SHORT_FORM.size;
+  return { incomplete: false, sum, mean, sfSum, sfMean };
+}
+function interpret(value) {
+  let label;
+  if (value > 1.4) label = 'hoch';
+  else if (value > 0.6) label = 'eher-hoch';
+  else if (value > -0.6) label = 'mittel';
+  else if (value > -1.4) label = 'eher-niedrig';
+  else label = 'niedrig';
+  return { label, text: T('int.' + label) };
+}
+function update() {
+  updateProgress();
+  const result = compute();
+  const box = document.getElementById('ergebnis-box');
+  if (result.incomplete) {
+    const missing = result.total - result.n;
+    if (currentLang === 'en') {
+      box.innerHTML = `<p class="muted"><strong>${missing} ${missing === 1 ? 'statement' : 'statements'}</strong> to go — please answer them all to see your profile.</p>`;
+    } else {
+      box.innerHTML = `<p class="muted">Noch <strong>${missing} ${missing === 1 ? 'Aussage' : 'Aussagen'}</strong> offen. Bitte alle ausfüllen, um dein Profil zu sehen.</p>`;
+    }
+    return;
+  }
+  const r = interpret(result.mean);
+  const sfR = interpret(result.sfMean);
+  const sfShort = sfR.text.split(' – ')[0];
+  box.innerHTML = `
+    <div class="ergebnis-grid">
+      <div class="ergebnis-karte">
+        <div class="wert">${result.sum > 0 ? '+' : ''}${result.sum.toFixed(0)}</div>
+        <div class="label">${T('js.sumLabel')}<br><span style="font-size:.75rem">${T('js.sumRange')}</span></div>
+      </div>
+      <div class="ergebnis-karte">
+        <div class="wert">${result.mean > 0 ? '+' : ''}${result.mean.toFixed(2)}</div>
+        <div class="label">${T('js.meanLabel')}<br><span style="font-size:.75rem">${T('js.meanScale')}</span></div>
+      </div>
+      <div class="ergebnis-karte gross">
+        <div class="interpretation ${r.label}">${r.text}</div>
+      </div>
+    </div>
+    <div class="kurzform-hinweis">
+      <strong>${T('js.shortPre')}</strong> ${T('js.shortSum')} ${result.sfSum > 0 ? '+' : ''}${result.sfSum.toFixed(0)} · ${T('js.shortMean')} ${result.sfMean > 0 ? '+' : ''}${result.sfMean.toFixed(2)} (${sfShort}). Cronbachs α = .83.
+    </div>`;
+}
+
+function setLanguage(lang) {
+  currentLang = (lang === 'en') ? 'en' : 'de';
+  try { localStorage.setItem('lang', currentLang); } catch (e) {}
+  document.documentElement.lang = currentLang;
+  document.getElementById('lang-de').classList.toggle('active', currentLang === 'de');
+  document.getElementById('lang-en').classList.toggle('active', currentLang === 'en');
+  document.title = T('meta.title');
+  applyI18n();
+  renderItems();
+  if (countAnswered() > 0) update();
+}
+
+(function init() {
+  let stored = 'de';
+  try { stored = localStorage.getItem('lang') || 'de'; } catch (e) {}
+  setLanguage(stored);
+})();
+</script>
+</body>
+</html>

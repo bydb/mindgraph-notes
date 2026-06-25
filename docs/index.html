@@ -75,19 +75,19 @@
     *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
     :root {
-      --bg: #faf8f0;
-      --bg-warm: #f5f0e4;
-      --card: rgba(255,255,255,0.65);
-      --card-hover: rgba(255,255,255,0.9);
-      --text: #1a1a1a;
-      --text-mid: #4a4540;
-      --text-muted: #8a8278;
-      --accent: #c4764a;
-      --accent-light: rgba(196,118,74,0.12);
-      --accent-glow: rgba(196,118,74,0.2);
-      --gradient: linear-gradient(135deg, #c4764a 0%, #d4905e 50%, #b86a3e 100%);
-      --border: rgba(0,0,0,0.06);
-      --radius: 14px;
+      --bg: #0c0a09;
+      --bg-warm: #151010;
+      --card: rgba(255,255,255,0.04);
+      --card-hover: rgba(255,255,255,0.08);
+      --text: #f6f0e8;
+      --text-mid: #c7bdb1;
+      --text-muted: #8c8276;
+      --accent: #ff7a3c;
+      --accent-light: rgba(255,122,60,0.14);
+      --accent-glow: rgba(236,77,138,0.4);
+      --gradient: linear-gradient(115deg, #ffb24a 0%, #ff7a3c 45%, #ec4d8a 100%);
+      --border: rgba(255,255,255,0.09);
+      --radius: 16px;
       --font: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
       --font-display: 'DM Serif Display', Georgia, serif;
     }
@@ -117,11 +117,11 @@
       width: 600px; height: 600px;
       border-radius: 50%;
       filter: blur(120px);
-      opacity: 0.5;
+      opacity: 0.6;
       pointer-events: none;
     }
-    .bg-glow-1 { top: -200px; right: -100px; background: rgba(196,118,74,0.1); }
-    .bg-glow-2 { bottom: 20%; left: -200px; background: rgba(196,118,74,0.06); }
+    .bg-glow-1 { top: -220px; right: -120px; background: radial-gradient(circle, #ff7a3c, transparent 70%); }
+    .bg-glow-2 { bottom: 12%; left: -200px; width: 520px; height: 520px; background: radial-gradient(circle, #ec4d8a, transparent 70%); opacity: 0.45; }
 
     /* --- Nav --- */
     nav {
@@ -129,7 +129,7 @@
       padding: 1rem 2rem;
       display: flex; justify-content: space-between; align-items: center;
       backdrop-filter: blur(16px) saturate(1.8);
-      background: rgba(250,248,240,0.8);
+      background: rgba(12,10,9,0.72);
       border-bottom: 1px solid var(--border);
     }
     .logo { display: flex; align-items: center; gap: 0.6rem; font-weight: 600; font-size: 1.1rem; letter-spacing: -0.01em; }
@@ -156,7 +156,7 @@
     }
     .hero-badge {
       display: inline-flex; align-items: center; gap: 0.5rem;
-      padding: 0.4rem 1rem; background: var(--accent-light); border: 1px solid rgba(196,118,74,0.15);
+      padding: 0.4rem 1rem; background: var(--accent-light); border: 1px solid rgba(255,122,60,0.15);
       border-radius: 100px; font-size: 0.78rem; color: var(--accent); font-weight: 500;
       letter-spacing: 0.03em; text-transform: uppercase; margin-bottom: 2rem;
     }
@@ -164,8 +164,8 @@
     @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
 
     h1 {
-      font-family: var(--font-display); font-size: clamp(2.8rem, 7vw, 4.5rem);
-      font-weight: 400; line-height: 1.08; margin-bottom: 1.5rem;
+      font-family: var(--font-display); font-size: clamp(3rem, 8vw, 5.4rem);
+      font-weight: 400; line-height: 1.04; margin-bottom: 1.5rem;
       color: var(--text); letter-spacing: -0.02em;
     }
     h1 em {
@@ -196,8 +196,8 @@
       margin-top: 3.5rem; max-width: 1000px; width: 100%; padding: 0 1rem;
     }
     .hero-screenshot img {
-      width: 100%; border-radius: var(--radius); display: block;
-      box-shadow: 0 40px 80px -20px rgba(0,0,0,0.12), 0 0 0 1px var(--border);
+      width: 100%; display: block; border-radius: 20px;
+      filter: drop-shadow(0 40px 70px rgba(0,0,0,0.55));
     }
 
     /* --- Section common --- */
@@ -239,7 +239,7 @@
     .cap-tags { display: flex; flex-wrap: wrap; gap: 0.35rem; }
     .cap-tag {
       font-size: 0.7rem; padding: 0.2rem 0.55rem; border-radius: 5px;
-      background: rgba(0,0,0,0.04); color: var(--text-muted); font-weight: 500;
+      background: rgba(255,255,255,0.07); color: var(--text-mid); font-weight: 500;
     }
     .cap-card.featured { grid-column: span 2; }
     .cap-card.featured .cap-inner { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; align-items: start; }
@@ -267,7 +267,7 @@
     }
     .compare-card p { color: var(--text-mid); font-size: 0.95rem; line-height: 1.55; }
     .compare-card strong { color: var(--text); font-weight: 600; }
-    .compare-card.accent { border-color: rgba(196,118,74,0.3); background: linear-gradient(135deg, rgba(196,118,74,0.06), transparent); }
+    .compare-card.accent { border-color: rgba(255,122,60,0.3); background: linear-gradient(135deg, rgba(255,122,60,0.06), transparent); }
 
     /* --- Model quality --- */
     .model-quality { padding: 5rem 2rem; max-width: 1100px; margin: 0 auto; }
@@ -298,7 +298,7 @@
       border-radius: 100px; font-size: 0.82rem; color: var(--text-mid); font-weight: 500;
     }
     .module-chip .chip-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); opacity: 0.7; }
-    .module-chip.core { border-color: rgba(196,118,74,0.35); background: rgba(196,118,74,0.06); color: var(--accent); font-weight: 600; }
+    .module-chip.core { border-color: rgba(255,122,60,0.35); background: rgba(255,122,60,0.06); color: var(--accent); font-weight: 600; }
     .module-chip.core .chip-dot { background: var(--accent); opacity: 1; }
 
     /* --- Download --- */
@@ -402,6 +402,7 @@
     <div class="nav-right">
       <a href="#features" data-i18n="nav.features">Features</a>
       <a href="#why" data-i18n="nav.why">Warum</a>
+      <a href="#kognition" data-i18n="nav.kognition">Kognition</a>
       <a href="#download" data-i18n="nav.download">Download</a>
       <a href="./blog/" data-i18n="nav.blog">Blog</a>
       <a href="https://discord.gg/XqayAQdE" target="_blank" rel="noopener noreferrer">Discord</a>
@@ -420,10 +421,10 @@
       <span data-i18n="hero.badge">Open Source &middot; Lokal &middot; Kostenlos</span>
     </div>
 
-    <h1 data-i18n="hero.title">Zeigt dir,<br><em>was heute wichtig ist.</em></h1>
+    <h1 data-i18n="hero.title">Der Fokus bleibt.<br><em>Auch wenn das Leben dazwischenkommt.</em></h1>
 
     <p class="hero-sub" data-i18n="hero.sub">
-      MindGraph Notes verbindet deine Notizen, Aufgaben, E-Mails und Dokumente &mdash; und sortiert sie nach Relevanz. Dashboard, Wissensgraph und lokale KI in einer Desktop-App. Ohne Cloud-Zwang.
+      MindGraph zeigt dir jeden Morgen, was heute z&auml;hlt &mdash; Aufgaben, Mails, Termine, vergessene F&auml;den. Du gehst aufs Bike, ins Wochenende, liegst mal f&uuml;nf Tage flach. Und nichts f&auml;llt durch. Lokal, ohne Cloud-Zwang.
     </p>
 
     <div class="hero-cta">
@@ -438,9 +439,272 @@
     </div>
 
     <div class="hero-screenshot">
-      <img src="app-mockup.svg" alt="MindGraph Notes Dashboard mit Aufgaben, Emails und Kalender" loading="lazy">
+      <img src="people-hero.png" alt="Einzelk&auml;mpfer arbeitet ruhig und konzentriert am Schreibtisch &ndash; alles im Blick" loading="lazy">
     </div>
   </section>
+
+  <!-- ============ KLARHEITS-STORY (DE-first, Erzählbogen) ============ -->
+  <style>
+    .story { max-width:1080px; margin:0 auto; padding:0 1.5rem; }
+    .st-eyebrow { display:inline-flex;align-items:center;gap:.5rem;padding:.35rem 1rem;border:1px solid var(--border);border-radius:100px;font-size:.72rem;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:#ffb24a;background:rgba(255,255,255,.03);margin-bottom:1.2rem; }
+    .st-eyebrow .d { width:7px;height:7px;border-radius:50%;background:#ff7a3c;box-shadow:0 0 10px #ff7a3c; }
+    .st-h { font-family:var(--font-display);font-weight:400;font-size:clamp(2rem,4.5vw,3.2rem);line-height:1.07;letter-spacing:-0.02em;margin-bottom:1.1rem; }
+    .st-h em { font-style:italic;background:var(--gradient);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent; }
+    .st-lead { color:var(--text-mid);font-size:1.12rem;line-height:1.7;max-width:680px; }
+    /* Feind */
+    .enemy { text-align:center;padding:5rem 0 1rem; }
+    .enemy .st-lead { margin:0 auto; }
+    .enemy-stats { display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;margin:2.6rem auto 0;max-width:880px; }
+    .enemy-stat { background:var(--card);border:1px solid var(--border);border-radius:16px;padding:1.6rem 1.2rem; }
+    .enemy-stat .n { font-size:clamp(2rem,4.5vw,2.8rem);font-weight:900;letter-spacing:-0.03em;background:var(--gradient);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;line-height:1; }
+    .enemy-stat .t { font-size:.86rem;color:var(--text-mid);margin-top:.6rem; }
+    .enemy-stat .src { font-size:.7rem;color:var(--text-muted);margin-top:.5rem; }
+    /* Wechsel */
+    .shift { text-align:center;padding:5rem 0; }
+    .shift .big { font-family:var(--font-display);font-weight:400;font-size:clamp(2rem,5vw,3.4rem);line-height:1.12;letter-spacing:-0.02em;max-width:780px;margin:0 auto; }
+    .shift .big em { font-style:italic;background:var(--gradient);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent; }
+    /* Why-Beats */
+    .beat { display:grid;grid-template-columns:1fr 1fr;gap:clamp(2rem,5vw,4rem);align-items:center;padding:3.5rem 0; }
+    .beat.rev .beat-text { order:2; }
+    .beat-img img { width:100%;display:block;filter:drop-shadow(0 30px 60px rgba(0,0,0,.5)); }
+    .beat-feature { display:flex;gap:.6rem;align-items:flex-start;margin-top:1.3rem;padding:1rem 1.2rem;background:var(--card);border:1px solid var(--border);border-radius:12px;font-size:.92rem;color:var(--text-mid); }
+    .beat-feature b { color:var(--text); }
+    .beat-feature .ic { color:#ff7a3c;flex-shrink:0;margin-top:1px; }
+    .beat .num { font-size:.78rem;font-weight:800;letter-spacing:.12em;color:var(--text-muted);margin-bottom:.6rem; }
+    /* 4d Kognition-Band */
+    .kogband { max-width:1080px;margin:3.5rem auto;padding:0 1.5rem; }
+    .kogband-in { border-radius:24px;border:1px solid var(--border);padding:clamp(2rem,4vw,3rem);
+      background:radial-gradient(120% 130% at 12% 0%,rgba(236,77,138,.20),transparent 55%),radial-gradient(120% 130% at 92% 100%,rgba(255,178,74,.16),transparent 55%),var(--bg-warm); }
+    .kogband-mini { display:flex;gap:1.6rem;flex-wrap:wrap;margin:1.2rem 0 1.6rem; }
+    .kogband-mini b { display:block;margin-bottom:.15rem; } .kogband-mini .g b{color:#45e09a;} .kogband-mini .l b{color:#ff6b6f;}
+    .kogband-mini div { font-size:.92rem;color:var(--text-mid);max-width:240px; }
+    /* Beweis */
+    .proof { padding:5rem 0 1rem; }
+    .proof-grid { display:grid;grid-template-columns:repeat(2,1fr);gap:1rem;margin-top:2rem; }
+    .proof-card { background:var(--card);border:1px solid var(--border);border-radius:16px;padding:1.5rem; }
+    .proof-card h3 { font-size:1.05rem;font-weight:700;margin-bottom:.4rem;display:flex;align-items:center;gap:.5rem; }
+    .proof-card h3 .ic{color:#45e09a;} .proof-card p{font-size:.92rem;color:var(--text-mid);}
+    /* Macher */
+    .maker { padding:5rem 0; }
+    .maker-in { display:grid;grid-template-columns:1fr 1fr;gap:clamp(1.5rem,4vw,3rem);align-items:center;
+      background:var(--card);border:1px solid var(--border);border-radius:24px;padding:clamp(1.8rem,4vw,3rem); }
+    .maker-photo { aspect-ratio:4/5;border-radius:18px;border:1px dashed var(--border);background:var(--bg-warm);display:flex;align-items:center;justify-content:center;text-align:center;color:var(--text-muted);font-size:.85rem;padding:1rem;overflow:hidden; }
+    .maker-photo img { width:100%;height:100%;object-fit:cover;object-position:center top;border-radius:18px;display:block; }
+    .maker blockquote { font-family:var(--font-display);font-size:clamp(1.3rem,2.6vw,1.8rem);line-height:1.4;letter-spacing:-0.01em;margin-bottom:1.2rem; }
+    .maker .sig { color:var(--text-mid);font-size:.95rem; } .maker .sig b{color:var(--text);}
+    /* Einladung */
+    .invite { text-align:center;padding:5rem 0; }
+    @media (max-width:780px){
+      .enemy-stats{grid-template-columns:1fr;} .proof-grid{grid-template-columns:1fr;}
+      .beat{grid-template-columns:1fr;} .beat.rev .beat-text{order:0;} .beat-img{order:-1;}
+      .maker-in{grid-template-columns:1fr;} .kogband-mini{gap:1.2rem;}
+    }
+  </style>
+
+  <!-- 2 · Der Feind -->
+  <section class="story enemy">
+    <div class="st-eyebrow"><span class="d"></span><span data-i18n="st.enemy.label">Das Problem</span></div>
+    <h2 class="st-h" data-i18n="st.enemy.h">Du bist Chef, Sachbearbeiter<br>und Ged&auml;chtnis &mdash; <em>in einer Person.</em></h2>
+    <p class="st-lead" data-i18n="st.enemy.lead">Keine Assistenz, kein Team, das mitdenkt. Alles landet bei dir: Aufgaben, Mails, Termine, Ideen, Fristen. Du h&auml;ltst es im Kopf &mdash; bis ein Tag krank reicht, damit etwas durchf&auml;llt. Nicht, weil du schlecht organisiert bist. Sondern weil ein Mensch nicht gleichzeitig arbeiten <em>und</em> alles bewachen kann.</p>
+    <img src="people-feind.png" alt="&Uuml;berforderter Einzelk&auml;mpfer an einem chaotischen Schreibtisch voller Notizzettel" loading="lazy" style="width:100%;max-width:760px;margin:2.6rem auto 0;display:block;border-radius:18px;filter:drop-shadow(0 30px 60px rgba(0,0,0,.55))">
+    <div class="enemy-stats">
+      <div class="enemy-stat"><div class="n" data-i18n="st.enemy.s1n">~1.200&times;</div><div class="t" data-i18n="st.enemy.s1">am Tag wechselst du zwischen Apps und Fenstern &ndash; jeder Wechsel kostet Fokus.</div><div class="src">Harvard Business Review</div></div>
+      <div class="enemy-stat"><div class="n" data-i18n="st.enemy.s2n">~2 Std.</div><div class="t" data-i18n="st.enemy.s2">t&auml;glich suchen Wissensarbeiter:innen nur nach Informationen, statt sie zu nutzen.</div><div class="src">McKinsey Global Institute</div></div>
+      <div class="enemy-stat"><div class="n" data-i18n="st.enemy.s3n">1 Tag</div><div class="t" data-i18n="st.enemy.s3">krank, im Stau oder abgelenkt &ndash; und das Kartenhaus aus Merkzetteln im Kopf wackelt.</div><div class="src" data-i18n="st.enemy.s3src">dein Alltag</div></div>
+    </div>
+  </section>
+
+  <!-- 3 · Der Wechsel -->
+  <section class="story shift">
+    <p class="big" data-i18n="st.shift">Was, wenn dein Arbeitsraum <em>mitdenkt</em> &mdash; und dir jeden Morgen zeigt, was heute z&auml;hlt, ohne dich zu ersetzen?</p>
+  </section>
+
+  <!-- 4a · Klarheit -->
+  <section class="story beat">
+    <div class="beat-text">
+      <div class="num" data-i18n="st.b1.num">WARUM 01 &middot; KLARHEIT</div>
+      <h2 class="st-h" data-i18n="st.b1.h">Das Wichtige von heute &mdash; <em>von selbst.</em></h2>
+      <p class="st-lead" data-i18n="st.b1.lead">Du &ouml;ffnest morgens einen Tab, nicht zehn. MindGraph zeigt &uuml;berf&auml;llige Aufgaben, Mails die Antwort erwarten, heutige Termine &ndash; und holt vergessene Notizen zur&uuml;ck ins Sichtfeld. Warst du f&uuml;nf Tage weg? Es liegt alles da, sortiert nach Relevanz. Nichts verloren.</p>
+      <div class="beat-feature"><span class="ic">&#10003;</span><span data-i18n="st.b1.f"><b>Dashboard &amp; Relevanz-Radar:</b> eine lokale KI bewertet laufend, welche offenen Probleme gerade Aufmerksamkeit brauchen &ndash; und welche wieder auftauchen sollten.</span></div>
+    </div>
+    <div class="beat-img"><img src="screenshot-inbox.png" alt="MindGraph Dashboard mit Posteingang: heutiger Fokus, Aufgaben und Mails an einem Ort" loading="lazy"></div>
+  </section>
+
+  <!-- 4b · Alles verbunden -->
+  <section class="story beat rev">
+    <div class="beat-text">
+      <div class="num" data-i18n="st.b2.num">WARUM 02 &middot; VERBUNDEN</div>
+      <h2 class="st-h" data-i18n="st.b2.h">Ein Arbeitsraum &mdash; <em>statt acht Apps.</em></h2>
+      <p class="st-lead" data-i18n="st.b2.lead">Notizen, Aufgaben, Mails, Dokumente, Wissensgraph: alles an einem Ort, alles verlinkt. Eine relevante Mail wird zur Notiz mit Aufgabe und R&uuml;ckverweis &ndash; ohne Copy&amp;Paste zwischen zehn Programmen. Weniger Wechsel, weniger Reibung, weniger verloren.</p>
+      <div class="beat-feature"><span class="ic">&#10003;</span><span data-i18n="st.b2.f"><b>Ein Vault statt Tool-Wildwuchs:</b> Markdown, Wissensgraph, Mail&rarr;Notiz, Tasks &ndash; Module schaltest du nach Bedarf an. <em>1 Arbeitsraum statt 8 Apps und 30 Plugins.</em></span></div>
+    </div>
+    <div class="beat-img"><img src="screenshot-graph.png" alt="MindGraph Wissensgraph: vernetzte Notizen als Knoten und Kanten" loading="lazy"></div>
+  </section>
+
+  <!-- 4c · Dein Rechner -->
+  <section class="story beat">
+    <div class="beat-text">
+      <div class="num" data-i18n="st.b3.num">WARUM 03 &middot; DEIN RECHNER</div>
+      <h2 class="st-h" data-i18n="st.b3.h">KI, die deine Daten <em>nicht</em> verl&auml;sst.</h2>
+      <p class="st-lead" data-i18n="st.b3.lead">Die meisten KI-Tools zwingen dich zur Wahl: Cloud nutzen oder Datenschutz haben. MindGraph l&ouml;st das &ndash; die KI l&auml;uft lokal auf deinem Rechner (Ollama/LM&nbsp;Studio). Keine Cloud-Pflicht, keine Telemetrie. Deine Notizen bleiben Markdown-Dateien, die dir geh&ouml;ren.</p>
+      <div class="beat-feature"><span class="ic">&#10003;</span><span data-i18n="st.b3.f"><b>Lokale KI &amp; offene Daten:</b> <b>48&nbsp;%</b> der Unternehmen nennen Datenschutz-Anforderungen als gr&ouml;&szlig;tes KI-Hemmnis <span style="color:var(--text-muted)">(Bitkom 2025)</span>. MindGraph braucht diesen Kompromiss nicht.</span></div>
+    </div>
+    <div class="beat-img"><img src="model-quality.png" alt="MindGraph Modell-Kompatibilit&auml;tsmatrix: getestete lokale KI-Modelle pro Modul" loading="lazy"></div>
+  </section>
+
+  <!-- 4d · Du denkst weiter (Kognition + Test) -->
+  <div class="kogband" id="kognition">
+    <div class="kogband-in">
+      <div class="st-eyebrow"><span class="d"></span><span data-i18n="st.b4.label">Warum 04 &middot; Du denkst weiter</span></div>
+      <h2 class="st-h" style="font-size:clamp(1.8rem,4vw,2.8rem)" data-i18n="st.b4.h">KI, die dich sch&auml;rfer macht &mdash; <em>nicht d&uuml;mmer.</em></h2>
+      <p class="st-lead" data-i18n="st.b4.lead">Wer Denken blind auslagert, verlernt es. In einer MIT-Studie zeigten Menschen, die mit einem Sprachmodell schrieben, die <b>schw&auml;chste Gehirnvernetzung</b> &ndash; viele konnten ihren eben verfassten Text nicht einmal wiedergeben <span style="color:var(--text-muted)">(Kosmyna et&nbsp;al. 2025, MIT Media Lab)</span>. MindGraph ist daf&uuml;r gebaut, dass du im Spiel bleibst: aktives Erinnern, Reflexion, bewusste Freigabe.</p>
+      <div class="kogband-mini">
+        <div class="g" data-i18n="st.b4.gain"><b>&uarr; Du gewinnst</b>Aktives Erinnern (Karteikarten), Reflexion (Brain), Mensch-in-der-Schleife.</div>
+        <div class="l" data-i18n="st.b4.loss"><b>&darr; Du verlierst</b>Blindes Copy-Paste, ausgelagertes Verstehen, kognitive Schuld.</div>
+      </div>
+      <a href="kognition.html" class="btn btn-primary">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M12 2a7 7 0 0 0-4 12.7c.5.4.8 1 .9 1.6h6.2c.1-.6.4-1.2.9-1.6A7 7 0 0 0 12 2z"/></svg>
+        <span data-i18n="st.b4.cta">Mach den Need-for-Cognition-Test</span>
+      </a>
+    </div>
+  </div>
+
+  <!-- 5 · Beweis -->
+  <section class="story proof">
+    <div style="text-align:center;max-width:680px;margin:0 auto">
+      <div class="st-eyebrow"><span class="d"></span><span data-i18n="st.proof.label">Warum du das glauben kannst</span></div>
+      <h2 class="st-h" data-i18n="st.proof.h">Keine Versprechen. <em>Nachpr&uuml;fbar.</em></h2>
+      <p class="st-lead" style="margin:0 auto" data-i18n="st.proof.lead">Ich kann dir keine geschönten Marketing-Prozente zeigen &ndash; und will es nicht. Stattdessen: Dinge, die du selbst pr&uuml;fen kannst.</p>
+    </div>
+    <div class="proof-grid">
+      <div class="proof-card"><h3><span class="ic">&#10003;</span> <span data-i18n="st.proof.c1h">L&auml;uft im echten Einsatz</span></h3><p data-i18n="st.proof.c1">T&auml;glich produktiv genutzt &ndash; in Vaults mit 3.000+ Notizen, stabil. Kein Showcase, sondern Werkzeug.</p></div>
+      <div class="proof-card"><h3><span class="ic">&#10003;</span> <span data-i18n="st.proof.c2h">Open Source</span></h3><p data-i18n="st.proof.c2">Der gesamte Code ist einsehbar (AGPL). Du musst mir nicht vertrauen &ndash; du kannst nachsehen.</p></div>
+      <div class="proof-card"><h3><span class="ic">&#10003;</span> <span data-i18n="st.proof.c3h">Lokal &amp; E2E-verschl&uuml;sselt</span></h3><p data-i18n="st.proof.c3">Keine Telemetrie, kein Tracker. Der optionale Sync ist Zero-Knowledge &ndash; die Passphrase verl&auml;sst nie dein Ger&auml;t.</p></div>
+      <div class="proof-card"><h3><span class="ic">&#10003;</span> <span data-i18n="st.proof.c4h">Modelle pro Modul getestet</span></h3><p data-i18n="st.proof.c4">Eine dokumentierte Kompatibilit&auml;tsmatrix zeigt, welche lokale KI f&uuml;r welches Modul taugt &ndash; nicht „irgendein Modell".</p></div>
+    </div>
+  </section>
+
+  <!-- 6 · Macher -->
+  <section class="story maker">
+    <div class="maker-in">
+      <div class="maker-photo">
+        <img src="maker-face.jpg" alt="Jochen Leeder, Macher von MindGraph Notes" loading="lazy">
+      </div>
+      <div>
+        <div class="st-eyebrow"><span class="d"></span><span data-i18n="st.maker.label">Wer dahintersteckt</span></div>
+        <blockquote data-i18n="st.maker.quote">&bdquo;Ich bin kein Konzern. Ich bin einer von euch &ndash; jemand, der alles im Blick behalten muss und sich keine Assistenz leisten kann. Ich habe MindGraph gebaut, weil ich es selbst jeden Tag brauche.&ldquo;</blockquote>
+        <p class="sig"><b>Jochen Leeder</b> &middot; <span data-i18n="st.maker.role">Macher von MindGraph Notes</span><br><span style="color:var(--text-muted)" data-i18n="st.maker.note">9 Sterne auf GitHub, null Werbung. Urteile &uuml;ber den Code, nicht &uuml;ber den Hype.</span></p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 7 · Einladung -->
+  <section class="story invite">
+    <img src="closing-bike.jpg" alt="Jochen beim Enduro im Wald &ndash; unterwegs, und nichts f&auml;llt durch" loading="lazy" style="width:100%;max-width:820px;margin:0 auto 2.2rem;display:block;border-radius:18px;filter:drop-shadow(0 30px 60px rgba(0,0,0,.55))">
+    <h2 class="st-h" data-i18n="st.invite.h">Behalte alles im Blick &mdash;<br><em>und bleib trotzdem du.</em></h2>
+    <p class="st-lead" style="margin:0 auto 2rem" data-i18n="st.invite.lead">Kostenlos, Open Source, in 2 Minuten startklar. Dein bestehender Markdown-Vault &ouml;ffnet 1:1.</p>
+    <a href="#download" class="btn btn-primary" style="font-size:1.05rem;padding:1rem 2.2rem">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      <span data-i18n="st.invite.cta">Kostenlos herunterladen</span>
+    </a>
+  </section>
+
+  <!-- ============ DETAIL / REFERENZ (bestehend, „was genau") ============ -->
+
+  <!-- Wie funktioniert MindGraph? (interaktive Tabs, eclarity-Stil) -->
+  <style>
+    .how { max-width:1080px; margin:4rem auto 1rem; padding:0 1.5rem; }
+    .how-head { text-align:center; margin-bottom:2.2rem; }
+    .how-tabs { display:flex; flex-wrap:wrap; gap:.4rem; justify-content:center; background:var(--card); border:1px solid var(--border); border-radius:100px; padding:.4rem; max-width:760px; margin:0 auto 2.4rem; }
+    .how-tab { flex:1; min-width:max-content; border:none; background:transparent; color:var(--text-mid); font:inherit; font-size:.88rem; font-weight:600; padding:.7rem 1.1rem; border-radius:100px; cursor:pointer; transition:all .2s; white-space:nowrap; }
+    .how-tab:hover { color:var(--text); }
+    .how-tab.active { background:var(--gradient); color:#1a120c; box-shadow:0 6px 18px rgba(255,122,60,.32); }
+    .how-panel { display:none; grid-template-columns:1fr 1fr; gap:clamp(1.5rem,4vw,3.5rem); align-items:center; }
+    .how-panel.active { display:grid; animation:howfade .35s ease; }
+    @keyframes howfade { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:none} }
+    .how-icon { width:52px; height:52px; border-radius:14px; display:flex; align-items:center; justify-content:center; background:var(--accent-light); border:1px solid var(--border); color:#ff7a3c; margin-bottom:1.1rem; }
+    .how-panel h3 { font-family:var(--font-display); font-weight:400; font-size:clamp(1.5rem,3vw,2.1rem); letter-spacing:-0.01em; margin-bottom:.8rem; }
+    .how-panel p { color:var(--text-mid); font-size:1.02rem; line-height:1.7; }
+    .how-visual { position:relative; display:flex; align-items:center; justify-content:center; }
+    .how-visual .halo { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:92%; aspect-ratio:16/11; border-radius:30px; background:radial-gradient(closest-side, rgba(255,122,60,.26), rgba(236,77,138,.12) 55%, transparent 78%); filter:blur(14px); z-index:0; }
+    .how-shot { position:relative; z-index:1; width:100%; }
+    .how-shot img { width:100%; display:block; filter:drop-shadow(0 30px 60px rgba(0,0,0,.5)); }
+    .how-badge { position:absolute; z-index:2; left:-16px; top:30px; width:56px; height:56px; border-radius:16px; background:var(--bg-warm); border:1px solid var(--border); display:flex; align-items:center; justify-content:center; color:#ff7a3c; box-shadow:0 14px 34px rgba(0,0,0,.45); }
+    @media (max-width:780px){ .how-panel.active{grid-template-columns:1fr;} .how-visual{order:-1;} .how-tabs{border-radius:18px;} .how-tab{flex:auto;} .how-badge{left:8px;top:8px;} }
+  </style>
+  <section class="how" id="how">
+    <div class="how-head">
+      <div class="section-label" data-i18n="how.label">Wie es funktioniert</div>
+      <h2 class="section-heading" data-i18n="how.heading">Ein Werkzeug, vier Bausteine.</h2>
+    </div>
+    <div class="how-tabs" role="tablist">
+      <button class="how-tab active" data-how="0" data-i18n="how.t0">Dashboard &amp; Relevanz</button>
+      <button class="how-tab" data-how="1" data-i18n="how.t1">Wissensraum &amp; Graph</button>
+      <button class="how-tab" data-how="2" data-i18n="how.t2">Lokale KI &amp; Datenschutz</button>
+      <button class="how-tab" data-how="3" data-i18n="how.t3">Lernen &amp; Karteikarten</button>
+    </div>
+
+    <div class="how-panel active" data-how="0">
+      <div>
+        <div class="how-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></div>
+        <h3 data-i18n="how.p0h">Dein Tag auf einen Blick</h3>
+        <p data-i18n="how.p0">Ein Tab statt zehn: &uuml;berf&auml;llige Aufgaben, Mails mit Antwort-Dringlichkeit, heutige Termine. Eine lokale KI bewertet laufend, welche offenen Probleme Aufmerksamkeit brauchen &ndash; und holt vergessene Notizen zur&uuml;ck ins Sichtfeld. Auch nach f&uuml;nf Tagen Pause liegt alles sortiert da.</p>
+      </div>
+      <div class="how-visual">
+        <div class="halo"></div>
+        <div class="how-badge"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/><circle cx="12" cy="12" r="4"/></svg></div>
+        <div class="how-shot"><img src="screenshot-dashboard.png" alt="MindGraph Dashboard mit dem Wichtigen von heute" loading="lazy"></div>
+      </div>
+    </div>
+
+    <div class="how-panel" data-how="1">
+      <div>
+        <div class="how-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="6" r="2.5"/><circle cx="19" cy="7" r="2.5"/><circle cx="12" cy="17" r="2.5"/><path d="M7 7l3 8M17 9l-4 6"/></svg></div>
+        <h3 data-i18n="how.p1h">Alles verbunden</h3>
+        <p data-i18n="how.p1">Notizen, Aufgaben, Mails und Dokumente in einem Vault &ndash; verlinkt im Wissensgraph. Eine relevante Mail wird zur Notiz mit Aufgabe und R&uuml;ckverweis, ohne Copy&amp;Paste zwischen Programmen. Dein bestehender Markdown-/Obsidian-Vault &ouml;ffnet 1:1.</p>
+      </div>
+      <div class="how-visual">
+        <div class="halo"></div>
+        <div class="how-badge"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="2"/><circle cx="18" cy="18" r="2"/><circle cx="6" cy="18" r="2"/><path d="M8 6h6a2 2 0 012 2v8M6 8v8"/></svg></div>
+        <div class="how-shot"><img src="screenshot-graph.png" alt="MindGraph Wissensgraph mit vernetzten Notizen" loading="lazy"></div>
+      </div>
+    </div>
+
+    <div class="how-panel" data-how="2">
+      <div>
+        <div class="how-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>
+        <h3 data-i18n="how.p2h">KI auf deinem Rechner</h3>
+        <p data-i18n="how.p2">Die KI l&auml;uft lokal (Ollama / LM&nbsp;Studio) &ndash; keine Cloud-Pflicht, keine Telemetrie. Du musst dich nicht zwischen KI <em>und</em> Datenschutz entscheiden. Der optionale Sync ist Ende-zu-Ende verschl&uuml;sselt; die Passphrase verl&auml;sst nie dein Ger&auml;t.</p>
+      </div>
+      <div class="how-visual">
+        <div class="halo"></div>
+        <div class="how-badge"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/></svg></div>
+        <div class="how-shot"><img src="model-quality.png" alt="MindGraph Modell-Kompatibilit&auml;tsmatrix: getestete lokale KI pro Modul" loading="lazy"></div>
+      </div>
+    </div>
+
+    <div class="how-panel" data-how="3">
+      <div>
+        <div class="how-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18"/></svg></div>
+        <h3 data-i18n="how.p3h">Wissen, das bleibt</h3>
+        <p data-i18n="how.p3">Karteikarten mit Spaced Repetition (SM-2), KI-Generierung direkt aus deinen Notizen, Anki-Import. Du rufst Wissen aktiv ab, statt es nachzuschlagen &ndash; so bleibt KI ein Werkzeug, das dich sch&auml;rfer macht, nicht abh&auml;ngig.</p>
+      </div>
+      <div class="how-visual">
+        <div class="halo"></div>
+        <div class="how-badge"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a7 7 0 00-4 12.7c.5.4.8 1 .9 1.6h6.2c.1-.6.4-1.2.9-1.6A7 7 0 0012 2z"/><path d="M9 18h6M10 22h4"/></svg></div>
+        <div class="how-shot"><img src="screenshot.png" alt="MindGraph Editor mit Notiz und Karteikarten-Panel" loading="lazy"></div>
+      </div>
+    </div>
+  </section>
+  <script>
+    document.querySelectorAll('.how-tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        const i = tab.getAttribute('data-how');
+        document.querySelectorAll('.how-tab').forEach(t => t.classList.toggle('active', t === tab));
+        document.querySelectorAll('.how-panel').forEach(p => p.classList.toggle('active', p.getAttribute('data-how') === i));
+      });
+    });
+  </script>
 
   <!-- Capabilities -->
   <section class="capabilities" id="features">
@@ -791,11 +1055,83 @@
       de: {
         "nav.features": "Features",
         "nav.why": "Warum",
+        "nav.kognition": "Kognition",
         "nav.download": "Download",
         "nav.blog": "Blog",
+        "kog.label": "Begleitende Forschung",
+        "kog.heading": "Stärkt KI dein Denken —<br>oder <em>ersetzt</em> sie es?",
+        "kog.sub": "Für Wissensarbeiter:innen entscheidet die Art der KI-Nutzung, ob sie geistig wachsen oder verlernen. Mach den validierten <em>Need-for-Cognition</em>-Test und sieh schwarz auf weiß, wo du gewinnst und wo du verlierst.",
+        "kog.gain.title": "↑ Wo du gewinnst",
+        "kog.gain.mini": "Aktives Erinnern, Reflexion, Mensch-in-der-Schleife.",
+        "kog.loss.mini": "Blindes Auslagern, kognitive Schuld.",
+        "kog.gain.desc": "Aktives Erinnern (Karteikarten &amp; Spaced Repetition), Reflexion statt Auslagerung (Brain), Mensch-in-der-Schleife (Workflow-Freigabe) und Denken im Dialog (Notes-Chat).",
+        "kog.loss.title": "↓ Wo du verlierst",
+        "kog.loss.desc": "Blindes Copy-Paste von KI-Antworten, ausgelagertes Verstehen und kognitive Schuld – wer nie selbst denkt, baut Denkvermögen ab (Kosmyna et al. 2025).",
+        "kog.cta": "Need-for-Cognition-Test machen",
+        "st.enemy.label": "Das Problem",
+        "st.enemy.h": "Du bist Chef, Sachbearbeiter<br>und Gedächtnis — <em>in einer Person.</em>",
+        "st.enemy.lead": "Keine Assistenz, kein Team, das mitdenkt. Alles landet bei dir: Aufgaben, Mails, Termine, Ideen, Fristen. Du hältst es im Kopf — bis ein Tag krank reicht, damit etwas durchfällt. Nicht, weil du schlecht organisiert bist. Sondern weil ein Mensch nicht gleichzeitig arbeiten <em>und</em> alles bewachen kann.",
+        "st.enemy.s1n": "~1.200×",
+        "st.enemy.s1": "am Tag wechselst du zwischen Apps und Fenstern – jeder Wechsel kostet Fokus.",
+        "st.enemy.s2n": "~2 Std.",
+        "st.enemy.s2": "täglich suchen Wissensarbeiter:innen nur nach Informationen, statt sie zu nutzen.",
+        "st.enemy.s3n": "1 Tag",
+        "st.enemy.s3": "krank, im Stau oder abgelenkt – und das Kartenhaus aus Merkzetteln im Kopf wackelt.",
+        "st.enemy.s3src": "dein Alltag",
+        "st.shift": "Was, wenn dein Arbeitsraum <em>mitdenkt</em> — und dir jeden Morgen zeigt, was heute zählt, ohne dich zu ersetzen?",
+        "st.b1.num": "WARUM 01 · KLARHEIT",
+        "st.b1.h": "Das Wichtige von heute — <em>von selbst.</em>",
+        "st.b1.lead": "Du öffnest morgens einen Tab, nicht zehn. MindGraph zeigt überfällige Aufgaben, Mails die Antwort erwarten, heutige Termine – und holt vergessene Notizen zurück ins Sichtfeld. Warst du fünf Tage weg? Es liegt alles da, sortiert nach Relevanz. Nichts verloren.",
+        "st.b1.f": "<b>Dashboard &amp; Relevanz-Radar:</b> eine lokale KI bewertet laufend, welche offenen Probleme gerade Aufmerksamkeit brauchen – und welche wieder auftauchen sollten.",
+        "st.b2.num": "WARUM 02 · VERBUNDEN",
+        "st.b2.h": "Ein Arbeitsraum — <em>statt acht Apps.</em>",
+        "st.b2.lead": "Notizen, Aufgaben, Mails, Dokumente, Wissensgraph: alles an einem Ort, alles verlinkt. Eine relevante Mail wird zur Notiz mit Aufgabe und Rückverweis – ohne Copy&amp;Paste zwischen zehn Programmen. Weniger Wechsel, weniger Reibung, weniger verloren.",
+        "st.b2.f": "<b>Ein Vault statt Tool-Wildwuchs:</b> Markdown, Wissensgraph, Mail→Notiz, Tasks – Module schaltest du nach Bedarf an. <em>1 Arbeitsraum statt 8 Apps und 30 Plugins.</em>",
+        "st.b3.num": "WARUM 03 · DEIN RECHNER",
+        "st.b3.h": "KI, die deine Daten <em>nicht</em> verlässt.",
+        "st.b3.lead": "Die meisten KI-Tools zwingen dich zur Wahl: Cloud nutzen oder Datenschutz haben. MindGraph löst das – die KI läuft lokal auf deinem Rechner (Ollama/LM Studio). Keine Cloud-Pflicht, keine Telemetrie. Deine Notizen bleiben Markdown-Dateien, die dir gehören.",
+        "st.b3.f": "<b>Lokale KI &amp; offene Daten:</b> <b>48 %</b> der Unternehmen nennen Datenschutz-Anforderungen als größtes KI-Hemmnis <span style=\"color:var(--text-muted)\">(Bitkom 2025)</span>. MindGraph braucht diesen Kompromiss nicht.",
+        "st.b4.label": "Warum 04 · Du denkst weiter",
+        "st.b4.h": "KI, die dich schärfer macht — <em>nicht dümmer.</em>",
+        "st.b4.lead": "Wer Denken blind auslagert, verlernt es. In einer MIT-Studie zeigten Menschen, die mit einem Sprachmodell schrieben, die <b>schwächste Gehirnvernetzung</b> – viele konnten ihren eben verfassten Text nicht einmal wiedergeben <span style=\"color:var(--text-muted)\">(Kosmyna et al. 2025, MIT Media Lab)</span>. MindGraph ist dafür gebaut, dass du im Spiel bleibst: aktives Erinnern, Reflexion, bewusste Freigabe.",
+        "st.b4.gain": "<b>↑ Du gewinnst</b>Aktives Erinnern (Karteikarten), Reflexion (Brain), Mensch-in-der-Schleife.",
+        "st.b4.loss": "<b>↓ Du verlierst</b>Blindes Copy-Paste, ausgelagertes Verstehen, kognitive Schuld.",
+        "st.b4.cta": "Mach den Need-for-Cognition-Test",
+        "st.proof.label": "Warum du das glauben kannst",
+        "st.proof.h": "Keine Versprechen. <em>Nachprüfbar.</em>",
+        "st.proof.lead": "Ich kann dir keine geschönten Marketing-Prozente zeigen – und will es nicht. Stattdessen: Dinge, die du selbst prüfen kannst.",
+        "st.proof.c1h": "Läuft im echten Einsatz",
+        "st.proof.c1": "Täglich produktiv genutzt – in Vaults mit 3.000+ Notizen, stabil. Kein Showcase, sondern Werkzeug.",
+        "st.proof.c2h": "Open Source",
+        "st.proof.c2": "Der gesamte Code ist einsehbar (AGPL). Du musst mir nicht vertrauen – du kannst nachsehen.",
+        "st.proof.c3h": "Lokal &amp; E2E-verschlüsselt",
+        "st.proof.c3": "Keine Telemetrie, kein Tracker. Der optionale Sync ist Zero-Knowledge – die Passphrase verlässt nie dein Gerät.",
+        "st.proof.c4h": "Modelle pro Modul getestet",
+        "st.proof.c4": "Eine dokumentierte Kompatibilitätsmatrix zeigt, welche lokale KI für welches Modul taugt – nicht „irgendein Modell\".",
+        "st.maker.label": "Wer dahintersteckt",
+        "st.maker.quote": "„Ich bin kein Konzern. Ich bin einer von euch – jemand, der alles im Blick behalten muss und sich keine Assistenz leisten kann. Ich habe MindGraph gebaut, weil ich es selbst jeden Tag brauche.“",
+        "st.maker.role": "Macher von MindGraph Notes",
+        "st.maker.note": "9 Sterne auf GitHub, null Werbung. Urteile über den Code, nicht über den Hype.",
+        "st.invite.h": "Behalte alles im Blick —<br><em>und bleib trotzdem du.</em>",
+        "st.invite.lead": "Kostenlos, Open Source, in 2 Minuten startklar. Dein bestehender Markdown-Vault öffnet 1:1.",
+        "st.invite.cta": "Kostenlos herunterladen",
+        "how.label": "Wie es funktioniert",
+        "how.heading": "Ein Werkzeug, vier Bausteine.",
+        "how.t0": "Dashboard &amp; Relevanz",
+        "how.t1": "Wissensraum &amp; Graph",
+        "how.t2": "Lokale KI &amp; Datenschutz",
+        "how.t3": "Lernen &amp; Karteikarten",
+        "how.p0h": "Dein Tag auf einen Blick",
+        "how.p0": "Ein Tab statt zehn: überfällige Aufgaben, Mails mit Antwort-Dringlichkeit, heutige Termine. Eine lokale KI bewertet laufend, welche offenen Probleme Aufmerksamkeit brauchen – und holt vergessene Notizen zurück ins Sichtfeld. Auch nach fünf Tagen Pause liegt alles sortiert da.",
+        "how.p1h": "Alles verbunden",
+        "how.p1": "Notizen, Aufgaben, Mails und Dokumente in einem Vault – verlinkt im Wissensgraph. Eine relevante Mail wird zur Notiz mit Aufgabe und Rückverweis, ohne Copy&amp;Paste zwischen Programmen. Dein bestehender Markdown-/Obsidian-Vault öffnet 1:1.",
+        "how.p2h": "KI auf deinem Rechner",
+        "how.p2": "Die KI läuft lokal (Ollama / LM Studio) – keine Cloud-Pflicht, keine Telemetrie. Du musst dich nicht zwischen KI <em>und</em> Datenschutz entscheiden. Der optionale Sync ist Ende-zu-Ende verschlüsselt; die Passphrase verlässt nie dein Gerät.",
+        "how.p3h": "Wissen, das bleibt",
+        "how.p3": "Karteikarten mit Spaced Repetition (SM-2), KI-Generierung direkt aus deinen Notizen, Anki-Import. Du rufst Wissen aktiv ab, statt es nachzuschlagen – so bleibt KI ein Werkzeug, das dich schärfer macht, nicht abhängig.",
         "hero.badge": "Open Source \u00b7 Lokal \u00b7 Kostenlos",
-        "hero.title": "Zeigt dir,<br><em>was heute wichtig ist.</em>",
-        "hero.sub": "MindGraph Notes verbindet deine Notizen, Aufgaben, E-Mails und Dokumente \u2014 und sortiert sie nach Relevanz. Dashboard, Wissensgraph und lokale KI in einer Desktop-App. Ohne Cloud-Zwang.",
+        "hero.title": "Der Fokus bleibt.<br><em>Auch wenn das Leben dazwischenkommt.</em>",
+        "hero.sub": "MindGraph zeigt dir jeden Morgen, was heute z\u00e4hlt \u2014 Aufgaben, Mails, Termine, vergessene F\u00e4den. Du gehst aufs Bike, ins Wochenende, liegst mal f\u00fcnf Tage flach. Und nichts f\u00e4llt durch. Lokal, ohne Cloud-Zwang.",
         "hero.cta": "Kostenlos herunterladen",
         "cap.label": "Was der Workspace kann",
         "cap.heading": "Ein Arbeitsraum,<br>Module nach Bedarf.",
@@ -914,8 +1250,80 @@
       en: {
         "nav.features": "Features",
         "nav.why": "Why",
+        "nav.kognition": "Cognition",
         "nav.download": "Download",
         "nav.blog": "Blog",
+        "kog.label": "Companion research",
+        "kog.heading": "Does AI sharpen your thinking —<br>or <em>replace</em> it?",
+        "kog.sub": "For knowledge workers, how you use AI decides whether you grow mentally or unlearn. Take the validated <em>Need for Cognition</em> test and see in black and white where you gain and where you lose. (Test in German.)",
+        "kog.gain.title": "↑ Where you gain",
+        "kog.gain.mini": "Active recall, reflection, human-in-the-loop.",
+        "kog.loss.mini": "Blind offloading, cognitive debt.",
+        "kog.gain.desc": "Active recall (flashcards &amp; spaced repetition), reflection instead of offloading (Brain), human-in-the-loop (workflow approval) and thinking in dialogue (Notes Chat).",
+        "kog.loss.title": "↓ Where you lose",
+        "kog.loss.desc": "Blindly copy-pasting AI answers, outsourced understanding and cognitive debt – those who never think for themselves erode their thinking ability (Kosmyna et al. 2025).",
+        "kog.cta": "Take the Need for Cognition test",
+        "st.enemy.label": "The problem",
+        "st.enemy.h": "You're the boss, the back office<br>and the memory — <em>all in one person.</em>",
+        "st.enemy.lead": "No assistant, no team thinking along. Everything lands on you: tasks, emails, dates, ideas, deadlines. You keep it in your head — until one sick day is enough for something to slip. Not because you're disorganized, but because no one can work <em>and</em> guard everything at once.",
+        "st.enemy.s1n": "~1,200×",
+        "st.enemy.s1": "times a day you switch between apps and windows – every switch costs focus.",
+        "st.enemy.s2n": "~2 hrs",
+        "st.enemy.s2": "a day knowledge workers spend just searching for information instead of using it.",
+        "st.enemy.s3n": "1 day",
+        "st.enemy.s3": "sick, stuck in traffic or distracted – and the house of cards of mental notes wobbles.",
+        "st.enemy.s3src": "your everyday",
+        "st.shift": "What if your workspace <em>thinks along</em> — showing you every morning what matters today, without replacing you?",
+        "st.b1.num": "WHY 01 · CLARITY",
+        "st.b1.h": "What matters today — <em>on its own.</em>",
+        "st.b1.lead": "In the morning you open one tab, not ten. MindGraph shows overdue tasks, emails awaiting a reply, today's appointments – and brings forgotten notes back into view. Been away for five days? It's all there, sorted by relevance. Nothing lost.",
+        "st.b1.f": "<b>Dashboard &amp; relevance radar:</b> a local AI continuously assesses which open problems need attention right now – and which should resurface.",
+        "st.b2.num": "WHY 02 · CONNECTED",
+        "st.b2.h": "One workspace — <em>instead of eight apps.</em>",
+        "st.b2.lead": "Notes, tasks, emails, documents, knowledge graph: all in one place, all linked. A relevant email becomes a note with a task and a backlink – no copy&amp;paste across ten programs. Fewer switches, less friction, less lost.",
+        "st.b2.f": "<b>One vault instead of tool sprawl:</b> Markdown, knowledge graph, email→note, tasks – switch modules on as you need them. <em>1 workspace instead of 8 apps and 30 plugins.</em>",
+        "st.b3.num": "WHY 03 · YOUR MACHINE",
+        "st.b3.h": "AI that <em>never</em> leaves your data.",
+        "st.b3.lead": "Most AI tools force a choice: use the cloud or keep your privacy. MindGraph removes it – the AI runs locally on your machine (Ollama/LM Studio). No cloud requirement, no telemetry. Your notes stay Markdown files that belong to you.",
+        "st.b3.f": "<b>Local AI &amp; open data:</b> <b>48%</b> of companies cite data-protection requirements as the biggest barrier to AI <span style=\"color:var(--text-muted)\">(Bitkom 2025)</span>. MindGraph doesn't need that trade-off.",
+        "st.b4.label": "Why 04 · You keep thinking",
+        "st.b4.h": "AI that makes you sharper — <em>not dumber.</em>",
+        "st.b4.lead": "Outsource thinking blindly and you unlearn it. In an MIT study, people who wrote with a language model showed the <b>weakest brain connectivity</b> – many couldn't even recall the text they had just written <span style=\"color:var(--text-muted)\">(Kosmyna et al. 2025, MIT Media Lab)</span>. MindGraph is built to keep you in the loop: active recall, reflection, deliberate approval.",
+        "st.b4.gain": "<b>↑ You gain</b>Active recall (flashcards), reflection (Brain), human-in-the-loop.",
+        "st.b4.loss": "<b>↓ You lose</b>Blind copy-paste, outsourced understanding, cognitive debt.",
+        "st.b4.cta": "Take the Need for Cognition test",
+        "st.proof.label": "Why you can believe this",
+        "st.proof.h": "No promises. <em>Verifiable.</em>",
+        "st.proof.lead": "I can't show you polished marketing percentages – and I won't. Instead: things you can check for yourself.",
+        "st.proof.c1h": "Runs in real use",
+        "st.proof.c1": "Used productively every day – in vaults with 3,000+ notes, stable. Not a showcase, a tool.",
+        "st.proof.c2h": "Open source",
+        "st.proof.c2": "The entire code is open (AGPL). You don't have to trust me – you can look.",
+        "st.proof.c3h": "Local &amp; E2E-encrypted",
+        "st.proof.c3": "No telemetry, no tracker. The optional sync is zero-knowledge – your passphrase never leaves your device.",
+        "st.proof.c4h": "Models tested per module",
+        "st.proof.c4": "A documented compatibility matrix shows which local AI is fit for which module – not 'just any model'.",
+        "st.maker.label": "Who's behind it",
+        "st.maker.quote": "“I'm not a corporation. I'm one of you – someone who has to keep everything in view and can't afford an assistant. I built MindGraph because I need it myself every day.”",
+        "st.maker.role": "Maker of MindGraph Notes",
+        "st.maker.note": "9 stars on GitHub, zero marketing. Judge the code, not the hype.",
+        "st.invite.h": "Keep everything in view —<br><em>and still be yourself.</em>",
+        "st.invite.lead": "Free, open source, ready in 2 minutes. Your existing Markdown vault opens as-is.",
+        "st.invite.cta": "Download for free",
+        "how.label": "How it works",
+        "how.heading": "One tool, four building blocks.",
+        "how.t0": "Dashboard &amp; relevance",
+        "how.t1": "Knowledge space &amp; graph",
+        "how.t2": "Local AI &amp; privacy",
+        "how.t3": "Learning &amp; flashcards",
+        "how.p0h": "Your day at a glance",
+        "how.p0": "One tab instead of ten: overdue tasks, emails by reply urgency, today's appointments. A local AI continuously rates which open problems need attention – and brings forgotten notes back into view. Even after a five-day break, everything is there, sorted.",
+        "how.p1h": "Everything connected",
+        "how.p1": "Notes, tasks, emails and documents in one vault – linked in the knowledge graph. A relevant email becomes a note with a task and a backlink, without copy&amp;paste between programs. Your existing Markdown/Obsidian vault opens as-is.",
+        "how.p2h": "AI on your machine",
+        "how.p2": "The AI runs locally (Ollama / LM Studio) – no cloud requirement, no telemetry. You don't have to choose between AI <em>and</em> privacy. The optional sync is end-to-end encrypted; the passphrase never leaves your device.",
+        "how.p3h": "Knowledge that sticks",
+        "how.p3": "Flashcards with spaced repetition (SM-2), AI generation straight from your notes, Anki import. You recall knowledge actively instead of looking it up – so AI stays a tool that makes you sharper, not dependent.",
         "hero.badge": "Open Source \u00b7 Local \u00b7 Free",
         "hero.title": "Shows you<br><em>what matters today.</em>",
         "hero.sub": "MindGraph Notes connects your notes, tasks, emails and documents \u2014 and ranks them by relevance. Dashboard, knowledge graph and local AI in one desktop app. No cloud lock-in.",

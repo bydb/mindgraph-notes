@@ -37,14 +37,15 @@
     }
 
     :root {
-      --bg: #faf8f0;
-      --bg-card: rgba(255, 255, 255, 0.7);
-      --bg-card-hover: rgba(255, 255, 255, 0.9);
-      --text: #2d2d2d;
-      --text-muted: #6b6b6b;
-      --accent: #d4875a;
-      --accent-glow: rgba(212, 135, 90, 0.25);
-      --border: rgba(0, 0, 0, 0.08);
+      --bg: #0c0a09;
+      --bg-card: rgba(255, 255, 255, 0.04);
+      --bg-card-hover: rgba(255, 255, 255, 0.08);
+      --text: #f6f0e8;
+      --text-muted: #a59b8d;
+      --accent: #ff7a3c;
+      --accent-glow: rgba(236, 77, 138, 0.35);
+      --border: rgba(255, 255, 255, 0.09);
+      --brand: linear-gradient(115deg, #ffb24a 0%, #ff7a3c 45%, #ec4d8a 100%);
     }
 
     body {
@@ -71,7 +72,7 @@
       left: -50%;
       width: 200%;
       height: 200%;
-      background: radial-gradient(circle at 30% 30%, rgba(212, 135, 90, 0.06) 0%, transparent 50%);
+      background: radial-gradient(circle at 30% 30%, rgba(255, 122, 60, 0.06) 0%, transparent 50%);
     }
 
     nav {
@@ -85,7 +86,7 @@
       align-items: center;
       z-index: 100;
       backdrop-filter: blur(10px);
-      background: rgba(250, 248, 240, 0.85);
+      background: rgba(12, 10, 9, 0.72);
       border-bottom: 1px solid var(--border);
     }
 
@@ -129,6 +130,10 @@
       color: var(--text);
     }
 
+    .lang-switch { display: flex; gap: 2px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 2px; }
+    .lang-switch button { background: transparent; border: none; color: var(--text-muted); padding: 0.3rem 0.6rem; border-radius: 6px; cursor: pointer; font-size: 0.8rem; font-weight: 700; transition: all 0.2s; }
+    .lang-switch button.active { background: var(--accent); color: #1a120c; }
+
     .container {
       max-width: 800px;
       margin: 0 auto;
@@ -138,7 +143,7 @@
     h1 {
       font-size: 2.5rem;
       margin-bottom: 0.5rem;
-      background: linear-gradient(135deg, #d4875a 0%, #c47a4e 100%);
+      background: var(--brand);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
       background-clip: text;
@@ -169,7 +174,7 @@
 
     .post-card:hover {
       background: var(--bg-card-hover);
-      border-color: rgba(212, 135, 90, 0.3);
+      border-color: rgba(255, 122, 60, 0.3);
       transform: translateY(-2px);
     }
 
@@ -283,14 +288,14 @@
     }
 
     .article-content code {
-      background: rgba(212, 135, 90, 0.1);
+      background: rgba(255, 122, 60, 0.1);
       padding: 0.2rem 0.5rem;
       border-radius: 4px;
       font-size: 0.9em;
     }
 
     .article-content pre {
-      background: rgba(0, 0, 0, 0.05);
+      background: rgba(255, 255, 255, 0.06);
       padding: 1rem;
       border-radius: 8px;
       overflow-x: auto;
@@ -332,7 +337,7 @@
     }
 
     .article-content thead {
-      background: rgba(212, 135, 90, 0.08);
+      background: rgba(255, 122, 60, 0.08);
     }
 
     .article-content th {
@@ -354,7 +359,7 @@
     }
 
     .article-content tbody tr:hover {
-      background: rgba(212, 135, 90, 0.04);
+      background: rgba(255, 122, 60, 0.04);
     }
 
     .article-content table p {
@@ -451,6 +456,10 @@
       <a href="../#download">Download</a>
       <a href="./" style="color: var(--accent);">Blog</a>
       <a href="https://github.com/bydb/mindgraph-notes" target="_blank">GitHub</a>
+      <div class="lang-switch">
+        <button onclick="setLanguage('de')" id="lang-de" class="active">DE</button>
+        <button onclick="setLanguage('en')" id="lang-en">EN</button>
+      </div>
     </div>
   </nav>
 
@@ -458,15 +467,15 @@
     <!-- Post List -->
     <div id="post-list" class="post-list">
       <h1>Blog</h1>
-      <p class="subtitle">Artikel über Wissensmanagement, KI und produktives Denken</p>
+      <p class="subtitle" id="blog-subtitle">Artikel über Wissensmanagement, KI und produktives Denken</p>
       <div id="posts" class="post-list">
-        <div class="loading">Lade Artikel...</div>
+        <div class="loading" id="blog-loading">Lade Artikel...</div>
       </div>
     </div>
 
     <!-- Article View -->
     <div id="article-view" class="article-view">
-      <a href="#" class="back-link" onclick="showList(); return false;">← Zurück zur Übersicht</a>
+      <a href="#" class="back-link" id="blog-back" onclick="showList(); return false;">← Zurück zur Übersicht</a>
       <article>
         <div class="article-header">
           <h1 id="article-title"></h1>
@@ -491,6 +500,35 @@
   <script>
     // List of blog posts (will be populated)
     const posts = [];
+
+    // ---- i18n (Chrome; Beiträge bleiben in Originalsprache) ----
+    const BLOG_T = {
+      de: {
+        subtitle: 'Artikel über Wissensmanagement, KI und produktives Denken',
+        loading: 'Lade Artikel...',
+        empty: 'Noch keine Artikel vorhanden.',
+        emptyPub: 'Noch keine veröffentlichten Artikel.',
+        emptyHint: 'Noch keine Artikel vorhanden.<br><br>Erstelle einen mit <code>/artikel</code> in Claude Code.',
+        back: '← Zurück zur Übersicht',
+        by: 'von',
+        locale: 'de-DE'
+      },
+      en: {
+        subtitle: 'Articles on knowledge management, AI and productive thinking',
+        loading: 'Loading articles...',
+        empty: 'No articles yet.',
+        emptyPub: 'No published articles yet.',
+        emptyHint: 'No articles yet.<br><br>Create one with <code>/artikel</code> in Claude Code.',
+        back: '← Back to overview',
+        by: 'by',
+        locale: 'en-US'
+      }
+    };
+    let blogLang = 'de';
+    try { blogLang = localStorage.getItem('lang') || 'de'; } catch (e) {}
+    function bt(k) { return (BLOG_T[blogLang] || BLOG_T.de)[k]; }
+    let allPosts = [];
+    let currentFile = null;
 
     // Parse YAML frontmatter
     function parseFrontmatter(content) {
@@ -560,7 +598,7 @@
         const postFiles = await response.json();
 
         if (postFiles.length === 0) {
-          postsContainer.innerHTML = '<div class="empty">Noch keine Artikel vorhanden.</div>';
+          postsContainer.innerHTML = `<div class="empty">${bt('empty')}</div>`;
           return;
         }
 
@@ -579,17 +617,12 @@
         loadedPosts.sort((a, b) => new Date(b.meta.date) - new Date(a.meta.date));
 
         if (loadedPosts.length === 0) {
-          postsContainer.innerHTML = '<div class="empty">Noch keine veröffentlichten Artikel.</div>';
+          postsContainer.innerHTML = `<div class="empty">${bt('emptyPub')}</div>`;
           return;
         }
 
-        postsContainer.innerHTML = loadedPosts.map(post => `
-          <a href="#${encodeURIComponent(post.file)}" class="post-card" onclick="showPost('${post.file}'); return false;">
-            <h2>${post.meta.title || post.file.replace('.md', '')}</h2>
-            <div class="date">${formatDate(post.meta.date)}</div>
-            ${post.meta.summary ? `<div class="summary">${post.meta.summary}</div>` : ''}
-          </a>
-        `).join('');
+        allPosts = loadedPosts;
+        renderList();
 
         // Check if URL has a post hash
         if (window.location.hash) {
@@ -597,8 +630,21 @@
           showPost(postFile);
         }
       } catch (e) {
-        postsContainer.innerHTML = '<div class="empty">Noch keine Artikel vorhanden.<br><br>Erstelle einen mit <code>/artikel</code> in Claude Code.</div>';
+        postsContainer.innerHTML = `<div class="empty">${bt('emptyHint')}</div>`;
       }
+    }
+
+    // Render post list in current language (dates localised)
+    function renderList() {
+      const postsContainer = document.getElementById('posts');
+      if (!allPosts.length) return;
+      postsContainer.innerHTML = allPosts.map(post => `
+        <a href="#${encodeURIComponent(post.file)}" class="post-card" onclick="showPost('${post.file}'); return false;">
+          <h2>${post.meta.title || post.file.replace('.md', '')}</h2>
+          <div class="date">${formatDate(post.meta.date)}</div>
+          ${post.meta.summary ? `<div class="summary">${post.meta.summary}</div>` : ''}
+        </a>
+      `).join('');
     }
 
     // Show single post
@@ -609,10 +655,11 @@
 
         const content = await response.text();
         const { meta, content: body } = parseFrontmatter(content);
+        currentFile = file;
 
         document.getElementById('article-title').textContent = meta.title || file.replace('.md', '');
         document.getElementById('article-date').textContent = formatDate(meta.date);
-        document.getElementById('article-author').textContent = meta.author ? `von ${meta.author}` : '';
+        document.getElementById('article-author').textContent = meta.author ? `${bt('by')} ${meta.author}` : '';
 
         // Process content
         let processedContent = cleanWikilinks(body);
@@ -634,6 +681,7 @@
 
     // Show post list
     function showList() {
+      currentFile = null;
       document.getElementById('post-list').classList.remove('hidden');
       document.getElementById('article-view').classList.remove('active');
       window.location.hash = '';
@@ -644,7 +692,22 @@
     function formatDate(dateStr) {
       if (!dateStr) return '';
       const date = new Date(dateStr);
-      return date.toLocaleDateString('de-DE', { year: 'numeric', month: 'long', day: 'numeric' });
+      return date.toLocaleDateString(bt('locale'), { year: 'numeric', month: 'long', day: 'numeric' });
+    }
+
+    // Language switch (Chrome only; shared with main site via localStorage 'lang')
+    function setLanguage(lang) {
+      blogLang = lang;
+      try { localStorage.setItem('lang', lang); } catch (e) {}
+      document.documentElement.lang = lang;
+      const de = document.getElementById('lang-de'), en = document.getElementById('lang-en');
+      if (de) de.classList.toggle('active', lang === 'de');
+      if (en) en.classList.toggle('active', lang === 'en');
+      const sub = document.getElementById('blog-subtitle'); if (sub) sub.textContent = bt('subtitle');
+      const back = document.getElementById('blog-back'); if (back) back.textContent = bt('back');
+      const loading = document.getElementById('blog-loading'); if (loading) loading.textContent = bt('loading');
+      renderList();
+      if (currentFile) { showPost(currentFile); }
     }
 
     // Handle back button
@@ -657,7 +720,8 @@
       }
     });
 
-    // Load posts on page load
+    // Apply stored language to chrome, then load posts
+    setLanguage(blogLang);
     loadPosts();
   </script>
 </body>
