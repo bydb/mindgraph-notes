@@ -426,6 +426,14 @@ export interface ReMarkableOptimizeResult {
   error?: string;
 }
 
+export interface ReMarkableBookifyResult {
+  success: boolean;
+  relativePdfPath?: string;
+  sourcePages?: number;
+  charCount?: number;
+  error?: string;
+}
+
 export interface ReMarkableUsbDebugInfoResult {
   success: boolean;
   connected: boolean;
@@ -536,7 +544,7 @@ export interface ElectronAPI {
   getFilesWithMtime: (vaultPath: string) => Promise<Array<{ path: string; mtime: number }>>;
 
   // PDF Export
-  exportPDF: (defaultFileName: string, htmlContent: string, title: string, vaultPath?: string, notePath?: string) => Promise<{
+  exportPDF: (defaultFileName: string, htmlContent: string, title: string, vaultPath?: string, notePath?: string, pdfStyle?: 'standard' | 'remarkable-book') => Promise<{
     success: boolean;
     path?: string;
     error?: string;
@@ -905,6 +913,7 @@ export interface ElectronAPI {
   remarkableDownloadDocument: (vaultPath: string, document: { id: string; name: string }) => Promise<ReMarkableDownloadResult>;
   remarkableUploadPdf: (vaultPath: string, relativePdfPath: string) => Promise<ReMarkableUploadResult>;
   remarkableOptimizePdfForUpload: (vaultPath: string, relativePdfPath: string) => Promise<ReMarkableOptimizeResult>;
+  remarkableBookifyPdf: (vaultPath: string, relativePdfPath: string) => Promise<ReMarkableBookifyResult>;
   remarkableUsbDebugInfo: () => Promise<ReMarkableUsbDebugInfoResult>;
 
   // edoobox Agent

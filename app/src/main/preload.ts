@@ -93,8 +93,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('load-embeddings-cache', vaultPath, model),
 
   // PDF Export
-  exportPDF: (defaultFileName: string, htmlContent: string, title: string, vaultPath?: string, notePath?: string) =>
-    ipcRenderer.invoke('export-pdf', defaultFileName, htmlContent, title, vaultPath, notePath),
+  exportPDF: (defaultFileName: string, htmlContent: string, title: string, vaultPath?: string, notePath?: string, pdfStyle?: 'standard' | 'remarkable-book') =>
+    ipcRenderer.invoke('export-pdf', defaultFileName, htmlContent, title, vaultPath, notePath, pdfStyle),
 
   // Notification API für Reminder-System
   showNotification: (title: string, body: string, noteId?: string) =>
@@ -503,6 +503,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('remarkable-upload-pdf', vaultPath, relativePdfPath),
   remarkableOptimizePdfForUpload: (vaultPath: string, relativePdfPath: string) =>
     ipcRenderer.invoke('remarkable-optimize-pdf', vaultPath, relativePdfPath),
+  remarkableBookifyPdf: (vaultPath: string, relativePdfPath: string) =>
+    ipcRenderer.invoke('remarkable-bookify-pdf', vaultPath, relativePdfPath),
   remarkableUsbDebugInfo: () =>
     ipcRenderer.invoke('remarkable-usb-debug-info'),
 

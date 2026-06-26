@@ -2,6 +2,23 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.8.14] - 2026-06-26
+
+reMarkable-Lesemodus: PDFs lesen sich jetzt wie ein Buch auf einem Kindle — große Schrift, in Gerätegröße.
+
+### Neu
+
+- **reMarkable-Buch-Export für eigene Notizen.** Neuer „reMarkable"-Button neben dem PDF-Export im Editor. Er rendert die Notiz frisch in reMarkable-Gerätegröße (157×210 mm) mit großer Serifenschrift (17 pt), viel Zeilenabstand und breiten Rändern — gestochen scharf und auswählbar, statt winziger A4-Schrift auf dem kleinen Schirm.
+- **„Als Buch + Export" für externe PDFs** (reMarkable-Sidebar). Wandelt fertige PDFs (z.B. Paper) per echtem Text-Reflow in ein buchtaugliches Layout um: Der Text wird extrahiert, neu umgebrochen und in Gerätegröße mit großer Schrift gerendert, dann direkt aufs Gerät geladen. Funktioniert dependency-frei (pdfjs, kein externes Tool). Kopf-/Fußzeilen, Seitenzahlen und Export-Artefakte (Klapp-Marker, Übersetzungs-Kopfzeilen) werden automatisch herausgefiltert.
+
+### Behoben
+
+- **Die alte „Optimieren"-Funktion brachte nichts.** Sie machte nur eine Dateigrößen-Komprimierung (und fiel ohne installiertes Ghostscript/qpdf auf „unverändert kopieren" zurück) — die Schrift blieb winzig. Der neue Buch-Modus löst das eigentliche Problem über echtes Reflow.
+
+### Hinweise
+
+- Der Reflow externer PDFs nimmt **einspaltige** Dokumente an; Abbildungen und Formeln bleiben dabei außen vor (reiner Text). Das Original-PDF bleibt erhalten.
+
 ## [0.8.13] - 2026-06-26
 
 Behebt das automatische Update auf macOS — diesmal an der eigentlichen Wurzel.

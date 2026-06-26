@@ -25,6 +25,7 @@ export const RemarkablePanel: React.FC = () => {
   const [openingDocumentId, setOpeningDocumentId] = useState<string | null>(null)
   const [isExportingSelectedPdf, setIsExportingSelectedPdf] = useState(false)
   const [isOptimizingAndExporting, setIsOptimizingAndExporting] = useState(false)
+  const [isBookifyingAndExporting, setIsBookifyingAndExporting] = useState(false)
   const [debugOpen, setDebugOpen] = useState(false)
   const [usbDebugInfo, setUsbDebugInfo] = useState<ReMarkableUsbDebugInfoResult | null>(null)
   const [lastExportMode, setLastExportMode] = useState<string>('n/a')
@@ -401,6 +402,47 @@ export const RemarkablePanel: React.FC = () => {
     }
   }, [exportCandidatePath, refresh, t, vaultPath])
 
+  const bookifyAndExportSelectedPdfToRemarkable = useCallback(async () => {
+    if (!vaultPath) {
+      setError(t('sidebar.remarkable.noVault'))
+      return
+    }
+    if (!exportCandidatePath) {
+      setError(t('sidebar.remarkable.noPdfSelected'))
+      return
+    }
+
+    setIsBookifyingAndExporting(true)
+    setError(null)
+    setInfo(t('remarkable.bookifying'))
+
+    try {
+      const status = await window.electronAPI.remarkableUsbCheck()
+      if (!status.connected) {
+        throw new Error(status.error || t('sidebar.remarkable.disconnected'))
+      }
+
+      const bookifyResult = await window.electronAPI.remarkableBookifyPdf(vaultPath, exportCandidatePath)
+      if (!bookifyResult.success || !bookifyResult.relativePdfPath) {
+        throw new Error(bookifyResult.error || t('remarkable.bookifyFailed'))
+      }
+
+      const uploadResult = await window.electronAPI.remarkableUploadPdf(vaultPath, bookifyResult.relativePdfPath)
+      if (!uploadResult.success) {
+        throw new Error(uploadResult.error || t('sidebar.remarkable.exportPdfError'))
+      }
+
+      setLastExportMode('bookify+export')
+      setLastExportDetail(`reflow ${bookifyResult.sourcePages ?? '?'}p`)
+      setInfo(t('remarkable.bookifySuccess'))
+      await refresh()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t('sidebar.remarkable.exportPdfError'))
+    } finally {
+      setIsBookifyingAndExporting(false)
+    }
+  }, [exportCandidatePath, refresh, t, vaultPath])
+
   useEffect(() => {
     if (remarkable.enabled && remarkable.autoRefreshOnOpen) {
       refresh()
@@ -459,7 +501,7 @@ export const RemarkablePanel: React.FC = () => {
             <button
               className="remarkable-export-btn"
               onClick={exportSelectedPdfToRemarkable}
-              disabled={isExportingSelectedPdf || isOptimizingAndExporting || !exportCandidatePath}
+              disabled={isExportingSelectedPdf || isOptimizingAndExporting || isBookifyingAndExporting || !exportCandidatePath}
               title={t('sidebar.remarkable.exportPdfAction')}
             >
               {isExportingSelectedPdf ? t('sidebar.remarkable.exporting') : t('sidebar.remarkable.exportPdfAction')}
@@ -467,10 +509,18 @@ export const RemarkablePanel: React.FC = () => {
             <button
               className="remarkable-export-btn remarkable-export-optimize-btn"
               onClick={optimizeAndExportSelectedPdfToRemarkable}
-              disabled={isExportingSelectedPdf || isOptimizingAndExporting || !exportCandidatePath}
+              disabled={isExportingSelectedPdf || isOptimizingAndExporting || isBookifyingAndExporting || !exportCandidatePath}
               title={t('remarkable.optimizeExportTitle')}
             >
               {isOptimizingAndExporting ? t('remarkable.optimizing') : t('remarkable.optimizeExport')}
+            </button>
+            <button
+              className="remarkable-export-btn remarkable-export-bookify-btn"
+              onClick={bookifyAndExportSelectedPdfToRemarkable}
+              disabled={isExportingSelectedPdf || isOptimizingAndExporting || isBookifyingAndExporting || !exportCandidatePath}
+              title={t('remarkable.bookifyExportTitle')}
+            >
+              {isBookifyingAndExporting ? t('remarkable.bookifying') : t('remarkable.bookifyExport')}
             </button>
             <span className="remarkable-export-file" title={exportCandidatePath || t('sidebar.remarkable.noPdfSelected')}>
               {exportCandidateName || t('sidebar.remarkable.noPdfSelected')}

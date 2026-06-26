@@ -4230,7 +4230,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
     }
   }, [selectedNote, vaultPath])
 
-  const handleExportPDF = useCallback(async () => {
+  const handleExportPDF = useCallback(async (pdfStyle: 'standard' | 'remarkable-book' = 'standard') => {
     if (!selectedNote) return
 
     const fileName = selectedNote.path.split('/').pop() || 'notiz.md'
@@ -4247,7 +4247,8 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
       htmlContent,
       frontmatterTitle || selectedNote.title,
       vaultPath || undefined,
-      selectedNote.path || undefined
+      selectedNote.path || undefined,
+      pdfStyle
     )
 
     if (result.success) {
@@ -4411,7 +4412,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
           )}
           <button
             className="export-btn"
-            onClick={handleExportPDF}
+            onClick={() => handleExportPDF('standard')}
             title={t('editor.exportPdf')}
           >
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
@@ -4419,6 +4420,17 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
               <path d="M8 2V10M8 10L5 7M8 10L11 7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
             PDF
+          </button>
+          <button
+            className="export-btn"
+            onClick={() => handleExportPDF('remarkable-book')}
+            title={t('editor.exportPdfRemarkable')}
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <rect x="3" y="2" width="10" height="12" rx="1" stroke="currentColor" strokeWidth="1.5"/>
+              <path d="M6 5.5h4M6 8h4M6 10.5h2.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+            </svg>
+            reMarkable
           </button>
           <button
             className="export-btn"

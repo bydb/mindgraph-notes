@@ -5273,14 +5273,16 @@ ipcMain.handle('project-rag-rerank-candidates', async (_event, vaultPath: string
 })
 
 // PDF Export - mit verstecktem Fenster für vollständigen Export
-ipcMain.handle('export-pdf', async (_event, defaultFileName: string, htmlContent: string, title: string, vaultPath?: string, notePath?: string) => {
+ipcMain.handle('export-pdf', async (_event, defaultFileName: string, htmlContent: string, title: string, vaultPath?: string, notePath?: string, pdfStyle?: 'standard' | 'remarkable-book') => {
   if (!mainWindow) return { success: false, error: 'Kein Fenster verfügbar' }
   if (vaultPath) assertApprovedVault(vaultPath, 'export-pdf')
+
+  const isRemarkable = pdfStyle === 'remarkable-book'
 
   // Speicherdialog öffnen
   const result = await dialog.showSaveDialog(mainWindow, {
     title: t('dialog.exportPdf.title'),
-    defaultPath: defaultFileName.replace('.md', '.pdf'),
+    defaultPath: defaultFileName.replace(/\.md$/, isRemarkable ? '.remarkable.pdf' : '.pdf'),
     filters: [{ name: 'PDF', extensions: ['pdf'] }]
   })
 
@@ -5380,10 +5382,48 @@ ipcMain.handle('export-pdf', async (_event, defaultFileName: string, htmlContent
       }
     })
 
+    // reMarkable-Buch-Stil: Serifenschrift, große Schrift, breite Ränder, reines
+    // Schwarz (e-ink). Kommt NACH dem Standard-Style → überschreibt ihn per Kaskade.
+    // Seitengröße wird in printToPDF auf den reMarkable-2-Schirm (157×210 mm) gesetzt.
+    const remarkableOverrideStyle = `
+        <style>
+          @page { size: 157mm 210mm; margin: 0; }
+          body {
+            font-family: 'Iowan Old Style', 'Palatino Linotype', 'Palatino', 'Georgia', serif;
+            font-size: 17pt;
+            line-height: 1.7;
+            color: #000;
+            padding: 14mm 13mm 16mm;
+            -webkit-hyphens: auto;
+            hyphens: auto;
+            text-rendering: optimizeLegibility;
+          }
+          h1 { font-size: 25pt; line-height: 1.25; margin: 0 0 14pt; padding-bottom: 6pt; border-bottom: 1.5px solid #000; }
+          h2 { font-size: 21pt; line-height: 1.3; margin: 22pt 0 10pt; }
+          h3 { font-size: 18.5pt; margin: 18pt 0 8pt; }
+          h4, h5, h6 { font-size: 17pt; margin: 16pt 0 6pt; }
+          p { margin: 0 0 0.75em; text-align: justify; }
+          ul, ol { margin: 0 0 0.75em; padding-left: 1.2em; }
+          li { margin-bottom: 0.3em; }
+          blockquote { border-left: 3px solid #000; padding-left: 12pt; margin: 12pt 0; color: #000; font-style: italic; }
+          code { font-family: 'SF Mono', Menlo, monospace; font-size: 14pt; background: #eee; padding: 1px 4px; }
+          pre { background: #f0f0f0; padding: 10pt; margin: 0 0 12pt; white-space: pre-wrap; word-wrap: break-word; font-size: 13pt; }
+          pre code { background: none; padding: 0; font-size: 13pt; }
+          a { color: #000; text-decoration: underline; }
+          img, svg { max-width: 100%; height: auto; display: block; margin: 12pt auto; }
+          table { border-collapse: collapse; width: 100%; margin: 0 0 12pt; font-size: 14pt; }
+          th, td { border: 1px solid #000; padding: 5pt 7pt; text-align: left; }
+          th { background: #eee; font-weight: 600; }
+          hr { border: none; border-top: 1px solid #000; margin: 18pt 0; }
+          .callout { margin: 12pt 0; padding: 9pt 12pt; border-left: 3px solid #000; background: #f6f6f6; }
+          .callout-title { font-weight: 600; margin-bottom: 5pt; }
+          .footnotes { margin-top: 24pt; padding-top: 12pt; border-top: 1px solid #000; font-size: 13pt; }
+        </style>`
+
     // HTML-Template für den PDF-Export
     const fullHtml = `
       <!DOCTYPE html>
-      <html>
+      <html lang="de">
       <head>
         <meta charset="UTF-8">
         <title>${title}</title>
@@ -5515,6 +5555,7 @@ ipcMain.handle('export-pdf', async (_event, defaultFileName: string, htmlContent
             max-width: 100%;
           }
         </style>
+        ${isRemarkable ? remarkableOverrideStyle : ''}
       </head>
       <body>
         ${resolvedHtml}
@@ -5550,17 +5591,22 @@ ipcMain.handle('export-pdf', async (_event, defaultFileName: string, htmlContent
         })
       `)
 
-      // PDF generieren
-      const pdfData = await pdfWindow.webContents.printToPDF({
-        printBackground: true,
-        pageSize: 'A4',
-        margins: {
-          top: 0.5,
-          bottom: 0.5,
-          left: 0.5,
-          right: 0.5
-        }
-      })
+      // PDF generieren. reMarkable-Buch: exakte Geräteseite (157×210 mm = reMarkable 2
+      // Schirm in Mikrometer), Ränder kommen aus dem body-Padding der Buch-CSS.
+      const pdfData = await pdfWindow.webContents.printToPDF(
+        isRemarkable
+          ? {
+              // Seitengröße (157×210 mm) kommt aus @page der reMarkable-CSS.
+              // Electrons pageSize-Objekt ist hier unzuverlässig (deutet Zahlen als Zoll).
+              printBackground: true,
+              preferCSSPageSize: true
+            }
+          : {
+              printBackground: true,
+              pageSize: 'A4',
+              margins: { top: 0.5, bottom: 0.5, left: 0.5, right: 0.5 }
+            }
+      )
 
       // Fenster schließen
       pdfWindow.close()
@@ -10268,6 +10314,62 @@ ipcMain.handle('remarkable-optimize-pdf', async (_event, vaultPath: string, rela
     return {
       success: false,
       error: error instanceof Error ? error.message : 'PDF konnte nicht optimiert werden'
+    }
+  }
+})
+
+// Wandelt ein PDF in ein "buchtaugliches" reMarkable-PDF um: Text wird extrahiert,
+// zu fließenden Absätzen umgebrochen (Reflow) und mit großer Serifenschrift in
+// Gerätegröße neu gerendert – liest sich wie ein Kindle-Buch. Abbildungen/Formeln
+// gehen dabei verloren (es bleibt der reine Text).
+ipcMain.handle('remarkable-bookify-pdf', async (_event, vaultPath: string, relativePdfPath: string) => {
+  try {
+    assertApprovedVault(vaultPath, 'remarkable-bookify-pdf')
+    if (!relativePdfPath.toLowerCase().endsWith('.pdf')) {
+      return { success: false, error: 'Nur PDF-Dateien können umgewandelt werden' }
+    }
+
+    const inputPath = validatePath(vaultPath, relativePdfPath)
+    try {
+      await fs.access(inputPath)
+    } catch {
+      return {
+        success: false,
+        error: `Quell-PDF nicht gefunden: „${path.basename(inputPath)}". Die Datei wurde verschoben oder gelöscht – bitte ein vorhandenes PDF auswählen.`
+      }
+    }
+    const inputBytes = await fs.readFile(inputPath)
+
+    const { extractReflowedHtml } = await import('./remarkable/pdfReflow')
+    const { renderReMarkableBookPdf } = await import('./remarkable/bookPdf')
+
+    const reflow = await extractReflowedHtml(new Uint8Array(inputBytes))
+    if (reflow.charCount < 40) {
+      return {
+        success: false,
+        error: 'Kaum Text gefunden – vermutlich ein gescanntes/Bild-PDF. Reflow funktioniert nur mit echtem Text.'
+      }
+    }
+
+    const baseName = path.basename(inputPath).replace(/\.pdf$/i, '')
+    const title = reflow.title || baseName
+    const pdfData = await renderReMarkableBookPdf(reflow.bodyHtml, title)
+
+    const outputPath = inputPath.replace(/\.pdf$/i, '.remarkable.pdf')
+    await fs.writeFile(outputPath, pdfData)
+    const optimizedRelative = path.relative(vaultPath, outputPath).split(path.sep).join('/')
+
+    return {
+      success: true,
+      relativePdfPath: optimizedRelative,
+      sourcePages: reflow.pageCount,
+      charCount: reflow.charCount
+    }
+  } catch (error) {
+    console.error('[reMarkable] Failed to bookify PDF:', { relativePdfPath, error })
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'PDF konnte nicht umgewandelt werden'
     }
   }
 })

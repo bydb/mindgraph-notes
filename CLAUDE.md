@@ -394,7 +394,7 @@ Oder: `/release` Command verwenden.
 ## reMarkable-Integration (USB)
 
 - USB-Verbindung über `http://10.11.99.1` (reMarkable "USB web interface")
-- Main-Module: `app/src/main/remarkable/` (`service.ts`, `transports/usb.ts`, `types.ts`)
+- Main-Module: `app/src/main/remarkable/` (`service.ts`, `transports/usb.ts`, `types.ts`, `pdfReflow.ts`, `bookPdf.ts`)
 - IPC-Handler in `main/index.ts`:
   - `remarkable-usb-check`
   - `remarkable-usb-debug-info`
@@ -402,10 +402,19 @@ Oder: `/release` Command verwenden.
   - `remarkable-download-document`
   - `remarkable-upload-pdf`
   - `remarkable-optimize-pdf`
+  - `remarkable-bookify-pdf`
 - Renderer-UI: `app/src/renderer/components/Sidebar/RemarkablePanel.tsx`
-- Features: Dokumente browsen/importieren, PDF exportieren, **Optimieren + Export** (Ghostscript/qpdf Fallback)
+- Features: Dokumente browsen/importieren, PDF exportieren, **Optimieren + Export** (Ghostscript/qpdf Fallback), **Als Buch + Export** (Reflow)
 - Stabilität: Upload-Flow enthält Reachability-Checks + Retry-Logik (wichtig für reMarkable Paper Move)
 - Branding: reMarkable-Logo in `app/src/renderer/assets/remarkable-logo.png`
+
+### reMarkable-Buch-Lesemodus (große Schrift wie auf einem Kindle)
+- **Problem**: Der reMarkable-Schirm ist physisch schmaler (157 mm) als A4 (210 mm). Ein A4-PDF auf das Gerät zu legen macht den Text **kleiner**, und reMarkable kann PDF-Text nicht reflowen/vergrößern. Reines PDF-Umlayouten (Skalieren/Schneiden) löst das NICHT — es schrumpft. Nur echtes Reflow (Zeilen neu umbrechen) vergrößert.
+- **Geräteseite**: reMarkable 2 = 1404×1872 px @ 226 dpi = **157×210 mm**. Gesetzt via CSS `@page { size: 157mm 210mm; margin: 0 }` + `printToPDF({ preferCSSPageSize: true })`. **NICHT** über das `pageSize`-Objekt: Electron 40 interpretiert dessen Zahlen fälschlich als Zoll (157000 → 11,3 Mio pt Riesenseite → Inhalt in winziger Ecke → scheinbar leere Seite). Die Typings-Doku („microns") ist falsch. Nach `loadFile` auf `document.fonts.ready` + ein `requestAnimationFrame` warten, sonst erfasst printToPDF gelegentlich eine leere Seite.
+- **Weg A — eigene Notizen** (`export-pdf` mit `pdfStyle: 'remarkable-book'`): rendert frisch aus dem Markdown in Gerätegröße, Serifenschrift 17pt, line-height 1.7, breite Ränder, reines Schwarz. Kommt als Override-`<style>` NACH dem Standard-Style (Kaskade). Zweiter „reMarkable"-Button neben „PDF" im Editor (`MarkdownEditor.tsx` `handleExportPDF('remarkable-book')`).
+- **Weg B — externe PDFs/Paper** (`remarkable-bookify-pdf`): `pdfReflow.ts` extrahiert Text via **pdfjs-dist** (legacy-ESM-Build, `await import('pdfjs-dist/legacy/build/pdf.mjs')` — externalisiert, NICHT gebündelt, sonst crasht `new DOMMatrix()` beim Init im Node-Kontext) → Zeilen über `hasEOL`/y rekonstruieren → Absätze umbrechen (weiche Silbentrennung am Zeilenende zusammenziehen, Kopf-/Fußzeilen über Wiederholungs-Heuristik entfernen, Überschriften per Schrifthöhe). `bookPdf.ts` rendert das HTML über dieselbe Buch-CSS zu PDF-Bytes (eigener `BrowserWindow` + `printToPDF`), Ausgabe `<name>.remarkable.pdf`, dann Upload.
+- **Annahme/Grenze**: Reflow geht von **einspaltigen** Dokumenten aus. Abbildungen, Formeln und exaktes Layout gehen verloren (reiner Text). Zweispaltige Journals werden verschachtelt — bewusst nicht gelöst (bräuchte Spaltenerkennung wie k2pdfopt). Bei gescannten Bild-PDFs ohne Textebene bricht der Handler mit Hinweis ab (`charCount < 40`).
+- **k2pdfopt bewusst NICHT genutzt**: kein Homebrew-Formula, nur unsigniertes Fremd-Binary → Gatekeeper/Notarisierungs-Problem für die verteilte App. Reflow via pdfjs ist dependency-frei und bündelt.
 
 ## Terminal (xterm.js + PTY)
 

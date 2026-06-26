@@ -1,6 +1,6 @@
 {
   "name": "mindgraph-notes",
-  "version": "0.8.13",
+  "version": "0.8.14",
   "description": "Lokaler Workspace, der dir täglich zeigt, was in deinen Notizen, Aufgaben und E-Mails wichtig ist — mit Wissensgraph und KI.",
   "main": "out/main/index.js",
   "scripts": {
@@ -161,6 +161,7 @@
     "mermaid": "^11.12.2",
     "node-pty": "^1.1.0",
     "nodemailer": "^8.0.4",
+    "pdfjs-dist": "^5.4.296",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
     "react-pdf": "^10.3.0",
