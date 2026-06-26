@@ -2,6 +2,14 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.8.13] - 2026-06-26
+
+Behebt das automatische Update auf macOS — diesmal an der eigentlichen Wurzel.
+
+### Behoben
+
+- **Automatische Updates auf macOS — der wirkliche Fix.** Der Update-Check lief zwar (seit 0.8.10), brach aber sofort intern mit „No published versions on GitHub" ab und meldete „kein Update verfügbar". Ursache war eine fehlerhafte Kombination zweier Update-Einstellungen (`channel = 'latest'` zusammen mit `allowPrerelease = true`): In der verwendeten electron-updater-Version führt das bei stabilen Releases dazu, dass gar keine Zielversion gefunden wird. Das ist jetzt behoben — der Update-Check findet die neueste stabile Version zuverlässig, lädt sie herunter und installiert sie beim Beenden. (Hinweis: Diese eine Version muss noch einmal von Hand installiert werden — alle bisher veröffentlichten Builds tragen den Fehler in sich und können sich nicht selbst auf diese Fassung aktualisieren. Ab dieser Version aktualisiert sich die App wieder von allein.)
+
 ## [0.8.12] - 2026-06-25
 
 Behebt mehrere Probleme im Brain-Modus und repariert den Word-Export von Grund auf.

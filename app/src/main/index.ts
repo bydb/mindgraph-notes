@@ -53,13 +53,19 @@ async function ensureAutoUpdater(): Promise<import('electron-updater').AppUpdate
     _autoUpdaterConfigured = true
     autoUpdater.autoDownload = true
     autoUpdater.autoInstallOnAppQuit = true
-    // Wir veröffentlichen Beta-Builds (Version mit "-beta") auf den `latest`-Channel
-    // (electron-builder erzeugt nur `latest-mac.yml`). Ohne Override leitet electron-updater
-    // aus dem "-beta"-Suffix der installierten Version den Channel `beta` ab und fragt
-    // `beta-mac.yml` ab → 404 → Update-Check scheitert still. Channel hart auf `latest`
-    // zwingen und Prerelease-Zielversionen erlauben, damit beta→beta-Updates funktionieren.
+    // Channel hart auf `latest` zwingen: Ohne Override leitet electron-updater aus einem
+    // evtl. "-beta"-Suffix der INSTALLIERTEN Version den Channel `beta` ab und fragt
+    // `beta-mac.yml` ab → 404 → Update-Check scheitert still. Wir veröffentlichen nur noch
+    // stabile Releases (prerelease=false) mit `latest-mac.yml`.
     autoUpdater.channel = 'latest'
-    autoUpdater.allowPrerelease = true
+    // WICHTIG: allowPrerelease MUSS false sein. In electron-updater 6.8.3 ist die Kombination
+    // `channel='latest'` + `allowPrerelease=true` für stabile Releases kaputt: Die Prerelease-
+    // Schleife in GitHubProvider.getLatestVersion setzt `tag` nur für Releases, deren Channel
+    // 'alpha'/'beta' ist oder exakt dem currentChannel entspricht. Bei currentChannel='latest'
+    // und stabilen Ziel-Releases (hrefChannel=null) greift keine Bedingung → tag bleibt null →
+    // "No published versions on GitHub" (ERR_UPDATER_NO_PUBLISHED_VERSIONS). Mit false nimmt der
+    // Provider den `/releases/latest`-Pfad (getLatestTagName) und findet die neueste stabile Version.
+    autoUpdater.allowPrerelease = false
     autoUpdater.logger = {
       info: (msg: unknown) => console.log('[AutoUpdate]', msg),
       warn: (msg: unknown) => console.warn('[AutoUpdate]', msg),
