@@ -47,6 +47,8 @@ export type {
 } from './state'
 export { initialPluginState, isPluginUsable, pluginBlockedReason } from './state'
 
+export type { PluginInvokeResult } from './transport'
+
 export type { ValidationResult } from './schemas'
 export {
   PLUGIN_MANIFEST_SCHEMA,

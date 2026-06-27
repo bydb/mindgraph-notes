@@ -81,6 +81,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   workflowSave: (vaultPath: string, file: object) => ipcRenderer.invoke('workflow-save', vaultPath, file),
   workflowRun: (payload: object) => ipcRenderer.invoke('workflow-run', payload),
 
+  // Plugin-Transport (ein generischer Kanal, nicht-generische Actions)
+  pluginInvoke: (pluginId: string, actionId: string, payload?: unknown) =>
+    ipcRenderer.invoke('plugin:invoke', pluginId, actionId, payload),
+  pluginList: () => ipcRenderer.invoke('plugin:list'),
+
   // Notes-Cache für schnelles Laden
   saveNotesCache: (vaultPath: string, cache: object) => ipcRenderer.invoke('save-notes-cache', vaultPath, cache),
   loadNotesCache: (vaultPath: string) => ipcRenderer.invoke('load-notes-cache', vaultPath),

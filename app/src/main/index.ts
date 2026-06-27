@@ -142,6 +142,8 @@ import { embedText as ragEmbedText } from './rag/embed'
 import { cosineSimilarity as ragCosineSimilarity } from '../shared/rag/similarity'
 import type { RagIndexStatus, RagQueryResult, RagRetrieveOptions } from '../shared/rag/types'
 import { setupTray, hideTransportWindow, updateShortcut, showTransportWindow } from './transport/trayManager'
+import { createMainRegistry } from './plugins/registry'
+import { registerPluginTransport } from './plugins/transport'
 
 // Globale Fehlerbehandlung für unhandled exceptions (z.B. IMAP Socket-Timeouts)
 process.on('uncaughtException', (error) => {
@@ -150,6 +152,12 @@ process.on('uncaughtException', (error) => {
 process.on('unhandledRejection', (reason) => {
   console.error('[Main] Unhandled rejection:', reason instanceof Error ? reason.message : reason)
 })
+
+// Plugin-System: build-seitig erkannte Registry (import.meta.glob) + generischer Transport.
+// Host noch der Default-Stub (echte Capability-Dienste folgen in Schritt 5); demo.echo läuft
+// schon end-to-end, demo.summarize wirft kontrolliert (normalisiert zu {ok,error}).
+const pluginRegistry = createMainRegistry()
+registerPluginTransport(pluginRegistry)
 
 let mainWindow: BrowserWindow | null = null
 let fileWatcher: FSWatcher | null = null
@@ -638,6 +646,9 @@ app.whenReady().then(async () => {
 
   createWindow()
   console.timeEnd('app-ready')
+
+  // Plugins aktivieren (fehler-isoliert in der Registry — ein defektes Plugin kippt den Start nie).
+  pluginRegistry.activateAll().catch((err) => console.error('[plugin] activateAll:', err))
 
   // Tray-Icon + Schnellerfassung (plattformübergreifend)
   {

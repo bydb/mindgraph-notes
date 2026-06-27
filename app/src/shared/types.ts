@@ -1061,6 +1061,10 @@ export interface ElectronAPI {
   workflowSave: (vaultPath: string, file: import('./workflow/model').WorkflowFile) => Promise<{ success: boolean; error?: string }>;
   workflowRun: (payload: import('./workflow/model').WorkflowRunPayload) => Promise<import('./workflow/model').WorkflowRun>;
 
+  // Plugin-Transport
+  pluginInvoke: (pluginId: string, actionId: string, payload?: unknown) => Promise<import('./plugins/transport').PluginInvokeResult>;
+  pluginList: () => Promise<import('./plugins/transport').PluginInvokeResult>;
+
   // Projekt-Status-Crystallizer
   projectStatusDiscover: (vaultPath: string, projectsFolderRel: string) => Promise<{ success: boolean; projects?: DiscoveredProject[]; error?: string }>;
   projectStatusMark: (vaultPath: string, projectFolderRel: string, keywords: string[], priority: 'high' | 'med' | 'low') => Promise<{ success: boolean; statusFilePath?: string; error?: string }>;
