@@ -60,9 +60,24 @@ export interface HostServices {
   /** Liest eine gebündelte App-Ressource (read-only, auf resources/ beschränkt). */
   readResource: (name: string) => Promise<Uint8Array>
   /** Modell-Auflösung + isHardLocked + isCloudModel-Gate stecken in dieser Primitive. */
-  llmGenerate: (prompt: string, opts: { module?: CompatModuleId; allowCloud?: boolean }) => Promise<string>
+  llmGenerate: (
+    prompt: string,
+    opts: { module?: CompatModuleId; allowCloud?: boolean; temperature?: number; maxTokens?: number }
+  ) => Promise<string>
   /** Roher fetch — die allowedHosts-Allowlist erzwingt der Host, nicht diese Primitive. */
   httpFetch: (url: string, init?: RequestInit) => Promise<Response>
+  /** Basic-Auth-Request mit Credentials in den Connection-Options (Apache-Auth-Quirk, WordPress). */
+  httpFetchBasicAuth: (
+    url: string,
+    opts: {
+      method: string
+      headers?: Record<string, string>
+      body?: string | Uint8Array
+      username: string
+      password: string
+      timeoutMs?: number
+    }
+  ) => Promise<{ statusCode: number; text: string }>
   /**
    * Zusätzliche, zur LAUFZEIT erlaubte Hosts pro Plugin (über die statischen manifest.http.
    * allowedHosts hinaus). Für Plugins mit user-konfiguriertem Endpunkt (z.B. Antares: jedes
@@ -143,8 +158,10 @@ export function createHostFactory(services: HostServices): HostFactory {
 
     if (caps.has('llm.generate')) {
       host.llm = {
-        generate: (prompt: string, opts?: { module?: CompatModuleId; allowCloud?: boolean }) =>
-          services.llmGenerate(prompt, opts ?? {}),
+        generate: (
+          prompt: string,
+          opts?: { module?: CompatModuleId; allowCloud?: boolean; temperature?: number; maxTokens?: number }
+        ) => services.llmGenerate(prompt, opts ?? {}),
       }
     }
 
@@ -153,6 +170,20 @@ export function createHostFactory(services: HostServices): HostFactory {
         fetch: async (url: string, init?: RequestInit) => {
           await ensureHostAllowed(url)
           return services.httpFetch(url, init)
+        },
+        fetchBasicAuth: async (
+          url: string,
+          opts: {
+            method: string
+            headers?: Record<string, string>
+            body?: string | Uint8Array
+            username: string
+            password: string
+            timeoutMs?: number
+          }
+        ) => {
+          await ensureHostAllowed(url)
+          return services.httpFetchBasicAuth(url, opts)
         },
       }
     }

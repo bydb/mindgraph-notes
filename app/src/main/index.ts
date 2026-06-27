@@ -233,24 +233,34 @@ function buildPluginHostServices(): HostServices {
       const res = await fetch(`${OLLAMA_API_URL}/api/generate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model, prompt, stream: false, think: false, options: { temperature: 0.4, num_predict: 1200 } })
+        body: JSON.stringify({
+          model, prompt, stream: false, think: false,
+          options: { temperature: opts.temperature ?? 0.4, num_predict: opts.maxTokens ?? 1200 }
+        })
       })
       if (!res.ok) throw new Error(`Ollama Fehler: ${res.status}`)
       const data = await res.json()
       return (data.response || '').trim()
     },
     httpFetch: (url, init) => fetch(url, init),
+    httpFetchBasicAuth: nativeServices.httpFetchBasicAuth,
     resolveExtraAllowedHosts: async (pluginId) => {
       // Plugins mit user-konfiguriertem Endpunkt (z.B. Antares: ui.antares.baseUrl) dürfen
       // ihren konfigurierten Host ansprechen — der ist user-getrust, anders als ein beliebiger.
       const ui = await loadUISettings().catch(() => ({} as Record<string, unknown>))
+      const hosts: string[] = []
       const cfg = ui[pluginId] as { baseUrl?: string } | undefined
-      if (!cfg?.baseUrl) return []
-      try {
-        return [new URL(cfg.baseUrl).hostname]
-      } catch {
-        return []
+      if (cfg?.baseUrl) {
+        try { hosts.push(new URL(cfg.baseUrl).hostname) } catch { /* ignore */ }
       }
+      // edoobox-Vertikale nutzt zusätzlich den user-konfigurierten WordPress-Host (Marketing).
+      if (pluginId === 'edoobox') {
+        const mk = ui.marketing as { wordpressUrl?: string } | undefined
+        if (mk?.wordpressUrl) {
+          try { hosts.push(new URL(mk.wordpressUrl).hostname) } catch { /* ignore */ }
+        }
+      }
+      return hosts
     },
     deviceRequest: nativeServices.deviceRequest,
     deviceDownload: nativeServices.deviceDownload,
@@ -760,6 +770,7 @@ app.whenReady().then(async () => {
   // Plugin kippt den Start nie.
   await migrateAntaresCredentialsToPlugin()
   await migrateEdooboxCredentialsToPlugin()
+  await migrateMarketingCredentialsToPlugin()
   pluginRegistry.setHostFactory(createHostFactory(buildPluginHostServices()))
   pluginRegistry.setHardLockGuard(async (moduleId) => {
     const ui = await loadUISettings().catch(() => ({} as Record<string, unknown>))
@@ -10288,304 +10299,22 @@ async function migrateEdooboxCredentialsToPlugin(): Promise<void> {
   }
 }
 
-// ========================================
-// Marketing (WordPress + Instagram)
-// ========================================
-
-function getMarketingCredentialsPath(): string {
-  return path.join(app.getPath('userData'), 'marketing-credentials.enc')
-}
-
-// Credentials speichern (safeStorage)
-ipcMain.handle('marketing-save-credentials', async (_event, credentials: { wpAppPassword?: string }) => {
+// Marketing (WordPress) ist Teil der edoobox-Vertikale (src/plugins/edoobox/, Phase 2b) —
+// Service, IPC + Bild-Flow leben jetzt im Plugin (plugin:invoke). Hier bleibt nur die einmalige
+// Migration des alten WordPress-App-Passworts (marketing-credentials.enc) in die Plugin-Secrets.
+async function migrateMarketingCredentialsToPlugin(): Promise<void> {
   try {
-    if (!safeStorage.isEncryptionAvailable()) {
-      console.warn('[marketing] safeStorage encryption not available')
-      return false
+    if (await pluginSecretGet('plugin:edoobox:wpAppPassword')) return // schon migriert
+    const encPath = path.join(app.getPath('userData'), 'marketing-credentials.enc')
+    const raw = await fs.readFile(encPath).catch(() => null)
+    if (!raw || !safeStorage.isEncryptionAvailable()) return
+    const creds = JSON.parse(safeStorage.decryptString(raw)) as { wpAppPassword?: string }
+    if (creds.wpAppPassword) {
+      await pluginSecretSet('plugin:edoobox:wpAppPassword', creds.wpAppPassword)
+      console.log('[marketing] Altes WordPress-App-Passwort in Plugin-Secrets migriert')
     }
-    // Merge with existing credentials
-    let existing: Record<string, string> = {}
-    const credPath = getMarketingCredentialsPath()
-    const fileExists = await fs.access(credPath).then(() => true).catch(() => false)
-    if (fileExists) {
-      try {
-        const encrypted = await fs.readFile(credPath)
-        existing = JSON.parse(safeStorage.decryptString(encrypted))
-      } catch { /* ignore */ }
-    }
-    const merged = { ...existing, ...credentials }
-    const data = JSON.stringify(merged)
-    const encrypted = safeStorage.encryptString(data)
-    await fs.writeFile(credPath, encrypted)
-    return true
-  } catch (error) {
-    console.error('[marketing] Failed to save credentials:', error)
-    return false
-  }
-})
-
-// Credentials laden (safeStorage)
-ipcMain.handle('marketing-load-credentials', async () => {
-  try {
-    if (!safeStorage.isEncryptionAvailable()) return null
-    const credPath = getMarketingCredentialsPath()
-    const exists = await fs.access(credPath).then(() => true).catch(() => false)
-    if (!exists) return null
-    const encrypted = await fs.readFile(credPath)
-    const decrypted = safeStorage.decryptString(encrypted)
-    return JSON.parse(decrypted) as { wpAppPassword?: string; igAccessToken?: string }
-  } catch (error) {
-    console.error('[marketing] Failed to load credentials:', error)
-    return null
-  }
-})
-
-// WordPress Verbindungstest
-ipcMain.handle('marketing-check-wordpress', async (_event, siteUrl: string, username: string) => {
-  try {
-    const creds = await loadMarketingCredentials()
-    if (!creds?.wpAppPassword) return { success: false, error: 'Kein WordPress App-Passwort gespeichert' }
-
-    const { WordPressService } = await import('./marketingService')
-    const wp = new WordPressService(siteUrl, username, creds.wpAppPassword)
-    const user = await wp.checkConnection()
-    return { success: true, userName: user.name }
-  } catch (error) {
-    console.error('[marketing] WordPress check failed:', error)
-    return { success: false, error: error instanceof Error ? error.message : 'Verbindung fehlgeschlagen' }
-  }
-})
-
-// Content generieren via Ollama
-ipcMain.handle('marketing-generate-content', async (_event, offerData: {
-  name: string
-  description?: string
-  dateStart?: string
-  dateEnd?: string
-  location?: string
-  price?: number
-  maxParticipants?: number
-  speakers?: string[]
-  bookingUrl?: string
-}, model: string) => {
-  console.log('[marketing] Generating content for:', offerData.name, 'with model:', model, 'location:', offerData.location, 'dateStart:', offerData.dateStart, 'speakers:', offerData.speakers, 'desc:', offerData.description?.slice(0, 50))
-  try {
-    // Build offer summary for the prompt
-    const details: string[] = []
-    if (offerData.description) details.push(`Beschreibung: ${offerData.description}`)
-    if (offerData.dateStart) {
-      const start = new Date(offerData.dateStart)
-      const dateStr = start.toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })
-      const timeStr = start.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })
-      if (offerData.dateEnd) {
-        const end = new Date(offerData.dateEnd)
-        const endDateStr = end.toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })
-        const endTimeStr = end.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })
-        if (dateStr === endDateStr) {
-          details.push(`Datum: ${dateStr}, ${timeStr} – ${endTimeStr}`)
-        } else {
-          details.push(`Datum: ${dateStr} ${timeStr} – ${endDateStr} ${endTimeStr}`)
-        }
-      } else {
-        details.push(`Datum: ${dateStr}, ${timeStr} Uhr`)
-      }
-    }
-    if (offerData.location) details.push(`Ort: ${offerData.location}`)
-    if (offerData.price) details.push(`Preis: ${offerData.price} EUR`)
-    if (offerData.maxParticipants) details.push(`Max. Teilnehmer: ${offerData.maxParticipants}`)
-    if (offerData.speakers?.length) details.push(`Referent(en): ${offerData.speakers.join(', ')}`)
-    if (offerData.bookingUrl) details.push(`Anmelde-Link: ${offerData.bookingUrl}`)
-
-    const offerSummary = `Titel: ${offerData.name}\n${details.join('\n')}`
-
-    const bookingHint = offerData.bookingUrl
-      ? ` Binde den Anmelde-Link (${offerData.bookingUrl}) prominent als Button oder Link im Call-to-Action ein.`
-      : ''
-
-    // Generate WordPress Blog Post
-    const wpPrompt = `Du bist ein professioneller Marketing-Texter für Fortbildungsveranstaltungen. Erstelle einen ansprechenden Blog-Post im HTML-Format. Verwende <h2>, <p>, <ul> Tags. BEGINNE NICHT mit dem Titel als Überschrift — der Titel wird automatisch von WordPress angezeigt. Starte direkt mit dem Einleitungstext. Der Blog-Post MUSS am Ende einen Abschnitt "Veranstaltungsdetails" mit ALLEN folgenden Infos als <p><strong>-Liste enthalten: Datum, Uhrzeit, Ort, Referent(en), Teilnehmerzahl.${bookingHint} WICHTIG: Verwende KEIN Gendern mit Sternchen, Doppelpunkt oder Unterstrich (NICHT Schüler*innen, Lehrer:innen etc.). Nutze stattdessen neutrale Begriffe wie Lehrkräfte, Teilnehmende oder die ausgeschriebene Form. Gib NUR den HTML-Body zurück, keine Erklärungen.
-
-Veranstaltung:
-${offerSummary}`
-
-    const wpResponse = await fetch(`${OLLAMA_API_URL}/api/generate`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model,
-        prompt: wpPrompt,
-        stream: false,
-        think: false,
-        options: { temperature: 0.7, num_predict: 2000 }
-      }),
-      signal: AbortSignal.timeout(120000)
-    })
-
-    if (!wpResponse.ok) throw new Error(`Ollama API Fehler: ${wpResponse.status}`)
-    const wpData = await wpResponse.json()
-    const blogPost = wpData.response?.trim() || ''
-
-    // Generate Instagram Caption
-    const igPrompt = `Du bist ein Social-Media-Experte. Erstelle eine ansprechende Instagram-Caption (max. 2000 Zeichen) für folgende Veranstaltung. Die Caption MUSS Datum, Uhrzeit und Ort der Veranstaltung enthalten. Sie soll Aufmerksamkeit erregen und mit relevanten Hashtags enden. Verwende passende Emojis. WICHTIG: Verwende KEIN Gendern mit Sternchen, Doppelpunkt oder Unterstrich (NICHT Schüler*innen, Lehrer:innen etc.). Nutze stattdessen neutrale Begriffe wie Lehrkräfte, Teilnehmende oder die ausgeschriebene Form. Gib NUR die Caption zurück.
-
-Veranstaltung:
-${offerSummary}`
-
-    const igResponse = await fetch(`${OLLAMA_API_URL}/api/generate`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model,
-        prompt: igPrompt,
-        stream: false,
-        think: false,
-        options: { temperature: 0.8, num_predict: 1000 }
-      }),
-      signal: AbortSignal.timeout(120000)
-    })
-
-    if (!igResponse.ok) throw new Error(`Ollama API Fehler (IG): ${igResponse.status}`)
-    const igData = await igResponse.json()
-    const igCaption = igData.response?.trim() || ''
-
-    console.log('[marketing] Content generated:', { blogPostLen: blogPost.length, igCaptionLen: igCaption.length })
-    return { success: true, blogPost, igCaption }
-  } catch (error) {
-    console.error('[marketing] Content generation failed:', error)
-    return { success: false, error: error instanceof Error ? error.message : 'Content-Generierung fehlgeschlagen' }
-  }
-})
-
-// WordPress Post veröffentlichen
-ipcMain.handle('marketing-publish-wordpress', async (_event, siteUrl: string, username: string, title: string, content: string, status: 'draft' | 'publish', featuredMediaId?: number) => {
-  try {
-    const creds = await loadMarketingCredentials()
-    if (!creds?.wpAppPassword) return { success: false, error: 'Kein WordPress App-Passwort gespeichert' }
-
-    const { WordPressService } = await import('./marketingService')
-    const wp = new WordPressService(siteUrl, username, creds.wpAppPassword)
-    const post = await wp.createPost(title, content, status, featuredMediaId)
-    console.log('[marketing] WordPress post created:', post.id, post.link)
-    return { success: true, postId: post.id, postUrl: post.link, status: post.status }
-  } catch (error) {
-    console.error('[marketing] WordPress publish failed:', error)
-    return { success: false, error: error instanceof Error ? error.message : 'Veröffentlichung fehlgeschlagen' }
-  }
-})
-
-// Bild auf WordPress hochladen (für Instagram-URL)
-ipcMain.handle('marketing-upload-image', async (_event, siteUrl: string, username: string, imagePath: string, caption?: string) => {
-  try {
-    const creds = await loadMarketingCredentials()
-    if (!creds?.wpAppPassword) return { success: false, error: 'Kein WordPress App-Passwort gespeichert' }
-
-    const safeImagePath = await assertSafePath(imagePath, 'marketing-upload-image')
-    const imageBuffer = await fs.readFile(safeImagePath)
-    const filename = path.basename(safeImagePath)
-    const ext = path.extname(safeImagePath).toLowerCase()
-    const mimeTypes: Record<string, string> = {
-      '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png',
-      '.gif': 'image/gif', '.webp': 'image/webp'
-    }
-    const mimeType = mimeTypes[ext] || 'image/jpeg'
-
-    const { WordPressService } = await import('./marketingService')
-    const wp = new WordPressService(siteUrl, username, creds.wpAppPassword)
-    const media = await wp.uploadMedia(imageBuffer, filename, mimeType, caption)
-    console.log('[marketing] Image uploaded:', media.id, media.source_url)
-    return { success: true, mediaId: media.id, imageUrl: media.source_url }
-  } catch (error) {
-    console.error('[marketing] Image upload failed:', error)
-    return { success: false, error: error instanceof Error ? error.message : 'Bild-Upload fehlgeschlagen' }
-  }
-})
-
-// Bild per Google Imagen generieren
-ipcMain.handle('marketing-generate-image', async (_event, prompt: string, apiKey: string) => {
-  console.log('[marketing] Generating image with Imagen, prompt length:', prompt.length, 'prompt:', prompt.slice(0, 200))
-  try {
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict?key=${apiKey}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        instances: [{ prompt }],
-        parameters: {
-          sampleCount: 1,
-          aspectRatio: '16:9',
-          safetyFilterLevel: 'block_only_high'
-        }
-      }),
-      signal: AbortSignal.timeout(120000)
-    })
-
-    if (!response.ok) {
-      const text = await response.text()
-      console.error('[marketing] Imagen API error:', response.status, text.slice(0, 500))
-      throw new Error(`Imagen API Fehler (${response.status}): ${text.slice(0, 200)}`)
-    }
-
-    const data = await response.json()
-    const filtered = data.predictions?.[0]?.safetyAttributes?.blocked
-      ? `BLOCKED (categories: ${JSON.stringify(data.predictions[0].safetyAttributes)})`
-      : data.filteredReason || 'none'
-    console.log('[marketing] Imagen response: predictions:', data.predictions?.length ?? 0, 'filtered:', filtered, 'keys:', Object.keys(data))
-    const predictions = data.predictions?.filter((p: { bytesBase64Encoded?: string }) => p.bytesBase64Encoded)
-    if (!predictions || predictions.length === 0) {
-      const reason = data.filteredReason || filtered || JSON.stringify(data).slice(0, 500)
-      console.error('[marketing] Imagen: no usable images returned. Full response:', JSON.stringify(data).slice(0, 1000))
-      throw new Error(`Keine Bilder generiert: ${reason}`)
-    }
-
-    // Save to temp file
-    const imageBase64 = predictions[0].bytesBase64Encoded
-    const tempPath = path.join(app.getPath('temp'), `mindgraph-imagen-${Date.now()}.png`)
-    await fs.writeFile(tempPath, Buffer.from(imageBase64, 'base64'))
-    console.log('[marketing] Image generated and saved to:', tempPath)
-
-    return { success: true, imagePath: tempPath, imageBase64 }
-  } catch (error) {
-    console.error('[marketing] Image generation failed:', error)
-    return { success: false, error: error instanceof Error ? error.message : 'Bildgenerierung fehlgeschlagen' }
-  }
-})
-
-// Bild als Base64 lesen (für Preview im Renderer)
-ipcMain.handle('marketing-read-image-base64', async (_event, imagePath: string) => {
-  try {
-    const safe = await assertSafePath(imagePath, 'marketing-read-image-base64')
-    const buffer = await fs.readFile(safe)
-    return buffer.toString('base64')
-  } catch {
-    return null
-  }
-})
-
-// Bild auswählen (File Dialog)
-ipcMain.handle('marketing-select-image', async () => {
-  try {
-    const result = await dialog.showOpenDialog({
-      title: 'Bild auswählen',
-      filters: [{ name: 'Bilder', extensions: ['jpg', 'jpeg', 'png', 'gif', 'webp'] }],
-      properties: ['openFile']
-    })
-    if (result.canceled || !result.filePaths[0]) return null
-    return result.filePaths[0]
-  } catch {
-    return null
-  }
-})
-
-// Helper: Marketing-Credentials laden
-async function loadMarketingCredentials(): Promise<{ wpAppPassword?: string; igAccessToken?: string } | null> {
-  try {
-    if (!safeStorage.isEncryptionAvailable()) return null
-    const credPath = getMarketingCredentialsPath()
-    const exists = await fs.access(credPath).then(() => true).catch(() => false)
-    if (!exists) return null
-    const encrypted = await fs.readFile(credPath)
-    return JSON.parse(safeStorage.decryptString(encrypted))
-  } catch {
-    return null
+  } catch (e) {
+    console.warn('[marketing] Credential-Migration übersprungen:', e instanceof Error ? e.message : e)
   }
 }
 

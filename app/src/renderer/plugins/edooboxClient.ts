@@ -71,4 +71,40 @@ export const edooboxClient = {
 
   generateAttendanceList: (data: AttendanceListData, suggestedFileName: string) =>
     invokePlugin<DocxExportResult>('edoobox', 'edoobox.generateAttendanceList', { data, suggestedFileName }),
+
+  // — Marketing (WordPress + Imagen), bytes-basierter Bild-Flow (Phase 2b) —
+  marketingSaveCredentials: (wpAppPassword: string) =>
+    invokePlugin<boolean>('edoobox', 'edoobox.marketingSaveCredentials', { wpAppPassword }),
+
+  marketingLoadCredentials: () =>
+    invokePlugin<{ wpAppPassword?: string } | null>('edoobox', 'edoobox.marketingLoadCredentials'),
+
+  marketingCheckWordpress: (siteUrl: string, username: string) =>
+    invokePlugin<{ success: boolean; userName?: string; error?: string }>(
+      'edoobox', 'edoobox.marketingCheckWordpress', { siteUrl, username }),
+
+  marketingGenerateContent: (offerData: {
+    name: string; description?: string; dateStart?: string; dateEnd?: string
+    location?: string; maxParticipants?: number; speakers?: string[]; bookingUrl?: string
+  }) =>
+    invokePlugin<{ success: boolean; blogPost?: string; igCaption?: string; error?: string }>(
+      'edoobox', 'edoobox.marketingGenerateContent', { offerData }),
+
+  marketingPublishWordpress: (
+    siteUrl: string, username: string, title: string, content: string,
+    status: 'draft' | 'publish', featuredMediaId?: number
+  ) =>
+    invokePlugin<{ success: boolean; postId?: number; postUrl?: string; status?: string; error?: string }>(
+      'edoobox', 'edoobox.marketingPublishWordpress', { siteUrl, username, title, content, status, featuredMediaId }),
+
+  marketingUploadImage: (siteUrl: string, username: string, imageBase64: string, fileName: string, caption?: string) =>
+    invokePlugin<{ success: boolean; mediaId?: number; imageUrl?: string; error?: string }>(
+      'edoobox', 'edoobox.marketingUploadImage', { siteUrl, username, imageBase64, fileName, caption }),
+
+  marketingGenerateImage: (prompt: string, apiKey: string) =>
+    invokePlugin<{ success: boolean; imageBase64?: string; error?: string }>(
+      'edoobox', 'edoobox.marketingGenerateImage', { prompt, apiKey }),
+
+  marketingSelectImage: () =>
+    invokePlugin<{ fileName: string; imageBase64: string } | null>('edoobox', 'edoobox.marketingSelectImage'),
 }

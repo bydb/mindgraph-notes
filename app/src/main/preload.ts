@@ -504,25 +504,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // Antares CS: migriert nach src/plugins/antares/ — Aufruf via electronAPI.pluginInvoke('antares', …)
 
-  // Marketing (WordPress)
-  marketingSaveCredentials: (credentials: { wpAppPassword?: string }) =>
-    ipcRenderer.invoke('marketing-save-credentials', credentials),
-  marketingLoadCredentials: () =>
-    ipcRenderer.invoke('marketing-load-credentials'),
-  marketingCheckWordpress: (siteUrl: string, username: string) =>
-    ipcRenderer.invoke('marketing-check-wordpress', siteUrl, username),
-  marketingGenerateContent: (offerData: object, model: string) =>
-    ipcRenderer.invoke('marketing-generate-content', offerData, model),
-  marketingPublishWordpress: (siteUrl: string, username: string, title: string, content: string, status: 'draft' | 'publish', featuredMediaId?: number) =>
-    ipcRenderer.invoke('marketing-publish-wordpress', siteUrl, username, title, content, status, featuredMediaId),
-  marketingUploadImage: (siteUrl: string, username: string, imagePath: string, caption?: string) =>
-    ipcRenderer.invoke('marketing-upload-image', siteUrl, username, imagePath, caption),
-  marketingGenerateImage: (prompt: string, apiKey: string) =>
-    ipcRenderer.invoke('marketing-generate-image', prompt, apiKey),
-  marketingReadImageBase64: (imagePath: string) =>
-    ipcRenderer.invoke('marketing-read-image-base64', imagePath),
-  marketingSelectImage: () =>
-    ipcRenderer.invoke('marketing-select-image'),
+  // Marketing (WordPress + Imagen): nach src/plugins/edoobox/ migriert (plugin:invoke via
+  // edooboxClient) — inkl. bytes-basiertem Bild-Flow (Phase 2b).
 
   // Office-Formate
   officeParseExcel: (filePath: string) =>

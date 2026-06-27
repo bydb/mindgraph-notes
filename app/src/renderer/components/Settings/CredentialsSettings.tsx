@@ -121,7 +121,7 @@ export const CredentialsSettings: React.FC<Props> = ({ onNavigateToTab }) => {
       note: 'Automatisiertes Publishing im Marketing-Tab',
       settingsTab: 'agents',
       checkSet: async () => {
-        const creds = await window.electronAPI.marketingLoadCredentials()
+        const creds = await edooboxClient.marketingLoadCredentials()
         return !!(creds && creds.wpAppPassword)
       }
     })

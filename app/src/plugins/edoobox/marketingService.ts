@@ -1,6 +1,14 @@
-// Marketing Service: WordPress REST API
-import https from 'node:https'
-import http from 'node:http'
+// Marketing Service: WordPress REST API (Plugin-Vertikale). Kein node:https/fetch direkt:
+// HTTP kommt INJIZIERT herein — `fetchImpl` (host.http.fetch, allowlist-gegated) für den
+// Normalfall, `basicAuthFetch` (host.http.fetchBasicAuth) für den Apache-Auth-Fallback.
+
+/** Host-injizierter fetch (Domain-Allowlist erzwingt der Capability-Host). */
+export type FetchImpl = (url: string, init?: RequestInit) => Promise<Response>
+/** Host-injizierter Basic-Auth-Request (Credentials in den Connection-Options, Apache-Quirk). */
+export type BasicAuthFetch = (
+  url: string,
+  opts: { method: string; headers?: Record<string, string>; body?: string | Uint8Array; username: string; password: string; timeoutMs?: number }
+) => Promise<{ statusCode: number; text: string }>
 
 export interface WordPressPost {
   id: number
@@ -21,13 +29,17 @@ export class WordPressService {
   private username: string
   private password: string
   private authHeader: string
+  private fetchImpl: FetchImpl
+  private basicAuthFetch: BasicAuthFetch
 
-  constructor(siteUrl: string, username: string, appPassword: string) {
+  constructor(siteUrl: string, username: string, appPassword: string, fetchImpl: FetchImpl, basicAuthFetch: BasicAuthFetch) {
     this.baseUrl = siteUrl.replace(/\/$/, '') + '/wp-json/wp/v2'
     // Application Passwords: Leerzeichen entfernen, da WordPress sie nur zur Lesbarkeit einfügt
     this.password = appPassword.replace(/\s+/g, '')
     this.username = username
     this.authHeader = 'Basic ' + Buffer.from(`${username}:${this.password}`).toString('base64')
+    this.fetchImpl = fetchImpl
+    this.basicAuthFetch = basicAuthFetch
   }
 
   private async request<T>(method: string, endpoint: string, body?: object, contentType?: string, rawBody?: Buffer): Promise<T> {
@@ -44,21 +56,20 @@ export class WordPressService {
     }
 
     // Erster Versuch: Standard Authorization Header
-    let res = await fetch(url, {
+    const res = await this.fetchImpl(url, {
       method,
       headers,
       body: rawBody ? new Uint8Array(rawBody) : (body ? JSON.stringify(body) : undefined),
       signal: AbortSignal.timeout(30000)
     })
 
-    // Apache/CGI-Fallback: Wenn 401 mit rest_not_logged_in, nutze node:https direkt
+    // Apache/CGI-Fallback: Wenn 401 mit rest_not_logged_in, Basic-Auth in den Connection-Options
     // (Apache leitet den Authorization-Header bei fetch() oft nicht an PHP weiter)
     if (res.status === 401) {
       const errText = await res.text().catch(() => '')
       if (errText.includes('rest_not_logged_in')) {
-        console.log('[marketing:wp] Auth header blocked, trying node:https with explicit auth')
-        const result = await this.requestWithNodeHttp<T>(method, url, headers, rawBody ? new Uint8Array(rawBody) : (body ? JSON.stringify(body) : undefined))
-        return result
+        console.log('[marketing:wp] Auth header blocked, trying basic-auth-in-options')
+        return await this.requestWithBasicAuth<T>(method, url, headers, rawBody ? new Uint8Array(rawBody) : (body ? JSON.stringify(body) : undefined))
       }
     }
 
@@ -80,52 +91,33 @@ export class WordPressService {
   }
 
   /**
-   * Fallback via node:https — setzt auth direkt im Request-Options-Objekt,
+   * Fallback über host.http.fetchBasicAuth — setzt auth direkt in den Connection-Options,
    * was Apache-Server korrekt als PHP_AUTH_USER/PHP_AUTH_PW durchreichen.
    */
-  private requestWithNodeHttp<T>(method: string, url: string, headers: Record<string, string>, body?: string | Uint8Array): Promise<T> {
-    return new Promise((resolve, reject) => {
-      const parsed = new URL(url)
-      const mod = parsed.protocol === 'https:' ? https : http
-      const options = {
-        hostname: parsed.hostname,
-        port: parsed.port || (parsed.protocol === 'https:' ? 443 : 80),
-        path: parsed.pathname + parsed.search,
-        method,
-        headers,
-        auth: `${this.username}:${this.password}`,
-        timeout: 30000
-      }
-
-      const req = mod.request(options, (res) => {
-        const chunks: Buffer[] = []
-        res.on('data', (chunk: Buffer) => chunks.push(chunk))
-        res.on('end', () => {
-          const responseText = Buffer.concat(chunks).toString('utf-8')
-          console.log(`[marketing:wp] node:https response ${res.statusCode}:`, responseText.slice(0, 200))
-          if (res.statusCode && res.statusCode >= 200 && res.statusCode < 300) {
-            try {
-              resolve(JSON.parse(responseText) as T)
-            } catch {
-              reject(new Error(`Invalid JSON response: ${responseText.slice(0, 100)}`))
-            }
-          } else {
-            let msg = `WordPress API error ${res.statusCode}`
-            try {
-              const err = JSON.parse(responseText)
-              if (err.message) msg = err.message
-              if (err.code) msg += ` (${err.code})`
-            } catch { /* ignore */ }
-            reject(new Error(msg))
-          }
-        })
-      })
-
-      req.on('error', reject)
-      req.on('timeout', () => { req.destroy(); reject(new Error('Request timeout')) })
-      if (body) req.write(body)
-      req.end()
+  private async requestWithBasicAuth<T>(method: string, url: string, headers: Record<string, string>, body?: string | Uint8Array): Promise<T> {
+    const { statusCode, text } = await this.basicAuthFetch(url, {
+      method,
+      headers,
+      body,
+      username: this.username,
+      password: this.password,
+      timeoutMs: 30000,
     })
+    console.log(`[marketing:wp] basic-auth response ${statusCode}:`, text.slice(0, 200))
+    if (statusCode >= 200 && statusCode < 300) {
+      try {
+        return JSON.parse(text) as T
+      } catch {
+        throw new Error(`Invalid JSON response: ${text.slice(0, 100)}`)
+      }
+    }
+    let msg = `WordPress API error ${statusCode}`
+    try {
+      const err = JSON.parse(text)
+      if (err.message) msg = err.message
+      if (err.code) msg += ` (${err.code})`
+    } catch { /* ignore */ }
+    throw new Error(msg)
   }
 
   async checkConnection(): Promise<{ id: number; name: string }> {
@@ -142,7 +134,7 @@ export class WordPressService {
     const url = `${this.baseUrl}/media`
     console.log(`[marketing:wp] POST ${url} (upload: ${filename})`)
 
-    const res = await fetch(url, {
+    const res = await this.fetchImpl(url, {
       method: 'POST',
       headers: {
         'Authorization': this.authHeader,

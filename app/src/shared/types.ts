@@ -916,16 +916,8 @@ export interface ElectronAPI {
   // Antares CS: migriert nach src/plugins/antares/ — Aufruf via pluginInvoke('antares', actionId, payload).
   // Die Antares-Datentypen (AntaresEntleiher/VerleihRow/Lizenz/DashboardCounts) bleiben hier (Renderer nutzt sie).
 
-  // Marketing (WordPress)
-  marketingSaveCredentials: (credentials: { wpAppPassword?: string }) => Promise<boolean>;
-  marketingLoadCredentials: () => Promise<{ wpAppPassword?: string } | null>;
-  marketingCheckWordpress: (siteUrl: string, username: string) => Promise<{ success: boolean; userName?: string; error?: string }>;
-  marketingGenerateContent: (offerData: object, model: string) => Promise<{ success: boolean; blogPost?: string; igCaption?: string; error?: string }>;
-  marketingPublishWordpress: (siteUrl: string, username: string, title: string, content: string, status: 'draft' | 'publish', featuredMediaId?: number) => Promise<{ success: boolean; postId?: number; postUrl?: string; status?: string; error?: string }>;
-  marketingUploadImage: (siteUrl: string, username: string, imagePath: string, caption?: string) => Promise<{ success: boolean; mediaId?: number; imageUrl?: string; error?: string }>;
-  marketingGenerateImage: (prompt: string, apiKey: string) => Promise<{ success: boolean; imagePath?: string; imageBase64?: string; error?: string }>;
-  marketingReadImageBase64: (imagePath: string) => Promise<string | null>;
-  marketingSelectImage: () => Promise<string | null>;
+  // Marketing (WordPress + Imagen): nach src/plugins/edoobox/ migriert (Aufruf via edooboxClient,
+  // bytes-basierter Bild-Flow). Keine electronAPI-Methoden mehr (Phase 2b).
 
   // Office-Formate
   officeParseExcel: (filePath: string) => Promise<{ success: boolean; data?: ExcelData; error?: string }>;

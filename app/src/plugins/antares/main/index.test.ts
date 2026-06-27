@@ -18,6 +18,7 @@ function buildRegistry() {
     secretDelete: async (k) => { secrets.delete(k) },
     llmGenerate: async () => '',
     httpFetch: async () => new Response('x'),
+    httpFetchBasicAuth: async () => ({ statusCode: 200, text: '{}' }),
     deviceRequest: async () => ({ statusCode: 200, text: '[]' }),
     deviceDownload: async () => ({ ok: true, statusCode: 200, bytes: new Uint8Array() }),
     deviceUpload: async () => ({ statusCode: 200, body: '' }),

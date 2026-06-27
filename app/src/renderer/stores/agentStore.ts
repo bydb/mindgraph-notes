@@ -39,7 +39,8 @@ interface AgentState {
   isGenerating: boolean
   isPublishing: boolean
   marketingPublishStatus: Record<string, MarketingPublishStatus> // offerId -> status
-  selectedImagePath: string | null
+  selectedImageBase64: string | null
+  selectedImageFileName: string | null
 
   // Actions
   setSelectedEventId: (id: string | null) => void
@@ -109,7 +110,8 @@ export const useAgentStore = create<AgentState>()((set, get) => ({
   isGenerating: false,
   isPublishing: false,
   marketingPublishStatus: {},
-  selectedImagePath: null,
+  selectedImageBase64: null,
+  selectedImageFileName: null,
   isGeneratingImage: false,
   imagePreviewDataUrl: null,
   imageGeneratedInfo: null,
@@ -281,7 +283,7 @@ export const useAgentStore = create<AgentState>()((set, get) => ({
   },
 
   // Marketing Actions
-  setSelectedMarketingOfferId: (id) => set({ selectedMarketingOfferId: id, generatedBlogPost: '', generatedIgCaption: '', selectedImagePath: null, imagePreviewDataUrl: null, imageGeneratedInfo: null }),
+  setSelectedMarketingOfferId: (id) => set({ selectedMarketingOfferId: id, generatedBlogPost: '', generatedIgCaption: '', selectedImageBase64: null, selectedImageFileName: null, imagePreviewDataUrl: null, imageGeneratedInfo: null }),
 
   loadMarketingOffers: async () => {
     set({ isMarketingLoading: true })
@@ -301,9 +303,7 @@ export const useAgentStore = create<AgentState>()((set, get) => ({
   generateContent: async (offer: EdooboxOfferDashboard, bookingUrl?: string) => {
     set({ isGenerating: true })
     try {
-      const { ollama } = useUIStore.getState()
-      const model = ollama.selectedModel || 'llama3.2'
-      const result = await window.electronAPI.marketingGenerateContent({
+      const result = await edooboxClient.marketingGenerateContent({
         name: offer.name,
         description: offer.description || '',
         dateStart: offer.dateStart,
@@ -312,7 +312,7 @@ export const useAgentStore = create<AgentState>()((set, get) => ({
         maxParticipants: offer.maxParticipants,
         speakers: offer.leaders,
         bookingUrl
-      }, model)
+      })
       if (result.success) {
         set({
           generatedBlogPost: result.blogPost || '',
@@ -334,14 +334,14 @@ export const useAgentStore = create<AgentState>()((set, get) => ({
     set({ isPublishing: true })
     try {
       const { wordpressUrl, wordpressUser, defaultPostStatus } = useUIStore.getState().marketing
-      const { selectedImagePath } = get()
+      const { selectedImageBase64, selectedImageFileName } = get()
 
       // Upload image as featured media if available, with caption for AI-generated images
       let featuredMediaId: number | undefined
-      if (selectedImagePath) {
+      if (selectedImageBase64) {
         const { imageGeneratedInfo } = get()
         const caption = imageGeneratedInfo ? 'Bild generiert mit Google Imagen 4.0' : undefined
-        const uploadResult = await window.electronAPI.marketingUploadImage(wordpressUrl, wordpressUser, selectedImagePath, caption)
+        const uploadResult = await edooboxClient.marketingUploadImage(wordpressUrl, wordpressUser, selectedImageBase64, selectedImageFileName || 'bild.png', caption)
         if (uploadResult.success && uploadResult.mediaId) {
           featuredMediaId = uploadResult.mediaId
         }
@@ -354,7 +354,7 @@ export const useAgentStore = create<AgentState>()((set, get) => ({
         finalContent = `<p class="imagen-caption" style="font-size:0.85em;color:#666;margin-top:-0.5em;margin-bottom:1.5em;font-style:italic;">${imageGeneratedInfo}</p>\n${content}`
       }
 
-      const result = await window.electronAPI.marketingPublishWordpress(wordpressUrl, wordpressUser, title, finalContent, defaultPostStatus, featuredMediaId)
+      const result = await edooboxClient.marketingPublishWordpress(wordpressUrl, wordpressUser, title, finalContent, defaultPostStatus, featuredMediaId)
       if (result.success) {
         set((state) => ({
           marketingPublishStatus: {
@@ -375,12 +375,11 @@ export const useAgentStore = create<AgentState>()((set, get) => ({
   },
 
   selectImage: async () => {
-    const result = await window.electronAPI.marketingSelectImage()
+    const result = await edooboxClient.marketingSelectImage()
     if (result) {
-      // Load as data URL for preview
-      const base64Result = await window.electronAPI.marketingReadImageBase64(result)
-      const dataUrl = base64Result ? `data:image/${result.split('.').pop() === 'png' ? 'png' : 'jpeg'};base64,${base64Result}` : null
-      set({ selectedImagePath: result, imagePreviewDataUrl: dataUrl })
+      const mime = result.fileName.split('.').pop()?.toLowerCase() === 'png' ? 'png' : 'jpeg'
+      const dataUrl = `data:image/${mime};base64,${result.imageBase64}`
+      set({ selectedImageBase64: result.imageBase64, selectedImageFileName: result.fileName, imagePreviewDataUrl: dataUrl, imageGeneratedInfo: null })
     }
   },
 
@@ -416,16 +415,16 @@ export const useAgentStore = create<AgentState>()((set, get) => ({
       const imagePrompt = rawPrompt || fallbackPrompt
 
       // Try generation, retry once with fallback prompt if it fails
-      let result = await window.electronAPI.marketingGenerateImage(imagePrompt, googleImagenApiKey)
+      let result = await edooboxClient.marketingGenerateImage(imagePrompt, googleImagenApiKey)
       if (!result.success && imagePrompt !== fallbackPrompt) {
         console.log('[marketing] Image generation failed, retrying with fallback prompt')
-        result = await window.electronAPI.marketingGenerateImage(fallbackPrompt, googleImagenApiKey)
+        result = await edooboxClient.marketingGenerateImage(fallbackPrompt, googleImagenApiKey)
       }
-      if (result.success && result.imagePath) {
-        const dataUrl = result.imageBase64 ? `data:image/png;base64,${result.imageBase64}` : null
+      if (result.success && result.imageBase64) {
+        const dataUrl = `data:image/png;base64,${result.imageBase64}`
         const now = new Date()
         const info = `Google Imagen 4.0 · ${now.toLocaleDateString('de-DE')} ${now.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} · Prompt: "${imagePrompt.slice(0, 100)}${imagePrompt.length > 100 ? '...' : ''}"`
-        set({ selectedImagePath: result.imagePath, imagePreviewDataUrl: dataUrl, imageGeneratedInfo: info, isGeneratingImage: false })
+        set({ selectedImageBase64: result.imageBase64, selectedImageFileName: 'imagen.png', imagePreviewDataUrl: dataUrl, imageGeneratedInfo: info, isGeneratingImage: false })
       } else {
         set({ isGeneratingImage: false })
       }

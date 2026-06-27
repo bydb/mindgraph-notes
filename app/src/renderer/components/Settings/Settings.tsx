@@ -1588,7 +1588,7 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab 
           setEdooboxApiSecret(creds.apiSecret)
         }
       })
-      window.electronAPI.marketingLoadCredentials().then(creds => {
+      edooboxClient.marketingLoadCredentials().then(creds => {
         if (creds) {
           if (creds.wpAppPassword) setWpAppPassword(creds.wpAppPassword)
         }
@@ -5382,7 +5382,7 @@ LIMIT 10
                         className="settings-btn"
                         onClick={async () => {
                           if (wpAppPassword) {
-                            const saved = await window.electronAPI.marketingSaveCredentials({ wpAppPassword })
+                            const saved = await edooboxClient.marketingSaveCredentials(wpAppPassword)
                             setWpCredsSaved(saved)
                           }
                         }}
@@ -5399,10 +5399,10 @@ LIMIT 10
                             setWpTestError(t('settings.agents.marketing.wpFillAll'))
                             return
                           }
-                          await window.electronAPI.marketingSaveCredentials({ wpAppPassword })
+                          await edooboxClient.marketingSaveCredentials(wpAppPassword)
                           setWpCredsSaved(true)
                           setWpTestStatus('testing')
-                          const result = await window.electronAPI.marketingCheckWordpress(marketingSettings.wordpressUrl, marketingSettings.wordpressUser)
+                          const result = await edooboxClient.marketingCheckWordpress(marketingSettings.wordpressUrl, marketingSettings.wordpressUser)
                           setWpTestStatus(result.success ? 'success' : 'failed')
                           setWpTestError(result.success ? null : (result.error || null))
                         }}

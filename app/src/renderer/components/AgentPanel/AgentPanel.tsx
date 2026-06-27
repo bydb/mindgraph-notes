@@ -582,7 +582,7 @@ const MarketingPublishDetail: React.FC<{ offer: EdooboxOfferDashboard; onBack: (
     generatedBlogPost, generatedIgCaption, isGenerating, isPublishing,
     generateContent, setGeneratedBlogPost, setGeneratedIgCaption,
     publishToWordpress, selectImage, generateImage, isGeneratingImage,
-    selectedImagePath, imagePreviewDataUrl, imageGeneratedInfo, marketingPublishStatus
+    selectedImageFileName, imagePreviewDataUrl, imageGeneratedInfo, marketingPublishStatus
   } = useAgentStore()
   const marketing = useUIStore(s => s.marketing)
   const edooboxBaseUrl = useUIStore(s => s.edoobox.baseUrl)
@@ -665,7 +665,7 @@ const MarketingPublishDetail: React.FC<{ offer: EdooboxOfferDashboard; onBack: (
                 <circle cx="9" cy="9" r="2" />
                 <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
               </svg>
-              {selectedImagePath ? selectedImagePath.split('/').pop() : t('agent.marketing.selectImage')}
+              {selectedImageFileName ? selectedImageFileName : t('agent.marketing.selectImage')}
             </button>
             {marketing.googleImagenApiKey && (
               <button

@@ -14,6 +14,7 @@ function fakeServices(over: Partial<HostServices> = {}): HostServices {
     secretDelete: vi.fn(async () => {}),
     llmGenerate: vi.fn(async () => 'antwort'),
     httpFetch: vi.fn(async () => new Response('ok')),
+    httpFetchBasicAuth: vi.fn(async () => ({ statusCode: 200, text: '{}' })),
     deviceRequest: vi.fn(async () => ({ statusCode: 200, text: '[]' })),
     deviceDownload: vi.fn(async () => ({ ok: true, statusCode: 200, bytes: new Uint8Array() })),
     deviceUpload: vi.fn(async () => ({ statusCode: 200, body: '' })),

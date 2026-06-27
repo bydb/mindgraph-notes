@@ -11,9 +11,15 @@ import { EDOOBOX_CAPABILITIES, manifest } from '../manifest'
 import { parseAkkreditierungsformular } from '../formularParser'
 import { generateIqReportBytes, IQ_TEMPLATE_NAME, type IqReportData } from '../iqReportService'
 import { generateAttendanceListBytes, ATTENDANCE_TEMPLATE_NAME, type AttendanceListData } from '../attendanceListService'
+import { WordPressService } from '../marketingService'
+import { buildMarketingPrompts, type MarketingOfferData } from '../marketingContent'
 import type { EdooboxEvent } from '../../../shared/types'
 
 const DOCX_FILTER = [{ name: 'Word-Dokument', extensions: ['docx'] }]
+const IMAGE_FILTER = [{ name: 'Bilder', extensions: ['jpg', 'jpeg', 'png', 'gif', 'webp'] }]
+const IMAGE_MIME: Record<string, string> = {
+  jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', gif: 'image/gif', webp: 'image/webp',
+}
 
 const EVENTS_REL_PATH = '.mindgraph/edoobox-events.json'
 
@@ -237,6 +243,127 @@ export default definePluginMain(
         return { success: true, filePath: saved.path }
       } catch (e) {
         return { success: false, error: errMsg(e, 'Teilnehmerliste konnte nicht erstellt werden') }
+      }
+    })
+
+    // ── Marketing (WordPress + Ollama-Content + Google Imagen) ──────────────────
+
+    // Baut einen WordPress-Client aus Payload-Koordinaten + hinterlegtem App-Passwort.
+    const makeWp = async (siteUrl: string, username: string): Promise<WordPressService> => {
+      const pw = await host.secrets.get('wpAppPassword')
+      if (!pw) throw new Error('Kein WordPress App-Passwort gespeichert')
+      return new WordPressService(siteUrl, username, pw, host.http.fetch, host.http.fetchBasicAuth)
+    }
+
+    actions.register('edoobox.marketingSaveCredentials', async (p) => {
+      try {
+        const { wpAppPassword } = p as { wpAppPassword: string }
+        await host.secrets.set('wpAppPassword', wpAppPassword)
+        return true
+      } catch {
+        return false
+      }
+    })
+    actions.register('edoobox.marketingLoadCredentials', async () => {
+      const wpAppPassword = await host.secrets.get('wpAppPassword')
+      return wpAppPassword ? { wpAppPassword } : null
+    })
+
+    actions.register('edoobox.marketingCheckWordpress', async (p) => {
+      try {
+        const { siteUrl, username } = p as { siteUrl: string; username: string }
+        const wp = await makeWp(siteUrl, username)
+        const user = await wp.checkConnection()
+        return { success: true, userName: user.name }
+      } catch (e) {
+        return { success: false, error: errMsg(e, 'Verbindung fehlgeschlagen') }
+      }
+    })
+
+    actions.register('edoobox.marketingGenerateContent', async (p) => {
+      try {
+        const { offerData } = p as { offerData: MarketingOfferData }
+        const { wpPrompt, igPrompt } = buildMarketingPrompts(offerData)
+        const blogPost = (await host.llm.generate(wpPrompt, { temperature: 0.7, maxTokens: 2000 })).trim()
+        const igCaption = (await host.llm.generate(igPrompt, { temperature: 0.8, maxTokens: 1000 })).trim()
+        return { success: true, blogPost, igCaption }
+      } catch (e) {
+        return { success: false, error: errMsg(e, 'Content-Generierung fehlgeschlagen') }
+      }
+    })
+
+    actions.register('edoobox.marketingPublishWordpress', async (p) => {
+      try {
+        const { siteUrl, username, title, content, status, featuredMediaId } = p as {
+          siteUrl: string; username: string; title: string; content: string
+          status: 'draft' | 'publish'; featuredMediaId?: number
+        }
+        const wp = await makeWp(siteUrl, username)
+        const post = await wp.createPost(title, content, status, featuredMediaId)
+        return { success: true, postId: post.id, postUrl: post.link, status: post.status }
+      } catch (e) {
+        return { success: false, error: errMsg(e, 'Veröffentlichung fehlgeschlagen') }
+      }
+    })
+
+    actions.register('edoobox.marketingUploadImage', async (p) => {
+      try {
+        const { siteUrl, username, imageBase64, fileName, caption } = p as {
+          siteUrl: string; username: string; imageBase64: string; fileName: string; caption?: string
+        }
+        const ext = (fileName.split('.').pop() || '').toLowerCase()
+        const mimeType = IMAGE_MIME[ext] || 'image/jpeg'
+        const wp = await makeWp(siteUrl, username)
+        const media = await wp.uploadMedia(Buffer.from(imageBase64, 'base64'), fileName, mimeType, caption)
+        return { success: true, mediaId: media.id, imageUrl: media.source_url }
+      } catch (e) {
+        return { success: false, error: errMsg(e, 'Bild-Upload fehlgeschlagen') }
+      }
+    })
+
+    // Google Imagen — liefert Base64 direkt zurück (keine Temp-Datei nötig).
+    actions.register('edoobox.marketingGenerateImage', async (p) => {
+      try {
+        const { prompt, apiKey } = p as { prompt: string; apiKey: string }
+        const res = await host.http.fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict?key=${apiKey}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              instances: [{ prompt }],
+              parameters: { sampleCount: 1, aspectRatio: '16:9', safetyFilterLevel: 'block_only_high' },
+            }),
+            signal: AbortSignal.timeout(120000),
+          }
+        )
+        if (!res.ok) {
+          const text = await res.text()
+          throw new Error(`Imagen API Fehler (${res.status}): ${text.slice(0, 200)}`)
+        }
+        const data = await res.json()
+        const predictions = (data.predictions as Array<{ bytesBase64Encoded?: string }> | undefined)?.filter(
+          (pr) => pr.bytesBase64Encoded
+        )
+        if (!predictions || predictions.length === 0) {
+          throw new Error(`Keine Bilder generiert: ${data.filteredReason || JSON.stringify(data).slice(0, 300)}`)
+        }
+        return { success: true, imageBase64: predictions[0].bytesBase64Encoded }
+      } catch (e) {
+        return { success: false, error: errMsg(e, 'Bildgenerierung fehlgeschlagen') }
+      }
+    })
+
+    // Bild auswählen (Dialog) → Base64 + Dateiname (kein Pfad, keine Temp-Datei).
+    actions.register('edoobox.marketingSelectImage', async () => {
+      try {
+        const picked = await host.dialog.openFile({ title: 'Bild auswählen', filters: IMAGE_FILTER })
+        if (!picked) return null
+        const fileName = picked.path.split(/[\\/]/).pop() || 'bild.png'
+        return { fileName, imageBase64: Buffer.from(picked.bytes).toString('base64') }
+      } catch (e) {
+        console.error('[edoobox] Select image failed:', e)
+        return null
       }
     })
   }

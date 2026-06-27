@@ -104,13 +104,29 @@ export interface SecretsService {
 export interface LlmService {
   generate(
     prompt: string,
-    opts?: { module?: CompatModuleId; allowCloud?: boolean }
+    opts?: { module?: CompatModuleId; allowCloud?: boolean; temperature?: number; maxTokens?: number }
   ): Promise<string>
 }
 
-/** HTTP — nur gegen Hosts aus manifest.http.allowedHosts; sonst wirft fetch. */
+/** HTTP — nur gegen Hosts aus manifest.http.allowedHosts; sonst wirft. */
 export interface HttpService {
   fetch(url: string, init?: RequestInit): Promise<Response>
+  /**
+   * Basic-Auth-Request mit den Credentials in den Connection-Options (nicht nur im Header).
+   * Nötig für Apache/CGI-Hosts, die den Authorization-Header bei fetch() verschlucken und
+   * Auth nur als PHP_AUTH_USER/PHP_AUTH_PW durchreichen (WordPress-REST). Liefert rohen Text.
+   */
+  fetchBasicAuth(
+    url: string,
+    opts: {
+      method: string
+      headers?: Record<string, string>
+      body?: string | Uint8Array
+      username: string
+      password: string
+      timeoutMs?: number
+    }
+  ): Promise<{ statusCode: number; text: string }>
 }
 
 /** Workflow-Anbindung — Plugin emittiert Daten an seine deklarierten Workflow-Actions. */

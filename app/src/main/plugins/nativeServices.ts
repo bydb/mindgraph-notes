@@ -8,6 +8,8 @@
 import { net, BrowserWindow, app, dialog } from 'electron'
 import { promises as fs } from 'fs'
 import path from 'path'
+import https from 'node:https'
+import http from 'node:http'
 import type { UsbDeviceInfo } from '../../shared/plugins/host'
 
 // ─── device.usb: HTTP über electron.net (reMarkable-USB-Webinterface) ───────────
@@ -214,6 +216,55 @@ export async function dialogSaveFile(
   if (result.canceled || !result.filePath) return null
   await fs.writeFile(result.filePath, Buffer.from(bytes))
   return { path: result.filePath }
+}
+
+// ─── http.fetchBasicAuth: Basic-Auth in den Connection-Options (Apache-Quirk) ────
+
+/**
+ * Request mit Basic-Auth direkt in den node:http(s)-Options (`auth`), die Apache als
+ * PHP_AUTH_USER/PHP_AUTH_PW durchreicht — anders als der Authorization-Header, den viele
+ * Apache/CGI-Setups bei fetch() verschlucken (WordPress REST). Liefert rohen Text + Status.
+ */
+export function httpFetchBasicAuth(
+  url: string,
+  opts: {
+    method: string
+    headers?: Record<string, string>
+    body?: string | Uint8Array
+    username: string
+    password: string
+    timeoutMs?: number
+  }
+): Promise<{ statusCode: number; text: string }> {
+  return new Promise((resolve, reject) => {
+    const parsed = new URL(url)
+    const mod = parsed.protocol === 'https:' ? https : http
+    const options = {
+      hostname: parsed.hostname,
+      port: parsed.port || (parsed.protocol === 'https:' ? 443 : 80),
+      path: parsed.pathname + parsed.search,
+      method: opts.method,
+      headers: opts.headers,
+      auth: `${opts.username}:${opts.password}`,
+      timeout: opts.timeoutMs ?? 30000,
+    }
+
+    const req = mod.request(options, (res) => {
+      const chunks: Buffer[] = []
+      res.on('data', (chunk: Buffer) => chunks.push(chunk))
+      res.on('end', () => {
+        resolve({ statusCode: res.statusCode ?? 0, text: Buffer.concat(chunks).toString('utf-8') })
+      })
+      res.on('error', reject)
+    })
+    req.on('error', reject)
+    req.on('timeout', () => {
+      req.destroy()
+      reject(new Error('Request timeout'))
+    })
+    if (opts.body) req.write(typeof opts.body === 'string' ? opts.body : Buffer.from(opts.body))
+    req.end()
+  })
 }
 
 // ─── resource: gebündelte App-Ressourcen (read-only, auf resources/ beschränkt) ──
