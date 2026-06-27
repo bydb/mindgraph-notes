@@ -10,11 +10,20 @@ function buildRegistry() {
   const services: HostServices = {
     readVaultFile: async () => '',
     writeVaultFile: async () => {},
+    readVaultBytes: async () => new Uint8Array(),
+    writeVaultBytes: async () => {},
+    vaultExists: async () => false,
     secretGet: async (k) => secrets.get(k) ?? null,
     secretSet: async (k, v) => { secrets.set(k, v) },
     secretDelete: async (k) => { secrets.delete(k) },
     llmGenerate: async () => '',
     httpFetch: async () => new Response('x'),
+    deviceRequest: async () => ({ statusCode: 200, text: '[]' }),
+    deviceDownload: async () => ({ ok: true, statusCode: 200, bytes: new Uint8Array() }),
+    deviceUpload: async () => ({ statusCode: 200, body: '' }),
+    listUsbDevices: async () => [],
+    pdfHtmlToPdf: async () => new Uint8Array(),
+    pdfOptimize: async () => ({ bytes: new Uint8Array(), method: 'unchanged' }),
     emitWorkflow: async () => {},
   }
   const registry = new PluginRegistry(createHostFactory(services))

@@ -1611,7 +1611,7 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab 
     setRemarkableStatus('checking')
     setRemarkableError(null)
     try {
-      const result = await window.electronAPI.remarkableUsbCheck()
+      const result = await invokePlugin<{ connected: boolean; error?: string }>('remarkable', 'remarkable.usbCheck')
       setRemarkableStatus(result.connected ? 'connected' : 'disconnected')
       if (!result.connected && result.error) {
         setRemarkableError(result.error)

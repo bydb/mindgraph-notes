@@ -13,14 +13,59 @@ import type { PluginCapability } from './manifest'
 
 // — Dienst-Interfaces, je ein Tor durch eine Kern-Grenze —
 
-/** Vault lesen (relativer Pfad im aktiven Vault). */
+/** Vault lesen (relativer Pfad im aktiven Vault). Text + Binär + Existenzprüfung. */
 export interface VaultReadService {
   read(relPath: string): Promise<string>
+  /** Binär lesen — z.B. PDF-Bytes für die reMarkable-Vertikale. */
+  readBytes(relPath: string): Promise<Uint8Array>
+  exists(relPath: string): Promise<boolean>
 }
 
-/** Vault schreiben — delegiert an writeFileSafe (assertSafePath + Backup + Auto-Heal). */
+/** Vault schreiben — Text via writeFileSafe (Backup + Auto-Heal), Binär als reiner Write. */
 export interface VaultWriteService {
   write(relPath: string, content: string): Promise<void>
+  /** Binär schreiben (legt Elternordner an) — markdown-Auto-Heal/Backup entfällt. */
+  writeBytes(relPath: string, bytes: Uint8Array): Promise<void>
+}
+
+/** Ein per USB erkanntes Gerät (macOS via ioreg; sonst leere Liste). */
+export interface UsbDeviceInfo {
+  vendorName?: string
+  productName?: string
+  vendorId?: number
+  productId?: number
+}
+
+/**
+ * Geräte-HTTP über electron.net, gegated auf manifest.http.allowedHosts (z.B. das
+ * reMarkable-USB-Webinterface 10.11.99.1). Liefert Text/Bytes; die Protokoll-/Retry-
+ * Logik bleibt im Plugin. listUsbDevices ist ein lokaler Diagnose-Read.
+ */
+export interface DeviceUsbService {
+  request(url: string, timeoutMs: number): Promise<{ statusCode: number; text: string }>
+  download(
+    url: string,
+    timeoutMs: number
+  ): Promise<{ ok: boolean; statusCode?: number; bytes?: Uint8Array }>
+  upload(
+    url: string,
+    fileName: string,
+    content: Uint8Array,
+    timeoutMs: number
+  ): Promise<{ statusCode: number; body: string }>
+  listUsbDevices(): Promise<UsbDeviceInfo[]>
+}
+
+/** HTML → PDF-Bytes über ein verstecktes BrowserWindow + printToPDF (preferCSSPageSize). */
+export interface PdfRenderService {
+  htmlToPdf(fullHtml: string): Promise<Uint8Array>
+}
+
+/** PDF verkleinern über Ghostscript → qpdf-Fallback; gibt die kleinere Variante zurück. */
+export interface PdfOptimizeService {
+  optimize(
+    bytes: Uint8Array
+  ): Promise<{ bytes: Uint8Array; method: 'ghostscript' | 'qpdf' | 'unchanged' }>
 }
 
 /** Secrets — pro Plugin-ID genamespacet, verschlüsselt via electron.safeStorage. */
@@ -61,6 +106,11 @@ export interface CapabilityServiceMap {
   'llm.generate': { llm: LlmService }
   'http.fetch': { http: HttpService }
   'workflow.action': { workflow: WorkflowActionService }
+  'device.usb': { device: DeviceUsbService }
+  // pdf.render + pdf.optimize verschmelzen über den gemeinsamen `pdf`-Schlüssel zu
+  // einem host.pdf mit beiden Methoden (analog vault.read + vault.write).
+  'pdf.render': { pdf: PdfRenderService }
+  'pdf.optimize': { pdf: PdfOptimizeService }
 }
 
 /** Union → Intersection. `{vault:R} | {vault:W}` ⇒ `{vault: R & W}`. */

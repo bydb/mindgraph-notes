@@ -1,8 +1,16 @@
+// reMarkable-Service — dünne Fassade über dem USB-Transport. Bekommt den Geräte-Dienst
+// (host.device) injiziert; importiert selbst kein electron/net (Import-Wall-konform).
+
 import type { RMDocumentSummary } from './types'
+import type { DeviceUsbService } from '../../shared/plugins/host'
 import { USBTransport } from './transports/usb'
 
 export class ReMarkableService {
-  private usbTransport = new USBTransport()
+  private usbTransport: USBTransport
+
+  constructor(device: DeviceUsbService) {
+    this.usbTransport = new USBTransport(device)
+  }
 
   async checkUsbConnection(): Promise<{ connected: boolean; mode: 'usb'; error?: string }> {
     try {
@@ -22,11 +30,11 @@ export class ReMarkableService {
     return this.usbTransport.listDocuments(folderId)
   }
 
-  async downloadUsbDocumentPdf(documentId: string): Promise<Buffer> {
+  async downloadUsbDocumentPdf(documentId: string): Promise<Uint8Array> {
     return this.usbTransport.downloadDocumentPdf(documentId)
   }
 
-  async uploadUsbPdf(fileName: string, content: Buffer): Promise<void> {
+  async uploadUsbPdf(fileName: string, content: Uint8Array): Promise<void> {
     await this.usbTransport.uploadPdf(fileName, content)
   }
 }

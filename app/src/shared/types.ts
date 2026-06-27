@@ -908,13 +908,6 @@ export interface ElectronAPI {
   calendarRequestAccess: () => Promise<{ success: boolean; status: 'granted' | 'alreadyGranted' | 'denied' | 'deniedPersistent' | 'unsupported' | 'error' | 'unknown'; error?: string; raw?: string }>;
 
   // reMarkable (USB)
-  remarkableUsbCheck: () => Promise<ReMarkableUsbCheckResult>;
-  remarkableListDocuments: (folderId?: string) => Promise<{ documents: ReMarkableDocumentSummary[]; error?: string }>;
-  remarkableDownloadDocument: (vaultPath: string, document: { id: string; name: string }) => Promise<ReMarkableDownloadResult>;
-  remarkableUploadPdf: (vaultPath: string, relativePdfPath: string) => Promise<ReMarkableUploadResult>;
-  remarkableOptimizePdfForUpload: (vaultPath: string, relativePdfPath: string) => Promise<ReMarkableOptimizeResult>;
-  remarkableBookifyPdf: (vaultPath: string, relativePdfPath: string) => Promise<ReMarkableBookifyResult>;
-  remarkableUsbDebugInfo: () => Promise<ReMarkableUsbDebugInfoResult>;
 
   // edoobox Agent
   edooboxSaveCredentials: (apiKey: string, apiSecret: string) => Promise<boolean>;

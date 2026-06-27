@@ -1,5 +1,12 @@
-import { net } from 'electron'
+// reMarkable-USB-Transport — Protokoll-Logik der Vertikale.
+//
+// Spricht das USB-Webinterface (http://10.11.99.1) NICHT direkt an: das rohe electron.net
+// liegt im Capability-Host (host.device, allowlisted auf 10.11.99.1). Hier bleibt die
+// reMarkable-spezifische Logik: Endpunkt-Varianten, JSON-Parsing, Upload-Retry/Reachability.
+// Kein Import von electron/net/fs — Import-Wall-konform.
+
 import type { ReMarkableTransport, RMDocumentSummary } from '../types'
+import type { DeviceUsbService } from '../../../shared/plugins/host'
 
 interface RawReMarkableDocument {
   ID?: string
@@ -13,6 +20,8 @@ interface RawReMarkableDocument {
 export class USBTransport implements ReMarkableTransport {
   private baseUrl = 'http://10.11.99.1'
 
+  constructor(private device: DeviceUsbService) {}
+
   async connect(): Promise<boolean> {
     const endpoints = [
       `${this.baseUrl}/documents/`,
@@ -24,7 +33,7 @@ export class USBTransport implements ReMarkableTransport {
 
     for (const endpoint of endpoints) {
       try {
-        const result = await this.requestWithElectronNet(endpoint, 8000)
+        const result = await this.device.request(endpoint, 8000)
         if (result.statusCode >= 200 && result.statusCode < 300) {
           return true
         }
@@ -52,13 +61,13 @@ export class USBTransport implements ReMarkableTransport {
 
     for (const endpoint of endpoints) {
       try {
-        const result = await this.requestWithElectronNet(endpoint, 10000)
+        const result = await this.device.request(endpoint, 10000)
         if (result.statusCode < 200 || result.statusCode >= 300) {
           lastStatus = result.statusCode
           continue
         }
 
-        const payload = this.parseDocumentsPayload(result.buffer)
+        const payload = this.parseDocumentsPayload(result.text)
 
         return payload
           .map((item) => this.normalizeDocument(item as RawReMarkableDocument))
@@ -75,7 +84,7 @@ export class USBTransport implements ReMarkableTransport {
     )
   }
 
-  async downloadDocumentPdf(documentId: string): Promise<Buffer> {
+  async downloadDocumentPdf(documentId: string): Promise<Uint8Array> {
     const endpoints = [
       `${this.baseUrl}/download/${encodeURIComponent(documentId)}/placeholder`,
       `${this.baseUrl}/download/${documentId}/placeholder`,
@@ -87,9 +96,9 @@ export class USBTransport implements ReMarkableTransport {
 
     for (const endpoint of endpoints) {
       try {
-        const result = await this.downloadWithElectronNet(endpoint, 60000)
-        if (result.ok && result.buffer) {
-          return result.buffer
+        const result = await this.device.download(endpoint, 60000)
+        if (result.ok && result.bytes) {
+          return result.bytes
         }
         if (result.statusCode) {
           lastStatus = result.statusCode
@@ -108,7 +117,7 @@ export class USBTransport implements ReMarkableTransport {
     )
   }
 
-  async uploadPdf(fileName: string, content: Buffer): Promise<void> {
+  async uploadPdf(fileName: string, content: Uint8Array): Promise<void> {
     const endpoints = [
       `${this.baseUrl}/upload`,
       `${this.baseUrl}/upload/`
@@ -127,7 +136,7 @@ export class USBTransport implements ReMarkableTransport {
 
       for (const endpoint of endpoints) {
         try {
-          const result = await this.uploadWithElectronNet(endpoint, fileName, content, 60000)
+          const result = await this.device.upload(endpoint, fileName, content, 60000)
           if (result.statusCode === 200 || result.statusCode === 201) {
             return
           }
@@ -151,49 +160,6 @@ export class USBTransport implements ReMarkableTransport {
     throw new Error(lastError || 'reMarkable upload endpoint not reachable')
   }
 
-  private downloadWithElectronNet(
-    url: string,
-    timeoutMs: number
-  ): Promise<{ ok: boolean; statusCode?: number; buffer?: Buffer }> {
-    return new Promise((resolve, reject) => {
-      const request = net.request({ method: 'GET', url })
-      const timeout = setTimeout(() => {
-        request.abort()
-        reject(new Error('reMarkable download timed out'))
-      }, timeoutMs)
-
-      request.on('response', (response) => {
-        const statusCode = response.statusCode
-        if (statusCode < 200 || statusCode >= 300) {
-          clearTimeout(timeout)
-          ;(response as unknown as NodeJS.ReadableStream).resume()
-          resolve({ ok: false, statusCode })
-          return
-        }
-
-        const chunks: Buffer[] = []
-        response.on('data', (chunk) => {
-          chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk))
-        })
-        response.on('end', () => {
-          clearTimeout(timeout)
-          resolve({ ok: true, statusCode, buffer: Buffer.concat(chunks) })
-        })
-        response.on('error', (error) => {
-          clearTimeout(timeout)
-          reject(error)
-        })
-      })
-
-      request.on('error', (error) => {
-        clearTimeout(timeout)
-        reject(error)
-      })
-
-      request.end()
-    })
-  }
-
   private normalizeDocument(item: RawReMarkableDocument): RMDocumentSummary | null {
     const name = item?.VissibleName || item?.VisibleName
     if (!item?.ID || !name || !item?.Type) {
@@ -211,10 +177,10 @@ export class USBTransport implements ReMarkableTransport {
     }
   }
 
-  private parseDocumentsPayload(buffer: Buffer): unknown[] {
+  private parseDocumentsPayload(text: string): unknown[] {
     let payload: unknown
     try {
-      payload = JSON.parse(buffer.toString('utf-8')) as unknown
+      payload = JSON.parse(text) as unknown
     } catch {
       return []
     }
@@ -236,108 +202,9 @@ export class USBTransport implements ReMarkableTransport {
     return []
   }
 
-  private requestWithElectronNet(
-    url: string,
-    timeoutMs: number
-  ): Promise<{ statusCode: number; buffer: Buffer }> {
-    return new Promise((resolve, reject) => {
-      const request = net.request({ method: 'GET', url })
-      const timeout = setTimeout(() => {
-        request.abort()
-        reject(new Error('reMarkable request timed out'))
-      }, timeoutMs)
-
-      request.on('response', (response) => {
-        const statusCode = response.statusCode
-        const chunks: Buffer[] = []
-        response.on('data', (chunk) => {
-          chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk))
-        })
-        response.on('end', () => {
-          clearTimeout(timeout)
-          resolve({ statusCode, buffer: Buffer.concat(chunks) })
-        })
-        response.on('error', (error) => {
-          clearTimeout(timeout)
-          reject(error)
-        })
-      })
-
-      request.on('error', (error) => {
-        clearTimeout(timeout)
-        reject(error)
-      })
-
-      request.end()
-    })
-  }
-
-  private uploadWithElectronNet(
-    endpoint: string,
-    fileName: string,
-    content: Buffer,
-    timeoutMs: number
-  ): Promise<{ statusCode: number; body: string }> {
-    return new Promise((resolve, reject) => {
-      const boundary = `----MindGraphReMarkableBoundary${Date.now().toString(16)}`
-      const safeFileName = fileName.replace(/"/g, "'")
-
-      const prefix = Buffer.from(
-        `--${boundary}\r\n` +
-        `Content-Disposition: form-data; name="file"; filename="${safeFileName}"\r\n` +
-        'Content-Type: application/pdf\r\n\r\n',
-        'utf-8'
-      )
-      const suffix = Buffer.from(`\r\n--${boundary}--\r\n`, 'utf-8')
-      const payload = Buffer.concat([prefix, content, suffix])
-
-      const request = net.request({
-        method: 'POST',
-        url: endpoint
-      })
-
-      const timeout = setTimeout(() => {
-        request.abort()
-        reject(new Error('reMarkable upload timed out'))
-      }, timeoutMs)
-
-      request.setHeader('Content-Type', `multipart/form-data; boundary=${boundary}`)
-
-      request.on('response', (response) => {
-        const statusCode = response.statusCode
-        const chunks: Buffer[] = []
-
-        response.on('data', (chunk) => {
-          chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk))
-        })
-
-        response.on('end', () => {
-          clearTimeout(timeout)
-          resolve({
-            statusCode,
-            body: Buffer.concat(chunks).toString('utf-8').trim()
-          })
-        })
-
-        response.on('error', (error) => {
-          clearTimeout(timeout)
-          reject(error)
-        })
-      })
-
-      request.on('error', (error) => {
-        clearTimeout(timeout)
-        reject(error)
-      })
-
-      request.write(payload)
-      request.end()
-    })
-  }
-
   private async ensureUsbReachable(timeoutMs: number): Promise<boolean> {
     try {
-      const result = await this.requestWithElectronNet(`${this.baseUrl}/documents/`, timeoutMs)
+      const result = await this.device.request(`${this.baseUrl}/documents/`, timeoutMs)
       return result.statusCode >= 200 && result.statusCode < 300
     } catch {
       return false

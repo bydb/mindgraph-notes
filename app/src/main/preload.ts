@@ -498,20 +498,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('calendar-request-access'),
 
   // reMarkable (USB)
-  remarkableUsbCheck: () =>
-    ipcRenderer.invoke('remarkable-usb-check'),
-  remarkableListDocuments: (folderId?: string) =>
-    ipcRenderer.invoke('remarkable-list-documents', folderId),
-  remarkableDownloadDocument: (vaultPath: string, document: { id: string; name: string }) =>
-    ipcRenderer.invoke('remarkable-download-document', vaultPath, document),
-  remarkableUploadPdf: (vaultPath: string, relativePdfPath: string) =>
-    ipcRenderer.invoke('remarkable-upload-pdf', vaultPath, relativePdfPath),
-  remarkableOptimizePdfForUpload: (vaultPath: string, relativePdfPath: string) =>
-    ipcRenderer.invoke('remarkable-optimize-pdf', vaultPath, relativePdfPath),
-  remarkableBookifyPdf: (vaultPath: string, relativePdfPath: string) =>
-    ipcRenderer.invoke('remarkable-bookify-pdf', vaultPath, relativePdfPath),
-  remarkableUsbDebugInfo: () =>
-    ipcRenderer.invoke('remarkable-usb-debug-info'),
 
   // edoobox Agent
   edooboxSaveCredentials: (apiKey: string, apiSecret: string) =>

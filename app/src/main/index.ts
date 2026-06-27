@@ -27,14 +27,6 @@ async function getSyncEngineClass(): Promise<typeof import('./sync/syncEngine').
   return _SyncEngineClass
 }
 
-let _remarkableService: import('./remarkable/service').ReMarkableService | null = null
-async function getRemarkableService(): Promise<import('./remarkable/service').ReMarkableService> {
-  if (!_remarkableService) {
-    _remarkableService = new (await import('./remarkable/service')).ReMarkableService()
-  }
-  return _remarkableService
-}
-
 // electron-updater: Modul lazy + Listener/Config nur einmal aufsetzen.
 let _autoUpdaterConfigured = false
 async function ensureAutoUpdater(): Promise<import('electron-updater').AppUpdater> {
@@ -145,6 +137,7 @@ import { setupTray, hideTransportWindow, updateShortcut, showTransportWindow } f
 import { createMainRegistry } from './plugins/registry'
 import { registerPluginTransport } from './plugins/transport'
 import { createHostFactory, type HostServices } from './plugins/host'
+import * as nativeServices from './plugins/nativeServices'
 
 // Globale Fehlerbehandlung für unhandled exceptions (z.B. IMAP Socket-Timeouts)
 process.on('uncaughtException', (error) => {
@@ -209,6 +202,20 @@ function buildPluginHostServices(): HostServices {
       const vp = requireVault('plugin:vault.write')
       await writeFileSafe(validatePath(vp, relPath), content)
     },
+    readVaultBytes: async (relPath) => {
+      const vp = requireVault('plugin:vault.readBytes')
+      return new Uint8Array(await fs.readFile(validatePath(vp, relPath)))
+    },
+    writeVaultBytes: async (relPath, bytes) => {
+      const vp = requireVault('plugin:vault.writeBytes')
+      const target = validatePath(vp, relPath)
+      await fs.mkdir(path.dirname(target), { recursive: true })
+      await fs.writeFile(target, Buffer.from(bytes))
+    },
+    vaultExists: async (relPath) => {
+      const vp = requireVault('plugin:vault.exists')
+      return fs.access(validatePath(vp, relPath)).then(() => true).catch(() => false)
+    },
     secretGet: pluginSecretGet,
     secretSet: pluginSecretSet,
     secretDelete: pluginSecretDelete,
@@ -245,6 +252,12 @@ function buildPluginHostServices(): HostServices {
         return []
       }
     },
+    deviceRequest: nativeServices.deviceRequest,
+    deviceDownload: nativeServices.deviceDownload,
+    deviceUpload: nativeServices.deviceUpload,
+    listUsbDevices: nativeServices.listUsbDevices,
+    pdfHtmlToPdf: nativeServices.htmlToPdf,
+    pdfOptimize: nativeServices.optimizePdf,
     emitWorkflow: async () => {
       throw new Error('workflow.action für Plugins noch nicht verdrahtet')
     }
@@ -10217,275 +10230,6 @@ do {
       }
     }
     return { success: false, error: friendly, needsPermission: true }
-  }
-})
-
-// ========================================
-// reMarkable (USB)
-// ========================================
-
-ipcMain.handle('remarkable-usb-check', async () => {
-  return (await getRemarkableService()).checkUsbConnection()
-})
-
-ipcMain.handle('remarkable-usb-debug-info', async () => {
-  try {
-    const status = await (await getRemarkableService()).checkUsbConnection()
-
-    if (process.platform !== 'darwin') {
-      return {
-        success: true,
-        connected: status.connected,
-        error: status.connected ? undefined : status.error
-      }
-    }
-
-    const { execFile } = await import('child_process')
-    const { promisify } = await import('util')
-    const execFileAsync = promisify(execFile)
-    const { stdout } = await execFileAsync('ioreg', ['-p', 'IOUSB', '-l', '-w', '0'], { timeout: 10000 })
-    const output = typeof stdout === 'string' ? stdout : String(stdout)
-
-    const targetBlock = output
-      .split('\n\n')
-      .find((block) => /"USB Vendor Name"\s*=\s*"reMarkable"|"kUSBVendorString"\s*=\s*"reMarkable"/i.test(block))
-
-    if (!targetBlock) {
-      return {
-        success: true,
-        connected: status.connected,
-        error: status.error
-      }
-    }
-
-    const vendorId = Number(targetBlock.match(/"idVendor"\s*=\s*(\d+)/)?.[1] || NaN)
-    const productId = Number(targetBlock.match(/"idProduct"\s*=\s*(\d+)/)?.[1] || NaN)
-    const vendorName = targetBlock.match(/"USB Vendor Name"\s*=\s*"([^"]+)"/)?.[1]
-      || targetBlock.match(/"kUSBVendorString"\s*=\s*"([^"]+)"/)?.[1]
-    const productName = targetBlock.match(/"USB Product Name"\s*=\s*"([^"]+)"/)?.[1]
-      || targetBlock.match(/"kUSBProductString"\s*=\s*"([^"]+)"/)?.[1]
-
-    return {
-      success: true,
-      connected: status.connected,
-      vendorName,
-      productName,
-      vendorId: Number.isFinite(vendorId) ? vendorId : undefined,
-      productId: Number.isFinite(productId) ? productId : undefined,
-      vendorIdHex: Number.isFinite(vendorId) ? `0x${vendorId.toString(16)}` : undefined,
-      productIdHex: Number.isFinite(productId) ? `0x${productId.toString(16)}` : undefined,
-      error: status.connected ? undefined : status.error
-    }
-  } catch (error) {
-    return {
-      success: false,
-      connected: false,
-      error: error instanceof Error ? error.message : 'USB debug info konnte nicht geladen werden'
-    }
-  }
-})
-
-ipcMain.handle('remarkable-list-documents', async (_event, folderId?: string) => {
-  try {
-    const documents = await (await getRemarkableService()).listUsbDocuments(folderId)
-    return { documents }
-  } catch (error) {
-    console.error('[reMarkable] Failed to list USB documents:', error)
-    return {
-      documents: [],
-      error: error instanceof Error ? error.message : 'Dokumente konnten nicht geladen werden'
-    }
-  }
-})
-
-ipcMain.handle('remarkable-download-document', async (_event, vaultPath: string, document: { id: string; name: string }) => {
-  const sanitizeFileName = (name: string) => {
-    const trimmed = name.trim().replace(/\s+/g, ' ')
-    const sanitized = trimmed.replace(/[^a-zA-Z0-9\-_. ]/g, '').replace(/ /g, '-')
-    return sanitized || 'remarkable-note'
-  }
-
-  try {
-    assertApprovedVault(vaultPath, 'remarkable-download-document')
-    const pdfBuffer = await (await getRemarkableService()).downloadUsbDocumentPdf(document.id)
-    const pdfDir = validatePath(vaultPath, 'reMarkable/pdf')
-    await fs.mkdir(pdfDir, { recursive: true })
-
-    const safeName = sanitizeFileName(document.name)
-    const fileName = `${safeName}-${document.id.slice(0, 8)}.pdf`
-    const filePath = validatePath(pdfDir, fileName)
-    const relativePdfPath = `reMarkable/pdf/${fileName}`
-
-    const alreadyExists = await fs.access(filePath).then(() => true).catch(() => false)
-    if (!alreadyExists) {
-      await fs.writeFile(filePath, pdfBuffer)
-    }
-
-    return { success: true, relativePdfPath, alreadyExists }
-  } catch (error) {
-    console.error('[reMarkable] Failed to download document:', { id: document.id, name: document.name, error })
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'Dokument konnte nicht heruntergeladen werden'
-    }
-  }
-})
-
-ipcMain.handle('remarkable-upload-pdf', async (_event, vaultPath: string, relativePdfPath: string) => {
-  try {
-    assertApprovedVault(vaultPath, 'remarkable-upload-pdf')
-    if (!relativePdfPath.toLowerCase().endsWith('.pdf')) {
-      return { success: false, error: 'Nur PDF-Dateien koennen exportiert werden' }
-    }
-
-    const filePath = validatePath(vaultPath, relativePdfPath)
-    const content = await fs.readFile(filePath)
-    const fileName = path.basename(relativePdfPath)
-
-    await (await getRemarkableService()).uploadUsbPdf(fileName, content)
-    return { success: true }
-  } catch (error) {
-    console.error('[reMarkable] Failed to upload PDF:', { relativePdfPath, error })
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'PDF konnte nicht exportiert werden'
-    }
-  }
-})
-
-ipcMain.handle('remarkable-optimize-pdf', async (_event, vaultPath: string, relativePdfPath: string) => {
-  try {
-    assertApprovedVault(vaultPath, 'remarkable-optimize-pdf')
-    if (!relativePdfPath.toLowerCase().endsWith('.pdf')) {
-      return { success: false, error: 'Nur PDF-Dateien koennen optimiert werden' }
-    }
-
-    const inputPath = validatePath(vaultPath, relativePdfPath)
-    const inputStat = await fs.stat(inputPath)
-    const outputPath = inputPath.replace(/\.pdf$/i, '.remarkable.pdf')
-
-    const { execFile } = await import('child_process')
-    const { promisify } = await import('util')
-    const execFileAsync = promisify(execFile)
-
-    const homeDir = process.env.HOME || `/Users/${process.env.USER || ''}`
-    const additionalPaths = [
-      '/opt/homebrew/bin',
-      '/opt/homebrew/sbin',
-      '/usr/local/bin',
-      '/usr/local/sbin',
-      `${homeDir}/.local/bin`
-    ]
-    const currentPath = process.env.PATH || '/usr/bin:/bin:/usr/sbin:/sbin'
-    const extendedPath = [...additionalPaths, ...currentPath.split(':')].join(':')
-    const env = { ...process.env, PATH: extendedPath }
-
-    let method: 'ghostscript' | 'qpdf' | 'unchanged' = 'unchanged'
-
-    try {
-      await execFileAsync('gs', [
-        '-sDEVICE=pdfwrite',
-        '-dCompatibilityLevel=1.4',
-        '-dPDFSETTINGS=/ebook',
-        '-dDetectDuplicateImages=true',
-        '-dCompressFonts=true',
-        '-dEmbedAllFonts=true',
-        '-dNOPAUSE',
-        '-dQUIET',
-        '-dBATCH',
-        `-sOutputFile=${outputPath}`,
-        inputPath
-      ], { env, timeout: 120000 })
-      method = 'ghostscript'
-    } catch {
-      try {
-        await execFileAsync('qpdf', ['--linearize', inputPath, outputPath], { env, timeout: 120000 })
-        method = 'qpdf'
-      } catch {
-        await fs.copyFile(inputPath, outputPath)
-        method = 'unchanged'
-      }
-    }
-
-    let optimizedStat = await fs.stat(outputPath)
-
-    if (optimizedStat.size > inputStat.size && method !== 'unchanged') {
-      await fs.copyFile(inputPath, outputPath)
-      method = 'unchanged'
-      optimizedStat = await fs.stat(outputPath)
-    }
-
-    const optimizedRelative = path.relative(vaultPath, outputPath).split(path.sep).join('/')
-
-    return {
-      success: true,
-      relativePdfPath: optimizedRelative,
-      method,
-      originalSize: inputStat.size,
-      optimizedSize: optimizedStat.size
-    }
-  } catch (error) {
-    console.error('[reMarkable] Failed to optimize PDF:', { relativePdfPath, error })
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'PDF konnte nicht optimiert werden'
-    }
-  }
-})
-
-// Wandelt ein PDF in ein "buchtaugliches" reMarkable-PDF um: Text wird extrahiert,
-// zu fließenden Absätzen umgebrochen (Reflow) und mit großer Serifenschrift in
-// Gerätegröße neu gerendert – liest sich wie ein Kindle-Buch. Abbildungen/Formeln
-// gehen dabei verloren (es bleibt der reine Text).
-ipcMain.handle('remarkable-bookify-pdf', async (_event, vaultPath: string, relativePdfPath: string) => {
-  try {
-    assertApprovedVault(vaultPath, 'remarkable-bookify-pdf')
-    if (!relativePdfPath.toLowerCase().endsWith('.pdf')) {
-      return { success: false, error: 'Nur PDF-Dateien können umgewandelt werden' }
-    }
-
-    const inputPath = validatePath(vaultPath, relativePdfPath)
-    try {
-      await fs.access(inputPath)
-    } catch {
-      return {
-        success: false,
-        error: `Quell-PDF nicht gefunden: „${path.basename(inputPath)}". Die Datei wurde verschoben oder gelöscht – bitte ein vorhandenes PDF auswählen.`
-      }
-    }
-    const inputBytes = await fs.readFile(inputPath)
-
-    const { extractReflowedHtml } = await import('./remarkable/pdfReflow')
-    const { renderReMarkableBookPdf } = await import('./remarkable/bookPdf')
-
-    const reflow = await extractReflowedHtml(new Uint8Array(inputBytes))
-    if (reflow.charCount < 40) {
-      return {
-        success: false,
-        error: 'Kaum Text gefunden – vermutlich ein gescanntes/Bild-PDF. Reflow funktioniert nur mit echtem Text.'
-      }
-    }
-
-    const baseName = path.basename(inputPath).replace(/\.pdf$/i, '')
-    const title = reflow.title || baseName
-    const pdfData = await renderReMarkableBookPdf(reflow.bodyHtml, title)
-
-    const outputPath = inputPath.replace(/\.pdf$/i, '.remarkable.pdf')
-    await fs.writeFile(outputPath, pdfData)
-    const optimizedRelative = path.relative(vaultPath, outputPath).split(path.sep).join('/')
-
-    return {
-      success: true,
-      relativePdfPath: optimizedRelative,
-      sourcePages: reflow.pageCount,
-      charCount: reflow.charCount
-    }
-  } catch (error) {
-    console.error('[reMarkable] Failed to bookify PDF:', { relativePdfPath, error })
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'PDF konnte nicht umgewandelt werden'
-    }
   }
 })
 

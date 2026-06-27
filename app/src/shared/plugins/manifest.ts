@@ -34,6 +34,12 @@ export type PluginCapability =
   | 'llm.generate'
   | 'http.fetch'
   | 'workflow.action'
+  // Geräte-/Dokument-Capabilities (reMarkable-Vertikale): jede ein schmales, zweck-
+  // spezifisches Tor durch eine privilegierte Kern-Grenze (electron.net an einen
+  // allowlisteten Host, BrowserWindow→PDF, Ghostscript/qpdf) — kein generisches exec/net.
+  | 'device.usb'
+  | 'pdf.render'
+  | 'pdf.optimize'
 
 /**
  * JSON Schema (draft-07) als reine serialisierbare Daten. Bewusst lose getypt —

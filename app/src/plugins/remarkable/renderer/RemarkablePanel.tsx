@@ -1,9 +1,23 @@
+// reMarkable-Plugin — Renderer-Panel (Sidebar). War früher components/Sidebar/RemarkablePanel.tsx;
+// jetzt in der Vertikale und über den Slot `sidebar.panel.remarkable` gemountet (./index.tsx).
+// Geräte-/PDF-Aufrufe laufen über invokePlugin('remarkable', …) statt window.electronAPI.remarkable*.
+// Docling/writeFile/readDirectory bleiben Kern-APIs (kein Teil der Vertikale).
+
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import type { ReMarkableDocumentSummary, ReMarkableUsbDebugInfoResult } from '../../../shared/types'
-import { useTranslation } from '../../utils/translations'
-import { useUIStore } from '../../stores/uiStore'
-import { createNoteFromFile, useNotesStore } from '../../stores/notesStore'
-import remarkableLogo from '../../assets/remarkable-logo.png'
+import type {
+  ReMarkableDocumentSummary,
+  ReMarkableUsbCheckResult,
+  ReMarkableUsbDebugInfoResult,
+  ReMarkableDownloadResult,
+  ReMarkableUploadResult,
+  ReMarkableOptimizeResult,
+  ReMarkableBookifyResult,
+} from '../../../shared/types'
+import { useTranslation } from '../../../renderer/utils/translations'
+import { useUIStore } from '../../../renderer/stores/uiStore'
+import { createNoteFromFile, useNotesStore } from '../../../renderer/stores/notesStore'
+import { invokePlugin } from '../../../renderer/plugins/client'
+import remarkableLogo from '../../../renderer/assets/remarkable-logo.png'
 
 export const RemarkablePanel: React.FC = () => {
   const { t } = useTranslation()
@@ -45,7 +59,11 @@ export const RemarkablePanel: React.FC = () => {
   }
 
   const loadDocuments = useCallback(async (folderId?: string) => {
-    const result = await window.electronAPI.remarkableListDocuments(folderId)
+    const result = await invokePlugin<{ documents: ReMarkableDocumentSummary[]; error?: string }>(
+      'remarkable',
+      'remarkable.listDocuments',
+      { folderId }
+    )
     if (result.error) {
       setError(result.error)
     }
@@ -70,10 +88,10 @@ export const RemarkablePanel: React.FC = () => {
     setInfo(null)
 
     try {
-      const status = await window.electronAPI.remarkableUsbCheck()
+      const status = await invokePlugin<ReMarkableUsbCheckResult>('remarkable', 'remarkable.usbCheck')
       setIsConnected(status.connected)
 
-      const debugResult = await window.electronAPI.remarkableUsbDebugInfo()
+      const debugResult = await invokePlugin<ReMarkableUsbDebugInfoResult>('remarkable', 'remarkable.usbDebugInfo')
       if (debugResult.success) {
         setUsbDebugInfo(debugResult)
       }
@@ -205,7 +223,7 @@ export const RemarkablePanel: React.FC = () => {
         return
       }
 
-      const downloadResult = await window.electronAPI.remarkableDownloadDocument(vaultPath, {
+      const downloadResult = await invokePlugin<ReMarkableDownloadResult>('remarkable', 'remarkable.download', {
         id: doc.id,
         name: doc.name
       })
@@ -294,7 +312,7 @@ export const RemarkablePanel: React.FC = () => {
     setInfo(t('sidebar.remarkable.openingPdf'))
 
     try {
-      const downloadResult = await window.electronAPI.remarkableDownloadDocument(vaultPath, {
+      const downloadResult = await invokePlugin<ReMarkableDownloadResult>('remarkable', 'remarkable.download', {
         id: doc.id,
         name: doc.name
       })
@@ -328,12 +346,14 @@ export const RemarkablePanel: React.FC = () => {
     setInfo(t('sidebar.remarkable.exportingPdf'))
 
     try {
-      const status = await window.electronAPI.remarkableUsbCheck()
+      const status = await invokePlugin<ReMarkableUsbCheckResult>('remarkable', 'remarkable.usbCheck')
       if (!status.connected) {
         throw new Error(status.error || t('sidebar.remarkable.disconnected'))
       }
 
-      const result = await window.electronAPI.remarkableUploadPdf(vaultPath, exportCandidatePath)
+      const result = await invokePlugin<ReMarkableUploadResult>('remarkable', 'remarkable.upload', {
+        relativePdfPath: exportCandidatePath
+      })
       if (!result.success) {
         throw new Error(result.error || t('sidebar.remarkable.exportPdfError'))
       }
@@ -365,17 +385,21 @@ export const RemarkablePanel: React.FC = () => {
     setInfo(t('remarkable.optimizingPdf'))
 
     try {
-      const status = await window.electronAPI.remarkableUsbCheck()
+      const status = await invokePlugin<ReMarkableUsbCheckResult>('remarkable', 'remarkable.usbCheck')
       if (!status.connected) {
         throw new Error(status.error || t('sidebar.remarkable.disconnected'))
       }
 
-      const optimizeResult = await window.electronAPI.remarkableOptimizePdfForUpload(vaultPath, exportCandidatePath)
+      const optimizeResult = await invokePlugin<ReMarkableOptimizeResult>('remarkable', 'remarkable.optimize', {
+        relativePdfPath: exportCandidatePath
+      })
       if (!optimizeResult.success || !optimizeResult.relativePdfPath) {
         throw new Error(optimizeResult.error || t('remarkable.optimizeFailed'))
       }
 
-      const uploadResult = await window.electronAPI.remarkableUploadPdf(vaultPath, optimizeResult.relativePdfPath)
+      const uploadResult = await invokePlugin<ReMarkableUploadResult>('remarkable', 'remarkable.upload', {
+        relativePdfPath: optimizeResult.relativePdfPath
+      })
       if (!uploadResult.success) {
         throw new Error(uploadResult.error || t('sidebar.remarkable.exportPdfError'))
       }
@@ -417,17 +441,21 @@ export const RemarkablePanel: React.FC = () => {
     setInfo(t('remarkable.bookifying'))
 
     try {
-      const status = await window.electronAPI.remarkableUsbCheck()
+      const status = await invokePlugin<ReMarkableUsbCheckResult>('remarkable', 'remarkable.usbCheck')
       if (!status.connected) {
         throw new Error(status.error || t('sidebar.remarkable.disconnected'))
       }
 
-      const bookifyResult = await window.electronAPI.remarkableBookifyPdf(vaultPath, exportCandidatePath)
+      const bookifyResult = await invokePlugin<ReMarkableBookifyResult>('remarkable', 'remarkable.bookify', {
+        relativePdfPath: exportCandidatePath
+      })
       if (!bookifyResult.success || !bookifyResult.relativePdfPath) {
         throw new Error(bookifyResult.error || t('remarkable.bookifyFailed'))
       }
 
-      const uploadResult = await window.electronAPI.remarkableUploadPdf(vaultPath, bookifyResult.relativePdfPath)
+      const uploadResult = await invokePlugin<ReMarkableUploadResult>('remarkable', 'remarkable.upload', {
+        relativePdfPath: bookifyResult.relativePdfPath
+      })
       if (!uploadResult.success) {
         throw new Error(uploadResult.error || t('sidebar.remarkable.exportPdfError'))
       }
@@ -588,3 +616,5 @@ export const RemarkablePanel: React.FC = () => {
     </div>
   )
 }
+
+export default RemarkablePanel

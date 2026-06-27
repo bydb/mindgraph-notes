@@ -9,6 +9,6 @@ export interface RMDocumentSummary {
 export interface ReMarkableTransport {
   connect(): Promise<boolean>
   listDocuments(folderId?: string): Promise<RMDocumentSummary[]>
-  downloadDocumentPdf(documentId: string): Promise<Buffer>
-  uploadPdf(fileName: string, content: Buffer): Promise<void>
+  downloadDocumentPdf(documentId: string): Promise<Uint8Array>
+  uploadPdf(fileName: string, content: Uint8Array): Promise<void>
 }

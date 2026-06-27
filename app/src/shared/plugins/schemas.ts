@@ -24,6 +24,9 @@ const CAPABILITY_VALUES = [
   'llm.generate',
   'http.fetch',
   'workflow.action',
+  'device.usb',
+  'pdf.render',
+  'pdf.optimize',
 ] as const
 
 const CATEGORY_VALUES = [

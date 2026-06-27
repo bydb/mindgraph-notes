@@ -11,7 +11,7 @@
 
 import type { ModuleId as CompatModuleId } from '../../shared/modelCompatibility'
 import type { PluginManifest } from '../../shared/plugins/manifest'
-import type { AnyPluginHost } from '../../shared/plugins/host'
+import type { AnyPluginHost, UsbDeviceInfo } from '../../shared/plugins/host'
 import type { HostFactory } from './registry'
 
 /**
@@ -22,9 +22,31 @@ import type { HostFactory } from './registry'
 export interface HostServices {
   readVaultFile: (relPath: string) => Promise<string>
   writeVaultFile: (relPath: string, content: string) => Promise<void>
+  /** Binäres Vault-I/O (PDFs der reMarkable-Vertikale) — geht durch dieselben Pfad-Checks. */
+  readVaultBytes: (relPath: string) => Promise<Uint8Array>
+  writeVaultBytes: (relPath: string, bytes: Uint8Array) => Promise<void>
+  vaultExists: (relPath: string) => Promise<boolean>
   secretGet: (namespacedKey: string) => Promise<string | null>
   secretSet: (namespacedKey: string, value: string) => Promise<void>
   secretDelete: (namespacedKey: string) => Promise<void>
+  // — Geräte-/PDF-Primitiven (electron.net, BrowserWindow, Ghostscript) — der Host gated
+  //   die device-URLs gegen allowedHosts; die Implementierungen liegen in nativeServices.ts.
+  deviceRequest: (url: string, timeoutMs: number) => Promise<{ statusCode: number; text: string }>
+  deviceDownload: (
+    url: string,
+    timeoutMs: number
+  ) => Promise<{ ok: boolean; statusCode?: number; bytes?: Uint8Array }>
+  deviceUpload: (
+    url: string,
+    fileName: string,
+    content: Uint8Array,
+    timeoutMs: number
+  ) => Promise<{ statusCode: number; body: string }>
+  listUsbDevices: () => Promise<UsbDeviceInfo[]>
+  pdfHtmlToPdf: (fullHtml: string) => Promise<Uint8Array>
+  pdfOptimize: (
+    bytes: Uint8Array
+  ) => Promise<{ bytes: Uint8Array; method: 'ghostscript' | 'qpdf' | 'unchanged' }>
   /** Modell-Auflösung + isHardLocked + isCloudModel-Gate stecken in dieser Primitive. */
   llmGenerate: (prompt: string, opts: { module?: CompatModuleId; allowCloud?: boolean }) => Promise<string>
   /** Roher fetch — die allowedHosts-Allowlist erzwingt der Host, nicht diese Primitive. */
@@ -64,13 +86,36 @@ export function createHostFactory(services: HostServices): HostFactory {
       log: (msg: string) => console.log(`[plugin:${id}] ${msg}`),
     }
 
+    // Geteilte Allowlist-Prüfung für http.fetch UND device.usb: statische manifest-Hosts
+    // ∪ zur Laufzeit erlaubte (user-konfigurierter Endpunkt). Leere Liste ⇒ komplett gesperrt.
+    const staticHosts = manifest.http?.allowedHosts ?? []
+    const ensureHostAllowed = async (url: string): Promise<void> => {
+      let hostname: string
+      try {
+        hostname = new URL(url).hostname
+      } catch {
+        throw new Error(`Plugin '${id}': ungültige URL '${url}'`)
+      }
+      const extra = services.resolveExtraAllowedHosts ? await services.resolveExtraAllowedHosts(id) : []
+      const allowedHosts = [...staticHosts, ...extra]
+      if (allowedHosts.length === 0) {
+        throw new Error(`Plugin '${id}': Netzzugriff gesperrt (keine allowedHosts deklariert)`)
+      }
+      if (!isHostAllowed(allowedHosts, hostname)) {
+        throw new Error(`Plugin '${id}': Host '${hostname}' nicht in allowedHosts`)
+      }
+    }
+
     if (caps.has('vault.read') || caps.has('vault.write')) {
       const vault: Record<string, unknown> = {}
       if (caps.has('vault.read')) {
         vault.read = (relPath: string) => services.readVaultFile(relPath)
+        vault.readBytes = (relPath: string) => services.readVaultBytes(relPath)
+        vault.exists = (relPath: string) => services.vaultExists(relPath)
       }
       if (caps.has('vault.write')) {
         vault.write = (relPath: string, content: string) => services.writeVaultFile(relPath, content)
+        vault.writeBytes = (relPath: string, bytes: Uint8Array) => services.writeVaultBytes(relPath, bytes)
       }
       host.vault = vault
     }
@@ -92,26 +137,42 @@ export function createHostFactory(services: HostServices): HostFactory {
     }
 
     if (caps.has('http.fetch')) {
-      const staticHosts = manifest.http?.allowedHosts ?? []
       host.http = {
         fetch: async (url: string, init?: RequestInit) => {
-          let hostname: string
-          try {
-            hostname = new URL(url).hostname
-          } catch {
-            throw new Error(`Plugin '${id}': ungültige URL '${url}'`)
-          }
-          const extra = services.resolveExtraAllowedHosts ? await services.resolveExtraAllowedHosts(id) : []
-          const allowedHosts = [...staticHosts, ...extra]
-          if (allowedHosts.length === 0) {
-            throw new Error(`Plugin '${id}': http.fetch gesperrt (keine allowedHosts deklariert)`)
-          }
-          if (!isHostAllowed(allowedHosts, hostname)) {
-            throw new Error(`Plugin '${id}': Host '${hostname}' nicht in allowedHosts`)
-          }
+          await ensureHostAllowed(url)
           return services.httpFetch(url, init)
         },
       }
+    }
+
+    if (caps.has('device.usb')) {
+      host.device = {
+        request: async (url: string, timeoutMs: number) => {
+          await ensureHostAllowed(url)
+          return services.deviceRequest(url, timeoutMs)
+        },
+        download: async (url: string, timeoutMs: number) => {
+          await ensureHostAllowed(url)
+          return services.deviceDownload(url, timeoutMs)
+        },
+        upload: async (url: string, fileName: string, content: Uint8Array, timeoutMs: number) => {
+          await ensureHostAllowed(url)
+          return services.deviceUpload(url, fileName, content, timeoutMs)
+        },
+        // Lokaler USB-Diagnose-Read (kein Netz) — nicht über die Host-Allowlist gegated.
+        listUsbDevices: () => services.listUsbDevices(),
+      }
+    }
+
+    if (caps.has('pdf.render') || caps.has('pdf.optimize')) {
+      const pdf: Record<string, unknown> = {}
+      if (caps.has('pdf.render')) {
+        pdf.htmlToPdf = (fullHtml: string) => services.pdfHtmlToPdf(fullHtml)
+      }
+      if (caps.has('pdf.optimize')) {
+        pdf.optimize = (bytes: Uint8Array) => services.pdfOptimize(bytes)
+      }
+      host.pdf = pdf
     }
 
     if (caps.has('workflow.action')) {
