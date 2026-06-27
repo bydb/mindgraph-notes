@@ -137,7 +137,7 @@ describe('definePluginMain', () => {
     const calls: string[] = []
     entry.register({
       host: { log: () => {}, http: { fetch: async () => new Response() }, secrets: {} as never },
-      actions: { register: (id) => calls.push(id) },
+      actions: { register: (id: string) => calls.push(id) },
     } as never)
     expect(registered).toBe(true)
     expect(calls).toEqual(['antares.ping'])
