@@ -233,6 +233,18 @@ function buildPluginHostServices(): HostServices {
       return (data.response || '').trim()
     },
     httpFetch: (url, init) => fetch(url, init),
+    resolveExtraAllowedHosts: async (pluginId) => {
+      // Plugins mit user-konfiguriertem Endpunkt (z.B. Antares: ui.antares.baseUrl) dürfen
+      // ihren konfigurierten Host ansprechen — der ist user-getrust, anders als ein beliebiger.
+      const ui = await loadUISettings().catch(() => ({} as Record<string, unknown>))
+      const cfg = ui[pluginId] as { baseUrl?: string } | undefined
+      if (!cfg?.baseUrl) return []
+      try {
+        return [new URL(cfg.baseUrl).hostname]
+      } catch {
+        return []
+      }
+    },
     emitWorkflow: async () => {
       throw new Error('workflow.action für Plugins noch nicht verdrahtet')
     }
@@ -730,6 +742,7 @@ app.whenReady().then(async () => {
   // Echten Capability-Host setzen (rohe Dienste an fs/safeStorage/Ollama gebunden) + Hard-Lock-
   // Guard (aktives Modell aus den UI-Settings), dann fehler-isoliert aktivieren — ein defektes
   // Plugin kippt den Start nie.
+  await migrateAntaresCredentialsToPlugin()
   pluginRegistry.setHostFactory(createHostFactory(buildPluginHostServices()))
   pluginRegistry.setHardLockGuard(async (moduleId) => {
     const ui = await loadUISettings().catch(() => ({} as Record<string, unknown>))
@@ -10802,129 +10815,27 @@ ipcMain.handle('edoobox-list-dates', async (_event, baseUrl: string, apiVersion:
 })
 
 // ========================================
-// Antares CS (Medienzentrum-Verleih)
+// Antares CS (Medienzentrum-Verleih) — migriert nach src/plugins/antares/ (Plugin-Vertikale).
+// Service, IPC und Credentials leben jetzt im Plugin (über plugin:invoke + Capability-Host).
+// Hier bleibt nur die EINMALIGE Migration der alten safeStorage-Credentials in die Plugin-Secrets.
 // ========================================
 
-function getAntaresCredentialsPath(): string {
-  return path.join(app.getPath('userData'), 'antares-credentials.enc')
-}
-
-async function loadAntaresCredentials(): Promise<{ username: string; password: string } | null> {
-  const credPath = getAntaresCredentialsPath()
-  const exists = await fs.access(credPath).then(() => true).catch(() => false)
-  if (!exists) return null
-  const encrypted = await fs.readFile(credPath)
+async function migrateAntaresCredentialsToPlugin(): Promise<void> {
   try {
-    return JSON.parse(safeStorage.decryptString(encrypted))
-  } catch {
-    return null
-  }
-}
-
-async function buildAntaresService(baseUrl: string, context: string) {
-  const creds = await loadAntaresCredentials()
-  if (!creds) throw new Error('Keine Antares-Zugangsdaten gespeichert')
-  const { AntaresService } = await import('./antaresService')
-  return new AntaresService(baseUrl, creds.username, creds.password, context || 'HE/16')
-}
-
-ipcMain.handle('antares-save-credentials', async (_event, username: string, password: string) => {
-  try {
-    if (!safeStorage.isEncryptionAvailable()) {
-      throw new Error('safeStorage ist nicht verfügbar')
+    if (await pluginSecretGet('plugin:antares:username')) return // schon migriert
+    const encPath = path.join(app.getPath('userData'), 'antares-credentials.enc')
+    const raw = await fs.readFile(encPath).catch(() => null)
+    if (!raw || !safeStorage.isEncryptionAvailable()) return
+    const creds = JSON.parse(safeStorage.decryptString(raw)) as { username?: string; password?: string }
+    if (creds.username && creds.password) {
+      await pluginSecretSet('plugin:antares:username', creds.username)
+      await pluginSecretSet('plugin:antares:password', creds.password)
+      console.log('[antares] Alte Credentials in Plugin-Secrets migriert')
     }
-    const encrypted = safeStorage.encryptString(JSON.stringify({ username, password }))
-    await fs.writeFile(getAntaresCredentialsPath(), encrypted)
-    return true
   } catch (e) {
-    console.error('[antares] Save credentials failed:', e)
-    return false
+    console.warn('[antares] Credential-Migration übersprungen:', e instanceof Error ? e.message : e)
   }
-})
-
-ipcMain.handle('antares-load-credentials', async () => {
-  return loadAntaresCredentials()
-})
-
-ipcMain.handle('antares-check', async (_event, baseUrl: string, context: string) => {
-  try {
-    const service = await buildAntaresService(baseUrl, context)
-    await service.checkConnection()
-    return { success: true }
-  } catch (e) {
-    return { success: false, error: e instanceof Error ? e.message : 'Verbindungsfehler' }
-  }
-})
-
-ipcMain.handle('antares-list-offene-registrierungen', async (_event, baseUrl: string, context: string) => {
-  try {
-    const service = await buildAntaresService(baseUrl, context)
-    const rows = await service.listOffeneRegistrierungen()
-    return { success: true, rows }
-  } catch (e) {
-    return { success: false, error: e instanceof Error ? e.message : 'Fehler' }
-  }
-})
-
-ipcMain.handle('antares-list-entleiher', async (_event, baseUrl: string, context: string, page?: number, rows?: number) => {
-  try {
-    const service = await buildAntaresService(baseUrl, context)
-    const result = await service.listEntleiher({ page, rows })
-    return { success: true, ...result }
-  } catch (e) {
-    return { success: false, error: e instanceof Error ? e.message : 'Fehler' }
-  }
-})
-
-ipcMain.handle('antares-list-mahnungen-geraete', async (_event, baseUrl: string, context: string) => {
-  try {
-    const service = await buildAntaresService(baseUrl, context)
-    const result = await service.listMahnungenGeraete()
-    return { success: true, ...result }
-  } catch (e) {
-    return { success: false, error: e instanceof Error ? e.message : 'Fehler' }
-  }
-})
-
-ipcMain.handle('antares-list-mahnungen-medien', async (_event, baseUrl: string, context: string) => {
-  try {
-    const service = await buildAntaresService(baseUrl, context)
-    const result = await service.listMahnungenMedien()
-    return { success: true, ...result }
-  } catch (e) {
-    return { success: false, error: e instanceof Error ? e.message : 'Fehler' }
-  }
-})
-
-ipcMain.handle('antares-list-ausgabeliste', async (_event, baseUrl: string, context: string) => {
-  try {
-    const service = await buildAntaresService(baseUrl, context)
-    const result = await service.listAusgabeliste()
-    return { success: true, ...result }
-  } catch (e) {
-    return { success: false, error: e instanceof Error ? e.message : 'Fehler' }
-  }
-})
-
-ipcMain.handle('antares-dashboard-counts', async (_event, baseUrl: string, context: string) => {
-  try {
-    const service = await buildAntaresService(baseUrl, context)
-    const counts = await service.fetchDashboardCounts()
-    return { success: true, counts }
-  } catch (e) {
-    return { success: false, error: e instanceof Error ? e.message : 'Fehler' }
-  }
-})
-
-ipcMain.handle('antares-list-lizenzen-ablauf', async (_event, baseUrl: string, context: string, daysAhead?: number) => {
-  try {
-    const service = await buildAntaresService(baseUrl, context)
-    const rows = await service.listLizenzenAblauf(daysAhead ?? 365)
-    return { success: true, rows }
-  } catch (e) {
-    return { success: false, error: e instanceof Error ? e.message : 'Fehler' }
-  }
-})
+}
 
 // ========================================
 // Marketing (WordPress + Instagram)

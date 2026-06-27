@@ -1,20 +1,22 @@
 /**
- * Antares CS API Client.
+ * Antares CS API Client — Plugin-Vertikale (migriert aus main/antaresService.ts).
  *
- * Reverse-engineered against Antares CS 2.0.4 (h+h Software / antares.net).
- * Read-only access via Cookie+PID session — uses the same flow as the
- * browser-based UI. Designed for the user's own admin/staff account.
- *
- * No official API exists; endpoints may change with Antares upgrades.
+ * Reverse-engineered gegen Antares CS 2.0.4 (h+h Software / antares.net). Read-only via
+ * Cookie+PID-Session. Kein fs/net/electron — der HTTP-Zugriff kommt INJIZIERT herein
+ * (`fetchImpl` = host.http.fetch), läuft also durch die allowedHosts-Allowlist des
+ * Capability-Hosts. Endpunkte können mit Antares-Upgrades brechen.
  */
 
-import type { AntaresEntleiher, AntaresVerleihRow, AntaresLizenz } from '../shared/types'
+import type { AntaresEntleiher, AntaresVerleihRow, AntaresLizenz } from '../../shared/types'
 
 interface AntaresAuth {
   pid: string
   cookie: string
   expiresAt: number
 }
+
+/** Der host-injizierte fetch (Domain-Allowlist erzwingt der Capability-Host). */
+export type FetchImpl = (url: string, init?: RequestInit) => Promise<Response>
 
 function truncateError(text: string, maxLen = 200): string {
   if (text.length <= maxLen) return text
@@ -29,8 +31,6 @@ function truncateError(text: string, maxLen = 200): string {
 /** Extract cookies from a Set-Cookie response header chain into a single Cookie request header. */
 function extractCookies(setCookieHeader: string | null, prior = ''): string {
   if (!setCookieHeader) return prior
-  // Set-Cookie can contain multiple comma-separated cookies but commas can also appear in Expires
-  // Use a simple parser: split by comma only when followed by `<name>=`
   const parts = setCookieHeader.split(/, (?=[A-Za-z0-9_-]+=)/)
   const jar: Record<string, string> = {}
   for (const c of prior.split('; ').filter(Boolean)) {
@@ -56,12 +56,20 @@ export class AntaresService {
   private username: string
   private password: string
   private auth: AntaresAuth | null = null
+  private fetchImpl: FetchImpl
 
-  constructor(baseUrl: string, username: string, password: string, context = 'HE/16') {
+  constructor(
+    baseUrl: string,
+    username: string,
+    password: string,
+    context = 'HE/16',
+    fetchImpl: FetchImpl = fetch
+  ) {
     this.baseUrl = baseUrl.replace(/\/$/, '')
     this.username = username
     this.password = password
     this.context = context
+    this.fetchImpl = fetchImpl
   }
 
   // ---- Auth ----
@@ -72,7 +80,7 @@ export class AntaresService {
     }
 
     // 1) Holt Login-Seite — sie liefert die initiale PID und setzt einen Session-Cookie
-    const r1 = await fetch(`${this.baseUrl}/`, { method: 'GET' })
+    const r1 = await this.fetchImpl(`${this.baseUrl}/`, { method: 'GET' })
     if (!r1.ok) throw new Error(`Antares Login-Seite (${r1.status}): ${truncateError(await r1.text())}`)
     const html1 = await r1.text()
     const m = html1.match(/login\?pid=([a-z0-9]+)/i)
@@ -81,7 +89,7 @@ export class AntaresService {
     const cookie1 = extractCookies(r1.headers.get('set-cookie'))
 
     // 2) Credentials POSTen
-    const r2 = await fetch(`${this.baseUrl}/login?pid=${encodeURIComponent(initialPid)}`, {
+    const r2 = await this.fetchImpl(`${this.baseUrl}/login?pid=${encodeURIComponent(initialPid)}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
@@ -95,9 +103,8 @@ export class AntaresService {
     // 3) Sanity: Dashboard abrufen — wenn Login fehlschlug, kommt eine Login-Seite zurueck.
     //    WICHTIG: der Dashboard-Aufruf setzt weitere Session-State-Cookies
     //    (UI-Filter-State, Such-Defaults), die wir für nachfolgende /search-
-    //    Calls brauchen. Ohne diese Cookies antwortet `/search?id=2` mit
-    //    "SQL ERROR".
-    const check = await fetch(`${this.baseUrl}/dashboard?template=plain&pid=${initialPid}`, {
+    //    Calls brauchen. Ohne diese Cookies antwortet `/search?id=2` mit "SQL ERROR".
+    const check = await this.fetchImpl(`${this.baseUrl}/dashboard?template=plain&pid=${initialPid}`, {
       method: 'GET',
       headers: { 'Cookie': cookie2 }
     })
@@ -124,7 +131,7 @@ export class AntaresService {
     const auth = await this.authenticate()
     const sep = path.includes('?') ? '&' : '?'
     const url = `${this.baseUrl}${path}${sep}pid=${auth.pid}`
-    const r = await fetch(url, {
+    const r = await this.fetchImpl(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
@@ -150,15 +157,11 @@ export class AntaresService {
     }
   }
 
-  /** Initialisiert den serverseitigen Filter-State für die nachfolgende
-   *  /search-Abfrage. Die Antares-UI macht beim Anklicken eines Dashboard-
-   *  Widgets genau diesen Call ZUERST (POST mit Body `autosearch=true` plus
-   *  optionale Filter wie `endfrom`/`endto`) — ohne ihn antwortet /search
-   *  mit "SQL ERROR" oder einem leeren Ergebnis. */
+  /** Initialisiert den serverseitigen Filter-State für die nachfolgende /search-Abfrage. */
   private async primeSearchMask(table: string, id: string, extraBody: Record<string, string> = {}): Promise<void> {
     const auth = await this.authenticate()
     const url = `${this.baseUrl}/result?template=partplain&id=${encodeURIComponent(id)}&type=${encodeURIComponent(table)}&pid=${auth.pid}`
-    await fetch(url, {
+    await this.fetchImpl(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
@@ -173,11 +176,7 @@ export class AntaresService {
 
   // ---- Domain methods ----
 
-  /** Offene Registrierungen — exakt das Zweischritt-Pattern der Antares-UI:
-   *  1) primeSearchMask setzt serverseitig den Filter-State für id=2
-   *  2) /search holt die Daten mit Pagination-Parametern (KEIN autosearch
-   *     mehr — das gehörte in Schritt 1). Dieses Pattern haben wir per
-   *     Reverse-Engineering der echten Browser-Requests verifiziert. */
+  /** Offene Registrierungen — Zweischritt-Pattern der Antares-UI (primeSearchMask + /search). */
   async listOffeneRegistrierungen(): Promise<AntaresEntleiher[]> {
     try {
       await this.primeSearchMask('entleiher', '2')
@@ -192,9 +191,7 @@ export class AntaresService {
     }
   }
 
-  /** Liest die aktuellen Aufgaben-Counts direkt aus dem Antares-Dashboard-HTML.
-   *  Robuster als die /search-Endpoints, weil der Server diese Werte schon
-   *  vorberechnet liefert. */
+  /** Aufgaben-Counts direkt aus dem Antares-Dashboard-HTML. */
   async fetchDashboardCounts(): Promise<{
     offeneRegistrierungen: number
     offeneAnfragenGeraete: number
@@ -206,7 +203,7 @@ export class AntaresService {
   }> {
     const auth = await this.authenticate()
     const url = `${this.baseUrl}/dashboard?template=plain&pid=${auth.pid}`
-    const r = await fetch(url, {
+    const r = await this.fetchImpl(url, {
       method: 'GET',
       headers: {
         'Cookie': auth.cookie,
@@ -229,7 +226,6 @@ export class AntaresService {
       stornierteVorbestellungen: extractCount(/(\d+)\s*stornierte\s+Vorbestellungen/i),
       ueberfaelligeGeraete: extractCount(/(\d+)\s*überfällige\s+Rückgaben/i),
       offeneVorbestellungenMedien: extractCount(/(\d+)\s*offene\s+Vorbestellung\b/i),
-      // Zweites Vorkommen von "überfällige Rückgaben" für Medien:
       ueberfaelligeMedien: (() => {
         const all = Array.from(html.matchAll(/(\d+)\s*überfällige\s+Rückgaben/gi))
         return all.length >= 2 ? parseInt(all[1][1], 10) : 0
@@ -237,7 +233,7 @@ export class AntaresService {
     }
   }
 
-  /** Alle Entleiher (paginiert, default 200 pro Seite). Vorsicht: kann Tausende sein. */
+  /** Alle Entleiher (paginiert, default 200 pro Seite). */
   async listEntleiher(opts: { page?: number; rows?: number } = {}): Promise<{ total: number; rows: AntaresEntleiher[] }> {
     await this.primeSearchMask('entleiher', '1')
     const data = await this.post<{ total: number; rows?: AntaresEntleiher[]; all_ids?: string[] }>(
@@ -257,12 +253,10 @@ export class AntaresService {
     initBody: Record<string, string>,
     opts: { page?: number; rows?: number; sort?: string; order?: 'asc' | 'desc'; status?: string } = {}
   ): Promise<{ total: number; rows: AntaresVerleihRow[] }> {
-    // 1) Filter serverseitig setzen
     await this.post(
       `/verleihsearch?action=verleih&refnr=${encodeURIComponent(ref)}&template=superplain`,
       initBody
     )
-    // 2) Daten holen
     const data = await this.post<{ total: number; rows?: AntaresVerleihRow[] }>(
       `/verleihsuchecopies?context=${encodeURIComponent(this.context)}&info=&ref=${encodeURIComponent(ref)}&rowcount=${opts.rows ?? 50}`,
       {
@@ -311,9 +305,7 @@ export class AntaresService {
     }, opts)
   }
 
-  /** Lizenzen, die in den nächsten N Tagen auslaufen.
-   *  Browser-Pattern reverse-engineered: primeSearchMask mit endfrom=heute,
-   *  endto=heute+N, searchtype=e — dann /search?table=lizenzen&id=3. */
+  /** Lizenzen, die in den nächsten N Tagen auslaufen. */
   async listLizenzenAblauf(daysAhead = 365, opts: { page?: number; rows?: number } = {}): Promise<AntaresLizenz[]> {
     try {
       const today = new Date()

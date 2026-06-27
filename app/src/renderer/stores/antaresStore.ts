@@ -1,6 +1,16 @@
 import { create } from 'zustand'
 import { useUIStore } from './uiStore'
+import { invokePlugin } from '../plugins/client'
 import type { AntaresEntleiher, AntaresVerleihRow, AntaresDashboardCounts, AntaresLizenz } from '../../shared/types'
+
+type Settled<T> = { ok: true; data: T } | { ok: false; error: string }
+async function settle<T>(p: Promise<T>): Promise<Settled<T>> {
+  try {
+    return { ok: true, data: await p }
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : 'Fehler' }
+  }
+}
 
 const EMPTY_COUNTS: AntaresDashboardCounts = {
   offeneRegistrierungen: 0,
@@ -46,25 +56,27 @@ export const useAntaresStore = create<AntaresState>((set) => ({
 
   loadAll: async () => {
     const { baseUrl, context } = getConfig()
+    const arg = { baseUrl, context }
     set({ loading: true, lastError: null })
+    type Verleih = { total: number; rows: AntaresVerleihRow[] }
     const [rCounts, rReg, rGer, rMed, rAus, rLiz] = await Promise.all([
-      window.electronAPI.antaresDashboardCounts(baseUrl, context),
-      window.electronAPI.antaresListOffeneRegistrierungen(baseUrl, context),
-      window.electronAPI.antaresListMahnungenGeraete(baseUrl, context),
-      window.electronAPI.antaresListMahnungenMedien(baseUrl, context),
-      window.electronAPI.antaresListAusgabeliste(baseUrl, context),
-      window.electronAPI.antaresListLizenzenAblauf(baseUrl, context, 365)
+      settle(invokePlugin<AntaresDashboardCounts>('antares', 'antares.dashboardCounts', arg)),
+      settle(invokePlugin<AntaresEntleiher[]>('antares', 'antares.listOffeneRegistrierungen', arg)),
+      settle(invokePlugin<Verleih>('antares', 'antares.listMahnungenGeraete', arg)),
+      settle(invokePlugin<Verleih>('antares', 'antares.listMahnungenMedien', arg)),
+      settle(invokePlugin<Verleih>('antares', 'antares.listAusgabeliste', arg)),
+      settle(invokePlugin<AntaresLizenz[]>('antares', 'antares.listLizenzenAblauf', { ...arg, daysAhead: 365 }))
     ])
-    const firstError = [rCounts, rReg, rGer, rMed, rAus, rLiz].find(r => !r.success)
+    const firstError = [rCounts, rReg, rGer, rMed, rAus, rLiz].find(r => !r.ok)
     set({
-      counts: rCounts.success && rCounts.counts ? rCounts.counts : EMPTY_COUNTS,
-      offeneRegistrierungen: rReg.success ? (rReg.rows || []) : [],
-      mahnungenGeraete: rGer.success ? (rGer.rows || []) : [],
-      mahnungenMedien: rMed.success ? (rMed.rows || []) : [],
-      ausgabeliste: rAus.success ? (rAus.rows || []) : [],
-      lizenzenAblauf365: rLiz.success ? (rLiz.rows || []) : [],
+      counts: rCounts.ok ? rCounts.data : EMPTY_COUNTS,
+      offeneRegistrierungen: rReg.ok ? rReg.data : [],
+      mahnungenGeraete: rGer.ok ? rGer.data.rows : [],
+      mahnungenMedien: rMed.ok ? rMed.data.rows : [],
+      ausgabeliste: rAus.ok ? rAus.data.rows : [],
+      lizenzenAblauf365: rLiz.ok ? rLiz.data : [],
       loading: false,
-      lastError: firstError ? (firstError.error || 'Fehler') : null,
+      lastError: firstError && firstError.ok === false ? firstError.error : null,
       lastFetchedAt: Date.now()
     })
   },

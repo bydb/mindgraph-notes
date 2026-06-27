@@ -87,6 +87,17 @@ describe('createHostFactory — http allowedHosts', () => {
     const f = http(manifest({ capabilities: ['http.fetch'] }))
     await expect(f.fetch('https://api.example.net/')).rejects.toThrow(/keine allowedHosts/)
   })
+
+  it('lässt user-konfigurierte Hosts via resolveExtraAllowedHosts durch (Antares-Fork)', async () => {
+    const services = fakeServices({ resolveExtraAllowedHosts: async () => ['mz-xy.configured.net'] })
+    const host = createHostFactory(services)(
+      manifest({ id: 'antares', capabilities: ['http.fetch'] }) // keine statischen allowedHosts
+    ) as Record<string, unknown>
+    const f = host.http as { fetch: (u: string) => Promise<Response> }
+    await f.fetch('https://mz-xy.configured.net/dashboard')
+    expect(services.httpFetch).toHaveBeenCalledOnce()
+    await expect(f.fetch('https://other.net/')).rejects.toThrow(/nicht in allowedHosts/)
+  })
 })
 
 describe('isHostAllowed — Wildcards', () => {

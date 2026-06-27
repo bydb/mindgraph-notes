@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useUIStore, ACCENT_COLORS, AI_LANGUAGES, FONT_FAMILIES, UI_LANGUAGES, BACKGROUND_COLORS, ICON_SETS, OUTLINE_STYLES, MODULES, MODULE_CATEGORIES, type Language, type FontFamily, type BackgroundColor, type IconSet, type OutlineStyle, type LLMBackend, type TransportDestination, type ModuleCategory, type ModuleDescriptor } from '../../stores/uiStore'
 import { isModuleEnabled, setModuleEnabled, useIsModuleEnabled } from '../../utils/modules'
+import { invokePlugin } from '../../plugins/client'
 import { useNotesStore, createNoteFromFile } from '../../stores/notesStore'
 import { useSyncStore } from '../../stores/syncStore'
 import { useVaultSettingsStore } from '../../stores/vaultSettingsStore'
@@ -1591,13 +1592,15 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab 
           if (creds.wpAppPassword) setWpAppPassword(creds.wpAppPassword)
         }
       })
-      window.electronAPI.antaresLoadCredentials().then(creds => {
-        if (creds) {
-          setAntaresUser(creds.username)
-          setAntaresPassword(creds.password)
-          setAntaresCredsSaved(true)
-        }
-      })
+      invokePlugin<{ username: string; password: string } | null>('antares', 'antares.loadCredentials')
+        .then(creds => {
+          if (creds) {
+            setAntaresUser(creds.username)
+            setAntaresPassword(creds.password)
+            setAntaresCredsSaved(true)
+          }
+        })
+        .catch(() => {})
     }
     if (isOpen && (activeTab === 'agents' || activeTab === 'remarkable')) {
       checkRemarkableConnection()
@@ -5280,8 +5283,8 @@ LIMIT 10
                         className="settings-btn"
                         onClick={async () => {
                           if (antaresUser && antaresPassword) {
-                            const saved = await window.electronAPI.antaresSaveCredentials(antaresUser, antaresPassword)
-                            setAntaresCredsSaved(saved)
+                            const saved = await invokePlugin<boolean>('antares', 'antares.saveCredentials', { username: antaresUser, password: antaresPassword }).catch(() => false)
+                            setAntaresCredsSaved(!!saved)
                           }
                         }}
                       >
@@ -5297,12 +5300,17 @@ LIMIT 10
                             setAntaresTestError(t('settings.agents.antares.saveFirst'))
                             return
                           }
-                          await window.electronAPI.antaresSaveCredentials(antaresUser, antaresPassword)
+                          await invokePlugin('antares', 'antares.saveCredentials', { username: antaresUser, password: antaresPassword })
                           setAntaresCredsSaved(true)
                           setAntaresTestStatus('testing')
-                          const result = await window.electronAPI.antaresCheck(antaresSettings.baseUrl, antaresSettings.context)
-                          setAntaresTestStatus(result.success ? 'success' : 'failed')
-                          setAntaresTestError(result.success ? null : (result.error || null))
+                          try {
+                            await invokePlugin('antares', 'antares.check', { baseUrl: antaresSettings.baseUrl, context: antaresSettings.context })
+                            setAntaresTestStatus('success')
+                            setAntaresTestError(null)
+                          } catch (err) {
+                            setAntaresTestStatus('failed')
+                            setAntaresTestError(err instanceof Error ? err.message : null)
+                          }
                         }}
                       >
                         {antaresTestStatus === 'testing'

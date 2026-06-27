@@ -930,17 +930,8 @@ export interface ElectronAPI {
   edooboxListBookings: (baseUrl: string, apiVersion: string, offerId: string) => Promise<{ success: boolean; bookings?: EdooboxBooking[]; error?: string }>;
   edooboxListDates: (baseUrl: string, apiVersion: string, offerId: string) => Promise<{ success: boolean; dates?: EdooboxEventDate[]; error?: string }>;
 
-  // Antares CS (Medienzentrum-Verleih)
-  antaresSaveCredentials: (username: string, password: string) => Promise<boolean>;
-  antaresLoadCredentials: () => Promise<{ username: string; password: string } | null>;
-  antaresCheck: (baseUrl: string, context: string) => Promise<{ success: boolean; error?: string }>;
-  antaresListOffeneRegistrierungen: (baseUrl: string, context: string) => Promise<{ success: boolean; rows?: AntaresEntleiher[]; error?: string }>;
-  antaresListEntleiher: (baseUrl: string, context: string, page?: number, rows?: number) => Promise<{ success: boolean; total?: number; rows?: AntaresEntleiher[]; error?: string }>;
-  antaresListMahnungenGeraete: (baseUrl: string, context: string) => Promise<{ success: boolean; total?: number; rows?: AntaresVerleihRow[]; error?: string }>;
-  antaresListMahnungenMedien: (baseUrl: string, context: string) => Promise<{ success: boolean; total?: number; rows?: AntaresVerleihRow[]; error?: string }>;
-  antaresListAusgabeliste: (baseUrl: string, context: string) => Promise<{ success: boolean; total?: number; rows?: AntaresVerleihRow[]; error?: string }>;
-  antaresDashboardCounts: (baseUrl: string, context: string) => Promise<{ success: boolean; counts?: AntaresDashboardCounts; error?: string }>;
-  antaresListLizenzenAblauf: (baseUrl: string, context: string, daysAhead?: number) => Promise<{ success: boolean; rows?: AntaresLizenz[]; error?: string }>;
+  // Antares CS: migriert nach src/plugins/antares/ — Aufruf via pluginInvoke('antares', actionId, payload).
+  // Die Antares-Datentypen (AntaresEntleiher/VerleihRow/Lizenz/DashboardCounts) bleiben hier (Renderer nutzt sie).
 
   // IQ-Auswertung
   iqGenerateReport: (data: IqReportData, suggestedFileName: string) => Promise<{ success: boolean; filePath?: string; canceled?: boolean; error?: string }>;

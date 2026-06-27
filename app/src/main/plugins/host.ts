@@ -29,6 +29,12 @@ export interface HostServices {
   llmGenerate: (prompt: string, opts: { module?: CompatModuleId; allowCloud?: boolean }) => Promise<string>
   /** Roher fetch — die allowedHosts-Allowlist erzwingt der Host, nicht diese Primitive. */
   httpFetch: (url: string, init?: RequestInit) => Promise<Response>
+  /**
+   * Zusätzliche, zur LAUFZEIT erlaubte Hosts pro Plugin (über die statischen manifest.http.
+   * allowedHosts hinaus). Für Plugins mit user-konfiguriertem Endpunkt (z.B. Antares: jedes
+   * Medienzentrum hat einen eigenen Server) — der konfigurierte Host ist user-getrust.
+   */
+  resolveExtraAllowedHosts?: (pluginId: string) => Promise<string[]>
   emitWorkflow: (pluginId: string, actionId: string, payload: unknown) => Promise<void>
 }
 
@@ -86,20 +92,22 @@ export function createHostFactory(services: HostServices): HostFactory {
     }
 
     if (caps.has('http.fetch')) {
-      const allowedHosts = manifest.http?.allowedHosts ?? []
+      const staticHosts = manifest.http?.allowedHosts ?? []
       host.http = {
-        fetch: (url: string, init?: RequestInit) => {
+        fetch: async (url: string, init?: RequestInit) => {
           let hostname: string
           try {
             hostname = new URL(url).hostname
           } catch {
-            return Promise.reject(new Error(`Plugin '${id}': ungültige URL '${url}'`))
+            throw new Error(`Plugin '${id}': ungültige URL '${url}'`)
           }
+          const extra = services.resolveExtraAllowedHosts ? await services.resolveExtraAllowedHosts(id) : []
+          const allowedHosts = [...staticHosts, ...extra]
           if (allowedHosts.length === 0) {
-            return Promise.reject(new Error(`Plugin '${id}': http.fetch gesperrt (keine allowedHosts deklariert)`))
+            throw new Error(`Plugin '${id}': http.fetch gesperrt (keine allowedHosts deklariert)`)
           }
           if (!isHostAllowed(allowedHosts, hostname)) {
-            return Promise.reject(new Error(`Plugin '${id}': Host '${hostname}' nicht in allowedHosts`))
+            throw new Error(`Plugin '${id}': Host '${hostname}' nicht in allowedHosts`)
           }
           return services.httpFetch(url, init)
         },
