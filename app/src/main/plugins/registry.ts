@@ -10,6 +10,7 @@
 // fertige Quell-Liste entgegen (DI), damit Tests Fake-Plugins ohne Dateisystem einspeisen.
 // Siehe docs/plugin-system-plan.md.
 
+import type { ModuleId as CompatModuleId } from '../../shared/modelCompatibility'
 import type { PluginManifest } from '../../shared/plugins/manifest'
 import type {
   PluginActionExecutor,
@@ -36,8 +37,12 @@ export interface MainPluginSource {
   loadEntry?: () => Promise<{ default: PluginMainEntry } | PluginMainEntry>
 }
 
-/** Baut den Capability-Host für ein Plugin. Per DI injiziert (echte Dienste erst Schritt 5). */
+/** Baut den Capability-Host für ein Plugin. Per DI injiziert (Stub bis der echte Host steht). */
 export type HostFactory = (manifest: PluginManifest) => AnyPluginHost
+
+/** Prüft vor einer LLM-Action mit `hardLockModule`, ob das aktive Modell gesperrt ist.
+ *  Gibt den Sperrgrund zurück oder null. Per DI injiziert (kennt das App-Modell-State). */
+export type HardLockGuard = (moduleId: CompatModuleId) => string | null | Promise<string | null>
 
 interface LoadedPlugin {
   manifest: PluginManifest
@@ -64,7 +69,19 @@ const STUB_HOST_FACTORY: HostFactory = () =>
 export class PluginRegistry {
   private readonly plugins = new Map<string, LoadedPlugin>()
 
-  constructor(private readonly hostFactory: HostFactory = STUB_HOST_FACTORY) {}
+  constructor(
+    private hostFactory: HostFactory = STUB_HOST_FACTORY,
+    private hardLockGuard?: HardLockGuard
+  ) {}
+
+  /** Setzt den echten Capability-Host nachträglich (nach Aktivierung gebaut in index.ts). */
+  setHostFactory(factory: HostFactory): void {
+    this.hostFactory = factory
+  }
+
+  setHardLockGuard(guard: HardLockGuard): void {
+    this.hardLockGuard = guard
+  }
 
   /**
    * Nimmt entdeckte Quellen auf. Validiert jedes Manifest; ein ungültiges landet als
@@ -216,6 +233,13 @@ export class PluginRegistry {
       if (!granted.has(cap)) {
         throw new Error(`Action '${actionId}' verlangt nicht gewährte Capability '${cap}'`)
       }
+    }
+
+    // Hard-Lock: LLM-Actions auf untrusted Input mit gesperrtem Modell blockieren —
+    // analog zum Workflow-Runner (kein Backdoor um die Modell-Matrix herum).
+    if (def.hardLockModule && this.hardLockGuard) {
+      const reason = await this.hardLockGuard(def.hardLockModule)
+      if (reason) throw new Error(reason)
     }
 
     const executor = p.actions.get(actionId)

@@ -144,6 +144,7 @@ import type { RagIndexStatus, RagQueryResult, RagRetrieveOptions } from '../shar
 import { setupTray, hideTransportWindow, updateShortcut, showTransportWindow } from './transport/trayManager'
 import { createMainRegistry } from './plugins/registry'
 import { registerPluginTransport } from './plugins/transport'
+import { createHostFactory, type HostServices } from './plugins/host'
 
 // Globale Fehlerbehandlung für unhandled exceptions (z.B. IMAP Socket-Timeouts)
 process.on('uncaughtException', (error) => {
@@ -154,10 +155,89 @@ process.on('unhandledRejection', (reason) => {
 })
 
 // Plugin-System: build-seitig erkannte Registry (import.meta.glob) + generischer Transport.
-// Host noch der Default-Stub (echte Capability-Dienste folgen in Schritt 5); demo.echo läuft
-// schon end-to-end, demo.summarize wirft kontrolliert (normalisiert zu {ok,error}).
+// Der echte Capability-Host wird in app.whenReady() gesetzt (setHostFactory); bis dahin Stub.
 const pluginRegistry = createMainRegistry()
 registerPluginTransport(pluginRegistry)
+
+// — Plugin-Secrets: pro Plugin genamespacet, via safeStorage verschlüsselt in userData —
+// (Direkter userData-Write wie bei den App-Settings; NICHT der Vault-Schreibpfad.)
+const pluginSecretsFile = (): string => path.join(app.getPath('userData'), 'plugin-secrets.json')
+async function loadPluginSecrets(): Promise<Record<string, string>> {
+  try {
+    return JSON.parse(await fs.readFile(pluginSecretsFile(), 'utf-8')) as Record<string, string>
+  } catch {
+    return {}
+  }
+}
+async function pluginSecretGet(key: string): Promise<string | null> {
+  if (!safeStorage.isEncryptionAvailable()) return null
+  const enc = (await loadPluginSecrets())[key]
+  if (!enc) return null
+  try {
+    return safeStorage.decryptString(Buffer.from(enc, 'base64'))
+  } catch {
+    return null
+  }
+}
+async function pluginSecretSet(key: string, value: string): Promise<void> {
+  if (!safeStorage.isEncryptionAvailable()) throw new Error('safeStorage nicht verfügbar — Secret nicht gespeichert')
+  const map = await loadPluginSecrets()
+  map[key] = safeStorage.encryptString(value).toString('base64')
+  await fs.writeFile(pluginSecretsFile(), JSON.stringify(map), 'utf-8')
+}
+async function pluginSecretDelete(key: string): Promise<void> {
+  const map = await loadPluginSecrets()
+  delete map[key]
+  await fs.writeFile(pluginSecretsFile(), JSON.stringify(map), 'utf-8')
+}
+
+/** Baut die rohen Host-Primitiven (an fs/safeStorage/Ollama/fetch gebunden). Die Per-Plugin-
+ *  Policy (Capability-Gating, Namespacing, allowedHosts) liegt in createHostFactory. */
+function buildPluginHostServices(): HostServices {
+  const requireVault = (op: string): string => {
+    const vp = lastKnownVaultPath
+    if (!vp) throw new Error(`Kein Vault geöffnet (${op})`)
+    assertApprovedVault(vp, op)
+    return vp
+  }
+  return {
+    readVaultFile: async (relPath) => {
+      const vp = requireVault('plugin:vault.read')
+      return fs.readFile(validatePath(vp, relPath), 'utf-8')
+    },
+    writeVaultFile: async (relPath, content) => {
+      const vp = requireVault('plugin:vault.write')
+      await writeFileSafe(validatePath(vp, relPath), content)
+    },
+    secretGet: pluginSecretGet,
+    secretSet: pluginSecretSet,
+    secretDelete: pluginSecretDelete,
+    llmGenerate: async (prompt, opts) => {
+      const ui = await loadUISettings().catch(() => ({} as Record<string, unknown>))
+      const ollama = ui.ollama as { selectedModel?: string; moduleModelOverrides?: Record<string, string> } | undefined
+      const model = (opts.module && ollama?.moduleModelOverrides?.[opts.module]) || ollama?.selectedModel || ''
+      if (!model) throw new Error('Kein Ollama-Modell konfiguriert')
+      if (opts.module && isModelHardLocked(model, opts.module)) {
+        throw new Error(`Modell '${model}' ist für '${opts.module}' gesperrt (Hard-Lock)`)
+      }
+      if (isModelIsCloud(model) && !opts.allowCloud) {
+        throw new Error(`Cloud-Modell '${model}' für Plugins gesperrt (Privacy)`)
+      }
+      const res = await fetch(`${OLLAMA_API_URL}/api/generate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model, prompt, stream: false, think: false, options: { temperature: 0.4, num_predict: 1200 } })
+      })
+      if (!res.ok) throw new Error(`Ollama Fehler: ${res.status}`)
+      const data = await res.json()
+      return (data.response || '').trim()
+    },
+    httpFetch: (url, init) => fetch(url, init),
+    emitWorkflow: async () => {
+      throw new Error('workflow.action für Plugins noch nicht verdrahtet')
+    }
+  }
+}
 
 let mainWindow: BrowserWindow | null = null
 let fileWatcher: FSWatcher | null = null
@@ -647,7 +727,18 @@ app.whenReady().then(async () => {
   createWindow()
   console.timeEnd('app-ready')
 
-  // Plugins aktivieren (fehler-isoliert in der Registry — ein defektes Plugin kippt den Start nie).
+  // Echten Capability-Host setzen (rohe Dienste an fs/safeStorage/Ollama gebunden) + Hard-Lock-
+  // Guard (aktives Modell aus den UI-Settings), dann fehler-isoliert aktivieren — ein defektes
+  // Plugin kippt den Start nie.
+  pluginRegistry.setHostFactory(createHostFactory(buildPluginHostServices()))
+  pluginRegistry.setHardLockGuard(async (moduleId) => {
+    const ui = await loadUISettings().catch(() => ({} as Record<string, unknown>))
+    const ollama = ui.ollama as { selectedModel?: string; moduleModelOverrides?: Record<string, string> } | undefined
+    const model = ollama?.moduleModelOverrides?.[moduleId] || ollama?.selectedModel || ''
+    return model && isModelHardLocked(model, moduleId)
+      ? `Modell '${model}' ist für '${moduleId}' gesperrt (Hard-Lock)`
+      : null
+  })
   pluginRegistry.activateAll().catch((err) => console.error('[plugin] activateAll:', err))
 
   // Tray-Icon + Schnellerfassung (plattformübergreifend)

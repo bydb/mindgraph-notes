@@ -169,6 +169,36 @@ describe('PluginRegistry — Fehler-Isolation', () => {
   })
 })
 
+describe('PluginRegistry — Hard-Lock-Guard', () => {
+  it('blockt eine Action mit hardLockModule, wenn der Guard einen Grund liefert', async () => {
+    const m = mkManifest('lock', {
+      actions: [{ id: 'lock.do', requiredCapabilities: [], hardLockModule: 'task-extraction' }],
+    })
+    const entry = definePluginMain({ id: 'lock', capabilities: [] }, ({ actions }) => {
+      actions.register('lock.do', async () => 'sollte nie laufen')
+    })
+    const guard = vi.fn(async () => 'Modell gesperrt')
+    const r = new PluginRegistry(undefined, guard)
+    r.register([{ manifest: m, loadEntry: async () => ({ default: entry }) }])
+    await r.activate('lock')
+    await expect(r.invoke('lock', 'lock.do', {})).rejects.toThrow(/Modell gesperrt/)
+    expect(guard).toHaveBeenCalledWith('task-extraction')
+  })
+
+  it('lässt durch, wenn der Guard null liefert', async () => {
+    const m = mkManifest('lock', {
+      actions: [{ id: 'lock.do', requiredCapabilities: [], hardLockModule: 'task-extraction' }],
+    })
+    const entry = definePluginMain({ id: 'lock', capabilities: [] }, ({ actions }) => {
+      actions.register('lock.do', async () => 'ok')
+    })
+    const r = new PluginRegistry(undefined, async () => null)
+    r.register([{ manifest: m, loadEntry: async () => ({ default: entry }) }])
+    await r.activate('lock')
+    expect(await r.invoke('lock', 'lock.do', {})).toBe('ok')
+  })
+})
+
 describe('PluginRegistry — Deaktivierung', () => {
   it('ruft stop(), leert Actions und blockiert danach Aufrufe', async () => {
     const stop = vi.fn(async () => {})
