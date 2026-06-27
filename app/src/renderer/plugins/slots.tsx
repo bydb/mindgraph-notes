@@ -9,18 +9,29 @@
 import React, { Suspense } from 'react'
 import { createRendererRegistry, type RendererPluginRegistry } from './registry'
 
-/** Was ein Plugin an einen Slot hängt: eine lazy geladene Default-Export-Komponente. */
+/** Was ein Plugin an einen Slot hängt: eine lazy geladene Default-Export-Komponente.
+ *  `ComponentType<any>`, damit ein Slot optionale Props (z.B. `onClose`) durchreichen kann. */
 export interface SlotContribution {
   pluginId: string
   title?: string
-  load: () => Promise<{ default: React.ComponentType }>
+  load: () => Promise<{ default: React.ComponentType<any> }>
 }
 
-// Singleton: die Glob-Erkennung läuft einmal beim ersten Slot-Render.
+// Singleton: die Glob-Erkennung läuft einmal beim ersten Slot-Render (oder beim eager
+// ensureRendererPlugins() in main.tsx).
 let registry: RendererPluginRegistry | null = null
 function getRegistry(): RendererPluginRegistry {
   if (!registry) registry = createRendererRegistry()
   return registry
+}
+
+/**
+ * Initialisiert die Renderer-Plugin-Registry EAGER. Wird beim App-Start (main.tsx) aufgerufen,
+ * damit alle `renderer/index.tsx` (und deren Modul-Seiteneffekte, z.B. Bridge-Provider-
+ * Registrierungen) laufen, bevor der erste Slot gemountet wird. Idempotent.
+ */
+export function ensureRendererPlugins(): void {
+  getRegistry()
 }
 
 // React.lazy pro Beitrag genau einmal erzeugen (stabile Identität → kein Remount-Flackern).
@@ -56,10 +67,12 @@ class SlotErrorBoundary extends React.Component<
  * nicht mit. Leerer Slot → `fallback` (default nichts) — genau das passiert nach dem
  * Löschen der Plugin-Vertikale.
  */
-export const PluginSlot: React.FC<{ slotId: string; fallback?: React.ReactNode }> = ({
-  slotId,
-  fallback = null,
-}) => {
+export const PluginSlot: React.FC<{
+  slotId: string
+  fallback?: React.ReactNode
+  /** Optionale Props, die an jede Slot-Komponente durchgereicht werden (z.B. `onClose`). */
+  props?: Record<string, unknown>
+}> = ({ slotId, fallback = null, props }) => {
   const contributions = getRegistry().getSlot(slotId) as SlotContribution[]
   if (contributions.length === 0) return <>{fallback}</>
   return (
@@ -69,7 +82,7 @@ export const PluginSlot: React.FC<{ slotId: string; fallback?: React.ReactNode }
         return (
           <SlotErrorBoundary key={`${c.pluginId}:${i}`} pluginId={c.pluginId}>
             <Suspense fallback={null}>
-              <Comp />
+              <Comp {...(props ?? {})} />
             </Suspense>
           </SlotErrorBoundary>
         )

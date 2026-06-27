@@ -6,8 +6,8 @@
 // Hinweis: Vault-Pfad wird vom Host aufgelöst (lastKnownVaultPath) — loadEvents/saveEvents
 // brauchen ihn NICHT mehr als Argument (anders als die alten IPC-Handler).
 
-import { invokePlugin } from './client'
-import { registerEdooboxServiceProvider } from '../stores/edooboxServiceBridge'
+import { invokePlugin } from '../../../renderer/plugins/client'
+import { registerEdooboxServiceProvider } from '../../../renderer/stores/edooboxServiceBridge'
 import type {
   EdooboxEvent,
   EdooboxOffer,
@@ -18,7 +18,7 @@ import type {
   EdooboxImportResult,
   IqReportData,
   AttendanceListData,
-} from '../../shared/types'
+} from '../../../shared/types'
 
 /** Rückgabe der DOCX-Export-Actions (Speichern via Dialog → Pfad | abgebrochen | Fehler). */
 type DocxExportResult = { success: boolean; filePath?: string; canceled?: boolean; error?: string }

@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react'
-import { useAgentStore } from '../../stores/agentStore'
-import { useUIStore } from '../../stores/uiStore'
-import { useTranslation } from '../../utils/translations'
-import { writeClipboardText } from '../../utils/clipboard'
-import { PanelHeader, PanelHeaderIconButton } from '../Shared/PanelHeader'
-import { IconCalendar } from '../Shared/Icons'
-import { edooboxClient } from '../../plugins/edooboxClient'
+import { useAgentStore } from './agentStore'
+import { useUIStore } from '../../../renderer/stores/uiStore'
+import { useTranslation } from '../../../renderer/utils/translations'
+import { writeClipboardText } from '../../../renderer/utils/clipboard'
+import { PanelHeader, PanelHeaderIconButton } from '../../../renderer/components/Shared/PanelHeader'
+import { IconCalendar } from '../../../renderer/components/Shared/Icons'
+import { edooboxClient } from './edooboxClient'
 import type { EdooboxEvent, EdooboxEventDate, EdooboxOfferDashboard, AttendanceListData, AttendanceParticipant } from '../../../shared/types'
 
 const MAX_ATTENDANCE_PARTICIPANTS = 100
@@ -22,7 +22,7 @@ function sanitizeFileName(value: string): string {
   return value.replace(/[\\/:*?"<>|]+/g, '_').replace(/\s+/g, ' ').trim().slice(0, 80) || 'Teilnehmerliste'
 }
 
-const edooboxLogoUrl = new URL('../../assets/edoobox-logo.png', import.meta.url).href
+const edooboxLogoUrl = new URL('../../../renderer/assets/edoobox-logo.png', import.meta.url).href
 
 interface AgentPanelProps {
   onClose: () => void
@@ -1055,7 +1055,15 @@ const IqView: React.FC = () => {
 
 export const AgentPanel: React.FC<AgentPanelProps> = ({ onClose }) => {
   const { t } = useTranslation()
-  const { dashboardView, setDashboardView, isImporting, parseFormular } = useAgentStore()
+  const { dashboardView, setDashboardView, isImporting, parseFormular, loadEvents, checkConnection } = useAgentStore()
+
+  // edoobox-Events + Verbindungsstatus beim Öffnen des Panels laden. Lag früher als
+  // App-Start-Effekt im Core (App.tsx); mit der Plugin-Vertikale lädt das Panel selbst —
+  // lazy beim ersten Mount, statt unbedingt beim Vault-Wechsel.
+  useEffect(() => {
+    loadEvents().catch(() => {})
+    checkConnection().catch(() => {})
+  }, [loadEvents, checkConnection])
 
   return (
     <div className="agent-panel">

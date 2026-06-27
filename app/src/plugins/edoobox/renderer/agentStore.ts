@@ -1,9 +1,9 @@
 import { create } from 'zustand'
-import type { EdooboxEvent, EdooboxOffer, EdooboxCategory, EdooboxOfferDashboard, EdooboxBooking, IqReportData } from '../../shared/types'
-import { useUIStore } from './uiStore'
-import { useNotesStore } from './notesStore'
-import { edooboxClient } from '../plugins/edooboxClient'
-import { useEventAgentBridge } from './eventAgentBridge'
+import type { EdooboxEvent, EdooboxOffer, EdooboxCategory, EdooboxOfferDashboard, EdooboxBooking, IqReportData } from '../../../shared/types'
+import { useUIStore } from '../../../renderer/stores/uiStore'
+import { useNotesStore } from '../../../renderer/stores/notesStore'
+import { edooboxClient } from './edooboxClient'
+import { useEventAgentBridge } from '../../../renderer/stores/eventAgentBridge'
 
 export interface MarketingPublishStatus {
   wordpress?: { postId: number; postUrl: string; status: string; publishedAt: string }
