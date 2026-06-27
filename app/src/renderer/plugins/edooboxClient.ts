@@ -14,7 +14,13 @@ import type {
   EdooboxOfferDashboard,
   EdooboxBooking,
   EdooboxEventDate,
+  EdooboxImportResult,
+  IqReportData,
+  AttendanceListData,
 } from '../../shared/types'
+
+/** Rückgabe der DOCX-Export-Actions (Speichern via Dialog → Pfad | abgebrochen | Fehler). */
+type DocxExportResult = { success: boolean; filePath?: string; canceled?: boolean; error?: string }
 
 export const edooboxClient = {
   saveCredentials: (apiKey: string, apiSecret: string) =>
@@ -55,4 +61,14 @@ export const edooboxClient = {
 
   saveEvents: (events: EdooboxEvent[]) =>
     invokePlugin<boolean>('edoobox', 'edoobox.saveEvents', { events }),
+
+  // — DOCX-/Dialog-Actions (Phase 2) —
+  parseFormular: () =>
+    invokePlugin<EdooboxImportResult | null>('edoobox', 'edoobox.parseFormular'),
+
+  generateIqReport: (data: IqReportData, suggestedFileName: string) =>
+    invokePlugin<DocxExportResult>('edoobox', 'edoobox.generateIqReport', { data, suggestedFileName }),
+
+  generateAttendanceList: (data: AttendanceListData, suggestedFileName: string) =>
+    invokePlugin<DocxExportResult>('edoobox', 'edoobox.generateAttendanceList', { data, suggestedFileName }),
 }

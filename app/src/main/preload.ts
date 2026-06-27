@@ -499,20 +499,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // reMarkable (USB)
 
-  // edoobox Agent — Backend nach src/plugins/edoobox/ migriert (plugin:invoke). Hier bleibt
-  // nur der DOCX-/Dialog-Formularimport (Phase 2 der Plugin-Vertikale).
-  edooboxParseFormular: () =>
-    ipcRenderer.invoke('edoobox-parse-formular'),
+  // edoobox Agent: vollständig nach src/plugins/edoobox/ migriert (plugin:invoke) — inkl.
+  // Formular-Import + IQ-/Anwesenheitsliste-DOCX (Phase 2, via edooboxClient).
 
   // Antares CS: migriert nach src/plugins/antares/ — Aufruf via electronAPI.pluginInvoke('antares', …)
-
-  // IQ-Auswertung
-  iqGenerateReport: (data: object, suggestedFileName: string) =>
-    ipcRenderer.invoke('iq-generate-report', data, suggestedFileName),
-
-  // Anwesenheitsliste (Teilnehmerliste)
-  attendanceListGenerate: (data: object, suggestedFileName: string) =>
-    ipcRenderer.invoke('attendance-list-generate', data, suggestedFileName),
 
   // Marketing (WordPress)
   marketingSaveCredentials: (credentials: { wpAppPassword?: string }) =>

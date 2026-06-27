@@ -1,6 +1,5 @@
-import { promises as fs } from 'node:fs'
-import path from 'node:path'
-import { app } from 'electron'
+// IQ-Report-Generator (Plugin-Vertikale). Kein fs/app/electron: die DOCX-Vorlage kommt als
+// Bytes herein (host.resource.read), das Ergebnis geht als Bytes zurück (host.dialog.saveFile).
 import JSZip from 'jszip'
 
 export interface IqReportData {
@@ -21,12 +20,8 @@ export interface IqReportData {
   checkDokumentiert: boolean
 }
 
-function getTemplatePath(): string {
-  const resourcesPath = app.isPackaged
-    ? path.join(process.resourcesPath, 'resources')
-    : path.join(app.getAppPath(), 'resources')
-  return path.join(resourcesPath, 'iq-template.docx')
-}
+/** Dateiname der gebündelten Vorlage (via host.resource.read geladen). */
+export const IQ_TEMPLATE_NAME = 'iq-template.docx'
 
 function escapeXml(value: string): string {
   return value
@@ -67,10 +62,8 @@ function setCheckbox(xml: string, name: string, checked: boolean): string {
   return xml.replace(re, (_m, p1, p2) => `${p1}${value}${p2}`)
 }
 
-export async function generateIqReport(data: IqReportData, outputPath: string): Promise<void> {
-  const templatePath = getTemplatePath()
-  const buffer = await fs.readFile(templatePath)
-  const zip = await JSZip.loadAsync(buffer)
+export async function generateIqReportBytes(data: IqReportData, templateBytes: Uint8Array): Promise<Uint8Array> {
+  const zip = await JSZip.loadAsync(templateBytes)
 
   const docFile = zip.file('word/document.xml')
   if (!docFile) throw new Error('word/document.xml not found in template')
@@ -100,6 +93,5 @@ export async function generateIqReport(data: IqReportData, outputPath: string): 
 
   zip.file('word/document.xml', xml)
 
-  const out = await zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' })
-  await fs.writeFile(outputPath, out)
+  return await zip.generateAsync({ type: 'uint8array', compression: 'DEFLATE' })
 }

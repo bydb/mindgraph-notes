@@ -5,7 +5,7 @@
 // ist 1:1 aus dem alten main/remarkable/* übernommen, nur die Rückgabeformen sind auf die
 // serialisierbaren Host-Service-Verträge angepasst (Text/Bytes statt Buffer-Streams).
 
-import { net, BrowserWindow, app } from 'electron'
+import { net, BrowserWindow, app, dialog } from 'electron'
 import { promises as fs } from 'fs'
 import path from 'path'
 import type { UsbDeviceInfo } from '../../shared/plugins/host'
@@ -182,6 +182,49 @@ export async function listUsbDevices(): Promise<UsbDeviceInfo[]> {
   } catch {
     return []
   }
+}
+
+// ─── dialog: OS-Datei-Dialoge (nur die gewählte Datei wird gelesen/geschrieben) ──
+
+/** Open-Dialog → liest die gewählte Datei und gibt { path, bytes } zurück (oder null). */
+export async function dialogOpenFile(opts: {
+  title?: string
+  filters?: { name: string; extensions: string[] }[]
+}): Promise<{ path: string; bytes: Uint8Array } | null> {
+  const win = BrowserWindow.getFocusedWindow()
+  const dialogOpts = { title: opts.title, filters: opts.filters, properties: ['openFile' as const] }
+  const result = win
+    ? await dialog.showOpenDialog(win, dialogOpts)
+    : await dialog.showOpenDialog(dialogOpts)
+  if (result.canceled || !result.filePaths[0]) return null
+  const filePath = result.filePaths[0]
+  const bytes = new Uint8Array(await fs.readFile(filePath))
+  return { path: filePath, bytes }
+}
+
+/** Save-Dialog → schreibt die Bytes an den gewählten Pfad und gibt { path } zurück (oder null). */
+export async function dialogSaveFile(
+  opts: { title?: string; defaultPath?: string; filters?: { name: string; extensions: string[] }[] },
+  bytes: Uint8Array
+): Promise<{ path: string } | null> {
+  const win = BrowserWindow.getFocusedWindow()
+  const result = win
+    ? await dialog.showSaveDialog(win, opts)
+    : await dialog.showSaveDialog(opts)
+  if (result.canceled || !result.filePath) return null
+  await fs.writeFile(result.filePath, Buffer.from(bytes))
+  return { path: result.filePath }
+}
+
+// ─── resource: gebündelte App-Ressourcen (read-only, auf resources/ beschränkt) ──
+
+/** Liest eine gebündelte Ressource aus resources/. basename() verhindert Pfad-Traversal. */
+export async function readResource(name: string): Promise<Uint8Array> {
+  const safeName = path.basename(name)
+  const resourcesPath = app.isPackaged
+    ? path.join(process.resourcesPath, 'resources')
+    : path.join(app.getAppPath(), 'resources')
+  return new Uint8Array(await fs.readFile(path.join(resourcesPath, safeName)))
 }
 
 // ─── pdf.render: HTML → PDF über ein verstecktes BrowserWindow ──────────────────

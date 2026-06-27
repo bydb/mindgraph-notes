@@ -126,7 +126,7 @@ const DashboardOfferCard: React.FC<{ offer: EdooboxOfferDashboard }> = ({ offer 
       }
 
       const fileName = `Teilnehmerliste - ${sanitizeFileName(offer.name)}.docx`
-      const result = await window.electronAPI.attendanceListGenerate(data, fileName)
+      const result = await edooboxClient.generateAttendanceList(data, fileName)
       if (!result.success && !result.canceled) {
         setListError(result.error || t('agent.attendanceList.generateFailed'))
       }

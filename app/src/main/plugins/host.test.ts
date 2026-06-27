@@ -20,6 +20,9 @@ function fakeServices(over: Partial<HostServices> = {}): HostServices {
     listUsbDevices: vi.fn(async () => []),
     pdfHtmlToPdf: vi.fn(async () => new Uint8Array()),
     pdfOptimize: vi.fn(async () => ({ bytes: new Uint8Array(), method: 'unchanged' as const })),
+    dialogOpenFile: vi.fn(async () => null),
+    dialogSaveFile: vi.fn(async () => null),
+    readResource: vi.fn(async () => new Uint8Array()),
     emitWorkflow: vi.fn(async () => {}),
     ...over,
   }

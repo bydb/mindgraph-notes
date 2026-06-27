@@ -1,6 +1,5 @@
-import { promises as fs } from 'node:fs'
-import path from 'node:path'
-import { app } from 'electron'
+// Teilnehmerliste-Generator (Plugin-Vertikale). Kein fs/app/electron: die DOCX-Vorlage kommt
+// als Bytes herein (host.resource.read), das Ergebnis geht als Bytes zurück (host.dialog.saveFile).
 import JSZip from 'jszip'
 
 export interface AttendanceParticipant {
@@ -28,12 +27,8 @@ export const MAX_ATTENDANCE_PARTICIPANTS_TOTAL = 100
 export const MAX_ATTENDANCE_PARTICIPANTS = ATTENDANCE_PARTICIPANTS_PER_PAGE
 export const MAX_ATTENDANCE_DATES = 8
 
-function getTemplatePath(): string {
-  const resourcesPath = app.isPackaged
-    ? path.join(process.resourcesPath, 'resources')
-    : path.join(app.getAppPath(), 'resources')
-  return path.join(resourcesPath, 'anwesenheitsliste-template.docx')
-}
+/** Dateiname der gebündelten Vorlage (via host.resource.read geladen). */
+export const ATTENDANCE_TEMPLATE_NAME = 'anwesenheitsliste-template.docx'
 
 function escapeXml(value: string): string {
   return value
@@ -111,14 +106,12 @@ function applyReplacements(xml: string, replacements: Record<string, string>): s
   return out
 }
 
-export async function generateAttendanceList(data: AttendanceListData, outputPath: string): Promise<void> {
+export async function generateAttendanceListBytes(data: AttendanceListData, templateBytes: Uint8Array): Promise<Uint8Array> {
   if (data.participants.length > MAX_ATTENDANCE_PARTICIPANTS_TOTAL) {
     throw new Error(`Zu viele Teilnehmer (${data.participants.length}). Maximum: ${MAX_ATTENDANCE_PARTICIPANTS_TOTAL}.`)
   }
 
-  const templatePath = getTemplatePath()
-  const buffer = await fs.readFile(templatePath)
-  const zip = await JSZip.loadAsync(buffer)
+  const zip = await JSZip.loadAsync(templateBytes)
 
   const docFile = zip.file('word/document.xml')
   if (!docFile) throw new Error('word/document.xml not found in template')
@@ -190,6 +183,5 @@ export async function generateAttendanceList(data: AttendanceListData, outputPat
   const newXml = beforeBody + newBodyContent + afterBody
 
   zip.file('word/document.xml', newXml)
-  const out = await zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' })
-  await fs.writeFile(outputPath, out)
+  return await zip.generateAsync({ type: 'uint8array', compression: 'DEFLATE' })
 }

@@ -8,7 +8,12 @@
 import { definePluginMain } from '../../../shared/plugins/entry'
 import { EdooboxService } from '../service'
 import { EDOOBOX_CAPABILITIES, manifest } from '../manifest'
+import { parseAkkreditierungsformular } from '../formularParser'
+import { generateIqReportBytes, IQ_TEMPLATE_NAME, type IqReportData } from '../iqReportService'
+import { generateAttendanceListBytes, ATTENDANCE_TEMPLATE_NAME, type AttendanceListData } from '../attendanceListService'
 import type { EdooboxEvent } from '../../../shared/types'
+
+const DOCX_FILTER = [{ name: 'Word-Dokument', extensions: ['docx'] }]
 
 const EVENTS_REL_PATH = '.mindgraph/edoobox-events.json'
 
@@ -185,6 +190,53 @@ export default definePluginMain(
       } catch (e) {
         console.error('[edoobox] Save events failed:', e)
         return false
+      }
+    })
+
+    // — Akkreditierungsformular (DOCX) → Event. Datei via host.dialog (User-gewählt). —
+    actions.register('edoobox.parseFormular', async () => {
+      try {
+        const picked = await host.dialog.openFile({ title: 'Akkreditierungsformular auswählen', filters: DOCX_FILTER })
+        if (!picked) return null
+        const fileName = picked.path.split(/[\\/]/).pop() || 'formular.docx'
+        return await parseAkkreditierungsformular(picked.bytes, fileName)
+      } catch (e) {
+        console.error('[edoobox] Parse formular failed:', e)
+        return null
+      }
+    })
+
+    // — IQ-Auswertung (DOCX): Vorlage via host.resource, Speicherort via host.dialog. —
+    actions.register('edoobox.generateIqReport', async (p) => {
+      try {
+        const { data, suggestedFileName } = p as { data: IqReportData; suggestedFileName: string }
+        const templateBytes = await host.resource.read(IQ_TEMPLATE_NAME)
+        const bytes = await generateIqReportBytes(data, templateBytes)
+        const saved = await host.dialog.saveFile(
+          { title: 'IQ-Auswertung speichern', defaultPath: suggestedFileName, filters: DOCX_FILTER },
+          bytes
+        )
+        if (!saved) return { success: false, canceled: true }
+        return { success: true, filePath: saved.path }
+      } catch (e) {
+        return { success: false, error: errMsg(e, 'IQ-Auswertung konnte nicht erstellt werden') }
+      }
+    })
+
+    // — Teilnehmerliste (DOCX): Vorlage via host.resource, Speicherort via host.dialog. —
+    actions.register('edoobox.generateAttendanceList', async (p) => {
+      try {
+        const { data, suggestedFileName } = p as { data: AttendanceListData; suggestedFileName: string }
+        const templateBytes = await host.resource.read(ATTENDANCE_TEMPLATE_NAME)
+        const bytes = await generateAttendanceListBytes(data, templateBytes)
+        const saved = await host.dialog.saveFile(
+          { title: 'Teilnehmerliste speichern', defaultPath: suggestedFileName, filters: DOCX_FILTER },
+          bytes
+        )
+        if (!saved) return { success: false, canceled: true }
+        return { success: true, filePath: saved.path }
+      } catch (e) {
+        return { success: false, error: errMsg(e, 'Teilnehmerliste konnte nicht erstellt werden') }
       }
     })
   }

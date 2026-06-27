@@ -24,6 +24,9 @@ function buildRegistry(over: Partial<HostServices> = {}) {
     listUsbDevices: async () => [],
     pdfHtmlToPdf: async () => new Uint8Array([9, 9]),
     pdfOptimize: async () => ({ bytes: new Uint8Array([7]), method: 'ghostscript' }),
+    dialogOpenFile: async () => null,
+    dialogSaveFile: async () => null,
+    readResource: async () => new Uint8Array(),
     emitWorkflow: async () => {},
     ...over,
   }

@@ -24,6 +24,9 @@ function buildRegistry() {
     listUsbDevices: async () => [],
     pdfHtmlToPdf: async () => new Uint8Array(),
     pdfOptimize: async () => ({ bytes: new Uint8Array(), method: 'unchanged' }),
+    dialogOpenFile: async () => null,
+    dialogSaveFile: async () => null,
+    readResource: async () => new Uint8Array(),
     emitWorkflow: async () => {},
   }
   const registry = new PluginRegistry(createHostFactory(services))

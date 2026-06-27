@@ -40,6 +40,11 @@ export type PluginCapability =
   | 'device.usb'
   | 'pdf.render'
   | 'pdf.optimize'
+  // Dokument-Capabilities (edoobox-Vertikale, Phase 2): schmale Tore für User-Datei-Dialoge
+  // (nur die im Dialog gewählte Datei wird gelesen/geschrieben) und gebündelte App-Ressourcen
+  // (read-only auf das resources/-Verzeichnis) — kein generisches Datei-System-Tor.
+  | 'dialog'
+  | 'resource'
 
 /**
  * JSON Schema (draft-07) als reine serialisierbare Daten. Bewusst lose getypt —

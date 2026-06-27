@@ -47,6 +47,18 @@ export interface HostServices {
   pdfOptimize: (
     bytes: Uint8Array
   ) => Promise<{ bytes: Uint8Array; method: 'ghostscript' | 'qpdf' | 'unchanged' }>
+  // — Dialog-/Ressourcen-Primitiven (electron.dialog, app-Ressourcen) — die Implementierungen
+  //   liegen in nativeServices.ts. Lesen/Schreiben gilt NUR für die im Dialog gewählte Datei.
+  dialogOpenFile: (opts: {
+    title?: string
+    filters?: { name: string; extensions: string[] }[]
+  }) => Promise<{ path: string; bytes: Uint8Array } | null>
+  dialogSaveFile: (
+    opts: { title?: string; defaultPath?: string; filters?: { name: string; extensions: string[] }[] },
+    bytes: Uint8Array
+  ) => Promise<{ path: string } | null>
+  /** Liest eine gebündelte App-Ressource (read-only, auf resources/ beschränkt). */
+  readResource: (name: string) => Promise<Uint8Array>
   /** Modell-Auflösung + isHardLocked + isCloudModel-Gate stecken in dieser Primitive. */
   llmGenerate: (prompt: string, opts: { module?: CompatModuleId; allowCloud?: boolean }) => Promise<string>
   /** Roher fetch — die allowedHosts-Allowlist erzwingt der Host, nicht diese Primitive. */
@@ -173,6 +185,23 @@ export function createHostFactory(services: HostServices): HostFactory {
         pdf.optimize = (bytes: Uint8Array) => services.pdfOptimize(bytes)
       }
       host.pdf = pdf
+    }
+
+    if (caps.has('dialog')) {
+      host.dialog = {
+        openFile: (opts: { title?: string; filters?: { name: string; extensions: string[] }[] }) =>
+          services.dialogOpenFile(opts),
+        saveFile: (
+          opts: { title?: string; defaultPath?: string; filters?: { name: string; extensions: string[] }[] },
+          bytes: Uint8Array
+        ) => services.dialogSaveFile(opts, bytes),
+      }
+    }
+
+    if (caps.has('resource')) {
+      host.resource = {
+        read: (name: string) => services.readResource(name),
+      }
     }
 
     if (caps.has('workflow.action')) {

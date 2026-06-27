@@ -152,6 +152,7 @@
     "highlight.js": "^11.11.1",
     "html-to-image": "^1.11.13",
     "imapflow": "^1.2.9",
+    "jszip": "^3.10.1",
     "katex": "^0.16.27",
     "mailparser": "^3.9.3",
     "mammoth": "^1.11.0",

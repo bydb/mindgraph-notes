@@ -27,6 +27,8 @@ const CAPABILITY_VALUES = [
   'device.usb',
   'pdf.render',
   'pdf.optimize',
+  'dialog',
+  'resource',
 ] as const
 
 const CATEGORY_VALUES = [

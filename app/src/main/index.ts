@@ -258,6 +258,9 @@ function buildPluginHostServices(): HostServices {
     listUsbDevices: nativeServices.listUsbDevices,
     pdfHtmlToPdf: nativeServices.htmlToPdf,
     pdfOptimize: nativeServices.optimizePdf,
+    dialogOpenFile: nativeServices.dialogOpenFile,
+    dialogSaveFile: nativeServices.dialogSaveFile,
+    readResource: nativeServices.readResource,
     emitWorkflow: async () => {
       throw new Error('workflow.action für Plugins noch nicht verdrahtet')
     }
@@ -10238,84 +10241,10 @@ do {
 // edoobox Agent (Veranstaltungsmanagement)
 // ========================================
 
-// edoobox-Backend (Credentials, Verbindungstest, Listen, Import, events.json) ist nach
-// src/plugins/edoobox/ migriert (Plugin-Vertikale, Phase 1) — läuft über plugin:invoke +
-// Capability-Host. Hier bleibt nur das, was noch dialog/DOCX braucht (Phase 2): parse-formular,
-// iq-generate-report, attendance-list-generate.
-
-// Formular parsen (öffnet Dateiauswahl)
-ipcMain.handle('edoobox-parse-formular', async () => {
-  try {
-    const { dialog } = await import('electron')
-    const result = await dialog.showOpenDialog({
-      title: t('dialog.edooboxFormular.title'),
-      filters: [{ name: t('dialog.edooboxFormular.filterName'), extensions: ['docx'] }],
-      properties: ['openFile']
-    })
-
-    if (result.canceled || !result.filePaths[0]) return null
-
-    const { parseAkkreditierungsformular } = await import('./formularParser')
-    return await parseAkkreditierungsformular(result.filePaths[0])
-  } catch (error) {
-    console.error('[edoobox] Parse formular failed:', error)
-    return null
-  }
-})
-
-// ========================================
-// IQ-Auswertung (Hessen IQ Rückmeldung)
-// ========================================
-
-ipcMain.handle('iq-generate-report', async (_event, data: import('./iqReportService').IqReportData, suggestedFileName: string) => {
-  try {
-    if (!mainWindow) return { success: false, error: 'No main window' }
-
-    const result = await dialog.showSaveDialog(mainWindow, {
-      title: 'IQ-Auswertung speichern',
-      defaultPath: suggestedFileName,
-      filters: [{ name: 'Word-Dokument', extensions: ['docx'] }]
-    })
-
-    if (result.canceled || !result.filePath) {
-      return { success: false, canceled: true }
-    }
-
-    const { generateIqReport } = await import('./iqReportService')
-    await generateIqReport(data, result.filePath)
-    return { success: true, filePath: result.filePath }
-  } catch (error) {
-    console.error('[iq] Generate report failed:', error)
-    return { success: false, error: error instanceof Error ? error.message : 'IQ-Auswertung konnte nicht erstellt werden' }
-  }
-})
-
-ipcMain.handle('attendance-list-generate', async (
-  _event,
-  data: import('./attendanceListService').AttendanceListData,
-  suggestedFileName: string,
-) => {
-  try {
-    if (!mainWindow) return { success: false, error: 'No main window' }
-
-    const result = await dialog.showSaveDialog(mainWindow, {
-      title: 'Teilnehmerliste speichern',
-      defaultPath: suggestedFileName,
-      filters: [{ name: 'Word-Dokument', extensions: ['docx'] }]
-    })
-
-    if (result.canceled || !result.filePath) {
-      return { success: false, canceled: true }
-    }
-
-    const { generateAttendanceList } = await import('./attendanceListService')
-    await generateAttendanceList(data, result.filePath)
-    return { success: true, filePath: result.filePath }
-  } catch (error) {
-    console.error('[attendance-list] Generate failed:', error)
-    return { success: false, error: error instanceof Error ? error.message : 'Teilnehmerliste konnte nicht erstellt werden' }
-  }
-})
+// edoobox-Backend + DOCX-/Dialog-Actions (Formular-Import, IQ-Auswertung, Teilnehmerliste)
+// sind nach src/plugins/edoobox/ migriert (Plugin-Vertikale, Phasen 1+2) — über plugin:invoke
+// + Capability-Host (http.fetch/secrets/vault + dialog/resource). Hier bleibt nur die
+// einmalige Credential-Migration (siehe unten). Marketing folgt in Phase 2b.
 
 // ========================================
 // Antares CS (Medienzentrum-Verleih) — migriert nach src/plugins/antares/ (Plugin-Vertikale).

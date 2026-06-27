@@ -6,7 +6,7 @@
 import type { PluginManifest } from '../../shared/plugins/manifest'
 
 /** as const → bindet das Capability-Tupel für definePluginMain im Main-Entry. */
-export const EDOOBOX_CAPABILITIES = ['http.fetch', 'secrets', 'vault.read', 'vault.write'] as const
+export const EDOOBOX_CAPABILITIES = ['http.fetch', 'secrets', 'vault.read', 'vault.write', 'dialog', 'resource'] as const
 
 // Eingabe mit edoobox-Server-Koordinaten (baseUrl + apiVersion kommen aus den Settings).
 const apiInput = {
@@ -117,6 +117,34 @@ export const manifest: PluginManifest = {
         type: 'object',
         required: ['events'],
         properties: { events: { type: 'array' } },
+        additionalProperties: false,
+      },
+    },
+    // — Dokument-Actions (Phase 2): Akkreditierungsformular-Import (DOCX→Event) +
+    //   IQ-/Anwesenheitsliste-Export (DOCX). Datei-I/O nur über host.dialog (User-gewählt)
+    //   + host.resource (gebündelte Vorlagen).
+    { id: 'edoobox.parseFormular', label: 'Akkreditierungsformular importieren', requiredCapabilities: ['dialog'] },
+    {
+      id: 'edoobox.generateIqReport',
+      label: 'IQ-Auswertung exportieren',
+      requiredCapabilities: ['resource', 'dialog'],
+      isWrite: true,
+      inputSchema: {
+        type: 'object',
+        required: ['data', 'suggestedFileName'],
+        properties: { data: { type: 'object' }, suggestedFileName: { type: 'string' } },
+        additionalProperties: false,
+      },
+    },
+    {
+      id: 'edoobox.generateAttendanceList',
+      label: 'Teilnehmerliste exportieren',
+      requiredCapabilities: ['resource', 'dialog'],
+      isWrite: true,
+      inputSchema: {
+        type: 'object',
+        required: ['data', 'suggestedFileName'],
+        properties: { data: { type: 'object' }, suggestedFileName: { type: 'string' } },
         additionalProperties: false,
       },
     },

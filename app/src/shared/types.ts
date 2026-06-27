@@ -909,18 +909,12 @@ export interface ElectronAPI {
 
   // reMarkable (USB)
 
-  // edoobox Agent — Backend nach src/plugins/edoobox/ migriert (Aufruf via pluginInvoke /
-  // edooboxClient). Hier bleibt nur der DOCX-/Dialog-Formularimport (Phase 2).
-  edooboxParseFormular: () => Promise<EdooboxImportResult | null>;
+  // edoobox Agent: vollständig nach src/plugins/edoobox/ migriert (Aufruf via edooboxClient) —
+  // inkl. Formular-Import + IQ-/Anwesenheitsliste-DOCX (Phase 2). Datentypen (EdooboxImportResult,
+  // IqReportData, AttendanceListData) bleiben hier, der Renderer nutzt sie weiter.
 
   // Antares CS: migriert nach src/plugins/antares/ — Aufruf via pluginInvoke('antares', actionId, payload).
   // Die Antares-Datentypen (AntaresEntleiher/VerleihRow/Lizenz/DashboardCounts) bleiben hier (Renderer nutzt sie).
-
-  // IQ-Auswertung
-  iqGenerateReport: (data: IqReportData, suggestedFileName: string) => Promise<{ success: boolean; filePath?: string; canceled?: boolean; error?: string }>;
-
-  // Anwesenheitsliste
-  attendanceListGenerate: (data: AttendanceListData, suggestedFileName: string) => Promise<{ success: boolean; filePath?: string; canceled?: boolean; error?: string }>;
 
   // Marketing (WordPress)
   marketingSaveCredentials: (credentials: { wpAppPassword?: string }) => Promise<boolean>;

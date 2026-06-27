@@ -1,6 +1,5 @@
-import type { EdooboxEvent, EdooboxEventDate, EdooboxSpeaker, EdooboxImportResult } from '../shared/types'
+import type { EdooboxEvent, EdooboxEventDate, EdooboxSpeaker, EdooboxImportResult } from '../../shared/types'
 import { randomUUID } from 'crypto'
-import path from 'path'
 
 // Label patterns for German Akkreditierungsformulare (fuzzy matching)
 // Priority order matters: more specific patterns first
@@ -166,9 +165,9 @@ function stripHtml(html: string): string {
   return html.replace(/<[^>]+>/g, '').trim()
 }
 
-export async function parseAkkreditierungsformular(filePath: string): Promise<EdooboxImportResult> {
+export async function parseAkkreditierungsformular(bytes: Uint8Array, fileName: string): Promise<EdooboxImportResult> {
   const mammoth = await import('mammoth')
-  const result = await mammoth.convertToHtml({ path: filePath })
+  const result = await mammoth.convertToHtml({ buffer: Buffer.from(bytes) })
   const html = result.value
 
   const warnings: string[] = []
@@ -329,7 +328,7 @@ export async function parseAkkreditierungsformular(filePath: string): Promise<Ed
     category: fields.category || undefined,
     status: 'imported',
     importedAt: new Date().toISOString(),
-    sourceFile: path.basename(filePath)
+    sourceFile: fileName
   }
 
   if (!fields.description) warnings.push('Keine Beschreibung gefunden')

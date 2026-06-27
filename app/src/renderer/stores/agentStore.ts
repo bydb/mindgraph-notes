@@ -139,7 +139,7 @@ export const useAgentStore = create<AgentState>()((set, get) => ({
   parseFormular: async () => {
     set({ isImporting: true })
     try {
-      const result = await window.electronAPI.edooboxParseFormular()
+      const result = await edooboxClient.parseFormular()
       if (!result) {
         set({ isImporting: false })
         return
@@ -525,7 +525,7 @@ export const useAgentStore = create<AgentState>()((set, get) => ({
 
     set({ isGeneratingIq: true })
     try {
-      const result = await window.electronAPI.iqGenerateReport(data, suggested)
+      const result = await edooboxClient.generateIqReport(data, suggested)
       if (result.success && result.filePath) {
         set({ isGeneratingIq: false, iqLastFilePath: result.filePath })
       } else {

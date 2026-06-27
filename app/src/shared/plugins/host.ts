@@ -68,6 +68,31 @@ export interface PdfOptimizeService {
   ): Promise<{ bytes: Uint8Array; method: 'ghostscript' | 'qpdf' | 'unchanged' }>
 }
 
+/** Datei-Filter für die OS-Dialoge (z.B. nur `.docx`). */
+export interface DialogFileFilter {
+  name: string
+  extensions: string[]
+}
+
+/**
+ * OS-Datei-Dialoge — das schmale Tor zu User-gewählten Dateien. Das Plugin bekommt NUR
+ * Bytes der Datei, die der User aktiv im Open-Dialog wählt, und schreibt NUR an den im
+ * Save-Dialog gewählten Pfad. Kein generisches Lesen/Schreiben beliebiger Pfade.
+ */
+export interface DialogService {
+  openFile(opts: { title?: string; filters?: DialogFileFilter[] }): Promise<{ path: string; bytes: Uint8Array } | null>
+  saveFile(
+    opts: { title?: string; defaultPath?: string; filters?: DialogFileFilter[] },
+    bytes: Uint8Array
+  ): Promise<{ path: string } | null>
+}
+
+/** Gebündelte App-Ressourcen (read-only, auf das `resources/`-Verzeichnis beschränkt) —
+ *  z.B. die DOCX-Vorlagen der edoobox-Vertikale. */
+export interface ResourceService {
+  read(name: string): Promise<Uint8Array>
+}
+
 /** Secrets — pro Plugin-ID genamespacet, verschlüsselt via electron.safeStorage. */
 export interface SecretsService {
   get(key: string): Promise<string | null>
@@ -111,6 +136,8 @@ export interface CapabilityServiceMap {
   // einem host.pdf mit beiden Methoden (analog vault.read + vault.write).
   'pdf.render': { pdf: PdfRenderService }
   'pdf.optimize': { pdf: PdfOptimizeService }
+  dialog: { dialog: DialogService }
+  resource: { resource: ResourceService }
 }
 
 /** Union → Intersection. `{vault:R} | {vault:W}` ⇒ `{vault: R & W}`. */
