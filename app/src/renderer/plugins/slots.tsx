@@ -1,0 +1,79 @@
+// Renderer-Slot-Rendering — die React-Seite der Renderer-Plugin-Registry.
+//
+// `RendererPluginRegistry` (registry.ts) ist bewusst React-frei und hält Slot-Beiträge
+// als `unknown`. Hier konkretisieren wir den Beitrags-Typ und mounten ihn: jeder Beitrag
+// ist eine lazy geladene React-Komponente, die an einem benannten Slot erscheint. Plugins
+// (z.B. das Antares-Dashboard-Widget) hängen sich so in die App, ohne dass die App sie
+// hart importiert — Grundlage des Deletion Tests. Siehe docs/plugin-system-plan.md #12.
+
+import React, { Suspense } from 'react'
+import { createRendererRegistry, type RendererPluginRegistry } from './registry'
+
+/** Was ein Plugin an einen Slot hängt: eine lazy geladene Default-Export-Komponente. */
+export interface SlotContribution {
+  pluginId: string
+  title?: string
+  load: () => Promise<{ default: React.ComponentType }>
+}
+
+// Singleton: die Glob-Erkennung läuft einmal beim ersten Slot-Render.
+let registry: RendererPluginRegistry | null = null
+function getRegistry(): RendererPluginRegistry {
+  if (!registry) registry = createRendererRegistry()
+  return registry
+}
+
+// React.lazy pro Beitrag genau einmal erzeugen (stabile Identität → kein Remount-Flackern).
+const lazyCache = new WeakMap<SlotContribution, React.ComponentType>()
+function lazyComponent(c: SlotContribution): React.ComponentType {
+  let comp = lazyCache.get(c)
+  if (!comp) {
+    comp = React.lazy(c.load)
+    lazyCache.set(c, comp)
+  }
+  return comp
+}
+
+class SlotErrorBoundary extends React.Component<
+  { pluginId: string; children: React.ReactNode },
+  { failed: boolean }
+> {
+  state = { failed: false }
+  static getDerivedStateFromError(): { failed: boolean } {
+    return { failed: true }
+  }
+  componentDidCatch(err: unknown): void {
+    console.error(`[plugin] Slot-Komponente '${this.props.pluginId}' warf beim Rendern:`, err)
+  }
+  render(): React.ReactNode {
+    return this.state.failed ? null : this.props.children
+  }
+}
+
+/**
+ * Rendert alle an `slotId` registrierten Plugin-Komponenten (Registrierungsreihenfolge).
+ * Jede ist isoliert (ErrorBoundary + Suspense); ein abgestürztes Plugin reißt den Slot
+ * nicht mit. Leerer Slot → `fallback` (default nichts) — genau das passiert nach dem
+ * Löschen der Plugin-Vertikale.
+ */
+export const PluginSlot: React.FC<{ slotId: string; fallback?: React.ReactNode }> = ({
+  slotId,
+  fallback = null,
+}) => {
+  const contributions = getRegistry().getSlot(slotId) as SlotContribution[]
+  if (contributions.length === 0) return <>{fallback}</>
+  return (
+    <>
+      {contributions.map((c, i) => {
+        const Comp = lazyComponent(c)
+        return (
+          <SlotErrorBoundary key={`${c.pluginId}:${i}`} pluginId={c.pluginId}>
+            <Suspense fallback={null}>
+              <Comp />
+            </Suspense>
+          </SlotErrorBoundary>
+        )
+      })}
+    </>
+  )
+}
