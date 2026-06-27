@@ -4,7 +4,7 @@ import { buildBrainSensors, getDayBoundsMs } from '../../utils/brainSensors'
 import { createNoteFromFile, useNotesStore } from '../../stores/notesStore'
 import { useUIStore } from '../../stores/uiStore'
 import { useEmailStore } from '../../stores/emailStore'
-import { useAgentStore } from '../../stores/agentStore'
+import { useEventAgentBridge } from '../../stores/eventAgentBridge'
 import { useTranslation } from '../../utils/translations'
 import { PluginSlot } from '../../plugins/slots'
 import {
@@ -180,7 +180,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onOpenInbox, onOpe
   const { notes, vaultPath, selectNote } = useNotesStore()
   const { taskExcludedFolders, dashboard, taskLeadTime } = useUIStore()
   const emails = useEmailStore(state => state.emails)
-  const loadDashboardOffers = useAgentStore(state => state.loadDashboard)
+  const loadDashboardOffers = useEventAgentBridge(state => state.loadOffers)
 
   const [snapshot, setSnapshot] = useState<DashboardSnapshot | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -206,8 +206,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onOpenInbox, onOpe
       const snapshotNotes = options?.reloadVault && vaultPath
         ? await reloadVaultNotesForDashboard(vaultPath)
         : notes
-      await loadDashboardOffers({ includeBookings: true })
-      const latestOffers = useAgentStore.getState().dashboardOffers
+      const latestOffers = await loadDashboardOffers({ includeBookings: true })
       const snap = await buildDashboardSnapshot({
         notes: snapshotNotes,
         vaultPath,

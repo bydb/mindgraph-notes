@@ -3,7 +3,7 @@ import { useEmailStore } from '../../stores/emailStore'
 import { useUIStore } from '../../stores/uiStore'
 import { useNotesStore } from '../../stores/notesStore'
 import { useContactStore } from '../../stores/contactStore'
-import { useAgentStore } from '../../stores/agentStore'
+import { useEventAgentBridge } from '../../stores/eventAgentBridge'
 import { useTranslation } from '../../utils/translations'
 import { sanitizeHtml } from '../../utils/sanitize'
 import { buildEmailContext, fetchCalendarEvents, loadMissingNoteContents } from '../../utils/emailContextBuilder'
@@ -24,7 +24,7 @@ export const EmailAIChatView: React.FC = () => {
   const { ollama } = useUIStore()
   const { notes } = useNotesStore()
   const { getContactByEmail } = useContactStore()
-  const { dashboardOffers } = useAgentStore()
+  const dashboardOffers = useEventAgentBridge(s => s.offers)
 
   const [input, setInput] = useState('')
   const [streamingContent, setStreamingContent] = useState('')

@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import type { AggregatedContact } from '../../shared/types'
 import { useEmailStore } from './emailStore'
-import { useAgentStore } from './agentStore'
+import { useEventAgentBridge } from './eventAgentBridge'
 import { useNotesStore } from './notesStore'
 
 interface ContactState {
@@ -70,8 +70,8 @@ export const useContactStore = create<ContactState>()((set, get) => ({
         }
       }
 
-      // Source 2: edoobox bookings
-      const { dashboardOffers } = useAgentStore.getState()
+      // Source 2: edoobox bookings (über die neutrale Bridge — kein harter Plugin-Import)
+      const dashboardOffers = useEventAgentBridge.getState().offers
       for (const offer of dashboardOffers) {
         if (!offer.bookings) continue
         for (const booking of offer.bookings) {

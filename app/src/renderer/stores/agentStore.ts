@@ -3,6 +3,7 @@ import type { EdooboxEvent, EdooboxOffer, EdooboxCategory, EdooboxOfferDashboard
 import { useUIStore } from './uiStore'
 import { useNotesStore } from './notesStore'
 import { edooboxClient } from '../plugins/edooboxClient'
+import { useEventAgentBridge } from './eventAgentBridge'
 
 export interface MarketingPublishStatus {
   wordpress?: { postId: number; postUrl: string; status: string; publishedAt: string }
@@ -265,6 +266,8 @@ export const useAgentStore = create<AgentState>()((set, get) => ({
         }
       }
       set({ dashboardOffers: offers, isDashboardLoading: false })
+      // Core-Konsumenten lesen über die neutrale Bridge (kein harter Plugin-Import).
+      useEventAgentBridge.getState().setOffers(offers)
     } catch {
       set({ isDashboardLoading: false })
     }
@@ -535,3 +538,18 @@ export const useAgentStore = create<AgentState>()((set, get) => ({
     }
   }
 }))
+
+// Registriert den edoobox-Store als Daten-Provider der neutralen Bridge. So lesen die Core-
+// Konsumenten (Dashboard/Briefing/Kontakte/Workflow/Email-KI) edoobox-Buchungen ohne harten
+// Import dieses Stores. In Phase 3b wandert diese Registrierung mit dem Store ins Plugin.
+useEventAgentBridge.getState().registerProvider({
+  loadOffers: async (opts) => {
+    await useAgentStore.getState().loadDashboard(opts)
+    return useAgentStore.getState().dashboardOffers
+  },
+  listBookings: async (offerId) => {
+    const { baseUrl, apiVersion } = useUIStore.getState().edoobox
+    const result = await edooboxClient.listBookings(baseUrl, apiVersion, offerId)
+    return result.success && result.bookings ? result.bookings : []
+  },
+})
