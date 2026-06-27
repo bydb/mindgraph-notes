@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react'
 import { useUIStore } from '../../stores/uiStore'
 import { invokePlugin } from '../../plugins/client'
+import { edooboxClient } from '../../plugins/edooboxClient'
 
 type TabId = 'integrations' | 'email' | 'agents' | 'telegram' | 'speech' | 'sync' | 'dashboard'
 
@@ -94,7 +95,7 @@ export const CredentialsSettings: React.FC<Props> = ({ onNavigateToTab }) => {
       note: 'Veranstaltungs-Agent',
       settingsTab: 'agents',
       checkSet: async () => {
-        const creds = await window.electronAPI.edooboxLoadCredentials()
+        const creds = await edooboxClient.loadCredentials()
         return !!(creds && creds.apiKey && creds.apiSecret)
       }
     })

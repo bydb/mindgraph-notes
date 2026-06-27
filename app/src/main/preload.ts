@@ -499,31 +499,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // reMarkable (USB)
 
-  // edoobox Agent
-  edooboxSaveCredentials: (apiKey: string, apiSecret: string) =>
-    ipcRenderer.invoke('edoobox-save-credentials', apiKey, apiSecret),
-  edooboxLoadCredentials: () =>
-    ipcRenderer.invoke('edoobox-load-credentials'),
-  edooboxCheck: (baseUrl: string, apiVersion: string) =>
-    ipcRenderer.invoke('edoobox-check', baseUrl, apiVersion),
-  edooboxListOffers: (baseUrl: string, apiVersion: string) =>
-    ipcRenderer.invoke('edoobox-list-offers', baseUrl, apiVersion),
-  edooboxListCategories: (baseUrl: string, apiVersion: string) =>
-    ipcRenderer.invoke('edoobox-list-categories', baseUrl, apiVersion),
+  // edoobox Agent — Backend nach src/plugins/edoobox/ migriert (plugin:invoke). Hier bleibt
+  // nur der DOCX-/Dialog-Formularimport (Phase 2 der Plugin-Vertikale).
   edooboxParseFormular: () =>
     ipcRenderer.invoke('edoobox-parse-formular'),
-  edooboxImportEvent: (baseUrl: string, apiVersion: string, event: object) =>
-    ipcRenderer.invoke('edoobox-import-event', baseUrl, apiVersion, event),
-  edooboxLoadEvents: (vaultPath: string) =>
-    ipcRenderer.invoke('edoobox-load-events', vaultPath),
-  edooboxSaveEvents: (vaultPath: string, events: object[]) =>
-    ipcRenderer.invoke('edoobox-save-events', vaultPath, events),
-  edooboxListOffersDashboard: (baseUrl: string, apiVersion: string, scope?: 'active' | 'past' | 'all') =>
-    ipcRenderer.invoke('edoobox-list-offers-dashboard', baseUrl, apiVersion, scope),
-  edooboxListBookings: (baseUrl: string, apiVersion: string, offerId: string) =>
-    ipcRenderer.invoke('edoobox-list-bookings', baseUrl, apiVersion, offerId),
-  edooboxListDates: (baseUrl: string, apiVersion: string, offerId: string) =>
-    ipcRenderer.invoke('edoobox-list-dates', baseUrl, apiVersion, offerId),
 
   // Antares CS: migriert nach src/plugins/antares/ — Aufruf via electronAPI.pluginInvoke('antares', …)
 

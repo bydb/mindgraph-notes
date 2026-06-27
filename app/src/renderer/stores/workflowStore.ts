@@ -20,6 +20,7 @@ import { useEmailStore } from './emailStore'
 import { useNotesStore } from './notesStore'
 import { useAntaresStore } from './antaresStore'
 import { useAgentStore } from './agentStore'
+import { edooboxClient } from '../plugins/edooboxClient'
 import { extractTasks } from '../utils/linkExtractor'
 import type { AntaresVerleihRow, EdooboxBooking, EdooboxOfferDashboard, Note } from '../../shared/types'
 
@@ -289,7 +290,7 @@ async function collectEdooboxManualItem(): Promise<WorkflowSeedItem | null> {
   const { baseUrl, apiVersion } = useUIStore.getState().edoobox
   let bookings: EdooboxBooking[] = []
   try {
-    const res = await window.electronAPI.edooboxListBookings(baseUrl, apiVersion, offer.id)
+    const res = await edooboxClient.listBookings(baseUrl, apiVersion, offer.id)
     bookings = res.success && res.bookings ? res.bookings as EdooboxBooking[] : []
   } catch { bookings = [] }
   const b = bookings.slice().sort((x, y) => (Date.parse(y.bookedAt || '') || 0) - (Date.parse(x.bookedAt || '') || 0))[0]
@@ -801,7 +802,7 @@ export const useWorkflowStore = create<WorkflowStoreState>()((set, get) => {
               let bookings = bookingsCache.get(o.id)
               if (!bookings) {
                 try {
-                  const res = await window.electronAPI.edooboxListBookings(edooboxCfg.baseUrl, edooboxCfg.apiVersion, o.id)
+                  const res = await edooboxClient.listBookings(edooboxCfg.baseUrl, edooboxCfg.apiVersion, o.id)
                   bookings = res.success && res.bookings ? res.bookings as EdooboxBooking[] : []
                 } catch { bookings = [] }
                 bookingsCache.set(o.id, bookings)

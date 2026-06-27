@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { useUIStore, ACCENT_COLORS, AI_LANGUAGES, FONT_FAMILIES, UI_LANGUAGES, BACKGROUND_COLORS, ICON_SETS, OUTLINE_STYLES, MODULES, MODULE_CATEGORIES, type Language, type FontFamily, type BackgroundColor, type IconSet, type OutlineStyle, type LLMBackend, type TransportDestination, type ModuleCategory, type ModuleDescriptor } from '../../stores/uiStore'
 import { isModuleEnabled, setModuleEnabled, useIsModuleEnabled } from '../../utils/modules'
 import { invokePlugin } from '../../plugins/client'
+import { edooboxClient } from '../../plugins/edooboxClient'
 import { useNotesStore, createNoteFromFile } from '../../stores/notesStore'
 import { useSyncStore } from '../../stores/syncStore'
 import { useVaultSettingsStore } from '../../stores/vaultSettingsStore'
@@ -1581,7 +1582,7 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab 
   // edoobox + Marketing + Antares Credentials laden
   useEffect(() => {
     if (isOpen && activeTab === 'agents') {
-      window.electronAPI.edooboxLoadCredentials().then(creds => {
+      edooboxClient.loadCredentials().then(creds => {
         if (creds) {
           setEdooboxApiKey(creds.apiKey)
           setEdooboxApiSecret(creds.apiSecret)
@@ -5178,7 +5179,7 @@ LIMIT 10
                         className="settings-btn"
                         onClick={async () => {
                           if (edooboxApiKey && edooboxApiSecret) {
-                            const saved = await window.electronAPI.edooboxSaveCredentials(edooboxApiKey, edooboxApiSecret)
+                            const saved = await edooboxClient.saveCredentials(edooboxApiKey, edooboxApiSecret)
                             setEdooboxCredsSaved(saved)
                           }
                         }}
@@ -5196,10 +5197,10 @@ LIMIT 10
                             return
                           }
                           // Save first, then test
-                          await window.electronAPI.edooboxSaveCredentials(edooboxApiKey, edooboxApiSecret)
+                          await edooboxClient.saveCredentials(edooboxApiKey, edooboxApiSecret)
                           setEdooboxCredsSaved(true)
                           setEdooboxTestStatus('testing')
-                          const result = await window.electronAPI.edooboxCheck(edooboxSettings.baseUrl, edooboxSettings.apiVersion)
+                          const result = await edooboxClient.check(edooboxSettings.baseUrl, edooboxSettings.apiVersion)
                           setEdooboxTestStatus(result.success ? 'success' : 'failed')
                           setEdooboxTestError(result.success ? null : (result.error || null))
                         }}

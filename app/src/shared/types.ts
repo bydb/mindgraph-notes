@@ -909,19 +909,9 @@ export interface ElectronAPI {
 
   // reMarkable (USB)
 
-  // edoobox Agent
-  edooboxSaveCredentials: (apiKey: string, apiSecret: string) => Promise<boolean>;
-  edooboxLoadCredentials: () => Promise<{ apiKey: string; apiSecret: string } | null>;
-  edooboxCheck: (baseUrl: string, apiVersion: string) => Promise<{ success: boolean; error?: string }>;
-  edooboxListOffers: (baseUrl: string, apiVersion: string) => Promise<{ success: boolean; offers?: EdooboxOffer[]; error?: string }>;
-  edooboxListCategories: (baseUrl: string, apiVersion: string) => Promise<{ success: boolean; categories?: EdooboxCategory[]; error?: string }>;
+  // edoobox Agent — Backend nach src/plugins/edoobox/ migriert (Aufruf via pluginInvoke /
+  // edooboxClient). Hier bleibt nur der DOCX-/Dialog-Formularimport (Phase 2).
   edooboxParseFormular: () => Promise<EdooboxImportResult | null>;
-  edooboxImportEvent: (baseUrl: string, apiVersion: string, event: EdooboxEvent) => Promise<{ success: boolean; offerId?: string; error?: string }>;
-  edooboxLoadEvents: (vaultPath: string) => Promise<EdooboxEvent[]>;
-  edooboxSaveEvents: (vaultPath: string, events: EdooboxEvent[]) => Promise<boolean>;
-  edooboxListOffersDashboard: (baseUrl: string, apiVersion: string, scope?: 'active' | 'past' | 'all') => Promise<{ success: boolean; offers?: EdooboxOfferDashboard[]; error?: string }>;
-  edooboxListBookings: (baseUrl: string, apiVersion: string, offerId: string) => Promise<{ success: boolean; bookings?: EdooboxBooking[]; error?: string }>;
-  edooboxListDates: (baseUrl: string, apiVersion: string, offerId: string) => Promise<{ success: boolean; dates?: EdooboxEventDate[]; error?: string }>;
 
   // Antares CS: migriert nach src/plugins/antares/ — Aufruf via pluginInvoke('antares', actionId, payload).
   // Die Antares-Datentypen (AntaresEntleiher/VerleihRow/Lizenz/DashboardCounts) bleiben hier (Renderer nutzt sie).

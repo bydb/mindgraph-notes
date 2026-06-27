@@ -5,6 +5,7 @@ import { useTranslation } from '../../utils/translations'
 import { writeClipboardText } from '../../utils/clipboard'
 import { PanelHeader, PanelHeaderIconButton } from '../Shared/PanelHeader'
 import { IconCalendar } from '../Shared/Icons'
+import { edooboxClient } from '../../plugins/edooboxClient'
 import type { EdooboxEvent, EdooboxEventDate, EdooboxOfferDashboard, AttendanceListData, AttendanceParticipant } from '../../../shared/types'
 
 const MAX_ATTENDANCE_PARTICIPANTS = 100
@@ -101,7 +102,7 @@ const DashboardOfferCard: React.FC<{ offer: EdooboxOfferDashboard }> = ({ offer 
       }
 
       let dates: string[] = []
-      const datesResult = await window.electronAPI.edooboxListDates(edooboxBaseUrl, edooboxApiVersion, offer.id)
+      const datesResult = await edooboxClient.listDates(edooboxBaseUrl, edooboxApiVersion, offer.id)
       if (datesResult.success && datesResult.dates && datesResult.dates.length > 0) {
         dates = datesResult.dates.slice(0, MAX_ATTENDANCE_DATES).map(d => d.date)
       } else if (offer.dateStart) {

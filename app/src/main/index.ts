@@ -756,6 +756,7 @@ app.whenReady().then(async () => {
   // Guard (aktives Modell aus den UI-Settings), dann fehler-isoliert aktivieren — ein defektes
   // Plugin kippt den Start nie.
   await migrateAntaresCredentialsToPlugin()
+  await migrateEdooboxCredentialsToPlugin()
   pluginRegistry.setHostFactory(createHostFactory(buildPluginHostServices()))
   pluginRegistry.setHardLockGuard(async (moduleId) => {
     const ui = await loadUISettings().catch(() => ({} as Record<string, unknown>))
@@ -10237,82 +10238,10 @@ do {
 // edoobox Agent (Veranstaltungsmanagement)
 // ========================================
 
-function getEdooboxCredentialsPath(): string {
-  return path.join(app.getPath('userData'), 'edoobox-credentials.enc')
-}
-
-// Credentials speichern (safeStorage)
-ipcMain.handle('edoobox-save-credentials', async (_event, apiKey: string, apiSecret: string) => {
-  try {
-    if (!safeStorage.isEncryptionAvailable()) {
-      console.warn('[edoobox] safeStorage encryption not available')
-      return false
-    }
-    const data = JSON.stringify({ apiKey, apiSecret })
-    const encrypted = safeStorage.encryptString(data)
-    await fs.writeFile(getEdooboxCredentialsPath(), encrypted)
-    return true
-  } catch (error) {
-    console.error('[edoobox] Failed to save credentials:', error)
-    return false
-  }
-})
-
-// Credentials laden (safeStorage)
-ipcMain.handle('edoobox-load-credentials', async () => {
-  try {
-    if (!safeStorage.isEncryptionAvailable()) return null
-    const credPath = getEdooboxCredentialsPath()
-    const exists = await fs.access(credPath).then(() => true).catch(() => false)
-    if (!exists) return null
-    const encrypted = await fs.readFile(credPath)
-    const decrypted = safeStorage.decryptString(encrypted)
-    return JSON.parse(decrypted) as { apiKey: string; apiSecret: string }
-  } catch (error) {
-    console.error('[edoobox] Failed to load credentials:', error)
-    return null
-  }
-})
-
-// Verbindungstest
-ipcMain.handle('edoobox-check', async (_event, baseUrl: string, apiVersion: string) => {
-  try {
-    const credPath = getEdooboxCredentialsPath()
-    const exists = await fs.access(credPath).then(() => true).catch(() => false)
-    if (!exists) return { success: false, error: 'Keine Zugangsdaten gespeichert' }
-
-    const encrypted = await fs.readFile(credPath)
-    const { apiKey, apiSecret } = JSON.parse(safeStorage.decryptString(encrypted))
-
-    console.log('[edoobox] Check connection:', { baseUrl, apiVersion, keyLen: apiKey?.length, secretLen: apiSecret?.length, keyPrefix: apiKey?.slice(0, 4), secretPrefix: apiSecret?.slice(0, 4) })
-    const { EdooboxService } = await import('./edooboxService')
-    const service = new EdooboxService(baseUrl, apiKey, apiSecret, apiVersion as 'v1' | 'v2')
-    await service.checkConnection()
-    return { success: true }
-  } catch (error) {
-    console.error('[edoobox] Connection check failed:', error)
-    return { success: false, error: error instanceof Error ? error.message : 'Verbindung fehlgeschlagen' }
-  }
-})
-
-// Angebote auflisten
-ipcMain.handle('edoobox-list-offers', async (_event, baseUrl: string, apiVersion: string) => {
-  try {
-    const credPath = getEdooboxCredentialsPath()
-    const exists = await fs.access(credPath).then(() => true).catch(() => false)
-    if (!exists) return { success: false, error: 'Keine Zugangsdaten gespeichert' }
-    const encrypted = await fs.readFile(credPath)
-    const { apiKey, apiSecret } = JSON.parse(safeStorage.decryptString(encrypted))
-
-    const { EdooboxService } = await import('./edooboxService')
-    const service = new EdooboxService(baseUrl, apiKey, apiSecret, apiVersion as 'v1' | 'v2')
-    const offers = await service.listOffers()
-    return { success: true, offers }
-  } catch (error) {
-    console.error('[edoobox] List offers failed:', error)
-    return { success: false, error: error instanceof Error ? error.message : 'Angebote konnten nicht geladen werden' }
-  }
-})
+// edoobox-Backend (Credentials, Verbindungstest, Listen, Import, events.json) ist nach
+// src/plugins/edoobox/ migriert (Plugin-Vertikale, Phase 1) — läuft über plugin:invoke +
+// Capability-Host. Hier bleibt nur das, was noch dialog/DOCX braucht (Phase 2): parse-formular,
+// iq-generate-report, attendance-list-generate.
 
 // Formular parsen (öffnet Dateiauswahl)
 ipcMain.handle('edoobox-parse-formular', async () => {
@@ -10331,158 +10260,6 @@ ipcMain.handle('edoobox-parse-formular', async () => {
   } catch (error) {
     console.error('[edoobox] Parse formular failed:', error)
     return null
-  }
-})
-
-// Kategorien auflisten
-ipcMain.handle('edoobox-list-categories', async (_event, baseUrl: string, apiVersion: string) => {
-  try {
-    const credPath = getEdooboxCredentialsPath()
-    const exists = await fs.access(credPath).then(() => true).catch(() => false)
-    if (!exists) return { success: false, error: 'Keine Zugangsdaten gespeichert' }
-    const encrypted = await fs.readFile(credPath)
-    const { apiKey, apiSecret } = JSON.parse(safeStorage.decryptString(encrypted))
-
-    const { EdooboxService } = await import('./edooboxService')
-    const service = new EdooboxService(baseUrl, apiKey, apiSecret, apiVersion as 'v1' | 'v2')
-    const categories = await service.listCategories()
-    return { success: true, categories }
-  } catch (error) {
-    console.error('[edoobox] List categories failed:', error)
-    return { success: false, error: error instanceof Error ? error.message : 'Kategorien konnten nicht geladen werden' }
-  }
-})
-
-// Event an edoobox senden (Offer + Dates erstellen)
-ipcMain.handle('edoobox-import-event', async (_event, baseUrl: string, apiVersion: string, event: {
-  id?: string; title: string; description: string; maxParticipants?: number;
-  dates: Array<{ date: string; startTime: string; endTime: string }>;
-  location?: string; speakers?: Array<{ name: string; role?: string; institution?: string }>;
-  contact?: string; price?: number; category?: string
-}) => {
-  try {
-    const credPath = getEdooboxCredentialsPath()
-    const exists = await fs.access(credPath).then(() => true).catch(() => false)
-    if (!exists) return { success: false, error: 'Keine Zugangsdaten gespeichert' }
-    const encrypted = await fs.readFile(credPath)
-    const { apiKey, apiSecret } = JSON.parse(safeStorage.decryptString(encrypted))
-
-    const { EdooboxService } = await import('./edooboxService')
-    const service = new EdooboxService(baseUrl, apiKey, apiSecret, apiVersion as 'v1' | 'v2')
-
-    if (!event.category) return { success: false, error: 'Keine Kategorie ausgewählt' }
-
-    const offerId = await service.createOffer({
-      name: event.title,
-      category: event.category
-    })
-
-    // Update offer with additional fields
-    const updateFields: Record<string, unknown> = {}
-    if (event.maxParticipants) updateFields.user_maximum = event.maxParticipants
-    if (event.price !== undefined) updateFields.price = event.price
-
-    // Create or find place for location
-    let placeId: string | undefined
-    if (event.location) {
-      try {
-        const places = await service.listPlaces()
-        const existing = places.find(p => p.name === event.location)
-        if (existing) {
-          placeId = existing.id
-        } else {
-          placeId = await service.createPlace(event.location)
-        }
-        updateFields.place = placeId
-      } catch (e) {
-        console.warn('[edoobox] Could not create/find place:', e)
-      }
-    }
-
-    if (Object.keys(updateFields).length > 0) {
-      await service.updateOffer(offerId, updateFields)
-    }
-
-    // Create description text via POST /v2/text
-    if (event.description) {
-      await service.createOfferText(offerId, 'de', event.description)
-    }
-
-    for (const d of event.dates) {
-      await service.createDate(offerId, { ...d, placeId })
-    }
-
-    return { success: true, offerId }
-  } catch (error) {
-    console.error('[edoobox] Import event failed:', error)
-    return { success: false, error: error instanceof Error ? error.message : 'Event konnte nicht erstellt werden' }
-  }
-})
-
-// Dashboard: Angebote mit Buchungszahlen
-ipcMain.handle('edoobox-list-offers-dashboard', async (_event, baseUrl: string, apiVersion: string, scope?: 'active' | 'past' | 'all') => {
-  try {
-    const credPath = getEdooboxCredentialsPath()
-    const exists = await fs.access(credPath).then(() => true).catch(() => false)
-    if (!exists) return { success: false, error: 'Keine Zugangsdaten gespeichert' }
-    const encrypted = await fs.readFile(credPath)
-    const { apiKey, apiSecret } = JSON.parse(safeStorage.decryptString(encrypted))
-
-    const { EdooboxService } = await import('./edooboxService')
-    const service = new EdooboxService(baseUrl, apiKey, apiSecret, apiVersion as 'v1' | 'v2')
-    const offers = await service.listOffersForDashboard(scope || 'active')
-    return { success: true, offers }
-  } catch (error) {
-    console.error('[edoobox] List offers dashboard failed:', error)
-    return { success: false, error: error instanceof Error ? error.message : 'Dashboard konnte nicht geladen werden' }
-  }
-})
-
-// Dashboard: Buchungen für ein Angebot
-ipcMain.handle('edoobox-list-bookings', async (_event, baseUrl: string, apiVersion: string, offerId: string) => {
-  try {
-    const credPath = getEdooboxCredentialsPath()
-    const exists = await fs.access(credPath).then(() => true).catch(() => false)
-    if (!exists) return { success: false, error: 'Keine Zugangsdaten gespeichert' }
-    const encrypted = await fs.readFile(credPath)
-    const { apiKey, apiSecret } = JSON.parse(safeStorage.decryptString(encrypted))
-
-    const { EdooboxService } = await import('./edooboxService')
-    const service = new EdooboxService(baseUrl, apiKey, apiSecret, apiVersion as 'v1' | 'v2')
-    const bookings = await service.listBookingsForOffer(offerId)
-    return { success: true, bookings }
-  } catch (error) {
-    console.error('[edoobox] List bookings failed:', error)
-    return { success: false, error: error instanceof Error ? error.message : 'Buchungen konnten nicht geladen werden' }
-  }
-})
-
-// Events laden (JSON-Persistenz)
-ipcMain.handle('edoobox-load-events', async (_event, vaultPath: string) => {
-  try {
-    assertApprovedVault(vaultPath, 'edoobox-load-events')
-    const eventsPath = path.join(vaultPath, '.mindgraph', 'edoobox-events.json')
-    const exists = await fs.access(eventsPath).then(() => true).catch(() => false)
-    if (!exists) return []
-    const data = await fs.readFile(eventsPath, 'utf-8')
-    return JSON.parse(data)
-  } catch (error) {
-    console.error('[edoobox] Load events failed:', error)
-    return []
-  }
-})
-
-// Events speichern (JSON-Persistenz)
-ipcMain.handle('edoobox-save-events', async (_event, vaultPath: string, events: unknown[]) => {
-  try {
-    assertApprovedVault(vaultPath, 'edoobox-save-events')
-    const mindgraphDir = path.join(vaultPath, '.mindgraph')
-    await fs.mkdir(mindgraphDir, { recursive: true })
-    await fs.writeFile(path.join(mindgraphDir, 'edoobox-events.json'), JSON.stringify(events, null, 2))
-    return true
-  } catch (error) {
-    console.error('[edoobox] Save events failed:', error)
-    return false
   }
 })
 
@@ -10540,24 +10317,6 @@ ipcMain.handle('attendance-list-generate', async (
   }
 })
 
-ipcMain.handle('edoobox-list-dates', async (_event, baseUrl: string, apiVersion: string, offerId: string) => {
-  try {
-    const credPath = getEdooboxCredentialsPath()
-    const exists = await fs.access(credPath).then(() => true).catch(() => false)
-    if (!exists) return { success: false, error: 'Keine Zugangsdaten gespeichert' }
-    const encrypted = await fs.readFile(credPath)
-    const { apiKey, apiSecret } = JSON.parse(safeStorage.decryptString(encrypted))
-
-    const { EdooboxService } = await import('./edooboxService')
-    const service = new EdooboxService(baseUrl, apiKey, apiSecret, apiVersion as 'v1' | 'v2')
-    const dates = await service.listDatesForOffer(offerId)
-    return { success: true, dates }
-  } catch (error) {
-    console.error('[edoobox] List dates failed:', error)
-    return { success: false, error: error instanceof Error ? error.message : 'Termine konnten nicht geladen werden' }
-  }
-})
-
 // ========================================
 // Antares CS (Medienzentrum-Verleih) — migriert nach src/plugins/antares/ (Plugin-Vertikale).
 // Service, IPC und Credentials leben jetzt im Plugin (über plugin:invoke + Capability-Host).
@@ -10578,6 +10337,25 @@ async function migrateAntaresCredentialsToPlugin(): Promise<void> {
     }
   } catch (e) {
     console.warn('[antares] Credential-Migration übersprungen:', e instanceof Error ? e.message : e)
+  }
+}
+
+// edoobox: einmalige Migration der alten safeStorage-Credentials (userData/edoobox-credentials.enc)
+// in die Plugin-Secrets (Schritt-9-Vertikale, Phase 1). Spiegelt migrateAntaresCredentialsToPlugin.
+async function migrateEdooboxCredentialsToPlugin(): Promise<void> {
+  try {
+    if (await pluginSecretGet('plugin:edoobox:apiKey')) return // schon migriert
+    const encPath = path.join(app.getPath('userData'), 'edoobox-credentials.enc')
+    const raw = await fs.readFile(encPath).catch(() => null)
+    if (!raw || !safeStorage.isEncryptionAvailable()) return
+    const creds = JSON.parse(safeStorage.decryptString(raw)) as { apiKey?: string; apiSecret?: string }
+    if (creds.apiKey && creds.apiSecret) {
+      await pluginSecretSet('plugin:edoobox:apiKey', creds.apiKey)
+      await pluginSecretSet('plugin:edoobox:apiSecret', creds.apiSecret)
+      console.log('[edoobox] Alte Credentials in Plugin-Secrets migriert')
+    }
+  } catch (e) {
+    console.warn('[edoobox] Credential-Migration übersprungen:', e instanceof Error ? e.message : e)
   }
 }
 

@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import type { EdooboxEvent, EdooboxOffer, EdooboxCategory, EdooboxOfferDashboard, EdooboxBooking, IqReportData } from '../../shared/types'
 import { useUIStore } from './uiStore'
 import { useNotesStore } from './notesStore'
+import { edooboxClient } from '../plugins/edooboxClient'
 
 export interface MarketingPublishStatus {
   wordpress?: { postId: number; postUrl: string; status: string; publishedAt: string }
@@ -118,19 +119,19 @@ export const useAgentStore = create<AgentState>()((set, get) => ({
   loadEvents: async () => {
     const vaultPath = useNotesStore.getState().vaultPath
     if (!vaultPath) return
-    const events = await window.electronAPI.edooboxLoadEvents(vaultPath)
+    const events = await edooboxClient.loadEvents()
     set({ events })
   },
 
   saveEvents: async () => {
     const vaultPath = useNotesStore.getState().vaultPath
     if (!vaultPath) return
-    await window.electronAPI.edooboxSaveEvents(vaultPath, get().events)
+    await edooboxClient.saveEvents(get().events)
   },
 
   checkConnection: async () => {
     const { baseUrl, apiVersion } = useUIStore.getState().edoobox
-    const result = await window.electronAPI.edooboxCheck(baseUrl, apiVersion)
+    const result = await edooboxClient.check(baseUrl, apiVersion)
     set({ isConnected: result.success })
     return result.success
   },
@@ -152,7 +153,7 @@ export const useAgentStore = create<AgentState>()((set, get) => ({
       }))
       const vaultPath = useNotesStore.getState().vaultPath
       if (vaultPath) {
-        await window.electronAPI.edooboxSaveEvents(vaultPath, [eventWithWarnings, ...get().events.filter(e => e.id !== eventWithWarnings.id)])
+        await edooboxClient.saveEvents([eventWithWarnings, ...get().events.filter(e => e.id !== eventWithWarnings.id)])
       }
     } catch {
       set({ isImporting: false })
@@ -166,7 +167,7 @@ export const useAgentStore = create<AgentState>()((set, get) => ({
       if (!event) return
 
       const { baseUrl, apiVersion } = useUIStore.getState().edoobox
-      const result = await window.electronAPI.edooboxImportEvent(baseUrl, apiVersion, event)
+      const result = await edooboxClient.importEvent(baseUrl, apiVersion, event)
 
       set((state) => ({
         events: state.events.map(e =>
@@ -196,7 +197,7 @@ export const useAgentStore = create<AgentState>()((set, get) => ({
 
   listOffers: async () => {
     const { baseUrl, apiVersion } = useUIStore.getState().edoobox
-    const result = await window.electronAPI.edooboxListOffers(baseUrl, apiVersion)
+    const result = await edooboxClient.listOffers(baseUrl, apiVersion)
     if (result.success && result.offers) {
       set({ offers: result.offers })
     }
@@ -204,7 +205,7 @@ export const useAgentStore = create<AgentState>()((set, get) => ({
 
   loadCategories: async () => {
     const { baseUrl, apiVersion } = useUIStore.getState().edoobox
-    const result = await window.electronAPI.edooboxListCategories(baseUrl, apiVersion)
+    const result = await edooboxClient.listCategories(baseUrl, apiVersion)
     if (result.success && result.categories) {
       set({ categories: result.categories })
     }
@@ -234,7 +235,7 @@ export const useAgentStore = create<AgentState>()((set, get) => ({
     set({ isDashboardLoading: true })
     try {
       const { baseUrl, apiVersion } = useUIStore.getState().edoobox
-      const result = await window.electronAPI.edooboxListOffersDashboard(baseUrl, apiVersion)
+      const result = await edooboxClient.listOffersDashboard(baseUrl, apiVersion)
       if (!result.success || !result.offers) {
         set({ isDashboardLoading: false })
         return
@@ -252,7 +253,7 @@ export const useAgentStore = create<AgentState>()((set, get) => ({
         if (targets.length > 0) {
           const results = await Promise.all(
             targets.map(o =>
-              window.electronAPI.edooboxListBookings(baseUrl, apiVersion, o.id)
+              edooboxClient.listBookings(baseUrl, apiVersion, o.id)
                 .then(r => ({ offerId: o.id, bookings: (r.success && r.bookings) ? r.bookings as EdooboxBooking[] : [] }))
                 .catch(() => ({ offerId: o.id, bookings: [] as EdooboxBooking[] }))
             )
@@ -269,7 +270,7 @@ export const useAgentStore = create<AgentState>()((set, get) => ({
 
   loadBookingsForOffer: async (offerId: string) => {
     const { baseUrl, apiVersion } = useUIStore.getState().edoobox
-    const result = await window.electronAPI.edooboxListBookings(baseUrl, apiVersion, offerId)
+    const result = await edooboxClient.listBookings(baseUrl, apiVersion, offerId)
     if (result.success && result.bookings) {
       set((state) => ({
         dashboardOffers: state.dashboardOffers.map(o =>
@@ -286,7 +287,7 @@ export const useAgentStore = create<AgentState>()((set, get) => ({
     set({ isMarketingLoading: true })
     try {
       const { baseUrl, apiVersion } = useUIStore.getState().edoobox
-      const result = await window.electronAPI.edooboxListOffersDashboard(baseUrl, apiVersion)
+      const result = await edooboxClient.listOffersDashboard(baseUrl, apiVersion)
       if (result.success && result.offers) {
         set({ marketingOffers: result.offers, isMarketingLoading: false })
       } else {
@@ -438,7 +439,7 @@ export const useAgentStore = create<AgentState>()((set, get) => ({
     set({ isIqLoading: true })
     try {
       const { baseUrl, apiVersion } = useUIStore.getState().edoobox
-      const result = await window.electronAPI.edooboxListOffersDashboard(baseUrl, apiVersion, 'past')
+      const result = await edooboxClient.listOffersDashboard(baseUrl, apiVersion, 'past')
       if (result.success && result.offers) {
         set({ iqOffers: result.offers, isIqLoading: false })
       } else {

@@ -1,4 +1,11 @@
-import type { EdooboxOffer, EdooboxOfferDashboard, EdooboxBooking, EdooboxEventDate } from '../shared/types'
+/**
+ * edoobox API Client — Plugin-Vertikale (migriert aus main/edooboxService.ts).
+ *
+ * Kein fs/net/electron: der HTTP-Zugriff kommt INJIZIERT herein (`fetchImpl` = host.http.fetch),
+ * läuft also durch die allowedHosts-Allowlist des Capability-Hosts. V1 (Query-Keys) + V2 (JWT).
+ */
+
+import type { EdooboxOffer, EdooboxOfferDashboard, EdooboxBooking, EdooboxEventDate } from '../../shared/types'
 
 type ApiVersion = 'v1' | 'v2'
 
@@ -12,6 +19,9 @@ export interface EdooboxCategory {
   id: string
   name: string
 }
+
+/** Der host-injizierte fetch (Domain-Allowlist erzwingt der Capability-Host). */
+export type FetchImpl = (url: string, init?: RequestInit) => Promise<Response>
 
 function truncateError(text: string, maxLen = 200): string {
   if (text.length <= maxLen) return text
@@ -29,12 +39,14 @@ export class EdooboxService {
   private apiSecret: string
   private apiVersion: ApiVersion
   private auth: EdooboxAuth | null = null
+  private fetchImpl: FetchImpl
 
-  constructor(baseUrl: string, apiKey: string, apiSecret: string, apiVersion: ApiVersion = 'v1') {
+  constructor(baseUrl: string, apiKey: string, apiSecret: string, fetchImpl: FetchImpl, apiVersion: ApiVersion = 'v1') {
     this.baseUrl = baseUrl.replace(/\/$/, '').replace(/\/v[12]$/i, '')
     this.apiKey = apiKey
     this.apiSecret = apiSecret
     this.apiVersion = apiVersion
+    this.fetchImpl = fetchImpl
   }
 
   // ---- V2 Auth (JWT) ----
@@ -56,7 +68,7 @@ export class EdooboxService {
       pad(expireDate.getSeconds()) +
       sign + pad(Math.floor(offset / 60)) + ':' + pad(offset % 60)
 
-    const res = await fetch(`${this.baseUrl}/v2/auth`, {
+    const res = await this.fetchImpl(`${this.baseUrl}/v2/auth`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -101,7 +113,7 @@ export class EdooboxService {
       console.log(`[edoobox] Body:`, JSON.stringify(body).slice(0, 500))
     }
 
-    const res = await fetch(url, options)
+    const res = await this.fetchImpl(url, options)
 
     if (!res.ok) {
       const text = await res.text()
@@ -127,7 +139,7 @@ export class EdooboxService {
     }
     const url = `${this.baseUrl}/v1${endpoint}?cms_data=${encodeURIComponent(JSON.stringify(cmsData))}`
 
-    const res = await fetch(url)
+    const res = await this.fetchImpl(url)
 
     if (!res.ok) {
       const text = await res.text()
