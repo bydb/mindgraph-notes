@@ -8,7 +8,7 @@ import { useTranslation } from '../../utils/translations'
 import { parseFrontmatter } from '../../utils/metadataExtractor'
 import { findImageInVault, isImageFile } from '../../utils/imageUtils'
 import { sanitizeHtml } from '../../utils/sanitize'
-import { edooboxClient } from '../../plugins/edooboxClient'
+import { edooboxService } from '../../stores/edooboxServiceBridge'
 
 interface PublishToWordPressModalProps {
   note: Note
@@ -126,7 +126,7 @@ export const PublishToWordPressModal: React.FC<PublishToWordPressModalProps> = (
         if (!dataUrl) continue
         const base64 = dataUrl.includes(',') ? dataUrl.slice(dataUrl.indexOf(',') + 1) : dataUrl
         const fileName = absPath.split(/[\\/]/).pop() || ref.split(/[\\/]/).pop() || 'bild.png'
-        const upload = await edooboxClient.marketingUploadImage(marketing.wordpressUrl, marketing.wordpressUser, base64, fileName)
+        const upload = await edooboxService.marketingUploadImage(marketing.wordpressUrl, marketing.wordpressUser, base64, fileName)
         if (upload.success && upload.imageUrl) {
           imageMap.set(ref, upload.imageUrl)
         }
@@ -158,7 +158,7 @@ export const PublishToWordPressModal: React.FC<PublishToWordPressModalProps> = (
 
       setProgress(t('publishWp.publishing'))
 
-      const res = await edooboxClient.marketingPublishWordpress(
+      const res = await edooboxService.marketingPublishWordpress(
         marketing.wordpressUrl,
         marketing.wordpressUser,
         title.trim(),

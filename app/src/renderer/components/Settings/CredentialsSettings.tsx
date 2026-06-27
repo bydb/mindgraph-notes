@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react'
 import { useUIStore } from '../../stores/uiStore'
 import { invokePlugin } from '../../plugins/client'
-import { edooboxClient } from '../../plugins/edooboxClient'
+import { edooboxService } from '../../stores/edooboxServiceBridge'
 
 type TabId = 'integrations' | 'email' | 'agents' | 'telegram' | 'speech' | 'sync' | 'dashboard'
 
@@ -95,7 +95,7 @@ export const CredentialsSettings: React.FC<Props> = ({ onNavigateToTab }) => {
       note: 'Veranstaltungs-Agent',
       settingsTab: 'agents',
       checkSet: async () => {
-        const creds = await edooboxClient.loadCredentials()
+        const creds = await edooboxService.loadCredentials()
         return !!(creds && creds.apiKey && creds.apiSecret)
       }
     })
@@ -121,7 +121,7 @@ export const CredentialsSettings: React.FC<Props> = ({ onNavigateToTab }) => {
       note: 'Automatisiertes Publishing im Marketing-Tab',
       settingsTab: 'agents',
       checkSet: async () => {
-        const creds = await edooboxClient.marketingLoadCredentials()
+        const creds = await edooboxService.marketingLoadCredentials()
         return !!(creds && creds.wpAppPassword)
       }
     })

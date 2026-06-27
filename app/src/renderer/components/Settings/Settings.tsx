@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { useUIStore, ACCENT_COLORS, AI_LANGUAGES, FONT_FAMILIES, UI_LANGUAGES, BACKGROUND_COLORS, ICON_SETS, OUTLINE_STYLES, MODULES, MODULE_CATEGORIES, type Language, type FontFamily, type BackgroundColor, type IconSet, type OutlineStyle, type LLMBackend, type TransportDestination, type ModuleCategory, type ModuleDescriptor } from '../../stores/uiStore'
 import { isModuleEnabled, setModuleEnabled, useIsModuleEnabled } from '../../utils/modules'
 import { invokePlugin } from '../../plugins/client'
-import { edooboxClient } from '../../plugins/edooboxClient'
+import { edooboxService } from '../../stores/edooboxServiceBridge'
 import { useNotesStore, createNoteFromFile } from '../../stores/notesStore'
 import { useSyncStore } from '../../stores/syncStore'
 import { useVaultSettingsStore } from '../../stores/vaultSettingsStore'
@@ -1582,13 +1582,13 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab 
   // edoobox + Marketing + Antares Credentials laden
   useEffect(() => {
     if (isOpen && activeTab === 'agents') {
-      edooboxClient.loadCredentials().then(creds => {
+      edooboxService.loadCredentials().then(creds => {
         if (creds) {
           setEdooboxApiKey(creds.apiKey)
           setEdooboxApiSecret(creds.apiSecret)
         }
       })
-      edooboxClient.marketingLoadCredentials().then(creds => {
+      edooboxService.marketingLoadCredentials().then(creds => {
         if (creds) {
           if (creds.wpAppPassword) setWpAppPassword(creds.wpAppPassword)
         }
@@ -5179,7 +5179,7 @@ LIMIT 10
                         className="settings-btn"
                         onClick={async () => {
                           if (edooboxApiKey && edooboxApiSecret) {
-                            const saved = await edooboxClient.saveCredentials(edooboxApiKey, edooboxApiSecret)
+                            const saved = await edooboxService.saveCredentials(edooboxApiKey, edooboxApiSecret)
                             setEdooboxCredsSaved(saved)
                           }
                         }}
@@ -5197,10 +5197,10 @@ LIMIT 10
                             return
                           }
                           // Save first, then test
-                          await edooboxClient.saveCredentials(edooboxApiKey, edooboxApiSecret)
+                          await edooboxService.saveCredentials(edooboxApiKey, edooboxApiSecret)
                           setEdooboxCredsSaved(true)
                           setEdooboxTestStatus('testing')
-                          const result = await edooboxClient.check(edooboxSettings.baseUrl, edooboxSettings.apiVersion)
+                          const result = await edooboxService.check(edooboxSettings.baseUrl, edooboxSettings.apiVersion)
                           setEdooboxTestStatus(result.success ? 'success' : 'failed')
                           setEdooboxTestError(result.success ? null : (result.error || null))
                         }}
@@ -5382,7 +5382,7 @@ LIMIT 10
                         className="settings-btn"
                         onClick={async () => {
                           if (wpAppPassword) {
-                            const saved = await edooboxClient.marketingSaveCredentials(wpAppPassword)
+                            const saved = await edooboxService.marketingSaveCredentials(wpAppPassword)
                             setWpCredsSaved(saved)
                           }
                         }}
@@ -5399,10 +5399,10 @@ LIMIT 10
                             setWpTestError(t('settings.agents.marketing.wpFillAll'))
                             return
                           }
-                          await edooboxClient.marketingSaveCredentials(wpAppPassword)
+                          await edooboxService.marketingSaveCredentials(wpAppPassword)
                           setWpCredsSaved(true)
                           setWpTestStatus('testing')
-                          const result = await edooboxClient.marketingCheckWordpress(marketingSettings.wordpressUrl, marketingSettings.wordpressUser)
+                          const result = await edooboxService.marketingCheckWordpress(marketingSettings.wordpressUrl, marketingSettings.wordpressUser)
                           setWpTestStatus(result.success ? 'success' : 'failed')
                           setWpTestError(result.success ? null : (result.error || null))
                         }}

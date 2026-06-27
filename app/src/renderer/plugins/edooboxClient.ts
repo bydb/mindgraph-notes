@@ -7,6 +7,7 @@
 // brauchen ihn NICHT mehr als Argument (anders als die alten IPC-Handler).
 
 import { invokePlugin } from './client'
+import { registerEdooboxServiceProvider } from '../stores/edooboxServiceBridge'
 import type {
   EdooboxEvent,
   EdooboxOffer,
@@ -108,3 +109,17 @@ export const edooboxClient = {
   marketingSelectImage: () =>
     invokePlugin<{ fileName: string; imageBase64: string } | null>('edoobox', 'edoobox.marketingSelectImage'),
 }
+
+// Registriert die Credential-/Marketing-Methoden als Service-Provider der neutralen Facade,
+// damit Core-Stellen (Settings/CredentialsSettings/WorkflowCanvas/Editor) NICHT direkt
+// edooboxClient importieren. In Phase 3b-ii wandert diese Registrierung mit dem Client ins Plugin.
+registerEdooboxServiceProvider({
+  loadCredentials: edooboxClient.loadCredentials,
+  saveCredentials: edooboxClient.saveCredentials,
+  check: edooboxClient.check,
+  marketingLoadCredentials: edooboxClient.marketingLoadCredentials,
+  marketingSaveCredentials: edooboxClient.marketingSaveCredentials,
+  marketingCheckWordpress: edooboxClient.marketingCheckWordpress,
+  marketingUploadImage: edooboxClient.marketingUploadImage,
+  marketingPublishWordpress: edooboxClient.marketingPublishWordpress,
+})
