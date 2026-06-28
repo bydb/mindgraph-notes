@@ -117,7 +117,7 @@
     "@types/dompurify": "^3.0.5",
     "@types/mailparser": "^3.4.6",
     "@types/markdown-it": "^14.1.2",
-    "@types/nodemailer": "^8.0.0",
+    "@types/nodemailer": "^8.0.1",
     "@types/react": "^19.2.8",
     "@types/react-dom": "^19.2.3",
     "@types/sql.js": "^1.4.11",
@@ -160,7 +160,7 @@
     "markdown-it-texmath": "^1.0.0",
     "mermaid": "^11.12.2",
     "node-pty": "^1.1.0",
-    "nodemailer": "^8.0.4",
+    "nodemailer": "^9.0.1",
     "pdfjs-dist": "^5.4.296",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
@@ -170,7 +170,7 @@
     "sql.js": "^1.13.0",
     "turndown": "^7.2.4",
     "ws": "^8.18.0",
-    "xlsx": "^0.18.5",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
     "xterm": "^5.3.0",
     "zustand": "^5.0.10"
   }
