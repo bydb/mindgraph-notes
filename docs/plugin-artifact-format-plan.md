@@ -1,8 +1,8 @@
 # A0 · Schritt 3 — Artefaktformat, integrity.json & Signierung (Plan / ADR)
 
-> **Status: ENTWURF — zur Review** (vorab im Scratchpad; landet als `docs/plugin-artifact-format-plan.md`
-> auf dem neuen Branch `feat/plugin-artifact-format`, frisch von `master` **nach Merge von #26**).
-> Letzter A0-Baustein vor A1 (Runtime-Loader-Spike). Folgt auf `docs/plugin-manifest-v2-plan.md`.
+> **Status: ENTWURF — zur Review** (Branch `feat/plugin-artifact-format`, von `master` nach Merge #26;
+> als Draft-PR geführt — Implementierung läuft schrittweise in denselben PR). Letzter A0-Baustein vor
+> A1 (Runtime-Loader-Spike). Folgt auf `docs/plugin-manifest-v2-plan.md` (A0/2, gemergt #26).
 
 ## Ziel
 
@@ -44,6 +44,9 @@ bleibt das „Template" nur ein Monorepo-Fixture). Konkret:
   (tsconfig paths + vite alias) — unverändert; externe Plugin-Repos konsumieren das **npm-dist**.
 - Versionsdisziplin: das publizierte `version`/`API_VERSION` ist die Bezugsgröße des Kompat-Gates
   (A0/2). Major-Bump erst bewusst vor öffentlichem Marktplatz (A2).
+- **Publish über npm Trusted Publishing (OIDC) + `npm publish --provenance`** aus einem geschützten
+  CI-Job — **kein langlebiger npm-Token** als Secret. Provenance bindet das Paket nachweisbar an
+  Repo + Workflow + Commit.
 
 ## Bundle-ABI (A0/3: **Main-only**)
 
@@ -63,13 +66,16 @@ gemeinsam mit dem Runtime-Loader-Spike definiert. Ein Main-only-Plugin ist als `
 - Geladen vom (späteren A1-)Loader über `require`/`createRequire`.
 - **Keine externen Imports, keine dynamischen Chunks** (genau eine Datei `main.js`). Der
   `definePluginMain`-Helfer (dependency-frei) wird **in das Bundle gebündelt** — der Host injiziert
-  ihn nicht. Host-Dienste kommen ausschließlich über `ctx.host` zur `register`-Zeit (Capability-Gate).
+  ihn nicht. Host-Dienste kommen **vorgesehenerweise** über `ctx.host` zur `register`-Zeit
+  (Capability-Gate).
 - **Node-/Electron-Built-ins beim Build explizit verbieten** (Bundler-`external`/Plugin bricht bei
-  `fs`/`path`/`electron`/… ab) — der einzige Draht nach außen ist `ctx.host`.
+  `fs`/`path`/`electron`/… ab).
 - Build-Target = Node/Electron-Version des Hosts (gepinnt).
-- **Caveat (Roadmap):** der Build-Bann ist eine Leitplanke, keine echte Isolation — bis zur
-  `utilityProcess`-Sandbox (Plugin-Roadmap Schritt 10) läuft das Bundle im Vertrauen des Main-
-  Prozesses. Signatur + Capability-Deklarationen + Built-in-Bann sind die aktuellen Schranken.
+- **Sicherheits-Klarstellung (wichtig):** `ctx.host` ist die *vorgesehene* API, technisch aber
+  **nicht der einzige Draht nach außen** — ein Main-CJS-Bundle hat im Main-Prozess weiterhin Zugriff
+  auf `process`, dynamisches `require`, globale Objekte usw. Der Build-Bann ist reines **Lint /
+  Defense-in-Depth**, keine Isolation. **In Phase A kommt Sicherheit ausschließlich aus Signatur +
+  Autorvertrauen.** Echte Isolation erst mit der `utilityProcess`-Sandbox (Plugin-Roadmap Schritt 10).
 
 ## Format
 
@@ -107,6 +113,19 @@ gemeinsam mit dem Runtime-Loader-Spike definiert. Ein Main-only-Plugin ist als `
 - `keyId` erlaubt spätere **Key-Rotation ohne Formatänderung**. A0/3 pinnt **genau einen** Key;
   Multi-Key-Trust-Store ist A2.
 
+### Kanonische JSON-Bytes (verbindlich für alle drei JSON-Dateien)
+
+`manifest.json`, `integrity.json` und `integrity.json.sig` werden **exakt** so serialisiert:
+
+```ts
+JSON.stringify(value, null, 2) + '\n'
+```
+
+UTF-8, **LF**, **kein BOM**, **feste Feldreihenfolge** (Objektschlüssel in der Reihenfolge, in der
+das Tool sie schreibt — beim Bauen deterministisch festgelegt). Ohne diese Festlegung ist
+„deterministisch" unvollständig: dieselben Daten könnten sonst unterschiedliche Bytes — und damit
+unterschiedliche Hashes/Signaturen — ergeben.
+
 ### Archiv `<id>-<version>.mgxplugin` (deterministisches tar.gz)
 
 ```
@@ -135,10 +154,18 @@ Node-Bordmittel.
 ## Reproduzierbarkeit (präzise)
 
 Ein Node-Tar-Writer **allein** garantiert wegen unterschiedlicher **Node-/zlib-Versionen** keine
-global bit-identischen gzip-Bytes. Daher **pinnen**: Node-Version (CI + `.nvmrc`/`engines`),
-Writer-Version, Kompressionsparameter. Wichtig: die **Signatur hängt nicht an den Archivbytes**,
-sondern an `integrity.json` — ein nicht-bit-identisches Archiv bricht die Verifikation **nicht**,
-es schwächt nur die Reproduzierbarkeits-Garantie.
+global bit-identischen gzip-Bytes. Daher konkrete, gepinnte Toolchain:
+
+- **Node:** exakt **20.x** (eine fixe Patch-Version) via `.nvmrc` + `engines` im Template; die CI
+  nutzt heute das *floating* `node-version: '20'` — der Build-Action/Template **muss exakt pinnen**
+  (floating ist nicht reproduzierbar).
+- **Tar-Writer:** **`tar` (node-tar) v7.x**, exakte Version gepinnt, mit `portable: true` (entfernt
+  mtime/uid/gid/atime/ctime-Nichtdeterminismus) + sortierten Einträgen — **kein** System-`tar`.
+- **gzip:** fixe Kompressionsstufe (z. B. `level: 9`, `mtime: 0`).
+
+Wichtig: die **Signatur hängt nicht an den Archivbytes**, sondern an `integrity.json` — ein
+nicht-bit-identisches Archiv bricht die Verifikation **nicht**, es schwächt nur die
+Reproduzierbarkeits-Garantie. (Sicherheits-Anker bleibt `integrity.json` + `.sig`.)
 
 ## Build-Reihenfolge (fix)
 
@@ -162,12 +189,18 @@ Schutz gegen Archive-Bombs und Ressourcen-Erschöpfung. Überschreitung ⇒ Abbr
 | Pro Datei (entpackt) | 100 MiB |
 | `manifest.json` / `integrity.json` je | 1 MiB |
 | `integrity.json.sig` | 16 KiB |
-| Pfadlänge | 240 Zeichen |
+| Pfadlänge gesamt | 240 Zeichen |
 | Pfadtiefe | 8 Segmente |
+| **Pro Pfadsegment** | **100 ASCII-Bytes** |
 
 **Nur reguläre Dateien.** Directory-, Symlink-, Hardlink-, Device-/Special- und **PAX/Global-Header**-
 Einträge werden abgelehnt (nicht still übersprungen). Die entpackte Gesamtsumme wird **während** des
 Entpackens mitgezählt (Streaming-Limit), nicht erst danach.
+
+**USTAR-Konsistenz:** Weil PAX-Header verboten sind, bleibt nur das **USTAR**-Namensfeld — daher die
+harte Grenze **≤ 100 ASCII-Bytes pro Pfadsegment**. Andernfalls bräuchte der Writer PAX-Extended-
+Header (verboten) oder das USTAR-`prefix`-Feld (mehrdeutig). **Writer und Verifier nutzen exakt
+dieselben Pfadregeln** — was der Verifier ablehnt, kann der Writer gar nicht erst erzeugen.
 
 ## Pfad- & Integrity-Normalisierung (streng, eindeutig)
 
@@ -190,11 +223,17 @@ Entpackens mitgezählt (Streaming-Limit), nicht erst danach.
 - `algorithm == "ed25519"`, `formatVersion` bekannt, `keyId` bekannt im Keyring;
 - `signature` = **kanonisches Base64**, nach Decode **exakt 64 Bytes** (ed25519-Signaturlänge).
 
-## Verifier-Reihenfolge (Sicherheitskern — alles in Quarantäne, Install zuletzt)
+## Verifier-Reihenfolge (Sicherheitskern — alles in Quarantäne)
+
+**A0/3 liefert genau eine reine Funktion: `verify(archive, keyring) → VerifiedPluginPackage`.** Sie
+entpackt in einen Quarantäne-Ordner, prüft alles und gibt bei Erfolg ein `VerifiedPluginPackage`
+zurück (verifiziertes Manifest + Quarantäne-Pfad + Dateiliste). **A0/3 installiert NICHT** — das
+atomare Verschieben Quarantäne → Plugin-Verzeichnis implementiert erst **A1/A2** (Loader). Die letzte
+Zeile unten ist daher als **spätere Pflicht** notiert, nicht als A0/3-Verhalten.
 
 ```
-sicher entpacken (Limits: Dateianzahl, Pro-Datei-/Gesamtgröße → Archive-Bomb-Schutz;
-                  Ablehnung von Symlink/Hardlink/absolut/„..“/Backslash)
+sicher entpacken in Quarantäne (Limits: Dateianzahl, Pro-Datei-/Gesamtgröße → Archive-Bomb-Schutz;
+                  Ablehnung von Symlink/Hardlink/absolut/„..“/Backslash/Übergröße-Segment)
 → integrity.json + .sig-Hülle lesen + Feldform prüfen (Normalisierung s.o.)
 → Ed25519-Signatur über die EXAKTEN integrity.json-Bytes; keyId → Key aus injiziertem Keyring
 → algorithm/formatVersion prüfen
@@ -202,12 +241,15 @@ sicher entpacken (Limits: Dateianzahl, Pro-Datei-/Gesamtgröße → Archive-Bomb
 → manifest.json parsen + validateManifest / validateManifestSemantics  (A0/2)
 → API-/App-Kompatibilitäts-Gates  (A0/2)
 → entrypoints gegen TATSÄCHLICHE Dateien prüfen (deklarierte main/renderer/styles existieren)
-→ ERST DANN atomar installieren (Quarantäne → Plugin-Verzeichnis)
+→ Rückgabe: VerifiedPluginPackage (Quarantäne)           ←── ENDE A0/3
+········································································
+→ [A1/A2] atomar installieren (Quarantäne → Plugin-Verzeichnis)   ←── spätere Pflicht, NICHT A0/3
 ```
 
-Begründung der Reihenfolge: Manifestprüfung **und** Kompat-Gates müssen **vor** dem Install laufen —
-ein Artefakt, das die Signatur trägt, aber ein inkompatibles/ungültiges Manifest hat, darf nie im
-Plugin-Verzeichnis landen.
+Begründung der Reihenfolge: Manifestprüfung **und** Kompat-Gates müssen **vor** einem späteren Install
+laufen — ein Artefakt, das die Signatur trägt, aber ein inkompatibles/ungültiges Manifest hat, darf
+nie ins Plugin-Verzeichnis gelangen. A0/3 stellt das sicher, indem ein solches Paket gar nicht erst
+als `VerifiedPluginPackage` zurückkommt.
 
 **Keyring per DI:** Der Verifier bekommt einen **injizierten Keyring** (`keyId → Public Key`) —
 keine eingebaute Konstante in der Verifier-Logik. So bleibt er standalone testbar (Fake-Keys) und
@@ -242,7 +284,8 @@ Der Produktions-Signierschlüssel ist das wertvollste Geheimnis dieses Schritts 
 
 ## Scope-Grenze
 
-- **Kein** Disk-/Runtime-Loader (der das Artefakt im Betrieb lädt + `entrypoints` ausführt) → A1.
+- **A0/3 verifiziert nur** (`verify() → VerifiedPluginPackage` in Quarantäne); **kein Install**, kein
+  Disk-/Runtime-Loader (der das Artefakt im Betrieb lädt + `entrypoints` ausführt) → A1/A2.
 - **Kein Renderer-Build-Vertrag** (React, dynamische Chunks, Renderer-Host-Injection) → A1; Template
   ist Main-only.
 - **Kein** Multi-Key-Trust-Store / Key-Rotation im Betrieb → A2.
@@ -259,12 +302,13 @@ Der Produktions-Signierschlüssel ist das wertvollste Geheimnis dieses Schritts 
    `require`/`createRequire` laden und prüfen, dass `module.exports` ein gültiges `PluginMainEntry`
    ist (belegt, dass kein `"type":"module"`-Kontext nötig ist). Build bricht ab, wenn das Bundle ein
    Node-/Electron-Built-in referenziert.
-3. Verifier (neue, standalone testbare Funktion mit injiziertem Keyring) akzeptiert ein korrektes
-   Artefakt und lehnt ab bei: kaputter Signatur, fremdem/unbekanntem keyId, Hash-/Size-Mismatch,
-   fehlender/zusätzlicher Datei, doppeltem/case-kollidierendem Pfad, Symlink/Hardlink/Dir/PAX-Eintrag,
+4. `verify()` (standalone testbar, injizierter Keyring) gibt bei einem korrekten Artefakt ein
+   `VerifiedPluginPackage` (Quarantäne) zurück und **installiert nicht**; lehnt ab bei: kaputter
+   Signatur, fremdem/unbekanntem keyId, Hash-/Size-Mismatch, fehlender/zusätzlicher Datei,
+   doppeltem/case-kollidierendem Pfad, Übergröße-Segment, Symlink/Hardlink/Dir/PAX-Eintrag,
    `..`/absolutem Pfad, jedem überschrittenen Limit, ungültigem/inkompatiblem Manifest, fehlendem
    entrypoint-Ziel — je per Test.
-4. Zwei Builds derselben Quelle mit gepinnter Toolchain erzeugen bit-identische `integrity.json`
+5. Zwei Builds derselben Quelle mit gepinnter Toolchain erzeugen bit-identische `integrity.json`
    (Archiv-Bit-Gleichheit ist Ziel, aber nicht sicherheitskritisch — s. Reproduzierbarkeit).
-5. `npm run typecheck` + `npm run test` + `npm run build` grün; kein Verhalten der gebündelten Plugins
+6. `npm run typecheck` + `npm run test` + `npm run build` grün; kein Verhalten der gebündelten Plugins
    geändert.
