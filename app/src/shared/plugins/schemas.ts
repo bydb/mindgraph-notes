@@ -87,6 +87,21 @@ export const PLUGIN_MANIFEST_SCHEMA: JsonSchema = {
         additionalProperties: false,
       },
     },
+    module: {
+      type: 'object',
+      required: ['enabledPath'],
+      properties: {
+        id: { type: 'string', pattern: '^[a-z][a-z0-9-]*$' },
+        enabledPath: { type: 'string', pattern: '^[a-zA-Z][a-zA-Z0-9]*(\\.[a-zA-Z][a-zA-Z0-9-]*)+$' },
+        linkedEnabledPaths: {
+          type: 'array',
+          items: { type: 'string', pattern: '^[a-zA-Z][a-zA-Z0-9]*(\\.[a-zA-Z][a-zA-Z0-9-]*)+$' },
+          uniqueItems: true,
+        },
+        legacyEnabledPath: { type: 'string', pattern: '^[a-zA-Z][a-zA-Z0-9]*(\\.[a-zA-Z][a-zA-Z0-9-]*)+$' },
+      },
+      additionalProperties: false,
+    },
     settingsSchema: { type: 'object' },
     actions: {
       type: 'array',

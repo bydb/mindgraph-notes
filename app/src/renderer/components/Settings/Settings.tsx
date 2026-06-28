@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
-import { useUIStore, ACCENT_COLORS, AI_LANGUAGES, FONT_FAMILIES, UI_LANGUAGES, BACKGROUND_COLORS, ICON_SETS, OUTLINE_STYLES, MODULES, MODULE_CATEGORIES, type Language, type FontFamily, type BackgroundColor, type IconSet, type OutlineStyle, type LLMBackend, type TransportDestination, type ModuleCategory, type ModuleDescriptor } from '../../stores/uiStore'
-import { isModuleEnabled, setModuleEnabled, useIsModuleEnabled } from '../../utils/modules'
+import { useUIStore, ACCENT_COLORS, AI_LANGUAGES, FONT_FAMILIES, UI_LANGUAGES, BACKGROUND_COLORS, ICON_SETS, OUTLINE_STYLES, MODULE_CATEGORIES, type Language, type FontFamily, type BackgroundColor, type IconSet, type OutlineStyle, type LLMBackend, type TransportDestination, type ModuleCategory, type ModuleDescriptor } from '../../stores/uiStore'
+import { MODULES, isModuleEnabled, setModuleEnabled, useIsModuleEnabled } from '../../utils/modules'
 import { invokePlugin } from '../../plugins/client'
 import { PluginSlot } from '../../plugins/slots'
 import { edooboxService } from '../../stores/edooboxServiceBridge'

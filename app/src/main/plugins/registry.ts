@@ -191,6 +191,16 @@ export class PluginRegistry {
         if (p.entry.stop) await p.entry.stop()
       } catch (stopErr) {
         console.error(`[plugin] stop() vor Retry von '${id}' warf: ${errMessage(stopErr)}`)
+        p.state = {
+          ...p.state,
+          activation: 'error',
+          readiness: 'unavailable',
+          error: {
+            message: `Erneute Aktivierung blockiert, weil vorheriges Aufräumen fehlschlug: ${errMessage(stopErr)}`,
+            at: nowIso(),
+          },
+        }
+        return p.state
       }
       p.entry = undefined
       p.host = undefined
@@ -261,9 +271,9 @@ export class PluginRegistry {
    * im Ausgangszustand `disabled` — so respektiert der App-Start den Modulschalter (A-pre #1).
    * Ohne Argument bleibt das alte Verhalten „alles aktivieren".
    */
-  async activateAll(isEnabled?: (id: string) => boolean): Promise<void> {
-    for (const id of this.plugins.keys()) {
-      if (isEnabled && !isEnabled(id)) continue
+  async activateAll(isEnabled?: (id: string, manifest: PluginManifest) => boolean): Promise<void> {
+    for (const [id, plugin] of this.plugins) {
+      if (isEnabled && !isEnabled(id, plugin.manifest)) continue
       await this.activate(id)
     }
   }

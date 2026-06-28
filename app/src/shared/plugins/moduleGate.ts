@@ -1,36 +1,15 @@
-// Plugin-Aktivierungs-Gate (A-pre Schritt 1) — verbindet ein gebündeltes Plugin mit dem
-// uiStore-Modulschalter, der es an-/ausschaltet.
+// Plugin-Aktivierungs-Gate — wird seit A-pre Schritt 2 vollständig aus dem Manifest abgeleitet
+// (`manifest.module.enabledPath`), nicht mehr aus einer hartcodierten Tabelle im Kern.
 //
 // Vor A-pre Schritt 1 flippte der Modulschalter NUR Renderer-Flags; der Main-Prozess
-// aktivierte beim Start blind ALLE Plugins (`activateAll`). Diese Tabelle ist jetzt die
+// aktivierte beim Start blind ALLE Plugins (`activateAll`). Das Manifest ist jetzt die
 // Single-Source, gegen die beide Prozesse den Lebenszyklus fahren:
 //   • Renderer: beim Umschalten → IPC `plugin:setEnabled` (activate/deactivate im Main)
 //   • Main:     beim Start → `activateAll` überspringt deaktivierte Plugins (bleiben `disabled`)
 //
-// Bewusst hartverdrahtet auf Zweck: In A-pre Schritt 2 wird diese Zuordnung aus den
-// Manifesten abgeleitet (Modul-Liste generisch). Plugins OHNE Eintrag (z.B. `demo`) haben
-// kein Gate und bleiben immer aktiv.
+// Plugins OHNE `manifest.module` (z.B. `demo`) haben kein Gate und bleiben immer aktiv.
 
-export interface PluginGate {
-  /** Plugin-ID (= Ordnername unter src/plugins/, = manifest.id). */
-  pluginId: string
-  /** uiStore-Modul-ID (MODULES[].id), dessen Schalter dieses Plugin steuert. */
-  moduleId: string
-  /** Dotted-Path in den persistierten uiStore-State, der true/false liefert
-   *  (z.B. 'edoobox.enabled' — das Bundle-Modul 'mz-suite' setzt diesen Flag). */
-  enabledPath: string
-  /** Optionaler Alt-Pfad aus der Pre-3b-Persistenz. Nur der Main-Startup-Gate liest ihn als
-   *  Fallback, damit ein bestehender User im EINEN Start zwischen Update und erster
-   *  migrierter Speicherung nicht fälschlich deaktiviert wird (Renderer migriert beim Laden). */
-  legacyEnabledPath?: string
-}
-
-export const PLUGIN_GATES: readonly PluginGate[] = [
-  // Antares: Config liegt seit 3b generisch unter pluginConfig.antares (Alt: Top-Level antares).
-  { pluginId: 'antares', moduleId: 'antares', enabledPath: 'pluginConfig.antares.enabled', legacyEnabledPath: 'antares.enabled' },
-  { pluginId: 'remarkable', moduleId: 'remarkable', enabledPath: 'remarkable.enabled' },
-  { pluginId: 'edoobox', moduleId: 'mz-suite', enabledPath: 'edoobox.enabled' },
-]
+import type { PluginManifest } from './manifest'
 
 /** Liest einen Dotted-Path (z.B. 'antares.enabled') als Boolean aus einem Settings-Objekt.
  *  STRIKT: nur exakt `true` zählt als aktiviert — ein persistierter String `"false"` o.ä.
@@ -49,12 +28,12 @@ export function readBoolPath(obj: unknown, path: string): boolean {
  * `settings` ist der persistierte uiStore-State (Main: aus ui-settings.json, Renderer:
  * aus useUIStore.getState()).
  */
-export function isPluginGateEnabled(pluginId: string, settings: unknown): boolean {
-  const gate = PLUGIN_GATES.find((g) => g.pluginId === pluginId)
-  if (!gate) return true
-  if (readBoolPath(settings, gate.enabledPath)) return true
+export function isPluginGateEnabled(manifest: PluginManifest, settings: unknown): boolean {
+  const module = manifest.module
+  if (!module) return true
+  if (readBoolPath(settings, module.enabledPath)) return true
   // Migrations-Fallback (s. legacyEnabledPath): nur relevant, bis der Renderer die Config
   // einmal migriert + gespeichert hat.
-  if (gate.legacyEnabledPath && readBoolPath(settings, gate.legacyEnabledPath)) return true
+  if (module.legacyEnabledPath && readBoolPath(settings, module.legacyEnabledPath)) return true
   return false
 }

@@ -460,14 +460,11 @@ export const MODULES: ModuleDescriptor[] = [
   { id: 'smart-connections',label: 'Smart Connections',description: 'Semantisch ähnliche Notizen finden', category: 'ai' },
   { id: 'language-tool',    label: 'LanguageTool',     description: 'Grammatik- und Rechtschreibprüfung im Editor', category: 'ai' },
   { id: 'email',            label: 'Email-Client',     description: 'IMAP/SMTP + KI-Analyse + Entwurfshilfe', category: 'communication' },
-  { id: 'mz-suite',         label: 'Edoobox Modul',description: 'edoobox + Marketing (WordPress) + IQ-Auswertung + Formularimport', category: 'business' },
-  { id: 'antares',          label: 'Antares Medienzentrum', description: 'Verleih-Daten aus Antares CS (Entleiher, Mahnungen Geräte/Medien)', category: 'business' },
   { id: 'workflow-canvas',  label: 'Workflow Canvas',  description: 'Module als verbindbare Bausteine auf einem Canvas — visuelle Prozesse mit lokaler KI', category: 'business' },
   { id: 'flashcards',       label: 'Flashcards & Quiz',description: 'Karteikarten mit Spaced Repetition und Quiz-Modus', category: 'learning' },
   { id: 'semantic-scholar', label: 'Research', description: 'Paper via Semantic Scholar und OpenAlex durchsuchen und zitieren', category: 'research' },
   { id: 'zotero',           label: 'Zotero',           description: 'Bibliothek durchsuchen, Zitate einfügen (⌘⇧Z)', category: 'research', iconText: 'Z', iconColor: '#cc2936' },
   { id: 'readwise',         label: 'Readwise',         description: 'Highlights aus Readwise synchronisieren', category: 'research' },
-  { id: 'remarkable',       label: 'reMarkable',       description: 'Dokumente mit dem reMarkable-Tablet austauschen', category: 'devices' },
   { id: 'docling',          label: 'Docling',          description: 'PDF-Textextraktion via Docling-Server', category: 'documents' },
   { id: 'vision-ocr',       label: 'Vision OCR',       description: 'Bilder und Scans per Vision-Modell in Text umwandeln', category: 'documents' },
   { id: 'speech',           label: 'Sprache',          description: 'Vorlesen (TTS) und Diktieren (Whisper, läuft offline in der App) in Editor & Flashcards', category: 'ai' },
@@ -718,6 +715,8 @@ interface UIState {
   setEdoobox: (settings: Partial<EdooboxSettings>) => void
   /** Generischer Patch-Setter für die Plugin-Config eines pluginId (A-pre Schritt 3b). */
   setPluginConfig: (pluginId: string, patch: Record<string, unknown>) => void
+  /** Setzt einen manifest-deklarierten Boolean-Pfad, ohne eine Plugin-ID im Kern zu kennen. */
+  setBooleanSettingPath: (path: string, value: boolean) => void
   setRemarkable: (settings: Partial<ReMarkableSettings>) => void
   setDailyNote: (settings: Partial<DailyNoteSettings>) => void
   setLastSeenVersion: (version: string) => void
@@ -1211,6 +1210,26 @@ export const useUIStore = create<UIState>()((set, get) => ({
       [pluginId]: { ...(state.pluginConfig[pluginId] ?? {}), ...patch }
     }
   })),
+  setBooleanSettingPath: (path, value) => set((state) => {
+    const keys = path.split('.')
+    if (keys.length < 2 || keys.some((key) => !/^[a-zA-Z][a-zA-Z0-9-]*$/.test(key))) return {}
+    const root = keys[0] as keyof UIState
+    const currentRoot = state[root]
+    if (!currentRoot || typeof currentRoot !== 'object' || Array.isArray(currentRoot)) return {}
+
+    const nextRoot = { ...(currentRoot as Record<string, unknown>) }
+    let cursor = nextRoot
+    for (let i = 1; i < keys.length - 1; i++) {
+      const current = cursor[keys[i]]
+      const next = current && typeof current === 'object' && !Array.isArray(current)
+        ? { ...(current as Record<string, unknown>) }
+        : {}
+      cursor[keys[i]] = next
+      cursor = next
+    }
+    cursor[keys[keys.length - 1]] = value
+    return { [root]: nextRoot } as Partial<UIState>
+  }),
   setRemarkable: (settings) => set((state) => ({
     remarkable: { ...state.remarkable, ...settings }
   })),

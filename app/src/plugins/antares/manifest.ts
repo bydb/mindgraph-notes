@@ -71,6 +71,10 @@ export const manifest: PluginManifest = {
   description: 'Read-only Verleih-Daten aus Antares CS (Entleiher, Mahnungen Geräte/Medien, Lizenzen).',
   category: 'business',
   icon: { text: '📦', color: '#10b981' },
+  module: {
+    enabledPath: 'pluginConfig.antares.enabled',
+    legacyEnabledPath: 'antares.enabled',
+  },
   capabilities: [...ANTARES_CAPABILITIES],
   // Baseline-Allowlist für den üblichen Provider; der konkret konfigurierte Host wird
   // zur Laufzeit aus den Settings ergänzt (resolveExtraAllowedHosts im Capability-Host).

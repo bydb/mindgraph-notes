@@ -146,6 +146,89 @@ describe('PluginRegistry — Fehler-Isolation', () => {
     expect(r.get('echo')?.activation).toBe('active')
   })
 
+  it('kann einen transienten Aktivierungsfehler ohne Neustart erneut versuchen', async () => {
+    let attempts = 0
+    const stop = vi.fn(async () => {})
+    const manifest = mkManifest('flaky')
+    const entry = definePluginMain(
+      { id: 'flaky', capabilities: [] },
+      () => {
+        attempts++
+        if (attempts === 1) throw new Error('vorübergehend kaputt')
+      },
+      { stop }
+    )
+    const r = new PluginRegistry()
+    r.register([{ manifest, loadEntry: async () => ({ default: entry }) }])
+
+    expect((await r.activate('flaky')).activation).toBe('error')
+    expect((await r.activate('flaky')).activation).toBe('active')
+    expect(attempts).toBe(2)
+    expect(stop).toHaveBeenCalledOnce()
+  })
+
+  it('räumt nach teilweise fehlgeschlagener Aktivierung über stop() auf', async () => {
+    const stop = vi.fn(async () => {})
+    const manifest = mkManifest('partial')
+    const entry = definePluginMain(
+      { id: 'partial', capabilities: [] },
+      () => {
+        throw new Error('Start nach Listener-Registrierung fehlgeschlagen')
+      },
+      { stop }
+    )
+    const r = new PluginRegistry()
+    r.register([{ manifest, loadEntry: async () => ({ default: entry }) }])
+
+    expect((await r.activate('partial')).activation).toBe('error')
+    expect(stop).toHaveBeenCalledOnce()
+  })
+
+  it('behält den Entry, wenn das Aufräumen nach Aktivierungsfehler scheitert', async () => {
+    let stopAttempts = 0
+    const stop = vi.fn(async () => {
+      stopAttempts++
+      if (stopAttempts === 1) throw new Error('Cleanup hängt')
+    })
+    const manifest = mkManifest('partial-stuck')
+    const entry = definePluginMain(
+      { id: 'partial-stuck', capabilities: [] },
+      () => {
+        throw new Error('Start fehlgeschlagen')
+      },
+      { stop }
+    )
+    const r = new PluginRegistry()
+    r.register([{ manifest, loadEntry: async () => ({ default: entry }) }])
+
+    expect((await r.activate('partial-stuck')).activation).toBe('error')
+    expect((await r.deactivate('partial-stuck')).activation).toBe('disabled')
+    expect(stop).toHaveBeenCalledTimes(2)
+  })
+
+  it('startet keinen zweiten Entry, solange das Aufräumen vor dem Retry weiter scheitert', async () => {
+    let registerAttempts = 0
+    const stop = vi.fn(async () => {
+      throw new Error('Cleanup hängt dauerhaft')
+    })
+    const manifest = mkManifest('partial-still-stuck')
+    const entry = definePluginMain(
+      { id: 'partial-still-stuck', capabilities: [] },
+      () => {
+        registerAttempts++
+        throw new Error('Start fehlgeschlagen')
+      },
+      { stop }
+    )
+    const r = new PluginRegistry()
+    r.register([{ manifest, loadEntry: async () => ({ default: entry }) }])
+
+    expect((await r.activate('partial-still-stuck')).activation).toBe('error')
+    expect((await r.activate('partial-still-stuck')).activation).toBe('error')
+    expect(registerAttempts).toBe(1)
+    expect(stop).toHaveBeenCalledTimes(2)
+  })
+
   it('serialisiert Transitionen: deactivate während laufender Aktivierung gewinnt (Endzustand disabled)', async () => {
     // register signalisiert seinen Start und hängt dann an einem Deferred — so kommt das
     // deactivate ECHT mitten in der Aktivierung (nach dem desired-Check, im await register).

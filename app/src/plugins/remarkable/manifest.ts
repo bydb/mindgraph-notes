@@ -51,6 +51,7 @@ export const manifest: PluginManifest = {
   description: 'reMarkable-Tablet über USB: Dokumente browsen/importieren, PDF exportieren, optimieren, als Buch umbrechen.',
   category: 'devices',
   icon: { text: '✎', color: '#111827' },
+  module: { enabledPath: 'remarkable.enabled' },
   capabilities: [...REMARKABLE_CAPABILITIES],
   // Statisches Gerät: das USB-Webinterface. Kein user-konfigurierter Host.
   http: { allowedHosts: ['10.11.99.1'] },

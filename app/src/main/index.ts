@@ -785,7 +785,7 @@ app.whenReady().then(async () => {
   // respektiert den Disabled-Zustand (gebündelte Plugins sind nicht mehr blind „immer an").
   const pluginGateSettings = startupUiSettings ?? {}
   pluginRegistry
-    .activateAll((id) => isPluginGateEnabled(id, pluginGateSettings))
+    .activateAll((_id, manifest) => isPluginGateEnabled(manifest, pluginGateSettings))
     .catch((err) => console.error('[plugin] activateAll:', err))
 
   // Tray-Icon + Schnellerfassung (plattformübergreifend)

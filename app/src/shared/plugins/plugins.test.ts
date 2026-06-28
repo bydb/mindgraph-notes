@@ -22,6 +22,7 @@ const validManifest: PluginManifest = {
   description: 'Verleih-Dashboard',
   category: 'business',
   capabilities: ['http.fetch', 'secrets'],
+  module: { enabledPath: 'pluginConfig.antares.enabled', legacyEnabledPath: 'antares.enabled' },
   http: { allowedHosts: ['antares.example.net'] },
   actions: [
     { id: 'antares.listMahnungen', requiredCapabilities: ['http.fetch'] },
@@ -60,6 +61,17 @@ describe('validateManifest', () => {
       actions: [{ id: 'antares.x', requiredCapabilities: ['http.fetch'], outputShema: { type: 'object' } }],
     })
     expect(r.valid).toBe(false)
+  })
+
+  it('lehnt unsichere oder malformed Modul-Pfade ab', () => {
+    expect(validateManifest({
+      ...validManifest,
+      module: { enabledPath: '__proto__.enabled' },
+    }).valid).toBe(false)
+    expect(validateManifest({
+      ...validManifest,
+      module: { enabledPath: 'enabled' },
+    }).valid).toBe(false)
   })
 })
 
@@ -193,15 +205,16 @@ describe('moduleGate (A-pre Schritt 1)', () => {
 
   it('isPluginGateEnabled: gegatete Plugins folgen dem Flag, ungegatete sind immer aktiv', () => {
     // Antares liest seit 3b den generischen Pfad pluginConfig.antares.enabled …
-    expect(isPluginGateEnabled('antares', { pluginConfig: { antares: { enabled: true } } })).toBe(true)
-    expect(isPluginGateEnabled('antares', { pluginConfig: { antares: { enabled: false } } })).toBe(false)
-    expect(isPluginGateEnabled('antares', {})).toBe(false)
+    expect(isPluginGateEnabled(validManifest, { pluginConfig: { antares: { enabled: true } } })).toBe(true)
+    expect(isPluginGateEnabled(validManifest, { pluginConfig: { antares: { enabled: false } } })).toBe(false)
+    expect(isPluginGateEnabled(validManifest, {})).toBe(false)
     // … plus Legacy-Fallback (Top-Level antares) für den EINEN Start vor der Renderer-Migration.
-    expect(isPluginGateEnabled('antares', { antares: { enabled: true } })).toBe(true)
-    expect(isPluginGateEnabled('antares', { antares: { enabled: false } })).toBe(false)
+    expect(isPluginGateEnabled(validManifest, { antares: { enabled: true } })).toBe(true)
+    expect(isPluginGateEnabled(validManifest, { antares: { enabled: false } })).toBe(false)
     // edoobox wird vom Bundle-Modul 'mz-suite' über edoobox.enabled gesteuert
-    expect(isPluginGateEnabled('edoobox', { edoobox: { enabled: true } })).toBe(true)
+    const edoobox = { ...validManifest, id: 'edoobox', module: { enabledPath: 'edoobox.enabled' } }
+    expect(isPluginGateEnabled(edoobox, { edoobox: { enabled: true } })).toBe(true)
     // demo hat kein Gate → immer aktiv
-    expect(isPluginGateEnabled('demo', {})).toBe(true)
+    expect(isPluginGateEnabled({ ...validManifest, id: 'demo', module: undefined }, {})).toBe(true)
   })
 })

@@ -77,6 +77,11 @@ export const manifest: PluginManifest = {
   description: 'Veranstaltungs-Agent: Akkreditierung → edoobox-Push, Dashboard, Buchungen, Teilnehmerlisten.',
   category: 'business',
   icon: { text: '🎓', color: '#6366f1' },
+  module: {
+    id: 'mz-suite',
+    enabledPath: 'edoobox.enabled',
+    linkedEnabledPaths: ['marketing.enabled'],
+  },
   capabilities: [...EDOOBOX_CAPABILITIES],
   // Baseline-Allowlist: edoobox-Provider + Google Imagen (Marketing-Bildgenerierung). Der
   // konfigurierte edoobox- UND WordPress-Host (ui.edoobox.baseUrl, ui.marketing.wordpressUrl)

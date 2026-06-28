@@ -89,6 +89,18 @@ export interface SlotDecl {
   fromAction?: string
 }
 
+/** Deklariert, wie ein Plugin im Modul-Tab erscheint und wo sein Enabled-Flag persistiert ist. */
+export interface PluginModuleDecl {
+  /** Modul-ID in der Settings-UI; standardmäßig identisch zur Plugin-ID. */
+  id?: string
+  /** Primärer Boolean-Pfad im UI-State, der den Main-Lifecycle dieses Plugins steuert. */
+  enabledPath: string
+  /** Weitere Flags, die derselbe Modulschalter gemeinsam setzt (z.B. ein Feature-Bundle). */
+  linkedEnabledPaths?: string[]
+  /** Übergangs-Pfad für bestehende Installationen während einer Config-Migration. */
+  legacyEnabledPath?: string
+}
+
 /**
  * Das vollständige Plugin-Manifest. Muss JSON-serialisierbar bleiben:
  * keine Funktionen, keine React-Komponenten, keine Klassen.
@@ -107,6 +119,8 @@ export interface PluginManifest {
   /** Domain-Allowlist für host.http.fetch. Fehlt sie, ist http.fetch gesperrt. */
   http?: { allowedHosts: string[] }
   credentials?: CredentialRequirement[]
+  /** Metadaten für den generisch aus Manifesten aufgebauten Modulschalter. */
+  module?: PluginModuleDecl
   /** Einfache Settings werden hieraus generiert; komplexe UI bleibt React. */
   settingsSchema?: JsonSchema
   actions?: ActionDef[]
