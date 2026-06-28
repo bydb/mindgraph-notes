@@ -34,10 +34,9 @@ import { OverduePanel } from './components/OverduePanel/OverduePanel'
 import { InboxPanel } from './components/InboxPanel/InboxPanel'
 import { DashboardView } from './components/DashboardPanel/DashboardView'
 import { MorningBriefing } from './components/DashboardPanel/MorningBriefing'
-import { AgentPanel } from './components/AgentPanel/AgentPanel'
 import { SemanticScholarPanel } from './components/SemanticScholarPanel/SemanticScholarPanel'
 import { useEmailStore } from './stores/emailStore'
-import { useAgentStore } from './stores/agentStore'
+import { PluginSlot } from './plugins/slots'
 import { TagsPanel } from './components/TagsPanel/TagsPanel'
 import { SmartConnectionsPanel } from './components/SmartConnectionsPanel/SmartConnectionsPanel'
 import { NotesChat } from './components/NotesChat/NotesChat'
@@ -162,7 +161,6 @@ const App: React.FC = () => {
   const zoteroModuleEnabled = useUIStore(state => state.zoteroEnabled)
   const vaultReadwiseActive = useVaultSettingsStore(state => state.features.readwise)
   const vaultEmailActive = useVaultSettingsStore(state => state.features.email)
-  const vaultEdooboxActive = useVaultSettingsStore(state => state.features.edoobox)
   const vaultWorkflowCanvasActive = useIsModuleEnabled('workflow-canvas')
   const vaultSettingsLoaded = useVaultSettingsStore(state => state.isLoaded)
   const [pendingNoteTitle, setPendingNoteTitle] = useState<string | null>(null)
@@ -591,13 +589,8 @@ const App: React.FC = () => {
     }
   }, [vaultPath])
 
-  // edoobox Agent: Events laden beim Vault-Wechsel (nur wenn im Vault aktiviert)
-  useEffect(() => {
-    if (!edooboxEnabled || !vaultPath) return
-    if (!vaultSettingsLoaded || !vaultEdooboxActive) return
-    useAgentStore.getState().loadEvents().catch(() => {})
-    useAgentStore.getState().checkConnection().catch(() => {})
-  }, [vaultPath, edooboxEnabled, vaultSettingsLoaded, vaultEdooboxActive])
+  // (edoobox-Events/Verbindung lädt jetzt das AgentPanel selbst beim Mount — die Logik wanderte
+  // mit der Plugin-Vertikale aus dem Core, siehe src/plugins/edoobox/renderer/AgentPanel.tsx.)
 
   // Workflow-Zeitplan-Trigger (Layer F): tab-unabhängiger Timer. Prüft alle 60s, ob der
   // persistierte Workflow einen fälligen schedule.timer-Trigger hat (lädt direkt von Platte,
@@ -1426,7 +1419,9 @@ const App: React.FC = () => {
                   ) : inboxPanelOpen ? (
                     <InboxPanel onClose={() => setInboxPanelOpen(false)} />
                   ) : agentPanelOpen ? (
-                    <AgentPanel onClose={() => setAgentPanelOpen(false)} />
+                    // edoobox-Vertikale: Panel kommt aus src/plugins/edoobox/renderer über den
+                    // Renderer-Slot. Kein harter Import mehr — Deletion Test (Ordner weg → Slot leer).
+                    <PluginSlot slotId="rightpanel.edoobox" props={{ onClose: () => setAgentPanelOpen(false) }} />
                   ) : (semanticScholarOpen && semanticScholarEnabled) ? (
                     <SemanticScholarPanel onClose={() => setSemanticScholarOpen(false)} />
                   ) : secondarySelectedNoteId ? (

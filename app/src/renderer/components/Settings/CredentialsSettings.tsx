@@ -1,5 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react'
 import { useUIStore } from '../../stores/uiStore'
+import { invokePlugin } from '../../plugins/client'
+import { edooboxService } from '../../stores/edooboxServiceBridge'
 
 type TabId = 'integrations' | 'email' | 'agents' | 'telegram' | 'speech' | 'sync' | 'dashboard'
 
@@ -93,7 +95,7 @@ export const CredentialsSettings: React.FC<Props> = ({ onNavigateToTab }) => {
       note: 'Veranstaltungs-Agent',
       settingsTab: 'agents',
       checkSet: async () => {
-        const creds = await window.electronAPI.edooboxLoadCredentials()
+        const creds = await edooboxService.loadCredentials()
         return !!(creds && creds.apiKey && creds.apiSecret)
       }
     })
@@ -106,7 +108,7 @@ export const CredentialsSettings: React.FC<Props> = ({ onNavigateToTab }) => {
       note: 'Username + Passwort für Antares CS (Medienzentrum-Verleih). Read-only.',
       settingsTab: 'agents',
       checkSet: async () => {
-        const creds = await window.electronAPI.antaresLoadCredentials()
+        const creds = await invokePlugin<{ username?: string; password?: string } | null>('antares', 'antares.loadCredentials').catch(() => null)
         return !!(creds && creds.username && creds.password)
       }
     })
@@ -119,7 +121,7 @@ export const CredentialsSettings: React.FC<Props> = ({ onNavigateToTab }) => {
       note: 'Automatisiertes Publishing im Marketing-Tab',
       settingsTab: 'agents',
       checkSet: async () => {
-        const creds = await window.electronAPI.marketingLoadCredentials()
+        const creds = await edooboxService.marketingLoadCredentials()
         return !!(creds && creds.wpAppPassword)
       }
     })

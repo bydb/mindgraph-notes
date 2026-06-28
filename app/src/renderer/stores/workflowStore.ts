@@ -19,7 +19,7 @@ import { useVaultSettingsStore } from './vaultSettingsStore'
 import { useEmailStore } from './emailStore'
 import { useNotesStore } from './notesStore'
 import { useAntaresStore } from './antaresStore'
-import { useAgentStore } from './agentStore'
+import { useEventAgentBridge } from './eventAgentBridge'
 import { extractTasks } from '../utils/linkExtractor'
 import type { AntaresVerleihRow, EdooboxBooking, EdooboxOfferDashboard, Note } from '../../shared/types'
 
@@ -283,14 +283,13 @@ async function collectAntaresItems(): Promise<WorkflowSeedItem[]> {
   return [...a.mahnungenGeraete, ...a.mahnungenMedien].filter(r => r.fn_leihnr).map(antaresRowToItem)
 }
 async function collectEdooboxManualItem(): Promise<WorkflowSeedItem | null> {
-  try { await useAgentStore.getState().loadDashboard() } catch { /* keine/abgelaufene Credentials */ }
-  const offer = useAgentStore.getState().dashboardOffers.find(o => o.bookingCount > 0)
+  const bridge = useEventAgentBridge.getState()
+  try { await bridge.loadOffers() } catch { /* keine/abgelaufene Credentials */ }
+  const offer = useEventAgentBridge.getState().offers.find(o => o.bookingCount > 0)
   if (!offer) return null
-  const { baseUrl, apiVersion } = useUIStore.getState().edoobox
   let bookings: EdooboxBooking[] = []
   try {
-    const res = await window.electronAPI.edooboxListBookings(baseUrl, apiVersion, offer.id)
-    bookings = res.success && res.bookings ? res.bookings as EdooboxBooking[] : []
+    bookings = await bridge.listBookings(offer.id)
   } catch { bookings = [] }
   const b = bookings.slice().sort((x, y) => (Date.parse(y.bookedAt || '') || 0) - (Date.parse(x.bookedAt || '') || 0))[0]
   return b ? edooboxBookingToItem(offer, b, 1) : edooboxOfferToItem(offer, 0, offer.bookingCount)
@@ -759,13 +758,10 @@ export const useWorkflowStore = create<WorkflowStoreState>()((set, get) => {
       antaresRows = [...a.mahnungenGeraete, ...a.mahnungenMedien].filter(r => r.fn_leihnr)
     }
     let edooboxOffers: EdooboxOfferDashboard[] = []
-    let edooboxCfg = { baseUrl: '', apiVersion: '' }
     const bookingsCache = new Map<string, EdooboxBooking[]>()
     if (families.has('edoobox.newBooking')) {
-      try { await useAgentStore.getState().loadDashboard() } catch { /* keine/abgelaufene Credentials */ }
-      edooboxOffers = useAgentStore.getState().dashboardOffers
-      const e = useUIStore.getState().edoobox
-      edooboxCfg = { baseUrl: e.baseUrl, apiVersion: e.apiVersion }
+      try { await useEventAgentBridge.getState().loadOffers() } catch { /* keine/abgelaufene Credentials */ }
+      edooboxOffers = useEventAgentBridge.getState().offers
     }
     const taskItems = families.has('tasks.dueSoon') ? collectTodayDueTaskItems(useNotesStore.getState().notes) : []
 
@@ -801,8 +797,7 @@ export const useWorkflowStore = create<WorkflowStoreState>()((set, get) => {
               let bookings = bookingsCache.get(o.id)
               if (!bookings) {
                 try {
-                  const res = await window.electronAPI.edooboxListBookings(edooboxCfg.baseUrl, edooboxCfg.apiVersion, o.id)
-                  bookings = res.success && res.bookings ? res.bookings as EdooboxBooking[] : []
+                  bookings = await useEventAgentBridge.getState().listBookings(o.id)
                 } catch { bookings = [] }
                 bookingsCache.set(o.id, bookings)
               }

@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react'
 import { useUIStore, ACCENT_COLORS, AI_LANGUAGES, FONT_FAMILIES, UI_LANGUAGES, BACKGROUND_COLORS, ICON_SETS, OUTLINE_STYLES, MODULES, MODULE_CATEGORIES, type Language, type FontFamily, type BackgroundColor, type IconSet, type OutlineStyle, type LLMBackend, type TransportDestination, type ModuleCategory, type ModuleDescriptor } from '../../stores/uiStore'
 import { isModuleEnabled, setModuleEnabled, useIsModuleEnabled } from '../../utils/modules'
+import { invokePlugin } from '../../plugins/client'
+import { edooboxService } from '../../stores/edooboxServiceBridge'
 import { useNotesStore, createNoteFromFile } from '../../stores/notesStore'
 import { useSyncStore } from '../../stores/syncStore'
 import { useVaultSettingsStore } from '../../stores/vaultSettingsStore'
@@ -1580,24 +1582,26 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab 
   // edoobox + Marketing + Antares Credentials laden
   useEffect(() => {
     if (isOpen && activeTab === 'agents') {
-      window.electronAPI.edooboxLoadCredentials().then(creds => {
+      edooboxService.loadCredentials().then(creds => {
         if (creds) {
           setEdooboxApiKey(creds.apiKey)
           setEdooboxApiSecret(creds.apiSecret)
         }
       })
-      window.electronAPI.marketingLoadCredentials().then(creds => {
+      edooboxService.marketingLoadCredentials().then(creds => {
         if (creds) {
           if (creds.wpAppPassword) setWpAppPassword(creds.wpAppPassword)
         }
       })
-      window.electronAPI.antaresLoadCredentials().then(creds => {
-        if (creds) {
-          setAntaresUser(creds.username)
-          setAntaresPassword(creds.password)
-          setAntaresCredsSaved(true)
-        }
-      })
+      invokePlugin<{ username: string; password: string } | null>('antares', 'antares.loadCredentials')
+        .then(creds => {
+          if (creds) {
+            setAntaresUser(creds.username)
+            setAntaresPassword(creds.password)
+            setAntaresCredsSaved(true)
+          }
+        })
+        .catch(() => {})
     }
     if (isOpen && (activeTab === 'agents' || activeTab === 'remarkable')) {
       checkRemarkableConnection()
@@ -1608,7 +1612,7 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab 
     setRemarkableStatus('checking')
     setRemarkableError(null)
     try {
-      const result = await window.electronAPI.remarkableUsbCheck()
+      const result = await invokePlugin<{ connected: boolean; error?: string }>('remarkable', 'remarkable.usbCheck')
       setRemarkableStatus(result.connected ? 'connected' : 'disconnected')
       if (!result.connected && result.error) {
         setRemarkableError(result.error)
@@ -5175,7 +5179,7 @@ LIMIT 10
                         className="settings-btn"
                         onClick={async () => {
                           if (edooboxApiKey && edooboxApiSecret) {
-                            const saved = await window.electronAPI.edooboxSaveCredentials(edooboxApiKey, edooboxApiSecret)
+                            const saved = await edooboxService.saveCredentials(edooboxApiKey, edooboxApiSecret)
                             setEdooboxCredsSaved(saved)
                           }
                         }}
@@ -5193,10 +5197,10 @@ LIMIT 10
                             return
                           }
                           // Save first, then test
-                          await window.electronAPI.edooboxSaveCredentials(edooboxApiKey, edooboxApiSecret)
+                          await edooboxService.saveCredentials(edooboxApiKey, edooboxApiSecret)
                           setEdooboxCredsSaved(true)
                           setEdooboxTestStatus('testing')
-                          const result = await window.electronAPI.edooboxCheck(edooboxSettings.baseUrl, edooboxSettings.apiVersion)
+                          const result = await edooboxService.check(edooboxSettings.baseUrl, edooboxSettings.apiVersion)
                           setEdooboxTestStatus(result.success ? 'success' : 'failed')
                           setEdooboxTestError(result.success ? null : (result.error || null))
                         }}
@@ -5280,8 +5284,8 @@ LIMIT 10
                         className="settings-btn"
                         onClick={async () => {
                           if (antaresUser && antaresPassword) {
-                            const saved = await window.electronAPI.antaresSaveCredentials(antaresUser, antaresPassword)
-                            setAntaresCredsSaved(saved)
+                            const saved = await invokePlugin<boolean>('antares', 'antares.saveCredentials', { username: antaresUser, password: antaresPassword }).catch(() => false)
+                            setAntaresCredsSaved(!!saved)
                           }
                         }}
                       >
@@ -5297,12 +5301,17 @@ LIMIT 10
                             setAntaresTestError(t('settings.agents.antares.saveFirst'))
                             return
                           }
-                          await window.electronAPI.antaresSaveCredentials(antaresUser, antaresPassword)
+                          await invokePlugin('antares', 'antares.saveCredentials', { username: antaresUser, password: antaresPassword })
                           setAntaresCredsSaved(true)
                           setAntaresTestStatus('testing')
-                          const result = await window.electronAPI.antaresCheck(antaresSettings.baseUrl, antaresSettings.context)
-                          setAntaresTestStatus(result.success ? 'success' : 'failed')
-                          setAntaresTestError(result.success ? null : (result.error || null))
+                          try {
+                            await invokePlugin('antares', 'antares.check', { baseUrl: antaresSettings.baseUrl, context: antaresSettings.context })
+                            setAntaresTestStatus('success')
+                            setAntaresTestError(null)
+                          } catch (err) {
+                            setAntaresTestStatus('failed')
+                            setAntaresTestError(err instanceof Error ? err.message : null)
+                          }
                         }}
                       >
                         {antaresTestStatus === 'testing'
@@ -5373,7 +5382,7 @@ LIMIT 10
                         className="settings-btn"
                         onClick={async () => {
                           if (wpAppPassword) {
-                            const saved = await window.electronAPI.marketingSaveCredentials({ wpAppPassword })
+                            const saved = await edooboxService.marketingSaveCredentials(wpAppPassword)
                             setWpCredsSaved(saved)
                           }
                         }}
@@ -5390,10 +5399,10 @@ LIMIT 10
                             setWpTestError(t('settings.agents.marketing.wpFillAll'))
                             return
                           }
-                          await window.electronAPI.marketingSaveCredentials({ wpAppPassword })
+                          await edooboxService.marketingSaveCredentials(wpAppPassword)
                           setWpCredsSaved(true)
                           setWpTestStatus('testing')
-                          const result = await window.electronAPI.marketingCheckWordpress(marketingSettings.wordpressUrl, marketingSettings.wordpressUser)
+                          const result = await edooboxService.marketingCheckWordpress(marketingSettings.wordpressUrl, marketingSettings.wordpressUser)
                           setWpTestStatus(result.success ? 'success' : 'failed')
                           setWpTestError(result.success ? null : (result.error || null))
                         }}

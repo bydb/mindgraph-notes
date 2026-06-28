@@ -8,6 +8,7 @@ import { useTranslation } from '../../utils/translations'
 import { parseFrontmatter } from '../../utils/metadataExtractor'
 import { findImageInVault, isImageFile } from '../../utils/imageUtils'
 import { sanitizeHtml } from '../../utils/sanitize'
+import { edooboxService } from '../../stores/edooboxServiceBridge'
 
 interface PublishToWordPressModalProps {
   note: Note
@@ -119,7 +120,13 @@ export const PublishToWordPressModal: React.FC<PublishToWordPressModalProps> = (
         setProgress(t('publishWp.uploadingImage').replace('{current}', String(i + 1)).replace('{total}', String(uniqueCandidates.length)))
         const absPath = resolveVaultImage(ref, vaultPath, fileTree)
         if (!absPath) continue
-        const upload = await window.electronAPI.marketingUploadImage(marketing.wordpressUrl, marketing.wordpressUser, absPath)
+        // Bild als Base64 lesen (Bytes-Flow), dann an die edoobox-Plugin-Vertikale geben.
+        const imgRes = await window.electronAPI.readImageAsDataUrl(absPath)
+        const dataUrl = imgRes.success ? imgRes.dataUrl : undefined
+        if (!dataUrl) continue
+        const base64 = dataUrl.includes(',') ? dataUrl.slice(dataUrl.indexOf(',') + 1) : dataUrl
+        const fileName = absPath.split(/[\\/]/).pop() || ref.split(/[\\/]/).pop() || 'bild.png'
+        const upload = await edooboxService.marketingUploadImage(marketing.wordpressUrl, marketing.wordpressUser, base64, fileName)
         if (upload.success && upload.imageUrl) {
           imageMap.set(ref, upload.imageUrl)
         }
@@ -151,7 +158,7 @@ export const PublishToWordPressModal: React.FC<PublishToWordPressModalProps> = (
 
       setProgress(t('publishWp.publishing'))
 
-      const res = await window.electronAPI.marketingPublishWordpress(
+      const res = await edooboxService.marketingPublishWordpress(
         marketing.wordpressUrl,
         marketing.wordpressUser,
         title.trim(),

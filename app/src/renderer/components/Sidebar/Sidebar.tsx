@@ -1,7 +1,7 @@
 import React, { useEffect, useCallback, useState, useRef } from 'react'
 import { FileTree } from './FileTree'
 import { BookmarksBar } from './BookmarksBar'
-import { RemarkablePanel } from './RemarkablePanel'
+import { PluginSlot } from '../../plugins/slots'
 import { useNotesStore, createNoteFromFile } from '../../stores/notesStore'
 import { useUIStore } from '../../stores/uiStore'
 import { useGraphStore } from '../../stores/graphStore'
@@ -534,7 +534,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ onOpenSearch }) => {
               </button>
             </div>
           )}
-          <RemarkablePanel />
+          {/* Plugin-Vertikale: reMarkable-Panel kommt aus src/plugins/remarkable/renderer
+              über den Renderer-Slot. Kein harter Import — Deletion Test (Ordner weg → Slot leer). */}
+          <PluginSlot slotId="sidebar.panel.remarkable" />
           <BookmarksBar />
           <div className="sidebar-content">
             <FileTree entries={fileTree} displayMode={fileTreeDisplayMode} />

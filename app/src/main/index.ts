@@ -27,14 +27,6 @@ async function getSyncEngineClass(): Promise<typeof import('./sync/syncEngine').
   return _SyncEngineClass
 }
 
-let _remarkableService: import('./remarkable/service').ReMarkableService | null = null
-async function getRemarkableService(): Promise<import('./remarkable/service').ReMarkableService> {
-  if (!_remarkableService) {
-    _remarkableService = new (await import('./remarkable/service')).ReMarkableService()
-  }
-  return _remarkableService
-}
-
 // electron-updater: Modul lazy + Listener/Config nur einmal aufsetzen.
 let _autoUpdaterConfigured = false
 async function ensureAutoUpdater(): Promise<import('electron-updater').AppUpdater> {
@@ -142,6 +134,10 @@ import { embedText as ragEmbedText } from './rag/embed'
 import { cosineSimilarity as ragCosineSimilarity } from '../shared/rag/similarity'
 import type { RagIndexStatus, RagQueryResult, RagRetrieveOptions } from '../shared/rag/types'
 import { setupTray, hideTransportWindow, updateShortcut, showTransportWindow } from './transport/trayManager'
+import { createMainRegistry } from './plugins/registry'
+import { registerPluginTransport } from './plugins/transport'
+import { createHostFactory, type HostServices } from './plugins/host'
+import * as nativeServices from './plugins/nativeServices'
 
 // Globale Fehlerbehandlung für unhandled exceptions (z.B. IMAP Socket-Timeouts)
 process.on('uncaughtException', (error) => {
@@ -150,6 +146,136 @@ process.on('uncaughtException', (error) => {
 process.on('unhandledRejection', (reason) => {
   console.error('[Main] Unhandled rejection:', reason instanceof Error ? reason.message : reason)
 })
+
+// Plugin-System: build-seitig erkannte Registry (import.meta.glob) + generischer Transport.
+// Der echte Capability-Host wird in app.whenReady() gesetzt (setHostFactory); bis dahin Stub.
+const pluginRegistry = createMainRegistry()
+registerPluginTransport(pluginRegistry)
+
+// — Plugin-Secrets: pro Plugin genamespacet, via safeStorage verschlüsselt in userData —
+// (Direkter userData-Write wie bei den App-Settings; NICHT der Vault-Schreibpfad.)
+const pluginSecretsFile = (): string => path.join(app.getPath('userData'), 'plugin-secrets.json')
+async function loadPluginSecrets(): Promise<Record<string, string>> {
+  try {
+    return JSON.parse(await fs.readFile(pluginSecretsFile(), 'utf-8')) as Record<string, string>
+  } catch {
+    return {}
+  }
+}
+async function pluginSecretGet(key: string): Promise<string | null> {
+  if (!safeStorage.isEncryptionAvailable()) return null
+  const enc = (await loadPluginSecrets())[key]
+  if (!enc) return null
+  try {
+    return safeStorage.decryptString(Buffer.from(enc, 'base64'))
+  } catch {
+    return null
+  }
+}
+async function pluginSecretSet(key: string, value: string): Promise<void> {
+  if (!safeStorage.isEncryptionAvailable()) throw new Error('safeStorage nicht verfügbar — Secret nicht gespeichert')
+  const map = await loadPluginSecrets()
+  map[key] = safeStorage.encryptString(value).toString('base64')
+  await fs.writeFile(pluginSecretsFile(), JSON.stringify(map), 'utf-8')
+}
+async function pluginSecretDelete(key: string): Promise<void> {
+  const map = await loadPluginSecrets()
+  delete map[key]
+  await fs.writeFile(pluginSecretsFile(), JSON.stringify(map), 'utf-8')
+}
+
+/** Baut die rohen Host-Primitiven (an fs/safeStorage/Ollama/fetch gebunden). Die Per-Plugin-
+ *  Policy (Capability-Gating, Namespacing, allowedHosts) liegt in createHostFactory. */
+function buildPluginHostServices(): HostServices {
+  const requireVault = (op: string): string => {
+    const vp = lastKnownVaultPath
+    if (!vp) throw new Error(`Kein Vault geöffnet (${op})`)
+    assertApprovedVault(vp, op)
+    return vp
+  }
+  return {
+    readVaultFile: async (relPath) => {
+      const vp = requireVault('plugin:vault.read')
+      return fs.readFile(validatePath(vp, relPath), 'utf-8')
+    },
+    writeVaultFile: async (relPath, content) => {
+      const vp = requireVault('plugin:vault.write')
+      await writeFileSafe(validatePath(vp, relPath), content)
+    },
+    readVaultBytes: async (relPath) => {
+      const vp = requireVault('plugin:vault.readBytes')
+      return new Uint8Array(await fs.readFile(validatePath(vp, relPath)))
+    },
+    writeVaultBytes: async (relPath, bytes) => {
+      const vp = requireVault('plugin:vault.writeBytes')
+      const target = validatePath(vp, relPath)
+      await fs.mkdir(path.dirname(target), { recursive: true })
+      await fs.writeFile(target, Buffer.from(bytes))
+    },
+    vaultExists: async (relPath) => {
+      const vp = requireVault('plugin:vault.exists')
+      return fs.access(validatePath(vp, relPath)).then(() => true).catch(() => false)
+    },
+    secretGet: pluginSecretGet,
+    secretSet: pluginSecretSet,
+    secretDelete: pluginSecretDelete,
+    llmGenerate: async (prompt, opts) => {
+      const ui = await loadUISettings().catch(() => ({} as Record<string, unknown>))
+      const ollama = ui.ollama as { selectedModel?: string; moduleModelOverrides?: Record<string, string> } | undefined
+      const model = (opts.module && ollama?.moduleModelOverrides?.[opts.module]) || ollama?.selectedModel || ''
+      if (!model) throw new Error('Kein Ollama-Modell konfiguriert')
+      if (opts.module && isModelHardLocked(model, opts.module)) {
+        throw new Error(`Modell '${model}' ist für '${opts.module}' gesperrt (Hard-Lock)`)
+      }
+      if (isModelIsCloud(model) && !opts.allowCloud) {
+        throw new Error(`Cloud-Modell '${model}' für Plugins gesperrt (Privacy)`)
+      }
+      const res = await fetch(`${OLLAMA_API_URL}/api/generate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model, prompt, stream: false, think: false,
+          options: { temperature: opts.temperature ?? 0.4, num_predict: opts.maxTokens ?? 1200 }
+        })
+      })
+      if (!res.ok) throw new Error(`Ollama Fehler: ${res.status}`)
+      const data = await res.json()
+      return (data.response || '').trim()
+    },
+    httpFetch: (url, init) => fetch(url, init),
+    httpFetchBasicAuth: nativeServices.httpFetchBasicAuth,
+    resolveExtraAllowedHosts: async (pluginId) => {
+      // Plugins mit user-konfiguriertem Endpunkt (z.B. Antares: ui.antares.baseUrl) dürfen
+      // ihren konfigurierten Host ansprechen — der ist user-getrust, anders als ein beliebiger.
+      const ui = await loadUISettings().catch(() => ({} as Record<string, unknown>))
+      const hosts: string[] = []
+      const cfg = ui[pluginId] as { baseUrl?: string } | undefined
+      if (cfg?.baseUrl) {
+        try { hosts.push(new URL(cfg.baseUrl).hostname) } catch { /* ignore */ }
+      }
+      // edoobox-Vertikale nutzt zusätzlich den user-konfigurierten WordPress-Host (Marketing).
+      if (pluginId === 'edoobox') {
+        const mk = ui.marketing as { wordpressUrl?: string } | undefined
+        if (mk?.wordpressUrl) {
+          try { hosts.push(new URL(mk.wordpressUrl).hostname) } catch { /* ignore */ }
+        }
+      }
+      return hosts
+    },
+    deviceRequest: nativeServices.deviceRequest,
+    deviceDownload: nativeServices.deviceDownload,
+    deviceUpload: nativeServices.deviceUpload,
+    listUsbDevices: nativeServices.listUsbDevices,
+    pdfHtmlToPdf: nativeServices.htmlToPdf,
+    pdfOptimize: nativeServices.optimizePdf,
+    dialogOpenFile: nativeServices.dialogOpenFile,
+    dialogSaveFile: nativeServices.dialogSaveFile,
+    readResource: nativeServices.readResource,
+    emitWorkflow: async () => {
+      throw new Error('workflow.action für Plugins noch nicht verdrahtet')
+    }
+  }
+}
 
 let mainWindow: BrowserWindow | null = null
 let fileWatcher: FSWatcher | null = null
@@ -638,6 +764,23 @@ app.whenReady().then(async () => {
 
   createWindow()
   console.timeEnd('app-ready')
+
+  // Echten Capability-Host setzen (rohe Dienste an fs/safeStorage/Ollama gebunden) + Hard-Lock-
+  // Guard (aktives Modell aus den UI-Settings), dann fehler-isoliert aktivieren — ein defektes
+  // Plugin kippt den Start nie.
+  await migrateAntaresCredentialsToPlugin()
+  await migrateEdooboxCredentialsToPlugin()
+  await migrateMarketingCredentialsToPlugin()
+  pluginRegistry.setHostFactory(createHostFactory(buildPluginHostServices()))
+  pluginRegistry.setHardLockGuard(async (moduleId) => {
+    const ui = await loadUISettings().catch(() => ({} as Record<string, unknown>))
+    const ollama = ui.ollama as { selectedModel?: string; moduleModelOverrides?: Record<string, string> } | undefined
+    const model = ollama?.moduleModelOverrides?.[moduleId] || ollama?.selectedModel || ''
+    return model && isModelHardLocked(model, moduleId)
+      ? `Modell '${model}' ist für '${moduleId}' gesperrt (Hard-Lock)`
+      : null
+  })
+  pluginRegistry.activateAll().catch((err) => console.error('[plugin] activateAll:', err))
 
   // Tray-Icon + Schnellerfassung (plattformübergreifend)
   {
@@ -10106,1022 +10249,72 @@ do {
 })
 
 // ========================================
-// reMarkable (USB)
-// ========================================
-
-ipcMain.handle('remarkable-usb-check', async () => {
-  return (await getRemarkableService()).checkUsbConnection()
-})
-
-ipcMain.handle('remarkable-usb-debug-info', async () => {
-  try {
-    const status = await (await getRemarkableService()).checkUsbConnection()
-
-    if (process.platform !== 'darwin') {
-      return {
-        success: true,
-        connected: status.connected,
-        error: status.connected ? undefined : status.error
-      }
-    }
-
-    const { execFile } = await import('child_process')
-    const { promisify } = await import('util')
-    const execFileAsync = promisify(execFile)
-    const { stdout } = await execFileAsync('ioreg', ['-p', 'IOUSB', '-l', '-w', '0'], { timeout: 10000 })
-    const output = typeof stdout === 'string' ? stdout : String(stdout)
-
-    const targetBlock = output
-      .split('\n\n')
-      .find((block) => /"USB Vendor Name"\s*=\s*"reMarkable"|"kUSBVendorString"\s*=\s*"reMarkable"/i.test(block))
-
-    if (!targetBlock) {
-      return {
-        success: true,
-        connected: status.connected,
-        error: status.error
-      }
-    }
-
-    const vendorId = Number(targetBlock.match(/"idVendor"\s*=\s*(\d+)/)?.[1] || NaN)
-    const productId = Number(targetBlock.match(/"idProduct"\s*=\s*(\d+)/)?.[1] || NaN)
-    const vendorName = targetBlock.match(/"USB Vendor Name"\s*=\s*"([^"]+)"/)?.[1]
-      || targetBlock.match(/"kUSBVendorString"\s*=\s*"([^"]+)"/)?.[1]
-    const productName = targetBlock.match(/"USB Product Name"\s*=\s*"([^"]+)"/)?.[1]
-      || targetBlock.match(/"kUSBProductString"\s*=\s*"([^"]+)"/)?.[1]
-
-    return {
-      success: true,
-      connected: status.connected,
-      vendorName,
-      productName,
-      vendorId: Number.isFinite(vendorId) ? vendorId : undefined,
-      productId: Number.isFinite(productId) ? productId : undefined,
-      vendorIdHex: Number.isFinite(vendorId) ? `0x${vendorId.toString(16)}` : undefined,
-      productIdHex: Number.isFinite(productId) ? `0x${productId.toString(16)}` : undefined,
-      error: status.connected ? undefined : status.error
-    }
-  } catch (error) {
-    return {
-      success: false,
-      connected: false,
-      error: error instanceof Error ? error.message : 'USB debug info konnte nicht geladen werden'
-    }
-  }
-})
-
-ipcMain.handle('remarkable-list-documents', async (_event, folderId?: string) => {
-  try {
-    const documents = await (await getRemarkableService()).listUsbDocuments(folderId)
-    return { documents }
-  } catch (error) {
-    console.error('[reMarkable] Failed to list USB documents:', error)
-    return {
-      documents: [],
-      error: error instanceof Error ? error.message : 'Dokumente konnten nicht geladen werden'
-    }
-  }
-})
-
-ipcMain.handle('remarkable-download-document', async (_event, vaultPath: string, document: { id: string; name: string }) => {
-  const sanitizeFileName = (name: string) => {
-    const trimmed = name.trim().replace(/\s+/g, ' ')
-    const sanitized = trimmed.replace(/[^a-zA-Z0-9\-_. ]/g, '').replace(/ /g, '-')
-    return sanitized || 'remarkable-note'
-  }
-
-  try {
-    assertApprovedVault(vaultPath, 'remarkable-download-document')
-    const pdfBuffer = await (await getRemarkableService()).downloadUsbDocumentPdf(document.id)
-    const pdfDir = validatePath(vaultPath, 'reMarkable/pdf')
-    await fs.mkdir(pdfDir, { recursive: true })
-
-    const safeName = sanitizeFileName(document.name)
-    const fileName = `${safeName}-${document.id.slice(0, 8)}.pdf`
-    const filePath = validatePath(pdfDir, fileName)
-    const relativePdfPath = `reMarkable/pdf/${fileName}`
-
-    const alreadyExists = await fs.access(filePath).then(() => true).catch(() => false)
-    if (!alreadyExists) {
-      await fs.writeFile(filePath, pdfBuffer)
-    }
-
-    return { success: true, relativePdfPath, alreadyExists }
-  } catch (error) {
-    console.error('[reMarkable] Failed to download document:', { id: document.id, name: document.name, error })
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'Dokument konnte nicht heruntergeladen werden'
-    }
-  }
-})
-
-ipcMain.handle('remarkable-upload-pdf', async (_event, vaultPath: string, relativePdfPath: string) => {
-  try {
-    assertApprovedVault(vaultPath, 'remarkable-upload-pdf')
-    if (!relativePdfPath.toLowerCase().endsWith('.pdf')) {
-      return { success: false, error: 'Nur PDF-Dateien koennen exportiert werden' }
-    }
-
-    const filePath = validatePath(vaultPath, relativePdfPath)
-    const content = await fs.readFile(filePath)
-    const fileName = path.basename(relativePdfPath)
-
-    await (await getRemarkableService()).uploadUsbPdf(fileName, content)
-    return { success: true }
-  } catch (error) {
-    console.error('[reMarkable] Failed to upload PDF:', { relativePdfPath, error })
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'PDF konnte nicht exportiert werden'
-    }
-  }
-})
-
-ipcMain.handle('remarkable-optimize-pdf', async (_event, vaultPath: string, relativePdfPath: string) => {
-  try {
-    assertApprovedVault(vaultPath, 'remarkable-optimize-pdf')
-    if (!relativePdfPath.toLowerCase().endsWith('.pdf')) {
-      return { success: false, error: 'Nur PDF-Dateien koennen optimiert werden' }
-    }
-
-    const inputPath = validatePath(vaultPath, relativePdfPath)
-    const inputStat = await fs.stat(inputPath)
-    const outputPath = inputPath.replace(/\.pdf$/i, '.remarkable.pdf')
-
-    const { execFile } = await import('child_process')
-    const { promisify } = await import('util')
-    const execFileAsync = promisify(execFile)
-
-    const homeDir = process.env.HOME || `/Users/${process.env.USER || ''}`
-    const additionalPaths = [
-      '/opt/homebrew/bin',
-      '/opt/homebrew/sbin',
-      '/usr/local/bin',
-      '/usr/local/sbin',
-      `${homeDir}/.local/bin`
-    ]
-    const currentPath = process.env.PATH || '/usr/bin:/bin:/usr/sbin:/sbin'
-    const extendedPath = [...additionalPaths, ...currentPath.split(':')].join(':')
-    const env = { ...process.env, PATH: extendedPath }
-
-    let method: 'ghostscript' | 'qpdf' | 'unchanged' = 'unchanged'
-
-    try {
-      await execFileAsync('gs', [
-        '-sDEVICE=pdfwrite',
-        '-dCompatibilityLevel=1.4',
-        '-dPDFSETTINGS=/ebook',
-        '-dDetectDuplicateImages=true',
-        '-dCompressFonts=true',
-        '-dEmbedAllFonts=true',
-        '-dNOPAUSE',
-        '-dQUIET',
-        '-dBATCH',
-        `-sOutputFile=${outputPath}`,
-        inputPath
-      ], { env, timeout: 120000 })
-      method = 'ghostscript'
-    } catch {
-      try {
-        await execFileAsync('qpdf', ['--linearize', inputPath, outputPath], { env, timeout: 120000 })
-        method = 'qpdf'
-      } catch {
-        await fs.copyFile(inputPath, outputPath)
-        method = 'unchanged'
-      }
-    }
-
-    let optimizedStat = await fs.stat(outputPath)
-
-    if (optimizedStat.size > inputStat.size && method !== 'unchanged') {
-      await fs.copyFile(inputPath, outputPath)
-      method = 'unchanged'
-      optimizedStat = await fs.stat(outputPath)
-    }
-
-    const optimizedRelative = path.relative(vaultPath, outputPath).split(path.sep).join('/')
-
-    return {
-      success: true,
-      relativePdfPath: optimizedRelative,
-      method,
-      originalSize: inputStat.size,
-      optimizedSize: optimizedStat.size
-    }
-  } catch (error) {
-    console.error('[reMarkable] Failed to optimize PDF:', { relativePdfPath, error })
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'PDF konnte nicht optimiert werden'
-    }
-  }
-})
-
-// Wandelt ein PDF in ein "buchtaugliches" reMarkable-PDF um: Text wird extrahiert,
-// zu fließenden Absätzen umgebrochen (Reflow) und mit großer Serifenschrift in
-// Gerätegröße neu gerendert – liest sich wie ein Kindle-Buch. Abbildungen/Formeln
-// gehen dabei verloren (es bleibt der reine Text).
-ipcMain.handle('remarkable-bookify-pdf', async (_event, vaultPath: string, relativePdfPath: string) => {
-  try {
-    assertApprovedVault(vaultPath, 'remarkable-bookify-pdf')
-    if (!relativePdfPath.toLowerCase().endsWith('.pdf')) {
-      return { success: false, error: 'Nur PDF-Dateien können umgewandelt werden' }
-    }
-
-    const inputPath = validatePath(vaultPath, relativePdfPath)
-    try {
-      await fs.access(inputPath)
-    } catch {
-      return {
-        success: false,
-        error: `Quell-PDF nicht gefunden: „${path.basename(inputPath)}". Die Datei wurde verschoben oder gelöscht – bitte ein vorhandenes PDF auswählen.`
-      }
-    }
-    const inputBytes = await fs.readFile(inputPath)
-
-    const { extractReflowedHtml } = await import('./remarkable/pdfReflow')
-    const { renderReMarkableBookPdf } = await import('./remarkable/bookPdf')
-
-    const reflow = await extractReflowedHtml(new Uint8Array(inputBytes))
-    if (reflow.charCount < 40) {
-      return {
-        success: false,
-        error: 'Kaum Text gefunden – vermutlich ein gescanntes/Bild-PDF. Reflow funktioniert nur mit echtem Text.'
-      }
-    }
-
-    const baseName = path.basename(inputPath).replace(/\.pdf$/i, '')
-    const title = reflow.title || baseName
-    const pdfData = await renderReMarkableBookPdf(reflow.bodyHtml, title)
-
-    const outputPath = inputPath.replace(/\.pdf$/i, '.remarkable.pdf')
-    await fs.writeFile(outputPath, pdfData)
-    const optimizedRelative = path.relative(vaultPath, outputPath).split(path.sep).join('/')
-
-    return {
-      success: true,
-      relativePdfPath: optimizedRelative,
-      sourcePages: reflow.pageCount,
-      charCount: reflow.charCount
-    }
-  } catch (error) {
-    console.error('[reMarkable] Failed to bookify PDF:', { relativePdfPath, error })
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'PDF konnte nicht umgewandelt werden'
-    }
-  }
-})
-
-// ========================================
 // edoobox Agent (Veranstaltungsmanagement)
 // ========================================
 
-function getEdooboxCredentialsPath(): string {
-  return path.join(app.getPath('userData'), 'edoobox-credentials.enc')
-}
-
-// Credentials speichern (safeStorage)
-ipcMain.handle('edoobox-save-credentials', async (_event, apiKey: string, apiSecret: string) => {
-  try {
-    if (!safeStorage.isEncryptionAvailable()) {
-      console.warn('[edoobox] safeStorage encryption not available')
-      return false
-    }
-    const data = JSON.stringify({ apiKey, apiSecret })
-    const encrypted = safeStorage.encryptString(data)
-    await fs.writeFile(getEdooboxCredentialsPath(), encrypted)
-    return true
-  } catch (error) {
-    console.error('[edoobox] Failed to save credentials:', error)
-    return false
-  }
-})
-
-// Credentials laden (safeStorage)
-ipcMain.handle('edoobox-load-credentials', async () => {
-  try {
-    if (!safeStorage.isEncryptionAvailable()) return null
-    const credPath = getEdooboxCredentialsPath()
-    const exists = await fs.access(credPath).then(() => true).catch(() => false)
-    if (!exists) return null
-    const encrypted = await fs.readFile(credPath)
-    const decrypted = safeStorage.decryptString(encrypted)
-    return JSON.parse(decrypted) as { apiKey: string; apiSecret: string }
-  } catch (error) {
-    console.error('[edoobox] Failed to load credentials:', error)
-    return null
-  }
-})
-
-// Verbindungstest
-ipcMain.handle('edoobox-check', async (_event, baseUrl: string, apiVersion: string) => {
-  try {
-    const credPath = getEdooboxCredentialsPath()
-    const exists = await fs.access(credPath).then(() => true).catch(() => false)
-    if (!exists) return { success: false, error: 'Keine Zugangsdaten gespeichert' }
-
-    const encrypted = await fs.readFile(credPath)
-    const { apiKey, apiSecret } = JSON.parse(safeStorage.decryptString(encrypted))
-
-    console.log('[edoobox] Check connection:', { baseUrl, apiVersion, keyLen: apiKey?.length, secretLen: apiSecret?.length, keyPrefix: apiKey?.slice(0, 4), secretPrefix: apiSecret?.slice(0, 4) })
-    const { EdooboxService } = await import('./edooboxService')
-    const service = new EdooboxService(baseUrl, apiKey, apiSecret, apiVersion as 'v1' | 'v2')
-    await service.checkConnection()
-    return { success: true }
-  } catch (error) {
-    console.error('[edoobox] Connection check failed:', error)
-    return { success: false, error: error instanceof Error ? error.message : 'Verbindung fehlgeschlagen' }
-  }
-})
-
-// Angebote auflisten
-ipcMain.handle('edoobox-list-offers', async (_event, baseUrl: string, apiVersion: string) => {
-  try {
-    const credPath = getEdooboxCredentialsPath()
-    const exists = await fs.access(credPath).then(() => true).catch(() => false)
-    if (!exists) return { success: false, error: 'Keine Zugangsdaten gespeichert' }
-    const encrypted = await fs.readFile(credPath)
-    const { apiKey, apiSecret } = JSON.parse(safeStorage.decryptString(encrypted))
-
-    const { EdooboxService } = await import('./edooboxService')
-    const service = new EdooboxService(baseUrl, apiKey, apiSecret, apiVersion as 'v1' | 'v2')
-    const offers = await service.listOffers()
-    return { success: true, offers }
-  } catch (error) {
-    console.error('[edoobox] List offers failed:', error)
-    return { success: false, error: error instanceof Error ? error.message : 'Angebote konnten nicht geladen werden' }
-  }
-})
-
-// Formular parsen (öffnet Dateiauswahl)
-ipcMain.handle('edoobox-parse-formular', async () => {
-  try {
-    const { dialog } = await import('electron')
-    const result = await dialog.showOpenDialog({
-      title: t('dialog.edooboxFormular.title'),
-      filters: [{ name: t('dialog.edooboxFormular.filterName'), extensions: ['docx'] }],
-      properties: ['openFile']
-    })
-
-    if (result.canceled || !result.filePaths[0]) return null
-
-    const { parseAkkreditierungsformular } = await import('./formularParser')
-    return await parseAkkreditierungsformular(result.filePaths[0])
-  } catch (error) {
-    console.error('[edoobox] Parse formular failed:', error)
-    return null
-  }
-})
-
-// Kategorien auflisten
-ipcMain.handle('edoobox-list-categories', async (_event, baseUrl: string, apiVersion: string) => {
-  try {
-    const credPath = getEdooboxCredentialsPath()
-    const exists = await fs.access(credPath).then(() => true).catch(() => false)
-    if (!exists) return { success: false, error: 'Keine Zugangsdaten gespeichert' }
-    const encrypted = await fs.readFile(credPath)
-    const { apiKey, apiSecret } = JSON.parse(safeStorage.decryptString(encrypted))
-
-    const { EdooboxService } = await import('./edooboxService')
-    const service = new EdooboxService(baseUrl, apiKey, apiSecret, apiVersion as 'v1' | 'v2')
-    const categories = await service.listCategories()
-    return { success: true, categories }
-  } catch (error) {
-    console.error('[edoobox] List categories failed:', error)
-    return { success: false, error: error instanceof Error ? error.message : 'Kategorien konnten nicht geladen werden' }
-  }
-})
-
-// Event an edoobox senden (Offer + Dates erstellen)
-ipcMain.handle('edoobox-import-event', async (_event, baseUrl: string, apiVersion: string, event: {
-  id?: string; title: string; description: string; maxParticipants?: number;
-  dates: Array<{ date: string; startTime: string; endTime: string }>;
-  location?: string; speakers?: Array<{ name: string; role?: string; institution?: string }>;
-  contact?: string; price?: number; category?: string
-}) => {
-  try {
-    const credPath = getEdooboxCredentialsPath()
-    const exists = await fs.access(credPath).then(() => true).catch(() => false)
-    if (!exists) return { success: false, error: 'Keine Zugangsdaten gespeichert' }
-    const encrypted = await fs.readFile(credPath)
-    const { apiKey, apiSecret } = JSON.parse(safeStorage.decryptString(encrypted))
-
-    const { EdooboxService } = await import('./edooboxService')
-    const service = new EdooboxService(baseUrl, apiKey, apiSecret, apiVersion as 'v1' | 'v2')
-
-    if (!event.category) return { success: false, error: 'Keine Kategorie ausgewählt' }
-
-    const offerId = await service.createOffer({
-      name: event.title,
-      category: event.category
-    })
-
-    // Update offer with additional fields
-    const updateFields: Record<string, unknown> = {}
-    if (event.maxParticipants) updateFields.user_maximum = event.maxParticipants
-    if (event.price !== undefined) updateFields.price = event.price
-
-    // Create or find place for location
-    let placeId: string | undefined
-    if (event.location) {
-      try {
-        const places = await service.listPlaces()
-        const existing = places.find(p => p.name === event.location)
-        if (existing) {
-          placeId = existing.id
-        } else {
-          placeId = await service.createPlace(event.location)
-        }
-        updateFields.place = placeId
-      } catch (e) {
-        console.warn('[edoobox] Could not create/find place:', e)
-      }
-    }
-
-    if (Object.keys(updateFields).length > 0) {
-      await service.updateOffer(offerId, updateFields)
-    }
-
-    // Create description text via POST /v2/text
-    if (event.description) {
-      await service.createOfferText(offerId, 'de', event.description)
-    }
-
-    for (const d of event.dates) {
-      await service.createDate(offerId, { ...d, placeId })
-    }
-
-    return { success: true, offerId }
-  } catch (error) {
-    console.error('[edoobox] Import event failed:', error)
-    return { success: false, error: error instanceof Error ? error.message : 'Event konnte nicht erstellt werden' }
-  }
-})
-
-// Dashboard: Angebote mit Buchungszahlen
-ipcMain.handle('edoobox-list-offers-dashboard', async (_event, baseUrl: string, apiVersion: string, scope?: 'active' | 'past' | 'all') => {
-  try {
-    const credPath = getEdooboxCredentialsPath()
-    const exists = await fs.access(credPath).then(() => true).catch(() => false)
-    if (!exists) return { success: false, error: 'Keine Zugangsdaten gespeichert' }
-    const encrypted = await fs.readFile(credPath)
-    const { apiKey, apiSecret } = JSON.parse(safeStorage.decryptString(encrypted))
-
-    const { EdooboxService } = await import('./edooboxService')
-    const service = new EdooboxService(baseUrl, apiKey, apiSecret, apiVersion as 'v1' | 'v2')
-    const offers = await service.listOffersForDashboard(scope || 'active')
-    return { success: true, offers }
-  } catch (error) {
-    console.error('[edoobox] List offers dashboard failed:', error)
-    return { success: false, error: error instanceof Error ? error.message : 'Dashboard konnte nicht geladen werden' }
-  }
-})
-
-// Dashboard: Buchungen für ein Angebot
-ipcMain.handle('edoobox-list-bookings', async (_event, baseUrl: string, apiVersion: string, offerId: string) => {
-  try {
-    const credPath = getEdooboxCredentialsPath()
-    const exists = await fs.access(credPath).then(() => true).catch(() => false)
-    if (!exists) return { success: false, error: 'Keine Zugangsdaten gespeichert' }
-    const encrypted = await fs.readFile(credPath)
-    const { apiKey, apiSecret } = JSON.parse(safeStorage.decryptString(encrypted))
-
-    const { EdooboxService } = await import('./edooboxService')
-    const service = new EdooboxService(baseUrl, apiKey, apiSecret, apiVersion as 'v1' | 'v2')
-    const bookings = await service.listBookingsForOffer(offerId)
-    return { success: true, bookings }
-  } catch (error) {
-    console.error('[edoobox] List bookings failed:', error)
-    return { success: false, error: error instanceof Error ? error.message : 'Buchungen konnten nicht geladen werden' }
-  }
-})
-
-// Events laden (JSON-Persistenz)
-ipcMain.handle('edoobox-load-events', async (_event, vaultPath: string) => {
-  try {
-    assertApprovedVault(vaultPath, 'edoobox-load-events')
-    const eventsPath = path.join(vaultPath, '.mindgraph', 'edoobox-events.json')
-    const exists = await fs.access(eventsPath).then(() => true).catch(() => false)
-    if (!exists) return []
-    const data = await fs.readFile(eventsPath, 'utf-8')
-    return JSON.parse(data)
-  } catch (error) {
-    console.error('[edoobox] Load events failed:', error)
-    return []
-  }
-})
-
-// Events speichern (JSON-Persistenz)
-ipcMain.handle('edoobox-save-events', async (_event, vaultPath: string, events: unknown[]) => {
-  try {
-    assertApprovedVault(vaultPath, 'edoobox-save-events')
-    const mindgraphDir = path.join(vaultPath, '.mindgraph')
-    await fs.mkdir(mindgraphDir, { recursive: true })
-    await fs.writeFile(path.join(mindgraphDir, 'edoobox-events.json'), JSON.stringify(events, null, 2))
-    return true
-  } catch (error) {
-    console.error('[edoobox] Save events failed:', error)
-    return false
-  }
-})
+// edoobox-Backend + DOCX-/Dialog-Actions (Formular-Import, IQ-Auswertung, Teilnehmerliste)
+// sind nach src/plugins/edoobox/ migriert (Plugin-Vertikale, Phasen 1+2) — über plugin:invoke
+// + Capability-Host (http.fetch/secrets/vault + dialog/resource). Hier bleibt nur die
+// einmalige Credential-Migration (siehe unten). Marketing folgt in Phase 2b.
 
 // ========================================
-// IQ-Auswertung (Hessen IQ Rückmeldung)
+// Antares CS (Medienzentrum-Verleih) — migriert nach src/plugins/antares/ (Plugin-Vertikale).
+// Service, IPC und Credentials leben jetzt im Plugin (über plugin:invoke + Capability-Host).
+// Hier bleibt nur die EINMALIGE Migration der alten safeStorage-Credentials in die Plugin-Secrets.
 // ========================================
 
-ipcMain.handle('iq-generate-report', async (_event, data: import('./iqReportService').IqReportData, suggestedFileName: string) => {
+async function migrateAntaresCredentialsToPlugin(): Promise<void> {
   try {
-    if (!mainWindow) return { success: false, error: 'No main window' }
-
-    const result = await dialog.showSaveDialog(mainWindow, {
-      title: 'IQ-Auswertung speichern',
-      defaultPath: suggestedFileName,
-      filters: [{ name: 'Word-Dokument', extensions: ['docx'] }]
-    })
-
-    if (result.canceled || !result.filePath) {
-      return { success: false, canceled: true }
+    if (await pluginSecretGet('plugin:antares:username')) return // schon migriert
+    const encPath = path.join(app.getPath('userData'), 'antares-credentials.enc')
+    const raw = await fs.readFile(encPath).catch(() => null)
+    if (!raw || !safeStorage.isEncryptionAvailable()) return
+    const creds = JSON.parse(safeStorage.decryptString(raw)) as { username?: string; password?: string }
+    if (creds.username && creds.password) {
+      await pluginSecretSet('plugin:antares:username', creds.username)
+      await pluginSecretSet('plugin:antares:password', creds.password)
+      console.log('[antares] Alte Credentials in Plugin-Secrets migriert')
     }
-
-    const { generateIqReport } = await import('./iqReportService')
-    await generateIqReport(data, result.filePath)
-    return { success: true, filePath: result.filePath }
-  } catch (error) {
-    console.error('[iq] Generate report failed:', error)
-    return { success: false, error: error instanceof Error ? error.message : 'IQ-Auswertung konnte nicht erstellt werden' }
-  }
-})
-
-ipcMain.handle('attendance-list-generate', async (
-  _event,
-  data: import('./attendanceListService').AttendanceListData,
-  suggestedFileName: string,
-) => {
-  try {
-    if (!mainWindow) return { success: false, error: 'No main window' }
-
-    const result = await dialog.showSaveDialog(mainWindow, {
-      title: 'Teilnehmerliste speichern',
-      defaultPath: suggestedFileName,
-      filters: [{ name: 'Word-Dokument', extensions: ['docx'] }]
-    })
-
-    if (result.canceled || !result.filePath) {
-      return { success: false, canceled: true }
-    }
-
-    const { generateAttendanceList } = await import('./attendanceListService')
-    await generateAttendanceList(data, result.filePath)
-    return { success: true, filePath: result.filePath }
-  } catch (error) {
-    console.error('[attendance-list] Generate failed:', error)
-    return { success: false, error: error instanceof Error ? error.message : 'Teilnehmerliste konnte nicht erstellt werden' }
-  }
-})
-
-ipcMain.handle('edoobox-list-dates', async (_event, baseUrl: string, apiVersion: string, offerId: string) => {
-  try {
-    const credPath = getEdooboxCredentialsPath()
-    const exists = await fs.access(credPath).then(() => true).catch(() => false)
-    if (!exists) return { success: false, error: 'Keine Zugangsdaten gespeichert' }
-    const encrypted = await fs.readFile(credPath)
-    const { apiKey, apiSecret } = JSON.parse(safeStorage.decryptString(encrypted))
-
-    const { EdooboxService } = await import('./edooboxService')
-    const service = new EdooboxService(baseUrl, apiKey, apiSecret, apiVersion as 'v1' | 'v2')
-    const dates = await service.listDatesForOffer(offerId)
-    return { success: true, dates }
-  } catch (error) {
-    console.error('[edoobox] List dates failed:', error)
-    return { success: false, error: error instanceof Error ? error.message : 'Termine konnten nicht geladen werden' }
-  }
-})
-
-// ========================================
-// Antares CS (Medienzentrum-Verleih)
-// ========================================
-
-function getAntaresCredentialsPath(): string {
-  return path.join(app.getPath('userData'), 'antares-credentials.enc')
-}
-
-async function loadAntaresCredentials(): Promise<{ username: string; password: string } | null> {
-  const credPath = getAntaresCredentialsPath()
-  const exists = await fs.access(credPath).then(() => true).catch(() => false)
-  if (!exists) return null
-  const encrypted = await fs.readFile(credPath)
-  try {
-    return JSON.parse(safeStorage.decryptString(encrypted))
-  } catch {
-    return null
+  } catch (e) {
+    console.warn('[antares] Credential-Migration übersprungen:', e instanceof Error ? e.message : e)
   }
 }
 
-async function buildAntaresService(baseUrl: string, context: string) {
-  const creds = await loadAntaresCredentials()
-  if (!creds) throw new Error('Keine Antares-Zugangsdaten gespeichert')
-  const { AntaresService } = await import('./antaresService')
-  return new AntaresService(baseUrl, creds.username, creds.password, context || 'HE/16')
+// edoobox: einmalige Migration der alten safeStorage-Credentials (userData/edoobox-credentials.enc)
+// in die Plugin-Secrets (Schritt-9-Vertikale, Phase 1). Spiegelt migrateAntaresCredentialsToPlugin.
+async function migrateEdooboxCredentialsToPlugin(): Promise<void> {
+  try {
+    if (await pluginSecretGet('plugin:edoobox:apiKey')) return // schon migriert
+    const encPath = path.join(app.getPath('userData'), 'edoobox-credentials.enc')
+    const raw = await fs.readFile(encPath).catch(() => null)
+    if (!raw || !safeStorage.isEncryptionAvailable()) return
+    const creds = JSON.parse(safeStorage.decryptString(raw)) as { apiKey?: string; apiSecret?: string }
+    if (creds.apiKey && creds.apiSecret) {
+      await pluginSecretSet('plugin:edoobox:apiKey', creds.apiKey)
+      await pluginSecretSet('plugin:edoobox:apiSecret', creds.apiSecret)
+      console.log('[edoobox] Alte Credentials in Plugin-Secrets migriert')
+    }
+  } catch (e) {
+    console.warn('[edoobox] Credential-Migration übersprungen:', e instanceof Error ? e.message : e)
+  }
 }
 
-ipcMain.handle('antares-save-credentials', async (_event, username: string, password: string) => {
+// Marketing (WordPress) ist Teil der edoobox-Vertikale (src/plugins/edoobox/, Phase 2b) —
+// Service, IPC + Bild-Flow leben jetzt im Plugin (plugin:invoke). Hier bleibt nur die einmalige
+// Migration des alten WordPress-App-Passworts (marketing-credentials.enc) in die Plugin-Secrets.
+async function migrateMarketingCredentialsToPlugin(): Promise<void> {
   try {
-    if (!safeStorage.isEncryptionAvailable()) {
-      throw new Error('safeStorage ist nicht verfügbar')
+    if (await pluginSecretGet('plugin:edoobox:wpAppPassword')) return // schon migriert
+    const encPath = path.join(app.getPath('userData'), 'marketing-credentials.enc')
+    const raw = await fs.readFile(encPath).catch(() => null)
+    if (!raw || !safeStorage.isEncryptionAvailable()) return
+    const creds = JSON.parse(safeStorage.decryptString(raw)) as { wpAppPassword?: string }
+    if (creds.wpAppPassword) {
+      await pluginSecretSet('plugin:edoobox:wpAppPassword', creds.wpAppPassword)
+      console.log('[marketing] Altes WordPress-App-Passwort in Plugin-Secrets migriert')
     }
-    const encrypted = safeStorage.encryptString(JSON.stringify({ username, password }))
-    await fs.writeFile(getAntaresCredentialsPath(), encrypted)
-    return true
   } catch (e) {
-    console.error('[antares] Save credentials failed:', e)
-    return false
-  }
-})
-
-ipcMain.handle('antares-load-credentials', async () => {
-  return loadAntaresCredentials()
-})
-
-ipcMain.handle('antares-check', async (_event, baseUrl: string, context: string) => {
-  try {
-    const service = await buildAntaresService(baseUrl, context)
-    await service.checkConnection()
-    return { success: true }
-  } catch (e) {
-    return { success: false, error: e instanceof Error ? e.message : 'Verbindungsfehler' }
-  }
-})
-
-ipcMain.handle('antares-list-offene-registrierungen', async (_event, baseUrl: string, context: string) => {
-  try {
-    const service = await buildAntaresService(baseUrl, context)
-    const rows = await service.listOffeneRegistrierungen()
-    return { success: true, rows }
-  } catch (e) {
-    return { success: false, error: e instanceof Error ? e.message : 'Fehler' }
-  }
-})
-
-ipcMain.handle('antares-list-entleiher', async (_event, baseUrl: string, context: string, page?: number, rows?: number) => {
-  try {
-    const service = await buildAntaresService(baseUrl, context)
-    const result = await service.listEntleiher({ page, rows })
-    return { success: true, ...result }
-  } catch (e) {
-    return { success: false, error: e instanceof Error ? e.message : 'Fehler' }
-  }
-})
-
-ipcMain.handle('antares-list-mahnungen-geraete', async (_event, baseUrl: string, context: string) => {
-  try {
-    const service = await buildAntaresService(baseUrl, context)
-    const result = await service.listMahnungenGeraete()
-    return { success: true, ...result }
-  } catch (e) {
-    return { success: false, error: e instanceof Error ? e.message : 'Fehler' }
-  }
-})
-
-ipcMain.handle('antares-list-mahnungen-medien', async (_event, baseUrl: string, context: string) => {
-  try {
-    const service = await buildAntaresService(baseUrl, context)
-    const result = await service.listMahnungenMedien()
-    return { success: true, ...result }
-  } catch (e) {
-    return { success: false, error: e instanceof Error ? e.message : 'Fehler' }
-  }
-})
-
-ipcMain.handle('antares-list-ausgabeliste', async (_event, baseUrl: string, context: string) => {
-  try {
-    const service = await buildAntaresService(baseUrl, context)
-    const result = await service.listAusgabeliste()
-    return { success: true, ...result }
-  } catch (e) {
-    return { success: false, error: e instanceof Error ? e.message : 'Fehler' }
-  }
-})
-
-ipcMain.handle('antares-dashboard-counts', async (_event, baseUrl: string, context: string) => {
-  try {
-    const service = await buildAntaresService(baseUrl, context)
-    const counts = await service.fetchDashboardCounts()
-    return { success: true, counts }
-  } catch (e) {
-    return { success: false, error: e instanceof Error ? e.message : 'Fehler' }
-  }
-})
-
-ipcMain.handle('antares-list-lizenzen-ablauf', async (_event, baseUrl: string, context: string, daysAhead?: number) => {
-  try {
-    const service = await buildAntaresService(baseUrl, context)
-    const rows = await service.listLizenzenAblauf(daysAhead ?? 365)
-    return { success: true, rows }
-  } catch (e) {
-    return { success: false, error: e instanceof Error ? e.message : 'Fehler' }
-  }
-})
-
-// ========================================
-// Marketing (WordPress + Instagram)
-// ========================================
-
-function getMarketingCredentialsPath(): string {
-  return path.join(app.getPath('userData'), 'marketing-credentials.enc')
-}
-
-// Credentials speichern (safeStorage)
-ipcMain.handle('marketing-save-credentials', async (_event, credentials: { wpAppPassword?: string }) => {
-  try {
-    if (!safeStorage.isEncryptionAvailable()) {
-      console.warn('[marketing] safeStorage encryption not available')
-      return false
-    }
-    // Merge with existing credentials
-    let existing: Record<string, string> = {}
-    const credPath = getMarketingCredentialsPath()
-    const fileExists = await fs.access(credPath).then(() => true).catch(() => false)
-    if (fileExists) {
-      try {
-        const encrypted = await fs.readFile(credPath)
-        existing = JSON.parse(safeStorage.decryptString(encrypted))
-      } catch { /* ignore */ }
-    }
-    const merged = { ...existing, ...credentials }
-    const data = JSON.stringify(merged)
-    const encrypted = safeStorage.encryptString(data)
-    await fs.writeFile(credPath, encrypted)
-    return true
-  } catch (error) {
-    console.error('[marketing] Failed to save credentials:', error)
-    return false
-  }
-})
-
-// Credentials laden (safeStorage)
-ipcMain.handle('marketing-load-credentials', async () => {
-  try {
-    if (!safeStorage.isEncryptionAvailable()) return null
-    const credPath = getMarketingCredentialsPath()
-    const exists = await fs.access(credPath).then(() => true).catch(() => false)
-    if (!exists) return null
-    const encrypted = await fs.readFile(credPath)
-    const decrypted = safeStorage.decryptString(encrypted)
-    return JSON.parse(decrypted) as { wpAppPassword?: string; igAccessToken?: string }
-  } catch (error) {
-    console.error('[marketing] Failed to load credentials:', error)
-    return null
-  }
-})
-
-// WordPress Verbindungstest
-ipcMain.handle('marketing-check-wordpress', async (_event, siteUrl: string, username: string) => {
-  try {
-    const creds = await loadMarketingCredentials()
-    if (!creds?.wpAppPassword) return { success: false, error: 'Kein WordPress App-Passwort gespeichert' }
-
-    const { WordPressService } = await import('./marketingService')
-    const wp = new WordPressService(siteUrl, username, creds.wpAppPassword)
-    const user = await wp.checkConnection()
-    return { success: true, userName: user.name }
-  } catch (error) {
-    console.error('[marketing] WordPress check failed:', error)
-    return { success: false, error: error instanceof Error ? error.message : 'Verbindung fehlgeschlagen' }
-  }
-})
-
-// Content generieren via Ollama
-ipcMain.handle('marketing-generate-content', async (_event, offerData: {
-  name: string
-  description?: string
-  dateStart?: string
-  dateEnd?: string
-  location?: string
-  price?: number
-  maxParticipants?: number
-  speakers?: string[]
-  bookingUrl?: string
-}, model: string) => {
-  console.log('[marketing] Generating content for:', offerData.name, 'with model:', model, 'location:', offerData.location, 'dateStart:', offerData.dateStart, 'speakers:', offerData.speakers, 'desc:', offerData.description?.slice(0, 50))
-  try {
-    // Build offer summary for the prompt
-    const details: string[] = []
-    if (offerData.description) details.push(`Beschreibung: ${offerData.description}`)
-    if (offerData.dateStart) {
-      const start = new Date(offerData.dateStart)
-      const dateStr = start.toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })
-      const timeStr = start.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })
-      if (offerData.dateEnd) {
-        const end = new Date(offerData.dateEnd)
-        const endDateStr = end.toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })
-        const endTimeStr = end.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })
-        if (dateStr === endDateStr) {
-          details.push(`Datum: ${dateStr}, ${timeStr} – ${endTimeStr}`)
-        } else {
-          details.push(`Datum: ${dateStr} ${timeStr} – ${endDateStr} ${endTimeStr}`)
-        }
-      } else {
-        details.push(`Datum: ${dateStr}, ${timeStr} Uhr`)
-      }
-    }
-    if (offerData.location) details.push(`Ort: ${offerData.location}`)
-    if (offerData.price) details.push(`Preis: ${offerData.price} EUR`)
-    if (offerData.maxParticipants) details.push(`Max. Teilnehmer: ${offerData.maxParticipants}`)
-    if (offerData.speakers?.length) details.push(`Referent(en): ${offerData.speakers.join(', ')}`)
-    if (offerData.bookingUrl) details.push(`Anmelde-Link: ${offerData.bookingUrl}`)
-
-    const offerSummary = `Titel: ${offerData.name}\n${details.join('\n')}`
-
-    const bookingHint = offerData.bookingUrl
-      ? ` Binde den Anmelde-Link (${offerData.bookingUrl}) prominent als Button oder Link im Call-to-Action ein.`
-      : ''
-
-    // Generate WordPress Blog Post
-    const wpPrompt = `Du bist ein professioneller Marketing-Texter für Fortbildungsveranstaltungen. Erstelle einen ansprechenden Blog-Post im HTML-Format. Verwende <h2>, <p>, <ul> Tags. BEGINNE NICHT mit dem Titel als Überschrift — der Titel wird automatisch von WordPress angezeigt. Starte direkt mit dem Einleitungstext. Der Blog-Post MUSS am Ende einen Abschnitt "Veranstaltungsdetails" mit ALLEN folgenden Infos als <p><strong>-Liste enthalten: Datum, Uhrzeit, Ort, Referent(en), Teilnehmerzahl.${bookingHint} WICHTIG: Verwende KEIN Gendern mit Sternchen, Doppelpunkt oder Unterstrich (NICHT Schüler*innen, Lehrer:innen etc.). Nutze stattdessen neutrale Begriffe wie Lehrkräfte, Teilnehmende oder die ausgeschriebene Form. Gib NUR den HTML-Body zurück, keine Erklärungen.
-
-Veranstaltung:
-${offerSummary}`
-
-    const wpResponse = await fetch(`${OLLAMA_API_URL}/api/generate`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model,
-        prompt: wpPrompt,
-        stream: false,
-        think: false,
-        options: { temperature: 0.7, num_predict: 2000 }
-      }),
-      signal: AbortSignal.timeout(120000)
-    })
-
-    if (!wpResponse.ok) throw new Error(`Ollama API Fehler: ${wpResponse.status}`)
-    const wpData = await wpResponse.json()
-    const blogPost = wpData.response?.trim() || ''
-
-    // Generate Instagram Caption
-    const igPrompt = `Du bist ein Social-Media-Experte. Erstelle eine ansprechende Instagram-Caption (max. 2000 Zeichen) für folgende Veranstaltung. Die Caption MUSS Datum, Uhrzeit und Ort der Veranstaltung enthalten. Sie soll Aufmerksamkeit erregen und mit relevanten Hashtags enden. Verwende passende Emojis. WICHTIG: Verwende KEIN Gendern mit Sternchen, Doppelpunkt oder Unterstrich (NICHT Schüler*innen, Lehrer:innen etc.). Nutze stattdessen neutrale Begriffe wie Lehrkräfte, Teilnehmende oder die ausgeschriebene Form. Gib NUR die Caption zurück.
-
-Veranstaltung:
-${offerSummary}`
-
-    const igResponse = await fetch(`${OLLAMA_API_URL}/api/generate`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model,
-        prompt: igPrompt,
-        stream: false,
-        think: false,
-        options: { temperature: 0.8, num_predict: 1000 }
-      }),
-      signal: AbortSignal.timeout(120000)
-    })
-
-    if (!igResponse.ok) throw new Error(`Ollama API Fehler (IG): ${igResponse.status}`)
-    const igData = await igResponse.json()
-    const igCaption = igData.response?.trim() || ''
-
-    console.log('[marketing] Content generated:', { blogPostLen: blogPost.length, igCaptionLen: igCaption.length })
-    return { success: true, blogPost, igCaption }
-  } catch (error) {
-    console.error('[marketing] Content generation failed:', error)
-    return { success: false, error: error instanceof Error ? error.message : 'Content-Generierung fehlgeschlagen' }
-  }
-})
-
-// WordPress Post veröffentlichen
-ipcMain.handle('marketing-publish-wordpress', async (_event, siteUrl: string, username: string, title: string, content: string, status: 'draft' | 'publish', featuredMediaId?: number) => {
-  try {
-    const creds = await loadMarketingCredentials()
-    if (!creds?.wpAppPassword) return { success: false, error: 'Kein WordPress App-Passwort gespeichert' }
-
-    const { WordPressService } = await import('./marketingService')
-    const wp = new WordPressService(siteUrl, username, creds.wpAppPassword)
-    const post = await wp.createPost(title, content, status, featuredMediaId)
-    console.log('[marketing] WordPress post created:', post.id, post.link)
-    return { success: true, postId: post.id, postUrl: post.link, status: post.status }
-  } catch (error) {
-    console.error('[marketing] WordPress publish failed:', error)
-    return { success: false, error: error instanceof Error ? error.message : 'Veröffentlichung fehlgeschlagen' }
-  }
-})
-
-// Bild auf WordPress hochladen (für Instagram-URL)
-ipcMain.handle('marketing-upload-image', async (_event, siteUrl: string, username: string, imagePath: string, caption?: string) => {
-  try {
-    const creds = await loadMarketingCredentials()
-    if (!creds?.wpAppPassword) return { success: false, error: 'Kein WordPress App-Passwort gespeichert' }
-
-    const safeImagePath = await assertSafePath(imagePath, 'marketing-upload-image')
-    const imageBuffer = await fs.readFile(safeImagePath)
-    const filename = path.basename(safeImagePath)
-    const ext = path.extname(safeImagePath).toLowerCase()
-    const mimeTypes: Record<string, string> = {
-      '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png',
-      '.gif': 'image/gif', '.webp': 'image/webp'
-    }
-    const mimeType = mimeTypes[ext] || 'image/jpeg'
-
-    const { WordPressService } = await import('./marketingService')
-    const wp = new WordPressService(siteUrl, username, creds.wpAppPassword)
-    const media = await wp.uploadMedia(imageBuffer, filename, mimeType, caption)
-    console.log('[marketing] Image uploaded:', media.id, media.source_url)
-    return { success: true, mediaId: media.id, imageUrl: media.source_url }
-  } catch (error) {
-    console.error('[marketing] Image upload failed:', error)
-    return { success: false, error: error instanceof Error ? error.message : 'Bild-Upload fehlgeschlagen' }
-  }
-})
-
-// Bild per Google Imagen generieren
-ipcMain.handle('marketing-generate-image', async (_event, prompt: string, apiKey: string) => {
-  console.log('[marketing] Generating image with Imagen, prompt length:', prompt.length, 'prompt:', prompt.slice(0, 200))
-  try {
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict?key=${apiKey}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        instances: [{ prompt }],
-        parameters: {
-          sampleCount: 1,
-          aspectRatio: '16:9',
-          safetyFilterLevel: 'block_only_high'
-        }
-      }),
-      signal: AbortSignal.timeout(120000)
-    })
-
-    if (!response.ok) {
-      const text = await response.text()
-      console.error('[marketing] Imagen API error:', response.status, text.slice(0, 500))
-      throw new Error(`Imagen API Fehler (${response.status}): ${text.slice(0, 200)}`)
-    }
-
-    const data = await response.json()
-    const filtered = data.predictions?.[0]?.safetyAttributes?.blocked
-      ? `BLOCKED (categories: ${JSON.stringify(data.predictions[0].safetyAttributes)})`
-      : data.filteredReason || 'none'
-    console.log('[marketing] Imagen response: predictions:', data.predictions?.length ?? 0, 'filtered:', filtered, 'keys:', Object.keys(data))
-    const predictions = data.predictions?.filter((p: { bytesBase64Encoded?: string }) => p.bytesBase64Encoded)
-    if (!predictions || predictions.length === 0) {
-      const reason = data.filteredReason || filtered || JSON.stringify(data).slice(0, 500)
-      console.error('[marketing] Imagen: no usable images returned. Full response:', JSON.stringify(data).slice(0, 1000))
-      throw new Error(`Keine Bilder generiert: ${reason}`)
-    }
-
-    // Save to temp file
-    const imageBase64 = predictions[0].bytesBase64Encoded
-    const tempPath = path.join(app.getPath('temp'), `mindgraph-imagen-${Date.now()}.png`)
-    await fs.writeFile(tempPath, Buffer.from(imageBase64, 'base64'))
-    console.log('[marketing] Image generated and saved to:', tempPath)
-
-    return { success: true, imagePath: tempPath, imageBase64 }
-  } catch (error) {
-    console.error('[marketing] Image generation failed:', error)
-    return { success: false, error: error instanceof Error ? error.message : 'Bildgenerierung fehlgeschlagen' }
-  }
-})
-
-// Bild als Base64 lesen (für Preview im Renderer)
-ipcMain.handle('marketing-read-image-base64', async (_event, imagePath: string) => {
-  try {
-    const safe = await assertSafePath(imagePath, 'marketing-read-image-base64')
-    const buffer = await fs.readFile(safe)
-    return buffer.toString('base64')
-  } catch {
-    return null
-  }
-})
-
-// Bild auswählen (File Dialog)
-ipcMain.handle('marketing-select-image', async () => {
-  try {
-    const result = await dialog.showOpenDialog({
-      title: 'Bild auswählen',
-      filters: [{ name: 'Bilder', extensions: ['jpg', 'jpeg', 'png', 'gif', 'webp'] }],
-      properties: ['openFile']
-    })
-    if (result.canceled || !result.filePaths[0]) return null
-    return result.filePaths[0]
-  } catch {
-    return null
-  }
-})
-
-// Helper: Marketing-Credentials laden
-async function loadMarketingCredentials(): Promise<{ wpAppPassword?: string; igAccessToken?: string } | null> {
-  try {
-    if (!safeStorage.isEncryptionAvailable()) return null
-    const credPath = getMarketingCredentialsPath()
-    const exists = await fs.access(credPath).then(() => true).catch(() => false)
-    if (!exists) return null
-    const encrypted = await fs.readFile(credPath)
-    return JSON.parse(safeStorage.decryptString(encrypted))
-  } catch {
-    return null
+    console.warn('[marketing] Credential-Migration übersprungen:', e instanceof Error ? e.message : e)
   }
 }
 

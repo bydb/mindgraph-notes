@@ -16,6 +16,8 @@ import 'reactflow/dist/style.css'
 import './workflowCanvas.css'
 
 import { useWorkflowStore } from '../../stores/workflowStore'
+import { invokePlugin } from '../../plugins/client'
+import { edooboxService } from '../../stores/edooboxServiceBridge'
 import { useTranslation } from '../../utils/translations'
 import { useNotesStore } from '../../stores/notesStore'
 import { useVaultSettingsStore } from '../../stores/vaultSettingsStore'
@@ -163,8 +165,8 @@ function InnerCanvas({ onOpenInbox }: Props) {
   useEffect(() => {
     let alive = true
     Promise.all([
-      window.electronAPI.edooboxLoadCredentials().then(c => !!(c && c.apiKey)).catch(() => false),
-      window.electronAPI.antaresLoadCredentials().then(c => !!(c && c.username)).catch(() => false)
+      edooboxService.loadCredentials().then(c => !!(c && c.apiKey)).catch(() => false),
+      invokePlugin<{ username?: string } | null>('antares', 'antares.loadCredentials').then(c => !!(c && c.username)).catch(() => false)
     ]).then(([edoobox, antares]) => { if (alive) setCreds({ edoobox, antares }) })
     return () => { alive = false }
   }, [])

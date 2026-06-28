@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { useNotesStore } from '../../stores/notesStore'
 import { useUIStore } from '../../stores/uiStore'
 import { useEmailStore } from '../../stores/emailStore'
-import { useAgentStore } from '../../stores/agentStore'
+import { useEventAgentBridge } from '../../stores/eventAgentBridge'
 import { useTranslation } from '../../utils/translations'
 import { buildDashboardSnapshot, formatRelativeDay, collectWeekFocus, collectFocusTasks, proposeTimeBlocks, type DashboardSnapshot } from '../../utils/dashboardData'
 import './MorningBriefing.css'
@@ -17,16 +17,15 @@ export const MorningBriefing: React.FC<MorningBriefingProps> = ({ onClose, onOpe
   const { notes, vaultPath } = useNotesStore()
   const { taskExcludedFolders, dashboard, setDashboard, taskLeadTime } = useUIStore()
   const emails = useEmailStore(state => state.emails)
-  const loadDashboardOffers = useAgentStore(state => state.loadDashboard)
+  const loadDashboardOffers = useEventAgentBridge(state => state.loadOffers)
 
   const [snapshot, setSnapshot] = useState<DashboardSnapshot | null>(null)
 
   useEffect(() => {
     let cancelled = false
     ;(async () => {
-      await loadDashboardOffers({ includeBookings: true })
+      const latestOffers = await loadDashboardOffers({ includeBookings: true })
       if (cancelled) return
-      const latestOffers = useAgentStore.getState().dashboardOffers
       const snap = await buildDashboardSnapshot({
         notes,
         vaultPath,

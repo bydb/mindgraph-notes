@@ -81,6 +81,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   workflowSave: (vaultPath: string, file: object) => ipcRenderer.invoke('workflow-save', vaultPath, file),
   workflowRun: (payload: object) => ipcRenderer.invoke('workflow-run', payload),
 
+  // Plugin-Transport (ein generischer Kanal, nicht-generische Actions)
+  pluginInvoke: (pluginId: string, actionId: string, payload?: unknown) =>
+    ipcRenderer.invoke('plugin:invoke', pluginId, actionId, payload),
+  pluginList: () => ipcRenderer.invoke('plugin:list'),
+
   // Notes-Cache für schnelles Laden
   saveNotesCache: (vaultPath: string, cache: object) => ipcRenderer.invoke('save-notes-cache', vaultPath, cache),
   loadNotesCache: (vaultPath: string) => ipcRenderer.invoke('load-notes-cache', vaultPath),
@@ -493,96 +498,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('calendar-request-access'),
 
   // reMarkable (USB)
-  remarkableUsbCheck: () =>
-    ipcRenderer.invoke('remarkable-usb-check'),
-  remarkableListDocuments: (folderId?: string) =>
-    ipcRenderer.invoke('remarkable-list-documents', folderId),
-  remarkableDownloadDocument: (vaultPath: string, document: { id: string; name: string }) =>
-    ipcRenderer.invoke('remarkable-download-document', vaultPath, document),
-  remarkableUploadPdf: (vaultPath: string, relativePdfPath: string) =>
-    ipcRenderer.invoke('remarkable-upload-pdf', vaultPath, relativePdfPath),
-  remarkableOptimizePdfForUpload: (vaultPath: string, relativePdfPath: string) =>
-    ipcRenderer.invoke('remarkable-optimize-pdf', vaultPath, relativePdfPath),
-  remarkableBookifyPdf: (vaultPath: string, relativePdfPath: string) =>
-    ipcRenderer.invoke('remarkable-bookify-pdf', vaultPath, relativePdfPath),
-  remarkableUsbDebugInfo: () =>
-    ipcRenderer.invoke('remarkable-usb-debug-info'),
 
-  // edoobox Agent
-  edooboxSaveCredentials: (apiKey: string, apiSecret: string) =>
-    ipcRenderer.invoke('edoobox-save-credentials', apiKey, apiSecret),
-  edooboxLoadCredentials: () =>
-    ipcRenderer.invoke('edoobox-load-credentials'),
-  edooboxCheck: (baseUrl: string, apiVersion: string) =>
-    ipcRenderer.invoke('edoobox-check', baseUrl, apiVersion),
-  edooboxListOffers: (baseUrl: string, apiVersion: string) =>
-    ipcRenderer.invoke('edoobox-list-offers', baseUrl, apiVersion),
-  edooboxListCategories: (baseUrl: string, apiVersion: string) =>
-    ipcRenderer.invoke('edoobox-list-categories', baseUrl, apiVersion),
-  edooboxParseFormular: () =>
-    ipcRenderer.invoke('edoobox-parse-formular'),
-  edooboxImportEvent: (baseUrl: string, apiVersion: string, event: object) =>
-    ipcRenderer.invoke('edoobox-import-event', baseUrl, apiVersion, event),
-  edooboxLoadEvents: (vaultPath: string) =>
-    ipcRenderer.invoke('edoobox-load-events', vaultPath),
-  edooboxSaveEvents: (vaultPath: string, events: object[]) =>
-    ipcRenderer.invoke('edoobox-save-events', vaultPath, events),
-  edooboxListOffersDashboard: (baseUrl: string, apiVersion: string, scope?: 'active' | 'past' | 'all') =>
-    ipcRenderer.invoke('edoobox-list-offers-dashboard', baseUrl, apiVersion, scope),
-  edooboxListBookings: (baseUrl: string, apiVersion: string, offerId: string) =>
-    ipcRenderer.invoke('edoobox-list-bookings', baseUrl, apiVersion, offerId),
-  edooboxListDates: (baseUrl: string, apiVersion: string, offerId: string) =>
-    ipcRenderer.invoke('edoobox-list-dates', baseUrl, apiVersion, offerId),
+  // edoobox Agent: vollständig nach src/plugins/edoobox/ migriert (plugin:invoke) — inkl.
+  // Formular-Import + IQ-/Anwesenheitsliste-DOCX (Phase 2, via edooboxClient).
 
-  // Antares CS (Medienzentrum-Verleih)
-  antaresSaveCredentials: (username: string, password: string) =>
-    ipcRenderer.invoke('antares-save-credentials', username, password),
-  antaresLoadCredentials: () =>
-    ipcRenderer.invoke('antares-load-credentials'),
-  antaresCheck: (baseUrl: string, context: string) =>
-    ipcRenderer.invoke('antares-check', baseUrl, context),
-  antaresListOffeneRegistrierungen: (baseUrl: string, context: string) =>
-    ipcRenderer.invoke('antares-list-offene-registrierungen', baseUrl, context),
-  antaresListEntleiher: (baseUrl: string, context: string, page?: number, rows?: number) =>
-    ipcRenderer.invoke('antares-list-entleiher', baseUrl, context, page, rows),
-  antaresListMahnungenGeraete: (baseUrl: string, context: string) =>
-    ipcRenderer.invoke('antares-list-mahnungen-geraete', baseUrl, context),
-  antaresListMahnungenMedien: (baseUrl: string, context: string) =>
-    ipcRenderer.invoke('antares-list-mahnungen-medien', baseUrl, context),
-  antaresListAusgabeliste: (baseUrl: string, context: string) =>
-    ipcRenderer.invoke('antares-list-ausgabeliste', baseUrl, context),
-  antaresDashboardCounts: (baseUrl: string, context: string) =>
-    ipcRenderer.invoke('antares-dashboard-counts', baseUrl, context),
-  antaresListLizenzenAblauf: (baseUrl: string, context: string, daysAhead?: number) =>
-    ipcRenderer.invoke('antares-list-lizenzen-ablauf', baseUrl, context, daysAhead),
+  // Antares CS: migriert nach src/plugins/antares/ — Aufruf via electronAPI.pluginInvoke('antares', …)
 
-  // IQ-Auswertung
-  iqGenerateReport: (data: object, suggestedFileName: string) =>
-    ipcRenderer.invoke('iq-generate-report', data, suggestedFileName),
-
-  // Anwesenheitsliste (Teilnehmerliste)
-  attendanceListGenerate: (data: object, suggestedFileName: string) =>
-    ipcRenderer.invoke('attendance-list-generate', data, suggestedFileName),
-
-  // Marketing (WordPress)
-  marketingSaveCredentials: (credentials: { wpAppPassword?: string }) =>
-    ipcRenderer.invoke('marketing-save-credentials', credentials),
-  marketingLoadCredentials: () =>
-    ipcRenderer.invoke('marketing-load-credentials'),
-  marketingCheckWordpress: (siteUrl: string, username: string) =>
-    ipcRenderer.invoke('marketing-check-wordpress', siteUrl, username),
-  marketingGenerateContent: (offerData: object, model: string) =>
-    ipcRenderer.invoke('marketing-generate-content', offerData, model),
-  marketingPublishWordpress: (siteUrl: string, username: string, title: string, content: string, status: 'draft' | 'publish', featuredMediaId?: number) =>
-    ipcRenderer.invoke('marketing-publish-wordpress', siteUrl, username, title, content, status, featuredMediaId),
-  marketingUploadImage: (siteUrl: string, username: string, imagePath: string, caption?: string) =>
-    ipcRenderer.invoke('marketing-upload-image', siteUrl, username, imagePath, caption),
-  marketingGenerateImage: (prompt: string, apiKey: string) =>
-    ipcRenderer.invoke('marketing-generate-image', prompt, apiKey),
-  marketingReadImageBase64: (imagePath: string) =>
-    ipcRenderer.invoke('marketing-read-image-base64', imagePath),
-  marketingSelectImage: () =>
-    ipcRenderer.invoke('marketing-select-image'),
+  // Marketing (WordPress + Imagen): nach src/plugins/edoobox/ migriert (plugin:invoke via
+  // edooboxClient) — inkl. bytes-basiertem Bild-Flow (Phase 2b).
 
   // Office-Formate
   officeParseExcel: (filePath: string) =>

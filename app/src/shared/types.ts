@@ -908,56 +908,16 @@ export interface ElectronAPI {
   calendarRequestAccess: () => Promise<{ success: boolean; status: 'granted' | 'alreadyGranted' | 'denied' | 'deniedPersistent' | 'unsupported' | 'error' | 'unknown'; error?: string; raw?: string }>;
 
   // reMarkable (USB)
-  remarkableUsbCheck: () => Promise<ReMarkableUsbCheckResult>;
-  remarkableListDocuments: (folderId?: string) => Promise<{ documents: ReMarkableDocumentSummary[]; error?: string }>;
-  remarkableDownloadDocument: (vaultPath: string, document: { id: string; name: string }) => Promise<ReMarkableDownloadResult>;
-  remarkableUploadPdf: (vaultPath: string, relativePdfPath: string) => Promise<ReMarkableUploadResult>;
-  remarkableOptimizePdfForUpload: (vaultPath: string, relativePdfPath: string) => Promise<ReMarkableOptimizeResult>;
-  remarkableBookifyPdf: (vaultPath: string, relativePdfPath: string) => Promise<ReMarkableBookifyResult>;
-  remarkableUsbDebugInfo: () => Promise<ReMarkableUsbDebugInfoResult>;
 
-  // edoobox Agent
-  edooboxSaveCredentials: (apiKey: string, apiSecret: string) => Promise<boolean>;
-  edooboxLoadCredentials: () => Promise<{ apiKey: string; apiSecret: string } | null>;
-  edooboxCheck: (baseUrl: string, apiVersion: string) => Promise<{ success: boolean; error?: string }>;
-  edooboxListOffers: (baseUrl: string, apiVersion: string) => Promise<{ success: boolean; offers?: EdooboxOffer[]; error?: string }>;
-  edooboxListCategories: (baseUrl: string, apiVersion: string) => Promise<{ success: boolean; categories?: EdooboxCategory[]; error?: string }>;
-  edooboxParseFormular: () => Promise<EdooboxImportResult | null>;
-  edooboxImportEvent: (baseUrl: string, apiVersion: string, event: EdooboxEvent) => Promise<{ success: boolean; offerId?: string; error?: string }>;
-  edooboxLoadEvents: (vaultPath: string) => Promise<EdooboxEvent[]>;
-  edooboxSaveEvents: (vaultPath: string, events: EdooboxEvent[]) => Promise<boolean>;
-  edooboxListOffersDashboard: (baseUrl: string, apiVersion: string, scope?: 'active' | 'past' | 'all') => Promise<{ success: boolean; offers?: EdooboxOfferDashboard[]; error?: string }>;
-  edooboxListBookings: (baseUrl: string, apiVersion: string, offerId: string) => Promise<{ success: boolean; bookings?: EdooboxBooking[]; error?: string }>;
-  edooboxListDates: (baseUrl: string, apiVersion: string, offerId: string) => Promise<{ success: boolean; dates?: EdooboxEventDate[]; error?: string }>;
+  // edoobox Agent: vollständig nach src/plugins/edoobox/ migriert (Aufruf via edooboxClient) —
+  // inkl. Formular-Import + IQ-/Anwesenheitsliste-DOCX (Phase 2). Datentypen (EdooboxImportResult,
+  // IqReportData, AttendanceListData) bleiben hier, der Renderer nutzt sie weiter.
 
-  // Antares CS (Medienzentrum-Verleih)
-  antaresSaveCredentials: (username: string, password: string) => Promise<boolean>;
-  antaresLoadCredentials: () => Promise<{ username: string; password: string } | null>;
-  antaresCheck: (baseUrl: string, context: string) => Promise<{ success: boolean; error?: string }>;
-  antaresListOffeneRegistrierungen: (baseUrl: string, context: string) => Promise<{ success: boolean; rows?: AntaresEntleiher[]; error?: string }>;
-  antaresListEntleiher: (baseUrl: string, context: string, page?: number, rows?: number) => Promise<{ success: boolean; total?: number; rows?: AntaresEntleiher[]; error?: string }>;
-  antaresListMahnungenGeraete: (baseUrl: string, context: string) => Promise<{ success: boolean; total?: number; rows?: AntaresVerleihRow[]; error?: string }>;
-  antaresListMahnungenMedien: (baseUrl: string, context: string) => Promise<{ success: boolean; total?: number; rows?: AntaresVerleihRow[]; error?: string }>;
-  antaresListAusgabeliste: (baseUrl: string, context: string) => Promise<{ success: boolean; total?: number; rows?: AntaresVerleihRow[]; error?: string }>;
-  antaresDashboardCounts: (baseUrl: string, context: string) => Promise<{ success: boolean; counts?: AntaresDashboardCounts; error?: string }>;
-  antaresListLizenzenAblauf: (baseUrl: string, context: string, daysAhead?: number) => Promise<{ success: boolean; rows?: AntaresLizenz[]; error?: string }>;
+  // Antares CS: migriert nach src/plugins/antares/ — Aufruf via pluginInvoke('antares', actionId, payload).
+  // Die Antares-Datentypen (AntaresEntleiher/VerleihRow/Lizenz/DashboardCounts) bleiben hier (Renderer nutzt sie).
 
-  // IQ-Auswertung
-  iqGenerateReport: (data: IqReportData, suggestedFileName: string) => Promise<{ success: boolean; filePath?: string; canceled?: boolean; error?: string }>;
-
-  // Anwesenheitsliste
-  attendanceListGenerate: (data: AttendanceListData, suggestedFileName: string) => Promise<{ success: boolean; filePath?: string; canceled?: boolean; error?: string }>;
-
-  // Marketing (WordPress)
-  marketingSaveCredentials: (credentials: { wpAppPassword?: string }) => Promise<boolean>;
-  marketingLoadCredentials: () => Promise<{ wpAppPassword?: string } | null>;
-  marketingCheckWordpress: (siteUrl: string, username: string) => Promise<{ success: boolean; userName?: string; error?: string }>;
-  marketingGenerateContent: (offerData: object, model: string) => Promise<{ success: boolean; blogPost?: string; igCaption?: string; error?: string }>;
-  marketingPublishWordpress: (siteUrl: string, username: string, title: string, content: string, status: 'draft' | 'publish', featuredMediaId?: number) => Promise<{ success: boolean; postId?: number; postUrl?: string; status?: string; error?: string }>;
-  marketingUploadImage: (siteUrl: string, username: string, imagePath: string, caption?: string) => Promise<{ success: boolean; mediaId?: number; imageUrl?: string; error?: string }>;
-  marketingGenerateImage: (prompt: string, apiKey: string) => Promise<{ success: boolean; imagePath?: string; imageBase64?: string; error?: string }>;
-  marketingReadImageBase64: (imagePath: string) => Promise<string | null>;
-  marketingSelectImage: () => Promise<string | null>;
+  // Marketing (WordPress + Imagen): nach src/plugins/edoobox/ migriert (Aufruf via edooboxClient,
+  // bytes-basierter Bild-Flow). Keine electronAPI-Methoden mehr (Phase 2b).
 
   // Office-Formate
   officeParseExcel: (filePath: string) => Promise<{ success: boolean; data?: ExcelData; error?: string }>;
@@ -1060,6 +1020,10 @@ export interface ElectronAPI {
   workflowLoad: (vaultPath: string) => Promise<import('./workflow/model').WorkflowFile | null>;
   workflowSave: (vaultPath: string, file: import('./workflow/model').WorkflowFile) => Promise<{ success: boolean; error?: string }>;
   workflowRun: (payload: import('./workflow/model').WorkflowRunPayload) => Promise<import('./workflow/model').WorkflowRun>;
+
+  // Plugin-Transport
+  pluginInvoke: (pluginId: string, actionId: string, payload?: unknown) => Promise<import('./plugins/transport').PluginInvokeResult>;
+  pluginList: () => Promise<import('./plugins/transport').PluginInvokeResult>;
 
   // Projekt-Status-Crystallizer
   projectStatusDiscover: (vaultPath: string, projectsFolderRel: string) => Promise<{ success: boolean; projects?: DiscoveredProject[]; error?: string }>;
