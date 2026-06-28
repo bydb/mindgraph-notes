@@ -47,4 +47,36 @@ export function registerPluginTransport(registry: PluginRegistry): void {
     if (!isTrustedSender(event)) return REJECTED
     return { ok: true, data: registry.list() }
   })
+
+  // Lebenszyklus: der Modulschalter (Renderer) fährt das Plugin im Main-Prozess hoch/runter.
+  // A-pre Schritt 1 — vorher flippte der Schalter nur Renderer-Flags, das Plugin lief immer.
+  ipcMain.handle(
+    'plugin:setEnabled',
+    async (event, pluginId: unknown, enabled: unknown): Promise<PluginInvokeResult> => {
+      if (!isTrustedSender(event)) return REJECTED
+      if (typeof pluginId !== 'string') return { ok: false, error: 'Ungültige Plugin-ID' }
+      if (typeof enabled !== 'boolean') return { ok: false, error: 'Ungültiges enabled-Flag' }
+      try {
+        const state = enabled
+          ? await registry.activate(pluginId)
+          : await registry.deactivate(pluginId)
+        // Erfolg NUR, wenn der erwartete Endzustand erreicht ist. activate/deactivate fangen
+        // Fehler intern und liefern einen error-Zustand — den NICHT als {ok:true} verpacken,
+        // sonst behauptet die UI „aus", obwohl der Main-Prozess meldet, dass das Plugin evtl.
+        // noch läuft (z.B. fehlgeschlagenes stop()). Jeder andere Zustand → {ok:false} → Rollback.
+        const expected = enabled ? 'active' : 'disabled'
+        if (state.activation !== expected) {
+          return {
+            ok: false,
+            error:
+              state.error?.message ??
+              `Plugin '${pluginId}' ist nach ${enabled ? 'Aktivierung' : 'Deaktivierung'} im Zustand '${state.activation}'`,
+          }
+        }
+        return { ok: true, data: state }
+      } catch (err) {
+        return { ok: false, error: err instanceof Error ? err.message : String(err) }
+      }
+    }
+  )
 }

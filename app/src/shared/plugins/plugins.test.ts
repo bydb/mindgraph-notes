@@ -11,6 +11,7 @@ import {
   type PluginRuntimeState,
 } from './state'
 import { definePluginMain } from './entry'
+import { readBoolPath, isPluginGateEnabled } from './moduleGate'
 import type { PluginManifest } from './manifest'
 
 const validManifest: PluginManifest = {
@@ -141,5 +142,24 @@ describe('definePluginMain', () => {
     } as never)
     expect(registered).toBe(true)
     expect(calls).toEqual(['antares.ping'])
+  })
+})
+
+describe('moduleGate (A-pre Schritt 1)', () => {
+  it('readBoolPath liest verschachtelte Flags und ist null-sicher', () => {
+    expect(readBoolPath({ antares: { enabled: true } }, 'antares.enabled')).toBe(true)
+    expect(readBoolPath({ antares: { enabled: false } }, 'antares.enabled')).toBe(false)
+    expect(readBoolPath({}, 'antares.enabled')).toBe(false)
+    expect(readBoolPath(null, 'antares.enabled')).toBe(false)
+  })
+
+  it('isPluginGateEnabled: gegatete Plugins folgen dem Flag, ungegatete sind immer aktiv', () => {
+    expect(isPluginGateEnabled('antares', { antares: { enabled: true } })).toBe(true)
+    expect(isPluginGateEnabled('antares', { antares: { enabled: false } })).toBe(false)
+    expect(isPluginGateEnabled('antares', {})).toBe(false)
+    // edoobox wird vom Bundle-Modul 'mz-suite' über edoobox.enabled gesteuert
+    expect(isPluginGateEnabled('edoobox', { edoobox: { enabled: true } })).toBe(true)
+    // demo hat kein Gate → immer aktiv
+    expect(isPluginGateEnabled('demo', {})).toBe(true)
   })
 })

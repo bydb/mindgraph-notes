@@ -135,6 +135,7 @@ import { cosineSimilarity as ragCosineSimilarity } from '../shared/rag/similarit
 import type { RagIndexStatus, RagQueryResult, RagRetrieveOptions } from '../shared/rag/types'
 import { setupTray, hideTransportWindow, updateShortcut, showTransportWindow } from './transport/trayManager'
 import { createMainRegistry } from './plugins/registry'
+import { isPluginGateEnabled } from '../shared/plugins/moduleGate'
 import { registerPluginTransport } from './plugins/transport'
 import { createHostFactory, type HostServices } from './plugins/host'
 import * as nativeServices from './plugins/nativeServices'
@@ -780,7 +781,12 @@ app.whenReady().then(async () => {
       ? `Modell '${model}' ist für '${moduleId}' gesperrt (Hard-Lock)`
       : null
   })
-  pluginRegistry.activateAll().catch((err) => console.error('[plugin] activateAll:', err))
+  // A-pre Schritt 1: nur Plugins aktivieren, deren Modulschalter aktiviert ist — der Start
+  // respektiert den Disabled-Zustand (gebündelte Plugins sind nicht mehr blind „immer an").
+  const pluginGateSettings = startupUiSettings ?? {}
+  pluginRegistry
+    .activateAll((id) => isPluginGateEnabled(id, pluginGateSettings))
+    .catch((err) => console.error('[plugin] activateAll:', err))
 
   // Tray-Icon + Schnellerfassung (plattformübergreifend)
   {

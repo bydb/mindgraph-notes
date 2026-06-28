@@ -1024,6 +1024,7 @@ export interface ElectronAPI {
   // Plugin-Transport
   pluginInvoke: (pluginId: string, actionId: string, payload?: unknown) => Promise<import('./plugins/transport').PluginInvokeResult>;
   pluginList: () => Promise<import('./plugins/transport').PluginInvokeResult>;
+  pluginSetEnabled: (pluginId: string, enabled: boolean) => Promise<import('./plugins/transport').PluginInvokeResult>;
 
   // Projekt-Status-Crystallizer
   projectStatusDiscover: (vaultPath: string, projectsFolderRel: string) => Promise<{ success: boolean; projects?: DiscoveredProject[]; error?: string }>;

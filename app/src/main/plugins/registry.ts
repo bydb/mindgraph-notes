@@ -50,6 +50,11 @@ interface LoadedPlugin {
   state: PluginRuntimeState
   entry?: PluginMainEntry
   actions: Map<string, PluginActionExecutor>
+  /** Zuletzt GEWÜNSCHTER Zustand (synchron beim activate/deactivate-Aufruf gesetzt).
+   *  Eine laufende Transition prüft ihn und bricht ab, wenn sie überholt wurde. */
+  desired: 'active' | 'disabled'
+  /** Serialisiert Transitionen pro Plugin — verhindert verschränkte activate/deactivate. */
+  lifecycle?: Promise<void>
 }
 
 /** Default-Host: log funktioniert, jeder Dienst wirft laut, solange Schritt 5 nicht verdrahtet ist. */
@@ -116,6 +121,7 @@ export class PluginRegistry {
             error: { message: `Ungültiges Manifest: ${errors.join('; ')}`, at: nowIso() },
           },
           actions: new Map(),
+          desired: 'disabled',
         })
         console.error(`[plugin] '${id}' abgewiesen: ${errors.join('; ')}`)
         continue
@@ -126,6 +132,7 @@ export class PluginRegistry {
         source,
         state: initialPluginState(id, manifest.version),
         actions: new Map(),
+        desired: 'disabled',
       })
     }
   }
@@ -139,12 +146,33 @@ export class PluginRegistry {
   }
 
   /**
+   * Reiht eine Transition pro Plugin serialisiert ein. Mehrere parallele activate/deactivate-
+   * Aufrufe (schnelles Umschalten) können sich so nicht verschränken; `p.desired` wird synchron
+   * gesetzt, sodass die zuletzt gewünschte Absicht gewinnt ("last desired wins").
+   */
+  private chain<T>(p: LoadedPlugin, fn: () => Promise<T>): Promise<T> {
+    const result = (p.lifecycle ?? Promise.resolve()).then(fn, fn)
+    p.lifecycle = result.then(
+      () => {},
+      () => {}
+    )
+    return result
+  }
+
+  /**
    * Lädt (lazy) den Main-Entry, ruft sein `register`/`start` mit einem Capability-Host und
    * sammelt die Action-Executoren. Jeder Fehler → `error`-Zustand, andere Plugins bleiben heil.
    */
   async activate(id: string): Promise<PluginRuntimeState> {
     const p = this.plugins.get(id)
     if (!p) throw new Error(`Unbekanntes Plugin '${id}'`)
+    p.desired = 'active'
+    return this.chain(p, () => this.doActivate(p))
+  }
+
+  private async doActivate(p: LoadedPlugin): Promise<PluginRuntimeState> {
+    const id = p.manifest.id
+    if (p.desired !== 'active') return p.state // von einem späteren deactivate überholt
     if (p.state.activation === 'error') return p.state // defektes Manifest bleibt defekt
     if (p.state.activation === 'active') return p.state
 
@@ -190,22 +218,53 @@ export class PluginRegistry {
     return p.state
   }
 
-  /** Aktiviert alle registrierten Plugins; sammelt keine Fehler (jeder ist isoliert im Zustand). */
-  async activateAll(): Promise<void> {
-    for (const id of this.plugins.keys()) await this.activate(id)
+  /**
+   * Aktiviert alle registrierten Plugins; sammelt keine Fehler (jeder ist isoliert im Zustand).
+   * `isEnabled` (optional): liefert sie für ein Plugin `false`, wird es übersprungen und bleibt
+   * im Ausgangszustand `disabled` — so respektiert der App-Start den Modulschalter (A-pre #1).
+   * Ohne Argument bleibt das alte Verhalten „alles aktivieren".
+   */
+  async activateAll(isEnabled?: (id: string) => boolean): Promise<void> {
+    for (const id of this.plugins.keys()) {
+      if (isEnabled && !isEnabled(id)) continue
+      await this.activate(id)
+    }
   }
 
   async deactivate(id: string): Promise<PluginRuntimeState> {
     const p = this.plugins.get(id)
     if (!p) throw new Error(`Unbekanntes Plugin '${id}'`)
-    if (p.state.activation !== 'active') return p.state
+    p.desired = 'disabled'
+    return this.chain(p, () => this.doDeactivate(p))
+  }
 
-    p.state = { ...p.state, activation: 'stopping' }
-    try {
-      if (p.entry?.stop) await p.entry.stop()
-    } catch (err) {
-      console.error(`[plugin] stop() von '${id}' warf: ${errMessage(err)}`)
+  private async doDeactivate(p: LoadedPlugin): Promise<PluginRuntimeState> {
+    const id = p.manifest.id
+    if (p.desired !== 'disabled') return p.state // von einem späteren activate überholt
+
+    // Solange ein Entry mit stop() hängt, MUSS stop() (erneut) laufen — auch nach einem früheren
+    // fehlgeschlagenen Stop. Der Entry bleibt erhalten, bis stop() wirklich durchläuft; sonst
+    // würde ein weiterlaufender Timer/Listener bei „nochmal ausschalten" weggeklickt.
+    if (p.entry?.stop) {
+      p.actions = new Map() // Actions sofort sperren — kein Aufruf mehr während/nach dem Stop
+      p.state = { ...p.state, activation: 'stopping' }
+      try {
+        await p.entry.stop()
+      } catch (err) {
+        // Stop gescheitert: Entry BEHALTEN (Retry beim nächsten Ausschalten), error halten.
+        console.error(`[plugin] stop() von '${id}' warf: ${errMessage(err)}`)
+        p.state = {
+          ...p.state,
+          activation: 'error',
+          readiness: 'unavailable',
+          error: { message: `Stoppen fehlgeschlagen: ${errMessage(err)}`, at: nowIso() },
+        }
+        return p.state
+      }
     }
+
+    // Sauber gestoppt (oder es gab nie einen Entry/stop) → endgültig `disabled`. Erst JETZT
+    // Entry + Fehler löschen; das räumt auch einen reinen Aktivierungsfehler (kein Entry) auf.
     p.entry = undefined
     p.actions = new Map()
     p.state = { ...p.state, activation: 'disabled', readiness: 'unavailable', error: undefined }

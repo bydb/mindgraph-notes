@@ -146,6 +146,140 @@ describe('PluginRegistry — Fehler-Isolation', () => {
     expect(r.get('echo')?.activation).toBe('active')
   })
 
+  it('serialisiert Transitionen: deactivate während laufender Aktivierung gewinnt (Endzustand disabled)', async () => {
+    // register signalisiert seinen Start und hängt dann an einem Deferred — so kommt das
+    // deactivate ECHT mitten in der Aktivierung (nach dem desired-Check, im await register).
+    let releaseRegister!: () => void
+    let signalStarted!: () => void
+    const gate = new Promise<void>((res) => { releaseRegister = res })
+    const started = new Promise<void>((res) => { signalStarted = res })
+    const stop = vi.fn(async () => {})
+    const m = mkManifest('slow')
+    const entry = definePluginMain(
+      { id: 'slow', capabilities: [] },
+      async () => { signalStarted(); await gate },
+      { stop }
+    )
+    const r = new PluginRegistry()
+    r.register([{ manifest: m, loadEntry: async () => ({ default: entry }) }])
+
+    const pAct = r.activate('slow')     // bleibt in register hängen
+    await started                       // Aktivierung ist jetzt wirklich in-flight
+    const pDeact = r.deactivate('slow') // gewünschter Endzustand: disabled
+    releaseRegister()
+    await Promise.all([pAct, pDeact])
+
+    expect(r.get('slow')?.activation).toBe('disabled')
+    expect(stop).toHaveBeenCalledOnce() // sauber gestoppt, nicht hängen geblieben als active
+  })
+
+  it('serialisiert Transitionen: synchrones An/Aus → letzter Wunsch (disabled) gewinnt ohne Start', async () => {
+    // activate + deactivate im selben Tick: das Plugin startet gar nicht erst (desired-Check
+    // im doActivate sieht bereits 'disabled') — bewusst kein verschwendeter Start/Stop.
+    const stop = vi.fn(async () => {})
+    let registered = false
+    const m = mkManifest('sync')
+    const entry = definePluginMain(
+      { id: 'sync', capabilities: [] },
+      () => { registered = true },
+      { stop }
+    )
+    const r = new PluginRegistry()
+    r.register([{ manifest: m, loadEntry: async () => ({ default: entry }) }])
+
+    const pAct = r.activate('sync')
+    const pDeact = r.deactivate('sync')
+    await Promise.all([pAct, pDeact])
+
+    expect(r.get('sync')?.activation).toBe('disabled')
+    expect(registered).toBe(false)
+    expect(stop).not.toHaveBeenCalled()
+  })
+
+  it('serialisiert Transitionen: activate nach deactivate gewinnt (Endzustand active)', async () => {
+    const r = new PluginRegistry()
+    r.register([echoSource()])
+    await r.activate('echo')
+    const pDeact = r.deactivate('echo')
+    const pAct = r.activate('echo') // letzter Wunsch: active
+    await Promise.all([pDeact, pAct])
+    expect(r.get('echo')?.activation).toBe('active')
+  })
+
+  it('ein fehlgeschlagenes stop() markiert error statt fälschlich disabled', async () => {
+    const stop = vi.fn(async () => { throw new Error('Timer hängt') })
+    const m = mkManifest('leaky')
+    const entry = definePluginMain({ id: 'leaky', capabilities: [] }, () => {}, { stop })
+    const r = new PluginRegistry()
+    r.register([{ manifest: m, loadEntry: async () => ({ default: entry }) }])
+    await r.activate('leaky')
+    const state = await r.deactivate('leaky')
+    expect(state.activation).toBe('error')
+    expect(state.error?.message).toMatch(/Stoppen fehlgeschlagen.*Timer hängt/)
+  })
+
+  it('versucht stop() beim nächsten Ausschalten ERNEUT (Entry bleibt, bis Stop durchläuft)', async () => {
+    let calls = 0
+    const stop = vi.fn(async () => {
+      calls++
+      if (calls === 1) throw new Error('Timer hängt') // erster Versuch scheitert
+    })
+    const m = mkManifest('retry')
+    const entry = definePluginMain({ id: 'retry', capabilities: [] }, () => {}, { stop })
+    const r = new PluginRegistry()
+    r.register([{ manifest: m, loadEntry: async () => ({ default: entry }) }])
+    await r.activate('retry')
+
+    const s1 = await r.deactivate('retry')
+    expect(s1.activation).toBe('error') // Stop gescheitert, Plugin läuft evtl. weiter
+
+    const s2 = await r.deactivate('retry') // erneutes Ausschalten → stop() wird ERNEUT versucht
+    expect(stop).toHaveBeenCalledTimes(2)
+    expect(s2.activation).toBe('disabled') // diesmal sauber gestoppt
+    expect(s2.error).toBeUndefined()
+  })
+
+  it('hält error und ruft stop() bei dauerhaftem Fehler bei jedem Ausschalten erneut auf', async () => {
+    const stop = vi.fn(async () => { throw new Error('hängt dauerhaft') })
+    const m = mkManifest('stuck')
+    const entry = definePluginMain({ id: 'stuck', capabilities: [] }, () => {}, { stop })
+    const r = new PluginRegistry()
+    r.register([{ manifest: m, loadEntry: async () => ({ default: entry }) }])
+    await r.activate('stuck')
+    expect((await r.deactivate('stuck')).activation).toBe('error')
+    expect((await r.deactivate('stuck')).activation).toBe('error')
+    expect(stop).toHaveBeenCalledTimes(2) // Entry blieb erhalten → Retry, nicht weggeklickt
+  })
+
+  it('deactivate räumt einen error-Zustand zu disabled auf (bewusstes Ausschalten)', async () => {
+    const m = mkManifest('boom2')
+    const entry = definePluginMain({ id: 'boom2', capabilities: [] }, () => {
+      throw new Error('kaputt')
+    })
+    const r = new PluginRegistry()
+    r.register([{ manifest: m, loadEntry: async () => ({ default: entry }) }])
+    await r.activate('boom2')
+    expect(r.get('boom2')?.activation).toBe('error')
+    const state = await r.deactivate('boom2')
+    expect(state.activation).toBe('disabled')
+    expect(state.error).toBeUndefined()
+  })
+
+  it('activateAll(isEnabled) überspringt deaktivierte Plugins — sie bleiben disabled', async () => {
+    const onManifest = mkManifest('on')
+    const onEntry = definePluginMain({ id: 'on', capabilities: [] }, () => {})
+    const offManifest = mkManifest('off')
+    const offEntry = definePluginMain({ id: 'off', capabilities: [] }, () => {})
+    const r = new PluginRegistry()
+    r.register([
+      { manifest: onManifest, loadEntry: async () => ({ default: onEntry }) },
+      { manifest: offManifest, loadEntry: async () => ({ default: offEntry }) },
+    ])
+    await r.activateAll((id) => id !== 'off')
+    expect(r.get('on')?.activation).toBe('active')
+    expect(r.get('off')?.activation).toBe('disabled')
+  })
+
   it('erkennt eine Entry-ID, die nicht zum Manifest passt', async () => {
     const m = mkManifest('mism')
     const wrong: PluginMainEntry = { id: 'other', register: async () => {} }

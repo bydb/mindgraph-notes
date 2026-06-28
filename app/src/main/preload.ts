@@ -85,6 +85,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   pluginInvoke: (pluginId: string, actionId: string, payload?: unknown) =>
     ipcRenderer.invoke('plugin:invoke', pluginId, actionId, payload),
   pluginList: () => ipcRenderer.invoke('plugin:list'),
+  pluginSetEnabled: (pluginId: string, enabled: boolean) =>
+    ipcRenderer.invoke('plugin:setEnabled', pluginId, enabled),
 
   // Notes-Cache für schnelles Laden
   saveNotesCache: (vaultPath: string, cache: object) => ipcRenderer.invoke('save-notes-cache', vaultPath, cache),

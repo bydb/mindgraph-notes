@@ -575,6 +575,15 @@ const ModulesTab: React.FC<{ t: TabTFn }> = ({ t }) => {
   const _tick = useUIStore(s => `${s.notesChatEnabled}${s.projectRagEnabled}${s.smartConnectionsEnabled}${s.flashcardsEnabled}${s.workflowCanvasEnabled}${s.semanticScholarEnabled}${s.zoteroEnabled}${s.languageTool.enabled}${s.email.enabled}${s.edoobox.enabled}${s.marketing.enabled}${s.readwise.enabled}${s.remarkable.enabled}${s.docling.enabled}${s.visionOcr.enabled}${s.speech.enabled}`)
   void _tick
 
+  // Fehlertext pro Modul, falls der Main-Prozess der Aktivierung nicht folgen kann (A-pre #1).
+  const [moduleErrors, setModuleErrors] = useState<Record<string, string>>({})
+  const toggleModule = (modId: ModuleDescriptor['id'], next: boolean) => {
+    setModuleErrors(prev => { const { [modId]: _drop, ...rest } = prev; return rest })
+    setModuleEnabled(modId, next).catch(err => {
+      setModuleErrors(prev => ({ ...prev, [modId]: err instanceof Error ? err.message : String(err) }))
+    })
+  }
+
   const grouped: Record<ModuleCategory, ModuleDescriptor[]> = {
     ai: [], communication: [], business: [], learning: [], research: [], devices: [], documents: []
   }
@@ -621,11 +630,16 @@ const ModulesTab: React.FC<{ t: TabTFn }> = ({ t }) => {
                   <div className="module-row-body">
                     <div className="module-row-label">{mod.label}</div>
                     <div className="module-row-desc">{mod.description}</div>
+                    {moduleErrors[mod.id] && (
+                      <div className="module-row-error" style={{ color: 'var(--error-color, #e5484d)', fontSize: '0.8em', marginTop: 4 }}>
+                        {moduleErrors[mod.id]}
+                      </div>
+                    )}
                   </div>
                   <input
                     type="checkbox"
                     checked={enabled}
-                    onChange={e => setModuleEnabled(mod.id, e.target.checked)}
+                    onChange={e => toggleModule(mod.id, e.target.checked)}
                   />
                 </label>
               )

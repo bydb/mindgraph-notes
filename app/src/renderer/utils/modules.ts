@@ -1,5 +1,7 @@
 import { useUIStore } from '../stores/uiStore'
 import type { ModuleDescriptor } from '../stores/uiStore'
+import { PLUGIN_GATES, readBoolPath } from '../../shared/plugins/moduleGate'
+import { setPluginEnabled } from '../plugins/client'
 
 // Reaktiver Hook: liest Modul-Enable-Status aus dem uiStore und re-rendert bei Änderungen.
 export function useIsModuleEnabled(id: ModuleDescriptor['id']): boolean {
@@ -51,7 +53,8 @@ export function isModuleEnabled(id: ModuleDescriptor['id']): boolean {
   }
 }
 
-export function setModuleEnabled(id: ModuleDescriptor['id'], enabled: boolean): void {
+/** Setzt nur die uiStore-Flags eines Moduls (synchron). Lifecycle-Sync passiert in setModuleEnabled. */
+function applyModuleFlags(id: ModuleDescriptor['id'], enabled: boolean): void {
   const s = useUIStore.getState()
   switch (id) {
     case 'notes-chat':        s.setNotesChatEnabled(enabled); break
@@ -73,5 +76,37 @@ export function setModuleEnabled(id: ModuleDescriptor['id'], enabled: boolean): 
     case 'docling':           s.setDocling({ enabled }); break
     case 'vision-ocr':        s.setVisionOcr({ enabled }); break
     case 'speech':            s.setSpeech({ enabled }); break
+  }
+}
+
+/**
+ * Schaltet ein Modul um und synchronisiert — bei plugin-gestützten Modulen — den
+ * Lebenszyklus im Main-Prozess (A-pre Schritt 1). Folgt der Main-Prozess NICHT (Aktivierung
+ * schlägt fehl), wird der UI-Schalter zurückgerollt und der Fehler weitergereicht, damit
+ * der Renderer-State nicht vom echten Plugin-Zustand abweicht.
+ */
+export async function setModuleEnabled(id: ModuleDescriptor['id'], enabled: boolean): Promise<void> {
+  const gates = PLUGIN_GATES.filter(g => g.moduleId === id)
+
+  // Kein plugin-gestütztes Modul → reiner Flag-Flip, kein Main-Roundtrip nötig.
+  if (gates.length === 0) {
+    applyModuleFlags(id, enabled)
+    return
+  }
+
+  const prev = isModuleEnabled(id)
+  applyModuleFlags(id, enabled)
+
+  // Flag-Zustand NACH dem Setter frisch lesen (das Bundle-Modul 'mz-suite' setzt edoobox.enabled)
+  // und nur die von diesem Modul gesteuerten Plugins synchronisieren.
+  const next = useUIStore.getState() as unknown
+  try {
+    await Promise.all(
+      gates.map(g => setPluginEnabled(g.pluginId, readBoolPath(next, g.enabledPath)))
+    )
+  } catch (err) {
+    applyModuleFlags(id, prev) // Rollback: UI-Schalter wieder in den echten Zustand bringen
+    console.error(`[plugin] Modul '${id}' konnte im Main-Prozess nicht ${enabled ? 'aktiviert' : 'deaktiviert'} werden:`, err)
+    throw err
   }
 }
