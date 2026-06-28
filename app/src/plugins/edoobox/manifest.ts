@@ -3,10 +3,42 @@
 // fetch-API + Credentials + events.json-Persistenz. Marketing/DOCX/Formular bleiben in Phase 1
 // noch im Core (brauchen dialog/files-Capabilities → Phase 2). Siehe docs/plugin-system-plan.md.
 
-import type { PluginManifest } from '../../shared/plugins/manifest'
+import type { PluginManifest, JsonSchema } from '../../shared/plugins/manifest'
 
 /** as const → bindet das Capability-Tupel für definePluginMain im Main-Entry. */
 export const EDOOBOX_CAPABILITIES = ['http.fetch', 'secrets', 'vault.read', 'vault.write', 'dialog', 'resource', 'llm.generate'] as const
+
+// — Ausgabe-Schemas (Defense-in-Depth, Envelope-Ebene). Die meisten Actions liefern die alte
+//   {success,…}-IPC-Hülle mit je nach Erfolg/Fehler unterschiedlichen (z.T. undefined-wertigen)
+//   Optionalfeldern → strikt geprüft wird nur das IMMER vorhandene `success:boolean`, der Rest
+//   bleibt lenient. Fixe, intern gebaute Formen (Credentials, ausgewähltes Bild) sind strikt.
+const boolResult: JsonSchema = { type: 'boolean' }
+const successEnvelope: JsonSchema = {
+  type: 'object',
+  required: ['success'],
+  properties: { success: { type: 'boolean' } },
+  additionalProperties: true,
+}
+const objectArray: JsonSchema = { type: 'array', items: { type: 'object' } }
+const nullableObject: JsonSchema = { anyOf: [{ type: 'null' }, { type: 'object' }] }
+const apiCredentialsResult: JsonSchema = {
+  anyOf: [
+    { type: 'null' },
+    { type: 'object', required: ['apiKey', 'apiSecret'], properties: { apiKey: { type: 'string' }, apiSecret: { type: 'string' } }, additionalProperties: false },
+  ],
+}
+const wpCredentialsResult: JsonSchema = {
+  anyOf: [
+    { type: 'null' },
+    { type: 'object', required: ['wpAppPassword'], properties: { wpAppPassword: { type: 'string' } }, additionalProperties: false },
+  ],
+}
+const selectedImageResult: JsonSchema = {
+  anyOf: [
+    { type: 'null' },
+    { type: 'object', required: ['fileName', 'imageBase64'], properties: { fileName: { type: 'string' }, imageBase64: { type: 'string' } }, additionalProperties: false },
+  ],
+}
 
 // Eingabe mit edoobox-Server-Koordinaten (baseUrl + apiVersion kommen aus den Settings).
 const apiInput = {
@@ -233,6 +265,36 @@ export const manifest: PluginManifest = {
     { id: 'edoobox.marketingSelectImage', requiredCapabilities: ['dialog'] },
   ],
   privacy: { containsPersonalData: true },
+}
+
+// Ausgabe-Schemas zentral je Action-ID zugeordnet — hält die große actions-Liste lesbar.
+// Vollständigkeit (jede Action MUSS hier stehen) wird im Test erzwungen.
+const EDOOBOX_OUTPUT_SCHEMAS: Record<string, JsonSchema> = {
+  'edoobox.check': successEnvelope,
+  'edoobox.listOffers': successEnvelope,
+  'edoobox.listCategories': successEnvelope,
+  'edoobox.listOffersDashboard': successEnvelope,
+  'edoobox.listBookings': successEnvelope,
+  'edoobox.listDates': successEnvelope,
+  'edoobox.importEvent': successEnvelope,
+  'edoobox.saveCredentials': boolResult,
+  'edoobox.loadCredentials': apiCredentialsResult,
+  'edoobox.loadEvents': objectArray,
+  'edoobox.saveEvents': boolResult,
+  'edoobox.parseFormular': nullableObject,
+  'edoobox.generateIqReport': successEnvelope,
+  'edoobox.generateAttendanceList': successEnvelope,
+  'edoobox.marketingSaveCredentials': boolResult,
+  'edoobox.marketingLoadCredentials': wpCredentialsResult,
+  'edoobox.marketingCheckWordpress': successEnvelope,
+  'edoobox.marketingGenerateContent': successEnvelope,
+  'edoobox.marketingPublishWordpress': successEnvelope,
+  'edoobox.marketingUploadImage': successEnvelope,
+  'edoobox.marketingGenerateImage': successEnvelope,
+  'edoobox.marketingSelectImage': selectedImageResult,
+}
+for (const action of manifest.actions ?? []) {
+  action.outputSchema = EDOOBOX_OUTPUT_SCHEMAS[action.id]
 }
 
 export default manifest

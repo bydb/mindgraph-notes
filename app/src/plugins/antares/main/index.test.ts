@@ -3,7 +3,7 @@ import entry from './index'
 import { manifest } from '../manifest'
 import { PluginRegistry } from '../../../main/plugins/registry'
 import { createHostFactory, type HostServices } from '../../../main/plugins/host'
-import { validateManifest, validateManifestSemantics } from '../../../shared/plugins/schemas'
+import { validateManifest, validateManifestSemantics, validateAgainst } from '../../../shared/plugins/schemas'
 
 function buildRegistry() {
   const secrets = new Map<string, string>()
@@ -68,5 +68,40 @@ describe('Antares-Plugin — Vertikale durch Registry + Host', () => {
     await expect(
       registry.invoke('antares', 'antares.dashboardCounts', { baseUrl: 'https://mz.datenbank-bildungsmedien.net', context: 'HE/16' })
     ).rejects.toThrow(/Zugangsdaten/)
+  })
+})
+
+describe('Antares-Plugin — Output-Schemas (Envelope-Validierung)', () => {
+  const out = (id: string) => manifest.actions!.find((a) => a.id === id)!.outputSchema!
+
+  it('jede Action deklariert ein outputSchema', () => {
+    for (const a of manifest.actions ?? []) expect(a.outputSchema, a.id).toBeDefined()
+  })
+
+  it('dashboardCounts: 7-Zahlen-Objekt ok, Fremdform abgewiesen', () => {
+    const good = {
+      offeneRegistrierungen: 0, offeneAnfragenGeraete: 0, offeneVorbestellungenGeraete: 0,
+      stornierteVorbestellungen: 0, ueberfaelligeGeraete: 0, offeneVorbestellungenMedien: 0, ueberfaelligeMedien: 0,
+    }
+    expect(validateAgainst(out('antares.dashboardCounts'), good).valid).toBe(true)
+    expect(validateAgainst(out('antares.dashboardCounts'), { offeneRegistrierungen: 'viele' }).valid).toBe(false)
+    expect(validateAgainst(out('antares.dashboardCounts'), 'Server returned HTML').valid).toBe(false)
+  })
+
+  it('listEntleiher: {total,rows} ok, String (z.B. HTML-Fehlerseite) abgewiesen', () => {
+    expect(validateAgainst(out('antares.listEntleiher'), { total: 2, rows: [{}, {}] }).valid).toBe(true)
+    expect(validateAgainst(out('antares.listEntleiher'), '<html>SQL ERROR</html>').valid).toBe(false)
+    expect(validateAgainst(out('antares.listEntleiher'), { rows: [] }).valid).toBe(false) // total fehlt
+  })
+
+  it('Zeilen sind lenient (Feld-Drift erlaubt), aber keine Nicht-Objekt-Zeile', () => {
+    expect(validateAgainst(out('antares.listMahnungenGeraete'), { total: 1, rows: [{ neuesFeldVomServer: 1 }] }).valid).toBe(true)
+    expect(validateAgainst(out('antares.listMahnungenGeraete'), { total: 1, rows: ['nur ein String'] }).valid).toBe(false)
+  })
+
+  it('loadCredentials: null oder das Paar; halbes Paar abgewiesen', () => {
+    expect(validateAgainst(out('antares.loadCredentials'), null).valid).toBe(true)
+    expect(validateAgainst(out('antares.loadCredentials'), { username: 'u', password: 'p' }).valid).toBe(true)
+    expect(validateAgainst(out('antares.loadCredentials'), { username: 'u' }).valid).toBe(false)
   })
 })

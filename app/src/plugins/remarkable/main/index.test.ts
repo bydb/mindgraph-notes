@@ -3,7 +3,7 @@ import entry from './index'
 import { manifest } from '../manifest'
 import { PluginRegistry } from '../../../main/plugins/registry'
 import { createHostFactory, type HostServices } from '../../../main/plugins/host'
-import { validateManifest, validateManifestSemantics } from '../../../shared/plugins/schemas'
+import { validateManifest, validateManifestSemantics, validateAgainst } from '../../../shared/plugins/schemas'
 
 function buildRegistry(over: Partial<HostServices> = {}) {
   const vault = new Map<string, Uint8Array>()
@@ -96,5 +96,35 @@ describe('reMarkable-Plugin — Vertikale durch Registry + Host', () => {
       relativePdfPath: 'notes/foo.txt',
     })) as { success: boolean; error?: string }
     expect(res.success).toBe(false)
+  })
+})
+
+describe('reMarkable-Plugin — Output-Schemas (Envelope-Validierung)', () => {
+  const out = (id: string) => manifest.actions!.find((a) => a.id === id)!.outputSchema!
+
+  it('jede Action deklariert ein outputSchema', () => {
+    for (const a of manifest.actions ?? []) expect(a.outputSchema, a.id).toBeDefined()
+  })
+
+  it('successEnvelope: Erfolg- UND Fehler-Form ok; toleriert undefined-Optionalfelder', () => {
+    expect(validateAgainst(out('remarkable.download'), { success: true, relativePdfPath: 'x.pdf', alreadyExists: false }).valid).toBe(true)
+    expect(validateAgainst(out('remarkable.download'), { success: false, error: 'kaputt' }).valid).toBe(true)
+    // usbDebugInfo setzt error bewusst auf undefined (connected) — darf NICHT werfen:
+    expect(validateAgainst(out('remarkable.usbDebugInfo'), { success: true, connected: true, error: undefined, vendorIdHex: undefined }).valid).toBe(true)
+    // Fremdform (kein success-Boolean) abgewiesen:
+    expect(validateAgainst(out('remarkable.download'), { ok: true }).valid).toBe(false)
+    expect(validateAgainst(out('remarkable.download'), 'kaputt').valid).toBe(false)
+  })
+
+  it('usbCheck: {connected,mode} ok, fehlendes Feld abgewiesen', () => {
+    expect(validateAgainst(out('remarkable.usbCheck'), { connected: true, mode: 'usb' }).valid).toBe(true)
+    expect(validateAgainst(out('remarkable.usbCheck'), { connected: 'ja', mode: 'usb' }).valid).toBe(false)
+    expect(validateAgainst(out('remarkable.usbCheck'), { mode: 'usb' }).valid).toBe(false)
+  })
+
+  it('listDocuments: {documents:[]} ok, Nicht-Objekt-Eintrag abgewiesen', () => {
+    expect(validateAgainst(out('remarkable.listDocuments'), { documents: [{ id: 'a' }], error: 'x' }).valid).toBe(true)
+    expect(validateAgainst(out('remarkable.listDocuments'), { documents: ['x'] }).valid).toBe(false)
+    expect(validateAgainst(out('remarkable.listDocuments'), { docs: [] }).valid).toBe(false)
   })
 })
