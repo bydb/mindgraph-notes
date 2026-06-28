@@ -5224,9 +5224,11 @@ LIMIT 10
 
                 <div className="settings-divider" />
 
-                {/* Antares-Settings: in die Antares-Vertikale ausgelagert (Slot). Leer nach
-                    Löschen des Plugin-Ordners → keine toten Antares-Einstellungen (Deletion Test). */}
-                <PluginSlot slotId="settings.section.antares" props={{ onGoToModules: () => setActiveTab('modules') }} />
+                {/* Generischer Plugin-Settings-Bereich: der Kern nennt KEIN Plugin namentlich,
+                    er rendert nur diesen einen Slot. Jede Vertikale (aktuell: Antares) trägt ihre
+                    eigene Sektion bei und gated sich selbst auf ihr Modul. Leer nach Löschen des
+                    Plugin-Ordners → keine toten Plugin-Einstellungen (Deletion Test). */}
+                <PluginSlot slotId="settings.section" props={{ onGoToModules: () => setActiveTab('modules') }} />
 
                 <div className="settings-divider" />
 
