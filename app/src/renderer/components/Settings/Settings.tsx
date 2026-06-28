@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { useUIStore, ACCENT_COLORS, AI_LANGUAGES, FONT_FAMILIES, UI_LANGUAGES, BACKGROUND_COLORS, ICON_SETS, OUTLINE_STYLES, MODULES, MODULE_CATEGORIES, type Language, type FontFamily, type BackgroundColor, type IconSet, type OutlineStyle, type LLMBackend, type TransportDestination, type ModuleCategory, type ModuleDescriptor } from '../../stores/uiStore'
 import { isModuleEnabled, setModuleEnabled, useIsModuleEnabled } from '../../utils/modules'
 import { invokePlugin } from '../../plugins/client'
+import { PluginSlot } from '../../plugins/slots'
 import { edooboxService } from '../../stores/edooboxServiceBridge'
 import { useNotesStore, createNoteFromFile } from '../../stores/notesStore'
 import { useSyncStore } from '../../stores/syncStore'
@@ -1397,13 +1398,7 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab 
   const [edooboxTestStatus, setEdooboxTestStatus] = useState<'idle' | 'testing' | 'success' | 'failed'>('idle')
   const [edooboxTestError, setEdooboxTestError] = useState<string | null>(null)
   const [edooboxCredsSaved, setEdooboxCredsSaved] = useState(false)
-
-  // Antares Credentials State
-  const [antaresUser, setAntaresUser] = useState('')
-  const [antaresPassword, setAntaresPassword] = useState('')
-  const [antaresTestStatus, setAntaresTestStatus] = useState<'idle' | 'testing' | 'success' | 'failed'>('idle')
-  const [antaresTestError, setAntaresTestError] = useState<string | null>(null)
-  const [antaresCredsSaved, setAntaresCredsSaved] = useState(false)
+  // Antares-Credentials/-Settings: in die Antares-Vertikale ausgelagert (AntaresSettings.tsx).
 
   // Marketing Credentials State
   const [wpAppPassword, setWpAppPassword] = useState('')
@@ -1517,8 +1512,6 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab 
     marketing: marketingSettings,
     setMarketing,
     edoobox: edooboxSettings,
-    antares: antaresSettings,
-    setAntares,
     remarkable: remarkableSettings,
     setRemarkable,
     dailyNote: dailyNoteSettings,
@@ -1593,7 +1586,7 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab 
     }
   }, [isOpen, emailSettings.accounts.length])
 
-  // edoobox + Marketing + Antares Credentials laden
+  // edoobox + Marketing Credentials laden (Antares lädt sich selbst in AntaresSettings.tsx)
   useEffect(() => {
     if (isOpen && activeTab === 'agents') {
       edooboxService.loadCredentials().then(creds => {
@@ -1607,15 +1600,6 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab 
           if (creds.wpAppPassword) setWpAppPassword(creds.wpAppPassword)
         }
       })
-      invokePlugin<{ username: string; password: string } | null>('antares', 'antares.loadCredentials')
-        .then(creds => {
-          if (creds) {
-            setAntaresUser(creds.username)
-            setAntaresPassword(creds.password)
-            setAntaresCredsSaved(true)
-          }
-        })
-        .catch(() => {})
     }
     if (isOpen && (activeTab === 'agents' || activeTab === 'remarkable')) {
       checkRemarkableConnection()
@@ -5240,112 +5224,9 @@ LIMIT 10
 
                 <div className="settings-divider" />
 
-                {/* Antares CS (Medienzentrum-Verleih) */}
-                <h4 className="settings-section-title">{t('settings.agents.antares.title')}</h4>
-                <p className="settings-hint">{t('settings.agents.antares.description')}</p>
-                <ModuleDisabledHint moduleId="antares" onGoToModules={() => setActiveTab('modules')} t={t} />
-
-                {antaresSettings.enabled && (
-                  <>
-                    <div className="settings-row">
-                      <label>{t('settings.agents.antares.baseUrl')}</label>
-                      <input
-                        type="text"
-                        value={antaresSettings.baseUrl}
-                        onChange={e => setAntares({ baseUrl: e.target.value })}
-                        placeholder="https://mzantares-he-16.datenbank-bildungsmedien.net"
-                        className="settings-input"
-                      />
-                    </div>
-
-                    <div className="settings-row">
-                      <label>{t('settings.agents.antares.context')}</label>
-                      <input
-                        type="text"
-                        value={antaresSettings.context}
-                        onChange={e => setAntares({ context: e.target.value })}
-                        placeholder="HE/16"
-                        className="settings-input"
-                      />
-                    </div>
-
-                    <div className="settings-row">
-                      <label>{t('settings.agents.antares.username')}</label>
-                      <input
-                        type="text"
-                        value={antaresUser}
-                        onChange={e => { setAntaresUser(e.target.value); setAntaresCredsSaved(false) }}
-                        placeholder={t('settings.agents.antares.username')}
-                        className="settings-input"
-                        autoComplete="username"
-                      />
-                    </div>
-
-                    <div className="settings-row">
-                      <label>{t('settings.agents.antares.password')}</label>
-                      <input
-                        type="password"
-                        value={antaresPassword}
-                        onChange={e => { setAntaresPassword(e.target.value); setAntaresCredsSaved(false) }}
-                        placeholder={t('settings.agents.antares.password')}
-                        className="settings-input"
-                        autoComplete="current-password"
-                      />
-                    </div>
-
-                    <div className="settings-row" style={{ gap: '8px' }}>
-                      <button
-                        className="settings-btn"
-                        onClick={async () => {
-                          if (antaresUser && antaresPassword) {
-                            const saved = await invokePlugin<boolean>('antares', 'antares.saveCredentials', { username: antaresUser, password: antaresPassword }).catch(() => false)
-                            setAntaresCredsSaved(!!saved)
-                          }
-                        }}
-                      >
-                        {antaresCredsSaved ? t('settings.agents.antares.saved') : t('settings.agents.antares.save')}
-                      </button>
-                      <button
-                        className="settings-btn"
-                        disabled={antaresTestStatus === 'testing'}
-                        onClick={async () => {
-                          setAntaresTestError(null)
-                          if (!antaresUser || !antaresPassword) {
-                            setAntaresTestStatus('failed')
-                            setAntaresTestError(t('settings.agents.antares.saveFirst'))
-                            return
-                          }
-                          await invokePlugin('antares', 'antares.saveCredentials', { username: antaresUser, password: antaresPassword })
-                          setAntaresCredsSaved(true)
-                          setAntaresTestStatus('testing')
-                          try {
-                            await invokePlugin('antares', 'antares.check', { baseUrl: antaresSettings.baseUrl, context: antaresSettings.context })
-                            setAntaresTestStatus('success')
-                            setAntaresTestError(null)
-                          } catch (err) {
-                            setAntaresTestStatus('failed')
-                            setAntaresTestError(err instanceof Error ? err.message : null)
-                          }
-                        }}
-                      >
-                        {antaresTestStatus === 'testing'
-                          ? t('settings.agents.antares.testing')
-                          : t('settings.agents.antares.testConnection')}
-                      </button>
-                      {antaresTestStatus === 'success' && (
-                        <span className="status-connected">{t('settings.agents.antares.connected')}</span>
-                      )}
-                      {antaresTestStatus === 'failed' && (
-                        <span className="status-disconnected">{t('settings.agents.antares.failed')}</span>
-                      )}
-                    </div>
-                    {antaresTestError && (
-                      <div className="settings-row">
-                        <span className="settings-error-detail">{antaresTestError}</span>
-                      </div>
-                    )}
-                  </>
-                )}
+                {/* Antares-Settings: in die Antares-Vertikale ausgelagert (Slot). Leer nach
+                    Löschen des Plugin-Ordners → keine toten Antares-Einstellungen (Deletion Test). */}
+                <PluginSlot slotId="settings.section.antares" props={{ onGoToModules: () => setActiveTab('modules') }} />
 
                 <div className="settings-divider" />
 
