@@ -48,6 +48,20 @@ const CATEGORY_VALUES = [
 export const PLUGIN_MANIFEST_SCHEMA: JsonSchema = {
   $schema: 'http://json-schema.org/draft-07/schema#',
   type: 'object',
+  definitions: {
+    workflowPort: {
+      type: 'object',
+      required: ['id', 'label', 'kind'],
+      properties: {
+        id: { type: 'string', minLength: 1 },
+        label: { type: 'string' },
+        kind: { type: 'string', minLength: 1 },
+        required: { type: 'boolean' },
+        multiple: { type: 'boolean' },
+      },
+      additionalProperties: false,
+    },
+  },
   required: ['id', 'version', 'label', 'description', 'category', 'capabilities'],
   // STRIKT: unbekannte Top-Level-Felder abweisen — fängt Tippfehler (z.B. `capabilites`).
   additionalProperties: false,
@@ -124,6 +138,33 @@ export const PLUGIN_MANIFEST_SCHEMA: JsonSchema = {
           hardLockModule: { type: 'string' },
         },
         // STRIKT: unbekannte Action-Felder abweisen — fängt z.B. `outputShema` statt `outputSchema`.
+        additionalProperties: false,
+      },
+    },
+    // Workflow-Canvas-Bausteine (Palette + Runner-Dispatch). Reine Metadaten — KEIN run().
+    // Der Kern baut Palette und Runner generisch daraus auf; statische antares/edoobox-Einträge
+    // gibt es nicht mehr (Deletion-Test).
+    workflowActions: {
+      type: 'array',
+      items: {
+        type: 'object',
+        required: ['id', 'moduleId', 'label', 'inputs', 'outputs'],
+        properties: {
+          id: { type: 'string', minLength: 1 },
+          moduleId: { type: 'string', minLength: 1 },
+          moduleLabel: { type: 'string' },
+          featureGate: { type: ['string', 'null'] },
+          label: { type: 'string', minLength: 1 },
+          description: { type: 'string' },
+          inputs: { type: 'array', items: { $ref: '#/definitions/workflowPort' } },
+          outputs: { type: 'array', items: { $ref: '#/definitions/workflowPort' } },
+          isTrigger: { type: 'boolean' },
+          isWrite: { type: 'boolean' },
+          isTerminal: { type: 'boolean' },
+          hardLockModule: { type: 'string' },
+          privacy: { type: 'object' },
+          config: { type: 'array', items: { type: 'object' } },
+        },
         additionalProperties: false,
       },
     },

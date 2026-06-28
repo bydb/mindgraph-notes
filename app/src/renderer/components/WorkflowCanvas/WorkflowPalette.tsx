@@ -1,8 +1,7 @@
 import { useState, type MouseEvent as ReactMouseEvent } from 'react'
 import { createPortal } from 'react-dom'
-import { actionsByModule, WORKFLOW_MODULE_LABELS } from '../../../shared/workflow/registry'
+import { actionsByModule, workflowModuleLabel, workflowModuleGate } from '../../../shared/workflow/registry'
 import {
-  MODULE_FEATURE_GATE,
   type WorkflowModuleId,
   type WorkflowActionDefinition,
   type WorkflowPortDefinition
@@ -46,8 +45,8 @@ export function WorkflowPalette({ onAdd, width, availability }: Props) {
   const grouped = actionsByModule()
 
   const isModuleActive = (moduleId: WorkflowModuleId): boolean => {
-    const gate = MODULE_FEATURE_GATE[moduleId]
-    if (!gate) return true // Kern-Modul
+    const gate = workflowModuleGate(moduleId)
+    if (!gate) return true // Kern-Modul (oder Plugin-Modul ohne Gate)
     return Boolean(features[gate as keyof VaultFeatures])
   }
 
@@ -78,7 +77,7 @@ export function WorkflowPalette({ onAdd, width, availability }: Props) {
               <span aria-hidden="true" style={{ display: 'inline-flex', alignItems: 'center' }}>
                 <ModuleIcon moduleId={moduleId} size={14} />
               </span>
-              <span>{WORKFLOW_MODULE_LABELS[moduleId]}</span>
+              <span>{workflowModuleLabel(moduleId)}</span>
               {!active && <span className="wf-palette__off" title={avail.reason || 'Modul deaktiviert'}>aus</span>}
             </div>
             {actions.map(action => (

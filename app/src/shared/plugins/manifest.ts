@@ -5,7 +5,7 @@
 // getrennten Main-/Renderer-Entries). Siehe docs/plugin-system-plan.md, Entscheidung #8.
 
 import type { ModuleId as CompatModuleId } from '../modelCompatibility'
-import type { WorkflowPrivacyMetadata } from '../workflow/types'
+import type { WorkflowPrivacyMetadata, WorkflowActionDefinition } from '../workflow/types'
 
 /**
  * Plugin-Kategorie. Spiegelt bewusst `ModuleCategory` aus uiStore (renderer),
@@ -124,6 +124,12 @@ export interface PluginManifest {
   /** Einfache Settings werden hieraus generiert; komplexe UI bleibt React. */
   settingsSchema?: JsonSchema
   actions?: ActionDef[]
+  /**
+   * Workflow-Canvas-Bausteine, die dieses Plugin zur Palette + zum Runner beisteuert
+   * (z.B. ein Trigger). Reine, serialisierbare Metadaten. Der Kern registriert sie generisch
+   * (registerWorkflowActions) — kein statischer antares/edoobox-Eintrag im Kern.
+   */
+  workflowActions?: WorkflowActionDefinition[]
   ui?: {
     settingsTab?: boolean
     dashboardWidget?: SlotDecl

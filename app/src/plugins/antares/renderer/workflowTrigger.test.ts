@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { buildAntaresEvent } from './workflowTrigger'
+import { manifest } from '../manifest'
 import type { WorkflowTriggerLedger } from '../../../shared/plugins/workflowTrigger'
 import type { AntaresVerleihRow } from '../../../shared/types'
 
@@ -22,6 +23,15 @@ function row(leihnr: string, over: Partial<AntaresVerleihRow> = {}): AntaresVerl
     ...over,
   }
 }
+
+describe('antares-Manifest trägt den Workflow-Trigger (statt Kern-Registry)', () => {
+  it('deklariert antares.mahnung als Trigger mit Text- + Kontakt-Ausgang', () => {
+    const action = manifest.workflowActions?.find(a => a.id === 'antares.mahnung')
+    expect(action?.isTrigger).toBe(true)
+    expect(action?.moduleId).toBe('antares')
+    expect(action?.outputs.map(o => o.id)).toEqual(['text', 'email'])
+  })
+})
 
 describe('buildAntaresEvent', () => {
   it('erzeugt ein Item je überfälliger Mahnung mit generischem Event-Trigger', () => {

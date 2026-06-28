@@ -112,7 +112,7 @@ import { matchEmailToProjects, gateProjectMatch } from '../shared/projectMatch'
 import { parseRelevanceConfig, stripConfigBlock, buildReplyStats, computeHardSignals, combineRelevance, extractConfigBlock, upsertConfigBlock, emptyRelevanceConfig, isSentMail, isSentFolderName, DEFAULT_VIP_WEIGHT, DEFAULT_DOMAIN_WEIGHT, DEFAULT_KEYWORD_BOOST } from '../shared/emailRelevance'
 import { isHardLocked as isModelHardLocked, isCloudModel as isModelIsCloud } from '../shared/modelCompatibility'
 import { listOpenRouterModels, chat as llmChat, streamOpenRouterChat } from './llm/chatClient'
-import { MODULE_FEATURE_GATE } from '../shared/workflow/types'
+import { registerWorkflowActions, workflowModuleGate } from '../shared/workflow/registry'
 import type { Workflow, WorkflowFile, WorkflowRunTrigger } from '../shared/workflow/model'
 import type {
   ProjectStatusCrystallizeInput,
@@ -134,7 +134,7 @@ import { embedText as ragEmbedText } from './rag/embed'
 import { cosineSimilarity as ragCosineSimilarity } from '../shared/rag/similarity'
 import type { RagIndexStatus, RagQueryResult, RagRetrieveOptions } from '../shared/rag/types'
 import { setupTray, hideTransportWindow, updateShortcut, showTransportWindow } from './transport/trayManager'
-import { createMainRegistry } from './plugins/registry'
+import { createMainRegistry, discoverMainPlugins } from './plugins/registry'
 import { isPluginGateEnabled } from '../shared/plugins/moduleGate'
 import { registerPluginTransport } from './plugins/transport'
 import { createHostFactory, type HostServices } from './plugins/host'
@@ -152,6 +152,13 @@ process.on('unhandledRejection', (reason) => {
 // Der echte Capability-Host wird in app.whenReady() gesetzt (setHostFactory); bis dahin Stub.
 const pluginRegistry = createMainRegistry()
 registerPluginTransport(pluginRegistry)
+
+// Plugin-beigesteuerte Workflow-Canvas-Bausteine (Manifest-Feld `workflowActions`) in die
+// gemeinsame Registry einspielen, damit der Runner sie generisch dispatcht (kein statischer
+// antares/edoobox-Eintrag mehr). Renderer macht dasselbe unabhängig (plugins/workflowActions.ts).
+for (const source of discoverMainPlugins()) {
+  if (source.manifest.workflowActions?.length) registerWorkflowActions(source.manifest.workflowActions)
+}
 
 // — Plugin-Secrets: pro Plugin genamespacet, via safeStorage verschlüsselt in userData —
 // (Direkter userData-Write wie bei den App-Settings; NICHT der Vault-Schreibpfad.)
@@ -1473,8 +1480,8 @@ ipcMain.handle('workflow-run', async (_event, payload: WorkflowRunPayload) => {
     isHardLocked: (model, moduleId) => isModelHardLocked(model, moduleId),
     isCloudModel: (model) => isModelIsCloud(model),
     isModuleActive: (workflowModuleId) => {
-      const gate = MODULE_FEATURE_GATE[workflowModuleId as keyof typeof MODULE_FEATURE_GATE]
-      return gate ? Boolean(features[gate]) : true
+      const gate = workflowModuleGate(workflowModuleId)
+      return gate ? Boolean(features[gate as keyof typeof features]) : true
     },
     ollamaGenerate,
     matchProject: async (email) => {

@@ -12,6 +12,7 @@ import type {
   WorkflowModuleId,
   WorkflowPortDefinition
 } from './types'
+import { MODULE_FEATURE_GATE } from './types'
 
 const out = (
   id: string,
@@ -27,16 +28,15 @@ const inp = (
   extra: Partial<WorkflowPortDefinition> = {}
 ): WorkflowPortDefinition => ({ id, label, kind, ...extra })
 
-/** Anzeigenamen der Module für die Palette. */
-export const WORKFLOW_MODULE_LABELS: Record<WorkflowModuleId, string> = {
+/** Anzeigenamen der KERN-Module für die Palette. Plugin-Module bringen ihr Label über
+ *  `WorkflowActionDefinition.moduleLabel` mit — aufgelöst via `workflowModuleLabel()`. */
+export const WORKFLOW_MODULE_LABELS: Partial<Record<WorkflowModuleId, string>> = {
   email: 'E-Mail',
   project: 'Projekt',
   ollama: 'Ollama',
   notes: 'Notiz',
   human: 'Menschliche Prüfung',
   calendar: 'Kalender',
-  edoobox: 'edoobox',
-  antares: 'Antares',
   tasks: 'Aufgaben',
   schedule: 'Zeitplan'
 }
@@ -290,40 +290,9 @@ export const WORKFLOW_ACTIONS: WorkflowActionDefinition[] = [
     outputs: [out('approval', 'Freigabe', 'human_approval')]
   },
 
-  // ---------------- ANTARES (Layer C) ----------------
-  {
-    // Feuert bei neuer überfälliger Rückgabe (Mahnung). Gibt eine menschenlesbare
-    // Beschreibung als Text aus → anschließbar an Notiz/Prüfung/Ollama.
-    id: 'antares.mahnung',
-    moduleId: 'antares',
-    label: 'Überfällige Rückgabe (Auslöser)',
-    description:
-      'Startpunkt: eine neue überfällige Rückgabe aus Antares (Mahnung). Gibt Leihnr, Titel, Entleiher, Schule, Rückgabedatum und - falls vorhanden - die E-Mail-Adresse aus.',
-    isTrigger: true,
-    inputs: [],
-    outputs: [
-      out('text', 'Mahnung', 'text'),
-      out('email', 'Kontakt', 'email')
-    ],
-    privacy: { containsPersonalData: true, requiresCredential: true }
-  },
-
-  // ---------------- EDOOBOX (Layer D) ----------------
-  {
-    // Feuert, wenn die Buchungszahl eines Angebots steigt (neue Anmeldung).
-    id: 'edoobox.newBooking',
-    moduleId: 'edoobox',
-    label: 'Neue Anmeldung (Auslöser)',
-    description:
-      'Startpunkt: eine neue Anmeldung in einem edoobox-Angebot. Gibt Angebotsname, Teilnehmer und E-Mail-Adresse aus.',
-    isTrigger: true,
-    inputs: [],
-    outputs: [
-      out('text', 'Anmeldung', 'text'),
-      out('email', 'Teilnehmer', 'email')
-    ],
-    privacy: { containsPersonalData: true, requiresCredential: true }
-  },
+  // Layer C/D (antares.mahnung, edoobox.newBooking) sind jetzt PLUGIN-beigesteuert:
+  // sie stehen in den jeweiligen Manifesten (workflowActions) und werden zur Laufzeit über
+  // registerWorkflowActions() eingespielt. Der Kern nennt sie nicht mehr (Deletion-Test).
 
   // ---------------- TASKS (Layer E) ----------------
   {
@@ -385,20 +354,68 @@ export const WORKFLOW_ACTIONS: WorkflowActionDefinition[] = [
   }
 ]
 
-const ACTION_INDEX: Record<string, WorkflowActionDefinition> = Object.fromEntries(
-  WORKFLOW_ACTIONS.map(a => [a.id, a])
-)
+// ── Plugin-beigesteuerte Actions (zur Laufzeit registriert) ──────────────────
+// Sowohl der Renderer (aus den gebündelten Manifesten) als auch der Main-Runner (aus der
+// Plugin-Registry) rufen registerWorkflowActions() beim Start. Bewusst additiv: WORKFLOW_ACTIONS
+// bleibt die Kern-Liste; deren Index wird mit den Plugin-Actions zusammengeführt. Fällt ein Plugin
+// weg, fehlt sein Manifest → seine Action wird nie registriert → kein Palette-Block, kein Dispatch.
+let pluginActions: WorkflowActionDefinition[] = []
+const pluginModuleLabels = new Map<string, string>()
+const pluginModuleGates = new Map<string, string | null>()
+
+function rebuildIndex(): void {
+  ACTION_INDEX = {}
+  for (const a of [...WORKFLOW_ACTIONS, ...pluginActions]) ACTION_INDEX[a.id] = a
+  pluginModuleLabels.clear()
+  pluginModuleGates.clear()
+  for (const a of pluginActions) {
+    if (a.moduleLabel) pluginModuleLabels.set(a.moduleId, a.moduleLabel)
+    if (a.featureGate !== undefined) pluginModuleGates.set(a.moduleId, a.featureGate)
+  }
+}
+
+/** Plugin-Workflow-Actions einspielen (idempotent, dedupe per id — erneute Registrierung ersetzt). */
+export function registerWorkflowActions(defs: readonly WorkflowActionDefinition[]): void {
+  if (defs.length === 0) return
+  const byId = new Map(pluginActions.map(a => [a.id, a]))
+  for (const d of defs) byId.set(d.id, d)
+  pluginActions = [...byId.values()]
+  rebuildIndex()
+}
+
+/** Nur für Tests: Plugin-Actions zurücksetzen (Kern-Zustand wiederherstellen). */
+export function __resetWorkflowActionsForTest(): void {
+  pluginActions = []
+  rebuildIndex()
+}
+
+let ACTION_INDEX: Record<string, WorkflowActionDefinition> = {}
+rebuildIndex()
 
 export function getActionById(id: string): WorkflowActionDefinition | undefined {
   return ACTION_INDEX[id]
 }
 
-export function actionsByModule(): Record<WorkflowModuleId, WorkflowActionDefinition[]> {
-  const grouped = {} as Record<WorkflowModuleId, WorkflowActionDefinition[]>
-  for (const action of WORKFLOW_ACTIONS) {
+/** Kern- + Plugin-Actions, gruppiert nach Modul-Id (für die Palette). */
+export function actionsByModule(): Record<string, WorkflowActionDefinition[]> {
+  const grouped: Record<string, WorkflowActionDefinition[]> = {}
+  for (const action of [...WORKFLOW_ACTIONS, ...pluginActions]) {
     ;(grouped[action.moduleId] ||= []).push(action)
   }
   return grouped
+}
+
+/** Modul-Label: Kern-Tabelle → Plugin-beigesteuert → Modul-Id als Fallback. */
+export function workflowModuleLabel(moduleId: string): string {
+  return WORKFLOW_MODULE_LABELS[moduleId as WorkflowModuleId] ?? pluginModuleLabels.get(moduleId) ?? moduleId
+}
+
+/** Modul-Feature-Gate: Kern-Map → Plugin-beigesteuert → null (immer verfügbar). */
+export function workflowModuleGate(moduleId: string): string | null {
+  const core = MODULE_FEATURE_GATE[moduleId as WorkflowModuleId]
+  if (core !== undefined) return core
+  if (pluginModuleGates.has(moduleId)) return pluginModuleGates.get(moduleId) ?? null
+  return null
 }
 
 export function getPortDef(

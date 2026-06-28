@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { buildEdooboxEvent } from './workflowTrigger'
+import { manifest } from '../manifest'
 import type { WorkflowTriggerLedger } from '../../../shared/plugins/workflowTrigger'
 import type { EdooboxBooking, EdooboxOfferDashboard } from '../../../shared/types'
 
@@ -20,6 +21,16 @@ function offer(id: string, bookingCount: number): EdooboxOfferDashboard {
 function booking(id: string, offerId: string, bookedAt: string): EdooboxBooking {
   return { id, offerId, userName: `User ${id}`, userEmail: `${id}@x.de`, status: 'ok', bookedAt }
 }
+
+describe('edoobox-Manifest trägt den Workflow-Trigger (statt Kern-Registry)', () => {
+  it('deklariert edoobox.newBooking als Trigger hinter dem edoobox-Feature-Gate', () => {
+    const action = manifest.workflowActions?.find(a => a.id === 'edoobox.newBooking')
+    expect(action?.isTrigger).toBe(true)
+    expect(action?.moduleId).toBe('edoobox')
+    expect(action?.featureGate).toBe('edoobox')
+    expect(action?.outputs.map(o => o.id)).toEqual(['text', 'email'])
+  })
+})
 
 describe('buildEdooboxEvent', () => {
   it('Erstbaseline: erstes Sehen erzeugt KEINE Items, afterRun setzt die Baseline', async () => {

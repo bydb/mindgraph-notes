@@ -97,6 +97,12 @@ export interface WorkflowActionDefinition {
   /** z.B. "email.analyze" — global eindeutig, dispatch-Key im Runner. */
   id: string
   moduleId: WorkflowModuleId
+  /** Anzeigename des Moduls für die Palette. Plugin-beigesteuerte Actions bringen ihn selbst
+   *  mit (der Kern hält keine Label-Tabelle für Plugin-Module). Kern-Module nutzen WORKFLOW_MODULE_LABELS. */
+  moduleLabel?: string
+  /** VaultFeatures-Toggle, das dieses Action-Modul gated. null = immer verfügbar. Plugin-Actions
+   *  deklarieren ihn hier statt im Kern-MODULE_FEATURE_GATE (Deletion-Test: Ordner weg ⇒ Gate weg). */
+  featureGate?: string | null
   label: string
   description?: string
   inputs: WorkflowPortDefinition[]
@@ -120,16 +126,17 @@ export interface WorkflowActionDefinition {
  * Welche VaultFeatures-Toggle ein Workflow-Modul gated. null = Kern-Modul
  * (immer verfügbar). Wird für Paletten-Filter + Runner-Modul-Check genutzt.
  */
-export const MODULE_FEATURE_GATE: Record<WorkflowModuleId, string | null> = {
+// Nur KERN-Module. Plugin-Module (antares/edoobox …) bringen ihren Gate über
+// `WorkflowActionDefinition.featureGate` mit — der Kern hält keinen statischen Eintrag für sie
+// (Deletion-Test). Auflösung über `workflowModuleGate()` in registry.ts (Kern-Map → Plugin-Gate → null).
+export const MODULE_FEATURE_GATE: Partial<Record<WorkflowModuleId, string | null>> = {
   email: 'email',
-  edoobox: 'edoobox',
   // Kern-Module (immer verfügbar):
   project: null,
   ollama: null,
   notes: null,
   human: null,
   calendar: null,
-  antares: null,
   tasks: null,
   schedule: null
 }

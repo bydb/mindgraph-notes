@@ -106,6 +106,26 @@ export const manifest: PluginManifest = {
     },
     { id: 'antares.loadCredentials', requiredCapabilities: ['secrets'], outputSchema: credentialsResult },
   ],
+  // Workflow-Canvas-Trigger (vorher statisch im Kern-Registry). Feuert bei neuer überfälliger
+  // Rückgabe; der generische Text-Trigger-Executor im Runner gibt den vorformatierten Seed-Text aus.
+  workflowActions: [
+    {
+      id: 'antares.mahnung',
+      moduleId: 'antares',
+      moduleLabel: 'Antares',
+      featureGate: null,
+      label: 'Überfällige Rückgabe (Auslöser)',
+      description:
+        'Startpunkt: eine neue überfällige Rückgabe aus Antares (Mahnung). Gibt Leihnr, Titel, Entleiher, Schule, Rückgabedatum und - falls vorhanden - die E-Mail-Adresse aus.',
+      isTrigger: true,
+      inputs: [],
+      outputs: [
+        { id: 'text', label: 'Mahnung', kind: 'text' },
+        { id: 'email', label: 'Kontakt', kind: 'email' },
+      ],
+      privacy: { containsPersonalData: true, requiresCredential: true },
+    },
+  ],
   privacy: { containsPersonalData: true, localOnly: true },
 }
 

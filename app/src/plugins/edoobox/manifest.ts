@@ -288,6 +288,26 @@ export const manifest: PluginManifest = {
     },
     { id: 'edoobox.marketingSelectImage', requiredCapabilities: ['dialog'] },
   ],
+  // Workflow-Canvas-Trigger (vorher statisch im Kern-Registry). Feuert bei steigender
+  // Buchungszahl; der generische Text-Trigger-Executor gibt den vorformatierten Seed-Text aus.
+  workflowActions: [
+    {
+      id: 'edoobox.newBooking',
+      moduleId: 'edoobox',
+      moduleLabel: 'edoobox',
+      featureGate: 'edoobox',
+      label: 'Neue Anmeldung (Auslöser)',
+      description:
+        'Startpunkt: eine neue Anmeldung in einem edoobox-Angebot. Gibt Angebotsname, Teilnehmer und E-Mail-Adresse aus.',
+      isTrigger: true,
+      inputs: [],
+      outputs: [
+        { id: 'text', label: 'Anmeldung', kind: 'text' },
+        { id: 'email', label: 'Teilnehmer', kind: 'email' },
+      ],
+      privacy: { containsPersonalData: true, requiresCredential: true },
+    },
+  ],
   privacy: { containsPersonalData: true },
 }
 
