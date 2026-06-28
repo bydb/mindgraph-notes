@@ -8,19 +8,38 @@ import type { PluginManifest, JsonSchema } from '../../shared/plugins/manifest'
 /** as const → bindet das Capability-Tupel für definePluginMain im Main-Entry. */
 export const EDOOBOX_CAPABILITIES = ['http.fetch', 'secrets', 'vault.read', 'vault.write', 'dialog', 'resource', 'llm.generate'] as const
 
-// — Ausgabe-Schemas (Defense-in-Depth, Envelope-Ebene). Die meisten Actions liefern die alte
-//   {success,…}-IPC-Hülle mit je nach Erfolg/Fehler unterschiedlichen (z.T. undefined-wertigen)
-//   Optionalfeldern → strikt geprüft wird nur das IMMER vorhandene `success:boolean`, der Rest
-//   bleibt lenient. Fixe, intern gebaute Formen (Credentials, ausgewähltes Bild) sind strikt.
-const boolResult: JsonSchema = { type: 'boolean' }
-const successEnvelope: JsonSchema = {
+// — Ausgabe-Schemas (Defense-in-Depth). Die meisten Actions liefern die alte {success,…}-IPC-
+//   Hülle. `success:boolean` ist IMMER da → required; die vom Renderer/Workflow KONSUMIERTEN
+//   Datenfelder (offers/bookings/dates/IDs/Texte) werden per Typ geprüft, WENN sie vorhanden
+//   sind (auf dem Fehlerpfad {success:false,error} fehlen sie ⇒ nicht required). `undefined`-
+//   wertige Felder kommen hier nicht vor (sie werden auf dem Fehlerpfad weggelassen), daher ist
+//   die Typprüfung „wenn vorhanden" sicher. additionalProperties bleibt offen.
+const str: JsonSchema = { type: 'string' }
+const num: JsonSchema = { type: 'number' }
+const arr: JsonSchema = { type: 'array' }
+/** Baut eine {success,…}-Hülle, die `success` erzwingt und die genannten Felder typt-wenn-vorhanden. */
+const envelope = (fields: Record<string, JsonSchema> = {}): JsonSchema => ({
   type: 'object',
   required: ['success'],
-  properties: { success: { type: 'boolean' } },
+  properties: { success: { type: 'boolean' }, ...fields },
   additionalProperties: true,
-}
+})
+const boolResult: JsonSchema = { type: 'boolean' }
 const objectArray: JsonSchema = { type: 'array', items: { type: 'object' } }
 const nullableObject: JsonSchema = { anyOf: [{ type: 'null' }, { type: 'object' }] }
+
+const plainEnvelope = envelope()
+const offersEnvelope = envelope({ offers: arr })
+const categoriesEnvelope = envelope({ categories: arr })
+const bookingsEnvelope = envelope({ bookings: arr })
+const datesEnvelope = envelope({ dates: arr })
+const importEventEnvelope = envelope({ offerId: str })
+const fileExportEnvelope = envelope({ filePath: str, canceled: { type: 'boolean' } })
+const contentEnvelope = envelope({ blogPost: str, igCaption: str })
+const wpCheckEnvelope = envelope({ userName: str })
+const publishEnvelope = envelope({ postId: num, postUrl: str, status: str })
+const uploadEnvelope = envelope({ mediaId: num, imageUrl: str })
+const imageEnvelope = envelope({ imageBase64: str })
 const apiCredentialsResult: JsonSchema = {
   anyOf: [
     { type: 'null' },
@@ -270,27 +289,27 @@ export const manifest: PluginManifest = {
 // Ausgabe-Schemas zentral je Action-ID zugeordnet — hält die große actions-Liste lesbar.
 // Vollständigkeit (jede Action MUSS hier stehen) wird im Test erzwungen.
 const EDOOBOX_OUTPUT_SCHEMAS: Record<string, JsonSchema> = {
-  'edoobox.check': successEnvelope,
-  'edoobox.listOffers': successEnvelope,
-  'edoobox.listCategories': successEnvelope,
-  'edoobox.listOffersDashboard': successEnvelope,
-  'edoobox.listBookings': successEnvelope,
-  'edoobox.listDates': successEnvelope,
-  'edoobox.importEvent': successEnvelope,
+  'edoobox.check': plainEnvelope,
+  'edoobox.listOffers': offersEnvelope,
+  'edoobox.listCategories': categoriesEnvelope,
+  'edoobox.listOffersDashboard': offersEnvelope,
+  'edoobox.listBookings': bookingsEnvelope,
+  'edoobox.listDates': datesEnvelope,
+  'edoobox.importEvent': importEventEnvelope,
   'edoobox.saveCredentials': boolResult,
   'edoobox.loadCredentials': apiCredentialsResult,
   'edoobox.loadEvents': objectArray,
   'edoobox.saveEvents': boolResult,
   'edoobox.parseFormular': nullableObject,
-  'edoobox.generateIqReport': successEnvelope,
-  'edoobox.generateAttendanceList': successEnvelope,
+  'edoobox.generateIqReport': fileExportEnvelope,
+  'edoobox.generateAttendanceList': fileExportEnvelope,
   'edoobox.marketingSaveCredentials': boolResult,
   'edoobox.marketingLoadCredentials': wpCredentialsResult,
-  'edoobox.marketingCheckWordpress': successEnvelope,
-  'edoobox.marketingGenerateContent': successEnvelope,
-  'edoobox.marketingPublishWordpress': successEnvelope,
-  'edoobox.marketingUploadImage': successEnvelope,
-  'edoobox.marketingGenerateImage': successEnvelope,
+  'edoobox.marketingCheckWordpress': wpCheckEnvelope,
+  'edoobox.marketingGenerateContent': contentEnvelope,
+  'edoobox.marketingPublishWordpress': publishEnvelope,
+  'edoobox.marketingUploadImage': uploadEnvelope,
+  'edoobox.marketingGenerateImage': imageEnvelope,
   'edoobox.marketingSelectImage': selectedImageResult,
 }
 for (const action of manifest.actions ?? []) {

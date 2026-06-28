@@ -289,8 +289,10 @@ export class PluginRegistry {
   private async evaluateReadiness(p: LoadedPlugin): Promise<ReadinessState> {
     const required = (p.manifest.credentials ?? []).filter((c) => c.required !== false)
     if (required.length === 0) return 'ready'
+    // Credentials deklariert, aber keine secrets-Capability ⇒ kann NICHT geprüft/geladen werden.
+    // Das ist ein Defekt, kein Einsatzbereit — KEIN Fail-open auf ready.
     const secrets = (p.host as { secrets?: { get(key: string): Promise<string | null> } } | undefined)?.secrets
-    if (!secrets) return 'ready' // Credentials deklariert, aber keine secrets-Capability — nicht blockieren
+    if (!secrets) return 'unavailable'
     try {
       for (const c of required) {
         const value = await secrets.get(c.key)
@@ -298,8 +300,10 @@ export class PluginRegistry {
       }
       return 'ready'
     } catch (err) {
+      // Technischer Fehler beim Lesen (z.B. safeStorage/Secrets-Speicher defekt): ehrlich
+      // `unavailable` melden statt einen Defekt als Einsatzbereitschaft zu kaschieren.
       console.error(`[plugin] Readiness-Check '${p.manifest.id}' warf: ${errMessage(err)}`)
-      return 'ready'
+      return 'unavailable'
     }
   }
 

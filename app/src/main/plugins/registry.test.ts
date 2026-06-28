@@ -446,6 +446,24 @@ describe('PluginRegistry — Readiness (needs-configuration)', () => {
     expect(r.get('opt')?.readiness).toBe('ready') // 'extra' fehlt, blockt aber nicht
   })
 
+  it('technischer Fehler beim Secrets-Lesen → unavailable (kein Fail-open auf ready)', async () => {
+    const brokenHost = () =>
+      ({
+        log: () => {},
+        secrets: {
+          get: async () => { throw new Error('safeStorage kaputt') },
+          set: async () => {},
+          delete: async () => {},
+        },
+      }) as unknown as AnyPluginHost
+    const r = new PluginRegistry(brokenHost)
+    r.register([{ manifest: credManifest, loadEntry: async () => ({ default: credEntry() }) }])
+    await r.activate('cred')
+    // Plugin läuft (Code geladen), ist aber NICHT als ready ausgewiesen — der Speicher ist defekt.
+    expect(r.get('cred')?.activation).toBe('active')
+    expect(r.get('cred')?.readiness).toBe('unavailable')
+  })
+
   it('refreshReadiness bewertet ein aktives Plugin neu', async () => {
     const store = new Map<string, string>()
     const r = new PluginRegistry(secretsHostFactory(store))

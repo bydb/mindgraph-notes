@@ -95,11 +95,26 @@ describe('edoobox-Plugin — Output-Schemas (Envelope-Validierung)', () => {
     for (const a of manifest.actions ?? []) expect(a.outputSchema, a.id).toBeDefined()
   })
 
-  it('successEnvelope: Erfolg/Fehler ok, Fremdform abgewiesen', () => {
+  it('Envelope: Erfolg/Fehler ok, Fremdform abgewiesen', () => {
     expect(validateAgainst(out('edoobox.listOffers'), { success: true, offers: [{ id: '1' }] }).valid).toBe(true)
     expect(validateAgainst(out('edoobox.listOffers'), { success: false, error: 'kaputt' }).valid).toBe(true)
     expect(validateAgainst(out('edoobox.listOffers'), { offers: [] }).valid).toBe(false) // kein success
     expect(validateAgainst(out('edoobox.listOffers'), '<html>error</html>').valid).toBe(false)
+  })
+
+  it('konsumierte Felder werden getypt: offers/bookings/dates als Array', () => {
+    // genau der Review-Fall: success:true, aber offers ist kaputt (String) → MUSS scheitern.
+    expect(validateAgainst(out('edoobox.listOffers'), { success: true, offers: 'kaputt' }).valid).toBe(false)
+    expect(validateAgainst(out('edoobox.listBookings'), { success: true, bookings: {} }).valid).toBe(false)
+    expect(validateAgainst(out('edoobox.listDates'), { success: true, dates: [] }).valid).toBe(true)
+  })
+
+  it('konsumierte Felder werden getypt: IDs/Texte mit passendem Typ', () => {
+    expect(validateAgainst(out('edoobox.marketingPublishWordpress'), { success: true, postId: 7, postUrl: 'https://x', status: 'publish' }).valid).toBe(true)
+    expect(validateAgainst(out('edoobox.marketingPublishWordpress'), { success: true, postId: 'sieben' }).valid).toBe(false)
+    expect(validateAgainst(out('edoobox.marketingUploadImage'), { success: true, mediaId: 'x' }).valid).toBe(false)
+    expect(validateAgainst(out('edoobox.marketingGenerateContent'), { success: true, blogPost: 123, igCaption: 'ok' }).valid).toBe(false)
+    expect(validateAgainst(out('edoobox.importEvent'), { success: true, offerId: 'abc' }).valid).toBe(true)
   })
 
   it('loadCredentials: null oder {apiKey,apiSecret}; halbes Paar abgewiesen', () => {
