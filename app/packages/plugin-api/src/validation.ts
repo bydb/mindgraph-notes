@@ -38,7 +38,10 @@ export interface CompatResult {
 
 // Relative Artefakt-Pfade: kein führendes '/'/'\\', kein Schema (xxx:), kein führendes '..'.
 // Der robuste „..-irgendwo"-Check läuft segmentweise in validateManifestSemantics.
-const ENTRY_PATH_PATTERN = '^(?![/\\\\])(?![A-Za-z][A-Za-z0-9+.-]*:)(?!\\.\\.(?:[/\\\\]|$)).+'
+const ENTRY_PATH_GUARD = '^(?![/\\\\])(?![A-Za-z][A-Za-z0-9+.-]*:)(?!\\.\\.(?:[/\\\\]|$))'
+// Gebaute Artefakte: main/renderer MÜSSEN .js sein, styles .css — A1 verlässt sich darauf.
+const ENTRY_JS_PATTERN = ENTRY_PATH_GUARD + '.+\\.js$'
+const ENTRY_CSS_PATTERN = ENTRY_PATH_GUARD + '.+\\.css$'
 
 const CAPABILITY_VALUES = [
   'vault.read',
@@ -107,8 +110,9 @@ export const PLUGIN_MANIFEST_SCHEMA: JsonSchema = {
       required: ['name'],
       properties: {
         name: { type: 'string', minLength: 1 },
+        // url wird zusätzlich semantisch auf http(s) geprüft (isHttpUrl) — später klickbar im Store.
         url: { type: 'string' },
-        email: { type: 'string' },
+        email: { type: 'string', format: 'email' },
       },
       additionalProperties: false,
     },
@@ -117,9 +121,9 @@ export const PLUGIN_MANIFEST_SCHEMA: JsonSchema = {
       // Mindestens ein Code-Einstieg (main ODER renderer); styles ist optional.
       anyOf: [{ required: ['main'] }, { required: ['renderer'] }],
       properties: {
-        main: { type: 'string', minLength: 1, pattern: ENTRY_PATH_PATTERN },
-        renderer: { type: 'string', minLength: 1, pattern: ENTRY_PATH_PATTERN },
-        styles: { type: 'string', minLength: 1, pattern: ENTRY_PATH_PATTERN },
+        main: { type: 'string', minLength: 1, pattern: ENTRY_JS_PATTERN },
+        renderer: { type: 'string', minLength: 1, pattern: ENTRY_JS_PATTERN },
+        styles: { type: 'string', minLength: 1, pattern: ENTRY_CSS_PATTERN },
       },
       additionalProperties: false,
     },
@@ -280,6 +284,10 @@ export function validateManifestSemantics(manifest: PluginManifest): ValidationR
   if (manifest.repo !== undefined && !isHttpUrl(manifest.repo)) {
     errors.push(`repo ist keine gültige http(s)-URL: '${manifest.repo}'.`)
   }
+  // author.url wird im Store klickbar — dieselbe http(s)-Strenge wie repo (kein javascript: o.ä.).
+  if (manifest.author?.url !== undefined && !isHttpUrl(manifest.author.url)) {
+    errors.push(`author.url ist keine gültige http(s)-URL: '${manifest.author.url}'.`)
+  }
   // '..' an JEDER Stelle eines Entry-Pfads ablehnen (das ajv-Pattern fängt nur den Präfix).
   for (const [key, value] of Object.entries(manifest.entrypoints ?? {})) {
     if (typeof value === 'string' && value.split(/[/\\]/).includes('..')) {
@@ -373,8 +381,15 @@ export function isAppCompatible(minAppVersion: string, appVersion: string): Comp
       reason: `Ungültige minAppVersion '${minAppVersion}'.`,
     }
   }
-  // Eine unlesbare App-Version darf legitime Plugins nicht fälschlich sperren (Fail-open).
-  if (!semver.valid(appVersion)) return { compatible: true }
+  // Fail-CLOSED: kann der Host seine eigene Version nicht belegen, darf das Gate nicht offen
+  // ausfallen — sonst umginge genau dieser Fall die Kompatibilitätsprüfung.
+  if (!semver.valid(appVersion)) {
+    return {
+      compatible: false,
+      kind: 'incompatible-app',
+      reason: `App-Version unlesbar ('${appVersion}') — Kompatibilität nicht belegbar.`,
+    }
+  }
   if (semver.lt(appVersion, minAppVersion)) {
     return {
       compatible: false,

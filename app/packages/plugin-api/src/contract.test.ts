@@ -140,6 +140,23 @@ describe('validateManifest — v2-Schema (strikt)', () => {
     expect(validateManifest({ ...validManifest, entrypoints: { main: 'https://x/main.js' } }).valid).toBe(false)
     expect(validateManifest({ ...validManifest, entrypoints: { main: '../main.js' } }).valid).toBe(false)
   })
+
+  it('erzwingt Artefakt-Endungen: main/renderer = .js, styles = .css', () => {
+    expect(validateManifest({ ...validManifest, entrypoints: { main: 'main.css' } }).valid).toBe(false)
+    expect(validateManifest({ ...validManifest, entrypoints: { renderer: 'renderer.tsx' } }).valid).toBe(false)
+    expect(validateManifest({ ...validManifest, entrypoints: { main: 'main.ts' } }).valid).toBe(false)
+    expect(validateManifest({
+      ...validManifest, entrypoints: { main: 'main.js', styles: 'styles.js' },
+    }).valid).toBe(false)
+    expect(validateManifest({
+      ...validManifest, entrypoints: { main: 'dist/main.js', renderer: 'dist/renderer.js', styles: 'dist/styles.css' },
+    }).valid).toBe(true)
+  })
+
+  it('validiert author.email per ajv-Format', () => {
+    expect(validateManifest({ ...validManifest, author: { name: 'J', email: 'kein-email' } }).valid).toBe(false)
+    expect(validateManifest({ ...validManifest, author: { name: 'J', email: 'j@example.com' } }).valid).toBe(true)
+  })
 })
 
 describe('validateManifestSemantics — SemVer/URL/Pfad', () => {
@@ -156,6 +173,13 @@ describe('validateManifestSemantics — SemVer/URL/Pfad', () => {
     expect(validateManifestSemantics({ ...validManifest, repo: 'not a url' }).valid).toBe(false)
     expect(validateManifestSemantics({ ...validManifest, repo: 'ftp://x/y' }).valid).toBe(false)
     expect(validateManifestSemantics({ ...validManifest, repo: 'https://github.com/x/y' }).valid).toBe(true)
+  })
+
+  it('lehnt eine nicht-http(s) author.url ab (z.B. javascript:)', () => {
+    const js = { ...validManifest, author: { name: 'J', url: 'javascript:alert(1)' } }
+    expect(validateManifestSemantics(js).valid).toBe(false)
+    const ok = { ...validManifest, author: { name: 'J', url: 'https://example.com' } }
+    expect(validateManifestSemantics(ok).valid).toBe(true)
   })
 
   it('fängt ein ..-Segment irgendwo im Entry-Pfad', () => {
@@ -189,6 +213,12 @@ describe('Kompatibilitäts-Gate', () => {
 
   it('isAppCompatible: ungültige minAppVersion ⇒ manifest-invalid', () => {
     expect(isAppCompatible('x.y.z', '0.8.14').kind).toBe('manifest-invalid')
+  })
+
+  it('isAppCompatible: unlesbare App-Version ⇒ fail-closed (incompatible-app)', () => {
+    const r = isAppCompatible('0.8.0', 'unbekannt')
+    expect(r.compatible).toBe(false)
+    expect(r.kind).toBe('incompatible-app')
   })
 })
 
