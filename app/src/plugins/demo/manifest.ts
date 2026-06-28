@@ -8,11 +8,16 @@ import type { PluginManifest } from '@mindgraph/plugin-api'
 export const DEMO_CAPABILITIES = ['llm.generate'] as const
 
 export const manifest: PluginManifest = {
+  manifestVersion: 2,
   id: 'demo',
   version: '0.1.0',
   label: 'Demo-Plugin',
   description: 'Architektur-Spike für das Plugin-System (kein Produkt-Feature).',
   category: 'ai',
+  apiVersion: '^0.2.0',
+  minAppVersion: '0.8.14',
+  author: { name: 'Jochen Leeder', url: 'https://mindgraph-notes.de' },
+  entrypoints: { main: 'main.js', renderer: 'renderer.js' },
   icon: { text: '🧪', color: '#9b87f5' },
   capabilities: [...DEMO_CAPABILITIES],
   actions: [

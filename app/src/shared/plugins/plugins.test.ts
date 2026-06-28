@@ -13,11 +13,16 @@ import type { PluginManifest } from '@mindgraph/plugin-api'
 // (Manifest-Validierung, definePluginMain) leben jetzt im Paket (contract.test.ts).
 
 const validManifest: PluginManifest = {
+  manifestVersion: 2,
   id: 'antares',
   version: '1.0.0',
   label: 'Antares Medienzentrum',
   description: 'Verleih-Dashboard',
   category: 'business',
+  apiVersion: '^0.2.0',
+  minAppVersion: '0.0.0',
+  author: { name: 'Test' },
+  entrypoints: { main: 'main.js' },
   capabilities: ['http.fetch', 'secrets'],
   module: { enabledPath: 'pluginConfig.antares.enabled', legacyEnabledPath: 'antares.enabled' },
   http: { allowedHosts: ['antares.example.net'] },

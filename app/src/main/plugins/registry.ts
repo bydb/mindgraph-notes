@@ -29,6 +29,9 @@ import {
   validateManifest,
   validateManifestSemantics,
   validateAgainst,
+  isApiCompatible,
+  isAppCompatible,
+  type PluginErrorKind,
 } from '@mindgraph/plugin-api/validation'
 
 /** Eine entdeckte Plugin-Quelle: reines Manifest + lazy Loader für den Main-Entry. */
@@ -82,7 +85,10 @@ export class PluginRegistry {
 
   constructor(
     private hostFactory: HostFactory = STUB_HOST_FACTORY,
-    private hardLockGuard?: HardLockGuard
+    private hardLockGuard?: HardLockGuard,
+    /** Laufende App-Version für das App-Kompat-Gate. Fehlt sie (z.B. in Tests), wird nur das
+     *  API-Gate geprüft — das App-Gate kann ohne bekannte App-Version nicht entscheiden. */
+    private appVersion?: string
   ) {}
 
   /** Setzt den echten Capability-Host nachträglich (nach Aktivierung gebaut in index.ts). */
@@ -115,22 +121,20 @@ export class PluginRegistry {
 
       if (!shape.valid || !semantics.valid) {
         const errors = [...shape.errors, ...semantics.errors]
-        this.plugins.set(id, {
-          manifest,
-          source,
-          state: {
-            id,
-            version: manifest?.version,
-            installation: 'bundled',
-            activation: 'error',
-            readiness: 'unavailable',
-            error: { message: `Ungültiges Manifest: ${errors.join('; ')}`, at: nowIso() },
-          },
-          actions: new Map(),
-          desired: 'disabled',
-          manifestInvalid: true,
-        })
+        this.setRejected(id, manifest, `Ungültiges Manifest: ${errors.join('; ')}`, 'manifest-invalid', source)
         console.error(`[plugin] '${id}' abgewiesen: ${errors.join('; ')}`)
+        continue
+      }
+
+      // Kompatibilitäts-Gate (A0/2): unpassende API-/App-Version ist ein terminaler Vertragsbruch
+      // — gleicher Pfad wie ein ungültiges Manifest (kein Aktivierungs-Retry), aber mit eigenem
+      // `kind`. Läuft NACH der Schema-/Semantik-Prüfung, daher ist apiVersion/minAppVersion gültig.
+      const api = isApiCompatible(manifest.apiVersion)
+      const app = this.appVersion ? isAppCompatible(manifest.minAppVersion, this.appVersion) : { compatible: true }
+      const incompat = !api.compatible ? api : !app.compatible ? app : null
+      if (incompat) {
+        this.setRejected(id, manifest, incompat.reason ?? 'Inkompatibles Plugin', incompat.kind ?? 'manifest-invalid', source)
+        console.error(`[plugin] '${id}' inkompatibel: ${incompat.reason}`)
         continue
       }
 
@@ -143,6 +147,31 @@ export class PluginRegistry {
         manifestInvalid: false,
       })
     }
+  }
+
+  /** Trägt ein abgewiesenes Plugin als TERMINALEN Fehlerzustand ein (kein Aktivierungs-Retry). */
+  private setRejected(
+    id: string,
+    manifest: PluginManifest,
+    message: string,
+    kind: PluginErrorKind,
+    source: MainPluginSource
+  ): void {
+    this.plugins.set(id, {
+      manifest,
+      source,
+      state: {
+        id,
+        version: manifest?.version,
+        installation: 'bundled',
+        activation: 'error',
+        readiness: 'unavailable',
+        error: { message, at: nowIso(), kind },
+      },
+      actions: new Map(),
+      desired: 'disabled',
+      manifestInvalid: true,
+    })
   }
 
   list(): PluginRuntimeState[] {
@@ -454,9 +483,10 @@ export function discoverMainPlugins(): MainPluginSource[] {
   return sources
 }
 
-/** Erzeugt eine fertig befüllte Registry aus dem Glob-Katalog. */
-export function createMainRegistry(hostFactory?: HostFactory): PluginRegistry {
-  const registry = new PluginRegistry(hostFactory)
+/** Erzeugt eine fertig befüllte Registry aus dem Glob-Katalog. `appVersion` aktiviert das
+ *  App-Kompat-Gate (in `index.ts` aus `app.getVersion()`). */
+export function createMainRegistry(hostFactory?: HostFactory, appVersion?: string): PluginRegistry {
+  const registry = new PluginRegistry(hostFactory, undefined, appVersion)
   registry.register(discoverMainPlugins())
   return registry
 }

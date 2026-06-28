@@ -165,7 +165,7 @@ process.on('unhandledRejection', (reason) => {
 
 // Plugin-System: build-seitig erkannte Registry (import.meta.glob) + generischer Transport.
 // Der echte Capability-Host wird in app.whenReady() gesetzt (setHostFactory); bis dahin Stub.
-const pluginRegistry = createMainRegistry()
+const pluginRegistry = createMainRegistry(undefined, app.getVersion())
 registerPluginTransport(pluginRegistry)
 
 // Plugin-beigesteuerte Workflow-Canvas-Bausteine (Manifest-Feld `workflowActions`) in die

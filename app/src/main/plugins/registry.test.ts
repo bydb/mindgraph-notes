@@ -6,11 +6,16 @@ import type { AnyPluginHost } from '@mindgraph/plugin-api'
 
 function mkManifest(id: string, over: Partial<PluginManifest> = {}): PluginManifest {
   return {
+    manifestVersion: 2,
     id,
     version: '1.0.0',
     label: id,
     description: 'Test',
     category: 'ai',
+    apiVersion: '^0.2.0',
+    minAppVersion: '0.0.0',
+    author: { name: 'Test' },
+    entrypoints: { main: 'main.js' },
     capabilities: [],
     ...over,
   }
@@ -613,6 +618,32 @@ describe('PluginRegistry — Readiness (needs-configuration)', () => {
     expect(r.get('cred')?.readiness).toBe('needs-configuration')
     store.set('token', 'xyz') // direkt am Host vorbei gesetzt
     expect((await r.refreshReadiness('cred')).readiness).toBe('ready')
+  })
+})
+
+describe('PluginRegistry — Kompatibilitäts-Gate', () => {
+  const noopEntry = (id: string) =>
+    async () => ({ default: definePluginMain({ id, capabilities: [] }, () => {}) })
+
+  it('inkompatible apiVersion ⇒ error/incompatible-api, terminal (kein Retry)', async () => {
+    const r = new PluginRegistry()
+    r.register([{ manifest: mkManifest('oldapi', { apiVersion: '^9.9.9' }), loadEntry: noopEntry('oldapi') }])
+    expect(r.get('oldapi')?.activation).toBe('error')
+    expect(r.get('oldapi')?.error?.kind).toBe('incompatible-api')
+    expect((await r.activate('oldapi')).activation).toBe('error')
+  })
+
+  it('zu hohe minAppVersion ⇒ error/incompatible-app (App-Version per DI)', () => {
+    const r = new PluginRegistry(undefined, undefined, '0.8.14')
+    r.register([{ manifest: mkManifest('newapp', { minAppVersion: '999.0.0' }), loadEntry: noopEntry('newapp') }])
+    expect(r.get('newapp')?.activation).toBe('error')
+    expect(r.get('newapp')?.error?.kind).toBe('incompatible-app')
+  })
+
+  it('ohne appVersion wird das App-Gate übersprungen (nur API-Gate greift)', () => {
+    const r = new PluginRegistry() // keine appVersion injiziert
+    r.register([{ manifest: mkManifest('skipapp', { minAppVersion: '999.0.0' }), loadEntry: noopEntry('skipapp') }])
+    expect(r.get('skipapp')?.activation).toBe('disabled')
   })
 })
 

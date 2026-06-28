@@ -65,11 +65,16 @@ const baseInput = {
 }
 
 export const manifest: PluginManifest = {
+  manifestVersion: 2,
   id: 'antares',
   version: '1.0.0',
   label: 'Antares Medienzentrum',
   description: 'Read-only Verleih-Daten aus Antares CS (Entleiher, Mahnungen Geräte/Medien, Lizenzen).',
   category: 'business',
+  apiVersion: '^0.2.0',
+  minAppVersion: '0.8.14',
+  author: { name: 'Jochen Leeder', url: 'https://mindgraph-notes.de' },
+  entrypoints: { main: 'main.js', renderer: 'renderer.js' },
   icon: { text: '📦', color: '#10b981' },
   module: {
     enabledPath: 'pluginConfig.antares.enabled',

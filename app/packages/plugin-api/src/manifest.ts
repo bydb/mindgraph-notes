@@ -89,6 +89,26 @@ export interface SlotDecl {
   fromAction?: string
 }
 
+/** Autor eines Plugins. Bewusst Objekt (nicht String) — eine spätere Erweiterung um url/email
+ *  bliebe additiv, eine String→Objekt-Umstellung wäre es nicht. */
+export interface PluginAuthor {
+  name: string
+  url?: string
+  email?: string
+}
+
+/**
+ * Code-Einstiegspunkte eines Plugins — **gebaute Artefakte** (z. B. `main.js`, `renderer.js`,
+ * `styles.css`), nicht TypeScript-Quellen. Reine relative Pfade (kein `..`, kein absoluter Pfad,
+ * keine URL). Mindestens `main` ODER `renderer` muss gesetzt sein. In Schritt 2 nur deklariert;
+ * ausgewertet wird das erst vom Runtime-/Disk-Loader (A1).
+ */
+export interface PluginEntrypoints {
+  main?: string
+  renderer?: string
+  styles?: string
+}
+
 /** Deklariert, wie ein Plugin im Modul-Tab erscheint und wo sein Enabled-Flag persistiert ist. */
 export interface PluginModuleDecl {
   /** Modul-ID in der Settings-UI; standardmäßig identisch zur Plugin-ID. */
@@ -106,13 +126,26 @@ export interface PluginModuleDecl {
  * keine Funktionen, keine React-Komponenten, keine Klassen.
  */
 export interface PluginManifest {
+  /** Format-Diskriminator. Aktuell ausschließlich `2` — v1 wird nicht mehr akzeptiert (A0/2).
+   *  Ein künftiges v3 bekommt bewusst ein eigenes Schema, kein aufgeweichtes v2. */
+  manifestVersion: 2
   /** Stabile ID — verbindet Manifest, Main-Entry, Renderer-Entry und alle Action-IDs. */
   id: string
-  /** SemVer — Grundlage für Config-Migration. */
+  /** SemVer (konkret) — Grundlage für Config-Migration. */
   version: string
   label: string
   description: string
   category: PluginCategory
+  /** SemVer-**Range** der `@mindgraph/plugin-api`, die das Plugin verträgt (z. B. `"^0.2.0"`).
+   *  Aktives Gate: `semver.satisfies(API_VERSION, apiVersion)`. */
+  apiVersion: string
+  /** Konkrete Mindest-App-Version (z. B. `"0.8.14"`). Aktives Gate: `semver.gte(appVersion, …)`. */
+  minAppVersion: string
+  author: PluginAuthor
+  /** Gebaute Code-Artefakte; mindestens `main` ODER `renderer`. Nur deklariert (Auswertung A1). */
+  entrypoints: PluginEntrypoints
+  /** Optionaler Quell-/Store-Link (echte http(s)-URL). */
+  repo?: string
   icon?: { text?: string; color?: string }
 
   capabilities: PluginCapability[]

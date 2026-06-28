@@ -31,11 +31,16 @@ function fakeServices(over: Partial<HostServices> = {}): HostServices {
 
 function manifest(over: Partial<PluginManifest> = {}): PluginManifest {
   return {
+    manifestVersion: 2,
     id: 'p',
     version: '1.0.0',
     label: 'P',
     description: 'x',
     category: 'ai',
+    apiVersion: '^0.2.0',
+    minAppVersion: '0.0.0',
+    author: { name: 'Test' },
+    entrypoints: { main: 'main.js' },
     capabilities: [],
     ...over,
   }
