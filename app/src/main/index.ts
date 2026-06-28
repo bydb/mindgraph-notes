@@ -4,16 +4,18 @@ import * as fs from 'fs/promises'
 import { existsSync } from 'fs'
 import type { FileEntry } from '../shared/types'
 
-// Dev-only: isoliertes userData-Profil, damit `npm run dev` NICHT die produktiven Daten (Settings,
-// Secrets, Caches) anfasst. Greift NUR ungepackt UND wenn MINDGRAPH_USER_DATA_DIR gesetzt ist.
-// Muss VOR jedem userData-Zugriff laufen → daher ganz am Modulanfang, vor app.whenReady().
-if (!app.isPackaged && process.env.MINDGRAPH_USER_DATA_DIR) {
+// Dev-only userData-Isolation: ungepackt (`npm run dev`/`start`) NIEMALS das produktive Profil der
+// installierten App anfassen — sonst migriert/schreibt der Dev-Build die echten Settings (real passiert).
+// Default ist ein eigenes „<App> (dev)"-Profil; mit MINDGRAPH_USER_DATA_DIR gezielt überschreibbar
+// (z.B. ein Klon des Produktivprofils für Tests MIT Credentials). Muss VOR jedem userData-Zugriff laufen.
+if (!app.isPackaged) {
   const devUserData = process.env.MINDGRAPH_USER_DATA_DIR
+    || path.join(app.getPath('userData'), '..', `${app.getName()} (dev)`)
   try {
     app.setPath('userData', devUserData)
-    console.log(`[dev] userData override aktiv → ${devUserData}`)
+    console.log(`[dev] isoliertes userData-Profil → ${devUserData}`)
   } catch (err) {
-    console.error('[dev] userData override fehlgeschlagen:', err)
+    console.error('[dev] userData-Isolation fehlgeschlagen:', err)
   }
 }
 
