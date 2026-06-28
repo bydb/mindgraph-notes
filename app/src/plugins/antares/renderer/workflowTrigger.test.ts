@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { buildAntaresEvent } from './workflowTrigger'
 import { manifest } from '../manifest'
 import { buildAntaresReminderExample } from './workflowExample'
-import type { WorkflowTriggerLedger } from '../../../shared/plugins/workflowTrigger'
+import type { WorkflowTriggerLedger } from '@mindgraph/plugin-api'
 import type { AntaresVerleihRow } from '../../../shared/types'
 
 function fakeLedger(initial: Record<string, string> = {}): WorkflowTriggerLedger & { raw: Record<string, string> } {

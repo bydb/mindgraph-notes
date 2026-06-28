@@ -6,8 +6,8 @@
 // React/Store erst beim Mounten geladen werden. Erkannt über `import.meta.glob` der
 // Renderer-Registry — kein harter Import in der App. Siehe #12.
 
-import type { PluginRendererEntry } from '../../../shared/plugins/entry'
-import { WORKFLOW_TRIGGER_SLOT, WORKFLOW_EXAMPLE_SLOT } from '../../../shared/plugins/workflowTrigger'
+import type { PluginRendererEntry } from '@mindgraph/plugin-api'
+import { WORKFLOW_TRIGGER_SLOT, WORKFLOW_EXAMPLE_SLOT } from '@mindgraph/plugin-api'
 import { antaresTriggerProvider } from './workflowTrigger'
 import { buildAntaresReminderExample } from './workflowExample'
 

@@ -1,7 +1,7 @@
 // Antares-Plugin — Manifest (rein serialisierbar). Erste echte Migration einer Spaghetti-
 // Verdrahtung in eine Vertikale. Read-only Medienzentren-Verleih. Siehe docs/plugin-system-plan.md.
 
-import type { PluginManifest, JsonSchema } from '../../shared/plugins/manifest'
+import type { PluginManifest, JsonSchema } from '@mindgraph/plugin-api'
 
 /** as const → bindet das Capability-Tupel für definePluginMain im Main-Entry. */
 export const ANTARES_CAPABILITIES = ['http.fetch', 'secrets'] as const

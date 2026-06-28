@@ -3,7 +3,7 @@ import entry from './index'
 import { manifest } from '../manifest'
 import { PluginRegistry } from '../../../main/plugins/registry'
 import { createHostFactory, type HostServices } from '../../../main/plugins/host'
-import { validateManifest, validateManifestSemantics, validateAgainst } from '../../../shared/plugins/schemas'
+import { validateManifest, validateManifestSemantics, validateAgainst } from '@mindgraph/plugin-api/validation'
 
 function buildRegistry(over: Partial<HostServices> = {}) {
   const vault = new Map<string, Uint8Array>()

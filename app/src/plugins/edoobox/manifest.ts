@@ -3,7 +3,7 @@
 // fetch-API + Credentials + events.json-Persistenz. Marketing/DOCX/Formular bleiben in Phase 1
 // noch im Core (brauchen dialog/files-Capabilities → Phase 2). Siehe docs/plugin-system-plan.md.
 
-import type { PluginManifest, JsonSchema } from '../../shared/plugins/manifest'
+import type { PluginManifest, JsonSchema } from '@mindgraph/plugin-api'
 
 /** as const → bindet das Capability-Tupel für definePluginMain im Main-Entry. */
 export const EDOOBOX_CAPABILITIES = ['http.fetch', 'secrets', 'vault.read', 'vault.write', 'dialog', 'resource', 'llm.generate'] as const

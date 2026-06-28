@@ -8,7 +8,7 @@ import type {
   WorkflowTriggerProvider,
   WorkflowTriggerLedger,
   WorkflowEventResult,
-} from '../../../shared/plugins/workflowTrigger'
+} from '@mindgraph/plugin-api'
 import type { WorkflowSeedItem } from '../../../shared/workflow/model'
 import type { EdooboxBooking, EdooboxOfferDashboard } from '../../../shared/types'
 import { useEventAgentBridge } from '../../../renderer/stores/eventAgentBridge'

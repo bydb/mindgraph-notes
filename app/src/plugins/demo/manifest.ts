@@ -2,7 +2,7 @@
 // Manifest (rein) + Main-Entry (Code) + Renderer-Entry (Slot), gekoppelt nur über `id`.
 // Kein Produkt-Feature — Vorlage + Testobjekt für die echten Migrationen (Antares zuerst).
 
-import type { PluginManifest } from '../../shared/plugins/manifest'
+import type { PluginManifest } from '@mindgraph/plugin-api'
 
 /** as const bewahrt das Capability-Tupel für definePluginMain im Main-Entry. */
 export const DEMO_CAPABILITIES = ['llm.generate'] as const

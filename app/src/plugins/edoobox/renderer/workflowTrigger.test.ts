@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { buildEdooboxEvent } from './workflowTrigger'
 import { manifest } from '../manifest'
 import { buildEdooboxConfirmationExample } from './workflowExample'
-import type { WorkflowTriggerLedger } from '../../../shared/plugins/workflowTrigger'
+import type { WorkflowTriggerLedger } from '@mindgraph/plugin-api'
 import type { EdooboxBooking, EdooboxOfferDashboard } from '../../../shared/types'
 
 function fakeLedger(initial: Record<string, string> = {}): WorkflowTriggerLedger & { raw: Record<string, string> } {

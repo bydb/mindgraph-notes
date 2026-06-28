@@ -4,7 +4,7 @@
 // genau `llm` + `log` (aus DEMO_CAPABILITIES); host.vault o.Ä. existiert nicht (Compile-Fehler).
 // Siehe docs/plugin-system-plan.md, Entscheidungen #3, #8, #15.
 
-import { definePluginMain } from '../../../shared/plugins/entry'
+import { definePluginMain } from '@mindgraph/plugin-api'
 import { DEMO_CAPABILITIES, manifest } from '../manifest'
 
 export default definePluginMain(

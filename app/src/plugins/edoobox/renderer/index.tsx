@@ -11,8 +11,8 @@
 // registriert sich → die Bridges liefern sichere Defaults, das Panel-Slot bleibt leer. Siehe
 // docs/plugin-system-plan.md #12.
 
-import type { PluginRendererEntry } from '../../../shared/plugins/entry'
-import { WORKFLOW_TRIGGER_SLOT, WORKFLOW_EXAMPLE_SLOT } from '../../../shared/plugins/workflowTrigger'
+import type { PluginRendererEntry } from '@mindgraph/plugin-api'
+import { WORKFLOW_TRIGGER_SLOT, WORKFLOW_EXAMPLE_SLOT } from '@mindgraph/plugin-api'
 import { edooboxTriggerProvider } from './workflowTrigger'
 import { buildEdooboxConfirmationExample } from './workflowExample'
 // Eager: Provider-Registrierung als Modul-Seiteneffekt (Daten-Bridge + Service-Facade).

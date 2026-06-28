@@ -4,7 +4,7 @@
 // Gate), Credentials über host.secrets (safeStorage, pro Plugin genamespacet). Der konfigurierte
 // Antares-Host wird vom Capital-Host dynamisch zur Allowlist ergänzt (user-konfiguriert).
 
-import { definePluginMain } from '../../../shared/plugins/entry'
+import { definePluginMain } from '@mindgraph/plugin-api'
 import { AntaresService } from '../service'
 import { ANTARES_CAPABILITIES, manifest } from '../manifest'
 

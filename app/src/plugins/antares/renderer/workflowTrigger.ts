@@ -8,7 +8,7 @@ import type {
   WorkflowTriggerProvider,
   WorkflowTriggerLedger,
   WorkflowEventResult,
-} from '../../../shared/plugins/workflowTrigger'
+} from '@mindgraph/plugin-api'
 import type { WorkflowSeedItem } from '../../../shared/workflow/model'
 import type { AntaresVerleihRow } from '../../../shared/types'
 import { useAntaresStore } from '../../../renderer/stores/antaresStore'

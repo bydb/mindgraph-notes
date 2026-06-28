@@ -5,7 +5,7 @@
 // (lazy Komponente), damit die Registry-Logik ohne React-Runtime testbar bleibt; echte
 // Plugins registrieren später echte Komponenten/Lazy-Imports. Siehe Entscheidung #12.
 
-import type { PluginRendererEntry } from '../../../shared/plugins/entry'
+import type { PluginRendererEntry } from '@mindgraph/plugin-api'
 
 const entry: PluginRendererEntry = {
   id: 'demo',

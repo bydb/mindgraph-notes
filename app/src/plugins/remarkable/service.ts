@@ -2,7 +2,7 @@
 // (host.device) injiziert; importiert selbst kein electron/net (Import-Wall-konform).
 
 import type { RMDocumentSummary } from './types'
-import type { DeviceUsbService } from '../../shared/plugins/host'
+import type { DeviceUsbService } from '@mindgraph/plugin-api'
 import { USBTransport } from './transports/usb'
 
 export class ReMarkableService {

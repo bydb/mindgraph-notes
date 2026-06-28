@@ -2,7 +2,7 @@
 // mit echtem Schreibpfad (vault.write) und privilegierten Geräte-/PDF-Capabilities.
 // Gerät = USB-Webinterface 10.11.99.1 (host.device, allowlisted). Siehe docs/plugin-system-plan.md.
 
-import type { PluginManifest, JsonSchema } from '../../shared/plugins/manifest'
+import type { PluginManifest, JsonSchema } from '@mindgraph/plugin-api'
 
 /** as const → bindet das Capability-Tupel für definePluginMain im Main-Entry. */
 export const REMARKABLE_CAPABILITIES = [
