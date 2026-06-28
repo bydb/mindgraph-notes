@@ -13,7 +13,7 @@ export function useIsModuleEnabled(id: ModuleDescriptor['id']): boolean {
       case 'language-tool':     return state.languageTool.enabled
       case 'email':             return state.email.enabled
       case 'mz-suite':          return state.edoobox.enabled || state.marketing.enabled
-      case 'antares':           return state.antares.enabled
+      case 'antares':           return state.pluginConfig.antares?.enabled === true
       case 'flashcards':        return state.flashcardsEnabled
       case 'workflow-canvas':   return state.workflowCanvasEnabled
       case 'semantic-scholar':  return state.semanticScholarEnabled
@@ -39,7 +39,7 @@ export function isModuleEnabled(id: ModuleDescriptor['id']): boolean {
     case 'language-tool':     return s.languageTool.enabled
     case 'email':             return s.email.enabled
     case 'mz-suite':          return s.edoobox.enabled || s.marketing.enabled
-    case 'antares':           return s.antares.enabled
+    case 'antares':           return s.pluginConfig.antares?.enabled === true
     case 'flashcards':        return s.flashcardsEnabled
     case 'workflow-canvas':   return s.workflowCanvasEnabled
     case 'semantic-scholar':  return s.semanticScholarEnabled
@@ -66,7 +66,7 @@ function applyModuleFlags(id: ModuleDescriptor['id'], enabled: boolean): void {
       s.setEdoobox({ enabled })
       s.setMarketing({ enabled })
       break
-    case 'antares':           s.setAntares({ enabled }); break
+    case 'antares':           s.setPluginConfig('antares', { enabled }); break
     case 'flashcards':        s.setFlashcardsEnabled(enabled); break
     case 'workflow-canvas':   s.setWorkflowCanvasEnabled(enabled); break
     case 'semantic-scholar':  s.setSemanticScholarEnabled(enabled); break

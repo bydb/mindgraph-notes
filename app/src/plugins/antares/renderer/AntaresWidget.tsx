@@ -7,7 +7,7 @@
 
 import React, { useEffect } from 'react'
 import { useShallow } from 'zustand/react/shallow'
-import { useUIStore } from '../../../renderer/stores/uiStore'
+import { usePluginEnabled } from '../../../renderer/plugins/config'
 import { useAntaresStore } from '../../../renderer/stores/antaresStore'
 import { useTranslation } from '../../../renderer/utils/translations'
 import type { AntaresVerleihRow as AntaresVerleihRowData } from '../../../shared/types'
@@ -15,7 +15,7 @@ import './antares-widget.css'
 
 export default function AntaresWidget() {
   const { t } = useTranslation()
-  const antaresEnabled = useUIStore(s => s.antares.enabled)
+  const antaresEnabled = usePluginEnabled('antares')
   const {
     counts,
     offeneRegistrierungen,

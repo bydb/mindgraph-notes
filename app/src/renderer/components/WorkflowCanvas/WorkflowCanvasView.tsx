@@ -17,6 +17,7 @@ import './workflowCanvas.css'
 
 import { useWorkflowStore } from '../../stores/workflowStore'
 import { invokePlugin } from '../../plugins/client'
+import { usePluginEnabled } from '../../plugins/config'
 import { edooboxService } from '../../stores/edooboxServiceBridge'
 import { useTranslation } from '../../utils/translations'
 import { useNotesStore } from '../../stores/notesStore'
@@ -96,7 +97,7 @@ function InnerCanvas({ onOpenInbox }: Props) {
   const emailActive = useVaultSettingsStore(s => s.features.email)
   // Konfig-Status für ehrliches Modul-Gating (Toggle AN UND konfiguriert).
   const edooboxFeature = useVaultSettingsStore(s => s.features.edoobox)
-  const antaresEnabled = useUIStore(s => s.antares.enabled)
+  const antaresEnabled = usePluginEnabled('antares')
   const projectsFolder = useUIStore(s => s.projectsRootFolder)
   const emailAccounts = useUIStore(s => s.email.accounts)
   // Signal für den Auto-Trigger: ändert sich, wenn Mails dazukommen/neu analysiert werden.

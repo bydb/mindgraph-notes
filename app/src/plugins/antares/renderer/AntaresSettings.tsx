@@ -1,23 +1,24 @@
 // Antares-Einstellungen — die Settings-Hälfte der Antares-Vertikale (Renderer).
 //
-// War früher inline in Settings.tsx (agents-Tab); jetzt im Plugin und über den Slot
-// `settings.section.antares` gemountet (siehe ./index.tsx). Liest baseUrl/context aus dem
-// (vorerst geteilten) uiStore, Credentials über invokePlugin('antares', …). Self-Gating:
-// bei deaktiviertem Modul zeigt es den Hinweis statt der Felder. Nach Löschen des Plugin-
-// Ordners ist der Slot leer → die Antares-Settings verschwinden rückstandslos (Deletion Test).
+// War früher inline in Settings.tsx (agents-Tab); jetzt im Plugin und über den generischen
+// Slot `settings.section` gemountet (siehe ./index.tsx). Config (baseUrl/context/enabled)
+// läuft über die GENERISCHE Plugin-Config-API (usePluginConfig) — kein Zugriff mehr auf
+// `state.antares.*`. Credentials über invokePlugin('antares', …). Self-Gating: bei
+// deaktiviertem Modul zeigt es den Hinweis statt der Felder. Nach Löschen des Plugin-Ordners
+// ist der Slot leer → die Antares-Settings verschwinden rückstandslos (Deletion Test).
 
 import { useEffect, useState } from 'react'
-import { useUIStore } from '../../../renderer/stores/uiStore'
 import { useTranslation } from '../../../renderer/utils/translations'
 import { invokePlugin } from '../../../renderer/plugins/client'
+import { usePluginConfig } from '../../../renderer/plugins/config'
+import { ANTARES_DEFAULTS } from '../../../renderer/stores/antaresStore'
 
 type TestStatus = 'idle' | 'testing' | 'success' | 'failed'
 
 /** `onGoToModules` wird vom Settings-Slot durchgereicht (Sprung zum Modul-Tab). */
 export default function AntaresSettings({ onGoToModules }: { onGoToModules?: () => void }) {
   const { t } = useTranslation()
-  const antares = useUIStore(s => s.antares)
-  const setAntares = useUIStore(s => s.setAntares)
+  const [antares, setAntares] = usePluginConfig('antares', ANTARES_DEFAULTS)
 
   const [user, setUser] = useState('')
   const [password, setPassword] = useState('')

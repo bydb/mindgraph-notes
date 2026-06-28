@@ -1,7 +1,21 @@
 import { create } from 'zustand'
-import { useUIStore } from './uiStore'
+import { getPluginConfig } from '../plugins/config'
 import { invokePlugin } from '../plugins/client'
 import type { AntaresEntleiher, AntaresVerleihRow, AntaresDashboardCounts, AntaresLizenz } from '../../shared/types'
+
+/** Antares-Config-Form + Defaults. Liegt (vorerst) im Kern, weil der gleichnamige Store ihn
+ *  braucht — der Kern darf NICHT aus src/plugins/ importieren (Deletion Test). Die Plugin-UI
+ *  (AntaresSettings) bezieht die Defaults von hier. Persistiert generisch in pluginConfig.antares. */
+export interface AntaresConfig {
+  enabled: boolean
+  baseUrl: string
+  context: string
+}
+export const ANTARES_DEFAULTS: AntaresConfig = {
+  enabled: false,
+  baseUrl: 'https://mzantares-he-16.datenbank-bildungsmedien.net',
+  context: 'HE/16',
+}
 
 type Settled<T> = { ok: true; data: T } | { ok: false; error: string }
 async function settle<T>(p: Promise<T>): Promise<Settled<T>> {
@@ -39,8 +53,8 @@ interface AntaresState {
 }
 
 function getConfig() {
-  const s = useUIStore.getState().antares
-  return { baseUrl: s.baseUrl, context: s.context }
+  const c = getPluginConfig('antares', ANTARES_DEFAULTS)
+  return { baseUrl: c.baseUrl, context: c.context }
 }
 
 export const useAntaresStore = create<AntaresState>((set) => ({

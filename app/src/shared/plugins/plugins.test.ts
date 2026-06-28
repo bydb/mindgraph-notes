@@ -192,9 +192,13 @@ describe('moduleGate (A-pre Schritt 1)', () => {
   })
 
   it('isPluginGateEnabled: gegatete Plugins folgen dem Flag, ungegatete sind immer aktiv', () => {
+    // Antares liest seit 3b den generischen Pfad pluginConfig.antares.enabled …
+    expect(isPluginGateEnabled('antares', { pluginConfig: { antares: { enabled: true } } })).toBe(true)
+    expect(isPluginGateEnabled('antares', { pluginConfig: { antares: { enabled: false } } })).toBe(false)
+    expect(isPluginGateEnabled('antares', {})).toBe(false)
+    // … plus Legacy-Fallback (Top-Level antares) für den EINEN Start vor der Renderer-Migration.
     expect(isPluginGateEnabled('antares', { antares: { enabled: true } })).toBe(true)
     expect(isPluginGateEnabled('antares', { antares: { enabled: false } })).toBe(false)
-    expect(isPluginGateEnabled('antares', {})).toBe(false)
     // edoobox wird vom Bundle-Modul 'mz-suite' über edoobox.enabled gesteuert
     expect(isPluginGateEnabled('edoobox', { edoobox: { enabled: true } })).toBe(true)
     // demo hat kein Gate → immer aktiv

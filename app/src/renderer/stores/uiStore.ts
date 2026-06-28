@@ -353,12 +353,6 @@ export interface EdooboxSettings {
 }
 
 // Antares CS (Medienzentrum-Verleih) Settings
-export interface AntaresSettings {
-  enabled: boolean
-  baseUrl: string
-  /** Antares-Kontext, z.B. "HE/16" für Medienzentrum Gießen-Vogelsberg */
-  context: string
-}
 
 export interface ReMarkableSettings {
   enabled: boolean
@@ -605,8 +599,10 @@ interface UIState {
   // edoobox Agent Settings
   edoobox: EdooboxSettings
 
-  // Antares CS Settings
-  antares: AntaresSettings
+  // Generische Plugin-Konfiguration (A-pre Schritt 3b): pro pluginId ein Settings-Objekt,
+  // ohne dass der uiStore die Form eines konkreten Plugins kennt. Antares läuft bereits
+  // hierüber (state.antares.* entfernt); edoobox/remarkable folgen.
+  pluginConfig: Record<string, Record<string, unknown>>
 
   // reMarkable Settings
   remarkable: ReMarkableSettings
@@ -720,7 +716,8 @@ interface UIState {
   setEmail: (settings: Partial<EmailSettings>) => void
   setMarketing: (settings: Partial<MarketingSettings>) => void
   setEdoobox: (settings: Partial<EdooboxSettings>) => void
-  setAntares: (settings: Partial<AntaresSettings>) => void
+  /** Generischer Patch-Setter für die Plugin-Config eines pluginId (A-pre Schritt 3b). */
+  setPluginConfig: (pluginId: string, patch: Record<string, unknown>) => void
   setRemarkable: (settings: Partial<ReMarkableSettings>) => void
   setDailyNote: (settings: Partial<DailyNoteSettings>) => void
   setLastSeenVersion: (version: string) => void
@@ -966,12 +963,9 @@ const defaultState = {
     webhookUrl: ''
   },
 
-  // Antares CS (Medienzentrum-Verleih)
-  antares: {
-    enabled: false,
-    baseUrl: 'https://mzantares-he-16.datenbank-bildungsmedien.net',
-    context: 'HE/16'
-  },
+  // Generische Plugin-Config (A-pre Schritt 3b) — Antares lebt hier (pluginConfig.antares),
+  // Defaults bringt das Plugin selbst mit (ANTARES_DEFAULTS in antaresStore).
+  pluginConfig: {},
 
   // reMarkable
   remarkable: {
@@ -1082,7 +1076,7 @@ const persistedKeys = [
   'canvasFilterPath', 'canvasViewMode', 'canvasShowEdges', 'canvasShowTags', 'canvasShowLinks', 'canvasShowImages', 'canvasShowSummaries',
   'canvasCompactMode', 'canvasReadMode', 'canvasHoverScale', 'canvasDefaultCardWidth', 'splitPosition', 'fileTreeDisplayMode', 'fileTreeKindFilter', 'notesRootFolder', 'projectsRootFolder', 'ollama', 'brain',
   'pdfCompanionEnabled', 'pdfDisplayMode', 'iconSet',
-  'smartConnectionsEnabled', 'notesChatEnabled', 'projectRagEnabled', 'flashcardsEnabled', 'workflowCanvasEnabled', 'semanticScholarEnabled', 'zoteroEnabled', 'smartConnectionsWeights', 'smartConnectionsRerankerEnabled', 'docling', 'visionOcr', 'readwise', 'languageTool', 'email', 'marketing', 'edoobox', 'antares', 'remarkable', 'dailyNote', 'taskExcludedFolders', 'speech',
+  'smartConnectionsEnabled', 'notesChatEnabled', 'projectRagEnabled', 'flashcardsEnabled', 'workflowCanvasEnabled', 'semanticScholarEnabled', 'zoteroEnabled', 'smartConnectionsWeights', 'smartConnectionsRerankerEnabled', 'docling', 'visionOcr', 'readwise', 'languageTool', 'email', 'marketing', 'edoobox', 'pluginConfig', 'remarkable', 'dailyNote', 'taskExcludedFolders', 'speech',
   'editorDefaultViewForcedToPreview',
   'appearanceMigratedToLight',
   'lastSeenVersion',
@@ -1211,8 +1205,11 @@ export const useUIStore = create<UIState>()((set, get) => ({
     edoobox: { ...state.edoobox, ...settings }
   })),
 
-  setAntares: (settings) => set((state) => ({
-    antares: { ...state.antares, ...settings }
+  setPluginConfig: (pluginId, patch) => set((state) => ({
+    pluginConfig: {
+      ...state.pluginConfig,
+      [pluginId]: { ...(state.pluginConfig[pluginId] ?? {}), ...patch }
+    }
   })),
   setRemarkable: (settings) => set((state) => ({
     remarkable: { ...state.remarkable, ...settings }
@@ -1331,7 +1328,7 @@ export const useUIStore = create<UIState>()((set, get) => ({
           languageTool: { ...get().languageTool, enabled: false },
           email: { ...get().email, enabled: false },
           edoobox: { ...get().edoobox, enabled: false },
-          antares: { ...get().antares, enabled: false },
+          pluginConfig: { ...get().pluginConfig, antares: { ...(get().pluginConfig.antares ?? {}), enabled: false } },
           marketing: { ...get().marketing, enabled: false },
           readwise: { ...get().readwise, enabled: false },
           remarkable: { ...get().remarkable, enabled: false },
@@ -1527,6 +1524,15 @@ export async function initializeUISettings(): Promise<void> {
       }
       if (validSettings.userProfile && profileMigration[validSettings.userProfile as string]) {
         validSettings.userProfile = profileMigration[validSettings.userProfile as string]
+      }
+      // A-pre Schritt 3b: Legacy Top-Level `antares`-Config → generische pluginConfig.antares.
+      // Einmalig; danach wird der Top-Level-Key nicht mehr persistiert (aus persistedKeys entfernt).
+      const legacyAntares = (savedSettings as Record<string, unknown>).antares
+      if (legacyAntares && typeof legacyAntares === 'object') {
+        const pc = (validSettings.pluginConfig ?? {}) as Record<string, Record<string, unknown>>
+        if (!pc.antares) {
+          validSettings.pluginConfig = { ...pc, antares: legacyAntares as Record<string, unknown> }
+        }
       }
       useUIStore.setState(validSettings)
     } else {

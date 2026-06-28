@@ -19,10 +19,15 @@ export interface PluginGate {
   /** Dotted-Path in den persistierten uiStore-State, der true/false liefert
    *  (z.B. 'edoobox.enabled' — das Bundle-Modul 'mz-suite' setzt diesen Flag). */
   enabledPath: string
+  /** Optionaler Alt-Pfad aus der Pre-3b-Persistenz. Nur der Main-Startup-Gate liest ihn als
+   *  Fallback, damit ein bestehender User im EINEN Start zwischen Update und erster
+   *  migrierter Speicherung nicht fälschlich deaktiviert wird (Renderer migriert beim Laden). */
+  legacyEnabledPath?: string
 }
 
 export const PLUGIN_GATES: readonly PluginGate[] = [
-  { pluginId: 'antares', moduleId: 'antares', enabledPath: 'antares.enabled' },
+  // Antares: Config liegt seit 3b generisch unter pluginConfig.antares (Alt: Top-Level antares).
+  { pluginId: 'antares', moduleId: 'antares', enabledPath: 'pluginConfig.antares.enabled', legacyEnabledPath: 'antares.enabled' },
   { pluginId: 'remarkable', moduleId: 'remarkable', enabledPath: 'remarkable.enabled' },
   { pluginId: 'edoobox', moduleId: 'mz-suite', enabledPath: 'edoobox.enabled' },
 ]
@@ -47,5 +52,9 @@ export function readBoolPath(obj: unknown, path: string): boolean {
 export function isPluginGateEnabled(pluginId: string, settings: unknown): boolean {
   const gate = PLUGIN_GATES.find((g) => g.pluginId === pluginId)
   if (!gate) return true
-  return readBoolPath(settings, gate.enabledPath)
+  if (readBoolPath(settings, gate.enabledPath)) return true
+  // Migrations-Fallback (s. legacyEnabledPath): nur relevant, bis der Renderer die Config
+  // einmal migriert + gespeichert hat.
+  if (gate.legacyEnabledPath && readBoolPath(settings, gate.legacyEnabledPath)) return true
+  return false
 }
