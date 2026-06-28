@@ -23,6 +23,17 @@ export interface EdooboxCategory {
 /** Der host-injizierte fetch (Domain-Allowlist erzwingt der Capability-Host). */
 export type FetchImpl = (url: string, init?: RequestInit) => Promise<Response>
 
+// Verbose-Logging der Request-/Response-ROHDATEN nur mit explizitem Opt-in: die edoobox-API
+// liefert personenbezogene Teilnehmerdaten (Name, E-Mail, Schule, Personalnummer). Standardmäßig
+// wird nur Methode/Endpunkt/Status/Größe geloggt, nie der Payload. Debug: MINDGRAPH_DEBUG_EDOOBOX=1
+const EDOOBOX_VERBOSE =
+  typeof process !== 'undefined' && process.env?.MINDGRAPH_DEBUG_EDOOBOX === '1'
+
+/** Größe eines Werts in Zeichen — diagnostisch, ohne den (personenbezogenen) Inhalt zu loggen. */
+function payloadSize(v: unknown): number {
+  try { return typeof v === 'string' ? v.length : JSON.stringify(v).length } catch { return -1 }
+}
+
 function truncateError(text: string, maxLen = 200): string {
   if (text.length <= maxLen) return text
   if (text.includes('<!DOCTYPE') || text.includes('<html')) {
@@ -110,21 +121,30 @@ export class EdooboxService {
     const options: RequestInit = { method, headers }
     if (body !== undefined) {
       options.body = JSON.stringify(body)
-      console.log(`[edoobox] Body:`, JSON.stringify(body).slice(0, 500))
+      // Body kann personenbezogene Daten enthalten → standardmäßig nur die Größe.
+      if (EDOOBOX_VERBOSE) console.log(`[edoobox] Body:`, JSON.stringify(body).slice(0, 500))
+      else console.log(`[edoobox] Body: ${payloadSize(body)} Zeichen`)
     }
 
     const res = await this.fetchImpl(url, options)
 
     if (!res.ok) {
       const text = await res.text()
-      const rawPreview = text.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 300)
-      console.error(`[edoobox] Response ${res.status} from ${url}:`, rawPreview)
+      // Fehler-Antworten können eingereichte personenbezogene Daten zurückspiegeln → redigiert.
+      if (EDOOBOX_VERBOSE) {
+        const rawPreview = text.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 300)
+        console.error(`[edoobox] Response ${res.status} from ${url}:`, rawPreview)
+      } else {
+        console.error(`[edoobox] Response ${res.status} from ${url} (${text.length} Zeichen)`)
+      }
       throw new Error(`edoobox API error (${res.status}): ${truncateError(text)}`)
     }
 
     const ct = res.headers.get('content-type')
     const result = ct?.includes('application/json') ? await res.json() : await res.text()
-    console.log(`[edoobox] Response OK from ${url}:`, JSON.stringify(result).slice(0, 500))
+    // Erfolgs-Antworten enthalten Teilnehmerdaten (Name, E-Mail, Schule, Personalnr.) → nie roh loggen.
+    if (EDOOBOX_VERBOSE) console.log(`[edoobox] Response OK from ${url}:`, JSON.stringify(result).slice(0, 500))
+    else console.log(`[edoobox] Response OK from ${url} (${payloadSize(result)} Zeichen)`)
     return result
   }
 
