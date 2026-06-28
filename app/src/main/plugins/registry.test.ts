@@ -353,6 +353,110 @@ describe('PluginRegistry — Deaktivierung', () => {
   })
 })
 
+describe('PluginRegistry — Readiness (needs-configuration)', () => {
+  // In-Memory-Secrets-Host: simuliert host.secrets (safeStorage) für die Readiness-Prüfung.
+  function secretsHostFactory(store: Map<string, string>): () => AnyPluginHost {
+    return () =>
+      ({
+        log: () => {},
+        secrets: {
+          get: async (k: string) => store.get(k) ?? null,
+          set: async (k: string, v: string) => { store.set(k, v) },
+          delete: async (k: string) => { store.delete(k) },
+        },
+      }) as unknown as AnyPluginHost
+  }
+
+  const credManifest = mkManifest('cred', {
+    capabilities: ['secrets'],
+    credentials: [{ key: 'token', label: 'Token', secret: true }],
+    actions: [
+      {
+        id: 'cred.saveCredentials',
+        requiredCapabilities: ['secrets'],
+        isWrite: true,
+        inputSchema: { type: 'object', required: ['token'], properties: { token: { type: 'string' } }, additionalProperties: false },
+      },
+      { id: 'cred.deleteCredentials', requiredCapabilities: ['secrets'], isWrite: true },
+      { id: 'cred.use', requiredCapabilities: ['secrets'] },
+    ],
+  })
+
+  function credEntry(): PluginMainEntry {
+    return definePluginMain({ id: 'cred', capabilities: ['secrets'] as const }, ({ host, actions }) => {
+      actions.register('cred.saveCredentials', async (p) => { await host.secrets.set('token', (p as { token: string }).token); return true })
+      actions.register('cred.deleteCredentials', async () => { await host.secrets.delete('token'); return true })
+      actions.register('cred.use', async () => ((await host.secrets.get('token')) ? 'ok' : 'nope'))
+    })
+  }
+
+  it('Plugin ohne Credentials ist nach Aktivierung sofort ready', async () => {
+    const r = new PluginRegistry()
+    r.register([echoSource()])
+    await r.activate('echo')
+    expect(r.get('echo')?.readiness).toBe('ready')
+  })
+
+  it('ohne hinterlegte Credentials → needs-configuration; saveCredentials flippt zu ready', async () => {
+    const store = new Map<string, string>()
+    const r = new PluginRegistry(secretsHostFactory(store))
+    r.register([{ manifest: credManifest, loadEntry: async () => ({ default: credEntry() }) }])
+
+    await r.activate('cred')
+    expect(r.get('cred')?.readiness).toBe('needs-configuration')
+
+    // Kein Deadlock: die Setup-Action ist trotz needs-configuration aufrufbar …
+    await r.invoke('cred', 'cred.saveCredentials', { token: 'abc' })
+    // … und der Auto-Refresh nach isWrite+secrets meldet jetzt ready.
+    expect(r.get('cred')?.readiness).toBe('ready')
+  })
+
+  it('eine normale Action ist auch bei needs-configuration aufrufbar (self-guard statt Gate)', async () => {
+    const store = new Map<string, string>()
+    const r = new PluginRegistry(secretsHostFactory(store))
+    r.register([{ manifest: credManifest, loadEntry: async () => ({ default: credEntry() }) }])
+    await r.activate('cred')
+    expect(r.get('cred')?.readiness).toBe('needs-configuration')
+    expect(await r.invoke('cred', 'cred.use', {})).toBe('nope') // Action selbst, nicht das Gate, antwortet
+  })
+
+  it('deleteCredentials kippt ready zurück auf needs-configuration', async () => {
+    const store = new Map<string, string>([['token', 'abc']])
+    const r = new PluginRegistry(secretsHostFactory(store))
+    r.register([{ manifest: credManifest, loadEntry: async () => ({ default: credEntry() }) }])
+    await r.activate('cred')
+    expect(r.get('cred')?.readiness).toBe('ready')
+    await r.invoke('cred', 'cred.deleteCredentials', {})
+    expect(r.get('cred')?.readiness).toBe('needs-configuration')
+  })
+
+  it('optionale Credentials (required:false) zählen nicht in die Readiness', async () => {
+    const store = new Map<string, string>([['token', 'abc']]) // nur das Pflicht-Credential
+    const optManifest = mkManifest('opt', {
+      capabilities: ['secrets'],
+      credentials: [
+        { key: 'token', label: 'Token', secret: true },
+        { key: 'extra', label: 'Optional', secret: true, required: false },
+      ],
+    })
+    const entry = definePluginMain({ id: 'opt', capabilities: ['secrets'] as const }, () => {})
+    const r = new PluginRegistry(secretsHostFactory(store))
+    r.register([{ manifest: optManifest, loadEntry: async () => ({ default: entry }) }])
+    await r.activate('opt')
+    expect(r.get('opt')?.readiness).toBe('ready') // 'extra' fehlt, blockt aber nicht
+  })
+
+  it('refreshReadiness bewertet ein aktives Plugin neu', async () => {
+    const store = new Map<string, string>()
+    const r = new PluginRegistry(secretsHostFactory(store))
+    r.register([{ manifest: credManifest, loadEntry: async () => ({ default: credEntry() }) }])
+    await r.activate('cred')
+    expect(r.get('cred')?.readiness).toBe('needs-configuration')
+    store.set('token', 'xyz') // direkt am Host vorbei gesetzt
+    expect((await r.refreshReadiness('cred')).readiness).toBe('ready')
+  })
+})
+
 describe('discoverMainPlugins (import.meta.glob-Verdrahtung)', () => {
   it('findet das Demo-Plugin und kann es aktivieren', async () => {
     const sources = discoverMainPlugins()

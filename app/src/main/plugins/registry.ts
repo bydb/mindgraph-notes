@@ -20,9 +20,10 @@ import type {
 import type { AnyPluginHost } from '../../shared/plugins/host'
 import {
   initialPluginState,
-  isPluginUsable,
+  isPluginInvokable,
   pluginBlockedReason,
   type PluginRuntimeState,
+  type ReadinessState,
 } from '../../shared/plugins/state'
 import {
   validateManifest,
@@ -49,6 +50,8 @@ interface LoadedPlugin {
   source: MainPluginSource
   state: PluginRuntimeState
   entry?: PluginMainEntry
+  /** Der bei der Aktivierung gebaute Capability-Host — für die Readiness-Prüfung (host.secrets). */
+  host?: AnyPluginHost
   actions: Map<string, PluginActionExecutor>
   /** Zuletzt GEWÜNSCHTER Zustand (synchron beim activate/deactivate-Aufruf gesetzt).
    *  Eine laufende Transition prüft ihn und bricht ab, wenn sie überholt wurde. */
@@ -202,10 +205,14 @@ export class PluginRegistry {
       await entry.register({ host, actions })
       if (entry.start) await entry.start({ host, actions })
 
+      p.host = host
       p.actions = actionMap
-      p.state = { ...p.state, activation: 'active', readiness: 'ready', error: undefined }
+      // Readiness ehrlich aus der Konfiguration ableiten (nicht mehr pauschal 'ready').
+      const readiness = await this.evaluateReadiness(p)
+      p.state = { ...p.state, activation: 'active', readiness, error: undefined }
     } catch (err) {
       p.entry = undefined
+      p.host = undefined
       p.actions = new Map()
       p.state = {
         ...p.state,
@@ -264,10 +271,44 @@ export class PluginRegistry {
     }
 
     // Sauber gestoppt (oder es gab nie einen Entry/stop) → endgültig `disabled`. Erst JETZT
-    // Entry + Fehler löschen; das räumt auch einen reinen Aktivierungsfehler (kein Entry) auf.
+    // Entry + Host + Fehler löschen; das räumt auch einen reinen Aktivierungsfehler (kein Entry) auf.
     p.entry = undefined
+    p.host = undefined
     p.actions = new Map()
     p.state = { ...p.state, activation: 'disabled', readiness: 'unavailable', error: undefined }
+    return p.state
+  }
+
+  /**
+   * Leitet die Readiness aus der Konfiguration ab: alle als `required` (Default) deklarierten
+   * Credentials müssen in host.secrets hinterlegt sein. Keine Credentials ⇒ sofort `ready`.
+   * Bewusst nur Anwesenheits-Check (kein Verbindungstest) — ein FALSCHES Credential ist ein
+   * Laufzeitfehler der Action, kein „needs-configuration". Wirft nie; im Zweifel `ready`
+   * (kein Falsch-Blockieren eines konfigurierten Plugins).
+   */
+  private async evaluateReadiness(p: LoadedPlugin): Promise<ReadinessState> {
+    const required = (p.manifest.credentials ?? []).filter((c) => c.required !== false)
+    if (required.length === 0) return 'ready'
+    const secrets = (p.host as { secrets?: { get(key: string): Promise<string | null> } } | undefined)?.secrets
+    if (!secrets) return 'ready' // Credentials deklariert, aber keine secrets-Capability — nicht blockieren
+    try {
+      for (const c of required) {
+        const value = await secrets.get(c.key)
+        if (!value) return 'needs-configuration'
+      }
+      return 'ready'
+    } catch (err) {
+      console.error(`[plugin] Readiness-Check '${p.manifest.id}' warf: ${errMessage(err)}`)
+      return 'ready'
+    }
+  }
+
+  /** Bewertet die Readiness eines aktiven Plugins neu (z.B. nachdem Credentials gespeichert wurden). */
+  async refreshReadiness(id: string): Promise<PluginRuntimeState> {
+    const p = this.plugins.get(id)
+    if (!p) throw new Error(`Unbekanntes Plugin '${id}'`)
+    if (p.state.activation !== 'active') return p.state
+    p.state = { ...p.state, readiness: await this.evaluateReadiness(p) }
     return p.state
   }
 
@@ -279,7 +320,10 @@ export class PluginRegistry {
   async invoke(id: string, actionId: string, payload: unknown): Promise<unknown> {
     const p = this.plugins.get(id)
     if (!p) throw new Error(`Unbekanntes Plugin '${id}'`)
-    if (!isPluginUsable(p.state)) {
+    // Gate auf Installation + Aktivierung (NICHT Readiness): eine unkonfigurierte Action
+    // wirft selbst einen klaren Fehler, und needs-configuration darf die eigenen Setup-
+    // Actions (saveCredentials) nicht sperren.
+    if (!isPluginInvokable(p.state)) {
       throw new Error(pluginBlockedReason(p.state) ?? `Plugin '${id}' nicht verfügbar`)
     }
 
@@ -314,6 +358,13 @@ export class PluginRegistry {
     if (def.outputSchema) {
       const r = validateAgainst(def.outputSchema, result, `${id}:${actionId}:out`)
       if (!r.valid) throw new Error(`Ungültige Ausgabe von '${actionId}': ${r.errors.join('; ')}`)
+    }
+
+    // Credential-mutierende Actions (saveCredentials/deleteCredentials: isWrite + 'secrets')
+    // ändern die Readiness — sofort neu bewerten, damit der gemeldete Zustand ehrlich bleibt
+    // (needs-configuration → ready, sobald die Zugangsdaten hinterlegt sind).
+    if (def.isWrite && def.requiredCapabilities.includes('secrets')) {
+      p.state = { ...p.state, readiness: await this.evaluateReadiness(p) }
     }
     return result
   }

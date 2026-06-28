@@ -34,7 +34,9 @@ export const manifest: PluginManifest = {
   credentials: [
     { key: 'apiKey', label: 'API Key', secret: true },
     { key: 'apiSecret', label: 'API Secret', secret: true },
-    { key: 'wpAppPassword', label: 'WordPress App-Passwort', secret: true },
+    // Optional: nur für die Marketing-Teilfunktion (WordPress). Fehlt es, ist edoobox trotzdem
+    // „bereit" — die Marketing-Action wirft erst beim Aufruf, wenn das Passwort fehlt.
+    { key: 'wpAppPassword', label: 'WordPress App-Passwort', secret: true, required: false },
   ],
   actions: [
     { id: 'edoobox.check', label: 'Verbindung testen', requiredCapabilities: ['http.fetch', 'secrets'], inputSchema: apiInput },

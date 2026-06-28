@@ -57,6 +57,9 @@ export interface CredentialRequirement {
   key: string
   label: string
   secret?: boolean
+  /** Default true. `false` ⇒ optionales Credential (z.B. WordPress-Passwort der Marketing-
+   *  Teilfunktion von edoobox) — zählt NICHT in die Readiness-Prüfung (needs-configuration). */
+  required?: boolean
 }
 
 /**

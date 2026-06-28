@@ -49,7 +49,8 @@ export const PLUGIN_MANIFEST_SCHEMA: JsonSchema = {
   $schema: 'http://json-schema.org/draft-07/schema#',
   type: 'object',
   required: ['id', 'version', 'label', 'description', 'category', 'capabilities'],
-  additionalProperties: true,
+  // STRIKT: unbekannte Top-Level-Felder abweisen — fängt Tippfehler (z.B. `capabilites`).
+  additionalProperties: false,
   properties: {
     id: { type: 'string', pattern: '^[a-z][a-z0-9-]*$' },
     version: { type: 'string', minLength: 1 },
@@ -81,6 +82,7 @@ export const PLUGIN_MANIFEST_SCHEMA: JsonSchema = {
           key: { type: 'string' },
           label: { type: 'string' },
           secret: { type: 'boolean' },
+          required: { type: 'boolean' },
         },
         additionalProperties: false,
       },
@@ -106,7 +108,8 @@ export const PLUGIN_MANIFEST_SCHEMA: JsonSchema = {
           privacy: { type: 'object' },
           hardLockModule: { type: 'string' },
         },
-        additionalProperties: true,
+        // STRIKT: unbekannte Action-Felder abweisen — fängt z.B. `outputShema` statt `outputSchema`.
+        additionalProperties: false,
       },
     },
     ui: {
@@ -146,13 +149,20 @@ export function validateManifest(value: unknown): ValidationResult {
 
 /**
  * Zusätzliche semantische Prüfungen, die JSON Schema nicht ausdrückt:
- * jede Action darf nur Capabilities verlangen, die das Plugin global deklariert hat.
+ *  - jede Action darf nur Capabilities verlangen, die das Plugin global deklariert hat;
+ *  - Action-IDs müssen eindeutig sein (doppelte würden widersprüchliche Schemas/Executoren
+ *    erzeugen — die Registry registriert sonst still den ersten und ignoriert den Rest).
  * Setzt voraus, dass `validateManifest` bereits grün war.
  */
 export function validateManifestSemantics(manifest: PluginManifest): ValidationResult {
   const errors: string[] = []
   const declared = new Set<string>(manifest.capabilities)
+  const seenActionIds = new Set<string>()
   for (const action of manifest.actions ?? []) {
+    if (seenActionIds.has(action.id)) {
+      errors.push(`Doppelte Action-ID '${action.id}'.`)
+    }
+    seenActionIds.add(action.id)
     for (const cap of action.requiredCapabilities) {
       if (!declared.has(cap)) {
         errors.push(

@@ -7,6 +7,7 @@ import {
 import {
   initialPluginState,
   isPluginUsable,
+  isPluginInvokable,
   pluginBlockedReason,
   type PluginRuntimeState,
 } from './state'
@@ -47,6 +48,19 @@ describe('validateManifest', () => {
     const r = validateManifest({ ...validManifest, capabilities: ['fs.raw'] })
     expect(r.valid).toBe(false)
   })
+
+  it('lehnt unbekannte Top-Level-Felder ab (Tippfehler-Schutz)', () => {
+    const r = validateManifest({ ...validManifest, capabilites: ['secrets'] })
+    expect(r.valid).toBe(false)
+  })
+
+  it('lehnt unbekannte Action-Felder ab (z.B. outputShema-Tippfehler)', () => {
+    const r = validateManifest({
+      ...validManifest,
+      actions: [{ id: 'antares.x', requiredCapabilities: ['http.fetch'], outputShema: { type: 'object' } }],
+    })
+    expect(r.valid).toBe(false)
+  })
 })
 
 describe('validateManifestSemantics', () => {
@@ -62,6 +76,19 @@ describe('validateManifestSemantics', () => {
     const r = validateManifestSemantics(bad)
     expect(r.valid).toBe(false)
     expect(r.errors[0]).toContain('vault.write')
+  })
+
+  it('fängt doppelte Action-IDs', () => {
+    const bad: PluginManifest = {
+      ...validManifest,
+      actions: [
+        { id: 'antares.dup', requiredCapabilities: ['http.fetch'] },
+        { id: 'antares.dup', requiredCapabilities: ['secrets'] },
+      ],
+    }
+    const r = validateManifestSemantics(bad)
+    expect(r.valid).toBe(false)
+    expect(r.errors.some((e) => e.includes("Doppelte Action-ID 'antares.dup'"))).toBe(true)
   })
 })
 
@@ -118,6 +145,17 @@ describe('Plugin-Lebenszyklus', () => {
     }
     expect(isPluginUsable(s)).toBe(false)
     expect(pluginBlockedReason(s)).toBe('Konfiguration erforderlich')
+    // …darf aber INVOKABLE bleiben: needs-configuration ist ein UX-Signal, kein Invoke-Gate
+    // (sonst wäre saveCredentials gesperrt). isPluginUsable bleibt für die „bereit"-Anzeige.
+    expect(isPluginInvokable(s)).toBe(true)
+  })
+
+  it('isPluginInvokable verlangt nur active (nicht ready), blockt aber disabled/error', () => {
+    const base = { id: 'x', installation: 'bundled' as const }
+    expect(isPluginInvokable({ ...base, activation: 'active', readiness: 'ready' })).toBe(true)
+    expect(isPluginInvokable({ ...base, activation: 'active', readiness: 'needs-configuration' })).toBe(true)
+    expect(isPluginInvokable({ ...base, activation: 'disabled', readiness: 'unavailable' })).toBe(false)
+    expect(isPluginInvokable({ ...base, activation: 'error', readiness: 'unavailable' })).toBe(false)
   })
 })
 

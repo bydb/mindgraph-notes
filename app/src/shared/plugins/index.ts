@@ -45,7 +45,7 @@ export type {
   PluginErrorInfo,
   PluginRuntimeState,
 } from './state'
-export { initialPluginState, isPluginUsable, pluginBlockedReason } from './state'
+export { initialPluginState, isPluginUsable, isPluginInvokable, pluginBlockedReason } from './state'
 
 export type { PluginInvokeResult } from './transport'
 
