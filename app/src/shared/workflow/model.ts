@@ -54,11 +54,20 @@ export type WorkflowRunTrigger =
   | 'event-email'
   | 'event-reply'
   | 'event-ics'
-  | 'event-mahnung'
-  | 'event-booking'
   | 'event-task'
+  | 'event-external'
   | 'event-scheduled'
 export type WorkflowRunStatus = 'running' | 'success' | 'failed' | 'cancelled'
+
+/** Seed-Kandidat eines Triggers (Mail-Signal, Aufgabe, Plugin-Quelle). `itemKey` ist
+ *  stabil pro Kandidat und dient dem Exactly-once-Ledger; `email` füttert den optionalen
+ *  Kontakt-/Reply-Pfad. Plugin-Trigger-Provider erzeugen diese Struktur in ihrer Vertikale. */
+export interface WorkflowSeedItem {
+  itemKey: string
+  text: string
+  meta?: Record<string, unknown>
+  email?: { id?: string; subject?: string; bodyText?: string; from?: string; name?: string }
+}
 export type WorkflowStepStatus =
   | 'pending'
   | 'running'
