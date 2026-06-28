@@ -1,9 +1,9 @@
 import { describe, it, expect } from 'vitest'
 import { dispatchInvoke, type InvokableRegistry } from './transport-core'
 import { PluginRegistry, type MainPluginSource } from './registry'
-import { definePluginMain } from '../../shared/plugins/entry'
-import type { PluginManifest } from '../../shared/plugins/manifest'
-import type { AnyPluginHost } from '../../shared/plugins/host'
+import { definePluginMain } from '@mindgraph/plugin-api'
+import type { PluginManifest } from '@mindgraph/plugin-api'
+import type { AnyPluginHost } from '@mindgraph/plugin-api'
 
 // Eine echte Registry mit einer reinen Action + einer host-abhängigen Action.
 function buildRegistry(): PluginRegistry {

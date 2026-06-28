@@ -11,13 +11,13 @@
 // Siehe docs/plugin-system-plan.md.
 
 import type { ModuleId as CompatModuleId } from '../../shared/modelCompatibility'
-import type { PluginManifest } from '../../shared/plugins/manifest'
+import type { PluginManifest } from '@mindgraph/plugin-api'
 import type {
   PluginActionExecutor,
   PluginActionRegistry,
   PluginMainEntry,
-} from '../../shared/plugins/entry'
-import type { AnyPluginHost } from '../../shared/plugins/host'
+} from '@mindgraph/plugin-api'
+import type { AnyPluginHost } from '@mindgraph/plugin-api'
 import {
   initialPluginState,
   isPluginInvokable,
@@ -29,7 +29,7 @@ import {
   validateManifest,
   validateManifestSemantics,
   validateAgainst,
-} from '../../shared/plugins/schemas'
+} from '@mindgraph/plugin-api/validation'
 
 /** Eine entdeckte Plugin-Quelle: reines Manifest + lazy Loader für den Main-Entry. */
 export interface MainPluginSource {

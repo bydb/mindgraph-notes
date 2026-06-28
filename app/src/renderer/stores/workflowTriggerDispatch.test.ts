@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { runEventForWorkflow, type EventDispatchDeps } from './workflowTriggerDispatch'
 import type { Workflow, WorkflowRun, WorkflowRunStatus, WorkflowSeedItem } from '../../shared/workflow/model'
-import type { WorkflowTriggerProvider } from '../../shared/plugins/workflowTrigger'
+import type { WorkflowTriggerProvider } from '@mindgraph/plugin-api'
 
 const wf = { id: 'wf1' } as Workflow
 

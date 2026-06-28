@@ -10,7 +10,7 @@ import { promises as fs } from 'fs'
 import path from 'path'
 import https from 'node:https'
 import http from 'node:http'
-import type { UsbDeviceInfo } from '../../shared/plugins/host'
+import type { UsbDeviceInfo } from '@mindgraph/plugin-api'
 
 // ─── device.usb: HTTP über electron.net (reMarkable-USB-Webinterface) ───────────
 

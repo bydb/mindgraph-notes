@@ -5,7 +5,7 @@
 // `import.meta.glob` der Renderer-Entries — keine handgepflegte Importliste. Ein Entry, der
 // beim contribute wirft, wird isoliert; andere Plugins bleiben sichtbar. Siehe Plan.
 
-import type { PluginRendererEntry, SlotRegistry } from '../../shared/plugins/entry'
+import type { PluginRendererEntry, SlotRegistry } from '@mindgraph/plugin-api'
 
 export class RendererPluginRegistry {
   private readonly slots = new Map<string, unknown[]>()

@@ -4,7 +4,7 @@
 // handgepflegten Liste im Kern. Beim Runtime-Loader (A1) wird nur die Quelle dieses Katalogs
 // ausgetauscht; seine Konsumenten bleiben unverändert.
 
-import type { PluginManifest } from '../../shared/plugins/manifest'
+import type { PluginManifest } from '@mindgraph/plugin-api'
 
 const modules = import.meta.glob<{ default?: PluginManifest; manifest?: PluginManifest }>(
   '../../plugins/*/manifest.ts',

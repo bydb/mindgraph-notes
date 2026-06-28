@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { RendererPluginRegistry, discoverRendererPlugins } from './registry'
-import type { PluginRendererEntry } from '../../shared/plugins/entry'
+import type { PluginRendererEntry } from '@mindgraph/plugin-api'
 
 function entry(id: string, slot: string, component: unknown): PluginRendererEntry {
   return { id, contribute: (slots) => slots.register(slot, component) }

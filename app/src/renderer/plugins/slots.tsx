@@ -8,7 +8,7 @@
 
 import React, { Suspense } from 'react'
 import { createRendererRegistry, type RendererPluginRegistry } from './registry'
-import { WORKFLOW_TRIGGER_SLOT, WORKFLOW_EXAMPLE_SLOT, type WorkflowTriggerProvider } from '../../shared/plugins/workflowTrigger'
+import { WORKFLOW_TRIGGER_SLOT, WORKFLOW_EXAMPLE_SLOT, type WorkflowTriggerProvider } from '@mindgraph/plugin-api'
 import type { Workflow } from '../../shared/workflow/model'
 
 /** Was ein Plugin an einen Slot hängt: eine lazy geladene Default-Export-Komponente.

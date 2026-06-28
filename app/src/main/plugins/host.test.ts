@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import { createHostFactory, isHostAllowed, type HostServices } from './host'
-import type { PluginManifest } from '../../shared/plugins/manifest'
+import type { PluginManifest } from '@mindgraph/plugin-api'
 
 function fakeServices(over: Partial<HostServices> = {}): HostServices {
   return {

@@ -10,7 +10,7 @@
 //      normale Fehler über `status: 'failed'`, ohne zu werfen).
 
 import type { Workflow, WorkflowRun, WorkflowRunTrigger, WorkflowSeedItem } from '../../shared/workflow/model'
-import type { WorkflowTriggerProvider, WorkflowTriggerLedger } from '../../shared/plugins/workflowTrigger'
+import type { WorkflowTriggerProvider, WorkflowTriggerLedger } from '@mindgraph/plugin-api'
 
 export const ledgerKey = (wfId: string, itemKey: string): string => `${wfId}::${itemKey}`
 

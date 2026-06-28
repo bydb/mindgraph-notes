@@ -21,7 +21,7 @@ import { useEmailStore } from './emailStore'
 import { useNotesStore } from './notesStore'
 import { extractTasks } from '../utils/linkExtractor'
 import type { Note } from '../../shared/types'
-import type { WorkflowTriggerProvider } from '../../shared/plugins/workflowTrigger'
+import type { WorkflowTriggerProvider } from '@mindgraph/plugin-api'
 import { getWorkflowTriggerProviders, getWorkflowExamples } from '../plugins/slots'
 import { runEventForWorkflow } from './workflowTriggerDispatch'
 

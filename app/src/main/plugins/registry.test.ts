@@ -1,8 +1,8 @@
 import { describe, it, expect, vi } from 'vitest'
 import { PluginRegistry, discoverMainPlugins, type MainPluginSource } from './registry'
-import { definePluginMain, type PluginMainEntry } from '../../shared/plugins/entry'
-import type { PluginManifest } from '../../shared/plugins/manifest'
-import type { AnyPluginHost } from '../../shared/plugins/host'
+import { definePluginMain, type PluginMainEntry } from '@mindgraph/plugin-api'
+import type { PluginManifest } from '@mindgraph/plugin-api'
+import type { AnyPluginHost } from '@mindgraph/plugin-api'
 
 function mkManifest(id: string, over: Partial<PluginManifest> = {}): PluginManifest {
   return {
