@@ -455,6 +455,7 @@ export interface ElectronAPI {
   // UI-Settings Persistenz
   loadUISettings: () => Promise<Record<string, unknown>>;
   saveUISettings: (settings: Record<string, unknown>) => Promise<boolean>;
+  pruneUISettingsKeys: (keys: string[]) => Promise<boolean>;
   setMainLanguage: (lang: string) => Promise<boolean>;
   clipboardWriteText: (text: string) => Promise<boolean>;
   clipboardReadText: () => Promise<string>;

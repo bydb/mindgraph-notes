@@ -8,6 +8,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // UI-Settings Persistenz
   loadUISettings: () => ipcRenderer.invoke('load-ui-settings'),
   saveUISettings: (settings: object) => ipcRenderer.invoke('save-ui-settings', settings),
+  pruneUISettingsKeys: (keys: string[]) => ipcRenderer.invoke('prune-ui-settings-keys', keys),
   setMainLanguage: (lang: string) => ipcRenderer.invoke('set-main-language', lang),
 
   // Clipboard über Electron, robuster als navigator.clipboard in separaten Fenstern

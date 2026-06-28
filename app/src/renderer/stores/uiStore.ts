@@ -1544,11 +1544,27 @@ export async function initializeUISettings(): Promise<void> {
         validSettings.userProfile = profileMigration[validSettings.userProfile as string]
       }
       // A-pre Schritt 3: Legacy Top-Level-Configs der Vertikalen → generische pluginConfig.<id>.
+      const legacyPresent = LEGACY_PLUGIN_CONFIG_IDS.filter(
+        (id) => { const v = (savedSettings as Record<string, unknown>)[id]; return v != null && typeof v === 'object' }
+      )
       validSettings.pluginConfig = migrateLegacyPluginConfig(
         savedSettings as Record<string, unknown>,
         (validSettings.pluginConfig ?? {}) as Record<string, Record<string, unknown>>
       )
       useUIStore.setState(validSettings)
+      // Karteileichen entfernen: erst die migrierte pluginConfig persistieren (crash-sicher),
+      // DANN die alten Top-Level-Keys von der Platte prunen (saveUISettings mergt sonst weiter).
+      if (legacyPresent.length > 0) {
+        try {
+          const persisted: Record<string, unknown> = {}
+          const s = useUIStore.getState()
+          for (const key of persistedKeys) persisted[key] = s[key as keyof typeof s]
+          await window.electronAPI.saveUISettings(persisted)
+          await window.electronAPI.pruneUISettingsKeys(legacyPresent as unknown as string[])
+        } catch (err) {
+          console.error('[UIStore] Legacy-pluginConfig-Cleanup fehlgeschlagen:', err)
+        }
+      }
     } else {
       console.log('[UIStore] No saved settings found, using defaults')
     }

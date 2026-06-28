@@ -4,6 +4,19 @@ import * as fs from 'fs/promises'
 import { existsSync } from 'fs'
 import type { FileEntry } from '../shared/types'
 
+// Dev-only: isoliertes userData-Profil, damit `npm run dev` NICHT die produktiven Daten (Settings,
+// Secrets, Caches) anfasst. Greift NUR ungepackt UND wenn MINDGRAPH_USER_DATA_DIR gesetzt ist.
+// Muss VOR jedem userData-Zugriff laufen → daher ganz am Modulanfang, vor app.whenReady().
+if (!app.isPackaged && process.env.MINDGRAPH_USER_DATA_DIR) {
+  const devUserData = process.env.MINDGRAPH_USER_DATA_DIR
+  try {
+    app.setPath('userData', devUserData)
+    console.log(`[dev] userData override aktiv → ${devUserData}`)
+  } catch (err) {
+    console.error('[dev] userData override fehlgeschlagen:', err)
+  }
+}
+
 // Lazy-loaded native/heavy Module — beim Start nicht eager geladen (8-GB-Startup-Optimierung).
 // node-pty (natives Addon), chokidar (fsevents), electron-updater, SyncEngine (ws) und
 // ReMarkableService werden erst beim ersten Bedarf importiert.
@@ -888,6 +901,28 @@ ipcMain.handle('set-main-language', (_event, lang: string) => {
     currentLanguage = lang
   }
   return true
+})
+
+// Top-Level-Keys aus ui-settings.json entfernen (generisch — Main kennt keine Plugin-Namen).
+// Nötig, weil saveUISettings mergt und nach pluginConfig-Migration entfernte Top-Level-Keys
+// sonst als Karteileichen liegen blieben. Der Renderer ruft das einmalig nach der Migration.
+ipcMain.handle('prune-ui-settings-keys', async (_event, keys: string[]) => {
+  if (!Array.isArray(keys) || keys.length === 0) return false
+  try {
+    let existing: Record<string, unknown> = {}
+    try {
+      existing = JSON.parse(await fs.readFile(getUISettingsPath(), 'utf-8'))
+    } catch { return false } // keine Datei → nichts zu prunen
+    let changed = false
+    for (const key of keys) {
+      if (typeof key === 'string' && key in existing) { delete existing[key]; changed = true }
+    }
+    if (changed) await fs.writeFile(getUISettingsPath(), JSON.stringify(existing, null, 2), 'utf-8')
+    return changed
+  } catch (error) {
+    console.error('Fehler beim Prunen der UI-Settings:', error)
+    return false
+  }
 })
 
 // Vault-Ordner öffnen
