@@ -4,8 +4,8 @@
 // und welche Capabilities es braucht — nie WIE es etwas tut (das lebt in den
 // getrennten Main-/Renderer-Entries). Siehe docs/plugin-system-plan.md, Entscheidung #8.
 
-import type { ModuleId as CompatModuleId } from '../modelCompatibility'
-import type { WorkflowPrivacyMetadata } from '../workflow/types'
+import type { CompatModuleId } from './compat'
+import type { WorkflowPrivacyMetadata, WorkflowActionDefinition } from './workflow'
 
 /**
  * Plugin-Kategorie. Spiegelt bewusst `ModuleCategory` aus uiStore (renderer),
@@ -57,6 +57,9 @@ export interface CredentialRequirement {
   key: string
   label: string
   secret?: boolean
+  /** Default true. `false` ⇒ optionales Credential (z.B. WordPress-Passwort der Marketing-
+   *  Teilfunktion von edoobox) — zählt NICHT in die Readiness-Prüfung (needs-configuration). */
+  required?: boolean
 }
 
 /**
@@ -86,6 +89,18 @@ export interface SlotDecl {
   fromAction?: string
 }
 
+/** Deklariert, wie ein Plugin im Modul-Tab erscheint und wo sein Enabled-Flag persistiert ist. */
+export interface PluginModuleDecl {
+  /** Modul-ID in der Settings-UI; standardmäßig identisch zur Plugin-ID. */
+  id?: string
+  /** Primärer Boolean-Pfad im UI-State, der den Main-Lifecycle dieses Plugins steuert. */
+  enabledPath: string
+  /** Weitere Flags, die derselbe Modulschalter gemeinsam setzt (z.B. ein Feature-Bundle). */
+  linkedEnabledPaths?: string[]
+  /** Übergangs-Pfad für bestehende Installationen während einer Config-Migration. */
+  legacyEnabledPath?: string
+}
+
 /**
  * Das vollständige Plugin-Manifest. Muss JSON-serialisierbar bleiben:
  * keine Funktionen, keine React-Komponenten, keine Klassen.
@@ -104,9 +119,17 @@ export interface PluginManifest {
   /** Domain-Allowlist für host.http.fetch. Fehlt sie, ist http.fetch gesperrt. */
   http?: { allowedHosts: string[] }
   credentials?: CredentialRequirement[]
+  /** Metadaten für den generisch aus Manifesten aufgebauten Modulschalter. */
+  module?: PluginModuleDecl
   /** Einfache Settings werden hieraus generiert; komplexe UI bleibt React. */
   settingsSchema?: JsonSchema
   actions?: ActionDef[]
+  /**
+   * Workflow-Canvas-Bausteine, die dieses Plugin zur Palette + zum Runner beisteuert
+   * (z.B. ein Trigger). Reine, serialisierbare Metadaten. Der Kern registriert sie generisch
+   * (registerWorkflowActions) — kein statischer antares/edoobox-Eintrag im Kern.
+   */
+  workflowActions?: WorkflowActionDefinition[]
   ui?: {
     settingsTab?: boolean
     dashboardWidget?: SlotDecl

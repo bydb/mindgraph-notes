@@ -48,8 +48,23 @@ const CATEGORY_VALUES = [
 export const PLUGIN_MANIFEST_SCHEMA: JsonSchema = {
   $schema: 'http://json-schema.org/draft-07/schema#',
   type: 'object',
+  definitions: {
+    workflowPort: {
+      type: 'object',
+      required: ['id', 'label', 'kind'],
+      properties: {
+        id: { type: 'string', minLength: 1 },
+        label: { type: 'string' },
+        kind: { type: 'string', minLength: 1 },
+        required: { type: 'boolean' },
+        multiple: { type: 'boolean' },
+      },
+      additionalProperties: false,
+    },
+  },
   required: ['id', 'version', 'label', 'description', 'category', 'capabilities'],
-  additionalProperties: true,
+  // STRIKT: unbekannte Top-Level-Felder abweisen — fängt Tippfehler (z.B. `capabilites`).
+  additionalProperties: false,
   properties: {
     id: { type: 'string', pattern: '^[a-z][a-z0-9-]*$' },
     version: { type: 'string', minLength: 1 },
@@ -81,9 +96,25 @@ export const PLUGIN_MANIFEST_SCHEMA: JsonSchema = {
           key: { type: 'string' },
           label: { type: 'string' },
           secret: { type: 'boolean' },
+          required: { type: 'boolean' },
         },
         additionalProperties: false,
       },
+    },
+    module: {
+      type: 'object',
+      required: ['enabledPath'],
+      properties: {
+        id: { type: 'string', pattern: '^[a-z][a-z0-9-]*$' },
+        enabledPath: { type: 'string', pattern: '^[a-zA-Z][a-zA-Z0-9]*(\\.[a-zA-Z][a-zA-Z0-9-]*)+$' },
+        linkedEnabledPaths: {
+          type: 'array',
+          items: { type: 'string', pattern: '^[a-zA-Z][a-zA-Z0-9]*(\\.[a-zA-Z][a-zA-Z0-9-]*)+$' },
+          uniqueItems: true,
+        },
+        legacyEnabledPath: { type: 'string', pattern: '^[a-zA-Z][a-zA-Z0-9]*(\\.[a-zA-Z][a-zA-Z0-9-]*)+$' },
+      },
+      additionalProperties: false,
     },
     settingsSchema: { type: 'object' },
     actions: {
@@ -106,7 +137,36 @@ export const PLUGIN_MANIFEST_SCHEMA: JsonSchema = {
           privacy: { type: 'object' },
           hardLockModule: { type: 'string' },
         },
-        additionalProperties: true,
+        // STRIKT: unbekannte Action-Felder abweisen — fängt z.B. `outputShema` statt `outputSchema`.
+        additionalProperties: false,
+      },
+    },
+    // Workflow-Canvas-Bausteine (Palette + Runner-Dispatch). Reine Metadaten — KEIN run().
+    // Der Kern baut Palette und Runner generisch daraus auf; statische antares/edoobox-Einträge
+    // gibt es nicht mehr (Deletion-Test).
+    workflowActions: {
+      type: 'array',
+      items: {
+        type: 'object',
+        required: ['id', 'moduleId', 'label', 'inputs', 'outputs'],
+        properties: {
+          id: { type: 'string', minLength: 1 },
+          moduleId: { type: 'string', minLength: 1 },
+          moduleLabel: { type: 'string' },
+          featureGate: { type: ['string', 'null'] },
+          label: { type: 'string', minLength: 1 },
+          description: { type: 'string' },
+          inputs: { type: 'array', items: { $ref: '#/definitions/workflowPort' } },
+          outputs: { type: 'array', items: { $ref: '#/definitions/workflowPort' } },
+          isTrigger: { type: 'boolean' },
+          isWrite: { type: 'boolean' },
+          isTerminal: { type: 'boolean' },
+          hardLockModule: { type: 'string' },
+          privacy: { type: 'object' },
+          config: { type: 'array', items: { type: 'object' } },
+          simLine: { type: 'string' },
+        },
+        additionalProperties: false,
       },
     },
     ui: {
@@ -146,13 +206,20 @@ export function validateManifest(value: unknown): ValidationResult {
 
 /**
  * Zusätzliche semantische Prüfungen, die JSON Schema nicht ausdrückt:
- * jede Action darf nur Capabilities verlangen, die das Plugin global deklariert hat.
+ *  - jede Action darf nur Capabilities verlangen, die das Plugin global deklariert hat;
+ *  - Action-IDs müssen eindeutig sein (doppelte würden widersprüchliche Schemas/Executoren
+ *    erzeugen — die Registry registriert sonst still den ersten und ignoriert den Rest).
  * Setzt voraus, dass `validateManifest` bereits grün war.
  */
 export function validateManifestSemantics(manifest: PluginManifest): ValidationResult {
   const errors: string[] = []
   const declared = new Set<string>(manifest.capabilities)
+  const seenActionIds = new Set<string>()
   for (const action of manifest.actions ?? []) {
+    if (seenActionIds.has(action.id)) {
+      errors.push(`Doppelte Action-ID '${action.id}'.`)
+    }
+    seenActionIds.add(action.id)
     for (const cap of action.requiredCapabilities) {
       if (!declared.has(cap)) {
         errors.push(

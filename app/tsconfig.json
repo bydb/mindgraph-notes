@@ -17,7 +17,9 @@
     "noFallthroughCasesInSwitch": true,
     "baseUrl": ".",
     "paths": {
-      "@/*": ["src/*"]
+      "@/*": ["src/*"],
+      "@mindgraph/plugin-api/validation": ["packages/plugin-api/src/validation.ts"],
+      "@mindgraph/plugin-api": ["packages/plugin-api/src/index.ts"]
     }
   },
   "include": ["src"],

@@ -11,24 +11,25 @@
 // Siehe docs/plugin-system-plan.md.
 
 import type { ModuleId as CompatModuleId } from '../../shared/modelCompatibility'
-import type { PluginManifest } from '../../shared/plugins/manifest'
+import type { PluginManifest } from '@mindgraph/plugin-api'
 import type {
   PluginActionExecutor,
   PluginActionRegistry,
   PluginMainEntry,
-} from '../../shared/plugins/entry'
-import type { AnyPluginHost } from '../../shared/plugins/host'
+} from '@mindgraph/plugin-api'
+import type { AnyPluginHost } from '@mindgraph/plugin-api'
 import {
   initialPluginState,
-  isPluginUsable,
+  isPluginInvokable,
   pluginBlockedReason,
   type PluginRuntimeState,
+  type ReadinessState,
 } from '../../shared/plugins/state'
 import {
   validateManifest,
   validateManifestSemantics,
   validateAgainst,
-} from '../../shared/plugins/schemas'
+} from '@mindgraph/plugin-api/validation'
 
 /** Eine entdeckte Plugin-Quelle: reines Manifest + lazy Loader für den Main-Entry. */
 export interface MainPluginSource {
@@ -49,7 +50,17 @@ interface LoadedPlugin {
   source: MainPluginSource
   state: PluginRuntimeState
   entry?: PluginMainEntry
+  /** Der bei der Aktivierung gebaute Capability-Host — für die Readiness-Prüfung (host.secrets). */
+  host?: AnyPluginHost
   actions: Map<string, PluginActionExecutor>
+  /** Zuletzt GEWÜNSCHTER Zustand (synchron beim activate/deactivate-Aufruf gesetzt).
+   *  Eine laufende Transition prüft ihn und bricht ab, wenn sie überholt wurde. */
+  desired: 'active' | 'disabled'
+  /** Serialisiert Transitionen pro Plugin — verhindert verschränkte activate/deactivate. */
+  lifecycle?: Promise<void>
+  /** Manifest war beim Register ungültig ⇒ TERMINAL (kein Aktivierungs-Retry). Ein reiner
+   *  Laufzeitfehler (entry.register/start wirft) ist dagegen wiederholbar. */
+  manifestInvalid: boolean
 }
 
 /** Default-Host: log funktioniert, jeder Dienst wirft laut, solange Schritt 5 nicht verdrahtet ist. */
@@ -116,6 +127,8 @@ export class PluginRegistry {
             error: { message: `Ungültiges Manifest: ${errors.join('; ')}`, at: nowIso() },
           },
           actions: new Map(),
+          desired: 'disabled',
+          manifestInvalid: true,
         })
         console.error(`[plugin] '${id}' abgewiesen: ${errors.join('; ')}`)
         continue
@@ -126,6 +139,8 @@ export class PluginRegistry {
         source,
         state: initialPluginState(id, manifest.version),
         actions: new Map(),
+        desired: 'disabled',
+        manifestInvalid: false,
       })
     }
   }
@@ -139,14 +154,58 @@ export class PluginRegistry {
   }
 
   /**
+   * Reiht eine Transition pro Plugin serialisiert ein. Mehrere parallele activate/deactivate-
+   * Aufrufe (schnelles Umschalten) können sich so nicht verschränken; `p.desired` wird synchron
+   * gesetzt, sodass die zuletzt gewünschte Absicht gewinnt ("last desired wins").
+   */
+  private chain<T>(p: LoadedPlugin, fn: () => Promise<T>): Promise<T> {
+    const result = (p.lifecycle ?? Promise.resolve()).then(fn, fn)
+    p.lifecycle = result.then(
+      () => {},
+      () => {}
+    )
+    return result
+  }
+
+  /**
    * Lädt (lazy) den Main-Entry, ruft sein `register`/`start` mit einem Capability-Host und
    * sammelt die Action-Executoren. Jeder Fehler → `error`-Zustand, andere Plugins bleiben heil.
    */
   async activate(id: string): Promise<PluginRuntimeState> {
     const p = this.plugins.get(id)
     if (!p) throw new Error(`Unbekanntes Plugin '${id}'`)
-    if (p.state.activation === 'error') return p.state // defektes Manifest bleibt defekt
+    p.desired = 'active'
+    return this.chain(p, () => this.doActivate(p))
+  }
+
+  private async doActivate(p: LoadedPlugin): Promise<PluginRuntimeState> {
+    const id = p.manifest.id
+    if (p.desired !== 'active') return p.state // von einem späteren deactivate überholt
+    if (p.manifestInvalid) return p.state // defektes Manifest bleibt TERMINAL (kein Retry)
     if (p.state.activation === 'active') return p.state
+    // Ein reiner LAUFZEIT-Fehler (error aus entry.register/start) ist wiederholbar: erneutes
+    // Aktivieren setzt zurück. Hängt noch ein Entry aus einem fehlgeschlagenen Start (Ressourcen
+    // evtl. geleakt), erst best-effort stoppen + verwerfen, damit nicht doppelt registriert wird.
+    if (p.entry) {
+      try {
+        if (p.entry.stop) await p.entry.stop()
+      } catch (stopErr) {
+        console.error(`[plugin] stop() vor Retry von '${id}' warf: ${errMessage(stopErr)}`)
+        p.state = {
+          ...p.state,
+          activation: 'error',
+          readiness: 'unavailable',
+          error: {
+            message: `Erneute Aktivierung blockiert, weil vorheriges Aufräumen fehlschlug: ${errMessage(stopErr)}`,
+            at: nowIso(),
+          },
+        }
+        return p.state
+      }
+      p.entry = undefined
+      p.host = undefined
+      p.actions = new Map()
+    }
 
     p.state = { ...p.state, activation: 'starting' }
     try {
@@ -174,10 +233,26 @@ export class PluginRegistry {
       await entry.register({ host, actions })
       if (entry.start) await entry.start({ host, actions })
 
+      p.host = host
       p.actions = actionMap
-      p.state = { ...p.state, activation: 'active', readiness: 'ready', error: undefined }
+      // Readiness ehrlich aus der Konfiguration ableiten (nicht mehr pauschal 'ready').
+      const readiness = await this.evaluateReadiness(p)
+      p.state = { ...p.state, activation: 'active', readiness, error: undefined }
     } catch (err) {
-      p.entry = undefined
+      // register/start kann bereits Timer/Listener angelegt haben → best-effort stoppen.
+      // Schlägt stop() fehl, Entry für einen späteren Deaktivierungs-Retry BEHALTEN (sonst sind
+      // die geleakten Ressourcen unerreichbar); sonst sauber verwerfen.
+      let stopFailed = false
+      if (p.entry?.stop) {
+        try {
+          await p.entry.stop()
+        } catch (stopErr) {
+          stopFailed = true
+          console.error(`[plugin] stop() nach fehlgeschlagener Aktivierung von '${id}' warf: ${errMessage(stopErr)}`)
+        }
+      }
+      if (!stopFailed) p.entry = undefined
+      p.host = undefined
       p.actions = new Map()
       p.state = {
         ...p.state,
@@ -190,25 +265,94 @@ export class PluginRegistry {
     return p.state
   }
 
-  /** Aktiviert alle registrierten Plugins; sammelt keine Fehler (jeder ist isoliert im Zustand). */
-  async activateAll(): Promise<void> {
-    for (const id of this.plugins.keys()) await this.activate(id)
+  /**
+   * Aktiviert alle registrierten Plugins; sammelt keine Fehler (jeder ist isoliert im Zustand).
+   * `isEnabled` (optional): liefert sie für ein Plugin `false`, wird es übersprungen und bleibt
+   * im Ausgangszustand `disabled` — so respektiert der App-Start den Modulschalter (A-pre #1).
+   * Ohne Argument bleibt das alte Verhalten „alles aktivieren".
+   */
+  async activateAll(isEnabled?: (id: string, manifest: PluginManifest) => boolean): Promise<void> {
+    for (const [id, plugin] of this.plugins) {
+      if (isEnabled && !isEnabled(id, plugin.manifest)) continue
+      await this.activate(id)
+    }
   }
 
   async deactivate(id: string): Promise<PluginRuntimeState> {
     const p = this.plugins.get(id)
     if (!p) throw new Error(`Unbekanntes Plugin '${id}'`)
-    if (p.state.activation !== 'active') return p.state
+    p.desired = 'disabled'
+    return this.chain(p, () => this.doDeactivate(p))
+  }
 
-    p.state = { ...p.state, activation: 'stopping' }
-    try {
-      if (p.entry?.stop) await p.entry.stop()
-    } catch (err) {
-      console.error(`[plugin] stop() von '${id}' warf: ${errMessage(err)}`)
+  private async doDeactivate(p: LoadedPlugin): Promise<PluginRuntimeState> {
+    const id = p.manifest.id
+    if (p.desired !== 'disabled') return p.state // von einem späteren activate überholt
+
+    // Solange ein Entry mit stop() hängt, MUSS stop() (erneut) laufen — auch nach einem früheren
+    // fehlgeschlagenen Stop. Der Entry bleibt erhalten, bis stop() wirklich durchläuft; sonst
+    // würde ein weiterlaufender Timer/Listener bei „nochmal ausschalten" weggeklickt.
+    if (p.entry?.stop) {
+      p.actions = new Map() // Actions sofort sperren — kein Aufruf mehr während/nach dem Stop
+      p.state = { ...p.state, activation: 'stopping' }
+      try {
+        await p.entry.stop()
+      } catch (err) {
+        // Stop gescheitert: Entry BEHALTEN (Retry beim nächsten Ausschalten), error halten.
+        console.error(`[plugin] stop() von '${id}' warf: ${errMessage(err)}`)
+        p.state = {
+          ...p.state,
+          activation: 'error',
+          readiness: 'unavailable',
+          error: { message: `Stoppen fehlgeschlagen: ${errMessage(err)}`, at: nowIso() },
+        }
+        return p.state
+      }
     }
+
+    // Sauber gestoppt (oder es gab nie einen Entry/stop) → endgültig `disabled`. Erst JETZT
+    // Entry + Host + Fehler löschen; das räumt auch einen reinen Aktivierungsfehler (kein Entry) auf.
     p.entry = undefined
+    p.host = undefined
     p.actions = new Map()
     p.state = { ...p.state, activation: 'disabled', readiness: 'unavailable', error: undefined }
+    return p.state
+  }
+
+  /**
+   * Leitet die Readiness aus der Konfiguration ab: alle als `required` (Default) deklarierten
+   * Credentials müssen in host.secrets hinterlegt sein. Keine Credentials ⇒ sofort `ready`.
+   * Bewusst nur Anwesenheits-Check (kein Verbindungstest) — ein FALSCHES Credential ist ein
+   * Laufzeitfehler der Action, kein „needs-configuration". Wirft nie; im Zweifel `ready`
+   * (kein Falsch-Blockieren eines konfigurierten Plugins).
+   */
+  private async evaluateReadiness(p: LoadedPlugin): Promise<ReadinessState> {
+    const required = (p.manifest.credentials ?? []).filter((c) => c.required !== false)
+    if (required.length === 0) return 'ready'
+    // Credentials deklariert, aber keine secrets-Capability ⇒ kann NICHT geprüft/geladen werden.
+    // Das ist ein Defekt, kein Einsatzbereit — KEIN Fail-open auf ready.
+    const secrets = (p.host as { secrets?: { get(key: string): Promise<string | null> } } | undefined)?.secrets
+    if (!secrets) return 'unavailable'
+    try {
+      for (const c of required) {
+        const value = await secrets.get(c.key)
+        if (!value) return 'needs-configuration'
+      }
+      return 'ready'
+    } catch (err) {
+      // Technischer Fehler beim Lesen (z.B. safeStorage/Secrets-Speicher defekt): ehrlich
+      // `unavailable` melden statt einen Defekt als Einsatzbereitschaft zu kaschieren.
+      console.error(`[plugin] Readiness-Check '${p.manifest.id}' warf: ${errMessage(err)}`)
+      return 'unavailable'
+    }
+  }
+
+  /** Bewertet die Readiness eines aktiven Plugins neu (z.B. nachdem Credentials gespeichert wurden). */
+  async refreshReadiness(id: string): Promise<PluginRuntimeState> {
+    const p = this.plugins.get(id)
+    if (!p) throw new Error(`Unbekanntes Plugin '${id}'`)
+    if (p.state.activation !== 'active') return p.state
+    p.state = { ...p.state, readiness: await this.evaluateReadiness(p) }
     return p.state
   }
 
@@ -220,7 +364,10 @@ export class PluginRegistry {
   async invoke(id: string, actionId: string, payload: unknown): Promise<unknown> {
     const p = this.plugins.get(id)
     if (!p) throw new Error(`Unbekanntes Plugin '${id}'`)
-    if (!isPluginUsable(p.state)) {
+    // Gate auf Installation + Aktivierung (NICHT Readiness): eine unkonfigurierte Action
+    // wirft selbst einen klaren Fehler, und needs-configuration darf die eigenen Setup-
+    // Actions (saveCredentials) nicht sperren.
+    if (!isPluginInvokable(p.state)) {
       throw new Error(pluginBlockedReason(p.state) ?? `Plugin '${id}' nicht verfügbar`)
     }
 
@@ -255,6 +402,13 @@ export class PluginRegistry {
     if (def.outputSchema) {
       const r = validateAgainst(def.outputSchema, result, `${id}:${actionId}:out`)
       if (!r.valid) throw new Error(`Ungültige Ausgabe von '${actionId}': ${r.errors.join('; ')}`)
+    }
+
+    // Credential-mutierende Actions (saveCredentials/deleteCredentials: isWrite + 'secrets')
+    // ändern die Readiness — sofort neu bewerten, damit der gemeldete Zustand ehrlich bleibt
+    // (needs-configuration → ready, sobald die Zugangsdaten hinterlegt sind).
+    if (def.isWrite && def.requiredCapabilities.includes('secrets')) {
+      p.state = { ...p.state, readiness: await this.evaluateReadiness(p) }
     }
     return result
   }

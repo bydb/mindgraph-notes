@@ -28,7 +28,9 @@ export const CredentialsSettings: React.FC<Props> = ({ onNavigateToTab }) => {
   const email = useUIStore(s => s.email)
   const readwise = useUIStore(s => s.readwise)
   const languageTool = useUIStore(s => s.languageTool)
-  const marketing = useUIStore(s => s.marketing)
+  // Nur den primitiven Bool selektieren (kein Objekt) — sonst entsteht pro Render eine neue
+  // Referenz, die über die credentials-useMemo eine Render-Schleife auslöst (flackernder Button).
+  const hasImagenKey = useUIStore(s => !!(s.pluginConfig.marketing as { googleImagenApiKey?: string } | undefined)?.googleImagenApiKey)
 
   const [statuses, setStatuses] = useState<Record<string, boolean>>({})
   const [loading, setLoading] = useState(true)
@@ -163,12 +165,12 @@ export const CredentialsSettings: React.FC<Props> = ({ onNavigateToTab }) => {
       category: 'KI-Cloud',
       note: 'Bild-Generierung im Marketing-Tab',
       settingsTab: 'agents',
-      checkSet: async () => !!marketing?.googleImagenApiKey,
+      checkSet: async () => hasImagenKey,
       inUiStore: true
     })
 
     return rows
-  }, [email, readwise, languageTool, marketing])
+  }, [email, readwise, languageTool, hasImagenKey])
 
   const refreshAll = useCallback(async () => {
     setLoading(true)

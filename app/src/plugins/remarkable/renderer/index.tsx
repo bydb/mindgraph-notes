@@ -2,7 +2,7 @@
 // `sidebar.panel.remarkable`. Lazy, damit React/Store erst beim Mounten geladen werden.
 // Self-Gating: das Panel rendert null, wenn das Modul deaktiviert ist.
 
-import type { PluginRendererEntry } from '../../../shared/plugins/entry'
+import type { PluginRendererEntry } from '@mindgraph/plugin-api'
 
 const entry: PluginRendererEntry = {
   id: 'remarkable',

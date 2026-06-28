@@ -280,6 +280,13 @@ const translations = {
     'settings.moduleGate.disabledHint': 'Dieses Modul ist deaktiviert.',
     'settings.moduleGate.goToModules': 'Zum Modul-Tab',
     'settings.modules.hint': 'Aktiviere nur, was du wirklich nutzt. Kern-Funktionen (Editor, MindGraph, Dashboard, Tasks) sind immer verfügbar.',
+    'settings.modules.coreTitle': 'MindGraph-Module',
+    'settings.modules.pluginsTitle': 'Installierte Plugins',
+    'settings.modules.pluginsHint': 'Eigenständige Erweiterungen. Später per Plugin-Store installier- und entfernbar.',
+    'settings.modules.pluginsEmpty': 'Keine Plugins installiert.',
+    'settings.modules.officialBadge': 'Offizielles Plugin',
+    'settings.modules.openStore': 'Plugin-Store öffnen',
+    'settings.modules.openStoreSoon': 'Bald verfügbar',
 
     // Speech / Voice (TTS + STT)
     'settings.speech.title': 'Sprache (Vorlesen & Diktieren)',
@@ -2898,6 +2905,13 @@ const translations = {
     'settings.tab.modules': 'Modules',
     'settings.tab.speech': 'Speech',
     'settings.modules.title': 'Modules',
+    'settings.modules.coreTitle': 'MindGraph modules',
+    'settings.modules.pluginsTitle': 'Installed plugins',
+    'settings.modules.pluginsHint': 'Standalone extensions. Installable and removable via the plugin store later.',
+    'settings.modules.pluginsEmpty': 'No plugins installed.',
+    'settings.modules.officialBadge': 'Official plugin',
+    'settings.modules.openStore': 'Open plugin store',
+    'settings.modules.openStoreSoon': 'Coming soon',
 
     // Speech / Voice (TTS + STT)
     'settings.speech.title': 'Speech (Read aloud & Dictation)',

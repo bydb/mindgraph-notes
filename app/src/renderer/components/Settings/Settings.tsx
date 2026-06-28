@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react'
-import { useUIStore, ACCENT_COLORS, AI_LANGUAGES, FONT_FAMILIES, UI_LANGUAGES, BACKGROUND_COLORS, ICON_SETS, OUTLINE_STYLES, MODULES, MODULE_CATEGORIES, type Language, type FontFamily, type BackgroundColor, type IconSet, type OutlineStyle, type LLMBackend, type TransportDestination, type ModuleCategory, type ModuleDescriptor } from '../../stores/uiStore'
-import { isModuleEnabled, setModuleEnabled, useIsModuleEnabled } from '../../utils/modules'
+import { useUIStore, ACCENT_COLORS, AI_LANGUAGES, FONT_FAMILIES, UI_LANGUAGES, BACKGROUND_COLORS, ICON_SETS, OUTLINE_STYLES, MODULE_CATEGORIES, EDOOBOX_DEFAULTS, MARKETING_DEFAULTS, REMARKABLE_DEFAULTS, type Language, type FontFamily, type BackgroundColor, type IconSet, type OutlineStyle, type LLMBackend, type TransportDestination, type ModuleCategory, type ModuleDescriptor } from '../../stores/uiStore'
+import { usePluginConfig } from '../../plugins/config'
+import { MODULES, isModuleEnabled, setModuleEnabled, useIsModuleEnabled, isPluginModule } from '../../utils/modules'
 import { invokePlugin } from '../../plugins/client'
+import { PluginSlot } from '../../plugins/slots'
 import { edooboxService } from '../../stores/edooboxServiceBridge'
 import { useNotesStore, createNoteFromFile } from '../../stores/notesStore'
 import { useSyncStore } from '../../stores/syncStore'
@@ -482,8 +484,8 @@ const VaultSettingsTab: React.FC<{ vaultPath: string; t: TabTFn; onNavigateToTab
   const setFeatureActive = useVaultSettingsStore(state => state.setFeatureActive)
   const readwise = useUIStore(state => state.readwise)
   const email = useUIStore(state => state.email)
-  const edoobox = useUIStore(state => state.edoobox)
-  const remarkable = useUIStore(state => state.remarkable)
+  const [edoobox] = usePluginConfig('edoobox', EDOOBOX_DEFAULTS)
+  const [remarkable] = usePluginConfig('remarkable', REMARKABLE_DEFAULTS)
   const vaultName = vaultPath.split('/').pop() || vaultPath
 
   const features: Array<{
@@ -572,67 +574,108 @@ const VaultSettingsTab: React.FC<{ vaultPath: string; t: TabTFn; onNavigateToTab
 
 const ModulesTab: React.FC<{ t: TabTFn }> = ({ t }) => {
   // useUIStore als Abhängigkeit einbinden, damit der Tab bei Flag-Änderungen rerendert
-  const _tick = useUIStore(s => `${s.notesChatEnabled}${s.projectRagEnabled}${s.smartConnectionsEnabled}${s.flashcardsEnabled}${s.workflowCanvasEnabled}${s.semanticScholarEnabled}${s.zoteroEnabled}${s.languageTool.enabled}${s.email.enabled}${s.edoobox.enabled}${s.marketing.enabled}${s.readwise.enabled}${s.remarkable.enabled}${s.docling.enabled}${s.visionOcr.enabled}${s.speech.enabled}`)
+  const _tick = useUIStore(s => `${s.notesChatEnabled}${s.projectRagEnabled}${s.smartConnectionsEnabled}${s.flashcardsEnabled}${s.workflowCanvasEnabled}${s.semanticScholarEnabled}${s.zoteroEnabled}${s.languageTool.enabled}${s.email.enabled}${s.readwise.enabled}${s.docling.enabled}${s.visionOcr.enabled}${s.speech.enabled}`)
   void _tick
+  // Generische Plugin-Module (z.B. Antares) liegen in pluginConfig — separat abonnieren, sonst
+  // löst ein Toggle über die generische Config-API keinen Re-Render des Modul-Tabs aus.
+  const _pluginTick = useUIStore(s => s.pluginConfig)
+  void _pluginTick
+
+  // Fehlertext pro Modul, falls der Main-Prozess der Aktivierung nicht folgen kann (A-pre #1).
+  const [moduleErrors, setModuleErrors] = useState<Record<string, string>>({})
+  const toggleModule = (modId: ModuleDescriptor['id'], next: boolean) => {
+    setModuleErrors(prev => { const { [modId]: _drop, ...rest } = prev; return rest })
+    setModuleEnabled(modId, next).catch(err => {
+      setModuleErrors(prev => ({ ...prev, [modId]: err instanceof Error ? err.message : String(err) }))
+    })
+  }
+
+  // Kern- von plugin-gestützten Modulen trennen: „MindGraph-Module" (immer dabei) vs.
+  // „Installierte Plugins" (eigenständige Vertikalen, später per Store verwaltbar).
+  const coreModules = MODULES.filter(m => !isPluginModule(m.id))
+  const pluginMods = MODULES.filter(m => isPluginModule(m.id))
 
   const grouped: Record<ModuleCategory, ModuleDescriptor[]> = {
     ai: [], communication: [], business: [], learning: [], research: [], devices: [], documents: []
   }
-  for (const mod of MODULES) grouped[mod.category].push(mod)
+  for (const mod of coreModules) grouped[mod.category].push(mod)
 
   const orderedCategories: ModuleCategory[] = ['ai', 'communication', 'business', 'learning', 'research', 'devices', 'documents']
 
+  const renderModuleRow = (mod: ModuleDescriptor, official?: boolean) => {
+    const enabled = isModuleEnabled(mod.id)
+    return (
+      <label key={mod.id} className={`module-row ${enabled ? 'active' : ''}`}>
+        {mod.iconText && (
+          <div
+            className="module-row-icon"
+            style={{ background: mod.iconColor || 'var(--accent-color, #4a9eff)' }}
+            aria-hidden="true"
+          >
+            <svg width="28" height="28" viewBox="0 0 28 28" xmlns="http://www.w3.org/2000/svg">
+              <text x="14" y="20" textAnchor="middle" fill="white" fontFamily="'Georgia', 'Times New Roman', serif" fontWeight="700" fontSize="18">
+                {mod.iconText}
+              </text>
+            </svg>
+          </div>
+        )}
+        <div className="module-row-body">
+          <div className="module-row-label">
+            {mod.label}
+            {official && (
+              <span className="module-row-badge" title={t('settings.modules.officialBadge')}>
+                ✓ {t('settings.modules.officialBadge')}
+              </span>
+            )}
+          </div>
+          <div className="module-row-desc">{mod.description}</div>
+          {moduleErrors[mod.id] && (
+            <div className="module-row-error" style={{ color: 'var(--error-color, #e5484d)', fontSize: '0.8em', marginTop: 4 }}>
+              {moduleErrors[mod.id]}
+            </div>
+          )}
+        </div>
+        <input
+          type="checkbox"
+          checked={enabled}
+          onChange={e => toggleModule(mod.id, e.target.checked)}
+        />
+      </label>
+    )
+  }
+
   return (
     <div className="settings-section">
-      <h3>{t('settings.modules.title')}</h3>
+      <h3>{t('settings.modules.coreTitle')}</h3>
       <p className="settings-hint">{t('settings.modules.hint')}</p>
 
       {orderedCategories.map(cat => (
-        <div key={cat} className="modules-category">
-          <h4 className="modules-category-title">{MODULE_CATEGORIES[cat]}</h4>
-          <div className="modules-list">
-            {grouped[cat].map(mod => {
-              const enabled = isModuleEnabled(mod.id)
-              return (
-                <label key={mod.id} className={`module-row ${enabled ? 'active' : ''}`}>
-                  {mod.iconText && (
-                    <div
-                      className="module-row-icon"
-                      style={{
-                        background: mod.iconColor || 'var(--accent-color, #4a9eff)'
-                      }}
-                      aria-hidden="true"
-                    >
-                      <svg width="28" height="28" viewBox="0 0 28 28" xmlns="http://www.w3.org/2000/svg">
-                        <text
-                          x="14"
-                          y="20"
-                          textAnchor="middle"
-                          fill="white"
-                          fontFamily="'Georgia', 'Times New Roman', serif"
-                          fontWeight="700"
-                          fontSize="18"
-                        >
-                          {mod.iconText}
-                        </text>
-                      </svg>
-                    </div>
-                  )}
-                  <div className="module-row-body">
-                    <div className="module-row-label">{mod.label}</div>
-                    <div className="module-row-desc">{mod.description}</div>
-                  </div>
-                  <input
-                    type="checkbox"
-                    checked={enabled}
-                    onChange={e => setModuleEnabled(mod.id, e.target.checked)}
-                  />
-                </label>
-              )
-            })}
+        grouped[cat].length === 0 ? null : (
+          <div key={cat} className="modules-category">
+            <h4 className="modules-category-title">{MODULE_CATEGORIES[cat]}</h4>
+            <div className="modules-list">
+              {grouped[cat].map(mod => renderModuleRow(mod))}
+            </div>
           </div>
-        </div>
+        )
       ))}
+
+      <div className="modules-plugins-header">
+        <h3>{t('settings.modules.pluginsTitle')}</h3>
+        <button
+          className="settings-btn-secondary"
+          disabled
+          title={t('settings.modules.openStoreSoon')}
+        >
+          {t('settings.modules.openStore')} · {t('settings.modules.openStoreSoon')}
+        </button>
+      </div>
+      <p className="settings-hint">{t('settings.modules.pluginsHint')}</p>
+      <div className="modules-list">
+        {pluginMods.length === 0
+          ? <p className="settings-hint">{t('settings.modules.pluginsEmpty')}</p>
+          : pluginMods.map(mod => renderModuleRow(mod, true))}
+      </div>
     </div>
   )
 }
@@ -1383,13 +1426,7 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab 
   const [edooboxTestStatus, setEdooboxTestStatus] = useState<'idle' | 'testing' | 'success' | 'failed'>('idle')
   const [edooboxTestError, setEdooboxTestError] = useState<string | null>(null)
   const [edooboxCredsSaved, setEdooboxCredsSaved] = useState(false)
-
-  // Antares Credentials State
-  const [antaresUser, setAntaresUser] = useState('')
-  const [antaresPassword, setAntaresPassword] = useState('')
-  const [antaresTestStatus, setAntaresTestStatus] = useState<'idle' | 'testing' | 'success' | 'failed'>('idle')
-  const [antaresTestError, setAntaresTestError] = useState<string | null>(null)
-  const [antaresCredsSaved, setAntaresCredsSaved] = useState(false)
+  // Antares-Credentials/-Settings: in die Antares-Vertikale ausgelagert (AntaresSettings.tsx).
 
   // Marketing Credentials State
   const [wpAppPassword, setWpAppPassword] = useState('')
@@ -1500,13 +1537,6 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab 
     setShowRawEditor,
     email: emailSettings,
     setEmail,
-    marketing: marketingSettings,
-    setMarketing,
-    edoobox: edooboxSettings,
-    antares: antaresSettings,
-    setAntares,
-    remarkable: remarkableSettings,
-    setRemarkable,
     dailyNote: dailyNoteSettings,
     setDailyNote,
     brain: brainSettings,
@@ -1516,6 +1546,11 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab 
     slashCommandTimeFormat,
     setSlashCommandTimeFormat
   } = useUIStore()
+
+  // Plugin-Vertikalen-Config generisch (pluginConfig) statt state.edoobox/marketing/remarkable.
+  const [marketingSettings, setMarketing] = usePluginConfig('marketing', MARKETING_DEFAULTS)
+  const [edooboxSettings] = usePluginConfig('edoobox', EDOOBOX_DEFAULTS)
+  const [remarkableSettings, setRemarkable] = usePluginConfig('remarkable', REMARKABLE_DEFAULTS)
 
   const { t } = useTranslation()
 
@@ -1579,7 +1614,7 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab 
     }
   }, [isOpen, emailSettings.accounts.length])
 
-  // edoobox + Marketing + Antares Credentials laden
+  // edoobox + Marketing Credentials laden (Antares lädt sich selbst in AntaresSettings.tsx)
   useEffect(() => {
     if (isOpen && activeTab === 'agents') {
       edooboxService.loadCredentials().then(creds => {
@@ -1593,15 +1628,6 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab 
           if (creds.wpAppPassword) setWpAppPassword(creds.wpAppPassword)
         }
       })
-      invokePlugin<{ username: string; password: string } | null>('antares', 'antares.loadCredentials')
-        .then(creds => {
-          if (creds) {
-            setAntaresUser(creds.username)
-            setAntaresPassword(creds.password)
-            setAntaresCredsSaved(true)
-          }
-        })
-        .catch(() => {})
     }
     if (isOpen && (activeTab === 'agents' || activeTab === 'remarkable')) {
       checkRemarkableConnection()
@@ -5226,112 +5252,11 @@ LIMIT 10
 
                 <div className="settings-divider" />
 
-                {/* Antares CS (Medienzentrum-Verleih) */}
-                <h4 className="settings-section-title">{t('settings.agents.antares.title')}</h4>
-                <p className="settings-hint">{t('settings.agents.antares.description')}</p>
-                <ModuleDisabledHint moduleId="antares" onGoToModules={() => setActiveTab('modules')} t={t} />
-
-                {antaresSettings.enabled && (
-                  <>
-                    <div className="settings-row">
-                      <label>{t('settings.agents.antares.baseUrl')}</label>
-                      <input
-                        type="text"
-                        value={antaresSettings.baseUrl}
-                        onChange={e => setAntares({ baseUrl: e.target.value })}
-                        placeholder="https://mzantares-he-16.datenbank-bildungsmedien.net"
-                        className="settings-input"
-                      />
-                    </div>
-
-                    <div className="settings-row">
-                      <label>{t('settings.agents.antares.context')}</label>
-                      <input
-                        type="text"
-                        value={antaresSettings.context}
-                        onChange={e => setAntares({ context: e.target.value })}
-                        placeholder="HE/16"
-                        className="settings-input"
-                      />
-                    </div>
-
-                    <div className="settings-row">
-                      <label>{t('settings.agents.antares.username')}</label>
-                      <input
-                        type="text"
-                        value={antaresUser}
-                        onChange={e => { setAntaresUser(e.target.value); setAntaresCredsSaved(false) }}
-                        placeholder={t('settings.agents.antares.username')}
-                        className="settings-input"
-                        autoComplete="username"
-                      />
-                    </div>
-
-                    <div className="settings-row">
-                      <label>{t('settings.agents.antares.password')}</label>
-                      <input
-                        type="password"
-                        value={antaresPassword}
-                        onChange={e => { setAntaresPassword(e.target.value); setAntaresCredsSaved(false) }}
-                        placeholder={t('settings.agents.antares.password')}
-                        className="settings-input"
-                        autoComplete="current-password"
-                      />
-                    </div>
-
-                    <div className="settings-row" style={{ gap: '8px' }}>
-                      <button
-                        className="settings-btn"
-                        onClick={async () => {
-                          if (antaresUser && antaresPassword) {
-                            const saved = await invokePlugin<boolean>('antares', 'antares.saveCredentials', { username: antaresUser, password: antaresPassword }).catch(() => false)
-                            setAntaresCredsSaved(!!saved)
-                          }
-                        }}
-                      >
-                        {antaresCredsSaved ? t('settings.agents.antares.saved') : t('settings.agents.antares.save')}
-                      </button>
-                      <button
-                        className="settings-btn"
-                        disabled={antaresTestStatus === 'testing'}
-                        onClick={async () => {
-                          setAntaresTestError(null)
-                          if (!antaresUser || !antaresPassword) {
-                            setAntaresTestStatus('failed')
-                            setAntaresTestError(t('settings.agents.antares.saveFirst'))
-                            return
-                          }
-                          await invokePlugin('antares', 'antares.saveCredentials', { username: antaresUser, password: antaresPassword })
-                          setAntaresCredsSaved(true)
-                          setAntaresTestStatus('testing')
-                          try {
-                            await invokePlugin('antares', 'antares.check', { baseUrl: antaresSettings.baseUrl, context: antaresSettings.context })
-                            setAntaresTestStatus('success')
-                            setAntaresTestError(null)
-                          } catch (err) {
-                            setAntaresTestStatus('failed')
-                            setAntaresTestError(err instanceof Error ? err.message : null)
-                          }
-                        }}
-                      >
-                        {antaresTestStatus === 'testing'
-                          ? t('settings.agents.antares.testing')
-                          : t('settings.agents.antares.testConnection')}
-                      </button>
-                      {antaresTestStatus === 'success' && (
-                        <span className="status-connected">{t('settings.agents.antares.connected')}</span>
-                      )}
-                      {antaresTestStatus === 'failed' && (
-                        <span className="status-disconnected">{t('settings.agents.antares.failed')}</span>
-                      )}
-                    </div>
-                    {antaresTestError && (
-                      <div className="settings-row">
-                        <span className="settings-error-detail">{antaresTestError}</span>
-                      </div>
-                    )}
-                  </>
-                )}
+                {/* Generischer Plugin-Settings-Bereich: der Kern nennt KEIN Plugin namentlich,
+                    er rendert nur diesen einen Slot. Jede Vertikale (aktuell: Antares) trägt ihre
+                    eigene Sektion bei und gated sich selbst auf ihr Modul. Leer nach Löschen des
+                    Plugin-Ordners → keine toten Plugin-Einstellungen (Deletion Test). */}
+                <PluginSlot slotId="settings.section" props={{ onGoToModules: () => setActiveTab('modules') }} />
 
                 <div className="settings-divider" />
 

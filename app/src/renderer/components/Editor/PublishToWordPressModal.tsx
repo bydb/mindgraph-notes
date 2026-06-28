@@ -3,7 +3,8 @@ import MarkdownIt from 'markdown-it'
 import taskLists from 'markdown-it-task-lists'
 import footnote from 'markdown-it-footnote'
 import type { Note, FileEntry } from '../../../shared/types'
-import { useUIStore } from '../../stores/uiStore'
+import { MARKETING_DEFAULTS } from '../../stores/uiStore'
+import { usePluginConfig } from '../../plugins/config'
 import { useTranslation } from '../../utils/translations'
 import { parseFrontmatter } from '../../utils/metadataExtractor'
 import { findImageInVault, isImageFile } from '../../utils/imageUtils'
@@ -55,7 +56,7 @@ function resolveVaultImage(fileName: string, vaultPath: string, fileTree: FileEn
 
 export const PublishToWordPressModal: React.FC<PublishToWordPressModalProps> = ({ note, vaultPath, fileTree, onClose }) => {
   const { t } = useTranslation()
-  const marketing = useUIStore(s => s.marketing)
+  const [marketing] = usePluginConfig('marketing', MARKETING_DEFAULTS)
 
   const frontmatter = useMemo(() => parseFrontmatter(note.content), [note.content])
   const defaultTitle = (firstString(frontmatter.title) ?? note.title ?? '').trim()

@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import type { EdooboxEvent, EdooboxOffer, EdooboxCategory, EdooboxOfferDashboard, EdooboxBooking, IqReportData } from '../../../shared/types'
 import { useUIStore } from '../../../renderer/stores/uiStore'
+import { getEdooboxConfig, getMarketingConfig } from './config'
 import { useNotesStore } from '../../../renderer/stores/notesStore'
 import { edooboxClient } from './edooboxClient'
 import { useEventAgentBridge } from '../../../renderer/stores/eventAgentBridge'
@@ -133,7 +134,7 @@ export const useAgentStore = create<AgentState>()((set, get) => ({
   },
 
   checkConnection: async () => {
-    const { baseUrl, apiVersion } = useUIStore.getState().edoobox
+    const { baseUrl, apiVersion } = getEdooboxConfig()
     const result = await edooboxClient.check(baseUrl, apiVersion)
     set({ isConnected: result.success })
     return result.success
@@ -169,7 +170,7 @@ export const useAgentStore = create<AgentState>()((set, get) => ({
       const event = get().events.find(e => e.id === eventId)
       if (!event) return
 
-      const { baseUrl, apiVersion } = useUIStore.getState().edoobox
+      const { baseUrl, apiVersion } = getEdooboxConfig()
       const result = await edooboxClient.importEvent(baseUrl, apiVersion, event)
 
       set((state) => ({
@@ -199,7 +200,7 @@ export const useAgentStore = create<AgentState>()((set, get) => ({
   },
 
   listOffers: async () => {
-    const { baseUrl, apiVersion } = useUIStore.getState().edoobox
+    const { baseUrl, apiVersion } = getEdooboxConfig()
     const result = await edooboxClient.listOffers(baseUrl, apiVersion)
     if (result.success && result.offers) {
       set({ offers: result.offers })
@@ -207,7 +208,7 @@ export const useAgentStore = create<AgentState>()((set, get) => ({
   },
 
   loadCategories: async () => {
-    const { baseUrl, apiVersion } = useUIStore.getState().edoobox
+    const { baseUrl, apiVersion } = getEdooboxConfig()
     const result = await edooboxClient.listCategories(baseUrl, apiVersion)
     if (result.success && result.categories) {
       set({ categories: result.categories })
@@ -237,7 +238,7 @@ export const useAgentStore = create<AgentState>()((set, get) => ({
   loadDashboard: async (options?: { includeBookings?: boolean }) => {
     set({ isDashboardLoading: true })
     try {
-      const { baseUrl, apiVersion } = useUIStore.getState().edoobox
+      const { baseUrl, apiVersion } = getEdooboxConfig()
       const result = await edooboxClient.listOffersDashboard(baseUrl, apiVersion)
       if (!result.success || !result.offers) {
         set({ isDashboardLoading: false })
@@ -274,7 +275,7 @@ export const useAgentStore = create<AgentState>()((set, get) => ({
   },
 
   loadBookingsForOffer: async (offerId: string) => {
-    const { baseUrl, apiVersion } = useUIStore.getState().edoobox
+    const { baseUrl, apiVersion } = getEdooboxConfig()
     const result = await edooboxClient.listBookings(baseUrl, apiVersion, offerId)
     if (result.success && result.bookings) {
       set((state) => ({
@@ -291,7 +292,7 @@ export const useAgentStore = create<AgentState>()((set, get) => ({
   loadMarketingOffers: async () => {
     set({ isMarketingLoading: true })
     try {
-      const { baseUrl, apiVersion } = useUIStore.getState().edoobox
+      const { baseUrl, apiVersion } = getEdooboxConfig()
       const result = await edooboxClient.listOffersDashboard(baseUrl, apiVersion)
       if (result.success && result.offers) {
         set({ marketingOffers: result.offers, isMarketingLoading: false })
@@ -336,7 +337,7 @@ export const useAgentStore = create<AgentState>()((set, get) => ({
   publishToWordpress: async (offerId: string, title: string, content: string) => {
     set({ isPublishing: true })
     try {
-      const { wordpressUrl, wordpressUser, defaultPostStatus } = useUIStore.getState().marketing
+      const { wordpressUrl, wordpressUser, defaultPostStatus } = getMarketingConfig()
       const { selectedImageBase64, selectedImageFileName } = get()
 
       // Upload image as featured media if available, with caption for AI-generated images
@@ -387,7 +388,7 @@ export const useAgentStore = create<AgentState>()((set, get) => ({
   },
 
   generateImage: async (offer: EdooboxOfferDashboard) => {
-    const { googleImagenApiKey } = useUIStore.getState().marketing
+    const { googleImagenApiKey } = getMarketingConfig()
     if (!googleImagenApiKey) return
     set({ isGeneratingImage: true })
     try {
@@ -440,7 +441,7 @@ export const useAgentStore = create<AgentState>()((set, get) => ({
   loadIqOffers: async () => {
     set({ isIqLoading: true })
     try {
-      const { baseUrl, apiVersion } = useUIStore.getState().edoobox
+      const { baseUrl, apiVersion } = getEdooboxConfig()
       const result = await edooboxClient.listOffersDashboard(baseUrl, apiVersion, 'past')
       if (result.success && result.offers) {
         set({ iqOffers: result.offers, isIqLoading: false })
@@ -548,7 +549,7 @@ useEventAgentBridge.getState().registerProvider({
     return useAgentStore.getState().dashboardOffers
   },
   listBookings: async (offerId) => {
-    const { baseUrl, apiVersion } = useUIStore.getState().edoobox
+    const { baseUrl, apiVersion } = getEdooboxConfig()
     const result = await edooboxClient.listBookings(baseUrl, apiVersion, offerId)
     return result.success && result.bookings ? result.bookings : []
   },

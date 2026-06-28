@@ -23,3 +23,13 @@ export async function listPlugins(): Promise<PluginRuntimeState[]> {
   if (!res.ok) throw new Error(res.error ?? 'Plugin-Liste konnte nicht geladen werden')
   return (res.data as PluginRuntimeState[]) ?? []
 }
+
+/** Fährt ein gebündeltes Plugin im Main-Prozess hoch/runter (Modulschalter → Lebenszyklus). */
+export async function setPluginEnabled(pluginId: string, enabled: boolean): Promise<void> {
+  const res = (await window.electronAPI.pluginSetEnabled(pluginId, enabled)) as PluginInvokeResult
+  if (!res.ok) {
+    throw new Error(
+      res.error ?? `Plugin '${pluginId}' konnte nicht ${enabled ? 'aktiviert' : 'deaktiviert'} werden`
+    )
+  }
+}

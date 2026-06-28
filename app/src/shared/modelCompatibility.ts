@@ -49,13 +49,11 @@
 
 export type Verdict = 'green' | 'yellow' | 'red' | 'untested'
 
-export type ModuleId =
-  | 'brain'
-  | 'task-extraction'
-  | 'mail-summary'
-  | 'dashboard-snapshot'
-  | 'smart-connections'
-  | 'project-status'
+// Kanonischer Heimatort der Modul-IDs ist jetzt @mindgraph/plugin-api (Plugin-Vertrag);
+// die Verdict-Matrix unten ist die App-Logik darüber. Der Alias hält bestehende
+// `ModuleId`-Importe im Kern unverändert.
+import type { CompatModuleId } from '@mindgraph/plugin-api'
+export type ModuleId = CompatModuleId
 
 export interface ModelMetrics {
   formatCompliancePct?: number

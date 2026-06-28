@@ -4,6 +4,21 @@ import * as fs from 'fs/promises'
 import { existsSync } from 'fs'
 import type { FileEntry } from '../shared/types'
 
+// Dev-only userData-Isolation: ungepackt (`npm run dev`/`start`) NIEMALS das produktive Profil der
+// installierten App anfassen — sonst migriert/schreibt der Dev-Build die echten Settings (real passiert).
+// Default ist ein eigenes „<App> (dev)"-Profil; mit MINDGRAPH_USER_DATA_DIR gezielt überschreibbar
+// (z.B. ein Klon des Produktivprofils für Tests MIT Credentials). Muss VOR jedem userData-Zugriff laufen.
+if (!app.isPackaged) {
+  const devUserData = process.env.MINDGRAPH_USER_DATA_DIR
+    || path.join(app.getPath('userData'), '..', `${app.getName()} (dev)`)
+  try {
+    app.setPath('userData', devUserData)
+    console.log(`[dev] isoliertes userData-Profil → ${devUserData}`)
+  } catch (err) {
+    console.error('[dev] userData-Isolation fehlgeschlagen:', err)
+  }
+}
+
 // Lazy-loaded native/heavy Module — beim Start nicht eager geladen (8-GB-Startup-Optimierung).
 // node-pty (natives Addon), chokidar (fsevents), electron-updater, SyncEngine (ws) und
 // ReMarkableService werden erst beim ersten Bedarf importiert.
@@ -112,7 +127,7 @@ import { matchEmailToProjects, gateProjectMatch } from '../shared/projectMatch'
 import { parseRelevanceConfig, stripConfigBlock, buildReplyStats, computeHardSignals, combineRelevance, extractConfigBlock, upsertConfigBlock, emptyRelevanceConfig, isSentMail, isSentFolderName, DEFAULT_VIP_WEIGHT, DEFAULT_DOMAIN_WEIGHT, DEFAULT_KEYWORD_BOOST } from '../shared/emailRelevance'
 import { isHardLocked as isModelHardLocked, isCloudModel as isModelIsCloud } from '../shared/modelCompatibility'
 import { listOpenRouterModels, chat as llmChat, streamOpenRouterChat } from './llm/chatClient'
-import { MODULE_FEATURE_GATE } from '../shared/workflow/types'
+import { registerWorkflowActions, workflowModuleGate } from '../shared/workflow/registry'
 import type { Workflow, WorkflowFile, WorkflowRunTrigger } from '../shared/workflow/model'
 import type {
   ProjectStatusCrystallizeInput,
@@ -134,7 +149,8 @@ import { embedText as ragEmbedText } from './rag/embed'
 import { cosineSimilarity as ragCosineSimilarity } from '../shared/rag/similarity'
 import type { RagIndexStatus, RagQueryResult, RagRetrieveOptions } from '../shared/rag/types'
 import { setupTray, hideTransportWindow, updateShortcut, showTransportWindow } from './transport/trayManager'
-import { createMainRegistry } from './plugins/registry'
+import { createMainRegistry, discoverMainPlugins } from './plugins/registry'
+import { isPluginGateEnabled } from '../shared/plugins/moduleGate'
 import { registerPluginTransport } from './plugins/transport'
 import { createHostFactory, type HostServices } from './plugins/host'
 import * as nativeServices from './plugins/nativeServices'
@@ -151,6 +167,13 @@ process.on('unhandledRejection', (reason) => {
 // Der echte Capability-Host wird in app.whenReady() gesetzt (setHostFactory); bis dahin Stub.
 const pluginRegistry = createMainRegistry()
 registerPluginTransport(pluginRegistry)
+
+// Plugin-beigesteuerte Workflow-Canvas-Bausteine (Manifest-Feld `workflowActions`) in die
+// gemeinsame Registry einspielen, damit der Runner sie generisch dispatcht (kein statischer
+// antares/edoobox-Eintrag mehr). Renderer macht dasselbe unabhängig (plugins/workflowActions.ts).
+for (const source of discoverMainPlugins()) {
+  if (source.manifest.workflowActions?.length) registerWorkflowActions(source.manifest.workflowActions)
+}
 
 // — Plugin-Secrets: pro Plugin genamespacet, via safeStorage verschlüsselt in userData —
 // (Direkter userData-Write wie bei den App-Settings; NICHT der Vault-Schreibpfad.)
@@ -245,17 +268,20 @@ function buildPluginHostServices(): HostServices {
     httpFetch: (url, init) => fetch(url, init),
     httpFetchBasicAuth: nativeServices.httpFetchBasicAuth,
     resolveExtraAllowedHosts: async (pluginId) => {
-      // Plugins mit user-konfiguriertem Endpunkt (z.B. Antares: ui.antares.baseUrl) dürfen
-      // ihren konfigurierten Host ansprechen — der ist user-getrust, anders als ein beliebiger.
+      // Plugins mit user-konfiguriertem Endpunkt (z.B. Antares-baseUrl) dürfen ihren konfigurierten
+      // Host ansprechen — der ist user-getrust, anders als ein beliebiger. Die Config liegt generisch
+      // unter ui.pluginConfig[pluginId] (A-pre Schritt 3); Top-Level bleibt als Legacy-Fallback.
       const ui = await loadUISettings().catch(() => ({} as Record<string, unknown>))
+      const pc = (ui.pluginConfig ?? {}) as Record<string, Record<string, unknown> | undefined>
+      const pluginCfg = (id: string) => (pc[id] ?? (ui[id] as Record<string, unknown> | undefined))
       const hosts: string[] = []
-      const cfg = ui[pluginId] as { baseUrl?: string } | undefined
+      const cfg = pluginCfg(pluginId) as { baseUrl?: string } | undefined
       if (cfg?.baseUrl) {
         try { hosts.push(new URL(cfg.baseUrl).hostname) } catch { /* ignore */ }
       }
       // edoobox-Vertikale nutzt zusätzlich den user-konfigurierten WordPress-Host (Marketing).
       if (pluginId === 'edoobox') {
-        const mk = ui.marketing as { wordpressUrl?: string } | undefined
+        const mk = pluginCfg('marketing') as { wordpressUrl?: string } | undefined
         if (mk?.wordpressUrl) {
           try { hosts.push(new URL(mk.wordpressUrl).hostname) } catch { /* ignore */ }
         }
@@ -780,7 +806,12 @@ app.whenReady().then(async () => {
       ? `Modell '${model}' ist für '${moduleId}' gesperrt (Hard-Lock)`
       : null
   })
-  pluginRegistry.activateAll().catch((err) => console.error('[plugin] activateAll:', err))
+  // A-pre Schritt 1: nur Plugins aktivieren, deren Modulschalter aktiviert ist — der Start
+  // respektiert den Disabled-Zustand (gebündelte Plugins sind nicht mehr blind „immer an").
+  const pluginGateSettings = startupUiSettings ?? {}
+  pluginRegistry
+    .activateAll((_id, manifest) => isPluginGateEnabled(manifest, pluginGateSettings))
+    .catch((err) => console.error('[plugin] activateAll:', err))
 
   // Tray-Icon + Schnellerfassung (plattformübergreifend)
   {
@@ -872,6 +903,28 @@ ipcMain.handle('set-main-language', (_event, lang: string) => {
     currentLanguage = lang
   }
   return true
+})
+
+// Top-Level-Keys aus ui-settings.json entfernen (generisch — Main kennt keine Plugin-Namen).
+// Nötig, weil saveUISettings mergt und nach pluginConfig-Migration entfernte Top-Level-Keys
+// sonst als Karteileichen liegen blieben. Der Renderer ruft das einmalig nach der Migration.
+ipcMain.handle('prune-ui-settings-keys', async (_event, keys: string[]) => {
+  if (!Array.isArray(keys) || keys.length === 0) return false
+  try {
+    let existing: Record<string, unknown> = {}
+    try {
+      existing = JSON.parse(await fs.readFile(getUISettingsPath(), 'utf-8'))
+    } catch { return false } // keine Datei → nichts zu prunen
+    let changed = false
+    for (const key of keys) {
+      if (typeof key === 'string' && key in existing) { delete existing[key]; changed = true }
+    }
+    if (changed) await fs.writeFile(getUISettingsPath(), JSON.stringify(existing, null, 2), 'utf-8')
+    return changed
+  } catch (error) {
+    console.error('Fehler beim Prunen der UI-Settings:', error)
+    return false
+  }
 })
 
 // Vault-Ordner öffnen
@@ -1467,8 +1520,8 @@ ipcMain.handle('workflow-run', async (_event, payload: WorkflowRunPayload) => {
     isHardLocked: (model, moduleId) => isModelHardLocked(model, moduleId),
     isCloudModel: (model) => isModelIsCloud(model),
     isModuleActive: (workflowModuleId) => {
-      const gate = MODULE_FEATURE_GATE[workflowModuleId as keyof typeof MODULE_FEATURE_GATE]
-      return gate ? Boolean(features[gate]) : true
+      const gate = workflowModuleGate(workflowModuleId)
+      return gate ? Boolean(features[gate as keyof typeof features]) : true
     },
     ollamaGenerate,
     matchProject: async (email) => {

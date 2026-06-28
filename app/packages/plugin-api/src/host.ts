@@ -8,7 +8,7 @@
 // WICHTIG: Die Generics sind Compile-Time-Assist, NICHT die Sicherheitsgrenze. Die echte
 // Grenze ist der Laufzeit-Capability-Check in der Registry (#3).
 
-import type { ModuleId as CompatModuleId } from '../modelCompatibility'
+import type { CompatModuleId } from './compat'
 import type { PluginCapability } from './manifest'
 
 // — Dienst-Interfaces, je ein Tor durch eine Kern-Grenze —

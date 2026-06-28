@@ -7,6 +7,7 @@ import type {
   WorkflowRun,
   WorkflowRunTrigger,
   WorkflowSchedule,
+  WorkflowSeedItem,
   WorkflowValidationResult
 } from '../../shared/workflow/model'
 import type { EmailMessage } from '../../shared/types'
@@ -18,10 +19,11 @@ import { useUIStore } from './uiStore'
 import { useVaultSettingsStore } from './vaultSettingsStore'
 import { useEmailStore } from './emailStore'
 import { useNotesStore } from './notesStore'
-import { useAntaresStore } from './antaresStore'
-import { useEventAgentBridge } from './eventAgentBridge'
 import { extractTasks } from '../utils/linkExtractor'
-import type { AntaresVerleihRow, EdooboxBooking, EdooboxOfferDashboard, Note } from '../../shared/types'
+import type { Note } from '../../shared/types'
+import type { WorkflowTriggerProvider } from '@mindgraph/plugin-api'
+import { getWorkflowTriggerProviders, getWorkflowExamples } from '../plugins/slots'
+import { runEventForWorkflow } from './workflowTriggerDispatch'
 
 interface ConnectingState {
   nodeId: string
@@ -76,7 +78,7 @@ interface WorkflowStoreState {
   setEnabled: (enabled: boolean) => void
   runForNewEmails: (vaultPath: string) => Promise<void>
   /** Dispatcht auf den aktiven Trigger-Baustein: Email → runForNewEmails,
-   *  antares/edoobox/tasks → eigener Collector (tab-scoped Poll). schedule → runScheduledIfDue. */
+   *  Provider-Trigger (Aufgaben + Plugins) → eigener Collector (tab-scoped Poll). schedule → runScheduledIfDue. */
   runTrigger: (vaultPath: string) => Promise<void>
   /** Layer F: lädt den persistierten Workflow von Platte (tab-unabhängig!) und
    *  führt ihn aus, falls der schedule.timer-Trigger jetzt fällig ist. */
@@ -119,21 +121,22 @@ function touch(wf: Workflow): Workflow {
 // kein Sync-Konflikt; analog zum Relevanz-Radar-Cache). Map "wfId::itemKey" → ISO.
 const FIRED_LEDGER_KEY = (vaultPath: string) => `mindgraph:workflow-fired:${vaultPath}`
 const LEDGER_CAP = 2000
-const ledgerKey = (wfId: string, itemKey: string) => `${wfId}::${itemKey}`
 
 function loadFiredLedger(vaultPath: string): Record<string, string> {
   try { return JSON.parse(localStorage.getItem(FIRED_LEDGER_KEY(vaultPath)) || '{}') } catch { return {} }
 }
-// Baselines (edoobox-Count) sind KEINE Timestamps und müssen IMMER erhalten bleiben —
-// sonst gilt ein Angebot wieder als „erstmals gesehen" und der Count-Delta geht verloren.
-const isBaselineKey = (k: string) => k.includes('::edoobox-count:')
+// Ein Marker-Wert ist entweder ein ISO-Timestamp (= einmaliger „gefeuert"-Marker, alterbar)
+// oder ein beliebiger Nicht-Timestamp (= Baseline, z.B. ein Plugin-Zählerstand). Baselines
+// müssen IMMER erhalten bleiben — sonst gilt eine Quelle wieder als „erstmals gesehen" und der
+// Delta geht verloren. Bewusst wert-basiert (nicht über Schlüsselnamen), damit der Kern keine
+// Plugin-spezifischen Marker-Konventionen kennen muss.
+const isAgeableMarker = (v: string) => /^\d{4}-\d{2}-\d{2}T/.test(v)
 function saveFiredLedger(vaultPath: string, ledger: Record<string, string>): void {
   let l = ledger
   const all = Object.entries(l)
   if (all.length > LEDGER_CAP) {
-    // Nur die einmaligen Feuer-Marker (ISO-Timestamp) altern lassen; Baselines bleiben.
-    const baselines = all.filter(([k]) => isBaselineKey(k))
-    const fired = all.filter(([k]) => !isBaselineKey(k))
+    const baselines = all.filter(([, v]) => !isAgeableMarker(v))
+    const fired = all.filter(([, v]) => isAgeableMarker(v))
       .sort((a, b) => (a[1] < b[1] ? -1 : a[1] > b[1] ? 1 : 0)) // älteste zuerst
     const keepFired = fired.slice(Math.max(0, fired.length - (LEDGER_CAP - baselines.length)))
     l = Object.fromEntries([...baselines, ...keepFired])
@@ -141,62 +144,9 @@ function saveFiredLedger(vaultPath: string, ledger: Record<string, string>): voi
   try { localStorage.setItem(FIRED_LEDGER_KEY(vaultPath), JSON.stringify(l)) } catch { /* Quota — ignorieren */ }
 }
 
-// ── Seed-Text-Formatierung (C/D/E): menschenlesbar, fließt in notes/human/ollama ──
-function formatMahnung(r: AntaresVerleihRow): string {
-  const name = [r.fn_vorname, r.fn_ename].filter(Boolean).join(' ').trim() || '(unbekannt)'
-  const email = extractEmail(r)
-  return [
-    'Überfällige Rückgabe (Mahnung)',
-    `- Leihnr: ${r.fn_leihnr || '?'}`,
-    `- Titel: ${r.fn_titel || '?'}`,
-    `- Art: ${r.fn_info === 'medien' ? 'Medium' : 'Gerät'}`,
-    `- Entleiher: ${name}`,
-    email ? `- E-Mail: ${email}` : '',
-    `- Schule: ${r.fn_schulname || '?'}`,
-    `- Rückgabe fällig: ${r.fn_rueckdatum || '?'}`
-  ].filter(Boolean).join('\n')
-}
-function formatBooking(o: EdooboxOfferDashboard, prev: number, neu: number): string {
-  return [
-    'Neue Anmeldung',
-    `- Angebot: ${o.name}${o.number ? ` (Nr. ${o.number})` : ''}`,
-    `- Anmeldungen gesamt: ${o.bookingCount} (vorher ${prev})`,
-    `- Neu: ${neu}`,
-    o.maxParticipants ? `- Plätze: ${o.bookingCount}/${o.maxParticipants}` : ''
-  ].filter(Boolean).join('\n')
-}
-function formatBookingParticipant(o: EdooboxOfferDashboard, b: EdooboxBooking): string {
-  return [
-    'Neue Anmeldung',
-    `- Angebot: ${o.name}${o.number ? ` (Nr. ${o.number})` : ''}`,
-    `- Teilnehmer: ${b.userName || 'Unbekannt'}`,
-    b.userEmail ? `- E-Mail: ${b.userEmail}` : '',
-    b.schule ? `- Schule: ${b.schule}` : '',
-    b.personalNr ? `- Personal-Nr: ${b.personalNr}` : '',
-    b.bookedAt ? `- Gebucht am: ${b.bookedAt}` : '',
-    o.maxParticipants ? `- Plätze: ${o.bookingCount}/${o.maxParticipants}` : ''
-  ].filter(Boolean).join('\n')
-}
-function pickString(obj: Record<string, unknown>, keys: string[]): string {
-  for (const key of keys) {
-    const value = obj[key]
-    if (typeof value === 'string' && value.trim()) return value.trim()
-  }
-  return ''
-}
-function extractEmail(obj: Record<string, unknown>): string {
-  const direct = pickString(obj, [
-    'email', 'mail', 'e_mail', 'eMail', 'userEmail', 'fn_email', 'fn_mail',
-    'fn_emailadresse', 'fn_emailadr', 'fn_mailadresse', 'fn_eml'
-  ])
-  if (direct) return direct
-  for (const value of Object.values(obj)) {
-    if (typeof value !== 'string') continue
-    const match = value.match(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/)
-    if (match) return match[0]
-  }
-  return ''
-}
+// ── Seed-Text-Formatierung (Kern-Trigger tasks.dueSoon): menschenlesbar, fließt in notes/human/ollama.
+// Plugin-Trigger (Antares-Mahnung, edoobox-Anmeldung) bringen ihre Formatierung im jeweiligen
+// Provider in der Vertikale mit (A-pre Schritt 4) — der Kern formatiert sie nicht mehr. ──
 function formatTask(note: Note, text: string, dueDate: Date): string {
   const due = dueDate.toISOString().slice(0, 10)
   return [
@@ -205,13 +155,6 @@ function formatTask(note: Note, text: string, dueDate: Date): string {
     `- Notiz: ${note.title || note.id}`,
     `- Fällig: ${due}`
   ].join('\n')
-}
-
-interface WorkflowSeedItem {
-  itemKey: string
-  text: string
-  meta?: Record<string, unknown>
-  email?: { id?: string; subject?: string; bodyText?: string; from?: string; name?: string }
 }
 
 function collectTodayDueTaskItems(notes: Note[]): WorkflowSeedItem[] {
@@ -238,61 +181,48 @@ function collectTodayDueTaskItems(notes: Note[]): WorkflowSeedItem[] {
   return items
 }
 
-// ── Item-Builder (geteilt zwischen Event-Pfad runTrigger und manuellem ▶ execute) ──
-function antaresRowToItem(r: AntaresVerleihRow): WorkflowSeedItem {
-  const name = [r.fn_vorname, r.fn_ename].filter(Boolean).join(' ').trim()
-  const email = extractEmail(r)
-  const subject = `Überfällige Rückgabe: ${r.fn_titel || r.fn_leihnr || ''}`.trim()
-  return {
-    itemKey: `mahnung:${r.fn_leihnr}`,
-    text: formatMahnung(r),
-    meta: { leihnr: r.fn_leihnr, medium: r.fn_info, schule: r.fn_schulname, recipientEmail: email, recipientName: name, subject },
-    email: { id: `antares:${r.fn_leihnr}`, subject, bodyText: formatMahnung(r), from: email, name }
-  }
-}
-function edooboxBookingToItem(o: EdooboxOfferDashboard, b: EdooboxBooking, newCount: number): WorkflowSeedItem {
-  const text = formatBookingParticipant(o, b)
-  return {
-    itemKey: `booking:${o.id}:${b.id || o.bookingCount}`,
-    text,
-    meta: {
-      offerId: o.id, bookingId: b.id, bookingCount: o.bookingCount, newCount,
-      recipientEmail: b.userEmail, recipientName: b.userName, userEmail: b.userEmail, userName: b.userName,
-      subject: `Neue Anmeldung: ${o.name}`
-    },
-    email: { id: `edoobox:${b.id || `${o.id}:${o.bookingCount}`}`, subject: `Neue Anmeldung: ${o.name}`, bodyText: text, from: b.userEmail, name: b.userName }
-  }
-}
-function edooboxOfferToItem(o: EdooboxOfferDashboard, prev: number, newCount: number): WorkflowSeedItem {
-  const text = formatBooking(o, prev, newCount)
-  return {
-    itemKey: `booking:${o.id}:${o.bookingCount}`,
-    text,
-    meta: { offerId: o.id, bookingCount: o.bookingCount, newCount, subject: `Neue Anmeldung: ${o.name}` },
-    email: { id: `edoobox:${o.id}:${o.bookingCount}`, subject: `Neue Anmeldung: ${o.name}`, bodyText: text }
-  }
+// ── Trigger-Provider ──────────────────────────────────────────────────────────
+// Der Kern kennt nur EINEN eingebauten Trigger (tasks.dueSoon — Aufgaben sind Kern,
+// kein Plugin). Externe Trigger (Antares-Mahnung, edoobox-Anmeldung) liefern Plugins
+// als WorkflowTriggerProvider über den Renderer-Slot. So dispatcht execute/runTrigger
+// generisch, ohne ein Plugin namentlich zu kennen (A-pre Schritt 4).
+const tasksTriggerProvider: WorkflowTriggerProvider = {
+  triggerActionId: 'tasks.dueSoon',
+  manualEmptyMessage: 'Keine heute fälligen Aufgaben.',
+  async collectManual(): Promise<WorkflowSeedItem | null> {
+    return collectTodayDueTaskItems(useNotesStore.getState().notes)[0] ?? null
+  },
+  async collectEvent() {
+    // Kein eigener Trigger → der Dispatch setzt 'event-external'. Provider-basierte Trigger
+    // (Kern-Aufgaben wie Plugins) tragen generische Event-Provenienz; nur der Mail-Signalpfad
+    // des Kerns mintet reichere Trigger (event-email/-reply/-ics).
+    return {
+      items: collectTodayDueTaskItems(useNotesStore.getState().notes),
+      emptyMessage: 'Keine heute fälligen Aufgaben.',
+    }
+  },
 }
 
-// Manuelle Seeds (▶ Ausführen) für die externen Trigger — ohne Ledger/Baseline
-// (manuell ist explizit, wie der tasks.dueSoon-Manualpfad). Liefert eine
-// repräsentative aktuelle Mahnung bzw. Anmeldung, damit der manuelle Lauf etwas
-// Sinnvolles seedet statt eines leeren Textes / einer fremden Inbox-Mail.
-async function collectAntaresItems(): Promise<WorkflowSeedItem[]> {
-  try { await useAntaresStore.getState().loadAll() } catch { /* keine/abgelaufene Credentials */ }
-  const a = useAntaresStore.getState()
-  return [...a.mahnungenGeraete, ...a.mahnungenMedien].filter(r => r.fn_leihnr).map(antaresRowToItem)
+/** Eingebauter + plugin-beigesteuerte Trigger-Provider, indiziert über die Action-Id.
+ *  Frisch je Aufruf, damit nach Plugin-Install/-Deinstall die Liste aktuell ist. */
+function getTriggerProviders(): Map<string, WorkflowTriggerProvider> {
+  const map = new Map<string, WorkflowTriggerProvider>()
+  map.set(tasksTriggerProvider.triggerActionId, tasksTriggerProvider)
+  for (const p of getWorkflowTriggerProviders()) map.set(p.triggerActionId, p)
+  return map
 }
-async function collectEdooboxManualItem(): Promise<WorkflowSeedItem | null> {
-  const bridge = useEventAgentBridge.getState()
-  try { await bridge.loadOffers() } catch { /* keine/abgelaufene Credentials */ }
-  const offer = useEventAgentBridge.getState().offers.find(o => o.bookingCount > 0)
-  if (!offer) return null
-  let bookings: EdooboxBooking[] = []
-  try {
-    bookings = await bridge.listBookings(offer.id)
-  } catch { bookings = [] }
-  const b = bookings.slice().sort((x, y) => (Date.parse(y.bookedAt || '') || 0) - (Date.parse(x.bookedAt || '') || 0))[0]
-  return b ? edooboxBookingToItem(offer, b, 1) : edooboxOfferToItem(offer, 0, offer.bookingCount)
+
+/** Ist diese Action ein POLL-Trigger (Aufgaben/Plugins, via Provider), also über runTrigger
+ *  gepollt — im Gegensatz zu Email-Signal- und Zeitplan-Triggern? Generisch aus den registrierten
+ *  Providern abgeleitet: ein gelöschtes Plugin verschwindet automatisch, kein toter Kernname. */
+export function isPollTriggerAction(actionId: string | undefined): boolean {
+  return !!actionId && getTriggerProviders().has(actionId)
+}
+
+/** Kern-Beispiele + plugin-beigesteuerte Beispiele (Renderer-Slot). Kern zuerst → das Flaggschiff
+ *  bleibt der Default. Nach Plugin-Löschung fehlen dessen Beispiele automatisch. */
+function allExampleWorkflows(): Workflow[] {
+  return [...buildExampleWorkflows(), ...getWorkflowExamples()]
 }
 
 // ── Zeitplan (Layer F): ist der Workflow JETZT fällig? ───────────────────────
@@ -319,7 +249,7 @@ function isScheduleDue(schedule: WorkflowSchedule, lastFiredIso: string | undefi
 }
 
 export const useWorkflowStore = create<WorkflowStoreState>()((set, get) => {
-  const examples = buildExampleWorkflows()
+  const examples = allExampleWorkflows()
   const initial = examples[0]
   return {
   workflow: initial,
@@ -346,7 +276,7 @@ export const useWorkflowStore = create<WorkflowStoreState>()((set, get) => {
   loadExample: () => set(s => {
     const merged = reconcileList(s.workflows, s.activeId, s.workflow)
     const existing = new Set(merged.map(w => w.id))
-    const templates = buildExampleWorkflows()
+    const templates = allExampleWorkflows()
     const next = templates.find(w => !existing.has(w.id))
     const base = next ?? templates[0]
     const wf = next ?? {
@@ -504,23 +434,16 @@ export const useWorkflowStore = create<WorkflowStoreState>()((set, get) => {
       ? { id: selected.id, subject: selected.subject, bodyText: selected.bodyText, from: selected.from?.address }
       : null
 
-    // Manueller Seed je Trigger-Art. Externe Trigger (Mahnung/Buchung/Aufgabe)
-    // brauchen ein eigenes Item — NICHT die zufällig markierte Inbox-Mail. Ist
+    // Manueller Seed je Trigger-Art. Trigger mit eigenem Provider (Aufgabe, Mahnung,
+    // Buchung) brauchen ein eigenes Item — NICHT die zufällig markierte Inbox-Mail. Ist
     // nichts da, sauberer „skipped"-Lauf statt eines leeren/falschen Entwurfs.
     set({ running: true, run: null })
     let skipMsg: string | null = null
     let seed: { text?: string; meta?: Record<string, unknown>; email?: WorkflowSeedItem['email'] } | null = null
-    if (triggerActionId === 'tasks.dueSoon') {
-      const item = collectTodayDueTaskItems(useNotesStore.getState().notes)[0]
-      if (!item) skipMsg = 'Keine heute fälligen Aufgaben.'
-      else seed = { text: item.text, meta: item.meta }
-    } else if (triggerActionId === 'antares.mahnung') {
-      const item = (await collectAntaresItems())[0]
-      if (!item) skipMsg = 'Keine überfälligen Rückgaben gefunden.'
-      else seed = { text: item.text, meta: item.meta, email: item.email }
-    } else if (triggerActionId === 'edoobox.newBooking') {
-      const item = await collectEdooboxManualItem()
-      if (!item) skipMsg = 'Keine Anmeldungen gefunden.'
+    const manualProvider = triggerActionId ? getTriggerProviders().get(triggerActionId) : undefined
+    if (manualProvider) {
+      const item = await manualProvider.collectManual()
+      if (!item) skipMsg = manualProvider.manualEmptyMessage ?? 'Keine passenden Daten für diesen Trigger.'
       else seed = { text: item.text, meta: item.meta, email: item.email }
     } else {
       seed = seedEmail ? { email: seedEmail } : null
@@ -703,16 +626,18 @@ export const useWorkflowStore = create<WorkflowStoreState>()((set, get) => {
   },
 
   // Poll-Trigger-Dispatch (Layer C/D/E) für ALLE aktivierten Workflows. Email-Trigger
-  // laufen über den Mail-Signal-Pfad runForNewEmails; antares/edoobox/tasks sammeln
-  // eigene Kandidaten (Exactly-once via localStorage-Ledger) und seeden mit Text +
-  // Kontakt. schedule.timer läuft tab-unabhängig über runScheduledIfDue (Layer F).
+  // laufen über den Mail-Signal-Pfad runForNewEmails; alle anderen Trigger sammeln über
+  // ihren registrierten Provider (Aufgaben + Plugins) eigene Kandidaten (Exactly-once via
+  // localStorage-Ledger) und seeden mit Text + Kontakt. schedule.timer läuft tab-unabhängig
+  // über runScheduledIfDue (Layer F).
   runTrigger: async (vaultPath) => {
     if (triggerBatchRunning) return
+    const providers = getTriggerProviders()
     const triggerOf = (w: Workflow) => w.nodes.map(n => n.actionId).find(id => getActionById(id)?.isTrigger) || ''
-    // Multi-Workflow: ALLE aktivierten Poll-Trigger-Workflows (nicht nur der aktive).
-    // Email-Trigger laufen über den eigenen (Mail-Signal-)Pfad runForNewEmails.
+    // Multi-Workflow: ALLE aktivierten Poll-Trigger-Workflows (nicht nur der aktive), deren
+    // Trigger ein Provider bedient. Email-Trigger laufen über den eigenen (Mail-Signal-)Pfad.
     const pollTargets = reconcileList(get().workflows, get().activeId, get().workflow)
-      .filter(w => w.enabled && ['antares.mahnung', 'edoobox.newBooking', 'tasks.dueSoon'].includes(triggerOf(w)))
+      .filter(w => w.enabled && providers.has(triggerOf(w)))
     if (pollTargets.length === 0) return
 
     const ollama = useUIStore.getState().ollama
@@ -720,109 +645,38 @@ export const useWorkflowStore = create<WorkflowStoreState>()((set, get) => {
     const models = { selected: ollama.selectedModel, overrides: (ollama.moduleModelOverrides || {}) as Record<string, string> }
     const projectsFolderRel = useUIStore.getState().projectsRootFolder || undefined
 
-    // Gemeinsame Schleife pro Workflow: frische Items seriell, hart gedeckelt,
-    // Ledger NUR bei Erfolg pflegen (sonst macht ein transienter Fehler das Item
-    // dauerhaft unsichtbar). Liefert den anzuzeigenden Lauf zurück.
-    const runItems = async (wf: Workflow, items: WorkflowSeedItem[], trigger: WorkflowRunTrigger, emptyMsg: string): Promise<WorkflowRun> => {
-      const ledger = loadFiredLedger(vaultPath)
-      const fresh = items.filter(it => !ledger[ledgerKey(wf.id, it.itemKey)]).slice(0, MAX_TRIGGER_BATCH)
-      if (fresh.length === 0) {
-        return {
-          id: genId('run'), workflowId: wf.id, mode: 'execute', trigger,
-          status: 'success', startedAt: new Date().toISOString(), finishedAt: new Date().toISOString(),
-          steps: [{ nodeId: '-', actionId: '-', label: 'Trigger', status: 'skipped', log: [emptyMsg] }]
-        }
-      }
-      let last: WorkflowRun | null = null
-      let changed = false
-      for (const it of fresh) {
-        const result = await window.electronAPI.workflowRun({
-          workflow: wf, vaultPath, trigger,
-          seed: { text: it.text, meta: it.meta, email: it.email },
-          models, features, projectsFolderRel
-        })
-        if (result.status === 'success') { ledger[ledgerKey(wf.id, it.itemKey)] = new Date().toISOString(); changed = true }
-        last = result
-      }
-      if (changed) saveFiredLedger(vaultPath, ledger)
-      return last as WorkflowRun
+    // Ein Seed-Lauf via IPC. Wirft NICHT bei normalen Fehlern (→ result.status); der Dispatch
+    // wertet das aus (Exactly-once + afterRun-Gate). Geteilt über alle Workflows dieses Batches.
+    const runOne = (wf: Workflow, it: WorkflowSeedItem, trigger: WorkflowRunTrigger) =>
+      window.electronAPI.workflowRun({
+        workflow: wf, vaultPath, trigger,
+        seed: { text: it.text, meta: it.meta, email: it.email },
+        models, features, projectsFolderRel
+      })
+    const dispatchDeps = {
+      loadLedger: () => loadFiredLedger(vaultPath),
+      saveLedger: (l: Record<string, string>) => saveFiredLedger(vaultPath, l),
+      runOne,
+      batchCap: MAX_TRIGGER_BATCH,
     }
 
-    // Externe Quellen EINMAL laden und über alle Workflows derselben Art teilen
-    // (kein N-faches Dashboard-Scrape bei mehreren aktivierten Workflows).
-    const families = new Set(pollTargets.map(triggerOf))
-    let antaresRows: AntaresVerleihRow[] = []
-    if (families.has('antares.mahnung')) {
-      try { await useAntaresStore.getState().loadAll() } catch { /* keine/abgelaufene Credentials */ }
-      const a = useAntaresStore.getState()
-      antaresRows = [...a.mahnungenGeraete, ...a.mahnungenMedien].filter(r => r.fn_leihnr)
-    }
-    let edooboxOffers: EdooboxOfferDashboard[] = []
-    const bookingsCache = new Map<string, EdooboxBooking[]>()
-    if (families.has('edoobox.newBooking')) {
-      try { await useEventAgentBridge.getState().loadOffers() } catch { /* keine/abgelaufene Credentials */ }
-      edooboxOffers = useEventAgentBridge.getState().offers
-    }
-    const taskItems = families.has('tasks.dueSoon') ? collectTodayDueTaskItems(useNotesStore.getState().notes) : []
+    // Externe Quellen EINMAL je Provider laden (mehrere Workflows derselben Quelle teilen
+    // sich den Scrape — kein N-faches Dashboard-Scrape). prepareEvent ist optional.
+    const usedTriggerIds = new Set(pollTargets.map(triggerOf))
 
     triggerBatchRunning = true
     set({ running: true })
     let finalRun: WorkflowRun | null = null
     try {
+      for (const id of usedTriggerIds) {
+        const prepare = providers.get(id)?.prepareEvent
+        if (prepare) { try { await prepare() } catch { /* keine/abgelaufene Credentials */ } }
+      }
       for (const wf of pollTargets) {
-        const t = triggerOf(wf)
-        if (t === 'antares.mahnung') {
-          // Reset: Ledger-Einträge für Leihnrn entfernen, die nicht mehr überfällig
-          // sind, damit ein zurückgegeben-und-erneut-überfälliges Item wieder feuert.
-          const ledger = loadFiredLedger(vaultPath)
-          const currentKeys = new Set(antaresRows.map(r => `mahnung:${r.fn_leihnr}`))
-          const prefix = `${wf.id}::mahnung:`
-          let changed = false
-          for (const k of Object.keys(ledger)) {
-            if (k.startsWith(prefix) && !currentKeys.has(k.slice(wf.id.length + 2))) { delete ledger[k]; changed = true }
-          }
-          if (changed) saveFiredLedger(vaultPath, ledger)
-          finalRun = await runItems(wf, antaresRows.map(antaresRowToItem), 'event-mahnung', 'Keine neuen überfälligen Rückgaben.')
-        } else if (t === 'edoobox.newBooking') {
-          // Baseline-Vergleich: pro Angebot den zuletzt gesehenen bookingCount merken;
-          // beim ersten Sehen nur Baseline setzen (kein Fehlalarm gegen den Bestand).
-          const ledger = loadFiredLedger(vaultPath)
-          const items: WorkflowSeedItem[] = []
-          const baselineUpdates: [string, string][] = []
-          for (const o of edooboxOffers) {
-            const baseKey = ledgerKey(wf.id, `edoobox-count:${o.id}`)
-            const prev = Number(ledger[baseKey])
-            if (Number.isFinite(prev) && o.bookingCount > prev) {
-              const newCount = o.bookingCount - prev
-              let bookings = bookingsCache.get(o.id)
-              if (!bookings) {
-                try {
-                  bookings = await useEventAgentBridge.getState().listBookings(o.id)
-                } catch { bookings = [] }
-                bookingsCache.set(o.id, bookings)
-              }
-              const freshBookings = bookings
-                .slice()
-                .sort((a, b) => (Date.parse(b.bookedAt || '') || 0) - (Date.parse(a.bookedAt || '') || 0))
-                .slice(0, Math.max(1, newCount))
-              if (freshBookings.length > 0) {
-                for (const b of freshBookings) items.push(edooboxBookingToItem(o, b, newCount))
-              } else {
-                items.push(edooboxOfferToItem(o, prev, newCount))
-              }
-            }
-            baselineUpdates.push([baseKey, String(o.bookingCount)])
-          }
-          finalRun = await runItems(wf, items, 'event-booking', 'Keine neuen Anmeldungen.')
-          // Baseline ERST nach dem Lauf vorrücken — schlägt runItems fehl (wirft → catch),
-          // bleibt die alte Baseline stehen und der Delta wird beim nächsten Poll erneut versucht.
-          const l2 = loadFiredLedger(vaultPath)
-          for (const [k, v] of baselineUpdates) l2[k] = v
-          saveFiredLedger(vaultPath, l2)
-        } else {
-          // tasks.dueSoon — nur HEUTE fällige Aufgaben.
-          finalRun = await runItems(wf, taskItems, 'event-task', 'Keine heute fälligen Aufgaben.')
-        }
+        const provider = providers.get(triggerOf(wf))
+        if (!provider) continue
+        const run = await runEventForWorkflow(wf, provider, dispatchDeps)
+        if (run) finalRun = run
       }
     } catch (e) {
       console.warn('[workflow] runTrigger:', e)

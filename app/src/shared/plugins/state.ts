@@ -46,13 +46,23 @@ export function initialPluginState(id: string, version?: string): PluginRuntimeS
   }
 }
 
-/** Genau dann nutzbar, wenn alle drei Achsen grün sind. */
+/** Genau dann nutzbar, wenn alle drei Achsen grün sind (für Store-/UX-„bereit"-Anzeige). */
 export function isPluginUsable(s: PluginRuntimeState): boolean {
   return (
     s.installation === 'bundled' &&
     s.activation === 'active' &&
     s.readiness === 'ready'
   )
+}
+
+/**
+ * Darf eine Action laufen? NUR Installation + Aktivierung müssen grün sein — Readiness ist
+ * ein UX-Signal (eine unkonfigurierte Action wirft selbst einen klaren Fehler), KEIN Invoke-
+ * Gate. Sonst würde `needs-configuration` auch die eigenen Setup-Actions (saveCredentials)
+ * sperren (Deadlock) und in Multi-Feature-Plugins die credential-freien Actions mit-blockieren.
+ */
+export function isPluginInvokable(s: PluginRuntimeState): boolean {
+  return s.installation === 'bundled' && s.activation === 'active'
 }
 
 /** Menschlich lesbarer Grund, warum ein Plugin (noch) nicht nutzbar ist — oder null. */

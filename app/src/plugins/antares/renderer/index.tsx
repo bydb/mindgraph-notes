@@ -1,10 +1,15 @@
 // Antares-Plugin — Renderer-Entry (im Renderer-Prozess, getrennt vom Main-Entry).
 //
-// Hängt das Dashboard-Widget an den benannten Slot `dashboard.widget.antares`. Lazy,
-// damit React/Store erst beim tatsächlichen Mounten geladen werden. Erkannt über
-// `import.meta.glob` der Renderer-Registry — kein harter Import in der App. Siehe #12.
+// Hängt das Dashboard-Widget an `dashboard.widget.antares` und die Einstellungen an den
+// GENERISCHEN, plugin-unabhängigen Slot `settings.section` (der Kern nennt kein Plugin
+// namentlich — er rendert nur diesen einen allgemeinen Settings-Bereich). Lazy, damit
+// React/Store erst beim Mounten geladen werden. Erkannt über `import.meta.glob` der
+// Renderer-Registry — kein harter Import in der App. Siehe #12.
 
-import type { PluginRendererEntry } from '../../../shared/plugins/entry'
+import type { PluginRendererEntry } from '@mindgraph/plugin-api'
+import { WORKFLOW_TRIGGER_SLOT, WORKFLOW_EXAMPLE_SLOT } from '@mindgraph/plugin-api'
+import { antaresTriggerProvider } from './workflowTrigger'
+import { buildAntaresReminderExample } from './workflowExample'
 
 const entry: PluginRendererEntry = {
   id: 'antares',
@@ -14,6 +19,15 @@ const entry: PluginRendererEntry = {
       title: 'Antares Medienzentrum',
       load: () => import('./AntaresWidget'),
     })
+    slots.register('settings.section', {
+      pluginId: 'antares',
+      title: 'Antares Medienzentrum',
+      load: () => import('./AntaresSettings'),
+    })
+    // Workflow-Trigger `antares.mahnung` — der Kern dispatcht generisch über diesen Provider.
+    slots.register(WORKFLOW_TRIGGER_SLOT, antaresTriggerProvider)
+    // Beispiel-Workflow für die Palette.
+    slots.register(WORKFLOW_EXAMPLE_SLOT, buildAntaresReminderExample)
   },
 }
 

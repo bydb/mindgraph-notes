@@ -11,7 +11,10 @@
 // registriert sich → die Bridges liefern sichere Defaults, das Panel-Slot bleibt leer. Siehe
 // docs/plugin-system-plan.md #12.
 
-import type { PluginRendererEntry } from '../../../shared/plugins/entry'
+import type { PluginRendererEntry } from '@mindgraph/plugin-api'
+import { WORKFLOW_TRIGGER_SLOT, WORKFLOW_EXAMPLE_SLOT } from '@mindgraph/plugin-api'
+import { edooboxTriggerProvider } from './workflowTrigger'
+import { buildEdooboxConfirmationExample } from './workflowExample'
 // Eager: Provider-Registrierung als Modul-Seiteneffekt (Daten-Bridge + Service-Facade).
 import './agentStore'
 import './edooboxClient'
@@ -24,6 +27,10 @@ const entry: PluginRendererEntry = {
       title: 'Edoobox',
       load: () => import('./AgentPanel').then(m => ({ default: m.AgentPanel })),
     })
+    // Workflow-Trigger `edoobox.newBooking` — der Kern dispatcht generisch über diesen Provider.
+    slots.register(WORKFLOW_TRIGGER_SLOT, edooboxTriggerProvider)
+    // Beispiel-Workflow für die Palette.
+    slots.register(WORKFLOW_EXAMPLE_SLOT, buildEdooboxConfirmationExample)
   },
 }
 

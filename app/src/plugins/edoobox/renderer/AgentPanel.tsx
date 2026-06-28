@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { useAgentStore } from './agentStore'
-import { useUIStore } from '../../../renderer/stores/uiStore'
+import { EDOOBOX_DEFAULTS, MARKETING_DEFAULTS } from '../../../renderer/stores/uiStore'
+import { usePluginConfig } from '../../../renderer/plugins/config'
 import { useTranslation } from '../../../renderer/utils/translations'
 import { writeClipboardText } from '../../../renderer/utils/clipboard'
 import { PanelHeader, PanelHeaderIconButton } from '../../../renderer/components/Shared/PanelHeader'
@@ -70,8 +71,9 @@ const OccupancyBadge: React.FC<{ booked: number; max: number }> = ({ booked, max
 const DashboardOfferCard: React.FC<{ offer: EdooboxOfferDashboard }> = ({ offer }) => {
   const { t } = useTranslation()
   const { loadBookingsForOffer } = useAgentStore()
-  const edooboxBaseUrl = useUIStore(s => s.edoobox.baseUrl)
-  const edooboxApiVersion = useUIStore(s => s.edoobox.apiVersion)
+  const [edoobox] = usePluginConfig('edoobox', EDOOBOX_DEFAULTS)
+  const edooboxBaseUrl = edoobox.baseUrl
+  const edooboxApiVersion = edoobox.apiVersion
   const [expanded, setExpanded] = useState(false)
   const [loadingBookings, setLoadingBookings] = useState(false)
   const [generatingList, setGeneratingList] = useState(false)
@@ -584,8 +586,9 @@ const MarketingPublishDetail: React.FC<{ offer: EdooboxOfferDashboard; onBack: (
     publishToWordpress, selectImage, generateImage, isGeneratingImage,
     selectedImageFileName, imagePreviewDataUrl, imageGeneratedInfo, marketingPublishStatus
   } = useAgentStore()
-  const marketing = useUIStore(s => s.marketing)
-  const edooboxBaseUrl = useUIStore(s => s.edoobox.baseUrl)
+  const [marketing] = usePluginConfig('marketing', MARKETING_DEFAULTS)
+  const [edooboxCfg] = usePluginConfig('edoobox', EDOOBOX_DEFAULTS)
+  const edooboxBaseUrl = edooboxCfg.baseUrl
   const status = marketingPublishStatus[offer.id]
   const [bookingUrl, setBookingUrl] = useState(
     offer.epHash ? `${edooboxBaseUrl.replace(/\/$/, '')}/ed/${offer.epHash}` : ''

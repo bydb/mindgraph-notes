@@ -3,10 +3,61 @@
 // fetch-API + Credentials + events.json-Persistenz. Marketing/DOCX/Formular bleiben in Phase 1
 // noch im Core (brauchen dialog/files-Capabilities → Phase 2). Siehe docs/plugin-system-plan.md.
 
-import type { PluginManifest } from '../../shared/plugins/manifest'
+import type { PluginManifest, JsonSchema } from '@mindgraph/plugin-api'
 
 /** as const → bindet das Capability-Tupel für definePluginMain im Main-Entry. */
 export const EDOOBOX_CAPABILITIES = ['http.fetch', 'secrets', 'vault.read', 'vault.write', 'dialog', 'resource', 'llm.generate'] as const
+
+// — Ausgabe-Schemas (Defense-in-Depth). Die meisten Actions liefern die alte {success,…}-IPC-
+//   Hülle. `success:boolean` ist IMMER da → required; die vom Renderer/Workflow KONSUMIERTEN
+//   Datenfelder (offers/bookings/dates/IDs/Texte) werden per Typ geprüft, WENN sie vorhanden
+//   sind (auf dem Fehlerpfad {success:false,error} fehlen sie ⇒ nicht required). `undefined`-
+//   wertige Felder kommen hier nicht vor (sie werden auf dem Fehlerpfad weggelassen), daher ist
+//   die Typprüfung „wenn vorhanden" sicher. additionalProperties bleibt offen.
+const str: JsonSchema = { type: 'string' }
+const num: JsonSchema = { type: 'number' }
+const arr: JsonSchema = { type: 'array' }
+/** Baut eine {success,…}-Hülle, die `success` erzwingt und die genannten Felder typt-wenn-vorhanden. */
+const envelope = (fields: Record<string, JsonSchema> = {}): JsonSchema => ({
+  type: 'object',
+  required: ['success'],
+  properties: { success: { type: 'boolean' }, ...fields },
+  additionalProperties: true,
+})
+const boolResult: JsonSchema = { type: 'boolean' }
+const objectArray: JsonSchema = { type: 'array', items: { type: 'object' } }
+const nullableObject: JsonSchema = { anyOf: [{ type: 'null' }, { type: 'object' }] }
+
+const plainEnvelope = envelope()
+const offersEnvelope = envelope({ offers: arr })
+const categoriesEnvelope = envelope({ categories: arr })
+const bookingsEnvelope = envelope({ bookings: arr })
+const datesEnvelope = envelope({ dates: arr })
+const importEventEnvelope = envelope({ offerId: str })
+const fileExportEnvelope = envelope({ filePath: str, canceled: { type: 'boolean' } })
+const contentEnvelope = envelope({ blogPost: str, igCaption: str })
+const wpCheckEnvelope = envelope({ userName: str })
+const publishEnvelope = envelope({ postId: num, postUrl: str, status: str })
+const uploadEnvelope = envelope({ mediaId: num, imageUrl: str })
+const imageEnvelope = envelope({ imageBase64: str })
+const apiCredentialsResult: JsonSchema = {
+  anyOf: [
+    { type: 'null' },
+    { type: 'object', required: ['apiKey', 'apiSecret'], properties: { apiKey: { type: 'string' }, apiSecret: { type: 'string' } }, additionalProperties: false },
+  ],
+}
+const wpCredentialsResult: JsonSchema = {
+  anyOf: [
+    { type: 'null' },
+    { type: 'object', required: ['wpAppPassword'], properties: { wpAppPassword: { type: 'string' } }, additionalProperties: false },
+  ],
+}
+const selectedImageResult: JsonSchema = {
+  anyOf: [
+    { type: 'null' },
+    { type: 'object', required: ['fileName', 'imageBase64'], properties: { fileName: { type: 'string' }, imageBase64: { type: 'string' } }, additionalProperties: false },
+  ],
+}
 
 // Eingabe mit edoobox-Server-Koordinaten (baseUrl + apiVersion kommen aus den Settings).
 const apiInput = {
@@ -26,6 +77,12 @@ export const manifest: PluginManifest = {
   description: 'Veranstaltungs-Agent: Akkreditierung → edoobox-Push, Dashboard, Buchungen, Teilnehmerlisten.',
   category: 'business',
   icon: { text: '🎓', color: '#6366f1' },
+  module: {
+    id: 'mz-suite',
+    enabledPath: 'pluginConfig.edoobox.enabled',
+    linkedEnabledPaths: ['pluginConfig.marketing.enabled'],
+    legacyEnabledPath: 'edoobox.enabled',
+  },
   capabilities: [...EDOOBOX_CAPABILITIES],
   // Baseline-Allowlist: edoobox-Provider + Google Imagen (Marketing-Bildgenerierung). Der
   // konfigurierte edoobox- UND WordPress-Host (ui.edoobox.baseUrl, ui.marketing.wordpressUrl)
@@ -34,7 +91,9 @@ export const manifest: PluginManifest = {
   credentials: [
     { key: 'apiKey', label: 'API Key', secret: true },
     { key: 'apiSecret', label: 'API Secret', secret: true },
-    { key: 'wpAppPassword', label: 'WordPress App-Passwort', secret: true },
+    // Optional: nur für die Marketing-Teilfunktion (WordPress). Fehlt es, ist edoobox trotzdem
+    // „bereit" — die Marketing-Action wirft erst beim Aufruf, wenn das Passwort fehlt.
+    { key: 'wpAppPassword', label: 'WordPress App-Passwort', secret: true, required: false },
   ],
   actions: [
     { id: 'edoobox.check', label: 'Verbindung testen', requiredCapabilities: ['http.fetch', 'secrets'], inputSchema: apiInput },
@@ -230,7 +289,58 @@ export const manifest: PluginManifest = {
     },
     { id: 'edoobox.marketingSelectImage', requiredCapabilities: ['dialog'] },
   ],
+  // Workflow-Canvas-Trigger (vorher statisch im Kern-Registry). Feuert bei steigender
+  // Buchungszahl; der generische Text-Trigger-Executor gibt den vorformatierten Seed-Text aus.
+  workflowActions: [
+    {
+      id: 'edoobox.newBooking',
+      moduleId: 'edoobox',
+      moduleLabel: 'edoobox',
+      featureGate: 'edoobox',
+      label: 'Neue Anmeldung (Auslöser)',
+      description:
+        'Startpunkt: eine neue Anmeldung in einem edoobox-Angebot. Gibt Angebotsname, Teilnehmer und E-Mail-Adresse aus.',
+      isTrigger: true,
+      inputs: [],
+      outputs: [
+        { id: 'text', label: 'Anmeldung', kind: 'text' },
+        { id: 'email', label: 'Teilnehmer', kind: 'email' },
+      ],
+      privacy: { containsPersonalData: true, requiresCredential: true },
+      simLine: 'Auslöser: neue Anmeldung für „Marslandschaft gestalten"',
+    },
+  ],
   privacy: { containsPersonalData: true },
+}
+
+// Ausgabe-Schemas zentral je Action-ID zugeordnet — hält die große actions-Liste lesbar.
+// Vollständigkeit (jede Action MUSS hier stehen) wird im Test erzwungen.
+const EDOOBOX_OUTPUT_SCHEMAS: Record<string, JsonSchema> = {
+  'edoobox.check': plainEnvelope,
+  'edoobox.listOffers': offersEnvelope,
+  'edoobox.listCategories': categoriesEnvelope,
+  'edoobox.listOffersDashboard': offersEnvelope,
+  'edoobox.listBookings': bookingsEnvelope,
+  'edoobox.listDates': datesEnvelope,
+  'edoobox.importEvent': importEventEnvelope,
+  'edoobox.saveCredentials': boolResult,
+  'edoobox.loadCredentials': apiCredentialsResult,
+  'edoobox.loadEvents': objectArray,
+  'edoobox.saveEvents': boolResult,
+  'edoobox.parseFormular': nullableObject,
+  'edoobox.generateIqReport': fileExportEnvelope,
+  'edoobox.generateAttendanceList': fileExportEnvelope,
+  'edoobox.marketingSaveCredentials': boolResult,
+  'edoobox.marketingLoadCredentials': wpCredentialsResult,
+  'edoobox.marketingCheckWordpress': wpCheckEnvelope,
+  'edoobox.marketingGenerateContent': contentEnvelope,
+  'edoobox.marketingPublishWordpress': publishEnvelope,
+  'edoobox.marketingUploadImage': uploadEnvelope,
+  'edoobox.marketingGenerateImage': imageEnvelope,
+  'edoobox.marketingSelectImage': selectedImageResult,
+}
+for (const action of manifest.actions ?? []) {
+  action.outputSchema = EDOOBOX_OUTPUT_SCHEMAS[action.id]
 }
 
 export default manifest

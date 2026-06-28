@@ -1,17 +1,16 @@
 import { describe, it, expect } from 'vitest'
 import {
-  validateManifest,
-  validateManifestSemantics,
-  validateAgainst,
-} from './schemas'
-import {
   initialPluginState,
   isPluginUsable,
+  isPluginInvokable,
   pluginBlockedReason,
   type PluginRuntimeState,
 } from './state'
-import { definePluginMain } from './entry'
-import type { PluginManifest } from './manifest'
+import { readBoolPath, isPluginGateEnabled } from './moduleGate'
+import type { PluginManifest } from '@mindgraph/plugin-api'
+
+// App-interne Tests: Lebenszyklus-State + Modulschalter-Gate. Die Vertrags-Tests
+// (Manifest-Validierung, definePluginMain) leben jetzt im Paket (contract.test.ts).
 
 const validManifest: PluginManifest = {
   id: 'antares',
@@ -20,64 +19,12 @@ const validManifest: PluginManifest = {
   description: 'Verleih-Dashboard',
   category: 'business',
   capabilities: ['http.fetch', 'secrets'],
+  module: { enabledPath: 'pluginConfig.antares.enabled', legacyEnabledPath: 'antares.enabled' },
   http: { allowedHosts: ['antares.example.net'] },
   actions: [
     { id: 'antares.listMahnungen', requiredCapabilities: ['http.fetch'] },
   ],
 }
-
-describe('validateManifest', () => {
-  it('akzeptiert ein gültiges Manifest', () => {
-    expect(validateManifest(validManifest)).toEqual({ valid: true, errors: [] })
-  })
-
-  it('lehnt fehlende Pflichtfelder ab', () => {
-    const r = validateManifest({ id: 'x', label: 'X' })
-    expect(r.valid).toBe(false)
-    expect(r.errors.length).toBeGreaterThan(0)
-  })
-
-  it('lehnt ungültige id-Pattern ab', () => {
-    const r = validateManifest({ ...validManifest, id: 'Bad ID' })
-    expect(r.valid).toBe(false)
-  })
-
-  it('lehnt unbekannte Capability ab', () => {
-    const r = validateManifest({ ...validManifest, capabilities: ['fs.raw'] })
-    expect(r.valid).toBe(false)
-  })
-})
-
-describe('validateManifestSemantics', () => {
-  it('akzeptiert Actions mit deklarierten Capabilities', () => {
-    expect(validateManifestSemantics(validManifest)).toEqual({ valid: true, errors: [] })
-  })
-
-  it('fängt eine Action, die eine nicht deklarierte Capability verlangt', () => {
-    const bad: PluginManifest = {
-      ...validManifest,
-      actions: [{ id: 'antares.write', requiredCapabilities: ['vault.write'] }],
-    }
-    const r = validateManifestSemantics(bad)
-    expect(r.valid).toBe(false)
-    expect(r.errors[0]).toContain('vault.write')
-  })
-})
-
-describe('validateAgainst (Action-IO)', () => {
-  const schema = {
-    type: 'object',
-    required: ['q'],
-    properties: { q: { type: 'string' } },
-    additionalProperties: false,
-  }
-  it('validiert eine korrekte Payload', () => {
-    expect(validateAgainst(schema, { q: 'hallo' }, 'test.in').valid).toBe(true)
-  })
-  it('lehnt eine fehlerhafte Payload ab', () => {
-    expect(validateAgainst(schema, { q: 5 }, 'test.in').valid).toBe(false)
-  })
-})
 
 describe('Plugin-Lebenszyklus', () => {
   it('frischer Zustand ist nicht nutzbar', () => {
@@ -117,29 +64,40 @@ describe('Plugin-Lebenszyklus', () => {
     }
     expect(isPluginUsable(s)).toBe(false)
     expect(pluginBlockedReason(s)).toBe('Konfiguration erforderlich')
+    // …darf aber INVOKABLE bleiben: needs-configuration ist ein UX-Signal, kein Invoke-Gate
+    // (sonst wäre saveCredentials gesperrt). isPluginUsable bleibt für die „bereit"-Anzeige.
+    expect(isPluginInvokable(s)).toBe(true)
+  })
+
+  it('isPluginInvokable verlangt nur active (nicht ready), blockt aber disabled/error', () => {
+    const base = { id: 'x', installation: 'bundled' as const }
+    expect(isPluginInvokable({ ...base, activation: 'active', readiness: 'ready' })).toBe(true)
+    expect(isPluginInvokable({ ...base, activation: 'active', readiness: 'needs-configuration' })).toBe(true)
+    expect(isPluginInvokable({ ...base, activation: 'disabled', readiness: 'unavailable' })).toBe(false)
+    expect(isPluginInvokable({ ...base, activation: 'error', readiness: 'unavailable' })).toBe(false)
   })
 })
 
-describe('definePluginMain', () => {
-  it('bindet die Capabilities und liefert einen Main-Entry', () => {
-    const manifest = { id: 'antares', capabilities: ['http.fetch', 'secrets'] } as const
-    let registered = false
-    const entry = definePluginMain(manifest, ({ host, actions }) => {
-      // Compile-Time: host.http + host.secrets sichtbar, host.vault NICHT.
-      void host.log
-      void host.http
-      void host.secrets
-      actions.register('antares.ping', async () => 'pong')
-      registered = true
-    })
-    expect(entry.id).toBe('antares')
-    // register mit einem Fake-Context aufrufen
-    const calls: string[] = []
-    entry.register({
-      host: { log: () => {}, http: { fetch: async () => new Response() }, secrets: {} as never },
-      actions: { register: (id: string) => calls.push(id) },
-    } as never)
-    expect(registered).toBe(true)
-    expect(calls).toEqual(['antares.ping'])
+describe('moduleGate (A-pre Schritt 1)', () => {
+  it('readBoolPath liest verschachtelte Flags und ist null-sicher', () => {
+    expect(readBoolPath({ antares: { enabled: true } }, 'antares.enabled')).toBe(true)
+    expect(readBoolPath({ antares: { enabled: false } }, 'antares.enabled')).toBe(false)
+    expect(readBoolPath({}, 'antares.enabled')).toBe(false)
+    expect(readBoolPath(null, 'antares.enabled')).toBe(false)
+  })
+
+  it('isPluginGateEnabled: gegatete Plugins folgen dem Flag, ungegatete sind immer aktiv', () => {
+    // Antares liest seit 3b den generischen Pfad pluginConfig.antares.enabled …
+    expect(isPluginGateEnabled(validManifest, { pluginConfig: { antares: { enabled: true } } })).toBe(true)
+    expect(isPluginGateEnabled(validManifest, { pluginConfig: { antares: { enabled: false } } })).toBe(false)
+    expect(isPluginGateEnabled(validManifest, {})).toBe(false)
+    // … plus Legacy-Fallback (Top-Level antares) für den EINEN Start vor der Renderer-Migration.
+    expect(isPluginGateEnabled(validManifest, { antares: { enabled: true } })).toBe(true)
+    expect(isPluginGateEnabled(validManifest, { antares: { enabled: false } })).toBe(false)
+    // edoobox wird vom Bundle-Modul 'mz-suite' über edoobox.enabled gesteuert
+    const edoobox = { ...validManifest, id: 'edoobox', module: { enabledPath: 'edoobox.enabled' } }
+    expect(isPluginGateEnabled(edoobox, { edoobox: { enabled: true } })).toBe(true)
+    // demo hat kein Gate → immer aktiv
+    expect(isPluginGateEnabled({ ...validManifest, id: 'demo', module: undefined }, {})).toBe(true)
   })
 })

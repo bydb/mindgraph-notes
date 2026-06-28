@@ -167,10 +167,9 @@ const EXECUTORS: Record<string, Executor> = {
   'email.replyReceived': triggerEmailExecutor,
   'email.icsReceived': triggerEmailExecutor,
 
-  // Layer C/D/E/F: Text-Trigger — geben den (im Renderer/Main vorformatierten)
-  // Seed-Text aus. Anschließbar an Notiz/Prüfung/Ollama.
-  'antares.mahnung': triggerTextExecutor,
-  'edoobox.newBooking': triggerTextExecutor,
+  // Layer E/F: Kern-Text-Trigger — geben den vorformatierten Seed-Text aus. Plugin-Text-Trigger
+  // (antares.mahnung, edoobox.newBooking) sind NICHT mehr hier hartverdrahtet: sie kommen aus den
+  // Manifesten und werden generisch über den isTrigger-Fallback (resolveExecutor) bedient.
   'tasks.dueSoon': triggerTextExecutor,
   'schedule.timer': triggerTextExecutor,
 
@@ -363,6 +362,19 @@ const EXECUTORS: Record<string, Executor> = {
   }
 }
 
+/**
+ * Löst den Executor einer Action auf. Explizit gemappte Kern-Actions gewinnen; jede andere
+ * REGISTRIERTE Trigger-Action (z.B. ein plugin-beigesteuerter Text-Trigger wie antares.mahnung)
+ * fällt generisch auf den Text-Trigger-Executor zurück — der Runner kennt keinen Plugin-Namen.
+ * Eine Action, die weder gemappt noch ein registrierter Trigger ist (z.B. nach Plugin-Löschung),
+ * liefert undefined → der Schritt wird sauber übersprungen.
+ */
+export function resolveExecutor(actionId: string): Executor | undefined {
+  const explicit = EXECUTORS[actionId]
+  if (explicit) return explicit
+  return getActionById(actionId)?.isTrigger ? triggerTextExecutor : undefined
+}
+
 export async function runWorkflow(workflow: Workflow, opts: RunOptions): Promise<WorkflowRun> {
   const startedAt = nowIso()
   // Seed normalisieren: seedEmail (Back-Compat) → seed.email. Executoren lesen nur opts.seed.
@@ -436,7 +448,7 @@ export async function runWorkflow(workflow: Workflow, opts: RunOptions): Promise
       }
     }
 
-    const executor = EXECUTORS[node.actionId]
+    const executor = resolveExecutor(node.actionId)
     if (!executor) {
       step.status = 'skipped'; step.log.push('Keine Implementierung (Phase 2).'); step.finishedAt = nowIso(); steps.push(step)
       outputs.set(nodeId, {})

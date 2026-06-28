@@ -8,6 +8,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // UI-Settings Persistenz
   loadUISettings: () => ipcRenderer.invoke('load-ui-settings'),
   saveUISettings: (settings: object) => ipcRenderer.invoke('save-ui-settings', settings),
+  pruneUISettingsKeys: (keys: string[]) => ipcRenderer.invoke('prune-ui-settings-keys', keys),
   setMainLanguage: (lang: string) => ipcRenderer.invoke('set-main-language', lang),
 
   // Clipboard über Electron, robuster als navigator.clipboard in separaten Fenstern
@@ -85,6 +86,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   pluginInvoke: (pluginId: string, actionId: string, payload?: unknown) =>
     ipcRenderer.invoke('plugin:invoke', pluginId, actionId, payload),
   pluginList: () => ipcRenderer.invoke('plugin:list'),
+  pluginSetEnabled: (pluginId: string, enabled: boolean) =>
+    ipcRenderer.invoke('plugin:setEnabled', pluginId, enabled),
 
   // Notes-Cache für schnelles Laden
   saveNotesCache: (vaultPath: string, cache: object) => ipcRenderer.invoke('save-notes-cache', vaultPath, cache),

@@ -15,8 +15,9 @@ import ReactFlow, {
 import 'reactflow/dist/style.css'
 import './workflowCanvas.css'
 
-import { useWorkflowStore } from '../../stores/workflowStore'
+import { useWorkflowStore, isPollTriggerAction } from '../../stores/workflowStore'
 import { invokePlugin } from '../../plugins/client'
+import { usePluginEnabled } from '../../plugins/config'
 import { edooboxService } from '../../stores/edooboxServiceBridge'
 import { useTranslation } from '../../utils/translations'
 import { useNotesStore } from '../../stores/notesStore'
@@ -25,7 +26,6 @@ import { useEmailStore } from '../../stores/emailStore'
 import { useUIStore } from '../../stores/uiStore'
 import { getActionById, getPortDef } from '../../../shared/workflow/registry'
 import { canConnectPorts } from '../../../shared/workflow/validation'
-import type { WorkflowModuleId } from '../../../shared/workflow/types'
 import { WorkflowNodeCard, type WorkflowNodeData } from './WorkflowNodeCard'
 import { WorkflowPalette, type ModuleAvailability } from './WorkflowPalette'
 import { WorkflowInspector } from './WorkflowInspector'
@@ -96,7 +96,7 @@ function InnerCanvas({ onOpenInbox }: Props) {
   const emailActive = useVaultSettingsStore(s => s.features.email)
   // Konfig-Status für ehrliches Modul-Gating (Toggle AN UND konfiguriert).
   const edooboxFeature = useVaultSettingsStore(s => s.features.edoobox)
-  const antaresEnabled = useUIStore(s => s.antares.enabled)
+  const antaresEnabled = usePluginEnabled('antares')
   const projectsFolder = useUIStore(s => s.projectsRootFolder)
   const emailAccounts = useUIStore(s => s.email.accounts)
   // Signal für den Auto-Trigger: ändert sich, wenn Mails dazukommen/neu analysiert werden.
@@ -104,7 +104,7 @@ function InnerCanvas({ onOpenInbox }: Props) {
 
   // Aktiver Trigger-Baustein → bestimmt Bedienelemente + Poll-Verhalten.
   const triggerActionId = workflow.nodes.map(n => n.actionId).find(id => getActionById(id)?.isTrigger)
-  const isPollTrigger = Boolean(triggerActionId && ['antares.mahnung', 'edoobox.newBooking', 'tasks.dueSoon'].includes(triggerActionId))
+  const isPollTrigger = isPollTriggerAction(triggerActionId)
   const isEmailTrigger = Boolean(triggerActionId && triggerActionId.startsWith('email.'))
   const isScheduleTrigger = triggerActionId === 'schedule.timer'
   const showTriggerControls = isPollTrigger || isScheduleTrigger || (isEmailTrigger && emailActive)
@@ -117,7 +117,7 @@ function InnerCanvas({ onOpenInbox }: Props) {
   const trig = (w: typeof workflow) => w.nodes.map(n => n.actionId).find(id => getActionById(id)?.isTrigger) || ''
   const allWorkflowsForGating = [workflow, ...workflows.filter(w => w.id !== activeId)]
   const hasEnabledEmailTrigger = allWorkflowsForGating.some(w => Boolean(w.enabled) && trig(w).startsWith('email.'))
-  const hasEnabledPollTrigger = allWorkflowsForGating.some(w => Boolean(w.enabled) && ['antares.mahnung', 'edoobox.newBooking', 'tasks.dueSoon'].includes(trig(w)))
+  const hasEnabledPollTrigger = allWorkflowsForGating.some(w => Boolean(w.enabled) && isPollTriggerAction(trig(w)))
 
   const [rfNodes, setRfNodes, onNodesChange] = useNodesState<WorkflowNodeData>([])
   const [rfEdges, setRfEdges, onEdgesChange] = useEdgesState([])
@@ -173,7 +173,7 @@ function InnerCanvas({ onOpenInbox }: Props) {
 
   // Ehrliche Modul-Verfügbarkeit: Toggle AN UND konfiguriert. Module ohne Eintrag
   // hier gelten als Kern-Module (immer verfügbar, via Feature-Toggle-Fallback in der Palette).
-  const moduleAvailability: Partial<Record<WorkflowModuleId, ModuleAvailability>> = {
+  const moduleAvailability: Partial<Record<string, ModuleAvailability>> = {
     email: !emailActive
       ? { ok: false, reason: 'Modul „E-Mail" ist aus — Einstellungen → Module' }
       : (emailAccounts.length > 0 && emailAccounts[0]?.host)

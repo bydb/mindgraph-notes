@@ -8,6 +8,8 @@
 
 import React, { Suspense } from 'react'
 import { createRendererRegistry, type RendererPluginRegistry } from './registry'
+import { WORKFLOW_TRIGGER_SLOT, WORKFLOW_EXAMPLE_SLOT, type WorkflowTriggerProvider } from '@mindgraph/plugin-api'
+import type { Workflow } from '../../shared/workflow/model'
 
 /** Was ein Plugin an einen Slot hängt: eine lazy geladene Default-Export-Komponente.
  *  `ComponentType<any>`, damit ein Slot optionale Props (z.B. `onClose`) durchreichen kann. */
@@ -32,6 +34,31 @@ function getRegistry(): RendererPluginRegistry {
  */
 export function ensureRendererPlugins(): void {
   getRegistry()
+}
+
+/**
+ * Nicht-React-Slot: Plugin-Trigger-Provider (Antares-Mahnung, edoobox-Anmeldung, …),
+ * gelesen vom `workflowStore` für den generischen Trigger-Dispatch. Leerer Slot nach dem
+ * Löschen einer Plugin-Vertikale → keine Provider → der zugehörige Trigger-Baustein
+ * feuert sauber ins Leere (kein toter Kern-Zweig). Siehe docs/plugin-store-plan.md (A-pre #4).
+ */
+export function getWorkflowTriggerProviders(): WorkflowTriggerProvider[] {
+  return getRegistry().getSlot(WORKFLOW_TRIGGER_SLOT) as WorkflowTriggerProvider[]
+}
+
+/**
+ * Plugin-beigesteuerte Beispiel-Workflows (als Builder → frische Objekte). Leerer Slot nach
+ * Plugin-Löschung → kein totes Beispiel. Ein werfender Builder wird isoliert.
+ */
+export function getWorkflowExamples(): Workflow[] {
+  const builders = getRegistry().getSlot(WORKFLOW_EXAMPLE_SLOT) as Array<() => Workflow>
+  const out: Workflow[] = []
+  for (const build of builders) {
+    try { out.push(build()) } catch (err) {
+      console.error('[plugin] Beispiel-Workflow-Builder warf:', err)
+    }
+  }
+  return out
 }
 
 // React.lazy pro Beitrag genau einmal erzeugen (stabile Identität → kein Remount-Flackern).

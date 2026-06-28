@@ -19192,6 +19192,36 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
   line-height: 1.4;
 }
 
+/* „Offizielles Plugin"-Badge neben dem Modulnamen (Phase A: alle Plugins sind signiert/erstanbieter). */
+.module-row-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: 8px;
+  padding: 1px 7px;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: color-mix(in srgb, var(--accent-color) 85%, var(--text-primary));
+  background: color-mix(in srgb, var(--accent-color) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent-color) 30%, transparent);
+  border-radius: 999px;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+/* Kopfzeile der „Installierte Plugins"-Abteilung: Titel links, (späterer) Store-Button rechts. */
+.modules-plugins-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 28px;
+}
+.modules-plugins-header h3 {
+  margin: 0;
+}
+
 .module-row input[type="checkbox"] {
   width: 18px;
   height: 18px;

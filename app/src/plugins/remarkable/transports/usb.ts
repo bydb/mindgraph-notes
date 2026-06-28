@@ -6,7 +6,7 @@
 // Kein Import von electron/net/fs — Import-Wall-konform.
 
 import type { ReMarkableTransport, RMDocumentSummary } from '../types'
-import type { DeviceUsbService } from '../../../shared/plugins/host'
+import type { DeviceUsbService } from '@mindgraph/plugin-api'
 
 interface RawReMarkableDocument {
   ID?: string

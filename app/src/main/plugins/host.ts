@@ -10,8 +10,8 @@
 // Fehlt eine Capability im Manifest, existiert der Dienst hier gar nicht — nicht nur im Typ.
 
 import type { ModuleId as CompatModuleId } from '../../shared/modelCompatibility'
-import type { PluginManifest } from '../../shared/plugins/manifest'
-import type { AnyPluginHost, UsbDeviceInfo } from '../../shared/plugins/host'
+import type { PluginManifest } from '@mindgraph/plugin-api'
+import type { AnyPluginHost, UsbDeviceInfo } from '@mindgraph/plugin-api'
 import type { HostFactory } from './registry'
 
 /**

@@ -2,7 +2,7 @@
 // mit echtem Schreibpfad (vault.write) und privilegierten Geräte-/PDF-Capabilities.
 // Gerät = USB-Webinterface 10.11.99.1 (host.device, allowlisted). Siehe docs/plugin-system-plan.md.
 
-import type { PluginManifest } from '../../shared/plugins/manifest'
+import type { PluginManifest, JsonSchema } from '@mindgraph/plugin-api'
 
 /** as const → bindet das Capability-Tupel für definePluginMain im Main-Entry. */
 export const REMARKABLE_CAPABILITIES = [
@@ -12,6 +12,30 @@ export const REMARKABLE_CAPABILITIES = [
   'pdf.render',
   'pdf.optimize',
 ] as const
+
+// — Ausgabe-Schemas (Defense-in-Depth, Envelope-Ebene). Die Actions liefern `{success, …}`-
+//   bzw. Status-Objekte mit je nach Erfolg/Fehler unterschiedlichen optionalen Feldern (teils
+//   `undefined`). Geprüft werden daher nur die IMMER vorhandenen Felder strikt; der Rest bleibt
+//   lenient (`additionalProperties: true`) — ein enumeriertes, aber undefined-wertiges Feld
+//   würde ajv sonst fälschlich werfen.
+const successEnvelope: JsonSchema = {
+  type: 'object',
+  required: ['success'],
+  properties: { success: { type: 'boolean' } },
+  additionalProperties: true,
+}
+const usbCheckResult: JsonSchema = {
+  type: 'object',
+  required: ['connected', 'mode'],
+  properties: { connected: { type: 'boolean' }, mode: { type: 'string' } },
+  additionalProperties: true,
+}
+const documentsResult: JsonSchema = {
+  type: 'object',
+  required: ['documents'],
+  properties: { documents: { type: 'array', items: { type: 'object' } } },
+  additionalProperties: true,
+}
 
 const pdfInput = {
   type: 'object' as const,
@@ -27,12 +51,13 @@ export const manifest: PluginManifest = {
   description: 'reMarkable-Tablet über USB: Dokumente browsen/importieren, PDF exportieren, optimieren, als Buch umbrechen.',
   category: 'devices',
   icon: { text: '✎', color: '#111827' },
+  module: { enabledPath: 'pluginConfig.remarkable.enabled', legacyEnabledPath: 'remarkable.enabled' },
   capabilities: [...REMARKABLE_CAPABILITIES],
   // Statisches Gerät: das USB-Webinterface. Kein user-konfigurierter Host.
   http: { allowedHosts: ['10.11.99.1'] },
   actions: [
-    { id: 'remarkable.usbCheck', label: 'USB-Verbindung prüfen', requiredCapabilities: ['device.usb'] },
-    { id: 'remarkable.usbDebugInfo', label: 'USB-Diagnose', requiredCapabilities: ['device.usb'] },
+    { id: 'remarkable.usbCheck', label: 'USB-Verbindung prüfen', requiredCapabilities: ['device.usb'], outputSchema: usbCheckResult },
+    { id: 'remarkable.usbDebugInfo', label: 'USB-Diagnose', requiredCapabilities: ['device.usb'], outputSchema: successEnvelope },
     {
       id: 'remarkable.listDocuments',
       label: 'Dokumente auflisten',
@@ -42,6 +67,7 @@ export const manifest: PluginManifest = {
         properties: { folderId: { type: 'string' } },
         additionalProperties: false,
       },
+      outputSchema: documentsResult,
     },
     {
       id: 'remarkable.download',
@@ -54,12 +80,14 @@ export const manifest: PluginManifest = {
         properties: { id: { type: 'string' }, name: { type: 'string' } },
         additionalProperties: false,
       },
+      outputSchema: successEnvelope,
     },
     {
       id: 'remarkable.upload',
       label: 'PDF exportieren',
       requiredCapabilities: ['device.usb', 'vault.read'],
       inputSchema: pdfInput,
+      outputSchema: successEnvelope,
     },
     {
       id: 'remarkable.optimize',
@@ -67,6 +95,7 @@ export const manifest: PluginManifest = {
       requiredCapabilities: ['vault.read', 'vault.write', 'pdf.optimize'],
       isWrite: true,
       inputSchema: pdfInput,
+      outputSchema: successEnvelope,
     },
     {
       id: 'remarkable.bookify',
@@ -74,6 +103,7 @@ export const manifest: PluginManifest = {
       requiredCapabilities: ['vault.read', 'vault.write', 'pdf.render'],
       isWrite: true,
       inputSchema: pdfInput,
+      outputSchema: successEnvelope,
     },
   ],
   privacy: { localOnly: true },

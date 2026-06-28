@@ -3,7 +3,7 @@ import entry from './index'
 import { manifest } from '../manifest'
 import { PluginRegistry } from '../../../main/plugins/registry'
 import { createHostFactory, type HostServices } from '../../../main/plugins/host'
-import { validateManifest, validateManifestSemantics } from '../../../shared/plugins/schemas'
+import { validateManifest, validateManifestSemantics, validateAgainst } from '@mindgraph/plugin-api/validation'
 
 function buildRegistry() {
   const secrets = new Map<string, string>()
@@ -85,5 +85,54 @@ describe('edoobox-Plugin — Vertikale durch Registry + Host', () => {
     expect(vault.has('.mindgraph/edoobox-events.json')).toBe(true)
 
     expect(await registry.invoke('edoobox', 'edoobox.loadEvents', {})).toEqual(events)
+  })
+})
+
+describe('edoobox-Plugin — Output-Schemas (Envelope-Validierung)', () => {
+  const out = (id: string) => manifest.actions!.find((a) => a.id === id)!.outputSchema!
+
+  it('JEDE Action deklariert ein outputSchema (Coverage erzwungen)', () => {
+    for (const a of manifest.actions ?? []) expect(a.outputSchema, a.id).toBeDefined()
+  })
+
+  it('Envelope: Erfolg/Fehler ok, Fremdform abgewiesen', () => {
+    expect(validateAgainst(out('edoobox.listOffers'), { success: true, offers: [{ id: '1' }] }).valid).toBe(true)
+    expect(validateAgainst(out('edoobox.listOffers'), { success: false, error: 'kaputt' }).valid).toBe(true)
+    expect(validateAgainst(out('edoobox.listOffers'), { offers: [] }).valid).toBe(false) // kein success
+    expect(validateAgainst(out('edoobox.listOffers'), '<html>error</html>').valid).toBe(false)
+  })
+
+  it('konsumierte Felder werden getypt: offers/bookings/dates als Array', () => {
+    // genau der Review-Fall: success:true, aber offers ist kaputt (String) → MUSS scheitern.
+    expect(validateAgainst(out('edoobox.listOffers'), { success: true, offers: 'kaputt' }).valid).toBe(false)
+    expect(validateAgainst(out('edoobox.listBookings'), { success: true, bookings: {} }).valid).toBe(false)
+    expect(validateAgainst(out('edoobox.listDates'), { success: true, dates: [] }).valid).toBe(true)
+  })
+
+  it('konsumierte Felder werden getypt: IDs/Texte mit passendem Typ', () => {
+    expect(validateAgainst(out('edoobox.marketingPublishWordpress'), { success: true, postId: 7, postUrl: 'https://x', status: 'publish' }).valid).toBe(true)
+    expect(validateAgainst(out('edoobox.marketingPublishWordpress'), { success: true, postId: 'sieben' }).valid).toBe(false)
+    expect(validateAgainst(out('edoobox.marketingUploadImage'), { success: true, mediaId: 'x' }).valid).toBe(false)
+    expect(validateAgainst(out('edoobox.marketingGenerateContent'), { success: true, blogPost: 123, igCaption: 'ok' }).valid).toBe(false)
+    expect(validateAgainst(out('edoobox.importEvent'), { success: true, offerId: 'abc' }).valid).toBe(true)
+  })
+
+  it('loadCredentials: null oder {apiKey,apiSecret}; halbes Paar abgewiesen', () => {
+    expect(validateAgainst(out('edoobox.loadCredentials'), null).valid).toBe(true)
+    expect(validateAgainst(out('edoobox.loadCredentials'), { apiKey: 'k', apiSecret: 's' }).valid).toBe(true)
+    expect(validateAgainst(out('edoobox.loadCredentials'), { apiKey: 'k' }).valid).toBe(false)
+  })
+
+  it('loadEvents: Array ok, Objekt abgewiesen; saveCredentials: Boolean', () => {
+    expect(validateAgainst(out('edoobox.loadEvents'), [{ id: 'e1' }]).valid).toBe(true)
+    expect(validateAgainst(out('edoobox.loadEvents'), { id: 'e1' }).valid).toBe(false)
+    expect(validateAgainst(out('edoobox.saveCredentials'), true).valid).toBe(true)
+    expect(validateAgainst(out('edoobox.saveCredentials'), { success: true }).valid).toBe(false)
+  })
+
+  it('marketingSelectImage: null oder {fileName,imageBase64}', () => {
+    expect(validateAgainst(out('edoobox.marketingSelectImage'), null).valid).toBe(true)
+    expect(validateAgainst(out('edoobox.marketingSelectImage'), { fileName: 'b.png', imageBase64: 'AAAA' }).valid).toBe(true)
+    expect(validateAgainst(out('edoobox.marketingSelectImage'), { fileName: 'b.png' }).valid).toBe(false)
   })
 })

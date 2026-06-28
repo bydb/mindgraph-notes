@@ -455,6 +455,7 @@ export interface ElectronAPI {
   // UI-Settings Persistenz
   loadUISettings: () => Promise<Record<string, unknown>>;
   saveUISettings: (settings: Record<string, unknown>) => Promise<boolean>;
+  pruneUISettingsKeys: (keys: string[]) => Promise<boolean>;
   setMainLanguage: (lang: string) => Promise<boolean>;
   clipboardWriteText: (text: string) => Promise<boolean>;
   clipboardReadText: () => Promise<string>;
@@ -1024,6 +1025,7 @@ export interface ElectronAPI {
   // Plugin-Transport
   pluginInvoke: (pluginId: string, actionId: string, payload?: unknown) => Promise<import('./plugins/transport').PluginInvokeResult>;
   pluginList: () => Promise<import('./plugins/transport').PluginInvokeResult>;
+  pluginSetEnabled: (pluginId: string, enabled: boolean) => Promise<import('./plugins/transport').PluginInvokeResult>;
 
   // Projekt-Status-Crystallizer
   projectStatusDiscover: (vaultPath: string, projectsFolderRel: string) => Promise<{ success: boolean; projects?: DiscoveredProject[]; error?: string }>;

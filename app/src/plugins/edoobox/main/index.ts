@@ -5,7 +5,7 @@
 // host.vault (writeFileSafe-Pfad). Die Action-Rückgaben behalten BEWUSST die alten
 // {success,…}-IPC-Shapes, damit agentStore/workflowStore unverändert weiterlaufen.
 
-import { definePluginMain } from '../../../shared/plugins/entry'
+import { definePluginMain } from '@mindgraph/plugin-api'
 import { EdooboxService } from '../service'
 import { EDOOBOX_CAPABILITIES, manifest } from '../manifest'
 import { parseAkkreditierungsformular } from '../formularParser'

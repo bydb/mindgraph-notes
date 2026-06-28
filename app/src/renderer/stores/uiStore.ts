@@ -353,17 +353,64 @@ export interface EdooboxSettings {
 }
 
 // Antares CS (Medienzentrum-Verleih) Settings
-export interface AntaresSettings {
-  enabled: boolean
-  baseUrl: string
-  /** Antares-Kontext, z.B. "HE/16" für Medienzentrum Gießen-Vogelsberg */
-  context: string
-}
 
 export interface ReMarkableSettings {
   enabled: boolean
   transport: 'usb'
   autoRefreshOnOpen: boolean
+}
+
+// Defaults für die generisch (pluginConfig) gespeicherten Vertikalen-Configs. Liegen — wie
+// ANTARES_DEFAULTS — bewusst im KERN, damit auch die (noch im Kern liegenden) Settings-Tabs
+// sie importieren können, ohne aus src/plugins/ zu importieren (Deletion-Test). A-pre Schritt 3.
+export const MARKETING_DEFAULTS: MarketingSettings = {
+  enabled: false,
+  wordpressUrl: '',
+  wordpressUser: '',
+  defaultPostStatus: 'draft',
+  googleImagenApiKey: ''
+}
+export const EDOOBOX_DEFAULTS: EdooboxSettings = {
+  enabled: false,
+  baseUrl: 'https://app1.edoobox.com',
+  apiVersion: 'v2',
+  webhookUrl: ''
+}
+export const REMARKABLE_DEFAULTS: ReMarkableSettings = {
+  enabled: false,
+  transport: 'usb',
+  autoRefreshOnOpen: true
+}
+
+/** Plugin-Ids, deren Config aus einem alten Top-Level-Key in die generische pluginConfig wandert. */
+const LEGACY_PLUGIN_CONFIG_IDS = ['antares', 'edoobox', 'marketing', 'remarkable'] as const
+
+/**
+ * A-pre Schritt 3: Legacy Top-Level-Configs der Vertikalen (z.B. `settings.edoobox`) einmalig in
+ * die generische `pluginConfig.<id>` übernehmen. Pure + getestet. Eine bereits vorhandene
+ * pluginConfig.<id> gewinnt (kein Überschreiben). Inklusive edoobox-baseUrl-Normalisierung.
+ */
+export function migrateLegacyPluginConfig(
+  saved: Record<string, unknown>,
+  currentPluginConfig: Record<string, Record<string, unknown>>
+): Record<string, Record<string, unknown>> {
+  const pc: Record<string, Record<string, unknown>> = { ...currentPluginConfig }
+  for (const id of LEGACY_PLUGIN_CONFIG_IDS) {
+    const legacy = saved[id]
+    if (legacy && typeof legacy === 'object' && !pc[id]) {
+      pc[id] = { ...(legacy as Record<string, unknown>) }
+    }
+  }
+  // edoobox-baseUrl-Normalisierung (vormals eigener Block): /v1|/v2-Suffix strippen, falsche
+  // app2-Migration zurückdrehen, fehlende apiVersion auf v1.
+  const edo = pc.edoobox as Partial<EdooboxSettings> | undefined
+  if (edo) {
+    if (typeof edo.baseUrl === 'string') {
+      edo.baseUrl = edo.baseUrl.replace(/\/v[12]$/i, '').replace('app2.edoobox.com', 'app1.edoobox.com')
+    }
+    if (!edo.apiVersion) edo.apiVersion = 'v1'
+  }
+  return pc
 }
 
 // Daily Note Settings
@@ -466,14 +513,11 @@ export const MODULES: ModuleDescriptor[] = [
   { id: 'smart-connections',label: 'Smart Connections',description: 'Semantisch ähnliche Notizen finden', category: 'ai' },
   { id: 'language-tool',    label: 'LanguageTool',     description: 'Grammatik- und Rechtschreibprüfung im Editor', category: 'ai' },
   { id: 'email',            label: 'Email-Client',     description: 'IMAP/SMTP + KI-Analyse + Entwurfshilfe', category: 'communication' },
-  { id: 'mz-suite',         label: 'Edoobox Modul',description: 'edoobox + Marketing (WordPress) + IQ-Auswertung + Formularimport', category: 'business' },
-  { id: 'antares',          label: 'Antares Medienzentrum', description: 'Verleih-Daten aus Antares CS (Entleiher, Mahnungen Geräte/Medien)', category: 'business' },
   { id: 'workflow-canvas',  label: 'Workflow Canvas',  description: 'Module als verbindbare Bausteine auf einem Canvas — visuelle Prozesse mit lokaler KI', category: 'business' },
   { id: 'flashcards',       label: 'Flashcards & Quiz',description: 'Karteikarten mit Spaced Repetition und Quiz-Modus', category: 'learning' },
   { id: 'semantic-scholar', label: 'Research', description: 'Paper via Semantic Scholar und OpenAlex durchsuchen und zitieren', category: 'research' },
   { id: 'zotero',           label: 'Zotero',           description: 'Bibliothek durchsuchen, Zitate einfügen (⌘⇧Z)', category: 'research', iconText: 'Z', iconColor: '#cc2936' },
   { id: 'readwise',         label: 'Readwise',         description: 'Highlights aus Readwise synchronisieren', category: 'research' },
-  { id: 'remarkable',       label: 'reMarkable',       description: 'Dokumente mit dem reMarkable-Tablet austauschen', category: 'devices' },
   { id: 'docling',          label: 'Docling',          description: 'PDF-Textextraktion via Docling-Server', category: 'documents' },
   { id: 'vision-ocr',       label: 'Vision OCR',       description: 'Bilder und Scans per Vision-Modell in Text umwandeln', category: 'documents' },
   { id: 'speech',           label: 'Sprache',          description: 'Vorlesen (TTS) und Diktieren (Whisper, läuft offline in der App) in Editor & Flashcards', category: 'ai' },
@@ -599,17 +643,10 @@ interface UIState {
   // Email Settings
   email: EmailSettings
 
-  // Marketing Settings
-  marketing: MarketingSettings
-
-  // edoobox Agent Settings
-  edoobox: EdooboxSettings
-
-  // Antares CS Settings
-  antares: AntaresSettings
-
-  // reMarkable Settings
-  remarkable: ReMarkableSettings
+  // Generische Plugin-Konfiguration (A-pre Schritt 3): pro pluginId ein Settings-Objekt,
+  // ohne dass der uiStore die Form eines konkreten Plugins kennt. Antares, edoobox, marketing
+  // und remarkable laufen hierüber (state.antares/edoobox/marketing/remarkable.* entfernt).
+  pluginConfig: Record<string, Record<string, unknown>>
 
   // Daily Note Settings
   dailyNote: DailyNoteSettings
@@ -718,10 +755,10 @@ interface UIState {
   setReadwise: (settings: Partial<ReadwiseSettings>) => void
   setLanguageTool: (settings: Partial<LanguageToolSettings>) => void
   setEmail: (settings: Partial<EmailSettings>) => void
-  setMarketing: (settings: Partial<MarketingSettings>) => void
-  setEdoobox: (settings: Partial<EdooboxSettings>) => void
-  setAntares: (settings: Partial<AntaresSettings>) => void
-  setRemarkable: (settings: Partial<ReMarkableSettings>) => void
+  /** Generischer Patch-Setter für die Plugin-Config eines pluginId (A-pre Schritt 3). */
+  setPluginConfig: (pluginId: string, patch: Record<string, unknown>) => void
+  /** Setzt einen manifest-deklarierten Boolean-Pfad, ohne eine Plugin-ID im Kern zu kennen. */
+  setBooleanSettingPath: (path: string, value: boolean) => void
   setDailyNote: (settings: Partial<DailyNoteSettings>) => void
   setLastSeenVersion: (version: string) => void
   setUpdateAvailable: (info: UpdateInfo | null) => void
@@ -949,36 +986,9 @@ const defaultState = {
     activeFolders: {}
   },
 
-  // Marketing (WordPress)
-  marketing: {
-    enabled: false,
-    wordpressUrl: '',
-    wordpressUser: '',
-    defaultPostStatus: 'draft' as const,
-    googleImagenApiKey: ''
-  },
-
-  // edoobox Agent
-  edoobox: {
-    enabled: false,
-    baseUrl: 'https://app1.edoobox.com',
-    apiVersion: 'v2' as const,
-    webhookUrl: ''
-  },
-
-  // Antares CS (Medienzentrum-Verleih)
-  antares: {
-    enabled: false,
-    baseUrl: 'https://mzantares-he-16.datenbank-bildungsmedien.net',
-    context: 'HE/16'
-  },
-
-  // reMarkable
-  remarkable: {
-    enabled: false,
-    transport: 'usb' as const,
-    autoRefreshOnOpen: true
-  },
+  // Generische Plugin-Config (A-pre Schritt 3) — antares/edoobox/marketing/remarkable leben hier
+  // (pluginConfig.<id>), Defaults im Kern (ANTARES_DEFAULTS / EDOOBOX_DEFAULTS / …).
+  pluginConfig: {},
 
   // Daily Note
   dailyNote: {
@@ -1082,7 +1092,7 @@ const persistedKeys = [
   'canvasFilterPath', 'canvasViewMode', 'canvasShowEdges', 'canvasShowTags', 'canvasShowLinks', 'canvasShowImages', 'canvasShowSummaries',
   'canvasCompactMode', 'canvasReadMode', 'canvasHoverScale', 'canvasDefaultCardWidth', 'splitPosition', 'fileTreeDisplayMode', 'fileTreeKindFilter', 'notesRootFolder', 'projectsRootFolder', 'ollama', 'brain',
   'pdfCompanionEnabled', 'pdfDisplayMode', 'iconSet',
-  'smartConnectionsEnabled', 'notesChatEnabled', 'projectRagEnabled', 'flashcardsEnabled', 'workflowCanvasEnabled', 'semanticScholarEnabled', 'zoteroEnabled', 'smartConnectionsWeights', 'smartConnectionsRerankerEnabled', 'docling', 'visionOcr', 'readwise', 'languageTool', 'email', 'marketing', 'edoobox', 'antares', 'remarkable', 'dailyNote', 'taskExcludedFolders', 'speech',
+  'smartConnectionsEnabled', 'notesChatEnabled', 'projectRagEnabled', 'flashcardsEnabled', 'workflowCanvasEnabled', 'semanticScholarEnabled', 'zoteroEnabled', 'smartConnectionsWeights', 'smartConnectionsRerankerEnabled', 'docling', 'visionOcr', 'readwise', 'languageTool', 'email', 'pluginConfig', 'dailyNote', 'taskExcludedFolders', 'speech',
   'editorDefaultViewForcedToPreview',
   'appearanceMigratedToLight',
   'lastSeenVersion',
@@ -1204,19 +1214,33 @@ export const useUIStore = create<UIState>()((set, get) => ({
   setEmail: (settings) => set((state) => ({
     email: { ...state.email, ...settings }
   })),
-  setMarketing: (settings) => set((state) => ({
-    marketing: { ...state.marketing, ...settings }
-  })),
-  setEdoobox: (settings) => set((state) => ({
-    edoobox: { ...state.edoobox, ...settings }
-  })),
 
-  setAntares: (settings) => set((state) => ({
-    antares: { ...state.antares, ...settings }
+  setPluginConfig: (pluginId, patch) => set((state) => ({
+    pluginConfig: {
+      ...state.pluginConfig,
+      [pluginId]: { ...(state.pluginConfig[pluginId] ?? {}), ...patch }
+    }
   })),
-  setRemarkable: (settings) => set((state) => ({
-    remarkable: { ...state.remarkable, ...settings }
-  })),
+  setBooleanSettingPath: (path, value) => set((state) => {
+    const keys = path.split('.')
+    if (keys.length < 2 || keys.some((key) => !/^[a-zA-Z][a-zA-Z0-9-]*$/.test(key))) return {}
+    const root = keys[0] as keyof UIState
+    const currentRoot = state[root]
+    if (!currentRoot || typeof currentRoot !== 'object' || Array.isArray(currentRoot)) return {}
+
+    const nextRoot = { ...(currentRoot as Record<string, unknown>) }
+    let cursor = nextRoot
+    for (let i = 1; i < keys.length - 1; i++) {
+      const current = cursor[keys[i]]
+      const next = current && typeof current === 'object' && !Array.isArray(current)
+        ? { ...(current as Record<string, unknown>) }
+        : {}
+      cursor[keys[i]] = next
+      cursor = next
+    }
+    cursor[keys[keys.length - 1]] = value
+    return { [root]: nextRoot } as Partial<UIState>
+  }),
   setDailyNote: (settings) => set((state) => ({
     dailyNote: { ...state.dailyNote, ...settings }
   })),
@@ -1330,11 +1354,15 @@ export const useUIStore = create<UIState>()((set, get) => ({
           pdfCompanionEnabled: false,
           languageTool: { ...get().languageTool, enabled: false },
           email: { ...get().email, enabled: false },
-          edoobox: { ...get().edoobox, enabled: false },
-          antares: { ...get().antares, enabled: false },
-          marketing: { ...get().marketing, enabled: false },
+          // Plugin-Vertikalen (generische Config): enabled-Flag pro pluginId aus pluginConfig kippen.
+          pluginConfig: {
+            ...get().pluginConfig,
+            antares: { ...(get().pluginConfig.antares ?? {}), enabled: false },
+            edoobox: { ...(get().pluginConfig.edoobox ?? {}), enabled: false },
+            marketing: { ...(get().pluginConfig.marketing ?? {}), enabled: false },
+            remarkable: { ...(get().pluginConfig.remarkable ?? {}), enabled: false },
+          },
           readwise: { ...get().readwise, enabled: false },
-          remarkable: { ...get().remarkable, enabled: false },
           docling: { ...get().docling, enabled: false },
           visionOcr: { ...get().visionOcr, enabled: false },
           dashboard: { ...get().dashboard, enabled: false },
@@ -1478,20 +1506,7 @@ export async function initializeUISettings(): Promise<void> {
           brain.autoConsolidateTime = '21:30'
         }
       }
-      // Migrate edoobox base URL: strip /v1 or /v2 suffix, use app2 for V2
-      if (validSettings.edoobox) {
-        const edoobox = validSettings.edoobox as EdooboxSettings
-        if (edoobox.baseUrl) {
-          edoobox.baseUrl = edoobox.baseUrl.replace(/\/v[12]$/i, '')
-        }
-        // Revert incorrect app2 migration
-        if (edoobox.baseUrl?.includes('app2.edoobox.com')) {
-          edoobox.baseUrl = edoobox.baseUrl.replace('app2.edoobox.com', 'app1.edoobox.com')
-        }
-        if (!edoobox.apiVersion) {
-          edoobox.apiVersion = 'v1'
-        }
-      }
+      // (edoobox-baseUrl-Normalisierung läuft jetzt in der pluginConfig-Migration weiter unten.)
       // Existing users upgrading from pre-1.0.16: they have settings but no onboardingCompleted
       // → skip onboarding for them
       if (!('onboardingCompleted' in savedSettings)) {
@@ -1528,7 +1543,28 @@ export async function initializeUISettings(): Promise<void> {
       if (validSettings.userProfile && profileMigration[validSettings.userProfile as string]) {
         validSettings.userProfile = profileMigration[validSettings.userProfile as string]
       }
+      // A-pre Schritt 3: Legacy Top-Level-Configs der Vertikalen → generische pluginConfig.<id>.
+      const legacyPresent = LEGACY_PLUGIN_CONFIG_IDS.filter(
+        (id) => { const v = (savedSettings as Record<string, unknown>)[id]; return v != null && typeof v === 'object' }
+      )
+      validSettings.pluginConfig = migrateLegacyPluginConfig(
+        savedSettings as Record<string, unknown>,
+        (validSettings.pluginConfig ?? {}) as Record<string, Record<string, unknown>>
+      )
       useUIStore.setState(validSettings)
+      // Karteileichen entfernen: erst die migrierte pluginConfig persistieren (crash-sicher),
+      // DANN die alten Top-Level-Keys von der Platte prunen (saveUISettings mergt sonst weiter).
+      if (legacyPresent.length > 0) {
+        try {
+          const persisted: Record<string, unknown> = {}
+          const s = useUIStore.getState()
+          for (const key of persistedKeys) persisted[key] = s[key as keyof typeof s]
+          await window.electronAPI.saveUISettings(persisted)
+          await window.electronAPI.pruneUISettingsKeys(legacyPresent as unknown as string[])
+        } catch (err) {
+          console.error('[UIStore] Legacy-pluginConfig-Cleanup fehlgeschlagen:', err)
+        }
+      }
     } else {
       console.log('[UIStore] No saved settings found, using defaults')
     }

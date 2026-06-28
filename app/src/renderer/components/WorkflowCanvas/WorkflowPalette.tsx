@@ -1,9 +1,7 @@
 import { useState, type MouseEvent as ReactMouseEvent } from 'react'
 import { createPortal } from 'react-dom'
-import { actionsByModule, WORKFLOW_MODULE_LABELS } from '../../../shared/workflow/registry'
+import { actionsByModule, workflowModuleLabel, workflowModuleGate } from '../../../shared/workflow/registry'
 import {
-  MODULE_FEATURE_GATE,
-  type WorkflowModuleId,
   type WorkflowActionDefinition,
   type WorkflowPortDefinition
 } from '../../../shared/workflow/types'
@@ -24,7 +22,7 @@ interface Props {
   /** Pixelbreite (vom ziehbaren Trenner gesteuert). Default per CSS 200px. */
   width?: number
   /** Pro Modul: aktiv + Grund. Fehlt ein Eintrag → Fallback auf Feature-Toggle. */
-  availability?: Partial<Record<WorkflowModuleId, ModuleAvailability>>
+  availability?: Partial<Record<string, ModuleAvailability>>
 }
 
 // Ein gebündelter Tooltip-Text pro Baustein (Beschreibung + alle Ports). Abschnitte
@@ -45,9 +43,9 @@ export function WorkflowPalette({ onAdd, width, availability }: Props) {
   const features = useVaultSettingsStore(s => s.features)
   const grouped = actionsByModule()
 
-  const isModuleActive = (moduleId: WorkflowModuleId): boolean => {
-    const gate = MODULE_FEATURE_GATE[moduleId]
-    if (!gate) return true // Kern-Modul
+  const isModuleActive = (moduleId: string): boolean => {
+    const gate = workflowModuleGate(moduleId)
+    if (!gate) return true // Kern-Modul (oder Plugin-Modul ohne Gate)
     return Boolean(features[gate as keyof VaultFeatures])
   }
 
@@ -66,7 +64,7 @@ export function WorkflowPalette({ onAdd, width, availability }: Props) {
   return (
     <div className="wf-palette" style={width ? { width, flex: `0 0 ${width}px` } : undefined}>
       <div className="wf-palette__title">Bausteine</div>
-      {(Object.keys(grouped) as WorkflowModuleId[]).map(moduleId => {
+      {Object.keys(grouped).map(moduleId => {
         const actions = grouped[moduleId]
         if (!actions?.length) return null
         // Verfügbarkeit: explizite Map (Toggle + Konfiguration) gewinnt; sonst Feature-Toggle.
@@ -78,7 +76,7 @@ export function WorkflowPalette({ onAdd, width, availability }: Props) {
               <span aria-hidden="true" style={{ display: 'inline-flex', alignItems: 'center' }}>
                 <ModuleIcon moduleId={moduleId} size={14} />
               </span>
-              <span>{WORKFLOW_MODULE_LABELS[moduleId]}</span>
+              <span>{workflowModuleLabel(moduleId)}</span>
               {!active && <span className="wf-palette__off" title={avail.reason || 'Modul deaktiviert'}>aus</span>}
             </div>
             {actions.map(action => (

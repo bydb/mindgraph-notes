@@ -5,7 +5,7 @@
 // (BrowserWindow / Ghostscript im Capability-Host), Vault-I/O über host.vault (binär).
 // Die reMarkable-Buch-CSS lebt hier (Plugin-Sache); der Host rendert nur HTML→PDF.
 
-import { definePluginMain } from '../../../shared/plugins/entry'
+import { definePluginMain } from '@mindgraph/plugin-api'
 import { ReMarkableService } from '../service'
 import { extractReflowedHtml } from '../pdfReflow'
 import { REMARKABLE_CAPABILITIES, manifest } from '../manifest'
