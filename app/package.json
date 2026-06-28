@@ -3,6 +3,9 @@
   "version": "0.8.14",
   "description": "Lokaler Workspace, der dir täglich zeigt, was in deinen Notizen, Aufgaben und E-Mails wichtig ist — mit Wissensgraph und KI.",
   "main": "out/main/index.js",
+  "workspaces": [
+    "packages/*"
+  ],
   "scripts": {
     "dev": "electron-vite dev",
     "build": "electron-vite build",
