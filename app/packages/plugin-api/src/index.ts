@@ -7,5 +7,19 @@
 
 export { API_VERSION } from './version'
 
-// (Vertrags-Typen — Manifest, Host, Entry, Workflow-Beiträge — wandern in den
-//  Folge-Commits dieses Schritts hierher.)
+export type { CompatModuleId } from './compat'
+
+export type {
+  WorkflowModuleId,
+  WorkflowPortKind,
+  WorkflowPortDefinition,
+  WorkflowPrivacyMetadata,
+  WorkflowConfigFieldType,
+  WorkflowConfigField,
+  WorkflowActionDefinition,
+  WorkflowRunTrigger,
+  WorkflowSeedItem,
+} from './workflow'
+
+// (Weitere Vertrags-Typen — Manifest, Host, Entry, Trigger-Provider — wandern im
+//  Folge-Commit dieses Schritts hierher.)

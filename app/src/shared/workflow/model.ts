@@ -3,6 +3,12 @@
 // Persistenz: {vault}/.mindgraph/workflows.json (Decision #9, geräte-lokal).
 // Siehe docs/workflow-canvas-plan.md "Beschlossener Stand".
 
+// Plugin-zugewandte Trigger-Typen leben im Plugin-Vertrag (@mindgraph/plugin-api), damit
+// Trigger-Provider in den Vertikalen sie ohne Kern-Import nutzen. Import + Re-Export halten
+// die lokalen Verwendungen (WorkflowRun, WorkflowRunPayload) und Kern-Importe unverändert.
+import type { WorkflowRunTrigger, WorkflowSeedItem } from '@mindgraph/plugin-api'
+export type { WorkflowRunTrigger, WorkflowSeedItem }
+
 export interface WorkflowNode {
   id: string
   /** Referenz auf WorkflowActionDefinition.id in der Registry. */
@@ -47,27 +53,8 @@ export interface Workflow {
 }
 
 export type WorkflowRunMode = 'simulate' | 'execute'
-/** 'manual' = ▶ Ausführen; alles andere = Event-Lauf (Hand-off → Aufgabe statt Compose).
- *  Provenienz pro Event-Quelle; die Unterscheidung manuell/Event macht isEventTrigger(). */
-export type WorkflowRunTrigger =
-  | 'manual'
-  | 'event-email'
-  | 'event-reply'
-  | 'event-ics'
-  | 'event-task'
-  | 'event-external'
-  | 'event-scheduled'
 export type WorkflowRunStatus = 'running' | 'success' | 'failed' | 'cancelled'
 
-/** Seed-Kandidat eines Triggers (Mail-Signal, Aufgabe, Plugin-Quelle). `itemKey` ist
- *  stabil pro Kandidat und dient dem Exactly-once-Ledger; `email` füttert den optionalen
- *  Kontakt-/Reply-Pfad. Plugin-Trigger-Provider erzeugen diese Struktur in ihrer Vertikale. */
-export interface WorkflowSeedItem {
-  itemKey: string
-  text: string
-  meta?: Record<string, unknown>
-  email?: { id?: string; subject?: string; bodyText?: string; from?: string; name?: string }
-}
 export type WorkflowStepStatus =
   | 'pending'
   | 'running'
