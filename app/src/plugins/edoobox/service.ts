@@ -34,6 +34,13 @@ function payloadSize(v: unknown): number {
   try { return typeof v === 'string' ? v.length : JSON.stringify(v).length } catch { return -1 }
 }
 
+/** Detail-Anhang für GEWORFENE Fehler: Rohtext nur im Debug-Modus, sonst generischer Hinweis.
+ *  Verhindert, dass personenbezogene API-Rohdaten über Exception-Messages in Renderer-/Workflow-/
+ *  Crash-Logs landen. */
+function errorDetail(raw: string): string {
+  return EDOOBOX_VERBOSE ? truncateError(raw) : 'Details unterdrückt (Debug: MINDGRAPH_DEBUG_EDOOBOX=1)'
+}
+
 function truncateError(text: string, maxLen = 200): string {
   if (text.length <= maxLen) return text
   if (text.includes('<!DOCTYPE') || text.includes('<html')) {
@@ -90,7 +97,7 @@ export class EdooboxService {
 
     if (!res.ok) {
       const text = await res.text()
-      throw new Error(`Authentication failed (${res.status}): ${truncateError(text)}`)
+      throw new Error(`Authentication failed (${res.status}): ${errorDetail(text)}`)
     }
 
     const data = await res.json()
@@ -137,7 +144,7 @@ export class EdooboxService {
       } else {
         console.error(`[edoobox] Response ${res.status} from ${url} (${text.length} Zeichen)`)
       }
-      throw new Error(`edoobox API error (${res.status}): ${truncateError(text)}`)
+      throw new Error(`edoobox API error (${res.status}): ${errorDetail(text)}`)
     }
 
     const ct = res.headers.get('content-type')
@@ -163,7 +170,7 @@ export class EdooboxService {
 
     if (!res.ok) {
       const text = await res.text()
-      throw new Error(`edoobox V1 API error (${res.status}): ${truncateError(text)}`)
+      throw new Error(`edoobox V1 API error (${res.status}): ${errorDetail(text)}`)
     }
 
     const ct = res.headers.get('content-type')
@@ -241,7 +248,7 @@ export class EdooboxService {
 
     const data = result.data as Record<string, unknown> | undefined
     const id = result.id || data?.id || result.offerId || ''
-    if (!id) throw new Error('No offer ID in response: ' + JSON.stringify(result).slice(0, 300))
+    if (!id) throw new Error('No offer ID in response: ' + errorDetail(JSON.stringify(result)))
     return String(id)
   }
 
@@ -282,7 +289,7 @@ export class EdooboxService {
     const result = await this.requestV2('POST', '/place', body) as Record<string, unknown>
     const data = result.data as Record<string, unknown> | undefined
     const id = result.id || data?.id || ''
-    if (!id) throw new Error('No place ID in response: ' + JSON.stringify(result).slice(0, 300))
+    if (!id) throw new Error('No place ID in response: ' + errorDetail(JSON.stringify(result)))
     return String(id)
   }
 
