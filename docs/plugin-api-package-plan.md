@@ -1,9 +1,10 @@
 # A0 · Schritt 1 — `@mindgraph/plugin-api` schälen (Plan / ADR)
 
-> **Status: FINAL-ENTWURF (2026-06-28).** Erster Schritt von **Phase A0** aus `docs/plugin-store-plan.md`
-> („Verträge & Format"). Entscheidungen A/B/C **bestätigt**, Paket-Surface **korrigiert** (s. unten).
-> Manifest v2, Repo-Template und Build/Sign-Action sind **spätere A0-Schritte** und hier bewusst
-> ausgeklammert. Geschrieben **vor** der Implementierung.
+> **Status: UMGESETZT (2026-06-28).** Erster Schritt von **Phase A0** aus `docs/plugin-store-plan.md`
+> („Verträge & Format"). Entscheidungen A/B/C bestätigt, Surface korrigiert. In sechs Commits
+> (C1 Gerüst → C2 Leak-Inversion → C3 Move+Stubs+Drift-Test → C4 Kern-Rewire → C5 Vertikalen+Test-Split+
+> Stub-Löschung → C6 Verifikation) umgesetzt. Alle Akzeptanzkriterien erfüllt (s.u.). Manifest v2,
+> Repo-Template und Build/Sign-Action bleiben **spätere A0-Schritte**.
 
 ## Ziel dieses Schritts
 
@@ -128,7 +129,7 @@ nicht zurückdreht.
 6. **Verifizieren.** isolierter Paket-`tsc` · `typecheck` · `test` · `build` · exemplarischer Deletion-Test ·
    Bundle-Stichprobe (Ajv nicht im Renderer-Haupt-Bundle, weil nur `/validation` es zieht).
 
-## Akzeptanzkriterien
+## Akzeptanzkriterien (alle erfüllt ✅)
 
 - `app/packages/plugin-api` **kompiliert isoliert** (eigener `tsc`), ohne `app/src/*` zu importieren.
 - Öffentlicher Haupt-Entry ist **Ajv-frei**; `ajv` nur über `@mindgraph/plugin-api/validation` erreichbar.
