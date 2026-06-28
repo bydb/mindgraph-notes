@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
-import { useUIStore, ACCENT_COLORS, AI_LANGUAGES, FONT_FAMILIES, UI_LANGUAGES, BACKGROUND_COLORS, ICON_SETS, OUTLINE_STYLES, MODULE_CATEGORIES, type Language, type FontFamily, type BackgroundColor, type IconSet, type OutlineStyle, type LLMBackend, type TransportDestination, type ModuleCategory, type ModuleDescriptor } from '../../stores/uiStore'
+import { useUIStore, ACCENT_COLORS, AI_LANGUAGES, FONT_FAMILIES, UI_LANGUAGES, BACKGROUND_COLORS, ICON_SETS, OUTLINE_STYLES, MODULE_CATEGORIES, EDOOBOX_DEFAULTS, MARKETING_DEFAULTS, REMARKABLE_DEFAULTS, type Language, type FontFamily, type BackgroundColor, type IconSet, type OutlineStyle, type LLMBackend, type TransportDestination, type ModuleCategory, type ModuleDescriptor } from '../../stores/uiStore'
+import { usePluginConfig } from '../../plugins/config'
 import { MODULES, isModuleEnabled, setModuleEnabled, useIsModuleEnabled, isPluginModule } from '../../utils/modules'
 import { invokePlugin } from '../../plugins/client'
 import { PluginSlot } from '../../plugins/slots'
@@ -483,8 +484,8 @@ const VaultSettingsTab: React.FC<{ vaultPath: string; t: TabTFn; onNavigateToTab
   const setFeatureActive = useVaultSettingsStore(state => state.setFeatureActive)
   const readwise = useUIStore(state => state.readwise)
   const email = useUIStore(state => state.email)
-  const edoobox = useUIStore(state => state.edoobox)
-  const remarkable = useUIStore(state => state.remarkable)
+  const [edoobox] = usePluginConfig('edoobox', EDOOBOX_DEFAULTS)
+  const [remarkable] = usePluginConfig('remarkable', REMARKABLE_DEFAULTS)
   const vaultName = vaultPath.split('/').pop() || vaultPath
 
   const features: Array<{
@@ -573,7 +574,7 @@ const VaultSettingsTab: React.FC<{ vaultPath: string; t: TabTFn; onNavigateToTab
 
 const ModulesTab: React.FC<{ t: TabTFn }> = ({ t }) => {
   // useUIStore als Abhängigkeit einbinden, damit der Tab bei Flag-Änderungen rerendert
-  const _tick = useUIStore(s => `${s.notesChatEnabled}${s.projectRagEnabled}${s.smartConnectionsEnabled}${s.flashcardsEnabled}${s.workflowCanvasEnabled}${s.semanticScholarEnabled}${s.zoteroEnabled}${s.languageTool.enabled}${s.email.enabled}${s.edoobox.enabled}${s.marketing.enabled}${s.readwise.enabled}${s.remarkable.enabled}${s.docling.enabled}${s.visionOcr.enabled}${s.speech.enabled}`)
+  const _tick = useUIStore(s => `${s.notesChatEnabled}${s.projectRagEnabled}${s.smartConnectionsEnabled}${s.flashcardsEnabled}${s.workflowCanvasEnabled}${s.semanticScholarEnabled}${s.zoteroEnabled}${s.languageTool.enabled}${s.email.enabled}${s.readwise.enabled}${s.docling.enabled}${s.visionOcr.enabled}${s.speech.enabled}`)
   void _tick
   // Generische Plugin-Module (z.B. Antares) liegen in pluginConfig — separat abonnieren, sonst
   // löst ein Toggle über die generische Config-API keinen Re-Render des Modul-Tabs aus.
@@ -1536,11 +1537,6 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab 
     setShowRawEditor,
     email: emailSettings,
     setEmail,
-    marketing: marketingSettings,
-    setMarketing,
-    edoobox: edooboxSettings,
-    remarkable: remarkableSettings,
-    setRemarkable,
     dailyNote: dailyNoteSettings,
     setDailyNote,
     brain: brainSettings,
@@ -1550,6 +1546,11 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab 
     slashCommandTimeFormat,
     setSlashCommandTimeFormat
   } = useUIStore()
+
+  // Plugin-Vertikalen-Config generisch (pluginConfig) statt state.edoobox/marketing/remarkable.
+  const [marketingSettings, setMarketing] = usePluginConfig('marketing', MARKETING_DEFAULTS)
+  const [edooboxSettings] = usePluginConfig('edoobox', EDOOBOX_DEFAULTS)
+  const [remarkableSettings, setRemarkable] = usePluginConfig('remarkable', REMARKABLE_DEFAULTS)
 
   const { t } = useTranslation()
 

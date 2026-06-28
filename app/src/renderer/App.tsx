@@ -42,6 +42,7 @@ import { SmartConnectionsPanel } from './components/SmartConnectionsPanel/SmartC
 import { NotesChat } from './components/NotesChat/NotesChat'
 import { TabBar } from './components/TabBar/TabBar'
 import { useUIStore, ACCENT_COLORS, FONT_FAMILIES, BACKGROUND_COLORS, initializeUISettings } from './stores/uiStore'
+import { usePluginEnabled } from './plugins/config'
 import { useTabStore } from './stores/tabStore'
 import { useTranslation } from './utils/translations'
 import { useNotesStore, createNoteFromFile } from './stores/notesStore'
@@ -152,7 +153,7 @@ const App: React.FC = () => {
   const openWorkflowCanvasTab = useTabStore(state => state.openWorkflowCanvasTab)
   const { unreadRelevantCount } = useEmailStore()
   const emailEnabled = useUIStore(state => state.email.enabled)
-  const edooboxEnabled = useUIStore(state => state.edoobox.enabled)
+  const edooboxEnabled = usePluginEnabled('edoobox')
   const workflowCanvasEnabled = useUIStore(state => state.workflowCanvasEnabled)
   const brainLensActive = useUIStore(state => state.brainLensActive)
   const transportTitlebarButtonVisible = useUIStore(

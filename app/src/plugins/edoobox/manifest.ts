@@ -79,8 +79,9 @@ export const manifest: PluginManifest = {
   icon: { text: '🎓', color: '#6366f1' },
   module: {
     id: 'mz-suite',
-    enabledPath: 'edoobox.enabled',
-    linkedEnabledPaths: ['marketing.enabled'],
+    enabledPath: 'pluginConfig.edoobox.enabled',
+    linkedEnabledPaths: ['pluginConfig.marketing.enabled'],
+    legacyEnabledPath: 'edoobox.enabled',
   },
   capabilities: [...EDOOBOX_CAPABILITIES],
   // Baseline-Allowlist: edoobox-Provider + Google Imagen (Marketing-Bildgenerierung). Der

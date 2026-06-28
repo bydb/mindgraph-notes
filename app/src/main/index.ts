@@ -253,17 +253,20 @@ function buildPluginHostServices(): HostServices {
     httpFetch: (url, init) => fetch(url, init),
     httpFetchBasicAuth: nativeServices.httpFetchBasicAuth,
     resolveExtraAllowedHosts: async (pluginId) => {
-      // Plugins mit user-konfiguriertem Endpunkt (z.B. Antares: ui.antares.baseUrl) dürfen
-      // ihren konfigurierten Host ansprechen — der ist user-getrust, anders als ein beliebiger.
+      // Plugins mit user-konfiguriertem Endpunkt (z.B. Antares-baseUrl) dürfen ihren konfigurierten
+      // Host ansprechen — der ist user-getrust, anders als ein beliebiger. Die Config liegt generisch
+      // unter ui.pluginConfig[pluginId] (A-pre Schritt 3); Top-Level bleibt als Legacy-Fallback.
       const ui = await loadUISettings().catch(() => ({} as Record<string, unknown>))
+      const pc = (ui.pluginConfig ?? {}) as Record<string, Record<string, unknown> | undefined>
+      const pluginCfg = (id: string) => (pc[id] ?? (ui[id] as Record<string, unknown> | undefined))
       const hosts: string[] = []
-      const cfg = ui[pluginId] as { baseUrl?: string } | undefined
+      const cfg = pluginCfg(pluginId) as { baseUrl?: string } | undefined
       if (cfg?.baseUrl) {
         try { hosts.push(new URL(cfg.baseUrl).hostname) } catch { /* ignore */ }
       }
       // edoobox-Vertikale nutzt zusätzlich den user-konfigurierten WordPress-Host (Marketing).
       if (pluginId === 'edoobox') {
-        const mk = ui.marketing as { wordpressUrl?: string } | undefined
+        const mk = pluginCfg('marketing') as { wordpressUrl?: string } | undefined
         if (mk?.wordpressUrl) {
           try { hosts.push(new URL(mk.wordpressUrl).hostname) } catch { /* ignore */ }
         }

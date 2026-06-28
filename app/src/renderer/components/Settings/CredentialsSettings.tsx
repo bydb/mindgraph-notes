@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react'
-import { useUIStore } from '../../stores/uiStore'
+import { useUIStore, MARKETING_DEFAULTS } from '../../stores/uiStore'
+import { usePluginConfig } from '../../plugins/config'
 import { invokePlugin } from '../../plugins/client'
 import { edooboxService } from '../../stores/edooboxServiceBridge'
 
@@ -28,7 +29,7 @@ export const CredentialsSettings: React.FC<Props> = ({ onNavigateToTab }) => {
   const email = useUIStore(s => s.email)
   const readwise = useUIStore(s => s.readwise)
   const languageTool = useUIStore(s => s.languageTool)
-  const marketing = useUIStore(s => s.marketing)
+  const [marketing] = usePluginConfig('marketing', MARKETING_DEFAULTS)
 
   const [statuses, setStatuses] = useState<Record<string, boolean>>({})
   const [loading, setLoading] = useState(true)

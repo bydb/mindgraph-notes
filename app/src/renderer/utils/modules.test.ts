@@ -16,17 +16,18 @@ describe('Plugin-Module aus Manifesten', () => {
 
   it('liest Plugin-Flags über die im Manifest deklarierten Pfade', () => {
     const state = useUIStore.getState()
+    // Alle Vertikalen lesen ihr Enabled-Flag jetzt aus der generischen pluginConfig (A-pre Schritt 3).
     state.setBooleanSettingPath('pluginConfig.antares.enabled', true)
-    state.setBooleanSettingPath('edoobox.enabled', true)
-    state.setBooleanSettingPath('remarkable.enabled', true)
+    state.setBooleanSettingPath('pluginConfig.edoobox.enabled', true)
+    state.setBooleanSettingPath('pluginConfig.remarkable.enabled', true)
 
     expect(isModuleEnabled('antares')).toBe(true)
     expect(isModuleEnabled('mz-suite')).toBe(true)
     expect(isModuleEnabled('remarkable')).toBe(true)
 
     state.setBooleanSettingPath('pluginConfig.antares.enabled', false)
-    state.setBooleanSettingPath('edoobox.enabled', false)
-    state.setBooleanSettingPath('marketing.enabled', false)
-    state.setBooleanSettingPath('remarkable.enabled', false)
+    state.setBooleanSettingPath('pluginConfig.edoobox.enabled', false)
+    state.setBooleanSettingPath('pluginConfig.marketing.enabled', false)
+    state.setBooleanSettingPath('pluginConfig.remarkable.enabled', false)
   })
 })

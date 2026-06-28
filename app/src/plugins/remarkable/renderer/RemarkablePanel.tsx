@@ -14,14 +14,15 @@ import type {
   ReMarkableBookifyResult,
 } from '../../../shared/types'
 import { useTranslation } from '../../../renderer/utils/translations'
-import { useUIStore } from '../../../renderer/stores/uiStore'
+import { useUIStore, REMARKABLE_DEFAULTS } from '../../../renderer/stores/uiStore'
+import { usePluginConfig } from '../../../renderer/plugins/config'
 import { createNoteFromFile, useNotesStore } from '../../../renderer/stores/notesStore'
 import { invokePlugin } from '../../../renderer/plugins/client'
 import remarkableLogo from '../../../renderer/assets/remarkable-logo.png'
 
 export const RemarkablePanel: React.FC = () => {
   const { t } = useTranslation()
-  const remarkable = useUIStore((s) => s.remarkable)
+  const [remarkable] = usePluginConfig('remarkable', REMARKABLE_DEFAULTS)
   const docling = useUIStore((s) => s.docling)
   const vaultPath = useNotesStore((s) => s.vaultPath)
   const notes = useNotesStore((s) => s.notes)
