@@ -12,8 +12,9 @@
 // docs/plugin-system-plan.md #12.
 
 import type { PluginRendererEntry } from '../../../shared/plugins/entry'
-import { WORKFLOW_TRIGGER_SLOT } from '../../../shared/plugins/workflowTrigger'
+import { WORKFLOW_TRIGGER_SLOT, WORKFLOW_EXAMPLE_SLOT } from '../../../shared/plugins/workflowTrigger'
 import { edooboxTriggerProvider } from './workflowTrigger'
+import { buildEdooboxConfirmationExample } from './workflowExample'
 // Eager: Provider-Registrierung als Modul-Seiteneffekt (Daten-Bridge + Service-Facade).
 import './agentStore'
 import './edooboxClient'
@@ -28,6 +29,8 @@ const entry: PluginRendererEntry = {
     })
     // Workflow-Trigger `edoobox.newBooking` — der Kern dispatcht generisch über diesen Provider.
     slots.register(WORKFLOW_TRIGGER_SLOT, edooboxTriggerProvider)
+    // Beispiel-Workflow für die Palette.
+    slots.register(WORKFLOW_EXAMPLE_SLOT, buildEdooboxConfirmationExample)
   },
 }
 

@@ -7,8 +7,9 @@
 // Renderer-Registry — kein harter Import in der App. Siehe #12.
 
 import type { PluginRendererEntry } from '../../../shared/plugins/entry'
-import { WORKFLOW_TRIGGER_SLOT } from '../../../shared/plugins/workflowTrigger'
+import { WORKFLOW_TRIGGER_SLOT, WORKFLOW_EXAMPLE_SLOT } from '../../../shared/plugins/workflowTrigger'
 import { antaresTriggerProvider } from './workflowTrigger'
+import { buildAntaresReminderExample } from './workflowExample'
 
 const entry: PluginRendererEntry = {
   id: 'antares',
@@ -25,6 +26,8 @@ const entry: PluginRendererEntry = {
     })
     // Workflow-Trigger `antares.mahnung` — der Kern dispatcht generisch über diesen Provider.
     slots.register(WORKFLOW_TRIGGER_SLOT, antaresTriggerProvider)
+    // Beispiel-Workflow für die Palette.
+    slots.register(WORKFLOW_EXAMPLE_SLOT, buildAntaresReminderExample)
   },
 }
 

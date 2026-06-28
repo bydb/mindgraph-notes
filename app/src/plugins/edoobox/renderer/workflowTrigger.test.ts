@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { buildEdooboxEvent } from './workflowTrigger'
 import { manifest } from '../manifest'
+import { buildEdooboxConfirmationExample } from './workflowExample'
 import type { WorkflowTriggerLedger } from '../../../shared/plugins/workflowTrigger'
 import type { EdooboxBooking, EdooboxOfferDashboard } from '../../../shared/types'
 
@@ -29,6 +30,11 @@ describe('edoobox-Manifest trägt den Workflow-Trigger (statt Kern-Registry)', (
     expect(action?.moduleId).toBe('edoobox')
     expect(action?.featureGate).toBe('edoobox')
     expect(action?.outputs.map(o => o.id)).toEqual(['text', 'email'])
+  })
+
+  it('liefert ein Beispiel-Workflow, der mit edoobox.newBooking startet', () => {
+    const wf = buildEdooboxConfirmationExample()
+    expect(wf.nodes.some(n => n.actionId === 'edoobox.newBooking')).toBe(true)
   })
 })
 

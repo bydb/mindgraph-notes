@@ -124,6 +124,7 @@ export const manifest: PluginManifest = {
         { id: 'email', label: 'Kontakt', kind: 'email' },
       ],
       privacy: { containsPersonalData: true, requiresCredential: true },
+      simLine: 'Auslöser: überfällige Rückgabe (Leihnr 4711)',
     },
   ],
   privacy: { containsPersonalData: true, localOnly: true },

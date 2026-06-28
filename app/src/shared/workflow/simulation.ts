@@ -34,8 +34,7 @@ const SIM_LINE: Record<string, string> = {
   'email.selectedEmail': 'Eingabe: Re: Roll-Up Marslandschaft',
   'email.replyReceived': 'Auslöser: Antwort auf gesendete Mail eingegangen',
   'email.icsReceived': 'Auslöser: Mail mit Kalender-Einladung (.ics)',
-  'antares.mahnung': 'Auslöser: überfällige Rückgabe (Leihnr 4711)',
-  'edoobox.newBooking': 'Auslöser: neue Anmeldung für „Marslandschaft gestalten"',
+  // antares.mahnung / edoobox.newBooking liefern ihre Sim-Zeile über action.simLine (Manifest).
   'tasks.dueSoon': 'Auslöser: Aufgabe „Entwurf prüfen" wird heute fällig',
   'schedule.timer': 'Auslöser: Zeitplan (täglich 09:00)',
   'email.analyze': 'Analyse: Relevanz 82, 1 Aufgabe erkannt',
@@ -103,7 +102,7 @@ export function simulateWorkflow(workflow: Workflow): WorkflowRun {
     const outputs: Record<string, unknown> = {}
     for (const port of action.outputs) outputs[port.id] = EXAMPLE_OUTPUT[port.kind]
 
-    const line = SIM_LINE[action.id] || `${action.label}: Beispielausgabe`
+    const line = action.simLine || SIM_LINE[action.id] || `${action.label}: Beispielausgabe`
     steps.push({
       nodeId,
       actionId: action.id,

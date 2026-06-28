@@ -8,7 +8,10 @@ import {
   workflowModuleLabel,
   workflowModuleGate,
 } from './registry'
+import { simulateWorkflow } from './simulation'
+import { buildExampleWorkflows } from './examples'
 import type { WorkflowActionDefinition } from './types'
+import type { Workflow } from './model'
 
 // Bewusst KEIN Import aus src/plugins/* — dieser Test muss eine echte Ordner-Löschung überleben.
 // Er prüft, dass der KERN selbst keine Plugin-Trigger enthält und sie nur generisch via
@@ -22,6 +25,7 @@ const synthetic: WorkflowActionDefinition = {
   isTrigger: true,
   inputs: [],
   outputs: [{ id: 'text', label: 'Text', kind: 'text' }],
+  simLine: 'Synthetischer Sim-Hinweis',
 }
 
 afterEach(() => __resetWorkflowActionsForTest())
@@ -58,5 +62,25 @@ describe('Deletion-Test: der Kern enthält keine statischen Plugin-Workflow-Trig
     registerWorkflowActions([synthetic])
     registerWorkflowActions([synthetic])
     expect(actionsByModule().antares?.length).toBe(1)
+  })
+
+  it('Simulation nutzt action.simLine (statt einer Kern-Tabelle)', () => {
+    registerWorkflowActions([synthetic])
+    const wf: Workflow = {
+      id: 'w', name: 'x', description: '', version: 1, enabled: false,
+      createdAt: '', updatedAt: '',
+      nodes: [{ id: 'n1', actionId: 'test.syntheticTrigger', position: { x: 0, y: 0 }, config: {} }],
+      edges: [],
+    }
+    const step = simulateWorkflow(wf).steps.find(s => s.actionId === 'test.syntheticTrigger')
+    expect(step?.log.join(' ')).toContain('Synthetischer Sim-Hinweis')
+  })
+})
+
+describe('Deletion-Test: Kern-Beispiele referenzieren keine Plugin-Trigger', () => {
+  it('buildExampleWorkflows nennt weder antares.mahnung noch edoobox.newBooking', () => {
+    const actionIds = buildExampleWorkflows().flatMap(w => w.nodes.map(n => n.actionId))
+    expect(actionIds).not.toContain('antares.mahnung')
+    expect(actionIds).not.toContain('edoobox.newBooking')
   })
 })

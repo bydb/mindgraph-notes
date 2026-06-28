@@ -8,7 +8,8 @@
 
 import React, { Suspense } from 'react'
 import { createRendererRegistry, type RendererPluginRegistry } from './registry'
-import { WORKFLOW_TRIGGER_SLOT, type WorkflowTriggerProvider } from '../../shared/plugins/workflowTrigger'
+import { WORKFLOW_TRIGGER_SLOT, WORKFLOW_EXAMPLE_SLOT, type WorkflowTriggerProvider } from '../../shared/plugins/workflowTrigger'
+import type { Workflow } from '../../shared/workflow/model'
 
 /** Was ein Plugin an einen Slot hängt: eine lazy geladene Default-Export-Komponente.
  *  `ComponentType<any>`, damit ein Slot optionale Props (z.B. `onClose`) durchreichen kann. */
@@ -43,6 +44,21 @@ export function ensureRendererPlugins(): void {
  */
 export function getWorkflowTriggerProviders(): WorkflowTriggerProvider[] {
   return getRegistry().getSlot(WORKFLOW_TRIGGER_SLOT) as WorkflowTriggerProvider[]
+}
+
+/**
+ * Plugin-beigesteuerte Beispiel-Workflows (als Builder → frische Objekte). Leerer Slot nach
+ * Plugin-Löschung → kein totes Beispiel. Ein werfender Builder wird isoliert.
+ */
+export function getWorkflowExamples(): Workflow[] {
+  const builders = getRegistry().getSlot(WORKFLOW_EXAMPLE_SLOT) as Array<() => Workflow>
+  const out: Workflow[] = []
+  for (const build of builders) {
+    try { out.push(build()) } catch (err) {
+      console.error('[plugin] Beispiel-Workflow-Builder warf:', err)
+    }
+  }
+  return out
 }
 
 // React.lazy pro Beitrag genau einmal erzeugen (stabile Identität → kein Remount-Flackern).

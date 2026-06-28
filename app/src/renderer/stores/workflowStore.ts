@@ -22,7 +22,7 @@ import { useNotesStore } from './notesStore'
 import { extractTasks } from '../utils/linkExtractor'
 import type { Note } from '../../shared/types'
 import type { WorkflowTriggerProvider } from '../../shared/plugins/workflowTrigger'
-import { getWorkflowTriggerProviders } from '../plugins/slots'
+import { getWorkflowTriggerProviders, getWorkflowExamples } from '../plugins/slots'
 import { runEventForWorkflow } from './workflowTriggerDispatch'
 
 interface ConnectingState {
@@ -210,6 +210,19 @@ function getTriggerProviders(): Map<string, WorkflowTriggerProvider> {
   return map
 }
 
+/** Ist diese Action ein POLL-Trigger (Aufgaben/Plugins, via Provider), also über runTrigger
+ *  gepollt — im Gegensatz zu Email-Signal- und Zeitplan-Triggern? Generisch aus den registrierten
+ *  Providern abgeleitet: ein gelöschtes Plugin verschwindet automatisch, kein toter Kernname. */
+export function isPollTriggerAction(actionId: string | undefined): boolean {
+  return !!actionId && getTriggerProviders().has(actionId)
+}
+
+/** Kern-Beispiele + plugin-beigesteuerte Beispiele (Renderer-Slot). Kern zuerst → das Flaggschiff
+ *  bleibt der Default. Nach Plugin-Löschung fehlen dessen Beispiele automatisch. */
+function allExampleWorkflows(): Workflow[] {
+  return [...buildExampleWorkflows(), ...getWorkflowExamples()]
+}
+
 // ── Zeitplan (Layer F): ist der Workflow JETZT fällig? ───────────────────────
 // occ = der jüngste geplante Zeitpunkt im aktuellen Tag/Woche/Monat. Fällig, wenn
 // now >= occ UND seit occ noch nicht gefeuert (lastFired < occ). Catch-up: ein
@@ -234,7 +247,7 @@ function isScheduleDue(schedule: WorkflowSchedule, lastFiredIso: string | undefi
 }
 
 export const useWorkflowStore = create<WorkflowStoreState>()((set, get) => {
-  const examples = buildExampleWorkflows()
+  const examples = allExampleWorkflows()
   const initial = examples[0]
   return {
   workflow: initial,
@@ -261,7 +274,7 @@ export const useWorkflowStore = create<WorkflowStoreState>()((set, get) => {
   loadExample: () => set(s => {
     const merged = reconcileList(s.workflows, s.activeId, s.workflow)
     const existing = new Set(merged.map(w => w.id))
-    const templates = buildExampleWorkflows()
+    const templates = allExampleWorkflows()
     const next = templates.find(w => !existing.has(w.id))
     const base = next ?? templates[0]
     const wf = next ?? {

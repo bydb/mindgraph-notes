@@ -306,6 +306,7 @@ export const manifest: PluginManifest = {
         { id: 'email', label: 'Teilnehmer', kind: 'email' },
       ],
       privacy: { containsPersonalData: true, requiresCredential: true },
+      simLine: 'Auslöser: neue Anmeldung für „Marslandschaft gestalten"',
     },
   ],
   privacy: { containsPersonalData: true },

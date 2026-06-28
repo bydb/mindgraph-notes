@@ -120,6 +120,9 @@ export interface WorkflowActionDefinition {
   hardLockModule?: CompatModuleId
   privacy?: WorkflowPrivacyMetadata
   config?: WorkflowConfigField[]
+  /** Sprechende Log-Zeile für den Simulations-Trockenlauf (Pitch-Leinwand). Plugin-Actions
+   *  bringen sie selbst mit; der Kern hält keine Tabelle dafür. Fallback: Label-basiert. */
+  simLine?: string
 }
 
 /**

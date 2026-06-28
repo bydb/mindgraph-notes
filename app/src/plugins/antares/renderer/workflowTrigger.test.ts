@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { buildAntaresEvent } from './workflowTrigger'
 import { manifest } from '../manifest'
+import { buildAntaresReminderExample } from './workflowExample'
 import type { WorkflowTriggerLedger } from '../../../shared/plugins/workflowTrigger'
 import type { AntaresVerleihRow } from '../../../shared/types'
 
@@ -30,6 +31,11 @@ describe('antares-Manifest trägt den Workflow-Trigger (statt Kern-Registry)', (
     expect(action?.isTrigger).toBe(true)
     expect(action?.moduleId).toBe('antares')
     expect(action?.outputs.map(o => o.id)).toEqual(['text', 'email'])
+  })
+
+  it('liefert ein Beispiel-Workflow, der mit antares.mahnung startet', () => {
+    const wf = buildAntaresReminderExample()
+    expect(wf.nodes.some(n => n.actionId === 'antares.mahnung')).toBe(true)
   })
 })
 

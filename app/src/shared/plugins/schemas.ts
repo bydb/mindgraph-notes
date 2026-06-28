@@ -164,6 +164,7 @@ export const PLUGIN_MANIFEST_SCHEMA: JsonSchema = {
           hardLockModule: { type: 'string' },
           privacy: { type: 'object' },
           config: { type: 'array', items: { type: 'object' } },
+          simLine: { type: 'string' },
         },
         additionalProperties: false,
       },

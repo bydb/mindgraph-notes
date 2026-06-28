@@ -16,6 +16,9 @@ import type { WorkflowRunTrigger, WorkflowSeedItem } from '../workflow/model'
 /** Slot-Id, unter dem Trigger-Provider registriert werden (analog zu `dashboard.widget.*`). */
 export const WORKFLOW_TRIGGER_SLOT = 'workflow.trigger'
 
+/** Slot-Id, unter dem ein Plugin einen Beispiel-Workflow (als Builder `() => Workflow`) beisteuert. */
+export const WORKFLOW_EXAMPLE_SLOT = 'workflow.example'
+
 /**
  * Auf EINEN Workflow eingeschränkte Sicht auf das (geräte-lokale) Exactly-once-Ledger.
  * Schlüssel sind bereits pro Workflow genamespaced — der Provider sieht nur seine eigenen
