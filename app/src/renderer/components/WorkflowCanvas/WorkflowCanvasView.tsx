@@ -26,7 +26,6 @@ import { useEmailStore } from '../../stores/emailStore'
 import { useUIStore } from '../../stores/uiStore'
 import { getActionById, getPortDef } from '../../../shared/workflow/registry'
 import { canConnectPorts } from '../../../shared/workflow/validation'
-import type { WorkflowModuleId } from '../../../shared/workflow/types'
 import { WorkflowNodeCard, type WorkflowNodeData } from './WorkflowNodeCard'
 import { WorkflowPalette, type ModuleAvailability } from './WorkflowPalette'
 import { WorkflowInspector } from './WorkflowInspector'
@@ -174,7 +173,7 @@ function InnerCanvas({ onOpenInbox }: Props) {
 
   // Ehrliche Modul-Verfügbarkeit: Toggle AN UND konfiguriert. Module ohne Eintrag
   // hier gelten als Kern-Module (immer verfügbar, via Feature-Toggle-Fallback in der Palette).
-  const moduleAvailability: Partial<Record<WorkflowModuleId, ModuleAvailability>> = {
+  const moduleAvailability: Partial<Record<string, ModuleAvailability>> = {
     email: !emailActive
       ? { ok: false, reason: 'Modul „E-Mail" ist aus — Einstellungen → Module' }
       : (emailAccounts.length > 0 && emailAccounts[0]?.host)

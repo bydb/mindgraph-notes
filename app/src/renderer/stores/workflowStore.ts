@@ -193,9 +193,11 @@ const tasksTriggerProvider: WorkflowTriggerProvider = {
     return collectTodayDueTaskItems(useNotesStore.getState().notes)[0] ?? null
   },
   async collectEvent() {
+    // Kein eigener Trigger → der Dispatch setzt 'event-external'. Provider-basierte Trigger
+    // (Kern-Aufgaben wie Plugins) tragen generische Event-Provenienz; nur der Mail-Signalpfad
+    // des Kerns mintet reichere Trigger (event-email/-reply/-ics).
     return {
       items: collectTodayDueTaskItems(useNotesStore.getState().notes),
-      trigger: 'event-task' as WorkflowRunTrigger,
       emptyMessage: 'Keine heute fälligen Aufgaben.',
     }
   },

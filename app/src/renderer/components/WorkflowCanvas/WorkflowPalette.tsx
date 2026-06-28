@@ -2,7 +2,6 @@ import { useState, type MouseEvent as ReactMouseEvent } from 'react'
 import { createPortal } from 'react-dom'
 import { actionsByModule, workflowModuleLabel, workflowModuleGate } from '../../../shared/workflow/registry'
 import {
-  type WorkflowModuleId,
   type WorkflowActionDefinition,
   type WorkflowPortDefinition
 } from '../../../shared/workflow/types'
@@ -23,7 +22,7 @@ interface Props {
   /** Pixelbreite (vom ziehbaren Trenner gesteuert). Default per CSS 200px. */
   width?: number
   /** Pro Modul: aktiv + Grund. Fehlt ein Eintrag → Fallback auf Feature-Toggle. */
-  availability?: Partial<Record<WorkflowModuleId, ModuleAvailability>>
+  availability?: Partial<Record<string, ModuleAvailability>>
 }
 
 // Ein gebündelter Tooltip-Text pro Baustein (Beschreibung + alle Ports). Abschnitte
@@ -44,7 +43,7 @@ export function WorkflowPalette({ onAdd, width, availability }: Props) {
   const features = useVaultSettingsStore(s => s.features)
   const grouped = actionsByModule()
 
-  const isModuleActive = (moduleId: WorkflowModuleId): boolean => {
+  const isModuleActive = (moduleId: string): boolean => {
     const gate = workflowModuleGate(moduleId)
     if (!gate) return true // Kern-Modul (oder Plugin-Modul ohne Gate)
     return Boolean(features[gate as keyof VaultFeatures])
@@ -65,7 +64,7 @@ export function WorkflowPalette({ onAdd, width, availability }: Props) {
   return (
     <div className="wf-palette" style={width ? { width, flex: `0 0 ${width}px` } : undefined}>
       <div className="wf-palette__title">Bausteine</div>
-      {(Object.keys(grouped) as WorkflowModuleId[]).map(moduleId => {
+      {Object.keys(grouped).map(moduleId => {
         const actions = grouped[moduleId]
         if (!actions?.length) return null
         // Verfügbarkeit: explizite Map (Toggle + Konfiguration) gewinnt; sonst Feature-Toggle.

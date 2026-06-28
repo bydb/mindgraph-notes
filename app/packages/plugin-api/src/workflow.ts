@@ -8,22 +8,6 @@
 import type { CompatModuleId } from './compat'
 
 /**
- * Quell-Modul einer Action. Bestimmt Paletten-Gruppierung und (via MODULE_FEATURE_GATE
- * im Kern) ob das Modul im Vault aktiv sein muss.
- */
-export type WorkflowModuleId =
-  | 'email'
-  | 'project'
-  | 'ollama'
-  | 'notes'
-  | 'human'
-  | 'calendar'
-  | 'edoobox'
-  | 'antares'
-  | 'tasks'
-  | 'schedule'
-
-/**
  * Typisierte Port-Arten. Verbindungen sind nur über die strikte Allowlist in
  * validation.ts erlaubt — KEINE impliziten Adapter (Decision #8).
  */
@@ -93,7 +77,10 @@ export interface WorkflowConfigField {
 export interface WorkflowActionDefinition {
   /** z.B. "email.analyze" — global eindeutig, dispatch-Key im Runner. */
   id: string
-  moduleId: WorkflowModuleId
+  /** Modul-Id zur Paletten-Gruppierung — bewusst ein offener `string`, damit ein neues
+   *  Store-Plugin seine eigene Modul-Id deklarieren kann, ohne das API-Paket zu ändern.
+   *  Die geschlossene Kern-Modul-Union (WorkflowModuleId) lebt App-intern. */
+  moduleId: string
   /** Anzeigename des Moduls für die Palette. Plugin-beigesteuerte Actions bringen ihn selbst
    *  mit (der Kern hält keine Label-Tabelle für Plugin-Module). Kern-Module nutzen WORKFLOW_MODULE_LABELS. */
   moduleLabel?: string
@@ -121,17 +108,6 @@ export interface WorkflowActionDefinition {
    *  bringen sie selbst mit; der Kern hält keine Tabelle dafür. Fallback: Label-basiert. */
   simLine?: string
 }
-
-/** 'manual' = ▶ Ausführen; alles andere = Event-Lauf (Hand-off → Aufgabe statt Compose).
- *  Provenienz pro Event-Quelle; die Unterscheidung manuell/Event macht isEventTrigger(). */
-export type WorkflowRunTrigger =
-  | 'manual'
-  | 'event-email'
-  | 'event-reply'
-  | 'event-ics'
-  | 'event-task'
-  | 'event-external'
-  | 'event-scheduled'
 
 /** Seed-Kandidat eines Triggers (Mail-Signal, Aufgabe, Plugin-Quelle). `itemKey` ist
  *  stabil pro Kandidat und dient dem Exactly-once-Ledger; `email` füttert den optionalen

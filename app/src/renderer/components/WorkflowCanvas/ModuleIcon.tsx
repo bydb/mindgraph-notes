@@ -39,13 +39,15 @@ const ACTION_MAP: Record<string, React.FC<{ size?: number }>> = {
   // schedule.timer → Modul-Icon IconRefresh (passt: wiederkehrender Zeitplan)
 }
 
-export const ModuleIcon: React.FC<{ moduleId: WorkflowModuleId; size?: number }> = ({ moduleId, size = 14 }) => {
-  const Comp = MAP[moduleId] ?? IconBox
+// moduleId ist ein offener String (Plugins bringen eigene) — die Kern-Iconmap kennt nur die
+// Kern-Module; alles andere fällt auf das generische IconBox zurück.
+export const ModuleIcon: React.FC<{ moduleId: string; size?: number }> = ({ moduleId, size = 14 }) => {
+  const Comp = MAP[moduleId as WorkflowModuleId] ?? IconBox
   return <Comp size={size} />
 }
 
 /** Icon eines Bausteins: pro-Action-Override, sonst Modul-Icon (Plugin-Module → generisches IconBox). */
-export const ActionIcon: React.FC<{ actionId: string; moduleId: WorkflowModuleId; size?: number }> = ({ actionId, moduleId, size = 14 }) => {
-  const Comp = ACTION_MAP[actionId] ?? MAP[moduleId] ?? IconBox
+export const ActionIcon: React.FC<{ actionId: string; moduleId: string; size?: number }> = ({ actionId, moduleId, size = 14 }) => {
+  const Comp = ACTION_MAP[actionId] ?? MAP[moduleId as WorkflowModuleId] ?? IconBox
   return <Comp size={size} />
 }

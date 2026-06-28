@@ -138,6 +138,24 @@ nicht zurückdreht.
 - `API_VERSION` exportiert **und** per Test an die Paketversion gekoppelt.
 - `npm run typecheck` · `test` · `build` grün; Deletion-Test grün.
 
+## Vertrags-Nachschärfung (Review nach C6, 2026-06-28)
+
+Zwei Typ-Fehler im öffentlichen Vertrag, die VOR Manifest v2 zu fixen waren — C2 hatte zwei
+Kern-Konzepte über-extrahiert:
+
+- **`WorkflowActionDefinition.moduleId` ist jetzt `string`** (vorher die geschlossene `WorkflowModuleId`-
+  Union, die ausgerechnet `antares`/`edoobox` enthielt). Ein neues Store-Plugin kann so seine eigene
+  Modul-Id deklarieren, ohne das API-Paket zu ändern. Die geschlossene **Kern-Modul-Union** (jetzt ohne
+  Plugin-Namen) bleibt App-intern in `shared/workflow/types.ts` (Quelle für Kern-Tabellen/-Icons). Folge:
+  `ModuleIcon`/`WorkflowPalette`/`moduleAvailability` auf offene `string`-Keys umgestellt (Kern-Maps casten
+  beim Lookup, Fallback IconBox).
+- **`WorkflowEventResult.trigger` ist jetzt `'event-external'` statt der vollen `WorkflowRunTrigger`-Union.**
+  Ein heruntergeladener Trigger-Provider kann damit keine Provenienz (`manual`, `event-email`, …) forgen
+  und so das Hand-off-/Human-in-the-loop-Verhalten beeinflussen. Die volle Union bleibt App-intern
+  (`shared/workflow/model.ts`); nur der **Mail-Signalpfad** des Kerns mintet reichere Trigger. Der
+  eingebaute Tasks-Provider trägt jetzt generische `event-external`-Provenienz (verhaltensgleich:
+  `isEventTrigger = trigger !== 'manual'`).
+
 ## Bewusst NICHT in diesem Schritt
 
 Manifest v2 (`minAppVersion`/`apiVersion`-Felder, neue Capabilities) · Repo-Template · Build/Sign-Action ·

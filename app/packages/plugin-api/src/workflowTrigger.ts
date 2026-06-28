@@ -11,7 +11,7 @@
 // Siehe docs/plugin-store-plan.md (Phase A-pre, Schritt 4) und
 // docs/plugin-system-plan.md #12 (Slot-Mechanik).
 
-import type { WorkflowRunTrigger, WorkflowSeedItem } from './workflow'
+import type { WorkflowSeedItem } from './workflow'
 
 /** Slot-Id, unter dem Trigger-Provider registriert werden (analog zu `dashboard.widget.*`). */
 export const WORKFLOW_TRIGGER_SLOT = 'workflow.trigger'
@@ -38,8 +38,10 @@ export interface WorkflowTriggerLedger {
 export interface WorkflowEventResult {
   /** Frische Kandidaten; der Kern filtert bereits gefeuerte (per itemKey) heraus und deckelt die Batch-Größe. */
   items: WorkflowSeedItem[]
-  /** Anzeige-Trigger des resultierenden Laufs (Default 'event-external'). */
-  trigger?: WorkflowRunTrigger
+  /** Anzeige-Trigger des resultierenden Laufs. Plugin-Provider dürfen NUR 'event-external'
+   *  setzen (Default) — die Provenienz/Human-in-the-loop-Semantik der übrigen Trigger
+   *  (manual, event-scheduled …) gehört dem Kern, nicht heruntergeladenem Plugin-Code. */
+  trigger?: 'event-external'
   /** Meldung für einen „skipped"-Lauf, wenn nichts Frisches anliegt. */
   emptyMessage?: string
   /** Nach erfolgreichem Lauf-Batch ausgeführt (z.B. Baseline vorrücken). Bekommt dieselbe Ledger-Sicht. */

@@ -3,11 +3,23 @@
 // Persistenz: {vault}/.mindgraph/workflows.json (Decision #9, geräte-lokal).
 // Siehe docs/workflow-canvas-plan.md "Beschlossener Stand".
 
-// Plugin-zugewandte Trigger-Typen leben im Plugin-Vertrag (@mindgraph/plugin-api), damit
-// Trigger-Provider in den Vertikalen sie ohne Kern-Import nutzen. Import + Re-Export halten
-// die lokalen Verwendungen (WorkflowRun, WorkflowRunPayload) und Kern-Importe unverändert.
-import type { WorkflowRunTrigger, WorkflowSeedItem } from '@mindgraph/plugin-api'
-export type { WorkflowRunTrigger, WorkflowSeedItem }
+// Der plugin-zugewandte Seed-Typ lebt im Plugin-Vertrag (@mindgraph/plugin-api), damit
+// Trigger-Provider in den Vertikalen ihn ohne Kern-Import erzeugen. Import + Re-Export halten
+// lokale Verwendungen + Kern-Importe unverändert.
+import type { WorkflowSeedItem } from '@mindgraph/plugin-api'
+export type { WorkflowSeedItem }
+
+/** 'manual' = ▶ Ausführen; alles andere = Event-Lauf (Hand-off → Aufgabe statt Compose).
+ *  Provenienz pro Event-Quelle; die Unterscheidung manuell/Event macht isEventTrigger().
+ *  App-intern: Plugin-Provider dürfen NUR 'event-external' liefern (siehe Plugin-Vertrag). */
+export type WorkflowRunTrigger =
+  | 'manual'
+  | 'event-email'
+  | 'event-reply'
+  | 'event-ics'
+  | 'event-task'
+  | 'event-external'
+  | 'event-scheduled'
 
 export interface WorkflowNode {
   id: string

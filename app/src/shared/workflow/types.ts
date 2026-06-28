@@ -13,7 +13,6 @@
 // hält bestehende `shared/workflow/types`-Importe im Kern unverändert. Der Workflow-MODELL-
 // Kern (Graph/Run/Runner) bleibt App-intern (model.ts).
 export type {
-  WorkflowModuleId,
   WorkflowPortKind,
   WorkflowPortDefinition,
   WorkflowPrivacyMetadata,
@@ -22,7 +21,21 @@ export type {
   WorkflowActionDefinition,
 } from '@mindgraph/plugin-api'
 
-import type { WorkflowModuleId } from '@mindgraph/plugin-api'
+/**
+ * Geschlossene Union der KERN-Workflow-Module (App-intern, NICHT im Plugin-Vertrag). Ein
+ * Plugin deklariert seine Modul-Id frei als String (`WorkflowActionDefinition.moduleId: string`);
+ * diese Union ist nur die Quelle für Kern-Tabellen (MODULE_FEATURE_GATE, WORKFLOW_MODULE_LABELS,
+ * Kern-Icons) und damit Single-Source der Modul-Namen, die der Kern selbst kennt.
+ */
+export type WorkflowModuleId =
+  | 'email'
+  | 'project'
+  | 'ollama'
+  | 'notes'
+  | 'human'
+  | 'calendar'
+  | 'tasks'
+  | 'schedule'
 
 /**
  * Welche VaultFeatures-Toggle ein Workflow-Modul gated. null = Kern-Modul
