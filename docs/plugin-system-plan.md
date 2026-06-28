@@ -228,7 +228,7 @@ Reihenfolge bewusst: **erst die Verträge (Manifest-Modell, Registries, validier
 - [ ] Manifest ist rein serialisierbar; Code nur in Main-/Renderer-Entry; kein direkter `fs`/`net`/`electron`-Import (ESLint grün)
 - [ ] Alle Aufrufe über `plugin:invoke` mit Senderprüfung und JSON-Schema-Validierung; **keine** neuen globalen `ElectronAPI`-Einträge
 - [ ] Einfache Settings deklarativ; komplexe UI als React-Komponente an benanntem Slot
-- [ ] Zod-Schemas für Manifest/State/Config und JSON Schemas für Settings/Action-IO vorhanden und geprüft
+- [ ] `ajv` (JSON Schema) für Manifest/State/Config UND Settings/Action-IO vorhanden und geprüft (kein Zod — siehe Entscheidung #9)
 - [ ] `npm run typecheck` + `npm run test` grün; Plugin hat eigene Tests in `src/plugins/<name>/tests/`
 - [ ] **Deletion Test (präzise):** Ordner gelöscht → `import.meta.glob`-Katalog neu erkannt → App **kompiliert und startet ohne weitere Codeänderung**, Feature restlos weg
 - [ ] Defektes Plugin (Manifest invalide / `register` wirft) → App startet trotzdem, Plugin in `error`
