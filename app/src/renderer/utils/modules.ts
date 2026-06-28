@@ -18,6 +18,15 @@ const pluginModules = pluginManifests
 /** Kernmodule plus alle manifest-deklarierten Plugin-Module. */
 export const MODULES: readonly ModuleDescriptor[] = [...CORE_MODULES, ...pluginModules]
 
+/** Modul-Ids, die von einem (manifest-deklarierten) Plugin stammen — für die Trennung
+ *  „MindGraph-Module" vs. „Installierte Plugins" in der Settings-UI. */
+export const PLUGIN_MODULE_IDS: ReadonlySet<string> = new Set(pluginModules.map(m => m.id))
+
+/** Ist dieses Modul plugin-gestützt (vs. Kern-Modul)? */
+export function isPluginModule(id: string): boolean {
+  return PLUGIN_MODULE_IDS.has(id)
+}
+
 function pluginManifestsForModule(id: string) {
   return pluginManifests.filter((manifest) => manifest.module && (manifest.module.id ?? manifest.id) === id)
 }

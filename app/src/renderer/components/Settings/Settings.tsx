@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { useUIStore, ACCENT_COLORS, AI_LANGUAGES, FONT_FAMILIES, UI_LANGUAGES, BACKGROUND_COLORS, ICON_SETS, OUTLINE_STYLES, MODULE_CATEGORIES, type Language, type FontFamily, type BackgroundColor, type IconSet, type OutlineStyle, type LLMBackend, type TransportDestination, type ModuleCategory, type ModuleDescriptor } from '../../stores/uiStore'
-import { MODULES, isModuleEnabled, setModuleEnabled, useIsModuleEnabled } from '../../utils/modules'
+import { MODULES, isModuleEnabled, setModuleEnabled, useIsModuleEnabled, isPluginModule } from '../../utils/modules'
 import { invokePlugin } from '../../plugins/client'
 import { PluginSlot } from '../../plugins/slots'
 import { edooboxService } from '../../stores/edooboxServiceBridge'
@@ -589,69 +589,92 @@ const ModulesTab: React.FC<{ t: TabTFn }> = ({ t }) => {
     })
   }
 
+  // Kern- von plugin-gestützten Modulen trennen: „MindGraph-Module" (immer dabei) vs.
+  // „Installierte Plugins" (eigenständige Vertikalen, später per Store verwaltbar).
+  const coreModules = MODULES.filter(m => !isPluginModule(m.id))
+  const pluginMods = MODULES.filter(m => isPluginModule(m.id))
+
   const grouped: Record<ModuleCategory, ModuleDescriptor[]> = {
     ai: [], communication: [], business: [], learning: [], research: [], devices: [], documents: []
   }
-  for (const mod of MODULES) grouped[mod.category].push(mod)
+  for (const mod of coreModules) grouped[mod.category].push(mod)
 
   const orderedCategories: ModuleCategory[] = ['ai', 'communication', 'business', 'learning', 'research', 'devices', 'documents']
 
+  const renderModuleRow = (mod: ModuleDescriptor, official?: boolean) => {
+    const enabled = isModuleEnabled(mod.id)
+    return (
+      <label key={mod.id} className={`module-row ${enabled ? 'active' : ''}`}>
+        {mod.iconText && (
+          <div
+            className="module-row-icon"
+            style={{ background: mod.iconColor || 'var(--accent-color, #4a9eff)' }}
+            aria-hidden="true"
+          >
+            <svg width="28" height="28" viewBox="0 0 28 28" xmlns="http://www.w3.org/2000/svg">
+              <text x="14" y="20" textAnchor="middle" fill="white" fontFamily="'Georgia', 'Times New Roman', serif" fontWeight="700" fontSize="18">
+                {mod.iconText}
+              </text>
+            </svg>
+          </div>
+        )}
+        <div className="module-row-body">
+          <div className="module-row-label">
+            {mod.label}
+            {official && (
+              <span className="module-row-badge" title={t('settings.modules.officialBadge')}>
+                ✓ {t('settings.modules.officialBadge')}
+              </span>
+            )}
+          </div>
+          <div className="module-row-desc">{mod.description}</div>
+          {moduleErrors[mod.id] && (
+            <div className="module-row-error" style={{ color: 'var(--error-color, #e5484d)', fontSize: '0.8em', marginTop: 4 }}>
+              {moduleErrors[mod.id]}
+            </div>
+          )}
+        </div>
+        <input
+          type="checkbox"
+          checked={enabled}
+          onChange={e => toggleModule(mod.id, e.target.checked)}
+        />
+      </label>
+    )
+  }
+
   return (
     <div className="settings-section">
-      <h3>{t('settings.modules.title')}</h3>
+      <h3>{t('settings.modules.coreTitle')}</h3>
       <p className="settings-hint">{t('settings.modules.hint')}</p>
 
       {orderedCategories.map(cat => (
-        <div key={cat} className="modules-category">
-          <h4 className="modules-category-title">{MODULE_CATEGORIES[cat]}</h4>
-          <div className="modules-list">
-            {grouped[cat].map(mod => {
-              const enabled = isModuleEnabled(mod.id)
-              return (
-                <label key={mod.id} className={`module-row ${enabled ? 'active' : ''}`}>
-                  {mod.iconText && (
-                    <div
-                      className="module-row-icon"
-                      style={{
-                        background: mod.iconColor || 'var(--accent-color, #4a9eff)'
-                      }}
-                      aria-hidden="true"
-                    >
-                      <svg width="28" height="28" viewBox="0 0 28 28" xmlns="http://www.w3.org/2000/svg">
-                        <text
-                          x="14"
-                          y="20"
-                          textAnchor="middle"
-                          fill="white"
-                          fontFamily="'Georgia', 'Times New Roman', serif"
-                          fontWeight="700"
-                          fontSize="18"
-                        >
-                          {mod.iconText}
-                        </text>
-                      </svg>
-                    </div>
-                  )}
-                  <div className="module-row-body">
-                    <div className="module-row-label">{mod.label}</div>
-                    <div className="module-row-desc">{mod.description}</div>
-                    {moduleErrors[mod.id] && (
-                      <div className="module-row-error" style={{ color: 'var(--error-color, #e5484d)', fontSize: '0.8em', marginTop: 4 }}>
-                        {moduleErrors[mod.id]}
-                      </div>
-                    )}
-                  </div>
-                  <input
-                    type="checkbox"
-                    checked={enabled}
-                    onChange={e => toggleModule(mod.id, e.target.checked)}
-                  />
-                </label>
-              )
-            })}
+        grouped[cat].length === 0 ? null : (
+          <div key={cat} className="modules-category">
+            <h4 className="modules-category-title">{MODULE_CATEGORIES[cat]}</h4>
+            <div className="modules-list">
+              {grouped[cat].map(mod => renderModuleRow(mod))}
+            </div>
           </div>
-        </div>
+        )
       ))}
+
+      <div className="modules-plugins-header">
+        <h3>{t('settings.modules.pluginsTitle')}</h3>
+        <button
+          className="settings-btn-secondary"
+          disabled
+          title={t('settings.modules.openStoreSoon')}
+        >
+          {t('settings.modules.openStore')} · {t('settings.modules.openStoreSoon')}
+        </button>
+      </div>
+      <p className="settings-hint">{t('settings.modules.pluginsHint')}</p>
+      <div className="modules-list">
+        {pluginMods.length === 0
+          ? <p className="settings-hint">{t('settings.modules.pluginsEmpty')}</p>
+          : pluginMods.map(mod => renderModuleRow(mod, true))}
+      </div>
     </div>
   )
 }
