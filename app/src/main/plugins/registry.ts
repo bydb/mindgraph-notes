@@ -58,6 +58,9 @@ interface LoadedPlugin {
   desired: 'active' | 'disabled'
   /** Serialisiert Transitionen pro Plugin — verhindert verschränkte activate/deactivate. */
   lifecycle?: Promise<void>
+  /** Manifest war beim Register ungültig ⇒ TERMINAL (kein Aktivierungs-Retry). Ein reiner
+   *  Laufzeitfehler (entry.register/start wirft) ist dagegen wiederholbar. */
+  manifestInvalid: boolean
 }
 
 /** Default-Host: log funktioniert, jeder Dienst wirft laut, solange Schritt 5 nicht verdrahtet ist. */
@@ -125,6 +128,7 @@ export class PluginRegistry {
           },
           actions: new Map(),
           desired: 'disabled',
+          manifestInvalid: true,
         })
         console.error(`[plugin] '${id}' abgewiesen: ${errors.join('; ')}`)
         continue
@@ -136,6 +140,7 @@ export class PluginRegistry {
         state: initialPluginState(id, manifest.version),
         actions: new Map(),
         desired: 'disabled',
+        manifestInvalid: false,
       })
     }
   }
@@ -176,8 +181,21 @@ export class PluginRegistry {
   private async doActivate(p: LoadedPlugin): Promise<PluginRuntimeState> {
     const id = p.manifest.id
     if (p.desired !== 'active') return p.state // von einem späteren deactivate überholt
-    if (p.state.activation === 'error') return p.state // defektes Manifest bleibt defekt
+    if (p.manifestInvalid) return p.state // defektes Manifest bleibt TERMINAL (kein Retry)
     if (p.state.activation === 'active') return p.state
+    // Ein reiner LAUFZEIT-Fehler (error aus entry.register/start) ist wiederholbar: erneutes
+    // Aktivieren setzt zurück. Hängt noch ein Entry aus einem fehlgeschlagenen Start (Ressourcen
+    // evtl. geleakt), erst best-effort stoppen + verwerfen, damit nicht doppelt registriert wird.
+    if (p.entry) {
+      try {
+        if (p.entry.stop) await p.entry.stop()
+      } catch (stopErr) {
+        console.error(`[plugin] stop() vor Retry von '${id}' warf: ${errMessage(stopErr)}`)
+      }
+      p.entry = undefined
+      p.host = undefined
+      p.actions = new Map()
+    }
 
     p.state = { ...p.state, activation: 'starting' }
     try {
@@ -211,7 +229,19 @@ export class PluginRegistry {
       const readiness = await this.evaluateReadiness(p)
       p.state = { ...p.state, activation: 'active', readiness, error: undefined }
     } catch (err) {
-      p.entry = undefined
+      // register/start kann bereits Timer/Listener angelegt haben → best-effort stoppen.
+      // Schlägt stop() fehl, Entry für einen späteren Deaktivierungs-Retry BEHALTEN (sonst sind
+      // die geleakten Ressourcen unerreichbar); sonst sauber verwerfen.
+      let stopFailed = false
+      if (p.entry?.stop) {
+        try {
+          await p.entry.stop()
+        } catch (stopErr) {
+          stopFailed = true
+          console.error(`[plugin] stop() nach fehlgeschlagener Aktivierung von '${id}' warf: ${errMessage(stopErr)}`)
+        }
+      }
+      if (!stopFailed) p.entry = undefined
       p.host = undefined
       p.actions = new Map()
       p.state = {

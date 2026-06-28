@@ -280,6 +280,64 @@ describe('PluginRegistry — Fehler-Isolation', () => {
     expect(r.get('off')?.activation).toBe('disabled')
   })
 
+  it('ein LAUFZEIT-Aktivierungsfehler ist wiederholbar (Retry aktiviert)', async () => {
+    let attempts = 0
+    const m = mkManifest('flaky')
+    const entry = definePluginMain({ id: 'flaky', capabilities: [] }, () => {
+      attempts++
+      if (attempts === 1) throw new Error('transient')
+    })
+    const r = new PluginRegistry()
+    r.register([{ manifest: m, loadEntry: async () => ({ default: entry }) }])
+    expect((await r.activate('flaky')).activation).toBe('error')
+    expect((await r.activate('flaky')).activation).toBe('active') // Retry setzt zurück
+  })
+
+  it('ein ungültiges Manifest bleibt TERMINAL (kein Aktivierungs-Retry, Entry nie geladen)', async () => {
+    let entryLoaded = false
+    const r = new PluginRegistry()
+    r.register([{
+      manifest: { id: 'Bad ID' } as PluginManifest,
+      loadEntry: async () => { entryLoaded = true; return { default: {} as PluginMainEntry } },
+    }])
+    expect(r.get('Bad ID')?.activation).toBe('error')
+    expect((await r.activate('Bad ID')).activation).toBe('error')
+    expect((await r.activate('Bad ID')).activation).toBe('error')
+    expect(entryLoaded).toBe(false)
+  })
+
+  it('best-effort stop() wenn start() nach Ressourcen-Anlage wirft', async () => {
+    const stop = vi.fn(async () => {})
+    const m = mkManifest('leakystart')
+    const entry = definePluginMain(
+      { id: 'leakystart', capabilities: [] },
+      () => {},
+      { start: async () => { throw new Error('start kaputt') }, stop }
+    )
+    const r = new PluginRegistry()
+    r.register([{ manifest: m, loadEntry: async () => ({ default: entry }) }])
+    const state = await r.activate('leakystart')
+    expect(state.activation).toBe('error')
+    expect(stop).toHaveBeenCalledOnce() // angelegte Ressourcen best-effort gestoppt
+  })
+
+  it('fehlgeschlagener Start + fehlgeschlagener Stop behält Entry → Deactivate-Retry stoppt', async () => {
+    let stopCalls = 0
+    const stop = vi.fn(async () => { stopCalls++; if (stopCalls === 1) throw new Error('stop kaputt') })
+    const m = mkManifest('leak2')
+    const entry = definePluginMain(
+      { id: 'leak2', capabilities: [] },
+      () => {},
+      { start: async () => { throw new Error('start kaputt') }, stop }
+    )
+    const r = new PluginRegistry()
+    r.register([{ manifest: m, loadEntry: async () => ({ default: entry }) }])
+    expect((await r.activate('leak2')).activation).toBe('error')
+    expect(stop).toHaveBeenCalledTimes(1) // best-effort scheiterte → Entry behalten
+    expect((await r.deactivate('leak2')).activation).toBe('disabled') // Retry stoppt sauber
+    expect(stop).toHaveBeenCalledTimes(2)
+  })
+
   it('erkennt eine Entry-ID, die nicht zum Manifest passt', async () => {
     const m = mkManifest('mism')
     const wrong: PluginMainEntry = { id: 'other', register: async () => {} }

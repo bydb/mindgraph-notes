@@ -575,6 +575,10 @@ const ModulesTab: React.FC<{ t: TabTFn }> = ({ t }) => {
   // useUIStore als Abhängigkeit einbinden, damit der Tab bei Flag-Änderungen rerendert
   const _tick = useUIStore(s => `${s.notesChatEnabled}${s.projectRagEnabled}${s.smartConnectionsEnabled}${s.flashcardsEnabled}${s.workflowCanvasEnabled}${s.semanticScholarEnabled}${s.zoteroEnabled}${s.languageTool.enabled}${s.email.enabled}${s.edoobox.enabled}${s.marketing.enabled}${s.readwise.enabled}${s.remarkable.enabled}${s.docling.enabled}${s.visionOcr.enabled}${s.speech.enabled}`)
   void _tick
+  // Generische Plugin-Module (z.B. Antares) liegen in pluginConfig — separat abonnieren, sonst
+  // löst ein Toggle über die generische Config-API keinen Re-Render des Modul-Tabs aus.
+  const _pluginTick = useUIStore(s => s.pluginConfig)
+  void _pluginTick
 
   // Fehlertext pro Modul, falls der Main-Prozess der Aktivierung nicht folgen kann (A-pre #1).
   const [moduleErrors, setModuleErrors] = useState<Record<string, string>>({})
