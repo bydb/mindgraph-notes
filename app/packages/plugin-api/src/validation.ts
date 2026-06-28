@@ -8,6 +8,8 @@
 
 import Ajv from 'ajv'
 import type { ValidateFunction } from 'ajv'
+import semver from 'semver'
+import { API_VERSION } from './version'
 import type { JsonSchema, PluginManifest } from './manifest'
 
 const ajv = new Ajv({ allErrors: true, removeAdditional: false })
@@ -16,6 +18,27 @@ export interface ValidationResult {
   valid: boolean
   errors: string[]
 }
+
+/**
+ * Diskriminator für einen terminalen Plugin-Fehlerzustand. Single-Source hier im Paket;
+ * `shared/plugins/state.ts` zieht den Typ per `import type` (compile-time erased ⇒ kein
+ * semver/ajv-Runtime-Leak in den Renderer).
+ *  - `manifest-invalid`: Schema-/Semantik-Verstoß, inkl. ungültiger SemVer/URL/Pfad.
+ *  - `incompatible-api`: gültige `apiVersion`-Range, die die laufende `API_VERSION` nicht erfüllt.
+ *  - `incompatible-app`: gültige `minAppVersion`, aber laufende App-Version ist kleiner.
+ */
+export type PluginErrorKind = 'manifest-invalid' | 'incompatible-api' | 'incompatible-app'
+
+/** Ergebnis eines Kompatibilitäts-Gates. `kind` ist nur bei `compatible: false` gesetzt. */
+export interface CompatResult {
+  compatible: boolean
+  reason?: string
+  kind?: PluginErrorKind
+}
+
+// Relative Artefakt-Pfade: kein führendes '/'/'\\', kein Schema (xxx:), kein führendes '..'.
+// Der robuste „..-irgendwo"-Check läuft segmentweise in validateManifestSemantics.
+const ENTRY_PATH_PATTERN = '^(?![/\\\\])(?![A-Za-z][A-Za-z0-9+.-]*:)(?!\\.\\.(?:[/\\\\]|$)).+'
 
 const CAPABILITY_VALUES = [
   'vault.read',
@@ -62,15 +85,45 @@ export const PLUGIN_MANIFEST_SCHEMA: JsonSchema = {
       additionalProperties: false,
     },
   },
-  required: ['id', 'version', 'label', 'description', 'category', 'capabilities'],
+  required: [
+    'manifestVersion', 'id', 'version', 'label', 'description', 'category', 'capabilities',
+    'apiVersion', 'minAppVersion', 'author', 'entrypoints',
+  ],
   // STRIKT: unbekannte Top-Level-Felder abweisen — fängt Tippfehler (z.B. `capabilites`).
   additionalProperties: false,
   properties: {
+    // v1 wird nicht mehr akzeptiert: hart const:2 + global required. v3 bekommt ein eigenes Schema.
+    manifestVersion: { const: 2 },
     id: { type: 'string', pattern: '^[a-z][a-z0-9-]*$' },
     version: { type: 'string', minLength: 1 },
     label: { type: 'string', minLength: 1 },
     description: { type: 'string' },
     category: { type: 'string', enum: CATEGORY_VALUES as unknown as string[] },
+    // SemVer-Form prüft die Semantik (validRange/valid); hier nur „nicht leer".
+    apiVersion: { type: 'string', minLength: 1 },
+    minAppVersion: { type: 'string', minLength: 1 },
+    author: {
+      type: 'object',
+      required: ['name'],
+      properties: {
+        name: { type: 'string', minLength: 1 },
+        url: { type: 'string' },
+        email: { type: 'string' },
+      },
+      additionalProperties: false,
+    },
+    entrypoints: {
+      type: 'object',
+      // Mindestens ein Code-Einstieg (main ODER renderer); styles ist optional.
+      anyOf: [{ required: ['main'] }, { required: ['renderer'] }],
+      properties: {
+        main: { type: 'string', minLength: 1, pattern: ENTRY_PATH_PATTERN },
+        renderer: { type: 'string', minLength: 1, pattern: ENTRY_PATH_PATTERN },
+        styles: { type: 'string', minLength: 1, pattern: ENTRY_PATH_PATTERN },
+      },
+      additionalProperties: false,
+    },
+    repo: { type: 'string' },
     icon: {
       type: 'object',
       properties: { text: { type: 'string' }, color: { type: 'string' } },
@@ -213,6 +266,27 @@ export function validateManifest(value: unknown): ValidationResult {
  */
 export function validateManifestSemantics(manifest: PluginManifest): ValidationResult {
   const errors: string[] = []
+
+  // — SemVer-/URL-/Pfad-Form (Klasse manifest-invalid; JSON Schema drückt das nicht aus) —
+  if (!semver.valid(manifest.version)) {
+    errors.push(`Ungültige SemVer-Version '${manifest.version}'.`)
+  }
+  if (!semver.valid(manifest.minAppVersion)) {
+    errors.push(`Ungültige minAppVersion '${manifest.minAppVersion}' (konkrete SemVer erwartet).`)
+  }
+  if (!semver.validRange(manifest.apiVersion)) {
+    errors.push(`Ungültige apiVersion-Range '${manifest.apiVersion}'.`)
+  }
+  if (manifest.repo !== undefined && !isHttpUrl(manifest.repo)) {
+    errors.push(`repo ist keine gültige http(s)-URL: '${manifest.repo}'.`)
+  }
+  // '..' an JEDER Stelle eines Entry-Pfads ablehnen (das ajv-Pattern fängt nur den Präfix).
+  for (const [key, value] of Object.entries(manifest.entrypoints ?? {})) {
+    if (typeof value === 'string' && value.split(/[/\\]/).includes('..')) {
+      errors.push(`Entry-Point '${key}' enthält ein '..'-Segment: '${value}'.`)
+    }
+  }
+
   const declared = new Set<string>(manifest.capabilities)
   const seenActionIds = new Set<string>()
   for (const action of manifest.actions ?? []) {
@@ -254,4 +328,59 @@ export function validateAgainst(
   const fn = key ? getValidator(key, schema) : ajv.compile(schema)
   const valid = fn(value) as boolean
   return { valid, errors: valid ? [] : formatErrors(fn) }
+}
+
+function isHttpUrl(value: string): boolean {
+  try {
+    const u = new URL(value)
+    return u.protocol === 'http:' || u.protocol === 'https:'
+  } catch {
+    return false
+  }
+}
+
+// — Kompatibilitäts-Gate (A0/2). Reine Funktionen über paket-eigene Daten (API_VERSION) bzw. die
+//   per Aufruf übergebene App-Version — standalone testbar. Der Registry-Aufruf läuft NACH
+//   validateManifest/validateManifestSemantics; eine ungültige Range/Version ist also bereits dort
+//   als `manifest-invalid` abgefangen. Die defensiven valid-Checks hier machen die Funktionen
+//   trotzdem für direkte (Fremd-)Aufrufer sicher.
+
+/** Prüft, ob die laufende `API_VERSION` die vom Plugin deklarierte `apiVersion`-Range erfüllt. */
+export function isApiCompatible(apiVersionRange: string): CompatResult {
+  if (typeof apiVersionRange !== 'string' || !semver.validRange(apiVersionRange)) {
+    return {
+      compatible: false,
+      kind: 'manifest-invalid',
+      reason: `Ungültige apiVersion-Range '${apiVersionRange}'.`,
+    }
+  }
+  if (!semver.satisfies(API_VERSION, apiVersionRange)) {
+    return {
+      compatible: false,
+      kind: 'incompatible-api',
+      reason: `Inkompatible API-Version: Plugin verlangt '${apiVersionRange}', App bietet '${API_VERSION}'.`,
+    }
+  }
+  return { compatible: true }
+}
+
+/** Prüft, ob die laufende App-Version mindestens `minAppVersion` ist. */
+export function isAppCompatible(minAppVersion: string, appVersion: string): CompatResult {
+  if (typeof minAppVersion !== 'string' || !semver.valid(minAppVersion)) {
+    return {
+      compatible: false,
+      kind: 'manifest-invalid',
+      reason: `Ungültige minAppVersion '${minAppVersion}'.`,
+    }
+  }
+  // Eine unlesbare App-Version darf legitime Plugins nicht fälschlich sperren (Fail-open).
+  if (!semver.valid(appVersion)) return { compatible: true }
+  if (semver.lt(appVersion, minAppVersion)) {
+    return {
+      compatible: false,
+      kind: 'incompatible-app',
+      reason: `App zu alt: Plugin verlangt mindestens '${minAppVersion}', App ist '${appVersion}'.`,
+    }
+  }
+  return { compatible: true }
 }

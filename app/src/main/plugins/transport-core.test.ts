@@ -8,11 +8,16 @@ import type { AnyPluginHost } from '@mindgraph/plugin-api'
 // Eine echte Registry mit einer reinen Action + einer host-abhängigen Action.
 function buildRegistry(): PluginRegistry {
   const manifest: PluginManifest = {
+    manifestVersion: 2,
     id: 'demo',
     version: '1.0.0',
     label: 'Demo',
     description: 'x',
     category: 'ai',
+    apiVersion: '^0.2.0',
+    minAppVersion: '0.0.0',
+    author: { name: 'Test' },
+    entrypoints: { main: 'main.js' },
     capabilities: ['llm.generate'],
     actions: [
       {

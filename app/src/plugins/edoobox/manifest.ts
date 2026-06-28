@@ -71,11 +71,16 @@ const apiInput = {
 }
 
 export const manifest: PluginManifest = {
+  manifestVersion: 2,
   id: 'edoobox',
   version: '1.0.0',
   label: 'Edoobox Modul',
   description: 'Veranstaltungs-Agent: Akkreditierung → edoobox-Push, Dashboard, Buchungen, Teilnehmerlisten.',
   category: 'business',
+  apiVersion: '^0.2.0',
+  minAppVersion: '0.8.14',
+  author: { name: 'Jochen Leeder', url: 'https://mindgraph-notes.de' },
+  entrypoints: { main: 'main.js', renderer: 'renderer.js' },
   icon: { text: '🎓', color: '#6366f1' },
   module: {
     id: 'mz-suite',

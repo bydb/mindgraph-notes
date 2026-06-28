@@ -45,11 +45,16 @@ const pdfInput = {
 }
 
 export const manifest: PluginManifest = {
+  manifestVersion: 2,
   id: 'remarkable',
   version: '1.0.0',
   label: 'reMarkable',
   description: 'reMarkable-Tablet über USB: Dokumente browsen/importieren, PDF exportieren, optimieren, als Buch umbrechen.',
   category: 'devices',
+  apiVersion: '^0.2.0',
+  minAppVersion: '0.8.14',
+  author: { name: 'Jochen Leeder', url: 'https://mindgraph-notes.de' },
+  entrypoints: { main: 'main.js', renderer: 'renderer.js' },
   icon: { text: '✎', color: '#111827' },
   module: { enabledPath: 'pluginConfig.remarkable.enabled', legacyEnabledPath: 'remarkable.enabled' },
   capabilities: [...REMARKABLE_CAPABILITIES],

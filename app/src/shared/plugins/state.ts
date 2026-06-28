@@ -5,6 +5,9 @@
 // Getrennte Achsen lassen ein aktiviertes Plugin sauber anzeigen, WARUM es noch
 // nicht nutzbar ist. Siehe docs/plugin-system-plan.md, Entscheidung #10.
 
+// `import type` ⇒ compile-time erased; zieht KEIN semver/ajv in den (renderer-geteilten) State.
+import type { PluginErrorKind } from '@mindgraph/plugin-api/validation'
+
 /** Liegt das Plugin im Build vor? (Phase 1: immer entweder gebündelt oder fehlend.) */
 export type InstallationState = 'bundled' | 'unavailable'
 
@@ -23,6 +26,8 @@ export interface PluginErrorInfo {
   message: string
   /** ISO-Zeitstempel, vom aufrufenden Prozess gesetzt. */
   at: string
+  /** Maschinenlesbarer Grund eines terminalen Fehlers (Schema-/Kompat-Verstoß). */
+  kind?: PluginErrorKind
 }
 
 /** Kombinierter Laufzeit-Zustand eines Plugins (eine Instanz pro Plugin-ID). */
