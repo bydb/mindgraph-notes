@@ -6,7 +6,7 @@
 // Das ist die Vorstufe zu `@mindgraph/plugin-api` (A0): die Settings-Persistenz ist damit
 // plugin-unabhängig, sodass eine Vertikale (perspektivisch) in ein eigenes Repo wandern kann.
 
-import { useCallback } from 'react'
+import { useCallback, useMemo } from 'react'
 import { useUIStore } from '../stores/uiStore'
 
 /** Liest die pro-pluginId gespeicherte Config (mit Defaults gemerged) — NICHT reaktiv (für Stores). */
@@ -22,7 +22,11 @@ export function usePluginConfig<T extends object>(
 ): [T, (patch: Partial<T>) => void] {
   const stored = useUIStore((s) => s.pluginConfig[pluginId]) as Partial<T> | undefined
   const setPluginConfig = useUIStore((s) => s.setPluginConfig)
-  const config = { ...defaults, ...(stored ?? {}) }
+  // STABILE Referenz: `stored` ist ein stabiler Zustand-Selektor-Wert, `defaults` eine
+  // Modul-Konstante. Ohne useMemo entstünde bei JEDEM Render ein neues Objekt → wer es in eine
+  // useEffect/useMemo-Dependency steckt (z.B. CredentialsSettings), bekommt eine Render-Schleife
+  // („Maximum update depth" / flackernde UI). Vgl. die Zustand-Selektor-Loop-Falle in CLAUDE.md.
+  const config = useMemo(() => ({ ...defaults, ...(stored ?? {}) }), [stored, defaults])
   const setConfig = useCallback(
     (patch: Partial<T>) => setPluginConfig(pluginId, patch as Record<string, unknown>),
     [pluginId, setPluginConfig]
