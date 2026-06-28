@@ -9,7 +9,7 @@
 //
 // Plugins OHNE `manifest.module` (z.B. `demo`) haben kein Gate und bleiben immer aktiv.
 
-import type { PluginManifest } from './manifest'
+import type { PluginManifest } from '@mindgraph/plugin-api'
 
 /** Liest einen Dotted-Path (z.B. 'antares.enabled') als Boolean aus einem Settings-Objekt.
  *  STRIKT: nur exakt `true` zählt als aktiviert — ein persistierter String `"false"` o.ä.

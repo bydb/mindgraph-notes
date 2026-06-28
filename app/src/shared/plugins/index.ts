@@ -1,59 +1,14 @@
-// Plugin-System — geteilte Verträge (prozessübergreifend, Single-Source).
+// Plugin-System — Barrel.
 //
-// Manifest = reine Daten · Entry = Code-Hooks · Host = Capability-Dienste ·
-// State = 3-Dimensionen-Lebenszyklus · Schemas = ajv-Laufzeitvalidierung.
-// Siehe docs/plugin-system-plan.md.
+// Der öffentliche Vertrag (Manifest, Host, Entry, Workflow-Beiträge) lebt jetzt im
+// Paket @mindgraph/plugin-api; die ajv-Validatoren auf dessen `/validation`-Subpath.
+// App-intern bleiben hier nur die nicht-öffentlichen Teile: Lebenszyklus-State,
+// das IPC-Wire-Format und die uiStore-Pfad-Mechanik des Modulschalters.
+// Siehe docs/plugin-api-package-plan.md (A0 · Schritt 1).
 
-export type {
-  PluginCategory,
-  PluginCapability,
-  JsonSchema,
-  CredentialRequirement,
-  ActionDef,
-  SlotDecl,
-  PluginManifest,
-} from './manifest'
+export * from '@mindgraph/plugin-api'
+export * from '@mindgraph/plugin-api/validation'
 
-export type {
-  VaultReadService,
-  VaultWriteService,
-  SecretsService,
-  LlmService,
-  HttpService,
-  WorkflowActionService,
-  CapabilityServiceMap,
-  CapabilityServicesFor,
-  PluginHostFor,
-  AnyPluginHost,
-} from './host'
-
-export type {
-  PluginActionExecutor,
-  PluginActionRegistry,
-  PluginMainContext,
-  PluginMainEntry,
-  PluginMainLifecycle,
-  SlotRegistry,
-  PluginRendererEntry,
-} from './entry'
-export { definePluginMain } from './entry'
-
-export type {
-  InstallationState,
-  ActivationState,
-  ReadinessState,
-  PluginErrorInfo,
-  PluginRuntimeState,
-} from './state'
-export { initialPluginState, isPluginUsable, isPluginInvokable, pluginBlockedReason } from './state'
-
-export type { PluginInvokeResult } from './transport'
-
-export type { ValidationResult } from './schemas'
-export {
-  PLUGIN_MANIFEST_SCHEMA,
-  validateManifest,
-  validateManifestSemantics,
-  getValidator,
-  validateAgainst,
-} from './schemas'
+export * from './state'
+export * from './transport'
+export * from './moduleGate'
