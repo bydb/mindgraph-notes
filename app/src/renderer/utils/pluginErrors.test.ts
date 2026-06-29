@@ -8,6 +8,8 @@ describe('pluginErrorKey', () => {
     expect(pluginErrorKey('incompatible-app')).toBe('plugins.error.incompatibleApp')
     expect(pluginErrorKey('redirect-blocked')).toBe('plugins.error.redirect')
     expect(pluginErrorKey('rate-limited')).toBe('plugins.error.rateLimited')
+    expect(pluginErrorKey('entry-type')).toBe('plugins.error.packageInvalid')
+    expect(pluginErrorKey('json-invalid')).toBe('plugins.error.packageInvalid')
   })
   it('liefert undefined für unbekannte/leere Codes', () => {
     expect(pluginErrorKey('nope')).toBeUndefined()
