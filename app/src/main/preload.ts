@@ -90,9 +90,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('plugin:setEnabled', pluginId, enabled),
   // Disk-installierte Plugins (A1 Runtime-Loader): Datei-Install / Deinstall / Fehlerliste
   pluginInstall: () => ipcRenderer.invoke('plugin:install'),
+  pluginInstallFromGithub: (repo: string, tag?: string) => ipcRenderer.invoke('plugin:installFromGithub', repo, tag),
   pluginUninstall: (pluginId: string) => ipcRenderer.invoke('plugin:uninstall', pluginId),
   pluginInstallErrors: () => ipcRenderer.invoke('plugin:installErrors'),
   pluginInstalled: () => ipcRenderer.invoke('plugin:installed'),
+  pluginCheckUpdates: () => ipcRenderer.invoke('plugin:checkUpdates'),
   pluginWidgets: () => ipcRenderer.invoke('plugin:widgets'),
   pluginWidgetData: (instanceId: string) => ipcRenderer.invoke('plugin:widgetData', instanceId),
   onPluginWidgetsChanged: (callback: () => void) => {

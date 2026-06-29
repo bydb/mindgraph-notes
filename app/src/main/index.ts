@@ -167,6 +167,8 @@ import {
 import { ArtifactError } from './plugins/artifact/limits'
 import { discoverInstalledPlugins, type DiscoverError } from './plugins/runtime/discover'
 import { ExternalWidgetRuntime } from './plugins/widgets'
+import { downloadPluginArtifact } from './plugins/download'
+import { checkPluginUpdates } from './plugins/update-checker'
 import { SECURE_WEB_PREFERENCES } from './windowSecurity'
 import { readArchiveFileCapped } from './plugins/runtime/readArchive'
 import { readActiveIndex } from './plugins/runtime/activeIndex'
@@ -281,6 +283,26 @@ ipcMain.handle('plugin:install', async (event) => {
   }
 })
 
+// A2: Install per öffentlichem GitHub-Repo (`owner/repo`[, Tag]). Lädt das signierte .mgxplugin-Asset
+// im MAIN (Host-Allowlist + Größe/Timeout in download.ts), gibt NUR Metadaten zurück (kein Buffer über
+// IPC) und reicht den Download UNGEPRÜFT in DENSELBEN verify→install-Pfad wie der Datei-Install —
+// Ed25519/Integrity/Manifest-Kompat passieren in installAndActivate, nicht hier.
+ipcMain.handle('plugin:installFromGithub', async (event, repo: unknown, tag: unknown) => {
+  if (!isTrustedSender(event)) return { ok: false, error: 'Nicht autorisierter Aufrufer' }
+  if (typeof repo !== 'string') return { ok: false, error: 'Ungültige Repo-Angabe' }
+  const tagArg = typeof tag === 'string' && tag.trim() ? tag.trim() : undefined
+  try {
+    const { archive } = await downloadPluginArtifact(repo, tagArg)
+    const out = await serializePluginOp(() => installAndActivate(pluginManageDeps(), archive))
+    publishExternalWidgetState()
+    return { ok: true, data: { id: out.id, version: out.version, idempotent: out.idempotent } }
+  } catch (err) {
+    const code = err instanceof ArtifactError ? err.code : undefined
+    const restartRequired = err instanceof PluginRestartRequiredError
+    return { ok: false, error: err instanceof Error ? err.message : String(err), code, restartRequired }
+  }
+})
+
 // Read-only: aktuell installierte, REGISTRIERTE Disk-Plugins (aus active.json ∩ Registry) mit
 // Live-Status. Beim Start re-verify-abgewiesene Plugins sind NICHT registriert → sie erscheinen hier
 // NICHT (sondern in plugin:installErrors mit echtem Grund), statt als verwirrender 'unknown'-Doppel.
@@ -298,6 +320,23 @@ ipcMain.handle('plugin:installed', async (event) => {
         readiness: st!.readiness ?? null,
         error: st!.error?.message ?? null,
       }))
+    return { ok: true, data }
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) }
+  }
+})
+
+// A2 (read-only): meldet je installiertem Plugin mit `manifest.repo`, ob ein neueres GitHub-Release
+// existiert. Lädt nichts — Install läuft user-ausgelöst über plugin:installFromGithub.
+ipcMain.handle('plugin:checkUpdates', async (event) => {
+  if (!isTrustedSender(event)) return { ok: false, error: 'Nicht autorisierter Aufrufer' }
+  try {
+    const installed = discoverInstalledPlugins(runtimePluginEnv()).sources.map((s) => ({
+      id: s.manifest.id,
+      version: s.manifest.version,
+      repo: s.manifest.repo,
+    }))
+    const data = await checkPluginUpdates(installed)
     return { ok: true, data }
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : String(err) }
