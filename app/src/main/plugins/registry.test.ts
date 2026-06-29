@@ -436,6 +436,36 @@ describe('PluginRegistry — Fehler-Isolation', () => {
     expect(state.error?.message).toMatch(/passt nicht/)
   })
 
+  it('unregister() stoppt + entfernt ein sauberes Plugin', async () => {
+    const stop = vi.fn(async () => {})
+    const m = mkManifest('clean')
+    const entry = definePluginMain({ id: 'clean', capabilities: [] }, () => {}, { stop })
+    const r = new PluginRegistry()
+    r.register([{ manifest: m, loadEntry: async () => ({ default: entry }) }])
+    await r.activate('clean')
+    await r.unregister('clean')
+    expect(stop).toHaveBeenCalledOnce()
+    expect(r.get('clean')).toBeUndefined() // aus der Map entfernt
+  })
+
+  it('unregister() WIRFT und BEHÄLT den Entry, wenn stop() fehlschlägt', async () => {
+    const stop = vi.fn(async () => { throw new Error('stop kaputt') })
+    const m = mkManifest('sticky')
+    const entry = definePluginMain({ id: 'sticky', capabilities: [] }, () => {}, { stop })
+    const r = new PluginRegistry()
+    r.register([{ manifest: m, loadEntry: async () => ({ default: entry }) }])
+    await r.activate('sticky')
+    await expect(r.unregister('sticky')).rejects.toThrow(/stop kaputt|stoppen/)
+    // NICHT gelöscht — der Entry mit evtl. laufenden Ressourcen bleibt für einen Retry erreichbar.
+    expect(r.get('sticky')).toBeDefined()
+    expect(r.get('sticky')?.activation).toBe('error')
+  })
+
+  it('unregister() einer unbekannten ID ist ein No-Op (wirft nicht)', async () => {
+    const r = new PluginRegistry()
+    await expect(r.unregister('ghost')).resolves.toBeUndefined()
+  })
+
   it('verweigert eine Action, die nicht im Manifest deklariert ist', async () => {
     const m = mkManifest('undecl')
     const entry = definePluginMain({ id: 'undecl', capabilities: [] }, ({ actions }) => {

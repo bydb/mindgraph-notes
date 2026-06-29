@@ -590,6 +590,78 @@ const ModulesTab: React.FC<{ t: TabTFn }> = ({ t }) => {
     })
   }
 
+  // Disk-installierte Plugins (A1): Datei-Install, Liste der installierten Plugins (Version/Status)
+  // mit Uninstall, sowie abgewiesene (beim Start nicht verifizierbare) Plugins.
+  const [installing, setInstalling] = useState(false)
+  const [installMsg, setInstallMsg] = useState<{ ok: boolean; text: string } | null>(null)
+  const [installErrors, setInstallErrors] = useState<Array<{ id: string; version: string; code: string; message: string }>>([])
+  const [diskPlugins, setDiskPlugins] = useState<Array<{ id: string; version: string; activation: string; readiness: string | null; error: string | null }>>([])
+  const [uninstalling, setUninstalling] = useState<string | null>(null)
+  const [confirmingUninstall, setConfirmingUninstall] = useState<string | null>(null)
+  // Lokalisierte Anzeige der Laufzeit-Enums (sonst englische Rohwerte für DE-User).
+  const activationLabel: Record<string, string> = {
+    active: t('settings.modules.statusActive'),
+    disabled: t('settings.modules.statusDisabled'),
+    starting: t('settings.modules.statusStarting'),
+    stopping: t('settings.modules.statusStopping'),
+    error: t('settings.modules.statusError'),
+  }
+  const readinessLabel: Record<string, string> = {
+    ready: t('settings.modules.readyReady'),
+    'needs-configuration': t('settings.modules.readyNeedsConfig'),
+    unavailable: t('settings.modules.readyUnavailable'),
+  }
+  const statusText = (p: { activation: string; readiness: string | null }) => {
+    const act = activationLabel[p.activation] ?? p.activation
+    // Readiness nur bei aktivem Plugin zeigen (bei disabled/error ist sie redundant).
+    if (p.activation === 'active' && p.readiness && readinessLabel[p.readiness]) {
+      return `${act} · ${readinessLabel[p.readiness]}`
+    }
+    return act
+  }
+  const refreshDiskPlugins = () => {
+    window.electronAPI.pluginInstallErrors().then(res => {
+      if (res.ok && res.data) setInstallErrors(res.data)
+    }).catch(() => { /* read-only Diagnose — Fehler ignorieren */ })
+    window.electronAPI.pluginInstalled().then(res => {
+      if (res.ok && res.data) setDiskPlugins(res.data)
+    }).catch(() => { /* read-only — Fehler ignorieren */ })
+  }
+  useEffect(refreshDiskPlugins, [])
+  const handleInstallPlugin = async () => {
+    setInstalling(true)
+    setInstallMsg(null)
+    try {
+      const res = await window.electronAPI.pluginInstall()
+      if (res.ok && res.data) {
+        setInstallMsg({ ok: true, text: t('settings.modules.installSuccess', { id: res.data.id, version: res.data.version }) })
+      } else if (!res.canceled) {
+        setInstallMsg({ ok: false, text: t('settings.modules.installFailed', { error: res.error ?? res.code ?? '?' }) })
+      }
+      refreshDiskPlugins()
+    } catch (err) {
+      setInstallMsg({ ok: false, text: t('settings.modules.installFailed', { error: err instanceof Error ? err.message : String(err) }) })
+    } finally {
+      setInstalling(false)
+    }
+  }
+  const handleUninstallPlugin = async (id: string) => {
+    setConfirmingUninstall(null)
+    setUninstalling(id)
+    setInstallMsg(null)
+    try {
+      const res = await window.electronAPI.pluginUninstall(id)
+      if (!res.ok) {
+        setInstallMsg({ ok: false, text: t('settings.modules.uninstallFailed', { error: res.error ?? '?' }) })
+      }
+      refreshDiskPlugins()
+    } catch (err) {
+      setInstallMsg({ ok: false, text: t('settings.modules.uninstallFailed', { error: err instanceof Error ? err.message : String(err) }) })
+    } finally {
+      setUninstalling(null)
+    }
+  }
+
   // Kern- von plugin-gestützten Modulen trennen: „MindGraph-Module" (immer dabei) vs.
   // „Installierte Plugins" (eigenständige Vertikalen, später per Store verwaltbar).
   const coreModules = MODULES.filter(m => !isPluginModule(m.id))
@@ -664,18 +736,89 @@ const ModulesTab: React.FC<{ t: TabTFn }> = ({ t }) => {
         <h3>{t('settings.modules.pluginsTitle')}</h3>
         <button
           className="settings-btn-secondary"
-          disabled
-          title={t('settings.modules.openStoreSoon')}
+          onClick={handleInstallPlugin}
+          disabled={installing}
         >
-          {t('settings.modules.openStore')} · {t('settings.modules.openStoreSoon')}
+          {installing ? t('settings.modules.installing') : t('settings.modules.installPlugin')}
         </button>
       </div>
       <p className="settings-hint">{t('settings.modules.pluginsHint')}</p>
+      {installMsg && (
+        <p
+          className="settings-hint"
+          style={{ color: installMsg.ok ? 'var(--success-color, #30a46c)' : 'var(--error-color, #e5484d)' }}
+        >
+          {installMsg.text}
+        </p>
+      )}
       <div className="modules-list">
         {pluginMods.length === 0
           ? <p className="settings-hint">{t('settings.modules.pluginsEmpty')}</p>
           : pluginMods.map(mod => renderModuleRow(mod, true))}
       </div>
+
+      <div className="modules-category" style={{ marginTop: 16 }}>
+        <h4 className="modules-category-title">{t('settings.modules.diskPluginsTitle')}</h4>
+        <div className="modules-list">
+          {diskPlugins.length === 0
+            ? <p className="settings-hint">{t('settings.modules.diskPluginsEmpty')}</p>
+            : diskPlugins.map(p => (
+              <div key={p.id} className="module-row">
+                <div className="module-row-body">
+                  <div className="module-row-label">{p.id} {p.version}</div>
+                  <div className="module-row-desc">{statusText(p)}</div>
+                  {p.error && (
+                    <div className="module-row-error" style={{ color: 'var(--error-color, #e5484d)', fontSize: '0.8em', marginTop: 4 }}>
+                      {p.error}
+                    </div>
+                  )}
+                </div>
+                {confirmingUninstall === p.id ? (
+                  <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                    <button
+                      className="settings-btn-secondary"
+                      style={{ color: 'var(--error-color, #e5484d)' }}
+                      onClick={() => handleUninstallPlugin(p.id)}
+                      disabled={uninstalling === p.id}
+                    >
+                      {uninstalling === p.id ? t('settings.modules.uninstalling') : t('settings.modules.uninstallConfirm')}
+                    </button>
+                    <button className="settings-btn-secondary" onClick={() => setConfirmingUninstall(null)} disabled={uninstalling === p.id}>
+                      {t('settings.modules.cancel')}
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    className="settings-btn-secondary"
+                    onClick={() => setConfirmingUninstall(p.id)}
+                    disabled={uninstalling !== null}
+                  >
+                    {t('settings.modules.uninstall')}
+                  </button>
+                )}
+              </div>
+            ))}
+        </div>
+      </div>
+
+      {installErrors.length > 0 && (
+        <div className="modules-category" style={{ marginTop: 16 }}>
+          <h4 className="modules-category-title">{t('settings.modules.installErrorsTitle')}</h4>
+          <p className="settings-hint">{t('settings.modules.installErrorsHint')}</p>
+          <div className="modules-list">
+            {installErrors.map(err => (
+              <div key={`${err.id}@${err.version}`} className="module-row">
+                <div className="module-row-body">
+                  <div className="module-row-label">{err.id} {err.version}</div>
+                  <div className="module-row-error" style={{ color: 'var(--error-color, #e5484d)', fontSize: '0.8em', marginTop: 4 }}>
+                    {err.code}: {err.message}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

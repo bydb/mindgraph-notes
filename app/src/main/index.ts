@@ -127,7 +127,7 @@ import { matchEmailToProjects, gateProjectMatch } from '../shared/projectMatch'
 import { parseRelevanceConfig, stripConfigBlock, buildReplyStats, computeHardSignals, combineRelevance, extractConfigBlock, upsertConfigBlock, emptyRelevanceConfig, isSentMail, isSentFolderName, DEFAULT_VIP_WEIGHT, DEFAULT_DOMAIN_WEIGHT, DEFAULT_KEYWORD_BOOST } from '../shared/emailRelevance'
 import { isHardLocked as isModelHardLocked, isCloudModel as isModelIsCloud } from '../shared/modelCompatibility'
 import { listOpenRouterModels, chat as llmChat, streamOpenRouterChat } from './llm/chatClient'
-import { registerWorkflowActions, workflowModuleGate } from '../shared/workflow/registry'
+import { registerWorkflowActions, unregisterWorkflowActions, workflowModuleGate } from '../shared/workflow/registry'
 import type { Workflow, WorkflowFile, WorkflowRunTrigger } from '../shared/workflow/model'
 import type {
   ProjectStatusCrystallizeInput,
@@ -151,9 +151,23 @@ import type { RagIndexStatus, RagQueryResult, RagRetrieveOptions } from '../shar
 import { setupTray, hideTransportWindow, updateShortcut, showTransportWindow } from './transport/trayManager'
 import { createMainRegistry, discoverMainPlugins } from './plugins/registry'
 import { isPluginGateEnabled } from '../shared/plugins/moduleGate'
-import { registerPluginTransport } from './plugins/transport'
+import { registerPluginTransport, isTrustedSender } from './plugins/transport'
 import { createHostFactory, type HostServices } from './plugins/host'
 import * as nativeServices from './plugins/nativeServices'
+import { buildKeyring, RESERVED_PLUGIN_IDS } from './plugins/runtime/keyring'
+import {
+  discoverAndRegisterInstalled,
+  installAndActivate,
+  uninstallPlugin,
+  PluginRestartRequiredError,
+  type ManageDeps,
+  type RuntimeEnv,
+} from './plugins/runtime/manage'
+import { ArtifactError } from './plugins/artifact/limits'
+import { discoverInstalledPlugins, type DiscoverError } from './plugins/runtime/discover'
+import { readArchiveFileCapped } from './plugins/runtime/readArchive'
+import { readActiveIndex } from './plugins/runtime/activeIndex'
+import { pluginPaths } from './plugins/runtime/paths'
 
 // Globale Fehlerbehandlung für unhandled exceptions (z.B. IMAP Socket-Timeouts)
 process.on('uncaughtException', (error) => {
@@ -171,9 +185,118 @@ registerPluginTransport(pluginRegistry)
 // Plugin-beigesteuerte Workflow-Canvas-Bausteine (Manifest-Feld `workflowActions`) in die
 // gemeinsame Registry einspielen, damit der Runner sie generisch dispatcht (kein statischer
 // antares/edoobox-Eintrag mehr). Renderer macht dasselbe unabhängig (plugins/workflowActions.ts).
+// Zugleich die gebündelten IDs sammeln — sie sind für Disk-Plugins gesperrt (gebündelt gewinnt).
+const bundledPluginIds = new Set<string>()
 for (const source of discoverMainPlugins()) {
+  if (typeof source.manifest?.id === 'string') bundledPluginIds.add(source.manifest.id)
   if (source.manifest.workflowActions?.length) registerWorkflowActions(source.manifest.workflowActions)
 }
+
+// — Disk-installierte Plugins (A1 Runtime-Loader): Store unter userData/plugins, signaturgeprüft —
+// Env + Verwaltungs-Deps sind lazy (app.getPath verlangt ein bereites app); blockedIds = gebündelte
+// + reservierte IDs, der Keyring nimmt Dev-Keys NUR in Dev-Builds via expliziter ENV-Datei auf.
+const pluginsRootDir = (): string => path.join(app.getPath('userData'), 'plugins')
+function runtimePluginEnv(): RuntimeEnv {
+  return {
+    pluginsRoot: pluginsRootDir(),
+    keyring: buildKeyring({
+      isPackaged: app.isPackaged,
+      devKeyringPath: process.env.MINDGRAPH_PLUGIN_DEV_KEYRING_PATH,
+    }),
+    appVersion: app.getVersion(),
+    blockedIds: new Set<string>([...bundledPluginIds, ...RESERVED_PLUGIN_IDS]),
+  }
+}
+function pluginManageDeps(): ManageDeps {
+  return {
+    env: runtimePluginEnv(),
+    registry: pluginRegistry,
+    registerWorkflowActions,
+    unregisterWorkflowActions,
+  }
+}
+// Re-Verify-/Kollisions-Fehler der LETZTEN Startup-Discovery (nur fürs Start-Log; die UI fragt
+// plugin:installErrors live ab, damit sie nach Install/Uninstall nicht veraltet).
+let lastPluginDiscoverErrors: DiscoverError[] = []
+
+// Serialisiert schreibende Plugin-Operationen (Install/Uninstall): beide machen read-modify-write
+// auf active.json — ohne Serialisierung könnten zwei nebenläufige IPC einen Eintrag verlieren
+// ("lost update"), sodass ein Plugin nach Neustart still nicht mehr lädt. Eine einfache Promise-Kette.
+let pluginOpChain: Promise<unknown> = Promise.resolve()
+function serializePluginOp<T>(fn: () => Promise<T>): Promise<T> {
+  const run = pluginOpChain.then(fn, fn)
+  pluginOpChain = run.then(() => undefined, () => undefined)
+  return run
+}
+
+// — Plugin-Verwaltung (A1): Datei-Install / Deinstall / Fehlerliste. Nur eigene App-Fenster
+//   (isTrustedSender), die Schreib-/Aktivierungslogik liegt im DI-Kern runtime/manage.ts. —
+ipcMain.handle('plugin:install', async (event) => {
+  if (!isTrustedSender(event)) return { ok: false, error: 'Nicht autorisierter Aufrufer' }
+  const result = await dialog.showOpenDialog(mainWindow!, {
+    title: 'Plugin installieren',
+    buttonLabel: 'Installieren',
+    properties: ['openFile'],
+    filters: [{ name: 'MindGraph-Plugin', extensions: ['mgxplugin'] }],
+  })
+  if (result.canceled || result.filePaths.length === 0) return { ok: false, canceled: true }
+  try {
+    // Größe VOR dem Lesen prüfen (stat) — sonst läge eine riesige Datei vor jedem Limit im RAM.
+    const archive = await readArchiveFileCapped(result.filePaths[0])
+    const out = await serializePluginOp(() => installAndActivate(pluginManageDeps(), archive))
+    return { ok: true, data: { id: out.id, version: out.version, idempotent: out.idempotent } }
+  } catch (err) {
+    const code = err instanceof ArtifactError ? err.code : undefined
+    const restartRequired = err instanceof PluginRestartRequiredError
+    return { ok: false, error: err instanceof Error ? err.message : String(err), code, restartRequired }
+  }
+})
+
+// Read-only: aktuell installierte, REGISTRIERTE Disk-Plugins (aus active.json ∩ Registry) mit
+// Live-Status. Beim Start re-verify-abgewiesene Plugins sind NICHT registriert → sie erscheinen hier
+// NICHT (sondern in plugin:installErrors mit echtem Grund), statt als verwirrender 'unknown'-Doppel.
+ipcMain.handle('plugin:installed', async (event) => {
+  if (!isTrustedSender(event)) return { ok: false, error: 'Nicht autorisierter Aufrufer' }
+  try {
+    const idx = readActiveIndex(pluginPaths(pluginsRootDir()).activeIndexPath)
+    const data = Object.entries(idx.active)
+      .map(([id, version]) => ({ id, version, st: pluginRegistry.get(id) }))
+      .filter((e) => e.st !== undefined)
+      .map(({ id, version, st }) => ({
+        id,
+        version,
+        activation: st!.activation,
+        readiness: st!.readiness ?? null,
+        error: st!.error?.message ?? null,
+      }))
+    return { ok: true, data }
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) }
+  }
+})
+
+ipcMain.handle('plugin:uninstall', async (event, pluginId: unknown) => {
+  if (!isTrustedSender(event)) return { ok: false, error: 'Nicht autorisierter Aufrufer' }
+  if (typeof pluginId !== 'string') return { ok: false, error: 'Ungültige Plugin-ID' }
+  try {
+    await serializePluginOp(() => uninstallPlugin(pluginManageDeps(), pluginId))
+    return { ok: true }
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) }
+  }
+})
+
+// Read-only: aktuell abgewiesene installierte Plugins (Re-Verify/Kollision). LIVE neu berechnet
+// (kein Code-Lauf — nur Hash/Signatur/Manifest-Verifikation), damit die Liste nach Install/Uninstall
+// stimmt und nicht den Startup-Stand zeigt.
+ipcMain.handle('plugin:installErrors', async (event) => {
+  if (!isTrustedSender(event)) return { ok: false, error: 'Nicht autorisierter Aufrufer' }
+  try {
+    return { ok: true, data: discoverInstalledPlugins(runtimePluginEnv()).errors }
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) }
+  }
+})
 
 // — Plugin-Secrets: pro Plugin genamespacet, via safeStorage verschlüsselt in userData —
 // (Direkter userData-Write wie bei den App-Settings; NICHT der Vault-Schreibpfad.)
@@ -806,6 +929,19 @@ app.whenReady().then(async () => {
       ? `Modell '${model}' ist für '${moduleId}' gesperrt (Hard-Lock)`
       : null
   })
+  // Disk-installierte Plugins (A1) als Quellen registrieren, BEVOR activateAll läuft — so fährt
+  // der gemeinsame Lebenszyklus-Pfad sie hoch (respektiert den Modulschalter). Re-Verify-/
+  // Kollisions-Fehler landen in lastPluginDiscoverErrors für die Verwaltungs-UI. Fehler-isoliert.
+  try {
+    lastPluginDiscoverErrors = discoverAndRegisterInstalled(pluginManageDeps())
+    if (lastPluginDiscoverErrors.length) {
+      console.warn(`[plugin] ${lastPluginDiscoverErrors.length} installierte(s) Plugin(s) abgewiesen:`,
+        lastPluginDiscoverErrors.map((e) => `${e.id}@${e.version} (${e.code})`).join(', '))
+    }
+  } catch (err) {
+    console.error('[plugin] Disk-Discovery fehlgeschlagen:', err instanceof Error ? err.message : err)
+  }
+
   // A-pre Schritt 1: nur Plugins aktivieren, deren Modulschalter aktiviert ist — der Start
   // respektiert den Disabled-Zustand (gebündelte Plugins sind nicht mehr blind „immer an").
   const pluginGateSettings = startupUiSettings ?? {}

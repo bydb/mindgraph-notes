@@ -362,6 +362,10 @@ export const WORKFLOW_ACTIONS: WorkflowActionDefinition[] = [
 let pluginActions: WorkflowActionDefinition[] = []
 const pluginModuleLabels = new Map<string, string>()
 const pluginModuleGates = new Map<string, string | null>()
+// actionId → ownerId (Plugin-Id), das diese Action registriert hat. Erlaubt das gezielte
+// Entfernen aller Actions eines Plugins bei Upgrade/Uninstall (sonst blieben tote/alte Actions
+// global registriert und der Runner könnte gegen einen nicht mehr existierenden Block dispatchen).
+const actionOwner = new Map<string, string>()
 
 function rebuildIndex(): void {
   ACTION_INDEX = {}
@@ -374,18 +378,70 @@ function rebuildIndex(): void {
   }
 }
 
-/** Plugin-Workflow-Actions einspielen (idempotent, dedupe per id — erneute Registrierung ersetzt). */
-export function registerWorkflowActions(defs: readonly WorkflowActionDefinition[]): void {
+/** IDs der Kern-Actions (statisch) — gegen Shadowing durch Plugin-Actions geschützt. */
+const CORE_ACTION_IDS: ReadonlySet<string> = new Set(WORKFLOW_ACTIONS.map(a => a.id))
+
+/** Prüft, ob `actionId` für `ownerId` eine FREMDE Kollision ist (Kern-Action, fremder oder
+ *  besitzloser Plugin-Action-Eintrag). Eigene IDs (gleicher Owner) zählen NICHT als Kollision. */
+function isForeignActionCollision(actionId: string, ownerId: string): boolean {
+  const exists = CORE_ACTION_IDS.has(actionId) || pluginActions.some(a => a.id === actionId)
+  return exists && actionOwner.get(actionId) !== ownerId
+}
+
+/** Liefert die Action-IDs aus `defs`, die für `ownerId` mit einer vorhandenen (Kern-/fremden)
+ *  Action kollidieren würden. LEER ⇒ alle Actions sind sauber registrierbar. Rein (keine Mutation);
+ *  der Install-Pfad nutzt das, um ein Plugin mit kollidierendem Vertrag TERMINAL abzulehnen, statt
+ *  es still degradiert zu aktivieren. */
+export function findWorkflowActionCollisions(
+  defs: readonly WorkflowActionDefinition[],
+  ownerId: string
+): string[] {
+  return defs.filter(d => isForeignActionCollision(d.id, ownerId)).map(d => d.id)
+}
+
+/** Plugin-Workflow-Actions einspielen (idempotent, dedupe per id — erneute Registrierung ersetzt).
+ *  `ownerId` (Plugin-Id) wird mitgeführt, damit Upgrade/Uninstall die Actions wieder gezielt
+ *  entfernen können (siehe unregisterWorkflowActions). Ohne ownerId bleibt die Action besitzlos
+ *  (gebündelte Plugins, die nie deinstalliert werden).
+ *
+ *  STRIKT OWNER-BASIERT (Sicherheit): Eine OWNED-Registrierung (Disk-Plugin mit ownerId) darf KEINE
+ *  Kern-Action und keine fremde/besitzlose Plugin-Action shadowen oder übernehmen — sie darf nur
+ *  EIGENE IDs ersetzen oder NEUE hinzufügen. Sonst könnte ein signiertes Disk-Plugin eine
+ *  gleichnamige Action deklarieren, eine geteilte (Kern/gebündelte) Action verdrängen und sie beim
+ *  eigenen Uninstall stillschweigend mitlöschen. Kollisionen werden verworfen + geloggt. */
+export function registerWorkflowActions(defs: readonly WorkflowActionDefinition[], ownerId?: string): void {
   if (defs.length === 0) return
   const byId = new Map(pluginActions.map(a => [a.id, a]))
-  for (const d of defs) byId.set(d.id, d)
+  for (const d of defs) {
+    if (ownerId && isForeignActionCollision(d.id, ownerId)) {
+      console.warn(
+        `[workflow] Plugin '${ownerId}': Action-ID '${d.id}' kollidiert mit einer vorhandenen (Kern-/fremden) Action — übersprungen`
+      )
+      continue
+    }
+    byId.set(d.id, d)
+    if (ownerId) actionOwner.set(d.id, ownerId)
+  }
   pluginActions = [...byId.values()]
+  rebuildIndex()
+}
+
+/** Entfernt alle von `ownerId` (Plugin-Id) registrierten Workflow-Actions — für Upgrade (alte
+ *  Version) und Uninstall. Module-Label/Gate des Owners verschwinden automatisch über rebuildIndex,
+ *  sobald keine seiner Actions mehr übrig ist. */
+export function unregisterWorkflowActions(ownerId: string): void {
+  const owned = new Set<string>()
+  for (const [actionId, owner] of actionOwner) if (owner === ownerId) owned.add(actionId)
+  if (owned.size === 0) return
+  pluginActions = pluginActions.filter(a => !owned.has(a.id))
+  for (const id of owned) actionOwner.delete(id)
   rebuildIndex()
 }
 
 /** Nur für Tests: Plugin-Actions zurücksetzen (Kern-Zustand wiederherstellen). */
 export function __resetWorkflowActionsForTest(): void {
   pluginActions = []
+  actionOwner.clear()
   rebuildIndex()
 }
 

@@ -142,3 +142,60 @@ Entpacken nötig).
 - ID-Kollision mit gebündeltem Plugin wird bei Install **und** Load abgelehnt (Test).
 - Re-Install byte-identisch = idempotent; abweichend = Fehler (Test).
 - `npm run typecheck` + `npm run test` + `npm run build` grün; gebündelte Plugins unverändert.
+
+## Entschieden (Review-Runde 2 — Integrationsreview Wiring)
+
+8. **Index-Commit ZULETZT (ADR-konform, bestätigt).** `installPluginArtifact()` materialisiert +
+   re-verifiziert NUR; es setzt `active.json` NICHT. Den Index committet `manage.installAndActivate()`
+   erst nach erfolgreichem Load + Activate. Verhindert eine Crash-Schleife, falls der Prozess während
+   `start()` abbricht (sonst zeigte der persistente Index auf eine crash-loopende Version).
+9. **Doppelfehler (Aktivierung scheitert UND `stop()` der neuen Version wirft) = `PluginRestartRequiredError`.**
+   Die Vorgängerversion wird NICHT in-Process reaktiviert (sonst liefen zwei Versionen + geleakte
+   Timer gleichzeitig). Der kaputte Entry bleibt für einen Stop-Retry; der Index zeigt weiter auf den
+   Vorgänger (lädt sauber beim Neustart); die UI meldet „Neustart erforderlich".
+10. **Workflow-Action-Kollision = TERMINALE Ablehnung des Plugins.** Deklariert ein Disk-Plugin eine
+    Action-ID, die mit einer Kern- oder fremden/besitzlosen Plugin-Action kollidiert, wird die
+    Aktivierung abgelehnt (kein still-degradiertes Plugin mit nur teilweise registriertem Vertrag).
+    Owner-Tracking entfernt beim Uninstall nur die EIGENEN Actions.
+11. **Schreibende Plugin-IPC (install/uninstall) sind serialisiert** (Promise-Kette) — `active.json`
+    ist read-modify-write; ohne Serialisierung verlöre eine nebenläufige Operation einen Eintrag.
+12. **Doppelfehler behält den Kandidatenordner (kein destruktives Startup-GC).** Der nach einem
+    Doppelfehler bewusst behaltene (evtl. noch laufende) Entry darf seinen Versionsordner nicht
+    verlieren — `cleanupFreshVersion` läuft NUR nach sauberem Stop. Der dormante Ordner bleibt als
+    inaktive Version liegen (Mehrversions-Design §1/§4). **Bewusst KEIN `reconcileStore`-GC:** ein
+    fail-closed `readActiveIndex()` (fehlende/beschädigte `active.json` → `{active:{}}`) würde sonst
+    als autoritative Löschliste den ganzen Store wischen. Sicheres GC erst später (F5, Tombstones /
+    nur nach validiertem Index).
+13. **Fehler beim finalen Index-Commit = dieselbe Recovery-Transaktion.** Wirft `setActiveVersion`
+    (I/O/Permissions/Disk-voll) NACH erfolgreicher Aktivierung, läuft die neue Version bereits, ist
+    aber nicht persistiert → gleicher Rollback wie bei einem Aktivierungsfehler (`rollbackStartedVersion`:
+    neue Version sauber stoppen + Vorgänger live; bei Stop-Doppelfehler `PluginRestartRequiredError`).
+    **Uninstall analog:** scheitert der `active.json`-Austrag, wird die noch persistierte aktive Version
+    wieder registriert + aktiviert. Der Commit-Writer ist per `ManageDeps.commitActiveVersion`
+    injizierbar (Test).
+14. **Workflow-Action-Kollision wird AUCH beim Startup terminal behandelt.** `discoverAndRegisterInstalled`
+    prüft vor jeder Registrierung `findWorkflowActionCollisions`; eine Kollision (z.B. durch ein
+    App-Update neu entstandene Kern-ID) erzeugt einen Discover-Fehler (`workflow-collision`) statt einer
+    partiell registrierten Quelle — gleiches Verhalten wie im Install-Pfad.
+
+## Offene ADR-Follow-ups (bekannte Low-Risiken, bewusst zurückgestellt)
+
+- **F1 — `stop()`-Timeout:** Ein Plugin, dessen `stop()` nie auflöst (Hang, nicht Reject), lässt
+  `unregister()`/das Upgrade unbegrenzt hängen. Folge-PR: `stop()` mit hartem Timeout umschließen →
+  bei Überschreitung wie ein Stop-Fehler behandeln (`PluginRestartRequiredError`).
+- **F2 — Gegatete Disk-Plugins re-enablen:** Ein Disk-Plugin mit `manifest.module.enabledPath` ohne
+  zugehörigen UI-Toggle (Disk-Plugins sind nicht in `MODULES`) ist nach Neustart still `disabled` und
+  nicht reaktivierbar. Folge-PR: pro Disk-Plugin einen Enable/Disable-Schalter in der Verwaltungs-UI
+  (oder Disk-Plugins generisch in die Modul-Liste aufnehmen).
+- **F3 — TOCTOU `stat`→`readFile` beim Archiv-Lesen:** Wird die (user-gewählte) Datei zwischen
+  Größen-`stat` und `readFile` getauscht, ist der OOM-Schutz umgehbar. Niedrig (lokaler Schreib-Race
+  auf genau diesen Pfad nötig). Folge-PR: per `open()`+`fstat`+streamendes Lesen mit Hard-Cap auf
+  EINEM File-Handle.
+- **F4 — Action-ID-Namespacing nicht erzwungen:** `workflowAction.id` ist nicht schema-seitig auf
+  ein `<pluginId>.`-Präfix beschränkt. Der Schaden (Shadowing/Löschen fremder Actions) ist durch den
+  Owner-Guard (§10) verhindert; das Namespacing-Schema bleibt als Härtung offen (Manifest-v2-Update).
+- **F5 — Sicheres Store-GC (dormante/verwaiste Versionsordner):** Inaktive Versionen (Rollback-
+  Vorgänger, nach Doppelfehler behaltene Kandidaten, alte Upgrade-Versionen) sammeln sich an. Ein
+  naives „lösche alles nicht-Aktive laut `active.json`" ist gefährlich (fail-closed-Index → Total-
+  löschung). Folge-PR: Tombstone-/Generationszähler je Version + GC NUR nach nachweislich validem,
+  nicht-leerem Index; Reaktivierungsfenster für Rollback respektieren.

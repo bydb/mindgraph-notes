@@ -67,14 +67,23 @@ const env = (over: Record<string, unknown> = {}) => ({
   ...over,
 })
 
+/** Install + Index-Commit (wie es der Aufrufer `manage` nach erfolgreicher Aktivierung täte) —
+ *  für die discover-Tests, die eine aktive Version in active.json brauchen. */
+async function installCommitted(a: Buffer, e = env()) {
+  const r = await installPluginArtifact(a, e)
+  setActiveVersion(root, r.id, r.version)
+  return r
+}
+
 describe('installPluginArtifact', () => {
-  it('installiert, materialisiert und aktiviert atomar', async () => {
+  it('materialisiert + verifiziert, OHNE den Aktivierungsindex zu setzen', async () => {
     const res = await installPluginArtifact(await archive(), env())
     expect(res).toMatchObject({ id: 'ext-plugin', version: '0.1.0', idempotent: false })
     expect(existsSync(join(res.versionDir, 'main.js'))).toBe(true)
     expect(existsSync(join(res.versionDir, 'integrity.json'))).toBe(true)
     expect(existsSync(join(res.versionDir, 'integrity.json.sig'))).toBe(true)
-    expect(readActiveIndex(pluginPaths(root).activeIndexPath).active).toEqual({ 'ext-plugin': '0.1.0' })
+    // Index-Commit ist Sache des Aufrufers (manage) NACH erfolgreicher Aktivierung — install setzt ihn NICHT.
+    expect(readActiveIndex(pluginPaths(root).activeIndexPath).active).toEqual({})
   })
 
   it('ist idempotent bei byte-identischem Artefakt', async () => {
@@ -118,7 +127,7 @@ describe('installPluginArtifact', () => {
 
 describe('discoverInstalledPlugins', () => {
   it('liefert die aktive Version als ladbare Quelle', async () => {
-    await installPluginArtifact(await archive(), env())
+    await installCommitted(await archive())
     const { sources, errors } = discoverInstalledPlugins(env())
     expect(errors).toEqual([])
     expect(sources).toHaveLength(1)
@@ -135,7 +144,7 @@ describe('discoverInstalledPlugins', () => {
   })
 
   it('Manipulation des installierten main.js → fail-closed (kein Source, Fehler gemeldet)', async () => {
-    const res = await installPluginArtifact(await archive(), env())
+    const res = await installCommitted(await archive())
     writeFileSync(join(res.versionDir, 'main.js'), Buffer.from('GETAMPERT — anderer Inhalt', 'utf8'))
     const { sources, errors } = discoverInstalledPlugins(env())
     expect(sources).toEqual([])
@@ -144,7 +153,7 @@ describe('discoverInstalledPlugins', () => {
   })
 
   it('unbekannter Key beim Laden → fail-closed (sig-unknown-key)', async () => {
-    await installPluginArtifact(await archive(), env())
+    await installCommitted(await archive())
     const emptyKeyring: Keyring = { get: () => undefined }
     const { sources, errors } = discoverInstalledPlugins(env({ keyring: emptyKeyring }))
     expect(sources).toEqual([])
@@ -152,7 +161,7 @@ describe('discoverInstalledPlugins', () => {
   })
 
   it('ID-Kollision wird auch beim Laden verworfen', async () => {
-    await installPluginArtifact(await archive(), env())
+    await installCommitted(await archive())
     const { sources, errors } = discoverInstalledPlugins(env({ blockedIds: new Set(['ext-plugin']) }))
     expect(sources).toEqual([])
     expect(errors[0].code).toBe('id-collision')
@@ -188,14 +197,13 @@ describe('A1 P1-Fixes — Regressionen', () => {
     await expect(installPluginArtifact(a, env())).rejects.toMatchObject({ code: 'version-conflict' })
   })
 
-  it('idempotenter Re-Install aktiviert eine zuvor inaktive Version', async () => {
+  it('idempotenter Re-Install lässt den Aktivierungsindex unverändert (Commit ist Aufrufer-Sache)', async () => {
     const a = await archive()
     await installPluginArtifact(a, env())
-    setActiveVersion(root, 'ext-plugin', null)
-    expect(readActiveIndex(pluginPaths(root).activeIndexPath).active).toEqual({})
+    expect(readActiveIndex(pluginPaths(root).activeIndexPath).active).toEqual({}) // install committet nie
     const res2 = await installPluginArtifact(a, env())
     expect(res2.idempotent).toBe(true)
-    expect(readActiveIndex(pluginPaths(root).activeIndexPath).active).toEqual({ 'ext-plugin': '0.1.0' })
+    expect(readActiveIndex(pluginPaths(root).activeIndexPath).active).toEqual({}) // weiterhin nicht gesetzt
   })
 
   // P1.3: Installation führt KEINEN Plugin-Code aus; Laden erst im loadEntry-Pfad.
@@ -203,7 +211,7 @@ describe('A1 P1-Fixes — Regressionen', () => {
     const a = await archive({
       main: Buffer.from('throw new Error("boom-on-load")\nmodule.exports = { id: "ext-plugin", register: function () {} }\n', 'utf8'),
     })
-    const res = await installPluginArtifact(a, env()) // darf NICHT werfen (kein require beim Install)
+    const res = await installCommitted(a) // darf NICHT werfen (kein require beim Install)
     expect(res.idempotent).toBe(false)
     const { sources } = discoverInstalledPlugins(env())
     await expect(sources[0].loadEntry!()).rejects.toThrow(/boom-on-load/) // erst hier wird ausgeführt
@@ -219,7 +227,7 @@ describe('A1 P1-Fixes — Regressionen', () => {
       signKey: priv,
       keyId: KEY_ID,
     })
-    await installPluginArtifact(a, env())
+    await installCommitted(a)
     const { sources, errors } = discoverInstalledPlugins(env())
     expect(errors).toEqual([])
     const entry = await sources[0].loadEntry!()

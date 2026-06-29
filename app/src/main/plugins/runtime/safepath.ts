@@ -20,8 +20,26 @@ export function assertSafeStoreVersionDir(storeDir: string, id: string, version:
   if (!VERSION_RE.test(version)) throw new ArtifactError('path-invalid', `Ungültige/unsichere Version '${version}'`)
   const idDir = join(storeDir, id)
   const target = join(idDir, version)
+  assertChainInsideStore(storeDir, [storeDir, idDir, target])
+  return target
+}
+
+/**
+ * Wie {@link assertSafeStoreVersionDir}, aber für das versionslose Plugin-Verzeichnis
+ * `storeDir/<id>` (Uninstall entfernt alle Versionen einer ID auf einmal). `id` muss ein sicheres
+ * Pfadsegment sein; die Kette darf keine Symlinks enthalten und nicht aus dem Store ausbrechen.
+ */
+export function assertSafeStoreIdDir(storeDir: string, id: string): string {
+  if (!ID_RE.test(id)) throw new ArtifactError('path-invalid', `Ungültige/unsichere Plugin-ID '${id}'`)
+  const idDir = join(storeDir, id)
+  assertChainInsideStore(storeDir, [storeDir, idDir])
+  return idDir
+}
+
+/** Existierende Pfade der Kette dürfen keine Symlinks sein und müssen real im Store liegen. */
+function assertChainInsideStore(storeDir: string, chain: string[]): void {
   const realStore = existsSync(storeDir) ? realpathSync(storeDir) : null
-  for (const p of [storeDir, idDir, target]) {
+  for (const p of chain) {
     if (!existsSync(p)) continue
     if (lstatSync(p).isSymbolicLink()) {
       throw new ArtifactError('path-invalid', `Symlink im Store-Pfad nicht erlaubt: '${p}'`)
@@ -33,5 +51,4 @@ export function assertSafeStoreVersionDir(storeDir: string, id: string, version:
       }
     }
   }
-  return target
 }

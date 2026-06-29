@@ -314,6 +314,29 @@ export class PluginRegistry {
     return this.chain(p, () => this.doDeactivate(p))
   }
 
+  /**
+   * Entfernt ein Plugin komplett aus der Registry (für Uninstall/Upgrade einer Disk-Quelle).
+   * Erst sauber deaktivieren (stop() laufen lassen), dann aus der Map löschen — unbekannte ID ist
+   * ein No-Op.
+   *
+   * WICHTIG (Stop-Sicherheit): Schlägt stop() fehl, erreicht das Plugin NICHT `disabled`. Dann wird
+   * NICHT gelöscht und ein Fehler geworfen — der Entry (mit evtl. noch laufenden Timern/Listenern)
+   * bleibt erhalten, damit ein späterer Deaktivierungs-Retry ihn noch erreicht. Der Aufrufer (z.B.
+   * Upgrade) MUSS dann abbrechen, statt die neue Version neben den weiterlaufenden alten Ressourcen
+   * zu starten.
+   */
+  async unregister(id: string): Promise<void> {
+    const p = this.plugins.get(id)
+    if (!p) return
+    const state = await this.deactivate(id) // wirft nie; liefert den Endzustand
+    if (state.activation !== 'disabled') {
+      throw new Error(
+        state.error?.message ?? `Plugin '${id}' ließ sich nicht stoppen (Zustand '${state.activation}')`
+      )
+    }
+    this.plugins.delete(id)
+  }
+
   private async doDeactivate(p: LoadedPlugin): Promise<PluginRuntimeState> {
     const id = p.manifest.id
     if (p.desired !== 'disabled') return p.state // von einem späteren activate überholt

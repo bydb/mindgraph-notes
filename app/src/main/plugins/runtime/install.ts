@@ -1,10 +1,14 @@
 // Atomare Plugin-Installation (A1): verify → Kollisions-/Idempotenz-/Conflict-Prüfung → atomar
-// materialisieren → Re-Verify (KEINE Code-Ausführung) → Version atomar aktiv schalten. Rollback
-// lässt nie ein Teil-Install zurück; die vorherige aktive Version bleibt erhalten.
+// materialisieren → Re-Verify (KEINE Code-Ausführung). Rollback lässt nie ein Teil-Install zurück.
 //
 // WICHTIG (P1.3): Hier wird `main.js` NICHT geladen/ausgeführt. Das Laden des Entry passiert
-// ausschließlich im Registry-Aktivierungspfad; scheitert es dort, rollt der Aufrufer `active.json`
-// über `previousVersion` auf den Vorgänger zurück.
+// ausschließlich im Registry-Aktivierungspfad.
+//
+// WICHTIG (ADR — Index-Commit NACH erfolgreicher Aktivierung): installPluginArtifact MATERIALISIERT
+// und VERIFIZIERT nur — es schaltet `active.json` NICHT auf die neue Version. Sonst zeigte der
+// persistente Index nach einem Crash/Abbruch während `start()` auf eine evtl. crash-loopende
+// Version (Crash-Schleife beim nächsten Start). Den Index committet der Aufrufer (manage) erst als
+// LETZTEN Schritt, nachdem der Entry erfolgreich geladen + aktiviert wurde.
 import { existsSync, mkdirSync, lstatSync, readFileSync, renameSync, rmSync } from 'node:fs'
 import { randomBytes } from 'node:crypto'
 import { join } from 'node:path'
@@ -46,9 +50,10 @@ export function setActiveVersion(pluginsRoot: string, id: string, version: strin
 }
 
 /**
- * Installiert ein `.mgxplugin`-Archiv. Verifiziert in die Quarantäne, prüft ID-Kollision +
- * Idempotenz/Conflict, materialisiert atomar, re-verifiziert (ohne Ausführung) und schaltet die
- * gewünschte Version atomar aktiv. Wirft `ArtifactError`.
+ * Installiert ein `.mgxplugin`-Archiv: verifiziert in die Quarantäne, prüft ID-Kollision +
+ * Idempotenz/Conflict, materialisiert atomar und re-verifiziert (ohne Ausführung). Schaltet
+ * `active.json` NICHT um — das committet der Aufrufer nach erfolgreicher Aktivierung. Wirft
+ * `ArtifactError`. `previousVersion` = die aktuell im Index aktive Version dieser ID (für den Aufrufer).
  */
 export async function installPluginArtifact(archive: Buffer, env: InstallEnv): Promise<InstallResult> {
   const paths = pluginPaths(env.pluginsRoot)
@@ -98,8 +103,7 @@ export async function installPluginArtifact(archive: Buffer, env: InstallEnv): P
       if (!sameIntegrity || !sameSig) {
         throw new ArtifactError('version-conflict', `'${id}@${version}' existiert bereits mit abweichendem Inhalt`)
       }
-      // Identisch + verifiziert → gewünschte Version atomar aktiv schalten (auch wenn vorher inaktiv).
-      setActiveVersion(env.pluginsRoot, id, version)
+      // Identisch + verifiziert → fertig materialisiert. Aktivierung + Index-Commit macht der Aufrufer.
       return { id, version, versionDir: target, idempotent: true, previousVersion }
     }
 
@@ -117,14 +121,13 @@ export async function installPluginArtifact(archive: Buffer, env: InstallEnv): P
       throw e
     }
 
-    // 7) Re-Verify der materialisierten Version (KEINE Ausführung); dann atomar aktiv schalten.
+    // 7) Re-Verify der materialisierten Version (KEINE Ausführung). Index NICHT setzen (Aufrufer committet).
     try {
       verifyInstalledDir(target, { keyring: env.keyring, appVersion: env.appVersion, limits: env.limits })
     } catch (e) {
       rmSync(target, { recursive: true, force: true }) // nie aktiviert → kein Teil-Install
       throw e
     }
-    setActiveVersion(env.pluginsRoot, id, version)
     return { id, version, versionDir: target, idempotent: false, previousVersion }
   } finally {
     rmSync(quarantineDir, { recursive: true, force: true })
