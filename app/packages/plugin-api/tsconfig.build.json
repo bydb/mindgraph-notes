@@ -1,0 +1,18 @@
+// Emit-Konfiguration NUR für den npm-Publish (dist/). Die In-Repo-Konsumption läuft weiter
+// über die TS-Quelle (exports → src, App-Alias, vitest). Hier wird CommonJS + .d.ts erzeugt;
+// ein `dist/package.json` mit { "type": "commonjs" } (vom build-Script geschrieben) markiert das
+// dist-Verzeichnis als CJS, obwohl das Paket-Root `"type": "module"` bleibt.
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "declaration": true,
+    "outDir": "dist",
+    "module": "CommonJS",
+    "moduleResolution": "node",
+    "esModuleInterop": true,
+    "skipLibCheck": true
+  },
+  "include": ["src"],
+  "exclude": ["src/**/*.test.ts"]
+}

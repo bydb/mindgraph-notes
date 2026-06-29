@@ -1,15 +1,35 @@
 {
   "name": "@mindgraph/plugin-api",
   "version": "0.2.0",
-  "private": true,
   "description": "Stabile öffentliche Grenze zwischen MindGraph und seinen Plugins (Typen + schmale Laufzeit-Helfer).",
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
     "./validation": "./src/validation.ts"
   },
+  "files": [
+    "dist"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "provenance": true,
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "./validation": {
+        "types": "./dist/validation.d.ts",
+        "default": "./dist/validation.js"
+      }
+    }
+  },
   "scripts": {
-    "typecheck": "tsc -p tsconfig.json"
+    "typecheck": "tsc -p tsconfig.json",
+    "build": "tsc -p tsconfig.build.json && echo '{ \"type\": \"commonjs\" }' > dist/package.json",
+    "prepublishOnly": "npm run build"
   },
   "dependencies": {
     "ajv": "^6.14.0",

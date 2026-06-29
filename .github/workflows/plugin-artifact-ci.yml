@@ -1,0 +1,43 @@
+name: Plugin Artifact CI
+
+# PR-/Push-Gate: führt die Artefakt-Pipeline aus (Template build → mit Dev-Key signieren →
+# mit passendem Test-Keyring verifizieren). Umgesetzt als vitest-E2E-Test (artifact/e2e.test.ts),
+# weil das Template @mindgraph/plugin-api erst nach dem npm-Publish via `npm install` beziehen kann;
+# der E2E-Test bundelt stattdessen gegen die Workspace-Quelle.
+
+on:
+  pull_request:
+    paths:
+      - 'app/**'
+      - 'plugin-template/**'
+      - '.github/workflows/plugin-artifact-ci.yml'
+  push:
+    branches: [master]
+    paths:
+      - 'app/**'
+      - 'plugin-template/**'
+      - '.github/workflows/plugin-artifact-ci.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  pipeline:
+    name: build → sign(dev) → verify(test keyring)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - name: Install (app + workspace plugin-api)
+        run: npm ci
+        working-directory: app
+      - name: Typecheck (App + Paket)
+        run: npm run typecheck
+        working-directory: app
+      - name: Artefakt-Pipeline + Verifier (build → sign(dev) → verify)
+        run: npm run test
+        working-directory: app

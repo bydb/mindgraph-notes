@@ -1,0 +1,25 @@
+{
+  "manifestVersion": 2,
+  "id": "example-plugin",
+  "version": "0.1.0",
+  "label": "Example Plugin",
+  "description": "Main-only Beispiel-Plugin für MindGraph Notes (A0/3 Template).",
+  "category": "ai",
+  "apiVersion": "^0.2.0",
+  "minAppVersion": "0.8.14",
+  "author": {
+    "name": "Your Name",
+    "url": "https://example.com"
+  },
+  "entrypoints": {
+    "main": "main.js"
+  },
+  "capabilities": [],
+  "actions": [
+    {
+      "id": "example-plugin.ping",
+      "label": "Ping",
+      "requiredCapabilities": []
+    }
+  ]
+}
