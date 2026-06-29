@@ -636,6 +636,8 @@ const ModulesTab: React.FC<{ t: TabTFn }> = ({ t }) => {
     }).catch(() => { /* read-only — Fehler ignorieren */ })
   }
   useEffect(refreshDiskPlugins, [])
+  // Verständliche Plugin-Fehlermeldung — NIE Rohtext/Code an einer Installationsfläche zeigen.
+  const pluginErr = (code?: string, raw?: string) => pluginErrorText(t as (key: string) => string, code, raw)
   const handleInstallPlugin = async () => {
     setInstalling(true)
     setInstallMsg(null)
@@ -644,11 +646,12 @@ const ModulesTab: React.FC<{ t: TabTFn }> = ({ t }) => {
       if (res.ok && res.data) {
         setInstallMsg({ ok: true, text: t('settings.modules.installSuccess', { id: res.data.id, version: res.data.version }) })
       } else if (!res.canceled) {
-        setInstallMsg({ ok: false, text: t('settings.modules.installFailed', { error: res.error ?? res.code ?? '?' }) })
+        setInstallMsg({ ok: false, text: t('settings.modules.installFailed', { error: pluginErr(res.code, res.error) }) })
       }
       refreshDiskPlugins()
     } catch (err) {
-      setInstallMsg({ ok: false, text: t('settings.modules.installFailed', { error: err instanceof Error ? err.message : String(err) }) })
+      console.error('[plugin:install]', err)
+      setInstallMsg({ ok: false, text: t('settings.modules.installFailed', { error: t('plugins.error.unknown') }) })
     } finally {
       setInstalling(false)
     }
@@ -664,7 +667,8 @@ const ModulesTab: React.FC<{ t: TabTFn }> = ({ t }) => {
       }
       refreshDiskPlugins()
     } catch (err) {
-      setInstallMsg({ ok: false, text: t('settings.modules.uninstallFailed', { error: err instanceof Error ? err.message : String(err) }) })
+      console.error('[plugin:uninstall]', err)
+      setInstallMsg({ ok: false, text: t('settings.modules.uninstallFailed', { error: t('plugins.error.unknown') }) })
     } finally {
       setUninstalling(null)
     }
@@ -691,10 +695,11 @@ const ModulesTab: React.FC<{ t: TabTFn }> = ({ t }) => {
         setRepoInput(''); setRepoTag('')
         refreshDiskPlugins(); void handleCheckUpdates()
       } else {
-        setInstallMsg({ ok: false, text: pluginErrorText(t as (key: string) => string, res.code, res.error) })
+        setInstallMsg({ ok: false, text: pluginErr(res.code, res.error) })
       }
     } catch (err) {
-      setInstallMsg({ ok: false, text: err instanceof Error ? err.message : String(err) })
+      console.error('[plugin:installFromGithub]', err)
+      setInstallMsg({ ok: false, text: t('plugins.error.unknown') })
     } finally {
       setInstallingRepo(false)
     }
@@ -709,10 +714,11 @@ const ModulesTab: React.FC<{ t: TabTFn }> = ({ t }) => {
         setInstallMsg({ ok: true, text: t('settings.modules.installSuccess', { id: res.data.id, version: res.data.version }) })
         refreshDiskPlugins(); void handleCheckUpdates()
       } else {
-        setInstallMsg({ ok: false, text: pluginErrorText(t as (key: string) => string, res.code, res.error) })
+        setInstallMsg({ ok: false, text: pluginErr(res.code, res.error) })
       }
     } catch (err) {
-      setInstallMsg({ ok: false, text: err instanceof Error ? err.message : String(err) })
+      console.error('[plugin:installFromGithub]', err)
+      setInstallMsg({ ok: false, text: t('plugins.error.unknown') })
     } finally {
       setUpdatingId(null)
     }
@@ -921,7 +927,7 @@ const ModulesTab: React.FC<{ t: TabTFn }> = ({ t }) => {
                 <div className="module-row-body">
                   <div className="module-row-label">{err.id} {err.version}</div>
                   <div className="module-row-error" style={{ color: 'var(--error-color, #e5484d)', fontSize: '0.8em', marginTop: 4 }}>
-                    {err.code}: {err.message}
+                    {pluginErr(err.code, err.message)}
                   </div>
                 </div>
               </div>

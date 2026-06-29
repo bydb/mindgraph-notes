@@ -23,6 +23,12 @@ const CODE_KEY: Record<string, string> = {
   'archive-too-large': 'plugins.error.tooLarge',
   'limit-file-size': 'plugins.error.tooLarge',
   'limit-total-size': 'plugins.error.tooLarge',
+  // Paket-Struktur (ungültiges/beschädigtes Archiv) — kein Roh-Leak an der Install-Fläche
+  'entry-type': 'plugins.error.packageInvalid',
+  'path-invalid': 'plugins.error.packageInvalid',
+  'duplicate-path': 'plugins.error.packageInvalid',
+  'limit-files': 'plugins.error.packageInvalid',
+  'json-invalid': 'plugins.error.packageInvalid',
   // Download / Netzwerk (A2)
   'redirect-blocked': 'plugins.error.redirect',
   'download-failed': 'plugins.error.download',
