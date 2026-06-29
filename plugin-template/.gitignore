@@ -1,0 +1,4 @@
+node_modules/
+dist/
+# Lokale Dev-Signierschlüssel — NIEMALS committen (von keygen:dev erzeugt).
+*.dev-key.json
