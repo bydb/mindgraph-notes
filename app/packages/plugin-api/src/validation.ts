@@ -323,6 +323,25 @@ export function validateManifestSemantics(manifest: PluginManifest): ValidationR
       }
     }
   }
+
+  // Widget-Provider-Vertrag (Renderer-Spike §4): eine `ui.{dashboardWidget,sidebarPanel}.fromAction`
+  // MUSS eine EXISTIERENDE Action referenzieren, die BEIDE Marker trägt — `widgetProvider: true` UND
+  // `isWrite: false` (nebenwirkungsfreier Datenlieferant). Sonst kein gültiger Widget-Datenkanal →
+  // das Plugin wird abgelehnt (kein still-degradiertes Widget).
+  const actionsById = new Map((manifest.actions ?? []).map((a) => [a.id, a]))
+  for (const slotKey of ['dashboardWidget', 'sidebarPanel'] as const) {
+    const fromAction = manifest.ui?.[slotKey]?.fromAction
+    if (!fromAction) continue
+    const action = actionsById.get(fromAction)
+    if (!action) {
+      errors.push(`ui.${slotKey}.fromAction '${fromAction}' referenziert keine deklarierte Action.`)
+    } else if (action.widgetProvider !== true || action.isWrite === true) {
+      errors.push(
+        `ui.${slotKey}.fromAction '${fromAction}' muss eine Action mit widgetProvider:true UND isWrite:false sein.`
+      )
+    }
+  }
+
   return { valid: errors.length === 0, errors }
 }
 

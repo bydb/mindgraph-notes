@@ -260,3 +260,35 @@ describe('definePluginMain', () => {
     expect(calls).toEqual(['antares.ping'])
   })
 })
+
+describe('validateManifestSemantics — Widget-Provider-Vertrag (Renderer-Spike §4)', () => {
+  const withWidget = (over: Record<string, unknown>): PluginManifest => ({
+    ...validManifest,
+    actions: [{ id: 'antares.widgetData', requiredCapabilities: [], widgetProvider: true, isWrite: false, ...over }],
+    ui: { dashboardWidget: { slot: 'dashboard.widget', fromAction: 'antares.widgetData' } },
+  })
+
+  it('akzeptiert eine fromAction mit widgetProvider:true UND isWrite:false', () => {
+    expect(validateManifestSemantics(withWidget({})).valid).toBe(true)
+  })
+
+  it('lehnt ab, wenn die fromAction-Action nicht existiert', () => {
+    const m: PluginManifest = { ...validManifest, ui: { dashboardWidget: { slot: 'dashboard.widget', fromAction: 'ghost' } } }
+    const r = validateManifestSemantics(m)
+    expect(r.valid).toBe(false)
+    expect(r.errors.join(' ')).toContain('ghost')
+  })
+
+  it('lehnt ab, wenn widgetProvider fehlt/false', () => {
+    expect(validateManifestSemantics(withWidget({ widgetProvider: false })).valid).toBe(false)
+    expect(validateManifestSemantics(withWidget({ widgetProvider: undefined })).valid).toBe(false)
+  })
+
+  it('lehnt ab, wenn isWrite:true (nicht nebenwirkungsfrei)', () => {
+    expect(validateManifestSemantics(withWidget({ isWrite: true })).valid).toBe(false)
+  })
+
+  it('ohne ui-Widget ist nichts zu prüfen', () => {
+    expect(validateManifestSemantics(validManifest).valid).toBe(true)
+  })
+})
