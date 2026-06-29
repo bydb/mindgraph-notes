@@ -4,9 +4,14 @@ import { createPublicKey, type KeyObject } from 'node:crypto'
 import { existsSync, readFileSync } from 'node:fs'
 import type { Keyring } from '../artifact/verify'
 
-/** Offizielle Prod-Public-Keys (SPKI PEM je keyId). LEER bis Maintainer-Freischaltung → ohne
- *  Eintrag lässt sich real KEIN Fremd-Artefakt laden (sig-unknown-key). */
-export const OFFICIAL_KEYS: Readonly<Record<string, string>> = {}
+/** Offizielle Prod-Public-Keys (SPKI PEM je keyId). Ohne passenden Eintrag lässt sich real KEIN
+ *  Fremd-Artefakt laden (sig-unknown-key). Rotation: neue keyId ZUSÄTZLICH pinnen, alte erst nach
+ *  Auslauf entfernen. Der jeweilige PRIVATE Key liegt ausschließlich im geschützten GitHub-Environment
+ *  `release-signing` (Secret `PLUGIN_SIGNING_KEY`) — nie im Repo. */
+export const OFFICIAL_KEYS: Readonly<Record<string, string>> = {
+  'mindgraph-release-2026-01':
+    '-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAotaSK1jNLSNryc7N5QkfsssLDx5Hs+9GU/frKGhCLSQ=\n-----END PUBLIC KEY-----\n',
+}
 
 /** Reservierte Kern-IDs, die externe Plugins niemals belegen dürfen (zusätzlich zu gebündelten). */
 export const RESERVED_PLUGIN_IDS: ReadonlySet<string> = new Set(['core', 'mindgraph', 'app', 'system'])
