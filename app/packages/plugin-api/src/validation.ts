@@ -87,6 +87,17 @@ export const PLUGIN_MANIFEST_SCHEMA: JsonSchema = {
       },
       additionalProperties: false,
     },
+    // UI-Slot-Beitrag: strikt nur die zwei Slot-Kategorien; optional die speisende Action.
+    // KEIN `view`-Feld (fromAction liefert die WidgetView, gegen WIDGET_VIEW_SCHEMA validiert).
+    slotDecl: {
+      type: 'object',
+      required: ['slot'],
+      properties: {
+        slot: { enum: ['dashboard.widget', 'sidebar.panel'] },
+        fromAction: { type: 'string', minLength: 1 },
+      },
+      additionalProperties: false,
+    },
   },
   required: [
     'manifestVersion', 'id', 'version', 'label', 'description', 'category', 'capabilities',
@@ -191,6 +202,7 @@ export const PLUGIN_MANIFEST_SCHEMA: JsonSchema = {
           outputSchema: { type: 'object' },
           isTrigger: { type: 'boolean' },
           isWrite: { type: 'boolean' },
+          widgetProvider: { type: 'boolean' },
           privacy: { type: 'object' },
           hardLockModule: { type: 'string' },
         },
@@ -230,8 +242,9 @@ export const PLUGIN_MANIFEST_SCHEMA: JsonSchema = {
       type: 'object',
       properties: {
         settingsTab: { type: 'boolean' },
-        dashboardWidget: { type: 'object' },
-        sidebarPanel: { type: 'object' },
+        // SlotDecl strikt: nur die zwei Slot-Kategorien; KEIN `view`-Template (fromAction liefert die WidgetView).
+        dashboardWidget: { $ref: '#/definitions/slotDecl' },
+        sidebarPanel: { $ref: '#/definitions/slotDecl' },
       },
       additionalProperties: false,
     },

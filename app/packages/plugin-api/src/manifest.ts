@@ -78,14 +78,24 @@ export interface ActionDef {
   outputSchema?: JsonSchema
   isTrigger?: boolean
   isWrite?: boolean
+  /** Markiert eine Action als nebenwirkungsfreien Datenlieferanten für ein externes Widget
+   *  (ADR Renderer-Spike §4). Der Host akzeptiert eine `ui.*.fromAction` NUR, wenn die referenzierte
+   *  Action `widgetProvider: true` UND `isWrite: false` trägt — sonst kein Widget-Datenkanal. */
+  widgetProvider?: boolean
   privacy?: WorkflowPrivacyMetadata
   /** Bei LLM-Actions auf untrusted Input: erzwingt isHardLocked-Check im Runner. */
   hardLockModule?: CompatModuleId
 }
 
-/** Deklaration eines UI-Slot-Beitrags: WELCHER Slot + optional WELCHE Action ihn speist. */
+/** Slot-Kategorien für externe UI-Beiträge (Host-kontrolliert; strikt begrenzt). */
+export const WIDGET_SLOTS = ['dashboard.widget', 'sidebar.panel'] as const
+export type WidgetSlot = (typeof WIDGET_SLOTS)[number]
+
+/** Deklaration eines UI-Slot-Beitrags: WELCHER (strikt begrenzter) Slot + WELCHE Action ihn speist.
+ *  Die `fromAction` liefert zur Laufzeit direkt die vollständige WidgetView (gegen WIDGET_VIEW_SCHEMA
+ *  validiert) — KEIN separates `view`-Template im Manifest. */
 export interface SlotDecl {
-  slot: string
+  slot: WidgetSlot
   fromAction?: string
 }
 

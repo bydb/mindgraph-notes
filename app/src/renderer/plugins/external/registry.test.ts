@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { ExternalWidgetRegistry, EXTERNAL_WIDGET_SLOTS } from './registry'
+import { ExternalWidgetRegistry, EXTERNAL_WIDGET_SLOTS, type ExternalWidgetSlot, type ExternalWidgetEntry } from './registry'
 
 describe('ExternalWidgetRegistry', () => {
   it('registriert Beiträge pro Slot und liefert sie zurück', () => {
@@ -30,11 +30,27 @@ describe('ExternalWidgetRegistry', () => {
     expect(r.getBySlot('sidebar.panel')).toEqual([]) // leerer Slot → leeres Array
   })
 
-  it('leerer/unbekannter Slot → leeres Array; clear() leert alles', () => {
+  it('leerer Slot → leeres Array; clear() leert alles', () => {
     const r = new ExternalWidgetRegistry()
     r.register({ pluginId: 'a', slot: 'dashboard.widget' })
-    expect(r.getBySlot('does.not.exist')).toEqual([])
+    expect(r.getBySlot('sidebar.panel')).toEqual([]) // gültig, aber leer
     r.clear()
     expect(r.getBySlot('dashboard.widget')).toEqual([])
+  })
+
+  it('verwirft einen unbekannten Slot zur Laufzeit (fail-closed)', () => {
+    const r = new ExternalWidgetRegistry()
+    r.register({ pluginId: 'a', slot: 'evil.slot' as ExternalWidgetSlot })
+    expect(r.getBySlot('evil.slot' as ExternalWidgetSlot)).toEqual([])
+    expect(r.getBySlot('dashboard.widget')).toEqual([])
+  })
+
+  it('getBySlot liefert eine KOPIE — Mutation am Ergebnis ändert die Registry nicht', () => {
+    const r = new ExternalWidgetRegistry()
+    r.register({ pluginId: 'a', slot: 'dashboard.widget' })
+    const out = r.getBySlot('dashboard.widget') as ExternalWidgetEntry[]
+    out.push({ pluginId: 'x', slot: 'dashboard.widget' })
+    out.length = 0
+    expect(r.getBySlot('dashboard.widget').map((e) => e.pluginId)).toEqual(['a'])
   })
 })

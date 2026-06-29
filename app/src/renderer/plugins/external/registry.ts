@@ -6,26 +6,35 @@
 // DATEN holt der Host später über `plugin:widgetData(instanceId)` (Increment 2), gerendert wird über
 // das feste Vokabular (DeclarativeWidget). Rein, React-frei, testbar.
 
-/** Slot-Kategorien für externe Widgets (Host-kontrolliert; identisch für alle externen Plugins). */
+import { WIDGET_SLOTS, type WidgetSlot } from '@mindgraph/plugin-api'
+
+/** Slot-Kategorien für externe Widgets (aus dem Manifest-Vertrag; Host-kontrolliert). */
 export const EXTERNAL_WIDGET_SLOTS = {
   dashboard: 'dashboard.widget',
   sidebar: 'sidebar.panel',
-} as const
+} as const satisfies Record<string, WidgetSlot>
 
-export type ExternalWidgetSlot = (typeof EXTERNAL_WIDGET_SLOTS)[keyof typeof EXTERNAL_WIDGET_SLOTS]
+export type ExternalWidgetSlot = WidgetSlot
+const KNOWN_SLOTS: ReadonlySet<string> = new Set(WIDGET_SLOTS)
 
-/** Ein deklarativer Widget-Beitrag eines externen Plugins an einen Slot. */
+/** Ein deklarativer Widget-Beitrag eines externen Plugins an einen (strikt begrenzten) Slot. */
 export interface ExternalWidgetEntry {
   pluginId: string
-  slot: string
+  slot: ExternalWidgetSlot
   title?: string
 }
 
 export class ExternalWidgetRegistry {
-  private readonly bySlot = new Map<string, ExternalWidgetEntry[]>()
+  private readonly bySlot = new Map<ExternalWidgetSlot, ExternalWidgetEntry[]>()
 
-  /** Registriert/aktualisiert den Beitrag eines Plugins für einen Slot (dedupe per pluginId+slot). */
+  /** Registriert/aktualisiert den Beitrag eines Plugins für einen Slot (dedupe per pluginId+slot).
+   *  Unbekannte Slots werden zur LAUFZEIT verworfen (fail-closed — die Daten stammen aus dem,
+   *  wenn auch signierten, Manifest und sollen keinen beliebigen Slot anlegen). */
   register(entry: ExternalWidgetEntry): void {
+    if (!KNOWN_SLOTS.has(entry.slot)) {
+      console.warn(`[ext-widget] unbekannter Slot '${entry.slot}' verworfen (Plugin '${entry.pluginId}')`)
+      return
+    }
     const list = this.bySlot.get(entry.slot) ?? []
     const idx = list.findIndex((e) => e.pluginId === entry.pluginId)
     if (idx >= 0) list[idx] = entry
@@ -42,9 +51,10 @@ export class ExternalWidgetRegistry {
     }
   }
 
-  /** Beiträge eines Slots (Registrierungsreihenfolge). */
-  getBySlot(slot: string): ExternalWidgetEntry[] {
-    return this.bySlot.get(slot) ?? []
+  /** Beiträge eines Slots als KOPIE (interner mutable Zustand bleibt gekapselt). */
+  getBySlot(slot: ExternalWidgetSlot): readonly ExternalWidgetEntry[] {
+    const list = this.bySlot.get(slot)
+    return list ? [...list] : []
   }
 
   clear(): void {

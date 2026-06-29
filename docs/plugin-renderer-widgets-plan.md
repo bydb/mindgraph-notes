@@ -58,21 +58,26 @@ Der Anker-Fall. Kein WebContents, **kein `renderer.js`**, kein Plugin-JS im Rend
 ausschließlich das signierte Manifest und ruft eine Main-Action auf; externe Renderer-Artefakte bleiben
 bis Tier 2 vollständig ungenutzt.**
 
-- **Manifest:** `ui.dashboardWidget = { slot, fromAction, view }` — `view` = reines, ajv-validiertes
-  Daten-Schema (Manifest bleibt code/JSX-frei).
-- **Eigene Registry (Amendment):** externe deklarative Widgets bekommen eine **neue, getrennte
-  `ExternalWidgetRegistry`** (renderer), die die `ui.*`-Deklarationen aus dem (signierten) Main-Plugin-State
-  liest. **NICHT** die bestehende Vollvertrauens-`RendererPluginRegistry`/`PluginSlot` (die bleibt
-  `bundled-only`, unverändert). So gibt es keine Naht, über die externe Beiträge in den Volltrauenspfad lecken.
-- **Datenfluss über scoped Main-IPC (Amendment):** der Host mountet eine Widget-Instanz mit `instanceId`;
-  der Renderer ruft **`plugin:widgetData(instanceId)`** — **Main** löst `instanceId → (pluginId, fromAction)`
-  aus seinem EIGENEN State auf und ruft die Action. Der Renderer benennt **nie** Plugin oder Action; es gibt
-  **kein** frei parametrisiertes `pluginInvoke` im Tier-1-Pfad. (Gleiches „Host fixiert Plugin+Action"-Prinzip
-  wie der Tier-2-Broker, hier schon für Tier 1.)
-- **`fromAction` = markierter, nebenwirkungsfreier Widget-Provider (Amendment):** die Action MUSS im Manifest
-  explizit als seiteneffektfreier Widget-Provider deklariert sein (z.B. `isWrite:false` + `widgetProvider:true`).
-  **Feste Host-Limits, erzwungen in Main:** max. Textlänge je Feld, max. Zeilen/Items, max. Payload-Bytes,
-  min. Refresh-Intervall, max. parallele Requests je Instanz. Überschreitung → abgeschnitten/abgelehnt.
+- **Manifest (Review-Runde 3, KEIN `view`-Template):** `ui.dashboardWidget = { slot, fromAction }` — `slot`
+  ist strikt `'dashboard.widget' | 'sidebar.panel'` (`WidgetSlot`, ajv-`enum`, `additionalProperties:false`).
+  **Die `fromAction` liefert zur Laufzeit DIREKT die vollständige `WidgetView`**, die der Host gegen
+  `WIDGET_VIEW_SCHEMA` validiert — KEIN zweites `view`-Schema/Template im Manifest (einfacher, ein
+  Validierungssystem statt zwei).
+- **Eigene Registry:** externe deklarative Widgets bekommen eine **neue, getrennte `ExternalWidgetRegistry`**
+  (renderer), die die `ui.*`-Deklarationen aus dem (signierten) Main-Plugin-State liest. **NICHT** die
+  bestehende Vollvertrauens-`RendererPluginRegistry`/`PluginSlot` (`bundled-only`, unverändert). `slot` ist
+  `WidgetSlot`-typisiert; unbekannte Slots werden zur Laufzeit verworfen; `getBySlot()` liefert eine Kopie
+  (interner Zustand gekapselt).
+- **Datenfluss über scoped Main-IPC:** der Host mountet eine Widget-Instanz mit einer **Main-seitig erzeugten
+  `instanceId`, die Plugin + Action + Slot UNVERÄNDERLICH bindet** (bei Disable/Uninstall gelöscht); der
+  Renderer ruft **`plugin:widgetData(instanceId)`** — **Main** löst `instanceId → (pluginId, fromAction)`
+  aus seinem EIGENEN State auf und ruft die Action. Der Renderer benennt **nie** Plugin, Action oder Slot;
+  **kein** frei parametrisiertes `pluginInvoke` im Tier-1-Pfad.
+- **`fromAction` = Widget-Provider, BEIDE Marker Pflicht:** der Host akzeptiert eine `fromAction` NUR, wenn
+  die referenzierte Action **`widgetProvider: true` UND `isWrite: false`** trägt (nebenwirkungsfrei). Beide
+  Marker sind im Manifest erforderlich (`ActionDef.widgetProvider`). **Feste Host-Limits, erzwungen in Main:**
+  max. Textlänge je Feld, max. Zeilen/Items, max. Payload-Bytes, min. Refresh-Intervall, max. parallele
+  Requests je Instanz. Überschreitung → abgeschnitten/abgelehnt.
 - **Rendering:** festes, host-eigenes, allowlisted Vokabular nativer React-Primitive für v1:
   **`stats | list | keyValue | progress | badge`** (inkl. 🔴🟢🔵-Status-Dot über `utils/noteKind.ts`).
   **Plugin-Strings ausschließlich als React-TEXT-Nodes (auto-escaped).**
@@ -205,10 +210,11 @@ Broker-Invarianten: **I-B1…I-B5** (§5.3). Deklarativ: **I-D1…I-D3** (§4). 
 
 ## 9. Akzeptanzkriterien (Spike 1)
 
-- Ein externes Plugin mit `ui.dashboardWidget={slot,fromAction,view}` (+ als `widgetProvider`/`isWrite:false`
-  markierter `fromAction`) rendert ein Widget aus dem v1-Vokabular; Strings als Text-Nodes; **kein**
-  `dangerouslySetInnerHTML` im Pfad (Test/Lint-Guard); `view`-Schema `additionalProperties:false` ohne
-  Präsentationsfelder.
+- Ein externes Plugin mit `ui.dashboardWidget={slot,fromAction}` (slot strikt; `fromAction` referenziert eine
+  Action mit `widgetProvider:true` UND `isWrite:false`) rendert ein Widget aus dem v1-Vokabular; die
+  `fromAction` liefert direkt eine gegen `WIDGET_VIEW_SCHEMA` validierte `WidgetView`; Strings als Text-Nodes;
+  **kein** `dangerouslySetInnerHTML` im Pfad (Test/Lint-Guard); `WIDGET_VIEW_SCHEMA` `additionalProperties:false`
+  ohne Präsentationsfelder.
 - Daten ausschließlich über `plugin:widgetData(instanceId)`; der Renderer benennt nie Plugin/Action; Host-Limits
   (Textlänge/Zeilen/Payload/Refresh/Parallelität) erzwungen.
 - Host-Demarkation „Externes Plugin · <id>" sichtbar; kein host-privilegierter Prompt in der Region.
@@ -218,12 +224,17 @@ Broker-Invarianten: **I-B1…I-B5** (§5.3). Deklarativ: **I-D1…I-D3** (§4). 
 - `npm run typecheck` + `npm run test` + `npm run build` grün; gebündelte Renderer-Plugins + PDF-Rendering
   unverändert.
 
-## 10. Beschlossene Entscheidungen (Review-Runde 2)
+## 10. Beschlossene Entscheidungen (Review-Runde 2/3)
 
 1. **Tier 2 = Option B**, session-partitionierter `WebContentsView` (nicht shared-session iframe).
 2. **Spike 1 = ausschließlich Tier 1.**
 3. **v1-Vokabular** = `stats/list/keyValue/progress/badge`.
 4. **Host-Demarkation „Externes Plugin · <id>" auch in Tier 1 verpflichtend.**
+6. **(Runde 3, Vertrags-Lock vor Increment 2):** KEIN `view`-Template — `fromAction` liefert direkt die zur
+   Laufzeit gegen `WIDGET_VIEW_SCHEMA` validierte `WidgetView`. `SlotDecl.slot` strikt `WidgetSlot`
+   (`dashboard.widget|sidebar.panel`); `ExternalWidgetEntry.slot` typisiert, unbekannte Slots zur Laufzeit
+   verworfen; `getBySlot()` liefert eine Kopie. Provider erfordert BEIDE Marker (`widgetProvider:true` +
+   `isWrite:false`). Main-seitige `instanceId` bindet Plugin+Action+Slot unveränderlich, bei Disable/Uninstall gelöscht.
 5. Amendments: N1 raus aus Spike 1; eigene `ExternalWidgetRegistry`; Tier-1-Daten über scoped
    `plugin:widgetData(instanceId)` (kein freies `pluginInvoke`); `fromAction` = markierter seiteneffektfreier
    Provider + feste Limits; Tier 2 auf WebContentsView/`MessagePortMain`/`webContents.id`+Nonce umgeschrieben

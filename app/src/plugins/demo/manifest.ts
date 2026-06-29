@@ -53,7 +53,7 @@ export const manifest: PluginManifest = {
     },
   ],
   ui: {
-    dashboardWidget: { slot: 'dashboard.widgets', fromAction: 'demo.echo' },
+    dashboardWidget: { slot: 'dashboard.widget', fromAction: 'demo.echo' },
   },
 }
 
