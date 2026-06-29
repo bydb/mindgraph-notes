@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { generateKeyPairSync } from 'node:crypto'
-import { mkdtempSync, writeFileSync, rmSync, symlinkSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, symlinkSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { signPlugin, SIGNER_KEY_ID } from './signCli'
@@ -81,7 +81,31 @@ describe('signPlugin — offizieller Signierer (adversarial)', () => {
   it('nicht-reguläre Datei (Symlink) → Abbruch', async () => {
     const dir = makeArtifact(validManifest())
     symlinkSync('/etc/hosts', join(dir, 'evil.js'))
-    await expect(signPlugin({ artifactDir: dir, ...base }, { officialKeys })).rejects.toThrow(/Nicht-reguläre Datei/)
+    await expect(signPlugin({ artifactDir: dir, ...base }, { officialKeys })).rejects.toThrow(/Symlink/)
+  })
+
+  it('verschachtelter Entrypoint (dist/main.js) wird signiert; der echte Verifier akzeptiert', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'mgxart-'))
+    writeFileSync(join(dir, 'manifest.json'), JSON.stringify(validManifest({ entrypoints: { main: 'dist/main.js' } }), null, 2) + '\n')
+    mkdirSync(join(dir, 'dist'))
+    writeFileSync(join(dir, 'dist', 'main.js'), 'module.exports = {}\n')
+    const archive = await signPlugin({ artifactDir: dir, ...base }, { officialKeys })
+    const q = mkdtempSync(join(tmpdir(), 'mgxq-'))
+    const v = await verifyPluginArtifact(archive, { keyring: keyringFromSpkiMap(officialKeys), appVersion: '9999.0.0', quarantineDir: q })
+    expect(v.id).toBe('demo-x')
+    expect(v.files.map((f) => f.path).sort()).toEqual(['dist/main.js', 'manifest.json'])
+    rmSync(dir, { recursive: true, force: true })
+    rmSync(q, { recursive: true, force: true })
+  })
+
+  it('verschachtelte unerwartete Datei (dist/extra.js) → Abbruch', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'mgxart-'))
+    writeFileSync(join(dir, 'manifest.json'), JSON.stringify(validManifest(), null, 2) + '\n')
+    writeFileSync(join(dir, 'main.js'), 'module.exports = {}\n')
+    mkdirSync(join(dir, 'dist'))
+    writeFileSync(join(dir, 'dist', 'extra.js'), 'x')
+    await expect(signPlugin({ artifactDir: dir, ...base }, { officialKeys })).rejects.toThrow(/Unerwartete Datei.*dist\/extra\.js/)
+    rmSync(dir, { recursive: true, force: true })
   })
 
   it('ungültiges Manifest → Abbruch', async () => {

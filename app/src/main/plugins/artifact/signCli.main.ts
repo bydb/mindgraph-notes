@@ -6,6 +6,7 @@
 import { createPrivateKey } from 'node:crypto'
 import { writeFileSync } from 'node:fs'
 import { signPlugin, SignError } from './signCli'
+import { ArtifactError } from './limits'
 
 async function main(): Promise<void> {
   const pem = process.env.PLUGIN_SIGNING_KEY
@@ -37,7 +38,9 @@ async function main(): Promise<void> {
     writeFileSync(outPath, archive)
     console.log(`Signiert: ${outPath} (${archive.length} Bytes, repo=${expectedRepo}, v=${expectedVersion})`)
   } catch (err) {
-    if (err instanceof SignError) {
+    // SignError = eigene Vertragsverletzung; ArtifactError = vom Walker/Verifier abgelehntes Artefakt
+    // (Symlink, Limit, Pfad, Post-Verify) — beide sind eine bewusste Ablehnung, kein interner Fehler.
+    if (err instanceof SignError || err instanceof ArtifactError) {
       console.error(`::error::Signierung abgelehnt: ${err.message}`)
       process.exit(1)
     }

@@ -12013,6 +12013,37 @@ async function verifyPluginArtifact(archive, opts) {
     files: entries
   };
 }
+function readPluginDirFiles(dir, limits = ARTIFACT_LIMITS) {
+  const root = (0, import_node_path11.resolve)(dir);
+  const files = /* @__PURE__ */ new Map();
+  let count = 0;
+  let total = 0;
+  const walk = (abs) => {
+    for (const name of (0, import_node_fs8.readdirSync)(abs)) {
+      const childAbs = (0, import_node_path11.join)(abs, name);
+      const st2 = (0, import_node_fs8.lstatSync)(childAbs);
+      if (st2.isSymbolicLink()) throw new ArtifactError("entry-type", `Symlink nicht erlaubt: '${(0, import_node_path11.relative)(root, childAbs).split(import_node_path11.sep).join("/")}'`);
+      if (st2.isDirectory()) {
+        walk(childAbs);
+        continue;
+      }
+      if (!st2.isFile()) throw new ArtifactError("entry-type", `Kein regul\xE4res File: '${name}'`);
+      const rel = (0, import_node_path11.relative)(root, childAbs).split(import_node_path11.sep).join("/");
+      const pErr = artifactPathError(rel, limits);
+      if (pErr) throw new ArtifactError("path-invalid", `'${rel}': ${pErr}`);
+      if (++count > limits.maxFiles) throw new ArtifactError("limit-files", `Mehr als ${limits.maxFiles} Dateien`);
+      const cap = rel === SIG_FILE ? limits.maxSigBytes : rel === INTEGRITY_FILE ? limits.maxIntegrityBytes : rel === MANIFEST_FILE ? limits.maxManifestBytes : limits.maxFileBytes;
+      if (st2.size > cap) throw new ArtifactError("limit-file-size", `'${rel}' \xFCberschreitet ${cap} Bytes`);
+      total += st2.size;
+      if (total > limits.maxTotalUnpackedBytes) {
+        throw new ArtifactError("limit-total-size", `Gesamtinhalt \xFCberschreitet ${limits.maxTotalUnpackedBytes} Bytes`);
+      }
+      files.set(rel, (0, import_node_fs8.readFileSync)(childAbs));
+    }
+  };
+  walk(root);
+  return files;
+}
 
 // src/main/plugins/runtime/keyring.ts
 var import_node_crypto4 = require("node:crypto");
@@ -12030,6 +12061,38 @@ function keyringFromSpkiMap(map) {
   return { get: (id) => keys.get(id) };
 }
 
+// src/main/plugins/download.ts
+var OWNER_RE = /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})$/;
+var REPO_RE = /^[A-Za-z0-9._-]{1,100}$/;
+function parseRepoRef(input) {
+  const s3 = String(input ?? "").trim();
+  const m2 = s3.match(/^([^/\s]+)\/([^/\s]+)$/);
+  if (!m2) throw new ArtifactError("repo-ref-invalid", `Ung\xFCltige Repo-Angabe '${input}' (erwartet owner/repo)`);
+  const owner = m2[1];
+  const repo = m2[2].replace(/\.git$/, "");
+  if (!OWNER_RE.test(owner) || !REPO_RE.test(repo) || repo === "." || repo === "..") {
+    throw new ArtifactError("repo-ref-invalid", `Ung\xFCltige Repo-Angabe '${input}'`);
+  }
+  return { owner, repo };
+}
+function parseRepoUrl(url) {
+  let u2;
+  try {
+    u2 = new URL(String(url ?? ""));
+  } catch {
+    throw new ArtifactError("repo-ref-invalid", `Ung\xFCltige Repo-URL '${url}'`);
+  }
+  if (u2.protocol !== "https:" && u2.protocol !== "http:") {
+    throw new ArtifactError("repo-ref-invalid", `Repo-URL muss http(s) sein: '${url}'`);
+  }
+  if (u2.hostname.toLowerCase() !== "github.com") {
+    throw new ArtifactError("repo-ref-invalid", `Nur github.com-Repo-URLs erlaubt, nicht '${u2.hostname}'`);
+  }
+  const parts = u2.pathname.split("/").filter(Boolean);
+  if (parts.length < 2) throw new ArtifactError("repo-ref-invalid", `Repo-URL ohne owner/repo: '${url}'`);
+  return parseRepoRef(`${parts[0]}/${parts[1]}`);
+}
+
 // src/main/plugins/artifact/signCli.ts
 var SIGNER_KEY_ID = "mindgraph-release-2026-01";
 var POST_VERIFY_APP_VERSION = "9999.0.0";
@@ -12040,18 +12103,6 @@ var SignError = class extends Error {
   }
 };
 var normPem = (pem) => pem.replace(/\r\n/g, "\n").trim();
-function repoSlugFromUrl(url) {
-  let u2;
-  try {
-    u2 = new URL(url);
-  } catch {
-    throw new SignError(`manifest.repo ist keine g\xFCltige URL: '${url}'`);
-  }
-  if (u2.hostname.toLowerCase() !== "github.com") throw new SignError(`manifest.repo ist kein github.com-Repo: '${url}'`);
-  const parts = u2.pathname.split("/").filter(Boolean);
-  if (parts.length < 2) throw new SignError(`manifest.repo ohne owner/repo: '${url}'`);
-  return `${parts[0]}/${parts[1].replace(/\.git$/, "")}`;
-}
 async function signPlugin(input, deps = {}) {
   const keyId = input.keyId ?? SIGNER_KEY_ID;
   const officialKeys = deps.officialKeys ?? OFFICIAL_KEYS;
@@ -12062,11 +12113,14 @@ async function signPlugin(input, deps = {}) {
   if (normPem(derivedPub) !== normPem(official)) {
     throw new SignError(`Secret-Public-Key \u2260 OFFICIAL_KEYS['${keyId}'] \u2014 falscher Signierschl\xFCssel.`);
   }
+  const present = readPluginDirFiles(input.artifactDir, ARTIFACT_LIMITS);
+  const manifestBuf = present.get(MANIFEST_FILE);
+  if (!manifestBuf) throw new SignError(`${MANIFEST_FILE} fehlt im Artefakt`);
   let manifest;
   try {
-    manifest = JSON.parse((0, import_node_fs9.readFileSync)((0, import_node_path12.join)(input.artifactDir, MANIFEST_FILE), "utf8"));
+    manifest = JSON.parse(manifestBuf.toString("utf8"));
   } catch {
-    throw new SignError(`${MANIFEST_FILE} fehlt oder ist kein g\xFCltiges JSON`);
+    throw new SignError(`${MANIFEST_FILE} ist kein g\xFCltiges JSON`);
   }
   const schema = validateManifest(manifest);
   if (!schema.valid) throw new SignError(`Manifest ung\xFCltig: ${schema.errors.join("; ")}`);
@@ -12076,27 +12130,23 @@ async function signPlugin(input, deps = {}) {
     throw new SignError(`manifest.version '${manifest.version}' \u2260 Tag-Version '${input.expectedVersion}'`);
   }
   if (!manifest.repo) throw new SignError("manifest.repo fehlt \u2014 f\xFCr offizielle Signierung erforderlich.");
-  const slug = repoSlugFromUrl(manifest.repo);
-  if (slug.toLowerCase() !== input.expectedRepo.toLowerCase()) {
-    throw new SignError(`manifest.repo '${slug}' \u2260 Input-Repo '${input.expectedRepo}'`);
+  const manifestRef = parseRepoUrl(manifest.repo);
+  const wantRef = parseRepoRef(input.expectedRepo);
+  if (manifestRef.owner.toLowerCase() !== wantRef.owner.toLowerCase() || manifestRef.repo.toLowerCase() !== wantRef.repo.toLowerCase()) {
+    throw new SignError(
+      `manifest.repo '${manifestRef.owner}/${manifestRef.repo}' \u2260 Input-Repo '${wantRef.owner}/${wantRef.repo}'`
+    );
   }
   const expected = /* @__PURE__ */ new Set([MANIFEST_FILE]);
   for (const k2 of ["main", "renderer", "styles"]) {
     const ep = manifest.entrypoints?.[k2];
     if (ep) expected.add(ep);
   }
-  const actual = (0, import_node_fs9.readdirSync)(input.artifactDir);
-  for (const name of actual) {
-    if (!(0, import_node_fs9.lstatSync)((0, import_node_path12.join)(input.artifactDir, name)).isFile()) {
-      throw new SignError(`Nicht-regul\xE4re Datei im Artefakt: '${name}'`);
-    }
-  }
-  const actualSet = new Set(actual);
-  for (const e of expected) if (!actualSet.has(e)) throw new SignError(`Erwartete Datei fehlt: '${e}'`);
-  for (const a of actualSet) if (!expected.has(a)) throw new SignError(`Unerwartete Datei im Artefakt: '${a}'`);
+  for (const e of expected) if (!present.has(e)) throw new SignError(`Erwartete Datei fehlt: '${e}'`);
+  for (const p2 of present.keys()) if (!expected.has(p2)) throw new SignError(`Unerwartete Datei im Artefakt: '${p2}'`);
   const payloadSet = new Set([...expected].filter((p2) => p2 !== MANIFEST_FILE));
   assertEntrypointsPresent(manifest, payloadSet);
-  const files = [...expected].map((p2) => ({ path: p2, content: (0, import_node_fs9.readFileSync)((0, import_node_path12.join)(input.artifactDir, p2)) }));
+  const files = [...expected].map((p2) => ({ path: p2, content: present.get(p2) }));
   const archive = await packPluginArtifact({ files, signKey: input.signKey, keyId });
   const quarantineDir = (0, import_node_fs9.mkdtempSync)((0, import_node_path12.join)((0, import_node_os2.tmpdir)(), "mgxsign-"));
   try {
@@ -12145,7 +12195,7 @@ async function main() {
     (0, import_node_fs10.writeFileSync)(outPath, archive);
     console.log(`Signiert: ${outPath} (${archive.length} Bytes, repo=${expectedRepo}, v=${expectedVersion})`);
   } catch (err) {
-    if (err instanceof SignError) {
+    if (err instanceof SignError || err instanceof ArtifactError) {
       console.error(`::error::Signierung abgelehnt: ${err.message}`);
       process.exit(1);
     }
