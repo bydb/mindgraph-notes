@@ -1026,6 +1026,10 @@ export interface ElectronAPI {
   pluginInvoke: (pluginId: string, actionId: string, payload?: unknown) => Promise<import('./plugins/transport').PluginInvokeResult>;
   pluginList: () => Promise<import('./plugins/transport').PluginInvokeResult>;
   pluginSetEnabled: (pluginId: string, enabled: boolean) => Promise<import('./plugins/transport').PluginInvokeResult>;
+  pluginInstall: () => Promise<{ ok: boolean; data?: { id: string; version: string; idempotent: boolean }; error?: string; code?: string; canceled?: boolean; restartRequired?: boolean }>;
+  pluginUninstall: (pluginId: string) => Promise<{ ok: boolean; error?: string }>;
+  pluginInstallErrors: () => Promise<{ ok: boolean; data?: Array<{ id: string; version: string; code: string; message: string }>; error?: string }>;
+  pluginInstalled: () => Promise<{ ok: boolean; data?: Array<{ id: string; version: string; activation: string; readiness: string | null; error: string | null }>; error?: string }>;
 
   // Projekt-Status-Crystallizer
   projectStatusDiscover: (vaultPath: string, projectsFolderRel: string) => Promise<{ success: boolean; projects?: DiscoveredProject[]; error?: string }>;

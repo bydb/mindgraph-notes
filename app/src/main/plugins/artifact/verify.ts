@@ -8,8 +8,8 @@ import { createHash, verify as cryptoVerify, type KeyObject } from 'node:crypto'
 import { createGunzip } from 'node:zlib'
 import { Readable, Writable } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
-import { mkdirSync, writeFileSync } from 'node:fs'
-import { dirname, resolve, sep } from 'node:path'
+import { mkdirSync, writeFileSync, readFileSync, readdirSync, lstatSync } from 'node:fs'
+import { dirname, resolve, sep, join, relative } from 'node:path'
 import {
   validateManifest,
   validateManifestSemantics,
@@ -181,40 +181,44 @@ function assertEntrypointsPresent(manifest: PluginManifest, payload: Set<string>
 function writeQuarantine(quarantineDir: string, files: Map<string, Buffer>, entries: IntegrityEntry[]): void {
   const root = resolve(quarantineDir)
   mkdirSync(root, { recursive: true })
-  for (const e of entries) {
-    const abs = resolve(root, e.path)
-    // Defense-in-Depth: Pfade sind bereits streng validiert (kein ..), hier nochmals einsperren.
+  // Payload + integrity.json + .sig schreiben → die Quarantäne ist ein vollständiges, später
+  // RE-verifizierbares Verzeichnis (A1 persistiert genau das als Install-Stand).
+  const write = (rel: string, buf: Buffer): void => {
+    const abs = resolve(root, rel)
     if (abs !== root && !abs.startsWith(root + sep)) {
-      throw new ArtifactError('path-invalid', `Pfad verlässt die Quarantäne: '${e.path}'`)
+      throw new ArtifactError('path-invalid', `Pfad verlässt die Quarantäne: '${rel}'`)
     }
     mkdirSync(dirname(abs), { recursive: true })
-    writeFileSync(abs, files.get(e.path)!)
+    writeFileSync(abs, buf)
   }
+  for (const e of entries) write(e.path, files.get(e.path)!)
+  write(INTEGRITY_FILE, files.get(INTEGRITY_FILE)!)
+  write(SIG_FILE, files.get(SIG_FILE)!)
+}
+
+/** Ergebnis der reinen Kern-Prüfungen (ohne I/O-Ziel). */
+export interface VerifiedFiles {
+  manifest: PluginManifest
+  files: IntegrityEntry[]
 }
 
 /**
- * Verifiziert ein `.mgxplugin`-Archiv vollständig und gibt ein `VerifiedPluginPackage` zurück.
- * Wirft `ArtifactError(code)` bei jedem Verstoß. **Kein Install** — das Verschieben aus der
- * Quarantäne ist A1/A2.
+ * Kern-Prüfungen über eine bereits eingelesene Datei-Map (path→Bytes): Signatur über die EXAKTEN
+ * integrity.json-Bytes → Dateimenge/Größe/Hash → Manifest (validate + Gates) → entrypoint-Existenz.
+ * Geteilt von Archiv-Verifikation (A0/3) UND Re-Verifikation eines installierten Verzeichnisses
+ * (A1). Wirft `ArtifactError` bei jedem Verstoß; serialisiert nichts neu.
  */
-export async function verifyPluginArtifact(archive: Buffer, opts: VerifyOptions): Promise<VerifiedPluginPackage> {
+export function verifyFileMap(
+  files: Map<string, Buffer>,
+  opts: { keyring: Keyring; appVersion: string; limits?: ArtifactLimits }
+): VerifiedFiles {
   const limits = opts.limits ?? ARTIFACT_LIMITS
-  if (archive.length > limits.maxArchiveBytes) {
-    throw new ArtifactError('archive-too-large', `Archiv überschreitet ${limits.maxArchiveBytes} Bytes`)
-  }
 
-  // 1) Entpacken (bomb-sicher) → Einträge mit Limits/Pfadregeln.
-  const headroom = limits.maxFiles * 1024 + 2 * 512
-  const plainTar = await gunzipCapped(archive, limits.maxTotalUnpackedBytes + headroom)
-  const files = await extractEntries(plainTar, limits)
-
-  // 2) integrity.json + .sig vorhanden?
   const integrityBytes = files.get(INTEGRITY_FILE)
   const sigBytes = files.get(SIG_FILE)
   if (!integrityBytes) throw new ArtifactError('fileset-mismatch', `'${INTEGRITY_FILE}' fehlt`)
   if (!sigBytes) throw new ArtifactError('fileset-mismatch', `'${SIG_FILE}' fehlt`)
 
-  // 3) Signatur über die EXAKTEN integrity.json-Bytes (Verifier serialisiert nichts neu).
   const sigValue = parseUtf8Json(sigBytes, 'sig-invalid', SIG_FILE)
   const { envelope, signature } = validateSigEnvelope(sigValue)
   const publicKey = opts.keyring.get(envelope.keyId)
@@ -223,7 +227,6 @@ export async function verifyPluginArtifact(archive: Buffer, opts: VerifyOptions)
     throw new ArtifactError('sig-mismatch', 'Signatur passt nicht zu integrity.json')
   }
 
-  // 4) integrity.json parsen + Dateimenge/Hashes/Größen prüfen.
   const doc = validateIntegrityDoc(parseUtf8Json(integrityBytes, 'integrity-invalid', INTEGRITY_FILE), limits)
   const payloadPaths = new Set([...files.keys()].filter((p) => p !== INTEGRITY_FILE && p !== SIG_FILE))
   const listed = new Set(doc.files.map((f) => f.path))
@@ -234,23 +237,90 @@ export async function verifyPluginArtifact(archive: Buffer, opts: VerifyOptions)
     const buf = files.get(e.path)
     if (!buf) throw new ArtifactError('fileset-mismatch', `In integrity.json gelistete Datei '${e.path}' fehlt`)
     if (buf.length !== e.size) throw new ArtifactError('size-mismatch', `Größe von '${e.path}' weicht ab`)
-    const actual = createHash('sha256').update(buf).digest('hex')
-    if (actual !== e.sha256) throw new ArtifactError('hash-mismatch', `Hash von '${e.path}' weicht ab`)
+    if (createHash('sha256').update(buf).digest('hex') !== e.sha256) {
+      throw new ArtifactError('hash-mismatch', `Hash von '${e.path}' weicht ab`)
+    }
   }
 
-  // 5) Manifest + Kompat-Gates (A0/2) + entrypoint-Existenz — alles noch in Quarantäne.
   const manifest = readManifest(files)
   assertCompatible(manifest, opts.appVersion)
   assertEntrypointsPresent(manifest, payloadPaths)
+  return { manifest, files: doc.files }
+}
 
-  // 6) Verifizierte Nutzdateien in die Quarantäne schreiben (KEIN Install).
-  writeQuarantine(opts.quarantineDir, files, doc.files)
-
+/**
+ * Verifiziert ein `.mgxplugin`-Archiv vollständig und gibt ein `VerifiedPluginPackage` zurück.
+ * Wirft `ArtifactError(code)` bei jedem Verstoß. **Kein Install** — das Verschieben aus der
+ * Quarantäne ist A1.
+ */
+export async function verifyPluginArtifact(archive: Buffer, opts: VerifyOptions): Promise<VerifiedPluginPackage> {
+  const limits = opts.limits ?? ARTIFACT_LIMITS
+  if (archive.length > limits.maxArchiveBytes) {
+    throw new ArtifactError('archive-too-large', `Archiv überschreitet ${limits.maxArchiveBytes} Bytes`)
+  }
+  // Entpacken (bomb-sicher) → Einträge mit Limits/Pfadregeln → Kern-Prüfungen → Quarantäne.
+  const headroom = limits.maxFiles * 1024 + 2 * 512
+  const plainTar = await gunzipCapped(archive, limits.maxTotalUnpackedBytes + headroom)
+  const files = await extractEntries(plainTar, limits)
+  const { manifest, files: entries } = verifyFileMap(files, opts)
+  writeQuarantine(opts.quarantineDir, files, entries)
   return {
     id: manifest.id,
     version: manifest.version,
     manifest,
     quarantineDir: resolve(opts.quarantineDir),
-    files: doc.files,
+    files: entries,
   }
+}
+
+/**
+ * Liest ein installiertes Verzeichnis rekursiv in eine Datei-Map — gleiche Pfad-/Limit-Regeln wie
+ * beim Entpacken; reguläre Dateien only (Symlinks via lstat abgelehnt → kein Ausbruch).
+ */
+function readInstalledDir(dir: string, limits: ArtifactLimits): Map<string, Buffer> {
+  const root = resolve(dir)
+  const files = new Map<string, Buffer>()
+  let count = 0
+  let total = 0
+  const walk = (abs: string): void => {
+    for (const name of readdirSync(abs)) {
+      const childAbs = join(abs, name)
+      const st = lstatSync(childAbs)
+      if (st.isSymbolicLink()) throw new ArtifactError('entry-type', `Symlink im Install-Verzeichnis: '${name}'`)
+      if (st.isDirectory()) {
+        walk(childAbs)
+        continue
+      }
+      if (!st.isFile()) throw new ArtifactError('entry-type', `Kein reguläres File: '${name}'`)
+      const rel = relative(root, childAbs).split(sep).join('/')
+      const pErr = artifactPathError(rel, limits)
+      if (pErr) throw new ArtifactError('path-invalid', `'${rel}': ${pErr}`)
+      if (++count > limits.maxFiles) throw new ArtifactError('limit-files', `Mehr als ${limits.maxFiles} Dateien`)
+      const cap =
+        rel === SIG_FILE ? limits.maxSigBytes
+        : rel === INTEGRITY_FILE ? limits.maxIntegrityBytes
+        : rel === MANIFEST_FILE ? limits.maxManifestBytes
+        : limits.maxFileBytes
+      if (st.size > cap) throw new ArtifactError('limit-file-size', `'${rel}' überschreitet ${cap} Bytes`)
+      total += st.size
+      if (total > limits.maxTotalUnpackedBytes) {
+        throw new ArtifactError('limit-total-size', `Gesamtinhalt überschreitet ${limits.maxTotalUnpackedBytes} Bytes`)
+      }
+      files.set(rel, readFileSync(childAbs))
+    }
+  }
+  walk(root)
+  return files
+}
+
+/**
+ * Re-Verifiziert ein bereits installiertes Verzeichnis (A1, Load-Pfad) gegen das dort persistierte
+ * integrity.json + .sig — **fail-closed**, liest nichts aus einem Archiv, schreibt nichts.
+ */
+export function verifyInstalledDir(
+  dir: string,
+  opts: { keyring: Keyring; appVersion: string; limits?: ArtifactLimits }
+): VerifiedFiles {
+  const limits = opts.limits ?? ARTIFACT_LIMITS
+  return verifyFileMap(readInstalledDir(dir, limits), { ...opts, limits })
 }

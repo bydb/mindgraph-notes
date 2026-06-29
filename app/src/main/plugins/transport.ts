@@ -15,7 +15,7 @@ import { dispatchInvoke } from './transport-core'
  * nur aus dessen Top-Frame. Damit kann fremder, in Markdown eingebetteter Inhalt (iframe)
  * den Kanal selbst bei CSP-Bypass nicht ansprechen. Defense-in-Depth vor der Registry.
  */
-function isTrustedSender(event: IpcMainInvokeEvent): boolean {
+export function isTrustedSender(event: IpcMainInvokeEvent): boolean {
   const wc = event.sender
   const isOwnWindow = BrowserWindow.getAllWindows().some(
     (w) => !w.isDestroyed() && w.webContents.id === wc.id

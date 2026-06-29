@@ -88,6 +88,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   pluginList: () => ipcRenderer.invoke('plugin:list'),
   pluginSetEnabled: (pluginId: string, enabled: boolean) =>
     ipcRenderer.invoke('plugin:setEnabled', pluginId, enabled),
+  // Disk-installierte Plugins (A1 Runtime-Loader): Datei-Install / Deinstall / Fehlerliste
+  pluginInstall: () => ipcRenderer.invoke('plugin:install'),
+  pluginUninstall: (pluginId: string) => ipcRenderer.invoke('plugin:uninstall', pluginId),
+  pluginInstallErrors: () => ipcRenderer.invoke('plugin:installErrors'),
+  pluginInstalled: () => ipcRenderer.invoke('plugin:installed'),
 
   // Notes-Cache für schnelles Laden
   saveNotesCache: (vaultPath: string, cache: object) => ipcRenderer.invoke('save-notes-cache', vaultPath, cache),

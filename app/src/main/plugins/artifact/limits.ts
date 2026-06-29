@@ -54,6 +54,12 @@ export type ArtifactErrorCode =
   | 'incompatible-api'
   | 'incompatible-app'
   | 'entrypoint-missing'
+  // — A1 (Runtime-Loader/Install) —
+  | 'id-collision' // ID trifft ein gebündeltes/reserviertes Plugin
+  | 'version-conflict' // id@version existiert mit ABWEICHENDEM/nicht verifizierbarem Inhalt
+  | 'load-failed' // Entry ließ sich nicht als PluginMainEntry laden (Registry-Aktivierung)
+  | 'entrypoint-unsupported' // z.B. Renderer-only-Manifest im Main-only-Loader
+  | 'workflow-collision' // workflowAction-ID kollidiert mit einer Kern-/fremden Action
 
 /** Terminaler Ablehnungsgrund eines Artefakts. `code` ist die maschinenlesbare Ursache. */
 export class ArtifactError extends Error {
