@@ -18,9 +18,14 @@ name: Sign Plugin Release (Produktion)
 # Der signierte .mgxplugin liegt danach als Workflow-Artefakt vor. Der Upload ans Plugin-Release ist
 # (vorerst) ein manueller Maintainer-Schritt — bewusst KEIN Cross-Repo-Write-Token in diesem Workflow.
 #
+# PFLICHT-Vorbedingung (einmalig, vor dem ersten Lauf): Das Environment 'release-signing' MUSS
+# Required Reviewers UND eine Deployment-Branch-Policy ausschließlich für 'master' gesetzt haben —
+# sonst kann der Signierjob von einem Fork-/Feature-Branch oder ohne Freigabe an den Key.
+#
 # Runbook: Actions → diesen Workflow → „Run workflow" auf master → repo (owner/repo), tag (vX.Y.Z) und
 # commit_sha (exakt der Commit hinter dem Tag) eintragen → sign-Job im Environment 'release-signing'
-# freigeben → Artefakt „signed-mgxplugin" herunterladen → am GitHub-Release des Plugin-Repos anhängen.
+# freigeben → Artefakt „signed-mgxplugin" herunterladen → VOR dem Anhängen am GitHub-Release des
+# Plugin-Repos Tag→Commit nochmals kontrollieren (`git ls-remote <repo> refs/tags/<tag>` == commit_sha).
 
 on:
   workflow_dispatch:
