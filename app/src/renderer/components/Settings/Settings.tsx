@@ -4,6 +4,7 @@ import { usePluginConfig } from '../../plugins/config'
 import { MODULES, isModuleEnabled, setModuleEnabled, useIsModuleEnabled, isPluginModule } from '../../utils/modules'
 import { invokePlugin } from '../../plugins/client'
 import { PluginSlot } from '../../plugins/slots'
+import { pluginErrorText } from '../../utils/pluginErrors'
 import { edooboxService } from '../../stores/edooboxServiceBridge'
 import { useNotesStore, createNoteFromFile } from '../../stores/notesStore'
 import { useSyncStore } from '../../stores/syncStore'
@@ -598,6 +599,13 @@ const ModulesTab: React.FC<{ t: TabTFn }> = ({ t }) => {
   const [diskPlugins, setDiskPlugins] = useState<Array<{ id: string; version: string; activation: string; readiness: string | null; error: string | null }>>([])
   const [uninstalling, setUninstalling] = useState<string | null>(null)
   const [confirmingUninstall, setConfirmingUninstall] = useState<string | null>(null)
+  // A3: Install per GitHub-Repo + Update-Badges (verdrahtet die ruhenden A2-IPCs).
+  const [repoInput, setRepoInput] = useState('')
+  const [repoTag, setRepoTag] = useState('')
+  const [installingRepo, setInstallingRepo] = useState(false)
+  const [updates, setUpdates] = useState<Array<{ id: string; repo: string; current: string; latest: string; hasUpdate: boolean }>>([])
+  const [checkingUpdates, setCheckingUpdates] = useState(false)
+  const [updatingId, setUpdatingId] = useState<string | null>(null)
   // Lokalisierte Anzeige der Laufzeit-Enums (sonst englische Rohwerte für DE-User).
   const activationLabel: Record<string, string> = {
     active: t('settings.modules.statusActive'),
@@ -661,6 +669,57 @@ const ModulesTab: React.FC<{ t: TabTFn }> = ({ t }) => {
       setUninstalling(null)
     }
   }
+  // A3: Update-Check (read-only) — beim Öffnen einmal + manueller Button. Kein Hintergrund-Polling.
+  const handleCheckUpdates = async () => {
+    setCheckingUpdates(true)
+    try {
+      const res = await window.electronAPI.pluginCheckUpdates()
+      if (res.ok && res.data) setUpdates(res.data)
+    } catch { /* read-only — Fehler ignorieren */ } finally {
+      setCheckingUpdates(false)
+    }
+  }
+  const handleInstallFromRepo = async () => {
+    const repo = repoInput.trim()
+    if (!repo) return
+    setInstallingRepo(true)
+    setInstallMsg(null)
+    try {
+      const res = await window.electronAPI.pluginInstallFromGithub(repo, repoTag.trim() || undefined)
+      if (res.ok && res.data) {
+        setInstallMsg({ ok: true, text: t('settings.modules.installSuccess', { id: res.data.id, version: res.data.version }) })
+        setRepoInput(''); setRepoTag('')
+        refreshDiskPlugins(); void handleCheckUpdates()
+      } else {
+        setInstallMsg({ ok: false, text: pluginErrorText(t as (key: string) => string, res.code, res.error) })
+      }
+    } catch (err) {
+      setInstallMsg({ ok: false, text: err instanceof Error ? err.message : String(err) })
+    } finally {
+      setInstallingRepo(false)
+    }
+  }
+  // 1-Klick-Update: lädt das neueste Release desselben Repos über denselben verifizierten A2-Pfad.
+  const handleUpdatePlugin = async (id: string, repo: string) => {
+    setUpdatingId(id)
+    setInstallMsg(null)
+    try {
+      const res = await window.electronAPI.pluginInstallFromGithub(repo)
+      if (res.ok && res.data) {
+        setInstallMsg({ ok: true, text: t('settings.modules.installSuccess', { id: res.data.id, version: res.data.version }) })
+        refreshDiskPlugins(); void handleCheckUpdates()
+      } else {
+        setInstallMsg({ ok: false, text: pluginErrorText(t as (key: string) => string, res.code, res.error) })
+      }
+    } catch (err) {
+      setInstallMsg({ ok: false, text: err instanceof Error ? err.message : String(err) })
+    } finally {
+      setUpdatingId(null)
+    }
+  }
+  useEffect(() => { void handleCheckUpdates() }, [])
+  // Verfügbare Updates per Plugin-ID für die Disk-Liste.
+  const updateById = new Map(updates.filter(u => u.hasUpdate).map(u => [u.id, u] as const))
 
   // Kern- von plugin-gestützten Modulen trennen: „MindGraph-Module" (immer dabei) vs.
   // „Installierte Plugins" (eigenständige Vertikalen, später per Store verwaltbar).
@@ -751,6 +810,29 @@ const ModulesTab: React.FC<{ t: TabTFn }> = ({ t }) => {
           {installMsg.text}
         </p>
       )}
+      <div className="modules-install-repo" style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', marginBottom: 4 }}>
+        <input
+          className="settings-input"
+          style={{ flex: '1 1 160px', minWidth: 120 }}
+          placeholder={t('settings.modules.repoPlaceholder')}
+          value={repoInput}
+          onChange={e => setRepoInput(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter') handleInstallFromRepo() }}
+          disabled={installingRepo}
+        />
+        <input
+          className="settings-input"
+          style={{ flex: '0 1 120px', minWidth: 90 }}
+          placeholder={t('settings.modules.tagPlaceholder')}
+          value={repoTag}
+          onChange={e => setRepoTag(e.target.value)}
+          disabled={installingRepo}
+        />
+        <button className="settings-btn-secondary" onClick={handleInstallFromRepo} disabled={installingRepo || !repoInput.trim()}>
+          {installingRepo ? t('settings.modules.installing') : t('settings.modules.installFromRepoButton')}
+        </button>
+      </div>
+      <p className="settings-hint">{t('settings.modules.installFromRepoHint')}</p>
       <div className="modules-list">
         {pluginMods.length === 0
           ? <p className="settings-hint">{t('settings.modules.pluginsEmpty')}</p>
@@ -758,14 +840,28 @@ const ModulesTab: React.FC<{ t: TabTFn }> = ({ t }) => {
       </div>
 
       <div className="modules-category" style={{ marginTop: 16 }}>
-        <h4 className="modules-category-title">{t('settings.modules.diskPluginsTitle')}</h4>
+        <div className="modules-plugins-header">
+          <h4 className="modules-category-title">{t('settings.modules.diskPluginsTitle')}</h4>
+          <button className="settings-btn-secondary" onClick={handleCheckUpdates} disabled={checkingUpdates}>
+            {checkingUpdates ? t('settings.modules.checkingUpdates') : t('settings.modules.checkUpdates')}
+          </button>
+        </div>
         <div className="modules-list">
           {diskPlugins.length === 0
             ? <p className="settings-hint">{t('settings.modules.diskPluginsEmpty')}</p>
-            : diskPlugins.map(p => (
+            : diskPlugins.map(p => {
+              const upd = updateById.get(p.id)
+              return (
               <div key={p.id} className="module-row">
                 <div className="module-row-body">
-                  <div className="module-row-label">{p.id} {p.version}</div>
+                  <div className="module-row-label">
+                    {p.id} {p.version}
+                    {upd && (
+                      <span style={{ marginLeft: 8, fontSize: '0.72em', color: 'var(--accent-color, #4a9eff)', border: '1px solid var(--accent-color, #4a9eff)', borderRadius: 4, padding: '1px 5px' }}>
+                        {t('settings.modules.updateAvailable')}
+                      </span>
+                    )}
+                  </div>
                   <div className="module-row-desc">{statusText(p)}</div>
                   {p.error && (
                     <div className="module-row-error" style={{ color: 'var(--error-color, #e5484d)', fontSize: '0.8em', marginTop: 4 }}>
@@ -773,31 +869,45 @@ const ModulesTab: React.FC<{ t: TabTFn }> = ({ t }) => {
                     </div>
                   )}
                 </div>
-                {confirmingUninstall === p.id ? (
-                  <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                  {upd && (
                     <button
                       className="settings-btn-secondary"
-                      style={{ color: 'var(--error-color, #e5484d)' }}
-                      onClick={() => handleUninstallPlugin(p.id)}
-                      disabled={uninstalling === p.id}
+                      onClick={() => handleUpdatePlugin(p.id, upd.repo)}
+                      disabled={updatingId === p.id}
                     >
-                      {uninstalling === p.id ? t('settings.modules.uninstalling') : t('settings.modules.uninstallConfirm')}
+                      {updatingId === p.id
+                        ? t('settings.modules.updating')
+                        : t('settings.modules.updateButton', { current: upd.current, latest: upd.latest })}
                     </button>
-                    <button className="settings-btn-secondary" onClick={() => setConfirmingUninstall(null)} disabled={uninstalling === p.id}>
-                      {t('settings.modules.cancel')}
+                  )}
+                  {confirmingUninstall === p.id ? (
+                    <>
+                      <button
+                        className="settings-btn-secondary"
+                        style={{ color: 'var(--error-color, #e5484d)' }}
+                        onClick={() => handleUninstallPlugin(p.id)}
+                        disabled={uninstalling === p.id}
+                      >
+                        {uninstalling === p.id ? t('settings.modules.uninstalling') : t('settings.modules.uninstallConfirm')}
+                      </button>
+                      <button className="settings-btn-secondary" onClick={() => setConfirmingUninstall(null)} disabled={uninstalling === p.id}>
+                        {t('settings.modules.cancel')}
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      className="settings-btn-secondary"
+                      onClick={() => setConfirmingUninstall(p.id)}
+                      disabled={uninstalling !== null}
+                    >
+                      {t('settings.modules.uninstall')}
                     </button>
-                  </div>
-                ) : (
-                  <button
-                    className="settings-btn-secondary"
-                    onClick={() => setConfirmingUninstall(p.id)}
-                    disabled={uninstalling !== null}
-                  >
-                    {t('settings.modules.uninstall')}
-                  </button>
-                )}
+                  )}
+                </div>
               </div>
-            ))}
+              )
+            })}
         </div>
       </div>
 
