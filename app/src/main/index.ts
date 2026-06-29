@@ -165,7 +165,8 @@ import {
   type RuntimeEnv,
 } from './plugins/runtime/manage'
 import { ArtifactError } from './plugins/artifact/limits'
-import { type DiscoverError } from './plugins/runtime/discover'
+import { discoverInstalledPlugins, type DiscoverError } from './plugins/runtime/discover'
+import { ExternalWidgetRuntime } from './plugins/widgets'
 import { SECURE_WEB_PREFERENCES } from './windowSecurity'
 import { readArchiveFileCapped } from './plugins/runtime/readArchive'
 import { readActiveIndex } from './plugins/runtime/activeIndex'
@@ -190,7 +191,8 @@ app.on('web-contents-created', (_event, contents) => {
 // Plugin-System: build-seitig erkannte Registry (import.meta.glob) + generischer Transport.
 // Der echte Capability-Host wird in app.whenReady() gesetzt (setHostFactory); bis dahin Stub.
 const pluginRegistry = createMainRegistry(undefined, app.getVersion())
-registerPluginTransport(pluginRegistry)
+const externalWidgetRuntime = new ExternalWidgetRuntime(pluginRegistry)
+registerPluginTransport(pluginRegistry, () => publishExternalWidgetState())
 
 // Plugin-beigesteuerte Workflow-Canvas-Bausteine (Manifest-Feld `workflowActions`) in die
 // gemeinsame Registry einspielen, damit der Runner sie generisch dispatcht (kein statischer
@@ -225,6 +227,22 @@ function pluginManageDeps(): ManageDeps {
     unregisterWorkflowActions,
   }
 }
+
+/** Spiegelt ausschließlich aktive, erneut verifizierte Disk-Manifeste in die scoped Widget-Runtime. */
+function syncExternalWidgetRuntime(): void {
+  const manifests = discoverInstalledPlugins(runtimePluginEnv()).sources
+    .map((source) => source.manifest)
+    .filter((manifest) => pluginRegistry.get(manifest.id)?.activation === 'active')
+  externalWidgetRuntime.sync(manifests)
+}
+
+/** Main→Renderer Push: nach Lifecycle-Änderungen entfernt der Renderer Zombies sofort. */
+function publishExternalWidgetState(): void {
+  syncExternalWidgetRuntime()
+  for (const window of BrowserWindow.getAllWindows()) {
+    if (!window.isDestroyed()) window.webContents.send('plugin:widgets-changed')
+  }
+}
 // Re-Verify-/Kollisions-Fehler der LETZTEN Startup-Discovery (nur fürs Start-Log; die UI fragt
 // plugin:installErrors live ab, damit sie nach Install/Uninstall nicht veraltet).
 let lastPluginDiscoverErrors: DiscoverError[] = []
@@ -254,6 +272,7 @@ ipcMain.handle('plugin:install', async (event) => {
     // Größe VOR dem Lesen prüfen (stat) — sonst läge eine riesige Datei vor jedem Limit im RAM.
     const archive = await readArchiveFileCapped(result.filePaths[0])
     const out = await serializePluginOp(() => installAndActivate(pluginManageDeps(), archive))
+    publishExternalWidgetState()
     return { ok: true, data: { id: out.id, version: out.version, idempotent: out.idempotent } }
   } catch (err) {
     const code = err instanceof ArtifactError ? err.code : undefined
@@ -290,7 +309,29 @@ ipcMain.handle('plugin:uninstall', async (event, pluginId: unknown) => {
   if (typeof pluginId !== 'string') return { ok: false, error: 'Ungültige Plugin-ID' }
   try {
     await serializePluginOp(() => uninstallPlugin(pluginManageDeps(), pluginId))
+    publishExternalWidgetState()
     return { ok: true }
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) }
+  }
+})
+
+// Tier-1 Renderer-Widgets: Renderer erhält nur Main-erzeugte instanceIds; Plugin/Action/Slot bleiben
+// vollständig im Main gebunden. Kein frei parametrisierter plugin:invoke-Pfad.
+ipcMain.handle('plugin:widgets', async (event) => {
+  if (!isTrustedSender(event)) return { ok: false, error: 'Nicht autorisierter Aufrufer' }
+  try {
+    syncExternalWidgetRuntime()
+    return { ok: true, data: externalWidgetRuntime.list() }
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) }
+  }
+})
+
+ipcMain.handle('plugin:widgetData', async (event, instanceId: unknown) => {
+  if (!isTrustedSender(event)) return { ok: false, error: 'Nicht autorisierter Aufrufer' }
+  try {
+    return { ok: true, data: await externalWidgetRuntime.invoke(instanceId) }
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : String(err) }
   }
@@ -958,9 +999,10 @@ app.whenReady().then(async () => {
   // A-pre Schritt 1: nur Plugins aktivieren, deren Modulschalter aktiviert ist — der Start
   // respektiert den Disabled-Zustand (gebündelte Plugins sind nicht mehr blind „immer an").
   const pluginGateSettings = startupUiSettings ?? {}
-  pluginRegistry
+  await pluginRegistry
     .activateAll((_id, manifest) => isPluginGateEnabled(manifest, pluginGateSettings))
     .catch((err) => console.error('[plugin] activateAll:', err))
+  syncExternalWidgetRuntime()
 
   // Tray-Icon + Schnellerfassung (plattformübergreifend)
   {

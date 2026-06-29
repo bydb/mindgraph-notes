@@ -30,7 +30,10 @@ export function isTrustedSender(event: IpcMainInvokeEvent): boolean {
 const REJECTED: PluginInvokeResult = { ok: false, error: 'Nicht autorisierter Aufrufer' }
 
 /** Verdrahtet `plugin:invoke` + `plugin:list` gegen die übergebene Registry. Einmal beim Start. */
-export function registerPluginTransport(registry: PluginRegistry): void {
+export function registerPluginTransport(
+  registry: PluginRegistry,
+  onLifecycleChanged?: () => void | Promise<void>
+): void {
   ipcMain.handle(
     'plugin:invoke',
     async (event, pluginId: unknown, actionId: unknown, payload: unknown): Promise<PluginInvokeResult> => {
@@ -72,6 +75,11 @@ export function registerPluginTransport(registry: PluginRegistry): void {
               state.error?.message ??
               `Plugin '${pluginId}' ist nach ${enabled ? 'Aktivierung' : 'Deaktivierung'} im Zustand '${state.activation}'`,
           }
+        }
+        try {
+          await onLifecycleChanged?.()
+        } catch (notifyErr) {
+          console.error('[plugin] Lifecycle-Push fehlgeschlagen:', notifyErr)
         }
         return { ok: true, data: state }
       } catch (err) {

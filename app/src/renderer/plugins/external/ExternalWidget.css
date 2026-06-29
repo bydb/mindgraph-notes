@@ -75,3 +75,5 @@
 .ext-widget-progress-bar { height: 100%; background: var(--accent-color, #4a9eff); }
 
 .ext-widget-error { font-size: 0.8rem; color: #e5484d; opacity: 0.85; }
+.ext-widget-loading { font-size: 0.8rem; opacity: 0.65; }
+.ext-widget-slot { display: grid; gap: 12px; margin-top: 12px; }

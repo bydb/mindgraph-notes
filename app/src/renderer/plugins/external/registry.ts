@@ -7,6 +7,7 @@
 // das feste Vokabular (DeclarativeWidget). Rein, React-frei, testbar.
 
 import { WIDGET_SLOTS, type WidgetSlot } from '@mindgraph/plugin-api'
+import type { ExternalWidgetDescriptor } from '../../../shared/plugins/widget'
 
 /** Slot-Kategorien für externe Widgets (aus dem Manifest-Vertrag; Host-kontrolliert). */
 export const EXTERNAL_WIDGET_SLOTS = {
@@ -18,38 +19,14 @@ export type ExternalWidgetSlot = WidgetSlot
 const KNOWN_SLOTS: ReadonlySet<string> = new Set(WIDGET_SLOTS)
 
 /** Ein deklarativer Widget-Beitrag eines externen Plugins an einen (strikt begrenzten) Slot. */
-export interface ExternalWidgetEntry {
-  pluginId: string
-  slot: ExternalWidgetSlot
+export interface ExternalWidgetEntry extends ExternalWidgetDescriptor {
   title?: string
 }
 
 export class ExternalWidgetRegistry {
   private readonly bySlot = new Map<ExternalWidgetSlot, ExternalWidgetEntry[]>()
-
-  /** Registriert/aktualisiert den Beitrag eines Plugins für einen Slot (dedupe per pluginId+slot).
-   *  Unbekannte Slots werden zur LAUFZEIT verworfen (fail-closed — die Daten stammen aus dem,
-   *  wenn auch signierten, Manifest und sollen keinen beliebigen Slot anlegen). */
-  register(entry: ExternalWidgetEntry): void {
-    if (!KNOWN_SLOTS.has(entry.slot)) {
-      console.warn(`[ext-widget] unbekannter Slot '${entry.slot}' verworfen (Plugin '${entry.pluginId}')`)
-      return
-    }
-    const list = this.bySlot.get(entry.slot) ?? []
-    const idx = list.findIndex((e) => e.pluginId === entry.pluginId)
-    if (idx >= 0) list[idx] = entry
-    else list.push(entry)
-    this.bySlot.set(entry.slot, list)
-  }
-
-  /** Entfernt ALLE Beiträge eines Plugins (Runtime-Disable/Uninstall — Increment 3). */
-  removeByPlugin(pluginId: string): void {
-    for (const [slot, list] of this.bySlot) {
-      const next = list.filter((e) => e.pluginId !== pluginId)
-      if (next.length) this.bySlot.set(slot, next)
-      else this.bySlot.delete(slot)
-    }
-  }
+  private revision = 0
+  private readonly listeners = new Set<() => void>()
 
   /** Beiträge eines Slots als KOPIE (interner mutable Zustand bleibt gekapselt). */
   getBySlot(slot: ExternalWidgetSlot): readonly ExternalWidgetEntry[] {
@@ -57,7 +34,32 @@ export class ExternalWidgetRegistry {
     return list ? [...list] : []
   }
 
-  clear(): void {
+  /** EINZIGER Schreibpfad: ersetzt den kompletten Stand durch die vom Main gelieferte,
+   *  autoritative Liste (Main ist Source-of-Truth — der Renderer spiegelt nur, baut NICHT
+   *  inkrementell auf). Dedupe per pluginId+slot; unbekannte Slots werden fail-closed verworfen
+   *  (die Daten stammen aus dem signierten Manifest, sollen aber keinen beliebigen Slot anlegen). */
+  replace(entries: readonly ExternalWidgetEntry[]): void {
     this.bySlot.clear()
+    for (const entry of entries) {
+      if (!KNOWN_SLOTS.has(entry.slot)) continue
+      const list = this.bySlot.get(entry.slot) ?? []
+      const idx = list.findIndex((candidate) => candidate.pluginId === entry.pluginId)
+      if (idx >= 0) list[idx] = entry
+      else list.push(entry)
+      this.bySlot.set(entry.slot, list)
+    }
+    this.changed()
+  }
+
+  subscribe = (listener: () => void): (() => void) => {
+    this.listeners.add(listener)
+    return () => this.listeners.delete(listener)
+  }
+
+  getRevision = (): number => this.revision
+
+  private changed(): void {
+    this.revision++
+    for (const listener of this.listeners) listener()
   }
 }

@@ -286,6 +286,18 @@ describe('validateManifestSemantics — Widget-Provider-Vertrag (Renderer-Spike 
 
   it('lehnt ab, wenn isWrite:true (nicht nebenwirkungsfrei)', () => {
     expect(validateManifestSemantics(withWidget({ isWrite: true })).valid).toBe(false)
+    expect(validateManifestSemantics(withWidget({ isWrite: undefined })).valid).toBe(false)
+  })
+
+  it('verlangt fromAction und die zum UI-Feld passende Slot-ID', () => {
+    expect(validateManifest({
+      ...validManifest,
+      ui: { dashboardWidget: { slot: 'dashboard.widget' } },
+    }).valid).toBe(false)
+    expect(validateManifestSemantics({
+      ...withWidget({}),
+      ui: { dashboardWidget: { slot: 'sidebar.panel', fromAction: 'antares.widgetData' } },
+    }).valid).toBe(false)
   })
 
   it('ohne ui-Widget ist nichts zu prüfen', () => {

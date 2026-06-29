@@ -91,7 +91,7 @@ export const PLUGIN_MANIFEST_SCHEMA: JsonSchema = {
     // KEIN `view`-Feld (fromAction liefert die WidgetView, gegen WIDGET_VIEW_SCHEMA validiert).
     slotDecl: {
       type: 'object',
-      required: ['slot'],
+      required: ['slot', 'fromAction'],
       properties: {
         slot: { enum: ['dashboard.widget', 'sidebar.panel'] },
         fromAction: { type: 'string', minLength: 1 },
@@ -335,10 +335,14 @@ export function validateManifestSemantics(manifest: PluginManifest): ValidationR
     const action = actionsById.get(fromAction)
     if (!action) {
       errors.push(`ui.${slotKey}.fromAction '${fromAction}' referenziert keine deklarierte Action.`)
-    } else if (action.widgetProvider !== true || action.isWrite === true) {
+    } else if (action.widgetProvider !== true || action.isWrite !== false) {
       errors.push(
         `ui.${slotKey}.fromAction '${fromAction}' muss eine Action mit widgetProvider:true UND isWrite:false sein.`
       )
+    }
+    const expectedSlot = slotKey === 'dashboardWidget' ? 'dashboard.widget' : 'sidebar.panel'
+    if (manifest.ui?.[slotKey]?.slot !== expectedSlot) {
+      errors.push(`ui.${slotKey}.slot muss exakt '${expectedSlot}' sein.`)
     }
   }
 

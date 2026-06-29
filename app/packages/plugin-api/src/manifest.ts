@@ -96,7 +96,7 @@ export type WidgetSlot = (typeof WIDGET_SLOTS)[number]
  *  validiert) — KEIN separates `view`-Template im Manifest. */
 export interface SlotDecl {
   slot: WidgetSlot
-  fromAction?: string
+  fromAction: string
 }
 
 /** Autor eines Plugins. Bewusst Objekt (nicht String) — eine spätere Erweiterung um url/email

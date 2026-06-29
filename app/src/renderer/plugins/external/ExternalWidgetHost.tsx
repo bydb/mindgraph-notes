@@ -26,7 +26,12 @@ class WidgetErrorBoundary extends React.Component<
   }
 }
 
-export const ExternalWidgetHost: React.FC<{ pluginId: string; view: WidgetView }> = ({ pluginId, view }) => {
+export const ExternalWidgetHost: React.FC<{
+  pluginId: string
+  view?: WidgetView
+  loading?: boolean
+  error?: string
+}> = ({ pluginId, view, loading, error }) => {
   const { t } = useTranslation()
   return (
     <section className="ext-widget" style={{ contain: 'layout paint style', overflow: 'hidden' }}>
@@ -38,7 +43,11 @@ export const ExternalWidgetHost: React.FC<{ pluginId: string; view: WidgetView }
       </header>
       <div className="ext-widget-body">
         <WidgetErrorBoundary fallback={<div className="ext-widget-error">{t('widgets.external.renderError')}</div>}>
-          <DeclarativeWidget view={view} />
+          {error
+            ? <div className="ext-widget-error">{error}</div>
+            : loading || !view
+              ? <div className="ext-widget-loading">{t('widgets.external.loading')}</div>
+              : <DeclarativeWidget view={view} />}
         </WidgetErrorBoundary>
       </div>
     </section>

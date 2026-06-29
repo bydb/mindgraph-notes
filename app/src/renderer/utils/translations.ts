@@ -310,6 +310,7 @@ const translations = {
     'settings.modules.readyUnavailable': 'Nicht verfügbar',
     'widgets.external.label': 'Externes Plugin',
     'widgets.external.renderError': 'Widget-Fehler',
+    'widgets.external.loading': 'Widget wird geladen …',
 
     // Speech / Voice (TTS + STT)
     'settings.speech.title': 'Sprache (Vorlesen & Diktieren)',
@@ -2958,6 +2959,7 @@ const translations = {
     'settings.modules.readyUnavailable': 'Unavailable',
     'widgets.external.label': 'External plugin',
     'widgets.external.renderError': 'Widget error',
+    'widgets.external.loading': 'Loading widget …',
 
     // Speech / Voice (TTS + STT)
     'settings.speech.title': 'Speech (Read aloud & Dictation)',

@@ -247,3 +247,25 @@ Broker-Invarianten: **I-B1…I-B5** (§5.3). Deklarativ: **I-D1…I-D3** (§4). 
 - F-R1 `sanitizePluginWidgetHtml` (falls Rich-Text je nötig). F-R2 Multi-Widget-Layout/Resize-Policy.
 - F-R3 Tier-2-Prozess-Modell-Details (WebContentsView-Lifecycle, OOPIF-Verhalten, Offscreen).
 - F-R4 generalisierte Egress-/Permission-Policy für künftige Renderer-Tiers (Tabs/Custom-Views).
+
+> Aus dem Pre-Commit-Review des Increment-2 (Renderer-Widgets-Runtime). Beide bewusst NICHT in Increment 2 —
+> die Akzeptanzkriterien §9 („Parallelität erzwungen") sind durch die Deckelung erfüllt; hier nur die Grenzen,
+> falls Provider teurer/dynamischer werden.
+
+- **F-R5 — Globales In-Flight-Limit für Provider-Läufe (Increment 2 hat nur Count-Cap + Per-Instanz-Dedup).**
+  Aktuell: `entry.pending` dedupliziert parallele Aufrufe *derselben* Instanz (`main/plugins/widgets.ts`), und
+  `WIDGET_RUNTIME_LIMITS.maxInstances=32` deckelt die Instanzzahl. Der Renderer mountet aber alle
+  `WidgetInstance` eines Slots gleichzeitig (`ExternalWidgetSlot.tsx`) → bis zu 32 *verschiedene*
+  `registry.invoke` laufen echt parallel; jeder führt den Plugin-Executor aus (potenziell LLM/Netz/fs innerhalb
+  der gewährten Capabilities). Es gibt KEIN globales In-Flight-Semaphore. Bei billigen Providern unkritisch.
+  Follow-up, falls Provider teuer werden: kleines globales Concurrency-Semaphore (z.B. ≤4 gleichzeitig) in der
+  Runtime, Rest FIFO. (Tier 2 fordert ohnehin I-B3-Rate-/In-Flight-Limits — dort konsolidieren.)
+
+- **F-R6 — Renderer holt Widget-Daten genau einmal je `instanceId`; kein Auto-Refresh/Retry.**
+  `WidgetInstance`-`useEffect` hängt an `descriptor.instanceId` (`ExternalWidgetSlot.tsx`), d.h. die
+  Main-seitige `minRefreshMs`/`cached`-Logik (`widgets.ts`) wird derzeit NUR bei Remount (instanceId-Wechsel via
+  Upgrade/Disable→Enable) ausgeübt. Konsequenz: ein transienter Provider-Fehler bleibt sichtbar, bis sich die
+  instanceId ändert — kein „Erneut laden"-Knopf, kein Polling. Bewusste Increment-2-Scope-Entscheidung
+  (Daten sind statisch je Instanz-Lebensdauer). Follow-up: renderer-seitiges Poll/Retry (manueller Reload +
+  optionales Intervall); ab dann wird der Main-Refresh-Throttle (`minRefreshMs`, Late-Result-Schutz)
+  tatsächlich tragend statt nur defensiv.
