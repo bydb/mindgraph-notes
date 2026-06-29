@@ -169,7 +169,7 @@ function assertCompatible(manifest: PluginManifest, appVersion: string): void {
   }
 }
 
-function assertEntrypointsPresent(manifest: PluginManifest, payload: Set<string>): void {
+export function assertEntrypointsPresent(manifest: PluginManifest, payload: Set<string>): void {
   for (const key of ['main', 'renderer', 'styles'] as const) {
     const ep = manifest.entrypoints?.[key]
     if (ep && !payload.has(ep)) {

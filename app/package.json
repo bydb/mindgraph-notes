@@ -18,6 +18,7 @@
     "prebuild": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
+    "build:signer": "node scripts/build-signer.mjs",
     "rag:eval": "node scripts/run-ts.mjs scripts/rag-eval.ts"
   },
   "keywords": [
