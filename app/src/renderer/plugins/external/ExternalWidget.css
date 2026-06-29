@@ -1,0 +1,77 @@
+/* Externe deklarative Widgets (A1 Renderer-Spike, Tier 1). Host besitzt das Styling vollständig;
+   Plugins liefern nur Daten (WidgetView). Nutzt die globalen Theme-Variablen. */
+
+.ext-widget {
+  border: 1px solid var(--border-color, color-mix(in srgb, var(--text-primary) 12%, transparent));
+  border-radius: 10px;
+  background: var(--bg-secondary, color-mix(in srgb, var(--text-primary) 4%, transparent));
+  overflow: hidden;
+}
+
+/* Nicht-fälschbare Demarkation — macht „das ist ein externes Plugin" sichtbar. */
+.ext-widget-demarcation {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  font-size: 0.7rem;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--text-primary) 60%, transparent);
+  background: color-mix(in srgb, var(--text-primary) 7%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--text-primary) 10%, transparent);
+}
+.ext-widget-demarcation-tag::before {
+  content: '🧩';
+  margin-right: 4px;
+}
+
+.ext-widget-body {
+  padding: 10px 12px;
+  font-size: 0.85rem;
+  color: var(--text-primary);
+}
+
+.ext-widget-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 6px;
+  flex: 0 0 auto;
+}
+
+/* stats */
+.ext-widget-stats { display: flex; flex-wrap: wrap; gap: 14px; }
+.ext-widget-stat-value { font-size: 1.25rem; font-weight: 600; }
+.ext-widget-trend { font-size: 0.7rem; margin-left: 4px; }
+.ext-widget-trend.trend-up { color: #30a46c; }
+.ext-widget-trend.trend-down { color: #e5484d; }
+.ext-widget-stat-label { font-size: 0.72rem; opacity: 0.7; }
+
+/* list */
+.ext-widget-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.ext-widget-list-item { display: flex; align-items: center; gap: 6px; }
+.ext-widget-list-title { font-weight: 500; }
+.ext-widget-list-sub { opacity: 0.65; font-size: 0.78rem; }
+.ext-widget-pill {
+  display: inline-flex; align-items: center;
+  padding: 1px 7px; border-radius: 999px; font-size: 0.72rem;
+  background: color-mix(in srgb, var(--accent-color, #4a9eff) 18%, transparent);
+}
+
+/* keyValue */
+.ext-widget-kv { margin: 0; display: flex; flex-direction: column; gap: 4px; }
+.ext-widget-kv-row { display: flex; justify-content: space-between; gap: 12px; }
+.ext-widget-kv-row dt { opacity: 0.7; margin: 0; }
+.ext-widget-kv-row dd { margin: 0; font-weight: 500; }
+
+/* progress */
+.ext-widget-progress-label { font-size: 0.75rem; opacity: 0.7; margin-bottom: 4px; }
+.ext-widget-progress-track {
+  height: 8px; border-radius: 999px; overflow: hidden;
+  background: color-mix(in srgb, var(--text-primary) 12%, transparent);
+}
+.ext-widget-progress-bar { height: 100%; background: var(--accent-color, #4a9eff); }
+
+.ext-widget-error { font-size: 0.8rem; color: #e5484d; opacity: 0.85; }
