@@ -52,9 +52,6 @@ export const manifest: PluginManifest = {
       },
     },
   ],
-  ui: {
-    dashboardWidget: { slot: 'dashboard.widgets', fromAction: 'demo.echo' },
-  },
 }
 
 export default manifest

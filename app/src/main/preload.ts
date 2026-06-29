@@ -93,6 +93,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
   pluginUninstall: (pluginId: string) => ipcRenderer.invoke('plugin:uninstall', pluginId),
   pluginInstallErrors: () => ipcRenderer.invoke('plugin:installErrors'),
   pluginInstalled: () => ipcRenderer.invoke('plugin:installed'),
+  pluginWidgets: () => ipcRenderer.invoke('plugin:widgets'),
+  pluginWidgetData: (instanceId: string) => ipcRenderer.invoke('plugin:widgetData', instanceId),
+  onPluginWidgetsChanged: (callback: () => void) => {
+    const handler = () => callback()
+    ipcRenderer.on('plugin:widgets-changed', handler)
+    return () => ipcRenderer.removeListener('plugin:widgets-changed', handler)
+  },
 
   // Notes-Cache für schnelles Laden
   saveNotesCache: (vaultPath: string, cache: object) => ipcRenderer.invoke('save-notes-cache', vaultPath, cache),

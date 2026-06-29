@@ -165,7 +165,9 @@ import {
   type RuntimeEnv,
 } from './plugins/runtime/manage'
 import { ArtifactError } from './plugins/artifact/limits'
-import { type DiscoverError } from './plugins/runtime/discover'
+import { discoverInstalledPlugins, type DiscoverError } from './plugins/runtime/discover'
+import { ExternalWidgetRuntime } from './plugins/widgets'
+import { SECURE_WEB_PREFERENCES } from './windowSecurity'
 import { readArchiveFileCapped } from './plugins/runtime/readArchive'
 import { readActiveIndex } from './plugins/runtime/activeIndex'
 import { pluginPaths } from './plugins/runtime/paths'
@@ -178,10 +180,19 @@ process.on('unhandledRejection', (reason) => {
   console.error('[Main] Unhandled rejection:', reason instanceof Error ? reason.message : reason)
 })
 
+// Sicherheit (ADR §6 I-A1): Default-Deny für window.open auf JEDEM erzeugten WebContents —
+// transportWindow, PDF-/htmlToPdf-Fenster und jedes künftige erben so NIE ein preload/electronAPI-
+// Kindfenster. Modul-Top-Level registriert (vor whenReady/Fenster-Erzeugung). Nur der vertrauens-
+// würdige Main-Host (mainWindow) überschreibt das mit kontrolliertem HTTP(S)-Forward (createWindow).
+app.on('web-contents-created', (_event, contents) => {
+  contents.setWindowOpenHandler(() => ({ action: 'deny' }))
+})
+
 // Plugin-System: build-seitig erkannte Registry (import.meta.glob) + generischer Transport.
 // Der echte Capability-Host wird in app.whenReady() gesetzt (setHostFactory); bis dahin Stub.
 const pluginRegistry = createMainRegistry(undefined, app.getVersion())
-registerPluginTransport(pluginRegistry)
+const externalWidgetRuntime = new ExternalWidgetRuntime(pluginRegistry)
+registerPluginTransport(pluginRegistry, () => publishExternalWidgetState())
 
 // Plugin-beigesteuerte Workflow-Canvas-Bausteine (Manifest-Feld `workflowActions`) in die
 // gemeinsame Registry einspielen, damit der Runner sie generisch dispatcht (kein statischer
@@ -216,6 +227,22 @@ function pluginManageDeps(): ManageDeps {
     unregisterWorkflowActions,
   }
 }
+
+/** Spiegelt ausschließlich aktive, erneut verifizierte Disk-Manifeste in die scoped Widget-Runtime. */
+function syncExternalWidgetRuntime(): void {
+  const manifests = discoverInstalledPlugins(runtimePluginEnv()).sources
+    .map((source) => source.manifest)
+    .filter((manifest) => pluginRegistry.get(manifest.id)?.activation === 'active')
+  externalWidgetRuntime.sync(manifests)
+}
+
+/** Main→Renderer Push: nach Lifecycle-Änderungen entfernt der Renderer Zombies sofort. */
+function publishExternalWidgetState(): void {
+  syncExternalWidgetRuntime()
+  for (const window of BrowserWindow.getAllWindows()) {
+    if (!window.isDestroyed()) window.webContents.send('plugin:widgets-changed')
+  }
+}
 // Re-Verify-/Kollisions-Fehler der LETZTEN Startup-Discovery (nur fürs Start-Log; die UI fragt
 // plugin:installErrors live ab, damit sie nach Install/Uninstall nicht veraltet).
 let lastPluginDiscoverErrors: DiscoverError[] = []
@@ -245,6 +272,7 @@ ipcMain.handle('plugin:install', async (event) => {
     // Größe VOR dem Lesen prüfen (stat) — sonst läge eine riesige Datei vor jedem Limit im RAM.
     const archive = await readArchiveFileCapped(result.filePaths[0])
     const out = await serializePluginOp(() => installAndActivate(pluginManageDeps(), archive))
+    publishExternalWidgetState()
     return { ok: true, data: { id: out.id, version: out.version, idempotent: out.idempotent } }
   } catch (err) {
     const code = err instanceof ArtifactError ? err.code : undefined
@@ -281,7 +309,29 @@ ipcMain.handle('plugin:uninstall', async (event, pluginId: unknown) => {
   if (typeof pluginId !== 'string') return { ok: false, error: 'Ungültige Plugin-ID' }
   try {
     await serializePluginOp(() => uninstallPlugin(pluginManageDeps(), pluginId))
+    publishExternalWidgetState()
     return { ok: true }
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) }
+  }
+})
+
+// Tier-1 Renderer-Widgets: Renderer erhält nur Main-erzeugte instanceIds; Plugin/Action/Slot bleiben
+// vollständig im Main gebunden. Kein frei parametrisierter plugin:invoke-Pfad.
+ipcMain.handle('plugin:widgets', async (event) => {
+  if (!isTrustedSender(event)) return { ok: false, error: 'Nicht autorisierter Aufrufer' }
+  try {
+    syncExternalWidgetRuntime()
+    return { ok: true, data: externalWidgetRuntime.list() }
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) }
+  }
+})
+
+ipcMain.handle('plugin:widgetData', async (event, instanceId: unknown) => {
+  if (!isTrustedSender(event)) return { ok: false, error: 'Nicht autorisierter Aufrufer' }
+  try {
+    return { ok: true, data: await externalWidgetRuntime.invoke(instanceId) }
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : String(err) }
   }
@@ -805,9 +855,8 @@ function createWindow(): void {
     minHeight: 600,
     icon: iconPath,
     webPreferences: {
+      ...SECURE_WEB_PREFERENCES,
       preload: path.join(__dirname, '../preload/index.js'),
-      contextIsolation: true,
-      nodeIntegration: false,
       sandbox: false
     },
     titleBarStyle: 'hiddenInset',
@@ -826,14 +875,17 @@ function createWindow(): void {
     mainWindow.loadFile(path.join(__dirname, '../renderer/index.html'))
   }
 
-  // Externe Links im Standardbrowser öffnen
+  // Sicherheit (ADR §6 I-A1): Der globale Handler (web-contents-created) denyt bereits ALLE
+  // window.open. Nur dieser vertrauenswürdige Main-Host überschreibt ihn, um HTTP(S)-Links
+  // kontrolliert im Standardbrowser zu öffnen — alles andere (about:/data:/blob:/mgxplugin:/…)
+  // bleibt verworfen. Default-deny, kein Fail-open.
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    // Externe URLs im Standardbrowser öffnen
     if (url.startsWith('http://') || url.startsWith('https://')) {
-      shell.openExternal(url)
-      return { action: 'deny' }
+      shell.openExternal(url).catch((err) =>
+        console.error('[security] openExternal fehlgeschlagen:', err instanceof Error ? err.message : err)
+      )
     }
-    return { action: 'allow' }
+    return { action: 'deny' }
   })
 
   // Context menu (Kopieren, Einfügen, Ausschneiden)
@@ -947,9 +999,10 @@ app.whenReady().then(async () => {
   // A-pre Schritt 1: nur Plugins aktivieren, deren Modulschalter aktiviert ist — der Start
   // respektiert den Disabled-Zustand (gebündelte Plugins sind nicht mehr blind „immer an").
   const pluginGateSettings = startupUiSettings ?? {}
-  pluginRegistry
+  await pluginRegistry
     .activateAll((_id, manifest) => isPluginGateEnabled(manifest, pluginGateSettings))
     .catch((err) => console.error('[plugin] activateAll:', err))
+  syncExternalWidgetRuntime()
 
   // Tray-Icon + Schnellerfassung (plattformübergreifend)
   {
@@ -5710,10 +5763,7 @@ ipcMain.handle('export-pdf', async (_event, defaultFileName: string, htmlContent
       width: 800,
       height: 600,
       show: false,
-      webPreferences: {
-        nodeIntegration: false,
-        contextIsolation: true
-      }
+      webPreferences: { ...SECURE_WEB_PREFERENCES }
     })
 
     // reMarkable-Buch-Stil: Serifenschrift, große Schrift, breite Ränder, reines

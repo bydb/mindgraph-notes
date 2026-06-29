@@ -7,6 +7,7 @@ import { useEmailStore } from '../../stores/emailStore'
 import { useEventAgentBridge } from '../../stores/eventAgentBridge'
 import { useTranslation } from '../../utils/translations'
 import { PluginSlot } from '../../plugins/slots'
+import { ExternalWidgetSlot } from '../../plugins/external/ExternalWidgetSlot'
 import {
   buildDashboardSnapshot,
   formatRelativeDay,
@@ -377,6 +378,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onOpenInbox, onOpe
             {dashboard.widgets.map(id => renderWidget(id))}
           </div>
         )}
+        <ExternalWidgetSlot slot="dashboard.widget" />
       </div>
     </div>
   )
@@ -1784,4 +1786,3 @@ const BookingsWidget: React.FC<WidgetProps> = ({ snapshot, onBookingClick, t }) 
     </section>
   )
 }
-

@@ -8,7 +8,7 @@
 import { BrowserWindow, ipcMain, type IpcMainInvokeEvent } from 'electron'
 import type { PluginRegistry } from './registry'
 import type { PluginInvokeResult } from '../../shared/plugins/transport'
-import { dispatchInvoke } from './transport-core'
+import { dispatchInvoke, isMainFrameSender } from './transport-core'
 
 /**
  * Akzeptiert nur Aufrufe aus einem eigenen App-Fenster (mainWindow/transportWindow) UND
@@ -21,16 +21,19 @@ export function isTrustedSender(event: IpcMainInvokeEvent): boolean {
     (w) => !w.isDestroyed() && w.webContents.id === wc.id
   )
   if (!isOwnWindow) return false
-  // senderFrame fehlt nur in Randfällen; wenn vorhanden, muss es der Haupt-Frame sein.
-  const frame = event.senderFrame
-  if (frame && frame !== wc.mainFrame) return false
+  // STRIKT + fail-closed (ADR §6 I-A4): der Sender MUSS der Haupt-Frame sein; ein fehlender
+  // senderFrame wird ABGELEHNT (vorher fail-open durchgelassen). Ein Sub-/Plugin-Frame nie.
+  if (!isMainFrameSender(event.senderFrame, wc.mainFrame)) return false
   return true
 }
 
 const REJECTED: PluginInvokeResult = { ok: false, error: 'Nicht autorisierter Aufrufer' }
 
 /** Verdrahtet `plugin:invoke` + `plugin:list` gegen die übergebene Registry. Einmal beim Start. */
-export function registerPluginTransport(registry: PluginRegistry): void {
+export function registerPluginTransport(
+  registry: PluginRegistry,
+  onLifecycleChanged?: () => void | Promise<void>
+): void {
   ipcMain.handle(
     'plugin:invoke',
     async (event, pluginId: unknown, actionId: unknown, payload: unknown): Promise<PluginInvokeResult> => {
@@ -72,6 +75,11 @@ export function registerPluginTransport(registry: PluginRegistry): void {
               state.error?.message ??
               `Plugin '${pluginId}' ist nach ${enabled ? 'Aktivierung' : 'Deaktivierung'} im Zustand '${state.activation}'`,
           }
+        }
+        try {
+          await onLifecycleChanged?.()
+        } catch (notifyErr) {
+          console.error('[plugin] Lifecycle-Push fehlgeschlagen:', notifyErr)
         }
         return { ok: true, data: state }
       } catch (err) {

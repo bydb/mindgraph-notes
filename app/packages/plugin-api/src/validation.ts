@@ -87,6 +87,17 @@ export const PLUGIN_MANIFEST_SCHEMA: JsonSchema = {
       },
       additionalProperties: false,
     },
+    // UI-Slot-Beitrag: strikt nur die zwei Slot-Kategorien; optional die speisende Action.
+    // KEIN `view`-Feld (fromAction liefert die WidgetView, gegen WIDGET_VIEW_SCHEMA validiert).
+    slotDecl: {
+      type: 'object',
+      required: ['slot', 'fromAction'],
+      properties: {
+        slot: { enum: ['dashboard.widget', 'sidebar.panel'] },
+        fromAction: { type: 'string', minLength: 1 },
+      },
+      additionalProperties: false,
+    },
   },
   required: [
     'manifestVersion', 'id', 'version', 'label', 'description', 'category', 'capabilities',
@@ -191,6 +202,7 @@ export const PLUGIN_MANIFEST_SCHEMA: JsonSchema = {
           outputSchema: { type: 'object' },
           isTrigger: { type: 'boolean' },
           isWrite: { type: 'boolean' },
+          widgetProvider: { type: 'boolean' },
           privacy: { type: 'object' },
           hardLockModule: { type: 'string' },
         },
@@ -230,8 +242,9 @@ export const PLUGIN_MANIFEST_SCHEMA: JsonSchema = {
       type: 'object',
       properties: {
         settingsTab: { type: 'boolean' },
-        dashboardWidget: { type: 'object' },
-        sidebarPanel: { type: 'object' },
+        // SlotDecl strikt: nur die zwei Slot-Kategorien; KEIN `view`-Template (fromAction liefert die WidgetView).
+        dashboardWidget: { $ref: '#/definitions/slotDecl' },
+        sidebarPanel: { $ref: '#/definitions/slotDecl' },
       },
       additionalProperties: false,
     },
@@ -310,6 +323,29 @@ export function validateManifestSemantics(manifest: PluginManifest): ValidationR
       }
     }
   }
+
+  // Widget-Provider-Vertrag (Renderer-Spike §4): eine `ui.{dashboardWidget,sidebarPanel}.fromAction`
+  // MUSS eine EXISTIERENDE Action referenzieren, die BEIDE Marker trägt — `widgetProvider: true` UND
+  // `isWrite: false` (nebenwirkungsfreier Datenlieferant). Sonst kein gültiger Widget-Datenkanal →
+  // das Plugin wird abgelehnt (kein still-degradiertes Widget).
+  const actionsById = new Map((manifest.actions ?? []).map((a) => [a.id, a]))
+  for (const slotKey of ['dashboardWidget', 'sidebarPanel'] as const) {
+    const fromAction = manifest.ui?.[slotKey]?.fromAction
+    if (!fromAction) continue
+    const action = actionsById.get(fromAction)
+    if (!action) {
+      errors.push(`ui.${slotKey}.fromAction '${fromAction}' referenziert keine deklarierte Action.`)
+    } else if (action.widgetProvider !== true || action.isWrite !== false) {
+      errors.push(
+        `ui.${slotKey}.fromAction '${fromAction}' muss eine Action mit widgetProvider:true UND isWrite:false sein.`
+      )
+    }
+    const expectedSlot = slotKey === 'dashboardWidget' ? 'dashboard.widget' : 'sidebar.panel'
+    if (manifest.ui?.[slotKey]?.slot !== expectedSlot) {
+      errors.push(`ui.${slotKey}.slot muss exakt '${expectedSlot}' sein.`)
+    }
+  }
+
   return { valid: errors.length === 0, errors }
 }
 
