@@ -159,12 +159,13 @@ import {
   discoverAndRegisterInstalled,
   installAndActivate,
   uninstallPlugin,
+  computeInstalledErrors,
   PluginRestartRequiredError,
   type ManageDeps,
   type RuntimeEnv,
 } from './plugins/runtime/manage'
 import { ArtifactError } from './plugins/artifact/limits'
-import { discoverInstalledPlugins, type DiscoverError } from './plugins/runtime/discover'
+import { type DiscoverError } from './plugins/runtime/discover'
 import { readArchiveFileCapped } from './plugins/runtime/readArchive'
 import { readActiveIndex } from './plugins/runtime/activeIndex'
 import { pluginPaths } from './plugins/runtime/paths'
@@ -286,13 +287,14 @@ ipcMain.handle('plugin:uninstall', async (event, pluginId: unknown) => {
   }
 })
 
-// Read-only: aktuell abgewiesene installierte Plugins (Re-Verify/Kollision). LIVE neu berechnet
-// (kein Code-Lauf — nur Hash/Signatur/Manifest-Verifikation), damit die Liste nach Install/Uninstall
-// stimmt und nicht den Startup-Stand zeigt.
+// Read-only: aktuell abgewiesene installierte Plugins (Re-Verify UND workflow-collision). LIVE neu
+// berechnet (kein Code-Lauf — nur Hash/Signatur/Manifest-Verifikation + Kollisionsprüfung gegen den
+// registrierten Stand), damit die Liste nach Install/Uninstall stimmt und auch beim Startup
+// entstandene Kollisionen zeigt (nicht nur reine Artefaktfehler).
 ipcMain.handle('plugin:installErrors', async (event) => {
   if (!isTrustedSender(event)) return { ok: false, error: 'Nicht autorisierter Aufrufer' }
   try {
-    return { ok: true, data: discoverInstalledPlugins(runtimePluginEnv()).errors }
+    return { ok: true, data: computeInstalledErrors(runtimePluginEnv()) }
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : String(err) }
   }

@@ -15,6 +15,7 @@ import {
   discoverAndRegisterInstalled,
   installAndActivate,
   uninstallPlugin,
+  computeInstalledErrors,
   PluginRestartRequiredError,
   type ManageDeps,
   type RegistryHandle,
@@ -404,6 +405,10 @@ describe('installAndActivate — Workflow-Action-Kollision', () => {
     const errors = discoverAndRegisterInstalled(deps({ registry: reg.handle }))
     expect(reg.registered.has('ext-plugin')).toBe(false) // NICHT registriert
     expect(errors.some(e => e.code === 'workflow-collision' && e.id === 'ext-plugin')).toBe(true)
+
+    // Die read-only Fehlerliste (IPC plugin:installErrors) zeigt die Kollision ebenfalls.
+    const live = computeInstalledErrors(env())
+    expect(live.some(e => e.code === 'workflow-collision' && e.id === 'ext-plugin')).toBe(true)
   })
 })
 

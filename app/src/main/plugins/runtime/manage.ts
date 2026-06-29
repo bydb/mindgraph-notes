@@ -92,21 +92,44 @@ export function discoverAndRegisterInstalled(deps: ManageDeps): DiscoverError[] 
   const { sources, errors } = discoverInstalledPlugins(deps.env)
   const allErrors = [...errors]
   for (const source of sources) {
-    const collisions = source.manifest.workflowActions?.length
-      ? findWorkflowActionCollisions(source.manifest.workflowActions, source.manifest.id)
-      : []
-    if (collisions.length) {
-      allErrors.push({
-        id: source.manifest.id,
-        version: source.manifest.version ?? '?',
-        code: 'workflow-collision',
-        message: `Kollidierende Workflow-Action-IDs (mit Kern-/anderen Plugins): ${collisions.join(', ')}`,
-      })
+    const collision = workflowCollisionError(source)
+    if (collision) {
+      allErrors.push(collision)
       continue // NICHT registrieren — kein Plugin mit teilweise registriertem Vertrag
     }
     registerSource(deps, source)
   }
   return allErrors
+}
+
+/**
+ * Read-only: ALLE aktuellen Discover-Fehler einer Installation — Re-Verify-/Kollisions-Fehler aus
+ * {@link discoverInstalledPlugins} PLUS `workflow-collision` (gegen den LIVE registrierten Stand).
+ * Für die Verwaltungs-UI, damit auch beim Startup entstandene Kollisionen erscheinen (nicht nur die
+ * reinen Artefaktfehler). Keine Registrierung/Seiteneffekte.
+ */
+export function computeInstalledErrors(env: RuntimeEnv): DiscoverError[] {
+  const { sources, errors } = discoverInstalledPlugins(env)
+  const out = [...errors]
+  for (const source of sources) {
+    const collision = workflowCollisionError(source)
+    if (collision) out.push(collision)
+  }
+  return out
+}
+
+/** `workflow-collision`-Discover-Fehler für eine Quelle, falls ihre Workflow-Actions kollidieren. */
+function workflowCollisionError(source: MainPluginSource): DiscoverError | null {
+  const collisions = source.manifest.workflowActions?.length
+    ? findWorkflowActionCollisions(source.manifest.workflowActions, source.manifest.id)
+    : []
+  if (!collisions.length) return null
+  return {
+    id: source.manifest.id,
+    version: source.manifest.version ?? '?',
+    code: 'workflow-collision',
+    message: `Kollidierende Workflow-Action-IDs (mit Kern-/anderen Plugins): ${collisions.join(', ')}`,
+  }
 }
 
 /**
