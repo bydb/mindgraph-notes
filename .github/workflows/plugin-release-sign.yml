@@ -1,42 +1,200 @@
 name: Sign Plugin Release (Produktion)
 
-# Vom Build GETRENNT und NICHT automatisch: nur manuell und ausschließlich im geschützten
-# Environment 'release-signing' (Required Reviewers + Secret PLUGIN_SIGNING_KEY). Standardmäßig
-# Dry-run: prüft nur Verfügbarkeit/Form des Prod-Keys, signiert nichts. Der echte Prod-Sign + Pack
-# bleibt ein Maintainer-Schritt (wird nach Bereitstellung des offiziellen Pack-CLI scharf geschaltet).
+# Zentraler, MANUELLER Signier-Workflow für offizielle Plugin-Releases. Der Produktions-Privatkey
+# (Secret PLUGIN_SIGNING_KEY) liegt AUSSCHLIESSLICH im geschützten Environment 'release-signing'
+# dieses Repos und verlässt es nie — kein Plugin-Repo bekommt ihn je zu sehen.
+#
+# Zwei getrennte Jobs mit Vertrauensgrenze dazwischen:
+#   build  — UNTRUSTED, OHNE Secrets: checkt das öffentliche Plugin-Repo am exakten Commit aus,
+#            verifiziert die Tag↔Commit-Bindung, baut es und lädt das gebaute dist/ als
+#            Run-gebundenes Artefakt hoch. Selbst bei kompromittiertem Plugin-Build gibt es hier
+#            nichts zu stehlen (kein Schlüssel, kein Write-Token, kein Environment-Zugriff).
+#   sign   — TRUSTED, im geschützten Environment: lädt NUR das gebaute Artefakt + den per github.sha
+#            gepinnten offiziellen Signierer (committetes Single-CJS-Bundle, KEIN npm/tsx), prüft
+#            Schlüsselbindung (Secret-Public-Key == OFFICIAL_KEYS byte-genau), Manifest/Version/Repo/
+#            Dateimenge, signiert kanonisch und re-verifiziert das Archiv über den echten Verifier.
+#            Der Signierer führt NIE Plugin-Code aus — er liest das Artefakt als reine Daten.
+#
+# Der signierte .mgxplugin liegt danach als Workflow-Artefakt vor. Der Upload ans Plugin-Release ist
+# (vorerst) ein manueller Maintainer-Schritt — bewusst KEIN Cross-Repo-Write-Token in diesem Workflow.
+#
+# PFLICHT-Vorbedingung (einmalig, vor dem ersten Lauf): Das Environment 'release-signing' MUSS
+# Required Reviewers UND eine Deployment-Branch-Policy ausschließlich für 'master' gesetzt haben —
+# sonst kann der Signierjob von einem Fork-/Feature-Branch oder ohne Freigabe an den Key.
+#
+# Runbook: Actions → diesen Workflow → „Run workflow" auf master → repo (owner/repo), tag (vX.Y.Z) und
+# commit_sha (exakt der Commit hinter dem Tag) eintragen → sign-Job im Environment 'release-signing'
+# freigeben → Artefakt „signed-mgxplugin" herunterladen → VOR dem Anhängen am GitHub-Release des
+# Plugin-Repos Tag→Commit nochmals kontrollieren (`git ls-remote <repo> refs/tags/<tag>` == commit_sha).
 
 on:
   workflow_dispatch:
     inputs:
-      dry_run:
-        description: 'Nur Key-Verfügbarkeit/-Form prüfen (nicht signieren)'
-        type: boolean
-        default: true
+      repo:
+        description: 'Öffentliches Plugin-Repo als owner/repo'
+        required: true
+      tag:
+        description: 'Release-Tag, z. B. v0.1.0'
+        required: true
+      commit_sha:
+        description: 'Exakter 40-stelliger Commit-SHA, auf den der Tag zeigt'
+        required: true
 
 permissions:
   contents: read
 
+# Pro Plugin+Tag serialisieren; laufende Signierung nicht abbrechen.
+concurrency:
+  group: plugin-sign-${{ inputs.repo }}-${{ inputs.tag }}
+  cancel-in-progress: false
+
 jobs:
-  sign:
+  build:
+    name: build (untrusted, ohne Schlüssel)
     runs-on: ubuntu-latest
-    environment: release-signing # geschützt: Required Reviewers + Secret PLUGIN_SIGNING_KEY
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      # Inputs NIE direkt in Shellcode interpolieren — über env-Variablen einlesen und streng prüfen.
+      - name: Eingaben streng validieren
+        env:
+          IN_REPO: ${{ inputs.repo }}
+          IN_TAG: ${{ inputs.tag }}
+          IN_SHA: ${{ inputs.commit_sha }}
+        run: |
+          set -euo pipefail
+          [[ "$IN_REPO" =~ ^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$ ]] || { echo "::error::repo muss 'owner/repo' sein"; exit 1; }
+          [[ "$IN_TAG"  =~ ^v?[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]] || { echo "::error::tag muss SemVer sein (z. B. v0.1.0)"; exit 1; }
+          [[ "$IN_SHA"  =~ ^[0-9a-f]{40}$ ]] || { echo "::error::commit_sha muss 40-stelliger Hex-SHA sein"; exit 1; }
+
+      # Verhindert, dass ein nachträglich verschobener Tag auf einen anderen Commit zeigt als gebaut wird.
+      - name: Tag↔Commit-Bindung prüfen (Anti-Tag-Mutation)
+        env:
+          IN_REPO: ${{ inputs.repo }}
+          IN_TAG: ${{ inputs.tag }}
+          IN_SHA: ${{ inputs.commit_sha }}
+        run: |
+          set -euo pipefail
+          remote="https://github.com/${IN_REPO}.git"
+          # Annotated- (^{} = dereferenzierter Commit) UND Lightweight-Tag berücksichtigen.
+          # Tag-Werte als awk-VARIABLEN übergeben (-v), nicht ins awk-Programm interpolieren.
+          map="$(git ls-remote "$remote" "refs/tags/${IN_TAG}" "refs/tags/${IN_TAG}^{}")"
+          tag_commit="$(printf '%s\n' "$map" | awk -v t="refs/tags/${IN_TAG}" -v d="refs/tags/${IN_TAG}^{}" '$2==d{c=$1} $2==t{l=$1} END{print (c!=""?c:l)}')"
+          if [ -z "$tag_commit" ]; then echo "::error::Tag '${IN_TAG}' in ${IN_REPO} nicht gefunden"; exit 1; fi
+          if [ "$tag_commit" != "$IN_SHA" ]; then
+            echo "::error::Tag '${IN_TAG}' zeigt auf ${tag_commit}, nicht auf den angegebenen ${IN_SHA} — Abbruch."
+            exit 1
+          fi
+          echo "Tag↔Commit ok: ${IN_TAG} → ${IN_SHA}"
+
+      - name: Plugin-Repo am Commit auschecken (untrusted)
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          repository: ${{ inputs.repo }}
+          ref: ${{ inputs.commit_sha }}
+          persist-credentials: false
+          path: plugin
+
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
           node-version: '20'
-      - name: Prod-Signierschlüssel prüfen (Form, ohne den Wert zu loggen)
+
+      # dist/ ist nach Konvention das Artefakt-Wurzelverzeichnis = manifest.json + deklarierte Entrypoints.
+      # Etwaige Zusatzdateien fängt später der Signierer (exakte Dateimenge) fail-closed ab.
+      - name: Plugin bauen (untrusted)
+        working-directory: plugin
+        run: |
+          set -euo pipefail
+          npm ci
+          npm run build
+          test -f dist/manifest.json || { echo "::error::Build hat dist/manifest.json nicht erzeugt"; exit 1; }
+
+      - name: Gebautes dist/ als Run-gebundenes Artefakt hochladen
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: plugin-build
+          path: plugin/dist
+          if-no-files-found: error
+          retention-days: 1
+
+  sign:
+    name: sign (trusted, Environment release-signing)
+    needs: build
+    runs-on: ubuntu-latest
+    # Defense-in-Depth: zusätzlich zur Environment-Branch-Policy nur von master signieren.
+    if: github.ref == 'refs/heads/master'
+    environment: release-signing # geschützt: Required Reviewers + Branch-Policy (nur master) + Secret
+    permissions:
+      contents: read # bewusst KEIN contents:write — kein Release-Upload nahe am Schlüssel.
+    steps:
+      # Den offiziellen Signierer aus GENAU diesem Workflow-Commit holen (nicht aus dem Plugin-Tag).
+      - name: Offiziellen Signierer auschecken (@ github.sha)
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: '20'
+
+      - name: Gebautes Artefakt laden (nur dieser Run)
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: plugin-build
+          path: incoming
+
+      - name: Version aus Tag ableiten
+        id: ver
+        env:
+          IN_TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          [[ "$IN_TAG" =~ ^v?[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]] || { echo "::error::tag ungültig"; exit 1; }
+          echo "version=${IN_TAG#v}" >> "$GITHUB_OUTPUT"
+
+      # Zwischen build und sign liegt das (potenziell lange) Environment-Approval. Ein in diesem Fenster
+      # verschobener Tag würde sonst den ALTEN Commit für einen inzwischen anders gebundenen Tag signieren
+      # (TOCTOU). Daher dieselbe Bindung UNMITTELBAR vor dem Signieren erneut prüfen — fail-closed.
+      - name: Tag↔Commit-Bindung erneut prüfen (TOCTOU nach Approval)
+        env:
+          IN_REPO: ${{ inputs.repo }}
+          IN_TAG: ${{ inputs.tag }}
+          IN_SHA: ${{ inputs.commit_sha }}
+        run: |
+          set -euo pipefail
+          remote="https://github.com/${IN_REPO}.git"
+          map="$(git ls-remote "$remote" "refs/tags/${IN_TAG}" "refs/tags/${IN_TAG}^{}")"
+          tag_commit="$(printf '%s\n' "$map" | awk -v t="refs/tags/${IN_TAG}" -v d="refs/tags/${IN_TAG}^{}" '$2==d{c=$1} $2==t{l=$1} END{print (c!=""?c:l)}')"
+          if [ -z "$tag_commit" ]; then echo "::error::Tag '${IN_TAG}' in ${IN_REPO} nicht (mehr) gefunden"; exit 1; fi
+          if [ "$tag_commit" != "$IN_SHA" ]; then
+            echo "::error::Tag '${IN_TAG}' zeigt jetzt auf ${tag_commit}, nicht mehr auf ${IN_SHA} — seit dem Build verschoben, Abbruch vor Signierung."
+            exit 1
+          fi
+          echo "Tag↔Commit weiterhin ok: ${IN_TAG} → ${IN_SHA}"
+
+      # Der Signierer prüft Schlüsselbindung, Manifest/Version/Repo/Dateimenge (nur reguläre Dateien),
+      # packt kanonisch und re-verifiziert das Archiv über den echten Verifier. Kein Plugin-Code-Run.
+      # Bundle ohne Laufzeit-npm-Deps → reines `node`, keine Dependency-Angriffsfläche neben dem Key.
+      - name: Signieren (Key-Bindung + Validierung + Pack + Post-Verify)
         env:
           PLUGIN_SIGNING_KEY: ${{ secrets.PLUGIN_SIGNING_KEY }}
+          ARTIFACT_DIR: incoming
+          PLUGIN_REPO: ${{ inputs.repo }}
+          PLUGIN_VERSION: ${{ steps.ver.outputs.version }}
+          OUT_PATH: signed.mgxplugin
         run: |
-          if [ -z "$PLUGIN_SIGNING_KEY" ]; then
+          set -euo pipefail
+          if [ -z "${PLUGIN_SIGNING_KEY:-}" ]; then
             echo "::error::PLUGIN_SIGNING_KEY fehlt — Environment 'release-signing' nicht freigegeben."
             exit 1
           fi
-          node -e "const {createPrivateKey}=require('node:crypto');const k=createPrivateKey(process.env.PLUGIN_SIGNING_KEY);if(k.asymmetricKeyType!=='ed25519'){console.error('Kein Ed25519-Schlüssel');process.exit(1)}console.log('Prod-Key ok: Ed25519, PKCS#8.')"
-      - name: Prod-Sign + Pack
-        if: ${{ inputs.dry_run == false }}
-        run: |
-          echo "::error::Echter Prod-Sign + Pack ist noch nicht scharf geschaltet."
-          echo "Wird über das offizielle Pack-/Signier-CLI ausgeführt (Maintainer-Aktivierung)."
-          exit 1
+          node app/scripts/sign-plugin.cjs
+
+      - name: Signiertes .mgxplugin als Artefakt hochladen (kurze Retention)
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: signed-mgxplugin
+          path: signed.mgxplugin
+          if-no-files-found: error
+          retention-days: 3
