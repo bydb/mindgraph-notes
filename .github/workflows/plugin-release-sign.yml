@@ -148,6 +148,26 @@ jobs:
           [[ "$IN_TAG" =~ ^v?[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]] || { echo "::error::tag ungültig"; exit 1; }
           echo "version=${IN_TAG#v}" >> "$GITHUB_OUTPUT"
 
+      # Zwischen build und sign liegt das (potenziell lange) Environment-Approval. Ein in diesem Fenster
+      # verschobener Tag würde sonst den ALTEN Commit für einen inzwischen anders gebundenen Tag signieren
+      # (TOCTOU). Daher dieselbe Bindung UNMITTELBAR vor dem Signieren erneut prüfen — fail-closed.
+      - name: Tag↔Commit-Bindung erneut prüfen (TOCTOU nach Approval)
+        env:
+          IN_REPO: ${{ inputs.repo }}
+          IN_TAG: ${{ inputs.tag }}
+          IN_SHA: ${{ inputs.commit_sha }}
+        run: |
+          set -euo pipefail
+          remote="https://github.com/${IN_REPO}.git"
+          map="$(git ls-remote "$remote" "refs/tags/${IN_TAG}" "refs/tags/${IN_TAG}^{}")"
+          tag_commit="$(printf '%s\n' "$map" | awk -v t="refs/tags/${IN_TAG}" -v d="refs/tags/${IN_TAG}^{}" '$2==d{c=$1} $2==t{l=$1} END{print (c!=""?c:l)}')"
+          if [ -z "$tag_commit" ]; then echo "::error::Tag '${IN_TAG}' in ${IN_REPO} nicht (mehr) gefunden"; exit 1; fi
+          if [ "$tag_commit" != "$IN_SHA" ]; then
+            echo "::error::Tag '${IN_TAG}' zeigt jetzt auf ${tag_commit}, nicht mehr auf ${IN_SHA} — seit dem Build verschoben, Abbruch vor Signierung."
+            exit 1
+          fi
+          echo "Tag↔Commit weiterhin ok: ${IN_TAG} → ${IN_SHA}"
+
       # Der Signierer prüft Schlüsselbindung, Manifest/Version/Repo/Dateimenge (nur reguläre Dateien),
       # packt kanonisch und re-verifiziert das Archiv über den echten Verifier. Kein Plugin-Code-Run.
       # Bundle ohne Laufzeit-npm-Deps → reines `node`, keine Dependency-Angriffsfläche neben dem Key.
