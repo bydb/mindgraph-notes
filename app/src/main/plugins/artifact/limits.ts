@@ -2,8 +2,22 @@
 // docs/plugin-artifact-format-plan.md). Rein, ohne I/O — von Verifier UND (Test-)Packer geteilt,
 // damit Writer und Verifier nachweislich dieselben Regeln verwenden.
 
-/** Archiv-/Pfadlimits gegen Archive-Bombs und Ressourcen-Erschöpfung. Werte = ADR-Tabelle. */
-export const ARTIFACT_LIMITS = {
+/** Archiv-/Pfadlimits gegen Archive-Bombs und Ressourcen-Erschöpfung (überschreibbar in Tests). */
+export interface ArtifactLimits {
+  maxFiles: number
+  maxArchiveBytes: number
+  maxTotalUnpackedBytes: number
+  maxFileBytes: number
+  maxManifestBytes: number
+  maxIntegrityBytes: number
+  maxSigBytes: number
+  maxPathLength: number
+  maxPathDepth: number
+  maxSegmentBytes: number
+}
+
+/** Default-Limits = ADR-Tabelle. */
+export const ARTIFACT_LIMITS: ArtifactLimits = {
   maxFiles: 512,
   maxArchiveBytes: 100 * 1024 * 1024, // 100 MiB komprimiert
   maxTotalUnpackedBytes: 250 * 1024 * 1024, // 250 MiB entpackt (Summe)
@@ -14,9 +28,7 @@ export const ARTIFACT_LIMITS = {
   maxPathLength: 240,
   maxPathDepth: 8,
   maxSegmentBytes: 100, // USTAR-Namensfeld (kein PAX) → ≤ 100 ASCII-Bytes pro Segment
-} as const
-
-export type ArtifactLimits = typeof ARTIFACT_LIMITS
+}
 
 /**
  * Maschinenlesbarer Grund einer Artefakt-Ablehnung — analog zu `PluginErrorKind` (A0/2), aber für
