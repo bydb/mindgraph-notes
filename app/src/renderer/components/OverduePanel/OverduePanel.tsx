@@ -7,6 +7,7 @@ import { extractTasks, buildTaskLine, type ExtractedTask } from '../../utils/lin
 import { trackContextEvent } from '../../utils/contextMemory'
 import { PanelHeader, PanelHeaderIconButton } from '../Shared/PanelHeader'
 import { IconClock, IconPlus, IconCalendar, IconSparkle } from '../Shared/Icons'
+import { OPENROUTER_MODEL_SENTINEL } from '../../../shared/llmBackend'
 
 interface TaskEntry extends ExtractedTask {
   noteId: string
@@ -425,7 +426,10 @@ export const OverduePanel: React.FC<OverduePanelProps> = ({ onClose }) => {
   const taggingCancelRef = useRef(false)
 
   // Modell für die Tag-Analyse: Email-Tab → Modul-Override (task-extraction) → globales Modell.
-  const taggingModel = email.analysisModel || ollama.moduleModelOverrides?.['task-extraction'] || ollama.selectedModel || ''
+  // '__openrouter__' ist ein Cloud-Sentinel (kein Ollama-Modellname) — fürs lokale Task-Tagging
+  // strippen, sonst landet er roh als Modell bei Ollama → 404 'model not found'.
+  const emailLocalModel = email.analysisModel === OPENROUTER_MODEL_SENTINEL ? '' : email.analysisModel
+  const taggingModel = emailLocalModel || ollama.moduleModelOverrides?.['task-extraction'] || ollama.selectedModel || ''
 
   // Alle im Vault bekannten Tags einmal aggregieren (für Autocomplete)
   const availableTags = useMemo(() => {
