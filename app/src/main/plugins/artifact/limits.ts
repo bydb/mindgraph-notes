@@ -60,6 +60,15 @@ export type ArtifactErrorCode =
   | 'load-failed' // Entry ließ sich nicht als PluginMainEntry laden (Registry-Aktivierung)
   | 'entrypoint-unsupported' // z.B. Renderer-only-Manifest im Main-only-Loader
   | 'workflow-collision' // workflowAction-ID kollidiert mit einer Kern-/fremden Action
+  // — A2 (GitHub-Download/Install-Service, docs/plugin-store-A2-plan.md) —
+  | 'repo-ref-invalid' // Eingabe ist kein gültiges owner/repo
+  | 'release-not-found' // kein (Nicht-Prerelease-)Release / Tag auf GitHub
+  | 'asset-not-found' // Release hat kein .mgxplugin-Asset
+  | 'asset-ambiguous' // Release hat mehrere .mgxplugin-Assets
+  | 'redirect-blocked' // Download-/Redirect-Ziel ist kein erlaubter GitHub-Host (oder kein https)
+  | 'download-failed' // HTTP-/Netzwerkfehler beim Laden
+  | 'download-timeout' // Download-Deadline überschritten
+  | 'rate-limited' // GitHub-API-Limit (60/h ohne Token)
 
 /** Terminaler Ablehnungsgrund eines Artefakts. `code` ist die maschinenlesbare Ursache. */
 export class ArtifactError extends Error {

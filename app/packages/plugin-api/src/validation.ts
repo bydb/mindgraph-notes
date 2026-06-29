@@ -435,3 +435,13 @@ export function isAppCompatible(minAppVersion: string, appVersion: string): Comp
   }
   return { compatible: true }
 }
+
+/**
+ * Ist `candidate` eine echt neuere SemVer als `current`? **Fail-closed:** unlesbare Versionen → `false`
+ * (kein falsches „Update verfügbar"). Genutzt vom Plugin-Update-Checker (A2, Baustein 8).
+ */
+export function isNewerVersion(candidate: string, current: string): boolean {
+  if (typeof candidate !== 'string' || typeof current !== 'string') return false
+  if (!semver.valid(candidate) || !semver.valid(current)) return false
+  return semver.gt(candidate, current)
+}
