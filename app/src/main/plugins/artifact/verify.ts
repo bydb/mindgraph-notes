@@ -169,7 +169,7 @@ function assertCompatible(manifest: PluginManifest, appVersion: string): void {
   }
 }
 
-function assertEntrypointsPresent(manifest: PluginManifest, payload: Set<string>): void {
+export function assertEntrypointsPresent(manifest: PluginManifest, payload: Set<string>): void {
   for (const key of ['main', 'renderer', 'styles'] as const) {
     const ep = manifest.entrypoints?.[key]
     if (ep && !payload.has(ep)) {
@@ -274,10 +274,13 @@ export async function verifyPluginArtifact(archive: Buffer, opts: VerifyOptions)
 }
 
 /**
- * Liest ein installiertes Verzeichnis rekursiv in eine Datei-Map — gleiche Pfad-/Limit-Regeln wie
- * beim Entpacken; reguläre Dateien only (Symlinks via lstat abgelehnt → kein Ausbruch).
+ * Liest ein Verzeichnis mit Plugin-Dateien rekursiv in eine Datei-Map (POSIX-relative Schlüssel) —
+ * gleiche Pfad-/Limit-Regeln wie beim Entpacken; reguläre Dateien only (Symlinks via lstat abgelehnt
+ * → kein Ausbruch); **lstat-Größencheck VOR `readFileSync`** (kein OOM auf eine zu große Datei).
+ * Geteilt vom Re-Verify eines installierten Verzeichnisses (A1) UND vom offiziellen Signierer, damit
+ * der privilegierte Signierjob exakt dieselben Limits anwendet wie der Verifier — vor Pack/Sign.
  */
-function readInstalledDir(dir: string, limits: ArtifactLimits): Map<string, Buffer> {
+export function readPluginDirFiles(dir: string, limits: ArtifactLimits = ARTIFACT_LIMITS): Map<string, Buffer> {
   const root = resolve(dir)
   const files = new Map<string, Buffer>()
   let count = 0
@@ -286,7 +289,7 @@ function readInstalledDir(dir: string, limits: ArtifactLimits): Map<string, Buff
     for (const name of readdirSync(abs)) {
       const childAbs = join(abs, name)
       const st = lstatSync(childAbs)
-      if (st.isSymbolicLink()) throw new ArtifactError('entry-type', `Symlink im Install-Verzeichnis: '${name}'`)
+      if (st.isSymbolicLink()) throw new ArtifactError('entry-type', `Symlink nicht erlaubt: '${relative(root, childAbs).split(sep).join('/')}'`)
       if (st.isDirectory()) {
         walk(childAbs)
         continue
@@ -322,5 +325,5 @@ export function verifyInstalledDir(
   opts: { keyring: Keyring; appVersion: string; limits?: ArtifactLimits }
 ): VerifiedFiles {
   const limits = opts.limits ?? ARTIFACT_LIMITS
-  return verifyFileMap(readInstalledDir(dir, limits), { ...opts, limits })
+  return verifyFileMap(readPluginDirFiles(dir, limits), { ...opts, limits })
 }

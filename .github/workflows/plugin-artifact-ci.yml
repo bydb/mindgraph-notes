@@ -41,3 +41,11 @@ jobs:
       - name: Artefakt-Pipeline + Verifier (build → sign(dev) → verify)
         run: npm run test
         working-directory: app
+      - name: Offizieller Signierer — Bundle ↔ Quelle (Drift-Check)
+        # Das committete sign-plugin.cjs MUSS exakt der aktuellen Quelle entsprechen — sonst könnte ein
+        # gebündeltes Artefakt von der reviewten Quelle abweichen. Neu bauen + auf Diff prüfen.
+        run: |
+          npm run build:signer
+          git diff --exit-code -- scripts/sign-plugin.cjs \
+            || { echo "::error::scripts/sign-plugin.cjs driftet von der Quelle — 'npm run build:signer' ausführen und committen."; exit 1; }
+        working-directory: app
