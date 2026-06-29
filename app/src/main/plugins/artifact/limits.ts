@@ -54,6 +54,10 @@ export type ArtifactErrorCode =
   | 'incompatible-api'
   | 'incompatible-app'
   | 'entrypoint-missing'
+  // — A1 (Runtime-Loader/Install) —
+  | 'id-collision' // ID trifft ein gebündeltes/reserviertes Plugin
+  | 'version-conflict' // id@version existiert mit ABWEICHENDEM Inhalt (nicht byte-identisch)
+  | 'load-failed' // Entry (main.js) ließ sich nicht als PluginMainEntry laden
 
 /** Terminaler Ablehnungsgrund eines Artefakts. `code` ist die maschinenlesbare Ursache. */
 export class ArtifactError extends Error {
