@@ -8,7 +8,7 @@
 import { BrowserWindow, ipcMain, type IpcMainInvokeEvent } from 'electron'
 import type { PluginRegistry } from './registry'
 import type { PluginInvokeResult } from '../../shared/plugins/transport'
-import { dispatchInvoke } from './transport-core'
+import { dispatchInvoke, isMainFrameSender } from './transport-core'
 
 /**
  * Akzeptiert nur Aufrufe aus einem eigenen App-Fenster (mainWindow/transportWindow) UND
@@ -21,9 +21,9 @@ export function isTrustedSender(event: IpcMainInvokeEvent): boolean {
     (w) => !w.isDestroyed() && w.webContents.id === wc.id
   )
   if (!isOwnWindow) return false
-  // senderFrame fehlt nur in Randfällen; wenn vorhanden, muss es der Haupt-Frame sein.
-  const frame = event.senderFrame
-  if (frame && frame !== wc.mainFrame) return false
+  // STRIKT + fail-closed (ADR §6 I-A4): der Sender MUSS der Haupt-Frame sein; ein fehlender
+  // senderFrame wird ABGELEHNT (vorher fail-open durchgelassen). Ein Sub-/Plugin-Frame nie.
+  if (!isMainFrameSender(event.senderFrame, wc.mainFrame)) return false
   return true
 }
 

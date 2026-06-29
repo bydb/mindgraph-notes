@@ -1,5 +1,6 @@
 import { Tray, Menu, globalShortcut, BrowserWindow, app, screen, nativeImage } from 'electron'
 import * as path from 'path'
+import { SECURE_WEB_PREFERENCES } from '../windowSecurity'
 
 let tray: Tray | null = null
 let transportWindow: BrowserWindow | null = null
@@ -107,9 +108,8 @@ function createTransportWindow(_resourcesPath: string): BrowserWindow {
     vibrancy: 'popover',
     visualEffectState: 'active',
     webPreferences: {
+      ...SECURE_WEB_PREFERENCES,
       preload: path.join(__dirname, '../preload/index.js'),
-      contextIsolation: true,
-      nodeIntegration: false,
       sandbox: false
     }
   })

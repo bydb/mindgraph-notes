@@ -11,6 +11,7 @@ import path from 'path'
 import https from 'node:https'
 import http from 'node:http'
 import type { UsbDeviceInfo } from '@mindgraph/plugin-api'
+import { SECURE_WEB_PREFERENCES } from '../windowSecurity'
 
 // ─── device.usb: HTTP über electron.net (reMarkable-USB-Webinterface) ───────────
 
@@ -290,7 +291,7 @@ export async function htmlToPdf(fullHtml: string): Promise<Uint8Array> {
     width: 800,
     height: 600,
     show: false,
-    webPreferences: { nodeIntegration: false, contextIsolation: true },
+    webPreferences: { ...SECURE_WEB_PREFERENCES },
   })
 
   const tempHtmlPath = path.join(

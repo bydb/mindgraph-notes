@@ -13,6 +13,16 @@ export interface InvokableRegistry {
 }
 
 /**
+ * Ist der `senderFrame` eines IPC-Events der erlaubte Haupt-Frame? STRIKT + fail-closed: ein
+ * fehlender Frame (null/undefined) → false. Ein Sub-/Plugin-Frame darf privilegierte Kanäle nie
+ * ansprechen. Pure Identitätsprüfung (electron-frei) → ohne Electron testbar. Genutzt von
+ * isTrustedSender (transport.ts). Siehe ADR §6 I-A4.
+ */
+export function isMainFrameSender(senderFrame: unknown, mainFrame: unknown): boolean {
+  return senderFrame != null && senderFrame === mainFrame
+}
+
+/**
  * Führt einen Plugin-Aufruf aus und normalisiert das Ergebnis. Wirft NIE — jeder Fehler
  * (ungültige Argumente, unbekanntes Plugin/Action, Schema-Verstoß, Executor-Exception)
  * wird zu {ok:false,error}. Die Sender-/Frame-Prüfung passiert davor in transport.ts.

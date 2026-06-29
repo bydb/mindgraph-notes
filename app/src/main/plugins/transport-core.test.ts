@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { dispatchInvoke, type InvokableRegistry } from './transport-core'
+import { dispatchInvoke, isMainFrameSender, type InvokableRegistry } from './transport-core'
 import { PluginRegistry, type MainPluginSource } from './registry'
 import { definePluginMain } from '@mindgraph/plugin-api'
 import type { PluginManifest } from '@mindgraph/plugin-api'
@@ -106,5 +106,19 @@ describe('dispatchInvoke — Normalisierung gegen echte Registry', () => {
     const r = await dispatchInvoke(registry, 'demo', 'demo.ghost', {})
     expect(r.ok).toBe(false)
     expect(r.error).toContain('demo.ghost')
+  })
+})
+
+describe('isMainFrameSender (ADR §6 I-A4)', () => {
+  it('akzeptiert nur den identischen Haupt-Frame', () => {
+    const mainFrame = {}
+    expect(isMainFrameSender(mainFrame, mainFrame)).toBe(true)
+    expect(isMainFrameSender({}, mainFrame)).toBe(false) // anderer (Sub-)Frame
+  })
+
+  it('lehnt einen fehlenden senderFrame fail-closed ab (Null-Test)', () => {
+    const mainFrame = {}
+    expect(isMainFrameSender(null, mainFrame)).toBe(false)
+    expect(isMainFrameSender(undefined, mainFrame)).toBe(false)
   })
 })

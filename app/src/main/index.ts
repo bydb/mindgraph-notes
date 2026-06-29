@@ -166,6 +166,7 @@ import {
 } from './plugins/runtime/manage'
 import { ArtifactError } from './plugins/artifact/limits'
 import { type DiscoverError } from './plugins/runtime/discover'
+import { SECURE_WEB_PREFERENCES } from './windowSecurity'
 import { readArchiveFileCapped } from './plugins/runtime/readArchive'
 import { readActiveIndex } from './plugins/runtime/activeIndex'
 import { pluginPaths } from './plugins/runtime/paths'
@@ -176,6 +177,14 @@ process.on('uncaughtException', (error) => {
 })
 process.on('unhandledRejection', (reason) => {
   console.error('[Main] Unhandled rejection:', reason instanceof Error ? reason.message : reason)
+})
+
+// Sicherheit (ADR §6 I-A1): Default-Deny für window.open auf JEDEM erzeugten WebContents —
+// transportWindow, PDF-/htmlToPdf-Fenster und jedes künftige erben so NIE ein preload/electronAPI-
+// Kindfenster. Modul-Top-Level registriert (vor whenReady/Fenster-Erzeugung). Nur der vertrauens-
+// würdige Main-Host (mainWindow) überschreibt das mit kontrolliertem HTTP(S)-Forward (createWindow).
+app.on('web-contents-created', (_event, contents) => {
+  contents.setWindowOpenHandler(() => ({ action: 'deny' }))
 })
 
 // Plugin-System: build-seitig erkannte Registry (import.meta.glob) + generischer Transport.
@@ -805,9 +814,8 @@ function createWindow(): void {
     minHeight: 600,
     icon: iconPath,
     webPreferences: {
+      ...SECURE_WEB_PREFERENCES,
       preload: path.join(__dirname, '../preload/index.js'),
-      contextIsolation: true,
-      nodeIntegration: false,
       sandbox: false
     },
     titleBarStyle: 'hiddenInset',
@@ -826,14 +834,17 @@ function createWindow(): void {
     mainWindow.loadFile(path.join(__dirname, '../renderer/index.html'))
   }
 
-  // Externe Links im Standardbrowser öffnen
+  // Sicherheit (ADR §6 I-A1): Der globale Handler (web-contents-created) denyt bereits ALLE
+  // window.open. Nur dieser vertrauenswürdige Main-Host überschreibt ihn, um HTTP(S)-Links
+  // kontrolliert im Standardbrowser zu öffnen — alles andere (about:/data:/blob:/mgxplugin:/…)
+  // bleibt verworfen. Default-deny, kein Fail-open.
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    // Externe URLs im Standardbrowser öffnen
     if (url.startsWith('http://') || url.startsWith('https://')) {
-      shell.openExternal(url)
-      return { action: 'deny' }
+      shell.openExternal(url).catch((err) =>
+        console.error('[security] openExternal fehlgeschlagen:', err instanceof Error ? err.message : err)
+      )
     }
-    return { action: 'allow' }
+    return { action: 'deny' }
   })
 
   // Context menu (Kopieren, Einfügen, Ausschneiden)
@@ -5710,10 +5721,7 @@ ipcMain.handle('export-pdf', async (_event, defaultFileName: string, htmlContent
       width: 800,
       height: 600,
       show: false,
-      webPreferences: {
-        nodeIntegration: false,
-        contextIsolation: true
-      }
+      webPreferences: { ...SECURE_WEB_PREFERENCES }
     })
 
     // reMarkable-Buch-Stil: Serifenschrift, große Schrift, breite Ränder, reines
