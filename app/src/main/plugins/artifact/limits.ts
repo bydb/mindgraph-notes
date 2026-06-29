@@ -56,8 +56,9 @@ export type ArtifactErrorCode =
   | 'entrypoint-missing'
   // — A1 (Runtime-Loader/Install) —
   | 'id-collision' // ID trifft ein gebündeltes/reserviertes Plugin
-  | 'version-conflict' // id@version existiert mit ABWEICHENDEM Inhalt (nicht byte-identisch)
-  | 'load-failed' // Entry (main.js) ließ sich nicht als PluginMainEntry laden
+  | 'version-conflict' // id@version existiert mit ABWEICHENDEM/nicht verifizierbarem Inhalt
+  | 'load-failed' // Entry ließ sich nicht als PluginMainEntry laden (Registry-Aktivierung)
+  | 'entrypoint-unsupported' // z.B. Renderer-only-Manifest im Main-only-Loader
 
 /** Terminaler Ablehnungsgrund eines Artefakts. `code` ist die maschinenlesbare Ursache. */
 export class ArtifactError extends Error {

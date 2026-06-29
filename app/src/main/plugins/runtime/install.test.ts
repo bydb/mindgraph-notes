@@ -1,12 +1,12 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { generateKeyPairSync, type KeyObject } from 'node:crypto'
-import { mkdtempSync, rmSync, existsSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, rmSync, existsSync, readFileSync, writeFileSync, symlinkSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { packPluginArtifact } from '../artifact/pack'
 import { canonicalJsonBytes } from '../artifact/format'
 import { type Keyring } from '../artifact/verify'
-import { installPluginArtifact } from './install'
+import { installPluginArtifact, setActiveVersion } from './install'
 import { discoverInstalledPlugins } from './discover'
 import { keyringFromSpkiMap } from './keyring'
 import { readActiveIndex } from './activeIndex'
@@ -156,5 +156,85 @@ describe('discoverInstalledPlugins', () => {
     const { sources, errors } = discoverInstalledPlugins(env({ blockedIds: new Set(['ext-plugin']) }))
     expect(sources).toEqual([])
     expect(errors[0].code).toBe('id-collision')
+  })
+})
+
+describe('A1 P1-Fixes — Regressionen', () => {
+  // P1.1: Symlink store/<id> + untrusted Indexwerte.
+  it('lehnt einen Symlink als store/<id> ab (path-invalid)', async () => {
+    const evil = mkdtempSync(join(tmpdir(), 'mgx-evil-'))
+    tmpDirs.push(evil)
+    mkdirSync(pluginPaths(root).storeDir, { recursive: true })
+    symlinkSync(evil, join(pluginPaths(root).storeDir, 'ext-plugin'))
+    await expect(installPluginArtifact(await archive(), env())).rejects.toMatchObject({ code: 'path-invalid' })
+  })
+
+  it('discover validiert untrusted active.json (böse id → path-invalid, kein Zugriff)', () => {
+    const p = pluginPaths(root)
+    mkdirSync(p.root, { recursive: true })
+    writeFileSync(p.activeIndexPath, JSON.stringify({ formatVersion: 1, active: { '../evil': '0.1.0', 'BAD ID': '1.0.0' } }) + '\n')
+    const { sources, errors } = discoverInstalledPlugins(env())
+    expect(sources).toEqual([])
+    expect(errors).toHaveLength(2)
+    expect(errors.every((e) => e.code === 'path-invalid')).toBe(true)
+  })
+
+  // P1.2: manipulierte Installation darf nicht als idempotent durchgehen; inaktive Version wird aktiviert.
+  it('Re-Install nach Manipulation ist NICHT idempotent (version-conflict)', async () => {
+    const a = await archive()
+    const res = await installPluginArtifact(a, env())
+    const orig = readFileSync(join(res.versionDir, 'main.js'))
+    writeFileSync(join(res.versionDir, 'main.js'), Buffer.alloc(orig.length, 0x41)) // gleiche Länge, anderer Hash
+    await expect(installPluginArtifact(a, env())).rejects.toMatchObject({ code: 'version-conflict' })
+  })
+
+  it('idempotenter Re-Install aktiviert eine zuvor inaktive Version', async () => {
+    const a = await archive()
+    await installPluginArtifact(a, env())
+    setActiveVersion(root, 'ext-plugin', null)
+    expect(readActiveIndex(pluginPaths(root).activeIndexPath).active).toEqual({})
+    const res2 = await installPluginArtifact(a, env())
+    expect(res2.idempotent).toBe(true)
+    expect(readActiveIndex(pluginPaths(root).activeIndexPath).active).toEqual({ 'ext-plugin': '0.1.0' })
+  })
+
+  // P1.3: Installation führt KEINEN Plugin-Code aus; Laden erst im loadEntry-Pfad.
+  it('führt main.js bei der Installation NICHT aus', async () => {
+    const a = await archive({
+      main: Buffer.from('throw new Error("boom-on-load")\nmodule.exports = { id: "ext-plugin", register: function () {} }\n', 'utf8'),
+    })
+    const res = await installPluginArtifact(a, env()) // darf NICHT werfen (kein require beim Install)
+    expect(res.idempotent).toBe(false)
+    const { sources } = discoverInstalledPlugins(env())
+    await expect(sources[0].loadEntry!()).rejects.toThrow(/boom-on-load/) // erst hier wird ausgeführt
+  })
+
+  // P1.4: verifizierter Manifest-Entrypoint wird respektiert; Renderer-only abgelehnt.
+  it('respektiert den Manifest-Entrypoint dist/main.js', async () => {
+    const a = await packPluginArtifact({
+      files: [
+        { path: 'manifest.json', content: manifestBytes({ entrypoints: { main: 'dist/main.js' } }) },
+        { path: 'dist/main.js', content: mainJs() },
+      ],
+      signKey: priv,
+      keyId: KEY_ID,
+    })
+    await installPluginArtifact(a, env())
+    const { sources, errors } = discoverInstalledPlugins(env())
+    expect(errors).toEqual([])
+    const entry = await sources[0].loadEntry!()
+    expect((entry as { id: string }).id).toBe('ext-plugin')
+  })
+
+  it('lehnt ein Renderer-only-Manifest im Main-Loader ab (entrypoint-unsupported)', async () => {
+    const a = await packPluginArtifact({
+      files: [
+        { path: 'manifest.json', content: manifestBytes({ entrypoints: { renderer: 'renderer.js' } }) },
+        { path: 'renderer.js', content: Buffer.from('module.exports = {}\n', 'utf8') },
+      ],
+      signKey: priv,
+      keyId: KEY_ID,
+    })
+    await expect(installPluginArtifact(a, env())).rejects.toMatchObject({ code: 'entrypoint-unsupported' })
   })
 })
