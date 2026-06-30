@@ -63,25 +63,29 @@ export function discoverVersion(
     if (manifest.id !== id) {
       throw new ArtifactError('manifest-invalid', `Manifest-ID '${manifest.id}' ≠ '${id}'`)
     }
+    // Renderer-Plugin-Host (ADR plugin-renderer-host §5.1): gültig mit main ODER renderer.
+    // Ein main-Entry liefert eine lazy `loadEntry` (require); renderer-only kommt OHNE loadEntry
+    // durch (Manifest + ui.fileEditors sichtbar) — die Renderer-Aktivierung läuft über den
+    // Renderer-Pfad (plugin:rendererEntry), nicht über require().
     const mainEntry = manifest.entrypoints?.main
-    if (!mainEntry) {
-      throw new ArtifactError('entrypoint-unsupported', `'${id}' hat keinen main-Entrypoint (Renderer-only wird in A1 nicht unterstützt)`)
+    const rendererEntry = manifest.entrypoints?.renderer
+    if (!mainEntry && !rendererEntry) {
+      throw new ArtifactError('entrypoint-unsupported', `'${id}' hat weder main- noch renderer-Entrypoint`)
     }
-    // Den verifizierten Manifest-Entrypoint laden (NICHT hartcodiert 'main.js').
-    const mainAbs = join(dir, mainEntry)
-    return {
-      source: {
-        manifest,
-        loadEntry: async () => {
-          // Frisch von der Platte laden: einen evtl. veralteten Cache-Teilbaum dieses Versions-
-          // ordners (Uninstall/Reinstall gleicher Pfad, Re-Aktivierung) vorher leeren.
-          purgeRequireCacheUnder(dir)
-          const req = createRequire(join(dir, '__loader.cjs'))
-          const mod = req(mainAbs) as { default?: PluginMainEntry }
-          return mod.default ?? (mod as unknown as PluginMainEntry)
-        },
-      },
+    const source: MainPluginSource = { manifest }
+    if (mainEntry) {
+      // Den verifizierten Manifest-Entrypoint laden (NICHT hartcodiert 'main.js').
+      const mainAbs = join(dir, mainEntry)
+      source.loadEntry = async () => {
+        // Frisch von der Platte laden: einen evtl. veralteten Cache-Teilbaum dieses Versions-
+        // ordners (Uninstall/Reinstall gleicher Pfad, Re-Aktivierung) vorher leeren.
+        purgeRequireCacheUnder(dir)
+        const req = createRequire(join(dir, '__loader.cjs'))
+        const mod = req(mainAbs) as { default?: PluginMainEntry }
+        return mod.default ?? (mod as unknown as PluginMainEntry)
+      }
     }
+    return { source }
   } catch (e) {
     const err = e instanceof ArtifactError ? e : new ArtifactError('load-failed', (e as Error).message)
     return { error: { id, version, code: err.code, message: err.message } }
