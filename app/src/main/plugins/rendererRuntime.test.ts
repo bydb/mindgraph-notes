@@ -120,6 +120,73 @@ describe('RendererRuntime', () => {
     })
   })
 
+  describe('invokeHostOp (F08/F09 — Host-Kapselung + Capability-Gating)', () => {
+    const vaultHost = () => ({
+      vault: { read: async (...a: unknown[]) => `content:${a[0]}`, write: async () => 'ok' },
+    })
+
+    it('dispatcht vault.read capability-gated über die injizierte Factory', async () => {
+      const rt = seqRuntime()
+      rt.setHostFactory(vaultHost)
+      rt.activate(activation())
+      await expect(rt.invokeHostOp('iid-1', 'vault.read', ['a.md'])).resolves.toEqual({ ok: true, data: 'content:a.md' })
+    })
+
+    it('lehnt nicht-vault / unbekannte Ops ab', async () => {
+      const rt = seqRuntime()
+      rt.setHostFactory(vaultHost)
+      rt.activate(activation())
+      expect((await rt.invokeHostOp('iid-1', 'secrets.get', [])).ok).toBe(false)
+      expect((await rt.invokeHostOp('iid-1', 'vault.delete', [])).ok).toBe(false)
+    })
+
+    it('meldet fehlende Capability (Factory liefert keinen vault)', async () => {
+      const rt = seqRuntime()
+      rt.setHostFactory(() => ({}))
+      rt.activate(activation())
+      expect((await rt.invokeHostOp('iid-1', 'vault.write', ['a', 'b'])).ok).toBe(false)
+    })
+
+    it('host-not-ready ohne Factory; unbekannte Instanz scheitert', async () => {
+      const rt = seqRuntime()
+      rt.activate(activation())
+      expect((await rt.invokeHostOp('iid-1', 'vault.read', ['a'])).ok).toBe(false) // keine Factory
+      rt.setHostFactory(vaultHost)
+      expect((await rt.invokeHostOp('unbekannt', 'vault.read', ['a'])).ok).toBe(false)
+    })
+  })
+
+  describe('drain (F08/§5.5 — Call-Gate + In-Flight)', () => {
+    it('drained sofort ohne laufende Calls; danach sperrt das Gate neue Calls', async () => {
+      const rt = seqRuntime()
+      rt.setHostFactory(() => ({ vault: { read: async () => 'x' } }))
+      rt.activate(activation())
+      await expect(rt.drain('excalidraw', 1000)).resolves.toBe('drained')
+      expect((await rt.invokeHostOp('iid-1', 'vault.read', ['a'])).ok).toBe(false) // Gate zu
+    })
+
+    it('wartet auf einen laufenden Call und meldet dann drained', async () => {
+      let release!: () => void
+      const gate = new Promise<void>((r) => { release = r })
+      const rt = seqRuntime()
+      rt.setHostFactory(() => ({ vault: { read: async () => { await gate; return 'x' } } }))
+      rt.activate(activation())
+      const call = rt.invokeHostOp('iid-1', 'vault.read', ['a'])
+      const drain = rt.drain('excalidraw', 1000)
+      release()
+      await call
+      await expect(drain).resolves.toBe('drained')
+    })
+
+    it('timeout, wenn ein Call nicht abschließt', async () => {
+      const rt = seqRuntime()
+      rt.setHostFactory(() => ({ vault: { read: () => new Promise(() => {}) } }))
+      rt.activate(activation())
+      void rt.invokeHostOp('iid-1', 'vault.read', ['a'])
+      await expect(rt.drain('excalidraw', 20)).resolves.toBe('timeout')
+    })
+  })
+
   it('list liefert byte-freie Descriptoren je aktivem Plugin', () => {
     const rt = seqRuntime()
     rt.activate(activation({ pluginId: 'a', pluginLabel: 'A' }))

@@ -167,7 +167,7 @@ import {
 import { ArtifactError } from './plugins/artifact/limits'
 import { discoverInstalledPlugins, type DiscoverError } from './plugins/runtime/discover'
 import { ExternalWidgetRuntime } from './plugins/widgets'
-import { RendererRuntime, type RendererActivation } from './plugins/rendererRuntime'
+import { RendererRuntime, type RendererActivation, type RendererHostFactory } from './plugins/rendererRuntime'
 import { verifyInstalledRendererPayload } from './plugins/artifact/verify'
 import { downloadPluginArtifact } from './plugins/download'
 import { checkPluginUpdates } from './plugins/update-checker'
@@ -206,9 +206,6 @@ const externalWidgetRuntime = new ExternalWidgetRuntime(pluginRegistry)
 // Renderer-Plugin-Host (ADR plugin-renderer-host §5.3/§5.4): hält die verifizierten Renderer-Bytes
 // aktiver Plugins; befüllt von syncRendererRuntime, gelesen vom plugin:rendererEntry-/plugin:host-IPC.
 const rendererRuntime = new RendererRuntime()
-// Für die plugin:host-Bridge (ADR §5.4): dieselbe capability-gated Host-Factory wie der Main-Registry,
-// erst in app.whenReady() gesetzt (zusammen mit setHostFactory). Bis dahin null → Bridge antwortet 'no-host'.
-let rendererHostFactory: ReturnType<typeof createHostFactory> | null = null
 registerPluginTransport(pluginRegistry, () => publishPluginUiState())
 
 // Plugin-beigesteuerte Workflow-Canvas-Bausteine (Manifest-Feld `workflowActions`) in die
@@ -469,30 +466,11 @@ ipcMain.handle('plugin:rendererEntry', async (event, pluginId: unknown) => {
 })
 
 // plugin:host (ADR plugin-renderer-host §5.4): capability-gated Vault-Bridge für Renderer-Plugins.
-// instanceId→pluginId→manifest wird MAIN-seitig gebunden (der Renderer nennt nie eine pluginId, I-S1).
-// KEINE Sicherheits-Seam (§4): ein voll vertrautes Renderer-Plugin könnte dieselbe Wirkung auch über
-// window.electronAPI erzielen — die harte Grenze bleibt writeFileSafe/assertApprovedVault in den Services.
-const RENDERER_HOST_VAULT_OPS = new Set(['read', 'readBytes', 'exists', 'write', 'writeBytes'])
+// Instanz→Eintrag, Call-Gate/In-Flight + Host-Erzeugung sind in der RendererRuntime gekapselt (das Manifest
+// verlässt das Modul nie, F09). KEINE Sicherheits-Seam (§4) — die harte Grenze bleibt writeFileSafe.
 ipcMain.handle('plugin:host', async (event, rendererInstanceId: unknown, op: unknown, args: unknown) => {
   if (!isTrustedSender(event)) return { ok: false, error: 'Nicht autorisierter Aufrufer' }
-  if (!rendererHostFactory) return { ok: false, error: 'Host noch nicht bereit' }
-  const manifest = rendererRuntime.resolveInstanceManifest(rendererInstanceId)
-  if (!manifest) return { ok: false, error: 'Renderer-Instanz nicht aktiv' }
-  const [ns, method] = String(op).split('.')
-  if (ns !== 'vault' || !RENDERER_HOST_VAULT_OPS.has(method)) {
-    return { ok: false, error: `Operation '${String(op)}' nicht erlaubt` }
-  }
-  try {
-    // Capability-Gating macht die Host-Factory: host.vault existiert nur bei deklarierter
-    // vault.read/write-Capability, mit genau den dazu passenden Methoden (read* vs write*).
-    const host = rendererHostFactory(manifest) as unknown as { vault?: Record<string, (...a: unknown[]) => unknown> }
-    const fn = host.vault?.[method]
-    if (typeof fn !== 'function') return { ok: false, error: `Capability für '${String(op)}' fehlt` }
-    const data = await fn(...(Array.isArray(args) ? args : []))
-    return { ok: true, data }
-  } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : String(err) }
-  }
+  return rendererRuntime.invokeHostOp(rendererInstanceId, op, args)
 })
 
 // Read-only: aktuell abgewiesene installierte Plugins (Re-Verify UND workflow-collision). LIVE neu
@@ -1132,8 +1110,10 @@ app.whenReady().then(async () => {
   await migrateAntaresCredentialsToPlugin()
   await migrateEdooboxCredentialsToPlugin()
   await migrateMarketingCredentialsToPlugin()
-  rendererHostFactory = createHostFactory(buildPluginHostServices())
-  pluginRegistry.setHostFactory(rendererHostFactory)
+  const hostFactory = createHostFactory(buildPluginHostServices())
+  pluginRegistry.setHostFactory(hostFactory)
+  // Dieselbe capability-gated Factory in die RendererRuntime (plugin:host-Bridge, §5.4).
+  rendererRuntime.setHostFactory(hostFactory as unknown as RendererHostFactory)
   pluginRegistry.setHardLockGuard(async (moduleId) => {
     const ui = await loadUISettings().catch(() => ({} as Record<string, unknown>))
     const ollama = ui.ollama as { selectedModel?: string; moduleModelOverrides?: Record<string, string> } | undefined

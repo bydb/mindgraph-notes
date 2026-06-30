@@ -1,25 +1,25 @@
 // RendererRuntime — main-seitige Autoritätsgrenze für externe Renderer-Plugins
-// (ADR plugin-renderer-host §5.1/§5.3/§5.4). Spiegelt das Muster von ExternalWidgetRuntime
-// (widgets.ts), hält aber die VERIFIZIERTEN Renderer-Bytes (VerifiedRendererPayload) und mintet
-// pro aktiver Version eine `generation` + eine zufällige `rendererInstanceId`.
+// (ADR plugin-renderer-host §5.1/§5.3/§5.4/§5.5). Hält die VERIFIZIERTEN Renderer-Bytes, mintet pro
+// aktiver Version eine `generation` + `rendererInstanceId`, und ist alleiniger Eigentümer von:
+//   - den Bytes (eigene Kopie, nur als utf8-String serviert — R1-impl-F03)
+//   - dem Manifest/der Host-Erzeugung (Factory injiziert; das Manifest verlässt das Modul NIE — F09)
+//   - dem Lifecycle: Call-Gate + In-Flight-Zähler je Generation + drain() (F08/§5.5)
 //
-// Bytes-Eigentum (R1-impl-F03): das Modul gibt NIE seine internen Einträge/Buffer heraus. Externe
-// Caller bekommen ausschließlich schmale, kopierte Abfragen: `servePayload` (utf8-Strings + geklonte
-// fileEditors), `resolveInstance` (nur Metadaten) und `list` (byte-freie Descriptoren).
-//
-// Die `rendererInstanceId` ist Routing-/Lifecycle-Mechanik (I-S1), KEINE Trust-Grenze: signierte
-// Renderer-Plugins laufen voll vertraut im Haupt-Renderer (§4). Der Renderer nennt in `plugin:host`
-// nie eine pluginId — Main löst instanceId→pluginId aus DIESER Map auf.
-//
-// HINWEIS (Task 5): der strikte §5.5-Lifecycle (Call-Gate, In-Flight-Zähler, Drain-vor-Unload) wird
-// hier ergänzt, sobald die Renderer-Seite (Task 8) den Aktivierungs-Ack liefert — er ist ohne die
-// Renderer-Gegenstelle nicht ausübbar. Aktuell: atomarer Ersatz + Generation als Naht dafür.
+// `rendererInstanceId` ist Routing-/Lifecycle-Mechanik (I-S1), KEINE Trust-Grenze: signierte
+// Renderer-Plugins laufen voll vertraut im Haupt-Renderer (§4). Die `plugin:host`-Vault-Bridge ist
+// Komfort, keine Sicherheits-Seam (die harte Grenze bleibt writeFileSafe/assertApprovedVault).
 
 import { randomUUID } from 'node:crypto'
 import type { FileEditorDecl, PluginManifest } from '@mindgraph/plugin-api'
 import type { VerifiedRendererPayload } from './artifact/verify'
 
-/** Main-interner Eintrag inkl. der verifizierten Bytes (verlässt das Modul NIE als Referenz). */
+/** Capability-Host eines Plugins (createHostFactory(manifest)). Schmal getypt — nur was die Bridge nutzt. */
+type CapabilityHost = { vault?: Record<string, (...a: unknown[]) => unknown> }
+export type RendererHostFactory = (manifest: PluginManifest) => CapabilityHost
+
+/** Erlaubte Vault-Operationen für `plugin:host` (Capability-Gating macht zusätzlich die Host-Factory). */
+const VAULT_OPS = new Set(['read', 'readBytes', 'exists', 'write', 'writeBytes'])
+
 interface RendererRuntimeEntry {
   pluginId: string
   pluginLabel: string
@@ -28,13 +28,14 @@ interface RendererRuntimeEntry {
   rendererInstanceId: string
   payload: VerifiedRendererPayload
   fileEditors: FileEditorDecl[]
-  /** Verifiziertes Manifest — read-only genutzt von `plugin:host` zum Bauen des capability-gated Hosts.
-   *  (Immutable Config, kein sensibles mutierbares Byte-Material wie `payload`.) */
+  /** Verifiziertes Manifest — NUR modul-intern (Host-Erzeugung), wird nie herausgegeben (F09). */
   manifest: PluginManifest
+  /** Lifecycle-Seam (F08/§5.5): laufende Host-Calls + Gate + Drain-Warter. */
+  inFlight: number
+  gateClosed: boolean
+  drainWaiters: Array<() => void>
 }
 
-/** Die an den Renderer gereichte Beschreibung — OHNE Bytes (die holt der Renderer per
- *  `plugin:rendererEntry`/`servePayload`). */
 export interface RendererDescriptor {
   pluginId: string
   pluginLabel: string
@@ -43,7 +44,6 @@ export interface RendererDescriptor {
   fileEditors: FileEditorDecl[]
 }
 
-/** Serve-Ergebnis für `plugin:rendererEntry`: Code/Styles als utf8-String (kein Buffer entkommt). */
 export interface RendererServe {
   rendererInstanceId: string
   pluginId: string
@@ -54,7 +54,6 @@ export interface RendererServe {
   fileEditors: FileEditorDecl[]
 }
 
-/** Auflösung instanceId→Metadaten für `plugin:host` (I-S1) — KEINE Bytes. */
 export interface RendererInstanceRef {
   pluginId: string
   version: string
@@ -70,20 +69,25 @@ export interface RendererActivation {
   manifest: PluginManifest
 }
 
+export type HostOpResult = { ok: true; data: unknown } | { ok: false; error: string }
+
 const cloneFileEditors = (fe: FileEditorDecl[]): FileEditorDecl[] =>
   fe.map((f) => ({ editorId: f.editorId, extensions: [...f.extensions], ...(f.label ? { label: f.label } : {}) }))
 
-/**
- * Hält die aktiven Renderer-Beiträge. `activate` ersetzt einen vorhandenen Eintrag desselben Plugins
- * **atomar** (neuen Eintrag erst vollständig bauen, dann beide Indizes in einem Schritt umsetzen — die
- * alte `rendererInstanceId` wird dabei ungültig). Reiner Zustand, keine I/O.
- */
 export class RendererRuntime {
   private byPlugin = new Map<string, RendererRuntimeEntry>()
   private byInstance = new Map<string, RendererRuntimeEntry>()
   private generationCounter = 0
 
-  constructor(private readonly mintId: () => string = randomUUID) {}
+  constructor(
+    private readonly mintId: () => string = randomUUID,
+    private hostFactory?: RendererHostFactory,
+  ) {}
+
+  /** Setzt die capability-gated Host-Factory (in app.whenReady() — dieselbe wie der Main-Registry). */
+  setHostFactory(factory: RendererHostFactory): void {
+    this.hostFactory = factory
+  }
 
   /** Aktiviert/ersetzt den Renderer-Beitrag eines Plugins; liefert den (byte-freien) Descriptor. */
   activate(a: RendererActivation): RendererDescriptor {
@@ -95,8 +99,7 @@ export class RendererRuntime {
       version: a.version,
       generation,
       rendererInstanceId,
-      // Eigene Kopie der verifizierten Bytes (R1-impl-F03): externe Mutation der Eingabe darf die
-      // Serve-Bytes nicht mehr ändern. Das Modul ist ab hier alleiniger Eigentümer.
+      // Eigene Kopie der verifizierten Bytes (F03) — externe Mutation darf die Serve-Bytes nicht ändern.
       payload: {
         code: Buffer.from(a.payload.code),
         styles: a.payload.styles ? Buffer.from(a.payload.styles) : undefined,
@@ -104,10 +107,11 @@ export class RendererRuntime {
       },
       fileEditors: cloneFileEditors(a.fileEditors),
       manifest: a.manifest,
+      inFlight: 0,
+      gateClosed: false,
+      drainWaiters: [],
     }
-    // Atomarer Swap: alten Eintrag (falls vorhanden) erst JETZT entfernen, dann neuen setzen —
-    // der neue Eintrag ist bereits vollständig + ID-kollisionsfrei gebaut (kein Zwischenzustand
-    // „weder alt noch neu"; kein Überschreiben einer fremden instanceId).
+    // Atomarer Swap: neuen Eintrag erst vollständig + ID-kollisionsfrei bauen, dann beide Indizes umsetzen.
     const prev = this.byPlugin.get(a.pluginId)
     if (prev) this.byInstance.delete(prev.rendererInstanceId)
     this.byPlugin.set(a.pluginId, entry)
@@ -115,11 +119,7 @@ export class RendererRuntime {
     return describe(entry)
   }
 
-  /**
-   * Gleicht den aktiven Bestand an die übergebene Liste an — **instanceId-stabil**: ein unveränderter
-   * Eintrag (gleiche `version` + `payload.hash`) BEHÄLT seine `rendererInstanceId`. Entfernte Plugins
-   * werden deaktiviert, geänderte/neue (re-)aktiviert. Liefert `changed`.
-   */
+  /** Instanz-stabiler Abgleich: unveränderte Einträge (version + payload.hash) behalten ihre instanceId. */
   syncActive(activations: readonly RendererActivation[]): { changed: boolean } {
     const want = new Map(activations.map((a) => [a.pluginId, a]))
     let changed = false
@@ -132,7 +132,7 @@ export class RendererRuntime {
     for (const a of activations) {
       const prev = this.byPlugin.get(a.pluginId)
       if (prev && prev.version === a.version && prev.payload.hash === a.payload.hash) {
-        prev.pluginLabel = a.pluginLabel // Anzeige aktualisieren, Identität (instanceId) erhalten
+        prev.pluginLabel = a.pluginLabel
         prev.fileEditors = cloneFileEditors(a.fileEditors)
         prev.manifest = a.manifest
         continue
@@ -143,7 +143,7 @@ export class RendererRuntime {
     return { changed }
   }
 
-  /** Entfernt den Renderer-Beitrag eines Plugins (Disable/Uninstall/Upgrade-Vorbereitung). */
+  /** Entfernt den Renderer-Beitrag eines Plugins. (Den Drain steuert der Aufrufer via drain() vorab.) */
   deactivate(pluginId: string): void {
     const prev = this.byPlugin.get(pluginId)
     if (!prev) return
@@ -151,8 +151,7 @@ export class RendererRuntime {
     this.byInstance.delete(prev.rendererInstanceId)
   }
 
-  /** Serve-Gate (I-L2) für `plugin:rendererEntry`: Code/Styles als utf8-Strings + geklonte Metadaten,
-   *  oder `undefined`, wenn das Plugin nicht aktiv ist. Kein Buffer/kein interner Eintrag entkommt. */
+  /** Serve-Gate (I-L2): Code/Styles als utf8-Strings + geklonte Metadaten, oder `undefined`. */
   servePayload(pluginId: unknown): RendererServe | undefined {
     if (typeof pluginId !== 'string') return undefined
     const e = this.byPlugin.get(pluginId)
@@ -168,7 +167,7 @@ export class RendererRuntime {
     }
   }
 
-  /** Auflösung instanceId→Metadaten für `plugin:host` (I-S1); `undefined` nach Invalidierung. */
+  /** Auflösung instanceId→Metadaten (KEINE Bytes/kein Manifest); `undefined` nach Invalidierung. */
   resolveInstance(rendererInstanceId: unknown): RendererInstanceRef | undefined {
     if (typeof rendererInstanceId !== 'string') return undefined
     const e = this.byInstance.get(rendererInstanceId)
@@ -176,19 +175,68 @@ export class RendererRuntime {
     return { pluginId: e.pluginId, version: e.version, generation: e.generation }
   }
 
-  /** Das verifizierte Manifest hinter einer instanceId — für den capability-gated Host (`plugin:host`).
-   *  Read-only nutzen (immutable Config); `undefined` nach Invalidierung. */
-  resolveInstanceManifest(rendererInstanceId: unknown): PluginManifest | undefined {
-    if (typeof rendererInstanceId !== 'string') return undefined
-    return this.byInstance.get(rendererInstanceId)?.manifest
-  }
-
-  /** Byte-freie Liste für den `plugin:renderers-changed`-Push an den Renderer. */
+  /** Byte-freie Liste für den `plugin:renderers-changed`-Push. */
   list(): RendererDescriptor[] {
     return [...this.byPlugin.values()].map(describe)
   }
 
-  /** Mintet eine ID, die garantiert noch nicht vergeben ist (Kollisions-Guard). */
+  /**
+   * `plugin:host`-Dispatch (F08/F09): instanceId→Eintrag (Main-gebunden, der Renderer nennt nie pluginId),
+   * Call-Gate + In-Flight-Zählung, Host-Erzeugung INTERN (Manifest verlässt das Modul nicht). Nur `vault.<op>`;
+   * das feine Capability-Gating (read* vs write*) macht die Host-Factory aus den Manifest-Capabilities.
+   */
+  async invokeHostOp(rendererInstanceId: unknown, op: unknown, args: unknown): Promise<HostOpResult> {
+    if (typeof rendererInstanceId !== 'string') return { ok: false, error: 'Ungültige Instanz' }
+    const e = this.byInstance.get(rendererInstanceId)
+    if (!e) return { ok: false, error: 'Renderer-Instanz nicht aktiv' }
+    if (e.gateClosed) return { ok: false, error: 'Plugin wird gerade entladen' }
+    if (!this.hostFactory) return { ok: false, error: 'Host noch nicht bereit' }
+    const [ns, method] = String(op).split('.')
+    if (ns !== 'vault' || !VAULT_OPS.has(method)) return { ok: false, error: `Operation '${String(op)}' nicht erlaubt` }
+
+    e.inFlight++
+    try {
+      const host = this.hostFactory(e.manifest)
+      const fn = host.vault?.[method]
+      if (typeof fn !== 'function') return { ok: false, error: `Capability für '${String(op)}' fehlt` }
+      const data = await fn(...(Array.isArray(args) ? args : []))
+      return { ok: true, data }
+    } catch (err) {
+      // Keine rohen Main-Exceptions/Stacks an den Renderer (F13) — nur die Message.
+      return { ok: false, error: err instanceof Error ? err.message : String(err) }
+    } finally {
+      e.inFlight--
+      if (e.inFlight === 0 && e.drainWaiters.length) {
+        const waiters = e.drainWaiters.splice(0)
+        for (const w of waiters) w()
+      }
+    }
+  }
+
+  /**
+   * Schließt das Call-Gate (keine neuen Host-Calls) und wartet, bis laufende Calls dieser Generation
+   * abgeschlossen sind (F08/§5.5). `'drained'` = sauber leer; `'timeout'` = es liefen noch Calls → der
+   * Aufrufer behandelt das fail-closed (`restart-required`, nichts löschen). Unbekanntes Plugin = `'drained'`.
+   */
+  async drain(pluginId: string, timeoutMs: number): Promise<'drained' | 'timeout'> {
+    const e = this.byPlugin.get(pluginId)
+    if (!e) return 'drained'
+    e.gateClosed = true
+    if (e.inFlight === 0) return 'drained'
+    return await new Promise<'drained' | 'timeout'>((resolve) => {
+      const timer = setTimeout(() => {
+        const i = e.drainWaiters.indexOf(onDrained)
+        if (i >= 0) e.drainWaiters.splice(i, 1)
+        resolve('timeout')
+      }, timeoutMs)
+      const onDrained = (): void => {
+        clearTimeout(timer)
+        resolve('drained')
+      }
+      e.drainWaiters.push(onDrained)
+    })
+  }
+
   private mintUniqueId(): string {
     for (let i = 0; i < 8; i++) {
       const id = this.mintId()
