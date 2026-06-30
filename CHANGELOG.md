@@ -2,7 +2,7 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
-## [0.9.0] - 2026-06-30
+## [0.9.0-beta] - 2026-06-30
 
 Das Plugin-Release: MindGraph lässt sich jetzt mit signierten Plugins erweitern — im Katalog entdecken, per Klick installieren, automatisch aktualisieren. Dazu ein rundum aufgeräumter Einstellungen-Bereich „Module & Plugins".
 
