@@ -176,7 +176,12 @@ import { SECURE_WEB_PREFERENCES } from './windowSecurity'
 import { readArchiveFileCapped } from './plugins/runtime/readArchive'
 import { readActiveIndex } from './plugins/runtime/activeIndex'
 import { pluginPaths, versionDir } from './plugins/runtime/paths'
-import { getFileType } from './fileTypes'
+import { getFileType, coreClaimedExtensions } from './fileTypes'
+import {
+  resolveFileEditors,
+  lookupFileEditor,
+  type ResolvedFileEditors,
+} from '../shared/plugins/fileEditorResolver'
 
 // Globale Fehlerbehandlung für unhandled exceptions (z.B. IMAP Socket-Timeouts)
 process.on('uncaughtException', (error) => {
@@ -1428,7 +1433,25 @@ const IGNORED_DIRECTORY_NAMES = new Set([
 ])
 
 
-async function readDirectoryRecursive(dirPath: string, basePath: string): Promise<FileEntry[]> {
+/** Aufgelöste Datei-Editor-Claims aktiver Renderer-Plugins (ADR plugin-renderer-host §7/§8). Kollidierende
+ *  Claims (Kern ODER zwischen Plugins) verwirft der Resolver + loggt sie; nur kollisionsfreie routen. */
+function activeFileEditorClaims(): ResolvedFileEditors {
+  const plugins = rendererRuntime.list().map((d) => ({ pluginId: d.pluginId, fileEditors: d.fileEditors }))
+  const resolved = resolveFileEditors(plugins, coreClaimedExtensions())
+  if (resolved.errors.length) {
+    console.warn(
+      '[plugin] Datei-Editor-Claims verworfen (Kollision):',
+      resolved.errors.map((e) => `${e.pluginId}:${e.extension}(${e.kind})`).join(', ')
+    )
+  }
+  return resolved
+}
+
+async function readDirectoryRecursive(
+  dirPath: string,
+  basePath: string,
+  claims: ResolvedFileEditors
+): Promise<FileEntry[]> {
   const entries: FileEntry[] = []
   const items = await fs.readdir(dirPath, { withFileTypes: true })
 
@@ -1446,7 +1469,7 @@ async function readDirectoryRecursive(dirPath: string, basePath: string): Promis
     const relativePath = path.relative(basePath, fullPath)
 
     if (item.isDirectory()) {
-      const children = await readDirectoryRecursive(fullPath, basePath)
+      const children = await readDirectoryRecursive(fullPath, basePath, claims)
       entries.push({
         name: item.name,
         path: relativePath,
@@ -1456,12 +1479,20 @@ async function readDirectoryRecursive(dirPath: string, basePath: string): Promis
     } else {
       const fileType = getFileType(item.name)
       if (fileType) {
-        entries.push({
-          name: item.name,
-          path: relativePath,
-          isDirectory: false,
-          fileType
-        })
+        entries.push({ name: item.name, path: relativePath, isDirectory: false, fileType })
+      } else {
+        // Plugin-bewusste Datei-Seam (ADR §7, R1-impl-F07): von keinem Kerntyp erfasste Dateien werden
+        // sichtbar, WENN ein aktives Renderer-Plugin ihre Endung beansprucht — sonst wie bisher gefiltert.
+        const claim = lookupFileEditor(item.name, claims)
+        if (claim) {
+          entries.push({
+            name: item.name,
+            path: relativePath,
+            isDirectory: false,
+            fileType: 'plugin',
+            pluginEditor: claim,
+          })
+        }
       }
     }
   }
@@ -1476,7 +1507,7 @@ async function readDirectoryRecursive(dirPath: string, basePath: string): Promis
 ipcMain.handle('read-directory', async (_event, dirPath: string) => {
   try {
     const safe = await assertSafePath(dirPath, 'read-directory')
-    return await readDirectoryRecursive(safe, safe)
+    return await readDirectoryRecursive(safe, safe, activeFileEditorClaims())
   } catch (error) {
     console.error('Fehler beim Lesen des Verzeichnisses:', error)
     return []

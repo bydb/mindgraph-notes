@@ -378,7 +378,10 @@ export interface FileEntry {
   path: string;
   isDirectory: boolean;
   children?: FileEntry[];
-  fileType?: 'markdown' | 'pdf' | 'image' | 'excel' | 'word' | 'powerpoint' | 'code';
+  fileType?: 'markdown' | 'pdf' | 'image' | 'excel' | 'word' | 'powerpoint' | 'code' | 'plugin';
+  /** Bei fileType 'plugin' (ADR plugin-renderer-host §7): welches Renderer-Plugin/Editor die Endung
+   *  beansprucht. Der FileTree öffnet damit einen plugin-editor-Tab. */
+  pluginEditor?: { pluginId: string; editorId: string };
 }
 
 // PDF-Dokument
