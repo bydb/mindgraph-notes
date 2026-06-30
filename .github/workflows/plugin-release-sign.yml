@@ -5,15 +5,19 @@ name: Sign Plugin Release (Produktion)
 # dieses Repos und verlässt es nie — kein Plugin-Repo bekommt ihn je zu sehen.
 #
 # Zwei getrennte Jobs mit Vertrauensgrenze dazwischen:
-#   build  — UNTRUSTED, OHNE Secrets: checkt das öffentliche Plugin-Repo am exakten Commit aus,
-#            verifiziert die Tag↔Commit-Bindung, baut es und lädt das gebaute dist/ als
-#            Run-gebundenes Artefakt hoch. Selbst bei kompromittiertem Plugin-Build gibt es hier
-#            nichts zu stehlen (kein Schlüssel, kein Write-Token, kein Environment-Zugriff).
+#   build  — UNTRUSTED, OHNE Secrets: normalisiert+validiert die Eingaben, checkt das öffentliche
+#            Plugin-Repo am exakten Commit aus, verifiziert die Tag↔Commit-Bindung, baut es und lädt
+#            das gebaute dist/ als Run-gebundenes Artefakt hoch. Selbst bei kompromittiertem
+#            Plugin-Build gibt es hier nichts zu stehlen (kein Schlüssel, kein Write-Token).
 #   sign   — TRUSTED, im geschützten Environment: lädt NUR das gebaute Artefakt + den per github.sha
 #            gepinnten offiziellen Signierer (committetes Single-CJS-Bundle, KEIN npm/tsx), prüft
 #            Schlüsselbindung (Secret-Public-Key == OFFICIAL_KEYS byte-genau), Manifest/Version/Repo/
 #            Dateimenge, signiert kanonisch und re-verifiziert das Archiv über den echten Verifier.
 #            Der Signierer führt NIE Plugin-Code aus — er liest das Artefakt als reine Daten.
+#
+# Eingaben sind paste-tolerant: führende/abschließende Whitespace werden getrimmt und der SHA wird
+# lowercased — DANACH greift weiterhin die strikte Validierung (^[0-9a-f]{40}$ etc.). Die normalisierten
+# Werte werden als Job-Outputs weitergereicht; beide Jobs nutzen ausschließlich diese (nie die Roh-Inputs).
 #
 # Der signierte .mgxplugin liegt danach als Workflow-Artefakt vor. Der Upload ans Plugin-Release ist
 # (vorerst) ein manueller Maintainer-Schritt — bewusst KEIN Cross-Repo-Write-Token in diesem Workflow.
@@ -54,25 +58,39 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+    # Normalisierte, streng validierte Werte für den sign-Job (nie die Roh-Inputs weiterreichen).
+    outputs:
+      repo: ${{ steps.norm.outputs.repo }}
+      tag: ${{ steps.norm.outputs.tag }}
+      sha: ${{ steps.norm.outputs.sha }}
+      version: ${{ steps.norm.outputs.version }}
     steps:
-      # Inputs NIE direkt in Shellcode interpolieren — über env-Variablen einlesen und streng prüfen.
-      - name: Eingaben streng validieren
+      # Inputs NIE direkt in Shellcode interpolieren — über env-Variablen einlesen. Paste-tolerant:
+      # führende/abschließende Whitespace trimmen + SHA lowercasen, DANN weiterhin strikt validieren.
+      - name: Eingaben normalisieren + streng validieren
+        id: norm
         env:
           IN_REPO: ${{ inputs.repo }}
           IN_TAG: ${{ inputs.tag }}
           IN_SHA: ${{ inputs.commit_sha }}
         run: |
           set -euo pipefail
-          [[ "$IN_REPO" =~ ^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$ ]] || { echo "::error::repo muss 'owner/repo' sein"; exit 1; }
-          [[ "$IN_TAG"  =~ ^v?[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]] || { echo "::error::tag muss SemVer sein (z. B. v0.1.0)"; exit 1; }
-          [[ "$IN_SHA"  =~ ^[0-9a-f]{40}$ ]] || { echo "::error::commit_sha muss 40-stelliger Hex-SHA sein"; exit 1; }
+          trim() { sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//'; }
+          repo="$(printf '%s' "$IN_REPO" | trim)"
+          tag="$(printf '%s' "$IN_TAG" | trim)"
+          sha="$(printf '%s' "$IN_SHA" | trim | tr 'A-F' 'a-f')"
+          [[ "$repo" =~ ^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$ ]] || { echo "::error::repo muss 'owner/repo' sein"; exit 1; }
+          [[ "$tag"  =~ ^v?[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]] || { echo "::error::tag muss SemVer sein (z. B. v0.1.0)"; exit 1; }
+          [[ "$sha"  =~ ^[0-9a-f]{40}$ ]] || { echo "::error::commit_sha muss 40-stelliger Hex-SHA sein (lowercase, keine Leerzeichen)"; exit 1; }
+          { echo "repo=$repo"; echo "tag=$tag"; echo "sha=$sha"; echo "version=${tag#v}"; } >> "$GITHUB_OUTPUT"
+          echo "Normalisiert: repo=$repo tag=$tag sha=$sha"
 
       # Verhindert, dass ein nachträglich verschobener Tag auf einen anderen Commit zeigt als gebaut wird.
       - name: Tag↔Commit-Bindung prüfen (Anti-Tag-Mutation)
         env:
-          IN_REPO: ${{ inputs.repo }}
-          IN_TAG: ${{ inputs.tag }}
-          IN_SHA: ${{ inputs.commit_sha }}
+          IN_REPO: ${{ steps.norm.outputs.repo }}
+          IN_TAG: ${{ steps.norm.outputs.tag }}
+          IN_SHA: ${{ steps.norm.outputs.sha }}
         run: |
           set -euo pipefail
           remote="https://github.com/${IN_REPO}.git"
@@ -90,8 +108,8 @@ jobs:
       - name: Plugin-Repo am Commit auschecken (untrusted)
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
-          repository: ${{ inputs.repo }}
-          ref: ${{ inputs.commit_sha }}
+          repository: ${{ steps.norm.outputs.repo }}
+          ref: ${{ steps.norm.outputs.sha }}
           persist-credentials: false
           path: plugin
 
@@ -144,23 +162,15 @@ jobs:
           name: plugin-build
           path: incoming
 
-      - name: Version aus Tag ableiten
-        id: ver
-        env:
-          IN_TAG: ${{ inputs.tag }}
-        run: |
-          set -euo pipefail
-          [[ "$IN_TAG" =~ ^v?[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]] || { echo "::error::tag ungültig"; exit 1; }
-          echo "version=${IN_TAG#v}" >> "$GITHUB_OUTPUT"
-
       # Zwischen build und sign liegt das (potenziell lange) Environment-Approval. Ein in diesem Fenster
       # verschobener Tag würde sonst den ALTEN Commit für einen inzwischen anders gebundenen Tag signieren
       # (TOCTOU). Daher dieselbe Bindung UNMITTELBAR vor dem Signieren erneut prüfen — fail-closed.
+      # Eingaben kommen aus den NORMALISIERTEN build-Outputs (nicht aus den Roh-Inputs).
       - name: Tag↔Commit-Bindung erneut prüfen (TOCTOU nach Approval)
         env:
-          IN_REPO: ${{ inputs.repo }}
-          IN_TAG: ${{ inputs.tag }}
-          IN_SHA: ${{ inputs.commit_sha }}
+          IN_REPO: ${{ needs.build.outputs.repo }}
+          IN_TAG: ${{ needs.build.outputs.tag }}
+          IN_SHA: ${{ needs.build.outputs.sha }}
         run: |
           set -euo pipefail
           remote="https://github.com/${IN_REPO}.git"
@@ -180,8 +190,8 @@ jobs:
         env:
           PLUGIN_SIGNING_KEY: ${{ secrets.PLUGIN_SIGNING_KEY }}
           ARTIFACT_DIR: incoming
-          PLUGIN_REPO: ${{ inputs.repo }}
-          PLUGIN_VERSION: ${{ steps.ver.outputs.version }}
+          PLUGIN_REPO: ${{ needs.build.outputs.repo }}
+          PLUGIN_VERSION: ${{ needs.build.outputs.version }}
           OUT_PATH: signed.mgxplugin
         run: |
           set -euo pipefail
