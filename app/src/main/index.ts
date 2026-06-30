@@ -176,6 +176,7 @@ import { SECURE_WEB_PREFERENCES } from './windowSecurity'
 import { readArchiveFileCapped } from './plugins/runtime/readArchive'
 import { readActiveIndex } from './plugins/runtime/activeIndex'
 import { pluginPaths, versionDir } from './plugins/runtime/paths'
+import { getFileType } from './fileTypes'
 
 // Globale Fehlerbehandlung für unhandled exceptions (z.B. IMAP Socket-Timeouts)
 process.on('uncaughtException', (error) => {
@@ -1420,50 +1421,12 @@ ipcMain.handle('create-note', async (_event, filePath: string) => {
 
 // Verzeichnis rekursiv lesen
 // Supported image extensions for file tree display
-const IMAGE_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.bmp', '.ico']
-
-// Code-Extensions — spiegelt codeLanguages.ts im Renderer (bewusste Duplikation, Main ↔ Renderer
-// dürfen keinen Code teilen, der DOM/hljs importiert). Nur Reine Text-Dateien, die mit highlight.js
-// gehighlighted werden können.
-const CODE_FILE_EXTENSIONS_MAIN = new Set([
-  'js', 'mjs', 'cjs', 'jsx', 'ts', 'tsx',
-  'py', 'pyw',
-  'html', 'htm', 'xml', 'svg',
-  'css', 'scss', 'sass', 'less',
-  'json', 'jsonc',
-  'yaml', 'yml',
-  'sh', 'bash', 'zsh', 'fish',
-  'markdown', 'mdx',
-  'sql',
-  'java', 'kt', 'kts',
-  'c', 'h', 'cpp', 'cxx', 'cc', 'hpp', 'hxx',
-  'cs',
-  'go', 'rs', 'php', 'rb', 'swift',
-  'diff', 'patch',
-  'txt', 'log', 'conf', 'ini', 'toml', 'env'
-])
-
 const IGNORED_DIRECTORY_NAMES = new Set([
   'node_modules', '.git', '.svn', '.hg', 'dist', 'build', 'out', 'target',
   '.next', '.nuxt', '.turbo', '.cache', '__pycache__', '.pytest_cache',
   '.venv', 'venv', 'env', '.idea', '.vscode'
 ])
 
-function getFileType(fileName: string): 'markdown' | 'pdf' | 'image' | 'excel' | 'word' | 'powerpoint' | 'code' | null {
-  const ext = path.extname(fileName).toLowerCase()
-  if (ext === '.md') return 'markdown'
-  if (ext === '.pdf') return 'pdf'
-  if (IMAGE_EXTENSIONS.includes(ext)) return 'image'
-  if (ext === '.xlsx' || ext === '.xls') return 'excel'
-  if (ext === '.docx' || ext === '.doc') return 'word'
-  if (ext === '.pptx' || ext === '.ppt') return 'powerpoint'
-  // Code-Dateien: Extension ohne führenden Punkt prüfen
-  if (ext && CODE_FILE_EXTENSIONS_MAIN.has(ext.slice(1))) return 'code'
-  // Spezial-Dateinamen ohne Extension (Dockerfile, Makefile)
-  const lower = fileName.toLowerCase()
-  if (lower === 'dockerfile' || lower === 'makefile' || lower === '.gitignore' || lower === '.env') return 'code'
-  return null
-}
 
 async function readDirectoryRecursive(dirPath: string, basePath: string): Promise<FileEntry[]> {
   const entries: FileEntry[] = []
