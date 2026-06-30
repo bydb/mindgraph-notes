@@ -315,6 +315,9 @@ const translations = {
     'settings.modules.catalogEmpty': 'Der Katalog ist derzeit leer.',
     'settings.modules.catalogInstall': 'Installieren',
     'settings.modules.catalogInstalled': 'Installiert',
+    'settings.modules.catalogSearchPlaceholder': 'Katalog durchsuchen …',
+    'settings.modules.catalogAllCategories': 'Alle',
+    'settings.modules.catalogNoMatch': 'Keine Treffer.',
     // A3: verständliche Plugin-Fehler
     'plugins.error.signature': 'Signatur ungültig — das Plugin ist nicht vertrauenswürdig und wurde abgelehnt.',
     'plugins.error.signatureKey': 'Mit einem unbekannten Schlüssel signiert — nicht vertrauenswürdig.',
@@ -3008,6 +3011,9 @@ const translations = {
     'settings.modules.catalogEmpty': 'The catalog is currently empty.',
     'settings.modules.catalogInstall': 'Install',
     'settings.modules.catalogInstalled': 'Installed',
+    'settings.modules.catalogSearchPlaceholder': 'Search catalog …',
+    'settings.modules.catalogAllCategories': 'All',
+    'settings.modules.catalogNoMatch': 'No matches.',
     // A3: human-readable plugin errors
     'plugins.error.signature': 'Invalid signature — the plugin is not trusted and was rejected.',
     'plugins.error.signatureKey': 'Signed with an unknown key — not trusted.',

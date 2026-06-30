@@ -5,6 +5,7 @@ import { MODULES, isModuleEnabled, setModuleEnabled, useIsModuleEnabled, isPlugi
 import { invokePlugin } from '../../plugins/client'
 import { PluginSlot } from '../../plugins/slots'
 import { pluginErrorText } from '../../utils/pluginErrors'
+import { catalogCategories, filterCatalogEntries } from '../../utils/catalogFilter'
 import { edooboxService } from '../../stores/edooboxServiceBridge'
 import { useNotesStore, createNoteFromFile } from '../../stores/notesStore'
 import { useSyncStore } from '../../stores/syncStore'
@@ -611,6 +612,9 @@ const ModulesTab: React.FC<{ t: TabTFn }> = ({ t }) => {
   const [catalogLoading, setCatalogLoading] = useState(false)
   const [catalogError, setCatalogError] = useState<string | null>(null)
   const [installingCatalogId, setInstallingCatalogId] = useState<string | null>(null)
+  // A5: Katalog-Suche + Kategorie-Filter (rein clientseitig über die geladenen Einträge).
+  const [catalogSearch, setCatalogSearch] = useState('')
+  const [catalogCategory, setCatalogCategory] = useState<string | null>(null)
   // Lokalisierte Anzeige der Laufzeit-Enums (sonst englische Rohwerte für DE-User).
   const activationLabel: Record<string, string> = {
     active: t('settings.modules.statusActive'),
@@ -767,6 +771,9 @@ const ModulesTab: React.FC<{ t: TabTFn }> = ({ t }) => {
   const updateById = new Map(updates.filter(u => u.hasUpdate).map(u => [u.id, u] as const))
   // Installierte Version je Plugin-ID — für den Katalog-Status (nicht installiert / installiert / Update).
   const installedById = new Map(diskPlugins.map(p => [p.id, p.version] as const))
+  // A5: Kategorien (für die Filter-Chips) + gefilterte Sicht (Suche + Kategorie).
+  const catCategories = catalogCategories(catalog)
+  const visibleCatalog = filterCatalogEntries(catalog, catalogSearch, catalogCategory)
 
   // Kern- von plugin-gestützten Modulen trennen: „MindGraph-Module" (immer dabei) vs.
   // „Installierte Plugins" (eigenständige Vertikalen, später per Store verwaltbar).
@@ -869,11 +876,46 @@ const ModulesTab: React.FC<{ t: TabTFn }> = ({ t }) => {
         {catalogError && (
           <p className="settings-hint" style={{ color: 'var(--error-color, #e5484d)' }}>{catalogError}</p>
         )}
+        {catalog.length > 0 && (
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', margin: '6px 0' }}>
+            <input
+              className="settings-input"
+              style={{ flex: '1 1 180px', minWidth: 140 }}
+              placeholder={t('settings.modules.catalogSearchPlaceholder')}
+              value={catalogSearch}
+              onChange={e => setCatalogSearch(e.target.value)}
+            />
+            {catCategories.length > 1 && (
+              <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                <button
+                  className="settings-btn-secondary"
+                  style={catalogCategory === null ? { borderColor: 'var(--accent-color, #4a9eff)', color: 'var(--accent-color, #4a9eff)' } : undefined}
+                  onClick={() => setCatalogCategory(null)}
+                >
+                  {t('settings.modules.catalogAllCategories')}
+                </button>
+                {catCategories.map(cat => (
+                  <button
+                    key={cat}
+                    className="settings-btn-secondary"
+                    style={catalogCategory === cat ? { borderColor: 'var(--accent-color, #4a9eff)', color: 'var(--accent-color, #4a9eff)' } : undefined}
+                    onClick={() => setCatalogCategory(catalogCategory === cat ? null : cat)}
+                  >
+                    {cat}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
         <div className="modules-list">
           {!catalogError && !catalogLoading && catalog.length === 0 && (
             <p className="settings-hint">{t('settings.modules.catalogEmpty')}</p>
           )}
-          {catalog.map(entry => {
+          {catalog.length > 0 && visibleCatalog.length === 0 && (
+            <p className="settings-hint">{t('settings.modules.catalogNoMatch')}</p>
+          )}
+          {visibleCatalog.map(entry => {
             const installedVersion = installedById.get(entry.id)
             const upd = updateById.get(entry.id)
             const busy = installingCatalogId === entry.id
