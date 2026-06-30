@@ -327,3 +327,38 @@ export function verifyInstalledDir(
   const limits = opts.limits ?? ARTIFACT_LIMITS
   return verifyFileMap(readPluginDirFiles(dir, limits), { ...opts, limits })
 }
+
+/** Die bei der Re-Verifikation gewonnenen, verifizierten Renderer-Bytes eines Plugins
+ *  (ADR plugin-renderer-host §5.3). Gehalten in der RendererRuntime; der Serve gibt EXAKT diese
+ *  In-Memory-Bytes aus (kein zweiter Platten-Read → kein TOCTOU; I-L1/I-L5). */
+export interface VerifiedRendererPayload {
+  code: Buffer
+  styles?: Buffer
+  /** sha256 der `code`-Bytes (Identität/Generation-Debug). */
+  hash: string
+}
+
+/**
+ * Re-verifiziert ein installiertes Verzeichnis **fail-closed** (Hash/Signatur über ALLE Dateien,
+ * inkl. `renderer.js`) und extrahiert den verifizierten Renderer-Payload — denselben Buffer, der
+ * gerade gegen `integrity.json` geprüft wurde (read-once). Plugins ohne `entrypoints.renderer`
+ * liefern `payload: undefined` (z.B. main-only).
+ */
+export function verifyInstalledRendererPayload(
+  dir: string,
+  opts: { keyring: Keyring; appVersion: string; limits?: ArtifactLimits }
+): { manifest: VerifiedFiles['manifest']; payload?: VerifiedRendererPayload } {
+  const limits = opts.limits ?? ARTIFACT_LIMITS
+  const bytes = readPluginDirFiles(dir, limits)
+  const { manifest } = verifyFileMap(bytes, { ...opts, limits })
+  const rendererRel = manifest.entrypoints?.renderer
+  if (!rendererRel) return { manifest }
+  const code = bytes.get(rendererRel)
+  // assertEntrypointsPresent (in verifyFileMap) garantiert die Existenz; defensiv dennoch prüfen.
+  if (!code) throw new ArtifactError('entrypoint-missing', `entrypoints.renderer '${rendererRel}' fehlt im Verzeichnis`)
+  const stylesRel = manifest.entrypoints?.styles
+  const styles = stylesRel ? bytes.get(stylesRel) : undefined
+  if (stylesRel && !styles) throw new ArtifactError('entrypoint-missing', `entrypoints.styles '${stylesRel}' fehlt im Verzeichnis`)
+  const hash = createHash('sha256').update(code).digest('hex')
+  return { manifest, payload: { code, styles, hash } }
+}
