@@ -1032,6 +1032,7 @@ export interface ElectronAPI {
   pluginInstallErrors: () => Promise<{ ok: boolean; data?: Array<{ id: string; version: string; code: string; message: string }>; error?: string }>;
   pluginInstalled: () => Promise<{ ok: boolean; data?: Array<{ id: string; version: string; activation: string; readiness: string | null; error: string | null }>; error?: string }>;
   pluginCheckUpdates: () => Promise<{ ok: boolean; data?: Array<{ id: string; repo: string; current: string; latest: string; hasUpdate: boolean }>; error?: string }>;
+  pluginCatalog: () => Promise<{ ok: boolean; data?: Array<{ id: string; name: string; repo: string; description?: string; author?: string; category?: string; tag?: string }>; error?: string; code?: string }>;
   pluginWidgets: () => Promise<import('./plugins/widget').WidgetListResult>;
   pluginWidgetData: (instanceId: string) => Promise<import('./plugins/widget').WidgetDataResult>;
   onPluginWidgetsChanged: (callback: () => void) => () => void;

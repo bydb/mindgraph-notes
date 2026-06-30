@@ -169,6 +169,7 @@ import { discoverInstalledPlugins, type DiscoverError } from './plugins/runtime/
 import { ExternalWidgetRuntime } from './plugins/widgets'
 import { downloadPluginArtifact } from './plugins/download'
 import { checkPluginUpdates } from './plugins/update-checker'
+import { fetchCatalog, resolveCatalogUrl } from './plugins/catalog'
 import { SECURE_WEB_PREFERENCES } from './windowSecurity'
 import { readArchiveFileCapped } from './plugins/runtime/readArchive'
 import { readActiveIndex } from './plugins/runtime/activeIndex'
@@ -340,6 +341,20 @@ ipcMain.handle('plugin:checkUpdates', async (event) => {
     return { ok: true, data }
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : String(err) }
+  }
+})
+
+// A3-Voll (read-only Discovery): lädt den zentralen, UNSIGNIERTEN Plugin-Katalog (catalog.json,
+// host-allowlisted + size-capped + schema-validiert). Reine Entdeckung — Install läuft danach
+// user-ausgelöst über plugin:installFromGithub und ist dort gegen OFFICIAL_KEYS signaturgeprüft.
+ipcMain.handle('plugin:catalog', async (event) => {
+  if (!isTrustedSender(event)) return { ok: false, error: 'Nicht autorisierter Aufrufer' }
+  try {
+    const data = await fetchCatalog(resolveCatalogUrl(app.isPackaged))
+    return { ok: true, data }
+  } catch (err) {
+    const code = err instanceof ArtifactError ? err.code : undefined
+    return { ok: false, error: err instanceof Error ? err.message : String(err), code }
   }
 })
 

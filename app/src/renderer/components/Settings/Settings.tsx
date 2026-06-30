@@ -606,6 +606,11 @@ const ModulesTab: React.FC<{ t: TabTFn }> = ({ t }) => {
   const [updates, setUpdates] = useState<Array<{ id: string; repo: string; current: string; latest: string; hasUpdate: boolean }>>([])
   const [checkingUpdates, setCheckingUpdates] = useState(false)
   const [updatingId, setUpdatingId] = useState<string | null>(null)
+  // A3-Voll: browsebarer Katalog (Discovery, read-only). Beim Öffnen einmal laden + manueller Refresh.
+  const [catalog, setCatalog] = useState<Array<{ id: string; name: string; repo: string; description?: string; author?: string; category?: string; tag?: string }>>([])
+  const [catalogLoading, setCatalogLoading] = useState(false)
+  const [catalogError, setCatalogError] = useState<string | null>(null)
+  const [installingCatalogId, setInstallingCatalogId] = useState<string | null>(null)
   // Lokalisierte Anzeige der Laufzeit-Enums (sonst englische Rohwerte für DE-User).
   const activationLabel: Record<string, string> = {
     active: t('settings.modules.statusActive'),
@@ -724,8 +729,44 @@ const ModulesTab: React.FC<{ t: TabTFn }> = ({ t }) => {
     }
   }
   useEffect(() => { void handleCheckUpdates() }, [])
+  // A3-Voll: Katalog laden (read-only Discovery). Beim Öffnen einmal + manueller Refresh.
+  const loadCatalog = async () => {
+    setCatalogLoading(true)
+    setCatalogError(null)
+    try {
+      const res = await window.electronAPI.pluginCatalog()
+      if (res.ok && res.data) setCatalog(res.data)
+      else setCatalogError(pluginErr(res.code, res.error))
+    } catch {
+      setCatalogError(t('plugins.error.unknown'))
+    } finally {
+      setCatalogLoading(false)
+    }
+  }
+  useEffect(() => { void loadCatalog() }, [])
+  // Install/Update aus dem Katalog — DERSELBE verifizierte A2-Pfad wie „Per Repo installieren".
+  const handleInstallFromCatalog = async (entry: { id: string; repo: string; tag?: string }) => {
+    setInstallingCatalogId(entry.id)
+    setInstallMsg(null)
+    try {
+      const res = await window.electronAPI.pluginInstallFromGithub(entry.repo, entry.tag)
+      if (res.ok && res.data) {
+        setInstallMsg({ ok: true, text: t('settings.modules.installSuccess', { id: res.data.id, version: res.data.version }) })
+        refreshDiskPlugins(); void handleCheckUpdates()
+      } else {
+        setInstallMsg({ ok: false, text: pluginErr(res.code, res.error) })
+      }
+    } catch (err) {
+      console.error('[plugin:installFromGithub]', err)
+      setInstallMsg({ ok: false, text: t('plugins.error.unknown') })
+    } finally {
+      setInstallingCatalogId(null)
+    }
+  }
   // Verfügbare Updates per Plugin-ID für die Disk-Liste.
   const updateById = new Map(updates.filter(u => u.hasUpdate).map(u => [u.id, u] as const))
+  // Installierte Version je Plugin-ID — für den Katalog-Status (nicht installiert / installiert / Update).
+  const installedById = new Map(diskPlugins.map(p => [p.id, p.version] as const))
 
   // Kern- von plugin-gestützten Modulen trennen: „MindGraph-Module" (immer dabei) vs.
   // „Installierte Plugins" (eigenständige Vertikalen, später per Store verwaltbar).
@@ -816,6 +857,59 @@ const ModulesTab: React.FC<{ t: TabTFn }> = ({ t }) => {
           {installMsg.text}
         </p>
       )}
+
+      <div className="modules-category" style={{ marginTop: 4, marginBottom: 12 }}>
+        <div className="modules-plugins-header">
+          <h4 className="modules-category-title">{t('settings.modules.catalogTitle')}</h4>
+          <button className="settings-btn-secondary" onClick={loadCatalog} disabled={catalogLoading}>
+            {catalogLoading ? t('settings.modules.catalogLoading') : t('settings.modules.catalogRefresh')}
+          </button>
+        </div>
+        <p className="settings-hint">{t('settings.modules.catalogHint')}</p>
+        {catalogError && (
+          <p className="settings-hint" style={{ color: 'var(--error-color, #e5484d)' }}>{catalogError}</p>
+        )}
+        <div className="modules-list">
+          {!catalogError && !catalogLoading && catalog.length === 0 && (
+            <p className="settings-hint">{t('settings.modules.catalogEmpty')}</p>
+          )}
+          {catalog.map(entry => {
+            const installedVersion = installedById.get(entry.id)
+            const upd = updateById.get(entry.id)
+            const busy = installingCatalogId === entry.id
+            return (
+              <div key={entry.id} className="module-row">
+                <div className="module-row-body">
+                  <div className="module-row-label">
+                    {entry.name}
+                    {entry.category && <span style={{ marginLeft: 8, fontSize: '0.72em', opacity: 0.7 }}>{entry.category}</span>}
+                  </div>
+                  {entry.description && <div className="module-row-desc">{entry.description}</div>}
+                  <div className="module-row-desc" style={{ opacity: 0.7, fontSize: '0.8em' }}>
+                    {entry.repo}{entry.author ? ` · ${entry.author}` : ''}
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                  {installedVersion && upd ? (
+                    <button className="settings-btn-secondary" onClick={() => handleInstallFromCatalog(entry)} disabled={busy}>
+                      {busy ? t('settings.modules.updating') : t('settings.modules.updateButton', { current: upd.current, latest: upd.latest })}
+                    </button>
+                  ) : installedVersion ? (
+                    <button className="settings-btn-secondary" disabled>
+                      {t('settings.modules.catalogInstalled')} {installedVersion}
+                    </button>
+                  ) : (
+                    <button className="settings-btn-secondary" onClick={() => handleInstallFromCatalog(entry)} disabled={busy}>
+                      {busy ? t('settings.modules.installing') : t('settings.modules.catalogInstall')}
+                    </button>
+                  )}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+
       <div className="modules-install-repo" style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', marginBottom: 4 }}>
         <input
           className="settings-input"

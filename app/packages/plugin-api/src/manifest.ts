@@ -180,3 +180,29 @@ export interface PluginManifest {
   }
   privacy?: { containsPersonalData?: boolean; localOnly?: boolean }
 }
+
+/**
+ * Ein Eintrag im Plugin-Katalog (Discovery-Metadaten des zentralen `mindgraph-plugins`-Repos).
+ * REIN serialisierbar. Der Katalog ist **nur Entdeckung** — Vertrauen wird beim Install gegen
+ * OFFICIAL_KEYS erzwungen (Signaturprüfung), nicht beim Katalog-Laden. `repo` ist `owner/repo`
+ * des öffentlichen Plugin-Repos; nur `id`/`name`/`repo` sind verpflichtend, der Rest ist Anzeige.
+ */
+export interface CatalogEntry {
+  /** Plugin-ID (passt zur Manifest-`id` des Plugins). */
+  id: string
+  name: string
+  /** `owner/repo` des öffentlichen Plugin-Repos. */
+  repo: string
+  description?: string
+  author?: string
+  /** Frei wählbares Anzeige-/Gruppierungs-Label (NICHT die Manifest-Kategorie-Enum). */
+  category?: string
+  /** Optionaler fixierter Release-Tag; ohne ihn installiert der Store das neueste Release. */
+  tag?: string
+}
+
+/** Der Katalog als versionierter Wrapper (forward-compatible, analog `manifestVersion`). */
+export interface CatalogDocument {
+  catalogVersion: 1
+  plugins: CatalogEntry[]
+}

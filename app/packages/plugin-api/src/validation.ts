@@ -10,7 +10,7 @@ import Ajv from 'ajv'
 import type { ValidateFunction } from 'ajv'
 import semver from 'semver'
 import { API_VERSION } from './version'
-import type { JsonSchema, PluginManifest } from './manifest'
+import type { CatalogDocument, JsonSchema, PluginManifest } from './manifest'
 
 const ajv = new Ajv({ allErrors: true, removeAdditional: false })
 
@@ -346,6 +346,57 @@ export function validateManifestSemantics(manifest: PluginManifest): ValidationR
     }
   }
 
+  return { valid: errors.length === 0, errors }
+}
+
+// — Plugin-Katalog (Discovery, A3-Voll). UNSIGNIERT: das Schema + die Semantik sind das einzige
+//   Tor beim Laden; Vertrauen wird beim Install gegen OFFICIAL_KEYS erzwungen (Signaturprüfung).
+//   Strikt `additionalProperties: false`. Nur id/name/repo sind Pflicht — der Rest ist Anzeige.
+
+export const CATALOG_SCHEMA: JsonSchema = {
+  $schema: 'http://json-schema.org/draft-07/schema#',
+  type: 'object',
+  required: ['catalogVersion', 'plugins'],
+  additionalProperties: false,
+  properties: {
+    catalogVersion: { const: 1 },
+    plugins: {
+      type: 'array',
+      items: {
+        type: 'object',
+        required: ['id', 'name', 'repo'],
+        additionalProperties: false,
+        properties: {
+          id: { type: 'string', pattern: '^[a-z][a-z0-9-]*$' },
+          name: { type: 'string', minLength: 1 },
+          repo: { type: 'string', minLength: 1 },
+          description: { type: 'string' },
+          author: { type: 'string' },
+          category: { type: 'string' },
+          tag: { type: 'string', minLength: 1 },
+        },
+      },
+    },
+  },
+}
+
+const validateCatalogFn = ajv.compile(CATALOG_SCHEMA)
+
+/** Prüft ein unbekanntes Objekt gegen das Katalog-Schema (Schema-Tor des Discovery-Layers). */
+export function validateCatalog(value: unknown): ValidationResult {
+  const valid = validateCatalogFn(value) as boolean
+  return { valid, errors: valid ? [] : formatErrors(validateCatalogFn) }
+}
+
+/** Semantik nach dem Schema: eindeutige Plugin-IDs (Duplikate würden im Store kollidieren).
+ *  Setzt voraus, dass `validateCatalog` bereits grün war. */
+export function validateCatalogSemantics(doc: CatalogDocument): ValidationResult {
+  const errors: string[] = []
+  const seen = new Set<string>()
+  for (const entry of doc.plugins) {
+    if (seen.has(entry.id)) errors.push(`Doppelte Katalog-ID '${entry.id}'.`)
+    seen.add(entry.id)
+  }
   return { valid: errors.length === 0, errors }
 }
 

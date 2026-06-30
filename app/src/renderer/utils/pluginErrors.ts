@@ -38,6 +38,8 @@ const CODE_KEY: Record<string, string> = {
   'asset-ambiguous': 'plugins.error.assetAmbiguous',
   'release-not-found': 'plugins.error.releaseNotFound',
   'repo-ref-invalid': 'plugins.error.repoInvalid',
+  // Katalog / Discovery (A3-Voll)
+  'catalog-invalid': 'plugins.error.catalog',
   // Install / Registry
   'id-collision': 'plugins.error.idCollision',
   'version-conflict': 'plugins.error.versionConflict',
