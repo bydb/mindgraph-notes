@@ -19230,6 +19230,174 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
   flex-shrink: 0;
 }
 
+/* ─────────────────────────────────────────────────────────────────────────
+   Settings · Module & Plugins — Redesign (stärkere Hierarchie, Toggle, Zone)
+   ───────────────────────────────────────────────────────────────────────── */
+
+/* Kräftiger Tab-Kopf (ersetzt die schwache settings-section h3 nur hier) */
+.settings-tab-header { margin: 2px 0 20px 0; }
+.settings-tab-header h2 {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: -0.01em;
+  margin: 0 0 4px 0;
+  text-transform: none;
+}
+.settings-tab-subtitle {
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  line-height: 1.45;
+  margin: 0;
+}
+
+/* Kategorie-Header: deutlich kräftiger + Hairline (war 11px, hellgrau) */
+.modules-category-title {
+  font-size: 12.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-primary);
+  margin: 0 0 10px 0;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+/* Buttons: secondary war ungestylt → jetzt klar sichtbar; + primary für Hauptaktion */
+.settings-btn-secondary {
+  padding: 7px 14px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  border-radius: var(--radius-md);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  white-space: nowrap;
+}
+.settings-btn-secondary:hover:not(:disabled) {
+  border-color: var(--accent-color);
+  color: var(--accent-color);
+}
+.settings-btn-secondary:disabled { opacity: 0.5; cursor: default; }
+.settings-btn-primary {
+  padding: 7px 16px;
+  border: 1px solid var(--accent-color);
+  background: var(--accent-color);
+  color: #fff;
+  border-radius: var(--radius-md);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  white-space: nowrap;
+  box-shadow: var(--shadow-sm);
+}
+.settings-btn-primary:hover:not(:disabled) { background: var(--accent-hover); transform: translateY(-1px); }
+.settings-btn-primary:disabled { opacity: 0.55; cursor: default; }
+
+/* Toggle-Switch statt nackter Checkbox (native input bleibt für A11y, versteckt) */
+.module-row input[type="checkbox"].module-toggle-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+.module-toggle {
+  position: relative;
+  flex-shrink: 0;
+  width: 38px;
+  height: 22px;
+  border-radius: 999px;
+  background: var(--border-color);
+  transition: background 0.18s ease;
+}
+.module-toggle::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+  transition: transform 0.18s ease;
+}
+.module-row input.module-toggle-input:checked + .module-toggle { background: var(--accent-color); }
+.module-row input.module-toggle-input:checked + .module-toggle::after { transform: translateX(16px); }
+
+/* Plugins-Zone: klar von den Modulen abgesetzt */
+.plugins-zone {
+  margin-top: 34px;
+  padding-top: 22px;
+  border-top: 2px solid var(--border-subtle);
+}
+.plugins-zone-header { display: flex; align-items: center; gap: 12px; margin-bottom: 6px; }
+.plugins-zone-header .module-row-icon { box-shadow: none; }
+/* Spezifität: muss .settings-section h3 (11px, muted) überstimmen */
+.settings-section h3.plugins-zone-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+  text-transform: none;
+  letter-spacing: normal;
+}
+.plugins-zone-subtitle { font-size: 12.5px; color: var(--text-secondary); margin: 2px 0 0 0; line-height: 1.4; }
+
+/* Sub-Sektionen (Katalog / Installierte / Offizielle) */
+.plugins-subsection { margin-top: 20px; }
+.plugins-subsection-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+.plugins-subsection-title { font-size: 13px; font-weight: 700; color: var(--text-primary); margin: 0; }
+
+/* Katalog-Eintrag mit Icon-Kachel */
+.catalog-icon { background: color-mix(in srgb, var(--accent-color) 22%, transparent); }
+.catalog-cat-chip {
+  margin-left: 8px;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  background: var(--bg-tertiary, color-mix(in srgb, var(--text-primary) 7%, transparent));
+  border-radius: 999px;
+  padding: 1px 8px;
+  vertical-align: middle;
+}
+
+/* „Erweitert" einklappbar */
+.plugins-advanced {
+  margin-top: 22px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+.plugins-advanced-summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 11px 14px;
+  background: var(--bg-secondary);
+  border: none;
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+}
+.plugins-advanced-summary:hover { background: color-mix(in srgb, var(--accent-color) 5%, var(--bg-secondary)); }
+.plugins-advanced-caret { display: inline-block; font-size: 10px; color: var(--text-secondary); transition: transform 0.18s ease; }
+.plugins-advanced.open .plugins-advanced-caret { transform: rotate(90deg); }
+.plugins-advanced-body { padding: 14px; border-top: 1px solid var(--border-subtle); }
+
 /* Dringende Aufgaben — Soft-Highlight (siehe taskExtractor.ts CRITICAL_PATTERN) */
 .task-urgent {
   background: rgba(255, 0, 0, 0.08);

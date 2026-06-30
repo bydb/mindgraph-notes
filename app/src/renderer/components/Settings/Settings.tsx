@@ -574,6 +574,23 @@ const VaultSettingsTab: React.FC<{ vaultPath: string; t: TabTFn; onNavigateToTab
   )
 }
 
+// Konsistente Icon-Kachel je Modul-Kategorie (Kern-Module haben kein eigenes iconText) — lucide-artige
+// White-Stroke-Glyphen + Kategorie-Farbe. Single-Source für renderModuleRow.
+const CATEGORY_VISUAL: Record<ModuleCategory, { color: string; path: React.ReactNode }> = {
+  ai: { color: '#7c5cff', path: <path d="m12 3 1.9 5.8a2 2 0 0 0 1.3 1.3L21 12l-5.8 1.9a2 2 0 0 0-1.3 1.3L12 21l-1.9-5.8a2 2 0 0 0-1.3-1.3L3 12l5.8-1.9a2 2 0 0 0 1.3-1.3z" /> },
+  communication: { color: '#2f7af5', path: <><rect x="2" y="4" width="20" height="16" rx="2" /><path d="m22 6-10 7L2 6" /></> },
+  business: { color: '#e0823d', path: <><rect x="2" y="7" width="20" height="14" rx="2" /><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2" /></> },
+  learning: { color: '#2fab6b', path: <><path d="M22 10 12 5 2 10l10 5 10-5z" /><path d="M6 12v5c0 1.5 2.7 3 6 3s6-1.5 6-3v-5" /></> },
+  research: { color: '#cc4d8f', path: <><circle cx="11" cy="11" r="7" /><path d="m21 21-4-4" /></> },
+  devices: { color: '#5b6470', path: <><rect x="5" y="2" width="14" height="20" rx="2" /><path d="M12 18h.01" /></> },
+  documents: { color: '#3aa0b0', path: <><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><path d="M14 2v6h6" /><path d="M9 13h6M9 17h6" /></> },
+}
+const categoryGlyph = (cat: ModuleCategory): React.ReactNode => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    {CATEGORY_VISUAL[cat].path}
+  </svg>
+)
+
 const ModulesTab: React.FC<{ t: TabTFn }> = ({ t }) => {
   // useUIStore als Abhängigkeit einbinden, damit der Tab bei Flag-Änderungen rerendert
   const _tick = useUIStore(s => `${s.notesChatEnabled}${s.projectRagEnabled}${s.smartConnectionsEnabled}${s.flashcardsEnabled}${s.workflowCanvasEnabled}${s.semanticScholarEnabled}${s.zoteroEnabled}${s.languageTool.enabled}${s.email.enabled}${s.readwise.enabled}${s.docling.enabled}${s.visionOcr.enabled}${s.speech.enabled}`)
@@ -615,6 +632,8 @@ const ModulesTab: React.FC<{ t: TabTFn }> = ({ t }) => {
   // A5: Katalog-Suche + Kategorie-Filter (rein clientseitig über die geladenen Einträge).
   const [catalogSearch, setCatalogSearch] = useState('')
   const [catalogCategory, setCatalogCategory] = useState<string | null>(null)
+  // Redesign: „Erweitert"-Block (manuelle Installation per Repo/Datei) standardmäßig eingeklappt.
+  const [advancedOpen, setAdvancedOpen] = useState(false)
   // Lokalisierte Anzeige der Laufzeit-Enums (sonst englische Rohwerte für DE-User).
   const activationLabel: Record<string, string> = {
     active: t('settings.modules.statusActive'),
@@ -791,19 +810,19 @@ const ModulesTab: React.FC<{ t: TabTFn }> = ({ t }) => {
     const enabled = isModuleEnabled(mod.id)
     return (
       <label key={mod.id} className={`module-row ${enabled ? 'active' : ''}`}>
-        {mod.iconText && (
-          <div
-            className="module-row-icon"
-            style={{ background: mod.iconColor || 'var(--accent-color, #4a9eff)' }}
-            aria-hidden="true"
-          >
+        <div
+          className="module-row-icon"
+          style={{ background: mod.iconText ? (mod.iconColor || 'var(--accent-color, #4a9eff)') : CATEGORY_VISUAL[mod.category].color }}
+          aria-hidden="true"
+        >
+          {mod.iconText ? (
             <svg width="28" height="28" viewBox="0 0 28 28" xmlns="http://www.w3.org/2000/svg">
               <text x="14" y="20" textAnchor="middle" fill="white" fontFamily="'Georgia', 'Times New Roman', serif" fontWeight="700" fontSize="18">
                 {mod.iconText}
               </text>
             </svg>
-          </div>
-        )}
+          ) : categoryGlyph(mod.category)}
+        </div>
         <div className="module-row-body">
           <div className="module-row-label">
             {mod.label}
@@ -822,17 +841,21 @@ const ModulesTab: React.FC<{ t: TabTFn }> = ({ t }) => {
         </div>
         <input
           type="checkbox"
+          className="module-toggle-input"
           checked={enabled}
           onChange={e => toggleModule(mod.id, e.target.checked)}
         />
+        <span className="module-toggle" aria-hidden="true" />
       </label>
     )
   }
 
   return (
     <div className="settings-section">
-      <h3>{t('settings.modules.coreTitle')}</h3>
-      <p className="settings-hint">{t('settings.modules.hint')}</p>
+      <div className="settings-tab-header">
+        <h2>{t('settings.modules.tabTitle')}</h2>
+        <p className="settings-tab-subtitle">{t('settings.modules.hint')}</p>
+      </div>
 
       {orderedCategories.map(cat => (
         grouped[cat].length === 0 ? null : (
@@ -845,33 +868,36 @@ const ModulesTab: React.FC<{ t: TabTFn }> = ({ t }) => {
         )
       ))}
 
-      <div className="modules-plugins-header">
-        <h3>{t('settings.modules.pluginsTitle')}</h3>
-        <button
-          className="settings-btn-secondary"
-          onClick={handleInstallPlugin}
-          disabled={installing}
-        >
-          {installing ? t('settings.modules.installing') : t('settings.modules.installPlugin')}
-        </button>
-      </div>
-      <p className="settings-hint">{t('settings.modules.pluginsHint')}</p>
-      {installMsg && (
-        <p
-          className="settings-hint"
-          style={{ color: installMsg.ok ? 'var(--success-color, #30a46c)' : 'var(--error-color, #e5484d)' }}
-        >
-          {installMsg.text}
-        </p>
-      )}
-
-      <div className="modules-category" style={{ marginTop: 4, marginBottom: 12 }}>
-        <div className="modules-plugins-header">
-          <h4 className="modules-category-title">{t('settings.modules.catalogTitle')}</h4>
-          <button className="settings-btn-secondary" onClick={loadCatalog} disabled={catalogLoading}>
-            {catalogLoading ? t('settings.modules.catalogLoading') : t('settings.modules.catalogRefresh')}
-          </button>
+      <div className="plugins-zone">
+        <div className="plugins-zone-header">
+          <div className="module-row-icon" style={{ background: '#5b6470', boxShadow: 'none' }} aria-hidden="true">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" />
+              <path d="m3.3 7 8.7 5 8.7-5" />
+              <path d="M12 22V12" />
+            </svg>
+          </div>
+          <div>
+            <h3 className="plugins-zone-title">{t('settings.modules.pluginsZoneTitle')}</h3>
+            <p className="plugins-zone-subtitle">{t('settings.modules.pluginsZoneSubtitle')}</p>
+          </div>
         </div>
+        {installMsg && (
+          <p
+            className="settings-hint"
+            style={{ color: installMsg.ok ? 'var(--success-color, #30a46c)' : 'var(--error-color, #e5484d)' }}
+          >
+            {installMsg.text}
+          </p>
+        )}
+
+        <div className="plugins-subsection">
+          <div className="plugins-subsection-head">
+            <h4 className="plugins-subsection-title">{t('settings.modules.catalogTitle')}</h4>
+            <button className="settings-btn-secondary" onClick={loadCatalog} disabled={catalogLoading}>
+              {catalogLoading ? t('settings.modules.catalogLoading') : t('settings.modules.catalogRefresh')}
+            </button>
+          </div>
         <p className="settings-hint">{t('settings.modules.catalogHint')}</p>
         {catalogError && (
           <p className="settings-hint" style={{ color: 'var(--error-color, #e5484d)' }}>{catalogError}</p>
@@ -921,10 +947,17 @@ const ModulesTab: React.FC<{ t: TabTFn }> = ({ t }) => {
             const busy = installingCatalogId === entry.id
             return (
               <div key={entry.id} className="module-row">
+                <div className="module-row-icon catalog-icon" aria-hidden="true">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent-color, #4a9eff)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" />
+                    <path d="m3.3 7 8.7 5 8.7-5" />
+                    <path d="M12 22V12" />
+                  </svg>
+                </div>
                 <div className="module-row-body">
                   <div className="module-row-label">
                     {entry.name}
-                    {entry.category && <span style={{ marginLeft: 8, fontSize: '0.72em', opacity: 0.7 }}>{entry.category}</span>}
+                    {entry.category && <span className="catalog-cat-chip">{entry.category}</span>}
                   </div>
                   {entry.description && <div className="module-row-desc">{entry.description}</div>}
                   <div className="module-row-desc" style={{ opacity: 0.7, fontSize: '0.8em' }}>
@@ -933,7 +966,7 @@ const ModulesTab: React.FC<{ t: TabTFn }> = ({ t }) => {
                 </div>
                 <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                   {installedVersion && upd ? (
-                    <button className="settings-btn-secondary" onClick={() => handleInstallFromCatalog(entry)} disabled={busy}>
+                    <button className="settings-btn-primary" onClick={() => handleInstallFromCatalog(entry)} disabled={busy}>
                       {busy ? t('settings.modules.updating') : t('settings.modules.updateButton', { current: upd.current, latest: upd.latest })}
                     </button>
                   ) : installedVersion ? (
@@ -941,7 +974,7 @@ const ModulesTab: React.FC<{ t: TabTFn }> = ({ t }) => {
                       {t('settings.modules.catalogInstalled')} {installedVersion}
                     </button>
                   ) : (
-                    <button className="settings-btn-secondary" onClick={() => handleInstallFromCatalog(entry)} disabled={busy}>
+                    <button className="settings-btn-primary" onClick={() => handleInstallFromCatalog(entry)} disabled={busy}>
                       {busy ? t('settings.modules.installing') : t('settings.modules.catalogInstall')}
                     </button>
                   )}
@@ -952,38 +985,9 @@ const ModulesTab: React.FC<{ t: TabTFn }> = ({ t }) => {
         </div>
       </div>
 
-      <div className="modules-install-repo" style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', marginBottom: 4 }}>
-        <input
-          className="settings-input"
-          style={{ flex: '1 1 160px', minWidth: 120 }}
-          placeholder={t('settings.modules.repoPlaceholder')}
-          value={repoInput}
-          onChange={e => setRepoInput(e.target.value)}
-          onKeyDown={e => { if (e.key === 'Enter') handleInstallFromRepo() }}
-          disabled={installingRepo}
-        />
-        <input
-          className="settings-input"
-          style={{ flex: '0 1 120px', minWidth: 90 }}
-          placeholder={t('settings.modules.tagPlaceholder')}
-          value={repoTag}
-          onChange={e => setRepoTag(e.target.value)}
-          disabled={installingRepo}
-        />
-        <button className="settings-btn-secondary" onClick={handleInstallFromRepo} disabled={installingRepo || !repoInput.trim()}>
-          {installingRepo ? t('settings.modules.installing') : t('settings.modules.installFromRepoButton')}
-        </button>
-      </div>
-      <p className="settings-hint">{t('settings.modules.installFromRepoHint')}</p>
-      <div className="modules-list">
-        {pluginMods.length === 0
-          ? <p className="settings-hint">{t('settings.modules.pluginsEmpty')}</p>
-          : pluginMods.map(mod => renderModuleRow(mod, true))}
-      </div>
-
-      <div className="modules-category" style={{ marginTop: 16 }}>
-        <div className="modules-plugins-header">
-          <h4 className="modules-category-title">{t('settings.modules.diskPluginsTitle')}</h4>
+      <div className="plugins-subsection">
+        <div className="plugins-subsection-head">
+          <h4 className="plugins-subsection-title">{t('settings.modules.diskPluginsTitle')}</h4>
           <button className="settings-btn-secondary" onClick={handleCheckUpdates} disabled={checkingUpdates}>
             {checkingUpdates ? t('settings.modules.checkingUpdates') : t('settings.modules.checkUpdates')}
           </button>
@@ -1053,6 +1057,53 @@ const ModulesTab: React.FC<{ t: TabTFn }> = ({ t }) => {
         </div>
       </div>
 
+      {pluginMods.length > 0 && (
+        <div className="plugins-subsection">
+          <h4 className="plugins-subsection-title">{t('settings.modules.officialPluginsTitle')}</h4>
+          <div className="modules-list" style={{ marginTop: 8 }}>
+            {pluginMods.map(mod => renderModuleRow(mod, true))}
+          </div>
+        </div>
+      )}
+
+      <div className={`plugins-advanced ${advancedOpen ? 'open' : ''}`}>
+        <button className="plugins-advanced-summary" onClick={() => setAdvancedOpen(o => !o)} aria-expanded={advancedOpen}>
+          <span className="plugins-advanced-caret">▸</span>
+          {t('settings.modules.advancedTitle')}
+        </button>
+        {advancedOpen && (
+          <div className="plugins-advanced-body">
+            <p className="settings-hint" style={{ marginTop: 0 }}>{t('settings.modules.advancedHint')}</p>
+            <div className="modules-install-repo" style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', marginBottom: 4 }}>
+              <input
+                className="settings-input"
+                style={{ flex: '1 1 160px', minWidth: 120 }}
+                placeholder={t('settings.modules.repoPlaceholder')}
+                value={repoInput}
+                onChange={e => setRepoInput(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') handleInstallFromRepo() }}
+                disabled={installingRepo}
+              />
+              <input
+                className="settings-input"
+                style={{ flex: '0 1 120px', minWidth: 90 }}
+                placeholder={t('settings.modules.tagPlaceholder')}
+                value={repoTag}
+                onChange={e => setRepoTag(e.target.value)}
+                disabled={installingRepo}
+              />
+              <button className="settings-btn-secondary" onClick={handleInstallFromRepo} disabled={installingRepo || !repoInput.trim()}>
+                {installingRepo ? t('settings.modules.installing') : t('settings.modules.installFromRepoButton')}
+              </button>
+            </div>
+            <p className="settings-hint">{t('settings.modules.installFromRepoHint')}</p>
+            <button className="settings-btn-secondary" onClick={handleInstallPlugin} disabled={installing} style={{ marginTop: 6 }}>
+              {installing ? t('settings.modules.installing') : t('settings.modules.installPlugin')}
+            </button>
+          </div>
+        )}
+      </div>
+
       {installErrors.length > 0 && (
         <div className="modules-category" style={{ marginTop: 16 }}>
           <h4 className="modules-category-title">{t('settings.modules.installErrorsTitle')}</h4>
@@ -1071,6 +1122,7 @@ const ModulesTab: React.FC<{ t: TabTFn }> = ({ t }) => {
           </div>
         </div>
       )}
+      </div>
     </div>
   )
 }
