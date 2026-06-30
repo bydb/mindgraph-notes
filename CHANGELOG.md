@@ -2,6 +2,31 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.9.0] - 2026-06-30
+
+Das Plugin-Release: MindGraph lässt sich jetzt mit signierten Plugins erweitern — im Katalog entdecken, per Klick installieren, automatisch aktualisieren. Dazu ein rundum aufgeräumter Einstellungen-Bereich „Module & Plugins".
+
+### Neu
+
+- **Plugin-Katalog (Store).** Neue „Katalog"-Sektion in Einstellungen → Module: offizielle Plugins durchsuchen (Volltext + Kategorie-Filter) und mit einem Klick installieren. Verfügbare Updates werden erkannt und ebenfalls per Klick eingespielt.
+- **Plugins installieren & verwalten.** Plugins lassen sich aus dem Katalog, direkt über ein GitHub-Repo (`owner/repo`, optional mit Release-Tag) oder aus einer lokalen `.mgxplugin`-Datei installieren — inkl. Aktiv-Status, Update- und Entfernen-Funktion.
+- **Plugin-Widgets.** Plugins können eigene Dashboard-/Sidebar-Widgets beisteuern (Badge, Liste, Statistik, Fortschritt …), die direkt im Dashboard erscheinen.
+- **Einstellungen „Module & Plugins" neu gestaltet.** Klare Überschriften, konsistente farbcodierte Icons für jedes Modul, Toggle-Schalter statt Checkboxen und eine übersichtliche Plugins-Zone (Katalog → Installierte Plugins → Offizielle Plugins → Erweitert).
+- **Antares, Edoobox und reMarkable** sind jetzt eigenständige, jederzeit zu- und abschaltbare offizielle Plugins.
+
+### Sicherheit
+
+- **Signierte Plugins.** Jedes Plugin wird vor der Installation kryptografisch (Ed25519) gegen den in der App fest hinterlegten offiziellen Schlüssel geprüft — zusammen mit Integritäts-, Manifest- und Kompatibilitätsprüfung. Nicht offiziell signierte Plugins werden abgewiesen.
+- **Geschützter Signier-Workflow.** Offizielle Plugins werden in einem freigabepflichtigen, abgeschotteten Build-Schritt signiert; der private Schlüssel verlässt diese geschützte Umgebung nie.
+- **Abhängigkeits-Updates.** Mehrere High-/Medium-Schwachstellen in mitgelieferten Paketen behoben (u. a. `ws`, `xlsx`, `nodemailer`); Sync-Server auf `ws` 8.21.0.
+- **Weniger Daten in Logs.** Der edoobox-Agent schreibt keine personenbezogenen API-Rohdaten mehr in Logs oder Fehlermeldungen.
+
+### Behoben
+
+- **Aufgaben & Termine:** „Tags automatisch füllen" löst keinen Ollama-404 mehr aus, wenn als Modell ein Cloud-Dienst eingestellt ist.
+- **Einstellungen:** Render-Schleife im Zugangsdaten-Tab behoben; keine technischen Roh-Fehlertexte mehr an den Installationsflächen.
+- **Entwicklung:** Der Dev-Build nutzt jetzt standardmäßig ein isoliertes Profil und greift nicht mehr auf das Produktivprofil zu.
+
 ## [0.8.14] - 2026-06-26
 
 reMarkable-Lesemodus: PDFs lesen sich jetzt wie ein Buch auf einem Kindle — große Schrift, in Gerätegröße.
