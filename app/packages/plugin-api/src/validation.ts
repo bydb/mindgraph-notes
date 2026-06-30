@@ -380,12 +380,12 @@ export const CATALOG_SCHEMA: JsonSchema = {
   },
 }
 
-const validateCatalogFn = ajv.compile(CATALOG_SCHEMA)
-
-/** Prüft ein unbekanntes Objekt gegen das Katalog-Schema (Schema-Tor des Discovery-Layers). */
+/** Prüft ein unbekanntes Objekt gegen das Katalog-Schema (Schema-Tor des Discovery-Layers).
+ *  LAZY kompiliert (getValidator-Cache, keine Top-Level-`ajv.compile`-Nebenwirkung) — so bleibt der
+ *  Signierer-Bundle, der `validation.ts` transitiv inlined, von Katalog-Änderungen entkoppelt
+ *  (esbuild tree-shaked die ungenutzte Katalog-Validierung aus `sign-plugin.cjs`). */
 export function validateCatalog(value: unknown): ValidationResult {
-  const valid = validateCatalogFn(value) as boolean
-  return { valid, errors: valid ? [] : formatErrors(validateCatalogFn) }
+  return validateAgainst(CATALOG_SCHEMA, value, 'catalog')
 }
 
 /** Semantik nach dem Schema: eindeutige Plugin-IDs (Duplikate würden im Store kollidieren).
