@@ -69,6 +69,8 @@ export type ArtifactErrorCode =
   | 'download-failed' // HTTP-/Netzwerkfehler beim Laden
   | 'download-timeout' // Download-Deadline überschritten
   | 'rate-limited' // GitHub-API-Limit (60/h ohne Token)
+  // — A3-Voll (Plugin-Katalog/Discovery, docs/plugin-store-A3-catalog-plan.md) —
+  | 'catalog-invalid' // catalog.json verletzt Schema/Semantik (Discovery-Tor, unsigniert)
 
 /** Terminaler Ablehnungsgrund eines Artefakts. `code` ist die maschinenlesbare Ursache. */
 export class ArtifactError extends Error {

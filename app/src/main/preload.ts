@@ -95,6 +95,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   pluginInstallErrors: () => ipcRenderer.invoke('plugin:installErrors'),
   pluginInstalled: () => ipcRenderer.invoke('plugin:installed'),
   pluginCheckUpdates: () => ipcRenderer.invoke('plugin:checkUpdates'),
+  // A3-Voll: zentraler Plugin-Katalog (Discovery, read-only)
+  pluginCatalog: () => ipcRenderer.invoke('plugin:catalog'),
   pluginWidgets: () => ipcRenderer.invoke('plugin:widgets'),
   pluginWidgetData: (instanceId: string) => ipcRenderer.invoke('plugin:widgetData', instanceId),
   onPluginWidgetsChanged: (callback: () => void) => {
