@@ -16,7 +16,7 @@
 // Renderer-Gegenstelle nicht ausübbar. Aktuell: atomarer Ersatz + Generation als Naht dafür.
 
 import { randomUUID } from 'node:crypto'
-import type { FileEditorDecl } from '@mindgraph/plugin-api'
+import type { FileEditorDecl, PluginManifest } from '@mindgraph/plugin-api'
 import type { VerifiedRendererPayload } from './artifact/verify'
 
 /** Main-interner Eintrag inkl. der verifizierten Bytes (verlässt das Modul NIE als Referenz). */
@@ -28,6 +28,9 @@ interface RendererRuntimeEntry {
   rendererInstanceId: string
   payload: VerifiedRendererPayload
   fileEditors: FileEditorDecl[]
+  /** Verifiziertes Manifest — read-only genutzt von `plugin:host` zum Bauen des capability-gated Hosts.
+   *  (Immutable Config, kein sensibles mutierbares Byte-Material wie `payload`.) */
+  manifest: PluginManifest
 }
 
 /** Die an den Renderer gereichte Beschreibung — OHNE Bytes (die holt der Renderer per
@@ -64,6 +67,7 @@ export interface RendererActivation {
   version: string
   payload: VerifiedRendererPayload
   fileEditors: FileEditorDecl[]
+  manifest: PluginManifest
 }
 
 const cloneFileEditors = (fe: FileEditorDecl[]): FileEditorDecl[] =>
@@ -99,6 +103,7 @@ export class RendererRuntime {
         hash: a.payload.hash,
       },
       fileEditors: cloneFileEditors(a.fileEditors),
+      manifest: a.manifest,
     }
     // Atomarer Swap: alten Eintrag (falls vorhanden) erst JETZT entfernen, dann neuen setzen —
     // der neue Eintrag ist bereits vollständig + ID-kollisionsfrei gebaut (kein Zwischenzustand
@@ -129,6 +134,7 @@ export class RendererRuntime {
       if (prev && prev.version === a.version && prev.payload.hash === a.payload.hash) {
         prev.pluginLabel = a.pluginLabel // Anzeige aktualisieren, Identität (instanceId) erhalten
         prev.fileEditors = cloneFileEditors(a.fileEditors)
+        prev.manifest = a.manifest
         continue
       }
       this.activate(a)
@@ -168,6 +174,13 @@ export class RendererRuntime {
     const e = this.byInstance.get(rendererInstanceId)
     if (!e) return undefined
     return { pluginId: e.pluginId, version: e.version, generation: e.generation }
+  }
+
+  /** Das verifizierte Manifest hinter einer instanceId — für den capability-gated Host (`plugin:host`).
+   *  Read-only nutzen (immutable Config); `undefined` nach Invalidierung. */
+  resolveInstanceManifest(rendererInstanceId: unknown): PluginManifest | undefined {
+    if (typeof rendererInstanceId !== 'string') return undefined
+    return this.byInstance.get(rendererInstanceId)?.manifest
   }
 
   /** Byte-freie Liste für den `plugin:renderers-changed`-Push an den Renderer. */

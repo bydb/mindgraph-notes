@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import type { PluginManifest } from '@mindgraph/plugin-api'
 import { RendererRuntime, type RendererActivation } from './rendererRuntime'
 
 const payload = (code: string) => ({ code: Buffer.from(code, 'utf8'), hash: 'h-' + code })
@@ -9,6 +10,7 @@ const activation = (over: Partial<RendererActivation> = {}): RendererActivation 
   version: '0.1.0',
   payload: payload('export default {}'),
   fileEditors: [{ editorId: 'draw', extensions: ['.excalidraw'] }],
+  manifest: { id: over.pluginId ?? 'excalidraw', capabilities: [] } as unknown as PluginManifest,
   ...over,
 })
 

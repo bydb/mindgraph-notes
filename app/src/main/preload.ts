@@ -108,6 +108,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // + Serve der verifizierten Bytes (utf8) für den Blob-URL-import; Push bei Lifecycle-Änderungen.
   pluginRenderers: () => ipcRenderer.invoke('plugin:renderers'),
   pluginRendererEntry: (pluginId: string) => ipcRenderer.invoke('plugin:rendererEntry', pluginId),
+  // Capability-gated Vault-Bridge: der Renderer übergibt die instanceId (nie eine pluginId) + 'vault.<op>'.
+  pluginHost: (rendererInstanceId: string, op: string, args: unknown[]) =>
+    ipcRenderer.invoke('plugin:host', rendererInstanceId, op, args),
   onPluginRenderersChanged: (callback: () => void) => {
     const handler = () => callback()
     ipcRenderer.on('plugin:renderers-changed', handler)
