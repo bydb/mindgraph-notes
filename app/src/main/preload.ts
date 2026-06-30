@@ -104,6 +104,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('plugin:widgets-changed', handler)
     return () => ipcRenderer.removeListener('plugin:widgets-changed', handler)
   },
+  // Renderer-Plugin-Host (ADR plugin-renderer-host §5.3/§6): Liste aktiver Renderer-Plugins (byte-frei)
+  // + Serve der verifizierten Bytes (utf8) für den Blob-URL-import; Push bei Lifecycle-Änderungen.
+  pluginRenderers: () => ipcRenderer.invoke('plugin:renderers'),
+  pluginRendererEntry: (pluginId: string) => ipcRenderer.invoke('plugin:rendererEntry', pluginId),
+  onPluginRenderersChanged: (callback: () => void) => {
+    const handler = () => callback()
+    ipcRenderer.on('plugin:renderers-changed', handler)
+    return () => ipcRenderer.removeListener('plugin:renderers-changed', handler)
+  },
 
   // Notes-Cache für schnelles Laden
   saveNotesCache: (vaultPath: string, cache: object) => ipcRenderer.invoke('save-notes-cache', vaultPath, cache),

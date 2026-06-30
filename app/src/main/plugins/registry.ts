@@ -212,6 +212,14 @@ export class PluginRegistry {
     if (p.desired !== 'active') return p.state // von einem späteren deactivate überholt
     if (p.manifestInvalid) return p.state // defektes Manifest bleibt TERMINAL (kein Retry)
     if (p.state.activation === 'active') return p.state
+    // Renderer-only (ADR plugin-renderer-host §5.1, R1-impl-F01): KEIN Main-Entry zu registrieren.
+    // Aktivierung ist ein wohldefinierter No-op-Erfolg — sonst würfe resolveEntry „kein Main-Entry",
+    // die Aktivierung ginge auf `error` und installAndActivate/Startup würden zurückrollen. Die
+    // Renderer-Beiträge laufen über die RendererRuntime (plugin:rendererEntry), nicht den Main-Lifecycle.
+    if (!p.source.loadEntry) {
+      p.state = { ...p.state, activation: 'active', readiness: 'ready', error: undefined }
+      return p.state
+    }
     // Ein reiner LAUFZEIT-Fehler (error aus entry.register/start) ist wiederholbar: erneutes
     // Aktivieren setzt zurück. Hängt noch ein Entry aus einem fehlgeschlagenen Start (Ressourcen
     // evtl. geleakt), erst best-effort stoppen + verwerfen, damit nicht doppelt registriert wird.

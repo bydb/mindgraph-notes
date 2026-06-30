@@ -167,13 +167,15 @@ import {
 import { ArtifactError } from './plugins/artifact/limits'
 import { discoverInstalledPlugins, type DiscoverError } from './plugins/runtime/discover'
 import { ExternalWidgetRuntime } from './plugins/widgets'
+import { RendererRuntime, type RendererActivation } from './plugins/rendererRuntime'
+import { verifyInstalledRendererPayload } from './plugins/artifact/verify'
 import { downloadPluginArtifact } from './plugins/download'
 import { checkPluginUpdates } from './plugins/update-checker'
 import { fetchCatalog, resolveCatalogUrl } from './plugins/catalog'
 import { SECURE_WEB_PREFERENCES } from './windowSecurity'
 import { readArchiveFileCapped } from './plugins/runtime/readArchive'
 import { readActiveIndex } from './plugins/runtime/activeIndex'
-import { pluginPaths } from './plugins/runtime/paths'
+import { pluginPaths, versionDir } from './plugins/runtime/paths'
 
 // Globale Fehlerbehandlung für unhandled exceptions (z.B. IMAP Socket-Timeouts)
 process.on('uncaughtException', (error) => {
@@ -195,7 +197,10 @@ app.on('web-contents-created', (_event, contents) => {
 // Der echte Capability-Host wird in app.whenReady() gesetzt (setHostFactory); bis dahin Stub.
 const pluginRegistry = createMainRegistry(undefined, app.getVersion())
 const externalWidgetRuntime = new ExternalWidgetRuntime(pluginRegistry)
-registerPluginTransport(pluginRegistry, () => publishExternalWidgetState())
+// Renderer-Plugin-Host (ADR plugin-renderer-host §5.3/§5.4): hält die verifizierten Renderer-Bytes
+// aktiver Plugins; befüllt von syncRendererRuntime, gelesen vom plugin:rendererEntry-/plugin:host-IPC.
+const rendererRuntime = new RendererRuntime()
+registerPluginTransport(pluginRegistry, () => publishPluginUiState())
 
 // Plugin-beigesteuerte Workflow-Canvas-Bausteine (Manifest-Feld `workflowActions`) in die
 // gemeinsame Registry einspielen, damit der Runner sie generisch dispatcht (kein statischer
@@ -239,11 +244,47 @@ function syncExternalWidgetRuntime(): void {
   externalWidgetRuntime.sync(manifests)
 }
 
-/** Main→Renderer Push: nach Lifecycle-Änderungen entfernt der Renderer Zombies sofort. */
-function publishExternalWidgetState(): void {
+/** Spiegelt aktive, erneut verifizierte Renderer-Plugins + ihre verifizierten Bytes in die
+ *  RendererRuntime (ADR plugin-renderer-host §5.3). instanceId-stabil via syncActive. */
+function syncRendererRuntime(): { changed: boolean } {
+  const env = runtimePluginEnv()
+  const paths = pluginPaths(env.pluginsRoot)
+  const activations: RendererActivation[] = []
+  for (const source of discoverInstalledPlugins(env).sources) {
+    const manifest = source.manifest
+    if (!manifest.entrypoints?.renderer) continue
+    if (pluginRegistry.get(manifest.id)?.activation !== 'active') continue
+    try {
+      const dir = versionDir(paths, manifest.id, manifest.version)
+      const { payload } = verifyInstalledRendererPayload(dir, {
+        keyring: env.keyring,
+        appVersion: env.appVersion,
+      })
+      if (payload) {
+        activations.push({
+          pluginId: manifest.id,
+          pluginLabel: manifest.label,
+          version: manifest.version,
+          payload,
+          fileEditors: manifest.ui?.fileEditors ?? [],
+        })
+      }
+    } catch {
+      // fail-closed: Re-Verify scheiterte (manipuliertes Verzeichnis) → diese Version NICHT servieren.
+    }
+  }
+  return rendererRuntime.syncActive(activations)
+}
+
+/** Main→Renderer Push für BEIDE Renderer-UI-Quellen (Tier-1-Widgets + Renderer-Plugins): nach
+ *  Lifecycle-Änderungen entfernt der Renderer Zombies sofort. */
+function publishPluginUiState(): void {
   syncExternalWidgetRuntime()
+  syncRendererRuntime()
   for (const window of BrowserWindow.getAllWindows()) {
-    if (!window.isDestroyed()) window.webContents.send('plugin:widgets-changed')
+    if (window.isDestroyed()) continue
+    window.webContents.send('plugin:widgets-changed')
+    window.webContents.send('plugin:renderers-changed')
   }
 }
 // Re-Verify-/Kollisions-Fehler der LETZTEN Startup-Discovery (nur fürs Start-Log; die UI fragt
@@ -275,7 +316,7 @@ ipcMain.handle('plugin:install', async (event) => {
     // Größe VOR dem Lesen prüfen (stat) — sonst läge eine riesige Datei vor jedem Limit im RAM.
     const archive = await readArchiveFileCapped(result.filePaths[0])
     const out = await serializePluginOp(() => installAndActivate(pluginManageDeps(), archive))
-    publishExternalWidgetState()
+    publishPluginUiState()
     return { ok: true, data: { id: out.id, version: out.version, idempotent: out.idempotent } }
   } catch (err) {
     const code = err instanceof ArtifactError ? err.code : undefined
@@ -295,7 +336,7 @@ ipcMain.handle('plugin:installFromGithub', async (event, repo: unknown, tag: unk
   try {
     const { archive } = await downloadPluginArtifact(repo, tagArg)
     const out = await serializePluginOp(() => installAndActivate(pluginManageDeps(), archive))
-    publishExternalWidgetState()
+    publishPluginUiState()
     return { ok: true, data: { id: out.id, version: out.version, idempotent: out.idempotent } }
   } catch (err) {
     const code = err instanceof ArtifactError ? err.code : undefined
@@ -363,7 +404,7 @@ ipcMain.handle('plugin:uninstall', async (event, pluginId: unknown) => {
   if (typeof pluginId !== 'string') return { ok: false, error: 'Ungültige Plugin-ID' }
   try {
     await serializePluginOp(() => uninstallPlugin(pluginManageDeps(), pluginId))
-    publishExternalWidgetState()
+    publishPluginUiState()
     return { ok: true }
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : String(err) }
@@ -386,6 +427,32 @@ ipcMain.handle('plugin:widgetData', async (event, instanceId: unknown) => {
   if (!isTrustedSender(event)) return { ok: false, error: 'Nicht autorisierter Aufrufer' }
   try {
     return { ok: true, data: await externalWidgetRuntime.invoke(instanceId) }
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) }
+  }
+})
+
+// Renderer-Plugin-Host (ADR plugin-renderer-host §5.3): byte-freie Liste der aktiven Renderer-Plugins
+// (Endungs-Claims + instanceId) für den Renderer-Boot/renderers-changed-Refresh.
+ipcMain.handle('plugin:renderers', async (event) => {
+  if (!isTrustedSender(event)) return { ok: false, error: 'Nicht autorisierter Aufrufer' }
+  try {
+    syncRendererRuntime()
+    return { ok: true, data: rendererRuntime.list() }
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) }
+  }
+})
+
+// Serviert die VERIFIZIERTEN Renderer-Bytes (read-once aus der RendererRuntime, I-L1/I-L5) als
+// utf8-String — der Renderer lädt sie via Blob-URL-import (CSP erlaubt `blob:` in script-src).
+ipcMain.handle('plugin:rendererEntry', async (event, pluginId: unknown) => {
+  if (!isTrustedSender(event)) return { ok: false, error: 'Nicht autorisierter Aufrufer' }
+  try {
+    syncRendererRuntime()
+    const serve = rendererRuntime.servePayload(pluginId)
+    if (!serve) return { ok: false, error: 'Renderer-Plugin nicht aktiv' }
+    return { ok: true, data: serve }
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : String(err) }
   }
@@ -1057,6 +1124,7 @@ app.whenReady().then(async () => {
     .activateAll((_id, manifest) => isPluginGateEnabled(manifest, pluginGateSettings))
     .catch((err) => console.error('[plugin] activateAll:', err))
   syncExternalWidgetRuntime()
+  syncRendererRuntime() // Renderer-Plugin-Host: verifizierte Bytes aktiver Renderer-Plugins bereitstellen
 
   // Tray-Icon + Schnellerfassung (plattformübergreifend)
   {

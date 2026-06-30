@@ -369,6 +369,19 @@ export function validateManifestSemantics(manifest: PluginManifest): ValidationR
     seenEditorIds.add(fe.editorId)
   }
 
+  // Main-gebundene Beiträge brauchen einen main-Entrypoint (ADR plugin-renderer-host §5.1, R1-impl-F05):
+  // ohne `main` registriert kein Executor `actions`/`workflowActions` → das wären tote Verträge (und ein
+  // ui.*-Widget-`fromAction` hätte keinen Provider). Renderer-only beschränkt sich auf ui.fileEditors +
+  // settingsSchema + vault-Capabilities.
+  if (!manifest.entrypoints?.main) {
+    if (manifest.actions?.length) {
+      errors.push('Renderer-only-Plugin (ohne entrypoints.main) darf keine `actions` deklarieren — kein Executor registrierbar.')
+    }
+    if (manifest.workflowActions?.length) {
+      errors.push('Renderer-only-Plugin (ohne entrypoints.main) darf keine `workflowActions` deklarieren.')
+    }
+  }
+
   return { valid: errors.length === 0, errors }
 }
 

@@ -506,3 +506,39 @@ describe('installAndActivate — Index-Commit-Timing', () => {
   })
 })
 
+// R1-impl-F01: renderer-only muss durch den ECHTEN Manage-/Registry-Pfad aktivieren (nicht nur über
+// den install.test-Bypass), sonst würfe registry.activate „kein Main-Entry" → Rollback, kein Commit.
+describe('renderer-only Aktivierung (R1-impl-F01)', () => {
+  const rendererOnlyArchive = () =>
+    packPluginArtifact({
+      files: [
+        {
+          path: 'manifest.json',
+          content: manifestBytes({
+            entrypoints: { renderer: 'renderer.js' },
+            ui: { fileEditors: [{ editorId: 'draw', extensions: ['.excalidraw'] }] },
+          }),
+        },
+        { path: 'renderer.js', content: Buffer.from('export default {}\n', 'utf8') },
+      ],
+      signKey: priv,
+      keyId: KEY_ID,
+    })
+
+  it('aktiviert über den echten installAndActivate-Pfad + committet den Index (kein Rollback)', async () => {
+    const real = new PluginRegistry(undefined, undefined, '0.8.14')
+    await installAndActivate(deps({ registry: real }), await rendererOnlyArchive())
+    expect(readActiveIndex(pluginPaths(root).activeIndexPath).active).toEqual({ 'ext-plugin': '0.1.0' })
+    expect(real.get('ext-plugin')?.activation).toBe('active')
+  })
+
+  it('aktiviert renderer-only beim Startup über die echte Registry', async () => {
+    const res = await installPluginArtifact(await rendererOnlyArchive(), env())
+    setActiveVersion(root, res.id, res.version)
+    const real = new PluginRegistry(undefined, undefined, '0.8.14')
+    expect(discoverAndRegisterInstalled(deps({ registry: real }))).toEqual([])
+    await real.activateAll()
+    expect(real.get('ext-plugin')?.activation).toBe('active')
+  })
+})
+
