@@ -2741,6 +2741,21 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab 
           </nav>
 
           <div className="settings-content">
+            {/* Petrol redesign: großer Seiten-Titel je Tab wie im Module-Tab (Konsistenz).
+                Der Module-Tab bringt seinen eigenen Header inkl. Untertitel mit → hier ausgenommen. */}
+            {activeTab !== 'modules' && (
+              <div className="settings-tab-header">
+                <h2>{
+                  activeTab === 'dashboard' ? t('settings.dashboard.title')
+                    : activeTab === 'transport' ? t('settings.transport.title')
+                    : activeTab === 'email' ? t('settings.email.title')
+                    : activeTab === 'remarkable' ? 'reMarkable'
+                    : activeTab === 'telegram' ? 'Telegram'
+                    : activeTab === 'credentials' ? 'Zugangsdaten'
+                    : t(`settings.tab.${activeTab}` as TranslationKey)
+                }</h2>
+              </div>
+            )}
             {/* Vault Tab */}
             {activeTab === 'vault' && vaultPath && (
               <VaultSettingsTab vaultPath={vaultPath} t={t} onNavigateToTab={setActiveTab} />
