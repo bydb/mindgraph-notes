@@ -375,7 +375,24 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onOpenInbox, onOpe
           </div>
         ) : (
           <div className="dashboard-view-grid">
-            {dashboard.widgets.map(id => renderWidget(id))}
+            {/* Bestand ist ein volles-Breite-Zahlenband direkt unter dem Fokus-Streifen (aus dem
+                Gehirn-Widget herausgelöst, Claude-Design-Layout). Bei fehlendem Fokus-Widget ans Ende. */}
+            {dashboard.widgets.flatMap(id => {
+              const nodes = [renderWidget(id)]
+              if (id === 'focus') {
+                nodes.push(
+                  <ErrorBoundary key="bestand" label={t('dashboard.brain.statsLabel')}>
+                    <BestandBand snapshot={snapshot} t={t} />
+                  </ErrorBoundary>
+                )
+              }
+              return nodes
+            })}
+            {!dashboard.widgets.includes('focus') && (
+              <ErrorBoundary key="bestand" label={t('dashboard.brain.statsLabel')}>
+                <BestandBand snapshot={snapshot} t={t} />
+              </ErrorBoundary>
+            )}
           </div>
         )}
         <ExternalWidgetSlot slot="dashboard.widget" />
@@ -402,13 +419,30 @@ interface ActivityWidgetProps extends WidgetProps {
   onNoteOpen: (id: string) => void
 }
 
-// Petrol redesign (Stage 2): eine Zelle im „Bestand"-Zahlenband; 0-Werte werden gedämpft.
-const StatCell: React.FC<{ value: number; label: string }> = ({ value, label }) => (
-  <div className="dv-activity-stat">
-    <span className={value === 0 ? 'dv-stat-zero' : undefined}>{value}</span>
-    <small>{label}</small>
-  </div>
-)
+// Petrol redesign (Claude-Design-Layout): „Bestand" ist ein eigenes, volles-Breite-Zahlenband
+// am unteren Dashboard-Rand — nicht mehr im Gehirn-Widget eingebettet. 0-Werte werden gedämpft.
+const BestandBand: React.FC<{ snapshot: DashboardSnapshot; t: TFn }> = ({ snapshot, t }) => {
+  const a = snapshot.activity
+  const m = a.memory
+  const cells: Array<{ value: number; label: string }> = [
+    { value: a.totalNotes, label: t('dashboard.activity.total') },
+    { value: a.touchedToday, label: t('dashboard.activity.today') },
+    { value: a.created7d, label: t('dashboard.activity.created7d') },
+    { value: a.changed30d, label: t('dashboard.activity.changed30d') },
+    { value: m.events7d, label: t('dashboard.activity.contextEvents7d') },
+    { value: m.taskEvents7d, label: t('dashboard.activity.taskEvents7d') }
+  ]
+  return (
+    <div className="dv-bestand-band">
+      {cells.map((c, i) => (
+        <div key={i} className="dv-bestand-cell">
+          <div className={`dv-bestand-num${c.value === 0 ? ' zero' : ''}`}>{c.value}</div>
+          <div className="dv-bestand-label">{c.label}</div>
+        </div>
+      ))}
+    </div>
+  )
+}
 
 const ActivityWidget: React.FC<ActivityWidgetProps> = ({ snapshot, t, vaultPath, notes, emails, onNoteOpen }) => {
   const activity = snapshot.activity
@@ -555,16 +589,8 @@ const ActivityWidget: React.FC<ActivityWidgetProps> = ({ snapshot, t, vaultPath,
         )}
       </div>
       <div className="dv-widget-body">
-        <div className="dv-brain-section-label">{t('dashboard.brain.statsLabel')}</div>
-        <div className="dv-activity-stats">
-          <StatCell value={activity.totalNotes} label={t('dashboard.activity.total')} />
-          <StatCell value={activity.touchedToday} label={t('dashboard.activity.today')} />
-          <StatCell value={activity.created7d} label={t('dashboard.activity.created7d')} />
-          <StatCell value={activity.changed30d} label={t('dashboard.activity.changed30d')} />
-          <StatCell value={memory.events7d} label={t('dashboard.activity.contextEvents7d')} />
-          <StatCell value={memory.taskEvents7d} label={t('dashboard.activity.taskEvents7d')} />
-        </div>
-
+        {/* „Bestand" wanderte in ein eigenes volles-Breite-Band unten (BestandBand) — das
+            Gehirn-Widget ist dadurch schlanker (Claude-Design-Layout). */}
         <div className="dv-activity-section-title">{t('dashboard.activity.changed7d')}</div>
         {activity.topFolders.length === 0 ? (
           <div className="dv-widget-empty">{t('dashboard.activity.empty')}</div>

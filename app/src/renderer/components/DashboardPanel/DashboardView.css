@@ -97,6 +97,43 @@
   margin: 0;
 }
 
+/* Petrol redesign (Claude-Design-Layout): „Fokus heute" ist der volle-Breite-Hero-Streifen
+   ganz oben, „Bestand" das ruhige volle-Breite-Zahlenband ganz unten. */
+.dashboard-view-grid > .dv-focus,
+.dashboard-view-grid > .dv-bestand-band {
+  grid-column: 1 / -1;
+}
+
+/* ===== Bestand — volles-Breite-Zahlenband (aus dem Gehirn-Widget herausgelöst) ===== */
+.dv-bestand-band {
+  display: flex;
+  border: 1px solid var(--border-subtle);
+  border-radius: 14px;
+  background: var(--bg-secondary);
+  overflow: hidden;
+}
+.dv-bestand-cell {
+  flex: 1;
+  min-width: 0;
+  padding: 15px 10px;
+  text-align: center;
+  border-right: 1px solid var(--border-subtle);
+}
+.dv-bestand-cell:last-child { border-right: none; }
+.dv-bestand-num {
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+.dv-bestand-num.zero { color: var(--text-muted); }
+.dv-bestand-label {
+  font-size: 10.5px;
+  color: var(--text-muted);
+  margin-top: 5px;
+}
+
 /* Widget */
 .dv-widget {
   --widget-accent: var(--accent-color);
