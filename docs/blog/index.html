@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Blog - MindGraph Notes</title>
   <meta name="description" content="Artikel über Wissensmanagement, KI und produktives Denken">
+  <link rel="icon" type="image/svg+xml" href="../mindgraph-logo.svg">
   <link rel="icon" href="../favicon.ico" sizes="48x48">
   <link rel="icon" type="image/png" sizes="48x48" href="../favicon-48x48.png">
   <link rel="icon" type="image/png" sizes="32x32" href="../favicon-32x32.png">
@@ -439,6 +440,110 @@
         display: none;
       }
     }
+
+    /* Petrol marketing design */
+    :root {
+      --bg: #f7f4ee;
+      --bg-card: #ffffff;
+      --bg-card-hover: #fcfaf6;
+      --text: #1c1a17;
+      --text-muted: #6e675e;
+      --accent: #10696b;
+      --accent-glow: rgba(16,105,107,.15);
+      --border: #e4dfd6;
+      --brand: linear-gradient(115deg,#10696b,#168386 58%,#d68c46);
+    }
+    body { background: var(--bg); color: var(--text); -webkit-font-smoothing: antialiased; }
+    .bg-animation::before {
+      background:
+        radial-gradient(circle at 18% 12%, rgba(214,140,70,.12), transparent 38%),
+        radial-gradient(circle at 85% 45%, rgba(16,105,107,.08), transparent 42%);
+    }
+    nav {
+      padding: .9rem 2rem;
+      background: rgba(247,244,238,.9);
+      border-color: var(--border);
+      box-shadow: 0 1px 0 rgba(255,255,255,.7);
+    }
+    .logo { color: var(--text); font-size: 1.05rem; }
+    .logo-icon { width: 28px; height: 28px; border-radius: 7px; }
+    .nav-links { gap: 1.4rem; }
+    .nav-links a { color: var(--text-muted); }
+    .nav-links a:hover { color: var(--accent); }
+    .lang-switch { background: #fff; }
+    .lang-switch button.active { background: var(--accent); color: #fff; }
+
+    .container { max-width: 940px; padding-top: 8.5rem; }
+    #post-list > h1 {
+      max-width: 13ch;
+      font-family: Georgia, 'Times New Roman', serif;
+      font-weight: 400;
+      font-size: clamp(2.8rem,6vw,4.6rem);
+      line-height: 1.04;
+      letter-spacing: -.025em;
+      margin-bottom: 1rem;
+      color: var(--text);
+      background: none;
+      -webkit-text-fill-color: currentColor;
+    }
+    #post-list > h1::after { content: '.'; color: var(--accent); }
+    .subtitle {
+      max-width: 640px;
+      margin-bottom: 3.5rem;
+      color: var(--text-muted);
+      font-size: 1.08rem;
+    }
+    #posts.post-list { gap: 1rem; }
+    .post-card {
+      padding: 1.55rem 1.7rem;
+      background: #fff;
+      border-color: var(--border);
+      box-shadow: 0 14px 34px rgba(28,26,23,.045);
+    }
+    .post-card:hover {
+      background: var(--bg-card-hover);
+      border-color: rgba(16,105,107,.35);
+      box-shadow: 0 20px 42px rgba(28,26,23,.09);
+    }
+    .post-card h2 {
+      font-family: Georgia, 'Times New Roman', serif;
+      font-weight: 400;
+      font-size: 1.4rem;
+      line-height: 1.25;
+    }
+    .post-card .date { color: #91897d; }
+    .post-card .summary { color: var(--text-muted); }
+    .post-card .tag { background: #e7f1f0; color: var(--accent); font-weight: 650; }
+
+    .article-header h1 {
+      font-family: Georgia, 'Times New Roman', serif;
+      font-weight: 400;
+      font-size: clamp(2.2rem,5vw,3.5rem);
+      line-height: 1.08;
+      color: var(--text);
+      background: none;
+      -webkit-text-fill-color: currentColor;
+    }
+    .article-content { color: #332f2a; font-size: 1.05rem; line-height: 1.78; }
+    .article-content h2,
+    .article-content h3 {
+      font-family: Georgia, 'Times New Roman', serif;
+      font-weight: 400;
+      color: var(--text);
+    }
+    .article-content blockquote,
+    .callout,
+    .article-content table { background: #fff; }
+    .article-content code { background: rgba(16,105,107,.09); }
+    .article-content pre { background: #252522; color: #f7f4ee; }
+    .article-content thead { background: #eef6f4; }
+    .article-content tbody tr:hover { background: rgba(16,105,107,.04); }
+    footer { background: rgba(255,255,255,.45); border-color: var(--border); }
+
+    @media (max-width: 900px) {
+      .nav-links a[href="../#features"],
+      .nav-links a[href="../#download"] { display: none; }
+    }
   </style>
 </head>
 <body>
@@ -447,7 +552,7 @@
   <nav>
     <a href="../" class="logo">
       <div class="logo-icon">
-        <img src="../icon.png" alt="MindGraph Notes">
+        <img src="../mindgraph-logo.svg" alt="">
       </div>
       MindGraph Notes
     </a>
@@ -466,8 +571,8 @@
   <div class="container">
     <!-- Post List -->
     <div id="post-list" class="post-list">
-      <h1>Blog</h1>
-      <p class="subtitle" id="blog-subtitle">Artikel über Wissensmanagement, KI und produktives Denken</p>
+      <h1 id="blog-title">Gedanken, die weiterführen</h1>
+      <p class="subtitle" id="blog-subtitle">Artikel über Wissensmanagement, lokale KI und produktives Denken &mdash; aus der Praxis hinter MindGraph Notes.</p>
       <div id="posts" class="post-list">
         <div class="loading" id="blog-loading">Lade Artikel...</div>
       </div>
@@ -490,6 +595,11 @@
   </div>
 
   <footer>
+    <p style="margin-bottom:.7rem">
+      <strong id="blog-dev-title" style="color:var(--text)">MindGraph erweitern:</strong>
+      <a id="blog-dev-template" href="https://github.com/bydb/mindgraph-notes/tree/master/plugin-template">Plugin-Template</a> &middot;
+      <a id="blog-dev-api" href="https://github.com/bydb/mindgraph-notes/tree/master/app/packages/plugin-api">Plugin-API</a>
+    </p>
     <p>
       Made with ❤️ by <a href="https://bydb.io">bydb.io</a> ·
       <a href="https://github.com/bydb/mindgraph-notes">GitHub</a> ·
@@ -504,7 +614,11 @@
     // ---- i18n (Chrome; Beiträge bleiben in Originalsprache) ----
     const BLOG_T = {
       de: {
-        subtitle: 'Artikel über Wissensmanagement, KI und produktives Denken',
+        title: 'Gedanken, die weiterführen',
+        subtitle: 'Artikel über Wissensmanagement, lokale KI und produktives Denken — aus der Praxis hinter MindGraph Notes.',
+        devTitle: 'MindGraph erweitern:',
+        devTemplate: 'Plugin-Template',
+        devApi: 'Plugin-API',
         loading: 'Lade Artikel...',
         empty: 'Noch keine Artikel vorhanden.',
         emptyPub: 'Noch keine veröffentlichten Artikel.',
@@ -514,7 +628,11 @@
         locale: 'de-DE'
       },
       en: {
-        subtitle: 'Articles on knowledge management, AI and productive thinking',
+        title: 'Ideas worth following',
+        subtitle: 'Articles on knowledge management, local AI and productive thinking — from the practice behind MindGraph Notes.',
+        devTitle: 'Extend MindGraph:',
+        devTemplate: 'Plugin template',
+        devApi: 'Plugin API',
         loading: 'Loading articles...',
         empty: 'No articles yet.',
         emptyPub: 'No published articles yet.',
@@ -703,7 +821,11 @@
       const de = document.getElementById('lang-de'), en = document.getElementById('lang-en');
       if (de) de.classList.toggle('active', lang === 'de');
       if (en) en.classList.toggle('active', lang === 'en');
+      const title = document.getElementById('blog-title'); if (title) title.textContent = bt('title');
       const sub = document.getElementById('blog-subtitle'); if (sub) sub.textContent = bt('subtitle');
+      const devTitle = document.getElementById('blog-dev-title'); if (devTitle) devTitle.textContent = bt('devTitle');
+      const devTemplate = document.getElementById('blog-dev-template'); if (devTemplate) devTemplate.textContent = bt('devTemplate');
+      const devApi = document.getElementById('blog-dev-api'); if (devApi) devApi.textContent = bt('devApi');
       const back = document.getElementById('blog-back'); if (back) back.textContent = bt('back');
       const loading = document.getElementById('blog-loading'); if (loading) loading.textContent = bt('loading');
       renderList();
