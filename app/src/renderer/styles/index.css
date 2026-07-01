@@ -8099,12 +8099,14 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
   overflow-y: auto;
 }
 
+/* Petrol redesign: Sektions-Header wie im Module-Tab (.modules-category-title) —
+   700 + --text-secondary (kräftiger) statt 600 + --text-muted (blass). */
 .settings-section h3 {
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--text-muted);
+  letter-spacing: 0.6px;
+  color: var(--text-secondary);
   margin: 0 0 14px 0;
 }
 
@@ -8128,6 +8130,8 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
 
 .settings-row label {
   font-size: 14px;
+  /* Petrol redesign: Zeilen-Label semibold wie die Module-Card-Titel (.module-row-label). */
+  font-weight: 600;
   color: var(--text-primary);
 }
 
