@@ -1,6 +1,13 @@
 import { create } from 'zustand'
 
-export type TabType = 'editor' | 'canvas' | 'global-canvas' | 'dashboard' | 'code' | 'workflow-canvas'
+export type TabType =
+  | 'editor'
+  | 'canvas'
+  | 'global-canvas'
+  | 'dashboard'
+  | 'code'
+  | 'workflow-canvas'
+  | 'plugin-editor'
 
 export interface Tab {
   id: string
@@ -9,6 +16,10 @@ export interface Tab {
   title: string
   /** Für Code-Tabs: Vault-relativer Pfad zur Code-Datei */
   codePath?: string
+  /** Für plugin-editor-Tabs (ADR plugin-renderer-host §7): welches Plugin/Editor die Datei bedient. */
+  pluginId?: string
+  filePath?: string
+  editorId?: string
 }
 
 export interface CanvasTabState {
@@ -30,6 +41,7 @@ interface TabState {
   openDashboardTab: () => void
   openWorkflowCanvasTab: () => void
   openCodeTab: (relativePath: string, title: string) => void
+  openPluginEditorTab: (pluginId: string, filePath: string, editorId: string, title: string) => void
   closeTab: (tabId: string) => void
   setActiveTab: (tabId: string) => void
 
@@ -196,6 +208,34 @@ export const useTabStore = create<TabState>()((set, get) => ({
       type: 'code',
       noteId: `code:${relativePath}`,
       codePath: relativePath,
+      title
+    }
+
+    set({
+      tabs: [...state.tabs, newTab],
+      activeTabId: newTab.id
+    })
+  },
+
+  openPluginEditorTab: (pluginId, filePath, editorId, title) => {
+    const state = get()
+
+    // Ein Tab pro (pluginId, filePath) — Mehrfach-Instanzen sind raus aus R1 (ADR §7, R1-F10).
+    const existingTab = state.tabs.find(
+      t => t.type === 'plugin-editor' && t.pluginId === pluginId && t.filePath === filePath
+    )
+    if (existingTab) {
+      set({ activeTabId: existingTab.id })
+      return
+    }
+
+    const newTab: Tab = {
+      id: generateTabId(),
+      type: 'plugin-editor',
+      noteId: `plugin:${pluginId}:${filePath}`,
+      pluginId,
+      filePath,
+      editorId,
       title
     }
 

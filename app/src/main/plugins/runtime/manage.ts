@@ -36,6 +36,9 @@ export interface RegistryHandle {
   get(id: string): PluginRuntimeState | undefined
 }
 
+/** Ausgang des Renderer-Aktivierungs-Handshakes (F06/§5.2). */
+export type RendererActivationOutcome = { ok: true } | { ok: false; error: string }
+
 export interface ManageDeps {
   env: RuntimeEnv
   registry: RegistryHandle
@@ -46,6 +49,30 @@ export interface ManageDeps {
   /** Schreibt den Aktivierungsindex (Commit nach Aktivierung / Uninstall). Default = echte
    *  setActiveVersion; injizierbar, um den Commit-Fehlerpfad zu testen. */
   commitActiveVersion?: (pluginsRoot: string, id: string, version: string | null) => void
+  /**
+   * Renderer-Aktivierungs-Handshake (ADR plugin-renderer-host §5.2, F06): aktiviert den Renderer-Beitrag
+   * des Kandidaten (mint rendererInstanceId + Push) und WARTET auf den Renderer-Ack (import + activate(host)
+   * + Staging). Wird in `installAndActivate` NUR aufgerufen, wenn der Kandidat einen `entrypoints.renderer`
+   * trägt. Default `undefined` → main-only-Plugins/Tests ohne Renderer laufen unverändert. Impl in index.ts
+   * (BrowserWindow/IPC/RendererRuntime).
+   */
+  activateRenderer?: (source: MainPluginSource) => Promise<RendererActivationOutcome>
+  /**
+   * Datei-Editor-Endungskollision-Gate (ADR §8, F07): prüft den vollständigen nächsten Claim-Zustand
+   * (Kandidat + weiterhin aktive Plugins + Kern-Endungen) VOR jeder Aktivierung/Commit. Default `undefined`
+   * → kein Gate (main-only/Tests). Impl in index.ts (rendererRuntime.list() + coreClaimedExtensions()).
+   */
+  validateFileEditorClaims?: (manifest: PluginManifest) => { ok: true } | { ok: false; error: string }
+  /**
+   * Renderer end-zu-ende entladen (ADR §5.2 Deactivate-Previous / §5.5-Matrix, F08/F14/F15/F16): drained die
+   * In-Flight-`plugin:host`-Calls UND fordert den Renderer zum Dispose (Mounts + `module.deactivate` + Styles +
+   * Blob) der konkreten instanceId auf, dann wartet es auf den §5.5-Ack. NUR `'success'` erlaubt den nächsten
+   * Schritt (Vorgänger-Stop/Kandidatenstart/Uninstall); `'error'`/`'timeout'` sind fail-closed (restart-required,
+   * nichts Persistentes mutieren). `'noop'` = das Plugin hatte gar keinen aktiven Renderer-Beitrag (main-only)
+   * → wie `'success'` weitermachen, aber ein späterer Main-Stop-Fehler bleibt ein normaler Abbruch (kein
+   * restart-required, F23). Default `undefined` → kein Renderer-Teardown (main-only/Tests).
+   */
+  tearDownRenderer?: (id: string) => Promise<'noop' | 'success' | 'error' | 'timeout'>
 }
 
 export interface InstallOutcome {
@@ -192,16 +219,44 @@ export async function installAndActivate(deps: ManageDeps, archive: Buffer): Pro
     )
   }
 
-  // Upgrade/Reinstall: die noch laufende Vorgängerversion sauber stoppen + entfernen, BEVOR die neue
-  // startet. unregister() wirft, wenn stop() fehlschlägt → Upgrade abbrechen, Vorgänger bleibt aktiv.
+  // Datei-Editor-Endungskollision (ADR §8, F07): den VOLLSTÄNDIGEN nächsten Claim-Zustand (Kandidat +
+  // alle weiterhin aktiven Plugins + Kern-Endungen) prüfen, BEVOR irgendetwas mutiert. Kollision (Kern /
+  // Plugin↔Plugin / normalisierte Mehrfachendung) = TERMINAL, Index/Registry unverändert.
+  if (deps.validateFileEditorClaims) {
+    const claimCheck = deps.validateFileEditorClaims(source.manifest)
+    if (!claimCheck.ok) {
+      cleanupFreshVersion(result)
+      throw new ArtifactError('fileEditor-collision', `Plugin '${result.id}': ${claimCheck.error}`)
+    }
+  }
+
+  // Upgrade/Reinstall: die Vorgängerversion VOLLSTÄNDIG entladen, BEVOR der Kandidat startet (ADR §5.2
+  // Deactivate-Previous, F14/F15): zuerst den Renderer end-zu-ende entladen (drain + dispose + Ack) — nur
+  // `'success'` lässt den Vorgänger-Main-Stop + Kandidatenstart zu; sonst fail-closed (restart-required,
+  // kein Doppelbetrieb). Danach den Main-Entry sauber stoppen (unregister wirft bei stop-Fehler).
   if (deps.registry.get(result.id)) {
+    const previousTeardown = deps.tearDownRenderer ? await deps.tearDownRenderer(result.id) : 'noop'
+    if (previousTeardown === 'error' || previousTeardown === 'timeout') {
+      cleanupFreshVersion(result)
+      throw new PluginRestartRequiredError(
+        `Upgrade von '${result.id}' abgebrochen: die Renderer-Vorgängerversion ließ sich nicht sauber entladen — Neustart erforderlich`
+      )
+    }
     try {
       await deps.registry.unregister(result.id)
     } catch (stopErr) {
-      cleanupFreshVersion(result) // Index zeigt weiter auf den (laufenden) Vorgänger → kein Rollback nötig
-      throw new Error(
-        `Upgrade von '${result.id}' abgebrochen: vorherige Version ließ sich nicht stoppen (${stopErr instanceof Error ? stopErr.message : String(stopErr)})`
-      )
+      cleanupFreshVersion(result)
+      const detail = stopErr instanceof Error ? stopErr.message : String(stopErr)
+      // F23: War der Vorgänger renderer-tragend (`'success'`), ist sein Renderer bereits weg, aber der
+      // Main-Entry blieb stehen → partially-stopped, KEIN sauberer Abbruch → Neustart erforderlich (sonst
+      // reaktivierte der Reconcile den halb-gestoppten Renderer aus dem Index). Main-only (`'noop'`) ist
+      // weiterhin ein normaler Abbruch: der Vorgänger läuft unberührt weiter.
+      if (previousTeardown === 'success') {
+        throw new PluginRestartRequiredError(
+          `Upgrade von '${result.id}' abgebrochen: Vorgänger-Renderer entladen, aber Main-Entry ließ sich nicht stoppen (${detail}) — Neustart erforderlich`
+        )
+      }
+      throw new Error(`Upgrade von '${result.id}' abgebrochen: vorherige Version ließ sich nicht stoppen (${detail})`)
     }
     deps.unregisterWorkflowActions(result.id) // Workflow-Actions der alten Version entfernen
   }
@@ -212,20 +267,64 @@ export async function installAndActivate(deps: ManageDeps, archive: Buffer): Pro
     await rollbackStartedVersion(deps, result, state.error?.message ?? `Aktivierung von '${result.id}' fehlgeschlagen`)
   }
 
+  // Renderer-Aktivierungs-Handshake (ADR §5.2, F06): hat der Kandidat einen Renderer-Entry, MUSS der
+  // Renderer das Bundle importieren + `activate(host)` + Staging bestätigen, BEVOR der Index committet.
+  // Ein kaputtes Bundle / werfendes activate → Rollback (kein „installiert+aktiv mit kaputtem Renderer").
+  if (source.manifest.entrypoints?.renderer && deps.activateRenderer) {
+    let outcome: RendererActivationOutcome
+    try {
+      outcome = await deps.activateRenderer(source)
+    } catch (err) {
+      outcome = { ok: false, error: err instanceof Error ? err.message : String(err) }
+    }
+    if (!outcome.ok) {
+      await rollbackCandidateWithRenderer(deps, result, source, `Renderer-Aktivierung von '${result.id}' fehlgeschlagen: ${outcome.error}`)
+    }
+  }
+
   // ERFOLG → JETZT erst den Aktivierungsindex committen (letzter Schritt, ADR-konform). Scheitert
-  // der Commit (I/O/Permissions/Disk-voll), läuft die neue Version zwar bereits, ist aber NICHT
-  // persistiert → Live- und Disk-Zustand liefen auseinander. Darum derselbe Recovery-Pfad wie bei
-  // einem Aktivierungsfehler (neue Version sauber stoppen + Vorgänger zurück, sonst Neustart).
+  // der Commit (I/O/Permissions/Disk-voll), läuft die neue Version zwar bereits (Main UND Renderer
+  // bestätigt), ist aber NICHT persistiert → Live- und Disk-Zustand liefen auseinander. Darum derselbe
+  // Recovery-Pfad wie bei einem Aktivierungsfehler — inkl. KANDIDATEN-RENDERER-TEARDOWN (F21).
   try {
     commitIndex(deps, result.id, result.version)
   } catch (commitErr) {
-    await rollbackStartedVersion(
+    await rollbackCandidateWithRenderer(
       deps,
       result,
+      source,
       `Index-Commit für '${result.id}' fehlgeschlagen: ${commitErr instanceof Error ? commitErr.message : String(commitErr)}`
     )
   }
   return { id: result.id, version: result.version, idempotent: result.idempotent, state }
+}
+
+/**
+ * Rollt einen Kandidaten zurück, der schon LÄUFT (Main aktiv + ggf. Renderer aktiv), nachdem die Aktivierung
+ * (Renderer-Ack) ODER der Index-Commit scheiterte (F16/F21). Stoppt den Kandidaten-Renderer über DASSELBE
+ * instanceId-gebundene Teardown-/Drain-Protokoll, BEVOR der Main-Rollback + Vorgänger-Restore läuft:
+ *   • Renderer-Teardown `error`/`timeout` → der Kandidat ließ sich nicht sauber entladen → Vorgänger NICHT
+ *     reaktivieren (Doppelbetrieb-Gefahr), `PluginRestartRequiredError`.
+ *   • sonst (`success`/`noop`/kein Renderer) → regulärer `rollbackStartedVersion` (Main-Stop + Vorgänger zurück).
+ * Wirft IMMER.
+ */
+async function rollbackCandidateWithRenderer(
+  deps: ManageDeps,
+  result: InstallResult,
+  source: MainPluginSource,
+  failure: string,
+): Promise<void> {
+  if (source.manifest.entrypoints?.renderer && deps.tearDownRenderer) {
+    const teardown = await deps.tearDownRenderer(result.id)
+    if (teardown === 'error' || teardown === 'timeout') {
+      await deps.registry.unregister(result.id).catch(() => {}) // Main-Entry best-effort stoppen
+      deps.unregisterWorkflowActions(result.id)
+      throw new PluginRestartRequiredError(
+        `${failure} — und der Kandidat ließ sich nicht sauber entladen → Neustart erforderlich`
+      )
+    }
+  }
+  await rollbackStartedVersion(deps, result, failure)
 }
 
 /**
@@ -271,7 +370,28 @@ async function rollbackStartedVersion(deps: ManageDeps, result: InstallResult, f
 export async function uninstallPlugin(deps: ManageDeps, id: string): Promise<void> {
   // Erst die ID als sicheres Pfadsegment prüfen (fail-fast, bevor irgendetwas mutiert wird).
   const idDir = assertSafeStoreIdDir(pluginPaths(deps.env.pluginsRoot).storeDir, id)
-  await deps.registry.unregister(id) // wirft bei stop-Fehler → Uninstall bricht ab, nichts mutiert
+  // Renderer end-zu-ende entladen (drain + dispose + Ack), BEVOR deaktiviert/gelöscht wird (ADR §5.2/§5.5,
+  // F14/F15). `'error'`/`'timeout'` = fail-closed: nichts mutiert, Neustart erforderlich (kein „aktiv mit
+  // geschlossenem Gate", F14). `'noop'`/`'success'` → weiter.
+  const uninstallTeardown = deps.tearDownRenderer ? await deps.tearDownRenderer(id) : 'noop'
+  if (uninstallTeardown === 'error' || uninstallTeardown === 'timeout') {
+    throw new PluginRestartRequiredError(
+      `Uninstall von '${id}' abgebrochen: der Renderer-Beitrag ließ sich nicht sauber entladen — Neustart erforderlich`
+    )
+  }
+  try {
+    await deps.registry.unregister(id) // wirft bei stop-Fehler
+  } catch (stopErr) {
+    // F23: war der Beitrag renderer-tragend (`'success'`), ist der Renderer bereits weg → partially-stopped →
+    // Neustart erforderlich (kein Reconcile, der den halb-gestoppten Renderer aus dem Index reaktiviert).
+    // Main-only (`'noop'`): normaler Stop-Fehler-Abbruch, nichts mutiert.
+    if (uninstallTeardown === 'success') {
+      throw new PluginRestartRequiredError(
+        `Uninstall von '${id}' abgebrochen: Renderer entladen, aber Main-Entry ließ sich nicht stoppen (${stopErr instanceof Error ? stopErr.message : String(stopErr)}) — Neustart erforderlich`
+      )
+    }
+    throw stopErr
+  }
   deps.unregisterWorkflowActions(id)
   try {
     commitIndex(deps, id, null)

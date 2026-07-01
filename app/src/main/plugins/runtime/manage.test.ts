@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { generateKeyPairSync, type KeyObject } from 'node:crypto'
 import { mkdtempSync, existsSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -503,6 +503,216 @@ describe('installAndActivate — Index-Commit-Timing', () => {
     await p
     // NACH Erfolg: Index committet auf 0.2.0.
     expect(readActiveIndex(pluginPaths(root).activeIndexPath).active).toEqual({ 'ext-plugin': '0.2.0' })
+  })
+})
+
+// R1-impl-F01: renderer-only muss durch den ECHTEN Manage-/Registry-Pfad aktivieren (nicht nur über
+// den install.test-Bypass), sonst würfe registry.activate „kein Main-Entry" → Rollback, kein Commit.
+describe('renderer-only Aktivierung (R1-impl-F01)', () => {
+  const rendererOnlyArchive = () =>
+    packPluginArtifact({
+      files: [
+        {
+          path: 'manifest.json',
+          content: manifestBytes({
+            entrypoints: { renderer: 'renderer.js' },
+            ui: { fileEditors: [{ editorId: 'draw', extensions: ['.excalidraw'] }] },
+          }),
+        },
+        { path: 'renderer.js', content: Buffer.from('export default {}\n', 'utf8') },
+      ],
+      signKey: priv,
+      keyId: KEY_ID,
+    })
+
+  it('aktiviert über den echten installAndActivate-Pfad + committet den Index (kein Rollback)', async () => {
+    const real = new PluginRegistry(undefined, undefined, '0.8.14')
+    await installAndActivate(deps({ registry: real }), await rendererOnlyArchive())
+    expect(readActiveIndex(pluginPaths(root).activeIndexPath).active).toEqual({ 'ext-plugin': '0.1.0' })
+    expect(real.get('ext-plugin')?.activation).toBe('active')
+  })
+
+  it('aktiviert renderer-only beim Startup über die echte Registry', async () => {
+    const res = await installPluginArtifact(await rendererOnlyArchive(), env())
+    setActiveVersion(root, res.id, res.version)
+    const real = new PluginRegistry(undefined, undefined, '0.8.14')
+    expect(discoverAndRegisterInstalled(deps({ registry: real }))).toEqual([])
+    await real.activateAll()
+    expect(real.get('ext-plugin')?.activation).toBe('active')
+  })
+})
+
+// R1-impl-F06: Eager-Activate-Handshake — der Renderer muss das Bundle importieren + activate(host) + Staging
+// bestätigen, BEVOR active.json committet. Der Handshake ist via deps.activateRenderer injiziert (Impl in
+// index.ts mit BrowserWindow/IPC). Ohne Injektion (main-only/Altests) läuft alles unverändert (siehe oben).
+describe('Renderer-Aktivierungs-Handshake (R1-impl-F06)', () => {
+  const rendererArchive = (version = '0.1.0') =>
+    packPluginArtifact({
+      files: [
+        {
+          path: 'manifest.json',
+          content: manifestBytes({
+            version,
+            entrypoints: { renderer: 'renderer.js' },
+            ui: { fileEditors: [{ editorId: 'draw', extensions: ['.excalidraw'] }] },
+          }),
+        },
+        { path: 'renderer.js', content: Buffer.from('export default {}\n', 'utf8') },
+      ],
+      signKey: priv,
+      keyId: KEY_ID,
+    })
+
+  it('Ack ok → committet den Index', async () => {
+    const real = new PluginRegistry(undefined, undefined, '0.8.14')
+    const activateRenderer = vi.fn(async () => ({ ok: true as const }))
+    await installAndActivate(deps({ registry: real, activateRenderer }), await rendererArchive())
+    expect(activateRenderer).toHaveBeenCalledTimes(1)
+    expect(readActiveIndex(pluginPaths(root).activeIndexPath).active).toEqual({ 'ext-plugin': '0.1.0' })
+  })
+
+  it('Ack-Fehler → KEIN Commit, Rollback, Kandidat über tearDownRenderer gestoppt (Frischinstall)', async () => {
+    const real = new PluginRegistry(undefined, undefined, '0.8.14')
+    const tearDownRenderer = vi.fn(async () => 'success' as const)
+    const activateRenderer = vi.fn(async () => ({ ok: false as const, error: 'kaputtes Bundle (contract)' }))
+    await expect(
+      installAndActivate(deps({ registry: real, activateRenderer, tearDownRenderer }), await rendererArchive()),
+    ).rejects.toThrow(/Renderer-Aktivierung.*kaputtes Bundle/)
+    expect(tearDownRenderer).toHaveBeenCalledWith('ext-plugin') // F16: Kandidat sauber entladen
+    expect(readActiveIndex(pluginPaths(root).activeIndexPath).active).toEqual({})
+    expect(real.get('ext-plugin')).toBeUndefined()
+  })
+
+  it('Ack-Fehler + Kandidat-Teardown scheitert → restart-required, KEIN Vorgänger-Restore (F16)', async () => {
+    const real = new PluginRegistry(undefined, undefined, '0.8.14')
+    const tearDownRenderer = vi.fn(async () => 'timeout' as const)
+    const activateRenderer = vi.fn(async () => ({ ok: false as const, error: 'activate boom' }))
+    await expect(
+      installAndActivate(deps({ registry: real, activateRenderer, tearDownRenderer }), await rendererArchive()),
+    ).rejects.toThrow(PluginRestartRequiredError)
+    expect(readActiveIndex(pluginPaths(root).activeIndexPath).active).toEqual({})
+  })
+
+  it('activateRenderer wirft → wie Ack-Fehler behandelt (Rollback)', async () => {
+    const real = new PluginRegistry(undefined, undefined, '0.8.14')
+    const activateRenderer = vi.fn(async () => { throw new Error('renderer-prozess weg') })
+    await expect(
+      installAndActivate(deps({ registry: real, activateRenderer }), await rendererArchive()),
+    ).rejects.toThrow(/renderer-prozess weg/)
+    expect(readActiveIndex(pluginPaths(root).activeIndexPath).active).toEqual({})
+  })
+
+  it('Upgrade: Kandidat-Ack scheitert → Vorgänger bleibt committet (0.1.0)', async () => {
+    const real = new PluginRegistry(undefined, undefined, '0.8.14')
+    // 0.1.0 sauber installieren (Ack ok)
+    await installAndActivate(deps({ registry: real, activateRenderer: vi.fn(async () => ({ ok: true as const })) }), await rendererArchive('0.1.0'))
+    expect(readActiveIndex(pluginPaths(root).activeIndexPath).active).toEqual({ 'ext-plugin': '0.1.0' })
+    // 0.2.0-Upgrade: Renderer-Ack scheitert → Rollback auf 0.1.0 (Teardowns sauber)
+    const tearDownRenderer = vi.fn(async () => 'success' as const)
+    await expect(
+      installAndActivate(
+        deps({ registry: real, activateRenderer: vi.fn(async () => ({ ok: false as const, error: 'activate boom' })), tearDownRenderer }),
+        await rendererArchive('0.2.0'),
+      ),
+    ).rejects.toThrow(/Renderer-Aktivierung/)
+    expect(tearDownRenderer).toHaveBeenCalledWith('ext-plugin') // Vorgänger (deactivate-previous) + Kandidat (rollback)
+    expect(readActiveIndex(pluginPaths(root).activeIndexPath).active).toEqual({ 'ext-plugin': '0.1.0' })
+    expect(real.get('ext-plugin')?.activation).toBe('active') // Vorgänger wieder live
+  })
+
+  it('F21: Commit-Fehler NACH erfolgreichem Ack → Kandidat über tearDownRenderer gestoppt, kein Commit', async () => {
+    const real = new PluginRegistry(undefined, undefined, '0.8.14')
+    const tearDownRenderer = vi.fn(async () => 'success' as const)
+    const commitActiveVersion = (): void => { throw new Error('disk full') }
+    await expect(
+      installAndActivate(
+        deps({ registry: real, activateRenderer: vi.fn(async () => ({ ok: true as const })), tearDownRenderer, commitActiveVersion }),
+        await rendererArchive(),
+      ),
+    ).rejects.toThrow(/Index-Commit/)
+    expect(tearDownRenderer).toHaveBeenCalledWith('ext-plugin') // F21: Kandidat-Renderer im Commit-Fehlerpfad gestoppt
+    expect(readActiveIndex(pluginPaths(root).activeIndexPath).active).toEqual({})
+  })
+
+  it('F21: Commit-Fehler + Kandidat-Teardown timeout → restart-required', async () => {
+    const real = new PluginRegistry(undefined, undefined, '0.8.14')
+    const tearDownRenderer = vi.fn(async () => 'timeout' as const)
+    const commitActiveVersion = (): void => { throw new Error('disk full') }
+    await expect(
+      installAndActivate(
+        deps({ registry: real, activateRenderer: vi.fn(async () => ({ ok: true as const })), tearDownRenderer, commitActiveVersion }),
+        await rendererArchive(),
+      ),
+    ).rejects.toThrow(PluginRestartRequiredError)
+    expect(readActiveIndex(pluginPaths(root).activeIndexPath).active).toEqual({})
+  })
+
+  it('F23: Upgrade — Vorgänger-Renderer entladen (success), dann Main-unregister wirft → restart-required', async () => {
+    const { handle } = fakeRegistry({ unregisterThrows: new Set(['ext-plugin']) })
+    await installAndActivate(deps({ registry: handle }), await archiveVer('0.1.0')) // 0.1.0 committet
+    const tearDownRenderer = vi.fn(async () => 'success' as const) // renderer-tragender Vorgänger
+    await expect(
+      installAndActivate(deps({ registry: handle, tearDownRenderer }), await archiveVer('0.2.0')),
+    ).rejects.toThrow(PluginRestartRequiredError)
+    expect(tearDownRenderer).toHaveBeenCalledWith('ext-plugin')
+    expect(readActiveIndex(pluginPaths(root).activeIndexPath).active).toEqual({ 'ext-plugin': '0.1.0' }) // Index unverändert
+  })
+})
+
+// R1-impl-F07: Endungskollisions-Gate VOR Commit. R1-impl-F08/F14/F15: Renderer end-zu-ende entladen
+// (tearDownRenderer = drain + dispose + Ack) vor Disable/Upgrade, nicht-`success` = fail-closed
+// (restart-required). Beide via DI injiziert (Impl in index.ts) — hier wird die WIRING/Transaktions-Wirkung
+// geprüft (die Resolver-Kollisionslogik deckt fileEditorResolver.test.ts ab, der Teardown-Ausgang rendererRegistry.test.ts).
+describe('Datei-Editor-Kollision + Renderer-Teardown (R1-impl-F07/F08/F14/F15)', () => {
+  it('F07: Claim-Kollision → terminal abgelehnt, Index/Registry unverändert', async () => {
+    const real = new PluginRegistry(undefined, undefined, '0.8.14')
+    const validateFileEditorClaims = vi.fn(() => ({ ok: false as const, error: 'Datei-Editor-Endungskollision: .md (core-collision)' }))
+    await expect(
+      installAndActivate(deps({ registry: real, validateFileEditorClaims }), await archive()),
+    ).rejects.toThrow(/Endungskollision/)
+    expect(validateFileEditorClaims).toHaveBeenCalledTimes(1)
+    expect(readActiveIndex(pluginPaths(root).activeIndexPath).active).toEqual({})
+    expect(real.get('ext-plugin')).toBeUndefined() // Registry nie angefasst
+  })
+
+  it('F07: kollisionsfreier Claim → Aktivierung läuft normal durch', async () => {
+    const real = new PluginRegistry(undefined, undefined, '0.8.14')
+    const validateFileEditorClaims = vi.fn(() => ({ ok: true as const }))
+    await installAndActivate(deps({ registry: real, validateFileEditorClaims }), await archive())
+    expect(readActiveIndex(pluginPaths(root).activeIndexPath).active).toEqual({ 'ext-plugin': '0.1.0' })
+  })
+
+  it('F14: Teardown-Nicht-Erfolg beim Uninstall → restart-required, nichts mutiert', async () => {
+    const real = new PluginRegistry(undefined, undefined, '0.8.14')
+    await installAndActivate(deps({ registry: real }), await archive())
+    const tearDownRenderer = vi.fn(async () => 'timeout' as const)
+    await expect(uninstallPlugin(deps({ registry: real, tearDownRenderer }), 'ext-plugin')).rejects.toThrow(
+      PluginRestartRequiredError,
+    )
+    expect(tearDownRenderer).toHaveBeenCalledWith('ext-plugin')
+    expect(readActiveIndex(pluginPaths(root).activeIndexPath).active).toEqual({ 'ext-plugin': '0.1.0' })
+    expect(real.get('ext-plugin')).toBeDefined() // weiterhin registriert + aktiv
+  })
+
+  it('F14: Teardown success beim Uninstall → Uninstall läuft durch', async () => {
+    const real = new PluginRegistry(undefined, undefined, '0.8.14')
+    await installAndActivate(deps({ registry: real }), await archive())
+    const tearDownRenderer = vi.fn(async () => 'success' as const)
+    await uninstallPlugin(deps({ registry: real, tearDownRenderer }), 'ext-plugin')
+    expect(readActiveIndex(pluginPaths(root).activeIndexPath).active).toEqual({})
+    expect(real.get('ext-plugin')).toBeUndefined()
+  })
+
+  it('F14/F15: Teardown-Nicht-Erfolg beim Upgrade (deactivate-previous) → restart-required, Vorgänger bleibt (0.1.0)', async () => {
+    const real = new PluginRegistry(undefined, undefined, '0.8.14')
+    await installAndActivate(deps({ registry: real }), await archiveVer('0.1.0'))
+    const tearDownRenderer = vi.fn(async () => 'error' as const)
+    await expect(
+      installAndActivate(deps({ registry: real, tearDownRenderer }), await archiveVer('0.2.0')),
+    ).rejects.toThrow(PluginRestartRequiredError)
+    expect(tearDownRenderer).toHaveBeenCalledWith('ext-plugin')
+    expect(readActiveIndex(pluginPaths(root).activeIndexPath).active).toEqual({ 'ext-plugin': '0.1.0' })
+    expect(real.get('ext-plugin')?.activation).toBe('active')
   })
 })
 

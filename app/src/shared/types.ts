@@ -378,7 +378,10 @@ export interface FileEntry {
   path: string;
   isDirectory: boolean;
   children?: FileEntry[];
-  fileType?: 'markdown' | 'pdf' | 'image' | 'excel' | 'word' | 'powerpoint' | 'code';
+  fileType?: 'markdown' | 'pdf' | 'image' | 'excel' | 'word' | 'powerpoint' | 'code' | 'plugin';
+  /** Bei fileType 'plugin' (ADR plugin-renderer-host §7): welches Renderer-Plugin/Editor die Endung
+   *  beansprucht. Der FileTree öffnet damit einen plugin-editor-Tab. */
+  pluginEditor?: { pluginId: string; editorId: string };
 }
 
 // PDF-Dokument
@@ -1036,6 +1039,17 @@ export interface ElectronAPI {
   pluginWidgets: () => Promise<import('./plugins/widget').WidgetListResult>;
   pluginWidgetData: (instanceId: string) => Promise<import('./plugins/widget').WidgetDataResult>;
   onPluginWidgetsChanged: (callback: () => void) => () => void;
+  // Renderer-Plugin-Host (ADR plugin-renderer-host §5.3/§6): byte-freie Liste + Serve der verifizierten
+  // Bytes (Blob-Import) + capability-gated Vault-Bridge + Lifecycle-Push + Aktivierungs-Ack (F06).
+  pluginRenderers: () => Promise<import('./plugins/renderer').RendererListResult>;
+  pluginRendererEntry: (pluginId: string) => Promise<import('./plugins/renderer').RendererServeResult>;
+  pluginHost: (rendererInstanceId: string, op: string, args: unknown[]) => Promise<import('./plugins/renderer').RendererHostOpResult>;
+  onPluginRenderersChanged: (callback: () => void) => () => void;
+  pluginRendererActivated: (ack: import('./plugins/renderer').RendererActivateAck) => Promise<{ ok: boolean }>;
+  // Gerichteter Teardown (ADR §5.2/§5.5, F15/F16): Main fordert den Teardown EINER instanceId an, der
+  // Renderer disposed (Mounts + module.deactivate + Styles + Blob) und ackt den §5.5-Ausgang zurück.
+  onPluginRendererTeardown: (callback: (rendererInstanceId: string) => void) => () => void;
+  pluginRendererTornDown: (ack: import('./plugins/renderer').RendererTeardownAck) => Promise<{ ok: boolean }>;
 
   // Projekt-Status-Crystallizer
   projectStatusDiscover: (vaultPath: string, projectsFolderRel: string) => Promise<{ success: boolean; projects?: DiscoveredProject[]; error?: string }>;

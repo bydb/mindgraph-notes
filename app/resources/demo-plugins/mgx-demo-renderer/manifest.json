@@ -1,0 +1,16 @@
+{
+  "manifestVersion": 2,
+  "id": "mgx-demo-renderer",
+  "version": "0.1.0",
+  "label": "Demo Renderer",
+  "description": "R1a-Beleg: schlichter .mgxdemo-Texteditor über die Renderer-Host-Vault-Bridge (eigenes Single-File-ESM, eigener Mount).",
+  "category": "ai",
+  "apiVersion": "^0.2.0",
+  "minAppVersion": "0.8.14",
+  "author": { "name": "MindGraph" },
+  "entrypoints": { "renderer": "renderer.js" },
+  "capabilities": ["vault.read", "vault.write"],
+  "ui": {
+    "fileEditors": [{ "editorId": "demo-text", "extensions": [".mgxdemo"], "label": "Demo-Text" }]
+  }
+}

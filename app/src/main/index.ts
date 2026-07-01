@@ -163,17 +163,36 @@ import {
   PluginRestartRequiredError,
   type ManageDeps,
   type RuntimeEnv,
+  type RendererActivationOutcome,
 } from './plugins/runtime/manage'
+import type { MainPluginSource } from './plugins/registry'
 import { ArtifactError } from './plugins/artifact/limits'
 import { discoverInstalledPlugins, type DiscoverError } from './plugins/runtime/discover'
 import { ExternalWidgetRuntime } from './plugins/widgets'
+import { RendererRuntime, type RendererActivation, type RendererHostFactory } from './plugins/rendererRuntime'
+import {
+  awaitRendererActivation,
+  resolveRendererActivation,
+  parseRendererAck,
+  awaitRendererTeardown,
+  resolveRendererTeardown,
+  parseRendererTeardownAck,
+} from './plugins/rendererAck'
+import { verifyInstalledRendererPayload } from './plugins/artifact/verify'
 import { downloadPluginArtifact } from './plugins/download'
 import { checkPluginUpdates } from './plugins/update-checker'
 import { fetchCatalog, resolveCatalogUrl } from './plugins/catalog'
 import { SECURE_WEB_PREFERENCES } from './windowSecurity'
 import { readArchiveFileCapped } from './plugins/runtime/readArchive'
 import { readActiveIndex } from './plugins/runtime/activeIndex'
-import { pluginPaths } from './plugins/runtime/paths'
+import { pluginPaths, versionDir } from './plugins/runtime/paths'
+import { getFileType, coreClaimedExtensions } from './fileTypes'
+import {
+  resolveFileEditors,
+  lookupFileEditor,
+  assertCandidateClaimsFree,
+  type ResolvedFileEditors,
+} from '../shared/plugins/fileEditorResolver'
 
 // Globale Fehlerbehandlung für unhandled exceptions (z.B. IMAP Socket-Timeouts)
 process.on('uncaughtException', (error) => {
@@ -195,7 +214,14 @@ app.on('web-contents-created', (_event, contents) => {
 // Der echte Capability-Host wird in app.whenReady() gesetzt (setHostFactory); bis dahin Stub.
 const pluginRegistry = createMainRegistry(undefined, app.getVersion())
 const externalWidgetRuntime = new ExternalWidgetRuntime(pluginRegistry)
-registerPluginTransport(pluginRegistry, () => publishExternalWidgetState())
+// Renderer-Plugin-Host (ADR plugin-renderer-host §5.3/§5.4): hält die verifizierten Renderer-Bytes
+// aktiver Plugins; befüllt von syncRendererRuntime, gelesen vom plugin:rendererEntry-/plugin:host-IPC.
+const rendererRuntime = new RendererRuntime()
+// Besitzer-Fenster je rendererInstanceId (F24): das webContents, dessen Aktivierungs-Ack Main akzeptiert hat.
+// Der gerichtete Teardown geht NUR dorthin, und nur dessen Ack zählt — kein Fremd-Fenster kann mit einem
+// idempotenten `success` den echten Besitzer-Ausgang vorzeitig ersetzen.
+const rendererOwners = new Map<string, Electron.WebContents>()
+registerPluginTransport(pluginRegistry, () => publishPluginUiState())
 
 // Plugin-beigesteuerte Workflow-Canvas-Bausteine (Manifest-Feld `workflowActions`) in die
 // gemeinsame Registry einspielen, damit der Runner sie generisch dispatcht (kein statischer
@@ -228,6 +254,21 @@ function pluginManageDeps(): ManageDeps {
     registry: pluginRegistry,
     registerWorkflowActions,
     unregisterWorkflowActions,
+    activateRenderer: activateRendererCandidate,
+    // F07: Endungskollision des Kandidaten gegen ALLE weiterhin aktiven Renderer-Plugins (ohne die zu
+    // ersetzende eigene Version) + Kern-Endungen — terminal VOR Commit (ADR §8).
+    validateFileEditorClaims: (manifest) =>
+      assertCandidateClaimsFree(
+        { pluginId: manifest.id, fileEditors: manifest.ui?.fileEditors ?? [] },
+        rendererRuntime
+          .list()
+          .filter((d) => d.pluginId !== manifest.id)
+          .map((d) => ({ pluginId: d.pluginId, fileEditors: d.fileEditors })),
+        coreClaimedExtensions(),
+      ),
+    // F08/F14/F15/F16: Renderer end-zu-ende entladen (drain + gerichteter Teardown-Ack) vor Disable/Upgrade/
+    // Rollback; nur 'success' erlaubt den nächsten Schritt, sonst fail-closed (restart-required).
+    tearDownRenderer,
   }
 }
 
@@ -239,11 +280,149 @@ function syncExternalWidgetRuntime(): void {
   externalWidgetRuntime.sync(manifests)
 }
 
-/** Main→Renderer Push: nach Lifecycle-Änderungen entfernt der Renderer Zombies sofort. */
-function publishExternalWidgetState(): void {
-  syncExternalWidgetRuntime()
+/**
+ * Renderer-Aktivierungs-Handshake (ADR §5.2, F06): der Kandidat ist während des Handshakes NOCH NICHT in
+ * `active.json` (Commit kommt erst nach dem Ack). Diese „Pinnung" hält ihn deshalb über syncRendererRuntime
+ * aktiv, damit die selbst-synchronisierenden `plugin:renderers`/`plugin:rendererEntry`-IPCs ihn nicht
+ * mitten im Laden wieder wegräumen. Bei einem Upgrade ÜBERSCHREIBT er den committeten Vorgänger.
+ */
+let pendingRendererCandidate: RendererActivation | null = null
+
+/** Spiegelt aktive, erneut verifizierte Renderer-Plugins + ihre verifizierten Bytes in die
+ *  RendererRuntime (ADR plugin-renderer-host §5.3). instanceId-stabil via syncActive. */
+function syncRendererRuntime(): { changed: boolean } {
+  const env = runtimePluginEnv()
+  const paths = pluginPaths(env.pluginsRoot)
+  const activations: RendererActivation[] = []
+  for (const source of discoverInstalledPlugins(env).sources) {
+    const manifest = source.manifest
+    if (!manifest.entrypoints?.renderer) continue
+    if (pluginRegistry.get(manifest.id)?.activation !== 'active') continue
+    // Während des Handshakes hat der Kandidat Vorrang vor seinem committeten Vorgänger (gleiche pluginId).
+    if (pendingRendererCandidate && manifest.id === pendingRendererCandidate.pluginId) continue
+    try {
+      const dir = versionDir(paths, manifest.id, manifest.version)
+      const { payload } = verifyInstalledRendererPayload(dir, {
+        keyring: env.keyring,
+        appVersion: env.appVersion,
+      })
+      if (payload) {
+        activations.push({
+          pluginId: manifest.id,
+          pluginLabel: manifest.label,
+          version: manifest.version,
+          payload,
+          fileEditors: manifest.ui?.fileEditors ?? [],
+          manifest,
+        })
+      }
+    } catch {
+      // fail-closed: Re-Verify scheiterte (manipuliertes Verzeichnis) → diese Version NICHT servieren.
+    }
+  }
+  if (pendingRendererCandidate) activations.push(pendingRendererCandidate)
+  return rendererRuntime.syncActive(activations)
+}
+
+/** Push NUR für die Renderer-Plugin-Quelle (Handshake-Schritt; der Renderer lädt + ackt danach). */
+function pushRenderersChanged(): void {
   for (const window of BrowserWindow.getAllWindows()) {
-    if (!window.isDestroyed()) window.webContents.send('plugin:widgets-changed')
+    if (window.isDestroyed()) continue
+    window.webContents.send('plugin:renderers-changed')
+  }
+}
+
+/** Max. Wartezeit auf den Renderer-Ack (import + activate(host) + Staging) — danach fail-closed. */
+const RENDERER_ACTIVATION_TIMEOUT_MS = 8000
+
+/**
+ * Aktiviert den Renderer-Beitrag eines Kandidaten (mint instanceId via syncRendererRuntime über die
+ * Pinnung + Push) und WARTET auf den Renderer-Ack (ADR §5.2, F06). Liefert das Ergebnis an die
+ * Transaktion in installAndActivate; bei Fehler/Timeout rollt diese zurück (kein Commit).
+ */
+async function activateRendererCandidate(source: MainPluginSource): Promise<RendererActivationOutcome> {
+  const env = runtimePluginEnv()
+  const paths = pluginPaths(env.pluginsRoot)
+  const manifest = source.manifest
+  let payload: RendererActivation['payload'] | undefined
+  try {
+    const dir = versionDir(paths, manifest.id, manifest.version)
+    payload = verifyInstalledRendererPayload(dir, { keyring: env.keyring, appVersion: env.appVersion }).payload
+  } catch (err) {
+    return { ok: false, error: `Renderer-Payload-Verifikation fehlgeschlagen: ${err instanceof Error ? err.message : String(err)}` }
+  }
+  if (!payload) return { ok: false, error: 'Kein verifizierter Renderer-Payload' }
+
+  pendingRendererCandidate = {
+    pluginId: manifest.id,
+    pluginLabel: manifest.label,
+    version: manifest.version,
+    payload,
+    fileEditors: manifest.ui?.fileEditors ?? [],
+    manifest,
+  }
+  try {
+    syncRendererRuntime() // aktiviert den Kandidaten (überschreibt Vorgänger) + mintet die instanceId
+    const instanceId = rendererRuntime.servePayload(manifest.id)?.rendererInstanceId
+    if (!instanceId) return { ok: false, error: 'Renderer-Instanz konnte nicht aktiviert werden' }
+    pushRenderersChanged() // Renderer lädt das Bundle, activate(host), Staging → ackt diese instanceId
+    const ack = await awaitRendererActivation(instanceId, RENDERER_ACTIVATION_TIMEOUT_MS)
+    if (ack.ok) return { ok: true }
+    return { ok: false, error: `${ack.error}${ack.phase ? ` (${ack.phase})` : ''}` }
+  } finally {
+    // Pinnung lösen: bei Erfolg committet installAndActivate gleich (→ Kandidat wird committet-aktiv,
+    // stabile instanceId via syncActive); bei Misserfolg räumt der Teardown + der IPC-Re-Sync auf.
+    pendingRendererCandidate = null
+  }
+}
+
+/**
+ * Entlädt den Renderer-Beitrag eines Plugins ENDE-ZU-ENDE (ADR §5.2 Deactivate-Previous / §5.5-Matrix,
+ * F08/F14/F15/F16/F24): (1) In-Flight `plugin:host`-Calls drainen; (2) den BESITZER-Renderer (F24) zum
+ * Dispose der konkreten instanceId auffordern und auf den §5.5-Ausgang warten (nur dessen Ack zählt);
+ * (3) die Matrix auf den Main-Zustand anwenden. NUR `'success'` entfernt den RendererRuntime-Eintrag (+
+ * Payload); `'error'`/`'timeout'` lassen ihn fail-closed stehen (gateClosed → restart-required).
+ *   - `'noop'` = das Plugin hat gar keinen aktiven Renderer-Beitrag (main-only) — nichts zu tun.
+ *   - Besitzerfenster geschlossen → der Renderer ist mit ihm weg → `'success'`.
+ */
+async function tearDownRenderer(pluginId: string): Promise<'noop' | 'success' | 'error' | 'timeout'> {
+  if ((await rendererRuntime.drain(pluginId, RENDERER_ACTIVATION_TIMEOUT_MS)) === 'timeout') return 'timeout'
+  const instanceId = rendererRuntime.list().find((d) => d.pluginId === pluginId)?.rendererInstanceId
+  if (!instanceId) return 'noop' // kein aktiver Renderer-Beitrag
+  const owner = rendererOwners.get(instanceId) ?? mainWindow?.webContents
+  const ownerGone = (): 'success' => {
+    rendererRuntime.deactivate(pluginId)
+    rendererOwners.delete(instanceId)
+    return 'success' // Besitzerfenster (und damit der Renderer) sind weg
+  }
+  if (!owner || owner.isDestroyed()) return ownerGone()
+  try {
+    owner.send('plugin:rendererTeardown', instanceId)
+  } catch (err) {
+    // F30: Fenster zwischen isDestroyed()-Check und send() zerstört → Renderer weg → atomar `success`.
+    // Anderer Send-Fehler bei lebendem Fenster → fail-closed (drain hat das Gate schon geschlossen) → `timeout`.
+    if (owner.isDestroyed()) return ownerGone()
+    console.error(`[plugin] Teardown-send an '${pluginId}' warf:`, err)
+    return 'timeout'
+  }
+  const outcome = await awaitRendererTeardown(instanceId, RENDERER_ACTIVATION_TIMEOUT_MS, owner.id)
+  if (outcome === 'success') {
+    rendererRuntime.deactivate(pluginId) // Eintrag + Payload weg
+    rendererOwners.delete(instanceId)
+  }
+  // error/timeout: Eintrag bleibt (gateClosed, restart-required); der Aufrufer (manage.ts) meldet Neustart.
+  return outcome
+}
+
+/** Main→Renderer Push für BEIDE Renderer-UI-Quellen (Tier-1-Widgets + Renderer-Plugins): nach
+ *  Lifecycle-Änderungen entfernt der Renderer Zombies sofort. */
+function publishPluginUiState(): void {
+  syncExternalWidgetRuntime()
+  syncRendererRuntime()
+  for (const window of BrowserWindow.getAllWindows()) {
+    if (window.isDestroyed()) continue
+    window.webContents.send('plugin:widgets-changed')
+    window.webContents.send('plugin:renderers-changed')
   }
 }
 // Re-Verify-/Kollisions-Fehler der LETZTEN Startup-Discovery (nur fürs Start-Log; die UI fragt
@@ -275,11 +454,14 @@ ipcMain.handle('plugin:install', async (event) => {
     // Größe VOR dem Lesen prüfen (stat) — sonst läge eine riesige Datei vor jedem Limit im RAM.
     const archive = await readArchiveFileCapped(result.filePaths[0])
     const out = await serializePluginOp(() => installAndActivate(pluginManageDeps(), archive))
-    publishExternalWidgetState()
+    publishPluginUiState()
     return { ok: true, data: { id: out.id, version: out.version, idempotent: out.idempotent } }
   } catch (err) {
-    const code = err instanceof ArtifactError ? err.code : undefined
     const restartRequired = err instanceof PluginRestartRequiredError
+    // F23: bei restart-required NICHT reconcilen — sonst reaktiviert syncRendererRuntime den partially-stopped
+    // (Vorgänger-)Renderer aus dem persistenten Index. Bei normalem Fehler auf den Vorgänger zurück-reconcilen.
+    if (!restartRequired) publishPluginUiState()
+    const code = err instanceof ArtifactError ? err.code : undefined
     return { ok: false, error: err instanceof Error ? err.message : String(err), code, restartRequired }
   }
 })
@@ -295,11 +477,14 @@ ipcMain.handle('plugin:installFromGithub', async (event, repo: unknown, tag: unk
   try {
     const { archive } = await downloadPluginArtifact(repo, tagArg)
     const out = await serializePluginOp(() => installAndActivate(pluginManageDeps(), archive))
-    publishExternalWidgetState()
+    publishPluginUiState()
     return { ok: true, data: { id: out.id, version: out.version, idempotent: out.idempotent } }
   } catch (err) {
-    const code = err instanceof ArtifactError ? err.code : undefined
     const restartRequired = err instanceof PluginRestartRequiredError
+    // F23: bei restart-required NICHT reconcilen — sonst reaktiviert syncRendererRuntime den partially-stopped
+    // (Vorgänger-)Renderer aus dem persistenten Index. Bei normalem Fehler auf den Vorgänger zurück-reconcilen.
+    if (!restartRequired) publishPluginUiState()
+    const code = err instanceof ArtifactError ? err.code : undefined
     return { ok: false, error: err instanceof Error ? err.message : String(err), code, restartRequired }
   }
 })
@@ -363,10 +548,12 @@ ipcMain.handle('plugin:uninstall', async (event, pluginId: unknown) => {
   if (typeof pluginId !== 'string') return { ok: false, error: 'Ungültige Plugin-ID' }
   try {
     await serializePluginOp(() => uninstallPlugin(pluginManageDeps(), pluginId))
-    publishExternalWidgetState()
+    publishPluginUiState()
     return { ok: true }
   } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : String(err) }
+    // F23: kein Reconcile bei restart-required (kein Re-Activate des partially-stopped Renderers aus dem Index).
+    const restartRequired = err instanceof PluginRestartRequiredError
+    return { ok: false, error: err instanceof Error ? err.message : String(err), restartRequired }
   }
 })
 
@@ -389,6 +576,61 @@ ipcMain.handle('plugin:widgetData', async (event, instanceId: unknown) => {
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : String(err) }
   }
+})
+
+// Renderer-Plugin-Host (ADR plugin-renderer-host §5.3): byte-freie Liste der aktiven Renderer-Plugins
+// (Endungs-Claims + instanceId) für den Renderer-Boot/renderers-changed-Refresh.
+ipcMain.handle('plugin:renderers', async (event) => {
+  if (!isTrustedSender(event)) return { ok: false, error: 'Nicht autorisierter Aufrufer' }
+  try {
+    syncRendererRuntime()
+    return { ok: true, data: rendererRuntime.list() }
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) }
+  }
+})
+
+// Serviert die VERIFIZIERTEN Renderer-Bytes (read-once aus der RendererRuntime, I-L1/I-L5) als
+// utf8-String — der Renderer lädt sie via Blob-URL-import (CSP erlaubt `blob:` in script-src).
+ipcMain.handle('plugin:rendererEntry', async (event, pluginId: unknown) => {
+  if (!isTrustedSender(event)) return { ok: false, error: 'Nicht autorisierter Aufrufer' }
+  try {
+    syncRendererRuntime()
+    const serve = rendererRuntime.servePayload(pluginId)
+    if (!serve) return { ok: false, error: 'Renderer-Plugin nicht aktiv' }
+    return { ok: true, data: serve }
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) }
+  }
+})
+
+// plugin:host (ADR plugin-renderer-host §5.4): capability-gated Vault-Bridge für Renderer-Plugins.
+// Instanz→Eintrag, Call-Gate/In-Flight + Host-Erzeugung sind in der RendererRuntime gekapselt (das Manifest
+// verlässt das Modul nie, F09). KEINE Sicherheits-Seam (§4) — die harte Grenze bleibt writeFileSafe.
+ipcMain.handle('plugin:host', async (event, rendererInstanceId: unknown, op: unknown, args: unknown) => {
+  if (!isTrustedSender(event)) return { ok: false, error: 'Nicht autorisierter Aufrufer' }
+  return rendererRuntime.invokeHostOp(rendererInstanceId, op, args)
+})
+
+// Renderer→Main Aktivierungs-Ack (ADR plugin-renderer-host §5.2, F06): löst den in der Aktivierungs-
+// Transaktion wartenden Promise (awaitRendererActivation) für diese instanceId. Untrusted-tolerant geparst.
+ipcMain.handle('plugin:rendererActivated', async (event, raw: unknown) => {
+  if (!isTrustedSender(event)) return { ok: false }
+  const ack = parseRendererAck(raw)
+  if (ack) {
+    if (ack.ok) rendererOwners.set(ack.rendererInstanceId, event.sender) // F24: Besitzer = ackendes Fenster
+    resolveRendererActivation(ack)
+  }
+  return { ok: true }
+})
+
+// Renderer→Main Teardown-Ack (ADR §5.2/§5.5, F15/F16/F24): meldet den §5.5-Ausgang eines gerichteten
+// Teardown-Requests; löst den in tearDownRenderer wartenden Promise NUR, wenn der Absender der Besitzer ist.
+ipcMain.handle('plugin:rendererTornDown', async (event, raw: unknown) => {
+  if (!isTrustedSender(event)) return { ok: false }
+  const ack = parseRendererTeardownAck(raw)
+  if (ack) resolveRendererTeardown(ack, event.sender.id)
+  return { ok: true }
 })
 
 // Read-only: aktuell abgewiesene installierte Plugins (Re-Verify UND workflow-collision). LIVE neu
@@ -1028,7 +1270,10 @@ app.whenReady().then(async () => {
   await migrateAntaresCredentialsToPlugin()
   await migrateEdooboxCredentialsToPlugin()
   await migrateMarketingCredentialsToPlugin()
-  pluginRegistry.setHostFactory(createHostFactory(buildPluginHostServices()))
+  const hostFactory = createHostFactory(buildPluginHostServices())
+  pluginRegistry.setHostFactory(hostFactory)
+  // Dieselbe capability-gated Factory in die RendererRuntime (plugin:host-Bridge, §5.4).
+  rendererRuntime.setHostFactory(hostFactory as unknown as RendererHostFactory)
   pluginRegistry.setHardLockGuard(async (moduleId) => {
     const ui = await loadUISettings().catch(() => ({} as Record<string, unknown>))
     const ollama = ui.ollama as { selectedModel?: string; moduleModelOverrides?: Record<string, string> } | undefined
@@ -1057,6 +1302,7 @@ app.whenReady().then(async () => {
     .activateAll((_id, manifest) => isPluginGateEnabled(manifest, pluginGateSettings))
     .catch((err) => console.error('[plugin] activateAll:', err))
   syncExternalWidgetRuntime()
+  syncRendererRuntime() // Renderer-Plugin-Host: verifizierte Bytes aktiver Renderer-Plugins bereitstellen
 
   // Tray-Icon + Schnellerfassung (plattformübergreifend)
   {
@@ -1320,52 +1566,32 @@ ipcMain.handle('create-note', async (_event, filePath: string) => {
 
 // Verzeichnis rekursiv lesen
 // Supported image extensions for file tree display
-const IMAGE_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.bmp', '.ico']
-
-// Code-Extensions — spiegelt codeLanguages.ts im Renderer (bewusste Duplikation, Main ↔ Renderer
-// dürfen keinen Code teilen, der DOM/hljs importiert). Nur Reine Text-Dateien, die mit highlight.js
-// gehighlighted werden können.
-const CODE_FILE_EXTENSIONS_MAIN = new Set([
-  'js', 'mjs', 'cjs', 'jsx', 'ts', 'tsx',
-  'py', 'pyw',
-  'html', 'htm', 'xml', 'svg',
-  'css', 'scss', 'sass', 'less',
-  'json', 'jsonc',
-  'yaml', 'yml',
-  'sh', 'bash', 'zsh', 'fish',
-  'markdown', 'mdx',
-  'sql',
-  'java', 'kt', 'kts',
-  'c', 'h', 'cpp', 'cxx', 'cc', 'hpp', 'hxx',
-  'cs',
-  'go', 'rs', 'php', 'rb', 'swift',
-  'diff', 'patch',
-  'txt', 'log', 'conf', 'ini', 'toml', 'env'
-])
-
 const IGNORED_DIRECTORY_NAMES = new Set([
   'node_modules', '.git', '.svn', '.hg', 'dist', 'build', 'out', 'target',
   '.next', '.nuxt', '.turbo', '.cache', '__pycache__', '.pytest_cache',
   '.venv', 'venv', 'env', '.idea', '.vscode'
 ])
 
-function getFileType(fileName: string): 'markdown' | 'pdf' | 'image' | 'excel' | 'word' | 'powerpoint' | 'code' | null {
-  const ext = path.extname(fileName).toLowerCase()
-  if (ext === '.md') return 'markdown'
-  if (ext === '.pdf') return 'pdf'
-  if (IMAGE_EXTENSIONS.includes(ext)) return 'image'
-  if (ext === '.xlsx' || ext === '.xls') return 'excel'
-  if (ext === '.docx' || ext === '.doc') return 'word'
-  if (ext === '.pptx' || ext === '.ppt') return 'powerpoint'
-  // Code-Dateien: Extension ohne führenden Punkt prüfen
-  if (ext && CODE_FILE_EXTENSIONS_MAIN.has(ext.slice(1))) return 'code'
-  // Spezial-Dateinamen ohne Extension (Dockerfile, Makefile)
-  const lower = fileName.toLowerCase()
-  if (lower === 'dockerfile' || lower === 'makefile' || lower === '.gitignore' || lower === '.env') return 'code'
-  return null
+
+/** Aufgelöste Datei-Editor-Claims aktiver Renderer-Plugins (ADR plugin-renderer-host §7/§8). Kollidierende
+ *  Claims (Kern ODER zwischen Plugins) verwirft der Resolver + loggt sie; nur kollisionsfreie routen. */
+function activeFileEditorClaims(): ResolvedFileEditors {
+  const plugins = rendererRuntime.list().map((d) => ({ pluginId: d.pluginId, fileEditors: d.fileEditors }))
+  const resolved = resolveFileEditors(plugins, coreClaimedExtensions())
+  if (resolved.errors.length) {
+    console.warn(
+      '[plugin] Datei-Editor-Claims verworfen (Kollision):',
+      resolved.errors.map((e) => `${e.pluginId}:${e.extension}(${e.kind})`).join(', ')
+    )
+  }
+  return resolved
 }
 
-async function readDirectoryRecursive(dirPath: string, basePath: string): Promise<FileEntry[]> {
+async function readDirectoryRecursive(
+  dirPath: string,
+  basePath: string,
+  claims: ResolvedFileEditors
+): Promise<FileEntry[]> {
   const entries: FileEntry[] = []
   const items = await fs.readdir(dirPath, { withFileTypes: true })
 
@@ -1383,7 +1609,7 @@ async function readDirectoryRecursive(dirPath: string, basePath: string): Promis
     const relativePath = path.relative(basePath, fullPath)
 
     if (item.isDirectory()) {
-      const children = await readDirectoryRecursive(fullPath, basePath)
+      const children = await readDirectoryRecursive(fullPath, basePath, claims)
       entries.push({
         name: item.name,
         path: relativePath,
@@ -1393,12 +1619,20 @@ async function readDirectoryRecursive(dirPath: string, basePath: string): Promis
     } else {
       const fileType = getFileType(item.name)
       if (fileType) {
-        entries.push({
-          name: item.name,
-          path: relativePath,
-          isDirectory: false,
-          fileType
-        })
+        entries.push({ name: item.name, path: relativePath, isDirectory: false, fileType })
+      } else {
+        // Plugin-bewusste Datei-Seam (ADR §7, R1-impl-F07): von keinem Kerntyp erfasste Dateien werden
+        // sichtbar, WENN ein aktives Renderer-Plugin ihre Endung beansprucht — sonst wie bisher gefiltert.
+        const claim = lookupFileEditor(item.name, claims)
+        if (claim) {
+          entries.push({
+            name: item.name,
+            path: relativePath,
+            isDirectory: false,
+            fileType: 'plugin',
+            pluginEditor: claim,
+          })
+        }
       }
     }
   }
@@ -1413,7 +1647,7 @@ async function readDirectoryRecursive(dirPath: string, basePath: string): Promis
 ipcMain.handle('read-directory', async (_event, dirPath: string) => {
   try {
     const safe = await assertSafePath(dirPath, 'read-directory')
-    return await readDirectoryRecursive(safe, safe)
+    return await readDirectoryRecursive(safe, safe, activeFileEditorClaims())
   } catch (error) {
     console.error('Fehler beim Lesen des Verzeichnisses:', error)
     return []

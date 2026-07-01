@@ -343,7 +343,7 @@ const FileItem: React.FC<FileItemProps> = ({
   const { iconSet, setTextSplitEnabled, flashcardsEnabled, viewMode, setViewMode, setCanvasFilterPath, taskExcludedFolders, toggleTaskExcludedFolder, brain } = useUIStore()
   const updateNote = useNotesStore(state => state.updateNote)
   const { fileCustomizations, setFileCustomization, removeFileCustomization, toggleFolderHidden, toggleFolderPinned, showHiddenFolders } = useGraphStore()
-  const { openCanvasTab, openCodeTab } = useTabStore()
+  const { openCanvasTab, openCodeTab, openPluginEditorTab } = useTabStore()
   const { isBookmarked, toggleBookmark } = useBookmarkStore()
 
   const isPdf = entry.fileType === 'pdf'
@@ -352,6 +352,7 @@ const FileItem: React.FC<FileItemProps> = ({
   const isWord = entry.fileType === 'word'
   const isPowerPoint = entry.fileType === 'powerpoint'
   const isCode = entry.fileType === 'code'
+  const isPlugin = entry.fileType === 'plugin'
   const isOffice = isExcel || isWord || isPowerPoint
   const officeType: 'excel' | 'word' | 'powerpoint' | null = isExcel ? 'excel' : isWord ? 'word' : isPowerPoint ? 'powerpoint' : null
   const noteId = generateNoteId(entry.path)
@@ -468,6 +469,8 @@ const FileItem: React.FC<FileItemProps> = ({
         selectOffice(entry.path, officeType)
       } else if (isCode) {
         openCodeTab(entry.path, entry.name)
+      } else if (isPlugin && entry.pluginEditor) {
+        openPluginEditorTab(entry.pluginEditor.pluginId, entry.path, entry.pluginEditor.editorId, entry.name)
       } else {
         selectNote(noteId)
       }

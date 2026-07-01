@@ -217,7 +217,7 @@ describe('A1 P1-Fixes — Regressionen', () => {
     await expect(sources[0].loadEntry!()).rejects.toThrow(/boom-on-load/) // erst hier wird ausgeführt
   })
 
-  // P1.4: verifizierter Manifest-Entrypoint wird respektiert; Renderer-only abgelehnt.
+  // P1.4: verifizierter Manifest-Entrypoint wird respektiert; renderer-only ist erlaubt (Renderer-Plugin-Host).
   it('respektiert den Manifest-Entrypoint dist/main.js', async () => {
     const a = await packPluginArtifact({
       files: [
@@ -234,15 +234,20 @@ describe('A1 P1-Fixes — Regressionen', () => {
     expect((entry as { id: string }).id).toBe('ext-plugin')
   })
 
-  it('lehnt ein Renderer-only-Manifest im Main-Loader ab (entrypoint-unsupported)', async () => {
+  it('installiert ein Renderer-only-Manifest (main optional, ADR plugin-renderer-host §5.1)', async () => {
     const a = await packPluginArtifact({
       files: [
         { path: 'manifest.json', content: manifestBytes({ entrypoints: { renderer: 'renderer.js' } }) },
-        { path: 'renderer.js', content: Buffer.from('module.exports = {}\n', 'utf8') },
+        { path: 'renderer.js', content: Buffer.from('export default {}\n', 'utf8') },
       ],
       signKey: priv,
       keyId: KEY_ID,
     })
-    await expect(installPluginArtifact(a, env())).rejects.toMatchObject({ code: 'entrypoint-unsupported' })
+    const res = await installCommitted(a) // darf NICHT werfen — renderer-only ist gültig
+    expect(res.idempotent).toBe(false)
+    const { sources, errors } = discoverInstalledPlugins(env())
+    expect(errors).toEqual([])
+    expect(sources).toHaveLength(1)
+    expect(sources[0].loadEntry).toBeUndefined() // renderer-only → kein Main-Loader (require)
   })
 })

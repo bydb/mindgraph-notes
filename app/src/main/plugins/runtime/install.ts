@@ -63,6 +63,7 @@ export async function installPluginArtifact(archive: Buffer, env: InstallEnv): P
   let id: string
   let version: string
   let mainEntry: string | undefined
+  let rendererEntry: string | undefined
   try {
     const verified = await verifyPluginArtifact(archive, {
       keyring: env.keyring,
@@ -73,6 +74,7 @@ export async function installPluginArtifact(archive: Buffer, env: InstallEnv): P
     id = verified.id
     version = verified.version
     mainEntry = verified.manifest.entrypoints?.main
+    rendererEntry = verified.manifest.entrypoints?.renderer
   } catch (e) {
     rmSync(quarantineDir, { recursive: true, force: true })
     throw e
@@ -83,9 +85,10 @@ export async function installPluginArtifact(archive: Buffer, env: InstallEnv): P
     if (env.blockedIds.has(id)) {
       throw new ArtifactError('id-collision', `Plugin-ID '${id}' ist reserviert/gebündelt und kann nicht installiert werden`)
     }
-    // 3) Main-only-Loader: ein Manifest ohne main-Entrypoint (z.B. Renderer-only) wird abgelehnt.
-    if (!mainEntry) {
-      throw new ArtifactError('entrypoint-unsupported', `'${id}' hat keinen main-Entrypoint (Renderer-only wird in A1 nicht unterstützt)`)
+    // 3) Renderer-Plugin-Host (ADR plugin-renderer-host §5.1): main ODER renderer genügt.
+    //    (Das Manifest-Schema erzwingt `anyOf[main, renderer]` bereits; dies ist die Runtime-Spiegelung.)
+    if (!mainEntry && !rendererEntry) {
+      throw new ArtifactError('entrypoint-unsupported', `'${id}' hat weder main- noch renderer-Entrypoint`)
     }
     // 4) Symlink-/Traversal-sicherer Zielpfad (id/version aus dem verifizierten Manifest).
     const target = assertSafeStoreVersionDir(paths.storeDir, id, version)

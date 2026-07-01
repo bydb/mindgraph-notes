@@ -60,6 +60,7 @@ export type ArtifactErrorCode =
   | 'load-failed' // Entry ließ sich nicht als PluginMainEntry laden (Registry-Aktivierung)
   | 'entrypoint-unsupported' // z.B. Renderer-only-Manifest im Main-only-Loader
   | 'workflow-collision' // workflowAction-ID kollidiert mit einer Kern-/fremden Action
+  | 'fileEditor-collision' // ui.fileEditors-Endung kollidiert mit Kern-/fremder Plugin-Endung (ADR §8, F07)
   // — A2 (GitHub-Download/Install-Service, docs/plugin-store-A2-plan.md) —
   | 'repo-ref-invalid' // Eingabe ist kein gültiges owner/repo
   | 'release-not-found' // kein (Nicht-Prerelease-)Release / Tag auf GitHub

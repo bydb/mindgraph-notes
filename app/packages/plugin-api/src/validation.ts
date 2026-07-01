@@ -98,6 +98,18 @@ export const PLUGIN_MANIFEST_SCHEMA: JsonSchema = {
       },
       additionalProperties: false,
     },
+    // Datei-Editor-Beanspruchung (ADR plugin-renderer-host §8). Endungs-Form wird zusätzlich in
+    // validateManifestSemantics + dem FileEditorResolver normalisiert/geprüft.
+    fileEditorDecl: {
+      type: 'object',
+      required: ['editorId', 'extensions'],
+      properties: {
+        editorId: { type: 'string', minLength: 1 },
+        extensions: { type: 'array', minItems: 1, items: { type: 'string', minLength: 1 } },
+        label: { type: 'string' },
+      },
+      additionalProperties: false,
+    },
   },
   required: [
     'manifestVersion', 'id', 'version', 'label', 'description', 'category', 'capabilities',
@@ -245,6 +257,7 @@ export const PLUGIN_MANIFEST_SCHEMA: JsonSchema = {
         // SlotDecl strikt: nur die zwei Slot-Kategorien; KEIN `view`-Template (fromAction liefert die WidgetView).
         dashboardWidget: { $ref: '#/definitions/slotDecl' },
         sidebarPanel: { $ref: '#/definitions/slotDecl' },
+        fileEditors: { type: 'array', items: { $ref: '#/definitions/fileEditorDecl' } },
       },
       additionalProperties: false,
     },
@@ -343,6 +356,29 @@ export function validateManifestSemantics(manifest: PluginManifest): ValidationR
     const expectedSlot = slotKey === 'dashboardWidget' ? 'dashboard.widget' : 'sidebar.panel'
     if (manifest.ui?.[slotKey]?.slot !== expectedSlot) {
       errors.push(`ui.${slotKey}.slot muss exakt '${expectedSlot}' sein.`)
+    }
+  }
+
+  // Datei-Editor-Claims (ADR plugin-renderer-host §8): editorId eindeutig je Plugin. Normalisierung +
+  // Kern-/Cross-Plugin-Kollision macht der FileEditorResolver zur Laufzeit (braucht den globalen Zustand).
+  const seenEditorIds = new Set<string>()
+  for (const fe of manifest.ui?.fileEditors ?? []) {
+    if (seenEditorIds.has(fe.editorId)) {
+      errors.push(`Doppelte ui.fileEditors.editorId '${fe.editorId}'.`)
+    }
+    seenEditorIds.add(fe.editorId)
+  }
+
+  // Main-gebundene Beiträge brauchen einen main-Entrypoint (ADR plugin-renderer-host §5.1, R1-impl-F05):
+  // ohne `main` registriert kein Executor `actions`/`workflowActions` → das wären tote Verträge (und ein
+  // ui.*-Widget-`fromAction` hätte keinen Provider). Renderer-only beschränkt sich auf ui.fileEditors +
+  // settingsSchema + vault-Capabilities.
+  if (!manifest.entrypoints?.main) {
+    if (manifest.actions?.length) {
+      errors.push('Renderer-only-Plugin (ohne entrypoints.main) darf keine `actions` deklarieren — kein Executor registrierbar.')
+    }
+    if (manifest.workflowActions?.length) {
+      errors.push('Renderer-only-Plugin (ohne entrypoints.main) darf keine `workflowActions` deklarieren.')
     }
   }
 

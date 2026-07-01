@@ -99,6 +99,18 @@ export interface SlotDecl {
   fromAction: string
 }
 
+/** Deklarierte, signierte Datei-Editor-Beanspruchung: WELCHE Dateiendungen ein Renderer-Plugin als
+ *  Editor bedient. Der Host kennt Endung→Plugin so VOR jeder Code-Ausführung (FileEditorResolver) und
+ *  routet deterministisch; `registerFileEditor` bindet zur Laufzeit nur die Mount-Funktion an die
+ *  `editorId` und nennt KEINE eigenen Endungen (ADR plugin-renderer-host §6/§8). */
+export interface FileEditorDecl {
+  /** Stabile ID innerhalb des Plugins — verbindet den Manifest-Claim mit `registerFileEditor` zur Laufzeit. */
+  editorId: string
+  /** Beanspruchte Dateiendungen, z.B. `['.excalidraw']`. Normalisiert vom FileEditorResolver. */
+  extensions: string[]
+  label?: string
+}
+
 /** Autor eines Plugins. Bewusst Objekt (nicht String) — eine spätere Erweiterung um url/email
  *  bliebe additiv, eine String→Objekt-Umstellung wäre es nicht. */
 export interface PluginAuthor {
@@ -177,6 +189,9 @@ export interface PluginManifest {
     settingsTab?: boolean
     dashboardWidget?: SlotDecl
     sidebarPanel?: SlotDecl
+    /** Datei-Editor-Beanspruchungen (ADR plugin-renderer-host §8). Signiert + code-frei lesbar,
+     *  damit der Host Endung→Plugin VOR dem Laden kennt. */
+    fileEditors?: FileEditorDecl[]
   }
   privacy?: { containsPersonalData?: boolean; localOnly?: boolean }
 }
