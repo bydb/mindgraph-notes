@@ -2142,7 +2142,8 @@ h2 { letter-spacing: -0.016em; }
 .view-mode-toggle {
   display: flex;
   gap: 2px;
-  background-color: var(--bg-tertiary);
+  /* Petrol redesign (Stage 3): segmentierter Toggle auf --bg-secondary (Spec). */
+  background-color: var(--bg-secondary);
   border-radius: var(--radius-md);
   padding: 3px;
   height: 28px;
@@ -2170,7 +2171,8 @@ h2 { letter-spacing: -0.016em; }
 
 .toggle-btn.active {
   background-color: var(--accent-color);
-  color: white;
+  /* Petrol redesign (Stage 3): --accent-on statt hartem Weiß → lesbar auf hellem Dark-Mode-Teal. */
+  color: var(--accent-on);
 }
 
 /* ============ EDITOR PREVIEW ============ */
@@ -16676,7 +16678,7 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
 .flashcards-filter-badge {
   padding: 2px 6px;
   background: var(--accent-color);
-  color: white;
+  color: var(--accent-on);
   border-radius: var(--radius-full);
   font-size: 11px;
   font-weight: 600;
@@ -16878,7 +16880,8 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
   background: var(--accent-color);
   border: none;
   border-radius: var(--radius-md);
-  color: white;
+  /* Petrol redesign (Stage 3): --accent-on statt hartem Weiß (Dark-Mode-Kontrast). */
+  color: var(--accent-on);
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
