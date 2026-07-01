@@ -408,4 +408,54 @@ aber die Änderung ist korrekt (pint `dataFaceCount` auf `EMBEDDED_FONTS.length`
 (Version-Pin, exakte Counts, semantische Bundle-Asserts, non-data-URL-Check) ist unverändert intakt.
 
 **Status Build/Verify Runde 2:** `node build.mjs` grün (F12 + Gate: 21 data:-Faces, exakte Counts), styles.css
-612 KB, Live-Re-Verify bestanden (7 Familien echte Metriken + fail-closed ready). Uncommitted.
+612 KB, Live-Re-Verify bestanden (7 Familien echte Metriken + fail-closed ready). **Committet als `9a93064`** (Plugin-Repo).
+
+---
+
+## Runde-2-Code (F08/F09/F10) — wörtliche Kernstellen aus Commit `9a93064`
+
+Damit du gegen den echten Code prüfst statt gegen die Prosa oben. Dateien im Plugin-Repo `~/dev/mindgraph-excalidraw-plugin` @ `9a93064`: `build.mjs` (EMBEDDED_FONTS + Gate), `src/renderer.tsx` (Preload).
+
+### F08/F09 — `EMBEDDED_FONTS` (build.mjs, statische Tabelle, KEINE Größen-Heuristik)
+`SUPPORTED_FONT_FAMILIES` (renderer.tsx) = **7 Nicht-CJK-Familien**: Excalifont, Nunito, Comic Shanns, Virgil, Cascadia, Lilita One, Liberation Sans (Xiaolai/CJK bewusst draußen). `EMBEDDED_FONTS` hat **21 Einträge** (alle Subsets dieser 7), jeder `{ family, filename, unicodeRange, weight? }` — `unicodeRange` **1:1 aus Excalidraws `static init()`** (chunk-K2UTITRG.js), nicht geraten:
+
+```js
+export const EMBEDDED_FONTS = [
+  { family: 'Excalifont', filename: '…a88b72a2….woff2',
+    unicodeRange: 'U+20-7e,U+a1-a6,U+a8,U+ab-ac,…,U+2212' },
+  // … Excalifont-Latin-ext, Comic Shanns (3 Subsets), Virgil, Cascadia, Lilita One, Liberation Sans …
+  { family: 'Nunito', filename: '…', weight: '500',
+    unicodeRange: 'U+0460-052F,U+1C80-1C88,U+20B4,…' },
+]   // 21 Einträge / 7 Familien; build.mjs bettet jeden als data:-@font-face MIT unicodeRange ein.
+    // existsSync-fail-closed, wenn eine Font-Datei fehlt (kein stiller Teil-Erfolg).
+```
+
+### Gate (build.mjs, Post-Build) — gegen stillen Font-Rückfall bei Excalidraw-Update
+```js
+if (dataFaceCount !== EMBEDDED_FONTS.length)  // erwartet 21
+  gateFail.push(`eingebettete data:-Faces = ${dataFaceCount} (erwartet ${EMBEDDED_FONTS.length})`)
+// + styles.css: KEINE non-data Font-URL (url(<nicht data:>…woff2)) erlaubt
+// + Bundle: 0 lebendes document.fonts.load( / .fonts.add( / Accept:"font/woff2"
+// + exakte fontPatchCounts (createUrls:1 loadFontFaces:1 fonts.load:2 fetchFont:1 genFontFace:1)
+// + Excalidraw-Version-Pin 0.18.1 → Build ROT bei jeder anderen Version (Pflicht-Re-Audit)
+```
+
+### F10 — fail-closed Font-Preload (src/renderer.tsx, VOR `setPhase('ready')`)
+```tsx
+const fontFail: string[] = []
+for (const family of SUPPORTED_FONT_FAMILIES) {              // alle 7 Pflichtfamilien
+  const faces = [...document.fonts].filter((ff) => ff.family === family)
+  if (faces.length === 0) { fontFail.push(`${family}: kein Face registriert`); continue }
+  try { await Promise.all(faces.map((ff) => ff.load())) }    // Fehler NICHT verschluckt
+  catch (e) { fontFail.push(`${family}: load-Fehler …`); continue }
+  const notLoaded = faces.filter((ff) => ff.status !== 'loaded')  // .status statt document.fonts.check() (weight-sensibel)
+  if (notLoaded.length > 0) fontFail.push(`${family}: … nicht 'loaded'`)
+}
+if (fontFail.length > 0) { setPhase('font-error'); return }  // read-only; onChange-Guard: kein Autosave vor 'ready'
+setPhase('ready')
+```
+
+**Re-Check-Auftrag — bestätige geschlossen ODER benenne konkrete Restlücke:**
+- **F08:** deterministische Tabelle statt „größte Datei", jede Familie/jedes Subset mit **originaler** `unicodeRange` → Glyphen-Abdeckung == echtes Excalidraw (ein Zeichen, das die Familie nicht hat, fällt in Plugin UND Excalidraw gleich zurück → kein Drift).
+- **F09:** alle **7** auswählbaren Nicht-CJK-Familien eingebettet (Live: `measureText('Hallo Welt')` je Familie ≠ monospace).
+- **F10:** jede Pflichtfamilie muss `status==='loaded'` sein, sonst `font-error` + read-only, kein Autosave — Fehlerpfad ist fail-**closed**.
