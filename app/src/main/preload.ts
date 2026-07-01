@@ -116,6 +116,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('plugin:renderers-changed', handler)
     return () => ipcRenderer.removeListener('plugin:renderers-changed', handler)
   },
+  // Renderer→Main Aktivierungs-Ack (F06/§5.2): nach import(blob)+activate(host)+Staging meldet der
+  // Renderer den Ausgang für die rendererInstanceId; Main committet active.json erst nach { ok:true }.
+  pluginRendererActivated: (ack: unknown) => ipcRenderer.invoke('plugin:rendererActivated', ack),
+  // Gerichteter Teardown (F15/F16/§5.2/§5.5): Main→Renderer Request EINER instanceId, Renderer→Main Ack des Ausgangs.
+  onPluginRendererTeardown: (callback: (rendererInstanceId: string) => void) => {
+    const handler = (_e: unknown, id: string) => callback(id)
+    ipcRenderer.on('plugin:rendererTeardown', handler)
+    return () => ipcRenderer.removeListener('plugin:rendererTeardown', handler)
+  },
+  pluginRendererTornDown: (ack: unknown) => ipcRenderer.invoke('plugin:rendererTornDown', ack),
 
   // Notes-Cache für schnelles Laden
   saveNotesCache: (vaultPath: string, cache: object) => ipcRenderer.invoke('save-notes-cache', vaultPath, cache),
