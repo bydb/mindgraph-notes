@@ -821,11 +821,9 @@ export const SmartConnectionsPanel: React.FC<SmartConnectionsPanelProps> = ({ on
   }
 
   // Farbe basierend auf Ähnlichkeit
-  const getSimilarityColor = (similarity: number): string => {
-    if (similarity >= 0.8) return 'var(--color-success)'
-    if (similarity >= 0.6) return 'var(--color-warning)'
-    return 'var(--accent-color)'
-  }
+  // Petrol redesign (Claude Design): %-Text + Balken immer im Akzent — die Balkenlänge
+  // trägt den Wert, kein grün/orange-Heat-Scale mehr.
+  const getSimilarityColor = (_similarity: number): string => 'var(--accent-color)'
 
   return (
     <div className="smart-connections-panel">

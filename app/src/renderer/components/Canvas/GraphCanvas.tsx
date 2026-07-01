@@ -907,7 +907,8 @@ AlignmentToolbar.displayName = 'AlignmentToolbar'
 // Stabile Referenzen - MÜSSEN außerhalb der Komponente sein
 const nodeTypes = { note: NoteNode, pdf: PdfNode, label: LabelNode } as const
 const fitViewOptions = { padding: 0.2 }
-const connectionLineStyle = { stroke: 'var(--accent-color)', strokeWidth: 2 }
+// Petrol redesign: Verbindungs-Vorschau (Drag) ruhig/neutral statt Akzent.
+const connectionLineStyle = { stroke: 'var(--border-color)', strokeWidth: 1.4 }
 const defaultEdgeOptions = {
   type: 'default' as const,
   sourceHandle: 'source-right',

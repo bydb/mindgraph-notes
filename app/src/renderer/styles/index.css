@@ -4084,12 +4084,14 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
 
 /* ============ NOTE NODE ============ */
 .note-node {
-  border-radius: 8px;
-  border: 1px solid color-mix(in srgb, var(--node-border) 86%, var(--border-color));
+  /* Petrol redesign (Brain-Screen): ruhige Node-Chips — radius 10, neutraler Rand
+     (Kategorie sitzt im führenden Dot), weicher Schatten (Claude Design). */
+  border-radius: 10px;
+  border: 1px solid var(--border-color);
   background-color: var(--node-bg);
   cursor: pointer;
   transition: all var(--transition-normal);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.07);
   overflow: hidden;
 }
 
@@ -5840,27 +5842,30 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
   background-color: rgba(220, 53, 69, 0.9);
 }
 
+/* Petrol redesign (Brain-Screen): ruhige, neutrale Kanten (Claude Design) statt akzent-getönt. */
 /* Connection Line */
 .react-flow__connection-line {
-  stroke: color-mix(in srgb, var(--accent-color) 72%, var(--edge-color));
-  stroke-width: 2;
+  stroke: var(--border-color);
+  stroke-width: 1.4;
   stroke-linecap: round;
 }
 
-/* Edge selected */
+/* Edge selected (Auswahl bleibt akzentuiert als Feedback) */
 .react-flow__edge.selected .react-flow__edge-path {
   stroke: var(--accent-color);
-  stroke-width: 2.5;
+  stroke-width: 2;
 }
 
 .react-flow__edge-path {
+  stroke: var(--border-color);
+  stroke-width: 1.4;
   stroke-linecap: round;
   transition: stroke 0.15s ease, stroke-width 0.15s ease, opacity 0.15s ease;
 }
 
 .react-flow__edge:hover .react-flow__edge-path {
-  stroke: color-mix(in srgb, var(--accent-color) 64%, var(--edge-color));
-  stroke-width: 2.25;
+  stroke: color-mix(in srgb, var(--border-color) 55%, var(--text-muted));
+  stroke-width: 1.8;
 }
 
 /* ============ NODE HANDLES ============ */
@@ -20063,7 +20068,8 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
 
 .bc-hub {
   background: var(--bg-primary);
-  border: 1.5px solid color-mix(in srgb, #e85aad 45%, var(--border-color));
+  /* Petrol redesign: Datum-Cluster-Rand in Akzent statt Pink (#e85aad). */
+  border: 1.5px solid color-mix(in srgb, var(--accent-color) 42%, transparent);
   border-radius: 12px; padding: 10px 12px; min-width: 152px;
   box-shadow: 0 6px 18px rgba(0,0,0,0.08); cursor: pointer;
 }
