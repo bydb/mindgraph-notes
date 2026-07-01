@@ -8,6 +8,7 @@ import { WorkContextStrip } from './components/Editor/WorkContextStrip'
 import { GraphCanvas } from './components/Canvas/GraphCanvas'
 import { BrainConstellation } from './components/Canvas/BrainConstellation'
 import { BrainIcon } from './components/BrainIcon'
+import { MindGraphLogo } from './components/Shared/MindGraphLogo'
 import { WorkflowCanvasView } from './components/WorkflowCanvas/WorkflowCanvasView'
 import { LocalCanvas } from './components/Canvas/LocalCanvas'
 import { PDFViewer } from './components/PDFViewer/PDFViewer'
@@ -1088,37 +1089,7 @@ const App: React.FC = () => {
               {customLogo ? (
                 <img src={customLogo} width="22" height="22" style={{ borderRadius: '50%', objectFit: 'cover' }} />
               ) : (
-                <svg width="22" height="22" viewBox="0 0 100 100" fill="none">
-                  <circle className="logo-bg" cx="50" cy="50" r="48"/>
-                  {/* Verbindungslinien */}
-                  <g className="logo-lines" stroke="var(--accent-color)" strokeWidth="2.5">
-                    <line x1="50" y1="22" x2="35" y2="38"/>
-                    <line x1="50" y1="22" x2="65" y2="38"/>
-                    <line x1="35" y1="38" x2="65" y2="38"/>
-                    <line x1="35" y1="38" x2="25" y2="58"/>
-                    <line x1="35" y1="38" x2="50" y2="52"/>
-                    <line x1="65" y1="38" x2="75" y2="58"/>
-                    <line x1="65" y1="38" x2="50" y2="52"/>
-                    <line x1="25" y1="58" x2="50" y2="52"/>
-                    <line x1="75" y1="58" x2="50" y2="52"/>
-                    <line x1="25" y1="58" x2="38" y2="75"/>
-                    <line x1="50" y1="52" x2="38" y2="75"/>
-                    <line x1="50" y1="52" x2="62" y2="75"/>
-                    <line x1="75" y1="58" x2="62" y2="75"/>
-                    <line x1="38" y1="75" x2="62" y2="75"/>
-                  </g>
-                  {/* Nodes */}
-                  <g className="logo-nodes" fill="var(--accent-color)">
-                    <circle cx="50" cy="22" r="7"/>
-                    <circle cx="35" cy="38" r="7"/>
-                    <circle cx="65" cy="38" r="7"/>
-                    <circle cx="25" cy="58" r="7"/>
-                    <circle cx="50" cy="52" r="7"/>
-                    <circle cx="75" cy="58" r="7"/>
-                    <circle cx="38" cy="75" r="7"/>
-                    <circle cx="62" cy="75" r="7"/>
-                  </g>
-                </svg>
+                <MindGraphLogo size={22} />
               )}
             </div>
             <span className="app-title">MindGraph Notes</span>

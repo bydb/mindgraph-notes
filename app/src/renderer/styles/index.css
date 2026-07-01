@@ -444,15 +444,6 @@ h2 { letter-spacing: -0.016em; }
   filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.2));
 }
 
-.app-logo .logo-bg {
-  fill: #2d2a3e;
-  transition: fill var(--transition-smooth);
-}
-
-[data-theme="dark"] .app-logo .logo-bg {
-  fill: #e8e6f0;
-}
-
 .app-title {
   font-weight: 600;
   font-size: 13px;

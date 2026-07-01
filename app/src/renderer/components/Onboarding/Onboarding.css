@@ -31,12 +31,6 @@
   margin-bottom: 24px;
 }
 
-.onboarding-welcome-logo svg .logo-bg {
-  fill: var(--bg-secondary);
-  stroke: var(--border-color);
-  stroke-width: 1;
-}
-
 .onboarding-welcome-title {
   font-size: 28px;
   font-weight: 700;
