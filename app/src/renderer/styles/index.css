@@ -8150,11 +8150,38 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
   min-width: 160px;
 }
 
+/* Petrol redesign: Settings-Checkboxen sind Toggle-Switches wie im Module-Tab (Konsistenz
+   über alle Einstellungs-Tabs) — 38×22-Pill, weißer Knopf, Akzent wenn an. */
 .settings-row input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  position: relative;
+  flex-shrink: 0;
+  width: 38px;
+  height: 22px;
+  margin: 0;
+  border-radius: 999px;
+  background: var(--border-color);
+  cursor: pointer;
+  transition: background 0.18s ease;
+}
+.settings-row input[type="checkbox"]::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
   width: 18px;
   height: 18px;
-  accent-color: var(--accent-color);
-  cursor: pointer;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+  transition: transform 0.18s ease;
+}
+.settings-row input[type="checkbox"]:checked {
+  background: var(--accent-color);
+}
+.settings-row input[type="checkbox"]:checked::after {
+  transform: translateX(16px);
 }
 
 .settings-row input[type="number"] {
