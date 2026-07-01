@@ -6,6 +6,7 @@
 <title>Denkst du noch – oder lässt du denken? | MindGraph Notes</title>
 <meta name="description" content="Validierter Need-for-Cognition-Test (Bless et al. 1991) als Begleitung zu MindGraph Notes. Finde heraus, wo du als Wissensarbeiter:in mit KI kognitiv gewinnst – und wo du verlierst.">
 <link rel="canonical" href="https://mindgraph-notes.de/kognition.html">
+<link rel="icon" type="image/svg+xml" href="mindgraph-logo.svg">
 <link rel="icon" href="favicon.ico" sizes="48x48">
 <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
 <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
@@ -173,6 +174,73 @@ p { color: var(--text-mid); }
 .interpretation.mittel { background: rgba(255,178,74,.16); color: var(--amber); }
 .interpretation.eher-niedrig, .interpretation.niedrig { background: rgba(255,90,95,.16); color: var(--red); }
 .kurzform-hinweis { font-size: 0.85rem; color: var(--text-muted); margin-top: 0.7rem; padding-top: 0.8rem; border-top: 1px solid var(--border); }
+.profile-visual { padding: 1.2rem 0 .4rem; }
+.profile-title { text-align: center; margin-bottom: 1.25rem; }
+.profile-title .interpretation { font-size: clamp(1.05rem,2.5vw,1.3rem); }
+.profile-scale-wrap { position: relative; padding-top: 2.8rem; margin: 0 .3rem; }
+.profile-scale {
+  height: 18px;
+  border-radius: 100px;
+  background: linear-gradient(90deg,#d98b86 0 26.67%,#e7ba7b 26.67% 40%,#d9d5cc 40% 60%,#91bea0 60% 73.33%,#4e9668 73.33% 100%);
+  box-shadow: inset 0 0 0 1px rgba(28,26,23,.08);
+}
+.profile-marker {
+  position: absolute;
+  top: 0;
+  left: var(--profile-position);
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  transition: left .4s ease;
+}
+.profile-marker-label {
+  background: var(--text);
+  color: #fff;
+  font-size: .76rem;
+  font-weight: 800;
+  padding: .28rem .65rem;
+  border-radius: 100px;
+  white-space: nowrap;
+}
+.profile-marker::after {
+  content: '';
+  width: 3px;
+  height: 23px;
+  border-radius: 3px;
+  background: var(--text);
+}
+.profile-axis {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: .5rem;
+  margin-top: .65rem;
+  color: var(--text-muted);
+  font-size: .72rem;
+  line-height: 1.25;
+}
+.profile-axis span:nth-child(2) { text-align: center; }
+.profile-axis span:last-child { text-align: right; }
+.profile-explanation {
+  max-width: 650px;
+  margin: 1.6rem auto .5rem;
+  padding: 1rem 1.1rem;
+  border-radius: 12px;
+  background: #fff;
+  color: var(--text-mid);
+  text-align: left;
+  line-height: 1.6;
+}
+.profile-explanation strong { color: var(--text); }
+.profile-method {
+  margin-top: 1rem;
+  color: var(--text-muted);
+  font-size: .8rem;
+}
+.profile-method summary { cursor: pointer; text-align: center; }
+.profile-method-grid { display: grid; grid-template-columns: repeat(2,1fr); gap: .7rem; margin-top: .8rem; }
+.profile-method-grid .ergebnis-karte { padding: .8rem; }
+.profile-method-grid .wert { font-size: 1.5rem; }
 
 /* CTA */
 .cta-card { text-align: center; border: 1px solid var(--border); background:
@@ -187,11 +255,104 @@ p { color: var(--text-mid); }
 footer { text-align: center; padding: 2.2rem 1rem; color: var(--text-muted); font-size: 0.82rem; border-top: 1px solid var(--border); position: relative; z-index: 2; }
 footer a { color: var(--amber); text-decoration: none; }
 
+/* Petrol marketing design */
+:root {
+  --bg: #f7f4ee;
+  --bg2: #fbf9f5;
+  --surface: #ffffff;
+  --surface-2: #f0ede7;
+  --text: #1c1a17;
+  --text-mid: #5c574e;
+  --text-muted: #837b70;
+  --border: #e4dfd6;
+  --orange: #10696b;
+  --amber: #10696b;
+  --magenta: #d68c46;
+  --green: #15803d;
+  --green-deep: #166534;
+  --red: #c2413b;
+  --brand: linear-gradient(115deg,#10696b 0%,#168386 58%,#d68c46 100%);
+  --brand-soft: linear-gradient(135deg,rgba(16,105,107,.09),rgba(214,140,70,.08));
+}
+body { background: var(--bg); }
+.orb { opacity: .11; filter: blur(140px); }
+.orb-1 { background: radial-gradient(circle,#d68c46,transparent 70%); }
+.orb-2 { background: radial-gradient(circle,#10696b,transparent 70%); }
+.orb-3 { background: radial-gradient(circle,#15803d,transparent 70%); }
+.grain { opacity: .16; background-image: radial-gradient(rgba(28,26,23,.05) 1px,transparent 1px); }
+nav {
+  background: rgba(247,244,238,.9);
+  border-color: var(--border);
+  box-shadow: 0 1px 0 rgba(255,255,255,.7);
+}
+.logo { color: var(--text); }
+.nav-cta {
+  color: #fff;
+  background: var(--orange);
+  box-shadow: 0 5px 16px rgba(16,105,107,.18);
+}
+.nav-cta:hover { box-shadow: 0 8px 24px rgba(16,105,107,.25); }
+.lang-switch { background: #fff; }
+.lang-switch button.active { background: var(--orange); color: #fff; }
+.eyebrow { background: rgba(255,255,255,.75); color: var(--orange); }
+.eyebrow .pulse { background: var(--orange); }
+h1 {
+  font-family: Georgia,'Times New Roman',serif;
+  font-weight: 400;
+  letter-spacing: -.025em;
+}
+h1 .grad,
+.cta-card h2 .grad,
+.section-label,
+.stat .num,
+.science-item .big,
+.item-nr,
+.ergebnis-karte .wert {
+  color: var(--orange);
+  background: none;
+  -webkit-text-fill-color: currentColor;
+  filter: none;
+}
+h2 { font-family: Georgia,'Times New Roman',serif; font-weight: 400; }
+.btn-primary { background: var(--orange); color: #fff; box-shadow: 0 9px 26px rgba(16,105,107,.2); }
+.btn-primary:hover { box-shadow: 0 13px 34px rgba(16,105,107,.28); }
+.btn-ghost { background: #fff; }
+.card,
+.science-item {
+  background: #fff;
+  box-shadow: 0 16px 38px rgba(28,26,23,.045);
+}
+.lane.gain { background: linear-gradient(160deg,rgba(21,128,61,.09),#fff); border-color: rgba(21,128,61,.24); }
+.lane.loss { background: linear-gradient(160deg,rgba(194,65,59,.08),#fff); border-color: rgba(194,65,59,.22); }
+.gain .lane-tag,.gain h3 { color: var(--green); filter: none; }
+.loss .lane-tag,.loss h3 { color: var(--red); filter: none; }
+.gain .chip { background: rgba(21,128,61,.1); color: var(--green); }
+.instruktion { background: #eef6f4; border-left-color: var(--orange); }
+.radio-dot { border-color: #cfc8bc; background: #fff; }
+.antworten label:hover .radio-dot { border-color: var(--orange); }
+.antworten input[type="radio"]:checked + .radio-dot {
+  background: var(--orange);
+  color: #fff;
+  box-shadow: 0 0 0 4px rgba(16,105,107,.12);
+}
+.progress-bar { background: var(--orange); box-shadow: none; }
+.ergebnis-box { background: #eef6f4; border-color: rgba(16,105,107,.3); }
+.ergebnis-karte { background: #fff; }
+.interpretation.hoch,.interpretation.eher-hoch { color: var(--green); }
+.interpretation.mittel { color: #9a6700; }
+.interpretation.eher-niedrig,.interpretation.niedrig { color: var(--red); }
+.cta-card {
+  background: radial-gradient(120% 140% at 50% 0%,rgba(16,105,107,.1),transparent 60%),#fbf9f5;
+}
+.quellen a,footer a { color: var(--orange); }
+footer { background: rgba(255,255,255,.45); }
+
 @media (max-width: 640px) {
   .split { grid-template-columns: 1fr; }
   .ergebnis-grid { grid-template-columns: 1fr; }
   .stats { gap: 1.8rem; }
   .card { padding: 1.4rem; }
+  .profile-axis { font-size: .64rem; }
 }
 @media print { nav,.orb,.grain,.cta-card { display: none; } body { background:#fff; color:#000; } }
 </style>
@@ -203,7 +364,7 @@ footer a { color: var(--amber); text-decoration: none; }
 <div class="grain"></div>
 
 <nav>
-  <a href="./" class="logo"><img src="icon.png" alt="MindGraph Notes"> MindGraph Notes</a>
+  <a href="./" class="logo"><img src="mindgraph-logo.svg" alt=""> MindGraph Notes</a>
   <div class="nav-right">
     <a href="./#download" class="nav-cta" data-i18n="nav.cta">App holen &rarr;</a>
     <div class="lang-switch">
@@ -337,7 +498,8 @@ footer a { color: var(--amber); text-decoration: none; }
 </div>
 
 <footer>
-  MindGraph Notes &middot; <a href="./" data-i18n="foot.home">Startseite</a> &middot; <a href="./#download">Download</a> &middot; <a href="https://github.com/bydb/mindgraph-notes" target="_blank" rel="noopener noreferrer">GitHub</a>
+  <div style="margin-bottom:.6rem"><strong style="color:var(--text)">MindGraph erweitern:</strong> <a href="https://github.com/bydb/mindgraph-notes/tree/master/plugin-template">Plugin-Template</a> &middot; <a href="https://github.com/bydb/mindgraph-notes/tree/master/app/packages/plugin-api">Plugin-API</a></div>
+  MindGraph Notes &middot; <a href="./" data-i18n="foot.home">Startseite</a> &middot; <a href="./#download">Download</a> &middot; <a href="./blog/">Blog</a> &middot; <a href="https://github.com/bydb/mindgraph-notes" target="_blank" rel="noopener noreferrer">GitHub</a>
 </footer>
 
 <script>
@@ -441,6 +603,16 @@ const translations = {
     'js.shortPre': 'Kurzform (15 Items):',
     'js.shortSum': 'Summe',
     'js.shortMean': 'Mittelwert',
+    'js.youAreHere': 'Du bist hier',
+    'js.axisLow': 'Denkanstrengung eher vermeiden',
+    'js.axisMid': 'situationsabhängig',
+    'js.axisHigh': 'Denkanstrengung aktiv suchen',
+    'js.method': 'Methodische Werte anzeigen',
+    'profile.hoch': '<strong>Was das bedeutet:</strong> Du suchst geistige Herausforderungen aktiv und empfindest anspruchsvolles Denken meist als befriedigend. Nutze KI vor allem als Sparringspartner – nicht als Abkürzung.',
+    'profile.eher-hoch': '<strong>Was das bedeutet:</strong> Du denkst überdurchschnittlich gern und bleibst auch bei komplexen Aufgaben eher dran. Achte darauf, dass KI dir neue Perspektiven gibt, statt den Denkweg vorwegzunehmen.',
+    'profile.mittel': '<strong>Was das bedeutet:</strong> Ob du dich auf anspruchsvolles Denken einlässt, hängt stark von Situation, Interesse und Energie ab. Lege bewusst fest, wann KI unterstützen darf und wann du zuerst selbst denkst.',
+    'profile.eher-niedrig': '<strong>Was das bedeutet:</strong> Geistig anstrengende Aufgaben kosten dich eher Überwindung. Das ist kein Defizit – aber ein guter Anlass, KI erst nach einem eigenen Denkversuch einzusetzen.',
+    'profile.niedrig': '<strong>Was das bedeutet:</strong> Du bevorzugst meist klare, wenig belastende Denkwege. Nutze KI bewusst dosiert und baue kleine Phasen des eigenen Erinnerns, Prüfens und Begründens ein.',
     'int.hoch': 'Hohes Need for Cognition – ausgeprägte Freude am Denken',
     'int.eher-hoch': 'Eher hohes Need for Cognition – überdurchschnittliche Denkfreude',
     'int.mittel': 'Durchschnittliches Need for Cognition – moderate Ausprägung',
@@ -505,6 +677,16 @@ const translations = {
     'js.shortPre': 'Short form (15 items):',
     'js.shortSum': 'Sum',
     'js.shortMean': 'Mean',
+    'js.youAreHere': 'You are here',
+    'js.axisLow': 'tend to avoid mental effort',
+    'js.axisMid': 'depends on the situation',
+    'js.axisHigh': 'actively seek mental effort',
+    'js.method': 'Show methodological values',
+    'profile.hoch': '<strong>What this means:</strong> You actively seek mental challenges and usually find demanding thought satisfying. Use AI primarily as a sparring partner, not a shortcut.',
+    'profile.eher-hoch': '<strong>What this means:</strong> You enjoy thinking more than average and tend to stay with complex tasks. Let AI provide new perspectives without taking over the path to the answer.',
+    'profile.mittel': '<strong>What this means:</strong> Whether you engage in demanding thought depends strongly on context, interest and energy. Decide deliberately when AI may help and when you will think first.',
+    'profile.eher-niedrig': '<strong>What this means:</strong> Mentally demanding tasks tend to require extra effort from you. That is not a deficit, but a good reason to use AI only after making your own first attempt.',
+    'profile.niedrig': '<strong>What this means:</strong> You generally prefer clear paths that require less mental effort. Use AI in measured doses and add small moments of recalling, checking and explaining for yourself.',
     'int.hoch': 'High Need for Cognition – a strong enjoyment of thinking',
     'int.eher-hoch': 'Fairly high Need for Cognition – above-average enjoyment of thinking',
     'int.mittel': 'Average Need for Cognition – a moderate level',
@@ -608,23 +790,39 @@ function update() {
   const r = interpret(result.mean);
   const sfR = interpret(result.sfMean);
   const sfShort = sfR.text.split(' – ')[0];
+  const position = Math.max(4, Math.min(96, ((result.mean + 3) / 6) * 100));
   box.innerHTML = `
-    <div class="ergebnis-grid">
-      <div class="ergebnis-karte">
-        <div class="wert">${result.sum > 0 ? '+' : ''}${result.sum.toFixed(0)}</div>
-        <div class="label">${T('js.sumLabel')}<br><span style="font-size:.75rem">${T('js.sumRange')}</span></div>
-      </div>
-      <div class="ergebnis-karte">
-        <div class="wert">${result.mean > 0 ? '+' : ''}${result.mean.toFixed(2)}</div>
-        <div class="label">${T('js.meanLabel')}<br><span style="font-size:.75rem">${T('js.meanScale')}</span></div>
-      </div>
-      <div class="ergebnis-karte gross">
+    <div class="profile-visual">
+      <div class="profile-title">
         <div class="interpretation ${r.label}">${r.text}</div>
       </div>
+      <div class="profile-scale-wrap" style="--profile-position:${position.toFixed(1)}%">
+        <div class="profile-marker"><span class="profile-marker-label">${T('js.youAreHere')}</span></div>
+        <div class="profile-scale" role="img" aria-label="${r.text}"></div>
+        <div class="profile-axis">
+          <span>${T('js.axisLow')}</span>
+          <span>${T('js.axisMid')}</span>
+          <span>${T('js.axisHigh')}</span>
+        </div>
+      </div>
+      <div class="profile-explanation">${T('profile.' + r.label)}</div>
     </div>
-    <div class="kurzform-hinweis">
-      <strong>${T('js.shortPre')}</strong> ${T('js.shortSum')} ${result.sfSum > 0 ? '+' : ''}${result.sfSum.toFixed(0)} · ${T('js.shortMean')} ${result.sfMean > 0 ? '+' : ''}${result.sfMean.toFixed(2)} (${sfShort}). Cronbachs α = .83.
-    </div>`;
+    <details class="profile-method">
+      <summary>${T('js.method')}</summary>
+      <div class="profile-method-grid">
+        <div class="ergebnis-karte">
+          <div class="wert">${result.sum > 0 ? '+' : ''}${result.sum.toFixed(0)}</div>
+          <div class="label">${T('js.sumLabel')}<br><span style="font-size:.75rem">${T('js.sumRange')}</span></div>
+        </div>
+        <div class="ergebnis-karte">
+          <div class="wert">${result.mean > 0 ? '+' : ''}${result.mean.toFixed(2)}</div>
+          <div class="label">${T('js.meanLabel')}<br><span style="font-size:.75rem">${T('js.meanScale')}</span></div>
+        </div>
+      </div>
+      <div class="kurzform-hinweis">
+        <strong>${T('js.shortPre')}</strong> ${T('js.shortSum')} ${result.sfSum > 0 ? '+' : ''}${result.sfSum.toFixed(0)} · ${T('js.shortMean')} ${result.sfMean > 0 ? '+' : ''}${result.sfMean.toFixed(2)} (${sfShort}). Cronbachs α = .83.
+      </div>
+    </details>`;
 }
 
 function setLanguage(lang) {
