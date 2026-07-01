@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<meta name="design_doc_mode" content="canvas">
+<style>
+  *,*::before,*::after{box-sizing:border-box}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;-webkit-font-smoothing:antialiased}
+  button{font-family:inherit}
+</style>
+</helmet>
+<div style="--canvas:{{canvas}};--bg:{{bg}};--chrome:{{chrome}};--panel:{{panel}};--bg2:{{bg2}};--text:{{text}};--text2:{{text2}};--text3:{{text3}};--text4:{{text4}};--border:{{border}};--border2:{{border2}};--accent:{{accent}};--accentText:{{accentText}};--accentWeak:{{accentWeak}};--catRed:{{catRed}};--catGreen:{{catGreen}};--catBlue:{{catBlue}};--amber:{{amber}};min-height:100vh;background:var(--canvas,#e8e9ec);padding:34px 40px;color:var(--text,#1a1a1a)">
+
+  <div style="display:flex;align-items:center;gap:16px;margin-bottom:22px">
+    <div style="font-size:15px;font-weight:700;letter-spacing:-.01em;color:var(--text,#1a1a1a)">App-Redesign · Petrol</div>
+    <div style="font-size:12.5px;color:var(--text3,#9ca3af)">Screen 1 von 5 · Dashboard · Editor, Brain, Mail &amp; Einstellungen folgen</div>
+    <div style="flex:1"></div>
+    <button onClick="{{ toggle }}" style="display:inline-flex;align-items:center;gap:8px;font-size:13px;font-weight:600;color:var(--text2,#6b7280);background:var(--panel,#fff);border:1px solid var(--border,#e6e7e9);border-radius:10px;padding:8px 14px;cursor:pointer">
+      <span style="width:14px;height:14px;border-radius:50%;background:var(--accent,#10696b);display:inline-block"></span>{{ themeLabel }}
+    </button>
+  </div>
+
+  <div style="width:1120px;background:var(--panel,#fff);border:1px solid var(--border,#e6e7e9);border-radius:14px;box-shadow:0 20px 55px rgba(0,0,0,.16);overflow:hidden">
+
+    <div style="display:flex;align-items:center;padding:0 14px;height:46px;background:var(--chrome,#f4f5f7);border-bottom:1px solid var(--border,#e6e7e9);gap:14px">
+      <div style="display:flex;align-items:center;gap:9px;flex:1;min-width:0">
+        <span style="display:flex;gap:7px"><span style="width:11px;height:11px;border-radius:50%;background:#ff5f57"></span><span style="width:11px;height:11px;border-radius:50%;background:#febc2e"></span><span style="width:11px;height:11px;border-radius:50%;background:#28c840"></span></span>
+        <svg width="22" height="22" viewBox="0 0 32 32" style="flex:none;margin-left:8px"><rect width="32" height="32" rx="8" style="fill:var(--accent,#10696b)"></rect><g stroke="#fff" stroke-width="1.5" stroke-linecap="round"><line x1="16" y1="16" x2="16" y2="7.5"></line><line x1="16" y1="16" x2="8" y2="23"></line><line x1="16" y1="16" x2="24" y2="23"></line><line x1="8" y1="23" x2="24" y2="23"></line></g><g fill="#fff"><circle cx="16" cy="16" r="3"></circle><circle cx="16" cy="7.5" r="2.3"></circle><circle cx="8" cy="23" r="2.3"></circle><circle cx="24" cy="23" r="2.3"></circle></g></svg>
+        <span style="font-weight:600;font-size:13.5px;color:var(--text,#1a1a1a)">MindGraph Notes</span>
+        <span style="display:inline-flex;align-items:center;gap:5px;font-size:10px;font-weight:600;color:var(--accent,#10696b);border:1px solid var(--border,#e6e7e9);border-radius:100px;padding:2px 8px"><span style="width:5px;height:5px;border-radius:50%;background:var(--accent,#10696b)"></span>0.9 Petrol</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:3px;background:var(--bg2,#f7f8f9);border-radius:10px;padding:3px">
+        <button onClick="{{ goEditor }}" style="{{ navEditor }}">Editor</button>
+        <button style="display:flex;align-items:center;font-size:12.5px;color:var(--text2,#6b7280);background:none;border:none;border-radius:7px;padding:5px 12px;cursor:pointer">Split</button>
+        <button onClick="{{ goBrain }}" style="{{ navBrain }}">Brain</button>
+        <button onClick="{{ goDash }}" style="{{ navDash }}">Dashboard</button>
+      </div>
+      <div style="display:flex;align-items:center;justify-content:flex-end;gap:14px;flex:1;color:var(--text3,#9ca3af)">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+        <button onClick="{{ goSettings }}" title="Einstellungen" style="background:none;border:none;padding:0;cursor:pointer;color:inherit;display:flex"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><line x1="4" y1="8" x2="20" y2="8"></line><line x1="4" y1="16" x2="20" y2="16"></line><circle cx="9" cy="8" r="2.3"></circle><circle cx="15" cy="16" r="2.3"></circle></svg></button>
+        <button onClick="{{ goMail }}" title="Posteingang" style="background:none;border:none;padding:0;cursor:pointer;color:inherit;display:flex"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2.5"></rect><path d="m3.5 7 8.5 6 8.5-6"></path></svg></button>
+      </div>
+    </div>
+
+    <div style="display:flex;height:720px">
+      <div style="width:236px;background:var(--chrome,#f4f5f7);border-right:1px solid var(--border,#e6e7e9);display:flex;flex-direction:column;min-width:0">
+        <div style="display:flex;align-items:flex-start;padding:14px 14px 12px;gap:8px"><span style="flex:1;font-size:11px;font-weight:700;letter-spacing:.09em;line-height:1.35;color:var(--text3,#9ca3af)">MINDGRAPH<br>NOTES</span><span style="width:24px;height:24px;border-radius:7px;background:var(--accent,#10696b);display:inline-flex;align-items:center;justify-content:center"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg></span></div>
+        <div style="padding:2px 14px 12px"><div style="font-size:15px;font-weight:700;color:var(--text,#1a1a1a)">2026</div><div style="font-size:11px;color:var(--text3,#9ca3af);margin-top:2px">6 Notizen · Notes</div></div>
+        <div style="display:flex;gap:7px;padding:0 14px 14px">
+          <span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--text2,#6b7280);background:var(--panel,#fff);border:1px solid var(--border,#e6e7e9);border-radius:999px;padding:4px 10px"><span style="width:8px;height:8px;border-radius:50%;background:var(--catRed,#dc2626)"></span>1</span>
+          <span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--text2,#6b7280);background:var(--panel,#fff);border:1px solid var(--border,#e6e7e9);border-radius:999px;padding:4px 10px"><span style="width:8px;height:8px;border-radius:50%;background:var(--catGreen,#15803d)"></span>1</span>
+          <span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--text3,#9ca3af);background:var(--panel,#fff);border:1px solid var(--border,#e6e7e9);border-radius:999px;padding:4px 10px"><span style="width:8px;height:8px;border-radius:50%;background:var(--catBlue,#256fd1)"></span>0</span>
+        </div>
+        <div style="padding:2px 8px;flex:1;overflow:hidden;font-size:13px;color:var(--text2,#6b7280)">
+          <div style="display:flex;align-items:center;gap:8px;padding:6px 8px"><span style="color:var(--text4,#c2c6cc);font-size:10px">▾</span><svg width="15" height="15" viewBox="0 0 24 24"><path d="M2 6.5A1.5 1.5 0 0 1 3.5 5H9l2 2h9.5A1.5 1.5 0 0 1 22 8.5v9A1.5 1.5 0 0 1 20.5 19h-17A1.5 1.5 0 0 1 2 17.5z" fill="var(--amber,#c98a2a)"></path></svg><span style="flex:1">Notes</span><span style="color:var(--text4,#c2c6cc);font-size:11px">2</span></div>
+          <div style="display:flex;align-items:center;gap:8px;padding:6px 8px 6px 30px"><span style="width:8px;height:8px;border-radius:50%;background:var(--catRed,#dc2626);flex:none"></span><span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Ermöglichung durch KI</span></div>
+          <div style="display:flex;align-items:center;gap:8px;padding:6px 8px 6px 30px;border-radius:8px;background:var(--accentWeak,#e7f1f0)"><span style="width:8px;height:8px;border-radius:50%;background:var(--catGreen,#15803d);flex:none"></span><span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500;color:var(--text,#1a1a1a)">Optimierung vs. Transformation</span></div>
+          <div style="display:flex;align-items:center;gap:8px;padding:6px 8px"><span style="color:var(--text4,#c2c6cc);font-size:10px">▾</span><svg width="15" height="15" viewBox="0 0 24 24"><path d="M2 6.5A1.5 1.5 0 0 1 3.5 5H9l2 2h9.5A1.5 1.5 0 0 1 22 8.5v9A1.5 1.5 0 0 1 20.5 19h-17A1.5 1.5 0 0 1 2 17.5z" fill="var(--amber,#c98a2a)"></path></svg><span style="flex:1">Projekte</span><span style="color:var(--text4,#c2c6cc);font-size:11px">2</span></div>
+          <div style="display:flex;align-items:center;gap:8px;padding:6px 8px 6px 44px"><span style="font-size:8px;font-weight:700;color:var(--catRed,#dc2626);border:1px solid var(--border,#e6e7e9);border-radius:4px;padding:1px 3px;flex:none">PDF</span><span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Reinmann 2023 – Deskilling</span></div>
+        </div>
+      </div>
+
+      <div style="flex:1;display:flex;flex-direction:column;background:var(--bg,#fff);min-width:0">
+        <div style="display:flex;align-items:center;gap:6px;padding:8px 14px;border-bottom:1px solid var(--border2,#eef0f2);background:var(--panel,#fff);overflow:hidden">
+          <span style="display:inline-flex;align-items:center;gap:7px;font-size:12.5px;color:var(--text2,#6b7280);padding:6px 12px;border-radius:8px;background:var(--bg2,#f7f8f9);max-width:200px"><span style="width:7px;height:7px;border-radius:50%;background:var(--catGreen,#15803d);flex:none"></span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Optimierung vs. Transformation</span></span>
+          <span style="display:inline-flex;align-items:center;gap:7px;font-size:12.5px;font-weight:600;color:var(--text,#1a1a1a);padding:6px 13px;border-radius:8px;background:var(--bg2,#f7f8f9);border:1px solid var(--border,#e6e7e9)">Dashboard</span>
+        </div>
+
+        <div style="flex:1;overflow:hidden">
+          <sc-if value="{{ isDash }}" hint-placeholder-val="{{ true }}">
+            <div style="padding:26px 30px;display:flex;flex-direction:column;gap:16px">
+              <div style="display:flex;align-items:flex-end;justify-content:space-between">
+                <div><div style="font-size:26px;font-weight:600;letter-spacing:-.02em;color:var(--text,#1a1a1a)">Dashboard</div><div style="font-size:13px;color:var(--text3,#9ca3af);margin-top:3px">Donnerstag, 25. Juni 2026</div></div>
+                <span style="display:inline-flex;align-items:center;gap:7px;font-size:12px;color:var(--text2,#6b7280);border:1px solid var(--border,#e6e7e9);border-radius:9px;padding:7px 12px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7"></path><polyline points="21 3 21 8 16 8"></polyline></svg>Aktualisieren</span>
+              </div>
+              <div style="border:1px solid var(--border,#e6e7e9);border-radius:14px;padding:16px 18px;display:flex;align-items:center;gap:15px">
+                <span style="width:36px;height:36px;border-radius:50%;border:1.5px solid var(--border,#e6e7e9);display:inline-flex;align-items:center;justify-content:center;flex:none"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--text3,#9ca3af)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></span>
+                <div style="flex:1;min-width:0"><div style="font-size:11px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--text3,#9ca3af);margin-bottom:3px">Fokus heute</div><div style="font-size:14px;color:var(--text2,#6b7280)">Keine Deadlines, kein Rückstau — nutze den Freiraum.</div></div>
+                <span style="font-size:12px;color:var(--text4,#c2c6cc)">0 fällig</span>
+              </div>
+              <div style="display:flex;gap:16px;align-items:stretch">
+                <div style="flex:1.55;border:1px solid var(--border,#e6e7e9);border-radius:14px;padding:16px 18px;display:flex;flex-direction:column;min-width:0">
+                  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px"><span style="font-size:11px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--text3,#9ca3af)">Relevante Notizen</span><span style="font-size:11px;color:var(--text4,#c2c6cc)">qwen3.5:4b</span></div>
+                  <div style="display:flex;align-items:center;gap:13px;padding:12px 0 10px"><span style="width:36px;height:28px;border-radius:8px;background:var(--bg2,#f7f8f9);color:var(--text2,#6b7280);font-size:13px;font-weight:600;display:inline-flex;align-items:center;justify-content:center;flex:none">41</span><div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:600;color:var(--text,#1a1a1a);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Ermöglichung durch KI</div><div style="font-size:12px;color:var(--text3,#9ca3af);margin-top:2px;display:flex;align-items:center;gap:7px"><span style="width:6px;height:6px;border-radius:50%;background:var(--catRed,#dc2626)"></span>Problem · kürzlich aktiv · Notes</div></div><span style="color:var(--text4,#c2c6cc);font-size:15px">›</span></div>
+                  <div style="height:1px;background:var(--border2,#eef0f2)"></div>
+                  <div style="font-size:12px;color:var(--text4,#c2c6cc);padding-top:10px">5 weitere Notizen unter dem Radar</div>
+                </div>
+                <div style="flex:1;display:flex;flex-direction:column;gap:16px;min-width:0">
+                  <div style="border:1px solid var(--border,#e6e7e9);border-radius:14px;padding:15px 18px;display:flex;align-items:center;justify-content:space-between"><span style="font-size:11px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--text3,#9ca3af)">Aufgaben</span><span style="font-size:13px;color:var(--text4,#c2c6cc)">Nichts fällig</span></div>
+                  <div style="border:1px solid var(--border,#e6e7e9);border-radius:14px;padding:15px 18px">
+                    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px"><span style="font-size:11px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--text3,#9ca3af)">Gehirn · Tagesgedächtnis</span><span style="font-size:11px;color:var(--text4,#c2c6cc)">qwen3.5:4b</span></div>
+                    <div style="display:flex;align-items:center;gap:11px"><span style="width:8px;height:8px;border-radius:50%;background:var(--amber,#c98a2a);flex:none"></span><span style="font-size:13px;color:var(--text2,#6b7280);flex:1">Heute noch nicht verdichtet</span><span style="font-size:12px;font-weight:600;color:var(--accentText,#fff);background:var(--accent,#10696b);border-radius:8px;padding:6px 13px">Verdichten</span></div>
+                  </div>
+                </div>
+              </div>
+              <div style="border:1px solid var(--border2,#eef0f2);border-radius:14px;background:var(--bg2,#f7f8f9);display:flex;padding:15px 8px">
+                <div style="flex:1;text-align:center;border-right:1px solid var(--border2,#eef0f2)"><div style="font-size:22px;font-weight:600;color:var(--text,#1a1a1a)">6</div><div style="font-size:10.5px;color:var(--text3,#9ca3af);margin-top:2px">Notizen</div></div>
+                <div style="flex:1;text-align:center;border-right:1px solid var(--border2,#eef0f2)"><div style="font-size:22px;font-weight:600;color:var(--text4,#c2c6cc)">0</div><div style="font-size:10.5px;color:var(--text3,#9ca3af);margin-top:2px">heute berührt</div></div>
+                <div style="flex:1;text-align:center;border-right:1px solid var(--border2,#eef0f2)"><div style="font-size:22px;font-weight:600;color:var(--text,#1a1a1a)">6</div><div style="font-size:10.5px;color:var(--text3,#9ca3af);margin-top:2px">neu (7 T)</div></div>
+                <div style="flex:1;text-align:center;border-right:1px solid var(--border2,#eef0f2)"><div style="font-size:22px;font-weight:600;color:var(--text,#1a1a1a)">44</div><div style="font-size:10.5px;color:var(--text3,#9ca3af);margin-top:2px">Signale</div></div>
+                <div style="flex:1;text-align:center"><div style="font-size:22px;font-weight:600;color:var(--text4,#c2c6cc)">0</div><div style="font-size:10.5px;color:var(--text3,#9ca3af);margin-top:2px">Aktionen</div></div>
+              </div>
+            </div>
+          </sc-if>
+          <sc-if value="{{ isEditor }}" hint-placeholder-val="{{ false }}">
+            <div style="height:100%;display:flex;min-width:0">
+              <div style="flex:1;display:flex;flex-direction:column;min-width:0">
+                <div style="display:flex;align-items:center;gap:12px;padding:11px 26px;border-bottom:1px solid var(--border2,#eef0f2)">
+                  <span style="color:var(--text4,#c2c6cc);font-size:16px">‹&nbsp;›</span>
+                  <span style="flex:1;font-size:13px;color:var(--text2,#6b7280)">Notes / Optimierung vs. Transformation</span>
+                  <span style="display:inline-flex;align-items:center;gap:6px;font-size:11.5px;color:var(--text2,#6b7280);border:1px solid var(--border,#e6e7e9);border-radius:8px;padding:5px 10px">PDF</span>
+                  <span style="display:inline-flex;gap:2px;background:var(--bg2,#f7f8f9);border-radius:8px;padding:3px"><span style="padding:4px 9px;border-radius:6px;color:var(--text3,#9ca3af);font-size:12px">Schreiben</span><span style="padding:4px 9px;border-radius:6px;background:var(--accent,#10696b);color:var(--accentText,#fff);font-size:12px;font-weight:600">Lesen</span></span>
+                </div>
+                <div style="flex:1;overflow:hidden;padding:28px 34px">
+                  <div style="font-size:27px;font-weight:700;letter-spacing:-.02em;color:var(--text,#1a1a1a)">Optimierung vs. Transformation</div>
+                  <div style="height:1px;background:var(--border2,#eef0f2);margin:16px 0 20px"></div>
+                  <p style="font-size:15px;line-height:1.7;color:var(--text2,#6b7280);margin:0 0 18px">KI lässt sich auf zwei grundverschiedene Arten einführen: als <b style="color:var(--text,#1a1a1a)">Optimierung</b> bestehender Abläufe — oder als <b style="color:var(--text,#1a1a1a)">Transformation</b>, die Prozesse neu denkt.</p>
+                  <div style="font-size:18px;font-weight:600;color:var(--text,#1a1a1a);margin:0 0 10px">Zwei Wege der Einführung</div>
+                  <p style="font-size:15px;line-height:1.7;color:var(--text2,#6b7280);margin:0 0 18px">Optimierung senkt Kosten im bestehenden Rahmen; Transformation verändert, <em>was</em> überhaupt getan wird — und wo menschliche Kompetenz gebraucht wird.</p>
+                  <div style="border-left:3px solid var(--accent,#10696b);background:var(--accentWeak,#e7f1f0);border-radius:0 10px 10px 0;padding:13px 16px;font-size:14px;line-height:1.6;color:var(--text,#1a1a1a)"><b>Kernidee:</b> Wer nur optimiert, riskiert Deskilling. Wer transformiert, muss Kompetenz bewusst neu aufbauen.</div>
+                  <div style="margin-top:18px;border:1px dashed var(--border,#e6e7e9);border-radius:12px;height:118px;display:flex;align-items:center;justify-content:center;color:var(--text3,#9ca3af);font-size:11.5px;font-family:ui-monospace,Menlo,monospace">Diagramm · Optimierung ↔ Transformation</div>
+                </div>
+                <div style="display:flex;align-items:center;gap:12px;padding:10px 26px;border-top:1px solid var(--border2,#eef0f2);font-size:11px;color:var(--text3,#9ca3af)"><span>758 Wörter</span><span style="color:var(--border,#e6e7e9)">·</span><span>5.572 Zeichen</span><span style="color:var(--border,#e6e7e9)">·</span><span>~4 min Lesezeit</span></div>
+              </div>
+              <div style="width:322px;border-left:1px solid var(--border,#e6e7e9);background:var(--panel,#fff);display:flex;flex-direction:column;min-width:0">
+                <div style="display:flex;align-items:center;justify-content:space-between;padding:15px 18px;border-bottom:1px solid var(--border2,#eef0f2)"><span style="display:inline-flex;align-items:center;gap:8px;font-size:13.5px;font-weight:600;color:var(--text,#1a1a1a)">Karteikarten <span style="font-size:11px;color:var(--text3,#9ca3af);font-weight:500">3</span></span><span style="color:var(--text3,#9ca3af);font-size:16px">＋</span></div>
+                <div style="display:flex;gap:16px;padding:11px 18px;border-bottom:1px solid var(--border2,#eef0f2);font-size:12.5px">
+                  <span style="color:var(--accent,#10696b);font-weight:600;border-bottom:2px solid var(--accent,#10696b);padding-bottom:7px">Alle</span>
+                  <span style="color:var(--text3,#9ca3af)">Fällig <span style="color:var(--accent,#10696b);font-weight:600">1</span></span>
+                  <span style="color:var(--text3,#9ca3af)">Neu <span style="color:var(--accent,#10696b);font-weight:600">1</span></span>
+                  <span style="color:var(--text3,#9ca3af)">Statistik</span>
+                </div>
+                <div style="flex:1;overflow:hidden;padding:12px 14px">
+                  <div style="border:1px solid var(--border,#e6e7e9);border-radius:11px;padding:13px 14px;margin-bottom:10px"><div style="font-size:13px;color:var(--text,#1a1a1a);line-height:1.45;margin-bottom:9px">Was unterscheidet Optimierung von Transformation?</div><div style="display:flex;align-items:center;gap:8px"><span style="font-size:10.5px;color:var(--text3,#9ca3af)">KI-Strategie</span><span style="font-size:9.5px;font-weight:600;color:var(--accent,#10696b);background:var(--accentWeak,#e7f1f0);border-radius:20px;padding:2px 8px">Fällig</span></div></div>
+                  <div style="border:1px solid var(--border,#e6e7e9);border-radius:11px;padding:13px 14px;margin-bottom:10px"><div style="font-size:13px;color:var(--text,#1a1a1a);line-height:1.45;margin-bottom:9px">Nenne ein Beispiel für inkrementelle Optimierung.</div><div style="display:flex;align-items:center;gap:8px"><span style="font-size:10.5px;color:var(--text3,#9ca3af)">KI-Strategie</span><span style="font-size:9.5px;font-weight:600;color:var(--text3,#9ca3af);background:var(--bg2,#f7f8f9);border-radius:20px;padding:2px 8px">In 2 Tagen</span></div></div>
+                  <div style="border:1px solid var(--border,#e6e7e9);border-radius:11px;padding:13px 14px"><div style="font-size:13px;color:var(--text,#1a1a1a);line-height:1.45;margin-bottom:9px">Welche Rolle spielt Deskilling dabei?</div><div style="display:flex;align-items:center;gap:8px"><span style="font-size:10.5px;color:var(--text3,#9ca3af)">Kompetenz</span><span style="font-size:9.5px;font-weight:600;color:var(--catGreen,#15803d);background:color-mix(in srgb,var(--catGreen,#15803d) 15%,transparent);border-radius:20px;padding:2px 8px">Neu</span></div></div>
+                </div>
+                <div style="padding:12px 14px;border-top:1px solid var(--border2,#eef0f2)"><div style="background:var(--accent,#10696b);color:var(--accentText,#fff);text-align:center;font-size:13px;font-weight:600;border-radius:10px;padding:11px">▶  1 fällige Karte lernen</div></div>
+              </div>
+            </div>
+          </sc-if>
+          <sc-if value="{{ isBrain }}" hint-placeholder-val="{{ false }}">
+            <div style="height:100%;display:flex;min-width:0">
+              <div style="flex:1;display:flex;flex-direction:column;min-width:0">
+                <div style="display:flex;align-items:center;gap:12px;padding:10px 20px;border-bottom:1px solid var(--border2,#eef0f2)">
+                  <span style="display:inline-flex;align-items:center;gap:6px;font-size:12.5px;color:var(--text2,#6b7280);border:1px solid var(--border,#e6e7e9);border-radius:8px;padding:6px 11px">← Freier Graph</span>
+                  <div style="flex:1"></div>
+                  <div style="display:inline-flex;align-items:center;gap:12px;font-size:13px;color:var(--text,#1a1a1a)"><span style="color:var(--text3,#9ca3af)">‹</span><span style="font-weight:600;display:inline-flex;align-items:center;gap:7px"><span style="width:13px;height:13px;border-radius:4px;background:var(--accent,#10696b);display:inline-block"></span>Juni 2026</span><span style="color:var(--text3,#9ca3af)">›</span></div>
+                  <div style="flex:1"></div>
+                  <span style="display:inline-flex;align-items:center;font-size:12.5px;color:var(--text2,#6b7280);border:1px solid var(--border,#e6e7e9);border-radius:8px;padding:6px 11px">Rückblick</span>
+                </div>
+                <div style="flex:1;position:relative;overflow:hidden;background:var(--bg,#fff)">
+                  <svg viewBox="0 0 560 430" preserveAspectRatio="none" style="position:absolute;inset:0;width:100%;height:100%"><path d="M110 78 Q150 150 205 205" stroke="var(--border,#dcd7ce)" stroke-width="1.4" fill="none"></path><path d="M360 118 Q300 165 250 208" stroke="var(--border,#dcd7ce)" stroke-width="1.4" fill="none"></path><path d="M120 300 Q160 258 198 230" stroke="var(--border,#dcd7ce)" stroke-width="1.4" fill="none"></path></svg>
+                  <div style="position:absolute;left:34px;top:56px;display:inline-flex;align-items:center;gap:8px;background:var(--panel,#fff);border:1px solid var(--border,#e6e7e9);border-radius:10px;padding:8px 12px;font-size:12px;font-weight:500;color:var(--text2,#6b7280);box-shadow:0 4px 12px rgba(0,0,0,.07);white-space:nowrap"><span style="width:8px;height:8px;border-radius:50%;background:var(--catGreen,#15803d)"></span>Optimierung vs. Transformation</div>
+                  <div style="position:absolute;left:330px;top:96px;display:inline-flex;align-items:center;gap:8px;background:var(--panel,#fff);border:1px solid var(--border,#e6e7e9);border-radius:10px;padding:8px 12px;font-size:12px;font-weight:500;color:var(--text2,#6b7280);box-shadow:0 4px 12px rgba(0,0,0,.07);white-space:nowrap"><span style="width:8px;height:8px;border-radius:50%;background:var(--catRed,#dc2626)"></span>Ermöglichung durch KI</div>
+                  <div style="position:absolute;left:168px;top:186px;background:var(--panel,#fff);border:1.5px solid color-mix(in srgb,var(--accent,#10696b) 42%,transparent);border-radius:12px;padding:9px 13px;box-shadow:0 6px 16px rgba(0,0,0,.09)"><div style="font-size:13px;font-weight:700;color:var(--text,#1a1a1a)">23. Juni</div><div style="font-size:10.5px;color:var(--text3,#9ca3af);margin-top:1px">3 Notizen</div></div>
+                  <div style="position:absolute;left:58px;top:280px;background:var(--panel,#fff);border:1.5px solid color-mix(in srgb,var(--accent,#10696b) 42%,transparent);border-radius:12px;padding:9px 13px;box-shadow:0 6px 16px rgba(0,0,0,.09)"><div style="font-size:13px;font-weight:700;color:var(--text,#1a1a1a)">22. Juni</div><div style="font-size:10.5px;color:var(--text3,#9ca3af);margin-top:1px">2 Notizen</div></div>
+                  <div style="position:absolute;left:16px;bottom:16px;display:flex;flex-direction:column;gap:6px"><span style="width:28px;height:28px;border-radius:8px;background:var(--panel,#fff);border:1px solid var(--border,#e6e7e9);display:flex;align-items:center;justify-content:center;color:var(--text2,#6b7280);font-size:16px">+</span><span style="width:28px;height:28px;border-radius:8px;background:var(--panel,#fff);border:1px solid var(--border,#e6e7e9);display:flex;align-items:center;justify-content:center;color:var(--text2,#6b7280);font-size:16px">−</span></div>
+                </div>
+              </div>
+              <div style="width:300px;border-left:1px solid var(--border,#e6e7e9);background:var(--panel,#fff);display:flex;flex-direction:column;min-width:0">
+                <div style="display:flex;align-items:center;justify-content:space-between;padding:15px 18px;border-bottom:1px solid var(--border2,#eef0f2)"><span style="display:inline-flex;align-items:center;gap:8px;font-size:13.5px;font-weight:600;color:var(--text,#1a1a1a)"><span style="width:8px;height:8px;border-radius:50%;background:var(--accent,#10696b)"></span>Smart Connections</span><span style="color:var(--text3,#9ca3af);font-size:14px">✕</span></div>
+                <div style="padding:16px 18px;display:flex;flex-direction:column;gap:16px">
+                  <div><div style="font-size:11px;color:var(--text3,#9ca3af);margin-bottom:6px">Modell</div><div style="display:flex;align-items:center;justify-content:space-between;border:1px solid var(--border,#e6e7e9);border-radius:9px;padding:8px 11px;font-size:12.5px;color:var(--text,#1a1a1a)"><span>bge-m3:latest</span><span style="color:var(--text3,#9ca3af)">⟳</span></div></div>
+                  <div style="border:1px solid var(--border,#e6e7e9);border-radius:11px;padding:12px 14px;background:var(--bg2,#f7f8f9)"><div style="font-size:11px;color:var(--text3,#9ca3af);margin-bottom:4px">Aktuelle Notiz</div><div style="font-size:13px;font-weight:600;color:var(--text,#1a1a1a);line-height:1.4">Optimierung vs. Transformation</div></div>
+                  <div><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px"><span style="font-size:12px;color:var(--text2,#6b7280)">Ähnliche Notizen</span><span style="font-size:11px;color:var(--text3,#9ca3af)">1</span></div>
+                    <div style="display:flex;gap:8px;margin-bottom:14px;font-size:10.5px;color:var(--text3,#9ca3af)"><span style="border:1px solid var(--border,#e6e7e9);border-radius:20px;padding:3px 9px">Keyword</span><span style="border:1px solid var(--border,#e6e7e9);border-radius:20px;padding:3px 9px">Link</span><span style="border:1px solid var(--border,#e6e7e9);border-radius:20px;padding:3px 9px"># Tags</span></div>
+                    <div style="border:1px solid var(--border,#e6e7e9);border-radius:11px;padding:12px 14px"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:9px"><span style="font-size:13px;font-weight:600;color:var(--text,#1a1a1a)">Ermöglichung durch KI</span><span style="font-size:12px;font-weight:700;color:var(--accent,#10696b)">100%</span></div><div style="height:6px;border-radius:999px;background:var(--bg2,#f7f8f9);overflow:hidden"><div style="width:100%;height:100%;background:var(--accent,#10696b)"></div></div></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </sc-if>
+          <sc-if value="{{ isMail }}" hint-placeholder-val="{{ false }}">
+            <div style="height:100%;display:flex;min-width:0">
+              <div style="width:362px;border-right:1px solid var(--border,#e6e7e9);display:flex;flex-direction:column;min-width:0">
+                <div style="padding:14px 18px;border-bottom:1px solid var(--border2,#eef0f2)">
+                  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px"><span style="font-size:15px;font-weight:700;color:var(--text,#1a1a1a)">Posteingang</span><span style="display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:600;color:var(--accentText,#fff);background:var(--accent,#10696b);border-radius:8px;padding:5px 11px">＋ Neu</span></div>
+                  <div style="display:flex;align-items:center;gap:10px"><div style="flex:1;display:flex;align-items:center;gap:7px;border:1px solid var(--border,#e6e7e9);border-radius:8px;padding:6px 10px;font-size:12px;color:var(--text3,#9ca3af)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"></circle><line x1="20" y1="20" x2="16.7" y2="16.7"></line></svg>Suchen…</div><span style="display:inline-flex;align-items:center;gap:6px;font-size:11.5px;color:var(--text2,#6b7280)"><span style="width:15px;height:15px;border-radius:4px;background:var(--accent,#10696b);display:inline-flex;align-items:center;justify-content:center;color:var(--accentText,#fff);font-size:10px">✓</span>Nur relevante</span></div>
+                </div>
+                <div style="flex:1;overflow:hidden">
+                  <div style="display:flex;gap:11px;padding:13px 16px;border-bottom:1px solid var(--border2,#eef0f2)"><span style="width:32px;height:32px;border-radius:50%;background:var(--bg2,#f7f8f9);color:var(--text2,#6b7280);font-size:13px;font-weight:600;display:inline-flex;align-items:center;justify-content:center;flex:none">M</span><div style="flex:1;min-width:0"><div style="display:flex;justify-content:space-between"><span style="font-size:12.5px;font-weight:600;color:var(--text,#1a1a1a)">Medium Daily Digest</span><span style="font-size:10.5px;color:var(--text3,#9ca3af)">08:40</span></div><div style="font-size:12px;color:var(--text,#1a1a1a);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">I Don't Draw Technical Graphics Anymore</div><div style="font-size:11px;color:var(--text3,#9ca3af);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Stories for bydb @bydb</div></div><span style="width:7px;height:7px;border-radius:50%;background:var(--accent,#10696b);flex:none;margin-top:6px"></span></div>
+                  <div style="display:flex;gap:11px;padding:13px 16px;border-bottom:1px solid var(--border2,#eef0f2)"><span style="width:32px;height:32px;border-radius:50%;background:var(--bg2,#f7f8f9);color:var(--text2,#6b7280);font-size:13px;font-weight:600;display:inline-flex;align-items:center;justify-content:center;flex:none">T</span><div style="flex:1;min-width:0"><div style="display:flex;justify-content:space-between"><span style="font-size:12.5px;font-weight:600;color:var(--text,#1a1a1a)">The Information</span><span style="font-size:10.5px;color:var(--text3,#9ca3af)">02:04</span></div><div style="font-size:12px;color:var(--text,#1a1a1a);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">The Data Center Image Problem</div><div style="font-size:11px;color:var(--text3,#9ca3af);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">The Briefing By Nick Wingfield</div></div><span style="width:7px;height:7px;border-radius:50%;background:var(--accent,#10696b);flex:none;margin-top:6px"></span></div>
+                  <div style="display:flex;gap:11px;padding:13px 16px;border-bottom:1px solid var(--border2,#eef0f2);background:var(--accentWeak,#e7f1f0)"><span style="width:32px;height:32px;border-radius:50%;background:var(--accent,#10696b);color:var(--accentText,#fff);font-size:13px;font-weight:600;display:inline-flex;align-items:center;justify-content:center;flex:none">E</span><div style="flex:1;min-width:0"><div style="display:flex;justify-content:space-between"><span style="font-size:12.5px;font-weight:700;color:var(--text,#1a1a1a)">edoobox</span><span style="font-size:10.5px;color:var(--text3,#9ca3af)">Gestern</span></div><div style="font-size:12px;font-weight:600;color:var(--text,#1a1a1a);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Neue Buchung: KI-Workshop</div><div style="margin-top:4px"><span style="font-size:9.5px;font-weight:600;color:var(--accent,#10696b);border:1px solid color-mix(in srgb,var(--accent,#10696b) 35%,transparent);border-radius:20px;padding:2px 8px">Antwort erwartet</span></div></div></div>
+                  <div style="display:flex;gap:11px;padding:13px 16px;border-bottom:1px solid var(--border2,#eef0f2)"><span style="width:32px;height:32px;border-radius:50%;background:var(--bg2,#f7f8f9);color:var(--text2,#6b7280);font-size:13px;font-weight:600;display:inline-flex;align-items:center;justify-content:center;flex:none">TU</span><div style="flex:1;min-width:0"><div style="display:flex;justify-content:space-between"><span style="font-size:12.5px;font-weight:600;color:var(--text,#1a1a1a)">TU München</span><span style="font-size:10.5px;color:var(--text3,#9ca3af)">Mo</span></div><div style="font-size:12px;color:var(--text,#1a1a1a);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Reinmann 2023 – Rückfrage Deskilling</div><div style="font-size:11px;color:var(--text3,#9ca3af);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Guten Tag, zu Ihrer Notiz…</div></div></div>
+                </div>
+              </div>
+              <div style="flex:1;display:flex;flex-direction:column;min-width:0;background:var(--bg,#fff)">
+                <div style="padding:20px 26px;border-bottom:1px solid var(--border2,#eef0f2)">
+                  <div style="font-size:18px;font-weight:700;color:var(--text,#1a1a1a);margin-bottom:8px">Neue Buchung: KI-Workshop</div>
+                  <div style="display:flex;align-items:center;gap:10px"><span style="width:30px;height:30px;border-radius:50%;background:var(--accent,#10696b);color:var(--accentText,#fff);font-size:12px;font-weight:600;display:inline-flex;align-items:center;justify-content:center">E</span><div><div style="font-size:12.5px;font-weight:600;color:var(--text,#1a1a1a)">edoobox</div><div style="font-size:11px;color:var(--text3,#9ca3af)">buchung@edoobox.com · Gestern 16:22</div></div></div>
+                </div>
+                <div style="padding:16px 26px">
+                  <div style="border:1px solid color-mix(in srgb,var(--accent,#10696b) 30%,transparent);background:var(--accentWeak,#e7f1f0);border-radius:11px;padding:13px 15px">
+                    <div style="display:flex;align-items:center;gap:7px;margin-bottom:8px"><span style="width:7px;height:7px;border-radius:50%;background:var(--accent,#10696b)"></span><span style="font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--accent,#10696b)">Warum relevant · hoch</span></div>
+                    <div style="font-size:12.5px;color:var(--text2,#6b7280);line-height:1.6">VIP-Absender (edoobox) · Keyword „Buchung" · Antwort erwartet. Verknüpft mit deiner Notiz <b style="color:var(--text,#1a1a1a)">Optimierung vs. Transformation</b>.</div>
+                  </div>
+                </div>
+                <div style="flex:1;padding:4px 26px;overflow:hidden"><p style="font-size:14px;line-height:1.7;color:var(--text2,#6b7280)">Guten Tag, eine neue Buchung für den Workshop „KI: Optimieren oder Transformieren?" ist eingegangen. Bitte bestätigen Sie den Termin am 3. Juli. Teilnehmerzahl: 12.</p></div>
+                <div style="display:flex;gap:10px;padding:16px 26px;border-top:1px solid var(--border2,#eef0f2)"><span style="display:inline-flex;align-items:center;gap:7px;font-size:13px;font-weight:600;color:var(--accentText,#fff);background:var(--accent,#10696b);border-radius:9px;padding:9px 16px">Antwort entwerfen</span><span style="display:inline-flex;align-items:center;font-size:13px;color:var(--text2,#6b7280);border:1px solid var(--border,#e6e7e9);border-radius:9px;padding:9px 16px">Als Notiz speichern</span></div>
+              </div>
+            </div>
+          </sc-if>
+          <sc-if value="{{ isSettings }}" hint-placeholder-val="{{ false }}">
+            <div style="height:100%;overflow:hidden;display:flex;flex-direction:column">
+              <div style="padding:22px 30px 4px"><div style="font-size:24px;font-weight:700;letter-spacing:-.02em;color:var(--text,#1a1a1a)">Einstellungen</div><div style="font-size:13px;color:var(--text3,#9ca3af);margin-top:3px">Module &amp; Plugins</div></div>
+              <div style="flex:1;overflow:hidden;padding:20px 30px;display:flex;gap:30px">
+                <div style="flex:1;min-width:0">
+                  <div style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text3,#9ca3af);margin-bottom:8px">Module</div>
+                  <div style="display:flex;align-items:center;gap:13px;padding:13px 0;border-bottom:1px solid var(--border2,#eef0f2)"><span style="width:30px;height:30px;border-radius:8px;background:color-mix(in srgb,var(--accent,#10696b) 15%,transparent);color:var(--accent,#10696b);display:inline-flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex:none">B</span><div style="flex:1;min-width:0"><div style="font-size:13.5px;font-weight:600;color:var(--text,#1a1a1a)">Brain</div><div style="font-size:11.5px;color:var(--text3,#9ca3af)">Lokales Tagesgedächtnis</div></div><span style="width:38px;height:22px;border-radius:999px;background:var(--accent,#10696b);position:relative;flex:none"><span style="position:absolute;top:2px;left:18px;width:18px;height:18px;border-radius:50%;background:#fff"></span></span></div>
+                  <div style="display:flex;align-items:center;gap:13px;padding:13px 0;border-bottom:1px solid var(--border2,#eef0f2)"><span style="width:30px;height:30px;border-radius:8px;background:color-mix(in srgb,var(--catBlue,#256fd1) 15%,transparent);color:var(--catBlue,#256fd1);display:inline-flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex:none">R</span><div style="flex:1;min-width:0"><div style="font-size:13.5px;font-weight:600;color:var(--text,#1a1a1a)">Relevanz-Radar</div><div style="font-size:11.5px;color:var(--text3,#9ca3af)">KI-bewertete Relevanz pro Notiz</div></div><span style="width:38px;height:22px;border-radius:999px;background:var(--accent,#10696b);position:relative;flex:none"><span style="position:absolute;top:2px;left:18px;width:18px;height:18px;border-radius:50%;background:#fff"></span></span></div>
+                  <div style="display:flex;align-items:center;gap:13px;padding:13px 0;border-bottom:1px solid var(--border2,#eef0f2)"><span style="width:30px;height:30px;border-radius:8px;background:color-mix(in srgb,var(--amber,#c98a2a) 16%,transparent);color:var(--amber,#c98a2a);display:inline-flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex:none">@</span><div style="flex:1;min-width:0"><div style="font-size:13.5px;font-weight:600;color:var(--text,#1a1a1a)">Smart Email</div><div style="font-size:11.5px;color:var(--text3,#9ca3af)">IMAP-Abruf mit KI-Analyse</div></div><span style="width:38px;height:22px;border-radius:999px;background:var(--accent,#10696b);position:relative;flex:none"><span style="position:absolute;top:2px;left:18px;width:18px;height:18px;border-radius:50%;background:#fff"></span></span></div>
+                  <div style="display:flex;align-items:center;gap:13px;padding:13px 0;border-bottom:1px solid var(--border2,#eef0f2)"><span style="width:30px;height:30px;border-radius:8px;background:color-mix(in srgb,var(--catGreen,#15803d) 15%,transparent);color:var(--catGreen,#15803d);display:inline-flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex:none">K</span><div style="flex:1;min-width:0"><div style="font-size:13.5px;font-weight:600;color:var(--text,#1a1a1a)">Karteikarten</div><div style="font-size:11.5px;color:var(--text3,#9ca3af)">Spaced Repetition (SM-2)</div></div><span style="width:38px;height:22px;border-radius:999px;background:var(--accent,#10696b);position:relative;flex:none"><span style="position:absolute;top:2px;left:18px;width:18px;height:18px;border-radius:50%;background:#fff"></span></span></div>
+                  <div style="display:flex;align-items:center;gap:13px;padding:13px 0"><span style="width:30px;height:30px;border-radius:8px;background:var(--bg2,#f7f8f9);color:var(--text3,#9ca3af);display:inline-flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex:none">&gt;_</span><div style="flex:1;min-width:0"><div style="font-size:13.5px;font-weight:600;color:var(--text,#1a1a1a)">Terminal</div><div style="font-size:11.5px;color:var(--text3,#9ca3af)">Integriertes PTY-Terminal</div></div><span style="width:38px;height:22px;border-radius:999px;background:var(--border,#e6e7e9);position:relative;flex:none"><span style="position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:#fff"></span></span></div>
+                </div>
+                <div style="flex:1;min-width:0">
+                  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><span style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text3,#9ca3af)">Plugins</span><span style="font-size:10px;font-weight:600;color:var(--accent,#10696b);background:var(--accentWeak,#e7f1f0);border-radius:20px;padding:2px 9px">3 Updates</span></div>
+                  <div style="display:flex;align-items:center;gap:7px;border:1px solid var(--border,#e6e7e9);border-radius:9px;padding:8px 11px;font-size:12px;color:var(--text3,#9ca3af);margin-bottom:14px"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"></circle><line x1="20" y1="20" x2="16.7" y2="16.7"></line></svg>Katalog durchsuchen…</div>
+                  <div style="border:1px solid var(--border,#e6e7e9);border-radius:12px;padding:13px 15px;margin-bottom:10px;display:flex;align-items:center;gap:12px"><div style="flex:1;min-width:0"><div style="display:flex;align-items:center;gap:8px"><span style="font-size:13.5px;font-weight:600;color:var(--text,#1a1a1a)">Antares</span><span style="font-size:9.5px;font-weight:600;color:var(--accent,#10696b);background:var(--accentWeak,#e7f1f0);border-radius:20px;padding:2px 7px">✓ signiert</span></div><div style="font-size:11.5px;color:var(--text3,#9ca3af);margin-top:3px">Literatur-Sync (Zotero)</div></div><span style="width:38px;height:22px;border-radius:999px;background:var(--accent,#10696b);position:relative;flex:none"><span style="position:absolute;top:2px;left:18px;width:18px;height:18px;border-radius:50%;background:#fff"></span></span></div>
+                  <div style="border:1px solid var(--border,#e6e7e9);border-radius:12px;padding:13px 15px;margin-bottom:10px;display:flex;align-items:center;gap:12px"><div style="flex:1;min-width:0"><div style="display:flex;align-items:center;gap:8px"><span style="font-size:13.5px;font-weight:600;color:var(--text,#1a1a1a)">edoobox</span><span style="font-size:9.5px;font-weight:600;color:var(--accent,#10696b);background:var(--accentWeak,#e7f1f0);border-radius:20px;padding:2px 7px">✓ signiert</span></div><div style="font-size:11.5px;color:var(--text3,#9ca3af);margin-top:3px">Buchungen &amp; Kurse</div></div><span style="width:38px;height:22px;border-radius:999px;background:var(--accent,#10696b);position:relative;flex:none"><span style="position:absolute;top:2px;left:18px;width:18px;height:18px;border-radius:50%;background:#fff"></span></span></div>
+                  <div style="border:1px solid var(--border,#e6e7e9);border-radius:12px;padding:13px 15px;display:flex;align-items:center;gap:12px"><div style="flex:1;min-width:0"><div style="display:flex;align-items:center;gap:8px"><span style="font-size:13.5px;font-weight:600;color:var(--text,#1a1a1a)">reMarkable</span><span style="font-size:9.5px;font-weight:600;color:var(--accent,#10696b);background:var(--accentWeak,#e7f1f0);border-radius:20px;padding:2px 7px">✓ signiert</span></div><div style="font-size:11.5px;color:var(--text3,#9ca3af);margin-top:3px">Buch-Export aufs Tablet</div></div><span style="width:38px;height:22px;border-radius:999px;background:var(--border,#e6e7e9);position:relative;flex:none"><span style="position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:#fff"></span></span></div>
+                </div>
+              </div>
+            </div>
+          </sc-if>
+          <sc-if value="{{ isPlaceholder }}" hint-placeholder-val="{{ false }}">
+            <div style="height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:40px;text-align:center">
+              <span style="width:52px;height:52px;border-radius:14px;background:var(--accentWeak,#e7f1f0);display:inline-flex;align-items:center;justify-content:center"><span style="width:20px;height:20px;border-radius:6px;border:2px dashed var(--accent,#10696b)"></span></span>
+              <div style="font-size:17px;font-weight:600;color:var(--text,#1a1a1a)">{{ screenTitle }}</div>
+              <div style="font-size:13px;color:var(--text3,#9ca3af);max-width:320px">Dieser Screen wird als Nächstes im selben Petrol-/Ruhig-Stil gebaut. Zurück zum <span style="color:var(--accent,#10696b);font-weight:600">Dashboard</span> über die obere Leiste.</div>
+            </div>
+          </sc-if>
+        </div>
+
+        <div style="display:flex;align-items:center;gap:10px;height:28px;padding:0 16px;background:var(--chrome,#f4f5f7);border-top:1px solid var(--border,#e6e7e9);font-size:11px;color:var(--text3,#9ca3af)">
+          <span>2026</span><span style="color:var(--border,#e6e7e9)">·</span><span>6 Notizen</span><span style="color:var(--border,#e6e7e9)">·</span><span>7 Links</span><span style="flex:1"></span><span>▲ Terminal</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = { dark: false, screen: 'dashboard' };
+  renderVals() {
+    const d = this.state.dark;
+    const sc = this.state.screen;
+    const pal = d
+      ? { canvas:'#0a0a0a', bg:'#111111', chrome:'#18181b', panel:'#161616', bg2:'#1f1f1f', text:'#f0f0f0', text2:'#a0a0a0', text3:'#6b7280', text4:'#4a4a4a', border:'#2a2a2a', border2:'#242424', accent:'#3cbfb3', accentWeak:'rgba(60,191,179,.15)', catRed:'#ff6b6b', catGreen:'#34d399', catBlue:'#6aa9ff', amber:'#e0a94f', accentText:'#06302e' }
+      : { canvas:'#e8e9ec', bg:'#ffffff', chrome:'#f4f5f7', panel:'#ffffff', bg2:'#f7f8f9', text:'#1a1a1a', text2:'#6b7280', text3:'#9ca3af', text4:'#c2c6cc', border:'#e6e7e9', border2:'#eef0f2', accent:'#10696b', accentWeak:'#e7f1f0', catRed:'#dc2626', catGreen:'#15803d', catBlue:'#256fd1', amber:'#c98a2a', accentText:'#ffffff' };
+    const tab = (active) => active
+      ? `display:flex;align-items:center;font-size:12.5px;font-weight:600;color:${pal.accentText};background:${pal.accent};border:none;border-radius:7px;padding:5px 14px;cursor:pointer`
+      : `display:flex;align-items:center;font-size:12.5px;color:${pal.text2};background:none;border:none;border-radius:7px;padding:5px 12px;cursor:pointer`;
+    const titles = { editor:'Editor / Notiz', brain:'Brain / Wissensgraph', mail:'Posteingang', settings:'Einstellungen · Module & Plugins' };
+    return {
+      ...pal, dark: d, themeLabel: d ? 'Dark' : 'Light',
+      toggle: () => this.setState(s => ({ dark: !s.dark })),
+      goDash: () => this.setState({ screen:'dashboard' }),
+      goEditor: () => this.setState({ screen:'editor' }),
+      goBrain: () => this.setState({ screen:'brain' }),
+      goMail: () => this.setState({ screen:'mail' }),
+      goSettings: () => this.setState({ screen:'settings' }),
+      isDash: sc === 'dashboard', isEditor: sc === 'editor', isBrain: sc === 'brain', isMail: sc === 'mail', isSettings: sc === 'settings', isPlaceholder: false,
+      screenTitle: titles[sc] || '',
+      navDash: tab(sc==='dashboard'), navEditor: tab(sc==='editor'), navBrain: tab(sc==='brain')
+    };
+  }
+}
+</script>
+</body>
+</html>

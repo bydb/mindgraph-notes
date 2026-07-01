@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  body{margin:0;background:#e8e9ec;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;-webkit-font-smoothing:antialiased}
+  .dv-turn{padding:44px 48px 40px;scroll-margin-top:16px}
+  .dv-thd{display:flex;align-items:baseline;gap:10px;margin:0 0 8px}
+  .dv-tid{font:600 10px ui-monospace,Menlo,monospace;padding:3px 7px;background:#1a1a1a;color:#fff;border-radius:4px;text-decoration:none}
+  .dv-tname{font:600 13px/1.2 -apple-system,sans-serif;color:#1a1a1a}
+  .dv-sub{margin:0 0 26px;font:13px/1.55 -apple-system,sans-serif;color:rgba(0,0,0,.5);max-width:820px}
+  .dv-sub a{color:#2a78d6;text-decoration:none}
+  .dv-opts{display:flex;flex-wrap:nowrap;gap:36px;align-items:flex-start}
+  .dv-opt{flex:none;display:flex;flex-direction:column;gap:11px;scroll-margin-top:16px}
+  .dv-oid{font:600 10.5px ui-monospace,Menlo,monospace;padding:3px 7px;background:rgba(0,0,0,.08);color:#1a1a1a;border-radius:5px;text-decoration:none}
+  .dv-olabel{display:flex;align-items:baseline;gap:8px;font:400 12px/1.45 -apple-system,sans-serif;color:rgba(0,0,0,.55);max-width:540px}
+  .dv-olabel b{color:#1a1a1a;font-weight:600}
+  .dv-opt:target .dv-oid{background:#2a78d6;color:#fff}
+  .dv-next{margin:28px 0 0;font:12px/1.6 -apple-system,sans-serif;color:rgba(0,0,0,.5)}
+  .dv-next a{color:#2a78d6;text-decoration:none}
+</style>
+</helmet>
+<section class="dv-turn" id="t1">
+  <div class="dv-thd"><a class="dv-tid" href="#t1">1</a><span class="dv-tname">Dashboard-Redesign</span></div>
+  <p class="dv-sub"><a class="dv-oid" href="#1a">1a</a> ist der aktuelle Stand. <a class="dv-oid" href="#1b">1b</a> und <a class="dv-oid" href="#1c">1c</a> nutzen dieselben Tokens (border-geführt, weiche Schatten, ruhige Semantikfarben) und beheben dieselben Punkte: entfärbte Card-Header statt großer Farbflächen, kollabierte Leerzustände, Display-Titel statt Timestamp-Dateinamen, dezente Modell-Badges. Akzent = Ink/Graphit, damit er nicht mit dem Semantik-Rot der Kategorien kollidiert. <a class="dv-oid" href="#1b">1b</a> bleibt konservativ im System · <a class="dv-oid" href="#1c">1c</a> ist meinungsstärker (Fokus-first, eigene Typo, Relevanz-Radar mit Balken).</p>
+  <div class="dv-opts">
+
+    <div class="dv-opt" id="1a">
+      <div class="dv-olabel"><a class="dv-oid" href="#1a">1a</a><span><b>Aktuell</b> — heutiger Stand (Screenshot). Große getönte Card-Header, drei von vier Karten leer, roter Balken, Timestamp-Dateinamen.</span></div>
+      <div style="width:600px;border:1px solid #dfe1e4;border-radius:12px;overflow:hidden;box-shadow:0 10px 30px rgba(17,17,17,.09);background:#fff">
+        <img src="ref/screenshot-dashboard.png" alt="Aktuelles Dashboard" style="display:block;width:100%;height:auto">
+      </div>
+    </div>
+
+    <div class="dv-opt" id="1b">
+      <div class="dv-olabel"><a class="dv-oid" href="#1b">1b</a><span><b>Ruhig &amp; verdichtet</b> — 100% innerhalb der bestehenden Tokens. Neutrale Karten, dünner Fokus-Streifen ohne Farbbalken, Leerzustände zu einer Zeile kollabiert, Bestand als ruhiges Zahlenband.</span></div>
+      <div style="width:1120px;background:#fff;border:1px solid #dfe1e4;border-radius:14px;box-shadow:0 14px 44px rgba(17,17,17,.11);overflow:hidden;color:#1a1a1a">
+        <div style="display:flex;align-items:center;padding:0 14px;height:46px;background:#f4f5f7;border-bottom:1px solid #e6e7e9;gap:14px">
+          <div style="display:flex;align-items:center;gap:8px;flex:1;min-width:0">
+            <span style="display:flex;gap:8px"><span style="width:12px;height:12px;border-radius:50%;background:#ff5f57"></span><span style="width:12px;height:12px;border-radius:50%;background:#febc2e"></span><span style="width:12px;height:12px;border-radius:50%;background:#28c840"></span></span>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8a8f98" stroke-width="1.7" style="margin-left:10px"><rect x="3" y="4" width="18" height="16" rx="2.5"></rect><line x1="9" y1="4" x2="9" y2="20"></line></svg>
+            <span style="width:20px;height:20px;border-radius:6px;background:#e0447a;display:inline-flex;align-items:center;justify-content:center;margin-left:6px;flex:none"><span style="width:8px;height:8px;border-radius:50%;background:#fff"></span></span>
+            <span style="font-weight:600;font-size:13.5px;color:#1a1a1a">MindGraph Notes</span>
+            <span style="font-size:9px;font-weight:700;letter-spacing:.06em;color:#9ca3af;border:1px solid #d7dade;border-radius:5px;padding:2px 5px">BETA</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:2px;background:#eceef1;border-radius:10px;padding:3px">
+            <span style="font-size:12.5px;color:#6b7280;padding:5px 12px;border-radius:7px">Editor</span>
+            <span style="font-size:12.5px;color:#6b7280;padding:5px 12px;border-radius:7px">Split</span>
+            <span style="font-size:12.5px;color:#6b7280;padding:5px 12px;border-radius:7px">Brain</span>
+            <span style="font-size:12.5px;color:#fff;font-weight:600;padding:5px 14px;border-radius:7px;background:#1a1a1a">Dashboard</span>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:flex-end;gap:15px;flex:1;color:#9aa0a8">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><line x1="4" y1="8" x2="20" y2="8"></line><line x1="4" y1="16" x2="20" y2="16"></line><circle cx="9" cy="8" r="2.3"></circle><circle cx="15" cy="16" r="2.3"></circle></svg>
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2.5"></rect><path d="m3.5 7 8.5 6 8.5-6"></path></svg>
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.5"></circle><circle cx="12" cy="12" r="1.5"></circle><circle cx="19" cy="12" r="1.5"></circle></svg>
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M9.6 9.2a2.5 2.5 0 1 1 3.6 2.3c-.8.5-1.2 1-1.2 1.9"></path><circle cx="12" cy="17" r="0.6" fill="currentColor" stroke="none"></circle></svg>
+          </div>
+        </div>
+        <div style="display:flex;height:722px">
+          <div style="width:236px;background:#f4f5f7;border-right:1px solid #e6e7e9;display:flex;flex-direction:column;min-width:0">
+            <div style="display:flex;align-items:flex-start;padding:14px 12px 12px;gap:8px">
+              <span style="flex:1;font-size:11px;font-weight:700;letter-spacing:.09em;line-height:1.35;color:#8a8f98">MINDGRAPH<br>NOTES</span>
+              <div style="display:flex;align-items:center;gap:7px;color:#9aa0a8">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"></circle><line x1="20" y1="20" x2="16.7" y2="16.7"></line></svg>
+                <span style="width:24px;height:24px;border-radius:7px;background:#1a1a1a;display:inline-flex;align-items:center;justify-content:center"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg></span>
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M2 6.5A1.5 1.5 0 0 1 3.5 5H9l2 2h9.5A1.5 1.5 0 0 1 22 8.5v9A1.5 1.5 0 0 1 20.5 19h-17A1.5 1.5 0 0 1 2 17.5z"></path><line x1="12" y1="10" x2="12" y2="15"></line><line x1="9.5" y1="12.5" x2="14.5" y2="12.5"></line></svg>
+              </div>
+            </div>
+            <div style="padding:2px 14px 12px;display:flex;align-items:flex-start;gap:8px">
+              <div style="flex:1"><div style="font-size:15px;font-weight:700;color:#1a1a1a">2026</div><div style="font-size:11px;color:#9ca3af;margin-top:2px">6 Notizen · Notes</div></div>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#b3b8bf" stroke-width="1.8" stroke-linecap="round"><line x1="4" y1="7" x2="16" y2="7"></line><line x1="4" y1="12" x2="12" y2="12"></line><line x1="4" y1="17" x2="9" y2="17"></line></svg>
+            </div>
+            <div style="display:flex;gap:7px;padding:0 14px 14px">
+              <span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:#6b7280;background:#fff;border:1px solid #e6e7e9;border-radius:999px;padding:4px 10px"><span style="width:8px;height:8px;border-radius:50%;background:#dc2626"></span>1</span>
+              <span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:#6b7280;background:#fff;border:1px solid #e6e7e9;border-radius:999px;padding:4px 10px"><span style="width:8px;height:8px;border-radius:50%;background:#15803d"></span>1</span>
+              <span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:#9ca3af;background:#fff;border:1px solid #e6e7e9;border-radius:999px;padding:4px 10px"><span style="width:8px;height:8px;border-radius:50%;background:#256fd1"></span>0</span>
+            </div>
+            <div style="padding:2px 8px;flex:1;overflow:hidden;font-size:13px;color:#374151">
+              <div style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:8px"><span style="color:#c2c6cc;font-size:10px">▾</span><svg width="15" height="15" viewBox="0 0 24 24"><path d="M2 6.5A1.5 1.5 0 0 1 3.5 5H9l2 2h9.5A1.5 1.5 0 0 1 22 8.5v9A1.5 1.5 0 0 1 20.5 19h-17A1.5 1.5 0 0 1 2 17.5z" fill="#e0a94f"></path></svg><span style="flex:1">Literatur</span><span style="color:#c2c6cc;font-size:11px">0</span></div>
+              <div style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:8px"><span style="color:#c2c6cc;font-size:10px">▾</span><svg width="15" height="15" viewBox="0 0 24 24"><path d="M2 6.5A1.5 1.5 0 0 1 3.5 5H9l2 2h9.5A1.5 1.5 0 0 1 22 8.5v9A1.5 1.5 0 0 1 20.5 19h-17A1.5 1.5 0 0 1 2 17.5z" fill="#e0a94f"></path></svg><span style="flex:1">Notes</span><span style="color:#c2c6cc;font-size:11px">2</span></div>
+              <div style="display:flex;align-items:center;gap:8px;padding:6px 8px 6px 30px;border-radius:8px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#9aa0a8" stroke-width="1.8" stroke-linecap="round"><line x1="5" y1="7" x2="19" y2="7"></line><line x1="5" y1="12" x2="19" y2="12"></line><line x1="5" y1="17" x2="13" y2="17"></line></svg><span style="width:8px;height:8px;border-radius:50%;background:#dc2626;flex:none"></span><span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Ermöglichung durch KI</span></div>
+              <div style="display:flex;align-items:center;gap:8px;padding:6px 8px 6px 30px;border-radius:8px;background:#eceef1"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6b7280" stroke-width="1.8" stroke-linecap="round"><line x1="5" y1="7" x2="19" y2="7"></line><line x1="5" y1="12" x2="19" y2="12"></line><line x1="5" y1="17" x2="13" y2="17"></line></svg><span style="width:8px;height:8px;border-radius:50%;background:#15803d;flex:none"></span><span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500;color:#1a1a1a">Optimierung vs. Transformation</span></div>
+              <div style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:8px"><span style="color:#c2c6cc;font-size:10px">▾</span><svg width="15" height="15" viewBox="0 0 24 24"><path d="M2 6.5A1.5 1.5 0 0 1 3.5 5H9l2 2h9.5A1.5 1.5 0 0 1 22 8.5v9A1.5 1.5 0 0 1 20.5 19h-17A1.5 1.5 0 0 1 2 17.5z" fill="#e0a94f"></path></svg><span style="flex:1">Projekte</span><span style="color:#c2c6cc;font-size:11px">0</span></div>
+              <div style="display:flex;align-items:center;gap:8px;padding:6px 8px 6px 22px;border-radius:8px"><span style="color:#c2c6cc;font-size:10px">▾</span><svg width="15" height="15" viewBox="0 0 24 24"><path d="M2 6.5A1.5 1.5 0 0 1 3.5 5H9l2 2h9.5A1.5 1.5 0 0 1 22 8.5v9A1.5 1.5 0 0 1 20.5 19h-17A1.5 1.5 0 0 1 2 17.5z" fill="#e0a94f"></path></svg><span style="flex:1">Deskilling</span><span style="color:#c2c6cc;font-size:11px">2</span></div>
+              <div style="display:flex;align-items:center;gap:8px;padding:6px 8px 6px 44px;border-radius:8px"><span style="font-size:8px;font-weight:700;color:#dc2626;border:1px solid #f0c9c9;border-radius:4px;padding:1px 3px;flex:none">PDF</span><span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Reinmann 2023 – Deskilling durch KI</span></div>
+              <div style="display:flex;align-items:center;gap:8px;padding:6px 8px 6px 44px;border-radius:8px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#9aa0a8" stroke-width="1.8" stroke-linecap="round"><line x1="5" y1="7" x2="19" y2="7"></line><line x1="5" y1="12" x2="19" y2="12"></line><line x1="5" y1="17" x2="13" y2="17"></line></svg><span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Reinmann 2023 – Notizen</span></div>
+              <div style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:8px;color:#6b7280"><span style="color:#c2c6cc;font-size:10px">▸</span><svg width="15" height="15" viewBox="0 0 24 24"><path d="M2 6.5A1.5 1.5 0 0 1 3.5 5H9l2 2h9.5A1.5 1.5 0 0 1 22 8.5v9A1.5 1.5 0 0 1 20.5 19h-17A1.5 1.5 0 0 1 2 17.5z" fill="#e0a94f"></path></svg><span style="flex:1">Ressourcen</span><span style="color:#c2c6cc;font-size:11px">0</span></div>
+            </div>
+          </div>
+          <div style="flex:1;display:flex;flex-direction:column;background:#fff;min-width:0">
+            <div style="display:flex;align-items:center;gap:6px;padding:8px 14px;border-bottom:1px solid #eef0f2;background:#fbfbfc;overflow:hidden">
+              <span style="display:inline-flex;align-items:center;gap:7px;font-size:12.5px;color:#6b7280;padding:6px 12px;border-radius:8px;background:#f1f2f4;max-width:190px"><span style="width:7px;height:7px;border-radius:50%;background:#dc2626;flex:none"></span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Ermöglichung durch KI</span></span>
+              <span style="display:inline-flex;align-items:center;gap:7px;font-size:12.5px;color:#6b7280;padding:6px 12px;border-radius:8px;max-width:170px"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Reinmann 2023 – Notizen</span></span>
+              <span style="display:inline-flex;align-items:center;gap:7px;font-size:12.5px;color:#6b7280;padding:6px 12px;border-radius:8px;max-width:190px"><span style="width:7px;height:7px;border-radius:50%;background:#15803d;flex:none"></span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Optimierung vs. Transformation</span></span>
+              <span style="display:inline-flex;align-items:center;gap:7px;font-size:12.5px;font-weight:600;color:#1a1a1a;padding:6px 13px;border-radius:8px;background:#ececee;border:1px solid #e0e2e5">Dashboard</span>
+            </div>
+            <div style="flex:1;padding:26px 30px;overflow:hidden;display:flex;flex-direction:column;gap:16px">
+              <div style="display:flex;align-items:flex-end;justify-content:space-between">
+                <div><div style="font-size:26px;font-weight:600;letter-spacing:-.02em;color:#1a1a1a">Dashboard</div><div style="font-size:13px;color:#9ca3af;margin-top:3px">Donnerstag, 25. Juni 2026</div></div>
+                <span style="display:inline-flex;align-items:center;gap:7px;font-size:12px;color:#6b7280;border:1px solid #e6e7e9;border-radius:9px;padding:7px 12px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7"></path><polyline points="21 3 21 8 16 8"></polyline></svg>Aktualisieren</span>
+              </div>
+              <div style="border:1px solid #e6e7e9;border-radius:14px;padding:16px 18px;display:flex;align-items:center;gap:15px">
+                <span style="width:36px;height:36px;border-radius:50%;border:1.5px solid #dbe0e6;display:inline-flex;align-items:center;justify-content:center;flex:none"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#b9bec6" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></span>
+                <div style="flex:1;min-width:0"><div style="font-size:11px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:#9ca3af;margin-bottom:3px">Fokus heute</div><div style="font-size:14px;color:#374151">Keine Deadlines, kein Rückstau — nutze den Freiraum.</div></div>
+                <span style="font-size:12px;color:#c2c6cc">0 fällig</span>
+              </div>
+              <div style="display:flex;gap:16px;align-items:stretch">
+                <div style="flex:1.55;border:1px solid #e6e7e9;border-radius:14px;padding:16px 18px;display:flex;flex-direction:column;min-width:0">
+                  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px"><span style="font-size:11px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:#9ca3af">Relevante Notizen</span><span style="display:inline-flex;align-items:center;gap:6px;font-size:11px;color:#c2c6cc">qwen3.5:4b<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7"></path><polyline points="21 3 21 8 16 8"></polyline></svg></span></div>
+                  <div style="display:flex;align-items:center;gap:13px;padding:12px 0 10px"><span style="width:36px;height:28px;border-radius:8px;background:#f3f4f6;color:#374151;font-size:13px;font-weight:600;display:inline-flex;align-items:center;justify-content:center;flex:none">41</span><div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:600;color:#1a1a1a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Ermöglichung durch KI</div><div style="font-size:12px;color:#9ca3af;margin-top:2px;display:flex;align-items:center;gap:7px"><span style="width:6px;height:6px;border-radius:50%;background:#dc2626"></span>Problem · kürzlich aktiv · Notes</div></div><span style="color:#c2c6cc;font-size:15px">›</span></div>
+                  <div style="height:1px;background:#f0f1f3"></div>
+                  <div style="font-size:12px;color:#c2c6cc;padding-top:10px">5 weitere Notizen unter dem Radar</div>
+                </div>
+                <div style="flex:1;display:flex;flex-direction:column;gap:16px;min-width:0">
+                  <div style="border:1px solid #e6e7e9;border-radius:14px;padding:15px 18px;display:flex;align-items:center;justify-content:space-between"><span style="font-size:11px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:#9ca3af">Aufgaben</span><span style="font-size:13px;color:#c2c6cc">Nichts fällig</span></div>
+                  <div style="border:1px solid #e6e7e9;border-radius:14px;padding:15px 18px">
+                    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px"><span style="font-size:11px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:#9ca3af">Gehirn · Tagesgedächtnis</span><span style="font-size:11px;color:#c2c6cc">qwen3.5:4b</span></div>
+                    <div style="display:flex;align-items:center;gap:11px"><span style="width:8px;height:8px;border-radius:50%;background:#d0a34a;flex:none"></span><span style="font-size:13px;color:#374151;flex:1">Heute noch nicht verdichtet</span><span style="font-size:12px;font-weight:600;color:#fff;background:#1a1a1a;border-radius:8px;padding:6px 13px">Verdichten</span></div>
+                  </div>
+                </div>
+              </div>
+              <div style="border:1px solid #eef0f2;border-radius:14px;background:#fafbfc;display:flex;padding:15px 8px">
+                <div style="flex:1;text-align:center;border-right:1px solid #eef0f2"><div style="font-size:22px;font-weight:600;color:#1a1a1a">6</div><div style="font-size:10.5px;color:#9ca3af;margin-top:2px">Notizen</div></div>
+                <div style="flex:1;text-align:center;border-right:1px solid #eef0f2"><div style="font-size:22px;font-weight:600;color:#c2c6cc">0</div><div style="font-size:10.5px;color:#9ca3af;margin-top:2px">heute berührt</div></div>
+                <div style="flex:1;text-align:center;border-right:1px solid #eef0f2"><div style="font-size:22px;font-weight:600;color:#1a1a1a">6</div><div style="font-size:10.5px;color:#9ca3af;margin-top:2px">neu (7 T)</div></div>
+                <div style="flex:1;text-align:center;border-right:1px solid #eef0f2"><div style="font-size:22px;font-weight:600;color:#1a1a1a">6</div><div style="font-size:10.5px;color:#9ca3af;margin-top:2px">geänd. (30 T)</div></div>
+                <div style="flex:1;text-align:center;border-right:1px solid #eef0f2"><div style="font-size:22px;font-weight:600;color:#1a1a1a">44</div><div style="font-size:10.5px;color:#9ca3af;margin-top:2px">Kontextsignale</div></div>
+                <div style="flex:1;text-align:center"><div style="font-size:22px;font-weight:600;color:#c2c6cc">0</div><div style="font-size:10.5px;color:#9ca3af;margin-top:2px">Aktionen</div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;height:28px;padding:0 16px;background:#f4f5f7;border-top:1px solid #e6e7e9;font-size:11px;color:#9ca3af">
+          <span>2026</span><span style="color:#d7dade">·</span><span>6 Notizen</span><span style="color:#d7dade">·</span><span>7 Links</span><span style="flex:1"></span><span>▲ Terminal</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="dv-opt" id="1c">
+      <div class="dv-olabel"><a class="dv-oid" href="#1c">1c</a><span><b>Fokus-first</b> — meinungsstärker. Eigene Typo (Space Grotesk für Wortmarke, Titel &amp; Zahlen), „Freiraum" als gestalteter Zustand statt Loch, Relevanz-Radar mit Balken, Gehirn als klares Modul mit Primär-Aktion.</span></div>
+      <div style="width:1120px;background:#fff;border:1px solid #dfe1e4;border-radius:14px;box-shadow:0 14px 44px rgba(17,17,17,.11);overflow:hidden;color:#1a1a1a">
+        <div style="display:flex;align-items:center;padding:0 14px;height:46px;background:#f4f5f7;border-bottom:1px solid #e6e7e9;gap:14px">
+          <div style="display:flex;align-items:center;gap:8px;flex:1;min-width:0">
+            <span style="display:flex;gap:8px"><span style="width:12px;height:12px;border-radius:50%;background:#ff5f57"></span><span style="width:12px;height:12px;border-radius:50%;background:#febc2e"></span><span style="width:12px;height:12px;border-radius:50%;background:#28c840"></span></span>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8a8f98" stroke-width="1.7" style="margin-left:10px"><rect x="3" y="4" width="18" height="16" rx="2.5"></rect><line x1="9" y1="4" x2="9" y2="20"></line></svg>
+            <span style="width:20px;height:20px;border-radius:6px;background:#e0447a;display:inline-flex;align-items:center;justify-content:center;margin-left:6px;flex:none"><span style="width:8px;height:8px;border-radius:50%;background:#fff"></span></span>
+            <span style="font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:14px;letter-spacing:-.01em;color:#1a1a1a">MindGraph Notes</span>
+            <span style="font-size:9px;font-weight:700;letter-spacing:.06em;color:#9ca3af;border:1px solid #d7dade;border-radius:5px;padding:2px 5px">BETA</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:2px;background:#eceef1;border-radius:10px;padding:3px">
+            <span style="font-size:12.5px;color:#6b7280;padding:5px 12px;border-radius:7px">Editor</span>
+            <span style="font-size:12.5px;color:#6b7280;padding:5px 12px;border-radius:7px">Split</span>
+            <span style="font-size:12.5px;color:#6b7280;padding:5px 12px;border-radius:7px">Brain</span>
+            <span style="font-size:12.5px;color:#fff;font-weight:600;padding:5px 14px;border-radius:7px;background:#1a1a1a">Dashboard</span>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:flex-end;gap:15px;flex:1;color:#9aa0a8">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><line x1="4" y1="8" x2="20" y2="8"></line><line x1="4" y1="16" x2="20" y2="16"></line><circle cx="9" cy="8" r="2.3"></circle><circle cx="15" cy="16" r="2.3"></circle></svg>
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2.5"></rect><path d="m3.5 7 8.5 6 8.5-6"></path></svg>
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.5"></circle><circle cx="12" cy="12" r="1.5"></circle><circle cx="19" cy="12" r="1.5"></circle></svg>
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M9.6 9.2a2.5 2.5 0 1 1 3.6 2.3c-.8.5-1.2 1-1.2 1.9"></path><circle cx="12" cy="17" r="0.6" fill="currentColor" stroke="none"></circle></svg>
+          </div>
+        </div>
+        <div style="display:flex;height:722px">
+          <div style="width:236px;background:#f4f5f7;border-right:1px solid #e6e7e9;display:flex;flex-direction:column;min-width:0">
+            <div style="display:flex;align-items:flex-start;padding:14px 12px 12px;gap:8px">
+              <span style="flex:1;font-family:'Space Grotesk',sans-serif;font-size:11px;font-weight:700;letter-spacing:.08em;line-height:1.35;color:#8a8f98">MINDGRAPH<br>NOTES</span>
+              <div style="display:flex;align-items:center;gap:7px;color:#9aa0a8">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"></circle><line x1="20" y1="20" x2="16.7" y2="16.7"></line></svg>
+                <span style="width:24px;height:24px;border-radius:7px;background:#1a1a1a;display:inline-flex;align-items:center;justify-content:center"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg></span>
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M2 6.5A1.5 1.5 0 0 1 3.5 5H9l2 2h9.5A1.5 1.5 0 0 1 22 8.5v9A1.5 1.5 0 0 1 20.5 19h-17A1.5 1.5 0 0 1 2 17.5z"></path><line x1="12" y1="10" x2="12" y2="15"></line><line x1="9.5" y1="12.5" x2="14.5" y2="12.5"></line></svg>
+              </div>
+            </div>
+            <div style="padding:2px 14px 12px;display:flex;align-items:flex-start;gap:8px">
+              <div style="flex:1"><div style="font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:600;color:#1a1a1a">2026</div><div style="font-size:11px;color:#9ca3af;margin-top:2px">6 Notizen · Notes</div></div>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#b3b8bf" stroke-width="1.8" stroke-linecap="round"><line x1="4" y1="7" x2="16" y2="7"></line><line x1="4" y1="12" x2="12" y2="12"></line><line x1="4" y1="17" x2="9" y2="17"></line></svg>
+            </div>
+            <div style="display:flex;gap:7px;padding:0 14px 14px">
+              <span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:#6b7280;background:#fff;border:1px solid #e6e7e9;border-radius:999px;padding:4px 10px"><span style="width:8px;height:8px;border-radius:50%;background:#dc2626"></span>1</span>
+              <span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:#6b7280;background:#fff;border:1px solid #e6e7e9;border-radius:999px;padding:4px 10px"><span style="width:8px;height:8px;border-radius:50%;background:#15803d"></span>1</span>
+              <span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:#9ca3af;background:#fff;border:1px solid #e6e7e9;border-radius:999px;padding:4px 10px"><span style="width:8px;height:8px;border-radius:50%;background:#256fd1"></span>0</span>
+            </div>
+            <div style="padding:2px 8px;flex:1;overflow:hidden;font-size:13px;color:#374151">
+              <div style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:8px"><span style="color:#c2c6cc;font-size:10px">▾</span><svg width="15" height="15" viewBox="0 0 24 24"><path d="M2 6.5A1.5 1.5 0 0 1 3.5 5H9l2 2h9.5A1.5 1.5 0 0 1 22 8.5v9A1.5 1.5 0 0 1 20.5 19h-17A1.5 1.5 0 0 1 2 17.5z" fill="#e0a94f"></path></svg><span style="flex:1">Literatur</span><span style="color:#c2c6cc;font-size:11px">0</span></div>
+              <div style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:8px"><span style="color:#c2c6cc;font-size:10px">▾</span><svg width="15" height="15" viewBox="0 0 24 24"><path d="M2 6.5A1.5 1.5 0 0 1 3.5 5H9l2 2h9.5A1.5 1.5 0 0 1 22 8.5v9A1.5 1.5 0 0 1 20.5 19h-17A1.5 1.5 0 0 1 2 17.5z" fill="#e0a94f"></path></svg><span style="flex:1">Notes</span><span style="color:#c2c6cc;font-size:11px">2</span></div>
+              <div style="display:flex;align-items:center;gap:8px;padding:6px 8px 6px 30px;border-radius:8px;background:#eceef1"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6b7280" stroke-width="1.8" stroke-linecap="round"><line x1="5" y1="7" x2="19" y2="7"></line><line x1="5" y1="12" x2="19" y2="12"></line><line x1="5" y1="17" x2="13" y2="17"></line></svg><span style="width:8px;height:8px;border-radius:50%;background:#dc2626;flex:none"></span><span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500;color:#1a1a1a">Ermöglichung durch KI</span></div>
+              <div style="display:flex;align-items:center;gap:8px;padding:6px 8px 6px 30px;border-radius:8px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#9aa0a8" stroke-width="1.8" stroke-linecap="round"><line x1="5" y1="7" x2="19" y2="7"></line><line x1="5" y1="12" x2="19" y2="12"></line><line x1="5" y1="17" x2="13" y2="17"></line></svg><span style="width:8px;height:8px;border-radius:50%;background:#15803d;flex:none"></span><span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Optimierung vs. Transformation</span></div>
+              <div style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:8px"><span style="color:#c2c6cc;font-size:10px">▾</span><svg width="15" height="15" viewBox="0 0 24 24"><path d="M2 6.5A1.5 1.5 0 0 1 3.5 5H9l2 2h9.5A1.5 1.5 0 0 1 22 8.5v9A1.5 1.5 0 0 1 20.5 19h-17A1.5 1.5 0 0 1 2 17.5z" fill="#e0a94f"></path></svg><span style="flex:1">Projekte</span><span style="color:#c2c6cc;font-size:11px">0</span></div>
+              <div style="display:flex;align-items:center;gap:8px;padding:6px 8px 6px 22px;border-radius:8px"><span style="color:#c2c6cc;font-size:10px">▾</span><svg width="15" height="15" viewBox="0 0 24 24"><path d="M2 6.5A1.5 1.5 0 0 1 3.5 5H9l2 2h9.5A1.5 1.5 0 0 1 22 8.5v9A1.5 1.5 0 0 1 20.5 19h-17A1.5 1.5 0 0 1 2 17.5z" fill="#e0a94f"></path></svg><span style="flex:1">Deskilling</span><span style="color:#c2c6cc;font-size:11px">2</span></div>
+              <div style="display:flex;align-items:center;gap:8px;padding:6px 8px 6px 44px;border-radius:8px"><span style="font-size:8px;font-weight:700;color:#dc2626;border:1px solid #f0c9c9;border-radius:4px;padding:1px 3px;flex:none">PDF</span><span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Reinmann 2023 – Deskilling durch KI</span></div>
+              <div style="display:flex;align-items:center;gap:8px;padding:6px 8px 6px 44px;border-radius:8px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#9aa0a8" stroke-width="1.8" stroke-linecap="round"><line x1="5" y1="7" x2="19" y2="7"></line><line x1="5" y1="12" x2="19" y2="12"></line><line x1="5" y1="17" x2="13" y2="17"></line></svg><span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Reinmann 2023 – Notizen</span></div>
+              <div style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:8px;color:#6b7280"><span style="color:#c2c6cc;font-size:10px">▸</span><svg width="15" height="15" viewBox="0 0 24 24"><path d="M2 6.5A1.5 1.5 0 0 1 3.5 5H9l2 2h9.5A1.5 1.5 0 0 1 22 8.5v9A1.5 1.5 0 0 1 20.5 19h-17A1.5 1.5 0 0 1 2 17.5z" fill="#e0a94f"></path></svg><span style="flex:1">Ressourcen</span><span style="color:#c2c6cc;font-size:11px">0</span></div>
+            </div>
+          </div>
+          <div style="flex:1;display:flex;flex-direction:column;background:#fff;min-width:0">
+            <div style="display:flex;align-items:center;gap:6px;padding:8px 14px;border-bottom:1px solid #eef0f2;background:#fbfbfc;overflow:hidden">
+              <span style="display:inline-flex;align-items:center;gap:7px;font-size:12.5px;color:#6b7280;padding:6px 12px;border-radius:8px;background:#f1f2f4;max-width:190px"><span style="width:7px;height:7px;border-radius:50%;background:#dc2626;flex:none"></span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Ermöglichung durch KI</span></span>
+              <span style="display:inline-flex;align-items:center;gap:7px;font-size:12.5px;color:#6b7280;padding:6px 12px;border-radius:8px;max-width:170px"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Reinmann 2023 – Notizen</span></span>
+              <span style="display:inline-flex;align-items:center;gap:7px;font-size:12.5px;color:#6b7280;padding:6px 12px;border-radius:8px;max-width:190px"><span style="width:7px;height:7px;border-radius:50%;background:#15803d;flex:none"></span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Optimierung vs. Transformation</span></span>
+              <span style="display:inline-flex;align-items:center;gap:7px;font-size:12.5px;font-weight:600;color:#1a1a1a;padding:6px 13px;border-radius:8px;background:#ececee;border:1px solid #e0e2e5">Dashboard</span>
+            </div>
+            <div style="flex:1;padding:26px 30px;overflow:hidden;display:flex;flex-direction:column;gap:18px">
+              <div style="display:flex;align-items:flex-end;justify-content:space-between">
+                <div><div style="font-family:'Space Grotesk',sans-serif;font-size:29px;font-weight:600;letter-spacing:-.01em;color:#1a1a1a">Dashboard</div><div style="font-size:13px;color:#9ca3af;margin-top:3px">Donnerstag, 25. Juni 2026</div></div>
+                <span style="display:inline-flex;align-items:center;gap:7px;font-size:12px;color:#6b7280;border:1px solid #e6e7e9;border-radius:9px;padding:7px 12px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7"></path><polyline points="21 3 21 8 16 8"></polyline></svg>Aktualisieren</span>
+              </div>
+              <div style="border:1px solid #e6e7e9;border-radius:16px;padding:24px 26px;display:flex;align-items:center;gap:24px;background:linear-gradient(180deg,#ffffff,#fcfcfd)">
+                <div style="flex:1;min-width:0"><div style="font-family:'Space Grotesk',sans-serif;font-size:32px;font-weight:600;letter-spacing:-.01em;color:#1a1a1a;line-height:1">Freiraum.</div><div style="font-size:14px;color:#6b7280;margin-top:8px">Keine Deadlines, kein Rückstau, kein offener Task. Der Tag gehört dir.</div></div>
+                <div style="text-align:right;border-left:1px solid #eef0f2;padding-left:24px;flex:none"><div style="font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#9ca3af;margin-bottom:7px">Kürzlich aktiv</div><span style="font-size:14px;color:#2563eb;font-weight:500">3 Notizen weiterdenken →</span></div>
+              </div>
+              <div style="display:flex;gap:18px;align-items:stretch">
+                <div style="flex:1.5;border:1px solid #e6e7e9;border-radius:16px;padding:18px 20px;min-width:0">
+                  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px"><span style="font-size:11px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:#9ca3af">Relevanz-Radar</span><span style="font-size:11px;color:#c2c6cc">qwen3.5:4b</span></div>
+                  <div style="margin-bottom:16px"><div style="display:flex;align-items:center;gap:11px;margin-bottom:7px"><span style="width:7px;height:7px;border-radius:50%;background:#dc2626;flex:none"></span><span style="flex:1;font-size:14px;font-weight:600;color:#1a1a1a;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Ermöglichung durch KI</span><span style="font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:600;color:#1a1a1a">41</span></div><div style="height:6px;border-radius:999px;background:#f0f1f3;overflow:hidden"><div style="width:41%;height:100%;background:#1a1a1a"></div></div><div style="font-size:11.5px;color:#9ca3af;margin-top:6px">Problem · kürzlich aktiv · Notes</div></div>
+                  <div style="margin-bottom:14px;opacity:.62"><div style="display:flex;align-items:center;gap:11px;margin-bottom:7px"><span style="width:7px;height:7px;border-radius:50%;background:#15803d;flex:none"></span><span style="flex:1;font-size:14px;font-weight:500;color:#374151;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Optimierung vs. Transformation</span><span style="font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:600;color:#6b7280">18</span></div><div style="height:6px;border-radius:999px;background:#f0f1f3;overflow:hidden"><div style="width:18%;height:100%;background:#b3b8bf"></div></div></div>
+                  <div style="opacity:.5"><div style="display:flex;align-items:center;gap:11px;margin-bottom:7px"><span style="width:7px;height:7px;border-radius:50%;background:#9ca3af;flex:none"></span><span style="flex:1;font-size:14px;font-weight:500;color:#374151;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Reinmann 2023 – Deskilling durch KI</span><span style="font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:600;color:#9ca3af">9</span></div><div style="height:6px;border-radius:999px;background:#f0f1f3;overflow:hidden"><div style="width:9%;height:100%;background:#cbd0d6"></div></div></div>
+                </div>
+                <div style="flex:1;display:flex;flex-direction:column;gap:18px;min-width:0">
+                  <div style="border:1px solid #e6e7e9;border-radius:16px;padding:18px 20px;flex:1;display:flex;flex-direction:column">
+                    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px"><span style="font-size:11px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:#9ca3af">Gehirn</span><span style="display:inline-flex;align-items:center;gap:6px;font-size:11.5px;color:#9ca3af"><span style="width:7px;height:7px;border-radius:50%;background:#d0a34a"></span>nicht verdichtet</span></div>
+                    <div style="display:flex;gap:10px;margin-bottom:16px"><div style="flex:1;background:#fafbfc;border:1px solid #eef0f2;border-radius:11px;padding:11px 12px"><div style="font-family:'Space Grotesk',sans-serif;font-size:24px;font-weight:600;color:#1a1a1a;line-height:1">6</div><div style="font-size:10.5px;color:#9ca3af;margin-top:5px">Notizen gesamt</div></div><div style="flex:1;background:#fafbfc;border:1px solid #eef0f2;border-radius:11px;padding:11px 12px"><div style="font-family:'Space Grotesk',sans-serif;font-size:24px;font-weight:600;color:#1a1a1a;line-height:1">44</div><div style="font-size:10.5px;color:#9ca3af;margin-top:5px">Kontextsignale</div></div></div>
+                    <div style="display:flex;gap:10px;margin-bottom:18px"><div style="flex:1;background:#fafbfc;border:1px solid #eef0f2;border-radius:11px;padding:11px 12px"><div style="font-family:'Space Grotesk',sans-serif;font-size:24px;font-weight:600;color:#c2c6cc;line-height:1">0</div><div style="font-size:10.5px;color:#9ca3af;margin-top:5px">heute berührt</div></div><div style="flex:1;background:#fafbfc;border:1px solid #eef0f2;border-radius:11px;padding:11px 12px"><div style="font-family:'Space Grotesk',sans-serif;font-size:24px;font-weight:600;color:#1a1a1a;line-height:1">6</div><div style="font-size:10.5px;color:#9ca3af;margin-top:5px">neu (7 Tage)</div></div></div>
+                    <button style="margin-top:auto;width:100%;border:none;background:#1a1a1a;color:#fff;font-size:13px;font-weight:600;border-radius:10px;padding:11px;cursor:pointer;font-family:inherit">Tag verdichten</button>
+                  </div>
+                  <div style="border:1px solid #e6e7e9;border-radius:16px;padding:15px 20px;display:flex;align-items:center;justify-content:space-between"><span style="font-size:11px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:#9ca3af">Aufgaben</span><span style="font-size:13px;color:#c2c6cc">Nichts fällig</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;height:28px;padding:0 16px;background:#f4f5f7;border-top:1px solid #e6e7e9;font-size:11px;color:#9ca3af">
+          <span>2026</span><span style="color:#d7dade">·</span><span>6 Notizen</span><span style="color:#d7dade">·</span><span>7 Links</span><span style="flex:1"></span><span>▲ Terminal</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+  <p class="dv-next">Nächste Schritte: „mehr wie <a class="dv-oid" href="#1c">1c</a>, aber Karten ruhiger wie <a class="dv-oid" href="#1b">1b</a>" · „<a class="dv-oid" href="#1b">1b</a> im Dark-Theme zeigen" · „auch die Graph-/Brain-Ansicht redesignen" · „andere Typo als Space Grotesk testen"</p>
+</section>
+</x-dc>
+</body>
+</html>
