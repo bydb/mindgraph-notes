@@ -102,10 +102,9 @@
   --widget-accent: var(--accent-color);
   background: var(--bg-primary);
   border: 1px solid var(--border-color);
-  border-radius: 8px;
-  box-shadow:
-    inset 0 3px 0 color-mix(in srgb, var(--widget-accent) 64%, transparent),
-    0 1px 2px rgba(0, 0, 0, 0.035);
+  border-radius: 14px;
+  /* Petrol redesign (Stage 2): neutral cards — kill the coloured top accent bar. */
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.035);
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -253,7 +252,8 @@
   justify-content: space-between;
   padding: 13px 15px 12px;
   border-bottom: 1px solid var(--border-subtle);
-  background: color-mix(in srgb, var(--widget-accent) 5%, var(--bg-primary));
+  /* Petrol redesign (Stage 2): neutral header — no coloured widget-accent tint. */
+  background: transparent;
 }
 
 .dv-widget-header h3 {
@@ -268,9 +268,10 @@
 .dv-widget-count {
   font-size: 11px;
   font-weight: 700;
-  background: color-mix(in srgb, var(--widget-accent) 10%, var(--bg-primary));
-  border: 1px solid color-mix(in srgb, var(--widget-accent) 20%, var(--border-subtle));
-  color: color-mix(in srgb, var(--widget-accent) 86%, var(--text-primary));
+  /* Petrol redesign (Stage 2): neutral count chip (not a coloured/red circle). */
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
   padding: 3px 9px;
   border-radius: 999px;
   min-width: 28px;
