@@ -11320,6 +11320,18 @@ var PLUGIN_MANIFEST_SCHEMA = {
         fromAction: { type: "string", minLength: 1 }
       },
       additionalProperties: false
+    },
+    // Datei-Editor-Beanspruchung (ADR plugin-renderer-host §8). Endungs-Form wird zusätzlich in
+    // validateManifestSemantics + dem FileEditorResolver normalisiert/geprüft.
+    fileEditorDecl: {
+      type: "object",
+      required: ["editorId", "extensions"],
+      properties: {
+        editorId: { type: "string", minLength: 1 },
+        extensions: { type: "array", minItems: 1, items: { type: "string", minLength: 1 } },
+        label: { type: "string" }
+      },
+      additionalProperties: false
     }
   },
   required: [
@@ -11476,7 +11488,8 @@ var PLUGIN_MANIFEST_SCHEMA = {
         settingsTab: { type: "boolean" },
         // SlotDecl strikt: nur die zwei Slot-Kategorien; KEIN `view`-Template (fromAction liefert die WidgetView).
         dashboardWidget: { $ref: "#/definitions/slotDecl" },
-        sidebarPanel: { $ref: "#/definitions/slotDecl" }
+        sidebarPanel: { $ref: "#/definitions/slotDecl" },
+        fileEditors: { type: "array", items: { $ref: "#/definitions/fileEditorDecl" } }
       },
       additionalProperties: false
     },
@@ -11553,6 +11566,21 @@ function validateManifestSemantics(manifest) {
     const expectedSlot = slotKey === "dashboardWidget" ? "dashboard.widget" : "sidebar.panel";
     if (manifest.ui?.[slotKey]?.slot !== expectedSlot) {
       errors.push(`ui.${slotKey}.slot muss exakt '${expectedSlot}' sein.`);
+    }
+  }
+  const seenEditorIds = /* @__PURE__ */ new Set();
+  for (const fe2 of manifest.ui?.fileEditors ?? []) {
+    if (seenEditorIds.has(fe2.editorId)) {
+      errors.push(`Doppelte ui.fileEditors.editorId '${fe2.editorId}'.`);
+    }
+    seenEditorIds.add(fe2.editorId);
+  }
+  if (!manifest.entrypoints?.main) {
+    if (manifest.actions?.length) {
+      errors.push("Renderer-only-Plugin (ohne entrypoints.main) darf keine `actions` deklarieren \u2014 kein Executor registrierbar.");
+    }
+    if (manifest.workflowActions?.length) {
+      errors.push("Renderer-only-Plugin (ohne entrypoints.main) darf keine `workflowActions` deklarieren.");
     }
   }
   return { valid: errors.length === 0, errors };
@@ -11771,6 +11799,40 @@ var MANIFEST_FILE = "manifest.json";
 var INTEGRITY_FILE = "integrity.json";
 var SIG_FILE = "integrity.json.sig";
 
+// src/main/plugins/artifact/esmCheck.ts
+var BANNED = [
+  { re: /\beval\s*\(/, kind: "eval" },
+  { re: /\bnew\s+Function\s*\(/, kind: "new Function" },
+  { re: /\bimport\.meta\.url\b/, kind: "import.meta.url" }
+];
+var STATIC_FROM = /(?:^|[\s;}])(?:import|export)\b[^;]*?\bfrom\s*['"]([^'"]+)['"]/g;
+var SIDE_EFFECT_IMPORT = /(?:^|[\s;}])import\s*['"]([^'"]+)['"]/g;
+var DYNAMIC_IMPORT = /\bimport\s*\(\s*['"]([^'"]+)['"]\s*\)/g;
+var isInlineSpecifier = (spec) => spec.startsWith("data:");
+function stripComments(code) {
+  return code.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/(^|[^:/])\/\/[^\n]*/g, "$1");
+}
+function findEsmViolations(rawCode) {
+  const code = stripComments(rawCode);
+  const out = [];
+  for (const b2 of BANNED) if (b2.re.test(code)) out.push({ kind: b2.kind });
+  const checkSpec = (spec, kind) => {
+    if (!isInlineSpecifier(spec)) out.push({ kind, detail: spec });
+  };
+  for (const m2 of code.matchAll(STATIC_FROM)) checkSpec(m2[1], "static-import");
+  for (const m2 of code.matchAll(SIDE_EFFECT_IMPORT)) checkSpec(m2[1], "side-effect-import");
+  for (const m2 of code.matchAll(DYNAMIC_IMPORT)) checkSpec(m2[1], "dynamic-import");
+  return out;
+}
+function assertSelfContainedEsm(code, label) {
+  const violations = findEsmViolations(code);
+  if (!violations.length) return;
+  const detail = violations.map((v2) => v2.detail ? `${v2.kind}('${v2.detail}')` : v2.kind).join(", ");
+  throw new Error(
+    `'${label}' ist kein selbstenthaltenes Single-File-ESM (ADR plugin-renderer-host \xA75.3, F12): ${detail}. B\xFCndle ALLE Abh\xE4ngigkeiten + Assets inline (data:); kein relativer/bare Import, kein import.meta.url, kein eval/new Function.`
+  );
+}
+
 // src/main/plugins/artifact/pack.ts
 var byPath = (a, b2) => a.path < b2.path ? -1 : a.path > b2.path ? 1 : 0;
 async function packPluginArtifact(input) {
@@ -11784,6 +11846,19 @@ async function packPluginArtifact(input) {
     seen.add(f2.path);
   }
   if (!seen.has(MANIFEST_FILE)) throw new Error(`'${MANIFEST_FILE}' fehlt in den Nutzdateien`);
+  const manifestFile = input.files.find((f2) => f2.path === MANIFEST_FILE);
+  if (manifestFile) {
+    let rendererRel;
+    try {
+      rendererRel = JSON.parse(manifestFile.content.toString("utf8"))?.entrypoints?.renderer;
+    } catch {
+      rendererRel = void 0;
+    }
+    if (typeof rendererRel === "string") {
+      const rf = input.files.find((f2) => f2.path === rendererRel);
+      if (rf) assertSelfContainedEsm(rf.content.toString("utf8"), rendererRel);
+    }
+  }
   const payload = [...input.files].sort(byPath);
   const entries = payload.map((f2) => ({
     path: f2.path,
