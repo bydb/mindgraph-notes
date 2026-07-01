@@ -2,7 +2,7 @@
 
 **Status:** Runde 1 (F01–F07) + Runde 2 (F08–F10, Codex-Re-Check) — ALLE von Claude adressiert + live re-verifiziert (7 Familien echte Metriken, fail-closed Preload). Wartet auf Codex-Re-Check Runde 2.
 **Autor Claude/Opus (Lead), Fix von Hermes (GLM 5.2), Verifikation von Claude.**
-**Repo des Fixes:** `~/dev/mindgraph-excalidraw-plugin` (eigenes git, Commit `6570e32 fix(fonts)`) — NICHT dieser Repo/Branch. Diese Datei ist **self-contained**: der zu prüfende Code ist unten eingebettet, du brauchst den Plugin-Repo nicht in deinem Kontext (kannst ihn aber unter dem Pfad lesen, falls verfügbar).
+**Repo des Fixes:** `~/dev/mindgraph-excalidraw-plugin` (eigenes git). **Zu prüfen ist der Runde-2-Stand = Commit `9a93064 fix(fonts): F01–F10`** (nicht der Runde-1-Commit `6570e32`) — NICHT dieser Repo/Branch. Diese Datei ist **self-contained**: der zu prüfende Code + die Runde-1/Runde-2-Antworten sind unten eingebettet; du brauchst den Plugin-Repo nicht in deinem Kontext (kannst ihn aber unter dem Pfad lesen, falls verfügbar). **Aufgabe dieses Re-Checks: F08/F09/F10 als geschlossen bestätigen oder konkrete Restlücken benennen.**
 
 ## Aufgabe
 
