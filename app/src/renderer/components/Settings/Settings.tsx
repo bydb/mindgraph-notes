@@ -2908,13 +2908,16 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab 
                   <button
                     className="settings-refresh"
                     onClick={() => {
+                      // Petrol redesign fix: auf die ECHTEN Store-Defaults zurücksetzen. Vorher
+                      // setzte der Reset die alten Vor-Petrol-Werte (terracotta-Akzent + creme-
+                      // Hintergrund) — Letzterer überschrieb sogar den Dark-Mode.
                       setTheme('system')
-                      setAccentColor('terracotta')
-                      setBackgroundColor('cream')
+                      setAccentColor('ink')
+                      setBackgroundColor('default')
                       setFontFamily('system')
                       setCustomAccentColor('#d4875a')
-                      setCustomBackgroundColorLight('#faf8f0')
-                      setCustomBackgroundColorDark('#18170f')
+                      setCustomBackgroundColorLight('#ffffff')
+                      setCustomBackgroundColorDark('#0d0d0d')
                       removeCustomLogo()
                     }}
                   >
