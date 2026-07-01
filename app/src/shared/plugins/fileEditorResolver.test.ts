@@ -3,6 +3,7 @@ import {
   normalizeExtension,
   extensionCandidates,
   resolveFileEditors,
+  assertCandidateClaimsFree,
   lookupFileEditor,
   WELL_KNOWN_CORE_EXTENSIONS,
   type PluginFileEditors,
@@ -105,5 +106,65 @@ describe('lookupFileEditor', () => {
   it('liefert null für nicht beanspruchte Dateien', () => {
     expect(lookupFileEditor('notiz.md', resolved)).toBeNull()
     expect(lookupFileEditor('ohneendung', resolved)).toBeNull()
+  })
+})
+
+describe('assertCandidateClaimsFree (Install/Upgrade-Gate, F07)', () => {
+  const core = WELL_KNOWN_CORE_EXTENSIONS
+
+  it('akzeptiert einen kollisionsfreien Kandidaten', () => {
+    const r = assertCandidateClaimsFree(
+      { pluginId: 'excalidraw', fileEditors: [{ editorId: 'draw', extensions: ['.excalidraw'] }] },
+      [{ pluginId: 'tldraw', fileEditors: [{ editorId: 't', extensions: ['.tldr'] }] }],
+      core,
+    )
+    expect(r).toEqual({ ok: true })
+  })
+
+  it('akzeptiert einen Kandidaten ganz ohne fileEditors', () => {
+    expect(assertCandidateClaimsFree({ pluginId: 'x', fileEditors: [] }, [], core)).toEqual({ ok: true })
+  })
+
+  it('lehnt eine Kern-Endung ab (core-collision)', () => {
+    const r = assertCandidateClaimsFree(
+      { pluginId: 'evil', fileEditors: [{ editorId: 'e', extensions: ['.md'] }] },
+      [],
+      core,
+    )
+    expect(r.ok).toBe(false)
+    if (!r.ok) expect(r.error).toMatch(/core-collision/)
+  })
+
+  it('lehnt eine bereits von einem anderen Plugin beanspruchte Endung ab (plugin-collision)', () => {
+    const r = assertCandidateClaimsFree(
+      { pluginId: 'b', fileEditors: [{ editorId: 'x', extensions: ['.draw'] }] },
+      [{ pluginId: 'a', fileEditors: [{ editorId: 'y', extensions: ['.draw'] }] }],
+      core,
+    )
+    expect(r.ok).toBe(false)
+    if (!r.ok) expect(r.error).toMatch(/plugin-collision.*'a'/)
+  })
+
+  it('erkennt normalisierte Mehrfachendungs-Kollision (.PDF.MD vs Kern .pdf.md)', () => {
+    const r = assertCandidateClaimsFree(
+      { pluginId: 'evil', fileEditors: [{ editorId: 'e', extensions: ['.PDF.MD'] }] },
+      [],
+      core,
+    )
+    expect(r.ok).toBe(false)
+    if (!r.ok) expect(r.error).toMatch(/\.pdf\.md/)
+  })
+
+  it('ignoriert Kollisionen ZWISCHEN anderen Plugins (nicht Sache des Kandidaten)', () => {
+    // a und b kollidieren miteinander, der Kandidat c ist sauber → ok für c.
+    const r = assertCandidateClaimsFree(
+      { pluginId: 'c', fileEditors: [{ editorId: 'z', extensions: ['.cc'] }] },
+      [
+        { pluginId: 'a', fileEditors: [{ editorId: 'y', extensions: ['.dup'] }] },
+        { pluginId: 'b', fileEditors: [{ editorId: 'y', extensions: ['.dup'] }] },
+      ],
+      core,
+    )
+    expect(r).toEqual({ ok: true })
   })
 })

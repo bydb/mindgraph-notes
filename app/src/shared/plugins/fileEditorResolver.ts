@@ -132,6 +132,30 @@ export function resolveFileEditors(
   return { byExtension, errors }
 }
 
+/**
+ * Kollisions-Gate für Install/Upgrade (ADR §8, F07): prüft, ob das KANDIDIERENDE Plugin gegen die
+ * weiterhin aktiven Plugins ODER die Kern-Endungen kollidiert — der vollständige nächste Claim-Zustand,
+ * VOR dem `active.json`-Commit. `others` = alle aktiven Plugins OHNE die (zu ersetzende) Version des
+ * Kandidaten. Jede den Kandidaten betreffende Kollision (Kern / Plugin↔Plugin / ungültige/normalisierte
+ * Endung) ist TERMINAL → der Aufrufer bricht Aktivierung + Commit ab.
+ */
+export function assertCandidateClaimsFree(
+  candidate: PluginFileEditors,
+  others: PluginFileEditors[],
+  coreExtensions: Iterable<string>,
+): { ok: true } | { ok: false; error: string } {
+  if (!(candidate.fileEditors ?? []).length) return { ok: true }
+  const resolved = resolveFileEditors([...others, candidate], coreExtensions)
+  const offending = resolved.errors.filter(
+    (e) => e.pluginId === candidate.pluginId || e.otherPluginId === candidate.pluginId,
+  )
+  if (!offending.length) return { ok: true }
+  const detail = offending
+    .map((e) => `${e.extension} (${e.kind}${e.otherPluginId ? ` mit '${e.otherPluginId}'` : ''})`)
+    .join(', ')
+  return { ok: false, error: `Datei-Editor-Endungskollision: ${detail}` }
+}
+
 /** Schlägt den (längsten passenden) Editor-Anspruch für einen Dateinamen nach, sonst `null`. */
 export function lookupFileEditor(fileName: string, resolved: ResolvedFileEditors): FileEditorClaim | null {
   for (const cand of extensionCandidates(fileName)) {

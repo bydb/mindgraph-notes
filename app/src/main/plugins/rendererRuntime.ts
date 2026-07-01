@@ -11,7 +11,14 @@
 
 import { randomUUID } from 'node:crypto'
 import type { FileEditorDecl, PluginManifest } from '@mindgraph/plugin-api'
+import type {
+  RendererDescriptor,
+  RendererServe,
+  RendererHostOpResult,
+} from '../../shared/plugins/renderer'
 import type { VerifiedRendererPayload } from './artifact/verify'
+
+export type { RendererDescriptor, RendererServe } from '../../shared/plugins/renderer'
 
 /** Capability-Host eines Plugins (createHostFactory(manifest)). Schmal getypt — nur was die Bridge nutzt. */
 type CapabilityHost = { vault?: Record<string, (...a: unknown[]) => unknown> }
@@ -36,24 +43,6 @@ interface RendererRuntimeEntry {
   drainWaiters: Array<() => void>
 }
 
-export interface RendererDescriptor {
-  pluginId: string
-  pluginLabel: string
-  version: string
-  rendererInstanceId: string
-  fileEditors: FileEditorDecl[]
-}
-
-export interface RendererServe {
-  rendererInstanceId: string
-  pluginId: string
-  pluginLabel: string
-  version: string
-  code: string
-  styles?: string
-  fileEditors: FileEditorDecl[]
-}
-
 export interface RendererInstanceRef {
   pluginId: string
   version: string
@@ -68,8 +57,6 @@ export interface RendererActivation {
   fileEditors: FileEditorDecl[]
   manifest: PluginManifest
 }
-
-export type HostOpResult = { ok: true; data: unknown } | { ok: false; error: string }
 
 const cloneFileEditors = (fe: FileEditorDecl[]): FileEditorDecl[] =>
   fe.map((f) => ({ editorId: f.editorId, extensions: [...f.extensions], ...(f.label ? { label: f.label } : {}) }))
@@ -185,7 +172,7 @@ export class RendererRuntime {
    * Call-Gate + In-Flight-Zählung, Host-Erzeugung INTERN (Manifest verlässt das Modul nicht). Nur `vault.<op>`;
    * das feine Capability-Gating (read* vs write*) macht die Host-Factory aus den Manifest-Capabilities.
    */
-  async invokeHostOp(rendererInstanceId: unknown, op: unknown, args: unknown): Promise<HostOpResult> {
+  async invokeHostOp(rendererInstanceId: unknown, op: unknown, args: unknown): Promise<RendererHostOpResult> {
     if (typeof rendererInstanceId !== 'string') return { ok: false, error: 'Ungültige Instanz' }
     const e = this.byInstance.get(rendererInstanceId)
     if (!e) return { ok: false, error: 'Renderer-Instanz nicht aktiv' }

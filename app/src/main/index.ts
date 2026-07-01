@@ -163,11 +163,21 @@ import {
   PluginRestartRequiredError,
   type ManageDeps,
   type RuntimeEnv,
+  type RendererActivationOutcome,
 } from './plugins/runtime/manage'
+import type { MainPluginSource } from './plugins/registry'
 import { ArtifactError } from './plugins/artifact/limits'
 import { discoverInstalledPlugins, type DiscoverError } from './plugins/runtime/discover'
 import { ExternalWidgetRuntime } from './plugins/widgets'
 import { RendererRuntime, type RendererActivation, type RendererHostFactory } from './plugins/rendererRuntime'
+import {
+  awaitRendererActivation,
+  resolveRendererActivation,
+  parseRendererAck,
+  awaitRendererTeardown,
+  resolveRendererTeardown,
+  parseRendererTeardownAck,
+} from './plugins/rendererAck'
 import { verifyInstalledRendererPayload } from './plugins/artifact/verify'
 import { downloadPluginArtifact } from './plugins/download'
 import { checkPluginUpdates } from './plugins/update-checker'
@@ -180,6 +190,7 @@ import { getFileType, coreClaimedExtensions } from './fileTypes'
 import {
   resolveFileEditors,
   lookupFileEditor,
+  assertCandidateClaimsFree,
   type ResolvedFileEditors,
 } from '../shared/plugins/fileEditorResolver'
 
@@ -206,6 +217,10 @@ const externalWidgetRuntime = new ExternalWidgetRuntime(pluginRegistry)
 // Renderer-Plugin-Host (ADR plugin-renderer-host §5.3/§5.4): hält die verifizierten Renderer-Bytes
 // aktiver Plugins; befüllt von syncRendererRuntime, gelesen vom plugin:rendererEntry-/plugin:host-IPC.
 const rendererRuntime = new RendererRuntime()
+// Besitzer-Fenster je rendererInstanceId (F24): das webContents, dessen Aktivierungs-Ack Main akzeptiert hat.
+// Der gerichtete Teardown geht NUR dorthin, und nur dessen Ack zählt — kein Fremd-Fenster kann mit einem
+// idempotenten `success` den echten Besitzer-Ausgang vorzeitig ersetzen.
+const rendererOwners = new Map<string, Electron.WebContents>()
 registerPluginTransport(pluginRegistry, () => publishPluginUiState())
 
 // Plugin-beigesteuerte Workflow-Canvas-Bausteine (Manifest-Feld `workflowActions`) in die
@@ -239,6 +254,21 @@ function pluginManageDeps(): ManageDeps {
     registry: pluginRegistry,
     registerWorkflowActions,
     unregisterWorkflowActions,
+    activateRenderer: activateRendererCandidate,
+    // F07: Endungskollision des Kandidaten gegen ALLE weiterhin aktiven Renderer-Plugins (ohne die zu
+    // ersetzende eigene Version) + Kern-Endungen — terminal VOR Commit (ADR §8).
+    validateFileEditorClaims: (manifest) =>
+      assertCandidateClaimsFree(
+        { pluginId: manifest.id, fileEditors: manifest.ui?.fileEditors ?? [] },
+        rendererRuntime
+          .list()
+          .filter((d) => d.pluginId !== manifest.id)
+          .map((d) => ({ pluginId: d.pluginId, fileEditors: d.fileEditors })),
+        coreClaimedExtensions(),
+      ),
+    // F08/F14/F15/F16: Renderer end-zu-ende entladen (drain + gerichteter Teardown-Ack) vor Disable/Upgrade/
+    // Rollback; nur 'success' erlaubt den nächsten Schritt, sonst fail-closed (restart-required).
+    tearDownRenderer,
   }
 }
 
@@ -250,6 +280,14 @@ function syncExternalWidgetRuntime(): void {
   externalWidgetRuntime.sync(manifests)
 }
 
+/**
+ * Renderer-Aktivierungs-Handshake (ADR §5.2, F06): der Kandidat ist während des Handshakes NOCH NICHT in
+ * `active.json` (Commit kommt erst nach dem Ack). Diese „Pinnung" hält ihn deshalb über syncRendererRuntime
+ * aktiv, damit die selbst-synchronisierenden `plugin:renderers`/`plugin:rendererEntry`-IPCs ihn nicht
+ * mitten im Laden wieder wegräumen. Bei einem Upgrade ÜBERSCHREIBT er den committeten Vorgänger.
+ */
+let pendingRendererCandidate: RendererActivation | null = null
+
 /** Spiegelt aktive, erneut verifizierte Renderer-Plugins + ihre verifizierten Bytes in die
  *  RendererRuntime (ADR plugin-renderer-host §5.3). instanceId-stabil via syncActive. */
 function syncRendererRuntime(): { changed: boolean } {
@@ -260,6 +298,8 @@ function syncRendererRuntime(): { changed: boolean } {
     const manifest = source.manifest
     if (!manifest.entrypoints?.renderer) continue
     if (pluginRegistry.get(manifest.id)?.activation !== 'active') continue
+    // Während des Handshakes hat der Kandidat Vorrang vor seinem committeten Vorgänger (gleiche pluginId).
+    if (pendingRendererCandidate && manifest.id === pendingRendererCandidate.pluginId) continue
     try {
       const dir = versionDir(paths, manifest.id, manifest.version)
       const { payload } = verifyInstalledRendererPayload(dir, {
@@ -280,7 +320,98 @@ function syncRendererRuntime(): { changed: boolean } {
       // fail-closed: Re-Verify scheiterte (manipuliertes Verzeichnis) → diese Version NICHT servieren.
     }
   }
+  if (pendingRendererCandidate) activations.push(pendingRendererCandidate)
   return rendererRuntime.syncActive(activations)
+}
+
+/** Push NUR für die Renderer-Plugin-Quelle (Handshake-Schritt; der Renderer lädt + ackt danach). */
+function pushRenderersChanged(): void {
+  for (const window of BrowserWindow.getAllWindows()) {
+    if (window.isDestroyed()) continue
+    window.webContents.send('plugin:renderers-changed')
+  }
+}
+
+/** Max. Wartezeit auf den Renderer-Ack (import + activate(host) + Staging) — danach fail-closed. */
+const RENDERER_ACTIVATION_TIMEOUT_MS = 8000
+
+/**
+ * Aktiviert den Renderer-Beitrag eines Kandidaten (mint instanceId via syncRendererRuntime über die
+ * Pinnung + Push) und WARTET auf den Renderer-Ack (ADR §5.2, F06). Liefert das Ergebnis an die
+ * Transaktion in installAndActivate; bei Fehler/Timeout rollt diese zurück (kein Commit).
+ */
+async function activateRendererCandidate(source: MainPluginSource): Promise<RendererActivationOutcome> {
+  const env = runtimePluginEnv()
+  const paths = pluginPaths(env.pluginsRoot)
+  const manifest = source.manifest
+  let payload: RendererActivation['payload'] | undefined
+  try {
+    const dir = versionDir(paths, manifest.id, manifest.version)
+    payload = verifyInstalledRendererPayload(dir, { keyring: env.keyring, appVersion: env.appVersion }).payload
+  } catch (err) {
+    return { ok: false, error: `Renderer-Payload-Verifikation fehlgeschlagen: ${err instanceof Error ? err.message : String(err)}` }
+  }
+  if (!payload) return { ok: false, error: 'Kein verifizierter Renderer-Payload' }
+
+  pendingRendererCandidate = {
+    pluginId: manifest.id,
+    pluginLabel: manifest.label,
+    version: manifest.version,
+    payload,
+    fileEditors: manifest.ui?.fileEditors ?? [],
+    manifest,
+  }
+  try {
+    syncRendererRuntime() // aktiviert den Kandidaten (überschreibt Vorgänger) + mintet die instanceId
+    const instanceId = rendererRuntime.servePayload(manifest.id)?.rendererInstanceId
+    if (!instanceId) return { ok: false, error: 'Renderer-Instanz konnte nicht aktiviert werden' }
+    pushRenderersChanged() // Renderer lädt das Bundle, activate(host), Staging → ackt diese instanceId
+    const ack = await awaitRendererActivation(instanceId, RENDERER_ACTIVATION_TIMEOUT_MS)
+    if (ack.ok) return { ok: true }
+    return { ok: false, error: `${ack.error}${ack.phase ? ` (${ack.phase})` : ''}` }
+  } finally {
+    // Pinnung lösen: bei Erfolg committet installAndActivate gleich (→ Kandidat wird committet-aktiv,
+    // stabile instanceId via syncActive); bei Misserfolg räumt der Teardown + der IPC-Re-Sync auf.
+    pendingRendererCandidate = null
+  }
+}
+
+/**
+ * Entlädt den Renderer-Beitrag eines Plugins ENDE-ZU-ENDE (ADR §5.2 Deactivate-Previous / §5.5-Matrix,
+ * F08/F14/F15/F16/F24): (1) In-Flight `plugin:host`-Calls drainen; (2) den BESITZER-Renderer (F24) zum
+ * Dispose der konkreten instanceId auffordern und auf den §5.5-Ausgang warten (nur dessen Ack zählt);
+ * (3) die Matrix auf den Main-Zustand anwenden. NUR `'success'` entfernt den RendererRuntime-Eintrag (+
+ * Payload); `'error'`/`'timeout'` lassen ihn fail-closed stehen (gateClosed → restart-required).
+ *   - `'noop'` = das Plugin hat gar keinen aktiven Renderer-Beitrag (main-only) — nichts zu tun.
+ *   - Besitzerfenster geschlossen → der Renderer ist mit ihm weg → `'success'`.
+ */
+async function tearDownRenderer(pluginId: string): Promise<'noop' | 'success' | 'error' | 'timeout'> {
+  if ((await rendererRuntime.drain(pluginId, RENDERER_ACTIVATION_TIMEOUT_MS)) === 'timeout') return 'timeout'
+  const instanceId = rendererRuntime.list().find((d) => d.pluginId === pluginId)?.rendererInstanceId
+  if (!instanceId) return 'noop' // kein aktiver Renderer-Beitrag
+  const owner = rendererOwners.get(instanceId) ?? mainWindow?.webContents
+  const ownerGone = (): 'success' => {
+    rendererRuntime.deactivate(pluginId)
+    rendererOwners.delete(instanceId)
+    return 'success' // Besitzerfenster (und damit der Renderer) sind weg
+  }
+  if (!owner || owner.isDestroyed()) return ownerGone()
+  try {
+    owner.send('plugin:rendererTeardown', instanceId)
+  } catch (err) {
+    // F30: Fenster zwischen isDestroyed()-Check und send() zerstört → Renderer weg → atomar `success`.
+    // Anderer Send-Fehler bei lebendem Fenster → fail-closed (drain hat das Gate schon geschlossen) → `timeout`.
+    if (owner.isDestroyed()) return ownerGone()
+    console.error(`[plugin] Teardown-send an '${pluginId}' warf:`, err)
+    return 'timeout'
+  }
+  const outcome = await awaitRendererTeardown(instanceId, RENDERER_ACTIVATION_TIMEOUT_MS, owner.id)
+  if (outcome === 'success') {
+    rendererRuntime.deactivate(pluginId) // Eintrag + Payload weg
+    rendererOwners.delete(instanceId)
+  }
+  // error/timeout: Eintrag bleibt (gateClosed, restart-required); der Aufrufer (manage.ts) meldet Neustart.
+  return outcome
 }
 
 /** Main→Renderer Push für BEIDE Renderer-UI-Quellen (Tier-1-Widgets + Renderer-Plugins): nach
@@ -326,8 +457,11 @@ ipcMain.handle('plugin:install', async (event) => {
     publishPluginUiState()
     return { ok: true, data: { id: out.id, version: out.version, idempotent: out.idempotent } }
   } catch (err) {
-    const code = err instanceof ArtifactError ? err.code : undefined
     const restartRequired = err instanceof PluginRestartRequiredError
+    // F23: bei restart-required NICHT reconcilen — sonst reaktiviert syncRendererRuntime den partially-stopped
+    // (Vorgänger-)Renderer aus dem persistenten Index. Bei normalem Fehler auf den Vorgänger zurück-reconcilen.
+    if (!restartRequired) publishPluginUiState()
+    const code = err instanceof ArtifactError ? err.code : undefined
     return { ok: false, error: err instanceof Error ? err.message : String(err), code, restartRequired }
   }
 })
@@ -346,8 +480,11 @@ ipcMain.handle('plugin:installFromGithub', async (event, repo: unknown, tag: unk
     publishPluginUiState()
     return { ok: true, data: { id: out.id, version: out.version, idempotent: out.idempotent } }
   } catch (err) {
-    const code = err instanceof ArtifactError ? err.code : undefined
     const restartRequired = err instanceof PluginRestartRequiredError
+    // F23: bei restart-required NICHT reconcilen — sonst reaktiviert syncRendererRuntime den partially-stopped
+    // (Vorgänger-)Renderer aus dem persistenten Index. Bei normalem Fehler auf den Vorgänger zurück-reconcilen.
+    if (!restartRequired) publishPluginUiState()
+    const code = err instanceof ArtifactError ? err.code : undefined
     return { ok: false, error: err instanceof Error ? err.message : String(err), code, restartRequired }
   }
 })
@@ -414,7 +551,9 @@ ipcMain.handle('plugin:uninstall', async (event, pluginId: unknown) => {
     publishPluginUiState()
     return { ok: true }
   } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : String(err) }
+    // F23: kein Reconcile bei restart-required (kein Re-Activate des partially-stopped Renderers aus dem Index).
+    const restartRequired = err instanceof PluginRestartRequiredError
+    return { ok: false, error: err instanceof Error ? err.message : String(err), restartRequired }
   }
 })
 
@@ -471,6 +610,27 @@ ipcMain.handle('plugin:rendererEntry', async (event, pluginId: unknown) => {
 ipcMain.handle('plugin:host', async (event, rendererInstanceId: unknown, op: unknown, args: unknown) => {
   if (!isTrustedSender(event)) return { ok: false, error: 'Nicht autorisierter Aufrufer' }
   return rendererRuntime.invokeHostOp(rendererInstanceId, op, args)
+})
+
+// Renderer→Main Aktivierungs-Ack (ADR plugin-renderer-host §5.2, F06): löst den in der Aktivierungs-
+// Transaktion wartenden Promise (awaitRendererActivation) für diese instanceId. Untrusted-tolerant geparst.
+ipcMain.handle('plugin:rendererActivated', async (event, raw: unknown) => {
+  if (!isTrustedSender(event)) return { ok: false }
+  const ack = parseRendererAck(raw)
+  if (ack) {
+    if (ack.ok) rendererOwners.set(ack.rendererInstanceId, event.sender) // F24: Besitzer = ackendes Fenster
+    resolveRendererActivation(ack)
+  }
+  return { ok: true }
+})
+
+// Renderer→Main Teardown-Ack (ADR §5.2/§5.5, F15/F16/F24): meldet den §5.5-Ausgang eines gerichteten
+// Teardown-Requests; löst den in tearDownRenderer wartenden Promise NUR, wenn der Absender der Besitzer ist.
+ipcMain.handle('plugin:rendererTornDown', async (event, raw: unknown) => {
+  if (!isTrustedSender(event)) return { ok: false }
+  const ack = parseRendererTeardownAck(raw)
+  if (ack) resolveRendererTeardown(ack, event.sender.id)
+  return { ok: true }
 })
 
 // Read-only: aktuell abgewiesene installierte Plugins (Re-Verify UND workflow-collision). LIVE neu
