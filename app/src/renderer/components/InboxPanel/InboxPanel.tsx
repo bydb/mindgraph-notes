@@ -742,7 +742,7 @@ export const InboxPanel: React.FC<InboxPanelProps> = ({ onClose }) => {
 
               {/* Action buttons */}
               <div className="inbox-email-actions">
-                <button className="inbox-action-btn" onClick={() => startReply(selectedEmail)} data-tooltip={t('inbox.reply.tooltip')}>
+                <button className="inbox-action-btn inbox-action-btn--primary" onClick={() => startReply(selectedEmail)} data-tooltip={t('inbox.reply.tooltip')}>
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <polyline points="9 17 4 12 9 7" />
                     <path d="M20 18v-2a4 4 0 0 0-4-4H4" />
@@ -846,42 +846,28 @@ export const InboxPanel: React.FC<InboxPanelProps> = ({ onClose }) => {
                     </div>
                   )}
 
-                  <div className="inbox-analysis-row">
-                    <span className="inbox-analysis-label">{t('inbox.detail.relevance')}</span>
-                    <div className="inbox-analysis-value">
-                      <div className="inbox-relevance-bar">
-                        <div
-                          className="inbox-relevance-fill"
-                          style={{ width: `${selectedEmail.analysis.relevanceScore}%` }}
-                        />
-                      </div>
-                      <span>{selectedEmail.analysis.relevanceScore}%</span>
+                  {/* Petrol redesign (Claude Design): „Warum relevant"-Box — Accent-Dot +
+                      Uppercase-Label + Score, Accent-subtle-Fläche, dann die Gründe. */}
+                  <div className="inbox-relevance-box">
+                    <div className="inbox-relevance-box-header">
+                      <span className="inbox-relevance-dot" aria-hidden="true" />
+                      <span className="inbox-relevance-label">{t('inbox.detail.relevance')}</span>
+                      <span className="inbox-relevance-level">{selectedEmail.analysis.relevanceScore}%</span>
                     </div>
-                  </div>
-
-                  {selectedEmail.analysis.relevanceReasons && selectedEmail.analysis.relevanceReasons.length > 0 && (
-                    <div className="inbox-analysis-row" style={{ alignItems: 'flex-start' }}>
-                      <span className="inbox-analysis-label">{t('inbox.detail.relevanceReasons')}</span>
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', flex: 1 }}>
+                    <div className="inbox-relevance-bar">
+                      <div
+                        className="inbox-relevance-fill"
+                        style={{ width: `${selectedEmail.analysis.relevanceScore}%` }}
+                      />
+                    </div>
+                    {selectedEmail.analysis.relevanceReasons && selectedEmail.analysis.relevanceReasons.length > 0 && (
+                      <div className="inbox-relevance-reasons">
                         {selectedEmail.analysis.relevanceReasons.map((reason, i) => (
-                          <span
-                            key={i}
-                            style={{
-                              fontSize: '11px',
-                              padding: '2px 8px',
-                              borderRadius: '10px',
-                              background: 'color-mix(in srgb, var(--accent-color) 14%, transparent)',
-                              color: 'var(--text-secondary, var(--text-muted))',
-                              border: '1px solid color-mix(in srgb, var(--accent-color) 25%, transparent)',
-                              whiteSpace: 'nowrap',
-                            }}
-                          >
-                            {reason}
-                          </span>
+                          <span key={i} className="inbox-relevance-reason">{reason}</span>
                         ))}
                       </div>
-                    </div>
-                  )}
+                    )}
+                  </div>
 
                   <div className="inbox-analysis-row">
                     <span className="inbox-analysis-label">{t('inbox.detail.sentiment')}</span>
@@ -1281,7 +1267,7 @@ export const InboxPanel: React.FC<InboxPanelProps> = ({ onClose }) => {
             {displayEmails.map(email => (
               <div
                 key={email.id}
-                className={`inbox-email-item ${!email.flags.includes('\\Seen') ? 'unread' : ''} ${email.sent ? 'sent' : ''}`}
+                className={`inbox-email-item ${!email.flags.includes('\\Seen') ? 'unread' : ''} ${email.sent ? 'sent' : ''} ${selectedEmailId === email.id ? 'selected' : ''}`}
                 onClick={() => {
                   setSelectedEmail(email.id)
                   setCurrentView('detail')

@@ -10619,8 +10619,37 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
   cursor: pointer;
 }
 
-.inbox-filter-checkbox input {
+/* Petrol redesign (Claude Design): „Nur relevante" = 15px Akzent-Check-Kästchen. */
+.inbox-filter-checkbox input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
   margin: 0;
+  width: 15px;
+  height: 15px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background: transparent;
+  cursor: pointer;
+  position: relative;
+  transition: background 0.12s, border-color 0.12s;
+}
+.inbox-filter-checkbox input[type="checkbox"]:hover {
+  border-color: var(--accent-color);
+}
+.inbox-filter-checkbox input[type="checkbox"]:checked {
+  background: var(--accent-color);
+  border-color: var(--accent-color);
+}
+.inbox-filter-checkbox input[type="checkbox"]:checked::after {
+  content: '✓';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: var(--accent-on);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
 }
 
 .inbox-progress {
@@ -10968,6 +10997,15 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
   background: var(--bg-secondary);
 }
 
+/* Petrol redesign (Claude Design): ausgewählte Zeile = --accent-subtle, Avatar in Akzent. */
+.inbox-email-item.selected {
+  background: var(--accent-subtle);
+}
+.inbox-email-item.selected .inbox-email-avatar {
+  background: var(--accent-color);
+  color: var(--accent-on);
+}
+
 .inbox-email-item.unread .inbox-email-sender {
   font-weight: 600;
 }
@@ -10982,8 +11020,10 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
   width: 32px;
   height: 32px;
   border-radius: 50%;
-  background: var(--accent-subtle);
-  color: var(--accent-color);
+  /* Petrol redesign (Claude Design): unselektiert neutral; die ausgewählte Zeile färbt
+     den Avatar in Akzent (siehe .inbox-email-item.selected weiter unten). */
+  background: var(--bg-secondary);
+  color: var(--text-primary);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -11056,8 +11096,9 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
 }
 
 .inbox-email-detail-header h3 {
-  font-size: 15px;
-  font-weight: 600;
+  /* Petrol redesign (Claude Design): Betreff 18px/700 im Lesebereich. */
+  font-size: 18px;
+  font-weight: 700;
   color: var(--text-primary);
   margin: 0 0 8px 0;
   line-height: 1.3;
@@ -11071,7 +11112,8 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
 }
 
 .inbox-email-from {
-  font-weight: 500;
+  /* Petrol redesign (Claude Design): Absender fett im Lesebereich. */
+  font-weight: 700;
   color: var(--text-primary);
 }
 
@@ -11142,6 +11184,62 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
   background: var(--accent-color);
   border-radius: 3px;
   transition: width 0.3s ease;
+}
+
+/* Petrol redesign (Claude Design): „Warum relevant"-Box — Accent-subtle-Fläche + Accent-Rand,
+   Accent-Dot + Uppercase-Label + Score, darunter Balken + Gründe. */
+.inbox-relevance-box {
+  padding: 12px 14px;
+  border: 1px solid color-mix(in srgb, var(--accent-color) 30%, transparent);
+  background: var(--accent-subtle);
+  border-radius: 11px;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+.inbox-relevance-box-header {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.inbox-relevance-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent-color);
+  flex: none;
+}
+.inbox-relevance-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--accent-color);
+}
+.inbox-relevance-level {
+  margin-left: auto;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+.inbox-relevance-box .inbox-relevance-bar {
+  width: 100%;
+  background: color-mix(in srgb, var(--accent-color) 16%, transparent);
+}
+.inbox-relevance-reasons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+.inbox-relevance-reason {
+  font-size: 11px;
+  color: var(--text-secondary);
+  padding: 2px 8px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--accent-color) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent-color) 22%, transparent);
+  white-space: nowrap;
 }
 
 .inbox-analysis-section {
@@ -11518,19 +11616,13 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
   right: 0;
 }
 
-.inbox-reply-badge.high {
-  background: #fecaca;
-  color: #dc2626;
-}
-
-.inbox-reply-badge.medium {
-  background: #fed7aa;
-  color: #ea580c;
-}
-
+/* Petrol redesign (Claude Design): „Antwort erwartet"-Indikator im Akzent statt alter
+   Urgency-Palette (rot/orange/blau). */
+.inbox-reply-badge.high,
+.inbox-reply-badge.medium,
 .inbox-reply-badge.low {
-  background: #e0e7ff;
-  color: #4f46e5;
+  background: var(--accent-subtle);
+  color: var(--accent-color);
 }
 
 .inbox-needs-reply {
@@ -11544,22 +11636,14 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
   margin-top: 4px;
 }
 
-.inbox-needs-reply.high {
-  background: #fef2f2;
-  color: #dc2626;
-  border: 1px solid #fecaca;
-}
-
-.inbox-needs-reply.medium {
-  background: #fff7ed;
-  color: #ea580c;
-  border: 1px solid #fed7aa;
-}
-
+/* Petrol redesign (Claude Design): „Antwort erwartet"-Box im Akzent (Accent-Text +
+   color-mix-Rand + Accent-subtle-Fläche) statt der alten Urgency-Palette. */
+.inbox-needs-reply.high,
+.inbox-needs-reply.medium,
 .inbox-needs-reply.low {
-  background: #eef2ff;
-  color: #4f46e5;
-  border: 1px solid #e0e7ff;
+  background: var(--accent-subtle);
+  color: var(--accent-color);
+  border: 1px solid color-mix(in srgb, var(--accent-color) 35%, transparent);
 }
 
 .inbox-needs-reply.handled {
@@ -11820,6 +11904,18 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
   background: var(--bg-tertiary);
   border-color: var(--accent);
   color: var(--accent);
+}
+
+/* Petrol redesign (Claude Design): „Antwort entwerfen" ist der Primär-Button (accent + accent-on). */
+.inbox-action-btn--primary {
+  background: var(--accent-color);
+  border-color: var(--accent-color);
+  color: var(--accent-on);
+}
+.inbox-action-btn--primary:hover {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+  color: var(--accent-on);
 }
 
 /* Sent email indicator */
