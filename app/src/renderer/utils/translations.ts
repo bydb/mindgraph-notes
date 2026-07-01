@@ -843,7 +843,7 @@ const translations = {
     'dashboard.soon': 'Bald fällig',
     'dashboard.later': 'Später',
     'dashboard.allDay': 'Ganztägig',
-    'dashboard.widgets.focus': 'Heute im Fokus',
+    'dashboard.widgets.focus': 'Fokus heute',
     'dashboard.widgets.tasks': 'Aufgaben',
     'dashboard.widgets.radar': 'Relevante Notizen',
     'dashboard.widgets.activity': 'Aktivität',
@@ -955,6 +955,7 @@ const translations = {
     // Focus-Widget
     'dashboard.focus.allClear': 'Keine Deadlines, kein Rückstau. Nutze den Freiraum.',
     'dashboard.focus.empty': 'Nichts Dringendes heute.',
+    'dashboard.focus.dueCount': '{count} fällig',
     'dashboard.focus.overdueOne': '{count} überfällige Aufgabe',
     'dashboard.focus.overdueMany': '{count} überfällige Aufgaben',
     'dashboard.focus.todayOne': '{count} Aufgabe heute fällig',
@@ -3549,7 +3550,7 @@ const translations = {
     'dashboard.soon': 'Due soon',
     'dashboard.later': 'Later',
     'dashboard.allDay': 'All day',
-    'dashboard.widgets.focus': 'Today\'s Focus',
+    'dashboard.widgets.focus': 'Focus today',
     'dashboard.widgets.tasks': 'Tasks',
     'dashboard.widgets.radar': 'Relevant notes',
     'dashboard.widgets.activity': 'Activity',
@@ -3661,6 +3662,7 @@ const translations = {
     // Focus widget
     'dashboard.focus.allClear': 'No deadlines, no backlog. Use the room.',
     'dashboard.focus.empty': 'Nothing urgent today.',
+    'dashboard.focus.dueCount': '{count} due',
     'dashboard.focus.overdueOne': '{count} overdue task',
     'dashboard.focus.overdueMany': '{count} overdue tasks',
     'dashboard.focus.todayOne': '{count} task due today',

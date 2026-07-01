@@ -111,34 +111,13 @@
   min-height: 210px;
 }
 
-.dv-widget-tasks {
-  --widget-accent: var(--color-danger, #e55);
-}
-
-.dv-widget-radar {
-  --widget-accent: var(--color-danger, #d93d42);
-}
-
-.dv-activity {
-  --widget-accent: var(--color-integrate, #0f9f8f);
-}
+/* Petrol redesign (Stage 2): keine per-Widget-Warmfarben mehr — alle Widgets teilen den
+   neutralen Petrol-Akzent (`.dv-widget { --widget-accent: var(--accent-color) }`). Die alten
+   Overrides (Tasks/Radar rot, Aktivität/Mail teal, Kalender, Buchungen grün) sind entfernt. */
 
 /* Brain — Lokales Tagesgedächtnis (Identität auf Aktivitäts-Widget) */
 .dv-brain {
   position: relative;
-}
-.dv-brain::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 3px;
-  background: linear-gradient(180deg,
-    color-mix(in srgb, var(--widget-accent) 80%, transparent) 0%,
-    color-mix(in srgb, var(--widget-accent) 40%, transparent) 100%);
-  border-top-left-radius: var(--radius-md, 8px);
-  border-bottom-left-radius: var(--radius-md, 8px);
 }
 .dv-brain-header {
   display: flex;
@@ -200,9 +179,14 @@
   border-radius: 50%;
   flex-shrink: 0;
 }
+/* Petrol redesign (Stage 2): „noch nicht verdichtet" ist ein semantischer Warte-Status →
+   Amber (wie im Handoff), nicht der Petrol-Akzent. */
 .dv-brain-status-dot-pending {
-  background: var(--widget-accent);
+  background: #c98a2a;
   animation: dv-brain-pulse 2.4s ease-in-out infinite;
+}
+[data-theme="dark"] .dv-brain-status-dot-pending {
+  background: #e0a94f;
 }
 .dv-brain-status-dot-ready {
   background: var(--color-success, #22a06b);
@@ -232,18 +216,6 @@
   letter-spacing: 0.08em;
   color: var(--text-muted);
   padding: 12px 15px 6px;
-}
-
-.dv-widget-emails {
-  --widget-accent: var(--color-integrate, #0f9f8f);
-}
-
-.dv-widget-calendar {
-  --widget-accent: var(--color-editor, var(--accent-color));
-}
-
-.dv-widget-bookings {
-  --widget-accent: var(--color-success, #22a06b);
 }
 
 .dv-widget-header {
@@ -289,6 +261,34 @@
   font-size: 13px;
   text-align: center;
   font-style: italic;
+}
+
+/* Petrol redesign (Stage 2): leere Widgets kollabieren zu einer ruhigen Einzeile
+   (Label links, gedämpfter Status rechts) — keine große leere Box mehr. */
+.dv-widget.dv-widget-collapsed {
+  min-height: 0;
+}
+
+.dv-collapsed-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 15px 18px;
+}
+
+.dv-collapsed-row h3 {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-secondary);
+}
+
+.dv-collapsed-status {
+  font-size: 13px;
+  color: color-mix(in srgb, var(--text-muted) 80%, transparent);
 }
 
 /* Groups */
@@ -391,34 +391,45 @@
 }
 
 /* Activity */
+/* Petrol redesign (Stage 2): „Bestand" ist ein ruhiges Zahlenband — ein gerahmter
+   --bg-secondary-Block, Zellen durch --border-subtle getrennt, 0-Werte gedämpft. */
 .dv-activity-stats {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-  padding: 12px 14px 10px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin: 12px 14px 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 14px;
+  background: var(--bg-secondary);
+  overflow: hidden;
 }
 
 .dv-activity-stat {
   min-width: 0;
-  padding: 10px;
-  border: 1px solid var(--border-subtle);
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--widget-accent) 4%, var(--bg-secondary));
+  padding: 12px 8px;
+  text-align: center;
+  border-right: 1px solid var(--border-subtle);
+  border-bottom: 1px solid var(--border-subtle);
 }
+/* rechte Spalte + letzte Reihe ohne Trennlinie (6 Zellen im 3-Spalten-Raster) */
+.dv-activity-stat:nth-child(3n) { border-right: none; }
+.dv-activity-stat:nth-child(n+4) { border-bottom: none; }
 
 .dv-activity-stat span {
   display: block;
   font-size: 22px;
-  font-weight: 750;
+  font-weight: 600;
   line-height: 1.05;
   color: var(--text-primary);
   font-variant-numeric: tabular-nums;
 }
+.dv-activity-stat span.dv-stat-zero {
+  color: var(--text-muted);
+}
 
 .dv-activity-stat small {
   display: block;
-  margin-top: 4px;
-  font-size: 11px;
+  margin-top: 2px;
+  font-size: 10.5px;
   color: var(--text-muted);
   line-height: 1.25;
 }
@@ -473,8 +484,10 @@
   background: color-mix(in srgb, var(--widget-accent) 78%, var(--accent-color));
 }
 
+/* Petrol redesign (Stage 2): Kontext-Balken bleiben neutral-grau, damit sie sich ruhig
+   von den Petrol-Ordnerbalken abheben (statt des früheren Lila-Mix). */
 .dv-activity-bar.context div {
-  background: color-mix(in srgb, var(--accent-color) 72%, #6f42c1);
+  background: color-mix(in srgb, var(--text-muted) 55%, var(--border-color));
 }
 
 .dv-activity-ai {
@@ -565,8 +578,8 @@
 }
 
 .dv-activity-ai-btn-primary {
-  background: var(--widget-accent, var(--accent-color, #2f7d6f));
-  color: var(--bg-primary, #fff);
+  background: var(--accent-color);
+  color: var(--accent-on);
   border-color: transparent;
 }
 
@@ -751,22 +764,24 @@
 }
 
 .dv-radar-row:last-child { border-bottom: none; }
-.dv-radar-row:hover { background: color-mix(in srgb, #d93d42 6%, var(--bg-hover)); }
+.dv-radar-row:hover { background: color-mix(in srgb, var(--accent-color) 5%, var(--bg-hover)); }
 
+/* Petrol redesign (Stage 2): Score-Chip neutral (kein roter Kreis) — abgerundetes
+   graues Rechteck, --text-secondary auf --bg-secondary. */
 .dv-radar-score {
   flex: 0 0 auto;
-  min-width: 30px;
-  height: 24px;
-  padding: 0 7px;
+  min-width: 32px;
+  height: 26px;
+  padding: 0 8px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 999px;
-  background: color-mix(in srgb, #d93d42 12%, var(--bg-primary));
-  border: 1px solid color-mix(in srgb, #d93d42 24%, transparent);
-  color: #b8272d;
-  font-size: 11px;
-  font-weight: 800;
+  border-radius: 8px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .dv-radar-body {
@@ -1231,26 +1246,57 @@
   opacity: 0.4;
 }
 
-/* ===== Focus-Widget ===== */
-.dv-focus {
-  border-color: color-mix(in srgb, var(--accent-color) 28%, var(--border-color));
-  box-shadow:
-    inset 3px 0 0 color-mix(in srgb, var(--accent-color) 78%, transparent),
-    0 2px 6px rgba(0, 0, 0, 0.045);
+/* ===== Focus-Widget =====
+   Petrol redesign (Stage 2): neutrale Karte — kein Akzent-Rand, kein Inset-Balken,
+   kein getönter Header. „Fokus heute" ist ruhig wie die übrigen Karten. */
+
+/* Kompakter Streifen im Leerzustand (hohler Kreis + Label + Zeile + „N fällig"). */
+.dv-widget.dv-focus-collapsed {
+  min-height: 0;
 }
 
-.dv-focus .dv-widget-header {
-  background: color-mix(in srgb, var(--accent-color) 8%, var(--bg-primary));
+.dv-focus-strip {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  padding: 16px 18px;
 }
 
-.dv-focus .dv-widget-header h3 {
-  color: var(--accent-color);
+.dv-focus-strip-check {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1.5px solid var(--border-color);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  flex: none;
 }
 
-.dv-focus .dv-widget-count {
-  background: color-mix(in srgb, var(--accent-color) 12%, var(--bg-primary));
-  border-color: color-mix(in srgb, var(--accent-color) 24%, transparent);
-  color: var(--accent-color);
+.dv-focus-strip-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.dv-focus-strip-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 3px;
+}
+
+.dv-focus-strip-line {
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.dv-focus-strip-due {
+  font-size: 12px;
+  color: color-mix(in srgb, var(--text-muted) 70%, transparent);
+  flex: none;
 }
 
 .dv-focus-narrative {
@@ -1261,7 +1307,6 @@
   color: var(--text-primary);
   font-weight: 600;
   border-bottom: 1px solid var(--border-subtle);
-  background: color-mix(in srgb, var(--accent-color) 5%, var(--bg-primary));
 }
 
 .dv-focus-row {
