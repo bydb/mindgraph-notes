@@ -150,7 +150,6 @@ p { color: var(--text-mid); }
 .item-header { display: flex; align-items: baseline; gap: 0.5rem; margin-bottom: 0.6rem; }
 .item-nr { font-weight: 900; min-width: 1.9rem; background: var(--brand); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
 .item-text { font-size: 0.96rem; flex: 1; color: var(--text); }
-.item-reverse { font-size: 0.64rem; font-weight: 800; color: var(--amber); background: rgba(255,178,74,.13); padding: 0.1rem 0.45rem; border-radius: 4px; white-space: nowrap; }
 .antworten { display: flex; gap: 0.3rem; padding-left: 2.4rem; flex-wrap: wrap; }
 .antworten label { display: flex; flex-direction: column; align-items: center; gap: 0.18rem; cursor: pointer; padding: 0.2rem 0.3rem; min-width: 2.5rem; }
 .antworten input[type="radio"] { display: none; }
@@ -406,12 +405,12 @@ footer { background: rgba(255,255,255,.45); }
         <strong>Need for Cognition</strong> ist kein IQ &ndash; es ist die Lust am Denken (Cacioppo &amp; Petty, 1982). Und genau diese Lust steht im KI-Zeitalter auf dem Spiel.
       </p>
       <p data-i18n="sci.p2">
-        Der Taschenrechner nahm uns das Rechnen ab. Generative KI greift höher: sie übernimmt das <strong>Denken selbst</strong>. Kosmyna et&nbsp;al. (2025) maßen es per EEG &ndash; wer beim Schreiben ein LLM nutzte, zeigte die <strong>schwächste Gehirnaktivität</strong>, und sie blieb schwach, selbst als die KI wieder weg war. <span style="color:var(--text)">Auslagern hat einen Preis. Mitdenken einen Gewinn.</span>
+        Der Taschenrechner nahm uns das Rechnen ab. Generative KI greift höher: sie kann das <strong>Denken selbst</strong> übernehmen. Erste Hinweise liefert eine MIT-Pilotstudie (Kosmyna et&nbsp;al. 2025, Preprint): Wer beim Schreiben ein LLM nutzte, zeigte im EEG die <strong>schwächste Hirnaktivität</strong> &ndash; auch dann noch, als die KI wieder weg war. Eine kleine Studie, kein Beweis &ndash; aber ein deutlicher Denkanstoß. <span style="color:var(--text)">Auslagern hat einen Preis. Mitdenken einen Gewinn.</span>
       </p>
       <div class="science-grid">
         <div class="science-item"><div class="big">r&nbsp;=&nbsp;.55</div><div class="sm" data-i18n="sci.k1">Denkfreude &harr; wissenschaftliches Interesse</div></div>
         <div class="science-item"><div class="big">r&nbsp;=&nbsp;.57</div><div class="sm" data-i18n="sci.k2">Denkfreude &harr; Leistungsmotivation</div></div>
-        <div class="science-item"><div class="big">EEG&nbsp;&darr;</div><div class="sm" data-i18n="sci.k3">schwächste Hirnaktivität bei LLM-Nutzung (Kosmyna 2025)</div></div>
+        <div class="science-item"><div class="big">EEG&nbsp;&darr;</div><div class="sm" data-i18n="sci.k3">Hinweis auf schwächere Hirnaktivität bei LLM-Nutzung (Pilotstudie, Kosmyna 2025)</div></div>
       </div>
     </div>
   </section>
@@ -437,7 +436,7 @@ footer { background: rgba(255,255,255,.45); }
         <ul>
           <li data-i18n="loss.1"><strong>Blindes Copy-Paste.</strong>KI-Antworten übernehmen, ohne sie je selbst zu formulieren.</li>
           <li data-i18n="loss.2"><strong>Verstehen auslagern.</strong>Das Ergebnis kennen, ohne den Weg &ndash; das „Chinesische Zimmer" im Kopf.</li>
-          <li data-i18n="loss.3"><strong>Kognitive Schuld.</strong>Wer nie selbst denkt, baut Denkvermögen ab (Kosmyna 2025).</li>
+          <li data-i18n="loss.3"><strong>Kognitive Schuld.</strong>Wer nie selbst denkt, riskiert Denkvermögen abzubauen &ndash; erste Befunde deuten darauf hin (Kosmyna 2025).</li>
           <li data-i18n="loss.4"><strong>Bequemlichkeit als Default.</strong>Immer das Werkzeug greifen, das am wenigsten verlangt.</li>
         </ul>
       </div>
@@ -493,7 +492,7 @@ footer { background: rgba(255,255,255,.45); }
   </section>
 
   <div class="quellen" data-i18n="quellen">
-    Quellen: Bless, H., Fellhauer, R.&nbsp;F., Bohner, G., &amp; Schwarz, N. (1991). <em>Need for Cognition: eine Skala zur Erfassung von Engagement und Freude bei Denkaufgaben</em> (ZUMA-Arbeitsbericht 91/06), Mannheim. &middot; Cacioppo, J.&nbsp;T., &amp; Petty, R.&nbsp;E. (1982). The need for cognition. <em>JPSP, 42(1)</em>. &middot; Kosmyna, N. et&nbsp;al. (2025). EEG-Studie zur Gehirnaktivität beim Schreiben mit/ohne LLM.
+    Quellen: Bless, H., Fellhauer, R.&nbsp;F., Bohner, G., &amp; Schwarz, N. (1991). <em>Need for Cognition: eine Skala zur Erfassung von Engagement und Freude bei Denkaufgaben</em> (ZUMA-Arbeitsbericht 91/06), Mannheim. &middot; Cacioppo, J.&nbsp;T., &amp; Petty, R.&nbsp;E. (1982). The need for cognition. <em>JPSP, 42(1)</em>. &middot; Kosmyna, N. et&nbsp;al. (2025). EEG-Studie zur Gehirnaktivität beim Schreiben mit/ohne LLM (Preprint, kleine Stichprobe).
   </div>
 </div>
 
@@ -560,10 +559,10 @@ const translations = {
     'sci.label': 'Warum das zählt',
     'sci.h2': 'Dasselbe Werkzeug.<br>Zwei Richtungen.',
     'sci.p1': '<strong>Need for Cognition</strong> ist kein IQ &ndash; es ist die Lust am Denken (Cacioppo &amp; Petty, 1982). Und genau diese Lust steht im KI-Zeitalter auf dem Spiel.',
-    'sci.p2': 'Der Taschenrechner nahm uns das Rechnen ab. Generative KI greift höher: sie übernimmt das <strong>Denken selbst</strong>. Kosmyna et&nbsp;al. (2025) maßen es per EEG &ndash; wer beim Schreiben ein LLM nutzte, zeigte die <strong>schwächste Gehirnaktivität</strong>, und sie blieb schwach, selbst als die KI wieder weg war. <span style="color:var(--text)">Auslagern hat einen Preis. Mitdenken einen Gewinn.</span>',
+    'sci.p2': 'Der Taschenrechner nahm uns das Rechnen ab. Generative KI greift höher: sie kann das <strong>Denken selbst</strong> übernehmen. Erste Hinweise liefert eine MIT-Pilotstudie (Kosmyna et&nbsp;al. 2025, Preprint): Wer beim Schreiben ein LLM nutzte, zeigte im EEG die <strong>schwächste Hirnaktivität</strong> &ndash; auch dann noch, als die KI wieder weg war. Eine kleine Studie, kein Beweis &ndash; aber ein deutlicher Denkanstoß. <span style="color:var(--text)">Auslagern hat einen Preis. Mitdenken einen Gewinn.</span>',
     'sci.k1': 'Denkfreude &harr; wissenschaftliches Interesse',
     'sci.k2': 'Denkfreude &harr; Leistungsmotivation',
-    'sci.k3': 'schwächste Hirnaktivität bei LLM-Nutzung (Kosmyna 2025)',
+    'sci.k3': 'Hinweis auf schwächere Hirnaktivität bei LLM-Nutzung (Pilotstudie, Kosmyna 2025)',
     'gl.label': 'Gewinn oder Verlust',
     'gl.h2': 'Die Richtung bestimmst <span class="grad">du</span>.',
     'gain.title': 'Du gewinnst',
@@ -574,7 +573,7 @@ const translations = {
     'loss.title': 'Du verlierst',
     'loss.1': '<strong>Blindes Copy-Paste.</strong>KI-Antworten übernehmen, ohne sie je selbst zu formulieren.',
     'loss.2': '<strong>Verstehen auslagern.</strong>Das Ergebnis kennen, ohne den Weg &ndash; das „Chinesische Zimmer" im Kopf.',
-    'loss.3': '<strong>Kognitive Schuld.</strong>Wer nie selbst denkt, baut Denkvermögen ab (Kosmyna 2025).',
+    'loss.3': '<strong>Kognitive Schuld.</strong>Wer nie selbst denkt, riskiert Denkvermögen abzubauen &ndash; erste Befunde deuten darauf hin (Kosmyna 2025).',
     'loss.4': '<strong>Bequemlichkeit als Default.</strong>Immer das Werkzeug greifen, das am wenigsten verlangt.',
     'test.label': 'Der Selbsttest',
     'test.h2': 'Wie tickst du?',
@@ -590,7 +589,7 @@ const translations = {
     'cta.p': 'MindGraph Notes ist für die linke Spalte gebaut: lokal, mit aktivem Erinnern, Reflexion und bewusster Freigabe. Open Source, kostenlos, ohne Cloud-Zwang.',
     'cta.dl': 'Kostenlos herunterladen',
     'cta.more': 'Mehr über MindGraph',
-    'quellen': 'Quellen: Bless, H., Fellhauer, R.&nbsp;F., Bohner, G., &amp; Schwarz, N. (1991). <em>Need for Cognition: eine Skala zur Erfassung von Engagement und Freude bei Denkaufgaben</em> (ZUMA-Arbeitsbericht 91/06), Mannheim. &middot; Cacioppo, J.&nbsp;T., &amp; Petty, R.&nbsp;E. (1982). The need for cognition. <em>JPSP, 42(1)</em>. &middot; Kosmyna, N. et&nbsp;al. (2025). EEG-Studie zur Gehirnaktivität beim Schreiben mit/ohne LLM.',
+    'quellen': 'Quellen: Bless, H., Fellhauer, R.&nbsp;F., Bohner, G., &amp; Schwarz, N. (1991). <em>Need for Cognition: eine Skala zur Erfassung von Engagement und Freude bei Denkaufgaben</em> (ZUMA-Arbeitsbericht 91/06), Mannheim. &middot; Cacioppo, J.&nbsp;T., &amp; Petty, R.&nbsp;E. (1982). The need for cognition. <em>JPSP, 42(1)</em>. &middot; Kosmyna, N. et&nbsp;al. (2025). EEG-Studie zur Gehirnaktivität beim Schreiben mit/ohne LLM (Preprint, kleine Stichprobe).',
     'foot.home': 'Startseite',
     // JS strings
     'js.answered': 'beantwortet',
@@ -634,10 +633,10 @@ const translations = {
     'sci.label': 'Why it matters',
     'sci.h2': 'The same tool.<br>Two directions.',
     'sci.p1': '<strong>Need for Cognition</strong> is not IQ &ndash; it is the enjoyment of thinking (Cacioppo &amp; Petty, 1982). And it is exactly this enjoyment that is at stake in the age of AI.',
-    'sci.p2': 'The calculator took arithmetic off our hands. Generative AI reaches higher: it takes over <strong>thinking itself</strong>. Kosmyna et&nbsp;al. (2025) measured it via EEG &ndash; people who wrote with an LLM showed the <strong>weakest brain activity</strong>, and it stayed weak even after the AI was gone. <span style="color:var(--text)">Offloading has a price. Thinking along has a payoff.</span>',
+    'sci.p2': 'The calculator took arithmetic off our hands. Generative AI reaches higher: it can take over <strong>thinking itself</strong>. Early evidence comes from an MIT pilot study (Kosmyna et&nbsp;al. 2025, preprint): people who wrote with an LLM showed the <strong>weakest brain activity</strong> in EEG &ndash; even after the AI was gone. A small study, not proof &ndash; but a clear nudge to keep thinking. <span style="color:var(--text)">Offloading has a price. Thinking along has a payoff.</span>',
     'sci.k1': 'enjoyment of thinking &harr; scientific interest',
     'sci.k2': 'enjoyment of thinking &harr; achievement motivation',
-    'sci.k3': 'weakest brain activity when using an LLM (Kosmyna 2025)',
+    'sci.k3': 'early evidence of weaker brain activity when using an LLM (pilot study, Kosmyna 2025)',
     'gl.label': 'Gain or loss',
     'gl.h2': 'You decide the <span class="grad">direction</span>.',
     'gain.title': 'You gain',
@@ -648,7 +647,7 @@ const translations = {
     'loss.title': 'You lose',
     'loss.1': '<strong>Blind copy-paste.</strong>Taking AI answers without ever phrasing them yourself.',
     'loss.2': '<strong>Outsourcing understanding.</strong>Knowing the answer without the path &ndash; the &bdquo;Chinese Room&ldquo; in your head.',
-    'loss.3': '<strong>Cognitive debt.</strong>Those who never think for themselves erode their thinking ability (Kosmyna 2025).',
+    'loss.3': '<strong>Cognitive debt.</strong>Those who never think for themselves risk eroding their thinking ability &ndash; early findings point that way (Kosmyna 2025).',
     'loss.4': '<strong>Convenience as the default.</strong>Always reaching for the tool that demands the least.',
     'test.label': 'The self-test',
     'test.h2': 'How do you tick?',
@@ -664,7 +663,7 @@ const translations = {
     'cta.p': 'MindGraph Notes is built for the left column: local, with active recall, reflection and deliberate approval. Open source, free, no forced cloud.',
     'cta.dl': 'Download for free',
     'cta.more': 'More about MindGraph',
-    'quellen': 'Sources: Bless, H., Fellhauer, R.&nbsp;F., Bohner, G., &amp; Schwarz, N. (1991). <em>Need for Cognition: a scale measuring engagement and enjoyment in thinking tasks</em> (ZUMA working paper 91/06), Mannheim &ndash; the items here are an English rendering of this validated German scale. &middot; Cacioppo, J.&nbsp;T., &amp; Petty, R.&nbsp;E. (1982). The need for cognition. <em>JPSP, 42(1)</em>. &middot; Kosmyna, N. et&nbsp;al. (2025). EEG study on brain activity when writing with/without an LLM.',
+    'quellen': 'Sources: Bless, H., Fellhauer, R.&nbsp;F., Bohner, G., &amp; Schwarz, N. (1991). <em>Need for Cognition: a scale measuring engagement and enjoyment in thinking tasks</em> (ZUMA working paper 91/06), Mannheim &ndash; the items here are an English rendering of this validated German scale. &middot; Cacioppo, J.&nbsp;T., &amp; Petty, R.&nbsp;E. (1982). The need for cognition. <em>JPSP, 42(1)</em>. &middot; Kosmyna, N. et&nbsp;al. (2025). EEG study on brain activity when writing with/without an LLM (preprint, small sample).',
     'foot.home': 'Home',
     // JS strings
     'js.answered': 'answered',
@@ -722,7 +721,6 @@ function renderItems() {
       <div class="item-header">
         <span class="item-nr">${nr}.</span>
         <span class="item-text">${text}</span>
-        ${reverse ? '<span class="item-reverse">(R)</span>' : ''}
       </div>
       <div class="antworten" data-nr="${nr}">
         ${VALUES.map(v => `
