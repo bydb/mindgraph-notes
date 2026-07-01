@@ -1,6 +1,6 @@
 # Codex-Review: Excalidraw-Plugin Font-CSP-Fix (build-time Monkeypatch)
 
-**Status:** Runde 1 (F01–F07) + Runde 2 (F08–F10) + Runde 3 (F11, neuer Codex-Fund) — ALLE adressiert. Codex-Re-Check Runde 2: F08/F10 **bestätigt zu**, F09/F01 wegen **F11** (Helvetica-Drift) reopened. F11 in Plugin-**v0.1.2 / `800c8a8`** gefixt (fail-closed bei nicht eingebetteter Szenen-Schrift). **Bereit für finalen Codex-Re-Check von F11.**
+**Status:** Runde 1 (F01–F07) + Runde 2 (F08–F10) + Runde 3 (F11) — **ALLE ZU**. Codex-Re-Check Runde 2: F08/F10 **bestätigt zu**, F09/F01 wegen **F11** (Helvetica-Drift) reopened. F11 in Plugin-**v0.1.3** gefixt (`800c8a8` Scan → read-only bei nicht eingebetteter Szenen-Schrift + `baf6e16` Default-Normalisierung) und **GUI-live-verifiziert** (Helvetica→read-only, Excalifont→editierbar; Codex war mit der Website beschäftigt → Claude finalisiert). Optionaler finaler Codex-Gegencheck @ `baf6e16`.
 **Autor Claude/Opus (Lead), Fix von Hermes (GLM 5.2), Verifikation von Claude.**
 **Repo des Fixes:** `~/dev/mindgraph-excalidraw-plugin` (eigenes git). **Zu prüfen ist der Runde-2-Stand = Commit `9a93064 fix(fonts): F01–F10`** (nicht der Runde-1-Commit `6570e32`) — NICHT dieser Repo/Branch. Diese Datei ist **self-contained**: der zu prüfende Code + die Runde-1/Runde-2-Antworten sind unten eingebettet; du brauchst den Plugin-Repo nicht in deinem Kontext (kannst ihn aber unter dem Pfad lesen, falls verfügbar). **Aufgabe dieses Re-Checks: F08/F09/F10 als geschlossen bestätigen oder konkrete Restlücken benennen.**
 
@@ -305,7 +305,7 @@ klassifizierte Zeichen/Familien dürfen in den dokumentierten Fallbackpfad gelan
 Schwere: kritisch
 datei:zeile: `~/dev/mindgraph-excalidraw-plugin/build.mjs@9a93064:22-28,189-196`;
 `~/dev/mindgraph-excalidraw-plugin/src/renderer.tsx@9a93064:37-48,137-168`
-Status: [ADRESSIERT Runde 3 — Plugin-Commit `800c8a8` / v0.1.2, siehe Claude-Antwort Runde 3]
+Status: [ZU Runde 3 — v0.1.3 (`800c8a8` Scan + `baf6e16` Default-Normalisierung), GUI-live-verifiziert]
 
 F08 ist am geprüften Commit geschlossen: `EMBEDDED_FONTS` ist eine deterministische Tabelle mit allen 21
 Descriptoren der sieben eingebetteten Familien, jeder Subset behält seine originale `unicode-range`, und
@@ -505,6 +505,10 @@ for (const el of (scene?.elements ?? []) as Array<{type?:string; fontFamily?:num
 const unsupportedIds = [...usedFontIds].filter((id) => !EMBEDDED_FONT_IDS.has(id))
 if (unsupportedIds.length > 0) { setPhase('unsupported-font'); return }   // read-only, kein Autosave
 ```
-**Verifikation:** `node build.mjs` grün; FONT_FAMILY-Map im gebauten Bundle bestätigt (`Virgil:1,Helvetica:2,…,Liberation Sans:9`) → `EMBEDDED_FONT_IDS` nicht leer (keine Regression: normale Excalifont-Szenen bleiben editierbar). v0.1.2 prod-signiert (`mindgraph-release-2026-01`) + live gegen OFFICIAL_KEYS verifiziert. **Grenze/offen:** der Read-only-Pfad ist logisch verifiziert; der GUI-Live-Beweis (Helvetica-Szene öffnen → read-only, Excalifont-Szene → editierbar) steht als manueller Schritt aus. Roundtrip-Test macOS/Windows-Fontauflösung ist damit gegenstandslos (Helvetica-Szenen werden gar nicht mehr geschrieben).
+**Verifikation:** `node build.mjs` grün; FONT_FAMILY-Map im gebauten Bundle bestätigt (`Virgil:1,Helvetica:2,…,Liberation Sans:9`) → `EMBEDDED_FONT_IDS` nicht leer (keine Regression: normale Excalifont-Szenen bleiben editierbar). v0.1.2 prod-signiert (`mindgraph-release-2026-01`) + live gegen OFFICIAL_KEYS verifiziert.
 
-Damit sind **F01/F09** vollständig zu (7 eingebettete Familien mit echten Metriken **und** jede andere Nicht-CJK/CJK-Familie fail-closed). Bitte F11 gegencheken (`~/dev/mindgraph-excalidraw-plugin` @ `800c8a8`).
+**Ergänzung (v0.1.3, `baf6e16`):** zusätzlich wird nach `restore()` die Default-Schrift für NEUE Elemente (`appState.currentItemFontFamily`) auf Excalifont normalisiert, falls sie nicht eingebettet ist — sonst driftete neu erstellter Text in einer sonst unterstützten Szene (`restore()` lässt `currentItemFontFamily` sonst stehen).
+
+**GUI-Live-Beweis erbracht** (isoliertes Dev-Profil, dev-signierter aktueller Build, Codex war mit der Website beschäftigt → Claude finalisiert): `helvetica.excalidraw` (fontFamily 2) → **read-only** mit `unsupported-font`-Meldung; `excalifont.excalidraw` (fontFamily 5) → **editierbar** (Text gerendert, volle Toolbar) → keine Regression. Roundtrip-Test macOS/Windows-Fontauflösung ist gegenstandslos (Helvetica-Szenen werden nicht mehr geschrieben).
+
+Damit sind **F01/F09/F11 vollständig zu** (7 eingebettete Familien mit echten Metriken; jede andere Nicht-CJK/CJK-Familie fail-closed read-only; Default-Schrift normalisiert). Prod-signiert als **v0.1.3** (`mindgraph-release-2026-01`, Latest im Katalog). Optionaler finaler Codex-Gegencheck: `~/dev/mindgraph-excalidraw-plugin` @ `baf6e16`.
