@@ -8131,6 +8131,18 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
   color: var(--text-primary);
 }
 
+/* Petrol redesign: linker Label+Hinweis-Block für Sonderzeilen (langer Hinweis) — Hinweis
+   links unter dem Label statt rechtsbündig neben dem Control (wie die Module-Zeilen). */
+.settings-row-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.settings-row-info .settings-hint {
+  margin-top: 0;
+}
+
 .settings-hint {
   display: block;
   font-size: 12px;

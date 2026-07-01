@@ -3118,19 +3118,17 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab 
                 </div>
 
                 <div className="settings-row">
-                  <label>{t('settings.editor.imagesFolder')}</label>
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
-                    <input
-                      type="text"
-                      value={imagesFolder}
-                      onChange={e => setImagesFolder(e.target.value)}
-                      placeholder=".attachments"
-                      style={{ width: '240px' }}
-                    />
-                    <span style={{ fontSize: '11px', color: 'var(--text-muted)', maxWidth: '320px', textAlign: 'right' }}>
-                      {t('settings.editor.imagesFolderHint')}
-                    </span>
+                  <div className="settings-row-info">
+                    <label>{t('settings.editor.imagesFolder')}</label>
+                    <span className="settings-hint">{t('settings.editor.imagesFolderHint')}</span>
                   </div>
+                  <input
+                    type="text"
+                    value={imagesFolder}
+                    onChange={e => setImagesFolder(e.target.value)}
+                    placeholder=".attachments"
+                    style={{ width: '240px', flexShrink: 0 }}
+                  />
                 </div>
 
                 <h3>{t('settings.editor.slashCommands')}</h3>
