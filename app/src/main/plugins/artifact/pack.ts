@@ -21,6 +21,7 @@ import {
   type IntegrityDoc,
   type IntegrityEntry,
 } from './format'
+import { assertSelfContainedEsm } from './esmCheck'
 
 export interface PackFile {
   path: string
@@ -53,6 +54,24 @@ export async function packPluginArtifact(input: PackInput): Promise<Buffer> {
     seen.add(f.path)
   }
   if (!seen.has(MANIFEST_FILE)) throw new Error(`'${MANIFEST_FILE}' fehlt in den Nutzdateien`)
+
+  // Single-File-ESM-Vertrag des Renderer-Entries erzwingen (ADR §5.3, F12) — Build-Zeit-Gate, damit ein
+  // nicht-selbstenthaltenes Bundle gar nicht erst signiert/verteilt wird (der Loader scheitert sonst erst
+  // nach Top-Level-Seiteneffekten). Manifest-/Pfad-Validität prüft danach der Verifier; hier nur best-effort.
+  const manifestFile = input.files.find((f) => f.path === MANIFEST_FILE)
+  if (manifestFile) {
+    let rendererRel: unknown
+    try {
+      rendererRel = (JSON.parse(manifestFile.content.toString('utf8')) as { entrypoints?: { renderer?: unknown } })
+        ?.entrypoints?.renderer
+    } catch {
+      rendererRel = undefined // ungültiges Manifest → der Verifier lehnt es ab, kein ESM-Check nötig
+    }
+    if (typeof rendererRel === 'string') {
+      const rf = input.files.find((f) => f.path === rendererRel)
+      if (rf) assertSelfContainedEsm(rf.content.toString('utf8'), rendererRel)
+    }
+  }
 
   const payload = [...input.files].sort(byPath)
   const entries: IntegrityEntry[] = payload.map((f) => ({
