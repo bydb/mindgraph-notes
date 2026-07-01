@@ -451,17 +451,25 @@ h2 { letter-spacing: -0.016em; }
   letter-spacing: -0.01em;
 }
 
+/* Petrol redesign: Versions-Pill „• 0.9 Petrol" (Accent-Dot + Accent-Text, Claude Design). */
 .beta-badge {
-  font-size: 9px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10px;
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: color-mix(in srgb, var(--accent-color) 72%, var(--text-secondary));
-  border: 1px solid color-mix(in srgb, var(--accent-color) 36%, transparent);
-  border-radius: 4px;
-  padding: 1px 5px;
+  color: var(--accent-color);
+  border: 1px solid var(--border-color);
+  border-radius: 100px;
+  padding: 2px 8px;
   margin-left: 6px;
-  opacity: 0.9;
+}
+.beta-badge-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--accent-color);
+  flex: none;
 }
 
 /* ============ UNIFIED BUTTON GROUP DESIGN ============ */
