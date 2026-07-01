@@ -60,7 +60,7 @@
 
 .image-control-btn:hover:not(:disabled) {
   background: var(--accent-color);
-  color: white;
+  color: var(--accent-on);
 }
 
 .image-control-btn:disabled {

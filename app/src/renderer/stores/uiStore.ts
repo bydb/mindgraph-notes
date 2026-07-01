@@ -57,7 +57,9 @@ export type AILanguageCode = typeof AI_LANGUAGES[number]['code']
 
 // Farbpalette für Akzentfarben
 export const ACCENT_COLORS: Record<AccentColor, { name: string; color: string; hover: string }> = {
-  ink: { name: 'Ink (Standard)', color: '#111111', hover: '#000000' },
+  // 'ink' key = the theme-aware brand default; recolored to Petrol (App.tsx clears inline
+  // overrides for this key → the per-theme CSS accent tokens apply: #10696b light / #3cbfb3 dark).
+  ink: { name: 'Petrol (Standard)', color: '#10696b', hover: '#0d5a5c' },
   blue: { name: 'Blau', color: '#0a84ff', hover: '#0070e0' },
   orange: { name: 'Orange', color: '#ff9500', hover: '#e68600' },
   green: { name: 'Grün', color: '#30d158', hover: '#28b84c' },

@@ -375,7 +375,24 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onOpenInbox, onOpe
           </div>
         ) : (
           <div className="dashboard-view-grid">
-            {dashboard.widgets.map(id => renderWidget(id))}
+            {/* Bestand ist ein volles-Breite-Zahlenband direkt unter dem Fokus-Streifen (aus dem
+                Gehirn-Widget herausgelöst, Claude-Design-Layout). Bei fehlendem Fokus-Widget ans Ende. */}
+            {dashboard.widgets.flatMap(id => {
+              const nodes = [renderWidget(id)]
+              if (id === 'focus') {
+                nodes.push(
+                  <ErrorBoundary key="bestand" label={t('dashboard.brain.statsLabel')}>
+                    <BestandBand snapshot={snapshot} t={t} />
+                  </ErrorBoundary>
+                )
+              }
+              return nodes
+            })}
+            {!dashboard.widgets.includes('focus') && (
+              <ErrorBoundary key="bestand" label={t('dashboard.brain.statsLabel')}>
+                <BestandBand snapshot={snapshot} t={t} />
+              </ErrorBoundary>
+            )}
           </div>
         )}
         <ExternalWidgetSlot slot="dashboard.widget" />
@@ -400,6 +417,31 @@ interface ActivityWidgetProps extends WidgetProps {
   notes: Note[]
   emails: import('../../../shared/types').EmailMessage[]
   onNoteOpen: (id: string) => void
+}
+
+// Petrol redesign (Claude-Design-Layout): „Bestand" ist ein eigenes, volles-Breite-Zahlenband
+// am unteren Dashboard-Rand — nicht mehr im Gehirn-Widget eingebettet. 0-Werte werden gedämpft.
+const BestandBand: React.FC<{ snapshot: DashboardSnapshot; t: TFn }> = ({ snapshot, t }) => {
+  const a = snapshot.activity
+  const m = a.memory
+  const cells: Array<{ value: number; label: string }> = [
+    { value: a.totalNotes, label: t('dashboard.activity.total') },
+    { value: a.touchedToday, label: t('dashboard.activity.today') },
+    { value: a.created7d, label: t('dashboard.activity.created7d') },
+    { value: a.changed30d, label: t('dashboard.activity.changed30d') },
+    { value: m.events7d, label: t('dashboard.activity.contextEvents7d') },
+    { value: m.taskEvents7d, label: t('dashboard.activity.taskEvents7d') }
+  ]
+  return (
+    <div className="dv-bestand-band">
+      {cells.map((c, i) => (
+        <div key={i} className="dv-bestand-cell">
+          <div className={`dv-bestand-num${c.value === 0 ? ' zero' : ''}`}>{c.value}</div>
+          <div className="dv-bestand-label">{c.label}</div>
+        </div>
+      ))}
+    </div>
+  )
 }
 
 const ActivityWidget: React.FC<ActivityWidgetProps> = ({ snapshot, t, vaultPath, notes, emails, onNoteOpen }) => {
@@ -547,34 +589,8 @@ const ActivityWidget: React.FC<ActivityWidgetProps> = ({ snapshot, t, vaultPath,
         )}
       </div>
       <div className="dv-widget-body">
-        <div className="dv-brain-section-label">{t('dashboard.brain.statsLabel')}</div>
-        <div className="dv-activity-stats">
-          <div className="dv-activity-stat">
-            <span>{activity.totalNotes}</span>
-            <small>{t('dashboard.activity.total')}</small>
-          </div>
-          <div className="dv-activity-stat">
-            <span>{activity.touchedToday}</span>
-            <small>{t('dashboard.activity.today')}</small>
-          </div>
-          <div className="dv-activity-stat">
-            <span>{activity.created7d}</span>
-            <small>{t('dashboard.activity.created7d')}</small>
-          </div>
-          <div className="dv-activity-stat">
-            <span>{activity.changed30d}</span>
-            <small>{t('dashboard.activity.changed30d')}</small>
-          </div>
-          <div className="dv-activity-stat">
-            <span>{memory.events7d}</span>
-            <small>{t('dashboard.activity.contextEvents7d')}</small>
-          </div>
-          <div className="dv-activity-stat">
-            <span>{memory.taskEvents7d}</span>
-            <small>{t('dashboard.activity.taskEvents7d')}</small>
-          </div>
-        </div>
-
+        {/* „Bestand" wanderte in ein eigenes volles-Breite-Band unten (BestandBand) — das
+            Gehirn-Widget ist dadurch schlanker (Claude-Design-Layout). */}
         <div className="dv-activity-section-title">{t('dashboard.activity.changed7d')}</div>
         {activity.topFolders.length === 0 ? (
           <div className="dv-widget-empty">{t('dashboard.activity.empty')}</div>
@@ -604,7 +620,7 @@ const ActivityWidget: React.FC<ActivityWidgetProps> = ({ snapshot, t, vaultPath,
             {visibleContexts.map(note => (
               <div key={`${note.noteId || note.path || note.title}`} className="dv-activity-folder">
                 <div className="dv-activity-folder-row">
-                  <span>{note.title}</span>
+                  <span>{getDisplayTitle(note.title)}</span>
                   <strong>{note.count}</strong>
                 </div>
                 <div className="dv-activity-bar context">
@@ -677,7 +693,15 @@ interface RadarConnection {
   feedback?: RadarFeedbackValue
 }
 
-const getCleanNoteTitle = (note: Note): string => stripNoteKindMarker(note.title).trim() || note.title
+// Petrol redesign (Stage 2): Karten/Zeilen zeigen den lesbaren Anzeigetitel, nicht den rohen
+// Zettelkasten-Dateinamen. Strippt einen führenden Zeitstempel-/Zettel-Prefix ("202606222240 - ")
+// und den 🔴🟢🔵-Marker (der Kategorie-Punkt wird separat gezeigt).
+const ZETTEL_ID_PREFIX = /^\d{8,14}\s*[-–—]\s*/
+const getDisplayTitle = (rawTitle: string): string => {
+  const withoutId = stripNoteKindMarker(rawTitle.replace(ZETTEL_ID_PREFIX, '')).trim()
+  return withoutId || stripNoteKindMarker(rawTitle).trim() || rawTitle
+}
+const getCleanNoteTitle = (note: Note): string => getDisplayTitle(note.title)
 
 const RADAR_STOP_WORDS = new Set([
   'infos', 'info', 'termine', 'termin', 'login', 'zugang', 'zugänge', 'daten',
@@ -946,9 +970,23 @@ const formatBookedAt = (iso: string): string => {
   return d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: '2-digit' })
 }
 
+// Petrol redesign (Stage 2): leere Widgets kollabieren zu einer ruhigen einzeiligen Karte
+// (Label links, gedämpfter Status rechts) statt einer großen leeren Box.
+const CollapsedWidget: React.FC<{ label: string; status: string; className?: string }> = ({ label, status, className }) => (
+  <section className={`dv-widget dv-widget-collapsed${className ? ` ${className}` : ''}`}>
+    <div className="dv-collapsed-row">
+      <h3>{label}</h3>
+      <span className="dv-collapsed-status">{status}</span>
+    </div>
+  </section>
+)
+
 const TasksWidget: React.FC<WidgetProps> = ({ snapshot, onTaskClick, t }) => {
   const { overdue, today, soon, later } = snapshot.tasks
   const total = overdue.length + today.length + soon.length + later.length
+  if (total === 0) {
+    return <CollapsedWidget label={t('dashboard.widgets.tasks')} status={t('dashboard.tasksEmpty')} className="dv-widget-tasks" />
+  }
   return (
     <section className="dv-widget dv-widget-tasks">
       <header className="dv-widget-header">
@@ -956,39 +994,33 @@ const TasksWidget: React.FC<WidgetProps> = ({ snapshot, onTaskClick, t }) => {
         <span className="dv-widget-count">{total}</span>
       </header>
       <div className="dv-widget-body">
-        {total === 0 ? (
-          <div className="dv-widget-empty">{t('dashboard.tasksEmpty')}</div>
-        ) : (
-          <>
-            {overdue.length > 0 && (
-              <Group label={t('dashboard.overdue')} tone="overdue">
-                {overdue.slice(0, 6).map(task => (
-                  <TaskRow key={`${task.noteId}-${task.line}`} task={task} onClick={() => onTaskClick?.(task)} showDate />
-                ))}
-              </Group>
-            )}
-            {today.length > 0 && (
-              <Group label={t('dashboard.today')}>
-                {today.slice(0, 8).map(task => (
-                  <TaskRow key={`${task.noteId}-${task.line}`} task={task} onClick={() => onTaskClick?.(task)} />
-                ))}
-              </Group>
-            )}
-            {soon.length > 0 && (
-              <Group label={t('dashboard.soon')}>
-                {soon.slice(0, 6).map(task => (
-                  <TaskRow key={`${task.noteId}-${task.line}`} task={task} onClick={() => onTaskClick?.(task)} showDate />
-                ))}
-              </Group>
-            )}
-            {later.length > 0 && (
-              <Group label={t('dashboard.later')}>
-                {later.slice(0, 6).map(task => (
-                  <TaskRow key={`${task.noteId}-${task.line}`} task={task} onClick={() => onTaskClick?.(task)} showDate />
-                ))}
-              </Group>
-            )}
-          </>
+        {overdue.length > 0 && (
+          <Group label={t('dashboard.overdue')} tone="overdue">
+            {overdue.slice(0, 6).map(task => (
+              <TaskRow key={`${task.noteId}-${task.line}`} task={task} onClick={() => onTaskClick?.(task)} showDate />
+            ))}
+          </Group>
+        )}
+        {today.length > 0 && (
+          <Group label={t('dashboard.today')}>
+            {today.slice(0, 8).map(task => (
+              <TaskRow key={`${task.noteId}-${task.line}`} task={task} onClick={() => onTaskClick?.(task)} />
+            ))}
+          </Group>
+        )}
+        {soon.length > 0 && (
+          <Group label={t('dashboard.soon')}>
+            {soon.slice(0, 6).map(task => (
+              <TaskRow key={`${task.noteId}-${task.line}`} task={task} onClick={() => onTaskClick?.(task)} showDate />
+            ))}
+          </Group>
+        )}
+        {later.length > 0 && (
+          <Group label={t('dashboard.later')}>
+            {later.slice(0, 6).map(task => (
+              <TaskRow key={`${task.noteId}-${task.line}`} task={task} onClick={() => onTaskClick?.(task)} showDate />
+            ))}
+          </Group>
         )}
       </div>
     </section>
@@ -1008,7 +1040,7 @@ const TaskRow: React.FC<{ task: DashboardTask; onClick: () => void; showDate?: b
     <div className="dv-task-body">
       <div className="dv-task-text">{task.text}</div>
       <div className="dv-task-meta">
-        <span>{task.noteTitle}</span>
+        <span>{getDisplayTitle(task.noteTitle)}</span>
         {task.dueDate && (
           <>
             <span className="sep">•</span>
@@ -1023,6 +1055,9 @@ const TaskRow: React.FC<{ task: DashboardTask; onClick: () => void; showDate?: b
 
 const EmailsWidget: React.FC<WidgetProps> = ({ snapshot, onEmailClick, onEmailHandled, t }) => {
   const items = snapshot.emails
+  if (items.length === 0) {
+    return <CollapsedWidget label={t('dashboard.widgets.emails')} status={t('dashboard.emailsEmpty')} className="dv-widget-emails" />
+  }
   return (
     <section className="dv-widget dv-widget-emails">
       <header className="dv-widget-header">
@@ -1030,11 +1065,8 @@ const EmailsWidget: React.FC<WidgetProps> = ({ snapshot, onEmailClick, onEmailHa
         <span className="dv-widget-count">{items.length}</span>
       </header>
       <div className="dv-widget-body">
-        {items.length === 0 ? (
-          <div className="dv-widget-empty">{t('dashboard.emailsEmpty')}</div>
-        ) : (
-          <div className="dv-list">
-            {items.slice(0, 10).map(item => {
+        <div className="dv-list">
+          {items.slice(0, 10).map(item => {
               const urgencyLabel = item.urgency === 'high'
                 ? t('dashboard.urgency.high')
                 : item.urgency === 'medium'
@@ -1063,7 +1095,6 @@ const EmailsWidget: React.FC<WidgetProps> = ({ snapshot, onEmailClick, onEmailHa
               )
             })}
           </div>
-        )}
       </div>
     </section>
   )
@@ -1326,6 +1357,12 @@ const RadarWidget: React.FC<RadarWidgetProps> = ({ snapshot, notes, vaultPath, o
     }
   }, [vaultPath, aiEnabled, aiModel, forceRefreshTick, radarAiRefreshIntervalHours])
 
+  // Petrol redesign (Stage 2): leeres Radar kollabiert zur Einzeile (kein KI-Refresh nötig,
+  // wenn es keine Notiz zu prüfen gibt).
+  if (radarSnapshot.active.length === 0 && radarSnapshot.sleeping.length === 0) {
+    return <CollapsedWidget label={t('dashboard.widgets.radar')} status={t('dashboard.radar.empty')} className="dv-widget-radar" />
+  }
+
   return (
     <section className="dv-widget dv-widget-radar">
       <header className="dv-widget-header">
@@ -1357,13 +1394,10 @@ const RadarWidget: React.FC<RadarWidgetProps> = ({ snapshot, notes, vaultPath, o
         <span className="dv-widget-count">{radarSnapshot.active.length}</span>
       </header>
       <div className="dv-widget-body">
-        {radarSnapshot.active.length === 0 && radarSnapshot.sleeping.length === 0 ? (
-          <div className="dv-widget-empty">{t('dashboard.radar.empty')}</div>
-        ) : (
-          <div className="dv-list">
-            {radarSnapshot.active.map(item => (
-              <div
-                key={item.note.id}
+        <div className="dv-list">
+          {radarSnapshot.active.map(item => (
+            <div
+              key={item.note.id}
                 className={`dv-radar-row ${item.aiReason ? 'with-ai' : ''} ${analyzingIds.has(item.note.id) ? 'analyzing' : ''}`}
                 role="button"
                 tabIndex={0}
@@ -1392,10 +1426,9 @@ const RadarWidget: React.FC<RadarWidgetProps> = ({ snapshot, notes, vaultPath, o
                     title={t('dashboard.radar.actionWebSearch')}
                     aria-label={t('dashboard.radar.actionWebSearch')}
                     onClick={() => {
-                      // Zettelkasten-ID-Präfix (12-stellige Zahl + optionaler Bindestrich) raus,
-                      // sonst sucht Google nach der ID statt nach dem Thema.
-                      const cleanTitle = getCleanNoteTitle(item.note).replace(/^\d{12}\s*-?\s*/, '').trim()
-                      const q = encodeURIComponent(cleanTitle || getCleanNoteTitle(item.note))
+                      // getCleanNoteTitle strippt bereits den Zettelkasten-ID-Präfix + Marker,
+                      // sonst würde Google nach der ID statt nach dem Thema suchen.
+                      const q = encodeURIComponent(getCleanNoteTitle(item.note))
                       window.electronAPI.openExternal(`https://www.google.com/search?q=${q}`)
                     }}
                   >
@@ -1427,7 +1460,6 @@ const RadarWidget: React.FC<RadarWidgetProps> = ({ snapshot, notes, vaultPath, o
               </div>
             ))}
           </div>
-        )}
 
         {radarSnapshot.sleeping.length > 0 && (
           <div className={`dv-radar-sleeping ${sleepingOpen ? 'open' : ''}`}>
@@ -1493,6 +1525,11 @@ const CalendarWidget: React.FC<CalendarWidgetProps> = ({ snapshot, t, onRefresh 
     }
   }
 
+  // Petrol redesign (Stage 2): leerer Kalender kollabiert zur Einzeile — der Permission-Fall
+  // behält seine große Karte, weil er den „Zugriff erteilen"-Button braucht.
+  if (!needsPermission && events.length === 0) {
+    return <CollapsedWidget label={t('dashboard.widgets.calendar')} status={t('dashboard.calendarEmpty')} className="dv-widget-calendar" />
+  }
   return (
     <section className="dv-widget dv-widget-calendar">
       <header className="dv-widget-header">
@@ -1518,8 +1555,6 @@ const CalendarWidget: React.FC<CalendarWidgetProps> = ({ snapshot, t, onRefresh 
               <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>{permissionMsg}</div>
             )}
           </div>
-        ) : events.length === 0 ? (
-          <div className="dv-widget-empty">{t('dashboard.calendarEmpty')}</div>
         ) : (
           <div className="dv-list">
             {events.slice(0, 12).map((item: CalendarItem, i) => (
@@ -1571,6 +1606,29 @@ const FocusWidget: React.FC<FocusWidgetProps> = ({ snapshot, t, onTaskClick, onR
     ? parts.join(', ') + '.'
     : t('dashboard.focus.allClear')
 
+  const dueCount = overdueCount + todayTasksCount
+
+  // Petrol redesign (Stage 2): Ist nichts fällig, kollabiert „Fokus heute" zu einem kompakten
+  // Streifen (hohler Kreis + Label + eine Zeile + „N fällig") statt einer großen leeren Karte.
+  if (focusTasks.length === 0) {
+    return (
+      <section className="dv-widget dv-focus dv-focus-collapsed">
+        <div className="dv-focus-strip">
+          <span className="dv-focus-strip-check" aria-hidden="true">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="20 6 9 17 4 12"/>
+            </svg>
+          </span>
+          <div className="dv-focus-strip-text">
+            <div className="dv-focus-strip-label">{t('dashboard.widgets.focus')}</div>
+            <div className="dv-focus-strip-line">{narrative}</div>
+          </div>
+          <span className="dv-focus-strip-due">{t('dashboard.focus.dueCount', { count: dueCount })}</span>
+        </div>
+      </section>
+    )
+  }
+
   return (
     <section className="dv-widget dv-focus">
       <header className="dv-widget-header">
@@ -1579,11 +1637,8 @@ const FocusWidget: React.FC<FocusWidgetProps> = ({ snapshot, t, onTaskClick, onR
       </header>
       <div className="dv-widget-body">
         <p className="dv-focus-narrative">{narrative}</p>
-        {focusTasks.length === 0 ? (
-          <div className="dv-widget-empty">{t('dashboard.focus.empty')}</div>
-        ) : (
-          <div className="dv-list">
-            {focusTasks.map(task => (
+        <div className="dv-list">
+          {focusTasks.map(task => (
               <div key={`${task.noteId}-${task.line}`} className={`dv-focus-row reason-${task.reason}`}>
                 <div className="dv-focus-row-body" onClick={() => onTaskClick(task)}>
                   <div className="dv-focus-text">{task.text}</div>
@@ -1591,7 +1646,7 @@ const FocusWidget: React.FC<FocusWidgetProps> = ({ snapshot, t, onTaskClick, onR
                     <span className={`dv-focus-badge reason-${task.reason}`}>
                       {t(`dashboard.focus.reason.${task.reason}` as never)}
                     </span>
-                    <span>{task.noteTitle}</span>
+                    <span>{getDisplayTitle(task.noteTitle)}</span>
                   </div>
                 </div>
                 <button
@@ -1611,7 +1666,6 @@ const FocusWidget: React.FC<FocusWidgetProps> = ({ snapshot, t, onTaskClick, onR
               </div>
             ))}
           </div>
-        )}
       </div>
       {pendingBlock && (
         <TimeblockModal
@@ -1693,7 +1747,7 @@ const TimeblockModal: React.FC<TimeblockModalProps> = ({ task, calendar, onClose
         </header>
         <div className="dv-modal-body">
           <div className="dv-modal-task">{task.text}</div>
-          <div className="dv-modal-task-note">{task.noteTitle}</div>
+          <div className="dv-modal-task-note">{getDisplayTitle(task.noteTitle)}</div>
 
           <label className="dv-modal-label">{t('dashboard.focus.duration')}</label>
           <div className="dv-modal-durations">
@@ -1755,6 +1809,9 @@ function toLocalInputValue(d: Date): string {
 
 const BookingsWidget: React.FC<WidgetProps> = ({ snapshot, onBookingClick, t }) => {
   const items = snapshot.bookings
+  if (items.length === 0) {
+    return <CollapsedWidget label={t('dashboard.widgets.bookings')} status={t('dashboard.bookingsEmpty')} className="dv-widget-bookings" />
+  }
   return (
     <section className="dv-widget dv-widget-bookings">
       <header className="dv-widget-header">
@@ -1762,26 +1819,22 @@ const BookingsWidget: React.FC<WidgetProps> = ({ snapshot, onBookingClick, t }) 
         <span className="dv-widget-count">{items.length}</span>
       </header>
       <div className="dv-widget-body">
-        {items.length === 0 ? (
-          <div className="dv-widget-empty">{t('dashboard.bookingsEmpty')}</div>
-        ) : (
-          <div className="dv-list">
-            {items.slice(0, 10).map(item => (
-              <div key={item.booking.id} className="dv-booking-row" onClick={() => onBookingClick?.(item)}>
-                <div className="dv-booking-name">{item.booking.userName || item.booking.userEmail}</div>
-                <div className="dv-booking-meta">
-                  <span>{item.offer.name}</span>
-                  {item.booking.bookedAt && (
-                    <>
-                      <span className="sep">•</span>
-                      <span>{formatBookedAt(item.booking.bookedAt)}</span>
-                    </>
-                  )}
-                </div>
+        <div className="dv-list">
+          {items.slice(0, 10).map(item => (
+            <div key={item.booking.id} className="dv-booking-row" onClick={() => onBookingClick?.(item)}>
+              <div className="dv-booking-name">{item.booking.userName || item.booking.userEmail}</div>
+              <div className="dv-booking-meta">
+                <span>{item.offer.name}</span>
+                {item.booking.bookedAt && (
+                  <>
+                    <span className="sep">•</span>
+                    <span>{formatBookedAt(item.booking.bookedAt)}</span>
+                  </>
+                )}
               </div>
-            ))}
-          </div>
-        )}
+            </div>
+          ))}
+        </div>
       </div>
     </section>
   )

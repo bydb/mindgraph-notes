@@ -2741,6 +2741,21 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab 
           </nav>
 
           <div className="settings-content">
+            {/* Petrol redesign: großer Seiten-Titel je Tab wie im Module-Tab (Konsistenz).
+                Der Module-Tab bringt seinen eigenen Header inkl. Untertitel mit → hier ausgenommen. */}
+            {activeTab !== 'modules' && (
+              <div className="settings-tab-header">
+                <h2>{
+                  activeTab === 'dashboard' ? t('settings.dashboard.title')
+                    : activeTab === 'transport' ? t('settings.transport.title')
+                    : activeTab === 'email' ? t('settings.email.title')
+                    : activeTab === 'remarkable' ? 'reMarkable'
+                    : activeTab === 'telegram' ? 'Telegram'
+                    : activeTab === 'credentials' ? 'Zugangsdaten'
+                    : t(`settings.tab.${activeTab}` as TranslationKey)
+                }</h2>
+              </div>
+            )}
             {/* Vault Tab */}
             {activeTab === 'vault' && vaultPath && (
               <VaultSettingsTab vaultPath={vaultPath} t={t} onNavigateToTab={setActiveTab} />
@@ -2908,13 +2923,16 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab 
                   <button
                     className="settings-refresh"
                     onClick={() => {
+                      // Petrol redesign fix: auf die ECHTEN Store-Defaults zurücksetzen. Vorher
+                      // setzte der Reset die alten Vor-Petrol-Werte (terracotta-Akzent + creme-
+                      // Hintergrund) — Letzterer überschrieb sogar den Dark-Mode.
                       setTheme('system')
-                      setAccentColor('terracotta')
-                      setBackgroundColor('cream')
+                      setAccentColor('ink')
+                      setBackgroundColor('default')
                       setFontFamily('system')
                       setCustomAccentColor('#d4875a')
-                      setCustomBackgroundColorLight('#faf8f0')
-                      setCustomBackgroundColorDark('#18170f')
+                      setCustomBackgroundColorLight('#ffffff')
+                      setCustomBackgroundColorDark('#0d0d0d')
                       removeCustomLogo()
                     }}
                   >
@@ -3115,19 +3133,17 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab 
                 </div>
 
                 <div className="settings-row">
-                  <label>{t('settings.editor.imagesFolder')}</label>
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
-                    <input
-                      type="text"
-                      value={imagesFolder}
-                      onChange={e => setImagesFolder(e.target.value)}
-                      placeholder=".attachments"
-                      style={{ width: '240px' }}
-                    />
-                    <span style={{ fontSize: '11px', color: 'var(--text-muted)', maxWidth: '320px', textAlign: 'right' }}>
-                      {t('settings.editor.imagesFolderHint')}
-                    </span>
+                  <div className="settings-row-info">
+                    <label>{t('settings.editor.imagesFolder')}</label>
+                    <span className="settings-hint">{t('settings.editor.imagesFolderHint')}</span>
                   </div>
+                  <input
+                    type="text"
+                    value={imagesFolder}
+                    onChange={e => setImagesFolder(e.target.value)}
+                    placeholder=".attachments"
+                    style={{ width: '240px', flexShrink: 0 }}
+                  />
                 </div>
 
                 <h3>{t('settings.editor.slashCommands')}</h3>

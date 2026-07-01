@@ -203,15 +203,12 @@ const FileIcon: React.FC = () => (
   </svg>
 )
 
+// Petrol redesign (Claude-Design-Angleichung): schlichtes rotes „PDF"-Badge (gerahmtes
+// Rechteck) statt der alten Dokument-Form mit Eselsohr.
 const PdfIcon: React.FC = () => (
   <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-    <path
-      d="M4 2C3.45 2 3 2.45 3 3V13C3 13.55 3.45 14 4 14H12C12.55 14 13 13.55 13 13V5.41C13 5.15 12.89 4.9 12.71 4.71L10.29 2.29C10.1 2.11 9.85 2 9.59 2H4Z"
-      fill="#ffebee"
-      stroke="#e53935"
-      strokeWidth="0.5"
-    />
-    <text x="8" y="11" textAnchor="middle" fontSize="5" fontWeight="bold" fill="#e53935">PDF</text>
+    <rect x="1.5" y="4" width="13" height="8" rx="2" fill="none" stroke="#dc2626" strokeWidth="0.9"/>
+    <text x="8" y="10.2" textAnchor="middle" fontSize="5" fontWeight="700" fill="#dc2626" letterSpacing="0.2">PDF</text>
   </svg>
 )
 

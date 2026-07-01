@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400..700&family=DM+Serif+Display&display=swap" rel="stylesheet">
+<style>
+  *,*::before,*::after{box-sizing:border-box}
+  body{margin:0;background:#efece6;color:#1c1a17;font-family:'DM Sans',-apple-system,sans-serif;-webkit-font-smoothing:antialiased}
+  .oid{font:600 10.5px ui-monospace,Menlo,monospace;padding:3px 7px;background:rgba(0,0,0,.08);color:#1c1a17;border-radius:5px}
+</style>
+</helmet>
+<div style="padding:48px 52px;max-width:1240px">
+  <div style="font-family:'DM Serif Display',serif;font-size:34px;letter-spacing:-.02em">MindGraph — Logo</div>
+  <p style="max-width:760px;color:#5c574e;font-size:14px;line-height:1.6;margin:10px 0 0">Konzept (Knoten-Graph) bleibt — Umsetzung wird flacher, reduzierter und themebar: <b style="color:#1c1a17">Farbe = Akzent-Token</b>, damit du sie pro Release umstellen kannst. <span class="oid">1a</span> Tile (App-Icon-Charakter) · <span class="oid">1b</span> Glyph (offen). Wortmarke in DM Sans, damit sie neben der Serif-Headline ruhig bleibt.</p>
+
+  <div style="display:flex;flex-wrap:wrap;gap:26px;align-items:stretch;margin-top:34px">
+
+    <div style="background:#fff;border:1px solid #e2ddd4;border-radius:18px;padding:24px;width:300px">
+      <div style="font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#a19a8f;margin-bottom:18px">Aktuell</div>
+      <div style="display:flex;justify-content:center;padding:10px 0 20px"><img src="site-ref/icon.png" alt="Aktuelles Logo" style="width:96px;height:96px"></div>
+      <ul style="margin:0;padding-left:18px;color:#5c574e;font-size:12.5px;line-height:1.7">
+        <li>9 Knoten → bei 28px ein Fleck</li>
+        <li>Glow/Halo wirkt gealtert</li>
+        <li>Navy + Orange = alte Palette</li>
+      </ul>
+    </div>
+
+    <div style="background:#fff;border:1px solid #e2ddd4;border-radius:18px;padding:24px;width:440px">
+      <div style="display:flex;align-items:center;gap:9px;margin-bottom:20px"><span class="oid">1a</span><span style="font-size:13px;color:#5c574e"><b style="color:#1c1a17">Tile</b> — App-Icon · <span style="color:#10696b;font-weight:700">✓ gewählt</span></span></div>
+      <div style="display:flex;align-items:center;gap:26px">
+        <div style="color:#10696b"><svg width="96" height="96" viewBox="0 0 32 32"><rect width="32" height="32" rx="8" fill="currentColor"></rect><g stroke="#fff" stroke-width="1.5" stroke-linecap="round"><line x1="16" y1="16" x2="16" y2="7.5"></line><line x1="16" y1="16" x2="8" y2="23"></line><line x1="16" y1="16" x2="24" y2="23"></line><line x1="8" y1="23" x2="24" y2="23"></line></g><g fill="#fff"><circle cx="16" cy="16" r="3"></circle><circle cx="16" cy="7.5" r="2.3"></circle><circle cx="8" cy="23" r="2.3"></circle><circle cx="24" cy="23" r="2.3"></circle></g></svg></div>
+        <div>
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px"><span style="color:#10696b"><svg width="30" height="30" viewBox="0 0 32 32"><rect width="32" height="32" rx="8" fill="currentColor"></rect><g stroke="#fff" stroke-width="1.5" stroke-linecap="round"><line x1="16" y1="16" x2="16" y2="7.5"></line><line x1="16" y1="16" x2="8" y2="23"></line><line x1="16" y1="16" x2="24" y2="23"></line><line x1="8" y1="23" x2="24" y2="23"></line></g><g fill="#fff"><circle cx="16" cy="16" r="3"></circle><circle cx="16" cy="7.5" r="2.3"></circle><circle cx="8" cy="23" r="2.3"></circle><circle cx="24" cy="23" r="2.3"></circle></g></svg></span><span style="font-weight:600;font-size:17px;letter-spacing:-.01em">MindGraph Notes</span></div>
+          <div style="display:flex;align-items:flex-end;gap:14px">
+            <span style="color:#10696b"><svg width="16" height="16" viewBox="0 0 32 32"><rect width="32" height="32" rx="8" fill="currentColor"></rect><g stroke="#fff" stroke-width="1.8" stroke-linecap="round"><line x1="16" y1="16" x2="16" y2="7.5"></line><line x1="16" y1="16" x2="8" y2="23"></line><line x1="16" y1="16" x2="24" y2="23"></line><line x1="8" y1="23" x2="24" y2="23"></line></g><g fill="#fff"><circle cx="16" cy="16" r="3.2"></circle><circle cx="16" cy="7.5" r="2.5"></circle><circle cx="8" cy="23" r="2.5"></circle><circle cx="24" cy="23" r="2.5"></circle></g></svg></span>
+            <span style="color:#10696b"><svg width="24" height="24" viewBox="0 0 32 32"><rect width="32" height="32" rx="8" fill="currentColor"></rect><g stroke="#fff" stroke-width="1.6" stroke-linecap="round"><line x1="16" y1="16" x2="16" y2="7.5"></line><line x1="16" y1="16" x2="8" y2="23"></line><line x1="16" y1="16" x2="24" y2="23"></line><line x1="8" y1="23" x2="24" y2="23"></line></g><g fill="#fff"><circle cx="16" cy="16" r="3"></circle><circle cx="16" cy="7.5" r="2.3"></circle><circle cx="8" cy="23" r="2.3"></circle><circle cx="24" cy="23" r="2.3"></circle></g></svg></span>
+            <span style="font-size:11px;color:#a19a8f">16 / 24 px</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div style="background:#fff;border:1px solid #e2ddd4;border-radius:18px;padding:24px;width:440px">
+      <div style="display:flex;align-items:center;gap:9px;margin-bottom:20px"><span class="oid">1b</span><span style="font-size:13px;color:#5c574e"><b style="color:#1c1a17">Glyph</b> — offen, Linien im Akzent</span></div>
+      <div style="display:flex;align-items:center;gap:26px">
+        <div style="color:#10696b"><svg width="96" height="96" viewBox="0 0 32 32"><g stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><line x1="16" y1="16" x2="16" y2="7.5"></line><line x1="16" y1="16" x2="8" y2="23"></line><line x1="16" y1="16" x2="24" y2="23"></line><line x1="8" y1="23" x2="24" y2="23"></line></g><g fill="currentColor"><circle cx="16" cy="16" r="3.4"></circle><circle cx="16" cy="7.5" r="2.6"></circle><circle cx="8" cy="23" r="2.6"></circle><circle cx="24" cy="23" r="2.6"></circle></g></svg></div>
+        <div>
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px"><span style="color:#10696b"><svg width="28" height="28" viewBox="0 0 32 32"><g stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><line x1="16" y1="16" x2="16" y2="7.5"></line><line x1="16" y1="16" x2="8" y2="23"></line><line x1="16" y1="16" x2="24" y2="23"></line><line x1="8" y1="23" x2="24" y2="23"></line></g><g fill="currentColor"><circle cx="16" cy="16" r="3.4"></circle><circle cx="16" cy="7.5" r="2.6"></circle><circle cx="8" cy="23" r="2.6"></circle><circle cx="24" cy="23" r="2.6"></circle></g></svg></span><span style="font-weight:600;font-size:17px;letter-spacing:-.01em">MindGraph Notes</span></div>
+          <div style="font-size:11px;color:#a19a8f">Am besten für helle Flächen &amp; die Wortmarke</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div style="margin-top:40px">
+    <div style="font-family:'DM Serif Display',serif;font-size:22px;margin-bottom:4px">Farbe pro Release</div>
+    <p style="color:#5c574e;font-size:13px;margin:0 0 22px;max-width:680px">Ein Akzent-Token treibt Logo, CTA, Links und Emphasis. Ein neues Release = ein neuer Wert — der Rest zieht automatisch mit.</p>
+    <div style="display:flex;flex-wrap:wrap;gap:18px">
+      <div style="text-align:center"><span style="color:#10696b"><svg width="72" height="72" viewBox="0 0 32 32"><rect width="32" height="32" rx="8" fill="currentColor"></rect><g stroke="#fff" stroke-width="1.5" stroke-linecap="round"><line x1="16" y1="16" x2="16" y2="7.5"></line><line x1="16" y1="16" x2="8" y2="23"></line><line x1="16" y1="16" x2="24" y2="23"></line><line x1="8" y1="23" x2="24" y2="23"></line></g><g fill="#fff"><circle cx="16" cy="16" r="3"></circle><circle cx="16" cy="7.5" r="2.3"></circle><circle cx="8" cy="23" r="2.3"></circle><circle cx="24" cy="23" r="2.3"></circle></g></svg></span><div style="font-size:12px;font-weight:600;margin-top:8px">Petrol</div><div style="font-size:10.5px;color:#a19a8f">v0.9 · aktuell</div></div>
+      <div style="text-align:center"><span style="color:#1c1a17"><svg width="72" height="72" viewBox="0 0 32 32"><rect width="32" height="32" rx="8" fill="currentColor"></rect><g stroke="#fff" stroke-width="1.5" stroke-linecap="round"><line x1="16" y1="16" x2="16" y2="7.5"></line><line x1="16" y1="16" x2="8" y2="23"></line><line x1="16" y1="16" x2="24" y2="23"></line><line x1="8" y1="23" x2="24" y2="23"></line></g><g fill="#fff"><circle cx="16" cy="16" r="3"></circle><circle cx="16" cy="7.5" r="2.3"></circle><circle cx="8" cy="23" r="2.3"></circle><circle cx="24" cy="23" r="2.3"></circle></g></svg></span><div style="font-size:12px;font-weight:600;margin-top:8px">Ink</div><div style="font-size:10.5px;color:#a19a8f">Core / neutral</div></div>
+      <div style="text-align:center"><span style="color:#d1662f"><svg width="72" height="72" viewBox="0 0 32 32"><rect width="32" height="32" rx="8" fill="currentColor"></rect><g stroke="#fff" stroke-width="1.5" stroke-linecap="round"><line x1="16" y1="16" x2="16" y2="7.5"></line><line x1="16" y1="16" x2="8" y2="23"></line><line x1="16" y1="16" x2="24" y2="23"></line><line x1="8" y1="23" x2="24" y2="23"></line></g><g fill="#fff"><circle cx="16" cy="16" r="3"></circle><circle cx="16" cy="7.5" r="2.3"></circle><circle cx="8" cy="23" r="2.3"></circle><circle cx="24" cy="23" r="2.3"></circle></g></svg></span><div style="font-size:12px;font-weight:600;margin-top:8px">Ember</div><div style="font-size:10.5px;color:#a19a8f">Release-Highlight</div></div>
+      <div style="text-align:center"><span style="color:#3a4ea8"><svg width="72" height="72" viewBox="0 0 32 32"><rect width="32" height="32" rx="8" fill="currentColor"></rect><g stroke="#fff" stroke-width="1.5" stroke-linecap="round"><line x1="16" y1="16" x2="16" y2="7.5"></line><line x1="16" y1="16" x2="8" y2="23"></line><line x1="16" y1="16" x2="24" y2="23"></line><line x1="8" y1="23" x2="24" y2="23"></line></g><g fill="#fff"><circle cx="16" cy="16" r="3"></circle><circle cx="16" cy="7.5" r="2.3"></circle><circle cx="8" cy="23" r="2.3"></circle><circle cx="24" cy="23" r="2.3"></circle></g></svg></span><div style="font-size:12px;font-weight:600;margin-top:8px">Indigo</div><div style="font-size:10.5px;color:#a19a8f">Beta-Zweig</div></div>
+      <div style="text-align:center"><span style="color:#2f7d52"><svg width="72" height="72" viewBox="0 0 32 32"><rect width="32" height="32" rx="8" fill="currentColor"></rect><g stroke="#fff" stroke-width="1.5" stroke-linecap="round"><line x1="16" y1="16" x2="16" y2="7.5"></line><line x1="16" y1="16" x2="8" y2="23"></line><line x1="16" y1="16" x2="24" y2="23"></line><line x1="8" y1="23" x2="24" y2="23"></line></g><g fill="#fff"><circle cx="16" cy="16" r="3"></circle><circle cx="16" cy="7.5" r="2.3"></circle><circle cx="8" cy="23" r="2.3"></circle><circle cx="24" cy="23" r="2.3"></circle></g></svg></span><div style="font-size:12px;font-weight:600;margin-top:8px">Forest</div><div style="font-size:10.5px;color:#a19a8f">LTS</div></div>
+      <div style="text-align:center"><span style="color:#7d3a63"><svg width="72" height="72" viewBox="0 0 32 32"><rect width="32" height="32" rx="8" fill="currentColor"></rect><g stroke="#fff" stroke-width="1.5" stroke-linecap="round"><line x1="16" y1="16" x2="16" y2="7.5"></line><line x1="16" y1="16" x2="8" y2="23"></line><line x1="16" y1="16" x2="24" y2="23"></line><line x1="8" y1="23" x2="24" y2="23"></line></g><g fill="#fff"><circle cx="16" cy="16" r="3"></circle><circle cx="16" cy="7.5" r="2.3"></circle><circle cx="8" cy="23" r="2.3"></circle><circle cx="24" cy="23" r="2.3"></circle></g></svg></span><div style="font-size:12px;font-weight:600;margin-top:8px">Plum</div><div style="font-size:10.5px;color:#a19a8f">Sonderedition</div></div>
+    </div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

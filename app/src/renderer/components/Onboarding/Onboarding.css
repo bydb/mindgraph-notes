@@ -31,12 +31,6 @@
   margin-bottom: 24px;
 }
 
-.onboarding-welcome-logo svg .logo-bg {
-  fill: var(--bg-secondary);
-  stroke: var(--border-color);
-  stroke-width: 1;
-}
-
 .onboarding-welcome-title {
   font-size: 28px;
   font-weight: 700;
@@ -68,7 +62,7 @@
   gap: 8px;
   padding: 12px 24px;
   background: var(--accent-color);
-  color: #fff;
+  color: var(--accent-on);
   border: none;
   border-radius: var(--radius-md);
   font-size: 15px;
@@ -832,7 +826,7 @@
 
 .onboarding-coach-msg-user .onboarding-coach-msg-text {
   background: var(--accent-color);
-  color: #fff;
+  color: var(--accent-on);
 }
 
 .onboarding-coach-msg-assistant .onboarding-coach-msg-text {
