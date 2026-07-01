@@ -491,7 +491,9 @@ h2 { letter-spacing: -0.016em; }
   border-radius: 8px;
   font-size: 11px;
   font-weight: 600;
-  color: var(--text-muted);
+  /* Petrol redesign (Stage 3 fix): --text-secondary statt --text-muted — die Icon-only-Buttons
+     oben (Einstellungen/Aufgaben/Inbox/…) waren mit #666 im Dark-Mode nicht zu erkennen. */
+  color: var(--text-secondary);
   cursor: pointer;
   transition: all var(--transition-fast);
   white-space: nowrap;
@@ -1879,7 +1881,9 @@ h2 { letter-spacing: -0.016em; }
   border: none;
   border-radius: var(--radius-md);
   background: var(--bg-tertiary);
-  color: var(--text-muted);
+  /* Petrol redesign (Stage 3 fix): --text-secondary statt --text-muted — #666 war auf dem
+     dunklen --bg-tertiary im Dark-Mode praktisch unlesbar (PDF/reMarkable/DOCX). */
+  color: var(--text-secondary);
   font-size: 11px;
   font-weight: 500;
   cursor: pointer;
