@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-labelledby="title">
+  <title id="title">MindGraph Notes</title>
+  <rect width="32" height="32" rx="8" fill="#10696b"/>
+  <g fill="none" stroke="#fff" stroke-width="1.5" stroke-linecap="round">
+    <path d="M16 16V7.5M16 16 8 23M16 16l8 7M8 23h16"/>
+  </g>
+  <g fill="#fff">
+    <circle cx="16" cy="16" r="3"/>
+    <circle cx="16" cy="7.5" r="2.3"/>
+    <circle cx="8" cy="23" r="2.3"/>
+    <circle cx="24" cy="23" r="2.3"/>
+  </g>
+</svg>

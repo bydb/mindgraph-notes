@@ -6,6 +6,7 @@
   <meta name="google-site-verification" content="XuIkFK3V33YXi92ZBbb1AsgrCejIxVlfMPM_Zj0Ny3o">
   <title>MindGraph Notes &ndash; Zeigt dir, was heute wichtig ist</title>
   <meta name="description" content="Lokaler Workspace, der dir t&auml;glich zeigt, was in deinen Notizen, Aufgaben und E-Mails wichtig ist. Markdown, Wissensgraph und lokale KI &ndash; Open Source, E2E-verschl&uuml;sselt, ohne Cloud-Zwang.">
+  <link rel="icon" type="image/svg+xml" href="mindgraph-logo.svg">
   <link rel="icon" href="favicon.ico" sizes="48x48">
   <link rel="icon" type="image/png" sizes="48x48" href="favicon-48x48.png">
   <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
@@ -45,7 +46,7 @@
     "url": "https://mindgraph-notes.de/",
     "downloadUrl": "https://github.com/bydb/mindgraph-notes/releases",
     "screenshot": "https://mindgraph-notes.de/screenshot.png",
-    "softwareVersion": "0.10.0-beta",
+    "softwareVersion": "0.10.1-beta",
     "author": { "@type": "Person", "name": "Jochen Leeder", "url": "https://bydb.io" },
     "license": "https://opensource.org/licenses/AGPL-3.0",
     "featureList": [
@@ -67,10 +68,6 @@
   }
   </script>
 
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300..700;1,9..40,300..700&family=DM+Serif+Display&display=swap" rel="stylesheet">
-
   <style>
     *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -88,8 +85,8 @@
       --gradient: linear-gradient(115deg, #ffb24a 0%, #ff7a3c 45%, #ec4d8a 100%);
       --border: rgba(255,255,255,0.09);
       --radius: 16px;
-      --font: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
-      --font-display: 'DM Serif Display', Georgia, serif;
+      --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      --font-display: Georgia, 'Times New Roman', serif;
     }
 
     body {
@@ -133,7 +130,7 @@
       border-bottom: 1px solid var(--border);
     }
     .logo { display: flex; align-items: center; gap: 0.6rem; font-weight: 600; font-size: 1.1rem; letter-spacing: -0.01em; }
-    .logo-icon { width: 28px; height: 28px; border-radius: 50%; overflow: hidden; }
+    .logo-icon { width: 28px; height: 28px; border-radius: 7px; overflow: hidden; }
     .logo-icon img { width: 100%; height: 100%; object-fit: cover; }
     .nav-right { display: flex; gap: 1.5rem; align-items: center; }
     .nav-right a { color: var(--text-muted); text-decoration: none; font-size: 0.85rem; transition: color 0.2s; }
@@ -154,12 +151,37 @@
       justify-content: center; align-items: center; text-align: center;
       padding: 7rem 2rem 4rem; max-width: 1000px; margin: 0 auto;
     }
+    .hero-badges {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: .65rem;
+      margin-bottom: 2rem;
+    }
     .hero-badge {
       display: inline-flex; align-items: center; gap: 0.5rem;
       padding: 0.4rem 1rem; background: var(--accent-light); border: 1px solid rgba(255,122,60,0.15);
       border-radius: 100px; font-size: 0.78rem; color: var(--accent); font-weight: 500;
-      letter-spacing: 0.03em; text-transform: uppercase; margin-bottom: 2rem;
+      letter-spacing: 0.03em; text-transform: uppercase;
     }
+    .release-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: .45rem;
+      padding: .4rem 1rem;
+      border: 1px solid rgba(16,105,107,.25);
+      border-radius: 100px;
+      background: #e7f1f0;
+      color: var(--accent);
+      font-size: .78rem;
+      font-weight: 700;
+      letter-spacing: .02em;
+      text-decoration: none;
+      transition: transform .2s, background .2s;
+    }
+    .release-badge:hover { transform: translateY(-1px); background: #dcebea; }
+    .release-badge::after { content: '→'; }
     .hero-dot { width: 6px; height: 6px; background: #22c55e; border-radius: 50%; animation: pulse 2s infinite; }
     @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
 
@@ -338,6 +360,24 @@
     }
     footer a { color: var(--text-muted); text-decoration: none; transition: color 0.2s; }
     footer a:hover { color: var(--accent); }
+    .footer-developer {
+      max-width: 720px;
+      margin: 0 auto 1.75rem;
+      padding: 1rem 1.2rem;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      background: rgba(255,255,255,.72);
+      color: var(--text-mid);
+    }
+    .footer-developer strong { color: var(--text); }
+    .footer-developer-links {
+      display: inline-flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: .45rem 1rem;
+      margin-top: .4rem;
+    }
+    footer .footer-developer-links a { color: var(--accent); font-weight: 600; }
 
     /* --- Modal --- */
     .modal {
@@ -372,6 +412,11 @@
       .model-quality-actions { justify-content: flex-start; flex-wrap: wrap; }
       .dl-grid { grid-template-columns: 1fr; }
     }
+    @media (min-width: 769px) and (max-width: 1180px) {
+      .nav-right { gap: 1rem; }
+      .nav-right a[href="./blog/"],
+      .nav-right a[href^="https://discord.gg/"] { display: none; }
+    }
     @media (min-width: 769px) and (max-width: 1024px) {
       .cap-grid { grid-template-columns: repeat(2, 1fr); }
     }
@@ -396,7 +441,7 @@
 
   <nav>
     <div class="logo">
-      <div class="logo-icon"><img src="icon.png" alt="MindGraph Notes"></div>
+      <div class="logo-icon"><img src="mindgraph-logo.svg" alt=""></div>
       MindGraph Notes
     </div>
     <div class="nav-right">
@@ -416,9 +461,12 @@
 
   <!-- Hero -->
   <section class="hero">
-    <div class="hero-badge">
-      <span class="hero-dot"></span>
-      <span data-i18n="hero.badge">Open Source &middot; Lokal &middot; Kostenlos</span>
+    <div class="hero-badges">
+      <div class="hero-badge">
+        <span class="hero-dot"></span>
+        <span data-i18n="hero.badge">Open Source &middot; Lokal &middot; Kostenlos</span>
+      </div>
+      <a class="release-badge" href="#changelog" data-i18n="hero.release">Neu: Plugins &amp; Excalidraw &middot; v0.10.1</a>
     </div>
 
     <h1 data-i18n="hero.title">Der Fokus bleibt.<br><em>Auch wenn das Leben dazwischenkommt.</em></h1>
@@ -439,7 +487,22 @@
     </div>
 
     <div class="hero-screenshot">
-      <img src="people-hero.png" alt="Einzelk&auml;mpfer arbeitet ruhig und konzentriert am Schreibtisch &ndash; alles im Blick" loading="lazy">
+      <div class="product-shot" aria-label="MindGraph Dashboard Vorschau">
+        <div class="product-bar">
+          <span class="traffic"><i></i><i></i><i></i></span>
+          <span style="margin:auto">Editor &nbsp;&nbsp; Brain &nbsp;&nbsp; <b style="color:#1a1a1a">Dashboard</b></span>
+        </div>
+        <div class="product-body">
+          <div class="product-heading"><div><b>Dashboard</b><div class="mock-meta">Donnerstag, 25. Juni 2026</div></div><span>Aktualisieren</span></div>
+          <div class="mock-card"><div class="mock-label">Fokus heute</div><div class="mock-row"><span style="font-size:18px;color:#b9bec6">&#10003;</span><span class="grow">Keine Deadlines, kein R&uuml;ckstau &mdash; nutze den Freiraum.</span><span class="mock-meta">0 f&auml;llig</span></div></div>
+          <div style="display:grid;grid-template-columns:1.5fr 1fr;gap:12px">
+            <div class="mock-card"><div class="mock-label">Relevante Notizen</div><div class="mock-row"><span class="mock-score">41</span><span class="mock-dot"></span><span class="grow"><b>Erm&ouml;glichung durch KI</b><br><span class="mock-meta">Problem &middot; k&uuml;rzlich aktiv</span></span></div></div>
+            <div class="mock-card"><div class="mock-label">Gehirn</div><div class="mock-row"><span class="mock-dot" style="background:#d0a34a"></span><span>nicht verdichtet</span></div></div>
+          </div>
+          <div class="mock-card mock-stats"><div class="mock-stat"><b>6</b><span>Notizen</span></div><div class="mock-stat"><b>6</b><span>neu (7 T)</span></div><div class="mock-stat"><b>44</b><span>Signale</span></div><div class="mock-stat"><b>7</b><span>Links</span></div></div>
+        </div>
+      </div>
+      <img class="hero-person" src="people-hero.png" alt="Ruhig konzentriert am Schreibtisch" loading="lazy">
     </div>
   </section>
 
@@ -490,7 +553,7 @@
       background:var(--card);border:1px solid var(--border);border-radius:24px;padding:clamp(1.8rem,4vw,3rem); }
     .maker-photo { aspect-ratio:4/5;border-radius:18px;border:1px dashed var(--border);background:var(--bg-warm);display:flex;align-items:center;justify-content:center;text-align:center;color:var(--text-muted);font-size:.85rem;padding:1rem;overflow:hidden; }
     .maker-photo img { width:100%;height:100%;object-fit:cover;object-position:center top;border-radius:18px;display:block; }
-    .maker blockquote { font-family:var(--font-display);font-size:clamp(1.3rem,2.6vw,1.8rem);line-height:1.4;letter-spacing:-0.01em;margin-bottom:1.2rem; }
+    .maker blockquote { font-family:var(--font);font-size:clamp(1.02rem,1.65vw,1.2rem);font-weight:450;line-height:1.68;letter-spacing:0;margin-bottom:1.2rem; }
     .maker .sig { color:var(--text-mid);font-size:.95rem; } .maker .sig b{color:var(--text);}
     /* Einladung */
     .invite { text-align:center;padding:5rem 0; }
@@ -527,7 +590,16 @@
       <p class="st-lead" data-i18n="st.b1.lead">Du &ouml;ffnest morgens einen Tab, nicht zehn. MindGraph zeigt &uuml;berf&auml;llige Aufgaben, Mails die Antwort erwarten, heutige Termine &ndash; und holt vergessene Notizen zur&uuml;ck ins Sichtfeld. Warst du f&uuml;nf Tage weg? Es liegt alles da, sortiert nach Relevanz. Nichts verloren.</p>
       <div class="beat-feature"><span class="ic">&#10003;</span><span data-i18n="st.b1.f"><b>Dashboard &amp; Relevanz-Radar:</b> eine lokale KI bewertet laufend, welche offenen Probleme gerade Aufmerksamkeit brauchen &ndash; und welche wieder auftauchen sollten.</span></div>
     </div>
-    <div class="beat-img"><img src="screenshot-inbox.png" alt="MindGraph Dashboard mit Posteingang: heutiger Fokus, Aufgaben und Mails an einem Ort" loading="lazy"></div>
+    <div class="beat-img">
+      <div class="product-shot" aria-label="Dashboard und Relevanz-Radar">
+        <div class="product-bar"><span class="traffic"><i></i><i></i><i></i></span><span>Dashboard</span></div>
+        <div class="product-body">
+          <div class="product-heading"><b>Dashboard</b><span>Mo, 29. Juni 2026</span></div>
+          <div class="mock-card focus"><div class="mock-label">Heute im Fokus &middot; 2 f&auml;llig</div><div class="mock-row"><span class="mock-dot"></span><span class="grow">Angebot Reinmann finalisieren</span><span class="mock-meta">17:00</span></div></div>
+          <div class="mock-card"><div class="mock-label">Relevante Notizen</div><div class="mock-row"><span class="mock-score">41</span><span class="mock-dot"></span><span class="grow"><b>Erm&ouml;glichung durch KI</b><br><span class="mock-meta">k&uuml;rzlich aktiv</span></span></div><div class="mock-row"><span class="mock-score">28</span><span class="mock-dot green"></span><span class="grow"><b>Optimierung vs. Transformation</b><br><span class="mock-meta">diese Woche</span></span></div></div>
+        </div>
+      </div>
+    </div>
   </section>
 
   <!-- 4b · Alles verbunden -->
@@ -538,7 +610,18 @@
       <p class="st-lead" data-i18n="st.b2.lead">Notizen, Aufgaben, Mails, Dokumente, Wissensgraph: alles an einem Ort, alles verlinkt. Eine relevante Mail wird zur Notiz mit Aufgabe und R&uuml;ckverweis &ndash; ohne Copy&amp;Paste zwischen zehn Programmen. Weniger Wechsel, weniger Reibung, weniger verloren.</p>
       <div class="beat-feature"><span class="ic">&#10003;</span><span data-i18n="st.b2.f"><b>Ein Vault statt Tool-Wildwuchs:</b> Markdown, Wissensgraph, Mail&rarr;Notiz, Tasks &ndash; Module schaltest du nach Bedarf an. <em>1 Arbeitsraum statt 8 Apps und 30 Plugins.</em></span></div>
     </div>
-    <div class="beat-img"><img src="screenshot-graph.png" alt="MindGraph Wissensgraph: vernetzte Notizen als Knoten und Kanten" loading="lazy"></div>
+    <div class="beat-img">
+      <div class="product-shot" aria-label="MindGraph Brain und Wissensgraph">
+        <div class="product-bar"><span class="traffic"><i></i><i></i><i></i></span><span>Brain &middot; Wissensgraph</span></div>
+        <div class="graph-mock">
+          <svg viewBox="0 0 480 296" preserveAspectRatio="none" aria-hidden="true"><path d="M120 58 Q150 100 182 138M298 92 Q268 120 236 140M108 198 Q142 184 168 166" stroke="#dcd7ce" stroke-width="1.4" fill="none"/></svg>
+          <div class="graph-node n1"><span class="mock-dot green"></span>Optimierung vs. Transformation</div>
+          <div class="graph-node n2"><span class="mock-dot"></span>Erm&ouml;glichung durch KI</div>
+          <div class="graph-node n3">23. Juni<br><span class="mock-meta">3 Notizen</span></div>
+          <div class="graph-node n4">22. Juni<br><span class="mock-meta">2 Notizen</span></div>
+        </div>
+      </div>
+    </div>
   </section>
 
   <!-- 4c · Dein Rechner -->
@@ -549,7 +632,24 @@
       <p class="st-lead" data-i18n="st.b3.lead">Die meisten KI-Tools zwingen dich zur Wahl: Cloud nutzen oder Datenschutz haben. MindGraph l&ouml;st das &ndash; die KI l&auml;uft lokal auf deinem Rechner (Ollama/LM&nbsp;Studio). Keine Cloud-Pflicht, keine Telemetrie. Deine Notizen bleiben Markdown-Dateien, die dir geh&ouml;ren.</p>
       <div class="beat-feature"><span class="ic">&#10003;</span><span data-i18n="st.b3.f"><b>Lokale KI &amp; offene Daten:</b> <b>48&nbsp;%</b> der Unternehmen nennen Datenschutz-Anforderungen als gr&ouml;&szlig;tes KI-Hemmnis <span style="color:var(--text-muted)">(Bitkom 2025)</span>. MindGraph braucht diesen Kompromiss nicht.</span></div>
     </div>
-    <div class="beat-img"><img src="model-quality.png" alt="MindGraph Modell-Kompatibilit&auml;tsmatrix: getestete lokale KI-Modelle pro Modul" loading="lazy"></div>
+    <div class="beat-img">
+      <div class="product-shot" aria-label="Kompatibilit&auml;t lokaler KI-Modelle">
+        <div class="product-bar"><span class="traffic"><i></i><i></i><i></i></span><span>Kompatibilit&auml;t pro Modul</span></div>
+        <div class="product-body">
+          <div class="product-heading"><div><b>Getestet, nicht geraten</b><div class="mock-meta">lokal ausf&uuml;hrbar</div></div></div>
+          <table class="matrix">
+            <thead><tr><th>Modell</th><th>Brain</th><th>Tasks</th><th>Mail</th><th>Radar</th></tr></thead>
+            <tbody>
+              <tr><td>Qwen 3.5 27B</td><td class="ok">&#10003;</td><td class="ok">&#10003;</td><td class="ok">&#10003;</td><td class="ok">&#10003;</td></tr>
+              <tr><td>Qwen 3.5 4B</td><td class="ok">&#10003;</td><td class="ok">&#10003;</td><td class="warn">!</td><td class="ok">&#10003;</td></tr>
+              <tr><td>Gemma 3</td><td class="ok">&#10003;</td><td class="ok">&#10003;</td><td class="ok">&#10003;</td><td class="warn">!</td></tr>
+              <tr><td>Llama 3.1 8B</td><td class="ok">&#10003;</td><td class="warn">!</td><td class="no">&times;</td><td>&middot;</td></tr>
+              <tr><td>bge-m3</td><td>&middot;</td><td>&middot;</td><td>&middot;</td><td class="ok">&#10003;</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
   </section>
 
   <!-- 4d · Du denkst weiter (Kognition + Test) -->
@@ -592,8 +692,8 @@
       </div>
       <div>
         <div class="st-eyebrow"><span class="d"></span><span data-i18n="st.maker.label">Wer dahintersteckt</span></div>
-        <blockquote data-i18n="st.maker.quote">&bdquo;Ich bin kein Konzern. Ich bin einer von euch &ndash; jemand, der alles im Blick behalten muss und sich keine Assistenz leisten kann. Ich habe MindGraph gebaut, weil ich es selbst jeden Tag brauche.&ldquo;</blockquote>
-        <p class="sig"><b>Jochen Leeder</b> &middot; <span data-i18n="st.maker.role">Macher von MindGraph Notes</span><br><span style="color:var(--text-muted)" data-i18n="st.maker.note">9 Sterne auf GitHub, null Werbung. Urteile &uuml;ber den Code, nicht &uuml;ber den Hype.</span></p>
+        <blockquote data-i18n="st.maker.quote">&bdquo;Ich entwickle MindGraph aus meinem Arbeitsalltag heraus. Ich studierte Chemieingenieurwesen in Erlangen und lernte dort programmieren. Danach wurde ich Lehrer und wechselte sp&auml;ter ins Medienzentrum, das ich heute leite. Au&szlig;erdem habe ich die p&auml;dagogische Leitung des MINT Space an der Technischen Hochschule Mittelhessen und arbeite im KI-Team der Hessischen Lehrkr&auml;fteakademie. MindGraph verbindet f&uuml;r mich Bildung, Organisation und Technik &mdash; und ist das Werkzeug, das mir selbst gefehlt hat.&ldquo;</blockquote>
+        <p class="sig"><b>Jochen Leeder</b> &middot; <span data-i18n="st.maker.role">Lehrer, Leiter eines Medienzentrums und Entwickler von MindGraph Notes</span><br><span style="color:var(--text-muted)" data-i18n="st.maker.note">Open Source &middot; t&auml;glich im produktiven Einsatz &middot; entwickelt aus echter Praxis</span></p>
       </div>
     </div>
   </section>
@@ -696,6 +796,285 @@
       </div>
     </div>
   </section>
+
+  <!-- Petrol redesign: light, calm surface from the Claude Design concept.
+       Kept as a final cascade layer so the existing i18n, interactions and
+       legal/download structure remain intact. -->
+  <style id="petrol-redesign">
+    :root {
+      --bg: #f7f4ee;
+      --bg-warm: #fbf9f5;
+      --card: #ffffff;
+      --card-hover: #fcfaf6;
+      --text: #1c1a17;
+      --text-mid: #5c574e;
+      --text-muted: #91897d;
+      --accent: #10696b;
+      --accent-light: rgba(16,105,107,.1);
+      --accent-glow: rgba(16,105,107,.18);
+      --gradient: linear-gradient(115deg, #10696b 0%, #168386 55%, #d68c46 100%);
+      --border: #e4dfd6;
+      --radius: 16px;
+    }
+
+    body { background: var(--bg); color: var(--text); }
+    .bg-grain { background: var(--bg); }
+    .bg-grain::after { opacity: .22; }
+    .bg-glow { opacity: .16; filter: blur(150px); }
+    .bg-glow-1 { background: radial-gradient(circle, #d68c46, transparent 70%); }
+    .bg-glow-2 { background: radial-gradient(circle, #10696b, transparent 70%); opacity: .12; }
+
+    nav {
+      background: rgba(247,244,238,.88);
+      border-color: rgba(28,26,23,.1);
+      box-shadow: 0 1px 0 rgba(255,255,255,.65);
+    }
+    .logo { color: var(--text); }
+    .nav-right a { color: var(--text-mid); }
+    .nav-right a:hover { color: var(--accent); }
+    .lang-switch { background: #fff; }
+
+    .hero { padding-top: 8rem; }
+    .hero-badge,
+    .st-eyebrow {
+      color: var(--accent);
+      background: rgba(255,255,255,.72);
+      border-color: var(--border);
+    }
+    .hero-dot,
+    .st-eyebrow .d {
+      background: var(--accent);
+      box-shadow: 0 0 0 4px rgba(16,105,107,.1);
+    }
+    h1 em,
+    .st-h em,
+    .shift .big em,
+    .enemy-stat .n {
+      color: var(--accent);
+      background: none;
+      -webkit-text-fill-color: currentColor;
+    }
+    .btn-primary {
+      background: var(--accent);
+      color: #fff;
+      box-shadow: 0 8px 24px rgba(16,105,107,.2);
+    }
+    .btn-primary:hover { box-shadow: 0 12px 30px rgba(16,105,107,.28); }
+    .btn-ghost { background: rgba(255,255,255,.7); color: var(--text); border-color: var(--border); }
+    .btn-ghost:hover { background: #fff; border-color: #cfc8bc; }
+
+    .hero-screenshot img,
+    .beat-img img,
+    .how-shot img {
+      filter: drop-shadow(0 28px 50px rgba(28,26,23,.2));
+    }
+    .hero-screenshot { position: relative; max-width: 900px; padding: 0 0 2rem; }
+    .hero-screenshot .hero-person {
+      position: absolute;
+      right: -22px;
+      bottom: 0;
+      width: 236px;
+      height: 158px;
+      object-fit: cover;
+      border: 5px solid var(--bg);
+      border-radius: 14px;
+      box-shadow: 0 22px 50px rgba(28,26,23,.28);
+      filter: none !important;
+      z-index: 3;
+    }
+    .product-shot {
+      background: #fff;
+      border: 1px solid #dedbd5;
+      border-radius: 16px;
+      overflow: hidden;
+      color: #1a1a1a;
+      box-shadow: 0 26px 54px rgba(28,26,23,.16);
+      text-align: left;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    }
+    .product-bar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      height: 40px;
+      padding: 0 14px;
+      background: #f4f5f7;
+      border-bottom: 1px solid #e6e7e9;
+      color: #8a8f98;
+      font-size: 11.5px;
+    }
+    .traffic { display: flex; gap: 6px; }
+    .traffic i { width: 10px; height: 10px; border-radius: 50%; display: block; }
+    .traffic i:nth-child(1) { background: #ff5f57; }
+    .traffic i:nth-child(2) { background: #febc2e; }
+    .traffic i:nth-child(3) { background: #28c840; }
+    .product-body { padding: 18px; display: flex; flex-direction: column; gap: 12px; }
+    .product-heading { display: flex; justify-content: space-between; align-items: baseline; }
+    .product-heading b { font-size: 18px; }
+    .product-heading span { color: #9ca3af; font-size: 11px; }
+    .mock-card { border: 1px solid #e6e7e9; border-radius: 12px; padding: 13px 15px; }
+    .mock-card.focus { border-color: #f0d3c9; background: #fdf6f2; }
+    .mock-label {
+      color: #9ca3af;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: .07em;
+      text-transform: uppercase;
+      margin-bottom: 9px;
+    }
+    .focus .mock-label { color: #c2673f; }
+    .mock-row { display: flex; align-items: center; gap: 9px; font-size: 12px; color: #374151; }
+    .mock-row + .mock-row { margin-top: 9px; }
+    .mock-row .grow { flex: 1; }
+    .mock-dot { width: 6px; height: 6px; border-radius: 50%; flex: none; background: #dc2626; }
+    .mock-dot.green { background: #15803d; }
+    .mock-score {
+      width: 30px;
+      height: 23px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 6px;
+      background: #f3f4f6;
+      font-weight: 600;
+    }
+    .mock-meta { color: #9ca3af; font-size: 10.5px; }
+    .mock-stats { display: grid; grid-template-columns: repeat(4,1fr); background: #fafbfc; }
+    .mock-stat { padding: 10px 4px; text-align: center; border-right: 1px solid #eef0f2; }
+    .mock-stat:last-child { border: 0; }
+    .mock-stat b { display: block; font-size: 18px; }
+    .mock-stat span { color: #9ca3af; font-size: 9px; }
+    .graph-mock { position: relative; height: 296px; background: #fff; overflow: hidden; }
+    .graph-mock svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+    .graph-node {
+      position: absolute;
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 8px 11px;
+      border: 1px solid #e6e7e9;
+      border-radius: 10px;
+      background: #fff;
+      box-shadow: 0 4px 12px rgba(28,26,23,.08);
+      color: #374151;
+      font-size: 11px;
+    }
+    .graph-node.n1 { left: 5%; top: 10%; }
+    .graph-node.n2 { right: 4%; top: 23%; }
+    .graph-node.n3 { left: 31%; top: 50%; border-color: #e8b9cc; font-weight: 700; }
+    .graph-node.n4 { left: 7%; bottom: 12%; }
+    .matrix { width: 100%; border-collapse: collapse; font-size: 11px; }
+    .matrix th, .matrix td { padding: 9px 7px; border-bottom: 1px solid #edf0f2; text-align: center; }
+    .matrix th:first-child, .matrix td:first-child { text-align: left; }
+    .matrix th { color: #9ca3af; font-size: 9px; text-transform: uppercase; letter-spacing: .04em; }
+    .ok { color: #15803d; font-weight: 800; }
+    .warn { color: #c88719; font-weight: 800; }
+    .no { color: #dc2626; font-weight: 800; }
+    .enemy img,
+    .invite img { filter: drop-shadow(0 26px 48px rgba(28,26,23,.2)) !important; }
+
+    .enemy-stat,
+    .beat-feature,
+    .proof-card,
+    .maker-in,
+    .cap-card,
+    .compare-card,
+    .dl-btn,
+    .module-chip {
+      box-shadow: 0 16px 40px rgba(28,26,23,.045);
+    }
+    .beat-feature .ic,
+    .proof-card h3 .ic,
+    .how-icon,
+    .how-badge { color: var(--accent); }
+    .proof-card h3 .ic { color: #15803d; }
+
+    .kogband-in {
+      background:
+        radial-gradient(120% 130% at 12% 0%, rgba(16,105,107,.1), transparent 55%),
+        radial-gradient(120% 130% at 92% 100%, rgba(214,140,70,.13), transparent 55%),
+        #fbf9f5;
+    }
+    .kogband-mini .g b { color: #15803d; }
+    .kogband-mini .l b { color: #c2413b; }
+    .maker-photo { background: #f0ece5; }
+
+    .how-tabs { background: rgba(255,255,255,.76); }
+    .how-tab.active { background: var(--accent); color: #fff; box-shadow: 0 6px 18px rgba(16,105,107,.2); }
+    .how-visual .halo {
+      background: radial-gradient(closest-side, rgba(16,105,107,.16), rgba(214,140,70,.09) 55%, transparent 78%);
+    }
+    .how-badge { background: #fff; box-shadow: 0 14px 34px rgba(28,26,23,.15); }
+
+    .cap-tag { background: #f0ede7; color: var(--text-mid); }
+    .cap-card::before { background: var(--accent); }
+    .cap-card:hover { box-shadow: 0 18px 42px rgba(28,26,23,.09); }
+    .compare-card.accent {
+      border-color: rgba(16,105,107,.28);
+      background: linear-gradient(135deg, rgba(16,105,107,.08), #fff);
+    }
+    .module-chip.core {
+      border-color: rgba(16,105,107,.28);
+      background: rgba(16,105,107,.07);
+      color: var(--accent);
+    }
+    .model-quality-figure { background: #fff; }
+    .modal-content { background: #fbf9f5; border: 1px solid var(--border); }
+
+    .release {
+      max-width: 1080px;
+      margin: 3rem auto 1rem;
+      padding: 0 1.5rem;
+    }
+    .release-inner {
+      padding: clamp(2rem,4vw,3rem);
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      background:
+        radial-gradient(120% 140% at 90% 0%, rgba(16,105,107,.11), transparent 55%),
+        #eef6f4;
+    }
+    .release-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 1.5rem;
+      flex-wrap: wrap;
+    }
+    .release-date { color: var(--text-muted); font-size: .8rem; white-space: nowrap; }
+    .release-grid {
+      display: grid;
+      grid-template-columns: repeat(2,1fr);
+      gap: .85rem;
+      margin-top: 1.7rem;
+    }
+    .release-card {
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 1rem 1.1rem;
+      display: flex;
+      gap: .75rem;
+    }
+    .release-card > span { color: var(--accent); font-weight: 800; }
+    .release-card b { display: block; margin-bottom: .15rem; }
+    .release-card p { color: var(--text-mid); font-size: .84rem; line-height: 1.5; }
+    .release-link {
+      display: inline-flex;
+      margin-top: 1.4rem;
+      color: var(--accent);
+      font-weight: 600;
+      text-decoration: none;
+    }
+
+    @media (max-width: 780px) {
+      .release-grid { grid-template-columns: 1fr; }
+      .hero { min-height: auto; }
+      .hero-screenshot .hero-person { width: 34%; height: auto; right: -6px; }
+      .product-body { padding: 12px; }
+      .graph-mock { height: 240px; }
+    }
+  </style>
   <script>
     document.querySelectorAll('.how-tab').forEach(tab => {
       tab.addEventListener('click', () => {
@@ -861,7 +1240,7 @@
     <div class="compare-header">
       <div class="section-label" data-i18n="compare.label">Warum MindGraph Notes</div>
       <h2 class="section-heading" data-i18n="compare.heading">Ein integrierter Arbeitsplatz &mdash;<br>statt acht Apps und 30 Plugins.</h2>
-      <p class="section-sub" data-i18n="compare.sub">MindGraph ist f&uuml;r Teams und Power-User, die Wissen, Emails, Aufgaben, Dokumente und KI nicht in zehn Tools verteilen wollen. Kein Plugin-Store &ndash; Module schaltest du in den Einstellungen an.</p>
+      <p class="section-sub" data-i18n="compare.sub">MindGraph ist f&uuml;r Einzelk&auml;mpfer, Teams und Power-User, die Wissen, Emails, Aufgaben, Dokumente und KI nicht in zehn Tools verteilen wollen. Kernfunktionen sind eingebaut; signierte Plugins erweitern den Arbeitsraum gezielt.</p>
     </div>
 
     <div class="compare-grid">
@@ -928,6 +1307,27 @@
     </div>
   </section>
 
+  <!-- Aktuelles Release -->
+  <section class="release" id="changelog">
+    <div class="release-inner">
+      <div class="release-head">
+        <div>
+          <div class="st-eyebrow"><span class="d"></span><span data-i18n="release.label">Release 0.10.1 &middot; Petrol</span></div>
+          <h2 class="st-h" style="font-size:clamp(1.8rem,3.8vw,2.6rem)" data-i18n="release.heading">Was ist neu &mdash; <em>das Plugin-Release.</em></h2>
+          <p class="st-lead" data-i18n="release.lead">MindGraph l&auml;sst sich jetzt mit signierten Plugins erweitern &mdash; im Katalog entdecken, per Klick installieren und sicher aktualisieren.</p>
+        </div>
+        <div class="release-date">v0.10.1-beta</div>
+      </div>
+      <div class="release-grid">
+        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c1h">Plugin-Katalog</b><p data-i18n="release.c1">Offizielle Erweiterungen durchsuchen, installieren und aktualisieren.</p></div></div>
+        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c2h">Signierte Plugins</b><p data-i18n="release.c2">Herkunft und Integrit&auml;t werden kryptografisch gepr&uuml;ft, bevor ein Plugin l&auml;uft.</p></div></div>
+        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c3h">Eigene Oberfl&auml;chen</b><p data-i18n="release.c3">Plugins k&ouml;nnen Editoren sowie Dashboard- und Sidebar-Widgets mitbringen.</p></div></div>
+        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c4h">Excalidraw</b><p data-i18n="release.c4">Der Zeicheneditor kommt als echtes externes Plugin &mdash; ohne festes App-Bundling.</p></div></div>
+      </div>
+      <a class="release-link" href="https://github.com/bydb/mindgraph-notes/releases" target="_blank" rel="noopener noreferrer" data-i18n="release.link">Vollst&auml;ndige Release Notes auf GitHub &rarr;</a>
+    </div>
+  </section>
+
   <!-- Download -->
   <section class="download" id="download">
     <div class="download-header">
@@ -937,21 +1337,21 @@
     </div>
 
     <div class="dl-grid">
-      <a href="https://github.com/bydb/mindgraph-notes/releases/download/v0.10.0-beta/MindGraph-Notes-0.10.0-beta-arm64.dmg" target="_blank" rel="noopener noreferrer" class="dl-btn">
+      <a href="https://github.com/bydb/mindgraph-notes/releases/latest" target="_blank" rel="noopener noreferrer" class="dl-btn">
         <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg>
-        <div class="dl-info"><div class="dl-platform">macOS (Apple Silicon)</div><div class="dl-version">.dmg &middot; v0.10.0-beta</div></div>
+        <div class="dl-info"><div class="dl-platform">macOS (Apple Silicon)</div><div class="dl-version">.dmg &middot; v0.10.1-beta</div></div>
       </a>
-      <a href="https://github.com/bydb/mindgraph-notes/releases/download/v0.10.0-beta/MindGraph-Notes-0.10.0-beta-x64.dmg" target="_blank" rel="noopener noreferrer" class="dl-btn">
+      <a href="https://github.com/bydb/mindgraph-notes/releases/latest" target="_blank" rel="noopener noreferrer" class="dl-btn">
         <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg>
-        <div class="dl-info"><div class="dl-platform">macOS (Intel)</div><div class="dl-version">.dmg &middot; v0.10.0-beta</div></div>
+        <div class="dl-info"><div class="dl-platform">macOS (Intel)</div><div class="dl-version">.dmg &middot; v0.10.1-beta</div></div>
       </a>
-      <a href="https://github.com/bydb/mindgraph-notes/releases/download/v0.10.0-beta/MindGraph.Notes-0.10.0-beta.AppImage" target="_blank" rel="noopener noreferrer" class="dl-btn">
+      <a href="https://github.com/bydb/mindgraph-notes/releases/latest" target="_blank" rel="noopener noreferrer" class="dl-btn">
         <svg width="28" height="28" viewBox="0 0 256 256" fill="currentColor"><path d="M220,152H36a12,12,0,0,0-12,12v40a12,12,0,0,0,12,12h80v12H96a8,8,0,0,0,0,16h64a8,8,0,0,0,0-16H140V216h80a12,12,0,0,0,12-12V164A12,12,0,0,0,220,152Zm-4,48H40V168H216ZM36,136H220a12,12,0,0,0,12-12V44a12,12,0,0,0-12-12H36A12,12,0,0,0,24,44v80A12,12,0,0,0,36,136ZM40,48H216v72H40Z"/></svg>
-        <div class="dl-info"><div class="dl-platform">Linux</div><div class="dl-version">.AppImage &middot; v0.10.0-beta</div></div>
+        <div class="dl-info"><div class="dl-platform">Linux</div><div class="dl-version">.AppImage &middot; v0.10.1-beta</div></div>
       </a>
-      <a href="https://github.com/bydb/mindgraph-notes/releases/download/v0.10.0-beta/MindGraph.Notes.Setup.0.10.0-beta.exe" target="_blank" rel="noopener noreferrer" class="dl-btn">
+      <a href="https://github.com/bydb/mindgraph-notes/releases/latest" target="_blank" rel="noopener noreferrer" class="dl-btn">
         <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor"><path d="M0 3.449L9.75 2.1v9.451H0m10.949-9.602L24 0v11.4H10.949M0 12.6h9.75v9.451L0 20.699M10.949 12.6H24V24l-12.9-1.801"/></svg>
-        <div class="dl-info"><div class="dl-platform">Windows</div><div class="dl-version">.exe &middot; v0.10.0-beta</div></div>
+        <div class="dl-info"><div class="dl-platform">Windows</div><div class="dl-version">.exe &middot; v0.10.1-beta</div></div>
       </a>
     </div>
     <p class="dl-more">
@@ -975,7 +1375,7 @@
     </div>
     <div class="faq-item">
       <h3 data-i18n="faq.q3">Was ist MindGraph eigentlich?</h3>
-      <p data-i18n="faq.a3">Eine lokale Arbeitsumgebung mit drei Schwerpunkten: erstens KI auf dem eigenen Rechner &ndash; Tagesres&uuml;mee, Posteingang-Analyse, Projekt-Status und Workflow-Automation, ohne dass Daten den Rechner verlassen. Zweitens ein integriertes Set aus Markdown-Editor, Wissensgraph, Posteingang, Aufgaben, Flashcards und Workflow-Canvas &ndash; kein Plugin-Store. Drittens ein offenes Format: Notizen sind Markdown-Dateien, kein Lock-in.</p>
+      <p data-i18n="faq.a3">Eine lokale Arbeitsumgebung mit drei Schwerpunkten: erstens KI auf dem eigenen Rechner &ndash; Tagesres&uuml;mee, Posteingang-Analyse, Projekt-Status und Workflow-Automation, ohne dass Daten den Rechner verlassen. Zweitens ein integrierter Kern aus Markdown-Editor, Wissensgraph, Posteingang und Aufgaben, gezielt erweiterbar durch signierte Plugins. Drittens ein offenes Format: Notizen sind Markdown-Dateien, kein Lock-in.</p>
     </div>
     <div class="faq-item">
       <h3 data-i18n="faq.q4">Funktionieren bestehende Markdown-Notizen?</h3>
@@ -996,6 +1396,14 @@
   </section>
 
   <footer>
+    <div class="footer-developer">
+      <strong data-i18n="footer.dev.title">Du willst MindGraph erweitern?</strong>
+      <div data-i18n="footer.dev.text">Baue ein externes, signiertes Plugin mit dem offiziellen Template und der Plugin-API.</div>
+      <div class="footer-developer-links">
+        <a href="https://github.com/bydb/mindgraph-notes/tree/master/plugin-template" target="_blank" rel="noopener noreferrer" data-i18n="footer.dev.template">Plugin-Template &rarr;</a>
+        <a href="https://github.com/bydb/mindgraph-notes/tree/master/app/packages/plugin-api" target="_blank" rel="noopener noreferrer" data-i18n="footer.dev.api">Plugin-API ansehen &rarr;</a>
+      </div>
+    </div>
     <p>
       Made with <svg width="14" height="14" viewBox="0 0 24 24" fill="var(--accent)" stroke="none" style="vertical-align:-2px;display:inline-block;"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0016.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 002 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></svg> by <a href="https://bydb.io">bydb.io</a> &middot;
       <a href="https://github.com/bydb/mindgraph-notes">GitHub</a> &middot;
@@ -1109,9 +1517,9 @@
         "st.proof.c4h": "Modelle pro Modul getestet",
         "st.proof.c4": "Eine dokumentierte Kompatibilitätsmatrix zeigt, welche lokale KI für welches Modul taugt – nicht „irgendein Modell\".",
         "st.maker.label": "Wer dahintersteckt",
-        "st.maker.quote": "„Ich bin kein Konzern. Ich bin einer von euch – jemand, der alles im Blick behalten muss und sich keine Assistenz leisten kann. Ich habe MindGraph gebaut, weil ich es selbst jeden Tag brauche.“",
-        "st.maker.role": "Macher von MindGraph Notes",
-        "st.maker.note": "9 Sterne auf GitHub, null Werbung. Urteile über den Code, nicht über den Hype.",
+        "st.maker.quote": "„Ich entwickle MindGraph aus meinem Arbeitsalltag heraus. Ich studierte Chemieingenieurwesen in Erlangen und lernte dort programmieren. Danach wurde ich Lehrer und wechselte später ins Medienzentrum, das ich heute leite. Außerdem habe ich die pädagogische Leitung des MINT Space an der Technischen Hochschule Mittelhessen und arbeite im KI-Team der Hessischen Lehrkräfteakademie. MindGraph verbindet für mich Bildung, Organisation und Technik — und ist das Werkzeug, das mir selbst gefehlt hat.“",
+        "st.maker.role": "Lehrer, Leiter eines Medienzentrums und Entwickler von MindGraph Notes",
+        "st.maker.note": "Open Source · täglich im produktiven Einsatz · entwickelt aus echter Praxis",
         "st.invite.h": "Behalte alles im Blick —<br><em>und bleib trotzdem du.</em>",
         "st.invite.lead": "Kostenlos, Open Source, in 2 Minuten startklar. Dein bestehender Markdown-Vault öffnet 1:1.",
         "st.invite.cta": "Kostenlos herunterladen",
@@ -1130,6 +1538,7 @@
         "how.p3h": "Wissen, das bleibt",
         "how.p3": "Karteikarten mit Spaced Repetition (SM-2), KI-Generierung direkt aus deinen Notizen, Anki-Import. Du rufst Wissen aktiv ab, statt es nachzuschlagen – so bleibt KI ein Werkzeug, das dich schärfer macht, nicht abhängig.",
         "hero.badge": "Open Source \u00b7 Lokal \u00b7 Kostenlos",
+        "hero.release": "Neu: Plugins & Excalidraw · v0.10.1",
         "hero.title": "Der Fokus bleibt.<br><em>Auch wenn das Leben dazwischenkommt.</em>",
         "hero.sub": "MindGraph zeigt dir jeden Morgen, was heute z\u00e4hlt \u2014 Aufgaben, Mails, Termine, vergessene F\u00e4den. Du gehst aufs Bike, ins Wochenende, liegst mal f\u00fcnf Tage flach. Und nichts f\u00e4llt durch. Lokal, ohne Cloud-Zwang.",
         "hero.cta": "Kostenlos herunterladen",
@@ -1165,7 +1574,7 @@
         "cap.security.desc": "Standardm\u00e4\u00dfig lokal. Optionaler E2E-verschl\u00fcsselter Sync (AES-256-GCM, Zero-Knowledge). Keine Telemetrie. DOMPurify-Sanitization und geh\u00e4rteter Prompt-Injection-Schutz im KI-Modul.",
         "compare.label": "Warum MindGraph Notes",
         "compare.heading": "Ein integrierter Arbeitsplatz \u2014<br>statt acht Apps und 30 Plugins.",
-        "compare.sub": "MindGraph ist f\u00fcr Teams und Power-User, die Wissen, Emails, Aufgaben, Dokumente und KI nicht in zehn Tools verteilen wollen. Kein Plugin-Store \u2013 Module schaltest du in den Einstellungen an.",
+        "compare.sub": "MindGraph ist f\u00fcr Einzelk\u00e4mpfer, Teams und Power-User, die Wissen, Emails, Aufgaben, Dokumente und KI nicht in zehn Tools verteilen wollen. Kernfunktionen sind eingebaut; signierte Plugins erweitern den Arbeitsraum gezielt.",
         "compare.c1.title": "Dashboard als Startpunkt",
         "compare.c1.desc": "Klassische Notiz-Apps zeigen dir eine leere Seite. MindGraph zeigt dir <strong>was heute wichtig ist</strong>: \u00fcberf\u00e4llige Tasks, Emails mit Antwort-Pflicht, heutige Termine \u2014 und \ud83d\udd34-Probleme, deren Relevanz eine lokale KI laufend bewertet, damit nichts in Vergessenheit ger\u00e4t.",
         "compare.c2.title": "Email direkt im Arbeitsraum",
@@ -1199,6 +1608,18 @@
         "modules.opt.vision": "Vision OCR",
         "modules.opt.speech": "Diktat & Vorlesen",
         "modules.opt.terminal": "Terminal",
+        "release.label": "Release 0.10.1 · Petrol",
+        "release.heading": "Was ist neu — <em>das Plugin-Release.</em>",
+        "release.lead": "MindGraph lässt sich jetzt mit signierten Plugins erweitern — im Katalog entdecken, per Klick installieren und sicher aktualisieren.",
+        "release.c1h": "Plugin-Katalog",
+        "release.c1": "Offizielle Erweiterungen durchsuchen, installieren und aktualisieren.",
+        "release.c2h": "Signierte Plugins",
+        "release.c2": "Herkunft und Integrität werden kryptografisch geprüft, bevor ein Plugin läuft.",
+        "release.c3h": "Eigene Oberflächen",
+        "release.c3": "Plugins können Editoren sowie Dashboard- und Sidebar-Widgets mitbringen.",
+        "release.c4h": "Excalidraw",
+        "release.c4": "Der Zeicheneditor kommt als echtes externes Plugin — ohne festes App-Bundling.",
+        "release.link": "Vollständige Release Notes auf GitHub →",
         "dl.label": "Download",
         "dl.heading": "Jetzt starten.",
         "dl.sub": "Kostenlos, Open Source, in 2 Minuten startklar. \u00d6ffne einen bestehenden Vault oder starte mit dem Starter-Vault.",
@@ -1210,7 +1631,7 @@
         "faq.q2": "Brauche ich Ollama?",
         "faq.a2": "F\u00fcr den vollen Funktionsumfang ja. MindGraph nutzt Ollama als lokale KI-Schicht: Tagesres\u00fcmee (Brain), E-Mail-Analyse, Aufgaben-Extraktion, Projekt-Status, Smart Connections und das Workflow-Canvas laufen dar\u00fcber \u2013 komplett auf deinem Rechner, ohne Cloud. Editor, Wissensgraph, Dashboard und Sync funktionieren auch ohne Ollama; die meisten KI-Module fehlen dann aber. Ollama l\u00e4dst du einmal von ollama.ai herunter.",
         "faq.q3": "Was ist MindGraph eigentlich?",
-        "faq.a3": "Eine lokale Arbeitsumgebung mit drei Schwerpunkten: erstens KI auf dem eigenen Rechner \u2013 Tagesres\u00fcmee, Posteingang-Analyse, Projekt-Status und Workflow-Automation, ohne dass Daten den Rechner verlassen. Zweitens ein integriertes Set aus Markdown-Editor, Wissensgraph, Posteingang, Aufgaben, Flashcards und Workflow-Canvas \u2013 kein Plugin-Store. Drittens ein offenes Format: Notizen sind Markdown-Dateien, kein Lock-in.",
+        "faq.a3": "Eine lokale Arbeitsumgebung mit drei Schwerpunkten: erstens KI auf dem eigenen Rechner \u2013 Tagesres\u00fcmee, Posteingang-Analyse, Projekt-Status und Workflow-Automation, ohne dass Daten den Rechner verlassen. Zweitens ein integrierter Kern aus Markdown-Editor, Wissensgraph, Posteingang und Aufgaben, gezielt erweiterbar durch signierte Plugins. Drittens ein offenes Format: Notizen sind Markdown-Dateien, kein Lock-in.",
         "faq.q4": "Funktionieren bestehende Markdown-Notizen?",
         "faq.a4": "Ja. Alles ist Markdown \u2013 die Notizen sind reine Textdateien auf deinem Rechner. Ein bestehendes Obsidian-Vault l\u00e4sst sich direkt \u00f6ffnen: Wikilinks, Tags, Frontmatter, Dataview und Canvas sprechen dieselbe Syntax. Du beh\u00e4ltst dein Format und kannst jederzeit auch wieder weg.",
         "faq.q5": "Wo liegen meine Daten?",
@@ -1222,6 +1643,10 @@
         "footer.contact": "Kontakt",
         "footer.impressum": "Impressum",
         "footer.privacy": "Datenschutz",
+        "footer.dev.title": "Du willst MindGraph erweitern?",
+        "footer.dev.text": "Baue ein externes, signiertes Plugin mit dem offiziellen Template und der Plugin-API.",
+        "footer.dev.template": "Plugin-Template →",
+        "footer.dev.api": "Plugin-API ansehen →",
         "impressum.title": "Impressum",
         "impressum.info": "Angaben gem\u00e4\u00df \u00a7 5 TMG",
         "impressum.country": "Deutschland",
@@ -1304,9 +1729,9 @@
         "st.proof.c4h": "Models tested per module",
         "st.proof.c4": "A documented compatibility matrix shows which local AI is fit for which module – not 'just any model'.",
         "st.maker.label": "Who's behind it",
-        "st.maker.quote": "“I'm not a corporation. I'm one of you – someone who has to keep everything in view and can't afford an assistant. I built MindGraph because I need it myself every day.”",
-        "st.maker.role": "Maker of MindGraph Notes",
-        "st.maker.note": "9 stars on GitHub, zero marketing. Judge the code, not the hype.",
+        "st.maker.quote": "“I develop MindGraph from my own working life. I studied chemical engineering in Erlangen and learned programming there. I then became a teacher and later moved into a media center, which I now lead. I also head the educational program at the MINT Space of the Technische Hochschule Mittelhessen and work with the AI team at the Hessian Teacher Academy. For me, MindGraph connects education, organization and technology — and is the tool I was missing myself.”",
+        "st.maker.role": "Teacher, media center director and developer of MindGraph Notes",
+        "st.maker.note": "Open source · used in production every day · built from real-world practice",
         "st.invite.h": "Keep everything in view —<br><em>and still be yourself.</em>",
         "st.invite.lead": "Free, open source, ready in 2 minutes. Your existing Markdown vault opens as-is.",
         "st.invite.cta": "Download for free",
@@ -1325,6 +1750,7 @@
         "how.p3h": "Knowledge that sticks",
         "how.p3": "Flashcards with spaced repetition (SM-2), AI generation straight from your notes, Anki import. You recall knowledge actively instead of looking it up – so AI stays a tool that makes you sharper, not dependent.",
         "hero.badge": "Open Source \u00b7 Local \u00b7 Free",
+        "hero.release": "New: Plugins & Excalidraw · v0.10.1",
         "hero.title": "Shows you<br><em>what matters today.</em>",
         "hero.sub": "MindGraph Notes connects your notes, tasks, emails and documents \u2014 and ranks them by relevance. Dashboard, knowledge graph and local AI in one desktop app. No cloud lock-in.",
         "hero.cta": "Download for free",
@@ -1360,7 +1786,7 @@
         "cap.security.desc": "Local by default. Optional E2E encrypted sync (AES-256-GCM, zero-knowledge). No telemetry. DOMPurify sanitization and hardened prompt injection defense in the AI module.",
         "compare.label": "Why MindGraph Notes",
         "compare.heading": "One integrated workplace \u2014<br>instead of eight apps and 30 plugins.",
-        "compare.sub": "MindGraph is for teams and power users who do not want knowledge, email, tasks, documents and AI scattered across ten tools. No plugin store \u2013 modules are toggles in settings.",
+        "compare.sub": "MindGraph is for solo operators, teams and power users who do not want knowledge, email, tasks, documents and AI scattered across ten tools. Core capabilities are built in; signed plugins extend the workspace deliberately.",
         "compare.c1.title": "Dashboard as starting point",
         "compare.c1.desc": "Classic note apps show you an empty page. MindGraph shows you <strong>what matters today</strong>: overdue tasks, emails awaiting reply, today's meetings — and 🔴-problems whose relevance a local AI continuously evaluates, so nothing falls off the radar.",
         "compare.c2.title": "Email inside your workspace",
@@ -1394,6 +1820,18 @@
         "modules.opt.vision": "Vision OCR",
         "modules.opt.speech": "Dictation & TTS",
         "modules.opt.terminal": "Terminal",
+        "release.label": "Release 0.10.1 · Petrol",
+        "release.heading": "What’s new — <em>the plugin release.</em>",
+        "release.lead": "MindGraph now supports signed plugins — discover them in the catalog, install with one click and update safely.",
+        "release.c1h": "Plugin catalog",
+        "release.c1": "Browse, install and update official extensions.",
+        "release.c2h": "Signed plugins",
+        "release.c2": "Origin and integrity are verified cryptographically before a plugin runs.",
+        "release.c3h": "Native interfaces",
+        "release.c3": "Plugins can contribute editors as well as dashboard and sidebar widgets.",
+        "release.c4h": "Excalidraw",
+        "release.c4": "The drawing editor ships as a real external plugin instead of being bundled into the app.",
+        "release.link": "Full release notes on GitHub →",
         "dl.label": "Download",
         "dl.heading": "Get started.",
         "dl.sub": "Free, open source, ready in 2 minutes. Open an existing vault or start with the starter vault.",
@@ -1405,7 +1843,7 @@
         "faq.q2": "Do I need Ollama?",
         "faq.a2": "For the full feature set, yes. MindGraph uses Ollama as a local AI layer: daily brain recap, email analysis, task extraction, project status, Smart Connections and the Workflow Canvas all run through it \u2013 entirely on your machine, no cloud. Editor, knowledge graph, dashboard and sync also work without Ollama, but most AI-powered modules won't. Install Ollama once from ollama.ai.",
         "faq.q3": "What is MindGraph, really?",
-        "faq.a3": "A local workspace built around three things: first, AI on your own machine \u2013 daily recap, inbox analysis, project status and workflow automation, with no data leaving the device. Second, an integrated suite \u2013 Markdown editor, knowledge graph, inbox, tasks, flashcards and a visual workflow canvas, no plugin store. Third, an open format: notes are plain Markdown files, no lock-in.",
+        "faq.a3": "A local workspace built around three things: first, AI on your own machine \u2013 daily recap, inbox analysis, project status and workflow automation, with no data leaving the device. Second, an integrated core of Markdown editor, knowledge graph, inbox and tasks, deliberately extensible through signed plugins. Third, an open format: notes are plain Markdown files, no lock-in.",
         "faq.q4": "Do my existing Markdown notes work?",
         "faq.a4": "Yes. Everything is Markdown \u2013 your notes are plain text files on your machine. An existing Obsidian vault opens directly: wikilinks, tags, frontmatter, dataview and canvas speak the same syntax. Your format stays portable, you can leave any time.",
         "faq.q5": "Where is my data stored?",
@@ -1417,6 +1855,10 @@
         "footer.contact": "Contact",
         "footer.impressum": "Legal Notice",
         "footer.privacy": "Privacy Policy",
+        "footer.dev.title": "Want to extend MindGraph?",
+        "footer.dev.text": "Build an external, signed plugin with the official template and Plugin API.",
+        "footer.dev.template": "Plugin template →",
+        "footer.dev.api": "Explore the Plugin API →",
         "impressum.title": "Legal Notice",
         "impressum.info": "Information according to \u00a7 5 TMG",
         "impressum.country": "Germany",
