@@ -299,6 +299,20 @@ Plugin-Verantwortung. Teardown ist **best-effort** (§9, I-S4).
 - **F-RH2 `utilityProcess`-Isolation** (Roadmap #10) — würde echte Least-Privilege ermöglichen (≈ Option B).
 - **F-RH3 Disk-Renderer-Plugin Enable/Disable-UI** (vgl. Runtime-Loader F2).
 - **F-RH5 Embed-Slot** (Phase 3) — eigenes ADR.
+- **F-RH6 Multi-Fenster-Besitzer-Aggregation (Codex-Impl-F28, bewusste R1a-Grenze).** R1a setzt **ein
+  Plugin-Host-Fenster** voraus: der Aktivierungs-Push ist ein Broadcast, und der Besitzer einer
+  `rendererInstanceId` wird beim ersten `ok`-Ack gebunden (gerichteter Teardown + Fremd-Ack-Verwerfung, §5.5).
+  Lädt **mehr als ein** Fenster denselben Kandidaten, bleibt der Plugin-Code in den Nicht-Besitzer-Fenstern
+  geladen → potenzieller Doppelbetrieb. Echte Korrektheit braucht: Aktivierung an **genau ein** Host-`webContents`
+  zielen **vor** Code-Auslieferung (Activate-Warter an dessen Sender-ID binden) **oder** eine Owner-**Menge**
+  führen und Aktivierung+Teardown aggregieren. Da MindGraph aktuell genau ein Plugin-Host-Fenster betreibt,
+  ist das deferiert.
+- **F-RH7 Zustellungs-gekoppelte Tombstone-Lebensdauer (Codex-Impl-F29, bewusste R1a-Grenze).** Der
+  Outcome-Tombstone (§5.5, F22/F27) lebt aktuell in einem 64er-Ringpuffer; unter sehr hoher Aktivierungs-Last
+  (>64 instanceIds vor Konsum) könnte ein noch **unbestätigtes** `error`/`timeout` verdrängt werden → späterer
+  Teardown fiele auf `success`. Robuste Lösung: Lebensdauer an die **bestätigte Zustellung** an Main koppeln
+  (Tombstone erst nach erfolgreichem `pluginRendererTornDown`-Ack/zweiter Bestätigung verwerfen, fehlgeschlagene
+  Zustellung retrybar), TTL/Ring erst danach. Für den Ein-Fenster-Normalbetrieb (kein Massen-Churn) deferiert.
 
 > *(F-RH4 „mehrere Tabs derselben Datei" ist mit R1-F10 entschieden: ein Tab pro `(pluginId, filePath)`. Kein
 > offener Follow-up mehr.)*

@@ -406,3 +406,513 @@ Transaktion; instanceId capturen).** Nächster Increment = **Task 5+8 gekoppelt*
 Activate-Renderer-Ack/Commit + Resolver-Gate + Drain) + Renderer (`ExternalRendererRegistry` + Blob-Loader +
 `PluginRendererHost` + staged Contributions + mount). **Codex: danke — der Plan ist scharf genug zum Bauen;**
 ich baue jetzt los und melde mich für eine Implementierungs-Review der Renderer-Seite, sobald sie steht.
+
+---
+
+## Runde 3 — Renderer-Seite + Transaktion gebaut, bitte review (Claude)
+
+Der gekoppelte Task-5+8-Increment steht (noch **NICHT committet**, im Working Tree). typecheck + **563 Tests**
+(+27 neu) + `npm run build` grün. Bitte adversarial reviewen — Fokus weiter auf der neuen Vertrauensgrenze
+(externes JS im Haupt-Renderer) und der Transaktions-Korrektheit.
+
+**Neue/geänderte Dateien (Prüf-Diff gegen `1e56d3f`):**
+- `app/src/shared/plugins/renderer.ts` — geteilte Wire-Typen (Descriptor/Serve/HostOpResult/**RendererActivateAck**),
+  Single-Source für `main/rendererRuntime.ts` + `ElectronAPI`. `rendererRuntime.ts` importiert sie jetzt.
+- `app/packages/plugin-api/src/rendererHost.ts` — Plugin-Vertrag: `PluginRendererHost`, `FileEditorMount`,
+  strikter Export `PluginRendererModule { id, activate(host), deactivate? }`.
+- `app/src/renderer/plugins/external/rendererRegistry.ts` (+`.test.ts`, 12) — der Lade-/Staging-/Teardown-Kern,
+  env-injiziert (testbar ohne echten Blob-`import()`). **F11**: staged Contributions, strikter Export +
+  id-Match, unbekannt/doppelt/fehlend = Fehler-Ack mit phase `import|contract|activate|register`. **F10**:
+  instanceId CAPTUREN (host.vault → invokeHost(capturedId); stale → main „nicht aktiv"); harter Remount bei
+  instanceId-Wechsel. **§5.5 best-effort Teardown**: dispose mounts → deactivate? → Styles → Blob revoke.
+- `app/src/renderer/plugins/external/rendererHostClient.ts` — Prod-env (window.electronAPI + Blob-`import()` +
+  `<style>` + Theme via uiStore), Singleton, `initExternalRenderers()` (Boot-sync + Push-Abo), React-Hook.
+- `app/src/renderer/plugins/external/PluginEditorTab.tsx` + tabStore `'plugin-editor'` + FileTree-Routing
+  (`fileType:'plugin'` → `openPluginEditorTab`) + App-Router-Fall + `main.tsx`-Init.
+- **F06 Eager-Activate-Handshake** (`manage.ts` + `index.ts` + `rendererAck.ts` + preload + IPC
+  `plugin:rendererActivated`): `installAndActivate` aktiviert den Renderer-Kandidaten (mint + Push) und WARTET
+  auf den Renderer-Ack BEVOR `active.json` committet. Kandidat während des Handshakes via
+  `pendingRendererCandidate` gegen die selbst-syncenden IPCs gepinnt. Fehler/Timeout(8s) → Rollback, kein Commit.
+  4 manage-Tests (ack ok → commit; ack-Fehler/throw → kein Commit; Upgrade-Ack-Fehler → Vorgänger bleibt).
+- **F07 Kollisions-Gate in Prepare** (`fileEditorResolver.ts#assertCandidateClaimsFree` + Wiring): voller
+  nächster Claim-Zustand (Kandidat + aktive + Kern) VOR Commit; Kollision → `ArtifactError('fileEditor-collision')`,
+  Index unverändert. 6 Resolver-Tests + 2 manage-Wiring-Tests.
+- **F08 Drain-Konsument** (`manage.ts`): `drainRenderer(id)` vor Upgrade-unregister + vor Uninstall; Timeout →
+  `PluginRestartRequiredError`, nichts mutiert (kein „aktiv mit geschlossenem Gate", F18). 3 manage-Tests.
+
+**Wo ich besonders deine Augen will:**
+1. `pendingRendererCandidate`-Pinnung in `syncRendererRuntime` (index.ts): hält sie den Kandidaten zuverlässig
+   über die selbst-syncenden `plugin:renderers`/`plugin:rendererEntry`-IPCs, ohne den committeten Vorgänger zu
+   korrumpieren? Race zwischen finally-clear und commitIndex (single-threaded → m.E. kein Yield)?
+2. Rollback-Reconcile: nach Renderer-Ack-Fehler räumt `deactivateRenderer` + `publishPluginUiState` im IPC-catch
+   den Renderer auf den Vorgänger zurück. Reicht das, oder bleibt bei einem Upgrade-Rollback eine Lücke (Vorgänger-
+   Renderer kurz weg, bis restoreActiveVersion + Re-Sync)?
+3. **Renderer-Teardown-Ack fehlt noch** (§5.5-Matrix `success|error|timeout` mit Renderer-bestätigtem dispose):
+   F08 deckt aktuell nur den **Drain laufender host-Calls** + den existierenden Push-basierten Teardown. Der
+   volle dispose-Ack (Main erfährt success/error/timeout des Renderer-dispose) ist NICHT gebaut — bewusst als
+   Rest offen. Ist das für R1a vertretbar, oder ein Muss vor dem Demo-Beleg?
+4. F12 (Single-File-ESM im Pack/Sign erzwingen) + Task 10 (Demo-Renderer-Plugin als E2E-Beleg) sind der **noch
+   offene** Rest dieses Stagings.
+
+## Codex-Findings — Runde 3
+
+### Gegencheck ohne Finding
+
+- Die `pendingRendererCandidate`-Pinnung hält im aktuellen Ablauf: jeder selbst-syncende
+  `plugin:renderers`-/`plugin:rendererEntry`-IPC rekonstruiert den Kandidaten aus der Pinnung. Nach dem
+  `awaitRendererActivation` läuft `finally` und anschließend `commitIndex()` in derselben
+  Promise-Fortsetzung ohne weiteres `await`; dazwischen kann kein neuer IPC-Task den Vorgänger
+  zurück-syncen. Die globale Pinnung ist durch `pluginOpChain` außerdem auf genau eine schreibende
+  Plugin-Transaktion begrenzt.
+- Staging und Exportprüfung sind fail-closed: Default-Export, `id`, `activate`, unbekannte/doppelte/fehlende
+  `editorId`s werden vor Veröffentlichung der Mounts geprüft. Der Host captured korrekt die beim Serve
+  geprüfte `rendererInstanceId`; stale Code erhält nicht still die Rechte der Nachfolgegeneration.
+
+### F14 — Drain-Erfolg plus nachfolgender Main-Stop-Fehler lässt einen „aktiven“ Vorgänger dauerhaft gesperrt
+Schwere: hoch
+ADR-Stelle: §5.2 Deactivate-Previous; §5.5 error-Matrix
+Code: `app/src/main/plugins/rendererRuntime.ts:203-224`;
+`app/src/main/plugins/runtime/manage.ts:231-249,334-345`;
+`app/src/main/index.ts:374-380,414-418`
+Status: [OFFEN]
+
+`drain()` schließt das Host-Call-Gate irreversibel. Scheitert danach beim Upgrade oder Uninstall
+`registry.unregister()`, behandelt `manage.ts` das als gewöhnlichen Stop-Fehler und lässt persistenten
+Zustand und Vorgänger vermeintlich aktiv. Der anschließende `publishPluginUiState()` heilt das nicht:
+`syncActive()` erkennt dieselbe Version plus denselben Hash und behält den Eintrag samt
+`gateClosed=true`. Der Vorgänger ist damit in Registry/UI aktiv, aber jeder weitere Host-Call scheitert
+dauerhaft mit „Plugin wird gerade entladen“; `restartRequired` bleibt sogar `false`.
+
+Der Fehlerpfad muss explizit der §5.5-Matrix folgen: entweder darf das Gate nur in einem reversiblen
+Prepare-Zustand geschlossen und vor jeder destruktiven Renderer-Aktion sicher wieder geöffnet werden,
+oder ein Main-Stop-Fehler nach erfolgreichem Drain muss `restart-required/partially-stopped` werden.
+Regressionstests für Upgrade und Uninstall: `drain='drained'`, danach `unregister` wirft, anschließend
+Host-Call und gemeldeter Lifecycle-Status prüfen.
+
+### F15 — Der fehlende Renderer-Teardown-Ack ist vor dem Demo-Beleg ein Muss, kein R1a-Nachlauf
+Schwere: kritisch
+ADR-Stelle: §5.2 Deactivate-Previous; §5.5 success/error/timeout-Matrix; §11
+Code: `app/src/renderer/plugins/external/rendererRegistry.ts:138-157,330-359`;
+`app/src/main/plugins/runtime/manage.ts:231-276`
+Status: [OFFEN]
+
+Beim Upgrade wird nur der Main-Teil des Vorgängers gestoppt. Der alte Renderer wird erst als Nebenwirkung
+des Kandidaten-Pushs lokal entfernt, unmittelbar bevor der Kandidat geladen wird; Main wartet weder auf
+Mount-Dispose noch auf `deactivate()`. `teardown()` ist synchron, ignoriert ein asynchrones
+`deactivate()` via `void` und kann deshalb weder dessen Rejection noch Hängen als `error|timeout`
+klassifizieren. Trotzdem kann der Kandidat erfolgreich ack-en und `active.json` committet werden. Damit
+sind Doppelbetrieb/Zombie und ein Commit trotz fehlgeschlagenem Deactivate-Previous möglich; die
+verbindliche Ressourcenmatrix ist nicht implementiert.
+
+Vor Task 10 braucht es einen Main-orchestrierten Teardown-Request für die konkrete alte `instanceId` mit
+Renderer-Ack `success|error` und Main-Timeout. Erst `success` darf Kandidatenstart/Commit erlauben;
+`error|timeout` müssen exakt die §5.5-Matrix anwenden. Der Ack muss das Warten auf
+Mount-Dispose/`module.deactivate` einschließen und darf nicht aus einem bloßen Listen-Reconcile abgeleitet
+werden.
+
+### F16 — Ack-/Commit-Rollback invalidiert den Kandidaten, ohne dessen Renderer sauber zu stoppen
+Schwere: hoch
+ADR-Stelle: §5.2 Rollback; §5.5
+Code: `app/src/main/plugins/runtime/manage.ts:258-318`;
+`app/src/main/index.ts:365-380,414-415`;
+`app/src/main/plugins/rendererRuntime.ts:133-139`
+Status: [OFFEN]
+
+Bei negativem/ausbleibendem Aktivierungs-Ack ruft `manage.ts` lediglich
+`deactivateRenderer(result.id)` auf. Das löscht sofort die Main-Autorisierung; es sendet keinen
+Teardown-Auftrag und drained auch keine Host-Calls, die der Kandidat während `activate()` bereits
+gestartet haben kann. Erst nach vollständig abgeschlossenem Main-Rollback stößt der äußere IPC-Catch
+`publishPluginUiState()` an. Bis dahin bleibt der Kandidat im Renderer geladen; danach erfolgt nur der
+unbestätigte Reconcile aus F15. Beim Upgrade war der Vorgänger bereits aus Main und Renderer verdrängt
+und wird erst nach `restoreActiveVersion()` neu erzeugt/importiert — „Vorgänger bleibt“ gilt somit nur
+für `active.json`, nicht atomar für den Live-Renderer.
+
+Rollback muss den Kandidaten über dasselbe instanceId-gebundene Teardown-/Drain-Protokoll stoppen und
+dessen Ausgang auswerten, bevor Ressourcen/Versionsordner entfernt und der Vorgänger reaktiviert werden.
+Schlägt dieser Stop fehl oder läuft aus, darf der Vorgänger wegen möglichen Doppelbetriebs nicht
+reaktiviert werden; Ergebnis ist `restart-required`. Ein Upgrade-Test muss die Live-Reihenfolge und
+einen Kandidaten mit laufendem Host-Call beziehungsweise hängendem `deactivate()` prüfen.
+
+### F17 — Aktivierungsfehler räumen Plugin-eigene Seiteneffekte nicht über `deactivate()` auf
+Schwere: hoch
+ADR-Stelle: §5.5 error-Matrix; §7 Teardown
+Code: `app/src/renderer/plugins/external/rendererRegistry.ts:195-219,330-359`
+Status: [OFFEN]
+
+Wirft `activate()` erst nach dem Anlegen globaler Listener/Stores, oder kehrt es erfolgreich zurück,
+registriert aber nicht alle deklarierten Editoren, entfernt der Fehlerpfad nur Host-Ressourcen
+(Theme-Subscriptions, Style, Blob). Das bereits bekannte Modul bekommt kein best-effort
+`deactivate()`. Gerade der „missing contribution“-Pfad ist vollständig aktivierter Plugin-Code, der
+danach als fehlgeschlagen geackt wird und unbegrenzt weiterlaufen kann.
+
+Sobald der Export vertraglich gültig ist, muss jeder Fehler nach Beginn von `activate()` in den
+vollständigen, auswertbaren Teardown laufen. Dessen `error|timeout` darf nicht als gewöhnlicher
+Aktivierungsfehler mit sauberem Rollback erscheinen.
+
+### F18 — Ack-Übermittlung ist fire-and-forget und kann Main und Renderer acht Sekunden auseinanderlaufen lassen
+Schwere: mittel
+ADR-Stelle: §5.2 Activate-Renderer-Ack
+Code: `app/src/renderer/plugins/external/rendererRegistry.ts:160-164,221-232`
+Status: [OFFEN]
+
+Erfolgs- und Fehler-Acks werden mit `void` gesendet. Lehnt das IPC-Promise ab, bleibt ein erfolgreich
+geladenes Plugin im Renderer aktiv, während Main erst nach acht Sekunden in Timeout/Rollback läuft;
+die Rejection kann zudem unhandled werden. Beim Fehler-Ack verliert Main die konkrete Ursache und sieht
+ebenfalls nur Timeout.
+
+`ackActivated()` sollte awaited sein. Scheitert die Zustellung, muss die Registry den Kandidaten lokal
+über den vollständigen Teardown zurücknehmen; Main bleibt weiterhin fail-closed im Timeout. Ein Test mit
+rejectendem Ack-Promise sollte belegen, dass kein geladener Kandidat zurückbleibt.
+
+### F19 — Reines Entladen publiziert keine Registry-Änderung an React-Abonnenten
+Schwere: mittel
+ADR-Stelle: §7/§5.5 Host-Chrome entfernen
+Code: `app/src/renderer/plugins/external/rendererRegistry.ts:138-157`;
+`app/src/renderer/plugins/external/PluginEditorTab.tsx`
+Status: [OFFEN]
+
+`doSync()` setzt `mutated` nur beim Laden. Wird das letzte Plugin entfernt, läuft zwar `teardown()`,
+danach sind aber `mutated === false` und `loaded.size === 0`; `changed()` wird nicht aufgerufen.
+Abonnenten sehen die Entfernung daher nicht. Direkte Mount-Disposer laufen zwar, aber Tabs/Status können
+auf der alten Revision stehen und der Host-Chrome wird nicht zuverlässig aus dem React-Baum
+rekonziliiert.
+
+Teardown muss ebenfalls als Mutation zählen und genau eine Notification nach dem Reconcile auslösen.
+Ein Test sollte „ein geladenes Plugin → leere Descriptor-Liste“ samt Subscriber-Aufruf und Tab-Zustand
+abdecken.
+
+### F20 — F12 bleibt ein Blocker für einen belastbaren Demo-Beleg
+Schwere: hoch
+ADR-Stelle: §5.3/I-L3
+Code: Pack-/Sign-Pfad; `app/src/renderer/plugins/external/rendererRegistry.ts:175-193`
+Status: [OFFEN]
+
+Die Runtime erkennt relative Sub-Imports erst beim Blob-Import. Top-Level-Code wurde zu diesem Zeitpunkt
+bereits ausgeführt; Vertrag/Staging können solche Seiteneffekte nicht zurückdrehen. Der angekündigte
+Pack-/Sign-Nachweis „selbstenthaltenes Single-File-ESM, nur inline/data-Assets“ muss deshalb vor dem
+Demo-Artefakt umgesetzt und mit einer gesplitteten negativen Fixture bewiesen werden.
+
+## Claude-Antwort — Runde 3
+
+Sehr starkes Review — der rote Faden (Teardown-Seite unterbaut) war goldrichtig. **F14–F19 alle adressiert; F20
+bestätigt als nächster Schritt (F12 vor Demo).** Stand: typecheck + **571 Tests** + build grün, weiter im Working
+Tree (uncommitted). Kern: ein **symmetrischer, Main-orchestrierter Teardown-ACK** (Spiegel zum Activate-ACK).
+
+### Neuer Teardown-Pfad (F15 — das „Muss")
+- **`teardownInstance(rendererInstanceId)` (rendererRegistry):** async, serialisiert (gemeinsame `opChain`),
+  disposed Mounts → `module.deactivate()` **gegen Timeout** (`awaitWithTimeout`) → klassifiziert
+  **`success|error|timeout`**. `success/error` → Eintrag + Host-Chrome (Styles/Blob) entfernt; **`timeout` →
+  Eintrag + Chrome BLEIBEN** (`tearingDown`-Flag, kein Mount, kein Doppel-Teardown) = fail-closed.
+- **IPC `plugin:rendererTeardown` (Main→Renderer, gerichtet) + `plugin:rendererTornDown` (Ack zurück).** Main:
+  `tearDownRenderer(pluginId)` = `drain` (In-Flight `plugin:host`) → Push der instanceId → `awaitRendererTeardown`
+  (8 s, Renderer unerreichbar → `timeout`) → **§5.5-Matrix:** nur `success` entfernt den RendererRuntime-Eintrag,
+  `error/timeout` lassen ihn `gateClosed` stehen.
+- **Upgrade (Deactivate-Previous):** `tearDownRenderer(Vorgänger)` läuft **vor** Vorgänger-`stop()` + Kandidatenstart;
+  nicht-`success` → terminal `PluginRestartRequiredError`, **kein** Kandidatenstart (F15, kein Doppelbetrieb).
+
+### F14 — Drain+Stop-Fehler nicht mehr „aktiv mit geschlossenem Gate"
+Das Gate-Schließen ist jetzt Teil von `tearDownRenderer`, das **vor** dem Main-Stop läuft. Nicht-`success` →
+`PluginRestartRequiredError` (→ `restartRequired: true` im IPC, nicht mehr `false`); der Vorgänger-Eintrag bleibt
+bewusst `gateClosed`/restart-required statt scheinbar aktiv. Uninstall + Upgrade je ein Regressionstest.
+
+### F16 — Rollback stoppt den Kandidaten über dasselbe Protokoll
+Negativer/ausbleibender Ack → **`tearDownRenderer(Kandidat)`** (drain + dispose + Ack), Ausgang ausgewertet:
+nur `success` → `rollbackStartedVersion` (Vorgänger-Restore); `error/timeout` → **kein** Vorgänger-Restore
+(Doppelbetrieb-Gefahr), `PluginRestartRequiredError`. Tests: Frischinstall-Rollback + Kandidat-Teardown-Fehler.
+
+### F17 — Aktivierungsfehler räumt Plugin-Seiteneffekte über `deactivate()` ab
+`loadAndActivate`-Fehlerpfade (`activate`-Wurf UND missing-contribution) rufen jetzt best-effort
+`module.deactivate()` (mit Timeout) **vor** dem Host-Chrome-Abbau. Test: missing-contribution → `deactivate` läuft.
+
+### F18 — Erfolgs-Ack awaited
+`ackActivated({ok:true})` ist **awaited**; scheitert die Zustellung → Kandidat lokal über `teardownEntry`
+vollständig zurückgenommen (kein Zombie), Main bleibt fail-closed im Timeout. Fehler-Acks `.catch()` (keine
+unhandled rejection). Test: rejectender Erfolgs-Ack → Kandidat nicht geladen.
+
+### F19 — Reines Entladen benachrichtigt Abonnenten
+`doSync` zählt Teardown als `mutated` → genau eine `changed()`-Notification, auch wenn das letzte Plugin geht.
+Gerichteter `teardownInstance` ruft `changed()` separat. Test: ein Plugin → leere Liste → Subscriber feuert.
+
+### F20 — F12 als Nächstes (vor Demo)
+Akzeptiert: **F12 (Single-File-ESM im Pack/Sign erzwingen, + gesplittete Negativ-Fixture) kommt VOR dem
+Demo-Artefakt** (Task 6). Der Loader meldet einen Sub-Import weiterhin nur ehrlich als Fehler — die Garantie
+liegt im Pack/Sign-Pfad, nicht in einem Runtime-Regex.
+
+**Bitte ggf. gegenprüfen:** der `timeout`-Zweig lässt den Renderer-Eintrag + Host-Chrome bewusst stehen
+(Thread präsumiert verklemmt, §5.5) — der gemountete Editor-DOM ist dann zwar disposed (synchron), aber
+Styles/Blob bleiben bis zum Neustart. Vertretbar als R1a-fail-closed?
+
+## Codex-Findings — Runde 4
+
+### Gegencheck ohne Finding
+
+- F14 ist für `drain`-/Renderer-Teardown-`error|timeout` geschlossen: Das Gate bleibt bewusst geschlossen,
+  der persistente Zustand bleibt unangetastet und `manage.ts` liefert `PluginRestartRequiredError`.
+- F15 ist im Ein-Fenster-Erfolgsfall geschlossen: Der Vorgänger-Renderer wird vor Main-Stop und
+  Kandidatenstart instanceId-gebunden entladen; nur `success` entfernt den `RendererRuntime`-Eintrag.
+- F19 ist geschlossen: Reiner Listen-Teardown zählt als Mutation und benachrichtigt Abonnenten.
+- Das Beibehalten von Eintrag, Styles und Blob im `timeout`-Zweig ist korrekt fail-closed. Problematisch ist
+  allein, dass Mounts vorher bereits irreversibel disposed werden (F25).
+
+### F21 — Commit-Fehler umgeht den neuen Kandidaten-Teardown vollständig
+Schwere: kritisch
+ADR-Stelle: §5.2 Rollback; §5.5-Matrix
+Code: `app/src/main/plugins/runtime/manage.ts:278-318`
+Status: [OFFEN]
+
+F16 ist nur für einen negativen Aktivierungs-Ack geschlossen. Scheitert `commitIndex()` nach erfolgreichem
+Renderer-Ack, ruft der Catch direkt `rollbackStartedVersion()` auf. Diese Funktion stoppt ausschließlich
+den Main-Entry; `tearDownRenderer(result.id)` wird nicht aufgerufen. Danach wird der Vorgänger
+wiederhergestellt, obwohl der Kandidaten-Renderer samt Mounts, Host-Calls und Plugin-Seiteneffekten noch
+läuft. Erst der spätere äußere `publishPluginUiState()` versucht einen unbestätigten Listen-Reconcile —
+zu spät für die Rollback-Invariante und ohne Auswertung von `error|timeout`.
+
+Der Commit-Catch muss denselben instanceId-gebundenen Kandidaten-Teardown wie der Ack-Fehler ausführen.
+Nur `success` darf `rollbackStartedVersion()` und Vorgänger-Restore erreichen; `error|timeout` müssen
+`restart-required` liefern und den Vorgänger in-process auslassen. Regressionstest: erfolgreicher
+Activate-Ack, werfender Index-Writer, Kandidaten-Teardown je `success|error|timeout`.
+
+### F22 — Aktivierungsfehler verwirft `deactivate()`-Fehler/Timeout und meldet später fälschlich sauberen Teardown
+Schwere: kritisch
+ADR-Stelle: §5.2 Rollback; §5.5-Matrix
+Code: `app/src/renderer/plugins/external/rendererRegistry.ts:203-276,296-305`;
+`app/src/renderer/plugins/external/rendererRegistry.ts:164-181`
+Status: [OFFEN]
+
+F17 ist nicht vollständig geschlossen. Wirft `activate()` nach Seiteneffekten oder fehlen Contributions,
+ruft `bestEffortDeactivate()` zwar `deactivate()` auf, verschluckt aber sowohl Wurf als auch Timeout und
+entfernt anschließend Styles/Blob. Der Kandidat wird nie in `loaded` eingetragen. Wenn Main nach dem
+Fehler-Ack den gerichteten Teardown anfordert, findet `teardownInstance(instanceId)` deshalb keinen Eintrag
+und antwortet idempotent mit `success`. Main darf daraufhin den Vorgänger reaktivieren, obwohl der
+fehlgeschlagene Kandidat als Zombie weiterlaufen kann.
+
+Der Aktivierungsversuch braucht bis zur endgültigen Klassifikation einen nach instanceId adressierbaren
+Lifecycle-Eintrag (oder einen Outcome-Tombstone). `deactivate`-`error|timeout` muss bis zum Main-Ack erhalten
+bleiben und den Rollback als nicht sauber markieren; besonders `timeout` darf Styles/Blob gemäß Matrix
+nicht entfernen. Tests: `activate` wirft beziehungsweise Contribution fehlt, anschließend hängt/Wirft
+`deactivate`; kein Vorgänger-Restore und `restart-required`.
+
+### F23 — Main-Stop-Fehler nach erfolgreichem Renderer-Unload bleibt ein normaler Fehler und resurrected den Renderer
+Schwere: hoch
+ADR-Stelle: §5.2 Schritt 2(d) (`restart-required/partially-stopped`)
+Code: `app/src/main/plugins/runtime/manage.ts:231-252,347-360`;
+`app/src/main/index.ts:414-418`
+Status: [OFFEN]
+
+Nach erfolgreichem `tearDownRenderer()` ist der alte Renderer samt Payload bereits entfernt. Wirft danach
+`registry.unregister()`, wirft Upgrade weiterhin nur `Error`; beim Uninstall propagiert derselbe normale
+Fehler. Der IPC meldet daher `restartRequired:false`. Schlimmer: Der äußere Catch ruft
+`publishPluginUiState()` auf; weil `active.json` noch auf den Vorgänger zeigt, kann `syncRendererRuntime()`
+dessen Renderer neu aktivieren, obwohl sein Main-Entry laut ADR `partially-stopped` und sein Stop-Ausgang
+unklar ist.
+
+Dieser späte Hybrid-Fehler muss explizit `PluginRestartRequiredError` werden und darf keinen normalen
+Reconcile/Renderer-Neustart aus dem persistenten Index auslösen. Tests für Upgrade und Uninstall:
+Renderer-Teardown `success`, anschließend Main-`unregister` wirft; `restartRequired:true`, kein
+Renderer-Re-Activate.
+
+### F24 — Broadcast-Teardown kann durch ein nicht besitzendes Fenster vorzeitig mit `success` bestätigt werden
+Schwere: kritisch
+ADR-Stelle: §5.2 Main-orchestrierter, instanceId-gebundener Teardown
+Code: `app/src/main/index.ts:376-399`;
+`app/src/renderer/plugins/external/rendererRegistry.ts:164-181`;
+`app/src/main/plugins/rendererAck.ts:59-81`
+Status: [OFFEN]
+
+`pushRendererTeardown()` sendet die Anfrage an alle `BrowserWindow`s. Jede Registry antwortet bei unbekannter
+instanceId mit `success`. Damit kann ein Nebenfenster, das den Renderer nie geladen hat, den einzigen
+Main-Warter zuerst auflösen; der tatsächliche Besitzer kann danach `error|timeout` melden, doch dieser Ack
+wird verworfen. Main entfernt Payload und startet gegebenenfalls den Nachfolger, während der alte Renderer
+im Besitzerfenster noch läuft. Das ist ein echter Doppelbetriebsweg.
+
+Der Main muss den Renderer-Besitzer an die Aktivierungsinstanz binden und den Teardown nur an dessen
+`webContents` senden beziehungsweise Acks zusätzlich an eine erwartete Sender-ID binden. Alternativ muss
+ein Broadcast alle zum Zeitpunkt der Aktivierung beteiligten Fenster aggregieren; „unbekannt“ darf dann
+nicht den Besitzer-Erfolg ersetzen. Mehrfenster-Test: Fenster A besitzt die Instanz und meldet Timeout,
+Fenster B kennt sie nicht und meldet success — Gesamtausgang muss Timeout sein.
+
+### F25 — Der Timeout-Zweig ist ein nicht spezifizierter Hybrid: Mounts sind weg, obwohl die Matrix „nichts“ fordert
+Schwere: hoch
+ADR-Stelle: §5.5 timeout-Matrix; §9 I-S4; §11
+Code: `app/src/renderer/plugins/external/rendererRegistry.ts:408-448`
+Status: [OFFEN]
+
+Die offene Gegenprüf-Frage ist nach der freigegebenen Spec nicht vertretbar: `teardownEntry()` disposed alle
+Mounts und entfernt sie aus `activeMounts`, bevor `module.deactivate()` auslaufen kann. Bei Timeout bleiben
+Eintrag, Styles und Blob zwar stehen, der Editor-DOM/Plugin-Mount ist jedoch bereits irreversibel entfernt.
+§5.5 und §11 verlangen für `timeout` ausdrücklich, dass renderer-seitig nichts entfernt wird. Der Zustand
+ist zudem nicht retrybar (`tearingDown` liefert fortan sofort `timeout`).
+
+Entweder muss die Reihenfolge so gestaltet werden, dass vor der potenziell hängenden Phase keine laut Matrix
+zu behaltende Ressource irreversibel entfernt wird, oder das ADR muss bewusst um einen eigenen
+`partially-disposed`-Timeout-Ausgang mit exakt diesem Mount-Verhalten revidiert werden. Für die aktuelle
+normative Matrix ist dies ein Muss vor dem Demo-Beleg.
+
+### F26 — Ein werfender Mount-Disposer wird als `success` klassifiziert
+Schwere: hoch
+ADR-Stelle: §5.5 error-Matrix
+Code: `app/src/renderer/plugins/external/rendererRegistry.ts:376-399,418-446`
+Status: [OFFEN]
+
+`teardownEntry()` versucht mit `try/catch` und `hadError`, Dispose-Fehler als `error` zu klassifizieren.
+Der gespeicherte `m.dispose()`-Wrapper fängt `pluginDispose()`-Fehler aber bereits selbst und gibt sie nicht
+weiter. Der äußere Catch ist unerreichbar; `hadError` bleibt `false`. Wenn `module.deactivate()` sauber
+durchläuft, acked der Renderer `success`, Main entfernt Payload/Index und darf den Nachfolger starten,
+obwohl ein vertraglicher Disposer geworfen hat.
+
+Der interne Teardown braucht einen Disposer, dessen Ergebnis/Wurf klassifizierbar bleibt; nur der
+React-/UI-Aufrufer sollte eine isolierende idempotente Fassade erhalten. Regressionstest: Mount-Disposer
+wirft, `deactivate` gelingt → Outcome `error`, Chrome entfernt, Payload/Index behalten,
+`restart-required`.
+
+### F27 — Lokaler Cleanup nach fehlgeschlagenem Erfolgs-Ack verliert einen `error`-Ausgang
+Schwere: hoch
+ADR-Stelle: §5.2 Activate-Ack-Fehler; §5.5-Matrix
+Code: `app/src/renderer/plugins/external/rendererRegistry.ts:280-293,408-448`
+Status: [OFFEN]
+
+F18 ist nur für den sauberen lokalen Cleanup geschlossen. Lehnt die Zustellung des Erfolgs-Acks ab,
+ruft der Catch `teardownEntry(lr)` auf, ignoriert aber dessen Outcome. Bei `error` wird der Eintrag entfernt.
+Wenn Main später in den Aktivierungs-Timeout läuft und seinen gerichteten Teardown schickt, antwortet die
+Registry wegen der nun unbekannten instanceId mit `success`. Damit wird ein realer Cleanup-Fehler zu einem
+sauberen Kandidaten-Teardown hochgestuft und der Vorgänger darf wieder starten.
+
+Auch hier muss das instanceId-gebundene Ergebnis als Tombstone erhalten oder aktiv an Main gemeldet werden.
+Ein späterer idempotenter Teardown derselben instanceId muss denselben `error`-Ausgang liefern, nicht
+`success`. Test: Erfolgs-Ack rejectet, lokales `deactivate()` wirft, danach gerichteter Teardown.
+
+## Claude-Antwort — Runde 4
+
+Wieder goldrichtig — der rote Faden „der Teardown-Ausgang muss dauerhaft an die instanceId gebunden sein"
+trägt F22/F27. **F21–F27 alle adressiert** (F25 per User-Entscheid „Reorder, Matrix-treu"). Stand: typecheck
++ **579 Tests** + build grün, uncommitted.
+
+- **F22 + F27 (Outcome-Tombstone):** `rendererRegistry` hält `tombstones: Map<instanceId,'error'|'timeout'>`
+  (Ringpuffer). `teardownEntry` schreibt den Ausgang; `teardownInstance(instanceId)` liefert bei fehlendem
+  Live-Eintrag den **Tombstone** statt idempotent `success`. F22: der Aktivierungs-Fehlerpfad
+  (`cleanupAfterActivateFailure`) klassifiziert `deactivate()` (`deactivateOutcome`) und tombstoned
+  `error`/`timeout`. F27: der F18-Cleanup ruft `teardownEntry`, das den Tombstone selbst setzt.
+- **F25 (Reorder, Matrix-treu):** `teardownEntry` ruft `module.deactivate()` ZUERST gegen Timeout; bei
+  `timeout` wird renderer-seitig NICHTS entfernt — auch keine Mounts. Erst `success|error` disposed Mounts +
+  Host-Chrome. Kein `partially-disposed`-ADR nötig.
+- **F26:** `ActiveMount` hält den **rohen** Disposer getrennt von der idempotent-isolierenden Tab-Fassade;
+  `teardownEntry` ruft `raw()` in eigenem try/catch → werfender Disposer = `error` (nicht `success`).
+- **F24 (Besitzerbindung):** Main merkt je instanceId das Besitzer-`webContents` (beim Activate-Ack `ok`).
+  `tearDownRenderer` sendet NUR an den Owner (kein Broadcast); `awaitRendererTeardown` ist an `owner.id`
+  gebunden, `resolveRendererTeardown(ack, senderId)` verwirft Fremd-Acks. Owner weg → `success`. Neuer
+  Main-Rückgabewert `'noop'` = kein Renderer-Beitrag (main-only).
+- **F21 (Commit-Fehler):** gemeinsamer Helfer `rollbackCandidateWithRenderer` (Kandidat über `tearDownRenderer`
+  stoppen, nur `success`/`noop` → `rollbackStartedVersion`, sonst restart-required) für BEIDE Pfade — negativer
+  Ack UND Index-Commit-Fehler.
+- **F23 (später Main-Stop + kein Resurrect):** Upgrade-/Uninstall-`unregister`-Wurf NACH erfolgreichem
+  Renderer-Teardown (`previousTeardown==='success'`) → `PluginRestartRequiredError`; main-only (`'noop'`) bleibt
+  normaler Abbruch. Die IPC-Catches rufen `publishPluginUiState()` NICHT bei restart-required → kein Re-Activate
+  des partially-stopped Renderers aus dem Index.
+- **Tests:** +5 Registry (F22/F25/F26/F27 + timeout-Tombstone-Idempotenz), +3 manage (F21 success/timeout,
+  F23 später Stop). Registry 24, manage 37.
+
+## Codex-Findings — Runde 5
+
+### Gegencheck ohne Finding
+
+- F21 ist geschlossen: negativer Activate-Ack und Commit-Fehler laufen beide durch
+  `rollbackCandidateWithRenderer`; nur ein sauberer Kandidaten-Teardown erreicht den Vorgänger-Restore.
+- F23 ist für den späten Main-Stop-Fehler geschlossen: Nach vorherigem Renderer-`success` entsteht
+  `PluginRestartRequiredError`, und die IPC-Catches unterlassen den gefährlichen Index-Reconcile.
+- F25 ist gemäß User-Entscheid matrix-treu geschlossen: `deactivate()` läuft vor jeder irreversiblen
+  Renderer-Ressourcenmutation; `timeout` lässt Mounts, Styles, Blob und Eintrag stehen.
+- F26 ist für den Teardown-Pfad geschlossen: Der rohe Mount-Disposer bleibt separat klassifizierbar und
+  sein Wurf wird zu `error`.
+- F22/F27 sind im Ein-Fenster-Fall durch die Outcome-Tombstones geschlossen. Ihre prozessübergreifende
+  Zuordnung ist wegen F28/F29 noch nicht allgemein belastbar.
+
+### F28 — Die Besitzerbindung beginnt erst nach dem Ack und kann durch spätere Fenster-Acks überschrieben werden
+Schwere: kritisch
+ADR-Stelle: §5.2 instanceId-gebundener Activate-/Teardown-Ack; kein Doppelbetrieb
+Code: `app/src/main/index.ts:223,358-370,405-414,608-615`;
+`app/src/renderer/plugins/external/rendererHostClient.ts:65-82`
+Status: [OFFEN]
+
+Der Aktivierungs-Push bleibt ein Broadcast an alle `BrowserWindow`s. Jedes Fenster mit initialisierter
+`ExternalRendererRegistry` kann denselben Kandidaten laden und `ok` ack-en. Der IPC-Handler schreibt bei
+jedem späteren `ok` erneut `rendererOwners.set(instanceId, event.sender)`, auch wenn
+`resolveRendererActivation()` keinen Pending-Warter mehr hat. Der zuletzt ackende Renderer wird somit
+willkürlich zum Owner; zuvor ackende Fenster behalten denselben Plugin-Code ebenfalls geladen. Der spätere
+gerichtete Teardown erreicht nur einen davon — F24s Doppelbetriebsweg besteht damit auf der
+Aktivierungsseite fort.
+
+Bei negativem Aktivierungs-Ack wird gar kein Owner gespeichert. Der für F22/F27 entscheidende Tombstone
+liegt aber genau im fehlgeschlagenen Rendererfenster; `tearDownRenderer()` fällt auf
+`mainWindow.webContents` zurück und kann von einem anderen Fenster idempotent `success` erhalten. Gleiches
+gilt, wenn die Erfolgs-Ack-Zustellung lokal scheiterte und Main deshalb nie einen Owner lernte.
+
+Der Owner muss vor Code-Auslieferung feststehen: Main wählt genau ein Host-`webContents`, sendet den
+Aktivierungsauftrag nur dorthin und bindet bereits den Activate-Warter an dessen Sender-ID. Alternativ
+müsste Main alle tatsächlich aktivierten Fenster als Owner-Menge führen und Aktivierung wie Teardown
+aggregieren; ein einzelner „letzter Ack gewinnt“-Owner reicht nicht. Tests: zwei Fenster ack-en dieselbe
+instanceId; ein später/fremd eintreffender Ack darf den Owner nicht ersetzen und kein zweiter Renderer darf
+geladen bleiben. Zusätzlich negativer Ack aus einem Nicht-`mainWindow` mit `error|timeout`-Tombstone.
+
+### F29 — Der 64er-Tombstone-Ring kann ein noch unbestätigtes Fehlerergebnis zu `success` degradieren
+Schwere: hoch
+ADR-Stelle: §5.2 Rollback; §5.5 outcome bleibt an instanceId gebunden
+Code: `app/src/renderer/plugins/external/rendererRegistry.ts:115-123,184-205`
+Status: [OFFEN]
+
+`recordTombstone()` verwirft bei Größe 65 blind den ältesten Eintrag. Es unterscheidet nicht zwischen einem
+Outcome, das Main bereits empfangen hat, und einem, dessen gerichteter Teardown noch aussteht. Gleichzeitig
+werden erfolgreich an Main zurückgelieferte Tombstones nie konsumiert. Dadurch füllt sich der Ring mit
+historischen Outcomes und kann gerade den noch sicherheitsrelevanten Tombstone entfernen. Ein späterer
+`teardownInstance(instanceId)` fällt dann auf `success` zurück; Main darf Payload entfernen und den
+Vorgänger starten, obwohl das echte Ergebnis `error|timeout` war.
+
+Die Lebensdauer muss vom Protokoll statt von einer willkürlichen Kapazität abhängen: Ein Outcome darf erst
+nach bestätigter Zustellung/Consumption durch Main verfallen. Dafür braucht der Renderer entweder eine
+zweite Main-Bestätigung oder muss die Promise von `pluginRendererTornDown` auswerten und nur nach
+erfolgreicher Zustellung löschen; fehlgeschlagene Zustellung bleibt retrybar. Begrenzung danach per
+TTL/Ring ist unkritisch. Test: 65 Tombstones, wobei der älteste noch nicht bestätigt ist — derselbe
+instanceId-Teardown muss weiterhin sein ursprüngliches `error|timeout` liefern.
+
+### F30 — Fenster-Tod zwischen `isDestroyed()` und `send()` umgeht die fail-closed Klassifikation
+Schwere: hoch
+ADR-Stelle: §5.2/§5.5 Owner weg versus Teardown-Timeout
+Code: `app/src/main/index.ts:388-404`
+Status: [OFFEN]
+
+`tearDownRenderer()` prüft `owner.isDestroyed()` und ruft anschließend ungeschützt `owner.send()`. Wird das
+Fenster dazwischen zerstört, kann `send()` synchron werfen. Der Hook rejected dann statt
+`success|error|timeout` zu liefern. `manage.ts` klassifiziert diesen Fall nicht als
+`PluginRestartRequiredError`; der normale IPC-Catch kann `publishPluginUiState()` ausführen, obwohl
+`rendererRuntime.drain()` das Gate bereits geschlossen hat — dieselbe „aktiv mit geschlossenem Gate“-Form,
+die F14 verhindern sollte.
+
+Der Owner-Send muss Teil der Lifecycle-Klassifikation sein: Ist das `webContents` beim Send-Fehler tatsächlich
+zerstört, ist der Renderer weg und der Pfad darf wie der vorhandene Owner-weg-Zweig atomar `success` anwenden.
+Bei anderem Send-Fehler bleibt der Eintrag gate-closed und der Ausgang ist `timeout`/`restart-required`.
+Regressionstest mit einem Owner, der nach `isDestroyed() === false` beim `send()` zerstört wirft.
+
+## Claude-Antwort — Runde 5
+
+Danke — der Ein-Fenster-Fall ist damit bestätigt sauber (F21/F23/F25/F26 zu, F22/F27 ein-Fenster zu). Zu den
+drei neuen Findings, **User-Entscheid**: F30 fixen, F28/F29 als bewusste R1a-Grenze dokumentieren.
+
+- **F30 [ADRESSIERT]:** `tearDownRenderer` umschließt `owner.send` mit try/catch. Wirft `send` und ist das
+  `webContents` tatsächlich zerstört → atomar `success` (Renderer ist mit dem Fenster weg, `ownerGone()`).
+  Anderer Send-Fehler bei lebendem Fenster → fail-closed `timeout` (das Gate ist durch `drain` bereits zu →
+  restart-required, kein „aktiv mit geschlossenem Gate"). Damit ist die Race zwischen `isDestroyed()` und
+  `send()` Teil der Lifecycle-Klassifikation.
+- **F28 [DEFERRED → ADR F-RH6]:** echte Multi-Fenster-Besitzer-Aggregation (Aktivierung an genau ein Host-
+  `webContents` zielen, Owner-Menge führen). **Bewusste R1a-Grenze:** MindGraph betreibt **ein** Plugin-Host-
+  Fenster; der Broadcast-Push + „erster `ok`-Ack bindet den Owner" ist für diesen Fall korrekt. In `docs/
+  plugin-renderer-host-plan.md §12` als F-RH6 dokumentiert (inkl. des richtigen Fixes für den Multi-Fenster-Fall).
+- **F29 [DEFERRED → ADR F-RH7]:** zustellungs-gekoppelte Tombstone-Lebensdauer statt 64er-Ring. **Bewusste
+  R1a-Grenze:** der Ring verdrängt nur unter >64 unkonsumierten instanceIds (Massen-Churn), der Normalbetrieb
+  trifft das nicht. Als F-RH7 dokumentiert (Tombstone erst nach bestätigter Zustellung verwerfen).
+
+Begründung der Grenze: F28/F29 betreffen Multi-Fenster-/Hochlast-Generalität, die im aktuellen Single-Plugin-
+Host-Fenster nicht auftritt. Ehrlich dokumentiert statt überbaut — passt zum R1a-Scope (Demo ist renderer-only).
+
+## Status
+🔁 **Runde 5 beantwortet — F30 gefixt, F28/F29 als R1a-Grenze (ADR F-RH6/F-RH7) dokumentiert. typecheck +
+579 Tests + build grün, uncommitted.** Jetzt → **Task 6: F12** (Pack/Sign Single-File-ESM erzwingen, F20) **dann**
+Demo-Renderer-Plugin (E2E-Beleg). Damit ist der Review-Zyklus für die Lifecycle-Seams geschlossen.
