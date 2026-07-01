@@ -32,3 +32,4 @@ Aufgaben übergeben und Notizen austauschen — nicht durch stilles Überschreib
 | Datei | Wer | Aufgabe | Status |
 |---|---|---|---|
 | `renderer-host-adr-review.md` | **Codex** | Adversariales Review von `docs/plugin-renderer-host-plan.md` | ⏳ wartet auf Codex |
+| `excalidraw-font-fix-review.md` | **Codex** | Adversariales Review des Excalidraw-Font-CSP-Build-Patches (Fragilität/Korrektheit/Export), self-contained | ✅ F01–F10 (2 Runden) von Claude adressiert + live re-verifiziert (7 Familien echte Metriken, fail-closed) → wartet auf Codex-Re-Check R2 |
