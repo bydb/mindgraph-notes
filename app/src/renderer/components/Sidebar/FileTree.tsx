@@ -263,6 +263,10 @@ const FileItem: React.FC<FileItemProps> = ({
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null)
   const [newNoteDialog, setNewNoteDialog] = useState<{ folderPath: string } | null>(null)
   const [newNoteName, setNewNoteName] = useState('')
+  // Plugin-Renderer-Datei-Editoren (z.B. Excalidraw): „Neue …-Datei" im Ordner-Kontextmenü, plugin-agnostisch.
+  const [pluginFileEditors, setPluginFileEditors] = useState<Array<{ pluginId: string; editorId: string; extension: string; label: string }>>([])
+  const [newPluginFileDialog, setNewPluginFileDialog] = useState<{ folderPath: string; pluginId: string; editorId: string; label: string; extension: string } | null>(null)
+  const [newPluginFileName, setNewPluginFileName] = useState('')
   const [isEditing, setIsEditing] = useState(false)
   const [editName, setEditName] = useState('')
   const [isDragOver, setIsDragOver] = useState(false)
@@ -666,6 +670,58 @@ const FileItem: React.FC<FileItemProps> = ({
     startQuiz(sourceType, sourcePath, questionCount)
     setContextMenu(null)
   }, [contextMenu, startQuiz])
+
+  // Aktive Renderer-Plugin-Datei-Editoren laden, sobald ein Ordner-Kontextmenü offen ist (in-memory IPC,
+  // immer frisch). Jeder Eintrag mit ≥1 Endung wird zu „Neue {Label}-Datei". Kein Excalidraw-Sonderweg.
+  useEffect(() => {
+    if (!contextMenu?.entry.isDirectory) return
+    let cancelled = false
+    void (async () => {
+      try {
+        const res = await window.electronAPI.pluginRenderers()
+        if (cancelled || !res.ok) return
+        const list = res.data.flatMap((d) =>
+          d.fileEditors.map((fe) => ({
+            pluginId: d.pluginId,
+            editorId: fe.editorId,
+            extension: fe.extensions[0] ?? '',
+            label: fe.label || d.pluginLabel,
+          }))
+        ).filter((fe) => fe.extension)
+        if (!cancelled) setPluginFileEditors(list)
+      } catch {
+        /* Liste bleibt leer — Kontextmenü zeigt dann keine Plugin-Einträge */
+      }
+    })()
+    return () => { cancelled = true }
+  }, [contextMenu])
+
+  const handleCreatePluginFileInFolder = useCallback((fe: { pluginId: string; editorId: string; label: string; extension: string }) => {
+    if (!contextMenu || !vaultPath || !contextMenu.entry.isDirectory) return
+    const folderPath = `${vaultPath}/${contextMenu.entry.path}`
+    setNewPluginFileDialog({ folderPath, pluginId: fe.pluginId, editorId: fe.editorId, label: fe.label, extension: fe.extension })
+    setNewPluginFileName('')
+    setContextMenu(null)
+  }, [contextMenu, vaultPath])
+
+  const handleSubmitNewPluginFile = useCallback(async () => {
+    if (!newPluginFileDialog || !newPluginFileName.trim() || !vaultPath) return
+    const { folderPath, pluginId, editorId, extension } = newPluginFileDialog
+    const raw = newPluginFileName.trim()
+    const fileName = raw.toLowerCase().endsWith(extension.toLowerCase()) ? raw : `${raw}${extension}`
+    const filePath = `${folderPath}/${fileName}`
+    try {
+      // Leere Datei: der Plugin-Editor rendert daraus eine leere Fläche (kein .md → Empty-Write-Guard greift nicht).
+      await window.electronAPI.writeFile(filePath, '')
+      const tree = await window.electronAPI.readDirectory(vaultPath)
+      setFileTree(tree)
+      openPluginEditorTab(pluginId, filePath, editorId, fileName)
+    } catch (error) {
+      console.error('Fehler beim Erstellen der Plugin-Datei:', error)
+    }
+    setNewPluginFileDialog(null)
+    setNewPluginFileName('')
+  }, [newPluginFileDialog, newPluginFileName, vaultPath, setFileTree, openPluginEditorTab])
 
   const handleCreateNoteInFolder = useCallback(() => {
     if (!contextMenu || !vaultPath || !contextMenu.entry.isDirectory) return
@@ -1297,6 +1353,15 @@ const FileItem: React.FC<FileItemProps> = ({
               <button onClick={handleCreateSubfolder} className="context-menu-item">
                 {t('fileTree.newSubfolder')}
               </button>
+              {pluginFileEditors.map((fe) => (
+                <button
+                  key={`${fe.pluginId}:${fe.editorId}`}
+                  onClick={() => handleCreatePluginFileInFolder(fe)}
+                  className="context-menu-item"
+                >
+                  {t('fileTree.newPluginFile', { label: fe.label })}
+                </button>
+              ))}
               <div className="context-menu-divider" />
               {/* Folder Color Picker */}
               <button
@@ -1495,6 +1560,27 @@ const FileItem: React.FC<FileItemProps> = ({
           <div className="new-note-dialog-buttons">
             <button onClick={handleSubmitNewNote} className="btn-primary">{t('fileTree.create')}</button>
             <button onClick={() => { setNewNoteDialog(null); setNewNoteName('') }}>{t('fileTree.cancel')}</button>
+          </div>
+        </div>
+      )}
+
+      {/* Dialog für neue Plugin-Datei (z.B. Excalidraw) im Ordner */}
+      {newPluginFileDialog && (
+        <div className="new-note-dialog" style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%, -50%)', zIndex: 1001 }}>
+          <input
+            type="text"
+            value={newPluginFileName}
+            onChange={(e) => setNewPluginFileName(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') handleSubmitNewPluginFile()
+              if (e.key === 'Escape') { setNewPluginFileDialog(null); setNewPluginFileName('') }
+            }}
+            placeholder={t('fileTree.fileName')}
+            autoFocus
+          />
+          <div className="new-note-dialog-buttons">
+            <button onClick={handleSubmitNewPluginFile} className="btn-primary">{t('fileTree.create')}</button>
+            <button onClick={() => { setNewPluginFileDialog(null); setNewPluginFileName('') }}>{t('fileTree.cancel')}</button>
           </div>
         </div>
       )}

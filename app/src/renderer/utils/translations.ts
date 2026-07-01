@@ -1316,6 +1316,8 @@ const translations = {
     // FileTree Context Menu
     'fileTree.newNoteHere': 'Neue Notiz hier',
     'fileTree.newSubfolder': 'Neuer Unterordner',
+    'fileTree.newPluginFile': 'Neue {label}-Datei',
+    'fileTree.fileName': 'Dateiname...',
     'fileTree.changeFolderColor': 'Ordnerfarbe ändern',
     'fileTree.changeFolderIcon': 'Ordner-Icon ändern',
     'fileTree.removeCustomization': 'Anpassung entfernen',
@@ -4023,6 +4025,8 @@ const translations = {
     // FileTree Context Menu
     'fileTree.newNoteHere': 'New note here',
     'fileTree.newSubfolder': 'New subfolder',
+    'fileTree.newPluginFile': 'New {label} file',
+    'fileTree.fileName': 'File name...',
     'fileTree.changeFolderColor': 'Change folder color',
     'fileTree.changeFolderIcon': 'Change folder icon',
     'fileTree.removeCustomization': 'Remove customization',
