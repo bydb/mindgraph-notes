@@ -2,6 +2,12 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.10.1-beta] - 2026-07-01
+
+### Neu
+
+- **„Neue …-Datei" für Plugin-Editoren im Kontextmenü.** Rechtsklick auf einen Ordner bietet jetzt für jedes installierte Renderer-Plugin einen Eintrag „Neue *{Name}*-Datei" (z. B. „Neue Excalidraw-Datei") — legt eine leere Datei mit der passenden Endung an und öffnet sie direkt im Plugin-Editor. Damit lässt sich z. B. eine neue Excalidraw-Zeichnung ohne Umweg direkt in der App erstellen. Funktioniert automatisch für jedes künftige Renderer-Plugin; erscheint nur, wenn das jeweilige Plugin installiert ist.
+
 ## [0.10.0-beta] - 2026-07-01
 
 Renderer-Plugins: Plugins können jetzt eigene Editoren und Ansichten direkt im Hauptfenster darstellen — nicht mehr nur Dashboard-Widgets. Das erste ist ein Excalidraw-Zeichen-Editor. Dazu ein durchgehend neu gestaltetes Erscheinungsbild („Petrol").
