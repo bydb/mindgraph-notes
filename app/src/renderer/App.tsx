@@ -13,6 +13,7 @@ import { LocalCanvas } from './components/Canvas/LocalCanvas'
 import { PDFViewer } from './components/PDFViewer/PDFViewer'
 import { CodeViewer } from './components/CodeViewer/CodeViewer'
 import './components/CodeViewer/CodeViewer.css'
+import { PluginEditorTab } from './plugins/external/PluginEditorTab'
 import { ImageViewer } from './components/ImageViewer/ImageViewer'
 import { OfficeViewer } from './components/OfficeViewer/OfficeViewer'
 import { Terminal } from './components/Terminal/Terminal'
@@ -1374,6 +1375,12 @@ const App: React.FC = () => {
                   />
                 ) : activeTab?.type === 'code' && activeTab.codePath && vaultPath ? (
                   <CodeViewer vaultPath={vaultPath} relativePath={activeTab.codePath} />
+                ) : activeTab?.type === 'plugin-editor' && activeTab.pluginId && activeTab.filePath ? (
+                  <PluginEditorTab
+                    pluginId={activeTab.pluginId}
+                    filePath={activeTab.filePath}
+                    editorId={activeTab.editorId}
+                  />
                 ) : selectedPdfPath && vaultPath ? (
                   <PDFViewer filePath={`${vaultPath}/${selectedPdfPath}`} fileName={selectedPdfPath.split('/').pop() || selectedPdfPath} relativePath={selectedPdfPath} />
                 ) : selectedImagePath && vaultPath ? (
