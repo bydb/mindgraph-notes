@@ -4636,7 +4636,8 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
   padding: 10px 20px;
   border: none;
   background-color: var(--accent-color);
-  color: white;
+  /* Petrol redesign (Stage 3): --accent-on statt hartem Weiß (Dark-Mode-Kontrast). */
+  color: var(--accent-on);
   border-radius: var(--radius-lg);
   font-size: 13px;
   font-weight: 600;
@@ -18816,7 +18817,8 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
 .sync-btn-primary {
   padding: 8px 16px;
   background: var(--accent-color);
-  color: white;
+  /* Petrol redesign (Stage 3): --accent-on statt hartem Weiß (Dark-Mode-Kontrast). */
+  color: var(--accent-on);
   border: none;
   border-radius: var(--radius-sm);
   font-size: 13px;
@@ -19282,7 +19284,8 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
   padding: 7px 16px;
   border: 1px solid var(--accent-color);
   background: var(--accent-color);
-  color: #fff;
+  /* Petrol redesign (Stage 3): --accent-on statt hartem Weiß (Dark-Mode-Kontrast auf hellem Teal). */
+  color: var(--accent-on);
   border-radius: var(--radius-md);
   font-size: 12.5px;
   font-weight: 600;
