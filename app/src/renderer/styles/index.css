@@ -28,10 +28,11 @@
   --shadow-lg: 0 8px 24px rgba(17, 17, 17, 0.10);
   --shadow-glow: 0 0 0 1px rgba(17, 17, 17, 0.05);
 
-  /* Accent Colors - neutral "ink" by default (runtime-overridden from ACCENT_COLORS) */
-  --accent-color: #111111;
-  --accent-hover: #000000;
-  --accent-subtle: rgba(17, 17, 17, 0.06);
+  /* Accent Colors - Petrol brand default, theme-aware (runtime-overridden from ACCENT_COLORS) */
+  --accent-color: #10696b;
+  --accent-hover: #0d5a5c;
+  --accent-subtle: rgba(16, 105, 107, 0.10);
+  --accent-on: #ffffff; /* text/icons ON an accent fill (primary buttons, active pills) */
 
   /* Link / focus - the single quiet blue, reserved for links + focus rings */
   --link-color: #2563eb;
@@ -98,10 +99,11 @@
   --text-muted: #666666;
   --border-color: #2a2a2a;
   --border-subtle: #222222;
-  /* Ink accent flips to near-white on dark (applies when accentColor === 'ink') */
-  --accent-color: #f0f0f0;
-  --accent-hover: #ffffff;
-  --accent-subtle: rgba(240, 240, 240, 0.10);
+  /* Petrol brand accent — brighter teal on dark for contrast (applies for the default accent) */
+  --accent-color: #3cbfb3;
+  --accent-hover: #5fd0c4;
+  --accent-subtle: rgba(60, 191, 179, 0.15);
+  --accent-on: #06302e; /* white fails contrast on the bright dark accent */
   --link-color: #6ea8fe;
   --link-hover: #93c0ff;
   --focus-ring: rgba(110, 168, 254, 0.40);
@@ -135,9 +137,10 @@
     --text-muted: #666666;
     --border-color: #2a2a2a;
     --border-subtle: #1f1f1f;
-    --accent-color: #f0f0f0;
-    --accent-hover: #ffffff;
-    --accent-subtle: rgba(240, 240, 240, 0.10);
+    --accent-color: #3cbfb3;
+    --accent-hover: #5fd0c4;
+    --accent-subtle: rgba(60, 191, 179, 0.15);
+    --accent-on: #06302e;
     --link-color: #6ea8fe;
     --link-hover: #93c0ff;
     --focus-ring: rgba(110, 168, 254, 0.40);
