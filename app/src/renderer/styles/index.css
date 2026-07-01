@@ -8112,13 +8112,18 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
   margin-top: 36px;
 }
 
+/* Petrol redesign: Settings-Zeilen sind gerahmte Cards wie im Module-Tab (Konsistenz) —
+   Rand + Radius + --bg-secondary-Fläche statt nur einer Bottom-Trennlinie. */
 .settings-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding: 14px 0;
-  border-bottom: 1px solid var(--border-subtle);
+  padding: 12px 14px;
+  margin-bottom: 8px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--bg-secondary);
 }
 
 .settings-row label {
