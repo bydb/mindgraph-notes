@@ -172,7 +172,7 @@
 
 .quick-event-actions .btn-primary {
   background: var(--accent-color);
-  color: white;
+  color: var(--accent-on);
   border-color: var(--accent-color);
 }
 

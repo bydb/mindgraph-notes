@@ -1397,7 +1397,7 @@
 
 .dv-focus-block-btn:hover {
   background: var(--accent-color);
-  color: white;
+  color: var(--accent-on);
 }
 
 /* ===== Timeblock-Modal ===== */
@@ -1568,7 +1568,7 @@
 
 .dv-modal-btn-primary {
   background: var(--accent-color);
-  color: white;
+  color: var(--accent-on);
 }
 .dv-modal-btn-primary:hover:not(:disabled) { filter: brightness(1.05); }
 

@@ -2052,7 +2052,7 @@ h2 { letter-spacing: -0.016em; }
 
 .lt-suggestion-btn:hover {
   background: var(--accent-color);
-  color: white;
+  color: var(--accent-on);
 }
 
 .lt-ignore-btn {
@@ -3282,7 +3282,7 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
 
 .wikilink-autocomplete-item.selected {
   background: var(--accent-color);
-  color: white;
+  color: var(--accent-on);
 }
 
 .wikilink-autocomplete-item.selected .wikilink-autocomplete-sublabel {
@@ -3455,7 +3455,7 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
 
 .slash-command-menu-item.selected {
   background: var(--accent-color);
-  color: white;
+  color: var(--accent-on);
 }
 
 .slash-command-menu-icon {
@@ -4252,7 +4252,7 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
 
 .note-node-external-link:hover {
   background: var(--accent-color);
-  color: white;
+  color: var(--accent-on);
 }
 
 .external-link-icon {
@@ -4625,7 +4625,7 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
 
 .btn-icon.active {
   background-color: var(--accent-color);
-  color: white;
+  color: var(--accent-on);
 }
 
 .btn-icon.active:hover {
@@ -5074,7 +5074,7 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
 
 .move-dialog .picker-dialog-footer .btn-primary {
   background: var(--accent-color);
-  color: white;
+  color: var(--accent-on);
   font-weight: 500;
 }
 
@@ -5311,7 +5311,7 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
 .tag-edit-save {
   border: none;
   background-color: var(--accent-color);
-  color: white;
+  color: var(--accent-on);
 }
 
 .tag-edit-save:hover {
@@ -5444,7 +5444,7 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
 .external-link-save {
   border: none;
   background-color: var(--accent-color);
-  color: white;
+  color: var(--accent-on);
 }
 
 .external-link-save:hover:not(:disabled) {
@@ -5609,7 +5609,7 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
 .image-upload-save {
   border: none;
   background-color: var(--accent-color);
-  color: white;
+  color: var(--accent-on);
 }
 
 .image-upload-save:hover:not(:disabled) {
@@ -5675,7 +5675,7 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
 .new-note-dialog-buttons .btn-primary {
   background-color: var(--accent-color);
   border-color: var(--accent-color);
-  color: white;
+  color: var(--accent-on);
 }
 
 .new-note-dialog-buttons .btn-primary:hover {
@@ -6646,7 +6646,7 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
 
 .zotero-action-toggle .action-btn.active {
   background: var(--accent-color);
-  color: white;
+  color: var(--accent-on);
 }
 
 .zotero-search-input-wrapper {
@@ -7047,7 +7047,7 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
 
 .template-picker-item.selected {
   background: var(--accent-color);
-  color: white;
+  color: var(--accent-on);
 }
 
 .template-picker-item.selected .template-picker-path {
@@ -7364,7 +7364,7 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
 
 .template-settings-btn.primary {
   background: var(--accent-color);
-  color: white;
+  color: var(--accent-on);
 }
 
 .template-settings-btn.primary:hover {
@@ -7445,7 +7445,7 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
 
 .quick-switcher-item.selected {
   background: var(--accent-color);
-  color: white;
+  color: var(--accent-on);
 }
 
 .quick-switcher-item.selected .quick-switcher-path,
@@ -7688,7 +7688,7 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
   gap: 6px;
   padding: 6px 12px;
   background: var(--accent-color);
-  color: white;
+  color: var(--accent-on);
   border: none;
   border-radius: var(--radius-sm);
   font-size: 12px;
@@ -7795,7 +7795,7 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
 .lp-tag {
   display: inline-block;
   background-color: var(--accent-color);
-  color: white;
+  color: var(--accent-on);
   padding: 1px 6px;
   border-radius: 4px;
   font-size: 0.85em;
@@ -8579,7 +8579,7 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
   margin-left: auto;
   padding: 2px 6px;
   background: var(--accent-color);
-  color: white;
+  color: var(--accent-on);
   border-radius: var(--radius-sm);
   font-size: 10px;
   font-weight: 500;
@@ -8709,7 +8709,7 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
   border: none;
   border-radius: var(--radius-sm);
   background: var(--accent-color);
-  color: white;
+  color: var(--accent-on);
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
@@ -8872,7 +8872,7 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
 .ai-image-presets .preset-btn.active {
   background: var(--accent-color);
   border-color: var(--accent-color);
-  color: white;
+  color: var(--accent-on);
 }
 
 .ai-image-advanced-toggle {
@@ -8980,7 +8980,7 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
 .ai-image-dialog-footer .generate-btn {
   background: var(--accent-color);
   border: none;
-  color: white;
+  color: var(--accent-on);
 }
 
 .ai-image-dialog-footer .generate-btn:hover:not(:disabled) {
@@ -9103,7 +9103,7 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
   height: 20px;
   border: none;
   background: var(--accent-color);
-  color: white;
+  color: var(--accent-on);
   border-radius: var(--radius-sm);
   font-size: 14px;
   cursor: pointer;
@@ -9245,7 +9245,7 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
   border: none;
   border-radius: var(--radius-md);
   background: var(--accent-color);
-  color: white;
+  color: var(--accent-on);
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
@@ -12672,7 +12672,7 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
   padding: 6px 16px;
   border: none;
   background: var(--accent-color);
-  color: white;
+  color: var(--accent-on);
   font-size: 12px;
   font-weight: 600;
   border-radius: var(--radius-sm);
@@ -12754,7 +12754,7 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
 
 .agent-save-btn {
   background: var(--accent-color);
-  color: white;
+  color: var(--accent-on);
   border-color: var(--accent-color);
 }
 
@@ -13353,7 +13353,7 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
   gap: 6px;
   padding: 8px 16px;
   background: var(--accent-color);
-  color: white;
+  color: var(--accent-on);
   border: none;
   border-radius: 8px;
   font-size: 13px;
@@ -13962,7 +13962,7 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
 
 .semantic-scholar-source-toggle button.active {
   background: var(--accent-color);
-  color: white;
+  color: var(--accent-on);
 }
 
 .semantic-scholar-search-row {
@@ -14681,7 +14681,7 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
   gap: 4px;
   padding: 4px 10px;
   background: var(--accent-color);
-  color: white;
+  color: var(--accent-on);
   border: none;
   border-radius: 4px;
   font-size: 11px;
@@ -14865,7 +14865,7 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
 .notes-chat-context-buttons button.active {
   background: var(--accent-color);
   border-color: var(--accent-color);
-  color: white;
+  color: var(--accent-on);
 }
 
 .notes-chat-folder-select {
@@ -14922,7 +14922,7 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
 .notes-chat-mode-buttons button.active {
   background: var(--accent-color);
   border-color: var(--accent-color);
-  color: white;
+  color: var(--accent-on);
 }
 
 .notes-chat-mode-buttons button:disabled {
@@ -15169,7 +15169,7 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
   height: 36px;
   border: none;
   background: var(--accent-color);
-  color: white;
+  color: var(--accent-on);
   border-radius: var(--radius-sm);
   cursor: pointer;
   transition: all var(--transition-fast);
@@ -15465,7 +15465,7 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
 
 .note-node-expand-btn:hover {
   background: var(--accent-color);
-  color: white;
+  color: var(--accent-on);
   border-style: solid;
 }
 
@@ -15474,7 +15474,7 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
   padding: 2px 6px;
   margin-top: 8px;
   background: var(--accent-color);
-  color: white;
+  color: var(--accent-on);
   font-size: 9px;
   font-weight: 700;
   letter-spacing: 0.5px;
@@ -15519,7 +15519,7 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
   display: inline-block;
   padding: 2px 6px;
   background: var(--accent-color);
-  color: white;
+  color: var(--accent-on);
   font-size: 9px;
   font-weight: 700;
   letter-spacing: 0.5px;
@@ -15670,7 +15670,7 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
   left: 12px;
   padding: 2px 8px;
   background: var(--accent-color);
-  color: white;
+  color: var(--accent-on);
   font-size: 9px;
   font-weight: 700;
   letter-spacing: 0.5px;
@@ -15863,7 +15863,7 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
 
 .whats-new-dismiss {
   background: var(--accent-color);
-  color: white;
+  color: var(--accent-on);
   border: none;
   padding: 10px 24px;
   border-radius: var(--radius-md);
@@ -16235,7 +16235,7 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
 
 .quiz-button-primary {
   background: var(--accent-color);
-  color: white;
+  color: var(--accent-on);
   border: none;
 }
 
@@ -16525,7 +16525,7 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
 .quiz-save-flashcards-btn:hover {
   background: var(--accent-color);
   border-color: var(--accent-color);
-  color: white;
+  color: var(--accent-on);
 }
 
 .quiz-save-flashcards-btn svg {
@@ -17364,7 +17364,7 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
   background: var(--accent-color);
   border: none;
   border-radius: var(--radius-md);
-  color: white;
+  color: var(--accent-on);
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
@@ -17993,7 +17993,7 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
   background: var(--accent-color);
   border: none;
   border-radius: var(--radius-md);
-  color: white;
+  color: var(--accent-on);
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
@@ -18239,7 +18239,7 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
 
 .properties-btn-add {
   background: var(--accent-color);
-  color: white;
+  color: var(--accent-on);
 }
 
 .properties-btn-add:hover {
@@ -18703,7 +18703,7 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
 .sync-activate-btn {
   padding: 10px 20px;
   background: var(--accent-color);
-  color: white;
+  color: var(--accent-on);
   border: none;
   border-radius: var(--radius-sm);
   font-size: 14px;

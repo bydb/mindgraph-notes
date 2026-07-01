@@ -254,7 +254,7 @@
 
 .briefing-btn-primary {
   background: var(--accent-color);
-  color: white;
+  color: var(--accent-on);
 }
 
 .briefing-btn-primary:hover {
