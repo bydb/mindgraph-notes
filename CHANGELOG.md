@@ -2,6 +2,26 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.10.0-beta] - 2026-07-01
+
+Renderer-Plugins: Plugins können jetzt eigene Editoren und Ansichten direkt im Hauptfenster darstellen — nicht mehr nur Dashboard-Widgets. Das erste ist ein Excalidraw-Zeichen-Editor. Dazu ein durchgehend neu gestaltetes Erscheinungsbild („Petrol").
+
+### Neu
+
+- **Renderer-Plugins.** Signierte Plugins können jetzt vollwertige Editoren und Ansichten im Hauptfenster rendern, nicht nur deklarative Widgets. Datei-Editoren melden sich für Dateiendungen an und öffnen die Datei in einem eigenen Tab.
+- **Excalidraw-Plugin.** Erstes Renderer-Plugin: handgezeichneter Zeichen-Editor für `.excalidraw`-Dateien im Vault, per Katalog oder GitHub installierbar. Die Schriften sind vollständig lokal eingebettet — keine Netz-Requests.
+- **Petrol-Design.** App-weit neu gestaltet: ruhigeres, dichteres Dashboard, einheitliche Einstellungen mit Umschaltern und Karten, neues 4-Knoten-Logo und abgestimmte Akzentfarben in Hell und Dunkel.
+
+### Sicherheit
+
+- **Renderer-Plugins signaturbasiert.** Heruntergeladenes Renderer-JS wird — wie jedes Plugin — vor dem Laden kryptografisch (Ed25519) gegen den offiziellen Schlüssel geprüft. Der Renderer-Code muss ein selbstenthaltenes Single-File-Bundle sein (kein `eval`, kein `new Function`, keine externen Importe).
+- **Sauberer Lebenszyklus.** Aktivierung und Abbau von Renderer-Plugins laufen über einen bestätigten Handshake; ein fehlgeschlagener Abbau lässt das Plugin nicht in einem halb geladenen Zustand zurück.
+
+### Verbesserungen
+
+- Dunkelmodus-Kontrast app-weit verbessert (Editor-Leiste, Kopfzeilen-Icons, Einstellungen).
+- Einstellungen → „Module & Plugins" typografisch und in der Anordnung vereinheitlicht.
+
 ## [0.9.0-beta] - 2026-06-30
 
 Das Plugin-Release: MindGraph lässt sich jetzt mit signierten Plugins erweitern — im Katalog entdecken, per Klick installieren, automatisch aktualisieren. Dazu ein rundum aufgeräumter Einstellungen-Bereich „Module & Plugins".
