@@ -132,6 +132,7 @@ const App: React.FC = () => {
   const syncEnabled = useSyncStore(state => state.syncEnabled)
   const syncStatus = useSyncStore(state => state.syncStatus)
   const [terminalVisible, setTerminalVisible] = useState(false)
+  const [appVersion, setAppVersion] = useState('')
   const [toolsMenuOpen, setToolsMenuOpen] = useState(false)
   const toolsMenuRef = useRef<HTMLDivElement>(null)
   const [quickSearchOpen, setQuickSearchOpen] = useState(false)
@@ -612,6 +613,7 @@ const App: React.FC = () => {
       try {
         // 1. Aktuelle Version holen
         const currentVersion = await window.electronAPI.getAppVersion()
+        setAppVersion(currentVersion)
         const { lastSeenVersion, setLastSeenVersion, setWhatsNewOpen, setUpdateAvailable } = useUIStore.getState()
 
         console.log('[App] Current version:', currentVersion, 'Last seen:', lastSeenVersion)
@@ -1094,8 +1096,8 @@ const App: React.FC = () => {
               )}
             </div>
             <span className="app-title">MindGraph Notes</span>
-            {/* Petrol redesign: Versions-/Codename-Pill mit Accent-Dot (Claude Design). */}
-            <span className="beta-badge"><span className="beta-badge-dot" aria-hidden="true" />0.9 Petrol</span>
+            {/* Petrol redesign: Versions-/Codename-Pill mit Accent-Dot (Claude Design). Version kommt aus package.json (get-app-version) — nie hartcodieren. */}
+            <span className="beta-badge"><span className="beta-badge-dot" aria-hidden="true" />{appVersion ? appVersion.replace(/-.*$/, '') : ''} Petrol</span>
           </div>
           
           <div className="titlebar-center">
