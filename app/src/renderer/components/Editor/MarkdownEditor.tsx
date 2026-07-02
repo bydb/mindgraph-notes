@@ -906,8 +906,8 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
   const { vaultPath, selectedNoteId, secondarySelectedNoteId, notes, updateNote, selectNote, selectSecondaryNote, addNote, fileTree, setFileTree, navigateBack, navigateForward, canNavigateBack, canNavigateForward } = useNotesStore(
     useShallow(s => ({ vaultPath: s.vaultPath, selectedNoteId: s.selectedNoteId, secondarySelectedNoteId: s.secondarySelectedNoteId, notes: s.notes, updateNote: s.updateNote, selectNote: s.selectNote, selectSecondaryNote: s.selectSecondaryNote, addNote: s.addNote, fileTree: s.fileTree, setFileTree: s.setFileTree, navigateBack: s.navigateBack, navigateForward: s.navigateForward, canNavigateBack: s.canNavigateBack, canNavigateForward: s.canNavigateForward }))
   )
-  const { pendingTemplateInsert, setPendingTemplateInsert, ollama, editorHeadingFolding, outlineStyle, editorShowWordCount, editorHeaderActions, languageTool, setLanguageTool, editorDefaultView, showFormattingToolbar, setShowFormattingToolbar, showRawEditor } = useUIStore(
-    useShallow(s => ({ pendingTemplateInsert: s.pendingTemplateInsert, setPendingTemplateInsert: s.setPendingTemplateInsert, ollama: s.ollama, editorHeadingFolding: s.editorHeadingFolding, outlineStyle: s.outlineStyle, editorShowWordCount: s.editorShowWordCount, editorHeaderActions: s.editorHeaderActions, languageTool: s.languageTool, setLanguageTool: s.setLanguageTool, editorDefaultView: s.editorDefaultView, showFormattingToolbar: s.showFormattingToolbar, setShowFormattingToolbar: s.setShowFormattingToolbar, showRawEditor: s.showRawEditor }))
+  const { pendingTemplateInsert, setPendingTemplateInsert, ollama, editorHeadingFolding, outlineStyle, editorShowWordCount, languageTool, setLanguageTool, editorDefaultView, showFormattingToolbar, setShowFormattingToolbar, showRawEditor } = useUIStore(
+    useShallow(s => ({ pendingTemplateInsert: s.pendingTemplateInsert, setPendingTemplateInsert: s.setPendingTemplateInsert, ollama: s.ollama, editorHeadingFolding: s.editorHeadingFolding, outlineStyle: s.outlineStyle, editorShowWordCount: s.editorShowWordCount, languageTool: s.languageTool, setLanguageTool: s.setLanguageTool, editorDefaultView: s.editorDefaultView, showFormattingToolbar: s.showFormattingToolbar, setShowFormattingToolbar: s.setShowFormattingToolbar, showRawEditor: s.showRawEditor }))
   )
   const [marketing] = usePluginConfig('marketing', MARKETING_DEFAULTS)
 
@@ -4441,7 +4441,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
             </button>
           )}
           {/* LanguageTool Check Button */}
-          {editorHeaderActions.languageTool && languageTool.enabled && viewMode !== 'preview' && (
+          {languageTool.enabled && viewMode !== 'preview' && (
             <button
               className={`lt-check-btn ${ltIsChecking ? 'checking' : ''}`}
               onClick={checkLanguageTool}
@@ -4474,7 +4474,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
               )}
             </button>
           )}
-          {editorHeaderActions.languageTool && languageTool.enabled && (
+          {languageTool.enabled && (
             <button
               className={`lt-check-btn lt-autocorrect-btn ${ltAutoCorrecting ? 'checking' : ''} ${ltCorrectedCount > 0 ? 'corrected' : ''}`}
               onClick={autoCorrectLanguageTool}
@@ -4511,7 +4511,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
               </svg>
             </button>
           )}
-          {editorHeaderActions.pdf && <button
+          <button
             className="export-btn"
             onClick={() => handleExportPDF('standard')}
             title={t('editor.exportPdf')}
@@ -4521,8 +4521,8 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
               <path d="M8 2V10M8 10L5 7M8 10L11 7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
             PDF
-          </button>}
-          {editorHeaderActions.remarkable && <button
+          </button>
+          <button
             className="export-btn"
             onClick={() => handleExportPDF('remarkable-book')}
             title={t('editor.exportPdfRemarkable')}
@@ -4532,8 +4532,8 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
               <path d="M6 5.5h4M6 8h4M6 10.5h2.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
             </svg>
             reMarkable
-          </button>}
-          {editorHeaderActions.docx && <button
+          </button>
+          <button
             className="export-btn"
             onClick={handleExportDocx}
             title={t('editor.exportDocx')}
@@ -4543,8 +4543,8 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
               <path d="M8 2V10M8 10L5 7M8 10L11 7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
             DOCX
-          </button>}
-          {editorHeaderActions.wordpress && marketing.enabled && marketing.wordpressUrl && (
+          </button>
+          {marketing.enabled && marketing.wordpressUrl && (
             <button
               className="export-btn"
               onClick={() => setShowPublishWpModal(true)}
