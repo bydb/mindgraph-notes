@@ -124,7 +124,7 @@ const ViewModeButton: React.FC<{
 
 const App: React.FC = () => {
   const { viewMode, setViewMode, toggleSidebar, sidebarVisible, splitPosition, setSplitPosition, sidebarWidth, setSidebarWidth, theme, setTheme, accentColor, backgroundColor, fontFamily, setPendingTemplateInsert, textSplitEnabled, setTextSplitEnabled, textSplitPosition, setTextSplitPosition, smartConnectionsEnabled, notesChatEnabled, flashcardsEnabled, semanticScholarEnabled, customLogo, customAccentColor, customBackgroundColorLight, customBackgroundColorDark, setHelpGuideOpen, taskExcludedFolders } = useUIStore()
-  const { notes, vaultPath, selectNote, selectedPdfPath, selectedImagePath, selectedOfficePath, selectedOfficeType, secondarySelectedNoteId, navigateBack, navigateForward, selectedNoteId } = useNotesStore()
+  const { notes, vaultPath, selectNote, selectedPdfPath, selectedImagePath, selectedOfficePath, selectedOfficeType, secondarySelectedNoteId, navigateBack, navigateForward, selectedNoteId, noteSelectionNonce } = useNotesStore()
   const { tabs, activeTabId } = useTabStore()
   const activeTab = tabs.find(t => t.id === activeTabId)
   const { t } = useTranslation()
@@ -735,13 +735,20 @@ const App: React.FC = () => {
   // letzten Lauf nicht geändert hat, ist der Re-Run nur ein notes-Update — dann darf ein
   // bewusst aktiver Non-Editor-Tab (Dashboard, Canvas, Code) nicht überschrieben werden.
   const lastSelectedNoteIdRef = useRef<string | null>(null)
+  const lastSelectionNonceRef = useRef(0)
   useEffect(() => {
     if (!selectedNoteId) {
       lastSelectedNoteIdRef.current = null
+      lastSelectionNonceRef.current = noteSelectionNonce
       return
     }
+    // „Bewusste Auswahl" = neue Notiz ODER erneuter selectNote-Aufruf (Nonce-Bump) — Letzteres
+    // deckt den Klick auf die BEREITS ausgewählte Notiz ab, während ein Plugin-/Dashboard-Tab
+    // den Editor verdeckt (vorher No-op: selectedNoteId änderte sich nicht → Effekt feuerte nie).
     const selectionChanged = lastSelectedNoteIdRef.current !== selectedNoteId
+      || lastSelectionNonceRef.current !== noteSelectionNonce
     lastSelectedNoteIdRef.current = selectedNoteId
+    lastSelectionNonceRef.current = noteSelectionNonce
 
     const { tabs: currentTabs, activeTabId: currentActiveTabId, openEditorTab: openTab } = useTabStore.getState()
 
@@ -761,7 +768,7 @@ const App: React.FC = () => {
     if (selectedNote) {
       openTab(selectedNoteId, selectedNote.title)
     }
-  }, [selectedNoteId, notes])
+  }, [selectedNoteId, noteSelectionNonce, notes])
 
   // PDF/Bild/Office haben — anders als .md — KEINEN eigenen Tab; sie sind nur
   // notesStore-State (selectedPdfPath/…). Die Haupt-Render-Kette (s. unten) prüft
@@ -783,7 +790,8 @@ const App: React.FC = () => {
     const { tabs: currentTabs, activeTabId: currentActiveTabId, setActiveTab } = useTabStore.getState()
     const activeTab = currentTabs.find(t => t.id === currentActiveTabId)
     const shadowsViewer = !!activeTab && (
-      activeTab.type === 'dashboard' || activeTab.type === 'workflow-canvas' || activeTab.type === 'code'
+      activeTab.type === 'dashboard' || activeTab.type === 'workflow-canvas' || activeTab.type === 'code' ||
+      activeTab.type === 'plugin-editor'
     )
     if (!shadowsViewer) return // Viewer ist bereits sichtbar — nichts tun
 

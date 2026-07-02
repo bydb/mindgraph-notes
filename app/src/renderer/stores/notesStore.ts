@@ -8,6 +8,10 @@ interface NotesState {
   notes: Note[]
   fileTree: FileEntry[]
   selectedNoteId: string | null
+  // Zählt JEDE selectNote-Aktion hoch — auch die Re-Auswahl derselben Notiz. Der Tab-Effekt in
+  // App.tsx unterscheidet damit „User hat aktiv gewählt" (Editor-Tab aktivieren, auch aus einem
+  // verdeckenden Plugin-/Dashboard-Tab heraus) von reinen notes-Array-Updates (Tab nicht anfassen).
+  noteSelectionNonce: number
   secondarySelectedNoteId: string | null  // Für Text-Split View
   selectedPdfPath: string | null  // Relativer Pfad zum ausgewählten PDF
   selectedImagePath: string | null  // Relativer Pfad zum ausgewählten Bild
@@ -63,6 +67,7 @@ export const useNotesStore = create<NotesState>((set, get) => ({
   notes: [],
   fileTree: [],
   selectedNoteId: null,
+  noteSelectionNonce: 0,
   secondarySelectedNoteId: null,
   selectedPdfPath: null,
   selectedImagePath: null,
@@ -182,9 +187,10 @@ export const useNotesStore = create<NotesState>((set, get) => ({
   }),
   
   selectNote: (id, addToHistory = true) => set((state) => {
-    // Wenn keine ID oder gleiche wie aktuelle, nur State updaten
+    // Wenn keine ID oder gleiche wie aktuelle, nur State updaten. Die Nonce zählt trotzdem hoch:
+    // auch die Re-Auswahl derselben Notiz ist eine bewusste Aktion (siehe NotesState-Kommentar).
     if (!id || id === state.selectedNoteId) {
-      return { selectedNoteId: id, selectedPdfPath: null, selectedImagePath: null, selectedOfficePath: null, selectedOfficeType: null }
+      return { selectedNoteId: id, noteSelectionNonce: state.noteSelectionNonce + 1, selectedPdfPath: null, selectedImagePath: null, selectedOfficePath: null, selectedOfficeType: null }
     }
 
     const openedNote = state.notes.find(n => n.id === id)
@@ -210,6 +216,7 @@ export const useNotesStore = create<NotesState>((set, get) => ({
       }
       return {
         selectedNoteId: id,
+        noteSelectionNonce: state.noteSelectionNonce + 1,
         selectedPdfPath: null,
         selectedImagePath: null,
         selectedOfficePath: null,
@@ -219,7 +226,7 @@ export const useNotesStore = create<NotesState>((set, get) => ({
       }
     }
 
-    return { selectedNoteId: id, selectedPdfPath: null, selectedImagePath: null, selectedOfficePath: null, selectedOfficeType: null }
+    return { selectedNoteId: id, noteSelectionNonce: state.noteSelectionNonce + 1, selectedPdfPath: null, selectedImagePath: null, selectedOfficePath: null, selectedOfficeType: null }
   }),
 
   selectSecondaryNote: (id) => set({ secondarySelectedNoteId: id }),
