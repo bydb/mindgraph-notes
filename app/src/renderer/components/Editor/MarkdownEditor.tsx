@@ -25,7 +25,7 @@ import { useShallow } from 'zustand/react/shallow'
 import { useTranslation } from '../../utils/translations'
 import { sanitizeHtml, escapeHtml } from '../../utils/sanitize'
 import { extractLinks, extractTags, extractTitle, extractHeadings, extractBlocks, resolvePluginFileLink } from '../../utils/linkExtractor'
-import { resolvePluginEmbedTarget, buildPluginEmbedFrame, mountPluginEmbedBody } from '../../utils/pluginEmbeds'
+import { resolvePluginEmbedTarget, buildPluginEmbedFrame, mountPluginEmbedBody, parsePluginEmbedSize } from '../../utils/pluginEmbeds'
 import { WikilinkAutocomplete, AutocompleteMode, BlockSelectionInfo } from './WikilinkAutocomplete'
 import { SlashCommandMenu } from './SlashCommandMenu'
 import { livePreviewExtension } from './extensions/livePreview'
@@ -454,12 +454,17 @@ wysiwygTurndown.addRule('officeEmbed', {
 })
 
 // Plugin-Embed (R2): rekonstruiert ![[datei.ext]] aus data-filename — der gemountete
-// Plugin-Inhalt (SVG etc.) darf NIE in die Markdown-Quelle wandern.
+// Plugin-Inhalt (SVG etc.) darf NIE in die Markdown-Quelle wandern. Die Größen-Syntax
+// (data-width/data-height) muss den Roundtrip überleben, sonst verliert jeder WYSIWYG-Save sie.
 wysiwygTurndown.addRule('pluginEmbed', {
   filter: (node) => node.nodeName === 'DIV' && (node as HTMLElement).classList.contains('plugin-embed'),
   replacement: (_content, node) => {
-    const filename = (node as HTMLElement).getAttribute('data-filename') || ''
-    return filename ? `\n\n![[${filename}]]\n\n` : ''
+    const el = node as HTMLElement
+    const filename = el.getAttribute('data-filename') || ''
+    const width = el.getAttribute('data-width')
+    const height = el.getAttribute('data-height')
+    const sizeSuffix = width ? `|${width}${height ? `x${height}` : ''}` : ''
+    return filename ? `\n\n![[${filename}${sizeSuffix}]]\n\n` : ''
   }
 })
 
@@ -662,8 +667,13 @@ md.renderer.rules.text = (tokens, idx) => {
 
     // Plugin-Embed (R2): ![[skizze.excalidraw]] — Endung von einem aktiven Renderer-Plugin
     // geclaimt und Datei existiert im Vault. Platzhalter-Div; Hydration mountet den Embed.
+    // Größen-Syntax ![[datei.ext|400]] / ![[datei.ext|400x300]] wandert als data-Attribute mit.
     if (resolvePluginEmbedTarget(linkText)) {
-      return `<div class="plugin-embed" data-filename="${md.utils.escapeHtml(linkText)}">
+      const embedSize = parsePluginEmbedSize(sizeOrAlias)
+      const sizeAttrs = embedSize
+        ? ` data-width="${embedSize.width}"${embedSize.height ? ` data-height="${embedSize.height}"` : ''}`
+        : ''
+      return `<div class="plugin-embed" data-filename="${md.utils.escapeHtml(linkText)}"${sizeAttrs}>
         <div class="plugin-embed-loading">Lade ${md.utils.escapeHtml(linkText)}...</div>
       </div>`
     }
@@ -3900,9 +3910,14 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
       }
 
       const { pluginId, editorId } = target.pluginEditor
+      const widthAttr = parseInt(embedEl.getAttribute('data-width') || '', 10)
+      const heightAttr = parseInt(embedEl.getAttribute('data-height') || '', 10)
+      const embedSize = Number.isFinite(widthAttr)
+        ? { width: widthAttr, height: Number.isFinite(heightAttr) ? heightAttr : null }
+        : null
       const { frame, body } = buildPluginEmbedFrame(filename, () => {
         useTabStore.getState().openPluginEditorTab(pluginId, target.path, editorId, target.name)
-      })
+      }, embedSize)
       embedEl.appendChild(frame)
       mounts.set(embedEl, { dispose: mountPluginEmbedBody(body, pluginId, editorId, target.path) })
     }

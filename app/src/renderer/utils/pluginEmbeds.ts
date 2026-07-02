@@ -33,15 +33,34 @@ export function resolvePluginEmbedTarget(fileName: string): ResolvedPluginFile |
   return resolved
 }
 
+/** Größen-Syntax `![[datei.ext|400]]` bzw. `![[datei.ext|400x300]]`: Breite skaliert den
+ *  Rahmen, Höhe den Body (Default 360px aus dem CSS). Gleiche Semantik wie Bild-Embeds. */
+export interface PluginEmbedSize {
+  width: number | null
+  height: number | null
+}
+
+export function parsePluginEmbedSize(sizeSpec: string | null | undefined): PluginEmbedSize | null {
+  if (!sizeSpec) return null
+  const m = /^(\d+)(?:x(\d+))?$/.exec(sizeSpec.trim())
+  if (!m) return null
+  return { width: parseInt(m[1], 10), height: m[2] ? parseInt(m[2], 10) : null }
+}
+
 export function buildPluginEmbedFrame(
   fileName: string,
-  onOpen: () => void
+  onOpen: () => void,
+  size?: PluginEmbedSize | null
 ): { frame: HTMLElement; body: HTMLElement } {
   const frame = document.createElement('div')
   frame.className = 'plugin-embed-frame'
   // Im WYSIWYG-Lesen-Modus (contentEditable) darf die Caret nicht in den Plugin-Inhalt wandern;
   // im CodeMirror-Widget ist non-editable ohnehin korrekt.
   frame.contentEditable = 'false'
+  if (size?.width) {
+    frame.style.width = `${size.width}px`
+    frame.style.maxWidth = '100%'
+  }
 
   const header = document.createElement('div')
   header.className = 'plugin-embed-header'
@@ -61,6 +80,7 @@ export function buildPluginEmbedFrame(
 
   const body = document.createElement('div')
   body.className = 'plugin-embed-body'
+  if (size?.height) body.style.height = `${size.height}px`
   frame.append(header, body)
   return { frame, body }
 }

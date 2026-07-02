@@ -467,7 +467,9 @@ export function decorateImage(ctx: DecoratorContext, from: number, to: number): 
           pluginFile.path,
           pluginFile.pluginEditor.pluginId,
           pluginFile.pluginEditor.editorId,
-          externalRendererRegistry.getInstanceId(pluginFile.pluginEditor.pluginId)
+          externalRendererRegistry.getInstanceId(pluginFile.pluginEditor.pluginId),
+          parsed.width,
+          parsed.height
         )
       })
     )

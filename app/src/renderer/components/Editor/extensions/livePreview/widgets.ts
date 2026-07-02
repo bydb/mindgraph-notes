@@ -489,7 +489,9 @@ export class PluginEmbedWidget extends WidgetType {
     readonly filePath: string,
     readonly pluginId: string,
     readonly editorId: string,
-    readonly instanceId: string | undefined
+    readonly instanceId: string | undefined,
+    readonly width: number | null = null,
+    readonly height: number | null = null
   ) {
     super()
   }
@@ -499,7 +501,9 @@ export class PluginEmbedWidget extends WidgetType {
       other.filePath === this.filePath &&
       other.pluginId === this.pluginId &&
       other.editorId === this.editorId &&
-      other.instanceId === this.instanceId
+      other.instanceId === this.instanceId &&
+      other.width === this.width &&
+      other.height === this.height
     )
   }
 
@@ -512,7 +516,7 @@ export class PluginEmbedWidget extends WidgetType {
           detail: { target: this.fileName, fragment: '' },
         })
       )
-    })
+    }, { width: this.width, height: this.height })
     const container = frame as PluginEmbedElement
     container.classList.add('lp-plugin-embed')
     container.__pluginEmbedCleanup = mountPluginEmbedBody(body, this.pluginId, this.editorId, this.filePath)
