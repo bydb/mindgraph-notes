@@ -2,6 +2,14 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.10.4-beta] - 2026-07-02
+
+### Fixes
+
+- **Sync-Endlosschleife bei großen Vaults behoben.** Der Smart-Connections-Embedding-Cache (`.mindgraph/embeddings-*.json`) wurde fälschlich mitgesynct; ab einer Größe von ~78 MB sprengte er das Übertragungslimit des Sync-Servers — die Verbindung brach ab, der Sync versuchte dieselbe Datei alle 5 Minuten erneut („Upload acknowledgment timeout") und alle dahinter wartenden Dateien wurden nie übertragen. Die Caches sind jetzt vom Sync ausgeschlossen (sie werden pro Gerät neu berechnet); bereits hochgeladene Kopien räumt der nächste Sync automatisch vom Server.
+- **Größen-Schranke für Sync-Uploads.** Dateien über 64 MB werden nicht mehr in die Upload-Warteschlange gelegt, sondern einmalig im Sync-Protokoll gemeldet — eine einzelne übergroße Datei kann den Sync nicht mehr dauerhaft blockieren.
+- **Robusterer Sync bei Upload-Fehlern.** Ein fehlgeschlagener Upload bricht nicht mehr den gesamten Sync-Lauf ab: übrige Dateien werden weiter übertragen, das Ergebnis meldet den Teilerfolg ehrlich, und fehlgeschlagene Dateien werden beim nächsten Lauf erneut versucht.
+
 ## [0.10.3-beta] - 2026-07-02
 
 Feinschliff nach den Excalidraw-Embeds: konfigurierbare Editor-Kopfzeile, Größen-Syntax für Embeds und vier hartnäckige UI-Fixes.
