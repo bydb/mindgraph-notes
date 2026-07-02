@@ -1987,6 +1987,13 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
   useEffect(() => {
     if (!editorRef.current || !effectiveNoteId) return
 
+    // Läufe dieses Effects sind abbrechbar: Der Guard über currentNoteIdRef fängt nur den
+    // NOTIZWECHSEL während des async Loads ab — nicht den Doppel-Lauf für DIESELBE Notiz
+    // (StrictMode-Remount, schnelle Re-Selektion X→Y→X). Ohne cancelled-Flag hängen dann
+    // ZWEI EditorViews gestapelt im DOM: oben die verwaiste (stale, kein viewRef), unten die
+    // echte — sichtbar erst beim Wechsel Lesen→Schreiben, weil preview den Container versteckt.
+    let cancelled = false
+
     // Speichere die aktuelle Note ID im ref für async Prüfung
     currentNoteIdRef.current = effectiveNoteId
 
@@ -2034,9 +2041,9 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
         lastSavedContentRef.current = content
       }
 
-      // Abbrechen wenn sich die Notiz in der Zwischenzeit geändert hat (prüfe gegen ref!)
-      if (currentNoteIdRef.current !== noteIdAtStart) {
-        console.log('[MarkdownEditor] Note changed during load, aborting. Was:', noteIdAtStart, 'Now:', currentNoteIdRef.current)
+      // Abbrechen wenn dieser Lauf abgebrochen wurde oder sich die Notiz geändert hat (ref!)
+      if (cancelled || currentNoteIdRef.current !== noteIdAtStart) {
+        console.log('[MarkdownEditor] Run cancelled or note changed during load, aborting. Was:', noteIdAtStart, 'Now:', currentNoteIdRef.current)
         return
       }
 
@@ -2271,10 +2278,18 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
       })
 
       // Nochmalige Prüfung direkt vor Editor-Erstellung
-      if (currentNoteIdRef.current !== noteIdAtStart) {
-        console.log('[MarkdownEditor] Note changed before editor creation, aborting. Was:', noteIdAtStart, 'Now:', currentNoteIdRef.current)
+      if (cancelled || currentNoteIdRef.current !== noteIdAtStart || !editorRef.current) {
+        console.log('[MarkdownEditor] Run cancelled or note changed before editor creation, aborting. Was:', noteIdAtStart, 'Now:', currentNoteIdRef.current)
         return
       }
+
+      // Defensiv: falls doch schon eine View existiert (Doppel-Lauf-Restrisiko), erst aufräumen —
+      // new EditorView({parent}) hängt sonst kommentarlos eine ZWEITE View in den Container.
+      if (viewRef.current) {
+        viewRef.current.destroy()
+        viewRef.current = null
+      }
+      editorRef.current.innerHTML = ''
 
       const view = new EditorView({
         state,
@@ -2300,8 +2315,19 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
     loadAndCreateEditor()
 
     return () => {
+      // In-flight-Load dieses Laufs verwerfen + View zerstören: verhindert die verwaiste
+      // Zweit-View beim Doppel-Lauf (s.o.). viewRef auf null setzen, damit der Unmount-
+      // Cleanup unten nicht doppelt destroy() ruft.
+      cancelled = true
       if (saveTimeoutRef.current) {
         clearTimeout(saveTimeoutRef.current)
+      }
+      if (viewRef.current) {
+        viewRef.current.destroy()
+        viewRef.current = null
+      }
+      if (editorRef.current) {
+        editorRef.current.innerHTML = ''
       }
     }
   }, [effectiveNoteId]) // Bei Notizwechsel neu erstellen (effectiveNoteId statt selectedNoteId für Text-Split Support)
