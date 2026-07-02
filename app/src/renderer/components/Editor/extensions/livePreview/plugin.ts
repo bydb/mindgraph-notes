@@ -153,6 +153,38 @@ export function createLivePreviewPlugin() {
     {
       decorations: (v) => v.decorations,
       eventHandlers: {
+        // Wikilinks/Links öffnen MUSS auf mousedown passieren: der mousedown setzt sonst
+        // den Cursor auf die Zeile → selectionSet → Decorations werden neu gebaut (Source-
+        // Reveal) → beim nachfolgenden click-Event existiert der .lp-wikilink-Span nicht
+        // mehr und der Klassen-Check läuft ins Leere (Cmd+Klick tat schlicht nichts).
+        mousedown: (event: MouseEvent) => {
+          if (event.button !== 0) return false
+          const target = event.target as HTMLElement | null
+          if (!target) return false
+
+          const openModifier = event.metaKey || event.ctrlKey
+          if (!openModifier) return false
+
+          if (target.classList.contains('lp-wikilink')) {
+            event.preventDefault()
+            window.dispatchEvent(new CustomEvent('live-preview-wikilink-open', {
+              detail: {
+                target: target.getAttribute('data-target') || '',
+                fragment: target.getAttribute('data-fragment') || ''
+              }
+            }))
+            return true
+          }
+
+          if (target.classList.contains('lp-link')) {
+            event.preventDefault()
+            const url = target.getAttribute('data-url')
+            if (url) window.open(url, '_blank', 'noopener,noreferrer')
+            return true
+          }
+
+          return false
+        },
         click: (event: MouseEvent, view: EditorView) => {
           const target = event.target as HTMLElement | null
           if (!target) return false
@@ -167,25 +199,6 @@ export function createLivePreviewPlugin() {
             view.dispatch({
               changes: { from: pos, to: pos + 3, insert: replacement }
             })
-            return true
-          }
-
-          const openModifier = event.metaKey || event.ctrlKey
-          if (openModifier && target.classList.contains('lp-wikilink')) {
-            event.preventDefault()
-            window.dispatchEvent(new CustomEvent('live-preview-wikilink-open', {
-              detail: {
-                target: target.getAttribute('data-target') || '',
-                fragment: target.getAttribute('data-fragment') || ''
-              }
-            }))
-            return true
-          }
-
-          if (openModifier && target.classList.contains('lp-link')) {
-            event.preventDefault()
-            const url = target.getAttribute('data-url')
-            if (url) window.open(url, '_blank', 'noopener,noreferrer')
             return true
           }
 

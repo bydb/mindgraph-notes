@@ -24,7 +24,7 @@ import { useTabStore } from '../../stores/tabStore'
 import { useShallow } from 'zustand/react/shallow'
 import { useTranslation } from '../../utils/translations'
 import { sanitizeHtml, escapeHtml } from '../../utils/sanitize'
-import { extractLinks, extractTags, extractTitle, extractHeadings, extractBlocks } from '../../utils/linkExtractor'
+import { extractLinks, extractTags, extractTitle, extractHeadings, extractBlocks, resolvePluginFileLink } from '../../utils/linkExtractor'
 import { WikilinkAutocomplete, AutocompleteMode, BlockSelectionInfo } from './WikilinkAutocomplete'
 import { SlashCommandMenu } from './SlashCommandMenu'
 import { livePreviewExtension } from './extensions/livePreview'
@@ -2368,7 +2368,19 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
         const fileNameWithoutExt = n.path.split('/').pop()?.replace('.md', '').toLowerCase() || ''
         return titleLower === linkLower || fileNameWithoutExt === linkLower
       })
-      if (!linkedNote) return
+      if (!linkedNote) {
+        // Kein Notiz-Treffer: Plugin-Datei (z.B. [[skizze.excalidraw]]) im Plugin-Editor öffnen
+        const pluginFile = resolvePluginFileLink(linkText, fileTree)
+        if (pluginFile) {
+          useTabStore.getState().openPluginEditorTab(
+            pluginFile.pluginEditor.pluginId,
+            pluginFile.path,
+            pluginFile.pluginEditor.editorId,
+            pluginFile.name
+          )
+        }
+        return
+      }
 
       if (isSecondary) {
         selectSecondaryNote(linkedNote.id)
@@ -2415,7 +2427,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
     return () => {
       window.removeEventListener('live-preview-wikilink-open', handleLivePreviewWikilinkOpen as EventListener)
     }
-  }, [notes, isSecondary, selectNote, selectSecondaryNote, vaultPath])
+  }, [notes, fileTree, isSecondary, selectNote, selectSecondaryNote, vaultPath])
 
   const updatePreviewToolbarPosition = useCallback(() => {
     const root = editablePreviewRef.current
@@ -3190,6 +3202,17 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
               }
             }, 100)
           }
+        } else {
+          // Kein Notiz-Treffer: Plugin-Datei (z.B. [[skizze.excalidraw]]) im Plugin-Editor öffnen
+          const pluginFile = resolvePluginFileLink(linkText, fileTree)
+          if (pluginFile) {
+            useTabStore.getState().openPluginEditorTab(
+              pluginFile.pluginEditor.pluginId,
+              pluginFile.path,
+              pluginFile.pluginEditor.editorId,
+              pluginFile.name
+            )
+          }
         }
       }
       return
@@ -3241,7 +3264,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
       }
       return
     }
-  }, [notes, selectNote, selectSecondaryNote, isSecondary, vaultPath, previewContent, saveContent, t, deleteAnnotationById])
+  }, [notes, fileTree, selectNote, selectSecondaryNote, isSecondary, vaultPath, previewContent, saveContent, t, deleteAnnotationById])
 
   // Process headings to add fold toggles
   const processHeadingFolds = useCallback((html: string): string => {

@@ -1,4 +1,4 @@
-import type { Note, NoteHeading, NoteBlock } from '../../shared/types'
+import type { Note, NoteHeading, NoteBlock, FileEntry } from '../../shared/types'
 import { extractTasks } from '../../shared/taskExtractor'
 export { extractTasks }
 export type { ExtractedTask, TaskSummary } from '../../shared/taskExtractor'
@@ -101,6 +101,41 @@ export function resolveLink(linkText: string, allNotes: Note[]): Note | null {
     note => note.path.toLowerCase().includes(normalizedLink)
   )
   return partialMatch || null
+}
+
+// Löst einen Wikilink auf eine Plugin-Datei auf (z.B. [[skizze.excalidraw]]).
+// Nur Dateien, deren Endung ein aktives Renderer-Plugin beansprucht (fileType
+// 'plugin' aus read-directory), mit Endung im Linktext — [[skizze]] ohne
+// Endung bleibt Notiz-Semantik.
+export type ResolvedPluginFile = FileEntry & { pluginEditor: { pluginId: string; editorId: string } }
+
+export function resolvePluginFileLink(linkText: string, tree: FileEntry[]): ResolvedPluginFile | null {
+  const normalized = linkText.trim().toLowerCase()
+  if (!normalized) return null
+
+  let nameMatch: ResolvedPluginFile | null = null
+  let pathMatch: ResolvedPluginFile | null = null
+
+  const visit = (entries: FileEntry[]): void => {
+    for (const entry of entries) {
+      if (entry.isDirectory) {
+        if (entry.children) visit(entry.children)
+        continue
+      }
+      if (entry.fileType !== 'plugin' || !entry.pluginEditor) continue
+      const resolved = entry as ResolvedPluginFile
+      const entryPath = entry.path.toLowerCase().replace(/\\/g, '/')
+      // Voller Pfad-Match ([[ordner/skizze.excalidraw]]) schlägt Namens-Match
+      if (entryPath === normalized || entryPath.endsWith('/' + normalized)) {
+        if (!pathMatch) pathMatch = resolved
+      } else if (entry.name.toLowerCase() === normalized) {
+        if (!nameMatch) nameMatch = resolved
+      }
+    }
+  }
+  visit(tree)
+
+  return pathMatch || nameMatch
 }
 
 export function extractTitle(content: string, fileName: string): string {
