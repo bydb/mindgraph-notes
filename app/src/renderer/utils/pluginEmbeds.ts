@@ -78,29 +78,33 @@ export function mountPluginEmbedBody(
     body.textContent = text
   }
 
-  const tryMount = (): boolean => {
-    if (!externalRendererRegistry.isLoaded(pluginId, editorId)) return false
+  // 'mounted' ist terminal; 'hint' und 'pending' beobachten die Registry weiter — sonst bleibt
+  // nach einem Plugin-Update bei OFFENER Notiz der v-alt-Hinweis-Chip stehen, obwohl die neue
+  // Version einen Embed registriert (real passiert beim 0.1.4→0.2.0-Update des Excalidraw-Plugins).
+  const tryMount = (): 'mounted' | 'hint' | 'pending' => {
+    if (!externalRendererRegistry.isLoaded(pluginId, editorId)) return 'pending'
     if (!externalRendererRegistry.hasEmbed(pluginId, editorId)) {
       showHint('Dieses Plugin liefert keine Inline-Vorschau — „Öffnen" zeigt die Datei im Editor-Tab.')
-      return true
+      return 'hint'
     }
     // Body vor dem Mount leeren: das Plugin mountet seine eigene React-Root und erwartet
-    // einen leeren Container (Lade-Hinweis würde sonst neben dem Embed stehen bleiben).
+    // einen leeren Container (Lade-/Hinweis-Text würde sonst neben dem Embed stehen bleiben).
     body.classList.remove('plugin-embed-hint')
     body.textContent = ''
     const dispose = externalRendererRegistry.mountEmbed(pluginId, editorId, body, filePath)
     if (!dispose) {
+      // Race: Registry-Stand hat sich zwischen hasEmbed und mountEmbed geändert → weiter beobachten.
       showHint('Embed konnte nicht geladen werden.')
-      return true
+      return 'hint'
     }
     cleanup.push(dispose)
-    return true
+    return 'mounted'
   }
 
-  if (!tryMount()) {
-    showHint('Plugin lädt …')
+  if (tryMount() !== 'mounted') {
+    if (!body.textContent) showHint('Plugin lädt …')
     const unsub = externalRendererRegistry.subscribe(() => {
-      if (tryMount()) unsub()
+      if (tryMount() === 'mounted') unsub()
     })
     cleanup.push(unsub)
   }
