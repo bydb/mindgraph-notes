@@ -2,6 +2,22 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.10.3-beta] - 2026-07-02
+
+Feinschliff nach den Excalidraw-Embeds: konfigurierbare Editor-Kopfzeile, Größen-Syntax für Embeds und vier hartnäckige UI-Fixes.
+
+### Neu
+
+- **Editor-Kopfzeile anpassbar.** Neue Settings-Sektion „Aktionen in der Kopfzeile" (Einstellungen → Editor): Korrektur, PDF-Export, reMarkable-Export, DOCX-Export und WordPress lassen sich einzeln ausblenden. Wer nie auf reMarkable exportiert oder kein WordPress nutzt, bekommt eine aufgeräumte Kopfzeile.
+- **Größen-Syntax für Plugin-Embeds.** `![[skizze.excalidraw|400]]` begrenzt die Embed-Breite auf 400 px, `|400x300` setzt zusätzlich die Höhe — gleiche Syntax wie bei Bildern, wirkt im Lesen- und im Schreiben-Modus, und die Größe übersteht das Bearbeiten im Lesen-Modus.
+
+### Fixes
+
+- **Notiz-Auswahl bei aktivem Plugin-Tab.** War ein Plugin-Editor-Tab (z. B. Excalidraw) aktiv und die angeklickte Notiz bereits ausgewählt, passierte beim Klick im Dateibaum oder in der Suche nichts — jetzt kommt der Notiz-Editor zuverlässig nach vorn. Auch die PDF-/Bild-/Office-Auswahl entkam dem Plugin-Tab bisher nicht.
+- **Doppelte Editoren beim Moduswechsel.** Der Wechsel Lesen→Schreiben zeigte sporadisch zwei gestapelte Editoren derselben Notiz (oben ein eingefrorener Quelltext ohne Funktion). Ursache war ein unabgesicherter Doppellauf beim Editor-Aufbau; behoben.
+- **Excalidraw-Werkzeugleiste bei eingeklappter Sidebar.** Nach dem Einklappen der Seitenleiste wurde die Palette links abgeschnitten. Plugins bekommen Größenänderungen ihres Containers jetzt mitgeteilt und layouten sich neu — gilt auch für Sidebar-Breiten-Drag und Panel-Umschalten.
+- **Embed-Hinweis-Chip aktualisiert sich nach Plugin-Update selbst.** Nach einem Plugin-Update auf eine Version mit Inline-Vorschau ersetzt sich der Hinweis-Chip in offenen Notizen sofort durch das gerenderte Embed (vorher musste die Notiz neu geöffnet werden).
+
 ## [0.10.2-beta] - 2026-07-02
 
 Plugin-Dateien fügen sich jetzt nahtlos in Notizen ein: `![[skizze.excalidraw]]` rendert die Zeichnung direkt in der Notiz, `[[skizze.excalidraw]]` öffnet sie im Plugin-Editor.
