@@ -41,6 +41,26 @@ export const PluginEditorTab: React.FC<{
     // instanceId in den Deps: harter Remount nur bei (Re-)Aktivierung dieses Plugins, nicht bei fremden.
   }, [pluginId, filePath, editorId, instanceId])
 
+  // Sidebar-Einklappen/-Resize verschiebt den Container OHNE window-resize-Event — gemountete
+  // Plugins (Excalidraw) rechnen ihre UI-Islands aber nur bei window-resize neu und zeichnen die
+  // linke Palette sonst mit stalem Viewport-Offset (wird vom overflow:hidden geclippt). Der
+  // ResizeObserver übersetzt jede Container-Größenänderung in ein globales resize-Event (rAF-
+  // gebündelt), damit das Plugin Geometrie und Pointer-Offsets neu berechnet.
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el) return
+    let raf = 0
+    const ro = new ResizeObserver(() => {
+      cancelAnimationFrame(raf)
+      raf = requestAnimationFrame(() => window.dispatchEvent(new Event('resize')))
+    })
+    ro.observe(el)
+    return () => {
+      cancelAnimationFrame(raf)
+      ro.disconnect()
+    }
+  }, [])
+
   const pending = !error && !externalRendererRegistry.isLoaded(pluginId, editorId)
 
   return (
