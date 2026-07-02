@@ -19,6 +19,7 @@
 
 import type {
   FileEditorMount,
+  FileEmbedMount,
   PluginRendererHost,
   PluginRendererModule,
 } from '@mindgraph/plugin-api'
@@ -81,6 +82,8 @@ interface LoadedRenderer {
   host: PluginRendererHost
   /** Veröffentlichte editorId→mount (erst nach erfolgreichem Staging). */
   mounts: Map<string, FileEditorMount>
+  /** OPT-IN Read-only-Embed-Mounts je editorId (R2, API ≥0.2.1) — leer, wenn das Plugin keine registriert. */
+  embedMounts: Map<string, FileEmbedMount>
   /** Host-Theme-Subscriptions — beim Teardown abräumen, falls das Plugin es vergisst. */
   themeUnsubs: Set<() => void>
   /** Teardown läuft/lief (hängendes deactivate) — sperrt neue Mounts + verhindert Doppel-Teardown. */
@@ -272,8 +275,9 @@ export class ExternalRendererRegistry {
 
     const declared = new Set(desc.fileEditors.map((f) => f.editorId))
     const staged = new Map<string, FileEditorMount>()
+    const stagedEmbeds = new Map<string, FileEmbedMount>()
     const themeUnsubs = new Set<() => void>()
-    const { host, closeStaging } = this.buildHost(desc.pluginId, instanceId, declared, staged, themeUnsubs)
+    const { host, closeStaging } = this.buildHost(desc.pluginId, instanceId, declared, staged, stagedEmbeds, themeUnsubs)
 
     try {
       await def.activate(host)
@@ -305,6 +309,7 @@ export class ExternalRendererRegistry {
       module: def,
       host,
       mounts: staged,
+      embedMounts: stagedEmbeds,
       themeUnsubs,
       tearingDown: false,
     })
@@ -358,6 +363,7 @@ export class ExternalRendererRegistry {
     instanceId: string,
     declared: ReadonlySet<string>,
     staged: Map<string, FileEditorMount>,
+    stagedEmbeds: Map<string, FileEmbedMount>,
     themeUnsubs: Set<() => void>,
   ): { host: PluginRendererHost; closeStaging: () => void } {
     const env = this.env
@@ -382,6 +388,21 @@ export class ExternalRendererRegistry {
           throw new RegisterError(`editorId '${editorId}' doppelt registriert`)
         }
         staged.set(editorId, mount)
+      },
+      // OPT-IN Read-only-Embed (R2): gleiche Staging-Regeln wie registerFileEditor, aber KEIN
+      // Pflicht-Beitrag — die Vollständigkeits-Prüfung nach activate gilt nur für Editoren.
+      registerFileEmbed: ({ editorId, mount }) => {
+        if (!stagingOpen) throw new RegisterError('registerFileEmbed ist nur während activate() erlaubt')
+        if (typeof editorId !== 'string' || typeof mount !== 'function') {
+          throw new RegisterError('registerFileEmbed erwartet { editorId:string, mount:function }')
+        }
+        if (!declared.has(editorId)) {
+          throw new RegisterError(`editorId '${editorId}' ist im Manifest nicht deklariert`)
+        }
+        if (stagedEmbeds.has(editorId)) {
+          throw new RegisterError(`Embed für editorId '${editorId}' doppelt registriert`)
+        }
+        stagedEmbeds.set(editorId, mount)
       },
       vault: {
         read: (p) => hostOp('vault.read', [p]) as Promise<string>,
@@ -421,18 +442,52 @@ export class ExternalRendererRegistry {
     if (!lr || lr.tearingDown) return null // kein Mount auf einem Plugin, das gerade entladen wird
     const mount = lr.mounts.get(editorId)
     if (!mount) return null
+    return this.runMount(lr, mount, editorId, container, filePath)
+  }
 
+  /** Hat das Plugin für diese editorId einen Read-only-Embed registriert? (Für den Fallback-Chip.) */
+  hasEmbed(pluginId: string, editorId: string): boolean {
+    const lr = this.loaded.get(pluginId)
+    return !!lr && !lr.tearingDown && lr.embedMounts.has(editorId)
+  }
+
+  /**
+   * Mountet einen Read-only-Embed (R2) in den Host-Container — gleiche Lifecycle-Semantik wie
+   * mountEditor (activeMounts-Tracking → Teardown disposed auch Embeds). `null` wenn Plugin nicht
+   * geladen ODER kein Embed registriert (Aufrufer zeigt den Fallback-Chip).
+   */
+  mountEmbed(
+    pluginId: string,
+    editorId: string,
+    container: HTMLElement,
+    filePath: string,
+  ): (() => void) | null {
+    const lr = this.loaded.get(pluginId)
+    if (!lr || lr.tearingDown) return null
+    const mount = lr.embedMounts.get(editorId)
+    if (!mount) return null
+    return this.runMount(lr, mount, `embed:${editorId}`, container, filePath)
+  }
+
+  /** Gemeinsamer Mount-Kern für Editor + Embed: activeMounts-Tracking + idempotente Dispose-Fassade. */
+  private runMount(
+    lr: LoadedRenderer,
+    mount: FileEditorMount | FileEmbedMount,
+    label: string,
+    container: HTMLElement,
+    filePath: string,
+  ): (() => void) | null {
     let raw: () => void = () => {}
     try {
       const d = mount(container, { filePath, host: lr.host })
       if (typeof d === 'function') raw = d
     } catch (err) {
-      console.error(`[plugin:${pluginId}] mount('${editorId}') warf:`, err)
+      console.error(`[plugin:${lr.pluginId}] mount('${label}') warf:`, err)
       return null
     }
 
     const token = {}
-    const entry: ActiveMount = { pluginId, raw, disposed: false }
+    const entry: ActiveMount = { pluginId: lr.pluginId, raw, disposed: false }
     this.activeMounts.set(token, entry)
     // An den Tab zurückgegebene Fassade: idempotent + isolierend. Der rohe `entry.raw` bleibt für
     // teardownEntry klassifizierbar (F26 — der Wurf wird dort NICHT verschluckt, sondern → `error`).
@@ -443,7 +498,7 @@ export class ExternalRendererRegistry {
       try {
         entry.raw()
       } catch (err) {
-        console.error(`[plugin:${pluginId}] dispose warf:`, err)
+        console.error(`[plugin:${lr.pluginId}] dispose warf:`, err)
       }
     }
   }

@@ -456,3 +456,110 @@ describe('ExternalRendererRegistry — Outcome-Tombstone + Matrix-treuer Timeout
     }
   })
 })
+
+describe('ExternalRendererRegistry — Read-only-Embeds (R2)', () => {
+  /** Modul, das Editor UND Embed für 'draw' registriert. */
+  const withEmbedModule = (pluginId: string): PluginRendererModule => ({
+    id: pluginId,
+    activate: (host: PluginRendererHost) => {
+      host.registerFileEditor({ editorId: 'draw', mount: (el) => { el.dataset.mounted = 'editor'; return () => { el.dataset.mounted = '' } } })
+      host.registerFileEmbed?.({ editorId: 'draw', mount: (el) => { el.dataset.mounted = 'embed'; return () => { el.dataset.mounted = '' } } })
+    },
+    deactivate: vi.fn(),
+  })
+
+  it('registriertes Embed: hasEmbed true, mountEmbed mountet + dispose räumt', async () => {
+    const plugins: FakePlugin[] = [{ pluginId: 'demo', instanceId: 'i1', editorIds: ['draw'], module: withEmbedModule('demo') }]
+    const { env } = makeEnv(plugins)
+    const reg = new ExternalRendererRegistry(env)
+    await reg.sync()
+
+    expect(reg.hasEmbed('demo', 'draw')).toBe(true)
+    const el = fakeEl()
+    const dispose = reg.mountEmbed('demo', 'draw', el, 'sketch.draw')
+    expect(dispose).toBeTypeOf('function')
+    expect(el.dataset.mounted).toBe('embed')
+    dispose!()
+    expect(el.dataset.mounted).toBe('')
+    dispose!() // idempotent
+  })
+
+  it('ohne Embed-Registrierung: hasEmbed false, mountEmbed null (Editor unberührt)', async () => {
+    const plugins: FakePlugin[] = [{ pluginId: 'demo', instanceId: 'i1', editorIds: ['draw'] }]
+    const { env, acks } = makeEnv(plugins)
+    const reg = new ExternalRendererRegistry(env)
+    await reg.sync()
+
+    expect(acks).toEqual([{ ok: true, rendererInstanceId: 'i1' }]) // Embed ist OPT-IN, kein Pflicht-Beitrag
+    expect(reg.hasEmbed('demo', 'draw')).toBe(false)
+    expect(reg.mountEmbed('demo', 'draw', fakeEl(), 'sketch.draw')).toBeNull()
+    expect(reg.mountEditor('demo', 'draw', fakeEl(), 'sketch.draw')).toBeTypeOf('function')
+  })
+
+  it('registerFileEmbed mit nicht deklarierter editorId → ack register', async () => {
+    const mod: PluginRendererModule = {
+      id: 'demo',
+      activate: (host) => {
+        host.registerFileEditor({ editorId: 'draw', mount: () => () => {} })
+        host.registerFileEmbed?.({ editorId: 'unbekannt', mount: () => () => {} })
+      },
+    }
+    const plugins: FakePlugin[] = [{ pluginId: 'demo', instanceId: 'i1', editorIds: ['draw'], module: mod }]
+    const { env, acks } = makeEnv(plugins)
+    const reg = new ExternalRendererRegistry(env)
+    await reg.sync()
+
+    expect(reg.isLoaded('demo')).toBe(false)
+    expect(acks[0]).toMatchObject({ ok: false, phase: 'register' })
+  })
+
+  it('doppelte Embed-Registrierung → ack register', async () => {
+    const mod: PluginRendererModule = {
+      id: 'demo',
+      activate: (host) => {
+        host.registerFileEditor({ editorId: 'draw', mount: () => () => {} })
+        host.registerFileEmbed?.({ editorId: 'draw', mount: () => () => {} })
+        host.registerFileEmbed?.({ editorId: 'draw', mount: () => () => {} })
+      },
+    }
+    const plugins: FakePlugin[] = [{ pluginId: 'demo', instanceId: 'i1', editorIds: ['draw'], module: mod }]
+    const { env, acks } = makeEnv(plugins)
+    const reg = new ExternalRendererRegistry(env)
+    await reg.sync()
+
+    expect(reg.isLoaded('demo')).toBe(false)
+    expect(acks[0]).toMatchObject({ ok: false, phase: 'register' })
+  })
+
+  it('registerFileEmbed nach activate (Staging zu) wirft', async () => {
+    let captured: PluginRendererHost | null = null
+    const mod: PluginRendererModule = {
+      id: 'demo',
+      activate: (host) => {
+        captured = host
+        host.registerFileEditor({ editorId: 'draw', mount: () => () => {} })
+      },
+    }
+    const plugins: FakePlugin[] = [{ pluginId: 'demo', instanceId: 'i1', editorIds: ['draw'], module: mod }]
+    const { env } = makeEnv(plugins)
+    const reg = new ExternalRendererRegistry(env)
+    await reg.sync()
+
+    expect(reg.isLoaded('demo')).toBe(true)
+    expect(() => captured!.registerFileEmbed!({ editorId: 'draw', mount: () => () => {} })).toThrow(/nur während activate/)
+  })
+
+  it('Teardown disposed auch aktive Embed-Mounts', async () => {
+    const plugins: FakePlugin[] = [{ pluginId: 'demo', instanceId: 'i1', editorIds: ['draw'], module: withEmbedModule('demo') }]
+    const { env } = makeEnv(plugins)
+    const reg = new ExternalRendererRegistry(env)
+    await reg.sync()
+
+    const el = fakeEl()
+    reg.mountEmbed('demo', 'draw', el, 'sketch.draw')
+    expect(el.dataset.mounted).toBe('embed')
+    expect(await reg.teardownInstance('i1')).toBe('success')
+    expect(el.dataset.mounted).toBe('')
+    expect(reg.hasEmbed('demo', 'draw')).toBe(false)
+  })
+})

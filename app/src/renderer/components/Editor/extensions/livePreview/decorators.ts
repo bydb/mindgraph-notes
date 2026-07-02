@@ -10,8 +10,11 @@ import {
   TagWidget,
   ImageWidget,
   PdfEmbedWidget,
+  PluginEmbedWidget,
 } from './widgets'
 import { parseObsidianEmbedSyntax } from '../../../../utils/imageUtils'
+import { resolvePluginEmbedTarget } from '../../../../utils/pluginEmbeds'
+import { externalRendererRegistry } from '../../../../plugins/external/rendererHostClient'
 import { CRITICAL_TASK_PATTERN } from '../../../../../shared/taskExtractor'
 
 /**
@@ -444,6 +447,28 @@ export function decorateImage(ctx: DecoratorContext, from: number, to: number): 
       to,
       Decoration.replace({
         widget: new PdfEmbedWidget(parsed.fileName, ctx.vaultPath)
+      })
+    )
+    return
+  }
+
+  // Plugin-Embed (R2): Endung wird von einem aktiven Renderer-Plugin geclaimt und die Datei
+  // existiert im Vault → Read-only-Embed-Widget. Nicht auflösbare Ziele fallen wie bisher
+  // zum ImageWidget durch (zeigt seinen Fehler-Fallback).
+  const pluginFile = resolvePluginEmbedTarget(parsed.fileName)
+  if (pluginFile) {
+    addDecoration(
+      ctx,
+      from,
+      to,
+      Decoration.replace({
+        widget: new PluginEmbedWidget(
+          parsed.fileName,
+          pluginFile.path,
+          pluginFile.pluginEditor.pluginId,
+          pluginFile.pluginEditor.editorId,
+          externalRendererRegistry.getInstanceId(pluginFile.pluginEditor.pluginId)
+        )
       })
     )
     return

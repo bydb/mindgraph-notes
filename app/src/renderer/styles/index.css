@@ -9475,6 +9475,85 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
   background: var(--bg-secondary);
 }
 
+/* Plugin-Embeds (R2): ![[datei.ext]] von Renderer-Plugins — geteilte Klassen
+   für Lesen-Modus (.plugin-embed-Platzhalter) und Live-Preview (.lp-plugin-embed). */
+.plugin-embed {
+  display: block;
+  margin: 12px 0;
+}
+
+.plugin-embed-loading {
+  padding: 16px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.plugin-embed-frame {
+  display: block;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: var(--bg-secondary);
+}
+
+.lp-plugin-embed {
+  margin: 4px 0;
+}
+
+.plugin-embed-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 12px;
+  background: var(--bg-tertiary);
+  border-bottom: 1px solid var(--border-color);
+  font-size: 12px;
+  color: var(--text-primary);
+}
+
+.plugin-embed-name {
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.plugin-embed-open {
+  flex-shrink: 0;
+  padding: 2px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.plugin-embed-open:hover {
+  background: var(--bg-primary-custom);
+  color: var(--text-primary);
+}
+
+.plugin-embed-body {
+  position: relative;
+  height: 360px;
+  overflow: hidden;
+  background: var(--bg-primary-custom);
+}
+
+.plugin-embed-body.plugin-embed-hint {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 120px;
+  padding: 16px;
+  color: var(--text-muted);
+  font-size: 13px;
+  text-align: center;
+}
+
 .office-embed {
   display: inline-flex;
   align-items: center;

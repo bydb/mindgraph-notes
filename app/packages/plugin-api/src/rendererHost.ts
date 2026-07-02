@@ -24,6 +24,19 @@ export type FileEditorMount = (
 ) => () => void
 
 /**
+ * Read-only-Embed-Mount (R2) — gleiche Form wie `FileEditorMount`, aber für Inline-Embeds
+ * (`![[datei.ext]]`) in Notizen. VERTRAG: der Mount darf NICHT schreiben (kein `vault.write`
+ * aus einem Embed — mehrere Embeds derselben Datei können gleichzeitig gemountet sein, ein
+ * schreibender Embed würde gegen den offenen Editor-Tab racen). Der Mount muss mit N parallelen
+ * Instanzen leben (eigene React-Root PRO Container, keine geteilten Modul-Variablen).
+ * Der Container hat feste Höhe; das Embed rendert hinein und passt sich der Breite an.
+ */
+export type FileEmbedMount = (
+  container: HTMLElement,
+  ctx: { filePath: string; host: PluginRendererHost },
+) => () => void
+
+/**
  * Komfort-Vault-Zugriff über die `plugin:host`-Bridge (geht durch `writeFileSafe`/`assertApprovedVault`,
  * einheitliche Vault-relative Pfade). KEINE Grenze gegen das Plugin (es hat `electronAPI`) — nur
  * ergonomisch und least-surprise. Alle Pfade sind relativ zum aktiven Vault.
@@ -47,6 +60,16 @@ export interface PluginRendererHost {
    * GENAU EINMAL registriert werden; unbekannt/doppelt/fehlend lässt die Aktivierung terminal scheitern.
    */
   registerFileEditor(opts: { editorId: string; mount: FileEditorMount }): void
+  /**
+   * OPT-IN Read-only-Embed für eine bereits im Manifest deklarierte `editorId` (R2, API ≥0.2.1).
+   * KEINE eigene Manifest-Deklaration — die Endungs-Claims kommen aus `ui.fileEditors`; ein Embed
+   * ist eine ZUSÄTZLICHE Darstellung derselben Dateien. Höchstens EINMAL pro `editorId`; eine
+   * unbekannte `editorId` oder Doppel-Registrierung lässt die Aktivierung terminal scheitern
+   * (analog `registerFileEditor`). Plugins, die auch auf älteren Hosts laufen sollen, rufen
+   * feature-detected auf: `host.registerFileEmbed?.({ … })`. Ohne Registrierung zeigt die App
+   * einen Fallback-Chip (Dateiname + Öffnen im Editor-Tab).
+   */
+  registerFileEmbed?(opts: { editorId: string; mount: FileEmbedMount }): void
   /** Komfort-Vault-Bridge (siehe `PluginRendererVault`). */
   readonly vault: PluginRendererVault
   /** Aktuelles Host-Theme (live — spiegelt spätere Wechsel wider). */

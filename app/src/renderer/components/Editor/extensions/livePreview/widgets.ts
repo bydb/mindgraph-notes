@@ -1,5 +1,6 @@
 import { WidgetType } from '@codemirror/view'
 import { escapeHtml } from '../../../../utils/sanitize'
+import { buildPluginEmbedFrame, mountPluginEmbedBody } from '../../../../utils/pluginEmbeds'
 
 /**
  * Widget for rendered wikilinks
@@ -465,5 +466,64 @@ export class TagWidget extends WidgetType {
 
   ignoreEvent(): boolean {
     return false
+  }
+}
+
+/** Container-Element eines Plugin-Embeds — trägt seinen Cleanup (dispose + Registry-Unsub) für destroy(). */
+type PluginEmbedElement = HTMLElement & { __pluginEmbedCleanup?: () => void }
+
+/**
+ * Read-only-Embed einer Plugin-Datei (R2): `![[skizze.excalidraw]]` mountet den vom Plugin via
+ * `registerFileEmbed` registrierten Embed in ein fest dimensioniertes Widget. Ohne registriertes
+ * Embed (altes Plugin) zeigt der Body einen Hinweis; der Öffnen-Button funktioniert immer — er
+ * dispatcht das bestehende `live-preview-wikilink-open`-Event (der MarkdownEditor löst Plugin-
+ * Dateien auf und öffnet den Editor-Tab).
+ *
+ * `instanceId` wird zur BAUZEIT gecaptured und geht in eq() ein: nach einem Plugin-Upgrade
+ * (instanceId-Wechsel) unterscheidet sich das neue Widget → CM ersetzt das DOM → sauberer Remount
+ * gegen die neue Instanz statt eines Zombie-Containers.
+ */
+export class PluginEmbedWidget extends WidgetType {
+  constructor(
+    readonly fileName: string,
+    readonly filePath: string,
+    readonly pluginId: string,
+    readonly editorId: string,
+    readonly instanceId: string | undefined
+  ) {
+    super()
+  }
+
+  eq(other: PluginEmbedWidget): boolean {
+    return (
+      other.filePath === this.filePath &&
+      other.pluginId === this.pluginId &&
+      other.editorId === this.editorId &&
+      other.instanceId === this.instanceId
+    )
+  }
+
+  toDOM(): HTMLElement {
+    const { frame, body } = buildPluginEmbedFrame(this.fileName, () => {
+      // Öffnen über das bestehende Wikilink-Event — der MarkdownEditor löst Plugin-Dateien
+      // auf und öffnet den Editor-Tab (gleicher Pfad wie Cmd+Klick auf [[datei.ext]]).
+      window.dispatchEvent(
+        new CustomEvent('live-preview-wikilink-open', {
+          detail: { target: this.fileName, fragment: '' },
+        })
+      )
+    })
+    const container = frame as PluginEmbedElement
+    container.classList.add('lp-plugin-embed')
+    container.__pluginEmbedCleanup = mountPluginEmbedBody(body, this.pluginId, this.editorId, this.filePath)
+    return container
+  }
+
+  destroy(dom: HTMLElement): void {
+    ;(dom as PluginEmbedElement).__pluginEmbedCleanup?.()
+  }
+
+  ignoreEvent(): boolean {
+    return true
   }
 }

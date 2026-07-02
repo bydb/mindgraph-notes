@@ -25,6 +25,7 @@ import { useShallow } from 'zustand/react/shallow'
 import { useTranslation } from '../../utils/translations'
 import { sanitizeHtml, escapeHtml } from '../../utils/sanitize'
 import { extractLinks, extractTags, extractTitle, extractHeadings, extractBlocks, resolvePluginFileLink } from '../../utils/linkExtractor'
+import { resolvePluginEmbedTarget, buildPluginEmbedFrame, mountPluginEmbedBody } from '../../utils/pluginEmbeds'
 import { WikilinkAutocomplete, AutocompleteMode, BlockSelectionInfo } from './WikilinkAutocomplete'
 import { SlashCommandMenu } from './SlashCommandMenu'
 import { livePreviewExtension } from './extensions/livePreview'
@@ -452,6 +453,16 @@ wysiwygTurndown.addRule('officeEmbed', {
   }
 })
 
+// Plugin-Embed (R2): rekonstruiert ![[datei.ext]] aus data-filename — der gemountete
+// Plugin-Inhalt (SVG etc.) darf NIE in die Markdown-Quelle wandern.
+wysiwygTurndown.addRule('pluginEmbed', {
+  filter: (node) => node.nodeName === 'DIV' && (node as HTMLElement).classList.contains('plugin-embed'),
+  replacement: (_content, node) => {
+    const filename = (node as HTMLElement).getAttribute('data-filename') || ''
+    return filename ? `\n\n![[${filename}]]\n\n` : ''
+  }
+})
+
 wysiwygTurndown.addRule('mermaidContainer', {
   filter: (node) => node.nodeName === 'DIV' && (node as HTMLElement).classList.contains('mermaid-container'),
   replacement: (_content, node) => {
@@ -526,7 +537,7 @@ function editablePreviewHtmlToMarkdown(root: HTMLElement, currentContent: string
   // Turndown's blankRule fängt leere Block-Elemente vor den Custom-Rules ab. In Production
   // haben unsere Embeds immer Inhalt (Loading-Spinner, Icons, SVG), aber als Sicherheitsnetz
   // injizieren wir ein Zero-Width-Space, falls ein Container doch mal leer ist.
-  clone.querySelectorAll('.pdf-embed, .office-embed, .mermaid-container, .dataview-preview-container').forEach(el => {
+  clone.querySelectorAll('.pdf-embed, .office-embed, .mermaid-container, .dataview-preview-container, .plugin-embed').forEach(el => {
     if (!el.textContent || !el.textContent.trim()) {
       el.appendChild(document.createTextNode('​'))
     }
@@ -646,6 +657,14 @@ md.renderer.rules.text = (tokens, idx) => {
         <span class="office-embed-icon">${icon}</span>
         <span class="office-embed-label">${typeLabel}-Datei:</span>
         <span class="office-embed-name">${md.utils.escapeHtml(linkText)}</span>
+      </div>`
+    }
+
+    // Plugin-Embed (R2): ![[skizze.excalidraw]] — Endung von einem aktiven Renderer-Plugin
+    // geclaimt und Datei existiert im Vault. Platzhalter-Div; Hydration mountet den Embed.
+    if (resolvePluginEmbedTarget(linkText)) {
+      return `<div class="plugin-embed" data-filename="${md.utils.escapeHtml(linkText)}">
+        <div class="plugin-embed-loading">Lade ${md.utils.escapeHtml(linkText)}...</div>
       </div>`
     }
 
@@ -873,6 +892,8 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
   const editorRef = useRef<HTMLDivElement>(null)
   const previewRef = useRef<HTMLDivElement>(null)
   const editablePreviewRef = useRef<HTMLDivElement>(null)
+  // Aktive Plugin-Embed-Mounts der Preview, per Platzhalter-Element getrackt (R2).
+  const pluginEmbedMountsRef = useRef(new Map<Element, { dispose: () => void }>())
   const viewRef = useRef<EditorView | null>(null)
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const previewEditTimeoutRef = useRef<NodeJS.Timeout | null>(null)
@@ -885,8 +906,8 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
   const { vaultPath, selectedNoteId, secondarySelectedNoteId, notes, updateNote, selectNote, selectSecondaryNote, addNote, fileTree, setFileTree, navigateBack, navigateForward, canNavigateBack, canNavigateForward } = useNotesStore(
     useShallow(s => ({ vaultPath: s.vaultPath, selectedNoteId: s.selectedNoteId, secondarySelectedNoteId: s.secondarySelectedNoteId, notes: s.notes, updateNote: s.updateNote, selectNote: s.selectNote, selectSecondaryNote: s.selectSecondaryNote, addNote: s.addNote, fileTree: s.fileTree, setFileTree: s.setFileTree, navigateBack: s.navigateBack, navigateForward: s.navigateForward, canNavigateBack: s.canNavigateBack, canNavigateForward: s.canNavigateForward }))
   )
-  const { pendingTemplateInsert, setPendingTemplateInsert, ollama, editorHeadingFolding, outlineStyle, editorShowWordCount, languageTool, setLanguageTool, editorDefaultView, showFormattingToolbar, setShowFormattingToolbar, showRawEditor } = useUIStore(
-    useShallow(s => ({ pendingTemplateInsert: s.pendingTemplateInsert, setPendingTemplateInsert: s.setPendingTemplateInsert, ollama: s.ollama, editorHeadingFolding: s.editorHeadingFolding, outlineStyle: s.outlineStyle, editorShowWordCount: s.editorShowWordCount, languageTool: s.languageTool, setLanguageTool: s.setLanguageTool, editorDefaultView: s.editorDefaultView, showFormattingToolbar: s.showFormattingToolbar, setShowFormattingToolbar: s.setShowFormattingToolbar, showRawEditor: s.showRawEditor }))
+  const { pendingTemplateInsert, setPendingTemplateInsert, ollama, editorHeadingFolding, outlineStyle, editorShowWordCount, editorHeaderActions, languageTool, setLanguageTool, editorDefaultView, showFormattingToolbar, setShowFormattingToolbar, showRawEditor } = useUIStore(
+    useShallow(s => ({ pendingTemplateInsert: s.pendingTemplateInsert, setPendingTemplateInsert: s.setPendingTemplateInsert, ollama: s.ollama, editorHeadingFolding: s.editorHeadingFolding, outlineStyle: s.outlineStyle, editorShowWordCount: s.editorShowWordCount, editorHeaderActions: s.editorHeaderActions, languageTool: s.languageTool, setLanguageTool: s.setLanguageTool, editorDefaultView: s.editorDefaultView, showFormattingToolbar: s.showFormattingToolbar, setShowFormattingToolbar: s.setShowFormattingToolbar, showRawEditor: s.showRawEditor }))
   )
   const [marketing] = usePluginConfig('marketing', MARKETING_DEFAULTS)
 
@@ -3641,6 +3662,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
     return () => clearTimeout(timer)
   }, [renderedMarkdown, viewMode, notes, vaultPath, contentVersion])
 
+
   // Load images in preview mode — resolves data-src to data URLs and caches them
   useEffect(() => {
     if (viewMode !== 'preview' || !vaultPath) return
@@ -3814,6 +3836,60 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
     if (!editable || isPreviewDomEditingRef.current) return
     editable.innerHTML = sanitizeHtml(renderedMarkdown)
   }, [renderedMarkdown, contentVersion])
+
+  // Plugin-Embeds (R2) in der Preview hydratisieren: mountet den vom Renderer-Plugin registrierten
+  // Read-only-Embed in die .plugin-embed-Platzhalter. MUSS NACH dem innerHTML-Effect definiert sein
+  // (Effects laufen in Definitionsreihenfolge — vorher gäbe es die frischen Platzhalter noch nicht).
+  // Mounts werden per Element-Identität getrackt statt pro Lauf neu gebaut: während des WYSIWYG-
+  // Editierens ändert sich renderedMarkdown bei jedem Tastendruck, das DOM bleibt aber stehen
+  // (isPreviewDomEditingRef) — ein Dispose/Remount pro Keystroke wäre teuer und flackerte.
+  useEffect(() => {
+    const mounts = pluginEmbedMountsRef.current
+
+    // Verwaiste Mounts wegräumen (innerHTML-Replace hat die Elemente aus dem DOM genommen).
+    for (const [el, entry] of [...mounts]) {
+      if (!el.isConnected) {
+        entry.dispose()
+        mounts.delete(el)
+      }
+    }
+
+    if (viewMode !== 'preview' || !previewRef.current) return
+
+    const embedElements = previewRef.current.querySelectorAll('.plugin-embed')
+    for (const embedEl of Array.from(embedElements)) {
+      const filename = embedEl.getAttribute('data-filename')
+      if (!filename || mounts.has(embedEl)) continue
+
+      embedEl.textContent = '' // Loading-Platzhalter verwerfen
+
+      const target = resolvePluginEmbedTarget(filename)
+      if (!target) {
+        const err = document.createElement('div')
+        err.className = 'plugin-embed-hint'
+        err.textContent = `Datei "${filename}" nicht gefunden`
+        embedEl.appendChild(err)
+        mounts.set(embedEl, { dispose: () => {} })
+        continue
+      }
+
+      const { pluginId, editorId } = target.pluginEditor
+      const { frame, body } = buildPluginEmbedFrame(filename, () => {
+        useTabStore.getState().openPluginEditorTab(pluginId, target.path, editorId, target.name)
+      })
+      embedEl.appendChild(frame)
+      mounts.set(embedEl, { dispose: mountPluginEmbedBody(body, pluginId, editorId, target.path) })
+    }
+  }, [renderedMarkdown, viewMode, fileTree, contentVersion])
+
+  // Unmount-Cleanup für Plugin-Embed-Mounts (das Tracking oben disposed nur verwaiste Elemente).
+  useEffect(() => {
+    const mounts = pluginEmbedMountsRef.current
+    return () => {
+      for (const [, entry] of mounts) entry.dispose()
+      mounts.clear()
+    }
+  }, [])
 
   // Phase 2: gespeicherte Annotationen beim Öffnen wieder als Highlight-Overlay einfärben.
   // Liest die co-lokierte Sidecar-Datei und verankert die Zitate im frisch gerenderten
@@ -4365,7 +4441,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
             </button>
           )}
           {/* LanguageTool Check Button */}
-          {languageTool.enabled && viewMode !== 'preview' && (
+          {editorHeaderActions.languageTool && languageTool.enabled && viewMode !== 'preview' && (
             <button
               className={`lt-check-btn ${ltIsChecking ? 'checking' : ''}`}
               onClick={checkLanguageTool}
@@ -4398,7 +4474,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
               )}
             </button>
           )}
-          {languageTool.enabled && (
+          {editorHeaderActions.languageTool && languageTool.enabled && (
             <button
               className={`lt-check-btn lt-autocorrect-btn ${ltAutoCorrecting ? 'checking' : ''} ${ltCorrectedCount > 0 ? 'corrected' : ''}`}
               onClick={autoCorrectLanguageTool}
@@ -4435,7 +4511,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
               </svg>
             </button>
           )}
-          <button
+          {editorHeaderActions.pdf && <button
             className="export-btn"
             onClick={() => handleExportPDF('standard')}
             title={t('editor.exportPdf')}
@@ -4445,8 +4521,8 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
               <path d="M8 2V10M8 10L5 7M8 10L11 7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
             PDF
-          </button>
-          <button
+          </button>}
+          {editorHeaderActions.remarkable && <button
             className="export-btn"
             onClick={() => handleExportPDF('remarkable-book')}
             title={t('editor.exportPdfRemarkable')}
@@ -4456,8 +4532,8 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
               <path d="M6 5.5h4M6 8h4M6 10.5h2.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
             </svg>
             reMarkable
-          </button>
-          <button
+          </button>}
+          {editorHeaderActions.docx && <button
             className="export-btn"
             onClick={handleExportDocx}
             title={t('editor.exportDocx')}
@@ -4467,8 +4543,8 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
               <path d="M8 2V10M8 10L5 7M8 10L11 7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
             DOCX
-          </button>
-          {marketing.enabled && marketing.wordpressUrl && (
+          </button>}
+          {editorHeaderActions.wordpress && marketing.enabled && marketing.wordpressUrl && (
             <button
               className="export-btn"
               onClick={() => setShowPublishWpModal(true)}
