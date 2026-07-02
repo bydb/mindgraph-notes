@@ -2,6 +2,21 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.10.2-beta] - 2026-07-02
+
+Plugin-Dateien fügen sich jetzt nahtlos in Notizen ein: `![[skizze.excalidraw]]` rendert die Zeichnung direkt in der Notiz, `[[skizze.excalidraw]]` öffnet sie im Plugin-Editor.
+
+### Neu
+
+- **Inline-Embeds für Plugin-Dateien.** `![[datei.ext]]` rendert Dateien von Renderer-Plugins als Read-only-Vorschau direkt in der Notiz — im Lesen- und im Schreiben-Modus. Mit dem aktualisierten Excalidraw-Plugin (v0.2.0) erscheint die Zeichnung als eingebettete Grafik samt handgezeichneter Schriften; der „Öffnen"-Knopf am Embed springt in den Editor-Tab. Plugins ohne Inline-Vorschau zeigen einen Hinweis-Chip mit Öffnen-Aktion. Die Vorschau übersteht das Bearbeiten im Lesen-Modus unverändert.
+- **Wikilinks öffnen Plugin-Dateien.** Ein Klick auf `[[skizze.excalidraw]]` im Lesen-Modus (bzw. Cmd/Ctrl+Klick im Schreiben-Modus) öffnet die Datei im zuständigen Plugin-Editor — gleiche Tab-Logik wie im Dateibaum, kein Duplikat-Tab.
+- **Plugin-API 0.2.1.** Neuer optionaler Host-Hook `registerFileEmbed` für Read-only-Inline-Embeds. Rückwärtskompatibel: bestehende Plugins laufen unverändert.
+
+### Fixes
+
+- **Cmd/Ctrl+Klick auf Wikilinks im Schreiben-Modus funktioniert wieder.** Der Klick setzte bisher nur den Cursor (die Link-Dekoration löste sich beim Mousedown auf, bevor der Klick ausgewertet wurde) — betraf Notiz-Links genauso wie Plugin-Dateien.
+- **Versions-Badge in der Titelleiste** zeigt jetzt immer die tatsächliche App-Version (vorher hartcodiert).
+
 ## [0.10.1-beta] - 2026-07-01
 
 ### Neu
