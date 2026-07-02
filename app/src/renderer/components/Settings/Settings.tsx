@@ -1939,6 +1939,8 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab 
     setOutlineStyle,
     editorShowWordCount,
     setEditorShowWordCount,
+    editorHeaderActions,
+    setEditorHeaderActions,
     editorDefaultView,
     setEditorDefaultView,
     autoSaveInterval,
@@ -3105,6 +3107,24 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab 
                     }}
                   />
                 </div>
+
+                <h3>{t('settings.editor.headerActions')}</h3>
+                {([
+                  ['languageTool', 'settings.editor.headerActionLanguageTool'],
+                  ['pdf', 'settings.editor.headerActionPdf'],
+                  ['remarkable', 'settings.editor.headerActionRemarkable'],
+                  ['docx', 'settings.editor.headerActionDocx'],
+                  ['wordpress', 'settings.editor.headerActionWordpress']
+                ] as const).map(([action, label]) => (
+                  <div className="settings-row" key={action}>
+                    <label>{t(label)}</label>
+                    <input
+                      type="checkbox"
+                      checked={editorHeaderActions[action]}
+                      onChange={e => setEditorHeaderActions({ [action]: e.target.checked })}
+                    />
+                  </div>
+                ))}
 
                 <h3>{t('settings.editor.behavior')}</h3>
                 <div className="settings-row">

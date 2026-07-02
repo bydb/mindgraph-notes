@@ -8,6 +8,13 @@ type Theme = 'light' | 'dark' | 'system'
 type CanvasViewMode = 'cards'
 type FileTreeDisplayMode = 'name' | 'path'  // 'name' = nur Dateiname, 'path' = voller Pfad
 type EditorViewMode = 'edit' | 'live-preview' | 'preview'
+export interface EditorHeaderActions {
+  languageTool: boolean
+  pdf: boolean
+  remarkable: boolean
+  docx: boolean
+  wordpress: boolean
+}
 type PdfDisplayMode = 'both' | 'companion-only' | 'pdf-only'  // Anzeige von PDF/Companion im FileTree
 type AccentColor = 'ink' | 'blue' | 'orange' | 'green' | 'purple' | 'pink' | 'teal' | 'rose' | 'coral' | 'mauve' | 'mint' | 'lime' | 'gold' | 'terracotta' | 'custom'
 export type LLMBackend = 'ollama' | 'lm-studio'
@@ -569,6 +576,7 @@ interface UIState {
   editorOutlining: boolean // Einrückungsbasiertes Outlining (Listen etc.)
   outlineStyle: OutlineStyle // Outlining-Design: 'default', 'lines', 'minimal', 'bullets', 'dashes'
   editorShowWordCount: boolean // Wort-/Zeichenzähler anzeigen
+  editorHeaderActions: EditorHeaderActions // optionale Aktionen in der Editor-Kopfzeile
   imagesFolder: string // Vault-relativer Ordner für Bild-Drops/Pastes (default '.attachments')
 
   // UI State
@@ -711,6 +719,7 @@ interface UIState {
   setEditorOutlining: (enabled: boolean) => void
   setOutlineStyle: (style: OutlineStyle) => void
   setEditorShowWordCount: (show: boolean) => void
+  setEditorHeaderActions: (settings: Partial<EditorHeaderActions>) => void
   setImagesFolder: (folder: string) => void
   setSidebarWidth: (width: number) => void
   toggleSidebar: () => void
@@ -822,6 +831,13 @@ const defaultState = {
   editorOutlining: false,
   outlineStyle: 'default' as OutlineStyle,
   editorShowWordCount: true,
+  editorHeaderActions: {
+    languageTool: true,
+    pdf: true,
+    remarkable: true,
+    docx: true,
+    wordpress: true
+  } as EditorHeaderActions,
   imagesFolder: '.attachments',
 
   // UI State
@@ -1089,7 +1105,7 @@ const defaultState = {
 const persistedKeys = [
   'viewMode', 'theme', 'accentColor', 'backgroundColor', 'loadLastVaultOnStart',
   'language', 'fontFamily', 'editorFontSize', 'editorLineNumbers', 'editorDefaultView',
-  'autoSaveInterval', 'editorHeadingFolding', 'editorOutlining', 'outlineStyle', 'editorShowWordCount', 'imagesFolder',
+  'autoSaveInterval', 'editorHeadingFolding', 'editorOutlining', 'outlineStyle', 'editorShowWordCount', 'editorHeaderActions', 'imagesFolder',
   'sidebarWidth', 'sidebarVisible', 'editorPreviewSplit', 'textSplitEnabled', 'textSplitPosition',
   'canvasFilterPath', 'canvasViewMode', 'canvasShowEdges', 'canvasShowTags', 'canvasShowLinks', 'canvasShowImages', 'canvasShowSummaries',
   'canvasCompactMode', 'canvasReadMode', 'canvasHoverScale', 'canvasDefaultCardWidth', 'splitPosition', 'fileTreeDisplayMode', 'fileTreeKindFilter', 'notesRootFolder', 'projectsRootFolder', 'ollama', 'brain',
@@ -1134,6 +1150,9 @@ export const useUIStore = create<UIState>()((set, get) => ({
   setEditorOutlining: (enabled) => set({ editorOutlining: enabled }),
   setOutlineStyle: (style) => set({ outlineStyle: style }),
   setEditorShowWordCount: (show) => set({ editorShowWordCount: show }),
+  setEditorHeaderActions: (settings) => set((state) => ({
+    editorHeaderActions: { ...state.editorHeaderActions, ...settings }
+  })),
   setImagesFolder: (folder) => set({ imagesFolder: folder }),
   setSidebarWidth: (width) => set({ sidebarWidth: width }),
   toggleSidebar: () => set((state) => ({ sidebarVisible: !state.sidebarVisible })),
