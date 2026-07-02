@@ -188,3 +188,71 @@ describe('diffManifests', () => {
     expect(diff.toUpload.length).toBe(0)
   })
 })
+
+// Regression 2026-07-02: embeddings-bge-m3-latest.json (83 MB) wurde als .mindgraph/*.json
+// gesynct, sprengte nach base64 (×4/3 ≈ 106 MiB) das 100-MiB-ws-maxPayload des Servers →
+// Server killte die Verbindung, Auto-Sync retryte dieselbe Datei alle 5 min (Endlosschleife,
+// "Upload acknowledgment timeout"). Zwei Verteidigungslinien: Embedding-Caches sind vom Sync
+// ausgeschlossen (gerätelokal ableitbar), und diffManifests hält übergroße Dateien generell
+// aus der Upload-Queue heraus.
+describe('isSyncable — Embedding-Caches', () => {
+  it('schließt .mindgraph/embeddings-*.json vom Sync aus', () => {
+    expect(isSyncable('.mindgraph/embeddings-bge-m3-latest.json')).toBe(false)
+    expect(isSyncable('.mindgraph/embeddings-nomic-embed-text-latest.json')).toBe(false)
+    expect(isSyncable('.mindgraph\\embeddings-mxbai-embed-large-latest.json')).toBe(false)
+  })
+
+  it('lässt andere .mindgraph-JSONs unberührt', () => {
+    expect(isSyncable('.mindgraph/emails.json')).toBe(true)
+    expect(isSyncable('.mindgraph/contacts.json')).toBe(true)
+  })
+})
+
+describe('diffManifests — maxUploadSize', () => {
+  const LIMIT = 64 * 1024 * 1024
+
+  it('hält übergroße neue Dateien aus toUpload heraus und meldet sie als skippedTooLarge', () => {
+    const local = manifest({
+      'riesig.pdf': file('h1', { size: 90 * 1024 * 1024 }),
+      'klein.md': file('h2')
+    })
+    const diff = diffManifests(local, manifest({}), undefined, undefined, LIMIT)
+    expect(diff.toUpload).toEqual(['klein.md'])
+    expect(diff.skippedTooLarge).toEqual(['riesig.pdf'])
+  })
+
+  it('hält übergroße lokal geänderte Dateien aus toUpload heraus', () => {
+    const local = manifest({ 'riesig.pdf': file('neu', { size: 90 * 1024 * 1024, syncedAt: 500, modifiedAt: 600 }) })
+    const remote = manifest({ 'riesig.pdf': file('alt', { modifiedAt: 400 }) })
+    const diff = diffManifests(local, remote, undefined, undefined, LIMIT)
+    expect(diff.toUpload).toEqual([])
+    expect(diff.skippedTooLarge).toEqual(['riesig.pdf'])
+  })
+
+  it('lässt übergroße Dateien nicht über den Konflikt-Pfad zum Upload durch (lokal bleibt erhalten)', () => {
+    // beide Seiten geändert = Konflikt; Konfliktauflösung würde bei neuerem lokalen Stand
+    // uploaden → gleiche Endlosschleife. Konservativ: weder Upload noch Download, nur melden.
+    const local = manifest({ 'riesig.pdf': file('lokal', { size: 90 * 1024 * 1024, syncedAt: 500, modifiedAt: 600 }) })
+    const remote = manifest({ 'riesig.pdf': file('remote', { modifiedAt: 700 }) })
+    const diff = diffManifests(local, remote, undefined, undefined, LIMIT)
+    expect(diff.conflicts).toEqual([])
+    expect(diff.toUpload).toEqual([])
+    expect(diff.toDownload).toEqual([])
+    expect(diff.skippedTooLarge).toEqual(['riesig.pdf'])
+  })
+
+  it('Downloads bleiben von der Größen-Schranke unberührt (nur remote geändert)', () => {
+    const local = manifest({ 'riesig.pdf': file('alt', { size: 90 * 1024 * 1024, syncedAt: 600, modifiedAt: 500 }) })
+    const remote = manifest({ 'riesig.pdf': file('neu', { modifiedAt: 700 }) })
+    const diff = diffManifests(local, remote, undefined, undefined, LIMIT)
+    expect(diff.toDownload).toEqual(['riesig.pdf'])
+    expect(diff.skippedTooLarge).toEqual([])
+  })
+
+  it('ohne maxUploadSize bleibt das Verhalten unverändert', () => {
+    const local = manifest({ 'riesig.pdf': file('h1', { size: 90 * 1024 * 1024 }) })
+    const diff = diffManifests(local, manifest({}))
+    expect(diff.toUpload).toEqual(['riesig.pdf'])
+    expect(diff.skippedTooLarge).toEqual([])
+  })
+})

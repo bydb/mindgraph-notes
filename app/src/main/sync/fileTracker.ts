@@ -66,6 +66,10 @@ function shouldExclude(relativePath: string, fileName: string): boolean {
   // Projekt-RAG-Indizes sind geräte-lokal abgeleitete Daten (große Embeddings,
   // modellabhängig) — wie die Backups vom Sync ausgeschlossen.
   if (relativePath.startsWith('.mindgraph/rag/') || relativePath.startsWith('.mindgraph\\rag\\')) return true
+  // Smart-Connections-Embedding-Caches: ebenfalls geräte-lokal ableitbar UND größenkritisch —
+  // embeddings-bge-m3-latest.json wuchs auf 83 MB und sprengte nach base64 (×4/3 ≈ 106 MiB)
+  // das 100-MiB-ws-maxPayload des Sync-Servers → Verbindungsabbruch + Retry-Endlosschleife.
+  if (relativePath.startsWith('.mindgraph/embeddings-') || relativePath.startsWith('.mindgraph\\embeddings-')) return true
   if (relativePath.startsWith('.trash/') || relativePath.startsWith('.trash\\')) return true
   if (relativePath.startsWith('.sync-trash/') || relativePath.startsWith('.sync-trash\\')) return true
   if (fileName.startsWith('~')) return true
@@ -196,19 +200,28 @@ export interface ManifestDiff {
   conflicts: string[]
   toDeleteLocal: string[]
   toDeleteRemote: string[]
+  /** Lokale Dateien über maxUploadSize — kommen NIE in toUpload/conflicts. Ein Upload
+   *  über dem Server-Payload-Limit killt die WS-Verbindung, der Auto-Sync retryt dieselbe
+   *  Datei endlos und alles dahinter in der Queue synct nie. Kaller loggt diese Liste. */
+  skippedTooLarge: string[]
 }
 
 export function diffManifests(
   local: FileManifest,
   remote: FileManifest,
   previousLocal?: FileManifest,
-  serverTombstones?: Record<string, { deletedAt: number }>
+  serverTombstones?: Record<string, { deletedAt: number }>,
+  maxUploadSize?: number
 ): ManifestDiff {
   const toUpload: string[] = []
   const toDownload: string[] = []
   const conflicts: string[] = []
   const toDeleteLocal: string[] = []
   const toDeleteRemote: string[] = []
+  const skippedTooLarge: string[] = []
+
+  const tooLarge = (f: FileInfo | undefined): boolean =>
+    maxUploadSize !== undefined && !!f && f.size > maxUploadSize
 
   const allPaths = new Set([
     ...Object.keys(local.files),
@@ -228,6 +241,9 @@ export function diffManifests(
         // Server has a tombstone for this file — it was deleted by another client.
         // Even though our manifest is fresh (syncedAt === null), don't re-upload.
         toDeleteLocal.push(filePath)
+      } else if (tooLarge(localFile)) {
+        // Zu groß für einen Upload — melden statt in die Queue (s. skippedTooLarge)
+        skippedTooLarge.push(filePath)
       } else {
         // New local file, upload
         toUpload.push(filePath)
@@ -258,7 +274,11 @@ export function diffManifests(
       const localChanged = localFile.syncedAt === null || localFile.modifiedAt > localFile.syncedAt
       const remoteChanged = remoteFile.modifiedAt > (localFile.syncedAt || 0)
 
-      if (localChanged && remoteChanged) {
+      if (localChanged && tooLarge(localFile)) {
+        // Upload unmöglich (Payload-Limit); Download würde den neueren lokalen Stand
+        // überschreiben → weder noch, nur melden. Lokale Datei bleibt unangetastet.
+        skippedTooLarge.push(filePath)
+      } else if (localChanged && remoteChanged) {
         // Both changed = conflict
         conflicts.push(filePath)
       } else if (localChanged) {
@@ -269,7 +289,7 @@ export function diffManifests(
     }
   }
 
-  return { toUpload, toDownload, conflicts, toDeleteLocal, toDeleteRemote }
+  return { toUpload, toDownload, conflicts, toDeleteLocal, toDeleteRemote, skippedTooLarge }
 }
 
 const MANIFEST_FILE = '.mindgraph/sync-manifest.json'

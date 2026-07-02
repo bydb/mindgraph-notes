@@ -19,6 +19,12 @@ type SyncStatus = SyncProgress['status']
 const PARALLEL_UPLOADS = 5
 const PARALLEL_DOWNLOADS = 5
 
+// Uploads gehen als EINE JSON-Nachricht mit base64-Payload (×4/3) über die WS-Verbindung.
+// Der Server (ws-Default maxPayload) kappt Nachrichten über 100 MiB und killt dabei die
+// Verbindung — die Datei würde endlos retryt und alles dahinter in der Queue nie synced.
+// 64 MB roh → ~85,4 MiB Nachricht: sichere Marge unter dem Limit.
+const MAX_SYNC_FILE_SIZE = 64 * 1024 * 1024
+
 interface ServerMessage {
   type: string
   code?: string
@@ -401,7 +407,19 @@ export class SyncEngine {
 
       // Compute diff — pass saved manifest so we can detect locally deleted files
       // Also pass server tombstones so files deleted on another device don't get re-uploaded
-      const diff = diffManifests(currentManifest, remoteManifest, this.manifest || undefined, this.lastServerTombstones)
+      const diff = diffManifests(currentManifest, remoteManifest, this.manifest || undefined, this.lastServerTombstones, MAX_SYNC_FILE_SIZE)
+
+      // Übergroße Dateien einmal pro Engine-Lauf melden (nicht bei jedem 5-min-Auto-Sync erneut)
+      for (const skippedPath of diff.skippedTooLarge) {
+        if (!this.loggedTooLargePaths.has(skippedPath)) {
+          this.loggedTooLargePaths.add(skippedPath)
+          this.sendLog({
+            type: 'error',
+            message: `Skipped — file exceeds 64 MB sync limit: ${skippedPath}`,
+            fileName: skippedPath
+          })
+        }
+      }
 
       // SAFETY: Mass-deletion protection
       // If many local files would be deleted, something is likely wrong
@@ -438,12 +456,24 @@ export class SyncEngine {
       const total = diff.toUpload.length + diff.toDownload.length + diff.conflicts.length + diff.toDeleteRemote.length
       let current = 0
 
-      // Upload files in parallel batches
+      // Upload files in parallel batches. Fehler pro DATEI abfangen statt den ganzen Sync
+      // abzubrechen — sonst blockiert eine einzelne kaputte Datei alle dahinter in der Queue
+      // und der Auto-Sync wiederholt den Komplett-Abbruch alle 5 Minuten (real passiert mit
+      // dem 83-MB-Embeddings-Cache, s. MAX_SYNC_FILE_SIZE).
+      const uploadFailures: string[] = []
       this.status = 'uploading'
       for (let i = 0; i < diff.toUpload.length; i += PARALLEL_UPLOADS) {
         const batch = diff.toUpload.slice(i, i + PARALLEL_UPLOADS)
         await Promise.all(batch.map(async (filePath) => {
-          await this.uploadFile(filePath)
+          try {
+            await this.uploadFile(filePath)
+          } catch (err) {
+            // syncedAt bleibt unangetastet → Datei wird beim nächsten Sync erneut versucht
+            uploadFailures.push(filePath)
+            const msg = err instanceof Error ? err.message : String(err)
+            this.sendLog({ type: 'error', message: `Upload failed: ${filePath} — ${msg}`, fileName: filePath })
+            return
+          }
           currentManifest.files[filePath].syncedAt = Date.now()
           current++
           this.sendLog({ type: 'upload', message: `Uploaded: ${filePath}`, fileName: filePath })
@@ -586,17 +616,27 @@ export class SyncEngine {
       this.manifest = currentManifest
       await saveManifest(this.vaultPath, this.manifest)
 
+      const uploadedCount = diff.toUpload.length - uploadFailures.length
+      if (uploadFailures.length > 0) {
+        // Teilerfolg: erfolgreiche Uploads sind im Manifest markiert; die fehlgeschlagenen
+        // haben weiter kein syncedAt und werden beim nächsten Auto-Sync erneut versucht.
+        this.status = 'error'
+        const error = `${uploadFailures.length} upload(s) failed (will retry): ${uploadFailures[0]}${uploadFailures.length > 1 ? ', …' : ''}`
+        this.sendProgress({ status: 'error', error })
+        return { success: false, uploaded: uploadedCount, downloaded: diff.toDownload.length, conflicts: diff.conflicts.length, error }
+      }
+
       this.status = 'done'
       const result: SyncResult = {
         success: true,
-        uploaded: diff.toUpload.length,
+        uploaded: uploadedCount,
         downloaded: diff.toDownload.length,
         conflicts: diff.conflicts.length
       }
 
       this.sendLog({
         type: 'sync',
-        message: `${diff.toUpload.length} uploaded, ${diff.toDownload.length} downloaded, ${diff.conflicts.length} conflicts`
+        message: `${uploadedCount} uploaded, ${diff.toDownload.length} downloaded, ${diff.conflicts.length} conflicts`
       })
       this.sendProgress({ status: 'done', current: total, total })
 
@@ -621,6 +661,9 @@ export class SyncEngine {
   }
 
   private lastServerTombstones: Record<string, { deletedAt: number }> = {}
+
+  // Bereits gemeldete Zu-groß-Dateien (Log-Spam-Schutz: Auto-Sync läuft alle 5 min)
+  private loggedTooLargePaths = new Set<string>()
 
   private async getRemoteManifest(): Promise<FileManifest> {
     return new Promise((resolve, reject) => {
@@ -1035,6 +1078,16 @@ export class SyncEngine {
     if (this.syncing) return
 
     try {
+      // Gleiche Größen-Schranke wie im Sync-Diff — pushFile umgeht diffManifests,
+      // darf die WS-Verbindung aber genauso wenig am Server-Payload-Limit killen.
+      const preStats = await fs.stat(path.join(this.vaultPath, relativePath))
+      if (preStats.size > MAX_SYNC_FILE_SIZE) {
+        if (!this.loggedTooLargePaths.has(relativePath)) {
+          this.loggedTooLargePaths.add(relativePath)
+          this.sendLog({ type: 'error', message: `Skipped — file exceeds 64 MB sync limit: ${relativePath}`, fileName: relativePath })
+        }
+        return
+      }
       await this.uploadFile(relativePath)
       if (this.manifest) {
         const absPath = path.join(this.vaultPath, relativePath)
