@@ -11265,7 +11265,7 @@ var import_ajv = __toESM(require_ajv(), 1);
 var import_semver = __toESM(require_semver2(), 1);
 
 // packages/plugin-api/src/version.ts
-var API_VERSION = "0.2.0";
+var API_VERSION = "0.2.1";
 
 // packages/plugin-api/src/validation.ts
 var ajv = new import_ajv.default({ allErrors: true, removeAdditional: false });
