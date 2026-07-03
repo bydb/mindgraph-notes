@@ -11220,6 +11220,8 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
   display: flex;
   flex-direction: column;
   gap: 16px;
+  /* Query-Container für die Aktionsleiste: unter 660px werden die Buttons Icon-only */
+  container-type: inline-size;
 }
 
 .inbox-email-detail-header h3 {
@@ -12009,6 +12011,7 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
 /* Email Actions in Detail View */
 .inbox-email-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   margin-top: 8px;
 }
@@ -12025,6 +12028,19 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
   font-size: 12px;
   cursor: pointer;
   transition: all 0.15s;
+  white-space: nowrap;
+}
+
+/* Schmales Panel: Aktions-Buttons Icon-only, die data-tooltip-Beschriftung übernimmt.
+   Das SVG-Icon bleibt 14px; symmetrisches Padding macht die Buttons quadratischer. */
+@container (max-width: 660px) {
+  .inbox-email-actions .inbox-action-label {
+    display: none;
+  }
+  .inbox-email-actions .inbox-action-btn {
+    padding: 6px 8px;
+    gap: 0;
+  }
 }
 
 .inbox-action-btn:hover {

@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useEffect, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import { useEmailStore } from '../../stores/emailStore'
+import { collectOwnAddresses, collectReplyAllRecipients } from '../../../shared/emailReply'
 import { useUIStore } from '../../stores/uiStore'
 import { useNotesStore } from '../../stores/notesStore'
 import { useIsModuleEnabled } from '../../utils/modules'
@@ -123,6 +124,7 @@ export const InboxPanel: React.FC<InboxPanelProps> = ({ onClose }) => {
     setCurrentView,
     setComposeState,
     startReply,
+    startReplyAll,
     startForward,
     startNewEmail,
     setAiChatEmail,
@@ -673,6 +675,16 @@ export const InboxPanel: React.FC<InboxPanelProps> = ({ onClose }) => {
                 <span className="inbox-email-from">{selectedEmail.from.name || selectedEmail.from.address}</span>
                 <span className="inbox-email-date">{formatDate(selectedEmail.date)}</span>
               </div>
+              {(selectedEmail.to?.length > 0 || (selectedEmail.cc?.length ?? 0) > 0) && (
+                <div className="inbox-email-to">
+                  {selectedEmail.to?.length > 0 && (
+                    <span>{t('inbox.detail.to')}: {selectedEmail.to.map(r => r.name || r.address).join(', ')}</span>
+                  )}
+                  {(selectedEmail.cc?.length ?? 0) > 0 && (
+                    <span> · {t('inbox.detail.cc')}: {selectedEmail.cc!.map(r => r.name || r.address).join(', ')}</span>
+                  )}
+                </div>
+              )}
               {/* Needs reply indicator */}
               {selectedEmail.analysis?.needsReply && !selectedEmail.analysis.replyHandled && (
                 <div className={`inbox-needs-reply ${selectedEmail.analysis.replyUrgency || 'medium'}`}>
@@ -747,20 +759,34 @@ export const InboxPanel: React.FC<InboxPanelProps> = ({ onClose }) => {
                     <polyline points="9 17 4 12 9 7" />
                     <path d="M20 18v-2a4 4 0 0 0-4-4H4" />
                   </svg>
-                  {t('inbox.reply')}
+                  <span className="inbox-action-label">{t('inbox.reply')}</span>
                 </button>
+                {(() => {
+                  // Reply-All nur zeigen, wenn es außer dem Absender weitere Empfänger gibt
+                  const { to, cc } = collectReplyAllRecipients(selectedEmail, collectOwnAddresses(emailSettings.accounts))
+                  return to.length + cc.length > 1 ? (
+                    <button className="inbox-action-btn" onClick={() => startReplyAll(selectedEmail)} data-tooltip={t('inbox.replyAll.tooltip')}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="7 17 2 12 7 7" />
+                        <polyline points="12 17 7 12 12 7" />
+                        <path d="M22 18v-2a4 4 0 0 0-4-4H7" />
+                      </svg>
+                      <span className="inbox-action-label">{t('inbox.replyAll')}</span>
+                    </button>
+                  ) : null
+                })()}
                 <button className="inbox-action-btn" onClick={() => startForward(selectedEmail)} data-tooltip={t('inbox.forward.tooltip')}>
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <polyline points="15 17 20 12 15 7" />
                     <path d="M4 18v-2a4 4 0 0 1 4-4h12" />
                   </svg>
-                  {t('inbox.forward')}
+                  <span className="inbox-action-label">{t('inbox.forward')}</span>
                 </button>
                 <button className="inbox-action-btn" onClick={() => setAiChatEmail(selectedEmail.id)} data-tooltip={t('inbox.discuss.tooltip')}>
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
                   </svg>
-                  {t('inbox.discuss')}
+                  <span className="inbox-action-label">{t('inbox.discuss')}</span>
                 </button>
                 {selectedEmail.analysis?.needsReply && (
                   <button
@@ -771,7 +797,7 @@ export const InboxPanel: React.FC<InboxPanelProps> = ({ onClose }) => {
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <polyline points="20 6 9 17 4 12" />
                     </svg>
-                    {selectedEmail.analysis?.replyHandled ? t('inbox.markUnhandled') : t('inbox.markHandled')}
+                    <span className="inbox-action-label">{selectedEmail.analysis?.replyHandled ? t('inbox.markUnhandled') : t('inbox.markHandled')}</span>
                   </button>
                 )}
                 {/* Move-to-folder */}
@@ -794,7 +820,7 @@ export const InboxPanel: React.FC<InboxPanelProps> = ({ onClose }) => {
                           <polyline points="9 14 12 17 15 14" />
                         </svg>
                       )}
-                      {t('inbox.move')}
+                      <span className="inbox-action-label">{t('inbox.move')}</span>
                     </button>
                     {showMoveDropdown && moveCandidates.length > 0 && (
                       <div className="inbox-move-dropdown" role="menu">

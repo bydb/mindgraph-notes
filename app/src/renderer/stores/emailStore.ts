@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import type { EmailMessage, EmailFilter, EmailFetchResult, EmailFolder, ComposeEmail, EmailSendResult } from '../../shared/types'
 import { isSentMail } from '../../shared/emailRelevance'
+import { collectOwnAddresses, collectReplyAllRecipients } from '../../shared/emailReply'
 import { useUIStore } from './uiStore'
 import { useNotesStore } from './notesStore'
 
@@ -54,12 +55,35 @@ interface EmailState {
   setCurrentView: (view: 'list' | 'detail' | 'compose' | 'aiChat') => void
   sendEmail: (vaultPath: string) => Promise<EmailSendResult>
   startReply: (email: EmailMessage) => void
+  startReplyAll: (email: EmailMessage) => void
   startForward: (email: EmailMessage) => void
   startNewEmail: () => void
   // AI Chat actions
   setAiChatEmail: (emailId: string | null) => void
   addAiChatMessage: (msg: { role: 'user' | 'assistant'; content: string }) => void
   setAiChatLoading: (loading: boolean) => void
+}
+
+/** Gemeinsame Reply-Basis (Zitat, Betreff, Signatur, Thread-Header) für Antworten/Allen antworten. */
+function buildReplyDraft(email: EmailMessage): Omit<ComposeEmail, 'to' | 'cc'> {
+  const { email: emailSettings } = useUIStore.getState()
+  const account = emailSettings.accounts[0]
+  const sig = emailSettings.signature ? `\n\n--\n${emailSettings.signature}` : ''
+
+  // Original-Email zitieren
+  const date = email.date ? new Date(email.date).toLocaleString() : ''
+  const sender = email.from.name ? `${email.from.name} <${email.from.address}>` : email.from.address
+  const quotedHeader = `\n\nAm ${date} schrieb ${sender}:\n`
+  const originalText = (email.bodyText || email.snippet || '').trim()
+  const quotedBody = originalText.split('\n').map(line => `> ${line}`).join('\n')
+
+  return {
+    subject: email.subject.startsWith('Re:') ? email.subject : `Re: ${email.subject}`,
+    body: sig + quotedHeader + quotedBody,
+    inReplyTo: email.id,
+    references: email.id,
+    accountId: account?.id || ''
+  }
 }
 
 export const useEmailStore = create<EmailState>()((set, get) => ({
@@ -641,6 +665,7 @@ export const useEmailStore = create<EmailState>()((set, get) => ({
           folder: result.sentMailbox || 'Sent',
           from: { name: '', address: account.user },
           to: composeState.to,
+          cc: composeState.cc && composeState.cc.length > 0 ? composeState.cc : undefined,
           subject: composeState.subject,
           date: new Date().toISOString(),
           snippet: composeState.body.substring(0, 200),
@@ -661,25 +686,23 @@ export const useEmailStore = create<EmailState>()((set, get) => ({
   },
 
   startReply: (email: EmailMessage) => {
-    const { email: emailSettings } = useUIStore.getState()
-    const account = emailSettings.accounts[0]
-    const sig = emailSettings.signature ? `\n\n--\n${emailSettings.signature}` : ''
-
-    // Original-Email zitieren
-    const date = email.date ? new Date(email.date).toLocaleString() : ''
-    const sender = email.from.name ? `${email.from.name} <${email.from.address}>` : email.from.address
-    const quotedHeader = `\n\nAm ${date} schrieb ${sender}:\n`
-    const originalText = (email.bodyText || email.snippet || '').trim()
-    const quotedBody = originalText.split('\n').map(line => `> ${line}`).join('\n')
-
     set({
       composeState: {
-        to: [{ name: email.from.name, address: email.from.address }],
-        subject: email.subject.startsWith('Re:') ? email.subject : `Re: ${email.subject}`,
-        body: sig + quotedHeader + quotedBody,
-        inReplyTo: email.id,
-        references: email.id,
-        accountId: account?.id || ''
+        ...buildReplyDraft(email),
+        to: [{ name: email.from.name, address: email.from.address }]
+      },
+      currentView: 'compose'
+    })
+  },
+
+  startReplyAll: (email: EmailMessage) => {
+    const { email: emailSettings } = useUIStore.getState()
+    const { to, cc } = collectReplyAllRecipients(email, collectOwnAddresses(emailSettings.accounts))
+    set({
+      composeState: {
+        ...buildReplyDraft(email),
+        to,
+        cc: cc.length > 0 ? cc : undefined
       },
       currentView: 'compose'
     })

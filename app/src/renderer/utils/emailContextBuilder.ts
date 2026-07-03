@@ -190,6 +190,9 @@ export function buildEmailContext(
   const emailContent = [
     `**Von:** ${email.from.name} <${email.from.address}>`,
     `**An:** ${email.to.map(r => `${r.name} <${r.address}>`).join(', ')}`,
+    ...(email.cc && email.cc.length > 0
+      ? [`**CC:** ${email.cc.map(r => `${r.name} <${r.address}>`).join(', ')}`]
+      : []),
     `**Betreff:** ${email.subject}`,
     `**Datum:** ${new Date(email.date).toLocaleDateString('de-DE', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}`,
     '',

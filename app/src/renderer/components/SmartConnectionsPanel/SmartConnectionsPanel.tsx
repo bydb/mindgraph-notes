@@ -233,7 +233,7 @@ function prepareTextForEmbedding(text: string): string {
   // als Bold-Markdown erzeugt und würden sonst das Embedding aller Mail-Notizen in
   // einen gemeinsamen "Metadaten-Cluster" ziehen.
   cleanText = cleanText.replace(
-    /^\*\*(?:Von|An|Datum|Relevanz|Stimmung|Kategorien|Betreff):\*\*.*$/gim,
+    /^\*\*(?:Von|An|CC|Datum|Relevanz|Stimmung|Kategorien|Betreff):\*\*.*$/gim,
     ''
   )
 

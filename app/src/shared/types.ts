@@ -1255,6 +1255,9 @@ export interface EmailMessage {
   accountId: string
   from: { name: string; address: string }
   to: { name: string; address: string }[]
+  /** CC-Empfänger aus dem IMAP-Envelope. Fehlt bei Mails, die vor Einführung
+   *  des Felds gefetcht wurden — Anzeige und Reply-All behandeln undefined wie []. */
+  cc?: { name: string; address: string }[]
   subject: string
   date: string            // ISO
   snippet: string         // Erste ~200 Zeichen

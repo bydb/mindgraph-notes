@@ -8718,7 +8718,7 @@ const SENT_DATES_MAX_PER_CONTACT = 40
 
 async function harvestSentRecipients(
   vaultPath: string,
-  emails: Array<{ sent?: boolean; folder?: string; date?: string; to?: Array<{ name?: string; address?: string }> }>
+  emails: Array<{ sent?: boolean; folder?: string; date?: string; to?: Array<{ name?: string; address?: string }>; cc?: Array<{ name?: string; address?: string }> }>
 ): Promise<void> {
   try {
     const contactsPath = path.join(vaultPath, '.mindgraph', 'contacts.json')
@@ -8736,7 +8736,7 @@ async function harvestSentRecipients(
     let changed = false
     for (const mail of emails) {
       if (!(mail.sent === true || isSentFolderName(mail.folder))) continue
-      for (const recipient of mail.to || []) {
+      for (const recipient of [...(mail.to || []), ...(mail.cc || [])]) {
         const address = recipient.address?.trim().toLowerCase()
         if (!address || !address.includes('@')) continue
         const existing = byEmail.get(address)
@@ -9021,6 +9021,10 @@ ipcMain.handle('email-fetch', async (_event, vaultPath: string, accounts: Array<
               name: t.name || '',
               address: t.address || ''
             }))
+            const cc = (msg.envelope?.cc || []).map((t: { name?: string; address?: string }) => ({
+              name: t.name || '',
+              address: t.address || ''
+            }))
 
             newEmails.push({
               id: messageId,
@@ -9033,6 +9037,7 @@ ipcMain.handle('email-fetch', async (_event, vaultPath: string, accounts: Array<
               sent: isSentFolderName(fetchFolder) || undefined,
               from: { name: from.name || '', address: from.address || '' },
               to,
+              cc: cc.length > 0 ? cc : undefined,
               subject: msg.envelope?.subject || '(Kein Betreff)',
               date: msg.envelope?.date ? new Date(msg.envelope.date).toISOString() : new Date().toISOString(),
               snippet: bodyText.substring(0, 200),
@@ -9805,6 +9810,7 @@ ipcMain.handle('email-relevance-config-save', async (_event, vaultPath: string, 
 ipcMain.handle('email-create-note', async (_event, vaultPath: string, email: {
   id: string
   from: { name: string; address: string }
+  cc?: { name: string; address: string }[]
   subject: string
   date: string
   bodyText: string
@@ -9932,6 +9938,9 @@ ipcMain.handle('email-create-note', async (_event, vaultPath: string, email: {
 
     // Metadaten
     lines.push(`**Von:** ${email.from.name || email.from.address}`)
+    if (email.cc && email.cc.length > 0) {
+      lines.push(`**CC:** ${email.cc.map(r => r.name || r.address).join(', ')}`)
+    }
     lines.push(`**Datum:** ${date.toLocaleDateString('de-DE', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}`)
     if (email.analysis) {
       lines.push(`**Relevanz:** ${email.analysis.relevanceScore}% · **Stimmung:** ${sentimentLabel(email.analysis.sentiment)}`)
