@@ -2,6 +2,19 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.10.5-beta] - 2026-07-03
+
+E-Mail-Update: CC-Empfänger kommen jetzt an, „Allen antworten" ist da, und die Aktionsleiste funktioniert auch in schmalen Panels.
+
+### Neu
+
+- **CC-Empfänger werden erfasst und angezeigt.** Bisher gingen die CC-Empfänger einer E-Mail beim Abruf verloren. Jetzt zeigt die Detail-Ansicht unter dem Absender, an wen die Mail außerdem ging („An: … · CC: …"). CC landet auch in der E-Mail-Notiz im Vault, im Kontext des KI-Chats und — bei gesendeten Mails — im Empfänger-Autocomplete des Compose-Fensters. Gilt für neu abgerufene Mails; bereits abgerufene Mails haben die Information rückwirkend nicht.
+- **„Allen antworten".** Neuer Button in der Detail-Ansicht, sichtbar sobald eine Mail außer dem Absender weitere Empfänger hat. Die Antwort geht an den Absender plus alle übrigen An-Empfänger, CC-Empfänger bleiben in CC — die eigenen Adressen (alle konfigurierten Konten) und Duplikate werden automatisch herausgefiltert.
+
+### Verbesserungen
+
+- **E-Mail-Aktionsleiste passt sich der Panel-Breite an.** Die Buttons (Antworten, Weiterleiten, Mit KI diskutieren, …) brauchten bisher ein sehr breites Panel, sonst wurden sie abgeschnitten. Jetzt brechen sie bei mittlerer Breite sauber in eine zweite Zeile um, und in schmalen Panels schalten sie auf platzsparende Icons um — die Beschriftung erscheint beim Überfahren als Tooltip.
+
 ## [0.10.4-beta] - 2026-07-02
 
 ### Fixes
