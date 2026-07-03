@@ -14,6 +14,7 @@ import { isBrainNote } from '../../utils/brainNote'
 import { BrainIcon } from '../BrainIcon'
 import { writeClipboardText } from '../../utils/clipboard'
 import { getFilePathsFromDataTransfer } from '../../utils/imageUtils'
+import { isTaskFolderExcluded } from '../../../shared/taskFolderFilter'
 
 const isMac = window.electronAPI.platform === 'darwin'
 const NOTE_KIND_ORDER: NoteKindId[] = ['problem', 'solution', 'info']
@@ -344,7 +345,7 @@ const FileItem: React.FC<FileItemProps> = ({
   }, [contextMenu])
 
   const { selectedNoteId, secondarySelectedNoteId, selectedPdfPath, selectedImagePath, selectedOfficePath, selectNote, selectSecondaryNote, selectPdf, selectImage, selectOffice, removeNote, setFileTree, vaultPath, notes, addNote, updateNotePath, fileTree, selectedPaths, togglePathSelection, clearSelection } = useNotesStore()
-  const { iconSet, setTextSplitEnabled, flashcardsEnabled, viewMode, setViewMode, setCanvasFilterPath, taskExcludedFolders, toggleTaskExcludedFolder, brain } = useUIStore()
+  const { iconSet, setTextSplitEnabled, flashcardsEnabled, viewMode, setViewMode, setCanvasFilterPath, taskExcludedFolders, taskIncludedFolders, toggleTaskExcludedFolder, brain } = useUIStore()
   const updateNote = useNotesStore(state => state.updateNote)
   const { fileCustomizations, setFileCustomization, removeFileCustomization, toggleFolderHidden, toggleFolderPinned, showHiddenFolders } = useGraphStore()
   const { openCanvasTab, openCodeTab, openPluginEditorTab } = useTabStore()
@@ -951,7 +952,8 @@ const FileItem: React.FC<FileItemProps> = ({
     setContextMenu(null)
   }, [contextMenu, toggleFolderPinned])
 
-  const isFolderTaskExcluded = contextMenu?.entry.isDirectory && taskExcludedFolders.some(f => contextMenu.entry.path === f || contextMenu.entry.path.startsWith(f + '/'))
+  // Effektiver Zustand inkl. Include-Overrides — Label und Toggle (uiStore) nutzen dieselbe Semantik
+  const isFolderTaskExcluded = contextMenu?.entry.isDirectory && isTaskFolderExcluded(contextMenu.entry.path, taskExcludedFolders, taskIncludedFolders)
 
   const handleToggleTaskExcluded = useCallback(() => {
     if (!contextMenu || !contextMenu.entry.isDirectory) return

@@ -179,7 +179,7 @@ const reloadVaultNotesForDashboard = async (vaultPath: string): Promise<Note[]> 
 export const DashboardView: React.FC<DashboardViewProps> = ({ onOpenInbox, onOpenAgent, onOpenSmartConnections }) => {
   const { t } = useTranslation()
   const { notes, vaultPath, selectNote } = useNotesStore()
-  const { taskExcludedFolders, dashboard, taskLeadTime } = useUIStore()
+  const { taskExcludedFolders, taskIncludedFolders, dashboard, taskLeadTime } = useUIStore()
   const emails = useEmailStore(state => state.emails)
   const loadDashboardOffers = useEventAgentBridge(state => state.loadOffers)
 
@@ -212,6 +212,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onOpenInbox, onOpe
         notes: snapshotNotes,
         vaultPath,
         excludedFolders: taskExcludedFolders,
+        includedFolders: taskIncludedFolders,
         emails,
         dashboardOffers: latestOffers,
         bookingsSinceIso: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString(),
@@ -233,7 +234,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onOpenInbox, onOpe
         isInitialLoadRef.current = false
       }
     }
-  }, [notes, vaultPath, taskExcludedFolders, emails, loadDashboardOffers, dashboard.calendarDaysAhead, taskLeadTime])
+  }, [notes, vaultPath, taskExcludedFolders, taskIncludedFolders, emails, loadDashboardOffers, dashboard.calendarDaysAhead, taskLeadTime])
 
   useEffect(() => {
     // Initial: sofort laden, einmalig mit reloadVault damit alle Notizen Content haben (sonst

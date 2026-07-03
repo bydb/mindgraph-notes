@@ -2,6 +2,7 @@ import type { EmailMessage, EdooboxOfferDashboard, EdooboxBooking, CalendarEvent
 import { extractTasks, type ExtractedTask } from './linkExtractor'
 import { getContextMemorySummary, type ContextMemorySummary } from './contextMemory'
 import { bucketForTask } from './taskBuckets'
+import { isTaskPathExcluded } from '../../shared/taskFolderFilter'
 import type { TaskLeadTime } from '../stores/uiStore'
 
 export interface DashboardTask extends ExtractedTask {
@@ -76,14 +77,15 @@ export async function collectTasks(
   notes: Note[],
   vaultPath: string | null,
   excludedFolders: string[],
-  leadTime: TaskLeadTime
+  leadTime: TaskLeadTime,
+  includedFolders: string[] = []
 ): Promise<TaskBuckets> {
   const empty: TaskBuckets = { overdue: [], today: [], soon: [], later: [] }
   if (!vaultPath) return empty
 
   const relevant = notes.filter(note =>
     ((note.taskStats?.total && note.taskStats.total > 0) || note.content) &&
-    !excludedFolders.some(f => note.path.startsWith(f + '/'))
+    !isTaskPathExcluded(note.path, excludedFolders, includedFolders)
   )
 
   const toLoad = relevant.filter(n => !n.content).map(n => n.path)
@@ -255,6 +257,8 @@ export interface SnapshotInputs {
   notes: Note[]
   vaultPath: string | null
   excludedFolders: string[]
+  /** Wieder-Aufnahme-Overrides unterhalb ausgeschlossener Ordner (shared/taskFolderFilter.ts). */
+  includedFolders?: string[]
   emails: EmailMessage[]
   dashboardOffers: EdooboxOfferDashboard[]
   bookingsSinceIso: string | null
@@ -265,7 +269,7 @@ export interface SnapshotInputs {
 
 export async function buildDashboardSnapshot(input: SnapshotInputs): Promise<DashboardSnapshot> {
   const [tasks, calendarRes] = await Promise.all([
-    collectTasks(input.notes, input.vaultPath, input.excludedFolders, input.taskLeadTime),
+    collectTasks(input.notes, input.vaultPath, input.excludedFolders, input.taskLeadTime, input.includedFolders),
     input.includeCalendar ? collectCalendar(input.calendarDaysAhead) : Promise.resolve<CalendarResult>({ items: [] })
   ])
   return {

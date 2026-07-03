@@ -38,6 +38,7 @@ import { DashboardView } from './components/DashboardPanel/DashboardView'
 import { MorningBriefing } from './components/DashboardPanel/MorningBriefing'
 import { SemanticScholarPanel } from './components/SemanticScholarPanel/SemanticScholarPanel'
 import { useEmailStore } from './stores/emailStore'
+import { isTaskPathExcluded } from '../shared/taskFolderFilter'
 import { PluginSlot } from './plugins/slots'
 import { TagsPanel } from './components/TagsPanel/TagsPanel'
 import { SmartConnectionsPanel } from './components/SmartConnectionsPanel/SmartConnectionsPanel'
@@ -123,7 +124,7 @@ const ViewModeButton: React.FC<{
 )
 
 const App: React.FC = () => {
-  const { viewMode, setViewMode, toggleSidebar, sidebarVisible, splitPosition, setSplitPosition, sidebarWidth, setSidebarWidth, theme, setTheme, accentColor, backgroundColor, fontFamily, setPendingTemplateInsert, textSplitEnabled, setTextSplitEnabled, textSplitPosition, setTextSplitPosition, smartConnectionsEnabled, notesChatEnabled, flashcardsEnabled, semanticScholarEnabled, customLogo, customAccentColor, customBackgroundColorLight, customBackgroundColorDark, setHelpGuideOpen, taskExcludedFolders } = useUIStore()
+  const { viewMode, setViewMode, toggleSidebar, sidebarVisible, splitPosition, setSplitPosition, sidebarWidth, setSidebarWidth, theme, setTheme, accentColor, backgroundColor, fontFamily, setPendingTemplateInsert, textSplitEnabled, setTextSplitEnabled, textSplitPosition, setTextSplitPosition, smartConnectionsEnabled, notesChatEnabled, flashcardsEnabled, semanticScholarEnabled, customLogo, customAccentColor, customBackgroundColorLight, customBackgroundColorDark, setHelpGuideOpen, taskExcludedFolders, taskIncludedFolders } = useUIStore()
   const { notes, vaultPath, selectNote, selectedPdfPath, selectedImagePath, selectedOfficePath, selectedOfficeType, secondarySelectedNoteId, navigateBack, navigateForward, selectedNoteId, noteSelectionNonce } = useNotesStore()
   const { tabs, activeTabId } = useTabStore()
   const activeTab = tabs.find(t => t.id === activeTabId)
@@ -262,16 +263,16 @@ const App: React.FC = () => {
       const count = notes.reduce((acc, note) => acc + note.outgoingLinks.length, 0)
       setLinkCount(count)
 
-      // Task-Stats (ausgeschlossene Ordner filtern)
+      // Task-Stats (ausgeschlossene Ordner filtern, Include-Overrides beachten)
       const filteredNotes = taskExcludedFolders.length > 0
-        ? notes.filter(n => !taskExcludedFolders.some(f => n.path.startsWith(f + '/')))
+        ? notes.filter(n => !isTaskPathExcluded(n.path, taskExcludedFolders, taskIncludedFolders))
         : notes
       const stats = getVaultTaskStats(filteredNotes)
       setTaskStats(stats)
     }, 100) // Kurze Verzögerung, UI first
 
     return () => clearTimeout(timer)
-  }, [notes, taskExcludedFolders])
+  }, [notes, taskExcludedFolders, taskIncludedFolders])
 
   // title → data-tooltip Konvertierung (verhindert doppelte native Tooltips)
   useEffect(() => {

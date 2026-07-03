@@ -8,6 +8,7 @@ import { trackContextEvent } from '../../utils/contextMemory'
 import { PanelHeader, PanelHeaderIconButton } from '../Shared/PanelHeader'
 import { IconClock, IconPlus, IconCalendar, IconSparkle } from '../Shared/Icons'
 import { OPENROUTER_MODEL_SENTINEL } from '../../../shared/llmBackend'
+import { isTaskPathExcluded } from '../../../shared/taskFolderFilter'
 
 interface TaskEntry extends ExtractedTask {
   noteId: string
@@ -412,7 +413,7 @@ const QuickAdd: React.FC<{
 export const OverduePanel: React.FC<OverduePanelProps> = ({ onClose }) => {
   const { t } = useTranslation()
   const { notes, vaultPath, selectNote, updateNote } = useNotesStore()
-  const { taskExcludedFolders, email, ollama } = useUIStore()
+  const { taskExcludedFolders, taskIncludedFolders, email, ollama } = useUIStore()
   const setQuickEventModalOpen = useUIStore(state => state.setQuickEventModalOpen)
   const [allTasks, setAllTasks] = useState<TaskEntry[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -479,7 +480,7 @@ export const OverduePanel: React.FC<OverduePanelProps> = ({ onClose }) => {
       const tasks: TaskEntry[] = []
       const notesWithPotentialTasks = notes.filter(note =>
         ((note.taskStats?.total && note.taskStats.total > 0) || note.content) &&
-        !taskExcludedFolders.some(f => note.path.startsWith(f + '/'))
+        !isTaskPathExcluded(note.path, taskExcludedFolders, taskIncludedFolders)
       )
 
       const notesToLoad = notesWithPotentialTasks.filter(n => !n.content)
@@ -525,7 +526,7 @@ export const OverduePanel: React.FC<OverduePanelProps> = ({ onClose }) => {
     }
 
     loadTasks()
-  }, [notes, vaultPath, taskExcludedFolders, reloadTick])
+  }, [notes, vaultPath, taskExcludedFolders, taskIncludedFolders, reloadTick])
 
   const today = getTodayStart()
   const tomorrow = new Date(today.getTime() + 24 * 60 * 60 * 1000)

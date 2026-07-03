@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import type { UpdateInfo } from '../../shared/types'
 import type { NoteKindId } from '../utils/noteKind'
 import { DEFAULT_OPENROUTER_SETTINGS, type OpenRouterSettings } from '../../shared/llmBackend'
+import { toggleTaskFolder } from '../../shared/taskFolderFilter'
 
 type ViewMode = 'editor' | 'split' | 'canvas'
 type Theme = 'light' | 'dark' | 'system'
@@ -628,8 +629,10 @@ interface UIState {
   // Sprache (TTS + STT)
   speech: SpeechSettings
 
-  // Task-Zählung: Ordner ausschließen
+  // Task-Zählung: Ordner ausschließen. taskIncludedFolders sind Wieder-Aufnahme-Overrides
+  // unterhalb ausgeschlossener Ordner — der tiefste Treffer entscheidet (shared/taskFolderFilter.ts).
   taskExcludedFolders: string[]
+  taskIncludedFolders: string[]
 
   // Smart Connections Gewichtungen
   smartConnectionsWeights: SmartConnectionsWeights
@@ -899,6 +902,7 @@ const defaultState = {
 
   // Task-Zählung: Ordner ausschließen
   taskExcludedFolders: [] as string[],
+  taskIncludedFolders: [] as string[],
 
   // KI-Features (opt-in - Human in the Loop)
   smartConnectionsEnabled: false,
@@ -1110,7 +1114,7 @@ const persistedKeys = [
   'canvasFilterPath', 'canvasViewMode', 'canvasShowEdges', 'canvasShowTags', 'canvasShowLinks', 'canvasShowImages', 'canvasShowSummaries',
   'canvasCompactMode', 'canvasReadMode', 'canvasHoverScale', 'canvasDefaultCardWidth', 'splitPosition', 'fileTreeDisplayMode', 'fileTreeKindFilter', 'notesRootFolder', 'projectsRootFolder', 'ollama', 'brain',
   'pdfCompanionEnabled', 'pdfDisplayMode', 'iconSet',
-  'smartConnectionsEnabled', 'notesChatEnabled', 'projectRagEnabled', 'flashcardsEnabled', 'workflowCanvasEnabled', 'semanticScholarEnabled', 'zoteroEnabled', 'smartConnectionsWeights', 'smartConnectionsRerankerEnabled', 'docling', 'visionOcr', 'readwise', 'languageTool', 'email', 'pluginConfig', 'dailyNote', 'taskExcludedFolders', 'speech',
+  'smartConnectionsEnabled', 'notesChatEnabled', 'projectRagEnabled', 'flashcardsEnabled', 'workflowCanvasEnabled', 'semanticScholarEnabled', 'zoteroEnabled', 'smartConnectionsWeights', 'smartConnectionsRerankerEnabled', 'docling', 'visionOcr', 'readwise', 'languageTool', 'email', 'pluginConfig', 'dailyNote', 'taskExcludedFolders', 'taskIncludedFolders', 'speech',
   'editorDefaultViewForcedToPreview',
   'appearanceMigratedToLight',
   'lastSeenVersion',
@@ -1210,9 +1214,11 @@ export const useUIStore = create<UIState>()((set, get) => ({
   setWorkflowCanvasEnabled: (enabled) => set({ workflowCanvasEnabled: enabled }),
   setSpeech: (settings) => set((state) => ({ speech: { ...state.speech, ...settings } })),
   toggleTaskExcludedFolder: (folderPath) => set((state) => {
-    const current = state.taskExcludedFolders
-    const isExcluded = current.includes(folderPath)
-    return { taskExcludedFolders: isExcluded ? current.filter(f => f !== folderPath) : [...current, folderPath] }
+    // Kippt den EFFEKTIVEN Zustand des Ordners — ein via Eltern ausgeschlossener
+    // Unterordner bekommt einen Include-Override statt (wie früher) fälschlich
+    // einen zusätzlichen Exclude-Eintrag.
+    const next = toggleTaskFolder(folderPath, state.taskExcludedFolders, state.taskIncludedFolders)
+    return { taskExcludedFolders: next.excluded, taskIncludedFolders: next.included }
   }),
   setSemanticScholarEnabled: (enabled) => set({ semanticScholarEnabled: enabled }),
   setZoteroEnabled: (enabled) => set({ zoteroEnabled: enabled }),
