@@ -187,6 +187,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
     cloud?: { model: string } | null
   }) => ipcRenderer.invoke('note-agent-run', params),
   noteAgentCancel: (runId: string) => ipcRenderer.invoke('note-agent-cancel', runId),
+  // Agent-Skills Stufe 1: Vault-Skills verwalten
+  noteSkillsList: (vaultPath: string) => ipcRenderer.invoke('note-skills-list', vaultPath),
+  noteSkillsSetEnabled: (vaultPath: string, folderName: string, enabled: boolean) =>
+    ipcRenderer.invoke('note-skills-set-enabled', vaultPath, folderName, enabled),
+  noteSkillsCreate: (vaultPath: string, name: string) => ipcRenderer.invoke('note-skills-create', vaultPath, name),
+  noteSkillsInstallStarter: (vaultPath: string) => ipcRenderer.invoke('note-skills-install-starter', vaultPath),
   noteAgentAcceptResult: (runId: string, resultId: string) => ipcRenderer.invoke('note-agent-accept-result', runId, resultId),
   noteAgentDiscardResult: (runId: string, resultId: string) => ipcRenderer.invoke('note-agent-discard-result', runId, resultId),
   onNoteAgentProgress: (callback: (p: { runId: string; seq: number; skill: string; summary: string }) => void) => {

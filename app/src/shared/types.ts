@@ -397,6 +397,15 @@ export interface NoteAgentResultCard {
   sources: string[];
 }
 
+// Agent-Skills Stufe 1: Vault-Skill (Skills/<ordner>/SKILL.md, agentskills.io-Format).
+export interface NoteAgentSkill {
+  name: string;
+  description: string;
+  folderName: string;
+  relPath: string;
+  enabled: boolean;
+}
+
 export interface NoteAgentProgressEvent {
   runId: string;
   seq: number;
@@ -648,6 +657,11 @@ export interface ElectronAPI {
     cloud?: { model: string } | null;
   }) => Promise<{ success: boolean; runId?: string; error?: string }>;
   noteAgentCancel: (runId: string) => Promise<{ success: boolean }>;
+  // Agent-Skills Stufe 1
+  noteSkillsList: (vaultPath: string) => Promise<{ skills: NoteAgentSkill[]; error?: string }>;
+  noteSkillsSetEnabled: (vaultPath: string, folderName: string, enabled: boolean) => Promise<{ success: boolean; error?: string }>;
+  noteSkillsCreate: (vaultPath: string, name: string) => Promise<{ success: boolean; relPath?: string; folderName?: string; error?: string }>;
+  noteSkillsInstallStarter: (vaultPath: string) => Promise<{ success: boolean; installed: string[]; error?: string }>;
   noteAgentAcceptResult: (runId: string, resultId: string) => Promise<{ success: boolean; fileName?: string; relPath?: string; error?: string }>;
   noteAgentDiscardResult: (runId: string, resultId: string) => Promise<{ success: boolean; error?: string }>;
   onNoteAgentProgress: (callback: (p: NoteAgentProgressEvent) => void) => void;

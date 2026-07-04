@@ -11,6 +11,7 @@ import type { ToolContext as TelegramToolContext } from '../telegram/agent/tools
 import { getContextAttachmentInfos, readAttachmentRaw } from './contextFiles'
 import { registerResult, type AgentRun } from './runRegistry'
 import { sanitizeOutputFileName, writeStagingFile } from './staging'
+import { readSkillBody } from './skillsLoader'
 import { markdownToDocx } from '../office/officeService'
 
 export interface NoteAgentContext {
@@ -86,6 +87,30 @@ export function createNoteAgentRegistry(): ToolRegistry<NoteAgentContext> {
       const res = await readAttachmentRaw(ctx.senderId, info.id, ctx.run.instruction)
       ctx.run.sources.add(info.name)
       return { ok: true, content: res.content, display: `read_attachment: ${info.name}` }
+    }
+  })
+
+  registry.register({
+    name: 'use_skill',
+    description: 'Lädt die vollständige Arbeitsanleitung (Skill) des Nutzers. Parameter: name = Skill-Name aus der Skill-Liste. Passt ein Skill zur Aufgabe, lies ihn ZUERST und folge seiner Anleitung.',
+    parameters: {
+      type: 'object',
+      properties: { name: { type: 'string', description: 'Skill-Name aus der Liste im System-Prompt' } },
+      required: ['name']
+    },
+    isWrite: false,
+    run: async (args, ctx) => {
+      const name = requireString(args, 'name')
+      if (!name) return err('Parameter "name" fehlt')
+      const skill =
+        ctx.run.skills.find(s => s.name === name || s.folderName === name) ||
+        ctx.run.skills.find(s => s.name.toLowerCase() === name.toLowerCase() || s.folderName.toLowerCase() === name.toLowerCase())
+      if (!skill) {
+        return err(`Skill "${name}" nicht gefunden. Verfügbar: ${ctx.run.skills.map(s => s.name).join(', ') || '(keine)'}`)
+      }
+      const body = await readSkillBody(ctx.run.vaultPath, skill.folderName)
+      ctx.run.sources.add(`Skill: ${skill.name}`)
+      return { ok: true, content: body, display: `use_skill: ${skill.name}` }
     }
   })
 

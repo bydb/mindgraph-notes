@@ -34,6 +34,9 @@ export interface AgentRun {
   targetFolderRel: string
   attachmentIds: string[]
   instruction: string
+  // Aktivierte Vault-Skills (Agent-Skills Stufe 1) — Discovery-Metadaten für den
+  // System-Prompt; den Body holt use_skill bei Bedarf.
+  skills: Array<{ name: string; description: string; folderName: string }>
   status: AgentRunStatus
   abort: AbortController
   seq: number
@@ -54,6 +57,7 @@ export function startRun(params: {
   targetFolderRel: string
   attachmentIds: string[]
   instruction: string
+  skills?: Array<{ name: string; description: string; folderName: string }>
 }): AgentRun | null {
   const existing = activeBySender.get(params.senderId)
   if (existing && existing.status === 'running') return null
@@ -67,6 +71,7 @@ export function startRun(params: {
     targetFolderRel: params.targetFolderRel,
     attachmentIds: params.attachmentIds,
     instruction: params.instruction,
+    skills: params.skills ?? [],
     status: 'running',
     abort: new AbortController(),
     seq: 0,

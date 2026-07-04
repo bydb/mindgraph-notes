@@ -15,6 +15,7 @@ import { TelegramSettings } from './TelegramSettings'
 import { CredentialsSettings } from './CredentialsSettings'
 import { ModelCompatibilitySection, ActiveModelStatusBadge, VERDICT_ICON, VERDICT_COLOR } from './ModelCompatibilitySection'
 import { OpenRouterSection } from './OpenRouterSection'
+import { SkillsSection } from './SkillsSection'
 import { EmailRelevanceRulesSection } from './EmailRelevanceRulesSection'
 import { getModelVerdict, CLOUD_TEST_MODELS, RECOMMENDED_PULL_MODELS, isCloudModel, modelMarkers } from '../../../shared/modelCompatibility'
 import { OPENROUTER_MODEL_SENTINEL, isOpenRouterReady } from '../../../shared/llmBackend'
@@ -40,7 +41,7 @@ interface SettingsProps {
   initialTab?: Tab
 }
 
-type Tab = 'vault' | 'general' | 'editor' | 'templates' | 'integrations' | 'shortcuts' | 'dataview' | 'sync' | 'dailyNote' | 'remarkable' | 'email' | 'agents' | 'transport' | 'dashboard' | 'modules' | 'speech' | 'telegram' | 'credentials' | 'brain'
+type Tab = 'vault' | 'general' | 'editor' | 'templates' | 'integrations' | 'shortcuts' | 'dataview' | 'sync' | 'dailyNote' | 'remarkable' | 'email' | 'agents' | 'transport' | 'dashboard' | 'modules' | 'speech' | 'telegram' | 'credentials' | 'brain' | 'skills'
 
 type BuiltInTemplateKey = 'empty' | 'dailyNote' | 'zettel' | 'meeting'
 
@@ -2608,6 +2609,16 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab 
               {t('settings.tab.brain')}
             </button>
             <button
+              className={`settings-nav-item ${activeTab === 'skills' ? 'active' : ''}`}
+              onClick={() => setActiveTab('skills')}
+            >
+              <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+                <path d="M9 2l1.8 4.4L15 8.2l-4.2 1.8L9 14.4 7.2 10 3 8.2l4.2-1.8L9 2z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
+                <path d="M14.5 12.5l.7 1.8 1.8.7-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7.7-1.8z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/>
+              </svg>
+              {t('settings.tab.skills')}
+            </button>
+            <button
               className={`settings-nav-item ${activeTab === 'transport' ? 'active' : ''}`}
               onClick={() => setActiveTab('transport')}
             >
@@ -5109,6 +5120,7 @@ LIMIT 10
             )}
 
             {/* Brain Tab — Lokales Tagesgedächtnis */}
+            {activeTab === 'skills' && <SkillsSection onClose={onClose} />}
             {activeTab === 'brain' && (
               <div className="settings-section">
                 <h3>{t('settings.brain.title')}</h3>

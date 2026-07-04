@@ -156,6 +156,7 @@ import { registerContextAttachment, registerContextFolder, removeContextAttachme
 import { startRun, getRunForSender, finishRun, publicResults, takeResult, cancelRunsForSender } from './noteAgent/runRegistry'
 import { runNoteAgentLoop } from './noteAgent/loop'
 import { cleanupOldStaging, assertInsideRunStaging, collisionFreeName } from './noteAgent/staging'
+import { listVaultSkills, listEnabledSkillHeaders, setSkillEnabled, createSkill, SKILLS_DIRNAME } from './noteAgent/skillsLoader'
 import { supportsNativeToolCalls } from '../shared/modelCompatibility'
 import { createHostFactory, type HostServices } from './plugins/host'
 import * as nativeServices from './plugins/nativeServices'
@@ -4012,13 +4013,17 @@ ipcMain.handle('note-agent-run', async (event, params: NoteAgentRunParams) => {
       chatOptions = { backend: 'ollama', ollamaModel: params.model }
     }
 
+    // Agent-Skills Stufe 1: aktivierte Vault-Skills als Discovery-Metadaten mitgeben.
+    const skills = await listEnabledSkillHeaders(params.vaultPath).catch(() => [])
+
     const run = startRun({
       senderId: event.sender.id,
       noteId: params.noteId,
       vaultPath: params.vaultPath,
       targetFolderRel: params.targetFolderRel,
       attachmentIds: params.attachmentIds || [],
-      instruction: params.instruction.trim()
+      instruction: params.instruction.trim(),
+      skills
     })
     if (!run) return { success: false, error: 'Es läuft bereits ein Agent-Lauf in diesem Fenster — erst abbrechen oder abwarten.' }
     hookNoteAgentCleanup(event.sender)
@@ -4102,6 +4107,69 @@ ipcMain.handle('note-agent-accept-result', async (event, runId: string, resultId
     // Übernahme gescheitert → Konsum zurücknehmen, damit der Nutzer es erneut versuchen kann.
     entry.consumed = false
     return { success: false, error: error instanceof Error ? error.message : 'Unbekannter Fehler' }
+  }
+})
+
+// ── Agent-Skills Stufe 1: Vault-Skills verwalten (docs/agent-skills-plan.md) ──
+ipcMain.handle('note-skills-list', async (event, vaultPath: string) => {
+  if (!isTrustedSender(event)) return { skills: [], error: 'Nicht autorisierter Aufrufer' }
+  try {
+    assertApprovedVault(vaultPath, 'note-skills-list')
+    return { skills: await listVaultSkills(vaultPath) }
+  } catch (error) {
+    return { skills: [], error: error instanceof Error ? error.message : 'Unbekannter Fehler' }
+  }
+})
+
+ipcMain.handle('note-skills-set-enabled', async (event, vaultPath: string, folderName: string, enabled: boolean) => {
+  if (!isTrustedSender(event)) return { success: false, error: 'Nicht autorisierter Aufrufer' }
+  try {
+    assertApprovedVault(vaultPath, 'note-skills-set-enabled')
+    await setSkillEnabled(vaultPath, path.basename(folderName), enabled)
+    return { success: true }
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : 'Unbekannter Fehler' }
+  }
+})
+
+ipcMain.handle('note-skills-create', async (event, vaultPath: string, name: string) => {
+  if (!isTrustedSender(event)) return { success: false, error: 'Nicht autorisierter Aufrufer' }
+  try {
+    assertApprovedVault(vaultPath, 'note-skills-create')
+    const res = await createSkill(vaultPath, name)
+    return { success: true, ...res }
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : 'Unbekannter Fehler' }
+  }
+})
+
+// Gebündelte Starter-Skills (resources/starter-skills/*) in den Vault kopieren —
+// vorhandene Skill-Ordner werden NIE überschrieben.
+ipcMain.handle('note-skills-install-starter', async (event, vaultPath: string) => {
+  if (!isTrustedSender(event)) return { success: false, installed: [], error: 'Nicht autorisierter Aufrufer' }
+  try {
+    assertApprovedVault(vaultPath, 'note-skills-install-starter')
+    const resourcesBase = app.isPackaged
+      ? path.join(process.resourcesPath)
+      : path.join(app.getAppPath(), 'resources')
+    const sourceDir = path.join(resourcesBase, 'starter-skills')
+    const entries = await fs.readdir(sourceDir, { withFileTypes: true })
+    const installed: string[] = []
+    for (const e of entries) {
+      if (!e.isDirectory()) continue
+      const target = path.join(vaultPath, SKILLS_DIRNAME, e.name)
+      try {
+        await fs.access(target)
+        continue // existiert — nicht überschreiben
+      } catch {
+        /* frei — kopieren */
+      }
+      await copyDirectoryRecursive(path.join(sourceDir, e.name), target)
+      installed.push(e.name)
+    }
+    return { success: true, installed }
+  } catch (error) {
+    return { success: false, installed: [], error: error instanceof Error ? error.message : 'Unbekannter Fehler' }
   }
 })
 
