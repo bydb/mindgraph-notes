@@ -2,6 +2,23 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.10.7-beta] - 2026-07-04
+
+Der Notiz-Agent lernt dazu: Skills als editierbare Anleitungen im Vault, ein kuratierter Skill-Katalog — und ein sichtbares Gedächtnis, das mit jedem Lauf wächst.
+
+### Neu
+
+- **Agent-Skills: Anleitungen, die der Agent selbst heranzieht.** Skills sind Markdown-Dateien im Vault-Ordner „Skills" (offenes SKILL.md-Format von agentskills.io — dieselben Dateien lesen auch Claude Code, Codex, Gemini CLI u.v.m.). Der Agent bekommt nur Name und Beschreibung in den Kontext; passt ein Skill zum Auftrag, liest er die volle Anleitung selbst und folgt ihr. Genutzte Skills erscheinen im Lauf-Protokoll und als Quelle auf der Ergebnis-Karte.
+- **Neuer Einstellungen-Tab „Skills".** Skills aktivieren/deaktivieren, mit einem Klick als ganz normale Notiz im Editor bearbeiten oder aus einem Template neu anlegen. Fünf deutsche Starter-Skills zum Ein-Klick-Installieren: Protokoll, Elternbrief, Tabellen-Zuordnung, Teilnehmerliste, Zusammenfassung.
+- **Skill-Katalog.** Kuratierte Skills von mindgraph-notes.de direkt in den Einstellungen durchstöbern — der komplette Inhalt wird vor der Installation angezeigt, inklusive Lizenz und Quelle. Zum Start sechs Skills (CC0): Selbsttest, Literaturnotiz, Wochenrückblick, Unterrichtsentwurf, Veranstaltungs-Checkliste, Pressemitteilung.
+- **Skill-Import vom Rechner.** SKILL.md-Dateien oder komplette Skill-Ordner (z. B. aus Community-Sammlungen) importieren. Enthaltene `scripts/`-Verzeichnisse werden aus Sicherheitsgründen grundsätzlich nicht übernommen — Skills sind in MindGraph reine Anleitungen, kein Code.
+- **Der Agent merkt sich, was du ihm beibringst.** Nach jedem Lauf gibt es „Fürs nächste Mal merken…": Bestätigte Merksätze landen als datierte Einträge in der Notiz `Skills/Agent-Gedächtnis.md`, die in jeden künftigen Lauf einfließt. Sichtbar, editierbar, löschbar — kein verstecktes Lernen, gespeichert wird nur per Klick.
+- **Skills mit Zusatzmaterial.** Skills können Referenzdateien mitbringen (`references/`, `assets/`) — der Agent listet sie beim Lesen des Skills auf und kann sie gezielt nachladen.
+
+### Verbessert
+
+- Der System-Prompt des Agenten stellt Nutzer-Anleitungen ausdrücklich über die eigenen Gewohnheiten des Modells („die Anleitung des Nutzers hat Vorrang").
+
 ## [0.10.6-beta] - 2026-07-04
 
 Der Notiz-Agent ist da: Dateien und ganze Ordner als KI-Kontext, Fragen zu PDFs und Tabellen im Notes Chat — und mit Zielordner wird die Notiz-KI zum Agenten, der recherchiert und Dateien erzeugt.
