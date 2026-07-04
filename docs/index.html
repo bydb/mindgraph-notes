@@ -466,7 +466,7 @@
         <span class="hero-dot"></span>
         <span data-i18n="hero.badge">Open Source &middot; Lokal &middot; Kostenlos</span>
       </div>
-      <a class="release-badge" href="#changelog" data-i18n="hero.release">Neu: Anpassbare Editor-Kopfzeile &amp; Embed-Gr&ouml;&szlig;en &middot; v0.10.4</a>
+      <a class="release-badge" href="#changelog" data-i18n="hero.release">Neu: Notiz-Agent mit Skills &ndash; KI erzeugt Dateien aus deinen Unterlagen &middot; v0.10.7</a>
     </div>
 
     <h1 data-i18n="hero.title">Der Fokus bleibt.<br><em>Auch wenn das Leben dazwischenkommt.</em></h1>
@@ -715,8 +715,10 @@
   <style>
     .how { max-width:1080px; margin:4rem auto 1rem; padding:0 1.5rem; }
     .how-head { text-align:center; margin-bottom:2.2rem; }
-    .how-tabs { display:flex; flex-wrap:wrap; gap:.4rem; justify-content:center; background:var(--card); border:1px solid var(--border); border-radius:100px; padding:.4rem; max-width:760px; margin:0 auto 2.4rem; }
-    .how-tab { flex:1; min-width:max-content; border:none; background:transparent; color:var(--text-mid); font:inherit; font-size:.88rem; font-weight:600; padding:.7rem 1.1rem; border-radius:100px; cursor:pointer; transition:all .2s; white-space:nowrap; }
+    /* width:max-content statt fester max-width: die Pille schrumpft auf den Inhalt und
+       bleibt einzeilig, solange Platz ist — kein zerrissener Umbruch mehr bei 4-5 Tabs. */
+    .how-tabs { display:flex; flex-wrap:wrap; gap:.4rem; justify-content:center; background:var(--card); border:1px solid var(--border); border-radius:100px; padding:.4rem; width:max-content; max-width:100%; margin:0 auto 2.4rem; }
+    .how-tab { flex:0 0 auto; min-width:max-content; border:none; background:transparent; color:var(--text-mid); font:inherit; font-size:.88rem; font-weight:600; padding:.7rem 1.1rem; border-radius:100px; cursor:pointer; transition:all .2s; white-space:nowrap; }
     .how-tab:hover { color:var(--text); }
     .how-tab.active { background:var(--gradient); color:#1a120c; box-shadow:0 6px 18px rgba(255,122,60,.32); }
     .how-panel { display:none; grid-template-columns:1fr 1fr; gap:clamp(1.5rem,4vw,3.5rem); align-items:center; }
@@ -730,18 +732,21 @@
     .how-shot { position:relative; z-index:1; width:100%; }
     .how-shot img { width:100%; display:block; filter:drop-shadow(0 30px 60px rgba(0,0,0,.5)); }
     .how-badge { position:absolute; z-index:2; left:-16px; top:30px; width:56px; height:56px; border-radius:16px; background:var(--bg-warm); border:1px solid var(--border); display:flex; align-items:center; justify-content:center; color:#ff7a3c; box-shadow:0 14px 34px rgba(0,0,0,.45); }
+    /* Sobald die Tabs umbrechen müssen, weicher Radius statt 100px-Pille (sonst wirkt der Umbruch kaputt). */
+    @media (max-width:1160px){ .how-tabs{border-radius:22px;} }
     @media (max-width:780px){ .how-panel.active{grid-template-columns:1fr;} .how-visual{order:-1;} .how-tabs{border-radius:18px;} .how-tab{flex:auto;} .how-badge{left:8px;top:8px;} }
   </style>
   <section class="how" id="how">
     <div class="how-head">
       <div class="section-label" data-i18n="how.label">Wie es funktioniert</div>
-      <h2 class="section-heading" data-i18n="how.heading">Ein Werkzeug, vier Bausteine.</h2>
+      <h2 class="section-heading" data-i18n="how.heading">Ein Werkzeug, f&uuml;nf Bausteine.</h2>
     </div>
     <div class="how-tabs" role="tablist">
       <button class="how-tab active" data-how="0" data-i18n="how.t0">Dashboard &amp; Relevanz</button>
       <button class="how-tab" data-how="1" data-i18n="how.t1">Wissensraum &amp; Graph</button>
       <button class="how-tab" data-how="2" data-i18n="how.t2">Lokale KI &amp; Datenschutz</button>
       <button class="how-tab" data-how="3" data-i18n="how.t3">Lernen &amp; Karteikarten</button>
+      <button class="how-tab" data-how="4" data-i18n="how.t4">Agent &amp; Skills</button>
     </div>
 
     <div class="how-panel active" data-how="0">
@@ -793,6 +798,19 @@
         <div class="halo"></div>
         <div class="how-badge"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a7 7 0 00-4 12.7c.5.4.8 1 .9 1.6h6.2c.1-.6.4-1.2.9-1.6A7 7 0 0012 2z"/><path d="M9 18h6M10 22h4"/></svg></div>
         <div class="how-shot"><img src="screenshot.png" alt="MindGraph Editor mit Notiz und Karteikarten-Panel" loading="lazy"></div>
+      </div>
+    </div>
+
+    <div class="how-panel" data-how="4">
+      <div>
+        <div class="how-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l2.2 5.3L20 10.5l-5.8 2.2L12 18l-2.2-5.3L4 10.5l5.8-2.2L12 3z"/><path d="M19 15l.9 2.1L22 18l-2.1.9L19 21l-.9-2.1L16 18l2.1-.9L19 15z"/></svg></div>
+        <h3 data-i18n="how.p4h">Ein Assistent f&uuml;r echte Arbeit</h3>
+        <p data-i18n="how.p4">Gib der KI deine Unterlagen &ndash; Excel, Word, PDF oder ganze Ordner &ndash; und einen Auftrag. Der Agent recherchiert in deinen Notizen und erzeugt fertige Dateien; du pr&uuml;fst jedes Ergebnis, bevor es in deinen Vault kommt. Skills sind einfache Notizen, mit denen du ihm deine Arbeitsweise beibringst (offener SKILL.md-Standard wie bei Claude Code &amp; Co.) &ndash; und was du ihm einmal sagst, merkt er sich. Sichtbar und editierbar.</p>
+      </div>
+      <div class="how-visual">
+        <div class="halo"></div>
+        <div class="how-badge"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l2.2 5.3L20 10.5l-5.8 2.2L12 18l-2.2-5.3L4 10.5l5.8-2.2L12 3z"/></svg></div>
+        <div class="how-shot"><img src="screenshot.png" alt="MindGraph Notiz-Agent: Auftrag mit Kontext-Dateien und Zielordner" loading="lazy"></div>
       </div>
     </div>
   </section>
@@ -1524,11 +1542,12 @@
         "st.invite.lead": "Kostenlos, Open Source, in 2 Minuten startklar. Dein bestehender Markdown-Vault öffnet 1:1.",
         "st.invite.cta": "Kostenlos herunterladen",
         "how.label": "Wie es funktioniert",
-        "how.heading": "Ein Werkzeug, vier Bausteine.",
+        "how.heading": "Ein Werkzeug, fünf Bausteine.",
         "how.t0": "Dashboard &amp; Relevanz",
         "how.t1": "Wissensraum &amp; Graph",
         "how.t2": "Lokale KI &amp; Datenschutz",
         "how.t3": "Lernen &amp; Karteikarten",
+        "how.t4": "Agent &amp; Skills",
         "how.p0h": "Dein Tag auf einen Blick",
         "how.p0": "Ein Tab statt zehn: überfällige Aufgaben, Mails mit Antwort-Dringlichkeit, heutige Termine. Eine lokale KI bewertet laufend, welche offenen Probleme Aufmerksamkeit brauchen – und holt vergessene Notizen zurück ins Sichtfeld. Auch nach fünf Tagen Pause liegt alles sortiert da.",
         "how.p1h": "Alles verbunden",
@@ -1537,8 +1556,10 @@
         "how.p2": "Die KI läuft lokal (Ollama / LM Studio) – keine Cloud-Pflicht, keine Telemetrie. Du musst dich nicht zwischen KI <em>und</em> Datenschutz entscheiden. Der optionale Sync ist Ende-zu-Ende verschlüsselt; die Passphrase verlässt nie dein Gerät.",
         "how.p3h": "Wissen, das bleibt",
         "how.p3": "Karteikarten mit Spaced Repetition (SM-2), KI-Generierung direkt aus deinen Notizen, Anki-Import. Du rufst Wissen aktiv ab, statt es nachzuschlagen – so bleibt KI ein Werkzeug, das dich schärfer macht, nicht abhängig.",
+        "how.p4h": "Ein Assistent für echte Arbeit",
+        "how.p4": "Gib der KI deine Unterlagen – Excel, Word, PDF oder ganze Ordner – und einen Auftrag. Der Agent recherchiert in deinen Notizen und erzeugt fertige Dateien; du prüfst jedes Ergebnis, bevor es in deinen Vault kommt. Skills sind einfache Notizen, mit denen du ihm deine Arbeitsweise beibringst (offener SKILL.md-Standard wie bei Claude Code &amp; Co.) – und was du ihm einmal sagst, merkt er sich. Sichtbar und editierbar.",
         "hero.badge": "Open Source \u00b7 Lokal \u00b7 Kostenlos",
-        "hero.release": "Neu: Anpassbare Editor-Kopfzeile & Embed-Größen · v0.10.4",
+        "hero.release": "Neu: Notiz-Agent mit Skills – KI erzeugt Dateien aus deinen Unterlagen · v0.10.7",
         "hero.title": "Der Fokus bleibt.<br><em>Auch wenn das Leben dazwischenkommt.</em>",
         "hero.sub": "MindGraph zeigt dir jeden Morgen, was heute z\u00e4hlt \u2014 Aufgaben, Mails, Termine, vergessene F\u00e4den. Du gehst aufs Bike, ins Wochenende, liegst mal f\u00fcnf Tage flach. Und nichts f\u00e4llt durch. Lokal, ohne Cloud-Zwang.",
         "hero.cta": "Kostenlos herunterladen",
@@ -1736,11 +1757,12 @@
         "st.invite.lead": "Free, open source, ready in 2 minutes. Your existing Markdown vault opens as-is.",
         "st.invite.cta": "Download for free",
         "how.label": "How it works",
-        "how.heading": "One tool, four building blocks.",
+        "how.heading": "One tool, five building blocks.",
         "how.t0": "Dashboard &amp; relevance",
         "how.t1": "Knowledge space &amp; graph",
         "how.t2": "Local AI &amp; privacy",
         "how.t3": "Learning &amp; flashcards",
+        "how.t4": "Agent &amp; skills",
         "how.p0h": "Your day at a glance",
         "how.p0": "One tab instead of ten: overdue tasks, emails by reply urgency, today's appointments. A local AI continuously rates which open problems need attention – and brings forgotten notes back into view. Even after a five-day break, everything is there, sorted.",
         "how.p1h": "Everything connected",
@@ -1749,8 +1771,10 @@
         "how.p2": "The AI runs locally (Ollama / LM Studio) – no cloud requirement, no telemetry. You don't have to choose between AI <em>and</em> privacy. The optional sync is end-to-end encrypted; the passphrase never leaves your device.",
         "how.p3h": "Knowledge that sticks",
         "how.p3": "Flashcards with spaced repetition (SM-2), AI generation straight from your notes, Anki import. You recall knowledge actively instead of looking it up – so AI stays a tool that makes you sharper, not dependent.",
+        "how.p4h": "An assistant for real work",
+        "how.p4": "Hand the AI your files – Excel, Word, PDF or whole folders – and a task. The agent researches your notes and produces finished files; you review every result before it enters your vault. Skills are plain notes that teach it how you work (the open SKILL.md standard used by Claude Code &amp; co.) – and what you tell it once, it remembers. Visible and editable.",
         "hero.badge": "Open Source \u00b7 Local \u00b7 Free",
-        "hero.release": "New: Customizable editor header & embed sizes · v0.10.4",
+        "hero.release": "New: Note agent with skills – AI creates files from your documents · v0.10.7",
         "hero.title": "Shows you<br><em>what matters today.</em>",
         "hero.sub": "MindGraph Notes connects your notes, tasks, emails and documents \u2014 and ranks them by relevance. Dashboard, knowledge graph and local AI in one desktop app. No cloud lock-in.",
         "hero.cta": "Download for free",
