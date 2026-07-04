@@ -72,6 +72,8 @@ const translations = {
     'pdfViewer.noContentExtracted': "Keine Inhalte extrahiert",
     'pdfViewer.loading': "PDF wird geladen...",
     'pdfViewer.processing': "PDF wird verarbeitet...",
+    'pdfViewer.aiEdit': "Mit KI bearbeiten",
+    'pdfViewer.aiEditTooltip': "Begleitnotiz öffnen und dieses PDF als KI-Kontext anhängen",
     'editor.aiEdited': "KI-bearbeitet",
     'editor.saving': "Speichern...",
     'editor.closeSecondaryPanel': "Sekundäres Panel schließen",
@@ -746,6 +748,14 @@ const translations = {
     'aiBar.preset.shorten': 'Kürzen',
     'aiBar.preset.structure': 'Strukturieren',
     'aiBar.preset.tone': 'Ton anpassen',
+    'aiBar.context.label': 'Kontext',
+    'aiBar.context.add': 'Datei als Kontext anhängen',
+    'aiBar.context.searchPlaceholder': 'Vault durchsuchen…',
+    'aiBar.context.fromComputer': 'Datei vom Computer wählen…',
+    'aiBar.context.folderFromComputer': 'Ordner vom Computer wählen…',
+    'aiBar.context.noResults': 'Keine passende Datei gefunden',
+    'aiBar.context.remove': 'Anhang entfernen',
+    'aiBar.context.cloudHint': 'Hinweis: Die angehängten Dateien werden an das gewählte Cloud-Modell gesendet. Lokales Modell wählen, um das zu vermeiden.',
 
     'titlebar.sync': 'Sync-Status',
 
@@ -1479,6 +1489,7 @@ const translations = {
     // Notes Chat
     'notesChat.noNoteSelected': 'Keine Notiz ausgewählt',
     'notesChat.notePrefix': 'Notiz',
+    'notesChat.filePrefix': 'Datei',
     'notesChat.folderPrefix': 'Ordner',
     'notesChat.noFolderSelected': 'Kein Ordner ausgewählt',
     'notesChat.selectFolder': 'Ordner wählen...',
@@ -2790,6 +2801,8 @@ const translations = {
     'pdfViewer.noContentExtracted': "No content extracted",
     'pdfViewer.loading': "Loading PDF...",
     'pdfViewer.processing': "Processing PDF...",
+    'pdfViewer.aiEdit': "Edit with AI",
+    'pdfViewer.aiEditTooltip': "Open companion note and attach this PDF as AI context",
     'editor.aiEdited': "AI-edited",
     'editor.saving': "Saving...",
     'editor.closeSecondaryPanel': "Close secondary panel",
@@ -3465,6 +3478,14 @@ const translations = {
     'aiBar.preset.shorten': 'Shorten',
     'aiBar.preset.structure': 'Structure',
     'aiBar.preset.tone': 'Adjust tone',
+    'aiBar.context.label': 'Context',
+    'aiBar.context.add': 'Attach file as context',
+    'aiBar.context.searchPlaceholder': 'Search vault…',
+    'aiBar.context.fromComputer': 'Choose file from computer…',
+    'aiBar.context.folderFromComputer': 'Choose folder from computer…',
+    'aiBar.context.noResults': 'No matching file found',
+    'aiBar.context.remove': 'Remove attachment',
+    'aiBar.context.cloudHint': 'Note: The attached files will be sent to the selected cloud model. Choose a local model to avoid this.',
 
     'titlebar.sync': 'Sync status',
 
@@ -4198,6 +4219,7 @@ const translations = {
     // Notes Chat
     'notesChat.noNoteSelected': 'No note selected',
     'notesChat.notePrefix': 'Note',
+    'notesChat.filePrefix': 'File',
     'notesChat.folderPrefix': 'Folder',
     'notesChat.noFolderSelected': 'No folder selected',
     'notesChat.selectFolder': 'Select folder...',

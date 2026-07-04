@@ -169,6 +169,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
   openAlexDeleteMailto: () => ipcRenderer.invoke('openalex-delete-mailto'),
   openAlexCheck: () => ipcRenderer.invoke('openalex-check'),
 
+  // Notiz-Agent Phase 1: Kontext-Dateien für die Macher-Leiste (Attachment-IDs, Pfade bleiben Main-seitig)
+  noteAgentAttachDialog: () => ipcRenderer.invoke('note-agent-attach-dialog'),
+  noteAgentAttachFolderDialog: () => ipcRenderer.invoke('note-agent-attach-folder-dialog'),
+  noteAgentAttachVaultFile: (vaultPath: string, relPath: string) =>
+    ipcRenderer.invoke('note-agent-attach-vault-file', vaultPath, relPath),
+  noteAgentDetach: (id: string) => ipcRenderer.invoke('note-agent-detach', id),
+
   // Ollama Local AI API
   ollamaCheck: () => ipcRenderer.invoke('ollama-check'),
   ollamaModels: () => ipcRenderer.invoke('ollama-models'),
@@ -181,6 +188,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     originalText: string
     customPrompt?: string
     cloud?: { model: string } | null
+    contextAttachmentIds?: string[]
   }) => ipcRenderer.invoke('ollama-generate', request),
   ollamaGenerateImage: (request: {
     model: string
@@ -211,8 +219,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('ollama-rerank-pair', model, query, document) as Promise<{ success: boolean; score?: number; error?: string }>,
 
   // Ollama Chat für Notes Chat
-  ollamaChat: (model: string, messages: Array<{ role: string; content: string }>, context: string, chatMode: 'direct' | 'socratic' | 'grill' | 'email' = 'direct', cloud?: { model: string } | null) =>
-    ipcRenderer.invoke('ollama-chat', model, messages, context, chatMode, cloud),
+  ollamaChat: (model: string, messages: Array<{ role: string; content: string }>, context: string, chatMode: 'direct' | 'socratic' | 'grill' | 'email' = 'direct', cloud?: { model: string } | null, contextAttachmentIds?: string[]) =>
+    ipcRenderer.invoke('ollama-chat', model, messages, context, chatMode, cloud, contextAttachmentIds),
   onOllamaChatChunk: (callback: (chunk: string) => void) => {
     ipcRenderer.removeAllListeners('ollama-chat-chunk')
     ipcRenderer.on('ollama-chat-chunk', (_event, chunk) => callback(chunk))
@@ -271,9 +279,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
     originalText: string
     customPrompt?: string
     port?: number
+    contextAttachmentIds?: string[]
   }) => ipcRenderer.invoke('lmstudio-generate', request),
-  lmstudioChat: (model: string, messages: Array<{ role: string; content: string }>, context: string, chatMode: 'direct' | 'socratic' | 'grill' = 'direct', port?: number) =>
-    ipcRenderer.invoke('lmstudio-chat', model, messages, context, chatMode, port),
+  lmstudioChat: (model: string, messages: Array<{ role: string; content: string }>, context: string, chatMode: 'direct' | 'socratic' | 'grill' = 'direct', port?: number, contextAttachmentIds?: string[]) =>
+    ipcRenderer.invoke('lmstudio-chat', model, messages, context, chatMode, port, contextAttachmentIds),
   lmstudioEmbeddings: (model: string, text: string, port?: number) =>
     ipcRenderer.invoke('lmstudio-embeddings', model, text, port),
   lmstudioEmbeddingModels: (port?: number) => ipcRenderer.invoke('lmstudio-embedding-models', port),

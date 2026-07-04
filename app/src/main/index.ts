@@ -152,6 +152,7 @@ import { setupTray, hideTransportWindow, updateShortcut, showTransportWindow } f
 import { createMainRegistry, discoverMainPlugins } from './plugins/registry'
 import { isPluginGateEnabled } from '../shared/plugins/moduleGate'
 import { registerPluginTransport, isTrustedSender } from './plugins/transport'
+import { registerContextAttachment, registerContextFolder, removeContextAttachment, clearContextAttachments, readContextBlock } from './noteAgent/contextFiles'
 import { createHostFactory, type HostServices } from './plugins/host'
 import * as nativeServices from './plugins/nativeServices'
 import { buildKeyring, RESERVED_PLUGIN_IDS } from './plugins/runtime/keyring'
@@ -3855,6 +3856,122 @@ ipcMain.handle('ollama-delete-model', async (_event, modelName: string) => {
   }
 })
 
+// ── Notiz-Agent Phase 1: Kontext-Dateien für die Macher-Leiste ────────────────
+// Design: docs/note-agent-harness-plan.md §2. Der Renderer erhält nur Attachment-IDs;
+// Pfade (insb. außerhalb des Vaults) bleiben Main-seitig. Die OS-Dialog-Auswahl ist
+// der Freigabe-Akt (gleiche Logik wie open-vault) — der Renderer kann sich keine
+// Freigaben selbst erteilen.
+const NOTE_AGENT_FILE_FILTERS = [
+  { name: 'Dokumente', extensions: ['xlsx', 'xls', 'docx', 'pptx', 'pdf', 'md', 'markdown', 'txt', 'csv'] }
+]
+const noteAgentCleanupHooked = new Set<number>()
+
+function hookNoteAgentCleanup(sender: Electron.WebContents): void {
+  if (noteAgentCleanupHooked.has(sender.id)) return
+  noteAgentCleanupHooked.add(sender.id)
+  const senderId = sender.id
+  sender.once('destroyed', () => {
+    clearContextAttachments(senderId)
+    noteAgentCleanupHooked.delete(senderId)
+  })
+}
+
+ipcMain.handle('note-agent-attach-dialog', async (event) => {
+  if (!isTrustedSender(event)) return { attachments: [], errors: ['Nicht autorisierter Aufrufer'] }
+  const result = await dialog.showOpenDialog({
+    title: 'Kontext-Dateien anhängen',
+    properties: ['openFile', 'multiSelections'],
+    filters: NOTE_AGENT_FILE_FILTERS
+  })
+  if (result.canceled || result.filePaths.length === 0) return { attachments: [], errors: [] }
+  hookNoteAgentCleanup(event.sender)
+  const attachments: unknown[] = []
+  const errors: string[] = []
+  for (const p of result.filePaths) {
+    // Liegt die Datei in einem freigegebenen Vault? (Nur Metadatum für die UI —
+    // die Dialog-Auswahl selbst ist die Lese-Freigabe.)
+    let insideVault = false
+    let chosenPath = p
+    try {
+      chosenPath = await assertSafePath(p, 'note-agent-attach-dialog')
+      insideVault = true
+    } catch {
+      /* außerhalb des Vaults — bewusst erlaubt */
+    }
+    const res = await registerContextAttachment(event.sender.id, chosenPath, insideVault)
+    if (res.ok) attachments.push(res.attachment)
+    else errors.push(res.error)
+  }
+  return { attachments, errors }
+})
+
+ipcMain.handle('note-agent-attach-vault-file', async (event, vaultPath: string, relPath: string) => {
+  if (!isTrustedSender(event)) return { attachments: [], errors: ['Nicht autorisierter Aufrufer'] }
+  try {
+    assertApprovedVault(vaultPath, 'note-agent-attach-vault-file')
+    const fullPath = validatePath(vaultPath, relPath)
+    hookNoteAgentCleanup(event.sender)
+    // Ordner-Kontext (Stufe 1): derselbe Weg akzeptiert auch Vault-Ordner.
+    const st = await fs.stat(fullPath)
+    const res = st.isDirectory()
+      ? await registerContextFolder(event.sender.id, fullPath, true)
+      : await registerContextAttachment(event.sender.id, fullPath, true)
+    return res.ok ? { attachments: [res.attachment], errors: [] } : { attachments: [], errors: [res.error] }
+  } catch (error) {
+    return { attachments: [], errors: [error instanceof Error ? error.message : 'Unbekannter Fehler'] }
+  }
+})
+
+// Ordner-Kontext (Stufe 1): OS-Ordnerdialog — die Auswahl ist die Lese-Freigabe.
+ipcMain.handle('note-agent-attach-folder-dialog', async (event) => {
+  if (!isTrustedSender(event)) return { attachments: [], errors: ['Nicht autorisierter Aufrufer'] }
+  const result = await dialog.showOpenDialog({
+    title: 'Ordner als Kontext anhängen',
+    properties: ['openDirectory']
+  })
+  if (result.canceled || result.filePaths.length === 0) return { attachments: [], errors: [] }
+  hookNoteAgentCleanup(event.sender)
+  const attachments: unknown[] = []
+  const errors: string[] = []
+  for (const p of result.filePaths) {
+    let insideVault = false
+    let chosenPath = p
+    try {
+      chosenPath = await assertSafePath(p, 'note-agent-attach-folder-dialog')
+      insideVault = true
+    } catch {
+      /* außerhalb des Vaults — bewusst erlaubt */
+    }
+    const res = await registerContextFolder(event.sender.id, chosenPath, insideVault)
+    if (res.ok) attachments.push(res.attachment)
+    else errors.push(res.error)
+  }
+  return { attachments, errors }
+})
+
+ipcMain.handle('note-agent-detach', async (event, id: string) => {
+  removeContextAttachment(event.sender.id, id)
+  return { success: true }
+})
+
+// Liest die registrierten Kontext-Dateien des Senders und baut den Prompt-Abschnitt.
+// Fail-closed: schlägt eine Datei fehl, wird der Generate-Aufruf abgebrochen statt
+// stillschweigend ohne den Anhang zu arbeiten. `instruction` steuert die
+// Prioritätsreihenfolge beim Ordner-Lesen (Keyword-Match im Dateinamen).
+async function buildNoteAgentContextSection(
+  senderId: number,
+  ids: string[] | undefined,
+  instruction = ''
+): Promise<{ section: string } | { error: string }> {
+  if (!ids || ids.length === 0) return { section: '' }
+  const ctx = await readContextBlock(senderId, ids, instruction)
+  const failed = ctx.files.filter(f => f.error)
+  if (failed.length > 0) {
+    return { error: `Kontext-Datei konnte nicht gelesen werden: ${failed.map(f => `${f.name} — ${f.error}`).join('; ')}` }
+  }
+  return { section: ctx.block ? `\n\n${ctx.block}` : '' }
+}
+
 // Führt eine KI-Anfrage aus
 interface OllamaRequest {
   model: string
@@ -3866,9 +3983,11 @@ interface OllamaRequest {
   // Cloud-Routing (OpenRouter) für Inline-Notiz-KI (note-edit). Nur gesetzt, wenn
   // der Renderer es per zweitem Opt-in (canUseCloudForFeature) freigegeben hat.
   cloud?: { model: string } | null
+  // Notiz-Agent Phase 1: Main-seitig registrierte Kontext-Dateien (Attachment-IDs).
+  contextAttachmentIds?: string[]
 }
 
-ipcMain.handle('ollama-generate', async (_event, request: OllamaRequest) => {
+ipcMain.handle('ollama-generate', async (event, request: OllamaRequest) => {
   console.log('[Ollama] Generate request:', request.action, 'with model:', request.model)
 
   try {
@@ -3882,9 +4001,21 @@ ipcMain.handle('ollama-generate', async (_event, request: OllamaRequest) => {
       custom: request.customPrompt || 'Bearbeite den folgenden Text nach deinem besten Wissen.'
     }
 
+    // Kontext-Dateien (Notiz-Agent Modus A): Main-seitig lesen, limitieren, markieren.
+    // Geht bewusst auch in den Cloud-Pfad mit — der Nutzer entscheidet, die UI weist hin
+    // (docs/note-agent-harness-plan.md, Entscheidung 7).
+    const ctxResult = await buildNoteAgentContextSection(
+      event.sender.id,
+      request.contextAttachmentIds,
+      request.customPrompt || request.prompt || ''
+    )
+    if ('error' in ctxResult) {
+      return { success: false, error: ctxResult.error, model: request.model, action: request.action }
+    }
+
     const fullPrompt = request.action === 'custom'
-      ? `${request.customPrompt}\n\nText:\n${request.originalText}`
-      : `${systemPrompts[request.action]}\n\nText:\n${request.originalText}`
+      ? `${request.customPrompt}${ctxResult.section}\n\nText:\n${request.originalText}`
+      : `${systemPrompts[request.action]}${ctxResult.section}\n\nText:\n${request.originalText}`
 
     // Cloud-Pfad (OpenRouter): nicht-streamend, gleicher Prompt. Key aus safeStorage.
     if (request.cloud?.model) {
@@ -4493,7 +4624,7 @@ ipcMain.handle('ollama-embeddings', async (_event, model: string, text: string) 
 })
 
 // Chat mit Kontext (für Notes Chat)
-ipcMain.handle('ollama-chat', async (event, model: string, messages: Array<{ role: string; content: string }>, context: string, chatMode: 'direct' | 'socratic' | 'grill' | 'email' = 'direct', cloud?: { model: string } | null) => {
+ipcMain.handle('ollama-chat', async (event, model: string, messages: Array<{ role: string; content: string }>, context: string, chatMode: 'direct' | 'socratic' | 'grill' | 'email' = 'direct', cloud?: { model: string } | null, contextAttachmentIds?: string[]) => {
   console.log('[Ollama] Chat request with model:', model, 'context length:', context.length, 'mode:', chatMode, 'cloud:', cloud?.model ?? 'no')
 
   // Email-Chat streamt auf eigenen Channels — Notes-Chat und Email-Chat können
@@ -4502,6 +4633,19 @@ ipcMain.handle('ollama-chat', async (event, model: string, messages: Array<{ rol
   const doneChannel = chatMode === 'email' ? 'ollama-email-chat-done' : 'ollama-chat-done'
 
   try {
+    // Kontext-Dateien (Notiz-Agent Phase 1): Main-seitig lesen und dem Notizen-Kontext
+    // voranstellen — fail-closed, wie bei ollama-generate. Die letzte Nutzerfrage
+    // steuert die Ordner-Priorisierung.
+    const lastUserMessage = [...messages].reverse().find(m => m.role === 'user')?.content || ''
+    const ctxResult = await buildNoteAgentContextSection(event.sender.id, contextAttachmentIds, lastUserMessage)
+    if ('error' in ctxResult) {
+      event.sender.send(doneChannel)
+      return { success: false, error: ctxResult.error }
+    }
+    if (ctxResult.section) {
+      context = context ? `${ctxResult.section.trimStart()}\n\n${context}` : ctxResult.section.trimStart()
+    }
+
     // System-Prompt basierend auf Modus
     const directPrompt = `Du bist ein hilfreicher Assistent, der Fragen zu den folgenden Notizen beantwortet. Antworte auf Deutsch, sei präzise und beziehe dich auf den Inhalt der Notizen.
 
@@ -4930,9 +5074,11 @@ interface LMStudioRequest {
   originalText: string
   customPrompt?: string
   port?: number
+  // Notiz-Agent Phase 1: Main-seitig registrierte Kontext-Dateien (Attachment-IDs).
+  contextAttachmentIds?: string[]
 }
 
-ipcMain.handle('lmstudio-generate', async (_event, request: LMStudioRequest) => {
+ipcMain.handle('lmstudio-generate', async (event, request: LMStudioRequest) => {
   console.log('[LM Studio] Generate request:', request.action, 'with model:', request.model)
   const port = request.port || LM_STUDIO_DEFAULT_PORT
 
@@ -4947,10 +5093,20 @@ ipcMain.handle('lmstudio-generate', async (_event, request: LMStudioRequest) => 
       custom: request.customPrompt || 'Bearbeite den folgenden Text nach deinem besten Wissen.'
     }
 
+    // Kontext-Dateien (Notiz-Agent Modus A) — gleiche Injektion wie im Ollama-Handler.
+    const ctxResult = await buildNoteAgentContextSection(
+      event.sender.id,
+      request.contextAttachmentIds,
+      request.customPrompt || request.prompt || ''
+    )
+    if ('error' in ctxResult) {
+      return { success: false, error: ctxResult.error, model: request.model, action: request.action }
+    }
+
     const systemMessage = systemPrompts[request.action]
     const userMessage = request.action === 'custom'
-      ? `${request.customPrompt}\n\nText:\n${request.originalText}`
-      : `Text:\n${request.originalText}`
+      ? `${request.customPrompt}${ctxResult.section}\n\nText:\n${request.originalText}`
+      : `${ctxResult.section ? ctxResult.section.trimStart() + '\n\n' : ''}Text:\n${request.originalText}`
 
     const response = await fetch(`${getLMStudioUrl(port)}/v1/chat/completions`, {
       method: 'POST',
@@ -5005,10 +5161,21 @@ ipcMain.handle('lmstudio-generate', async (_event, request: LMStudioRequest) => 
 })
 
 // Chat mit Kontext (für Notes Chat) - LM Studio Version
-ipcMain.handle('lmstudio-chat', async (event, model: string, messages: Array<{ role: string; content: string }>, context: string, chatMode: 'direct' | 'socratic' | 'grill' = 'direct', port: number = LM_STUDIO_DEFAULT_PORT) => {
+ipcMain.handle('lmstudio-chat', async (event, model: string, messages: Array<{ role: string; content: string }>, context: string, chatMode: 'direct' | 'socratic' | 'grill' = 'direct', port: number = LM_STUDIO_DEFAULT_PORT, contextAttachmentIds?: string[]) => {
   console.log('[LM Studio] Chat request with model:', model, 'context length:', context.length, 'mode:', chatMode)
 
   try {
+    // Kontext-Dateien (Notiz-Agent Phase 1) — gleiche Injektion wie im Ollama-Chat.
+    const lastUserMessage = [...messages].reverse().find(m => m.role === 'user')?.content || ''
+    const ctxResult = await buildNoteAgentContextSection(event.sender.id, contextAttachmentIds, lastUserMessage)
+    if ('error' in ctxResult) {
+      event.sender.send('ollama-chat-done')
+      return { success: false, error: ctxResult.error }
+    }
+    if (ctxResult.section) {
+      context = context ? `${ctxResult.section.trimStart()}\n\n${context}` : ctxResult.section.trimStart()
+    }
+
     // System-Prompt basierend auf Modus (gleich wie Ollama)
     const directPrompt = `Du bist ein hilfreicher Assistent, der Fragen zu den folgenden Notizen beantwortet. Antworte auf Deutsch, sei präzise und beziehe dich auf den Inhalt der Notizen.
 

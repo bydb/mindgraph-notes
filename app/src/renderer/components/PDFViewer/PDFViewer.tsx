@@ -36,8 +36,8 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ filePath, fileName, relati
   const [visionSuccess, setVisionSuccess] = useState<boolean>(false)
   const [visionProgress, setVisionProgress] = useState<{ current: number; total: number } | null>(null)
 
-  const { docling, visionOcr, setTextSplitEnabled } = useUIStore()
-  const { vaultPath, addNote, selectSecondaryNote } = useNotesStore()
+  const { docling, visionOcr, setTextSplitEnabled, setPendingAgentContext } = useUIStore()
+  const { vaultPath, addNote, selectNote, selectSecondaryNote } = useNotesStore()
   const { t } = useTranslation()
 
   // PDF über IPC laden (als Base64)
@@ -92,6 +92,41 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ filePath, fileName, relati
 
   const resetZoom = () => {
     setScale(1.0)
+  }
+
+  // Notiz-Agent Phase 1: „Mit KI bearbeiten" — öffnet die Begleitnotiz und hängt
+  // dieses PDF als Kontext an die Macher-Leiste (via pendingAgentContext im uiStore).
+  const handleOpenWithAi = async () => {
+    if (!vaultPath) return
+    try {
+      const pdfRelativePath = relativePath || fileName
+      const companion = await window.electronAPI.ensurePdfCompanion(pdfRelativePath, vaultPath)
+      const noteId = generateNoteId(companion.path)
+
+      // Notiz in den Store bringen (addNote upsertet) — bei frischer Companion nötig,
+      // damit selectNote sofort etwas zum Anzeigen hat.
+      const stats = await window.electronAPI.getFileStats(`${vaultPath}/${companion.path}`)
+      const { extractLinks, extractTags, extractTitle, extractHeadings, extractBlocks } = await import('../../utils/linkExtractor')
+      addNote({
+        id: noteId,
+        path: companion.path,
+        title: extractTitle(companion.content, companion.path.split('/').pop() || ''),
+        content: companion.content,
+        outgoingLinks: extractLinks(companion.content),
+        incomingLinks: [],
+        tags: extractTags(companion.content),
+        headings: extractHeadings(companion.content),
+        blocks: extractBlocks(companion.content),
+        sourcePdf: pdfRelativePath,
+        createdAt: stats.createdAt,
+        modifiedAt: stats.modifiedAt
+      })
+
+      setPendingAgentContext({ noteId, relPath: pdfRelativePath })
+      selectNote(noteId)
+    } catch (err) {
+      console.error('[PDFViewer] Mit KI bearbeiten fehlgeschlagen:', err)
+    }
   }
 
   // Docling: Extract PDF content to Companion Note
@@ -315,6 +350,21 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ filePath, fileName, relati
       <div className="pdf-viewer-header">
         <span className="pdf-viewer-title">{fileName}</span>
         <div className="pdf-viewer-controls">
+          {/* Notiz-Agent: Begleitnotiz öffnen + PDF als KI-Kontext anhängen */}
+          <div className="pdf-viewer-extract">
+            <button
+              className="pdf-viewer-extract-btn"
+              onClick={handleOpenWithAi}
+              disabled={!vaultPath}
+              title={t('pdfViewer.aiEditTooltip')}
+            >
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                <path d="M8 2L9.4 6.6L14 8L9.4 9.4L8 14L6.6 9.4L2 8L6.6 6.6L8 2Z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/>
+              </svg>
+              <span>{t('pdfViewer.aiEdit')}</span>
+            </button>
+          </div>
+
           {/* Docling Extract Button */}
           {docling.enabled && (
             <div className="pdf-viewer-extract">

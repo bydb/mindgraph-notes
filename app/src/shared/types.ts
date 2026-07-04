@@ -372,6 +372,21 @@ export interface GraphData {
   };
 }
 
+// Notiz-Agent Phase 1: Kontext-Datei der Macher-Leiste. Der Renderer kennt nur die
+// Attachment-ID — der absolute Pfad bleibt Main-seitig (docs/note-agent-harness-plan.md §2).
+export interface NoteAgentAttachment {
+  id: string;
+  name: string;
+  kind: 'xlsx' | 'docx' | 'pptx' | 'pdf' | 'md' | 'txt' | 'csv' | 'folder';
+  insideVault: boolean;
+  sizeBytes: number;
+}
+
+export interface NoteAgentAttachResult {
+  attachments: NoteAgentAttachment[];
+  errors: string[];
+}
+
 // IPC Kommunikation
 export interface FileEntry {
   name: string;
@@ -589,6 +604,12 @@ export interface ElectronAPI {
   openAlexDeleteMailto: () => Promise<{ success: boolean; error?: string }>;
   openAlexCheck: () => Promise<{ available: boolean; authenticated: boolean; remaining?: string; error?: string }>;
 
+  // Notiz-Agent Phase 1: Kontext-Dateien für die Macher-Leiste
+  noteAgentAttachDialog: () => Promise<NoteAgentAttachResult>;
+  noteAgentAttachFolderDialog: () => Promise<NoteAgentAttachResult>;
+  noteAgentAttachVaultFile: (vaultPath: string, relPath: string) => Promise<NoteAgentAttachResult>;
+  noteAgentDetach: (id: string) => Promise<{ success: boolean }>;
+
   // Ollama Local AI API
   ollamaCheck: () => Promise<boolean>;
   ollamaModels: () => Promise<Array<{ name: string; size: number }>>;
@@ -601,6 +622,7 @@ export interface ElectronAPI {
     originalText: string;
     customPrompt?: string;
     cloud?: { model: string } | null;
+    contextAttachmentIds?: string[];
   }) => Promise<{
     success: boolean;
     result?: string;
@@ -647,7 +669,7 @@ export interface ElectronAPI {
   }>;
 
   // Ollama Chat für Notes Chat
-  ollamaChat: (model: string, messages: Array<{ role: string; content: string }>, context: string, chatMode?: 'direct' | 'socratic' | 'grill' | 'email', cloud?: { model: string } | null) => Promise<{
+  ollamaChat: (model: string, messages: Array<{ role: string; content: string }>, context: string, chatMode?: 'direct' | 'socratic' | 'grill' | 'email', cloud?: { model: string } | null, contextAttachmentIds?: string[]) => Promise<{
     success: boolean;
     response?: string;
     error?: string;
@@ -679,6 +701,7 @@ export interface ElectronAPI {
     originalText: string;
     customPrompt?: string;
     port?: number;
+    contextAttachmentIds?: string[];
   }) => Promise<{
     success: boolean;
     result?: string;
@@ -691,7 +714,7 @@ export interface ElectronAPI {
     customPrompt?: string;
     timestamp?: string;
   }>;
-  lmstudioChat: (model: string, messages: Array<{ role: string; content: string }>, context: string, chatMode?: 'direct' | 'socratic' | 'grill', port?: number) => Promise<{
+  lmstudioChat: (model: string, messages: Array<{ role: string; content: string }>, context: string, chatMode?: 'direct' | 'socratic' | 'grill', port?: number, contextAttachmentIds?: string[]) => Promise<{
     success: boolean;
     response?: string;
     error?: string;

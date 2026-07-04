@@ -7,7 +7,10 @@ import { useTranslation } from '../../utils/translations'
 import { writeClipboardText } from '../../utils/clipboard'
 import { ModelPicker } from '../Shared/ModelPicker'
 import { PanelHeader } from '../Shared/PanelHeader'
+import { ContextAttachmentRow } from '../Shared/ContextAttachmentRow'
 import { canUseCloudForFeature, OPENROUTER_MODEL_SENTINEL } from '../../../shared/llmBackend'
+import { isCloudModel } from '../../../shared/modelCompatibility'
+import type { NoteAgentAttachment } from '../../../shared/types'
 import MarkdownIt from 'markdown-it'
 import texmath from 'markdown-it-texmath'
 import katex from 'katex'
@@ -69,7 +72,7 @@ interface NotesChatProps {
 
 export const NotesChat: React.FC<NotesChatProps> = ({ onClose }) => {
   const { t } = useTranslation()
-  const { notes, selectedNoteId, vaultPath } = useNotesStore()
+  const { notes, selectedNoteId, vaultPath, selectedPdfPath, selectedOfficePath } = useNotesStore()
   const { ollama: llmSettings } = useUIStore()
   const language = useUIStore(s => s.language)
   const lang: 'de' | 'en' = language === 'en' ? 'en' : 'de'
@@ -92,6 +95,10 @@ export const NotesChat: React.FC<NotesChatProps> = ({ onClose }) => {
   const [selectedProject, setSelectedProject] = useState<string>('')
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [inputValue, setInputValue] = useState('')
+  // Notiz-Agent Phase 1: Kontext-Dateien (PDF/Tabelle/…) für Fragen im Chat.
+  // Panel-Sitzungs-Zustand — bewusst nicht pro Notiz gekeyt (der Chat ist die Einheit).
+  const [chatAttachments, setChatAttachments] = useState<NoteAgentAttachment[]>([])
+  const [attachError, setAttachError] = useState<string | null>(null)
   const [isStreaming, setIsStreaming] = useState(false)
   const [streamingContent, setStreamingContent] = useState('')
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null)
@@ -412,6 +419,68 @@ export const NotesChat: React.FC<NotesChatProps> = ({ onClose }) => {
     return context
   }, [contextMode, currentNote, selectedFolder, notes, vaultPath])
 
+  // Notiz-Agent Phase 1: Kontext-Dateien anhängen/entfernen (Main-Registry via IPC).
+  const attachFromDialog = useCallback(async () => {
+    setAttachError(null)
+    const res = await window.electronAPI.noteAgentAttachDialog()
+    if (res.attachments.length > 0) setChatAttachments(prev => [...prev, ...res.attachments])
+    if (res.errors.length > 0) setAttachError(res.errors.join(' · '))
+  }, [])
+
+  const attachFolderFromDialog = useCallback(async () => {
+    setAttachError(null)
+    const res = await window.electronAPI.noteAgentAttachFolderDialog()
+    if (res.attachments.length > 0) setChatAttachments(prev => [...prev, ...res.attachments])
+    if (res.errors.length > 0) setAttachError(res.errors.join(' · '))
+  }, [])
+
+  const attachVaultFile = useCallback(async (relPath: string) => {
+    if (!vaultPath) return
+    setAttachError(null)
+    const res = await window.electronAPI.noteAgentAttachVaultFile(vaultPath, relPath)
+    if (res.attachments.length > 0) setChatAttachments(prev => [...prev, ...res.attachments])
+    if (res.errors.length > 0) setAttachError(res.errors.join(' · '))
+  }, [vaultPath])
+
+  const detachFile = useCallback(async (id: string) => {
+    setAttachError(null)
+    await window.electronAPI.noteAgentDetach(id)
+    setChatAttachments(prev => prev.filter(a => a.id !== id))
+  }, [])
+
+  // Auto-Kontext: die links geöffnete PDF-/Office-Datei wandert automatisch als Chip
+  // in den Chat — „aktuell geöffnet = Kontext", wie bei einer Notiz. Der Auto-Chip
+  // folgt der Auswahl (alter wird entfernt, neuer angehängt); manuell angehängte
+  // Chips bleiben unberührt. Entfernt der Nutzer den Auto-Chip, kommt er für dieselbe
+  // Datei nicht wieder (Ref merkt sich den Pfad).
+  const autoCtxRef = useRef<{ path: string; id: string | null } | null>(null)
+  useEffect(() => {
+    if (!vaultPath || contextMode === 'project') return
+    // Auch bei ausgewählter PDF-Begleitnotiz (<name>.pdf.md) das Quell-PDF mitnehmen —
+    // die Companion ist oft fast leer, die Fragen zielen auf das PDF.
+    const companionSource = currentNote?.sourcePdf
+      || (currentNote && /\.pdf\.md$/i.test(currentNote.path) ? currentNote.path.slice(0, -3) : null)
+    const openFile = selectedPdfPath || selectedOfficePath || companionSource || null
+    const prev = autoCtxRef.current
+    if (openFile === (prev?.path ?? null)) return
+    if (prev?.id) void detachFile(prev.id)
+    autoCtxRef.current = openFile ? { path: openFile, id: null } : null
+    if (!openFile) return
+    const fileName = openFile.split('/').pop()
+    if (chatAttachments.some(a => a.name === fileName)) return // bereits manuell angehängt
+    void (async () => {
+      const res = await window.electronAPI.noteAgentAttachVaultFile(vaultPath, openFile)
+      if (res.attachments.length > 0) {
+        setChatAttachments(prevA => [...prevA, ...res.attachments])
+        if (autoCtxRef.current?.path === openFile) autoCtxRef.current.id = res.attachments[0].id
+      }
+      if (res.errors.length > 0) setAttachError(res.errors.join(' · '))
+    })()
+    // chatAttachments bewusst nicht in den Deps — der Pfad-Vergleich oben verhindert
+    // Mehrfach-Attach, und Änderungen an den Chips sollen den Auto-Chip nicht triggern.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedPdfPath, selectedOfficePath, currentNote, vaultPath, contextMode, detachFile])
+
   // Nachricht senden
   const sendMessage = async () => {
     // selectedModel ist bei Cloud-Routing (OpenRouter) optional — dann zählt das Cloud-Modell.
@@ -476,7 +545,9 @@ export const NotesChat: React.FC<NotesChatProps> = ({ onClose }) => {
 
     try {
       const context = await getContextText()
-      if (!context) {
+      // Angehängte Kontext-Dateien zählen als Kontext — auch ohne passende Notizen.
+      const attachmentIds = chatAttachments.length > 0 ? chatAttachments.map(a => a.id) : undefined
+      if (!context && !attachmentIds) {
         setMessages(prev => [...prev, {
           role: 'assistant',
           content: 'Keine Notizen zum Chatten verfügbar. Wähle eine Notiz aus oder ändere den Kontext-Modus.'
@@ -496,12 +567,18 @@ export const NotesChat: React.FC<NotesChatProps> = ({ onClose }) => {
       const cloud = orCloudAvailable && useCloudChat ? { model: orCloudModel } : null
 
       // Backend-basierte API-Auswahl (Cloud hat Vorrang, wenn gewählt)
+      let res: { success?: boolean; error?: string } | undefined
       if (cloud) {
-        await window.electronAPI.ollamaChat(selectedModel, recentMessages, context, chatMode, cloud)
+        res = await window.electronAPI.ollamaChat(selectedModel, recentMessages, context, chatMode, cloud, attachmentIds)
       } else if (llmSettings.backend === 'lm-studio') {
-        await window.electronAPI.lmstudioChat(selectedModel, recentMessages, context, chatMode, llmSettings.lmStudioPort)
+        res = await window.electronAPI.lmstudioChat(selectedModel, recentMessages, context, chatMode, llmSettings.lmStudioPort, attachmentIds)
       } else {
-        await window.electronAPI.ollamaChat(selectedModel, recentMessages, context, chatMode)
+        res = await window.electronAPI.ollamaChat(selectedModel, recentMessages, context, chatMode, null, attachmentIds)
+      }
+      // Fehler sichtbar machen (z.B. fail-closed bei nicht lesbarer Kontext-Datei).
+      if (res && res.success === false && res.error) {
+        setMessages(prev => [...prev, { role: 'assistant', content: (lang === 'de' ? 'Fehler: ' : 'Error: ') + res.error }])
+        setIsStreaming(false)
       }
     } catch (err) {
       console.error('[NotesChat] Error sending message:', err)
@@ -560,8 +637,13 @@ export const NotesChat: React.FC<NotesChatProps> = ({ onClose }) => {
   // Kontext-Info Text
   const getContextInfo = (): string => {
     switch (contextMode) {
-      case 'current':
-        return currentNote ? `${t('notesChat.notePrefix')}: ${currentNote.title}` : t('notesChat.noNoteSelected')
+      case 'current': {
+        if (currentNote) return `${t('notesChat.notePrefix')}: ${currentNote.title}`
+        // Geöffnete PDF-/Office-Datei zählt als aktueller Kontext (Auto-Chip).
+        const openFile = selectedPdfPath || selectedOfficePath
+        if (openFile) return `${t('notesChat.filePrefix')}: ${openFile.split('/').pop()}`
+        return t('notesChat.noNoteSelected')
+      }
       case 'folder':
         if (selectedFolder) {
           const count = notes.filter(n => n.path.startsWith(selectedFolder + '/') || n.path === selectedFolder).length
@@ -810,6 +892,23 @@ export const NotesChat: React.FC<NotesChatProps> = ({ onClose }) => {
               </>
             )}
           </div>
+
+          {/* Notiz-Agent Phase 1: Kontext-Dateien (PDF/Tabelle/…) für Fragen im Chat.
+              Im Projekt-Modus ausgeblendet — Projekt-RAG hat seinen eigenen Retrieval-Pfad. */}
+          {contextMode !== 'project' && (
+            <div className="notes-chat-context">
+              <ContextAttachmentRow
+                attachments={chatAttachments}
+                onAttachDialog={attachFromDialog}
+                onAttachFolderDialog={attachFolderFromDialog}
+                onAttachVaultFile={attachVaultFile}
+                onDetach={detachFile}
+                disabled={isStreaming}
+                attachError={attachError}
+                cloudSelected={(orCloudAvailable && useCloudChat) || isCloudModel(selectedModel)}
+              />
+            </div>
+          )}
 
           {/* Eingabe */}
           <div className="notes-chat-input-area">

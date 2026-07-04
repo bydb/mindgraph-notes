@@ -229,6 +229,14 @@ interface PendingTemplateInsert {
   cursorPosition?: number
 }
 
+// Notiz-Agent Phase 1: „Mit KI bearbeiten" aus dem PDF-Viewer — der Editor hängt
+// nach dem Notizwechsel die Datei als Kontext an und öffnet die Macher-Leiste.
+// Gleiche Mechanik wie pendingTemplateInsert (Store trägt, Editor konsumiert).
+interface PendingAgentContext {
+  noteId: string
+  relPath: string
+}
+
 // LLM AI Settings (Ollama & LM Studio)
 interface LLMSettings {
   enabled: boolean
@@ -603,6 +611,7 @@ interface UIState {
   notesRootFolder: string // Relativer Pfad im Vault für neue Arbeitsnotizen
   projectsRootFolder: string // Relativer Pfad im Vault für Projekt-Ordner (Crystallizer)
   pendingTemplateInsert: PendingTemplateInsert | null // Template das in Editor eingefügt werden soll
+  pendingAgentContext: PendingAgentContext | null // Datei, die der Editor als KI-Kontext anhängen soll
 
   // LLM AI Settings (Ollama & LM Studio)
   ollama: LLMSettings
@@ -748,6 +757,7 @@ interface UIState {
   setNotesRootFolder: (folder: string) => void
   setProjectsRootFolder: (folder: string) => void
   setPendingTemplateInsert: (template: PendingTemplateInsert | null) => void
+  setPendingAgentContext: (ctx: PendingAgentContext | null) => void
   setOllama: (settings: Partial<LLMSettings>) => void
   setBrain: (settings: Partial<BrainSettings>) => void
   setPdfCompanionEnabled: (enabled: boolean) => void
@@ -866,6 +876,7 @@ const defaultState = {
   notesRootFolder: '',
   projectsRootFolder: '',
   pendingTemplateInsert: null as PendingTemplateInsert | null,
+  pendingAgentContext: null as PendingAgentContext | null,
 
   // LLM AI Settings (Ollama & LM Studio)
   ollama: {
@@ -1202,6 +1213,7 @@ export const useUIStore = create<UIState>()((set, get) => ({
   }),
   setProjectsRootFolder: (folder) => set({ projectsRootFolder: normalizeVaultFolder(folder) }),
   setPendingTemplateInsert: (template) => set({ pendingTemplateInsert: template }),
+  setPendingAgentContext: (ctx) => set({ pendingAgentContext: ctx }),
   setOllama: (settings) => set((state) => ({ ollama: { ...state.ollama, ...settings } })),
   setBrain: (settings) => set((state) => ({ brain: { ...state.brain, ...settings } })),
   setPdfCompanionEnabled: (enabled) => set({ pdfCompanionEnabled: enabled }),

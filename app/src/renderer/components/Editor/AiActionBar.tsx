@@ -4,11 +4,16 @@ import { useTranslation } from '../../utils/translations'
 import { ModelLogo } from '../Shared/ModelLogo'
 import { ModelPicker } from '../Shared/ModelPicker'
 import { HumanIcon } from '../Shared/HumanIcon'
+import { ContextAttachmentRow } from '../Shared/ContextAttachmentRow'
 import { diffStats, type DiffOp } from '../../utils/blockDiff'
+import { OPENROUTER_MODEL_SENTINEL } from '../../../shared/llmBackend'
+import { isCloudModel } from '../../../shared/modelCompatibility'
+import type { NoteAgentAttachment } from '../../../shared/types'
 
 // Macher-Leiste: Anweisung → KI-Vorschlag als Block-Diff → Übernehmen/Verwerfen.
 // Eingeklappt = ruhiges Zuhause des ⌘⇧A-Assistenten. Provenienz ist eingewebt:
 // im Diff ist das Entfernte „dein Text" (Human-SVG), das Neue von der KI (Modell-Logo).
+// Notiz-Agent Phase 1: Kontext-Datei-Chips + Cloud-Hinweis (docs/note-agent-harness-plan.md §1).
 
 export interface AiProposalMeta {
   ops: DiffOp[]
@@ -37,6 +42,13 @@ interface Props {
   onModelChange: (model: string) => void
   // Label-Override fürs Dropdown (z.B. „OpenRouter · <modell>" für den Cloud-Eintrag).
   getModelLabel?: (name: string) => string
+  // Notiz-Agent Phase 1: Kontext-Dateien (flüchtig, pro Notiz — Verwaltung im MarkdownEditor).
+  attachments: NoteAgentAttachment[]
+  onAttachDialog: () => void
+  onAttachFolderDialog: () => void
+  onAttachVaultFile: (relPath: string) => void
+  onDetach: (id: string) => void
+  attachError: string | null
 }
 
 const PRESETS = [
@@ -46,11 +58,15 @@ const PRESETS = [
   { id: 'tone', key: 'aiBar.preset.tone' as const },
 ]
 
-export function AiActionBar({ open, onOpenChange, phase, proposal, onGenerate, onAccept, onDiscard, tagSuggestions, tagsLoading, onSuggestTags, onAcceptTag, onDismissTag, model, models, onModelChange, getModelLabel }: Props) {
+export function AiActionBar({ open, onOpenChange, phase, proposal, onGenerate, onAccept, onDiscard, tagSuggestions, tagsLoading, onSuggestTags, onAcceptTag, onDismissTag, model, models, onModelChange, getModelLabel, attachments, onAttachDialog, onAttachFolderDialog, onAttachVaultFile, onDetach, attachError }: Props) {
   const { t } = useTranslation()
   const aiEnabled = useUIStore(s => s.ollama.enabled)
   const [instruction, setInstruction] = useState('')
   const [preset, setPreset] = useState<string | null>(null)
+
+  // Cloud-Erkennung nur für den Hinweis (keine Sperre — Entscheidung 7 im Plan):
+  // OpenRouter-Sentinel oder gehostetes Ollama-Cloud-Modell (`:cloud`/`-cloud`).
+  const cloudSelected = model === OPENROUTER_MODEL_SENTINEL || isCloudModel(model)
 
   if (!aiEnabled) return null
 
@@ -143,6 +159,19 @@ export function AiActionBar({ open, onOpenChange, phase, proposal, onGenerate, o
           else if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); submit() }
         }}
       />
+
+      {/* Notiz-Agent Phase 1: Kontext-Dateien als Chips + Picker (geteilte Komponente) */}
+      <ContextAttachmentRow
+        attachments={attachments}
+        onAttachDialog={onAttachDialog}
+        onAttachFolderDialog={onAttachFolderDialog}
+        onAttachVaultFile={onAttachVaultFile}
+        onDetach={onDetach}
+        disabled={phase === 'generating'}
+        attachError={attachError}
+        cloudSelected={cloudSelected}
+      />
+
       <div className="ai-bar-footer">
         <div className="ai-bar-model-pick" title={t('aiBar.model')}>
           <ModelPicker

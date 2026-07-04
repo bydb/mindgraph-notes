@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useCallback, useState, useMemo, memo } from 'react'
+import type { NoteAgentAttachment } from '../../../shared/types'
 import { EditorState, Compartment } from '@codemirror/state'
 import { EditorView, keymap, lineNumbers, highlightActiveLine } from '@codemirror/view'
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands'
@@ -68,6 +69,10 @@ import { isBrainNote, brainNoteLabel } from '../../utils/brainNote'
 import { BrainIcon } from '../BrainIcon'
 import { readClipboardText, writeClipboardText } from '../../utils/clipboard'
 import { canUseCloudForFeature, OPENROUTER_MODEL_SENTINEL } from '../../../shared/llmBackend'
+
+// Stabile leere Referenz für die Kontext-Datei-Selektion (kein neues Array pro Render —
+// bekannte Loop-Falle bei Zustand/React, siehe CLAUDE.md Workflow-Canvas-Lehren).
+const EMPTY_AGENT_ATTACHMENTS: NoteAgentAttachment[] = []
 
 const markdownCodeLanguages = [
   LanguageDescription.of({
@@ -916,8 +921,8 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
   const { vaultPath, selectedNoteId, secondarySelectedNoteId, notes, updateNote, selectNote, selectSecondaryNote, addNote, fileTree, setFileTree, navigateBack, navigateForward, canNavigateBack, canNavigateForward } = useNotesStore(
     useShallow(s => ({ vaultPath: s.vaultPath, selectedNoteId: s.selectedNoteId, secondarySelectedNoteId: s.secondarySelectedNoteId, notes: s.notes, updateNote: s.updateNote, selectNote: s.selectNote, selectSecondaryNote: s.selectSecondaryNote, addNote: s.addNote, fileTree: s.fileTree, setFileTree: s.setFileTree, navigateBack: s.navigateBack, navigateForward: s.navigateForward, canNavigateBack: s.canNavigateBack, canNavigateForward: s.canNavigateForward }))
   )
-  const { pendingTemplateInsert, setPendingTemplateInsert, ollama, editorHeadingFolding, outlineStyle, editorShowWordCount, editorHeaderActions, languageTool, setLanguageTool, editorDefaultView, showFormattingToolbar, setShowFormattingToolbar, showRawEditor } = useUIStore(
-    useShallow(s => ({ pendingTemplateInsert: s.pendingTemplateInsert, setPendingTemplateInsert: s.setPendingTemplateInsert, ollama: s.ollama, editorHeadingFolding: s.editorHeadingFolding, outlineStyle: s.outlineStyle, editorShowWordCount: s.editorShowWordCount, editorHeaderActions: s.editorHeaderActions, languageTool: s.languageTool, setLanguageTool: s.setLanguageTool, editorDefaultView: s.editorDefaultView, showFormattingToolbar: s.showFormattingToolbar, setShowFormattingToolbar: s.setShowFormattingToolbar, showRawEditor: s.showRawEditor }))
+  const { pendingTemplateInsert, setPendingTemplateInsert, pendingAgentContext, setPendingAgentContext, ollama, editorHeadingFolding, outlineStyle, editorShowWordCount, editorHeaderActions, languageTool, setLanguageTool, editorDefaultView, showFormattingToolbar, setShowFormattingToolbar, showRawEditor } = useUIStore(
+    useShallow(s => ({ pendingTemplateInsert: s.pendingTemplateInsert, setPendingTemplateInsert: s.setPendingTemplateInsert, pendingAgentContext: s.pendingAgentContext, setPendingAgentContext: s.setPendingAgentContext, ollama: s.ollama, editorHeadingFolding: s.editorHeadingFolding, outlineStyle: s.outlineStyle, editorShowWordCount: s.editorShowWordCount, editorHeaderActions: s.editorHeaderActions, languageTool: s.languageTool, setLanguageTool: s.setLanguageTool, editorDefaultView: s.editorDefaultView, showFormattingToolbar: s.showFormattingToolbar, setShowFormattingToolbar: s.setShowFormattingToolbar, showRawEditor: s.showRawEditor }))
   )
   const [marketing] = usePluginConfig('marketing', MARKETING_DEFAULTS)
 
@@ -958,6 +963,11 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
   const noteEditCloudModel = ollama.openrouter?.model?.trim() || ''
   const [aiUseCloud, setAiUseCloud] = useState(false)
   useEffect(() => { setAiUseCloud(noteEditCloudAvailable) }, [noteEditCloudAvailable])
+  // Notiz-Agent Phase 1: Kontext-Dateien, flüchtig und strikt auf die Note-ID gekeyt —
+  // der Editor bleibt bei Notizwechsel gemountet (docs/note-agent-harness-plan.md §1/F08).
+  const [agentAttachmentsByNote, setAgentAttachmentsByNote] = useState<Record<string, NoteAgentAttachment[]>>({})
+  const [agentAttachError, setAgentAttachError] = useState<string | null>(null)
+  const agentAttachments = (effectiveNoteId && agentAttachmentsByNote[effectiveNoteId]) || EMPTY_AGENT_ATTACHMENTS
   const [showAIImageDialog, setShowAIImageDialog] = useState(false)
   const [showPublishWpModal, setShowPublishWpModal] = useState(false)
   const [previewToolbar, setPreviewToolbar] = useState<{ x: number; y: number } | null>(null)
@@ -1803,6 +1813,57 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
     }
   }
 
+  // ── Notiz-Agent Phase 1: Kontext-Dateien für die Macher-Leiste ──────────────
+  const agentAddAttachments = useCallback((noteId: string, added: NoteAgentAttachment[]) => {
+    setAgentAttachmentsByNote(prev => ({ ...prev, [noteId]: [...(prev[noteId] || []), ...added] }))
+  }, [])
+
+  const agentAttachFromDialog = useCallback(async () => {
+    if (!effectiveNoteId) return
+    setAgentAttachError(null)
+    const res = await window.electronAPI.noteAgentAttachDialog()
+    if (res.attachments.length > 0) agentAddAttachments(effectiveNoteId, res.attachments)
+    if (res.errors.length > 0) setAgentAttachError(res.errors.join(' · '))
+  }, [effectiveNoteId, agentAddAttachments])
+
+  const agentAttachFolderFromDialog = useCallback(async () => {
+    if (!effectiveNoteId) return
+    setAgentAttachError(null)
+    const res = await window.electronAPI.noteAgentAttachFolderDialog()
+    if (res.attachments.length > 0) agentAddAttachments(effectiveNoteId, res.attachments)
+    if (res.errors.length > 0) setAgentAttachError(res.errors.join(' · '))
+  }, [effectiveNoteId, agentAddAttachments])
+
+  const agentAttachVaultFile = useCallback(async (relPath: string) => {
+    if (!effectiveNoteId || !vaultPath) return
+    setAgentAttachError(null)
+    const res = await window.electronAPI.noteAgentAttachVaultFile(vaultPath, relPath)
+    if (res.attachments.length > 0) agentAddAttachments(effectiveNoteId, res.attachments)
+    if (res.errors.length > 0) setAgentAttachError(res.errors.join(' · '))
+  }, [effectiveNoteId, vaultPath, agentAddAttachments])
+
+  const agentDetach = useCallback(async (id: string) => {
+    if (!effectiveNoteId) return
+    setAgentAttachError(null)
+    await window.electronAPI.noteAgentDetach(id)
+    setAgentAttachmentsByNote(prev => ({
+      ...prev,
+      [effectiveNoteId]: (prev[effectiveNoteId] || []).filter(a => a.id !== id)
+    }))
+  }, [effectiveNoteId])
+
+  // „Mit KI bearbeiten" (z.B. aus dem PDF-Viewer): sobald die Ziel-Notiz aktiv ist,
+  // die Datei als Kontext anhängen und die Macher-Leiste öffnen.
+  useEffect(() => {
+    if (!pendingAgentContext || isSecondary || !effectiveNoteId) return
+    if (pendingAgentContext.noteId !== effectiveNoteId) return
+    const fileName = pendingAgentContext.relPath.split('/').pop()
+    const alreadyAttached = (agentAttachmentsByNote[effectiveNoteId] || []).some(a => a.name === fileName)
+    setPendingAgentContext(null)
+    setAiBarOpen(true)
+    if (!alreadyAttached) void agentAttachVaultFile(pendingAgentContext.relPath)
+  }, [pendingAgentContext, setPendingAgentContext, isSecondary, effectiveNoteId, agentAttachmentsByNote, agentAttachVaultFile])
+
   const aiGenerate = useCallback(async (instruction: string, preset: string | null) => {
     const view = viewRef.current
     if (!view || !ollama.enabled) return
@@ -1841,7 +1902,9 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
         prompt: action === 'custom' ? customPrompt : '',
         action: action as 'translate' | 'summarize' | 'continue' | 'improve' | 'custom' | 'ocr-cleanup',
         originalText: oldText,
-        customPrompt: action === 'custom' ? customPrompt : undefined
+        customPrompt: action === 'custom' ? customPrompt : undefined,
+        // Notiz-Agent Phase 1: Main-seitig registrierte Kontext-Dateien mitgeben.
+        contextAttachmentIds: agentAttachments.length > 0 ? agentAttachments.map(a => a.id) : undefined
       }
       // Cloud-Routing (OpenRouter) für Inline-Notiz-KI — nur wenn 'note-edit' per zweitem Opt-in frei.
       const cloud = noteEditCloud ? { model: ollama.openrouter.model.trim() } : null
@@ -1851,7 +1914,12 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
           ? await window.electronAPI.lmstudioGenerate({ ...req, port: ollama.lmStudioPort })
           : await window.electronAPI.ollamaGenerate(req)
       const result = response as AIResult
-      if (!result.success || !result.result) { setAiPhase('idle'); return }
+      if (!result.success || !result.result) {
+        // Fehler sichtbar machen (z.B. fail-closed bei nicht lesbarer Kontext-Datei).
+        if (result.error) setAgentAttachError(result.error)
+        setAiPhase('idle')
+        return
+      }
       const newText = result.result.trim()
       const ops = diffLines(oldText, newText)
       setAiProposal({
@@ -1869,7 +1937,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
       console.error('[AI-Bar] Generierung fehlgeschlagen:', e)
       setAiPhase('idle')
     }
-  }, [ollama, aiModel, aiUseCloud])
+  }, [ollama, aiModel, aiUseCloud, agentAttachments])
 
   const aiAcceptProposal = useCallback(() => {
     const view = viewRef.current
@@ -5021,6 +5089,12 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
             else { setAiUseCloud(false); setAiModel(name) }
           }}
           getModelLabel={(name) => name === OPENROUTER_MODEL_SENTINEL ? `OpenRouter · ${noteEditCloudModel}` : name}
+          attachments={agentAttachments}
+          onAttachDialog={agentAttachFromDialog}
+          onAttachFolderDialog={agentAttachFolderFromDialog}
+          onAttachVaultFile={agentAttachVaultFile}
+          onDetach={agentDetach}
+          attachError={agentAttachError}
         />
       )}
     </div>
