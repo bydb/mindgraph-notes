@@ -1,12 +1,8 @@
-// Tool-Registry für den Telegram-Agent.
-// Sammelt alle Tools, mappt sie auf das Ollama-Schema und führt sie aus.
-//
-// Zentrale Idee: jedes Tool hat
-// - name + description + JSON-Schema (für das LLM)
-// - isWrite-Flag (steuert, ob Confirm nötig ist)
-// - run(args, ctx) — die eigentliche Implementierung
+// Tool-Registry für den Telegram-Agent — Instanziierung der generischen
+// ToolRegistry (main/llm/toolRegistry.ts) mit dem Telegram-ToolContext.
+// isWrite löst hier den Confirm-Flow aus (harte Sicherheitsgrenze, siehe loop.ts).
 
-import type { ToolDefinition } from '../../../llm/chatClient'
+import { ToolRegistry as GenericToolRegistry, type AppTool as GenericAppTool, type ToolResult } from '../../../llm/toolRegistry'
 
 export interface ToolContext {
   vaultPath: string
@@ -16,54 +12,7 @@ export interface ToolContext {
   embeddingModel: string                    // zentrales Projekt-RAG-Embedding-Modell (z.B. "bge-m3")
 }
 
-export interface ToolResult {
-  ok: boolean
-  content: string                           // dem LLM zurückgegeben (string, JSON-stringified bei strukturierten Daten)
-  display?: string                          // optionale, dem User in Telegram angezeigte Zusammenfassung
-}
+export type { ToolResult }
+export type AppTool = GenericAppTool<ToolContext>
 
-export interface AppTool {
-  name: string
-  description: string
-  parameters: Record<string, unknown>       // JSON Schema
-  isWrite: boolean
-  run: (args: Record<string, unknown>, ctx: ToolContext) => Promise<ToolResult>
-}
-
-export class ToolRegistry {
-  private tools = new Map<string, AppTool>()
-
-  register(tool: AppTool): void {
-    if (this.tools.has(tool.name)) {
-      throw new Error(`Tool ${tool.name} bereits registriert`)
-    }
-    this.tools.set(tool.name, tool)
-  }
-
-  get(name: string): AppTool | undefined {
-    return this.tools.get(name)
-  }
-
-  /** Liefert die für das LLM sichtbaren Tool-Definitionen, gefiltert nach Allowlist. */
-  toolDefinitionsFor(allowedNames: Set<string> | null): ToolDefinition[] {
-    const defs: ToolDefinition[] = []
-    for (const tool of this.tools.values()) {
-      if (allowedNames && !allowedNames.has(tool.name)) continue
-      defs.push({
-        name: tool.name,
-        description: tool.description,
-        parameters: tool.parameters
-      })
-    }
-    return defs
-  }
-
-  /** Tool-Namen, die Schreibrechte brauchen — für Settings-UI nützlich. */
-  writeToolNames(): string[] {
-    return Array.from(this.tools.values()).filter(t => t.isWrite).map(t => t.name)
-  }
-
-  allToolNames(): string[] {
-    return Array.from(this.tools.keys())
-  }
-}
+export class ToolRegistry extends GenericToolRegistry<ToolContext> {}

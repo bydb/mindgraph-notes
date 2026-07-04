@@ -387,6 +387,33 @@ export interface NoteAgentAttachResult {
   errors: string[];
 }
 
+// Notiz-Agent Phase 2 (Modus B): Renderer-sichtbare Run-Artefakte — bewusst ohne Pfade,
+// nur opake Handles (docs/note-agent-harness-plan.md, F02).
+export interface NoteAgentResultCard {
+  resultId: string;
+  suggestedName: string;
+  kind: string;
+  summary: string;
+  sources: string[];
+}
+
+export interface NoteAgentProgressEvent {
+  runId: string;
+  seq: number;
+  skill: string;
+  summary: string;
+}
+
+export interface NoteAgentDoneEvent {
+  runId: string;
+  ok: boolean;
+  cancelled?: boolean;
+  error?: string;
+  text?: string;
+  hitMaxIterations?: boolean;
+  results: NoteAgentResultCard[];
+}
+
 // IPC Kommunikation
 export interface FileEntry {
   name: string;
@@ -609,6 +636,22 @@ export interface ElectronAPI {
   noteAgentAttachFolderDialog: () => Promise<NoteAgentAttachResult>;
   noteAgentAttachVaultFile: (vaultPath: string, relPath: string) => Promise<NoteAgentAttachResult>;
   noteAgentDetach: (id: string) => Promise<{ success: boolean }>;
+  // Notiz-Agent Phase 2: Agent-Loop (Modus B)
+  noteAgentRun: (params: {
+    vaultPath: string;
+    noteId: string;
+    noteContent: string;
+    instruction: string;
+    model: string;
+    attachmentIds: string[];
+    targetFolderRel: string;
+    cloud?: { model: string } | null;
+  }) => Promise<{ success: boolean; runId?: string; error?: string }>;
+  noteAgentCancel: (runId: string) => Promise<{ success: boolean }>;
+  noteAgentAcceptResult: (runId: string, resultId: string) => Promise<{ success: boolean; fileName?: string; relPath?: string; error?: string }>;
+  noteAgentDiscardResult: (runId: string, resultId: string) => Promise<{ success: boolean; error?: string }>;
+  onNoteAgentProgress: (callback: (p: NoteAgentProgressEvent) => void) => void;
+  onNoteAgentDone: (callback: (p: NoteAgentDoneEvent) => void) => void;
 
   // Ollama Local AI API
   ollamaCheck: () => Promise<boolean>;

@@ -70,6 +70,10 @@ function shouldExclude(relativePath: string, fileName: string): boolean {
   // embeddings-bge-m3-latest.json wuchs auf 83 MB und sprengte nach base64 (×4/3 ≈ 106 MiB)
   // das 100-MiB-ws-maxPayload des Sync-Servers → Verbindungsabbruch + Retry-Endlosschleife.
   if (relativePath.startsWith('.mindgraph/embeddings-') || relativePath.startsWith('.mindgraph\\embeddings-')) return true
+  // Notiz-Agent-Staging: unbestätigte Agent-Outputs (Phase 2) bleiben geräte-lokal —
+  // NICHTS davon darf vor der menschlichen Abnahme auf andere Geräte syncen
+  // (docs/note-agent-harness-plan.md, F03).
+  if (relativePath.startsWith('.mindgraph/agent-staging/') || relativePath.startsWith('.mindgraph\\agent-staging\\')) return true
   if (relativePath.startsWith('.trash/') || relativePath.startsWith('.trash\\')) return true
   if (relativePath.startsWith('.sync-trash/') || relativePath.startsWith('.sync-trash\\')) return true
   if (fileName.startsWith('~')) return true

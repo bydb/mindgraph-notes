@@ -175,6 +175,36 @@ contextBridge.exposeInMainWorld('electronAPI', {
   noteAgentAttachVaultFile: (vaultPath: string, relPath: string) =>
     ipcRenderer.invoke('note-agent-attach-vault-file', vaultPath, relPath),
   noteAgentDetach: (id: string) => ipcRenderer.invoke('note-agent-detach', id),
+  // Notiz-Agent Phase 2: Agent-Loop (Modus B) — Run/Abbruch + Ergebnis-Handles
+  noteAgentRun: (params: {
+    vaultPath: string
+    noteId: string
+    noteContent: string
+    instruction: string
+    model: string
+    attachmentIds: string[]
+    targetFolderRel: string
+    cloud?: { model: string } | null
+  }) => ipcRenderer.invoke('note-agent-run', params),
+  noteAgentCancel: (runId: string) => ipcRenderer.invoke('note-agent-cancel', runId),
+  noteAgentAcceptResult: (runId: string, resultId: string) => ipcRenderer.invoke('note-agent-accept-result', runId, resultId),
+  noteAgentDiscardResult: (runId: string, resultId: string) => ipcRenderer.invoke('note-agent-discard-result', runId, resultId),
+  onNoteAgentProgress: (callback: (p: { runId: string; seq: number; skill: string; summary: string }) => void) => {
+    ipcRenderer.removeAllListeners('note-agent-progress')
+    ipcRenderer.on('note-agent-progress', (_event, p) => callback(p))
+  },
+  onNoteAgentDone: (callback: (p: {
+    runId: string
+    ok: boolean
+    cancelled?: boolean
+    error?: string
+    text?: string
+    hitMaxIterations?: boolean
+    results: Array<{ resultId: string; suggestedName: string; kind: string; summary: string; sources: string[] }>
+  }) => void) => {
+    ipcRenderer.removeAllListeners('note-agent-done')
+    ipcRenderer.on('note-agent-done', (_event, p) => callback(p))
+  },
 
   // Ollama Local AI API
   ollamaCheck: () => ipcRenderer.invoke('ollama-check'),

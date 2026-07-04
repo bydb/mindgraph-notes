@@ -9,3 +9,4 @@ export type CompatModuleId =
   | 'dashboard-snapshot'
   | 'smart-connections'
   | 'project-status'
+  | 'note-agent'

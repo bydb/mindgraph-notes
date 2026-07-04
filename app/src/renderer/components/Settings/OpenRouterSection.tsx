@@ -9,7 +9,8 @@ import {
 const FEATURE_LABELS: Record<CloudFeatureId, { de: string; en: string }> = {
   'notes-chat': { de: 'Notes Chat', en: 'Notes Chat' },
   'note-edit': { de: 'Notiz bearbeiten (KI)', en: 'Note editing (AI)' },
-  'quiz': { de: 'Karteikarten & Quiz', en: 'Flashcards & Quiz' }
+  'quiz': { de: 'Karteikarten & Quiz', en: 'Flashcards & Quiz' },
+  'note-agent': { de: 'Notiz-Agent (Dateien erzeugen)', en: 'Note agent (create files)' }
 }
 
 // OpenRouter Cloud-Backend (opt-in). Privacy-Modell siehe shared/llmBackend.ts:

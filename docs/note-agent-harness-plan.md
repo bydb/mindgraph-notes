@@ -288,6 +288,19 @@ Dateien:
 
 Offener GUI-Test (Phase 1, Schritt 4): Excel/DOCX/PDF anhängen und Vorschlag erzeugen, Scan-PDF-Abbruch, Groß-Datei-Ablehnung, Cloud-Hinweis bei OpenRouter-Auswahl, Chips-Wechsel zwischen Notizen.
 
+**Phase 2 umgesetzt (2026-07-04).** Alle Prerequisites + Agent-Loop + UI; `npm run typecheck`, `npm run test` (639) und `npm run build` grün; Run-Registry/Staging per temporärem vitest-Harness verifiziert (Ein-Run-pro-Sender, Sender-Bindung, Einmal-Konsum, keine Results nach Abbruch, pfadfreie publicResults, Dateinamen-Sanitizer, realpath-Containment, Kollisionsnamen). **Noch nicht im GUI laufzeit-getestet.**
+
+Dateien Phase 2:
+- Prerequisites: `sync/fileTracker.ts` (agent-staging-Ausschluss + Regressionstests), `llm/chatClient.ts` (`ChatOptions.signal`, kombiniert mit internem Timeout via `AbortSignal.any`), `llm/toolRegistry.ts` (neu, generisch; Telegram-Registry ist jetzt Instanziierung), `shared/modelCompatibility.ts` (Modul `note-agent` untested + `supportsNativeToolCalls` fail-closed; OpenRouter nicht gegated), `shared/llmBackend.ts` + `OpenRouterSection` (CloudFeatureId `note-agent`), `plugin-api/compat.ts` (CompatModuleId)
+- `main/noteAgent/runRegistry.ts` (neu) — ein Run pro webContents, Sender-Bindung, opake Result-Handles, Einmal-Konsum, Cancel bei Window-Destroy
+- `main/noteAgent/staging.ts` (neu) — Staging-Wurzel, temp+rename-Writes, Dateinamen-Sanitizer (Allowlist-Endungen), realpath-Containment, Kollisionsnamen, 7-Tage-Cleanup
+- `main/noteAgent/skills.ts` (neu) — 7 Skills; note_read/note_search als Adapter auf die Telegram-Tools; Write-Skills nehmen strukturierte Daten (Entscheidung 11) und registrieren Ergebnis-Karten mit Quellen
+- `main/noteAgent/loop.ts` (neu) — chatWithTools-Loop (max 8 Iterationen, Signal-Vertrag, kein Text-Fallback für Tool-Calls — Capability-Gate statt Heuristik), System-Prompt „erst lesen, dann genau einmal schreiben"
+- `main/index.ts` — IPC `note-agent-run` (Gates: Hard-Lock, Capability, Zielordner; async Loop, sender-gebundene `note-agent-progress`/`note-agent-done`-Events mit Sequenz), `note-agent-cancel`, `note-agent-accept-result` (writeFileSafe für .md, Kollisionsnamen, Konsum-Rollback bei Fehler), `note-agent-discard-result`
+- UI: `AiActionBar` (Zielordner-Picker + Chip, Ausführen-Weiche bei Zielordner, Lauf-Protokoll, Ergebnis-Karten mit Quellen + Übernehmen/Verwerfen, Abbrechen), `MarkdownEditor` (Run-State pro Notiz, Event-Routing über runId→noteId, Notizwechsel bricht laufenden Lauf ab — Entscheidung 12, Cloud nur mit `note-agent`-Opt-in)
+
+Offener GUI-Test (Phase 2): Zielordner wählen → Anweisung → Lauf-Protokoll → Ergebnis-Karte übernehmen/verwerfen; Abbrechen; Modell ohne Tool-Calling (Gemma) → Gate-Fehlermeldung; Leitbeispiel (Excel → Zuordnung → neue Excel) mit qwen-Klasse-Modell.
+
 **Nachträge (2026-07-04, aus Nutzer-Feedback):**
 - **PDF-Viewer-Einstieg**: Bei geöffnetem PDF gibt es keine Macher-Leiste (PDFViewer ersetzt den Editor; kein editierbarer Body). Neuer Button „Mit KI bearbeiten" im PDF-Viewer: öffnet die Begleitnotiz (`ensurePdfCompanion`, bestehendes Companion-Konzept) und hängt das PDF automatisch als Kontext an — über neues `pendingAgentContext` im uiStore (Muster `pendingTemplateInsert`), konsumiert vom Editor (Duplikat-Schutz, öffnet die Leiste). Office-Dateien (OfficeViewer) haben kein Companion-Konzept — bewusst offen.
 - **Notes Chat als zweite Oberfläche**: gleiche Kontext-Infrastruktur für *Fragen* (statt Transformationen). Geteilte Komponente `Shared/ContextAttachmentRow` + Hook `useContextVaultFiles` (AiActionBar refaktoriert darauf); Chips-Zeile über der Chat-Eingabe (im Projekt-RAG-Modus ausgeblendet — eigener Retrieval-Pfad); `ollama-chat`/`lmstudio-chat` um `contextAttachmentIds` erweitert, Injektion Main-seitig fail-closed vor den Notizen-Kontext; Anhänge zählen als Kontext auch ohne gewählte Notiz; Fehler-Results werden jetzt als Chat-Nachricht sichtbar. GUI-Test offen.

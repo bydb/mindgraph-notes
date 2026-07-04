@@ -52,6 +52,13 @@ describe('isSyncable', () => {
     expect(isSyncable('.attachments/datei.bin')).toBe(true)
   })
 
+  it('schließt Agent-Staging komplett aus — unbestätigte Outputs bleiben lokal (F03)', () => {
+    expect(isSyncable('.mindgraph/agent-staging/run-123/Entwurf.md')).toBe(false)
+    expect(isSyncable('.mindgraph/agent-staging/run-123/Zuordnung.xlsx')).toBe(false)
+    expect(isSyncable('.mindgraph/agent-staging/run-123/Bericht.pdf')).toBe(false)
+    expect(isSyncable('.mindgraph\\agent-staging\\run-123\\Entwurf.md')).toBe(false)
+  })
+
   it('schließt unbekannte Endungen im Root aus', () => {
     expect(isSyncable('skript.exe')).toBe(false)
     expect(isSyncable('daten.csv')).toBe(false)

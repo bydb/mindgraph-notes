@@ -1,11 +1,13 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import { useTranslation } from '../../utils/translations'
 import { useContextVaultFiles } from '../../utils/useContextVaultFiles'
 import type { NoteAgentAttachment } from '../../../shared/types'
 
-// Notiz-Agent Phase 1: geteilte Kontext-Zeile (Chips + Vault-Picker + Fehler +
-// Cloud-Hinweis) für Macher-Leiste und Notes-Chat. Die Verwaltung der Attachments
-// (Main-Registry via IPC) liegt beim Aufrufer — hier nur Darstellung + Picker.
+// Notiz-Agent Phase 1: geteilte Kontext-Zeile (Pill-Button + Chips + Vault-Picker +
+// Fehler + Cloud-Hinweis) für Macher-Leiste und Notes-Chat. Die Verwaltung der
+// Attachments (Main-Registry via IPC) liegt beim Aufrufer — hier nur Darstellung.
+// `extra` erlaubt dem Aufrufer, weitere Elemente in DIESELBE Zeile zu setzen
+// (Macher-Leiste: Zielordner-Button + Chip) — eine ruhige Zeile statt Stapel.
 // Styles: globale .ai-bar-context*-Klassen in styles/index.css.
 
 interface Props {
@@ -19,15 +21,22 @@ interface Props {
   // Cloud-Backend gewählt? Dann Hinweis zeigen, sobald Anhänge da sind (keine Sperre —
   // Entscheidung 7 im Plan, der Nutzer entscheidet).
   cloudSelected: boolean
+  extra?: ReactNode
 }
 
-const FolderGlyph = () => (
-  <svg width="11" height="11" viewBox="0 0 16 16" aria-hidden="true" style={{ flexShrink: 0 }}>
+export const FolderGlyph = ({ size = 11 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 16 16" aria-hidden="true" style={{ flexShrink: 0 }}>
     <path d="M1.5 3.5A1.5 1.5 0 0 1 3 2h3l1.5 2H13a1.5 1.5 0 0 1 1.5 1.5v6A1.5 1.5 0 0 1 13 13H3a1.5 1.5 0 0 1-1.5-1.5v-8Z" stroke="currentColor" strokeWidth="1.3" fill="none" strokeLinejoin="round" />
   </svg>
 )
 
-export function ContextAttachmentRow({ attachments, onAttachDialog, onAttachFolderDialog, onAttachVaultFile, onDetach, disabled, attachError, cloudSelected }: Props) {
+const PlusGlyph = () => (
+  <svg width="11" height="11" viewBox="0 0 12 12" aria-hidden="true" style={{ flexShrink: 0 }}>
+    <path d="M6 1v10M1 6h10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" fill="none" />
+  </svg>
+)
+
+export function ContextAttachmentRow({ attachments, onAttachDialog, onAttachFolderDialog, onAttachVaultFile, onDetach, disabled, attachError, cloudSelected, extra }: Props) {
   const { t } = useTranslation()
   const vaultFiles = useContextVaultFiles()
   const [pickerOpen, setPickerOpen] = useState(false)
@@ -50,18 +59,16 @@ export function ContextAttachmentRow({ attachments, onAttachDialog, onAttachFold
   return (
     <>
       <div className="ai-bar-context">
-        <span className="ai-bar-context-label">{t('aiBar.context.label')}</span>
         <div className="ai-bar-context-picker-wrap">
           <button
             type="button"
-            className="ai-bar-context-add"
+            className="ai-bar-context-btn"
             onClick={() => (pickerOpen ? closePicker() : setPickerOpen(true))}
             disabled={disabled}
             title={t('aiBar.context.add')}
-            aria-label={t('aiBar.context.add')}
             aria-expanded={pickerOpen}
           >
-            <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M6 1v10M1 6h10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" fill="none" /></svg>
+            <PlusGlyph /> {t('aiBar.context.label')}
           </button>
           {pickerOpen && (
             <div className="ai-bar-context-picker">
@@ -109,6 +116,7 @@ export function ContextAttachmentRow({ attachments, onAttachDialog, onAttachFold
             <button type="button" className="ai-bar-chip-x" onClick={() => onDetach(a.id)} disabled={disabled} aria-label={t('aiBar.context.remove')}>×</button>
           </span>
         ))}
+        {extra}
       </div>
       {attachError && <div className="ai-bar-context-error">{attachError}</div>}
       {attachments.length > 0 && cloudSelected && (

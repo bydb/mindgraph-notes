@@ -123,6 +123,38 @@ export function removeContextAttachment(senderId: number, id: string): void {
   registryBySender.get(senderId)?.delete(id)
 }
 
+// Für den Agent-Loop (Phase 2): Metadaten der registrierten Anhänge eines Runs —
+// der System-Prompt nennt nur Namen/Typen, Inhalte holt das Modell via read_attachment.
+export function getContextAttachmentInfos(senderId: number, ids: string[]): ContextAttachmentInfo[] {
+  const map = registryBySender.get(senderId)
+  const out: ContextAttachmentInfo[] = []
+  for (const id of ids) {
+    const e = map?.get(id)
+    if (e) out.push({ id: e.id, name: e.name, kind: e.kind, insideVault: e.insideVault, sizeBytes: e.sizeBytes })
+  }
+  return out
+}
+
+// Roh-Lesen eines einzelnen Anhangs für den read_attachment-Skill — ohne den
+// Delimiter-Rahmen (den setzt der Loop-Kontext), aber mit denselben Budgets.
+export async function readAttachmentRaw(
+  senderId: number,
+  id: string,
+  instruction = ''
+): Promise<{ name: string; content: string; truncated: boolean }> {
+  const entry = registryBySender.get(senderId)?.get(id)
+  if (!entry) throw new Error('Anhang nicht (mehr) registriert')
+  if (entry.kind === 'folder') {
+    const res = await readFolderContext(entry, instruction, MAX_CHARS_TOTAL)
+    return { name: entry.name, content: res.content, truncated: res.truncated }
+  }
+  let content = hygieneText(await extractContent(entry)).trim()
+  if (!content) throw new Error('Datei ist leer oder enthält keinen lesbaren Text')
+  const truncated = content.length > MAX_CHARS_PER_FILE
+  if (truncated) content = content.slice(0, MAX_CHARS_PER_FILE) + '\n[gekürzt: Datei-Budget erreicht]'
+  return { name: entry.name, content, truncated }
+}
+
 export function clearContextAttachments(senderId: number): void {
   registryBySender.delete(senderId)
 }

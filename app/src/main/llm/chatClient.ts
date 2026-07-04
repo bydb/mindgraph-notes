@@ -43,6 +43,13 @@ export interface ChatOptions {
   responseFormat?: 'json'                  // OpenRouter: erzwingt response_format json_object (für strukturierte Analysen)
   temperature?: number                     // OpenRouter: temperature
   maxTokens?: number                      // OpenRouter: max_tokens; Ollama: nur dokumentarisch
+  // Externes Abbruch-Signal (z.B. Abbrechen-Button im Notiz-Agent) — wird mit dem
+  // internen Request-Timeout kombiniert, ersetzt ihn nicht (Plan F05).
+  signal?: AbortSignal
+  // Request-Timeout-Override in ms. Default: 120s (chat) / 180s (chatWithTools).
+  // Der Notiz-Agent setzt 600s: große lokale Modelle brauchen mit gewachsenem
+  // Tool-Kontext länger, und der Nutzer hat einen echten Abbrechen-Button.
+  timeoutMs?: number
 }
 
 export interface ChatResult {
@@ -63,6 +70,12 @@ const OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1'
 const OPENROUTER_HEADERS_EXTRA = {
   'HTTP-Referer': 'https://mindgraph-notes.de',
   'X-Title': 'MindGraph Notes'
+}
+
+// Kombiniert externes Abbruch-Signal mit dem internen Timeout (Cancellation-Vertrag F05).
+function requestSignal(timeoutMs: number, external?: AbortSignal): AbortSignal {
+  const timeout = AbortSignal.timeout(timeoutMs)
+  return external ? AbortSignal.any([external, timeout]) : timeout
 }
 
 async function isOllamaReachable(url: string): Promise<boolean> {
@@ -120,7 +133,7 @@ async function chatViaOllama(messages: ChatMessage[], opts: ChatOptions): Promis
       messages: messages.map(m => ({ role: m.role, content: m.content })),
       stream: false
     }),
-    signal: AbortSignal.timeout(120000)
+    signal: requestSignal(opts.timeoutMs ?? 120000, opts.signal)
   })
   if (!res.ok) {
     const body = await res.text()
@@ -210,7 +223,7 @@ async function chatViaOpenRouter(messages: ChatMessage[], opts: ChatOptions): Pr
       ...(typeof opts.temperature === 'number' ? { temperature: opts.temperature } : {}),
       ...(opts.maxTokens ? { max_tokens: opts.maxTokens } : {})
     }),
-    signal: AbortSignal.timeout(120000)
+    signal: requestSignal(opts.timeoutMs ?? 120000, opts.signal)
   })
   if (!res.ok) {
     throw new Error(friendlyOpenRouterError(res.status, await res.text(), model))
@@ -287,7 +300,7 @@ async function chatWithToolsViaOllama(
       tools: wireTools,
       stream: false
     }),
-    signal: AbortSignal.timeout(180000)
+    signal: requestSignal(opts.timeoutMs ?? 180000, opts.signal)
   })
   if (!res.ok) {
     const body = await res.text()
@@ -387,7 +400,7 @@ async function chatWithToolsViaOpenRouter(
       tools: wireTools,
       stream: false
     }),
-    signal: AbortSignal.timeout(180000)
+    signal: requestSignal(opts.timeoutMs ?? 180000, opts.signal)
   })
   if (!res.ok) {
     throw new Error(friendlyOpenRouterError(res.status, await res.text(), model))

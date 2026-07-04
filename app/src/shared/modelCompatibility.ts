@@ -88,6 +88,11 @@ export const MODULES: ModuleDescriptor[] = [
   // sichtbare Radar-Anzeige bringt — bei UNTRUSTED Notiz-Inhalt ein Sicherheitsrisiko.
   { id: 'dashboard-snapshot', damageRelevant: true  },
   { id: 'smart-connections',  damageRelevant: false },
+  // Notiz-Agent (Modus B, Tool-Loop): noch KEINE Benchmarks — Default untested
+  // (sichtbare Warnung, kein Lock). damageRelevant erst nach Wiederholungs-Runs
+  // entscheiden (docs/note-agent-harness-plan.md, Offene Frage 2). Die harte
+  // technische Grenze ist das Tool-Calling-Gate (supportsNativeToolCalls).
+  { id: 'note-agent',         damageRelevant: false },
   // Project-Status nicht damageRelevant: Output landet in einem klar
   // markierten Draft (`_STATUS-WW.md`), nie in der kanonischen Statusseite.
   // Nutzer reviewt vor dem Übernehmen — Halluzinationen sind Cosmetic, kein Sicherheitsrisiko.
@@ -315,6 +320,11 @@ export const MODEL_COMPATIBILITY: ModelCompatibilityData = {
     // gemma4:latest 9/10 — qualitativ gleichauf (je ~1/15 thin-week-Fabrikation
     // "Theme ausgewählt"). olmo-3:7b-think unbrauchbar (0/10, kein Format, ~74 s).
     // DEFAULT auf qwen3.5:4b (3,4 GB, 8-GB-tauglich, = Mail-Modell) statt ministral (6 GB).
+    // Notiz-Agent (Modus B): noch keine Benchmarks — leere Matrix = alle Modelle
+    // "untested" (Warnung am Picker, kein Lock). Testkandidaten laut Plan: qwen3,
+    // qwen2.5-coder, llama3.1, mistral-nemo. Benchmark-Fall (Tabelle lesen →
+    // zuordnen → Tabelle schreiben) kommt in ~/dev/brain-model-benchmark/.
+    'note-agent':          {},
     'project-status':      {
       'qwen3.5:4b': {
         verdict: 'yellow',
@@ -529,6 +539,44 @@ export function isHumanFavorite(model: string): boolean {
 export function isCloudModel(model: string): boolean {
   if (!model) return false
   return /[:-]cloud$/i.test(model.trim())
+}
+
+// ── Tool-Calling-Capability (Notiz-Agent Modus B) ────────────────────────────
+// Gepflegte Liste von Ollama-Modellfamilien mit nativen Tool-Calls — FAIL-CLOSED:
+// unbekannte Familien starten den Agent-Loop nicht (klare Fehlermeldung statt
+// stillem Degradieren). Das ist eine CAPABILITY-Aussage („kann Tool-Calls"),
+// KEINE Qualitäts- oder Eignungsaussage — die kommt aus der Verdict-Matrix nach
+// Benchmarks (Plan F07: Capability ≠ Verdict ≠ Empfehlung).
+// Gemma (alle Versionen) kann kein Tool-Calling. OpenRouter-Modelle werden nicht
+// hier gegated — die OpenAI-kompatible API normalisiert Tool-Calls, Fehler kommen
+// sauber zurück.
+const TOOL_CAPABLE_FAMILIES = [
+  'qwen3', // inkl. qwen3.5/qwen3.6
+  'qwen2.5',
+  'qwen2.5-coder',
+  'llama3.1',
+  'llama3.2',
+  'llama3.3',
+  'llama4',
+  'mistral-nemo',
+  'mistral-small',
+  'mistral-large',
+  'ministral',
+  'devstral',
+  'command-r',
+  'firefunction',
+  'hermes3',
+  'granite3',
+  'gpt-oss'
+]
+
+export function supportsNativeToolCalls(model: string): boolean {
+  const base = model.trim().toLowerCase()
+  if (!base) return false
+  // Namensform: familie[:tag] — Familie extrahieren, Versionssuffixe der Familie
+  // (qwen3.5, llama3.1 …) bleiben Teil des Prefix-Vergleichs.
+  const family = base.split(':')[0]
+  return TOOL_CAPABLE_FAMILIES.some(f => family === f || family.startsWith(f))
 }
 
 // "Cloud-Test-Modelle": Modelle, die wir als Null-Reibungs-Einstieg für Test-User

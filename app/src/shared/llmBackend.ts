@@ -23,9 +23,9 @@ export const OPENROUTER_MODEL_SENTINEL = '__openrouter__'
 // Cloud-fähige Features, die KEINE Matrix-Module sind (allgemeine Textarbeit auf
 // Notiz-Inhalten). Bewusst getrennt von ModuleId, damit die Benchmark-/Hard-Lock-
 // Matrix sauber bleibt. Alle sind personenbezogen → in der UI mit ⚠️ + Opt-in.
-export type CloudFeatureId = 'notes-chat' | 'note-edit' | 'quiz'
+export type CloudFeatureId = 'notes-chat' | 'note-edit' | 'quiz' | 'note-agent'
 
-export const CLOUD_CAPABLE_FEATURES: CloudFeatureId[] = ['notes-chat', 'note-edit', 'quiz']
+export const CLOUD_CAPABLE_FEATURES: CloudFeatureId[] = ['notes-chat', 'note-edit', 'quiz', 'note-agent']
 
 // Die OpenRouter-bezogenen Settings (Teil von uiStore.ollama.openrouter).
 export interface OpenRouterSettings {

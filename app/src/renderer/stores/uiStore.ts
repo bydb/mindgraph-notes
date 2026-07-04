@@ -253,6 +253,7 @@ interface LLMSettings {
     'dashboard-snapshot': string
     'smart-connections': string
     'project-status': string
+    'note-agent': string
   }
   // Embedding-Modell fürs Projekt-RAG. EIN zentrales Setting — alle Surfaces
   // (Dashboard, NotesChat, Telegram, Workflow, loadProjectContext, Crystallizer)
@@ -891,7 +892,8 @@ const defaultState = {
       'mail-summary': '',
       'dashboard-snapshot': '',
       'smart-connections': '',
-      'project-status': ''
+      'project-status': '',
+      'note-agent': ''
     },
     projectRagEmbeddingModel: 'bge-m3',
     openrouter: { ...DEFAULT_OPENROUTER_SETTINGS }

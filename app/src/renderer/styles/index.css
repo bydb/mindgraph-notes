@@ -19861,22 +19861,28 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
 .ai-bar-context { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
 .ai-bar-context-label { font-size: 11px; color: var(--text-muted); }
 .ai-bar-context-picker-wrap { position: relative; display: inline-flex; }
-.ai-bar-context-add {
+/* Pill-Buttons im Preset-Stil — eine ruhige Zeile statt einsamer Icon-Kreise */
+.ai-bar-context-btn {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  width: 22px;
-  height: 22px;
-  padding: 0;
+  gap: 5px;
+  padding: 3px 10px;
   border: 1px solid var(--border-color);
   border-radius: var(--radius-full);
   background: var(--bg-primary);
   color: var(--text-secondary);
+  font-size: 12px;
+  font-family: inherit;
   cursor: pointer;
   transition: all var(--transition-fast);
 }
-.ai-bar-context-add:hover:not(:disabled) { color: var(--text-primary); border-color: var(--text-muted); }
-.ai-bar-context-add:disabled { opacity: 0.5; cursor: not-allowed; }
+.ai-bar-context-btn:hover:not(:disabled) { color: var(--text-primary); border-color: var(--text-muted); }
+.ai-bar-context-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.ai-bar-context-btn.active {
+  background: var(--accent-subtle);
+  color: var(--accent-color);
+  border-color: var(--accent-color);
+}
 .ai-bar-context-picker {
   position: absolute;
   bottom: calc(100% + 6px);
@@ -19956,6 +19962,57 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
   white-space: nowrap;
 }
 .ai-bar-context-error { font-size: 11px; color: var(--color-danger); }
+
+/* Notiz-Agent Phase 2: Lauf-Protokoll + Ergebnis-Karten */
+.ai-bar-agent {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--bg-primary);
+}
+.ai-bar-agent-steps { display: flex; flex-direction: column; gap: 2px; }
+.ai-bar-agent-step {
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-family: var(--font-mono, ui-monospace, monospace);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ai-bar-agent-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.ai-bar-agent-working { font-size: 12px; color: var(--text-secondary); }
+.ai-bar-agent-text { font-size: 12px; color: var(--text-primary); line-height: 1.5; white-space: pre-wrap; }
+.ai-bar-agent-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--bg-secondary);
+}
+.ai-bar-agent-card-head { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.ai-bar-agent-card-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ai-bar-agent-card-meta { font-size: 11px; color: var(--text-muted); flex-shrink: 0; }
+.ai-bar-agent-card-sources {
+  font-size: 11px;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ai-bar-agent-card-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
+.ai-bar-agent-card-state { font-size: 11px; color: var(--text-secondary); }
 .ai-bar-cloud-hint {
   padding: 6px 9px;
   border: 1px solid color-mix(in srgb, var(--color-warning) 35%, transparent);

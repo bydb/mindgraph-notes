@@ -1,14 +1,34 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useUIStore } from '../../stores/uiStore'
 import { useTranslation } from '../../utils/translations'
 import { ModelLogo } from '../Shared/ModelLogo'
 import { ModelPicker } from '../Shared/ModelPicker'
 import { HumanIcon } from '../Shared/HumanIcon'
-import { ContextAttachmentRow } from '../Shared/ContextAttachmentRow'
+import { ContextAttachmentRow, FolderGlyph } from '../Shared/ContextAttachmentRow'
 import { diffStats, type DiffOp } from '../../utils/blockDiff'
 import { OPENROUTER_MODEL_SENTINEL } from '../../../shared/llmBackend'
 import { isCloudModel } from '../../../shared/modelCompatibility'
+import { useContextVaultFiles } from '../../utils/useContextVaultFiles'
 import type { NoteAgentAttachment } from '../../../shared/types'
+
+// Notiz-Agent Phase 2 (Modus B): UI-Zustand eines Agent-Laufs — verwaltet im
+// MarkdownEditor (pro Notiz gekeyt), hier nur dargestellt.
+export interface AgentUiStep {
+  seq: number
+  skill: string
+  summary: string
+}
+
+export interface AgentUiResult {
+  resultId: string
+  suggestedName: string
+  kind: string
+  summary: string
+  sources: string[]
+  state: 'pending' | 'accepted' | 'discarded'
+  finalName?: string
+  error?: string
+}
 
 // Macher-Leiste: Anweisung → KI-Vorschlag als Block-Diff → Übernehmen/Verwerfen.
 // Eingeklappt = ruhiges Zuhause des ⌘⇧A-Assistenten. Provenienz ist eingewebt:
@@ -49,6 +69,18 @@ interface Props {
   onAttachVaultFile: (relPath: string) => void
   onDetach: (id: string) => void
   attachError: string | null
+  // Notiz-Agent Phase 2 (Modus B): Zielordner = implizite Eskalation zum Agent-Loop.
+  targetFolder: string
+  onTargetFolderChange: (rel: string | null) => void
+  agentPhase: 'idle' | 'running' | 'review'
+  agentSteps: AgentUiStep[]
+  agentResults: AgentUiResult[]
+  agentFinalText: string
+  onAgentRun: (instruction: string) => void
+  onAgentCancel: () => void
+  onAgentAccept: (resultId: string) => void
+  onAgentDiscard: (resultId: string) => void
+  onAgentDismiss: () => void
 }
 
 const PRESETS = [
@@ -58,27 +90,51 @@ const PRESETS = [
   { id: 'tone', key: 'aiBar.preset.tone' as const },
 ]
 
-export function AiActionBar({ open, onOpenChange, phase, proposal, onGenerate, onAccept, onDiscard, tagSuggestions, tagsLoading, onSuggestTags, onAcceptTag, onDismissTag, model, models, onModelChange, getModelLabel, attachments, onAttachDialog, onAttachFolderDialog, onAttachVaultFile, onDetach, attachError }: Props) {
+export function AiActionBar({ open, onOpenChange, phase, proposal, onGenerate, onAccept, onDiscard, tagSuggestions, tagsLoading, onSuggestTags, onAcceptTag, onDismissTag, model, models, onModelChange, getModelLabel, attachments, onAttachDialog, onAttachFolderDialog, onAttachVaultFile, onDetach, attachError, targetFolder, onTargetFolderChange, agentPhase, agentSteps, agentResults, agentFinalText, onAgentRun, onAgentCancel, onAgentAccept, onAgentDiscard, onAgentDismiss }: Props) {
   const { t } = useTranslation()
   const aiEnabled = useUIStore(s => s.ollama.enabled)
   const [instruction, setInstruction] = useState('')
   const [preset, setPreset] = useState<string | null>(null)
+  // Zielordner-Picker (Modus B)
+  const vaultEntries = useContextVaultFiles()
+  const [targetPickerOpen, setTargetPickerOpen] = useState(false)
+  const [targetQuery, setTargetQuery] = useState('')
+  const targetMatches = useMemo(() => {
+    const q = targetQuery.trim().toLowerCase()
+    const folders = vaultEntries.filter(f => f.isFolder)
+    const pool = q ? folders.filter(f => f.name.toLowerCase().includes(q) || f.relPath.toLowerCase().includes(q)) : folders
+    return pool.slice(0, 8)
+  }, [targetQuery, vaultEntries])
 
   // Cloud-Erkennung nur für den Hinweis (keine Sperre — Entscheidung 7 im Plan):
   // OpenRouter-Sentinel oder gehostetes Ollama-Cloud-Modell (`:cloud`/`-cloud`).
   const cloudSelected = model === OPENROUTER_MODEL_SENTINEL || isCloudModel(model)
+  const agentMode = !!targetFolder
+  const busy = phase === 'generating' || agentPhase === 'running'
 
   if (!aiEnabled) return null
+
+  const closeTargetPicker = () => {
+    setTargetPickerOpen(false)
+    setTargetQuery('')
+  }
 
   const close = () => {
     onOpenChange(false)
     onDiscard()
     setInstruction('')
     setPreset(null)
+    closeTargetPicker()
   }
 
   const submit = () => {
-    if (phase === 'generating') return
+    if (busy) return
+    // Modus B: Zielordner verknüpft → Agent-Loop statt Block-Diff (implizite Eskalation).
+    if (agentMode) {
+      if (!instruction.trim()) return
+      onAgentRun(instruction.trim())
+      return
+    }
     if (!preset && !instruction.trim()) return
     onGenerate(instruction.trim(), preset)
   }
@@ -160,17 +216,127 @@ export function AiActionBar({ open, onOpenChange, phase, proposal, onGenerate, o
         }}
       />
 
-      {/* Notiz-Agent Phase 1: Kontext-Dateien als Chips + Picker (geteilte Komponente) */}
+      {/* Notiz-Agent: EINE ruhige Zeile — Kontext-Button, Chips, Ziel-Button (Phase 2).
+          Zielordner verknüpft = Agent-Loop mit Datei-Outputs; Erklärung im Tooltip. */}
       <ContextAttachmentRow
         attachments={attachments}
         onAttachDialog={onAttachDialog}
         onAttachFolderDialog={onAttachFolderDialog}
         onAttachVaultFile={onAttachVaultFile}
         onDetach={onDetach}
-        disabled={phase === 'generating'}
+        disabled={busy}
         attachError={attachError}
-        cloudSelected={cloudSelected}
+        cloudSelected={cloudSelected && !agentMode}
+        extra={
+          <>
+            <div className="ai-bar-context-picker-wrap">
+              <button
+                type="button"
+                className={`ai-bar-context-btn ${targetFolder ? 'active' : ''}`}
+                onClick={() => (targetPickerOpen ? closeTargetPicker() : setTargetPickerOpen(true))}
+                disabled={busy}
+                title={t('aiBar.target.hint')}
+                aria-expanded={targetPickerOpen}
+              >
+                <FolderGlyph /> {t('aiBar.target.label')}
+              </button>
+              {targetPickerOpen && (
+                <div className="ai-bar-context-picker">
+                  <input
+                    autoFocus
+                    className="ai-bar-context-search"
+                    placeholder={t('aiBar.target.searchPlaceholder')}
+                    value={targetQuery}
+                    onChange={e => setTargetQuery(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Escape') { e.stopPropagation(); closeTargetPicker() } }}
+                  />
+                  <div className="ai-bar-context-results">
+                    {targetMatches.map(f => (
+                      <button
+                        key={f.relPath}
+                        type="button"
+                        className="ai-bar-context-result"
+                        onClick={() => { onTargetFolderChange(f.relPath); closeTargetPicker() }}
+                        title={f.relPath}
+                      >
+                        <span className="ai-bar-context-result-name">{f.name}</span>
+                        <span className="ai-bar-context-result-path">{f.relPath}</span>
+                      </button>
+                    ))}
+                    {targetMatches.length === 0 && (
+                      <div className="ai-bar-context-empty">{t('aiBar.context.noResults')}</div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+            {targetFolder && (
+              <span className="ai-bar-chip ai-bar-context-chip ai-bar-target-chip">
+                <span className="ai-bar-context-chip-name" title={targetFolder}>
+                  <FolderGlyph /> {targetFolder.split('/').pop()}
+                </span>
+                <button type="button" className="ai-bar-chip-x" onClick={() => onTargetFolderChange(null)} disabled={busy} aria-label={t('aiBar.target.remove')}>×</button>
+              </span>
+            )}
+          </>
+        }
       />
+
+      {/* Modus B + Cloud: ehrlicher Hinweis — auch vom Agenten GELESENE Notizen gehen
+          im Verlauf an den Anbieter, nicht nur die Anhänge (Entscheidung 7). */}
+      {agentMode && cloudSelected && (
+        <div className="ai-bar-cloud-hint">{t('aiBar.agent.cloudHint')}</div>
+      )}
+
+      {/* Agent-Lauf: Protokoll + Abbrechen + Ergebnis-Karten */}
+      {agentPhase !== 'idle' && (
+        <div className="ai-bar-agent">
+          {agentSteps.length > 0 && (
+            <div className="ai-bar-agent-steps">
+              {agentSteps.map(s => (
+                <div key={s.seq} className="ai-bar-agent-step">{s.seq}. {s.skill}{s.summary ? ` — ${s.summary}` : ''}</div>
+              ))}
+            </div>
+          )}
+          {agentPhase === 'running' && (
+            <div className="ai-bar-agent-row">
+              <span className="ai-bar-agent-working">{t('aiBar.agent.working')}</span>
+              <button type="button" className="ai-bar-cancel" onClick={onAgentCancel}>{t('aiBar.cancel')}</button>
+            </div>
+          )}
+          {agentPhase === 'review' && (
+            <>
+              {agentFinalText && <div className="ai-bar-agent-text">{agentFinalText}</div>}
+              {agentResults.map(r => (
+                <div key={r.resultId} className="ai-bar-agent-card">
+                  <div className="ai-bar-agent-card-head">
+                    <span className="ai-bar-agent-card-name" title={r.suggestedName}>{r.suggestedName}</span>
+                    <span className="ai-bar-agent-card-meta">{r.summary}</span>
+                  </div>
+                  {r.sources.length > 0 && (
+                    <div className="ai-bar-agent-card-sources">{t('aiBar.agent.sources')}: {r.sources.join(', ')}</div>
+                  )}
+                  {r.state === 'pending' ? (
+                    <div className="ai-bar-agent-card-actions">
+                      <button type="button" className="ai-bar-cancel" onClick={() => onAgentDiscard(r.resultId)}>{t('aiBar.discard')}</button>
+                      <button type="button" className="ai-bar-send" onClick={() => onAgentAccept(r.resultId)}>{t('aiBar.agent.accept')}</button>
+                    </div>
+                  ) : (
+                    <div className="ai-bar-agent-card-state">
+                      {r.state === 'accepted' ? `${t('aiBar.agent.accepted')}: ${r.finalName || r.suggestedName}` : t('aiBar.agent.discardedState')}
+                    </div>
+                  )}
+                  {r.error && <div className="ai-bar-context-error">{r.error}</div>}
+                </div>
+              ))}
+              <div className="ai-bar-agent-row">
+                <span />
+                <button type="button" className="ai-bar-cancel" onClick={onAgentDismiss}>{t('aiBar.agent.close')}</button>
+              </div>
+            </>
+          )}
+        </div>
+      )}
 
       <div className="ai-bar-footer">
         <div className="ai-bar-model-pick" title={t('aiBar.model')}>
@@ -189,9 +355,9 @@ export function AiActionBar({ open, onOpenChange, phase, proposal, onGenerate, o
             type="button"
             className="ai-bar-send"
             onClick={submit}
-            disabled={phase === 'generating' || (!preset && !instruction.trim())}
+            disabled={busy || (agentMode ? !instruction.trim() : (!preset && !instruction.trim()))}
           >
-            {phase === 'generating' ? t('aiBar.generating') : t('aiBar.send')}
+            {phase === 'generating' ? t('aiBar.generating') : agentPhase === 'running' ? t('aiBar.agent.working') : agentMode ? t('aiBar.agent.run') : t('aiBar.send')}
           </button>
         </div>
       </div>

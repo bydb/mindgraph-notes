@@ -126,7 +126,7 @@ import { runWorkflow, type RunnerServices, type SeedEmail } from './workflows/ru
 import { matchEmailToProjects, gateProjectMatch } from '../shared/projectMatch'
 import { parseRelevanceConfig, stripConfigBlock, buildReplyStats, computeHardSignals, combineRelevance, extractConfigBlock, upsertConfigBlock, emptyRelevanceConfig, isSentMail, isSentFolderName, DEFAULT_VIP_WEIGHT, DEFAULT_DOMAIN_WEIGHT, DEFAULT_KEYWORD_BOOST } from '../shared/emailRelevance'
 import { isHardLocked as isModelHardLocked, isCloudModel as isModelIsCloud } from '../shared/modelCompatibility'
-import { listOpenRouterModels, chat as llmChat, streamOpenRouterChat } from './llm/chatClient'
+import { listOpenRouterModels, chat as llmChat, streamOpenRouterChat, type ChatOptions as LlmChatOptions } from './llm/chatClient'
 import { registerWorkflowActions, unregisterWorkflowActions, workflowModuleGate } from '../shared/workflow/registry'
 import type { Workflow, WorkflowFile, WorkflowRunTrigger } from '../shared/workflow/model'
 import type {
@@ -153,6 +153,10 @@ import { createMainRegistry, discoverMainPlugins } from './plugins/registry'
 import { isPluginGateEnabled } from '../shared/plugins/moduleGate'
 import { registerPluginTransport, isTrustedSender } from './plugins/transport'
 import { registerContextAttachment, registerContextFolder, removeContextAttachment, clearContextAttachments, readContextBlock } from './noteAgent/contextFiles'
+import { startRun, getRunForSender, finishRun, publicResults, takeResult, cancelRunsForSender } from './noteAgent/runRegistry'
+import { runNoteAgentLoop } from './noteAgent/loop'
+import { cleanupOldStaging, assertInsideRunStaging, collisionFreeName } from './noteAgent/staging'
+import { supportsNativeToolCalls } from '../shared/modelCompatibility'
 import { createHostFactory, type HostServices } from './plugins/host'
 import * as nativeServices from './plugins/nativeServices'
 import { buildKeyring, RESERVED_PLUGIN_IDS } from './plugins/runtime/keyring'
@@ -3872,6 +3876,9 @@ function hookNoteAgentCleanup(sender: Electron.WebContents): void {
   const senderId = sender.id
   sender.once('destroyed', () => {
     clearContextAttachments(senderId)
+    // Fenster zu = Lauf terminal (F10): laufender Agent wird abgebrochen,
+    // verspätete Ergebnisse werden nicht mehr registriert.
+    cancelRunsForSender(senderId)
     noteAgentCleanupHooked.delete(senderId)
   })
 }
@@ -3951,6 +3958,165 @@ ipcMain.handle('note-agent-attach-folder-dialog', async (event) => {
 
 ipcMain.handle('note-agent-detach', async (event, id: string) => {
   removeContextAttachment(event.sender.id, id)
+  return { success: true }
+})
+
+// ── Notiz-Agent Phase 2: Agent-Loop mit Skills (Modus B) ─────────────────────
+// Design: docs/note-agent-harness-plan.md §4. Run-Registry erzwingt einen Lauf
+// pro Fenster; Ergebnisse landen im Staging und werden über opake Handles
+// übernommen/verworfen — der Renderer sieht nie Pfade.
+interface NoteAgentRunParams {
+  vaultPath: string
+  noteId: string
+  noteContent: string
+  instruction: string
+  model: string
+  attachmentIds: string[]
+  targetFolderRel: string
+  // Cloud-Routing (OpenRouter) — nur gesetzt, wenn per 'note-agent'-Opt-in freigegeben.
+  cloud?: { model: string } | null
+}
+
+ipcMain.handle('note-agent-run', async (event, params: NoteAgentRunParams) => {
+  if (!isTrustedSender(event)) return { success: false, error: 'Nicht autorisierter Aufrufer' }
+  try {
+    assertApprovedVault(params.vaultPath, 'note-agent-run')
+    const targetAbs = validatePath(params.vaultPath, params.targetFolderRel)
+    const targetStat = await fs.stat(targetAbs).catch(() => null)
+    if (!targetStat?.isDirectory()) {
+      return { success: false, error: `Zielordner nicht gefunden: ${params.targetFolderRel}` }
+    }
+    if (!params.instruction?.trim()) {
+      return { success: false, error: 'Keine Anweisung angegeben' }
+    }
+
+    // Hard-Lock (Matrix) + Capability-Gate (fail-closed) — nur für lokale Modelle;
+    // OpenRouter normalisiert Tool-Calls über die OpenAI-kompatible API.
+    if (!params.cloud?.model) {
+      if (isModelHardLocked(params.model, 'note-agent')) {
+        return { success: false, error: `Modell "${params.model}" ist für den Notiz-Agenten gesperrt (rot in der Kompatibilitäts-Matrix).` }
+      }
+      if (!supportsNativeToolCalls(params.model)) {
+        return { success: false, error: `Modell "${params.model}" unterstützt kein natives Tool-Calling — der Agent-Loop braucht das. Kandidaten: qwen3, qwen2.5-coder, llama3.1, mistral-nemo.` }
+      }
+    }
+
+    let chatOptions: LlmChatOptions
+    if (params.cloud?.model) {
+      const orKey = await loadOpenRouterKey()
+      if (!orKey) {
+        return { success: false, error: 'OpenRouter-Cloud ist für den Notiz-Agenten gewählt, aber kein API-Key hinterlegt (Einstellungen → KI → OpenRouter).' }
+      }
+      chatOptions = { backend: 'openrouter', openrouterApiKey: orKey, openrouterModel: params.cloud.model }
+    } else {
+      chatOptions = { backend: 'ollama', ollamaModel: params.model }
+    }
+
+    const run = startRun({
+      senderId: event.sender.id,
+      noteId: params.noteId,
+      vaultPath: params.vaultPath,
+      targetFolderRel: params.targetFolderRel,
+      attachmentIds: params.attachmentIds || [],
+      instruction: params.instruction.trim()
+    })
+    if (!run) return { success: false, error: 'Es läuft bereits ein Agent-Lauf in diesem Fenster — erst abbrechen oder abwarten.' }
+    hookNoteAgentCleanup(event.sender)
+    void cleanupOldStaging(params.vaultPath).catch(() => undefined)
+
+    // Loop asynchron — der Handler gibt sofort die runId zurück (für Abbrechen),
+    // Fortschritt und Abschluss kommen als sender-gebundene Events.
+    const sender = event.sender
+    void (async () => {
+      try {
+        const res = await runNoteAgentLoop({
+          run,
+          noteContent: params.noteContent || '',
+          chatOptions,
+          onStep: (seq, skill, summary) => {
+            if (!sender.isDestroyed()) sender.send('note-agent-progress', { runId: run.runId, seq, skill, summary })
+          }
+        })
+        finishRun(run, 'done')
+        if (!sender.isDestroyed()) {
+          sender.send('note-agent-done', {
+            runId: run.runId,
+            ok: true,
+            text: res.text,
+            hitMaxIterations: res.hitMaxIterations,
+            results: publicResults(run)
+          })
+        }
+      } catch (e) {
+        const cancelled = run.abort.signal.aborted
+        finishRun(run, cancelled ? 'cancelled' : 'error')
+        let message = e instanceof Error ? e.message : String(e)
+        if (/aborted due to timeout|TimeoutError/i.test(message)) {
+          message = 'Zeitüberschreitung: Das Modell hat nicht innerhalb von 10 Minuten geantwortet. Kleineres/schnelleres Modell wählen oder den Auftrag verkleinern.'
+        }
+        if (!sender.isDestroyed()) {
+          sender.send('note-agent-done', {
+            runId: run.runId,
+            ok: false,
+            cancelled,
+            error: message,
+            results: publicResults(run)
+          })
+        }
+      }
+    })()
+
+    return { success: true, runId: run.runId }
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : 'Unbekannter Fehler' }
+  }
+})
+
+ipcMain.handle('note-agent-cancel', async (event, runId: string) => {
+  const run = getRunForSender(event.sender.id, runId)
+  if (run && run.status === 'running') run.abort.abort()
+  return { success: true }
+})
+
+ipcMain.handle('note-agent-accept-result', async (event, runId: string, resultId: string) => {
+  if (!isTrustedSender(event)) return { success: false, error: 'Nicht autorisierter Aufrufer' }
+  const run = getRunForSender(event.sender.id, runId)
+  if (!run) return { success: false, error: 'Unbekannter Lauf' }
+  const entry = takeResult(event.sender.id, runId, resultId)
+  if (!entry) return { success: false, error: 'Ergebnis nicht (mehr) verfügbar' }
+  try {
+    const real = await assertInsideRunStaging(run, entry.stagingPath)
+    const targetDir = validatePath(run.vaultPath, run.targetFolderRel)
+    const finalName = await collisionFreeName(targetDir, entry.suggestedName)
+    const destPath = path.join(targetDir, finalName)
+    if (entry.kind === 'md') {
+      // Markdown über die eine Schreibgrenze (Auto-Backup, Empty-Block, Auto-Heal).
+      const content = await fs.readFile(real, 'utf-8')
+      await writeFileSafe(destPath, content)
+    } else {
+      await fs.copyFile(real, destPath)
+    }
+    await fs.rm(real, { force: true }).catch(() => undefined)
+    return { success: true, fileName: finalName, relPath: path.join(run.targetFolderRel, finalName).replace(/\\/g, '/') }
+  } catch (error) {
+    // Übernahme gescheitert → Konsum zurücknehmen, damit der Nutzer es erneut versuchen kann.
+    entry.consumed = false
+    return { success: false, error: error instanceof Error ? error.message : 'Unbekannter Fehler' }
+  }
+})
+
+ipcMain.handle('note-agent-discard-result', async (event, runId: string, resultId: string) => {
+  if (!isTrustedSender(event)) return { success: false, error: 'Nicht autorisierter Aufrufer' }
+  const run = getRunForSender(event.sender.id, runId)
+  if (!run) return { success: false, error: 'Unbekannter Lauf' }
+  const entry = takeResult(event.sender.id, runId, resultId)
+  if (!entry) return { success: false, error: 'Ergebnis nicht (mehr) verfügbar' }
+  try {
+    const real = await assertInsideRunStaging(run, entry.stagingPath)
+    await fs.rm(real, { force: true })
+  } catch {
+    /* Datei fehlt bereits — Verwerfen ist idempotent */
+  }
   return { success: true }
 })
 
