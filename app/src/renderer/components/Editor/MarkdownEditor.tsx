@@ -1989,6 +1989,14 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
     else agentResultPatch(noteId, resultId, { error: res.error })
   }, [effectiveNoteId, agentRunByNote, agentResultPatch])
 
+  // Mitlernen (Stufe 3): Merksatz in die Agent-Gedächtnis-Notiz (Skills/Agent-Gedächtnis.md).
+  const agentRemember = useCallback(async (text: string): Promise<boolean> => {
+    if (!vaultPath) return false
+    const res = await window.electronAPI.noteAgentRemember(vaultPath, text)
+    if (!res.success) setAgentAttachError(res.error || 'Speichern fehlgeschlagen')
+    return res.success
+  }, [vaultPath])
+
   const agentRunDismiss = useCallback(() => {
     if (!effectiveNoteId) return
     setAgentRunByNote(prev => {
@@ -5271,6 +5279,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
           onAgentAccept={agentResultAccept}
           onAgentDiscard={agentResultDiscard}
           onAgentDismiss={agentRunDismiss}
+          onRemember={agentRemember}
         />
       )}
     </div>

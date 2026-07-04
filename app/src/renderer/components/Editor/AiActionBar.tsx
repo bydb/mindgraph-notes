@@ -81,6 +81,8 @@ interface Props {
   onAgentAccept: (resultId: string) => void
   onAgentDiscard: (resultId: string) => void
   onAgentDismiss: () => void
+  // Mitlernen (Stufe 3): bestätigter Merksatz → Agent-Gedächtnis-Notiz. true = gespeichert.
+  onRemember: (text: string) => Promise<boolean>
 }
 
 const PRESETS = [
@@ -90,11 +92,24 @@ const PRESETS = [
   { id: 'tone', key: 'aiBar.preset.tone' as const },
 ]
 
-export function AiActionBar({ open, onOpenChange, phase, proposal, onGenerate, onAccept, onDiscard, tagSuggestions, tagsLoading, onSuggestTags, onAcceptTag, onDismissTag, model, models, onModelChange, getModelLabel, attachments, onAttachDialog, onAttachFolderDialog, onAttachVaultFile, onDetach, attachError, targetFolder, onTargetFolderChange, agentPhase, agentSteps, agentResults, agentFinalText, onAgentRun, onAgentCancel, onAgentAccept, onAgentDiscard, onAgentDismiss }: Props) {
+export function AiActionBar({ open, onOpenChange, phase, proposal, onGenerate, onAccept, onDiscard, tagSuggestions, tagsLoading, onSuggestTags, onAcceptTag, onDismissTag, model, models, onModelChange, getModelLabel, attachments, onAttachDialog, onAttachFolderDialog, onAttachVaultFile, onDetach, attachError, targetFolder, onTargetFolderChange, agentPhase, agentSteps, agentResults, agentFinalText, onAgentRun, onAgentCancel, onAgentAccept, onAgentDiscard, onAgentDismiss, onRemember }: Props) {
   const { t } = useTranslation()
   const aiEnabled = useUIStore(s => s.ollama.enabled)
   const [instruction, setInstruction] = useState('')
   const [preset, setPreset] = useState<string | null>(null)
+  // Mitlernen (Stufe 3): Merksatz-Eingabe in der Review-Phase.
+  const [rememberText, setRememberText] = useState('')
+  const [rememberSaved, setRememberSaved] = useState(false)
+
+  const submitRemember = async () => {
+    if (!rememberText.trim()) return
+    const ok = await onRemember(rememberText.trim())
+    if (ok) {
+      setRememberText('')
+      setRememberSaved(true)
+      setTimeout(() => setRememberSaved(false), 3000)
+    }
+  }
   // Zielordner-Picker (Modus B)
   const vaultEntries = useContextVaultFiles()
   const [targetPickerOpen, setTargetPickerOpen] = useState(false)
@@ -329,6 +344,19 @@ export function AiActionBar({ open, onOpenChange, phase, proposal, onGenerate, o
                   {r.error && <div className="ai-bar-context-error">{r.error}</div>}
                 </div>
               ))}
+              {/* Mitlernen (Stufe 3): bestätigter Merksatz → Agent-Gedächtnis-Notiz */}
+              <div className="ai-bar-agent-remember">
+                <input
+                  className="ai-bar-context-search"
+                  placeholder={t('aiBar.agent.rememberPlaceholder')}
+                  value={rememberText}
+                  onChange={e => setRememberText(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') void submitRemember() }}
+                />
+                <button type="button" className="ai-bar-cancel" onClick={() => void submitRemember()} disabled={!rememberText.trim()}>
+                  {rememberSaved ? t('aiBar.agent.remembered') : t('aiBar.agent.remember')}
+                </button>
+              </div>
               <div className="ai-bar-agent-row">
                 <span />
                 <button type="button" className="ai-bar-cancel" onClick={onAgentDismiss}>{t('aiBar.agent.close')}</button>

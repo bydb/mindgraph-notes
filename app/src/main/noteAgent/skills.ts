@@ -8,10 +8,10 @@ import * as path from 'path'
 import { ToolRegistry, type ToolResult } from '../llm/toolRegistry'
 import { noteReadTool, noteSearchTool } from '../telegram/agent/tools/notes'
 import type { ToolContext as TelegramToolContext } from '../telegram/agent/tools/registry'
-import { getContextAttachmentInfos, readAttachmentRaw } from './contextFiles'
+import { getContextAttachmentInfos, readAttachmentRaw, extractFileContentRaw } from './contextFiles'
 import { registerResult, type AgentRun } from './runRegistry'
 import { sanitizeOutputFileName, writeStagingFile } from './staging'
-import { readSkillBody } from './skillsLoader'
+import { readSkillBody, listSkillFiles, resolveSkillFile } from './skillsLoader'
 import { markdownToDocx } from '../office/officeService'
 
 export interface NoteAgentContext {
@@ -110,7 +110,38 @@ export function createNoteAgentRegistry(): ToolRegistry<NoteAgentContext> {
       }
       const body = await readSkillBody(ctx.run.vaultPath, skill.folderName)
       ctx.run.sources.add(`Skill: ${skill.name}`)
-      return { ok: true, content: body, display: `use_skill: ${skill.name}` }
+      // references/assets sichtbar machen (Stufe 3) — gelesen wird per read_skill_file.
+      const files = await listSkillFiles(ctx.run.vaultPath, skill.folderName)
+      const filesNote = files.length
+        ? `\n\n[Zusatzdateien dieses Skills — bei Bedarf mit read_skill_file lesen: ${files.join(', ')}]`
+        : ''
+      return { ok: true, content: body + filesNote, display: `use_skill: ${skill.name}` }
+    }
+  })
+
+  registry.register({
+    name: 'read_skill_file',
+    description: 'Liest eine Zusatzdatei eines Skills (references/, assets/). Parameter: skill = Skill-Name, file = Pfad aus der Zusatzdatei-Liste von use_skill.',
+    parameters: {
+      type: 'object',
+      properties: {
+        skill: { type: 'string', description: 'Skill-Name' },
+        file: { type: 'string', description: 'Relativer Pfad innerhalb des Skills, z.B. references/vorlage.md' }
+      },
+      required: ['skill', 'file']
+    },
+    isWrite: false,
+    run: async (args, ctx) => {
+      const skillName = requireString(args, 'skill')
+      const fileRel = requireString(args, 'file')
+      if (!skillName || !fileRel) return err('Parameter "skill" und "file" sind erforderlich')
+      const skill =
+        ctx.run.skills.find(s => s.name === skillName || s.folderName === skillName) ||
+        ctx.run.skills.find(s => s.name.toLowerCase() === skillName.toLowerCase() || s.folderName.toLowerCase() === skillName.toLowerCase())
+      if (!skill) return err(`Skill "${skillName}" nicht gefunden`)
+      const abs = resolveSkillFile(ctx.run.vaultPath, skill.folderName, fileRel)
+      const content = await extractFileContentRaw(abs)
+      return { ok: true, content, display: `read_skill_file: ${skill.name}/${fileRel}` }
     }
   })
 

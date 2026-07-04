@@ -156,7 +156,8 @@ import { registerContextAttachment, registerContextFolder, removeContextAttachme
 import { startRun, getRunForSender, finishRun, publicResults, takeResult, cancelRunsForSender } from './noteAgent/runRegistry'
 import { runNoteAgentLoop } from './noteAgent/loop'
 import { cleanupOldStaging, assertInsideRunStaging, collisionFreeName } from './noteAgent/staging'
-import { listVaultSkills, listEnabledSkillHeaders, setSkillEnabled, createSkill, SKILLS_DIRNAME } from './noteAgent/skillsLoader'
+import { listVaultSkills, listEnabledSkillHeaders, setSkillEnabled, createSkill, readAgentMemory, appendAgentMemory, SKILLS_DIRNAME } from './noteAgent/skillsLoader'
+import { fetchSkillsCatalog, installCatalogSkill, importSkillFromPath } from './noteAgent/skillsCatalog'
 import { supportsNativeToolCalls } from '../shared/modelCompatibility'
 import { createHostFactory, type HostServices } from './plugins/host'
 import * as nativeServices from './plugins/nativeServices'
@@ -4015,6 +4016,8 @@ ipcMain.handle('note-agent-run', async (event, params: NoteAgentRunParams) => {
 
     // Agent-Skills Stufe 1: aktivierte Vault-Skills als Discovery-Metadaten mitgeben.
     const skills = await listEnabledSkillHeaders(params.vaultPath).catch(() => [])
+    // Mitlernen (Stufe 3): bestätigte Regeln aus früheren Läufen in den Prompt.
+    const agentMemory = await readAgentMemory(params.vaultPath).catch(() => '')
 
     const run = startRun({
       senderId: event.sender.id,
@@ -4037,6 +4040,7 @@ ipcMain.handle('note-agent-run', async (event, params: NoteAgentRunParams) => {
         const res = await runNoteAgentLoop({
           run,
           noteContent: params.noteContent || '',
+          agentMemory,
           chatOptions,
           onStep: (seq, skill, summary) => {
             if (!sender.isDestroyed()) sender.send('note-agent-progress', { runId: run.runId, seq, skill, summary })
@@ -4110,6 +4114,18 @@ ipcMain.handle('note-agent-accept-result', async (event, runId: string, resultId
   }
 })
 
+// Mitlernen (Stufe 3): bestätigten Merksatz an die Agent-Gedächtnis-Notiz anhängen.
+ipcMain.handle('note-agent-remember', async (event, vaultPath: string, text: string) => {
+  if (!isTrustedSender(event)) return { success: false, error: 'Nicht autorisierter Aufrufer' }
+  try {
+    assertApprovedVault(vaultPath, 'note-agent-remember')
+    const relPath = await appendAgentMemory(vaultPath, text)
+    return { success: true, relPath }
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : 'Unbekannter Fehler' }
+  }
+})
+
 // ── Agent-Skills Stufe 1: Vault-Skills verwalten (docs/agent-skills-plan.md) ──
 ipcMain.handle('note-skills-list', async (event, vaultPath: string) => {
   if (!isTrustedSender(event)) return { skills: [], error: 'Nicht autorisierter Aufrufer' }
@@ -4170,6 +4186,44 @@ ipcMain.handle('note-skills-install-starter', async (event, vaultPath: string) =
     return { success: true, installed }
   } catch (error) {
     return { success: false, installed: [], error: error instanceof Error ? error.message : 'Unbekannter Fehler' }
+  }
+})
+
+// ── Agent-Skills Stufe 2: kuratierter Katalog + Import (docs/agent-skills-plan.md) ──
+ipcMain.handle('note-skills-catalog', async (event) => {
+  if (!isTrustedSender(event)) return { skills: [], error: 'Nicht autorisierter Aufrufer' }
+  try {
+    return { skills: await fetchSkillsCatalog() }
+  } catch (error) {
+    return { skills: [], error: error instanceof Error ? error.message : 'Unbekannter Fehler' }
+  }
+})
+
+ipcMain.handle('note-skills-catalog-install', async (event, vaultPath: string, id: string) => {
+  if (!isTrustedSender(event)) return { success: false, error: 'Nicht autorisierter Aufrufer' }
+  try {
+    assertApprovedVault(vaultPath, 'note-skills-catalog-install')
+    const res = await installCatalogSkill(vaultPath, id)
+    return { success: true, ...res }
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : 'Unbekannter Fehler' }
+  }
+})
+
+// Import vom Rechner: SKILL.md-Datei oder Skill-Ordner — die Dialog-Auswahl ist die Freigabe.
+ipcMain.handle('note-skills-import-dialog', async (event, vaultPath: string) => {
+  if (!isTrustedSender(event)) return { success: false, error: 'Nicht autorisierter Aufrufer' }
+  try {
+    assertApprovedVault(vaultPath, 'note-skills-import-dialog')
+    const result = await dialog.showOpenDialog({
+      title: 'Skill importieren (SKILL.md oder Skill-Ordner)',
+      properties: ['openFile', 'openDirectory']
+    })
+    if (result.canceled || result.filePaths.length === 0) return { success: false, cancelled: true }
+    const res = await importSkillFromPath(vaultPath, result.filePaths[0])
+    return { success: true, ...res }
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : 'Unbekannter Fehler' }
   }
 })
 

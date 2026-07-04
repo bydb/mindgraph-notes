@@ -120,6 +120,86 @@ export async function setSkillEnabled(vaultPath: string, folderName: string, ena
   await fs.writeFile(settingsFile, JSON.stringify(settings, null, 2), 'utf-8')
 }
 
+// Zusatzdateien eines Skills (references/, assets/ — Spec-Layout), max. 2 Ebenen.
+// use_skill listet sie auf; gelesen wird per read_skill_file.
+export async function listSkillFiles(vaultPath: string, folderName: string): Promise<string[]> {
+  const base = path.join(vaultPath, SKILLS_DIRNAME, path.basename(folderName))
+  const out: string[] = []
+  const walk = async (dir: string, prefix: string, depth: number): Promise<void> => {
+    if (depth > 2 || out.length >= 20) return
+    let dirents
+    try {
+      dirents = await fs.readdir(dir, { withFileTypes: true })
+    } catch {
+      return
+    }
+    for (const d of dirents) {
+      if (d.name.startsWith('.') || out.length >= 20) continue
+      if (d.isDirectory()) {
+        if (d.name === 'scripts') continue // wird bewusst nicht ausgeführt/angeboten
+        await walk(path.join(dir, d.name), `${prefix}${d.name}/`, depth + 1)
+      } else if (d.name !== 'SKILL.md') {
+        out.push(`${prefix}${d.name}`)
+      }
+    }
+  }
+  await walk(base, '', 0)
+  return out.sort()
+}
+
+// Datei INNERHALB eines Skill-Ordners auflösen — Containment-Check gegen Traversal.
+export function resolveSkillFile(vaultPath: string, folderName: string, fileRel: string): string {
+  const base = path.resolve(vaultPath, SKILLS_DIRNAME, path.basename(folderName))
+  const resolved = path.resolve(base, fileRel)
+  if (resolved !== base && !resolved.startsWith(base + path.sep)) {
+    throw new Error('Pfad liegt außerhalb des Skill-Ordners')
+  }
+  return resolved
+}
+
+// ── Mitlernen (Stufe 3): Agent-Gedächtnis als sichtbare Vault-Notiz ──────────
+// Muster Email-Instruktionen.md: eine normale Markdown-Datei fließt in jeden
+// Lauf-Prompt ein. Nichts wird ohne Klick des Nutzers gespeichert; die Datei ist
+// jederzeit im Editor les-, änder- und löschbar.
+export const AGENT_MEMORY_RELPATH = `${SKILLS_DIRNAME}/Agent-Gedächtnis.md`
+const MAX_MEMORY_CHARS = 6_000
+
+export async function readAgentMemory(vaultPath: string): Promise<string> {
+  try {
+    const raw = await fs.readFile(path.join(vaultPath, AGENT_MEMORY_RELPATH), 'utf-8')
+    const trimmed = raw.trim()
+    if (!trimmed) return ''
+    return trimmed.length > MAX_MEMORY_CHARS
+      ? trimmed.slice(0, MAX_MEMORY_CHARS) + '\n[gekürzt: Gedächtnis-Budget erreicht]'
+      : trimmed
+  } catch {
+    return ''
+  }
+}
+
+// Bestätigten Merksatz als datiertes Bullet anhängen; legt die Datei beim ersten
+// Mal mit Kopf an. Rückgabe: vault-relativer Pfad (für „Notiz öffnen" in der UI).
+export async function appendAgentMemory(vaultPath: string, text: string): Promise<string> {
+  const entry = text.trim().replace(/\s+/g, ' ')
+  if (!entry) throw new Error('Kein Merktext angegeben')
+  const abs = path.join(vaultPath, AGENT_MEMORY_RELPATH)
+  let existing = ''
+  try {
+    existing = await fs.readFile(abs, 'utf-8')
+  } catch {
+    existing = `# Agent-Gedächtnis
+
+Gelernte Regeln aus Agent-Läufen — fließen in jeden Lauf ein. Frei editierbar:
+Überholtes einfach löschen.
+`
+  }
+  const day = new Date().toISOString().slice(0, 10)
+  const updated = `${existing.trimEnd()}\n\n- ${day}: ${entry}\n`
+  await fs.mkdir(path.dirname(abs), { recursive: true })
+  await fs.writeFile(abs, updated, 'utf-8')
+  return AGENT_MEMORY_RELPATH
+}
+
 // Neuen Skill aus Template anlegen. Gibt den vault-relativen Pfad zur SKILL.md zurück.
 export async function createSkill(vaultPath: string, rawName: string): Promise<{ relPath: string; folderName: string }> {
   const displayName = rawName.trim()

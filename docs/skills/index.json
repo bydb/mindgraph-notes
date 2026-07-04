@@ -1,0 +1,60 @@
+{
+  "version": 1,
+  "updated": "2026-07-04",
+  "skills": [
+    {
+      "id": "checkliste-veranstaltung",
+      "name": "Veranstaltungs-Checkliste",
+      "description": "Vollständige Checkliste für die Vorbereitung, Durchführung und Nachbereitung einer Veranstaltung erstellen.",
+      "language": "de",
+      "license": "CC0-1.0",
+      "source": "MindGraph",
+      "content": "---\nname: Veranstaltungs-Checkliste\ndescription: Vollständige Checkliste für die Vorbereitung, Durchführung und Nachbereitung einer Veranstaltung erstellen.\n---\n\n# Veranstaltungs-Checkliste erstellen\n\n## Wann anwenden\n\nWenn eine Veranstaltung (Fortbildung, Konferenz, Elternabend, Workshop) organisiert\nwerden soll und alle Aufgaben systematisch erfasst werden müssen.\n\n## Vorgehen\n\n1. Kläre aus der Quelle: Art der Veranstaltung, Datum, Ort, Teilnehmerzahl,\n   Verantwortliche. Fehlendes als offenen Punkt aufnehmen.\n2. Gliedere die Checkliste in drei Zeitblöcke: Vorbereitung (mit Vorlauffristen),\n   Veranstaltungstag, Nachbereitung.\n3. Jede Aufgabe als Checkbox (`- [ ]`) mit Frist und — falls bekannt —\n   verantwortlicher Person.\n4. Denke die Standardbereiche durch: Raum und Technik, Einladung und Anmeldung,\n   Material und Ausdrucke, Verpflegung, Beschilderung, Teilnehmerliste,\n   Dokumentation, Dank und Auswertung.\n5. Ordne innerhalb der Blöcke chronologisch: was zuerst fällig ist, steht oben.\n\n## Regeln\n\n- Fristen konkret als Datum oder „bis N Tage vorher\" — nie „rechtzeitig\".\n- Aufgaben so formulieren, dass sie abhakbar sind (eine Handlung pro Zeile).\n- Offene Verantwortlichkeiten sichtbar mit „(wer?)\" markieren.\n- Nichts erfinden: was die Quelle nicht hergibt, wird als Klärungspunkt gelistet.\n"
+    },
+    {
+      "id": "literaturnotiz",
+      "name": "Literaturnotiz",
+      "description": "Wissenschaftliche Texte (Paper, Kapitel, Artikel) zu einer strukturierten Literaturnotiz im Zettelkasten-Stil verarbeiten.",
+      "language": "de",
+      "license": "CC0-1.0",
+      "source": "MindGraph",
+      "content": "---\nname: Literaturnotiz\ndescription: Wissenschaftliche Texte (Paper, Kapitel, Artikel) zu einer strukturierten Literaturnotiz im Zettelkasten-Stil verarbeiten.\n---\n\n# Literaturnotiz erstellen\n\n## Wann anwenden\n\nWenn ein wissenschaftlicher Text (PDF, Paper, Buchkapitel) für den Zettelkasten\noder die eigene Forschung aufbereitet werden soll.\n\n## Vorgehen\n\n1. Lies die Quelle vollständig, bevor du schreibst.\n2. Kopf der Notiz: vollständige Quellenangabe (Autoren, Jahr, Titel, wo erschienen),\n   so wie sie in der Quelle steht.\n3. Abschnitt „Kernaussage\": die zentrale These in zwei bis drei eigenen Sätzen.\n4. Abschnitt „Argumente und Befunde\": die wichtigsten Punkte als Liste — pro Punkt\n   eigene Formulierung plus Fundstelle (Seite oder Abschnitt), wörtliche Zitate nur\n   sparsam und in Anführungszeichen.\n5. Abschnitt „Methode\" (falls empirisch): Stichprobe, Vorgehen, zentrale Messgrößen\n   in wenigen Zeilen.\n6. Abschnitt „Einordnung\": Grenzen, offene Fragen und mögliche Anschlussstellen an\n   eigene Notizen — Verknüpfungen als Wikilinks vorschlagen.\n\n## Regeln\n\n- Paraphrase vor Zitat: eigene Worte zeigen Verständnis, Zitate belegen.\n- Behauptungen des Autors klar von eigener Einordnung trennen.\n- Zahlen und Befunde exakt übernehmen, nie runden oder zuspitzen.\n- Was der Text nicht hergibt, bleibt offen — keine Lücken auffüllen.\n"
+    },
+    {
+      "id": "pressemitteilung",
+      "name": "Pressemitteilung",
+      "description": "Pressemitteilung oder öffentliche Ankündigung aus Fakten und Notizen formulieren (journalistischer Aufbau, zitierfähig).",
+      "language": "de",
+      "license": "CC0-1.0",
+      "source": "MindGraph",
+      "content": "---\nname: Pressemitteilung\ndescription: Pressemitteilung oder öffentliche Ankündigung aus Fakten und Notizen formulieren (journalistischer Aufbau, zitierfähig).\n---\n\n# Pressemitteilung erstellen\n\n## Wann anwenden\n\nWenn eine Veranstaltung, ein Angebot oder ein Ergebnis öffentlich angekündigt\nwerden soll — für Presse, Website oder Newsletter.\n\n## Vorgehen\n\n1. Sammle aus der Quelle die W-Fragen: Wer, was, wann, wo, warum, wie —\n   fehlende Angaben als offene Punkte kennzeichnen, nicht erfinden.\n2. Aufbau: prägnante Überschrift, fetter Vorspann mit der Kernbotschaft in zwei\n   Sätzen, danach Absätze in absteigender Wichtigkeit (das Wichtigste zuerst —\n   der Text muss von hinten kürzbar sein).\n3. Ein wörtliches Zitat einer verantwortlichen Person einplanen: als Platzhalter\n   mit Kennzeichnung, von wem das Zitat kommen soll — kein Zitat erfinden.\n4. Schlussabsatz: Kurzporträt der Einrichtung und Kontakt für Rückfragen\n   (Platzhalter, falls nicht in der Quelle).\n\n## Regeln\n\n- Sachlich und aktiv formulieren; keine Werbesprache, keine Superlative ohne Beleg.\n- Kurze Sätze, keine Fachabkürzungen ohne Erklärung.\n- Alle Termine mit Wochentag und Datum; Ortsangaben vollständig.\n- Länge: eine halbe bis eine Seite.\n"
+    },
+    {
+      "id": "selbsttest",
+      "name": "Selbsttest",
+      "description": "Aus einem Dokument oder einer Notiz einen Selbsttest mit Ankreuzfragen erstellen (Markdown-Notiz mit Checkboxen und Lösungsteil).",
+      "language": "de",
+      "license": "CC0-1.0",
+      "source": "MindGraph",
+      "content": "---\nname: Selbsttest\ndescription: Aus einem Dokument oder einer Notiz einen Selbsttest mit Ankreuzfragen erstellen (Markdown-Notiz mit Checkboxen und Lösungsteil).\n---\n\n# Selbsttest erstellen\n\n## Wann anwenden\n\nWenn aus einem Fachtext, einer PDF oder Notizen ein Test zum Selbstlernen\nentstehen soll — mit ankreuzbaren Fragen und getrenntem Lösungsteil.\n\n## Vorgehen\n\n1. Lies die Quelle vollständig und sammle die prüfbaren Kernaussagen.\n2. Erstelle pro Kernaussage eine Frage. Mische die Fragetypen:\n   Einfachauswahl (eine richtige Antwort), Mehrfachauswahl (mehrere richtige)\n   und Richtig/Falsch-Aussagen.\n3. Format als Markdown-Notiz: jede Frage als nummerierte Überschrift, darunter\n   die Antwortoptionen als Checkbox-Liste (`- [ ] Option`).\n4. Falsche Antwortoptionen müssen plausibel sein — typische Missverständnisse\n   aus dem Text, keine offensichtlich absurden Optionen.\n5. Am Ende ein Abschnitt „Lösungen\": pro Frage die richtigen Optionen mit einem\n   Satz Begründung und — wenn möglich — der Fundstelle in der Quelle.\n\n## Regeln\n\n- Nur Inhalte abfragen, die tatsächlich in der Quelle stehen.\n- Bei Mehrfachauswahl in der Frage kennzeichnen: „(mehrere Antworten möglich)\".\n- Verständnisfragen vor reinen Faktenfragen bevorzugen.\n- Umfang: der Stoffmenge angemessen; lieber weniger gute Fragen als Füllmaterial.\n"
+    },
+    {
+      "id": "unterrichtsentwurf",
+      "name": "Unterrichtsentwurf",
+      "description": "Unterrichtsstunde oder Fortbildungseinheit planen (Lernziele, Phasenverlauf, Material) — als Markdown-Notiz oder Word-Dokument.",
+      "language": "de",
+      "license": "CC0-1.0",
+      "source": "MindGraph",
+      "content": "---\nname: Unterrichtsentwurf\ndescription: Unterrichtsstunde oder Fortbildungseinheit planen (Lernziele, Phasenverlauf, Material) — als Markdown-Notiz oder Word-Dokument.\n---\n\n# Unterrichtsentwurf erstellen\n\n## Wann anwenden\n\nWenn eine Unterrichtsstunde, ein Workshop oder eine Fortbildungseinheit geplant\nwerden soll — aus einem Thema, Material oder Stichpunkten.\n\n## Vorgehen\n\n1. Kläre aus der Quelle: Thema, Zielgruppe/Stufe, verfügbare Zeit, vorhandenes\n   Material und Vorwissen. Fehlendes als Annahme kennzeichnen.\n2. Formuliere zwei bis vier Lernziele nach dem Muster „Die Teilnehmenden können …\"\n   — beobachtbar und überprüfbar, keine vagen Absichtserklärungen.\n3. Plane den Verlauf als Tabelle mit den Spalten Phase / Zeit / Was passiert /\n   Sozialform / Material. Übliche Phasen: Einstieg, Erarbeitung, Sicherung,\n   optional Vertiefung oder Transfer.\n4. Die Zeiten müssen sich auf die verfügbare Gesamtzeit summieren; plane einen\n   Puffer ein und kennzeichne, welche Phase bei Zeitnot gekürzt wird.\n5. Abschnitt „Material\": alles, was vorbereitet werden muss, als Checkliste.\n6. Abschnitt „Differenzierung\": je ein Angebot für Schnelle und für Unterstützung.\n\n## Regeln\n\n- Aktivierung vor Vortrag: Phasen so planen, dass die Teilnehmenden arbeiten,\n  nicht nur zuhören.\n- Jede Phase zahlt erkennbar auf ein Lernziel ein — Phasen ohne Ziel streichen.\n- Realistische Zeiten: Einstieg und Sicherung werden regelmäßig unterschätzt.\n- Keine Methodenvielfalt um ihrer selbst willen.\n"
+    },
+    {
+      "id": "wochenrueckblick",
+      "name": "Wochenrückblick",
+      "description": "Wochenrückblick aus den Brain-Tageszusammenfassungen und Journal-Notizen der letzten Woche erstellen.",
+      "language": "de",
+      "license": "CC0-1.0",
+      "source": "MindGraph",
+      "content": "---\nname: Wochenrückblick\ndescription: Wochenrückblick aus den Brain-Tageszusammenfassungen und Journal-Notizen der letzten Woche erstellen.\n---\n\n# Wochenrückblick erstellen\n\n## Wann anwenden\n\nWenn aus den Tagesnotizen einer Woche (Brain-Tagesgedächtnis, Journal) ein\nkompakter Rückblick entstehen soll.\n\n## Vorgehen\n\n1. Suche die Tagesnotizen der betreffenden Woche im Vault (Brain-Ordner und\n   Journal) und lies sie vollständig — nicht raten, was passiert ist.\n2. Gliederung: „Das war die Woche\" (drei bis fünf Sätze), „Erledigt\" (Liste der\n   abgeschlossenen Dinge), „Offen geblieben\" (Liste mit kurzem Grund),\n   „Beobachtung\" (ein Muster oder eine Erkenntnis der Woche).\n3. Verlinke erwähnte Notizen als Wikilinks, wenn die Titel in den Quellen stehen.\n4. Schließe mit einem Vorschlag für die wichtigste Sache der kommenden Woche —\n   klar als Vorschlag gekennzeichnet.\n\n## Regeln\n\n- Nur berichten, was in den Quellen steht; Tage ohne Notizen als solche benennen.\n- Ehrlich bleiben: dünne Wochen nicht aufblasen, Wiederholungen zusammenfassen.\n- Keine Bewertung der Person, nur der Sachstand.\n- Umfang: eine Bildschirmseite.\n"
+    }
+  ]
+}

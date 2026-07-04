@@ -371,6 +371,25 @@ async function readFolderContext(
   return { content: [header, manifestLines.join('\n'), ...sections].join('\n\n'), truncated }
 }
 
+// Roh-Extraktion einer einzelnen Datei für Agent-Skills (references/assets, Stufe 3):
+// gleiche Parser/Budgets/Hygiene wie Anhänge, ohne Registry — der Aufrufer hat den
+// Pfad bereits validiert (Containment im Skill-Ordner).
+export async function extractFileContentRaw(absPath: string): Promise<string> {
+  const name = path.basename(absPath)
+  const kind = contextKindFromFilename(name)
+  if (!kind || kind === 'folder') throw new Error(`Dateityp nicht unterstützt: ${name}`)
+  const st = await fs.stat(absPath)
+  const maxBytes = kind === 'md' || kind === 'txt' || kind === 'csv' ? MAX_BYTES_TEXT : MAX_BYTES_BINARY
+  if (st.size > maxBytes) throw new Error(`${name} ist zu groß`)
+  const entry: AttachmentEntry = { id: '', name, kind, insideVault: true, sizeBytes: st.size, absPath }
+  let content = hygieneText(await extractContent(entry)).trim()
+  if (!content) throw new Error('Datei ist leer oder enthält keinen lesbaren Text')
+  if (content.length > MAX_CHARS_PER_FILE) {
+    content = content.slice(0, MAX_CHARS_PER_FILE) + '\n[gekürzt: Datei-Budget erreicht]'
+  }
+  return content
+}
+
 export interface ContextReadResult {
   block: string
   files: Array<{ id: string; name: string; chars: number; truncated: boolean; error?: string }>

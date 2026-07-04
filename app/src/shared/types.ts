@@ -406,6 +406,17 @@ export interface NoteAgentSkill {
   enabled: boolean;
 }
 
+// Agent-Skills Stufe 2: Eintrag des kuratierten Katalogs (docs/skills/index.json).
+export interface NoteAgentCatalogSkill {
+  id: string;
+  name: string;
+  description: string;
+  language: string;
+  license: string;
+  source: string;
+  content: string; // vollständige SKILL.md — Pflicht-Vorschau vor Installation
+}
+
 export interface NoteAgentProgressEvent {
   runId: string;
   seq: number;
@@ -657,11 +668,16 @@ export interface ElectronAPI {
     cloud?: { model: string } | null;
   }) => Promise<{ success: boolean; runId?: string; error?: string }>;
   noteAgentCancel: (runId: string) => Promise<{ success: boolean }>;
+  noteAgentRemember: (vaultPath: string, text: string) => Promise<{ success: boolean; relPath?: string; error?: string }>;
   // Agent-Skills Stufe 1
   noteSkillsList: (vaultPath: string) => Promise<{ skills: NoteAgentSkill[]; error?: string }>;
   noteSkillsSetEnabled: (vaultPath: string, folderName: string, enabled: boolean) => Promise<{ success: boolean; error?: string }>;
   noteSkillsCreate: (vaultPath: string, name: string) => Promise<{ success: boolean; relPath?: string; folderName?: string; error?: string }>;
   noteSkillsInstallStarter: (vaultPath: string) => Promise<{ success: boolean; installed: string[]; error?: string }>;
+  // Agent-Skills Stufe 2: Katalog + Import
+  noteSkillsCatalog: () => Promise<{ skills: NoteAgentCatalogSkill[]; error?: string }>;
+  noteSkillsCatalogInstall: (vaultPath: string, id: string) => Promise<{ success: boolean; relPath?: string; folderName?: string; error?: string }>;
+  noteSkillsImportDialog: (vaultPath: string) => Promise<{ success: boolean; cancelled?: boolean; relPath?: string; folderName?: string; skippedScripts?: boolean; error?: string }>;
   noteAgentAcceptResult: (runId: string, resultId: string) => Promise<{ success: boolean; fileName?: string; relPath?: string; error?: string }>;
   noteAgentDiscardResult: (runId: string, resultId: string) => Promise<{ success: boolean; error?: string }>;
   onNoteAgentProgress: (callback: (p: NoteAgentProgressEvent) => void) => void;

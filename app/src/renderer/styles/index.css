@@ -20013,6 +20013,8 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
 }
 .ai-bar-agent-card-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
 .ai-bar-agent-card-state { font-size: 11px; color: var(--text-secondary); }
+.ai-bar-agent-remember { display: flex; align-items: center; gap: 8px; }
+.ai-bar-agent-remember .ai-bar-context-search { flex: 1; }
 .ai-bar-cloud-hint {
   padding: 6px 9px;
   border: 1px solid color-mix(in srgb, var(--color-warning) 35%, transparent);

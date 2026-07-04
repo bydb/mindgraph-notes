@@ -187,12 +187,17 @@ contextBridge.exposeInMainWorld('electronAPI', {
     cloud?: { model: string } | null
   }) => ipcRenderer.invoke('note-agent-run', params),
   noteAgentCancel: (runId: string) => ipcRenderer.invoke('note-agent-cancel', runId),
+  noteAgentRemember: (vaultPath: string, text: string) => ipcRenderer.invoke('note-agent-remember', vaultPath, text),
   // Agent-Skills Stufe 1: Vault-Skills verwalten
   noteSkillsList: (vaultPath: string) => ipcRenderer.invoke('note-skills-list', vaultPath),
   noteSkillsSetEnabled: (vaultPath: string, folderName: string, enabled: boolean) =>
     ipcRenderer.invoke('note-skills-set-enabled', vaultPath, folderName, enabled),
   noteSkillsCreate: (vaultPath: string, name: string) => ipcRenderer.invoke('note-skills-create', vaultPath, name),
   noteSkillsInstallStarter: (vaultPath: string) => ipcRenderer.invoke('note-skills-install-starter', vaultPath),
+  // Agent-Skills Stufe 2: Katalog + Import
+  noteSkillsCatalog: () => ipcRenderer.invoke('note-skills-catalog'),
+  noteSkillsCatalogInstall: (vaultPath: string, id: string) => ipcRenderer.invoke('note-skills-catalog-install', vaultPath, id),
+  noteSkillsImportDialog: (vaultPath: string) => ipcRenderer.invoke('note-skills-import-dialog', vaultPath),
   noteAgentAcceptResult: (runId: string, resultId: string) => ipcRenderer.invoke('note-agent-accept-result', runId, resultId),
   noteAgentDiscardResult: (runId: string, resultId: string) => ipcRenderer.invoke('note-agent-discard-result', runId, resultId),
   onNoteAgentProgress: (callback: (p: { runId: string; seq: number; skill: string; summary: string }) => void) => {

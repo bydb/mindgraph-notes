@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useNotesStore } from '../../stores/notesStore'
 import { useTranslation } from '../../utils/translations'
 import { generateNoteId } from '../../utils/linkExtractor'
-import type { NoteAgentSkill } from '../../../shared/types'
+import type { NoteAgentSkill, NoteAgentCatalogSkill } from '../../../shared/types'
 
 // Agent-Skills Stufe 1 (docs/agent-skills-plan.md): Vault-Skills verwalten.
 // Skills sind Markdown-Notizen (Skills/<ordner>/SKILL.md, agentskills.io-Format) —
@@ -21,6 +21,10 @@ export function SkillsSection({ onClose }: Props) {
   const [error, setError] = useState<string | null>(null)
   const [newName, setNewName] = useState('')
   const [installStatus, setInstallStatus] = useState<string | null>(null)
+  // Stufe 2: kuratierter Katalog (Vorschau-vor-Install ist Pflicht-UX) + Import.
+  const [catalog, setCatalog] = useState<NoteAgentCatalogSkill[] | null>(null)
+  const [catalogLoading, setCatalogLoading] = useState(false)
+  const [previewId, setPreviewId] = useState<string | null>(null)
 
   const reload = useCallback(async () => {
     if (!vaultPath) return
@@ -85,6 +89,44 @@ export function SkillsSection({ onClose }: Props) {
     setNewName('')
     await reload()
     await openSkill(res.relPath)
+  }
+
+  const loadCatalog = async () => {
+    setError(null)
+    setCatalogLoading(true)
+    const res = await window.electronAPI.noteSkillsCatalog()
+    setCatalog(res.skills)
+    if (res.error) setError(res.error)
+    setCatalogLoading(false)
+  }
+
+  const installFromCatalog = async (id: string) => {
+    if (!vaultPath) return
+    setError(null)
+    const res = await window.electronAPI.noteSkillsCatalogInstall(vaultPath, id)
+    if (!res.success) {
+      setError(res.error || 'Installation fehlgeschlagen')
+      return
+    }
+    setPreviewId(null)
+    setInstallStatus(`${t('settings.skills.installed')}: ${id}`)
+    await reload()
+  }
+
+  const importFromDisk = async () => {
+    if (!vaultPath) return
+    setError(null)
+    setInstallStatus(null)
+    const res = await window.electronAPI.noteSkillsImportDialog(vaultPath)
+    if (res.cancelled) return
+    if (!res.success) {
+      setError(res.error || 'Import fehlgeschlagen')
+      return
+    }
+    setInstallStatus(
+      `${t('settings.skills.installed')}: ${res.folderName}${res.skippedScripts ? ` — ${t('settings.skills.scriptsSkipped')}` : ''}`
+    )
+    await reload()
   }
 
   const installStarter = async () => {
@@ -171,6 +213,79 @@ export function SkillsSection({ onClose }: Props) {
           {t('settings.skills.install')}
         </button>
       </div>
+      <div className="settings-row">
+        <label>
+          {t('settings.skills.import')}
+          <span style={{ display: 'block', fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
+            {t('settings.skills.importHint')}
+          </span>
+        </label>
+        <button type="button" className="settings-btn-secondary" onClick={() => void importFromDisk()}>
+          {t('settings.skills.importButton')}
+        </button>
+      </div>
+
+      <div className="settings-divider" />
+
+      <div className="settings-row">
+        <label>
+          {t('settings.skills.catalog')}
+          <span style={{ display: 'block', fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
+            {t('settings.skills.catalogHint')}
+          </span>
+        </label>
+        <button type="button" className="settings-btn-secondary" onClick={() => void loadCatalog()} disabled={catalogLoading}>
+          {catalogLoading ? '…' : t('settings.skills.catalogLoad')}
+        </button>
+      </div>
+
+      {catalog && catalog.length === 0 && <p className="settings-hint">{t('settings.skills.catalogEmpty')}</p>}
+      {catalog?.map(entry => {
+        const alreadyInstalled = skills.some(s => s.folderName === entry.id)
+        return (
+          <div key={entry.id} className="settings-row" style={{ alignItems: 'flex-start', flexDirection: 'column', gap: 6 }}>
+            <div style={{ display: 'flex', width: '100%', gap: 8, alignItems: 'flex-start' }}>
+              <label style={{ flex: 1, minWidth: 0 }}>
+                <span style={{ fontWeight: 500 }}>{entry.name}</span>
+                <span style={{ display: 'block', fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>{entry.description}</span>
+                <span style={{ display: 'block', fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
+                  {entry.source} · {entry.license}{entry.language ? ` · ${entry.language}` : ''}
+                </span>
+              </label>
+              <button
+                type="button"
+                className="settings-btn-secondary"
+                onClick={() => setPreviewId(previewId === entry.id ? null : entry.id)}
+                disabled={alreadyInstalled}
+              >
+                {alreadyInstalled ? t('settings.skills.alreadyInstalled') : previewId === entry.id ? t('settings.skills.previewClose') : t('settings.skills.preview')}
+              </button>
+            </div>
+            {previewId === entry.id && !alreadyInstalled && (
+              <div style={{ width: '100%' }}>
+                {/* Pflicht-UX: kompletter Inhalt VOR der Installation sichtbar */}
+                <pre style={{
+                  maxHeight: 260,
+                  overflow: 'auto',
+                  padding: '8px 10px',
+                  border: '1px solid var(--border-color)',
+                  borderRadius: 'var(--radius-md)',
+                  background: 'var(--bg-primary)',
+                  fontSize: 11,
+                  whiteSpace: 'pre-wrap',
+                  margin: 0
+                }}>{entry.content}</pre>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 6 }}>
+                  <button type="button" className="settings-btn" onClick={() => void installFromCatalog(entry.id)}>
+                    {t('settings.skills.install')}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )
+      })}
+
       {installStatus && <p className="settings-hint">{installStatus}</p>}
       {error && <p className="settings-hint" style={{ color: 'var(--color-danger)' }}>{error}</p>}
     </div>

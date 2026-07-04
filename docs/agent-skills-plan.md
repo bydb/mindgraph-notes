@@ -170,6 +170,11 @@ Entschiedene offene Fragen: sichtbarer Ordner `Skills/` (Skills sind normale Not
 
 Dateien: `main/noteAgent/skillsLoader.ts` (Scan `Skills/*/SKILL.md`, Mini-Frontmatter-Parser ohne YAML-Dependency, Budgets, setSkillEnabled merge-sicher, createSkill mit Umlaut-Slug), `use_skill`-Tool in `skills.ts` (Quelle „Skill: <name>" auf Ergebnis-Karten), Discovery-Block + Vorrang-Regel im System-Prompt (`loop.ts`), IPC `note-skills-list/set-enabled/create/install-starter` (isTrustedSender), Settings-Tab „Skills" (`SkillsSection.tsx`: Liste/Toggle/Bearbeiten-öffnet-Notiz/Neu/Starter-Install), 5 Starter-Skills in `resources/starter-skills/` (Protokoll, Elternbrief, Tabellen-Zuordnung, Teilnehmerliste, Zusammenfassung — via electron-builder `extraResources` gebündelt).
 
+**Stufe 2+3 umgesetzt (2026-07-04).** typecheck/test(639)/build grün; Harness verifiziert (Gedächtnis-Anlage/Append/Kürzung, references-Listing ohne scripts/, Traversal-Schutz, Datei-/Ordner-Import mit scripts-Skip und Duplikat-Schutz). **GUI-Test offen.**
+
+- **Stufe 2 (Katalog + Import):** kuratierter Katalog als statisches JSON auf der Website (`docs/skills/index.json`, generiert aus `docs/skills/src/*.md` — JSON statt Roh-Markdown wegen Jekyll). 6 Skills (CC0-1.0): Selbsttest, Literaturnotiz, Wochenrückblick, Unterrichtsentwurf, Veranstaltungs-Checkliste, Pressemitteilung. Main-seitig `skillsCatalog.ts` (fetch mit Validierung + Cache, Install nur aus dem Main-Cache, strikte id-Prüfung); UI mit **Vorschau-vor-Install** (Install-Button nur in der geöffneten Vorschau) + Lizenz/Quelle-Anzeige; Import vom Rechner (SKILL.md-Datei mit Umlaut-Slug oder Skill-Ordner, scripts/ wird nie mitkopiert und der Skip angezeigt). Achtung: Katalog ist erst nach Push (Pages-Deploy) online abrufbar.
+- **Stufe 3 (Mitlernen + references/):** `Skills/Agent-Gedächtnis.md` fließt in jeden Lauf-Prompt („GEDÄCHTNIS DES NUTZERS"); Review-UI „Fürs nächste Mal merken…" hängt bestätigte Merksätze als datierte Bullets an (IPC `note-agent-remember`); `use_skill` listet Zusatzdateien, neues Tool `read_skill_file` liest references/assets mit Containment-Check (scripts/ ausgenommen). LLM-Vorschlag für Merksätze bewusst zurückgestellt.
+
 ## Offene Fragen
 
 1. Versteckter (`.mindgraph/skills/`) vs. sichtbarer Skill-Ordner im Vault?
