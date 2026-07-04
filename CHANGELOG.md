@@ -2,6 +2,29 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.10.6-beta] - 2026-07-04
+
+Der Notiz-Agent ist da: Dateien und ganze Ordner als KI-Kontext, Fragen zu PDFs und Tabellen im Notes Chat — und mit Zielordner wird die Notiz-KI zum Agenten, der recherchiert und Dateien erzeugt.
+
+### Neu
+
+- **Kontext-Dateien für die Notiz-KI.** Über „+ Kontext" in der KI-Leiste unter der Notiz lassen sich Excel-, Word-, PowerPoint-, PDF-, Markdown-, Text- und CSV-Dateien anhängen — per Vault-Suche oder vom Computer. Ihre Inhalte fließen in den Vorschlag ein („Fasse zusammen unter Einbezug dieser Tabelle"). Zu große Dateien werden vor dem Lesen abgelehnt, lange Inhalte budgetiert gekürzt — immer mit sichtbarem Hinweis, nie stillschweigend.
+- **Ordner als Kontext.** Ein ganzer Ordner als Anhang: Die KI erhält ein Manifest aller unterstützten Dateien (Name, Typ, Größe, Änderungsdatum) plus die Inhalte nach Priorität — Dateien, deren Name Begriffe aus der Anweisung enthält, zuerst, danach die zuletzt geänderten. Nicht gelesene Dateien stehen ausdrücklich im Manifest.
+- **Notiz-Agent: Zielordner verknüpfen, Dateien erzeugen lassen.** Wird über „Ziel" ein Ordner verknüpft, wird aus dem Vorschlag ein Agent-Lauf: Das Modell liest die Anhänge, durchsucht bei Bedarf selbstständig den Vault (inklusive Brain-Tagesgedächtnis) und erzeugt Excel-, Word- oder Markdown-Dateien. Alles landet zuerst in einem Staging-Bereich — übernommen wird per Ergebnis-Karte mit Quellenliste, nichts schreibt ungefragt ins Vault. Mit Live-Lauf-Protokoll und Abbrechen-Button. Lokale Modelle brauchen natives Tool-Calling (z. B. qwen-Familie; ungeeignete Modelle werden mit klarer Meldung abgelehnt).
+- **Fragen zu PDFs und Tabellen im Notes Chat.** Dieselbe Kontext-Zeile sitzt jetzt über der Chat-Eingabe. Die links geöffnete PDF- oder Office-Datei hängt sich automatisch als Chip an („aktuell geöffnet = Kontext"); bei PDF-Begleitnotizen kommt das Quell-PDF mit.
+- **„Mit KI bearbeiten" im PDF-Viewer.** Ein Klick öffnet die Begleitnotiz und hängt das PDF automatisch als Kontext an — von der PDF-Ansicht direkt in die Arbeit.
+- **OpenRouter für den Notiz-Agenten (Opt-in).** Eigenes Cloud-Opt-in „Notiz-Agent" in den OpenRouter-Einstellungen. Der Hinweis in der Leiste sagt dabei ehrlich, dass neben Auftrag und Anhängen auch die vom Agenten gelesenen Notizen an den Anbieter gehen. Lokal bleibt der Standard.
+
+### Verbessert
+
+- Der Agent-Staging-Bereich (`.mindgraph/agent-staging/`) ist vom Sync ausgeschlossen — unbestätigte Agent-Entwürfe bleiben auf dem Gerät, bis sie übernommen werden.
+- Der Notiz-Agent erscheint als eigenes Modul in der Modell-Kompatibilitäts-Matrix (Einstellungen); Benchmarks folgen, bis dahin gilt „ungetestet" mit sichtbarem Hinweis am Modell-Picker.
+- KI-Anfragen des Agenten haben ein großzügiges Zeitfenster (10 Minuten pro Schritt) — große lokale Modelle brechen nicht mehr mitten im Auftrag mit Timeout ab; der Abbrechen-Button bleibt jederzeit wirksam.
+
+### Behoben
+
+- **Task-Ordner-Filter:** Der Ordner-Ausschluss folgt jetzt dem Prinzip „nächster Vorfahre entscheidet" — Unterordner eines ausgeschlossenen Ordners lassen sich wieder gezielt in die Aufgabenliste aufnehmen.
+
 ## [0.10.5-beta] - 2026-07-03
 
 E-Mail-Update: CC-Empfänger kommen jetzt an, „Allen antworten" ist da, und die Aktionsleiste funktioniert auch in schmalen Panels.
