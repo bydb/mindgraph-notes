@@ -87,10 +87,23 @@ export async function listEnabledSkillHeaders(vaultPath: string): Promise<VaultS
   return all.filter(s => s.enabled).map(({ name, description, folderName }) => ({ name, description, folderName }))
 }
 
+// Kanonische Lese-Grenze für Skill-Dateien (R03): der realpath des Ziels MUSS im
+// realpath des Skill-Ordners bleiben. Fängt Symlinks ab, die aus dem Vault zeigen
+// (sonst könnte eine als references/… getarnte Symlink-Datei externe Inhalte lesen
+// und bei Cloud-Läufen exfiltrieren).
+async function assertInsideSkill(vaultPath: string, folderName: string, absTarget: string): Promise<string> {
+  const baseReal = await fs.realpath(path.join(vaultPath, SKILLS_DIRNAME, path.basename(folderName)))
+  const targetReal = await fs.realpath(absTarget)
+  if (targetReal !== baseReal && !targetReal.startsWith(baseReal + path.sep)) {
+    throw new Error('Skill-Datei liegt außerhalb des Skill-Ordners')
+  }
+  return targetReal
+}
+
 // Voller Skill-Body für use_skill — ohne Frontmatter, Budget-gekappt.
 export async function readSkillBody(vaultPath: string, folderName: string): Promise<string> {
   const safeFolder = path.basename(folderName)
-  const skillFile = path.join(vaultPath, SKILLS_DIRNAME, safeFolder, 'SKILL.md')
+  const skillFile = await assertInsideSkill(vaultPath, safeFolder, path.join(vaultPath, SKILLS_DIRNAME, safeFolder, 'SKILL.md'))
   const content = await fs.readFile(skillFile, 'utf-8')
   const { body } = parseSkillFile(content)
   const trimmed = body.trim()
@@ -135,10 +148,11 @@ export async function listSkillFiles(vaultPath: string, folderName: string): Pro
     }
     for (const d of dirents) {
       if (d.name.startsWith('.') || out.length >= 20) continue
+      if (d.isSymbolicLink()) continue // R03: Symlinks nicht anbieten (read_skill_file lehnt sie ohnehin ab)
       if (d.isDirectory()) {
         if (d.name === 'scripts') continue // wird bewusst nicht ausgeführt/angeboten
         await walk(path.join(dir, d.name), `${prefix}${d.name}/`, depth + 1)
-      } else if (d.name !== 'SKILL.md') {
+      } else if (d.isFile() && d.name !== 'SKILL.md') {
         out.push(`${prefix}${d.name}`)
       }
     }
@@ -147,14 +161,15 @@ export async function listSkillFiles(vaultPath: string, folderName: string): Pro
   return out.sort()
 }
 
-// Datei INNERHALB eines Skill-Ordners auflösen — Containment-Check gegen Traversal.
-export function resolveSkillFile(vaultPath: string, folderName: string, fileRel: string): string {
+// Datei INNERHALB eines Skill-Ordners auflösen — lexikalischer Traversal-Check UND
+// kanonische Symlink-Grenze (R03).
+export async function resolveSkillFile(vaultPath: string, folderName: string, fileRel: string): Promise<string> {
   const base = path.resolve(vaultPath, SKILLS_DIRNAME, path.basename(folderName))
   const resolved = path.resolve(base, fileRel)
   if (resolved !== base && !resolved.startsWith(base + path.sep)) {
     throw new Error('Pfad liegt außerhalb des Skill-Ordners')
   }
-  return resolved
+  return assertInsideSkill(vaultPath, path.basename(folderName), resolved)
 }
 
 // ── Mitlernen (Stufe 3): Agent-Gedächtnis als sichtbare Vault-Notiz ──────────

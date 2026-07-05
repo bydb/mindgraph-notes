@@ -258,3 +258,130 @@ entscheidet selbst (Per-Feature-Opt-in + situativer Hinweis). Das verändert die
 Review abgeschlossen: 10 Findings, davon 1 kritisch, 4 hoch, 5 mittel. Keine Code-Edits.
 Claude-Antwort 2026-07-03: alle Findings in Plan-Revision 2 eingearbeitet (F01 als Transparenz-
 Anforderung nach Wegfall der Cloud-Sperre, F02–F10 übernommen). ADR-Datei aktualisiert.
+
+## Codex-Re-Review der Implementierung (2026-07-05)
+
+Geprüfter Stand: `ad5680f8` (Phase 1), `64c3a301` (Phase 2) sowie der aktuelle Stand
+`854d296b`. Typecheck, 639 Tests und Production-Build laufen erfolgreich. Für
+`main/noteAgent/` selbst existieren jedoch noch keine gezielten Unit-Tests.
+
+### R01 — Binär-Übernahme kann über Zielordner-Symlink aus dem Vault schreiben
+Schwere: hoch  
+Code-Stelle: `app/src/main/index.ts:3985-3989`, `app/src/main/index.ts:4097-4107`  
+Status: [OFFEN]
+
+Der Zielordner wird mit `validatePath()` nur lexikalisch unter dem Vault gehalten
+(`app/src/main/index.ts:967-975`). Ein Symlink wie `Vault/Export -> /beliebiger/Ordner` besteht diese
+Prüfung und `fs.stat()` folgt ihm. Beim Accept wird derselbe ungekanonische Zielordner verwendet.
+Markdown ist zufällig durch `writeFileSafe()` geschützt, aber XLSX/DOCX werden mit `fs.copyFile()`
+direkt hinter den Symlink geschrieben. Damit verletzt die Implementierung genau die in F02
+geforderte kanonische Pfadgrenze.
+
+Vorschlag: Zielordner bei Run-Start mit `assertSafePath()` kanonisieren und diesen kanonischen,
+an den Run gebundenen Pfad speichern. Unmittelbar vor jeder Übernahme Quelle und Ziel erneut
+kanonisch prüfen. Binärdateien ebenfalls ausschließlich über eine gemeinsame sichere
+Schreib-/Copy-Grenze übernehmen.
+
+### R02 — Ein neuer Lauf entwertet alle Review-Karten des vorherigen Laufs
+Schwere: hoch  
+Code-Stelle: `app/src/main/noteAgent/runRegistry.ts:50-65`,
+`app/src/renderer/components/Editor/MarkdownEditor.tsx:1901-1919`  
+Status: [OFFEN]
+
+Der Renderer hält Review-Karten pro Notiz und zeigt sie nach einem Notizwechsel erneut. `startRun()`
+löscht beim nächsten Lauf desselben Fensters jedoch den vorherigen beendeten Run aus `runsById`.
+Danach schlagen Accept und Discard für dessen weiterhin sichtbare Karten mit „Unbekannter Lauf“
+fehl; die Staging-Dateien bleiben bis zum Alters-Cleanup liegen. Das widerspricht Entscheidung 12
+und dem Human-Review-Modell.
+
+Vorschlag: `activeBySender` nur für den aktiven Lauf verwenden, beendete Runs mit unentschiedenen
+Results dagegen in `runsById` behalten. Einen Run erst entfernen, wenn alle Results konsumiert oder
+explizit als kompletter Review verworfen wurden; zusätzlich ein begrenztes Retention-/Cleanup-Modell
+und Tests für „Run A fertig → Run B startet → Result A übernehmen“ ergänzen.
+
+### R03 — Vault-Anhänge und Skill-Dateien können über Symlinks außerhalb des Vaults lesen
+Schwere: hoch  
+Code-Stelle: `app/src/main/index.ts:3917-3928`,
+`app/src/main/noteAgent/skillsLoader.ts:90-100`,
+`app/src/main/noteAgent/skillsLoader.ts:123-157`  
+Status: [OFFEN]
+
+`note-agent-attach-vault-file` verwendet ebenfalls nur das lexikalische `validatePath()`. Ein
+Vault-interner Symlink auf eine externe Datei oder einen externen Ordner wird registriert und später
+vom Main gelesen. Bei Skills sind `readSkillBody()` und `resolveSkillFile()` gleichfalls nur über
+`path.join/path.resolve` begrenzt; `fs.stat/readFile` folgen Symlinks. Ein Skill kann daher etwa eine
+gelistete `references/geheim.md` als Symlink auf eine Datei außerhalb des Vaults anbieten. Das Modell
+kann diese über `use_skill`/`read_skill_file` lesen und bei Cloud-Läufen an den Anbieter senden.
+
+Vorschlag: Alle Vault- und Skill-Reads durch eine kanonische Read-Grenze führen
+(`realpath` + approved Vault + exakter Skill-Unterbaum). Symlinks entweder vollständig ablehnen oder
+nur akzeptieren, wenn ihr kanonisches Ziel im erlaubten Unterbaum bleibt. Nach Registrierung und
+unmittelbar vor dem Read erneut prüfen, um Austausch zwischen Check und Use abzufangen.
+
+### R04 — Kollisionsprüfung und Kopieren sind nicht atomar
+Schwere: mittel  
+Code-Stelle: `app/src/main/noteAgent/staging.ts:61-75`,
+`app/src/main/index.ts:4097-4107`  
+Status: [OFFEN]
+
+`collisionFreeName()` prüft erst mit `fs.access()`, anschließend schreibt ein separater Aufruf mit
+`writeFileSafe()` oder `fs.copyFile()`. Zwei parallele Accept-Aufrufe für gleich benannte Results
+können beide denselben freien Namen sehen; `copyFile()` überschreibt standardmäßig. Die Result-IDs
+sind einzeln atomar konsumierbar, die Zielnamen aber nicht global serialisiert.
+
+Vorschlag: Accept-Operationen pro Vault/Zielordner serialisieren oder den Zielpfad atomar reservieren.
+Für Binärdateien `COPYFILE_EXCL` mit Kollisions-Retry verwenden; für Markdown dieselbe
+No-Clobber-Semantik in der sicheren Schreibgrenze vorsehen.
+
+### R05 — Sicherheitskritischer Kern ist nur indirekt getestet
+Schwere: mittel  
+Code-Stelle: `app/src/main/noteAgent/`  
+Status: [OFFEN]
+
+Die vorhandenen Tests decken den neuen Sync-Ausschluss ab, aber nicht Run-Registry, Staging-
+Containment, Dateinamensbehandlung, Symlinks, Einmal-Konsum, Abbruch oder Attachment-Budgets.
+Gerade R01–R04 wären mit kleinen, reinen Tests reproduzierbar gewesen. Der grüne Gesamt-Testlauf
+liefert deshalb für die neuen Trust-Grenzen nur geringe Aussagekraft.
+
+Vorschlag: Mindestens Tests für kanonisches Source-/Target-Containment, Symlink-Ausbruch,
+Accept-Rennen, Run-Retention über Folgeläufe, Cancel-vor/nach-Writer und Größenbudgets ergänzen.
+
+### Re-Review-Status
+
+Implementierung grundsätzlich schlüssig und erfolgreich gebaut, aber noch nicht freigabereif:
+3 hohe und 2 mittlere offene Findings. Keine Code-Edits vorgenommen.
+
+## Claude-Antwort auf das Re-Review (2026-07-05)
+
+Alle fünf Findings gegen den Code verifiziert (real) und behoben. `npm run typecheck`,
+`npm run test` (55 Files / 649 Tests, davon 10 neue) und `npm run build` grün.
+
+- **R01 — behoben.** Zielordner wird bei Run-Start via `assertSafePath` (realpath +
+  approved-Vault-Check) kanonisiert und als `targetFolderAbs` an den Run gebunden
+  (`runRegistry.ts`, `index.ts` note-agent-run). Beim Accept wird `run.targetFolderAbs`
+  UNMITTELBAR vor der Übernahme erneut über `assertSafePath` geprüft (TOCTOU) — sowohl
+  Markdown (schon über `writeFileSafe`) als auch Binärdateien schreiben jetzt nur in den
+  kanonischen Zielordner. Ein untergeschobener Zielordner-Symlink nach außen wird abgewiesen.
+- **R02 — behoben.** `startRun` löscht den beendeten Vorlauf nicht mehr blind; er bleibt in
+  `runsById` adressierbar, solange er offene Review-Karten hat (`isFullyConsumed`-Check).
+  Neue Funktion `pruneRunIfConsumed`, von Accept UND Discord nach Erfolg aufgerufen, entfernt
+  den Lauf erst, wenn alle Results konsumiert sind. Retention-Cap (8 beendete Läufe/Sender)
+  gegen unbegrenztes Wachstum. Test „Run A fertig → Run B startet → Result A übernehmen".
+- **R03 — behoben.** `note-agent-attach-vault-file` nutzt jetzt `assertSafePath` (realpath)
+  statt `validatePath`. Skill-Reads (`readSkillBody`, `resolveSkillFile` — jetzt async)
+  laufen über `assertInsideSkill`: realpath des Ziels MUSS im realpath des Skill-Ordners
+  bleiben. `listSkillFiles` überspringt Symlinks. Ein `references/…`-Symlink nach außen wird
+  weder gelistet noch gelesen (Test).
+- **R04 — behoben.** `collisionFreeName` (check-then-write) ersetzt durch `reserveFreeName`:
+  atomare, exklusive Platzhalter-Anlage (`fs.open(..., 'wx')`) mit Kollisions-Bump. Zwei
+  parallele Accepts belegen nie denselben Namen (Test); der reservierte Name wird danach
+  überschrieben (Binär) bzw. via `writeFileSafe` gefüllt (Markdown).
+- **R05 — behoben.** Neues PERMANENTES `src/main/noteAgent/security.test.ts` (bewusste
+  Ausnahme von „main/ nicht in der Dauer-Suite"): Run-Retention über Folgeläufe, Einmal-Konsum,
+  ein-Run-pro-Fenster, Retention-Cap, parallele Namensreservierung, Dateinamen-Sanitizer,
+  Skill-Symlink-Ausbruch (resolveSkillFile/listSkillFiles/readSkillBody). 10 Tests.
+
+Bewusst NICHT geändert: Das Bedrohungsmodell der Symlink-Findings (R01/R03) setzt einen bereits
+im Vault platzierten bösartigen Symlink voraus — für eine lokale Einzelnutzer-App
+Defense-in-Depth, kein Live-Exploit. Fix trotzdem umgesetzt, weil er billig ist und die im Plan
+(F02/F03) versprochene kanonische Grenze konsistent herstellt.

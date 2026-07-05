@@ -58,18 +58,27 @@ export async function assertInsideRunStaging(run: AgentRun, absPath: string): Pr
   return real
 }
 
-// Kollisionsfreier Zielname im Zielordner: "Name (2).xlsx", "Name (3).xlsx" …
-// (gleiche Konvention wie Brain-Tagesnotizen).
-export async function collisionFreeName(dirAbs: string, fileName: string): Promise<string> {
+// Atomare, kollisionsfreie Namensreservierung (R04): legt exklusiv (`wx`) eine
+// leere Platzhalterdatei an und gibt Zielname + -pfad zurück. Zwei parallele
+// Accepts können so nie denselben Namen belegen — der zweite fällt auf "(2)".
+// Der Aufrufer schreibt danach über den Platzhalter (er „besitzt" den Namen).
+// Konvention "Name (2).xlsx" wie bei Brain-Tagesnotizen.
+export async function reserveFreeName(
+  dirAbs: string,
+  fileName: string
+): Promise<{ finalName: string; destPath: string }> {
   const ext = path.extname(fileName)
   const stem = fileName.slice(0, fileName.length - ext.length)
-  let candidate = fileName
-  for (let i = 2; i < 100; i++) {
+  for (let i = 1; i < 100; i++) {
+    const candidate = i === 1 ? fileName : `${stem} (${i})${ext}`
+    const destPath = path.join(dirAbs, candidate)
     try {
-      await fs.access(path.join(dirAbs, candidate))
-      candidate = `${stem} (${i})${ext}`
-    } catch {
-      return candidate
+      const fh = await fs.open(destPath, 'wx')
+      await fh.close()
+      return { finalName: candidate, destPath }
+    } catch (e) {
+      if ((e as NodeJS.ErrnoException).code === 'EEXIST') continue
+      throw e
     }
   }
   throw new Error(`Kein freier Dateiname für ${fileName} gefunden`)

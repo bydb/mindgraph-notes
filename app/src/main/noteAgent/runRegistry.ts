@@ -32,6 +32,9 @@ export interface AgentRun {
   noteId: string
   vaultPath: string
   targetFolderRel: string
+  // Kanonischer (realpath) Zielordner, bei Run-Start festgeschrieben (R01): Accept
+  // schreibt ausschließlich hierhin, nie über einen später untergeschobenen Symlink.
+  targetFolderAbs: string
   attachmentIds: string[]
   instruction: string
   // Aktivierte Vault-Skills (Agent-Skills Stufe 1) — Discovery-Metadaten für den
@@ -44,24 +47,43 @@ export interface AgentRun {
   sources: Set<string> // gelesene Anhänge/Notizen — landen auf den Ergebnis-Karten
 }
 
+// Beendete Läufe mit noch offenen Review-Karten pro Sender maximal halten —
+// darüber hinaus die ältesten evakuieren (ihre Staging-Reste räumt der Alters-Cleanup).
+const MAX_RETAINED_FINISHED_RUNS_PER_SENDER = 8
+
 const activeBySender = new Map<number, AgentRun>()
 const runsById = new Map<string, AgentRun>()
 
-// Atomare Reservierung: existiert für den Sender bereits ein aktiver Lauf → null.
-// Ein beendeter Vorgänger-Lauf des Senders wird dabei aus der Registry entfernt
-// (seine unkonsumierte Staging-Reste räumt der Alters-Cleanup ab).
+function isFullyConsumed(run: AgentRun): boolean {
+  for (const r of run.results.values()) if (!r.consumed) return false
+  return true
+}
+
+// Retention: pro Sender höchstens N beendete Läufe behalten (Map = Insertion-Order,
+// älteste zuerst evakuieren). Aktive Läufe zählen nicht.
+function enforceRetention(senderId: number): void {
+  const finished = [...runsById.values()].filter(r => r.senderId === senderId && r.status !== 'running')
+  for (let i = 0; i < finished.length - MAX_RETAINED_FINISHED_RUNS_PER_SENDER; i++) {
+    runsById.delete(finished[i].runId)
+  }
+}
+
+// Atomare Reservierung: existiert für den Sender bereits ein AKTIVER Lauf → null.
+// Ein beendeter Vorgänger bleibt adressierbar, solange er offene Review-Karten hat
+// (R02) — nur wenn alle seine Results konsumiert sind, wird er entfernt.
 export function startRun(params: {
   senderId: number
   noteId: string
   vaultPath: string
   targetFolderRel: string
+  targetFolderAbs: string
   attachmentIds: string[]
   instruction: string
   skills?: Array<{ name: string; description: string; folderName: string }>
 }): AgentRun | null {
   const existing = activeBySender.get(params.senderId)
   if (existing && existing.status === 'running') return null
-  if (existing) runsById.delete(existing.runId)
+  if (existing && isFullyConsumed(existing)) runsById.delete(existing.runId)
 
   const run: AgentRun = {
     runId: `run-${randomBytes(8).toString('hex')}`,
@@ -69,6 +91,7 @@ export function startRun(params: {
     noteId: params.noteId,
     vaultPath: params.vaultPath,
     targetFolderRel: params.targetFolderRel,
+    targetFolderAbs: params.targetFolderAbs,
     attachmentIds: params.attachmentIds,
     instruction: params.instruction,
     skills: params.skills ?? [],
@@ -80,6 +103,7 @@ export function startRun(params: {
   }
   activeBySender.set(params.senderId, run)
   runsById.set(run.runId, run)
+  enforceRetention(params.senderId)
   return run
 }
 
@@ -119,6 +143,12 @@ export function takeResult(senderId: number, runId: string, resultId: string): A
   if (!entry || entry.consumed) return null
   entry.consumed = true
   return entry
+}
+
+// Nach erfolgreichem Accept/Discard: beendeten Lauf entfernen, wenn keine offenen
+// Karten mehr da sind. Bei Rollback (consumed→false gesetzt) bleibt er adressierbar.
+export function pruneRunIfConsumed(run: AgentRun): void {
+  if (run.status !== 'running' && isFullyConsumed(run)) runsById.delete(run.runId)
 }
 
 export function publicResults(run: AgentRun): PublicAgentResult[] {

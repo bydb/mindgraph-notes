@@ -139,7 +139,7 @@ export function createNoteAgentRegistry(): ToolRegistry<NoteAgentContext> {
         ctx.run.skills.find(s => s.name === skillName || s.folderName === skillName) ||
         ctx.run.skills.find(s => s.name.toLowerCase() === skillName.toLowerCase() || s.folderName.toLowerCase() === skillName.toLowerCase())
       if (!skill) return err(`Skill "${skillName}" nicht gefunden`)
-      const abs = resolveSkillFile(ctx.run.vaultPath, skill.folderName, fileRel)
+      const abs = await resolveSkillFile(ctx.run.vaultPath, skill.folderName, fileRel)
       const content = await extractFileContentRaw(abs)
       return { ok: true, content, display: `read_skill_file: ${skill.name}/${fileRel}` }
     }

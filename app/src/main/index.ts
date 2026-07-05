@@ -153,9 +153,9 @@ import { createMainRegistry, discoverMainPlugins } from './plugins/registry'
 import { isPluginGateEnabled } from '../shared/plugins/moduleGate'
 import { registerPluginTransport, isTrustedSender } from './plugins/transport'
 import { registerContextAttachment, registerContextFolder, removeContextAttachment, clearContextAttachments, readContextBlock } from './noteAgent/contextFiles'
-import { startRun, getRunForSender, finishRun, publicResults, takeResult, cancelRunsForSender } from './noteAgent/runRegistry'
+import { startRun, getRunForSender, finishRun, publicResults, takeResult, cancelRunsForSender, pruneRunIfConsumed } from './noteAgent/runRegistry'
 import { runNoteAgentLoop } from './noteAgent/loop'
-import { cleanupOldStaging, assertInsideRunStaging, collisionFreeName } from './noteAgent/staging'
+import { cleanupOldStaging, assertInsideRunStaging, reserveFreeName } from './noteAgent/staging'
 import { listVaultSkills, listEnabledSkillHeaders, setSkillEnabled, createSkill, readAgentMemory, appendAgentMemory, SKILLS_DIRNAME } from './noteAgent/skillsLoader'
 import { fetchSkillsCatalog, installCatalogSkill, importSkillFromPath } from './noteAgent/skillsCatalog'
 import { supportsNativeToolCalls } from '../shared/modelCompatibility'
@@ -3918,7 +3918,9 @@ ipcMain.handle('note-agent-attach-vault-file', async (event, vaultPath: string, 
   if (!isTrustedSender(event)) return { attachments: [], errors: ['Nicht autorisierter Aufrufer'] }
   try {
     assertApprovedVault(vaultPath, 'note-agent-attach-vault-file')
-    const fullPath = validatePath(vaultPath, relPath)
+    // R03: kanonisch (realpath) auflösen — ein Vault-interner Symlink auf eine externe
+    // Datei/einen externen Ordner wird so abgewiesen, nicht registriert und gelesen.
+    const fullPath = await assertSafePath(path.join(vaultPath, relPath), 'note-agent-attach-vault-file')
     hookNoteAgentCleanup(event.sender)
     // Ordner-Kontext (Stufe 1): derselbe Weg akzeptiert auch Vault-Ordner.
     const st = await fs.stat(fullPath)
@@ -3983,7 +3985,15 @@ ipcMain.handle('note-agent-run', async (event, params: NoteAgentRunParams) => {
   if (!isTrustedSender(event)) return { success: false, error: 'Nicht autorisierter Aufrufer' }
   try {
     assertApprovedVault(params.vaultPath, 'note-agent-run')
-    const targetAbs = validatePath(params.vaultPath, params.targetFolderRel)
+    // R01: Zielordner kanonisch (realpath) auflösen und an den Run binden — nicht
+    // nur lexikalisch (`validatePath`), sonst würde ein Vault-interner Symlink nach
+    // außen die Grenze aushebeln. Der kanonische Pfad wird beim Accept erneut geprüft.
+    let targetAbs: string
+    try {
+      targetAbs = await assertSafePath(path.join(params.vaultPath, params.targetFolderRel), 'note-agent-run-target')
+    } catch {
+      return { success: false, error: `Zielordner nicht erlaubt: ${params.targetFolderRel}` }
+    }
     const targetStat = await fs.stat(targetAbs).catch(() => null)
     if (!targetStat?.isDirectory()) {
       return { success: false, error: `Zielordner nicht gefunden: ${params.targetFolderRel}` }
@@ -4024,6 +4034,7 @@ ipcMain.handle('note-agent-run', async (event, params: NoteAgentRunParams) => {
       noteId: params.noteId,
       vaultPath: params.vaultPath,
       targetFolderRel: params.targetFolderRel,
+      targetFolderAbs: targetAbs,
       attachmentIds: params.attachmentIds || [],
       instruction: params.instruction.trim(),
       skills
@@ -4095,17 +4106,22 @@ ipcMain.handle('note-agent-accept-result', async (event, runId: string, resultId
   if (!entry) return { success: false, error: 'Ergebnis nicht (mehr) verfügbar' }
   try {
     const real = await assertInsideRunStaging(run, entry.stagingPath)
-    const targetDir = validatePath(run.vaultPath, run.targetFolderRel)
-    const finalName = await collisionFreeName(targetDir, entry.suggestedName)
-    const destPath = path.join(targetDir, finalName)
+    // R01/TOCTOU: kanonischen, an den Run gebundenen Zielordner UNMITTELBAR vor der
+    // Übernahme erneut prüfen — fängt einen zwischen Run-Start und Accept
+    // untergeschobenen Symlink ab.
+    const targetDir = await assertSafePath(run.targetFolderAbs, 'note-agent-accept-target')
+    // R04: Name atomar reservieren (exklusives Create) statt check-then-write.
+    const { finalName, destPath } = await reserveFreeName(targetDir, entry.suggestedName)
     if (entry.kind === 'md') {
       // Markdown über die eine Schreibgrenze (Auto-Backup, Empty-Block, Auto-Heal).
       const content = await fs.readFile(real, 'utf-8')
       await writeFileSafe(destPath, content)
     } else {
+      // Platzhalter (leer, gerade reserviert) wird überschrieben — der Name gehört uns.
       await fs.copyFile(real, destPath)
     }
     await fs.rm(real, { force: true }).catch(() => undefined)
+    pruneRunIfConsumed(run)
     return { success: true, fileName: finalName, relPath: path.join(run.targetFolderRel, finalName).replace(/\\/g, '/') }
   } catch (error) {
     // Übernahme gescheitert → Konsum zurücknehmen, damit der Nutzer es erneut versuchen kann.
@@ -4239,6 +4255,7 @@ ipcMain.handle('note-agent-discard-result', async (event, runId: string, resultI
   } catch {
     /* Datei fehlt bereits — Verwerfen ist idempotent */
   }
+  pruneRunIfConsumed(run)
   return { success: true }
 })
 
