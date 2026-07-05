@@ -2,6 +2,27 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.10.8-beta] - 2026-07-05
+
+Command Palette, Onboarding-Verbesserungen und Agent-Härtung — der Alltag mit der App wird schneller und sicherer.
+
+### Neu
+
+- **Command Palette (Cmd+Shift+P).** Panels, Ansichten, Tabs und Werkzeuge per Textsuche aufrufen — kein Klickweg mehr zu den häufigsten Aktionen. Modulabhängige Einträge erscheinen nur bei aktivem Modul. Eintrag im ⋯-Menü, Shortcut-Referenz in den Einstellungen.
+- **Dashboard: Aufgaben ohne Datum.** Offene Aufgaben ohne @[[Datum]] erscheinen jetzt im Aufgaben-Widget unter „Ohne Datum" — vorher waren sie schlicht unsichtbar.
+- **Settings → Module: „Jetzt einrichten →".** Direktsprung vom Modul-Schalter zur Konfiguration (Email, Sprache, reMarkable, mz-suite, Antares, Smart Connections).
+
+### Verbessert
+
+- **Onboarding:** Willkommen-Notiz öffnet genau einmal nach Abschluss (statt bei jedem App-Start). Schrittzähler dynamisch via StepIndicator. Toter ollama.com-Link klickbar.
+- **Editor:** Einmaliger Lesemodus-Hinweis komplettiert — direkt tippen möglich, Cmd+E für [[-Vorschläge und Formatierungs-Shortcuts.
+- **Website:** Agent & Skills als fünfter Baustein, Deployment auf GitHub Actions umgestellt.
+
+### Behoben
+
+- **Notiz-Agent: kanonische Pfadgrenzen** (Codex R01–R05) — Run-Retention, atomare Übernahme, strikte Pfadnormalisierung im Staging.
+- **Notiz-Agent: TOCTOU & Accept-Rollback** (Codex C01–C03) — Anhang-TOCTOU, Retention-Eviction, Rollback bei Ablehnung.
+
 ## [0.10.7-beta] - 2026-07-04
 
 Der Notiz-Agent lernt dazu: Skills als editierbare Anleitungen im Vault, ein kuratierter Skill-Katalog — und ein sichtbares Gedächtnis, das mit jedem Lauf wächst.
