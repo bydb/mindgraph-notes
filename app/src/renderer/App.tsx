@@ -21,6 +21,7 @@ import { Terminal } from './components/Terminal/Terminal'
 import { QuickSearch } from './components/QuickSearch/QuickSearch'
 import { ZoteroSearch } from './components/ZoteroSearch/ZoteroSearch'
 import { QuickSwitcher } from './components/QuickSwitcher/QuickSwitcher'
+import { CommandPalette, type CommandAction } from './components/CommandPalette/CommandPalette'
 import { TemplatePicker } from './components/TemplatePicker/TemplatePicker'
 import { TemplateSettings } from './components/TemplatePicker/TemplateSettings'
 import { Settings } from './components/Settings/Settings'
@@ -139,6 +140,7 @@ const App: React.FC = () => {
   const [quickSearchOpen, setQuickSearchOpen] = useState(false)
   const [zoteroSearchOpen, setZoteroSearchOpen] = useState(false)
   const [quickSwitcherOpen, setQuickSwitcherOpen] = useState(false)
+  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false)
   const [templatePickerOpen, setTemplatePickerOpen] = useState(false)
   const [templateSettingsOpen, setTemplateSettingsOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
@@ -163,6 +165,7 @@ const App: React.FC = () => {
   const transportTitlebarButtonVisible = useUIStore(
     state => state.transport.enabled && state.transport.showTitlebarButton
   )
+  const transportEnabled = useUIStore(state => state.transport.enabled)
   const zoteroModuleEnabled = useUIStore(state => state.zoteroEnabled)
   const vaultReadwiseActive = useVaultSettingsStore(state => state.features.readwise)
   const vaultEmailActive = useVaultSettingsStore(state => state.features.email)
@@ -891,8 +894,15 @@ const App: React.FC = () => {
   // Globale Keyboard Shortcuts
   useEffect(() => {
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      // Cmd+Shift+P / Ctrl+Shift+P für die Befehls-Palette (Aktionen statt Notizen)
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'p') {
+        e.preventDefault()
+        e.stopPropagation()
+        setCommandPaletteOpen(true)
+        return
+      }
       // Cmd+P / Ctrl+P für Schnellsuche
-      if ((e.metaKey || e.ctrlKey) && e.key === 'p') {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'p' && !e.shiftKey) {
         e.preventDefault()
         setQuickSearchOpen(true)
       }
@@ -1077,6 +1087,36 @@ const App: React.FC = () => {
     document.addEventListener('mouseup', handleMouseUp)
   }, [setTextSplitPosition])
 
+  // Befehls-Palette (Cmd+Shift+P): alle Panels/Ansichten/Werkzeuge per Textsuche.
+  // Bewusst pro Render neu gebaut (kein useMemo) — die Liste hängt an vielen
+  // Modul-Flags, und die Palette rendert nur bei geöffnetem Zustand.
+  const commandActions: CommandAction[] = [
+    { id: 'view-editor', category: t('commandPalette.cat.view'), label: t('commandPalette.viewEditor'), keywords: 'editor view ansicht', run: () => setViewMode('editor') },
+    { id: 'view-split', category: t('commandPalette.cat.view'), label: t('commandPalette.viewSplit'), keywords: 'split view ansicht', run: () => setViewMode('split') },
+    { id: 'view-brain', category: t('commandPalette.cat.view'), label: t('commandPalette.viewBrain'), keywords: 'graph canvas brain mindgraph', run: () => setViewMode('canvas') },
+    ...(dashboardEnabled ? [{ id: 'open-dashboard', category: t('commandPalette.cat.view'), label: t('commandPalette.openDashboard'), keywords: 'dashboard widgets', run: () => openDashboardTab() }] : []),
+    ...(vaultWorkflowCanvasActive ? [{ id: 'open-workflow', category: t('commandPalette.cat.view'), label: t('commandPalette.openWorkflow'), keywords: 'workflow automation canvas', run: () => openWorkflowCanvasTab() }] : []),
+    { id: 'panel-tasks', category: t('commandPalette.cat.panels'), label: t('commandPalette.panelTasks'), keywords: 'tasks aufgaben termine overdue', run: () => switchRightPanel('overdue') },
+    { id: 'panel-tags', category: t('commandPalette.cat.panels'), label: t('commandPalette.panelTags'), keywords: 'tags schlagworte', run: () => switchRightPanel('tags') },
+    ...(smartConnectionsEnabled ? [{ id: 'panel-smart', category: t('commandPalette.cat.panels'), label: t('commandPalette.panelSmart'), keywords: 'smart connections similar aehnlich', run: () => switchRightPanel('smartConnections') }] : []),
+    ...(notesChatEnabled ? [{ id: 'panel-chat', category: t('commandPalette.cat.panels'), label: t('commandPalette.panelChat'), keywords: 'chat ki ai notes', run: () => switchRightPanel('notesChat') }] : []),
+    ...(flashcardsEnabled ? [{ id: 'panel-flashcards', category: t('commandPalette.cat.panels'), label: t('commandPalette.panelFlashcards'), keywords: 'flashcards karteikarten lernen', run: () => switchRightPanel('flashcards') }] : []),
+    ...(emailEnabled ? [{ id: 'panel-inbox', category: t('commandPalette.cat.panels'), label: t('commandPalette.panelInbox'), keywords: 'email inbox posteingang mail', run: () => switchRightPanel('inbox') }] : []),
+    ...(edooboxEnabled ? [{ id: 'panel-agent', category: t('commandPalette.cat.panels'), label: t('commandPalette.panelAgent'), keywords: 'agent edoobox veranstaltungen events', run: () => switchRightPanel('agent') }] : []),
+    ...(semanticScholarEnabled ? [{ id: 'panel-scholar', category: t('commandPalette.cat.panels'), label: t('commandPalette.panelScholar'), keywords: 'semantic scholar paper research', run: () => switchRightPanel('semanticScholar') }] : []),
+    { id: 'open-quick-search', category: t('commandPalette.cat.search'), label: t('commandPalette.quickSearch'), keywords: 'suche search volltext', shortcut: 'Cmd+P', run: () => setQuickSearchOpen(true) },
+    { id: 'open-quick-switcher', category: t('commandPalette.cat.search'), label: t('commandPalette.quickSwitcher'), keywords: 'switcher notiz wechseln open note', shortcut: 'Cmd+K', run: () => setQuickSwitcherOpen(true) },
+    { id: 'open-templates', category: t('commandPalette.cat.search'), label: t('commandPalette.templates'), keywords: 'template vorlage einfuegen', shortcut: 'Cmd+Shift+T', run: () => setTemplatePickerOpen(true) },
+    ...(zoteroModuleEnabled ? [{ id: 'open-zotero', category: t('commandPalette.cat.search'), label: t('commandPalette.zotero'), keywords: 'zotero literatur bibliothek', shortcut: 'Cmd+Shift+Z', run: () => setZoteroSearchOpen(true) }] : []),
+    ...(transportEnabled ? [{ id: 'open-transport', category: t('commandPalette.cat.tools'), label: t('commandPalette.transport'), keywords: 'transport schnellerfassung capture', run: () => window.electronAPI.transportShow() }] : []),
+    { id: 'toggle-terminal', category: t('commandPalette.cat.tools'), label: t('commandPalette.terminal'), keywords: 'terminal shell konsole', run: () => setTerminalVisible(v => !v) },
+    { id: 'toggle-sidebar', category: t('commandPalette.cat.tools'), label: t('commandPalette.sidebar'), keywords: 'sidebar seitenleiste', run: () => toggleSidebar() },
+    { id: 'toggle-theme', category: t('commandPalette.cat.tools'), label: t('commandPalette.theme'), keywords: 'theme dark light hell dunkel', run: () => setTheme(theme === 'dark' ? 'light' : 'dark') },
+    { id: 'open-settings', category: t('commandPalette.cat.tools'), label: t('commandPalette.settings'), keywords: 'settings einstellungen preferences', shortcut: 'Cmd+,', run: () => setSettingsOpen(true) },
+    { id: 'open-settings-modules', category: t('commandPalette.cat.tools'), label: t('commandPalette.settingsModules'), keywords: 'module plugins aktivieren', run: () => { setSettingsInitialTab('modules'); setSettingsOpen(true) } },
+    { id: 'open-help', category: t('commandPalette.cat.tools'), label: t('commandPalette.help'), keywords: 'hilfe help guide uebersicht', shortcut: 'Cmd+/', run: () => setHelpGuideOpen(true) }
+  ]
+
   return (
     <ReactFlowProvider>
       <div className="app">
@@ -1251,6 +1291,11 @@ const App: React.FC = () => {
                 </button>
                 {toolsMenuOpen && (
                   <div className="titlebar-tools-menu" role="menu">
+                    <button className="titlebar-tools-item" role="menuitem" onClick={() => { setCommandPaletteOpen(true); setToolsMenuOpen(false) }}>
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 6 15 12 9 18"/></svg>
+                      <span>{t('commandPalette.menuLabel')}</span>
+                      <span className="titlebar-tools-shortcut">⇧⌘P</span>
+                    </button>
                     <button className={`titlebar-tools-item ${tagsPanelOpen ? 'active' : ''}`} role="menuitem" onClick={() => { switchRightPanel('tags'); setToolsMenuOpen(false) }}>
                       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
                       <span>{t('titlebar.tags')}</span>
@@ -1572,6 +1617,13 @@ const App: React.FC = () => {
       <ZoteroSearch
         isOpen={zoteroSearchOpen}
         onClose={() => setZoteroSearchOpen(false)}
+      />
+
+      {/* Befehls-Palette (Cmd+Shift+P) */}
+      <CommandPalette
+        isOpen={commandPaletteOpen}
+        onClose={() => setCommandPaletteOpen(false)}
+        actions={commandActions}
       />
 
       {/* Quick Switcher Modal (Cmd+K) */}

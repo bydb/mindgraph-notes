@@ -2150,6 +2150,58 @@ h2 { letter-spacing: -0.016em; }
   opacity: 0.6;
 }
 
+/* Einmaliger Lesemodus-Hinweis unter dem Editor-Header */
+.reading-mode-hint {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  background-color: color-mix(in srgb, var(--accent-color) 8%, var(--bg-primary));
+  border-bottom: 1px solid var(--border-color);
+}
+
+.reading-mode-hint svg {
+  flex-shrink: 0;
+  color: var(--accent-color);
+}
+
+.reading-mode-hint-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.reading-mode-hint-switch,
+.reading-mode-hint-dismiss {
+  border: none;
+  background: transparent;
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all var(--transition-fast);
+}
+
+.reading-mode-hint-switch {
+  color: var(--accent-on);
+  background-color: var(--accent-color);
+}
+
+.reading-mode-hint-switch:hover {
+  filter: brightness(1.1);
+}
+
+.reading-mode-hint-dismiss {
+  color: var(--text-muted);
+}
+
+.reading-mode-hint-dismiss:hover {
+  color: var(--text-primary);
+  background-color: var(--bg-secondary);
+}
+
 /* View Mode Toggle */
 .view-mode-toggle {
   display: flex;
@@ -19458,6 +19510,24 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
   line-height: 1.4;
 }
 
+/* Sprung vom Modul-Toggle zur zugehörigen Konfiguration (anderer Settings-Tab) */
+.module-row-configure {
+  display: inline-flex;
+  align-items: center;
+  margin-top: 6px;
+  padding: 2px 0;
+  border: none;
+  background: transparent;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent-color);
+  cursor: pointer;
+}
+
+.module-row-configure:hover {
+  text-decoration: underline;
+}
+
 /* „Offizielles Plugin"-Badge neben dem Modulnamen (Phase A: alle Plugins sind signiert/erstanbieter). */
 .module-row-badge {
   display: inline-flex;
@@ -20156,6 +20226,33 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
   color: var(--accent-color);
 }
 .titlebar-tools-item svg { flex-shrink: 0; }
+
+.titlebar-tools-shortcut {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+/* ============ COMMAND PALETTE (Cmd+Shift+P) ============ */
+/* Nutzt das Quick-Switcher-Grundlayout; eigene Klassen nur für Gruppen + Shortcuts. */
+.command-palette-category {
+  padding: 8px 14px 4px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--text-muted);
+}
+
+.command-palette-shortcut {
+  margin-left: auto;
+  padding: 2px 6px;
+  font-size: 11px;
+  color: var(--text-muted);
+  background: var(--bg-secondary);
+  border-radius: var(--radius-sm);
+  white-space: nowrap;
+}
 
 /* ============ MODEL PICKER (vendor-logo dropdown) ============ */
 .model-picker {

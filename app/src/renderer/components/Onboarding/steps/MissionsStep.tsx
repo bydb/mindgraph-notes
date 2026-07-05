@@ -1,5 +1,6 @@
 import React from 'react'
 import { useTranslation } from '../../../utils/translations'
+import { StepIndicator } from './StepIndicator'
 
 interface MissionsStepProps {
   onFinish: () => void
@@ -7,6 +8,8 @@ interface MissionsStepProps {
   hasStarterVault?: boolean
   /** When true, hides step indicator and shows close button instead of back/finish */
   standalone?: boolean
+  stepNumber?: number
+  totalSteps?: number
 }
 
 const missions = [
@@ -70,23 +73,15 @@ export const MissionsStep: React.FC<MissionsStepProps> = ({
   onFinish,
   onBack,
   hasStarterVault = false,
-  standalone = false
+  standalone = false,
+  stepNumber = 4,
+  totalSteps = 4
 }) => {
   const { t } = useTranslation()
 
   return (
     <div className="onboarding-step">
-      {!standalone && (
-        <div className="onboarding-step-header">
-          <span className="onboarding-step-indicator">{t('onboarding.step', { current: '4', total: '4' })}</span>
-          <div className="onboarding-progress">
-            <div className="onboarding-progress-dot active" />
-            <div className="onboarding-progress-dot active" />
-            <div className="onboarding-progress-dot active" />
-            <div className="onboarding-progress-dot active" />
-          </div>
-        </div>
-      )}
+      {!standalone && <StepIndicator current={stepNumber} total={totalSteps} />}
 
       <h2 className="onboarding-step-title">{t('onboarding.missions.title')}</h2>
       <p className="onboarding-step-desc">{t('onboarding.missions.subtitle')}</p>

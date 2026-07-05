@@ -17,7 +17,7 @@ type OnboardingStep = 'welcome' | 'intent' | 'email-setup' | 'ai' | 'dashboard' 
 const EMAIL_SETUP_PROFILES = new Set(['office', 'professional'])
 
 export const Onboarding: React.FC = () => {
-  const { onboardingOpen, setOnboardingOpen, setOnboardingCompleted, setUserProfile, applyProfileDefaults } = useUIStore()
+  const { onboardingOpen, setOnboardingOpen, setOnboardingCompleted, setUserProfile, applyProfileDefaults, setWelcomeNotePending } = useUIStore()
   const [step, setStep] = useState<OnboardingStep>('welcome')
   const [vaultPath, setLocalVaultPath] = useState<string | null>(null)
   const [selectedProfile, setSelectedProfile] = useState<UserProfile>(null)
@@ -55,24 +55,38 @@ export const Onboarding: React.FC = () => {
       setUserProfile(selectedProfile)
       applyProfileDefaults(selectedProfile)
     }
+    setWelcomeNotePending(true)
     setOnboardingCompleted(true)
     setOnboardingOpen(false)
-  }, [vaultPath, selectedProfile, finishWithVault, setOnboardingCompleted, setOnboardingOpen, setUserProfile, applyProfileDefaults])
+  }, [vaultPath, selectedProfile, finishWithVault, setOnboardingCompleted, setOnboardingOpen, setUserProfile, applyProfileDefaults, setWelcomeNotePending])
 
   const handleOpenVaultDirect = useCallback(async () => {
     try {
       const result = await window.electronAPI.openVault()
       if (result) {
         await finishWithVault(result)
+        setWelcomeNotePending(true)
         setOnboardingCompleted(true)
         setOnboardingOpen(false)
       }
     } catch (error) {
       console.error('[Onboarding] Failed to open vault:', error)
     }
-  }, [finishWithVault, setOnboardingCompleted, setOnboardingOpen])
+  }, [finishWithVault, setOnboardingCompleted, setOnboardingOpen, setWelcomeNotePending])
 
   if (!onboardingOpen) return null
+
+  // Schrittzähler: office/professional durchlaufen zusätzlich den E-Mail-Setup-Step,
+  // also 5 statt 4 Schritte. Die Anzeige muss dem realen Pfad folgen.
+  const hasEmailStep = !!selectedProfile && EMAIL_SETUP_PROFILES.has(selectedProfile)
+  const totalSteps = hasEmailStep ? 5 : 4
+  const stepNumbers: Record<Exclude<OnboardingStep, 'welcome'>, number> = {
+    intent: 1,
+    'email-setup': 2,
+    ai: hasEmailStep ? 3 : 2,
+    dashboard: hasEmailStep ? 4 : 3,
+    missions: hasEmailStep ? 5 : 4
+  }
 
   return (
     <div className="onboarding-overlay">
@@ -99,12 +113,16 @@ export const Onboarding: React.FC = () => {
                 setStep('ai')
               }
             }}
+            stepNumber={stepNumbers.intent}
+            totalSteps={totalSteps}
           />
         )}
         {step === 'email-setup' && (
           <EmailSetupStep
             onBack={() => setStep('intent')}
             onNext={() => setStep('ai')}
+            stepNumber={stepNumbers['email-setup']}
+            totalSteps={totalSteps}
           />
         )}
         {step === 'ai' && (
@@ -117,6 +135,8 @@ export const Onboarding: React.FC = () => {
               }
             }}
             onNext={() => setStep('dashboard')}
+            stepNumber={stepNumbers.ai}
+            totalSteps={totalSteps}
           />
         )}
         {step === 'dashboard' && (
@@ -124,6 +144,8 @@ export const Onboarding: React.FC = () => {
             profile={selectedProfile}
             onBack={() => setStep('ai')}
             onNext={() => setStep('missions')}
+            stepNumber={stepNumbers.dashboard}
+            totalSteps={totalSteps}
           />
         )}
         {step === 'missions' && (
@@ -131,6 +153,8 @@ export const Onboarding: React.FC = () => {
             onBack={() => setStep('dashboard')}
             onFinish={completeOnboarding}
             hasStarterVault={createdStarterVault}
+            stepNumber={stepNumbers.missions}
+            totalSteps={totalSteps}
           />
         )}
       </div>

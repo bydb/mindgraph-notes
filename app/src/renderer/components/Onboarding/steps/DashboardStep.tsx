@@ -2,11 +2,14 @@ import React, { useEffect } from 'react'
 import { useUIStore } from '../../../stores/uiStore'
 import type { DashboardWidgetId, UserProfile } from '../../../stores/uiStore'
 import { useTranslation } from '../../../utils/translations'
+import { StepIndicator } from './StepIndicator'
 
 interface DashboardStepProps {
   onBack: () => void
   onNext: () => void
   profile: UserProfile
+  stepNumber: number
+  totalSteps: number
 }
 
 const ALL_WIDGETS: { id: DashboardWidgetId; labelKey: string }[] = [
@@ -39,7 +42,7 @@ const profileDefaults = (profile: UserProfile): DashboardWidgetId[] => {
   }
 }
 
-export const DashboardStep: React.FC<DashboardStepProps> = ({ onBack, onNext, profile }) => {
+export const DashboardStep: React.FC<DashboardStepProps> = ({ onBack, onNext, profile, stepNumber, totalSteps }) => {
   const { t } = useTranslation()
   const dashboard = useUIStore(s => s.dashboard)
   const setDashboard = useUIStore(s => s.setDashboard)
@@ -67,15 +70,7 @@ export const DashboardStep: React.FC<DashboardStepProps> = ({ onBack, onNext, pr
 
   return (
     <div className="onboarding-step">
-      <div className="onboarding-step-header">
-        <span className="onboarding-step-indicator">{t('onboarding.step', { current: '3', total: '4' })}</span>
-        <div className="onboarding-progress">
-          <div className="onboarding-progress-dot active" />
-          <div className="onboarding-progress-dot active" />
-          <div className="onboarding-progress-dot active" />
-          <div className="onboarding-progress-dot" />
-        </div>
-      </div>
+      <StepIndicator current={stepNumber} total={totalSteps} />
 
       <h2 className="onboarding-step-title">{t('onboarding.dashboard.title')}</h2>
       <p className="onboarding-step-desc">{t('onboarding.dashboard.subtitle')}</p>

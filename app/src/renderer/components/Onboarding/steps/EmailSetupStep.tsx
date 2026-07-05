@@ -7,10 +7,13 @@
 import React, { useMemo, useState } from 'react'
 import { useUIStore } from '../../../stores/uiStore'
 import { useTranslation } from '../../../utils/translations'
+import { StepIndicator } from './StepIndicator'
 
 interface EmailSetupStepProps {
   onBack: () => void
   onNext: () => void
+  stepNumber: number
+  totalSteps: number
 }
 
 interface Preset {
@@ -37,7 +40,7 @@ const PRESETS: Preset[] = [
 
 type TestStatus = 'idle' | 'testing' | 'success' | 'failed'
 
-export const EmailSetupStep: React.FC<EmailSetupStepProps> = ({ onBack, onNext }) => {
+export const EmailSetupStep: React.FC<EmailSetupStepProps> = ({ onBack, onNext, stepNumber, totalSteps }) => {
   const { t } = useTranslation()
   const emailSettings = useUIStore(s => s.email)
   const setEmail = useUIStore(s => s.setEmail)
@@ -116,9 +119,7 @@ export const EmailSetupStep: React.FC<EmailSetupStepProps> = ({ onBack, onNext }
 
   return (
     <div className="onboarding-step onboarding-ai-setup">
-      <div className="onboarding-step-header">
-        <span className="onboarding-step-indicator">{t('onboarding.emailSetup.indicator')}</span>
-      </div>
+      <StepIndicator current={stepNumber} total={totalSteps} />
 
       <h2 className="onboarding-step-title">{t('onboarding.emailSetup.title')}</h2>
       <p className="onboarding-step-desc">{t('onboarding.emailSetup.subtitle')}</p>

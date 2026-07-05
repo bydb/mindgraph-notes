@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { useTranslation } from '../../../utils/translations'
 import type { UserProfile } from '../../../stores/uiStore'
+import { StepIndicator } from './StepIndicator'
 
 interface IntentStepProps {
   selectedProfile: UserProfile
@@ -9,6 +10,8 @@ interface IntentStepProps {
   setVaultPath: (path: string) => void
   onBack: () => void
   onNext: () => void
+  stepNumber: number
+  totalSteps: number
 }
 
 const profiles: { id: Exclude<UserProfile, null>; icon: React.ReactNode }[] = [
@@ -97,7 +100,9 @@ export const IntentStep: React.FC<IntentStepProps> = ({
   vaultPath,
   setVaultPath,
   onBack,
-  onNext
+  onNext,
+  stepNumber,
+  totalSteps
 }) => {
   const { t, language } = useTranslation()
   const [loading, setLoading] = useState(false)
@@ -168,15 +173,7 @@ export const IntentStep: React.FC<IntentStepProps> = ({
 
   return (
     <div className="onboarding-step">
-      <div className="onboarding-step-header">
-        <span className="onboarding-step-indicator">{t('onboarding.step', { current: '1', total: '4' })}</span>
-        <div className="onboarding-progress">
-          <div className="onboarding-progress-dot active" />
-          <div className="onboarding-progress-dot" />
-          <div className="onboarding-progress-dot" />
-          <div className="onboarding-progress-dot" />
-        </div>
-      </div>
+      <StepIndicator current={stepNumber} total={totalSteps} />
 
       {!showVault ? (
         <>

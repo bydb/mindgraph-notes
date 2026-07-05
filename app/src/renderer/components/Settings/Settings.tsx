@@ -592,7 +592,19 @@ const categoryGlyph = (cat: ModuleCategory): React.ReactNode => (
   </svg>
 )
 
-const ModulesTab: React.FC<{ t: TabTFn }> = ({ t }) => {
+// Module, deren Konfiguration in einem anderen Settings-Tab liegt: nach dem
+// Aktivieren direkt dorthin springen können — Toggle (hier) und Einrichtung
+// (dort) sind sonst zwei getrennte Orte ohne Verbindung.
+const MODULE_CONFIG_TABS: Record<string, Tab> = {
+  email: 'email',
+  speech: 'speech',
+  remarkable: 'remarkable',
+  'mz-suite': 'agents',
+  antares: 'agents',
+  'smart-connections': 'integrations'
+}
+
+const ModulesTab: React.FC<{ t: TabTFn; onOpenTab: (tab: Tab) => void }> = ({ t, onOpenTab }) => {
   // useUIStore als Abhängigkeit einbinden, damit der Tab bei Flag-Änderungen rerendert
   const _tick = useUIStore(s => `${s.notesChatEnabled}${s.projectRagEnabled}${s.smartConnectionsEnabled}${s.flashcardsEnabled}${s.workflowCanvasEnabled}${s.semanticScholarEnabled}${s.zoteroEnabled}${s.languageTool.enabled}${s.email.enabled}${s.readwise.enabled}${s.docling.enabled}${s.visionOcr.enabled}${s.speech.enabled}`)
   void _tick
@@ -838,6 +850,21 @@ const ModulesTab: React.FC<{ t: TabTFn }> = ({ t }) => {
             <div className="module-row-error" style={{ color: 'var(--error-color, #e5484d)', fontSize: '0.8em', marginTop: 4 }}>
               {moduleErrors[mod.id]}
             </div>
+          )}
+          {enabled && MODULE_CONFIG_TABS[mod.id] && (
+            <button
+              type="button"
+              className="module-row-configure"
+              onClick={(e) => {
+                // Row ist ein <label> um die Toggle-Checkbox — ohne preventDefault
+                // würde der Klick das Modul gleich wieder deaktivieren.
+                e.preventDefault()
+                e.stopPropagation()
+                onOpenTab(MODULE_CONFIG_TABS[mod.id])
+              }}
+            >
+              {t('settings.modules.configure')} →
+            </button>
           )}
         </div>
         <input
@@ -4415,6 +4442,10 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab 
                     <span>{t('settings.shortcuts.quickSearch')}</span>
                   </div>
                   <div className="shortcut-item">
+                    <kbd>Cmd</kbd>+<kbd>Shift</kbd>+<kbd>P</kbd>
+                    <span>{t('settings.shortcuts.commandPalette')}</span>
+                  </div>
+                  <div className="shortcut-item">
                     <kbd>Cmd</kbd>+<kbd>,</kbd>
                     <span>{t('settings.shortcuts.openSettings')}</span>
                   </div>
@@ -5889,7 +5920,7 @@ LIMIT 10
 
             {/* Modules Tab */}
             {activeTab === 'modules' && (
-              <ModulesTab t={t} />
+              <ModulesTab t={t} onOpenTab={setActiveTab} />
             )}
 
             {/* Speech Tab */}

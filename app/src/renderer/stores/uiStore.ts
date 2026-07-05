@@ -702,6 +702,8 @@ interface UIState {
   // Onboarding
   onboardingCompleted: boolean
   onboardingOpen: boolean
+  /** Transient (nicht persistiert): direkt nach Onboarding-Abschluss die Willkommen-Notiz öffnen */
+  welcomeNotePending: boolean
   brainLensActive: boolean
   helpGuideOpen: boolean
 
@@ -712,6 +714,8 @@ interface UIState {
   // Formatting Toolbar
   showFormattingToolbar: boolean
   showRawEditor: boolean
+  /** Einmaliger Hinweis „Lesemodus — Cmd+E zum Schreiben" wurde weggeklickt oder durch Moduswechsel erledigt */
+  readingModeHintDismissed: boolean
 
   // User Profile
   userProfile: UserProfile
@@ -795,12 +799,14 @@ interface UIState {
   removeCustomLogo: () => void
   setOnboardingCompleted: (completed: boolean) => void
   setOnboardingOpen: (open: boolean) => void
+  setWelcomeNotePending: (pending: boolean) => void
   setBrainLensActive: (active: boolean) => void
   setSystemTotalRamGb: (gb: number | null) => void
   setHelpGuideOpen: (open: boolean) => void
   setSlashCommandDateFormat: (format: string) => void
   setSlashCommandTimeFormat: (format: string) => void
   setShowFormattingToolbar: (show: boolean) => void
+  setReadingModeHintDismissed: (dismissed: boolean) => void
   setShowRawEditor: (show: boolean) => void
   setUserProfile: (profile: UserProfile) => void
   applyProfileDefaults: (profile: UserProfile) => void
@@ -1051,6 +1057,7 @@ const defaultState = {
   // Onboarding
   onboardingCompleted: false,
   onboardingOpen: false,
+  welcomeNotePending: false,
   brainLensActive: false,
   systemTotalRamGb: null,
   helpGuideOpen: false,
@@ -1062,6 +1069,7 @@ const defaultState = {
   // Formatting Toolbar
   showFormattingToolbar: false,
   showRawEditor: false,
+  readingModeHintDismissed: false,
 
   // User Profile
   userProfile: null as UserProfile,
@@ -1139,6 +1147,7 @@ const persistedKeys = [
   'slashCommandTimeFormat',
   'showFormattingToolbar',
   'showRawEditor',
+  'readingModeHintDismissed',
   'transport',
   'dashboard',
   'telegramBot',
@@ -1295,6 +1304,7 @@ export const useUIStore = create<UIState>()((set, get) => ({
   removeCustomLogo: () => set({ customLogo: null }),
   setOnboardingCompleted: (completed) => set({ onboardingCompleted: completed }),
   setOnboardingOpen: (open) => set({ onboardingOpen: open }),
+  setWelcomeNotePending: (pending) => set({ welcomeNotePending: pending }),
   setBrainLensActive: (active) => set({ brainLensActive: active }),
   setSystemTotalRamGb: (gb) => set({ systemTotalRamGb: gb }),
   setHelpGuideOpen: (open) => set({ helpGuideOpen: open }),
@@ -1302,6 +1312,7 @@ export const useUIStore = create<UIState>()((set, get) => ({
   setSlashCommandTimeFormat: (format) => set({ slashCommandTimeFormat: format }),
   setShowFormattingToolbar: (show) => set({ showFormattingToolbar: show }),
   setShowRawEditor: (show) => set({ showRawEditor: show }),
+  setReadingModeHintDismissed: (dismissed) => set({ readingModeHintDismissed: dismissed }),
   setUserProfile: (profile) => set({ userProfile: profile }),
   setTransport: (settings) => set((state) => ({
     transport: { ...state.transport, ...settings }

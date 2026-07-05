@@ -2,10 +2,13 @@ import React, { useState, useEffect } from 'react'
 import { useTranslation } from '../../../utils/translations'
 import { useUIStore } from '../../../stores/uiStore'
 import { CLOUD_TEST_MODELS, RECOMMENDED_PULL_MODELS, isCloudModel, modelMarkers } from '../../../../shared/modelCompatibility'
+import { StepIndicator } from './StepIndicator'
 
 interface AIStepProps {
   onBack: () => void
   onNext: () => void
+  stepNumber: number
+  totalSteps: number
 }
 
 const capabilities = [
@@ -35,7 +38,7 @@ const capabilities = [
   }
 ]
 
-export const AIStep: React.FC<AIStepProps> = ({ onBack, onNext }) => {
+export const AIStep: React.FC<AIStepProps> = ({ onBack, onNext, stepNumber, totalSteps }) => {
   const { t } = useTranslation()
   const { ollama, setOllama } = useUIStore()
   const [ollamaConnected, setOllamaConnected] = useState(false)
@@ -124,15 +127,7 @@ export const AIStep: React.FC<AIStepProps> = ({ onBack, onNext }) => {
 
   return (
     <div className="onboarding-step">
-      <div className="onboarding-step-header">
-        <span className="onboarding-step-indicator">{t('onboarding.step', { current: '2', total: '4' })}</span>
-        <div className="onboarding-progress">
-          <div className="onboarding-progress-dot active" />
-          <div className="onboarding-progress-dot active" />
-          <div className="onboarding-progress-dot" />
-          <div className="onboarding-progress-dot" />
-        </div>
-      </div>
+      <StepIndicator current={stepNumber} total={totalSteps} />
 
       <h2 className="onboarding-step-title">{t('onboarding.aiFeatures.title')}</h2>
       <p className="onboarding-step-desc">{t('onboarding.aiFeatures.subtitle')}</p>
@@ -257,7 +252,19 @@ export const AIStep: React.FC<AIStepProps> = ({ onBack, onNext }) => {
         <div className="onboarding-ai-hint">
           <span>{t('onboarding.ai.installHint')}</span>
           {' '}
-          <span className="onboarding-ai-link">{t('onboarding.ai.downloadOllama')}</span>
+          <span
+            className="onboarding-ai-link"
+            role="link"
+            tabIndex={0}
+            onClick={() => window.electronAPI.openExternal('https://ollama.com/download')}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                window.electronAPI.openExternal('https://ollama.com/download')
+              }
+            }}
+          >
+            {t('onboarding.ai.downloadOllama')}
+          </span>
         </div>
       )}
 

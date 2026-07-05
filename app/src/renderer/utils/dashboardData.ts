@@ -16,6 +16,7 @@ export interface TaskBuckets {
   today: DashboardTask[]
   soon: DashboardTask[]       // innerhalb Lead-Time
   later: DashboardTask[]      // dahinter, max 14 Tage Voraus
+  noDate: DashboardTask[]     // offene Tasks ohne Reminder — sonst im Dashboard unsichtbar
 }
 
 export interface EmailActionItem {
@@ -80,7 +81,7 @@ export async function collectTasks(
   leadTime: TaskLeadTime,
   includedFolders: string[] = []
 ): Promise<TaskBuckets> {
-  const empty: TaskBuckets = { overdue: [], today: [], soon: [], later: [] }
+  const empty: TaskBuckets = { overdue: [], today: [], soon: [], later: [], noDate: [] }
   if (!vaultPath) return empty
 
   const relevant = notes.filter(note =>
@@ -99,13 +100,19 @@ export async function collectTasks(
   }
 
   const all: DashboardTask[] = []
+  const noDate: DashboardTask[] = []
   for (const note of relevant) {
     const content = note.content || loaded[note.path]
     if (!content) continue
     const { tasks } = extractTasks(content)
     for (const task of tasks) {
-      if (task.completed || !task.dueDate) continue
-      all.push({ ...task, noteId: note.id, noteTitle: note.title, notePath: note.path })
+      if (task.completed) continue
+      const dashboardTask = { ...task, noteId: note.id, noteTitle: note.title, notePath: note.path }
+      if (!task.dueDate) {
+        noDate.push(dashboardTask)
+      } else {
+        all.push(dashboardTask)
+      }
     }
   }
 
@@ -115,7 +122,7 @@ export async function collectTasks(
   const byDue = (a: DashboardTask, b: DashboardTask) =>
     (a.dueDate!.getTime()) - (b.dueDate!.getTime())
 
-  const buckets: TaskBuckets = { overdue: [], today: [], soon: [], later: [] }
+  const buckets: TaskBuckets = { overdue: [], today: [], soon: [], later: [], noDate }
   for (const task of all) {
     if (task.dueDate! >= horizon) continue
     const bucket = bucketForTask(task, leadTime, today)
@@ -125,6 +132,10 @@ export async function collectTasks(
   buckets.today.sort(byDue)
   buckets.soon.sort(byDue)
   buckets.later.sort(byDue)
+  // Ohne Fälligkeit gibt es kein Datum zum Sortieren: kritische zuerst, dann nach Notiz
+  buckets.noDate.sort((a, b) =>
+    Number(b.isCritical) - Number(a.isCritical) || a.noteTitle.localeCompare(b.noteTitle)
+  )
   return buckets
 }
 

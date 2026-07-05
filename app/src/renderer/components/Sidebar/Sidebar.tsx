@@ -327,12 +327,17 @@ export const Sidebar: React.FC<SidebarProps> = ({ onOpenSearch }) => {
         // Graph-Daten aus dem Vault laden
         await loadGraphData(targetVault)
 
-        // Nach Onboarding: Willkommen-Notiz automatisch öffnen
-        const welcomeNote = loadedNotes.find(n =>
-          n.path === 'Willkommen.md' || n.path === 'Welcome.md'
-        )
-        if (welcomeNote) {
-          selectNote(welcomeNote.id)
+        // Nach Onboarding: Willkommen-Notiz genau EINMAL automatisch öffnen. Ohne das
+        // transiente Flag würde sie bei jedem App-Start erneut aufspringen, solange
+        // die Datei im Vault-Root liegt.
+        if (useUIStore.getState().welcomeNotePending) {
+          useUIStore.getState().setWelcomeNotePending(false)
+          const welcomeNote = loadedNotes.find(n =>
+            n.path === 'Willkommen.md' || n.path === 'Welcome.md'
+          )
+          if (welcomeNote) {
+            selectNote(welcomeNote.id)
+          }
         }
 
         // File-Watcher starten

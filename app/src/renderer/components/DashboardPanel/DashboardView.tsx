@@ -983,8 +983,8 @@ const CollapsedWidget: React.FC<{ label: string; status: string; className?: str
 )
 
 const TasksWidget: React.FC<WidgetProps> = ({ snapshot, onTaskClick, t }) => {
-  const { overdue, today, soon, later } = snapshot.tasks
-  const total = overdue.length + today.length + soon.length + later.length
+  const { overdue, today, soon, later, noDate } = snapshot.tasks
+  const total = overdue.length + today.length + soon.length + later.length + noDate.length
   if (total === 0) {
     return <CollapsedWidget label={t('dashboard.widgets.tasks')} status={t('dashboard.tasksEmpty')} className="dv-widget-tasks" />
   }
@@ -1021,6 +1021,16 @@ const TasksWidget: React.FC<WidgetProps> = ({ snapshot, onTaskClick, t }) => {
             {later.slice(0, 6).map(task => (
               <TaskRow key={`${task.noteId}-${task.line}`} task={task} onClick={() => onTaskClick?.(task)} showDate />
             ))}
+          </Group>
+        )}
+        {noDate.length > 0 && (
+          <Group label={t('dashboard.noDate')}>
+            {noDate.slice(0, 6).map(task => (
+              <TaskRow key={`${task.noteId}-${task.line}`} task={task} onClick={() => onTaskClick?.(task)} />
+            ))}
+            {noDate.length > 6 && (
+              <div className="dv-group-more">{t('dashboard.moreTasks', { count: noDate.length - 6 })}</div>
+            )}
           </Group>
         )}
       </div>
