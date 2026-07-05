@@ -1,0 +1,47 @@
+# Website-Deployment (mindgraph-notes.de) — Actions-basiert statt Legacy-Jekyll.
+# docs/ ist reines statisches HTML: Artefakt hochladen, deployen, fertig — kein
+# Jekyll-Build, der etwas verarbeiten (oder flaky fehlschlagen) könnte.
+# Hintergrund: Der Legacy-Build war seit 2026-07-02 wiederholt unzuverlässig
+# (hängende Builds, transiente „Deployment failed, try again later").
+# Voraussetzung: Repo-Settings → Pages → Source = "GitHub Actions" (build_type: workflow).
+
+name: Deploy Website
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'docs/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Nur ein Pages-Deploy gleichzeitig; laufende werden vom neueren abgelöst.
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload docs/ as Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
