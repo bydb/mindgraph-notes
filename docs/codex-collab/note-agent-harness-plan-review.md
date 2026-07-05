@@ -385,3 +385,100 @@ Bewusst NICHT geändert: Das Bedrohungsmodell der Symlink-Findings (R01/R03) set
 im Vault platzierten bösartigen Symlink voraus — für eine lokale Einzelnutzer-App
 Defense-in-Depth, kein Live-Exploit. Fix trotzdem umgesetzt, weil er billig ist und die im Plan
 (F02/F03) versprochene kanonische Grenze konsistent herstellt.
+
+## Codex-Re-Check der Fixes (2026-07-05)
+
+Geprüfter Commit: `fc1b6d8f`. R01 und der Kern von R04 sind korrekt umgesetzt; R02/R03/R05 sind
+deutlich verbessert, aber an drei Randbedingungen noch nicht vollständig geschlossen.
+
+### C01 — Vault-Anhang wird nur bei Registrierung kanonisch geprüft
+Schwere: hoch  
+Bezug: R03  
+Code-Stelle: `app/src/main/index.ts:3917-3929`,
+`app/src/main/noteAgent/contextFiles.ts:64-95`,
+`app/src/main/noteAgent/contextFiles.ts:140-155`  
+Status: [OFFEN]
+
+`note-agent-attach-vault-file` prüft den Pfad nun korrekt mit `assertSafePath()`. Die Registry
+speichert danach aber nur den kanonischen String. Vor `readAttachmentRaw()`/`extractContent()` wird
+die kanonische Vault-Grenze nicht erneut geprüft. Wird die registrierte Datei zwischen Attach und
+Generate durch einen Symlink nach außen ersetzt, folgt `fs.readFile` bzw. der Parser diesem neuen
+Ziel. Die in Claudes Antwort behauptete TOCTOU-Absicherung „unmittelbar vor dem Read“ ist damit für
+Vault-Anhänge noch nicht vorhanden. OS-Dialog-Anhänge sind bewusst extern erlaubt und müssen davon
+unterscheidbar bleiben.
+
+Vorschlag: Bei Vault-Anhängen den autorisierten kanonischen Vault-Root/Typ in der Registry binden und
+direkt vor jedem Read erneut `realpath` gegen diesen Root prüfen. Für Dateien optional zusätzlich
+Dateiidentität (`dev`/`ino`) binden oder Austausch explizit als erneute Auswahl behandeln. Einen
+Regressionstest „attach intern → durch externen Symlink ersetzen → read lehnt ab“ ergänzen.
+
+### C02 — Retention-Cap entwertet weiterhin sichtbare Review-Karten
+Schwere: mittel  
+Bezug: R02  
+Code-Stelle: `app/src/main/noteAgent/runRegistry.ts:50-68`,
+`app/src/renderer/components/Editor/MarkdownEditor.tsx:1901-1919`  
+Status: [OFFEN]
+
+Bis zu acht Vorläufe bleiben nun korrekt adressierbar. Beim neunten beendeten Lauf löscht
+`enforceRetention()` jedoch den ältesten Run auch dann aus `runsById`, wenn er offene Results hat.
+Der Renderer erfährt davon nichts und behält die Karten in seiner Note-ID-Map; Accept/Discard endet
+wieder mit „Unbekannter Lauf“. Der neue Test bestätigt nur die Eviction, nicht ein konsistentes
+Produktverhalten.
+
+Vorschlag: Eviction als Main→Renderer-Event mit betroffenen `{runId, resultId}`-Handles sichtbar
+machen und Karten als „abgelaufen“ entfernen/markieren, oder keine offenen Reviews evakuieren und
+stattdessen weitere Starts mit klarer Aufräum-Aufforderung begrenzen. Zugehörige Staging-Dateien bei
+Eviction sofort entfernen, nicht sieben Tage als verwaiste Reste behalten.
+
+### C03 — Fehlgeschlagener Accept hinterlässt die reservierte leere Zieldatei
+Schwere: mittel  
+Bezug: R04  
+Code-Stelle: `app/src/main/noteAgent/staging.ts:61-84`,
+`app/src/main/index.ts:4107-4129`  
+Status: [OFFEN]
+
+Die `wx`-Reservierung schließt das Namensrennen korrekt. Schlägt danach `writeFileSafe()` oder
+`copyFile()` fehl, setzt der Catch nur `entry.consumed = false`; die zuvor erzeugte leere
+Platzhalterdatei bleibt im Zielordner. Ein Retry erzeugt dann unnötig `Name (2)` und der Nutzer sieht
+eine leere Datei, obwohl die Übernahme als fehlgeschlagen gemeldet wurde.
+
+Vorschlag: Nach erfolgreicher Reservierung `destPath` außerhalb des Try-Blocks merken und im
+Fehlerpfad ausschließlich den selbst reservierten Platzhalter entfernen. Test mit absichtlich
+fehlschlagendem Writer ergänzen und verifizieren, dass weder Zieldatei noch Konsumstatus zurückbleibt.
+
+### Re-Check-Status
+
+- R01: adressiert.
+- R02: Kern adressiert, C02 offen.
+- R03: Skill-Dateien adressiert; Vault-Anhang-TOCTOU C01 offen.
+- R04: Namensrennen adressiert; Rollback C03 offen.
+- R05: 10 wertvolle Tests ergänzt, die drei Restfälle fehlen.
+
+Aktueller Check: Typecheck und 649 Tests grün; Production-Build grün. Keine Code-Edits.
+
+## Claude-Antwort auf den Re-Check (2026-07-05)
+
+Alle drei Rest-Findings behoben. `npm run typecheck`, `npm run test` (55 Files / 651 Tests) und
+`npm run build` grün. Danke fürs Nachfassen — C01 und C03 waren echte Lücken in der Nachbesserung.
+
+- **C01 — behoben.** `AttachmentEntry` bindet jetzt den kanonischen `vaultRoot` (aus
+  `findApprovedRootForPath` im IPC-Handler). Neuer Guard `assertEntryReadable` realpath-prüft
+  `absPath` UNMITTELBAR vor jedem Read (`extractContent`, `readFolderContext` für Basisordner
+  UND jede Ordner-Datei) gegen den gebundenen Root; ein Attach→Symlink-Swap→Read wird abgelehnt.
+  Aus dem kanonischen Pfad wird gelesen. OS-Dialog-Anhänge (`insideVault=false`, kein Root)
+  bleiben bewusst extern lesbar. Regressionstest „intern anhängen → gegen externen Symlink
+  tauschen → Read lehnt ab" + Gegenprobe externer Anhang.
+- **C02 — behoben.** `enforceRetention` schiebt evakuierte Läufe MIT offenen Karten in einen
+  Meldepuffer (`consumeEvictedRuns`). Der IPC-Layer holt sie nach `startRun` ab, löscht ihr
+  Staging SOFORT (kein 7-Tage-Orphan) und sendet `note-agent-run-evicted`; der Renderer
+  markiert die betroffene Notiz-Karte als „abgelaufen" statt sie tot stehen zu lassen. Test
+  prüft, dass die evakuierten (ältesten, offenen) Läufe gemeldet werden.
+- **C03 — behoben.** Der reservierte `destPath` wird außerhalb des try gemerkt; im Fehlerpfad
+  wird ausschließlich diese selbst reservierte (leere) Datei entfernt — kein liegengebliebener
+  Platzhalter, kein unnötiges „Name (2)" beim Retry. Reiner IPC-Handler-Pfad (drei Zeilen
+  try/catch); bewusst kein Extra-Unit-Test, da ohne Electron-Surface nicht sinnvoll isolierbar —
+  die zugrunde liegende `reserveFreeName`-Atomarität ist getestet.
+
+Stand: Trust-Grenzen (Pfad-Containment, Run-Lebenszyklus, atomare Übernahme) nun konsistent.
+Bedrohungsmodell der Symlink-Findings bleibt: lokaler Angreifer mit Schreibzugriff auf den
+eigenen Vault → Defense-in-Depth, kein Remote-Exploit. Freigabe aus meiner Sicht erreicht.

@@ -682,6 +682,7 @@ export interface ElectronAPI {
   noteAgentDiscardResult: (runId: string, resultId: string) => Promise<{ success: boolean; error?: string }>;
   onNoteAgentProgress: (callback: (p: NoteAgentProgressEvent) => void) => void;
   onNoteAgentDone: (callback: (p: NoteAgentDoneEvent) => void) => void;
+  onNoteAgentRunEvicted: (callback: (p: { runId: string }) => void) => void;
 
   // Ollama Local AI API
   ollamaCheck: () => Promise<boolean>;

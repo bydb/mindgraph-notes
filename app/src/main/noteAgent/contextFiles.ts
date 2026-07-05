@@ -26,6 +26,24 @@ export interface ContextAttachmentInfo {
 
 interface AttachmentEntry extends ContextAttachmentInfo {
   absPath: string
+  // Kanonischer Vault-Root für Vault-Anhänge (C01) — vor jedem Read wird `absPath`
+  // erneut per realpath gegen diesen Root geprüft. OS-Dialog-Anhänge (insideVault=false)
+  // sind bewusst extern und tragen keinen Root.
+  vaultRoot?: string
+}
+
+// C01/TOCTOU: kanonische Lese-Grenze vor JEDEM Read. Fängt einen zwischen Attach und
+// Read (oder Attach und Generate) untergeschobenen Symlink ab. Gibt den kanonischen
+// Pfad zurück, aus dem tatsächlich gelesen wird.
+async function assertEntryReadable(entry: { absPath: string; insideVault: boolean; vaultRoot?: string; name: string }): Promise<string> {
+  const real = await fs.realpath(entry.absPath)
+  if (entry.insideVault && entry.vaultRoot) {
+    const rootReal = await fs.realpath(entry.vaultRoot)
+    if (real !== rootReal && !real.startsWith(rootReal + path.sep)) {
+      throw new Error(`Anhang "${entry.name}" liegt nicht mehr im Vault (Symlink?) — abgelehnt`)
+    }
+  }
+  return real
 }
 
 // ── Limits (Startwerte laut Plan §2 / Offene Frage 1 — nach Praxistest justieren) ──
@@ -64,7 +82,8 @@ const registryBySender = new Map<number, Map<string, AttachmentEntry>>()
 export async function registerContextAttachment(
   senderId: number,
   absPath: string,
-  insideVault: boolean
+  insideVault: boolean,
+  vaultRoot?: string
 ): Promise<{ ok: true; attachment: ContextAttachmentInfo } | { ok: false; error: string }> {
   const name = path.basename(absPath)
   const kind = contextKindFromFilename(name)
@@ -91,7 +110,7 @@ export async function registerContextAttachment(
     map = new Map()
     registryBySender.set(senderId, map)
   }
-  map.set(id, { id, name, kind, insideVault, sizeBytes, absPath })
+  map.set(id, { id, name, kind, insideVault, sizeBytes, absPath, vaultRoot })
   return { ok: true, attachment: { id, name, kind, insideVault, sizeBytes } }
 }
 
@@ -100,7 +119,8 @@ export async function registerContextAttachment(
 export async function registerContextFolder(
   senderId: number,
   absPath: string,
-  insideVault: boolean
+  insideVault: boolean,
+  vaultRoot?: string
 ): Promise<{ ok: true; attachment: ContextAttachmentInfo } | { ok: false; error: string }> {
   const name = path.basename(absPath)
   try {
@@ -115,7 +135,7 @@ export async function registerContextFolder(
     map = new Map()
     registryBySender.set(senderId, map)
   }
-  map.set(id, { id, name, kind: 'folder', insideVault, sizeBytes: 0, absPath })
+  map.set(id, { id, name, kind: 'folder', insideVault, sizeBytes: 0, absPath, vaultRoot })
   return { ok: true, attachment: { id, name, kind: 'folder', insideVault, sizeBytes: 0 } }
 }
 
@@ -204,9 +224,11 @@ async function extractPdfText(absPath: string): Promise<string> {
 }
 
 async function extractContent(entry: AttachmentEntry): Promise<string> {
+  // C01: kanonischen Pfad UNMITTELBAR vor dem Read auflösen/prüfen und daraus lesen.
+  const src = await assertEntryReadable(entry)
   switch (entry.kind) {
     case 'xlsx': {
-      const data = await parseExcel(entry.absPath)
+      const data = await parseExcel(src)
       const parts: string[] = []
       const sheets = data.sheets.slice(0, MAX_XLSX_SHEETS)
       for (const sheet of sheets) {
@@ -222,19 +244,19 @@ async function extractContent(entry: AttachmentEntry): Promise<string> {
       return parts.join('\n\n')
     }
     case 'docx': {
-      const d = await parseDocx(entry.absPath)
+      const d = await parseDocx(src)
       return d.markdown || d.html
     }
     case 'pptx': {
-      const d = await parsePptx(entry.absPath)
+      const d = await parsePptx(src)
       return d.slides
         .map(s => `## Folie ${s.index}${s.title ? `: ${s.title}` : ''}\n${s.text}${s.notes ? `\nNotizen: ${s.notes}` : ''}`)
         .join('\n\n')
     }
     case 'pdf':
-      return extractPdfText(entry.absPath)
+      return extractPdfText(src)
     default:
-      return fs.readFile(entry.absPath, 'utf-8')
+      return fs.readFile(src, 'utf-8')
   }
 }
 
@@ -262,14 +284,18 @@ async function readFolderContext(
   instruction: string,
   budget: number
 ): Promise<{ content: string; truncated: boolean }> {
-  const dirents = await fs.readdir(entry.absPath, { withFileTypes: true })
+  // C01: Ordner selbst kanonisch prüfen und aus dem realen Pfad lesen.
+  const dirReal = await assertEntryReadable(entry)
+  const dirents = await fs.readdir(dirReal, { withFileTypes: true })
   const tokens = instructionTokens(instruction)
 
   const supported: FolderFileInfo[] = []
   let unsupportedCount = 0
   let oversizedCount = 0
   for (const d of dirents) {
-    if (!d.isFile() || d.name.startsWith('.')) continue
+    // Symlinks nicht anbieten (C01) — d.isFile() ist für Symlinks bereits false,
+    // der explizite Check hält es robust.
+    if (d.isSymbolicLink() || !d.isFile() || d.name.startsWith('.')) continue
     const kind = contextKindFromFilename(d.name)
     if (!kind) {
       unsupportedCount++
@@ -277,7 +303,7 @@ async function readFolderContext(
     }
     let st
     try {
-      st = await fs.stat(path.join(entry.absPath, d.name))
+      st = await fs.stat(path.join(dirReal, d.name))
     } catch {
       continue
     }
@@ -327,7 +353,8 @@ async function readFolderContext(
         kind: f.kind,
         insideVault: entry.insideVault,
         sizeBytes: f.sizeBytes,
-        absPath: path.join(entry.absPath, f.name)
+        absPath: path.join(dirReal, f.name),
+        vaultRoot: entry.vaultRoot // C01: Vault-Grenze erbt auf die Ordner-Dateien
       }
       let content = hygieneText(await extractContent(fileEntry)).trim()
       if (!content) {

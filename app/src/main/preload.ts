@@ -216,6 +216,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.removeAllListeners('note-agent-done')
     ipcRenderer.on('note-agent-done', (_event, p) => callback(p))
   },
+  onNoteAgentRunEvicted: (callback: (p: { runId: string }) => void) => {
+    ipcRenderer.removeAllListeners('note-agent-run-evicted')
+    ipcRenderer.on('note-agent-run-evicted', (_event, p) => callback(p))
+  },
 
   // Ollama Local AI API
   ollamaCheck: () => ipcRenderer.invoke('ollama-check'),

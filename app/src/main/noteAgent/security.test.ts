@@ -7,9 +7,10 @@ import { describe, it, expect, beforeAll } from 'vitest'
 import { promises as fs } from 'fs'
 import * as os from 'os'
 import * as path from 'path'
-import { startRun, registerResult, finishRun, takeResult, getRunForSender, pruneRunIfConsumed } from './runRegistry'
+import { startRun, registerResult, finishRun, takeResult, getRunForSender, pruneRunIfConsumed, consumeEvictedRuns } from './runRegistry'
 import { reserveFreeName, sanitizeOutputFileName } from './staging'
 import { readSkillBody, resolveSkillFile, listSkillFiles } from './skillsLoader'
+import { registerContextAttachment, readAttachmentRaw, removeContextAttachment } from './contextFiles'
 
 const ROOT = path.join(os.tmpdir(), 'mindgraph-noteagent-security-test')
 
@@ -67,7 +68,8 @@ describe('R02 — beendete Läufe mit offenen Review-Karten bleiben adressierbar
     pruneRunIfConsumed(a)
   })
 
-  it('Retention: pro Sender höchstens 8 beendete Läufe mit offenen Karten', () => {
+  it('Retention: max 8 beendete Läufe; evakuierte offene Läufe werden gemeldet (C02)', () => {
+    consumeEvictedRuns() // Puffer aus Vortests leeren
     const ids: string[] = []
     for (let i = 0; i < 12; i++) {
       const r = startRun(mkRunParams(4))!
@@ -78,6 +80,11 @@ describe('R02 — beendete Läufe mit offenen Review-Karten bleiben adressierbar
     // Die ältesten sind evakuiert, die jüngsten noch da.
     expect(getRunForSender(4, ids[0])).toBeNull()
     expect(getRunForSender(4, ids[11])).not.toBeNull()
+    // C02: die evakuierten Läufe (mit offenen Karten) wurden zum Aufräumen gemeldet,
+    // damit der Renderer die toten Karten fallenlässt statt „Unbekannter Lauf".
+    const evicted = consumeEvictedRuns().map(r => r.runId)
+    expect(evicted).toContain(ids[0])
+    expect(evicted).not.toContain(ids[11])
   })
 })
 
@@ -135,5 +142,40 @@ describe('R03 — Skill-Reads mit realpath-Containment (Symlink-Ausbruch)', () =
 
   it('readSkillBody eines normalen Skills funktioniert', async () => {
     expect(await readSkillBody(ROOT, 'brave')).toContain('Text.')
+  })
+})
+
+describe('C01 — Vault-Anhang: Read prüft realpath erneut (Attach→Symlink-Swap)', () => {
+  const SENDER = 77
+  it('liest einen internen Anhang, lehnt ihn nach Symlink-Swap nach außen ab', async () => {
+    const dir = path.join(ROOT, 'attach-toctou')
+    await fs.mkdir(dir, { recursive: true })
+    const inside = path.join(dir, 'daten.csv')
+    await fs.writeFile(inside, 'Name;Wert\nA;1\n')
+    const secret = path.join(ROOT, 'aussen.csv')
+    await fs.writeFile(secret, 'GEHEIM;extern\n')
+
+    // Registrierung mit gebundenem Vault-Root (wie im IPC-Handler nach assertSafePath).
+    const reg = await registerContextAttachment(SENDER, inside, true, dir)
+    expect(reg.ok).toBe(true)
+    if (!reg.ok) return
+    // Erster Read: ok.
+    expect((await readAttachmentRaw(SENDER, reg.attachment.id)).content).toContain('A;1')
+
+    // Datei zwischen Attach und Read gegen einen Symlink nach außen tauschen.
+    await fs.rm(inside)
+    await fs.symlink(secret, inside)
+    await expect(readAttachmentRaw(SENDER, reg.attachment.id)).rejects.toThrow('nicht mehr im Vault')
+    removeContextAttachment(SENDER, reg.attachment.id)
+  })
+
+  it('externer OS-Dialog-Anhang (insideVault=false) bleibt lesbar', async () => {
+    const ext = path.join(ROOT, 'extern-erlaubt.txt')
+    await fs.writeFile(ext, 'extern ok')
+    const reg = await registerContextAttachment(SENDER, ext, false)
+    expect(reg.ok).toBe(true)
+    if (!reg.ok) return
+    expect((await readAttachmentRaw(SENDER, reg.attachment.id)).content).toContain('extern ok')
+    removeContextAttachment(SENDER, reg.attachment.id)
   })
 })

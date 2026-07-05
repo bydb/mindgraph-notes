@@ -153,9 +153,9 @@ import { createMainRegistry, discoverMainPlugins } from './plugins/registry'
 import { isPluginGateEnabled } from '../shared/plugins/moduleGate'
 import { registerPluginTransport, isTrustedSender } from './plugins/transport'
 import { registerContextAttachment, registerContextFolder, removeContextAttachment, clearContextAttachments, readContextBlock } from './noteAgent/contextFiles'
-import { startRun, getRunForSender, finishRun, publicResults, takeResult, cancelRunsForSender, pruneRunIfConsumed } from './noteAgent/runRegistry'
+import { startRun, getRunForSender, finishRun, publicResults, takeResult, cancelRunsForSender, pruneRunIfConsumed, consumeEvictedRuns } from './noteAgent/runRegistry'
 import { runNoteAgentLoop } from './noteAgent/loop'
-import { cleanupOldStaging, assertInsideRunStaging, reserveFreeName } from './noteAgent/staging'
+import { cleanupOldStaging, assertInsideRunStaging, reserveFreeName, stagingDirFor } from './noteAgent/staging'
 import { listVaultSkills, listEnabledSkillHeaders, setSkillEnabled, createSkill, readAgentMemory, appendAgentMemory, SKILLS_DIRNAME } from './noteAgent/skillsLoader'
 import { fetchSkillsCatalog, installCatalogSkill, importSkillFromPath } from './noteAgent/skillsCatalog'
 import { supportsNativeToolCalls } from '../shared/modelCompatibility'
@@ -3922,11 +3922,14 @@ ipcMain.handle('note-agent-attach-vault-file', async (event, vaultPath: string, 
     // Datei/einen externen Ordner wird so abgewiesen, nicht registriert und gelesen.
     const fullPath = await assertSafePath(path.join(vaultPath, relPath), 'note-agent-attach-vault-file')
     hookNoteAgentCleanup(event.sender)
+    // C01: den approved Vault-Root an den Anhang binden — vor jedem späteren Read wird
+    // erneut realpath dagegen geprüft (Schutz gegen Attach→Symlink-Swap→Read).
+    const vaultRoot = findApprovedRootForPath(fullPath) ?? path.resolve(vaultPath)
     // Ordner-Kontext (Stufe 1): derselbe Weg akzeptiert auch Vault-Ordner.
     const st = await fs.stat(fullPath)
     const res = st.isDirectory()
-      ? await registerContextFolder(event.sender.id, fullPath, true)
-      : await registerContextAttachment(event.sender.id, fullPath, true)
+      ? await registerContextFolder(event.sender.id, fullPath, true, vaultRoot)
+      : await registerContextAttachment(event.sender.id, fullPath, true, vaultRoot)
     return res.ok ? { attachments: [res.attachment], errors: [] } : { attachments: [], errors: [res.error] }
   } catch (error) {
     return { attachments: [], errors: [error instanceof Error ? error.message : 'Unbekannter Fehler'] }
@@ -4042,6 +4045,13 @@ ipcMain.handle('note-agent-run', async (event, params: NoteAgentRunParams) => {
     if (!run) return { success: false, error: 'Es läuft bereits ein Agent-Lauf in diesem Fenster — erst abbrechen oder abwarten.' }
     hookNoteAgentCleanup(event.sender)
     void cleanupOldStaging(params.vaultPath).catch(() => undefined)
+    // C02: bei der Retention evakuierte Läufe mit offenen Karten sofort aufräumen —
+    // Staging löschen (kein 7-Tage-Orphan) und dem Renderer melden, damit er die
+    // toten Karten fallenlässt (sonst „Unbekannter Lauf" beim späteren Accept).
+    for (const ev of consumeEvictedRuns()) {
+      void fs.rm(stagingDirFor(ev), { recursive: true, force: true }).catch(() => undefined)
+      if (!event.sender.isDestroyed()) event.sender.send('note-agent-run-evicted', { runId: ev.runId })
+    }
 
     // Loop asynchron — der Handler gibt sofort die runId zurück (für Abbrechen),
     // Fortschritt und Abschluss kommen als sender-gebundene Events.
@@ -4104,6 +4114,9 @@ ipcMain.handle('note-agent-accept-result', async (event, runId: string, resultId
   if (!run) return { success: false, error: 'Unbekannter Lauf' }
   const entry = takeResult(event.sender.id, runId, resultId)
   if (!entry) return { success: false, error: 'Ergebnis nicht (mehr) verfügbar' }
+  // C03: reservierten Platzhalter außerhalb des try merken, damit der Fehlerpfad
+  // ausschließlich die selbst angelegte leere Datei aufräumt.
+  let reservedDest: string | null = null
   try {
     const real = await assertInsideRunStaging(run, entry.stagingPath)
     // R01/TOCTOU: kanonischen, an den Run gebundenen Zielordner UNMITTELBAR vor der
@@ -4112,6 +4125,7 @@ ipcMain.handle('note-agent-accept-result', async (event, runId: string, resultId
     const targetDir = await assertSafePath(run.targetFolderAbs, 'note-agent-accept-target')
     // R04: Name atomar reservieren (exklusives Create) statt check-then-write.
     const { finalName, destPath } = await reserveFreeName(targetDir, entry.suggestedName)
+    reservedDest = destPath
     if (entry.kind === 'md') {
       // Markdown über die eine Schreibgrenze (Auto-Backup, Empty-Block, Auto-Heal).
       const content = await fs.readFile(real, 'utf-8')
@@ -4126,6 +4140,9 @@ ipcMain.handle('note-agent-accept-result', async (event, runId: string, resultId
   } catch (error) {
     // Übernahme gescheitert → Konsum zurücknehmen, damit der Nutzer es erneut versuchen kann.
     entry.consumed = false
+    // C03: die eben reservierte (noch leere) Zieldatei entfernen — sonst bleibt eine
+    // leere Datei liegen und ein Retry landet unnötig bei „Name (2)".
+    if (reservedDest) await fs.rm(reservedDest, { force: true }).catch(() => undefined)
     return { success: false, error: error instanceof Error ? error.message : 'Unbekannter Fehler' }
   }
 })

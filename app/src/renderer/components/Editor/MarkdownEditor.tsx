@@ -931,8 +931,8 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
   const { vaultPath, selectedNoteId, secondarySelectedNoteId, notes, updateNote, selectNote, selectSecondaryNote, addNote, fileTree, setFileTree, navigateBack, navigateForward, canNavigateBack, canNavigateForward } = useNotesStore(
     useShallow(s => ({ vaultPath: s.vaultPath, selectedNoteId: s.selectedNoteId, secondarySelectedNoteId: s.secondarySelectedNoteId, notes: s.notes, updateNote: s.updateNote, selectNote: s.selectNote, selectSecondaryNote: s.selectSecondaryNote, addNote: s.addNote, fileTree: s.fileTree, setFileTree: s.setFileTree, navigateBack: s.navigateBack, navigateForward: s.navigateForward, canNavigateBack: s.canNavigateBack, canNavigateForward: s.canNavigateForward }))
   )
-  const { pendingTemplateInsert, setPendingTemplateInsert, pendingAgentContext, setPendingAgentContext, ollama, editorHeadingFolding, outlineStyle, editorShowWordCount, editorHeaderActions, languageTool, setLanguageTool, editorDefaultView, showFormattingToolbar, setShowFormattingToolbar, showRawEditor } = useUIStore(
-    useShallow(s => ({ pendingTemplateInsert: s.pendingTemplateInsert, setPendingTemplateInsert: s.setPendingTemplateInsert, pendingAgentContext: s.pendingAgentContext, setPendingAgentContext: s.setPendingAgentContext, ollama: s.ollama, editorHeadingFolding: s.editorHeadingFolding, outlineStyle: s.outlineStyle, editorShowWordCount: s.editorShowWordCount, editorHeaderActions: s.editorHeaderActions, languageTool: s.languageTool, setLanguageTool: s.setLanguageTool, editorDefaultView: s.editorDefaultView, showFormattingToolbar: s.showFormattingToolbar, setShowFormattingToolbar: s.setShowFormattingToolbar, showRawEditor: s.showRawEditor }))
+  const { pendingTemplateInsert, setPendingTemplateInsert, pendingAgentContext, setPendingAgentContext, ollama, editorHeadingFolding, outlineStyle, editorShowWordCount, editorHeaderActions, languageTool, setLanguageTool, editorDefaultView, showFormattingToolbar, setShowFormattingToolbar, showRawEditor, readingModeHintDismissed, setReadingModeHintDismissed } = useUIStore(
+    useShallow(s => ({ pendingTemplateInsert: s.pendingTemplateInsert, setPendingTemplateInsert: s.setPendingTemplateInsert, pendingAgentContext: s.pendingAgentContext, setPendingAgentContext: s.setPendingAgentContext, ollama: s.ollama, editorHeadingFolding: s.editorHeadingFolding, outlineStyle: s.outlineStyle, editorShowWordCount: s.editorShowWordCount, editorHeaderActions: s.editorHeaderActions, languageTool: s.languageTool, setLanguageTool: s.setLanguageTool, editorDefaultView: s.editorDefaultView, showFormattingToolbar: s.showFormattingToolbar, setShowFormattingToolbar: s.setShowFormattingToolbar, showRawEditor: s.showRawEditor, readingModeHintDismissed: s.readingModeHintDismissed, setReadingModeHintDismissed: s.setReadingModeHintDismissed }))
   )
   const [marketing] = usePluginConfig('marketing', MARKETING_DEFAULTS)
 
@@ -1917,6 +1917,18 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
                 : `${t('aiBar.agent.errorPrefix')}: ${p.error || '?'}`
           }
         }
+      })
+    })
+    // C02: Main hat einen alten Lauf aus der Retention evakuiert — dessen Karten
+    // sind nicht mehr übernehmbar; als abgelaufen markieren statt „Unbekannter Lauf".
+    window.electronAPI.onNoteAgentRunEvicted(p => {
+      const noteId = agentRunNoteRef.current.get(p.runId)
+      if (!noteId) return
+      agentRunNoteRef.current.delete(p.runId)
+      setAgentRunByNote(prev => {
+        const cur = prev[noteId]
+        if (!cur || cur.runId !== p.runId) return prev
+        return { ...prev, [noteId]: { ...cur, phase: 'review', results: [], finalText: t('aiBar.agent.evicted') } }
       })
     })
   }, [isSecondary, t])
@@ -4334,8 +4346,20 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
     }
   }, [viewMode, notes, vaultPath])
 
+  // Bewusster Moduswechsel (Button oder Cmd+E) erledigt den einmaligen
+  // Lesemodus-Hinweis — der Nutzer hat den Mechanismus dann gefunden.
+  const markModeHintSeen = () => {
+    if (!readingModeHintDismissed) setReadingModeHintDismissed(true)
+  }
+
+  const handleSetViewMode = (mode: ViewMode) => {
+    markModeHintSeen()
+    setViewMode(mode)
+  }
+
   // Toggle view mode (cycles depending on showRawEditor setting)
   const toggleViewMode = () => {
+    markModeHintSeen()
     setViewMode(prev => {
       if (showRawEditor) {
         // Full cycle: edit -> live-preview -> preview -> edit
@@ -4843,7 +4867,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
             {showRawEditor && (
               <button
                 className={`toggle-btn ${viewMode === 'edit' ? 'active' : ''}`}
-                onClick={() => setViewMode('edit')}
+                onClick={() => handleSetViewMode('edit')}
                 title={t('editor.modeMarkdown')}
               >
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
@@ -4853,7 +4877,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
             )}
             <button
               className={`toggle-btn ${viewMode === 'live-preview' ? 'active' : ''}`}
-              onClick={() => setViewMode('live-preview')}
+              onClick={() => handleSetViewMode('live-preview')}
               title={t('editor.modeWrite')}
             >
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
@@ -4863,7 +4887,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
             </button>
             <button
               className={`toggle-btn ${viewMode === 'preview' ? 'active' : ''}`}
-              onClick={() => setViewMode('preview')}
+              onClick={() => handleSetViewMode('preview')}
               title={t('editor.modeRead')}
             >
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
@@ -4874,6 +4898,31 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
           </div>
         </div>
       </div>
+
+      {/* Einmaliger Hinweis für den Default-Lesemodus: Notizen öffnen read-only,
+          ohne diesen Hinweis wirkt das Dokument „eingefroren", bis man Cmd+E kennt. */}
+      {viewMode === 'preview' && !readingModeHintDismissed && (
+        <div className="reading-mode-hint">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+            <circle cx="8" cy="8" r="6.5" stroke="currentColor" strokeWidth="1.5"/>
+            <path d="M8 7.5V11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+            <circle cx="8" cy="5.2" r="0.9" fill="currentColor"/>
+          </svg>
+          <span className="reading-mode-hint-text">{t('editor.readingModeHint')}</span>
+          <button
+            className="reading-mode-hint-switch"
+            onClick={() => handleSetViewMode('live-preview')}
+          >
+            {t('editor.readingModeHint.switch')}
+          </button>
+          <button
+            className="reading-mode-hint-dismiss"
+            onClick={() => setReadingModeHintDismissed(true)}
+          >
+            {t('editor.readingModeHint.dismiss')}
+          </button>
+        </div>
+      )}
 
       {/* Properties Panel for editing frontmatter */}
       {viewMode !== 'preview' && (

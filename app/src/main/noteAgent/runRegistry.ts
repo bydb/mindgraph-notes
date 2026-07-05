@@ -53,6 +53,11 @@ const MAX_RETAINED_FINISHED_RUNS_PER_SENDER = 8
 
 const activeBySender = new Map<number, AgentRun>()
 const runsById = new Map<string, AgentRun>()
+// C02: bei der Retention evakuierte Läufe mit NOCH OFFENEN Review-Karten. Der
+// IPC-Layer holt sie ab (consumeEvictedRuns), löscht ihr Staging sofort und meldet
+// dem Renderer, dass er die zugehörigen Karten fallenlassen soll — sonst würden
+// Accept/Discord später mit „Unbekannter Lauf" scheitern.
+const evictedWithOpenReviews: AgentRun[] = []
 
 function isFullyConsumed(run: AgentRun): boolean {
   for (const r of run.results.values()) if (!r.consumed) return false
@@ -60,12 +65,20 @@ function isFullyConsumed(run: AgentRun): boolean {
 }
 
 // Retention: pro Sender höchstens N beendete Läufe behalten (Map = Insertion-Order,
-// älteste zuerst evakuieren). Aktive Läufe zählen nicht.
+// älteste zuerst evakuieren). Aktive Läufe zählen nicht. Evakuierte Läufe mit offenen
+// Karten wandern in den Meldepuffer (C02).
 function enforceRetention(senderId: number): void {
   const finished = [...runsById.values()].filter(r => r.senderId === senderId && r.status !== 'running')
   for (let i = 0; i < finished.length - MAX_RETAINED_FINISHED_RUNS_PER_SENDER; i++) {
-    runsById.delete(finished[i].runId)
+    const r = finished[i]
+    runsById.delete(r.runId)
+    if (!isFullyConsumed(r)) evictedWithOpenReviews.push(r)
   }
+}
+
+// Vom IPC-Layer nach startRun abgeholt: evakuierte Läufe mit offenen Karten (leert den Puffer).
+export function consumeEvictedRuns(): AgentRun[] {
+  return evictedWithOpenReviews.splice(0)
 }
 
 // Atomare Reservierung: existiert für den Sender bereits ein AKTIVER Lauf → null.
