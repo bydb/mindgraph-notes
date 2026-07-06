@@ -13,6 +13,7 @@ import { registerResult, type AgentRun } from './runRegistry'
 import { sanitizeOutputFileName, writeStagingFile } from './staging'
 import { readSkillBody, listSkillFiles, resolveSkillFile } from './skillsLoader'
 import { markdownToDocx } from '../office/officeService'
+import { fillDocxTableCells, MAX_FILL_ENTRIES, type DocxCellEntry } from '../../shared/docxTableFill'
 
 export interface NoteAgentContext {
   senderId: number
@@ -34,6 +35,22 @@ function telegramCtx(ctx: NoteAgentContext): TelegramToolContext {
 function err(message: string): ToolResult {
   return { ok: false, content: `Fehler: ${message}` }
 }
+
+// Vault-relative Pfadauflösung mit Traversal-Schutz — gleiche Logik wie
+// resolveInVault in telegram/agent/tools/notes.ts (dort nicht exportiert).
+function resolveInVault(vaultRoot: string, relativePath: string): string {
+  if (path.isAbsolute(relativePath)) {
+    throw new Error('Absoluter Pfad nicht erlaubt — bitte Vault-relativen Pfad nutzen.')
+  }
+  const resolved = path.resolve(vaultRoot, relativePath)
+  const rootResolved = path.resolve(vaultRoot)
+  if (resolved !== rootResolved && !resolved.startsWith(rootResolved + path.sep)) {
+    throw new Error('Pfad liegt außerhalb des Vaults.')
+  }
+  return resolved
+}
+
+const MAX_FORM_TEMPLATE_BYTES = 10 * 1024 * 1024
 
 function requireString(args: Record<string, unknown>, key: string): string | null {
   const v = args[key]
@@ -252,6 +269,85 @@ export function createNoteAgentRegistry(): ToolRegistry<NoteAgentContext> {
         ok: true,
         content: `Datei "${fileName}" wurde erzeugt. Sie wird dem Nutzer zur Übernahme angezeigt. Erzeuge sie NICHT erneut.`,
         display: `${fileName} — Word-Dokument`
+      }
+    }
+  })
+
+  // Formular-Vorlagen (amtliche DOCX ohne {{Platzhalter}}) zellenweise füllen —
+  // Entscheidung 11 bleibt gewahrt: das LLM liefert strukturierte Zell-Einträge,
+  // die Binärdatei baut deterministischer Code (shared/docxTableFill).
+  // Die Feld→Zeilen-Zuordnung kommt aus der jeweiligen Vault-Skill (references/),
+  // damit KEIN formular-spezifisches Wissen in den App-Code wandert.
+  registry.register({
+    name: 'fill_docx_form',
+    description:
+      'Füllt Tabellenzellen einer Word-Formularvorlage (.docx) aus dem Vault und erzeugt die ausgefüllte Datei im Staging. Für amtliche Formulare ohne Platzhalter — die Feld→Zeilen-Zuordnung steht in der zugehörigen Skill (use_skill/read_skill_file). Parameter: template (vault-relativer Pfad zur .docx-Vorlage), file_name, entries (Array aus {table, row, cell, text}; Indizes 0-basiert, text mit \\n für Absätze). Nur Felder mit Inhalt angeben.',
+    parameters: {
+      type: 'object',
+      properties: {
+        template: { type: 'string', description: 'Vault-relativer Pfad zur .docx-Vorlage' },
+        file_name: { type: 'string', description: 'Dateiname der ausgefüllten .docx' },
+        entries: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              table: { type: 'number', description: 'Top-Level-Tabellenindex, 0-basiert' },
+              row: { type: 'number', description: 'Zeilenindex, 0-basiert' },
+              cell: { type: 'number', description: 'Zellenindex, 0-basiert' },
+              text: { type: 'string', description: 'Zellinhalt; \\n = neuer Absatz' }
+            },
+            required: ['table', 'row', 'cell', 'text']
+          }
+        }
+      },
+      required: ['template', 'file_name', 'entries']
+    },
+    isWrite: true,
+    run: async (args, ctx) => {
+      const templateRel = requireString(args, 'template')
+      const rawName = requireString(args, 'file_name')
+      if (!templateRel) return err('Parameter "template" fehlt')
+      if (!rawName) return err('Parameter "file_name" fehlt')
+      if (!templateRel.toLowerCase().endsWith('.docx')) return err('Vorlage muss eine .docx-Datei sein')
+      const rawEntries = args.entries
+      if (!Array.isArray(rawEntries) || rawEntries.length === 0) {
+        return err('Parameter "entries" muss ein nicht-leeres Array sein')
+      }
+      if (rawEntries.length > MAX_FILL_ENTRIES) {
+        return err(`Zu viele Einträge (${rawEntries.length}). Maximum: ${MAX_FILL_ENTRIES}.`)
+      }
+      const entries: DocxCellEntry[] = []
+      for (const raw of rawEntries) {
+        const e = raw as Record<string, unknown>
+        if (typeof e !== 'object' || e === null) return err('Jeder Eintrag muss ein Objekt {table, row, cell, text} sein')
+        const { table, row, cell, text } = e
+        if (typeof table !== 'number' || typeof row !== 'number' || typeof cell !== 'number' || typeof text !== 'string') {
+          return err('Eintrag unvollständig — table/row/cell als Zahlen, text als String erforderlich')
+        }
+        if (!text.trim()) continue // leere Felder still überspringen (bleiben in der Vorlage leer)
+        entries.push({ table, row, cell, text })
+      }
+      if (entries.length === 0) return err('Alle Einträge waren leer — nichts zu schreiben')
+
+      let templateBytes: Buffer
+      try {
+        const abs = resolveInVault(ctx.run.vaultPath, templateRel)
+        const st = await fs.stat(abs)
+        if (!st.isFile()) return err(`Vorlage "${templateRel}" ist keine Datei`)
+        if (st.size > MAX_FORM_TEMPLATE_BYTES) return err(`Vorlage ist zu groß (${Math.round(st.size / 1024 / 1024)} MB, max. 10 MB)`)
+        templateBytes = await fs.readFile(abs)
+      } catch (e) {
+        return err(`Vorlage "${templateRel}" konnte nicht gelesen werden: ${e instanceof Error ? e.message : String(e)}`)
+      }
+
+      try {
+        const filled = await fillDocxTableCells(new Uint8Array(templateBytes), entries)
+        const fileName = sanitizeOutputFileName(rawName, '.docx')
+        ctx.run.sources.add(templateRel)
+        return registerStagedResult(ctx, fileName, 'docx', Buffer.from(filled), `${entries.length} Formularfelder aus Vorlage ${path.basename(templateRel)}`)
+      } catch (e) {
+        return err(e instanceof Error ? e.message : String(e))
       }
     }
   })

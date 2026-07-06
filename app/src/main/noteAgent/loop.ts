@@ -58,7 +58,7 @@ ARBEITSWEISE (strikt einhalten):
    - Anhänge via read_attachment (exakter Dateiname aus der Liste unten).
    - Fehlen dir Informationen für den Auftrag (Fakten, Zuordnungen, frühere Ereignisse), DURCHSUCHE den Vault: note_search mit 1-3 Stichworten aus dem Auftrag, dann note_read auf die relevanten Treffer. Die Suche umfasst ALLE Notizen des Nutzers, auch sein Tagesgedächtnis (Brain-Ordner mit Tageszusammenfassungen). Rate keine Fakten, die du per note_search nachschlagen kannst.
    - Den Zielordner via list_target_folder (Namenskollisionen, vorhandene Vorlagen).
-2. SCHREIBE danach genau EINMAL das Ergebnis (write_xlsx, write_docx oder write_note) — kein Schreib-Lese-Pingpong, keine Wiederholung bereits erzeugter Dateien.
+2. SCHREIBE danach genau EINMAL das Ergebnis (write_xlsx, write_docx, write_note — oder fill_docx_form, wenn eine Skill eine Formular-Vorlage mit Feld→Zeilen-Zuordnung vorgibt) — kein Schreib-Lese-Pingpong, keine Wiederholung bereits erzeugter Dateien.
 3. ANTWORTE zum Schluss mit 1-3 Sätzen, was du erzeugt hast und worauf der Nutzer achten sollte. Keine Rückfragen — triff sinnvolle Annahmen und benenne sie.
 
 REGELN:
@@ -84,6 +84,9 @@ export async function runNoteAgentLoop(params: NoteAgentLoopParams): Promise<Not
   if (run.skills.length > 0) {
     allowed.add('use_skill')
     allowed.add('read_skill_file')
+    // Formular-Füllung nur mit Skill anbieten — die Feld→Zeilen-Zuordnung
+    // kommt aus der Skill-Referenz, ohne sie ist das Tool nicht sinnvoll nutzbar.
+    allowed.add('fill_docx_form')
   }
   const tools = registry.toolDefinitionsFor(allowed)
 
@@ -158,6 +161,10 @@ function summarizeArgs(skill: string, args: Record<string, unknown>): string {
     }
     case 'write_docx':
     case 'write_note': return pick('file_name')
+    case 'fill_docx_form': {
+      const fields = Array.isArray(args.entries) ? args.entries.length : 0
+      return `${pick('file_name')} (${fields} Felder)`
+    }
     default: return ''
   }
 }
