@@ -586,6 +586,7 @@ interface UIState {
   editorOutlining: boolean // Einrückungsbasiertes Outlining (Listen etc.)
   outlineStyle: OutlineStyle // Outlining-Design: 'default', 'lines', 'minimal', 'bullets', 'dashes'
   editorShowWordCount: boolean // Wort-/Zeichenzähler anzeigen
+  editorShowBacklinks: boolean // Backlinks-Bereich unter dem Editor anzeigen
   editorHeaderActions: EditorHeaderActions // optionale Aktionen in der Editor-Kopfzeile
   imagesFolder: string // Vault-relativer Ordner für Bild-Drops/Pastes (default '.attachments')
 
@@ -736,6 +737,7 @@ interface UIState {
   setEditorOutlining: (enabled: boolean) => void
   setOutlineStyle: (style: OutlineStyle) => void
   setEditorShowWordCount: (show: boolean) => void
+  setEditorShowBacklinks: (show: boolean) => void
   setEditorHeaderActions: (settings: Partial<EditorHeaderActions>) => void
   setImagesFolder: (folder: string) => void
   setSidebarWidth: (width: number) => void
@@ -851,6 +853,7 @@ const defaultState = {
   editorOutlining: false,
   outlineStyle: 'default' as OutlineStyle,
   editorShowWordCount: true,
+  editorShowBacklinks: true,
   editorHeaderActions: {
     languageTool: true,
     pdf: true,
@@ -1130,7 +1133,7 @@ const defaultState = {
 const persistedKeys = [
   'viewMode', 'theme', 'accentColor', 'backgroundColor', 'loadLastVaultOnStart',
   'language', 'fontFamily', 'editorFontSize', 'editorLineNumbers', 'editorDefaultView',
-  'autoSaveInterval', 'editorHeadingFolding', 'editorOutlining', 'outlineStyle', 'editorShowWordCount', 'editorHeaderActions', 'imagesFolder',
+  'autoSaveInterval', 'editorHeadingFolding', 'editorOutlining', 'outlineStyle', 'editorShowWordCount', 'editorShowBacklinks', 'editorHeaderActions', 'imagesFolder',
   'sidebarWidth', 'sidebarVisible', 'editorPreviewSplit', 'textSplitEnabled', 'textSplitPosition',
   'canvasFilterPath', 'canvasViewMode', 'canvasShowEdges', 'canvasShowTags', 'canvasShowLinks', 'canvasShowImages', 'canvasShowSummaries',
   'canvasCompactMode', 'canvasReadMode', 'canvasHoverScale', 'canvasDefaultCardWidth', 'splitPosition', 'fileTreeDisplayMode', 'fileTreeKindFilter', 'notesRootFolder', 'projectsRootFolder', 'ollama', 'brain',
@@ -1176,6 +1179,7 @@ export const useUIStore = create<UIState>()((set, get) => ({
   setEditorOutlining: (enabled) => set({ editorOutlining: enabled }),
   setOutlineStyle: (style) => set({ outlineStyle: style }),
   setEditorShowWordCount: (show) => set({ editorShowWordCount: show }),
+  setEditorShowBacklinks: (show) => set({ editorShowBacklinks: show }),
   setEditorHeaderActions: (settings) => set((state) => ({
     editorHeaderActions: { ...state.editorHeaderActions, ...settings }
   })),

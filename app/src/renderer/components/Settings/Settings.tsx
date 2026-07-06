@@ -1967,6 +1967,8 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab 
     setOutlineStyle,
     editorShowWordCount,
     setEditorShowWordCount,
+    editorShowBacklinks,
+    setEditorShowBacklinks,
     editorHeaderActions,
     setEditorHeaderActions,
     editorDefaultView,
@@ -3121,6 +3123,14 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab 
                     type="checkbox"
                     checked={editorShowWordCount}
                     onChange={e => setEditorShowWordCount(e.target.checked)}
+                  />
+                </div>
+                <div className="settings-row">
+                  <label>{t('settings.editor.showBacklinks')}</label>
+                  <input
+                    type="checkbox"
+                    checked={editorShowBacklinks}
+                    onChange={e => setEditorShowBacklinks(e.target.checked)}
                   />
                 </div>
                 <div className="settings-row">

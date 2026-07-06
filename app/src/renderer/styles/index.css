@@ -3875,6 +3875,32 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
   transform: rotate(-90deg);
 }
 
+.backlinks-header-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.backlinks-hide {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  opacity: 0.55;
+  transition: opacity var(--transition-fast), color var(--transition-fast), background-color var(--transition-fast);
+}
+
+.backlinks-hide:hover {
+  opacity: 1;
+  color: var(--text-primary);
+  background-color: var(--bg-tertiary);
+}
+
 .backlinks-content {
   max-height: 150px;
   overflow-y: auto;

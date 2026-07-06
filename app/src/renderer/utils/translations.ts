@@ -1161,6 +1161,7 @@ const translations = {
     // Backlinks
     'backlinks.title': 'Backlinks',
     'backlinks.none': 'Keine Backlinks',
+    'backlinks.hide': 'Backlinks-Bereich ausblenden (wieder aktivierbar in Einstellungen → Editor)',
 
     // Arbeitskontext-Streifen (rote Notizen)
     'workContext.title': 'Arbeitskontext',
@@ -1202,6 +1203,7 @@ const translations = {
     'settings.editor.formattingToolbar': 'Formatierungsleiste',
     'settings.editor.rawEditor': 'Markdown-Modus anzeigen',
     'settings.editor.wordCounter': 'Wörter-/Zeichenzähler',
+    'settings.editor.showBacklinks': 'Backlinks-Bereich anzeigen',
     'settings.editor.headerActions': 'Aktionen in der Kopfzeile',
     'settings.editor.headerActionLanguageTool': 'Korrektur',
     'settings.editor.headerActionPdf': 'PDF-Export',
@@ -3977,6 +3979,7 @@ const translations = {
     // Backlinks
     'backlinks.title': 'Backlinks',
     'backlinks.none': 'No backlinks',
+    'backlinks.hide': 'Hide backlinks area (re-enable in Settings → Editor)',
 
     // Work-context strip (red notes)
     'workContext.title': 'Work context',
@@ -4018,6 +4021,7 @@ const translations = {
     'settings.editor.formattingToolbar': 'Formatting toolbar',
     'settings.editor.rawEditor': 'Show Markdown mode',
     'settings.editor.wordCounter': 'Word/character counter',
+    'settings.editor.showBacklinks': 'Show backlinks area',
     'settings.editor.headerActions': 'Header actions',
     'settings.editor.headerActionLanguageTool': 'Proofreading',
     'settings.editor.headerActionPdf': 'PDF export',

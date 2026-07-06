@@ -162,6 +162,7 @@ const App: React.FC = () => {
   const edooboxEnabled = usePluginEnabled('edoobox')
   const workflowCanvasEnabled = useUIStore(state => state.workflowCanvasEnabled)
   const brainLensActive = useUIStore(state => state.brainLensActive)
+  const editorShowBacklinks = useUIStore(state => state.editorShowBacklinks)
   const transportTitlebarButtonVisible = useUIStore(
     state => state.transport.enabled && state.transport.showTitlebarButton
   )
@@ -1427,7 +1428,7 @@ const App: React.FC = () => {
                   <>
                     <MarkdownEditor />
                     <WorkContextStrip />
-                    <BacklinksPanel />
+                    {editorShowBacklinks && <BacklinksPanel />}
                   </>
                 )}
               </div>
@@ -1466,7 +1467,7 @@ const App: React.FC = () => {
                   ) : secondarySelectedNoteId ? (
                     <>
                       <MarkdownEditor isSecondary />
-                      <BacklinksPanel isSecondary />
+                      {editorShowBacklinks && <BacklinksPanel isSecondary />}
                     </>
                   ) : (
                     <div className="text-split-placeholder">
