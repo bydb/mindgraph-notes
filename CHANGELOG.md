@@ -2,6 +2,15 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.10.10-beta] - 2026-07-07
+
+Der Notiz-Agent füllt jetzt amtliche Word-Formulare aus — und der Editor lässt sich weiter entrümpeln.
+
+### Neu
+
+- **Agent füllt Formular-Vorlagen aus (fill_docx_form).** Der Notiz-Agent kann amtliche Word-Formulare ohne Platzhalter (z. B. den Akkreditierungsantrag 2021 der hessischen Lehrkräfteakademie) zellenweise ausfüllen: Vorlage aus dem Vault, Inhalte aus der Notiz, fertige .docx als Ergebnis-Karte. Die Feld-Zuordnung liegt in der jeweiligen Skill (`Skills/<name>/references/`) — neue Formulare brauchen nur eine neue Skill, keinen Code. Die Fülllogik ist gegen die echte Vorlage validiert (Absätze, verbundene Zellen, erhaltene Zell-Formatierung); das Werkzeug erscheint nur, wenn Skills vorhanden sind.
+- **Backlinks-Bereich ausblendbar.** Der Backlinks-Bereich unter dem Editor lässt sich jetzt komplett ausblenden — per Ausblenden-Knopf direkt in der Leiste oder dauerhaft über Einstellungen → Editor → „Backlinks-Bereich anzeigen". Gilt für Haupt- und Split-Editor, Standard bleibt sichtbar.
+
 ## [0.10.9-beta] - 2026-07-06
 
 Bugfix-Release: Aufgaben-Zeilen im Lesen-Modus wurden bei wiederholtem Speichern beschädigt — das ist behoben.
