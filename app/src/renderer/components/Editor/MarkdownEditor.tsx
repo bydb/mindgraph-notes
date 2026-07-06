@@ -359,10 +359,17 @@ const md = new MarkdownIt({
 })
 
 // Task-Listen Plugin aktivieren (für - [ ] und - [x] Syntax)
+// WICHTIG: label:false. Mit label:true+labelAfter:true rendert das Plugin den Task-Text
+// DOPPELT — einmal als gerendertes Inline-Content, einmal als Rohtext im <label
+// class="task-list-item-label">. Im WYSIWYG-Roundtrip (Lesen-Modus → turndown) serialisiert
+// Turndown BEIDE Kopien → exponentielle Verdopplung des Task-Textes bei jedem (Auto-)Speichern
+// (2→4→8→16…) plus Backslash-Wachstum auf `**`/`__`. Betraf nur Task-Zeilen. Empirisch
+// reproduziert; label:false liefert genau EINE Kopie. Die Checkbox bleibt klickbar über
+// `data-line` (processTaskCheckboxes + Click-Handler) — das native <label>-Klick-Toggle
+// brauchen wir nicht (der App-Handler arbeitet ohnehin auf der Markdown-Quelle).
 md.use(taskLists, {
   enabled: true,
-  label: true,
-  labelAfter: true
+  label: false
 })
 
 // Fußnoten Plugin aktivieren (für [^1] Syntax)
@@ -394,7 +401,9 @@ wysiwygTurndown.use(turndownTables)
 // Listen) bleiben escaped, damit Klartext nicht plötzlich zu Block-Syntax wird.
 wysiwygTurndown.escape = (input: string) =>
   input
-    .replace(/\*/g, '\\*')
+    // Idempotent: ein bereits escaptes `\*` NICHT erneut zu `\\*` verdoppeln (sonst
+    // Backslash-Wachstum bei jedem Roundtrip auf schon leicht beschädigten Notizen).
+    .replace(/(?<!\\)\*/g, '\\*')
     .replace(/^-/g, '\\-')
     .replace(/^\+ /g, '\\+ ')
     .replace(/^(=+)/g, '\\$1')
@@ -923,6 +932,9 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const previewEditTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const isPreviewDomEditingRef = useRef(false)
+  // Fokuswechsel (z.B. vom Lesen-Modus zur Macher-Leiste) dürfen keinen
+  // HTML→Markdown-Roundtrip auslösen. Nur echte DOM-Änderungen werden committed.
+  const isPreviewDomDirtyRef = useRef(false)
   const lastSavedContentRef = useRef<string>('')
   const isExternalUpdateRef = useRef(false)
   const currentNoteIdRef = useRef<string | null>(null)  // Track current note ID for async operations
@@ -2316,6 +2328,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
       // bleibt es von einem vorherigen Commit (refreshPreview=false) auf true hängen und
       // der innerHTML-Effekt rendert den neuen Body nicht — Titel neu, Body alt (v0.7.x-Bug).
       isPreviewDomEditingRef.current = false
+      isPreviewDomDirtyRef.current = false
       if (previewEditTimeoutRef.current) {
         clearTimeout(previewEditTimeoutRef.current)
         previewEditTimeoutRef.current = null
@@ -2769,6 +2782,10 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
     const root = editablePreviewRef.current
     const view = viewRef.current
     if (!root || !view) return
+    if (!isPreviewDomDirtyRef.current) {
+      if (refreshPreview) isPreviewDomEditingRef.current = false
+      return
+    }
 
     const currentContent = view.state.doc.toString()
     const turndowned = editablePreviewHtmlToMarkdown(root, currentContent)
@@ -2776,6 +2793,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
     // turndown-Roundtrip einen zuvor (im Editor) berechneten Wert wieder mit leer.
     const nextContent = updateWorkTimeFields(turndowned)
     if (nextContent === currentContent) {
+      isPreviewDomDirtyRef.current = false
       if (refreshPreview) isPreviewDomEditingRef.current = false
       return
     }
@@ -2789,6 +2807,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
       changes: { from: 0, to: currentContent.length, insert: nextContent }
     })
     saveContent(nextContent)
+    isPreviewDomDirtyRef.current = false
 
     if (mustRefresh) {
       isPreviewDomEditingRef.current = false
@@ -2944,6 +2963,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
     }
 
     rememberPreviewSelection()
+    isPreviewDomDirtyRef.current = true
     commitEditablePreview(true)
     return true
   }, [commitEditablePreview, rememberPreviewSelection, viewMode])
@@ -3028,6 +3048,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
 
   const scheduleEditablePreviewCommit = useCallback(() => {
     isPreviewDomEditingRef.current = true
+    isPreviewDomDirtyRef.current = true
     updatePreviewToolbarPosition()
     if (previewEditTimeoutRef.current) clearTimeout(previewEditTimeoutRef.current)
     previewEditTimeoutRef.current = setTimeout(() => {
@@ -3182,6 +3203,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
 
         // Sofort committen statt 1.2s zu warten — sonst sieht der User das Bild nicht
         // im Markdown-Source und ein anschließender Modus-Wechsel würde es verlieren.
+        isPreviewDomDirtyRef.current = true
         commitEditablePreview(true)
       } catch (err) {
         console.error('[PreviewDrop] Error:', err)
