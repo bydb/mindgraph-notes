@@ -2,6 +2,14 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.10.9-beta] - 2026-07-06
+
+Bugfix-Release: Aufgaben-Zeilen im Lesen-Modus wurden bei wiederholtem Speichern beschädigt — das ist behoben.
+
+### Behoben
+
+- **Task-Text-Verdopplung im Lesen-Modus.** In Notizen mit Aufgaben (`- [ ]`) konnte der Aufgabentext beim WYSIWYG-Roundtrip (Lesen-Modus) bei jedem (automatischen) Speichern exponentiell verdoppelt und mit Backslashes überschwemmt werden (`**Titel:**` → `\*\*Titel:\*\*` → `\\*\\*…`). Ursache war eine Doppel-Ausgabe des Task-Texts durch das Task-Listen-Rendering (`label`-Element). Zusätzlich ist die Escape-Behandlung für `*` idempotent gemacht, damit bereits leicht beschädigte Notizen beim Speichern nicht weiter anwachsen. Nur Aufgaben-Zeilen waren betroffen; bereits beschädigte Notizen lassen sich aus den automatischen Backups wiederherstellen.
+
 ## [0.10.8-beta] - 2026-07-05
 
 Command Palette, Onboarding-Verbesserungen und Agent-Härtung — der Alltag mit der App wird schneller und sicherer.
