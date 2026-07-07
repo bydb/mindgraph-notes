@@ -40,6 +40,11 @@
 //   Defaults UNVERÄNDERT (gemma4:12b-mlx ist ~10 GB, nicht 8-GB-tauglich), aber in die
 //   Pull-Liste aufgenommen (Apple-Silicon/MLX-Option). smart-connections nicht anwendbar
 //   (Chat-Modell, kein Embedding).
+// 2026-07-07: Modellnamen-Kanonisierung (canonicalModelKey) — LM-Studio-IDs
+//   (`qwen/qwen3.5-4b`, `Meta-Llama-3.1-8B-Instruct-GGUF`, `mlx-community/…`) matchen
+//   jetzt dieselben Matrix-Einträge wie die Ollama-Tags. Gleiche Gewichte = gleiches
+//   Verdict; vor allem greift der Hard-Lock (llama3.1 im Dashboard) damit auch bei
+//   LM Studio. Keine neuen Benchmark-Daten, daher version unverändert.
 //
 // "verdict":
 //   - "green":     Für dieses Modul produktiv geeignet.
@@ -380,13 +385,132 @@ export const RECOMMENDED_DEFAULTS: Partial<Record<ModuleId, string>> = {
   'project-status':     'qwen3.5:4b'
 }
 
+// ─── Modellnamen-Kanonisierung (Ollama-Tags ↔ LM-Studio-IDs) ─────────────────
+// Die Matrix-Keys sind Ollama-Tags (`qwen3.5:4b`). LM Studio liefert für DIESELBEN
+// Gewichte OpenAI-Style-IDs (`qwen/qwen3.5-4b`, `Meta-Llama-3.1-8B-Instruct-GGUF`,
+// `mlx-community/Qwen3.6-27B-4bit`). Ohne Normalisierung wären alle LM-Studio-Modelle
+// "untested" — und isHardLocked würde dort NIE greifen (llama3.1 liefe ungeblockt
+// gegen das damageRelevant-Dashboard). Beide Namensformen werden deshalb auf einen
+// kanonischen Schlüssel abgebildet: `familie:größe[:varianten]`.
+//
+// Regeln:
+//   - Publisher-Präfix (`qwen/`, `lmstudio-community/`) fällt weg; ein
+//     `mlx`-haltiger Publisher (`mlx-community/`) setzt die mlx-Variante.
+//   - Rausch-Tokens ändern die Modellidentität nicht und fallen weg: instruct/it/
+//     chat/gguf, Quantisierung (q4_k_m, 4bit, int8, nvfp4), Release-Nummern (2410)
+//     und v-Versionen — Letztere nur NACH dem Größen-Token (davor sind Zahlen
+//     Familien-Identität: gemma-4 ≠ gemma-2, ministral-3).
+//   - Bedeutungstragende Varianten bleiben: mlx, bf16/fp16, cloud, latest — und
+//     alle UNBEKANNTEN Suffixe (z.B. `-abliterated`, `-thinking`): ein Fine-Tune
+//     erbt NICHT das Verdict seines Basismodells (fail-closed Richtung untested).
+//   - Miss mit mlx-Variante → Zweitversuch ohne mlx: gleiche Gewichte, anderes
+//     Runtime-Format. So erbt ein MLX-llama3.1 den red-Hard-Lock, und die auf
+//     Apple Silicon üblichen MLX-Downloads matchen die GGUF-Benchmarks. Die
+//     Gegenrichtung (mlx-Matrix-Eintrag für Nicht-mlx-Anfrage) bleibt strikt.
+interface CanonicalModelParts {
+  family: string
+  size: string
+  variants: string[]
+}
+
+const CANON_SIZE_RE = /^\d+(?:\.\d+)?[bm]$/ // 4b, 0.8b, 27b, 270m
+const CANON_VARIANT_KEEP = new Set(['mlx', 'bf16', 'fp16', 'f16', 'cloud', 'latest'])
+// Tokens ohne Identitätsgehalt — Position egal (auch im Familienteil, z.B. Meta-Llama).
+const CANON_NOISE = new Set(['meta', 'instruct', 'it', 'chat', 'gguf', 'hf', 'gptq', 'awq', 'qat', 'dpo'])
+
+// Rausch-Erkennung NACH dem Größen-Token (Quantisierung, Release-Nummern, Einzelbuchstaben
+// aus zerlegtem q4_k_m). Vor der Größe wäre das zu aggressiv (ministral-3, gemma-4).
+function isPostSizeNoiseToken(token: string): boolean {
+  if (CANON_NOISE.has(token)) return true
+  if (token.length === 1) return true                    // k, m aus q4_k_m
+  if (/^i?q\d/.test(token)) return true                  // q4, q4km, q8_0, iq4xs
+  if (/^\d+bit$/.test(token)) return true                // 4bit, 8bit
+  if (/^(?:int|nf|nvfp|mxfp)\d+$/.test(token)) return true
+  if (/^\d+$/.test(token)) return true                   // Release-/Datums-Nummern (2410, 2507)
+  if (/^v\d+(?:\.\d+)*$/.test(token)) return true        // v0.2, v2
+  return false
+}
+
+function canonicalModelParts(model: string): CanonicalModelParts | null {
+  let s = (model || '').trim().toLowerCase()
+  if (!s) return null
+  if (s.endsWith('.gguf')) s = s.slice(0, -'.gguf'.length)
+  const pathParts = s.split('/').filter(Boolean)
+  if (pathParts.length === 0) return null
+  const mlxPublisher = pathParts.length > 1 && pathParts.slice(0, -1).some(p => p.includes('mlx'))
+  // `:` (Ollama-Tag), `@` (LM-Studio-Quant-Suffix) und `_` (q4_k_m) vereinheitlichen.
+  const tokens = pathParts[pathParts.length - 1].replace(/[:@_]/g, '-').split('-').filter(Boolean)
+  const familyTokens: string[] = []
+  const variants = new Set<string>()
+  let size = ''
+  for (const token of tokens) {
+    if (!size && CANON_SIZE_RE.test(token)) { size = token; continue }
+    if (CANON_VARIANT_KEEP.has(token)) { variants.add(token); continue }
+    if (size) {
+      if (!isPostSizeNoiseToken(token)) variants.add(token)
+    } else if (!CANON_NOISE.has(token)) {
+      familyTokens.push(token)
+    }
+  }
+  if (mlxPublisher) variants.add('mlx')
+  const family = familyTokens.join('')
+  if (!family) return null
+  return { family, size, variants: [...variants].sort() }
+}
+
+function buildCanonicalKey(parts: CanonicalModelParts): string {
+  const { family, size, variants } = parts
+  return family + (size ? `:${size}` : '') + (variants.length ? `:${variants.join('-')}` : '')
+}
+
+// Kanonischer Schlüssel eines Modellnamens (exportiert für Tests/Debug).
+// '' wenn kein Modellname erkennbar.
+export function canonicalModelKey(model: string): string {
+  const parts = canonicalModelParts(model)
+  return parts ? buildCanonicalKey(parts) : ''
+}
+
+// Lookup-Schlüssel in Prioritätsreihenfolge: exakt kanonisch, dann ohne mlx-Variante.
+function canonicalLookupKeys(model: string): string[] {
+  const parts = canonicalModelParts(model)
+  if (!parts) return []
+  const keys = [buildCanonicalKey(parts)]
+  if (parts.variants.includes('mlx')) {
+    keys.push(buildCanonicalKey({ ...parts, variants: parts.variants.filter(v => v !== 'mlx') }))
+  }
+  return keys
+}
+
+// Kanonischer Index pro Modul (lazy) — die Matrix-Keys selbst werden mit derselben
+// Funktion kanonisiert, damit beide Seiten identisch transformiert sind.
+const canonicalIndexCache = new Map<ModuleId, Map<string, ModelVerdict>>()
+function canonicalIndexFor(moduleId: ModuleId): Map<string, ModelVerdict> {
+  let index = canonicalIndexCache.get(moduleId)
+  if (!index) {
+    index = new Map()
+    const moduleMap = MODEL_COMPATIBILITY.modules[moduleId] || {}
+    for (const [tag, verdict] of Object.entries(moduleMap)) {
+      const key = canonicalModelKey(tag)
+      if (key && !index.has(key)) index.set(key, verdict)
+    }
+    canonicalIndexCache.set(moduleId, index)
+  }
+  return index
+}
+
 // Verdict für ein konkretes Modell und Modul nachschlagen.
 // "untested" wenn das Modell nicht in der Matrix steht (z.B. neu gepullt).
+// Exakter Ollama-Tag-Match zuerst, dann kanonischer Match (LM-Studio-IDs).
 export function getModelVerdict(model: string, moduleId: ModuleId): ModelVerdict {
   const moduleMap = MODEL_COMPATIBILITY.modules[moduleId]
   if (!moduleMap) return { verdict: 'untested', reasons: [] }
   const exact = moduleMap[model]
   if (exact) return exact
+  const index = canonicalIndexFor(moduleId)
+  for (const key of canonicalLookupKeys(model)) {
+    const hit = index.get(key)
+    if (hit) return hit
+  }
   return { verdict: 'untested', reasons: [] }
 }
 
@@ -428,6 +552,24 @@ function estimateModelRamFromName(model: string): number | null {
   return Math.round((params * gbPerB + 1) * 10) / 10
 }
 
+// Kanonischer RAM-Index über alle Module (lazy) — für LM-Studio-IDs, deren
+// exakter Tag nicht in der Matrix steht.
+let canonicalRamCache: Map<string, number> | null = null
+function canonicalRamMap(): Map<string, number> {
+  if (!canonicalRamCache) {
+    canonicalRamCache = new Map()
+    for (const moduleMap of Object.values(MODEL_COMPATIBILITY.modules)) {
+      for (const [tag, verdict] of Object.entries(moduleMap)) {
+        const ram = verdict.metrics?.ramGigabytes
+        if (typeof ram !== 'number' || ram <= 0) continue
+        const key = canonicalModelKey(tag)
+        if (key && !canonicalRamCache.has(key)) canonicalRamCache.set(key, ram)
+      }
+    }
+  }
+  return canonicalRamCache
+}
+
 // Liefert den geschätzten RAM-Bedarf (GB) eines Modells: bevorzugt den gemessenen
 // Matrix-Wert (in irgendeinem Modul gepflegt — RAM ist modulunabhängig), sonst
 // die Namens-Heuristik. null = unbekannt (keine Warnung).
@@ -437,6 +579,11 @@ export function getModelRamGb(model: string): number | null {
   for (const moduleMap of Object.values(MODEL_COMPATIBILITY.modules)) {
     const ram = moduleMap[tag]?.metrics?.ramGigabytes
     if (typeof ram === 'number' && ram > 0) return ram
+  }
+  const ramByCanonical = canonicalRamMap()
+  for (const key of canonicalLookupKeys(tag)) {
+    const ram = ramByCanonical.get(key)
+    if (typeof ram === 'number') return ram
   }
   return estimateModelRamFromName(tag)
 }
@@ -464,10 +611,12 @@ export function checkModelRamFit(model: string, totalRamGb: number | null | unde
 
 // MLX-Modelle: Apple-Silicon-optimiert (laufen via Apples MLX-Framework nativ
 // auf M-Chips, deutlich schneller + weniger RAM als GGUF/llama.cpp-Varianten).
-// Erkennung: `-mlx` irgendwo im Tag (z.B. `qwen3.6:27b-mlx`, `qwen3.5:9b-mlx-bf16`).
+// Erkennung: `-mlx` irgendwo im Tag (z.B. `qwen3.6:27b-mlx`, `qwen3.5:9b-mlx-bf16`)
+// oder — bei LM-Studio-IDs — mlx-Publisher/-Token (`mlx-community/…`).
 export function isMlxModel(model: string): boolean {
   if (!model) return false
-  return /-mlx(?:[-:].*)?$/i.test(model.trim())
+  if (/-mlx(?:[-:].*)?$/i.test(model.trim())) return true
+  return canonicalModelParts(model)?.variants.includes('mlx') === true
 }
 
 // Gemeinsamer Marker-Präfix für Modell-Labels in allen UI-Stellen.
@@ -486,7 +635,7 @@ export function modelMarkers(model: string): string {
 // (ministral/mixtral → Mistral) vor generischen Treffern. Unbekannt → 'generic'.
 export type ModelVendorId =
   | 'qwen' | 'gemma' | 'mistral' | 'llama' | 'phi' | 'deepseek'
-  | 'openai' | 'nomic' | 'bge' | 'granite' | 'cohere' | 'openrouter' | 'generic'
+  | 'openai' | 'nomic' | 'bge' | 'granite' | 'cohere' | 'openrouter' | 'llmbase' | 'generic'
 
 const VENDOR_PATTERNS: Array<{ id: ModelVendorId; name: string; re: RegExp }> = [
   { id: 'qwen',    name: 'Qwen (Alibaba)',     re: /\bqwen|qwq/i },
@@ -500,10 +649,11 @@ const VENDOR_PATTERNS: Array<{ id: ModelVendorId; name: string; re: RegExp }> = 
   { id: 'cohere',  name: 'Cohere',              re: /\bcommand-?r|\bcohere|\baya/i },
   { id: 'bge',     name: 'BAAI (BGE)',          re: /\bbge/i },
   { id: 'nomic',   name: 'Nomic',               re: /\bnomic/i },
-  // OpenRouter ZULETZT: ein echtes Cloud-Modell wie `openrouter/google/gemma-3`
-  // matcht oben bereits seinen echten Vendor (gemma). Nur der bare Sentinel
-  // `__openrouter__` (Dropdown-Eintrag) fällt bis hierher durch → OpenRouter-Logo.
+  // Cloud-Provider ZULETZT: ein echtes Cloud-Modell wie `openrouter/google/gemma-3`
+  // matcht oben bereits seinen echten Vendor (gemma). Nur die baren Sentinels
+  // `__openrouter__`/`__llmbase__` (Dropdown-Einträge) fallen bis hierher durch → Provider-Logo.
   { id: 'openrouter', name: 'OpenRouter',        re: /openrouter/i },
+  { id: 'llmbase',    name: 'LLMBase',           re: /llmbase/i },
 ]
 
 export function getModelVendor(model: string): { id: ModelVendorId; name: string } {
@@ -526,7 +676,11 @@ export function getModelVendor(model: string): { id: ModelVendorId; name: string
 export function isHumanFavorite(model: string): boolean {
   if (!model) return false
   const entry = RECOMMENDED_PULL_MODELS.find(m => m.name === model)
-  return entry?.humanFavorite === true
+  if (entry) return entry.humanFavorite === true
+  const canonical = canonicalModelKey(model)
+  if (!canonical) return false
+  const viaCanonical = RECOMMENDED_PULL_MODELS.find(m => canonicalModelKey(m.name) === canonical)
+  return viaCanonical?.humanFavorite === true
 }
 
 // Ollama-Cloud-Modelle tragen einen Cloud-Suffix im Tag — entweder `:cloud`
@@ -570,13 +724,26 @@ const TOOL_CAPABLE_FAMILIES = [
   'gpt-oss'
 ]
 
+// Kanonisierte Familien der Tool-Liste (lazy) — derselbe Join wie in
+// canonicalModelParts, damit `qwen/qwen3.5-4b` (LM Studio) genauso matcht
+// wie `qwen3.5:4b` (Ollama) und `mistral-nemo` → `mistralnemo` konsistent bleibt.
+let toolCapableCanonicalFamilies: string[] | null = null
+function getToolCapableCanonicalFamilies(): string[] {
+  if (!toolCapableCanonicalFamilies) {
+    toolCapableCanonicalFamilies = TOOL_CAPABLE_FAMILIES
+      .map(f => canonicalModelParts(f)?.family || '')
+      .filter(Boolean)
+  }
+  return toolCapableCanonicalFamilies
+}
+
 export function supportsNativeToolCalls(model: string): boolean {
-  const base = model.trim().toLowerCase()
-  if (!base) return false
-  // Namensform: familie[:tag] — Familie extrahieren, Versionssuffixe der Familie
+  // Kanonische Familie extrahieren — deckt Ollama-Tags (familie:tag) UND
+  // LM-Studio-IDs (publisher/familie-größe-…) ab. Versionssuffixe der Familie
   // (qwen3.5, llama3.1 …) bleiben Teil des Prefix-Vergleichs.
-  const family = base.split(':')[0]
-  return TOOL_CAPABLE_FAMILIES.some(f => family === f || family.startsWith(f))
+  const family = canonicalModelParts(model)?.family ?? ''
+  if (!family) return false
+  return getToolCapableCanonicalFamilies().some(f => family === f || family.startsWith(f))
 }
 
 // "Cloud-Test-Modelle": Modelle, die wir als Null-Reibungs-Einstieg für Test-User

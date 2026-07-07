@@ -168,6 +168,7 @@ Module als verbindbare Bausteine mit **typisierten Ports** auf einem React-Flow-
 
 ### Modell-Kompatibilitäts-Matrix
 - **Single-Source-of-Truth**: `app/src/shared/modelCompatibility.ts`. Datenstand im File-Header dokumentiert (`version: '2026-05-14'`).
+- **Modellnamen-Kanonisierung** (`canonicalModelKey`): Matrix-Keys sind Ollama-Tags, aber LM-Studio-IDs (`qwen/qwen3.5-4b`, `Meta-Llama-3.1-8B-Instruct-GGUF`, `mlx-community/…`) werden auf denselben kanonischen Schlüssel abgebildet — gleiche Gewichte = gleiches Verdict, und der Hard-Lock greift auch bei LM Studio. Fine-Tune-Suffixe (`-abliterated` etc.) erben bewusst NICHTS (fail-closed → untested). MLX-Miss fällt auf den GGUF-Eintrag zurück (nicht umgekehrt).
 - 5 Module: `brain`, `task-extraction`, `mail-summary`, `dashboard-snapshot`, `smart-connections`.
 - 4 Verdicts: `green` (geeignet), `yellow` (Vorbehalt), `red` (Hard-Lock), `untested` (Default für unbekannte Modelle).
 - **`damageRelevant: true`** für `task-extraction` und `dashboard-snapshot` → bei `red` echter Code-Lock via `isHardLocked()`.

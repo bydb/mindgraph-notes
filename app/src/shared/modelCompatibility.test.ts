@@ -14,6 +14,8 @@ import {
   isMlxModel,
   getModelRamGb,
   checkModelRamFit,
+  canonicalModelKey,
+  supportsNativeToolCalls,
   MODULES,
   MODEL_COMPATIBILITY
 } from './modelCompatibility'
@@ -32,6 +34,68 @@ describe('getModelVerdict', () => {
 
   it('Modul ohne Einträge (smart-connections) → jedes Modell untested', () => {
     expect(getModelVerdict('ministral-3:8b', 'smart-connections').verdict).toBe('untested')
+  })
+})
+
+describe('Modellnamen-Kanonisierung (LM Studio ↔ Ollama)', () => {
+  it('kanonisiert Ollama-Tags und LM-Studio-IDs auf denselben Schlüssel', () => {
+    expect(canonicalModelKey('qwen/qwen3.5-4b')).toBe(canonicalModelKey('qwen3.5:4b'))
+    expect(canonicalModelKey('Qwen3.5-4B-Instruct-GGUF')).toBe(canonicalModelKey('qwen3.5:4b'))
+    expect(canonicalModelKey('lmstudio-community/Meta-Llama-3.1-8B-Instruct-GGUF')).toBe(canonicalModelKey('llama3.1:8b'))
+    expect(canonicalModelKey('mistralai/Ministral-3-8B-Instruct-2410-GGUF')).toBe(canonicalModelKey('ministral-3:8b'))
+    expect(canonicalModelKey('mlx-community/Qwen3.6-27B-Instruct-4bit')).toBe(canonicalModelKey('qwen3.6:27b-mlx'))
+  })
+
+  it('Generationsnummern VOR der Größe bleiben Identität (gemma-4 ≠ gemma-2)', () => {
+    expect(canonicalModelKey('google/gemma-4-12b-it')).not.toBe(canonicalModelKey('google/gemma-2-12b-it'))
+    expect(canonicalModelKey('mlx-community/gemma-4-12b-it-qat-4bit')).toBe(canonicalModelKey('gemma4:12b-mlx'))
+  })
+
+  it('LM-Studio-ID liefert dasselbe Verdict wie der Ollama-Tag', () => {
+    expect(getModelVerdict('qwen/qwen3.5-4b', 'task-extraction').verdict).toBe('green')
+    expect(getModelVerdict('Qwen3.5-4B-Instruct-GGUF', 'mail-summary').verdict).toBe('green')
+    expect(getModelVerdict('lmstudio-community/Meta-Llama-3.1-8B-Instruct-GGUF', 'dashboard-snapshot').verdict).toBe('red')
+  })
+
+  it('SICHERHEIT: Hard-Lock greift auch für LM-Studio-IDs (llama3.1 im Dashboard)', () => {
+    expect(isHardLocked('lmstudio-community/Meta-Llama-3.1-8B-Instruct-GGUF', 'dashboard-snapshot')).toBe(true)
+    // MLX-Variante erbt den Lock über den mlx-Strip-Fallback (gleiche Gewichte).
+    expect(isHardLocked('mlx-community/Llama-3.1-8B-Instruct-4bit', 'dashboard-snapshot')).toBe(true)
+  })
+
+  it('MLX-Download matcht den GGUF-Benchmark, wenn kein eigener mlx-Eintrag existiert', () => {
+    expect(getModelVerdict('mlx-community/Qwen3.5-4B-Instruct-4bit', 'task-extraction').verdict).toBe('green')
+  })
+
+  it('Fine-Tunes/unbekannte Suffixe erben KEIN Verdict (fail-closed → untested)', () => {
+    expect(getModelVerdict('Qwen3.5-4B-Instruct-abliterated', 'task-extraction').verdict).toBe('untested')
+    expect(getModelVerdict('irgendein/unbekanntes-modell-7b', 'brain').verdict).toBe('untested')
+  })
+
+  it('Quantisierungs-Suffixe (@q4_k_m, 4bit) ändern die Identität nicht', () => {
+    expect(getModelVerdict('qwen3.5-4b@q4_k_m', 'task-extraction').verdict).toBe('green')
+  })
+
+  it('bf16 bleibt bedeutungstragend (eigener Matrix-Eintrag qwen3.5:9b-mlx-bf16)', () => {
+    expect(getModelVerdict('mlx-community/Qwen3.5-9B-Instruct-bf16', 'brain').verdict).toBe('red')
+  })
+
+  it('isMlxModel erkennt mlx-community-Publisher', () => {
+    expect(isMlxModel('mlx-community/Qwen3.5-4B-Instruct-4bit')).toBe(true)
+    expect(isMlxModel('qwen/qwen3.5-4b')).toBe(false)
+  })
+
+  it('getModelRamGb findet Matrix-Werte auch über LM-Studio-IDs', () => {
+    expect(getModelRamGb('qwen/qwen3.5-4b')).toBe(4)
+    expect(getModelRamGb('mistralai/Ministral-3-8B-Instruct-2410-GGUF')).toBe(6)
+  })
+
+  it('supportsNativeToolCalls funktioniert für beide Namensformen', () => {
+    expect(supportsNativeToolCalls('qwen3.5:4b')).toBe(true)
+    expect(supportsNativeToolCalls('qwen/qwen3.5-4b')).toBe(true)
+    expect(supportsNativeToolCalls('mistral/mistral-nemo')).toBe(true)
+    expect(supportsNativeToolCalls('google/gemma-4-12b-it')).toBe(false)
+    expect(supportsNativeToolCalls('gemma4:latest')).toBe(false)
   })
 })
 
