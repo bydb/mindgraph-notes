@@ -2647,6 +2647,7 @@ ipcMain.handle('create-starter-vault', async (_event, targetPath: string, varian
 
     const vaultName =
       variant === 'office' ? 'starter-vault-office'
+      : variant === 'demo' ? 'starter-vault-demo'
       : variant === 'en' ? 'starter-vault-en'
       : 'starter-vault'
     const sourcePath = path.join(resourcesBase, vaultName)
@@ -2660,6 +2661,18 @@ ipcMain.handle('create-starter-vault', async (_event, targetPath: string, varian
     }
 
     await copyDirectoryRecursive(sourcePath, targetPath)
+
+    // Demo-Vault: die gebündelten Agent-Skills gehören zur Demo-Erfahrung dazu
+    // (die Demo-Tour führt sie vor). Gleiche Quelle wie `note-skills-install-starter`,
+    // damit die Skills nicht doppelt in resources gepflegt werden.
+    if (variant === 'demo') {
+      try {
+        await copyDirectoryRecursive(path.join(resourcesBase, 'starter-skills'), path.join(targetPath, 'Skills'))
+      } catch (err) {
+        console.warn('[StarterVault] Starter-Skills konnten nicht kopiert werden:', err)
+      }
+    }
+
     await addApprovedRoot(targetPath)
     console.log('[StarterVault] Created at:', targetPath)
     return true

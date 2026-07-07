@@ -153,6 +153,26 @@ export const IntentStep: React.FC<IntentStepProps> = ({
     }
   }
 
+  const handleCreateDemo = async () => {
+    setError(null)
+    try {
+      const result = await window.electronAPI.selectVaultDirectory()
+      if (!result) return
+      const confirmed = await confirmIfNotEmpty(result)
+      if (!confirmed) return
+      setLoading(true)
+      // Demo-Vault: ein realistisches Beispiel mit allen Funktionen (Projekte,
+      // Wissensnetz, Aufgaben, Agent-Skills, Demo-Tour) — profilunabhängig.
+      await window.electronAPI.createStarterVault(result, 'demo')
+      setVaultPath(result)
+    } catch (err) {
+      console.error('[Onboarding] Failed to create demo vault:', err)
+      setError(String(err))
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const handleCreateEmpty = async () => {
     setError(null)
     try {
@@ -246,6 +266,22 @@ export const IntentStep: React.FC<IntentStepProps> = ({
                 <div className="onboarding-vault-option-text">
                   <span className="onboarding-vault-option-title">{t('onboarding.vault.createStarter')}</span>
                   <span className="onboarding-vault-option-desc">{t('onboarding.vault.createStarterDesc')}</span>
+                </div>
+                {loading && <span className="onboarding-vault-loading">...</span>}
+              </button>
+            )}
+
+            {selectedProfile !== 'viewer' && (
+              <button className="onboarding-vault-option" onClick={handleCreateDemo} disabled={loading}>
+                <div className="onboarding-vault-option-icon">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="10"/>
+                    <polygon points="10 8 16 12 10 16 10 8"/>
+                  </svg>
+                </div>
+                <div className="onboarding-vault-option-text">
+                  <span className="onboarding-vault-option-title">{t('onboarding.vault.createDemo')}</span>
+                  <span className="onboarding-vault-option-desc">{t('onboarding.vault.createDemoDesc')}</span>
                 </div>
                 {loading && <span className="onboarding-vault-loading">...</span>}
               </button>
