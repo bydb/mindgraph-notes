@@ -2,6 +2,14 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.10.11-beta] - 2026-07-07
+
+Mehr Platz zum Lesen: die Email-Detail-Ansicht ist deutlich verdichtet.
+
+### Verbessert
+
+- **Email-Detail-Ansicht verdichtet.** Der Kopfbereich beanspruchte bis zu 60 % der Panelhöhe, bevor der Mail-Text anfing — jetzt gehört der Platz dem Text: Anhänge standardmäßig als eine Zeile eingeklappt (Anzahl + Namen, Aktionen nach Aufklappen), die KI-Analyse als Kompaktzeile „Relevanz · Sentiment · Projekt" mit Details auf Klick (Projekt-Vorschlag bleibt direkt bestätigbar, Phishing-Warnung immer sichtbar), „Antwort erwartet" als kompaktes Badge statt Banner. Der Mail-Text hat kein inneres Scrollfenster mehr — gescrollt wird nur noch im Panel.
+
 ## [0.10.10-beta] - 2026-07-07
 
 Der Notiz-Agent füllt jetzt amtliche Word-Formulare aus — und der Editor lässt sich weiter entrümpeln.
