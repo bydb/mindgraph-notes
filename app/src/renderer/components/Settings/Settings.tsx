@@ -15,10 +15,11 @@ import { TelegramSettings } from './TelegramSettings'
 import { CredentialsSettings } from './CredentialsSettings'
 import { ModelCompatibilitySection, ActiveModelStatusBadge, VERDICT_ICON, VERDICT_COLOR } from './ModelCompatibilitySection'
 import { OpenRouterSection } from './OpenRouterSection'
+import { LLMBaseSection } from './LLMBaseSection'
 import { SkillsSection } from './SkillsSection'
 import { EmailRelevanceRulesSection } from './EmailRelevanceRulesSection'
 import { getModelVerdict, CLOUD_TEST_MODELS, RECOMMENDED_PULL_MODELS, isCloudModel, modelMarkers } from '../../../shared/modelCompatibility'
-import { OPENROUTER_MODEL_SENTINEL, isOpenRouterReady } from '../../../shared/llmBackend'
+import { isCloudProviderReady, cloudProviderForSentinel, CLOUD_PROVIDER_META, type CloudProviderId } from '../../../shared/llmBackend'
 import { ModelRamWarning } from '../Shared/ModelRamWarning'
 import { ModelPicker } from '../Shared/ModelPicker'
 import { ensureTransformersModel, isTransformersModelReady } from '../../utils/voice/transformersStt'
@@ -3720,6 +3721,7 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab 
                 />
 
                 <OpenRouterSection />
+                <LLMBaseSection />
 
                 <div className="settings-row">
                   <label>{t('settings.integrations.defaultTranslation')}</label>
@@ -5576,20 +5578,26 @@ LIMIT 10
                       <label>{t('settings.email.analysisModel')}</label>
                       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
                         <ModelPicker
-                          // SENTINEL nur als value zeigen, wenn OpenRouter wirklich verfügbar ist —
-                          // sonst (deaktiviert) würde der Picker den Rohwert „__openrouter__" anzeigen.
-                          value={emailSettings.analysisModel === OPENROUTER_MODEL_SENTINEL && !isOpenRouterReady(ollama.openrouter)
-                            ? '' : emailSettings.analysisModel}
+                          // SENTINEL nur als value zeigen, wenn der Cloud-Provider wirklich
+                          // verfügbar ist — sonst (deaktiviert) würde der Picker den Rohwert
+                          // „__openrouter__"/„__llmbase__" anzeigen.
+                          value={(() => {
+                            const p = cloudProviderForSentinel(emailSettings.analysisModel)
+                            return p && !isCloudProviderReady(ollama[p]) ? '' : emailSettings.analysisModel
+                          })()}
                           placeholder={{ value: '', label: t('settings.email.analysisModelDefault') }}
                           models={[
-                            ...(isOpenRouterReady(ollama.openrouter) ? [{ name: OPENROUTER_MODEL_SENTINEL }] : []),
+                            ...(['openrouter', 'llmbase'] as CloudProviderId[])
+                              .filter(p => isCloudProviderReady(ollama[p]))
+                              .map(p => ({ name: CLOUD_PROVIDER_META[p].sentinel })),
                             ...ollamaModels
                           ]}
-                          getLabel={name => name === OPENROUTER_MODEL_SENTINEL
-                            ? `OpenRouter · ${ollama.openrouter.model.trim()}`
-                            : name}
+                          getLabel={name => {
+                            const p = cloudProviderForSentinel(name)
+                            return p ? `${CLOUD_PROVIDER_META[p].label} · ${ollama[p].model.trim()}` : name
+                          }}
                           renderMeta={name => {
-                            if (name === OPENROUTER_MODEL_SENTINEL) return null
+                            if (cloudProviderForSentinel(name)) return null
                             const v = getModelVerdict(name, 'task-extraction')
                             return (
                               <span title={v.reasons.join(' · ') || t(`settings.integrations.compatibility.verdict.${v.verdict}` as TranslationKey)}
@@ -5600,13 +5608,15 @@ LIMIT 10
                             // `analysisModel` ist die EINZIGE autoritative Routing-Quelle (siehe emailStore).
                             // `cloudModules` dient hier NUR als „schon bestätigt"-Merker fürs ⚠️-Confirm —
                             // es steuert NICHT das Routing (sonst laufen zwei States auseinander → Rückfall).
-                            if (val === OPENROUTER_MODEL_SENTINEL && !ollama.openrouter.cloudModules.includes('task-extraction')) {
+                            const p = cloudProviderForSentinel(val)
+                            if (p && !ollama[p].cloudModules.includes('task-extraction')) {
+                              const label = CLOUD_PROVIDER_META[p].label
                               const warn = language === 'en'
-                                ? 'Email analysis via OpenRouter: email content is sent to OpenRouter (cloud) and leaves your computer. Continue?'
-                                : 'E-Mail-Analyse über OpenRouter: Mailinhalte werden an OpenRouter (Cloud) gesendet und verlassen deinen Rechner. Fortfahren?'
+                                ? `Email analysis via ${label}: email content is sent to ${label} (cloud) and leaves your computer. Continue?`
+                                : `E-Mail-Analyse über ${label}: Mailinhalte werden an ${label} (Cloud) gesendet und verlassen deinen Rechner. Fortfahren?`
                               // eslint-disable-next-line no-alert
                               if (!window.confirm(warn)) return
-                              setOllama({ openrouter: { ...ollama.openrouter, cloudModules: [...ollama.openrouter.cloudModules, 'task-extraction'] } })
+                              setOllama({ [p]: { ...ollama[p], cloudModules: [...ollama[p].cloudModules, 'task-extraction'] } })
                             }
                             // Läuft IMMER durch — egal ob Cloud oder lokal. Kein Race möglich.
                             setEmail({ analysisModel: val })
@@ -5615,9 +5625,12 @@ LIMIT 10
                           maxWidth="none"
                           style={{ minWidth: 280 }}
                         />
-                        {emailSettings.analysisModel === OPENROUTER_MODEL_SENTINEL ? (
+                        {cloudProviderForSentinel(emailSettings.analysisModel) ? (
                           <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '2px 8px', borderRadius: '10px', background: 'var(--bg-secondary, rgba(0,0,0,0.04))', border: '1px solid var(--border, #e5e7eb)', fontSize: '11px' }}>
-                            ☁️ {language === 'en' ? 'Cloud — emails are sent to OpenRouter' : 'Cloud — Mailinhalte gehen an OpenRouter'}
+                            ☁️ {(() => {
+                              const label = CLOUD_PROVIDER_META[cloudProviderForSentinel(emailSettings.analysisModel)!].label
+                              return language === 'en' ? `Cloud — emails are sent to ${label}` : `Cloud — Mailinhalte gehen an ${label}`
+                            })()}
                           </span>
                         ) : emailSettings.analysisModel && (() => {
                           const v = getModelVerdict(emailSettings.analysisModel, 'task-extraction')
@@ -5641,7 +5654,7 @@ LIMIT 10
                             </span>
                           )
                         })()}
-                        {emailSettings.analysisModel !== OPENROUTER_MODEL_SENTINEL && (
+                        {!cloudProviderForSentinel(emailSettings.analysisModel) && (
                           <ModelRamWarning model={emailSettings.analysisModel || ollama.selectedModel} />
                         )}
                       </div>

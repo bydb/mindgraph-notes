@@ -8,7 +8,7 @@ import { writeClipboardText } from '../../utils/clipboard'
 import { ModelPicker } from '../Shared/ModelPicker'
 import { PanelHeader } from '../Shared/PanelHeader'
 import { ContextAttachmentRow } from '../Shared/ContextAttachmentRow'
-import { canUseCloudForFeature, OPENROUTER_MODEL_SENTINEL } from '../../../shared/llmBackend'
+import { cloudRoutesForFeature, cloudProviderForSentinel, type CloudProviderId } from '../../../shared/llmBackend'
 import { isCloudModel } from '../../../shared/modelCompatibility'
 import type { NoteAgentAttachment } from '../../../shared/types'
 import MarkdownIt from 'markdown-it'
@@ -84,12 +84,13 @@ export const NotesChat: React.FC<NotesChatProps> = ({ onClose }) => {
   const [isLoading, setIsLoading] = useState(true)
   const [contextMode, setContextMode] = useState<ContextMode>('current')
   const [chatMode, setChatMode] = useState<ChatMode>('direct')
-  // OpenRouter-Cloud für Notes-Chat: nur verfügbar, wenn in den Einstellungen per
-  // zweitem Opt-in freigeschaltet. Default cloud, wenn verfügbar; pro Sitzung umschaltbar.
-  const orCloudAvailable = canUseCloudForFeature('notes-chat', llmSettings.openrouter)
-  const orCloudModel = llmSettings.openrouter?.model?.trim() || ''
-  const [useCloudChat, setUseCloudChat] = useState(false)
-  useEffect(() => { setUseCloudChat(orCloudAvailable) }, [orCloudAvailable])
+  // Cloud für Notes-Chat (OpenRouter/LLMBase): nur verfügbar, wenn in den Einstellungen
+  // per zweitem Opt-in freigeschaltet. Default erster verfügbarer Provider; pro Sitzung umschaltbar.
+  const cloudRoutes = cloudRoutesForFeature('notes-chat', llmSettings)
+  const defaultCloudProvider = cloudRoutes[0]?.provider ?? null
+  const [cloudChatProvider, setCloudChatProvider] = useState<CloudProviderId | null>(null)
+  useEffect(() => { setCloudChatProvider(defaultCloudProvider) }, [defaultCloudProvider])
+  const activeCloudRoute = cloudChatProvider ? (cloudRoutes.find(r => r.provider === cloudChatProvider) ?? null) : null
   const [selectedFolder, setSelectedFolder] = useState<string>('')
   const [projectList, setProjectList] = useState<ProjectOption[]>([])
   const [selectedProject, setSelectedProject] = useState<string>('')
@@ -484,7 +485,7 @@ export const NotesChat: React.FC<NotesChatProps> = ({ onClose }) => {
   // Nachricht senden
   const sendMessage = async () => {
     // selectedModel ist bei Cloud-Routing (OpenRouter) optional — dann zählt das Cloud-Modell.
-    const cloudChatActive = orCloudAvailable && useCloudChat
+    const cloudChatActive = !!activeCloudRoute
     if (!inputValue.trim() || (!selectedModel && !cloudChatActive) || isStreaming) return
 
     const userMessage = inputValue.trim()
@@ -564,7 +565,7 @@ export const NotesChat: React.FC<NotesChatProps> = ({ onClose }) => {
       recentMessages.push({ role: 'user', content: userMessage })
 
       // Cloud-Routing (OpenRouter): nur wenn freigeschaltet UND in dieser Sitzung gewählt.
-      const cloud = orCloudAvailable && useCloudChat ? { model: orCloudModel } : null
+      const cloud = activeCloudRoute ? { model: activeCloudRoute.model, provider: activeCloudRoute.provider } : null
 
       // Backend-basierte API-Auswahl (Cloud hat Vorrang, wenn gewählt)
       let res: { success?: boolean; error?: string } | undefined
@@ -678,7 +679,7 @@ export const NotesChat: React.FC<NotesChatProps> = ({ onClose }) => {
           <div className="notes-chat-spinner"></div>
           <p>Prüfe {llmSettings.backend === 'lm-studio' ? 'LM Studio' : 'Ollama'}...</p>
         </div>
-      ) : !isBackendAvailable && !orCloudAvailable ? (
+      ) : !isBackendAvailable && cloudRoutes.length === 0 ? (
         <div className="notes-chat-unavailable">
           <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
             <circle cx="12" cy="12" r="10"/>
@@ -692,7 +693,7 @@ export const NotesChat: React.FC<NotesChatProps> = ({ onClose }) => {
               : 'Starte Ollama für den Chat mit deinen Notizen'}
           </span>
         </div>
-      ) : models.length === 0 && !orCloudAvailable ? (
+      ) : models.length === 0 && cloudRoutes.length === 0 ? (
         <div className="notes-chat-unavailable">
           <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
@@ -713,13 +714,14 @@ export const NotesChat: React.FC<NotesChatProps> = ({ onClose }) => {
             <div className="notes-chat-model-row">
               <label>Modell:</label>
               <ModelPicker
-                value={useCloudChat && orCloudAvailable ? OPENROUTER_MODEL_SENTINEL : selectedModel}
-                models={orCloudAvailable ? [{ name: OPENROUTER_MODEL_SENTINEL }, ...models] : models}
+                value={activeCloudRoute ? activeCloudRoute.sentinel : selectedModel}
+                models={[...cloudRoutes.map(r => ({ name: r.sentinel })), ...models]}
                 onChange={(name) => {
-                  if (name === OPENROUTER_MODEL_SENTINEL) { setUseCloudChat(true) }
-                  else { setUseCloudChat(false); setSelectedModel(name) }
+                  const provider = cloudProviderForSentinel(name)
+                  if (provider) { setCloudChatProvider(provider) }
+                  else { setCloudChatProvider(null); setSelectedModel(name) }
                 }}
-                getLabel={(name) => name === OPENROUTER_MODEL_SENTINEL ? `OpenRouter · ${orCloudModel}` : name}
+                getLabel={(name) => cloudRoutes.find(r => r.sentinel === name)?.label ?? name}
                 disabled={isStreaming}
                 ariaLabel="Modell"
               />
@@ -905,7 +907,7 @@ export const NotesChat: React.FC<NotesChatProps> = ({ onClose }) => {
                 onDetach={detachFile}
                 disabled={isStreaming}
                 attachError={attachError}
-                cloudSelected={(orCloudAvailable && useCloudChat) || isCloudModel(selectedModel)}
+                cloudSelected={!!activeCloudRoute || isCloudModel(selectedModel)}
               />
             </div>
           )}

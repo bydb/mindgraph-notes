@@ -554,6 +554,17 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('openrouter-list-models'),
   openrouterTest: (model: string) =>
     ipcRenderer.invoke('openrouter-test', model),
+  // LLMBase Cloud-Backend (EU/DSGVO)
+  llmbaseSaveKey: (apiKey: string) =>
+    ipcRenderer.invoke('llmbase-save-key', apiKey),
+  llmbaseHasKey: () =>
+    ipcRenderer.invoke('llmbase-has-key'),
+  llmbaseClearKey: () =>
+    ipcRenderer.invoke('llmbase-clear-key'),
+  llmbaseListModels: () =>
+    ipcRenderer.invoke('llmbase-list-models'),
+  llmbaseTest: (model: string) =>
+    ipcRenderer.invoke('llmbase-test', model),
   onEmailFetchProgress: (callback: (progress: { current: number; total: number; status: string }) => void) => {
     ipcRenderer.removeAllListeners('email-fetch-progress')
     ipcRenderer.on('email-fetch-progress', (_event, progress) => callback(progress))

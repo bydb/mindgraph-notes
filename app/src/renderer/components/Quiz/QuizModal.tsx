@@ -5,7 +5,7 @@ import { useNotesStore } from '../../stores/notesStore'
 import { useFlashcardStore, createFlashcardFromQuiz } from '../../stores/flashcardStore'
 import { useTranslation } from '../../utils/translations'
 import { MarkdownContent } from '../Flashcards/MarkdownContent'
-import { canUseCloudForFeature } from '../../../shared/llmBackend'
+import { cloudRoutesForFeature } from '../../../shared/llmBackend'
 
 export const QuizModal: React.FC = () => {
   const { t } = useTranslation()
@@ -39,12 +39,11 @@ export const QuizModal: React.FC = () => {
   const { addFlashcards, saveFlashcards, loadFlashcards, setPanel: setFlashcardsPanel } = useFlashcardStore()
   const [flashcardsSaved, setFlashcardsSaved] = useState(false)
 
-  // OpenRouter-Cloud für Karteikarten/Quiz nur, wenn global einsatzbereit UND das
-  // 'quiz'-Feature explizit freigeschaltet ist (Einstellungen → KI → OpenRouter).
-  // null = lokal über ollama.selectedModel. Single-Source: canUseCloudForFeature.
-  const quizCloud = canUseCloudForFeature('quiz', ollama.openrouter)
-    ? { model: ollama.openrouter.model.trim() }
-    : null
+  // Cloud (OpenRouter/LLMBase) für Karteikarten/Quiz nur, wenn ein Provider einsatzbereit
+  // ist UND das 'quiz'-Feature dort explizit freigeschaltet wurde (Einstellungen → KI).
+  // Erster freigeschalteter Provider gewinnt. null = lokal über ollama.selectedModel.
+  const quizRoute = cloudRoutesForFeature('quiz', ollama)[0] ?? null
+  const quizCloud = quizRoute ? { model: quizRoute.model, provider: quizRoute.provider } : null
 
   // Fragen generieren wenn Quiz gestartet wird
   useEffect(() => {

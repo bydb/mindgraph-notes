@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { useUIStore, AI_LANGUAGES, AILanguageCode } from '../../stores/uiStore'
 import { useTranslation } from '../../utils/translations'
-import { canUseCloudForFeature } from '../../../shared/llmBackend'
+import { cloudRoutesForFeature } from '../../../shared/llmBackend'
 
 type AIAction = 'translate' | 'summarize' | 'continue' | 'improve' | 'custom' | 'ocr-cleanup'
 
@@ -59,8 +59,8 @@ export const AIContextMenu: React.FC<AIContextMenuProps> = ({
   }, [showCustomPrompt])
 
   const handleAction = async (action: AIAction, targetLanguage?: string, customPrompt?: string) => {
-    const noteEditCloud = canUseCloudForFeature('note-edit', ollama.openrouter)
-    if (!ollama.enabled || (!ollama.selectedModel && !noteEditCloud)) {
+    const noteEditRoute = cloudRoutesForFeature('note-edit', ollama)[0] ?? null
+    if (!ollama.enabled || (!ollama.selectedModel && !noteEditRoute)) {
       onClose()
       return
     }
@@ -79,7 +79,7 @@ export const AIContextMenu: React.FC<AIContextMenuProps> = ({
         customPrompt: customPrompt
       }
 
-      const cloud = noteEditCloud ? { model: ollama.openrouter.model.trim() } : null
+      const cloud = noteEditRoute ? { model: noteEditRoute.model, provider: noteEditRoute.provider } : null
       const response = cloud
         ? await window.electronAPI.ollamaGenerate({ ...requestParams, cloud })
         : ollama.backend === 'lm-studio'

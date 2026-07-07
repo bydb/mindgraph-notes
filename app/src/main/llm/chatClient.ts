@@ -1,17 +1,25 @@
 // Einheitlicher Chat-Client für Main-Prozess-Komponenten (Telegram-Bot,
 // Email-Analyse, Notes-Chat, …).
 //
-// Zwei Backends:
+// Drei Backends:
 //   - 'ollama'     — lokale Modelle ODER Ollama-Cloud-Modelle (`*:cloud`).
 //   - 'openrouter' — OpenAI-kompatibles Cloud-Backend (https://openrouter.ai).
+//   - 'llmbase'    — OpenAI-kompatibles EU-Cloud-Backend (https://llmbase.ai,
+//                    Inference in DE/NL/FI/CH — DSGVO-Positionierung).
 //
-// WICHTIG (Privacy): OpenRouter ist ein Cloud-Dienst. Der Aufrufer ist dafür
-// verantwortlich, das Backend NUR dann auf 'openrouter' zu setzen, wenn der
-// User es bewusst freigeschaltet hat. Siehe shared/llmBackend.ts
-// (isOpenRouterReady / canUseCloudForFeature) und den Email-Picker (analysisModel).
+// WICHTIG (Privacy): OpenRouter und LLMBase sind Cloud-Dienste. Der Aufrufer ist
+// dafür verantwortlich, das Backend NUR dann auf einen Cloud-Provider zu setzen,
+// wenn der User es bewusst freigeschaltet hat. Siehe shared/llmBackend.ts
+// (isCloudProviderReady / canUseCloudForFeature) und den Email-Picker (analysisModel).
 // Das Brain-Modul nutzt diesen Client NICHT — es ist hardcoded localhost.
 
-export type ChatBackend = 'ollama' | 'openrouter'
+export type ChatBackend = 'ollama' | 'openrouter' | 'llmbase'
+// Die OpenAI-kompatiblen Cloud-Backends (alles außer Ollama).
+export type CloudChatBackend = Exclude<ChatBackend, 'ollama'>
+
+export function isCloudChatBackend(backend: ChatBackend | undefined): backend is CloudChatBackend {
+  return backend === 'openrouter' || backend === 'llmbase'
+}
 
 export interface ToolCall {
   id: string                              // bei Ollama synthetisch, bei OpenRouter echt
@@ -40,9 +48,12 @@ export interface ChatOptions {
   // OpenRouter:
   openrouterApiKey?: string               // Pflicht wenn backend === 'openrouter'
   openrouterModel?: string                // z.B. 'qwen/qwen-2.5-7b-instruct' (Pflicht für OpenRouter)
-  responseFormat?: 'json'                  // OpenRouter: erzwingt response_format json_object (für strukturierte Analysen)
-  temperature?: number                     // OpenRouter: temperature
-  maxTokens?: number                      // OpenRouter: max_tokens; Ollama: nur dokumentarisch
+  // LLMBase:
+  llmbaseApiKey?: string                  // Pflicht wenn backend === 'llmbase'
+  llmbaseModel?: string                   // z.B. 'qwen/qwen3.5-9b' (Pflicht für LLMBase)
+  responseFormat?: 'json'                  // Cloud: erzwingt response_format json_object (für strukturierte Analysen)
+  temperature?: number                     // Cloud: temperature
+  maxTokens?: number                      // Cloud: max_tokens; Ollama: nur dokumentarisch
   // Externes Abbruch-Signal (z.B. Abbrechen-Button im Notiz-Agent) — wird mit dem
   // internen Request-Timeout kombiniert, ersetzt ihn nicht (Plan F05).
   signal?: AbortSignal
@@ -65,11 +76,34 @@ export interface ChatWithToolsResult {
 }
 
 const DEFAULT_OLLAMA_URL = 'http://localhost:11434'
-const OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1'
-// OpenRouter empfiehlt diese Header zur App-Attribution (optional, schaden nicht).
-const OPENROUTER_HEADERS_EXTRA = {
-  'HTTP-Referer': 'https://mindgraph-notes.de',
-  'X-Title': 'MindGraph Notes'
+
+// OpenAI-kompatible Cloud-Provider — EIN Codepfad, parametrisiert über diese Map.
+// OpenRouter empfiehlt die Attribution-Header (optional, schaden nicht); LLMBase
+// braucht keine Extra-Header (schaden aber ebenfalls nicht — App-Attribution).
+const CLOUD_PROVIDERS: Record<CloudChatBackend, {
+  label: string
+  baseUrl: string
+  extraHeaders: Record<string, string>
+  creditsHint: string   // handlungsleitender Hinweis bei 402 (Guthaben erschöpft)
+}> = {
+  openrouter: {
+    label: 'OpenRouter',
+    baseUrl: 'https://openrouter.ai/api/v1',
+    extraHeaders: {
+      'HTTP-Referer': 'https://mindgraph-notes.de',
+      'X-Title': 'MindGraph Notes'
+    },
+    creditsHint: 'auf openrouter.ai/credits aufladen'
+  },
+  llmbase: {
+    label: 'LLMBase',
+    baseUrl: 'https://api.llmbase.ai/v1',
+    extraHeaders: {
+      'HTTP-Referer': 'https://mindgraph-notes.de',
+      'X-Title': 'MindGraph Notes'
+    },
+    creditsHint: 'Prepaid-Credits auf llmbase.ai aufladen'
+  }
 }
 
 // Kombiniert externes Abbruch-Signal mit dem internen Timeout (Cancellation-Vertrag F05).
@@ -173,22 +207,23 @@ function openrouterMessageText(msg: OpenAIChatChoice['message']): string {
   return (msg?.reasoning ?? msg?.reasoning_content ?? '').trim()
 }
 
-function openrouterHeaders(apiKey: string): Record<string, string> {
+function cloudHeaders(backend: CloudChatBackend, apiKey: string): Record<string, string> {
   return {
     'Content-Type': 'application/json',
     'Authorization': `Bearer ${apiKey}`,
-    ...OPENROUTER_HEADERS_EXTRA
+    ...CLOUD_PROVIDERS[backend].extraHeaders
   }
 }
 
-// Übersetzt OpenRouter-Fehler in klare, handlungsleitende Meldungen (statt rohem JSON).
-function friendlyOpenRouterError(status: number, body: string, model?: string): string {
-  if (status === 401) return 'OpenRouter: API-Key ungültig oder fehlt (401).'
-  if (status === 402) return 'OpenRouter: Guthaben/Limit erschöpft (402) — auf openrouter.ai/credits aufladen.'
+// Übersetzt Cloud-Provider-Fehler in klare, handlungsleitende Meldungen (statt rohem JSON).
+function friendlyCloudError(backend: CloudChatBackend, status: number, body: string, model?: string): string {
+  const { label, creditsHint } = CLOUD_PROVIDERS[backend]
+  if (status === 401) return `${label}: API-Key ungültig oder fehlt (401).`
+  if (status === 402) return `${label}: Guthaben/Limit erschöpft (402) — ${creditsHint}.`
   if (status === 429) {
     const m = model ? `„${model}"` : 'Das Modell'
-    const isFree = /:free\b/i.test(model || '')
-    return `OpenRouter: ${m} ist gerade rate-limitiert (429).` +
+    const isFree = backend === 'openrouter' && /:free\b/i.test(model || '')
+    return `${label}: ${m} ist gerade rate-limitiert (429).` +
       (isFree
         ? ' Das ist das Limit des Gratis-Tiers — kurz warten, ein anderes :free-Modell wählen oder ein kleines Guthaben aufladen (openrouter.ai/credits), das die Free-Limits anhebt.'
         : ' Kurz warten und erneut versuchen, oder ein anderes Modell wählen.')
@@ -197,24 +232,25 @@ function friendlyOpenRouterError(status: number, body: string, model?: string): 
   try {
     const j = JSON.parse(body) as { error?: { message?: string; metadata?: { raw?: string } } }
     const raw = j.error?.metadata?.raw || j.error?.message
-    if (raw) return `OpenRouter API ${status}: ${raw}`
+    if (raw) return `${label} API ${status}: ${raw}`
   } catch { /* kein JSON */ }
-  return `OpenRouter API ${status}: ${body}`
+  return `${label} API ${status}: ${body}`
 }
 
-function assertOpenRouterConfig(opts: ChatOptions): { apiKey: string; model: string } {
-  const apiKey = opts.openrouterApiKey?.trim()
-  const model = opts.openrouterModel?.trim()
-  if (!apiKey) throw new Error('OpenRouter-API-Key fehlt. Bitte in den Einstellungen hinterlegen.')
-  if (!model) throw new Error('Kein OpenRouter-Modell ausgewählt.')
+function assertCloudConfig(backend: CloudChatBackend, opts: ChatOptions): { apiKey: string; model: string } {
+  const label = CLOUD_PROVIDERS[backend].label
+  const apiKey = (backend === 'llmbase' ? opts.llmbaseApiKey : opts.openrouterApiKey)?.trim()
+  const model = (backend === 'llmbase' ? opts.llmbaseModel : opts.openrouterModel)?.trim()
+  if (!apiKey) throw new Error(`${label}-API-Key fehlt. Bitte in den Einstellungen hinterlegen.`)
+  if (!model) throw new Error(`Kein ${label}-Modell ausgewählt.`)
   return { apiKey, model }
 }
 
-async function chatViaOpenRouter(messages: ChatMessage[], opts: ChatOptions): Promise<ChatResult> {
-  const { apiKey, model } = assertOpenRouterConfig(opts)
-  const res = await fetch(`${OPENROUTER_BASE_URL}/chat/completions`, {
+async function chatViaCloud(backend: CloudChatBackend, messages: ChatMessage[], opts: ChatOptions): Promise<ChatResult> {
+  const { apiKey, model } = assertCloudConfig(backend, opts)
+  const res = await fetch(`${CLOUD_PROVIDERS[backend].baseUrl}/chat/completions`, {
     method: 'POST',
-    headers: openrouterHeaders(apiKey),
+    headers: cloudHeaders(backend, apiKey),
     body: JSON.stringify({
       model,
       messages: messages.map(m => ({ role: m.role, content: m.content })),
@@ -226,15 +262,15 @@ async function chatViaOpenRouter(messages: ChatMessage[], opts: ChatOptions): Pr
     signal: requestSignal(opts.timeoutMs ?? 120000, opts.signal)
   })
   if (!res.ok) {
-    throw new Error(friendlyOpenRouterError(res.status, await res.text(), model))
+    throw new Error(friendlyCloudError(backend, res.status, await res.text(), model))
   }
   const json = await res.json() as { choices?: OpenAIChatChoice[] }
-  return { text: openrouterMessageText(json.choices?.[0]?.message), backend: 'openrouter' }
+  return { text: openrouterMessageText(json.choices?.[0]?.message), backend }
 }
 
 export async function chat(messages: ChatMessage[], opts: ChatOptions = {}): Promise<ChatResult> {
-  if (opts.backend === 'openrouter') {
-    return chatViaOpenRouter(messages, opts)
+  if (isCloudChatBackend(opts.backend)) {
+    return chatViaCloud(opts.backend, messages, opts)
   }
   const ollamaUrl = opts.ollamaUrl ?? DEFAULT_OLLAMA_URL
   if (!(await isOllamaReachable(ollamaUrl))) {
@@ -356,7 +392,7 @@ async function chatWithToolsViaOllama(
   }
 }
 
-// ─── OpenRouter: tool-use (OpenAI-kompatibel) ────────────────────────────────
+// ─── Cloud (OpenRouter/LLMBase): tool-use (OpenAI-kompatibel) ────────────────
 
 function openrouterMessageToWire(m: ChatMessage): Record<string, unknown> {
   if (m.role === 'tool') {
@@ -380,20 +416,21 @@ function openrouterMessageToWire(m: ChatMessage): Record<string, unknown> {
   return { role: m.role, content: m.content }
 }
 
-async function chatWithToolsViaOpenRouter(
+async function chatWithToolsViaCloud(
+  backend: CloudChatBackend,
   messages: ChatMessage[],
   tools: ToolDefinition[],
   opts: ChatOptions
 ): Promise<ChatWithToolsResult> {
-  const { apiKey, model } = assertOpenRouterConfig(opts)
+  const { apiKey, model } = assertCloudConfig(backend, opts)
   const wireTools = tools.map(t => ({
     type: 'function',
     function: { name: t.name, description: t.description, parameters: t.parameters }
   }))
 
-  const res = await fetch(`${OPENROUTER_BASE_URL}/chat/completions`, {
+  const res = await fetch(`${CLOUD_PROVIDERS[backend].baseUrl}/chat/completions`, {
     method: 'POST',
-    headers: openrouterHeaders(apiKey),
+    headers: cloudHeaders(backend, apiKey),
     body: JSON.stringify({
       model,
       messages: messages.map(openrouterMessageToWire),
@@ -403,7 +440,7 @@ async function chatWithToolsViaOpenRouter(
     signal: requestSignal(opts.timeoutMs ?? 180000, opts.signal)
   })
   if (!res.ok) {
-    throw new Error(friendlyOpenRouterError(res.status, await res.text(), model))
+    throw new Error(friendlyCloudError(backend, res.status, await res.text(), model))
   }
   const json = await res.json() as { choices?: OpenAIChatChoice[] }
   const msg = json.choices?.[0]?.message
@@ -434,7 +471,7 @@ async function chatWithToolsViaOpenRouter(
     content: text,
     tool_calls: toolCalls.length > 0 ? toolCalls : undefined
   }
-  return { text, toolCalls, backend: 'openrouter', assistantMessage }
+  return { text, toolCalls, backend, assistantMessage }
 }
 
 export async function chatWithTools(
@@ -442,8 +479,8 @@ export async function chatWithTools(
   tools: ToolDefinition[],
   opts: ChatOptions = {}
 ): Promise<ChatWithToolsResult> {
-  if (opts.backend === 'openrouter') {
-    return chatWithToolsViaOpenRouter(messages, tools, opts)
+  if (isCloudChatBackend(opts.backend)) {
+    return chatWithToolsViaCloud(opts.backend, messages, tools, opts)
   }
   const ollamaUrl = opts.ollamaUrl ?? DEFAULT_OLLAMA_URL
   if (!(await isOllamaReachable(ollamaUrl))) {
@@ -452,21 +489,22 @@ export async function chatWithTools(
   return chatWithToolsViaOllama(messages, tools, opts)
 }
 
-// ─── OpenRouter: Streaming-Chat (SSE) ───────────────────────────────────────
+// ─── Cloud (OpenRouter/LLMBase): Streaming-Chat (SSE) ───────────────────────
 // Streamt Token für Token via onToken-Callback und liefert am Ende den
 // Gesamttext. Für Notes-Chat & Co., damit Cloud sich wie das lokale Ollama-
 // Streaming anfühlt (kein „hängen" bis die ganze Antwort da ist).
-export async function streamOpenRouterChat(
+export async function streamCloudChat(
   messages: ChatMessage[],
-  opts: { apiKey: string; model: string; signal?: AbortSignal },
+  opts: { backend: CloudChatBackend; apiKey: string; model: string; signal?: AbortSignal },
   onToken: (delta: string) => void
 ): Promise<string> {
-  if (!opts.apiKey) throw new Error('OpenRouter-API-Key fehlt.')
-  if (!opts.model) throw new Error('Kein OpenRouter-Modell ausgewählt.')
+  const label = CLOUD_PROVIDERS[opts.backend].label
+  if (!opts.apiKey) throw new Error(`${label}-API-Key fehlt.`)
+  if (!opts.model) throw new Error(`Kein ${label}-Modell ausgewählt.`)
 
-  const res = await fetch(`${OPENROUTER_BASE_URL}/chat/completions`, {
+  const res = await fetch(`${CLOUD_PROVIDERS[opts.backend].baseUrl}/chat/completions`, {
     method: 'POST',
-    headers: openrouterHeaders(opts.apiKey),
+    headers: cloudHeaders(opts.backend, opts.apiKey),
     body: JSON.stringify({
       model: opts.model,
       messages: messages.map(m => ({ role: m.role, content: m.content })),
@@ -475,10 +513,10 @@ export async function streamOpenRouterChat(
     signal: opts.signal
   })
   if (!res.ok) {
-    throw new Error(friendlyOpenRouterError(res.status, await res.text(), opts.model))
+    throw new Error(friendlyCloudError(opts.backend, res.status, await res.text(), opts.model))
   }
   const reader = res.body?.getReader()
-  if (!reader) throw new Error('Keine Response-Daten von OpenRouter')
+  if (!reader) throw new Error(`Keine Response-Daten von ${label}`)
 
   const decoder = new TextDecoder()
   let full = ''
@@ -509,21 +547,31 @@ export async function streamOpenRouterChat(
   return full
 }
 
-// ─── OpenRouter: Modell-Liste (für Settings-Picker) ──────────────────────────
+// Historischer Name — OpenRouter-Streaming, bestehende Aufrufer bleiben gültig.
+export async function streamOpenRouterChat(
+  messages: ChatMessage[],
+  opts: { apiKey: string; model: string; signal?: AbortSignal },
+  onToken: (delta: string) => void
+): Promise<string> {
+  return streamCloudChat(messages, { ...opts, backend: 'openrouter' }, onToken)
+}
+
+// ─── Cloud (OpenRouter/LLMBase): Modell-Liste (für Settings-Picker) ──────────
 
 export interface OpenRouterModelInfo {
   id: string
   name: string
   contextLength?: number
-  promptPrice?: string        // USD pro 1M Tokens, als String wie von OpenRouter geliefert
+  promptPrice?: string        // USD pro 1M Tokens, als String wie vom Provider geliefert
 }
 
-export async function listOpenRouterModels(apiKey: string): Promise<OpenRouterModelInfo[]> {
-  const res = await fetch(`${OPENROUTER_BASE_URL}/models`, {
+export async function listCloudModels(backend: CloudChatBackend, apiKey: string): Promise<OpenRouterModelInfo[]> {
+  const { label, baseUrl } = CLOUD_PROVIDERS[backend]
+  const res = await fetch(`${baseUrl}/models`, {
     headers: apiKey ? { 'Authorization': `Bearer ${apiKey}` } : {},
     signal: AbortSignal.timeout(10000)
   })
-  if (!res.ok) throw new Error(`OpenRouter Modell-Liste ${res.status}: ${await res.text()}`)
+  if (!res.ok) throw new Error(`${label} Modell-Liste ${res.status}: ${await res.text()}`)
   const json = await res.json() as {
     data?: Array<{
       id?: string
@@ -540,4 +588,9 @@ export async function listOpenRouterModels(apiKey: string): Promise<OpenRouterMo
       contextLength: m.context_length,
       promptPrice: m.pricing?.prompt
     }))
+}
+
+// Historischer Name — bestehende Aufrufer bleiben gültig.
+export async function listOpenRouterModels(apiKey: string): Promise<OpenRouterModelInfo[]> {
+  return listCloudModels('openrouter', apiKey)
 }

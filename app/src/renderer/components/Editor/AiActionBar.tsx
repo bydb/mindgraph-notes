@@ -6,7 +6,7 @@ import { ModelPicker } from '../Shared/ModelPicker'
 import { HumanIcon } from '../Shared/HumanIcon'
 import { ContextAttachmentRow, FolderGlyph } from '../Shared/ContextAttachmentRow'
 import { diffStats, type DiffOp } from '../../utils/blockDiff'
-import { OPENROUTER_MODEL_SENTINEL } from '../../../shared/llmBackend'
+import { cloudProviderForSentinel } from '../../../shared/llmBackend'
 import { isCloudModel } from '../../../shared/modelCompatibility'
 import { useContextVaultFiles } from '../../utils/useContextVaultFiles'
 import type { NoteAgentAttachment } from '../../../shared/types'
@@ -122,8 +122,8 @@ export function AiActionBar({ open, onOpenChange, phase, proposal, onGenerate, o
   }, [targetQuery, vaultEntries])
 
   // Cloud-Erkennung nur für den Hinweis (keine Sperre — Entscheidung 7 im Plan):
-  // OpenRouter-Sentinel oder gehostetes Ollama-Cloud-Modell (`:cloud`/`-cloud`).
-  const cloudSelected = model === OPENROUTER_MODEL_SENTINEL || isCloudModel(model)
+  // Cloud-Sentinel (OpenRouter/LLMBase) oder gehostetes Ollama-Cloud-Modell (`:cloud`/`-cloud`).
+  const cloudSelected = cloudProviderForSentinel(model) !== null || isCloudModel(model)
   const agentMode = !!targetFolder
   const busy = phase === 'generating' || agentPhase === 'running'
 

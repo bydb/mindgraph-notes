@@ -205,35 +205,40 @@ export const useEmailStore = create<EmailState>()((set, get) => ({
     if (get().isAnalyzing) return
 
     const { email, ollama } = useUIStore.getState()
-    const { OPENROUTER_MODEL_SENTINEL, isOpenRouterReady } = await import('../../shared/llmBackend')
+    const { cloudProviderForSentinel, isCloudProviderReady, CLOUD_PROVIDER_META } = await import('../../shared/llmBackend')
 
     // Das Analyse-Modell wird an EINER Stelle gewählt (Email-Tab → Analyse-Modell):
-    // entweder ein lokales Ollama-Modell ODER der Sentinel „OpenRouter". DIESER Wert
-    // ist allein autoritativ fürs Routing — kein zweites `cloudModules`-Gate mehr
-    // (das lief mit analysisModel auseinander → Rückfall aufs alte Modell). Das ⚠️-Opt-in
-    // passiert einmalig beim Auswählen im Picker (Settings). isOpenRouterReady = gemeinsame
-    // Basis-Verfügbarkeitsprüfung (enabled + Key + Modell), identisch zu den Feature-Gates.
+    // entweder ein lokales Ollama-Modell ODER ein Cloud-Sentinel („OpenRouter"/„LLMBase").
+    // DIESER Wert ist allein autoritativ fürs Routing — kein zweites `cloudModules`-Gate
+    // mehr (das lief mit analysisModel auseinander → Rückfall aufs alte Modell). Das
+    // ⚠️-Opt-in passiert einmalig beim Auswählen im Picker (Settings). isCloudProviderReady
+    // = gemeinsame Basis-Verfügbarkeitsprüfung (enabled + Key + Modell), wie Feature-Gates.
     const analysisChoice = email.analysisModel
-    const useCloud = analysisChoice === OPENROUTER_MODEL_SENTINEL && isOpenRouterReady(ollama.openrouter)
+    const sentinelProvider = cloudProviderForSentinel(analysisChoice)
+    const providerSettings = sentinelProvider ? ollama[sentinelProvider] : undefined
+    const useCloud = !!sentinelProvider && isCloudProviderReady(providerSettings)
 
     // Lokales Modell (Sentinel zählt NICHT als lokaler Name): Tab-Wahl → Modul-Override → global.
     const moduleOverride = ollama.moduleModelOverrides?.['task-extraction'] || ''
-    const localChoice = analysisChoice && analysisChoice !== OPENROUTER_MODEL_SENTINEL ? analysisChoice : ''
+    const localChoice = analysisChoice && !sentinelProvider ? analysisChoice : ''
     const model = localChoice || moduleOverride || ollama.selectedModel
 
-    const cloud = useCloud
-      ? { model: ollama.openrouter.moduleModelOverrides?.['task-extraction']?.trim() || ollama.openrouter.model.trim() }
+    const cloud = useCloud && sentinelProvider && providerSettings
+      ? {
+          model: providerSettings.moduleModelOverrides?.['task-extraction']?.trim() || providerSettings.model.trim(),
+          provider: sentinelProvider
+        }
       : null
-    // Modellname für Fehler-/Status-Texte: bei Cloud das echte OpenRouter-Modell.
-    const displayModel = cloud ? `openrouter/${cloud.model}` : model
+    // Modellname für Fehler-/Status-Texte: bei Cloud das echte Provider-Modell.
+    const displayModel = cloud ? `${cloud.provider}/${cloud.model}` : model
 
     // Lokales Modell ist nur Pflicht, wenn NICHT in die Cloud geroutet wird.
     if (!useCloud) {
       if (!model) {
-        // Häufig: User stand auf „OpenRouter", hat es aber deaktiviert → Sentinel ohne
-        // lokales Fallback-Modell. Nicht still scheitern — sichtbarer Hinweis in der UI.
-        const msg = analysisChoice === OPENROUTER_MODEL_SENTINEL
-          ? 'OpenRouter ist deaktiviert, aber als Analyse-Modell gewählt. Bitte im Email-Tab ein lokales Modell oder wieder OpenRouter wählen.'
+        // Häufig: User stand auf einem Cloud-Sentinel, hat den Provider aber deaktiviert
+        // → Sentinel ohne lokales Fallback-Modell. Nicht still scheitern — sichtbarer Hinweis.
+        const msg = sentinelProvider
+          ? `${CLOUD_PROVIDER_META[sentinelProvider].label} ist deaktiviert, aber als Analyse-Modell gewählt. Bitte im Email-Tab ein lokales Modell oder wieder einen Cloud-Provider wählen.`
           : 'Kein Analyse-Modell konfiguriert. Bitte in den Einstellungen ein Modell wählen.'
         console.warn(`[EmailStore] ${msg}`)
         set({ analysisError: msg })

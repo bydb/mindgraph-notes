@@ -68,7 +68,7 @@ import { getNoteKind, stripNoteKindMarker, setAiProvenanceInContent, getAiProven
 import { isBrainNote, brainNoteLabel } from '../../utils/brainNote'
 import { BrainIcon } from '../BrainIcon'
 import { readClipboardText, writeClipboardText } from '../../utils/clipboard'
-import { canUseCloudForFeature, OPENROUTER_MODEL_SENTINEL } from '../../../shared/llmBackend'
+import { cloudRoutesForFeature, cloudProviderForSentinel, type CloudProviderId } from '../../../shared/llmBackend'
 
 // Stabile leere Referenz für die Kontext-Datei-Selektion (kein neues Array pro Render —
 // bekannte Loop-Falle bei Zustand/React, siehe CLAUDE.md Workflow-Canvas-Lehren).
@@ -980,16 +980,23 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
   // Modellwahl für die Macher-Leiste (lokales Override; '' = globales Standardmodell).
   const [aiModel, setAiModel] = useState('')
   const [aiModels, setAiModels] = useState<Array<{ name: string }>>([])
-  // OpenRouter-Cloud für Inline-Notiz-KI: als Eintrag im Modell-Dropdown wählbar.
-  const noteEditCloudAvailable = canUseCloudForFeature('note-edit', ollama.openrouter)
-  // Notiz-Agent (Modus B) hat ein EIGENES Cloud-Opt-in — der OpenRouter-Eintrag im
-  // Picker erscheint, sobald eines der beiden Features freigeschaltet ist; welcher
-  // Pfad ihn nutzen darf, prüft der jeweilige Submit (Modus A: note-edit, B: note-agent).
-  const agentCloudAvailable = canUseCloudForFeature('note-agent', ollama.openrouter)
-  const anyCloudAvailable = noteEditCloudAvailable || agentCloudAvailable
-  const noteEditCloudModel = ollama.openrouter?.model?.trim() || ''
-  const [aiUseCloud, setAiUseCloud] = useState(false)
-  useEffect(() => { setAiUseCloud(anyCloudAvailable) }, [anyCloudAvailable])
+  // Cloud (OpenRouter/LLMBase) für Inline-Notiz-KI: pro Provider ein Eintrag im
+  // Modell-Dropdown. Der Notiz-Agent (Modus B) hat ein EIGENES Cloud-Opt-in — der
+  // Provider-Eintrag im Picker erscheint, sobald dort eines der beiden Features
+  // freigeschaltet ist; welcher Pfad ihn nutzen darf, prüft der jeweilige Submit
+  // (Modus A: note-edit, B: note-agent).
+  const noteEditRoutes = useMemo(() => cloudRoutesForFeature('note-edit', ollama), [ollama])
+  const agentRoutes = useMemo(() => cloudRoutesForFeature('note-agent', ollama), [ollama])
+  const cloudPickerRoutes = useMemo(
+    () => [...noteEditRoutes, ...agentRoutes.filter(r => !noteEditRoutes.some(n => n.provider === r.provider))],
+    [noteEditRoutes, agentRoutes]
+  )
+  const defaultAiCloudProvider = cloudPickerRoutes[0]?.provider ?? null
+  const [aiCloudProvider, setAiCloudProvider] = useState<CloudProviderId | null>(null)
+  useEffect(() => { setAiCloudProvider(defaultAiCloudProvider) }, [defaultAiCloudProvider])
+  const activeAiCloudRoute = aiCloudProvider
+    ? (cloudPickerRoutes.find(r => r.provider === aiCloudProvider) ?? null)
+    : null
   // Notiz-Agent Phase 1: Kontext-Dateien, flüchtig und strikt auf die Note-ID gekeyt —
   // der Editor bleibt bei Notizwechsel gemountet (docs/note-agent-harness-plan.md §1/F08).
   const [agentAttachmentsByNote, setAgentAttachmentsByNote] = useState<Record<string, NoteAgentAttachment[]>>({})
@@ -1949,14 +1956,16 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
     if (!effectiveNoteId || !vaultPath || !agentTargetFolder) return
     setAgentAttachError(null)
     // Cloud-Routing nur mit eigenem 'note-agent'-Opt-in (Entscheidung 7): der
-    // OpenRouter-Eintrag im Picker allein reicht nicht.
-    let cloud: { model: string } | null = null
-    if (aiUseCloud && anyCloudAvailable) {
-      if (!agentCloudAvailable) {
+    // Cloud-Eintrag im Picker allein reicht nicht — der gewählte Provider muss
+    // note-agent explizit freigeschaltet haben.
+    let cloud: { model: string; provider: CloudProviderId } | null = null
+    if (activeAiCloudRoute) {
+      const agentRoute = agentRoutes.find(r => r.provider === activeAiCloudRoute.provider)
+      if (!agentRoute) {
         setAgentAttachError(t('aiBar.agent.cloudNotEnabled'))
         return
       }
-      cloud = { model: noteEditCloudModel }
+      cloud = { model: agentRoute.model, provider: agentRoute.provider }
     }
     const view = viewRef.current
     const noteContent = view ? view.state.doc.toString() : (selectedNote?.content || '')
@@ -1980,7 +1989,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
       ...prev,
       [effectiveNoteId]: { runId: res.runId ?? null, phase: 'running', steps: [], results: [], finalText: '' }
     }))
-  }, [effectiveNoteId, vaultPath, agentTargetFolder, aiUseCloud, anyCloudAvailable, agentCloudAvailable, noteEditCloudModel, ollama, aiModel, agentAttachments, selectedNote, t])
+  }, [effectiveNoteId, vaultPath, agentTargetFolder, activeAiCloudRoute, agentRoutes, ollama, aiModel, agentAttachments, selectedNote, t])
 
   const agentRunCancel = useCallback(() => {
     const run = effectiveNoteId ? agentRunByNote[effectiveNoteId] : undefined
@@ -2058,16 +2067,19 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
     const view = viewRef.current
     if (!view || !ollama.enabled) return
     const model = aiModel || ollama.selectedModel
-    // Cloud-Routing (note-edit): aktiv, wenn freigeschaltet UND im Dropdown gewählt.
-    const noteEditCloud = canUseCloudForFeature('note-edit', ollama.openrouter) && aiUseCloud
-    // OpenRouter im Picker gewählt, aber note-edit nicht freigeschaltet (nur note-agent):
+    // Cloud-Routing (note-edit): aktiv, wenn der im Dropdown gewählte Provider
+    // note-edit freigeschaltet hat.
+    const noteEditRoute = activeAiCloudRoute
+      ? (noteEditRoutes.find(r => r.provider === activeAiCloudRoute.provider) ?? null)
+      : null
+    // Cloud im Picker gewählt, aber note-edit dort nicht freigeschaltet (nur note-agent):
     // nicht stillschweigend lokal ausweichen — klare Meldung.
-    if (aiUseCloud && anyCloudAvailable && !noteEditCloud) {
+    if (activeAiCloudRoute && !noteEditRoute) {
       setAgentAttachError(t('aiBar.context.cloudNotEnabledEdit'))
       setAiPhase('idle')
       return
     }
-    if (!model && !noteEditCloud) return
+    if (!model && !noteEditRoute) return
 
     // Scope: Auswahl, sonst der ganze Body (Frontmatter ausgeklammert).
     const sel = view.state.selection.main
@@ -2103,8 +2115,8 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
         // Notiz-Agent Phase 1: Main-seitig registrierte Kontext-Dateien mitgeben.
         contextAttachmentIds: agentAttachments.length > 0 ? agentAttachments.map(a => a.id) : undefined
       }
-      // Cloud-Routing (OpenRouter) für Inline-Notiz-KI — nur wenn 'note-edit' per zweitem Opt-in frei.
-      const cloud = noteEditCloud ? { model: ollama.openrouter.model.trim() } : null
+      // Cloud-Routing (OpenRouter/LLMBase) für Inline-Notiz-KI — nur wenn 'note-edit' per zweitem Opt-in frei.
+      const cloud = noteEditRoute ? { model: noteEditRoute.model, provider: noteEditRoute.provider } : null
       const response = cloud
         ? await window.electronAPI.ollamaGenerate({ ...req, cloud })
         : ollama.backend === 'lm-studio'
@@ -2134,7 +2146,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
       console.error('[AI-Bar] Generierung fehlgeschlagen:', e)
       setAiPhase('idle')
     }
-  }, [ollama, aiModel, aiUseCloud, anyCloudAvailable, agentAttachments, t])
+  }, [ollama, aiModel, activeAiCloudRoute, noteEditRoutes, agentAttachments, t])
 
   const aiAcceptProposal = useCallback(() => {
     const view = viewRef.current
@@ -5326,13 +5338,14 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
           onSuggestTags={aiSuggestTags}
           onAcceptTag={aiAcceptTag}
           onDismissTag={aiDismissTag}
-          model={aiUseCloud && anyCloudAvailable ? OPENROUTER_MODEL_SENTINEL : (aiModel || ollama.selectedModel)}
-          models={anyCloudAvailable ? [{ name: OPENROUTER_MODEL_SENTINEL }, ...aiModels] : aiModels}
+          model={activeAiCloudRoute ? activeAiCloudRoute.sentinel : (aiModel || ollama.selectedModel)}
+          models={[...cloudPickerRoutes.map(r => ({ name: r.sentinel })), ...aiModels]}
           onModelChange={(name) => {
-            if (name === OPENROUTER_MODEL_SENTINEL) { setAiUseCloud(true) }
-            else { setAiUseCloud(false); setAiModel(name) }
+            const provider = cloudProviderForSentinel(name)
+            if (provider) { setAiCloudProvider(provider) }
+            else { setAiCloudProvider(null); setAiModel(name) }
           }}
-          getModelLabel={(name) => name === OPENROUTER_MODEL_SENTINEL ? `OpenRouter · ${noteEditCloudModel}` : name}
+          getModelLabel={(name) => cloudPickerRoutes.find(r => r.sentinel === name)?.label ?? name}
           attachments={agentAttachments}
           onAttachDialog={agentAttachFromDialog}
           onAttachFolderDialog={agentAttachFolderFromDialog}

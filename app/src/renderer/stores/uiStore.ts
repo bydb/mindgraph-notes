@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import type { UpdateInfo } from '../../shared/types'
 import type { NoteKindId } from '../utils/noteKind'
-import { DEFAULT_OPENROUTER_SETTINGS, type OpenRouterSettings } from '../../shared/llmBackend'
+import { DEFAULT_OPENROUTER_SETTINGS, DEFAULT_LLMBASE_SETTINGS, type CloudProviderSettings } from '../../shared/llmBackend'
 import { toggleTaskFolder } from '../../shared/taskFolderFilter'
 
 type ViewMode = 'editor' | 'split' | 'canvas'
@@ -260,10 +260,12 @@ interface LLMSettings {
   // MÜSSEN dasselbe lesen, sonst invalidiert ein Modell-Mismatch den Index bei
   // jedem Cross-Surface-Aufruf (Dauer-Rebuild). Default: bge-m3.
   projectRagEmbeddingModel: string
-  // OpenRouter Cloud-Backend (opt-in). Single-Source-Policy in shared/llmBackend.ts.
-  // Der API-Key selbst liegt NICHT hier, sondern verschlüsselt im Main (safeStorage);
+  // Cloud-Backends (opt-in). Single-Source-Policy in shared/llmBackend.ts.
+  // Die API-Keys selbst liegen NICHT hier, sondern verschlüsselt im Main (safeStorage);
   // `hasApiKey` spiegelt nur, ob einer hinterlegt ist.
-  openrouter: OpenRouterSettings
+  openrouter: CloudProviderSettings
+  // LLMBase (llmbase.ai) — EU-Inference (DE/NL/FI/CH), DSGVO-Positionierung.
+  llmbase: CloudProviderSettings
 }
 
 // Brain (lokales Tagesgedächtnis — speichert Tageszusammenfassungen im Vault)
@@ -905,7 +907,8 @@ const defaultState = {
       'note-agent': ''
     },
     projectRagEmbeddingModel: 'bge-m3',
-    openrouter: { ...DEFAULT_OPENROUTER_SETTINGS }
+    openrouter: { ...DEFAULT_OPENROUTER_SETTINGS },
+    llmbase: { ...DEFAULT_LLMBASE_SETTINGS }
   },
 
   // Brain (lokales Tagesgedächtnis)
@@ -1551,6 +1554,20 @@ export async function initializeUISettings(): Promise<void> {
             cloudFeatures: Array.isArray(ll.openrouter.cloudFeatures) ? ll.openrouter.cloudFeatures : [],
             moduleModelOverrides: (ll.openrouter.moduleModelOverrides && typeof ll.openrouter.moduleModelOverrides === 'object')
               ? ll.openrouter.moduleModelOverrides : {}
+          }
+        }
+        // LLMBase-Cloud-Backend ergänzen (eingeführt 2026-07-07). Gleiche Policy:
+        // Default lokal, keine Cloud-Features aktiv.
+        if (!ll.llmbase || typeof ll.llmbase !== 'object') {
+          ll.llmbase = { ...DEFAULT_LLMBASE_SETTINGS }
+        } else {
+          ll.llmbase = {
+            ...DEFAULT_LLMBASE_SETTINGS,
+            ...ll.llmbase,
+            cloudModules: Array.isArray(ll.llmbase.cloudModules) ? ll.llmbase.cloudModules : [],
+            cloudFeatures: Array.isArray(ll.llmbase.cloudFeatures) ? ll.llmbase.cloudFeatures : [],
+            moduleModelOverrides: (ll.llmbase.moduleModelOverrides && typeof ll.llmbase.moduleModelOverrides === 'object')
+              ? ll.llmbase.moduleModelOverrides : {}
           }
         }
       }

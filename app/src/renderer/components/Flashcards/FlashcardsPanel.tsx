@@ -5,7 +5,7 @@ import { useUIStore } from '../../stores/uiStore'
 import { useTranslation } from '../../utils/translations'
 import { FlashcardStats } from './FlashcardStats'
 import { PanelHeader, PanelHeaderIconButton } from '../Shared/PanelHeader'
-import { canUseCloudForFeature } from '../../../shared/llmBackend'
+import { cloudRoutesForFeature } from '../../../shared/llmBackend'
 import type { Flashcard } from '../../../shared/types'
 
 interface FlashcardsPanelProps {
@@ -152,9 +152,8 @@ export const FlashcardsPanel: React.FC<FlashcardsPanelProps> = ({ onClose }) => 
         setTimeout(() => setGenResult(null), 5000)
         return
       }
-      const cloud = canUseCloudForFeature('quiz', ollama.openrouter)
-        ? { model: ollama.openrouter.model.trim() }
-        : null
+      const route = cloudRoutesForFeature('quiz', ollama)[0] ?? null
+      const cloud = route ? { model: route.model, provider: route.provider } : null
       const result = await window.electronAPI.flashcardsGenerate(ollama.selectedModel, content, 20, note.path, cloud)
       if (result.success && result.cards && result.cards.length > 0) {
         const cards = result.cards.map(c => createFlashcardFromQuiz(c.front, c.back, c.topic || note.title, note.path))
