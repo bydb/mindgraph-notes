@@ -161,6 +161,11 @@ export const InboxPanel: React.FC<InboxPanelProps> = ({ onClose }) => {
   const [attachmentError, setAttachmentError] = useState('')
   const [attachmentAction, setAttachmentAction] = useState<Record<number, 'busy' | 'done' | 'error'>>({})
   const [icsMsg, setIcsMsg] = useState('')
+  // Platz fürs Lesen: Anhänge + Analyse-Details standardmäßig eingeklappt.
+  // attachmentsExpanded wird pro Mail zurückgesetzt; analysisExpanded gilt für die Session
+  // (wer die Details aufklappt, will sie meist auch bei der nächsten Mail sehen).
+  const [attachmentsExpanded, setAttachmentsExpanded] = useState(false)
+  const [analysisExpanded, setAnalysisExpanded] = useState(false)
 
   // Body-/Anhang-State bei Mailwechsel zurücksetzen (sonst Leak aus der vorherigen Mail).
   useEffect(() => {
@@ -169,6 +174,7 @@ export const InboxPanel: React.FC<InboxPanelProps> = ({ onClose }) => {
     setAttachmentError('')
     setAttachmentAction({})
     setIcsMsg('')
+    setAttachmentsExpanded(false)
   }, [selectedEmailId])
 
   const openLink = useCallback((href: string) => {
@@ -707,12 +713,28 @@ export const InboxPanel: React.FC<InboxPanelProps> = ({ onClose }) => {
               {/* Attachments: Inhalt wird on-demand vom Server geladen (siehe handleAttachment) */}
               {selectedEmail.hasAttachments && selectedEmail.attachmentNames && selectedEmail.attachmentNames.length > 0 && (
                 <div className="inbox-attachment-info">
-                  <div className="inbox-attachment-header">
+                  {/* Eingeklappt: eine Zeile mit Anzahl + Namen; Aktionen (Speichern/Kalender) erst nach Aufklappen */}
+                  <button
+                    type="button"
+                    className="inbox-attachment-header inbox-attachment-toggle"
+                    onClick={() => setAttachmentsExpanded(v => !v)}
+                    aria-expanded={attachmentsExpanded}
+                  >
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48" />
                     </svg>
                     <span>{selectedEmail.attachmentNames.length} {t('inbox.detail.attachments')}</span>
-                  </div>
+                    {!attachmentsExpanded && (
+                      <span className="inbox-attachment-names">{selectedEmail.attachmentNames.join(' · ')}</span>
+                    )}
+                    <svg
+                      className={`inbox-collapse-chevron ${attachmentsExpanded ? 'is-open' : ''}`}
+                      width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+                    >
+                      <polyline points="6 9 12 15 18 9" />
+                    </svg>
+                  </button>
+                  {attachmentsExpanded && (
                   <div className="inbox-attachment-list">
                     {selectedEmail.attachmentNames.map((name, i) => {
                       const loaded = attachmentList?.[i]
@@ -747,6 +769,7 @@ export const InboxPanel: React.FC<InboxPanelProps> = ({ onClose }) => {
                       )
                     })}
                   </div>
+                  )}
                   {icsMsg && <div className="inbox-attachment-ok">{icsMsg}</div>}
                   {attachmentError && <div className="inbox-attachment-err">{attachmentError}</div>}
                 </div>
@@ -872,6 +895,65 @@ export const InboxPanel: React.FC<InboxPanelProps> = ({ onClose }) => {
                     </div>
                   )}
 
+                  {/* Kompaktzeile: Kernfakten (Relevanz, Sentiment, Projekt) in EINER Zeile —
+                      die volle Analyse-Karte nur auf Klick. Der Platz gehört dem Mail-Text. */}
+                  <button
+                    type="button"
+                    className="inbox-analysis-compact"
+                    onClick={() => setAnalysisExpanded(v => !v)}
+                    aria-expanded={analysisExpanded}
+                    title={analysisExpanded ? t('inbox.detail.hideAnalysis') : t('inbox.detail.showAnalysis')}
+                  >
+                    <span className="inbox-relevance-dot" aria-hidden="true" />
+                    <span className="inbox-analysis-compact-item">
+                      {selectedEmail.analysis.relevanceScore}% {t('inbox.detail.relevance')}
+                    </span>
+                    <span className="inbox-analysis-compact-sep">·</span>
+                    <span className="inbox-analysis-compact-item">
+                      <span className="inbox-sentiment-dot" style={{ background: getSentimentColor(selectedEmail.analysis.sentiment) }} />
+                      {getSentimentLabel(selectedEmail.analysis.sentiment)}
+                    </span>
+                    {activeProject && (
+                      <>
+                        <span className="inbox-analysis-compact-sep">·</span>
+                        <span className="inbox-analysis-compact-item inbox-analysis-compact-project">
+                          {activeProject.marker.project || activeProject.folderName}
+                        </span>
+                      </>
+                    )}
+                    {!activeProject && showProjectSuggestion && projectGate.top && (
+                      <>
+                        <span className="inbox-analysis-compact-sep">·</span>
+                        <span className="inbox-analysis-compact-item">
+                          {t('inbox.detail.suggestion')}: {projectGate.top.project.marker.project || projectGate.top.project.folderName}
+                        </span>
+                        {/* kein <button> im <button> — Spans mit role, Klick stoppt das Toggle */}
+                        <span
+                          role="button"
+                          tabIndex={0}
+                          className="inbox-project-suggestion-accept"
+                          onClick={(e) => { e.stopPropagation(); if (projectGate.top) handlePickProject(projectGate.top.project.folderRel) }}
+                          title={t('inbox.detail.acceptSuggestion')}
+                        >✓</span>
+                        <span
+                          role="button"
+                          tabIndex={0}
+                          className="inbox-project-suggestion-dismiss"
+                          onClick={(e) => { e.stopPropagation(); handleClearProject() }}
+                          title={t('inbox.detail.dismissSuggestion')}
+                        >×</span>
+                      </>
+                    )}
+                    <svg
+                      className={`inbox-collapse-chevron ${analysisExpanded ? 'is-open' : ''}`}
+                      width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+                    >
+                      <polyline points="6 9 12 15 18 9" />
+                    </svg>
+                  </button>
+
+                  {analysisExpanded && (
+                  <>
                   {/* Petrol redesign (Claude Design): „Warum relevant"-Box — Accent-Dot +
                       Uppercase-Label + Score, Accent-subtle-Fläche, dann die Gründe. */}
                   <div className="inbox-relevance-box">
@@ -1073,6 +1155,8 @@ export const InboxPanel: React.FC<InboxPanelProps> = ({ onClose }) => {
                         </div>
                       </div>
                     </div>
+                  )}
+                  </>
                   )}
 
                   {renderBodyBlock(selectedEmail)}

@@ -11836,11 +11836,13 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 6px 10px;
-  border-radius: var(--radius-sm);
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
   font-size: 12px;
   font-weight: 500;
   margin-top: 4px;
+  /* Kompaktes Inline-Badge statt Full-width-Banner — Platz gehört dem Mail-Text. */
+  width: fit-content;
 }
 
 /* Petrol redesign (Claude Design): „Antwort erwartet"-Box im Akzent (Accent-Text +
@@ -11902,6 +11904,83 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
   white-space: nowrap;
   flex: 1;
   min-width: 0;
+}
+
+/* Anhänge eingeklappt: Header ist ein Toggle, Namen laufen kompakt in der Zeile mit */
+.inbox-attachment-toggle {
+  width: 100%;
+  background: transparent;
+  border: none;
+  padding: 0;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.inbox-attachment-toggle:hover {
+  color: var(--text-primary);
+}
+
+.inbox-attachment-names {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-muted);
+}
+
+.inbox-collapse-chevron {
+  margin-left: auto;
+  flex-shrink: 0;
+  color: var(--text-muted);
+  transition: transform var(--transition-fast);
+}
+
+.inbox-collapse-chevron.is-open {
+  transform: rotate(180deg);
+}
+
+/* Analyse-Kompaktzeile: Relevanz · Sentiment · Projekt in einer Zeile, Details auf Klick */
+.inbox-analysis-compact {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  background: transparent;
+  border: none;
+  padding: 2px 0;
+  font: inherit;
+  font-size: 12px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  text-align: left;
+  min-width: 0;
+}
+
+.inbox-analysis-compact:hover {
+  color: var(--text-primary);
+}
+
+.inbox-analysis-compact-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.inbox-analysis-compact-project {
+  font-weight: 500;
+  color: var(--accent-color);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.inbox-analysis-compact-sep {
+  color: var(--text-muted);
+  flex-shrink: 0;
 }
 
 .inbox-attachment-actions {
@@ -12017,8 +12096,8 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
   background: var(--bg-content);
   padding: 14px 16px;
   margin-bottom: 8px;
-  max-height: 400px;
-  overflow-y: auto;
+  /* Bewusst KEINE max-height: das Panel scrollt selbst — ein inneres Scrollfenster
+     würde den Mail-Text auf einen schmalen Streifen quetschen (Doppel-Scroll). */
 }
 
 .inbox-original-text pre {
