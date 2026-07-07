@@ -2,6 +2,25 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.10.12-beta] - 2026-07-07
+
+LM Studio und LLMBase werden Erstklassbürger: geprüfte Modell-Empfehlungen gelten jetzt auch für LM Studio, mit LLMBase kommt ein deutscher EU-Cloud-Anbieter dazu — und ein neuer Demo-Vault zeigt alle Funktionen an einem realistischen Beispiel.
+
+### Neu
+
+- **LLMBase als zweiter Cloud-Anbieter (EU/DSGVO).** Neben OpenRouter lässt sich jetzt LLMBase (llmbase.ai, deutscher Anbieter — Inference ausschließlich auf EU-Servern in DE/NL/FI/CH, DSGVO-Positionierung mit AVV) freischalten: eigene Sektion in Einstellungen → KI mit API-Key (verschlüsselt via safeStorage), Modell-Auswahl und Verbindungstest. Verfügbar überall dort, wo OpenRouter verfügbar ist — Notes-Chat, Notiz-KI, Notiz-Agent, Karteikarten/Quiz und E-Mail-Analyse — jeweils als eigener Eintrag im Modell-Picker. Das Privacy-Modell bleibt unverändert: Standard ist lokal, jede Funktion braucht ihr eigenes Opt-in, E-Mail-Chat und Brain bleiben immer lokal.
+- **Demo-Vault mit geführter Tour.** Neue Onboarding-Option „Demo-Vault erstellen": ein realistisches Beispiel (Medienzentrum-Szenario) mit Projekten inkl. `_STATUS.md`, terminierten Aufgaben fürs Dashboard, einem verlinkten Wissensnetz für den Graphen, Meeting-Rohmaterial für die Agent-Skills (Protokoll, Teilnehmerliste, Elternbrief, Zusammenfassung), Lernmaterial für Karteikarten/Quiz, Brain-Beispieltag und Email-Instruktionen. Die `Demo-Tour.md` führt in 10 Stationen durch alle Funktionen; die Starter-Skills werden automatisch mitinstalliert.
+
+### Verbessert
+
+- **Modell-Empfehlungen gelten jetzt auch für LM Studio.** Die Kompatibilitäts-Matrix erkennt LM-Studio-Modell-IDs (`qwen/qwen3.5-4b`, `…-Instruct-GGUF`, `mlx-community/…`) und ordnet ihnen die mit Ollama gemessenen Bewertungen zu — gleiche Gewichte, gleiches Verdict. Damit greift auch die Sicherheits-Sperre für ungeeignete Modelle (Hard-Lock) bei LM Studio, ebenso RAM-Warnung, MLX-Marker und Tool-Calling-Erkennung. Unbekannte Fine-Tunes erben bewusst keine Bewertung.
+- **Offizielle Anbieter-Logos.** OpenRouter (echtes Split-Route-Zeichen) und LLMBase (Funken-Marke in Markenorange) erscheinen in den Einstellungen und in allen Modell-Auswahlen.
+- **Website:** Texte zu lokaler KI geschärft.
+
+### Behoben
+
+- **Log-Rauschen beim Notiz-Öffnen.** Der Lesemodus prüfte bei jeder Notiz die optionale Annotationen-Datei („… - Annotationen.md") über einen Lesepfad, der bei fehlender Datei zwei Fehlermeldungen ins Protokoll schrieb. Fehlende Sidecar-Dateien werden jetzt still als „keine Annotationen" behandelt.
+
 ## [0.10.11-beta] - 2026-07-07
 
 Mehr Platz zum Lesen: die Email-Detail-Ansicht ist deutlich verdichtet.
