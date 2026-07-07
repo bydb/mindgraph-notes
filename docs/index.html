@@ -1299,6 +1299,86 @@
     <p class="model-quality-note" data-i18n="modelq.note">Datenstand 07.06.2026. Quelle: produktive Modell-Kompatibilit&auml;tsmatrix und lokale Benchmark-Reports.</p>
   </section>
 
+
+  <!-- Cloud-Ausgang: LLMBase / OpenRouter -->
+  <style id="cloud-section-style">
+    .cloud-power { max-width: 1100px; margin: 0 auto; padding: 5rem 2rem 4rem; }
+    .cloud-power .section-sub { max-width: 720px; }
+    .ram-meter {
+      margin: 2.2rem 0 2.4rem; padding: 1.4rem 1.6rem; background: var(--card);
+      border: 1px solid var(--border); border-radius: var(--radius);
+    }
+    .ram-meter-title { font-size: .82rem; font-weight: 600; color: var(--text-mid); letter-spacing: .02em; margin-bottom: 1rem; }
+    .ram-row { display: grid; grid-template-columns: minmax(160px, 240px) 1fr minmax(90px, auto); gap: 1rem; align-items: center; padding: .45rem 0; }
+    .ram-name { font-size: .88rem; color: var(--text); font-weight: 500; }
+    .ram-name small { display: block; color: var(--text-muted); font-weight: 400; }
+    .ram-bar { position: relative; height: 12px; background: var(--accent-light); border-radius: 100px; overflow: hidden; }
+    .ram-bar i { position: absolute; inset: 0 auto 0 0; border-radius: 100px; background: var(--accent); }
+    .ram-bar.cloud i { background: var(--gradient); }
+    .ram-val { font-size: .82rem; color: var(--text-mid); font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+    .ram-note { margin-top: .9rem; font-size: .78rem; color: var(--text-muted); }
+    .cloud-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.2rem; }
+    @media (max-width: 900px) { .cloud-grid { grid-template-columns: 1fr; } .ram-row { grid-template-columns: 1fr; gap: .3rem; } .ram-val { text-align: left; } }
+    .cloud-card {
+      position: relative; padding: 1.5rem 1.5rem 1.4rem; background: var(--card);
+      border: 1px solid var(--border); border-radius: var(--radius);
+    }
+    .cloud-card h3 { font-size: 1.02rem; font-weight: 650; margin-bottom: .55rem; color: var(--text); }
+    .cloud-card p { font-size: .9rem; line-height: 1.55; color: var(--text-mid); }
+    .cloud-card.highlight { border-color: var(--accent); box-shadow: 0 10px 34px -18px var(--accent-glow); }
+    .cloud-badge {
+      position: absolute; top: -11px; left: 1.4rem; padding: .18rem .6rem; font-size: .68rem;
+      font-weight: 650; letter-spacing: .06em; text-transform: uppercase; color: #fff;
+      background: var(--accent); border-radius: 100px;
+    }
+    .cloud-card a.cloud-link { display: inline-block; margin-top: .7rem; font-size: .86rem; font-weight: 600; color: var(--accent); text-decoration: none; }
+    .cloud-card a.cloud-link:hover { text-decoration: underline; }
+    .cloud-privacy {
+      margin-top: 1.6rem; padding: .95rem 1.3rem; font-size: .86rem; color: var(--text-mid);
+      background: var(--accent-light); border: 1px solid var(--border); border-radius: var(--radius);
+    }
+    .cloud-privacy strong { color: var(--text); }
+  </style>
+  <section class="cloud-power" id="cloud">
+    <div class="section-label" data-i18n="cloud.label">Neu &middot; Cloud nach deiner Entscheidung</div>
+    <h2 class="section-heading" data-i18n="cloud.heading">Gro&szlig;e Modelle.<br>Auch auf kleinen Rechnern.</h2>
+    <p class="section-sub" data-i18n="cloud.sub">Manche Aufgaben verdienen ein Flaggschiff-Modell &mdash; aber dein Laptop hat 8&nbsp;GB RAM. Daf&uuml;r gibt es jetzt zwei Cloud-Ausg&auml;nge, beide strikt opt-in und pro Funktion einzeln freigeschaltet.</p>
+
+    <figure class="ram-meter fade-in">
+      <div class="ram-meter-title" data-i18n="cloud.meter.title">Beispiel: ein Rechner mit 8 GB RAM</div>
+      <div class="ram-row">
+        <span class="ram-name" data-i18n="cloud.meter.localName">Lokal m&ouml;glich<small>Qwen 3.5 &middot; 4 Mrd. Parameter</small></span>
+        <span class="ram-bar"><i style="width:7%"></i></span>
+        <span class="ram-val" data-i18n="cloud.meter.localVal">~4 GB RAM belegt</span>
+      </div>
+      <div class="ram-row">
+        <span class="ram-name" data-i18n="cloud.meter.cloudName">Mit LLMBase<small>Qwen 3.5 &middot; 397 Mrd. Parameter</small></span>
+        <span class="ram-bar cloud"><i style="width:100%"></i></span>
+        <span class="ram-val" data-i18n="cloud.meter.cloudVal">0 GB lokal</span>
+      </div>
+      <div class="ram-note" data-i18n="cloud.meter.note">Balken = Modellgr&ouml;&szlig;e. Die Inferenz l&auml;uft auf EU-Servern &mdash; dein Rechner bleibt entspannt.</div>
+    </figure>
+
+    <div class="cloud-grid">
+      <div class="cloud-card">
+        <h3 data-i18n="cloud.local.title">Lokal &mdash; der Standard</h3>
+        <p data-i18n="cloud.local.desc">Ollama oder LM Studio auf deinem Rechner. Deine Inhalte bleiben zu Hause, mit getesteten Modell-Empfehlungen ab 8&nbsp;GB RAM. Daran &auml;ndert sich nichts.</p>
+      </div>
+      <div class="cloud-card highlight">
+        <span class="cloud-badge" data-i18n="cloud.llmbase.badge">Neu</span>
+        <h3 data-i18n="cloud.llmbase.title">LLMBase &mdash; EU-Cloud aus Deutschland</h3>
+        <p data-i18n="cloud.llmbase.desc">Open-Weight-Flaggschiffe (Qwen, DeepSeek, Llama) auf EU-Servern in Deutschland, den Niederlanden, Finnland und der Schweiz. DSGVO-Positionierung mit AVV, laut Anbieter ohne Speicherung der Anfragen, Abrechnung pro Nutzung. Volle Modellqualit&auml;t auf jedem Rechner &mdash; auch auf dem alten B&uuml;ro-Laptop.</p>
+        <a class="cloud-link" href="https://llmbase.ai" target="_blank" rel="noopener noreferrer" data-i18n="cloud.llmbase.link">llmbase.ai &rarr;</a>
+      </div>
+      <div class="cloud-card">
+        <h3 data-i18n="cloud.openrouter.title">OpenRouter &mdash; der Weltkatalog</h3>
+        <p data-i18n="cloud.openrouter.desc">Die gr&ouml;&szlig;te Modellauswahl &uuml;ber einen US-Anbieter &mdash; f&uuml;r unkritische Inhalte, wenn du maximale Auswahl willst.</p>
+      </div>
+    </div>
+
+    <p class="cloud-privacy" data-i18n="cloud.privacy"><strong>Die rote Linie bleibt:</strong> Cloud ist nie der Standard. Jede Funktion braucht ihr eigenes Opt-in &mdash; und Brain sowie E-Mail-Chat laufen grunds&auml;tzlich lokal.</p>
+  </section>
+
   <!-- Module strip -->
   <section class="modules-strip">
     <div class="modules-strip-label" data-i18n="modules.label">Kern immer aktiv &middot; Module nach Bedarf</div>
@@ -1479,6 +1559,24 @@
   <script>
     const translations = {
       de: {
+        "cloud.label": "Neu &middot; Cloud nach deiner Entscheidung",
+        "cloud.heading": "Gro&szlig;e Modelle.<br>Auch auf kleinen Rechnern.",
+        "cloud.sub": "Manche Aufgaben verdienen ein Flaggschiff-Modell &mdash; aber dein Laptop hat 8&nbsp;GB RAM. Daf&uuml;r gibt es jetzt zwei Cloud-Ausg&auml;nge, beide strikt opt-in und pro Funktion einzeln freigeschaltet.",
+        "cloud.meter.title": "Beispiel: ein Rechner mit 8 GB RAM",
+        "cloud.meter.localName": "Lokal m&ouml;glich<small>Qwen 3.5 &middot; 4 Mrd. Parameter</small>",
+        "cloud.meter.localVal": "~4 GB RAM belegt",
+        "cloud.meter.cloudName": "Mit LLMBase<small>Qwen 3.5 &middot; 397 Mrd. Parameter</small>",
+        "cloud.meter.cloudVal": "0 GB lokal",
+        "cloud.meter.note": "Balken = Modellgr&ouml;&szlig;e. Die Inferenz l&auml;uft auf EU-Servern &mdash; dein Rechner bleibt entspannt.",
+        "cloud.local.title": "Lokal &mdash; der Standard",
+        "cloud.local.desc": "Ollama oder LM Studio auf deinem Rechner. Deine Inhalte bleiben zu Hause, mit getesteten Modell-Empfehlungen ab 8&nbsp;GB RAM. Daran &auml;ndert sich nichts.",
+        "cloud.llmbase.badge": "Neu",
+        "cloud.llmbase.title": "LLMBase &mdash; EU-Cloud aus Deutschland",
+        "cloud.llmbase.desc": "Open-Weight-Flaggschiffe (Qwen, DeepSeek, Llama) auf EU-Servern in Deutschland, den Niederlanden, Finnland und der Schweiz. DSGVO-Positionierung mit AVV, laut Anbieter ohne Speicherung der Anfragen, Abrechnung pro Nutzung. Volle Modellqualit&auml;t auf jedem Rechner &mdash; auch auf dem alten B&uuml;ro-Laptop.",
+        "cloud.llmbase.link": "llmbase.ai &rarr;",
+        "cloud.openrouter.title": "OpenRouter &mdash; der Weltkatalog",
+        "cloud.openrouter.desc": "Die gr&ouml;&szlig;te Modellauswahl &uuml;ber einen US-Anbieter &mdash; f&uuml;r unkritische Inhalte, wenn du maximale Auswahl willst.",
+        "cloud.privacy": "<strong>Die rote Linie bleibt:</strong> Cloud ist nie der Standard. Jede Funktion braucht ihr eigenes Opt-in &mdash; und Brain sowie E-Mail-Chat laufen grunds&auml;tzlich lokal.",
         "nav.features": "Features",
         "nav.why": "Warum",
         "nav.kognition": "Kognition",
@@ -1694,6 +1792,24 @@
         "privacy.contact.title": "6. Verantwortliche Stelle"
       },
       en: {
+        "cloud.label": "New &middot; Cloud on your terms",
+        "cloud.heading": "Big models.<br>Even on small machines.",
+        "cloud.sub": "Some tasks deserve a flagship model &mdash; but your laptop has 8&nbsp;GB of RAM. There are now two cloud exits for that, both strictly opt-in and enabled per feature.",
+        "cloud.meter.title": "Example: a machine with 8 GB RAM",
+        "cloud.meter.localName": "Possible locally<small>Qwen 3.5 &middot; 4B parameters</small>",
+        "cloud.meter.localVal": "~4 GB RAM used",
+        "cloud.meter.cloudName": "With LLMBase<small>Qwen 3.5 &middot; 397B parameters</small>",
+        "cloud.meter.cloudVal": "0 GB locally",
+        "cloud.meter.note": "Bar = model size. Inference runs on EU servers &mdash; your machine stays relaxed.",
+        "cloud.local.title": "Local &mdash; the default",
+        "cloud.local.desc": "Ollama or LM Studio on your machine. Your content stays home, with tested model recommendations from 8&nbsp;GB RAM. Nothing changes here.",
+        "cloud.llmbase.badge": "New",
+        "cloud.llmbase.title": "LLMBase &mdash; EU cloud from Germany",
+        "cloud.llmbase.desc": "Open-weight flagships (Qwen, DeepSeek, Llama) on EU servers in Germany, the Netherlands, Finland and Switzerland. GDPR positioning with a DPA, no request retention according to the provider, pay-per-use billing. Full model quality on any machine &mdash; including the old office laptop.",
+        "cloud.llmbase.link": "llmbase.ai &rarr;",
+        "cloud.openrouter.title": "OpenRouter &mdash; the world catalog",
+        "cloud.openrouter.desc": "The largest model selection via a US provider &mdash; for non-sensitive content when you want maximum choice.",
+        "cloud.privacy": "<strong>The red line stays:</strong> cloud is never the default. Every feature needs its own opt-in &mdash; and Brain and email chat always run locally.",
         "nav.features": "Features",
         "nav.why": "Why",
         "nav.kognition": "Cognition",
