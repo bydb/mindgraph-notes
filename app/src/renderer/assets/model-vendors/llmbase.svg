@@ -1,8 +1,9 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" role="img" aria-label="LLMBase">
-  <rect x="2.5" y="2.5" width="19" height="19" rx="5" fill="#1D4ED8"/>
-  <g fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-    <ellipse cx="12" cy="7.6" rx="5.5" ry="2.4"/>
-    <path d="M6.5 7.6v4.4c0 1.33 2.46 2.4 5.5 2.4s5.5-1.07 5.5-2.4V7.6"/>
-    <path d="M6.5 12v4.4c0 1.33 2.46 2.4 5.5 2.4s5.5-1.07 5.5-2.4V12"/>
+  <rect x="2.5" y="2.5" width="19" height="19" rx="5" fill="#F96E00"/>
+  <!-- Offizielle LLMBase-Funken-Marke (llmbase.ai), weiss auf Markenorange -->
+  <g fill="#fff">
+    <path d="M9.6 7.6 Q10.68 11.92 15.0 13.0 Q10.68 14.08 9.6 18.4 Q8.52 14.08 4.199999999999999 13.0 Q8.52 11.92 9.6 7.6 Z"/>
+    <path d="M16.0 4.6 Q16.64 7.16 19.2 7.8 Q16.64 8.44 16.0 11.0 Q15.36 8.44 12.8 7.8 Q15.36 7.16 16.0 4.6 Z"/>
+    <path d="M16.6 14.099999999999998 Q17.060000000000002 15.939999999999998 18.900000000000002 16.4 Q17.060000000000002 16.86 16.6 18.7 Q16.14 16.86 14.3 16.4 Q16.14 15.939999999999998 16.6 14.099999999999998 Z"/>
   </g>
 </svg>

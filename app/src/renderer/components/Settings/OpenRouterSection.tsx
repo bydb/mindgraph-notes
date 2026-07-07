@@ -4,6 +4,7 @@ import {
   CLOUD_CAPABLE_FEATURES,
   type CloudFeatureId
 } from '../../../shared/llmBackend'
+import openrouterLogo from '../../assets/model-vendors/openrouter.svg'
 
 // Anzeige-Labels für Nicht-Matrix-Cloud-Features.
 const FEATURE_LABELS: Record<CloudFeatureId, { de: string; en: string }> = {
@@ -109,7 +110,8 @@ export function OpenRouterSection() {
   return (
     <div className="settings-row" style={{ flexDirection: 'column', alignItems: 'stretch', gap: '10px', marginTop: '16px', paddingTop: '16px', borderTop: '1px solid var(--border, #e5e7eb)' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <label style={{ fontWeight: 600 }}>
+        <label style={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <img src={openrouterLogo} width={20} height={20} alt="" />
           {en ? 'OpenRouter (Cloud) — optional' : 'OpenRouter (Cloud) — optional'}
         </label>
         <input

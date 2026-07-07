@@ -4,6 +4,7 @@ import {
   CLOUD_CAPABLE_FEATURES,
   type CloudFeatureId
 } from '../../../shared/llmBackend'
+import llmbaseLogo from '../../assets/model-vendors/llmbase.svg'
 
 // Anzeige-Labels für Nicht-Matrix-Cloud-Features (identisch zur OpenRouter-Sektion).
 const FEATURE_LABELS: Record<CloudFeatureId, { de: string; en: string }> = {
@@ -104,7 +105,8 @@ export function LLMBaseSection() {
   return (
     <div className="settings-row" style={{ flexDirection: 'column', alignItems: 'stretch', gap: '10px', marginTop: '16px', paddingTop: '16px', borderTop: '1px solid var(--border, #e5e7eb)' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <label style={{ fontWeight: 600 }}>
+        <label style={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <img src={llmbaseLogo} width={20} height={20} alt="" />
           {en ? 'LLMBase (EU cloud) — optional' : 'LLMBase (EU-Cloud) — optional'}
         </label>
         <input
