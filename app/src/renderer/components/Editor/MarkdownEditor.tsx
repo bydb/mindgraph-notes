@@ -4228,13 +4228,15 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
     if (!root || !selectedNote || !vaultPath) return
     let cancelled = false
     const abs = `${vaultPath}/${annotationRelPathFor(selectedNote.path)}`
-    window.electronAPI.readFile(abs)
+    // readFileOptional: die Sidecar-Datei fehlt bei den meisten Notizen — das ist
+    // der Normalfall und darf keinen Error-Log im Main-Prozess erzeugen.
+    window.electronAPI.readFileOptional(abs)
       .then(content => {
         if (cancelled || !content || isPreviewDomEditingRef.current) return
         const anchors = parseAnnotationAnchors(content)
         if (anchors.length) applyStoredHighlights(root, anchors)
       })
-      .catch(() => { /* keine Annotationen-Datei → nichts einzufärben */ })
+      .catch(() => { /* Lesefehler → nichts einzufärben */ })
     return () => { cancelled = true }
   }, [renderedMarkdown, contentVersion, viewMode, selectedNote?.path, vaultPath])
 

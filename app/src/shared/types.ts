@@ -533,6 +533,8 @@ export interface ElectronAPI {
   createEmptyVault: (targetPath: string) => Promise<boolean>;
   readDirectory: (dirPath: string) => Promise<FileEntry[]>;
   readFile: (filePath: string) => Promise<string>;
+  // Wie readFile, aber fehlende Datei → null (Sidecar-Probing ohne Error-Log)
+  readFileOptional: (filePath: string) => Promise<string | null>;
   readFilesBatch: (basePath: string, relativePaths: string[]) => Promise<Record<string, string | null>>;
   readFileBinary: (filePath: string) => Promise<string>;  // Returns Base64
   writeFile: (filePath: string, content: string) => Promise<void>;

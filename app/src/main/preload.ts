@@ -19,6 +19,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   selectFolderInVault: (vaultPath: string) => ipcRenderer.invoke('select-folder-in-vault', vaultPath),
   readDirectory: (dirPath: string) => ipcRenderer.invoke('read-directory', dirPath),
   readFile: (filePath: string) => ipcRenderer.invoke('read-file', filePath),
+  readFileOptional: (filePath: string) => ipcRenderer.invoke('read-file-optional', filePath),
   readFilesBatch: (basePath: string, relativePaths: string[]) => ipcRenderer.invoke('read-files-batch', basePath, relativePaths),
   readFileBinary: (filePath: string) => ipcRenderer.invoke('read-file-binary', filePath),
   writeFile: (filePath: string, content: string) => ipcRenderer.invoke('write-file', filePath, content),

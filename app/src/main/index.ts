@@ -1672,6 +1672,21 @@ ipcMain.handle('read-file', async (_event, filePath: string) => {
   }
 })
 
+// Optionale Datei lesen (Sidecar-Probing, z.B. „… - Annotationen.md"): eine fehlende
+// Datei ist hier der NORMALFALL, kein Fehler → null statt Reject. Verhindert das
+// doppelte Error-Logging (Handler + Electron-Invoke) bei jedem Notiz-Öffnen.
+// Der Pfad-Sicherheitscheck bleibt bewusst laut (wirft weiterhin).
+ipcMain.handle('read-file-optional', async (_event, filePath: string) => {
+  const safe = await assertSafePath(filePath, 'read-file-optional')
+  try {
+    return await fs.readFile(safe, 'utf-8')
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException)?.code === 'ENOENT') return null
+    console.error('Fehler beim Lesen der Datei:', error)
+    throw error
+  }
+})
+
 // Mehrere Dateien auf einmal lesen (für Performance)
 ipcMain.handle('read-files-batch', async (_event, basePath: string, relativePaths: string[]) => {
   assertApprovedVault(basePath, 'read-files-batch')
