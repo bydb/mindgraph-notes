@@ -547,6 +547,16 @@
     .proof-card { background:var(--card);border:1px solid var(--border);border-radius:16px;padding:1.5rem; }
     .proof-card h3 { font-size:1.05rem;font-weight:700;margin-bottom:.4rem;display:flex;align-items:center;gap:.5rem; }
     .proof-card h3 .ic{color:#45e09a;} .proof-card p{font-size:.92rem;color:var(--text-mid);}
+    /* Aus der Praxis */
+    .praxis { padding:4rem 0 0; }
+    .praxis-in { text-align:center;border-radius:24px;border:1px solid var(--border);padding:clamp(2rem,4vw,3rem);
+      background:radial-gradient(120% 130% at 88% 0%,var(--accent-light),transparent 55%),var(--card); }
+    .praxis-in .st-lead { margin:0 auto; }
+    .praxis-points { display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;margin:2.2rem auto 0;max-width:920px;text-align:left; }
+    .praxis-point { background:var(--bg-warm);border:1px solid var(--border);border-radius:16px;padding:1.3rem 1.2rem;font-size:.92rem;color:var(--text-mid);line-height:1.6; }
+    .praxis-point b { display:block;color:var(--text);margin-bottom:.35rem; }
+    .praxis-closer { margin:2.2rem auto 0;max-width:680px;font-size:1.05rem;line-height:1.7;color:var(--text-mid);font-style:italic; }
+    .praxis-closer a { color:var(--accent);text-decoration:none;border-bottom:1px solid var(--accent-light);font-style:normal;font-weight:600; }
     /* Macher */
     .maker { padding:5rem 0; }
     .maker-in { display:grid;grid-template-columns:1fr 1fr;gap:clamp(1.5rem,4vw,3rem);align-items:center;
@@ -558,7 +568,7 @@
     /* Einladung */
     .invite { text-align:center;padding:5rem 0; }
     @media (max-width:780px){
-      .enemy-stats{grid-template-columns:1fr;} .proof-grid{grid-template-columns:1fr;}
+      .enemy-stats{grid-template-columns:1fr;} .proof-grid{grid-template-columns:1fr;} .praxis-points{grid-template-columns:1fr;}
       .beat{grid-template-columns:1fr;} .beat.rev .beat-text{order:0;} .beat-img{order:-1;}
       .maker-in{grid-template-columns:1fr;} .kogband-mini{gap:1.2rem;}
     }
@@ -681,6 +691,21 @@
       <div class="proof-card"><h3><span class="ic">&#10003;</span> <span data-i18n="st.proof.c2h">Open Source</span></h3><p data-i18n="st.proof.c2">Der gesamte Code ist einsehbar (AGPL). Du musst mir nicht vertrauen &ndash; du kannst nachsehen.</p></div>
       <div class="proof-card"><h3><span class="ic">&#10003;</span> <span data-i18n="st.proof.c3h">Lokal &amp; E2E-verschl&uuml;sselt</span></h3><p data-i18n="st.proof.c3">Keine Telemetrie, kein Tracker. Der optionale Sync ist Zero-Knowledge &ndash; die Passphrase verl&auml;sst nie dein Ger&auml;t.</p></div>
       <div class="proof-card"><h3><span class="ic">&#10003;</span> <span data-i18n="st.proof.c4h">Modelle pro Modul getestet</span></h3><p data-i18n="st.proof.c4">Eine dokumentierte Kompatibilit&auml;tsmatrix zeigt, welche lokale KI f&uuml;r welches Modul taugt &ndash; nicht „irgendein Modell".</p></div>
+    </div>
+  </section>
+
+  <!-- 5b · Aus der Praxis -->
+  <section class="story praxis">
+    <div class="praxis-in">
+      <div class="st-eyebrow"><span class="d"></span><span data-i18n="st.praxis.label">Aus der Praxis</span></div>
+      <h2 class="st-h" data-i18n="st.praxis.h">Weniger Verwaltung &mdash; <em>mehr Zeit f&uuml;r Lehrer und Sch&uuml;ler.</em></h2>
+      <p class="st-lead" data-i18n="st.praxis.lead">Verwaltung frisst die Zeit, die eigentlich den Schulen geh&ouml;rt: Mails, Verleihlisten, Veranstaltungsorganisation. In unserem Medienzentrum beh&auml;lt MindGraph diese Dinge im Blick &ndash; damit wir es nicht st&auml;ndig tun m&uuml;ssen.</p>
+      <div class="praxis-points">
+        <div class="praxis-point" data-i18n="st.praxis.p1"><b>Mails vorsortiert</b>Eingehende Mails werden lokal per KI bewertet, Aufgaben und Fristen automatisch als To-dos angelegt. Nichts geht mehr im Posteingang unter.</div>
+        <div class="praxis-point" data-i18n="st.praxis.p2"><b>Verleih im Blick</b>Ger&auml;te- und Medienverleih als Dashboard: offene Anfragen, laufende Ausleihen, f&auml;llige R&uuml;ckgaben &ndash; ein Blick statt drei Systeme.</div>
+        <div class="praxis-point" data-i18n="st.praxis.p3"><b>Fortbildungen automatisiert</b>Vom Akkreditierungsformular bis zur fertigen Teilnehmerliste l&auml;uft die Organisation weitgehend von selbst.</div>
+      </div>
+      <p class="praxis-closer" data-i18n="st.praxis.closer">Das Ergebnis ist keine Kennzahl, sondern Zeit: f&uuml;r Beratung und Fortbildung von Lehrern, f&uuml;r medienp&auml;dagogische Projekte mit Sch&uuml;lern. Effizienz ist kein Selbstzweck &ndash; sie ist nur dann etwas wert, wenn die gewonnene Zeit bei Menschen ankommt. <a href="blog/#2026-07-07-effizienz-ist-ein-verstaerker-kein-ziel.md">Der ganze Gedanke im Blog &rarr;</a></p>
     </div>
   </section>
 
@@ -1632,6 +1657,13 @@
         "st.proof.c3": "Keine Telemetrie, kein Tracker. Der optionale Sync ist Zero-Knowledge – die Passphrase verlässt nie dein Gerät.",
         "st.proof.c4h": "Modelle pro Modul getestet",
         "st.proof.c4": "Eine dokumentierte Kompatibilitätsmatrix zeigt, welche lokale KI für welches Modul taugt – nicht „irgendein Modell\".",
+        "st.praxis.label": "Aus der Praxis",
+        "st.praxis.h": "Weniger Verwaltung — <em>mehr Zeit für Lehrer und Schüler.</em>",
+        "st.praxis.lead": "Verwaltung frisst die Zeit, die eigentlich den Schulen gehört: Mails, Verleihlisten, Veranstaltungsorganisation. In unserem Medienzentrum behält MindGraph diese Dinge im Blick – damit wir es nicht ständig tun müssen.",
+        "st.praxis.p1": "<b>Mails vorsortiert</b>Eingehende Mails werden lokal per KI bewertet, Aufgaben und Fristen automatisch als To-dos angelegt. Nichts geht mehr im Posteingang unter.",
+        "st.praxis.p2": "<b>Verleih im Blick</b>Geräte- und Medienverleih als Dashboard: offene Anfragen, laufende Ausleihen, fällige Rückgaben – ein Blick statt drei Systeme.",
+        "st.praxis.p3": "<b>Fortbildungen automatisiert</b>Vom Akkreditierungsformular bis zur fertigen Teilnehmerliste läuft die Organisation weitgehend von selbst.",
+        "st.praxis.closer": "Das Ergebnis ist keine Kennzahl, sondern Zeit: für Beratung und Fortbildung von Lehrern, für medienpädagogische Projekte mit Schülern. Effizienz ist kein Selbstzweck – sie ist nur dann etwas wert, wenn die gewonnene Zeit bei Menschen ankommt. <a href='blog/#2026-07-07-effizienz-ist-ein-verstaerker-kein-ziel.md'>Der ganze Gedanke im Blog →</a>",
         "st.maker.label": "Wer dahintersteckt",
         "st.maker.quote": "„Ich entwickle MindGraph aus meinem Arbeitsalltag heraus. Ich studierte Chemieingenieurwesen in Erlangen und lernte dort programmieren. Danach wurde ich Lehrer und wechselte später ins Medienzentrum, das ich heute leite. Außerdem habe ich die pädagogische Leitung des MINT Space an der Technischen Hochschule Mittelhessen und arbeite im KI-Team der Hessischen Lehrkräfteakademie. MindGraph verbindet für mich Bildung, Organisation und Technik — und ist das Werkzeug, das mir selbst gefehlt hat.“",
         "st.maker.role": "Lehrer, Leiter eines Medienzentrums und Entwickler von MindGraph Notes",
@@ -1865,6 +1897,13 @@
         "st.proof.c3": "No telemetry, no tracker. The optional sync is zero-knowledge – your passphrase never leaves your device.",
         "st.proof.c4h": "Models tested per module",
         "st.proof.c4": "A documented compatibility matrix shows which local AI is fit for which module – not 'just any model'.",
+        "st.praxis.label": "From real practice",
+        "st.praxis.h": "Less admin — <em>more time for teachers and students.</em>",
+        "st.praxis.lead": "Administration eats the time that really belongs to schools: emails, lending lists, event logistics. In our media center, MindGraph keeps these things in view – so we don't have to.",
+        "st.praxis.p1": "<b>Email triaged</b>Incoming mail is scored locally by AI; tasks and deadlines are captured as to-dos automatically. Nothing gets buried in the inbox anymore.",
+        "st.praxis.p2": "<b>Lending at a glance</b>Device and media lending as a dashboard: open requests, active loans, due returns – one look instead of three systems.",
+        "st.praxis.p3": "<b>Training events automated</b>From the accreditation form to the finished attendance list, the organization largely runs itself.",
+        "st.praxis.closer": "The result isn't a metric, it's time: for advising and training teachers, for media-education projects with students. Efficiency is not an end in itself – it's only worth something when the time it frees up reaches people. <a href='blog/#2026-07-07-effizienz-ist-ein-verstaerker-kein-ziel.md'>The full essay on the blog (German) →</a>",
         "st.maker.label": "Who's behind it",
         "st.maker.quote": "“I develop MindGraph from my own working life. I studied chemical engineering in Erlangen and learned programming there. I then became a teacher and later moved into a media center, which I now lead. I also head the educational program at the MINT Space of the Technische Hochschule Mittelhessen and work with the AI team at the Hessian Teacher Academy. For me, MindGraph connects education, organization and technology — and is the tool I was missing myself.”",
         "st.maker.role": "Teacher, media center director and developer of MindGraph Notes",
