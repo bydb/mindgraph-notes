@@ -823,7 +823,10 @@ const ModulesTab: React.FC<{ t: TabTFn; onOpenTab: (tab: Tab) => void }> = ({ t,
   const renderModuleRow = (mod: ModuleDescriptor, official?: boolean) => {
     const enabled = isModuleEnabled(mod.id)
     return (
-      <label key={mod.id} className={`module-row ${enabled ? 'active' : ''}`}>
+      // htmlFor MUSS explizit gesetzt sein: ohne es wäre das Label-Ziel das ERSTE labelbare
+      // Element im Baum — und das ist der „Konfigurieren"-<button>, nicht die Checkbox.
+      // Ein Klick auf die Zeile/den Toggle öffnete dann den Config-Tab statt umzuschalten.
+      <label key={mod.id} htmlFor={`module-toggle-${mod.id}`} className={`module-row ${enabled ? 'active' : ''}`}>
         <div
           className="module-row-icon"
           style={{ background: mod.iconText ? (mod.iconColor || 'var(--accent-color, #4a9eff)') : CATEGORY_VISUAL[mod.category].color }}
@@ -869,6 +872,7 @@ const ModulesTab: React.FC<{ t: TabTFn; onOpenTab: (tab: Tab) => void }> = ({ t,
           )}
         </div>
         <input
+          id={`module-toggle-${mod.id}`}
           type="checkbox"
           className="module-toggle-input"
           checked={enabled}
