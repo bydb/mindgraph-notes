@@ -1,8 +1,14 @@
-import { app, BrowserWindow, ipcMain, dialog, shell, Notification, safeStorage, Menu, session, systemPreferences, clipboard, powerMonitor } from 'electron'
+import { app, BrowserWindow, ipcMain, dialog, shell, Notification, safeStorage, Menu, session, systemPreferences, clipboard, powerMonitor, protocol } from 'electron'
 import * as path from 'path'
 import * as fs from 'fs/promises'
 import { existsSync } from 'fs'
 import type { FileEntry } from '../shared/types'
+import {
+  HTML_PREVIEW_SCHEME,
+  previewPathnameToFsPath,
+  previewMimeFor,
+  PREVIEW_DOCUMENT_CSP
+} from '../shared/htmlPreview'
 
 // Dev-only userData-Isolation: ungepackt (`npm run dev`/`start`) NIEMALS das produktive Profil der
 // installierten App anfassen — sonst migriert/schreibt der Dev-Build die echten Settings (real passiert).
@@ -1092,6 +1098,50 @@ function findApprovedRootForPath(filePath: string): string | null {
   return roots.find(root => isPathInside(resolved, root)) ?? null
 }
 
+// =====================================================================
+// HTML-Vorschau: mindgraph-preview://vault/<absoluter Pfad>
+// =====================================================================
+// Liefert Vault-Dateien für die sandboxed <iframe>-Vorschau im Code-Editor
+// (CodeViewer). Sicherheitsenvelope identisch zu den FS-IPC-Handlern: jeder
+// Request läuft durch assertSafePath (approvedVaultRoots + realpath) — das
+// Protocol öffnet dem Renderer also keine Fläche, die readFile nicht schon hat.
+// HTML-Antworten bekommen PREVIEW_DOCUMENT_CSP (shared/htmlPreview.ts): die
+// Vorschau bleibt komplett offline, kein externer Host, keine Exfiltration.
+function registerHtmlPreviewProtocol(): void {
+  protocol.handle(HTML_PREVIEW_SCHEME, async (request) => {
+    if (request.method !== 'GET') {
+      return new Response('Method not allowed', { status: 405 })
+    }
+    const fsPath = previewPathnameToFsPath(new URL(request.url).pathname)
+    if (!fsPath) return new Response('Bad request', { status: 400 })
+
+    let safe: string
+    try {
+      safe = await assertSafePath(fsPath, 'html-preview')
+    } catch {
+      return new Response('Forbidden', { status: 403 })
+    }
+
+    let data: Buffer
+    try {
+      data = await fs.readFile(safe)
+    } catch {
+      return new Response('Not found', { status: 404 })
+    }
+
+    const mime = previewMimeFor(safe)
+    const headers: Record<string, string> = {
+      'Content-Type': mime,
+      'Cache-Control': 'no-store',
+      'X-Content-Type-Options': 'nosniff'
+    }
+    if (mime.startsWith('text/html')) {
+      headers['Content-Security-Policy'] = PREVIEW_DOCUMENT_CSP
+    }
+    return new Response(new Uint8Array(data), { headers })
+  })
+}
+
 function backupTimestamp(date = new Date()): string {
   const pad = (value: number, length = 2) => String(value).padStart(length, '0')
   return [
@@ -1229,6 +1279,15 @@ function createWindow(): void {
 // App-Name setzen
 app.name = 'MindGraph Notes'
 
+// HTML-Vorschau: privilegiertes Scheme MUSS vor dem ready-Event registriert werden
+// (standard → relative URL-Auflösung im Dokument, secure → keine Mixed-Content-Blocks).
+protocol.registerSchemesAsPrivileged([
+  {
+    scheme: HTML_PREVIEW_SCHEME,
+    privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true }
+  }
+])
+
 // Linux: WM_CLASS setzen für korrektes Taskbar-Icon
 if (process.platform === 'linux') {
   // Im Dev-Modus: eigene .desktop-Datei, im Production: von electron-builder generiert
@@ -1249,6 +1308,7 @@ app.whenReady().then(async () => {
     }
   })
   setupMediaPermissions()
+  registerHtmlPreviewProtocol()
 
   // UI-Settings nur EINMAL von Disk laden und unten für Tray/Transport wiederverwenden
   // (vorher zwei identische Disk-Reads beim Start).

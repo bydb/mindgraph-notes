@@ -16,6 +16,7 @@ import { tags } from '@lezer/highlight'
 import { detectLanguage } from '../../utils/codeLanguages'
 import { writeClipboardText } from '../../utils/clipboard'
 import { useTranslation } from '../../utils/translations'
+import { buildHtmlPreviewUrl, isHtmlPreviewable } from '../../../shared/htmlPreview'
 
 interface CodeViewerProps {
   vaultPath: string
@@ -129,9 +130,28 @@ export const CodeViewer: React.FC<CodeViewerProps> = ({ vaultPath, relativePath 
 
   const containerRef = useRef<HTMLDivElement>(null)
   const viewRef = useRef<EditorView | null>(null)
+  // Save-Trigger aus der Effect-Closure (pfad-gebunden), damit der Vorschau-
+  // Wechsel ungespeicherte Änderungen vor dem iframe-Load wegschreibt.
+  const saveNowRef = useRef<(() => Promise<void>) | null>(null)
 
   const language = useMemo(() => detectLanguage(relativePath), [relativePath])
   const fileName = relativePath.split(/[/\\]/).pop() || relativePath
+
+  // HTML-Vorschau: sandboxed iframe über mindgraph-preview:// (shared/htmlPreview.ts).
+  // Default ist Vorschau — wie bei Notizen (Lesen zuerst, Editieren einen Klick entfernt).
+  const isHtml = useMemo(() => isHtmlPreviewable(relativePath), [relativePath])
+  const [viewMode, setViewMode] = useState<'code' | 'preview'>(isHtml ? 'preview' : 'code')
+  const [previewNonce, setPreviewNonce] = useState(0)
+  const previewUrl = useMemo(
+    () => (isHtml ? buildHtmlPreviewUrl(vaultPath, relativePath) : ''),
+    [isHtml, vaultPath, relativePath]
+  )
+
+  const showPreview = async (): Promise<void> => {
+    await saveNowRef.current?.()
+    setPreviewNonce((n) => n + 1)
+    setViewMode('preview')
+  }
 
   useEffect(() => {
     // Alles pfad-gebunden in dieser Closure halten: beim Datei-Wechsel läuft der
@@ -146,6 +166,8 @@ export const CodeViewer: React.FC<CodeViewerProps> = ({ vaultPath, relativePath 
     setLoaded(false)
     setError(null)
     setSaveState('clean')
+    setViewMode(isHtmlPreviewable(relativePath) ? 'preview' : 'code')
+    setPreviewNonce((n) => n + 1)
 
     const saveNow = async (): Promise<void> => {
       if (!view) return
@@ -170,6 +192,7 @@ export const CodeViewer: React.FC<CodeViewerProps> = ({ vaultPath, relativePath 
       if (saveTimer) clearTimeout(saveTimer)
       saveTimer = setTimeout(() => { saveNow() }, AUTOSAVE_DELAY)
     }
+    saveNowRef.current = saveNow
 
     const init = async (): Promise<void> => {
       let text = ''
@@ -250,6 +273,7 @@ export const CodeViewer: React.FC<CodeViewerProps> = ({ vaultPath, relativePath 
     return () => {
       cancelled = true
       if (saveTimer) clearTimeout(saveTimer)
+      if (saveNowRef.current === saveNow) saveNowRef.current = null
       if (viewRef.current === view) viewRef.current = null
       if (view) {
         // Ungespeicherte Änderungen beim Schließen/Tabwechsel nicht verlieren
@@ -293,6 +317,33 @@ export const CodeViewer: React.FC<CodeViewerProps> = ({ vaultPath, relativePath 
           )}
         </div>
         <div className="code-viewer-actions">
+          {isHtml && (
+            <div className="code-viewer-mode-toggle">
+              <button
+                className={`code-viewer-action-btn${viewMode === 'preview' ? ' active' : ''}`}
+                onClick={() => { showPreview() }}
+                title={t('codeEditor.preview')}
+              >
+                {t('codeEditor.preview')}
+              </button>
+              <button
+                className={`code-viewer-action-btn${viewMode === 'code' ? ' active' : ''}`}
+                onClick={() => setViewMode('code')}
+                title={t('codeEditor.code')}
+              >
+                {t('codeEditor.code')}
+              </button>
+            </div>
+          )}
+          {isHtml && viewMode === 'preview' && (
+            <button
+              className="code-viewer-action-btn"
+              onClick={() => setPreviewNonce((n) => n + 1)}
+              title={t('codeEditor.reloadPreview')}
+            >
+              {t('codeEditor.reloadPreview')}
+            </button>
+          )}
           <span className="code-viewer-lines">{lineCount} {t('codeEditor.lines')}</span>
           <button
             className="code-viewer-action-btn"
@@ -330,11 +381,27 @@ export const CodeViewer: React.FC<CodeViewerProps> = ({ vaultPath, relativePath 
         </div>
       )}
 
-      {!loaded && !error && (
+      {!loaded && !error && viewMode === 'code' && (
         <div className="code-viewer-loading">{t('codeEditor.loading')}</div>
       )}
 
-      <div className="code-viewer-editor" ref={containerRef} />
+      {/* Editor bleibt im Vorschau-Modus gemountet (hält Doc + Autosave), nur versteckt */}
+      <div
+        className={`code-viewer-editor${viewMode === 'preview' ? ' code-viewer-editor--hidden' : ''}`}
+        ref={containerRef}
+      />
+
+      {/* Sandbox OHNE allow-same-origin: opaque Origin, kein Zugriff auf App/Storage.
+          allow-popups: target=_blank-Links landen via setWindowOpenHandler im System-Browser. */}
+      {isHtml && viewMode === 'preview' && !error && (
+        <iframe
+          key={previewNonce}
+          className="code-viewer-preview"
+          src={previewUrl}
+          sandbox="allow-scripts allow-forms allow-popups"
+          title={fileName}
+        />
+      )}
     </div>
   )
 }

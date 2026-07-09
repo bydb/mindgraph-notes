@@ -89,6 +89,32 @@
   overflow: hidden;
 }
 
+/* Im Vorschau-Modus bleibt der Editor gemountet (Doc + Autosave), nur unsichtbar */
+.code-viewer-editor--hidden {
+  display: none;
+}
+
+/* HTML-Vorschau (sandboxed iframe) — weißer Default wie im Browser,
+   damit Seiten ohne eigene Hintergrundfarbe im Dark Mode lesbar bleiben */
+.code-viewer-preview {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  border: none;
+  background: #fff;
+}
+
+.code-viewer-mode-toggle {
+  display: flex;
+  gap: 4px;
+}
+
+.code-viewer-action-btn.active {
+  background: color-mix(in srgb, var(--accent-color, #4a9eff) 15%, transparent);
+  border-color: var(--accent-color, #4a9eff);
+  color: var(--accent-color, #4a9eff);
+}
+
 .code-viewer-editor .cm-editor {
   height: 100%;
 }
