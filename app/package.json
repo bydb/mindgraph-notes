@@ -1,6 +1,6 @@
 {
   "name": "mindgraph-notes",
-  "version": "0.10.13-beta",
+  "version": "0.10.14-beta",
   "description": "Lokaler Workspace, der dir täglich zeigt, was in deinen Notizen, Aufgaben und E-Mails wichtig ist — mit Wissensgraph und KI.",
   "main": "out/main/index.js",
   "workspaces": [

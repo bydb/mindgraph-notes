@@ -2,6 +2,18 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.10.14-beta] - 2026-07-09
+
+HTML-Dateien öffnen jetzt direkt in der App als Live-Vorschau — Standalone-Seiten, Exporte und kleine Web-Experimente lassen sich ansehen, ohne die App zu verlassen.
+
+### Neu
+
+- **HTML-Vorschau im Code-Editor.** `.html`-Dateien öffnen standardmäßig als gerenderte Vorschau in einer abgeschotteten Sandbox; über den Header lässt sich jederzeit zwischen Vorschau und Code umschalten und die Vorschau neu laden. Relative Ressourcen (CSS, JavaScript, Bilder neben der HTML-Datei) funktionieren; externe Links öffnen im System-Browser. Die Vorschau bleibt komplett offline: Inhalte laufen durch dieselbe Sicherheits-Prüfung wie alle Dateizugriffe, externe Hosts sind blockiert.
+
+### Verbessert
+
+- **Website:** Modell-Tabelle korrigiert (Qwen 3.6 27B statt 3.5).
+
 ## [0.10.13-beta] - 2026-07-09
 
 Code-Dateien lassen sich jetzt direkt in MindGraph bearbeiten — der bisherige Nur-Lese-Viewer ist ein vollwertiger Code-Editor geworden.
