@@ -2,6 +2,22 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.10.13-beta] - 2026-07-09
+
+Code-Dateien lassen sich jetzt direkt in MindGraph bearbeiten — der bisherige Nur-Lese-Viewer ist ein vollwertiger Code-Editor geworden.
+
+### Neu
+
+- **Code-Editor statt Code-Viewer.** Code-Dateien (TypeScript, Python, JSON, YAML, Shell u. v. m.) sind direkt in der App editierbar — mit Syntax-Highlighting für rund 150 Sprachen (Sprachmodule werden bei Bedarf nachgeladen), Suchen/Ersetzen (Cmd+F), Undo/Redo, Code-Falten im Gutter, Klammer-Paarung, Auto-Einrückung und Multi-Cursor (Alt+Klick). Gespeichert wird automatisch nach kurzer Tipp-Pause oder sofort mit Cmd+S; ungespeicherte Änderungen zeigen einen Punkt neben dem Dateinamen, und beim Tab-Wechsel geht nichts verloren. Die Syntax-Farben folgen dem App-Theme (hell und dunkel). Der Button „In VS Code öffnen" bleibt für alles, was eine echte IDE braucht.
+
+### Verbessert
+
+- **Website:** Neue Sektion „Große Modelle auf kleinen Rechnern" (LLMBase EU-Cloud), Praxis-Teaser aus einem Medienzentrum, neuer Blog-Beitrag „Effizienz ist ein Verstärker, kein Ziel"; abgelaufener Discord-Link entfernt.
+
+### Behoben
+
+- **Modul-Schalter in den Einstellungen.** Der Ein/Aus-Schalter eines Moduls öffnete dessen Konfigurations-Tab, statt das Modul umzuschalten.
+
 ## [0.10.12-beta] - 2026-07-07
 
 LM Studio und LLMBase werden Erstklassbürger: geprüfte Modell-Empfehlungen gelten jetzt auch für LM Studio, mit LLMBase kommt ein deutscher EU-Cloud-Anbieter dazu — und ein neuer Demo-Vault zeigt alle Funktionen an einem realistischen Beispiel.
