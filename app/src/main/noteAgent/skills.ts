@@ -14,6 +14,7 @@ import { sanitizeOutputFileName, writeStagingFile } from './staging'
 import { readSkillBody, listSkillFiles, resolveSkillFile } from './skillsLoader'
 import { markdownToDocx } from '../office/officeService'
 import { fillDocxTableCells, MAX_FILL_ENTRIES, type DocxCellEntry } from '../../shared/docxTableFill'
+import { buildScientificHtmlPage, looksLikeFullHtmlDocument } from '../../shared/scientificHtmlPage'
 
 export interface NoteAgentContext {
   senderId: number
@@ -60,7 +61,7 @@ function requireString(args: Record<string, unknown>, key: string): string | nul
 async function registerStagedResult(
   ctx: NoteAgentContext,
   fileName: string,
-  kind: 'md' | 'xlsx' | 'docx' | 'txt' | 'csv',
+  kind: 'md' | 'xlsx' | 'docx' | 'txt' | 'csv' | 'html',
   data: Buffer | string,
   summary: string
 ): Promise<ToolResult> {
@@ -349,6 +350,45 @@ export function createNoteAgentRegistry(): ToolRegistry<NoteAgentContext> {
       } catch (e) {
         return err(e instanceof Error ? e.message : String(e))
       }
+    }
+  })
+
+  // Wissenschaftliche HTML-Seite (Entscheidung 11: LLM liefert Titel + Body-Inhalt,
+  // das Dokument baut buildScientificHtmlPage). LaTeX bleibt als Quelltext in der
+  // Datei und wird client-seitig von lokalem KaTeX gerendert; die Assets kopiert
+  // der Accept-Handler neben die Seite (htmlAssets.ts).
+  registry.register({
+    name: 'write_html',
+    description:
+      'Erzeugt eine wissenschaftliche HTML-Seite im Staging (Formeln via LaTeX, Grafiken als Inline-SVG). Parameter: file_name, title (Seitentitel — wird als Überschrift gesetzt, NICHT im Body wiederholen), body_html (NUR vollständig ausgearbeiteter Artikel-Inhalt — niemals Platzhalter, Auslassungspunkte oder leere Gerüst-Elemente; kein html/head/body-Gerüst), optional lang ("de"/"en"). CSS-Klassen des Seiten-Templates: div.equation umschließt eine $$-Display-Formel (wird automatisch nummeriert); Inline-Formeln in \\( \\); figure.fig enthält ein Inline-SVG plus figcaption (wird automatisch als Abbildung nummeriert); div.abstract für die Zusammenfassung; div.table-wrap um Tabellen; section.references mit ol fürs Literaturverzeichnis, Textverweise als sup.cite-Anker. SVG-Regeln: viewBox setzen (z.B. 0 0 640 300), alle Koordinaten innerhalb der viewBox, polyline-points NUR mit Leerzeichen/Komma trennen (keine Semikolons), Farben aus var(--fig-line), var(--fig-line-2), var(--muted), var(--fig-grid) oder currentColor, Beschriftung als text-Elemente ohne LaTeX.',
+    parameters: {
+      type: 'object',
+      properties: {
+        file_name: { type: 'string' },
+        title: { type: 'string', description: 'Seitentitel' },
+        body_html: { type: 'string', description: 'Artikel-Inhalt als HTML (Sektionen, Formeln, SVG) — ohne Dokumentgerüst und ohne <h1>' },
+        lang: { type: 'string', description: '"de" (Default) oder "en"' }
+      },
+      required: ['file_name', 'title', 'body_html']
+    },
+    isWrite: true,
+    run: async (args, ctx) => {
+      const rawName = requireString(args, 'file_name')
+      const title = requireString(args, 'title')
+      const bodyHtml = requireString(args, 'body_html')
+      if (!rawName) return err('Parameter "file_name" fehlt')
+      if (!title) return err('Parameter "title" fehlt')
+      if (!bodyHtml) return err('Parameter "body_html" fehlt oder ist leer')
+      if (looksLikeFullHtmlDocument(bodyHtml)) {
+        return err('body_html enthält ein Dokumentgerüst (<html>/<head>/<body>) — übergib NUR den Artikel-Inhalt, das Seiten-Template kommt von der App')
+      }
+      const fileName = sanitizeOutputFileName(rawName, '.html')
+      const html = buildScientificHtmlPage({
+        title,
+        bodyHtml,
+        lang: typeof args.lang === 'string' ? args.lang : 'de'
+      })
+      return registerStagedResult(ctx, fileName, 'html', html, `${bodyHtml.split(/\s+/).length} Wörter, wissenschaftliche HTML-Seite`)
     }
   })
 

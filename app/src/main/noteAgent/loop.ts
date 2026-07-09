@@ -58,7 +58,7 @@ ARBEITSWEISE (strikt einhalten):
    - Anhänge via read_attachment (exakter Dateiname aus der Liste unten).
    - Fehlen dir Informationen für den Auftrag (Fakten, Zuordnungen, frühere Ereignisse), DURCHSUCHE den Vault: note_search mit 1-3 Stichworten aus dem Auftrag, dann note_read auf die relevanten Treffer. Die Suche umfasst ALLE Notizen des Nutzers, auch sein Tagesgedächtnis (Brain-Ordner mit Tageszusammenfassungen). Rate keine Fakten, die du per note_search nachschlagen kannst.
    - Den Zielordner via list_target_folder (Namenskollisionen, vorhandene Vorlagen).
-2. SCHREIBE danach genau EINMAL das Ergebnis (write_xlsx, write_docx, write_note — oder fill_docx_form, wenn eine Skill eine Formular-Vorlage mit Feld→Zeilen-Zuordnung vorgibt) — kein Schreib-Lese-Pingpong, keine Wiederholung bereits erzeugter Dateien.
+2. SCHREIBE danach genau EINMAL das Ergebnis (write_xlsx, write_docx, write_note; write_html für wissenschaftliche HTML-Seiten mit Formeln und Grafiken — oder fill_docx_form, wenn eine Skill eine Formular-Vorlage mit Feld→Zeilen-Zuordnung vorgibt) — kein Schreib-Lese-Pingpong, keine Wiederholung bereits erzeugter Dateien.
 3. ANTWORTE zum Schluss mit 1-3 Sätzen, was du erzeugt hast und worauf der Nutzer achten sollte. Keine Rückfragen — triff sinnvolle Annahmen und benenne sie.
 
 REGELN:
@@ -79,7 +79,7 @@ export async function runNoteAgentLoop(params: NoteAgentLoopParams): Promise<Not
   const attachments = getContextAttachmentInfos(run.senderId, run.attachmentIds)
 
   // Skill-Angebot nach Kontextlage filtern (Plan Entscheidung 4).
-  const allowed = new Set(['note_read', 'note_search', 'list_target_folder', 'write_xlsx', 'write_docx', 'write_note'])
+  const allowed = new Set(['note_read', 'note_search', 'list_target_folder', 'write_xlsx', 'write_docx', 'write_note', 'write_html'])
   if (attachments.length > 0) allowed.add('read_attachment')
   if (run.skills.length > 0) {
     allowed.add('use_skill')
@@ -160,6 +160,7 @@ function summarizeArgs(skill: string, args: Record<string, unknown>): string {
       return `${pick('file_name')} (${rows} Zeilen)`
     }
     case 'write_docx':
+    case 'write_html':
     case 'write_note': return pick('file_name')
     case 'fill_docx_form': {
       const fields = Array.isArray(args.entries) ? args.entries.length : 0

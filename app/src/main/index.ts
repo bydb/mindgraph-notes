@@ -162,6 +162,7 @@ import { registerContextAttachment, registerContextFolder, removeContextAttachme
 import { startRun, getRunForSender, finishRun, publicResults, takeResult, cancelRunsForSender, pruneRunIfConsumed, consumeEvictedRuns } from './noteAgent/runRegistry'
 import { runNoteAgentLoop } from './noteAgent/loop'
 import { cleanupOldStaging, assertInsideRunStaging, reserveFreeName, stagingDirFor } from './noteAgent/staging'
+import { ensureHtmlPageAssets } from './noteAgent/htmlAssets'
 import { listVaultSkills, listEnabledSkillHeaders, setSkillEnabled, createSkill, readAgentMemory, appendAgentMemory, SKILLS_DIRNAME } from './noteAgent/skillsLoader'
 import { fetchSkillsCatalog, installCatalogSkill, importSkillFromPath } from './noteAgent/skillsCatalog'
 import { supportsNativeToolCalls } from '../shared/modelCompatibility'
@@ -4221,6 +4222,11 @@ ipcMain.handle('note-agent-accept-result', async (event, runId: string, resultId
     } else {
       // Platzhalter (leer, gerade reserviert) wird überschrieben — der Name gehört uns.
       await fs.copyFile(real, destPath)
+    }
+    // write_html-Seiten referenzieren KaTeX relativ — Assets neben die Seite legen
+    // (idempotent; Fehler hier lässt den Accept sauber in den Retry-Pfad laufen).
+    if (entry.kind === 'html') {
+      await ensureHtmlPageAssets(targetDir)
     }
     await fs.rm(real, { force: true }).catch(() => undefined)
     pruneRunIfConsumed(run)

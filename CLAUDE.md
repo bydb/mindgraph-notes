@@ -266,6 +266,14 @@ Click-Handler für Decorations: `view.posAtCoords()` + StateField-Lookup nutzen 
 - **Custom-Protocol** `mindgraph-preview://vault/<absoluter Pfad>` in `main/index.ts` (`registerHtmlPreviewProtocol`): jeder Request läuft durch `assertSafePath` — gleiche Sicherheitsenvelope wie die FS-IPC-Handler. Scheme-Registrierung (`registerSchemesAsPrivileged`) MUSS vor `app.ready` bleiben. Relative Ressourcen (CSS/JS/Bilder neben der HTML-Datei) funktionieren über normale URL-Auflösung.
 - **Vorschau bleibt offline**: HTML-Antworten bekommen eine CSP ohne externe Hosts (Inline-Skripte/-Styles erlaubt). iframe-Sandbox OHNE `allow-same-origin` (opaque Origin). `target=_blank`-Links landen via `setWindowOpenHandler` im System-Browser; normale externe Navigation ist CSP-geblockt (bewusst — echter Browser-Tab wäre ein eigenes Feature via `WebContentsView`).
 - **Bekannte Grenzen**: `fetch()`/ES-Module-Scripts aus der Vorschau-Seite scheitern an CORS (opaque Origin), `localStorage` wirft in der Sandbox — Standalone-Seiten mit klassischen Inline-Skripten sind der Zielfall. `webviewTag: false` bleibt unangetastet.
+- **Font-Loads aus CSS (`@font-face`) funktionieren** trotz opaque Origin — empirisch verifiziert mit den KaTeX-woff2 (write_html-Feature). Chromium erzwingt hier kein CORS gegen das Custom-Scheme.
+
+### Notiz-Agent: `write_html` (wissenschaftliche HTML-Seiten)
+- **Tool `write_html`** (`main/noteAgent/skills.ts`): LLM liefert `title` + `body_html` (+ optional `lang`), das Dokument baut `shared/scientificHtmlPage.ts` (`buildScientificHtmlPage`, Entscheidung 11). Body-only-Kontrakt: `looksLikeFullHtmlDocument()` lehnt Dokumentgerüste ab. Unit-Tests in `shared/scientificHtmlPage.test.ts`.
+- **LaTeX bleibt Quelltext** (`$$…$$`, `\(…\)`) — client-seitiges Rendering via KaTeX auto-render; die Seite bleibt im Code-Editor editierbar. Gleichungs-/Abbildungs-Nummerierung über CSS-Counter (`<div class="equation">`, `<figure class="fig">`).
+- **Offline-Assets**: Seiten referenzieren `mindgraph-assets/katex/` relativ (Konstante `HTML_PAGE_ASSETS_DIRNAME`). Der Accept-Handler (`note-agent-accept-result`) kopiert die Assets idempotent neben die Seite (`main/noteAgent/htmlAssets.ts`). Quelle: `app/resources/html-page-assets/katex/` — **vendored KaTeX v0.16.27** (js/css/auto-render/woff2); beim KaTeX-Bump in package.json neu kopieren (siehe README dort).
+- **Staging-Allowlist** in `noteAgent/staging.ts` um `.html`/`.htm` erweitert; `kind: 'html'` in `runRegistry.ts`.
+- **Starter-Skill** `resources/starter-skills/wissenschaftliche-webseite/SKILL.md` dokumentiert die Template-Bausteine (equation/fig/abstract/table-wrap/references) und SVG-Regeln (viewBox, CSS-Variablen `--fig-line`/`--fig-line-2`/`--fig-grid`, kein LaTeX in SVG-Text).
 
 ## Release-Prozess
 
