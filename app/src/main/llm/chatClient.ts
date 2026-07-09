@@ -112,6 +112,20 @@ function requestSignal(timeoutMs: number, external?: AbortSignal): AbortSignal {
   return external ? AbortSignal.any([external, timeout]) : timeout
 }
 
+// Chat-Completions laufen über Electrons net.fetch (Chromium-Netzwerk-Stack) statt
+// über das globale Node-fetch (undici): undici bricht Requests nach 300 s ohne
+// Response-Header hart ab (headersTimeout, nicht konfigurierbar ohne Dispatcher).
+// Bei `stream: false` kommen die Header aber erst, wenn die KOMPLETTE Antwort
+// generiert ist — langsame lokale Modelle (qwen3.6:27b-mlx, lange write_html-
+// Antworten) starben so reproduzierbar nach exakt 5 Minuten mit „fetch failed",
+// obwohl der Notiz-Agent ein 600-s-Timeout gesetzt hatte. Das AbortSignal aus
+// requestSignal() bleibt die einzige Zeitgrenze. Die kurzen Reachability-Checks
+// (/api/tags, 1,5-3 s Timeout) bleiben bewusst auf dem globalen fetch.
+async function chatFetch(url: string, init: RequestInit): Promise<Response> {
+  const { net } = await import('electron')
+  return net.fetch(url, init)
+}
+
 async function isOllamaReachable(url: string): Promise<boolean> {
   try {
     const res = await fetch(`${url}/api/tags`, { signal: AbortSignal.timeout(1500) })
@@ -159,7 +173,7 @@ async function chatViaOllama(messages: ChatMessage[], opts: ChatOptions): Promis
   const model = await pickDefaultOllamaModel(url, opts.ollamaModel)
   if (!model) throw new Error('Kein Ollama-Modell verfügbar')
 
-  const res = await fetch(`${url}/api/chat`, {
+  const res = await chatFetch(`${url}/api/chat`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -248,7 +262,7 @@ function assertCloudConfig(backend: CloudChatBackend, opts: ChatOptions): { apiK
 
 async function chatViaCloud(backend: CloudChatBackend, messages: ChatMessage[], opts: ChatOptions): Promise<ChatResult> {
   const { apiKey, model } = assertCloudConfig(backend, opts)
-  const res = await fetch(`${CLOUD_PROVIDERS[backend].baseUrl}/chat/completions`, {
+  const res = await chatFetch(`${CLOUD_PROVIDERS[backend].baseUrl}/chat/completions`, {
     method: 'POST',
     headers: cloudHeaders(backend, apiKey),
     body: JSON.stringify({
@@ -327,7 +341,7 @@ async function chatWithToolsViaOllama(
     }
   }))
 
-  const res = await fetch(`${url}/api/chat`, {
+  const res = await chatFetch(`${url}/api/chat`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -428,7 +442,7 @@ async function chatWithToolsViaCloud(
     function: { name: t.name, description: t.description, parameters: t.parameters }
   }))
 
-  const res = await fetch(`${CLOUD_PROVIDERS[backend].baseUrl}/chat/completions`, {
+  const res = await chatFetch(`${CLOUD_PROVIDERS[backend].baseUrl}/chat/completions`, {
     method: 'POST',
     headers: cloudHeaders(backend, apiKey),
     body: JSON.stringify({
