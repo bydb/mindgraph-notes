@@ -2,6 +2,20 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.10.16-beta] - 2026-07-10
+
+Der Notiz-Agent scheitert nicht mehr still: Fehler stehen im Lauf-Protokoll, das Iterations-Limit wird gemeldet, und Cloud-Modelle, die den HTML-Kontrakt ignorieren, werden automatisch repariert.
+
+### Behoben
+
+- **Notiz-Agent: Fehlschläge sind jetzt sichtbar.** Abgelehnte oder fehlgeschlagene Tool-Aufrufe erscheinen als eigene Zeile im Schritt-Protokoll (z. B. „write_html — Fehler: …"), und wenn ein Lauf das Iterations-Limit erreicht, sagt die Abschluss-Ansicht das klar — vorher las sich der letzte Modelltext („Ich erstelle die Webseite.") wie ein laufender Prozess, obwohl der Lauf ohne Ergebnis beendet war.
+- **write_html repariert Dokumentgerüste selbst.** Liefert das Modell ein komplettes HTML-Dokument statt nur des Artikel-Inhalts (real aufgetreten mit GLM 5.2), extrahiert das Tool jetzt den Body-Inhalt, statt abzulehnen — jede Ablehnung erzwang vorher eine minutenlange Neu-Generierung der ganzen Seite.
+- **Merken-Button mit echtem Feedback.** Der Mitlernen-Button im Agent-Abschluss zeigt jetzt seinen deaktivierten Zustand (erst Merksatz eintippen), bestätigt erfolgreiches Speichern sichtbar mit Zielpfad („Gemerkt — Skills/Agent-Gedächtnis.md") und zeigt Fehler direkt an der Merken-Zeile — vorher schluckte ein Klick auf den scheinbar aktiven Button die Eingabe kommentarlos.
+
+### Verbessert
+
+- **Notiz-Agent: Iterations-Limit 8 → 12.** Recherche-lastige Aufträge (viele Notiz-Zugriffe vor dem Schreiben) haben jetzt Luft für die Schreib-Iteration plus eine Fehler-Korrektur.
+
 ## [0.10.15-beta] - 2026-07-10
 
 Der Notiz-Agent schreibt jetzt wissenschaftliche HTML-Seiten — mit LaTeX-Formeln, nummerierten Gleichungen und SVG-Abbildungen, komplett offline.
