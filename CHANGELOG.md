@@ -2,6 +2,14 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.10.17-beta] - 2026-07-10
+
+Der Code-Editor überschreibt keine externen Änderungen mehr: Was andere Programme (KI-Assistenten, VS Code, Sync) an einer geöffneten Datei ändern, wird erkannt statt still verworfen.
+
+### Neu
+
+- **Code-Editor erkennt externe Datei-Änderungen.** Wird eine im Code-Editor geöffnete Datei außerhalb der App geändert, lädt der Editor die neue Version automatisch nach (bei ungespeicherten eigenen Änderungen erscheint stattdessen eine Wahl: „Externe Version laden" oder „Meine Version speichern"). Die HTML-Vorschau aktualisiert sich dabei mit. Vorher schrieb der Editor beim automatischen Speichern oder Tab-Wechsel seinen alten Stand zurück und überschrieb damit externe Änderungen kommentarlos — jetzt prüft jeder Speichervorgang zuerst, ob die Datei auf der Platte neuer ist.
+
 ## [0.10.16-beta] - 2026-07-10
 
 Der Notiz-Agent scheitert nicht mehr still: Fehler stehen im Lauf-Protokoll, das Iterations-Limit wird gemeldet, und Cloud-Modelle, die den HTML-Kontrakt ignorieren, werden automatisch repariert.
