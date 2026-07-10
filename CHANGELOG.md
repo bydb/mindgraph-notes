@@ -2,6 +2,18 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.10.15-beta] - 2026-07-10
+
+Der Notiz-Agent schreibt jetzt wissenschaftliche HTML-Seiten — mit LaTeX-Formeln, nummerierten Gleichungen und SVG-Abbildungen, komplett offline.
+
+### Neu
+
+- **Wissenschaftliche HTML-Seiten vom Notiz-Agenten (`write_html`).** Der Notiz-Agent kann als Ergebnis eine vollständige, wissenschaftlich formatierte HTML-Seite erzeugen: LaTeX-Formeln werden client-seitig mit KaTeX gerendert (die Formeln bleiben als Quelltext editierbar), Gleichungen und Abbildungen werden automatisch nummeriert, dazu Bausteine für Abstract, Tabellen und Literaturverzeichnis sowie SVG-Grafiken im App-Design. Die Seiten öffnen direkt in der HTML-Vorschau aus 0.10.14 und funktionieren komplett offline — die KaTeX-Assets (vendored v0.16.27) werden beim Übernehmen automatisch neben die Seite kopiert. Der neue Starter-Skill „Wissenschaftliche Webseite" dokumentiert alle Template-Bausteine.
+
+### Behoben
+
+- **Lange KI-Antworten brechen nicht mehr nach exakt 5 Minuten ab.** Der Netzwerk-Stack des Main-Prozesses (undici) kappte nicht-streamende Chat-Anfragen nach 300 Sekunden ohne Response-Header — bei langsamen lokalen Modellen (z. B. qwen3.6:27b auf kleiner Hardware) starb jede Antwort über 5 Minuten mit „fetch failed". Chat-Completions laufen jetzt über Electrons Chromium-Netzwerk-Stack; es gilt nur noch das reguläre Anfrage-Timeout.
+
 ## [0.10.14-beta] - 2026-07-09
 
 HTML-Dateien öffnen jetzt direkt in der App als Live-Vorschau — Standalone-Seiten, Exporte und kleine Web-Experimente lassen sich ansehen, ohne die App zu verlassen.
