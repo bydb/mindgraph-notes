@@ -14,7 +14,7 @@ import { sanitizeOutputFileName, writeStagingFile } from './staging'
 import { readSkillBody, listSkillFiles, resolveSkillFile } from './skillsLoader'
 import { markdownToDocx } from '../office/officeService'
 import { fillDocxTableCells, MAX_FILL_ENTRIES, type DocxCellEntry } from '../../shared/docxTableFill'
-import { buildScientificHtmlPage, looksLikeFullHtmlDocument } from '../../shared/scientificHtmlPage'
+import { buildScientificHtmlPage, extractArticleBody, looksLikeFullHtmlDocument } from '../../shared/scientificHtmlPage'
 
 export interface NoteAgentContext {
   senderId: number
@@ -379,16 +379,23 @@ export function createNoteAgentRegistry(): ToolRegistry<NoteAgentContext> {
       if (!rawName) return err('Parameter "file_name" fehlt')
       if (!title) return err('Parameter "title" fehlt')
       if (!bodyHtml) return err('Parameter "body_html" fehlt oder ist leer')
+      // Dokumentgerüst selbst heilen statt ablehnen — eine Ablehnung zwingt das Modell,
+      // die komplette Seite neu zu generieren (Minuten + eine Loop-Iteration).
+      let articleHtml = bodyHtml
       if (looksLikeFullHtmlDocument(bodyHtml)) {
-        return err('body_html enthält ein Dokumentgerüst (<html>/<head>/<body>) — übergib NUR den Artikel-Inhalt, das Seiten-Template kommt von der App')
+        const extracted = extractArticleBody(bodyHtml)
+        if (!extracted) {
+          return err('body_html enthält ein Dokumentgerüst (<html>/<head>/<body>) — übergib NUR den Artikel-Inhalt, das Seiten-Template kommt von der App')
+        }
+        articleHtml = extracted
       }
       const fileName = sanitizeOutputFileName(rawName, '.html')
       const html = buildScientificHtmlPage({
         title,
-        bodyHtml,
+        bodyHtml: articleHtml,
         lang: typeof args.lang === 'string' ? args.lang : 'de'
       })
-      return registerStagedResult(ctx, fileName, 'html', html, `${bodyHtml.split(/\s+/).length} Wörter, wissenschaftliche HTML-Seite`)
+      return registerStagedResult(ctx, fileName, 'html', html, `${articleHtml.split(/\s+/).length} Wörter, wissenschaftliche HTML-Seite`)
     }
   })
 

@@ -1929,8 +1929,10 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
             ...cur,
             phase: 'review',
             results: p.results.map(r => ({ ...r, state: 'pending' as const })),
+            // Iterations-Limit sichtbar machen: sonst liest sich der letzte Modelltext
+            // („Ich erstelle jetzt…") wie ein laufender Prozess, obwohl der Lauf vorbei ist.
             finalText: p.ok
-              ? (p.text || '')
+              ? [p.text || '', p.hitMaxIterations ? t('aiBar.agent.maxIterations') : ''].filter(Boolean).join('\n\n')
               : p.cancelled
                 ? t('aiBar.agent.cancelled')
                 : `${t('aiBar.agent.errorPrefix')}: ${p.error || '?'}`
@@ -2023,11 +2025,10 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
   }, [effectiveNoteId, agentRunByNote, agentResultPatch])
 
   // Mitlernen (Stufe 3): Merksatz in die Agent-Gedächtnis-Notiz (Skills/Agent-Gedächtnis.md).
-  const agentRemember = useCallback(async (text: string): Promise<boolean> => {
-    if (!vaultPath) return false
-    const res = await window.electronAPI.noteAgentRemember(vaultPath, text)
-    if (!res.success) setAgentAttachError(res.error || 'Speichern fehlgeschlagen')
-    return res.success
+  // Feedback (Erfolg + Fehler) rendert die AiActionBar direkt an der Merken-Zeile.
+  const agentRemember = useCallback(async (text: string): Promise<{ success: boolean; relPath?: string; error?: string }> => {
+    if (!vaultPath) return { success: false, error: 'Kein Vault geöffnet' }
+    return window.electronAPI.noteAgentRemember(vaultPath, text)
   }, [vaultPath])
 
   const agentRunDismiss = useCallback(() => {

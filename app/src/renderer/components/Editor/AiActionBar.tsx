@@ -81,8 +81,8 @@ interface Props {
   onAgentAccept: (resultId: string) => void
   onAgentDiscard: (resultId: string) => void
   onAgentDismiss: () => void
-  // Mitlernen (Stufe 3): bestätigter Merksatz → Agent-Gedächtnis-Notiz. true = gespeichert.
-  onRemember: (text: string) => Promise<boolean>
+  // Mitlernen (Stufe 3): bestätigter Merksatz → Agent-Gedächtnis-Notiz.
+  onRemember: (text: string) => Promise<{ success: boolean; relPath?: string; error?: string }>
 }
 
 const PRESETS = [
@@ -99,15 +99,17 @@ export function AiActionBar({ open, onOpenChange, phase, proposal, onGenerate, o
   const [preset, setPreset] = useState<string | null>(null)
   // Mitlernen (Stufe 3): Merksatz-Eingabe in der Review-Phase.
   const [rememberText, setRememberText] = useState('')
-  const [rememberSaved, setRememberSaved] = useState(false)
+  const [rememberFeedback, setRememberFeedback] = useState<{ kind: 'saved'; relPath: string } | { kind: 'error'; text: string } | null>(null)
 
   const submitRemember = async () => {
     if (!rememberText.trim()) return
-    const ok = await onRemember(rememberText.trim())
-    if (ok) {
+    const res = await onRemember(rememberText.trim())
+    if (res.success) {
       setRememberText('')
-      setRememberSaved(true)
-      setTimeout(() => setRememberSaved(false), 3000)
+      setRememberFeedback({ kind: 'saved', relPath: res.relPath || 'Skills/Agent-Gedächtnis.md' })
+      setTimeout(() => setRememberFeedback(f => (f?.kind === 'saved' ? null : f)), 5000)
+    } else {
+      setRememberFeedback({ kind: 'error', text: res.error || t('aiBar.agent.rememberError') })
     }
   }
   // Zielordner-Picker (Modus B)
@@ -350,13 +352,19 @@ export function AiActionBar({ open, onOpenChange, phase, proposal, onGenerate, o
                   className="ai-bar-context-search"
                   placeholder={t('aiBar.agent.rememberPlaceholder')}
                   value={rememberText}
-                  onChange={e => setRememberText(e.target.value)}
+                  onChange={e => { setRememberText(e.target.value); if (rememberFeedback?.kind === 'error') setRememberFeedback(null) }}
                   onKeyDown={e => { if (e.key === 'Enter') void submitRemember() }}
                 />
                 <button type="button" className="ai-bar-cancel" onClick={() => void submitRemember()} disabled={!rememberText.trim()}>
-                  {rememberSaved ? t('aiBar.agent.remembered') : t('aiBar.agent.remember')}
+                  {t('aiBar.agent.remember')}
                 </button>
               </div>
+              {rememberFeedback?.kind === 'saved' && (
+                <div className="ai-bar-agent-remember-saved">&#10003; {t('aiBar.agent.remembered')} — {rememberFeedback.relPath}</div>
+              )}
+              {rememberFeedback?.kind === 'error' && (
+                <div className="ai-bar-context-error">{rememberFeedback.text}</div>
+              )}
               <div className="ai-bar-agent-row">
                 <span />
                 <button type="button" className="ai-bar-cancel" onClick={onAgentDismiss}>{t('aiBar.agent.close')}</button>

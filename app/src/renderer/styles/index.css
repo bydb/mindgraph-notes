@@ -19964,7 +19964,8 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
   font-family: inherit;
   cursor: pointer;
 }
-.ai-bar-cancel:hover { background: color-mix(in srgb, var(--text-primary) 7%, transparent); color: var(--text-primary); }
+.ai-bar-cancel:hover:not(:disabled) { background: color-mix(in srgb, var(--text-primary) 7%, transparent); color: var(--text-primary); }
+.ai-bar-cancel:disabled { opacity: 0.45; cursor: default; }
 .ai-bar-send {
   padding: 6px 14px;
   border: none;
@@ -20190,6 +20191,7 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
 .ai-bar-agent-card-state { font-size: 11px; color: var(--text-secondary); }
 .ai-bar-agent-remember { display: flex; align-items: center; gap: 8px; }
 .ai-bar-agent-remember .ai-bar-context-search { flex: 1; }
+.ai-bar-agent-remember-saved { font-size: 11px; color: var(--accent-color); }
 .ai-bar-cloud-hint {
   padding: 6px 9px;
   border: 1px solid color-mix(in srgb, var(--color-warning) 35%, transparent);

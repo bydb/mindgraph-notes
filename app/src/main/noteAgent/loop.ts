@@ -8,7 +8,10 @@ import { getContextAttachmentInfos } from './contextFiles'
 import { createNoteAgentRegistry, type NoteAgentContext } from './skills'
 import { nextSeq, type AgentRun } from './runRegistry'
 
-const MAX_ITERATIONS = 8
+// 12 statt 8: recherche-lastige Läufe (viele note_read/note_search vor dem Schreiben)
+// brauchen Luft für die Schreib-Iteration plus eine Fehler-Korrektur — real lief ein
+// 20-Tool-Call-Lauf mit GLM 5.2 ins Limit, bevor das Ergebnis fertig war.
+const MAX_ITERATIONS = 12
 
 export interface NoteAgentLoopParams {
   run: AgentRun
@@ -126,6 +129,9 @@ export async function runNoteAgentLoop(params: NoteAgentLoopParams): Promise<Not
       try {
         const toolResult = await tool.run(call.arguments, ctx)
         if (run.abort.signal.aborted) throw new Error('Abgebrochen')
+        // Abgelehnte Tool-Aufrufe im Protokoll zeigen — sonst sieht der Lauf nach
+        // Fortschritt aus, während das Modell still eine Fehler-Schleife dreht.
+        if (!toolResult.ok) onStep(nextSeq(run), call.name, shortToolError(toolResult.content))
         messages.push({
           role: 'tool',
           tool_call_id: call.id,
@@ -133,17 +139,25 @@ export async function runNoteAgentLoop(params: NoteAgentLoopParams): Promise<Not
           content: toolResult.content
         })
       } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e)
+        if (!run.abort.signal.aborted) onStep(nextSeq(run), call.name, shortToolError(msg))
         messages.push({
           role: 'tool',
           tool_call_id: call.id,
           tool_name: call.name,
-          content: `Tool-Fehler: ${e instanceof Error ? e.message : String(e)}`
+          content: `Tool-Fehler: ${msg}`
         })
       }
     }
   }
 
   return { text: lastText || 'Iterations-Limit erreicht ohne abschließende Antwort.', hitMaxIterations: true }
+}
+
+// Fehler-Zeile fürs Lauf-Protokoll: „Fehler:"-Präfix vereinheitlichen, Rest kürzen.
+function shortToolError(content: string): string {
+  const text = content.replace(/^(Tool-)?Fehler:\s*/i, '')
+  return `Fehler: ${text.length > 160 ? `${text.slice(0, 160)}…` : text}`
 }
 
 // Kompakte, menschenlesbare Schritt-Zeile fürs Lauf-Protokoll.

@@ -26,6 +26,22 @@ export function looksLikeFullHtmlDocument(bodyHtml: string): boolean {
   return /<\s*(!doctype|html|head|body)\b/i.test(bodyHtml)
 }
 
+// Selbstheilung für Modelle, die den Body-only-Kontrakt ignorieren und ein komplettes
+// Dokument liefern (real aufgetreten mit GLM 5.2): Artikel-Inhalt aus dem Gerüst ziehen
+// statt ablehnen — jede Ablehnung kostet eine volle Neu-Generierung der Seite und damit
+// eine Loop-Iteration. null = nichts Brauchbares extrahierbar (dann greift die Ablehnung).
+export function extractArticleBody(html: string): string | null {
+  const bodyMatch = html.match(/<body[^>]*>([\s\S]*)<\/body>/i)
+  const inner = bodyMatch
+    ? bodyMatch[1]
+    : html
+        .replace(/<!doctype[^>]*>/gi, '')
+        .replace(/<head[^>]*>[\s\S]*?<\/head>/gi, '')
+        .replace(/<\/?(?:html|body)[^>]*>/gi, '')
+  const trimmed = inner.trim()
+  return trimmed && !looksLikeFullHtmlDocument(trimmed) ? trimmed : null
+}
+
 function escapeHtml(text: string): string {
   return text
     .replace(/&/g, '&amp;')

@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   buildScientificHtmlPage,
+  extractArticleBody,
   looksLikeFullHtmlDocument,
   HTML_PAGE_ASSETS_DIRNAME
 } from './scientificHtmlPage'
@@ -68,5 +69,31 @@ describe('looksLikeFullHtmlDocument', () => {
     expect(looksLikeFullHtmlDocument('<p>Text mit \\(x^2\\)</p>')).toBe(false)
     // Wortgrenze: <header> ist ein normales Body-Element, kein <head>
     expect(looksLikeFullHtmlDocument('<header class="paper">x</header>')).toBe(false)
+  })
+})
+
+describe('extractArticleBody', () => {
+  it('zieht den Inhalt aus <body>…</body> (Selbstheilung für Komplett-Dokumente)', () => {
+    const doc = '<!DOCTYPE html>\n<html lang="de">\n<head><title>T</title><style>p{}</style></head>\n<body>\n<section><h2>1 Einleitung</h2><p>Inhalt</p></section>\n</body>\n</html>'
+    expect(extractArticleBody(doc)).toBe('<section><h2>1 Einleitung</h2><p>Inhalt</p></section>')
+  })
+
+  it('greedy bis zum letzten </body> — Codebeispiele mit </body> im Inhalt bleiben erhalten', () => {
+    const doc = '<body><p>a</p><pre>&lt;/body&gt;</pre><p>b</p></body>'
+    expect(extractArticleBody(doc)).toBe('<p>a</p><pre>&lt;/body&gt;</pre><p>b</p>')
+  })
+
+  it('Gerüst ohne <body>-Paar: doctype/html/head-Reste werden entfernt', () => {
+    const doc = '<!DOCTYPE html><html><head><title>T</title></head><section><p>Inhalt</p></section></html>'
+    expect(extractArticleBody(doc)).toBe('<section><p>Inhalt</p></section>')
+  })
+
+  it('Attribute auf body werden mitentfernt', () => {
+    expect(extractArticleBody('<body class="paper" data-x="1"><p>x</p></body>')).toBe('<p>x</p>')
+  })
+
+  it('null wenn nichts Brauchbares übrig bleibt', () => {
+    expect(extractArticleBody('<!DOCTYPE html><html><head><title>T</title></head><body></body></html>')).toBe(null)
+    expect(extractArticleBody('<html></html>')).toBe(null)
   })
 })

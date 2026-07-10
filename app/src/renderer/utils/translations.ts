@@ -837,6 +837,8 @@ const translations = {
     'aiBar.agent.rememberPlaceholder': 'Fürs nächste Mal merken… (landet in Skills/Agent-Gedächtnis.md)',
     'aiBar.agent.remember': 'Merken',
     'aiBar.agent.remembered': 'Gemerkt',
+    'aiBar.agent.rememberError': 'Speichern fehlgeschlagen',
+    'aiBar.agent.maxIterations': 'Iterations-Limit erreicht — der Lauf endete, bevor der Agent fertig war. Erneut ausführen oder den Auftrag verkleinern.',
     'aiBar.agent.cloudHint': 'Hinweis: Auftrag, Anhänge und vom Agenten gelesene Notizen werden an das Cloud-Modell gesendet. Lokales Modell wählen, um das zu vermeiden.',
     'aiBar.context.cloudNotEnabledEdit': 'Cloud ist für „Notiz bearbeiten (KI)" nicht freigeschaltet (Einstellungen → Integrationen → OpenRouter) — oder lokales Modell wählen.',
 
@@ -3670,6 +3672,8 @@ const translations = {
     'aiBar.agent.rememberPlaceholder': 'Remember for next time… (saved to Skills/Agent-Gedächtnis.md)',
     'aiBar.agent.remember': 'Remember',
     'aiBar.agent.remembered': 'Saved',
+    'aiBar.agent.rememberError': 'Saving failed',
+    'aiBar.agent.maxIterations': 'Iteration limit reached — the run ended before the agent could finish. Run again or reduce the task.',
     'aiBar.agent.cloudHint': 'Note: The task, attachments and notes read by the agent will be sent to the cloud model. Choose a local model to avoid this.',
     'aiBar.context.cloudNotEnabledEdit': 'Cloud is not enabled for "Note editing (AI)" (Settings → Integrations → OpenRouter) — or choose a local model.',
 
