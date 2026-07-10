@@ -127,12 +127,15 @@ export const CodeViewer: React.FC<CodeViewerProps> = ({ vaultPath, relativePath 
   const [vscodeMsg, setVscodeMsg] = useState<string | null>(null)
   const [saveState, setSaveState] = useState<SaveState>('clean')
   const [lineCount, setLineCount] = useState(0)
+  // Externe Änderung bei ungespeichertem Puffer: Banner statt stillem Überschreiben.
+  const [externalConflict, setExternalConflict] = useState(false)
 
   const containerRef = useRef<HTMLDivElement>(null)
   const viewRef = useRef<EditorView | null>(null)
   // Save-Trigger aus der Effect-Closure (pfad-gebunden), damit der Vorschau-
   // Wechsel ungespeicherte Änderungen vor dem iframe-Load wegschreibt.
   const saveNowRef = useRef<(() => Promise<void>) | null>(null)
+  const resolveConflictRef = useRef<((keepMine: boolean) => Promise<void>) | null>(null)
 
   const language = useMemo(() => detectLanguage(relativePath), [relativePath])
   const fileName = relativePath.split(/[/\\]/).pop() || relativePath
@@ -162,22 +165,64 @@ export const CodeViewer: React.FC<CodeViewerProps> = ({ vaultPath, relativePath 
     let view: EditorView | null = null
     let lastSaved = ''
     let saveTimer: ReturnType<typeof setTimeout> | null = null
+    // Guard gegen den Stale-Puffer-Clobber (real: externe Reparatur zweimal überschrieben):
+    // mtime der Version, die dieser Editor zuletzt gelesen/geschrieben hat. Alles Neuere
+    // auf der Platte ist eine externe Änderung.
+    let lastKnownMtime = 0
+    let conflict = false
 
     setLoaded(false)
     setError(null)
     setSaveState('clean')
+    setExternalConflict(false)
     setViewMode(isHtmlPreviewable(relativePath) ? 'preview' : 'code')
     setPreviewNonce((n) => n + 1)
 
-    const saveNow = async (): Promise<void> => {
+    const readDiskMtime = async (): Promise<number> => {
+      const stats = await window.electronAPI.getFileStats(fullPath)
+      return new Date(stats.modifiedAt).getTime()
+    }
+
+    // Externe Version in den Editor übernehmen (nur bei sauberem Puffer oder auf Klick).
+    const adoptDiskVersion = async (): Promise<void> => {
+      const mtime = await readDiskMtime()
+      const disk = (await window.electronAPI.readFile(fullPath) as string) ?? ''
+      if (cancelled || !view) return
+      lastSaved = disk
+      lastKnownMtime = mtime
+      if (view.state.doc.toString() !== disk) {
+        view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: disk } })
+      }
+      setSaveState('clean')
+      setPreviewNonce((n) => n + 1)
+    }
+
+    const saveNow = async (force = false): Promise<void> => {
       if (!view) return
+      if (conflict && !force) return
       const content = view.state.doc.toString()
       if (content === lastSaved) return
+
+      // Vor dem Schreiben prüfen, ob die Platte inzwischen eine fremde Version trägt —
+      // sonst überschreibt der Editor-Puffer externe Writes (Claude, VS Code, Sync).
+      if (!force) {
+        try {
+          if (await readDiskMtime() > lastKnownMtime) {
+            const disk = (await window.electronAPI.readFile(fullPath) as string) ?? ''
+            if (disk !== lastSaved && disk !== content) {
+              conflict = true
+              if (!cancelled) setExternalConflict(true)
+              return
+            }
+          }
+        } catch { /* stat fehlgeschlagen (Datei neu/gelöscht) — normaler Write-Versuch */ }
+      }
 
       if (!cancelled) setSaveState('saving')
       try {
         await window.electronAPI.writeFile(fullPath, content)
         lastSaved = content
+        try { lastKnownMtime = await readDiskMtime() } catch { /* unkritisch */ }
         if (!cancelled && view) {
           // Nur auf clean setzen, wenn zwischenzeitlich nichts Neues getippt wurde
           setSaveState(view.state.doc.toString() === content ? 'clean' : 'dirty')
@@ -194,9 +239,51 @@ export const CodeViewer: React.FC<CodeViewerProps> = ({ vaultPath, relativePath 
     }
     saveNowRef.current = saveNow
 
+    // Poll + Fokus-Check auf externe Änderungen: sauberer Puffer → still neu laden
+    // (wie VS Code), ungespeicherte Änderungen → Konflikt-Banner, Autosave pausiert.
+    const checkExternal = async (): Promise<void> => {
+      if (cancelled || !view || conflict) return
+      try {
+        const mtime = await readDiskMtime()
+        if (mtime <= lastKnownMtime) return
+        const disk = (await window.electronAPI.readFile(fullPath) as string) ?? ''
+        if (cancelled || !view) return
+        const current = view.state.doc.toString()
+        if (disk === current) {
+          lastSaved = disk
+          lastKnownMtime = mtime
+        } else if (current === lastSaved) {
+          await adoptDiskVersion()
+        } else {
+          conflict = true
+          setExternalConflict(true)
+        }
+      } catch { /* Datei evtl. gerade gelöscht/umbenannt — nichts erzwingen */ }
+    }
+    const pollTimer = setInterval(() => { checkExternal() }, 2500)
+    const onFocus = (): void => { checkExternal() }
+    window.addEventListener('focus', onFocus)
+
+    const resolveConflict = async (keepMine: boolean): Promise<void> => {
+      conflict = false
+      if (!cancelled) setExternalConflict(false)
+      try {
+        if (keepMine) await saveNow(true)
+        else await adoptDiskVersion()
+      } catch (err) {
+        console.error('[CodeViewer] Konflikt-Auflösung fehlgeschlagen:', err)
+        if (!cancelled) setSaveState('error')
+      }
+    }
+    resolveConflictRef.current = resolveConflict
+
     const init = async (): Promise<void> => {
       let text = ''
       try {
+        // mtime VOR dem Inhalt lesen: ändert sich die Datei dazwischen, ist die
+        // gespeicherte mtime älter → der nächste Poll lädt schlimmstenfalls einmal
+        // zu viel neu, verpasst aber nie eine externe Änderung.
+        try { lastKnownMtime = await readDiskMtime() } catch { /* Datei evtl. brandneu */ }
         text = (await window.electronAPI.readFile(fullPath) as string) ?? ''
       } catch (err) {
         if (!cancelled) setError(err instanceof Error ? err.message : String(err))
@@ -273,15 +360,28 @@ export const CodeViewer: React.FC<CodeViewerProps> = ({ vaultPath, relativePath 
     return () => {
       cancelled = true
       if (saveTimer) clearTimeout(saveTimer)
+      clearInterval(pollTimer)
+      window.removeEventListener('focus', onFocus)
       if (saveNowRef.current === saveNow) saveNowRef.current = null
+      if (resolveConflictRef.current === resolveConflict) resolveConflictRef.current = null
       if (viewRef.current === view) viewRef.current = null
       if (view) {
-        // Ungespeicherte Änderungen beim Schließen/Tabwechsel nicht verlieren
+        // Ungespeicherte Änderungen beim Schließen/Tabwechsel nicht verlieren —
+        // aber NIE über eine extern geänderte Datei schreiben (der Clobber-Vektor):
+        // bei ungelöstem Konflikt oder neuerer Platten-Version wird übersprungen.
         const content = view.state.doc.toString()
-        if (content !== lastSaved) {
-          window.electronAPI.writeFile(fullPath, content).catch((err: unknown) => {
-            console.error('[CodeViewer] Fehler beim Speichern (unmount):', err)
-          })
+        if (content !== lastSaved && !conflict) {
+          window.electronAPI.getFileStats(fullPath)
+            .then((stats) => {
+              if (new Date(stats.modifiedAt).getTime() > lastKnownMtime) {
+                console.warn('[CodeViewer] Unmount-Save übersprungen — Datei wurde extern geändert:', fullPath)
+                return
+              }
+              return window.electronAPI.writeFile(fullPath, content)
+            })
+            .catch((err: unknown) => {
+              console.error('[CodeViewer] Fehler beim Speichern (unmount):', err)
+            })
         }
         view.destroy()
         view = null
@@ -378,6 +478,26 @@ export const CodeViewer: React.FC<CodeViewerProps> = ({ vaultPath, relativePath 
       {vscodeMsg && (
         <div className="code-viewer-error">
           {vscodeMsg}
+        </div>
+      )}
+
+      {externalConflict && (
+        <div className="code-viewer-conflict">
+          <span>{t('codeEditor.externalChange')}</span>
+          <div className="code-viewer-conflict-actions">
+            <button
+              className="code-viewer-action-btn"
+              onClick={() => { resolveConflictRef.current?.(false) }}
+            >
+              {t('codeEditor.conflictReload')}
+            </button>
+            <button
+              className="code-viewer-action-btn"
+              onClick={() => { resolveConflictRef.current?.(true) }}
+            >
+              {t('codeEditor.conflictKeepMine')}
+            </button>
+          </div>
         </div>
       )}
 

@@ -190,3 +190,21 @@
 .code-viewer-error {
   color: #dc2626;
 }
+
+/* Externe Änderung bei ungespeichertem Puffer: Entscheidung statt stillem Überschreiben */
+.code-viewer-conflict {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 16px;
+  font-size: 12px;
+  color: var(--text-primary);
+  background: color-mix(in srgb, #d97706 12%, var(--bg-primary));
+  border-bottom: 1px solid color-mix(in srgb, #d97706 35%, transparent);
+}
+.code-viewer-conflict-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
