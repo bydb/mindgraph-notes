@@ -163,6 +163,7 @@ Module als verbindbare Bausteine mit **typisierten Ports** auf einem React-Flow-
 - **Lesen-Modus** ist **WYSIWYG mit Inline-Editing** — Änderungen gehen via `turndown` zurück zu Markdown.
 - **Turndown-Escape MUSS selektiv konfiguriert sein**: `[`, `]`, `\`, `_` bleiben unangetastet (sonst exponentielle Wikilink-Korruption mit `2ⁿ−1`-Backslash-Wachstum, siehe v0.6.40-Fix). Nur Block-Start-Marker und Inline-Emphasis werden escaped.
 - **WYSIWYG-Roundtrip-Regeln für Embeds**: PDF/Office (`data-filename`), Mermaid (`data-source`), Dataview (`data-query`). Embeds werden aus diesen Attributen rekonstruiert, sonst stillschweigend gestrippt.
+- **Code-Blöcke im Roundtrip**: Der Lesen-Modus rendert Code-Zeilen als `<span class="code-line">` OHNE `\n` (wrapLines für CSS-Counter-Zeilennummern) — `renderedCodeBlockRule` (`utils/wysiwygCodeBlockRule.ts`) rekonstruiert die Zeilen aus den Spans. Ohne diese Regel presste turndowns Default jeden Code-Block auf EINE Zeile (stille Korruption, traf real den `email-relevance-config`-Block).
 - **Auto-Heal** für korrupte Wikilinks läuft in jedem `.md`-Write-Pfad (`write-file`, `tasks-update-line`, `tasks-create`) — strippt beliebig viele Backslashes vor `[` und `]`.
 - **REMINDER_REGEX in `shared/taskExtractor.ts`** ist tolerant gegenüber `\[\[`, `\\\[\\\[`, etc. — Tasks werden auch in leicht beschädigten Notizen sichtbar.
 
