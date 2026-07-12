@@ -2,7 +2,15 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
-## [0.10.19-beta] - 2026-07-12
+## [0.10.20-beta] - 2026-07-12
+
+Lange Dokumente lassen sich jetzt vollständig übersetzen — die KI-Textaktionen arbeiten große Texte abschnittsweise ab, statt an Token- und Zeit-Limits abzubrechen.
+
+### Behoben
+
+- **KI-Übersetzung langer Dokumente bricht nicht mehr ab.** Übersetzen, OCR-Bereinigung und Lektorat scheiterten bei langen Texten (z.B. 78.000 Zeichen) an mehreren Grenzen gleichzeitig: Die Ausgabe war auf 2000 Tokens gedeckelt, das Kontextfenster wurde nicht mitdimensioniert (der Anfang des Dokuments wurde still verworfen), lokale Läufe starben nach exakt 5 Minuten an einem internen Netzwerk-Timeout und Cloud-Läufe nach 2 Minuten. Große Texte werden jetzt automatisch an Absatzgrenzen in Abschnitte zerlegt und nacheinander verarbeitet — mit Fortschrittsanzeige („3/9") im KI-Menü. Gilt für Ollama, LM Studio und Cloud (OpenRouter/LLMBase).
+- **Tooltips im Code-Editor sind wieder sichtbar.** Sie öffneten nach oben und wurden vom Fensterrahmen abgeschnitten — jetzt öffnen sie nach unten.
+- **EPUB-Dateien erscheinen im Dateibaum.** Exportierte EPUBs waren bisher unsichtbar. Sie zeigen jetzt ein eigenes Icon, und ein Klick öffnet sie mit der Standard-App des Systems (z.B. Apple Books).
 
 Wichtiger Datenschutz-Fix für den Lesen-Modus: Code-Blöcke überleben das Speichern jetzt unversehrt. Ein Update wird allen Nutzern empfohlen.
 
