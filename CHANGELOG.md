@@ -2,7 +2,13 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
-## [0.10.18-beta] - 2026-07-12
+## [0.10.19-beta] - 2026-07-12
+
+Wichtiger Datenschutz-Fix für den Lesen-Modus: Code-Blöcke überleben das Speichern jetzt unversehrt. Ein Update wird allen Nutzern empfohlen.
+
+### Behoben
+
+- **Lesen-Modus zerstört keine Code-Blöcke mehr.** Beim Bearbeiten einer Notiz im Lesen-Modus verloren Code-Blöcke beim Speichern sämtliche Zeilenumbrüche — alle Zeilen klebten danach in einer einzigen (Ursache: die Zeilennummern-Darstellung rendert jede Code-Zeile als eigenes Element ohne Zeilenumbruch dazwischen, und die Rückumwandlung zu Markdown übernahm das eins zu eins). Der Fehler bestand still seit frühen Versionen und traf u.a. den Regelblock der E-Mail-Instruktionen: die festen Relevanz-Regeln (VIP-Absender, Domains, Schlüsselwörter) waren dadurch wirkungslos und die Felder in den Einstellungen leer. Die Rückumwandlung setzt die Zeilen jetzt korrekt wieder zusammen; betroffene Notizen lassen sich aus den automatischen Backups (`.mindgraph/backups/`) wiederherstellen.
 
 Zettel in Sekunden: Die Schnellerfassung hat einen eigenen Zettel-Modus mit KI-Vorschlägen für Tags und Emoji-Cluster. Dazu PDF- und EPUB-Export für HTML-Seiten und ein ehrlicheres Tagesgedächtnis.
 
