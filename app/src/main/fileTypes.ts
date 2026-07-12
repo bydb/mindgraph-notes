@@ -7,7 +7,7 @@
 
 import { extname } from 'node:path'
 
-export type CoreFileType = 'markdown' | 'pdf' | 'image' | 'excel' | 'word' | 'powerpoint' | 'code'
+export type CoreFileType = 'markdown' | 'pdf' | 'image' | 'excel' | 'word' | 'powerpoint' | 'code' | 'epub'
 
 const IMAGE_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.bmp', '.ico'] as const
 
@@ -39,6 +39,7 @@ const SPECIAL_CODE_FILENAMES = new Set(['dockerfile', 'makefile', '.gitignore', 
 const CORE_EXTENSION_TYPES: ReadonlyMap<string, CoreFileType> = new Map<string, CoreFileType>([
   ['.md', 'markdown'],
   ['.pdf', 'pdf'],
+  ['.epub', 'epub'],
   ...IMAGE_EXTENSIONS.map((e) => [e, 'image'] as [string, CoreFileType]),
   ['.xlsx', 'excel'], ['.xls', 'excel'],
   ['.docx', 'word'], ['.doc', 'word'],

@@ -2668,6 +2668,14 @@ ipcMain.handle('show-in-folder', async (_event, filePath: string) => {
   return true
 })
 
+// Vault-Datei mit der Standard-App des Systems öffnen (z.B. EPUB → Apple Books).
+// Pfad läuft durch assertSafePath — nur Dateien aus bestätigten Vault-Roots.
+ipcMain.handle('open-path', async (_event, filePath: string) => {
+  const safe = await assertSafePath(filePath, 'open-path')
+  const error = await shell.openPath(safe)
+  return { success: !error, error: error || undefined }
+})
+
 // Ordner erstellen
 ipcMain.handle('create-directory', async (_event, dirPath: string) => {
   try {

@@ -658,6 +658,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   htmlPreviewExport: (vaultPath: string, relativePath: string, format: 'pdf' | 'epub') =>
     ipcRenderer.invoke('html-preview-export', { vaultPath, relativePath, format }),
 
+  // Vault-Datei mit der System-Standard-App öffnen (z.B. EPUB)
+  openPath: (absolutePath: string) =>
+    ipcRenderer.invoke('open-path', absolutePath),
+
   // Task-Editing (Overdue-Panel / Aufgaben & Termine)
   tasksUpdateLine: (data: {
     vaultPath: string

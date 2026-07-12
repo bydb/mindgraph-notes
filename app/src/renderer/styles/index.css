@@ -252,6 +252,8 @@ h2 { letter-spacing: -0.016em; }
 /* Weitere Container, die oben anliegen → Tooltip nach unten: */
 .tab-bar [data-tooltip]::after,
 .editor-preview .fold-toggle[data-tooltip]::after,
+/* Code-Editor-Header: .code-viewer hat overflow:hidden — nach oben würde der Tooltip geclippt */
+.code-viewer-header [data-tooltip]::after,
 .focus-floating-bar [data-tooltip]::after {
   bottom: auto;
   top: calc(100% + 6px);
@@ -262,6 +264,7 @@ h2 { letter-spacing: -0.016em; }
 .vault-info [data-tooltip]::after,
 .remarkable-header [data-tooltip]::after,
 .voice-preview-controls [data-tooltip]::after,
+.code-viewer-actions [data-tooltip]::after,
 .canvas-export-panel [data-tooltip]::after {
   bottom: auto;
   top: calc(100% + 6px);
@@ -273,6 +276,7 @@ h2 { letter-spacing: -0.016em; }
 .vault-info [data-tooltip]:hover::after,
 .remarkable-header [data-tooltip]:hover::after,
 .voice-preview-controls [data-tooltip]:hover::after,
+.code-viewer-actions [data-tooltip]:hover::after,
 .canvas-export-panel [data-tooltip]:hover::after {
   transform: scale(1);
 }

@@ -213,6 +213,13 @@ const PdfIcon: React.FC = () => (
   </svg>
 )
 
+const EpubIcon: React.FC = () => (
+  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+    <rect x="1.5" y="4" width="13" height="8" rx="2" fill="none" stroke="#7c3aed" strokeWidth="0.9"/>
+    <text x="8" y="10.2" textAnchor="middle" fontSize="4.4" fontWeight="700" fill="#7c3aed" letterSpacing="0.2">EPUB</text>
+  </svg>
+)
+
 const ImageIcon: React.FC = () => (
   <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
     <rect x="2" y="3" width="12" height="10" rx="1" fill="#e3f2fd" stroke="#1976d2" strokeWidth="0.5"/>
@@ -358,6 +365,7 @@ const FileItem: React.FC<FileItemProps> = ({
   const isPowerPoint = entry.fileType === 'powerpoint'
   const isCode = entry.fileType === 'code'
   const isPlugin = entry.fileType === 'plugin'
+  const isEpub = entry.fileType === 'epub'
   const isOffice = isExcel || isWord || isPowerPoint
   const officeType: 'excel' | 'word' | 'powerpoint' | null = isExcel ? 'excel' : isWord ? 'word' : isPowerPoint ? 'powerpoint' : null
   const noteId = generateNoteId(entry.path)
@@ -369,14 +377,14 @@ const FileItem: React.FC<FileItemProps> = ({
       : isOffice
         ? selectedOfficePath === entry.path
         : selectedNoteId === noteId)
-  const isSecondarySelected = !entry.isDirectory && !isPdf && !isImage && !isOffice && secondarySelectedNoteId === noteId
+  const isSecondarySelected = !entry.isDirectory && !isPdf && !isImage && !isOffice && !isEpub && secondarySelectedNoteId === noteId
 
   // Finde die Notiz um Link-Count zu zeigen
   const note = notes.find(n => n.id === noteId)
   const linkCount = note ? note.outgoingLinks.filter(l => !/\.(png|jpe?g|gif|svg|webp|bmp|ico|tiff?)$/i.test(l)).length : 0
 
   // Bookmark Status (nur für Markdown-Notizen)
-  const noteIsBookmarked = !entry.isDirectory && !isPdf && !isImage && !isOffice && isBookmarked(noteId)
+  const noteIsBookmarked = !entry.isDirectory && !isPdf && !isImage && !isOffice && !isEpub && isBookmarked(noteId)
 
   // Hole Customization für diesen Eintrag (nur für Ordner)
   const customization = entry.isDirectory ? fileCustomizations[entry.path] : undefined
@@ -394,8 +402,8 @@ const FileItem: React.FC<FileItemProps> = ({
       // Ordner: immer nur den Ordnernamen anzeigen
       return entry.name
     }
-    // Für Bilder und Office-Dateien: vollständigen Namen mit Endung anzeigen
-    if (isImage || isOffice) {
+    // Für Bilder, Office- und EPUB-Dateien: vollständigen Namen mit Endung anzeigen
+    if (isImage || isOffice || isEpub) {
       return entry.name
     }
     // Endung nur am Ende strippen (replace() träfe das erste Vorkommen im Pfad)
@@ -407,7 +415,7 @@ const FileItem: React.FC<FileItemProps> = ({
     ? entry.path.slice(0, entry.path.lastIndexOf('/') + 1)
     : ''
   const indexedKindId = noteKindIndex.get(entry.path)
-  const noteKind = !entry.isDirectory && !isPdf && !isImage && !isOffice
+  const noteKind = !entry.isDirectory && !isPdf && !isImage && !isOffice && !isEpub
     ? (indexedKindId ? NOTE_KINDS[indexedKindId] : getNoteKindFromText(displayName) || getNoteKindFromText(entry.path))
     : null
   const visibleDisplayName = noteKind ? stripNoteKindMarker(displayName) : displayName
@@ -450,7 +458,7 @@ const FileItem: React.FC<FileItemProps> = ({
     }
 
     // Cmd/Ctrl+Click: Split-View (Secondary Note)
-    if ((e.metaKey || e.ctrlKey) && !entry.isDirectory && !isPdf && !isImage && !isOffice) {
+    if ((e.metaKey || e.ctrlKey) && !entry.isDirectory && !isPdf && !isImage && !isOffice && !isEpub) {
       e.preventDefault()
       setTextSplitEnabled(true)
       selectSecondaryNote(noteId)
@@ -476,6 +484,9 @@ const FileItem: React.FC<FileItemProps> = ({
         openCodeTab(entry.path, entry.name)
       } else if (isPlugin && entry.pluginEditor) {
         openPluginEditorTab(entry.pluginEditor.pluginId, entry.path, entry.pluginEditor.editorId, entry.name)
+      } else if (isEpub) {
+        // Kein eingebauter EPUB-Reader — mit der System-Standard-App öffnen (Apple Books & Co.)
+        if (vaultPath) void window.electronAPI.openPath(`${vaultPath}/${entry.path}`)
       } else {
         selectNote(noteId)
       }
@@ -1268,7 +1279,7 @@ const FileItem: React.FC<FileItemProps> = ({
               <ChevronIcon open={false} />
             </span>
             <span className="file-icon-wrapper">
-              {isBrainEntry ? <BrainIcon size={14} /> : isPdf ? <PdfIcon /> : isImage ? <ImageIcon /> : isExcel ? <ExcelIcon /> : isWord ? <WordIcon /> : isPowerPoint ? <PowerPointIcon /> : <FileIcon />}
+              {isBrainEntry ? <BrainIcon size={14} /> : isPdf ? <PdfIcon /> : isEpub ? <EpubIcon /> : isImage ? <ImageIcon /> : isExcel ? <ExcelIcon /> : isWord ? <WordIcon /> : isPowerPoint ? <PowerPointIcon /> : <FileIcon />}
             </span>
             {isEditing ? (
               <input

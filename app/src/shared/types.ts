@@ -440,7 +440,7 @@ export interface FileEntry {
   path: string;
   isDirectory: boolean;
   children?: FileEntry[];
-  fileType?: 'markdown' | 'pdf' | 'image' | 'excel' | 'word' | 'powerpoint' | 'code' | 'plugin';
+  fileType?: 'markdown' | 'pdf' | 'image' | 'excel' | 'word' | 'powerpoint' | 'code' | 'epub' | 'plugin';
   /** Bei fileType 'plugin' (ADR plugin-renderer-host §7): welches Renderer-Plugin/Editor die Endung
    *  beansprucht. Der FileTree öffnet damit einen plugin-editor-Tab. */
   pluginEditor?: { pluginId: string; editorId: string };
@@ -1070,6 +1070,7 @@ export interface ElectronAPI {
   openInVSCode: (absolutePath: string) => Promise<{ success: boolean; error?: string }>;
   htmlPreviewExport: (vaultPath: string, relativePath: string, format: 'pdf' | 'epub') =>
     Promise<{ success: boolean; path?: string; error?: string; warning?: string; canceled?: boolean }>;
+  openPath: (absolutePath: string) => Promise<{ success: boolean; error?: string }>;
   tasksUpdateLine: (data: {
     vaultPath: string;
     relativePath: string;
