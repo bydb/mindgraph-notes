@@ -58,6 +58,15 @@ export const AIContextMenu: React.FC<AIContextMenuProps> = ({
     }
   }, [showCustomPrompt])
 
+  // Fortschritt gechunkter Lang-Text-Aktionen (z.B. „Übersetze 3/9")
+  const [chunkProgress, setChunkProgress] = useState<{ current: number; total: number } | null>(null)
+  useEffect(() => {
+    const unsubscribe = window.electronAPI.onAiActionProgress((progress) => {
+      setChunkProgress({ current: progress.current, total: progress.total })
+    })
+    return unsubscribe
+  }, [])
+
   const handleAction = async (action: AIAction, targetLanguage?: string, customPrompt?: string) => {
     const noteEditRoute = cloudRoutesForFeature('note-edit', ollama)[0] ?? null
     if (!ollama.enabled || (!ollama.selectedModel && !noteEditRoute)) {
@@ -67,6 +76,7 @@ export const AIContextMenu: React.FC<AIContextMenuProps> = ({
 
     setIsLoading(true)
     setLoadingAction(action)
+    setChunkProgress(null)
 
     try {
       // Backend-basierte API-Auswahl
@@ -167,7 +177,10 @@ export const AIContextMenu: React.FC<AIContextMenuProps> = ({
             {t('ai.translate')} → {getLanguageName(ollama.defaultTranslateLanguage)}
           </span>
           {isLoading && loadingAction === 'translate' ? (
-            <span className="ai-loading-spinner" />
+            <>
+              {chunkProgress && <span className="ai-chunk-progress">{chunkProgress.current}/{chunkProgress.total}</span>}
+              <span className="ai-loading-spinner" />
+            </>
           ) : (
             <span className="ai-submenu-arrow">▶</span>
           )}
@@ -200,7 +213,10 @@ export const AIContextMenu: React.FC<AIContextMenuProps> = ({
             <span className="ai-action-icon">{ACTION_ICONS[action]}</span>
             <span className="ai-action-label">{t(`ai.${action}` as const)}</span>
             {isLoading && loadingAction === action && (
-              <span className="ai-loading-spinner" />
+              <>
+                {chunkProgress && <span className="ai-chunk-progress">{chunkProgress.current}/{chunkProgress.total}</span>}
+                <span className="ai-loading-spinner" />
+              </>
             )}
           </div>
         ))}

@@ -698,6 +698,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('transport-window-shown', () => callback())
   },
 
+  // Fortschritt gechunkter KI-Aktionen (Übersetzen/OCR-Cleanup/Lektorat langer Texte)
+  onAiActionProgress: (callback: (progress: { action: string; current: number; total: number }) => void) => {
+    const listener = (_event: unknown, progress: { action: string; current: number; total: number }): void => callback(progress)
+    ipcRenderer.on('ai-action-progress', listener)
+    return () => ipcRenderer.removeListener('ai-action-progress', listener)
+  },
+
   // Telegram Bot
   telegramSaveToken: (token: string) =>
     ipcRenderer.invoke('telegram-save-token', token),

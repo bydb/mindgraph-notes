@@ -13,6 +13,7 @@ import {
 } from '../shared/htmlPreview'
 import { exportPreviewPdf, exportPreviewEpub } from './htmlExport'
 import { buildZettelContent, buildZettelFileName, extractFrontmatterTags, sanitizeZettelEmojis, sanitizeZettelTag } from '../shared/zettel'
+import { splitTextIntoChunks, LONG_TEXT_CHUNK_THRESHOLD } from '../shared/textChunking'
 
 // Dev-only userData-Isolation: ungepackt (`npm run dev`/`start`) NIEMALS das produktive Profil der
 // installierten App anfassen — sonst migriert/schreibt der Dev-Build die echten Settings (real passiert).
@@ -4443,68 +4444,106 @@ ipcMain.handle('ollama-generate', async (event, request: OllamaRequest) => {
       return { success: false, error: ctxResult.error, model: request.model, action: request.action }
     }
 
-    const fullPrompt = request.action === 'custom'
-      ? `${request.customPrompt}${ctxResult.section}\n\nText:\n${request.originalText}`
-      : `${systemPrompts[request.action]}${ctxResult.section}\n\nText:\n${request.originalText}`
+    // Lang-Text-Aktionen (Output ≈ Input-Länge) laufen absatzweise gechunkt — ein
+    // langes Dokument (real: 78k-Zeichen-Übersetzung) sprengt sonst JEDES Limit:
+    // num_predict deckelte den Output auf 2000 Tokens, Ollamas Default-num_ctx
+    // schnitt den Input still vorne ab, Cloud-Provider capen max_tokens, und der
+    // 120-s-Cloud-Timeout bzw. undicis 300-s-headersTimeout killten lange Läufe.
+    const isLongOutputAction = request.action === 'translate' || request.action === 'ocr-cleanup' || request.action === 'improve'
+    const chunks = isLongOutputAction && request.originalText.length > LONG_TEXT_CHUNK_THRESHOLD
+      ? splitTextIntoChunks(request.originalText)
+      : [request.originalText]
 
-    // Cloud-Pfad (OpenRouter/LLMBase): nicht-streamend, gleicher Prompt. Key aus safeStorage.
-    if (request.cloud?.model) {
-      const cloudResolved = await resolveCloudChatOptions(request.cloud)
-      if (!cloudResolved) {
-        return { success: false, error: 'Cloud ist für die Notiz-KI aktiviert, aber kein API-Key hinterlegt (Einstellungen → KI → Cloud-Provider).', model: request.model, action: request.action }
-      }
-      const res = await llmChat(
-        [{ role: 'user', content: fullPrompt }],
-        { ...cloudResolved.chatOptions, temperature: request.action === 'translate' ? 0.3 : 0.7 }
-      )
-      return {
-        success: true,
-        result: (res.text || '').trim(),
-        model: `${cloudResolved.provider}/${cloudResolved.model}`,
-        action: request.action,
-        prompt: fullPrompt,
-        originalText: request.originalText,
-        targetLanguage: request.targetLanguage,
-        customPrompt: request.customPrompt,
-        timestamp: new Date().toISOString()
-      }
+    const systemPrompt = request.action === 'custom'
+      ? (request.customPrompt || 'Bearbeite den folgenden Text nach deinem besten Wissen.')
+      : systemPrompts[request.action]
+    const temperature = (request.action === 'translate' || request.action === 'ocr-cleanup') ? 0.3 : 0.7
+    const buildChunkPrompt = (chunk: string, index: number): string =>
+      // Kontext-Anhänge nur in den ersten Chunk (wie bisher im Single-Shot)
+      `${systemPrompt}${index === 0 ? ctxResult.section : ''}\n\nText:\n${chunk}`
+
+    // Cloud-Pfad (OpenRouter/LLMBase): Key aus safeStorage, einmal auflösen.
+    const cloudResolved = request.cloud?.model ? await resolveCloudChatOptions(request.cloud) : null
+    if (request.cloud?.model && !cloudResolved) {
+      return { success: false, error: 'Cloud ist für die Notiz-KI aktiviert, aber kein API-Key hinterlegt (Einstellungen → KI → Cloud-Provider).', model: request.model, action: request.action }
     }
 
-    const response = await fetch(`${OLLAMA_API_URL}/api/generate`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: request.model,
-        prompt: fullPrompt,
-        stream: false,
-        think: false,
-        options: {
-          temperature: (request.action === 'translate' || request.action === 'ocr-cleanup') ? 0.3 : 0.7,
-          num_predict: request.action === 'summarize' ? 500 : 2000
+    const pieces: string[] = []
+    for (let i = 0; i < chunks.length; i++) {
+      if (chunks.length > 1) {
+        event.sender.send('ai-action-progress', { action: request.action, current: i + 1, total: chunks.length })
+      }
+      const chunkPrompt = buildChunkPrompt(chunks[i], i)
+
+      if (cloudResolved) {
+        const res = await llmChat(
+          [{ role: 'user', content: chunkPrompt }],
+          {
+            ...cloudResolved.chatOptions,
+            temperature,
+            // Provider-Default-Caps reichen für Übersetzungs-Output nicht → explizit setzen;
+            // Default-timeoutMs (120 s) ist für lange Chunks zu knapp.
+            ...(isLongOutputAction ? { maxTokens: Math.min(16384, Math.max(4096, Math.ceil(chunks[i].length / 2))) } : {}),
+            timeoutMs: 600_000
+          }
+        )
+        pieces.push((res.text || '').trim())
+      } else {
+        const numPredict = isLongOutputAction
+          ? Math.min(16384, Math.max(2048, Math.ceil(chunks[i].length / 2)))
+          : (request.action === 'summarize' ? 500 : 2000)
+        // num_ctx nur setzen, wenn Prompt+Output über Ollamas Default hinausgehen —
+        // sonst würde der Input STILL vorne abgeschnitten. Zeichen/3 ≈ Token.
+        const estimatedTokens = Math.ceil(chunkPrompt.length / 3) + numPredict
+        const numCtx = estimatedTokens > 6000
+          ? Math.min(65536, 1024 * Math.ceil((estimatedTokens * 1.25) / 1024))
+          : undefined
+
+        // net.fetch statt globalem fetch: undici bricht stream:false-Requests nach
+        // 300 s ohne Response-Header hart ab (gleiche Falle wie beim Notiz-Agenten,
+        // siehe chatFetch in llm/chatClient.ts). Zeitgrenze: 30 min pro Chunk.
+        const { net } = await import('electron')
+        const response = await net.fetch(`${OLLAMA_API_URL}/api/generate`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model: request.model,
+            prompt: chunkPrompt,
+            stream: false,
+            think: false,
+            options: {
+              temperature,
+              num_predict: numPredict,
+              ...(numCtx ? { num_ctx: numCtx } : {})
+            }
+          }),
+          signal: AbortSignal.timeout(30 * 60_000)
+        })
+
+        if (!response.ok) {
+          const errorText = await response.text()
+          console.error('[Ollama] API error:', errorText)
+          throw new Error(`Ollama API Fehler: ${response.status}`)
         }
-      })
-    })
 
-    if (!response.ok) {
-      const errorText = await response.text()
-      console.error('[Ollama] API error:', errorText)
-      throw new Error(`Ollama API Fehler: ${response.status}`)
+        const data = await response.json()
+        console.log('[Ollama] Response received:', {
+          chunk: `${i + 1}/${chunks.length}`,
+          hasResponse: !!data.response,
+          responseLength: data.response?.length || 0,
+          done: data.done
+        })
+        pieces.push((data.response || '').trim())
+      }
     }
-
-    const data = await response.json()
-    console.log('[Ollama] Response received:', {
-      hasResponse: !!data.response,
-      responseLength: data.response?.length || 0,
-      hasThinking: !!data.thinking,
-      done: data.done
-    })
 
     return {
       success: true,
-      result: data.response?.trim() || '',
-      model: request.model,
+      // Chunk-Grenzen sind (fast immer) Absatzgrenzen → mit Leerzeile wieder zusammensetzen.
+      result: pieces.join(chunks.length > 1 ? '\n\n' : ''),
+      model: cloudResolved ? `${cloudResolved.provider}/${cloudResolved.model}` : request.model,
       action: request.action,
-      prompt: fullPrompt,
+      prompt: buildChunkPrompt(chunks[0], 0),
       originalText: request.originalText,
       targetLanguage: request.targetLanguage,
       customPrompt: request.customPrompt,
@@ -5534,46 +5573,67 @@ ipcMain.handle('lmstudio-generate', async (event, request: LMStudioRequest) => {
     }
 
     const systemMessage = systemPrompts[request.action]
-    const userMessage = request.action === 'custom'
-      ? `${request.customPrompt}${ctxResult.section}\n\nText:\n${request.originalText}`
-      : `${ctxResult.section ? ctxResult.section.trimStart() + '\n\n' : ''}Text:\n${request.originalText}`
 
-    const response = await fetch(`${getLMStudioUrl(port)}/v1/chat/completions`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: request.model,
-        messages: [
-          { role: 'system', content: systemMessage },
-          { role: 'user', content: userMessage }
-        ],
-        temperature: (request.action === 'translate' || request.action === 'ocr-cleanup') ? 0.3 : 0.7,
-        max_tokens: request.action === 'summarize' ? 500 : 2000,
-        stream: false
-      })
-    })
+    // Lang-Text-Aktionen chunken — gleiche Begründung wie im Ollama-Handler
+    // (max_tokens 2000 + undici-headersTimeout brachen lange Übersetzungen ab).
+    const isLongOutputAction = request.action === 'translate' || request.action === 'ocr-cleanup' || request.action === 'improve'
+    const chunks = isLongOutputAction && request.originalText.length > LONG_TEXT_CHUNK_THRESHOLD
+      ? splitTextIntoChunks(request.originalText)
+      : [request.originalText]
 
-    if (!response.ok) {
-      const errorText = await response.text()
-      console.error('[LM Studio] API error:', errorText)
-      throw new Error(`LM Studio API Fehler: ${response.status}`)
+    const buildUserMessage = (chunk: string, index: number): string => {
+      const ctx = index === 0 ? ctxResult.section : ''
+      return request.action === 'custom'
+        ? `${request.customPrompt}${ctx}\n\nText:\n${chunk}`
+        : `${ctx ? ctx.trimStart() + '\n\n' : ''}Text:\n${chunk}`
     }
 
-    const data = await response.json()
-    const result = data.choices?.[0]?.message?.content || ''
+    const pieces: string[] = []
+    for (let i = 0; i < chunks.length; i++) {
+      if (chunks.length > 1) {
+        event.sender.send('ai-action-progress', { action: request.action, current: i + 1, total: chunks.length })
+      }
+      const { net } = await import('electron')
+      const response = await net.fetch(`${getLMStudioUrl(port)}/v1/chat/completions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: request.model,
+          messages: [
+            { role: 'system', content: systemMessage },
+            { role: 'user', content: buildUserMessage(chunks[i], i) }
+          ],
+          temperature: (request.action === 'translate' || request.action === 'ocr-cleanup') ? 0.3 : 0.7,
+          max_tokens: isLongOutputAction
+            ? Math.min(16384, Math.max(2048, Math.ceil(chunks[i].length / 2)))
+            : (request.action === 'summarize' ? 500 : 2000),
+          stream: false
+        }),
+        signal: AbortSignal.timeout(30 * 60_000)
+      })
 
-    console.log('[LM Studio] Response received:', {
-      hasResponse: !!result,
-      responseLength: result.length,
-      done: true
-    })
+      if (!response.ok) {
+        const errorText = await response.text()
+        console.error('[LM Studio] API error:', errorText)
+        throw new Error(`LM Studio API Fehler: ${response.status}`)
+      }
+
+      const data = await response.json()
+      const result = data.choices?.[0]?.message?.content || ''
+      console.log('[LM Studio] Response received:', {
+        chunk: `${i + 1}/${chunks.length}`,
+        hasResponse: !!result,
+        responseLength: result.length
+      })
+      pieces.push(result.trim())
+    }
 
     return {
       success: true,
-      result: result.trim(),
+      result: pieces.join(chunks.length > 1 ? '\n\n' : ''),
       model: request.model,
       action: request.action,
-      prompt: userMessage,
+      prompt: buildUserMessage(chunks[0], 0),
       originalText: request.originalText,
       targetLanguage: request.targetLanguage,
       customPrompt: request.customPrompt,

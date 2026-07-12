@@ -8796,6 +8796,18 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
   margin-left: auto;
 }
 
+/* Chunk-Fortschritt gechunkter Lang-Text-Aktionen (z.B. "3/9" beim Übersetzen) */
+.ai-chunk-progress {
+  margin-left: auto;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-secondary);
+}
+
+.ai-chunk-progress + .ai-loading-spinner {
+  margin-left: 6px;
+}
+
 @keyframes ai-spin {
   to {
     transform: rotate(360deg);

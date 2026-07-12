@@ -1071,6 +1071,7 @@ export interface ElectronAPI {
   htmlPreviewExport: (vaultPath: string, relativePath: string, format: 'pdf' | 'epub') =>
     Promise<{ success: boolean; path?: string; error?: string; warning?: string; canceled?: boolean }>;
   openPath: (absolutePath: string) => Promise<{ success: boolean; error?: string }>;
+  onAiActionProgress: (callback: (progress: { action: string; current: number; total: number }) => void) => () => void;
   tasksUpdateLine: (data: {
     vaultPath: string;
     relativePath: string;
