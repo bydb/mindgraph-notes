@@ -19,6 +19,7 @@ const CATEGORIES: Category[] = [
 ]
 
 export default function TransportCapture(): React.ReactElement {
+  const [mode, setMode] = useState<'note' | 'zettel'>('note')
   const [category, setCategory] = useState('🟢')
   const [content, setContent] = useState('')
   const [selectedTags, setSelectedTags] = useState<Set<string>>(new Set())
@@ -28,6 +29,18 @@ export default function TransportCapture(): React.ReactElement {
   const [status, setStatus] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
   const [newTagInput, setNewTagInput] = useState('')
   const [isPreparingModel, setIsPreparingModel] = useState(false)
+
+  // Zettel-Modus: eigene Felder nach der gelebten Zettelkasten-Konvention
+  // (Emoji-Cluster im Dateinamen, Zitat / Mein Gedanke / Quelle im Body).
+  const [zettelTitle, setZettelTitle] = useState('')
+  const [zettelEmojis, setZettelEmojis] = useState('')
+  const [zettelQuote, setZettelQuote] = useState('')
+  const [zettelThought, setZettelThought] = useState('')
+  const [zettelSource, setZettelSource] = useState('')
+  const [zettelFolder, setZettelFolder] = useState('')
+  const [zettelVaultTags, setZettelVaultTags] = useState<string[]>([])
+  const [isSuggesting, setIsSuggesting] = useState(false)
+  const zettelContextLoadedRef = useRef(false)
 
   // Config aus Main Process
   const [destinations, setDestinations] = useState<{ label: string; folder: string }[]>([])
@@ -90,13 +103,18 @@ export default function TransportCapture(): React.ReactElement {
   useEffect(() => {
     loadConfig()
 
-    // Bei jedem Fenster-Anzeigen: Reset + Config neu laden
+    // Bei jedem Fenster-Anzeigen: Reset + Config neu laden (der Modus bleibt erhalten)
     window.electronAPI.onTransportWindowShown(() => {
       dictationHandleRef.current?.cancel()
       dictationHandleRef.current = null
       setContent('')
       setSelectedTags(new Set())
       setCategory('🟢')
+      setZettelTitle('')
+      setZettelEmojis('')
+      setZettelQuote('')
+      setZettelThought('')
+      setZettelSource('')
       setIsSubmitting(false)
       setStatus(null)
       loadConfig()
@@ -104,6 +122,27 @@ export default function TransportCapture(): React.ReactElement {
       setTimeout(() => editorRef.current?.focus(), 50)
     })
   }, [loadConfig])
+
+  // Zettel-Kontext (Zettelkasten-Ordner + geerntete Tags) einmal pro Fenster-Leben
+  // lazy laden, sobald der Zettel-Modus zum ersten Mal aktiviert wird.
+  useEffect(() => {
+    if (mode !== 'zettel' || zettelContextLoadedRef.current) return
+    zettelContextLoadedRef.current = true
+    window.electronAPI.transportZettelContext()
+      .then((ctx) => {
+        if (ctx.zettelFolder) setZettelFolder((prev) => prev || ctx.zettelFolder!)
+        setZettelVaultTags(ctx.tags || [])
+      })
+      .catch((err) => console.error('[Transport] Zettel-Kontext fehlgeschlagen:', err))
+  }, [mode])
+
+  // Moduswechsel: gewählte Tags nicht in den anderen Modus mitschleppen.
+  const switchMode = (next: 'note' | 'zettel'): void => {
+    if (next === mode) return
+    setMode(next)
+    setSelectedTags(new Set())
+    setNewTagInput('')
+  }
 
   // Auto-Focus beim Laden
   useEffect(() => {
@@ -132,14 +171,14 @@ export default function TransportCapture(): React.ReactElement {
         handleSubmit()
       }
 
-      // Cmd+T: Task einfügen
-      if ((e.metaKey || e.ctrlKey) && e.key === 't') {
+      // Cmd+T: Task einfügen (nur Notiz-Modus — fügt in den Notiz-Editor ein)
+      if ((e.metaKey || e.ctrlKey) && e.key === 't' && mode === 'note') {
         e.preventDefault()
         setShowTaskModal(true)
       }
 
-      // Cmd+D: Diktat starten/stoppen
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'd' && !showTaskModal) {
+      // Cmd+D: Diktat starten/stoppen (nur Notiz-Modus, Ziel ist der Notiz-Editor)
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'd' && !showTaskModal && mode === 'note') {
         e.preventDefault()
         void toggleDictation()
       }
@@ -147,7 +186,8 @@ export default function TransportCapture(): React.ReactElement {
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [content, destinationFolder, selectedTags, category, showTaskModal, isDictating, voiceStatus])
+  }, [content, destinationFolder, selectedTags, category, showTaskModal, isDictating, voiceStatus,
+    mode, zettelTitle, zettelEmojis, zettelQuote, zettelThought, zettelSource, zettelFolder])
 
   const toggleTag = (tag: string): void => {
     setSelectedTags(prev => {
@@ -283,7 +323,85 @@ export default function TransportCapture(): React.ReactElement {
     }
   }
 
+  // KI-Vorschlag: Tags + Emoji-Cluster aus Titel/Zitat/Gedanke (lokales Ollama,
+  // gleiche Modell-Präzedenz wie der Aufgaben-Tagger).
+  const handleSuggestMeta = async (): Promise<void> => {
+    if (isSuggesting) return
+    const ollama = useUIStore.getState().ollama
+    const model = ollama?.moduleModelOverrides?.['task-extraction'] || ollama?.selectedModel || ''
+    if (!model) {
+      showStatusToast('Kein Ollama-Modell konfiguriert.', 'error')
+      return
+    }
+    if (!zettelTitle.trim() && !zettelQuote.trim() && !zettelThought.trim()) {
+      showStatusToast('Erst Titel, Zitat oder Gedanke eingeben.', 'error')
+      return
+    }
+    setIsSuggesting(true)
+    try {
+      const res = await window.electronAPI.zettelSuggestMeta({
+        model,
+        title: zettelTitle,
+        quote: zettelQuote,
+        thought: zettelThought,
+        candidateTags: zettelVaultTags
+      })
+      if (!res.success) {
+        showStatusToast(res.error || 'Vorschlag fehlgeschlagen', 'error')
+        return
+      }
+      if (res.emojis) setZettelEmojis(res.emojis)
+      if (res.tags && res.tags.length > 0) {
+        setSelectedTags((prev) => new Set([...prev, ...res.tags!]))
+      }
+      if (!res.emojis && (!res.tags || res.tags.length === 0)) {
+        showStatusToast('Keine Vorschläge erhalten.', 'error')
+      }
+    } catch (err) {
+      showStatusToast(err instanceof Error ? err.message : 'Vorschlag fehlgeschlagen', 'error')
+    } finally {
+      setIsSuggesting(false)
+    }
+  }
+
+  const handleZettelSubmit = async (): Promise<void> => {
+    const title = zettelTitle.trim()
+    const folder = zettelFolder || destinationFolder
+    if (!title || (!zettelQuote.trim() && !zettelThought.trim()) || !folder || isSubmitting) return
+
+    setIsSubmitting(true)
+    try {
+      const result = await window.electronAPI.transportSaveZettel({
+        title,
+        emojis: zettelEmojis,
+        quote: zettelQuote.trim(),
+        thought: zettelThought.trim(),
+        source: zettelSource.trim(),
+        tags: Array.from(selectedTags),
+        destinationFolder: folder
+      })
+
+      if (result.success && result.relativePath) {
+        showStatusToast('Zettel erfasst!', 'success')
+        await window.electronAPI.transportOpenInMain(result.relativePath)
+        setTimeout(() => {
+          window.electronAPI.transportClose()
+        }, 400)
+      } else {
+        showStatusToast(result.error || 'Fehler beim Speichern', 'error')
+      }
+    } catch {
+      showStatusToast('Fehler beim Speichern', 'error')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
   const handleSubmit = async (): Promise<void> => {
+    if (mode === 'zettel') {
+      await handleZettelSubmit()
+      return
+    }
     const text = content.trim()
     if (!text || !destinationFolder || isSubmitting) return
 
@@ -342,51 +460,136 @@ export default function TransportCapture(): React.ReactElement {
   return (
     <>
       <div className="transport-body">
-        {/* Kategorie-Auswahl */}
-        <div className="transport-categories">
-          {CATEGORIES.map(cat => (
-            <button
-              key={cat.emoji}
-              className={`transport-category-btn ${category === cat.emoji ? 'selected' : ''}`}
-              onClick={() => setCategory(cat.emoji)}
-            >
-              <span className="category-dot" style={{ background: cat.color }} />
-              {cat.label}
-            </button>
-          ))}
-        </div>
-
-        {/* Zielordner */}
-        <div className="transport-destination">
-          <label>Ziel:</label>
-          <select
-            value={destinationFolder}
-            onChange={(e) => setDestinationFolder(e.target.value)}
+        {/* Modus: Schnellnotiz | Zettel */}
+        <div className="transport-mode-switch">
+          <button
+            className={`transport-mode-btn ${mode === 'note' ? 'selected' : ''}`}
+            onClick={() => switchMode('note')}
           >
-            {allDestinations.length === 0 && (
-              <option value="">Kein Ordner verfügbar</option>
-            )}
-            {allDestinations.map(dest => (
-              <option key={dest.folder} value={dest.folder}>
-                {dest.label}
-              </option>
-            ))}
-          </select>
+            Notiz
+          </button>
+          <button
+            className={`transport-mode-btn ${mode === 'zettel' ? 'selected' : ''}`}
+            onClick={() => switchMode('zettel')}
+          >
+            Zettel
+          </button>
         </div>
 
-        {/* Editor */}
-        <textarea
-          ref={editorRef}
-          className="transport-editor"
-          placeholder="Erste Zeile = Titel. Einfach losschreiben..."
-          value={content}
-          onChange={(e) => setContent(e.target.value)}
-        />
+        {mode === 'note' && (
+          <>
+            {/* Kategorie-Auswahl */}
+            <div className="transport-categories">
+              {CATEGORIES.map(cat => (
+                <button
+                  key={cat.emoji}
+                  className={`transport-category-btn ${category === cat.emoji ? 'selected' : ''}`}
+                  onClick={() => setCategory(cat.emoji)}
+                >
+                  <span className="category-dot" style={{ background: cat.color }} />
+                  {cat.label}
+                </button>
+              ))}
+            </div>
 
-        {/* Toolbar: Tags + Task-Button */}
+            {/* Zielordner */}
+            <div className="transport-destination">
+              <label>Ziel:</label>
+              <select
+                value={destinationFolder}
+                onChange={(e) => setDestinationFolder(e.target.value)}
+              >
+                {allDestinations.length === 0 && (
+                  <option value="">Kein Ordner verfügbar</option>
+                )}
+                {allDestinations.map(dest => (
+                  <option key={dest.folder} value={dest.folder}>
+                    {dest.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Editor */}
+            <textarea
+              ref={editorRef}
+              className="transport-editor"
+              placeholder="Erste Zeile = Titel. Einfach losschreiben..."
+              value={content}
+              onChange={(e) => setContent(e.target.value)}
+            />
+          </>
+        )}
+
+        {mode === 'zettel' && (
+          <>
+            {/* Zielordner (mit erkanntem Zettelkasten vorbelegt) */}
+            <div className="transport-destination">
+              <label>Ziel:</label>
+              <select
+                value={zettelFolder || destinationFolder}
+                onChange={(e) => setZettelFolder(e.target.value)}
+              >
+                {allDestinations.length === 0 && (
+                  <option value="">Kein Ordner verfügbar</option>
+                )}
+                {zettelFolder && !allDestinations.some(d => d.folder === zettelFolder) && (
+                  <option value={zettelFolder}>{zettelFolder}</option>
+                )}
+                {allDestinations.map(dest => (
+                  <option key={dest.folder} value={dest.folder}>
+                    {dest.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Emoji-Cluster + Titel — die Emojis erzählen die Mini-Geschichte des Zettels */}
+            <div className="transport-zettel-titlerow">
+              <input
+                className="transport-zettel-input transport-zettel-emojis"
+                type="text"
+                placeholder="🌍💡"
+                title="Emoji-Cluster für den Dateinamen (KI schlägt vor, du entscheidest)"
+                value={zettelEmojis}
+                onChange={(e) => setZettelEmojis(e.target.value)}
+              />
+              <input
+                className="transport-zettel-input transport-zettel-title"
+                type="text"
+                placeholder="Titel des Zettels"
+                value={zettelTitle}
+                onChange={(e) => setZettelTitle(e.target.value)}
+                autoFocus
+              />
+            </div>
+
+            <textarea
+              className="transport-zettel-area"
+              placeholder="Zitat oder Kernidee (wörtlich aus der Quelle)…"
+              value={zettelQuote}
+              onChange={(e) => setZettelQuote(e.target.value)}
+            />
+            <textarea
+              className="transport-zettel-area"
+              placeholder="Mein Gedanke: Was bedeutet das? Welche Implikationen?…"
+              value={zettelThought}
+              onChange={(e) => setZettelThought(e.target.value)}
+            />
+            <input
+              className="transport-zettel-input"
+              type="text"
+              placeholder="Quelle: [[Notiz]], Literaturangabe oder URL"
+              value={zettelSource}
+              onChange={(e) => setZettelSource(e.target.value)}
+            />
+          </>
+        )}
+
+        {/* Toolbar: Tags + Aktionen (Notiz: Diktat/Task — Zettel: KI-Vorschlag) */}
         <div className="transport-toolbar">
           <div className="transport-tags">
-            {predefinedTags.map(tag => (
+            {(mode === 'zettel' ? zettelVaultTags.slice(0, 10) : predefinedTags).map(tag => (
               <button
                 key={tag}
                 className={`transport-tag-chip ${selectedTags.has(tag) ? 'selected' : ''}`}
@@ -395,9 +598,9 @@ export default function TransportCapture(): React.ReactElement {
                 {tag}
               </button>
             ))}
-            {/* Custom Tags (manuell hinzugefügte) */}
+            {/* Custom Tags (manuell hinzugefügte + KI-Vorschläge) */}
             {Array.from(selectedTags)
-              .filter(tag => !predefinedTags.includes(tag))
+              .filter(tag => !(mode === 'zettel' ? zettelVaultTags.slice(0, 10) : predefinedTags).includes(tag))
               .map(tag => (
                 <button
                   key={tag}
@@ -424,6 +627,23 @@ export default function TransportCapture(): React.ReactElement {
               }}
             />
           </div>
+          {mode === 'zettel' && (
+            <div className="transport-tool-actions">
+              <button
+                className="transport-task-btn"
+                onClick={() => void handleSuggestMeta()}
+                disabled={isSuggesting}
+                title="Tags + Emojis per lokaler KI vorschlagen"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9L12 3z" />
+                  <path d="M19 15l.9 2.1L22 18l-2.1.9L19 21l-.9-2.1L16 18l2.1-.9L19 15z" />
+                </svg>
+                {isSuggesting ? 'Denke…' : 'Tags & Emojis'}
+              </button>
+            </div>
+          )}
+          {mode === 'note' && (
           <div className="transport-tool-actions">
             <button
               className={`transport-task-btn transport-dictation-btn ${isDictating ? 'active' : ''}`}
@@ -460,6 +680,7 @@ export default function TransportCapture(): React.ReactElement {
               Task
             </button>
           </div>
+          )}
         </div>
 
         {/* Actions */}
@@ -473,7 +694,9 @@ export default function TransportCapture(): React.ReactElement {
           <button
             className="transport-btn transport-btn-primary"
             onClick={handleSubmit}
-            disabled={!content.trim() || !destinationFolder || isSubmitting}
+            disabled={isSubmitting || (mode === 'note'
+              ? !content.trim() || !destinationFolder
+              : !zettelTitle.trim() || (!zettelQuote.trim() && !zettelThought.trim()) || !(zettelFolder || destinationFolder))}
           >
             {isSubmitting ? 'Erfasse…' : 'Erfassen ⌘↵'}
           </button>

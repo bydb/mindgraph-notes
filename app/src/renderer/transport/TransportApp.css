@@ -74,6 +74,94 @@ body {
 }
 
 /* Kategorie-Buttons */
+/* Modus-Umschalter: Notiz | Zettel */
+.transport-mode-switch {
+  display: flex;
+  gap: 4px;
+  padding: 3px;
+  border: 1px solid var(--transport-border);
+  border-radius: var(--transport-radius-sm);
+  background: var(--transport-surface);
+  align-self: flex-start;
+}
+
+.transport-mode-btn {
+  padding: 4px 14px;
+  border: none;
+  border-radius: calc(var(--transport-radius-sm) - 2px);
+  background: transparent;
+  color: var(--transport-text-secondary);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  -webkit-app-region: no-drag;
+}
+
+.transport-mode-btn.selected {
+  background: color-mix(in srgb, var(--transport-accent) 18%, transparent);
+  color: var(--transport-text);
+}
+
+/* Zettel-Formular */
+.transport-zettel-titlerow {
+  display: flex;
+  gap: 8px;
+}
+
+.transport-zettel-input {
+  padding: 8px 12px;
+  border: 1px solid var(--transport-border);
+  border-radius: var(--transport-radius-sm);
+  background: var(--transport-surface);
+  color: var(--transport-text);
+  font-size: 14px;
+  outline: none;
+  -webkit-app-region: no-drag;
+}
+
+.transport-zettel-input:focus {
+  border-color: var(--transport-accent);
+}
+
+.transport-zettel-input::placeholder {
+  color: var(--transport-text-secondary);
+}
+
+.transport-zettel-emojis {
+  width: 96px;
+  flex-shrink: 0;
+  text-align: center;
+}
+
+.transport-zettel-title {
+  flex: 1;
+  min-width: 0;
+}
+
+.transport-zettel-area {
+  flex: 1;
+  min-height: 64px;
+  padding: 8px 12px;
+  border: 1px solid var(--transport-border);
+  border-radius: var(--transport-radius-sm);
+  background: var(--transport-surface);
+  color: var(--transport-text);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  font-size: 13.5px;
+  line-height: 1.5;
+  resize: none;
+  outline: none;
+  -webkit-app-region: no-drag;
+}
+
+.transport-zettel-area:focus {
+  border-color: var(--transport-accent);
+}
+
+.transport-zettel-area::placeholder {
+  color: var(--transport-text-secondary);
+}
+
 .transport-categories {
   display: flex;
   gap: 6px;

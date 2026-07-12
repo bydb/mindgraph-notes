@@ -233,6 +233,11 @@ Module als verbindbare Bausteine mit **typisierten Ports** auf einem React-Flow-
 - **Hard-Block für leere Writes** auf nicht-leere Markdown-Dateien im `write-file`-Handler — zweite Verteidigungslinie unabhängig vom Editor.
 - Backups **vom Sync ausgeschlossen** (bleiben lokal).
 
+### Schnellerfassung: Zettel-Modus
+- Umschalter Notiz/Zettel im Transport-Fenster. Zettel-Konvention (gelebt, NICHT das alte Templater-Template): Dateiname `<Emoji-Cluster> - <Titel>.md` (Umlaute bleiben), Frontmatter `id` (JJJJMMTTHHmm)/`created`/`tags` als Inline-Array, Body `**Zitat:**`/`**Mein Gedanke:**`/`**Quelle**`. Pure Bausteine + Frontmatter-Tag-Parser in `shared/zettel.ts` (getestet).
+- IPC: `transport-zettel-context` (findet ersten Ordner mit „zettelkasten" im Namen, BFS max. Tiefe 4, und erntet Top-60-Frontmatter-Tags), `zettel-suggest-meta` (lokales Ollama schlägt Tags + Emoji-Cluster vor; gleiche Härtung wie `tasks-suggest-tags`: `isHardLocked('task-extraction')`, UNTRUSTED-Marker, JSON-Fallback-Parser), `transport-save-zettel`.
+- Modell-Präzedenz wie Aufgaben-Tagger: `ollama.moduleModelOverrides['task-extraction']` → `selectedModel`. ⌘D-Diktat und ⌘T-Task sind bewusst Notiz-Modus-only (Einfügeziel ist der Notiz-Editor).
+
 ### Eingebautes Whisper STT
 - `utils/stt/transformersStt.ts` läuft im Renderer via `@huggingface/transformers` v4 + ONNX Runtime.
 - **Modell-Konfiguration**: Encoder `q8` (~25 MB), Decoder `fp32` (~150 MB). Wichtig: quantisierter Decoder bricht ONNX-Runtime mit „MatMulNBits-Scales fehlen". Nicht ändern ohne Test.
