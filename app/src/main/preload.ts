@@ -648,6 +648,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   openInVSCode: (absolutePath: string) =>
     ipcRenderer.invoke('open-in-vscode', absolutePath),
 
+  // HTML-Vorschau (Code-Editor) als PDF/EPUB exportieren
+  htmlPreviewExport: (vaultPath: string, relativePath: string, format: 'pdf' | 'epub') =>
+    ipcRenderer.invoke('html-preview-export', { vaultPath, relativePath, format }),
 
   // Task-Editing (Overdue-Panel / Aufgaben & Termine)
   tasksUpdateLine: (data: {

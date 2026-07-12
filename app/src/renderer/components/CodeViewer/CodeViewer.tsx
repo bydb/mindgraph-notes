@@ -156,6 +156,33 @@ export const CodeViewer: React.FC<CodeViewerProps> = ({ vaultPath, relativePath 
     setViewMode('preview')
   }
 
+  // PDF/EPUB-Export der gerenderten Seite (main/htmlExport.ts). Vorher speichern,
+  // damit der Export den aktuellen Puffer trifft — exportiert wird von der Platte.
+  const [exporting, setExporting] = useState<'pdf' | 'epub' | null>(null)
+  const [exportMsg, setExportMsg] = useState<string | null>(null)
+  const handleExport = async (format: 'pdf' | 'epub'): Promise<void> => {
+    if (exporting) return
+    setExporting(format)
+    let msg: string | null = null
+    try {
+      await saveNowRef.current?.()
+      const result = await window.electronAPI.htmlPreviewExport(vaultPath, relativePath, format)
+      if (result?.success) {
+        msg = result.warning ? `${t('codeEditor.exportWarning')}: ${result.warning}` : t('codeEditor.exportDone')
+      } else if (result?.error) {
+        msg = `${t('codeEditor.exportError')}: ${result.error}`
+      } // canceled → still bleiben
+    } catch (err) {
+      msg = `${t('codeEditor.exportError')}: ${err instanceof Error ? err.message : String(err)}`
+    } finally {
+      setExporting(null)
+    }
+    if (msg) {
+      setExportMsg(msg)
+      setTimeout(() => setExportMsg(null), 6000)
+    }
+  }
+
   useEffect(() => {
     // Alles pfad-gebunden in dieser Closure halten: beim Datei-Wechsel läuft der
     // Render (neuer Pfad) VOR dem Cleanup (alter Inhalt) — Refs auf den Pfad
@@ -444,6 +471,26 @@ export const CodeViewer: React.FC<CodeViewerProps> = ({ vaultPath, relativePath 
               {t('codeEditor.reloadPreview')}
             </button>
           )}
+          {isHtml && (
+            <>
+              <button
+                className="code-viewer-action-btn"
+                onClick={() => { handleExport('pdf') }}
+                disabled={exporting !== null}
+                title={t('codeEditor.exportPdfTitle')}
+              >
+                {exporting === 'pdf' ? t('codeEditor.exporting') : t('codeEditor.exportPdf')}
+              </button>
+              <button
+                className="code-viewer-action-btn"
+                onClick={() => { handleExport('epub') }}
+                disabled={exporting !== null}
+                title={t('codeEditor.exportEpubTitle')}
+              >
+                {exporting === 'epub' ? t('codeEditor.exporting') : t('codeEditor.exportEpub')}
+              </button>
+            </>
+          )}
           <span className="code-viewer-lines">{lineCount} {t('codeEditor.lines')}</span>
           <button
             className="code-viewer-action-btn"
@@ -478,6 +525,12 @@ export const CodeViewer: React.FC<CodeViewerProps> = ({ vaultPath, relativePath 
       {vscodeMsg && (
         <div className="code-viewer-error">
           {vscodeMsg}
+        </div>
+      )}
+
+      {exportMsg && (
+        <div className="code-viewer-export-msg">
+          {exportMsg}
         </div>
       )}
 

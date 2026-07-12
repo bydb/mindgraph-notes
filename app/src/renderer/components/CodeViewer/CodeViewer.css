@@ -191,6 +191,15 @@
   color: #dc2626;
 }
 
+/* Transientes Export-Ergebnis (PDF/EPUB) */
+.code-viewer-export-msg {
+  padding: 6px 16px;
+  font-size: 12px;
+  color: var(--text-primary);
+  background: color-mix(in srgb, var(--accent-color) 10%, var(--bg-primary));
+  border-bottom: 1px solid color-mix(in srgb, var(--accent-color) 30%, transparent);
+}
+
 /* Externe Änderung bei ungespeichertem Puffer: Entscheidung statt stillem Überschreiben */
 .code-viewer-conflict {
   display: flex;

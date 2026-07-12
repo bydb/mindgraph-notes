@@ -1063,6 +1063,8 @@ export interface ElectronAPI {
   transportShow: () => Promise<void>;
   transportUpdateShortcut: (shortcut: string) => Promise<{ success: boolean; error?: string }>;
   openInVSCode: (absolutePath: string) => Promise<{ success: boolean; error?: string }>;
+  htmlPreviewExport: (vaultPath: string, relativePath: string, format: 'pdf' | 'epub') =>
+    Promise<{ success: boolean; path?: string; error?: string; warning?: string; canceled?: boolean }>;
   tasksUpdateLine: (data: {
     vaultPath: string;
     relativePath: string;

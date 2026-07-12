@@ -7,8 +7,11 @@ import {
   HTML_PREVIEW_SCHEME,
   previewPathnameToFsPath,
   previewMimeFor,
-  PREVIEW_DOCUMENT_CSP
+  PREVIEW_DOCUMENT_CSP,
+  buildHtmlPreviewUrl,
+  isHtmlPreviewable
 } from '../shared/htmlPreview'
+import { exportPreviewPdf, exportPreviewEpub } from './htmlExport'
 
 // Dev-only userData-Isolation: ungepackt (`npm run dev`/`start`) NIEMALS das produktive Profil der
 // installierten App anfassen — sonst migriert/schreibt der Dev-Build die echten Settings (real passiert).
@@ -828,6 +831,7 @@ const mainTranslations: Record<'de' | 'en', Record<string, string>> = {
     'dialog.newFolder.title': 'Neuen Ordner erstellen',
     'dialog.newFolder.button': 'Ordner erstellen',
     'dialog.exportPdf.title': 'Als PDF exportieren',
+    'dialog.exportEpub.title': 'Als EPUB exportieren',
     'dialog.stripWikilinks.title': 'Wikilinks entfernen',
     'dialog.stripWikilinks.message': 'Wikilinks in "{name}" entfernen?',
     'dialog.stripWikilinks.detail': 'Diese Aktion entfernt alle [[Wikilink]]-Klammern aus den Markdown-Dateien in diesem Ordner (rekursiv). Der Text bleibt erhalten.\n\nBeispiel: [[Link]] → Link, [[Link|Alias]] → Alias\n\nDiese Aktion kann nicht rückgängig gemacht werden.',
@@ -875,6 +879,7 @@ const mainTranslations: Record<'de' | 'en', Record<string, string>> = {
     'dialog.newFolder.title': 'Create New Folder',
     'dialog.newFolder.button': 'Create Folder',
     'dialog.exportPdf.title': 'Export as PDF',
+    'dialog.exportEpub.title': 'Export as EPUB',
     'dialog.stripWikilinks.title': 'Remove Wikilinks',
     'dialog.stripWikilinks.message': 'Remove wikilinks in "{name}"?',
     'dialog.stripWikilinks.detail': 'This action removes all [[Wikilink]] brackets from Markdown files in this folder (recursively). The text content is preserved.\n\nExample: [[Link]] → Link, [[Link|Alias]] → Alias\n\nThis action cannot be undone.',
@@ -6877,6 +6882,46 @@ ipcMain.handle('export-pdf', async (_event, defaultFileName: string, htmlContent
   } catch (error) {
     console.error('PDF Export Fehler:', error)
     return { success: false, error: String(error) }
+  }
+})
+
+// HTML-Vorschau (Code-Editor) als PDF/EPUB exportieren. Rendert über das
+// mindgraph-preview://-Protokoll — gleiche Sicherheitsenvelope wie die Vorschau,
+// KaTeX ist beim Export bereits gerendert (siehe main/htmlExport.ts).
+ipcMain.handle('html-preview-export', async (_event, args: { vaultPath: string; relativePath: string; format: 'pdf' | 'epub' }) => {
+  if (!mainWindow) return { success: false, error: 'Kein Fenster verfügbar' }
+  try {
+    const { vaultPath, relativePath, format } = args
+    if (format !== 'pdf' && format !== 'epub') return { success: false, error: 'Unbekanntes Format' }
+    assertApprovedVault(vaultPath, 'html-preview-export')
+    const safeHtmlPath = await assertSafePath(path.join(vaultPath, relativePath), 'html-preview-export')
+    if (!isHtmlPreviewable(safeHtmlPath)) return { success: false, error: 'Keine HTML-Datei' }
+
+    const baseName = path.basename(safeHtmlPath).replace(/\.html?$/i, '')
+    const saveResult = await dialog.showSaveDialog(mainWindow, {
+      title: format === 'pdf' ? t('dialog.exportPdf.title') : t('dialog.exportEpub.title'),
+      defaultPath: `${baseName}.${format}`,
+      filters: format === 'pdf'
+        ? [{ name: 'PDF', extensions: ['pdf'] }]
+        : [{ name: 'EPUB', extensions: ['epub'] }]
+    })
+    if (saveResult.canceled || !saveResult.filePath) return { success: false, canceled: true }
+
+    const previewUrl = buildHtmlPreviewUrl(vaultPath, relativePath)
+    if (format === 'pdf') {
+      await exportPreviewPdf(previewUrl, saveResult.filePath)
+      return { success: true, path: saveResult.filePath }
+    }
+    const { warnings } = await exportPreviewEpub({
+      previewUrl,
+      htmlPath: safeHtmlPath,
+      targetPath: saveResult.filePath,
+      safePath: assertSafePath
+    })
+    return { success: true, path: saveResult.filePath, warning: warnings.length > 0 ? warnings.join('; ') : undefined }
+  } catch (error) {
+    console.error('[html-preview-export] Fehler:', error)
+    return { success: false, error: error instanceof Error ? error.message : String(error) }
   }
 })
 
