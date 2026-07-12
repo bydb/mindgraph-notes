@@ -2,7 +2,18 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
-## [0.10.17-beta] - 2026-07-10
+## [0.10.18-beta] - 2026-07-12
+
+Zettel in Sekunden: Die Schnellerfassung hat einen eigenen Zettel-Modus mit KI-Vorschlägen für Tags und Emoji-Cluster. Dazu PDF- und EPUB-Export für HTML-Seiten und ein ehrlicheres Tagesgedächtnis.
+
+### Neu
+
+- **Zettel-Modus in der Schnellerfassung.** Der Umschalter „Notiz | Zettel" im Schnellerfassungs-Fenster (Tray/Shortcut) öffnet ein Zettel-Formular: Emoji-Cluster, Titel, Zitat, eigener Gedanke und Quelle. Der Zettelkasten-Ordner wird automatisch erkannt, die häufigsten Tags der bestehenden Zettel stehen als Chips bereit, und der Button „Tags & Emojis" lässt das lokale Ollama-Modell passende Tags und einen Emoji-Cluster für den Dateinamen vorschlagen — bevorzugt aus dem gewachsenen Tag-Vokabular des Zettelkastens, editierbar vor dem Speichern. Gespeichert wird im Zettel-Format (Frontmatter mit `id`/`created`/`tags`, Sektionen Zitat / Mein Gedanke / Quelle), der neue Zettel öffnet direkt im Hauptfenster.
+- **HTML-Seiten als PDF und EPUB exportieren.** Der Code-Editor bekommt für HTML-Dateien zwei Export-Buttons neben der Vorschau. Beide exportieren die fertig gerenderte Seite — mathematische Formeln (KaTeX) sind im Export bereits gesetzt. Das EPUB bettet Stylesheets, Schriften und lokale Bilder ein und enthält ein Inhaltsverzeichnis aus den Überschriften; es braucht im E-Reader kein JavaScript und funktioniert damit auch in Apple Books & Co.
+
+### Behoben
+
+- **Tagesgedächtnis: bloßes Öffnen ist keine Tagesarbeit mehr.** Notizen, die an einem Tag nur geöffnet wurden (Tab-Klick, wiederhergestellter Tab), erzeugen in der Tageszusammenfassung keinen Wikilink mehr — und tauchen damit nicht mehr fälschlich als „Teil deines Tages" im Arbeitskontext-Streifen fremder Notizen auf. Nur bearbeitete oder neu erstellte Notizen werden verlinkt; nur geöffnete werden weiterhin erwähnt, aber als Klartext.
 
 Der Code-Editor überschreibt keine externen Änderungen mehr: Was andere Programme (KI-Assistenten, VS Code, Sync) an einer geöffneten Datei ändern, wird erkannt statt still verworfen.
 
