@@ -1,6 +1,6 @@
 import * as path from 'path'
 import * as fs from 'fs/promises'
-import type { BrainConsolidateInput, BrainConsolidateResult } from './types'
+import type { BrainConsolidateInput, BrainConsolidateResult, BrainSensorNote } from './types'
 import { isCloudModel } from '../../shared/modelCompatibility'
 
 const OLLAMA_LOCAL_URL = 'http://localhost:11434'
@@ -16,10 +16,18 @@ function sanitizeFolderPath(input: string | undefined): string {
   return parts.join('/')
 }
 
-function buildPrompt(input: BrainConsolidateInput): string {
+// Nur bearbeitete/erstellte Notizen erzeugen eine Tages-Assoziation (Wikilink → Backlink
+// → „Teil deines Tages" im Arbeitskontext). Bloßes Öffnen (Tab-Klick, Tab-Restore) reicht
+// nicht — sonst taucht eine seit Wochen unveränderte Notiz in jedem Tagesgedächtnis auf,
+// an dem ihr Tab einmal angeklickt wurde.
+export function isLinkableNote(events: BrainSensorNote['events']): boolean {
+  return events.created || events.updated > 0
+}
+
+export function buildPrompt(input: BrainConsolidateInput): string {
   const lang = input.language
 
-  const noteTitles = input.sensors.notes.map(n => n.title)
+  const linkableTitles = input.sensors.notes.filter(n => isLinkableNote(n.events)).map(n => n.title)
 
   const notesLines = input.sensors.notes.length === 0
     ? (lang === 'de' ? '- (keine berührten Notizen)' : '- (no touched notes)')
@@ -30,7 +38,10 @@ function buildPrompt(input: BrainConsolidateInput): string {
         if (n.events.updated > 0) evs.push(lang === 'de' ? `geändert ×${n.events.updated}` : `edited ×${n.events.updated}`)
         const tags = n.tags.length > 0 ? ` — tags: ${n.tags.map(t => '#' + t).join(' ')}` : ''
         const evsStr = evs.length > 0 ? ` (${evs.join(', ')})` : ''
-        return `- [[${n.title}]]${evsStr}${tags}`
+        const label = isLinkableNote(n.events)
+          ? `[[${n.title}]]`
+          : (lang === 'de' ? `„${n.title}“` : `"${n.title}"`)
+        return `- ${label}${evsStr}${tags}`
       }).join('\n')
 
   const journalBlock = input.sensors.journal
@@ -63,8 +74,8 @@ function buildPrompt(input: BrainConsolidateInput): string {
           ).join('\n')
         : '')
 
-  const wikilinkList = noteTitles.length > 0
-    ? noteTitles.map(t => `[[${t}]]`).join(', ')
+  const wikilinkList = linkableTitles.length > 0
+    ? linkableTitles.map(t => `[[${t}]]`).join(', ')
     : ''
 
   if (lang === 'de') {
@@ -93,6 +104,7 @@ REGELN — beachte alle:
 
 2. WIKILINKS — verpflichtend: Wenn du eine der folgenden Notizen erwähnst, schreibe sie EXAKT in Doppelklammern. Verwende für eine andere Bezeichnung die Alias-Syntax [[Titel|Anzeigetext]].
    Verfügbare Notizen: ${wikilinkList || '(keine)'}
+   Nur diese Notizen bekommen Doppelklammern. Notizen, die oben in Anführungszeichen stehen (nur geöffnet, nicht bearbeitet), erwähnst du OHNE Doppelklammern.
    Beispiel richtig: "Ich aktualisierte [[20260507_TO_Dienstversammlung]] und schrieb an [[Quantencomputer-Anwendungen|Quantencomputer]]."
    Beispiel falsch: "Ich aktualisierte die Dienstversammlung." (ohne Wikilink)
 
@@ -131,6 +143,7 @@ RULES — follow all:
 
 2. WIKILINKS — mandatory: When mentioning one of the following notes, write it EXACTLY in double brackets. For a different display label, use [[Title|display]].
    Available notes: ${wikilinkList || '(none)'}
+   Only these notes get double brackets. Notes listed above in quotes (only opened, not edited) are mentioned WITHOUT double brackets.
    Right: "I updated [[20260507_TO_Dienstversammlung]] and wrote to [[Quantencomputer-Anwendungen|Quantencomputer]]."
    Wrong: "I updated the staff meeting." (no wikilink)
 
@@ -187,7 +200,7 @@ function escapeRegex(value: string): string {
 // wickeln wir ihn nachträglich in Wikilinks. Bestehende [[…]]-Vorkommen werden nicht
 // doppelt gewrappt. Sehr kurze Titel (< 4 Zeichen) werden ignoriert, um false positives
 // bei generischen Wörtern zu vermeiden.
-function injectWikilinks(body: string, titles: string[]): string {
+export function injectWikilinks(body: string, titles: string[]): string {
   if (!titles.length) return body
   // Längere Titel zuerst, damit Übersnippets nicht von Teilstrings überlagert werden.
   const sorted = [...titles].filter(t => t && t.length >= 4).sort((a, b) => b.length - a.length)
@@ -197,6 +210,21 @@ function injectWikilinks(body: string, titles: string[]): string {
     // Nur ersetzen, wenn nicht bereits in [[…]] eingebettet (Negative Lookbehind/-ahead).
     const re = new RegExp(`(?<!\\[\\[)(?<!\\[\\[[^\\]]*\\|)${escaped}(?!\\]\\])(?![^\\[]*\\]\\])`, 'g')
     result = result.replace(re, `[[${title}]]`)
+  }
+  return result
+}
+
+// Gegenstück zum Sicherheitsnetz: Links auf nur-geöffnete Notizen werden zu Klartext
+// zurückgedreht — auch wenn das Modell die Prompt-Regel ignoriert. Ohne Wikilink kein
+// Backlink, ohne Backlink keine falsche „Teil deines Tages"-Zuordnung.
+export function stripWikilinksFor(body: string, titles: string[]): string {
+  let result = body
+  for (const title of titles) {
+    if (!title) continue
+    const escaped = escapeRegex(title)
+    // [[Titel]] → Titel, [[Titel|Alias]] → Alias
+    result = result.replace(new RegExp(`\\[\\[${escaped}\\]\\]`, 'g'), title)
+    result = result.replace(new RegExp(`\\[\\[${escaped}\\|([^\\]]*)\\]\\]`, 'g'), '$1')
   }
   return result
 }
@@ -296,7 +324,10 @@ export async function consolidateDay(
     }
   }
 
-  body = injectWikilinks(body, input.sensors.notes.map(n => n.title))
+  const linkable = input.sensors.notes.filter(n => isLinkableNote(n.events))
+  const openedOnly = input.sensors.notes.filter(n => !isLinkableNote(n.events))
+  body = stripWikilinksFor(body, openedOnly.map(n => n.title))
+  body = injectWikilinks(body, linkable.map(n => n.title))
 
   const frontmatter = buildFrontmatter(input)
   const content = `${frontmatter}\n\n${body}\n`
