@@ -60,6 +60,7 @@ import {
 } from '../../utils/annotations'
 import { isImageFile, findImageInVault, getFilePathsFromDataTransfer, extractImageFromDataTransfer, fileToBase64 } from '../../utils/imageUtils'
 import { highlightCode } from '../../utils/highlightSetup'
+import { renderedCodeBlockRule } from '../../utils/wysiwygCodeBlockRule'
 import { speak, stopSpeaking } from '../../utils/voice/tts'
 import { startDictation, type DictationHandle } from '../../utils/voice/stt'
 import { useIsModuleEnabled } from '../../utils/modules'
@@ -428,6 +429,11 @@ wysiwygTurndown.addRule('taskCheckbox', {
   filter: (node) => node.nodeName === 'INPUT' && (node as HTMLInputElement).type === 'checkbox',
   replacement: (_content, node) => ((node as HTMLInputElement).checked ? '[x] ' : '[ ] ')
 })
+
+// Code-Blöcke: rekonstruiert Zeilenumbrüche aus den .code-line-Spans des
+// Lesen-Modus-Renderings — Turndowns Default presste jeden Code-Block auf EINE
+// Zeile zusammen (Details + Regressionstest in utils/wysiwygCodeBlockRule.ts).
+wysiwygTurndown.addRule('renderedCodeBlock', renderedCodeBlockRule)
 
 wysiwygTurndown.addRule('wikiImage', {
   filter: (node) => {
