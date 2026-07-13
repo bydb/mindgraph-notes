@@ -1058,7 +1058,7 @@ export interface ElectronAPI {
   transportGetConfig: () => Promise<{ vaultPath: string | null; transport: { destinations: { label: string; folder: string }[]; predefinedTags: string[]; defaultDestinationIndex: number } | null }>;
   transportListVaultSubdirs: () => Promise<string[]>;
   transportSaveNote: (data: { title: string; category: string; tags: string[]; content: string; destinationFolder: string }) => Promise<{ success: boolean; relativePath?: string; error?: string }>;
-  transportZettelContext: () => Promise<{ zettelFolder: string | null; tags: string[] }>;
+  transportZettelContext: (preferredFolder?: string) => Promise<{ zettelFolder: string | null; tags: string[] }>;
   zettelSuggestMeta: (request: { model: string; title?: string; quote?: string; thought?: string; candidateTags?: string[] }) =>
     Promise<{ success: boolean; tags?: string[]; emojis?: string; error?: string; model?: string }>;
   transportSaveZettel: (data: { title: string; emojis: string; quote: string; thought: string; source: string; tags: string[]; destinationFolder: string }) =>

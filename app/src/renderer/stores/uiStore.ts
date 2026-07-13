@@ -465,6 +465,7 @@ export interface TransportSettings {
   /** @deprecated Migriert auf defaultDestinationFolder. Nur noch für Rückwärtskompatibilität. */
   defaultDestinationIndex?: number
   defaultDestinationFolder: string   // Pfad zum Ziel-Ordner (aus destinations ODER Vault-Subdir)
+  zettelDestinationFolder: string    // Zielordner für Zettel; leer = Auto-Erkennung („zettelkasten"-Ordner)
   showTitlebarButton: boolean
 }
 
@@ -1089,6 +1090,7 @@ const defaultState = {
     ],
     predefinedTags: ['idee', 'todo', 'frage', 'wichtig'],
     defaultDestinationFolder: '00 - Inbox',
+    zettelDestinationFolder: '',
     showTitlebarButton: true
   } as TransportSettings,
 

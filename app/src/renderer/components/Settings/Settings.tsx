@@ -430,6 +430,24 @@ const TransportSettingsTab: React.FC<{ t: TabTFn }> = ({ t }) => {
         </select>
       </div>
 
+      <div className="settings-row">
+        <label>{t('settings.transport.zettelDestination')}</label>
+        <select
+          value={transport.zettelDestinationFolder || ''}
+          onChange={e => setTransport({ zettelDestinationFolder: e.target.value })}
+          className="settings-select"
+        >
+          <option value="">{t('settings.transport.zettelDestinationAuto')}</option>
+          {transport.zettelDestinationFolder && !vaultSubdirs.includes(transport.zettelDestinationFolder) && (
+            <option value={transport.zettelDestinationFolder}>{transport.zettelDestinationFolder}</option>
+          )}
+          {vaultSubdirs.map(dir => (
+            <option key={`zettel-${dir}`} value={dir}>{dir}</option>
+          ))}
+        </select>
+      </div>
+      <p className="settings-hint" style={{ marginTop: '-4px' }}>{t('settings.transport.zettelDestinationHint')}</p>
+
       <div className="settings-divider" />
 
       <h3>{t('settings.transport.tags')}</h3>

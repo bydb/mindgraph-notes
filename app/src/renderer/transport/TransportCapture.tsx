@@ -38,9 +38,13 @@ export default function TransportCapture(): React.ReactElement {
   const [zettelThought, setZettelThought] = useState('')
   const [zettelSource, setZettelSource] = useState('')
   const [zettelFolder, setZettelFolder] = useState('')
+  const [zettelConfigFolder, setZettelConfigFolder] = useState('')
+  const [configLoaded, setConfigLoaded] = useState(false)
   const [zettelVaultTags, setZettelVaultTags] = useState<string[]>([])
   const [isSuggesting, setIsSuggesting] = useState(false)
-  const zettelContextLoadedRef = useRef(false)
+  // Merkt, für welchen konfigurierten Ordner der Kontext (Tags) zuletzt geladen wurde —
+  // Settings-Änderung zwischen zwei Fenster-Shows lädt neu, sonst einmal pro Fenster-Leben.
+  const zettelContextLoadedForRef = useRef<string | null>(null)
 
   // Config aus Main Process
   const [destinations, setDestinations] = useState<{ label: string; folder: string }[]>([])
@@ -80,6 +84,7 @@ export default function TransportCapture(): React.ReactElement {
         const rawCfg = config.transport as unknown as {
           defaultDestinationFolder?: string
           defaultDestinationIndex?: number
+          zettelDestinationFolder?: string
           destinations?: { folder: string }[]
         }
         let defaultFolder = rawCfg.defaultDestinationFolder || ''
@@ -94,9 +99,17 @@ export default function TransportCapture(): React.ReactElement {
           defaultFolder = subdirs[0]
         }
         if (defaultFolder) setDestinationFolder(defaultFolder)
+
+        // Konfigurierter Zettel-Zielordner (Settings → Schnellerfassung) hat Vorrang
+        // vor der Auto-Erkennung; wie beim Notiz-Ziel bei jedem Fenster-Show neu angewandt.
+        const zettelCfg = rawCfg.zettelDestinationFolder || ''
+        setZettelConfigFolder(zettelCfg)
+        if (zettelCfg) setZettelFolder(zettelCfg)
       }
     } catch (err) {
       console.error('[Transport] Config laden fehlgeschlagen:', err)
+    } finally {
+      setConfigLoaded(true)
     }
   }, [])
 
@@ -123,18 +136,20 @@ export default function TransportCapture(): React.ReactElement {
     })
   }, [loadConfig])
 
-  // Zettel-Kontext (Zettelkasten-Ordner + geerntete Tags) einmal pro Fenster-Leben
-  // lazy laden, sobald der Zettel-Modus zum ersten Mal aktiviert wird.
+  // Zettel-Kontext (Zettelkasten-Ordner + geerntete Tags) lazy laden, sobald der
+  // Zettel-Modus aktiviert wird — erst nach der Config, damit ein konfigurierter
+  // Zielordner die Erkennung übersteuert und die Tags aus dem richtigen Ordner kommen.
   useEffect(() => {
-    if (mode !== 'zettel' || zettelContextLoadedRef.current) return
-    zettelContextLoadedRef.current = true
-    window.electronAPI.transportZettelContext()
+    if (mode !== 'zettel' || !configLoaded) return
+    if (zettelContextLoadedForRef.current === zettelConfigFolder) return
+    zettelContextLoadedForRef.current = zettelConfigFolder
+    window.electronAPI.transportZettelContext(zettelConfigFolder || undefined)
       .then((ctx) => {
         if (ctx.zettelFolder) setZettelFolder((prev) => prev || ctx.zettelFolder!)
         setZettelVaultTags(ctx.tags || [])
       })
       .catch((err) => console.error('[Transport] Zettel-Kontext fehlgeschlagen:', err))
-  }, [mode])
+  }, [mode, configLoaded, zettelConfigFolder])
 
   // Moduswechsel: gewählte Tags nicht in den anderen Modus mitschleppen.
   const switchMode = (next: 'note' | 'zettel'): void => {

@@ -637,8 +637,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('transport-list-vault-subdirs'),
   transportSaveNote: (data: { title: string; category: string; tags: string[]; content: string; destinationFolder: string }) =>
     ipcRenderer.invoke('transport-save-note', data),
-  transportZettelContext: () =>
-    ipcRenderer.invoke('transport-zettel-context'),
+  transportZettelContext: (preferredFolder?: string) =>
+    ipcRenderer.invoke('transport-zettel-context', preferredFolder),
   zettelSuggestMeta: (request: { model: string; title?: string; quote?: string; thought?: string; candidateTags?: string[] }) =>
     ipcRenderer.invoke('zettel-suggest-meta', request),
   transportSaveZettel: (data: { title: string; emojis: string; quote: string; thought: string; source: string; tags: string[]; destinationFolder: string }) =>

@@ -11844,15 +11844,22 @@ ipcMain.handle('transport-save-note', async (_event, data: {
 })
 
 // Transport: Zettel-Kontext — Zettelkasten-Ordner finden + vorhandene Tags ernten.
-// Ordner-Erkennung: erster Vault-Ordner (BFS, max. Tiefe 4), dessen Name
+// Konfigurierter Ordner (Settings → Schnellerfassung → Zettel-Zielordner) hat Vorrang;
+// sonst Ordner-Erkennung: erster Vault-Ordner (BFS, max. Tiefe 4), dessen Name
 // „zettelkasten" enthält — null, wenn keiner existiert (dann wählt der Nutzer selbst).
-ipcMain.handle('transport-zettel-context', async () => {
+ipcMain.handle('transport-zettel-context', async (_event, preferredFolder?: string) => {
   try {
     const settings = await loadSettings()
     const vaultPath = settings.lastVaultPath
     if (!vaultPath) return { zettelFolder: null, tags: [] }
 
     let zettelFolder: string | null = null
+    if (preferredFolder && typeof preferredFolder === 'string') {
+      try {
+        const preferredAbs = validatePath(vaultPath, preferredFolder)
+        if ((await fs.stat(preferredAbs)).isDirectory()) zettelFolder = preferredFolder
+      } catch { /* ungültig oder nicht (mehr) vorhanden → Auto-Erkennung */ }
+    }
     const queue: Array<{ dir: string; rel: string; depth: number }> = [{ dir: vaultPath, rel: '', depth: 0 }]
     while (queue.length > 0 && !zettelFolder) {
       const { dir, rel, depth } = queue.shift()!

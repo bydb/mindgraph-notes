@@ -236,7 +236,8 @@ Module als verbindbare Bausteine mit **typisierten Ports** auf einem React-Flow-
 
 ### Schnellerfassung: Zettel-Modus
 - Umschalter Notiz/Zettel im Transport-Fenster. Zettel-Konvention (gelebt, NICHT das alte Templater-Template): Dateiname `<Emoji-Cluster> - <Titel>.md` (Umlaute bleiben), Frontmatter `id` (JJJJMMTTHHmm)/`created`/`tags` als Inline-Array, Body `**Zitat:**`/`**Mein Gedanke:**`/`**Quelle**`. Pure Bausteine + Frontmatter-Tag-Parser in `shared/zettel.ts` (getestet).
-- IPC: `transport-zettel-context` (findet ersten Ordner mit „zettelkasten" im Namen, BFS max. Tiefe 4, und erntet Top-60-Frontmatter-Tags), `zettel-suggest-meta` (lokales Ollama schlägt Tags + Emoji-Cluster vor; gleiche Härtung wie `tasks-suggest-tags`: `isHardLocked('task-extraction')`, UNTRUSTED-Marker, JSON-Fallback-Parser), `transport-save-zettel`.
+- IPC: `transport-zettel-context` (optionaler `preferredFolder`-Param — konfigurierter Ordner hat Vorrang, sonst ersten Ordner mit „zettelkasten" im Namen finden, BFS max. Tiefe 4; erntet Top-60-Frontmatter-Tags aus dem aufgelösten Ordner), `zettel-suggest-meta` (lokales Ollama schlägt Tags + Emoji-Cluster vor; gleiche Härtung wie `tasks-suggest-tags`: `isHardLocked('task-extraction')`, UNTRUSTED-Marker, JSON-Fallback-Parser), `transport-save-zettel`.
+- **Zettel-Zielordner konfigurierbar**: `transport.zettelDestinationFolder` (uiStore, Settings → Schnellerfassung) — leer = Auto-Erkennung. Wird wie das Notiz-Standard-Ziel bei jedem Fenster-Show neu angewandt; Dropdown-Änderungen im Transport-Fenster gelten pro Erfassung.
 - Modell-Präzedenz wie Aufgaben-Tagger: `ollama.moduleModelOverrides['task-extraction']` → `selectedModel`. ⌘D-Diktat und ⌘T-Task sind bewusst Notiz-Modus-only (Einfügeziel ist der Notiz-Editor).
 
 ### Eingebautes Whisper STT
