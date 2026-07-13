@@ -2,6 +2,14 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.10.21-beta] - 2026-07-13
+
+Der Zettel-Zielordner lässt sich jetzt fest einstellen — die Schnellerfassung muss den Zettelkasten nicht mehr erraten.
+
+### Neu
+
+- **Zielordner für Zettel frei wählbar.** In den Einstellungen unter „Schnellerfassung" gibt es neben dem Standard-Zielordner jetzt einen eigenen „Zettel-Zielordner". Ohne Auswahl gilt weiterhin die automatische Erkennung (erster Ordner, dessen Name „zettelkasten" enthält). Mit Auswahl ist der Ordner bei jedem Öffnen des Zettel-Formulars vorbelegt — und die Tag-Chips samt KI-Kandidaten werden aus genau diesem Ordner geerntet. Nützlich für Vaults ohne eigenen Zettelkasten-Ordner oder mit abweichender Struktur.
+
 ## [0.10.20-beta] - 2026-07-12
 
 Lange Dokumente lassen sich jetzt vollständig übersetzen — die KI-Textaktionen arbeiten große Texte abschnittsweise ab, statt an Token- und Zeit-Limits abzubrechen.
