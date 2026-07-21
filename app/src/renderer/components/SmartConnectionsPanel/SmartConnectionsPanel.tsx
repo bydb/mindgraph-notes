@@ -5,28 +5,18 @@ import { useTranslation } from '../../utils/translations'
 import { rerank, type RerankerProgress } from '../../utils/reranker/reranker'
 import { ModelPicker } from '../Shared/ModelPicker'
 import { PanelHeader } from '../Shared/PanelHeader'
+import {
+  EMBEDDINGS_CACHE_VERSION as CACHE_VERSION,
+  cosineSimilarity,
+  normalizeEmbeddingScore,
+  pickPreferredEmbeddingModel,
+  type EmbeddingsCache
+} from '../../utils/embeddingSimilarity'
 
 interface EmbeddingModel {
   name: string
   size: number
 }
-
-interface EmbeddingsCacheEntry {
-  embedding: number[]
-  mtime: number      // File modification time when embedding was generated
-  size: number       // File size for change detection
-}
-
-interface EmbeddingsCache {
-  model: string
-  version: number
-  lastUpdated: number
-  files: Record<string, EmbeddingsCacheEntry>
-}
-
-// Cache-Version. Erhöhen, wenn sich `prepareTextForEmbedding` ändert,
-// damit veraltete Embeddings automatisch neu berechnet werden.
-const CACHE_VERSION = 2
 
 interface SimilarNote {
   id: string
@@ -290,17 +280,6 @@ function truncateForEmbedding(text: string): string {
   return prepareTextForEmbedding(text)
 }
 
-// Normalisiere Embedding-Score für bessere Differenzierung
-// Cosine-Similarity clustert typisch zwischen 0.5-0.95
-// Diese Funktion spreizt die Werte auf 0-1 für sichtbarere Unterschiede
-function normalizeEmbeddingScore(rawScore: number): number {
-  const MIN_EXPECTED = 0.50  // Scores darunter = unverwandt
-  const MAX_EXPECTED = 0.95  // Sehr hohe Ähnlichkeit
-
-  const normalized = (rawScore - MIN_EXPECTED) / (MAX_EXPECTED - MIN_EXPECTED)
-  return Math.max(0, Math.min(1, normalized))
-}
-
 // Berechne Hybrid-Score aus allen Faktoren
 function calculateHybridScore(
   embeddingScore: number,
@@ -321,24 +300,6 @@ function calculateHybridScore(
     weights.folder * folderProximity
 
   return Math.min(1.0, score)
-}
-
-// Cosine similarity zwischen zwei Vektoren
-function cosineSimilarity(a: number[], b: number[]): number {
-  if (a.length !== b.length) return 0
-
-  let dotProduct = 0
-  let normA = 0
-  let normB = 0
-
-  for (let i = 0; i < a.length; i++) {
-    dotProduct += a[i] * b[i]
-    normA += a[i] * a[i]
-    normB += b[i] * b[i]
-  }
-
-  if (normA === 0 || normB === 0) return 0
-  return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB))
 }
 
 // Radialer Fortschrittsring für das Hintergrund-Reranking (KI-Schritt → --color-ai).
@@ -442,18 +403,9 @@ export const SmartConnectionsPanel: React.FC<SmartConnectionsPanelProps> = ({ on
         setIsBackendAvailable(available)
         setEmbeddingModels(models)
 
-        if (models.length > 0) {
-          // Bevorzuge bge-m3 (multilingual, deutlich bessere Score-Spreizung für deutsche Vaults),
-          // dann nomic-embed-text als Fallback, sonst erstes verfügbares Modell.
-          const bgeModel = models.find((m: EmbeddingModel) => m.name.includes('bge-m3'))
-          const nomicModel = models.find((m: EmbeddingModel) => m.name.includes('nomic'))
-          if (bgeModel) {
-            setSelectedModel(bgeModel.name)
-          } else if (nomicModel) {
-            setSelectedModel(nomicModel.name)
-          } else {
-            setSelectedModel(models[0].name)
-          }
+        const preferred = pickPreferredEmbeddingModel(models)
+        if (preferred) {
+          setSelectedModel(preferred)
         }
       } catch (err) {
         console.error('[SmartConnections] Error checking backend:', err)

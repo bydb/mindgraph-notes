@@ -1911,6 +1911,485 @@ h2 { letter-spacing: -0.016em; }
   flex-shrink: 0;
 }
 
+/* ============ RUHIGE KOPFZEILE (Editor-Redesign) ============ */
+
+/* Titelgruppe: Breadcrumb + Titel + Zettel-ID-Chip + Autorschaft */
+.editor-title-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+
+.editor-title-group h3 {
+  flex: 0 1 auto;
+}
+
+.editor-breadcrumb {
+  font-size: 12px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.editor-zettel-chip {
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-muted);
+  border: 1px solid var(--border-color);
+  border-radius: 5px;
+  padding: 1px 5px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  cursor: default;
+}
+
+/* Dropdown-Menüs in der Kopfzeile (Export, LanguageTool) */
+.header-menu-wrap {
+  position: relative;
+  display: flex;
+}
+
+.header-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 120;
+  min-width: 224px;
+  background: var(--bg-content);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  overflow: hidden;
+  padding-bottom: 2px;
+}
+
+.header-menu-label {
+  padding: 10px 12px 4px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--text-muted);
+}
+
+.header-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 8px 12px;
+  border: none;
+  background: transparent;
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  text-align: left;
+}
+
+.header-menu-item:hover:not(:disabled) {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
+.header-menu-item:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.header-menu-item svg {
+  flex-shrink: 0;
+}
+
+.header-menu-meta {
+  margin-left: auto;
+  font-size: 10.5px;
+  color: var(--text-muted);
+}
+
+.header-menu-footer {
+  padding: 8px 12px;
+  border-top: 1px solid var(--border-color);
+  font-size: 10.5px;
+  color: var(--text-muted);
+}
+
+/* LanguageTool als Ein-Icon-Button mit Fehler-Badge */
+.lt-icon-btn {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: var(--radius-md);
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.lt-icon-btn:hover,
+.lt-icon-btn.open {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
+.lt-icon-btn.checking {
+  color: var(--accent-color);
+}
+
+.lt-icon-btn .lt-error-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 15px;
+  height: 15px;
+  padding: 0 4px;
+  font-size: 9px;
+}
+
+/* Kontextspalten-Toggle in der Kopfzeile */
+.context-toggle-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: var(--radius-md);
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.context-toggle-btn:hover {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
+.context-toggle-btn.active {
+  background: color-mix(in srgb, var(--accent-color) 12%, var(--bg-content));
+  color: var(--accent-color);
+}
+
+/* Beschrifteter Modus-Toggle (Markdown | Schreiben | Lesen) */
+.toggle-btn.toggle-btn-label {
+  width: auto;
+  padding: 0 10px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+/* Editor-Hauptbereich: Inhalt + Kontextspalte nebeneinander */
+.editor-main {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.editor-main > .editor-content,
+.editor-main > .editor-preview {
+  min-width: 0;
+}
+
+/* Fußzeile: Backlinks-Zähler rechts */
+.editor-footer-spacer {
+  flex: 1;
+}
+
+.editor-footer-backlinks {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: none;
+  background: transparent;
+  font-size: 11px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: var(--radius-sm);
+}
+
+.editor-footer-backlinks:hover {
+  color: var(--text-primary);
+  background: var(--bg-tertiary);
+}
+
+.editor-footer-backlinks-arrow {
+  opacity: 0.6;
+}
+
+/* ============ KONTEXTSPALTE ============ */
+.context-panel {
+  width: 272px;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 14px 14px 10px;
+  border-left: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+  overflow-y: auto;
+}
+
+.context-panel-header {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.context-panel-title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-secondary);
+}
+
+.context-panel-subtitle {
+  flex: 1;
+  font-size: 10px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.context-panel-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  align-self: center;
+}
+
+.context-panel-close:hover {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+.context-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.context-section-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--text-muted);
+}
+
+.context-section-meta {
+  margin-left: auto;
+  font-size: 9.5px;
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--text-muted);
+  opacity: 0.8;
+}
+
+.context-count {
+  font-weight: 600;
+  font-size: 10px;
+  background: color-mix(in srgb, var(--accent-color) 12%, transparent);
+  color: var(--accent-color);
+  border-radius: 999px;
+  padding: 1px 7px;
+}
+
+.context-count-due {
+  background: color-mix(in srgb, #d97706 14%, transparent);
+  color: #d97706;
+}
+
+.context-empty {
+  margin: 0;
+  font-size: 11px;
+  color: var(--text-muted);
+  line-height: 1.45;
+}
+
+.context-link-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.context-link-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 10px;
+  background: var(--bg-content);
+  border: 1px solid var(--border-color);
+  border-radius: 9px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  text-align: left;
+}
+
+.context-link-row:hover {
+  color: var(--text-primary);
+  border-color: color-mix(in srgb, var(--accent-color) 35%, var(--border-color));
+}
+
+.context-link-unresolved {
+  color: var(--text-muted);
+  cursor: default;
+}
+
+.context-link-unresolved:hover {
+  color: var(--text-muted);
+  border-color: var(--border-color);
+}
+
+.context-link-arrow {
+  font-size: 11px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.context-link-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.context-link-missing {
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.context-pdf-chip {
+  font-size: 8px;
+  font-weight: 700;
+  color: #dc2626;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  padding: 0 3px;
+  flex-shrink: 0;
+}
+
+.context-dot-neutral {
+  background: var(--text-muted);
+  opacity: 0.5;
+}
+
+.context-similar-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.context-similar-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  padding: 8px 10px;
+  background: var(--bg-content);
+  border: 1px solid var(--border-color);
+  border-radius: 9px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.context-similar-card:hover {
+  border-color: color-mix(in srgb, var(--accent-color) 35%, var(--border-color));
+}
+
+.context-similar-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.context-similar-score {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--accent-color);
+  flex-shrink: 0;
+}
+
+.context-similar-bar {
+  display: block;
+  height: 3px;
+  border-radius: 999px;
+  background: var(--bg-tertiary);
+}
+
+.context-similar-bar-fill {
+  display: block;
+  height: 3px;
+  border-radius: 999px;
+  background: var(--accent-color);
+}
+
+.context-flashcard-preview {
+  padding: 8px 10px;
+  background: var(--bg-content);
+  border: 1px solid var(--border-color);
+  border-radius: 9px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-secondary);
+}
+
+.context-flashcard-learn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  height: 30px;
+  border: none;
+  border-radius: 9px;
+  background: var(--accent-color);
+  color: var(--accent-on);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.context-flashcard-learn:hover {
+  background: var(--accent-hover, var(--accent-color));
+}
+
+.context-panel-spacer {
+  flex: 1;
+}
+
+.context-panel-hint {
+  font-size: 10.5px;
+  color: var(--text-muted);
+  text-align: center;
+  padding-bottom: 2px;
+}
+
 /* LanguageTool Check Button */
 .lt-check-btn {
   display: flex;
@@ -6958,6 +7437,8 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
   .view-mode-toggle,
   .export-btn,
   .backlinks-panel,
+  .context-panel,
+  .editor-footer,
   .format-menu {
     display: none !important;
   }
@@ -6970,6 +7451,11 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
     height: auto !important;
     overflow: visible !important;
     background: white !important;
+  }
+
+  .editor-main {
+    display: block !important;
+    overflow: visible !important;
   }
 
   .editor-preview {
