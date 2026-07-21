@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import ReactFlow, {
-  Background, Controls, Handle, Position,
+  Background, Controls, Handle, Panel, Position, useReactFlow,
   useNodesState, useEdgesState, ReactFlowProvider,
   type Node, type Edge, type NodeProps
 } from 'reactflow'
@@ -8,8 +8,9 @@ import 'reactflow/dist/style.css'
 import { useShallow } from 'zustand/react/shallow'
 import { useNotesStore } from '../../stores/notesStore'
 import { useUIStore } from '../../stores/uiStore'
+import { useTranslation } from '../../utils/translations'
 import { isBrainNote, brainNoteDate, brainNoteLabel, BRAIN_FOLDER_DEFAULT } from '../../utils/brainNote'
-import { getNoteKind } from '../../utils/noteKind'
+import { getNoteKind, stripNoteKindMarker, splitZettelTitle, NOTE_KINDS, type NoteKindId } from '../../utils/noteKind'
 import { resolveLink } from '../../utils/linkExtractor'
 import { BrainIcon } from '../BrainIcon'
 import type { Note } from '../../../shared/types'
@@ -17,12 +18,19 @@ import type { Note } from '../../../shared/types'
 // Brain-Rückblick — das Brain *spricht* über deinen Monat: welcher Tag komplex war,
 // welches Thema dich durchgehend beschäftigt hat, was du geklärt hast. Fakten
 // deterministisch aus den Brain-Notizen (counts/themes/Links), kein Bild zum Entziffern.
-// Die zeitliche Konstellation bleibt als optionales „dazu ansehen" erhalten.
+//
+// Design „Lesbarer Graph + Zeitstrahl" (Varianten 1b+1c): drei ZUSTÄNDE im
+// Segmented-Control (Rückblick | Zeitstrahl | Ganzer Graph — Label = Zustand,
+// nie Aktion), die Konstellation ist ein Zeitstrahl mit Tages-Punkten auf einer
+// Spine, Kanten neutral (Kategorie steckt nur im Dot), Legende unten rechts,
+// „Heute"-Punkt als leerer Docking-Punkt, Brain einheitlich in --brain-color.
 
 const MONTHS_DE = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember']
 const NEUTRAL = '#9aa3b2'
 // Struktur-Themen, die kein Topic sind (Boilerplate) — fürs „was hat dich beschäftigt"
 const GENERIC_THEMES = new Set(['email', 'mail', 'journal', 'note', 'notes', 'inbox', 'tasks', 'task'])
+const DAY_NODE_W = 170
+const CHIP_W = 190
 
 function parseThemes(content: string): string[] {
   const fm = content.match(/^---\s*\n([\s\S]*?)\n---/)
@@ -45,39 +53,98 @@ function parseCounts(content: string): Record<string, number> {
   return out
 }
 
-// ── Graph-Knoten (optionale Konstellation) ────────────────────────────────────
-const BrainHubNode: React.FC<NodeProps> = ({ data }) => (
-  <div className="bc-hub">
-    <Handle type="source" position={Position.Right} className="bc-handle" />
-    <Handle type="target" position={Position.Left} className="bc-handle" />
-    <div className="bc-hub-head"><BrainIcon size={15} /> <span className="bc-hub-date">{data.label}</span></div>
-    {data.themes && <div className="bc-hub-themes">{data.themes}</div>}
-    <div className="bc-hub-count">{data.count} Notizen</div>
-  </div>
-)
+// Anzeige-Titel für Chips: Zettel-ID + Kategorie-Marker raus (Befund E3)
+function chipTitle(title: string): string {
+  return splitZettelTitle(stripNoteKindMarker(title)).displayTitle
+}
+
+// ── Graph-Knoten (Zeitstrahl) ─────────────────────────────────────────────────
+// nodeTypes MUSS Modul-Konstante bleiben (React-Flow-Loop-Falle).
+
+// Tages-Punkt auf der Spine: Dot oben mittig, Datum + Meta darunter.
+const BrainDayNode: React.FC<NodeProps> = ({ data }) => {
+  const { t } = useTranslation()
+  return (
+    <div className={`bc-day${data.densest ? ' bc-day-densest' : ''}`}>
+      <Handle type="target" position={Position.Left} id="l" className="bc-handle bc-handle-spine" />
+      <Handle type="source" position={Position.Right} id="r" className="bc-handle bc-handle-spine" />
+      <Handle type="source" position={Position.Top} id="t" className="bc-handle bc-handle-top" />
+      <span className="bc-day-dot" />
+      <div className="bc-day-date">
+        {data.label}
+        {data.densest && <span className="bc-day-badge">{t('brain.densestDay')}</span>}
+      </div>
+      {data.meta && <div className="bc-day-meta">{data.meta}</div>}
+    </div>
+  )
+}
+
+// „Heute" — leerer Docking-Punkt, lädt zum Verdichten ein.
+const BrainTodayNode: React.FC<NodeProps> = ({ data }) => {
+  const { t } = useTranslation()
+  return (
+    <div className="bc-today" title={t('brain.todayPendingHint')}>
+      <Handle type="target" position={Position.Left} id="l" className="bc-handle bc-handle-spine" />
+      <span className="bc-today-dot" />
+      <div className="bc-today-date">{data.label}</div>
+      <div className="bc-today-meta">{t('brain.todayPending')}</div>
+    </div>
+  )
+}
+
+// Notiz-Chip über der Spine: Kategorie nur im Dot, PDF als Chip.
 const ConstNoteNode: React.FC<NodeProps> = ({ data }) => (
   <div className="bc-note" title={data.title}>
-    <Handle type="target" position={Position.Left} className="bc-handle" />
-    <Handle type="source" position={Position.Right} className="bc-handle" />
-    <span className="bc-note-dot" style={{ background: data.color }} />
+    <Handle type="target" position={Position.Bottom} id="b" className="bc-handle" />
+    {data.isPdf
+      ? <span className="bc-note-pdf">PDF</span>
+      : <span className="bc-note-dot" style={{ background: data.color }} />}
     <span className="bc-note-title">{data.title}</span>
   </div>
 )
-const nodeTypes = { brainHub: BrainHubNode, constNote: ConstNoteNode }
+
+// „Das Brain sagt" — die Rückblick-Essenz als Karte IM Zeitstrahl (1c ②).
+const BrainSayNode: React.FC<NodeProps> = ({ data }) => {
+  const { t } = useTranslation()
+  const selectNote = useNotesStore(s => s.selectNote)
+  const setViewMode = useUIStore(s => s.setViewMode)
+  const open = (id: string) => { selectNote(id); setViewMode('editor') }
+  return (
+    <div className="bc-say">
+      <div className="bc-say-label">{t('brain.says')}</div>
+      <div className="bc-say-text">
+        {data.densest && (
+          <>Am <button className="bc-link" onClick={() => open(data.densest.noteId)}>{data.densest.label}</button> war
+            richtig viel los: <b>{data.densest.links} Notizen</b>
+            {data.densest.themes.length > 0 && <> — vor allem rund um <b>{data.densest.themes.join(' · ')}</b></>}. </>
+        )}
+        {data.thread && (
+          <>Durchgehend beschäftigt hat dich <button className="bc-link" onClick={() => open(data.thread.noteId)}>{data.thread.title}</button> — an <b>{data.thread.days} Tagen</b> kam es wieder hoch.</>
+        )}
+      </div>
+    </div>
+  )
+}
+
+const nodeTypes = { brainDay: BrainDayNode, brainToday: BrainTodayNode, constNote: ConstNoteNode, brainSay: BrainSayNode }
+
+type BrainView = 'digest' | 'timeline'
 
 const Inner: React.FC = () => {
+  const { t } = useTranslation()
   const { notes, vaultPath, selectNote } = useNotesStore(
     useShallow(s => ({ notes: s.notes, vaultPath: s.vaultPath, selectNote: s.selectNote }))
   )
   const brainFolder = useUIStore(s => s.brain.folderPath) || BRAIN_FOLDER_DEFAULT
   const setBrainLensActive = useUIStore(s => s.setBrainLensActive)
   const setViewMode = useUIStore(s => s.setViewMode)
+  const rf = useReactFlow()
 
   const now = new Date()
   const [year, setYear] = useState(now.getFullYear())
   const [month, setMonth] = useState(now.getMonth() + 1)
   const [contentMap, setContentMap] = useState<Record<string, string>>({})
-  const [showGraph, setShowGraph] = useState(false)
+  const [view, setView] = useState<BrainView>('digest')
 
   const monthBrains = useMemo(
     () => notes
@@ -148,71 +215,212 @@ const Inner: React.FC = () => {
     return { dayCount: days.length, totalTouched, totalCreated, totalTasks, densest, quiet, topThemes, topThread }
   }, [monthBrains, contentMap, base])
 
-  // ── Optionale Konstellation (Graph) ─────────────────────────────────────────
+  // ── Zeitstrahl-Layout (1c): Spine mit Tages-Punkten, Chips darüber ─────────
   const layout = useMemo(() => {
     const rfNodes: Node[] = []; const rfEdges: Edge[] = []
-    if (monthBrains.length === 0) return { rfNodes, rfEdges }
-    const X0 = 120
-    const AXIS_W = Math.max(900, (monthBrains.length - 1) * 240)
-    const daysInMonth = new Date(year, month, 0).getDate()
-    const xForDay = (day: number) => X0 + (daysInMonth > 1 ? (day - 1) / (daysInMonth - 1) : 0.5) * AXIS_W
     const hubX = new Map<number, number>()
+    if (monthBrains.length === 0) return { rfNodes, rfEdges, hubX }
+    // Gleichmäßige Abstände statt datumsproportional — aufeinanderfolgende Tage
+    // würden sonst kollidieren (Labels sind ~170px breit).
+    const X0 = 120
+    const DAY_GAP = 240
+    monthBrains.forEach((b, i) => hubX.set(b.d!.d, X0 + i * DAY_GAP))
+    const densestDay = monthBrains.length > 1 ? digest?.densest?.day : undefined
+
     for (const { n, d } of monthBrains) {
-      const x = xForDay(d!.d); hubX.set(d!.d, x)
+      const x = hubX.get(d!.d)!
       const content = contentMap[n.path] ?? n.content ?? ''
-      rfNodes.push({ id: 'hub-' + n.id, type: 'brainHub', position: { x, y: 0 }, data: { noteId: n.id, label: brainNoteLabel({ ...n, content }), themes: parseThemes(content).slice(0, 3).join(' · '), count: base.perDayLinks.get(d!.d) || 0 } })
+      const themes = parseThemes(content).filter(th => !GENERIC_THEMES.has(th.toLowerCase())).slice(0, 3).join(' · ')
+      const count = base.perDayLinks.get(d!.d) || 0
+      rfNodes.push({
+        id: 'day-' + n.id, type: 'brainDay', draggable: false,
+        position: { x: x - DAY_NODE_W / 2, y: -9 },
+        data: {
+          noteId: n.id,
+          label: brainNoteLabel({ ...n, content }),
+          meta: themes || (count === 1 ? t('brain.oneNote') : t('brain.notesCount', { count })),
+          densest: d!.d === densestDay
+        }
+      })
     }
-    const belowIdx = new Map<number, number>(); let sharedBand = 0
+
+    // Spine: neutrale Verbindungen zwischen aufeinanderfolgenden Tagen
+    for (let i = 1; i < monthBrains.length; i++) {
+      rfEdges.push({
+        id: `spine-${i}`, type: 'straight', focusable: false,
+        source: 'day-' + monthBrains[i - 1].n.id, target: 'day-' + monthBrains[i].n.id,
+        sourceHandle: 'r', targetHandle: 'l',
+        style: { stroke: 'var(--edge-color)', strokeWidth: 2 }
+      })
+    }
+
+    // „Heute" als leerer Docking-Punkt (nur im aktuellen Monat, solange unverdichtet)
+    const today = new Date()
+    const isCurrentMonth = today.getFullYear() === year && today.getMonth() + 1 === month
+    const showTodayDock = isCurrentMonth && !monthBrains.some(b => b.d!.d === today.getDate())
+    if (showTodayDock) {
+      const x = X0 + monthBrains.length * DAY_GAP
+      rfNodes.push({
+        id: 'today', type: 'brainToday', draggable: false, selectable: false,
+        position: { x: x - DAY_NODE_W / 2, y: -7 },
+        data: { label: `${today.getDate()}. ${MONTHS_DE[month - 1]}` }
+      })
+      const last = monthBrains[monthBrains.length - 1]
+      rfEdges.push({
+        id: 'spine-today', type: 'straight', focusable: false,
+        source: 'day-' + last.n.id, target: 'today', sourceHandle: 'r', targetHandle: 'l',
+        style: { stroke: 'var(--edge-color)', strokeWidth: 2, strokeDasharray: '5 5' }
+      })
+    }
+
+    // Notiz-Chips ÜBER der Spine; Kategorie nur im Dot, Kanten neutral (1b ②)
+    const aboveIdx = new Map<number, number>(); let sharedBand = 0
     for (const [id, { note, hubs }] of base.linkedBy) {
       const color = getNoteKind(note)?.dotColor || NEUTRAL
       let x: number, y: number
-      if (hubs.length >= 2) { x = hubs.reduce((s, h) => s + (hubX.get(h) || 0), 0) / hubs.length; y = -200 - (sharedBand++ % 4) * 80 }
-      else { const day = hubs[0]; const i = belowIdx.get(day) || 0; belowIdx.set(day, i + 1); x = (hubX.get(day) || 0) + (i % 2 === 0 ? -46 : 46); y = 150 + i * 58 }
-      rfNodes.push({ id: 'note-' + id, type: 'constNote', position: { x, y }, data: { noteId: note.id, title: note.title, color } })
+      if (hubs.length >= 2) {
+        x = hubs.reduce((s, h) => s + (hubX.get(h) || 0), 0) / hubs.length - CHIP_W / 2
+        y = -300 - (sharedBand++ % 3) * 52
+      } else {
+        const day = hubs[0]; const i = aboveIdx.get(day) || 0; aboveIdx.set(day, i + 1)
+        x = (hubX.get(day) || 0) - CHIP_W / 2 + (i % 2 === 0 ? -52 : 52)
+        y = -96 - i * 48
+      }
+      rfNodes.push({
+        id: 'note-' + id, type: 'constNote', position: { x, y },
+        data: { noteId: note.id, title: chipTitle(note.title), color, isPdf: !!note.sourcePdf }
+      })
       for (const day of hubs) {
         const brain = monthBrains.find(b => b.d!.d === day); if (!brain) continue
-        rfEdges.push({ id: `e-${brain.n.id}-${id}`, source: 'hub-' + brain.n.id, target: 'note-' + id, type: 'straight', style: { stroke: color, strokeWidth: hubs.length >= 2 ? 1.6 : 1, opacity: 0.55 } })
+        rfEdges.push({
+          id: `e-${brain.n.id}-${id}`, focusable: false,
+          source: 'day-' + brain.n.id, target: 'note-' + id,
+          sourceHandle: 't', targetHandle: 'b',
+          type: hubs.length >= 2 ? 'default' : 'straight',
+          style: { stroke: 'var(--edge-color)', strokeWidth: hubs.length >= 2 ? 1.6 : 1.2, opacity: 0.85 }
+        })
       }
     }
-    return { rfNodes, rfEdges }
-  }, [monthBrains, year, month, contentMap, base])
+
+    // „Das Brain sagt" — Rückblick-Essenz als Karte unter der Spine (1c ②)
+    if (digest && (digest.densest || digest.topThread)) {
+      const spineW = (monthBrains.length - 1 + (showTodayDock ? 1 : 0)) * DAY_GAP
+      rfNodes.push({
+        id: 'say', type: 'brainSay', draggable: false, selectable: false,
+        position: { x: X0 + spineW / 2 - 280, y: 130 },
+        data: {
+          densest: digest.densest ? {
+            noteId: digest.densest.noteId,
+            label: digest.densest.label,
+            links: digest.densest.links,
+            themes: digest.densest.themes.filter(th => !GENERIC_THEMES.has(th.toLowerCase())).slice(0, 2)
+          } : null,
+          thread: digest.topThread ? {
+            noteId: digest.topThread.note.id,
+            title: chipTitle(digest.topThread.note.title),
+            days: digest.topThread.days
+          } : null
+        }
+      })
+    }
+
+    return { rfNodes, rfEdges, hubX }
+  }, [monthBrains, year, month, contentMap, base, digest, t])
 
   const [rfNodes, setRfNodes, onNodesChange] = useNodesState([])
   const [rfEdges, setRfEdges, onEdgesChange] = useEdgesState([])
   useEffect(() => { setRfNodes(layout.rfNodes); setRfEdges(layout.rfEdges) }, [layout, setRfNodes, setRfEdges])
 
-  const prevMonth = () => { setShowGraph(false); if (month === 1) { setMonth(12); setYear(y => y - 1) } else setMonth(m => m - 1) }
-  const nextMonth = () => { setShowGraph(false); if (month === 12) { setMonth(1); setYear(y => y + 1) } else setMonth(m => m + 1) }
+  // Beim Monats-/Ansichtswechsel den Zeitstrahl einpassen
+  useEffect(() => {
+    if (view !== 'timeline') return
+    const id = window.setTimeout(() => rf.fitView({ padding: 0.25, duration: 300 }), 60)
+    return () => window.clearTimeout(id)
+  }, [layout, view, rf])
+
+  const prevMonth = () => { if (month === 1) { setMonth(12); setYear(y => y - 1) } else setMonth(m => m - 1) }
+  const nextMonth = () => { if (month === 12) { setMonth(1); setYear(y => y + 1) } else setMonth(m => m + 1) }
+  const goToday = () => { setYear(now.getFullYear()); setMonth(now.getMonth() + 1) }
+  const isCurrentMonth = year === now.getFullYear() && month === now.getMonth() + 1
   const monthName = `${MONTHS_DE[month - 1]} ${year}`
   // Klick auf einen Tag/eine Notiz: zur Editor-Ansicht wechseln, damit die Datei
   // tatsächlich erscheint (im Graph-Modus bliebe sie sonst „hinter" dem Graph).
   const openNote = (id: string) => { selectNote(id); setViewMode('editor') }
+  const centerDay = (day: number) => {
+    const x = layout.hubX.get(day)
+    if (x !== undefined) rf.setCenter(x, -60, { zoom: 0.9, duration: 400 })
+  }
+
+  const LEGEND_KINDS: NoteKindId[] = ['problem', 'solution', 'info']
 
   return (
     <div className="brain-constellation">
       <div className="bc-toolbar">
-        <button className="bc-btn" onClick={() => setBrainLensActive(false)}>← Freier Graph</button>
+        {/* Zustands-Control (1b ①): Label = Zustand, nie Aktion */}
+        <div className="bc-seg">
+          <button
+            className={`bc-seg-btn ${view === 'digest' ? 'active' : ''}`}
+            onClick={() => setView('digest')}
+          >{t('brain.view.digest')}</button>
+          <button
+            className={`bc-seg-btn ${view === 'timeline' ? 'active' : ''}`}
+            onClick={() => setView('timeline')}
+          ><BrainIcon size={12} /> {t('brain.view.timeline')}</button>
+          <button
+            className="bc-seg-btn"
+            onClick={() => setBrainLensActive(false)}
+          >{t('brain.view.fullGraph')}</button>
+        </div>
         <div className="bc-month">
           <button className="bc-nav" onClick={prevMonth} aria-label="Vorheriger Monat">◂</button>
           <span className="bc-month-label"><BrainIcon size={14} /> {monthName}</span>
           <button className="bc-nav" onClick={nextMonth} aria-label="Nächster Monat">▸</button>
+          {!isCurrentMonth && (
+            <button className="bc-today-btn" onClick={goToday}>{t('brain.today')}</button>
+          )}
         </div>
-        {monthBrains.length > 0 && (
-          <button className="bc-btn" onClick={() => setShowGraph(g => !g)}>{showGraph ? 'Rückblick' : 'MindGraph'}</button>
-        )}
       </div>
 
       {monthBrains.length === 0 || !digest ? (
         <div className="bc-empty"><BrainIcon size={28} /><p>Keine Brain-Tage in {monthName}.</p><span>Wechsle den Monat oder erzeuge eine Tageszusammenfassung.</span></div>
-      ) : showGraph ? (
+      ) : view === 'timeline' ? (
         <ReactFlow
           nodes={rfNodes} edges={rfEdges} onNodesChange={onNodesChange} onEdgesChange={onEdgesChange}
           nodeTypes={nodeTypes}
-          onNodeClick={(_e, node) => openNote((node.data as { noteId: string }).noteId)}
-          fitView fitViewOptions={{ padding: 0.2 }} minZoom={0.2} maxZoom={1.8} proOptions={{ hideAttribution: true }}
+          onNodeClick={(_e, node) => {
+            const noteId = (node.data as { noteId?: string }).noteId
+            if (noteId) openNote(noteId)
+          }}
+          fitView fitViewOptions={{ padding: 0.25 }} minZoom={0.2} maxZoom={1.8} proOptions={{ hideAttribution: true }}
         >
           <Background gap={26} color="rgba(20,23,29,0.05)" />
           <Controls showInteractive={false} />
+          {/* Monats-Scrubber: Brain-Tage als Punkte, Klick zentriert den Tag (1c ④) */}
+          {monthBrains.length > 1 && (
+            <Panel position="bottom-center" className="bc-scrubber">
+              {monthBrains.map(b => (
+                <button
+                  key={b.n.id}
+                  className="bc-scrubber-dot"
+                  title={`${b.d!.d}. ${MONTHS_DE[month - 1]}`}
+                  onClick={() => centerDay(b.d!.d)}
+                />
+              ))}
+            </Panel>
+          )}
+          {/* Legende (1b ③): Kategorie-Farben + Kantenbedeutung */}
+          <Panel position="bottom-right" className="bc-legend">
+            {LEGEND_KINDS.map(k => (
+              <span key={k} className="bc-legend-item">
+                <span className="bc-legend-dot" style={{ background: NOTE_KINDS[k].dotColor }} />
+                {NOTE_KINDS[k].label}
+              </span>
+            ))}
+            <span className="bc-legend-item">
+              <span className="bc-legend-line" />
+              {t('brain.legend.touched')}
+            </span>
+          </Panel>
         </ReactFlow>
       ) : (
         <div className="bc-digest-wrap">
@@ -236,7 +444,7 @@ const Inner: React.FC = () => {
             {digest.quiet.length > 0 && digest.quiet[0].links < (digest.densest?.links ?? 0) && (
               <p className="bc-quiet">Ruhiger war's am {digest.quiet.map(q => q.label).join(' und ')}.</p>
             )}
-            <button className="bc-toggle-graph" onClick={() => setShowGraph(true)}>MindGraph anzeigen →</button>
+            <button className="bc-toggle-graph" onClick={() => setView('timeline')}>{t('brain.showTimeline')}</button>
           </div>
         </div>
       )}

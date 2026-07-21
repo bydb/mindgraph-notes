@@ -1220,6 +1220,18 @@ const translations = {
 
     // Brain (Tagesgedächtnis)
     'brain.noteLabel': 'Brain-Tagesnotiz',
+    'brain.view.digest': 'Rückblick',
+    'brain.view.timeline': 'Zeitstrahl',
+    'brain.view.fullGraph': 'Ganzer Graph',
+    'brain.today': 'Heute',
+    'brain.todayPending': 'heute — noch nicht verdichtet',
+    'brain.todayPendingHint': 'Tageszusammenfassung im Dashboard erzeugen',
+    'brain.says': 'Das Brain sagt',
+    'brain.showTimeline': 'Zeitstrahl anzeigen →',
+    'brain.legend.touched': 'am Tag berührt',
+    'brain.densestDay': 'dichtester Tag',
+    'brain.notesCount': '{count} Notizen',
+    'brain.oneNote': '1 Notiz',
     'workContext.brainHeading': 'Tagesgedächtnis',
     'workContext.partOfDay': 'Teil deines Tages am',
 
@@ -4109,6 +4121,18 @@ const translations = {
 
     // Brain (daily memory)
     'brain.noteLabel': 'Brain daily note',
+    'brain.view.digest': 'Review',
+    'brain.view.timeline': 'Timeline',
+    'brain.view.fullGraph': 'Whole graph',
+    'brain.today': 'Today',
+    'brain.todayPending': 'today — not yet condensed',
+    'brain.todayPendingHint': 'Create the daily summary from the dashboard',
+    'brain.says': 'The Brain says',
+    'brain.showTimeline': 'Show timeline →',
+    'brain.legend.touched': 'touched that day',
+    'brain.densestDay': 'densest day',
+    'brain.notesCount': '{count} notes',
+    'brain.oneNote': '1 note',
     'workContext.brainHeading': 'Daily memory',
     'workContext.partOfDay': 'Part of your day on',
 
