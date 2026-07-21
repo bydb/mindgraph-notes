@@ -2,7 +2,9 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
-## [Unveröffentlicht]
+## [0.10.22-beta] - 2026-07-21
+
+Der Notiz-Agent kann jetzt optional im Web recherchieren, geprüfte Seiten lesen und die verwendeten Quellen nachvollziehbar in die fertige Notiz übernehmen.
 
 ### Neu
 
