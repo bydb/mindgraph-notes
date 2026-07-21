@@ -7,6 +7,7 @@ import {
   extractUrlsFromInstruction,
   parseSearxngResults,
   parseLinkupResults,
+  parseTavilyResults,
   normalizeQuery,
   isQueryTooLong,
   isSearchAllowedInPhase,
@@ -239,6 +240,18 @@ describe('parseLinkupResults', () => {
   })
 })
 
+describe('parseTavilyResults', () => {
+  it('mappt Tavily /search (title/url/content) auf Hits', () => {
+    const json = { results: [{ title: 'Canberra', url: 'https://x.example/c', content: 'Hauptstadt', score: 0.9 }] }
+    expect(parseTavilyResults(json)).toEqual([{ title: 'Canberra', url: 'https://x.example/c', snippet: 'Hauptstadt' }])
+  })
+
+  it('robuste Rückgabe bei kaputter Eingabe', () => {
+    expect(parseTavilyResults(null)).toEqual([])
+    expect(parseTavilyResults({ results: [{ title: 't', url: 'nope' }] })).toEqual([])
+  })
+})
+
 describe('normalizeQuery / isQueryTooLong', () => {
   it('normalizeQuery trimmt nur, kürzt nicht', () => {
     expect(normalizeQuery('  hallo  ')).toBe('hallo')
@@ -270,7 +283,8 @@ describe('isWebResearchConfigComplete', () => {
     expect(isWebResearchConfigComplete({ provider: 'searxng', searxngUrl: 'kaputt' })).toBe(false)
   })
 
-  it('Linkup ist config-seitig vollständig (Key prüft der Main)', () => {
+  it('Tavily/Linkup sind config-seitig vollständig (Key prüft der Main)', () => {
+    expect(isWebResearchConfigComplete({ provider: 'tavily', searxngUrl: '' })).toBe(true)
     expect(isWebResearchConfigComplete({ provider: 'linkup', searxngUrl: '' })).toBe(true)
   })
 

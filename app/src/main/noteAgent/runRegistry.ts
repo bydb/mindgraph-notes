@@ -13,7 +13,7 @@ export type AgentRunStatus = 'running' | 'done' | 'cancelled' | 'error'
 // Auftrags-URLs), NIE das Modell. Zustandsmaschine search → fetch → write (einseitig).
 export interface WebRunState {
   config: WebResearchConfig
-  linkupApiKey: string | null
+  apiKey: string | null                 // Key des aktuellen Providers (tavily/linkup); null bei searxng
   phase: WebResearchPhase
   allowedUrls: Set<string>              // normalisierte URLs, die web_fetch abrufen darf
   queries: Array<{ query: string; status: 'ok' | 'failed' }>

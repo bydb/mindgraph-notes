@@ -16,9 +16,13 @@
 
 // ── Provider ────────────────────────────────────────────────────────────────
 
-export type WebSearchProviderId = 'searxng' | 'linkup'
+export type WebSearchProviderId = 'tavily' | 'searxng' | 'linkup'
 
-export const WEB_SEARCH_PROVIDER_IDS: WebSearchProviderId[] = ['searxng', 'linkup']
+// Reihenfolge = Anzeige/Empfehlung: Tavily zuerst (empfohlen, kostenloser Key, zuverlässig).
+export const WEB_SEARCH_PROVIDER_IDS: WebSearchProviderId[] = ['tavily', 'searxng', 'linkup']
+
+// Provider, die einen API-Key brauchen (Key liegt Main-seitig verschlüsselt, pro Provider).
+export const KEY_PROVIDERS: WebSearchProviderId[] = ['tavily', 'linkup']
 
 export const WEB_SEARCH_PROVIDER_META: Record<WebSearchProviderId, {
   label: string
@@ -27,6 +31,16 @@ export const WEB_SEARCH_PROVIDER_META: Record<WebSearchProviderId, {
   needsBaseUrl: boolean
   privacyNote: { de: string; en: string }
 }> = {
+  tavily: {
+    label: 'Tavily',
+    keysUrl: 'https://app.tavily.com/home',
+    needsApiKey: true,
+    needsBaseUrl: false,
+    privacyNote: {
+      de: 'Empfohlen: kostenloser Anbieter mit schneller Anmeldung (~1.000 Suchen/Monat gratis, keine Kreditkarte). US-Firma — Suchanfragen verlassen deinen Rechner und die EU. Die Seiten-Extraktion bleibt lokal.',
+      en: 'Recommended: free provider with quick signup (~1,000 searches/month free, no credit card). US company — search queries leave your computer and the EU. Page extraction stays local.'
+    }
+  },
   searxng: {
     label: 'SearXNG',
     keysUrl: 'https://docs.searxng.org/',
@@ -376,6 +390,20 @@ export function parseSearxngResults(json: unknown): WebSearchHit[] {
   return hits
 }
 
+/** Tavily `/search`: `{ results: [{ title, url, content, score }] }`. */
+export function parseTavilyResults(json: unknown): WebSearchHit[] {
+  const results = (json as { results?: unknown })?.results
+  if (!Array.isArray(results)) return []
+  const hits: WebSearchHit[] = []
+  for (const r of results) {
+    const rec = r as Record<string, unknown>
+    const hit = toHit(rec?.title, rec?.url, rec?.content)
+    if (hit) hits.push(hit)
+    if (hits.length >= MAX_HITS_PER_SEARCH) break
+  }
+  return hits
+}
+
 /** Linkup `outputType: searchResults`: `{ results: [{ type, name, url, content }] }`. */
 export function parseLinkupResults(json: unknown): WebSearchHit[] {
   const results = (json as { results?: unknown })?.results
@@ -430,6 +458,7 @@ export function mergeDeterministicSources(markdown: string, fetches: WebFetchRec
 export function isWebResearchConfigComplete(config: WebResearchConfig | undefined): boolean {
   if (!config) return false
   if (config.provider === 'searxng') return normalizeWebUrl(config.searxngUrl) !== null
-  if (config.provider === 'linkup') return true   // Key-Existenz prüft der Main
+  // Key-Provider (tavily/linkup): config-seitig vollständig — die Key-Existenz prüft der Main.
+  if (config.provider === 'tavily' || config.provider === 'linkup') return true
   return false
 }

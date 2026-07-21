@@ -160,7 +160,7 @@ export function AiActionBar({ open, onOpenChange, phase, proposal, onGenerate, o
   useEffect(() => {
     if (webResearchModule && !webResearchConfig) {
       window.electronAPI.webResearchLoadConfig()
-        .then(c => setWebResearchConfig({ provider: c.provider, searxngUrl: c.searxngUrl, hasLinkupKey: c.hasLinkupKey }))
+        .then(c => setWebResearchConfig({ provider: c.provider, searxngUrl: c.searxngUrl, hasTavilyKey: c.hasTavilyKey, hasLinkupKey: c.hasLinkupKey }))
         .catch(() => { /* ignorieren */ })
     }
   }, [webResearchModule, webResearchConfig, setWebResearchConfig])
@@ -172,9 +172,9 @@ export function AiActionBar({ open, onOpenChange, phase, proposal, onGenerate, o
   }, [open, agentMode, webResearchModule])
 
   const webConfigured = !!webResearchConfig && (
-    webResearchConfig.provider === 'linkup'
-      ? webResearchConfig.hasLinkupKey
-      : isWebResearchConfigComplete({ provider: 'searxng', searxngUrl: webResearchConfig.searxngUrl })
+    webResearchConfig.provider === 'tavily' ? webResearchConfig.hasTavilyKey :
+    webResearchConfig.provider === 'linkup' ? webResearchConfig.hasLinkupKey :
+    isWebResearchConfigComplete({ provider: 'searxng', searxngUrl: webResearchConfig.searxngUrl })
   )
   const webProviderLabel = webResearchConfig ? WEB_SEARCH_PROVIDER_META[webResearchConfig.provider].label : ''
 

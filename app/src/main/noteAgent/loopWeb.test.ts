@@ -28,7 +28,7 @@ function makeRun(web?: WebRunState): AgentRun {
 function makeWeb(overrides: Partial<WebRunState> = {}): WebRunState {
   return {
     config: { provider: 'searxng', searxngUrl: 'https://searx.example/' },
-    linkupApiKey: null, phase: 'search', allowedUrls: new Set(), queries: [], fetches: [],
+    apiKey: null, phase: 'search', allowedUrls: new Set(), queries: [], fetches: [],
     searchCount: 0, fetchCount: 0, wrote: false, ...overrides
   }
 }

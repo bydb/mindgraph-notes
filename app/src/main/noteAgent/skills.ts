@@ -472,7 +472,7 @@ export function createNoteAgentRegistry(): ToolRegistry<NoteAgentContext> {
       if (isQueryTooLong(query)) return err('Suchanfrage zu lang — formuliere 3–8 Stichworte (max. 250 Zeichen).')
       web.searchCount += 1 // VOR dem externen Versuch zählen (auch Fehlversuche verbrauchen Budget)
       try {
-        const hits = await webSearch(query, { config: web.config, linkupApiKey: web.linkupApiKey, signal: ctx.run.abort.signal })
+        const hits = await webSearch(query, { config: web.config, apiKey: web.apiKey, signal: ctx.run.abort.signal })
         web.queries.push({ query, status: 'ok' })
         for (const h of hits) web.allowedUrls.add(h.url)
         return { ok: true, content: formatSearchResults(hits), display: `web_search: „${query}"` }

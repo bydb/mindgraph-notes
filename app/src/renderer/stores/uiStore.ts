@@ -641,7 +641,7 @@ interface UIState {
   webResearchEnabled: boolean
   // Spiegel der Main-seitigen Webrecherche-Config (0d) — nur zum Anzeigen in der KI-Leiste
   // (Provider-Tooltip, „konfiguriert?"). NICHT persistiert; wird per IPC geladen/aktualisiert.
-  webResearchConfig: { provider: 'searxng' | 'linkup'; searxngUrl: string; hasLinkupKey: boolean } | null
+  webResearchConfig: { provider: 'tavily' | 'searxng' | 'linkup'; searxngUrl: string; hasTavilyKey: boolean; hasLinkupKey: boolean } | null
   semanticScholarEnabled: boolean
   zoteroEnabled: boolean
 
@@ -784,7 +784,7 @@ interface UIState {
   setFlashcardsEnabled: (enabled: boolean) => void
   setWorkflowCanvasEnabled: (enabled: boolean) => void
   setWebResearchEnabled: (enabled: boolean) => void
-  setWebResearchConfig: (config: { provider: 'searxng' | 'linkup'; searxngUrl: string; hasLinkupKey: boolean } | null) => void
+  setWebResearchConfig: (config: { provider: 'tavily' | 'searxng' | 'linkup'; searxngUrl: string; hasTavilyKey: boolean; hasLinkupKey: boolean } | null) => void
   setSemanticScholarEnabled: (enabled: boolean) => void
   setZoteroEnabled: (enabled: boolean) => void
   setSpeech: (settings: Partial<SpeechSettings>) => void

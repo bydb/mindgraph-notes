@@ -784,10 +784,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Webrecherche (Opt-in): Provider-Config + Linkup-Key liegen Main-seitig (0d),
   // der Renderer verwaltet sie nur über diese Kanäle.
   webResearchLoadConfig: () => ipcRenderer.invoke('webresearch-load-config'),
-  webResearchSaveConfig: (input: { provider?: 'searxng' | 'linkup'; searxngUrl?: string }) =>
+  webResearchSaveConfig: (input: { provider?: 'tavily' | 'searxng' | 'linkup'; searxngUrl?: string }) =>
     ipcRenderer.invoke('webresearch-save-config', input),
-  webResearchSaveKey: (apiKey: string) => ipcRenderer.invoke('webresearch-save-key', apiKey),
-  webResearchHasKey: () => ipcRenderer.invoke('webresearch-has-key'),
-  webResearchClearKey: () => ipcRenderer.invoke('webresearch-clear-key'),
+  webResearchSaveKey: (provider: 'tavily' | 'linkup', apiKey: string) => ipcRenderer.invoke('webresearch-save-key', provider, apiKey),
+  webResearchHasKey: (provider: 'tavily' | 'linkup') => ipcRenderer.invoke('webresearch-has-key', provider),
+  webResearchClearKey: (provider: 'tavily' | 'linkup') => ipcRenderer.invoke('webresearch-clear-key', provider),
   webResearchTest: () => ipcRenderer.invoke('webresearch-test')
 })

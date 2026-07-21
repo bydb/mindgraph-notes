@@ -1008,12 +1008,12 @@ export interface ElectronAPI {
   llmbaseListModels: () => Promise<{ success: boolean; models: Array<{ id: string; name: string; contextLength?: number; promptPrice?: string }>; error?: string }>;
   llmbaseTest: (model: string) => Promise<{ success: boolean; reply?: string; error?: string }>;
 
-  // Webrecherche (Opt-in) — Provider-Config + Linkup-Key liegen Main-seitig (0d).
-  webResearchLoadConfig: () => Promise<{ provider: 'searxng' | 'linkup'; searxngUrl: string; approvedPrivateOrigin?: string; hasLinkupKey: boolean }>;
-  webResearchSaveConfig: (input: { provider?: 'searxng' | 'linkup'; searxngUrl?: string }) => Promise<{ success: boolean; config?: { provider: 'searxng' | 'linkup'; searxngUrl: string }; error?: string }>;
-  webResearchSaveKey: (apiKey: string) => Promise<{ success: boolean; hasKey?: boolean; error?: string }>;
-  webResearchHasKey: () => Promise<boolean>;
-  webResearchClearKey: () => Promise<{ success: boolean; error?: string }>;
+  // Webrecherche (Opt-in) — Provider-Config + API-Keys liegen Main-seitig (0d), pro Provider.
+  webResearchLoadConfig: () => Promise<{ provider: 'tavily' | 'searxng' | 'linkup'; searxngUrl: string; approvedPrivateOrigin?: string; hasTavilyKey: boolean; hasLinkupKey: boolean }>;
+  webResearchSaveConfig: (input: { provider?: 'tavily' | 'searxng' | 'linkup'; searxngUrl?: string }) => Promise<{ success: boolean; config?: { provider: 'tavily' | 'searxng' | 'linkup'; searxngUrl: string }; error?: string }>;
+  webResearchSaveKey: (provider: 'tavily' | 'linkup', apiKey: string) => Promise<{ success: boolean; hasKey?: boolean; error?: string }>;
+  webResearchHasKey: (provider: 'tavily' | 'linkup') => Promise<boolean>;
+  webResearchClearKey: (provider: 'tavily' | 'linkup') => Promise<{ success: boolean; error?: string }>;
   webResearchTest: () => Promise<{ success: boolean; count?: number; error?: string }>;
   onEmailFetchProgress: (callback: (progress: { current: number; total: number; status: string }) => void) => void;
   onEmailAnalysisProgress: (callback: (progress: { current: number; total: number }) => void) => void;

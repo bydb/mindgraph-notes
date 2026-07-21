@@ -1,4 +1,4 @@
-// Webrecherche — Such-Provider-Clients (SearXNG, Linkup). Beide laufen über den einen
+// Webrecherche — Such-Provider-Clients (Tavily, SearXNG, Linkup). Alle laufen über den einen
 // Egress-Pfad (egress.ts) und liefern normalisierte WebSearchHits. Die Antwortgröße ist
 // gedeckelt; kaputte/Nicht-JSON-Antworten werden mit verständlicher Meldung abgewiesen.
 
@@ -6,15 +6,17 @@ import { safeFetch } from './egress'
 import {
   parseSearxngResults,
   parseLinkupResults,
+  parseTavilyResults,
   type WebSearchHit,
   type WebResearchConfig,
+  MAX_HITS_PER_SEARCH,
   WEB_SEARCH_RESPONSE_MAX_BYTES,
   WEB_FETCH_TIMEOUT_MS
 } from '../../shared/webResearch'
 
 export interface WebSearchDeps {
   config: WebResearchConfig
-  linkupApiKey?: string | null
+  apiKey?: string | null   // Key des aktuellen Providers (tavily/linkup); null bei searxng
   signal?: AbortSignal
 }
 
@@ -93,9 +95,41 @@ async function searchViaLinkup(query: string, apiKey: string | null | undefined,
   return parseLinkupResults(parseJsonBody(res.body, 'Linkup'))
 }
 
+async function searchViaTavily(query: string, apiKey: string | null | undefined, signal?: AbortSignal): Promise<WebSearchHit[]> {
+  const key = (apiKey || '').trim()
+  if (!key) throw new Error('Kein Tavily-API-Key hinterlegt. Bitte in den Einstellungen eintragen (kostenlos bei app.tavily.com).')
+
+  // search_depth 'basic' = reine Treffer (Titel + URL + Snippet), keine LLM-Antwort/kein
+  // serverseitiges Raw-Content-Scraping — die Seiten-Extraktion machen wir lokal (fetchExtract).
+  let res
+  try {
+    res = await safeFetch('https://api.tavily.com/search', {
+      signal,
+      timeoutMs: WEB_FETCH_TIMEOUT_MS,
+      maxBytes: WEB_SEARCH_RESPONSE_MAX_BYTES,
+      method: 'POST',
+      followRedirects: false,
+      headers: {
+        Authorization: `Bearer ${key}`,
+        'Content-Type': 'application/json'
+      },
+      bodyText: JSON.stringify({ query, search_depth: 'basic', max_results: MAX_HITS_PER_SEARCH, include_answer: false, include_raw_content: false, include_images: false }),
+      acceptContentTypes: ['application/json']
+    })
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    throw new Error(`Tavily nicht erreichbar: ${msg}`)
+  }
+  if (res.status === 401 || res.status === 403) throw new Error('Tavily lehnt den API-Key ab (401/403). Key in den Einstellungen prüfen.')
+  if (res.status === 429) throw new Error('Tavily-Ratenlimit/Kontingent erreicht (429). Später erneut versuchen.')
+  if (res.status < 200 || res.status >= 300) throw new Error(`Tavily antwortete mit HTTP ${res.status}.`)
+  return parseTavilyResults(parseJsonBody(res.body, 'Tavily'))
+}
+
 /** Führt eine Websuche über den konfigurierten Provider aus. `query` ist bereits geprüft. */
 export async function webSearch(query: string, deps: WebSearchDeps): Promise<WebSearchHit[]> {
+  if (deps.config.provider === 'tavily') return searchViaTavily(query, deps.apiKey, deps.signal)
   if (deps.config.provider === 'searxng') return searchViaSearxng(deps.config, query, deps.signal)
-  if (deps.config.provider === 'linkup') return searchViaLinkup(query, deps.linkupApiKey, deps.signal)
+  if (deps.config.provider === 'linkup') return searchViaLinkup(query, deps.apiKey, deps.signal)
   throw new Error(`Unbekannter Suchanbieter: ${deps.config.provider}`)
 }

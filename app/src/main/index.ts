@@ -3,10 +3,10 @@ import * as path from 'path'
 import * as fs from 'fs/promises'
 import { existsSync } from 'fs'
 import type { FileEntry } from '../shared/types'
-import { loadWebResearchConfig, saveWebResearchConfig, loadLinkupKey, saveLinkupKey, clearLinkupKey } from './webResearch/config'
+import { loadWebResearchConfig, saveWebResearchConfig, loadProviderKey, saveProviderKey, clearProviderKey, keyPresence } from './webResearch/config'
 import { webSearch as webResearchSearch } from './webResearch/providers'
 import { originNeedsPrivateApproval as webResearchNeedsApproval } from './webResearch/egress'
-import { isWebResearchConfigComplete, normalizeWebUrl, extractUrlsFromInstruction } from '../shared/webResearch'
+import { isWebResearchConfigComplete, normalizeWebUrl, extractUrlsFromInstruction, KEY_PROVIDERS, type WebSearchProviderId } from '../shared/webResearch'
 import {
   HTML_PREVIEW_SCHEME,
   previewPathnameToFsPath,
@@ -4165,13 +4165,13 @@ ipcMain.handle('note-agent-run', async (event, params: NoteAgentRunParams) => {
       if (!isWebResearchConfigComplete(webConfig)) {
         return { success: false, error: 'Webrecherche ist eingeschaltet, aber nicht konfiguriert (Einstellungen → Webrecherche: SearXNG-URL bzw. Linkup-Key).' }
       }
-      const linkupApiKey = webConfig.provider === 'linkup' ? await loadLinkupKey() : null
-      if (webConfig.provider === 'linkup' && !linkupApiKey) {
-        return { success: false, error: 'Webrecherche mit Linkup gewählt, aber kein API-Key hinterlegt (Einstellungen → Webrecherche).' }
+      const apiKey = KEY_PROVIDERS.includes(webConfig.provider) ? await loadProviderKey(webConfig.provider) : null
+      if (KEY_PROVIDERS.includes(webConfig.provider) && !apiKey) {
+        return { success: false, error: 'Webrecherche gewählt, aber kein API-Key hinterlegt (Einstellungen → Integrationen → Webrecherche).' }
       }
       web = {
         config: webConfig,
-        linkupApiKey,
+        apiKey,
         phase: 'search',
         allowedUrls: new Set(extractUrlsFromInstruction(params.instruction)),
         queries: [],
@@ -9201,10 +9201,11 @@ const WR_UNAUTHORIZED = { success: false, error: 'Nicht autorisierter Aufrufer' 
 ipcMain.handle('webresearch-load-config', async (event) => {
   if (!isTrustedSender(event)) return WR_UNAUTHORIZED
   const config = await loadWebResearchConfig()
-  return { ...config, hasLinkupKey: !!(await loadLinkupKey()) }
+  const keys = await keyPresence()
+  return { ...config, hasTavilyKey: keys.tavily, hasLinkupKey: keys.linkup }
 })
 
-ipcMain.handle('webresearch-save-config', async (event, input: { provider?: 'searxng' | 'linkup'; searxngUrl?: string }) => {
+ipcMain.handle('webresearch-save-config', async (event, input: { provider?: WebSearchProviderId; searxngUrl?: string }) => {
   if (!isTrustedSender(event)) return WR_UNAUTHORIZED
   try {
     // Eine SearXNG-Adresse, die (auch per DNS) auf eine private/interne IP zeigt, aktiviert die
@@ -9240,25 +9241,36 @@ ipcMain.handle('webresearch-save-config', async (event, input: { provider?: 'sea
   }
 })
 
-ipcMain.handle('webresearch-save-key', async (event, apiKey: string) => {
+// Key-IPC ist provider-scoped: der Renderer nennt explizit den Provider (tavily/linkup),
+// damit ein Provider-Wechsel den anderen Key nicht überschreibt.
+function coerceKeyProvider(v: unknown): WebSearchProviderId | null {
+  return KEY_PROVIDERS.includes(v as WebSearchProviderId) ? (v as WebSearchProviderId) : null
+}
+
+ipcMain.handle('webresearch-save-key', async (event, provider: string, apiKey: string) => {
   if (!isTrustedSender(event)) return WR_UNAUTHORIZED
+  const p = coerceKeyProvider(provider)
+  if (!p) return { success: false, error: 'Unbekannter Key-Provider.' }
   try {
-    const result = await saveLinkupKey(apiKey)
+    const result = await saveProviderKey(p, apiKey)
     return { success: true, ...result }
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : String(error) }
   }
 })
 
-ipcMain.handle('webresearch-has-key', async (event) => {
+ipcMain.handle('webresearch-has-key', async (event, provider: string) => {
   if (!isTrustedSender(event)) return false
-  return !!(await loadLinkupKey())
+  const p = coerceKeyProvider(provider)
+  return p ? !!(await loadProviderKey(p)) : false
 })
 
-ipcMain.handle('webresearch-clear-key', async (event) => {
+ipcMain.handle('webresearch-clear-key', async (event, provider: string) => {
   if (!isTrustedSender(event)) return WR_UNAUTHORIZED
+  const p = coerceKeyProvider(provider)
+  if (!p) return { success: false, error: 'Unbekannter Key-Provider.' }
   try {
-    await clearLinkupKey()
+    await clearProviderKey(p)
     return { success: true }
   } catch (error) {
     // Konnte NICHT gelöscht werden → ehrlich melden, damit die UI nicht „kein Key" anzeigt.
@@ -9272,13 +9284,13 @@ ipcMain.handle('webresearch-test', async (event) => {
   try {
     const config = await loadWebResearchConfig()
     if (!isWebResearchConfigComplete(config)) {
-      return { success: false, error: 'Konfiguration unvollständig (SearXNG-URL bzw. Linkup-Key fehlt).' }
+      return { success: false, error: 'Konfiguration unvollständig (SearXNG-URL bzw. API-Key fehlt).' }
     }
-    const linkupApiKey = config.provider === 'linkup' ? await loadLinkupKey() : null
-    if (config.provider === 'linkup' && !linkupApiKey) {
-      return { success: false, error: 'Kein Linkup-API-Key hinterlegt.' }
+    const apiKey = KEY_PROVIDERS.includes(config.provider) ? await loadProviderKey(config.provider) : null
+    if (KEY_PROVIDERS.includes(config.provider) && !apiKey) {
+      return { success: false, error: 'Kein API-Key hinterlegt.' }
     }
-    const hits = await webResearchSearch('MindGraph Notes Test', { config, linkupApiKey })
+    const hits = await webResearchSearch('MindGraph Notes Test', { config, apiKey })
     return { success: true, count: hits.length }
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : String(error) }
