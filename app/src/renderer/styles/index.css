@@ -2080,12 +2080,17 @@ h2 { letter-spacing: -0.016em; }
   color: var(--accent-color);
 }
 
-/* Beschrifteter Modus-Toggle (Markdown | Schreiben | Lesen) */
+/* Beschrifteter Modus-Toggle (Markdown | Schreiben | Lesen) — Icon + Wort */
 .toggle-btn.toggle-btn-label {
   width: auto;
   padding: 0 10px;
+  gap: 5px;
   font-size: 11px;
   font-weight: 600;
+}
+
+.toggle-btn.toggle-btn-label svg {
+  flex-shrink: 0;
 }
 
 /* Editor-Hauptbereich: Inhalt + Kontextspalte nebeneinander */

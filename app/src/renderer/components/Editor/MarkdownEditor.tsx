@@ -5037,6 +5037,9 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
                 onClick={() => handleSetViewMode('edit')}
                 title={t('editor.modeMarkdown')}
               >
+                <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
+                  <path d="M11.5 2.5L13.5 4.5L5 13H3V11L11.5 2.5Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
                 {t('editor.modeMarkdownShort')}
               </button>
             )}
@@ -5045,6 +5048,10 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
               onClick={() => handleSetViewMode('live-preview')}
               title={t('editor.modeWrite')}
             >
+              <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
+                <path d="M8 3C4.5 3 1.5 8 1.5 8C1.5 8 4.5 13 8 13C11.5 13 14.5 8 14.5 8C14.5 8 11.5 3 8 3Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M11.5 2.5L13.5 4.5L10 8L8.5 6.5L11.5 2.5Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
               {t('editor.modeWriteShort')}
             </button>
             <button
@@ -5052,6 +5059,10 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
               onClick={() => handleSetViewMode('preview')}
               title={t('editor.modeRead')}
             >
+              <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
+                <path d="M8 3C4.5 3 1.5 8 1.5 8C1.5 8 4.5 13 8 13C11.5 13 14.5 8 14.5 8C14.5 8 11.5 3 8 3Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                <circle cx="8" cy="8" r="2" stroke="currentColor" strokeWidth="1.5"/>
+              </svg>
               {t('editor.modeReadShort')}
             </button>
           </div>
