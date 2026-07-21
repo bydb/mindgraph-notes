@@ -781,7 +781,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   projectStatusLoadSynonyms: (vaultPath: string, projectFolderRel: string) =>
     ipcRenderer.invoke('project-status-load-synonyms', vaultPath, projectFolderRel),
 
-  // Webrecherche (Opt-in): Provider-Config + Linkup-Key liegen Main-seitig (0d),
+  // Webrecherche (Opt-in): Provider-Config + API-Keys liegen Main-seitig (0d),
   // der Renderer verwaltet sie nur über diese Kanäle.
   webResearchLoadConfig: () => ipcRenderer.invoke('webresearch-load-config'),
   webResearchSaveConfig: (input: { provider?: 'tavily' | 'searxng' | 'linkup'; searxngUrl?: string }) =>

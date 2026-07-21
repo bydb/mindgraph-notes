@@ -57,6 +57,7 @@ Lokaler Workspace, der deine Notizen, Aufgaben, E-Mails und Dokumente verbindet 
 - **Lokal-first**: lokale LLMs via Ollama (Zusammenfassen, Uebersetzen, Weiterschreiben) -- Standard, ohne Cloud-Zwang
 - **Cloud opt-in via OpenRouter** (seit v0.8.1): für schwache Hardware optional zuschaltbar, bewusst pro Funktion -- Brain bleibt immer lokal
 - **Macher-Leiste (⌘⇧A)**: KI schlägt Änderungen als Block-Diff vor -- du übernimmst oder verwirfst, nichts wird automatisch ersetzt
+- **Webrecherche (Opt-in)**: Der Notiz-Agent sucht über Tavily, SearXNG oder Linkup, liest freigegebene Treffer lokal und erzeugt eine gestagede Notiz mit deterministischem Quellenblock
 - KI-Kontextmenue (Alt+Rechtsklick) für Textauswahl, Provenienz (Modell + Datum) im Frontmatter
 - **Smart Connections**: Ähnlichkeitssuche über Embeddings (bge-m3) mit optionalem LLM-Reranker
 - **Eingebautes Diktat** (Whisper STT, lokal im Browser-Runtime) -- Schnellerfassung per ⌘D

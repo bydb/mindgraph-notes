@@ -2,6 +2,20 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [Unveröffentlicht]
+
+### Neu
+
+- **Optionale Webrecherche für den Notiz-Agenten.** Pro Auftrag lässt sich eine Websuche zuschalten. Tavily ist der empfohlene Standard; alternativ funktionieren eine eigene SearXNG-Instanz oder Linkup. Der Agent darf nur Treffer des laufenden Suchlaufs abrufen, schützt lokale und interne Netze vor Zugriffen und ergänzt erfolgreiche Quellen deterministisch in der fertigen Notiz. Anbieter-Konfiguration und API-Keys bleiben im Main-Prozess; die App zeigt vor Cloud-Läufen, welche Daten an welchen Dienst gehen.
+- **Ruhigerer Editor mit Kontextspalte.** Die Kopfzeile konzentriert sich auf die wichtigsten Aktionen, während Zusammenhänge und Arbeitskontext in einer eigenen Seitenleiste erreichbar sind.
+- **Neue Zentrale „KI & Modelle" und durchsuchbare Einstellungen.** Provider, Modelle und KI-Funktionen sind gebündelt; die Suche springt direkt zum passenden Einstellungsbereich.
+- **Ausgebautes Brain.** Zustandssteuerung und Zeitstrahl machen Veränderungen des persönlichen Wissenskontexts nachvollziehbarer.
+
+### Behoben
+
+- **Große Wissensgraphen frieren den Renderer nicht mehr ein.** Der Canvas schützt sich vor einem ungefilterten Riesen-Graphen.
+- **Editor-Modusumschalter zeigt wieder Icon und Beschriftung.**
+
 ## [0.10.21-beta] - 2026-07-13
 
 Der Zettel-Zielordner lässt sich jetzt fest einstellen — die Schnellerfassung muss den Zettelkasten nicht mehr erraten.

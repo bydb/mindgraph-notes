@@ -229,6 +229,13 @@ Module als verbindbare Bausteine mit **typisierten Ports** auf einem React-Flow-
 - `chatClient.chatWithTools()` mapped Ollama-Wire-Format (`role: tool`, `tool_calls.function`) auf interne `ToolCall`-Struktur. Tool-fähige Ollama-Modelle bevorzugt: `qwen3`, `qwen2.5-coder`, `llama3.1`, `mistral-nemo`. Gemma kann **kein** Tool-Calling.
 - `safeReplyMarkdown` retried Plain-Text bei Markdown-Parse-Fehlern (Telegram lehnt unbalancierte `*`/`_`/`` ` `` ab).
 
+### Webrecherche des Notiz-Agenten (Opt-in)
+- Zweistufiges Opt-in: Modul `web-research` (default aus) + Globus pro Agent-Lauf. Ohne Globus enthält die Tool-Allowlist kein `web_search`/`web_fetch`.
+- Provider: **Tavily** (empfohlener Default), **SearXNG** (eigene Instanz) und **Linkup**. Config und verschlüsselte API-Keys liegen ausschließlich Main-seitig in `main/webResearch/config.ts`; Run-Parameter enthalten nur `{ enabled: true }`.
+- Egress-Sicherheitskern in `main/webResearch/egress.ts`: DNS-gepinnter Socket, nur global routbare Ziele, same-host-Redirects, Größen-/Dekompressions-/Zeitlimits. Private SearXNG-Origins brauchen eine sichtbare Main-Freigabe; `web_fetch` hat nie eine private Ausnahme.
+- Zustandsmaschine in `noteAgent/skills.ts`: `search → fetch → write`, Main-geführte URL-Allowlist, Budgets und genau ein `write_note`. Der Quellenblock wird deterministisch aus erfolgreichen Fetch-Records erzeugt; Webinhalte gelten als untrusted Daten.
+- Vollständiger Entwurf/Sicherheitsvertrag: `docs/web-research-plan.md`. Tests: `shared/webResearch.test.ts`, `main/webResearch/security.test.ts`, `noteAgent/webTools.test.ts`, `noteAgent/webFetchRecord.test.ts`, `noteAgent/loopWeb.test.ts`.
+
 ### Automatische Backups
 - `<vault>/.mindgraph/backups/JJJJ-MM-TT/<relpath>/<dateiname>.<timestamp>.bak` vor jedem `.md`-Write.
 - **Hard-Block für leere Writes** auf nicht-leere Markdown-Dateien im `write-file`-Handler — zweite Verteidigungslinie unabhängig vom Editor.

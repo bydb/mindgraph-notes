@@ -1,0 +1,30 @@
+Thesis:
+KI ist kein Jugendthema und kein Expertenthema. Sie ist ein Generationenthema: Jugendliche nutzen sie selbstverstaendlicher, Erwachsene schauen genauer hin, weil sie schon fruehere Technologiespruenge erlebt haben.
+
+Audience:
+Klasse 10 an der Friedrich-Magnus-Gesamtschule Laubach.
+
+One-line arc:
+Vom C64 zur KI: Erst zeigen, woher Jochen kommt, dann das Vorurteil "KI ist nur fuer Junge" kippen, dann Studien und Kanalzahlen gegenueberstellen, dann die gemeinsame Leitfrage setzen.
+
+Slides:
+1. Claim: Ich komme aus einer Zeit, in der man Computer noch anfassen, verstehen und manchmal ueberlisten musste.
+   Proof object: left/right timeline from C64 and Amiga 500 to AI agents, avatars, vibe coding.
+   Source: personal framing from user.
+   Omission: no hardware images used to avoid unverified assets.
+
+2. Claim: Das naheliegende Vorurteil ist falsch: KI interessiert nicht nur die Jungen.
+   Proof object: large contrast statement with "13-24: 6.5%" versus "35+: 80.5%".
+   Source: user-provided Everlast AI screenshot.
+
+3. Claim: Bei einem KI-Kanal liegt die Mitte des Publikums mitten im Berufsleben.
+   Proof object: horizontal bar chart with exact age percentages.
+   Source: user-provided Everlast AI screenshot.
+
+4. Claim: Studien zeigen den eigentlichen Unterschied: Jugendliche nutzen KI selbstverstaendlicher, Aeltere fuehlen sich seltener sicher.
+   Proof object: two-column comparison of usage/self-confidence and interest/skepticism.
+   Source: FOM 2025, Leibniz-HBI 2025, D21 2024/25, Vodafone 2024.
+
+5. Claim: Die beste Diskussion entsteht, wenn Tempo und Erfahrung zusammenkommen.
+   Proof object: bridge diagram "Klasse 10" + "Gen X" -> "KI verstehen, nicht nur benutzen".
+   Source: synthesis from sources.

@@ -1,0 +1,795 @@
+{
+  "schema": "openai.presentation.layout/v4",
+  "unit": "px",
+  "slide": {
+    "aid": "sl/yq9sk4",
+    "id": "yq9sk4",
+    "slide": 2,
+    "layoutId": "aadf4736-e9f8-4e80-a036-bfb1b97e8bf1",
+    "layoutName": "Title Slide",
+    "layoutType": "title",
+    "masterLayoutId": "4850f72b-d411-4c11-9c95-0d78506eb821",
+    "masterLayoutName": "Master",
+    "frame": {
+      "left": 0,
+      "top": 0,
+      "width": 1280,
+      "height": 720
+    }
+  },
+  "theme": {
+    "colorSchemeName": "ChatGPT",
+    "colors": {
+      "accent1": "#156082",
+      "accent2": "#E97132",
+      "accent3": "#196B24",
+      "accent4": "#0F9ED5",
+      "accent5": "#A02B93",
+      "accent6": "#4EA72E",
+      "bg1": "#FFFFFF",
+      "bg2": "#000000",
+      "tx1": "#1F1F1F",
+      "tx2": "#FFFFFF",
+      "dk1": "#000000",
+      "lt1": "#FFFFFF",
+      "dk2": "#0E2841",
+      "lt2": "#E8E8E8",
+      "hlink": "#467886",
+      "folHlink": "#96607D"
+    },
+    "typefaces": [
+      "Avenir Next"
+    ]
+  },
+  "inheritedLayers": [
+    {
+      "scope": "layout",
+      "id": "aadf4736-e9f8-4e80-a036-bfb1b97e8bf1",
+      "name": "Title Slide",
+      "type": "title",
+      "parentLayoutId": "4850f72b-d411-4c11-9c95-0d78506eb821",
+      "elements": []
+    },
+    {
+      "scope": "master",
+      "id": "4850f72b-d411-4c11-9c95-0d78506eb821",
+      "name": "Master",
+      "type": "master",
+      "elements": []
+    }
+  ],
+  "elements": [
+    {
+      "order": 1,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/1cfa9w3m",
+      "id": "1",
+      "bbox": [
+        0,
+        0,
+        1280,
+        720
+      ],
+      "geometry": "rect",
+      "fillColor": "#111319"
+    },
+    {
+      "order": 2,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/ulwval87",
+      "id": "2",
+      "bbox": [
+        56,
+        44,
+        11,
+        11
+      ],
+      "geometry": "rect",
+      "fillColor": "#F2B84B"
+    },
+    {
+      "order": 3,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/j6tovaho",
+      "id": "3",
+      "bbox": [
+        78,
+        36,
+        360,
+        28
+      ],
+      "geometry": "rect",
+      "text": "VORURTEIL KIPPEN",
+      "textPreview": "VORURTEIL KIPPEN",
+      "resolvedFontSize": 14,
+      "resolvedTextStyle": {
+        "anchor": 2,
+        "fontSize": 14,
+        "typeface": "Avenir Next",
+        "color": "#A9ADB8",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "middle",
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "VORURTEIL KIPPEN"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "VORURTEIL KIPPEN",
+          "resolvedTextStyle": {
+            "fontSize": 14,
+            "typeface": "Avenir Next",
+            "color": "#A9ADB8",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "VORURTEIL KIPPEN",
+              "fontSize": 14,
+              "typeface": "Avenir Next",
+              "color": "#A9ADB8",
+              "bold": true
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 4,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/c3ylc7u5",
+      "id": "4",
+      "bbox": [
+        1188,
+        668,
+        36,
+        20
+      ],
+      "geometry": "rect",
+      "text": "02",
+      "textPreview": "02",
+      "resolvedFontSize": 12,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 12,
+        "typeface": "Avenir Next",
+        "color": "#A9ADB8",
+        "alignment": "right",
+        "verticalAlignment": "top",
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "02"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "02",
+          "resolvedTextStyle": {
+            "fontSize": 12,
+            "typeface": "Avenir Next",
+            "color": "#A9ADB8",
+            "alignment": "right"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "02",
+              "fontSize": 12,
+              "typeface": "Avenir Next",
+              "color": "#A9ADB8"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 5,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/1kre1w7m",
+      "id": "5",
+      "bbox": [
+        56,
+        104,
+        760,
+        64
+      ],
+      "geometry": "rect",
+      "text": "KI ist kein Jugendthema.",
+      "textPreview": "KI ist kein Jugendthema.",
+      "resolvedFontSize": 58,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 58,
+        "typeface": "Avenir Next",
+        "color": "#FFFFFF",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "KI ist kein Jugendthema."
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "KI ist kein Jugendthema.",
+          "resolvedTextStyle": {
+            "fontSize": 58,
+            "typeface": "Avenir Next",
+            "color": "#FFFFFF",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "KI ist kein Jugendthema.",
+              "fontSize": 58,
+              "typeface": "Avenir Next",
+              "color": "#FFFFFF",
+              "bold": true
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 6,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/uxc3ylc7",
+      "id": "6",
+      "bbox": [
+        60,
+        184,
+        650,
+        58
+      ],
+      "geometry": "rect",
+      "text": "Zumindest nicht, wenn man sich anschaut, wer KI-Inhalte wirklich verfolgt.",
+      "textPreview": "Zumindest nicht, wenn man sich anschaut, wer KI-Inhalte wirklich verfolgt.",
+      "resolvedFontSize": 24,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 24,
+        "typeface": "Avenir Next",
+        "color": "#A9ADB8",
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 2,
+        "lines": [
+          {
+            "index": 1,
+            "text": "Zumindest nicht, wenn man sich anschaut, wer KI-Inhalte"
+          },
+          {
+            "index": 2,
+            "text": "wirklich verfolgt."
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "Zumindest nicht, wenn man sich anschaut, wer KI-Inhalte wirklich verfolgt.",
+          "resolvedTextStyle": {
+            "fontSize": 24,
+            "typeface": "Avenir Next",
+            "color": "#A9ADB8",
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "Zumindest nicht, wenn man sich anschaut, wer KI-Inhalte wirklich verfolgt.",
+              "fontSize": 24,
+              "typeface": "Avenir Next",
+              "color": "#A9ADB8"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 7,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/ji5snelo",
+      "id": "7",
+      "bbox": [
+        72,
+        316,
+        440,
+        168
+      ],
+      "geometry": "rect",
+      "fillColor": "#1B1E27"
+    },
+    {
+      "order": 8,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/8bat47y1",
+      "id": "8",
+      "bbox": [
+        104,
+        342,
+        230,
+        68
+      ],
+      "geometry": "rect",
+      "text": "6,5 %",
+      "textPreview": "6,5 %",
+      "resolvedFontSize": 62,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 62,
+        "typeface": "Avenir Next",
+        "color": "#F2B84B",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "6,5 %"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "6,5 %",
+          "resolvedTextStyle": {
+            "fontSize": 62,
+            "typeface": "Avenir Next",
+            "color": "#F2B84B",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "6,5 %",
+              "fontSize": 62,
+              "typeface": "Avenir Next",
+              "color": "#F2B84B",
+              "bold": true
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 9,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/1w7mp0bi",
+      "id": "9",
+      "bbox": [
+        108,
+        426,
+        280,
+        30
+      ],
+      "geometry": "rect",
+      "text": "13 bis 24 Jahre",
+      "textPreview": "13 bis 24 Jahre",
+      "resolvedFontSize": 22,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 22,
+        "typeface": "Avenir Next",
+        "color": "#FFFFFF",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "13 bis 24 Jahre"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "13 bis 24 Jahre",
+          "resolvedTextStyle": {
+            "fontSize": 22,
+            "typeface": "Avenir Next",
+            "color": "#FFFFFF",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "13 bis 24 Jahre",
+              "fontSize": 22,
+              "typeface": "Avenir Next",
+              "color": "#FFFFFF",
+              "bold": true
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 10,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/d0z61032",
+      "id": "10",
+      "bbox": [
+        594,
+        270,
+        560,
+        232
+      ],
+      "geometry": "rect",
+      "fillColor": "#F2EEE7"
+    },
+    {
+      "order": 11,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/kf6dcbul",
+      "id": "11",
+      "bbox": [
+        634,
+        304,
+        280,
+        82
+      ],
+      "geometry": "rect",
+      "text": "80,5 %",
+      "textPreview": "80,5 %",
+      "resolvedFontSize": 78,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 78,
+        "typeface": "Avenir Next",
+        "color": "#111319",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "80,5 %"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "80,5 %",
+          "resolvedTextStyle": {
+            "fontSize": 78,
+            "typeface": "Avenir Next",
+            "color": "#111319",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "80,5 %",
+              "fontSize": 78,
+              "typeface": "Avenir Next",
+              "color": "#111319",
+              "bold": true
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 12,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/vu9knih4",
+      "id": "12",
+      "bbox": [
+        640,
+        404,
+        360,
+        34
+      ],
+      "geometry": "rect",
+      "text": "35 Jahre und aelter",
+      "textPreview": "35 Jahre und aelter",
+      "resolvedFontSize": 26,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 26,
+        "typeface": "Avenir Next",
+        "color": "#111319",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "35 Jahre und aelter"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "35 Jahre und aelter",
+          "resolvedTextStyle": {
+            "fontSize": 26,
+            "typeface": "Avenir Next",
+            "color": "#111319",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "35 Jahre und aelter",
+              "fontSize": 26,
+              "typeface": "Avenir Next",
+              "color": "#111319",
+              "bold": true
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 13,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/29gr2p8n",
+      "id": "13",
+      "bbox": [
+        642,
+        450,
+        420,
+        44
+      ],
+      "geometry": "rect",
+      "text": "Die groesste Neugier sitzt nicht nur im Klassenzimmer, sondern auch mitten im Berufsleben.",
+      "textPreview": "Die groesste Neugier sitzt nicht nur im Klassenzimmer, sondern auch mitten im Berufsleben.",
+      "resolvedFontSize": 17,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 17,
+        "typeface": "Avenir Next",
+        "color": "#111319",
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 2,
+        "lines": [
+          {
+            "index": 1,
+            "text": "Die groesste Neugier sitzt nicht nur im Klassenzimmer,"
+          },
+          {
+            "index": 2,
+            "text": "sondern auch mitten im Berufsleben."
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "Die groesste Neugier sitzt nicht nur im Klassenzimmer, sondern auch mitten im Berufsleben.",
+          "resolvedTextStyle": {
+            "fontSize": 17,
+            "typeface": "Avenir Next",
+            "color": "#111319",
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "Die groesste Neugier sitzt nicht nur im Klassenzimmer, sondern auch mitten im Berufsleben.",
+              "fontSize": 17,
+              "typeface": "Avenir Next",
+              "color": "#111319"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 14,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/d8bat47y",
+      "id": "14",
+      "bbox": [
+        56,
+        640,
+        1168,
+        1
+      ],
+      "geometry": "rect",
+      "fillColor": "#3A3D46"
+    },
+    {
+      "order": 15,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/knih4byh",
+      "id": "15",
+      "bbox": [
+        56,
+        672,
+        900,
+        18
+      ],
+      "geometry": "rect",
+      "text": "Quelle: Nutzer-Screenshot, Everlast AI YouTube-Kanalstatistik; abgeleitet: 13-24 = 3,8 + 2,7; 35+ = 25,6 + 25,5 + 20,4 + 9,0.",
+      "textPreview": "Quelle: Nutzer-Screenshot, Everlast AI YouTube-Kanalstatistik; abgeleitet: 13-24 = 3,8 + 2,7; 35+ = 25,6 + 25,5 + 20,4 + 9,0.",
+      "resolvedFontSize": 10,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 10,
+        "typeface": "Avenir Next",
+        "color": "#A9ADB8",
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "Quelle: Nutzer-Screenshot, Everlast AI YouTube-Kanalstatistik; abgeleitet: 13-24 = 3,8 + 2,7; 35+ = 25,6 + 25,5 + 20,4 + 9,0."
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "Quelle: Nutzer-Screenshot, Everlast AI YouTube-Kanalstatistik; abgeleitet: 13-24 = 3,8 + 2,7; 35+ = 25,6 + 25,5 + 20,4 + 9,0.",
+          "resolvedTextStyle": {
+            "fontSize": 10,
+            "typeface": "Avenir Next",
+            "color": "#A9ADB8",
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "Quelle: Nutzer-Screenshot, Everlast AI YouTube-Kanalstatistik; abgeleitet: 13-24 = 3,8 + 2,7; 35+ = 25,6 + 25,5 + 20,4 + 9,0.",
+              "fontSize": 10,
+              "typeface": "Avenir Next",
+              "color": "#A9ADB8"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    }
+  ],
+  "composeRuns": []
+}

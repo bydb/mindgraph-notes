@@ -1,0 +1,1782 @@
+{
+  "schema": "openai.presentation.layout/v4",
+  "unit": "px",
+  "slide": {
+    "aid": "sl/upoo7x",
+    "id": "upoo7x",
+    "slide": 3,
+    "layoutId": "aadf4736-e9f8-4e80-a036-bfb1b97e8bf1",
+    "layoutName": "Title Slide",
+    "layoutType": "title",
+    "masterLayoutId": "4850f72b-d411-4c11-9c95-0d78506eb821",
+    "masterLayoutName": "Master",
+    "frame": {
+      "left": 0,
+      "top": 0,
+      "width": 1280,
+      "height": 720
+    }
+  },
+  "theme": {
+    "colorSchemeName": "ChatGPT",
+    "colors": {
+      "accent1": "#156082",
+      "accent2": "#E97132",
+      "accent3": "#196B24",
+      "accent4": "#0F9ED5",
+      "accent5": "#A02B93",
+      "accent6": "#4EA72E",
+      "bg1": "#FFFFFF",
+      "bg2": "#000000",
+      "tx1": "#1F1F1F",
+      "tx2": "#FFFFFF",
+      "dk1": "#000000",
+      "lt1": "#FFFFFF",
+      "dk2": "#0E2841",
+      "lt2": "#E8E8E8",
+      "hlink": "#467886",
+      "folHlink": "#96607D"
+    },
+    "typefaces": [
+      "Avenir Next"
+    ]
+  },
+  "inheritedLayers": [
+    {
+      "scope": "layout",
+      "id": "aadf4736-e9f8-4e80-a036-bfb1b97e8bf1",
+      "name": "Title Slide",
+      "type": "title",
+      "parentLayoutId": "4850f72b-d411-4c11-9c95-0d78506eb821",
+      "elements": []
+    },
+    {
+      "scope": "master",
+      "id": "4850f72b-d411-4c11-9c95-0d78506eb821",
+      "name": "Master",
+      "type": "master",
+      "elements": []
+    }
+  ],
+  "elements": [
+    {
+      "order": 1,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/il0rqd4v",
+      "id": "1",
+      "bbox": [
+        0,
+        0,
+        1280,
+        720
+      ],
+      "geometry": "rect",
+      "fillColor": "#F2EEE7"
+    },
+    {
+      "order": 2,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/tcj6tova",
+      "id": "2",
+      "bbox": [
+        56,
+        44,
+        11,
+        11
+      ],
+      "geometry": "rect",
+      "fillColor": "#F2B84B"
+    },
+    {
+      "order": 3,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/0rqd4vmt",
+      "id": "3",
+      "bbox": [
+        78,
+        36,
+        360,
+        28
+      ],
+      "geometry": "rect",
+      "text": "BEWEISOBJEKT",
+      "textPreview": "BEWEISOBJEKT",
+      "resolvedFontSize": 14,
+      "resolvedTextStyle": {
+        "anchor": 2,
+        "fontSize": 14,
+        "typeface": "Avenir Next",
+        "color": "#A9ADB8",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "middle",
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "BEWEISOBJEKT"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "BEWEISOBJEKT",
+          "resolvedTextStyle": {
+            "fontSize": 14,
+            "typeface": "Avenir Next",
+            "color": "#A9ADB8",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "BEWEISOBJEKT",
+              "fontSize": 14,
+              "typeface": "Avenir Next",
+              "color": "#A9ADB8",
+              "bold": true
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 4,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/byhgn29g",
+      "id": "4",
+      "bbox": [
+        1188,
+        668,
+        36,
+        20
+      ],
+      "geometry": "rect",
+      "text": "03",
+      "textPreview": "03",
+      "resolvedFontSize": 12,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 12,
+        "typeface": "Avenir Next",
+        "color": "#A9ADB8",
+        "alignment": "right",
+        "verticalAlignment": "top",
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "03"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "03",
+          "resolvedTextStyle": {
+            "fontSize": 12,
+            "typeface": "Avenir Next",
+            "color": "#A9ADB8",
+            "alignment": "right"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "03",
+              "fontSize": 12,
+              "typeface": "Avenir Next",
+              "color": "#A9ADB8"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 5,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/idonyd0z",
+      "id": "5",
+      "bbox": [
+        56,
+        88,
+        780,
+        96
+      ],
+      "geometry": "rect",
+      "text": "Bei einem KI-Kanal liegt die Mitte des Publikums mitten im Berufsleben.",
+      "textPreview": "Bei einem KI-Kanal liegt die Mitte des Publikums mitten im Berufsleben.",
+      "resolvedFontSize": 38,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 38,
+        "typeface": "Avenir Next",
+        "color": "#111319",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 2,
+        "lines": [
+          {
+            "index": 1,
+            "text": "Bei einem KI-Kanal liegt die Mitte des"
+          },
+          {
+            "index": 2,
+            "text": "Publikums mitten im Berufsleben."
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "Bei einem KI-Kanal liegt die Mitte des Publikums mitten im Berufsleben.",
+          "resolvedTextStyle": {
+            "fontSize": 38,
+            "typeface": "Avenir Next",
+            "color": "#111319",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "Bei einem KI-Kanal liegt die Mitte des Publikums mitten im Berufsleben.",
+              "fontSize": 38,
+              "typeface": "Avenir Next",
+              "color": "#111319",
+              "bold": true
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 6,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/t47y1kre",
+      "id": "6",
+      "bbox": [
+        56,
+        190,
+        360,
+        26
+      ],
+      "geometry": "rect",
+      "text": "Altersverteilung Everlast AI",
+      "textPreview": "Altersverteilung Everlast AI",
+      "resolvedFontSize": 18,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 18,
+        "typeface": "Avenir Next",
+        "color": "#62636A",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "Altersverteilung Everlast AI"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "Altersverteilung Everlast AI",
+          "resolvedTextStyle": {
+            "fontSize": 18,
+            "typeface": "Avenir Next",
+            "color": "#62636A",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "Altersverteilung Everlast AI",
+              "fontSize": 18,
+              "typeface": "Avenir Next",
+              "color": "#62636A",
+              "bold": true
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 7,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/0je9cvix",
+      "id": "7",
+      "bbox": [
+        92,
+        244,
+        220,
+        24
+      ],
+      "geometry": "rect",
+      "text": "13 bis 17 Jahre",
+      "textPreview": "13 bis 17 Jahre",
+      "resolvedFontSize": 17,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 17,
+        "typeface": "Avenir Next",
+        "color": "#111319",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "13 bis 17 Jahre"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "13 bis 17 Jahre",
+          "resolvedTextStyle": {
+            "fontSize": 17,
+            "typeface": "Avenir Next",
+            "color": "#111319",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "13 bis 17 Jahre",
+              "fontSize": 17,
+              "typeface": "Avenir Next",
+              "color": "#111319",
+              "bold": true
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 8,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/bulwval8",
+      "id": "8",
+      "bbox": [
+        342,
+        248,
+        400,
+        16
+      ],
+      "geometry": "rect",
+      "fillColor": "#DED8CE"
+    },
+    {
+      "order": 9,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/i9s36hcr",
+      "id": "9",
+      "bbox": [
+        342,
+        248,
+        58.46,
+        16
+      ],
+      "geometry": "rect",
+      "fillColor": "#D7B6FF"
+    },
+    {
+      "order": 10,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/0fepkzup",
+      "id": "10",
+      "bbox": [
+        766,
+        242,
+        88,
+        28
+      ],
+      "geometry": "rect",
+      "text": "3,8 %",
+      "textPreview": "3,8 %",
+      "resolvedFontSize": 21,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 21,
+        "typeface": "Avenir Next",
+        "color": "#111319",
+        "bold": true,
+        "alignment": "right",
+        "verticalAlignment": "top",
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "3,8 %"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "3,8 %",
+          "resolvedTextStyle": {
+            "fontSize": 21,
+            "typeface": "Avenir Next",
+            "color": "#111319",
+            "bold": true,
+            "alignment": "right"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "3,8 %",
+              "fontSize": 21,
+              "typeface": "Avenir Next",
+              "color": "#111319",
+              "bold": true
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 11,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/p0bi9s36",
+      "id": "11",
+      "bbox": [
+        92,
+        294,
+        220,
+        24
+      ],
+      "geometry": "rect",
+      "text": "18 bis 24 Jahre",
+      "textPreview": "18 bis 24 Jahre",
+      "resolvedFontSize": 17,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 17,
+        "typeface": "Avenir Next",
+        "color": "#111319",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "18 bis 24 Jahre"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "18 bis 24 Jahre",
+          "resolvedTextStyle": {
+            "fontSize": 17,
+            "typeface": "Avenir Next",
+            "color": "#111319",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "18 bis 24 Jahre",
+              "fontSize": 17,
+              "typeface": "Avenir Next",
+              "color": "#111319",
+              "bold": true
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 12,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/i9s36hcr",
+      "id": "12",
+      "bbox": [
+        342,
+        298,
+        400,
+        16
+      ],
+      "geometry": "rect",
+      "fillColor": "#DED8CE"
+    },
+    {
+      "order": 13,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/bulwval8",
+      "id": "13",
+      "bbox": [
+        342,
+        298,
+        41.54,
+        16
+      ],
+      "geometry": "rect",
+      "fillColor": "#D7B6FF"
+    },
+    {
+      "order": 14,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/032lszqt",
+      "id": "14",
+      "bbox": [
+        766,
+        292,
+        88,
+        28
+      ],
+      "geometry": "rect",
+      "text": "2,7 %",
+      "textPreview": "2,7 %",
+      "resolvedFontSize": 21,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 21,
+        "typeface": "Avenir Next",
+        "color": "#111319",
+        "bold": true,
+        "alignment": "right",
+        "verticalAlignment": "top",
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "2,7 %"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "2,7 %",
+          "resolvedTextStyle": {
+            "fontSize": 21,
+            "typeface": "Avenir Next",
+            "color": "#111319",
+            "bold": true,
+            "alignment": "right"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "2,7 %",
+              "fontSize": 21,
+              "typeface": "Avenir Next",
+              "color": "#111319",
+              "bold": true
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 15,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/tovahoza",
+      "id": "15",
+      "bbox": [
+        92,
+        344,
+        220,
+        24
+      ],
+      "geometry": "rect",
+      "text": "25 bis 34 Jahre",
+      "textPreview": "25 bis 34 Jahre",
+      "resolvedFontSize": 17,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 17,
+        "typeface": "Avenir Next",
+        "color": "#111319",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "25 bis 34 Jahre"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "25 bis 34 Jahre",
+          "resolvedTextStyle": {
+            "fontSize": 17,
+            "typeface": "Avenir Next",
+            "color": "#111319",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "25 bis 34 Jahre",
+              "fontSize": 17,
+              "typeface": "Avenir Next",
+              "color": "#111319",
+              "bold": true
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 16,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/ixczed8v",
+      "id": "16",
+      "bbox": [
+        342,
+        348,
+        400,
+        16
+      ],
+      "geometry": "rect",
+      "fillColor": "#DED8CE"
+    },
+    {
+      "order": 17,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/bi9s36hc",
+      "id": "17",
+      "bbox": [
+        342,
+        348,
+        200,
+        16
+      ],
+      "geometry": "rect",
+      "fillColor": "#D7B6FF"
+    },
+    {
+      "order": 18,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/0rqd4vmt",
+      "id": "18",
+      "bbox": [
+        766,
+        342,
+        88,
+        28
+      ],
+      "geometry": "rect",
+      "text": "13,0 %",
+      "textPreview": "13,0 %",
+      "resolvedFontSize": 21,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 21,
+        "typeface": "Avenir Next",
+        "color": "#111319",
+        "bold": true,
+        "alignment": "right",
+        "verticalAlignment": "top",
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "13,0 %"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "13,0 %",
+          "resolvedTextStyle": {
+            "fontSize": 21,
+            "typeface": "Avenir Next",
+            "color": "#111319",
+            "bold": true,
+            "alignment": "right"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "13,0 %",
+              "fontSize": 21,
+              "typeface": "Avenir Next",
+              "color": "#111319",
+              "bold": true
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 19,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/tcj6tova",
+      "id": "19",
+      "bbox": [
+        92,
+        394,
+        220,
+        24
+      ],
+      "geometry": "rect",
+      "text": "35 bis 44 Jahre",
+      "textPreview": "35 bis 44 Jahre",
+      "resolvedFontSize": 17,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 17,
+        "typeface": "Avenir Next",
+        "color": "#111319",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "35 bis 44 Jahre"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "35 bis 44 Jahre",
+          "resolvedTextStyle": {
+            "fontSize": 17,
+            "typeface": "Avenir Next",
+            "color": "#111319",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "35 bis 44 Jahre",
+              "fontSize": 17,
+              "typeface": "Avenir Next",
+              "color": "#111319",
+              "bold": true
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 20,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/x0nuxc3y",
+      "id": "20",
+      "bbox": [
+        342,
+        398,
+        400,
+        16
+      ],
+      "geometry": "rect",
+      "fillColor": "#DED8CE"
+    },
+    {
+      "order": 21,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/4fu18jqh",
+      "id": "21",
+      "bbox": [
+        342,
+        398,
+        393.85,
+        16
+      ],
+      "geometry": "rect",
+      "fillColor": "#B778F2"
+    },
+    {
+      "order": 22,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/fu18jqh0",
+      "id": "22",
+      "bbox": [
+        766,
+        392,
+        88,
+        28
+      ],
+      "geometry": "rect",
+      "text": "25,6 %",
+      "textPreview": "25,6 %",
+      "resolvedFontSize": 21,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 21,
+        "typeface": "Avenir Next",
+        "color": "#111319",
+        "bold": true,
+        "alignment": "right",
+        "verticalAlignment": "top",
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "25,6 %"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "25,6 %",
+          "resolvedTextStyle": {
+            "fontSize": 21,
+            "typeface": "Avenir Next",
+            "color": "#111319",
+            "bold": true,
+            "alignment": "right"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "25,6 %",
+              "fontSize": 21,
+              "typeface": "Avenir Next",
+              "color": "#111319",
+              "bold": true
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 23,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/m94fu18j",
+      "id": "23",
+      "bbox": [
+        92,
+        444,
+        220,
+        24
+      ],
+      "geometry": "rect",
+      "text": "45 bis 54 Jahre",
+      "textPreview": "45 bis 54 Jahre",
+      "resolvedFontSize": 17,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 17,
+        "typeface": "Avenir Next",
+        "color": "#111319",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "45 bis 54 Jahre"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "45 bis 54 Jahre",
+          "resolvedTextStyle": {
+            "fontSize": 17,
+            "typeface": "Avenir Next",
+            "color": "#111319",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "45 bis 54 Jahre",
+              "fontSize": 17,
+              "typeface": "Avenir Next",
+              "color": "#111319",
+              "bold": true
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 24,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/xobm58z2",
+      "id": "24",
+      "bbox": [
+        342,
+        448,
+        400,
+        16
+      ],
+      "geometry": "rect",
+      "fillColor": "#DED8CE"
+    },
+    {
+      "order": 25,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/83itgfml",
+      "id": "25",
+      "bbox": [
+        342,
+        448,
+        392.31,
+        16
+      ],
+      "geometry": "rect",
+      "fillColor": "#B778F2"
+    },
+    {
+      "order": 26,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/fil0rqd4",
+      "id": "26",
+      "bbox": [
+        766,
+        442,
+        88,
+        28
+      ],
+      "geometry": "rect",
+      "text": "25,5 %",
+      "textPreview": "25,5 %",
+      "resolvedFontSize": 21,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 21,
+        "typeface": "Avenir Next",
+        "color": "#111319",
+        "bold": true,
+        "alignment": "right",
+        "verticalAlignment": "top",
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "25,5 %"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "25,5 %",
+          "resolvedTextStyle": {
+            "fontSize": 21,
+            "typeface": "Avenir Next",
+            "color": "#111319",
+            "bold": true,
+            "alignment": "right"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "25,5 %",
+              "fontSize": 21,
+              "typeface": "Avenir Next",
+              "color": "#111319",
+              "bold": true
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 27,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/qxs72x4n",
+      "id": "27",
+      "bbox": [
+        92,
+        494,
+        220,
+        24
+      ],
+      "geometry": "rect",
+      "text": "55 bis 64 Jahre",
+      "textPreview": "55 bis 64 Jahre",
+      "resolvedFontSize": 17,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 17,
+        "typeface": "Avenir Next",
+        "color": "#111319",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "55 bis 64 Jahre"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "55 bis 64 Jahre",
+          "resolvedTextStyle": {
+            "fontSize": 17,
+            "typeface": "Avenir Next",
+            "color": "#111319",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "55 bis 64 Jahre",
+              "fontSize": 17,
+              "typeface": "Avenir Next",
+              "color": "#111319",
+              "bold": true
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 28,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/xkf6dcbu",
+      "id": "28",
+      "bbox": [
+        342,
+        498,
+        400,
+        16
+      ],
+      "geometry": "rect",
+      "fillColor": "#DED8CE"
+    },
+    {
+      "order": 29,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/4zidonyd",
+      "id": "29",
+      "bbox": [
+        342,
+        498,
+        313.85,
+        16
+      ],
+      "geometry": "rect",
+      "fillColor": "#B778F2"
+    },
+    {
+      "order": 30,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/itgfmlkj",
+      "id": "30",
+      "bbox": [
+        766,
+        492,
+        88,
+        28
+      ],
+      "geometry": "rect",
+      "text": "20,4 %",
+      "textPreview": "20,4 %",
+      "resolvedFontSize": 21,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 21,
+        "typeface": "Avenir Next",
+        "color": "#111319",
+        "bold": true,
+        "alignment": "right",
+        "verticalAlignment": "top",
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "20,4 %"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "20,4 %",
+          "resolvedTextStyle": {
+            "fontSize": 21,
+            "typeface": "Avenir Next",
+            "color": "#111319",
+            "bold": true,
+            "alignment": "right"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "20,4 %",
+              "fontSize": 21,
+              "typeface": "Avenir Next",
+              "color": "#111319",
+              "bold": true
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 31,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/7ed8bat4",
+      "id": "31",
+      "bbox": [
+        92,
+        544,
+        220,
+        24
+      ],
+      "geometry": "rect",
+      "text": "ueber 65 Jahre",
+      "textPreview": "ueber 65 Jahre",
+      "resolvedFontSize": 17,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 17,
+        "typeface": "Avenir Next",
+        "color": "#111319",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "ueber 65 Jahre"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "ueber 65 Jahre",
+          "resolvedTextStyle": {
+            "fontSize": 17,
+            "typeface": "Avenir Next",
+            "color": "#111319",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "ueber 65 Jahre",
+              "fontSize": 17,
+              "typeface": "Avenir Next",
+              "color": "#111319",
+              "bold": true
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 32,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/0z61032l",
+      "id": "32",
+      "bbox": [
+        342,
+        548,
+        400,
+        16
+      ],
+      "geometry": "rect",
+      "fillColor": "#DED8CE"
+    },
+    {
+      "order": 33,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/pkzupwb2",
+      "id": "33",
+      "bbox": [
+        342,
+        548,
+        138.46,
+        16
+      ],
+      "geometry": "rect",
+      "fillColor": "#D7B6FF"
+    },
+    {
+      "order": 34,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/ih4byhgn",
+      "id": "34",
+      "bbox": [
+        766,
+        542,
+        88,
+        28
+      ],
+      "geometry": "rect",
+      "text": "9,0 %",
+      "textPreview": "9,0 %",
+      "resolvedFontSize": 21,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 21,
+        "typeface": "Avenir Next",
+        "color": "#111319",
+        "bold": true,
+        "alignment": "right",
+        "verticalAlignment": "top",
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "9,0 %"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "9,0 %",
+          "resolvedTextStyle": {
+            "fontSize": 21,
+            "typeface": "Avenir Next",
+            "color": "#111319",
+            "bold": true,
+            "alignment": "right"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "9,0 %",
+              "fontSize": 21,
+              "typeface": "Avenir Next",
+              "color": "#111319",
+              "bold": true
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 35,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/72x4nap4",
+      "id": "35",
+      "bbox": [
+        950,
+        250,
+        224,
+        148
+      ],
+      "geometry": "rect",
+      "fillColor": "#111319"
+    },
+    {
+      "order": 36,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/0nuxc3yl",
+      "id": "36",
+      "bbox": [
+        978,
+        278,
+        166,
+        58
+      ],
+      "geometry": "rect",
+      "text": "29,4 %",
+      "textPreview": "29,4 %",
+      "resolvedFontSize": 48,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 48,
+        "typeface": "Avenir Next",
+        "color": "#F2B84B",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "29,4 %"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "29,4 %",
+          "resolvedTextStyle": {
+            "fontSize": 48,
+            "typeface": "Avenir Next",
+            "color": "#F2B84B",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "29,4 %",
+              "fontSize": 48,
+              "typeface": "Avenir Next",
+              "color": "#F2B84B",
+              "bold": true
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 37,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/p8nqxs72",
+      "id": "37",
+      "bbox": [
+        980,
+        346,
+        160,
+        46
+      ],
+      "geometry": "rect",
+      "text": "sind 55 Jahre oder aelter",
+      "textPreview": "sind 55 Jahre oder aelter",
+      "resolvedFontSize": 17,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 17,
+        "typeface": "Avenir Next",
+        "color": "#FFFFFF",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 2,
+        "lines": [
+          {
+            "index": 1,
+            "text": "sind 55 Jahre oder"
+          },
+          {
+            "index": 2,
+            "text": "aelter"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "sind 55 Jahre oder aelter",
+          "resolvedTextStyle": {
+            "fontSize": 17,
+            "typeface": "Avenir Next",
+            "color": "#FFFFFF",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "sind 55 Jahre oder aelter",
+              "fontSize": 17,
+              "typeface": "Avenir Next",
+              "color": "#FFFFFF",
+              "bold": true
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 38,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/ed8v6psf",
+      "id": "38",
+      "bbox": [
+        952,
+        430,
+        238,
+        90
+      ],
+      "geometry": "rect",
+      "text": "Das ist genau die Altersgruppe, in der viele berufliche Erfahrung und Skepsis mitbringen.",
+      "textPreview": "Das ist genau die Altersgruppe, in der viele berufliche Erfahrung und Skepsis mitbringen.",
+      "resolvedFontSize": 17,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 17,
+        "typeface": "Avenir Next",
+        "color": "#111319",
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 4,
+        "lines": [
+          {
+            "index": 1,
+            "text": "Das ist genau die"
+          },
+          {
+            "index": 2,
+            "text": "Altersgruppe, in der viele"
+          },
+          {
+            "index": 3,
+            "text": "berufliche Erfahrung und"
+          },
+          {
+            "index": 4,
+            "text": "Skepsis mitbringen."
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "Das ist genau die Altersgruppe, in der viele berufliche Erfahrung und Skepsis mitbringen.",
+          "resolvedTextStyle": {
+            "fontSize": 17,
+            "typeface": "Avenir Next",
+            "color": "#111319",
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "Das ist genau die Altersgruppe, in der viele berufliche Erfahrung und Skepsis mitbringen.",
+              "fontSize": 17,
+              "typeface": "Avenir Next",
+              "color": "#111319"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 39,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/7y1kre1w",
+      "id": "39",
+      "bbox": [
+        56,
+        672,
+        900,
+        18
+      ],
+      "geometry": "rect",
+      "text": "Quelle: Nutzer-Screenshot, Everlast AI YouTube-Kanalstatistik. Hinweis: Kanalpublikum, nicht repraesentativ fuer die Gesamtbevoelkerung.",
+      "textPreview": "Quelle: Nutzer-Screenshot, Everlast AI YouTube-Kanalstatistik. Hinweis: Kanalpublikum, nicht repraesentativ fuer die Gesamtbevoelkerung.",
+      "resolvedFontSize": 10,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 10,
+        "typeface": "Avenir Next",
+        "color": "#A9ADB8",
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "Quelle: Nutzer-Screenshot, Everlast AI YouTube-Kanalstatistik. Hinweis: Kanalpublikum, nicht repraesentativ fuer die Gesamtbevoelkerung."
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "Quelle: Nutzer-Screenshot, Everlast AI YouTube-Kanalstatistik. Hinweis: Kanalpublikum, nicht repraesentativ fuer die Gesamtbevoelkerung.",
+          "resolvedTextStyle": {
+            "fontSize": 10,
+            "typeface": "Avenir Next",
+            "color": "#A9ADB8",
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "Quelle: Nutzer-Screenshot, Everlast AI YouTube-Kanalstatistik. Hinweis: Kanalpublikum, nicht repraesentativ fuer die Gesamtbevoelkerung.",
+              "fontSize": 10,
+              "typeface": "Avenir Next",
+              "color": "#A9ADB8"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    }
+  ],
+  "composeRuns": []
+}

@@ -42,6 +42,7 @@ interface SettingsProps {
   isOpen: boolean
   onClose: () => void
   initialTab?: Tab
+  initialAnchor?: string
 }
 
 type Tab = 'vault' | 'general' | 'editor' | 'templates' | 'integrations' | 'shortcuts' | 'dataview' | 'sync' | 'dailyNote' | 'remarkable' | 'email' | 'agents' | 'transport' | 'dashboard' | 'modules' | 'ai' | 'speech' | 'telegram' | 'credentials' | 'brain' | 'skills'
@@ -622,12 +623,13 @@ const MODULE_CONFIG_TABS: Record<string, Tab> = {
   remarkable: 'remarkable',
   'mz-suite': 'agents',
   antares: 'agents',
-  'smart-connections': 'ai'
+  'smart-connections': 'ai',
+  'web-research': 'ai'
 }
 
 const ModulesTab: React.FC<{ t: TabTFn; onOpenTab: (tab: Tab) => void }> = ({ t, onOpenTab }) => {
   // useUIStore als Abhängigkeit einbinden, damit der Tab bei Flag-Änderungen rerendert
-  const _tick = useUIStore(s => `${s.notesChatEnabled}${s.projectRagEnabled}${s.smartConnectionsEnabled}${s.flashcardsEnabled}${s.workflowCanvasEnabled}${s.semanticScholarEnabled}${s.zoteroEnabled}${s.languageTool.enabled}${s.email.enabled}${s.readwise.enabled}${s.docling.enabled}${s.visionOcr.enabled}${s.speech.enabled}`)
+  const _tick = useUIStore(s => `${s.notesChatEnabled}${s.projectRagEnabled}${s.smartConnectionsEnabled}${s.flashcardsEnabled}${s.workflowCanvasEnabled}${s.webResearchEnabled}${s.semanticScholarEnabled}${s.zoteroEnabled}${s.languageTool.enabled}${s.email.enabled}${s.readwise.enabled}${s.docling.enabled}${s.visionOcr.enabled}${s.speech.enabled}`)
   void _tick
   // Generische Plugin-Module (z.B. Antares) liegen in pluginConfig — separat abonnieren, sonst
   // löst ein Toggle über die generische Config-API keinen Re-Render des Modul-Tabs aus.
@@ -1892,7 +1894,7 @@ const SignatureImagePreview: React.FC<{ imagePath: string }> = ({ imagePath }) =
   )
 }
 
-export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab }) => {
+export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab, initialAnchor }) => {
   const [activeTab, setActiveTab] = useState<Tab>(initialTab ?? 'general')
 
   // Wenn der initialTab sich ändert (z.B. vom HelpGuide), übernehmen
@@ -1913,6 +1915,20 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab 
       }
     }, 90)
   }
+  // Deep-Link aus einer anderen Oberfläche (z.B. unkonfigurierter Web-Globus): nach dem
+  // Tab-Wechsel exakt zur Zielsektion scrollen, statt nur oben im langen KI-Tab zu landen.
+  useEffect(() => {
+    if (!isOpen || !initialAnchor) return
+    const timer = window.setTimeout(() => {
+      const el = document.querySelector(`[data-settings-anchor="${initialAnchor}"]`)
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        el.classList.add('settings-anchor-flash')
+        window.setTimeout(() => el.classList.remove('settings-anchor-flash'), 1800)
+      }
+    }, 90)
+    return () => window.clearTimeout(timer)
+  }, [isOpen, initialTab, initialAnchor])
   const [zoteroStatus, setZoteroStatus] = useState<'checking' | 'connected' | 'disconnected'>('checking')
   const [ollamaStatus, setOllamaStatus] = useState<'checking' | 'connected' | 'disconnected'>('checking')
   const [lmstudioStatus, setLmstudioStatus] = useState<'checking' | 'connected' | 'disconnected'>('checking')
