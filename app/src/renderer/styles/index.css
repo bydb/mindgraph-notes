@@ -20203,6 +20203,21 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.ai-bar-agent-web {
+  margin: 4px 0;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-subtle, transparent);
+}
+.ai-bar-agent-web-summary { font-size: 11px; font-weight: 600; color: var(--text-primary); margin-bottom: 2px; }
+.ai-bar-agent-web-item {
+  font-size: 11px;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .ai-bar-agent-card-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
 .ai-bar-agent-card-state { font-size: 11px; color: var(--text-secondary); }
 .ai-bar-agent-remember { display: flex; align-items: center; gap: 8px; }

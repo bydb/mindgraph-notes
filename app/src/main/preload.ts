@@ -186,6 +186,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     attachmentIds: string[]
     targetFolderRel: string
     cloud?: { model: string } | null
+    webResearch?: { enabled: boolean } | null
   }) => ipcRenderer.invoke('note-agent-run', params),
   noteAgentCancel: (runId: string) => ipcRenderer.invoke('note-agent-cancel', runId),
   noteAgentRemember: (vaultPath: string, text: string) => ipcRenderer.invoke('note-agent-remember', vaultPath, text),
@@ -213,6 +214,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
     text?: string
     hitMaxIterations?: boolean
     results: Array<{ resultId: string; suggestedName: string; kind: string; summary: string; sources: string[] }>
+    web?: {
+      queries: Array<{ query: string; status: string }>
+      fetches: Array<{ url: string; title: string; status: string }>
+      searchCount: number
+      fetchCount: number
+    }
   }) => void) => {
     ipcRenderer.removeAllListeners('note-agent-done')
     ipcRenderer.on('note-agent-done', (_event, p) => callback(p))
@@ -772,5 +779,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
   projectStatusGenerateSynonyms: (vaultPath: string, projectFolderRel: string, model: string) =>
     ipcRenderer.invoke('project-status-generate-synonyms', vaultPath, projectFolderRel, model),
   projectStatusLoadSynonyms: (vaultPath: string, projectFolderRel: string) =>
-    ipcRenderer.invoke('project-status-load-synonyms', vaultPath, projectFolderRel)
+    ipcRenderer.invoke('project-status-load-synonyms', vaultPath, projectFolderRel),
+
+  // Webrecherche (Opt-in): Provider-Config + Linkup-Key liegen Main-seitig (0d),
+  // der Renderer verwaltet sie nur über diese Kanäle.
+  webResearchLoadConfig: () => ipcRenderer.invoke('webresearch-load-config'),
+  webResearchSaveConfig: (input: { provider?: 'searxng' | 'linkup'; searxngUrl?: string }) =>
+    ipcRenderer.invoke('webresearch-save-config', input),
+  webResearchSaveKey: (apiKey: string) => ipcRenderer.invoke('webresearch-save-key', apiKey),
+  webResearchHasKey: () => ipcRenderer.invoke('webresearch-has-key'),
+  webResearchClearKey: () => ipcRenderer.invoke('webresearch-clear-key'),
+  webResearchTest: () => ipcRenderer.invoke('webresearch-test')
 })

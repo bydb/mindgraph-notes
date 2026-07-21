@@ -4,8 +4,24 @@
 // einmal konsumierbar, verspätete Ergebnisse abgebrochener Läufe werden verworfen.
 
 import { randomBytes } from 'crypto'
+import type { WebResearchConfig, WebResearchPhase, WebFetchRecord } from '../../shared/webResearch'
 
 export type AgentRunStatus = 'running' | 'done' | 'cancelled' | 'error'
+
+// Webrecherche-Zustand eines Laufs (nur gesetzt, wenn der Nutzer die Webrecherche für
+// diesen Lauf aktiviert hat). Der Main führt die erlaubte URL-Liste (Suchtreffer +
+// Auftrags-URLs), NIE das Modell. Zustandsmaschine search → fetch → write (einseitig).
+export interface WebRunState {
+  config: WebResearchConfig
+  linkupApiKey: string | null
+  phase: WebResearchPhase
+  allowedUrls: Set<string>              // normalisierte URLs, die web_fetch abrufen darf
+  queries: Array<{ query: string; status: 'ok' | 'failed' }>
+  fetches: WebFetchRecord[]
+  searchCount: number
+  fetchCount: number
+  wrote: boolean                        // 0e: genau EIN write_note pro Web-Lauf
+}
 
 export interface AgentResultEntry {
   resultId: string
@@ -45,6 +61,7 @@ export interface AgentRun {
   seq: number
   results: Map<string, AgentResultEntry>
   sources: Set<string> // gelesene Anhänge/Notizen — landen auf den Ergebnis-Karten
+  web?: WebRunState    // nur bei aktivierter Webrecherche
 }
 
 // Beendete Läufe mit noch offenen Review-Karten pro Sender maximal halten —
@@ -93,6 +110,7 @@ export function startRun(params: {
   attachmentIds: string[]
   instruction: string
   skills?: Array<{ name: string; description: string; folderName: string }>
+  web?: WebRunState
 }): AgentRun | null {
   const existing = activeBySender.get(params.senderId)
   if (existing && existing.status === 'running') return null
@@ -112,7 +130,8 @@ export function startRun(params: {
     abort: new AbortController(),
     seq: 0,
     results: new Map(),
-    sources: new Set()
+    sources: new Set(),
+    web: params.web
   }
   activeBySender.set(params.senderId, run)
   runsById.set(run.runId, run)
