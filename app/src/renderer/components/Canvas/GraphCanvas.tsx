@@ -33,6 +33,11 @@ import { useTranslation, type TranslationKey } from '../../utils/translations'
 import { getNoteKind } from '../../utils/noteKind'
 
 // Verfügbare Farben für Nodes (labelKey wird über useTranslation aufgelöst)
+// Obergrenze für gerenderte Notizen im Graphen. Darüber verlangt der Canvas
+// eine Ordnerwahl statt zu rendern — ein ungefilterter 4000er-Graph ist weder
+// lesbar noch schafft ihn das Layout (Renderer-Freeze, real aufgetreten).
+const MAX_GRAPH_NOTES = 500
+
 const nodeColors = [
   { labelKey: 'graphCanvas.colorDefault', value: undefined },
   { labelKey: 'graphCanvas.colorRed', value: '#ffcdd2' },
@@ -1116,8 +1121,18 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
     })
   }, [allNotes, canvasFilterPath, localRootNoteId, expandedNoteIds])
 
+  // Ungefilterte Riesen-Graphen haben keine Aussagekraft und frieren den Renderer
+  // ein (Layout + React Flow skalieren nicht auf Tausende Nodes — real passiert
+  // bei 4251 Notizen). Oberhalb der Schwelle wird nicht gerendert, sondern eine
+  // Ordnerwahl verlangt. Local Mode ist ausgenommen (zeigt nur Nachbarschaft).
+  const graphTooLarge = !localRootNoteId && notes.length > MAX_GRAPH_NOTES
+
   useEffect(() => {
     if (!vaultPath) return
+    // Guard: solange die Ordnerwahl-Karte steht, KEINE Inhalte nachladen —
+    // der Batch-Load + updateNote pro Notiz (Tausende Store-Updates mit
+    // Re-Render-Kaskade) war der eigentliche Kern des Renderer-Freezes.
+    if (graphTooLarge) return
 
     const missingContentNotes = notes.filter(
       note => !note.content && !loadingContentPathsRef.current.has(note.path)
@@ -1145,7 +1160,7 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
         pathsToLoad.forEach(path => loadingContentPathsRef.current.delete(path))
       }
     })()
-  }, [notes, vaultPath, updateNote])
+  }, [graphTooLarge, notes, vaultPath, updateNote])
 
   // PDFs nach Ordner-Filter filtern (nur PDFs ohne Companion-Note anzeigen)
   const pdfs = useMemo(() => {
@@ -1868,6 +1883,8 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
 
   // Notizen und PDFs zu Nodes konvertieren
   const initialNodes: Node[] = useMemo(() => {
+    // Guard: oberhalb der Schwelle gar nicht erst Nodes bauen (Freeze-Schutz)
+    if (graphTooLarge) return []
     // Note-Nodes
     const noteNodes = notes.map((note, index) => {
       // Nutze gespeicherte Position oder generiere Position
@@ -2053,10 +2070,12 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
     }))
 
     return [...noteNodes, ...pdfNodes, ...labelNodes]
-  }, [notes, pdfs, positions, labels, getStablePosition, editingNodeId, handleNodeTitleChange, handleLabelTextChange, handleEditingDone, handleTaskToggle, handleOpenExternalLink, imageDataUrls, loadImageDataUrl, canvasShowTags, canvasShowLinks, canvasShowImages, canvasShowSummaries, canvasCompactMode, canvasDefaultCardWidth, canvasFilterPath, localRootNoteId, expandedNoteIds, onExpandNode, allNotes])
+  }, [graphTooLarge, notes, pdfs, positions, labels, getStablePosition, editingNodeId, handleNodeTitleChange, handleLabelTextChange, handleEditingDone, handleTaskToggle, handleOpenExternalLink, imageDataUrls, loadImageDataUrl, canvasShowTags, canvasShowLinks, canvasShowImages, canvasShowSummaries, canvasCompactMode, canvasDefaultCardWidth, canvasFilterPath, localRootNoteId, expandedNoteIds, onExpandNode, allNotes])
   
   // Links zu Edges konvertieren - bidirektionale Links zusammenführen
   const initialEdges: Edge[] = useMemo(() => {
+    // Guard: oberhalb der Schwelle gar nicht erst Kanten bauen (Freeze-Schutz)
+    if (graphTooLarge) return []
     const edgeMap = new Map<string, Edge>()
     // Alle gerichteten Links sammeln für Bidirektional-Erkennung
     const directedLinks = new Set<string>()
@@ -2132,7 +2151,7 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
     })
     
     return Array.from(edgeMap.values())
-  }, [notes, manualEdges, positions])
+  }, [graphTooLarge, notes, manualEdges, positions])
   
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes)
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges)
@@ -3690,6 +3709,26 @@ Antworte NUR mit JSON:
           <button className="btn-primary" onClick={() => setCanvasFilterPath(null)}>
             {t('graphCanvas.showAll')}
           </button>
+        </div>
+      ) : graphTooLarge ? (
+        <div className="canvas-empty canvas-too-large">
+          <p className="canvas-too-large-title">{t('graphCanvas.tooLarge.title')}</p>
+          <p className="canvas-too-large-hint">
+            {t('graphCanvas.tooLarge.hint', { count: notes.length, max: MAX_GRAPH_NOTES })}
+          </p>
+          <select
+            className="canvas-filter-select"
+            value={canvasFilterPath || ''}
+            onChange={(e) => setCanvasFilterPath(e.target.value || null)}
+          >
+            <option value="" disabled>{t('graphCanvas.tooLarge.chooseFolder')}</option>
+            <option value="__root__">{t('graphCanvas.rootLevelOnly')}</option>
+            {folders.map(folder => (
+              <option key={folder} value={folder}>
+                📁 {folder} ({folderCounts.get(folder) || 0})
+              </option>
+            ))}
+          </select>
         </div>
       ) : (
       <ReactFlow

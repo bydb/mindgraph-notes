@@ -4643,6 +4643,12 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
   text-align: center;
 }
 
+/* Guard: zu großer Graph — Ordnerwahl statt Renderer-Freeze */
+.canvas-too-large { gap: 6px; padding: 0 24px; }
+.canvas-too-large-title { font-size: 15px; font-weight: 600; color: var(--text-primary); }
+.canvas-too-large-hint { font-size: 12.5px; max-width: 420px; line-height: 1.5; }
+.canvas-too-large .canvas-filter-select { margin-top: 10px; max-width: 320px; }
+
 .graph-canvas .react-flow {
   flex: 1;
   min-height: 300px;
