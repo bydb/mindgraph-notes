@@ -146,7 +146,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose,
   )
 }
 
-function fuzzyMatch(query: string, text: string): boolean {
+export function fuzzyMatch(query: string, text: string): boolean {
   let queryIndex = 0
   for (let i = 0; i < text.length && queryIndex < query.length; i++) {
     if (text[i] === query[queryIndex]) {
@@ -156,7 +156,7 @@ function fuzzyMatch(query: string, text: string): boolean {
   return queryIndex === query.length
 }
 
-function highlightMatch(text: string, query: string): React.ReactNode {
+export function highlightMatch(text: string, query: string): React.ReactNode {
   if (!query) return text
   const lowerText = text.toLowerCase()
   const lowerQuery = query.toLowerCase()

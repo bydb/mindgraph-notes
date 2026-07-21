@@ -8623,6 +8623,163 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
   min-height: 0;
 }
 
+/* ── Settings-Suche (Design 1b „Suche zuerst") ── */
+.settings-search {
+  position: relative;
+  margin: 0 2px 10px;
+}
+
+.settings-search-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 11px;
+  border: 1px solid var(--border-color);
+  border-radius: 9px;
+  background: var(--bg-content);
+  color: var(--text-muted);
+}
+
+.settings-search-field:focus-within {
+  border-color: var(--accent-color);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-color) 12%, transparent);
+}
+
+.settings-search-field input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: 13px;
+  color: var(--text-primary);
+}
+
+.settings-search-results {
+  position: absolute;
+  left: 0;
+  top: calc(100% + 6px);
+  width: 300px;
+  z-index: 40;
+  background: var(--bg-content);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.14);
+  overflow: hidden;
+}
+
+.settings-search-result {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  width: 100%;
+  padding: 8px 14px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+}
+
+.settings-search-result.selected {
+  background: color-mix(in srgb, var(--accent-color) 10%, transparent);
+}
+
+.settings-search-result-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.settings-search-result-label mark {
+  background: color-mix(in srgb, var(--accent-color) 22%, transparent);
+  color: inherit;
+  border-radius: 3px;
+  padding: 0 1px;
+}
+
+.settings-search-result-path {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.settings-search-empty {
+  padding: 10px 14px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.settings-search-hint {
+  padding: 8px 14px;
+  border-top: 1px solid var(--border-subtle);
+  font-size: 10.5px;
+  color: var(--text-muted);
+}
+
+/* Ziel-Zeile nach Such-Sprung kurz hervorheben */
+.settings-anchor-flash {
+  animation: settings-anchor-flash 1.8s ease;
+  border-radius: 10px;
+}
+
+@keyframes settings-anchor-flash {
+  0%, 55% { box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-color) 50%, transparent); }
+  100% { box-shadow: 0 0 0 3px transparent; }
+}
+
+/* ── KI-Zentrale: Backend-Statuskarte ── */
+.ai-central-status {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  border: 1px solid var(--border-color);
+  border-radius: 14px;
+  margin-bottom: 14px;
+}
+
+.ai-central-status-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--accent-color) 10%, transparent);
+  color: var(--accent-color);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.ai-central-status-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.ai-central-status-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.ai-central-status-meta {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.ai-central-status-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  margin-left: 3px;
+  vertical-align: 1px;
+}
+
+.ai-central-status-dot-ok { background: #15803d; }
+.ai-central-status-dot-off { background: #dc2626; }
+
 .settings-nav-section-label {
   font-size: 10.5px;
   font-weight: 700;

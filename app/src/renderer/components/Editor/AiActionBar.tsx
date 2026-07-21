@@ -356,7 +356,7 @@ export function AiActionBar({ open, onOpenChange, phase, proposal, onGenerate, o
                 className={`ai-bar-context-btn ai-bar-web-btn ${webResearchArmed ? 'active' : ''}`}
                 onClick={() => {
                   if (!webConfigured) {
-                    window.dispatchEvent(new CustomEvent('mindgraph:openSettings', { detail: { tab: 'integrations' } }))
+                    window.dispatchEvent(new CustomEvent('mindgraph:openSettings', { detail: { tab: 'ai' } }))
                     return
                   }
                   setWebResearchArmed(v => !v)
