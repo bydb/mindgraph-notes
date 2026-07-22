@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { useUIStore, ACCENT_COLORS, AI_LANGUAGES, FONT_FAMILIES, UI_LANGUAGES, BACKGROUND_COLORS, ICON_SETS, OUTLINE_STYLES, MODULE_CATEGORIES, EDOOBOX_DEFAULTS, MARKETING_DEFAULTS, REMARKABLE_DEFAULTS, type Language, type FontFamily, type BackgroundColor, type IconSet, type OutlineStyle, type LLMBackend, type TransportDestination, type ModuleCategory, type ModuleDescriptor } from '../../stores/uiStore'
 import { usePluginConfig } from '../../plugins/config'
-import { MODULES, isModuleEnabled, setModuleEnabled, useIsModuleEnabled, isPluginModule } from '../../utils/modules'
+import { MODULES, isModuleEnabled, setModuleEnabled, useIsModuleEnabled, isPluginModule, pluginIdsForModule } from '../../utils/modules'
 import { invokePlugin } from '../../plugins/client'
-import { PluginSlot } from '../../plugins/slots'
+import { PluginSlot, getSettingsSections } from '../../plugins/slots'
+import { SETTINGS_SECTION_SLOT } from '@mindgraph/plugin-api'
 import { pluginErrorText } from '../../utils/pluginErrors'
 import { catalogCategories, filterCatalogEntries } from '../../utils/catalogFilter'
 import { edooboxService } from '../../stores/edooboxServiceBridge'
@@ -45,7 +46,8 @@ interface SettingsProps {
   initialAnchor?: string
 }
 
-type Tab = 'vault' | 'general' | 'editor' | 'templates' | 'integrations' | 'shortcuts' | 'dataview' | 'sync' | 'dailyNote' | 'remarkable' | 'email' | 'agents' | 'transport' | 'dashboard' | 'modules' | 'ai' | 'speech' | 'telegram' | 'credentials' | 'brain' | 'skills'
+// `plugin:<pluginId>` = dynamischer Settings-Tab eines Plugins mit settings.section-Beitrag (z.B. plugin:antares).
+type Tab = 'vault' | 'general' | 'editor' | 'templates' | 'integrations' | 'shortcuts' | 'dataview' | 'sync' | 'dailyNote' | 'remarkable' | 'email' | 'agents' | 'transport' | 'dashboard' | 'modules' | 'ai' | 'speech' | 'telegram' | 'credentials' | 'brain' | 'skills' | `plugin:${string}`
 
 type BuiltInTemplateKey = 'empty' | 'dailyNote' | 'zettel' | 'meeting'
 
@@ -539,7 +541,7 @@ const VaultSettingsTab: React.FC<{ vaultPath: string; t: TabTFn; onNavigateToTab
       label: 'E-Mail',
       description: t('settings.vault.emailDesc'),
       globallyConfigured: email.enabled && email.accounts.length > 0,
-      configTab: 'agents'
+      configTab: 'email'
     },
     {
       key: 'edoobox',
@@ -622,9 +624,17 @@ const MODULE_CONFIG_TABS: Record<string, Tab> = {
   speech: 'speech',
   remarkable: 'remarkable',
   'mz-suite': 'agents',
-  antares: 'agents',
   'smart-connections': 'ai',
   'web-research': 'ai'
+}
+
+// Config-Tab eines Moduls: fester Eintrag oben ODER — bei Plugin-Modulen — der dynamische
+// Tab `plugin:<id>`, wenn das Plugin eine settings.section beiträgt (z.B. Antares).
+function moduleConfigTab(modId: string): Tab | undefined {
+  if (MODULE_CONFIG_TABS[modId]) return MODULE_CONFIG_TABS[modId]
+  const sections = getSettingsSections()
+  const pluginId = pluginIdsForModule(modId).find(id => sections.some(c => c.pluginId === id))
+  return pluginId ? `plugin:${pluginId}` : undefined
 }
 
 const ModulesTab: React.FC<{ t: TabTFn; onOpenTab: (tab: Tab) => void }> = ({ t, onOpenTab }) => {
@@ -844,6 +854,7 @@ const ModulesTab: React.FC<{ t: TabTFn; onOpenTab: (tab: Tab) => void }> = ({ t,
 
   const renderModuleRow = (mod: ModuleDescriptor, official?: boolean) => {
     const enabled = isModuleEnabled(mod.id)
+    const configTab = moduleConfigTab(mod.id)
     return (
       // htmlFor MUSS explizit gesetzt sein: ohne es wäre das Label-Ziel das ERSTE labelbare
       // Element im Baum — und das ist der „Konfigurieren"-<button>, nicht die Checkbox.
@@ -877,7 +888,7 @@ const ModulesTab: React.FC<{ t: TabTFn; onOpenTab: (tab: Tab) => void }> = ({ t,
               {moduleErrors[mod.id]}
             </div>
           )}
-          {enabled && MODULE_CONFIG_TABS[mod.id] && (
+          {enabled && configTab && (
             <button
               type="button"
               className="module-row-configure"
@@ -886,7 +897,7 @@ const ModulesTab: React.FC<{ t: TabTFn; onOpenTab: (tab: Tab) => void }> = ({ t,
                 // würde der Klick das Modul gleich wieder deaktivieren.
                 e.preventDefault()
                 e.stopPropagation()
-                onOpenTab(MODULE_CONFIG_TABS[mod.id])
+                onOpenTab(configTab)
               }}
             >
               {t('settings.modules.configure')} →
@@ -1897,6 +1908,15 @@ const SignatureImagePreview: React.FC<{ imagePath: string }> = ({ imagePath }) =
 export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab, initialAnchor }) => {
   const [activeTab, setActiveTab] = useState<Tab>(initialTab ?? 'general')
 
+  // Dynamische Plugin-Settings-Tabs: ein Tab pro settings.section-Beitrag eines AKTIVEN
+  // Plugins (Konvention: Gate `pluginConfig.<pluginId>.enabled`, wie usePluginEnabled).
+  // Der Kern nennt kein Plugin namentlich — Titel/Sichtbarkeit kommen aus der Registrierung.
+  const pluginConfigState = useUIStore(s => s.pluginConfig)
+  const pluginSettingsSections = useMemo(
+    () => getSettingsSections().filter(c => pluginConfigState[c.pluginId]?.enabled === true),
+    [pluginConfigState]
+  )
+
   // Wenn der initialTab sich ändert (z.B. vom HelpGuide), übernehmen
   useEffect(() => {
     if (isOpen && initialTab) setActiveTab(initialTab)
@@ -2885,6 +2905,25 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab,
                 reMarkable
               </button>
             )}
+            {/* Plugin-Settings-Tabs: ein Eintrag pro settings.section-Beitrag eines aktiven
+                Plugins (z.B. Antares). Der Kern nennt kein Plugin namentlich. */}
+            {pluginSettingsSections.map(section => {
+              const tabId: Tab = `plugin:${section.pluginId}`
+              return (
+                <button
+                  key={tabId}
+                  className={`settings-nav-item ${activeTab === tabId ? 'active' : ''}`}
+                  onClick={() => setActiveTab(tabId)}
+                >
+                  <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+                    <path d="M6 2v4M12 2v4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                    <path d="M4 6h10v3a5 5 0 01-10 0V6z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
+                    <path d="M9 14v3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                  </svg>
+                  {section.title ?? section.pluginId}
+                </button>
+              )
+            })}
             {/* Telegram-Tab: immer sichtbar (Bot-Feature) */}
             <button
               className={`settings-nav-item ${activeTab === 'telegram' ? 'active' : ''}`}
@@ -2934,6 +2973,8 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab,
                     : activeTab === 'remarkable' ? 'reMarkable'
                     : activeTab === 'telegram' ? 'Telegram'
                     : activeTab === 'credentials' ? 'Zugangsdaten'
+                    : activeTab.startsWith('plugin:')
+                      ? (getSettingsSections().find(c => `plugin:${c.pluginId}` === activeTab)?.title ?? activeTab.slice('plugin:'.length))
                     : t(`settings.tab.${activeTab}` as TranslationKey)
                 }</h2>
               </div>
@@ -5988,14 +6029,6 @@ LIMIT 10
 
                 <div className="settings-divider" />
 
-                {/* Generischer Plugin-Settings-Bereich: der Kern nennt KEIN Plugin namentlich,
-                    er rendert nur diesen einen Slot. Jede Vertikale (aktuell: Antares) trägt ihre
-                    eigene Sektion bei und gated sich selbst auf ihr Modul. Leer nach Löschen des
-                    Plugin-Ordners → keine toten Plugin-Einstellungen (Deletion Test). */}
-                <PluginSlot slotId="settings.section" props={{ onGoToModules: () => setActiveTab('modules') }} />
-
-                <div className="settings-divider" />
-
                 {/* Marketing (WordPress + Instagram) — Teil des mz-suite Moduls */}
                 <h4 className="settings-section-title">{t('settings.agents.marketing.title')}</h4>
                 <p className="settings-hint">{t('settings.agents.marketing.description')}</p>
@@ -6115,6 +6148,19 @@ LIMIT 10
 
                 <div className="settings-divider" />
                 <p className="settings-hint">{t('settings.agents.moreAgents')}</p>
+              </div>
+            )}
+
+            {/* Dynamische Plugin-Settings-Tabs: rendert genau die settings.section des
+                gewählten Plugins (z.B. plugin:antares). Leerer Slot nach Plugin-Löschung
+                → leerer Tab statt Crash (Deletion Test); der Nav-Eintrag ist dann eh weg. */}
+            {activeTab.startsWith('plugin:') && (
+              <div className="settings-section">
+                <PluginSlot
+                  slotId={SETTINGS_SECTION_SLOT}
+                  pluginId={activeTab.slice('plugin:'.length)}
+                  props={{ onGoToModules: () => setActiveTab('modules') }}
+                />
               </div>
             )}
 

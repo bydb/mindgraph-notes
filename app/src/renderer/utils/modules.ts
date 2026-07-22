@@ -31,6 +31,11 @@ function pluginManifestsForModule(id: string) {
   return pluginManifests.filter((manifest) => manifest.module && (manifest.module.id ?? manifest.id) === id)
 }
 
+/** Plugin-Ids, die ein Modul steuert (Modul-Id ≠ Plugin-Id möglich, z.B. mz-suite → edoobox). */
+export function pluginIdsForModule(id: string): string[] {
+  return pluginManifestsForModule(id).map((manifest) => manifest.id)
+}
+
 function pluginModuleEnabled(state: unknown, id: string): boolean | undefined {
   const manifests = pluginManifestsForModule(id)
   if (manifests.length === 0) return undefined

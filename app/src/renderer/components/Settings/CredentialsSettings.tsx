@@ -3,7 +3,7 @@ import { useUIStore } from '../../stores/uiStore'
 import { invokePlugin } from '../../plugins/client'
 import { edooboxService } from '../../stores/edooboxServiceBridge'
 
-type TabId = 'integrations' | 'email' | 'agents' | 'telegram' | 'speech' | 'sync' | 'dashboard'
+type TabId = 'integrations' | 'email' | 'agents' | 'telegram' | 'speech' | 'sync' | 'dashboard' | `plugin:${string}`
 
 interface CredentialRow {
   id: string
@@ -108,7 +108,7 @@ export const CredentialsSettings: React.FC<Props> = ({ onNavigateToTab }) => {
       label: 'Antares Zugangsdaten',
       category: 'Business',
       note: 'Username + Passwort für Antares CS (Medienzentrum-Verleih). Read-only.',
-      settingsTab: 'agents',
+      settingsTab: 'plugin:antares',
       checkSet: async () => {
         const creds = await invokePlugin<{ username?: string; password?: string } | null>('antares', 'antares.loadCredentials').catch(() => null)
         return !!(creds && creds.username && creds.password)

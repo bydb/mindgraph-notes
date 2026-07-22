@@ -9,7 +9,7 @@ Analog zur EdooBox-Integration aufgebaut.
 ## Aktivierung
 
 1. Settings → **Module** → "Antares Medienzentrum" aktivieren
-2. Settings → **Agenten** → Antares-Sektion:
+2. Settings → **Antares** (eigener Tab, erscheint bei aktivem Modul):
    - Server-URL (z.B. `https://mzantares-he-16.datenbank-bildungsmedien.net`)
    - Kontext (z.B. `HE/16`)
    - Benutzername + Passwort

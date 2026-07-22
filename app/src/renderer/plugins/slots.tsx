@@ -8,7 +8,7 @@
 
 import React, { Suspense } from 'react'
 import { createRendererRegistry, type RendererPluginRegistry } from './registry'
-import { WORKFLOW_TRIGGER_SLOT, WORKFLOW_EXAMPLE_SLOT, type WorkflowTriggerProvider } from '@mindgraph/plugin-api'
+import { WORKFLOW_TRIGGER_SLOT, WORKFLOW_EXAMPLE_SLOT, SETTINGS_SECTION_SLOT, type WorkflowTriggerProvider } from '@mindgraph/plugin-api'
 import type { Workflow } from '../../shared/workflow/model'
 
 /** Was ein Plugin an einen Slot hängt: eine lazy geladene Default-Export-Komponente.
@@ -61,6 +61,15 @@ export function getWorkflowExamples(): Workflow[] {
   return out
 }
 
+/**
+ * Alle registrierten Plugin-Settings-Sektionen (`SETTINGS_SECTION_SLOT`). Die Settings-UI
+ * erzeugt daraus dynamisch einen Tab pro Beitrag eines aktiven Plugins — der Kern nennt
+ * dabei kein Plugin namentlich. Leerer Slot nach Plugin-Löschung → kein toter Tab.
+ */
+export function getSettingsSections(): SlotContribution[] {
+  return getRegistry().getSlot(SETTINGS_SECTION_SLOT) as SlotContribution[]
+}
+
 // React.lazy pro Beitrag genau einmal erzeugen (stabile Identität → kein Remount-Flackern).
 const lazyCache = new WeakMap<SlotContribution, React.ComponentType>()
 function lazyComponent(c: SlotContribution): React.ComponentType {
@@ -97,10 +106,13 @@ class SlotErrorBoundary extends React.Component<
 export const PluginSlot: React.FC<{
   slotId: string
   fallback?: React.ReactNode
+  /** Nur Beiträge dieses Plugins rendern (z.B. der eigene dynamische Settings-Tab). */
+  pluginId?: string
   /** Optionale Props, die an jede Slot-Komponente durchgereicht werden (z.B. `onClose`). */
   props?: Record<string, unknown>
-}> = ({ slotId, fallback = null, props }) => {
-  const contributions = getRegistry().getSlot(slotId) as SlotContribution[]
+}> = ({ slotId, fallback = null, pluginId, props }) => {
+  const all = getRegistry().getSlot(slotId) as SlotContribution[]
+  const contributions = pluginId ? all.filter(c => c.pluginId === pluginId) : all
   if (contributions.length === 0) return <>{fallback}</>
   return (
     <>

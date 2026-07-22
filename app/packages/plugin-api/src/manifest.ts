@@ -91,6 +91,12 @@ export interface ActionDef {
 export const WIDGET_SLOTS = ['dashboard.widget', 'sidebar.panel'] as const
 export type WidgetSlot = (typeof WIDGET_SLOTS)[number]
 
+/** Generischer Plugin-Settings-Slot: jede Vertikale trägt hier ihre Settings-Sektion bei.
+ *  Der Kern rendert pro Beitrag eines AKTIVEN Plugins einen eigenen Settings-Tab
+ *  (`plugin:<pluginId>`) — er nennt kein Plugin namentlich. Leerer Slot nach Löschen des
+ *  Plugin-Ordners → kein toter Tab (Deletion Test). */
+export const SETTINGS_SECTION_SLOT = 'settings.section'
+
 /** Deklaration eines UI-Slot-Beitrags: WELCHER (strikt begrenzter) Slot + WELCHE Action ihn speist.
  *  Die `fromAction` liefert zur Laufzeit direkt die vollständige WidgetView (gegen WIDGET_VIEW_SCHEMA
  *  validiert) — KEIN separates `view`-Template im Manifest. */
