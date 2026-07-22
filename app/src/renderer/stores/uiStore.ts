@@ -361,13 +361,16 @@ export interface EmailSettings {
   activeFolders: Record<string, string>
 }
 
-// Marketing Settings (WordPress)
-export interface MarketingSettings {
+// WordPress-Plugin Settings (Publishing). Ehemals „Marketing"-Namespace der edoobox-
+// Vertikale — seit Paket 3 der Modul-Entflechtung eigenes Plugin `wordpress` mit eigenem
+// Modul-Gate. App-Passwort liegt in den Plugin-Secrets, der Imagen-Key im
+// image-generation-Modul (safeStorage) — beides bewusst NICHT hier.
+export interface WordpressSettings {
   enabled: boolean
-  wordpressUrl: string
-  wordpressUser: string
+  /** Site-URL; Feldname `baseUrl`, damit der generische resolveExtraAllowedHosts-Zweig greift. */
+  baseUrl: string
+  username: string
   defaultPostStatus: 'draft' | 'publish'
-  googleImagenApiKey: string
 }
 
 // edoobox Agent Settings
@@ -389,12 +392,11 @@ export interface ReMarkableSettings {
 // Defaults für die generisch (pluginConfig) gespeicherten Vertikalen-Configs. Liegen — wie
 // ANTARES_DEFAULTS — bewusst im KERN, damit auch die (noch im Kern liegenden) Settings-Tabs
 // sie importieren können, ohne aus src/plugins/ zu importieren (Deletion-Test). A-pre Schritt 3.
-export const MARKETING_DEFAULTS: MarketingSettings = {
+export const WORDPRESS_DEFAULTS: WordpressSettings = {
   enabled: false,
-  wordpressUrl: '',
-  wordpressUser: '',
-  defaultPostStatus: 'draft',
-  googleImagenApiKey: ''
+  baseUrl: '',
+  username: '',
+  defaultPostStatus: 'draft'
 }
 export const EDOOBOX_DEFAULTS: EdooboxSettings = {
   enabled: false,
@@ -549,7 +551,8 @@ export const MODULES: ModuleDescriptor[] = [
   { id: 'vision-ocr',       label: 'Vision OCR',       description: 'Bilder und Scans per Vision-Modell in Text umwandeln', category: 'documents' },
   { id: 'speech',           label: 'Sprache',          description: 'Vorlesen (TTS) und Diktieren (Whisper, läuft offline in der App) in Editor & Flashcards', category: 'ai' },
   { id: 'project-rag',      label: 'Projekt-RAG',      description: 'Projektordner semantisch befragen — On-demand-Index, Embedding & Antwort lokal', category: 'ai' },
-  { id: 'web-research',     label: 'Webrecherche',     description: 'Der Notiz-Agent recherchiert im Web und erstellt eine Notiz mit Quellen — opt-in, eigene Suchmaschine (SearXNG) oder EU-Anbieter (Linkup)', category: 'ai' }
+  { id: 'web-research',     label: 'Webrecherche',     description: 'Der Notiz-Agent recherchiert im Web und erstellt eine Notiz mit Quellen — opt-in, eigene Suchmaschine (SearXNG) oder EU-Anbieter (Linkup)', category: 'ai' },
+  { id: 'image-generation', label: 'Bild-Generierung', description: 'Bilder mit Google Imagen erzeugen (Cloud, eigener API-Key) — nutzbar im Marketing-Tab und künftig im Notiz-Agenten', category: 'ai' }
 ]
 
 export type TtsEngine = 'system' | 'elevenlabs'
@@ -649,6 +652,8 @@ interface UIState {
   // Spiegel der Main-seitigen Webrecherche-Config (0d) — nur zum Anzeigen in der KI-Leiste
   // (Provider-Tooltip, „konfiguriert?"). NICHT persistiert; wird per IPC geladen/aktualisiert.
   webResearchConfig: { provider: 'tavily' | 'searxng' | 'linkup'; searxngUrl: string; hasTavilyKey: boolean; hasLinkupKey: boolean } | null
+  /** Bild-Generierung (Google Imagen, Cloud, eigener Key) — opt-in. Key liegt via safeStorage im Main. */
+  imageGenerationEnabled: boolean
   semanticScholarEnabled: boolean
   zoteroEnabled: boolean
 
@@ -697,6 +702,9 @@ interface UIState {
   editorDefaultViewForcedToPreview: boolean
   // einmalige Migration: altes warmes Default-Design (cream/terracotta) → weiß/ink
   appearanceMigratedToLight: boolean
+  // einmalige Migration: Google-Imagen-Key aus pluginConfig.marketing (Klartext-localStorage)
+  // → safeStorage im Main (image-generation-Modul)
+  imagenKeyMigratedToSafeStorage: boolean
 
   // Update-Checker & What's New
   lastSeenVersion: string
@@ -793,6 +801,7 @@ interface UIState {
   setFlashcardsEnabled: (enabled: boolean) => void
   setWorkflowCanvasEnabled: (enabled: boolean) => void
   setWebResearchEnabled: (enabled: boolean) => void
+  setImageGenerationEnabled: (enabled: boolean) => void
   setWebResearchConfig: (config: { provider: 'tavily' | 'searxng' | 'linkup'; searxngUrl: string; hasTavilyKey: boolean; hasLinkupKey: boolean } | null) => void
   setSemanticScholarEnabled: (enabled: boolean) => void
   setZoteroEnabled: (enabled: boolean) => void
@@ -956,6 +965,7 @@ const defaultState = {
   workflowCanvasEnabled: false,
   webResearchEnabled: false,
   webResearchConfig: null,
+  imageGenerationEnabled: false,
   semanticScholarEnabled: true,
   zoteroEnabled: true,
 
@@ -1069,6 +1079,7 @@ const defaultState = {
   // Update-Checker & What's New
   editorDefaultViewForcedToPreview: false,
   appearanceMigratedToLight: false,
+  imagenKeyMigratedToSafeStorage: false,
   lastSeenVersion: '',
   updateAvailable: null as UpdateInfo | null,
   whatsNewOpen: false,
@@ -1163,7 +1174,7 @@ const persistedKeys = [
   'canvasFilterPath', 'canvasViewMode', 'canvasShowEdges', 'canvasShowTags', 'canvasShowLinks', 'canvasShowImages', 'canvasShowSummaries',
   'canvasCompactMode', 'canvasReadMode', 'canvasHoverScale', 'canvasDefaultCardWidth', 'splitPosition', 'fileTreeDisplayMode', 'fileTreeKindFilter', 'notesRootFolder', 'projectsRootFolder', 'ollama', 'brain',
   'pdfCompanionEnabled', 'pdfDisplayMode', 'iconSet',
-  'smartConnectionsEnabled', 'notesChatEnabled', 'projectRagEnabled', 'flashcardsEnabled', 'workflowCanvasEnabled', 'webResearchEnabled', 'semanticScholarEnabled', 'zoteroEnabled', 'smartConnectionsWeights', 'smartConnectionsRerankerEnabled', 'docling', 'visionOcr', 'readwise', 'languageTool', 'email', 'pluginConfig', 'dailyNote', 'taskExcludedFolders', 'taskIncludedFolders', 'speech',
+  'smartConnectionsEnabled', 'notesChatEnabled', 'projectRagEnabled', 'flashcardsEnabled', 'workflowCanvasEnabled', 'webResearchEnabled', 'imageGenerationEnabled', 'imagenKeyMigratedToSafeStorage', 'semanticScholarEnabled', 'zoteroEnabled', 'smartConnectionsWeights', 'smartConnectionsRerankerEnabled', 'docling', 'visionOcr', 'readwise', 'languageTool', 'email', 'pluginConfig', 'dailyNote', 'taskExcludedFolders', 'taskIncludedFolders', 'speech',
   'editorDefaultViewForcedToPreview',
   'appearanceMigratedToLight',
   'lastSeenVersion',
@@ -1267,6 +1278,7 @@ export const useUIStore = create<UIState>()((set, get) => ({
   setFlashcardsEnabled: (enabled) => set({ flashcardsEnabled: enabled }),
   setWorkflowCanvasEnabled: (enabled) => set({ workflowCanvasEnabled: enabled }),
   setWebResearchEnabled: (enabled) => set({ webResearchEnabled: enabled }),
+  setImageGenerationEnabled: (enabled) => set({ imageGenerationEnabled: enabled }),
   setWebResearchConfig: (config) => set({ webResearchConfig: config }),
   setSpeech: (settings) => set((state) => ({ speech: { ...state.speech, ...settings } })),
   toggleTaskExcludedFolder: (folderPath) => set((state) => {
@@ -1650,6 +1662,50 @@ export async function initializeUISettings(): Promise<void> {
         savedSettings as Record<string, unknown>,
         (validSettings.pluginConfig ?? {}) as Record<string, Record<string, unknown>>
       )
+      // Einmalige Migration (Paket 2 Modul-Entflechtung): Google-Imagen-Key lag als
+      // Klartext in pluginConfig.marketing.googleImagenApiKey (localStorage) → jetzt
+      // safeStorage im Main (image-generation-Modul). Wer einen Key hatte, bekommt das
+      // Modul aktiviert (kein Funktionsverlust im Marketing-Tab). Idempotent: bei Fehler
+      // bleibt das Flag aus und der nächste Start versucht es erneut. Läuft bewusst NACH
+      // migrateLegacyPluginConfig (sehr alte Installationen: Key noch top-level).
+      if (!validSettings.imagenKeyMigratedToSafeStorage) {
+        const marketingCfg = validSettings.pluginConfig?.marketing as { googleImagenApiKey?: string } | undefined
+        const legacyKey = marketingCfg?.googleImagenApiKey
+        if (legacyKey && typeof legacyKey === 'string') {
+          try {
+            const res = await window.electronAPI.imageGenSaveKey(legacyKey)
+            if (res.success) {
+              delete marketingCfg!.googleImagenApiKey
+              validSettings.imageGenerationEnabled = true
+              validSettings.imagenKeyMigratedToSafeStorage = true
+            }
+          } catch { /* nächster Start versucht es erneut */ }
+        } else {
+          validSettings.imagenKeyMigratedToSafeStorage = true
+        }
+      }
+      // Migration (Paket 3 Modul-Entflechtung): Marketing-Config (pluginConfig.marketing)
+      // → eigenes WordPress-Plugin (pluginConfig.wordpress). Wer Marketing aktiv hatte,
+      // bekommt das WordPress-Modul aktiviert (kein Funktionsverlust im Marketing-Tab und
+      // beim Editor-Publish). Präsenz-basiert und idempotent: der marketing-Namespace wird
+      // danach entfernt — außer der Imagen-Key wartet oben noch auf einen Retry.
+      const legacyMarketing = validSettings.pluginConfig?.marketing as {
+        enabled?: boolean; wordpressUrl?: string; wordpressUser?: string
+        defaultPostStatus?: 'draft' | 'publish'; googleImagenApiKey?: string
+      } | undefined
+      if (legacyMarketing) {
+        if (!validSettings.pluginConfig!.wordpress) {
+          validSettings.pluginConfig!.wordpress = {
+            enabled: legacyMarketing.enabled === true,
+            baseUrl: legacyMarketing.wordpressUrl ?? '',
+            username: legacyMarketing.wordpressUser ?? '',
+            defaultPostStatus: legacyMarketing.defaultPostStatus ?? 'draft'
+          }
+        }
+        if (!legacyMarketing.googleImagenApiKey) {
+          delete validSettings.pluginConfig!.marketing
+        }
+      }
       useUIStore.setState(validSettings)
       // Karteileichen entfernen: erst die migrierte pluginConfig persistieren (crash-sicher),
       // DANN die alten Top-Level-Keys von der Platte prunen (saveUISettings mergt sonst weiter).

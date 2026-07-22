@@ -3,13 +3,13 @@ import MarkdownIt from 'markdown-it'
 import taskLists from 'markdown-it-task-lists'
 import footnote from 'markdown-it-footnote'
 import type { Note, FileEntry } from '../../../shared/types'
-import { MARKETING_DEFAULTS } from '../../stores/uiStore'
+import { WORDPRESS_DEFAULTS } from '../../stores/uiStore'
 import { usePluginConfig } from '../../plugins/config'
 import { useTranslation } from '../../utils/translations'
 import { parseFrontmatter } from '../../utils/metadataExtractor'
 import { findImageInVault, isImageFile } from '../../utils/imageUtils'
 import { sanitizeHtml } from '../../utils/sanitize'
-import { edooboxService } from '../../stores/edooboxServiceBridge'
+import { wordpressService } from '../../stores/wordpressServiceBridge'
 
 interface PublishToWordPressModalProps {
   note: Note
@@ -56,13 +56,13 @@ function resolveVaultImage(fileName: string, vaultPath: string, fileTree: FileEn
 
 export const PublishToWordPressModal: React.FC<PublishToWordPressModalProps> = ({ note, vaultPath, fileTree, onClose }) => {
   const { t } = useTranslation()
-  const [marketing] = usePluginConfig('marketing', MARKETING_DEFAULTS)
+  const [wordpress] = usePluginConfig('wordpress', WORDPRESS_DEFAULTS)
 
   const frontmatter = useMemo(() => parseFrontmatter(note.content), [note.content])
   const defaultTitle = (firstString(frontmatter.title) ?? note.title ?? '').trim()
 
   const [title, setTitle] = useState(defaultTitle)
-  const [status, setStatus] = useState<'draft' | 'publish'>(marketing.defaultPostStatus)
+  const [status, setStatus] = useState<'draft' | 'publish'>(wordpress.defaultPostStatus)
   const [isPublishing, setIsPublishing] = useState(false)
   const [progress, setProgress] = useState<string | null>(null)
   const [result, setResult] = useState<WpResult | null>(null)
@@ -81,7 +81,7 @@ export const PublishToWordPressModal: React.FC<PublishToWordPressModalProps> = (
     return sanitizeHtml(rawHtml)
   }, [md, bodyMarkdown])
 
-  const notConfigured = !marketing.wordpressUrl || !marketing.wordpressUser
+  const notConfigured = !wordpress.baseUrl || !wordpress.username
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Escape' && !isPublishing) onClose()
@@ -127,7 +127,7 @@ export const PublishToWordPressModal: React.FC<PublishToWordPressModalProps> = (
         if (!dataUrl) continue
         const base64 = dataUrl.includes(',') ? dataUrl.slice(dataUrl.indexOf(',') + 1) : dataUrl
         const fileName = absPath.split(/[\\/]/).pop() || ref.split(/[\\/]/).pop() || 'bild.png'
-        const upload = await edooboxService.marketingUploadImage(marketing.wordpressUrl, marketing.wordpressUser, base64, fileName)
+        const upload = await wordpressService.uploadImage(wordpress.baseUrl, wordpress.username, base64, fileName)
         if (upload.success && upload.imageUrl) {
           imageMap.set(ref, upload.imageUrl)
         }
@@ -159,9 +159,9 @@ export const PublishToWordPressModal: React.FC<PublishToWordPressModalProps> = (
 
       setProgress(t('publishWp.publishing'))
 
-      const res = await edooboxService.marketingPublishWordpress(
-        marketing.wordpressUrl,
-        marketing.wordpressUser,
+      const res = await wordpressService.publishPost(
+        wordpress.baseUrl,
+        wordpress.username,
         title.trim(),
         finalHtml,
         status
@@ -178,7 +178,7 @@ export const PublishToWordPressModal: React.FC<PublishToWordPressModalProps> = (
       setIsPublishing(false)
       setProgress(null)
     }
-  }, [title, status, isPublishing, bodyMarkdown, md, vaultPath, fileTree, marketing.wordpressUrl, marketing.wordpressUser, t])
+  }, [title, status, isPublishing, bodyMarkdown, md, vaultPath, fileTree, wordpress.baseUrl, wordpress.username, t])
 
   return (
     <div className="ai-image-dialog-overlay" onClick={() => { if (!isPublishing) onClose() }}>

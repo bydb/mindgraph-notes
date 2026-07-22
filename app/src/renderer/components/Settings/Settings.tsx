@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react'
-import { useUIStore, ACCENT_COLORS, AI_LANGUAGES, FONT_FAMILIES, UI_LANGUAGES, BACKGROUND_COLORS, ICON_SETS, OUTLINE_STYLES, MODULE_CATEGORIES, EDOOBOX_DEFAULTS, MARKETING_DEFAULTS, REMARKABLE_DEFAULTS, type Language, type FontFamily, type BackgroundColor, type IconSet, type OutlineStyle, type LLMBackend, type TransportDestination, type ModuleCategory, type ModuleDescriptor } from '../../stores/uiStore'
+import React, { useState, useEffect, useMemo } from 'react'
+import { useUIStore, ACCENT_COLORS, AI_LANGUAGES, FONT_FAMILIES, UI_LANGUAGES, BACKGROUND_COLORS, ICON_SETS, OUTLINE_STYLES, MODULE_CATEGORIES, EDOOBOX_DEFAULTS, REMARKABLE_DEFAULTS, type Language, type FontFamily, type BackgroundColor, type IconSet, type OutlineStyle, type LLMBackend, type TransportDestination, type ModuleCategory, type ModuleDescriptor } from '../../stores/uiStore'
 import { usePluginConfig } from '../../plugins/config'
-import { MODULES, isModuleEnabled, setModuleEnabled, useIsModuleEnabled, isPluginModule } from '../../utils/modules'
+import { MODULES, isModuleEnabled, setModuleEnabled, useIsModuleEnabled, isPluginModule, pluginIdsForModule } from '../../utils/modules'
 import { invokePlugin } from '../../plugins/client'
-import { PluginSlot } from '../../plugins/slots'
+import { PluginSlot, getSettingsSections } from '../../plugins/slots'
+import { SETTINGS_SECTION_SLOT } from '@mindgraph/plugin-api'
 import { pluginErrorText } from '../../utils/pluginErrors'
 import { catalogCategories, filterCatalogEntries } from '../../utils/catalogFilter'
 import { edooboxService } from '../../stores/edooboxServiceBridge'
@@ -17,6 +18,7 @@ import { ModelCompatibilitySection, ActiveModelStatusBadge, VERDICT_ICON, VERDIC
 import { OpenRouterSection } from './OpenRouterSection'
 import { LLMBaseSection } from './LLMBaseSection'
 import { WebResearchSection } from './WebResearchSection'
+import { ImageGenerationSection } from './ImageGenerationSection'
 import { SkillsSection } from './SkillsSection'
 import { EmailRelevanceRulesSection } from './EmailRelevanceRulesSection'
 import { SettingsSearch, type SettingsSearchEntry } from './SettingsSearch'
@@ -45,7 +47,8 @@ interface SettingsProps {
   initialAnchor?: string
 }
 
-type Tab = 'vault' | 'general' | 'editor' | 'templates' | 'integrations' | 'shortcuts' | 'dataview' | 'sync' | 'dailyNote' | 'remarkable' | 'email' | 'agents' | 'transport' | 'dashboard' | 'modules' | 'ai' | 'speech' | 'telegram' | 'credentials' | 'brain' | 'skills'
+// `plugin:<pluginId>` = dynamischer Settings-Tab eines Plugins mit settings.section-Beitrag (z.B. plugin:antares).
+type Tab = 'vault' | 'general' | 'editor' | 'templates' | 'integrations' | 'shortcuts' | 'dataview' | 'sync' | 'dailyNote' | 'remarkable' | 'email' | 'agents' | 'transport' | 'dashboard' | 'modules' | 'ai' | 'speech' | 'telegram' | 'credentials' | 'brain' | 'skills' | `plugin:${string}`
 
 type BuiltInTemplateKey = 'empty' | 'dailyNote' | 'zettel' | 'meeting'
 
@@ -539,7 +542,7 @@ const VaultSettingsTab: React.FC<{ vaultPath: string; t: TabTFn; onNavigateToTab
       label: 'E-Mail',
       description: t('settings.vault.emailDesc'),
       globallyConfigured: email.enabled && email.accounts.length > 0,
-      configTab: 'agents'
+      configTab: 'email'
     },
     {
       key: 'edoobox',
@@ -622,9 +625,18 @@ const MODULE_CONFIG_TABS: Record<string, Tab> = {
   speech: 'speech',
   remarkable: 'remarkable',
   'mz-suite': 'agents',
-  antares: 'agents',
   'smart-connections': 'ai',
-  'web-research': 'ai'
+  'web-research': 'ai',
+  'image-generation': 'ai'
+}
+
+// Config-Tab eines Moduls: fester Eintrag oben ODER — bei Plugin-Modulen — der dynamische
+// Tab `plugin:<id>`, wenn das Plugin eine settings.section beiträgt (z.B. Antares).
+function moduleConfigTab(modId: string): Tab | undefined {
+  if (MODULE_CONFIG_TABS[modId]) return MODULE_CONFIG_TABS[modId]
+  const sections = getSettingsSections()
+  const pluginId = pluginIdsForModule(modId).find(id => sections.some(c => c.pluginId === id))
+  return pluginId ? `plugin:${pluginId}` : undefined
 }
 
 const ModulesTab: React.FC<{ t: TabTFn; onOpenTab: (tab: Tab) => void }> = ({ t, onOpenTab }) => {
@@ -844,6 +856,7 @@ const ModulesTab: React.FC<{ t: TabTFn; onOpenTab: (tab: Tab) => void }> = ({ t,
 
   const renderModuleRow = (mod: ModuleDescriptor, official?: boolean) => {
     const enabled = isModuleEnabled(mod.id)
+    const configTab = moduleConfigTab(mod.id)
     return (
       // htmlFor MUSS explizit gesetzt sein: ohne es wäre das Label-Ziel das ERSTE labelbare
       // Element im Baum — und das ist der „Konfigurieren"-<button>, nicht die Checkbox.
@@ -877,7 +890,7 @@ const ModulesTab: React.FC<{ t: TabTFn; onOpenTab: (tab: Tab) => void }> = ({ t,
               {moduleErrors[mod.id]}
             </div>
           )}
-          {enabled && MODULE_CONFIG_TABS[mod.id] && (
+          {enabled && configTab && (
             <button
               type="button"
               className="module-row-configure"
@@ -886,7 +899,7 @@ const ModulesTab: React.FC<{ t: TabTFn; onOpenTab: (tab: Tab) => void }> = ({ t,
                 // würde der Klick das Modul gleich wieder deaktivieren.
                 e.preventDefault()
                 e.stopPropagation()
-                onOpenTab(MODULE_CONFIG_TABS[mod.id])
+                onOpenTab(configTab)
               }}
             >
               {t('settings.modules.configure')} →
@@ -1897,6 +1910,15 @@ const SignatureImagePreview: React.FC<{ imagePath: string }> = ({ imagePath }) =
 export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab, initialAnchor }) => {
   const [activeTab, setActiveTab] = useState<Tab>(initialTab ?? 'general')
 
+  // Dynamische Plugin-Settings-Tabs: ein Tab pro settings.section-Beitrag eines AKTIVEN
+  // Plugins (Konvention: Gate `pluginConfig.<pluginId>.enabled`, wie usePluginEnabled).
+  // Der Kern nennt kein Plugin namentlich — Titel/Sichtbarkeit kommen aus der Registrierung.
+  const pluginConfigState = useUIStore(s => s.pluginConfig)
+  const pluginSettingsSections = useMemo(
+    () => getSettingsSections().filter(c => pluginConfigState[c.pluginId]?.enabled === true),
+    [pluginConfigState]
+  )
+
   // Wenn der initialTab sich ändert (z.B. vom HelpGuide), übernehmen
   useEffect(() => {
     if (isOpen && initialTab) setActiveTab(initialTab)
@@ -1959,10 +1981,6 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab,
   // Antares-Credentials/-Settings: in die Antares-Vertikale ausgelagert (AntaresSettings.tsx).
 
   // Marketing Credentials State
-  const [wpAppPassword, setWpAppPassword] = useState('')
-  const [wpCredsSaved, setWpCredsSaved] = useState(false)
-  const [wpTestStatus, setWpTestStatus] = useState<'idle' | 'testing' | 'success' | 'failed'>('idle')
-  const [wpTestError, setWpTestError] = useState<string | null>(null)
   const [remarkableStatus, setRemarkableStatus] = useState<'checking' | 'connected' | 'disconnected'>('checking')
   const [remarkableError, setRemarkableError] = useState<string | null>(null)
 
@@ -2081,8 +2099,8 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab,
     setSlashCommandTimeFormat
   } = useUIStore()
 
-  // Plugin-Vertikalen-Config generisch (pluginConfig) statt state.edoobox/marketing/remarkable.
-  const [marketingSettings, setMarketing] = usePluginConfig('marketing', MARKETING_DEFAULTS)
+  // Plugin-Vertikalen-Config generisch (pluginConfig) statt state.edoobox/remarkable.
+  // WordPress konfiguriert sich seit Paket 3 im eigenen Plugin-Settings-Tab.
   const [edooboxSettings] = usePluginConfig('edoobox', EDOOBOX_DEFAULTS)
   const [remarkableSettings, setRemarkable] = usePluginConfig('remarkable', REMARKABLE_DEFAULTS)
 
@@ -2099,6 +2117,7 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab,
   const searchSpeechEnabled = useIsModuleEnabled('speech')
   const searchRemarkableEnabled = useIsModuleEnabled('remarkable')
   const searchWebResearchEnabled = useIsModuleEnabled('web-research')
+  const searchImageGenEnabled = useIsModuleEnabled('image-generation')
   const searchIndex = React.useMemo<SettingsSearchEntry[]>(() => {
     const g = {
       basics: t('settings.nav.basics'),
@@ -2145,6 +2164,7 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab,
       { id: 'ai-openrouter', tab: 'ai', label: 'OpenRouter (Cloud)', path: `${g.modules} → ${t('settings.tab.ai')}`, keywords: 'openrouter cloud api opt-in claude gpt', anchor: 'ai-openrouter' },
       { id: 'ai-llmbase', tab: 'ai', label: 'LLMBase (EU-Cloud)', path: `${g.modules} → ${t('settings.tab.ai')}`, keywords: 'llmbase eu dsgvo cloud europa', anchor: 'ai-llmbase' },
       { id: 'ai-webresearch', tab: 'ai', label: 'Webrecherche', path: `${g.modules} → ${t('settings.tab.ai')}`, keywords: 'webrecherche tavily linkup suche web research agent', anchor: 'ai-webresearch' },
+      { id: 'ai-imagegen', tab: 'ai', label: 'Bild-Generierung', path: `${g.modules} → ${t('settings.tab.ai')}`, keywords: 'bild generierung imagen google bilder image generation api key', anchor: 'ai-imagegen' },
       { id: 'ai-smart-connections', tab: 'ai', label: t('settings.integrations.smartConnections'), path: `${g.modules} → ${t('settings.tab.ai')}`, keywords: 'smart connections gewichte reranker ähnliche notizen' },
       // E-Mail
       { id: 'email-analysis-model', tab: 'email', label: t('settings.email.analysisModel'), path: `${g.modules} → ${t('settings.email.title')}`, keywords: 'analyse modell email ki relevanz' },
@@ -2160,9 +2180,10 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab,
       if (['tab-speech', 'speech-whisper'].includes(e.id)) return searchSpeechEnabled
       if (e.id === 'tab-remarkable') return searchRemarkableEnabled
       if (e.id === 'ai-webresearch') return searchWebResearchEnabled
+      if (e.id === 'ai-imagegen') return searchImageGenEnabled
       return true
     })
-  }, [t, searchEmailEnabled, searchSpeechEnabled, searchRemarkableEnabled, searchWebResearchEnabled])
+  }, [t, searchEmailEnabled, searchSpeechEnabled, searchRemarkableEnabled, searchWebResearchEnabled, searchImageGenEnabled])
 
   // App Version
   const [appVersion, setAppVersion] = useState<string>('')
@@ -2222,18 +2243,13 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab,
     }
   }, [isOpen, emailSettings.accounts.length])
 
-  // edoobox + Marketing Credentials laden (Antares lädt sich selbst in AntaresSettings.tsx)
+  // edoobox-Credentials laden (Antares/WordPress laden sich selbst in ihren Plugin-Settings)
   useEffect(() => {
     if (isOpen && activeTab === 'agents') {
       edooboxService.loadCredentials().then(creds => {
         if (creds) {
           setEdooboxApiKey(creds.apiKey)
           setEdooboxApiSecret(creds.apiSecret)
-        }
-      })
-      edooboxService.marketingLoadCredentials().then(creds => {
-        if (creds) {
-          if (creds.wpAppPassword) setWpAppPassword(creds.wpAppPassword)
         }
       })
     }
@@ -2885,6 +2901,25 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab,
                 reMarkable
               </button>
             )}
+            {/* Plugin-Settings-Tabs: ein Eintrag pro settings.section-Beitrag eines aktiven
+                Plugins (z.B. Antares). Der Kern nennt kein Plugin namentlich. */}
+            {pluginSettingsSections.map(section => {
+              const tabId: Tab = `plugin:${section.pluginId}`
+              return (
+                <button
+                  key={tabId}
+                  className={`settings-nav-item ${activeTab === tabId ? 'active' : ''}`}
+                  onClick={() => setActiveTab(tabId)}
+                >
+                  <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+                    <path d="M6 2v4M12 2v4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                    <path d="M4 6h10v3a5 5 0 01-10 0V6z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
+                    <path d="M9 14v3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                  </svg>
+                  {section.title ?? section.pluginId}
+                </button>
+              )
+            })}
             {/* Telegram-Tab: immer sichtbar (Bot-Feature) */}
             <button
               className={`settings-nav-item ${activeTab === 'telegram' ? 'active' : ''}`}
@@ -2934,6 +2969,8 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab,
                     : activeTab === 'remarkable' ? 'reMarkable'
                     : activeTab === 'telegram' ? 'Telegram'
                     : activeTab === 'credentials' ? 'Zugangsdaten'
+                    : activeTab.startsWith('plugin:')
+                      ? (getSettingsSections().find(c => `plugin:${c.pluginId}` === activeTab)?.title ?? activeTab.slice('plugin:'.length))
                     : t(`settings.tab.${activeTab}` as TranslationKey)
                 }</h2>
               </div>
@@ -3902,6 +3939,7 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab,
                 <div data-settings-anchor="ai-openrouter"><OpenRouterSection /></div>
                 <div data-settings-anchor="ai-llmbase"><LLMBaseSection /></div>
                 {isModuleEnabled('web-research') && <div data-settings-anchor="ai-webresearch"><WebResearchSection /></div>}
+                {isModuleEnabled('image-generation') && <div data-settings-anchor="ai-imagegen"><ImageGenerationSection /></div>}
 
                 <div className="settings-row">
                   <label>{t('settings.integrations.defaultTranslation')}</label>
@@ -5986,135 +6024,25 @@ LIMIT 10
                   </>
                 )}
 
-                <div className="settings-divider" />
-
-                {/* Generischer Plugin-Settings-Bereich: der Kern nennt KEIN Plugin namentlich,
-                    er rendert nur diesen einen Slot. Jede Vertikale (aktuell: Antares) trägt ihre
-                    eigene Sektion bei und gated sich selbst auf ihr Modul. Leer nach Löschen des
-                    Plugin-Ordners → keine toten Plugin-Einstellungen (Deletion Test). */}
-                <PluginSlot slotId="settings.section" props={{ onGoToModules: () => setActiveTab('modules') }} />
-
-                <div className="settings-divider" />
-
-                {/* Marketing (WordPress + Instagram) — Teil des mz-suite Moduls */}
-                <h4 className="settings-section-title">{t('settings.agents.marketing.title')}</h4>
-                <p className="settings-hint">{t('settings.agents.marketing.description')}</p>
-
-                {marketingSettings.enabled && (
-                  <>
-                    {/* WordPress */}
-                    <h5 className="settings-subsection-title">{t('settings.agents.marketing.wordpress')}</h5>
-
-                    <div className="settings-row">
-                      <label>{t('settings.agents.marketing.wpUrl')}</label>
-                      <input
-                        type="url"
-                        value={marketingSettings.wordpressUrl}
-                        onChange={e => setMarketing({ wordpressUrl: e.target.value })}
-                        placeholder="https://meine-seite.de"
-                        className="settings-input"
-                      />
-                    </div>
-
-                    <div className="settings-row">
-                      <label>{t('settings.agents.marketing.wpUser')}</label>
-                      <input
-                        type="text"
-                        value={marketingSettings.wordpressUser}
-                        onChange={e => setMarketing({ wordpressUser: e.target.value })}
-                        placeholder="admin"
-                        className="settings-input"
-                      />
-                    </div>
-
-                    <div className="settings-row">
-                      <label>{t('settings.agents.marketing.wpAppPassword')}</label>
-                      <input
-                        type="password"
-                        value={wpAppPassword}
-                        onChange={e => { setWpAppPassword(e.target.value); setWpCredsSaved(false) }}
-                        placeholder="xxxx xxxx xxxx xxxx"
-                        className="settings-input"
-                      />
-                    </div>
-
-                    <div className="settings-row" style={{ gap: '8px' }}>
-                      <button
-                        className="settings-btn"
-                        onClick={async () => {
-                          if (wpAppPassword) {
-                            const saved = await edooboxService.marketingSaveCredentials(wpAppPassword)
-                            setWpCredsSaved(saved)
-                          }
-                        }}
-                      >
-                        {wpCredsSaved ? t('settings.agents.edoobox.saved') : t('settings.agents.edoobox.save')}
-                      </button>
-                      <button
-                        className="settings-btn"
-                        disabled={wpTestStatus === 'testing'}
-                        onClick={async () => {
-                          setWpTestError(null)
-                          if (!wpAppPassword || !marketingSettings.wordpressUrl || !marketingSettings.wordpressUser) {
-                            setWpTestStatus('failed')
-                            setWpTestError(t('settings.agents.marketing.wpFillAll'))
-                            return
-                          }
-                          await edooboxService.marketingSaveCredentials(wpAppPassword)
-                          setWpCredsSaved(true)
-                          setWpTestStatus('testing')
-                          const result = await edooboxService.marketingCheckWordpress(marketingSettings.wordpressUrl, marketingSettings.wordpressUser)
-                          setWpTestStatus(result.success ? 'success' : 'failed')
-                          setWpTestError(result.success ? null : (result.error || null))
-                        }}
-                      >
-                        {wpTestStatus === 'testing'
-                          ? t('settings.agents.edoobox.testing')
-                          : t('settings.agents.edoobox.testConnection')}
-                      </button>
-                      {wpTestStatus === 'success' && (
-                        <span className="status-connected">{t('settings.agents.edoobox.connected')}</span>
-                      )}
-                      {wpTestStatus === 'failed' && (
-                        <span className="status-disconnected">{t('settings.agents.edoobox.failed')}</span>
-                      )}
-                    </div>
-                    {wpTestError && (
-                      <div className="settings-row">
-                        <span className="settings-error-detail">{wpTestError}</span>
-                      </div>
-                    )}
-
-                    <div className="settings-row">
-                      <label>{t('settings.agents.marketing.defaultStatus')}</label>
-                      <select
-                        value={marketingSettings.defaultPostStatus}
-                        onChange={e => setMarketing({ defaultPostStatus: e.target.value as 'draft' | 'publish' })}
-                        className="settings-select"
-                      >
-                        <option value="draft">{t('settings.agents.marketing.statusDraft')}</option>
-                        <option value="publish">{t('settings.agents.marketing.statusPublish')}</option>
-                      </select>
-                    </div>
-
-                    {/* Google Imagen */}
-                    <h5 className="settings-subsection-title">{t('settings.agents.marketing.imagenTitle')}</h5>
-
-                    <div className="settings-row">
-                      <label>{t('settings.agents.marketing.imagenApiKey')}</label>
-                      <input
-                        type="password"
-                        value={marketingSettings.googleImagenApiKey}
-                        onChange={e => setMarketing({ googleImagenApiKey: e.target.value })}
-                        placeholder="AIzaSy..."
-                        className="settings-input"
-                      />
-                    </div>
-                  </>
-                )}
+                {/* WordPress-Publishing ist seit Paket 3 der Modul-Entflechtung das eigene
+                    Plugin `wordpress` (eigener Settings-Tab), Google Imagen das Core-Modul
+                    image-generation (KI-Tab) — hier nur noch edoobox selbst. */}
 
                 <div className="settings-divider" />
                 <p className="settings-hint">{t('settings.agents.moreAgents')}</p>
+              </div>
+            )}
+
+            {/* Dynamische Plugin-Settings-Tabs: rendert genau die settings.section des
+                gewählten Plugins (z.B. plugin:antares). Leerer Slot nach Plugin-Löschung
+                → leerer Tab statt Crash (Deletion Test); der Nav-Eintrag ist dann eh weg. */}
+            {activeTab.startsWith('plugin:') && (
+              <div className="settings-section">
+                <PluginSlot
+                  slotId={SETTINGS_SECTION_SLOT}
+                  pluginId={activeTab.slice('plugin:'.length)}
+                  props={{ onGoToModules: () => setActiveTab('modules') }}
+                />
               </div>
             )}
 

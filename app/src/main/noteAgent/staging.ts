@@ -13,7 +13,7 @@ const STAGING_DIRNAME = 'agent-staging'
 const MAX_STAGING_AGE_DAYS = 7
 
 // Erlaubte Output-Endungen — deckungsgleich mit den Write-Skills.
-const ALLOWED_OUTPUT_EXT = new Set(['.md', '.xlsx', '.docx', '.txt', '.csv', '.html', '.htm'])
+const ALLOWED_OUTPUT_EXT = new Set(['.md', '.xlsx', '.docx', '.txt', '.csv', '.html', '.htm', '.png'])
 
 export function stagingRootFor(vaultPath: string): string {
   return path.join(vaultPath, '.mindgraph', STAGING_DIRNAME)

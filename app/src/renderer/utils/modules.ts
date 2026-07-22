@@ -31,6 +31,11 @@ function pluginManifestsForModule(id: string) {
   return pluginManifests.filter((manifest) => manifest.module && (manifest.module.id ?? manifest.id) === id)
 }
 
+/** Plugin-Ids, die ein Modul steuert (Modul-Id ≠ Plugin-Id möglich, z.B. mz-suite → edoobox). */
+export function pluginIdsForModule(id: string): string[] {
+  return pluginManifestsForModule(id).map((manifest) => manifest.id)
+}
+
 function pluginModuleEnabled(state: unknown, id: string): boolean | undefined {
   const manifests = pluginManifestsForModule(id)
   if (manifests.length === 0) return undefined
@@ -55,6 +60,7 @@ export function useIsModuleEnabled(id: ModuleDescriptor['id']): boolean {
       case 'flashcards':        return state.flashcardsEnabled
       case 'workflow-canvas':   return state.workflowCanvasEnabled
       case 'web-research':      return state.webResearchEnabled
+      case 'image-generation':  return state.imageGenerationEnabled
       case 'semantic-scholar':  return state.semanticScholarEnabled
       case 'zotero':            return state.zoteroEnabled
       case 'readwise':          return state.readwise.enabled
@@ -81,6 +87,7 @@ export function isModuleEnabled(id: ModuleDescriptor['id']): boolean {
     case 'flashcards':        return s.flashcardsEnabled
     case 'workflow-canvas':   return s.workflowCanvasEnabled
     case 'web-research':      return s.webResearchEnabled
+    case 'image-generation':  return s.imageGenerationEnabled
     case 'semantic-scholar':  return s.semanticScholarEnabled
     case 'zotero':            return s.zoteroEnabled
     case 'readwise':          return s.readwise.enabled
@@ -113,6 +120,7 @@ function applyModuleFlags(id: ModuleDescriptor['id'], enabled: boolean): void {
     case 'flashcards':        s.setFlashcardsEnabled(enabled); break
     case 'workflow-canvas':   s.setWorkflowCanvasEnabled(enabled); break
     case 'web-research':      s.setWebResearchEnabled(enabled); break
+    case 'image-generation':  s.setImageGenerationEnabled(enabled); break
     case 'semantic-scholar':  s.setSemanticScholarEnabled(enabled); break
     case 'zotero':            s.setZoteroEnabled(enabled); break
     case 'readwise':          s.setReadwise({ enabled }); break

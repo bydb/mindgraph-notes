@@ -4,14 +4,15 @@
 
 import { getPluginConfig } from '../../../renderer/plugins/config'
 import {
-  EDOOBOX_DEFAULTS, MARKETING_DEFAULTS,
-  type EdooboxSettings, type MarketingSettings,
+  EDOOBOX_DEFAULTS, WORDPRESS_DEFAULTS,
+  type EdooboxSettings, type WordpressSettings,
 } from '../../../renderer/stores/uiStore'
 
 /** Nicht-reaktiver Read (für Stores/Aufrufpfade). */
 export function getEdooboxConfig(): EdooboxSettings {
   return getPluginConfig('edoobox', EDOOBOX_DEFAULTS)
 }
-export function getMarketingConfig(): MarketingSettings {
-  return getPluginConfig('marketing', MARKETING_DEFAULTS)
+/** Config des (eigenständigen) WordPress-Plugins — vom Marketing-Tab nur MITGELESEN. */
+export function getWordpressConfig(): WordpressSettings {
+  return getPluginConfig('wordpress', WORDPRESS_DEFAULTS)
 }

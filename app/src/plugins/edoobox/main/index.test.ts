@@ -110,9 +110,7 @@ describe('edoobox-Plugin — Output-Schemas (Envelope-Validierung)', () => {
   })
 
   it('konsumierte Felder werden getypt: IDs/Texte mit passendem Typ', () => {
-    expect(validateAgainst(out('edoobox.marketingPublishWordpress'), { success: true, postId: 7, postUrl: 'https://x', status: 'publish' }).valid).toBe(true)
-    expect(validateAgainst(out('edoobox.marketingPublishWordpress'), { success: true, postId: 'sieben' }).valid).toBe(false)
-    expect(validateAgainst(out('edoobox.marketingUploadImage'), { success: true, mediaId: 'x' }).valid).toBe(false)
+    // Publish/Upload sind seit Paket 3 Actions des wordpress-Plugins (dort getestet).
     expect(validateAgainst(out('edoobox.marketingGenerateContent'), { success: true, blogPost: 123, igCaption: 'ok' }).valid).toBe(false)
     expect(validateAgainst(out('edoobox.importEvent'), { success: true, offerId: 'abc' }).valid).toBe(true)
   })

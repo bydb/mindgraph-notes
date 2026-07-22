@@ -1,6 +1,7 @@
-// Marketing Service: WordPress REST API (Plugin-Vertikale). Kein node:https/fetch direkt:
-// HTTP kommt INJIZIERT herein — `fetchImpl` (host.http.fetch, allowlist-gegated) für den
-// Normalfall, `basicAuthFetch` (host.http.fetchBasicAuth) für den Apache-Auth-Fallback.
+// WordPress-Plugin — REST-API-Client (aus der edoobox-Marketing-Vertikale herausgelöst,
+// Paket 3 der Modul-Entflechtung: WP-Publish ist kein edoobox-Feature). Kein node:https/fetch
+// direkt: HTTP kommt INJIZIERT herein — `fetchImpl` (host.http.fetch, allowlist-gegated) für
+// den Normalfall, `basicAuthFetch` (host.http.fetchBasicAuth) für den Apache-Auth-Fallback.
 
 /** Host-injizierter fetch (Domain-Allowlist erzwingt der Capability-Host). */
 export type FetchImpl = (url: string, init?: RequestInit) => Promise<Response>

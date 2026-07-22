@@ -80,7 +80,7 @@ function requireString(args: Record<string, unknown>, key: string): string | nul
 async function registerStagedResult(
   ctx: NoteAgentContext,
   fileName: string,
-  kind: 'md' | 'xlsx' | 'docx' | 'txt' | 'csv' | 'html',
+  kind: 'md' | 'xlsx' | 'docx' | 'txt' | 'csv' | 'html' | 'png',
   data: Buffer | string,
   summary: string
 ): Promise<ToolResult> {
@@ -415,6 +415,41 @@ export function createNoteAgentRegistry(): ToolRegistry<NoteAgentContext> {
         lang: typeof args.lang === 'string' ? args.lang : 'de'
       })
       return registerStagedResult(ctx, fileName, 'html', html, `${articleHtml.split(/\s+/).length} Wörter, wissenschaftliche HTML-Seite`)
+    }
+  })
+
+  // Bild-Generierung (Opt-in-Modul image-generation, Paket 4 der Modul-Entflechtung).
+  // Nur in der Allowlist, wenn run.imageGen (Modul aktiv + Key hinterlegt) — siehe loop.ts.
+  // Der Imagen-Aufruf läuft komplett Main-seitig (Key verlässt den Main-Prozess nicht).
+  registry.register({
+    name: 'generate_image',
+    description:
+      'Generiert ein Bild mit Google Imagen (Cloud, nutzt den hinterlegten API-Key des Nutzers) und legt es als PNG im Staging ab. Parameter: file_name, prompt (ENGLISCHER Bild-Prompt, max. 50 Wörter: Motiv, Stil, Licht konkret beschreiben; KEIN Text im Bild), optional aspect_ratio ("16:9" | "4:3" | "1:1" | "3:4" | "9:16", Default "16:9"). Das Bild kann in einer Notiz per ![[dateiname.png]] eingebettet werden — die Notiz mit write_note NACH diesem Tool erzeugen.',
+    parameters: {
+      type: 'object',
+      properties: {
+        file_name: { type: 'string' },
+        prompt: { type: 'string', description: 'Englischer Bild-Prompt (max. 50 Wörter, kein Text im Bild)' },
+        aspect_ratio: { type: 'string', description: '"16:9" (Default), "4:3", "1:1", "3:4" oder "9:16"' }
+      },
+      required: ['file_name', 'prompt']
+    },
+    isWrite: true,
+    run: async (args, ctx) => {
+      const rawName = requireString(args, 'file_name')
+      const prompt = requireString(args, 'prompt')
+      if (!rawName) return err('Parameter "file_name" fehlt')
+      if (!prompt) return err('Parameter "prompt" fehlt')
+      const RATIOS = ['16:9', '4:3', '1:1', '3:4', '9:16'] as const
+      type Ratio = (typeof RATIOS)[number]
+      const aspectRatio: Ratio = RATIOS.includes(args.aspect_ratio as Ratio) ? (args.aspect_ratio as Ratio) : '16:9'
+      const fileName = sanitizeOutputFileName(rawName, '.png')
+      const { generateImage } = await import('../imageGen/imagenService')
+      const res = await generateImage(prompt, { aspectRatio })
+      if (!res.success || !res.imageBase64) {
+        return err(res.error || 'Bildgenerierung fehlgeschlagen')
+      }
+      return registerStagedResult(ctx, fileName, 'png', Buffer.from(res.imageBase64, 'base64'), `Bild ${aspectRatio}, Google Imagen`)
     }
   })
 

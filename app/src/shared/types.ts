@@ -660,6 +660,12 @@ export interface ElectronAPI {
   openAlexDeleteMailto: () => Promise<{ success: boolean; error?: string }>;
   openAlexCheck: () => Promise<{ available: boolean; authenticated: boolean; remaining?: string; error?: string }>;
 
+  // Bild-Generierung (image-generation-Modul, Google Imagen)
+  imageGenSaveKey: (apiKey: string) => Promise<{ success: boolean; error?: string }>;
+  imageGenLoadKey: () => Promise<string | null>;
+  imageGenDeleteKey: () => Promise<{ success: boolean }>;
+  imageGenerate: (params: { prompt: string; aspectRatio?: '16:9' | '4:3' | '1:1' | '3:4' | '9:16' }) => Promise<{ success: boolean; imageBase64?: string; error?: string }>;
+
   // Notiz-Agent Phase 1: Kontext-Dateien für die Macher-Leiste
   noteAgentAttachDialog: () => Promise<NoteAgentAttachResult>;
   noteAgentAttachFolderDialog: () => Promise<NoteAgentAttachResult>;
