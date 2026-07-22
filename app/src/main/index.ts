@@ -4181,6 +4181,18 @@ ipcMain.handle('note-agent-run', async (event, params: NoteAgentRunParams) => {
       }
     }
 
+    // Bild-Generierung (Opt-in-Modul image-generation): generate_image nur anbieten,
+    // wenn das Modul aktiv ist UND ein Imagen-Key hinterlegt — sonst sieht das Modell
+    // das Tool nicht (kein toter Tool-Call-Pfad).
+    let imageGen = false
+    try {
+      const ui = await loadUISettings() as Record<string, unknown>
+      if (ui.imageGenerationEnabled === true) {
+        const { loadImagenKey } = await import('./imageGen/imagenService')
+        imageGen = !!(await loadImagenKey())
+      }
+    } catch { /* Modul bleibt aus */ }
+
     const run = startRun({
       senderId: event.sender.id,
       noteId: params.noteId,
@@ -4190,7 +4202,8 @@ ipcMain.handle('note-agent-run', async (event, params: NoteAgentRunParams) => {
       attachmentIds: params.attachmentIds || [],
       instruction: params.instruction.trim(),
       skills,
-      web
+      web,
+      imageGen
     })
     if (!run) return { success: false, error: 'Es läuft bereits ein Agent-Lauf in diesem Fenster — erst abbrechen oder abwarten.' }
     hookNoteAgentCleanup(event.sender)

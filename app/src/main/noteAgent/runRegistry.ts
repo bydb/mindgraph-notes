@@ -27,7 +27,7 @@ export interface AgentResultEntry {
   resultId: string
   stagingPath: string // absolut, ausschließlich Main-seitig
   suggestedName: string
-  kind: 'md' | 'xlsx' | 'docx' | 'txt' | 'csv' | 'html'
+  kind: 'md' | 'xlsx' | 'docx' | 'txt' | 'csv' | 'html' | 'png'
   summary: string
   sources: string[]
   consumed: boolean
@@ -62,6 +62,9 @@ export interface AgentRun {
   results: Map<string, AgentResultEntry>
   sources: Set<string> // gelesene Anhänge/Notizen — landen auf den Ergebnis-Karten
   web?: WebRunState    // nur bei aktivierter Webrecherche
+  // Bild-Generierung (Opt-in-Modul image-generation): beim Run-Start Main-seitig
+  // bestimmt (Modul aktiv + Imagen-Key hinterlegt) → schaltet das generate_image-Tool frei.
+  imageGen?: boolean
 }
 
 // Beendete Läufe mit noch offenen Review-Karten pro Sender maximal halten —
@@ -111,6 +114,7 @@ export function startRun(params: {
   instruction: string
   skills?: Array<{ name: string; description: string; folderName: string }>
   web?: WebRunState
+  imageGen?: boolean
 }): AgentRun | null {
   const existing = activeBySender.get(params.senderId)
   if (existing && existing.status === 'running') return null
@@ -131,7 +135,8 @@ export function startRun(params: {
     seq: 0,
     results: new Map(),
     sources: new Set(),
-    web: params.web
+    web: params.web,
+    imageGen: params.imageGen
   }
   activeBySender.set(params.senderId, run)
   runsById.set(run.runId, run)
