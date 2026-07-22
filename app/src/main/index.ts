@@ -168,7 +168,7 @@ import { createMainRegistry, discoverMainPlugins } from './plugins/registry'
 import { isPluginGateEnabled } from '../shared/plugins/moduleGate'
 import { registerPluginTransport, isTrustedSender } from './plugins/transport'
 import { registerContextAttachment, registerContextFolder, removeContextAttachment, clearContextAttachments, readContextBlock } from './noteAgent/contextFiles'
-import { startRun, getRunForSender, finishRun, publicResults, takeResult, cancelRunsForSender, pruneRunIfConsumed, consumeEvictedRuns, type WebRunState } from './noteAgent/runRegistry'
+import { startRun, getRunForSender, finishRun, publicResults, takeResult, peekResult, cancelRunsForSender, pruneRunIfConsumed, consumeEvictedRuns, type WebRunState } from './noteAgent/runRegistry'
 import { runNoteAgentLoop } from './noteAgent/loop'
 import { cleanupOldStaging, assertInsideRunStaging, reserveFreeName, stagingDirFor } from './noteAgent/staging'
 import { ensureHtmlPageAssets } from './noteAgent/htmlAssets'
@@ -4301,6 +4301,38 @@ ipcMain.handle('note-agent-accept-result', async (event, runId: string, resultId
     // C03: die eben reservierte (noch leere) Zieldatei entfernen — sonst bleibt eine
     // leere Datei liegen und ein Retry landet unnötig bei „Name (2)".
     if (reservedDest) await fs.rm(reservedDest, { force: true }).catch(() => undefined)
+    return { success: false, error: error instanceof Error ? error.message : 'Unbekannter Fehler' }
+  }
+})
+
+// Vorschau eines Ergebnisses VOR der Übernahme: liest die Staging-Datei read-only
+// und konsumiert das Ergebnis NICHT — der Renderer sieht weiterhin nur Inhalte,
+// nie Staging-Pfade. Textformate liefern den vollständigen (gekappten) Inhalt;
+// Binärformate (xlsx/docx) melden sich als nicht-vorschaubar.
+ipcMain.handle('note-agent-preview-result', async (event, runId: string, resultId: string) => {
+  if (!isTrustedSender(event)) return { success: false, error: 'Nicht autorisierter Aufrufer' }
+  const run = getRunForSender(event.sender.id, runId)
+  if (!run) return { success: false, error: 'Unbekannter Lauf' }
+  const entry = peekResult(event.sender.id, runId, resultId)
+  if (!entry) return { success: false, error: 'Ergebnis nicht (mehr) verfügbar' }
+  try {
+    const real = await assertInsideRunStaging(run, entry.stagingPath)
+    const textKinds = new Set(['md', 'txt', 'csv', 'html'])
+    if (!textKinds.has(entry.kind)) {
+      const stat = await fs.stat(real)
+      return { success: true, kind: entry.kind, binary: true, sizeBytes: stat.size }
+    }
+    const MAX_PREVIEW_CHARS = 200_000
+    const content = await fs.readFile(real, 'utf-8')
+    const truncated = content.length > MAX_PREVIEW_CHARS
+    return {
+      success: true,
+      kind: entry.kind,
+      binary: false,
+      text: truncated ? content.slice(0, MAX_PREVIEW_CHARS) : content,
+      truncated
+    }
+  } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : 'Unbekannter Fehler' }
   }
 })

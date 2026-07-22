@@ -202,6 +202,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   noteSkillsImportDialog: (vaultPath: string) => ipcRenderer.invoke('note-skills-import-dialog', vaultPath),
   noteAgentAcceptResult: (runId: string, resultId: string) => ipcRenderer.invoke('note-agent-accept-result', runId, resultId),
   noteAgentDiscardResult: (runId: string, resultId: string) => ipcRenderer.invoke('note-agent-discard-result', runId, resultId),
+  noteAgentPreviewResult: (runId: string, resultId: string) => ipcRenderer.invoke('note-agent-preview-result', runId, resultId),
   onNoteAgentProgress: (callback: (p: { runId: string; seq: number; skill: string; summary: string }) => void) => {
     ipcRenderer.removeAllListeners('note-agent-progress')
     ipcRenderer.on('note-agent-progress', (_event, p) => callback(p))

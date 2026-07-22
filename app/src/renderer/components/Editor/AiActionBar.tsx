@@ -40,6 +40,17 @@ export interface AgentUiWeb {
   fetchCount: number
 }
 
+// Vorschau-Antwort des Main-Prozesses (note-agent-preview-result): Inhalt der
+// Staging-Datei, nie Pfade.
+export interface AgentPreviewResponse {
+  success: boolean
+  kind?: string
+  binary?: boolean
+  text?: string
+  truncated?: boolean
+  error?: string
+}
+
 // Macher-Leiste: Anweisung → KI-Vorschlag als Block-Diff → Übernehmen/Verwerfen.
 // Eingeklappt = ruhiges Zuhause des ⌘⇧A-Assistenten. Provenienz ist eingewebt:
 // im Diff ist das Entfernte „dein Text" (Human-SVG), das Neue von der KI (Modell-Logo).
@@ -87,10 +98,15 @@ interface Props {
   agentResults: AgentUiResult[]
   agentFinalText: string
   agentWeb?: AgentUiWeb
+  // Provenienz des Laufs: Modell + Datenweg (null = lokal, sonst Cloud-Label).
+  agentModel: string
+  agentCloudLabel: string | null
   onAgentRun: (instruction: string, opts: { webResearch: boolean }) => void
   onAgentCancel: () => void
   onAgentAccept: (resultId: string) => void
   onAgentDiscard: (resultId: string) => void
+  // Vorschau der Staging-Datei vor Übernehmen/Verwerfen (read-only).
+  onAgentPreview: (resultId: string) => Promise<AgentPreviewResponse>
   onAgentDismiss: () => void
   // Mitlernen (Stufe 3): bestätigter Merksatz → Agent-Gedächtnis-Notiz.
   onRemember: (text: string) => Promise<{ success: boolean; relPath?: string; error?: string }>
@@ -114,7 +130,7 @@ const PRESETS = [
   { id: 'tone', key: 'aiBar.preset.tone' as const },
 ]
 
-export function AiActionBar({ open, onOpenChange, phase, proposal, onGenerate, onAccept, onDiscard, tagSuggestions, tagsLoading, onSuggestTags, onAcceptTag, onDismissTag, model, models, onModelChange, getModelLabel, attachments, onAttachDialog, onAttachFolderDialog, onAttachVaultFile, onDetach, attachError, targetFolder, onTargetFolderChange, agentPhase, agentSteps, agentResults, agentFinalText, agentWeb, onAgentRun, onAgentCancel, onAgentAccept, onAgentDiscard, onAgentDismiss, onRemember }: Props) {
+export function AiActionBar({ open, onOpenChange, phase, proposal, onGenerate, onAccept, onDiscard, tagSuggestions, tagsLoading, onSuggestTags, onAcceptTag, onDismissTag, model, models, onModelChange, getModelLabel, attachments, onAttachDialog, onAttachFolderDialog, onAttachVaultFile, onDetach, attachError, targetFolder, onTargetFolderChange, agentPhase, agentSteps, agentResults, agentFinalText, agentWeb, agentModel, agentCloudLabel, onAgentRun, onAgentCancel, onAgentAccept, onAgentDiscard, onAgentPreview, onAgentDismiss, onRemember }: Props) {
   const { t } = useTranslation()
   const aiEnabled = useUIStore(s => s.ollama.enabled)
   const webResearchModule = useIsModuleEnabled('web-research')
@@ -177,6 +193,41 @@ export function AiActionBar({ open, onOpenChange, phase, proposal, onGenerate, o
     isWebResearchConfigComplete({ provider: 'searxng', searxngUrl: webResearchConfig.searxngUrl })
   )
   const webProviderLabel = webResearchConfig ? WEB_SEARCH_PROVIDER_META[webResearchConfig.provider].label : ''
+
+  // Im Agent-Modus haben die Umschreib-Presets keine Wirkung (der Agent-Loop
+  // nutzt nur die Anweisung) — sie werden ausgeblendet und eine aktive Auswahl
+  // zurückgesetzt, damit kein toter Zustand zurückbleibt.
+  useEffect(() => {
+    if (agentMode) setPreset(null)
+  }, [agentMode])
+
+  // Vorschau-Zustand pro Ergebnis-Karte (lazy geladen, gecacht bis Dismiss).
+  const [previews, setPreviews] = useState<Record<string, { open: boolean; loading: boolean; text?: string; binary?: boolean; truncated?: boolean; error?: string }>>({})
+
+  const togglePreview = async (resultId: string) => {
+    const cur = previews[resultId]
+    if (cur?.open) {
+      setPreviews(p => ({ ...p, [resultId]: { ...cur, open: false } }))
+      return
+    }
+    if (cur && !cur.loading) {
+      setPreviews(p => ({ ...p, [resultId]: { ...cur, open: true } }))
+      return
+    }
+    setPreviews(p => ({ ...p, [resultId]: { open: true, loading: true } }))
+    const res = await onAgentPreview(resultId)
+    setPreviews(p => ({
+      ...p,
+      [resultId]: {
+        open: true,
+        loading: false,
+        text: res.text,
+        binary: res.binary,
+        truncated: res.truncated,
+        error: res.success ? undefined : (res.error || '?')
+      }
+    }))
+  }
 
   if (!aiEnabled) return null
 
@@ -255,22 +306,25 @@ export function AiActionBar({ open, onOpenChange, phase, proposal, onGenerate, o
     )
   }
 
-  // Idle / Generating: Presets + Eingabe
+  // Idle / Generating: Presets + Eingabe.
+  // Im Agent-Modus sind die Umschreib-Presets ausgeblendet — sie wirken dort nicht.
   return (
     <div className="ai-bar-expanded">
-      <div className="ai-bar-presets">
-        {PRESETS.map(p => (
-          <button
-            key={p.id}
-            type="button"
-            className={`ai-bar-preset ${preset === p.id ? 'active' : ''}`}
-            onClick={() => setPreset(preset === p.id ? null : p.id)}
-            disabled={phase === 'generating'}
-          >
-            {t(p.key)}
-          </button>
-        ))}
-      </div>
+      {!agentMode && (
+        <div className="ai-bar-presets">
+          {PRESETS.map(p => (
+            <button
+              key={p.id}
+              type="button"
+              className={`ai-bar-preset ${preset === p.id ? 'active' : ''}`}
+              onClick={() => setPreset(preset === p.id ? null : p.id)}
+              disabled={phase === 'generating'}
+            >
+              {t(p.key)}
+            </button>
+          ))}
+        </div>
+      )}
       <textarea
         className="ai-bar-input"
         placeholder={t('aiBar.placeholder')}
@@ -378,6 +432,14 @@ export function AiActionBar({ open, onOpenChange, phase, proposal, onGenerate, o
         }
       />
 
+      {/* Sichtbarer Moduswechsel: der Zielordner eskaliert die Leiste vom Block-Diff
+          zum Agent-Loop mit Datei-Outputs — das darf nicht nur im Tooltip stehen. */}
+      {agentMode && (
+        <div className="ai-bar-agent-mode-hint">
+          {t('aiBar.agent.modeHintBefore')}<strong>{targetFolder.split('/').pop()}</strong>{t('aiBar.agent.modeHintAfter')}
+        </div>
+      )}
+
       {/* Modus B + Cloud: ehrlicher Hinweis — auch vom Agenten GELESENE Notizen gehen
           im Verlauf an den Anbieter, nicht nur die Anhänge (Entscheidung 7). */}
       {agentMode && cloudSelected && (
@@ -396,6 +458,16 @@ export function AiActionBar({ open, onOpenChange, phase, proposal, onGenerate, o
       {/* Agent-Lauf: Protokoll + Abbrechen + Ergebnis-Karten */}
       {agentPhase !== 'idle' && (
         <div className="ai-bar-agent">
+          {/* Provenienz: Modell + Datenweg des Laufs (analog zum Block-Diff-Kopf) */}
+          {agentModel && (
+            <div className="ai-bar-agent-prov" title={agentModel}>
+              <ModelLogo model={agentModel} size={13} />
+              <span className="ai-bar-agent-prov-model">{agentModel}</span>
+              <span className="ai-bar-agent-prov-route">
+                · {agentCloudLabel ? `${t('aiBar.agent.provCloud')} (${agentCloudLabel})` : t('aiBar.agent.provLocal')}
+              </span>
+            </div>
+          )}
           {agentSteps.length > 0 && (
             <div className="ai-bar-agent-steps">
               {agentSteps.map(s => (
@@ -439,8 +511,31 @@ export function AiActionBar({ open, onOpenChange, phase, proposal, onGenerate, o
                   {r.sources.length > 0 && (
                     <div className="ai-bar-agent-card-sources">{t('aiBar.agent.sources')}: {r.sources.join(', ')}</div>
                   )}
+                  {/* Vorschau vor der Entscheidung: exakt der Inhalt, der bei
+                      „Übernehmen" in den Vault geschrieben würde. */}
+                  {r.state === 'pending' && previews[r.resultId]?.open && (
+                    <div className="ai-bar-agent-preview">
+                      {previews[r.resultId].loading ? (
+                        <span className="ai-bar-agent-preview-loading">…</span>
+                      ) : previews[r.resultId].error ? (
+                        <span className="ai-bar-context-error">{previews[r.resultId].error}</span>
+                      ) : previews[r.resultId].binary ? (
+                        <span className="ai-bar-agent-preview-binary">{t('aiBar.agent.previewBinary')}</span>
+                      ) : (
+                        <>
+                          <pre>{previews[r.resultId].text}</pre>
+                          {previews[r.resultId].truncated && (
+                            <div className="ai-bar-agent-preview-truncated">{t('aiBar.agent.previewTruncated')}</div>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  )}
                   {r.state === 'pending' ? (
                     <div className="ai-bar-agent-card-actions">
+                      <button type="button" className="ai-bar-cancel ai-bar-agent-preview-btn" onClick={() => void togglePreview(r.resultId)}>
+                        {previews[r.resultId]?.open ? t('aiBar.agent.previewHide') : t('aiBar.agent.preview')}
+                      </button>
                       <button type="button" className="ai-bar-cancel" onClick={() => onAgentDiscard(r.resultId)}>{t('aiBar.discard')}</button>
                       <button type="button" className="ai-bar-send" onClick={() => onAgentAccept(r.resultId)}>{t('aiBar.agent.accept')}</button>
                     </div>

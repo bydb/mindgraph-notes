@@ -177,6 +177,15 @@ export function takeResult(senderId: number, runId: string, resultId: string): A
   return entry
 }
 
+// Read-only-Zugriff für die Vorschau vor der Übernahme — konsumiert NICHT.
+export function peekResult(senderId: number, runId: string, resultId: string): AgentResultEntry | null {
+  const run = getRunForSender(senderId, runId)
+  if (!run) return null
+  const entry = run.results.get(resultId)
+  if (!entry || entry.consumed) return null
+  return entry
+}
+
 // Nach erfolgreichem Accept/Discard: beendeten Lauf entfernen, wenn keine offenen
 // Karten mehr da sind. Bei Rollback (consumed→false gesetzt) bleibt er adressierbar.
 export function pruneRunIfConsumed(run: AgentRun): void {
