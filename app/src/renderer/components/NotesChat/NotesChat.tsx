@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { sanitizeHtml } from '../../utils/sanitize'
-import { useNotesStore } from '../../stores/notesStore'
+import { useNotesStore, createNoteFromFile } from '../../stores/notesStore'
 import { useUIStore } from '../../stores/uiStore'
 import { useIsModuleEnabled } from '../../utils/modules'
 import { useTranslation } from '../../utils/translations'
@@ -96,6 +96,11 @@ export const NotesChat: React.FC<NotesChatProps> = ({ onClose }) => {
   const [selectedProject, setSelectedProject] = useState<string>('')
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [inputValue, setInputValue] = useState('')
+  // Kontrollierte Übernahme in den Vault: Feedback-Zustand pro Nachricht + Fehlerzeile.
+  const [savedIndex, setSavedIndex] = useState<number | null>(null)
+  const [appendedIndex, setAppendedIndex] = useState<number | null>(null)
+  const [transferError, setTransferError] = useState<string | null>(null)
+  const notesRootFolder = useUIStore(s => s.notesRootFolder)
   // Notiz-Agent Phase 1: Kontext-Dateien (PDF/Tabelle/…) für Fragen im Chat.
   // Panel-Sitzungs-Zustand — bewusst nicht pro Notiz gekeyt (der Chat ist die Einheit).
   const [chatAttachments, setChatAttachments] = useState<NoteAgentAttachment[]>([])
@@ -605,33 +610,106 @@ export const NotesChat: React.FC<NotesChatProps> = ({ onClose }) => {
     setStreamingContent('')
   }
 
+  // Provenienz-Callout (KI-generiert: Frage, Modell, Datum) — eine Quelle für
+  // Kopieren, „Als Notiz speichern" und „An Notiz anhängen".
+  const buildProvenanceBlock = (msg: ChatMessage): string => {
+    const dateStr = msg.timestamp
+      ? msg.timestamp.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })
+      : ''
+    const timeStr = msg.timestamp
+      ? msg.timestamp.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })
+      : ''
+    let block = '\n\n---\n'
+    block += `> [!quote] KI-generiert\n`
+    if (msg.question) {
+      block += `> **Frage:** *${msg.question}*\n`
+    }
+    block += `> **Modell:** ${msg.model || 'unbekannt'} | ${dateStr}, ${timeStr}`
+    return block
+  }
+
   // Nachricht kopieren mit Metadaten
   const copyMessage = async (msg: ChatMessage, index: number) => {
     try {
-      // Datum/Zeit formatieren
-      const dateStr = msg.timestamp
-        ? msg.timestamp.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })
-        : ''
-      const timeStr = msg.timestamp
-        ? msg.timestamp.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })
-        : ''
-
-      // Kopiertext mit Callout erstellen
-      let copyText = msg.content
-
-      // Trennlinie und Metadaten als Callout
-      copyText += '\n\n---\n'
-      copyText += `> [!quote] KI-generiert\n`
-      if (msg.question) {
-        copyText += `> **Frage:** *${msg.question}*\n`
-      }
-      copyText += `> **Modell:** ${msg.model || 'unbekannt'} | ${dateStr}, ${timeStr}`
-
-      await writeClipboardText(copyText)
+      await writeClipboardText(msg.content + buildProvenanceBlock(msg))
       setCopiedIndex(index)
       setTimeout(() => setCopiedIndex(null), 2000)
     } catch (err) {
       console.error('[NotesChat] Copy failed:', err)
+    }
+  }
+
+  // „Als neue Notiz speichern": legt die Antwort samt Provenienz-Callout als
+  // Notiz im Standard-Notizordner an (gleicher Zielort wie „Neue Notiz" in der
+  // Sidebar) und öffnet sie — die Übernahme ist damit sofort sichtbar.
+  const saveAsNote = async (msg: ChatMessage, index: number) => {
+    if (!vaultPath) return
+    setTransferError(null)
+    try {
+      const rawTitle = (msg.question || '').replace(/\s+/g, ' ').trim()
+      const safeTitle = rawTitle
+        .replace(/[\x00-\x1F\x7F]/g, '')
+        .replace(/[\\/:*?"<>|#[\]]/g, '')
+        .trim()
+        .substring(0, 60) || t('notesChat.aiAnswerTitle')
+      const d = msg.timestamp || new Date()
+      const stamp = [
+        d.getFullYear(),
+        String(d.getMonth() + 1).padStart(2, '0'),
+        String(d.getDate()).padStart(2, '0'),
+        String(d.getHours()).padStart(2, '0'),
+        String(d.getMinutes()).padStart(2, '0')
+      ].join('')
+      const targetFolder = notesRootFolder.trim().replace(/^\/+|\/+$/g, '')
+
+      // Kollision vermeiden: nie überschreiben, Suffix anhängen.
+      let fileName = `${stamp} - ${safeTitle}.md`
+      let relativePath = targetFolder ? `${targetFolder}/${fileName}` : fileName
+      for (let attempt = 2; attempt <= 20; attempt++) {
+        const existing = await window.electronAPI.readFileOptional(`${vaultPath}/${relativePath}`)
+        if (existing === null || existing === undefined) break
+        fileName = `${stamp} - ${safeTitle} (${attempt}).md`
+        relativePath = targetFolder ? `${targetFolder}/${fileName}` : fileName
+      }
+
+      const frontmatter = `---\ntitle: "${safeTitle.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"\ncreated: ${d.toISOString()}\n---\n\n`
+      const content = `${frontmatter}${msg.content}${buildProvenanceBlock(msg)}\n`
+      const filePath = `${vaultPath}/${relativePath}`
+
+      if (targetFolder) {
+        await window.electronAPI.ensureDir(`${vaultPath}/${targetFolder}`)
+      }
+      await window.electronAPI.writeFile(filePath, content)
+      const note = await createNoteFromFile(filePath, relativePath, content)
+      const store = useNotesStore.getState()
+      store.addNote(note)
+      store.selectNote(note.id)
+      setSavedIndex(index)
+      setTimeout(() => setSavedIndex(null), 2000)
+    } catch (err) {
+      console.error('[NotesChat] Save as note failed:', err)
+      setTransferError(t('notesChat.transferFailed'))
+    }
+  }
+
+  // „An aktuelle Notiz anhängen": liest den Notiz-Inhalt frisch von Platte
+  // (Store-Content kann Cache-bedingt leer sein), hängt Antwort + Provenienz an
+  // und aktualisiert den Store — gleiches Muster wie der PDF-Companion-Append.
+  const appendToCurrentNote = async (msg: ChatMessage, index: number) => {
+    if (!vaultPath || !currentNote) return
+    setTransferError(null)
+    try {
+      const filePath = `${vaultPath}/${currentNote.path}`
+      const existing = await window.electronAPI.readFile(filePath)
+      const sep = existing.endsWith('\n\n') ? '' : existing.endsWith('\n') ? '\n' : '\n\n'
+      const newContent = `${existing}${sep}${msg.content}${buildProvenanceBlock(msg)}\n`
+      await window.electronAPI.writeFile(filePath, newContent)
+      useNotesStore.getState().updateNote(currentNote.id, { content: newContent })
+      setAppendedIndex(index)
+      setTimeout(() => setAppendedIndex(null), 2000)
+    } catch (err) {
+      console.error('[NotesChat] Append to note failed:', err)
+      setTransferError(t('notesChat.transferFailed'))
     }
   }
 
@@ -864,22 +942,60 @@ export const NotesChat: React.FC<NotesChatProps> = ({ onClose }) => {
                       dangerouslySetInnerHTML={{ __html: linkifyWikilinks(sanitizeHtml(md.render(msg.content)), resolveNoteId) }}
                     />
                     {msg.role === 'assistant' && (
-                      <button
-                        className={`notes-chat-copy ${copiedIndex === idx ? 'copied' : ''}`}
-                        onClick={() => copyMessage(msg, idx)}
-                        title={copiedIndex === idx ? 'Kopiert!' : 'Kopieren'}
-                      >
-                        {copiedIndex === idx ? (
-                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <polyline points="20 6 9 17 4 12"/>
-                          </svg>
-                        ) : (
-                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
-                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
-                          </svg>
+                      <div className="notes-chat-msg-actions">
+                        <button
+                          className={`notes-chat-copy ${copiedIndex === idx ? 'copied' : ''}`}
+                          onClick={() => copyMessage(msg, idx)}
+                          title={copiedIndex === idx ? 'Kopiert!' : 'Kopieren'}
+                        >
+                          {copiedIndex === idx ? (
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <polyline points="20 6 9 17 4 12"/>
+                            </svg>
+                          ) : (
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                            </svg>
+                          )}
+                        </button>
+                        <button
+                          className={`notes-chat-copy ${savedIndex === idx ? 'copied' : ''}`}
+                          onClick={() => saveAsNote(msg, idx)}
+                          title={savedIndex === idx ? t('notesChat.saveAsNoteDone') : t('notesChat.saveAsNote')}
+                        >
+                          {savedIndex === idx ? (
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <polyline points="20 6 9 17 4 12"/>
+                            </svg>
+                          ) : (
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                              <polyline points="14 2 14 8 20 8"/>
+                              <line x1="12" y1="18" x2="12" y2="12"/>
+                              <line x1="9" y1="15" x2="15" y2="15"/>
+                            </svg>
+                          )}
+                        </button>
+                        {currentNote && (
+                          <button
+                            className={`notes-chat-copy ${appendedIndex === idx ? 'copied' : ''}`}
+                            onClick={() => appendToCurrentNote(msg, idx)}
+                            title={appendedIndex === idx ? t('notesChat.appendToNoteDone') : `${t('notesChat.appendToNote')}: ${currentNote.title}`}
+                          >
+                            {appendedIndex === idx ? (
+                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <polyline points="20 6 9 17 4 12"/>
+                              </svg>
+                            ) : (
+                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <polyline points="15 10 20 15 15 20"/>
+                                <path d="M4 4v7a4 4 0 0 0 4 4h12"/>
+                              </svg>
+                            )}
+                          </button>
                         )}
-                      </button>
+                      </div>
                     )}
                   </div>
                 ))}
@@ -910,6 +1026,11 @@ export const NotesChat: React.FC<NotesChatProps> = ({ onClose }) => {
                 cloudSelected={!!activeCloudRoute || isCloudModel(selectedModel)}
               />
             </div>
+          )}
+
+          {/* Fehler bei der Vault-Übernahme (Als Notiz speichern / Anhängen) */}
+          {transferError && (
+            <div className="notes-chat-transfer-error">{transferError}</div>
           )}
 
           {/* Eingabe */}

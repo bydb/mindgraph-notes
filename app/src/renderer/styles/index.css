@@ -15522,6 +15522,28 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
   color: var(--color-success);
 }
 
+/* Aktions-Reihe unter Assistent-Nachrichten: Kopieren · Als Notiz · Anhängen */
+.notes-chat-msg-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.notes-chat-msg-actions .notes-chat-copy {
+  margin-top: 4px;
+}
+
+/* Fehler bei der Vault-Übernahme (Als Notiz speichern / Anhängen) */
+.notes-chat-transfer-error {
+  margin: 0 12px 6px;
+  padding: 6px 9px;
+  border: 1px solid color-mix(in srgb, var(--color-danger) 35%, transparent);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--color-danger) 8%, transparent);
+  color: var(--color-danger);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
 .notes-chat-message.streaming .notes-chat-message-content {
   background: var(--bg-tertiary);
 }
