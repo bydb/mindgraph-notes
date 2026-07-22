@@ -1,6 +1,18 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useUIStore } from '../../stores/uiStore'
 import { WEB_SEARCH_PROVIDER_META, WEB_SEARCH_PROVIDER_IDS, type WebSearchProviderId } from '../../../shared/webResearch'
+
+type LoadedWebResearchConfig = {
+  provider: WebSearchProviderId
+  searxngUrl: string
+  hasTavilyKey: boolean
+  hasLinkupKey: boolean
+}
+
+type WebResearchConfigPatch = {
+  provider?: WebSearchProviderId
+  searxngUrl?: string
+}
 
 // Webrecherche-Konfiguration (Opt-in). Provider-Config + API-Keys liegen Main-seitig (0d), pro
 // Provider. Diese Sektion verwaltet sie über die webResearch-IPC und spiegelt den Zustand in den
@@ -12,19 +24,26 @@ export function WebResearchSection() {
 
   const [provider, setProvider] = useState<WebSearchProviderId>('tavily')
   const [searxngUrl, setSearxngUrl] = useState('')
-  const [lastSavedUrl, setLastSavedUrl] = useState('')
   const [hasTavilyKey, setHasTavilyKey] = useState(false)
   const [hasLinkupKey, setHasLinkupKey] = useState(false)
   const [keyInput, setKeyInput] = useState('')
   const [saving, setSaving] = useState(false)
   const [status, setStatus] = useState<{ ok: boolean; msg: string } | null>(null)
   const [testing, setTesting] = useState(false)
+  // Provider-/URL-Saves strikt serialisieren. Besonders wichtig beim Klick auf „Suche testen":
+  // davor feuert das blur des URL-Felds. Der Test wartet auf genau diesen Save, statt parallel
+  // die alte Main-Config zu prüfen oder bei privaten URLs einen zweiten Freigabedialog zu öffnen.
+  const saveQueueRef = useRef<Promise<boolean>>(Promise.resolve(true))
+  const pendingSavesRef = useRef(0)
+  const savedConfigRef = useRef<Pick<LoadedWebResearchConfig, 'provider' | 'searxngUrl'>>({
+    provider: 'tavily',
+    searxngUrl: ''
+  })
 
-  type Loaded = { provider: WebSearchProviderId; searxngUrl: string; hasTavilyKey: boolean; hasLinkupKey: boolean }
-  const applyLoaded = (cfg: Loaded) => {
+  const applyLoaded = (cfg: LoadedWebResearchConfig) => {
     setProvider(cfg.provider)
     setSearxngUrl(cfg.searxngUrl)
-    setLastSavedUrl(cfg.searxngUrl)
+    savedConfigRef.current = { provider: cfg.provider, searxngUrl: cfg.searxngUrl }
     setHasTavilyKey(cfg.hasTavilyKey)
     setHasLinkupKey(cfg.hasLinkupKey)
     setMirror({ provider: cfg.provider, searxngUrl: cfg.searxngUrl, hasTavilyKey: cfg.hasTavilyKey, hasLinkupKey: cfg.hasLinkupKey })
@@ -38,26 +57,48 @@ export function WebResearchSection() {
   const meta = WEB_SEARCH_PROVIDER_META[provider]
   const currentHasKey = provider === 'tavily' ? hasTavilyKey : provider === 'linkup' ? hasLinkupKey : false
 
-  const pushMirror = (over: Partial<Loaded>) =>
+  const pushMirror = (over: Partial<LoadedWebResearchConfig>) =>
     setMirror({ provider, searxngUrl, hasTavilyKey, hasLinkupKey, ...over })
 
-  const saveProvider = async (next: { provider?: WebSearchProviderId; searxngUrl?: string }): Promise<boolean> => {
+  const saveProvider = (next: WebResearchConfigPatch): Promise<boolean> => {
+    pendingSavesRef.current += 1
     setSaving(true)
     setStatus(null)
-    try {
-      const res = await window.electronAPI.webResearchSaveConfig(next)
-      if (res.success && res.config) {
-        setProvider(res.config.provider)
-        setSearxngUrl(res.config.searxngUrl)
-        setLastSavedUrl(res.config.searxngUrl)
-        setMirror({ provider: res.config.provider, searxngUrl: res.config.searxngUrl, hasTavilyKey, hasLinkupKey })
-        return true
+    const run = async (): Promise<boolean> => {
+      try {
+        const res = await window.electronAPI.webResearchSaveConfig(next)
+        if (res.success && res.config) {
+          const mirror = useUIStore.getState().webResearchConfig
+          const nextHasTavilyKey = mirror?.hasTavilyKey ?? hasTavilyKey
+          const nextHasLinkupKey = mirror?.hasLinkupKey ?? hasLinkupKey
+          setProvider(res.config.provider)
+          setSearxngUrl(res.config.searxngUrl)
+          savedConfigRef.current = { provider: res.config.provider, searxngUrl: res.config.searxngUrl }
+          setMirror({
+            provider: res.config.provider,
+            searxngUrl: res.config.searxngUrl,
+            hasTavilyKey: nextHasTavilyKey,
+            hasLinkupKey: nextHasLinkupKey
+          })
+          return true
+        }
+        setStatus({ ok: false, msg: res.error || (en ? 'Save failed' : 'Speichern fehlgeschlagen') })
+        return false
+      } catch (error) {
+        setStatus({
+          ok: false,
+          msg: error instanceof Error ? error.message : (en ? 'Save failed' : 'Speichern fehlgeschlagen')
+        })
+        return false
       }
-      setStatus({ ok: false, msg: res.error || (en ? 'Save failed' : 'Speichern fehlgeschlagen') })
-      return false
-    } finally {
-      setSaving(false)
     }
+
+    const task = saveQueueRef.current.then(run, run)
+    saveQueueRef.current = task
+    return task.finally(() => {
+      pendingSavesRef.current -= 1
+      if (pendingSavesRef.current === 0) setSaving(false)
+    })
   }
 
   const saveKey = async () => {
@@ -96,13 +137,21 @@ export function WebResearchSection() {
   // Save-dann-Test: erst die aktuelle URL sichern, damit der Test nie eine veraltete Main-Config
   // prüft (bei SearXNG kann das Speichern einen Freigabe-Dialog auslösen).
   const runTest = async () => {
-    if (provider === 'searxng') {
-      const saved = await saveProvider({ provider: 'searxng', searxngUrl })
-      if (!saved) return
-    }
     setTesting(true)
     setStatus(null)
     try {
+      // Ein unmittelbar vorausgehendes blur/onChange hat seinen Save bereits eingereiht.
+      // Scheitert dieser (z.B. Freigabe abgebrochen), nicht sofort denselben Dialog wiederholen.
+      const hadPendingSave = pendingSavesRef.current > 0
+      const pendingSaveSucceeded = await saveQueueRef.current
+      if (hadPendingSave && !pendingSaveSucceeded) return
+
+      const persisted = savedConfigRef.current
+      const patch: WebResearchConfigPatch = {}
+      if (persisted.provider !== provider) patch.provider = provider
+      if (provider === 'searxng' && persisted.searxngUrl !== searxngUrl) patch.searxngUrl = searxngUrl
+      if (Object.keys(patch).length > 0 && !(await saveProvider(patch))) return
+
       const res = await window.electronAPI.webResearchTest()
       setStatus(res.success
         ? { ok: true, msg: en ? `OK — ${res.count ?? 0} results` : `OK — ${res.count ?? 0} Treffer` }
@@ -153,7 +202,9 @@ export function WebResearchSection() {
               type="text"
               value={searxngUrl}
               onChange={e => setSearxngUrl(e.target.value)}
-              onBlur={() => { if (searxngUrl !== lastSavedUrl) void saveProvider({ searxngUrl }) }}
+              onBlur={() => {
+                if (searxngUrl !== savedConfigRef.current.searxngUrl) void saveProvider({ searxngUrl })
+              }}
               placeholder="https://searx.example.org"
               style={{ flex: 1 }}
             />

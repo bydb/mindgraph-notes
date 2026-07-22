@@ -99,8 +99,10 @@ async function searchViaTavily(query: string, apiKey: string | null | undefined,
   const key = (apiKey || '').trim()
   if (!key) throw new Error('Kein Tavily-API-Key hinterlegt. Bitte in den Einstellungen eintragen (kostenlos bei app.tavily.com).')
 
-  // search_depth 'basic' = reine Treffer (Titel + URL + Snippet), keine LLM-Antwort/kein
-  // serverseitiges Raw-Content-Scraping — die Seiten-Extraktion machen wir lokal (fetchExtract).
+  // search_depth 'basic' + include_answer/raw_content=false = keine synthetisierte Antwort und
+  // kein vollständiger bereinigter Seiteninhalt in der API-Antwort. Tavily liefert weiterhin
+  // eigene NLP-Treffer-Snippets aus seinem Suchindex; den vollständigen Seitenabruf und unsere
+  // Markdown-Extraktion macht ausschließlich fetchExtract lokal.
   let res
   try {
     res = await safeFetch('https://api.tavily.com/search', {

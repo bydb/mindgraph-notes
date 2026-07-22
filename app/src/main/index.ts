@@ -4163,7 +4163,7 @@ ipcMain.handle('note-agent-run', async (event, params: NoteAgentRunParams) => {
     if (params.webResearch?.enabled) {
       const webConfig = await loadWebResearchConfig()
       if (!isWebResearchConfigComplete(webConfig)) {
-        return { success: false, error: 'Webrecherche ist eingeschaltet, aber nicht konfiguriert (Einstellungen → Webrecherche: SearXNG-URL bzw. Linkup-Key).' }
+        return { success: false, error: 'Webrecherche ist eingeschaltet, aber nicht konfiguriert (Einstellungen → KI & Modelle → Webrecherche: SearXNG-URL oder API-Key für Tavily/Linkup).' }
       }
       const apiKey = KEY_PROVIDERS.includes(webConfig.provider) ? await loadProviderKey(webConfig.provider) : null
       if (KEY_PROVIDERS.includes(webConfig.provider) && !apiKey) {
@@ -9193,7 +9193,7 @@ function registerCloudProviderIpc(provider: CloudChatBackend): void {
 registerCloudProviderIpc('openrouter')
 registerCloudProviderIpc('llmbase')
 
-// ── Webrecherche (Opt-in): Provider-Config + Linkup-Key Main-seitig (0d) ──────
+// ── Webrecherche (Opt-in): Provider-Config + API-Keys Main-seitig (0d) ────────
 // ALLE Handler prüfen isTrustedSender (nur eigener Top-Frame) — fremder, in Markdown
 // eingebetteter Inhalt/Sub-Frame kann Config/Key weder lesen/ändern noch Netzproben auslösen.
 const WR_UNAUTHORIZED = { success: false, error: 'Nicht autorisierter Aufrufer' } as const

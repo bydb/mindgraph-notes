@@ -46,7 +46,7 @@
     "url": "https://mindgraph-notes.de/",
     "downloadUrl": "https://github.com/bydb/mindgraph-notes/releases",
     "screenshot": "https://mindgraph-notes.de/screenshot.png",
-    "softwareVersion": "0.10.21-beta",
+    "softwareVersion": "0.10.22-beta",
     "author": { "@type": "Person", "name": "Jochen Leeder", "url": "https://bydb.io" },
     "license": "https://opensource.org/licenses/AGPL-3.0",
     "featureList": [
@@ -464,7 +464,7 @@
         <span class="hero-dot"></span>
         <span data-i18n="hero.badge">Open Source &middot; Lokal &middot; Kostenlos</span>
       </div>
-      <a class="release-badge" href="#changelog" data-i18n="hero.release">Neu: Zielordner für Zettel frei wählbar &middot; v0.10.21</a>
+      <a class="release-badge" href="#changelog" data-i18n="hero.release">Neu: Webrecherche mit gepr&uuml;ften Quellen &middot; v0.10.22</a>
     </div>
 
     <h1 data-i18n="hero.title">Der Fokus bleibt.<br><em>Auch wenn das Leben dazwischenkommt.</em></h1>
@@ -842,7 +842,7 @@
       <div>
         <div class="how-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3c2.5 2.5 3.8 5.7 3.8 9s-1.3 6.5-3.8 9c-2.5-2.5-3.8-5.7-3.8-9S9.5 5.5 12 3z"/></svg></div>
         <h3 data-i18n="how.p5h">Das Web, wenn du es brauchst</h3>
-        <p data-i18n="how.p5">Schalte die Webrecherche pro Auftrag zu &ndash; ganz optional. Der Agent sucht, liest die passenden Seiten und schreibt eine Notiz mit sauberem Quellenverzeichnis; du pr&uuml;fst sie, bevor sie in deinen Vault kommt. Nur die Suchanfragen verlassen deinen Rechner &ndash; die Seiten wertet die App lokal aus. Und den Suchanbieter w&auml;hlst du selbst: kostenlos einsatzbereit oder deine eigene, private Suchmaschine.</p>
+        <p data-i18n="how.p5">Schalte die Webrecherche pro Auftrag zu &ndash; ganz optional. Der Agent sucht, liest die passenden Seiten und schreibt eine Notiz mit sauberem Quellenverzeichnis; du pr&uuml;fst sie, bevor sie in deinen Vault kommt. Der Suchanbieter erh&auml;lt nur die Suchanfragen; die vollst&auml;ndigen Seiten ruft die App lokal ab. Bei einem optionalen Cloud-Modell geht der gelesene Kontext zus&auml;tzlich an dessen Anbieter &ndash; darauf weist die App vor dem Lauf hin. Den Suchanbieter w&auml;hlst du selbst: sofort einsatzbereit oder deine eigene, private Suchmaschine.</p>
       </div>
       <div class="how-visual">
         <div class="halo"></div>
@@ -1447,17 +1447,17 @@
     <div class="release-inner">
       <div class="release-head">
         <div>
-          <div class="st-eyebrow"><span class="d"></span><span data-i18n="release.label">Release 0.10.4 &middot; Petrol</span></div>
-          <h2 class="st-h" style="font-size:clamp(1.8rem,3.8vw,2.6rem)" data-i18n="release.heading">Was ist neu &mdash; <em>das Plugin-Release.</em></h2>
-          <p class="st-lead" data-i18n="release.lead">MindGraph l&auml;sst sich jetzt mit signierten Plugins erweitern &mdash; im Katalog entdecken, per Klick installieren und sicher aktualisieren.</p>
+          <div class="st-eyebrow"><span class="d"></span><span data-i18n="release.label">Release 0.10.22 &middot; Webrecherche</span></div>
+          <h2 class="st-h" style="font-size:clamp(1.8rem,3.8vw,2.6rem)" data-i18n="release.heading">Was ist neu &mdash; <em>Recherche mit Quellen.</em></h2>
+          <p class="st-lead" data-i18n="release.lead">Der Notiz-Agent kann jetzt optional im Web suchen, passende Seiten lesen und daraus eine Notiz mit nachvollziehbarem Quellenverzeichnis erstellen.</p>
         </div>
-        <div class="release-date">v0.10.21-beta</div>
+        <div class="release-date">v0.10.22-beta</div>
       </div>
       <div class="release-grid">
-        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c1h">Plugin-Katalog</b><p data-i18n="release.c1">Offizielle Erweiterungen durchsuchen, installieren und aktualisieren.</p></div></div>
-        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c2h">Signierte Plugins</b><p data-i18n="release.c2">Herkunft und Integrit&auml;t werden kryptografisch gepr&uuml;ft, bevor ein Plugin l&auml;uft.</p></div></div>
-        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c3h">Eigene Oberfl&auml;chen</b><p data-i18n="release.c3">Plugins k&ouml;nnen Editoren sowie Dashboard- und Sidebar-Widgets mitbringen.</p></div></div>
-        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c4h">Excalidraw</b><p data-i18n="release.c4">Der Zeicheneditor kommt als echtes externes Plugin &mdash; ohne festes App-Bundling.</p></div></div>
+        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c1h">Webrecherche pro Auftrag</b><p data-i18n="release.c1">Tavily, eine eigene SearXNG-Instanz oder Linkup durchsuchen und Ergebnisse gezielt lesen.</p></div></div>
+        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c2h">Gepr&uuml;fte Quellen</b><p data-i18n="release.c2">Die App erzeugt das Quellenverzeichnis deterministisch aus den tats&auml;chlich gelesenen Seiten.</p></div></div>
+        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c3h">Sicherer Seitenabruf</b><p data-i18n="release.c3">Allowlist, DNS-Pinning und SSRF-Schutz sperren interne oder unerlaubte Ziele.</p></div></div>
+        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c4h">Ruhigerer Arbeitsraum</b><p data-i18n="release.c4">Editor-Kontextspalte, durchsuchbare Einstellungen und die neue Zentrale &bdquo;KI &amp; Modelle&ldquo; schaffen mehr &Uuml;bersicht.</p></div></div>
       </div>
       <a class="release-link" href="https://github.com/bydb/mindgraph-notes/releases" target="_blank" rel="noopener noreferrer" data-i18n="release.link">Vollst&auml;ndige Release Notes auf GitHub &rarr;</a>
     </div>
@@ -1474,19 +1474,19 @@
     <div class="dl-grid">
       <a href="https://github.com/bydb/mindgraph-notes/releases/latest" target="_blank" rel="noopener noreferrer" class="dl-btn">
         <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg>
-        <div class="dl-info"><div class="dl-platform">macOS (Apple Silicon)</div><div class="dl-version">.dmg &middot; v0.10.21-beta</div></div>
+        <div class="dl-info"><div class="dl-platform">macOS (Apple Silicon)</div><div class="dl-version">.dmg &middot; v0.10.22-beta</div></div>
       </a>
       <a href="https://github.com/bydb/mindgraph-notes/releases/latest" target="_blank" rel="noopener noreferrer" class="dl-btn">
         <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg>
-        <div class="dl-info"><div class="dl-platform">macOS (Intel)</div><div class="dl-version">.dmg &middot; v0.10.21-beta</div></div>
+        <div class="dl-info"><div class="dl-platform">macOS (Intel)</div><div class="dl-version">.dmg &middot; v0.10.22-beta</div></div>
       </a>
       <a href="https://github.com/bydb/mindgraph-notes/releases/latest" target="_blank" rel="noopener noreferrer" class="dl-btn">
         <svg width="28" height="28" viewBox="0 0 256 256" fill="currentColor"><path d="M220,152H36a12,12,0,0,0-12,12v40a12,12,0,0,0,12,12h80v12H96a8,8,0,0,0,0,16h64a8,8,0,0,0,0-16H140V216h80a12,12,0,0,0,12-12V164A12,12,0,0,0,220,152Zm-4,48H40V168H216ZM36,136H220a12,12,0,0,0,12-12V44a12,12,0,0,0-12-12H36A12,12,0,0,0,24,44v80A12,12,0,0,0,36,136ZM40,48H216v72H40Z"/></svg>
-        <div class="dl-info"><div class="dl-platform">Linux</div><div class="dl-version">.AppImage &middot; v0.10.21-beta</div></div>
+        <div class="dl-info"><div class="dl-platform">Linux</div><div class="dl-version">.AppImage &middot; v0.10.22-beta</div></div>
       </a>
       <a href="https://github.com/bydb/mindgraph-notes/releases/latest" target="_blank" rel="noopener noreferrer" class="dl-btn">
         <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor"><path d="M0 3.449L9.75 2.1v9.451H0m10.949-9.602L24 0v11.4H10.949M0 12.6h9.75v9.451L0 20.699M10.949 12.6H24V24l-12.9-1.801"/></svg>
-        <div class="dl-info"><div class="dl-platform">Windows</div><div class="dl-version">.exe &middot; v0.10.21-beta</div></div>
+        <div class="dl-info"><div class="dl-platform">Windows</div><div class="dl-version">.exe &middot; v0.10.22-beta</div></div>
       </a>
     </div>
     <p class="dl-more">
@@ -1701,9 +1701,9 @@
         "how.p4": "Gib der KI deine Unterlagen – Excel, Word, PDF oder ganze Ordner – und einen Auftrag. Der Agent recherchiert in deinen Notizen und erzeugt fertige Dateien; du prüfst jedes Ergebnis, bevor es in deinen Vault kommt. Skills sind einfache Notizen, mit denen du ihm deine Arbeitsweise beibringst (offener SKILL.md-Standard wie bei Claude Code &amp; Co.) – und was du ihm einmal sagst, merkt er sich. Sichtbar und editierbar.",
         "how.t5": "Webrecherche",
         "how.p5h": "Das Web, wenn du es brauchst",
-        "how.p5": "Schalte die Webrecherche pro Auftrag zu – ganz optional. Der Agent sucht, liest die passenden Seiten und schreibt eine Notiz mit sauberem Quellenverzeichnis; du prüfst sie, bevor sie in deinen Vault kommt. Nur die Suchanfragen verlassen deinen Rechner – die Seiten wertet die App lokal aus. Und den Suchanbieter wählst du selbst: kostenlos einsatzbereit oder deine eigene, private Suchmaschine.",
+        "how.p5": "Schalte die Webrecherche pro Auftrag zu – ganz optional. Der Agent sucht, liest die passenden Seiten und schreibt eine Notiz mit sauberem Quellenverzeichnis; du prüfst sie, bevor sie in deinen Vault kommt. Der Suchanbieter erhält nur die Suchanfragen; die vollständigen Seiten ruft die App lokal ab. Bei einem optionalen Cloud-Modell geht der gelesene Kontext zusätzlich an dessen Anbieter – darauf weist die App vor dem Lauf hin. Den Suchanbieter wählst du selbst: sofort einsatzbereit oder deine eigene, private Suchmaschine.",
         "hero.badge": "Open Source \u00b7 Lokal \u00b7 Kostenlos",
-        "hero.release": "Neu: Zielordner für Zettel frei wählbar &middot; v0.10.21",
+        "hero.release": "Neu: Webrecherche mit geprüften Quellen &middot; v0.10.22",
         "hero.title": "Der Fokus bleibt.<br><em>Auch wenn das Leben dazwischenkommt.</em>",
         "hero.sub": "MindGraph zeigt dir jeden Morgen, was heute z\u00e4hlt \u2014 Aufgaben, Mails, Termine, vergessene F\u00e4den. Du gehst aufs Bike, ins Wochenende, liegst mal f\u00fcnf Tage flach. Und nichts f\u00e4llt durch. Lokal, ohne Cloud-Zwang.",
         "hero.cta": "Kostenlos herunterladen",
@@ -1773,17 +1773,17 @@
         "modules.opt.vision": "Vision OCR",
         "modules.opt.speech": "Diktat & Vorlesen",
         "modules.opt.terminal": "Terminal",
-        "release.label": "Release 0.10.4 · Petrol",
-        "release.heading": "Was ist neu — <em>das Plugin-Release.</em>",
-        "release.lead": "MindGraph lässt sich jetzt mit signierten Plugins erweitern — im Katalog entdecken, per Klick installieren und sicher aktualisieren.",
-        "release.c1h": "Plugin-Katalog",
-        "release.c1": "Offizielle Erweiterungen durchsuchen, installieren und aktualisieren.",
-        "release.c2h": "Signierte Plugins",
-        "release.c2": "Herkunft und Integrität werden kryptografisch geprüft, bevor ein Plugin läuft.",
-        "release.c3h": "Eigene Oberflächen",
-        "release.c3": "Plugins können Editoren sowie Dashboard- und Sidebar-Widgets mitbringen.",
-        "release.c4h": "Excalidraw",
-        "release.c4": "Der Zeicheneditor kommt als echtes externes Plugin — ohne festes App-Bundling.",
+        "release.label": "Release 0.10.22 · Webrecherche",
+        "release.heading": "Was ist neu — <em>Recherche mit Quellen.</em>",
+        "release.lead": "Der Notiz-Agent kann jetzt optional im Web suchen, passende Seiten lesen und daraus eine Notiz mit nachvollziehbarem Quellenverzeichnis erstellen.",
+        "release.c1h": "Webrecherche pro Auftrag",
+        "release.c1": "Tavily, eine eigene SearXNG-Instanz oder Linkup durchsuchen und Ergebnisse gezielt lesen.",
+        "release.c2h": "Geprüfte Quellen",
+        "release.c2": "Die App erzeugt das Quellenverzeichnis deterministisch aus den tatsächlich gelesenen Seiten.",
+        "release.c3h": "Sicherer Seitenabruf",
+        "release.c3": "Allowlist, DNS-Pinning und SSRF-Schutz sperren interne oder unerlaubte Ziele.",
+        "release.c4h": "Ruhigerer Arbeitsraum",
+        "release.c4": "Editor-Kontextspalte, durchsuchbare Einstellungen und die neue Zentrale „KI &amp; Modelle“ schaffen mehr Übersicht.",
         "release.link": "Vollständige Release Notes auf GitHub →",
         "dl.label": "Download",
         "dl.heading": "Jetzt starten.",
@@ -1944,9 +1944,9 @@
         "how.p4": "Hand the AI your files – Excel, Word, PDF or whole folders – and a task. The agent researches your notes and produces finished files; you review every result before it enters your vault. Skills are plain notes that teach it how you work (the open SKILL.md standard used by Claude Code &amp; co.) – and what you tell it once, it remembers. Visible and editable.",
         "how.t5": "Web research",
         "how.p5h": "The web, when you need it",
-        "how.p5": "Turn on web research per task – entirely optional. The agent searches, reads the relevant pages and writes a note with a clean list of sources; you review it before it enters your vault. Only the search queries leave your computer – pages are processed locally. And you pick the search provider yourself: ready to go for free, or your own private search engine.",
+        "how.p5": "Turn on web research per task – entirely optional. The agent searches, reads the relevant pages and writes a note with a clean list of sources; you review it before it enters your vault. The search provider receives only the queries; the app fetches full pages locally. With an optional cloud model, the extracted context is also sent to that model provider – the app warns you before the run. You choose the search provider yourself: ready to use or your own private search engine.",
         "hero.badge": "Open Source \u00b7 Local \u00b7 Free",
-        "hero.release": "New: choose your Zettel destination folder &middot; v0.10.21",
+        "hero.release": "New: web research with verified sources &middot; v0.10.22",
         "hero.title": "Shows you<br><em>what matters today.</em>",
         "hero.sub": "MindGraph Notes connects your notes, tasks, emails and documents \u2014 and ranks them by relevance. Dashboard, knowledge graph and local AI in one desktop app. No cloud lock-in.",
         "hero.cta": "Download for free",
@@ -2016,17 +2016,17 @@
         "modules.opt.vision": "Vision OCR",
         "modules.opt.speech": "Dictation & TTS",
         "modules.opt.terminal": "Terminal",
-        "release.label": "Release 0.10.4 · Petrol",
-        "release.heading": "What’s new — <em>the plugin release.</em>",
-        "release.lead": "MindGraph now supports signed plugins — discover them in the catalog, install with one click and update safely.",
-        "release.c1h": "Plugin catalog",
-        "release.c1": "Browse, install and update official extensions.",
-        "release.c2h": "Signed plugins",
-        "release.c2": "Origin and integrity are verified cryptographically before a plugin runs.",
-        "release.c3h": "Native interfaces",
-        "release.c3": "Plugins can contribute editors as well as dashboard and sidebar widgets.",
-        "release.c4h": "Excalidraw",
-        "release.c4": "The drawing editor ships as a real external plugin instead of being bundled into the app.",
+        "release.label": "Release 0.10.22 · Web research",
+        "release.heading": "What’s new — <em>research with sources.</em>",
+        "release.lead": "The note agent can now optionally search the web, read relevant pages and turn them into a note with a traceable source list.",
+        "release.c1h": "Web research per task",
+        "release.c1": "Search with Tavily, your own SearXNG instance or Linkup and selectively read the results.",
+        "release.c2h": "Verified sources",
+        "release.c2": "The app builds the source list deterministically from the pages that were actually read.",
+        "release.c3h": "Safe page fetching",
+        "release.c3": "An allowlist, DNS pinning and SSRF protection block internal or unauthorized targets.",
+        "release.c4h": "A calmer workspace",
+        "release.c4": "The editor context panel, searchable settings and the new AI &amp; Models hub make the workspace easier to navigate.",
         "release.link": "Full release notes on GitHub →",
         "dl.label": "Download",
         "dl.heading": "Get started.",

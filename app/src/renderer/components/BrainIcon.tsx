@@ -1,9 +1,9 @@
 import React from 'react'
 
-// Rosa SVG-Gehirn zur Kennzeichnung von Brain-Tagesnotizen.
-// Bewusst KEIN 🧠-Emoji (uneinheitliche Plattform-Darstellung) — ein eigenes,
-// klar erkennbares Icon in Brain-Rosa.
-const BRAIN_ROSA = '#e85aad'
+// SVG-Gehirn zur Kennzeichnung von Brain-Tagesnotizen.
+// Bewusst KEIN 🧠-Emoji (uneinheitliche Plattform-Darstellung).
+// Farbe kommt aus dem Token --brain-color (= Akzentfarbe; Design-Befund B3 —
+// vorher hartes Pink #e85aad neben Petrol).
 
 interface BrainIconProps {
   size?: number
@@ -18,7 +18,7 @@ export const BrainIcon: React.FC<BrainIconProps> = ({ size = 14, className, titl
     height={size}
     viewBox="0 0 24 24"
     fill="none"
-    stroke={BRAIN_ROSA}
+    stroke="var(--brain-color)"
     strokeWidth="2"
     strokeLinecap="round"
     strokeLinejoin="round"

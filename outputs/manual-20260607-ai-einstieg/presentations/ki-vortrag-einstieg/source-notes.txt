@@ -1,0 +1,30 @@
+Sources used:
+
+1. User-provided screenshot: age distribution for the YouTube channel Everlast AI.
+   Values transcribed:
+   - 13-17 years: 3.8%
+   - 18-24 years: 2.7%
+   - 25-34 years: 13.0%
+   - 35-44 years: 25.6%
+   - 45-54 years: 25.5%
+   - 55-64 years: 20.4%
+   - over 65 years: 9.0%
+   Derived:
+   - 35+ years: 80.5%
+   - 55+ years: 29.4%
+
+2. FOM Hochschule, 2025:
+   https://newsroom.fom.de/news/zwischen-hoffnung-und-sorge-so-blickt-deutschland-auf-ki-506960
+   Key points: Gen Z 69% feel safe/competent with AI; Gen X 26%; Babyboomers 10%.
+
+3. Leibniz-Institut fuer Medienforschung | Hans-Bredow-Institut, 2025:
+   https://leibniz-hbi.de/hbi-news/presseinfo/nutzung-und-wahrnehmung-generativer-ki-zur-informationssuche-in-deutschland/
+   Key points: 16-19 year olds nearly 96% use generative AI; 60-69 year olds about 18%.
+
+4. Initiative D21, D21-Digital-Index 2024/2025:
+   https://initiatived21.de/publikationen/d21-digital-index/2024-25
+   Key points: 39% conscious AI usage overall; acceptance rises when AI is useful, easy, and time-saving.
+
+5. Vodafone Stiftung, Jugendstudie 2024:
+   https://www.vodafone-stiftung.de/jugendstudie-kuenstliche-intelligenz/
+   Key points: 73% of 14-20 year olds see AI more as chance than danger; 74% already use AI applications.

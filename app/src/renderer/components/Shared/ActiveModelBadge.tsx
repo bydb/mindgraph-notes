@@ -61,7 +61,7 @@ export function ActiveModelBadge({ moduleId, tabOverride, tabOverrideLabel }: Pr
 
   const openSettings = () => {
     window.dispatchEvent(
-      new CustomEvent('mindgraph:openSettings', { detail: { tab: 'integrations' } })
+      new CustomEvent('mindgraph:openSettings', { detail: { tab: 'ai' } })
     )
   }
 

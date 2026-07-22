@@ -145,6 +145,7 @@ const App: React.FC = () => {
   const [templateSettingsOpen, setTemplateSettingsOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [settingsInitialTab, setSettingsInitialTab] = useState<string | undefined>(undefined)
+  const [settingsInitialAnchor, setSettingsInitialAnchor] = useState<string | undefined>(undefined)
   const [overduePanelOpen, setOverduePanelOpen] = useState(false)
   const [tagsPanelOpen, setTagsPanelOpen] = useState(false)
   const [smartConnectionsOpen, setSmartConnectionsOpen] = useState(false)
@@ -294,8 +295,9 @@ const App: React.FC = () => {
   // Deep-Links aus HelpGuide/Briefing: Settings-Tab öffnen, Briefing anzeigen
   useEffect(() => {
     const handleOpenSettings = (e: Event) => {
-      const detail = (e as CustomEvent<{ tab?: string }>).detail
+      const detail = (e as CustomEvent<{ tab?: string; anchor?: string }>).detail
       if (detail?.tab) setSettingsInitialTab(detail.tab)
+      setSettingsInitialAnchor(detail?.anchor)
       setSettingsOpen(true)
     }
     const handleShowBriefing = () => setBriefingOpen(true)
@@ -1659,8 +1661,13 @@ const App: React.FC = () => {
       {/* Settings Modal (Cmd+,) */}
       <Settings
         isOpen={settingsOpen}
-        onClose={() => { setSettingsOpen(false); setSettingsInitialTab(undefined) }}
+        onClose={() => {
+          setSettingsOpen(false)
+          setSettingsInitialTab(undefined)
+          setSettingsInitialAnchor(undefined)
+        }}
         initialTab={settingsInitialTab as never}
+        initialAnchor={settingsInitialAnchor}
       />
 
       {/* What's New Modal (shown after update) */}
