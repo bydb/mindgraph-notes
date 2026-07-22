@@ -19,7 +19,7 @@ import 'katex/dist/katex.min.css'
 import 'katex/contrib/mhchem/mhchem.js'  // Chemie-Support (mhchem)
 import mermaid from 'mermaid'
 import { useNotesStore, createNoteFromFile } from '../../stores/notesStore'
-import { useUIStore, MARKETING_DEFAULTS, type EditorExportKind } from '../../stores/uiStore'
+import { useUIStore, WORDPRESS_DEFAULTS, type EditorExportKind } from '../../stores/uiStore'
 import { usePluginConfig } from '../../plugins/config'
 import { useTabStore } from '../../stores/tabStore'
 import { useShallow } from 'zustand/react/shallow'
@@ -973,7 +973,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
   const { pendingTemplateInsert, setPendingTemplateInsert, pendingAgentContext, setPendingAgentContext, ollama, editorHeadingFolding, outlineStyle, editorShowWordCount, editorHeaderActions, languageTool, setLanguageTool, editorDefaultView, showFormattingToolbar, setShowFormattingToolbar, showRawEditor, readingModeHintDismissed, setReadingModeHintDismissed, editorShowContextPanel, setEditorShowContextPanel, editorLastExport, setEditorLastExport } = useUIStore(
     useShallow(s => ({ pendingTemplateInsert: s.pendingTemplateInsert, setPendingTemplateInsert: s.setPendingTemplateInsert, pendingAgentContext: s.pendingAgentContext, setPendingAgentContext: s.setPendingAgentContext, ollama: s.ollama, editorHeadingFolding: s.editorHeadingFolding, outlineStyle: s.outlineStyle, editorShowWordCount: s.editorShowWordCount, editorHeaderActions: s.editorHeaderActions, languageTool: s.languageTool, setLanguageTool: s.setLanguageTool, editorDefaultView: s.editorDefaultView, showFormattingToolbar: s.showFormattingToolbar, setShowFormattingToolbar: s.setShowFormattingToolbar, showRawEditor: s.showRawEditor, readingModeHintDismissed: s.readingModeHintDismissed, setReadingModeHintDismissed: s.setReadingModeHintDismissed, editorShowContextPanel: s.editorShowContextPanel, setEditorShowContextPanel: s.setEditorShowContextPanel, editorLastExport: s.editorLastExport, setEditorLastExport: s.setEditorLastExport }))
   )
-  const [marketing] = usePluginConfig('marketing', MARKETING_DEFAULTS)
+  const [wordpress] = usePluginConfig('wordpress', WORDPRESS_DEFAULTS)
 
   // Verwende die übergebene noteId oder die primary/secondary Selection
   const effectiveNoteId = noteId ?? (isSecondary ? secondarySelectedNoteId : selectedNoteId)
@@ -4804,7 +4804,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
   const parentFolder = selectedNote.path.includes('/')
     ? selectedNote.path.split('/').slice(-2, -1)[0]
     : null
-  const wordpressAvailable = Boolean(editorHeaderActions.wordpress && marketing.enabled && marketing.wordpressUrl)
+  const wordpressAvailable = Boolean(editorHeaderActions.wordpress && wordpress.enabled && wordpress.baseUrl)
   const exportAvailable = editorHeaderActions.pdf || editorHeaderActions.docx || editorHeaderActions.remarkable || wordpressAvailable
   const exportKindLabels: Record<EditorExportKind, string> = {
     pdf: t('editor.exportMenu.pdf'),

@@ -769,17 +769,15 @@ function buildPluginHostServices(): HostServices {
       const pc = (ui.pluginConfig ?? {}) as Record<string, Record<string, unknown> | undefined>
       const pluginCfg = (id: string) => (pc[id] ?? (ui[id] as Record<string, unknown> | undefined))
       const hosts: string[] = []
+      // Generisch: <plugin>.baseUrl (Antares, WordPress, edoobox — jede Vertikale mit
+      // konfigurierbarem Host legt ihn unter diesem Schlüssel ab).
       const cfg = pluginCfg(pluginId) as { baseUrl?: string } | undefined
       if (cfg?.baseUrl) {
         try { hosts.push(new URL(cfg.baseUrl).hostname) } catch { /* ignore */ }
       }
-      // edoobox-Vertikale nutzt zusätzlich den user-konfigurierten WordPress-Host (Marketing).
-      if (pluginId === 'edoobox') {
-        const mk = pluginCfg('marketing') as { wordpressUrl?: string } | undefined
-        if (mk?.wordpressUrl) {
-          try { hosts.push(new URL(mk.wordpressUrl).hostname) } catch { /* ignore */ }
-        }
-      }
+      // (Der frühere edoobox-Sonderfall — WordPress-Host aus pluginConfig.marketing — ist
+      // seit Paket 3 der Modul-Entflechtung weg: WordPress ist ein eigenes Plugin, dessen
+      // baseUrl über den generischen Zweig oben greift.)
       return hosts
     },
     deviceRequest: nativeServices.deviceRequest,
@@ -1349,6 +1347,7 @@ app.whenReady().then(async () => {
   await migrateAntaresCredentialsToPlugin()
   await migrateEdooboxCredentialsToPlugin()
   await migrateMarketingCredentialsToPlugin()
+  await migrateWordpressSecretFromEdoobox()
   const hostFactory = createHostFactory(buildPluginHostServices())
   pluginRegistry.setHostFactory(hostFactory)
   // Dieselbe capability-gated Factory in die RendererRuntime (plugin:host-Bridge, §5.4).
@@ -11774,9 +11773,10 @@ async function migrateEdooboxCredentialsToPlugin(): Promise<void> {
   }
 }
 
-// Marketing (WordPress) ist Teil der edoobox-Vertikale (src/plugins/edoobox/, Phase 2b) —
-// Service, IPC + Bild-Flow leben jetzt im Plugin (plugin:invoke). Hier bleibt nur die einmalige
-// Migration des alten WordPress-App-Passworts (marketing-credentials.enc) in die Plugin-Secrets.
+// WordPress ist seit Paket 3 der Modul-Entflechtung ein EIGENES Plugin (src/plugins/wordpress/).
+// Hier bleiben nur die einmaligen Migrationen: (1) uraltes marketing-credentials.enc →
+// edoobox-Plugin-Secret (Phase 2b), (2) edoobox-Plugin-Secret → wordpress-Plugin-Secret.
+// Beide idempotent; Kette deckt auch Direkt-Upgrades von sehr alten Versionen ab.
 async function migrateMarketingCredentialsToPlugin(): Promise<void> {
   try {
     if (await pluginSecretGet('plugin:edoobox:wpAppPassword')) return // schon migriert
@@ -11790,6 +11790,19 @@ async function migrateMarketingCredentialsToPlugin(): Promise<void> {
     }
   } catch (e) {
     console.warn('[marketing] Credential-Migration übersprungen:', e instanceof Error ? e.message : e)
+  }
+}
+
+async function migrateWordpressSecretFromEdoobox(): Promise<void> {
+  try {
+    if (await pluginSecretGet('plugin:wordpress:wpAppPassword')) return // schon migriert
+    const pw = await pluginSecretGet('plugin:edoobox:wpAppPassword')
+    if (pw) {
+      await pluginSecretSet('plugin:wordpress:wpAppPassword', pw)
+      console.log('[wordpress] App-Passwort aus edoobox-Plugin-Secrets übernommen')
+    }
+  } catch (e) {
+    console.warn('[wordpress] Secret-Migration übersprungen:', e instanceof Error ? e.message : e)
   }
 }
 

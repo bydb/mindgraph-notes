@@ -1,7 +1,8 @@
 import { create } from 'zustand'
 import type { EdooboxEvent, EdooboxOffer, EdooboxCategory, EdooboxOfferDashboard, EdooboxBooking, IqReportData } from '../../../shared/types'
 import { useUIStore } from '../../../renderer/stores/uiStore'
-import { getEdooboxConfig, getMarketingConfig } from './config'
+import { getEdooboxConfig, getWordpressConfig } from './config'
+import { wordpressService } from '../../../renderer/stores/wordpressServiceBridge'
 import { useNotesStore } from '../../../renderer/stores/notesStore'
 import { edooboxClient } from './edooboxClient'
 import { useEventAgentBridge } from '../../../renderer/stores/eventAgentBridge'
@@ -337,7 +338,8 @@ export const useAgentStore = create<AgentState>()((set, get) => ({
   publishToWordpress: async (offerId: string, title: string, content: string) => {
     set({ isPublishing: true })
     try {
-      const { wordpressUrl, wordpressUser, defaultPostStatus } = getMarketingConfig()
+      // Publishing läuft über das eigenständige WordPress-Plugin (neutrale Bridge).
+      const { baseUrl, username, defaultPostStatus } = getWordpressConfig()
       const { selectedImageBase64, selectedImageFileName } = get()
 
       // Upload image as featured media if available, with caption for AI-generated images
@@ -345,7 +347,7 @@ export const useAgentStore = create<AgentState>()((set, get) => ({
       if (selectedImageBase64) {
         const { imageGeneratedInfo } = get()
         const caption = imageGeneratedInfo ? 'Bild generiert mit Google Imagen 4.0' : undefined
-        const uploadResult = await edooboxClient.marketingUploadImage(wordpressUrl, wordpressUser, selectedImageBase64, selectedImageFileName || 'bild.png', caption)
+        const uploadResult = await wordpressService.uploadImage(baseUrl, username, selectedImageBase64, selectedImageFileName || 'bild.png', caption)
         if (uploadResult.success && uploadResult.mediaId) {
           featuredMediaId = uploadResult.mediaId
         }
@@ -358,7 +360,7 @@ export const useAgentStore = create<AgentState>()((set, get) => ({
         finalContent = `<p class="imagen-caption" style="font-size:0.85em;color:#666;margin-top:-0.5em;margin-bottom:1.5em;font-style:italic;">${imageGeneratedInfo}</p>\n${content}`
       }
 
-      const result = await edooboxClient.marketingPublishWordpress(wordpressUrl, wordpressUser, title, finalContent, defaultPostStatus, featuredMediaId)
+      const result = await wordpressService.publishPost(baseUrl, username, title, finalContent, defaultPostStatus, featuredMediaId)
       if (result.success) {
         set((state) => ({
           marketingPublishStatus: {

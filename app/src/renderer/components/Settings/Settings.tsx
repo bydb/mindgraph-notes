@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react'
-import { useUIStore, ACCENT_COLORS, AI_LANGUAGES, FONT_FAMILIES, UI_LANGUAGES, BACKGROUND_COLORS, ICON_SETS, OUTLINE_STYLES, MODULE_CATEGORIES, EDOOBOX_DEFAULTS, MARKETING_DEFAULTS, REMARKABLE_DEFAULTS, type Language, type FontFamily, type BackgroundColor, type IconSet, type OutlineStyle, type LLMBackend, type TransportDestination, type ModuleCategory, type ModuleDescriptor } from '../../stores/uiStore'
+import { useUIStore, ACCENT_COLORS, AI_LANGUAGES, FONT_FAMILIES, UI_LANGUAGES, BACKGROUND_COLORS, ICON_SETS, OUTLINE_STYLES, MODULE_CATEGORIES, EDOOBOX_DEFAULTS, REMARKABLE_DEFAULTS, type Language, type FontFamily, type BackgroundColor, type IconSet, type OutlineStyle, type LLMBackend, type TransportDestination, type ModuleCategory, type ModuleDescriptor } from '../../stores/uiStore'
 import { usePluginConfig } from '../../plugins/config'
 import { MODULES, isModuleEnabled, setModuleEnabled, useIsModuleEnabled, isPluginModule, pluginIdsForModule } from '../../utils/modules'
 import { invokePlugin } from '../../plugins/client'
@@ -1981,10 +1981,6 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab,
   // Antares-Credentials/-Settings: in die Antares-Vertikale ausgelagert (AntaresSettings.tsx).
 
   // Marketing Credentials State
-  const [wpAppPassword, setWpAppPassword] = useState('')
-  const [wpCredsSaved, setWpCredsSaved] = useState(false)
-  const [wpTestStatus, setWpTestStatus] = useState<'idle' | 'testing' | 'success' | 'failed'>('idle')
-  const [wpTestError, setWpTestError] = useState<string | null>(null)
   const [remarkableStatus, setRemarkableStatus] = useState<'checking' | 'connected' | 'disconnected'>('checking')
   const [remarkableError, setRemarkableError] = useState<string | null>(null)
 
@@ -2103,8 +2099,8 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab,
     setSlashCommandTimeFormat
   } = useUIStore()
 
-  // Plugin-Vertikalen-Config generisch (pluginConfig) statt state.edoobox/marketing/remarkable.
-  const [marketingSettings, setMarketing] = usePluginConfig('marketing', MARKETING_DEFAULTS)
+  // Plugin-Vertikalen-Config generisch (pluginConfig) statt state.edoobox/remarkable.
+  // WordPress konfiguriert sich seit Paket 3 im eigenen Plugin-Settings-Tab.
   const [edooboxSettings] = usePluginConfig('edoobox', EDOOBOX_DEFAULTS)
   const [remarkableSettings, setRemarkable] = usePluginConfig('remarkable', REMARKABLE_DEFAULTS)
 
@@ -2247,18 +2243,13 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab,
     }
   }, [isOpen, emailSettings.accounts.length])
 
-  // edoobox + Marketing Credentials laden (Antares lädt sich selbst in AntaresSettings.tsx)
+  // edoobox-Credentials laden (Antares/WordPress laden sich selbst in ihren Plugin-Settings)
   useEffect(() => {
     if (isOpen && activeTab === 'agents') {
       edooboxService.loadCredentials().then(creds => {
         if (creds) {
           setEdooboxApiKey(creds.apiKey)
           setEdooboxApiSecret(creds.apiSecret)
-        }
-      })
-      edooboxService.marketingLoadCredentials().then(creds => {
-        if (creds) {
-          if (creds.wpAppPassword) setWpAppPassword(creds.wpAppPassword)
         }
       })
     }
@@ -6033,113 +6024,9 @@ LIMIT 10
                   </>
                 )}
 
-                <div className="settings-divider" />
-
-                {/* Marketing (WordPress + Instagram) — Teil des mz-suite Moduls */}
-                <h4 className="settings-section-title">{t('settings.agents.marketing.title')}</h4>
-                <p className="settings-hint">{t('settings.agents.marketing.description')}</p>
-
-                {marketingSettings.enabled && (
-                  <>
-                    {/* WordPress */}
-                    <h5 className="settings-subsection-title">{t('settings.agents.marketing.wordpress')}</h5>
-
-                    <div className="settings-row">
-                      <label>{t('settings.agents.marketing.wpUrl')}</label>
-                      <input
-                        type="url"
-                        value={marketingSettings.wordpressUrl}
-                        onChange={e => setMarketing({ wordpressUrl: e.target.value })}
-                        placeholder="https://meine-seite.de"
-                        className="settings-input"
-                      />
-                    </div>
-
-                    <div className="settings-row">
-                      <label>{t('settings.agents.marketing.wpUser')}</label>
-                      <input
-                        type="text"
-                        value={marketingSettings.wordpressUser}
-                        onChange={e => setMarketing({ wordpressUser: e.target.value })}
-                        placeholder="admin"
-                        className="settings-input"
-                      />
-                    </div>
-
-                    <div className="settings-row">
-                      <label>{t('settings.agents.marketing.wpAppPassword')}</label>
-                      <input
-                        type="password"
-                        value={wpAppPassword}
-                        onChange={e => { setWpAppPassword(e.target.value); setWpCredsSaved(false) }}
-                        placeholder="xxxx xxxx xxxx xxxx"
-                        className="settings-input"
-                      />
-                    </div>
-
-                    <div className="settings-row" style={{ gap: '8px' }}>
-                      <button
-                        className="settings-btn"
-                        onClick={async () => {
-                          if (wpAppPassword) {
-                            const saved = await edooboxService.marketingSaveCredentials(wpAppPassword)
-                            setWpCredsSaved(saved)
-                          }
-                        }}
-                      >
-                        {wpCredsSaved ? t('settings.agents.edoobox.saved') : t('settings.agents.edoobox.save')}
-                      </button>
-                      <button
-                        className="settings-btn"
-                        disabled={wpTestStatus === 'testing'}
-                        onClick={async () => {
-                          setWpTestError(null)
-                          if (!wpAppPassword || !marketingSettings.wordpressUrl || !marketingSettings.wordpressUser) {
-                            setWpTestStatus('failed')
-                            setWpTestError(t('settings.agents.marketing.wpFillAll'))
-                            return
-                          }
-                          await edooboxService.marketingSaveCredentials(wpAppPassword)
-                          setWpCredsSaved(true)
-                          setWpTestStatus('testing')
-                          const result = await edooboxService.marketingCheckWordpress(marketingSettings.wordpressUrl, marketingSettings.wordpressUser)
-                          setWpTestStatus(result.success ? 'success' : 'failed')
-                          setWpTestError(result.success ? null : (result.error || null))
-                        }}
-                      >
-                        {wpTestStatus === 'testing'
-                          ? t('settings.agents.edoobox.testing')
-                          : t('settings.agents.edoobox.testConnection')}
-                      </button>
-                      {wpTestStatus === 'success' && (
-                        <span className="status-connected">{t('settings.agents.edoobox.connected')}</span>
-                      )}
-                      {wpTestStatus === 'failed' && (
-                        <span className="status-disconnected">{t('settings.agents.edoobox.failed')}</span>
-                      )}
-                    </div>
-                    {wpTestError && (
-                      <div className="settings-row">
-                        <span className="settings-error-detail">{wpTestError}</span>
-                      </div>
-                    )}
-
-                    <div className="settings-row">
-                      <label>{t('settings.agents.marketing.defaultStatus')}</label>
-                      <select
-                        value={marketingSettings.defaultPostStatus}
-                        onChange={e => setMarketing({ defaultPostStatus: e.target.value as 'draft' | 'publish' })}
-                        className="settings-select"
-                      >
-                        <option value="draft">{t('settings.agents.marketing.statusDraft')}</option>
-                        <option value="publish">{t('settings.agents.marketing.statusPublish')}</option>
-                      </select>
-                    </div>
-
-                    {/* Google Imagen ist seit dem image-generation-Modul ein eigenes
-                        Opt-in-Modul (Einstellungen → KI) — hier keine Key-Config mehr. */}
-                  </>
-                )}
+                {/* WordPress-Publishing ist seit Paket 3 der Modul-Entflechtung das eigene
+                    Plugin `wordpress` (eigener Settings-Tab), Google Imagen das Core-Modul
+                    image-generation (KI-Tab) — hier nur noch edoobox selbst. */}
 
                 <div className="settings-divider" />
                 <p className="settings-hint">{t('settings.agents.moreAgents')}</p>

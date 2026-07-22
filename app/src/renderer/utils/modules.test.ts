@@ -9,7 +9,7 @@ describe('Plugin-Module aus Manifesten', () => {
     expect(CORE_MODULES.map((module) => module.id)).not.toContain('remarkable')
 
     expect(MODULES.map((module) => module.id)).toEqual(
-      expect.arrayContaining(['antares', 'mz-suite', 'remarkable'])
+      expect.arrayContaining(['antares', 'mz-suite', 'remarkable', 'wordpress'])
     )
     expect(new Set(MODULES.map((module) => module.id)).size).toBe(MODULES.length)
   })
@@ -20,14 +20,16 @@ describe('Plugin-Module aus Manifesten', () => {
     state.setBooleanSettingPath('pluginConfig.antares.enabled', true)
     state.setBooleanSettingPath('pluginConfig.edoobox.enabled', true)
     state.setBooleanSettingPath('pluginConfig.remarkable.enabled', true)
+    state.setBooleanSettingPath('pluginConfig.wordpress.enabled', true)
 
     expect(isModuleEnabled('antares')).toBe(true)
     expect(isModuleEnabled('mz-suite')).toBe(true)
     expect(isModuleEnabled('remarkable')).toBe(true)
+    expect(isModuleEnabled('wordpress')).toBe(true)
 
     state.setBooleanSettingPath('pluginConfig.antares.enabled', false)
     state.setBooleanSettingPath('pluginConfig.edoobox.enabled', false)
-    state.setBooleanSettingPath('pluginConfig.marketing.enabled', false)
     state.setBooleanSettingPath('pluginConfig.remarkable.enabled', false)
+    state.setBooleanSettingPath('pluginConfig.wordpress.enabled', false)
   })
 })

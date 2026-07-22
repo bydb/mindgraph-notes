@@ -15,7 +15,6 @@ export const EDOOBOX_CAPABILITIES = ['http.fetch', 'secrets', 'vault.read', 'vau
 //   wertige Felder kommen hier nicht vor (sie werden auf dem Fehlerpfad weggelassen), daher ist
 //   die Typprüfung „wenn vorhanden" sicher. additionalProperties bleibt offen.
 const str: JsonSchema = { type: 'string' }
-const num: JsonSchema = { type: 'number' }
 const arr: JsonSchema = { type: 'array' }
 /** Baut eine {success,…}-Hülle, die `success` erzwingt und die genannten Felder typt-wenn-vorhanden. */
 const envelope = (fields: Record<string, JsonSchema> = {}): JsonSchema => ({
@@ -36,19 +35,10 @@ const datesEnvelope = envelope({ dates: arr })
 const importEventEnvelope = envelope({ offerId: str })
 const fileExportEnvelope = envelope({ filePath: str, canceled: { type: 'boolean' } })
 const contentEnvelope = envelope({ blogPost: str, igCaption: str })
-const wpCheckEnvelope = envelope({ userName: str })
-const publishEnvelope = envelope({ postId: num, postUrl: str, status: str })
-const uploadEnvelope = envelope({ mediaId: num, imageUrl: str })
 const apiCredentialsResult: JsonSchema = {
   anyOf: [
     { type: 'null' },
     { type: 'object', required: ['apiKey', 'apiSecret'], properties: { apiKey: { type: 'string' }, apiSecret: { type: 'string' } }, additionalProperties: false },
-  ],
-}
-const wpCredentialsResult: JsonSchema = {
-  anyOf: [
-    { type: 'null' },
-    { type: 'object', required: ['wpAppPassword'], properties: { wpAppPassword: { type: 'string' } }, additionalProperties: false },
   ],
 }
 const selectedImageResult: JsonSchema = {
@@ -84,21 +74,17 @@ export const manifest: PluginManifest = {
   module: {
     id: 'mz-suite',
     enabledPath: 'pluginConfig.edoobox.enabled',
-    linkedEnabledPaths: ['pluginConfig.marketing.enabled'],
     legacyEnabledPath: 'edoobox.enabled',
   },
   capabilities: [...EDOOBOX_CAPABILITIES],
-  // Baseline-Allowlist: edoobox-Provider. Der konfigurierte edoobox- UND WordPress-Host
-  // (ui.edoobox.baseUrl, ui.marketing.wordpressUrl) wird zur Laufzeit ergänzt
-  // (resolveExtraAllowedHosts im Capability-Host). Bild-Generierung (Google Imagen) ist
-  // seit der Modul-Entflechtung ein CORE-Modul (image-generation) — kein Imagen-Host mehr hier.
+  // Baseline-Allowlist: edoobox-Provider. Der konfigurierte edoobox-Host (ui.edoobox.baseUrl)
+  // wird zur Laufzeit ergänzt (resolveExtraAllowedHosts im Capability-Host). WordPress ist
+  // seit Paket 3 der Modul-Entflechtung ein eigenes Plugin, Bild-Generierung (Google Imagen)
+  // ein CORE-Modul (image-generation) — keine fremden Hosts mehr hier.
   http: { allowedHosts: ['*.edoobox.com'] },
   credentials: [
     { key: 'apiKey', label: 'API Key', secret: true },
     { key: 'apiSecret', label: 'API Secret', secret: true },
-    // Optional: nur für die Marketing-Teilfunktion (WordPress). Fehlt es, ist edoobox trotzdem
-    // „bereit" — die Marketing-Action wirft erst beim Aufruf, wenn das Passwort fehlt.
-    { key: 'wpAppPassword', label: 'WordPress App-Passwort', secret: true, required: false },
   ],
   actions: [
     { id: 'edoobox.check', label: 'Verbindung testen', requiredCapabilities: ['http.fetch', 'secrets'], inputSchema: apiInput },
@@ -214,29 +200,9 @@ export const manifest: PluginManifest = {
         additionalProperties: false,
       },
     },
-    // — Marketing-Actions (Phase 2b): WordPress-Publishing + Ollama-Content. —
-    {
-      id: 'edoobox.marketingSaveCredentials',
-      requiredCapabilities: ['secrets'],
-      isWrite: true,
-      inputSchema: {
-        type: 'object',
-        required: ['wpAppPassword'],
-        properties: { wpAppPassword: { type: 'string' } },
-        additionalProperties: false,
-      },
-    },
-    { id: 'edoobox.marketingLoadCredentials', requiredCapabilities: ['secrets'] },
-    {
-      id: 'edoobox.marketingCheckWordpress',
-      requiredCapabilities: ['http.fetch', 'secrets'],
-      inputSchema: {
-        type: 'object',
-        required: ['siteUrl', 'username'],
-        properties: { siteUrl: { type: 'string' }, username: { type: 'string' } },
-        additionalProperties: false,
-      },
-    },
+    // — Marketing-Actions: Ollama-Content-Generierung + Bild-Auswahl. WordPress-Publishing
+    //   ist seit Paket 3 der Modul-Entflechtung das eigene Plugin `wordpress` (mitbenutzt
+    //   via wordpressServiceBridge); Bild-Generierung das Core-Modul `image-generation`. —
     {
       id: 'edoobox.marketingGenerateContent',
       requiredCapabilities: ['llm.generate'],
@@ -244,41 +210,6 @@ export const manifest: PluginManifest = {
         type: 'object',
         required: ['offerData'],
         properties: { offerData: { type: 'object' } },
-        additionalProperties: false,
-      },
-    },
-    {
-      id: 'edoobox.marketingPublishWordpress',
-      requiredCapabilities: ['http.fetch', 'secrets'],
-      isWrite: true,
-      inputSchema: {
-        type: 'object',
-        required: ['siteUrl', 'username', 'title', 'content', 'status'],
-        properties: {
-          siteUrl: { type: 'string' },
-          username: { type: 'string' },
-          title: { type: 'string' },
-          content: { type: 'string' },
-          status: { type: 'string' },
-          featuredMediaId: { type: 'number' },
-        },
-        additionalProperties: false,
-      },
-    },
-    {
-      id: 'edoobox.marketingUploadImage',
-      requiredCapabilities: ['http.fetch', 'secrets'],
-      isWrite: true,
-      inputSchema: {
-        type: 'object',
-        required: ['siteUrl', 'username', 'imageBase64', 'fileName'],
-        properties: {
-          siteUrl: { type: 'string' },
-          username: { type: 'string' },
-          imageBase64: { type: 'string' },
-          fileName: { type: 'string' },
-          caption: { type: 'string' },
-        },
         additionalProperties: false,
       },
     },
@@ -325,12 +256,7 @@ const EDOOBOX_OUTPUT_SCHEMAS: Record<string, JsonSchema> = {
   'edoobox.parseFormular': nullableObject,
   'edoobox.generateIqReport': fileExportEnvelope,
   'edoobox.generateAttendanceList': fileExportEnvelope,
-  'edoobox.marketingSaveCredentials': boolResult,
-  'edoobox.marketingLoadCredentials': wpCredentialsResult,
-  'edoobox.marketingCheckWordpress': wpCheckEnvelope,
   'edoobox.marketingGenerateContent': contentEnvelope,
-  'edoobox.marketingPublishWordpress': publishEnvelope,
-  'edoobox.marketingUploadImage': uploadEnvelope,
   'edoobox.marketingSelectImage': selectedImageResult,
 }
 for (const action of manifest.actions ?? []) {

@@ -361,13 +361,15 @@ export interface EmailSettings {
   activeFolders: Record<string, string>
 }
 
-// Marketing Settings (WordPress)
-// Der Google-Imagen-Key lebt seit dem image-generation-Modul NICHT mehr hier
-// (war Klartext in localStorage) — er liegt via safeStorage im Main-Prozess.
-export interface MarketingSettings {
+// WordPress-Plugin Settings (Publishing). Ehemals „Marketing"-Namespace der edoobox-
+// Vertikale — seit Paket 3 der Modul-Entflechtung eigenes Plugin `wordpress` mit eigenem
+// Modul-Gate. App-Passwort liegt in den Plugin-Secrets, der Imagen-Key im
+// image-generation-Modul (safeStorage) — beides bewusst NICHT hier.
+export interface WordpressSettings {
   enabled: boolean
-  wordpressUrl: string
-  wordpressUser: string
+  /** Site-URL; Feldname `baseUrl`, damit der generische resolveExtraAllowedHosts-Zweig greift. */
+  baseUrl: string
+  username: string
   defaultPostStatus: 'draft' | 'publish'
 }
 
@@ -390,10 +392,10 @@ export interface ReMarkableSettings {
 // Defaults für die generisch (pluginConfig) gespeicherten Vertikalen-Configs. Liegen — wie
 // ANTARES_DEFAULTS — bewusst im KERN, damit auch die (noch im Kern liegenden) Settings-Tabs
 // sie importieren können, ohne aus src/plugins/ zu importieren (Deletion-Test). A-pre Schritt 3.
-export const MARKETING_DEFAULTS: MarketingSettings = {
+export const WORDPRESS_DEFAULTS: WordpressSettings = {
   enabled: false,
-  wordpressUrl: '',
-  wordpressUser: '',
+  baseUrl: '',
+  username: '',
   defaultPostStatus: 'draft'
 }
 export const EDOOBOX_DEFAULTS: EdooboxSettings = {
@@ -1643,27 +1645,6 @@ export async function initializeUISettings(): Promise<void> {
         }
         validSettings.appearanceMigratedToLight = true
       }
-      // Einmalige Migration (Paket 2 Modul-Entflechtung): Google-Imagen-Key lag als
-      // Klartext in pluginConfig.marketing.googleImagenApiKey (localStorage) → jetzt
-      // safeStorage im Main (image-generation-Modul). Wer einen Key hatte, bekommt das
-      // Modul aktiviert (kein Funktionsverlust im Marketing-Tab). Idempotent: bei Fehler
-      // bleibt das Flag aus und der nächste Start versucht es erneut.
-      if (!validSettings.imagenKeyMigratedToSafeStorage) {
-        const marketingCfg = validSettings.pluginConfig?.marketing as { googleImagenApiKey?: string } | undefined
-        const legacyKey = marketingCfg?.googleImagenApiKey
-        if (legacyKey && typeof legacyKey === 'string') {
-          try {
-            const res = await window.electronAPI.imageGenSaveKey(legacyKey)
-            if (res.success) {
-              delete marketingCfg!.googleImagenApiKey
-              validSettings.imageGenerationEnabled = true
-              validSettings.imagenKeyMigratedToSafeStorage = true
-            }
-          } catch { /* nächster Start versucht es erneut */ }
-        } else {
-          validSettings.imagenKeyMigratedToSafeStorage = true
-        }
-      }
       // Migrate old profile names to new ones
       const profileMigration: Record<string, UserProfile> = {
         'schueler': 'student',
@@ -1681,6 +1662,50 @@ export async function initializeUISettings(): Promise<void> {
         savedSettings as Record<string, unknown>,
         (validSettings.pluginConfig ?? {}) as Record<string, Record<string, unknown>>
       )
+      // Einmalige Migration (Paket 2 Modul-Entflechtung): Google-Imagen-Key lag als
+      // Klartext in pluginConfig.marketing.googleImagenApiKey (localStorage) → jetzt
+      // safeStorage im Main (image-generation-Modul). Wer einen Key hatte, bekommt das
+      // Modul aktiviert (kein Funktionsverlust im Marketing-Tab). Idempotent: bei Fehler
+      // bleibt das Flag aus und der nächste Start versucht es erneut. Läuft bewusst NACH
+      // migrateLegacyPluginConfig (sehr alte Installationen: Key noch top-level).
+      if (!validSettings.imagenKeyMigratedToSafeStorage) {
+        const marketingCfg = validSettings.pluginConfig?.marketing as { googleImagenApiKey?: string } | undefined
+        const legacyKey = marketingCfg?.googleImagenApiKey
+        if (legacyKey && typeof legacyKey === 'string') {
+          try {
+            const res = await window.electronAPI.imageGenSaveKey(legacyKey)
+            if (res.success) {
+              delete marketingCfg!.googleImagenApiKey
+              validSettings.imageGenerationEnabled = true
+              validSettings.imagenKeyMigratedToSafeStorage = true
+            }
+          } catch { /* nächster Start versucht es erneut */ }
+        } else {
+          validSettings.imagenKeyMigratedToSafeStorage = true
+        }
+      }
+      // Migration (Paket 3 Modul-Entflechtung): Marketing-Config (pluginConfig.marketing)
+      // → eigenes WordPress-Plugin (pluginConfig.wordpress). Wer Marketing aktiv hatte,
+      // bekommt das WordPress-Modul aktiviert (kein Funktionsverlust im Marketing-Tab und
+      // beim Editor-Publish). Präsenz-basiert und idempotent: der marketing-Namespace wird
+      // danach entfernt — außer der Imagen-Key wartet oben noch auf einen Retry.
+      const legacyMarketing = validSettings.pluginConfig?.marketing as {
+        enabled?: boolean; wordpressUrl?: string; wordpressUser?: string
+        defaultPostStatus?: 'draft' | 'publish'; googleImagenApiKey?: string
+      } | undefined
+      if (legacyMarketing) {
+        if (!validSettings.pluginConfig!.wordpress) {
+          validSettings.pluginConfig!.wordpress = {
+            enabled: legacyMarketing.enabled === true,
+            baseUrl: legacyMarketing.wordpressUrl ?? '',
+            username: legacyMarketing.wordpressUser ?? '',
+            defaultPostStatus: legacyMarketing.defaultPostStatus ?? 'draft'
+          }
+        }
+        if (!legacyMarketing.googleImagenApiKey) {
+          delete validSettings.pluginConfig!.marketing
+        }
+      }
       useUIStore.setState(validSettings)
       // Karteileichen entfernen: erst die migrierte pluginConfig persistieren (crash-sicher),
       // DANN die alten Top-Level-Keys von der Platte prunen (saveUISettings mergt sonst weiter).

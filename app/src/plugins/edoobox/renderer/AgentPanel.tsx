@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { useAgentStore } from './agentStore'
-import { EDOOBOX_DEFAULTS, MARKETING_DEFAULTS } from '../../../renderer/stores/uiStore'
+import { EDOOBOX_DEFAULTS, WORDPRESS_DEFAULTS } from '../../../renderer/stores/uiStore'
 import { usePluginConfig } from '../../../renderer/plugins/config'
 import { useIsModuleEnabled } from '../../../renderer/utils/modules'
 import { useTranslation } from '../../../renderer/utils/translations'
@@ -587,7 +587,8 @@ const MarketingPublishDetail: React.FC<{ offer: EdooboxOfferDashboard; onBack: (
     publishToWordpress, selectImage, generateImage, isGeneratingImage,
     selectedImageFileName, imagePreviewDataUrl, imageGeneratedInfo, marketingPublishStatus
   } = useAgentStore()
-  const [marketing] = usePluginConfig('marketing', MARKETING_DEFAULTS)
+  // WordPress-Publishing = eigenes Plugin; der Marketing-Tab liest dessen Config nur mit.
+  const [wordpress] = usePluginConfig('wordpress', WORDPRESS_DEFAULTS)
   const [edooboxCfg] = usePluginConfig('edoobox', EDOOBOX_DEFAULTS)
   // Bild-Generierung = eigenes Core-Modul (Key liegt Main-seitig, nicht mehr in marketing.*).
   const imageGenEnabled = useIsModuleEnabled('image-generation')
@@ -723,7 +724,7 @@ const MarketingPublishDetail: React.FC<{ offer: EdooboxOfferDashboard; onBack: (
           <button
             className="agent-marketing-publish-btn wp"
             onClick={handlePublishWp}
-            disabled={isPublishing || !marketing.wordpressUrl}
+            disabled={isPublishing || !wordpress.enabled || !wordpress.baseUrl}
           >
             {isPublishing ? t('agent.marketing.publishing') : t('agent.marketing.publishWp')}
           </button>

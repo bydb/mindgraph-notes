@@ -2,6 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react'
 import { useUIStore } from '../../stores/uiStore'
 import { invokePlugin } from '../../plugins/client'
 import { edooboxService } from '../../stores/edooboxServiceBridge'
+import { wordpressService } from '../../stores/wordpressServiceBridge'
 
 type TabId = 'integrations' | 'email' | 'agents' | 'telegram' | 'speech' | 'sync' | 'dashboard' | 'ai' | `plugin:${string}`
 
@@ -112,15 +113,15 @@ export const CredentialsSettings: React.FC<Props> = ({ onNavigateToTab }) => {
       }
     })
 
-    // WordPress (Marketing)
+    // WordPress (eigenes Plugin seit Paket 3 der Modul-Entflechtung)
     rows.push({
       id: 'wordpress',
       label: 'WordPress App-Passwort',
       category: 'Business',
-      note: 'Automatisiertes Publishing im Marketing-Tab',
-      settingsTab: 'agents',
+      note: 'Publishing aus Editor und Marketing-Tab',
+      settingsTab: 'plugin:wordpress',
       checkSet: async () => {
-        const creds = await edooboxService.marketingLoadCredentials()
+        const creds = await wordpressService.loadCredentials()
         return !!(creds && creds.wpAppPassword)
       }
     })

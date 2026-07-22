@@ -11,15 +11,11 @@ import { EDOOBOX_CAPABILITIES, manifest } from '../manifest'
 import { parseAkkreditierungsformular } from '../formularParser'
 import { generateIqReportBytes, IQ_TEMPLATE_NAME, type IqReportData } from '../iqReportService'
 import { generateAttendanceListBytes, ATTENDANCE_TEMPLATE_NAME, type AttendanceListData } from '../attendanceListService'
-import { WordPressService } from '../marketingService'
 import { buildMarketingPrompts, type MarketingOfferData } from '../marketingContent'
 import type { EdooboxEvent } from '../../../shared/types'
 
 const DOCX_FILTER = [{ name: 'Word-Dokument', extensions: ['docx'] }]
 const IMAGE_FILTER = [{ name: 'Bilder', extensions: ['jpg', 'jpeg', 'png', 'gif', 'webp'] }]
-const IMAGE_MIME: Record<string, string> = {
-  jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', gif: 'image/gif', webp: 'image/webp',
-}
 
 const EVENTS_REL_PATH = '.mindgraph/edoobox-events.json'
 
@@ -246,39 +242,9 @@ export default definePluginMain(
       }
     })
 
-    // ── Marketing (WordPress + Ollama-Content + Google Imagen) ──────────────────
-
-    // Baut einen WordPress-Client aus Payload-Koordinaten + hinterlegtem App-Passwort.
-    const makeWp = async (siteUrl: string, username: string): Promise<WordPressService> => {
-      const pw = await host.secrets.get('wpAppPassword')
-      if (!pw) throw new Error('Kein WordPress App-Passwort gespeichert')
-      return new WordPressService(siteUrl, username, pw, host.http.fetch, host.http.fetchBasicAuth)
-    }
-
-    actions.register('edoobox.marketingSaveCredentials', async (p) => {
-      try {
-        const { wpAppPassword } = p as { wpAppPassword: string }
-        await host.secrets.set('wpAppPassword', wpAppPassword)
-        return true
-      } catch {
-        return false
-      }
-    })
-    actions.register('edoobox.marketingLoadCredentials', async () => {
-      const wpAppPassword = await host.secrets.get('wpAppPassword')
-      return wpAppPassword ? { wpAppPassword } : null
-    })
-
-    actions.register('edoobox.marketingCheckWordpress', async (p) => {
-      try {
-        const { siteUrl, username } = p as { siteUrl: string; username: string }
-        const wp = await makeWp(siteUrl, username)
-        const user = await wp.checkConnection()
-        return { success: true, userName: user.name }
-      } catch (e) {
-        return { success: false, error: errMsg(e, 'Verbindung fehlgeschlagen') }
-      }
-    })
+    // ── Marketing (Ollama-Content + Bild-Auswahl) ────────────────────────────────
+    // WordPress-Publishing lebt seit Paket 3 der Modul-Entflechtung im eigenen Plugin
+    // `wordpress` (Actions wordpress.*), Bild-Generierung im Core-Modul image-generation.
 
     actions.register('edoobox.marketingGenerateContent', async (p) => {
       try {
@@ -291,38 +257,6 @@ export default definePluginMain(
         return { success: false, error: errMsg(e, 'Content-Generierung fehlgeschlagen') }
       }
     })
-
-    actions.register('edoobox.marketingPublishWordpress', async (p) => {
-      try {
-        const { siteUrl, username, title, content, status, featuredMediaId } = p as {
-          siteUrl: string; username: string; title: string; content: string
-          status: 'draft' | 'publish'; featuredMediaId?: number
-        }
-        const wp = await makeWp(siteUrl, username)
-        const post = await wp.createPost(title, content, status, featuredMediaId)
-        return { success: true, postId: post.id, postUrl: post.link, status: post.status }
-      } catch (e) {
-        return { success: false, error: errMsg(e, 'Veröffentlichung fehlgeschlagen') }
-      }
-    })
-
-    actions.register('edoobox.marketingUploadImage', async (p) => {
-      try {
-        const { siteUrl, username, imageBase64, fileName, caption } = p as {
-          siteUrl: string; username: string; imageBase64: string; fileName: string; caption?: string
-        }
-        const ext = (fileName.split('.').pop() || '').toLowerCase()
-        const mimeType = IMAGE_MIME[ext] || 'image/jpeg'
-        const wp = await makeWp(siteUrl, username)
-        const media = await wp.uploadMedia(Buffer.from(imageBase64, 'base64'), fileName, mimeType, caption)
-        return { success: true, mediaId: media.id, imageUrl: media.source_url }
-      } catch (e) {
-        return { success: false, error: errMsg(e, 'Bild-Upload fehlgeschlagen') }
-      }
-    })
-
-    // Bild-GENERIERUNG (Google Imagen) lebt seit der Modul-Entflechtung im Core
-    // (image-generation-Modul, IPC image-generate) — hier bewusst keine Action mehr.
 
     // Bild auswählen (Dialog) → Base64 + Dateiname (kein Pfad, keine Temp-Datei).
     actions.register('edoobox.marketingSelectImage', async () => {
