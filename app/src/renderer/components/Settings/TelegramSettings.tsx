@@ -231,7 +231,27 @@ export const TelegramSettings: React.FC = () => {
 
   return (
     <div className="settings-section">
-      <h3>{t('telegramSettings.heading')}</h3>
+      <h3 style={{ display: 'flex', alignItems: 'center' }}>
+        {t('telegramSettings.heading')}
+        <span className="beta-badge">
+          <span className="beta-badge-dot" />
+          {t('telegramSettings.experimentalBadge')}
+        </span>
+      </h3>
+      <div
+        style={{
+          padding: '10px 12px',
+          borderRadius: 6,
+          border: '1px solid var(--border-color)',
+          background: 'color-mix(in srgb, var(--accent-color) 6%, transparent)',
+          color: 'var(--text-secondary)',
+          fontSize: 13,
+          lineHeight: 1.5,
+          marginBottom: 14
+        }}
+      >
+        {t('telegramSettings.experimentalNote')}
+      </div>
       <p className="settings-help">
         {t('telegramSettings.intro')}
       </p>

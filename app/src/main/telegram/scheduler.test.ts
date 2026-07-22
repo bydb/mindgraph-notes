@@ -6,7 +6,7 @@
 // fs in einem temporären Verzeichnis (kein Mock). Die Service-Tests verwenden
 // Regeln, die frühestens in Stunden feuern → Timer feuern im Test nie, werden in
 // afterEach abgebaut.
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { promises as fs } from 'fs'
 import os from 'os'
 import path from 'path'
@@ -193,5 +193,102 @@ describe('SchedulerService — Zustandskohärenz', () => {
     await fresh.start()                      // Bot-Start-Resume
     expect(fresh.isRunning()).toBe(true)
     fresh.stop()
+  })
+})
+
+describe('SchedulerService — Reconfiguration-Race (Generation)', () => {
+  // Szenario: ein Timer-Callback läuft (executeRule in-flight), währenddessen
+  // ändert der Nutzer die Config. Der alte Callback darf sich danach NICHT mehr
+  // neu einplanen — sonst re-armiert er eine gelöschte Regel oder überschreibt
+  // via timers.set() den frisch geplanten Timer der geänderten Regel.
+  // Fake-Timer + gated generateBriefing halten die Ausführung kontrolliert offen.
+  let dir: string
+  let svc: SchedulerService
+  let releaseBriefing: () => void
+  let briefingCalls: number
+
+  function makeDeps(): SchedulerDeps {
+    briefingCalls = 0
+    const gate = new Promise<void>(resolve => { releaseBriefing = resolve })
+    return {
+      getVaultPath: () => '/vault',
+      getExcludedFolders: () => [],
+      getOllamaModel: () => 'm',
+      getBriefingIncludeEmails: () => false,
+      getBriefingIncludeOverdue: () => false,
+      getBrainFolderPath: () => 'brain',
+      sendTelegramMessage: async () => {},
+      generateBriefing: async () => {
+        briefingCalls += 1
+        if (briefingCalls === 1) await gate // erster Lauf hängt, bis der Test ihn freigibt
+        return 'briefing'
+      },
+      loadOverdueTasks: async () => []
+    }
+  }
+
+  beforeEach(async () => {
+    vi.useFakeTimers()
+    // Mi, 24.06.2026, 12:00 — Regeln feuern deterministisch relativ dazu
+    vi.setSystemTime(new Date(2026, 5, 24, 12, 0, 0))
+    dir = await fs.mkdtemp(path.join(os.tmpdir(), 'mg-sched-race-'))
+    svc = new SchedulerService(makeDeps(), dir)
+  })
+
+  afterEach(async () => {
+    svc.stop()
+    vi.useRealTimers()
+    await fs.rm(dir, { recursive: true, force: true })
+  })
+
+  async function flushMicrotasks(): Promise<void> {
+    // Promise-Ketten des Timer-Callbacks abarbeiten lassen (kein Timer nötig)
+    for (let i = 0; i < 10; i++) await Promise.resolve()
+  }
+
+  it('REGRESSION: während der Ausführung gelöschte Regel wird nicht re-armiert', async () => {
+    await svc.setConfig({ enabled: true, rules: [rule({ hour: 12, minute: 1 })] })
+    expect(vi.getTimerCount()).toBe(1)
+
+    // Timer feuert, executeRule hängt im gated Briefing
+    await vi.advanceTimersByTimeAsync(60_000)
+    expect(briefingCalls).toBe(1)
+
+    // Nutzer löscht die Regel, während sie noch läuft
+    await svc.setConfig({ enabled: true, rules: [] })
+    expect(vi.getTimerCount()).toBe(0)
+
+    // Briefing wird fertig — der alte Callback darf sich NICHT neu einplanen
+    releaseBriefing()
+    await flushMicrotasks()
+    expect(vi.getTimerCount()).toBe(0)
+  })
+
+  it('REGRESSION: während der Ausführung geänderte Regel behält den NEUEN Zeitplan', async () => {
+    await svc.setConfig({ enabled: true, rules: [rule({ hour: 12, minute: 1 })] })
+    await vi.advanceTimersByTimeAsync(60_000) // feuert 12:01, hängt im Briefing
+
+    // Nutzer verschiebt dieselbe Regel (gleiche ID) auf 18:00
+    await svc.setConfig({ enabled: true, rules: [rule({ hour: 18, minute: 0 })] })
+    expect(vi.getTimerCount()).toBe(1)
+
+    releaseBriefing()
+    await flushMicrotasks()
+    // Der alte Callback darf den neuen Timer nicht durch die alte Regel ersetzen
+    expect(vi.getTimerCount()).toBe(1)
+
+    // Beweis, dass der verbleibende Timer der NEUE ist: er feuert um 18:00
+    // (die alte Regel würde erst morgen 12:01 feuern → briefingCalls bliebe 1)
+    await vi.advanceTimersByTimeAsync(6 * 60 * 60 * 1000) // 12:01 → 18:01
+    expect(briefingCalls).toBe(2)
+  })
+
+  it('stop() während laufender Ausführung verhindert Re-Arm ebenfalls', async () => {
+    await svc.setConfig({ enabled: true, rules: [rule({ hour: 12, minute: 1 })] })
+    await vi.advanceTimersByTimeAsync(60_000)
+    svc.stop()
+    releaseBriefing()
+    await flushMicrotasks()
+    expect(vi.getTimerCount()).toBe(0)
   })
 })

@@ -5,23 +5,11 @@
 // Sicherheits-Check: die Zielzeile muss tatsächlich ein Task sein, sonst Fehler.
 
 import { promises as fs } from 'fs'
-import path from 'path'
 import { tasksDueToday, tasksOverdue, tasksThisWeek, scanAllTasks } from '../../vaultQueries'
+import { resolveInVaultSafe } from './vaultPaths'
 import type { AppTool, ToolContext } from './registry'
 
 const TASK_LINE_REGEX = /^([\s]*[-*]\s*\[)([ xX])(\].*)$/
-
-function resolveInVault(vaultRoot: string, relativePath: string): string {
-  if (path.isAbsolute(relativePath)) {
-    throw new Error('Absoluter Pfad nicht erlaubt — bitte Vault-relativen Pfad nutzen.')
-  }
-  const resolved = path.resolve(vaultRoot, relativePath)
-  const rootResolved = path.resolve(vaultRoot)
-  if (resolved !== rootResolved && !resolved.startsWith(rootResolved + path.sep)) {
-    throw new Error('Pfad liegt außerhalb des Vaults.')
-  }
-  return resolved
-}
 
 export const taskListTool: AppTool = {
   name: 'task_list',
@@ -85,7 +73,7 @@ export const taskToggleTool: AppTool = {
     if (!rel) return { ok: false, content: 'Fehler: path fehlt.' }
     if (!Number.isInteger(line) || line < 1) return { ok: false, content: 'Fehler: line muss eine positive Ganzzahl sein.' }
 
-    const abs = resolveInVault(ctx.vaultPath, rel)
+    const abs = await resolveInVaultSafe(ctx.vaultPath, rel)
     let content: string
     try {
       content = await fs.readFile(abs, 'utf-8')

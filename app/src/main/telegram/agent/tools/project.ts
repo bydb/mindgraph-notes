@@ -8,17 +8,12 @@ import type { AppTool, ToolContext } from './registry'
 
 // Für den Agenten brauchen wir assertSafePath — aber die RAG-Engine erwartet
 // eine Validierungsfunktion. Im Telegram-Pfad gibt es keinen approvedVaultRoots-
-// Mechanismus; wir prüfen stattdessen, dass der Pfad innerhalb des Vault-Roots
-// bleibt (analog resolveInVault in notes.ts).
+// Mechanismus; wir prüfen stattdessen symlink-sicher, dass der Pfad innerhalb
+// des Vault-Roots bleibt (ensureAbsInVaultSafe in vaultPaths.ts).
 function makeVaultGuard(vaultRoot: string) {
   return async (requestedPath: string, _op: string): Promise<string> => {
-    const path = await import('path')
-    const resolved = path.resolve(requestedPath)
-    const root = path.resolve(vaultRoot)
-    if (resolved !== root && !resolved.startsWith(root + path.sep)) {
-      throw new Error('Pfad außerhalb des Vaults.')
-    }
-    return resolved
+    const { ensureAbsInVaultSafe } = await import('./vaultPaths')
+    return ensureAbsInVaultSafe(vaultRoot, requestedPath)
   }
 }
 
