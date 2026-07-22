@@ -682,6 +682,7 @@ export interface ElectronAPI {
   noteSkillsImportDialog: (vaultPath: string) => Promise<{ success: boolean; cancelled?: boolean; relPath?: string; folderName?: string; skippedScripts?: boolean; error?: string }>;
   noteAgentAcceptResult: (runId: string, resultId: string) => Promise<{ success: boolean; fileName?: string; relPath?: string; error?: string }>;
   noteAgentDiscardResult: (runId: string, resultId: string) => Promise<{ success: boolean; error?: string }>;
+  noteAgentPreviewResult: (runId: string, resultId: string) => Promise<{ success: boolean; kind?: string; binary?: boolean; text?: string; truncated?: boolean; sizeBytes?: number; error?: string }>;
   onNoteAgentProgress: (callback: (p: NoteAgentProgressEvent) => void) => void;
   onNoteAgentDone: (callback: (p: NoteAgentDoneEvent) => void) => void;
   onNoteAgentRunEvicted: (callback: (p: { runId: string }) => void) => void;

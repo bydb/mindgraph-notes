@@ -20218,6 +20218,59 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
   line-height: 1.4;
 }
 
+/* Sichtbarer Agent-Modus (Zielordner verknüpft): ruhiger Akzent-Hinweis statt Tooltip */
+.ai-bar-agent-mode-hint {
+  padding: 6px 9px;
+  border: 1px solid color-mix(in srgb, var(--accent-color) 30%, transparent);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--accent-color) 7%, transparent);
+  color: var(--text-secondary);
+  font-size: 11px;
+  line-height: 1.4;
+}
+.ai-bar-agent-mode-hint strong { color: var(--text-primary); font-weight: 600; }
+
+/* Provenienz des Agent-Laufs: Modell + Datenweg (lokal/Cloud) */
+.ai-bar-agent-prov {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  min-width: 0;
+}
+.ai-bar-agent-prov-model {
+  font-weight: 600;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ai-bar-agent-prov-route { flex-shrink: 0; color: var(--text-muted); }
+
+/* Vorschau der Staging-Datei auf der Ergebnis-Karte */
+.ai-bar-agent-preview {
+  max-height: 240px;
+  overflow: auto;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--bg-primary);
+  padding: 8px 10px;
+}
+.ai-bar-agent-preview pre {
+  margin: 0;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 11px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--text-primary);
+}
+.ai-bar-agent-preview-loading,
+.ai-bar-agent-preview-binary { font-size: 11px; color: var(--text-muted); }
+.ai-bar-agent-preview-truncated { font-size: 10px; color: var(--text-muted); margin-top: 4px; }
+.ai-bar-agent-card-actions .ai-bar-agent-preview-btn { margin-right: auto; }
+
 /* Review-Phase: Provenienz-Kopf (Human → KI) + Block-Diff */
 .ai-bar-review-head {
   display: flex;

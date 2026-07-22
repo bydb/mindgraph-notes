@@ -82,8 +82,12 @@ interface AgentRunUiState {
   steps: AgentUiStep[]
   results: AgentUiResult[]
   finalText: string
+  // Provenienz des Laufs: Modell + Datenweg (lokal vs. Cloud-Provider-Label) —
+  // beim Start festgehalten, damit die Review-Karten sie anzeigen können.
+  model: string
+  cloudLabel: string | null
 }
-const EMPTY_AGENT_RUN: AgentRunUiState = { runId: null, phase: 'idle', steps: [], results: [], finalText: '' }
+const EMPTY_AGENT_RUN: AgentRunUiState = { runId: null, phase: 'idle', steps: [], results: [], finalText: '', model: '', cloudLabel: null }
 
 const markdownCodeLanguages = [
   LanguageDescription.of({
@@ -1967,6 +1971,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
     // Cloud-Eintrag im Picker allein reicht nicht — der gewählte Provider muss
     // note-agent explizit freigeschaltet haben.
     let cloud: { model: string; provider: CloudProviderId } | null = null
+    let cloudLabel: string | null = null
     if (activeAiCloudRoute) {
       const agentRoute = agentRoutes.find(r => r.provider === activeAiCloudRoute.provider)
       if (!agentRoute) {
@@ -1974,6 +1979,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
         return
       }
       cloud = { model: agentRoute.model, provider: agentRoute.provider }
+      cloudLabel = agentRoute.label
     }
     const view = viewRef.current
     const noteContent = view ? view.state.doc.toString() : (selectedNote?.content || '')
@@ -1995,7 +2001,15 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
     agentRunNoteRef.current.set(res.runId, effectiveNoteId)
     setAgentRunByNote(prev => ({
       ...prev,
-      [effectiveNoteId]: { runId: res.runId ?? null, phase: 'running', steps: [], results: [], finalText: '' }
+      [effectiveNoteId]: {
+        runId: res.runId ?? null,
+        phase: 'running',
+        steps: [],
+        results: [],
+        finalText: '',
+        model: cloud ? cloud.model : model,
+        cloudLabel
+      }
     }))
   }, [effectiveNoteId, vaultPath, agentTargetFolder, activeAiCloudRoute, agentRoutes, ollama, aiModel, agentAttachments, selectedNote, t])
 
@@ -2029,6 +2043,13 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
     if (res.success) agentResultPatch(noteId, resultId, { state: 'discarded', error: undefined })
     else agentResultPatch(noteId, resultId, { error: res.error })
   }, [effectiveNoteId, agentRunByNote, agentResultPatch])
+
+  // Vorschau vor der Übernahme: liest die Staging-Datei read-only via Main.
+  const agentResultPreview = useCallback(async (resultId: string) => {
+    const run = effectiveNoteId ? agentRunByNote[effectiveNoteId] : undefined
+    if (!run?.runId) return { success: false, error: 'Kein aktiver Lauf' }
+    return window.electronAPI.noteAgentPreviewResult(run.runId, resultId)
+  }, [effectiveNoteId, agentRunByNote])
 
   // Mitlernen (Stufe 3): Merksatz in die Agent-Gedächtnis-Notiz (Skills/Agent-Gedächtnis.md).
   // Feedback (Erfolg + Fehler) rendert die AiActionBar direkt an der Merken-Zeile.
@@ -5367,10 +5388,13 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
           agentSteps={agentRunState.steps}
           agentResults={agentRunState.results}
           agentFinalText={agentRunState.finalText}
+          agentModel={agentRunState.model}
+          agentCloudLabel={agentRunState.cloudLabel}
           onAgentRun={agentRunStart}
           onAgentCancel={agentRunCancel}
           onAgentAccept={agentResultAccept}
           onAgentDiscard={agentResultDiscard}
+          onAgentPreview={agentResultPreview}
           onAgentDismiss={agentRunDismiss}
           onRemember={agentRemember}
         />
