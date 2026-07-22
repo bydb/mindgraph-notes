@@ -1,0 +1,1072 @@
+{
+  "schema": "openai.presentation.layout/v4",
+  "unit": "px",
+  "slide": {
+    "aid": "sl/3mcxn6",
+    "id": "3mcxn6",
+    "slide": 4,
+    "layoutId": "aadf4736-e9f8-4e80-a036-bfb1b97e8bf1",
+    "layoutName": "Title Slide",
+    "layoutType": "title",
+    "masterLayoutId": "4850f72b-d411-4c11-9c95-0d78506eb821",
+    "masterLayoutName": "Master",
+    "frame": {
+      "left": 0,
+      "top": 0,
+      "width": 1280,
+      "height": 720
+    }
+  },
+  "theme": {
+    "colorSchemeName": "ChatGPT",
+    "colors": {
+      "accent1": "#156082",
+      "accent2": "#E97132",
+      "accent3": "#196B24",
+      "accent4": "#0F9ED5",
+      "accent5": "#A02B93",
+      "accent6": "#4EA72E",
+      "bg1": "#FFFFFF",
+      "bg2": "#000000",
+      "tx1": "#1F1F1F",
+      "tx2": "#FFFFFF",
+      "dk1": "#000000",
+      "lt1": "#FFFFFF",
+      "dk2": "#0E2841",
+      "lt2": "#E8E8E8",
+      "hlink": "#467886",
+      "folHlink": "#96607D"
+    },
+    "typefaces": [
+      "Avenir Next"
+    ]
+  },
+  "inheritedLayers": [
+    {
+      "scope": "layout",
+      "id": "aadf4736-e9f8-4e80-a036-bfb1b97e8bf1",
+      "name": "Title Slide",
+      "type": "title",
+      "parentLayoutId": "4850f72b-d411-4c11-9c95-0d78506eb821",
+      "elements": []
+    },
+    {
+      "scope": "master",
+      "id": "4850f72b-d411-4c11-9c95-0d78506eb821",
+      "name": "Master",
+      "type": "master",
+      "elements": []
+    }
+  ],
+  "elements": [
+    {
+      "order": 1,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/vmtwra5g",
+      "id": "1",
+      "bbox": [
+        0,
+        0,
+        1280,
+        720
+      ],
+      "geometry": "rect",
+      "fillColor": "#111319"
+    },
+    {
+      "order": 2,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/o7qpg3ex",
+      "id": "2",
+      "bbox": [
+        56,
+        44,
+        11,
+        11
+      ],
+      "geometry": "rect",
+      "fillColor": "#F2B84B"
+    },
+    {
+      "order": 3,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/dsji5sne",
+      "id": "3",
+      "bbox": [
+        78,
+        36,
+        360,
+        28
+      ],
+      "geometry": "rect",
+      "text": "STUDIENKONTRAST",
+      "textPreview": "STUDIENKONTRAST",
+      "resolvedFontSize": 14,
+      "resolvedTextStyle": {
+        "anchor": 2,
+        "fontSize": 14,
+        "typeface": "Avenir Next",
+        "color": "#A9ADB8",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "middle",
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "STUDIENKONTRAST"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "STUDIENKONTRAST",
+          "resolvedTextStyle": {
+            "fontSize": 14,
+            "typeface": "Avenir Next",
+            "color": "#A9ADB8",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "STUDIENKONTRAST",
+              "fontSize": 14,
+              "typeface": "Avenir Next",
+              "color": "#A9ADB8",
+              "bold": true
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 4,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/6dcbulwv",
+      "id": "4",
+      "bbox": [
+        1188,
+        668,
+        36,
+        20
+      ],
+      "geometry": "rect",
+      "text": "04",
+      "textPreview": "04",
+      "resolvedFontSize": 12,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 12,
+        "typeface": "Avenir Next",
+        "color": "#A9ADB8",
+        "alignment": "right",
+        "verticalAlignment": "top",
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "04"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "04",
+          "resolvedTextStyle": {
+            "fontSize": 12,
+            "typeface": "Avenir Next",
+            "color": "#A9ADB8",
+            "alignment": "right"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "04",
+              "fontSize": 12,
+              "typeface": "Avenir Next",
+              "color": "#A9ADB8"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 5,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/vy90je9c",
+      "id": "5",
+      "bbox": [
+        56,
+        88,
+        920,
+        96
+      ],
+      "geometry": "rect",
+      "text": "Der Unterschied ist nicht Interesse, sondern Selbstverstaendlichkeit.",
+      "textPreview": "Der Unterschied ist nicht Interesse, sondern Selbstverstaendlichkeit.",
+      "resolvedFontSize": 44,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 44,
+        "typeface": "Avenir Next",
+        "color": "#FFFFFF",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 2,
+        "lines": [
+          {
+            "index": 1,
+            "text": "Der Unterschied ist nicht Interesse,"
+          },
+          {
+            "index": 2,
+            "text": "sondern Selbstverstaendlichkeit."
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "Der Unterschied ist nicht Interesse, sondern Selbstverstaendlichkeit.",
+          "resolvedTextStyle": {
+            "fontSize": 44,
+            "typeface": "Avenir Next",
+            "color": "#FFFFFF",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "Der Unterschied ist nicht Interesse, sondern Selbstverstaendlichkeit.",
+              "fontSize": 44,
+              "typeface": "Avenir Next",
+              "color": "#FFFFFF",
+              "bold": true
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 6,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/oj2t83it",
+      "id": "6",
+      "bbox": [
+        70,
+        226,
+        520,
+        316
+      ],
+      "geometry": "rect",
+      "fillColor": "#F2EEE7"
+    },
+    {
+      "order": 7,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/d4vmtwra",
+      "id": "7",
+      "bbox": [
+        102,
+        254,
+        330,
+        38
+      ],
+      "geometry": "rect",
+      "text": "Klasse 10 heute",
+      "textPreview": "Klasse 10 heute",
+      "resolvedFontSize": 30,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 30,
+        "typeface": "Avenir Next",
+        "color": "#111319",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "Klasse 10 heute"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "Klasse 10 heute",
+          "resolvedTextStyle": {
+            "fontSize": 30,
+            "typeface": "Avenir Next",
+            "color": "#111319",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "Klasse 10 heute",
+              "fontSize": 30,
+              "typeface": "Avenir Next",
+              "color": "#111319",
+              "bold": true
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 8,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/6hcrmhk3",
+      "id": "8",
+      "bbox": [
+        104,
+        314,
+        400,
+        56
+      ],
+      "geometry": "rect",
+      "text": "Fast alle 16- bis 19-Jaehrigen nutzen generative KI.",
+      "textPreview": "Fast alle 16- bis 19-Jaehrigen nutzen generative KI.",
+      "resolvedFontSize": 22,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 22,
+        "typeface": "Avenir Next",
+        "color": "#111319",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 2,
+        "lines": [
+          {
+            "index": 1,
+            "text": "Fast alle 16- bis 19-Jaehrigen nutzen"
+          },
+          {
+            "index": 2,
+            "text": "generative KI."
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "Fast alle 16- bis 19-Jaehrigen nutzen generative KI.",
+          "resolvedTextStyle": {
+            "fontSize": 22,
+            "typeface": "Avenir Next",
+            "color": "#111319",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "Fast alle 16- bis 19-Jaehrigen nutzen generative KI.",
+              "fontSize": 22,
+              "typeface": "Avenir Next",
+              "color": "#111319",
+              "bold": true
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 9,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/z25kb6xk",
+      "id": "9",
+      "bbox": [
+        106,
+        398,
+        410,
+        86
+      ],
+      "geometry": "rect",
+      "text": "Leibniz-HBI: knapp 96 % Nutzung bei 16-19.\nVodafone: 74 % der 14-20-Jaehrigen nutzen KI-Anwendungen.",
+      "textPreview": "Leibniz-HBI: knapp 96 % Nutzung bei 16-19. | Vodafone: 74 % der 14-20-Jaehrigen nutzen KI-Anwendungen.",
+      "resolvedFontSize": 18,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 18,
+        "typeface": "Avenir Next",
+        "color": "#41434C",
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 3,
+        "lines": [
+          {
+            "index": 1,
+            "text": "Leibniz-HBI: knapp 96 % Nutzung bei 16-19."
+          },
+          {
+            "index": 2,
+            "text": "Vodafone: 74 % der 14-20-Jaehrigen nutzen"
+          },
+          {
+            "index": 3,
+            "text": "KI-Anwendungen."
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "Leibniz-HBI: knapp 96 % Nutzung bei 16-19.",
+          "resolvedTextStyle": {
+            "fontSize": 18,
+            "typeface": "Avenir Next",
+            "color": "#41434C",
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "Leibniz-HBI: knapp 96 % Nutzung bei 16-19.",
+              "fontSize": 18,
+              "typeface": "Avenir Next",
+              "color": "#41434C"
+            }
+          ],
+          "marginLeft": 0
+        },
+        {
+          "index": 2,
+          "text": "Vodafone: 74 % der 14-20-Jaehrigen nutzen KI-Anwendungen.",
+          "resolvedTextStyle": {
+            "fontSize": 18,
+            "typeface": "Avenir Next",
+            "color": "#41434C",
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "Vodafone: 74 % der 14-20-Jaehrigen nutzen KI-Anwendungen.",
+              "fontSize": 18,
+              "typeface": "Avenir Next",
+              "color": "#41434C"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 10,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/vy90je9c",
+      "id": "10",
+      "bbox": [
+        104,
+        498,
+        340,
+        8
+      ],
+      "geometry": "rect",
+      "fillColor": "#F2B84B"
+    },
+    {
+      "order": 11,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/6dcbulwv",
+      "id": "11",
+      "bbox": [
+        690,
+        226,
+        520,
+        316
+      ],
+      "geometry": "rect",
+      "fillColor": "#F2EEE7"
+    },
+    {
+      "order": 12,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/d4vmtwra",
+      "id": "12",
+      "bbox": [
+        722,
+        254,
+        330,
+        38
+      ],
+      "geometry": "rect",
+      "text": "Jochen / Gen X",
+      "textPreview": "Jochen / Gen X",
+      "resolvedFontSize": 30,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 30,
+        "typeface": "Avenir Next",
+        "color": "#111319",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "Jochen / Gen X"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "Jochen / Gen X",
+          "resolvedTextStyle": {
+            "fontSize": 30,
+            "typeface": "Avenir Next",
+            "color": "#111319",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "Jochen / Gen X",
+              "fontSize": 30,
+              "typeface": "Avenir Next",
+              "color": "#111319",
+              "bold": true
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 13,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/oj2t83it",
+      "id": "13",
+      "bbox": [
+        724,
+        314,
+        410,
+        56
+      ],
+      "geometry": "rect",
+      "text": "Erwachsene schauen genau hin, fuehlen sich aber seltener sicher.",
+      "textPreview": "Erwachsene schauen genau hin, fuehlen sich aber seltener sicher.",
+      "resolvedFontSize": 22,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 22,
+        "typeface": "Avenir Next",
+        "color": "#111319",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 2,
+        "lines": [
+          {
+            "index": 1,
+            "text": "Erwachsene schauen genau hin,"
+          },
+          {
+            "index": 2,
+            "text": "fuehlen sich aber seltener sicher."
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "Erwachsene schauen genau hin, fuehlen sich aber seltener sicher.",
+          "resolvedTextStyle": {
+            "fontSize": 22,
+            "typeface": "Avenir Next",
+            "color": "#111319",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "Erwachsene schauen genau hin, fuehlen sich aber seltener sicher.",
+              "fontSize": 22,
+              "typeface": "Avenir Next",
+              "color": "#111319",
+              "bold": true
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 14,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/vmtwra5g",
+      "id": "14",
+      "bbox": [
+        726,
+        398,
+        410,
+        86
+      ],
+      "geometry": "rect",
+      "text": "FOM: 26 % der Gen X fuehlen sich sicher im Umgang mit KI.\nD21: Nutzen, Einfachheit und Zeitersparnis treiben Akzeptanz.",
+      "textPreview": "FOM: 26 % der Gen X fuehlen sich sicher im Umgang mit KI. | D21: Nutzen, Einfachheit und Zeitersparnis treiben Akzeptanz.",
+      "resolvedFontSize": 18,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 18,
+        "typeface": "Avenir Next",
+        "color": "#41434C",
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 4,
+        "lines": [
+          {
+            "index": 1,
+            "text": "FOM: 26 % der Gen X fuehlen sich sicher im"
+          },
+          {
+            "index": 2,
+            "text": "Umgang mit KI."
+          },
+          {
+            "index": 3,
+            "text": "D21: Nutzen, Einfachheit und Zeitersparnis"
+          },
+          {
+            "index": 4,
+            "text": "treiben Akzeptanz."
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "FOM: 26 % der Gen X fuehlen sich sicher im Umgang mit KI.",
+          "resolvedTextStyle": {
+            "fontSize": 18,
+            "typeface": "Avenir Next",
+            "color": "#41434C",
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "FOM: 26 % der Gen X fuehlen sich sicher im Umgang mit KI.",
+              "fontSize": 18,
+              "typeface": "Avenir Next",
+              "color": "#41434C"
+            }
+          ],
+          "marginLeft": 0
+        },
+        {
+          "index": 2,
+          "text": "D21: Nutzen, Einfachheit und Zeitersparnis treiben Akzeptanz.",
+          "resolvedTextStyle": {
+            "fontSize": 18,
+            "typeface": "Avenir Next",
+            "color": "#41434C",
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "D21: Nutzen, Einfachheit und Zeitersparnis treiben Akzeptanz.",
+              "fontSize": 18,
+              "typeface": "Avenir Next",
+              "color": "#41434C"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 15,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/61032lsz",
+      "id": "15",
+      "bbox": [
+        724,
+        498,
+        132,
+        8
+      ],
+      "geometry": "rect",
+      "fillColor": "#B778F2"
+    },
+    {
+      "order": 16,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/dsji5sne",
+      "id": "16",
+      "bbox": [
+        178,
+        568,
+        120,
+        28
+      ],
+      "geometry": "rect",
+      "text": "Tempo",
+      "textPreview": "Tempo",
+      "resolvedFontSize": 22,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 22,
+        "typeface": "Avenir Next",
+        "color": "#F2B84B",
+        "bold": true,
+        "alignment": "center",
+        "verticalAlignment": "top",
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "Tempo"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "Tempo",
+          "resolvedTextStyle": {
+            "fontSize": 22,
+            "typeface": "Avenir Next",
+            "color": "#F2B84B",
+            "bold": true,
+            "alignment": "center"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "Tempo",
+              "fontSize": 22,
+              "typeface": "Avenir Next",
+              "color": "#F2B84B",
+              "bold": true
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 17,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/o7qpg3ex",
+      "id": "17",
+      "bbox": [
+        612,
+        558,
+        60,
+        42
+      ],
+      "geometry": "rect",
+      "text": "+",
+      "textPreview": "+",
+      "resolvedFontSize": 42,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 42,
+        "typeface": "Avenir Next",
+        "color": "#FFFFFF",
+        "bold": true,
+        "alignment": "center",
+        "verticalAlignment": "top",
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "+"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "+",
+          "resolvedTextStyle": {
+            "fontSize": 42,
+            "typeface": "Avenir Next",
+            "color": "#FFFFFF",
+            "bold": true,
+            "alignment": "center"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "+",
+              "fontSize": 42,
+              "typeface": "Avenir Next",
+              "color": "#FFFFFF",
+              "bold": true
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 18,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/vahoza1g",
+      "id": "18",
+      "bbox": [
+        812,
+        568,
+        150,
+        28
+      ],
+      "geometry": "rect",
+      "text": "Erfahrung",
+      "textPreview": "Erfahrung",
+      "resolvedFontSize": 22,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 22,
+        "typeface": "Avenir Next",
+        "color": "#D7B6FF",
+        "bold": true,
+        "alignment": "center",
+        "verticalAlignment": "top",
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "Erfahrung"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "Erfahrung",
+          "resolvedTextStyle": {
+            "fontSize": 22,
+            "typeface": "Avenir Next",
+            "color": "#D7B6FF",
+            "bold": true,
+            "alignment": "center"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "Erfahrung",
+              "fontSize": 22,
+              "typeface": "Avenir Next",
+              "color": "#D7B6FF",
+              "bold": true
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 19,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/6tovahoz",
+      "id": "19",
+      "bbox": [
+        56,
+        672,
+        900,
+        18
+      ],
+      "geometry": "rect",
+      "text": "Quellen: Leibniz-HBI 2025; Vodafone Stiftung 2024; FOM Hochschule 2025; D21-Digital-Index 2024/25.",
+      "textPreview": "Quellen: Leibniz-HBI 2025; Vodafone Stiftung 2024; FOM Hochschule 2025; D21-Digital-Index 2024/25.",
+      "resolvedFontSize": 10,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 10,
+        "typeface": "Avenir Next",
+        "color": "#A9ADB8",
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "Quellen: Leibniz-HBI 2025; Vodafone Stiftung 2024; FOM Hochschule 2025; D21-Digital-Index 2024/25."
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "Quellen: Leibniz-HBI 2025; Vodafone Stiftung 2024; FOM Hochschule 2025; D21-Digital-Index 2024/25.",
+          "resolvedTextStyle": {
+            "fontSize": 10,
+            "typeface": "Avenir Next",
+            "color": "#A9ADB8",
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "Quellen: Leibniz-HBI 2025; Vodafone Stiftung 2024; FOM Hochschule 2025; D21-Digital-Index 2024/25.",
+              "fontSize": 10,
+              "typeface": "Avenir Next",
+              "color": "#A9ADB8"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    }
+  ],
+  "composeRuns": []
+}

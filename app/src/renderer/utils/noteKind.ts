@@ -116,6 +116,15 @@ export function stripNoteKindMarker(text: string): string {
     .trim()
 }
 
+// Zettelkasten-Titel „202606222240 - Optimierung vs. Transformation" in ID und
+// Anzeige-Titel trennen. Die ID (JJJJMMTTHHmm, 10-14 Ziffern) bleibt als stiller
+// Chip verfügbar; der Rest wird als Titel angezeigt. Kein Match → id: null.
+export function splitZettelTitle(title: string): { zettelId: string | null; displayTitle: string } {
+  const match = title.match(/^(\d{10,14})\s*-\s*(.+)$/)
+  if (!match) return { zettelId: null, displayTitle: title }
+  return { zettelId: match[1], displayTitle: match[2].trim() }
+}
+
 export function setNoteKindInContent(content: string, kindId: NoteKindId): string {
   const categoryLine = `category: ${kindId}`
   const frontmatterMatch = content.match(/^---\s*\n([\s\S]*?)\n---/)

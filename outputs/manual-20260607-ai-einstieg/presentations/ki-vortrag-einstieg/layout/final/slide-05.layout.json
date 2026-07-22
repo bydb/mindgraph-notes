@@ -1,0 +1,1052 @@
+{
+  "schema": "openai.presentation.layout/v4",
+  "unit": "px",
+  "slide": {
+    "aid": "sl/zqqp6m",
+    "id": "zqqp6m",
+    "slide": 5,
+    "layoutId": "aadf4736-e9f8-4e80-a036-bfb1b97e8bf1",
+    "layoutName": "Title Slide",
+    "layoutType": "title",
+    "masterLayoutId": "4850f72b-d411-4c11-9c95-0d78506eb821",
+    "masterLayoutName": "Master",
+    "frame": {
+      "left": 0,
+      "top": 0,
+      "width": 1280,
+      "height": 720
+    }
+  },
+  "theme": {
+    "colorSchemeName": "ChatGPT",
+    "colors": {
+      "accent1": "#156082",
+      "accent2": "#E97132",
+      "accent3": "#196B24",
+      "accent4": "#0F9ED5",
+      "accent5": "#A02B93",
+      "accent6": "#4EA72E",
+      "bg1": "#FFFFFF",
+      "bg2": "#000000",
+      "tx1": "#1F1F1F",
+      "tx2": "#FFFFFF",
+      "dk1": "#000000",
+      "lt1": "#FFFFFF",
+      "dk2": "#0E2841",
+      "lt2": "#E8E8E8",
+      "hlink": "#467886",
+      "folHlink": "#96607D"
+    },
+    "typefaces": [
+      "Avenir Next"
+    ]
+  },
+  "inheritedLayers": [
+    {
+      "scope": "layout",
+      "id": "aadf4736-e9f8-4e80-a036-bfb1b97e8bf1",
+      "name": "Title Slide",
+      "type": "title",
+      "parentLayoutId": "4850f72b-d411-4c11-9c95-0d78506eb821",
+      "elements": []
+    },
+    {
+      "scope": "master",
+      "id": "4850f72b-d411-4c11-9c95-0d78506eb821",
+      "name": "Master",
+      "type": "master",
+      "elements": []
+    }
+  ],
+  "elements": [
+    {
+      "order": 1,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/p4r65wju",
+      "id": "1",
+      "bbox": [
+        0,
+        0,
+        1280,
+        720
+      ],
+      "geometry": "rect",
+      "fillColor": "#111319"
+    },
+    {
+      "order": 2,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/ed8v6psf",
+      "id": "2",
+      "bbox": [
+        56,
+        44,
+        11,
+        11
+      ],
+      "geometry": "rect",
+      "fillColor": "#F2B84B"
+    },
+    {
+      "order": 3,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/7y1kre1w",
+      "id": "3",
+      "bbox": [
+        78,
+        36,
+        360,
+        28
+      ],
+      "geometry": "rect",
+      "text": "UEBERGANG",
+      "textPreview": "UEBERGANG",
+      "resolvedFontSize": 14,
+      "resolvedTextStyle": {
+        "anchor": 2,
+        "fontSize": 14,
+        "typeface": "Avenir Next",
+        "color": "#A9ADB8",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "middle",
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "UEBERGANG"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "UEBERGANG",
+          "resolvedTextStyle": {
+            "fontSize": 14,
+            "typeface": "Avenir Next",
+            "color": "#A9ADB8",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "UEBERGANG",
+              "fontSize": 14,
+              "typeface": "Avenir Next",
+              "color": "#A9ADB8",
+              "bold": true
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 4,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/0bi9s36h",
+      "id": "4",
+      "bbox": [
+        1188,
+        668,
+        36,
+        20
+      ],
+      "geometry": "rect",
+      "text": "05",
+      "textPreview": "05",
+      "resolvedFontSize": 12,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 12,
+        "typeface": "Avenir Next",
+        "color": "#A9ADB8",
+        "alignment": "right",
+        "verticalAlignment": "top",
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "05"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "05",
+          "resolvedTextStyle": {
+            "fontSize": 12,
+            "typeface": "Avenir Next",
+            "color": "#A9ADB8",
+            "alignment": "right"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "05",
+              "fontSize": 12,
+              "typeface": "Avenir Next",
+              "color": "#A9ADB8"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 5,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/pwb2hwfy",
+      "id": "5",
+      "bbox": [
+        56,
+        86,
+        900,
+        116
+      ],
+      "geometry": "rect",
+      "text": "Die spannende Frage ist nicht:\nWer ist besser mit KI?",
+      "textPreview": "Die spannende Frage ist nicht: | Wer ist besser mit KI?",
+      "resolvedFontSize": 37,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 37,
+        "typeface": "Avenir Next",
+        "color": "#FFFFFF",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 2,
+        "lines": [
+          {
+            "index": 1,
+            "text": "Die spannende Frage ist nicht:"
+          },
+          {
+            "index": 2,
+            "text": "Wer ist besser mit KI?"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "Die spannende Frage ist nicht:",
+          "resolvedTextStyle": {
+            "fontSize": 37,
+            "typeface": "Avenir Next",
+            "color": "#FFFFFF",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "Die spannende Frage ist nicht:",
+              "fontSize": 37,
+              "typeface": "Avenir Next",
+              "color": "#FFFFFF",
+              "bold": true
+            }
+          ],
+          "marginLeft": 0
+        },
+        {
+          "index": 2,
+          "text": "Wer ist besser mit KI?",
+          "resolvedTextStyle": {
+            "fontSize": 37,
+            "typeface": "Avenir Next",
+            "color": "#FFFFFF",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "Wer ist besser mit KI?",
+              "fontSize": 37,
+              "typeface": "Avenir Next",
+              "color": "#FFFFFF",
+              "bold": true
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 6,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/i5sneloj",
+      "id": "6",
+      "bbox": [
+        58,
+        212,
+        820,
+        56
+      ],
+      "geometry": "rect",
+      "text": "Sondern: Was passiert, wenn eure Selbstverstaendlichkeit und meine Bastler-Neugier zusammenkommen?",
+      "textPreview": "Sondern: Was passiert, wenn eure Selbstverstaendlichkeit und meine Bastler-Neugier zusammenkommen?",
+      "resolvedFontSize": 23,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 23,
+        "typeface": "Avenir Next",
+        "color": "#A9ADB8",
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 2,
+        "lines": [
+          {
+            "index": 1,
+            "text": "Sondern: Was passiert, wenn eure Selbstverstaendlichkeit und meine"
+          },
+          {
+            "index": 2,
+            "text": "Bastler-Neugier zusammenkommen?"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "Sondern: Was passiert, wenn eure Selbstverstaendlichkeit und meine Bastler-Neugier zusammenkommen?",
+          "resolvedTextStyle": {
+            "fontSize": 23,
+            "typeface": "Avenir Next",
+            "color": "#A9ADB8",
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "Sondern: Was passiert, wenn eure Selbstverstaendlichkeit und meine Bastler-Neugier zusammenkommen?",
+              "fontSize": 23,
+              "typeface": "Avenir Next",
+              "color": "#A9ADB8"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 7,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/7qpg3ex0",
+      "id": "7",
+      "bbox": [
+        92,
+        312,
+        300,
+        126
+      ],
+      "geometry": "rect",
+      "fillColor": "#F2EEE7"
+    },
+    {
+      "order": 8,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/0z61032l",
+      "id": "8",
+      "bbox": [
+        122,
+        338,
+        220,
+        34
+      ],
+      "geometry": "rect",
+      "text": "Klasse 10",
+      "textPreview": "Klasse 10",
+      "resolvedFontSize": 30,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 30,
+        "typeface": "Avenir Next",
+        "color": "#111319",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "Klasse 10"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "Klasse 10",
+          "resolvedTextStyle": {
+            "fontSize": 30,
+            "typeface": "Avenir Next",
+            "color": "#111319",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "Klasse 10",
+              "fontSize": 30,
+              "typeface": "Avenir Next",
+              "color": "#111319",
+              "bold": true
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 9,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/pkzupwb2",
+      "id": "9",
+      "bbox": [
+        124,
+        388,
+        210,
+        70
+      ],
+      "geometry": "rect",
+      "text": "Tempo\nAusprobieren\nneuer Alltag",
+      "textPreview": "Tempo | Ausprobieren | neuer Alltag",
+      "resolvedFontSize": 20,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 20,
+        "typeface": "Avenir Next",
+        "color": "#41434C",
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 3,
+        "lines": [
+          {
+            "index": 1,
+            "text": "Tempo"
+          },
+          {
+            "index": 2,
+            "text": "Ausprobieren"
+          },
+          {
+            "index": 3,
+            "text": "neuer Alltag"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "Tempo",
+          "resolvedTextStyle": {
+            "fontSize": 20,
+            "typeface": "Avenir Next",
+            "color": "#41434C",
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "Tempo",
+              "fontSize": 20,
+              "typeface": "Avenir Next",
+              "color": "#41434C"
+            }
+          ],
+          "marginLeft": 0
+        },
+        {
+          "index": 2,
+          "text": "Ausprobieren",
+          "resolvedTextStyle": {
+            "fontSize": 20,
+            "typeface": "Avenir Next",
+            "color": "#41434C",
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "Ausprobieren",
+              "fontSize": 20,
+              "typeface": "Avenir Next",
+              "color": "#41434C"
+            }
+          ],
+          "marginLeft": 0
+        },
+        {
+          "index": 3,
+          "text": "neuer Alltag",
+          "resolvedTextStyle": {
+            "fontSize": 20,
+            "typeface": "Avenir Next",
+            "color": "#41434C",
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "neuer Alltag",
+              "fontSize": 20,
+              "typeface": "Avenir Next",
+              "color": "#41434C"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 10,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/5sneloj2",
+      "id": "10",
+      "bbox": [
+        888,
+        312,
+        300,
+        126
+      ],
+      "geometry": "rect",
+      "fillColor": "#F2EEE7"
+    },
+    {
+      "order": 11,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/cbulwval",
+      "id": "11",
+      "bbox": [
+        918,
+        338,
+        220,
+        34
+      ],
+      "geometry": "rect",
+      "text": "Gen X",
+      "textPreview": "Gen X",
+      "resolvedFontSize": 30,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 30,
+        "typeface": "Avenir Next",
+        "color": "#111319",
+        "bold": true,
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "Gen X"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "Gen X",
+          "resolvedTextStyle": {
+            "fontSize": 30,
+            "typeface": "Avenir Next",
+            "color": "#111319",
+            "bold": true,
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "Gen X",
+              "fontSize": 30,
+              "typeface": "Avenir Next",
+              "color": "#111319",
+              "bold": true
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 12,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/nqxs72x4",
+      "id": "12",
+      "bbox": [
+        920,
+        388,
+        210,
+        70
+      ],
+      "geometry": "rect",
+      "text": "Erfahrung\nSkepsis\nKontext",
+      "textPreview": "Erfahrung | Skepsis | Kontext",
+      "resolvedFontSize": 20,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 20,
+        "typeface": "Avenir Next",
+        "color": "#41434C",
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 3,
+        "lines": [
+          {
+            "index": 1,
+            "text": "Erfahrung"
+          },
+          {
+            "index": 2,
+            "text": "Skepsis"
+          },
+          {
+            "index": 3,
+            "text": "Kontext"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "Erfahrung",
+          "resolvedTextStyle": {
+            "fontSize": 20,
+            "typeface": "Avenir Next",
+            "color": "#41434C",
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "Erfahrung",
+              "fontSize": 20,
+              "typeface": "Avenir Next",
+              "color": "#41434C"
+            }
+          ],
+          "marginLeft": 0
+        },
+        {
+          "index": 2,
+          "text": "Skepsis",
+          "resolvedTextStyle": {
+            "fontSize": 20,
+            "typeface": "Avenir Next",
+            "color": "#41434C",
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "Skepsis",
+              "fontSize": 20,
+              "typeface": "Avenir Next",
+              "color": "#41434C"
+            }
+          ],
+          "marginLeft": 0
+        },
+        {
+          "index": 3,
+          "text": "Kontext",
+          "resolvedTextStyle": {
+            "fontSize": 20,
+            "typeface": "Avenir Next",
+            "color": "#41434C",
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "Kontext",
+              "fontSize": 20,
+              "typeface": "Avenir Next",
+              "color": "#41434C"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 13,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/u54zidon",
+      "id": "13",
+      "bbox": [
+        484,
+        280,
+        312,
+        190
+      ],
+      "geometry": "rect",
+      "fillColor": "#F2B84B"
+    },
+    {
+      "order": 14,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/5kb6xkf6",
+      "id": "14",
+      "bbox": [
+        510,
+        326,
+        260,
+        92
+      ],
+      "geometry": "rect",
+      "text": "KI verstehen,\nnicht nur benutzen.",
+      "textPreview": "KI verstehen, | nicht nur benutzen.",
+      "resolvedFontSize": 34,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 34,
+        "typeface": "Avenir Next",
+        "color": "#111319",
+        "bold": true,
+        "alignment": "center",
+        "verticalAlignment": "top",
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 3,
+        "lines": [
+          {
+            "index": 1,
+            "text": "KI verstehen,"
+          },
+          {
+            "index": 2,
+            "text": "nicht nur"
+          },
+          {
+            "index": 3,
+            "text": "benutzen."
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "KI verstehen,",
+          "resolvedTextStyle": {
+            "fontSize": 34,
+            "typeface": "Avenir Next",
+            "color": "#111319",
+            "bold": true,
+            "alignment": "center"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "KI verstehen,",
+              "fontSize": 34,
+              "typeface": "Avenir Next",
+              "color": "#111319",
+              "bold": true
+            }
+          ],
+          "marginLeft": 0
+        },
+        {
+          "index": 2,
+          "text": "nicht nur benutzen.",
+          "resolvedTextStyle": {
+            "fontSize": 34,
+            "typeface": "Avenir Next",
+            "color": "#111319",
+            "bold": true,
+            "alignment": "center"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "nicht nur benutzen.",
+              "fontSize": 34,
+              "typeface": "Avenir Next",
+              "color": "#111319",
+              "bold": true
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 15,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/czed8v6p",
+      "id": "15",
+      "bbox": [
+        392,
+        370,
+        92,
+        4
+      ],
+      "geometry": "rect",
+      "fillColor": "#B778F2"
+    },
+    {
+      "order": 16,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/neloj2t8",
+      "id": "16",
+      "bbox": [
+        796,
+        370,
+        92,
+        4
+      ],
+      "geometry": "rect",
+      "fillColor": "#B778F2"
+    },
+    {
+      "order": 17,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/ytsvu9kn",
+      "id": "17",
+      "bbox": [
+        160,
+        548,
+        960,
+        60
+      ],
+      "geometry": "rect",
+      "text": "Heute geht es um KI, Agenten, Avatare und Vibe Coding als Werkzeuge, die wir kritisch und kreativ nutzen koennen.",
+      "textPreview": "Heute geht es um KI, Agenten, Avatare und Vibe Coding als Werkzeuge, die wir kritisch und kreativ nutzen koennen.",
+      "resolvedFontSize": 24,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 24,
+        "typeface": "Avenir Next",
+        "color": "#FFFFFF",
+        "alignment": "center",
+        "verticalAlignment": "top",
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 2,
+        "lines": [
+          {
+            "index": 1,
+            "text": "Heute geht es um KI, Agenten, Avatare und Vibe Coding als Werkzeuge, die wir kritisch"
+          },
+          {
+            "index": 2,
+            "text": "und kreativ nutzen koennen."
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "Heute geht es um KI, Agenten, Avatare und Vibe Coding als Werkzeuge, die wir kritisch und kreativ nutzen koennen.",
+          "resolvedTextStyle": {
+            "fontSize": 24,
+            "typeface": "Avenir Next",
+            "color": "#FFFFFF",
+            "alignment": "center"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "Heute geht es um KI, Agenten, Avatare und Vibe Coding als Werkzeuge, die wir kritisch und kreativ nutzen koennen.",
+              "fontSize": 24,
+              "typeface": "Avenir Next",
+              "color": "#FFFFFF"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    },
+    {
+      "order": 18,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/58z25kb6",
+      "id": "18",
+      "bbox": [
+        56,
+        640,
+        1168,
+        1
+      ],
+      "geometry": "rect",
+      "fillColor": "#3A3D46"
+    },
+    {
+      "order": 19,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/gn29gr2p",
+      "id": "19",
+      "bbox": [
+        56,
+        672,
+        900,
+        18
+      ],
+      "geometry": "rect",
+      "text": "Synthesis aus Kanalzahlen und Studienlage: Nutzung, Interesse und Kompetenz unterscheiden sich nach Kontext und Alter.",
+      "textPreview": "Synthesis aus Kanalzahlen und Studienlage: Nutzung, Interesse und Kompetenz unterscheiden sich nach Kontext und Alter.",
+      "resolvedFontSize": 10,
+      "resolvedTextStyle": {
+        "anchor": 1,
+        "fontSize": 10,
+        "typeface": "Avenir Next",
+        "color": "#A9ADB8",
+        "alignment": "left",
+        "verticalAlignment": "top",
+        "insets": {
+          "top": 0,
+          "right": 0,
+          "bottom": 0,
+          "left": 0
+        }
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "Synthesis aus Kanalzahlen und Studienlage: Nutzung, Interesse und Kompetenz unterscheiden sich nach Kontext und Alter."
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "Synthesis aus Kanalzahlen und Studienlage: Nutzung, Interesse und Kompetenz unterscheiden sich nach Kontext und Alter.",
+          "resolvedTextStyle": {
+            "fontSize": 10,
+            "typeface": "Avenir Next",
+            "color": "#A9ADB8",
+            "alignment": "left"
+          },
+          "runs": [
+            {
+              "index": 1,
+              "text": "Synthesis aus Kanalzahlen und Studienlage: Nutzung, Interesse und Kompetenz unterscheiden sich nach Kontext und Alter.",
+              "fontSize": 10,
+              "typeface": "Avenir Next",
+              "color": "#A9ADB8"
+            }
+          ],
+          "marginLeft": 0
+        }
+      ],
+      "lineWidth": 0
+    }
+  ],
+  "composeRuns": []
+}

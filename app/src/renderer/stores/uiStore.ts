@@ -16,6 +16,11 @@ export interface EditorHeaderActions {
   docx: boolean
   wordpress: boolean
 }
+export type EditorExportKind = 'pdf' | 'docx' | 'remarkable' | 'wordpress'
+export interface EditorLastExport {
+  kind: EditorExportKind
+  at: number // Date.now() des letzten Exports
+}
 type PdfDisplayMode = 'both' | 'companion-only' | 'pdf-only'  // Anzeige von PDF/Companion im FileTree
 type AccentColor = 'ink' | 'blue' | 'orange' | 'green' | 'purple' | 'pink' | 'teal' | 'rose' | 'coral' | 'mauve' | 'mint' | 'lime' | 'gold' | 'terracotta' | 'custom'
 export type LLMBackend = 'ollama' | 'lm-studio'
@@ -591,6 +596,8 @@ interface UIState {
   outlineStyle: OutlineStyle // Outlining-Design: 'default', 'lines', 'minimal', 'bullets', 'dashes'
   editorShowWordCount: boolean // Wort-/Zeichenzähler anzeigen
   editorShowBacklinks: boolean // Backlinks-Bereich unter dem Editor anzeigen
+  editorShowContextPanel: boolean // Kontextspalte rechts im Editor (Verknüpft/Ähnlich/Karteikarten)
+  editorLastExport: EditorLastExport | null // „Zuletzt"-Gedächtnis des Export-Menüs
   editorHeaderActions: EditorHeaderActions // optionale Aktionen in der Editor-Kopfzeile
   imagesFolder: string // Vault-relativer Ordner für Bild-Drops/Pastes (default '.attachments')
 
@@ -746,6 +753,8 @@ interface UIState {
   setOutlineStyle: (style: OutlineStyle) => void
   setEditorShowWordCount: (show: boolean) => void
   setEditorShowBacklinks: (show: boolean) => void
+  setEditorShowContextPanel: (show: boolean) => void
+  setEditorLastExport: (lastExport: EditorLastExport) => void
   setEditorHeaderActions: (settings: Partial<EditorHeaderActions>) => void
   setImagesFolder: (folder: string) => void
   setSidebarWidth: (width: number) => void
@@ -864,6 +873,8 @@ const defaultState = {
   outlineStyle: 'default' as OutlineStyle,
   editorShowWordCount: true,
   editorShowBacklinks: true,
+  editorShowContextPanel: true,
+  editorLastExport: null as EditorLastExport | null,
   editorHeaderActions: {
     languageTool: true,
     pdf: true,
@@ -1147,7 +1158,7 @@ const defaultState = {
 const persistedKeys = [
   'viewMode', 'theme', 'accentColor', 'backgroundColor', 'loadLastVaultOnStart',
   'language', 'fontFamily', 'editorFontSize', 'editorLineNumbers', 'editorDefaultView',
-  'autoSaveInterval', 'editorHeadingFolding', 'editorOutlining', 'outlineStyle', 'editorShowWordCount', 'editorShowBacklinks', 'editorHeaderActions', 'imagesFolder',
+  'autoSaveInterval', 'editorHeadingFolding', 'editorOutlining', 'outlineStyle', 'editorShowWordCount', 'editorShowBacklinks', 'editorShowContextPanel', 'editorLastExport', 'editorHeaderActions', 'imagesFolder',
   'sidebarWidth', 'sidebarVisible', 'editorPreviewSplit', 'textSplitEnabled', 'textSplitPosition',
   'canvasFilterPath', 'canvasViewMode', 'canvasShowEdges', 'canvasShowTags', 'canvasShowLinks', 'canvasShowImages', 'canvasShowSummaries',
   'canvasCompactMode', 'canvasReadMode', 'canvasHoverScale', 'canvasDefaultCardWidth', 'splitPosition', 'fileTreeDisplayMode', 'fileTreeKindFilter', 'notesRootFolder', 'projectsRootFolder', 'ollama', 'brain',
@@ -1194,6 +1205,8 @@ export const useUIStore = create<UIState>()((set, get) => ({
   setOutlineStyle: (style) => set({ outlineStyle: style }),
   setEditorShowWordCount: (show) => set({ editorShowWordCount: show }),
   setEditorShowBacklinks: (show) => set({ editorShowBacklinks: show }),
+  setEditorShowContextPanel: (show) => set({ editorShowContextPanel: show }),
+  setEditorLastExport: (lastExport) => set({ editorLastExport: lastExport }),
   setEditorHeaderActions: (settings) => set((state) => ({
     editorHeaderActions: { ...state.editorHeaderActions, ...settings }
   })),

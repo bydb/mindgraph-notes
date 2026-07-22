@@ -1,0 +1,20 @@
+task mode: create
+primary deck-profile: engineering-platform
+secondary gates: strategy-leadership, because the opening frames AI as a societal shift for students
+required proof objects:
+- personal technology timeline: C64 / Amiga 500 to AI agents / avatars / vibe coding
+- audience-age distribution from user-provided Everlast AI screenshot
+- study contrast using FOM 2025, Leibniz-HBI 2025, D21 2024/25, Vodafone Stiftung 2024
+source/asset requirements:
+- no invented Everlast AI or YouTube identity assets
+- cite screenshot as user-provided channel analytics
+- cite public study URLs in footers
+brand authenticity constraints:
+- no recreated YouTube logo or Everlast AI logo
+- use text labels and chart geometry only
+profile-specific QA gates:
+- charts must use direct labels and preserve exact percentages
+- claims must be readable at classroom projection distance
+- no slide should require reading long paragraphs
+known missing inputs:
+- no full channel context or subscriber base for Everlast AI; treat screenshot as channel analytics, not representative population data

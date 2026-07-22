@@ -19,6 +19,7 @@ import { LLMBaseSection } from './LLMBaseSection'
 import { WebResearchSection } from './WebResearchSection'
 import { SkillsSection } from './SkillsSection'
 import { EmailRelevanceRulesSection } from './EmailRelevanceRulesSection'
+import { SettingsSearch, type SettingsSearchEntry } from './SettingsSearch'
 import { getModelVerdict, CLOUD_TEST_MODELS, RECOMMENDED_PULL_MODELS, isCloudModel, modelMarkers } from '../../../shared/modelCompatibility'
 import { isCloudProviderReady, cloudProviderForSentinel, CLOUD_PROVIDER_META, type CloudProviderId } from '../../../shared/llmBackend'
 import { ModelRamWarning } from '../Shared/ModelRamWarning'
@@ -41,9 +42,10 @@ interface SettingsProps {
   isOpen: boolean
   onClose: () => void
   initialTab?: Tab
+  initialAnchor?: string
 }
 
-type Tab = 'vault' | 'general' | 'editor' | 'templates' | 'integrations' | 'shortcuts' | 'dataview' | 'sync' | 'dailyNote' | 'remarkable' | 'email' | 'agents' | 'transport' | 'dashboard' | 'modules' | 'speech' | 'telegram' | 'credentials' | 'brain' | 'skills'
+type Tab = 'vault' | 'general' | 'editor' | 'templates' | 'integrations' | 'shortcuts' | 'dataview' | 'sync' | 'dailyNote' | 'remarkable' | 'email' | 'agents' | 'transport' | 'dashboard' | 'modules' | 'ai' | 'speech' | 'telegram' | 'credentials' | 'brain' | 'skills'
 
 type BuiltInTemplateKey = 'empty' | 'dailyNote' | 'zettel' | 'meeting'
 
@@ -621,12 +623,13 @@ const MODULE_CONFIG_TABS: Record<string, Tab> = {
   remarkable: 'remarkable',
   'mz-suite': 'agents',
   antares: 'agents',
-  'smart-connections': 'integrations'
+  'smart-connections': 'ai',
+  'web-research': 'ai'
 }
 
 const ModulesTab: React.FC<{ t: TabTFn; onOpenTab: (tab: Tab) => void }> = ({ t, onOpenTab }) => {
   // useUIStore als Abhängigkeit einbinden, damit der Tab bei Flag-Änderungen rerendert
-  const _tick = useUIStore(s => `${s.notesChatEnabled}${s.projectRagEnabled}${s.smartConnectionsEnabled}${s.flashcardsEnabled}${s.workflowCanvasEnabled}${s.semanticScholarEnabled}${s.zoteroEnabled}${s.languageTool.enabled}${s.email.enabled}${s.readwise.enabled}${s.docling.enabled}${s.visionOcr.enabled}${s.speech.enabled}`)
+  const _tick = useUIStore(s => `${s.notesChatEnabled}${s.projectRagEnabled}${s.smartConnectionsEnabled}${s.flashcardsEnabled}${s.workflowCanvasEnabled}${s.webResearchEnabled}${s.semanticScholarEnabled}${s.zoteroEnabled}${s.languageTool.enabled}${s.email.enabled}${s.readwise.enabled}${s.docling.enabled}${s.visionOcr.enabled}${s.speech.enabled}`)
   void _tick
   // Generische Plugin-Module (z.B. Antares) liegen in pluginConfig — separat abonnieren, sonst
   // löst ein Toggle über die generische Config-API keinen Re-Render des Modul-Tabs aus.
@@ -1891,13 +1894,41 @@ const SignatureImagePreview: React.FC<{ imagePath: string }> = ({ imagePath }) =
   )
 }
 
-export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab }) => {
+export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab, initialAnchor }) => {
   const [activeTab, setActiveTab] = useState<Tab>(initialTab ?? 'general')
 
   // Wenn der initialTab sich ändert (z.B. vom HelpGuide), übernehmen
   useEffect(() => {
     if (isOpen && initialTab) setActiveTab(initialTab)
   }, [isOpen, initialTab])
+
+  // Settings-Suche (Design 1b): Sprung zum Tab, optional zum Anker mit kurzem Aufblitzen.
+  const navigateToSetting = (tab: string, anchor?: string) => {
+    setActiveTab(tab as Tab)
+    if (!anchor) return
+    window.setTimeout(() => {
+      const el = document.querySelector(`[data-settings-anchor="${anchor}"]`)
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        el.classList.add('settings-anchor-flash')
+        window.setTimeout(() => el.classList.remove('settings-anchor-flash'), 1800)
+      }
+    }, 90)
+  }
+  // Deep-Link aus einer anderen Oberfläche (z.B. unkonfigurierter Web-Globus): nach dem
+  // Tab-Wechsel exakt zur Zielsektion scrollen, statt nur oben im langen KI-Tab zu landen.
+  useEffect(() => {
+    if (!isOpen || !initialAnchor) return
+    const timer = window.setTimeout(() => {
+      const el = document.querySelector(`[data-settings-anchor="${initialAnchor}"]`)
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        el.classList.add('settings-anchor-flash')
+        window.setTimeout(() => el.classList.remove('settings-anchor-flash'), 1800)
+      }
+    }, 90)
+    return () => window.clearTimeout(timer)
+  }, [isOpen, initialTab, initialAnchor])
   const [zoteroStatus, setZoteroStatus] = useState<'checking' | 'connected' | 'disconnected'>('checking')
   const [ollamaStatus, setOllamaStatus] = useState<'checking' | 'connected' | 'disconnected'>('checking')
   const [lmstudioStatus, setLmstudioStatus] = useState<'checking' | 'connected' | 'disconnected'>('checking')
@@ -2058,6 +2089,80 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab 
   const { t } = useTranslation()
 
   const { vaultPath, setFileTree } = useNotesStore()
+
+  // Kuratierter Such-Index (Design 1b, Befund S1): alle Tabs + die wichtigsten
+  // Einzel-Einstellungen mit Pfad und Synonym-Keywords. Modell-Orte sind komplett
+  // abgedeckt — genau die waren vorher über 7 Tabs verstreut.
+  // Modul-Flags als Hook-Werte, damit der Index nach dem asynchronen Laden der
+  // Modul-Konfiguration neu gebaut wird (sonst fehlen z.B. die E-Mail-Einträge).
+  const searchEmailEnabled = useIsModuleEnabled('email')
+  const searchSpeechEnabled = useIsModuleEnabled('speech')
+  const searchRemarkableEnabled = useIsModuleEnabled('remarkable')
+  const searchWebResearchEnabled = useIsModuleEnabled('web-research')
+  const searchIndex = React.useMemo<SettingsSearchEntry[]>(() => {
+    const g = {
+      basics: t('settings.nav.basics'),
+      workflow: t('settings.nav.workflow'),
+      modules: t('settings.nav.modules'),
+      account: t('settings.nav.account')
+    }
+    const entries: SettingsSearchEntry[] = [
+      // Tabs
+      { id: 'tab-general', tab: 'general', label: t('settings.tab.general'), path: g.basics, keywords: 'allgemein general theme design darstellung' },
+      { id: 'tab-editor', tab: 'editor', label: t('settings.tab.editor'), path: g.basics, keywords: 'editor schreiben lesen markdown' },
+      { id: 'tab-templates', tab: 'templates', label: t('settings.tab.templates'), path: g.basics, keywords: 'vorlagen templates' },
+      { id: 'tab-shortcuts', tab: 'shortcuts', label: t('settings.tab.shortcuts'), path: g.basics, keywords: 'tastenkürzel shortcuts hotkeys tastatur keyboard' },
+      { id: 'tab-dashboard', tab: 'dashboard', label: t('settings.dashboard.title'), path: g.workflow, keywords: 'dashboard radar widgets' },
+      { id: 'tab-dailyNote', tab: 'dailyNote', label: t('settings.tab.dailyNote'), path: g.workflow, keywords: 'tägliche notiz daily journal' },
+      { id: 'tab-brain', tab: 'brain', label: t('settings.tab.brain'), path: g.workflow, keywords: 'brain gehirn tagesgedächtnis rückblick zeitstrahl' },
+      { id: 'tab-skills', tab: 'skills', label: t('settings.tab.skills'), path: g.workflow, keywords: 'skills fähigkeiten agent' },
+      { id: 'tab-transport', tab: 'transport', label: t('settings.transport.title'), path: g.workflow, keywords: 'schnellerfassung quick capture zettel diktat transport' },
+      { id: 'tab-dataview', tab: 'dataview', label: t('settings.tab.dataview'), path: g.workflow, keywords: 'dataview abfragen queries tabellen' },
+      { id: 'tab-ai', tab: 'ai', label: t('settings.tab.ai'), path: g.modules, keywords: 'ki ai modelle models ollama lm studio cloud llm' },
+      { id: 'tab-modules', tab: 'modules', label: t('settings.tab.modules'), path: g.modules, keywords: 'module features aktivieren deaktivieren' },
+      { id: 'tab-integrations', tab: 'integrations', label: t('settings.tab.integrations'), path: g.modules, keywords: 'integrationen zotero research openalex readwise languagetool docling' },
+      { id: 'tab-email', tab: 'email', label: t('settings.email.title'), path: g.modules, keywords: 'email e-mail imap smtp posteingang mail' },
+      { id: 'tab-speech', tab: 'speech', label: t('settings.tab.speech'), path: g.modules, keywords: 'sprache diktat vorlesen whisper stt tts speech voice' },
+      { id: 'tab-remarkable', tab: 'remarkable', label: 'reMarkable', path: g.modules, keywords: 'remarkable tablet ereader export' },
+      { id: 'tab-telegram', tab: 'telegram', label: 'Telegram', path: g.modules, keywords: 'telegram bot agent messenger' },
+      { id: 'tab-sync', tab: 'sync', label: t('settings.tab.sync'), path: g.account, keywords: 'sync synchronisation geräte verschlüsselung passphrase aktivierungscode' },
+      { id: 'tab-credentials', tab: 'credentials', label: 'Zugangsdaten', path: g.account, keywords: 'zugangsdaten credentials passwörter api keys schlüssel' },
+      // Allgemein
+      { id: 'general-theme', tab: 'general', label: t('settings.general.theme'), path: `${g.basics} → ${t('settings.tab.general')}`, keywords: 'theme hell dunkel dark light system' },
+      { id: 'general-accent', tab: 'general', label: t('settings.general.accentColor'), path: `${g.basics} → ${t('settings.tab.general')}`, keywords: 'akzentfarbe accent farbe petrol color' },
+      { id: 'general-language', tab: 'general', label: t('settings.general.language'), path: `${g.basics} → ${t('settings.tab.general')}`, keywords: 'sprache oberfläche language deutsch english ui' },
+      { id: 'general-font', tab: 'general', label: t('settings.general.font'), path: `${g.basics} → ${t('settings.tab.general')}`, keywords: 'schriftart font typografie' },
+      // Editor
+      { id: 'editor-default-view', tab: 'editor', label: t('settings.editor.defaultViewLabel'), path: `${g.basics} → ${t('settings.tab.editor')}`, keywords: 'standardmodus lesen schreiben markdown default view' },
+      { id: 'editor-languagetool', tab: 'editor', label: 'LanguageTool', path: `${g.basics} → ${t('settings.tab.editor')}`, keywords: 'rechtschreibung grammatik korrektur languagetool prüfen' },
+      { id: 'editor-backlinks', tab: 'editor', label: t('settings.editor.showBacklinks'), path: `${g.basics} → ${t('settings.tab.editor')}`, keywords: 'backlinks verknüpft kontextspalte' },
+      { id: 'editor-header-actions', tab: 'editor', label: t('settings.editor.headerActions'), path: `${g.basics} → ${t('settings.tab.editor')}`, keywords: 'export pdf docx remarkable wordpress kopfzeile' },
+      // KI & Modelle (vorher über 7 Tabs verstreut — Befund S1)
+      { id: 'ai-backend', tab: 'ai', label: t('settings.integrations.backend'), path: `${g.modules} → ${t('settings.tab.ai')}`, keywords: 'backend ollama lm studio lokal ki ai', anchor: 'ai-backend' },
+      { id: 'ai-default-model', tab: 'ai', label: t('settings.integrations.ollama.model'), path: `${g.modules} → ${t('settings.tab.ai')}`, keywords: 'standard modell default model chat analyse qwen', anchor: 'ai-default-model' },
+      { id: 'ai-matrix', tab: 'ai', label: t('settings.integrations.compatibility.title'), path: `${g.modules} → ${t('settings.tab.ai')}`, keywords: 'modell kompatibilität matrix modul override brain aufgaben extraktion mail zusammenfassung eignung verdict', anchor: 'ai-matrix' },
+      { id: 'ai-embedding', tab: 'ai', label: 'Projekt-RAG Embedding', path: `${g.modules} → ${t('settings.tab.ai')}`, keywords: 'embedding modell bge nomic smart connections ähnlichkeit rag', anchor: 'ai-embedding' },
+      { id: 'ai-openrouter', tab: 'ai', label: 'OpenRouter (Cloud)', path: `${g.modules} → ${t('settings.tab.ai')}`, keywords: 'openrouter cloud api opt-in claude gpt', anchor: 'ai-openrouter' },
+      { id: 'ai-llmbase', tab: 'ai', label: 'LLMBase (EU-Cloud)', path: `${g.modules} → ${t('settings.tab.ai')}`, keywords: 'llmbase eu dsgvo cloud europa', anchor: 'ai-llmbase' },
+      { id: 'ai-webresearch', tab: 'ai', label: 'Webrecherche', path: `${g.modules} → ${t('settings.tab.ai')}`, keywords: 'webrecherche tavily linkup suche web research agent', anchor: 'ai-webresearch' },
+      { id: 'ai-smart-connections', tab: 'ai', label: t('settings.integrations.smartConnections'), path: `${g.modules} → ${t('settings.tab.ai')}`, keywords: 'smart connections gewichte reranker ähnliche notizen' },
+      // E-Mail
+      { id: 'email-analysis-model', tab: 'email', label: t('settings.email.analysisModel'), path: `${g.modules} → ${t('settings.email.title')}`, keywords: 'analyse modell email ki relevanz' },
+      { id: 'email-signature', tab: 'email', label: t('settings.email.signature'), path: `${g.modules} → ${t('settings.email.title')}`, keywords: 'signatur unterschrift absender' },
+      // Diktat & Vorlesen
+      { id: 'speech-whisper', tab: 'speech', label: 'Whisper-Modell', path: `${g.modules} → ${t('settings.tab.speech')}`, keywords: 'whisper diktat stt modell transkription spracherkennung' },
+      // Schnellerfassung
+      { id: 'transport-zettel-folder', tab: 'transport', label: t('settings.transport.zettelDestination'), path: `${g.workflow} → ${t('settings.transport.title')}`, keywords: 'zettel zielordner zettelkasten schnellerfassung' }
+    ]
+    // Modul-gegatete Tabs nur anbieten, wenn sie auch in der Nav existieren
+    return entries.filter(e => {
+      if (['tab-email', 'email-analysis-model', 'email-signature'].includes(e.id)) return searchEmailEnabled
+      if (['tab-speech', 'speech-whisper'].includes(e.id)) return searchSpeechEnabled
+      if (e.id === 'tab-remarkable') return searchRemarkableEnabled
+      if (e.id === 'ai-webresearch') return searchWebResearchEnabled
+      return true
+    })
+  }, [t, searchEmailEnabled, searchSpeechEnabled, searchRemarkableEnabled, searchWebResearchEnabled])
 
   // App Version
   const [appVersion, setAppVersion] = useState<string>('')
@@ -2569,6 +2674,8 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab 
 
         <div className="settings-body">
           <nav className="settings-nav">
+            {/* Settings-Suche (Design 1b): findet Tabs UND Einzel-Einstellungen */}
+            <SettingsSearch entries={searchIndex} onNavigate={navigateToSetting} />
             {/* Vault (immer ganz oben, wenn geladen) */}
             {vaultPath && (
               <button
@@ -2693,6 +2800,16 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab 
 
             {/* Section: Module */}
             <div className="settings-nav-section-label">{t('settings.nav.modules')}</div>
+            {/* KI-Zentrale (Design 1c): alle Modell-Entscheidungen an einem Ort */}
+            <button
+              className={`settings-nav-item ${activeTab === 'ai' ? 'active' : ''}`}
+              onClick={() => setActiveTab('ai')}
+            >
+              <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+                <path d="M9 2l1.8 4.4L15 8.2l-4.2 1.8L9 14.4 7.2 10 3 8.2l4.2-1.8L9 2z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
+              </svg>
+              {t('settings.tab.ai')}
+            </button>
             <button
               className={`settings-nav-item ${activeTab === 'modules' ? 'active' : ''}`}
               onClick={() => setActiveTab('modules')}
@@ -2703,7 +2820,6 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab 
               </svg>
               {t('settings.tab.modules')}
             </button>
-            {/* Integrationen bleibt sichtbar, da es Ollama/LM Studio als KI-Backend enthält */}
             <button
               className={`settings-nav-item ${activeTab === 'integrations' ? 'active' : ''}`}
               onClick={() => setActiveTab('integrations')}
@@ -3450,8 +3566,46 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab 
             )}
 
             {/* Integrationen Tab */}
-            {activeTab === 'integrations' && (
+            {/* KI & Modelle (Design 1c „KI-Zentrale"): Backend, Standard-Modell,
+                Modul-Matrix, Embedding und Cloud-Provider an EINEM Ort — vorher
+                über den Integrationen-Tab verstreut. */}
+            {activeTab === 'ai' && (
               <div className="settings-section">
+                <div className="ai-central-status" data-settings-anchor="ai-backend">
+                  <span className="ai-central-status-icon">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="4" y="4" width="16" height="16" rx="3"/>
+                      <circle cx="12" cy="12" r="3"/>
+                      <path d="M12 4V2M12 22v-2M4 12H2M22 12h-2"/>
+                    </svg>
+                  </span>
+                  <span className="ai-central-status-text">
+                    <span className="ai-central-status-title">
+                      {ollama.backend === 'lm-studio' ? 'LM Studio' : 'Ollama'}
+                      {(ollama.backend === 'lm-studio' ? lmstudioStatus : ollamaStatus) === 'connected' ? (
+                        <> {t('settings.ai.statusRunning')} <span className="ai-central-status-dot ai-central-status-dot-ok" /></>
+                      ) : (ollama.backend === 'lm-studio' ? lmstudioStatus : ollamaStatus) === 'checking' ? (
+                        <> {t('settings.checkingConnection')}</>
+                      ) : (
+                        <> {t('settings.ai.statusOffline')} <span className="ai-central-status-dot ai-central-status-dot-off" /></>
+                      )}
+                    </span>
+                    <span className="ai-central-status-meta">
+                      {ollama.backend === 'lm-studio' ? `localhost:${ollama.lmStudioPort}` : 'localhost:11434'}
+                      {' · '}
+                      {(ollama.backend === 'lm-studio' ? lmstudioModels : ollamaModels).length} {t('settings.models')}
+                    </span>
+                  </span>
+                  <button
+                    className="settings-refresh"
+                    onClick={ollama.backend === 'lm-studio' ? checkLmstudioConnection : checkOllamaConnection}
+                  >
+                    {t('settings.refresh')}
+                  </button>
+                </div>
+                <div className="settings-info" style={{ marginBottom: '16px' }}>
+                  <p>{t('settings.ai.privacyStory')}</p>
+                </div>
                 <h3>{t('settings.integrations.localAI')}</h3>
 
                 <div className="settings-row">
@@ -3500,7 +3654,7 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab 
                     </div>
 
                     {ollamaStatus === 'connected' && (
-                      <div className="settings-row" style={{ flexDirection: 'column', alignItems: 'stretch', gap: '4px' }}>
+                      <div className="settings-row" style={{ flexDirection: 'column', alignItems: 'stretch', gap: '4px' }} data-settings-anchor="ai-default-model">
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                           <label style={{ minWidth: '120px' }}>{t('settings.integrations.ollama.model')}</label>
                           <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flex: 1 }}>
@@ -3533,7 +3687,7 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab 
 
                     {/* Projekt-RAG: zentrales Embedding-Modell (nur wenn Modul aktiv) */}
                     {ollamaStatus === 'connected' && isModuleEnabled('project-rag') && (
-                      <div className="settings-row" style={{ flexDirection: 'column', alignItems: 'stretch', gap: '4px' }}>
+                      <div className="settings-row" style={{ flexDirection: 'column', alignItems: 'stretch', gap: '4px' }} data-settings-anchor="ai-embedding">
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                           <label style={{ minWidth: '120px' }}>
                             {language === 'en' ? 'Project-RAG embedding' : 'Projekt-RAG Embedding'}
@@ -3739,13 +3893,15 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab 
                   </>
                 )}
 
-                <ModelCompatibilitySection
-                  availableModels={ollama.backend === 'ollama' ? ollamaModels : lmstudioModels}
-                />
+                <div data-settings-anchor="ai-matrix">
+                  <ModelCompatibilitySection
+                    availableModels={ollama.backend === 'ollama' ? ollamaModels : lmstudioModels}
+                  />
+                </div>
 
-                <OpenRouterSection />
-                <LLMBaseSection />
-                {isModuleEnabled('web-research') && <WebResearchSection />}
+                <div data-settings-anchor="ai-openrouter"><OpenRouterSection /></div>
+                <div data-settings-anchor="ai-llmbase"><LLMBaseSection /></div>
+                {isModuleEnabled('web-research') && <div data-settings-anchor="ai-webresearch"><WebResearchSection /></div>}
 
                 <div className="settings-row">
                   <label>{t('settings.integrations.defaultTranslation')}</label>
@@ -3923,7 +4079,14 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab 
                   </div>
                 )}
 
-                <h3 style={{ marginTop: '32px' }}>{t('settings.integrations.zotero')}</h3>
+              </div>
+            )}
+
+            {/* Integrationen: externe Dienste (Zotero, Research, …) — die KI-Blöcke
+                sind in den Tab „KI & Modelle" gewandert. */}
+            {activeTab === 'integrations' && (
+              <div className="settings-section">
+                <h3>{t('settings.integrations.zotero')}</h3>
                 <div className="settings-row">
                   <label>Status</label>
                   <div className="settings-status">

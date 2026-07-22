@@ -1,0 +1,47 @@
+Slide size: 1280x720.
+
+Background:
+- deep ink #111319 for main slides
+- subtle warm panel #F2EEE7 for proof/chart areas
+
+Typography:
+- Avenir Next / Arial fallback for all text
+- title 40-56px
+- cover claim 56-64px
+- labels 14-18px
+- footers 10-12px
+
+Palette:
+- ink #111319
+- paper #F2EEE7
+- white #FFFFFF
+- violet accent #B778F2
+- amber accent #F2B84B
+- mint support #52C7A3
+- muted text #A9ADB8
+
+Chart grammar:
+- horizontal bars, exact values, direct labels
+- violet for Everlast AI age distribution
+- amber for student/generation contrast
+
+Diagram grammar:
+- no decorative icons unless they encode meaning
+- timeline and bridge diagrams use simple nodes, rules, and labels
+
+Footer/source grammar:
+- small source line bottom-left
+- slide marker bottom-right
+
+Layout families:
+- editorial opener
+- metric contrast
+- bar proof
+- two-column study comparison
+- bridge/transition slide
+
+Banned motifs:
+- fake YouTube or Everlast AI logos
+- generic card grids
+- stock-like AI brains/robots
+- purple-only palette

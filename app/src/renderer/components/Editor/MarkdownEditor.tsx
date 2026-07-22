@@ -19,7 +19,7 @@ import 'katex/dist/katex.min.css'
 import 'katex/contrib/mhchem/mhchem.js'  // Chemie-Support (mhchem)
 import mermaid from 'mermaid'
 import { useNotesStore, createNoteFromFile } from '../../stores/notesStore'
-import { useUIStore, MARKETING_DEFAULTS } from '../../stores/uiStore'
+import { useUIStore, MARKETING_DEFAULTS, type EditorExportKind } from '../../stores/uiStore'
 import { usePluginConfig } from '../../plugins/config'
 import { useTabStore } from '../../stores/tabStore'
 import { useShallow } from 'zustand/react/shallow'
@@ -65,7 +65,8 @@ import { speak, stopSpeaking } from '../../utils/voice/tts'
 import { startDictation, type DictationHandle } from '../../utils/voice/stt'
 import { useIsModuleEnabled } from '../../utils/modules'
 import { useVoiceStore } from '../../stores/voiceStore'
-import { getNoteKind, stripNoteKindMarker, setAiProvenanceInContent, getAiProvenance, addTagToFrontmatter, getFrontmatterTags } from '../../utils/noteKind'
+import { getNoteKind, stripNoteKindMarker, splitZettelTitle, setAiProvenanceInContent, getAiProvenance, addTagToFrontmatter, getFrontmatterTags } from '../../utils/noteKind'
+import { ContextPanel } from './ContextPanel'
 import { isBrainNote, brainNoteLabel } from '../../utils/brainNote'
 import { BrainIcon } from '../BrainIcon'
 import { readClipboardText, writeClipboardText } from '../../utils/clipboard'
@@ -918,6 +919,21 @@ function processCallouts(content: string): string {
 
 type ViewMode = 'edit' | 'preview' | 'live-preview'
 
+// „Zuletzt: PDF · gestern 14:32" — kompakte Zeitangabe für das Export-Menü.
+function formatExportTime(at: number, language: 'de' | 'en'): string {
+  const d = new Date(at)
+  const now = new Date()
+  const locale = language === 'de' ? 'de-DE' : 'en-US'
+  const time = d.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })
+  if (d.toDateString() === now.toDateString()) return time
+  const yesterday = new Date(now)
+  yesterday.setDate(now.getDate() - 1)
+  if (d.toDateString() === yesterday.toDateString()) {
+    return `${language === 'de' ? 'gestern' : 'yesterday'} ${time}`
+  }
+  return `${d.toLocaleDateString(locale)} ${time}`
+}
+
 // Compartment for live preview extension (created once, reused)
 const livePreviewCompartment = new Compartment()
 // Compartment for dataview extension
@@ -950,8 +966,8 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
   const { vaultPath, selectedNoteId, secondarySelectedNoteId, notes, updateNote, selectNote, selectSecondaryNote, addNote, fileTree, setFileTree, navigateBack, navigateForward, canNavigateBack, canNavigateForward } = useNotesStore(
     useShallow(s => ({ vaultPath: s.vaultPath, selectedNoteId: s.selectedNoteId, secondarySelectedNoteId: s.secondarySelectedNoteId, notes: s.notes, updateNote: s.updateNote, selectNote: s.selectNote, selectSecondaryNote: s.selectSecondaryNote, addNote: s.addNote, fileTree: s.fileTree, setFileTree: s.setFileTree, navigateBack: s.navigateBack, navigateForward: s.navigateForward, canNavigateBack: s.canNavigateBack, canNavigateForward: s.canNavigateForward }))
   )
-  const { pendingTemplateInsert, setPendingTemplateInsert, pendingAgentContext, setPendingAgentContext, ollama, editorHeadingFolding, outlineStyle, editorShowWordCount, editorHeaderActions, languageTool, setLanguageTool, editorDefaultView, showFormattingToolbar, setShowFormattingToolbar, showRawEditor, readingModeHintDismissed, setReadingModeHintDismissed } = useUIStore(
-    useShallow(s => ({ pendingTemplateInsert: s.pendingTemplateInsert, setPendingTemplateInsert: s.setPendingTemplateInsert, pendingAgentContext: s.pendingAgentContext, setPendingAgentContext: s.setPendingAgentContext, ollama: s.ollama, editorHeadingFolding: s.editorHeadingFolding, outlineStyle: s.outlineStyle, editorShowWordCount: s.editorShowWordCount, editorHeaderActions: s.editorHeaderActions, languageTool: s.languageTool, setLanguageTool: s.setLanguageTool, editorDefaultView: s.editorDefaultView, showFormattingToolbar: s.showFormattingToolbar, setShowFormattingToolbar: s.setShowFormattingToolbar, showRawEditor: s.showRawEditor, readingModeHintDismissed: s.readingModeHintDismissed, setReadingModeHintDismissed: s.setReadingModeHintDismissed }))
+  const { pendingTemplateInsert, setPendingTemplateInsert, pendingAgentContext, setPendingAgentContext, ollama, editorHeadingFolding, outlineStyle, editorShowWordCount, editorHeaderActions, languageTool, setLanguageTool, editorDefaultView, showFormattingToolbar, setShowFormattingToolbar, showRawEditor, readingModeHintDismissed, setReadingModeHintDismissed, editorShowContextPanel, setEditorShowContextPanel, editorLastExport, setEditorLastExport } = useUIStore(
+    useShallow(s => ({ pendingTemplateInsert: s.pendingTemplateInsert, setPendingTemplateInsert: s.setPendingTemplateInsert, pendingAgentContext: s.pendingAgentContext, setPendingAgentContext: s.setPendingAgentContext, ollama: s.ollama, editorHeadingFolding: s.editorHeadingFolding, outlineStyle: s.outlineStyle, editorShowWordCount: s.editorShowWordCount, editorHeaderActions: s.editorHeaderActions, languageTool: s.languageTool, setLanguageTool: s.setLanguageTool, editorDefaultView: s.editorDefaultView, showFormattingToolbar: s.showFormattingToolbar, setShowFormattingToolbar: s.setShowFormattingToolbar, showRawEditor: s.showRawEditor, readingModeHintDismissed: s.readingModeHintDismissed, setReadingModeHintDismissed: s.setReadingModeHintDismissed, editorShowContextPanel: s.editorShowContextPanel, setEditorShowContextPanel: s.setEditorShowContextPanel, editorLastExport: s.editorLastExport, setEditorLastExport: s.setEditorLastExport }))
   )
   const [marketing] = usePluginConfig('marketing', MARKETING_DEFAULTS)
 
@@ -974,6 +990,11 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
   const loadedImagesRef = useRef<Map<string, string>>(new Map())
   const [imagesLoadedVersion, setImagesLoadedVersion] = useState(0)
   const [formatMenu, setFormatMenu] = useState<{ x: number; y: number; ai?: { selectedText: string; selectionStart: number; selectionEnd: number } } | null>(null)
+  // Kopfzeilen-Dropdowns („Ruhige Kopfzeile"): Export-Menü + LanguageTool-Menü.
+  const [showExportMenu, setShowExportMenu] = useState(false)
+  const [showLtMenu, setShowLtMenu] = useState(false)
+  const exportMenuRef = useRef<HTMLDivElement | null>(null)
+  const ltMenuRef = useRef<HTMLDivElement | null>(null)
   const [propertiesCollapsed, setPropertiesCollapsed] = useState(false)
   const [foldedHeadings, setFoldedHeadings] = useState<Set<string>>(new Set())
   const [aiMenu, setAiMenu] = useState<{ x: number; y: number; selectedText: string; selectionStart: number; selectionEnd: number } | null>(null)
@@ -4681,6 +4702,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
     } else if (!res.canceled) {
       console.error('DOCX Export fehlgeschlagen:', res.error)
     }
+    return res.success === true
   }, [selectedNote, vaultPath])
 
   const handleExportPDF = useCallback(async (pdfStyle: 'standard' | 'remarkable-book' = 'standard') => {
@@ -4709,7 +4731,36 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
     } else if (result.error !== 'Abgebrochen') {
       console.error('PDF Export fehlgeschlagen:', result.error)
     }
+    return result.success === true
   }, [selectedNote, frontmatterTitle, renderedMarkdown, vaultPath])
+
+  // Kopfzeilen-Dropdowns: Klick außerhalb schließt beide Menüs.
+  useEffect(() => {
+    if (!showExportMenu && !showLtMenu) return
+    const onDocClick = (e: MouseEvent) => {
+      const target = e.target as Node
+      if (exportMenuRef.current?.contains(target) || ltMenuRef.current?.contains(target)) return
+      setShowExportMenu(false)
+      setShowLtMenu(false)
+    }
+    document.addEventListener('mousedown', onDocClick)
+    return () => document.removeEventListener('mousedown', onDocClick)
+  }, [showExportMenu, showLtMenu])
+
+  // Export-Menü: eine Aktion ausführen und bei Erfolg als „Zuletzt" merken.
+  // WordPress öffnet nur das Modal — gemerkt wird dort nichts (Modal kann abbrechen).
+  const runExport = useCallback(async (kind: EditorExportKind) => {
+    setShowExportMenu(false)
+    if (kind === 'wordpress') {
+      setShowPublishWpModal(true)
+      return
+    }
+    let ok = false
+    if (kind === 'pdf') ok = (await handleExportPDF('standard')) === true
+    else if (kind === 'remarkable') ok = (await handleExportPDF('remarkable-book')) === true
+    else if (kind === 'docx') ok = (await handleExportDocx()) === true
+    if (ok) setEditorLastExport({ kind, at: Date.now() })
+  }, [handleExportPDF, handleExportDocx, setEditorLastExport])
 
   if (!selectedNote) {
     return (
@@ -4721,9 +4772,25 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
   }
   const selectedNoteKind = getNoteKind(selectedNote)
   const selectedNoteIsBrain = isBrainNote(selectedNote)
-  const selectedNoteDisplayTitle = selectedNoteIsBrain
+  const rawHeaderTitle = selectedNoteIsBrain
     ? brainNoteLabel(selectedNote)
     : selectedNoteKind ? stripNoteKindMarker(selectedNote.title) : selectedNote.title
+  // „Ruhige Kopfzeile": Zettel-Zeitstempel aus dem Titel in einen stillen Mono-Chip auslagern.
+  const { zettelId, displayTitle: selectedNoteDisplayTitle } = selectedNoteIsBrain
+    ? { zettelId: null, displayTitle: rawHeaderTitle }
+    : splitZettelTitle(rawHeaderTitle)
+  // Breadcrumb: unmittelbarer Elternordner der Notiz (Vault-Root → kein Breadcrumb).
+  const parentFolder = selectedNote.path.includes('/')
+    ? selectedNote.path.split('/').slice(-2, -1)[0]
+    : null
+  const wordpressAvailable = Boolean(editorHeaderActions.wordpress && marketing.enabled && marketing.wordpressUrl)
+  const exportAvailable = editorHeaderActions.pdf || editorHeaderActions.docx || editorHeaderActions.remarkable || wordpressAvailable
+  const exportKindLabels: Record<EditorExportKind, string> = {
+    pdf: t('editor.exportMenu.pdf'),
+    docx: t('editor.exportMenu.docx'),
+    remarkable: t('editor.exportMenu.remarkable'),
+    wordpress: t('editor.exportMenu.wordpress')
+  }
 
   return (
     <div className="editor-container">
@@ -4752,32 +4819,42 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
             </button>
           </div>
         )}
-        <h3 title={selectedNoteDisplayTitle}>
-          {selectedNoteIsBrain ? (
-            <BrainIcon size={15} title={t('brain.noteLabel')} />
-          ) : selectedNoteKind && (
-            <span
-              className={`note-kind-dot note-kind-${selectedNoteKind.id}`}
-              title={selectedNoteKind.label}
-              aria-label={selectedNoteKind.label}
-            />
+        <div className="editor-title-group">
+          {parentFolder && (
+            <span className="editor-breadcrumb" title={selectedNote.path}>{parentFolder} /</span>
           )}
-          {selectedNoteDisplayTitle}
-        </h3>
-        {!isSecondary && ollama.enabled && (() => {
-          const prov = getAiProvenance(previewContent)
-          return prov ? (
-            <span className="note-authorship note-authorship-ai" title={`${t('editor.aiEdited')} · ${prov.model}${prov.date ? ' · ' + prov.date : ''}`}>
-              <ModelLogo model={prov.model} size={13} />
-              <span>{t('editor.aiEdited')}</span>
+          <h3 title={selectedNoteDisplayTitle}>
+            {selectedNoteIsBrain ? (
+              <BrainIcon size={15} title={t('brain.noteLabel')} />
+            ) : selectedNoteKind && (
+              <span
+                className={`note-kind-dot note-kind-${selectedNoteKind.id}`}
+                title={selectedNoteKind.label}
+                aria-label={selectedNoteKind.label}
+              />
+            )}
+            {selectedNoteDisplayTitle}
+          </h3>
+          {zettelId && (
+            <span className="editor-zettel-chip" title={t('editor.zettelIdTooltip', { id: zettelId })}>
+              …{zettelId.slice(-4)}
             </span>
-          ) : (
-            <span className="note-authorship note-authorship-human" title={t('aiBar.byYouTitle')}>
-              <HumanIcon size={12} />
-              <span>{t('aiBar.byYou')}</span>
-            </span>
-          )
-        })()}
+          )}
+          {!isSecondary && ollama.enabled && (() => {
+            const prov = getAiProvenance(previewContent)
+            return prov ? (
+              <span className="note-authorship note-authorship-ai" title={`${t('editor.aiEdited')} · ${prov.model}${prov.date ? ' · ' + prov.date : ''}`}>
+                <ModelLogo model={prov.model} size={13} />
+                <span>{t('editor.aiEdited')}</span>
+              </span>
+            ) : (
+              <span className="note-authorship note-authorship-human" title={t('aiBar.byYouTitle')}>
+                <HumanIcon size={12} />
+                <span>{t('aiBar.byYou')}</span>
+              </span>
+            )
+          })()}
+        </div>
         <div className="editor-header-right">
           {isSaving && <span className="saving-indicator">{t('editor.saving')}</span>}
           {isSecondary && (
@@ -4792,63 +4869,72 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
               </svg>
             </button>
           )}
-          {/* LanguageTool Check Button */}
-          {editorHeaderActions.languageTool && languageTool.enabled && viewMode !== 'preview' && (
-            <button
-              className={`lt-check-btn ${ltIsChecking ? 'checking' : ''}`}
-              onClick={checkLanguageTool}
-              disabled={ltIsChecking}
-              title={ltErrorMessage || (ltStatus === 'ok'
-                ? (ltMatches.length > 0
-                  ? t('languagetool.errorsFound', { count: ltMatches.length })
-                  : t('languagetool.noErrors'))
-                : t('languagetool.check'))}
-            >
-              {ltIsChecking ? (
-                <svg width="16" height="16" viewBox="0 0 16 16" className="lt-spinner">
-                  <circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" strokeWidth="2" strokeDasharray="20 10" />
-                </svg>
-              ) : (
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                  <path d="M13.5 4.5L6 12L2.5 8.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-              )}
-              {ltIsChecking
-                ? t('languagetool.checking')
-                : ltStatus === 'ok' && ltMatches.length === 0
-                  ? t('languagetool.noErrors')
-                  : t('languagetool.check')}
-              {ltStatus === 'error' && (
-                <span className="lt-error-badge">!</span>
-              )}
-              {ltStatus !== 'error' && ltMatches.length > 0 && (
-                <span className="lt-error-badge">{ltMatches.length}</span>
-              )}
-            </button>
-          )}
+          {/* LanguageTool: EIN Icon mit Fehler-Badge, Aktionen (Prüfen/Korrigieren) im Menü */}
           {editorHeaderActions.languageTool && languageTool.enabled && (
-            <button
-              className={`lt-check-btn lt-autocorrect-btn ${ltAutoCorrecting ? 'checking' : ''} ${ltCorrectedCount > 0 ? 'corrected' : ''}`}
-              onClick={autoCorrectLanguageTool}
-              disabled={ltAutoCorrecting}
-              title={t('languagetool.autoCorrectHint')}
-            >
-              {ltAutoCorrecting ? (
-                <svg width="16" height="16" viewBox="0 0 16 16" className="lt-spinner">
-                  <circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" strokeWidth="2" strokeDasharray="20 10" />
-                </svg>
-              ) : (
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                  <path d="M1.5 8.5L4.5 11.5L9 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                  <path d="M8.5 10.5L10 12L14.5 6.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
+            <div className="header-menu-wrap" ref={ltMenuRef}>
+              <button
+                className={`lt-icon-btn ${(ltIsChecking || ltAutoCorrecting) ? 'checking' : ''} ${showLtMenu ? 'open' : ''}`}
+                onClick={() => { setShowLtMenu(v => !v); setShowExportMenu(false) }}
+                title={ltErrorMessage || (ltStatus === 'ok'
+                  ? (ltMatches.length > 0
+                    ? t('languagetool.errorsFound', { count: ltMatches.length })
+                    : t('languagetool.noErrors'))
+                  : t('languagetool.check'))}
+              >
+                {(ltIsChecking || ltAutoCorrecting) ? (
+                  <svg width="15" height="15" viewBox="0 0 16 16" className="lt-spinner">
+                    <circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" strokeWidth="2" strokeDasharray="20 10" />
+                  </svg>
+                ) : (
+                  <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
+                    <path d="M13.5 4.5L6 12L2.5 8.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                )}
+                {ltStatus === 'error' && (
+                  <span className="lt-error-badge">!</span>
+                )}
+                {ltStatus !== 'error' && ltMatches.length > 0 && (
+                  <span className="lt-error-badge">{ltMatches.length}</span>
+                )}
+              </button>
+              {showLtMenu && (
+                <div className="header-menu">
+                  <button
+                    className="header-menu-item"
+                    disabled={ltIsChecking || viewMode === 'preview'}
+                    onClick={() => { setShowLtMenu(false); checkLanguageTool() }}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                      <path d="M13.5 4.5L6 12L2.5 8.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                    {ltIsChecking ? t('languagetool.checking') : t('languagetool.check')}
+                    {ltStatus === 'ok' && (
+                      <span className="header-menu-meta">
+                        {ltMatches.length > 0
+                          ? t('languagetool.errorsFound', { count: ltMatches.length })
+                          : t('languagetool.noErrors')}
+                      </span>
+                    )}
+                  </button>
+                  <button
+                    className="header-menu-item"
+                    disabled={ltAutoCorrecting}
+                    onClick={() => { setShowLtMenu(false); autoCorrectLanguageTool() }}
+                    title={t('languagetool.autoCorrectHint')}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                      <path d="M1.5 8.5L4.5 11.5L9 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                      <path d="M8.5 10.5L10 12L14.5 6.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                    {ltAutoCorrecting
+                      ? t('languagetool.autoCorrecting')
+                      : ltCorrectedCount > 0
+                        ? t('languagetool.corrected', { count: ltCorrectedCount })
+                        : t('languagetool.autoCorrect')}
+                  </button>
+                </div>
               )}
-              {ltAutoCorrecting
-                ? t('languagetool.autoCorrecting')
-                : ltCorrectedCount > 0
-                  ? t('languagetool.corrected', { count: ltCorrectedCount })
-                  : t('languagetool.autoCorrect')}
-            </button>
+            </div>
           )}
           {viewMode !== 'preview' && (
             <button
@@ -4863,83 +4949,121 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
               </svg>
             </button>
           )}
-          {editorHeaderActions.pdf && <button
-            className="export-btn"
-            onClick={() => handleExportPDF('standard')}
-            title={t('editor.exportPdf')}
-          >
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-              <path d="M14 10V13C14 13.5523 13.5523 14 13 14H3C2.44772 14 2 13.5523 2 13V10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-              <path d="M8 2V10M8 10L5 7M8 10L11 7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-            PDF
-          </button>}
-          {editorHeaderActions.remarkable && <button
-            className="export-btn"
-            onClick={() => handleExportPDF('remarkable-book')}
-            title={t('editor.exportPdfRemarkable')}
-          >
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-              <rect x="3" y="2" width="10" height="12" rx="1" stroke="currentColor" strokeWidth="1.5"/>
-              <path d="M6 5.5h4M6 8h4M6 10.5h2.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
-            </svg>
-            reMarkable
-          </button>}
-          {editorHeaderActions.docx && <button
-            className="export-btn"
-            onClick={handleExportDocx}
-            title={t('editor.exportDocx')}
-          >
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-              <path d="M14 10V13C14 13.5523 13.5523 14 13 14H3C2.44772 14 2 13.5523 2 13V10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-              <path d="M8 2V10M8 10L5 7M8 10L11 7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-            DOCX
-          </button>}
-          {editorHeaderActions.wordpress && marketing.enabled && marketing.wordpressUrl && (
+          {/* Export: EIN Button mit Menü statt PDF/reMarkable/DOCX/WP-Einzelbuttons */}
+          {exportAvailable && (
+            <div className="header-menu-wrap" ref={exportMenuRef}>
+              <button
+                className={`export-btn export-menu-btn ${showExportMenu ? 'open' : ''}`}
+                onClick={() => { setShowExportMenu(v => !v); setShowLtMenu(false) }}
+                title={t('editor.exportAs')}
+              >
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                  <path d="M14 10V13C14 13.5523 13.5523 14 13 14H3C2.44772 14 2 13.5523 2 13V10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                  <path d="M8 2V10M8 10L5 7M8 10L11 7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+                {t('editor.export')}
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="6 9 12 15 18 9"/>
+                </svg>
+              </button>
+              {showExportMenu && (
+                <div className="header-menu">
+                  <div className="header-menu-label">{t('editor.exportAs')}</div>
+                  {editorHeaderActions.pdf && (
+                    <button className="header-menu-item" onClick={() => runExport('pdf')} title={t('editor.exportPdf')}>
+                      <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                        <path d="M14 10V13C14 13.5523 13.5523 14 13 14H3C2.44772 14 2 13.5523 2 13V10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                        <path d="M8 2V10M8 10L5 7M8 10L11 7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                      {t('editor.exportMenu.pdf')}
+                    </button>
+                  )}
+                  {editorHeaderActions.docx && (
+                    <button className="header-menu-item" onClick={() => runExport('docx')} title={t('editor.exportDocx')}>
+                      <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                        <path d="M14 10V13C14 13.5523 13.5523 14 13 14H3C2.44772 14 2 13.5523 2 13V10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                        <path d="M8 2V10M8 10L5 7M8 10L11 7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                      {t('editor.exportMenu.docx')}
+                    </button>
+                  )}
+                  {editorHeaderActions.remarkable && (
+                    <button className="header-menu-item" onClick={() => runExport('remarkable')} title={t('editor.exportPdfRemarkable')}>
+                      <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                        <rect x="3" y="2" width="10" height="12" rx="1" stroke="currentColor" strokeWidth="1.5"/>
+                        <path d="M6 5.5h4M6 8h4M6 10.5h2.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+                      </svg>
+                      {t('editor.exportMenu.remarkable')}
+                    </button>
+                  )}
+                  {wordpressAvailable && (
+                    <button className="header-menu-item" onClick={() => runExport('wordpress')} title={t('editor.publishWp')}>
+                      <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                        <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.5"/>
+                        <path d="M2.5 8h11M8 2.5c1.8 2 2.8 3.8 2.8 5.5S9.8 11.5 8 13.5M8 2.5C6.2 4.5 5.2 6.3 5.2 8S6.2 11.5 8 13.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+                      </svg>
+                      {t('editor.exportMenu.wordpress')}
+                    </button>
+                  )}
+                  {editorLastExport && (
+                    <div className="header-menu-footer">
+                      {t('editor.exportMenu.last', {
+                        label: exportKindLabels[editorLastExport.kind],
+                        time: formatExportTime(editorLastExport.at, language)
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+          {/* Kontextspalte ein-/ausblenden */}
+          {!isSecondary && (
             <button
-              className="export-btn"
-              onClick={() => setShowPublishWpModal(true)}
-              title={t('editor.publishWp')}
+              className={`context-toggle-btn ${editorShowContextPanel ? 'active' : ''}`}
+              onClick={() => setEditorShowContextPanel(!editorShowContextPanel)}
+              title={editorShowContextPanel ? t('editor.contextPanel.hide') : t('editor.contextPanel.show')}
             >
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.5"/>
-                <path d="M2.5 8h11M8 2.5c1.8 2 2.8 3.8 2.8 5.5S9.8 11.5 8 13.5M8 2.5C6.2 4.5 5.2 6.3 5.2 8S6.2 11.5 8 13.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="3" width="18" height="18" rx="2"/>
+                <line x1="15" y1="3" x2="15" y2="21"/>
               </svg>
-              WP
             </button>
           )}
           <div className="view-mode-toggle">
             {showRawEditor && (
               <button
-                className={`toggle-btn ${viewMode === 'edit' ? 'active' : ''}`}
+                className={`toggle-btn toggle-btn-label ${viewMode === 'edit' ? 'active' : ''}`}
                 onClick={() => handleSetViewMode('edit')}
                 title={t('editor.modeMarkdown')}
               >
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
                   <path d="M11.5 2.5L13.5 4.5L5 13H3V11L11.5 2.5Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
+                {t('editor.modeMarkdownShort')}
               </button>
             )}
             <button
-              className={`toggle-btn ${viewMode === 'live-preview' ? 'active' : ''}`}
+              className={`toggle-btn toggle-btn-label ${viewMode === 'live-preview' ? 'active' : ''}`}
               onClick={() => handleSetViewMode('live-preview')}
               title={t('editor.modeWrite')}
             >
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
                 <path d="M8 3C4.5 3 1.5 8 1.5 8C1.5 8 4.5 13 8 13C11.5 13 14.5 8 14.5 8C14.5 8 11.5 3 8 3Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                 <path d="M11.5 2.5L13.5 4.5L10 8L8.5 6.5L11.5 2.5Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
+              {t('editor.modeWriteShort')}
             </button>
             <button
-              className={`toggle-btn ${viewMode === 'preview' ? 'active' : ''}`}
+              className={`toggle-btn toggle-btn-label ${viewMode === 'preview' ? 'active' : ''}`}
               onClick={() => handleSetViewMode('preview')}
               title={t('editor.modeRead')}
             >
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
                 <path d="M8 3C4.5 3 1.5 8 1.5 8C1.5 8 4.5 13 8 13C11.5 13 14.5 8 14.5 8C14.5 8 11.5 3 8 3Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                 <circle cx="8" cy="8" r="2" stroke="currentColor" strokeWidth="1.5"/>
               </svg>
+              {t('editor.modeReadShort')}
             </button>
           </div>
         </div>
@@ -4988,6 +5112,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
         />
       )}
 
+      <div className="editor-main">
       <div
         className={`editor-content ${viewMode !== 'preview' ? 'visible' : 'hidden'} ${viewMode === 'live-preview' ? 'live-preview-mode' : ''}`}
         ref={editorRef}
@@ -5163,6 +5288,12 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
         />
       </div>
 
+      {/* Kontextspalte: Verknüpft / Ähnlich / Karteikarten an einem Ort */}
+      {!isSecondary && editorShowContextPanel && (
+        <ContextPanel note={selectedNote} />
+      )}
+      </div>
+
       {/* Editor Footer mit Statistiken */}
       {editorShowWordCount && (
         <div className="editor-footer">
@@ -5175,6 +5306,17 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
           <span className="editor-stat" title={t('editor.readTime')}>
             ~{documentStats.readingTimeMinutes} {t('editor.readTimeMin')}
           </span>
+          <span className="editor-footer-spacer" />
+          {!isSecondary && (
+            <button
+              className="editor-footer-backlinks"
+              onClick={() => setEditorShowContextPanel(!editorShowContextPanel)}
+              title={editorShowContextPanel ? t('editor.contextPanel.hide') : t('editor.contextPanel.show')}
+            >
+              <span className="editor-footer-backlinks-arrow">←</span>
+              {selectedNote.incomingLinks.length} {t('backlinks.title')}
+            </button>
+          )}
         </div>
       )}
 

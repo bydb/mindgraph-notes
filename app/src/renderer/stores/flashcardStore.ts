@@ -104,7 +104,7 @@ function addDays(date: Date, days: number): Date {
   return result
 }
 
-function isCardDue(card: Flashcard): boolean {
+export function isCardDue(card: Flashcard): boolean {
   if (card.status !== 'active') return false
   if (!card.nextReview) return true // Never reviewed = due
   return new Date(card.nextReview) <= new Date()
