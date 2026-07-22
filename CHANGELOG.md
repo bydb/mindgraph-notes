@@ -2,19 +2,27 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
-## [0.10.22-beta] - 2026-07-21
+## [0.10.23-beta] - 2026-07-22
 
-Der Notiz-Agent kann jetzt optional im Web recherchieren, geprüfte Seiten lesen und die verwendeten Quellen nachvollziehbar in die fertige Notiz übernehmen.
+Der Notiz-Agent kann jetzt optional im Web recherchieren und zeigt vor der Übernahme, was er in den Vault schreiben würde. Dazu ein ruhigeres Editor-Design, direkte Vault-Übernahme aus dem Notes-Chat und Sicherheits-Härtung des Telegram-Moduls.
 
 ### Neu
 
 - **Optionale Webrecherche für den Notiz-Agenten.** Pro Auftrag lässt sich eine Websuche zuschalten. Tavily ist der empfohlene Standard; alternativ funktionieren eine eigene SearXNG-Instanz oder Linkup. Der Agent darf nur Treffer des laufenden Suchlaufs abrufen, schützt lokale und interne Netze vor Zugriffen und ergänzt erfolgreiche Quellen deterministisch in der fertigen Notiz. Anbieter-Konfiguration und API-Keys bleiben im Main-Prozess; die App zeigt vor Cloud-Läufen, welche Daten an welchen Dienst gehen.
+- **Artefaktvorschau vor der Übernahme.** Ergebnis-Karten des Notiz-Agenten haben jetzt einen Vorschau-Knopf: Er zeigt exakt den Inhalt, der bei „Übernehmen" in den Vault geschrieben würde — vorher wanderte die Datei ungesehen hinein. Dazu eine Provenienz-Zeile am Lauf: Modell und Datenweg (lokal oder Cloud).
+- **Sichtbarer Agent-Modus.** Beim Verknüpfen eines Zielordners erklärt die KI-Leiste jetzt sichtbar, dass die KI mehrschrittig arbeitet und neue Dateien erstellt — und dass nichts ohne Übernahme im Vault landet. Die dort wirkungslosen Umschreib-Presets sind im Agent-Modus ausgeblendet.
+- **Notes-Chat-Antworten in den Vault übernehmen.** Zwei neue Aktionen neben dem Kopieren-Knopf: „Als neue Notiz speichern" (landet im Standard-Notizordner und öffnet sich direkt) und „An aktuelle Notiz anhängen" — beide mit Provenienz-Callout (Frage, Modell, Datum).
 - **Ruhigerer Editor mit Kontextspalte.** Die Kopfzeile konzentriert sich auf die wichtigsten Aktionen, während Zusammenhänge und Arbeitskontext in einer eigenen Seitenleiste erreichbar sind.
 - **Neue Zentrale „KI & Modelle" und durchsuchbare Einstellungen.** Provider, Modelle und KI-Funktionen sind gebündelt; die Suche springt direkt zum passenden Einstellungsbereich.
 - **Ausgebautes Brain.** Zustandssteuerung und Zeitstrahl machen Veränderungen des persönlichen Wissenskontexts nachvollziehbarer.
 
+### Geändert
+
+- **Telegram-Bot als experimentell markiert.** Das Modul bleibt enthalten und nutzbar, wird aber derzeit nicht aktiv weiterentwickelt (Kennzeichnung in den Einstellungen). Feedback ist willkommen — bei genügend Interesse wird die Entwicklung wieder aufgenommen.
+
 ### Behoben
 
+- **Telegram-Sicherheit gehärtet.** Drei Fixes: Die Vault-Grenze der Agent-Tools ist jetzt symlink-sicher (ein Link im Vault, der nach außen zeigt, wird erkannt und abgewiesen); Schreib-Tools laufen ohne Bestätigungskanal grundsätzlich nicht mehr (fail-closed); und der Zeitplaner kann gelöschte oder geänderte Regeln nicht mehr versehentlich mit alter Konfiguration wieder einplanen.
 - **Große Wissensgraphen frieren den Renderer nicht mehr ein.** Der Canvas schützt sich vor einem ungefilterten Riesen-Graphen.
 - **Editor-Modusumschalter zeigt wieder Icon und Beschriftung.**
 
