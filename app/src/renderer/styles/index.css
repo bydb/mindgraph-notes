@@ -20164,6 +20164,11 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
   background: var(--bg-primary);
+  /* Höhe begrenzen + intern scrollen: bei langen Läufen (viele Schritte + Provenienz +
+     Ergebnis-Karte) wuchs die Leiste sonst über den Bildschirm hinaus und der
+     „Übernehmen"-Button war nicht erreichbar. */
+  max-height: 40vh;
+  overflow-y: auto;
 }
 .ai-bar-agent-steps { display: flex; flex-direction: column; gap: 2px; }
 .ai-bar-agent-step {
@@ -20197,6 +20202,21 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
 }
 .ai-bar-agent-card-meta { font-size: 11px; color: var(--text-muted); flex-shrink: 0; }
 .ai-bar-agent-card-sources {
+  font-size: 11px;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ai-bar-agent-web {
+  margin: 4px 0;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-subtle, transparent);
+}
+.ai-bar-agent-web-summary { font-size: 11px; font-weight: 600; color: var(--text-primary); margin-bottom: 2px; }
+.ai-bar-agent-web-item {
   font-size: 11px;
   color: var(--text-muted);
   overflow: hidden;

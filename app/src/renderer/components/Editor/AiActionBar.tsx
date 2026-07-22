@@ -1,6 +1,7 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useUIStore } from '../../stores/uiStore'
 import { useTranslation } from '../../utils/translations'
+import { WEB_SEARCH_PROVIDER_META, isWebResearchConfigComplete } from '../../../shared/webResearch'
 import { ModelLogo } from '../Shared/ModelLogo'
 import { ModelPicker } from '../Shared/ModelPicker'
 import { HumanIcon } from '../Shared/HumanIcon'
@@ -9,6 +10,7 @@ import { diffStats, type DiffOp } from '../../utils/blockDiff'
 import { cloudProviderForSentinel } from '../../../shared/llmBackend'
 import { isCloudModel } from '../../../shared/modelCompatibility'
 import { useContextVaultFiles } from '../../utils/useContextVaultFiles'
+import { useIsModuleEnabled } from '../../utils/modules'
 import type { NoteAgentAttachment } from '../../../shared/types'
 
 // Notiz-Agent Phase 2 (Modus B): UI-Zustand eines Agent-Laufs — verwaltet im
@@ -28,6 +30,14 @@ export interface AgentUiResult {
   state: 'pending' | 'accepted' | 'discarded'
   finalName?: string
   error?: string
+}
+
+// Webrecherche-Provenienz eines Laufs — Suchen + Seitenabrufe inkl. Fehlversuchen.
+export interface AgentUiWeb {
+  queries: Array<{ query: string; status: string }>
+  fetches: Array<{ url: string; title: string; status: string }>
+  searchCount: number
+  fetchCount: number
 }
 
 // Macher-Leiste: Anweisung → KI-Vorschlag als Block-Diff → Übernehmen/Verwerfen.
@@ -76,13 +86,25 @@ interface Props {
   agentSteps: AgentUiStep[]
   agentResults: AgentUiResult[]
   agentFinalText: string
-  onAgentRun: (instruction: string) => void
+  agentWeb?: AgentUiWeb
+  onAgentRun: (instruction: string, opts: { webResearch: boolean }) => void
   onAgentCancel: () => void
   onAgentAccept: (resultId: string) => void
   onAgentDiscard: (resultId: string) => void
   onAgentDismiss: () => void
   // Mitlernen (Stufe 3): bestätigter Merksatz → Agent-Gedächtnis-Notiz.
   onRemember: (text: string) => Promise<{ success: boolean; relPath?: string; error?: string }>
+}
+
+// Globus-Icon für den Webrecherche-Toggle (SVG, kein Emoji).
+function GlobeGlyph() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden focusable="false">
+      <circle cx="12" cy="12" r="9" />
+      <path d="M3 12h18" />
+      <path d="M12 3c2.5 2.5 3.8 5.7 3.8 9s-1.3 6.5-3.8 9c-2.5-2.5-3.8-5.7-3.8-9S9.5 5.5 12 3z" />
+    </svg>
+  )
 }
 
 const PRESETS = [
@@ -92,9 +114,13 @@ const PRESETS = [
   { id: 'tone', key: 'aiBar.preset.tone' as const },
 ]
 
-export function AiActionBar({ open, onOpenChange, phase, proposal, onGenerate, onAccept, onDiscard, tagSuggestions, tagsLoading, onSuggestTags, onAcceptTag, onDismissTag, model, models, onModelChange, getModelLabel, attachments, onAttachDialog, onAttachFolderDialog, onAttachVaultFile, onDetach, attachError, targetFolder, onTargetFolderChange, agentPhase, agentSteps, agentResults, agentFinalText, onAgentRun, onAgentCancel, onAgentAccept, onAgentDiscard, onAgentDismiss, onRemember }: Props) {
+export function AiActionBar({ open, onOpenChange, phase, proposal, onGenerate, onAccept, onDiscard, tagSuggestions, tagsLoading, onSuggestTags, onAcceptTag, onDismissTag, model, models, onModelChange, getModelLabel, attachments, onAttachDialog, onAttachFolderDialog, onAttachVaultFile, onDetach, attachError, targetFolder, onTargetFolderChange, agentPhase, agentSteps, agentResults, agentFinalText, agentWeb, onAgentRun, onAgentCancel, onAgentAccept, onAgentDiscard, onAgentDismiss, onRemember }: Props) {
   const { t } = useTranslation()
   const aiEnabled = useUIStore(s => s.ollama.enabled)
+  const webResearchModule = useIsModuleEnabled('web-research')
+  const webResearchConfig = useUIStore(s => s.webResearchConfig)
+  const setWebResearchConfig = useUIStore(s => s.setWebResearchConfig)
+  const [webResearchArmed, setWebResearchArmed] = useState(false)
   const [instruction, setInstruction] = useState('')
   const [preset, setPreset] = useState<string | null>(null)
   // Mitlernen (Stufe 3): Merksatz-Eingabe in der Review-Phase.
@@ -129,6 +155,29 @@ export function AiActionBar({ open, onOpenChange, phase, proposal, onGenerate, o
   const agentMode = !!targetFolder
   const busy = phase === 'generating' || agentPhase === 'running'
 
+  // Config-Spiegel (0d) einmal laden, sobald das Modul aktiv ist — die Leiste braucht Provider
+  // + „konfiguriert?" für Tooltip und Warnung (P2-1).
+  useEffect(() => {
+    if (webResearchModule && !webResearchConfig) {
+      window.electronAPI.webResearchLoadConfig()
+        .then(c => setWebResearchConfig({ provider: c.provider, searxngUrl: c.searxngUrl, hasTavilyKey: c.hasTavilyKey, hasLinkupKey: c.hasLinkupKey }))
+        .catch(() => { /* ignorieren */ })
+    }
+  }, [webResearchModule, webResearchConfig, setWebResearchConfig])
+
+  // Pro-Lauf-Opt-in NICHT über Läufe/Kontexte hinweg lecken (P1-2): zurücksetzen, sobald die
+  // Leiste geschlossen ist, der Agent-Modus verlassen wird oder das Modul aus ist.
+  useEffect(() => {
+    if (!open || !agentMode || !webResearchModule) setWebResearchArmed(false)
+  }, [open, agentMode, webResearchModule])
+
+  const webConfigured = !!webResearchConfig && (
+    webResearchConfig.provider === 'tavily' ? webResearchConfig.hasTavilyKey :
+    webResearchConfig.provider === 'linkup' ? webResearchConfig.hasLinkupKey :
+    isWebResearchConfigComplete({ provider: 'searxng', searxngUrl: webResearchConfig.searxngUrl })
+  )
+  const webProviderLabel = webResearchConfig ? WEB_SEARCH_PROVIDER_META[webResearchConfig.provider].label : ''
+
   if (!aiEnabled) return null
 
   const closeTargetPicker = () => {
@@ -141,6 +190,7 @@ export function AiActionBar({ open, onOpenChange, phase, proposal, onGenerate, o
     onDiscard()
     setInstruction('')
     setPreset(null)
+    setWebResearchArmed(false)
     closeTargetPicker()
   }
 
@@ -149,7 +199,9 @@ export function AiActionBar({ open, onOpenChange, phase, proposal, onGenerate, o
     // Modus B: Zielordner verknüpft → Agent-Loop statt Block-Diff (implizite Eskalation).
     if (agentMode) {
       if (!instruction.trim()) return
-      onAgentRun(instruction.trim())
+      // webResearch nur, wenn Modul an, scharfgestellt UND konfiguriert — nie „scharf-aber-
+      // unkonfiguriert" an den Main geben (der Lauf würde sonst scheitern).
+      onAgentRun(instruction.trim(), { webResearch: webResearchModule && webResearchArmed && webConfigured })
       return
     }
     if (!preset && !instruction.trim()) return
@@ -295,6 +347,31 @@ export function AiActionBar({ open, onOpenChange, phase, proposal, onGenerate, o
                 <button type="button" className="ai-bar-chip-x" onClick={() => onTargetFolderChange(null)} disabled={busy} aria-label={t('aiBar.target.remove')}>×</button>
               </span>
             )}
+            {/* Webrecherche pro Lauf scharfstellen (Globus). NUR im Agent-Modus sichtbar
+                (Zielordner gesetzt). Nicht konfiguriert → NICHT scharfstellen, sondern in die
+                Einstellungen springen („Jetzt einrichten"); sonst würde der Lauf im Main scheitern. */}
+            {webResearchModule && agentMode && (
+              <button
+                type="button"
+                className={`ai-bar-context-btn ai-bar-web-btn ${webResearchArmed ? 'active' : ''}`}
+                onClick={() => {
+                  if (!webConfigured) {
+                    window.dispatchEvent(new CustomEvent('mindgraph:openSettings', { detail: { tab: 'integrations' } }))
+                    return
+                  }
+                  setWebResearchArmed(v => !v)
+                }}
+                disabled={busy}
+                title={webResearchArmed
+                  ? t('aiBar.web.armed')
+                  : webConfigured
+                    ? `${t('aiBar.web.hint')} (${webProviderLabel})`
+                    : t('aiBar.web.setup')}
+                aria-pressed={webResearchArmed}
+              >
+                <GlobeGlyph /> {t('aiBar.web.label')}
+              </button>
+            )}
           </>
         }
       />
@@ -303,6 +380,15 @@ export function AiActionBar({ open, onOpenChange, phase, proposal, onGenerate, o
           im Verlauf an den Anbieter, nicht nur die Anhänge (Entscheidung 7). */}
       {agentMode && cloudSelected && (
         <div className="ai-bar-cloud-hint">{t('aiBar.agent.cloudHint')}</div>
+      )}
+      {/* Webrecherche scharf: ehrlicher Datenfluss-Hinweis; bei Cloud-LLM beide Flüsse.
+          Nicht konfiguriert → klare Warnung VOR dem Lauf (statt erst im Main zu scheitern). */}
+      {agentMode && webResearchArmed && (
+        <div className="ai-bar-cloud-hint">
+          {!webConfigured
+            ? t('aiBar.web.notConfigured')
+            : cloudSelected ? t('aiBar.web.cloudFlowHint') : t('aiBar.web.flowHint')}
+        </div>
       )}
 
       {/* Agent-Lauf: Protokoll + Abbrechen + Ergebnis-Karten */}
@@ -324,6 +410,24 @@ export function AiActionBar({ open, onOpenChange, phase, proposal, onGenerate, o
           {agentPhase === 'review' && (
             <>
               {agentFinalText && <div className="ai-bar-agent-text">{agentFinalText}</div>}
+              {/* Webrecherche-Provenienz: „N Suchen · M Seiten" inkl. Fehlversuchen (P1-1). */}
+              {agentWeb && (agentWeb.searchCount > 0 || agentWeb.fetchCount > 0) && (
+                <div className="ai-bar-agent-web">
+                  <div className="ai-bar-agent-web-summary">
+                    {agentWeb.searchCount} {t('aiBar.web.searchesLabel')} · {agentWeb.fetchCount} {t('aiBar.web.pagesLabel')}
+                  </div>
+                  {agentWeb.queries.map((q, i) => (
+                    <div key={`q${i}`} className="ai-bar-agent-web-item">
+                      {t('aiBar.web.searchItem')}: „{q.query}"{q.status !== 'ok' ? ` (${t('aiBar.web.failed')})` : ''}
+                    </div>
+                  ))}
+                  {agentWeb.fetches.map((f, i) => (
+                    <div key={`f${i}`} className="ai-bar-agent-web-item" title={f.url}>
+                      {t('aiBar.web.pageItem')}: {f.title || f.url}{f.status !== 'ok' ? ` (${t('aiBar.web.failed')})` : ''}
+                    </div>
+                  ))}
+                </div>
+              )}
               {agentResults.map(r => (
                 <div key={r.resultId} className="ai-bar-agent-card">
                   <div className="ai-bar-agent-card-head">

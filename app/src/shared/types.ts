@@ -432,6 +432,13 @@ export interface NoteAgentDoneEvent {
   text?: string;
   hitMaxIterations?: boolean;
   results: NoteAgentResultCard[];
+  // Webrecherche-Provenienz (nur bei aktivierter Webrecherche) — Suchen + Seitenabrufe.
+  web?: {
+    queries: Array<{ query: string; status: string }>;
+    fetches: Array<{ url: string; title: string; status: string }>;
+    searchCount: number;
+    fetchCount: number;
+  };
 }
 
 // IPC Kommunikation
@@ -668,6 +675,7 @@ export interface ElectronAPI {
     attachmentIds: string[];
     targetFolderRel: string;
     cloud?: { model: string; provider?: 'openrouter' | 'llmbase' } | null;
+    webResearch?: { enabled: boolean } | null;
   }) => Promise<{ success: boolean; runId?: string; error?: string }>;
   noteAgentCancel: (runId: string) => Promise<{ success: boolean }>;
   noteAgentRemember: (vaultPath: string, text: string) => Promise<{ success: boolean; relPath?: string; error?: string }>;
@@ -999,6 +1007,14 @@ export interface ElectronAPI {
   llmbaseClearKey: () => Promise<{ success: boolean }>;
   llmbaseListModels: () => Promise<{ success: boolean; models: Array<{ id: string; name: string; contextLength?: number; promptPrice?: string }>; error?: string }>;
   llmbaseTest: (model: string) => Promise<{ success: boolean; reply?: string; error?: string }>;
+
+  // Webrecherche (Opt-in) — Provider-Config + API-Keys liegen Main-seitig (0d), pro Provider.
+  webResearchLoadConfig: () => Promise<{ provider: 'tavily' | 'searxng' | 'linkup'; searxngUrl: string; approvedPrivateOrigin?: string; hasTavilyKey: boolean; hasLinkupKey: boolean }>;
+  webResearchSaveConfig: (input: { provider?: 'tavily' | 'searxng' | 'linkup'; searxngUrl?: string }) => Promise<{ success: boolean; config?: { provider: 'tavily' | 'searxng' | 'linkup'; searxngUrl: string }; error?: string }>;
+  webResearchSaveKey: (provider: 'tavily' | 'linkup', apiKey: string) => Promise<{ success: boolean; hasKey?: boolean; error?: string }>;
+  webResearchHasKey: (provider: 'tavily' | 'linkup') => Promise<boolean>;
+  webResearchClearKey: (provider: 'tavily' | 'linkup') => Promise<{ success: boolean; error?: string }>;
+  webResearchTest: () => Promise<{ success: boolean; count?: number; error?: string }>;
   onEmailFetchProgress: (callback: (progress: { current: number; total: number; status: string }) => void) => void;
   onEmailAnalysisProgress: (callback: (progress: { current: number; total: number }) => void) => void;
   emailSetup: (vaultPath: string, inboxFolderName?: string) => Promise<{ success: boolean; folderPath?: string; instructionPath?: string; error?: string }>;

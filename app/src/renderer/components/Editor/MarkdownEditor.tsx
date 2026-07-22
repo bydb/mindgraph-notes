@@ -32,7 +32,7 @@ import { SlashCommandMenu } from './SlashCommandMenu'
 import { livePreviewExtension } from './extensions/livePreview'
 import { imageHandlingExtension } from './extensions/imageHandling'
 import { languageToolExtension, setLanguageToolMatches, setCorrectionHighlights, setLtErrorClickHandler, type LanguageToolMatch, type LanguageToolPopupMatch } from './extensions/languageTool'
-import { AiActionBar, type AiProposalMeta, type AgentUiStep, type AgentUiResult } from './AiActionBar'
+import { AiActionBar, type AiProposalMeta, type AgentUiStep, type AgentUiResult, type AgentUiWeb } from './AiActionBar'
 import { diffLines } from '../../utils/blockDiff'
 import { ModelLogo } from '../Shared/ModelLogo'
 import { HumanIcon } from '../Shared/HumanIcon'
@@ -82,6 +82,7 @@ interface AgentRunUiState {
   steps: AgentUiStep[]
   results: AgentUiResult[]
   finalText: string
+  web?: AgentUiWeb
 }
 const EMPTY_AGENT_RUN: AgentRunUiState = { runId: null, phase: 'idle', steps: [], results: [], finalText: '' }
 
@@ -1935,6 +1936,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
             ...cur,
             phase: 'review',
             results: p.results.map(r => ({ ...r, state: 'pending' as const })),
+            web: p.web,
             // Iterations-Limit sichtbar machen: sonst liest sich der letzte Modelltext
             // („Ich erstelle jetzt…") wie ein laufender Prozess, obwohl der Lauf vorbei ist.
             finalText: p.ok
@@ -1960,7 +1962,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
     })
   }, [isSecondary, t])
 
-  const agentRunStart = useCallback(async (instruction: string) => {
+  const agentRunStart = useCallback(async (instruction: string, opts?: { webResearch?: boolean }) => {
     if (!effectiveNoteId || !vaultPath || !agentTargetFolder) return
     setAgentAttachError(null)
     // Cloud-Routing nur mit eigenem 'note-agent'-Opt-in (Entscheidung 7): der
@@ -1986,7 +1988,8 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
       model,
       attachmentIds: agentAttachments.map(a => a.id),
       targetFolderRel: agentTargetFolder,
-      cloud
+      cloud,
+      webResearch: opts?.webResearch ? { enabled: true } : null
     })
     if (!res.success || !res.runId) {
       setAgentAttachError(res.error || 'Start fehlgeschlagen')
@@ -5367,6 +5370,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
           agentSteps={agentRunState.steps}
           agentResults={agentRunState.results}
           agentFinalText={agentRunState.finalText}
+          agentWeb={agentRunState.web}
           onAgentRun={agentRunStart}
           onAgentCancel={agentRunCancel}
           onAgentAccept={agentResultAccept}

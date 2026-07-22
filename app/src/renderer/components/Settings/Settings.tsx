@@ -16,6 +16,7 @@ import { CredentialsSettings } from './CredentialsSettings'
 import { ModelCompatibilitySection, ActiveModelStatusBadge, VERDICT_ICON, VERDICT_COLOR } from './ModelCompatibilitySection'
 import { OpenRouterSection } from './OpenRouterSection'
 import { LLMBaseSection } from './LLMBaseSection'
+import { WebResearchSection } from './WebResearchSection'
 import { SkillsSection } from './SkillsSection'
 import { EmailRelevanceRulesSection } from './EmailRelevanceRulesSection'
 import { getModelVerdict, CLOUD_TEST_MODELS, RECOMMENDED_PULL_MODELS, isCloudModel, modelMarkers } from '../../../shared/modelCompatibility'
@@ -3744,6 +3745,7 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab 
 
                 <OpenRouterSection />
                 <LLMBaseSection />
+                {isModuleEnabled('web-research') && <WebResearchSection />}
 
                 <div className="settings-row">
                   <label>{t('settings.integrations.defaultTranslation')}</label>

@@ -3,6 +3,10 @@ import * as path from 'path'
 import * as fs from 'fs/promises'
 import { existsSync } from 'fs'
 import type { FileEntry } from '../shared/types'
+import { loadWebResearchConfig, saveWebResearchConfig, loadProviderKey, saveProviderKey, clearProviderKey, keyPresence } from './webResearch/config'
+import { webSearch as webResearchSearch } from './webResearch/providers'
+import { originNeedsPrivateApproval as webResearchNeedsApproval } from './webResearch/egress'
+import { isWebResearchConfigComplete, normalizeWebUrl, extractUrlsFromInstruction, KEY_PROVIDERS, type WebSearchProviderId } from '../shared/webResearch'
 import {
   HTML_PREVIEW_SCHEME,
   previewPathnameToFsPath,
@@ -164,7 +168,7 @@ import { createMainRegistry, discoverMainPlugins } from './plugins/registry'
 import { isPluginGateEnabled } from '../shared/plugins/moduleGate'
 import { registerPluginTransport, isTrustedSender } from './plugins/transport'
 import { registerContextAttachment, registerContextFolder, removeContextAttachment, clearContextAttachments, readContextBlock } from './noteAgent/contextFiles'
-import { startRun, getRunForSender, finishRun, publicResults, takeResult, cancelRunsForSender, pruneRunIfConsumed, consumeEvictedRuns } from './noteAgent/runRegistry'
+import { startRun, getRunForSender, finishRun, publicResults, takeResult, cancelRunsForSender, pruneRunIfConsumed, consumeEvictedRuns, type WebRunState } from './noteAgent/runRegistry'
 import { runNoteAgentLoop } from './noteAgent/loop'
 import { cleanupOldStaging, assertInsideRunStaging, reserveFreeName, stagingDirFor } from './noteAgent/staging'
 import { ensureHtmlPageAssets } from './noteAgent/htmlAssets'
@@ -4086,6 +4090,22 @@ interface NoteAgentRunParams {
   targetFolderRel: string
   // Cloud-Routing (OpenRouter) — nur gesetzt, wenn per 'note-agent'-Opt-in freigegeben.
   cloud?: { model: string } | null
+  // Webrecherche für diesen Lauf (Globus-Toggle) — nur { enabled }, die Provider-Config
+  // liegt Main-seitig (0d). Der Main seedet die erlaubte URL-Liste aus dem Auftrag (0f).
+  webResearch?: { enabled: boolean } | null
+}
+
+// Web-Provenienz fürs done-Event (Renderer zeigt „N Suchen · M Seiten" + Liste). Enthält
+// bewusst NUR das, was tatsächlich passiert ist — inkl. Fehlversuchen.
+function webRunProvenance(run: { web?: WebRunState }): { queries: Array<{ query: string; status: string }>; fetches: Array<{ url: string; title: string; status: string }>; searchCount: number; fetchCount: number } | undefined {
+  const w = run.web
+  if (!w) return undefined
+  return {
+    queries: w.queries,
+    fetches: w.fetches.map(f => ({ url: f.finalUrl, title: f.title, status: f.status })),
+    searchCount: w.searchCount,
+    fetchCount: w.fetchCount
+  }
 }
 
 ipcMain.handle('note-agent-run', async (event, params: NoteAgentRunParams) => {
@@ -4136,6 +4156,32 @@ ipcMain.handle('note-agent-run', async (event, params: NoteAgentRunParams) => {
     // Mitlernen (Stufe 3): bestätigte Regeln aus früheren Läufen in den Prompt.
     const agentMemory = await readAgentMemory(params.vaultPath).catch(() => '')
 
+    // Webrecherche (Opt-in): nur wenn der Renderer sie für diesen Lauf aktiviert hat UND
+    // die Provider-Config Main-seitig vollständig ist. Der Main führt die erlaubte URL-Liste
+    // und seedet sie aus den Auftrags-URLs (0f) — der Renderer liefert keine URLs.
+    let web: WebRunState | undefined
+    if (params.webResearch?.enabled) {
+      const webConfig = await loadWebResearchConfig()
+      if (!isWebResearchConfigComplete(webConfig)) {
+        return { success: false, error: 'Webrecherche ist eingeschaltet, aber nicht konfiguriert (Einstellungen → Webrecherche: SearXNG-URL bzw. Linkup-Key).' }
+      }
+      const apiKey = KEY_PROVIDERS.includes(webConfig.provider) ? await loadProviderKey(webConfig.provider) : null
+      if (KEY_PROVIDERS.includes(webConfig.provider) && !apiKey) {
+        return { success: false, error: 'Webrecherche gewählt, aber kein API-Key hinterlegt (Einstellungen → Integrationen → Webrecherche).' }
+      }
+      web = {
+        config: webConfig,
+        apiKey,
+        phase: 'search',
+        allowedUrls: new Set(extractUrlsFromInstruction(params.instruction)),
+        queries: [],
+        fetches: [],
+        searchCount: 0,
+        fetchCount: 0,
+        wrote: false
+      }
+    }
+
     const run = startRun({
       senderId: event.sender.id,
       noteId: params.noteId,
@@ -4144,7 +4190,8 @@ ipcMain.handle('note-agent-run', async (event, params: NoteAgentRunParams) => {
       targetFolderAbs: targetAbs,
       attachmentIds: params.attachmentIds || [],
       instruction: params.instruction.trim(),
-      skills
+      skills,
+      web
     })
     if (!run) return { success: false, error: 'Es läuft bereits ein Agent-Lauf in diesem Fenster — erst abbrechen oder abwarten.' }
     hookNoteAgentCleanup(event.sender)
@@ -4178,7 +4225,8 @@ ipcMain.handle('note-agent-run', async (event, params: NoteAgentRunParams) => {
             ok: true,
             text: res.text,
             hitMaxIterations: res.hitMaxIterations,
-            results: publicResults(run)
+            results: publicResults(run),
+            web: webRunProvenance(run)
           })
         }
       } catch (e) {
@@ -4194,7 +4242,8 @@ ipcMain.handle('note-agent-run', async (event, params: NoteAgentRunParams) => {
             ok: false,
             cancelled,
             error: message,
-            results: publicResults(run)
+            results: publicResults(run),
+            web: webRunProvenance(run)
           })
         }
       }
@@ -9143,6 +9192,110 @@ function registerCloudProviderIpc(provider: CloudChatBackend): void {
 
 registerCloudProviderIpc('openrouter')
 registerCloudProviderIpc('llmbase')
+
+// ── Webrecherche (Opt-in): Provider-Config + Linkup-Key Main-seitig (0d) ──────
+// ALLE Handler prüfen isTrustedSender (nur eigener Top-Frame) — fremder, in Markdown
+// eingebetteter Inhalt/Sub-Frame kann Config/Key weder lesen/ändern noch Netzproben auslösen.
+const WR_UNAUTHORIZED = { success: false, error: 'Nicht autorisierter Aufrufer' } as const
+
+ipcMain.handle('webresearch-load-config', async (event) => {
+  if (!isTrustedSender(event)) return WR_UNAUTHORIZED
+  const config = await loadWebResearchConfig()
+  const keys = await keyPresence()
+  return { ...config, hasTavilyKey: keys.tavily, hasLinkupKey: keys.linkup }
+})
+
+ipcMain.handle('webresearch-save-config', async (event, input: { provider?: WebSearchProviderId; searxngUrl?: string }) => {
+  if (!isTrustedSender(event)) return WR_UNAUTHORIZED
+  try {
+    // Eine SearXNG-Adresse, die (auch per DNS) auf eine private/interne IP zeigt, aktiviert die
+    // SSRF-Ausnahme. Damit das nicht durch einen (womöglich kompromittierten) Renderer-Aufruf
+    // allein scharf wird, verlangt sie eine sichtbare Main-seitige Nutzerfreigabe — und die
+    // Freigabe wird als EXAKTES Origin gespeichert (nicht nur als Hostname). Öffentliche Hosts
+    // brauchen keinen Dialog.
+    let approvedPrivateOrigin: string | undefined
+    const raw = (input?.searxngUrl || '').trim()
+    if (raw) {
+      const norm = normalizeWebUrl(raw)
+      if (norm && (await webResearchNeedsApproval(norm))) {
+        const host = new URL(norm).host
+        const win = BrowserWindow.fromWebContents(event.sender) || BrowserWindow.getFocusedWindow()
+        const opts = {
+          type: 'warning' as const,
+          buttons: ['Abbrechen', 'Erlauben'],
+          defaultId: 0,
+          cancelId: 0,
+          title: 'Lokale Suchadresse erlauben?',
+          message: 'Die Webrecherche soll Suchanfragen an eine Adresse in deinem lokalen Netzwerk senden.',
+          detail: `Adresse: ${host}\n\nNur erlauben, wenn du diese SearXNG-Instanz selbst betreibst.`
+        }
+        const { response } = win ? await dialog.showMessageBox(win, opts) : await dialog.showMessageBox(opts)
+        if (response !== 1) return { success: false, error: 'Lokale Suchadresse wurde nicht freigegeben.' }
+        approvedPrivateOrigin = new URL(norm).origin
+      }
+    }
+    const config = await saveWebResearchConfig({ ...(input || {}), approvedPrivateOrigin })
+    return { success: true, config }
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : String(error) }
+  }
+})
+
+// Key-IPC ist provider-scoped: der Renderer nennt explizit den Provider (tavily/linkup),
+// damit ein Provider-Wechsel den anderen Key nicht überschreibt.
+function coerceKeyProvider(v: unknown): WebSearchProviderId | null {
+  return KEY_PROVIDERS.includes(v as WebSearchProviderId) ? (v as WebSearchProviderId) : null
+}
+
+ipcMain.handle('webresearch-save-key', async (event, provider: string, apiKey: string) => {
+  if (!isTrustedSender(event)) return WR_UNAUTHORIZED
+  const p = coerceKeyProvider(provider)
+  if (!p) return { success: false, error: 'Unbekannter Key-Provider.' }
+  try {
+    const result = await saveProviderKey(p, apiKey)
+    return { success: true, ...result }
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : String(error) }
+  }
+})
+
+ipcMain.handle('webresearch-has-key', async (event, provider: string) => {
+  if (!isTrustedSender(event)) return false
+  const p = coerceKeyProvider(provider)
+  return p ? !!(await loadProviderKey(p)) : false
+})
+
+ipcMain.handle('webresearch-clear-key', async (event, provider: string) => {
+  if (!isTrustedSender(event)) return WR_UNAUTHORIZED
+  const p = coerceKeyProvider(provider)
+  if (!p) return { success: false, error: 'Unbekannter Key-Provider.' }
+  try {
+    await clearProviderKey(p)
+    return { success: true }
+  } catch (error) {
+    // Konnte NICHT gelöscht werden → ehrlich melden, damit die UI nicht „kein Key" anzeigt.
+    return { success: false, error: error instanceof Error ? error.message : String(error) }
+  }
+})
+
+// Verbindungstest: eine echte Probe-Suche über den konfigurierten Provider.
+ipcMain.handle('webresearch-test', async (event) => {
+  if (!isTrustedSender(event)) return WR_UNAUTHORIZED
+  try {
+    const config = await loadWebResearchConfig()
+    if (!isWebResearchConfigComplete(config)) {
+      return { success: false, error: 'Konfiguration unvollständig (SearXNG-URL bzw. API-Key fehlt).' }
+    }
+    const apiKey = KEY_PROVIDERS.includes(config.provider) ? await loadProviderKey(config.provider) : null
+    if (KEY_PROVIDERS.includes(config.provider) && !apiKey) {
+      return { success: false, error: 'Kein API-Key hinterlegt.' }
+    }
+    const hits = await webResearchSearch('MindGraph Notes Test', { config, apiKey })
+    return { success: true, count: hits.length }
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : String(error) }
+  }
+})
 
 // Email-Verbindungstest
 ipcMain.handle('email-connect', async (_event, account: { host: string; port: number; user: string; tls: boolean; id: string }) => {
