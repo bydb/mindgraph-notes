@@ -1607,6 +1607,12 @@ const translations = {
     // Notes Chat
     'notesChat.socraticMode': 'Sokratischer Dialog - die KI stellt Rückfragen',
     'notesChat.clearChat': 'Chat leeren',
+    'notesChat.saveAsNote': 'Als neue Notiz speichern',
+    'notesChat.saveAsNoteDone': 'Notiz erstellt',
+    'notesChat.appendToNote': 'An aktuelle Notiz anhängen',
+    'notesChat.appendToNoteDone': 'Angehängt',
+    'notesChat.aiAnswerTitle': 'KI-Antwort',
+    'notesChat.transferFailed': 'Übernahme in den Vault fehlgeschlagen.',
 
     // Smart Connections
     'smartConnections.folderProximity': 'Ordner-Nähe (5%)',
@@ -4528,6 +4534,12 @@ const translations = {
     // Notes Chat
     'notesChat.socraticMode': 'Socratic dialogue - AI asks follow-up questions',
     'notesChat.clearChat': 'Clear chat',
+    'notesChat.saveAsNote': 'Save as new note',
+    'notesChat.saveAsNoteDone': 'Note created',
+    'notesChat.appendToNote': 'Append to current note',
+    'notesChat.appendToNoteDone': 'Appended',
+    'notesChat.aiAnswerTitle': 'AI answer',
+    'notesChat.transferFailed': 'Transfer to vault failed.',
 
     // Smart Connections
     'smartConnections.folderProximity': 'Folder proximity (5%)',
