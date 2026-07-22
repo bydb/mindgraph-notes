@@ -6276,6 +6276,31 @@ ipcMain.handle('check-command-exists', async (_event, command: string, args?: st
 })
 
 // ===== Voice: ElevenLabs TTS =====
+// ============ Bild-Generierung (image-generation-Modul, Google Imagen) ============
+// Dünne IPC-Hülle um main/imageGen/imagenService.ts. Der Key bleibt Main-seitig
+// (safeStorage) — der Renderer bekommt für die Anzeige nur den geladenen Wert,
+// die Generierung selbst lädt ihn intern und reicht ihn nie durch.
+
+ipcMain.handle('image-gen-save-key', async (_event, apiKey: string) => {
+  const { saveImagenKey } = await import('./imageGen/imagenService')
+  return saveImagenKey(apiKey)
+})
+
+ipcMain.handle('image-gen-load-key', async () => {
+  const { loadImagenKey } = await import('./imageGen/imagenService')
+  return loadImagenKey()
+})
+
+ipcMain.handle('image-gen-delete-key', async () => {
+  const { deleteImagenKey } = await import('./imageGen/imagenService')
+  return deleteImagenKey()
+})
+
+ipcMain.handle('image-generate', async (_event, params: { prompt: string; aspectRatio?: '16:9' | '4:3' | '1:1' | '3:4' | '9:16' }) => {
+  const { generateImage } = await import('./imageGen/imagenService')
+  return generateImage(params.prompt, { aspectRatio: params.aspectRatio })
+})
+
 function getElevenLabsKeyPath(): string {
   return path.join(app.getPath('userData'), 'elevenlabs-key.enc')
 }

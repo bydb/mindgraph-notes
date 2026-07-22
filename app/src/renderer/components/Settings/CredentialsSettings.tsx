@@ -3,7 +3,7 @@ import { useUIStore } from '../../stores/uiStore'
 import { invokePlugin } from '../../plugins/client'
 import { edooboxService } from '../../stores/edooboxServiceBridge'
 
-type TabId = 'integrations' | 'email' | 'agents' | 'telegram' | 'speech' | 'sync' | 'dashboard' | `plugin:${string}`
+type TabId = 'integrations' | 'email' | 'agents' | 'telegram' | 'speech' | 'sync' | 'dashboard' | 'ai' | `plugin:${string}`
 
 interface CredentialRow {
   id: string
@@ -28,9 +28,6 @@ export const CredentialsSettings: React.FC<Props> = ({ onNavigateToTab }) => {
   const email = useUIStore(s => s.email)
   const readwise = useUIStore(s => s.readwise)
   const languageTool = useUIStore(s => s.languageTool)
-  // Nur den primitiven Bool selektieren (kein Objekt) — sonst entsteht pro Render eine neue
-  // Referenz, die über die credentials-useMemo eine Render-Schleife auslöst (flackernder Button).
-  const hasImagenKey = useUIStore(s => !!(s.pluginConfig.marketing as { googleImagenApiKey?: string } | undefined)?.googleImagenApiKey)
 
   const [statuses, setStatuses] = useState<Record<string, boolean>>({})
   const [loading, setLoading] = useState(true)
@@ -163,14 +160,13 @@ export const CredentialsSettings: React.FC<Props> = ({ onNavigateToTab }) => {
       id: 'imagen',
       label: 'Google Imagen API-Key',
       category: 'KI-Cloud',
-      note: 'Bild-Generierung im Marketing-Tab',
-      settingsTab: 'agents',
-      checkSet: async () => hasImagenKey,
-      inUiStore: true
+      note: 'Bild-Generierung (Modul) — genutzt vom Marketing-Tab',
+      settingsTab: 'ai',
+      checkSet: async () => !!(await window.electronAPI.imageGenLoadKey())
     })
 
     return rows
-  }, [email, readwise, languageTool, hasImagenKey])
+  }, [email, readwise, languageTool])
 
   const refreshAll = useCallback(async () => {
     setLoading(true)

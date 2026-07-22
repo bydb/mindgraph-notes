@@ -170,6 +170,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
   openAlexDeleteMailto: () => ipcRenderer.invoke('openalex-delete-mailto'),
   openAlexCheck: () => ipcRenderer.invoke('openalex-check'),
 
+  // Bild-Generierung (image-generation-Modul, Google Imagen)
+  imageGenSaveKey: (apiKey: string) => ipcRenderer.invoke('image-gen-save-key', apiKey),
+  imageGenLoadKey: () => ipcRenderer.invoke('image-gen-load-key'),
+  imageGenDeleteKey: () => ipcRenderer.invoke('image-gen-delete-key'),
+  imageGenerate: (params: { prompt: string; aspectRatio?: '16:9' | '4:3' | '1:1' | '3:4' | '9:16' }) =>
+    ipcRenderer.invoke('image-generate', params),
+
   // Notiz-Agent Phase 1: Kontext-Dateien für die Macher-Leiste (Attachment-IDs, Pfade bleiben Main-seitig)
   noteAgentAttachDialog: () => ipcRenderer.invoke('note-agent-attach-dialog'),
   noteAgentAttachFolderDialog: () => ipcRenderer.invoke('note-agent-attach-folder-dialog'),

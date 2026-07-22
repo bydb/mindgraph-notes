@@ -102,9 +102,7 @@ export const edooboxClient = {
     invokePlugin<{ success: boolean; mediaId?: number; imageUrl?: string; error?: string }>(
       'edoobox', 'edoobox.marketingUploadImage', { siteUrl, username, imageBase64, fileName, caption }),
 
-  marketingGenerateImage: (prompt: string, apiKey: string) =>
-    invokePlugin<{ success: boolean; imageBase64?: string; error?: string }>(
-      'edoobox', 'edoobox.marketingGenerateImage', { prompt, apiKey }),
+  // Bild-GENERIERUNG läuft über das Core-Modul image-generation (window.electronAPI.imageGenerate).
 
   marketingSelectImage: () =>
     invokePlugin<{ fileName: string; imageBase64: string } | null>('edoobox', 'edoobox.marketingSelectImage'),

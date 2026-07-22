@@ -39,7 +39,6 @@ const contentEnvelope = envelope({ blogPost: str, igCaption: str })
 const wpCheckEnvelope = envelope({ userName: str })
 const publishEnvelope = envelope({ postId: num, postUrl: str, status: str })
 const uploadEnvelope = envelope({ mediaId: num, imageUrl: str })
-const imageEnvelope = envelope({ imageBase64: str })
 const apiCredentialsResult: JsonSchema = {
   anyOf: [
     { type: 'null' },
@@ -89,10 +88,11 @@ export const manifest: PluginManifest = {
     legacyEnabledPath: 'edoobox.enabled',
   },
   capabilities: [...EDOOBOX_CAPABILITIES],
-  // Baseline-Allowlist: edoobox-Provider + Google Imagen (Marketing-Bildgenerierung). Der
-  // konfigurierte edoobox- UND WordPress-Host (ui.edoobox.baseUrl, ui.marketing.wordpressUrl)
-  // wird zur Laufzeit ergänzt (resolveExtraAllowedHosts im Capability-Host).
-  http: { allowedHosts: ['*.edoobox.com', 'generativelanguage.googleapis.com'] },
+  // Baseline-Allowlist: edoobox-Provider. Der konfigurierte edoobox- UND WordPress-Host
+  // (ui.edoobox.baseUrl, ui.marketing.wordpressUrl) wird zur Laufzeit ergänzt
+  // (resolveExtraAllowedHosts im Capability-Host). Bild-Generierung (Google Imagen) ist
+  // seit der Modul-Entflechtung ein CORE-Modul (image-generation) — kein Imagen-Host mehr hier.
+  http: { allowedHosts: ['*.edoobox.com'] },
   credentials: [
     { key: 'apiKey', label: 'API Key', secret: true },
     { key: 'apiSecret', label: 'API Secret', secret: true },
@@ -214,7 +214,7 @@ export const manifest: PluginManifest = {
         additionalProperties: false,
       },
     },
-    // — Marketing-Actions (Phase 2b): WordPress-Publishing + Ollama-Content + Imagen-Bilder. —
+    // — Marketing-Actions (Phase 2b): WordPress-Publishing + Ollama-Content. —
     {
       id: 'edoobox.marketingSaveCredentials',
       requiredCapabilities: ['secrets'],
@@ -282,16 +282,6 @@ export const manifest: PluginManifest = {
         additionalProperties: false,
       },
     },
-    {
-      id: 'edoobox.marketingGenerateImage',
-      requiredCapabilities: ['http.fetch'],
-      inputSchema: {
-        type: 'object',
-        required: ['prompt', 'apiKey'],
-        properties: { prompt: { type: 'string' }, apiKey: { type: 'string' } },
-        additionalProperties: false,
-      },
-    },
     { id: 'edoobox.marketingSelectImage', requiredCapabilities: ['dialog'] },
   ],
   // Workflow-Canvas-Trigger (vorher statisch im Kern-Registry). Feuert bei steigender
@@ -341,7 +331,6 @@ const EDOOBOX_OUTPUT_SCHEMAS: Record<string, JsonSchema> = {
   'edoobox.marketingGenerateContent': contentEnvelope,
   'edoobox.marketingPublishWordpress': publishEnvelope,
   'edoobox.marketingUploadImage': uploadEnvelope,
-  'edoobox.marketingGenerateImage': imageEnvelope,
   'edoobox.marketingSelectImage': selectedImageResult,
 }
 for (const action of manifest.actions ?? []) {

@@ -2859,9 +2859,17 @@ const translations = {
     'settings.agents.marketing.defaultStatus': 'Standard-Status',
     'settings.agents.marketing.statusDraft': 'Entwurf',
     'settings.agents.marketing.statusPublish': 'Veröffentlicht',
-    'settings.agents.marketing.imagenTitle': 'Bildgenerierung (Google Imagen)',
-    'settings.agents.marketing.imagenApiKey': 'Google AI Studio API Key',
     'titlebar.agents': 'Veranstaltungsagent',
+
+    // Bild-Generierung (image-generation-Modul, KI-Tab)
+    'settings.ai.imageGen.title': 'Bild-Generierung (Google Imagen)',
+    'settings.ai.imageGen.description': 'Erzeugt Bilder über die Google-Imagen-API mit deinem eigenen API-Key — genutzt vom Marketing-Tab und künftig vom Notiz-Agenten.',
+    'settings.ai.imageGen.apiKey': 'Google AI Studio API Key',
+    'settings.ai.imageGen.save': 'Key speichern',
+    'settings.ai.imageGen.saved': 'Gespeichert',
+    'settings.ai.imageGen.keyStored': 'Key hinterlegt',
+    'settings.ai.imageGen.saveFailed': 'Speichern fehlgeschlagen',
+    'settings.ai.imageGen.privacyHint': 'Der Key wird verschlüsselt auf diesem Rechner gespeichert (safeStorage). Prompts gehen an Google — keine Notiz- oder Mail-Inhalte, nur der Bild-Prompt.',
 
     // Slash Commands
     'slashCommand.header': 'Slash-Befehle',
@@ -5785,9 +5793,17 @@ const translations = {
     'settings.agents.marketing.defaultStatus': 'Default status',
     'settings.agents.marketing.statusDraft': 'Draft',
     'settings.agents.marketing.statusPublish': 'Published',
-    'settings.agents.marketing.imagenTitle': 'Image Generation (Google Imagen)',
-    'settings.agents.marketing.imagenApiKey': 'Google AI Studio API Key',
     'titlebar.agents': 'Event Agent',
+
+    // Image generation (image-generation module, AI tab)
+    'settings.ai.imageGen.title': 'Image generation (Google Imagen)',
+    'settings.ai.imageGen.description': 'Generates images via the Google Imagen API with your own API key — used by the marketing tab and, in the future, the note agent.',
+    'settings.ai.imageGen.apiKey': 'Google AI Studio API key',
+    'settings.ai.imageGen.save': 'Save key',
+    'settings.ai.imageGen.saved': 'Saved',
+    'settings.ai.imageGen.keyStored': 'Key stored',
+    'settings.ai.imageGen.saveFailed': 'Saving failed',
+    'settings.ai.imageGen.privacyHint': 'The key is stored encrypted on this machine (safeStorage). Prompts are sent to Google — no note or mail content, only the image prompt.',
 
     // Slash Commands
     'slashCommand.header': 'Slash Commands',

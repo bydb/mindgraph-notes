@@ -321,38 +321,8 @@ export default definePluginMain(
       }
     })
 
-    // Google Imagen — liefert Base64 direkt zurück (keine Temp-Datei nötig).
-    actions.register('edoobox.marketingGenerateImage', async (p) => {
-      try {
-        const { prompt, apiKey } = p as { prompt: string; apiKey: string }
-        const res = await host.http.fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict?key=${apiKey}`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              instances: [{ prompt }],
-              parameters: { sampleCount: 1, aspectRatio: '16:9', safetyFilterLevel: 'block_only_high' },
-            }),
-            signal: AbortSignal.timeout(120000),
-          }
-        )
-        if (!res.ok) {
-          const text = await res.text()
-          throw new Error(`Imagen API Fehler (${res.status}): ${text.slice(0, 200)}`)
-        }
-        const data = await res.json()
-        const predictions = (data.predictions as Array<{ bytesBase64Encoded?: string }> | undefined)?.filter(
-          (pr) => pr.bytesBase64Encoded
-        )
-        if (!predictions || predictions.length === 0) {
-          throw new Error(`Keine Bilder generiert: ${data.filteredReason || JSON.stringify(data).slice(0, 300)}`)
-        }
-        return { success: true, imageBase64: predictions[0].bytesBase64Encoded }
-      } catch (e) {
-        return { success: false, error: errMsg(e, 'Bildgenerierung fehlgeschlagen') }
-      }
-    })
+    // Bild-GENERIERUNG (Google Imagen) lebt seit der Modul-Entflechtung im Core
+    // (image-generation-Modul, IPC image-generate) — hier bewusst keine Action mehr.
 
     // Bild auswählen (Dialog) → Base64 + Dateiname (kein Pfad, keine Temp-Datei).
     actions.register('edoobox.marketingSelectImage', async () => {

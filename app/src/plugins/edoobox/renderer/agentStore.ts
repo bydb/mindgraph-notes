@@ -388,8 +388,8 @@ export const useAgentStore = create<AgentState>()((set, get) => ({
   },
 
   generateImage: async (offer: EdooboxOfferDashboard) => {
-    const { googleImagenApiKey } = getMarketingConfig()
-    if (!googleImagenApiKey) return
+    // Bild-Generierung = Core-Modul image-generation (Key liegt Main-seitig in safeStorage).
+    if (!useUIStore.getState().imageGenerationEnabled) return
     set({ isGeneratingImage: true })
     try {
       // Erst Ollama einen passenden Bild-Prompt generieren lassen
@@ -419,10 +419,10 @@ export const useAgentStore = create<AgentState>()((set, get) => ({
       const imagePrompt = rawPrompt || fallbackPrompt
 
       // Try generation, retry once with fallback prompt if it fails
-      let result = await edooboxClient.marketingGenerateImage(imagePrompt, googleImagenApiKey)
+      let result = await window.electronAPI.imageGenerate({ prompt: imagePrompt, aspectRatio: '16:9' })
       if (!result.success && imagePrompt !== fallbackPrompt) {
         console.log('[marketing] Image generation failed, retrying with fallback prompt')
-        result = await edooboxClient.marketingGenerateImage(fallbackPrompt, googleImagenApiKey)
+        result = await window.electronAPI.imageGenerate({ prompt: fallbackPrompt, aspectRatio: '16:9' })
       }
       if (result.success && result.imageBase64) {
         const dataUrl = `data:image/png;base64,${result.imageBase64}`

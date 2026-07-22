@@ -18,6 +18,7 @@ import { ModelCompatibilitySection, ActiveModelStatusBadge, VERDICT_ICON, VERDIC
 import { OpenRouterSection } from './OpenRouterSection'
 import { LLMBaseSection } from './LLMBaseSection'
 import { WebResearchSection } from './WebResearchSection'
+import { ImageGenerationSection } from './ImageGenerationSection'
 import { SkillsSection } from './SkillsSection'
 import { EmailRelevanceRulesSection } from './EmailRelevanceRulesSection'
 import { SettingsSearch, type SettingsSearchEntry } from './SettingsSearch'
@@ -625,7 +626,8 @@ const MODULE_CONFIG_TABS: Record<string, Tab> = {
   remarkable: 'remarkable',
   'mz-suite': 'agents',
   'smart-connections': 'ai',
-  'web-research': 'ai'
+  'web-research': 'ai',
+  'image-generation': 'ai'
 }
 
 // Config-Tab eines Moduls: fester Eintrag oben ODER — bei Plugin-Modulen — der dynamische
@@ -2119,6 +2121,7 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab,
   const searchSpeechEnabled = useIsModuleEnabled('speech')
   const searchRemarkableEnabled = useIsModuleEnabled('remarkable')
   const searchWebResearchEnabled = useIsModuleEnabled('web-research')
+  const searchImageGenEnabled = useIsModuleEnabled('image-generation')
   const searchIndex = React.useMemo<SettingsSearchEntry[]>(() => {
     const g = {
       basics: t('settings.nav.basics'),
@@ -2165,6 +2168,7 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab,
       { id: 'ai-openrouter', tab: 'ai', label: 'OpenRouter (Cloud)', path: `${g.modules} → ${t('settings.tab.ai')}`, keywords: 'openrouter cloud api opt-in claude gpt', anchor: 'ai-openrouter' },
       { id: 'ai-llmbase', tab: 'ai', label: 'LLMBase (EU-Cloud)', path: `${g.modules} → ${t('settings.tab.ai')}`, keywords: 'llmbase eu dsgvo cloud europa', anchor: 'ai-llmbase' },
       { id: 'ai-webresearch', tab: 'ai', label: 'Webrecherche', path: `${g.modules} → ${t('settings.tab.ai')}`, keywords: 'webrecherche tavily linkup suche web research agent', anchor: 'ai-webresearch' },
+      { id: 'ai-imagegen', tab: 'ai', label: 'Bild-Generierung', path: `${g.modules} → ${t('settings.tab.ai')}`, keywords: 'bild generierung imagen google bilder image generation api key', anchor: 'ai-imagegen' },
       { id: 'ai-smart-connections', tab: 'ai', label: t('settings.integrations.smartConnections'), path: `${g.modules} → ${t('settings.tab.ai')}`, keywords: 'smart connections gewichte reranker ähnliche notizen' },
       // E-Mail
       { id: 'email-analysis-model', tab: 'email', label: t('settings.email.analysisModel'), path: `${g.modules} → ${t('settings.email.title')}`, keywords: 'analyse modell email ki relevanz' },
@@ -2180,9 +2184,10 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab,
       if (['tab-speech', 'speech-whisper'].includes(e.id)) return searchSpeechEnabled
       if (e.id === 'tab-remarkable') return searchRemarkableEnabled
       if (e.id === 'ai-webresearch') return searchWebResearchEnabled
+      if (e.id === 'ai-imagegen') return searchImageGenEnabled
       return true
     })
-  }, [t, searchEmailEnabled, searchSpeechEnabled, searchRemarkableEnabled, searchWebResearchEnabled])
+  }, [t, searchEmailEnabled, searchSpeechEnabled, searchRemarkableEnabled, searchWebResearchEnabled, searchImageGenEnabled])
 
   // App Version
   const [appVersion, setAppVersion] = useState<string>('')
@@ -3943,6 +3948,7 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab,
                 <div data-settings-anchor="ai-openrouter"><OpenRouterSection /></div>
                 <div data-settings-anchor="ai-llmbase"><LLMBaseSection /></div>
                 {isModuleEnabled('web-research') && <div data-settings-anchor="ai-webresearch"><WebResearchSection /></div>}
+                {isModuleEnabled('image-generation') && <div data-settings-anchor="ai-imagegen"><ImageGenerationSection /></div>}
 
                 <div className="settings-row">
                   <label>{t('settings.integrations.defaultTranslation')}</label>
@@ -6130,19 +6136,8 @@ LIMIT 10
                       </select>
                     </div>
 
-                    {/* Google Imagen */}
-                    <h5 className="settings-subsection-title">{t('settings.agents.marketing.imagenTitle')}</h5>
-
-                    <div className="settings-row">
-                      <label>{t('settings.agents.marketing.imagenApiKey')}</label>
-                      <input
-                        type="password"
-                        value={marketingSettings.googleImagenApiKey}
-                        onChange={e => setMarketing({ googleImagenApiKey: e.target.value })}
-                        placeholder="AIzaSy..."
-                        className="settings-input"
-                      />
-                    </div>
+                    {/* Google Imagen ist seit dem image-generation-Modul ein eigenes
+                        Opt-in-Modul (Einstellungen → KI) — hier keine Key-Config mehr. */}
                   </>
                 )}
 
