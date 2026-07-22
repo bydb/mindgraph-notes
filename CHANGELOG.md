@@ -2,6 +2,27 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.10.24-beta] - 2026-07-22
+
+Großes Aufräumen bei Modulen und Plugins: WordPress-Publishing und Bild-Generierung sind jetzt eigenständige Bausteine statt Anhängsel des edoobox-Moduls — einzeln aktivierbar, einzeln konfigurierbar, und sie ergänzen sich weiterhin. Dazu kann der Notiz-Agent jetzt Bilder generieren.
+
+### Neu
+
+- **WordPress als eigenständiges Modul.** Das WordPress-Publishing (bisher in den edoobox-Marketing-Einstellungen versteckt) ist ein eigenes Modul mit eigenem Einstellungs-Tab: Site-URL, Benutzername, Anwendungspasswort, Verbindungstest und Standard-Status. „Zu WordPress veröffentlichen" im Editor funktioniert damit auch ganz ohne edoobox. Bestehende Konfiguration und App-Passwort werden beim Update automatisch übernommen — wer Marketing aktiv hatte, hat das WordPress-Modul direkt eingeschaltet.
+- **Bild-Generierung als eigenes Modul.** Google Imagen (eigener API-Key, Opt-in, Standard aus) ist aus edoobox herausgelöst und unter Einstellungen → KI konfigurierbar. Der API-Key liegt jetzt verschlüsselt im System-Schlüsselbund (safeStorage) statt im Klartext in den Einstellungen und verlässt bei der Generierung den Hauptprozess nicht mehr. Der edoobox-Marketing-Tab generiert Bilder wie gewohnt — jetzt über das gemeinsame Modul.
+- **Der Notiz-Agent kann Bilder generieren.** Neues Werkzeug `generate_image`: Bei aktivem Bild-Generierungs-Modul (und hinterlegtem Key) kann der Agent z.B. ein Titelbild für einen Artikel erzeugen und in der Notiz per `![[bild.png]]` einbetten. Das Bild landet wie alle Agent-Ergebnisse zuerst im Staging und kommt erst per Übernahme-Klick in den Vault.
+- **Skill „Webseiten-Artikel".** Neuer Katalog-Skill für Artikel im Web-Format, inklusive Kennzeichnung KI-generierter Inhalte nach EU AI Act.
+
+### Geändert
+
+- **Antares hat einen eigenen Einstellungs-Tab.** Die Antares-Zugangsdaten lagen bisher im edoobox-Tab „Agenten". Plugins mit eigenen Einstellungen bekommen jetzt automatisch einen eigenen Tab in der Einstellungs-Navigation (sichtbar bei aktivem Modul) — davon profitiert auch das neue WordPress-Modul.
+- **edoobox-Modul entschlackt.** Der edoobox-Schalter aktiviert nicht mehr stillschweigend Marketing mit. Der Marketing-Tab behält die KI-Text-Generierung und die Bild-Auswahl; Publishing und Bild-Generierung laufen über die eigenständigen Module.
+
+### Behoben
+
+- **Antares-Einstellungen waren unerreichbar, wenn edoobox deaktiviert war.** Der Agenten-Tab (und damit die darin liegende Antares-Sektion) erschien nur bei aktivem edoobox-Modul.
+- **„Jetzt einrichten" beim E-Mail-Feature im Vault-Tab** führte in den Agenten-Tab statt in die E-Mail-Einstellungen.
+
 ## [0.10.23-beta] - 2026-07-22
 
 Der Notiz-Agent kann jetzt optional im Web recherchieren und zeigt vor der Übernahme, was er in den Vault schreiben würde. Dazu ein ruhigeres Editor-Design, direkte Vault-Übernahme aus dem Notes-Chat und Sicherheits-Härtung des Telegram-Moduls.
