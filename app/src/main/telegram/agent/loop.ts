@@ -187,10 +187,20 @@ export async function runAgent(
 
       // Confirm-Flow für Schreib-Tools. Das isWrite-Flag ist die harte
       // Sicherheitsgrenze; confirmRequiredTools bleibt als zusätzliche Settings-Schicht.
+      // Fail-closed: ohne Confirm-Kanal wird ein bestätigungspflichtiges Tool
+      // NIE ausgeführt — die Grenze darf nicht von der Verdrahtung des Aufrufers abhängen.
       if (tool.isWrite || opts.confirmRequiredTools.has(call.name)) {
-        const approved = opts.requestConfirm
-          ? await opts.requestConfirm(call.name, call.arguments)
-          : true
+        if (!opts.requestConfirm) {
+          toolCallsDenied += 1
+          messages.push({
+            role: 'tool',
+            tool_call_id: call.id,
+            tool_name: call.name,
+            content: `Fehler: Tool "${call.name}" erfordert eine Nutzer-Bestätigung, aber es steht kein Bestätigungskanal zur Verfügung. Aktion nicht ausgeführt.`
+          })
+          continue
+        }
+        const approved = await opts.requestConfirm(call.name, call.arguments)
         if (!approved) {
           toolCallsDenied += 1
           messages.push({

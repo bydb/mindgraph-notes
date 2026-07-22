@@ -1,25 +1,14 @@
 // Notes-Tools für den Telegram-Agent.
 // note_search · note_read · note_create · note_append
 //
-// Pfade werden via path.resolve + Vault-Root-Check gegen Path-Traversal gesichert.
+// Pfade werden via resolveInVaultSafe (vaultPaths.ts) gesichert — lexikalisch
+// UND symlink-sicher per realpath.
 
 import { promises as fs } from 'fs'
 import path from 'path'
 import { searchVault } from '../../vaultQueries'
+import { resolveInVaultSafe } from './vaultPaths'
 import type { AppTool, ToolContext } from './registry'
-
-function resolveInVault(vaultRoot: string, relativePath: string): string {
-  // Akzeptiert nur Vault-relative Pfade. Absolute Pfade werden abgewiesen.
-  if (path.isAbsolute(relativePath)) {
-    throw new Error('Absoluter Pfad nicht erlaubt — bitte Vault-relativen Pfad nutzen.')
-  }
-  const resolved = path.resolve(vaultRoot, relativePath)
-  const rootResolved = path.resolve(vaultRoot)
-  if (resolved !== rootResolved && !resolved.startsWith(rootResolved + path.sep)) {
-    throw new Error('Pfad liegt außerhalb des Vaults.')
-  }
-  return resolved
-}
 
 function timestampYmdHm(): string {
   const d = new Date()
@@ -106,7 +95,7 @@ export const noteReadTool: AppTool = {
     if (!rel.toLowerCase().endsWith('.md')) {
       return { ok: false, content: 'Fehler: note_read kann nur Markdown-Dateien (.md) lesen.' }
     }
-    const abs = resolveInVault(ctx.vaultPath, rel)
+    const abs = await resolveInVaultSafe(ctx.vaultPath, rel)
     try {
       const content = await fs.readFile(abs, 'utf-8')
       const truncated = content.length > 8000 ? content.slice(0, 8000) + '\n\n[…gekürzt]' : content
@@ -146,7 +135,7 @@ export const noteCreateTool: AppTool = {
     const safeTitle = sanitizeTitleForFilename(title)
     const filename = `${timestampYmdHm()} - ${category} ${safeTitle}.md`
     const relPath = folder ? path.join(folder, filename) : filename
-    const abs = resolveInVault(ctx.vaultPath, relPath)
+    const abs = await resolveInVaultSafe(ctx.vaultPath, relPath)
     try {
       await fs.mkdir(path.dirname(abs), { recursive: true })
       // Falls Datei existiert: nicht überschreiben — Suffix anhängen
@@ -157,7 +146,7 @@ export const noteCreateTool: AppTool = {
         attempt += 1
         const variant = `${timestampYmdHm()} - ${category} ${safeTitle} (${attempt}).md`
         finalRel = folder ? path.join(folder, variant) : variant
-        finalAbs = resolveInVault(ctx.vaultPath, finalRel)
+        finalAbs = await resolveInVaultSafe(ctx.vaultPath, finalRel)
       }
 
       const frontmatterLines = ['---']
@@ -198,7 +187,7 @@ export const noteAppendTool: AppTool = {
     const content = String(args.content ?? '')
     if (!rel) return { ok: false, content: 'Fehler: path fehlt.' }
     if (!content) return { ok: false, content: 'Fehler: content ist leer.' }
-    const abs = resolveInVault(ctx.vaultPath, rel)
+    const abs = await resolveInVaultSafe(ctx.vaultPath, rel)
     if (!(await fileExists(abs))) return { ok: false, content: `Datei nicht gefunden: ${rel}` }
     try {
       const existing = await fs.readFile(abs, 'utf-8')

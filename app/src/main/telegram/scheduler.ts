@@ -126,6 +126,12 @@ export class SchedulerService {
   private deps: SchedulerDeps
   private userDataPath: string
   private running = false
+  // Konfigurationsgeneration: wird bei jedem applyRuntime()/stop() erhöht.
+  // Ein in-flight Timer-Callback (executeRule läuft noch, während der Nutzer
+  // die Config ändert) darf sich danach NICHT mehr neu einplanen — sonst
+  // re-armiert er eine gelöschte Regel oder überschreibt via timers.set()
+  // den frisch geplanten Timer der geänderten Regel mit der alten Version.
+  private generation = 0
 
   constructor(deps: SchedulerDeps, userDataPath: string) {
     this.deps = deps
@@ -163,6 +169,7 @@ export class SchedulerService {
   // wieder aufsetzt.
   stop(): void {
     this.running = false
+    this.generation += 1
     for (const [, timer] of this.timers) {
       clearTimeout(timer)
     }
@@ -185,6 +192,7 @@ export class SchedulerService {
 
   // Einzige Reconcile-Stelle: Timer-Zustand an this.config.enabled angleichen.
   private applyRuntime(): void {
+    this.generation += 1
     for (const [, timer] of this.timers) {
       clearTimeout(timer)
     }
@@ -197,6 +205,7 @@ export class SchedulerService {
   }
 
   private scheduleRule(rule: ScheduleRule): void {
+    const gen = this.generation
     const ms = msUntilNextRun(rule)
     if (ms === null) {
       console.log(`[Scheduler] rule ${rule.id} (${rule.action}) skipped — disabled or no valid day`)
@@ -206,12 +215,15 @@ export class SchedulerService {
     console.log(`[Scheduler] rule ${rule.id} (${rule.action}) scheduled in ${Math.round(ms / 1000 / 60)} min`)
 
     const timer = setTimeout(async () => {
-      if (!this.running) return
+      if (!this.running || gen !== this.generation) return
       await this.executeRule(rule)
       // Nach Ausführung: nächste Ausführung planen (wiederkehrend) — aber nur,
-      // solange der Scheduler läuft (sonst armiert ein in-flight Timer nach
-      // stop()/disable() wieder neu).
-      if (this.running) this.scheduleRule(rule)
+      // wenn seit der Planung keine Config-Änderung kam (Generation) und der
+      // Scheduler noch läuft. Die Regel wird frisch per ID aus der aktuellen
+      // Config geladen, nie aus der Closure — die kann veraltet sein.
+      if (!this.running || gen !== this.generation) return
+      const current = this.config.rules.find(r => r.id === rule.id)
+      if (current) this.scheduleRule(current)
     }, ms)
 
     this.timers.set(rule.id, timer)
