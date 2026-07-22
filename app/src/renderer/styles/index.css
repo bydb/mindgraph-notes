@@ -1949,6 +1949,121 @@ h2 { letter-spacing: -0.016em; }
   cursor: default;
 }
 
+/* ============ TITEL IM DOKUMENT (Design 1c) ============ */
+
+/* Ruhige Kopfzeile: Breadcrumb + Titel als eine gedämpfte Zeile */
+.editor-title-group-quiet {
+  overflow: hidden;
+}
+
+.editor-title-group-quiet .editor-breadcrumb {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 12.5px;
+}
+
+.editor-title-group-quiet .editor-breadcrumb .brain-icon {
+  margin-right: 5px;
+  vertical-align: -2px;
+}
+
+.editor-breadcrumb-title {
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+/* Dokument-Kopf: Titel + Eigenschaften-Zeile im Inhalt (Lesen-Modus).
+   Lebt im .editor-preview-Scroller und erbt dessen Seitenpadding. */
+.note-doc-title {
+  font-size: 33px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+  margin: 0 0 10px;
+  color: var(--text-primary);
+}
+
+.note-doc-props {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 0 0 24px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.note-doc-kind {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: var(--radius-full);
+  padding: 3px 10px;
+}
+
+.note-doc-kind .note-kind-dot {
+  width: 7px;
+  height: 7px;
+  flex: 0 0 7px;
+  box-shadow: none;
+}
+
+.note-doc-kind-problem {
+  color: var(--color-danger);
+  background: color-mix(in srgb, var(--color-danger) 10%, transparent);
+}
+
+.note-doc-kind-solution {
+  color: var(--color-success);
+  background: color-mix(in srgb, var(--color-success) 10%, transparent);
+}
+
+.note-doc-kind-info {
+  color: var(--color-info);
+  background: color-mix(in srgb, var(--color-info) 10%, transparent);
+}
+
+.note-doc-chip {
+  font-size: 11px;
+  color: var(--text-muted);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-full);
+  padding: 3px 10px;
+  white-space: nowrap;
+}
+
+.note-doc-tag {
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.note-doc-props-spacer {
+  flex: 1;
+}
+
+.note-doc-id {
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-muted);
+  cursor: default;
+}
+
+/* Kompakte Variante im Schreiben-Modus: statischer Titel über dem Editor */
+.note-doc-header.compact {
+  padding: 20px 24px 4px;
+}
+
+.note-doc-header.compact .note-doc-title {
+  margin: 0;
+  font-size: 26px;
+}
+
 /* Dropdown-Menüs in der Kopfzeile (Export, LanguageTool) */
 .header-menu-wrap {
   position: relative;

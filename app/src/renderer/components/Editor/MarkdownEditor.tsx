@@ -34,8 +34,6 @@ import { imageHandlingExtension } from './extensions/imageHandling'
 import { languageToolExtension, setLanguageToolMatches, setCorrectionHighlights, setLtErrorClickHandler, type LanguageToolMatch, type LanguageToolPopupMatch } from './extensions/languageTool'
 import { AiActionBar, type AiProposalMeta, type AgentUiStep, type AgentUiResult, type AgentUiWeb } from './AiActionBar'
 import { diffLines } from '../../utils/blockDiff'
-import { ModelLogo } from '../Shared/ModelLogo'
-import { HumanIcon } from '../Shared/HumanIcon'
 import { dataviewExtension, setDataviewNotes, setDataviewLanguage, setDataviewViewMode, setNoteClickHandler } from './extensions/dataview'
 import { useDataviewStore } from '../../stores/dataviewStore'
 import { PropertiesPanel } from './PropertiesPanel'
@@ -67,6 +65,7 @@ import { useIsModuleEnabled } from '../../utils/modules'
 import { useVoiceStore } from '../../stores/voiceStore'
 import { getNoteKind, stripNoteKindMarker, splitZettelTitle, setAiProvenanceInContent, getAiProvenance, addTagToFrontmatter, getFrontmatterTags } from '../../utils/noteKind'
 import { ContextPanel } from './ContextPanel'
+import { NoteDocumentHeader, deriveCreatedDate, formatCreatedDate } from './NoteDocumentHeader'
 import { isBrainNote, brainNoteLabel } from '../../utils/brainNote'
 import { BrainIcon } from '../BrainIcon'
 import { readClipboardText, writeClipboardText } from '../../utils/clipboard'
@@ -3718,7 +3717,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
   }, [editorHeadingFolding])
 
   // Rendered markdown (mit Frontmatter-Titel, Callouts, Figures und interaktiven Checkboxen)
-  const { frontmatterTitle, renderedMarkdown } = useMemo(() => {
+  const { frontmatterTitle, renderedMarkdown, bodyStartsWithH1 } = useMemo(() => {
     const { title, body } = parseFrontmatter(previewContent)
     const withCallouts = processCallouts(body)
     const htmlContent = md.render(withCallouts)
@@ -3740,7 +3739,10 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
 
     return {
       frontmatterTitle: title,
-      renderedMarkdown: finalHtml
+      renderedMarkdown: finalHtml,
+      // Beginnt der Body mit einer H1, unterdrückt der Dokument-Kopf seinen Titel —
+      // sonst stünden zwei große Titel übereinander.
+      bodyStartsWithH1: /^\s*#\s/.test(body)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [previewContent, processHeadingFolds, imagesLoadedVersion])
@@ -4806,6 +4808,13 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
     : null
   const wordpressAvailable = Boolean(editorHeaderActions.wordpress && wordpress.enabled && wordpress.baseUrl)
   const exportAvailable = editorHeaderActions.pdf || editorHeaderActions.docx || editorHeaderActions.remarkable || wordpressAvailable
+  // „Titel im Dokument" (Design 1c): Titel + Eigenschaften-Zeile wandern aus der
+  // Kopfzeile in den Dokumentbereich. Frontmatter-title hat Vorrang vor dem Dateinamen.
+  const docHeaderTitle = bodyStartsWithH1 ? null : (frontmatterTitle || selectedNoteDisplayTitle)
+  const docCreatedDate = deriveCreatedDate(previewContent, zettelId, selectedNote.createdAt)
+  const docCreatedLabel = docCreatedDate ? formatCreatedDate(docCreatedDate, language) : null
+  const docTags = getFrontmatterTags(previewContent)
+  const docProvenance = getAiProvenance(previewContent)
   const exportKindLabels: Record<EditorExportKind, string> = {
     pdf: t('editor.exportMenu.pdf'),
     docx: t('editor.exportMenu.docx'),
@@ -4840,41 +4849,14 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
             </button>
           </div>
         )}
-        <div className="editor-title-group">
-          {parentFolder && (
-            <span className="editor-breadcrumb" title={selectedNote.path}>{parentFolder} /</span>
-          )}
-          <h3 title={selectedNoteDisplayTitle}>
-            {selectedNoteIsBrain ? (
-              <BrainIcon size={15} title={t('brain.noteLabel')} />
-            ) : selectedNoteKind && (
-              <span
-                className={`note-kind-dot note-kind-${selectedNoteKind.id}`}
-                title={selectedNoteKind.label}
-                aria-label={selectedNoteKind.label}
-              />
-            )}
-            {selectedNoteDisplayTitle}
-          </h3>
-          {zettelId && (
-            <span className="editor-zettel-chip" title={t('editor.zettelIdTooltip', { id: zettelId })}>
-              …{zettelId.slice(-4)}
-            </span>
-          )}
-          {!isSecondary && ollama.enabled && (() => {
-            const prov = getAiProvenance(previewContent)
-            return prov ? (
-              <span className="note-authorship note-authorship-ai" title={`${t('editor.aiEdited')} · ${prov.model}${prov.date ? ' · ' + prov.date : ''}`}>
-                <ModelLogo model={prov.model} size={13} />
-                <span>{t('editor.aiEdited')}</span>
-              </span>
-            ) : (
-              <span className="note-authorship note-authorship-human" title={t('aiBar.byYouTitle')}>
-                <HumanIcon size={12} />
-                <span>{t('aiBar.byYou')}</span>
-              </span>
-            )
-          })()}
+        {/* Ruhige Kopfzeile (1c): nur noch gedämpfter Breadcrumb — Titel, Zettel-ID
+            und Autorschaft leben jetzt im Dokument-Kopf (NoteDocumentHeader). */}
+        <div className="editor-title-group editor-title-group-quiet">
+          <span className="editor-breadcrumb" title={selectedNote.path}>
+            {selectedNoteIsBrain && <BrainIcon size={13} title={t('brain.noteLabel')} />}
+            {parentFolder && <>{parentFolder} / </>}
+            <span className="editor-breadcrumb-title">{selectedNoteDisplayTitle}</span>
+          </span>
         </div>
         <div className="editor-header-right">
           {isSaving && <span className="saving-indicator">{t('editor.saving')}</span>}
@@ -5054,18 +5036,17 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
           <div className="view-mode-toggle">
             {showRawEditor && (
               <button
-                className={`toggle-btn toggle-btn-label ${viewMode === 'edit' ? 'active' : ''}`}
+                className={`toggle-btn ${viewMode === 'edit' ? 'active' : ''}`}
                 onClick={() => handleSetViewMode('edit')}
                 title={t('editor.modeMarkdown')}
               >
                 <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
                   <path d="M11.5 2.5L13.5 4.5L5 13H3V11L11.5 2.5Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
-                {t('editor.modeMarkdownShort')}
               </button>
             )}
             <button
-              className={`toggle-btn toggle-btn-label ${viewMode === 'live-preview' ? 'active' : ''}`}
+              className={`toggle-btn ${viewMode === 'live-preview' ? 'active' : ''}`}
               onClick={() => handleSetViewMode('live-preview')}
               title={t('editor.modeWrite')}
             >
@@ -5073,10 +5054,9 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
                 <path d="M8 3C4.5 3 1.5 8 1.5 8C1.5 8 4.5 13 8 13C11.5 13 14.5 8 14.5 8C14.5 8 11.5 3 8 3Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                 <path d="M11.5 2.5L13.5 4.5L10 8L8.5 6.5L11.5 2.5Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
-              {t('editor.modeWriteShort')}
             </button>
             <button
-              className={`toggle-btn toggle-btn-label ${viewMode === 'preview' ? 'active' : ''}`}
+              className={`toggle-btn ${viewMode === 'preview' ? 'active' : ''}`}
               onClick={() => handleSetViewMode('preview')}
               title={t('editor.modeRead')}
             >
@@ -5084,7 +5064,6 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
                 <path d="M8 3C4.5 3 1.5 8 1.5 8C1.5 8 4.5 13 8 13C11.5 13 14.5 8 14.5 8C14.5 8 11.5 3 8 3Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                 <circle cx="8" cy="8" r="2" stroke="currentColor" strokeWidth="1.5"/>
               </svg>
-              {t('editor.modeReadShort')}
             </button>
           </div>
         </div>
@@ -5133,6 +5112,19 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
         />
       )}
 
+      {/* Schreiben-Modus: nur der Dokument-Titel (Eigenschaften zeigt das PropertiesPanel) */}
+      {viewMode === 'live-preview' && (
+        <NoteDocumentHeader
+          compact
+          title={docHeaderTitle}
+          kind={null}
+          createdLabel={null}
+          tags={[]}
+          zettelId={null}
+          aiProvenance={null}
+          showAuthorship={false}
+        />
+      )}
       <div className="editor-main">
       <div
         className={`editor-content ${viewMode !== 'preview' ? 'visible' : 'hidden'} ${viewMode === 'live-preview' ? 'live-preview-mode' : ''}`}
@@ -5271,9 +5263,15 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
             </button>
           </div>
         )}
-        {frontmatterTitle && (
-          <h1 className="frontmatter-title">{frontmatterTitle}</h1>
-        )}
+        <NoteDocumentHeader
+          title={docHeaderTitle}
+          kind={selectedNoteIsBrain ? null : selectedNoteKind}
+          createdLabel={docCreatedLabel}
+          tags={docTags}
+          zettelId={zettelId}
+          aiProvenance={docProvenance}
+          showAuthorship={!isSecondary && ollama.enabled}
+        />
         <div
           ref={editablePreviewRef}
           className="editor-preview-editable"
