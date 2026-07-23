@@ -2,6 +2,23 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.10.26-beta] - 2026-07-23
+
+Die letzte Beta vor 1.0. Der Notiz-Agent lernt jetzt aktiv mit: Nach jedem Lauf schlägt er selbst einen Merksatz vor, den du per Klick ins Agent-Gedächtnis übernimmst. Dazu reparierte Editor-Tastenkürzel.
+
+### Neu
+
+- **Merksatz-Vorschlag nach Agent-Läufen.** Nach jedem erfolgreichen Lauf destilliert dasselbe Modell (gleicher Datenweg — lokal bleibt lokal) eine wiederverwendbare Regel aus Auftrag und Ergebnis und befüllt das Merken-Feld vor: anpassen oder direkt mit „Merken" in `Skills/Agent-Gedächtnis.md` übernehmen. Nichts wird automatisch gespeichert; eigenes Tippen hat Vorrang, ein neuer Lauf setzt das Feld zurück. Findet das Modell keine verallgemeinerbare Regel, bleibt das Feld leer. Der Vorschlag entsteht nach der Anzeige der Ergebnis-Karten und kostet keine Wartezeit.
+
+### Geändert
+
+- **Einladendere KI-Leiste.** Die eingeklappte Leiste unter dem Editor sagt jetzt, was der Klick kann: „Sag der KI, was aus dieser Notiz werden soll — vom Feinschliff bis zur fertigen Recherche…"
+- **Klareres Merken-Feld.** Der Platzhalter erklärt, dass eine eigene Regel eingetippt oder der automatische Vorschlag abgewartet werden kann.
+
+### Behoben
+
+- **Alle drei ⌘⇧-Tastenkürzel des Editors waren wirkungslos** (⌘⇧A KI-Leiste, ⌘⇧F Format-Menü, ⌘⇧I Bildgenerierung): Mit gedrücktem Shift liefert die Tastatur den Großbuchstaben, der Vergleich im Code erwartete den kleinen. ⌘⇧A öffnet die KI-Leiste jetzt außerdem in allen drei Modi — auch im Lesen-Modus, der den Shortcut anzeigt.
+
 ## [0.10.25-beta] - 2026-07-23
 
 Der Editor rückt die Notiz ins Zentrum: Titel und Eigenschaften stehen jetzt im Dokument selbst, die Kopfzeile wird zum ruhigen Breadcrumb, und die Kontextspalte vereint alles Verwandte an einem Ort — inklusive des bisherigen Arbeitskontext-Streifens und neuer Karteikarten-Erstellung im Lesemoment.
