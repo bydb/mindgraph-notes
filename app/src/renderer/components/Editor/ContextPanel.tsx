@@ -2,12 +2,16 @@ import React, { useEffect, useMemo, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { useNotesStore } from '../../stores/notesStore'
 import { useUIStore } from '../../stores/uiStore'
+import { useProjectStatusStore } from '../../stores/projectStatusStore'
 import { useFlashcardStore, isCardDue } from '../../stores/flashcardStore'
 import { useTranslation } from '../../utils/translations'
 import { getNoteKind } from '../../utils/noteKind'
 import { resolveLink } from '../../utils/linkExtractor'
 import { isBrainNote, brainNoteLabel } from '../../utils/brainNote'
 import { BrainIcon } from '../BrainIcon'
+import { annotationRelPathFor, parseAnnotationAnchors, type AnnotationAnchor } from '../../utils/annotations'
+import { extractTasks, type ExtractedTask } from '../../../shared/taskExtractor'
+import { matchEmailToProjects, gateProjectMatch } from '../../../shared/projectMatch'
 import {
   EMBEDDINGS_CACHE_VERSION,
   cosineSimilarity,
@@ -15,11 +19,14 @@ import {
   pickPreferredEmbeddingModel,
   type EmbeddingsCache
 } from '../../utils/embeddingSimilarity'
-import type { Note } from '../../../shared/types'
+import type { DiscoveredProject, Note } from '../../../shared/types'
 
 // Kontextspalte rechts im Editor: vereint Backlinks, ausgehende Links,
-// Smart-Connections-Ähnlichkeit und fällige Karteikarten an EINEM Ort
-// (Design-Variante „Fokus + Kontextspalte", Befund E4: vorher drei Orte).
+// Smart-Connections-Ähnlichkeit, Arbeitskontext (Projekt, offene Aufgaben,
+// rote Annotationen — nur bei 🔴-Notizen) und fällige Karteikarten an EINEM
+// Ort (Design-Variante „Fokus + Kontextspalte", Befund E4: vorher drei Orte).
+// Der frühere WorkContextStrip unter dem Editor ist hierher eingefaltet;
+// seine Brain-Sektion entfiel ersatzlos (Brain-Backlinks stehen in „Verknüpft").
 //
 // Ähnlichkeit ist bewusst NUR Cache-basiert: es werden keine Embeddings
 // berechnet, nur der bestehende Smart-Connections-Cache gelesen (Cosine +
@@ -27,6 +34,24 @@ import type { Note } from '../../../shared/types'
 
 interface ContextPanelProps {
   note: Note
+}
+
+// Projekte EINMAL pro Sitzung lazy laden (discover = nur markierte _STATUS.md
+// lesen). Modul-weite Sperre gegen wiederholte Discover-Läufe pro Notiz-Öffnen.
+let projectLoadTriedFor: string | null = null
+
+// Numerisches Ordner-Präfix für die Anzeige entfernen ("134 - AIS chat change" → "AIS chat change").
+const cleanProjectName = (name: string): string =>
+  name.replace(/^\s*\d+\s*[-–—]\s*/, '').trim() || name
+
+const shortQuote = (q: string): string => {
+  const c = (q || '').replace(/\s+/g, ' ').trim()
+  return c.length > 110 ? `${c.slice(0, 110)}…` : c
+}
+
+interface MatchedProject {
+  project: DiscoveredProject
+  confidence: 'high' | 'low'
 }
 
 interface SimilarEntry {
@@ -46,15 +71,18 @@ export const ContextPanel: React.FC<ContextPanelProps> = ({ note }) => {
   const { notes, vaultPath, selectNote } = useNotesStore(
     useShallow(s => ({ notes: s.notes, vaultPath: s.vaultPath, selectNote: s.selectNote }))
   )
-  const { smartConnectionsEnabled, flashcardsEnabled, llmSettings, brainFolder, setEditorShowContextPanel } = useUIStore(
+  const { smartConnectionsEnabled, flashcardsEnabled, llmSettings, brainFolder, projectsRootFolder, setEditorShowContextPanel } = useUIStore(
     useShallow(s => ({
       smartConnectionsEnabled: s.smartConnectionsEnabled,
       flashcardsEnabled: s.flashcardsEnabled,
       llmSettings: s.ollama,
       brainFolder: s.brain.folderPath,
+      projectsRootFolder: s.projectsRootFolder,
       setEditorShowContextPanel: s.setEditorShowContextPanel
     }))
   )
+  const projects = useProjectStatusStore(s => s.projects)
+  const synonyms = useProjectStatusStore(s => s.synonyms)
   const { flashcards, startStudySession, setPanel } = useFlashcardStore(
     useShallow(s => ({ flashcards: s.flashcards, startStudySession: s.startStudySession, setPanel: s.setPanel }))
   )
@@ -154,6 +182,66 @@ export const ContextPanel: React.FC<ContextPanelProps> = ({ note }) => {
     setSimilarState(own && own.length > 0 ? 'ready' : 'not-indexed')
   }, [embeddingsCache, note.id])
 
+  // --- Arbeitskontext (nur 🔴-Notizen): Projekt, offene Aufgaben, rote Annotationen ---
+  const noteKind = useMemo(() => getNoteKind(note), [note])
+  const isProblem = noteKind?.id === 'problem'
+
+  useEffect(() => {
+    if (!vaultPath) return
+    const st = useProjectStatusStore.getState()
+    if (projectLoadTriedFor !== vaultPath && st.projects.length === 0 && !st.loading && st.lastLoadedAt === null) {
+      projectLoadTriedFor = vaultPath
+      void st.load(vaultPath, projectsRootFolder || undefined)
+    }
+  }, [vaultPath, projectsRootFolder])
+
+  // Projekt per Pfad (starkes Signal) oder Keyword-Match (findet Inbox-/Mail-Notizen).
+  const matchedProject = useMemo<MatchedProject | null>(() => {
+    if (!isProblem || projects.length === 0) return null
+    const byPath = projects.find(p => note.path.startsWith(`${p.folderRel}/`))
+    if (byPath) return { project: byPath, confidence: 'high' }
+    const matches = matchEmailToProjects({ subject: note.title, bodyText: note.content }, projects, synonyms)
+    const gate = gateProjectMatch(matches)
+    if (gate.top && (gate.confidence === 'high' || gate.confidence === 'low')) {
+      return { project: gate.top.project, confidence: gate.confidence }
+    }
+    return null
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [note.path, note.title, note.content, isProblem, projects, synonyms])
+
+  // Aufgaben + Annotationen frisch von Platte lesen (Store-Content kann aus dem
+  // Cache leer sein) — ein readFilesBatch-Call, wie im früheren Streifen.
+  const [redAnno, setRedAnno] = useState<AnnotationAnchor[]>([])
+  const [openTasks, setOpenTasks] = useState<ExtractedTask[]>([])
+
+  useEffect(() => {
+    let cancelled = false
+    if (!vaultPath || !isProblem) {
+      setRedAnno([])
+      setOpenTasks([])
+      return
+    }
+    const notePath = note.path
+    ;(async () => {
+      let red: AnnotationAnchor[] = []
+      let tasks: ExtractedTask[] = []
+      try {
+        const annoRel = annotationRelPathFor(notePath)
+        const res = await window.electronAPI.readFilesBatch(vaultPath, [annoRel, notePath])
+        red = parseAnnotationAnchors(res[annoRel] || '').filter(a => a.color === 'red')
+        tasks = extractTasks(res[notePath] || '').tasks.filter(task => !task.completed)
+      } catch {
+        /* Sidecar fehlt o. Lesefehler → leer, Sektionen bleiben still */
+      }
+      if (cancelled) return
+      setRedAnno(red)
+      setOpenTasks(tasks)
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [note.id, note.path, vaultPath, isProblem])
+
   // --- Karteikarten dieser Notiz ---
   const noteCards = useMemo(
     () => flashcards.filter(c => c.sourceNote === note.path),
@@ -201,6 +289,21 @@ export const ContextPanel: React.FC<ContextPanelProps> = ({ note }) => {
           </svg>
         </button>
       </div>
+
+      {matchedProject && (
+        <section className="context-section">
+          <div className="context-section-head">{t('workContext.project')}</div>
+          <div className="context-project">
+            <span className="context-project-name">{cleanProjectName(matchedProject.project.marker.project)}</span>
+            <span className={`context-project-status context-project-status-${matchedProject.project.marker.status ?? 'active'}`}>
+              {(matchedProject.project.marker.status ?? 'active') === 'done' ? t('workContext.statusDone') : t('workContext.statusActive')}
+            </span>
+            {matchedProject.confidence === 'low' && (
+              <span className="context-project-likely">{t('workContext.likely')}</span>
+            )}
+          </div>
+        </section>
+      )}
 
       <section className="context-section">
         <div className="context-section-head">
@@ -262,6 +365,48 @@ export const ContextPanel: React.FC<ContextPanelProps> = ({ note }) => {
           {similarState === 'unavailable' && (
             <p className="context-empty">{t('context.similarUnavailable')}</p>
           )}
+        </section>
+      )}
+
+      {openTasks.length > 0 && (
+        <section className="context-section">
+          <div className="context-section-head">
+            {t('workContext.openTasks')}
+            <span className="context-count">{openTasks.length}</span>
+          </div>
+          <ul className="context-task-list">
+            {openTasks.slice(0, 4).map((task, i) => (
+              <li key={i} className={`context-task${task.isCritical ? ' critical' : ''}${task.isOverdue ? ' overdue' : ''}`}>
+                <span className="context-task-box">☐</span>
+                <span className="context-task-text">{task.text}</span>
+                {task.isCritical && <span className="context-task-urgent">{t('workContext.urgent')}</span>}
+              </li>
+            ))}
+            {openTasks.length > 4 && (
+              <li className="context-more">+{openTasks.length - 4} {t('workContext.more')}</li>
+            )}
+          </ul>
+        </section>
+      )}
+
+      {redAnno.length > 0 && (
+        <section className="context-section">
+          <div className="context-section-head">
+            <span className="context-anno-dot" />
+            {t('workContext.redAnnotations')}
+            <span className="context-count">{redAnno.length}</span>
+          </div>
+          <ul className="context-anno-list">
+            {redAnno.slice(0, 3).map(a => (
+              <li key={a.id} className="context-anno">
+                {a.page != null && <span className="context-anno-page">S. {a.page}</span>}
+                <span className="context-anno-quote">{shortQuote(a.quote)}</span>
+              </li>
+            ))}
+            {redAnno.length > 3 && (
+              <li className="context-more">+{redAnno.length - 3} {t('workContext.more')}</li>
+            )}
+          </ul>
         </section>
       )}
 

@@ -1,21 +1,21 @@
 import type { NoteKindDefinition } from '../../utils/noteKind'
 import { ModelLogo } from '../Shared/ModelLogo'
-import { HumanIcon } from '../Shared/HumanIcon'
 import { useTranslation } from '../../utils/translations'
 
 // Titel + Eigenschaften-Zeile im Dokument (Design-Variante 1c „Fokus + Kontextspalte").
 // Rein präsentational; lebt als Geschwister der contentEditable-Fläche und ist damit
 // unsichtbar für den Turndown-Roundtrip des Lesen-Modus.
+// Bewusst schlank (User-Feedback 2026-07-23): Kategorie, Erstelldatum, KI-Badge
+// (nur bei KI-bearbeiteten Notizen, chip-klein) und Zettel-ID — keine Tag-Chips,
+// kein „von dir"-Badge (nur die Ausnahme KI wird markiert).
 
 interface NoteDocumentHeaderProps {
   // null → Titel unterdrückt (Body beginnt bereits mit einer H1 — sonst Doppel-Titel)
   title: string | null
   kind: NoteKindDefinition | null
   createdLabel: string | null
-  tags: string[]
   zettelId: string | null
   aiProvenance: { model: string; date: string } | null
-  showAuthorship: boolean
   // Schreiben-Modus: nur Titel, keine Eigenschaften-Zeile (Frontmatter zeigt dort das PropertiesPanel)
   compact?: boolean
 }
@@ -60,10 +60,8 @@ export function NoteDocumentHeader({
   title,
   kind,
   createdLabel,
-  tags,
   zettelId,
   aiProvenance,
-  showAuthorship,
   compact
 }: NoteDocumentHeaderProps) {
   const { t } = useTranslation()
@@ -89,24 +87,14 @@ export function NoteDocumentHeader({
         {createdLabel && (
           <span className="note-doc-chip">{t('editor.docHeader.created', { date: createdLabel })}</span>
         )}
-        {tags.map(tag => (
-          <span key={tag} className="note-doc-chip note-doc-tag">#{tag}</span>
-        ))}
-        {showAuthorship && (
-          aiProvenance ? (
-            <span
-              className="note-authorship note-authorship-ai"
-              title={`${t('editor.aiEdited')} · ${aiProvenance.model}${aiProvenance.date ? ' · ' + aiProvenance.date : ''}`}
-            >
-              <ModelLogo model={aiProvenance.model} size={13} />
-              <span>{t('editor.aiEdited')}</span>
-            </span>
-          ) : (
-            <span className="note-authorship note-authorship-human" title={t('aiBar.byYouTitle')}>
-              <HumanIcon size={12} />
-              <span>{t('aiBar.byYou')}</span>
-            </span>
-          )
+        {aiProvenance && (
+          <span
+            className="note-doc-ai"
+            title={`${t('editor.aiEdited')} · ${aiProvenance.model}${aiProvenance.date ? ' · ' + aiProvenance.date : ''}`}
+          >
+            <ModelLogo model={aiProvenance.model} size={12} />
+            {t('editor.aiEdited')}
+          </span>
         )}
         <span className="note-doc-props-spacer" />
         {zettelId && (

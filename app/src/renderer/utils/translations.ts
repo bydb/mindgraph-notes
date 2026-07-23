@@ -1224,13 +1224,11 @@ const translations = {
     'backlinks.hide': 'Backlinks-Bereich ausblenden (wieder aktivierbar in Einstellungen → Editor)',
 
     // Arbeitskontext-Streifen (rote Notizen)
-    'workContext.title': 'Arbeitskontext',
     'workContext.project': 'Projekt',
     'workContext.statusActive': 'aktiv',
     'workContext.statusDone': 'erledigt',
     'workContext.statusUnknown': 'Status nicht erfasst',
     'workContext.redAnnotations': 'Rot markiert',
-    'workContext.related': 'Verwandte Notizen',
     'workContext.likely': 'vermutlich',
     'workContext.openTasks': 'Offene Aufgaben',
     'workContext.urgent': 'dringend',
@@ -1250,8 +1248,6 @@ const translations = {
     'brain.densestDay': 'dichtester Tag',
     'brain.notesCount': '{count} Notizen',
     'brain.oneNote': '1 Notiz',
-    'workContext.brainHeading': 'Tagesgedächtnis',
-    'workContext.partOfDay': 'Teil deines Tages am',
 
     // Footer Task Stats (additional)
     'footer.openTasks': 'Offene Tasks',
@@ -4166,13 +4162,11 @@ const translations = {
     'backlinks.hide': 'Hide backlinks area (re-enable in Settings → Editor)',
 
     // Work-context strip (red notes)
-    'workContext.title': 'Work context',
     'workContext.project': 'Project',
     'workContext.statusActive': 'active',
     'workContext.statusDone': 'done',
     'workContext.statusUnknown': 'Status not captured',
     'workContext.redAnnotations': 'Marked red',
-    'workContext.related': 'Related notes',
     'workContext.likely': 'likely',
     'workContext.openTasks': 'Open tasks',
     'workContext.urgent': 'urgent',
@@ -4192,8 +4186,6 @@ const translations = {
     'brain.densestDay': 'densest day',
     'brain.notesCount': '{count} notes',
     'brain.oneNote': '1 note',
-    'workContext.brainHeading': 'Daily memory',
-    'workContext.partOfDay': 'Part of your day on',
 
     // Footer Task Stats (additional)
     'footer.openTasks': 'Open tasks',

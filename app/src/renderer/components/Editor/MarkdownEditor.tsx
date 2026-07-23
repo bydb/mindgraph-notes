@@ -4813,7 +4813,6 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
   const docHeaderTitle = bodyStartsWithH1 ? null : (frontmatterTitle || selectedNoteDisplayTitle)
   const docCreatedDate = deriveCreatedDate(previewContent, zettelId, selectedNote.createdAt)
   const docCreatedLabel = docCreatedDate ? formatCreatedDate(docCreatedDate, language) : null
-  const docTags = getFrontmatterTags(previewContent)
   const docProvenance = getAiProvenance(previewContent)
   const exportKindLabels: Record<EditorExportKind, string> = {
     pdf: t('editor.exportMenu.pdf'),
@@ -5119,10 +5118,8 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
           title={docHeaderTitle}
           kind={null}
           createdLabel={null}
-          tags={[]}
           zettelId={null}
           aiProvenance={null}
-          showAuthorship={false}
         />
       )}
       <div className="editor-main">
@@ -5267,10 +5264,8 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
           title={docHeaderTitle}
           kind={selectedNoteIsBrain ? null : selectedNoteKind}
           createdLabel={docCreatedLabel}
-          tags={docTags}
           zettelId={zettelId}
           aiProvenance={docProvenance}
-          showAuthorship={!isSecondary && ollama.enabled}
         />
         <div
           ref={editablePreviewRef}
