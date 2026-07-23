@@ -2,6 +2,27 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.10.25-beta] - 2026-07-23
+
+Der Editor rückt die Notiz ins Zentrum: Titel und Eigenschaften stehen jetzt im Dokument selbst, die Kopfzeile wird zum ruhigen Breadcrumb, und die Kontextspalte vereint alles Verwandte an einem Ort — inklusive des bisherigen Arbeitskontext-Streifens und neuer Karteikarten-Erstellung im Lesemoment.
+
+### Neu
+
+- **Titel und Eigenschaften im Dokument.** Im Lesemodus steht der Notiz-Titel als große Überschrift direkt über dem Text, darunter eine Eigenschaften-Zeile mit Kategorie (Problem/Lösung/Info), Erstelldatum und der Zettel-ID. Das Erstelldatum kommt aus dem Frontmatter, der Zettel-ID oder dem Datei-Datum — in dieser Reihenfolge. Ein Frontmatter-`title` hat Vorrang vor dem Dateinamen; beginnt eine Notiz bereits mit einer Überschrift, entsteht kein Doppel-Titel. Im Schreibmodus erscheint der Titel kompakt über dem Editor.
+- **Karteikarte direkt an der Notiz erstellen.** Die Karteikarten-Sektion der Kontextspalte hat jetzt einen Plus-Knopf: Er öffnet den Karten-Editor mit vorbefüllter Quell-Notiz und Themen-Ordner — Lernkarten entstehen im Lesemoment, ohne den Kontext zu verlassen.
+- **Kompaktes KI-Badge.** KI-bearbeitete Notizen tragen in der Eigenschaften-Zeile ein dezentes Badge mit Modell-Logo in Chip-Größe. Nicht bearbeitete Notizen zeigen kein Badge — nur die Ausnahme wird markiert.
+
+### Geändert
+
+- **Arbeitskontext in die Kontextspalte eingefaltet.** Der Streifen unter dem Editor ist entfernt; zugeordnetes Projekt (mit Status), offene Aufgaben und rote Markierungen erscheinen bei Problem-Notizen jetzt in der Kontextspalte. Die Tagesgedächtnis-Zeile entfiel ersatzlos — Brain-Tage stehen als Backlinks unter „Verknüpft".
+- **Ruhige Kopfzeile.** Statt Titelzeile mit Chips zeigt der Editor-Kopf nur noch einen gedämpften Breadcrumb (Ordner / Titel). Der Modus-Umschalter (Markdown/Schreiben/Lesen) kommt mit Icons aus; die vollen Namen bleiben als Tooltip.
+- **Ruhigere Zeilentitel in der Kontextspalte.** Kategorie-Emojis und Zettel-ID-Präfixe sind aus den Einträgen unter „Verknüpft" und „Ähnlich" entfernt — die Kategorie zeigt der Status-Punkt, und die schmale Spalte gewinnt Platz für den eigentlichen Titel.
+
+### Behoben
+
+- **Überdimensioniertes KI-Badge im Lesemodus.** Eine generische Bild-Regel der Leseansicht gab auch dem kleinen Modell-Logo im Badge 20 px Außenabstand — das Badge wuchs zum Riesen-Oval. Zudem sind die Chip-Höhen der Eigenschaften-Zeile jetzt einheitlich.
+- **Bild-Generierung auch mit Webrecherche.** Das `generate_image`-Werkzeug des Notiz-Agenten stand im Webrecherche-Lauf nicht zur Verfügung.
+
 ## [0.10.24-beta] - 2026-07-22
 
 Großes Aufräumen bei Modulen und Plugins: WordPress-Publishing und Bild-Generierung sind jetzt eigenständige Bausteine statt Anhängsel des edoobox-Moduls — einzeln aktivierbar, einzeln konfigurierbar, und sie ergänzen sich weiterhin. Dazu kann der Notiz-Agent jetzt Bilder generieren.
