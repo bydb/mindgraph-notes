@@ -5,7 +5,7 @@ import { useUIStore } from '../../stores/uiStore'
 import { useProjectStatusStore } from '../../stores/projectStatusStore'
 import { useFlashcardStore, isCardDue } from '../../stores/flashcardStore'
 import { useTranslation } from '../../utils/translations'
-import { getNoteKind } from '../../utils/noteKind'
+import { getNoteKind, stripNoteKindMarker, splitZettelTitle } from '../../utils/noteKind'
 import { resolveLink } from '../../utils/linkExtractor'
 import { isBrainNote, brainNoteLabel } from '../../utils/brainNote'
 import { BrainIcon } from '../BrainIcon'
@@ -54,6 +54,11 @@ interface MatchedProject {
   confidence: 'high' | 'low'
 }
 
+// Zeilentitel beruhigen: Kategorie-Emoji raus (der Dot zeigt die Kategorie,
+// Konvention „Dot statt rohem Emoji") und Zettel-ID-Präfix ausblenden.
+const rowTitle = (title: string): string =>
+  splitZettelTitle(stripNoteKindMarker(title)).displayTitle
+
 interface SimilarEntry {
   id: string
   title: string
@@ -83,8 +88,8 @@ export const ContextPanel: React.FC<ContextPanelProps> = ({ note }) => {
   )
   const projects = useProjectStatusStore(s => s.projects)
   const synonyms = useProjectStatusStore(s => s.synonyms)
-  const { flashcards, startStudySession, setPanel } = useFlashcardStore(
-    useShallow(s => ({ flashcards: s.flashcards, startStudySession: s.startStudySession, setPanel: s.setPanel }))
+  const { flashcards, startStudySession, setPanel, setCreatingCard } = useFlashcardStore(
+    useShallow(s => ({ flashcards: s.flashcards, startStudySession: s.startStudySession, setPanel: s.setPanel, setCreatingCard: s.setCreatingCard }))
   )
 
   // --- Verknüpft: Backlinks (←) + ausgehende Links (→) ---
@@ -267,7 +272,7 @@ export const ContextPanel: React.FC<ContextPanelProps> = ({ note }) => {
         ) : (
           <span className={`note-kind-dot${kind ? ` note-kind-${kind.id}` : ' context-dot-neutral'}`} />
         )}
-        <span className="context-link-title">{brain ? brainNoteLabel(target) : target.title}</span>
+        <span className="context-link-title">{brain ? brainNoteLabel(target) : rowTitle(target.title)}</span>
       </button>
     )
   }
@@ -346,7 +351,7 @@ export const ContextPanel: React.FC<ContextPanelProps> = ({ note }) => {
                   onClick={() => selectNote(entry.id)}
                 >
                   <span className="context-similar-row">
-                    <span className="context-link-title">{entry.title}</span>
+                    <span className="context-link-title">{rowTitle(entry.title)}</span>
                     <span className="context-similar-score">{Math.round(entry.score * 100)}%</span>
                   </span>
                   <span className="context-similar-bar">
@@ -410,15 +415,30 @@ export const ContextPanel: React.FC<ContextPanelProps> = ({ note }) => {
         </section>
       )}
 
-      {flashcardsEnabled && noteCards.length > 0 && (
+      {flashcardsEnabled && (
         <section className="context-section">
           <div className="context-section-head">
             {t('context.flashcards')}
-            <span className={`context-count${dueCards.length > 0 ? ' context-count-due' : ''}`}>
-              {dueCards.length > 0
-                ? t('context.flashcardsDue', { count: dueCards.length })
-                : t('context.flashcardsNoneDue')}
-            </span>
+            {noteCards.length > 0 && (
+              <span className={`context-count${dueCards.length > 0 ? ' context-count-due' : ''}`}>
+                {dueCards.length > 0
+                  ? t('context.flashcardsDue', { count: dueCards.length })
+                  : t('context.flashcardsNoneDue')}
+              </span>
+            )}
+            {/* Karte direkt aus dem Lesekontext erstellen — öffnet das globale
+                FlashcardEditor-Modal, Quell-Notiz + Thema füllt es selbst vor. */}
+            <button
+              className="context-add-btn"
+              onClick={() => setCreatingCard(true)}
+              title={t('context.flashcardsAdd')}
+              aria-label={t('context.flashcardsAdd')}
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+                <path d="M12 5v14" />
+                <path d="M5 12h14" />
+              </svg>
+            </button>
           </div>
           {dueCards.length > 0 && (
             <>

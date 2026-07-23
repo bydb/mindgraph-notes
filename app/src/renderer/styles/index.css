@@ -2635,6 +2635,31 @@ h2 { letter-spacing: -0.016em; }
   color: var(--text-muted);
 }
 
+.context-add-btn {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: var(--bg-content);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.context-add-btn:hover {
+  color: var(--accent-color);
+  border-color: color-mix(in srgb, var(--accent-color) 35%, var(--border-color));
+}
+
+/* Badge vorhanden → Button trotzdem rechtsbündig, Badge bleibt links daneben */
+.context-count + .context-add-btn {
+  margin-left: auto;
+}
+
 .context-flashcard-preview {
   padding: 8px 10px;
   background: var(--bg-content);
