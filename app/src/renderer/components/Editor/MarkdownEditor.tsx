@@ -87,6 +87,9 @@ interface AgentRunUiState {
   // beim Start festgehalten, damit die Review-Karten sie anzeigen können.
   model: string
   cloudLabel: string | null
+  // Mitlernen (Stufe 3): Merksatz-Vorschlag des Modells, trifft asynchron nach dem
+  // Done-Event ein und befüllt das Merken-Feld vor (solange der Nutzer nichts tippt).
+  rememberSuggestion?: string
 }
 const EMPTY_AGENT_RUN: AgentRunUiState = { runId: null, phase: 'idle', steps: [], results: [], finalText: '', model: '', cloudLabel: null }
 
@@ -1970,6 +1973,16 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
                 : `${t('aiBar.agent.errorPrefix')}: ${p.error || '?'}`
           }
         }
+      })
+    })
+    // Mitlernen (Stufe 3): Merksatz-Vorschlag trifft asynchron nach dem Done-Event ein.
+    window.electronAPI.onNoteAgentMemorySuggestion(p => {
+      const noteId = agentRunNoteRef.current.get(p.runId)
+      if (!noteId) return
+      setAgentRunByNote(prev => {
+        const cur = prev[noteId]
+        if (!cur || cur.runId !== p.runId) return prev
+        return { ...prev, [noteId]: { ...cur, rememberSuggestion: p.text } }
       })
     })
     // C02: Main hat einen alten Lauf aus der Retention evakuiert — dessen Karten
@@ -4652,17 +4665,33 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
     setAiMenu(null)
   }, [viewMode, ollama.enabled, ollama.selectedModel])
 
-  // Tastenkombinationen: Cmd+Shift+F = Format-Menü, Cmd+Shift+A = AI-Menü
+  // Tastenkombinationen: Cmd+Shift+F = Format-Menü, Cmd+Shift+A = KI-Leiste, Cmd+Shift+I = Bild
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (viewMode === 'preview' || !viewRef.current) return
+      if (!(e.metaKey || e.ctrlKey) || !e.shiftKey) return
+      // Mit gedrücktem Shift ist e.key der GROSSBUCHSTABE ('A') — ein Vergleich
+      // gegen 'a' matcht nie. Deshalb normalisieren, sonst sind alle drei Shortcuts tot.
+      const key = e.key.toLowerCase()
 
+      // Cmd+Shift+A öffnet die Macher-Leiste unten (Auswahl = Scope, sonst ganze Notiz) —
+      // in ALLEN Modi, auch im Lesen-Modus (dem Default, in dem die Leiste den Shortcut anzeigt).
+      if (key === 'a') {
+        e.preventDefault()
+        if (ollama.enabled && ollama.selectedModel) {
+          setAiBarOpen(true)
+          setFormatMenu(null)
+          setAiMenu(null)
+        }
+        return
+      }
+
+      if (viewMode === 'preview' || !viewRef.current) return
       const view = viewRef.current
       const { from } = view.state.selection.main
       const coords = view.coordsAtPos(from)
 
       // Cmd+Shift+F für Format-Menü
-      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 'f') {
+      if (key === 'f') {
         e.preventDefault()
         if (coords) {
           setFormatMenu({ x: coords.left, y: coords.top })
@@ -4670,18 +4699,8 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
         }
       }
 
-      // Cmd+Shift+A öffnet die Macher-Leiste unten (Auswahl = Scope, sonst ganze Notiz).
-      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 'a') {
-        e.preventDefault()
-        if (ollama.enabled && ollama.selectedModel) {
-          setAiBarOpen(true)
-          setFormatMenu(null)
-          setAiMenu(null)
-        }
-      }
-
       // Cmd+Shift+I für KI-Bildgenerierung
-      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 'i') {
+      if (key === 'i') {
         e.preventDefault()
         if (ollama.enabled) {
           setShowAIImageDialog(true)
@@ -5536,6 +5555,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
           onAgentPreview={agentResultPreview}
           onAgentDismiss={agentRunDismiss}
           onRemember={agentRemember}
+          rememberSuggestion={agentRunState.rememberSuggestion ?? null}
         />
       )}
     </div>

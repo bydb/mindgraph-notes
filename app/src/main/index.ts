@@ -170,6 +170,7 @@ import { registerPluginTransport, isTrustedSender } from './plugins/transport'
 import { registerContextAttachment, registerContextFolder, removeContextAttachment, clearContextAttachments, readContextBlock } from './noteAgent/contextFiles'
 import { startRun, getRunForSender, finishRun, publicResults, takeResult, peekResult, cancelRunsForSender, pruneRunIfConsumed, consumeEvictedRuns, type WebRunState } from './noteAgent/runRegistry'
 import { runNoteAgentLoop } from './noteAgent/loop'
+import { suggestAgentMemory } from './noteAgent/memorySuggestion'
 import { cleanupOldStaging, assertInsideRunStaging, reserveFreeName, stagingDirFor } from './noteAgent/staging'
 import { ensureHtmlPageAssets } from './noteAgent/htmlAssets'
 import { listVaultSkills, listEnabledSkillHeaders, setSkillEnabled, createSkill, readAgentMemory, appendAgentMemory, SKILLS_DIRNAME } from './noteAgent/skillsLoader'
@@ -4240,6 +4241,18 @@ ipcMain.handle('note-agent-run', async (event, params: NoteAgentRunParams) => {
             results: publicResults(run),
             web: webRunProvenance(run)
           })
+        }
+        // Mitlernen (Stufe 3): Merksatz-Vorschlag asynchron NACH dem Done-Event —
+        // kostet die Ergebnis-Karten keine Latenz. Reines Komfort-Feature: Fehler
+        // bleiben still, gespeichert wird nur per „Merken"-Klick des Nutzers.
+        if (run.results.size > 0) {
+          void suggestAgentMemory(run, chatOptions)
+            .then(suggestion => {
+              if (suggestion && !sender.isDestroyed()) {
+                sender.send('note-agent-memory-suggestion', { runId: run.runId, text: suggestion })
+              }
+            })
+            .catch(() => undefined)
         }
       } catch (e) {
         const cancelled = run.abort.signal.aborted

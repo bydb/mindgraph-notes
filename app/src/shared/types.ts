@@ -700,6 +700,7 @@ export interface ElectronAPI {
   onNoteAgentProgress: (callback: (p: NoteAgentProgressEvent) => void) => void;
   onNoteAgentDone: (callback: (p: NoteAgentDoneEvent) => void) => void;
   onNoteAgentRunEvicted: (callback: (p: { runId: string }) => void) => void;
+  onNoteAgentMemorySuggestion: (callback: (p: { runId: string; text: string }) => void) => void;
 
   // Ollama Local AI API
   ollamaCheck: () => Promise<boolean>;

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useUIStore } from '../../stores/uiStore'
 import { useTranslation } from '../../utils/translations'
 import { WEB_SEARCH_PROVIDER_META, isWebResearchConfigComplete } from '../../../shared/webResearch'
@@ -110,6 +110,9 @@ interface Props {
   onAgentDismiss: () => void
   // Mitlernen (Stufe 3): bestätigter Merksatz → Agent-Gedächtnis-Notiz.
   onRemember: (text: string) => Promise<{ success: boolean; relPath?: string; error?: string }>
+  // Merksatz-Vorschlag des Modells (trifft asynchron nach dem Lauf ein) —
+  // befüllt das Merken-Feld vor, solange der Nutzer nichts Eigenes getippt hat.
+  rememberSuggestion: string | null
 }
 
 // Globus-Icon für den Webrecherche-Toggle (SVG, kein Emoji).
@@ -130,7 +133,7 @@ const PRESETS = [
   { id: 'tone', key: 'aiBar.preset.tone' as const },
 ]
 
-export function AiActionBar({ open, onOpenChange, phase, proposal, onGenerate, onAccept, onDiscard, tagSuggestions, tagsLoading, onSuggestTags, onAcceptTag, onDismissTag, model, models, onModelChange, getModelLabel, attachments, onAttachDialog, onAttachFolderDialog, onAttachVaultFile, onDetach, attachError, targetFolder, onTargetFolderChange, agentPhase, agentSteps, agentResults, agentFinalText, agentWeb, agentModel, agentCloudLabel, onAgentRun, onAgentCancel, onAgentAccept, onAgentDiscard, onAgentPreview, onAgentDismiss, onRemember }: Props) {
+export function AiActionBar({ open, onOpenChange, phase, proposal, onGenerate, onAccept, onDiscard, tagSuggestions, tagsLoading, onSuggestTags, onAcceptTag, onDismissTag, model, models, onModelChange, getModelLabel, attachments, onAttachDialog, onAttachFolderDialog, onAttachVaultFile, onDetach, attachError, targetFolder, onTargetFolderChange, agentPhase, agentSteps, agentResults, agentFinalText, agentWeb, agentModel, agentCloudLabel, onAgentRun, onAgentCancel, onAgentAccept, onAgentDiscard, onAgentPreview, onAgentDismiss, onRemember, rememberSuggestion }: Props) {
   const { t } = useTranslation()
   const aiEnabled = useUIStore(s => s.ollama.enabled)
   const webResearchModule = useIsModuleEnabled('web-research')
@@ -142,6 +145,24 @@ export function AiActionBar({ open, onOpenChange, phase, proposal, onGenerate, o
   // Mitlernen (Stufe 3): Merksatz-Eingabe in der Review-Phase.
   const [rememberText, setRememberText] = useState('')
   const [rememberFeedback, setRememberFeedback] = useState<{ kind: 'saved'; relPath: string } | { kind: 'error'; text: string } | null>(null)
+  // true, sobald der Nutzer selbst getippt/geleert hat — dann überschreibt kein Vorschlag mehr.
+  const rememberTouched = useRef(false)
+
+  // Vorschlag vorbefüllen, solange das Feld unberührt und leer ist.
+  useEffect(() => {
+    if (!rememberSuggestion || rememberTouched.current || rememberText.trim()) return
+    setRememberText(rememberSuggestion)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rememberSuggestion])
+
+  // Neuer Lauf → Merken-Zeile zurücksetzen (sonst klebt der Vorschlag des Vorläufers).
+  useEffect(() => {
+    if (agentPhase === 'running') {
+      setRememberText('')
+      setRememberFeedback(null)
+      rememberTouched.current = false
+    }
+  }, [agentPhase])
 
   const submitRemember = async () => {
     if (!rememberText.trim()) return
@@ -553,7 +574,7 @@ export function AiActionBar({ open, onOpenChange, phase, proposal, onGenerate, o
                   className="ai-bar-context-search"
                   placeholder={t('aiBar.agent.rememberPlaceholder')}
                   value={rememberText}
-                  onChange={e => { setRememberText(e.target.value); if (rememberFeedback?.kind === 'error') setRememberFeedback(null) }}
+                  onChange={e => { rememberTouched.current = true; setRememberText(e.target.value); if (rememberFeedback?.kind === 'error') setRememberFeedback(null) }}
                   onKeyDown={e => { if (e.key === 'Enter') void submitRemember() }}
                 />
                 <button type="button" className="ai-bar-cancel" onClick={() => void submitRemember()} disabled={!rememberText.trim()}>
