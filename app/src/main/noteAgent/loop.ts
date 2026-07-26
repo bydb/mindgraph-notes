@@ -4,6 +4,7 @@
 // nativen Tool-Calls in den Loop (Plan F07 — Capability sauber getrennt von Qualität).
 
 import { chatWithTools, type ChatMessage, type ChatOptions } from '../llm/chatClient'
+import { looksTruncated, contextTruncationMessage, AGENT_NUM_CTX, AGENT_NUM_CTX_WEB } from '../../shared/contextGuard'
 import { getContextAttachmentInfos } from './contextFiles'
 import { createNoteAgentRegistry, type NoteAgentContext } from './skills'
 import { nextSeq, type AgentRun } from './runRegistry'
@@ -142,13 +143,32 @@ export async function runNoteAgentLoop(params: NoteAgentLoopParams): Promise<Not
   // 10-Minuten-Fenster pro Request: große lokale Modelle (z.B. qwen3.6:27b-mlx) brauchen
   // mit gewachsenem Tool-Kontext deutlich länger als die 180s-Default — der Nutzer hat
   // einen echten Abbrechen-Button, das Timeout ist nur noch die Notbremse.
-  const chatOptions: ChatOptions = { ...params.chatOptions, signal: run.abort.signal, timeoutMs: 600_000 }
+  const chatOptions: ChatOptions = {
+    ...params.chatOptions,
+    signal: run.abort.signal,
+    timeoutMs: 600_000,
+    // Explizit statt geerbt: Ohne num_ctx hängt der Überlauf an Ollamas globaler
+    // Einstellung, die die App nicht kennt — und der Überlauf ist still.
+    numCtx: params.chatOptions?.numCtx ?? (run.web ? AGENT_NUM_CTX_WEB : AGENT_NUM_CTX)
+  }
 
   let lastText = ''
   let nudgedForWrite = false
+  let previousPromptTokens: number | undefined
   for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration++) {
+    const sentChars = messages.reduce((n, m) => n + (m.content?.length ?? 0), 0)
     const result = await chatWithTools(messages, tools, chatOptions)
     if (run.abort.signal.aborted) throw new Error('Abgebrochen')
+
+    // Stiller Kontext-Überlauf: Die Mitte der Konversation (Auftrag + bisherige
+    // Tool-Ergebnisse) wäre weg, das Modell würde aber weiterarbeiten und ein
+    // plausibles, auftragsfremdes Ergebnis liefern. Lieber laut abbrechen —
+    // gleiche Linie wie „keine stillen Kürzungen" bei den Lese-Budgets.
+    if (looksTruncated({ promptTokens: result.promptTokens, previousPromptTokens, sentChars })) {
+      throw new Error(contextTruncationMessage(result.promptTokens!, Math.min(previousPromptTokens ?? Infinity, sentChars / 4)))
+    }
+    if (typeof result.promptTokens === 'number') previousPromptTokens = result.promptTokens
+
     lastText = result.text
     messages.push(result.assistantMessage)
 
