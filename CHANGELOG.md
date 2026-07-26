@@ -2,6 +2,42 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.10.27-beta] - 2026-07-26
+
+Gemessen statt geraten: Zehn lokale Modelle liefen durch einen neuen Agenten-Benchmark (21 Aufgaben pro Modell), dazu ein Praxistest mit echten Vault-Skills. Das Ergebnis ist eine klare Empfehlung — und ehrliche Grenzen für kleinere Geräte.
+
+### Modellempfehlung für den Notiz-Agenten
+
+- **Qwen 3.6 27B ist ab jetzt die offizielle Empfehlung für den Notiz-Agenten.** Es bestand als einziges lokales Modell sowohl den Benchmark fehlerfrei (21/21 Läufe) als auch den härtesten Vault-Skill vollständig. Es läuft auch mit vollem 256k-Kontext komplett auf der GPU (19 GB). Die Empfehlung steht in den Einstellungen, in der Pull-Liste und am Modell-Picker.
+- **Ehrliche Grenze für kleine Geräte:** Unterhalb von ~19 GB trägt kein getestetes lokales Modell den Agenten zuverlässig — auch der bisherige 8-GB-Kandidat Qwen 3.5 4B fiel im Skill-Praxistest durch. Auf 8/16-GB-Macs ist der Agent realistisch nur über die Cloud-Anbieter (LLMBase, OpenRouter) nutzbar — als Opt-in, die Entscheidung bleibt beim Nutzer.
+- Die Modell-Kompatibilitäts-Matrix hat jetzt erstmals Bewertungen für das Agent-Modul (10 Modelle, Datenstand 2026-07-26), inklusive der Gründe pro Modell. Llama 3.1 8B und Qwen 3.5 0.8B sind rot: Das eine liefert Platzhalter statt Inhalt, das andere erfindet Inhalte zu nicht existierenden Notizen.
+
+### Zuverlässigkeit des Agenten
+
+- **Kein stiller Auftragsverlust mehr:** Läuft das Kontextfenster über, warf Ollama bisher heimlich die Mitte des Gesprächs weg — der Agent verlor den Auftrag samt Zwischenergebnissen und lieferte trotzdem ein plausibel aussehendes Ergebnis. Der Agent legt die Kontextgröße jetzt selbst fest (32k, mit Webrecherche 64k) und bricht bei erkannter Kürzung mit einer klaren Fehlermeldung ab.
+- **Leere Läufe gelten nicht mehr als Erfolg:** Beendet ein Modell den Lauf ohne Datei und ohne Antwort, wird es einmal zum Abschluss angestoßen — bleibt es dabei, meldet der Lauf einen Fehler statt einer leeren Ergebnis-Karte.
+- Der Modell-Override für den Notiz-Agenten in den Einstellungen wirkt jetzt tatsächlich (Reihenfolge: Auswahl in der Leiste → Modul-Override → globales Modell). Vorher wurde er angezeigt, aber ignoriert.
+
+### LM Studio & Modell-Erkennung
+
+- **LM Studio treibt jetzt auch den Notiz-Agenten an** (viertes Chat-Backend neben Ollama, OpenRouter und LLMBase).
+- **Tool-Fähigkeit wird nicht mehr am Modellnamen geraten:** Ollama meldet selbst, welche Modelle Tool-Calling können — die alte Namensliste sperrte Gemma 4, GLM und Kimi fälschlich aus und ließ einen Reranker fälschlich durch.
+- Ollama-Tags wie `ministral-3:latest` finden jetzt ihren Matrix-Eintrag (`ministral-3:8b`) — vorher zeigten sie überall „Nicht getestet", obwohl das Modell gebenchmarkt ist.
+- Die Speicherangabe für Qwen 3.6 wurde von 48 GB auf gemessene 24 GB korrigiert — die Warnung vor „zu großem Modell" erschien fälschlich auf Rechnern, die es problemlos tragen.
+
+### Sicherheit
+
+- **Lücke in der LM-Studio-Anbindung geschlossen:** Der Port-Parameter aus der Oberfläche wird jetzt streng geprüft (nur Zahlen 1–65535). Vorher hätte ein manipulierter Wert Anfragen samt Notiz-Inhalten an einen fremden Server umleiten können.
+
+### Fixes
+
+- SVG-Dateien öffnen wieder als Bild statt als XML-Quelltext; eingebettete `![[bild.svg]]`-Verweise zeigen wieder das Bild.
+- Überlauf-Fehlermeldungen nennen jetzt wirksame Abhilfen (Anhänge reduzieren, Auftrag verkleinern) statt einer Einstellung, die der Agent ohnehin übersteuert.
+
+### Doku
+
+- Neu: `docs/agent-model-benchmark-plan.md` (Konzept und Stand des Agenten-Benchmarks) und `docs/note-agent-skill-benchmark.md` (Skill-Praxistest, lokal-only, deterministisch bewertet).
+
 ## [0.10.26-beta] - 2026-07-23
 
 Die letzte Beta vor 1.0. Der Notiz-Agent lernt jetzt aktiv mit: Nach jedem Lauf schlägt er selbst einen Merksatz vor, den du per Klick ins Agent-Gedächtnis übernimmst. Dazu reparierte Editor-Tastenkürzel.
