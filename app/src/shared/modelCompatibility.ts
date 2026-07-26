@@ -364,8 +364,10 @@ export const MODEL_COMPATIBILITY: ModelCompatibilityData = {
     // Tool-Loop ist das eine Näherung, denn Chat-Template und Tool-Call-Parsing
     // sind backendabhängig. Eigener LM-Studio-Bench steht aus (Backend-Schalter im
     // Harness existiert). GRENZEN DER MESSUNG: 4 Kern-Tools (note_search/note_read/
-    // write_note/list_target_folder); Skills, write_html, Office-Dateien, Bilder
-    // und Webrecherche sind NICHT abgedeckt.
+    // write_note/list_target_folder); write_html, Office-Dateien, Bilder und
+    // Webrecherche sind NICHT abgedeckt. Skills wurden separat praxisgetestet
+    // (2026-07-26, echte Vault-Skills): nur qwen3.6:27b-mlx bestand den härtesten
+    // Skill vollständig (~315 s); qwen3.5:4b fiel dort in allen Bereichen durch.
     'note-agent': {
       'qwen3.6:latest': {
         verdict: 'green',
@@ -381,8 +383,8 @@ export const MODEL_COMPATIBILITY: ModelCompatibilityData = {
       },
       'qwen3.6:27b-mlx': {
         verdict: 'green',
-        reasons: ['~102 s Median — für interaktives Arbeiten spürbar zäh'],
-        notes: 'Bench 2026-07-26: einziges Modell ohne einen einzigen Fehlschlag (21/21 Läufe, alle Kennzahlen 100 %). Holt sich Inhalte teils über note_search statt note_read — anderer Weg, gleiches Ergebnis (Kennungen aus den Notizen stehen korrekt im Artefakt). ~19 GB RAM.',
+        reasons: ['~102 s Median, schwere Skills ~5 min — Qualität vor Tempo'],
+        notes: 'DIE EMPFEHLUNG für den Notiz-Agenten (Produktentscheidung 2026-07-26). Bench: einziges Modell ohne einen einzigen Fehlschlag (21/21 Läufe, alle Kennzahlen 100 %). Skill-Praxistest: bestand als einziges lokales Modell den härtesten Vault-Skill vollständig (~315 s). Läuft auch bei 256k-Kontext komplett auf der GPU (19 GB). Holt sich Inhalte teils über note_search statt note_read — anderer Weg, gleiches Ergebnis.',
         metrics: { latencySecondsPerRun: 102, ramGigabytes: 19 }
       },
       'qwen3.5:9b-mlx-bf16': {
@@ -393,8 +395,8 @@ export const MODEL_COMPATIBILITY: ModelCompatibilityData = {
       },
       'qwen3.5:4b': {
         verdict: 'yellow',
-        reasons: ['Bricht in ~19 % der Läufe ohne Artefakt ab — liest die Notiz und hört dann auf (2/3 im nachgeschärften Lesefall)', 'Schreib-Pingpong in 1/3 Läufen des Vergleichsfalls: drei Artefakte statt einem'],
-        notes: 'Bench 2026-07-26: die 8-GB-Empfehlung für den Notiz-Agenten — einziges Modell unter der RAM-Schwelle mit 100 % Argument-Treue, dazu ~25 s Median bei nur 3,4 GB. Schwäche ist die Terminierung, nicht die Genauigkeit: Wenn es schreibt, stimmt der Inhalt (die 78 % Ergebnis-Verwertung sind Abbrüche vor dem Schreiben, keine falschen Angaben).',
+        reasons: ['Im Praxistest mit echten Vault-Skills durchgefallen (2026-07-26) — für Skill-Läufe ungeeignet', 'Bricht in ~19 % der Läufe ohne Artefakt ab — liest die Notiz und hört dann auf', 'Schreib-Pingpong in 1/3 Läufen des Vergleichsfalls: drei Artefakte statt einem'],
+        notes: 'Bench 2026-07-26: auf den EINFACHEN Tool-Ketten brauchbar (100 % Argument-Treue, ~25 s, 3,4 GB) — aber der anschließende Praxistest mit echten Vault-Skills ging in allen Bereichen daneben. Konsequenz: KEIN 8-GB-taugliches lokales Modell trägt den Agenten zuverlässig; auf kleinen Geräten ist der Agent realistisch nur über die Cloud-Provider (LLMBase/OpenRouter) nutzbar — Opt-in, der Nutzer entscheidet.',
         metrics: { latencySecondsPerRun: 25, ramGigabytes: 4 }
       },
       'ministral-3:8b': {
@@ -480,7 +482,17 @@ export const RECOMMENDED_DEFAULTS: Partial<Record<ModuleId, string>> = {
   // project-status: qwen3.5:4b — gebenchmarkt 2026-06-03 (9/10, Honesty-Scorer), gleichauf
   // mit ministral, aber 3,4 GB (8-GB-tauglich) + zugleich das Mail-Modell → ein Modell für
   // Mail UND Projekt-Status. ministral-3:8b bleibt als getestete Option (yellow) in der Matrix.
-  'project-status':     'qwen3.5:4b'
+  'project-status':     'qwen3.5:4b',
+  // note-agent: qwen3.6:27b-mlx — Produktentscheidung 2026-07-26 nach Benchmark
+  // (einziges Modell mit 21/21 fehlerfreien Läufen) UND Praxistest mit echten
+  // Vault-Skills (härtester Skill vollständig bestanden, ~315 s). Qualität vor
+  // Tempo: Ein einziger stiller Fehler kostet mehr als zehn langsame korrekte
+  // Läufe. WICHTIG für kleine Geräte: Es gibt KEIN getestetes lokales Modell
+  // unter ~19 GB, das den Agenten zuverlässig trägt — qwen3.5:4b fiel im
+  // Skill-Praxistest durch (im Kern-Benchmark nur yellow). Auf 8/16-GB-Macs ist
+  // der Agent daher realistisch nur über die Cloud-Provider (LLMBase/OpenRouter)
+  // nutzbar — Opt-in, der Nutzer entscheidet (kein Auto-Fallback).
+  'note-agent':         'qwen3.6:27b-mlx'
 }
 
 // ─── Modellnamen-Kanonisierung (Ollama-Tags ↔ LM-Studio-IDs) ─────────────────
@@ -957,7 +969,7 @@ export const RECOMMENDED_PULL_MODELS: Array<{
   { name: 'ministral-3:8b',      label: 'Ministral 3 8B (~6 GB — Brain/Dashboard-Empfehlung, läuft auf 16 GB RAM)' },
   { name: 'gemma4:latest',       label: 'Gemma 4 (~10 GB — schnell; Prompts brauchen Platzhalter statt Beispielwerte)' },
   { name: 'gemma4:12b-mlx',      label: 'Gemma 4 12B MLX (~10 GB — Apple-Silicon/MLX, stark bei Task-Extraktion; Prompts brauchen Platzhalter statt Beispielwerte)' },
-  { name: 'qwen3.6:27b-mlx',     label: 'Qwen 3.6 27B MLX (~22 GB)',         humanFavorite: true },
+  { name: 'qwen3.6:27b-mlx',     label: 'Qwen 3.6 27B MLX (~19 GB — Empfehlung für den Notiz-Agenten: einziges fehlerfreies Modell im Agenten-Benchmark)', humanFavorite: true },
   { name: 'qwen3.6:latest',      label: 'Qwen 3.6 36B MoE (~24 GB bei 32k Kontext, ~29 GB bei 256k — schnell trotz Größe)', humanFavorite: true },
   { name: 'qwen3.5:9b-mlx-bf16', label: 'Qwen 3.5 9B MLX (~8 GB)' },
   { name: 'bge-m3:latest',       label: 'bge-m3 (~600 MB, multilingual — Smart Connections)', kind: 'embedding' }
