@@ -165,7 +165,7 @@ export async function runNoteAgentLoop(params: NoteAgentLoopParams): Promise<Not
     // plausibles, auftragsfremdes Ergebnis liefern. Lieber laut abbrechen —
     // gleiche Linie wie „keine stillen Kürzungen" bei den Lese-Budgets.
     if (looksTruncated({ promptTokens: result.promptTokens, previousPromptTokens, sentChars })) {
-      throw new Error(contextTruncationMessage(result.promptTokens!, Math.min(previousPromptTokens ?? Infinity, sentChars / 4)))
+      throw new Error(contextTruncationMessage(result.promptTokens!, Math.min(previousPromptTokens ?? Infinity, sentChars / 4), chatOptions.numCtx))
     }
     if (typeof result.promptTokens === 'number') previousPromptTokens = result.promptTokens
 
@@ -185,6 +185,23 @@ export async function runNoteAgentLoop(params: NoteAgentLoopParams): Promise<Not
           continue
         }
         throw new Error('Der Recherche-Lauf wurde ohne Ergebnis beendet — es wurde keine Notiz geschrieben. Bitte den Auftrag konkreter formulieren oder ein stärkeres Modell wählen.')
+      }
+      // Stiller Leerlauf auch außerhalb der Webrecherche: kein Tool gerufen, nichts
+      // gestaged UND nichts gesagt — vorher wurde das als Erfolg gemeldet (ok: true
+      // mit leerer Karte). Der Benchmark hat genau diesen Modus real gemessen
+      // (gemma4:latest 1/3 im reinen Schreibfall, qwen3.5:4b ~19 % der Läufe).
+      // Bewusst eng: Ein Lauf MIT Abschlusstext ist eine legitime Antwort und
+      // bleibt Erfolg — nur das doppelte Nichts wird erst angeschoben, dann Fehler.
+      if (run.results.size === 0 && result.text.trim() === '') {
+        if (!nudgedForWrite && iteration < MAX_ITERATIONS) {
+          nudgedForWrite = true
+          messages.push({
+            role: 'user',
+            content: 'Du hast weder eine Datei erzeugt noch geantwortet. Führe den Auftrag JETZT aus — erzeuge das Ergebnis mit einem Schreib-Tool (z.B. write_note) oder gib eine inhaltliche Antwort.'
+          })
+          continue
+        }
+        throw new Error('Der Lauf wurde ohne Ergebnis beendet — keine Datei erzeugt und keine Antwort gegeben. Bitte den Auftrag konkreter formulieren oder ein stärkeres Modell wählen.')
       }
       return { text: result.text, hitMaxIterations: false }
     }

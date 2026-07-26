@@ -3811,8 +3811,18 @@ const ollamaCapabilityResolver = new OllamaCapabilityResolver({
 
 // Helper to get LM Studio URL with custom port
 // Use 127.0.0.1 instead of localhost to avoid IPv6 resolution issues
-function getLMStudioUrl(port: number = LM_STUDIO_DEFAULT_PORT): string {
-  return `http://127.0.0.1:${port}`
+//
+// SICHERHEIT: Der Port kommt über IPC aus dem Renderer, und IPC-Typen schützen zur
+// Laufzeit nicht — ein String wie "80@evil.example" ergäbe interpoliert
+// `http://127.0.0.1:80@evil.example` (Userinfo-Trick: tatsächlicher Host wäre
+// evil.example). Ein kompromittierter Renderer könnte so den kompletten
+// Agenten-Prompt (Notiz, Gedächtnis, Tool-Ergebnisse) an einen fremden Server
+// leiten. Deshalb HIER zentral validieren — alle LM-Studio-Handler bauen ihre URL
+// über diese Funktion: nur ganzzahlige Ports 1–65535, alles andere fällt auf den
+// Default. Keine String-Coercion ("1234abc" wird NICHT zu 1234).
+function getLMStudioUrl(port: unknown = LM_STUDIO_DEFAULT_PORT): string {
+  const valid = typeof port === 'number' && Number.isInteger(port) && port >= 1 && port <= 65535
+  return `http://127.0.0.1:${valid ? port : LM_STUDIO_DEFAULT_PORT}`
 }
 
 // Strippen von Inhalten, die als UNTRUSTED in einen LLM-Prompt gehen.
@@ -4148,11 +4158,15 @@ ipcMain.handle('note-agent-run', async (event, params: NoteAgentRunParams) => {
       if (isNonGenerativeModel(params.model)) {
         return { success: false, error: `Modell "${params.model}" ist ein Embedding-/Reranker-Modell und kann keinen Agent-Loop ausführen.` }
       }
-      // Ollama liefert `capabilities` und ist damit die autoritative Quelle. LM Studio
-      // hat kein Äquivalent (/v1/models kennt keine Capabilities) — dort NICHT nach
-      // Modellnamen raten, sondern LM Studio selbst antworten lassen: eine abgelehnte
-      // Tool-Anfrage kommt als klarer Fehler zurück (friendlyLmStudioError), genau wie
-      // bei OpenRouter/LLMBase. Namensraten war exakt der Bug, der gemma4 aussperrte.
+      // Ollama liefert `capabilities` und ist damit die autoritative Quelle. Bei
+      // LM Studio wird NICHT nach Modellnamen gegatet, sondern LM Studio selbst
+      // antworten gelassen: eine abgelehnte Tool-Anfrage kommt als klarer Fehler
+      // zurück (friendlyLmStudioError), genau wie bei OpenRouter/LLMBase.
+      // Namensraten war exakt der Bug, der gemma4 aussperrte.
+      // TODO: LM Studios NATIVE REST-API (/api/v1/models, nicht das OpenAI-kompatible
+      // /v1/models) liefert inzwischen `trained_for_tool_use` + Kontextlängen — damit
+      // ließe sich auch hier VOR dem Lauf gaten statt erst am Fehler. Nachziehen,
+      // sobald der LM-Studio-Pfad überhaupt GUI-getestet ist.
       if (localBackend === 'ollama'
         && !(await ollamaCapabilityResolver.supportsTools(params.model, supportsNativeToolCalls))) {
         return { success: false, error: `Modell "${params.model}" unterstützt kein natives Tool-Calling — der Agent-Loop braucht ein Modell mit der Capability "tools".` }

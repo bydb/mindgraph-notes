@@ -1,8 +1,18 @@
 # Benchmark-Plan: Welche Modelle taugen fürs agentische Arbeiten?
 
-Status: **Konzept zum Gegenlesen** (2026-07-26). Noch kein Code.
-Zielartefakt: gefüllte Verdict-Matrix für das Modul `note-agent` + eine Empfehlung, die
-im Modell-Picker sichtbar wird.
+Status: **UMGESETZT** (2026-07-26). Harness: `~/dev/brain-model-benchmark/bench-note-agent.mjs`
+(+ `summarize-note-agent.mjs`), Ergebnisse: `results/note-agent-2026-07-26.md` (10 Modelle
+komplett, qwen3-vl abgebrochen). Die Verdicts stehen in `shared/modelCompatibility.ts`
+(`modules['note-agent']`, version 2026-07-26). Noch offen aus diesem Plan: der
+LM-Studio-Durchlauf (Backend-Schalter existiert, Lauf steht aus) und
+`recommendedAgentModels()` für den Picker.
+
+Wichtige Abweichungen von diesem Konzept, die sich beim Messen ergaben: a07 (Skill-Fall)
+und der ursprüngliche a06 (write_html) wurden nicht umgesetzt — gemessen sind die 4
+Kern-Tools; die Wertung brauchte fünf Nachbesserungen (Canary nur bei ausdrücklich
+angeforderter Kennung, erwarteter Fehl-Read zählt nicht als Halluzination, Fließtext-
+Tool-Calls, Schreibfall ohne Artefakt, Weg-vs-Ergebnis bei readTargets) — Details im
+Memory `project-agent-model-benchmark`.
 
 ## 1. Warum die vorhandenen Benchmarks die Frage nicht beantworten
 

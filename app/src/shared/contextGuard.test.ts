@@ -53,6 +53,19 @@ describe('contextTruncationMessage', () => {
     const msg = contextTruncationMessage(59, 15_000)
     expect(msg).toContain('gekürzt')
     expect(msg).toContain('59')
-    expect(msg).toMatch(/OLLAMA_CONTEXT_LENGTH/)
+    expect(msg).toContain('Anhänge')
+  })
+
+  it('empfiehlt NICHT die Server-Einstellung — der Agent sendet num_ctx selbst', () => {
+    // Regression zu einem realen Doku-Fehler: Die erste Fassung riet zu
+    // OLLAMA_CONTEXT_LENGTH, das der explizit gesendete Request-Wert übersteuert.
+    expect(contextTruncationMessage(59, 15_000, 65_536)).not.toMatch(/OLLAMA_CONTEXT_LENGTH/)
+  })
+
+  it('nennt das angeforderte Fenster, wenn trotz num_ctx gekürzt wurde', () => {
+    // Dann ist das Modell-Maximum kleiner als angefordert — anderes Modell nötig.
+    const msg = contextTruncationMessage(59, 15_000, 65_536)
+    expect(msg).toContain('65.536')
+    expect(msg).toContain('Maximum des Modells')
   })
 })

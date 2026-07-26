@@ -2021,7 +2021,10 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
     }
     const view = viewRef.current
     const noteContent = view ? view.state.doc.toString() : (selectedNote?.content || '')
-    const model = aiModel || ollama.selectedModel
+    // Dokumentierte Modell-Präzedenz (CLAUDE.md): explizite Auswahl in der Leiste →
+    // Modul-Override aus den Einstellungen → globales Modell. Ohne das mittlere Glied
+    // zeigte die Kompatibilitäts-UI einen Agenten-Override an, der nie wirkte.
+    const model = aiModel || ollama.moduleModelOverrides?.['note-agent'] || ollama.selectedModel
     const res = await window.electronAPI.noteAgentRun({
       vaultPath,
       noteId: effectiveNoteId,

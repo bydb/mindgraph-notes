@@ -45,8 +45,10 @@
 //   29 GB bei 262144 (dann 20 % CPU auf einem 32-GB-Mac). Die 48 waren zu hoch und
 //   lösten die Weak-HW-Warnung auf Hardware aus, die das Modell tragen kann.
 //   WICHTIG: Der RAM-Bedarf großer Kontextfenster ist in `ramGigabytes` NICHT
-//   abgebildet — die App sendet kein num_ctx und erbt Ollamas globale Einstellung.
-//   Wer dort 256k stehen hat, braucht real ~5 GB mehr als die Matrix angibt.
+//   abgebildet. Der Notiz-Agent sendet num_ctx inzwischen explizit (32k bzw. 64k
+//   mit Webrecherche, shared/contextGuard.ts); die ÜBRIGEN Chat-Pfade (Notes-Chat,
+//   Mail-Analyse, Brain, …) senden weiterhin kein num_ctx und erben Ollamas globale
+//   Einstellung — wer dort 256k stehen hat, braucht real ~5 GB mehr als angegeben.
 // 2026-07-26: note-agent erstmals gefüllt (war seit Einführung `{}`, der Hard-Lock-
 //   Zweig konnte nie feuern). Grundlage: bench-note-agent.mjs, 11 Modelle × 7 Fälle
 //   × 3 Reps, num_ctx 32768 gepinnt. Gemessen wird der TOOL-LOOP (Syntax, Argument-
@@ -356,11 +358,19 @@ export const MODEL_COMPATIBILITY: ModelCompatibilityData = {
     // (schreiben / lesen→schreiben / suchen→lesen→schreiben / zwei Lesevorgänge /
     // nicht existierende Notiz / unterspezifiziert), je 3 Reps, num_ctx 32768.
     // Harness: ~/dev/brain-model-benchmark/bench-note-agent.mjs.
+    //
+    // PROVENIENZ: Alle Verdicts wurden gegen OLLAMA gemessen. LM-Studio-IDs erben
+    // sie über die Kanonisierung (gleiche Gewichte = gleiches Verdict) — für den
+    // Tool-Loop ist das eine Näherung, denn Chat-Template und Tool-Call-Parsing
+    // sind backendabhängig. Eigener LM-Studio-Bench steht aus (Backend-Schalter im
+    // Harness existiert). GRENZEN DER MESSUNG: 4 Kern-Tools (note_search/note_read/
+    // write_note/list_target_folder); Skills, write_html, Office-Dateien, Bilder
+    // und Webrecherche sind NICHT abgedeckt.
     'note-agent': {
       'qwen3.6:latest': {
         verdict: 'green',
         reasons: [],
-        notes: 'Bench 2026-07-26: bestes Verhältnis aus Qualität und Tempo — Terminierung und Argument-Treue je 100 %, dabei mit ~30 s Median das schnellste grüne Modell. Der Grund ist strukturell: 36B als Mixture-of-Experts (qwen35moe), pro Token ist nur ein Bruchteil aktiv — deshalb schlägt es das kleinere dichte qwen3.6:27b-mlx um Faktor 3. ACHTUNG RAM (gemessen mit `ollama ps`, 32-GB-M2): 24 GB bei num_ctx 32768 / 25 GB bei 65536 / 26 GB bei 131072 / 29 GB bei 262144 — erst bei 256k rutschen 20 % auf die CPU. Für den Agenten MIT Webrecherche sind 32k zu klein: Worst Case eines Laufs sind ~144.000 Zeichen Webinhalt (10 Fetches à 8.000 + 8 Suchen à 8 Treffer), also ~50.000 Token plus Skill und Notizen. Empfehlung 131072. Die App sendet kein num_ctx und erbt Ollamas globale Einstellung.',
+        notes: 'Bench 2026-07-26: bestes Verhältnis aus Qualität und Tempo — Terminierung und Argument-Treue je 100 %, dabei mit ~30 s Median das schnellste grüne Modell. Der Grund ist strukturell: 36B als Mixture-of-Experts (qwen35moe), pro Token ist nur ein Bruchteil aktiv — deshalb schlägt es das kleinere dichte qwen3.6:27b-mlx um Faktor 3. ACHTUNG RAM (gemessen mit `ollama ps`, 32-GB-M2): 24 GB bei num_ctx 32768 / 25 GB bei 65536 / 26 GB bei 131072 / 29 GB bei 262144 — erst bei 256k rutschen 20 % auf die CPU. Für den Agenten MIT Webrecherche sind 32k zu klein: Worst Case eines Laufs sind ~144.000 Zeichen Webinhalt (10 Fetches à 8.000 + 8 Suchen à 8 Treffer), also ~50.000 Token plus Skill und Notizen. Der Notiz-Agent sendet num_ctx deshalb explizit (32k / 64k mit Webrecherche, shared/contextGuard.ts); die übrigen Chat-Pfade erben weiterhin Ollamas globale Einstellung.',
         metrics: { latencySecondsPerRun: 30, ramGigabytes: 24 }
       },
       'gemma4:latest': {

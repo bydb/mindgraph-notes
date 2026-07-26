@@ -75,15 +75,21 @@ export function looksTruncated(input: ContextTruncationInput): boolean {
   return false
 }
 
-// Fehlertext für den abgebrochenen Lauf. Bewusst handlungsleitend: Der Nutzer kann
-// das Kontextfenster selbst hochsetzen, und ohne diesen Hinweis bliebe unklar, warum
-// ein Lauf abbricht, der „eigentlich lief".
-export function contextTruncationMessage(promptTokens: number, expectedAtLeast: number): string {
+// Fehlertext für den abgebrochenen Lauf. Bewusst handlungsleitend — und die Abhilfe
+// muss zur Ursache passen: Der Agent sendet num_ctx SELBST (AGENT_NUM_CTX*), die
+// Server-Einstellung OLLAMA_CONTEXT_LENGTH ist für diesen Request also wirkungslos.
+// Was wirklich hilft, ist die Konversation zu verkleinern — oder das Modell selbst
+// hat ein kleineres Maximum als angefordert, dann hilft nur ein anderes Modell.
+export function contextTruncationMessage(promptTokens: number, expectedAtLeast: number, requestedCtx?: number): string {
+  const window = requestedCtx
+    ? `Angefordert waren ${requestedCtx.toLocaleString('de-DE')} Token — wurde trotzdem gekürzt, ist das Maximum des Modells vermutlich kleiner. `
+    : ''
   return (
-    `Das Kontextfenster des Modells ist für diesen Lauf zu klein — die Konversation wurde gekürzt ` +
+    `Das Kontextfenster reicht für diesen Lauf nicht — die Konversation wurde gekürzt ` +
     `(verarbeitet: ${promptTokens} Token, erwartet mindestens ~${Math.round(expectedAtLeast)}). ` +
     `Dabei geht der Auftrag mitsamt den bisherigen Zwischenergebnissen verloren, deshalb wurde der Lauf abgebrochen. ` +
-    `Abhilfe: in Ollama ein größeres Kontextfenster einstellen (OLLAMA_CONTEXT_LENGTH, empfohlen 131072), ` +
-    `ein Modell mit größerem Kontext wählen, oder den Auftrag kleiner schneiden.`
+    window +
+    `Abhilfe: weniger oder kleinere Anhänge mitgeben, den Auftrag kleiner schneiden, ` +
+    `oder ein Modell mit größerem Kontextfenster wählen.`
   )
 }
