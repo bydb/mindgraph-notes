@@ -387,10 +387,10 @@ export const MODEL_COMPATIBILITY: ModelCompatibilityData = {
         notes: 'Bench 2026-07-26: die 8-GB-Empfehlung für den Notiz-Agenten — einziges Modell unter der RAM-Schwelle mit 100 % Argument-Treue, dazu ~25 s Median bei nur 3,4 GB. Schwäche ist die Terminierung, nicht die Genauigkeit: Wenn es schreibt, stimmt der Inhalt (die 78 % Ergebnis-Verwertung sind Abbrüche vor dem Schreiben, keine falschen Angaben).',
         metrics: { latencySecondsPerRun: 25, ramGigabytes: 4 }
       },
-      'ministral-3:latest': {
+      'ministral-3:8b': {
         verdict: 'yellow',
         reasons: ['Liest die Notiz korrekt und schreibt sie dann nicht: 0/3 im Fall lesen→schreiben (kein write_note, leerer Abschlusstext)', 'Reproduzierbar kaputtes Tool-Call-JSON (Ollama HTTP 500) — im Produkt sieht der Nutzer „Ollama API 500"'],
-        notes: 'Bench 2026-07-26: mit ~13 s Median das schnellste Modell im Feld, aber die Kette reißt vor dem Schreiben ab. Für andere Module (brain, dashboard) weiterhin stark — nur für den Tool-Loop nicht. ~6 GB RAM. Als `:latest` eingetragen, weil der Tag kanonisch NICHT auf `ministral-3:8b` fällt.',
+        notes: 'Bench 2026-07-26: mit ~13 s Median das schnellste Modell im Feld, aber die Kette reißt vor dem Schreiben ab. Für andere Module (brain, dashboard) weiterhin stark — nur für den Tool-Loop nicht. ~6 GB RAM. Gemessen wurde der Tag `ministral-3:latest` (dieselbe 6-GB-Datei); der Eintrag steht wie überall sonst unter `:8b`, der `latest`-Tag findet ihn über die Größen-Brücke.',
         metrics: { latencySecondsPerRun: 13, ramGigabytes: 6 }
       },
       'gemma4:12b-mlx': {
@@ -495,6 +495,14 @@ export const RECOMMENDED_DEFAULTS: Partial<Record<ModuleId, string>> = {
 //     Runtime-Format. So erbt ein MLX-llama3.1 den red-Hard-Lock, und die auf
 //     Apple Silicon üblichen MLX-Downloads matchen die GGUF-Benchmarks. Die
 //     Gegenrichtung (mlx-Matrix-Eintrag für Nicht-mlx-Anfrage) bleibt strikt.
+//   - `latest` ↔ Größe: `ministral-3:latest` und `ministral-3:8b` sind auf einem
+//     Rechner dieselbe Datei, kanonisch aber `ministral3:latest` vs `ministral3:8b`.
+//     Ohne Brücke zeigte ein installiertes `ministral-3:latest` in JEDEM Modul
+//     „untested" — obwohl es dort gebenchmarkt und bei dashboard-snapshot sogar
+//     der Default ist. Siehe latestSizeFallback(): greift NUR, wenn die Familie
+//     genau EINEN passenden Gegeneintrag hat. `qwen3.5:latest` bleibt deshalb
+//     untested (4b/0.8b/9b-bf16 wären drei Kandidaten), und geraten wird nie —
+//     ein falsch geerbtes green auf einem 0.8b wäre schlimmer als „nicht getestet".
 interface CanonicalModelParts {
   family: string
   size: string
@@ -569,9 +577,63 @@ function canonicalLookupKeys(model: string): string[] {
   return keys
 }
 
+// `family:size` ohne weitere Varianten — die schlichte lokale Bauform (`ministral-3:8b`).
+function isPlainSized(p: CanonicalModelParts): boolean {
+  return p.size !== '' && p.variants.length === 0
+}
+
+// `family:latest` ohne Größe — der Ollama-Default-Tag (`ministral-3:latest`).
+function isLatestForm(p: CanonicalModelParts): boolean {
+  return p.size === '' && p.variants.length === 1 && p.variants[0] === 'latest'
+}
+
+// Brücke vom Nutzer-Tag `family:latest` auf den Größen-Eintrag der Matrix.
+//
+// NUR diese Richtung: `latest` ist die mehrdeutige Seite, die Matrix führt Größen.
+// Die Gegenrichtung (Anfrage mit Größe → `latest`-Eintrag) wäre reines Raten — im
+// Test holte sich `gemma4:99b` prompt das green von `gemma4:latest` (das ein 8B ist).
+//
+// Die Bedingung ist absichtlich hart: Die Familie darf im Modul GENAU EINEN lokalen
+// Eintrag haben. Die schwächere Regel „genau ein Eintrag mit schlichter Größe" sah
+// richtig aus und riet trotzdem falsch — `qwen3.5:latest` hätte in task-extraction
+// das green von `qwen3.5:4b` geerbt, obwohl dahinter genauso das rote 0.8b stecken
+// kann. Mehr als ein lokaler Eintrag in der Familie → untested.
+//
+// GRENZE, bewusst in Kauf genommen: Auch das bleibt eine Annahme, denn `latest` ist
+// ein bewegliches Ziel. Sauber auflösen ließe sich der Tag nur über die Runtime
+// (`/api/show` liefert den Parameter-Count, siehe ollamaCapabilities.ts) — dafür
+// müsste getModelVerdict asynchron werden. Bis dahin gilt: eindeutig oder gar nicht.
+function latestSizeFallback(parts: CanonicalModelParts, moduleId: ModuleId): ModelVerdict | null {
+  if (!isLatestForm(parts)) return null
+
+  // Cloud-Einträge zählen nicht mit: `latest` ist ein lokaler Tag.
+  const local = (familyIndexFor(moduleId).get(parts.family) ?? []).filter(e => !e.parts.variants.includes('cloud'))
+  if (local.length !== 1) return null
+  return isPlainSized(local[0].parts) ? local[0].verdict : null
+}
+
 // Kanonischer Index pro Modul (lazy) — die Matrix-Keys selbst werden mit derselben
 // Funktion kanonisiert, damit beide Seiten identisch transformiert sind.
 const canonicalIndexCache = new Map<ModuleId, Map<string, ModelVerdict>>()
+
+// Zweiter Index, nach Familie gruppiert — Grundlage für latestSizeFallback().
+interface FamilyEntry { parts: CanonicalModelParts; verdict: ModelVerdict }
+const familyIndexCache = new Map<ModuleId, Map<string, FamilyEntry[]>>()
+function familyIndexFor(moduleId: ModuleId): Map<string, FamilyEntry[]> {
+  let index = familyIndexCache.get(moduleId)
+  if (!index) {
+    index = new Map()
+    for (const tag of Object.keys(MODEL_COMPATIBILITY.modules[moduleId] || {})) {
+      const parts = canonicalModelParts(tag)
+      if (!parts) continue
+      const list = index.get(parts.family) ?? []
+      list.push({ parts, verdict: MODEL_COMPATIBILITY.modules[moduleId][tag] })
+      index.set(parts.family, list)
+    }
+    familyIndexCache.set(moduleId, index)
+  }
+  return index
+}
 function canonicalIndexFor(moduleId: ModuleId): Map<string, ModelVerdict> {
   let index = canonicalIndexCache.get(moduleId)
   if (!index) {
@@ -598,6 +660,11 @@ export function getModelVerdict(model: string, moduleId: ModuleId): ModelVerdict
   for (const key of canonicalLookupKeys(model)) {
     const hit = index.get(key)
     if (hit) return hit
+  }
+  const parts = canonicalModelParts(model)
+  if (parts) {
+    const bridged = latestSizeFallback(parts, moduleId)
+    if (bridged) return bridged
   }
   return { verdict: 'untested', reasons: [] }
 }

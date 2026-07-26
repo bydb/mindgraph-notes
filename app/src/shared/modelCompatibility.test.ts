@@ -104,6 +104,46 @@ describe('Modellnamen-Kanonisierung (LM Studio ↔ Ollama)', () => {
   })
 })
 
+describe('latest ↔ Größe (Ollama-Default-Tag)', () => {
+  it('installiertes :latest findet den Größen-Eintrag der Matrix', () => {
+    // Der Auslöser: `ministral-3:latest` (6 GB = das 8B) zeigte in JEDEM Modul
+    // „untested", obwohl die Matrix es als `ministral-3:8b` führt — und
+    // dashboard-snapshot es sogar als Default hat.
+    expect(getModelVerdict('ministral-3:latest', 'brain').verdict).toBe('green')
+    expect(getModelVerdict('ministral-3:latest', 'dashboard-snapshot').verdict)
+      .toBe(getModelVerdict('ministral-3:8b', 'dashboard-snapshot').verdict)
+  })
+
+  it('gilt in allen Modulen, in denen die Familie eindeutig ist', () => {
+    expect(getModelVerdict('ministral-3:latest', 'note-agent').verdict).toBe('yellow')
+    expect(getModelVerdict('ministral-3:latest', 'mail-summary').verdict).toBe('green')
+  })
+
+  it('RÄT NICHT, wenn die Familie mehrere Größen hat', () => {
+    // qwen3.5 gibt es als 0.8b, 4b und 9b-mlx-bf16 mit sehr verschiedenen Verdicts.
+    // Ein geerbtes green auf einem 0.8b wäre schlimmer als „nicht getestet".
+    expect(getModelVerdict('qwen3.5:latest', 'note-agent').verdict).toBe('untested')
+    expect(getModelVerdict('qwen3.5:latest', 'task-extraction').verdict).toBe('untested')
+  })
+
+  it('überbrückt NICHT von einer Größe auf einen :latest-Eintrag', () => {
+    // Die Gegenrichtung wäre Raten. `gemma4:latest` ist laut `ollama show` ein 8B —
+    // ein gepulltes `gemma4:4b` oder `gemma4:27b` (kleinere/größere Geschwister, wie
+    // sie jede Gemma-Generation hat) ist ein ANDERES Modell und darf dessen Verdict
+    // nicht erben. Bewusst plausible Größen im Test, keine erfundenen: Der Fall muss
+    // eintreten können, sonst prüft der Test nichts.
+    expect(getModelVerdict('gemma4:4b', 'note-agent').verdict).toBe('untested')
+    expect(getModelVerdict('gemma4:27b', 'brain').verdict).toBe('untested')
+    // Gleiches für die qwen-Familien, deren `latest` in der Matrix steht.
+    expect(getModelVerdict('qwen3.6:8b', 'note-agent').verdict).toBe('untested')
+  })
+
+  it('lässt den Hard-Lock nicht aufweichen', () => {
+    // llama3.1 steht als :8b in der Matrix und ist im Dashboard rot.
+    expect(isHardLocked('llama3.1:latest', 'dashboard-snapshot')).toBe(true)
+  })
+})
+
 describe('isHardLocked — Sicherheitsgrenze', () => {
   it('sperrt llama3.1:8b im damageRelevant-Dashboard (red)', () => {
     // Dokumentierte Sicherheitseigenschaft: llama3.1 fällt auf Prompt-Injection
