@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { getFileType, coreClaimedExtensions } from './fileTypes'
+import { getFileType, coreClaimedExtensions, DUPLICATE_CORE_EXTENSIONS } from './fileTypes'
 
 describe('getFileType', () => {
   it('klassifiziert bekannte Endungen (case-insensitiv)', () => {
@@ -54,5 +54,32 @@ describe('Parität getFileType ↔ coreClaimedExtensions (R1-impl-F04)', () => {
       expect(core.has(ext), ext).toBe(false)
       expect(getFileType(`datei${ext}`)).toBeNull()
     }
+  })
+})
+
+// Regression: `.svg` steht sowohl in IMAGE_EXTENSIONS als auch in CODE_EXTENSIONS. Da beide Listen
+// in dieselbe Map gespreadet werden, gewann der spätere Code-Eintrag — SVGs wurden im FileTree als
+// Code-Datei geöffnet (XML-Quelltext statt Grafik) und `findImageInVault` (filtert auf
+// fileType === 'image') fand sie nicht mehr, wodurch `![[bild.svg]]`-Embeds in Notizen leer blieben.
+describe('SVG bleibt ein Bild (Regression)', () => {
+  it('klassifiziert .svg als image, nicht als code', () => {
+    expect(getFileType('nahrungskette.svg')).toBe('image')
+    expect(getFileType('HERO.SVG')).toBe('image')
+  })
+
+  it('lässt die übrigen Bild-Endungen unberührt', () => {
+    for (const name of ['a.png', 'a.jpg', 'a.jpeg', 'a.gif', 'a.webp', 'a.bmp', 'a.ico']) {
+      expect(getFileType(name), name).toBe('image')
+    }
+  })
+
+  it('hält verwandte Markup-Endungen weiterhin bei code', () => {
+    expect(getFileType('a.xml')).toBe('code')
+    expect(getFileType('a.html')).toBe('code')
+  })
+
+  it('keine Endung wird von zwei Typ-Listen beansprucht', () => {
+    // Ein Duplikat würde still nach Listen-Reihenfolge aufgelöst statt nach Absicht.
+    expect(DUPLICATE_CORE_EXTENSIONS).toEqual([])
   })
 })

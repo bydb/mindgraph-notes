@@ -16,7 +16,10 @@ const IMAGE_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.bm
 const CODE_EXTENSIONS = [
   'js', 'mjs', 'cjs', 'jsx', 'ts', 'tsx',
   'py', 'pyw',
-  'html', 'htm', 'xml', 'svg',
+  // KEIN 'svg': SVG ist eine Bilddatei (IMAGE_EXTENSIONS) und muss im Bild-Viewer landen,
+  // nicht im Code-Editor. Stand es in beiden Listen, gewann der spätere Map-Eintrag ('code') —
+  // siehe DUPLICATE_CORE_EXTENSIONS unten.
+  'html', 'htm', 'xml',
   'css', 'scss', 'sass', 'less',
   'json', 'jsonc',
   'yaml', 'yml',
@@ -35,8 +38,26 @@ const CODE_EXTENSIONS = [
  *  irrelevant: ein Plugin beansprucht Endungen, keine vollständigen Namen). */
 const SPECIAL_CODE_FILENAMES = new Set(['dockerfile', 'makefile', '.gitignore', '.env'])
 
+/** Endungen, die von ZWEI Typ-Listen beansprucht werden. `new Map([...])` lässt beim Spread still
+ *  den SPÄTEREN Eintrag gewinnen: genau so wurde `.svg` (in IMAGE_EXTENSIONS **und** früher in
+ *  CODE_EXTENSIONS) zur Code-Datei — SVGs öffneten als XML-Quelltext und `findImageInVault` fand
+ *  sie nicht mehr, wodurch `![[bild.svg]]`-Embeds leer blieben. Der Konflikt ist jetzt sichtbar
+ *  statt still; `fileTypes.test.ts` nagelt fest, dass die Liste leer bleibt. */
+const duplicateExtensions: string[] = []
+
+function buildCoreExtensionTypes(
+  entries: ReadonlyArray<[string, CoreFileType]>
+): ReadonlyMap<string, CoreFileType> {
+  const map = new Map<string, CoreFileType>()
+  for (const [ext, type] of entries) {
+    if (map.has(ext)) duplicateExtensions.push(ext)
+    map.set(ext, type)
+  }
+  return map
+}
+
 /** EINE Quelle: Endung (lowercase, '.'-präfixiert) → Kern-Dateityp. */
-const CORE_EXTENSION_TYPES: ReadonlyMap<string, CoreFileType> = new Map<string, CoreFileType>([
+const CORE_EXTENSION_TYPES: ReadonlyMap<string, CoreFileType> = buildCoreExtensionTypes([
   ['.md', 'markdown'],
   ['.pdf', 'pdf'],
   ['.epub', 'epub'],
@@ -46,6 +67,9 @@ const CORE_EXTENSION_TYPES: ReadonlyMap<string, CoreFileType> = new Map<string, 
   ['.pptx', 'powerpoint'], ['.ppt', 'powerpoint'],
   ...CODE_EXTENSIONS.map((e) => [`.${e}`, 'code'] as [string, CoreFileType]),
 ])
+
+/** Diagnose für den Paritätstest: doppelt beanspruchte Endungen (muss leer sein). */
+export const DUPLICATE_CORE_EXTENSIONS: readonly string[] = duplicateExtensions
 
 /** Klassifiziert einen Dateinamen in einen Kern-Dateityp oder `null` (unbekannt). */
 export function getFileType(fileName: string): CoreFileType | null {
