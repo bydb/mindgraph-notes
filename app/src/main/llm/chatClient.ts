@@ -1,8 +1,11 @@
 // Einheitlicher Chat-Client für Main-Prozess-Komponenten (Telegram-Bot,
 // Email-Analyse, Notes-Chat, …).
 //
-// Drei Backends:
+// Vier Backends:
 //   - 'ollama'     — lokale Modelle ODER Ollama-Cloud-Modelle (`*:cloud`).
+//   - 'lmstudio'   — LOKALES LM Studio, OpenAI-kompatibel (127.0.0.1:1234). Teilt
+//                    sich den Wire-Code mit den Cloud-Providern, ist aber KEINE
+//                    Cloud: kein API-Key, nichts verlässt den Rechner.
 //   - 'openrouter' — OpenAI-kompatibles Cloud-Backend (https://openrouter.ai).
 //   - 'llmbase'    — OpenAI-kompatibles EU-Cloud-Backend (https://llmbase.ai,
 //                    Inference in DE/NL/FI/CH — DSGVO-Positionierung).
@@ -13,9 +16,10 @@
 // (isCloudProviderReady / canUseCloudForFeature) und den Email-Picker (analysisModel).
 // Das Brain-Modul nutzt diesen Client NICHT — es ist hardcoded localhost.
 
-export type ChatBackend = 'ollama' | 'openrouter' | 'llmbase'
-// Die OpenAI-kompatiblen Cloud-Backends (alles außer Ollama).
-export type CloudChatBackend = Exclude<ChatBackend, 'ollama'>
+export type ChatBackend = 'ollama' | 'lmstudio' | 'openrouter' | 'llmbase'
+// Die OpenAI-kompatiblen CLOUD-Backends. LM Studio spricht dasselbe Protokoll,
+// gehört hier aber bewusst NICHT dazu — an diesem Typ hängen die Privacy-Gates.
+export type CloudChatBackend = Exclude<ChatBackend, 'ollama' | 'lmstudio'>
 
 export function isCloudChatBackend(backend: ChatBackend | undefined): backend is CloudChatBackend {
   return backend === 'openrouter' || backend === 'llmbase'
@@ -45,6 +49,9 @@ export interface ChatOptions {
   backend?: ChatBackend                   // default 'ollama'
   ollamaUrl?: string                      // default: http://localhost:11434
   ollamaModel?: string                    // z.B. 'qwen3.6:27b-mlx' oder 'qwen3.5:cloud'
+  // LM Studio (lokal, OpenAI-kompatibel):
+  lmstudioUrl?: string                    // Basis OHNE /v1, default: http://127.0.0.1:1234
+  lmstudioModel?: string                  // Modell-ID aus /v1/models (Pflicht wenn backend === 'lmstudio')
   // OpenRouter:
   openrouterApiKey?: string               // Pflicht wenn backend === 'openrouter'
   openrouterModel?: string                // z.B. 'qwen/qwen-2.5-7b-instruct' (Pflicht für OpenRouter)
@@ -61,6 +68,16 @@ export interface ChatOptions {
   // Der Notiz-Agent setzt 600s: große lokale Modelle brauchen mit gewachsenem
   // Tool-Kontext länger, und der Nutzer hat einen echten Abbrechen-Button.
   timeoutMs?: number
+  // Kontextfenster in Token (nur Ollama: `options.num_ctx`).
+  //
+  // OHNE diesen Wert erbt der Request Ollamas GLOBALE Einstellung — und die kennt
+  // die App nicht. Steht sie zu klein, wirft llama.cpp beim Überlauf still die
+  // MITTE der Konversation weg: System-Prompt und letzte Nachricht überleben,
+  // der Auftrag des Nutzers und alle bisherigen Tool-Ergebnisse nicht. Es gibt
+  // dabei keinen Fehler und keine Warnung (empirisch geprüft 2026-07-26 gegen
+  // qwen3.5:4b und qwen3.6:latest — prompt_eval_count fiel von 106 auf 59).
+  // Deshalb setzt der Notiz-Agent den Wert explizit, statt zu hoffen.
+  numCtx?: number
 }
 
 export interface ChatResult {
@@ -73,9 +90,17 @@ export interface ChatWithToolsResult {
   toolCalls: ToolCall[]                   // leer = Modell ist fertig
   backend: ChatBackend
   assistantMessage: ChatMessage           // ans History anhängen, bevor weiter geht
+  // Wie viele Prompt-Token der Server TATSÄCHLICH verarbeitet hat (Ollama:
+  // `prompt_eval_count`, OpenAI-kompatibel: `usage.prompt_tokens`). Undefined,
+  // wenn der Server nichts meldet. Einziger verlässlicher Beleg dafür, dass die
+  // Konversation vollständig ankam — siehe ChatOptions.numCtx.
+  promptTokens?: number
 }
 
 const DEFAULT_OLLAMA_URL = 'http://localhost:11434'
+// 127.0.0.1 statt localhost — sonst landet der Request unter Umständen auf ::1,
+// wo LM Studio nicht lauscht (gleiche Begründung wie in main/index.ts).
+const DEFAULT_LMSTUDIO_URL = 'http://127.0.0.1:1234'
 
 // OpenAI-kompatible Cloud-Provider — EIN Codepfad, parametrisiert über diese Map.
 // OpenRouter empfiehlt die Attribution-Header (optional, schaden nicht); LLMBase
@@ -135,6 +160,15 @@ async function isOllamaReachable(url: string): Promise<boolean> {
   }
 }
 
+async function isLmStudioReachable(url: string): Promise<boolean> {
+  try {
+    const res = await fetch(`${url}/v1/models`, { signal: AbortSignal.timeout(1500) })
+    return res.ok
+  } catch {
+    return false
+  }
+}
+
 // Cloud-Modelle (`-cloud`-Suffix) werden NIE auto-gewählt:
 // 1. Privacy — Prompt-Inhalte (Briefing, Brain, Mails) sollen nicht ungewollt
 //    zur Ollama-Cloud gehen.
@@ -179,7 +213,8 @@ async function chatViaOllama(messages: ChatMessage[], opts: ChatOptions): Promis
     body: JSON.stringify({
       model,
       messages: messages.map(m => ({ role: m.role, content: m.content })),
-      stream: false
+      stream: false,
+      ...(opts.numCtx ? { options: { num_ctx: opts.numCtx } } : {})
     }),
     signal: requestSignal(opts.timeoutMs ?? 120000, opts.signal)
   })
@@ -260,13 +295,73 @@ function assertCloudConfig(backend: CloudChatBackend, opts: ChatOptions): { apiK
   return { apiKey, model }
 }
 
-async function chatViaCloud(backend: CloudChatBackend, messages: ChatMessage[], opts: ChatOptions): Promise<ChatResult> {
+// LM-Studio-Fehler in handlungsleitende Meldungen übersetzen. Wichtigster Fall:
+// LM Studio ist selbst die Autorität für Tool-Calling (es gibt dort kein
+// `capabilities`-Feld wie bei Ollama) — lehnt es Tools ab, muss der Nutzer das
+// als Modell-Eigenschaft lesen können, nicht als App-Fehler.
+export function friendlyLmStudioError(status: number, body: string, model: string): string {
+  if (status === 404) {
+    return `LM Studio: Modell „${model}" ist nicht geladen (404). In LM Studio unter „Developer" laden und den lokalen Server starten.`
+  }
+  let detail = body.trim()
+  try {
+    const j = JSON.parse(body) as { error?: string | { message?: string } }
+    const raw = typeof j.error === 'string' ? j.error : j.error?.message
+    if (raw) detail = raw
+  } catch { /* kein JSON */ }
+  if (/tool|function[_ ]call/i.test(detail)) {
+    return `LM Studio: „${model}" unterstützt keine Tool-Aufrufe (${status}) — der Agent-Loop braucht ein Modell mit Tool-Template (z. B. qwen3.x, llama3.1, mistral-nemo). (Details: ${detail})`
+  }
+  return `LM Studio API ${status}: ${detail}`
+}
+
+// Ein OpenAI-kompatibler /chat/completions-Endpunkt. Cloud-Provider und das lokale
+// LM Studio teilen sich denselben Wire-Code — unterschiedlich sind nur URL, Header
+// und die Fehlerübersetzung.
+interface OpenAiCompatibleTarget {
+  endpoint: string
+  headers: Record<string, string>
+  model: string
+  friendlyError: (status: number, body: string) => string
+}
+
+function cloudTarget(backend: CloudChatBackend, opts: ChatOptions): OpenAiCompatibleTarget {
   const { apiKey, model } = assertCloudConfig(backend, opts)
-  const res = await chatFetch(`${CLOUD_PROVIDERS[backend].baseUrl}/chat/completions`, {
-    method: 'POST',
+  return {
+    endpoint: `${CLOUD_PROVIDERS[backend].baseUrl}/chat/completions`,
     headers: cloudHeaders(backend, apiKey),
+    model,
+    friendlyError: (status, body) => friendlyCloudError(backend, status, body, model)
+  }
+}
+
+function lmStudioTarget(opts: ChatOptions): OpenAiCompatibleTarget {
+  const model = opts.lmstudioModel?.trim()
+  if (!model) throw new Error('Kein LM-Studio-Modell ausgewählt.')
+  const base = (opts.lmstudioUrl ?? DEFAULT_LMSTUDIO_URL).replace(/\/+$/, '')
+  return {
+    endpoint: `${base}/v1/chat/completions`,
+    headers: { 'Content-Type': 'application/json' },
+    model,
+    friendlyError: (status, body) => friendlyLmStudioError(status, body, model)
+  }
+}
+
+function openAiCompatibleTarget(backend: ChatBackend, opts: ChatOptions): OpenAiCompatibleTarget {
+  return backend === 'lmstudio' ? lmStudioTarget(opts) : cloudTarget(backend as CloudChatBackend, opts)
+}
+
+async function chatViaOpenAiCompatible(
+  backend: ChatBackend,
+  messages: ChatMessage[],
+  opts: ChatOptions
+): Promise<ChatResult> {
+  const target = openAiCompatibleTarget(backend, opts)
+  const res = await chatFetch(target.endpoint, {
+    method: 'POST',
+    headers: target.headers,
     body: JSON.stringify({
-      model,
+      model: target.model,
       messages: messages.map(m => ({ role: m.role, content: m.content })),
       stream: false,
       ...(opts.responseFormat === 'json' ? { response_format: { type: 'json_object' } } : {}),
@@ -276,7 +371,7 @@ async function chatViaCloud(backend: CloudChatBackend, messages: ChatMessage[], 
     signal: requestSignal(opts.timeoutMs ?? 120000, opts.signal)
   })
   if (!res.ok) {
-    throw new Error(friendlyCloudError(backend, res.status, await res.text(), model))
+    throw new Error(target.friendlyError(res.status, await res.text()))
   }
   const json = await res.json() as { choices?: OpenAIChatChoice[] }
   return { text: openrouterMessageText(json.choices?.[0]?.message), backend }
@@ -284,7 +379,14 @@ async function chatViaCloud(backend: CloudChatBackend, messages: ChatMessage[], 
 
 export async function chat(messages: ChatMessage[], opts: ChatOptions = {}): Promise<ChatResult> {
   if (isCloudChatBackend(opts.backend)) {
-    return chatViaCloud(opts.backend, messages, opts)
+    return chatViaOpenAiCompatible(opts.backend, messages, opts)
+  }
+  if (opts.backend === 'lmstudio') {
+    const url = (opts.lmstudioUrl ?? DEFAULT_LMSTUDIO_URL).replace(/\/+$/, '')
+    if (!(await isLmStudioReachable(url))) {
+      throw new Error(`LM Studio ist nicht erreichbar (${url}). Bitte LM Studio starten und den lokalen Server aktivieren.`)
+    }
+    return chatViaOpenAiCompatible('lmstudio', messages, opts)
   }
   const ollamaUrl = opts.ollamaUrl ?? DEFAULT_OLLAMA_URL
   if (!(await isOllamaReachable(ollamaUrl))) {
@@ -348,7 +450,8 @@ async function chatWithToolsViaOllama(
       model,
       messages: messages.map(ollamaMessageToWire),
       tools: wireTools,
-      stream: false
+      stream: false,
+      ...(opts.numCtx ? { options: { num_ctx: opts.numCtx } } : {})
     }),
     signal: requestSignal(opts.timeoutMs ?? 180000, opts.signal)
   })
@@ -365,6 +468,7 @@ async function chatWithToolsViaOllama(
       content?: string
       tool_calls?: OllamaToolCallWire[]
     }
+    prompt_eval_count?: number
   }
 
   const rawCalls = json.message?.tool_calls ?? []
@@ -402,11 +506,12 @@ async function chatWithToolsViaOllama(
     text,
     toolCalls,
     backend: 'ollama',
-    assistantMessage
+    assistantMessage,
+    promptTokens: json.prompt_eval_count
   }
 }
 
-// ─── Cloud (OpenRouter/LLMBase): tool-use (OpenAI-kompatibel) ────────────────
+// ─── OpenAI-kompatibles tool-use (OpenRouter/LLMBase/LM Studio) ──────────────
 
 function openrouterMessageToWire(m: ChatMessage): Record<string, unknown> {
   if (m.role === 'tool') {
@@ -430,23 +535,23 @@ function openrouterMessageToWire(m: ChatMessage): Record<string, unknown> {
   return { role: m.role, content: m.content }
 }
 
-async function chatWithToolsViaCloud(
-  backend: CloudChatBackend,
+async function chatWithToolsViaOpenAiCompatible(
+  backend: ChatBackend,
   messages: ChatMessage[],
   tools: ToolDefinition[],
   opts: ChatOptions
 ): Promise<ChatWithToolsResult> {
-  const { apiKey, model } = assertCloudConfig(backend, opts)
+  const target = openAiCompatibleTarget(backend, opts)
   const wireTools = tools.map(t => ({
     type: 'function',
     function: { name: t.name, description: t.description, parameters: t.parameters }
   }))
 
-  const res = await chatFetch(`${CLOUD_PROVIDERS[backend].baseUrl}/chat/completions`, {
+  const res = await chatFetch(target.endpoint, {
     method: 'POST',
-    headers: cloudHeaders(backend, apiKey),
+    headers: target.headers,
     body: JSON.stringify({
-      model,
+      model: target.model,
       messages: messages.map(openrouterMessageToWire),
       tools: wireTools,
       stream: false
@@ -454,9 +559,9 @@ async function chatWithToolsViaCloud(
     signal: requestSignal(opts.timeoutMs ?? 180000, opts.signal)
   })
   if (!res.ok) {
-    throw new Error(friendlyCloudError(backend, res.status, await res.text(), model))
+    throw new Error(target.friendlyError(res.status, await res.text()))
   }
-  const json = await res.json() as { choices?: OpenAIChatChoice[] }
+  const json = await res.json() as { choices?: OpenAIChatChoice[]; usage?: { prompt_tokens?: number } }
   const msg = json.choices?.[0]?.message
   const rawCalls = msg?.tool_calls ?? []
   const toolCalls: ToolCall[] = rawCalls
@@ -485,7 +590,7 @@ async function chatWithToolsViaCloud(
     content: text,
     tool_calls: toolCalls.length > 0 ? toolCalls : undefined
   }
-  return { text, toolCalls, backend, assistantMessage }
+  return { text, toolCalls, backend, assistantMessage, promptTokens: json.usage?.prompt_tokens }
 }
 
 export async function chatWithTools(
@@ -494,7 +599,14 @@ export async function chatWithTools(
   opts: ChatOptions = {}
 ): Promise<ChatWithToolsResult> {
   if (isCloudChatBackend(opts.backend)) {
-    return chatWithToolsViaCloud(opts.backend, messages, tools, opts)
+    return chatWithToolsViaOpenAiCompatible(opts.backend, messages, tools, opts)
+  }
+  if (opts.backend === 'lmstudio') {
+    const url = (opts.lmstudioUrl ?? DEFAULT_LMSTUDIO_URL).replace(/\/+$/, '')
+    if (!(await isLmStudioReachable(url))) {
+      throw new Error(`LM Studio ist nicht erreichbar (${url}). Bitte LM Studio starten und den lokalen Server aktivieren.`)
+    }
+    return chatWithToolsViaOpenAiCompatible('lmstudio', messages, tools, opts)
   }
   const ollamaUrl = opts.ollamaUrl ?? DEFAULT_OLLAMA_URL
   if (!(await isOllamaReachable(ollamaUrl))) {

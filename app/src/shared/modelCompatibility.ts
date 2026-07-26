@@ -40,6 +40,29 @@
 //   Defaults UNVERÄNDERT (gemma4:12b-mlx ist ~10 GB, nicht 8-GB-tauglich), aber in die
 //   Pull-Liste aufgenommen (Apple-Silicon/MLX-Option). smart-connections nicht anwendbar
 //   (Chat-Modell, kein Embedding).
+// 2026-07-26 (2): RAM-Angabe für qwen3.6:latest in ALLEN Modulen von 48 auf 24 GB
+//   korrigiert — nachgemessen mit `ollama ps`: 24 GB bei num_ctx 32768 (96 % GPU),
+//   29 GB bei 262144 (dann 20 % CPU auf einem 32-GB-Mac). Die 48 waren zu hoch und
+//   lösten die Weak-HW-Warnung auf Hardware aus, die das Modell tragen kann.
+//   WICHTIG: Der RAM-Bedarf großer Kontextfenster ist in `ramGigabytes` NICHT
+//   abgebildet — die App sendet kein num_ctx und erbt Ollamas globale Einstellung.
+//   Wer dort 256k stehen hat, braucht real ~5 GB mehr als die Matrix angibt.
+// 2026-07-26: note-agent erstmals gefüllt (war seit Einführung `{}`, der Hard-Lock-
+//   Zweig konnte nie feuern). Grundlage: bench-note-agent.mjs, 11 Modelle × 7 Fälle
+//   × 3 Reps, num_ctx 32768 gepinnt. Gemessen wird der TOOL-LOOP (Syntax, Argument-
+//   Treue, Ergebnis-Verwertung via Canary-Kennungen, Terminierung), NICHT Textqualität.
+//   green: qwen3.6:latest (schnellstes grünes, ~30 s), gemma4:latest, qwen3.6:27b-mlx
+//   (einziges 21/21). 8-GB-Empfehlung: qwen3.5:4b (yellow, aber 100 % Argument-Treue).
+//   red: llama3.1:8b (Tool-Calls als Fließtext,
+//   Platzhalter-Artefakte) und qwen3.5:0.8b (erfindet Inhalte zu fehlenden Notizen).
+//   Zwei Lehren in den Daten: (1) MLX-Varianten sind hier nicht nur langsamer, sondern
+//   ungenauer als ihre GGUF-Geschwister (gemma4:12b-mlx 60 % vs gemma4:latest 100 %
+//   Argument-Treue); (2) die gemma4-Familie ist tool-tauglich — die bis 2026-07-26
+//   hardcodierte „Gemma kann kein Tool-Calling"-Liste war empirisch falsch.
+//   Messfalle, die drei Verdicts verfälscht hatte: Ein Canary beweist Ergebnis-
+//   Verwertung nur, wenn die AUFGABE die Kennung verlangt — sonst bestraft er das
+//   anweisungstreue Modell. Der nachgeschärfte Fall drehte qwen3.5:9b-mlx-bf16 von
+//   green auf yellow (behauptet, die gelesene Angabe stehe nicht in der Notiz).
 // 2026-07-07: Modellnamen-Kanonisierung (canonicalModelKey) — LM-Studio-IDs
 //   (`qwen/qwen3.5-4b`, `Meta-Llama-3.1-8B-Instruct-GGUF`, `mlx-community/…`) matchen
 //   jetzt dieselben Matrix-Einträge wie die Ollama-Tags. Gleiche Gewichte = gleiches
@@ -110,7 +133,7 @@ export interface ModelCompatibilityData {
 }
 
 export const MODEL_COMPATIBILITY: ModelCompatibilityData = {
-  version: '2026-06-07',
+  version: '2026-07-26',
   modules: {
     brain: {
       'ministral-3:8b': {
@@ -139,8 +162,8 @@ export const MODEL_COMPATIBILITY: ModelCompatibilityData = {
       'qwen3.6:latest': {
         verdict: 'green',
         reasons: [],
-        notes: '36B-Modell — überall stark, aber langsam (~25 s/Lauf) und ≥48 GB RAM.',
-        metrics: { criticalTitlesLinkedPct: 90, rule5CompliancePct: 0, latencySecondsPerRun: 25, ramGigabytes: 48 }
+        notes: '36B-Modell — überall stark, aber langsam (~25 s/Lauf) und ~24 GB RAM (bei 256k Kontext ~29 GB — siehe Kontext-Hinweis bei note-agent).',
+        metrics: { criticalTitlesLinkedPct: 90, rule5CompliancePct: 0, latencySecondsPerRun: 25, ramGigabytes: 24 }
       },
       'llama3.1:8b': {
         verdict: 'red',
@@ -245,7 +268,7 @@ export const MODEL_COMPATIBILITY: ModelCompatibilityData = {
         verdict: 'green',
         reasons: [],
         notes: 'Beste Gesamtgenauigkeit (97 %), aber 12 s/Mail.',
-        metrics: { recallPct: 97, latencySecondsPerRun: 12, ramGigabytes: 48 }
+        metrics: { recallPct: 97, latencySecondsPerRun: 12, ramGigabytes: 24 }
       },
       'llama3.1:8b': {
         verdict: 'green',
@@ -293,7 +316,7 @@ export const MODEL_COMPATIBILITY: ModelCompatibilityData = {
         verdict: 'green',
         reasons: [],
         notes: 'Perfekter Lauf (8/8), erkennt Prompt-Injection sauber.',
-        metrics: { recallPct: 100, latencySecondsPerRun: 5, ramGigabytes: 48 }
+        metrics: { recallPct: 100, latencySecondsPerRun: 5, ramGigabytes: 24 }
       },
       'llama3.1:8b': {
         verdict: 'red',
@@ -329,7 +352,72 @@ export const MODEL_COMPATIBILITY: ModelCompatibilityData = {
     // "untested" (Warnung am Picker, kein Lock). Testkandidaten laut Plan: qwen3,
     // qwen2.5-coder, llama3.1, mistral-nemo. Benchmark-Fall (Tabelle lesen →
     // zuordnen → Tabelle schreiben) kommt in ~/dev/brain-model-benchmark/.
-    'note-agent':          {},
+    // Note-Agent: gemessen wird der TOOL-LOOP, nicht Textqualität — 7 Fälle
+    // (schreiben / lesen→schreiben / suchen→lesen→schreiben / zwei Lesevorgänge /
+    // nicht existierende Notiz / unterspezifiziert), je 3 Reps, num_ctx 32768.
+    // Harness: ~/dev/brain-model-benchmark/bench-note-agent.mjs.
+    'note-agent': {
+      'qwen3.6:latest': {
+        verdict: 'green',
+        reasons: [],
+        notes: 'Bench 2026-07-26: bestes Verhältnis aus Qualität und Tempo — Terminierung und Argument-Treue je 100 %, dabei mit ~30 s Median das schnellste grüne Modell. Der Grund ist strukturell: 36B als Mixture-of-Experts (qwen35moe), pro Token ist nur ein Bruchteil aktiv — deshalb schlägt es das kleinere dichte qwen3.6:27b-mlx um Faktor 3. ACHTUNG RAM (gemessen mit `ollama ps`, 32-GB-M2): 24 GB bei num_ctx 32768 / 25 GB bei 65536 / 26 GB bei 131072 / 29 GB bei 262144 — erst bei 256k rutschen 20 % auf die CPU. Für den Agenten MIT Webrecherche sind 32k zu klein: Worst Case eines Laufs sind ~144.000 Zeichen Webinhalt (10 Fetches à 8.000 + 8 Suchen à 8 Treffer), also ~50.000 Token plus Skill und Notizen. Empfehlung 131072. Die App sendet kein num_ctx und erbt Ollamas globale Einstellung.',
+        metrics: { latencySecondsPerRun: 30, ramGigabytes: 24 }
+      },
+      'gemma4:latest': {
+        verdict: 'green',
+        reasons: ['Ein stiller Leerlauf in 1/3 Läufen der reinen Schreibaufgabe: kein Tool-Aufruf, leere Antwort, kein Artefakt'],
+        notes: 'Bench 2026-07-26: 20 von 21 Läufen bestanden, Argument-Treue und Ergebnis-Verwertung je 100 % — keine halluzinierten Dateinamen. ~41 s Median, ~10 GB RAM. Bemerkenswert, weil die gemma4-Familie bis 2026-07-26 per hardcodierter Namensliste vom Tool-Calling ausgesperrt war (Capability-Gate korrigiert).',
+        metrics: { latencySecondsPerRun: 41, ramGigabytes: 10 }
+      },
+      'qwen3.6:27b-mlx': {
+        verdict: 'green',
+        reasons: ['~102 s Median — für interaktives Arbeiten spürbar zäh'],
+        notes: 'Bench 2026-07-26: einziges Modell ohne einen einzigen Fehlschlag (21/21 Läufe, alle Kennzahlen 100 %). Holt sich Inhalte teils über note_search statt note_read — anderer Weg, gleiches Ergebnis (Kennungen aus den Notizen stehen korrekt im Artefakt). ~19 GB RAM.',
+        metrics: { latencySecondsPerRun: 102, ramGigabytes: 19 }
+      },
+      'qwen3.5:9b-mlx-bf16': {
+        verdict: 'yellow',
+        reasons: ['Behauptet in 1/3 Läufen, die geforderte Angabe stehe nicht in der Notiz („Zeitraum: nicht specified in source document") — obwohl es genau diese Notiz zuvor gelesen hat', 'Ergebnis-Verwertung nur 67 %', 'Beendet den Suchfall in 1/3 Läufen ohne Artefakt'],
+        notes: 'Bench 2026-07-26: Argument-Treue 100 %, keine halluzinierten Pfade, Terminierung 95 % — die Kette läuft. Der Schwachpunkt sitzt am Ende: Der gelesene Inhalt kommt nicht zuverlässig im Artefakt an. Erst der nachgeschärfte Fall (Kennung ausdrücklich angefordert) hat das sichtbar gemacht. ~51 s Median, ~18 GB RAM.',
+        metrics: { latencySecondsPerRun: 51, ramGigabytes: 18 }
+      },
+      'qwen3.5:4b': {
+        verdict: 'yellow',
+        reasons: ['Bricht in ~19 % der Läufe ohne Artefakt ab — liest die Notiz und hört dann auf (2/3 im nachgeschärften Lesefall)', 'Schreib-Pingpong in 1/3 Läufen des Vergleichsfalls: drei Artefakte statt einem'],
+        notes: 'Bench 2026-07-26: die 8-GB-Empfehlung für den Notiz-Agenten — einziges Modell unter der RAM-Schwelle mit 100 % Argument-Treue, dazu ~25 s Median bei nur 3,4 GB. Schwäche ist die Terminierung, nicht die Genauigkeit: Wenn es schreibt, stimmt der Inhalt (die 78 % Ergebnis-Verwertung sind Abbrüche vor dem Schreiben, keine falschen Angaben).',
+        metrics: { latencySecondsPerRun: 25, ramGigabytes: 4 }
+      },
+      'ministral-3:latest': {
+        verdict: 'yellow',
+        reasons: ['Liest die Notiz korrekt und schreibt sie dann nicht: 0/3 im Fall lesen→schreiben (kein write_note, leerer Abschlusstext)', 'Reproduzierbar kaputtes Tool-Call-JSON (Ollama HTTP 500) — im Produkt sieht der Nutzer „Ollama API 500"'],
+        notes: 'Bench 2026-07-26: mit ~13 s Median das schnellste Modell im Feld, aber die Kette reißt vor dem Schreiben ab. Für andere Module (brain, dashboard) weiterhin stark — nur für den Tool-Loop nicht. ~6 GB RAM. Als `:latest` eingetragen, weil der Tag kanonisch NICHT auf `ministral-3:8b` fällt.',
+        metrics: { latencySecondsPerRun: 13, ramGigabytes: 6 }
+      },
+      'gemma4:12b-mlx': {
+        verdict: 'yellow',
+        reasons: ['Argument-Treue nur 60 %: vertippt Dateinamen (`Digitalwoche-Plannung.md`, `Digitalwoche-Planmg.md`) und wiederholt denselben Fehlgriff bis zu 4× hintereinander', 'Läuft im Suchfall in 1/3 Läufen ins Iterations-Limit'],
+        notes: 'Bench 2026-07-26: deutlich schwächer als das GGUF-Schwestermodell gemma4:latest (100 % Argument-Treue) — die MLX-Variante ist hier nicht nur langsamer, sondern ungenauer. Braucht mit ~6,8 Iterationen doppelt so viele Schritte wie der Rest. ~10 GB RAM.',
+        metrics: { latencySecondsPerRun: 59, ramGigabytes: 10 }
+      },
+      'gemma4:e4b-mlx': {
+        verdict: 'yellow',
+        reasons: ['Verwertet Tool-Ergebnisse nur in 33 % der Läufe: nennt ausdrücklich angeforderte Kennungen aus der gelesenen Notiz nicht', 'Suchfall und Vergleichsfall je 1/3 bestanden'],
+        notes: 'Bench 2026-07-26: liest und schreibt zuverlässig, aber der Inhalt kommt zu oft aus dem Prompt-Gedächtnis statt aus dem Tool-Ergebnis — genau der stille Fehler, den ein Agent nicht machen darf. ~25 s Median, ~10 GB RAM.',
+        metrics: { latencySecondsPerRun: 25, ramGigabytes: 10 }
+      },
+      'qwen3.5:0.8b': {
+        verdict: 'red',
+        reasons: ['Erfindet in 1/3 Läufen einen Bericht zu einer nicht existierenden Notiz, statt den Fehler zu benennen', 'Argument-Treue 57 %: halluziniert Notiznamen (`Mediazentrum-Verleih.md`, `Projekt-Ali.md`)', 'Nur 1/3 im Fall lesen→schreiben, 1/3 im Suchfall'],
+        notes: 'Bench 2026-07-26: für den Notiz-Agenten unbrauchbar. Das red ist eine bewusste Abweichung von der automatischen Schwellenformel (die kennt nur Syntax und Terminierung) — ausschlaggebend ist das Erfinden von Inhalten zu fehlenden Notizen. note-agent ist nicht damageRelevant, das red warnt also, es sperrt nicht.',
+        metrics: { latencySecondsPerRun: 15, ramGigabytes: 1 }
+      },
+      'llama3.1:8b': {
+        verdict: 'red',
+        reasons: ['Schreibt Tool-Aufrufe als Fließtext in die Antwort statt sie aufzurufen (Tool-Syntax 78 %)', 'Liefert Artefakte mit Platzhaltern statt Inhalt („[Insertiere hier den Inhalt der Notizen]", Tabellen aus Dummy-Links)', 'Halluziniert Pfade (`/Vault/Projekt-Alpha.md`, `/Notizen/…`) — Argument-Treue 25 %, Ergebnis-Verwertung 0 %'],
+        notes: 'Bench 2026-07-26: bestand keinen einzigen mehrstufigen Fall. Schnell (~15 s), aber das Ergebnis ist wertlos.',
+        metrics: { latencySecondsPerRun: 15, ramGigabytes: 8 }
+      }
+    },
     'project-status':      {
       'qwen3.5:4b': {
         verdict: 'yellow',
@@ -346,8 +434,8 @@ export const MODEL_COMPATIBILITY: ModelCompatibilityData = {
       'qwen3.6:latest': {
         verdict: 'green',
         reasons: [],
-        notes: 'Beste Qualität bei vielen Quellen, aber langsam (~90 s/Projekt) und ≥48 GB RAM.',
-        metrics: { latencySecondsPerRun: 90, ramGigabytes: 48 }
+        notes: 'Beste Qualität bei vielen Quellen, aber langsam (~90 s/Projekt) und ~24 GB RAM (bei 256k Kontext ~29 GB — siehe Kontext-Hinweis bei note-agent).',
+        metrics: { latencySecondsPerRun: 90, ramGigabytes: 24 }
       },
       'qwen3.6:27b-mlx': {
         verdict: 'green',
@@ -696,14 +784,12 @@ export function isCloudModel(model: string): boolean {
 }
 
 // ── Tool-Calling-Capability (Notiz-Agent Modus B) ────────────────────────────
-// Gepflegte Liste von Ollama-Modellfamilien mit nativen Tool-Calls — FAIL-CLOSED:
-// unbekannte Familien starten den Agent-Loop nicht (klare Fehlermeldung statt
-// stillem Degradieren). Das ist eine CAPABILITY-Aussage („kann Tool-Calls"),
-// KEINE Qualitäts- oder Eignungsaussage — die kommt aus der Verdict-Matrix nach
-// Benchmarks (Plan F07: Capability ≠ Verdict ≠ Empfehlung).
-// Gemma (alle Versionen) kann kein Tool-Calling. OpenRouter-Modelle werden nicht
-// hier gegated — die OpenAI-kompatible API normalisiert Tool-Calls, Fehler kommen
-// sauber zurück.
+// Fail-closed FALLBACK für Backends ohne verlässliche Capability-Metadaten oder
+// wenn Ollamas /api/show vorübergehend nicht erreichbar ist. Für Ollama ist dessen
+// `capabilities`-Feld die primäre Wahrheit (main/ollamaCapabilities.ts).
+// Das ist eine CAPABILITY-Aussage („kann Tool-Calls"), KEINE Qualitäts- oder
+// Eignungsaussage — die kommt aus der Verdict-Matrix nach Benchmarks
+// (Plan F07: Capability ≠ Verdict ≠ Empfehlung).
 const TOOL_CAPABLE_FAMILIES = [
   'qwen3', // inkl. qwen3.5/qwen3.6
   'qwen2.5',
@@ -721,8 +807,20 @@ const TOOL_CAPABLE_FAMILIES = [
   'firefunction',
   'hermes3',
   'granite3',
-  'gpt-oss'
+  'gpt-oss',
+  'gemma4',
+  'glm-5',
+  'glm-ocr',
+  'kimi-k2.5'
 ]
+
+// Nicht-generative Ableger dürfen nicht allein durch ein Familienpräfix (z.B.
+// qwen3) in den Agent-Loop gelangen.
+const NON_CHAT_MODEL_PATTERN = /\b(?:rerank(?:er|ing)?|embed(?:ding)?)\b/i
+
+export function isNonGenerativeModel(model: string): boolean {
+  return NON_CHAT_MODEL_PATTERN.test(model)
+}
 
 // Kanonisierte Familien der Tool-Liste (lazy) — derselbe Join wie in
 // canonicalModelParts, damit `qwen/qwen3.5-4b` (LM Studio) genauso matcht
@@ -738,6 +836,7 @@ function getToolCapableCanonicalFamilies(): string[] {
 }
 
 export function supportsNativeToolCalls(model: string): boolean {
+  if (isNonGenerativeModel(model)) return false
   // Kanonische Familie extrahieren — deckt Ollama-Tags (familie:tag) UND
   // LM-Studio-IDs (publisher/familie-größe-…) ab. Versionssuffixe der Familie
   // (qwen3.5, llama3.1 …) bleiben Teil des Prefix-Vergleichs.
@@ -782,7 +881,7 @@ export const RECOMMENDED_PULL_MODELS: Array<{
   { name: 'gemma4:latest',       label: 'Gemma 4 (~10 GB — schnell; Prompts brauchen Platzhalter statt Beispielwerte)' },
   { name: 'gemma4:12b-mlx',      label: 'Gemma 4 12B MLX (~10 GB — Apple-Silicon/MLX, stark bei Task-Extraktion; Prompts brauchen Platzhalter statt Beispielwerte)' },
   { name: 'qwen3.6:27b-mlx',     label: 'Qwen 3.6 27B MLX (~22 GB)',         humanFavorite: true },
-  { name: 'qwen3.6:latest',      label: 'Qwen 3.6 (~48 GB, sehr großer RAM-Bedarf)', humanFavorite: true },
+  { name: 'qwen3.6:latest',      label: 'Qwen 3.6 36B MoE (~24 GB bei 32k Kontext, ~29 GB bei 256k — schnell trotz Größe)', humanFavorite: true },
   { name: 'qwen3.5:9b-mlx-bf16', label: 'Qwen 3.5 9B MLX (~8 GB)' },
   { name: 'bge-m3:latest',       label: 'bge-m3 (~600 MB, multilingual — Smart Connections)', kind: 'embedding' }
 ]

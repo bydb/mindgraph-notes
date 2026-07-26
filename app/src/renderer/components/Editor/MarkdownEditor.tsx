@@ -2030,6 +2030,10 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
       model,
       attachmentIds: agentAttachments.map(a => a.id),
       targetFolderRel: agentTargetFolder,
+      // Ohne Backend liefe eine LM-Studio-Auswahl gegen Ollama — der Picker oben
+      // wird bei backend === 'lm-studio' aus LM Studios /v1/models befüllt.
+      localBackend: ollama.backend === 'lm-studio' ? 'lmstudio' : 'ollama',
+      lmStudioPort: ollama.lmStudioPort,
       cloud,
       webResearch: opts?.webResearch ? { enabled: true } : null
     })

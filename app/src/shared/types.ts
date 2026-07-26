@@ -59,6 +59,12 @@ export interface DeletedFileInfo {
   deletedAt: number
 }
 
+export interface OllamaModelInfo {
+  name: string
+  size: number
+  capabilities?: string[]
+}
+
 // Update-Checker Types
 export interface UpdateInfo {
   available: boolean
@@ -680,6 +686,8 @@ export interface ElectronAPI {
     model: string;
     attachmentIds: string[];
     targetFolderRel: string;
+    localBackend?: 'ollama' | 'lmstudio';
+    lmStudioPort?: number;
     cloud?: { model: string; provider?: 'openrouter' | 'llmbase' } | null;
     webResearch?: { enabled: boolean } | null;
   }) => Promise<{ success: boolean; runId?: string; error?: string }>;
@@ -704,7 +712,7 @@ export interface ElectronAPI {
 
   // Ollama Local AI API
   ollamaCheck: () => Promise<boolean>;
-  ollamaModels: () => Promise<Array<{ name: string; size: number }>>;
+  ollamaModels: () => Promise<OllamaModelInfo[]>;
   ollamaImageModels: () => Promise<Array<{ name: string; size: number }>>;
   ollamaGenerate: (request: {
     model: string;

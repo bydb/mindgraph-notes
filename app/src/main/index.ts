@@ -175,7 +175,8 @@ import { cleanupOldStaging, assertInsideRunStaging, reserveFreeName, stagingDirF
 import { ensureHtmlPageAssets } from './noteAgent/htmlAssets'
 import { listVaultSkills, listEnabledSkillHeaders, setSkillEnabled, createSkill, readAgentMemory, appendAgentMemory, SKILLS_DIRNAME } from './noteAgent/skillsLoader'
 import { fetchSkillsCatalog, installCatalogSkill, importSkillFromPath } from './noteAgent/skillsCatalog'
-import { supportsNativeToolCalls } from '../shared/modelCompatibility'
+import { supportsNativeToolCalls, isNonGenerativeModel } from '../shared/modelCompatibility'
+import { OllamaCapabilityResolver, parseOllamaModels } from './ollamaCapabilities'
 import { createHostFactory, type HostServices } from './plugins/host'
 import * as nativeServices from './plugins/nativeServices'
 import { buildKeyring, RESERVED_PLUGIN_IDS } from './plugins/runtime/keyring'
@@ -3804,6 +3805,9 @@ ipcMain.handle('openalex-check', async () => {
 // ============ LOCAL AI API (Ollama & LM Studio) ============
 const OLLAMA_API_URL = 'http://localhost:11434'
 const LM_STUDIO_DEFAULT_PORT = 1234
+const ollamaCapabilityResolver = new OllamaCapabilityResolver({
+  apiUrl: OLLAMA_API_URL
+})
 
 // Helper to get LM Studio URL with custom port
 // Use 127.0.0.1 instead of localhost to avoid IPv6 resolution issues
@@ -3850,11 +3854,9 @@ ipcMain.handle('ollama-models', async () => {
 
     if (!response.ok) return []
 
-    const data = await response.json()
-    return data.models?.map((m: { name: string; size: number }) => ({
-      name: m.name,
-      size: m.size
-    })) || []
+    const models = parseOllamaModels(await response.json())
+    ollamaCapabilityResolver.rememberModels(models)
+    return models
   } catch (error) {
     console.error('[Ollama] Error fetching models:', error)
     return []
@@ -4088,6 +4090,11 @@ interface NoteAgentRunParams {
   model: string
   attachmentIds: string[]
   targetFolderRel: string
+  // Lokales Backend, das der Nutzer in den Einstellungen gewählt hat. Ohne diese
+  // Angabe liefe ein LM-Studio-Modell gegen Ollama (falscher Server, irreführender
+  // Fehler) — der Renderer schickt deshalb sein `ollama.backend` mit.
+  localBackend?: 'ollama' | 'lmstudio'
+  lmStudioPort?: number
   // Cloud-Routing (OpenRouter) — nur gesetzt, wenn per 'note-agent'-Opt-in freigegeben.
   cloud?: { model: string } | null
   // Webrecherche für diesen Lauf (Globus-Toggle) — nur { enabled }, die Provider-Config
@@ -4129,14 +4136,26 @@ ipcMain.handle('note-agent-run', async (event, params: NoteAgentRunParams) => {
       return { success: false, error: 'Keine Anweisung angegeben' }
     }
 
-    // Hard-Lock (Matrix) + Capability-Gate (fail-closed) — nur für lokale Modelle;
-    // OpenRouter/LLMBase normalisieren Tool-Calls über die OpenAI-kompatible API.
+    // Hard-Lock (Matrix) + Capability-Gate — nur für lokale Modelle; OpenRouter/
+    // LLMBase normalisieren Tool-Calls über die OpenAI-kompatible API.
+    const localBackend = params.localBackend === 'lmstudio' ? 'lmstudio' : 'ollama'
     if (!params.cloud?.model) {
       if (isModelHardLocked(params.model, 'note-agent')) {
         return { success: false, error: `Modell "${params.model}" ist für den Notiz-Agenten gesperrt (rot in der Kompatibilitäts-Matrix).` }
       }
-      if (!supportsNativeToolCalls(params.model)) {
-        return { success: false, error: `Modell "${params.model}" unterstützt kein natives Tool-Calling — der Agent-Loop braucht das. Kandidaten: qwen3, qwen2.5-coder, llama3.1, mistral-nemo.` }
+      // Embedding-/Reranker-Modelle sind in KEINEM Backend sinnvoll — der Check ist
+      // reine Namensheuristik, aber billig und verhindert einen sicher nutzlosen Lauf.
+      if (isNonGenerativeModel(params.model)) {
+        return { success: false, error: `Modell "${params.model}" ist ein Embedding-/Reranker-Modell und kann keinen Agent-Loop ausführen.` }
+      }
+      // Ollama liefert `capabilities` und ist damit die autoritative Quelle. LM Studio
+      // hat kein Äquivalent (/v1/models kennt keine Capabilities) — dort NICHT nach
+      // Modellnamen raten, sondern LM Studio selbst antworten lassen: eine abgelehnte
+      // Tool-Anfrage kommt als klarer Fehler zurück (friendlyLmStudioError), genau wie
+      // bei OpenRouter/LLMBase. Namensraten war exakt der Bug, der gemma4 aussperrte.
+      if (localBackend === 'ollama'
+        && !(await ollamaCapabilityResolver.supportsTools(params.model, supportsNativeToolCalls))) {
+        return { success: false, error: `Modell "${params.model}" unterstützt kein natives Tool-Calling — der Agent-Loop braucht ein Modell mit der Capability "tools".` }
       }
     }
 
@@ -4147,6 +4166,12 @@ ipcMain.handle('note-agent-run', async (event, params: NoteAgentRunParams) => {
         return { success: false, error: 'Cloud ist für den Notiz-Agenten gewählt, aber kein API-Key hinterlegt (Einstellungen → KI → Cloud-Provider).' }
       }
       chatOptions = cloudResolved.chatOptions
+    } else if (localBackend === 'lmstudio') {
+      chatOptions = {
+        backend: 'lmstudio',
+        lmstudioModel: params.model,
+        lmstudioUrl: getLMStudioUrl(params.lmStudioPort)
+      }
     } else {
       chatOptions = { backend: 'ollama', ollamaModel: params.model }
     }

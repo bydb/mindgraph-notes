@@ -192,6 +192,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     model: string
     attachmentIds: string[]
     targetFolderRel: string
+    localBackend?: 'ollama' | 'lmstudio'
+    lmStudioPort?: number
     cloud?: { model: string } | null
     webResearch?: { enabled: boolean } | null
   }) => ipcRenderer.invoke('note-agent-run', params),
