@@ -8172,9 +8172,11 @@ function extractVersionSection(changelog: string, version: string): string {
   if (match) {
     // Bereinige den Inhalt: Entferne den Header selbst und trim
     let section = match[0].trim()
-    // Entferne das Datum aus dem Header für sauberere Anzeige
-    section = section.replace(/^## \[\d+\.\d+\.\d+\] - \d{4}-\d{2}-\d{2}\s*/, '')
-    return section
+    // Entferne die Header-Zeile (Version + Datum) für sauberere Anzeige — der Dialog
+    // zeigt die Version bereits im Titel. Bewusst formatunabhängig auf die erste Zeile:
+    // Tags tragen ein Suffix wie "-beta", ein `\d+\.\d+\.\d+`-Muster greift dort nicht.
+    section = section.replace(/^## \[[^\]]+\][^\n]*\n*/, '')
+    return section.trim()
   }
 
   return ''
