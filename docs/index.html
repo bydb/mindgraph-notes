@@ -34,7 +34,9 @@
   <meta name="twitter:description" content="Lokaler Workspace, der Notizen, Aufgaben, E-Mails und Dokumente nach Relevanz sortiert. Open Source, lokal mit KI, E2E-verschl&uuml;sselt.">
   <meta name="twitter:image" content="https://mindgraph-notes.de/screenshot.png">
 
-  <script type="application/ld+json">
+  <!-- Einzige Stelle, an der die Release-Version steht. Alle sichtbaren Versionsangaben
+       (Hero-Badge, Release-Sektion, Download-Karten) lesen sie beim Laden hier heraus. -->
+  <script type="application/ld+json" id="app-schema">
   {
     "@context": "https://schema.org",
     "@type": "SoftwareApplication",
@@ -1449,14 +1451,14 @@
         <div>
           <div class="st-eyebrow"><span class="d"></span><span data-i18n="release.label">Release 0.10.26 &middot; Letzte Beta vor 1.0</span></div>
           <h2 class="st-h" style="font-size:clamp(1.8rem,3.8vw,2.6rem)" data-i18n="release.heading">Was ist neu &mdash; <em>der Agent lernt mit.</em></h2>
-          <p class="st-lead" data-i18n="release.lead">Nach jedem Agent-Lauf schl&auml;gt das Modell selbst einen Merksatz vor, den du per Klick ins Agent-Ged&auml;chtnis &uuml;bernimmst &mdash; dazu reparierte Tastenk&uuml;rzel und der neue Editor-Fokus aus 0.10.25.</p>
+          <p class="st-lead" data-i18n="release.lead">Nach jedem Agent-Lauf mit erzeugten Dateien schl&auml;gt das Modell selbst einen Merksatz vor, den du per Klick ins Agent-Ged&auml;chtnis &uuml;bernimmst &mdash; dazu reparierte Tastenk&uuml;rzel und der neue Editor-Fokus aus 0.10.25.</p>
         </div>
-        <div class="release-date">v0.10.26-beta</div>
+        <div class="release-date">v<span data-app-version>0.10.26-beta</span></div>
       </div>
       <div class="release-grid">
         <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c1h">Merksatz-Vorschlag</b><p data-i18n="release.c1">Der Notiz-Agent destilliert nach dem Lauf eine wiederverwendbare Regel aus Auftrag und Ergebnis &mdash; mit demselben Modell, &uuml;ber denselben Datenweg wie der Lauf: lokal bleibt lokal.</p></div></div>
         <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c2h">Du entscheidest</b><p data-i18n="release.c2">Der Vorschlag ist nur vorbef&uuml;llt: anpassen oder per Klick ins Agent-Ged&auml;chtnis &uuml;bernehmen &mdash; nichts wird automatisch gespeichert.</p></div></div>
-        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c3h">Reparierte Kurzbefehle</b><p data-i18n="release.c3">&#8984;&#8679;A &ouml;ffnet die KI-Leiste jetzt in jedem Modus, auch beim Lesen &mdash; Format-Men&uuml; und Bildgenerierung reagieren wieder.</p></div></div>
+        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c3h">Reparierte Kurzbefehle</b><p data-i18n="release.c3">&#8984;&#8679;A (Strg+Umschalt+A) &ouml;ffnet die KI-Leiste jetzt in jedem Modus, auch beim Lesen &mdash; Format-Men&uuml; und Bildgenerierung reagieren im Schreiben-Modus wieder.</p></div></div>
         <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c4h">Editor-Fokus inklusive</b><p data-i18n="release.c4">Titel und Eigenschaften im Dokument, alles Verwandte in einer Kontextspalte, Karteikarten im Lesemoment (aus 0.10.25).</p></div></div>
       </div>
       <a class="release-link" href="https://github.com/bydb/mindgraph-notes/releases" target="_blank" rel="noopener noreferrer" data-i18n="release.link">Vollst&auml;ndige Release Notes auf GitHub &rarr;</a>
@@ -1474,19 +1476,19 @@
     <div class="dl-grid">
       <a href="https://github.com/bydb/mindgraph-notes/releases/latest" target="_blank" rel="noopener noreferrer" class="dl-btn">
         <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg>
-        <div class="dl-info"><div class="dl-platform">macOS (Apple Silicon)</div><div class="dl-version">.dmg &middot; v0.10.26-beta</div></div>
+        <div class="dl-info"><div class="dl-platform">macOS (Apple Silicon)</div><div class="dl-version">.dmg &middot; v<span data-app-version>0.10.26-beta</span></div></div>
       </a>
       <a href="https://github.com/bydb/mindgraph-notes/releases/latest" target="_blank" rel="noopener noreferrer" class="dl-btn">
         <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg>
-        <div class="dl-info"><div class="dl-platform">macOS (Intel)</div><div class="dl-version">.dmg &middot; v0.10.26-beta</div></div>
+        <div class="dl-info"><div class="dl-platform">macOS (Intel)</div><div class="dl-version">.dmg &middot; v<span data-app-version>0.10.26-beta</span></div></div>
       </a>
       <a href="https://github.com/bydb/mindgraph-notes/releases/latest" target="_blank" rel="noopener noreferrer" class="dl-btn">
         <svg width="28" height="28" viewBox="0 0 256 256" fill="currentColor"><path d="M220,152H36a12,12,0,0,0-12,12v40a12,12,0,0,0,12,12h80v12H96a8,8,0,0,0,0,16h64a8,8,0,0,0,0-16H140V216h80a12,12,0,0,0,12-12V164A12,12,0,0,0,220,152Zm-4,48H40V168H216ZM36,136H220a12,12,0,0,0,12-12V44a12,12,0,0,0-12-12H36A12,12,0,0,0,24,44v80A12,12,0,0,0,36,136ZM40,48H216v72H40Z"/></svg>
-        <div class="dl-info"><div class="dl-platform">Linux</div><div class="dl-version">.AppImage &middot; v0.10.26-beta</div></div>
+        <div class="dl-info"><div class="dl-platform">Linux</div><div class="dl-version">.AppImage &middot; v<span data-app-version>0.10.26-beta</span></div></div>
       </a>
       <a href="https://github.com/bydb/mindgraph-notes/releases/latest" target="_blank" rel="noopener noreferrer" class="dl-btn">
         <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor"><path d="M0 3.449L9.75 2.1v9.451H0m10.949-9.602L24 0v11.4H10.949M0 12.6h9.75v9.451L0 20.699M10.949 12.6H24V24l-12.9-1.801"/></svg>
-        <div class="dl-info"><div class="dl-platform">Windows</div><div class="dl-version">.exe &middot; v0.10.26-beta</div></div>
+        <div class="dl-info"><div class="dl-platform">Windows</div><div class="dl-version">.exe &middot; v<span data-app-version>0.10.26-beta</span></div></div>
       </a>
     </div>
     <p class="dl-more">
@@ -1703,7 +1705,7 @@
         "how.p5h": "Das Web, wenn du es brauchst",
         "how.p5": "Schalte die Webrecherche pro Auftrag zu – ganz optional. Der Agent sucht, liest die passenden Seiten und schreibt eine Notiz mit sauberem Quellenverzeichnis; du prüfst sie, bevor sie in deinen Vault kommt. Der Suchanbieter erhält nur die Suchanfragen; die vollständigen Seiten ruft die App lokal ab. Bei einem optionalen Cloud-Modell geht der gelesene Kontext zusätzlich an dessen Anbieter – darauf weist die App vor dem Lauf hin. Den Suchanbieter wählst du selbst: sofort einsatzbereit oder deine eigene, private Suchmaschine.",
         "hero.badge": "Open Source \u00b7 Lokal \u00b7 Kostenlos",
-        "hero.release": "Letzte Beta vor 1.0 &mdash; der Notiz-Agent lernt jetzt aktiv mit &middot; v0.10.26",
+        "hero.release": "Letzte Beta vor 1.0 &mdash; der Notiz-Agent lernt jetzt aktiv mit &middot; v{vs}",
         "hero.title": "Der Fokus bleibt.<br><em>Auch wenn das Leben dazwischenkommt.</em>",
         "hero.sub": "MindGraph zeigt dir jeden Morgen, was heute z\u00e4hlt \u2014 Aufgaben, Mails, Termine, vergessene F\u00e4den. Du gehst aufs Bike, ins Wochenende, liegst mal f\u00fcnf Tage flach. Und nichts f\u00e4llt durch. Lokal, ohne Cloud-Zwang.",
         "hero.cta": "Kostenlos herunterladen",
@@ -1773,15 +1775,15 @@
         "modules.opt.vision": "Vision OCR",
         "modules.opt.speech": "Diktat & Vorlesen",
         "modules.opt.terminal": "Terminal",
-        "release.label": "Release 0.10.26 · Letzte Beta vor 1.0",
+        "release.label": "Release {vs} · Letzte Beta vor 1.0",
         "release.heading": "Was ist neu — <em>der Agent lernt mit.</em>",
-        "release.lead": "Nach jedem Agent-Lauf schlägt das Modell selbst einen Merksatz vor, den du per Klick ins Agent-Gedächtnis übernimmst — dazu reparierte Tastenkürzel und der neue Editor-Fokus aus 0.10.25.",
+        "release.lead": "Nach jedem Agent-Lauf mit erzeugten Dateien schlägt das Modell selbst einen Merksatz vor, den du per Klick ins Agent-Gedächtnis übernimmst — dazu reparierte Tastenkürzel und der neue Editor-Fokus aus 0.10.25.",
         "release.c1h": "Merksatz-Vorschlag",
         "release.c1": "Der Notiz-Agent destilliert nach dem Lauf eine wiederverwendbare Regel aus Auftrag und Ergebnis — mit demselben Modell, über denselben Datenweg wie der Lauf: lokal bleibt lokal.",
         "release.c2h": "Du entscheidest",
         "release.c2": "Der Vorschlag ist nur vorbefüllt: anpassen oder per Klick ins Agent-Gedächtnis übernehmen — nichts wird automatisch gespeichert.",
         "release.c3h": "Reparierte Kurzbefehle",
-        "release.c3": "⌘⇧A öffnet die KI-Leiste jetzt in jedem Modus, auch beim Lesen — Format-Menü und Bildgenerierung reagieren wieder.",
+        "release.c3": "⌘⇧A (Strg+Umschalt+A) öffnet die KI-Leiste jetzt in jedem Modus, auch beim Lesen — Format-Menü und Bildgenerierung reagieren im Schreiben-Modus wieder.",
         "release.c4h": "Editor-Fokus inklusive",
         "release.c4": "Titel und Eigenschaften im Dokument, alles Verwandte in einer Kontextspalte, Karteikarten im Lesemoment (aus 0.10.25).",
         "release.link": "Vollständige Release Notes auf GitHub →",
@@ -1946,7 +1948,7 @@
         "how.p5h": "The web, when you need it",
         "how.p5": "Turn on web research per task – entirely optional. The agent searches, reads the relevant pages and writes a note with a clean list of sources; you review it before it enters your vault. The search provider receives only the queries; the app fetches full pages locally. With an optional cloud model, the extracted context is also sent to that model provider – the app warns you before the run. You choose the search provider yourself: ready to use or your own private search engine.",
         "hero.badge": "Open Source \u00b7 Local \u00b7 Free",
-        "hero.release": "Final beta before 1.0 &mdash; the note agent now learns as you go &middot; v0.10.26",
+        "hero.release": "Final beta before 1.0 &mdash; the note agent now learns as you go &middot; v{vs}",
         "hero.title": "Shows you<br><em>what matters today.</em>",
         "hero.sub": "MindGraph Notes connects your notes, tasks, emails and documents \u2014 and ranks them by relevance. Dashboard, knowledge graph and local AI in one desktop app. No cloud lock-in.",
         "hero.cta": "Download for free",
@@ -2016,15 +2018,15 @@
         "modules.opt.vision": "Vision OCR",
         "modules.opt.speech": "Dictation & TTS",
         "modules.opt.terminal": "Terminal",
-        "release.label": "Release 0.10.26 · Final beta before 1.0",
+        "release.label": "Release {vs} · Final beta before 1.0",
         "release.heading": "What’s new — <em>the agent learns as you go.</em>",
-        "release.lead": "After every agent run the model proposes a rule worth remembering, adopted into the agent memory with one click — plus repaired shortcuts and the editor focus from 0.10.25.",
+        "release.lead": "After every agent run that produced files the model proposes a rule worth remembering, adopted into the agent memory with one click — plus repaired shortcuts and the editor focus from 0.10.25.",
         "release.c1h": "Suggested rules",
         "release.c1": "The note agent distills a reusable rule from task and result after each run — same model, same data path as the run: local stays local.",
         "release.c2h": "You decide",
         "release.c2": "The suggestion is only prefilled: adjust it or adopt it into the agent memory with one click — nothing is saved automatically.",
         "release.c3h": "Repaired shortcuts",
-        "release.c3": "⌘⇧A opens the AI bar in every mode now, including reading — format menu and image generation respond again.",
+        "release.c3": "⌘⇧A (Ctrl+Shift+A) opens the AI bar in every mode now, including reading — format menu and image generation respond again in writing mode.",
         "release.c4h": "Editor focus included",
         "release.c4": "Title and properties inside the document, everything related in one context panel, flashcards while reading (from 0.10.25).",
         "release.link": "Full release notes on GitHub →",
@@ -2084,6 +2086,24 @@
 
     let currentLang = localStorage.getItem('lang') || 'de';
 
+    // Release-Version: EINE Quelle, das JSON-LD-Schema im <head>. Sichtbare Angaben tragen
+    // entweder [data-app-version] (voller Tag) oder das Token {vs} (Kurzform) im Übersetzungs-
+    // String. Beim Release also nur noch "softwareVersion" oben anfassen. Der Inline-Text
+    // bleibt als Fallback stehen, falls das Schema mal nicht lesbar ist.
+    const APP_VERSION = (() => {
+      try {
+        return JSON.parse(document.getElementById('app-schema').textContent).softwareVersion || '';
+      } catch (e) {
+        return '';
+      }
+    })();
+    const APP_VERSION_SHORT = APP_VERSION.replace(/-.*$/, '');
+
+    function applyVersion(text) {
+      if (!APP_VERSION) return text;
+      return text.split('{vs}').join(APP_VERSION_SHORT).split('{v}').join(APP_VERSION);
+    }
+
     function setLanguage(lang) {
       currentLang = lang;
       localStorage.setItem('lang', lang);
@@ -2093,8 +2113,11 @@
       document.querySelectorAll('[data-i18n]').forEach(el => {
         const key = el.getAttribute('data-i18n');
         const t = translations[lang]?.[key];
-        if (t) el.innerHTML = t;
+        if (t) el.innerHTML = applyVersion(t);
       });
+      if (APP_VERSION) {
+        document.querySelectorAll('[data-app-version]').forEach(el => { el.textContent = APP_VERSION; });
+      }
     }
 
     function openModal(id) {

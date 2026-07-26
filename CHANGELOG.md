@@ -8,7 +8,7 @@ Die letzte Beta vor 1.0. Der Notiz-Agent lernt jetzt aktiv mit: Nach jedem Lauf 
 
 ### Neu
 
-- **Merksatz-Vorschlag nach Agent-Läufen.** Nach jedem erfolgreichen Lauf destilliert dasselbe Modell (gleicher Datenweg — lokal bleibt lokal) eine wiederverwendbare Regel aus Auftrag und Ergebnis und befüllt das Merken-Feld vor: anpassen oder direkt mit „Merken" in `Skills/Agent-Gedächtnis.md` übernehmen. Nichts wird automatisch gespeichert; eigenes Tippen hat Vorrang, ein neuer Lauf setzt das Feld zurück. Findet das Modell keine verallgemeinerbare Regel, bleibt das Feld leer. Der Vorschlag entsteht nach der Anzeige der Ergebnis-Karten und kostet keine Wartezeit.
+- **Merksatz-Vorschlag nach Agent-Läufen.** Nach jedem Lauf, der Dateien erzeugt hat, destilliert dasselbe Modell (gleicher Datenweg — lokal bleibt lokal) eine wiederverwendbare Regel aus Auftrag und Ergebnis und befüllt das Merken-Feld vor: anpassen oder direkt mit „Merken" in `Skills/Agent-Gedächtnis.md` übernehmen. Nichts wird automatisch gespeichert; eigenes Tippen hat Vorrang, ein neuer Lauf setzt das Feld zurück. Läufe, die nur mit einer Textantwort enden, schlagen nichts vor — ebenso wenig, wenn das Modell keine verallgemeinerbare Regel findet. Der Vorschlag entsteht nach der Anzeige der Ergebnis-Karten und kostet keine Wartezeit.
 
 ### Geändert
 
@@ -17,7 +17,7 @@ Die letzte Beta vor 1.0. Der Notiz-Agent lernt jetzt aktiv mit: Nach jedem Lauf 
 
 ### Behoben
 
-- **Alle drei ⌘⇧-Tastenkürzel des Editors waren wirkungslos** (⌘⇧A KI-Leiste, ⌘⇧F Format-Menü, ⌘⇧I Bildgenerierung): Mit gedrücktem Shift liefert die Tastatur den Großbuchstaben, der Vergleich im Code erwartete den kleinen. ⌘⇧A öffnet die KI-Leiste jetzt außerdem in allen drei Modi — auch im Lesen-Modus, der den Shortcut anzeigt.
+- **Alle drei ⌘⇧-Tastenkürzel des Editors waren wirkungslos** (⌘⇧A KI-Leiste, ⌘⇧F Format-Menü, ⌘⇧I Bildgenerierung; unter Windows und Linux Strg+Umschalt): Mit gedrücktem Shift liefert die Tastatur den Großbuchstaben, der Vergleich im Code erwartete den kleinen. ⌘⇧A öffnet die KI-Leiste jetzt in allen drei Modi — auch im Lesen-Modus, der den Shortcut anzeigt. ⌘⇧F und ⌘⇧I greifen wie das Rechtsklick-Menü nur im Schreiben- und Markdown-Modus, da sie auf der Cursor-Position im Editor arbeiten.
 
 ## [0.10.25-beta] - 2026-07-23
 

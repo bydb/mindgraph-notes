@@ -294,17 +294,18 @@ Click-Handler für Decorations: `view.posAtCoords()` + StateField-Lookup nutzen 
 
 ## Release-Prozess
 
-1. Version in `app/package.json` bumpen
-2. Download-Links in `docs/index.html` aktualisieren (Version in JSON-LD Schema)
-3. `CHANGELOG.md` aktualisieren
-4. Commit: `"Bump version to X.X.XX-beta"`
-5. Tag: `git tag vX.X.XX-beta && git push origin vX.X.XX-beta`
-6. GitHub Actions baut automatisch:
+1. Version in `app/package.json` bumpen — danach `npm install --package-lock-only` in `app/`, sonst bleibt `package-lock.json` auf der alten Version stehen
+2. In `docs/index.html` **nur** `"softwareVersion"` im JSON-LD (`<script id="app-schema">`) anfassen — das ist die einzige Versionsquelle der Seite. Hero-Badge und Release-Label lesen sie über das Token `{vs}` (Kurzform ohne `-beta`) im `translations`-Objekt, Release-Datum und Download-Karten über `[data-app-version]` (voller Tag). Der Inline-Text daneben ist nur der No-JS-Fallback. Die Release-**Texte** (Badge-Highlight, `release.*`-Karten) natürlich weiterhin inhaltlich neu schreiben, DE **und** EN
+3. `<lastmod>` in `docs/sitemap.xml` auf das Release-Datum setzen
+4. `CHANGELOG.md` aktualisieren — Versions-Heading `## [X.X.XX-beta] - JJJJ-MM-TT`; der Was-ist-neu-Dialog schneidet genau diese erste Zeile weg (`extractVersionSection`)
+5. Commit: `"Bump version to X.X.XX-beta"`
+6. Tag: `git tag vX.X.XX-beta && git push origin vX.X.XX-beta`
+7. GitHub Actions baut automatisch:
    - macOS (arm64+x64) — signiert + notarisiert
    - Linux (AppImage+deb+snap)
    - Windows (exe)
-7. Release wird automatisch auf GitHub erstellt via `softprops/action-gh-release`
-8. Snap wird automatisch zum Snap Store (edge channel) hochgeladen
+8. Release wird automatisch auf GitHub erstellt via `softprops/action-gh-release`
+9. Snap wird automatisch zum Snap Store (edge channel) hochgeladen
 
 Oder: `/release` Command verwenden.
 

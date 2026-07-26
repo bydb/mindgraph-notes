@@ -953,6 +953,9 @@ interface MarkdownEditorProps {
 export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecondary = false }) => {
   const { t } = useTranslation()
   const editorRef = useRef<HTMLDivElement>(null)
+  // Wurzel dieser Editor-Instanz — nötig, um Tastenkürzel vom window-Listener auf den
+  // eigenen Editor zu beschränken (Split-View rendert zwei Instanzen nebeneinander).
+  const containerRef = useRef<HTMLDivElement>(null)
   const previewRef = useRef<HTMLDivElement>(null)
   const editablePreviewRef = useRef<HTMLDivElement>(null)
   // Aktive Plugin-Embed-Mounts der Preview, per Platzhalter-Element getrackt (R2).
@@ -4673,15 +4676,28 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
       // gegen 'a' matcht nie. Deshalb normalisieren, sonst sind alle drei Shortcuts tot.
       const key = e.key.toLowerCase()
 
+      // Der Listener hängt am window, damit der Shortcut auch im Lesen-Modus greift (dort
+      // hat CodeMirror keinen Fokus). Preis: er sieht auch Tastendrücke aus fremden Panels.
+      // Deshalb Tipp-Ziele AUSSERHALB dieser Editor-Instanz ignorieren (Inbox-Compose,
+      // Notes-Chat, Suchfeld, zweiter Editor im Split-View) — sonst öffnet ⌘⇧A die KI-Leiste
+      // hinter dem Panel, in dem gerade getippt wird.
+      const target = e.target instanceof HTMLElement ? e.target : null
+      const typingElsewhere = Boolean(
+        target?.closest('input, textarea, [contenteditable="true"]') &&
+        !containerRef.current?.contains(target)
+      )
+      if (typingElsewhere) return
+
       // Cmd+Shift+A öffnet die Macher-Leiste unten (Auswahl = Scope, sonst ganze Notiz) —
       // in ALLEN Modi, auch im Lesen-Modus (dem Default, in dem die Leiste den Shortcut anzeigt).
       if (key === 'a') {
+        // Ohne verfügbare KI gibt es nichts zu öffnen — dann das Kürzel NICHT schlucken,
+        // sonst verschwindet es wirkungslos (z.B. Select-all in einem fremden Kontext).
+        if (!ollama.enabled || !ollama.selectedModel) return
         e.preventDefault()
-        if (ollama.enabled && ollama.selectedModel) {
-          setAiBarOpen(true)
-          setFormatMenu(null)
-          setAiMenu(null)
-        }
+        setAiBarOpen(true)
+        setFormatMenu(null)
+        setAiMenu(null)
         return
       }
 
@@ -4701,12 +4717,11 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
 
       // Cmd+Shift+I für KI-Bildgenerierung
       if (key === 'i') {
+        if (!ollama.enabled) return
         e.preventDefault()
-        if (ollama.enabled) {
-          setShowAIImageDialog(true)
-          setFormatMenu(null)
-          setAiMenu(null)
-        }
+        setShowAIImageDialog(true)
+        setFormatMenu(null)
+        setAiMenu(null)
       }
     }
     window.addEventListener('keydown', handleKeyDown)
@@ -4841,7 +4856,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
   }
 
   return (
-    <div className="editor-container">
+    <div className="editor-container" ref={containerRef}>
       <div className="editor-header">
         {!isSecondary && (
           <div className="editor-nav-buttons">
