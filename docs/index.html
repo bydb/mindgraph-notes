@@ -48,7 +48,7 @@
     "url": "https://mindgraph-notes.de/",
     "downloadUrl": "https://github.com/bydb/mindgraph-notes/releases",
     "screenshot": "https://mindgraph-notes.de/screenshot.png",
-    "softwareVersion": "0.10.27-beta",
+    "softwareVersion": "0.10.28-beta",
     "author": { "@type": "Person", "name": "Jochen Leeder", "url": "https://bydb.io" },
     "license": "https://opensource.org/licenses/AGPL-3.0",
     "featureList": [
@@ -1450,17 +1450,17 @@
     <div class="release-inner">
       <div class="release-head">
         <div>
-          <div class="st-eyebrow"><span class="d"></span><span data-i18n="release.label">Release 0.10.27 &middot; Beta-Zielgerade vor 1.0</span></div>
-          <h2 class="st-h" style="font-size:clamp(1.8rem,3.8vw,2.6rem)" data-i18n="release.heading">Was ist neu &mdash; <em>gemessen statt geraten.</em></h2>
-          <p class="st-lead" data-i18n="release.lead">Zehn lokale Modelle im Agenten-Benchmark, dazu ein Praxistest mit echten Vault-Skills: Ab jetzt empfiehlt MindGraph klar Qwen&nbsp;3.6&nbsp;27B f&uuml;r den Notiz-Agenten &mdash; und sagt ehrlich, was auf kleineren Ger&auml;ten geht.</p>
+          <div class="st-eyebrow"><span class="d"></span><span data-i18n="release.label">Release 0.10.28 &middot; Beta-Zielgerade vor 1.0</span></div>
+          <h2 class="st-h" style="font-size:clamp(1.8rem,3.8vw,2.6rem)" data-i18n="release.heading">Was ist neu &mdash; <em>man sieht, was von der KI kommt.</em></h2>
+          <p class="st-lead" data-i18n="release.lead">Jede Notiz, an der die KI mitgeschrieben hat, sagt jetzt welches Modell es war &mdash; sichtbar beim Lesen, dauerhaft in der Datei. Dazu eine treffsicherere Bewertung von Mails und Fristen.</p>
         </div>
         <div class="release-date">v<span data-app-version>0.10.27-beta</span></div>
       </div>
       <div class="release-grid">
-        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c1h">Klare Modellempfehlung</b><p data-i18n="release.c1">21 Aufgaben pro Modell plus der h&auml;rteste Vault-Skill: Qwen&nbsp;3.6&nbsp;27B bestand als einziges lokales Modell fehlerfrei &mdash; und ist jetzt die Empfehlung direkt am Modell-Picker.</p></div></div>
-        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c2h">Ehrliche Grenzen</b><p data-i18n="release.c2">Unter ~19&nbsp;GB tr&auml;gt kein getestetes lokales Modell den Agenten zuverl&auml;ssig. Kleinere Macs nutzen ihn &uuml;ber LLMBase oder OpenRouter &mdash; als Opt-in, du entscheidest.</p></div></div>
-        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c3h">Kein stiller Datenverlust</b><p data-i18n="release.c3">L&auml;uft das Kontextfenster &uuml;ber, bricht der Agent mit klarer Meldung ab, statt deinen Auftrag heimlich zu verlieren &mdash; und leere L&auml;ufe werden nachgefasst statt als Erfolg gemeldet.</p></div></div>
-        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c4h">Sicherheit &amp; LM Studio</b><p data-i18n="release.c4">Eine L&uuml;cke in der LM-Studio-Anbindung ist geschlossen, LM Studio treibt jetzt auch den Agenten an, und Gemma-4-Modelle sind nicht mehr f&auml;lschlich gesperrt.</p></div></div>
+        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c1h">Kennzeichnung &uuml;berall</b><p data-i18n="release.c1">Notiz-Agent, Notizen-Chat, Mail-Notizen, Brain, Projekt-Status, Workflows: Was die KI schreibt, tr&auml;gt Modell und Datum in der Notiz &mdash; und im Lesen-Modus ein Abzeichen unter dem Titel.</p></div></div>
+        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c2h">Kein Abzeichen ohne KI</b><p data-i18n="release.c2">Ein Workflow, der Text nur durchreicht, wird nicht als KI-Inhalt markiert. Eine Kennzeichnung, die &uuml;berall steht, sagt nichts mehr aus.</p></div></div>
+        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c3h">Mails treffsicherer bewertet</b><p data-i18n="release.c3">Unsere Relevanz-Skala war falsch geeicht &mdash; nicht die Modelle. Neu kalibriert stieg die Trefferquote des empfohlenen Modells von 6 auf 8 von 8 F&auml;llen.</p></div></div>
+        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c4h">Fristen richtig gelesen</b><p data-i18n="release.c4">Eine &uuml;berschrittene Frist macht eine Notiz nicht veraltet, sondern dringend. Und Notizen mit versteckten Anweisungen an die KI landen zuverl&auml;ssig bei Dringlichkeit 0.</p></div></div>
       </div>
       <a class="release-link" href="https://github.com/bydb/mindgraph-notes/releases" target="_blank" rel="noopener noreferrer" data-i18n="release.link">Vollst&auml;ndige Release Notes auf GitHub &rarr;</a>
     </div>
@@ -1778,16 +1778,16 @@
         "modules.opt.speech": "Diktat & Vorlesen",
         "modules.opt.terminal": "Terminal",
         "release.label": "Release {vs} · Beta-Zielgerade vor 1.0",
-        "release.heading": "Was ist neu — <em>gemessen statt geraten.</em>",
-        "release.lead": "Zehn lokale Modelle im Agenten-Benchmark, dazu ein Praxistest mit echten Vault-Skills: Ab jetzt empfiehlt MindGraph klar Qwen 3.6 27B für den Notiz-Agenten — und sagt ehrlich, was auf kleineren Geräten geht.",
-        "release.c1h": "Klare Modellempfehlung",
-        "release.c1": "21 Aufgaben pro Modell plus der härteste Vault-Skill: Qwen 3.6 27B bestand als einziges lokales Modell fehlerfrei — und ist jetzt die Empfehlung direkt am Modell-Picker.",
-        "release.c2h": "Ehrliche Grenzen",
-        "release.c2": "Unter ~19 GB trägt kein getestetes lokales Modell den Agenten zuverlässig. Kleinere Macs nutzen ihn über LLMBase oder OpenRouter — als Opt-in, du entscheidest.",
-        "release.c3h": "Kein stiller Datenverlust",
-        "release.c3": "Läuft das Kontextfenster über, bricht der Agent mit klarer Meldung ab, statt deinen Auftrag heimlich zu verlieren — und leere Läufe werden nachgefasst statt als Erfolg gemeldet.",
-        "release.c4h": "Sicherheit & LM Studio",
-        "release.c4": "Eine Lücke in der LM-Studio-Anbindung ist geschlossen, LM Studio treibt jetzt auch den Agenten an, und Gemma-4-Modelle sind nicht mehr fälschlich gesperrt.",
+        "release.heading": "Was ist neu — <em>man sieht, was von der KI kommt.</em>",
+        "release.lead": "Jede Notiz, an der die KI mitgeschrieben hat, sagt jetzt welches Modell es war — sichtbar beim Lesen, dauerhaft in der Datei. Dazu eine treffsicherere Bewertung von Mails und Fristen.",
+        "release.c1h": "Kennzeichnung überall",
+        "release.c1": "Notiz-Agent, Notizen-Chat, Mail-Notizen, Brain, Projekt-Status, Workflows: Was die KI schreibt, trägt Modell und Datum in der Notiz — und im Lesen-Modus ein Abzeichen unter dem Titel.",
+        "release.c2h": "Kein Abzeichen ohne KI",
+        "release.c2": "Ein Workflow, der Text nur durchreicht, wird nicht als KI-Inhalt markiert. Eine Kennzeichnung, die überall steht, sagt nichts mehr aus.",
+        "release.c3h": "Mails treffsicherer bewertet",
+        "release.c3": "Unsere Relevanz-Skala war falsch geeicht — nicht die Modelle. Neu kalibriert stieg die Trefferquote des empfohlenen Modells von 6 auf 8 von 8 Fällen.",
+        "release.c4h": "Fristen richtig gelesen",
+        "release.c4": "Eine überschrittene Frist macht eine Notiz nicht veraltet, sondern dringend. Und Notizen mit versteckten Anweisungen an die KI landen zuverlässig bei Dringlichkeit 0.",
         "release.link": "Vollständige Release Notes auf GitHub →",
         "dl.label": "Download",
         "dl.heading": "Jetzt starten.",
@@ -2022,16 +2022,16 @@
         "modules.opt.speech": "Dictation & TTS",
         "modules.opt.terminal": "Terminal",
         "release.label": "Release {vs} · Beta home stretch before 1.0",
-        "release.heading": "What’s new — <em>measured, not guessed.</em>",
-        "release.lead": "Ten local models put through the agent benchmark plus a hands-on test with real vault skills: MindGraph now clearly recommends Qwen 3.6 27B for the note agent — and is honest about what smaller machines can do.",
-        "release.c1h": "A clear model pick",
-        "release.c1": "21 tasks per model plus the hardest vault skill: Qwen 3.6 27B was the only local model to pass without a single failure — and is now the recommendation right at the model picker.",
-        "release.c2h": "Honest limits",
-        "release.c2": "Below ~19 GB no tested local model carries the agent reliably. Smaller Macs run it via LLMBase or OpenRouter — strictly opt-in, you decide.",
-        "release.c3h": "No silent data loss",
-        "release.c3": "If the context window overflows, the agent stops with a clear message instead of silently losing your task — and empty runs are prompted once, then reported as failures instead of success.",
-        "release.c4h": "Security & LM Studio",
-        "release.c4": "A gap in the LM Studio integration is closed, LM Studio now powers the agent too, and Gemma 4 models are no longer wrongly locked out.",
+        "release.heading": "What’s new — <em>you can see what came from the AI.</em>",
+        "release.lead": "Every note the AI helped write now states which model it was — visible while reading, stored in the file itself. Plus sharper scoring for mail and deadlines.",
+        "release.c1h": "Labelled everywhere",
+        "release.c1": "Note agent, notes chat, mail notes, Brain, project status, workflows: whatever the AI writes carries its model and date in the note — and a small badge under the title in reading mode.",
+        "release.c2h": "No badge without AI",
+        "release.c2": "A workflow that merely passes text along is not labelled as AI content. A label that appears everywhere stops meaning anything.",
+        "release.c3h": "Sharper mail scoring",
+        "release.c3": "Our relevance scale was miscalibrated — not the models. Recalibrated, the recommended model went from 6 to 8 out of 8 correct cases.",
+        "release.c4h": "Deadlines read correctly",
+        "release.c4": "A missed deadline makes a note urgent, not obsolete. And notes carrying hidden instructions to the AI reliably score 0 urgency.",
         "release.link": "Full release notes on GitHub →",
         "dl.label": "Download",
         "dl.heading": "Get started.",

@@ -2,6 +2,27 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.10.28-beta] - 2026-07-27
+
+Was von der KI kommt, steht jetzt dran. Und die Mail- und Dashboard-Bewertung ist deutlich treffsicherer — nachdem sich herausstellte, dass nicht die Modelle danebenlagen, sondern unsere eigene Skala.
+
+### Jeder KI-Inhalt ist als solcher erkennbar
+
+- **Notizen, an denen die KI geschrieben hat, tragen jetzt ihr Modell im Frontmatter** (`ki-modell`, `ki-datum`) und zeigen es im Lesen-Modus als kleines Abzeichen unter dem Titel — mit Hersteller-Logo und Modellnamen. Bisher machte das nur die KI-Leiste im Editor; alle anderen Wege markierten nichts.
+- **Gekennzeichnet wird jetzt überall:** Notiz-Agent, Notizen-Chat, Notizen aus E-Mails, Brain-Tagesnotizen, Projekt-Status und der Workflow-Runner. Bei wissenschaftlichen HTML-Seiten steht die Angabe in der Fußzeile und in den Seiten-Metadaten, weil HTML keine Frontmatter-Felder kennt.
+- **Kein Abzeichen ohne echte KI-Arbeit:** Ein Workflow, der Text nur von A nach B durchreicht, wird nicht als KI-Inhalt markiert. Eine Kennzeichnung, die überall steht, sagt nichts mehr aus.
+- Modelle von Anthropic werden am Modell-Logo jetzt korrekt erkannt statt mit dem grauen Platzhalter angezeigt.
+
+### Treffsicherere Bewertung von Mails und Notizen
+
+- **Die Relevanz-Bewertung eingehender Mails war falsch geeicht.** Eine Nachmessung mit vier Modellen zeigte: Die Modelle folgten der vorgegebenen Skala korrekt — die Skala selbst passte nicht. Sie ist neu kalibriert, und automatische Bestätigungen eigener Buchungen bekommen einen eigenen, niedrigen Bereich. Im Test stieg die Trefferquote des empfohlenen Modells von 6 auf 8 von 8 Fällen.
+- **Eine überschrittene Frist macht eine Notiz nicht veraltet, sondern dringend.** Das Dashboard wertet abgelaufene Termine jetzt als überfällig statt als erledigt — ohne dabei zukünftige Fristen wie „vor den Sommerferien" fälschlich als verstrichen zu behandeln.
+- **Härterer Schutz vor manipulierten Notizen:** Enthält eine Notiz versteckte Anweisungen an die KI, wird sie zuverlässig mit Dringlichkeit 0 bewertet — unabhängig davon, wie dringend der übrige Inhalt wirkt.
+
+### Transparenz
+
+- Die Website zeigt die vollständige Modell-Kompatibilitäts-Matrix samt Methodik und Grenzen. Die Seite wird automatisch aus derselben Quelle erzeugt, die auch die App benutzt — eine von Hand gepflegte Seite driftet zwangsläufig vom Programm weg.
+
 ## [0.10.27-beta] - 2026-07-26
 
 Gemessen statt geraten: Zehn lokale Modelle liefen durch einen neuen Agenten-Benchmark (21 Aufgaben pro Modell), dazu ein Praxistest mit echten Vault-Skills. Das Ergebnis ist eine klare Empfehlung — und ehrliche Grenzen für kleinere Geräte.
