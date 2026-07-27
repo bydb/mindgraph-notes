@@ -18,6 +18,7 @@ import {
 import { exportPreviewPdf, exportPreviewEpub } from './htmlExport'
 import { buildZettelContent, buildZettelFileName, extractFrontmatterTags, sanitizeZettelEmojis, sanitizeZettelTag } from '../shared/zettel'
 import { splitTextIntoChunks, LONG_TEXT_CHUNK_THRESHOLD } from '../shared/textChunking'
+import { setAiProvenanceInContent, todayIsoDate } from '../shared/aiProvenance'
 
 // Dev-only userData-Isolation: ungepackt (`npm run dev`/`start`) NIEMALS das produktive Profil der
 // installierten App anfassen — sonst migriert/schreibt der Dev-Build die echten Settings (real passiert).
@@ -2172,7 +2173,7 @@ ipcMain.handle('workflow-run', async (_event, payload: WorkflowRunPayload) => {
       const chunks = await ragRetrieve(index, query, embedModel)
       return { contextText: ragChunksToContext(chunks), chunkCount: chunks.length }
     },
-    createNote: async (folder, title, content) => {
+    createNote: async (folder, title, content, aiModel) => {
       // Vault-Konvention: Zettelkasten-ID `YYYYMMDDhhmm - Titel.md` + YAML-Frontmatter.
       const now = new Date()
       const p = (n: number) => String(n).padStart(2, '0')
@@ -2214,10 +2215,15 @@ ipcMain.handle('workflow-run', async (_event, payload: WorkflowRunPayload) => {
         '---'
       ].join('\n')
       const body = `${fm}\n\n# ${safeTitle}\n\n> 🔁 Erstellt am ${dateHuman} per Workflow „${wfName}"\n\n${content}\n`
-      await writeFileSafe(path.join(vaultPath, rel), body)
+      // KI-Provenienz nur, wenn im Lauf tatsächlich ein Modell gearbeitet hat — ein
+      // Workflow, der Text bloß durchreicht, ist kein KI-Inhalt.
+      await writeFileSafe(
+        path.join(vaultPath, rel),
+        aiModel ? setAiProvenanceInContent(body, aiModel, todayIsoDate()) : body
+      )
       return rel
     },
-    appendNote: async (noteRel, text) => {
+    appendNote: async (noteRel, text, aiModel) => {
       // `noteRel` stammt aus untrusted Quellen (note-Port / verkettete Modell-Ausgabe).
       // Erst validieren (wirft bei Traversal), DANN lesen/mkdir — sonst Info-Disclosure
       // + Arbitrary-mkdir außerhalb des Vaults, bevor writeFileSafe greift.
@@ -2226,7 +2232,8 @@ ipcMain.handle('workflow-run', async (_event, payload: WorkflowRunPayload) => {
       try { existing = await fs.readFile(abs, 'utf-8') } catch { existing = '' }
       const sep = existing.length === 0 || existing.endsWith('\n') ? '' : '\n'
       await fs.mkdir(path.dirname(abs), { recursive: true })
-      await writeFileSafe(abs, existing + sep + text + '\n')
+      const next = existing + sep + text + '\n'
+      await writeFileSafe(abs, aiModel ? setAiProvenanceInContent(next, aiModel, todayIsoDate()) : next)
       return noteRel
     },
     searchNotes: async (query) => searchWorkflowNotes(vaultPath, query),
@@ -4174,12 +4181,16 @@ ipcMain.handle('note-agent-run', async (event, params: NoteAgentRunParams) => {
     }
 
     let chatOptions: LlmChatOptions
+    // Modellbezeichnung für die KI-Provenienz der übernommenen Ergebnisse — bei
+    // Cloud-Routing mit Provider-Präfix, gleiche Konvention wie in der KI-Leiste.
+    let provenanceModel = params.model
     if (params.cloud?.model) {
       const cloudResolved = await resolveCloudChatOptions(params.cloud)
       if (!cloudResolved) {
         return { success: false, error: 'Cloud ist für den Notiz-Agenten gewählt, aber kein API-Key hinterlegt (Einstellungen → KI → Cloud-Provider).' }
       }
       chatOptions = cloudResolved.chatOptions
+      provenanceModel = `${cloudResolved.provider}/${cloudResolved.model}`
     } else if (localBackend === 'lmstudio') {
       chatOptions = {
         backend: 'lmstudio',
@@ -4241,6 +4252,7 @@ ipcMain.handle('note-agent-run', async (event, params: NoteAgentRunParams) => {
       targetFolderAbs: targetAbs,
       attachmentIds: params.attachmentIds || [],
       instruction: params.instruction.trim(),
+      model: provenanceModel,
       skills,
       web,
       imageGen
@@ -4345,8 +4357,10 @@ ipcMain.handle('note-agent-accept-result', async (event, runId: string, resultId
     reservedDest = destPath
     if (entry.kind === 'md') {
       // Markdown über die eine Schreibgrenze (Auto-Backup, Empty-Block, Auto-Heal).
+      // Die KI-Provenienz wird hier gesetzt — beim Übernehmen, nicht schon im
+      // write_note-Tool: verworfene Ergebnisse sollen keinen Stempel bekommen.
       const content = await fs.readFile(real, 'utf-8')
-      await writeFileSafe(destPath, content)
+      await writeFileSafe(destPath, setAiProvenanceInContent(content, run.model, todayIsoDate()))
     } else {
       // Platzhalter (leer, gerade reserviert) wird überschrieben — der Name gehört uns.
       await fs.copyFile(real, destPath)
@@ -10831,6 +10845,8 @@ ipcMain.handle('email-create-note', async (_event, vaultPath: string, email: {
     suggestedActions?: (Record<string, unknown> | string)[]
     needsReply?: boolean
     replyUrgency?: 'low' | 'medium' | 'high'
+    /** Analyse-Modell — trägt die KI-Provenienz ins Frontmatter (EmailAnalysis.model). */
+    model?: string
   }
 }, inboxFolderName?: string) => {
   try {
@@ -11055,7 +11071,14 @@ ipcMain.handle('email-create-note', async (_event, vaultPath: string, email: {
       }
     }
 
-    await fs.writeFile(filePath, lines.join('\n'), 'utf-8')
+    // KI-Provenienz: die Notiz trägt Zusammenfassung, extrahierte Infos und Aufgaben
+    // aus der Modell-Analyse. Ohne Analyse-Modell bleibt sie ungestempelt — eine
+    // rein aus Kopfdaten gebaute Notiz ist kein KI-Inhalt.
+    const noteBody = lines.join('\n')
+    const noteContent = email.analysis?.model
+      ? setAiProvenanceInContent(noteBody, email.analysis.model, todayIsoDate())
+      : noteBody
+    await fs.writeFile(filePath, noteContent, 'utf-8')
     console.log('[Email] Note created:', fileName)
 
     return { success: true, path: path.join(inboxFolderRelative, fileName), alreadyExists: false }

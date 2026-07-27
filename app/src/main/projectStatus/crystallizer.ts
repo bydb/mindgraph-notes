@@ -777,6 +777,8 @@ project: "${escapeYaml(marker.project)}"
 week: ${weekTag}
 generated_at: ${generatedAtIso}
 generated_by: "ollama:${escapeYaml(model)}"
+ki-modell: "${escapeYaml(model)}"
+ki-datum: ${generatedAtIso.slice(0, 10)}
 language: ${language}
 brain_days_included: "${escapeYaml(includedBrain)}"
 inbox_notes_included: "${escapeYaml(inboxList)}"

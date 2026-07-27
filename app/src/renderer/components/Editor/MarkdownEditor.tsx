@@ -63,7 +63,8 @@ import { speak, stopSpeaking } from '../../utils/voice/tts'
 import { startDictation, type DictationHandle } from '../../utils/voice/stt'
 import { useIsModuleEnabled } from '../../utils/modules'
 import { useVoiceStore } from '../../stores/voiceStore'
-import { getNoteKind, stripNoteKindMarker, splitZettelTitle, setAiProvenanceInContent, getAiProvenance, addTagToFrontmatter, getFrontmatterTags } from '../../utils/noteKind'
+import { getNoteKind, stripNoteKindMarker, splitZettelTitle, addTagToFrontmatter, getFrontmatterTags } from '../../utils/noteKind'
+import { setAiProvenanceInContent, getAiProvenance, todayIsoDate } from '../../../shared/aiProvenance'
 import { ContextPanel } from './ContextPanel'
 import { NoteDocumentHeader, deriveCreatedDate, formatCreatedDate } from './NoteDocumentHeader'
 import { isBrainNote, brainNoteLabel } from '../../utils/brainNote'
@@ -2229,7 +2230,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
     const content = view.state.doc.toString()
     // 1. Scope ersetzen, 2. durable Provenienz (Modell/Datum) ins Frontmatter.
     const afterScope = content.slice(0, p.from) + p.newText + content.slice(p.to)
-    const finalContent = setAiProvenanceInContent(afterScope, p.model, p.date || new Date().toISOString().slice(0, 10))
+    const finalContent = setAiProvenanceInContent(afterScope, p.model, p.date || todayIsoDate())
     // Frontmatter wird oben eingefügt → Scope verschiebt sich um diesen Delta.
     const fmDelta = finalContent.length - afterScope.length
     const newFrom = p.from + fmDelta

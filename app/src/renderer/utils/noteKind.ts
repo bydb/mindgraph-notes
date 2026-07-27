@@ -160,29 +160,9 @@ export function clearNoteKindInContent(content: string): string {
 }
 
 // ─── KI-Provenienz (welches Modell hat zuletzt bearbeitet) ───────────────────
-// Durable, maschinenlesbar im Frontmatter; unsichtbar im Lesen-Modus.
-export function setAiProvenanceInContent(content: string, model: string, date: string): string {
-  const modelLine = `ki-modell: ${model}`
-  const dateLine = `ki-datum: ${date}`
-  const fmMatch = content.match(/^---\s*\n([\s\S]*?)\n---/)
-  if (fmMatch) {
-    let fm = fmMatch[1]
-    const bodyStart = fmMatch[0].length
-    fm = /^ki-modell:\s*.*$/m.test(fm) ? fm.replace(/^ki-modell:\s*.*$/m, modelLine) : `${fm.trimEnd()}\n${modelLine}`
-    fm = /^ki-datum:\s*.*$/m.test(fm) ? fm.replace(/^ki-datum:\s*.*$/m, dateLine) : `${fm.trimEnd()}\n${dateLine}`
-    return `---\n${fm}\n---${content.slice(bodyStart)}`
-  }
-  return `---\n${modelLine}\n${dateLine}\n---\n\n${content}`
-}
-
-export function getAiProvenance(content: string): { model: string; date: string } | null {
-  const fmMatch = content.match(/^---\s*\n([\s\S]*?)\n---/)
-  if (!fmMatch) return null
-  const m = fmMatch[1].match(/^ki-modell:\s*(.+)$/m)
-  if (!m) return null
-  const d = fmMatch[1].match(/^ki-datum:\s*(.+)$/m)
-  return { model: m[1].trim(), date: d ? d[1].trim() : '' }
-}
+// Liegt in `shared/aiProvenance.ts` — die Schreibpfade des Notiz-Agenten, von Brain,
+// den E-Mail-Notizen und dem Workflow-Runner laufen im Main-Prozess und können
+// dieses Renderer-Modul nicht importieren.
 
 // ─── Tags (Frontmatter) ──────────────────────────────────────────────────────
 // Liest vorhandene Tags (inline-Array `tags: [a, b]` oder Block-Liste `- a`).

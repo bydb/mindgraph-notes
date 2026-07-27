@@ -412,7 +412,9 @@ export function createNoteAgentRegistry(): ToolRegistry<NoteAgentContext> {
       const html = buildScientificHtmlPage({
         title,
         bodyHtml: articleHtml,
-        lang: typeof args.lang === 'string' ? args.lang : 'de'
+        lang: typeof args.lang === 'string' ? args.lang : 'de',
+        // KI-Provenienz: HTML trägt kein YAML — Kennzeichnung via <meta> + Fußzeile.
+        aiModel: ctx.run.model
       })
       return registerStagedResult(ctx, fileName, 'html', html, `${articleHtml.split(/\s+/).length} Wörter, wissenschaftliche HTML-Seite`)
     }

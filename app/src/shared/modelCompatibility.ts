@@ -870,7 +870,7 @@ export function modelMarkers(model: string): string {
 // (ministral/mixtral → Mistral) vor generischen Treffern. Unbekannt → 'generic'.
 export type ModelVendorId =
   | 'qwen' | 'gemma' | 'mistral' | 'llama' | 'phi' | 'deepseek'
-  | 'openai' | 'nomic' | 'bge' | 'granite' | 'cohere' | 'openrouter' | 'llmbase' | 'generic'
+  | 'openai' | 'anthropic' | 'nomic' | 'bge' | 'granite' | 'cohere' | 'openrouter' | 'llmbase' | 'generic'
 
 const VENDOR_PATTERNS: Array<{ id: ModelVendorId; name: string; re: RegExp }> = [
   { id: 'qwen',    name: 'Qwen (Alibaba)',     re: /\bqwen|qwq/i },
@@ -880,6 +880,9 @@ const VENDOR_PATTERNS: Array<{ id: ModelVendorId; name: string; re: RegExp }> = 
   { id: 'phi',     name: 'Phi (Microsoft)',     re: /\bphi[-\d]/i },
   { id: 'deepseek',name: 'DeepSeek',            re: /\bdeepseek/i },
   { id: 'openai',  name: 'OpenAI',              re: /\bgpt[-_]?oss|\bgpt-/i },
+  // Bewusst nur `claude`/`anthropic` — Modellreihen-Namen (opus/sonnet/haiku/fable)
+  // wären zu unspezifisch und würden fremde Tags fälschlich als Anthropic ausweisen.
+  { id: 'anthropic', name: 'Anthropic (Claude)', re: /\bclaude|\banthropic/i },
   { id: 'granite', name: 'Granite (IBM)',       re: /\bgranite/i },
   { id: 'cohere',  name: 'Cohere',              re: /\bcommand-?r|\bcohere|\baya/i },
   { id: 'bge',     name: 'BAAI (BGE)',          re: /\bbge/i },

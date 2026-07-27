@@ -61,8 +61,9 @@ export interface RunnerServices {
   loadProjectContext: (folderRel: string) => Promise<string>
   /** Projekt-RAG: semantisches Retrieval über den Projektordner (lokal). */
   ragRetrieve: (folderRel: string, query: string) => Promise<{ contextText: string; chunkCount: number }>
-  createNote: (folder: string, title: string, content: string) => Promise<string>
-  appendNote: (noteRel: string, text: string) => Promise<string>
+  /** `aiModel` gesetzt → die Notiz wird als KI-Inhalt gestempelt (shared/aiProvenance). */
+  createNote: (folder: string, title: string, content: string, aiModel?: string | null) => Promise<string>
+  appendNote: (noteRel: string, text: string, aiModel?: string | null) => Promise<string>
   searchNotes: (query: string) => Promise<string[]>
   createTask: (taskLine: string) => Promise<string>
 }
@@ -75,6 +76,24 @@ export interface RunOptions {
   /** @deprecated Back-Compat-Alias — wird beim Lauf nach seed.email normalisiert. */
   seedEmail?: SeedEmail | null
   services: RunnerServices
+  /**
+   * Lauf-lokale Modell-Spur: LLM-Actions tragen hier ihr Modell ein, die Schreib-Actions
+   * lesen es für die KI-Provenienz. `null` bedeutet „in diesem Lauf hat noch kein Modell
+   * gearbeitet" — dann wird NICHT gestempelt. Ein Workflow, der bloß Text deterministisch
+   * in eine Notiz durchreicht, ist kein KI-Inhalt und darf nicht so ausgewiesen werden.
+   * Wird von `runWorkflow` beim Start initialisiert.
+   */
+  aiTrace?: { lastModel: string | null }
+}
+
+/** Modell der letzten LLM-Action dieses Laufs — null, wenn keine gelaufen ist. */
+function aiModelOf(opts: RunOptions): string | null {
+  return opts.aiTrace?.lastModel ?? null
+}
+
+/** Von jeder LLM-Action nach dem Modell-Aufruf zu setzen. */
+function noteAiModel(opts: RunOptions, model: string): void {
+  if (opts.aiTrace) opts.aiTrace.lastModel = model
 }
 
 interface ExecResult {
@@ -178,6 +197,7 @@ const EXECUTORS: Record<string, Executor> = {
     const model = opts.services.resolveModel(node.config.model as string | undefined, 'task-extraction')
     const prompt = `Analysiere die folgende E-Mail. Gib eine kurze Zusammenfassung (1 Satz) und liste erkannte Aufgaben als Bulletpoints.\n\nBetreff: ${email.subject || ''}\n\n${email.bodyText || ''}`
     const out = await opts.services.ollamaGenerate(prompt, model)
+    noteAiModel(opts, model)
     return {
       outputs: { analysis: { summary: out.slice(0, 400) }, text: email.bodyText || out },
       log: [`Analyse mit ${model}: ${out.split('\n')[0].slice(0, 80)}`]
@@ -236,6 +256,7 @@ const EXECUTORS: Record<string, Executor> = {
   'ollama.summarize': async (node, inputs, opts) => {
     const model = opts.services.resolveModel(node.config.model as string | undefined, 'task-extraction')
     const out = await opts.services.ollamaGenerate(`Fasse den folgenden Text prägnant zusammen:\n\n${asText(inputs.text)}`, model)
+    noteAiModel(opts, model)
     return { outputs: { text: out }, log: [`Zusammengefasst mit ${model}`] }
   },
 
@@ -258,6 +279,7 @@ const EXECUTORS: Record<string, Executor> = {
     ].map(r => `- ${r}`).join('\n')
     const prompt = `Entwirf eine freundliche, professionelle Antwort auf die folgende E-Mail.\n${anredeHinweis}\n\nWichtige Regeln:\n${regeln}\n\nLeichte Formatierung ist erlaubt (Markdown: **fett**, *kursiv*, Listen mit "• "). KEINE "Betreff:"-Zeile, beginne direkt mit der Anrede. Gib NUR den Antworttext zurück.\n\n=== E-Mail ===\nBetreff: ${email.subject || ''}\n${email.bodyText || ''}\n\n=== Projektkontext ===\n${context || '(keiner)'}`
     const out = await opts.services.ollamaGenerate(prompt, model)
+    noteAiModel(opts, model)
     return { outputs: { draft: out }, log: [`Antwortentwurf mit ${model} erzeugt (Anrede: ${anrede})`] }
   },
 
@@ -267,6 +289,7 @@ const EXECUTORS: Record<string, Executor> = {
       `Extrahiere konkrete, umsetzbare Aufgaben aus dem folgenden Text. Gib NUR eine Liste, eine Aufgabe pro Zeile. Keine Einleitung, keine Überschrift. Wenn keine Aufgaben enthalten sind, antworte mit einer leeren Zeile.\n\n${asText(inputs.text)}`,
       model
     )
+    noteAiModel(opts, model)
     // Robust normalisieren: beliebiges Format (•, *, 1., - [ ], Klartext) → "- [ ] …".
     const tasks = out
       .split('\n')
@@ -291,6 +314,7 @@ const EXECUTORS: Record<string, Executor> = {
   'ollama.classify': async (node, inputs, opts) => {
     const model = opts.services.resolveModel(node.config.model as string | undefined, 'task-extraction')
     const out = await opts.services.ollamaGenerate(`Klassifiziere den folgenden Text in eine Kategorie. Antworte knapp.\n\n${asText(inputs.text)}`, model)
+    noteAiModel(opts, model)
     return { outputs: { result: { raw: out } }, log: [`Klassifiziert mit ${model}`] }
   },
 
@@ -298,19 +322,20 @@ const EXECUTORS: Record<string, Executor> = {
     const model = opts.services.resolveModel(node.config.model as string | undefined, 'task-extraction')
     const userPrompt = (node.config.prompt as string) || 'Bearbeite den folgenden Text.'
     const out = await opts.services.ollamaGenerate(`${userPrompt}\n\n${asText(inputs.text)}`, model)
+    noteAiModel(opts, model)
     return { outputs: { text: out }, log: [`Text transformiert mit ${model}`] }
   },
 
   'notes.create': async (node, inputs, opts) => {
     const folder = (node.config.folder as string) || '000 - 📥 inbox/010 - 📥 Notes'
     const title = (node.config.title as string) || 'Workflow-Notiz'
-    const rel = await opts.services.createNote(folder, title, asText(inputs.text))
+    const rel = await opts.services.createNote(folder, title, asText(inputs.text), aiModelOf(opts))
     return { outputs: { note: rel }, log: [`Notiz angelegt: ${rel}`] }
   },
 
   'notes.append': async (_node, inputs, opts) => {
     const noteRel = asNoteRel(inputs.note)
-    const rel = await opts.services.appendNote(noteRel, asText(inputs.text))
+    const rel = await opts.services.appendNote(noteRel, asText(inputs.text), aiModelOf(opts))
     return { outputs: { note: rel }, log: [`An Notiz angehängt: ${rel}`] }
   },
 
@@ -324,7 +349,7 @@ const EXECUTORS: Record<string, Executor> = {
       : asText(raw).split('\n').map(s => s.trim()).filter(Boolean)
     // extractTasks liefert bereits „- [ ] …"; fremde Quellen ggf. zur Checkbox normalisieren.
     const lines = list.map(l => (/^[-*]\s*\[[ xX]\]/.test(l) ? l : `- [ ] ${l.replace(/^[-*]\s+/, '')}`))
-    const rel = await opts.services.appendNote(noteRel, lines.join('\n'))
+    const rel = await opts.services.appendNote(noteRel, lines.join('\n'), aiModelOf(opts))
     return { outputs: { note: rel }, log: [`${lines.length} Aufgabe(n) an Notiz angehängt: ${rel}`] }
   },
 
@@ -379,6 +404,9 @@ export async function runWorkflow(workflow: Workflow, opts: RunOptions): Promise
   const startedAt = nowIso()
   // Seed normalisieren: seedEmail (Back-Compat) → seed.email. Executoren lesen nur opts.seed.
   if (!opts.seed && opts.seedEmail) opts.seed = { email: opts.seedEmail }
+  // Modell-Spur pro Lauf frisch — ein früherer Lauf darf einen rein deterministischen
+  // Folgelauf nicht fälschlich als KI-Inhalt stempeln.
+  opts.aiTrace = { lastModel: null }
   const order = topoSort(workflow)
   const baseRun: WorkflowRun = {
     id: genId('run'),

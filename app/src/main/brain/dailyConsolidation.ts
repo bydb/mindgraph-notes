@@ -255,11 +255,16 @@ function buildFrontmatter(input: BrainConsolidateInput): string {
   if (input.sensors.journal) sources.push('journal')
   const sourcesYaml = sources.map(s => `  - ${s}`).join('\n')
 
+  // `generated_by` bleibt (trägt die Privacy-Aussage „lokal via Ollama" und wird von
+  // projectStatus/discovery ausgewertet); `ki-modell`/`ki-datum` kommen zusätzlich
+  // dazu — sie sind der app-weite Schlüssel fürs KI-Badge im Lesen-Modus.
   return `---
 type: brain-day
 date: ${input.date}
 generated_at: ${input.generatedAtIso}
 generated_by: "ollama:${escapeYamlString(input.model)}"
+ki-modell: "${escapeYamlString(input.model)}"
+ki-datum: ${input.date}
 language: ${input.language}
 sources:
 ${sourcesYaml}

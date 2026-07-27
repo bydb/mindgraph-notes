@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" role="img" aria-label="Anthropic (Claude)">
+  <rect x="2.5" y="2.5" width="19" height="19" rx="5" fill="#D97757"/>
+  <g stroke="#fff" stroke-width="1.9" stroke-linecap="round">
+    <path d="M12 5.4v13.2"/>
+    <path d="M12 5.4v13.2" transform="rotate(90 12 12)"/>
+    <path d="M12 6.6v10.8" transform="rotate(45 12 12)"/>
+    <path d="M12 6.6v10.8" transform="rotate(-45 12 12)"/>
+  </g>
+</svg>

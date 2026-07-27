@@ -10,6 +10,8 @@
 // LaTeX bleibt als Quelltext in der Datei ($$…$$ / \(…\)) und wird client-seitig von
 // KaTeX auto-render gerendert — die Seite bleibt damit im Code-Editor editierbar.
 
+import { buildProvenanceMetaTag } from './aiProvenance'
+
 /** Ordnername der Seiten-Assets neben der HTML-Datei (Kopierziel im Accept-Handler). */
 export const HTML_PAGE_ASSETS_DIRNAME = 'mindgraph-assets'
 
@@ -19,6 +21,12 @@ export interface ScientificHtmlPageOptions {
   bodyHtml: string
   /** 'de' (Default) oder 'en' — steuert lang-Attribut und Beschriftungen (Abbildung/Figure). */
   lang?: string
+  /**
+   * KI-Provenienz: erzeugendes Modell. HTML kann kein YAML-Frontmatter tragen, deshalb
+   * wandert die Kennzeichnung hier in ein `<meta name="ki-modell">` plus eine sichtbare
+   * Fußzeile. Leer/weggelassen → Seite bleibt unmarkiert (nicht falsch markiert).
+   */
+  aiModel?: string
 }
 
 /** Grobe Erkennung vollständiger Dokumente — write_html erwartet NUR Body-Inhalt. */
@@ -56,12 +64,21 @@ export function buildScientificHtmlPage(options: ScientificHtmlPageOptions): str
   const title = escapeHtml(options.title.trim())
   const assets = HTML_PAGE_ASSETS_DIRNAME
 
+  // KI-Provenienz: maschinenlesbar im <meta>, sichtbar als Fußzeile. Ohne Modell
+  // bleibt beides leer — eine Seite unmarkiert zu lassen ist besser, als sie falsch
+  // zu kennzeichnen.
+  const aiModel = (options.aiModel || '').trim()
+  const aiMeta = aiModel ? `\n${buildProvenanceMetaTag(aiModel)}` : ''
+  const aiFooter = aiModel
+    ? `  <footer class="ai-provenance">${lang === 'en' ? 'Generated with AI model' : 'Erstellt mit KI-Modell'}: ${escapeHtml(aiModel)}</footer>\n`
+    : ''
+
   return `<!DOCTYPE html>
 <html lang="${lang}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${title}</title>
+<title>${title}</title>${aiMeta}
 
 <!-- KaTeX: lokal, relativ zur HTML-Datei — kein CDN, die Seite bleibt offline. -->
 <link rel="stylesheet" href="${assets}/katex/katex.min.css">
@@ -197,6 +214,14 @@ export function buildScientificHtmlPage(options: ScientificHtmlPageOptions): str
     overflow-x: auto;
   }
 
+  .ai-provenance {
+    margin-top: 3rem;
+    padding-top: 0.9rem;
+    border-top: 1px solid var(--rule);
+    color: var(--muted);
+    font-size: 0.8rem;
+  }
+
   @media print {
     body { font-size: 10.5pt; }
     article { max-width: none; padding: 0; }
@@ -210,7 +235,7 @@ export function buildScientificHtmlPage(options: ScientificHtmlPageOptions): str
     <h1>${title}</h1>
   </header>
 ${options.bodyHtml}
-</article>
+${aiFooter}</article>
 
 <script>
   document.addEventListener('DOMContentLoaded', function () {

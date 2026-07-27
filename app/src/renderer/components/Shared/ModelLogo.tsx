@@ -7,6 +7,7 @@ import llama from '../../assets/model-vendors/llama.svg'
 import phi from '../../assets/model-vendors/phi.svg'
 import deepseek from '../../assets/model-vendors/deepseek.svg'
 import openai from '../../assets/model-vendors/openai.svg'
+import anthropic from '../../assets/model-vendors/anthropic.svg'
 import granite from '../../assets/model-vendors/granite.svg'
 import cohere from '../../assets/model-vendors/cohere.svg'
 import bge from '../../assets/model-vendors/bge.svg'
@@ -17,7 +18,7 @@ import generic from '../../assets/model-vendors/generic.svg'
 
 // Vendor-Logo → Asset-URL. Single source: getModelVendor() in shared/modelCompatibility.
 const VENDOR_LOGOS: Record<ModelVendorId, string> = {
-  qwen, gemma, mistral, llama, phi, deepseek, openai, granite, cohere, bge, nomic, openrouter, llmbase, generic
+  qwen, gemma, mistral, llama, phi, deepseek, openai, anthropic, granite, cohere, bge, nomic, openrouter, llmbase, generic
 }
 
 interface Props {

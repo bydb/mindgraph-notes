@@ -53,6 +53,9 @@ export interface AgentRun {
   targetFolderAbs: string
   attachmentIds: string[]
   instruction: string
+  // Modell dieses Laufs (lokaler Tag oder `<provider>/<modell>` bei Cloud-Routing).
+  // Trägt die KI-Provenienz in die übernommenen Ergebnisse (shared/aiProvenance).
+  model: string
   // Aktivierte Vault-Skills (Agent-Skills Stufe 1) — Discovery-Metadaten für den
   // System-Prompt; den Body holt use_skill bei Bedarf.
   skills: Array<{ name: string; description: string; folderName: string }>
@@ -112,6 +115,7 @@ export function startRun(params: {
   targetFolderAbs: string
   attachmentIds: string[]
   instruction: string
+  model: string
   skills?: Array<{ name: string; description: string; folderName: string }>
   web?: WebRunState
   imageGen?: boolean
@@ -129,6 +133,7 @@ export function startRun(params: {
     targetFolderAbs: params.targetFolderAbs,
     attachmentIds: params.attachmentIds,
     instruction: params.instruction,
+    model: params.model,
     skills: params.skills ?? [],
     status: 'running',
     abort: new AbortController(),

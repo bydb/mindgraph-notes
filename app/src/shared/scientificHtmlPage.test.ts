@@ -54,6 +54,23 @@ describe('buildScientificHtmlPage', () => {
     expect(html).toContain('counter-increment: equation')
     expect(html).toContain('counter-increment: figure')
   })
+
+  it('weist KI-Provenienz maschinenlesbar und sichtbar aus', () => {
+    const html = buildScientificHtmlPage({ title: 'T', bodyHtml: '<p>x</p>', aiModel: 'qwen3.6:27b-mlx' })
+    expect(html).toContain('<meta name="ki-modell" content="qwen3.6:27b-mlx">')
+    expect(html).toContain('Erstellt mit KI-Modell: qwen3.6:27b-mlx')
+  })
+
+  it('englische Seiten bekommen die englische Fußzeile', () => {
+    const html = buildScientificHtmlPage({ title: 'T', bodyHtml: '<p>x</p>', lang: 'en', aiModel: 'gemma4:latest' })
+    expect(html).toContain('Generated with AI model: gemma4:latest')
+  })
+
+  it('ohne Modell bleibt die Seite unmarkiert statt falsch markiert', () => {
+    const html = buildScientificHtmlPage({ title: 'T', bodyHtml: '<p>x</p>' })
+    expect(html).not.toContain('ki-modell')
+    expect(html).not.toContain('ai-provenance">')
+  })
 })
 
 describe('looksLikeFullHtmlDocument', () => {

@@ -1,0 +1,116 @@
+// KI-Provenienz: welches Modell hat den Inhalt erzeugt bzw. zuletzt bearbeitet.
+//
+// Single-Source und prozessübergreifend (Main + Renderer): die Schreibpfade des
+// Notiz-Agenten, von Brain, den E-Mail-Notizen und dem Workflow-Runner leben im
+// Main-Prozess, die KI-Leiste und der Notizen-Chat im Renderer — beide stempeln
+// denselben Frontmatter-Schlüssel, damit das Badge im Lesen-Modus überall greift.
+//
+// Durable und maschinenlesbar im Frontmatter (`ki-modell` + `ki-datum`); im
+// Lesen-Modus rendert `NoteDocumentHeader` daraus ein Chip mit Hersteller-Logo.
+//
+// Bewusst NICHT in `writeFileSafe` verdrahtet: das ist die gemeinsame Schreibgrenze
+// für menschliche UND maschinelle Writes und darf nichts über die Herkunft annehmen.
+// Jeder KI-Pfad stempelt selbst, unmittelbar vor dem Schreiben.
+
+export const AI_PROVENANCE_MODEL_KEY = 'ki-modell'
+export const AI_PROVENANCE_DATE_KEY = 'ki-datum'
+
+/**
+ * YAML-Plain-Scalar, wo möglich — sonst doppelt gequotet.
+ * Ollama-Tags wie `qwen3.6:27b-mlx` enthalten zwar einen Doppelpunkt, aber kein
+ * `": "`, und bleiben damit gültige Plain-Scalars. Erst Sonderfälle (Doppelpunkt
+ * mit Leerzeichen, `#`, Anführungszeichen, Rand-Whitespace) brauchen Quotes.
+ */
+function yamlScalar(value: string): string {
+  const v = value.trim()
+  if (!v) return '""'
+  const needsQuotes = /:\s/.test(v) || /\s#/.test(v) || /^[#&*!|>%@`"'-]/.test(v) || /["\\\n]/.test(v)
+  if (!needsQuotes) return v
+  return `"${v.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`
+}
+
+/** Umkehrung von `yamlScalar` beim Lesen: umschließende Quotes entfernen. */
+function unquoteScalar(raw: string): string {
+  const v = raw.trim()
+  if (v.length >= 2 && ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'")))) {
+    const inner = v.slice(1, -1)
+    return v.startsWith('"') ? inner.replace(/\\"/g, '"').replace(/\\\\/g, '\\') : inner.replace(/''/g, "'")
+  }
+  return v
+}
+
+/**
+ * Schreibt/aktualisiert `ki-modell` + `ki-datum` im Frontmatter.
+ * Vorhandene Zeilen werden ersetzt (nie dupliziert), der Body bleibt unangetastet.
+ * Ohne Frontmatter wird einer angelegt.
+ */
+export function setAiProvenanceInContent(content: string, model: string, date: string): string {
+  const modelLine = `${AI_PROVENANCE_MODEL_KEY}: ${yamlScalar(model)}`
+  const dateLine = `${AI_PROVENANCE_DATE_KEY}: ${yamlScalar(date)}`
+  const fmMatch = content.match(/^---\s*\n([\s\S]*?)\n---/)
+  if (fmMatch) {
+    let fm = fmMatch[1]
+    const bodyStart = fmMatch[0].length
+    fm = new RegExp(`^${AI_PROVENANCE_MODEL_KEY}:\\s*.*$`, 'm').test(fm)
+      ? fm.replace(new RegExp(`^${AI_PROVENANCE_MODEL_KEY}:\\s*.*$`, 'm'), modelLine)
+      : `${fm.trimEnd()}\n${modelLine}`
+    fm = new RegExp(`^${AI_PROVENANCE_DATE_KEY}:\\s*.*$`, 'm').test(fm)
+      ? fm.replace(new RegExp(`^${AI_PROVENANCE_DATE_KEY}:\\s*.*$`, 'm'), dateLine)
+      : `${fm.trimEnd()}\n${dateLine}`
+    return `---\n${fm}\n---${content.slice(bodyStart)}`
+  }
+  return `---\n${modelLine}\n${dateLine}\n---\n\n${content}`
+}
+
+/** Liest die Provenienz aus dem Frontmatter. null = nicht KI-markiert. */
+export function getAiProvenance(content: string): { model: string; date: string } | null {
+  const fmMatch = content.match(/^---\s*\n([\s\S]*?)\n---/)
+  if (!fmMatch) return null
+  const m = fmMatch[1].match(new RegExp(`^${AI_PROVENANCE_MODEL_KEY}:\\s*(.+)$`, 'm'))
+  if (!m) return null
+  const model = unquoteScalar(m[1])
+  if (!model) return null
+  const d = fmMatch[1].match(new RegExp(`^${AI_PROVENANCE_DATE_KEY}:\\s*(.+)$`, 'm'))
+  return { model, date: d ? unquoteScalar(d[1]) : '' }
+}
+
+/** Heutiges Datum als `YYYY-MM-DD` — das Format von `ki-datum`. */
+export function todayIsoDate(): string {
+  return new Date().toISOString().slice(0, 10)
+}
+
+const MAX_LABEL_CHARS = 22
+
+/**
+ * Anzeigename fürs Badge: Provider-/Namespace-Präfix strippen und kappen.
+ * `openrouter/anthropic/claude-sonnet-4` → `claude-sonnet-4`,
+ * `mlx-community/qwen3.6-27b` → `qwen3.6-27b`.
+ * Der vollständige String bleibt dem Tooltip vorbehalten.
+ */
+export function formatProvenanceLabel(model: string): string {
+  const raw = (model || '').trim()
+  if (!raw) return ''
+  const segments = raw.split('/').filter(Boolean)
+  const short = segments.length > 0 ? segments[segments.length - 1] : raw
+  if (short.length <= MAX_LABEL_CHARS) return short
+  return `${short.slice(0, MAX_LABEL_CHARS - 1)}…`
+}
+
+function escapeHtmlAttribute(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+}
+
+/**
+ * HTML-Pendant zum Frontmatter-Stempel: erzeugte Seiten (write_html) können kein
+ * YAML tragen, deshalb wandert die Provenienz dort in ein `<meta>`-Tag.
+ * Leerer String, wenn kein Modell bekannt ist — dann bleibt die Seite unmarkiert.
+ */
+export function buildProvenanceMetaTag(model: string): string {
+  const m = (model || '').trim()
+  if (!m) return ''
+  return `<meta name="${AI_PROVENANCE_MODEL_KEY}" content="${escapeHtmlAttribute(m)}">`
+}

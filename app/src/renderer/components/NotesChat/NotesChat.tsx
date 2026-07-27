@@ -10,6 +10,7 @@ import { PanelHeader } from '../Shared/PanelHeader'
 import { ContextAttachmentRow } from '../Shared/ContextAttachmentRow'
 import { cloudRoutesForFeature, cloudProviderForSentinel, type CloudProviderId } from '../../../shared/llmBackend'
 import { isCloudModel } from '../../../shared/modelCompatibility'
+import { setAiProvenanceInContent, todayIsoDate } from '../../../shared/aiProvenance'
 import type { NoteAgentAttachment } from '../../../shared/types'
 import MarkdownIt from 'markdown-it'
 import texmath from 'markdown-it-texmath'
@@ -612,6 +613,14 @@ export const NotesChat: React.FC<NotesChatProps> = ({ onClose }) => {
 
   // Provenienz-Callout (KI-generiert: Frage, Modell, Datum) — eine Quelle für
   // Kopieren, „Als Notiz speichern" und „An Notiz anhängen".
+  // KI-Provenienz ins Frontmatter (Badge im Lesen-Modus). Ohne bekanntes Modell
+  // bleibt die Notiz ungestempelt — ein leeres Badge wäre irreführender als keines.
+  const stampAi = (content: string, msg: ChatMessage): string => {
+    if (!msg.model) return content
+    const date = msg.timestamp ? msg.timestamp.toISOString().slice(0, 10) : todayIsoDate()
+    return setAiProvenanceInContent(content, msg.model, date)
+  }
+
   const buildProvenanceBlock = (msg: ChatMessage): string => {
     const dateStr = msg.timestamp
       ? msg.timestamp.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })
@@ -673,7 +682,12 @@ export const NotesChat: React.FC<NotesChatProps> = ({ onClose }) => {
       }
 
       const frontmatter = `---\ntitle: "${safeTitle.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"\ncreated: ${d.toISOString()}\n---\n\n`
-      const content = `${frontmatter}${msg.content}${buildProvenanceBlock(msg)}\n`
+      // Frontmatter-Stempel fürs KI-Badge im Lesen-Modus; der Provenienz-Callout im
+      // Body bleibt zusätzlich (er trägt die gestellte Frage).
+      const content = stampAi(
+        `${frontmatter}${msg.content}${buildProvenanceBlock(msg)}\n`,
+        msg
+      )
       const filePath = `${vaultPath}/${relativePath}`
 
       if (targetFolder) {
@@ -702,7 +716,10 @@ export const NotesChat: React.FC<NotesChatProps> = ({ onClose }) => {
       const filePath = `${vaultPath}/${currentNote.path}`
       const existing = await window.electronAPI.readFile(filePath)
       const sep = existing.endsWith('\n\n') ? '' : existing.endsWith('\n') ? '\n' : '\n\n'
-      const newContent = `${existing}${sep}${msg.content}${buildProvenanceBlock(msg)}\n`
+      const newContent = stampAi(
+        `${existing}${sep}${msg.content}${buildProvenanceBlock(msg)}\n`,
+        msg
+      )
       await window.electronAPI.writeFile(filePath, newContent)
       useNotesStore.getState().updateNote(currentNote.id, { content: newContent })
       setAppendedIndex(index)

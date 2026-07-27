@@ -23,6 +23,7 @@ function mkRunParams(senderId: number, overrides: Record<string, unknown> = {}) 
     targetFolderAbs: path.join(ROOT, 'Ziel'),
     attachmentIds: [],
     instruction: 'x',
+    model: 'qwen3.6:latest',
     ...overrides
   }
 }

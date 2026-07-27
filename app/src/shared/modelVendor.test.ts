@@ -16,6 +16,9 @@ describe('getModelVendor', () => {
     ['phi-4:latest', 'phi'],
     ['deepseek-r1:14b', 'deepseek'],
     ['gpt-oss:120b-cloud', 'openai'],
+    ['Claude (Fable 5)', 'anthropic'],
+    // Cloud-Route: der echte Vendor gewinnt vor dem Provider-Sentinel.
+    ['openrouter/anthropic/claude-sonnet-4', 'anthropic'],
     ['granite3.2:8b', 'granite'],
     ['command-r:35b', 'cohere'],
     ['bge-m3:latest', 'bge'],

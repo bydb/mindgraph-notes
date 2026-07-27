@@ -1,5 +1,6 @@
 import type { NoteKindDefinition } from '../../utils/noteKind'
 import { ModelLogo } from '../Shared/ModelLogo'
+import { formatProvenanceLabel } from '../../../shared/aiProvenance'
 import { useTranslation } from '../../utils/translations'
 
 // Titel + Eigenschaften-Zeile im Dokument (Design-Variante 1c „Fokus + Kontextspalte").
@@ -93,7 +94,7 @@ export function NoteDocumentHeader({
             title={`${t('editor.aiEdited')} · ${aiProvenance.model}${aiProvenance.date ? ' · ' + aiProvenance.date : ''}`}
           >
             <ModelLogo model={aiProvenance.model} size={12} />
-            {t('editor.aiEdited')}
+            {formatProvenanceLabel(aiProvenance.model)}
           </span>
         )}
         <span className="note-doc-props-spacer" />

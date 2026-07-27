@@ -2053,6 +2053,11 @@ h2 { letter-spacing: -0.016em; }
   padding: 3px 10px;
   white-space: nowrap;
   cursor: default;
+  /* Das Chip trägt den Modellnamen — lange Cloud-Tags dürfen die
+     Eigenschaften-Zeile nicht sprengen (voller Name steht im Tooltip). */
+  max-width: 240px;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* Muss die generische Preview-Regel `.editor-preview img` (margin: 20px 0,
