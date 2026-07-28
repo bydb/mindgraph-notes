@@ -15,11 +15,13 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
-    "baseUrl": ".",
+    // Kein `baseUrl`: in TS 6 abgekündigt (TS5101), fällt in TS 7 weg. Ohne baseUrl müssen die
+    // paths-Ziele explizit relativ ("./…") sein, sonst TS5090. Vite löst dieselben Aliase separat
+    // über electron.vite.config.ts auf — die beiden Listen müssen synchron bleiben.
     "paths": {
-      "@/*": ["src/*"],
-      "@mindgraph/plugin-api/validation": ["packages/plugin-api/src/validation.ts"],
-      "@mindgraph/plugin-api": ["packages/plugin-api/src/index.ts"]
+      "@/*": ["./src/*"],
+      "@mindgraph/plugin-api/validation": ["./packages/plugin-api/src/validation.ts"],
+      "@mindgraph/plugin-api": ["./packages/plugin-api/src/index.ts"]
     }
   },
   "include": ["src"],
