@@ -433,6 +433,29 @@
     .cap-card:nth-child(4) { transition-delay: 0.24s; }
     .cap-card:nth-child(5) { transition-delay: 0.32s; }
     .cap-card:nth-child(6) { transition-delay: 0.4s; }
+  
+    /* --- Agent-Kapitel: Attrappe des Auftragsfensters --- */
+    .agent-prompt {
+      background: #fff; border: 1px solid #e4dfd6; border-left: 3px solid var(--accent);
+      border-radius: 10px; padding: 11px 13px; font-size: 13.5px; color: #1a1a1a; line-height: 1.45;
+    }
+    .agent-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 12px; }
+    .agent-chip {
+      font-size: 11.5px; padding: 3px 8px; border-radius: 999px;
+      background: #f3f0ea; border: 1px solid #e4dfd6; color: #5c574e;
+    }
+    .agent-chip.skill { background: rgba(16,105,107,.09); border-color: rgba(16,105,107,.25); color: #10696b; }
+    .agent-step {
+      width: 15px; height: 15px; border-radius: 50%; flex: none;
+      display: inline-flex; align-items: center; justify-content: center;
+      font-size: 9px; color: #fff; background: #10696b;
+    }
+    .agent-step.run { background: #fff; border: 2px solid #d0a34a; }
+    .agent-review { border-color: rgba(16,105,107,.3) !important; background: rgba(16,105,107,.045) !important; }
+    .agent-actions { display: flex; gap: 6px; flex: none; }
+    .agent-accept, .agent-reject { font-size: 11px; padding: 2.5px 8px; border-radius: 6px; }
+    .agent-accept { background: #10696b; color: #fff; }
+    .agent-reject { background: #fff; border: 1px solid #e4dfd6; color: #91897d; }
   </style>
 </head>
 <body>
@@ -487,22 +510,20 @@
     </div>
 
     <div class="hero-screenshot">
-      <div class="product-shot" aria-label="MindGraph Dashboard Vorschau">
-        <div class="product-bar">
-          <span class="traffic"><i></i><i></i><i></i></span>
-          <span style="margin:auto">Editor &nbsp;&nbsp; Brain &nbsp;&nbsp; <b style="color:#1a1a1a">Dashboard</b></span>
-        </div>
-        <div class="product-body">
-          <div class="product-heading"><div><b>Dashboard</b><div class="mock-meta">Donnerstag, 25. Juni 2026</div></div><span>Aktualisieren</span></div>
-          <div class="mock-card"><div class="mock-label">Fokus heute</div><div class="mock-row"><span style="font-size:18px;color:#b9bec6">&#10003;</span><span class="grow">Keine Deadlines, kein R&uuml;ckstau &mdash; nutze den Freiraum.</span><span class="mock-meta">0 f&auml;llig</span></div></div>
-          <div style="display:grid;grid-template-columns:1.5fr 1fr;gap:12px">
-            <div class="mock-card"><div class="mock-label">Relevante Notizen</div><div class="mock-row"><span class="mock-score">41</span><span class="mock-dot"></span><span class="grow"><b>Erm&ouml;glichung durch KI</b><br><span class="mock-meta">Problem &middot; k&uuml;rzlich aktiv</span></span></div></div>
-            <div class="mock-card"><div class="mock-label">Gehirn</div><div class="mock-row"><span class="mock-dot" style="background:#d0a34a"></span><span>nicht verdichtet</span></div></div>
-          </div>
-          <div class="mock-card mock-stats"><div class="mock-stat"><b>6</b><span>Notizen</span></div><div class="mock-stat"><b>6</b><span>neu (7 T)</span></div><div class="mock-stat"><b>44</b><span>Signale</span></div><div class="mock-stat"><b>7</b><span>Links</span></div></div>
+      <div class="hero-video">
+        <video id="heroWorkflow" autoplay muted loop playsinline preload="metadata" poster="hero-workflow-poster.jpg"
+               data-i18n-aria="hero.videoAlt"
+               aria-label="Ablauf in der App: eine E-Mail trifft ein, die Aufgabe darin wird erkannt, daraus entsteht eine Notiz, und am n&auml;chsten Morgen steht alles im Dashboard.">
+          <source src="hero-workflow.mp4" type="video/mp4">
+          <track kind="captions" src="hero-workflow.de.vtt" srclang="de" label="Deutsch" default>
+          <track kind="captions" src="hero-workflow.en.vtt" srclang="en" label="English">
+        </video>
+        <div class="hero-video-actions">
+          <button class="hero-video-btn" type="button" onclick="toggleHeroSound()" id="heroSoundBtn">Ton an</button>
+          <button class="hero-video-btn" type="button" onclick="toggleHeroVideo()" id="heroPlayBtn">Anhalten</button>
         </div>
       </div>
-      <img class="hero-person" src="people-hero.png" alt="Ruhig konzentriert am Schreibtisch" loading="lazy">
+      <p class="hero-caption" id="heroCaption" aria-live="off"></p>
     </div>
   </section>
 
@@ -612,10 +633,45 @@
     </div>
   </section>
 
+
+  <!-- 4a2 · Der Agent -->
+  <section class="story beat rev">
+    <div class="beat-text">
+      <div class="num" data-i18n="st.bag.num">WARUM 02 &middot; AUFTR&Auml;GE</div>
+      <h2 class="st-h" data-i18n="st.bag.h">Sag, was zu tun ist &mdash; <em>und pr&uuml;fe, was dabei herauskommt.</em></h2>
+      <p class="st-lead" data-i18n="st.bag.lead">Der Agent ist kein Chatfenster, das Text ausspuckt. Du gibst ihm einen Auftrag und deine Unterlagen &ndash; Excel, Word, PDF, ganze Ordner. Er sucht in deinen eigenen Notizen, arbeitet Schritt f&uuml;r Schritt und legt fertige Dateien vor. Geschrieben wird erst, wenn du zugestimmt hast.</p>
+      <div class="beat-feature"><span class="ic">&#10003;</span><span data-i18n="st.bag.f"><b>Skills statt Prompt-Basteln:</b> Deine Arbeitsweise bringst du ihm als ganz normale Notiz bei &ndash; offener SKILL.md-Standard. Was du ihm einmal sagst, merkt er sich.</span></div>
+    </div>
+    <div class="beat-img">
+      <div class="product-shot" data-i18n-aria="st.bag.alt" aria-label="Notiz-Agent: Auftrag, Kontext-Dateien und Ergebnis zur Pr&uuml;fung">
+        <div class="product-bar"><span class="traffic"><i></i><i></i><i></i></span><span data-i18n="st.bag.win">Notiz-Agent</span></div>
+        <div class="product-body">
+          <div class="agent-prompt" data-i18n="st.bag.m1">&bdquo;Fasse den Projektordner Digitalpakt zu einem Statusbericht zusammen.&ldquo;</div>
+          <div class="agent-chips">
+            <span class="agent-chip" data-i18n="st.bag.c1">Digitalpakt II/</span>
+            <span class="agent-chip" data-i18n="st.bag.c2">Antrag.docx</span>
+            <span class="agent-chip" data-i18n="st.bag.c3">Kosten.xlsx</span>
+            <span class="agent-chip skill" data-i18n="st.bag.c4">Skill: Statusbericht</span>
+          </div>
+          <div class="mock-card">
+            <div class="mock-label" data-i18n="st.bag.m2">Arbeitsschritte</div>
+            <div class="mock-row"><span class="agent-step">&#10003;</span><span class="grow" data-i18n="st.bag.s1">12 Notizen im Projektordner gelesen</span></div>
+            <div class="mock-row"><span class="agent-step">&#10003;</span><span class="grow" data-i18n="st.bag.s2">Antrag und Kostenaufstellung ausgewertet</span></div>
+            <div class="mock-row"><span class="agent-step run"></span><span class="grow" data-i18n="st.bag.s3">Statusbericht entworfen</span></div>
+          </div>
+          <div class="mock-card agent-review">
+            <div class="mock-label" data-i18n="st.bag.m3">Zur Pr&uuml;fung &middot; noch nicht gespeichert</div>
+            <div class="mock-row"><span class="mock-dot green"></span><span class="grow"><b data-i18n="st.bag.file">Statusbericht Digitalpakt II.md</b></span><span class="agent-actions"><span class="agent-accept" data-i18n="st.bag.ok">&Uuml;bernehmen</span><span class="agent-reject" data-i18n="st.bag.no">Verwerfen</span></span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <!-- 4b · Alles verbunden -->
   <section class="story beat rev">
     <div class="beat-text">
-      <div class="num" data-i18n="st.b2.num">WARUM 02 &middot; VERBUNDEN</div>
+      <div class="num" data-i18n="st.b2.num">WARUM 03 &middot; VERBUNDEN</div>
       <h2 class="st-h" data-i18n="st.b2.h">Ein Arbeitsraum &mdash; <em>statt acht Apps.</em></h2>
       <p class="st-lead" data-i18n="st.b2.lead">Notizen, Aufgaben, Mails, Dokumente, Wissensgraph: alles an einem Ort, alles verlinkt. Eine relevante Mail wird zur Notiz mit Aufgabe und R&uuml;ckverweis &ndash; ohne Copy&amp;Paste zwischen zehn Programmen. Weniger Wechsel, weniger Reibung, weniger verloren.</p>
       <div class="beat-feature"><span class="ic">&#10003;</span><span data-i18n="st.b2.f"><b>Ein Vault statt Tool-Wildwuchs:</b> Markdown, Wissensgraph, Mail&rarr;Notiz, Tasks &ndash; Module schaltest du nach Bedarf an. <em>1 Arbeitsraum statt 8 Apps und 30 Plugins.</em></span></div>
@@ -637,7 +693,7 @@
   <!-- 4c · Dein Rechner -->
   <section class="story beat">
     <div class="beat-text">
-      <div class="num" data-i18n="st.b3.num">WARUM 03 &middot; DEIN RECHNER</div>
+      <div class="num" data-i18n="st.b3.num">WARUM 04 &middot; DEIN RECHNER</div>
       <h2 class="st-h" data-i18n="st.b3.h">KI auf deinem Rechner — <em>deine Daten bleiben bei dir.</em></h2>
       <p class="st-lead" data-i18n="st.b3.lead">Viele KI-Tools stellen dich vor eine falsche Wahl: Komfort in der Cloud oder Kontrolle &uuml;ber deine Daten. MindGraph l&ouml;st das lokal &ndash; mit Modellen auf deinem Rechner (Ollama/LM&nbsp;Studio), ohne Cloud-Pflicht und ohne Telemetrie. Deine Notizen bleiben Markdown-Dateien, die dir geh&ouml;ren.</p>
       <div class="beat-feature"><span class="ic">&#10003;</span><span data-i18n="st.b3.f"><b>Lokale KI &amp; offene Daten:</b> <b>48&nbsp;%</b> der Unternehmen nennen Datenschutz-Anforderungen als gr&ouml;&szlig;tes KI-Hemmnis <span style="color:var(--text-muted)">(Bitkom 2025)</span>. MindGraph braucht diesen Kompromiss nicht.</span></div>
@@ -665,7 +721,7 @@
   <!-- 4d · Du denkst weiter (Kognition + Test) -->
   <div class="kogband" id="kognition">
     <div class="kogband-in">
-      <div class="st-eyebrow"><span class="d"></span><span data-i18n="st.b4.label">Warum 04 &middot; Du denkst weiter</span></div>
+      <div class="st-eyebrow"><span class="d"></span><span data-i18n="st.b4.label">Warum 05 &middot; Du denkst weiter</span></div>
       <h2 class="st-h" style="font-size:clamp(1.8rem,4vw,2.8rem)" data-i18n="st.b4.h">KI, die dein Denken st&auml;rkt &mdash; <em>statt es zu ersetzen.</em></h2>
       <p class="st-lead" data-i18n="st.b4.lead">Wer Denken blind auslagert, verlernt es. In einer MIT-Studie zeigten Menschen, die mit einem Sprachmodell schrieben, die <b>schw&auml;chste Gehirnvernetzung</b> &ndash; viele konnten ihren eben verfassten Text nicht einmal wiedergeben <span style="color:var(--text-muted)">(Kosmyna et&nbsp;al. 2025, MIT Media Lab)</span>. MindGraph ist daf&uuml;r gebaut, dass du im Spiel bleibst: aktives Erinnern, Reflexion, bewusste Freigabe.</p>
       <div class="kogband-mini">
@@ -768,10 +824,10 @@
     </div>
     <div class="how-tabs" role="tablist">
       <button class="how-tab active" data-how="0" data-i18n="how.t0">Dashboard &amp; Relevanz</button>
+      <button class="how-tab" data-how="4" data-i18n="how.t4">Agent &amp; Skills</button>
       <button class="how-tab" data-how="1" data-i18n="how.t1">Wissensraum &amp; Graph</button>
       <button class="how-tab" data-how="2" data-i18n="how.t2">Lokale KI &amp; Datenschutz</button>
       <button class="how-tab" data-how="3" data-i18n="how.t3">Lernen &amp; Karteikarten</button>
-      <button class="how-tab" data-how="4" data-i18n="how.t4">Agent &amp; Skills</button>
       <button class="how-tab" data-how="5" data-i18n="how.t5">Webrecherche</button>
     </div>
 
@@ -926,6 +982,53 @@
       filter: drop-shadow(0 28px 50px rgba(28,26,23,.2));
     }
     .hero-screenshot { position: relative; max-width: 900px; padding: 0 0 2rem; }
+    /* --- Workflow-Video im Hero --- */
+    .hero-screenshot:has(.hero-video) { max-width: none; }
+    .hero-video {
+      position: relative; border-radius: 14px; overflow: hidden;
+      width: min(1180px, 94vw); margin-inline: auto;
+      /* Der Videorahmen bringt einen eigenen Cremeton mit. Raender weich auslaufen
+         lassen, sonst steht ein sichtbarer Kasten auf dem Seitenhintergrund. */
+      -webkit-mask-image:
+        linear-gradient(to right, transparent 0, #000 4%, #000 96%, transparent 100%),
+        linear-gradient(to bottom, transparent 0, #000 5%, #000 95%, transparent 100%);
+      -webkit-mask-composite: source-in;
+      mask-image:
+        linear-gradient(to right, transparent 0, #000 4%, #000 96%, transparent 100%),
+        linear-gradient(to bottom, transparent 0, #000 5%, #000 95%, transparent 100%);
+      mask-composite: intersect;
+    }
+    .hero-video video { display: block; width: 100%; height: auto; }
+    .hero-video-actions {
+      position: absolute; right: 14px; bottom: 14px;
+      display: flex; gap: .4rem;
+      opacity: 0; transition: opacity .18s ease;
+    }
+    .hero-video:hover .hero-video-actions,
+    .hero-video-actions:focus-within { opacity: 1; }
+    .hero-video-btn {
+      padding: .4rem .7rem; border-radius: 999px;
+      border: 1px solid var(--border); background: rgba(255,255,255,.82);
+      color: var(--text-mid); font: inherit; font-size: .8rem; cursor: pointer;
+      transition: background .18s ease, color .18s ease;
+      -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+    }
+    .hero-video-btn:hover { background: #fff; color: var(--text); }
+    .hero-video-btn[aria-pressed="true"] { background: var(--accent); color: var(--accent-on, #fff); border-color: transparent; }
+    /* Sprechertext laeuft unter dem Video mit, nicht darin - sonst verdeckt er die
+       App. Feste Mindesthoehe, damit die Seite beim Cue-Wechsel nicht springt. */
+    .hero-caption {
+      margin: 1.15rem auto 0; max-width: 720px; min-height: 2.9em;
+      font-size: .95rem; line-height: 1.45; color: var(--text-mid);
+      text-wrap: balance;
+    }
+    @media (max-width: 640px) { .hero-caption { font-size: .88rem; min-height: 4.2em; } }
+    @media (prefers-reduced-motion: reduce) {
+      .hero-video video { display: none; }
+      .hero-video { background: center/cover no-repeat url("hero-workflow-poster.jpg"); aspect-ratio: 16 / 9; }
+      .hero-video-actions { display: none; }
+      .hero-caption { display: none; }
+    }
     .hero-screenshot .hero-person {
       position: absolute;
       right: -22px;
@@ -1646,15 +1749,34 @@
         "st.b1.h": "Das Wichtige von heute — <em>von selbst.</em>",
         "st.b1.lead": "Du öffnest morgens einen Tab, nicht zehn. MindGraph zeigt überfällige Aufgaben, Mails die Antwort erwarten, heutige Termine – und holt vergessene Notizen zurück ins Sichtfeld. Warst du fünf Tage weg? Es liegt alles da, sortiert nach Relevanz. Nichts verloren.",
         "st.b1.f": "<b>Dashboard &amp; Relevanz-Radar:</b> eine lokale KI bewertet laufend, welche offenen Probleme gerade Aufmerksamkeit brauchen – und welche wieder auftauchen sollten.",
-        "st.b2.num": "WARUM 02 · VERBUNDEN",
+        "st.bag.num": "WARUM 02 · AUFTRÄGE",
+        "st.bag.h": "Sag, was zu tun ist — <em>und prüfe, was dabei herauskommt.</em>",
+        "st.bag.lead": "Der Agent ist kein Chatfenster, das Text ausspuckt. Du gibst ihm einen Auftrag und deine Unterlagen – Excel, Word, PDF, ganze Ordner. Er sucht in deinen eigenen Notizen, arbeitet Schritt für Schritt und legt fertige Dateien vor. Geschrieben wird erst, wenn du zugestimmt hast.",
+        "st.bag.f": "<b>Skills statt Prompt-Basteln:</b> Deine Arbeitsweise bringst du ihm als ganz normale Notiz bei – offener SKILL.md-Standard. Was du ihm einmal sagst, merkt er sich.",
+        "st.bag.win": "Notiz-Agent",
+        "st.bag.alt": "Notiz-Agent: Auftrag, Kontext-Dateien und Ergebnis zur Prüfung",
+        "st.bag.m1": "„Fasse den Projektordner Digitalpakt zu einem Statusbericht zusammen.“",
+        "st.bag.c1": "Digitalpakt II/",
+        "st.bag.c2": "Antrag.docx",
+        "st.bag.c3": "Kosten.xlsx",
+        "st.bag.c4": "Skill: Statusbericht",
+        "st.bag.m2": "Arbeitsschritte",
+        "st.bag.m3": "Zur Prüfung · noch nicht gespeichert",
+        "st.bag.s1": "12 Notizen im Projektordner gelesen",
+        "st.bag.s2": "Antrag und Kostenaufstellung ausgewertet",
+        "st.bag.s3": "Statusbericht entworfen",
+        "st.bag.file": "Statusbericht Digitalpakt II.md",
+        "st.bag.ok": "Übernehmen",
+        "st.bag.no": "Verwerfen",
+        "st.b2.num": "WARUM 03 · VERBUNDEN",
         "st.b2.h": "Ein Arbeitsraum — <em>statt acht Apps.</em>",
         "st.b2.lead": "Notizen, Aufgaben, Mails, Dokumente, Wissensgraph: alles an einem Ort, alles verlinkt. Eine relevante Mail wird zur Notiz mit Aufgabe und Rückverweis – ohne Copy&amp;Paste zwischen zehn Programmen. Weniger Wechsel, weniger Reibung, weniger verloren.",
         "st.b2.f": "<b>Ein Vault statt Tool-Wildwuchs:</b> Markdown, Wissensgraph, Mail→Notiz, Tasks – Module schaltest du nach Bedarf an. <em>1 Arbeitsraum statt 8 Apps und 30 Plugins.</em>",
-        "st.b3.num": "WARUM 03 · DEIN RECHNER",
+        "st.b3.num": "WARUM 04 · DEIN RECHNER",
         "st.b3.h": "KI auf deinem Rechner — <em>deine Daten bleiben bei dir.</em>",
         "st.b3.lead": "Viele KI-Tools stellen dich vor eine falsche Wahl: Komfort in der Cloud oder Kontrolle über deine Daten. MindGraph löst das lokal – mit Modellen auf deinem Rechner (Ollama/LM Studio), ohne Cloud-Pflicht und ohne Telemetrie. Deine Notizen bleiben Markdown-Dateien, die dir gehören.",
         "st.b3.f": "<b>Lokale KI &amp; offene Daten:</b> <b>48 %</b> der Unternehmen nennen Datenschutz-Anforderungen als größtes KI-Hemmnis <span style=\"color:var(--text-muted)\">(Bitkom 2025)</span>. MindGraph braucht diesen Kompromiss nicht.",
-        "st.b4.label": "Warum 04 · Du denkst weiter",
+        "st.b4.label": "Warum 05 · Du denkst weiter",
         "st.b4.h": "KI, die dein Denken stärkt — <em>statt es zu ersetzen.</em>",
         "st.b4.lead": "Wer Denken blind auslagert, verlernt es. In einer MIT-Studie zeigten Menschen, die mit einem Sprachmodell schrieben, die <b>schwächste Gehirnvernetzung</b> – viele konnten ihren eben verfassten Text nicht einmal wiedergeben <span style=\"color:var(--text-muted)\">(Kosmyna et al. 2025, MIT Media Lab)</span>. MindGraph ist dafür gebaut, dass du im Spiel bleibst: aktives Erinnern, Reflexion, bewusste Freigabe.",
         "st.b4.gain": "<b>↑ Du gewinnst</b>Aktives Erinnern (Karteikarten), Reflexion (Brain), Mensch-in-der-Schleife.",
@@ -1707,6 +1829,11 @@
         "how.p5": "Schalte die Webrecherche pro Auftrag zu – ganz optional. Der Agent sucht, liest die passenden Seiten und schreibt eine Notiz mit sauberem Quellenverzeichnis; du prüfst sie, bevor sie in deinen Vault kommt. Der Suchanbieter erhält nur die Suchanfragen; die vollständigen Seiten ruft die App lokal ab. Bei einem optionalen Cloud-Modell geht der gelesene Kontext zusätzlich an dessen Anbieter – darauf weist die App vor dem Lauf hin. Den Suchanbieter wählst du selbst: sofort einsatzbereit oder deine eigene, private Suchmaschine.",
         "hero.badge": "Open Source \u00b7 Lokal \u00b7 Kostenlos",
         "hero.release": "Wartungsrelease &mdash; alle 13 gemeldeten Sicherheitsl&uuml;cken geschlossen &middot; v{vs}",
+        "hero.videoPause": "Anhalten",
+        "hero.videoPlay": "Abspielen",
+        "hero.soundOn": "Ton an",
+        "hero.soundOff": "Ton aus",
+        "hero.videoAlt": "Ablauf in der App: eine E-Mail trifft ein, die Aufgabe darin wird erkannt, daraus entsteht eine Notiz, und am nächsten Morgen steht alles im Dashboard.",
         "hero.title": "Der Fokus bleibt.<br><em>Auch wenn das Leben dazwischenkommt.</em>",
         "hero.sub": "MindGraph zeigt dir jeden Morgen, was heute z\u00e4hlt \u2014 Aufgaben, Mails, Termine, vergessene F\u00e4den. Du gehst aufs Bike, ins Wochenende, liegst mal f\u00fcnf Tage flach. Und nichts f\u00e4llt durch. Lokal, ohne Cloud-Zwang.",
         "hero.cta": "Kostenlos herunterladen",
@@ -1890,15 +2017,34 @@
         "st.b1.h": "What matters today — <em>on its own.</em>",
         "st.b1.lead": "In the morning you open one tab, not ten. MindGraph shows overdue tasks, emails awaiting a reply, today's appointments – and brings forgotten notes back into view. Been away for five days? It's all there, sorted by relevance. Nothing lost.",
         "st.b1.f": "<b>Dashboard &amp; relevance radar:</b> a local AI continuously assesses which open problems need attention right now – and which should resurface.",
-        "st.b2.num": "WHY 02 · CONNECTED",
+        "st.bag.num": "WHY 02 · ASSIGNMENTS",
+        "st.bag.h": "Say what needs doing — <em>then check what comes back.</em>",
+        "st.bag.lead": "The agent is not a chat box that spits out text. You give it an assignment and your material – spreadsheets, documents, PDFs, whole folders. It searches your own notes, works step by step and hands you finished files. Nothing is written until you say so.",
+        "st.bag.f": "<b>Skills instead of prompt fiddling:</b> you teach it how you work in a plain note – the open SKILL.md standard. Tell it once, and it remembers.",
+        "st.bag.win": "Note agent",
+        "st.bag.alt": "Note agent: assignment, context files and a result waiting for review",
+        "st.bag.m1": "“Turn the Digital Pact project folder into a status report.”",
+        "st.bag.c1": "Digital Pact II/",
+        "st.bag.c2": "Application.docx",
+        "st.bag.c3": "Costs.xlsx",
+        "st.bag.c4": "Skill: Status report",
+        "st.bag.m2": "Steps",
+        "st.bag.m3": "For review · not saved yet",
+        "st.bag.s1": "Read 12 notes in the project folder",
+        "st.bag.s2": "Went through the application and the cost sheet",
+        "st.bag.s3": "Drafted the status report",
+        "st.bag.file": "Status report Digital Pact II.md",
+        "st.bag.ok": "Accept",
+        "st.bag.no": "Discard",
+        "st.b2.num": "WHY 03 · CONNECTED",
         "st.b2.h": "One workspace — <em>instead of eight apps.</em>",
         "st.b2.lead": "Notes, tasks, emails, documents, knowledge graph: all in one place, all linked. A relevant email becomes a note with a task and a backlink – no copy&amp;paste across ten programs. Fewer switches, less friction, less lost.",
         "st.b2.f": "<b>One vault instead of tool sprawl:</b> Markdown, knowledge graph, email→note, tasks – switch modules on as you need them. <em>1 workspace instead of 8 apps and 30 plugins.</em>",
-        "st.b3.num": "WHY 03 · YOUR MACHINE",
+        "st.b3.num": "WHY 04 · YOUR MACHINE",
         "st.b3.h": "AI on your machine — <em>your data stays with you.</em>",
         "st.b3.lead": "Many AI tools present a false choice: cloud convenience or control over your data. MindGraph keeps it local – with models running on your machine (Ollama/LM Studio), no cloud requirement and no telemetry. Your notes stay Markdown files that belong to you.",
         "st.b3.f": "<b>Local AI &amp; open data:</b> <b>48%</b> of companies cite data-protection requirements as the biggest barrier to AI <span style=\"color:var(--text-muted)\">(Bitkom 2025)</span>. MindGraph doesn't need that trade-off.",
-        "st.b4.label": "Why 04 · You keep thinking",
+        "st.b4.label": "Why 05 · You keep thinking",
         "st.b4.h": "AI that strengthens your thinking — <em>instead of replacing it.</em>",
         "st.b4.lead": "Outsource thinking blindly and you unlearn it. In an MIT study, people who wrote with a language model showed the <b>weakest brain connectivity</b> – many couldn't even recall the text they had just written <span style=\"color:var(--text-muted)\">(Kosmyna et al. 2025, MIT Media Lab)</span>. MindGraph is built to keep you in the loop: active recall, reflection, deliberate approval.",
         "st.b4.gain": "<b>↑ You gain</b>Active recall (flashcards), reflection (Brain), human-in-the-loop.",
@@ -1951,6 +2097,11 @@
         "how.p5": "Turn on web research per task – entirely optional. The agent searches, reads the relevant pages and writes a note with a clean list of sources; you review it before it enters your vault. The search provider receives only the queries; the app fetches full pages locally. With an optional cloud model, the extracted context is also sent to that model provider – the app warns you before the run. You choose the search provider yourself: ready to use or your own private search engine.",
         "hero.badge": "Open Source \u00b7 Local \u00b7 Free",
         "hero.release": "Maintenance release &mdash; all 13 reported vulnerabilities closed &middot; v{vs}",
+        "hero.videoPause": "Pause",
+        "hero.videoPlay": "Play",
+        "hero.soundOn": "Sound on",
+        "hero.soundOff": "Sound off",
+        "hero.videoAlt": "What happens in the app: an email arrives, the task inside it is spotted, a note is created from it, and the next morning everything sits on your dashboard.",
         "hero.title": "Shows you<br><em>what matters today.</em>",
         "hero.sub": "MindGraph Notes connects your notes, tasks, emails and documents \u2014 and ranks them by relevance. Dashboard, knowledge graph and local AI in one desktop app. No cloud lock-in.",
         "hero.cta": "Download for free",
@@ -2118,9 +2269,85 @@
         const t = translations[lang]?.[key];
         if (t) el.innerHTML = applyVersion(t);
       });
+      // aria-label ist Text, kein Markup -> eigene Schleife, damit Screenreader mitwandern
+      document.querySelectorAll('[data-i18n-aria]').forEach(el => {
+        const t = translations[lang]?.[el.getAttribute('data-i18n-aria')];
+        if (t) el.setAttribute('aria-label', t);
+      });
+      syncHeroVideoButton();
       if (APP_VERSION) {
         document.querySelectorAll('[data-app-version]').forEach(el => { el.textContent = APP_VERSION; });
       }
+    }
+
+    // Endlos laufende Bewegung muss anhaltbar sein (WCAG 2.2.2). Beschriftungen folgen
+    // dem Zustand des Videos, nicht umgekehrt - sonst luegen sie nach einem Sprachwechsel.
+    function syncHeroVideoButton() {
+      const v = document.getElementById('heroWorkflow');
+      if (!v) return;
+      const t = (key, fb) => translations[currentLang]?.[key] || fb;
+      const play = document.getElementById('heroPlayBtn');
+      if (play) {
+        const label = v.paused ? t('hero.videoPlay', 'Abspielen') : t('hero.videoPause', 'Anhalten');
+        play.textContent = label;
+        play.setAttribute('aria-label', label);
+      }
+      const sound = document.getElementById('heroSoundBtn');
+      if (sound) {
+        const label = v.muted ? t('hero.soundOn', 'Ton an') : t('hero.soundOff', 'Ton aus');
+        sound.textContent = label;
+        sound.setAttribute('aria-label', label);
+        sound.setAttribute('aria-pressed', String(!v.muted));
+      }
+      syncHeroCaptionTrack();
+    }
+
+    function toggleHeroVideo() {
+      const v = document.getElementById('heroWorkflow');
+      if (!v) return;
+      if (v.paused) { v.play(); } else { v.pause(); }
+      syncHeroVideoButton();
+    }
+
+    // Mit Ton ergibt eine Endlosschleife keinen Sinn - der Sprecher wuerde sich
+    // ununterbrochen wiederholen. Ton an heisst deshalb: einmal von vorn, ohne Schleife.
+    function toggleHeroSound() {
+      const v = document.getElementById('heroWorkflow');
+      if (!v) return;
+      if (v.muted) {
+        v.muted = false;
+        v.loop = false;
+        v.currentTime = 0;
+        v.play();
+      } else {
+        v.muted = true;
+        v.loop = true;
+      }
+      syncHeroVideoButton();
+    }
+
+    // Untertitel werden unter dem Video ausgegeben statt im Bild: der Sprechertext
+    // bleibt so auch ohne Ton lesbar, ohne die App zu verdecken.
+    function syncHeroCaptionTrack() {
+      const v = document.getElementById('heroWorkflow');
+      const out = document.getElementById('heroCaption');
+      if (!v || !out || !v.textTracks) return;
+      let active = null;
+      for (const track of v.textTracks) {
+        const wanted = track.language === currentLang;
+        track.mode = wanted ? 'hidden' : 'disabled';
+        if (wanted) active = track;
+      }
+      if (!active) { out.textContent = ''; return; }
+      if (!active.dataset_bound) {
+        active.addEventListener('cuechange', () => {
+          const cue = active.activeCues && active.activeCues[0];
+          out.textContent = cue ? cue.text.replace(/\n/g, ' ') : '';
+        });
+        active.dataset_bound = true;
+      }
+      const cue = active.activeCues && active.activeCues[0];
+      out.textContent = cue ? cue.text.replace(/\n/g, ' ') : '';
     }
 
     function openModal(id) {
@@ -2143,6 +2370,39 @@
 
     // Init language
     setLanguage(currentLang);
+
+    // Autoplay startet erst NACH dem ersten setLanguage-Durchlauf - ohne diese
+    // Kopplung behauptet der Knopf danach dauerhaft "Abspielen", obwohl das Video laeuft.
+    (function bindHeroVideo() {
+      const v = document.getElementById('heroWorkflow');
+      if (!v) return;
+      ['play', 'pause', 'volumechange', 'loadedmetadata'].forEach(ev =>
+        v.addEventListener(ev, syncHeroVideoButton));
+
+      // Mit Ton laeuft das Video ohne Schleife - sonst bliebe es am Ende stehen und
+      // der Hero waere fuer alle spaeteren Blicke ein Standbild. Danach zurueck in
+      // die stumme Schleife, also in den Zustand, in dem die Seite geladen wird.
+      v.addEventListener('ended', () => {
+        v.muted = true;
+        v.loop = true;
+        v.currentTime = 0;
+        v.play().catch(() => {});
+        syncHeroVideoButton();
+      });
+
+      // Ausserhalb des Sichtbereichs nicht weiterlaufen lassen: spart Rechenzeit und
+      // verhindert, dass der Sprecher weiterredet, waehrend man laengst woanders liest.
+      if ('IntersectionObserver' in window) {
+        new IntersectionObserver((entries) => {
+          for (const e of entries) {
+            if (e.isIntersecting) { if (v.muted && v.paused) v.play().catch(() => {}); }
+            else if (!v.paused) v.pause();
+          }
+        }, { threshold: 0.15 }).observe(v);
+      }
+
+      syncHeroVideoButton();
+    })();
   </script>
 </body>
 </html>
