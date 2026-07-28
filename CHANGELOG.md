@@ -2,6 +2,22 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.10.29-beta] - 2026-07-28
+
+Ein Wartungsrelease ohne neue Funktionen. Alle 13 gemeldeten Sicherheitslücken in den mitgelieferten Fremdbibliotheken sind geschlossen, der Unterbau ist auf aktuellem Stand. An der App selbst ändert sich nichts — Notizen, Einstellungen und Vault bleiben unberührt.
+
+### Sicherheit
+
+- **Alle 13 Meldungen geschlossen** (neun davon hoch eingestuft, `npm audit` meldet null Befunde). Dahinter standen nur drei echte Ursachen; der Rest waren Weiterleitungen dorthin über die Abhängigkeiten des Bauwerkzeugs: eine Textmuster-Bibliothek ließ sich zu unbegrenzter Ausdehnung bringen, eine präparierte ZIP-Datei konnte beim Import (Anki-Karten, Office-Dateien) übermäßig viel Speicher anfordern, und die Bildverarbeitung erbte alte Lücken ihrer C-Bibliothek.
+- **Bewusst gegen die Automatik entschieden:** Die eingebaute Reparaturfunktion hätte das Bauwerkzeug auf eine ältere Hauptversion zurückgestuft, die eigene, ältere Lücken mitbringt. Stattdessen wurden alle betroffenen Pakete gezielt nach vorn aktualisiert und die drei Ursachen über feste Vorgaben erzwungen, weil sie tief in fremden Abhängigkeitsbäumen hängen.
+- **Sync-Server**: Ein Werkzeug-Befund im Entwicklungsserver ist ebenfalls behoben. Er betraf nur die Entwicklung unter Windows, nicht den laufenden Serverbetrieb.
+
+### Aufräumen
+
+- **Eine ungenutzte Bibliothek entfernt**: `react-window` wurde nirgends mehr im Programm verwendet und ist samt der zugehörigen Typdefinitionen raus. Die Typdefinitionen waren zudem seit Längerem auf einen veralteten Stand festgenagelt.
+- **TypeScript auf Version 6** angehoben. Nötig war dafür eine einzige Anpassung an der Projektkonfiguration, die ohnehin fällig gewesen wäre: die abgekündigte Option `baseUrl` ist entfernt, die Pfad-Aliase sind explizit relativ. Der Sync-Server bleibt vorerst auf der vorherigen Version.
+- **Doku richtiggestellt**: Die mitgelieferten KaTeX-Dateien für den HTML-Export sind Version 0.16.43; README und Projektdoku behaupteten 0.16.27. Beide Stellen stimmen wieder, mit Hinweis, wo die echte Version ablesbar ist.
+
 ## [0.10.28-beta] - 2026-07-27
 
 Was von der KI kommt, steht jetzt dran. Und die Mail- und Dashboard-Bewertung ist deutlich treffsicherer — nachdem sich herausstellte, dass nicht die Modelle danebenlagen, sondern unsere eigene Skala.

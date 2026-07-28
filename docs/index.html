@@ -48,7 +48,7 @@
     "url": "https://mindgraph-notes.de/",
     "downloadUrl": "https://github.com/bydb/mindgraph-notes/releases",
     "screenshot": "https://mindgraph-notes.de/screenshot.png",
-    "softwareVersion": "0.10.28-beta",
+    "softwareVersion": "0.10.29-beta",
     "author": { "@type": "Person", "name": "Jochen Leeder", "url": "https://bydb.io" },
     "license": "https://opensource.org/licenses/AGPL-3.0",
     "featureList": [
@@ -466,7 +466,7 @@
         <span class="hero-dot"></span>
         <span data-i18n="hero.badge">Open Source &middot; Lokal &middot; Kostenlos</span>
       </div>
-      <a class="release-badge" href="#changelog" data-i18n="hero.release">Beta-Zielgerade vor 1.0 &mdash; klare Modellempfehlung f&uuml;r den Agenten &middot; v0.10.27</a>
+      <a class="release-badge" href="#changelog" data-i18n="hero.release">Wartungsrelease &mdash; alle 13 gemeldeten Sicherheitsl&uuml;cken geschlossen &middot; v0.10.29</a>
     </div>
 
     <h1 data-i18n="hero.title">Der Fokus bleibt.<br><em>Auch wenn das Leben dazwischenkommt.</em></h1>
@@ -1450,17 +1450,17 @@
     <div class="release-inner">
       <div class="release-head">
         <div>
-          <div class="st-eyebrow"><span class="d"></span><span data-i18n="release.label">Release 0.10.28 &middot; Beta-Zielgerade vor 1.0</span></div>
-          <h2 class="st-h" style="font-size:clamp(1.8rem,3.8vw,2.6rem)" data-i18n="release.heading">Was ist neu &mdash; <em>man sieht, was von der KI kommt.</em></h2>
-          <p class="st-lead" data-i18n="release.lead">Jede Notiz, an der die KI mitgeschrieben hat, sagt jetzt welches Modell es war &mdash; sichtbar beim Lesen, dauerhaft in der Datei. Dazu eine treffsicherere Bewertung von Mails und Fristen.</p>
+          <div class="st-eyebrow"><span class="d"></span><span data-i18n="release.label">Release 0.10.29 &middot; Wartung vor 1.0</span></div>
+          <h2 class="st-h" style="font-size:clamp(1.8rem,3.8vw,2.6rem)" data-i18n="release.heading">Was ist neu &mdash; <em>nichts, was man sieht. Genau darum geht es.</em></h2>
+          <p class="st-lead" data-i18n="release.lead">Dieses Release bringt keine neuen Funktionen. Es schlie&szlig;t alle 13 gemeldeten Sicherheitsl&uuml;cken in den mitgelieferten Fremdbibliotheken und bringt den Unterbau auf einen aktuellen Stand &mdash; die Grundlage daf&uuml;r, dass 1.0 tragf&auml;hig ist.</p>
         </div>
         <div class="release-date">v<span data-app-version>0.10.27-beta</span></div>
       </div>
       <div class="release-grid">
-        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c1h">Kennzeichnung &uuml;berall</b><p data-i18n="release.c1">Notiz-Agent, Notizen-Chat, Mail-Notizen, Brain, Projekt-Status, Workflows: Was die KI schreibt, tr&auml;gt Modell und Datum in der Notiz &mdash; und im Lesen-Modus ein Abzeichen unter dem Titel.</p></div></div>
-        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c2h">Kein Abzeichen ohne KI</b><p data-i18n="release.c2">Ein Workflow, der Text nur durchreicht, wird nicht als KI-Inhalt markiert. Eine Kennzeichnung, die &uuml;berall steht, sagt nichts mehr aus.</p></div></div>
-        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c3h">Mails treffsicherer bewertet</b><p data-i18n="release.c3">Unsere Relevanz-Skala war falsch geeicht &mdash; nicht die Modelle. Neu kalibriert stieg die Trefferquote des empfohlenen Modells von 6 auf 8 von 8 F&auml;llen.</p></div></div>
-        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c4h">Fristen richtig gelesen</b><p data-i18n="release.c4">Eine &uuml;berschrittene Frist macht eine Notiz nicht veraltet, sondern dringend. Und Notizen mit versteckten Anweisungen an die KI landen zuverl&auml;ssig bei Dringlichkeit 0.</p></div></div>
+        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c1h">Alle Meldungen geschlossen</b><p data-i18n="release.c1">13 Sicherheitsmeldungen, neun davon hoch eingestuft. Dahinter standen drei echte Ursachen &mdash; unter anderem konnte eine pr&auml;parierte ZIP-Datei beim Import &uuml;berm&auml;&szlig;ig viel Speicher belegen. Alle drei sind behoben, die Pr&uuml;fung meldet null Befunde.</p></div></div>
+        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c2h">Kein R&uuml;ckschritt am Unterbau</b><p data-i18n="release.c2">Die bequeme Automatik-Reparatur h&auml;tte unser Bauwerkzeug auf eine &auml;ltere Hauptversion zur&uuml;ckgestuft &mdash; mit eigenen alten L&uuml;cken. Stattdessen ist jedes Paket gezielt nach vorn aktualisiert.</p></div></div>
+        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c3h">Weniger Ballast</b><p data-i18n="release.c3">Eine Bibliothek, die im Programm gar nicht mehr benutzt wurde, ist entfernt. Was nicht mitgeliefert wird, kann auch keine L&uuml;cke haben.</p></div></div>
+        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c4h">Aktuelle Werkzeuge</b><p data-i18n="release.c4">Der Programmierunterbau l&auml;uft auf der neuesten TypeScript-Hauptversion. An den Funktionen &auml;ndert sich nichts &mdash; dein Vault bleibt exakt so, wie er ist.</p></div></div>
       </div>
       <a class="release-link" href="https://github.com/bydb/mindgraph-notes/releases" target="_blank" rel="noopener noreferrer" data-i18n="release.link">Vollst&auml;ndige Release Notes auf GitHub &rarr;</a>
     </div>
@@ -1706,7 +1706,7 @@
         "how.p5h": "Das Web, wenn du es brauchst",
         "how.p5": "Schalte die Webrecherche pro Auftrag zu – ganz optional. Der Agent sucht, liest die passenden Seiten und schreibt eine Notiz mit sauberem Quellenverzeichnis; du prüfst sie, bevor sie in deinen Vault kommt. Der Suchanbieter erhält nur die Suchanfragen; die vollständigen Seiten ruft die App lokal ab. Bei einem optionalen Cloud-Modell geht der gelesene Kontext zusätzlich an dessen Anbieter – darauf weist die App vor dem Lauf hin. Den Suchanbieter wählst du selbst: sofort einsatzbereit oder deine eigene, private Suchmaschine.",
         "hero.badge": "Open Source \u00b7 Lokal \u00b7 Kostenlos",
-        "hero.release": "Beta-Zielgerade vor 1.0 &mdash; klare Modellempfehlung f&uuml;r den Agenten &middot; v{vs}",
+        "hero.release": "Wartungsrelease &mdash; alle 13 gemeldeten Sicherheitsl&uuml;cken geschlossen &middot; v{vs}",
         "hero.title": "Der Fokus bleibt.<br><em>Auch wenn das Leben dazwischenkommt.</em>",
         "hero.sub": "MindGraph zeigt dir jeden Morgen, was heute z\u00e4hlt \u2014 Aufgaben, Mails, Termine, vergessene F\u00e4den. Du gehst aufs Bike, ins Wochenende, liegst mal f\u00fcnf Tage flach. Und nichts f\u00e4llt durch. Lokal, ohne Cloud-Zwang.",
         "hero.cta": "Kostenlos herunterladen",
@@ -1777,17 +1777,17 @@
         "modules.opt.vision": "Vision OCR",
         "modules.opt.speech": "Diktat & Vorlesen",
         "modules.opt.terminal": "Terminal",
-        "release.label": "Release {vs} · Beta-Zielgerade vor 1.0",
-        "release.heading": "Was ist neu — <em>man sieht, was von der KI kommt.</em>",
-        "release.lead": "Jede Notiz, an der die KI mitgeschrieben hat, sagt jetzt welches Modell es war — sichtbar beim Lesen, dauerhaft in der Datei. Dazu eine treffsicherere Bewertung von Mails und Fristen.",
-        "release.c1h": "Kennzeichnung überall",
-        "release.c1": "Notiz-Agent, Notizen-Chat, Mail-Notizen, Brain, Projekt-Status, Workflows: Was die KI schreibt, trägt Modell und Datum in der Notiz — und im Lesen-Modus ein Abzeichen unter dem Titel.",
-        "release.c2h": "Kein Abzeichen ohne KI",
-        "release.c2": "Ein Workflow, der Text nur durchreicht, wird nicht als KI-Inhalt markiert. Eine Kennzeichnung, die überall steht, sagt nichts mehr aus.",
-        "release.c3h": "Mails treffsicherer bewertet",
-        "release.c3": "Unsere Relevanz-Skala war falsch geeicht — nicht die Modelle. Neu kalibriert stieg die Trefferquote des empfohlenen Modells von 6 auf 8 von 8 Fällen.",
-        "release.c4h": "Fristen richtig gelesen",
-        "release.c4": "Eine überschrittene Frist macht eine Notiz nicht veraltet, sondern dringend. Und Notizen mit versteckten Anweisungen an die KI landen zuverlässig bei Dringlichkeit 0.",
+        "release.label": "Release {vs} · Wartung vor 1.0",
+        "release.heading": "Was ist neu — <em>nichts, was man sieht. Genau darum geht es.</em>",
+        "release.lead": "Dieses Release bringt keine neuen Funktionen. Es schließt alle 13 gemeldeten Sicherheitslücken in den mitgelieferten Fremdbibliotheken und bringt den Unterbau auf einen aktuellen Stand — die Grundlage dafür, dass 1.0 tragfähig ist.",
+        "release.c1h": "Alle Meldungen geschlossen",
+        "release.c1": "13 Sicherheitsmeldungen, neun davon hoch eingestuft. Dahinter standen drei echte Ursachen — unter anderem konnte eine präparierte ZIP-Datei beim Import übermäßig viel Speicher belegen. Alle drei sind behoben, die Prüfung meldet null Befunde.",
+        "release.c2h": "Kein Rückschritt am Unterbau",
+        "release.c2": "Die bequeme Automatik-Reparatur hätte unser Bauwerkzeug auf eine ältere Hauptversion zurückgestuft — mit eigenen alten Lücken. Stattdessen ist jedes Paket gezielt nach vorn aktualisiert.",
+        "release.c3h": "Weniger Ballast",
+        "release.c3": "Eine Bibliothek, die im Programm gar nicht mehr benutzt wurde, ist entfernt. Was nicht mitgeliefert wird, kann auch keine Lücke haben.",
+        "release.c4h": "Aktuelle Werkzeuge",
+        "release.c4": "Der Programmierunterbau läuft auf der neuesten TypeScript-Hauptversion. An den Funktionen ändert sich nichts — dein Vault bleibt exakt so, wie er ist.",
         "release.link": "Vollständige Release Notes auf GitHub →",
         "dl.label": "Download",
         "dl.heading": "Jetzt starten.",
@@ -1950,7 +1950,7 @@
         "how.p5h": "The web, when you need it",
         "how.p5": "Turn on web research per task – entirely optional. The agent searches, reads the relevant pages and writes a note with a clean list of sources; you review it before it enters your vault. The search provider receives only the queries; the app fetches full pages locally. With an optional cloud model, the extracted context is also sent to that model provider – the app warns you before the run. You choose the search provider yourself: ready to use or your own private search engine.",
         "hero.badge": "Open Source \u00b7 Local \u00b7 Free",
-        "hero.release": "Beta home stretch before 1.0 &mdash; a clear model pick for the agent &middot; v{vs}",
+        "hero.release": "Maintenance release &mdash; all 13 reported vulnerabilities closed &middot; v{vs}",
         "hero.title": "Shows you<br><em>what matters today.</em>",
         "hero.sub": "MindGraph Notes connects your notes, tasks, emails and documents \u2014 and ranks them by relevance. Dashboard, knowledge graph and local AI in one desktop app. No cloud lock-in.",
         "hero.cta": "Download for free",
@@ -2021,17 +2021,17 @@
         "modules.opt.vision": "Vision OCR",
         "modules.opt.speech": "Dictation & TTS",
         "modules.opt.terminal": "Terminal",
-        "release.label": "Release {vs} · Beta home stretch before 1.0",
-        "release.heading": "What’s new — <em>you can see what came from the AI.</em>",
-        "release.lead": "Every note the AI helped write now states which model it was — visible while reading, stored in the file itself. Plus sharper scoring for mail and deadlines.",
-        "release.c1h": "Labelled everywhere",
-        "release.c1": "Note agent, notes chat, mail notes, Brain, project status, workflows: whatever the AI writes carries its model and date in the note — and a small badge under the title in reading mode.",
-        "release.c2h": "No badge without AI",
-        "release.c2": "A workflow that merely passes text along is not labelled as AI content. A label that appears everywhere stops meaning anything.",
-        "release.c3h": "Sharper mail scoring",
-        "release.c3": "Our relevance scale was miscalibrated — not the models. Recalibrated, the recommended model went from 6 to 8 out of 8 correct cases.",
-        "release.c4h": "Deadlines read correctly",
-        "release.c4": "A missed deadline makes a note urgent, not obsolete. And notes carrying hidden instructions to the AI reliably score 0 urgency.",
+        "release.label": "Release {vs} · Maintenance before 1.0",
+        "release.heading": "What’s new — <em>nothing you can see. That is the point.</em>",
+        "release.lead": "This release adds no features. It closes all 13 reported vulnerabilities in the third-party libraries we ship and brings the foundations up to date — the groundwork for a 1.0 that holds.",
+        "release.c1h": "Every report closed",
+        "release.c1": "13 security reports, nine of them rated high. Behind them sat three actual causes — among others, a crafted ZIP file could claim excessive memory during import. All three are fixed; the audit now reports zero findings.",
+        "release.c2h": "No step backwards",
+        "release.c2": "The convenient automatic fix would have downgraded our build tool to an older major version — with old holes of its own. Instead every package was moved deliberately forward.",
+        "release.c3h": "Less ballast",
+        "release.c3": "A library the app no longer used at all has been removed. What we do not ship cannot carry a vulnerability.",
+        "release.c4h": "Current tooling",
+        "release.c4": "The codebase now builds on the latest TypeScript major version. Nothing changes about what the app does — your vault stays exactly as it is.",
         "release.link": "Full release notes on GitHub →",
         "dl.label": "Download",
         "dl.heading": "Get started.",
