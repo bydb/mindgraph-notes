@@ -8285,16 +8285,16 @@ __export(index_min_exports, {
   x: () => So
 });
 function Zn(s3, t, e) {
-  let i = t, r = t ? t.next : s3.head, n = new me(e, i, r, s3);
+  let i = t, r = t ? t.next : s3.head, n = new ue(e, i, r, s3);
   return n.next === void 0 && (s3.tail = n), n.prev === void 0 && (s3.head = n), s3.length++, n;
 }
 function Yn(s3, t) {
-  s3.tail = new me(t, s3.tail, void 0, s3), s3.head || (s3.head = s3.tail), s3.length++;
+  s3.tail = new ue(t, s3.tail, void 0, s3), s3.head || (s3.head = s3.tail), s3.length++;
 }
 function Kn(s3, t) {
-  s3.head = new me(t, void 0, s3.head, s3), s3.tail || (s3.tail = s3.head), s3.length++;
+  s3.head = new ue(t, void 0, s3.head, s3), s3.tail || (s3.tail = s3.head), s3.length++;
 }
-var import_events, import_fs, import_node_events, import_node_stream, import_node_string_decoder, import_node_path, import_node_fs, import_path, import_events2, import_assert, import_buffer, Ps, import_zlib, import_node_path2, import_node_path3, import_fs2, import_fs3, import_path2, import_node_path4, import_path3, import_node_fs2, import_node_assert, import_node_crypto, import_node_fs3, import_node_path5, import_fs4, import_node_fs4, import_node_path6, import_node_fs5, import_promises, import_node_path7, import_node_path8, import_node_fs6, import_node_path9, zr, Ur, Ds, Wr, Gr, Zr, Q, J, nt, De, qt, Ne, Ns, Ae, As, z, Mt, g, Qt, Bt, b, N, _, bi, Ie, L, w, _i, Oi, Is, Ti, Z, xi, Ce, Jt, Rt, C, jt, Yr, Kr, Vr, $r, Fe, Li, Xr, qr, A, Jr, ht, H, te, u, Ni, tt, Ai, ki, vi, ie, ke, Ut, Ht, Ii, Pt, at, U, ot, Y, zt, Ci, j, ee, Fi, ve, gt, Me, bt, _t, Be, et, Wt, jr, Fs, ks, vs, Ms, Bs, tn, se, K, sn, M, rn, zs, nn, Bi, Tt, Gt, Pi, re, Pe, ze, Ue, He, We, Ge, Ze, Ye, Ke, Us, hn, an, Hs, ln, cn, Ws, Gs, Hi, ne, dn, Ui, oe, Ve, mn, F, un, xt, Wi, pn, lt, En, wn, Sn, ct, yn, Rn, gn, Gi, bn, Lt, ft, On, Tn, xn, Ln, f, $e, Dt, Nn, Xi, qi, An, B, Nt, it, Zi, Zs, V, he, dt, Ys, p, st, mt, Yi, At, y, Xe, qe, Ki, Ks, Vs, ae, Vi, Qe, Yt, $, Je, It, je, ti, $s, In, le, $i, Xs, Cn, rt, ut, vn, Qi, Mn, Bn, Ct, Ji, zn, qs, ce, ei, ji, Un, Hn, ts, Qs, rr, Wn, tr, er, ir, is, sr, fe, ii, ss, si, rs, ns, os, hs, pt, ri, as, es, q, de, ni, oi, Gn, hi, me, pi, nr, li, ue, W, pe, Et, Ft, Ee, ai, G, ls, ci, or, ds, ms, fi, di, hr, cs, mi, lr, fs, wt, kt, Vn, $n, fr, dr, Xn, qn, Qn, Jn, Er, wr, mr, Sr, yr, Rr, jn, to, eo, ur, us, ps, Ei, io, Es, so, ws, Se, St, no, gr, Ss, br, oo, _r, ys, Or, Vt, Tr, ho, ao, lo, yi, Lr, Dr, _s, Nr, Os, P, Ts, xs, gi, Ar, Ir, Re, Cr, Fr, Rs, yt, O, Ri, kr, $t, gs, bs, Ls, ge, be, _e, Oe, fo, Te, mo, uo, po, vr, Xt, ye, xe, Eo, wo, So, yo, Ro, go, bo, _o, vt, Oo, To;
+var import_events, import_fs, import_node_events, import_node_stream, import_node_string_decoder, import_node_path, import_node_fs, import_path, import_events2, import_assert, import_buffer, Ps, import_zlib, import_node_path2, import_node_path3, import_fs2, import_fs3, import_path2, import_node_path4, import_path3, import_node_fs2, import_node_assert, import_node_crypto, import_node_fs3, import_node_path5, import_fs4, import_node_fs4, import_node_path6, import_node_fs5, import_promises, import_node_path7, import_node_path8, import_node_fs6, import_node_path9, zr, Ur, Ds, Wr, Gr, Zr, Q, J, nt, De, qt, Ne, Ns, Ae, As, z, Mt, g, Qt, Bt, b, N, _, bi, Ie, L, S, _i, Oi, Is, Ti, Z, xi, Ce, Jt, Rt, C, jt, Yr, Kr, Vr, $r, Fe, Li, Xr, qr, A, Jr, ht, H, te, m, Ni, tt, Ai, ki, vi, ie, ke, Ut, Ht, Ii, Pt, at, U, ot, Y, zt, Ci, j, ee, Fi, ve, gt, Me, bt, _t, Be, et, Wt, jr, Fs, ks, vs, Ms, Bs, tn, se, K, sn, M, rn, zs, nn, Bi, Tt, Gt, Pi, re, Pe, ze, Ue, He, We, Ge, Ze, Ye, Ke, Us, hn, an, Hs, ln, cn, Ws, Gs, Hi, ne, dn, Ui, oe, Ve, un, F, mn, xt, Wi, pn, lt, En, wn, Sn, ct, yn, Rn, gn, Gi, bn, Lt, ft, On, Tn, xn, Ln, f, $e, Dt, Nn, Xi, qi, An, B, Nt, it, Zi, Zs, V, he, dt, Ys, p, st, ut, Yi, At, w, Xe, qe, Ki, Ks, Vs, ae, Vi, Qe, Yt, $, Je, It, je, ti, $s, In, le, $i, Xs, Cn, rt, mt, vn, Qi, Mn, Bn, Ct, Ji, zn, qs, ce, ei, ji, Un, Hn, ts, Qs, rr, Wn, tr, er, ir, is, sr, fe, ii, ss, si, rs, ns, os, hs, pt, ri, as, es, q, de, ni, oi, Gn, hi, ue, pi, nr, li, me, W, pe, Et, Ft, Ee, ai, G, ls, ci, or, ds, us, fi, di, hr, cs, ui, lr, fs, wt, kt, Vn, $n, fr, dr, Xn, qn, Qn, Jn, Er, wr, ur, Sr, yr, Rr, jn, to, eo, mr, ms, ps, Ei, io, Es, so, ws, Se, St, no, gr, Ss, br, oo, _r, ys, Or, Vt, Tr, ho, ao, lo, yi, Lr, Dr, _s, Nr, Os, P, Ts, xs, gi, Ar, Ir, Re, Cr, Fr, Rs, yt, O, Ri, kr, $t, gs, bs, Ls, ge, be, _e, Oe, fo, Te, uo, mo, po, vr, Xt, ye, xe, Eo, wo, So, yo, Ro, go, bo, _o, vt, Oo, To;
 var init_index_min = __esm({
   "node_modules/tar/dist/esm/index.min.js"() {
     import_events = __toESM(require("events"), 1);
@@ -8359,7 +8359,7 @@ var init_index_min = __esm({
     bi = Symbol("bufferPush");
     Ie = Symbol("bufferShift");
     L = Symbol("objectMode");
-    w = Symbol("destroyed");
+    S = Symbol("destroyed");
     _i = Symbol("error");
     Oi = Symbol("emitData");
     Is = Symbol("emitEnd");
@@ -8417,7 +8417,7 @@ var init_index_min = __esm({
       [Ne] = false;
       [qt] = null;
       [_] = 0;
-      [w] = false;
+      [S] = false;
       [Jt];
       [Ce] = false;
       [Rt] = 0;
@@ -8466,7 +8466,7 @@ var init_index_min = __esm({
       write(t, e, i) {
         if (this[Ce]) return false;
         if (this[Q]) throw new Error("write after end");
-        if (this[w]) return this.emit("error", Object.assign(new Error("Cannot call write after a stream was destroyed"), { code: "ERR_STREAM_DESTROYED" })), true;
+        if (this[S]) return this.emit("error", Object.assign(new Error("Cannot call write after a stream was destroyed"), { code: "ERR_STREAM_DESTROYED" })), true;
         typeof e == "function" && (i = e, e = "utf8"), e || (e = "utf8");
         let r = this[Z] ? jt : Yr;
         if (!this[L] && !Buffer.isBuffer(t)) {
@@ -8477,7 +8477,7 @@ var init_index_min = __esm({
         return this[L] ? (this[g] && this[_] !== 0 && this[Ae](true), this[g] ? this.emit("data", t) : this[bi](t), this[_] !== 0 && this.emit("readable"), i && r(i), this[g]) : t.length ? (typeof t == "string" && !(e === this[z] && !this[Mt]?.lastNeed) && (t = Buffer.from(t, e)), Buffer.isBuffer(t) && this[z] && (t = this[Mt].write(t)), this[g] && this[_] !== 0 && this[Ae](true), this[g] ? this.emit("data", t) : this[bi](t), this[_] !== 0 && this.emit("readable"), i && r(i), this[g]) : (this[_] !== 0 && this.emit("readable"), i && r(i), this[g]);
       }
       read(t) {
-        if (this[w]) return null;
+        if (this[S]) return null;
         if (this[C] = false, this[_] === 0 || t === 0 || t && t > this[_]) return this[J](), null;
         this[L] && (t = null), this[b].length > 1 && !this[L] && (this[b] = [this[z] ? this[b].join("") : Buffer.concat(this[b], this[_])]);
         let e = this[Ns](t || null, this[b][0]);
@@ -8495,7 +8495,7 @@ var init_index_min = __esm({
         return typeof t == "function" && (i = t, t = void 0), typeof e == "function" && (i = e, e = "utf8"), t !== void 0 && this.write(t, e), i && this.once("end", i), this[Q] = true, this.writable = false, (this[g] || !this[Qt]) && this[J](), this;
       }
       [Bt]() {
-        this[w] || (!this[Rt] && !this[N].length && (this[C] = true), this[Qt] = false, this[g] = true, this.emit("resume"), this[b].length ? this[Ae]() : this[Q] ? this[J]() : this.emit("drain"));
+        this[S] || (!this[Rt] && !this[N].length && (this[C] = true), this[Qt] = false, this[g] = true, this.emit("resume"), this[b].length ? this[Ae]() : this[Q] ? this[J]() : this.emit("drain"));
       }
       resume() {
         return this[Bt]();
@@ -8504,7 +8504,7 @@ var init_index_min = __esm({
         this[g] = false, this[Qt] = true, this[C] = false;
       }
       get destroyed() {
-        return this[w];
+        return this[S];
       }
       get flowing() {
         return this[g];
@@ -8528,7 +8528,7 @@ var init_index_min = __esm({
         return this.emit("data", t), this[g];
       }
       pipe(t, e) {
-        if (this[w]) return t;
+        if (this[S]) return t;
         this[C] = false;
         let i = this[nt];
         return e = e || {}, t === Ds.stdout || t === Ds.stderr ? e.end = false : e.end = e.end !== false, e.proxyErrors = !!e.proxyErrors, i ? e.end && t.end() : (this[N].push(e.proxyErrors ? new Li(this, t, e) : new Fe(this, t, e)), this[Z] ? jt(() => this[Bt]()) : this[Bt]()), t;
@@ -8566,15 +8566,15 @@ var init_index_min = __esm({
         return this[nt];
       }
       [J]() {
-        !this[De] && !this[nt] && !this[w] && this[b].length === 0 && this[Q] && (this[De] = true, this.emit("end"), this.emit("prefinish"), this.emit("finish"), this[Ne] && this.emit("close"), this[De] = false);
+        !this[De] && !this[nt] && !this[S] && this[b].length === 0 && this[Q] && (this[De] = true, this.emit("end"), this.emit("prefinish"), this.emit("finish"), this[Ne] && this.emit("close"), this[De] = false);
       }
       emit(t, ...e) {
         let i = e[0];
-        if (t !== "error" && t !== "close" && t !== w && this[w]) return false;
+        if (t !== "error" && t !== "close" && t !== S && this[S]) return false;
         if (t === "data") return !this[L] && !i ? false : this[Z] ? (jt(() => this[Oi](i)), true) : this[Oi](i);
         if (t === "end") return this[Is]();
         if (t === "close") {
-          if (this[Ne] = true, !this[nt] && !this[w]) return false;
+          if (this[Ne] = true, !this[nt] && !this[S]) return false;
           let n = super.emit("close");
           return this.removeAllListeners("close"), n;
         } else if (t === "error") {
@@ -8626,7 +8626,7 @@ var init_index_min = __esm({
       }
       async promise() {
         return new Promise((t, e) => {
-          this.on(w, () => e(new Error("stream destroyed"))), this.on("error", (i) => e(i)), this.on("end", () => t());
+          this.on(S, () => e(new Error("stream destroyed"))), this.on("error", (i) => e(i)), this.on("end", () => t());
         });
       }
       [Symbol.asyncIterator]() {
@@ -8638,14 +8638,14 @@ var init_index_min = __esm({
           if (r !== null) return Promise.resolve({ done: false, value: r });
           if (this[Q]) return e();
           let n, o, h = (d) => {
-            this.off("data", a), this.off("end", l), this.off(w, c), e(), o(d);
+            this.off("data", a), this.off("end", l), this.off(S, c), e(), o(d);
           }, a = (d) => {
-            this.off("error", h), this.off("end", l), this.off(w, c), this.pause(), n({ value: d, done: !!this[Q] });
+            this.off("error", h), this.off("end", l), this.off(S, c), this.pause(), n({ value: d, done: !!this[Q] });
           }, l = () => {
-            this.off("error", h), this.off("data", a), this.off(w, c), e(), n({ done: true, value: void 0 });
+            this.off("error", h), this.off("data", a), this.off(S, c), e(), n({ done: true, value: void 0 });
           }, c = () => h(new Error("stream destroyed"));
-          return new Promise((d, S) => {
-            o = S, n = d, this.once(w, c), this.once("error", h), this.once("end", l), this.once("data", a);
+          return new Promise((d, y) => {
+            o = y, n = d, this.once(S, c), this.once("error", h), this.once("end", l), this.once("data", a);
           });
         }, throw: e, return: e, [Symbol.asyncIterator]() {
           return this;
@@ -8654,21 +8654,21 @@ var init_index_min = __esm({
       }
       [Symbol.iterator]() {
         this[C] = false;
-        let t = false, e = () => (this.pause(), this.off(_i, e), this.off(w, e), this.off("end", e), t = true, { done: true, value: void 0 }), i = () => {
+        let t = false, e = () => (this.pause(), this.off(_i, e), this.off(S, e), this.off("end", e), t = true, { done: true, value: void 0 }), i = () => {
           if (t) return e();
           let r = this.read();
           return r === null ? e() : { done: false, value: r };
         };
-        return this.once("end", e), this.once(_i, e), this.once(w, e), { next: i, throw: e, return: e, [Symbol.iterator]() {
+        return this.once("end", e), this.once(_i, e), this.once(S, e), { next: i, throw: e, return: e, [Symbol.iterator]() {
           return this;
         }, [Symbol.dispose]: () => {
         } };
       }
       destroy(t) {
-        if (this[w]) return t ? this.emit("error", t) : this.emit(w), this;
-        this[w] = true, this[C] = true, this[b].length = 0, this[_] = 0;
+        if (this[S]) return t ? this.emit("error", t) : this.emit(S), this;
+        this[S] = true, this[C] = true, this[b].length = 0, this[_] = 0;
         let e = this;
-        return typeof e.close == "function" && !this[Ne] && e.close(), t ? this.emit("error", t) : this.emit(w), this;
+        return typeof e.close == "function" && !this[Ne] && e.close(), t ? this.emit("error", t) : this.emit(S), this;
       }
       static get isStream() {
         return Wr;
@@ -8678,7 +8678,7 @@ var init_index_min = __esm({
     ht = Symbol("_autoClose");
     H = Symbol("_close");
     te = Symbol("_ended");
-    u = Symbol("_fd");
+    m = Symbol("_fd");
     Ni = Symbol("_finished");
     tt = Symbol("_flags");
     Ai = Symbol("_flush");
@@ -8705,7 +8705,7 @@ var init_index_min = __esm({
     bt = Symbol("_errored");
     _t = class extends A {
       [bt] = false;
-      [u];
+      [m];
       [U];
       [Ci];
       [j] = false;
@@ -8714,10 +8714,10 @@ var init_index_min = __esm({
       [ht];
       constructor(t, e) {
         if (e = e || {}, super(e), this.readable = true, this.writable = false, typeof t != "string") throw new TypeError("path must be a string");
-        this[bt] = false, this[u] = typeof e.fd == "number" ? e.fd : void 0, this[U] = t, this[Ci] = e.readSize || 16 * 1024 * 1024, this[j] = false, this[Fi] = typeof e.size == "number" ? e.size : 1 / 0, this[ee] = this[Fi], this[ht] = typeof e.autoClose == "boolean" ? e.autoClose : true, typeof this[u] == "number" ? this[zt]() : this[at]();
+        this[bt] = false, this[m] = typeof e.fd == "number" ? e.fd : void 0, this[U] = t, this[Ci] = e.readSize || 16 * 1024 * 1024, this[j] = false, this[Fi] = typeof e.size == "number" ? e.size : 1 / 0, this[ee] = this[Fi], this[ht] = typeof e.autoClose == "boolean" ? e.autoClose : true, typeof this[m] == "number" ? this[zt]() : this[at]();
       }
       get fd() {
-        return this[u];
+        return this[m];
       }
       get path() {
         return this[U];
@@ -8732,7 +8732,7 @@ var init_index_min = __esm({
         import_fs.default.open(this[U], "r", (t, e) => this[Ht](t, e));
       }
       [Ht](t, e) {
-        t ? this[Ut](t) : (this[u] = e, this.emit("open", e), this[zt]());
+        t ? this[Ut](t) : (this[m] = e, this.emit("open", e), this[zt]());
       }
       [vi]() {
         return Buffer.allocUnsafe(Math.min(this[Ci], this[ee]));
@@ -8742,16 +8742,16 @@ var init_index_min = __esm({
           this[j] = true;
           let t = this[vi]();
           if (t.length === 0) return process.nextTick(() => this[Ii](null, 0, t));
-          import_fs.default.read(this[u], t, 0, t.length, null, (e, i, r) => this[Ii](e, i, r));
+          import_fs.default.read(this[m], t, 0, t.length, null, (e, i, r) => this[Ii](e, i, r));
         }
       }
       [Ii](t, e, i) {
         this[j] = false, t ? this[Ut](t) : this[ki](e, i) && this[zt]();
       }
       [H]() {
-        if (this[ht] && typeof this[u] == "number") {
-          let t = this[u];
-          this[u] = void 0, import_fs.default.close(t, (e) => e ? this.emit("error", e) : this.emit("close"));
+        if (this[ht] && typeof this[m] == "number") {
+          let t = this[m];
+          this[m] = void 0, import_fs.default.close(t, (e) => e ? this.emit("error", e) : this.emit("close"));
         }
       }
       [Ut](t) {
@@ -8767,7 +8767,7 @@ var init_index_min = __esm({
           case "finish":
             return false;
           case "drain":
-            return typeof this[u] == "number" && this[zt](), false;
+            return typeof this[m] == "number" && this[zt](), false;
           case "error":
             return this[bt] ? false : (this[bt] = true, super.emit(t, ...e));
           default:
@@ -8790,7 +8790,7 @@ var init_index_min = __esm({
           if (!this[j]) {
             this[j] = true;
             do {
-              let e = this[vi](), i = e.length === 0 ? 0 : import_fs.default.readSync(this[u], e, 0, e.length, null);
+              let e = this[vi](), i = e.length === 0 ? 0 : import_fs.default.readSync(this[m], e, 0, e.length, null);
               if (!this[ki](i, e)) break;
             } while (true);
             this[j] = false;
@@ -8801,9 +8801,9 @@ var init_index_min = __esm({
         }
       }
       [H]() {
-        if (this[ht] && typeof this[u] == "number") {
-          let t = this[u];
-          this[u] = void 0, import_fs.default.closeSync(t), this.emit("close");
+        if (this[ht] && typeof this[m] == "number") {
+          let t = this[m];
+          this[m] = void 0, import_fs.default.closeSync(t), this.emit("close");
         }
       }
     };
@@ -8818,15 +8818,15 @@ var init_index_min = __esm({
       [U];
       [ie];
       [ht];
-      [u];
+      [m];
       [Me];
       [tt];
       [Ni] = false;
       [ot];
       constructor(t, e) {
-        e = e || {}, super(e), this[U] = t, this[u] = typeof e.fd == "number" ? e.fd : void 0, this[ie] = e.mode === void 0 ? 438 : e.mode, this[ot] = typeof e.start == "number" ? e.start : void 0, this[ht] = typeof e.autoClose == "boolean" ? e.autoClose : true;
+        e = e || {}, super(e), this[U] = t, this[m] = typeof e.fd == "number" ? e.fd : void 0, this[ie] = e.mode === void 0 ? 438 : e.mode, this[ot] = typeof e.start == "number" ? e.start : void 0, this[ht] = typeof e.autoClose == "boolean" ? e.autoClose : true;
         let i = this[ot] !== void 0 ? "r+" : "w";
-        this[Me] = e.flags === void 0, this[tt] = e.flags === void 0 ? i : e.flags, this[u] === void 0 && this[at]();
+        this[Me] = e.flags === void 0, this[tt] = e.flags === void 0 ? i : e.flags, this[m] === void 0 && this[at]();
       }
       emit(t, ...e) {
         if (t === "error") {
@@ -8836,7 +8836,7 @@ var init_index_min = __esm({
         return super.emit(t, ...e);
       }
       get fd() {
-        return this[u];
+        return this[m];
       }
       get path() {
         return this[U];
@@ -8848,16 +8848,16 @@ var init_index_min = __esm({
         import_fs.default.open(this[U], this[tt], this[ie], (t, e) => this[Ht](t, e));
       }
       [Ht](t, e) {
-        this[Me] && this[tt] === "r+" && t && t.code === "ENOENT" ? (this[tt] = "w", this[at]()) : t ? this[Ut](t) : (this[u] = e, this.emit("open", e), this[gt] || this[Ai]());
+        this[Me] && this[tt] === "r+" && t && t.code === "ENOENT" ? (this[tt] = "w", this[at]()) : t ? this[Ut](t) : (this[m] = e, this.emit("open", e), this[gt] || this[Ai]());
       }
       end(t, e) {
-        return t && this.write(t, e), this[te] = true, !this[gt] && !this[Y].length && typeof this[u] == "number" && this[Pt](null, 0), this;
+        return t && this.write(t, e), this[te] = true, !this[gt] && !this[Y].length && typeof this[m] == "number" && this[Pt](null, 0), this;
       }
       write(t, e) {
-        return typeof t == "string" && (t = Buffer.from(t, e)), this[te] ? (this.emit("error", new Error("write() after end()")), false) : this[u] === void 0 || this[gt] || this[Y].length ? (this[Y].push(t), this[ke] = true, false) : (this[gt] = true, this[ve](t), true);
+        return typeof t == "string" && (t = Buffer.from(t, e)), this[te] ? (this.emit("error", new Error("write() after end()")), false) : this[m] === void 0 || this[gt] || this[Y].length ? (this[Y].push(t), this[ke] = true, false) : (this[gt] = true, this[ve](t), true);
       }
       [ve](t) {
-        import_fs.default.write(this[u], t, 0, t.length, this[ot], (e, i) => this[Pt](e, i));
+        import_fs.default.write(this[m], t, 0, t.length, this[ot], (e, i) => this[Pt](e, i));
       }
       [Pt](t, e) {
         t ? this[Ut](t) : (this[ot] !== void 0 && typeof e == "number" && (this[ot] += e), this[Y].length ? this[Ai]() : (this[gt] = false, this[te] && !this[Ni] ? (this[Ni] = true, this[H](), this.emit("finish")) : this[ke] && (this[ke] = false, this.emit("drain"))));
@@ -8867,13 +8867,13 @@ var init_index_min = __esm({
         else if (this[Y].length === 1) this[ve](this[Y].pop());
         else {
           let t = this[Y];
-          this[Y] = [], Jr(this[u], t, this[ot], (e, i) => this[Pt](e, i));
+          this[Y] = [], Jr(this[m], t, this[ot], (e, i) => this[Pt](e, i));
         }
       }
       [H]() {
-        if (this[ht] && typeof this[u] == "number") {
-          let t = this[u];
-          this[u] = void 0, import_fs.default.close(t, (e) => e ? this.emit("error", e) : this.emit("close"));
+        if (this[ht] && typeof this[m] == "number") {
+          let t = this[m];
+          this[m] = void 0, import_fs.default.close(t, (e) => e ? this.emit("error", e) : this.emit("close"));
         }
       }
     };
@@ -8890,15 +8890,15 @@ var init_index_min = __esm({
         this[Ht](null, t);
       }
       [H]() {
-        if (this[ht] && typeof this[u] == "number") {
-          let t = this[u];
-          this[u] = void 0, import_fs.default.closeSync(t), this.emit("close");
+        if (this[ht] && typeof this[m] == "number") {
+          let t = this[m];
+          this[m] = void 0, import_fs.default.closeSync(t), this.emit("close");
         }
       }
       [ve](t) {
         let e = true;
         try {
-          this[Pt](null, import_fs.default.writeSync(this[u], t, 0, t.length, this[ot])), e = false;
+          this[Pt](null, import_fs.default.writeSync(this[m], t, 0, t.length, this[ot])), e = false;
         } finally {
           if (e) try {
             this[H]();
@@ -9157,7 +9157,7 @@ var init_index_min = __esm({
     Ui = /* @__PURE__ */ new Set(["0", "", "1", "2", "3", "4", "5", "6", "7", "D"]);
     oe = /* @__PURE__ */ new Map([["0", "File"], ["", "OldFile"], ["1", "Link"], ["2", "SymbolicLink"], ["3", "CharacterDevice"], ["4", "BlockDevice"], ["5", "Directory"], ["6", "FIFO"], ["7", "ContiguousFile"], ["g", "GlobalExtendedHeader"], ["x", "ExtendedHeader"], ["A", "SolarisACL"], ["D", "GNUDumpDir"], ["I", "Inode"], ["K", "NextFileHasLongLinkpath"], ["L", "NextFileHasLongPath"], ["M", "ContinuationFile"], ["N", "OldGnuLongPath"], ["S", "SparseFile"], ["V", "TapeVolumeHeader"], ["X", "OldExtendedHeader"]]);
     Ve = new Map(Array.from(oe).map((s3) => [s3[1], s3[0]]));
-    mn = (s3) => s3 === void 0 || s3 < 0 ? void 0 : s3;
+    un = (s3) => s3 === void 0 || s3 < 0 ? void 0 : s3;
     F = class {
       cksumValid = false;
       needPax = false;
@@ -9186,7 +9186,7 @@ var init_index_min = __esm({
       decode(t, e, i, r) {
         if (e || (e = 0), !t || !(t.length >= e + 512)) throw new Error("need 512 bytes for header");
         let n = xt(t, e + 156, 1), o = Ui.has(n), h = o ? i : void 0, a = o ? r : void 0;
-        if (this.path = h?.path ?? xt(t, e, 100), this.mode = h?.mode ?? a?.mode ?? lt(t, e + 100, 8), this.uid = h?.uid ?? a?.uid ?? lt(t, e + 108, 8), this.gid = h?.gid ?? a?.gid ?? lt(t, e + 116, 8), this.size = mn(h?.size ?? a?.size ?? lt(t, e + 124, 12)), this.mtime = h?.mtime ?? a?.mtime ?? Wi(t, e + 136, 12), this.cksum = lt(t, e + 148, 12), a && this.#i(a, true), h && this.#i(h), ne(n) && (this.#t = n || "0"), this.#t === "0" && this.path.slice(-1) === "/" && (this.#t = "5"), this.#t === "5" && (this.size = 0), this.linkpath = xt(t, e + 157, 100), t.subarray(e + 257, e + 265).toString() === "ustar\x0000") if (this.uname = h?.uname ?? a?.uname ?? xt(t, e + 265, 32), this.gname = h?.gname ?? a?.gname ?? xt(t, e + 297, 32), this.devmaj = h?.devmaj ?? a?.devmaj ?? lt(t, e + 329, 8) ?? 0, this.devmin = h?.devmin ?? a?.devmin ?? lt(t, e + 337, 8) ?? 0, t[e + 475] !== 0) {
+        if (this.path = h?.path ?? xt(t, e, 100), this.mode = h?.mode ?? a?.mode ?? lt(t, e + 100, 8), this.uid = h?.uid ?? a?.uid ?? lt(t, e + 108, 8), this.gid = h?.gid ?? a?.gid ?? lt(t, e + 116, 8), this.size = un(h?.size ?? a?.size ?? lt(t, e + 124, 12)), this.mtime = h?.mtime ?? a?.mtime ?? Wi(t, e + 136, 12), this.cksum = lt(t, e + 148, 12), a && this.#i(a, true), h && this.#i(h), ne(n) && (this.#t = n || "0"), this.#t === "0" && this.path.slice(-1) === "/" && (this.#t = "5"), this.#t === "5" && (this.size = 0), this.linkpath = xt(t, e + 157, 100), t.subarray(e + 257, e + 265).toString() === "ustar\x0000") if (this.uname = h?.uname ?? a?.uname ?? xt(t, e + 265, 32), this.gname = h?.gname ?? a?.gname ?? xt(t, e + 297, 32), this.devmaj = h?.devmaj ?? a?.devmaj ?? lt(t, e + 329, 8) ?? 0, this.devmin = h?.devmin ?? a?.devmin ?? lt(t, e + 337, 8) ?? 0, t[e + 475] !== 0) {
           let c = xt(t, e + 345, 155);
           this.path = c + "/" + this.path;
         } else {
@@ -9203,7 +9203,7 @@ var init_index_min = __esm({
       }
       encode(t, e = 0) {
         if (t || (t = this.block = Buffer.alloc(512)), this.#t === "Unsupported" && (this.#t = "0"), !(t.length >= e + 512)) throw new Error("need 512 bytes for header");
-        let i = this.ctime || this.atime ? 130 : 155, r = un(this.path || "", i), n = r[0], o = r[1];
+        let i = this.ctime || this.atime ? 130 : 155, r = mn(this.path || "", i), n = r[0], o = r[1];
         this.needPax = !!r[2], this.needPax = Lt(t, e, 100, n) || this.needPax, this.needPax = ct(t, e + 100, 8, this.mode) || this.needPax, this.needPax = ct(t, e + 108, 8, this.uid) || this.needPax, this.needPax = ct(t, e + 116, 8, this.gid) || this.needPax, this.needPax = ct(t, e + 124, 12, this.size) || this.needPax, this.needPax = Gi(t, e + 136, 12, this.mtime) || this.needPax, t[e + 156] = Number(this.#t.codePointAt(0)), this.needPax = Lt(t, e + 157, 100, this.linkpath) || this.needPax, t.write("ustar\x0000", e + 257, 8), this.needPax = Lt(t, e + 265, 32, this.uname) || this.needPax, this.needPax = Lt(t, e + 297, 32, this.gname) || this.needPax, this.needPax = ct(t, e + 329, 8, this.devmaj) || this.needPax, this.needPax = ct(t, e + 337, 8, this.devmin) || this.needPax, this.needPax = Lt(t, e + 345, i, o) || this.needPax, t[e + 475] !== 0 ? this.needPax = Lt(t, e + 345, 155, o) || this.needPax : (this.needPax = Lt(t, e + 345, 130, o) || this.needPax, this.needPax = Gi(t, e + 476, 12, this.atime) || this.needPax, this.needPax = Gi(t, e + 488, 12, this.ctime) || this.needPax);
         let h = 256;
         for (let a = e; a < e + 148; a++) h += t[a];
@@ -9223,7 +9223,7 @@ var init_index_min = __esm({
         else throw new TypeError("invalid entry type: " + t);
       }
     };
-    un = (s3, t) => {
+    mn = (s3, t) => {
       let i = s3, r = "", n, o = import_node_path2.posix.parse(s3).root || ".";
       if (Buffer.byteLength(i) < 100) n = [i, r, false];
       else {
@@ -9416,10 +9416,10 @@ var init_index_min = __esm({
     Ys = Symbol("emitMeta");
     p = Symbol("buffer");
     st = Symbol("queue");
-    mt = Symbol("ended");
+    ut = Symbol("ended");
     Yi = Symbol("emittedEnd");
     At = Symbol("emit");
-    y = Symbol("unzip");
+    w = Symbol("unzip");
     Xe = Symbol("consumeChunk");
     qe = Symbol("consumeChunkSub");
     Ki = Symbol("consumeBody");
@@ -9458,8 +9458,8 @@ var init_index_min = __esm({
       [dt] = "";
       [V];
       [he];
-      [mt] = false;
-      [y];
+      [ut] = false;
+      [w];
       [$] = false;
       [It];
       [je] = false;
@@ -9569,7 +9569,13 @@ var init_index_min = __esm({
         }
       }
       abort(t) {
-        this[$] || (this[$] = true, this.emit("abort", t), this.warn("TAR_ABORT", t, { recoverable: false }));
+        if (!this[$]) {
+          if (this[w]) {
+            let e = this[w];
+            e.write = () => true, e.end = () => e, e.emit = () => false, e.destroy?.();
+          }
+          this[$] = true, this.emit("abort", t), this.warn("TAR_ABORT", t, { recoverable: false });
+        }
       }
       [Xs](t) {
         this[$i] += t.length;
@@ -9578,11 +9584,11 @@ var init_index_min = __esm({
       }
       write(t, e, i) {
         if (typeof e == "function" && (i = e, e = void 0), typeof t == "string" && (t = Buffer.from(t, typeof e == "string" ? e : "utf8")), this[$]) return i?.(), false;
-        if ((this[y] === void 0 || this.brotli === void 0 && this[y] === false) && t) {
+        if ((this[w] === void 0 || this.brotli === void 0 && this[w] === false) && t) {
           if (this[p] && (t = Buffer.concat([this[p], t]), this[p] = void 0), t.length < An) return this[p] = t, i?.(), true;
-          for (let a = 0; this[y] === void 0 && a < Xi.length; a++) t[a] !== Xi[a] && (this[y] = false);
+          for (let a = 0; this[w] === void 0 && a < Xi.length; a++) t[a] !== Xi[a] && (this[w] = false);
           let o = false;
-          if (this[y] === false && this.zstd !== false) {
+          if (this[w] === false && this.zstd !== false) {
             o = true;
             for (let a = 0; a < qi.length; a++) if (t[a] !== qi[a]) {
               o = false;
@@ -9590,27 +9596,27 @@ var init_index_min = __esm({
             }
           }
           let h = this.brotli === void 0 && !o;
-          if (this[y] === false && h) if (t.length < 512) if (this[mt]) this.brotli = true;
+          if (this[w] === false && h) if (t.length < 512) if (this[ut]) this.brotli = true;
           else return this[p] = t, i?.(), true;
           else try {
             new F(t.subarray(0, 512)), this.brotli = false;
           } catch {
             this.brotli = true;
           }
-          if (this[y] === void 0 || this[y] === false && (this.brotli || o)) {
-            let a = this[mt];
-            this[mt] = false, this[y] = this[y] === void 0 ? new Ue({}) : o ? new Ke({}) : new Ge({}), this[y].on("data", (c) => {
+          if (this[w] === void 0 || this[w] === false && (this.brotli || o)) {
+            let a = this[ut];
+            this[ut] = false, this[w] = this[w] === void 0 ? new Ue({}) : o ? new Ke({}) : new Ge({}), this[w].on("data", (c) => {
               this[Xs](c) && this[Xe](c);
-            }), this[y].on("error", (c) => {
+            }), this[w].on("error", (c) => {
               this[$] || this.abort(c);
-            }), this[y].on("end", () => {
-              this[mt] = true, this[Xe]();
+            }), this[w].on("end", () => {
+              this[ut] = true, this[Xe]();
             }), this[Yt] = true, this[le] += t.length;
-            let l = !!this[y][a ? "end" : "write"](t);
+            let l = !!this[w][a ? "end" : "write"](t);
             return this[Yt] = false, i?.(), l;
           }
         }
-        this[Yt] = true, this[y] ? (this[le] += t.length, this[y].write(t)) : this[Xe](t), this[Yt] = false;
+        this[Yt] = true, this[w] ? (this[le] += t.length, this[w].write(t)) : this[Xe](t), this[Yt] = false;
         let n = this[st].length > 0 ? false : this[it] ? this[it].flowing : true;
         return !n && this[st].length === 0 && this[it]?.once("drain", () => this.emit("drain")), i?.(), n;
       }
@@ -9618,7 +9624,7 @@ var init_index_min = __esm({
         t && !this[$] && (this[p] = this[p] ? Buffer.concat([this[p], t]) : t);
       }
       [Qe]() {
-        if (this[mt] && !this[Yi] && !this[$] && !this[ae]) {
+        if (this[ut] && !this[Yi] && !this[$] && !this[ae]) {
           this[Yi] = true;
           let t = this[Nt];
           if (t?.blockRemain) {
@@ -9643,7 +9649,7 @@ var init_index_min = __esm({
           }
           this[ae] = false;
         }
-        (!this[p] || this[mt]) && this[Qe]();
+        (!this[p] || this[ut]) && this[Qe]();
       }
       [qe](t) {
         let e = 0, i = t.length;
@@ -9665,10 +9671,10 @@ var init_index_min = __esm({
         e < i && (this[p] = this[p] ? Buffer.concat([t.subarray(e), this[p]]) : t.subarray(e));
       }
       end(t, e, i) {
-        return typeof t == "function" && (i = t, e = void 0, t = void 0), typeof e == "function" && (i = e, e = void 0), typeof t == "string" && (t = Buffer.from(t, e)), i && this.once("finish", i), this[$] || (this[y] ? (t && (this[le] += t.length, this[y].write(t)), this[y].end()) : (this[mt] = true, (this.brotli === void 0 || this.zstd === void 0) && (t = t || Buffer.alloc(0)), t && this.write(t), this[Qe]())), this;
+        return typeof t == "function" && (i = t, e = void 0, t = void 0), typeof e == "function" && (i = e, e = void 0), typeof t == "string" && (t = Buffer.from(t, e)), i && this.once("finish", i), this[$] || (this[w] ? (t && (this[le] += t.length, this[w].write(t)), this[w].end()) : (this[ut] = true, (this.brotli === void 0 || this.zstd === void 0) && (t = t || Buffer.alloc(0)), t && this.write(t), this[Qe]())), this;
       }
     };
-    ut = (s3) => {
+    mt = (s3) => {
       let t = s3.length - 1, e = -1;
       for (; t > -1 && s3.charAt(t) === "/"; ) e = t, t--;
       return e === -1 ? s3 : s3.slice(0, e);
@@ -9680,16 +9686,17 @@ var init_index_min = __esm({
       } : (e) => e.resume();
     };
     Qi = (s3, t) => {
-      let e = new Map(t.map((n) => [ut(n), true])), i = s3.filter, r = (n, o = "") => {
-        let h = o || (0, import_path.parse)(n).root || ".", a;
-        if (n === h) a = false;
+      let e = new Map(t.map((o) => [mt(o), true])), i = s3.filter, r = 100, n = (o, h = "", a = 0) => {
+        if (a >= r) return e.set(o, false), false;
+        let l = h || (0, import_path.parse)(o).root || ".", c;
+        if (o === l) c = false;
         else {
-          let l = e.get(n);
-          a = l !== void 0 ? l : r((0, import_path.dirname)(n), h);
+          let d = e.get(o);
+          c = d !== void 0 ? d : n((0, import_path.dirname)(o), l, a + 1);
         }
-        return e.set(n, a), a;
+        return e.set(o, c), c;
       };
-      s3.filter = i ? (n, o) => i(n, o) && r(ut(n)) : (n) => r(ut(n));
+      s3.filter = i ? (o, h) => i(o, h) && n(mt(o)) : (o) => n(mt(o));
     };
     Mn = (s3) => {
       let t = new rt(s3), e = s3.file, i;
@@ -9746,7 +9753,7 @@ var init_index_min = __esm({
     Hn = new Map(ji.map((s3, t) => [s3, ei[t]]));
     ts = (s3) => ei.reduce((t, e) => t.split(e).join(Un.get(e)), s3);
     Qs = (s3) => ji.reduce((t, e) => t.split(e).join(Hn.get(e)), s3);
-    rr = (s3, t) => t ? (s3 = f(s3).replace(/^\.(\/|$)/, ""), ut(t) + "/" + s3) : f(s3);
+    rr = (s3, t) => t ? (s3 = f(s3).replace(/^\.(\/|$)/, ""), mt(t) + "/" + s3) : f(s3);
     Wn = 16 * 1024 * 1024;
     tr = Symbol("process");
     er = Symbol("file");
@@ -10172,7 +10179,7 @@ var init_index_min = __esm({
         return this.head = e, this.tail = t, this;
       }
     };
-    me = class {
+    ue = class {
       list;
       next;
       prev;
@@ -10197,7 +10204,7 @@ var init_index_min = __esm({
     };
     nr = Buffer.alloc(1024);
     li = Symbol("onStat");
-    ue = Symbol("ended");
+    me = Symbol("ended");
     W = Symbol("queue");
     pe = Symbol("pendingLinks");
     Et = Symbol("current");
@@ -10209,12 +10216,12 @@ var init_index_min = __esm({
     ci = Symbol("addFSEntry");
     or = Symbol("addTarEntry");
     ds = Symbol("stat");
-    ms = Symbol("readdir");
+    us = Symbol("readdir");
     fi = Symbol("onreaddir");
     di = Symbol("pipe");
     hr = Symbol("entry");
     cs = Symbol("entryOpt");
-    mi = Symbol("writeEntryClass");
+    ui = Symbol("writeEntryClass");
     lr = Symbol("write");
     fs = Symbol("ondrain");
     wt = class extends A {
@@ -10238,21 +10245,21 @@ var init_index_min = __esm({
       mtime;
       filter;
       jobs;
-      [mi];
+      [ui];
       onWriteEntry;
       [W];
       [pe] = /* @__PURE__ */ new Map();
       [G] = 0;
       [Ee] = false;
-      [ue] = false;
+      [me] = false;
       constructor(t = {}) {
-        if (super(), this.opt = t, this.file = t.file || "", this.cwd = t.cwd || process.cwd(), this.maxReadSize = t.maxReadSize, this.preservePaths = !!t.preservePaths, this.strict = !!t.strict, this.noPax = !!t.noPax, this.prefix = f(t.prefix || ""), this.linkCache = t.linkCache || /* @__PURE__ */ new Map(), this.statCache = t.statCache || /* @__PURE__ */ new Map(), this.readdirCache = t.readdirCache || /* @__PURE__ */ new Map(), this.onWriteEntry = t.onWriteEntry, this[mi] = de, typeof t.onwarn == "function" && this.on("warn", t.onwarn), this.portable = !!t.portable, t.gzip || t.brotli || t.zstd) {
+        if (super(), this.opt = t, this.file = t.file || "", this.cwd = t.cwd || process.cwd(), this.maxReadSize = t.maxReadSize, this.preservePaths = !!t.preservePaths, this.strict = !!t.strict, this.noPax = !!t.noPax, this.prefix = f(t.prefix || ""), this.linkCache = t.linkCache || /* @__PURE__ */ new Map(), this.statCache = t.statCache || /* @__PURE__ */ new Map(), this.readdirCache = t.readdirCache || /* @__PURE__ */ new Map(), this.onWriteEntry = t.onWriteEntry, this[ui] = de, typeof t.onwarn == "function" && this.on("warn", t.onwarn), this.portable = !!t.portable, t.gzip || t.brotli || t.zstd) {
           if ((t.gzip ? 1 : 0) + (t.brotli ? 1 : 0) + (t.zstd ? 1 : 0) > 1) throw new TypeError("gzip, brotli, zstd are mutually exclusive");
           if (t.gzip && (typeof t.gzip != "object" && (t.gzip = {}), this.portable && (t.gzip.portable = true), this.zip = new ze(t.gzip)), t.brotli && (typeof t.brotli != "object" && (t.brotli = {}), this.zip = new We(t.brotli)), t.zstd && (typeof t.zstd != "object" && (t.zstd = {}), this.zip = new Ye(t.zstd)), !this.zip) throw new Error("impossible");
           let e = this.zip;
           e.on("data", (i) => super.write(i)), e.on("end", () => super.end()), e.on("drain", () => this[fs]()), this.on("resume", () => e.resume());
         } else this.on("drain", this[fs]);
-        this.noDirRecurse = !!t.noDirRecurse, this.follow = !!t.follow, this.noMtime = !!t.noMtime, t.mtime && (this.mtime = t.mtime), this.filter = typeof t.filter == "function" ? t.filter : () => true, this[W] = new hi(), this[G] = 0, this.jobs = Number(t.jobs) || 4, this[Ee] = false, this[ue] = false;
+        this.noDirRecurse = !!t.noDirRecurse, this.follow = !!t.follow, this.noMtime = !!t.noMtime, t.mtime && (this.mtime = t.mtime), this.filter = typeof t.filter == "function" ? t.filter : () => true, this[W] = new hi(), this[G] = 0, this.jobs = Number(t.jobs) || 4, this[Ee] = false, this[me] = false;
       }
       [lr](t) {
         return super.write(t);
@@ -10261,10 +10268,10 @@ var init_index_min = __esm({
         return this.write(t), this;
       }
       end(t, e, i) {
-        return typeof t == "function" && (i = t, t = void 0), typeof e == "function" && (i = e, e = void 0), t && this.add(t), this[ue] = true, this[Ft](), i && i(), this;
+        return typeof t == "function" && (i = t, t = void 0), typeof e == "function" && (i = e, e = void 0), t && this.add(t), this[me] = true, this[Ft](), i && i(), this;
       }
       write(t) {
-        if (this[ue]) throw new Error("write after end");
+        if (this[me]) throw new Error("write after end");
         return typeof t == "string" ? this[ci](t) : this[or](t), this.flowing;
       }
       [or](t) {
@@ -10296,7 +10303,7 @@ var init_index_min = __esm({
         }
         this[Ft]();
       }
-      [ms](t) {
+      [us](t) {
         t.pending = true, this[G] += 1, import_fs2.default.readdir(t.absolute, (e, i) => {
           if (t.pending = false, this[G] -= 1, e) return this.emit("error", e);
           this[fi](t, i);
@@ -10312,7 +10319,7 @@ var init_index_min = __esm({
             let e = t.next;
             this[W].removeNode(t), t.next = e;
           }
-          this[Ee] = false, this[ue] && this[W].length === 0 && this[G] === 0 && (this.zip ? this.zip.end(nr) : (super.write(nr), super.end()));
+          this[Ee] = false, this[me] && this[W].length === 0 && this[G] === 0 && (this.zip ? this.zip.end(nr) : (super.write(nr), super.end()));
         }
       }
       get [Et]() {
@@ -10343,7 +10350,7 @@ var init_index_min = __esm({
           if (t.stat && !t.ignore) {
             if (!this.noDirRecurse && t.stat.isDirectory() && !t.readdir) {
               let e = this.readdirCache.get(t.absolute);
-              if (e ? this[fi](t, e) : this[ms](t), !t.readdir) return;
+              if (e ? this[fi](t, e) : this[us](t), !t.readdir) return;
             }
             if (t.entry = this[hr](t), !t.entry) {
               t.ignore = true;
@@ -10359,7 +10366,7 @@ var init_index_min = __esm({
       [hr](t) {
         this[G] += 1;
         try {
-          return new this[mi](t.path, this[cs](t)).on("end", () => this[ls](t)).on("error", (i) => this.emit("error", i));
+          return new this[ui](t.path, this[cs](t)).on("end", () => this[ls](t)).on("error", (i) => this.emit("error", i));
         } catch (e) {
           this.emit("error", e);
         }
@@ -10390,7 +10397,7 @@ var init_index_min = __esm({
     kt = class extends wt {
       sync = true;
       constructor(t) {
-        super(t), this[mi] = ni;
+        super(t), this[ui] = ni;
       }
       pause() {
       }
@@ -10400,7 +10407,7 @@ var init_index_min = __esm({
         let e = this.follow ? "statSync" : "lstatSync";
         this[li](t, import_fs2.default[e](t.absolute));
       }
-      [ms](t) {
+      [us](t) {
         this[fi](t, import_fs2.default.readdirSync(t.absolute));
       }
       [di](t) {
@@ -10452,13 +10459,13 @@ var init_index_min = __esm({
     });
     Jn = process.env.__FAKE_PLATFORM__ || process.platform;
     Er = Jn === "win32";
-    ({ O_CREAT: wr, O_NOFOLLOW: mr, O_TRUNC: Sr, O_WRONLY: yr } = import_fs4.default.constants);
+    ({ O_CREAT: wr, O_NOFOLLOW: ur, O_TRUNC: Sr, O_WRONLY: yr } = import_fs4.default.constants);
     Rr = Number(process.env.__FAKE_FS_O_FILENAME__) || import_fs4.default.constants.UV_FS_O_FILEMAP || 0;
     jn = Er && !!Rr;
     to = 512 * 1024;
     eo = Rr | Sr | wr | yr;
-    ur = !Er && typeof mr == "number" ? mr | Sr | wr | yr : null;
-    us = ur !== null ? () => ur : jn ? (s3) => s3 < to ? eo : "w" : () => "w";
+    mr = !Er && typeof ur == "number" ? ur | Sr | wr | yr : null;
+    ms = mr !== null ? () => mr : jn ? (s3) => s3 < to ? eo : "w" : () => "w";
     ps = (s3, t, e) => {
       try {
         return import_node_fs4.default.lchownSync(s3, t, e);
@@ -10544,13 +10551,13 @@ var init_index_min = __esm({
     };
     gr = (s3, t, e) => {
       s3 = f(s3);
-      let i = t.umask ?? 18, r = t.mode | 448, n = (r & i) !== 0, o = t.uid, h = t.gid, a = typeof o == "number" && typeof h == "number" && (o !== t.processUid || h !== t.processGid), l = t.preserve, c = t.unlink, d = f(t.cwd), S = (E, x) => {
-        E ? e(E) : x && a ? Es(x, o, h, (Le) => S(Le)) : n ? import_node_fs5.default.chmod(s3, r, e) : e();
+      let i = t.umask ?? 18, r = t.mode | 448, n = (r & i) !== 0, o = t.uid, h = t.gid, a = typeof o == "number" && typeof h == "number" && (o !== t.processUid || h !== t.processGid), l = t.preserve, c = t.unlink, d = f(t.cwd), y = (E, x) => {
+        E ? e(E) : x && a ? Es(x, o, h, (Le) => y(Le)) : n ? import_node_fs5.default.chmod(s3, r, e) : e();
       };
-      if (s3 === d) return no(s3, S);
-      if (l) return import_promises.default.mkdir(s3, { mode: r, recursive: true }).then((E) => S(null, E ?? void 0), S);
+      if (s3 === d) return no(s3, y);
+      if (l) return import_promises.default.mkdir(s3, { mode: r, recursive: true }).then((E) => y(null, E ?? void 0), y);
       let D = f(import_node_path7.default.relative(d, s3)).split("/");
-      Ss(d, D, r, c, d, void 0, S);
+      Ss(d, D, r, c, d, void 0, y);
     };
     Ss = (s3, t, e, i, r, n, o) => {
       if (t.length === 0) return o(null, n);
@@ -10626,7 +10633,7 @@ var init_index_min = __esm({
       #i = /* @__PURE__ */ new Map();
       #s = /* @__PURE__ */ new Set();
       reserve(t, e) {
-        t = ao ? ["win32 parallelization disabled"] : t.map((r) => ut((0, import_node_path8.join)(Tr(r))));
+        t = ao ? ["win32 parallelization disabled"] : t.map((r) => mt((0, import_node_path8.join)(Tr(r))));
         let i = new Set(t.map((r) => lo(r)).reduce((r, n) => r.concat(n)));
         this.#i.set(e, { dirs: i, paths: t });
         for (let r of t) {
@@ -10714,8 +10721,8 @@ var init_index_min = __esm({
     Oe = Symbol("checkedCwd");
     fo = process.env.TESTING_TAR_FAKE_PLATFORM || process.platform;
     Te = fo === "win32";
-    mo = 1024;
-    uo = (s3, t) => {
+    uo = 1024;
+    mo = (s3, t) => {
       if (!Te) return import_node_fs3.default.unlink(s3, t);
       let e = s3 + ".DELETE." + (0, import_node_crypto.randomBytes)(16).toString("hex");
       import_node_fs3.default.rename(s3, e, (i) => {
@@ -10766,7 +10773,7 @@ var init_index_min = __esm({
           if (t.preserveOwner) throw new TypeError("cannot preserve owner in archive and also set owner explicitly");
           this.uid = t.uid, this.gid = t.gid, this.setOwner = true;
         } else this.uid = void 0, this.gid = void 0, this.setOwner = false;
-        this.preserveOwner = t.preserveOwner === void 0 && typeof t.uid != "number" ? process.getuid?.() === 0 : !!t.preserveOwner, this.processUid = (this.preserveOwner || this.setOwner) && process.getuid ? process.getuid() : void 0, this.processGid = (this.preserveOwner || this.setOwner) && process.getgid ? process.getgid() : void 0, this.maxDepth = typeof t.maxDepth == "number" ? t.maxDepth : mo, this.forceChown = t.forceChown === true, this.win32 = !!t.win32 || Te, this.newer = !!t.newer, this.keep = !!t.keep, this.noMtime = !!t.noMtime, this.preservePaths = !!t.preservePaths, this.unlink = !!t.unlink, this.cwd = f(import_node_path5.default.resolve(t.cwd || process.cwd())), this.strip = Number(t.strip) || 0, this.processUmask = this.chmod ? typeof t.processUmask == "number" ? t.processUmask : Lr() : 0, this.umask = typeof t.umask == "number" ? t.umask : this.processUmask, this.dmode = t.dmode || 511 & ~this.umask, this.fmode = t.fmode || 438 & ~this.umask, this.on("entry", (e) => this[Dr](e));
+        this.preserveOwner = t.preserveOwner === void 0 && typeof t.uid != "number" ? process.getuid?.() === 0 : !!t.preserveOwner, this.processUid = (this.preserveOwner || this.setOwner) && process.getuid ? process.getuid() : void 0, this.processGid = (this.preserveOwner || this.setOwner) && process.getgid ? process.getgid() : void 0, this.maxDepth = typeof t.maxDepth == "number" ? t.maxDepth : uo, this.forceChown = t.forceChown === true, this.win32 = !!t.win32 || Te, this.newer = !!t.newer, this.keep = !!t.keep, this.noMtime = !!t.noMtime, this.preservePaths = !!t.preservePaths, this.unlink = !!t.unlink, this.cwd = f(import_node_path5.default.resolve(t.cwd || process.cwd())), this.strip = Number(t.strip) || 0, this.processUmask = this.chmod ? typeof t.processUmask == "number" ? t.processUmask : Lr() : 0, this.umask = typeof t.umask == "number" ? t.umask : this.processUmask, this.dmode = t.dmode || 511 & ~this.umask, this.fmode = t.fmode || 438 & ~this.umask, this.on("entry", (e) => this[Dr](e));
       }
       warn(t, e, i = {}) {
         return (t === "TAR_BAD_ARCHIVE" || t === "TAR_ABORT") && (i.recoverable = false), super.warn(t, e, i);
@@ -10840,7 +10847,7 @@ var init_index_min = __esm({
         return vr(this.gid, t.gid, this.processGid);
       }
       [Ts](t, e) {
-        let i = typeof t.mode == "number" ? t.mode & 4095 : this.fmode, r = new et(String(t.absolute), { flags: us(t.size), mode: i, autoClose: false });
+        let i = typeof t.mode == "number" ? t.mode & 4095 : this.fmode, r = new et(String(t.absolute), { flags: ms(t.size), mode: i, autoClose: false });
         r.on("error", (a) => {
           r.fd && import_node_fs3.default.close(r.fd, () => {
           }), r.write = () => true, this[O](a, t), e();
@@ -10860,12 +10867,12 @@ var init_index_min = __esm({
           if (typeof l == "number" && t.mtime && !this.noMtime) {
             n++;
             let c = t.atime || /* @__PURE__ */ new Date(), d = t.mtime;
-            import_node_fs3.default.futimes(l, c, d, (S) => S ? import_node_fs3.default.utimes(a, c, d, (T) => o(T && S)) : o());
+            import_node_fs3.default.futimes(l, c, d, (y) => y ? import_node_fs3.default.utimes(a, c, d, (T) => o(T && y)) : o());
           }
           if (typeof l == "number" && this[ge](t)) {
             n++;
             let c = this[be](t), d = this[_e](t);
-            typeof c == "number" && typeof d == "number" && import_node_fs3.default.fchown(l, c, d, (S) => S ? import_node_fs3.default.chown(a, c, d, (T) => o(T && S)) : o());
+            typeof c == "number" && typeof d == "number" && import_node_fs3.default.fchown(l, c, d, (y) => y ? import_node_fs3.default.chown(a, c, d, (T) => o(T && y)) : o());
           }
           o();
         });
@@ -10967,7 +10974,7 @@ var init_index_min = __esm({
               if (t.absolute !== this.cwd) return import_node_fs3.default.rmdir(String(t.absolute), (l) => this[P](l ?? null, t, i));
             }
             if (t.absolute === this.cwd) return this[P](null, t, i);
-            uo(String(t.absolute), (l) => this[P](l ?? null, t, i));
+            mo(String(t.absolute), (l) => this[P](l ?? null, t, i));
           });
         };
         this[Oe] ? n() : r();
@@ -11050,7 +11057,7 @@ var init_index_min = __esm({
           (h || a) && this[O](h || a, t), e();
         }, n;
         try {
-          n = import_node_fs3.default.openSync(String(t.absolute), us(t.size), i);
+          n = import_node_fs3.default.openSync(String(t.absolute), ms(t.size), i);
         } catch (h) {
           return r(h);
         }
@@ -11192,27 +11199,27 @@ var init_index_min = __esm({
           T ? import_node_fs6.default.close(n, (E) => h(T)) : h(null, D);
         }, l = 0;
         if (o === 0) return a(null, 0);
-        let c = 0, d = Buffer.alloc(512), S = (T, D) => {
+        let c = 0, d = Buffer.alloc(512), y = (T, D) => {
           if (T || D === void 0) return a(T);
-          if (c += D, c < 512 && D) return import_node_fs6.default.read(n, d, c, d.length - c, l + c, S);
+          if (c += D, c < 512 && D) return import_node_fs6.default.read(n, d, c, d.length - c, l + c, y);
           if (l === 0 && d[0] === 31 && d[1] === 139) return a(new Error("cannot append to compressed archives"));
           if (c < 512) return a(null, l);
           let E = new F(d);
           if (!E.cksumValid) return a(null, l);
           let x = 512 * Math.ceil((E.size ?? 0) / 512);
           if (l + x + 512 > o || (l += x + 512, l >= o)) return a(null, l);
-          s3.mtimeCache && E.mtime && s3.mtimeCache.set(String(E.path), E.mtime), c = 0, import_node_fs6.default.read(n, d, 0, 512, l, S);
+          s3.mtimeCache && E.mtime && s3.mtimeCache.set(String(E.path), E.mtime), c = 0, import_node_fs6.default.read(n, d, 0, 512, l, y);
         };
-        import_node_fs6.default.read(n, d, 0, 512, l, S);
+        import_node_fs6.default.read(n, d, 0, 512, l, y);
       };
       return new Promise((n, o) => {
         e.on("error", o);
         let h = "r+", a = (l, c) => {
           if (l && l.code === "ENOENT" && h === "r+") return h = "w+", import_node_fs6.default.open(s3.file, h, a);
           if (l || !c) return o(l);
-          import_node_fs6.default.fstat(c, (d, S) => {
+          import_node_fs6.default.fstat(c, (d, y) => {
             if (d) return import_node_fs6.default.close(c, () => o(d));
-            i(c, S.size, (T, D) => {
+            i(c, y.size, (T, D) => {
               if (T) return o(T);
               let E = new et(s3.file, { fd: c, start: D });
               e.pipe(E), E.on("error", o), E.on("close", n), _o(e, t);
