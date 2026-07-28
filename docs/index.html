@@ -492,15 +492,15 @@
                data-i18n-aria="hero.videoAlt"
                aria-label="Ablauf in der App: eine E-Mail trifft ein, die Aufgabe darin wird erkannt, daraus entsteht eine Notiz, und am n&auml;chsten Morgen steht alles im Dashboard.">
           <source src="hero-workflow.mp4" type="video/mp4">
+          <track kind="captions" src="hero-workflow.de.vtt" srclang="de" label="Deutsch" default>
+          <track kind="captions" src="hero-workflow.en.vtt" srclang="en" label="English">
         </video>
-        <button class="hero-video-toggle" type="button" onclick="toggleHeroVideo(this)">Anhalten</button>
+        <div class="hero-video-actions">
+          <button class="hero-video-btn" type="button" onclick="toggleHeroSound()" id="heroSoundBtn">Ton an</button>
+          <button class="hero-video-btn" type="button" onclick="toggleHeroVideo()" id="heroPlayBtn">Anhalten</button>
+        </div>
       </div>
-      <ol class="hero-flow">
-        <li data-i18n="hero.flow1">E-Mail trifft ein</li>
-        <li data-i18n="hero.flow2">Aufgabe wird erkannt</li>
-        <li data-i18n="hero.flow3">Notiz entsteht</li>
-        <li data-i18n="hero.flow4">Am n&auml;chsten Morgen im Dashboard</li>
-      </ol>
+      <p class="hero-caption" id="heroCaption" aria-live="off"></p>
     </div>
   </section>
 
@@ -941,33 +941,35 @@
       mask-composite: intersect;
     }
     .hero-video video { display: block; width: 100%; height: auto; }
-    .hero-video-toggle {
+    .hero-video-actions {
       position: absolute; right: 14px; bottom: 14px;
-      display: inline-flex; align-items: center; gap: .4rem;
+      display: flex; gap: .4rem;
+      opacity: 0; transition: opacity .18s ease;
+    }
+    .hero-video:hover .hero-video-actions,
+    .hero-video-actions:focus-within { opacity: 1; }
+    .hero-video-btn {
       padding: .4rem .7rem; border-radius: 999px;
       border: 1px solid var(--border); background: rgba(255,255,255,.82);
       color: var(--text-mid); font: inherit; font-size: .8rem; cursor: pointer;
-      opacity: 0; transition: opacity .18s ease, background .18s ease;
+      transition: background .18s ease, color .18s ease;
       -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
     }
-    .hero-video:hover .hero-video-toggle,
-    .hero-video-toggle:focus-visible { opacity: 1; }
-    .hero-video-toggle:hover { background: #fff; color: var(--text); }
-    .hero-flow {
-      display: flex; flex-wrap: wrap; justify-content: center; align-items: center;
-      gap: .55rem .9rem; list-style: none; margin: 1.35rem 0 0; padding: 0;
-      font-size: .93rem; color: var(--text-mid);
+    .hero-video-btn:hover { background: #fff; color: var(--text); }
+    .hero-video-btn[aria-pressed="true"] { background: var(--accent); color: var(--accent-on, #fff); border-color: transparent; }
+    /* Sprechertext laeuft unter dem Video mit, nicht darin - sonst verdeckt er die
+       App. Feste Mindesthoehe, damit die Seite beim Cue-Wechsel nicht springt. */
+    .hero-caption {
+      margin: 1.15rem auto 0; max-width: 720px; min-height: 2.9em;
+      font-size: .95rem; line-height: 1.45; color: var(--text-mid);
+      text-wrap: balance;
     }
-    .hero-flow li { display: flex; align-items: center; gap: .55rem; }
-    .hero-flow li::before {
-      content: ""; width: 7px; height: 7px; border-radius: 50%;
-      background: var(--accent); opacity: .55; flex: none;
-    }
-    @media (max-width: 640px) { .hero-flow { font-size: .85rem; gap: .4rem .6rem; } }
+    @media (max-width: 640px) { .hero-caption { font-size: .88rem; min-height: 4.2em; } }
     @media (prefers-reduced-motion: reduce) {
       .hero-video video { display: none; }
       .hero-video { background: center/cover no-repeat url("hero-workflow-poster.jpg"); aspect-ratio: 16 / 9; }
-      .hero-video-toggle { display: none; }
+      .hero-video-actions { display: none; }
+      .hero-caption { display: none; }
     }
     .hero-screenshot .hero-person {
       position: absolute;
@@ -1750,12 +1752,10 @@
         "how.p5": "Schalte die Webrecherche pro Auftrag zu – ganz optional. Der Agent sucht, liest die passenden Seiten und schreibt eine Notiz mit sauberem Quellenverzeichnis; du prüfst sie, bevor sie in deinen Vault kommt. Der Suchanbieter erhält nur die Suchanfragen; die vollständigen Seiten ruft die App lokal ab. Bei einem optionalen Cloud-Modell geht der gelesene Kontext zusätzlich an dessen Anbieter – darauf weist die App vor dem Lauf hin. Den Suchanbieter wählst du selbst: sofort einsatzbereit oder deine eigene, private Suchmaschine.",
         "hero.badge": "Open Source \u00b7 Lokal \u00b7 Kostenlos",
         "hero.release": "Wartungsrelease &mdash; alle 13 gemeldeten Sicherheitsl&uuml;cken geschlossen &middot; v{vs}",
-        "hero.flow1": "E-Mail trifft ein",
-        "hero.flow2": "Aufgabe wird erkannt",
-        "hero.flow3": "Notiz entsteht",
-        "hero.flow4": "Am nächsten Morgen im Dashboard",
         "hero.videoPause": "Anhalten",
         "hero.videoPlay": "Abspielen",
+        "hero.soundOn": "Ton an",
+        "hero.soundOff": "Ton aus",
         "hero.videoAlt": "Ablauf in der App: eine E-Mail trifft ein, die Aufgabe darin wird erkannt, daraus entsteht eine Notiz, und am nächsten Morgen steht alles im Dashboard.",
         "hero.title": "Der Fokus bleibt.<br><em>Auch wenn das Leben dazwischenkommt.</em>",
         "hero.sub": "MindGraph zeigt dir jeden Morgen, was heute z\u00e4hlt \u2014 Aufgaben, Mails, Termine, vergessene F\u00e4den. Du gehst aufs Bike, ins Wochenende, liegst mal f\u00fcnf Tage flach. Und nichts f\u00e4llt durch. Lokal, ohne Cloud-Zwang.",
@@ -2001,12 +2001,10 @@
         "how.p5": "Turn on web research per task – entirely optional. The agent searches, reads the relevant pages and writes a note with a clean list of sources; you review it before it enters your vault. The search provider receives only the queries; the app fetches full pages locally. With an optional cloud model, the extracted context is also sent to that model provider – the app warns you before the run. You choose the search provider yourself: ready to use or your own private search engine.",
         "hero.badge": "Open Source \u00b7 Local \u00b7 Free",
         "hero.release": "Maintenance release &mdash; all 13 reported vulnerabilities closed &middot; v{vs}",
-        "hero.flow1": "An email arrives",
-        "hero.flow2": "The task in it is spotted",
-        "hero.flow3": "A note is created",
-        "hero.flow4": "Next morning, it is on your dashboard",
         "hero.videoPause": "Pause",
         "hero.videoPlay": "Play",
+        "hero.soundOn": "Sound on",
+        "hero.soundOff": "Sound off",
         "hero.videoAlt": "What happens in the app: an email arrives, the task inside it is spotted, a note is created from it, and the next morning everything sits on your dashboard.",
         "hero.title": "Shows you<br><em>what matters today.</em>",
         "hero.sub": "MindGraph Notes connects your notes, tasks, emails and documents \u2014 and ranks them by relevance. Dashboard, knowledge graph and local AI in one desktop app. No cloud lock-in.",
@@ -2186,16 +2184,26 @@
       }
     }
 
-    // Endlos laufende Bewegung muss anhaltbar sein (WCAG 2.2.2). Beschriftung folgt
-    // dem Zustand des Videos, nicht umgekehrt - sonst luegt sie nach einem Sprachwechsel.
+    // Endlos laufende Bewegung muss anhaltbar sein (WCAG 2.2.2). Beschriftungen folgen
+    // dem Zustand des Videos, nicht umgekehrt - sonst luegen sie nach einem Sprachwechsel.
     function syncHeroVideoButton() {
       const v = document.getElementById('heroWorkflow');
-      const btn = document.querySelector('.hero-video-toggle');
-      if (!v || !btn) return;
-      const key = v.paused ? 'hero.videoPlay' : 'hero.videoPause';
-      const label = translations[currentLang]?.[key] || (v.paused ? 'Abspielen' : 'Anhalten');
-      btn.textContent = label;
-      btn.setAttribute('aria-label', label);
+      if (!v) return;
+      const t = (key, fb) => translations[currentLang]?.[key] || fb;
+      const play = document.getElementById('heroPlayBtn');
+      if (play) {
+        const label = v.paused ? t('hero.videoPlay', 'Abspielen') : t('hero.videoPause', 'Anhalten');
+        play.textContent = label;
+        play.setAttribute('aria-label', label);
+      }
+      const sound = document.getElementById('heroSoundBtn');
+      if (sound) {
+        const label = v.muted ? t('hero.soundOn', 'Ton an') : t('hero.soundOff', 'Ton aus');
+        sound.textContent = label;
+        sound.setAttribute('aria-label', label);
+        sound.setAttribute('aria-pressed', String(!v.muted));
+      }
+      syncHeroCaptionTrack();
     }
 
     function toggleHeroVideo() {
@@ -2203,6 +2211,47 @@
       if (!v) return;
       if (v.paused) { v.play(); } else { v.pause(); }
       syncHeroVideoButton();
+    }
+
+    // Mit Ton ergibt eine Endlosschleife keinen Sinn - der Sprecher wuerde sich
+    // ununterbrochen wiederholen. Ton an heisst deshalb: einmal von vorn, ohne Schleife.
+    function toggleHeroSound() {
+      const v = document.getElementById('heroWorkflow');
+      if (!v) return;
+      if (v.muted) {
+        v.muted = false;
+        v.loop = false;
+        v.currentTime = 0;
+        v.play();
+      } else {
+        v.muted = true;
+        v.loop = true;
+      }
+      syncHeroVideoButton();
+    }
+
+    // Untertitel werden unter dem Video ausgegeben statt im Bild: der Sprechertext
+    // bleibt so auch ohne Ton lesbar, ohne die App zu verdecken.
+    function syncHeroCaptionTrack() {
+      const v = document.getElementById('heroWorkflow');
+      const out = document.getElementById('heroCaption');
+      if (!v || !out || !v.textTracks) return;
+      let active = null;
+      for (const track of v.textTracks) {
+        const wanted = track.language === currentLang;
+        track.mode = wanted ? 'hidden' : 'disabled';
+        if (wanted) active = track;
+      }
+      if (!active) { out.textContent = ''; return; }
+      if (!active.dataset_bound) {
+        active.addEventListener('cuechange', () => {
+          const cue = active.activeCues && active.activeCues[0];
+          out.textContent = cue ? cue.text.replace(/\n/g, ' ') : '';
+        });
+        active.dataset_bound = true;
+      }
+      const cue = active.activeCues && active.activeCues[0];
+      out.textContent = cue ? cue.text.replace(/\n/g, ' ') : '';
     }
 
     function openModal(id) {
@@ -2225,6 +2274,39 @@
 
     // Init language
     setLanguage(currentLang);
+
+    // Autoplay startet erst NACH dem ersten setLanguage-Durchlauf - ohne diese
+    // Kopplung behauptet der Knopf danach dauerhaft "Abspielen", obwohl das Video laeuft.
+    (function bindHeroVideo() {
+      const v = document.getElementById('heroWorkflow');
+      if (!v) return;
+      ['play', 'pause', 'volumechange', 'loadedmetadata'].forEach(ev =>
+        v.addEventListener(ev, syncHeroVideoButton));
+
+      // Mit Ton laeuft das Video ohne Schleife - sonst bliebe es am Ende stehen und
+      // der Hero waere fuer alle spaeteren Blicke ein Standbild. Danach zurueck in
+      // die stumme Schleife, also in den Zustand, in dem die Seite geladen wird.
+      v.addEventListener('ended', () => {
+        v.muted = true;
+        v.loop = true;
+        v.currentTime = 0;
+        v.play().catch(() => {});
+        syncHeroVideoButton();
+      });
+
+      // Ausserhalb des Sichtbereichs nicht weiterlaufen lassen: spart Rechenzeit und
+      // verhindert, dass der Sprecher weiterredet, waehrend man laengst woanders liest.
+      if ('IntersectionObserver' in window) {
+        new IntersectionObserver((entries) => {
+          for (const e of entries) {
+            if (e.isIntersecting) { if (v.muted && v.paused) v.play().catch(() => {}); }
+            else if (!v.paused) v.pause();
+          }
+        }, { threshold: 0.15 }).observe(v);
+      }
+
+      syncHeroVideoButton();
+    })();
   </script>
 </body>
 </html>
