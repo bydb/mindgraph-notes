@@ -408,7 +408,7 @@ export function createNoteAgentRegistry(): ToolRegistry<NoteAgentContext> {
         }
         articleHtml = extracted
       }
-      const fileName = sanitizeOutputFileName(rawName, '.html')
+      const fileName = sanitizeOutputFileName(rawName, '.html', ['.htm'])
       const html = buildScientificHtmlPage({
         title,
         bodyHtml: articleHtml,
@@ -469,6 +469,15 @@ export function createNoteAgentRegistry(): ToolRegistry<NoteAgentContext> {
       let markdown = requireString(args, 'markdown')
       if (!rawName) return err('Parameter "file_name" fehlt')
       if (!markdown) return err('Parameter "markdown" fehlt oder ist leer')
+      // Der Namensfilter würde `seite.html` zu `seite.html.md` machen — eine
+      // Markdown-Datei voller HTML. Statt das stillschweigend zu tun, das
+      // Modell auf das richtige Werkzeug stoßen: es kann die Seite danach in
+      // derselben Iteration korrekt erzeugen.
+      if (/\.html?$/i.test(rawName)) {
+        return err(
+          'write_note schreibt ausschließlich Markdown. Für eine HTML-Seite das Werkzeug write_html benutzen (Parameter: title, body_html) — nur dann bekommt die Seite die Formel-Darstellung und das Layout.'
+        )
+      }
       // Web-Lauf (0e): genau EIN Write; die App hängt den Quellenblock deterministisch an.
       if (ctx.run.web) {
         if (ctx.run.web.wrote) return err('Das Ergebnis wurde bereits geschrieben — im Recherche-Modus ist nur ein write_note erlaubt.')

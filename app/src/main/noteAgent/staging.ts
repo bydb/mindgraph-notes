@@ -12,7 +12,9 @@ import type { AgentRun } from './runRegistry'
 const STAGING_DIRNAME = 'agent-staging'
 const MAX_STAGING_AGE_DAYS = 7
 
-// Erlaubte Output-Endungen — deckungsgleich mit den Write-Skills.
+// Endungen, die überhaupt als Agent-Output vorkommen. Welche davon ein
+// EINZELNES Werkzeug behalten darf, entscheidet der Aufrufer (siehe unten) —
+// diese Menge ist nur die äußere Schranke.
 const ALLOWED_OUTPUT_EXT = new Set(['.md', '.xlsx', '.docx', '.txt', '.csv', '.html', '.htm', '.png'])
 
 export function stagingRootFor(vaultPath: string): string {
@@ -23,9 +25,19 @@ export function stagingDirFor(run: AgentRun): string {
   return path.join(stagingRootFor(run.vaultPath), run.runId)
 }
 
-// Dateinamen vom LLM sind untrusted: nur Basename, keine Steuerzeichen, Endung
-// aus der Allowlist (sonst wird die Default-Endung angehängt).
-export function sanitizeOutputFileName(raw: string, defaultExt: string): string {
+// Dateinamen vom LLM sind untrusted: nur Basename, keine Steuerzeichen, und die
+// Endung muss zu dem passen, was das aufrufende Werkzeug tatsächlich schreibt.
+//
+// Früher wurde gegen die gemeinsame ALLOWED_OUTPUT_EXT geprüft. Damit durfte
+// JEDES Werkzeug JEDE Endung behalten — `write_note` konnte eine Datei
+// `seite.html` nennen und sie trotzdem als kind 'md' registrieren. Beim
+// Übernehmen bekam die HTML-Seite dann den Markdown-Frontmatter-Stempel VOR
+// `<!DOCTYPE html>` (sichtbarer Header, Quirks-Modus) und die KaTeX-Dateien
+// wurden nicht danebengelegt, weil dieser Schritt an kind 'html' hängt. Real
+// aufgetreten. Deshalb entscheidet jetzt der Aufrufer über die Endung.
+//
+// `alsoAllow` ist für Werkzeuge mit mehreren gültigen Schreibweisen (.html/.htm).
+export function sanitizeOutputFileName(raw: string, defaultExt: string, alsoAllow: string[] = []): string {
   const base = path.basename(String(raw || '').trim())
     .replace(/[\x00-\x1F\x7F]/g, '')
     .replace(/[\\/:*?"<>|]/g, '-')
@@ -33,7 +45,9 @@ export function sanitizeOutputFileName(raw: string, defaultExt: string): string 
   const fallback = `Ergebnis${defaultExt}`
   if (!base || base === '.' || base === '..') return fallback
   const ext = path.extname(base).toLowerCase()
-  if (!ALLOWED_OUTPUT_EXT.has(ext)) return `${base}${defaultExt}`
+  const permitted = new Set([defaultExt.toLowerCase(), ...alsoAllow.map(e => e.toLowerCase())])
+  // Doppelte Schranke: passend zum Werkzeug UND innerhalb der äußeren Menge.
+  if (!permitted.has(ext) || !ALLOWED_OUTPUT_EXT.has(ext)) return `${base}${defaultExt}`
   return base
 }
 

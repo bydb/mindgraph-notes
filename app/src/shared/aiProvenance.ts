@@ -40,11 +40,30 @@ function unquoteScalar(raw: string): string {
 }
 
 /**
+ * Ein YAML-Frontmatter-Block ist nur in Markdown ein Metadaten-Kopf. In einer
+ * HTML-Datei wäre er sichtbarer Text — und weil er VOR `<!DOCTYPE html>`
+ * landet, zählt die Typangabe nicht mehr: der Browser fällt in den
+ * Quirks-Modus, Layout und Skripte verhalten sich anders (real aufgetreten:
+ * eine wissenschaftliche Seite zeigte danach den Kopf als Text und ließ alle
+ * Formeln als `$$` stehen).
+ *
+ * Bewusst nur der Dokumentanfang und nicht `looksLikeFullHtmlDocument()`: das
+ * prüft irgendwo im Text und würde jeder Markdown-Notiz mit einem
+ * HTML-Codeblock still den Stempel verweigern.
+ */
+function looksLikeHtmlDocument(content: string): boolean {
+  return /^﻿?\s*<\s*(!doctype\s+html|html)\b/i.test(content)
+}
+
+/**
  * Schreibt/aktualisiert `ki-modell` + `ki-datum` im Frontmatter.
  * Vorhandene Zeilen werden ersetzt (nie dupliziert), der Body bleibt unangetastet.
  * Ohne Frontmatter wird einer angelegt.
+ * HTML-Dokumente bleiben unverändert — dort wäre der Block kein Metadaten-Kopf,
+ * sondern sichtbarer Text vor der Typangabe.
  */
 export function setAiProvenanceInContent(content: string, model: string, date: string): string {
+  if (looksLikeHtmlDocument(content)) return content
   const modelLine = `${AI_PROVENANCE_MODEL_KEY}: ${yamlScalar(model)}`
   const dateLine = `${AI_PROVENANCE_DATE_KEY}: ${yamlScalar(date)}`
   const fmMatch = content.match(/^---\s*\n([\s\S]*?)\n---/)
