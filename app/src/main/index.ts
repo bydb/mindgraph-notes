@@ -16,6 +16,7 @@ import {
   isHtmlPreviewable
 } from '../shared/htmlPreview'
 import { exportPreviewPdf, exportPreviewEpub } from './htmlExport'
+import { bundledResourcesDir } from './bundledResources'
 import { buildZettelContent, buildZettelFileName, extractFrontmatterTags, sanitizeZettelEmojis, sanitizeZettelTag } from '../shared/zettel'
 import { splitTextIntoChunks, LONG_TEXT_CHUNK_THRESHOLD } from '../shared/textChunking'
 import { setAiProvenanceInContent, todayIsoDate } from '../shared/aiProvenance'
@@ -2744,9 +2745,7 @@ ipcMain.handle('create-starter-vault', async (_event, targetPath: string, varian
     if (!approvedVaultRoots.has(path.resolve(targetPath))) {
       throw new Error('Vault-Zielpfad nicht autorisiert — bitte via Dialog auswählen')
     }
-    const resourcesBase = app.isPackaged
-      ? path.join(process.resourcesPath)
-      : path.join(app.getAppPath(), 'resources')
+    const resourcesBase = bundledResourcesDir()
 
     const vaultName =
       variant === 'office' ? 'starter-vault-office'
@@ -4466,10 +4465,7 @@ ipcMain.handle('note-skills-install-starter', async (event, vaultPath: string) =
   if (!isTrustedSender(event)) return { success: false, installed: [], error: 'Nicht autorisierter Aufrufer' }
   try {
     assertApprovedVault(vaultPath, 'note-skills-install-starter')
-    const resourcesBase = app.isPackaged
-      ? path.join(process.resourcesPath)
-      : path.join(app.getAppPath(), 'resources')
-    const sourceDir = path.join(resourcesBase, 'starter-skills')
+    const sourceDir = path.join(bundledResourcesDir(), 'starter-skills')
     const entries = await fs.readdir(sourceDir, { withFileTypes: true })
     const installed: string[] = []
     for (const e of entries) {
