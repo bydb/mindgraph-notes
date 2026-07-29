@@ -2,6 +2,21 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.10.30-beta] - 2026-07-29
+
+Ein reines Fehlerbehebungs-Release. Alle drei App-Fehler traten **ausschließlich in der installierten Fassung** auf und waren beim Entwickeln unsichtbar — gefunden wurden sie erst, weil MindGraph auf einem zweiten Rechner neu eingerichtet wurde. Genau der Weg, den jeder neue Nutzer geht. An deinen Notizen und Einstellungen ändert sich nichts.
+
+### Behoben
+
+- **Starter-Vault und Starter-Skills gehen im Installer wieder.** Wer sich aus der installierten App ein Starter-Vault anlegen wollte, bekam „Starter vault not found"; die mitgelieferten Anleitungen brachen mit `ENOENT` ab. Ursache: Der Ordner mit den gebündelten Dateien liegt im fertigen Programm eine Ebene tiefer, als der Code gesucht hat. Im Entwicklungsmodus greift ein anderer, korrekter Zweig — deshalb ist es durch alle Tests gerutscht. Betroffen waren **alle vier** Starter-Vault-Varianten (Deutsch, Englisch, Office, Demo), also ein Onboarding-Pfad. Die Pfad-Auflösung liegt jetzt an einer Stelle, und ein Test prüft die Bau-Konfiguration selbst, damit sie nicht wieder auseinanderläuft.
+- **Formeln auf wissenschaftlichen Webseiten.** Ließ man den Notiz-Agenten eine wissenschaftliche Seite schreiben, konnte diese als Notiz statt als Seite abgelegt werden. Folge: ein Metadaten-Block stand sichtbar über der Seite, die Seite lief im Kompatibilitätsmodus des Browsers, und **alle Formeln blieben als `$$`-Quelltext stehen**. Zwei unabhängige Riegel: Die Dateiendung ist jetzt an das schreibende Werkzeug gebunden (kein Werkzeug kann mehr einen fremden Dokumenttyp unter seinem eigenen Etikett ablegen), und der Herkunfts-Stempel lässt HTML-Dokumente grundsätzlich unangetastet.
+- **Anleitung „Wissenschaftliche Webseite" wieder auffindbar.** Sie fehlte im Skill-Katalog und war in der Aufzählung der mitgelieferten Anleitungen nicht genannt — der Hinweistext sprach von fünf Anleitungen, mitgeliefert werden sieben. Beides korrigiert, DE und EN.
+
+### Website
+
+- **Startseite auf dem Handy.** Die Seite ruckelte und ließ sich seitlich verschieben. Ursache waren drei Weichzeichner-Ebenen über dem laufenden Hero-Video, die bei jedem Videobild neu berechnet wurden. Auf Touch-Geräten sind sie jetzt abgeschaltet, das Video startet erst auf Tippen, und die Bedienknöpfe sind dauerhaft sichtbar (vorher waren sie per Hover versteckt und damit auf dem Telefon unerreichbar).
+- **Bilder von 6,8 MB auf 687 KB.** Screenshots und Fotos liegen jetzt als WebP in sinnvoller Auflösung vor; der gemessene Kompressionsverlust liegt bei 44 dB und ist mit bloßem Auge nicht zu sehen. Zusammen mit dem Video lädt ein Telefon beim Durchscrollen rund 690 KB statt 9,6 MB.
+
 ## [0.10.29-beta] - 2026-07-28
 
 Ein Wartungsrelease ohne neue Funktionen. Alle 13 gemeldeten Sicherheitslücken in den mitgelieferten Fremdbibliotheken sind geschlossen, der Unterbau ist auf aktuellem Stand. An der App selbst ändert sich nichts — Notizen, Einstellungen und Vault bleiben unberührt.

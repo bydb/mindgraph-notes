@@ -48,7 +48,7 @@
     "url": "https://mindgraph-notes.de/",
     "downloadUrl": "https://github.com/bydb/mindgraph-notes/releases",
     "screenshot": "https://mindgraph-notes.de/screenshot.png",
-    "softwareVersion": "0.10.29-beta",
+    "softwareVersion": "0.10.30-beta",
     "author": { "@type": "Person", "name": "Jochen Leeder", "url": "https://bydb.io" },
     "license": "https://opensource.org/licenses/AGPL-3.0",
     "featureList": [
@@ -492,7 +492,7 @@
         <span class="hero-dot"></span>
         <span data-i18n="hero.badge">Open Source &middot; Lokal &middot; Kostenlos</span>
       </div>
-      <a class="release-badge" href="#changelog" data-i18n="hero.release">Wartungsrelease &mdash; alle 13 gemeldeten Sicherheitsl&uuml;cken geschlossen &middot; v0.10.29</a>
+      <a class="release-badge" href="#changelog" data-i18n="hero.release">Fehlerbehebungen &mdash; Starter-Vault und Skills funktionieren im Installer wieder &middot; v0.10.30</a>
     </div>
 
     <h1 data-i18n="hero.title">Der Fokus bleibt.<br><em>Auch wenn das Leben dazwischenkommt.</em></h1>
@@ -1627,17 +1627,17 @@
     <div class="release-inner">
       <div class="release-head">
         <div>
-          <div class="st-eyebrow"><span class="d"></span><span data-i18n="release.label">Release 0.10.29 &middot; Wartung vor 1.0</span></div>
-          <h2 class="st-h" style="font-size:clamp(1.8rem,3.8vw,2.6rem)" data-i18n="release.heading">Was ist neu &mdash; <em>nichts, was man sieht. Genau darum geht es.</em></h2>
-          <p class="st-lead" data-i18n="release.lead">Dieses Release bringt keine neuen Funktionen. Es schlie&szlig;t alle 13 gemeldeten Sicherheitsl&uuml;cken in den mitgelieferten Fremdbibliotheken und bringt den Unterbau auf einen aktuellen Stand &mdash; die Grundlage daf&uuml;r, dass 1.0 tragf&auml;hig ist.</p>
+          <div class="st-eyebrow"><span class="d"></span><span data-i18n="release.label">Release 0.10.30 &middot; Fehlerbehebungen</span></div>
+          <h2 class="st-h" style="font-size:clamp(1.8rem,3.8vw,2.6rem)" data-i18n="release.heading">Was ist neu &mdash; <em>drei Fehler, die es nur in der fertigen App gab.</em></h2>
+          <p class="st-lead" data-i18n="release.lead">Alle drei traten ausschlie&szlig;lich in der installierten Fassung auf und waren beim Entwickeln unsichtbar. Gefunden wurden sie erst, weil jemand MindGraph auf einem zweiten Rechner eingerichtet hat &mdash; genau der Weg, den jeder neue Nutzer geht.</p>
         </div>
-        <div class="release-date">v<span data-app-version>0.10.27-beta</span></div>
+        <div class="release-date">v<span data-app-version>0.10.30-beta</span></div>
       </div>
       <div class="release-grid">
-        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c1h">Alle Meldungen geschlossen</b><p data-i18n="release.c1">13 Sicherheitsmeldungen, neun davon hoch eingestuft. Dahinter standen drei echte Ursachen &mdash; unter anderem konnte eine pr&auml;parierte ZIP-Datei beim Import &uuml;berm&auml;&szlig;ig viel Speicher belegen. Alle drei sind behoben, die Pr&uuml;fung meldet null Befunde.</p></div></div>
-        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c2h">Kein R&uuml;ckschritt am Unterbau</b><p data-i18n="release.c2">Die bequeme Automatik-Reparatur h&auml;tte unser Bauwerkzeug auf eine &auml;ltere Hauptversion zur&uuml;ckgestuft &mdash; mit eigenen alten L&uuml;cken. Stattdessen ist jedes Paket gezielt nach vorn aktualisiert.</p></div></div>
-        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c3h">Weniger Ballast</b><p data-i18n="release.c3">Eine Bibliothek, die im Programm gar nicht mehr benutzt wurde, ist entfernt. Was nicht mitgeliefert wird, kann auch keine L&uuml;cke haben.</p></div></div>
-        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c4h">Aktuelle Werkzeuge</b><p data-i18n="release.c4">Der Programmierunterbau l&auml;uft auf der neuesten TypeScript-Hauptversion. An den Funktionen &auml;ndert sich nichts &mdash; dein Vault bleibt exakt so, wie er ist.</p></div></div>
+        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c1h">Starter-Vault und Skills gehen wieder</b><p data-i18n="release.c1">Wer sich aus der installierten App ein Starter-Vault anlegen wollte, bekam eine Fehlermeldung; die mitgelieferten Anleitungen lie&szlig;en sich nicht installieren. Beide suchten ihre Dateien an einer Stelle, an der sie im fertigen Programm nicht liegen &mdash; im Entwicklungsmodus stimmte der Weg, deshalb fiel es lange nicht auf.</p></div></div>
+        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c2h">Formeln auf wissenschaftlichen Seiten</b><p data-i18n="release.c2">Lie&szlig; man den Notiz-Agenten eine wissenschaftliche Seite schreiben, konnte sie versehentlich als Notiz abgelegt werden. Dann stand ein Metadaten-Block sichtbar &uuml;ber der Seite und alle Formeln blieben als Quelltext stehen. Das kann jetzt nicht mehr passieren.</p></div></div>
+        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c3h">Anleitung wieder auffindbar</b><p data-i18n="release.c3">Die Anleitung f&uuml;r wissenschaftliche Webseiten fehlte im Katalog und in der Aufz&auml;hlung der mitgelieferten Anleitungen. Beides erg&auml;nzt &mdash; sie l&auml;sst sich jetzt auf jedem Rechner nachinstallieren.</p></div></div>
+        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c4h">Diese Seite auf dem Handy</b><p data-i18n="release.c4">Die Startseite ruckelte auf dem Telefon und lie&szlig; sich seitlich verschieben. Video und Bilder laden jetzt sparsam: rund 690 KB statt 9,6 MB beim Durchscrollen.</p></div></div>
       </div>
       <a class="release-link" href="https://github.com/bydb/mindgraph-notes/releases" target="_blank" rel="noopener noreferrer" data-i18n="release.link">Vollst&auml;ndige Release Notes auf GitHub &rarr;</a>
     </div>
@@ -1902,7 +1902,7 @@
         "how.p5h": "Das Web, wenn du es brauchst",
         "how.p5": "Schalte die Webrecherche pro Auftrag zu – ganz optional. Der Agent sucht, liest die passenden Seiten und schreibt eine Notiz mit sauberem Quellenverzeichnis; du prüfst sie, bevor sie in deinen Vault kommt. Der Suchanbieter erhält nur die Suchanfragen; die vollständigen Seiten ruft die App lokal ab. Bei einem optionalen Cloud-Modell geht der gelesene Kontext zusätzlich an dessen Anbieter – darauf weist die App vor dem Lauf hin. Den Suchanbieter wählst du selbst: sofort einsatzbereit oder deine eigene, private Suchmaschine.",
         "hero.badge": "Open Source \u00b7 Lokal \u00b7 Kostenlos",
-        "hero.release": "Wartungsrelease &mdash; alle 13 gemeldeten Sicherheitsl&uuml;cken geschlossen &middot; v{vs}",
+        "hero.release": "Fehlerbehebungen &mdash; Starter-Vault und Skills funktionieren im Installer wieder &middot; v{vs}",
         "hero.videoPause": "Anhalten",
         "hero.videoPlay": "Abspielen",
         "hero.videoStart": "Video abspielen",
@@ -1979,17 +1979,17 @@
         "modules.opt.vision": "Vision OCR",
         "modules.opt.speech": "Diktat & Vorlesen",
         "modules.opt.terminal": "Terminal",
-        "release.label": "Release {vs} · Wartung vor 1.0",
-        "release.heading": "Was ist neu — <em>nichts, was man sieht. Genau darum geht es.</em>",
-        "release.lead": "Dieses Release bringt keine neuen Funktionen. Es schließt alle 13 gemeldeten Sicherheitslücken in den mitgelieferten Fremdbibliotheken und bringt den Unterbau auf einen aktuellen Stand — die Grundlage dafür, dass 1.0 tragfähig ist.",
-        "release.c1h": "Alle Meldungen geschlossen",
-        "release.c1": "13 Sicherheitsmeldungen, neun davon hoch eingestuft. Dahinter standen drei echte Ursachen — unter anderem konnte eine präparierte ZIP-Datei beim Import übermäßig viel Speicher belegen. Alle drei sind behoben, die Prüfung meldet null Befunde.",
-        "release.c2h": "Kein Rückschritt am Unterbau",
-        "release.c2": "Die bequeme Automatik-Reparatur hätte unser Bauwerkzeug auf eine ältere Hauptversion zurückgestuft — mit eigenen alten Lücken. Stattdessen ist jedes Paket gezielt nach vorn aktualisiert.",
-        "release.c3h": "Weniger Ballast",
-        "release.c3": "Eine Bibliothek, die im Programm gar nicht mehr benutzt wurde, ist entfernt. Was nicht mitgeliefert wird, kann auch keine Lücke haben.",
-        "release.c4h": "Aktuelle Werkzeuge",
-        "release.c4": "Der Programmierunterbau läuft auf der neuesten TypeScript-Hauptversion. An den Funktionen ändert sich nichts — dein Vault bleibt exakt so, wie er ist.",
+        "release.label": "Release {vs} · Fehlerbehebungen",
+        "release.heading": "Was ist neu — <em>drei Fehler, die es nur in der fertigen App gab.</em>",
+        "release.lead": "Alle drei traten ausschließlich in der installierten Fassung auf und waren beim Entwickeln unsichtbar. Gefunden wurden sie erst, weil jemand MindGraph auf einem zweiten Rechner eingerichtet hat — genau der Weg, den jeder neue Nutzer geht.",
+        "release.c1h": "Starter-Vault und Skills gehen wieder",
+        "release.c1": "Wer sich aus der installierten App ein Starter-Vault anlegen wollte, bekam eine Fehlermeldung; die mitgelieferten Anleitungen ließen sich nicht installieren. Beide suchten ihre Dateien an einer Stelle, an der sie im fertigen Programm nicht liegen — im Entwicklungsmodus stimmte der Weg, deshalb fiel es lange nicht auf.",
+        "release.c2h": "Formeln auf wissenschaftlichen Seiten",
+        "release.c2": "Ließ man den Notiz-Agenten eine wissenschaftliche Seite schreiben, konnte sie versehentlich als Notiz abgelegt werden. Dann stand ein Metadaten-Block sichtbar über der Seite und alle Formeln blieben als Quelltext stehen. Das kann jetzt nicht mehr passieren.",
+        "release.c3h": "Anleitung wieder auffindbar",
+        "release.c3": "Die Anleitung für wissenschaftliche Webseiten fehlte im Katalog und in der Aufzählung der mitgelieferten Anleitungen. Beides ergänzt — sie lässt sich jetzt auf jedem Rechner nachinstallieren.",
+        "release.c4h": "Diese Seite auf dem Handy",
+        "release.c4": "Die Startseite ruckelte auf dem Telefon und ließ sich seitlich verschieben. Video und Bilder laden jetzt sparsam: rund 690 KB statt 9,6 MB beim Durchscrollen.",
         "release.link": "Vollständige Release Notes auf GitHub →",
         "dl.label": "Download",
         "dl.heading": "Jetzt starten.",
@@ -2171,7 +2171,7 @@
         "how.p5h": "The web, when you need it",
         "how.p5": "Turn on web research per task – entirely optional. The agent searches, reads the relevant pages and writes a note with a clean list of sources; you review it before it enters your vault. The search provider receives only the queries; the app fetches full pages locally. With an optional cloud model, the extracted context is also sent to that model provider – the app warns you before the run. You choose the search provider yourself: ready to use or your own private search engine.",
         "hero.badge": "Open Source \u00b7 Local \u00b7 Free",
-        "hero.release": "Maintenance release &mdash; all 13 reported vulnerabilities closed &middot; v{vs}",
+        "hero.release": "Bug fixes &mdash; starter vault and skills work in the installer again &middot; v{vs}",
         "hero.videoPause": "Pause",
         "hero.videoPlay": "Play",
         "hero.videoStart": "Play video",
@@ -2248,17 +2248,17 @@
         "modules.opt.vision": "Vision OCR",
         "modules.opt.speech": "Dictation & TTS",
         "modules.opt.terminal": "Terminal",
-        "release.label": "Release {vs} · Maintenance before 1.0",
-        "release.heading": "What’s new — <em>nothing you can see. That is the point.</em>",
-        "release.lead": "This release adds no features. It closes all 13 reported vulnerabilities in the third-party libraries we ship and brings the foundations up to date — the groundwork for a 1.0 that holds.",
-        "release.c1h": "Every report closed",
-        "release.c1": "13 security reports, nine of them rated high. Behind them sat three actual causes — among others, a crafted ZIP file could claim excessive memory during import. All three are fixed; the audit now reports zero findings.",
-        "release.c2h": "No step backwards",
-        "release.c2": "The convenient automatic fix would have downgraded our build tool to an older major version — with old holes of its own. Instead every package was moved deliberately forward.",
-        "release.c3h": "Less ballast",
-        "release.c3": "A library the app no longer used at all has been removed. What we do not ship cannot carry a vulnerability.",
-        "release.c4h": "Current tooling",
-        "release.c4": "The codebase now builds on the latest TypeScript major version. Nothing changes about what the app does — your vault stays exactly as it is.",
+        "release.label": "Release {vs} · Bug fixes",
+        "release.heading": "What’s new — <em>three bugs that only existed in the finished app.</em>",
+        "release.lead": "All three showed up only in the installed build and were invisible during development. They surfaced because someone set MindGraph up on a second machine — exactly the path every new user takes.",
+        "release.c1h": "Starter vault and skills work again",
+        "release.c1": "Creating a starter vault from the installed app failed with an error, and the bundled instructions could not be installed. Both looked for their files in a place they do not sit in the packaged build — in development the path was right, which is why this went unnoticed for so long.",
+        "release.c2h": "Formulas on scientific pages",
+        "release.c2": "When the note agent wrote a scientific page, it could be filed as a note by mistake. A metadata block then sat visibly above the page and every formula stayed as raw source. That can no longer happen.",
+        "release.c3h": "The instruction is findable again",
+        "release.c3": "The instruction for scientific web pages was missing from the catalogue and from the list of bundled instructions. Both added — it can now be installed on any machine.",
+        "release.c4h": "This site on your phone",
+        "release.c4": "The home page stuttered on phones and could be pushed sideways. Video and images now load sparingly: roughly 690 KB instead of 9.6 MB while scrolling through.",
         "release.link": "Full release notes on GitHub →",
         "dl.label": "Download",
         "dl.heading": "Get started.",
