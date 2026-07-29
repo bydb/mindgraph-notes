@@ -15,6 +15,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
   clipboardWriteText: (text: string) => ipcRenderer.invoke('clipboard-write-text', text),
   clipboardReadText: () => ipcRenderer.invoke('clipboard-read-text'),
 
+  // Display-/GPU-Diagnose (Beamer, AirPlay, Software-Rendering)
+  getDisplayHealth: () => ipcRenderer.invoke('get-display-health'),
+  onDisplayHealthChanged: (callback: (health: unknown) => void) => {
+    const handler = (_e: unknown, health: unknown) => callback(health)
+    ipcRenderer.on('display-health-changed', handler)
+    return () => ipcRenderer.removeListener('display-health-changed', handler)
+  },
+
   openVault: () => ipcRenderer.invoke('open-vault'),
   selectFolderInVault: (vaultPath: string) => ipcRenderer.invoke('select-folder-in-vault', vaultPath),
   readDirectory: (dirPath: string) => ipcRenderer.invoke('read-directory', dirPath),

@@ -741,6 +741,13 @@ interface UIState {
   /** Einmaliger Hinweis „Lesemodus — Cmd+E zum Schreiben" wurde weggeklickt oder durch Moduswechsel erledigt */
   readingModeHintDismissed: boolean
 
+  // Präsentationsmodus: schaltet ganzflächige Weichzeichner und Übergänge ab. Gedacht für
+  // Beamer/AirPlay, wo Chromium oft auf Software-Rendering zurückfällt und genau diese Effekte
+  // die Oberfläche unbenutzbar machen.
+  presentationMode: boolean
+  /** Der Hinweis „riskante Bildschirm-Konstellation" wurde für diese Sitzung weggeklickt. */
+  presentationHintDismissed: boolean
+
   // User Profile
   userProfile: UserProfile
 
@@ -838,6 +845,8 @@ interface UIState {
   setShowFormattingToolbar: (show: boolean) => void
   setReadingModeHintDismissed: (dismissed: boolean) => void
   setShowRawEditor: (show: boolean) => void
+  setPresentationMode: (enabled: boolean) => void
+  setPresentationHintDismissed: (dismissed: boolean) => void
   setUserProfile: (profile: UserProfile) => void
   applyProfileDefaults: (profile: UserProfile) => void
 
@@ -1109,6 +1118,10 @@ const defaultState = {
   showRawEditor: false,
   readingModeHintDismissed: false,
 
+  // Präsentationsmodus
+  presentationMode: false,
+  presentationHintDismissed: false,
+
   // User Profile
   userProfile: null as UserProfile,
 
@@ -1187,6 +1200,10 @@ const persistedKeys = [
   'showFormattingToolbar',
   'showRawEditor',
   'readingModeHintDismissed',
+  // Bewusst persistiert: Der wirksamste Sofort-Fix bei GPU-Aussetzern ist ein App-Neustart —
+  // danach muss der Präsentationsmodus noch an sein. `presentationHintDismissed` dagegen NICHT
+  // persistieren, sonst warnt die App beim nächsten Beamer-Termin nie wieder.
+  'presentationMode',
   'transport',
   'dashboard',
   'telegramBot',
@@ -1358,6 +1375,11 @@ export const useUIStore = create<UIState>()((set, get) => ({
   setShowFormattingToolbar: (show) => set({ showFormattingToolbar: show }),
   setShowRawEditor: (show) => set({ showRawEditor: show }),
   setReadingModeHintDismissed: (dismissed) => set({ readingModeHintDismissed: dismissed }),
+  // Beim Einschalten den Hinweis miterledigen — er hat seinen Zweck dann erfüllt.
+  setPresentationMode: (enabled) => set(
+    enabled ? { presentationMode: true, presentationHintDismissed: true } : { presentationMode: false }
+  ),
+  setPresentationHintDismissed: (dismissed) => set({ presentationHintDismissed: dismissed }),
   setUserProfile: (profile) => set({ userProfile: profile }),
   setTransport: (settings) => set((state) => ({
     transport: { ...state.transport, ...settings }

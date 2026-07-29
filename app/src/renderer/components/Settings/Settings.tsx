@@ -15,6 +15,7 @@ import { useTranslation, type TranslationKey } from '../../utils/translations'
 import { TelegramSettings } from './TelegramSettings'
 import { CredentialsSettings } from './CredentialsSettings'
 import { ModelCompatibilitySection, ActiveModelStatusBadge, VERDICT_ICON, VERDICT_COLOR } from './ModelCompatibilitySection'
+import { PresentationSection } from './PresentationSection'
 import { OpenRouterSection } from './OpenRouterSection'
 import { LLMBaseSection } from './LLMBaseSection'
 import { WebResearchSection } from './WebResearchSection'
@@ -3158,6 +3159,8 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab,
                     {t('settings.general.resetAppearance')}
                   </button>
                 </div>
+
+                <PresentationSection />
 
                 <h3>{t('settings.general.vault')}</h3>
                 <div className="settings-row">

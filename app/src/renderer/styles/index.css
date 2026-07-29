@@ -21693,3 +21693,32 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
   color: var(--text-muted); font-size: 0.95rem; font-weight: 500; cursor: pointer;
 }
 .bc-toggle-graph:hover { color: var(--brain-color); }
+
+/* ============================================================================
+   Präsentationsmodus
+   ----------------------------------------------------------------------------
+   Für Beamer, HDMI und AirPlay. Auf externen Schirmen fällt Chromiums GPU-Prozess
+   bei der Display-Rekonfiguration gerne auf Software-Rendering zurück; ab dann
+   rechnet die CPU jedes Pixel selbst. Ganzflächige `backdrop-filter`-Overlays
+   kosten in dem Zustand ein Vielfaches und machen die Oberfläche unbenutzbar.
+
+   Bewusst NICHT abgeschaltet: `animation`. Spinner und Fortschrittsanzeigen
+   müssen sich weiter bewegen — ein eingefrorener Spinner sieht aus wie eine
+   hängende App und wäre auf der Bühne genau das falsche Signal.
+   ============================================================================ */
+
+body.presentation-mode *,
+body.presentation-mode *::before,
+body.presentation-mode *::after {
+  /* Der teuerste Effekt der App: ganzflächige Weichzeichner hinter Modal-Overlays.
+     Die Overlays behalten ihre halbtransparente Hintergrundfarbe, die Trennung
+     zwischen Dialog und Hintergrund bleibt also erhalten. */
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+
+  /* Übergänge auf praktisch null. Kein optischer Verlust, aber jeder Hover und
+     jeder Panel-Wechsel spart bei Software-Rendering ein komplettes Neuzeichnen.
+     0.01ms statt 0s, damit `transitionend`-Handler weiterhin feuern. */
+  transition-duration: 0.01ms !important;
+  transition-delay: 0ms !important;
+}

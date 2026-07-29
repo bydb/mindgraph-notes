@@ -16,6 +16,7 @@ import {
   isHtmlPreviewable
 } from '../shared/htmlPreview'
 import { exportPreviewPdf, exportPreviewEpub } from './htmlExport'
+import { initDisplayDiagnostics, getDisplayHealth } from './displayDiagnostics'
 import { buildZettelContent, buildZettelFileName, extractFrontmatterTags, sanitizeZettelEmojis, sanitizeZettelTag } from '../shared/zettel'
 import { splitTextIntoChunks, LONG_TEXT_CHUNK_THRESHOLD } from '../shared/textChunking'
 import { setAiProvenanceInContent, todayIsoDate } from '../shared/aiProvenance'
@@ -1344,6 +1345,11 @@ app.whenReady().then(async () => {
   createWindow()
   console.timeEnd('app-ready')
 
+  // Display-/GPU-Diagnose: protokolliert Bildschirm-Wechsel und GPU-Prozess-Abstürze und meldet
+  // riskante Konstellationen (Beamer, AirPlay, Software-Rendering) an den Renderer.
+  // Erst NACH createWindow, damit der erste Befund ein Fenster zum Senden vorfindet.
+  initDisplayDiagnostics({ getMainWindow: () => mainWindow })
+
   // Echten Capability-Host setzen (rohe Dienste an fs/safeStorage/Ollama gebunden) + Hard-Lock-
   // Guard (aktives Modell aus den UI-Settings), dann fehler-isoliert aktivieren — ein defektes
   // Plugin kippt den Start nie.
@@ -1429,6 +1435,9 @@ ipcMain.handle('clipboard-write-text', (_event, text: string) => {
 ipcMain.handle('clipboard-read-text', () => {
   return clipboard.readText()
 })
+
+// Display-/GPU-Zustand für die Diagnose-Anzeige in den Einstellungen.
+ipcMain.handle('get-display-health', () => getDisplayHealth())
 
 // Letzten Vault-Pfad laden
 // Aktueller Vault-Pfad im Main-Prozess (für Telegram-Bot etc.)

@@ -1,5 +1,6 @@
 import type { RelevanceConfig } from './emailRelevance'
 import type { RagIndexStatus, RagQueryResult, RetrievedChunk } from './rag/types'
+import type { DisplayHealth } from './displayHealth'
 
 // Per-Vault Feature Toggles
 export interface VaultFeatures {
@@ -537,6 +538,11 @@ export interface ElectronAPI {
   setMainLanguage: (lang: string) => Promise<boolean>;
   clipboardWriteText: (text: string) => Promise<boolean>;
   clipboardReadText: () => Promise<string>;
+
+  // Display-/GPU-Diagnose (Beamer, AirPlay, Software-Rendering)
+  getDisplayHealth: () => Promise<DisplayHealth>;
+  /** Liefert eine Abmelde-Funktion zurück. */
+  onDisplayHealthChanged: (callback: (health: DisplayHealth) => void) => () => void;
 
   openVault: () => Promise<string | null>;
   selectFolderInVault: (vaultPath: string) => Promise<string | null>;

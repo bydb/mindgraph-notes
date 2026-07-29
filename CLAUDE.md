@@ -243,6 +243,17 @@ Module als verbindbare Bausteine mit **typisierten Ports** auf einem React-Flow-
 - **Hard-Block für leere Writes** auf nicht-leere Markdown-Dateien im `write-file`-Handler — zweite Verteidigungslinie unabhängig vom Editor.
 - Backups **vom Sync ausgeschlossen** (bleiben lokal).
 
+### Präsentationsmodus + Display-/GPU-Diagnose
+- Anlass (29.07.2026, real): Präsentation über Apple TV am Beamer — Oberfläche wurde stark verzögert, dann praktisch unbedienbar.
+- **Bewertung pur + getestet** in `shared/displayHealth.ts` (`analyzeDisplayHealth`, 17 Unit-Tests). Electron-Anbindung in `main/displayDiagnostics.ts`, IPC `get-display-health` + Push-Event `display-health-changed`.
+- 4 Risiko-Gründe: `software-rendering`, `low-refresh-rate` (< 50 Hz), `mixed-scale-factors`, `likely-mirroring`. Die letzten beiden sind auf „zweiter Schirm vorhanden" gegated.
+- **GPU-Warmup ist Pflicht** (`GPU_WARMUP_SETTLE_MS`): `app.getGPUFeatureStatus().gpu_compositing` meldet direkt nach `createWindow()` noch `disabled_software` und erst ~1 s nach `did-finish-load` den echten Wert. Ohne das Warmup warnt die App bei JEDEM normalen Start vor einem GPU-Ausfall. `readGpuCompositing()` liefert vor dem Warmup bewusst `undefined` (= unbekannt), damit auch ein früher IPC-Aufruf aus dem Renderer den Fehlalarm nicht einfängt.
+- **Fail-open bei unbekanntem GPU-Status**: `isHardwareAccelerated()` gibt `null` (unbekannt) statt `false` zurück. Ein Fehlalarm „Grafik kaputt" wäre schlimmer als ein verpasster Hinweis.
+- `refreshHz: 0` heißt „vom OS nicht gemeldet", NICHT 0 Hz — sonst meldet `Math.min` dauerhaft „unter 50 Hz" (Regressionstest vorhanden).
+- **Präsentationsmodus** (uiStore `presentationMode`, persistiert): `body.presentation-mode` in `styles/index.css` schaltet `backdrop-filter` (15 ganzflächige Overlay-Weichzeichner, der teuerste Effekt der App) und alle `transition`-Dauern ab. **`animation` bleibt bewusst an** — ein eingefrorener Spinner sieht aus wie eine hängende App.
+- `presentationMode` wird persistiert (App-Neustart ist der Sofort-Fix bei GPU-Aussetzern, danach muss der Modus noch an sein), `presentationHintDismissed` bewusst NICHT (sonst warnt die App beim nächsten Beamer-Termin nie wieder).
+- Kein Automatismus: Der Modus wird nur angeboten (`Shared/PresentationMode.tsx`), nie selbsttätig aktiviert. Manueller Schalter + Diagnose-Anzeige in Einstellungen → Allgemein (`Settings/PresentationSection.tsx`).
+
 ### Schnellerfassung: Zettel-Modus
 - Umschalter Notiz/Zettel im Transport-Fenster. Zettel-Konvention (gelebt, NICHT das alte Templater-Template): Dateiname `<Emoji-Cluster> - <Titel>.md` (Umlaute bleiben), Frontmatter `id` (JJJJMMTTHHmm)/`created`/`tags` als Inline-Array, Body `**Zitat:**`/`**Mein Gedanke:**`/`**Quelle**`. Pure Bausteine + Frontmatter-Tag-Parser in `shared/zettel.ts` (getestet).
 - IPC: `transport-zettel-context` (optionaler `preferredFolder`-Param — konfigurierter Ordner hat Vorrang, sonst ersten Ordner mit „zettelkasten" im Namen finden, BFS max. Tiefe 4; erntet Top-60-Frontmatter-Tags aus dem aufgelösten Ordner), `zettel-suggest-meta` (lokales Ollama schlägt Tags + Emoji-Cluster vor; gleiche Härtung wie `tasks-suggest-tags`: `isHardLocked('task-extraction')`, UNTRUSTED-Marker, JSON-Fallback-Parser), `transport-save-zettel`.
