@@ -188,7 +188,10 @@
     @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
 
     h1 {
-      font-family: var(--font-display); font-size: clamp(3rem, 8vw, 5.4rem);
+      /* Untergrenze 3rem war zu gross fuer Telefone: "dazwischenkommt" passte
+         nicht mehr zwischen die Seitenraender und schob die Seite quer.
+         Aendert nur Viewports unter ~600px, darueber greift weiter 8vw. */
+      font-family: var(--font-display); font-size: clamp(2.2rem, 8vw, 5.4rem);
       font-weight: 400; line-height: 1.04; margin-bottom: 1.5rem;
       color: var(--text); letter-spacing: -0.02em;
     }
@@ -510,7 +513,7 @@
     </div>
 
     <div class="hero-screenshot">
-      <div class="hero-video">
+      <div class="hero-video" id="heroVideoFrame">
         <video id="heroWorkflow" autoplay muted loop playsinline preload="metadata" poster="hero-workflow-poster.jpg"
                data-i18n-aria="hero.videoAlt"
                aria-label="Ablauf in der App: eine E-Mail trifft ein, die Aufgabe darin wird erkannt, daraus entsteht eine Notiz, und am n&auml;chsten Morgen steht alles im Dashboard.">
@@ -518,6 +521,10 @@
           <track kind="captions" src="hero-workflow.de.vtt" srclang="de" label="Deutsch" default>
           <track kind="captions" src="hero-workflow.en.vtt" srclang="en" label="English">
         </video>
+        <button class="hero-video-play" type="button" onclick="startHeroVideo()" id="heroBigPlay"
+                data-i18n-aria="hero.videoStart" aria-label="Video abspielen">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>
+        </button>
         <div class="hero-video-actions">
           <button class="hero-video-btn" type="button" onclick="toggleHeroSound()" id="heroSoundBtn">Ton an</button>
           <button class="hero-video-btn" type="button" onclick="toggleHeroVideo()" id="heroPlayBtn">Anhalten</button>
@@ -525,6 +532,21 @@
       </div>
       <p class="hero-caption" id="heroCaption" aria-live="off"></p>
     </div>
+    <script>
+      // Muss direkt hier stehen, nicht im Skriptblock am Seitenende: sonst hat
+      // der Browser das Autoplay auf dem Handy laengst angestossen und das
+      // Video ist schon geladen. Auf Touch-Geraeten bleibt zunaechst das
+      // Standbild stehen, abgespielt wird erst auf Tippen.
+      (function () {
+        var v = document.getElementById('heroWorkflow');
+        if (!v || !window.matchMedia('(max-width: 780px), (hover: none)').matches) return;
+        v.autoplay = false;
+        v.removeAttribute('autoplay');
+        v.preload = 'none';
+        v.pause();
+        document.getElementById('heroVideoFrame').classList.add('is-idle');
+      })();
+    </script>
   </section>
 
   <!-- ============ KLARHEITS-STORY (DE-first, Erzählbogen) ============ -->
@@ -1027,6 +1049,7 @@
       .hero-video video { display: none; }
       .hero-video { background: center/cover no-repeat url("hero-workflow-poster.jpg"); aspect-ratio: 16 / 9; }
       .hero-video-actions { display: none; }
+      .hero-video-play { display: none !important; }
       .hero-caption { display: none; }
     }
     .hero-screenshot .hero-person {
@@ -1234,6 +1257,57 @@
       .product-body { padding: 12px; }
       .graph-mock { height: 240px; }
     }
+
+    /* --- Handy: Weichzeichner runter, sonst ruckelt das Hero-Video ---
+       Ueber dem laufenden Video liegen drei teure Ebenen: die Navigation mit
+       Hintergrund-Weichzeichner, zwei fest positionierte Farbschleier mit
+       blur(150px) und die weiche Maske am Videorand. Jedes einzelne Videobild
+       zwingt den Browser, alle drei neu zu berechnen. Auf dem Telefon reicht
+       das, um die komplette Seite zaeh zu machen - auch beim Scrollen weit
+       unterhalb des Videos. Deshalb hier: harte Kanten statt Masken. */
+    @media (max-width: 780px), (hover: none) {
+      nav {
+        -webkit-backdrop-filter: none;
+        backdrop-filter: none;
+        background: var(--bg);
+      }
+      .bg-glow { filter: none; opacity: .12; }
+      .hero-video {
+        /* 94vw war breiter als der Platz zwischen den Seitenraendern -> die
+           Seite liess sich quer schieben. */
+        width: 100%;
+        border-radius: 12px;
+        -webkit-mask-image: none;
+        mask-image: none;
+      }
+      /* Ohne Mauszeiger gibt es kein Hover: die Bedienknoepfe waren auf dem
+         Handy unsichtbar und damit unerreichbar (Video liess sich nicht
+         anhalten). Jetzt dauerhaft sichtbar. */
+      .hero-video-actions { opacity: 1; }
+      .hero-video-btn {
+        -webkit-backdrop-filter: none;
+        backdrop-filter: none;
+        background: rgba(255,255,255,.94);
+      }
+    }
+
+    /* Standbild statt Autoplay auf dem Handy: 3 MB Video von selbst zu laden
+       kostet Datenvolumen und Rechenzeit, bevor jemand ueberhaupt hinsieht. */
+    .hero-video.is-idle .hero-video-actions { display: none; }
+    .hero-video-play {
+      position: absolute; inset: 0; margin: auto;
+      width: 74px; height: 74px; border-radius: 50%;
+      display: none; align-items: center; justify-content: center;
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,.92);
+      color: var(--accent);
+      cursor: pointer;
+      box-shadow: 0 8px 24px rgba(28,26,23,.18);
+    }
+    .hero-video.is-idle .hero-video-play { display: flex; }
+    /* Solange nichts laeuft, steht dort sonst ein Sprechertext aus der Mitte
+       des Videos unter einem Standbild. */
+    .hero-video.is-idle ~ .hero-caption { display: none; }
   </style>
   <script>
     document.querySelectorAll('.how-tab').forEach(tab => {
@@ -1831,6 +1905,7 @@
         "hero.release": "Wartungsrelease &mdash; alle 13 gemeldeten Sicherheitsl&uuml;cken geschlossen &middot; v{vs}",
         "hero.videoPause": "Anhalten",
         "hero.videoPlay": "Abspielen",
+        "hero.videoStart": "Video abspielen",
         "hero.soundOn": "Ton an",
         "hero.soundOff": "Ton aus",
         "hero.videoAlt": "Ablauf in der App: eine E-Mail trifft ein, die Aufgabe darin wird erkannt, daraus entsteht eine Notiz, und am nächsten Morgen steht alles im Dashboard.",
@@ -2099,6 +2174,7 @@
         "hero.release": "Maintenance release &mdash; all 13 reported vulnerabilities closed &middot; v{vs}",
         "hero.videoPause": "Pause",
         "hero.videoPlay": "Play",
+        "hero.videoStart": "Play video",
         "hero.soundOn": "Sound on",
         "hero.soundOff": "Sound off",
         "hero.videoAlt": "What happens in the app: an email arrives, the task inside it is spotted, a note is created from it, and the next morning everything sits on your dashboard.",
@@ -2309,6 +2385,16 @@
       syncHeroVideoButton();
     }
 
+    // Gegenstueck zum Autoplay-Riegel oben: erst ab hier wird das Video geladen.
+    function startHeroVideo() {
+      const v = document.getElementById('heroWorkflow');
+      if (!v) return;
+      document.getElementById('heroVideoFrame')?.classList.remove('is-idle');
+      v.preload = 'metadata';
+      v.play();
+      syncHeroVideoButton();
+    }
+
     // Mit Ton ergibt eine Endlosschleife keinen Sinn - der Sprecher wuerde sich
     // ununterbrochen wiederholen. Ton an heisst deshalb: einmal von vorn, ohne Schleife.
     function toggleHeroSound() {
@@ -2393,8 +2479,13 @@
       // Ausserhalb des Sichtbereichs nicht weiterlaufen lassen: spart Rechenzeit und
       // verhindert, dass der Sprecher weiterredet, waehrend man laengst woanders liest.
       if ('IntersectionObserver' in window) {
+        const frame = document.getElementById('heroVideoFrame');
         new IntersectionObserver((entries) => {
           for (const e of entries) {
+            // Solange der Autoplay-Riegel steht (Handy, noch nicht angetippt),
+            // darf auch das Sichtbarwerden das Video nicht starten - sonst
+            // haette der Riegel keine Wirkung.
+            if (frame && frame.classList.contains('is-idle')) continue;
             if (e.isIntersecting) { if (v.muted && v.paused) v.play().catch(() => {}); }
             else if (!v.paused) v.pause();
           }
