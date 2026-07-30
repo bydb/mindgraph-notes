@@ -2,6 +2,19 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.10.32-beta] - 2026-07-30
+
+Nachbesserung zu 0.10.31: Die dort eingebaute Absicherung gegen Netzaussetzer griff genau im wichtigsten Fall nicht — nach einem Ruhezustand.
+
+### Behoben
+
+- **Ruhezustand beendet einen laufenden Auftrag nicht mehr.** In 0.10.31 sollte die App eine unterbrochene Anfrage einmal wiederholen. Sie tat es nicht, sobald der Rechner länger geschlafen hatte als das Zeitfenster des Auftrags (beim Notiz-Agenten zehn Minuten): Die Wiederholung prüfte ein Signal, das den Abbruch durch den Nutzer und das abgelaufene Zeitfenster in einen Topf warf. Nach dem Aufwachen war das Zeitfenster immer abgelaufen, also unterblieb die Wiederholung — und der rohe Fehlercode landete beim Nutzer. Jetzt verhindert nur noch ein echter Abbruch durch den Nutzer die Wiederholung, und der zweite Versuch bekommt ein frisches Zeitfenster.
+- **Der Abbruchgrund wird auch tief verschachtelt erkannt.** Netzwerkfehler kommen oft als `fetch failed` mit dem eigentlichen Grund eine oder zwei Ebenen darunter, teils als Sammelfehler mehrerer Adressen. Bisher wurde nur die oberste Ebene geprüft. Zusätzlich schreibt die App jetzt in ihr Protokoll, wenn sie einen Netzwerkfehler bewusst **nicht** wiederholt — damit so ein Fall künftig nachvollziehbar ist, statt erraten werden zu müssen.
+
+### Bekannte Grenze
+
+- Schläft der Rechner so lange, dass die Anfrage nicht am Netzabbruch, sondern an der Zeitüberschreitung scheitert, meldet die App weiterhin „Zeitüberschreitung". Der Auftrag ist dann ebenfalls verloren; das ist noch nicht behoben.
+
 ## [0.10.31-beta] - 2026-07-30
 
 Ein Fehlerbehebungs-Release rund um den Notiz-Agenten. Der auffälligste Fall: Mit eingeschalteter Webrecherche konnte der Agent eine wissenschaftliche Webseite gar nicht fertigstellen — er wiederholte denselben Schritt, bis der Auftrag abbrach. An deinen Notizen und Einstellungen ändert sich nichts.

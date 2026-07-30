@@ -17,7 +17,7 @@ import { describe, it, expect, vi, afterEach } from 'vitest'
 const netFetch = vi.fn()
 vi.mock('electron', () => ({ net: { fetch: (...args: unknown[]) => netFetch(...args) } }))
 
-import { chatWithTools, CHAT_RETRY_DELAY_MS } from './chatClient'
+import { chatWithTools, CHAT_RETRY_DELAY_MS, errorChainText } from './chatClient'
 
 const OPTS = { backend: 'openrouter' as const, openrouterApiKey: 'k', openrouterModel: 'moonshotai/kimi-k3' }
 const MSGS = [{ role: 'user' as const, content: 'hi' }]
@@ -86,6 +86,82 @@ describe('chatFetch — Retry bei transienten Netzabbrüchen', () => {
     await p
 
     expect(net.attempts()).toBe(2)
+  })
+})
+
+// Der Grund liegt bei fetch fast nie oben: `TypeError: fetch failed` mit dem echten
+// Chromium-/Socket-Fehler als cause, teils zwei Ebenen tief oder als AggregateError.
+// Genau hier hätte die erste Fassung (nur eine cause-Ebene) den Retry verpasst.
+describe('errorChainText — der Grund steckt in der Kette', () => {
+  it('findet den Grund zwei cause-Ebenen tief', () => {
+    const inner = new Error('net::ERR_NETWORK_IO_SUSPENDED')
+    const mid = Object.assign(new Error('fetch failed'), { cause: inner })
+    const outer = Object.assign(new TypeError('fetch failed'), { cause: mid })
+    expect(errorChainText(outer)).toContain('ERR_NETWORK_IO_SUSPENDED')
+  })
+
+  it('findet den Grund in AggregateError.errors', () => {
+    const agg = Object.assign(new AggregateError([new Error('ECONNREFUSED'), new Error('ECONNRESET')], 'alle Adressen'), {})
+    expect(errorChainText(agg)).toContain('ECONNRESET')
+  })
+
+  it('bricht bei zyklischer cause-Kette ab, statt zu hängen', () => {
+    const a = new Error('a') as Error & { cause?: unknown }
+    const b = Object.assign(new Error('b'), { cause: a })
+    a.cause = b
+    expect(errorChainText(a)).toBe('a | b')
+  })
+
+  it('verträgt Nicht-Error-Werte', () => {
+    expect(errorChainText('net::ERR_NETWORK_CHANGED')).toBe('net::ERR_NETWORK_CHANGED')
+    expect(errorChainText(null)).toBe('')
+  })
+})
+
+describe('chatFetch — Retry greift auch bei verschachteltem Grund', () => {
+  it('wiederholt, wenn der Abbruchgrund zwei Ebenen tief liegt', async () => {
+    const net = arm(a => {
+      if (a > 1) return okResponse()
+      const inner = new Error('net::ERR_NETWORK_IO_SUSPENDED')
+      const mid = Object.assign(new Error('fetch failed'), { cause: inner })
+      throw Object.assign(new TypeError('fetch failed'), { cause: mid })
+    })
+
+    vi.useFakeTimers()
+    const p = call()
+    await vi.advanceTimersByTimeAsync(CHAT_RETRY_DELAY_MS + 10)
+    await p
+
+    expect(net.attempts()).toBe(2)
+  })
+})
+
+// DER Fehler aus 0.10.31 (Praxistest 30.07., kimi-k3): Der Retry prüfte das KOMBINIERTE
+// Signal aus Nutzer-Abbruch UND internem Timeout. Schläft der Rechner länger als das
+// Zeitfenster (Notiz-Agent: 10 Minuten), ist das Timeout beim Aufwachen längst abgelaufen —
+// der Retry sprang nie an, und der rohe `net::ERR_NETWORK_IO_SUSPENDED` landete beim Nutzer.
+// Nur der NUTZER-Abbruch darf die Wiederholung verhindern; das Zeitfenster wird pro Versuch
+// neu aufgezogen.
+describe('chatFetch — abgelaufenes Timeout blockiert den Retry NICHT', () => {
+  it('wiederholt nach einem Netzabbruch, obwohl das Zeitfenster verstrichen ist', async () => {
+    const signals: AbortSignal[] = []
+    let attempts = 0
+    netFetch.mockImplementation(async (_url: string, init: RequestInit) => {
+      signals.push(init.signal as AbortSignal)
+      if (++attempts === 1) throw new Error('net::ERR_NETWORK_IO_SUSPENDED')
+      return okResponse('nach dem Aufwachen')
+    })
+
+    // timeoutMs bewusst winzig: das Zeitfenster des ERSTEN Versuchs ist beim Retry sicher
+    // abgelaufen — genau die Lage nach einem Ruhezustand.
+    const p = chatWithTools(MSGS, [], { ...OPTS, timeoutMs: 5 })
+    const res = await p
+
+    expect(res.text).toBe('nach dem Aufwachen')
+    expect(attempts).toBe(2)
+    // Beweis, dass der zweite Versuch ein FRISCHES Zeitfenster bekam:
+    expect(signals[1]).not.toBe(signals[0])
+    expect(signals[1].aborted).toBe(false)
   })
 })
 
