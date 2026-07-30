@@ -2,6 +2,19 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.10.33-beta] - 2026-07-30
+
+Für kleine Laptops: Während ein Agent-Auftrag läuft, legt sich der Rechner nicht mehr schlafen.
+
+### Behoben
+
+- **Der Rechner bleibt wach, solange ein Auftrag des Notiz-Agenten läuft.** Auf einem kleinen MacBook im Akkubetrieb brachen drei Läufe hintereinander mit einem Netzwerkfehler ab, auf einem größeren Rechner keiner. Die Ursache lag nicht in der App: Ein Agent-Auftrag dauert Minuten, in denen niemand die Maschine bedient — macOS legt sie dann in den Energiesparzustand, der Netzwerkdienst wird stillgelegt, und die laufende Anfrage stirbt. Die App sagt dem Betriebssystem jetzt für die Dauer eines Auftrags, dass es nicht schlafen legen soll. **Der Bildschirm darf weiterhin dunkel werden** — nur der Rechner selbst bleibt wach. Nach dem Auftrag gilt sofort wieder die normale Energieverwaltung, auch wenn der Auftrag mit einem Fehler endet.
+
+### Bekannte Grenzen
+
+- Der Schutz gilt bisher nur für Aufträge des Notiz-Agenten. Andere langlaufende Vorgänge (Mail-Analyse im Stapel, Tageszusammenfassung, Workflows) sind noch nicht abgedeckt — dort ist das Problem bisher auch nicht aufgetreten.
+- Klappst du den Deckel zu, schläft der Rechner trotzdem. Dagegen hilft kein Programm.
+
 ## [0.10.32-beta] - 2026-07-30
 
 Nachbesserung zu 0.10.31: Die dort eingebaute Absicherung gegen Netzaussetzer griff genau im wichtigsten Fall nicht — nach einem Ruhezustand.

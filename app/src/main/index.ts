@@ -171,6 +171,7 @@ import { isPluginGateEnabled } from '../shared/plugins/moduleGate'
 import { registerPluginTransport, isTrustedSender } from './plugins/transport'
 import { registerContextAttachment, registerContextFolder, removeContextAttachment, clearContextAttachments, readContextBlock } from './noteAgent/contextFiles'
 import { startRun, getRunForSender, finishRun, publicResults, takeResult, peekResult, cancelRunsForSender, pruneRunIfConsumed, consumeEvictedRuns, type WebRunState } from './noteAgent/runRegistry'
+import { acquireStayAwake } from './powerGuard'
 import { runNoteAgentLoop } from './noteAgent/loop'
 import { suggestAgentMemory } from './noteAgent/memorySuggestion'
 import { cleanupOldStaging, assertInsideRunStaging, reserveFreeName, stagingDirFor } from './noteAgent/staging'
@@ -4270,6 +4271,9 @@ ipcMain.handle('note-agent-run', async (event, params: NoteAgentRunParams) => {
     // Loop asynchron — der Handler gibt sofort die runId zurück (für Abbrechen),
     // Fortschritt und Abschluss kommen als sender-gebundene Events.
     const sender = event.sender
+    // Ruhezustand während des Laufs verhindern — auf kleinen Laptops im Akkubetrieb hat
+    // macOS sonst mitten im Auftrag den Netzwerkdienst stillgelegt (siehe powerGuard.ts).
+    const releaseStayAwake = acquireStayAwake('Notiz-Agent-Lauf')
     void (async () => {
       try {
         const res = await runNoteAgentLoop({
@@ -4321,6 +4325,9 @@ ipcMain.handle('note-agent-run', async (event, params: NoteAgentRunParams) => {
             web: webRunProvenance(run)
           })
         }
+      } finally {
+        // MUSS hier stehen: sonst bleibt die Maschine nach einem Fehler-Lauf für immer wach.
+        releaseStayAwake()
       }
     })()
 
