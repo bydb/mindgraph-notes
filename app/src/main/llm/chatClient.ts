@@ -146,9 +146,60 @@ function requestSignal(timeoutMs: number, external?: AbortSignal): AbortSignal {
 // obwohl der Notiz-Agent ein 600-s-Timeout gesetzt hatte. Das AbortSignal aus
 // requestSignal() bleibt die einzige Zeitgrenze. Die kurzen Reachability-Checks
 // (/api/tags, 1,5-3 s Timeout) bleiben bewusst auf dem globalen fetch.
+// Transiente Netzabbrüche: Chromium räumt laufende Verbindungen ab, wenn der Rechner in
+// den Ruhezustand geht oder das Netz wechselt (WLAN, VPN, Docking). Der Request stirbt
+// dann mit `net::ERR_NETWORK_IO_SUSPENDED` o.ä. — real aufgetreten mitten in einem
+// Notiz-Agent-Lauf, wo ein einziger Aussetzer die komplette Recherche gekostet hat.
+// Bewusst eng: nur Fehler, die eindeutig „Verbindung weg" heißen. HTTP-Fehler (429, 5xx)
+// gehören NICHT hierher — die behandelt der Aufrufer mit eigenen Meldungen.
+const TRANSIENT_NET_ERROR =
+  /ERR_NETWORK_IO_SUSPENDED|ERR_NETWORK_CHANGED|ERR_INTERNET_DISCONNECTED|ERR_CONNECTION_RESET|ERR_CONNECTION_CLOSED|ERR_CONNECTION_ABORTED|ECONNRESET/i
+
+function isTransientNetworkError(e: unknown): boolean {
+  const msg = e instanceof Error ? `${e.message} ${String((e as { cause?: unknown }).cause ?? '')}` : String(e)
+  return TRANSIENT_NET_ERROR.test(msg)
+}
+
+export const CHAT_RETRY_DELAY_MS = 1500
+
+/**
+ * BEWUSSTE ZUSAGE: „at least once", nicht „exactly once".
+ *
+ * Ein abgerissener Socket sagt nicht, ob der Server den Request schon bekommen und
+ * abgearbeitet hat. Der Wiederholungsversuch kann bei einem Cloud-Backend also eine zweite,
+ * bezahlte Inferenz auslösen. Das ist der Preis dafür, dass ein Ruhezustand nicht mehr einen
+ * kompletten Agent-Lauf (Minuten Arbeit, ebenfalls bezahlte Tokens) vernichtet — die
+ * Abwägung fiel bewusst zugunsten des Laufs aus.
+ *
+ * Was die Kosten begrenzt: genau EIN Versuch, nur bei eindeutigen Verbindungsabbrüchen,
+ * nie nach Nutzer-Abbruch/Timeout, und HTTP-Antworten (429/402/5xx) laufen gar nicht erst
+ * hier durch. Der Wiederholungsversuch ist im Log sichtbar.
+ *
+ * Wer das ändern will: NICHT die Versuchszahl erhöhen — bei einem echten Netzausfall
+ * multipliziert das nur die Kosten. Der richtige Hebel wäre ein serverseitiger
+ * Idempotenz-Schlüssel, den weder OpenRouter noch LLMBase heute anbieten.
+ */
 async function chatFetch(url: string, init: RequestInit): Promise<Response> {
   const { net } = await import('electron')
-  return net.fetch(url, init)
+  try {
+    return await net.fetch(url, init)
+  } catch (e) {
+    // Genau EIN Wiederholungsversuch. Nicht wiederholen, wenn der Nutzer abgebrochen hat
+    // oder das Timeout gefeuert ist — dann ist das Signal der Grund, nicht das Netz.
+    if (!isTransientNetworkError(e) || init.signal?.aborted) throw e
+    await new Promise(resolve => setTimeout(resolve, CHAT_RETRY_DELAY_MS))
+    if (init.signal?.aborted) throw e
+    console.log('[LLM] Netzverbindung war unterbrochen — Anfrage wird einmal wiederholt')
+    try {
+      return await net.fetch(url, init)
+    } catch (e2) {
+      if (!isTransientNetworkError(e2) || init.signal?.aborted) throw e2
+      throw new Error(
+        'Die Netzwerkverbindung wurde während der Anfrage unterbrochen (z. B. Ruhezustand, WLAN- oder VPN-Wechsel) — auch der Wiederholungsversuch schlug fehl. ' +
+        `Bitte die Verbindung prüfen und den Vorgang erneut starten. (${e2 instanceof Error ? e2.message : String(e2)})`
+      )
+    }
+  }
 }
 
 async function isOllamaReachable(url: string): Promise<boolean> {

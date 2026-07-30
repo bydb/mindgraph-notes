@@ -19,13 +19,24 @@ import { webSearch } from '../webResearch/providers'
 import { fetchAndExtract, FetchExtractError } from '../webResearch/fetchExtract'
 import {
   normalizeWebUrl, normalizeQuery, isQueryTooLong, isSearchAllowedInPhase, mergeDeterministicSources,
-  MAX_WEB_SEARCHES_PER_RUN, MAX_WEB_FETCHES_PER_RUN,
+  mergeDeterministicSourcesHtml, MAX_WEB_SEARCHES_PER_RUN, MAX_WEB_FETCHES_PER_RUN,
   type WebSearchHit
 } from '../../shared/webResearch'
 
 export interface NoteAgentContext {
   senderId: number
   run: AgentRun
+  /**
+   * Werkzeug-Allowlist dieses Laufs (aus loop.ts). Fehlermeldungen dürfen nur auf
+   * Werkzeuge verweisen, die der Lauf tatsächlich hat — sonst schickt eine Ablehnung
+   * das Modell in eine Fehler-Schleife.
+   */
+  allowedTools?: ReadonlySet<string>
+}
+
+/** Hat dieser Lauf das Werkzeug? Ohne Allowlist (Tests) konservativ: ja. */
+function isToolAvailable(ctx: NoteAgentContext, name: string): boolean {
+  return !ctx.allowedTools || ctx.allowedTools.has(name)
 }
 
 // Die Vault-Lese-Skills (note_read/note_search) sind Adapter auf die erprobten
@@ -408,15 +419,30 @@ export function createNoteAgentRegistry(): ToolRegistry<NoteAgentContext> {
         }
         articleHtml = extracted
       }
+      const lang = typeof args.lang === 'string' ? args.lang : 'de'
+      // Wortzahl für die Ergebnis-Karte VOR dem Quellenblock — der ist App-Beiwerk,
+      // der Nutzer will die Länge des Artikels sehen.
+      const wordCount = articleHtml.split(/\s+/).length
+      // Web-Lauf (0e): genau EIN Ergebnis-Write, egal ob Notiz oder Seite; den
+      // Quellenblock hängt die App deterministisch an — hier als HTML-Sektion.
+      if (ctx.run.web) {
+        if (ctx.run.web.wrote) return err('Das Ergebnis wurde bereits geschrieben — im Recherche-Modus ist nur EIN Ergebnis erlaubt.')
+        articleHtml = mergeDeterministicSourcesHtml(articleHtml, ctx.run.web.fetches, lang)
+      }
       const fileName = sanitizeOutputFileName(rawName, '.html', ['.htm'])
       const html = buildScientificHtmlPage({
         title,
         bodyHtml: articleHtml,
-        lang: typeof args.lang === 'string' ? args.lang : 'de',
+        lang,
         // KI-Provenienz: HTML trägt kein YAML — Kennzeichnung via <meta> + Fußzeile.
         aiModel: ctx.run.model
       })
-      return registerStagedResult(ctx, fileName, 'html', html, `${articleHtml.split(/\s+/).length} Wörter, wissenschaftliche HTML-Seite`)
+      const res = await registerStagedResult(ctx, fileName, 'html', html, `${wordCount} Wörter, wissenschaftliche HTML-Seite`)
+      if (res.ok && ctx.run.web) {
+        ctx.run.web.wrote = true
+        ctx.run.web.phase = 'write'
+      }
+      return res
     }
   })
 
@@ -472,15 +498,19 @@ export function createNoteAgentRegistry(): ToolRegistry<NoteAgentContext> {
       // Der Namensfilter würde `seite.html` zu `seite.html.md` machen — eine
       // Markdown-Datei voller HTML. Statt das stillschweigend zu tun, das
       // Modell auf das richtige Werkzeug stoßen: es kann die Seite danach in
-      // derselben Iteration korrekt erzeugen.
+      // derselben Iteration korrekt erzeugen. Der Verweis muss auf ein Tool
+      // zeigen, das dieser Lauf auch WIRKLICH hat — sonst dreht das Modell eine
+      // Fehler-Schleife (real passiert, als write_html im Web-Lauf gesperrt war).
       if (/\.html?$/i.test(rawName)) {
         return err(
-          'write_note schreibt ausschließlich Markdown. Für eine HTML-Seite das Werkzeug write_html benutzen (Parameter: title, body_html) — nur dann bekommt die Seite die Formel-Darstellung und das Layout.'
+          isToolAvailable(ctx, 'write_html')
+            ? 'write_note schreibt ausschließlich Markdown. Für eine HTML-Seite das Werkzeug write_html benutzen (Parameter: title, body_html) — nur dann bekommt die Seite die Formel-Darstellung und das Layout.'
+            : 'write_note schreibt ausschließlich Markdown, und HTML-Seiten sind in diesem Lauf nicht verfügbar. Gib der Datei die Endung .md und schreibe das Ergebnis als Markdown-Notiz.'
         )
       }
       // Web-Lauf (0e): genau EIN Write; die App hängt den Quellenblock deterministisch an.
       if (ctx.run.web) {
-        if (ctx.run.web.wrote) return err('Das Ergebnis wurde bereits geschrieben — im Recherche-Modus ist nur ein write_note erlaubt.')
+        if (ctx.run.web.wrote) return err('Das Ergebnis wurde bereits geschrieben — im Recherche-Modus ist nur EIN Ergebnis erlaubt.')
         markdown = mergeDeterministicSources(markdown, ctx.run.web.fetches)
       }
       const fileName = sanitizeOutputFileName(rawName, '.md')

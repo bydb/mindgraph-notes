@@ -454,6 +454,80 @@ export function mergeDeterministicSources(markdown: string, fetches: WebFetchRec
   return `${base}\n\n## Quellen\n\n${lines.join('\n')}\n`
 }
 
+function escapeHtmlText(text: string): string {
+  return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+}
+
+/**
+ * Entfernt GENAU die eine `<section>`, die der Quellen-Abschnitt des Modells ist — nicht
+ * „alles ab Quellen bis Dateiende".
+ *
+ * Warum kein Regex: eine Regex mit `$`-Anker verschluckt jedes weitere `</section>` und löscht
+ * damit ein Fazit, das NACH den Quellen steht (P1-Befund 30.07.2026, reproduziert). Deshalb ein
+ * balancierter Scanner: `<section>`/`</section>` zählen, Top-Level-Sektionen als Spans sammeln,
+ * die LETZTE mit Quellen-Überschrift herausschneiden. Alles davor und danach bleibt unberührt.
+ *
+ * Bekannte Grenze: `<section` in einem HTML-Kommentar oder Attributwert würde mitgezählt. Für
+ * write_html-Inhalte ist das irrelevant — und der Fehlerfall wäre „nichts entfernt" (dann steht
+ * eine doppelte Quellen-Überschrift da), nie „zu viel entfernt".
+ */
+function stripModelSourcesSection(bodyHtml: string): string {
+  const tagRe = /<(\/?)section\b[^>]*>/gi
+  const spans: Array<[number, number]> = []
+  let depth = 0
+  let start = -1
+  let m: RegExpExecArray | null
+  while ((m = tagRe.exec(bodyHtml)) !== null) {
+    if (m[1] === '/') {
+      if (depth === 0) continue // verwaistes </section> — ignorieren, nicht negativ zählen
+      depth--
+      if (depth === 0 && start >= 0) {
+        spans.push([start, m.index + m[0].length])
+        start = -1
+      }
+    } else {
+      if (depth === 0) start = m.index
+      depth++
+    }
+  }
+  const isSourcesSection = /^<section\b[^>]*>\s*<h[1-6][^>]*>\s*(?:Quellen|Sources)\s*<\/h[1-6]>/i
+  for (let i = spans.length - 1; i >= 0; i--) {
+    const [from, to] = spans[i]
+    if (isSourcesSection.test(bodyHtml.slice(from, to))) {
+      return bodyHtml.slice(0, from).trimEnd() + '\n' + bodyHtml.slice(to).trimStart()
+    }
+  }
+  return bodyHtml
+}
+
+/**
+ * HTML-Pendant zu mergeDeterministicSources für write_html-Seiten im Recherche-Modus.
+ * Gleiche Autorität, gleiche Regel: NUR erfolgreich abgerufene, deduplizierte URLs; der vom
+ * Modell selbst geschriebene Quellen-Abschnitt wird ersetzt. Ein Literatur-/References-
+ * Abschnitt mit anderer Überschrift bleibt stehen — analog zum Markdown-Pfad, wo nur
+ * „## Quellen" der App gehört.
+ *
+ * Escaping ist hier Pflicht: Titel kommen aus fremden <title>-Tags und landen direkt im DOM.
+ */
+export function mergeDeterministicSourcesHtml(bodyHtml: string, fetches: WebFetchRecord[], lang?: string): string {
+  const en = !!lang && lang.toLowerCase().startsWith('en')
+  const heading = en ? 'Sources' : 'Quellen'
+  const base = stripModelSourcesSection(bodyHtml).trimEnd()
+  const seen = new Set<string>()
+  const ok = fetches.filter(f => f.status === 'ok' && !seen.has(f.finalUrl) && (seen.add(f.finalUrl), true))
+  if (!ok.length) return base + '\n'
+  const items = ok.map(f => {
+    const text = escapeHtmlText(sanitizeSourceTitle(f.title) || f.finalUrl)
+    const retrieved = `${en ? 'retrieved on' : 'abgerufen am'} ${escapeHtmlText(f.fetchedAt.slice(0, 10))}`
+    // Fail-closed: nur http(s) wird verlinkt — alles andere bleibt reiner Text.
+    const link = /^https?:\/\//i.test(f.finalUrl)
+      ? `<a href="${escapeHtmlText(f.finalUrl)}">${text}</a>`
+      : text
+    return `    <li>${link} — ${retrieved}</li>`
+  })
+  return `${base}\n\n<section class="references">\n  <h2>${heading}</h2>\n  <ol>\n${items.join('\n')}\n  </ol>\n</section>\n`
+}
+
 /** Ist die Provider-Konfiguration einsatzbereit? (Key-Existenz prüft der Main separat.) */
 export function isWebResearchConfigComplete(config: WebResearchConfig | undefined): boolean {
   if (!config) return false

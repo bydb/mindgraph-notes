@@ -2,6 +2,17 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.10.31-beta] - 2026-07-30
+
+Ein Fehlerbehebungs-Release rund um den Notiz-Agenten. Der auffälligste Fall: Mit eingeschalteter Webrecherche konnte der Agent eine wissenschaftliche Webseite gar nicht fertigstellen — er wiederholte denselben Schritt, bis der Auftrag abbrach. An deinen Notizen und Einstellungen ändert sich nichts.
+
+### Behoben
+
+- **Recherche und wissenschaftliche Webseiten schließen sich nicht mehr aus.** Bat man den Notiz-Agenten mit eingeschalteter Webrecherche um eine wissenschaftliche Seite, drehte er sich im Kreis: Seine Anleitung verlangt das Werkzeug für HTML-Seiten, im Recherche-Modus war genau dieses Werkzeug aber abgeschaltet. Die Ablehnung, die er stattdessen bekam, verwies ihn auf ebendieses fehlende Werkzeug — er versuchte es erneut, bekam dieselbe Antwort, und so fort. Das Werkzeug ist im Recherche-Modus jetzt verfügbar, die recherchierte Seite entsteht in einem Zug.
+- **Quellenverzeichnis unter recherchierten Webseiten.** Recherchierte HTML-Seiten bekommen ihr Quellenverzeichnis jetzt genauso automatisch angehängt wie recherchierte Notizen — mit Abrufdatum und ausschließlich den Seiten, die tatsächlich gelesen wurden. Der Agent kann keine Quelle behaupten, die er nie geöffnet hat. Ein eigenes Literaturverzeichnis auf der Seite bleibt daneben unberührt.
+- **Kurze Netzaussetzer beenden einen Auftrag nicht mehr.** Ging der Rechner mitten in einem Auftrag in den Ruhezustand oder wechselte das Netz (WLAN, VPN, Dock), brach die Verbindung ab und die gesamte bis dahin geleistete Arbeit war verloren. Die App wiederholt die Anfrage jetzt einmal und erklärt in klaren Worten, wenn auch das nicht klappt. Bewusst genau ein Versuch und nur bei echten Verbindungsabbrüchen — ein erschöpftes Guthaben oder eine Auslastungsmeldung des Anbieters wird nicht wiederholt.
+- **Fehlermeldungen des Agenten verweisen nur noch auf Werkzeuge, die er wirklich hat.** Das war die eigentliche Ursache der Endlosschleife oben und ist jetzt allgemein abgesichert: Eine Ablehnung, die auf ein nicht verfügbares Werkzeug zeigt, wird sonst selbst zum Motor der Wiederholung.
+
 ## [0.10.30-beta] - 2026-07-29
 
 Ein reines Fehlerbehebungs-Release. Alle drei App-Fehler traten **ausschließlich in der installierten Fassung** auf und waren beim Entwickeln unsichtbar — gefunden wurden sie erst, weil MindGraph auf einem zweiten Rechner neu eingerichtet wurde. Genau der Weg, den jeder neue Nutzer geht. An deinen Notizen und Einstellungen ändert sich nichts.

@@ -12,6 +12,7 @@ import {
   isQueryTooLong,
   isSearchAllowedInPhase,
   mergeDeterministicSources,
+  mergeDeterministicSourcesHtml,
   sanitizeSourceTitle,
   isWebResearchConfigComplete,
   WEB_QUERY_MAX_CHARS,
@@ -343,6 +344,115 @@ describe('mergeDeterministicSources', () => {
     // Keine Autolink-Syntax und keine Klammer-Link-Syntax auf evil-Ziele:
     expect(quellen).not.toContain('<https://')
     expect(quellen).not.toContain('](https://evil')
+  })
+})
+
+describe('mergeDeterministicSourcesHtml', () => {
+  const rec = (url: string, title: string, status: 'ok' | 'failed' = 'ok') => ({
+    requestedUrl: url, finalUrl: url, redirectChain: [url], title, fetchedAt: '2026-07-20T10:00:00.000Z', status
+  })
+
+  it('hängt nur erfolgreich abgerufene, deduplizierte Quellen als HTML-Sektion an', () => {
+    const html = mergeDeterministicSourcesHtml('<section><p>Text.</p></section>', [
+      rec('https://a.com/1', 'Titel A'),
+      rec('https://a.com/1', 'Titel A (dup)'),
+      rec('https://b.com/2', 'Titel B'),
+      rec('https://c.com/3', 'Fehlversuch', 'failed')
+    ])
+    expect(html).toContain('<section class="references">')
+    expect(html).toContain('<h2>Quellen</h2>')
+    expect(html).toContain('<a href="https://a.com/1">Titel A</a> — abgerufen am 2026-07-20')
+    expect(html).toContain('<a href="https://b.com/2">Titel B</a>')
+    expect(html).not.toContain('c.com/3')
+    expect(html.match(/a\.com\/1/g)?.length).toBe(1)
+  })
+
+  it('ersetzt eine vom Modell selbst geschriebene Quellen-Sektion', () => {
+    const body = '<p>Inhalt.</p>\n<section class="references"><h2>Quellen</h2><ol><li><a href="https://fake.example/">erfunden</a></li></ol></section>'
+    const html = mergeDeterministicSourcesHtml(body, [rec('https://real.com/x', 'Echt')])
+    expect(html).not.toContain('fake.example')
+    expect(html).toContain('https://real.com/x')
+    expect(html.match(/<h2>Quellen<\/h2>/g)?.length).toBe(1)
+  })
+
+  // P1-Befund 30.07.2026: die erste Fassung nutzte eine Regex mit $-Anker und verschluckte
+  // dabei jedes weitere </section> — ein Fazit NACH den Quellen wurde gelöscht (Datenverlust).
+  it('löscht KEINEN Inhalt, der nach der Quellen-Sektion steht', () => {
+    const body = [
+      '<section><h2>1 Einleitung</h2><p>Anfang.</p></section>',
+      '<section class="references"><h2>Quellen</h2><ol><li><a href="https://fake.example/">erfunden</a></li></ol></section>',
+      '<section><h2>2 Fazit</h2><p>Das Fazit darf nicht verschwinden.</p></section>'
+    ].join('\n')
+    const html = mergeDeterministicSourcesHtml(body, [rec('https://real.com/x', 'Echt')])
+    expect(html).toContain('Das Fazit darf nicht verschwinden.')
+    expect(html).toContain('<h2>2 Fazit</h2>')
+    expect(html).toContain('<h2>1 Einleitung</h2>')
+    expect(html).not.toContain('fake.example')
+    expect(html.match(/<h2>Quellen<\/h2>/g)?.length).toBe(1)
+  })
+
+  it('entfernt nur die LETZTE Quellen-Sektion und lässt verschachtelte Sektionen intakt', () => {
+    const body = [
+      '<section><h2>1 Kapitel</h2><section><h3>1.1 Unterkapitel</h3><p>Verschachtelt.</p></section><p>Ende Kapitel.</p></section>',
+      '<section><h2>Quellen</h2><ol><li>alt</li></ol></section>'
+    ].join('\n')
+    const html = mergeDeterministicSourcesHtml(body, [rec('https://real.com/x', 'Echt')])
+    expect(html).toContain('1.1 Unterkapitel')
+    expect(html).toContain('Ende Kapitel.')
+    expect(html).not.toContain('<li>alt</li>')
+    expect(html.match(/<h2>Quellen<\/h2>/g)?.length).toBe(1)
+  })
+
+  it('eine Quellen-Sektion tief im Dokument wird nicht mit einer äußeren Sektion verwechselt', () => {
+    // Verschachtelt: die „Quellen"-Überschrift steht NICHT am Anfang der Top-Level-Sektion.
+    const body = '<section><h2>Anhang</h2><section><h3>Quellen</h3><ol><li>alt</li></ol></section></section>'
+    const html = mergeDeterministicSourcesHtml(body, [rec('https://real.com/x', 'Echt')])
+    // Die äußere Sektion bleibt vollständig erhalten — nichts wird weggeschnitten.
+    expect(html).toContain('<h2>Anhang</h2>')
+    expect(html).toContain('<li>alt</li>')
+    expect(html).toContain('https://real.com/x')
+  })
+
+  it('lässt einen Literatur-Abschnitt des Modells stehen (nur „Quellen" gehört der App)', () => {
+    const body = '<p>Text.</p>\n<section class="references"><h2>Literatur</h2><ol><li>Zeigarnik, B. (1927)</li></ol></section>'
+    const html = mergeDeterministicSourcesHtml(body, [rec('https://real.com/x', 'Echt')])
+    expect(html).toContain('<h2>Literatur</h2>')
+    expect(html).toContain('Zeigarnik, B. (1927)')
+    expect(html).toContain('<h2>Quellen</h2>')
+  })
+
+  it('ohne erfolgreiche Fetches keine Quellen-Sektion', () => {
+    expect(mergeDeterministicSourcesHtml('<p>Nur Text.</p>', [rec('https://x.com/', 'X', 'failed')]))
+      .not.toContain('class="references"')
+  })
+
+  it('englische Seite bekommt englische Beschriftung', () => {
+    const html = mergeDeterministicSourcesHtml('<p>Text.</p>', [rec('https://a.com/1', 'Title A')], 'en')
+    expect(html).toContain('<h2>Sources</h2>')
+    expect(html).toContain('retrieved on 2026-07-20')
+  })
+
+  it('P1: ein manipulierter Titel kann kein HTML injizieren', () => {
+    // Realer Angriff aus dem <title>: Tag-Ausbruch + eigenes Script/Link.
+    const evil = 'Legitim</a><script>alert(1)</script><a href="https://evil.example/">klick'
+    const html = mergeDeterministicSourcesHtml('<p>Inhalt.</p>', [rec('https://gut.example/', evil)])
+    const quellen = html.slice(html.indexOf('<section class="references">'))
+    // Der Titel landet komplett als inerter Text — kein Tag überlebt, auch kein href
+    // auf das evil-Ziel (der Text „evil.example" darf dastehen, klickbar ist er nicht).
+    expect(quellen).not.toContain('<script>')
+    expect(quellen).not.toContain('href="https://evil')
+    // Genau EIN Listeneintrag und EIN Link, und der zeigt auf die echte Quelle:
+    expect(quellen.match(/<li>/g)?.length).toBe(1)
+    expect(quellen.match(/<a href=/g)?.length).toBe(1)
+    expect(quellen).toContain('<a href="https://gut.example/">')
+  })
+
+  it('nicht-http(s)-URLs werden nicht verlinkt', () => {
+    const html = mergeDeterministicSourcesHtml('<p>T</p>', [
+      { ...rec('https://ok.com/', 'Gut'), finalUrl: 'javascript:alert(1)' }
+    ])
+    expect(html).not.toContain('<a href=')
+    expect(html).toContain('<li>Gut —')
   })
 })
 
