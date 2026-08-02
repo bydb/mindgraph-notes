@@ -2,6 +2,25 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.10.34-beta] - 2026-08-02
+
+Der Hinweis, dass eine KI mitgeschrieben hat, bleibt jetzt auch am exportierten Dokument.
+
+### Behoben
+
+- **PDF-Export behält die KI-Kennzeichnung.** Notizen, an denen eine KI mitgeschrieben hat, tragen den Modellnamen in ihren Eigenschaften, und der Lesen-Modus zeigt ihn als kleines Zeichen neben dem Titel. Beim PDF-Export ging das verloren: Die App gibt zum Drucken nur den fertig gesetzten Text weiter, die Eigenschaften bleiben zurück. Das Ergebnis war ein Dokument ohne jeden Hinweis auf seine Herkunft — ausgerechnet in dem Moment, in dem man es weitergibt. Am Ende der Seite steht jetzt eine schmale Fußzeile mit dem Modellnamen, im reMarkable-Buchstil schwarz und in Lesegröße statt als graues Kleingedrucktes.
+- **Word-Export ebenso.** Beim Erzeugen einer Word-Datei wurde der Eigenschaften-Block abgeschnitten, bevor irgendetwas gelesen werden konnte. Der Modellname wird jetzt vorher ausgelesen und als abgesetzter Absatz unter einer dünnen Linie ans Dokumentende gesetzt. Das gilt für den Export aus dem Editor genauso wie für Word-Dateien, die der Notiz-Agent schreibt — die trugen bisher gar keine Kennzeichnung.
+
+### Verbessert
+
+- **Ein Wortlaut für alle Formate.** Wissenschaftliche HTML-Seite, PDF und Word bauen ihren Hinweis jetzt aus derselben Quelle. Vorher hätte derselbe Text je nach Dateiformat unterschiedlich gekennzeichnet sein können. Wo kein Modell bekannt ist, bleibt die Datei unmarkiert — keine Kennzeichnung ist ehrlicher als eine falsche.
+
+### Bekannte Grenzen
+
+- Beim **EPUB-Export** einer wissenschaftlichen Seite bleibt der sichtbare Hinweis erhalten, die zusätzliche maschinenlesbare Angabe im Dateikopf jedoch nicht. Für einen Leser ändert sich nichts.
+- Bereits vorhandene Dateien werden nicht nachträglich gekennzeichnet. Das gilt weiterhin auch für Notizen, die vor Einführung der Kennzeichnung entstanden sind — deren Herkunft ist nicht mehr feststellbar, und Raten wäre schlechter als nichts.
+- **Excel-Dateien** des Notiz-Agenten tragen weiterhin keinen Hinweis.
+
 ## [0.10.33-beta] - 2026-07-30
 
 Für kleine Laptops: Während ein Agent-Auftrag läuft, legt sich der Rechner nicht mehr schlafen.
