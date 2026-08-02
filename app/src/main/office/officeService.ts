@@ -1,5 +1,6 @@
 import * as path from 'path'
 import * as fs from 'fs/promises'
+import { getAiProvenance, buildProvenanceNotice } from '../../shared/aiProvenance'
 
 export interface ExcelSheet {
   name: string
@@ -102,7 +103,17 @@ export async function docxToMarkdownWithImages(filePath: string, attachmentsDir:
   return { markdown }
 }
 
-export async function markdownToDocx(markdownContent: string, outputPath: string): Promise<void> {
+export interface MarkdownToDocxOptions {
+  /**
+   * KI-Provenienz für die Kennzeichnungs-Fußzeile. Nur nötig, wenn das Markdown
+   * kein Frontmatter trägt — der Notiz-Agent liefert reinen Body, dort ist das
+   * Modell nur im Lauf bekannt. Beim Export einer Notiz kommt es aus dem
+   * Frontmatter, das diese Funktion ohnehin abschneidet.
+   */
+  aiModel?: string
+}
+
+export async function markdownToDocx(markdownContent: string, outputPath: string, options?: MarkdownToDocxOptions): Promise<void> {
   const docxLib = await import('docx')
   const { Document, Packer, Paragraph, HeadingLevel, TextRun, LevelFormat, AlignmentType, ShadingType, BorderStyle } = docxLib
 
@@ -162,6 +173,11 @@ export async function markdownToDocx(markdownContent: string, outputPath: string
     if (runs.length === 0) runs.push(new TextRun({ text: '', ...extra }))
     return runs
   }
+
+  // KI-Provenienz vor dem Abschneiden retten: `ki-modell` steht im Frontmatter,
+  // das gleich wegfällt. Ein explizit übergebenes Modell hat Vorrang (Notiz-Agent,
+  // dessen Markdown kein Frontmatter hat).
+  const aiModel = (options?.aiModel || getAiProvenance(markdownContent)?.model || '').trim()
 
   // Strip a leading YAML frontmatter block — it's metadata, not document body.
   let body = markdownContent
@@ -269,6 +285,16 @@ export async function markdownToDocx(markdownContent: string, outputPath: string
   }
   // Flush a callout that runs to the end of the document.
   flushQuote()
+
+  // KI-Kennzeichnung als abgesetzte Fußzeile am Dokumentende. Der Wortlaut kommt
+  // aus shared/aiProvenance, damit PDF, HTML-Seite und Word denselben Satz tragen.
+  if (aiModel) {
+    paragraphs.push(new Paragraph({
+      spacing: { before: 480 },
+      border: { top: { style: BorderStyle.SINGLE, size: 6, color: 'CCCCCC', space: 8 } },
+      children: [new TextRun({ text: buildProvenanceNotice(aiModel), size: 16, color: '666666', italics: true })]
+    }))
+  }
 
   const doc = new Document({
     numbering: {

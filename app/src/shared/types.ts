@@ -625,7 +625,9 @@ export interface ElectronAPI {
   getFilesWithMtime: (vaultPath: string) => Promise<Array<{ path: string; mtime: number }>>;
 
   // PDF Export
-  exportPDF: (defaultFileName: string, htmlContent: string, title: string, vaultPath?: string, notePath?: string, pdfStyle?: 'standard' | 'remarkable-book') => Promise<{
+  // `aiModel`: KI-Provenienz aus dem Frontmatter der Notiz. Das PDF trägt kein
+  // YAML — ohne diesen Durchreicher verlöre der Export die Kennzeichnung.
+  exportPDF: (defaultFileName: string, htmlContent: string, title: string, vaultPath?: string, notePath?: string, pdfStyle?: 'standard' | 'remarkable-book', aiModel?: string) => Promise<{
     success: boolean;
     path?: string;
     error?: string;

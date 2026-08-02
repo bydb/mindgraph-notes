@@ -10,7 +10,7 @@
 // LaTeX bleibt als Quelltext in der Datei ($$…$$ / \(…\)) und wird client-seitig von
 // KaTeX auto-render gerendert — die Seite bleibt damit im Code-Editor editierbar.
 
-import { buildProvenanceMetaTag } from './aiProvenance'
+import { buildProvenanceMetaTag, buildProvenanceFooterHtml } from './aiProvenance'
 
 /** Ordnername der Seiten-Assets neben der HTML-Datei (Kopierziel im Accept-Handler). */
 export const HTML_PAGE_ASSETS_DIRNAME = 'mindgraph-assets'
@@ -69,9 +69,7 @@ export function buildScientificHtmlPage(options: ScientificHtmlPageOptions): str
   // zu kennzeichnen.
   const aiModel = (options.aiModel || '').trim()
   const aiMeta = aiModel ? `\n${buildProvenanceMetaTag(aiModel)}` : ''
-  const aiFooter = aiModel
-    ? `  <footer class="ai-provenance">${lang === 'en' ? 'Generated with AI model' : 'Erstellt mit KI-Modell'}: ${escapeHtml(aiModel)}</footer>\n`
-    : ''
+  const aiFooter = aiModel ? `  ${buildProvenanceFooterHtml(aiModel, lang)}\n` : ''
 
   return `<!DOCTYPE html>
 <html lang="${lang}">
