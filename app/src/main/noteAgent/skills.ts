@@ -283,7 +283,9 @@ export function createNoteAgentRegistry(): ToolRegistry<NoteAgentContext> {
       const fileName = sanitizeOutputFileName(rawName, '.docx')
       // markdownToDocx schreibt selbst — in eine temp-Datei im Staging rendern lassen.
       const stagingPath = await writeStagingFile(ctx.run, fileName, '')
-      await markdownToDocx(markdown, stagingPath)
+      // Provenienz explizit: das Agenten-Markdown trägt kein Frontmatter, aus dem
+      // markdownToDocx das Modell sonst zieht (gleiche Kennzeichnung wie write_html).
+      await markdownToDocx(markdown, stagingPath, { aiModel: ctx.run.model })
       await fs.rm(stagingPath + '.tmp', { force: true }).catch(() => undefined)
       const entry = registerResult(ctx.run, {
         stagingPath,

@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import {
   buildProvenanceMetaTag,
+  buildProvenanceFooterHtml,
+  buildProvenanceNotice,
   formatProvenanceLabel,
   getAiProvenance,
   setAiProvenanceInContent
@@ -123,5 +125,35 @@ describe('setAiProvenanceInContent — HTML bleibt unangetastet', () => {
   it('stempelt Markdown, das nur mit einem Inline-Tag beginnt', () => {
     const md = '<span class="x">Hinweis</span>\n\nText'
     expect(setAiProvenanceInContent(md, 'm', '2026-07-29').startsWith('---\n')).toBe(true)
+  })
+})
+
+describe('buildProvenanceNotice', () => {
+  it('nutzt denselben Wortlaut wie die HTML-Seite, in beiden Sprachen', () => {
+    expect(buildProvenanceNotice(MODEL)).toBe(`Erstellt mit KI-Modell: ${MODEL}`)
+    expect(buildProvenanceNotice(MODEL, 'de')).toBe(`Erstellt mit KI-Modell: ${MODEL}`)
+    expect(buildProvenanceNotice(MODEL, 'en')).toBe(`Generated with AI model: ${MODEL}`)
+  })
+
+  it('bleibt ohne Modell leer — unmarkiert ist besser als falsch markiert', () => {
+    expect(buildProvenanceNotice('')).toBe('')
+    expect(buildProvenanceNotice('   ')).toBe('')
+    expect(buildProvenanceNotice('   ', 'en')).toBe('')
+  })
+})
+
+describe('buildProvenanceFooterHtml', () => {
+  it('liefert eine Fußzeile mit der Styling-Klasse des Dokuments', () => {
+    expect(buildProvenanceFooterHtml(MODEL))
+      .toBe(`<footer class="ai-provenance">Erstellt mit KI-Modell: ${MODEL}</footer>`)
+  })
+
+  it('escaped Modellnamen, die HTML enthalten', () => {
+    expect(buildProvenanceFooterHtml('a<script>b'))
+      .toBe('<footer class="ai-provenance">Erstellt mit KI-Modell: a&lt;script&gt;b</footer>')
+  })
+
+  it('bleibt ohne Modell leer', () => {
+    expect(buildProvenanceFooterHtml('')).toBe('')
   })
 })

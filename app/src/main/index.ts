@@ -19,7 +19,7 @@ import { exportPreviewPdf, exportPreviewEpub } from './htmlExport'
 import { bundledResourcesDir } from './bundledResources'
 import { buildZettelContent, buildZettelFileName, extractFrontmatterTags, sanitizeZettelEmojis, sanitizeZettelTag } from '../shared/zettel'
 import { splitTextIntoChunks, LONG_TEXT_CHUNK_THRESHOLD } from '../shared/textChunking'
-import { setAiProvenanceInContent, todayIsoDate } from '../shared/aiProvenance'
+import { setAiProvenanceInContent, todayIsoDate, buildProvenanceFooterHtml } from '../shared/aiProvenance'
 
 // Dev-only userData-Isolation: ungepackt (`npm run dev`/`start`) NIEMALS das produktive Profil der
 // installierten App anfassen — sonst migriert/schreibt der Dev-Build die echten Settings (real passiert).
@@ -6792,7 +6792,7 @@ ipcMain.handle('project-rag-rerank-candidates', async (_event, vaultPath: string
 })
 
 // PDF Export - mit verstecktem Fenster für vollständigen Export
-ipcMain.handle('export-pdf', async (_event, defaultFileName: string, htmlContent: string, title: string, vaultPath?: string, notePath?: string, pdfStyle?: 'standard' | 'remarkable-book') => {
+ipcMain.handle('export-pdf', async (_event, defaultFileName: string, htmlContent: string, title: string, vaultPath?: string, notePath?: string, pdfStyle?: 'standard' | 'remarkable-book', aiModel?: string) => {
   if (!mainWindow) return { success: false, error: 'Kein Fenster verfügbar' }
   if (vaultPath) assertApprovedVault(vaultPath, 'export-pdf')
 
@@ -6934,7 +6934,13 @@ ipcMain.handle('export-pdf', async (_event, defaultFileName: string, htmlContent
           .callout { margin: 12pt 0; padding: 9pt 12pt; border-left: 3px solid #000; background: #f6f6f6; }
           .callout-title { font-weight: 600; margin-bottom: 5pt; }
           .footnotes { margin-top: 24pt; padding-top: 12pt; border-top: 1px solid #000; font-size: 13pt; }
+          .ai-provenance { margin-top: 24pt; padding-top: 10pt; border-top: 1px solid #000; font-size: 13pt; }
         </style>`
+
+    // KI-Provenienz: das Frontmatter der Notiz überlebt das Rendern nicht (der
+    // Renderer schickt nur den gerenderten Body), deshalb kommt die Kennzeichnung
+    // hier als Fußzeile zurück ins Dokument. Ohne Modell bleibt sie leer.
+    const provenanceFooter = buildProvenanceFooterHtml(aiModel || '')
 
     // HTML-Template für den PDF-Export
     const fullHtml = `
@@ -7070,11 +7076,19 @@ ipcMain.handle('export-pdf', async (_event, defaultFileName: string, htmlContent
           .mermaid svg {
             max-width: 100%;
           }
+          .ai-provenance {
+            margin-top: 32px;
+            padding-top: 10px;
+            border-top: 1px solid #ddd;
+            color: #666;
+            font-size: 9pt;
+          }
         </style>
         ${isRemarkable ? remarkableOverrideStyle : ''}
       </head>
       <body>
         ${resolvedHtml}
+        ${provenanceFooter}
       </body>
       </html>
     `

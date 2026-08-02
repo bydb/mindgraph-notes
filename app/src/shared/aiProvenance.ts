@@ -115,6 +115,20 @@ export function formatProvenanceLabel(model: string): string {
   return `${short.slice(0, MAX_LABEL_CHARS - 1)}…`
 }
 
+/**
+ * Sichtbare Kennzeichnung für Ausgabeformate ohne Frontmatter (HTML, PDF, DOCX).
+ *
+ * Eine einzige Wortlaut-Quelle für alle Exportwege: sonst driften die
+ * Formulierungen auseinander und dieselbe Notiz trägt je nach Dateiformat einen
+ * anderen Hinweis. Leerer String ohne Modell — unmarkiert ist besser als falsch
+ * markiert (gleiche Regel wie beim `<meta>`-Tag).
+ */
+export function buildProvenanceNotice(model: string, lang?: string): string {
+  const m = (model || '').trim()
+  if (!m) return ''
+  return `${lang === 'en' ? 'Generated with AI model' : 'Erstellt mit KI-Modell'}: ${m}`
+}
+
 function escapeHtmlAttribute(value: string): string {
   return value
     .replace(/&/g, '&amp;')
@@ -132,4 +146,20 @@ export function buildProvenanceMetaTag(model: string): string {
   const m = (model || '').trim()
   if (!m) return ''
   return `<meta name="${AI_PROVENANCE_MODEL_KEY}" content="${escapeHtmlAttribute(m)}">`
+}
+
+/**
+ * Sichtbare Fußzeile für alles, was über ein HTML-Template gerendert wird:
+ * erzeugte Seiten (write_html) und der PDF-Export von Notizen.
+ *
+ * Das Styling kommt bewusst NICHT als Inline-Style mit, sondern über die Klasse
+ * `.ai-provenance` aus dem jeweiligen Dokument — sonst kämpfte ein fest
+ * verdrahtetes Grau gegen den reMarkable-Buchstil (reines Schwarz, e-ink).
+ * `escapeHtmlAttribute` escaped mehr als für Textinhalt nötig; das ist
+ * unschädlich und spart einen zweiten, fast identischen Escaper.
+ */
+export function buildProvenanceFooterHtml(model: string, lang?: string): string {
+  const notice = buildProvenanceNotice(model, lang)
+  if (!notice) return ''
+  return `<footer class="ai-provenance">${escapeHtmlAttribute(notice)}</footer>`
 }
