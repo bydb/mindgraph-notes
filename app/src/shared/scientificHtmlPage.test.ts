@@ -71,6 +71,29 @@ describe('buildScientificHtmlPage', () => {
     expect(html).not.toContain('ki-modell')
     expect(html).not.toContain('ai-provenance">')
   })
+
+  // Im Vault lag eine am 30.07.2026 erzeugte Seite mit `<meta name="ki-modell">`,
+  // aber LEERER Fußzeile — maschinenlesbar markiert, für den Leser unsichtbar.
+  // Der heutige Builder kann das nicht erzeugen (beide stammen aus derselben
+  // Prüfung); dieser Test hält das fest, damit die zwei Kennzeichnungen nicht
+  // wieder auseinanderlaufen können.
+  it('trägt Kennzeichnung nie nur maschinenlesbar — meta und Fußzeile kommen zusammen', () => {
+    for (const model of ['qwen3.6:27b-mlx', 'openrouter/moonshotai/kimi-k3', 'llmbase/deepseek/deepseek-v4-pro']) {
+      for (const lang of ['de', 'en']) {
+        const html = buildScientificHtmlPage({ title: 'T', bodyHtml: '<p>x</p>', lang, aiModel: model })
+        const hasMeta = html.includes(`<meta name="ki-modell" content="${model}">`)
+        const footer = html.match(/<footer class="ai-provenance">([\s\S]*?)<\/footer>/)
+        expect(hasMeta).toBe(true)
+        expect(footer?.[1].trim()).toContain(model)
+      }
+    }
+  })
+
+  it('erzeugt keine leere Fußzeile, wenn das Modell nur aus Leerraum besteht', () => {
+    const html = buildScientificHtmlPage({ title: 'T', bodyHtml: '<p>x</p>', aiModel: '   ' })
+    expect(html).not.toContain('ai-provenance">')
+    expect(html).not.toContain('ki-modell')
+  })
 })
 
 describe('looksLikeFullHtmlDocument', () => {

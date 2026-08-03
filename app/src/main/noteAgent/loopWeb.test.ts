@@ -60,3 +60,33 @@ describe('Web-Lauf-Abschluss (0e: genau ein Write)', () => {
     expect(res.hitMaxIterations).toBe(false)
   })
 })
+
+// Regression 30.07.2026: write_html war im Web-Lauf aus der Allowlist geflogen, während der
+// Skill „Wissenschaftliche Webseite" es verlangte. Das Modell rief write_note mit .html auf,
+// bekam „benutze write_html" — ein Werkzeug, das der Lauf nicht hatte — und drehte eine
+// Fehler-Schleife (real mit kimi-k3, bis ein Netzabbruch den Lauf killte).
+describe('Werkzeug-Allowlist im Web-Lauf', () => {
+  const toolNames = (callIndex = 0) =>
+    (mockChat.mock.calls[callIndex][1] as Array<{ name: string }>).map(t => t.name)
+
+  it('bietet write_note UND write_html an, aber keine Office-Formate', async () => {
+    mockChat.mockResolvedValue(noToolCalls)
+    await run(makeWeb({ wrote: true, phase: 'write' }))
+    const names = toolNames()
+    expect(names).toContain('write_note')
+    expect(names).toContain('write_html')
+    expect(names).toContain('web_search')
+    expect(names).not.toContain('write_xlsx')
+    expect(names).not.toContain('write_docx')
+    expect(names).not.toContain('fill_docx_form')
+  })
+
+  it('Nicht-Web-Lauf bietet die Office-Formate weiterhin an', async () => {
+    mockChat.mockResolvedValue(noToolCalls)
+    await run(undefined)
+    const names = toolNames()
+    expect(names).toContain('write_xlsx')
+    expect(names).toContain('write_html')
+    expect(names).not.toContain('web_search')
+  })
+})

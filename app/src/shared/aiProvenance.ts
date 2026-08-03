@@ -40,11 +40,30 @@ function unquoteScalar(raw: string): string {
 }
 
 /**
+ * Ein YAML-Frontmatter-Block ist nur in Markdown ein Metadaten-Kopf. In einer
+ * HTML-Datei wäre er sichtbarer Text — und weil er VOR `<!DOCTYPE html>`
+ * landet, zählt die Typangabe nicht mehr: der Browser fällt in den
+ * Quirks-Modus, Layout und Skripte verhalten sich anders (real aufgetreten:
+ * eine wissenschaftliche Seite zeigte danach den Kopf als Text und ließ alle
+ * Formeln als `$$` stehen).
+ *
+ * Bewusst nur der Dokumentanfang und nicht `looksLikeFullHtmlDocument()`: das
+ * prüft irgendwo im Text und würde jeder Markdown-Notiz mit einem
+ * HTML-Codeblock still den Stempel verweigern.
+ */
+function looksLikeHtmlDocument(content: string): boolean {
+  return /^﻿?\s*<\s*(!doctype\s+html|html)\b/i.test(content)
+}
+
+/**
  * Schreibt/aktualisiert `ki-modell` + `ki-datum` im Frontmatter.
  * Vorhandene Zeilen werden ersetzt (nie dupliziert), der Body bleibt unangetastet.
  * Ohne Frontmatter wird einer angelegt.
+ * HTML-Dokumente bleiben unverändert — dort wäre der Block kein Metadaten-Kopf,
+ * sondern sichtbarer Text vor der Typangabe.
  */
 export function setAiProvenanceInContent(content: string, model: string, date: string): string {
+  if (looksLikeHtmlDocument(content)) return content
   const modelLine = `${AI_PROVENANCE_MODEL_KEY}: ${yamlScalar(model)}`
   const dateLine = `${AI_PROVENANCE_DATE_KEY}: ${yamlScalar(date)}`
   const fmMatch = content.match(/^---\s*\n([\s\S]*?)\n---/)
@@ -96,6 +115,20 @@ export function formatProvenanceLabel(model: string): string {
   return `${short.slice(0, MAX_LABEL_CHARS - 1)}…`
 }
 
+/**
+ * Sichtbare Kennzeichnung für Ausgabeformate ohne Frontmatter (HTML, PDF, DOCX).
+ *
+ * Eine einzige Wortlaut-Quelle für alle Exportwege: sonst driften die
+ * Formulierungen auseinander und dieselbe Notiz trägt je nach Dateiformat einen
+ * anderen Hinweis. Leerer String ohne Modell — unmarkiert ist besser als falsch
+ * markiert (gleiche Regel wie beim `<meta>`-Tag).
+ */
+export function buildProvenanceNotice(model: string, lang?: string): string {
+  const m = (model || '').trim()
+  if (!m) return ''
+  return `${lang === 'en' ? 'Generated with AI model' : 'Erstellt mit KI-Modell'}: ${m}`
+}
+
 function escapeHtmlAttribute(value: string): string {
   return value
     .replace(/&/g, '&amp;')
@@ -113,4 +146,20 @@ export function buildProvenanceMetaTag(model: string): string {
   const m = (model || '').trim()
   if (!m) return ''
   return `<meta name="${AI_PROVENANCE_MODEL_KEY}" content="${escapeHtmlAttribute(m)}">`
+}
+
+/**
+ * Sichtbare Fußzeile für alles, was über ein HTML-Template gerendert wird:
+ * erzeugte Seiten (write_html) und der PDF-Export von Notizen.
+ *
+ * Das Styling kommt bewusst NICHT als Inline-Style mit, sondern über die Klasse
+ * `.ai-provenance` aus dem jeweiligen Dokument — sonst kämpfte ein fest
+ * verdrahtetes Grau gegen den reMarkable-Buchstil (reines Schwarz, e-ink).
+ * `escapeHtmlAttribute` escaped mehr als für Textinhalt nötig; das ist
+ * unschädlich und spart einen zweiten, fast identischen Escaper.
+ */
+export function buildProvenanceFooterHtml(model: string, lang?: string): string {
+  const notice = buildProvenanceNotice(model, lang)
+  if (!notice) return ''
+  return `<footer class="ai-provenance">${escapeHtmlAttribute(notice)}</footer>`
 }

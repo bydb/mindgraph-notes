@@ -48,7 +48,7 @@
     "url": "https://mindgraph-notes.de/",
     "downloadUrl": "https://github.com/bydb/mindgraph-notes/releases",
     "screenshot": "https://mindgraph-notes.de/screenshot.png",
-    "softwareVersion": "0.10.29-beta",
+    "softwareVersion": "0.10.34-beta",
     "author": { "@type": "Person", "name": "Jochen Leeder", "url": "https://bydb.io" },
     "license": "https://opensource.org/licenses/AGPL-3.0",
     "featureList": [
@@ -188,7 +188,10 @@
     @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
 
     h1 {
-      font-family: var(--font-display); font-size: clamp(3rem, 8vw, 5.4rem);
+      /* Untergrenze 3rem war zu gross fuer Telefone: "dazwischenkommt" passte
+         nicht mehr zwischen die Seitenraender und schob die Seite quer.
+         Aendert nur Viewports unter ~600px, darueber greift weiter 8vw. */
+      font-family: var(--font-display); font-size: clamp(2.2rem, 8vw, 5.4rem);
       font-weight: 400; line-height: 1.04; margin-bottom: 1.5rem;
       color: var(--text); letter-spacing: -0.02em;
     }
@@ -489,7 +492,7 @@
         <span class="hero-dot"></span>
         <span data-i18n="hero.badge">Open Source &middot; Lokal &middot; Kostenlos</span>
       </div>
-      <a class="release-badge" href="#changelog" data-i18n="hero.release">Wartungsrelease &mdash; alle 13 gemeldeten Sicherheitsl&uuml;cken geschlossen &middot; v0.10.29</a>
+      <a class="release-badge" href="#changelog" data-i18n="hero.release">KI-Hinweise &uuml;berstehen jetzt PDF- und Word-Export &middot; v0.10.34</a>
     </div>
 
     <h1 data-i18n="hero.title">Der Fokus bleibt.<br><em>Auch wenn das Leben dazwischenkommt.</em></h1>
@@ -510,7 +513,7 @@
     </div>
 
     <div class="hero-screenshot">
-      <div class="hero-video">
+      <div class="hero-video" id="heroVideoFrame">
         <video id="heroWorkflow" autoplay muted loop playsinline preload="metadata" poster="hero-workflow-poster.jpg"
                data-i18n-aria="hero.videoAlt"
                aria-label="Ablauf in der App: eine E-Mail trifft ein, die Aufgabe darin wird erkannt, daraus entsteht eine Notiz, und am n&auml;chsten Morgen steht alles im Dashboard.">
@@ -518,6 +521,10 @@
           <track kind="captions" src="hero-workflow.de.vtt" srclang="de" label="Deutsch" default>
           <track kind="captions" src="hero-workflow.en.vtt" srclang="en" label="English">
         </video>
+        <button class="hero-video-play" type="button" onclick="startHeroVideo()" id="heroBigPlay"
+                data-i18n-aria="hero.videoStart" aria-label="Video abspielen">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>
+        </button>
         <div class="hero-video-actions">
           <button class="hero-video-btn" type="button" onclick="toggleHeroSound()" id="heroSoundBtn">Ton an</button>
           <button class="hero-video-btn" type="button" onclick="toggleHeroVideo()" id="heroPlayBtn">Anhalten</button>
@@ -525,6 +532,21 @@
       </div>
       <p class="hero-caption" id="heroCaption" aria-live="off"></p>
     </div>
+    <script>
+      // Muss direkt hier stehen, nicht im Skriptblock am Seitenende: sonst hat
+      // der Browser das Autoplay auf dem Handy laengst angestossen und das
+      // Video ist schon geladen. Auf Touch-Geraeten bleibt zunaechst das
+      // Standbild stehen, abgespielt wird erst auf Tippen.
+      (function () {
+        var v = document.getElementById('heroWorkflow');
+        if (!v || !window.matchMedia('(max-width: 780px), (hover: none)').matches) return;
+        v.autoplay = false;
+        v.removeAttribute('autoplay');
+        v.preload = 'none';
+        v.pause();
+        document.getElementById('heroVideoFrame').classList.add('is-idle');
+      })();
+    </script>
   </section>
 
   <!-- ============ KLARHEITS-STORY (DE-first, Erzählbogen) ============ -->
@@ -600,7 +622,7 @@
     <div class="st-eyebrow"><span class="d"></span><span data-i18n="st.enemy.label">Das Problem</span></div>
     <h2 class="st-h" data-i18n="st.enemy.h">Du bist Chef, Sachbearbeiter<br>und Ged&auml;chtnis &mdash; <em>in einer Person.</em></h2>
     <p class="st-lead" data-i18n="st.enemy.lead">Keine Assistenz, kein Team, das mitdenkt. Alles landet bei dir: Aufgaben, Mails, Termine, Ideen, Fristen. Du h&auml;ltst es im Kopf &mdash; bis ein Tag krank reicht, damit etwas durchf&auml;llt. Nicht, weil du schlecht organisiert bist. Sondern weil ein Mensch nicht gleichzeitig arbeiten <em>und</em> alles bewachen kann.</p>
-    <img src="people-feind.png" alt="&Uuml;berforderter Einzelk&auml;mpfer an einem chaotischen Schreibtisch voller Notizzettel" loading="lazy" style="width:100%;max-width:760px;margin:2.6rem auto 0;display:block;border-radius:18px;filter:drop-shadow(0 30px 60px rgba(0,0,0,.55))">
+    <img src="people-feind.webp" alt="&Uuml;berforderter Einzelk&auml;mpfer an einem chaotischen Schreibtisch voller Notizzettel" loading="lazy" style="width:100%;max-width:760px;margin:2.6rem auto 0;display:block;border-radius:18px;filter:drop-shadow(0 30px 60px rgba(0,0,0,.55))">
     <div class="enemy-stats">
       <div class="enemy-stat"><div class="n" data-i18n="st.enemy.s1n">~1.200&times;</div><div class="t" data-i18n="st.enemy.s1">am Tag wechselst du zwischen Apps und Fenstern &ndash; jeder Wechsel kostet Fokus.</div><div class="src">Harvard Business Review</div></div>
       <div class="enemy-stat"><div class="n" data-i18n="st.enemy.s2n">~2 Std.</div><div class="t" data-i18n="st.enemy.s2">t&auml;glich suchen Wissensarbeiter:innen nur nach Informationen, statt sie zu nutzen.</div><div class="src">McKinsey Global Institute</div></div>
@@ -769,7 +791,7 @@
   <section class="story maker">
     <div class="maker-in">
       <div class="maker-photo">
-        <img src="maker-face.jpg" alt="Jochen Leeder, Macher von MindGraph Notes" loading="lazy">
+        <img src="maker-face.webp" alt="Jochen Leeder, Macher von MindGraph Notes" loading="lazy">
       </div>
       <div>
         <div class="st-eyebrow"><span class="d"></span><span data-i18n="st.maker.label">Wer dahintersteckt</span></div>
@@ -781,7 +803,7 @@
 
   <!-- 7 · Einladung -->
   <section class="story invite">
-    <img src="closing-bike.jpg" alt="Jochen beim Enduro im Wald &ndash; unterwegs, und nichts f&auml;llt durch" loading="lazy" style="width:100%;max-width:820px;margin:0 auto 2.2rem;display:block;border-radius:18px;filter:drop-shadow(0 30px 60px rgba(0,0,0,.55))">
+    <img src="closing-bike.webp" alt="Jochen beim Enduro im Wald &ndash; unterwegs, und nichts f&auml;llt durch" loading="lazy" style="width:100%;max-width:820px;margin:0 auto 2.2rem;display:block;border-radius:18px;filter:drop-shadow(0 30px 60px rgba(0,0,0,.55))">
     <h2 class="st-h" data-i18n="st.invite.h">Behalte alles im Blick &mdash;<br><em>und bleib trotzdem du.</em></h2>
     <p class="st-lead" style="margin:0 auto 2rem" data-i18n="st.invite.lead">Kostenlos, Open Source, in 2 Minuten startklar. Dein bestehender Markdown-Vault &ouml;ffnet 1:1.</p>
     <a href="#download" class="btn btn-primary" style="font-size:1.05rem;padding:1rem 2.2rem">
@@ -840,7 +862,7 @@
       <div class="how-visual">
         <div class="halo"></div>
         <div class="how-badge"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/><circle cx="12" cy="12" r="4"/></svg></div>
-        <div class="how-shot"><img src="screenshot-dashboard.png" alt="MindGraph Dashboard mit dem Wichtigen von heute" loading="lazy"></div>
+        <div class="how-shot"><img src="screenshot-dashboard.webp" alt="MindGraph Dashboard mit dem Wichtigen von heute" loading="lazy"></div>
       </div>
     </div>
 
@@ -853,7 +875,7 @@
       <div class="how-visual">
         <div class="halo"></div>
         <div class="how-badge"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="2"/><circle cx="18" cy="18" r="2"/><circle cx="6" cy="18" r="2"/><path d="M8 6h6a2 2 0 012 2v8M6 8v8"/></svg></div>
-        <div class="how-shot"><img src="screenshot-graph.png" alt="MindGraph Wissensgraph mit vernetzten Notizen" loading="lazy"></div>
+        <div class="how-shot"><img src="screenshot-graph.webp" alt="MindGraph Wissensgraph mit vernetzten Notizen" loading="lazy"></div>
       </div>
     </div>
 
@@ -866,7 +888,7 @@
       <div class="how-visual">
         <div class="halo"></div>
         <div class="how-badge"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/></svg></div>
-        <div class="how-shot"><img src="model-quality.png" alt="MindGraph Modell-Kompatibilit&auml;tsmatrix: getestete lokale KI pro Modul" loading="lazy"></div>
+        <div class="how-shot"><img src="model-quality.webp" alt="MindGraph Modell-Kompatibilit&auml;tsmatrix: getestete lokale KI pro Modul" loading="lazy"></div>
       </div>
     </div>
 
@@ -879,7 +901,7 @@
       <div class="how-visual">
         <div class="halo"></div>
         <div class="how-badge"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a7 7 0 00-4 12.7c.5.4.8 1 .9 1.6h6.2c.1-.6.4-1.2.9-1.6A7 7 0 0012 2z"/><path d="M9 18h6M10 22h4"/></svg></div>
-        <div class="how-shot"><img src="screenshot.png" alt="MindGraph Editor mit Notiz und Karteikarten-Panel" loading="lazy"></div>
+        <div class="how-shot"><img src="screenshot.webp" alt="MindGraph Editor mit Notiz und Karteikarten-Panel" loading="lazy"></div>
       </div>
     </div>
 
@@ -892,7 +914,7 @@
       <div class="how-visual">
         <div class="halo"></div>
         <div class="how-badge"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l2.2 5.3L20 10.5l-5.8 2.2L12 18l-2.2-5.3L4 10.5l5.8-2.2L12 3z"/></svg></div>
-        <div class="how-shot"><img src="screenshot.png" alt="MindGraph Notiz-Agent: Auftrag mit Kontext-Dateien und Zielordner" loading="lazy"></div>
+        <div class="how-shot"><img src="screenshot.webp" alt="MindGraph Notiz-Agent: Auftrag mit Kontext-Dateien und Zielordner" loading="lazy"></div>
       </div>
     </div>
 
@@ -905,7 +927,7 @@
       <div class="how-visual">
         <div class="halo"></div>
         <div class="how-badge"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3c2.5 2.5 3.8 5.7 3.8 9s-1.3 6.5-3.8 9c-2.5-2.5-3.8-5.7-3.8-9S9.5 5.5 12 3z"/></svg></div>
-        <div class="how-shot"><img src="screenshot.png" alt="MindGraph Webrecherche: Agent mit Notiz und Quellenverzeichnis" loading="lazy"></div>
+        <div class="how-shot"><img src="screenshot.webp" alt="MindGraph Webrecherche: Agent mit Notiz und Quellenverzeichnis" loading="lazy"></div>
       </div>
     </div>
   </section>
@@ -1027,6 +1049,7 @@
       .hero-video video { display: none; }
       .hero-video { background: center/cover no-repeat url("hero-workflow-poster.jpg"); aspect-ratio: 16 / 9; }
       .hero-video-actions { display: none; }
+      .hero-video-play { display: none !important; }
       .hero-caption { display: none; }
     }
     .hero-screenshot .hero-person {
@@ -1234,6 +1257,57 @@
       .product-body { padding: 12px; }
       .graph-mock { height: 240px; }
     }
+
+    /* --- Handy: Weichzeichner runter, sonst ruckelt das Hero-Video ---
+       Ueber dem laufenden Video liegen drei teure Ebenen: die Navigation mit
+       Hintergrund-Weichzeichner, zwei fest positionierte Farbschleier mit
+       blur(150px) und die weiche Maske am Videorand. Jedes einzelne Videobild
+       zwingt den Browser, alle drei neu zu berechnen. Auf dem Telefon reicht
+       das, um die komplette Seite zaeh zu machen - auch beim Scrollen weit
+       unterhalb des Videos. Deshalb hier: harte Kanten statt Masken. */
+    @media (max-width: 780px), (hover: none) {
+      nav {
+        -webkit-backdrop-filter: none;
+        backdrop-filter: none;
+        background: var(--bg);
+      }
+      .bg-glow { filter: none; opacity: .12; }
+      .hero-video {
+        /* 94vw war breiter als der Platz zwischen den Seitenraendern -> die
+           Seite liess sich quer schieben. */
+        width: 100%;
+        border-radius: 12px;
+        -webkit-mask-image: none;
+        mask-image: none;
+      }
+      /* Ohne Mauszeiger gibt es kein Hover: die Bedienknoepfe waren auf dem
+         Handy unsichtbar und damit unerreichbar (Video liess sich nicht
+         anhalten). Jetzt dauerhaft sichtbar. */
+      .hero-video-actions { opacity: 1; }
+      .hero-video-btn {
+        -webkit-backdrop-filter: none;
+        backdrop-filter: none;
+        background: rgba(255,255,255,.94);
+      }
+    }
+
+    /* Standbild statt Autoplay auf dem Handy: 3 MB Video von selbst zu laden
+       kostet Datenvolumen und Rechenzeit, bevor jemand ueberhaupt hinsieht. */
+    .hero-video.is-idle .hero-video-actions { display: none; }
+    .hero-video-play {
+      position: absolute; inset: 0; margin: auto;
+      width: 74px; height: 74px; border-radius: 50%;
+      display: none; align-items: center; justify-content: center;
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,.92);
+      color: var(--accent);
+      cursor: pointer;
+      box-shadow: 0 8px 24px rgba(28,26,23,.18);
+    }
+    .hero-video.is-idle .hero-video-play { display: flex; }
+    /* Solange nichts laeuft, steht dort sonst ein Sprechertext aus der Mitte
+       des Videos unter einem Standbild. */
+    .hero-video.is-idle ~ .hero-caption { display: none; }
   </style>
   <script>
     document.querySelectorAll('.how-tab').forEach(tab => {
@@ -1437,7 +1511,7 @@
       </div>
     </div>
     <figure class="model-quality-figure fade-in">
-      <img src="model-quality.png" alt="MindGraph Notes Modellqualit&auml;t lokaler KI: Kompatibilit&auml;tsmatrix f&uuml;r Brain, Tasks, Mail, Radar, Projekt-Status und Smart Connections" loading="lazy">
+      <img src="model-quality.webp" alt="MindGraph Notes Modellqualit&auml;t lokaler KI: Kompatibilit&auml;tsmatrix f&uuml;r Brain, Tasks, Mail, Radar, Projekt-Status und Smart Connections" loading="lazy">
     </figure>
     <p class="model-quality-note" data-i18n="modelq.note">Datenstand 07.06.2026. Quelle: produktive Modell-Kompatibilit&auml;tsmatrix und lokale Benchmark-Reports.</p>
   </section>
@@ -1553,17 +1627,16 @@
     <div class="release-inner">
       <div class="release-head">
         <div>
-          <div class="st-eyebrow"><span class="d"></span><span data-i18n="release.label">Release 0.10.29 &middot; Wartung vor 1.0</span></div>
-          <h2 class="st-h" style="font-size:clamp(1.8rem,3.8vw,2.6rem)" data-i18n="release.heading">Was ist neu &mdash; <em>nichts, was man sieht. Genau darum geht es.</em></h2>
-          <p class="st-lead" data-i18n="release.lead">Dieses Release bringt keine neuen Funktionen. Es schlie&szlig;t alle 13 gemeldeten Sicherheitsl&uuml;cken in den mitgelieferten Fremdbibliotheken und bringt den Unterbau auf einen aktuellen Stand &mdash; die Grundlage daf&uuml;r, dass 1.0 tragf&auml;hig ist.</p>
+          <div class="st-eyebrow"><span class="d"></span><span data-i18n="release.label">Release 0.10.34 &middot; KI-Kennzeichnung</span></div>
+          <h2 class="st-h" style="font-size:clamp(1.8rem,3.8vw,2.6rem)" data-i18n="release.heading">Was ist neu &mdash; <em>der KI-Hinweis bleibt dran, auch wenn die Datei das Haus verl&auml;sst.</em></h2>
+          <p class="st-lead" data-i18n="release.lead">Notizen, die eine KI geschrieben hat, tragen den Namen des Modells sichtbar in der App. Beim Export ging dieser Hinweis bisher verloren &mdash; ausgerechnet dort, wo ein Dokument weitergegeben wird. PDF und Word behalten ihn jetzt.</p>
         </div>
-        <div class="release-date">v<span data-app-version>0.10.27-beta</span></div>
+        <div class="release-date">v<span data-app-version>0.10.30-beta</span></div>
       </div>
       <div class="release-grid">
-        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c1h">Alle Meldungen geschlossen</b><p data-i18n="release.c1">13 Sicherheitsmeldungen, neun davon hoch eingestuft. Dahinter standen drei echte Ursachen &mdash; unter anderem konnte eine pr&auml;parierte ZIP-Datei beim Import &uuml;berm&auml;&szlig;ig viel Speicher belegen. Alle drei sind behoben, die Pr&uuml;fung meldet null Befunde.</p></div></div>
-        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c2h">Kein R&uuml;ckschritt am Unterbau</b><p data-i18n="release.c2">Die bequeme Automatik-Reparatur h&auml;tte unser Bauwerkzeug auf eine &auml;ltere Hauptversion zur&uuml;ckgestuft &mdash; mit eigenen alten L&uuml;cken. Stattdessen ist jedes Paket gezielt nach vorn aktualisiert.</p></div></div>
-        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c3h">Weniger Ballast</b><p data-i18n="release.c3">Eine Bibliothek, die im Programm gar nicht mehr benutzt wurde, ist entfernt. Was nicht mitgeliefert wird, kann auch keine L&uuml;cke haben.</p></div></div>
-        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c4h">Aktuelle Werkzeuge</b><p data-i18n="release.c4">Der Programmierunterbau l&auml;uft auf der neuesten TypeScript-Hauptversion. An den Funktionen &auml;ndert sich nichts &mdash; dein Vault bleibt exakt so, wie er ist.</p></div></div>
+        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c1h">PDF beh&auml;lt den KI-Hinweis</b><p data-i18n="release.c1">Wer eine von KI geschriebene Notiz als PDF exportierte, bekam ein Dokument ohne jeden Hinweis darauf. Jetzt steht am Ende der Seite eine schmale Fu&szlig;zeile mit dem Namen des Modells. Im reMarkable-Buchstil in Lesegr&ouml;&szlig;e statt als graues Kleingedrucktes.</p></div></div>
+        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c2h">Word-Dateien ebenso</b><p data-i18n="release.c2">Gleiches gilt f&uuml;r den Export nach Word &mdash; aus dem Editor wie aus dem Notiz-Agenten. Der Hinweis steht abgesetzt am Dokumentende, unter einer d&uuml;nnen Linie.</p></div></div>
+        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c3h">Ein Wortlaut, oder gar keiner</b><p data-i18n="release.c3">Wissenschaftliche Seite, PDF und Word tragen denselben Satz, damit derselbe Text nicht je nach Dateiformat anders gekennzeichnet ist. Und wo das Modell nicht bekannt ist, bleibt die Datei unmarkiert &mdash; keine Kennzeichnung ist ehrlicher als eine falsche.</p></div></div>
       </div>
       <a class="release-link" href="https://github.com/bydb/mindgraph-notes/releases" target="_blank" rel="noopener noreferrer" data-i18n="release.link">Vollst&auml;ndige Release Notes auf GitHub &rarr;</a>
     </div>
@@ -1828,9 +1901,10 @@
         "how.p5h": "Das Web, wenn du es brauchst",
         "how.p5": "Schalte die Webrecherche pro Auftrag zu – ganz optional. Der Agent sucht, liest die passenden Seiten und schreibt eine Notiz mit sauberem Quellenverzeichnis; du prüfst sie, bevor sie in deinen Vault kommt. Der Suchanbieter erhält nur die Suchanfragen; die vollständigen Seiten ruft die App lokal ab. Bei einem optionalen Cloud-Modell geht der gelesene Kontext zusätzlich an dessen Anbieter – darauf weist die App vor dem Lauf hin. Den Suchanbieter wählst du selbst: sofort einsatzbereit oder deine eigene, private Suchmaschine.",
         "hero.badge": "Open Source \u00b7 Lokal \u00b7 Kostenlos",
-        "hero.release": "Wartungsrelease &mdash; alle 13 gemeldeten Sicherheitsl&uuml;cken geschlossen &middot; v{vs}",
+        "hero.release": "KI-Hinweise überstehen jetzt PDF- und Word-Export &middot; v{vs}",
         "hero.videoPause": "Anhalten",
         "hero.videoPlay": "Abspielen",
+        "hero.videoStart": "Video abspielen",
         "hero.soundOn": "Ton an",
         "hero.soundOff": "Ton aus",
         "hero.videoAlt": "Ablauf in der App: eine E-Mail trifft ein, die Aufgabe darin wird erkannt, daraus entsteht eine Notiz, und am nächsten Morgen steht alles im Dashboard.",
@@ -1904,17 +1978,15 @@
         "modules.opt.vision": "Vision OCR",
         "modules.opt.speech": "Diktat & Vorlesen",
         "modules.opt.terminal": "Terminal",
-        "release.label": "Release {vs} · Wartung vor 1.0",
-        "release.heading": "Was ist neu — <em>nichts, was man sieht. Genau darum geht es.</em>",
-        "release.lead": "Dieses Release bringt keine neuen Funktionen. Es schließt alle 13 gemeldeten Sicherheitslücken in den mitgelieferten Fremdbibliotheken und bringt den Unterbau auf einen aktuellen Stand — die Grundlage dafür, dass 1.0 tragfähig ist.",
-        "release.c1h": "Alle Meldungen geschlossen",
-        "release.c1": "13 Sicherheitsmeldungen, neun davon hoch eingestuft. Dahinter standen drei echte Ursachen — unter anderem konnte eine präparierte ZIP-Datei beim Import übermäßig viel Speicher belegen. Alle drei sind behoben, die Prüfung meldet null Befunde.",
-        "release.c2h": "Kein Rückschritt am Unterbau",
-        "release.c2": "Die bequeme Automatik-Reparatur hätte unser Bauwerkzeug auf eine ältere Hauptversion zurückgestuft — mit eigenen alten Lücken. Stattdessen ist jedes Paket gezielt nach vorn aktualisiert.",
-        "release.c3h": "Weniger Ballast",
-        "release.c3": "Eine Bibliothek, die im Programm gar nicht mehr benutzt wurde, ist entfernt. Was nicht mitgeliefert wird, kann auch keine Lücke haben.",
-        "release.c4h": "Aktuelle Werkzeuge",
-        "release.c4": "Der Programmierunterbau läuft auf der neuesten TypeScript-Hauptversion. An den Funktionen ändert sich nichts — dein Vault bleibt exakt so, wie er ist.",
+        "release.label": "Release {vs} · KI-Kennzeichnung",
+        "release.heading": "Was ist neu — <em>der KI-Hinweis bleibt dran, auch wenn die Datei das Haus verlässt.</em>",
+        "release.lead": "Notizen, die eine KI geschrieben hat, tragen den Namen des Modells sichtbar in der App. Beim Export ging dieser Hinweis bisher verloren — ausgerechnet dort, wo ein Dokument weitergegeben wird. PDF und Word behalten ihn jetzt.",
+        "release.c1h": "PDF behält den KI-Hinweis",
+        "release.c1": "Wer eine von KI geschriebene Notiz als PDF exportierte, bekam ein Dokument ohne jeden Hinweis darauf. Jetzt steht am Ende der Seite eine schmale Fußzeile mit dem Namen des Modells. Im reMarkable-Buchstil in Lesegröße statt als graues Kleingedrucktes.",
+        "release.c2h": "Word-Dateien ebenso",
+        "release.c2": "Gleiches gilt für den Export nach Word — aus dem Editor wie aus dem Notiz-Agenten. Der Hinweis steht abgesetzt am Dokumentende, unter einer dünnen Linie.",
+        "release.c3h": "Ein Wortlaut, oder gar keiner",
+        "release.c3": "Wissenschaftliche Seite, PDF und Word tragen denselben Satz, damit derselbe Text nicht je nach Dateiformat anders gekennzeichnet ist. Und wo das Modell nicht bekannt ist, bleibt die Datei unmarkiert — keine Kennzeichnung ist ehrlicher als eine falsche.",
         "release.link": "Vollständige Release Notes auf GitHub →",
         "dl.label": "Download",
         "dl.heading": "Jetzt starten.",
@@ -2096,9 +2168,10 @@
         "how.p5h": "The web, when you need it",
         "how.p5": "Turn on web research per task – entirely optional. The agent searches, reads the relevant pages and writes a note with a clean list of sources; you review it before it enters your vault. The search provider receives only the queries; the app fetches full pages locally. With an optional cloud model, the extracted context is also sent to that model provider – the app warns you before the run. You choose the search provider yourself: ready to use or your own private search engine.",
         "hero.badge": "Open Source \u00b7 Local \u00b7 Free",
-        "hero.release": "Maintenance release &mdash; all 13 reported vulnerabilities closed &middot; v{vs}",
+        "hero.release": "AI labels now survive PDF and Word export &middot; v{vs}",
         "hero.videoPause": "Pause",
         "hero.videoPlay": "Play",
+        "hero.videoStart": "Play video",
         "hero.soundOn": "Sound on",
         "hero.soundOff": "Sound off",
         "hero.videoAlt": "What happens in the app: an email arrives, the task inside it is spotted, a note is created from it, and the next morning everything sits on your dashboard.",
@@ -2172,17 +2245,15 @@
         "modules.opt.vision": "Vision OCR",
         "modules.opt.speech": "Dictation & TTS",
         "modules.opt.terminal": "Terminal",
-        "release.label": "Release {vs} · Maintenance before 1.0",
-        "release.heading": "What’s new — <em>nothing you can see. That is the point.</em>",
-        "release.lead": "This release adds no features. It closes all 13 reported vulnerabilities in the third-party libraries we ship and brings the foundations up to date — the groundwork for a 1.0 that holds.",
-        "release.c1h": "Every report closed",
-        "release.c1": "13 security reports, nine of them rated high. Behind them sat three actual causes — among others, a crafted ZIP file could claim excessive memory during import. All three are fixed; the audit now reports zero findings.",
-        "release.c2h": "No step backwards",
-        "release.c2": "The convenient automatic fix would have downgraded our build tool to an older major version — with old holes of its own. Instead every package was moved deliberately forward.",
-        "release.c3h": "Less ballast",
-        "release.c3": "A library the app no longer used at all has been removed. What we do not ship cannot carry a vulnerability.",
-        "release.c4h": "Current tooling",
-        "release.c4": "The codebase now builds on the latest TypeScript major version. Nothing changes about what the app does — your vault stays exactly as it is.",
+        "release.label": "Release {vs} · AI labelling",
+        "release.heading": "What’s new — <em>the AI label stays on, even once the file leaves the house.</em>",
+        "release.lead": "Notes written by an AI carry the model’s name visibly inside the app. On export that label used to disappear — precisely where a document gets passed on. PDF and Word now keep it.",
+        "release.c1h": "PDF keeps the AI label",
+        "release.c1": "Exporting an AI-written note as a PDF used to produce a document with no trace of its origin. There is now a slim footer at the end of the page carrying the model’s name. In the reMarkable book style it comes in reading size rather than as grey fine print.",
+        "release.c2h": "Word files too",
+        "release.c2": "The same goes for Word export — from the editor as well as from the note agent. The label sits at the end of the document, set apart below a thin rule.",
+        "release.c3h": "One wording, or none at all",
+        "release.c3": "Scientific page, PDF and Word carry the same sentence, so the same text isn’t labelled differently depending on the file format. And where the model isn’t known, the file stays unlabelled — no label is more honest than a wrong one.",
         "release.link": "Full release notes on GitHub →",
         "dl.label": "Download",
         "dl.heading": "Get started.",
@@ -2309,6 +2380,16 @@
       syncHeroVideoButton();
     }
 
+    // Gegenstueck zum Autoplay-Riegel oben: erst ab hier wird das Video geladen.
+    function startHeroVideo() {
+      const v = document.getElementById('heroWorkflow');
+      if (!v) return;
+      document.getElementById('heroVideoFrame')?.classList.remove('is-idle');
+      v.preload = 'metadata';
+      v.play();
+      syncHeroVideoButton();
+    }
+
     // Mit Ton ergibt eine Endlosschleife keinen Sinn - der Sprecher wuerde sich
     // ununterbrochen wiederholen. Ton an heisst deshalb: einmal von vorn, ohne Schleife.
     function toggleHeroSound() {
@@ -2393,8 +2474,13 @@
       // Ausserhalb des Sichtbereichs nicht weiterlaufen lassen: spart Rechenzeit und
       // verhindert, dass der Sprecher weiterredet, waehrend man laengst woanders liest.
       if ('IntersectionObserver' in window) {
+        const frame = document.getElementById('heroVideoFrame');
         new IntersectionObserver((entries) => {
           for (const e of entries) {
+            // Solange der Autoplay-Riegel steht (Handy, noch nicht angetippt),
+            // darf auch das Sichtbarwerden das Video nicht starten - sonst
+            // haette der Riegel keine Wirkung.
+            if (frame && frame.classList.contains('is-idle')) continue;
             if (e.isIntersecting) { if (v.muted && v.paused) v.play().catch(() => {}); }
             else if (!v.paused) v.pause();
           }

@@ -148,8 +148,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('load-embeddings-cache', vaultPath, model),
 
   // PDF Export
-  exportPDF: (defaultFileName: string, htmlContent: string, title: string, vaultPath?: string, notePath?: string, pdfStyle?: 'standard' | 'remarkable-book') =>
-    ipcRenderer.invoke('export-pdf', defaultFileName, htmlContent, title, vaultPath, notePath, pdfStyle),
+  exportPDF: (defaultFileName: string, htmlContent: string, title: string, vaultPath?: string, notePath?: string, pdfStyle?: 'standard' | 'remarkable-book', aiModel?: string) =>
+    ipcRenderer.invoke('export-pdf', defaultFileName, htmlContent, title, vaultPath, notePath, pdfStyle, aiModel),
 
   // Notification API für Reminder-System
   showNotification: (title: string, body: string, noteId?: string) =>

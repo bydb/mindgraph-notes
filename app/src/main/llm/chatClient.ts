@@ -146,9 +146,106 @@ function requestSignal(timeoutMs: number, external?: AbortSignal): AbortSignal {
 // obwohl der Notiz-Agent ein 600-s-Timeout gesetzt hatte. Das AbortSignal aus
 // requestSignal() bleibt die einzige Zeitgrenze. Die kurzen Reachability-Checks
 // (/api/tags, 1,5-3 s Timeout) bleiben bewusst auf dem globalen fetch.
-async function chatFetch(url: string, init: RequestInit): Promise<Response> {
+// Transiente Netzabbrüche: Chromium räumt laufende Verbindungen ab, wenn der Rechner in
+// den Ruhezustand geht oder das Netz wechselt (WLAN, VPN, Docking). Der Request stirbt
+// dann mit `net::ERR_NETWORK_IO_SUSPENDED` o.ä. — real aufgetreten mitten in einem
+// Notiz-Agent-Lauf, wo ein einziger Aussetzer die komplette Recherche gekostet hat.
+// Bewusst eng: nur Fehler, die eindeutig „Verbindung weg" heißen. HTTP-Fehler (429, 5xx)
+// gehören NICHT hierher — die behandelt der Aufrufer mit eigenen Meldungen.
+const TRANSIENT_NET_ERROR =
+  /ERR_NETWORK_IO_SUSPENDED|ERR_NETWORK_CHANGED|ERR_INTERNET_DISCONNECTED|ERR_CONNECTION_RESET|ERR_CONNECTION_CLOSED|ERR_CONNECTION_ABORTED|ECONNRESET/i
+
+/**
+ * Sammelt ALLE Meldungen der Fehlerkette zu einem Text.
+ *
+ * Nötig, weil der eigentliche Grund selten oben liegt: fetch wirft typischerweise ein
+ * `TypeError: fetch failed` und hängt den echten Chromium-/Socket-Fehler als `cause` an —
+ * teils zwei Ebenen tief, teils als `AggregateError.errors` (mehrere Adressen probiert).
+ * Nur die erste Ebene anzusehen bedeutet: der Retry greift genau dann nicht, wenn er
+ * gebraucht wird. Tiefe begrenzt, damit ein zyklisches `cause` nicht hängen bleibt.
+ */
+export function errorChainText(e: unknown): string {
+  const parts: string[] = []
+  const seen = new Set<unknown>()
+  let current: unknown = e
+  for (let depth = 0; current != null && depth < 5; depth++) {
+    if (seen.has(current)) break
+    seen.add(current)
+    if (current instanceof Error) {
+      parts.push(current.message)
+      const nested = (current as { errors?: unknown }).errors
+      if (Array.isArray(nested)) {
+        for (const n of nested) parts.push(n instanceof Error ? n.message : String(n))
+      }
+      current = (current as { cause?: unknown }).cause
+    } else {
+      parts.push(String(current))
+      break
+    }
+  }
+  return parts.join(' | ')
+}
+
+function isTransientNetworkError(e: unknown): boolean {
+  return TRANSIENT_NET_ERROR.test(errorChainText(e))
+}
+
+export const CHAT_RETRY_DELAY_MS = 1500
+
+/**
+ * BEWUSSTE ZUSAGE: „at least once", nicht „exactly once".
+ *
+ * Ein abgerissener Socket sagt nicht, ob der Server den Request schon bekommen und
+ * abgearbeitet hat. Der Wiederholungsversuch kann bei einem Cloud-Backend also eine zweite,
+ * bezahlte Inferenz auslösen. Das ist der Preis dafür, dass ein Ruhezustand nicht mehr einen
+ * kompletten Agent-Lauf (Minuten Arbeit, ebenfalls bezahlte Tokens) vernichtet — die
+ * Abwägung fiel bewusst zugunsten des Laufs aus.
+ *
+ * Was die Kosten begrenzt: genau EIN Versuch, nur bei eindeutigen Verbindungsabbrüchen,
+ * nie nach Nutzer-Abbruch/Timeout, und HTTP-Antworten (429/402/5xx) laufen gar nicht erst
+ * hier durch. Der Wiederholungsversuch ist im Log sichtbar.
+ *
+ * Wer das ändern will: NICHT die Versuchszahl erhöhen — bei einem echten Netzausfall
+ * multipliziert das nur die Kosten. Der richtige Hebel wäre ein serverseitiger
+ * Idempotenz-Schlüssel, den weder OpenRouter noch LLMBase heute anbieten.
+ */
+export interface ChatFetchDeadline {
+  /** Zeitfenster für EINEN Versuch. Der Wiederholungsversuch bekommt ein frisches. */
+  timeoutMs: number
+  /** NUR das Abbruch-Signal des Nutzers — nie mit dem internen Timeout vermischen. */
+  userSignal?: AbortSignal
+}
+
+async function chatFetch(url: string, init: Omit<RequestInit, 'signal'>, deadline: ChatFetchDeadline): Promise<Response> {
   const { net } = await import('electron')
-  return net.fetch(url, init)
+  // Pro Versuch ein frisches Zeitfenster. Genau hier lag der Fehler der ersten Fassung:
+  // ein bereits verbrauchtes Timeout hätte den Wiederholungsversuch sofort erstickt.
+  const attempt = () => net.fetch(url, { ...init, signal: requestSignal(deadline.timeoutMs, deadline.userSignal) })
+
+  try {
+    return await attempt()
+  } catch (e) {
+    // Nur der NUTZER-Abbruch verhindert die Wiederholung.
+    if (deadline.userSignal?.aborted) throw e
+    if (!isTransientNetworkError(e)) {
+      // Diagnose: Ohne diese Zeile ist im Nachhinein nicht zu unterscheiden, ob der Retry
+      // gar nicht ansprang oder ob er lief und ebenfalls scheiterte.
+      console.log(`[LLM] Anfrage fehlgeschlagen, kein Wiederholungsfall: ${errorChainText(e)}`)
+      throw e
+    }
+    await new Promise(resolve => setTimeout(resolve, CHAT_RETRY_DELAY_MS))
+    if (deadline.userSignal?.aborted) throw e
+    console.log('[LLM] Netzverbindung war unterbrochen — Anfrage wird einmal wiederholt')
+    try {
+      return await attempt()
+    } catch (e2) {
+      if (deadline.userSignal?.aborted || !isTransientNetworkError(e2)) throw e2
+      throw new Error(
+        'Die Netzwerkverbindung wurde während der Anfrage unterbrochen (z. B. Ruhezustand, WLAN- oder VPN-Wechsel) — auch der Wiederholungsversuch schlug fehl. ' +
+        `Bitte die Verbindung prüfen und den Vorgang erneut starten. (${errorChainText(e2)})`
+      )
+    }
+  }
 }
 
 async function isOllamaReachable(url: string): Promise<boolean> {
@@ -216,8 +313,7 @@ async function chatViaOllama(messages: ChatMessage[], opts: ChatOptions): Promis
       stream: false,
       ...(opts.numCtx ? { options: { num_ctx: opts.numCtx } } : {})
     }),
-    signal: requestSignal(opts.timeoutMs ?? 120000, opts.signal)
-  })
+  }, { timeoutMs: opts.timeoutMs ?? 120000, userSignal: opts.signal })
   if (!res.ok) {
     const body = await res.text()
     if (res.status === 403 && /cloud/i.test(body)) {
@@ -368,8 +464,7 @@ async function chatViaOpenAiCompatible(
       ...(typeof opts.temperature === 'number' ? { temperature: opts.temperature } : {}),
       ...(opts.maxTokens ? { max_tokens: opts.maxTokens } : {})
     }),
-    signal: requestSignal(opts.timeoutMs ?? 120000, opts.signal)
-  })
+  }, { timeoutMs: opts.timeoutMs ?? 120000, userSignal: opts.signal })
   if (!res.ok) {
     throw new Error(target.friendlyError(res.status, await res.text()))
   }
@@ -453,8 +548,7 @@ async function chatWithToolsViaOllama(
       stream: false,
       ...(opts.numCtx ? { options: { num_ctx: opts.numCtx } } : {})
     }),
-    signal: requestSignal(opts.timeoutMs ?? 180000, opts.signal)
-  })
+  }, { timeoutMs: opts.timeoutMs ?? 180000, userSignal: opts.signal })
   if (!res.ok) {
     const body = await res.text()
     if (res.status === 403 && /cloud/i.test(body)) {
@@ -556,8 +650,7 @@ async function chatWithToolsViaOpenAiCompatible(
       tools: wireTools,
       stream: false
     }),
-    signal: requestSignal(opts.timeoutMs ?? 180000, opts.signal)
-  })
+  }, { timeoutMs: opts.timeoutMs ?? 180000, userSignal: opts.signal })
   if (!res.ok) {
     throw new Error(target.friendlyError(res.status, await res.text()))
   }

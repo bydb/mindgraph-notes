@@ -4782,13 +4782,19 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
     }
     htmlContent += renderedMarkdown
 
+    // KI-Provenienz mitgeben: `htmlContent` ist der gerenderte Body, das
+    // Frontmatter mit `ki-modell` ist darin nicht mehr enthalten. Ohne diesen
+    // Durchreicher verließe eine KI-geschriebene Notiz die App ungekennzeichnet.
+    const provenance = getAiProvenance(previewContent)
+
     const result = await window.electronAPI.exportPDF(
       fileName,
       htmlContent,
       frontmatterTitle || selectedNote.title,
       vaultPath || undefined,
       selectedNote.path || undefined,
-      pdfStyle
+      pdfStyle,
+      provenance?.model
     )
 
     if (result.success) {
@@ -4797,7 +4803,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
       console.error('PDF Export fehlgeschlagen:', result.error)
     }
     return result.success === true
-  }, [selectedNote, frontmatterTitle, renderedMarkdown, vaultPath])
+  }, [selectedNote, frontmatterTitle, renderedMarkdown, vaultPath, previewContent])
 
   // Kopfzeilen-Dropdowns: Klick außerhalb schließt beide Menüs.
   useEffect(() => {

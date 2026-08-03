@@ -2,6 +2,77 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.10.34-beta] - 2026-08-02
+
+Der Hinweis, dass eine KI mitgeschrieben hat, bleibt jetzt auch am exportierten Dokument.
+
+### Behoben
+
+- **PDF-Export behält die KI-Kennzeichnung.** Notizen, an denen eine KI mitgeschrieben hat, tragen den Modellnamen in ihren Eigenschaften, und der Lesen-Modus zeigt ihn als kleines Zeichen neben dem Titel. Beim PDF-Export ging das verloren: Die App gibt zum Drucken nur den fertig gesetzten Text weiter, die Eigenschaften bleiben zurück. Das Ergebnis war ein Dokument ohne jeden Hinweis auf seine Herkunft — ausgerechnet in dem Moment, in dem man es weitergibt. Am Ende der Seite steht jetzt eine schmale Fußzeile mit dem Modellnamen, im reMarkable-Buchstil schwarz und in Lesegröße statt als graues Kleingedrucktes.
+- **Word-Export ebenso.** Beim Erzeugen einer Word-Datei wurde der Eigenschaften-Block abgeschnitten, bevor irgendetwas gelesen werden konnte. Der Modellname wird jetzt vorher ausgelesen und als abgesetzter Absatz unter einer dünnen Linie ans Dokumentende gesetzt. Das gilt für den Export aus dem Editor genauso wie für Word-Dateien, die der Notiz-Agent schreibt — die trugen bisher gar keine Kennzeichnung.
+
+### Verbessert
+
+- **Ein Wortlaut für alle Formate.** Wissenschaftliche HTML-Seite, PDF und Word bauen ihren Hinweis jetzt aus derselben Quelle. Vorher hätte derselbe Text je nach Dateiformat unterschiedlich gekennzeichnet sein können. Wo kein Modell bekannt ist, bleibt die Datei unmarkiert — keine Kennzeichnung ist ehrlicher als eine falsche.
+
+### Bekannte Grenzen
+
+- Beim **EPUB-Export** einer wissenschaftlichen Seite bleibt der sichtbare Hinweis erhalten, die zusätzliche maschinenlesbare Angabe im Dateikopf jedoch nicht. Für einen Leser ändert sich nichts.
+- Bereits vorhandene Dateien werden nicht nachträglich gekennzeichnet. Das gilt weiterhin auch für Notizen, die vor Einführung der Kennzeichnung entstanden sind — deren Herkunft ist nicht mehr feststellbar, und Raten wäre schlechter als nichts.
+- **Excel-Dateien** des Notiz-Agenten tragen weiterhin keinen Hinweis.
+
+## [0.10.33-beta] - 2026-07-30
+
+Für kleine Laptops: Während ein Agent-Auftrag läuft, legt sich der Rechner nicht mehr schlafen.
+
+### Behoben
+
+- **Der Rechner bleibt wach, solange ein Auftrag des Notiz-Agenten läuft.** Auf einem kleinen MacBook im Akkubetrieb brachen drei Läufe hintereinander mit einem Netzwerkfehler ab, auf einem größeren Rechner keiner. Die Ursache lag nicht in der App: Ein Agent-Auftrag dauert Minuten, in denen niemand die Maschine bedient — macOS legt sie dann in den Energiesparzustand, der Netzwerkdienst wird stillgelegt, und die laufende Anfrage stirbt. Die App sagt dem Betriebssystem jetzt für die Dauer eines Auftrags, dass es nicht schlafen legen soll. **Der Bildschirm darf weiterhin dunkel werden** — nur der Rechner selbst bleibt wach. Nach dem Auftrag gilt sofort wieder die normale Energieverwaltung, auch wenn der Auftrag mit einem Fehler endet.
+
+### Bekannte Grenzen
+
+- Der Schutz gilt bisher nur für Aufträge des Notiz-Agenten. Andere langlaufende Vorgänge (Mail-Analyse im Stapel, Tageszusammenfassung, Workflows) sind noch nicht abgedeckt — dort ist das Problem bisher auch nicht aufgetreten.
+- Klappst du den Deckel zu, schläft der Rechner trotzdem. Dagegen hilft kein Programm.
+
+## [0.10.32-beta] - 2026-07-30
+
+Nachbesserung zu 0.10.31: Die dort eingebaute Absicherung gegen Netzaussetzer griff genau im wichtigsten Fall nicht — nach einem Ruhezustand.
+
+### Behoben
+
+- **Ruhezustand beendet einen laufenden Auftrag nicht mehr.** In 0.10.31 sollte die App eine unterbrochene Anfrage einmal wiederholen. Sie tat es nicht, sobald der Rechner länger geschlafen hatte als das Zeitfenster des Auftrags (beim Notiz-Agenten zehn Minuten): Die Wiederholung prüfte ein Signal, das den Abbruch durch den Nutzer und das abgelaufene Zeitfenster in einen Topf warf. Nach dem Aufwachen war das Zeitfenster immer abgelaufen, also unterblieb die Wiederholung — und der rohe Fehlercode landete beim Nutzer. Jetzt verhindert nur noch ein echter Abbruch durch den Nutzer die Wiederholung, und der zweite Versuch bekommt ein frisches Zeitfenster.
+- **Der Abbruchgrund wird auch tief verschachtelt erkannt.** Netzwerkfehler kommen oft als `fetch failed` mit dem eigentlichen Grund eine oder zwei Ebenen darunter, teils als Sammelfehler mehrerer Adressen. Bisher wurde nur die oberste Ebene geprüft. Zusätzlich schreibt die App jetzt in ihr Protokoll, wenn sie einen Netzwerkfehler bewusst **nicht** wiederholt — damit so ein Fall künftig nachvollziehbar ist, statt erraten werden zu müssen.
+
+### Bekannte Grenze
+
+- Schläft der Rechner so lange, dass die Anfrage nicht am Netzabbruch, sondern an der Zeitüberschreitung scheitert, meldet die App weiterhin „Zeitüberschreitung". Der Auftrag ist dann ebenfalls verloren; das ist noch nicht behoben.
+
+## [0.10.31-beta] - 2026-07-30
+
+Ein Fehlerbehebungs-Release rund um den Notiz-Agenten. Der auffälligste Fall: Mit eingeschalteter Webrecherche konnte der Agent eine wissenschaftliche Webseite gar nicht fertigstellen — er wiederholte denselben Schritt, bis der Auftrag abbrach. An deinen Notizen und Einstellungen ändert sich nichts.
+
+### Behoben
+
+- **Recherche und wissenschaftliche Webseiten schließen sich nicht mehr aus.** Bat man den Notiz-Agenten mit eingeschalteter Webrecherche um eine wissenschaftliche Seite, drehte er sich im Kreis: Seine Anleitung verlangt das Werkzeug für HTML-Seiten, im Recherche-Modus war genau dieses Werkzeug aber abgeschaltet. Die Ablehnung, die er stattdessen bekam, verwies ihn auf ebendieses fehlende Werkzeug — er versuchte es erneut, bekam dieselbe Antwort, und so fort. Das Werkzeug ist im Recherche-Modus jetzt verfügbar, die recherchierte Seite entsteht in einem Zug.
+- **Quellenverzeichnis unter recherchierten Webseiten.** Recherchierte HTML-Seiten bekommen ihr Quellenverzeichnis jetzt genauso automatisch angehängt wie recherchierte Notizen — mit Abrufdatum und ausschließlich den Seiten, die tatsächlich gelesen wurden. Der Agent kann keine Quelle behaupten, die er nie geöffnet hat. Ein eigenes Literaturverzeichnis auf der Seite bleibt daneben unberührt.
+- **Kurze Netzaussetzer beenden einen Auftrag nicht mehr.** Ging der Rechner mitten in einem Auftrag in den Ruhezustand oder wechselte das Netz (WLAN, VPN, Dock), brach die Verbindung ab und die gesamte bis dahin geleistete Arbeit war verloren. Die App wiederholt die Anfrage jetzt einmal und erklärt in klaren Worten, wenn auch das nicht klappt. Bewusst genau ein Versuch und nur bei echten Verbindungsabbrüchen — ein erschöpftes Guthaben oder eine Auslastungsmeldung des Anbieters wird nicht wiederholt.
+- **Fehlermeldungen des Agenten verweisen nur noch auf Werkzeuge, die er wirklich hat.** Das war die eigentliche Ursache der Endlosschleife oben und ist jetzt allgemein abgesichert: Eine Ablehnung, die auf ein nicht verfügbares Werkzeug zeigt, wird sonst selbst zum Motor der Wiederholung.
+
+## [0.10.30-beta] - 2026-07-29
+
+Ein reines Fehlerbehebungs-Release. Alle drei App-Fehler traten **ausschließlich in der installierten Fassung** auf und waren beim Entwickeln unsichtbar — gefunden wurden sie erst, weil MindGraph auf einem zweiten Rechner neu eingerichtet wurde. Genau der Weg, den jeder neue Nutzer geht. An deinen Notizen und Einstellungen ändert sich nichts.
+
+### Behoben
+
+- **Starter-Vault und Starter-Skills gehen im Installer wieder.** Wer sich aus der installierten App ein Starter-Vault anlegen wollte, bekam „Starter vault not found"; die mitgelieferten Anleitungen brachen mit `ENOENT` ab. Ursache: Der Ordner mit den gebündelten Dateien liegt im fertigen Programm eine Ebene tiefer, als der Code gesucht hat. Im Entwicklungsmodus greift ein anderer, korrekter Zweig — deshalb ist es durch alle Tests gerutscht. Betroffen waren **alle vier** Starter-Vault-Varianten (Deutsch, Englisch, Office, Demo), also ein Onboarding-Pfad. Die Pfad-Auflösung liegt jetzt an einer Stelle, und ein Test prüft die Bau-Konfiguration selbst, damit sie nicht wieder auseinanderläuft.
+- **Formeln auf wissenschaftlichen Webseiten.** Ließ man den Notiz-Agenten eine wissenschaftliche Seite schreiben, konnte diese als Notiz statt als Seite abgelegt werden. Folge: ein Metadaten-Block stand sichtbar über der Seite, die Seite lief im Kompatibilitätsmodus des Browsers, und **alle Formeln blieben als `$$`-Quelltext stehen**. Zwei unabhängige Riegel: Die Dateiendung ist jetzt an das schreibende Werkzeug gebunden (kein Werkzeug kann mehr einen fremden Dokumenttyp unter seinem eigenen Etikett ablegen), und der Herkunfts-Stempel lässt HTML-Dokumente grundsätzlich unangetastet.
+- **Anleitung „Wissenschaftliche Webseite" wieder auffindbar.** Sie fehlte im Skill-Katalog und war in der Aufzählung der mitgelieferten Anleitungen nicht genannt — der Hinweistext sprach von fünf Anleitungen, mitgeliefert werden sieben. Beides korrigiert, DE und EN.
+
+### Website
+
+- **Startseite auf dem Handy.** Die Seite ruckelte und ließ sich seitlich verschieben. Ursache waren drei Weichzeichner-Ebenen über dem laufenden Hero-Video, die bei jedem Videobild neu berechnet wurden. Auf Touch-Geräten sind sie jetzt abgeschaltet, das Video startet erst auf Tippen, und die Bedienknöpfe sind dauerhaft sichtbar (vorher waren sie per Hover versteckt und damit auf dem Telefon unerreichbar).
+- **Bilder von 6,8 MB auf 687 KB.** Screenshots und Fotos liegen jetzt als WebP in sinnvoller Auflösung vor; der gemessene Kompressionsverlust liegt bei 44 dB und ist mit bloßem Auge nicht zu sehen. Zusammen mit dem Video lädt ein Telefon beim Durchscrollen rund 690 KB statt 9,6 MB.
+
 ## [0.10.29-beta] - 2026-07-28
 
 Ein Wartungsrelease ohne neue Funktionen. Alle 13 gemeldeten Sicherheitslücken in den mitgelieferten Fremdbibliotheken sind geschlossen, der Unterbau ist auf aktuellem Stand. An der App selbst ändert sich nichts — Notizen, Einstellungen und Vault bleiben unberührt.

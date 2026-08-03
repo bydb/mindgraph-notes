@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import {
   buildProvenanceMetaTag,
+  buildProvenanceFooterHtml,
+  buildProvenanceNotice,
   formatProvenanceLabel,
   getAiProvenance,
   setAiProvenanceInContent
@@ -92,5 +94,66 @@ describe('buildProvenanceMetaTag', () => {
 
   it('bleibt leer ohne Modell — unmarkiert statt falsch markiert', () => {
     expect(buildProvenanceMetaTag('')).toBe('')
+  })
+})
+
+// Am 29.07.2026 real aufgetreten: eine wissenschaftliche HTML-Seite lief über den
+// Markdown-Zweig der Übernahme und bekam den Frontmatter-Block vorangestellt.
+// Der stand danach als Text über der Seite — und weil `<!DOCTYPE html>` nicht
+// mehr an erster Stelle stand, fiel der Browser in den Quirks-Modus und
+// renderte KEINE Formel mehr, obwohl KaTeX geladen war.
+describe('setAiProvenanceInContent — HTML bleibt unangetastet', () => {
+  it('stempelt kein vollständiges HTML-Dokument', () => {
+    const html = '<!DOCTYPE html>\n<html lang="de">\n<head><title>x</title></head>\n<body>$$ a $$</body>\n</html>'
+    expect(setAiProvenanceInContent(html, 'qwen3.6:latest', '2026-07-29')).toBe(html)
+  })
+
+  it('erkennt HTML auch mit führendem Leerraum, BOM und anderer Schreibweise', () => {
+    for (const doc of ['  \n<!doctype html>\n<html>', '﻿<!DOCTYPE HTML>\n<html>', '<html lang="de">']) {
+      expect(setAiProvenanceInContent(doc, 'm', '2026-07-29')).toBe(doc)
+    }
+  })
+
+  it('stempelt Markdown weiterhin — auch mit HTML-Codeblock darin', () => {
+    const md = '# Titel\n\n```html\n<!DOCTYPE html>\n<html></html>\n```\n'
+    const out = setAiProvenanceInContent(md, 'qwen3.6:latest', '2026-07-29')
+    expect(out.startsWith('---\nki-modell: ')).toBe(true)
+    expect(out).toContain('# Titel')
+    expect(getAiProvenance(out)?.model).toBe('qwen3.6:latest')
+  })
+
+  it('stempelt Markdown, das nur mit einem Inline-Tag beginnt', () => {
+    const md = '<span class="x">Hinweis</span>\n\nText'
+    expect(setAiProvenanceInContent(md, 'm', '2026-07-29').startsWith('---\n')).toBe(true)
+  })
+})
+
+describe('buildProvenanceNotice', () => {
+  it('nutzt denselben Wortlaut wie die HTML-Seite, in beiden Sprachen', () => {
+    expect(buildProvenanceNotice(MODEL)).toBe(`Erstellt mit KI-Modell: ${MODEL}`)
+    expect(buildProvenanceNotice(MODEL, 'de')).toBe(`Erstellt mit KI-Modell: ${MODEL}`)
+    expect(buildProvenanceNotice(MODEL, 'en')).toBe(`Generated with AI model: ${MODEL}`)
+  })
+
+  it('bleibt ohne Modell leer — unmarkiert ist besser als falsch markiert', () => {
+    expect(buildProvenanceNotice('')).toBe('')
+    expect(buildProvenanceNotice('   ')).toBe('')
+    expect(buildProvenanceNotice('   ', 'en')).toBe('')
+  })
+})
+
+describe('buildProvenanceFooterHtml', () => {
+  it('liefert eine Fußzeile mit der Styling-Klasse des Dokuments', () => {
+    expect(buildProvenanceFooterHtml(MODEL))
+      .toBe(`<footer class="ai-provenance">Erstellt mit KI-Modell: ${MODEL}</footer>`)
+  })
+
+  it('escaped Modellnamen, die HTML enthalten', () => {
+    expect(buildProvenanceFooterHtml('a<script>b'))
+      .toBe('<footer class="ai-provenance">Erstellt mit KI-Modell: a&lt;script&gt;b</footer>')
+  })
+
+  it('bleibt ohne Modell leer', () => {
+    expect(buildProvenanceFooterHtml('')).toBe('')
   })
 })

@@ -17,9 +17,10 @@ import {
 } from '../shared/htmlPreview'
 import { exportPreviewPdf, exportPreviewEpub } from './htmlExport'
 import { initDisplayDiagnostics, getDisplayHealth } from './displayDiagnostics'
+import { bundledResourcesDir } from './bundledResources'
 import { buildZettelContent, buildZettelFileName, extractFrontmatterTags, sanitizeZettelEmojis, sanitizeZettelTag } from '../shared/zettel'
 import { splitTextIntoChunks, LONG_TEXT_CHUNK_THRESHOLD } from '../shared/textChunking'
-import { setAiProvenanceInContent, todayIsoDate } from '../shared/aiProvenance'
+import { setAiProvenanceInContent, todayIsoDate, buildProvenanceFooterHtml } from '../shared/aiProvenance'
 
 // Dev-only userData-Isolation: ungepackt (`npm run dev`/`start`) NIEMALS das produktive Profil der
 // installierten App anfassen — sonst migriert/schreibt der Dev-Build die echten Settings (real passiert).
@@ -171,6 +172,7 @@ import { isPluginGateEnabled } from '../shared/plugins/moduleGate'
 import { registerPluginTransport, isTrustedSender } from './plugins/transport'
 import { registerContextAttachment, registerContextFolder, removeContextAttachment, clearContextAttachments, readContextBlock } from './noteAgent/contextFiles'
 import { startRun, getRunForSender, finishRun, publicResults, takeResult, peekResult, cancelRunsForSender, pruneRunIfConsumed, consumeEvictedRuns, type WebRunState } from './noteAgent/runRegistry'
+import { acquireStayAwake } from './powerGuard'
 import { runNoteAgentLoop } from './noteAgent/loop'
 import { suggestAgentMemory } from './noteAgent/memorySuggestion'
 import { cleanupOldStaging, assertInsideRunStaging, reserveFreeName, stagingDirFor } from './noteAgent/staging'
@@ -2753,9 +2755,7 @@ ipcMain.handle('create-starter-vault', async (_event, targetPath: string, varian
     if (!approvedVaultRoots.has(path.resolve(targetPath))) {
       throw new Error('Vault-Zielpfad nicht autorisiert — bitte via Dialog auswählen')
     }
-    const resourcesBase = app.isPackaged
-      ? path.join(process.resourcesPath)
-      : path.join(app.getAppPath(), 'resources')
+    const resourcesBase = bundledResourcesDir()
 
     const vaultName =
       variant === 'office' ? 'starter-vault-office'
@@ -4280,6 +4280,9 @@ ipcMain.handle('note-agent-run', async (event, params: NoteAgentRunParams) => {
     // Loop asynchron — der Handler gibt sofort die runId zurück (für Abbrechen),
     // Fortschritt und Abschluss kommen als sender-gebundene Events.
     const sender = event.sender
+    // Ruhezustand während des Laufs verhindern — auf kleinen Laptops im Akkubetrieb hat
+    // macOS sonst mitten im Auftrag den Netzwerkdienst stillgelegt (siehe powerGuard.ts).
+    const releaseStayAwake = acquireStayAwake('Notiz-Agent-Lauf')
     void (async () => {
       try {
         const res = await runNoteAgentLoop({
@@ -4331,6 +4334,9 @@ ipcMain.handle('note-agent-run', async (event, params: NoteAgentRunParams) => {
             web: webRunProvenance(run)
           })
         }
+      } finally {
+        // MUSS hier stehen: sonst bleibt die Maschine nach einem Fehler-Lauf für immer wach.
+        releaseStayAwake()
       }
     })()
 
@@ -4475,10 +4481,7 @@ ipcMain.handle('note-skills-install-starter', async (event, vaultPath: string) =
   if (!isTrustedSender(event)) return { success: false, installed: [], error: 'Nicht autorisierter Aufrufer' }
   try {
     assertApprovedVault(vaultPath, 'note-skills-install-starter')
-    const resourcesBase = app.isPackaged
-      ? path.join(process.resourcesPath)
-      : path.join(app.getAppPath(), 'resources')
-    const sourceDir = path.join(resourcesBase, 'starter-skills')
+    const sourceDir = path.join(bundledResourcesDir(), 'starter-skills')
     const entries = await fs.readdir(sourceDir, { withFileTypes: true })
     const installed: string[] = []
     for (const e of entries) {
@@ -6798,7 +6801,7 @@ ipcMain.handle('project-rag-rerank-candidates', async (_event, vaultPath: string
 })
 
 // PDF Export - mit verstecktem Fenster für vollständigen Export
-ipcMain.handle('export-pdf', async (_event, defaultFileName: string, htmlContent: string, title: string, vaultPath?: string, notePath?: string, pdfStyle?: 'standard' | 'remarkable-book') => {
+ipcMain.handle('export-pdf', async (_event, defaultFileName: string, htmlContent: string, title: string, vaultPath?: string, notePath?: string, pdfStyle?: 'standard' | 'remarkable-book', aiModel?: string) => {
   if (!mainWindow) return { success: false, error: 'Kein Fenster verfügbar' }
   if (vaultPath) assertApprovedVault(vaultPath, 'export-pdf')
 
@@ -6940,7 +6943,13 @@ ipcMain.handle('export-pdf', async (_event, defaultFileName: string, htmlContent
           .callout { margin: 12pt 0; padding: 9pt 12pt; border-left: 3px solid #000; background: #f6f6f6; }
           .callout-title { font-weight: 600; margin-bottom: 5pt; }
           .footnotes { margin-top: 24pt; padding-top: 12pt; border-top: 1px solid #000; font-size: 13pt; }
+          .ai-provenance { margin-top: 24pt; padding-top: 10pt; border-top: 1px solid #000; font-size: 13pt; }
         </style>`
+
+    // KI-Provenienz: das Frontmatter der Notiz überlebt das Rendern nicht (der
+    // Renderer schickt nur den gerenderten Body), deshalb kommt die Kennzeichnung
+    // hier als Fußzeile zurück ins Dokument. Ohne Modell bleibt sie leer.
+    const provenanceFooter = buildProvenanceFooterHtml(aiModel || '')
 
     // HTML-Template für den PDF-Export
     const fullHtml = `
@@ -7076,11 +7085,19 @@ ipcMain.handle('export-pdf', async (_event, defaultFileName: string, htmlContent
           .mermaid svg {
             max-width: 100%;
           }
+          .ai-provenance {
+            margin-top: 32px;
+            padding-top: 10px;
+            border-top: 1px solid #ddd;
+            color: #666;
+            font-size: 9pt;
+          }
         </style>
         ${isRemarkable ? remarkableOverrideStyle : ''}
       </head>
       <body>
         ${resolvedHtml}
+        ${provenanceFooter}
       </body>
       </html>
     `

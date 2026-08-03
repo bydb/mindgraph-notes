@@ -108,6 +108,27 @@ describe('R04 — atomare Namensreservierung', () => {
     expect(sanitizeOutputFileName('böse.exe', '.md')).toBe('böse.exe.md')
     expect(sanitizeOutputFileName('', '.xlsx')).toBe('Ergebnis.xlsx')
   })
+
+  // Der Kern des Fehlers vom 29.07.2026: die Endung muss zum Werkzeug passen,
+  // nicht bloß irgendwo in der gemeinsamen Liste stehen. Sonst registriert
+  // write_note eine HTML-Seite als Markdown — mit Frontmatter-Stempel vor
+  // <!DOCTYPE html> und ohne die KaTeX-Dateien daneben.
+  it('bindet die Endung an das aufrufende Werkzeug, nicht an die gemeinsame Liste', () => {
+    // write_note darf keine fremden Dokumenttypen behalten
+    expect(sanitizeOutputFileName('seite.html', '.md')).toBe('seite.html.md')
+    expect(sanitizeOutputFileName('tabelle.xlsx', '.md')).toBe('tabelle.xlsx.md')
+    expect(sanitizeOutputFileName('bild.png', '.md')).toBe('bild.png.md')
+    // umgekehrt genauso
+    expect(sanitizeOutputFileName('notiz.md', '.xlsx')).toBe('notiz.md.xlsx')
+    // die eigene Endung bleibt erhalten
+    expect(sanitizeOutputFileName('notiz.md', '.md')).toBe('notiz.md')
+    expect(sanitizeOutputFileName('Bericht.docx', '.docx')).toBe('Bericht.docx')
+    // Groß-/Kleinschreibung ist egal
+    expect(sanitizeOutputFileName('Notiz.MD', '.md')).toBe('Notiz.MD')
+    // write_html akzeptiert beide Schreibweisen
+    expect(sanitizeOutputFileName('seite.htm', '.html', ['.htm'])).toBe('seite.htm')
+    expect(sanitizeOutputFileName('seite.html', '.html', ['.htm'])).toBe('seite.html')
+  })
 })
 
 describe('R03 — Skill-Reads mit realpath-Containment (Symlink-Ausbruch)', () => {

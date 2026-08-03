@@ -8,6 +8,7 @@
 import { net, BrowserWindow, app, dialog } from 'electron'
 import { promises as fs } from 'fs'
 import path from 'path'
+import { bundledResourcesDir } from '../bundledResources'
 import https from 'node:https'
 import http from 'node:http'
 import type { UsbDeviceInfo } from '@mindgraph/plugin-api'
@@ -273,10 +274,9 @@ export function httpFetchBasicAuth(
 /** Liest eine gebündelte Ressource aus resources/. basename() verhindert Pfad-Traversal. */
 export async function readResource(name: string): Promise<Uint8Array> {
   const safeName = path.basename(name)
-  const resourcesPath = app.isPackaged
-    ? path.join(process.resourcesPath, 'resources')
-    : path.join(app.getAppPath(), 'resources')
-  return new Uint8Array(await fs.readFile(path.join(resourcesPath, safeName)))
+  // War hier schon richtig; nutzt jetzt dieselbe Quelle wie die übrigen
+  // Aufrufer, damit die drei Kopien nicht wieder auseinanderlaufen.
+  return new Uint8Array(await fs.readFile(path.join(bundledResourcesDir(), safeName)))
 }
 
 // ─── pdf.render: HTML → PDF über ein verstecktes BrowserWindow ──────────────────
