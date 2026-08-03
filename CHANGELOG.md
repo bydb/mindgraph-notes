@@ -2,6 +2,21 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.10.35-beta] - 2026-08-03
+
+Wenn die Oberfläche am Beamer oder am zweiten Monitor zäh wird, zeigt die App jetzt, woran es liegt.
+
+### Neu
+
+- **Bildschirme und Grafik in den Einstellungen.** Unter Allgemein steht ab sofort, wie viele Bildschirme angeschlossen sind, mit welcher Bildwiederholrate der langsamste läuft und ob die Grafikkarte gerade zeichnet oder der Hauptprozessor eingesprungen ist. Letzteres ist der wichtigste Fall: Beim An- und Abstecken von Bildschirmen kann die Grafikbeschleunigung wegbrechen, und die App zeichnet danach still über den Hauptprozessor weiter. Sie wirkt dann „einfach langsam", ohne dass irgendwo ein Fehler auftaucht — je größer das Fenster, desto schlimmer. Erkennbar war das bisher nur daran, dass ein Neustart der App alles heilt. Genau diesen Rat gibt die Anzeige jetzt auch.
+- **Präsentationsmodus.** Ein Schalter, der die teuersten Effekte der Oberfläche abstellt: die Weichzeichner hinter Dialogen und alle Übergangsanimationen. Ladeanzeigen drehen sich bewusst weiter — ein eingefrorener Kreisel sähe aus wie eine hängende App und wäre auf der Bühne das falsche Signal. Der Modus wird angeboten, sobald ein zweiter Bildschirm erkannt wird, aber nie von selbst eingeschaltet. Er bleibt über den Neustart hinweg erhalten, denn der Neustart ist ja gerade die Sofortmaßnahme.
+
+### Hintergrund
+
+Anlass war ein Aussetzer während einer Vorführung über Apple TV am Beamer. Ein zweiter Vorfall an einem großen Monitor hat dann gezeigt, dass es kein Bühnen-Sonderfall ist: Dieselbe Ursache trifft den Alltagsbetrieb an jedem externen Bildschirm. Die Bewertung selbst liegt in geprüftem Code mit 17 eigenen Tests; sie unterscheidet vier Risiken — ausgefallene Grafikbeschleunigung, niedrige Bildwiederholrate, unterschiedlich skalierte Bildschirme und vermutliche Spiegelung.
+
+Zwei Fallen wurden dabei bewusst umgangen: Kurz nach dem Start meldet das System noch gar keine Grafikbeschleunigung — ungeprüft hätte die App bei **jedem** Start vor einem Ausfall gewarnt, und eine Warnung, die immer kommt, liest nach drei Tagen niemand mehr. Und bei unbekanntem Zustand meldet die Anzeige „unbekannt" statt „ausgefallen": ein Fehlalarm wäre schlimmer als ein verpasster Hinweis.
+
 ## [0.10.34-beta] - 2026-08-02
 
 Der Hinweis, dass eine KI mitgeschrieben hat, bleibt jetzt auch am exportierten Dokument.
