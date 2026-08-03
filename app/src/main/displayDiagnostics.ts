@@ -125,10 +125,24 @@ function scheduleRecheck(reason: string, delay = RECHECK_DEBOUNCE_MS): void {
   }, delay)
 }
 
-/** Aktueller Stand für den IPC-Handler; berechnet ihn beim ersten Zugriff nach. */
+/**
+ * Aktueller Stand für den IPC-Handler — bewusst bei JEDEM Aufruf frisch berechnet.
+ *
+ * Der Renderer fragt genau dann, wenn jemand wissen will, wie es GERADE steht: Die Einstellungen
+ * werden geöffnet, weil die App zickt. Ein gecachter Stand vom Programmstart wäre dort die
+ * falsche Antwort — er würde „Grafikbeschleunigung: aktiv" behaupten, obwohl sie längst
+ * weggebrochen ist. Real aufgetreten am 03.08.2026 (Cinema Display): Der Zustand kippte, ohne
+ * dass ein `display-*`-Event oder `child-process-gone` gefeuert hätte; nur ein frischer
+ * Abruf hätte es zeigen können.
+ *
+ * `currentHealth` bleibt absichtlich unberührt (außer beim allerersten Mal): Es dient der
+ * Änderungserkennung in `publish()` — würde es hier mitgeschrieben, verschluckte das Log den
+ * nächsten echten Wechsel, weil er dann nicht mehr als Änderung gälte.
+ */
 export function getDisplayHealth(): DisplayHealth {
-  if (!currentHealth) currentHealth = computeHealth()
-  return currentHealth
+  const health = computeHealth()
+  if (!currentHealth) currentHealth = health
+  return health
 }
 
 /**
