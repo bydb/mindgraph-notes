@@ -4,6 +4,27 @@ type TranslationKey = keyof typeof translations.de
 
 const translations = {
   de: {
+    // Präsentationsmodus (Beamer / AirPlay / externer Bildschirm)
+    'presentation.title': "Präsentationsmodus",
+    'presentation.settingsLabel': "Präsentationsmodus",
+    'presentation.settingsHint': "Schaltet Weichzeichner hinter Dialogen und Übergangsanimationen ab. Sinnvoll am Beamer oder per AirPlay, wo die Oberfläche sonst spürbar zäh wird.",
+    'presentation.hintTitle': "Externer Bildschirm erkannt",
+    'presentation.hintBody': "Die Oberfläche kann in dieser Konstellation träge werden. Der Präsentationsmodus schaltet die teuersten Effekte ab.",
+    'presentation.enable': "Präsentationsmodus einschalten",
+    'presentation.dismiss': "Hinweis ausblenden",
+    'presentation.enabledNotice': "Präsentationsmodus ist aktiv",
+    'presentation.reason.software-rendering': "Die Grafikbeschleunigung ist ausgefallen — die App zeichnet gerade über den Hauptprozessor. Ein Neustart der App stellt sie wieder her.",
+    'presentation.reason.low-refresh-rate': "Ein Bildschirm läuft mit niedriger Bildwiederholrate. Die App zeichnet dann nur noch in diesem Takt.",
+    'presentation.reason.mixed-scale-factors': "Die Bildschirme haben unterschiedliche Skalierung. Die Oberfläche muss dadurch dauernd neu gezeichnet werden.",
+    'presentation.reason.likely-mirroring': "Die Bildschirme werden vermutlich gespiegelt. Erweitern statt Spiegeln ist deutlich flüssiger.",
+    'presentation.diagnosticsTitle': "Bildschirme und Grafik",
+    'presentation.diagDisplays': "Bildschirme",
+    'presentation.diagRefresh': "Niedrigste Bildwiederholrate",
+    'presentation.diagGpu': "Grafikbeschleunigung",
+    'presentation.diagGpuHardware': "aktiv (Grafikkarte)",
+    'presentation.diagGpuSoftware': "ausgefallen (Hauptprozessor)",
+    'presentation.diagUnknown': "unbekannt",
+
     'workflowCanvas.renameAria': "Workflow-Name (umbenennen)",
     'workflowCanvas.renameTitle': "Aktiven Workflow umbenennen",
     'workflowCanvas.newTitle': "Neuen leeren Workflow anlegen",
@@ -2942,6 +2963,27 @@ const translations = {
   },
 
   en: {
+    // Presentation mode (projector / AirPlay / external display)
+    'presentation.title': "Presentation mode",
+    'presentation.settingsLabel': "Presentation mode",
+    'presentation.settingsHint': "Turns off the blur behind dialogs and all transition animations. Useful on a projector or over AirPlay, where the interface otherwise becomes noticeably sluggish.",
+    'presentation.hintTitle': "External display detected",
+    'presentation.hintBody': "The interface may become sluggish in this setup. Presentation mode turns off the most expensive effects.",
+    'presentation.enable': "Turn on presentation mode",
+    'presentation.dismiss': "Dismiss",
+    'presentation.enabledNotice': "Presentation mode is active",
+    'presentation.reason.software-rendering': "Graphics acceleration has dropped out — the app is currently drawing on the main processor. Restarting the app restores it.",
+    'presentation.reason.low-refresh-rate': "One display runs at a low refresh rate. The app can only draw at that rate.",
+    'presentation.reason.mixed-scale-factors': "The displays use different scaling. That forces the interface to be redrawn constantly.",
+    'presentation.reason.likely-mirroring': "The displays appear to be mirrored. Extending instead of mirroring is noticeably smoother.",
+    'presentation.diagnosticsTitle': "Displays and graphics",
+    'presentation.diagDisplays': "Displays",
+    'presentation.diagRefresh': "Lowest refresh rate",
+    'presentation.diagGpu': "Graphics acceleration",
+    'presentation.diagGpuHardware': "active (GPU)",
+    'presentation.diagGpuSoftware': "dropped out (CPU)",
+    'presentation.diagUnknown': "unknown",
+
     'workflowCanvas.renameAria': "Workflow name (rename)",
     'workflowCanvas.renameTitle': "Rename active workflow",
     'workflowCanvas.newTitle': "Create new empty workflow",

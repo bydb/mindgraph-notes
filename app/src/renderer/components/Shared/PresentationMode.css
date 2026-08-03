@@ -1,0 +1,88 @@
+/* Hinweis-Karte unten rechts, wenn eine riskante Bildschirm-Konstellation erkannt wurde.
+   Bewusst links vom Voice-Toast-Platz gedacht, aber gleiche Ecke — beide gleichzeitig sind
+   ein seltener Randfall und der Voice-Toast liegt mit z-index 9999 darüber. */
+.presentation-hint {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 9990;
+  width: 340px;
+  max-width: calc(100vw - 40px);
+  padding: 14px 16px;
+  border-radius: 10px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--text-primary);
+}
+
+.presentation-hint-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.presentation-hint-head svg {
+  flex-shrink: 0;
+  color: var(--accent-color);
+}
+
+.presentation-hint-head strong {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.presentation-hint-close {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px;
+  background: none;
+  border: none;
+  border-radius: 4px;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.presentation-hint-close:hover {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+.presentation-hint-body {
+  margin: 0 0 8px;
+  color: var(--text-secondary);
+}
+
+.presentation-hint-reasons {
+  margin: 0 0 12px;
+  padding-left: 18px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.presentation-hint-reasons li + li {
+  margin-top: 4px;
+}
+
+.presentation-hint-action {
+  width: 100%;
+  padding: 7px 12px;
+  border: none;
+  border-radius: 6px;
+  background: var(--accent-color);
+  /* Projektregel: auf Akzentflächen immer den dafür vorgesehenen Kontrast-Token nutzen,
+     sonst verschwindet die Schrift bei hellen Akzentfarben. */
+  color: var(--accent-on);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.presentation-hint-action:hover {
+  background: var(--accent-hover);
+}
