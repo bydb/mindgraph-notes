@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { useNoteAgentStore } from './noteAgentStore'
 
 export type TabType =
   | 'editor'
@@ -7,6 +8,7 @@ export type TabType =
   | 'dashboard'
   | 'code'
   | 'workflow-canvas'
+  | 'agent'
   | 'plugin-editor'
 
 export interface Tab {
@@ -40,6 +42,9 @@ interface TabState {
   openGlobalCanvasTab: () => void
   openDashboardTab: () => void
   openWorkflowCanvasTab: () => void
+  /** Agent-Tab (Notiz-Agent ohne offene Notiz). Liefert die Tab-ID — sie ist zugleich
+   *  der Bereich im noteAgentStore, an den Aufrufer Anhänge hängen können. */
+  openAgentTab: () => string
   openCodeTab: (relativePath: string, title: string) => void
   openPluginEditorTab: (pluginId: string, filePath: string, editorId: string, title: string) => void
   closeTab: (tabId: string) => void
@@ -194,6 +199,20 @@ export const useTabStore = create<TabState>()((set, get) => ({
     })
   },
 
+  // Genau EIN Agent-Tab: ein zweiter wäre eine zweite Anhang-Sammlung für dieselbe
+  // Arbeit, und der Main erlaubt ohnehin nur einen aktiven Lauf pro Fenster.
+  openAgentTab: () => {
+    const state = get()
+    const existingTab = state.tabs.find(t => t.type === 'agent')
+    if (existingTab) {
+      set({ activeTabId: existingTab.id })
+      return existingTab.id
+    }
+    const newTab: Tab = { id: generateTabId(), type: 'agent', noteId: '', title: 'Agent' }
+    set({ tabs: [...state.tabs, newTab], activeTabId: newTab.id })
+    return newTab.id
+  },
+
   openCodeTab: (relativePath, title) => {
     const state = get()
 
@@ -257,6 +276,12 @@ export const useTabStore = create<TabState>()((set, get) => ({
     const newCanvasStates = { ...state.canvasStates }
     if (closedTab.type === 'canvas') {
       delete newCanvasStates[tabId]
+    }
+    // Agent-Tab: Anhänge, Zielordner und ein eventuell laufender Auftrag gehören zum
+    // Tab — beim Schließen abbrechen und vergessen. (Ein Tab-WECHSEL darf das nicht
+    // tun: dort bleibt der Lauf im Store und läuft weiter.)
+    if (closedTab.type === 'agent') {
+      useNoteAgentStore.getState().disposeScope(tabId)
     }
 
     // Determine new active tab

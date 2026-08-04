@@ -5,6 +5,7 @@
 
 import { randomBytes } from 'crypto'
 import type { WebResearchConfig, WebResearchPhase, WebFetchRecord } from '../../shared/webResearch'
+import type { CollectedTable } from '../../shared/tableCollect'
 
 export type AgentRunStatus = 'running' | 'done' | 'cancelled' | 'error'
 
@@ -63,6 +64,9 @@ export interface AgentRun {
   abort: AbortController
   seq: number
   results: Map<string, AgentResultEntry>
+  // Zusammengeführte Tabellen dieses Laufs (collect_table). Sie leben NUR hier —
+  // ihre Zeilen gehen nie an das Modell, sondern direkt in die Ergebnisdatei.
+  datasets: Map<string, CollectedTable>
   sources: Set<string> // gelesene Anhänge/Notizen — landen auf den Ergebnis-Karten
   web?: WebRunState    // nur bei aktivierter Webrecherche
   // Bild-Generierung (Opt-in-Modul image-generation): beim Run-Start Main-seitig
@@ -139,6 +143,7 @@ export function startRun(params: {
     abort: new AbortController(),
     seq: 0,
     results: new Map(),
+    datasets: new Map(),
     sources: new Set(),
     web: params.web,
     imageGen: params.imageGen
@@ -175,6 +180,18 @@ export function registerResult(
   const result: AgentResultEntry = { ...entry, resultId: `res-${randomBytes(6).toString('hex')}`, consumed: false }
   run.results.set(result.resultId, result)
   return result
+}
+
+// Zusammengeführte Tabelle im Lauf ablegen; der Name ist sprechend, damit das Modell
+// ihn in write_xlsx wiederverwenden kann (dataset="tabelle1").
+export function registerDataset(run: AgentRun, table: CollectedTable): string {
+  const id = `tabelle${run.datasets.size + 1}`
+  run.datasets.set(id, table)
+  return id
+}
+
+export function getDataset(run: AgentRun, id: string): CollectedTable | null {
+  return run.datasets.get(id) || run.datasets.get(id.trim().toLowerCase()) || null
 }
 
 // Atomare Einmal-Konsumierung für Übernehmen/Verwerfen.

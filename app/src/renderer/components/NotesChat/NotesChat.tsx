@@ -473,8 +473,8 @@ export const NotesChat: React.FC<NotesChatProps> = ({ onClose }) => {
     if (prev?.id) void detachFile(prev.id)
     autoCtxRef.current = openFile ? { path: openFile, id: null } : null
     if (!openFile) return
-    const fileName = openFile.split('/').pop()
-    if (chatAttachments.some(a => a.name === fileName)) return // bereits manuell angehängt
+    const normalizedOpenFile = openFile.replace(/\\/g, '/')
+    if (chatAttachments.some(a => a.insideVault && a.name.replace(/\\/g, '/') === normalizedOpenFile)) return // bereits manuell angehängt
     void (async () => {
       const res = await window.electronAPI.noteAgentAttachVaultFile(vaultPath, openFile)
       if (res.attachments.length > 0) {

@@ -48,7 +48,7 @@
     "url": "https://mindgraph-notes.de/",
     "downloadUrl": "https://github.com/bydb/mindgraph-notes/releases",
     "screenshot": "https://mindgraph-notes.de/screenshot.png",
-    "softwareVersion": "0.10.35-beta",
+    "softwareVersion": "0.10.36-beta",
     "author": { "@type": "Person", "name": "Jochen Leeder", "url": "https://bydb.io" },
     "license": "https://opensource.org/licenses/AGPL-3.0",
     "featureList": [
@@ -492,7 +492,7 @@
         <span class="hero-dot"></span>
         <span data-i18n="hero.badge">Open Source &middot; Lokal &middot; Kostenlos</span>
       </div>
-      <a class="release-badge" href="#changelog" data-i18n="hero.release">Wird die Oberfl&auml;che z&auml;h, sagt die App jetzt warum &middot; v0.10.35</a>
+      <a class="release-badge" href="#changelog" data-i18n="hero.release">Einen Ordner voller Tabellen auswerten lassen &middot; v0.10.36</a>
     </div>
 
     <h1 data-i18n="hero.title">Der Fokus bleibt.<br><em>Auch wenn das Leben dazwischenkommt.</em></h1>
@@ -1627,16 +1627,16 @@
     <div class="release-inner">
       <div class="release-head">
         <div>
-          <div class="st-eyebrow"><span class="d"></span><span data-i18n="release.label">Release 0.10.35 &middot; Bildschirme und Grafik</span></div>
-          <h2 class="st-h" style="font-size:clamp(1.8rem,3.8vw,2.6rem)" data-i18n="release.heading">Was ist neu &mdash; <em>wenn die Oberfl&auml;che z&auml;h wird, muss man nicht mehr raten.</em></h2>
-          <p class="st-lead" data-i18n="release.lead">Am Beamer oder am zweiten Monitor bricht die Bedienung manchmal ein: Fenster zeichnen verz&ouml;gert, ganze Fl&auml;chen bleiben leer. Die Ursache liegt fast nie in der Notiz-App, sondern darin, dass die Grafikbeschleunigung weggebrochen ist. Nur sieht man das bisher nirgends. Jetzt schon.</p>
+          <div class="st-eyebrow"><span class="d"></span><span data-i18n="release.label">Release 0.10.36 &middot; Ordner auswerten</span></div>
+          <h2 class="st-h" style="font-size:clamp(1.8rem,3.8vw,2.6rem)" data-i18n="release.heading">Was ist neu &mdash; <em>60 Tabellen auswerten, ohne 60 Tabellen zu &ouml;ffnen.</em></h2>
+          <p class="st-lead" data-i18n="release.lead">Ein Ordner voller R&uuml;ckmeldungen, jede in einer eigenen Excel-Datei, alle gleich aufgebaut. Bisher hie&szlig; das: &ouml;ffnen, abtippen, zusammenf&uuml;hren. Jetzt h&auml;ngen Sie den Ordner an, sagen was Sie wissen wollen, und bekommen eine Tabelle plus eine Auswertung &mdash; samt Liste der Dateien, die nicht verwertet werden konnten.</p>
         </div>
         <div class="release-date">v<span data-app-version>0.10.35-beta</span></div>
       </div>
       <div class="release-grid">
-        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c1h">Bildschirme und Grafik auf einen Blick</b><p data-i18n="release.c1">Unter Einstellungen &rarr; Allgemein steht, wie viele Bildschirme angeschlossen sind, mit welcher Bildwiederholrate der langsamste l&auml;uft und ob die Grafikkarte gerade zeichnet oder der Hauptprozessor einspringt. Steht dort &bdquo;ausgefallen&ldquo;, hilft ein Neustart der App sofort &mdash; und das sagt sie auch dazu.</p></div></div>
-        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c2h">Pr&auml;sentationsmodus f&uuml;r den Ernstfall</b><p data-i18n="release.c2">Ein Schalter, der die teuersten Effekte abstellt: die Weichzeichner hinter Dialogen und alle &Uuml;bergangsanimationen. Ladeanzeigen drehen sich weiter &mdash; ein eingefrorener Kreisel s&auml;he aus wie eine h&auml;ngende App. Der Modus wird angeboten, wenn ein zweiter Bildschirm erkannt wird, aber nie von selbst eingeschaltet.</p></div></div>
-        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c3h">Ein Hinweis, der stimmt</b><p data-i18n="release.c3">Kurz nach dem Start meldet das System noch gar keine Grafikbeschleunigung. Ungepr&uuml;ft w&uuml;rde die App deshalb bei jedem Start Alarm schlagen &mdash; und eine Warnung, die immer kommt, liest nach drei Tagen niemand mehr. Sie wartet den echten Wert ab, misst bei jedem Blick neu und schweigt lieber, als falsch zu warnen.</p></div></div>
+        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c1h">Ordner anh&auml;ngen, Frage stellen</b><p data-i18n="release.c1">Rechtsklick auf einen Ordner &rarr; &bdquo;Ordner mit Agent auswerten&ldquo;. Es &ouml;ffnet sich ein Arbeitsplatz, in dem der Ordner schon angeh&auml;ngt ist &mdash; ganz ohne ge&ouml;ffnete Notiz. Sie w&auml;hlen einen Zielordner f&uuml;r das Ergebnis und beschreiben in einem Satz, was herauskommen soll.</p></div></div>
+        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c2h">Die Zeilen liest die App, nicht das Modell</b><p data-i18n="release.c2">Das Sprachmodell entscheidet nur, welche Spalten gebraucht werden. Das Zusammenf&uuml;hren selbst macht die App: Kopfzeile finden, Spalten zuordnen &mdash; auch wenn die eine Schule &bdquo;Name, Vorname&ldquo; und die andere &bdquo;Name/Vorname&ldquo; schreibt &mdash; und jede Zeile mit ihrer Herkunftsdatei versehen. Tausende Zeilen laufen so nie durch das Modell, wo sie stillschweigend verloren gehen k&ouml;nnten.</p></div></div>
+        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c3h">Keine stillen L&uuml;cken</b><p data-i18n="release.c3">Jede Datei, die nicht gelesen oder nicht zugeordnet werden konnte, steht namentlich im Ergebnis &mdash; als eigenes Tabellenblatt &bdquo;Nicht verwertet&ldquo;. Auch wenn eine Obergrenze greift, sagt die App das ausdr&uuml;cklich. Eine unvollst&auml;ndige Auswertung darf nicht aussehen wie eine vollst&auml;ndige.</p></div></div>
       </div>
       <a class="release-link" href="https://github.com/bydb/mindgraph-notes/releases" target="_blank" rel="noopener noreferrer" data-i18n="release.link">Vollst&auml;ndige Release Notes auf GitHub &rarr;</a>
     </div>
@@ -1901,7 +1901,7 @@
         "how.p5h": "Das Web, wenn du es brauchst",
         "how.p5": "Schalte die Webrecherche pro Auftrag zu – ganz optional. Der Agent sucht, liest die passenden Seiten und schreibt eine Notiz mit sauberem Quellenverzeichnis; du prüfst sie, bevor sie in deinen Vault kommt. Der Suchanbieter erhält nur die Suchanfragen; die vollständigen Seiten ruft die App lokal ab. Bei einem optionalen Cloud-Modell geht der gelesene Kontext zusätzlich an dessen Anbieter – darauf weist die App vor dem Lauf hin. Den Suchanbieter wählst du selbst: sofort einsatzbereit oder deine eigene, private Suchmaschine.",
         "hero.badge": "Open Source \u00b7 Lokal \u00b7 Kostenlos",
-        "hero.release": "Wird die Oberfläche zäh, sagt die App jetzt warum &middot; v{vs}",
+        "hero.release": "Einen Ordner voller Tabellen auswerten lassen &middot; v{vs}",
         "hero.videoPause": "Anhalten",
         "hero.videoPlay": "Abspielen",
         "hero.videoStart": "Video abspielen",
@@ -1978,15 +1978,15 @@
         "modules.opt.vision": "Vision OCR",
         "modules.opt.speech": "Diktat & Vorlesen",
         "modules.opt.terminal": "Terminal",
-        "release.label": "Release {vs} · Bildschirme und Grafik",
-        "release.heading": "Was ist neu — <em>wenn die Oberfläche zäh wird, muss man nicht mehr raten.</em>",
-        "release.lead": "Am Beamer oder am zweiten Monitor bricht die Bedienung manchmal ein: Fenster zeichnen verzögert, ganze Flächen bleiben leer. Die Ursache liegt fast nie in der Notiz-App, sondern darin, dass die Grafikbeschleunigung weggebrochen ist. Nur sieht man das bisher nirgends. Jetzt schon.",
-        "release.c1h": "Bildschirme und Grafik auf einen Blick",
-        "release.c1": "Unter Einstellungen → Allgemein steht, wie viele Bildschirme angeschlossen sind, mit welcher Bildwiederholrate der langsamste läuft und ob die Grafikkarte gerade zeichnet oder der Hauptprozessor einspringt. Steht dort „ausgefallen“, hilft ein Neustart der App sofort — und das sagt sie auch dazu.",
-        "release.c2h": "Präsentationsmodus für den Ernstfall",
-        "release.c2": "Ein Schalter, der die teuersten Effekte abstellt: die Weichzeichner hinter Dialogen und alle Übergangsanimationen. Ladeanzeigen drehen sich weiter — ein eingefrorener Kreisel sähe aus wie eine hängende App. Der Modus wird angeboten, wenn ein zweiter Bildschirm erkannt wird, aber nie von selbst eingeschaltet.",
-        "release.c3h": "Ein Hinweis, der stimmt",
-        "release.c3": "Kurz nach dem Start meldet das System noch gar keine Grafikbeschleunigung. Ungeprüft würde die App deshalb bei jedem Start Alarm schlagen — und eine Warnung, die immer kommt, liest nach drei Tagen niemand mehr. Sie wartet den echten Wert ab, misst bei jedem Blick neu und schweigt lieber, als falsch zu warnen.",
+        "release.label": "Release {vs} · Ordner auswerten",
+        "release.heading": "Was ist neu — <em>60 Tabellen auswerten, ohne 60 Tabellen zu öffnen.</em>",
+        "release.lead": "Ein Ordner voller Rückmeldungen, jede in einer eigenen Excel-Datei, alle gleich aufgebaut. Bisher hieß das: öffnen, abtippen, zusammenführen. Jetzt hängen Sie den Ordner an, sagen was Sie wissen wollen, und bekommen eine Tabelle plus eine Auswertung — samt Liste der Dateien, die nicht verwertet werden konnten.",
+        "release.c1h": "Ordner anhängen, Frage stellen",
+        "release.c1": "Rechtsklick auf einen Ordner → „Ordner mit Agent auswerten“. Es öffnet sich ein Arbeitsplatz, in dem der Ordner schon angehängt ist — ganz ohne geöffnete Notiz. Sie wählen einen Zielordner für das Ergebnis und beschreiben in einem Satz, was herauskommen soll.",
+        "release.c2h": "Die Zeilen liest die App, nicht das Modell",
+        "release.c2": "Das Sprachmodell entscheidet nur, welche Spalten gebraucht werden. Das Zusammenführen selbst macht die App: Kopfzeile finden, Spalten zuordnen — auch wenn die eine Schule „Name, Vorname“ und die andere „Name/Vorname“ schreibt — und jede Zeile mit ihrer Herkunftsdatei versehen. Tausende Zeilen laufen so nie durch das Modell, wo sie stillschweigend verloren gehen könnten.",
+        "release.c3h": "Keine stillen Lücken",
+        "release.c3": "Jede Datei, die nicht gelesen oder nicht zugeordnet werden konnte, steht namentlich im Ergebnis — als eigenes Tabellenblatt „Nicht verwertet“. Auch wenn eine Obergrenze greift, sagt die App das ausdrücklich. Eine unvollständige Auswertung darf nicht aussehen wie eine vollständige.",
         "release.link": "Vollständige Release Notes auf GitHub →",
         "dl.label": "Download",
         "dl.heading": "Jetzt starten.",
@@ -2168,7 +2168,7 @@
         "how.p5h": "The web, when you need it",
         "how.p5": "Turn on web research per task – entirely optional. The agent searches, reads the relevant pages and writes a note with a clean list of sources; you review it before it enters your vault. The search provider receives only the queries; the app fetches full pages locally. With an optional cloud model, the extracted context is also sent to that model provider – the app warns you before the run. You choose the search provider yourself: ready to use or your own private search engine.",
         "hero.badge": "Open Source \u00b7 Local \u00b7 Free",
-        "hero.release": "AI labels now survive PDF and Word export &middot; v{vs}",
+        "hero.release": "Have a whole folder of spreadsheets evaluated &middot; v{vs}",
         "hero.videoPause": "Pause",
         "hero.videoPlay": "Play",
         "hero.videoStart": "Play video",
@@ -2245,15 +2245,15 @@
         "modules.opt.vision": "Vision OCR",
         "modules.opt.speech": "Dictation & TTS",
         "modules.opt.terminal": "Terminal",
-        "release.label": "Release {vs} · Displays and graphics",
-        "release.heading": "What’s new — <em>when the interface turns sluggish, you no longer have to guess.</em>",
-        "release.lead": "On a projector or a second monitor the interface sometimes falls apart: windows redraw late, whole areas stay blank. The cause is almost never the note app itself, but graphics acceleration having dropped out. Until now there was nowhere to see that. Now there is.",
-        "release.c1h": "Displays and graphics at a glance",
-        "release.c1": "Settings → General now shows how many displays are attached, the refresh rate of the slowest one, and whether the graphics card is drawing or the main processor has taken over. If it says “dropped out”, restarting the app fixes it right away — and the app says so.",
-        "release.c2h": "Presentation mode for the real thing",
-        "release.c2": "One switch that turns off the most expensive effects: the blur behind dialogs and every transition animation. Loading indicators keep spinning — a frozen spinner would look like a hung app. The mode is offered when a second display is detected, but never switched on by itself.",
-        "release.c3h": "A warning that holds",
-        "release.c3": "Shortly after launch the system reports no graphics acceleration at all. Left unchecked, the app would raise the alarm on every single start — and a warning that always fires goes unread within three days. It waits for the real value, measures afresh each time you look, and would rather stay quiet than warn you wrongly.",
+        "release.label": "Release {vs} · Evaluating folders",
+        "release.heading": "What’s new — <em>evaluate 60 spreadsheets without opening 60 spreadsheets.</em>",
+        "release.lead": "A folder full of returns, each one its own spreadsheet, all built the same way. Until now that meant: open, retype, merge. Now you attach the folder, say what you want to know, and get a table plus a written evaluation — including a list of the files that could not be used.",
+        "release.c1h": "Attach a folder, ask a question",
+        "release.c1": "Right-click a folder → “Analyse folder with agent”. A workspace opens with the folder already attached — no note needs to be open at all. You pick a target folder for the result and describe in one sentence what should come out of it.",
+        "release.c2h": "The app reads the rows, not the model",
+        "release.c2": "The language model only decides which columns are needed. The merging itself is done by the app: find the header row, match the columns — even when one school writes “Name, first name” and the next writes “Name/first name” — and tag every row with the file it came from. Thousands of rows therefore never pass through the model, where they could quietly go missing.",
+        "release.c3h": "No silent gaps",
+        "release.c3": "Every file that could not be read or matched is named in the result — as its own worksheet, “Not used”. And when a limit kicks in, the app says so explicitly. An incomplete evaluation must never look like a complete one.",
         "release.link": "Full release notes on GitHub →",
         "dl.label": "Download",
         "dl.heading": "Get started.",

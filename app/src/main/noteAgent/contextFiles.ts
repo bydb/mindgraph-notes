@@ -13,6 +13,10 @@ import { promises as fs } from 'fs'
 import * as path from 'path'
 import { randomBytes } from 'crypto'
 import { parseExcel, sheetToMarkdownTable, parseDocx, parsePptx } from '../office/officeService'
+import {
+  extractFromSheet, pickSheet, parseDelimitedText,
+  type CollectedTable, type FileCollectStatus, type RowFilter, type SheetLike
+} from '../../shared/tableCollect'
 
 export type ContextFileKind = 'xlsx' | 'docx' | 'pptx' | 'pdf' | 'md' | 'txt' | 'csv' | 'folder'
 
@@ -79,29 +83,60 @@ export function contextKindFromFilename(name: string): ContextFileKind | null {
 // Registry pro Renderer (webContents.id). Nicht persistiert — Kontext ist flüchtig (Plan #12).
 const registryBySender = new Map<number, Map<string, AttachmentEntry>>()
 
+function normalizeRelativePath(value: string): string {
+  return value.split(path.sep).join('/')
+}
+
+/**
+ * Modell- und renderer-sichtbarer Name eines Anhangs. Vault-Anhänge dürfen ihren
+ * relativen Pfad zeigen (der Renderer kennt ihn bereits); externe Anhänge behalten
+ * ausschließlich den Basisnamen. Bei einer Kollision wird ein pfadfreier Suffix
+ * vergeben, damit Tool-Aufrufe nie still den ersten gleichnamigen Anhang wählen.
+ */
+function attachmentName(
+  map: Map<string, AttachmentEntry>,
+  absPath: string,
+  insideVault: boolean,
+  vaultRoot: string | undefined,
+  kind: ContextFileKind
+): string {
+  const relative = insideVault && vaultRoot ? path.relative(vaultRoot, absPath) : ''
+  const relativeIsInside = relative !== '' && relative !== '..' && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative)
+  const preferred = relativeIsInside ? normalizeRelativePath(relative) : path.basename(absPath)
+  const used = new Set(Array.from(map.values(), entry => entry.name.toLowerCase()))
+  if (!used.has(preferred.toLowerCase())) return preferred
+
+  const ext = kind === 'folder' ? '' : path.extname(preferred)
+  const stem = ext ? preferred.slice(0, -ext.length) : preferred
+  for (let index = 2; ; index++) {
+    const candidate = `${stem} (${index})${ext}`
+    if (!used.has(candidate.toLowerCase())) return candidate
+  }
+}
+
 export async function registerContextAttachment(
   senderId: number,
   absPath: string,
   insideVault: boolean,
   vaultRoot?: string
 ): Promise<{ ok: true; attachment: ContextAttachmentInfo } | { ok: false; error: string }> {
-  const name = path.basename(absPath)
-  const kind = contextKindFromFilename(name)
-  if (!kind) return { ok: false, error: `Dateityp nicht unterstützt: ${name}` }
+  const baseName = path.basename(absPath)
+  const kind = contextKindFromFilename(baseName)
+  if (!kind) return { ok: false, error: `Dateityp nicht unterstützt: ${baseName}` }
 
   let sizeBytes = 0
   try {
     const st = await fs.stat(absPath)
-    if (!st.isFile()) return { ok: false, error: `Keine Datei: ${name}` }
+    if (!st.isFile()) return { ok: false, error: `Keine Datei: ${baseName}` }
     sizeBytes = st.size
   } catch {
-    return { ok: false, error: `Datei nicht lesbar: ${name}` }
+    return { ok: false, error: `Datei nicht lesbar: ${baseName}` }
   }
 
   const maxBytes = kind === 'md' || kind === 'txt' || kind === 'csv' ? MAX_BYTES_TEXT : MAX_BYTES_BINARY
   if (sizeBytes > maxBytes) {
     const mb = (n: number) => Math.max(1, Math.round(n / 1024 / 1024))
-    return { ok: false, error: `${name} ist zu groß (${mb(sizeBytes)} MB, Limit ${mb(maxBytes)} MB)` }
+    return { ok: false, error: `${baseName} ist zu groß (${mb(sizeBytes)} MB, Limit ${mb(maxBytes)} MB)` }
   }
 
   const id = randomBytes(8).toString('hex')
@@ -110,6 +145,7 @@ export async function registerContextAttachment(
     map = new Map()
     registryBySender.set(senderId, map)
   }
+  const name = attachmentName(map, absPath, insideVault, vaultRoot, kind)
   map.set(id, { id, name, kind, insideVault, sizeBytes, absPath, vaultRoot })
   return { ok: true, attachment: { id, name, kind, insideVault, sizeBytes } }
 }
@@ -122,12 +158,12 @@ export async function registerContextFolder(
   insideVault: boolean,
   vaultRoot?: string
 ): Promise<{ ok: true; attachment: ContextAttachmentInfo } | { ok: false; error: string }> {
-  const name = path.basename(absPath)
+  const baseName = path.basename(absPath)
   try {
     const st = await fs.stat(absPath)
-    if (!st.isDirectory()) return { ok: false, error: `Kein Ordner: ${name}` }
+    if (!st.isDirectory()) return { ok: false, error: `Kein Ordner: ${baseName}` }
   } catch {
-    return { ok: false, error: `Ordner nicht lesbar: ${name}` }
+    return { ok: false, error: `Ordner nicht lesbar: ${baseName}` }
   }
   const id = randomBytes(8).toString('hex')
   let map = registryBySender.get(senderId)
@@ -135,6 +171,7 @@ export async function registerContextFolder(
     map = new Map()
     registryBySender.set(senderId, map)
   }
+  const name = attachmentName(map, absPath, insideVault, vaultRoot, 'folder')
   map.set(id, { id, name, kind: 'folder', insideVault, sizeBytes: 0, absPath, vaultRoot })
   return { ok: true, attachment: { id, name, kind: 'folder', insideVault, sizeBytes: 0 } }
 }
@@ -177,6 +214,250 @@ export async function readAttachmentRaw(
 
 export function clearContextAttachments(senderId: number): void {
   registryBySender.delete(senderId)
+}
+
+// ── Selektives Ordner-Lesen im Agent-Loop (Plan §„Ordner als Kontext", Stufe 2) ──
+// Der Single-Shot-Weg (readFolderContext über read_attachment) kippt einen ganzen
+// Ordner in EIN Tool-Ergebnis und ist bei 20 Dateien am Anschlag. Hier bekommt das
+// Modell stattdessen erst ein Manifest (ohne Inhalte, deshalb ohne Zeichen-Budget)
+// und liest danach gezielt einzelne Dateien.
+
+// Sheet-Details kosten einen vollen Parser-Lauf pro Datei — bei großen Ordnern wäre
+// das Manifest sonst minutenlang. Darüber hinaus wird das Detail weggelassen und im
+// Manifest als solches vermerkt (keine stillen Kürzungen).
+const MAX_MANIFEST_DETAIL_FILES = 40
+
+export interface FolderFileManifestEntry {
+  name: string
+  kind: ContextFileKind
+  sizeBytes: number
+  mtimeMs: number
+  /** Nur xlsx und nur innerhalb des Detail-Budgets: Blattname + Zeilen-/Spaltenzahl. */
+  sheets?: Array<{ name: string; rows: number; cols: number }>
+  /** Gesetzt, wenn die Datei nicht gelesen werden kann (zu groß, Parser-Fehler). */
+  problem?: string
+}
+
+export interface FolderManifest {
+  folderName: string
+  files: FolderFileManifestEntry[]
+  unsupportedCount: number
+  detailsOmitted: number
+}
+
+function attachmentsOf(senderId: number, ids: string[]): AttachmentEntry[] {
+  const map = registryBySender.get(senderId)
+  const out: AttachmentEntry[] = []
+  for (const id of ids) {
+    const e = map?.get(id)
+    if (e) out.push(e)
+  }
+  return out
+}
+
+/**
+ * Ordner-Anhang eines Laufs per Name finden. Wirft mit einer Fehlermeldung, die auf
+ * den EINZIGEN echten Weg zeigt (Ordner anhängen) — nie auf „hochladen", das gibt es
+ * in dieser App nicht und hat ein Modell real in eine Sackgasse geschickt.
+ */
+function requireFolderEntry(senderId: number, ids: string[], folderName: string): AttachmentEntry {
+  const all = attachmentsOf(senderId, ids)
+  const folders = all.filter(e => e.kind === 'folder')
+  if (folders.length === 0) {
+    throw new Error(
+      'Diesem Lauf ist kein Ordner als Kontext angehängt. Der Nutzer muss den Ordner über den Kontext-Button der Macher-Leiste anhängen — du kannst Ordner nicht selbst öffnen.'
+    )
+  }
+  const hit =
+    folders.find(f => f.name === folderName) ||
+    folders.find(f => f.name.toLowerCase() === folderName.toLowerCase()) ||
+    (folders.length === 1 ? folders[0] : undefined)
+  if (!hit) {
+    throw new Error(`Ordner "${folderName}" ist nicht angehängt. Angehängte Ordner: ${folders.map(f => f.name).join(', ')}`)
+  }
+  return hit
+}
+
+/** Direkte, unterstützte Dateien eines Ordners — gemeinsame Basis für Manifest und Einzel-Lesen. */
+async function listSupportedFolderFiles(
+  entry: AttachmentEntry
+): Promise<{ dirReal: string; files: FolderFileInfo[]; unsupportedCount: number }> {
+  const dirReal = await assertEntryReadable(entry)
+  const dirents = await fs.readdir(dirReal, { withFileTypes: true })
+  const files: FolderFileInfo[] = []
+  let unsupportedCount = 0
+  for (const d of dirents) {
+    if (d.isSymbolicLink() || !d.isFile() || d.name.startsWith('.')) continue
+    const kind = contextKindFromFilename(d.name)
+    if (!kind) {
+      unsupportedCount++
+      continue
+    }
+    let st
+    try {
+      st = await fs.stat(path.join(dirReal, d.name))
+    } catch {
+      continue
+    }
+    files.push({ name: d.name, kind, sizeBytes: st.size, mtimeMs: st.mtimeMs, keywordHit: false })
+  }
+  files.sort((a, b) => a.name.localeCompare(b.name, 'de'))
+  return { dirReal, files, unsupportedCount }
+}
+
+function maxBytesFor(kind: ContextFileKind): number {
+  return kind === 'md' || kind === 'txt' || kind === 'csv' ? MAX_BYTES_TEXT : MAX_BYTES_BINARY
+}
+
+/** Manifest eines angehängten Ordners: alle unterstützten Dateien, KEINE Inhalte. */
+export async function listFolderManifest(senderId: number, ids: string[], folderName: string): Promise<FolderManifest> {
+  const entry = requireFolderEntry(senderId, ids, folderName)
+  const { dirReal, files, unsupportedCount } = await listSupportedFolderFiles(entry)
+  if (files.length === 0) {
+    throw new Error(`Ordner "${entry.name}" enthält keine unterstützten Dateien (direkte Ebene)`)
+  }
+
+  const out: FolderFileManifestEntry[] = []
+  let detailsOmitted = 0
+  let detailed = 0
+  for (const f of files) {
+    const item: FolderFileManifestEntry = { name: f.name, kind: f.kind, sizeBytes: f.sizeBytes, mtimeMs: f.mtimeMs }
+    if (f.sizeBytes > maxBytesFor(f.kind)) {
+      item.problem = 'zu groß, kann nicht gelesen werden'
+    } else if (f.kind === 'xlsx') {
+      if (detailed < MAX_MANIFEST_DETAIL_FILES) {
+        detailed++
+        try {
+          // C01: kanonisch prüfen UNMITTELBAR vor dem Lesen und aus dem geprüften
+          // Pfad lesen — auch hier, nicht nur beim Inhalts-Lesen. Zwischen readdir
+          // und parseExcel kann ein Symlink untergeschoben worden sein.
+          const src = await assertEntryReadable({
+            absPath: path.join(dirReal, f.name),
+            insideVault: entry.insideVault,
+            vaultRoot: entry.vaultRoot,
+            name: f.name
+          })
+          const data = await parseExcel(src)
+          item.sheets = data.sheets.map(s => ({
+            name: s.name,
+            rows: s.rows.length,
+            cols: s.rows.reduce((n, r) => Math.max(n, r.length), 0)
+          }))
+        } catch (e) {
+          item.problem = `nicht lesbar (${e instanceof Error ? e.message : String(e)})`
+        }
+      } else {
+        detailsOmitted++
+      }
+    }
+    out.push(item)
+  }
+  return { folderName: entry.name, files: out, unsupportedCount, detailsOmitted }
+}
+
+export interface ReadFolderFileOptions {
+  /** Nur xlsx: Blattname oder 1-basierter Index. Ohne Angabe alle Blätter (bis zum Budget). */
+  sheet?: string
+  /** Erste auszugebende Zeile (1-basiert, Kopfzeile zählt mit). Default 1. */
+  offset?: number
+  /** Maximale Zeilenzahl. Default 200 (xlsx) bzw. 400 Textzeilen. */
+  maxRows?: number
+}
+
+const DEFAULT_ROWS_XLSX = 200
+const DEFAULT_LINES_TEXT = 400
+
+/**
+ * Eine einzelne Datei aus einem angehängten Ordner lesen — mit Blatt- und
+ * Zeilenbereich. Das ist der Weg, auf dem große Ordner überhaupt bearbeitbar werden:
+ * das Modell holt sich gezielt, was es braucht, statt alles auf einmal zu bekommen.
+ */
+export async function readFolderFile(
+  senderId: number,
+  ids: string[],
+  folderName: string,
+  fileName: string,
+  opts: ReadFolderFileOptions = {}
+): Promise<{ folderName: string; fileName: string; content: string; truncated: boolean }> {
+  const entry = requireFolderEntry(senderId, ids, folderName)
+  const base = path.basename(fileName)
+  if (!base || base !== fileName.trim()) {
+    throw new Error('Dateiname darf keinen Pfad enthalten — nur den Namen aus dem Manifest angeben.')
+  }
+  const { dirReal, files } = await listSupportedFolderFiles(entry)
+  const info = files.find(f => f.name === base) || files.find(f => f.name.toLowerCase() === base.toLowerCase())
+  if (!info) {
+    throw new Error(`Datei "${base}" liegt nicht im Ordner "${entry.name}". Verfügbar: ${files.slice(0, 30).map(f => f.name).join(', ')}`)
+  }
+  if (info.sizeBytes > maxBytesFor(info.kind)) {
+    throw new Error(`"${base}" ist zu groß (${Math.round(info.sizeBytes / 1024 / 1024)} MB)`)
+  }
+
+  const fileEntry: AttachmentEntry = {
+    id: '',
+    name: info.name,
+    kind: info.kind,
+    insideVault: entry.insideVault,
+    sizeBytes: info.sizeBytes,
+    absPath: path.join(dirReal, info.name),
+    vaultRoot: entry.vaultRoot
+  }
+
+  const offset = Math.max(1, Math.floor(opts.offset ?? 1))
+  let content: string
+  let truncated = false
+
+  if (info.kind === 'xlsx') {
+    const src = await assertEntryReadable(fileEntry)
+    const data = await parseExcel(src)
+    const wanted = opts.sheet?.trim()
+    let sheets = data.sheets
+    if (wanted) {
+      const byIndex = /^\d+$/.test(wanted) ? data.sheets[Number(wanted) - 1] : undefined
+      const byName = data.sheets.find(s => s.name === wanted) || data.sheets.find(s => s.name.toLowerCase() === wanted.toLowerCase())
+      const picked = byName || byIndex
+      if (!picked) throw new Error(`Blatt "${wanted}" gibt es nicht. Vorhanden: ${data.sheets.map(s => s.name).join(', ')}`)
+      sheets = [picked]
+    }
+    const maxRows = Math.max(1, Math.floor(opts.maxRows ?? DEFAULT_ROWS_XLSX))
+    const parts: string[] = []
+    for (const sheet of sheets.slice(0, MAX_XLSX_SHEETS)) {
+      const slice = sheet.rows.slice(offset - 1, offset - 1 + maxRows)
+      parts.push(`### Blatt "${sheet.name}" (Zeilen ${offset}–${offset + slice.length - 1} von ${sheet.rows.length})`)
+      // Beim Blättern die erste Zeile mitschicken: sonst steht ab offset=201 eine
+      // Tabelle ohne Überschriften da und das Modell rät die Spaltenbedeutung.
+      const shown = offset > 1 && sheet.rows.length > 0 ? [sheet.rows[0], ...slice] : slice
+      if (offset > 1) parts.push('(erste Zeile der Datei zur Orientierung vorangestellt)')
+      parts.push(sheetToMarkdownTable({ name: sheet.name, rows: shown }))
+      if (offset - 1 + slice.length < sheet.rows.length) {
+        truncated = true
+        parts.push(`[weiter mit offset=${offset + slice.length}]`)
+      }
+    }
+    if (!wanted && data.sheets.length > MAX_XLSX_SHEETS) {
+      truncated = true
+      parts.push(`[${data.sheets.length - MAX_XLSX_SHEETS} weitere Blätter nicht gezeigt — mit dem Parameter sheet einzeln anfordern]`)
+    }
+    content = parts.join('\n\n')
+  } else {
+    const full = hygieneText(await extractContent(fileEntry)).trim()
+    if (!full) throw new Error('Datei ist leer oder enthält keinen lesbaren Text')
+    const lines = full.split('\n')
+    const maxLines = Math.max(1, Math.floor(opts.maxRows ?? DEFAULT_LINES_TEXT))
+    const slice = lines.slice(offset - 1, offset - 1 + maxLines)
+    content = slice.join('\n')
+    if (offset - 1 + slice.length < lines.length) {
+      truncated = true
+      content += `\n[gekürzt: Zeile ${offset + slice.length} von ${lines.length} — weiter mit offset=${offset + slice.length}]`
+    }
+  }
+
+  content = hygieneText(content).trim()
+  if (content.length > MAX_CHARS_PER_FILE) {
+    content = content.slice(0, MAX_CHARS_PER_FILE) + '\n[gekürzt: Datei-Budget erreicht — kleineren Bereich per offset/max_rows anfordern]'
+    truncated = true
+  }
+  return { folderName: entry.name, fileName: info.name, content, truncated }
 }
 
 // Hygiene, keine Sicherheitsgrenze (Plan F09): unsichtbare Steuerzeichen raus,
@@ -396,6 +677,155 @@ async function readFolderContext(
 
   const header = `Ordner "${entry.name}" — ${supported.length} unterstützte Dateien (nur direkte Ebene${extra.length ? '; ' + extra.join(', ') : ''}):`
   return { content: [header, manifestLines.join('\n'), ...sections].join('\n\n'), truncated }
+}
+
+// ── Deterministische Zusammenführung vieler gleichartiger Tabellen ──
+// Die Zeilen laufen bewusst NICHT durch den Modellkontext: bei 60 Rückläufen wären
+// das Zehntausende Zeichen, und ein stiller Kontext-Überlauf würde das Ergebnis
+// unbemerkt verfälschen. Das Modell nennt nur Spalten und Filter, hier wird gelesen.
+
+const MAX_COLLECT_FILES = 300
+const MAX_COLLECT_ROWS = 20_000
+
+export interface CollectFolderOptions {
+  /** Blattname oder 1-basierte Nummer; ohne Angabe das erste Blatt jeder Datei. */
+  sheet?: string
+  filters?: RowFilter[]
+  /** Nur diese Dateien berücksichtigen (Namen aus dem Manifest). */
+  files?: string[]
+  /** Fortschritt fürs Lauf-Protokoll — 60 Dateien zu parsen dauert spürbar. */
+  onProgress?: (done: number, total: number, file: string) => void
+  /** Abbruch des Laufs — wird pro Datei geprüft, nicht erst am Ende. */
+  signal?: AbortSignal
+}
+
+/** Tabellenblätter einer Datei — Excel direkt, CSV über den einfachen Trennzeichen-Parser. */
+async function sheetsForTableFile(absPath: string, kind: ContextFileKind): Promise<SheetLike[]> {
+  if (kind === 'xlsx') {
+    const data = await parseExcel(absPath)
+    return data.sheets
+  }
+  if (kind === 'csv' || kind === 'txt') {
+    const text = await fs.readFile(absPath, 'utf-8')
+    return [{ name: path.basename(absPath), rows: parseDelimitedText(hygieneText(text)) }]
+  }
+  throw new Error('kein Tabellenformat (nur Excel und CSV)')
+}
+
+/**
+ * Liest ALLE Tabellen eines angehängten Ordners und führt die gewünschten Spalten
+ * zusammen. Ergebnis: eine Tabelle mit Herkunftsspalte plus ein Statusbericht je Datei.
+ */
+export async function collectFolderTable(
+  senderId: number,
+  ids: string[],
+  folderName: string,
+  columns: string[],
+  opts: CollectFolderOptions = {}
+): Promise<CollectedTable & { folderName: string; truncated: boolean }> {
+  const entry = requireFolderEntry(senderId, ids, folderName)
+  const { dirReal, files } = await listSupportedFolderFiles(entry)
+
+  const wantedNames = opts.files?.length
+    ? new Set(opts.files.map(n => path.basename(n).toLowerCase()))
+    : null
+  let candidates = files.filter(f => (f.kind === 'xlsx' || f.kind === 'csv' || f.kind === 'txt'))
+  if (wantedNames) candidates = candidates.filter(f => wantedNames.has(f.name.toLowerCase()))
+  if (candidates.length === 0) {
+    throw new Error(`Ordner "${entry.name}" enthält keine Tabellen (Excel oder CSV)${wantedNames ? ' unter den angegebenen Dateien' : ''}.`)
+  }
+
+  const outColumns = [...columns, 'Quelldatei']
+  const rows: string[][] = []
+  const statuses: FileCollectStatus[] = []
+  let truncated = false
+
+  // Dateien jenseits der Datei-Obergrenze NICHT stillschweigend weglassen: sie
+  // stehen namentlich im Bericht, sonst sieht eine gekappte Auswertung vollständig aus.
+  let overflowFiles: FolderFileInfo[] = []
+  if (candidates.length > MAX_COLLECT_FILES) {
+    truncated = true
+    overflowFiles = candidates.slice(MAX_COLLECT_FILES)
+    candidates = candidates.slice(0, MAX_COLLECT_FILES)
+  }
+
+  // Ist die Zeilen-Obergrenze erreicht, werden ALLE weiteren Dateien gar nicht mehr
+  // gelesen. Sie dürfen dann nicht als „leer" erscheinen — sie haben nichts gesagt.
+  let rowLimitHit = false
+
+  for (let i = 0; i < candidates.length; i++) {
+    // Abbrechen muss WÄHREND des Sammelns wirken: 300 Dateien zu parsen dauert
+    // Minuten, in denen der Lauf sonst unkündbar weiterläuft und den nächsten blockiert.
+    if (opts.signal?.aborted) throw new Error('Abgebrochen')
+    const f = candidates[i]
+    opts.onProgress?.(i + 1, candidates.length, f.name)
+    if (rowLimitHit) {
+      statuses.push({ file: f.name, status: 'nicht_ausgewertet', rows: 0, message: `Zeilen-Obergrenze (${MAX_COLLECT_ROWS}) erreicht — Datei nicht mehr gelesen` })
+      continue
+    }
+    if (f.sizeBytes > maxBytesFor(f.kind)) {
+      statuses.push({ file: f.name, status: 'fehler', rows: 0, message: 'zu groß' })
+      continue
+    }
+    try {
+      const fileEntry: AttachmentEntry = {
+        id: '',
+        name: f.name,
+        kind: f.kind,
+        insideVault: entry.insideVault,
+        sizeBytes: f.sizeBytes,
+        absPath: path.join(dirReal, f.name),
+        vaultRoot: entry.vaultRoot
+      }
+      const src = await assertEntryReadable(fileEntry)
+      const sheets = await sheetsForTableFile(src, f.kind)
+      const sheet = pickSheet(sheets, opts.sheet)
+      if (!sheet) {
+        statuses.push({ file: f.name, status: 'fehler', rows: 0, message: `Blatt "${opts.sheet}" nicht vorhanden` })
+        continue
+      }
+      const res = extractFromSheet(sheet, columns, opts.filters ?? [])
+      if (res.headerRowIndex === -1) {
+        statuses.push({ file: f.name, status: 'fehler', rows: 0, message: 'keine Kopfzeile gefunden' })
+        continue
+      }
+      const room = Math.max(0, MAX_COLLECT_ROWS - rows.length)
+      const taken = res.rows.slice(0, room)
+      for (const r of taken) rows.push([...r, f.name])
+      // Angebrochene Datei: „teilweise" mit Zahlen, NIE „ok" — sonst wäre die Lücke
+      // im Bericht unsichtbar.
+      if (taken.length < res.rows.length) {
+        rowLimitHit = true
+        truncated = true
+        statuses.push({
+          file: f.name,
+          status: 'teilweise',
+          rows: taken.length,
+          missingColumns: res.missingColumns.length ? res.missingColumns : undefined,
+          message: `Zeilen-Obergrenze (${MAX_COLLECT_ROWS}) erreicht — nur ${taken.length} von ${res.rows.length} Zeilen übernommen`
+        })
+        continue
+      }
+      statuses.push({
+        file: f.name,
+        status: res.missingColumns.length ? 'teilweise' : taken.length === 0 ? 'leer' : 'ok',
+        rows: taken.length,
+        missingColumns: res.missingColumns.length ? res.missingColumns : undefined,
+        message: taken.length === 0 && !res.missingColumns.length
+          ? (res.filteredOutCount ? `alle ${res.filteredOutCount} Zeilen vom Filter aussortiert` : 'keine Datenzeilen')
+          : undefined
+      })
+    } catch (e) {
+      if (opts.signal?.aborted) throw e
+      statuses.push({ file: f.name, status: 'fehler', rows: 0, message: e instanceof Error ? e.message : String(e) })
+    }
+  }
+
+  for (const f of overflowFiles) {
+    statuses.push({ file: f.name, status: 'nicht_ausgewertet', rows: 0, message: `Datei-Obergrenze (${MAX_COLLECT_FILES}) erreicht — Datei nicht gelesen` })
+  }
+
+  return { folderName: entry.name, columns: outColumns, rows, files: statuses, truncated }
 }
 
 // Roh-Extraktion einer einzelnen Datei für Agent-Skills (references/assets, Stufe 3):

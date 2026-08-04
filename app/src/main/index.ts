@@ -4037,13 +4037,15 @@ ipcMain.handle('note-agent-attach-dialog', async (event) => {
     // die Dialog-Auswahl selbst ist die Lese-Freigabe.)
     let insideVault = false
     let chosenPath = p
+    let vaultRoot: string | undefined
     try {
       chosenPath = await assertSafePath(p, 'note-agent-attach-dialog')
       insideVault = true
+      vaultRoot = findApprovedRootForPath(chosenPath) ?? undefined
     } catch {
       /* außerhalb des Vaults — bewusst erlaubt */
     }
-    const res = await registerContextAttachment(event.sender.id, chosenPath, insideVault)
+    const res = await registerContextAttachment(event.sender.id, chosenPath, insideVault, vaultRoot)
     if (res.ok) attachments.push(res.attachment)
     else errors.push(res.error)
   }
@@ -4086,13 +4088,15 @@ ipcMain.handle('note-agent-attach-folder-dialog', async (event) => {
   for (const p of result.filePaths) {
     let insideVault = false
     let chosenPath = p
+    let vaultRoot: string | undefined
     try {
       chosenPath = await assertSafePath(p, 'note-agent-attach-folder-dialog')
       insideVault = true
+      vaultRoot = findApprovedRootForPath(chosenPath) ?? undefined
     } catch {
       /* außerhalb des Vaults — bewusst erlaubt */
     }
-    const res = await registerContextFolder(event.sender.id, chosenPath, insideVault)
+    const res = await registerContextFolder(event.sender.id, chosenPath, insideVault, vaultRoot)
     if (res.ok) attachments.push(res.attachment)
     else errors.push(res.error)
   }

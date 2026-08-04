@@ -20898,6 +20898,33 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
   padding: 1px 6px;
 }
 
+/* Agent-Tab: der Notiz-Agent ohne offene Notiz. Nutzt bewusst dieselben
+   .ai-bar-*-Bausteine wie die Macher-Leiste — ein Werkzeug, ein Aussehen. */
+.agent-view {
+  height: 100%;
+  overflow-y: auto;
+  background: var(--bg-primary);
+}
+.agent-view-inner {
+  max-width: 780px;
+  margin: 0 auto;
+  padding: 32px 24px 48px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.agent-view-head { display: flex; flex-direction: column; gap: 4px; margin-bottom: 4px; }
+.agent-view-title { font-size: 18px; font-weight: 600; color: var(--text-primary); margin: 0; }
+.agent-view-sub { font-size: 13px; line-height: 1.55; color: var(--text-secondary); margin: 0; }
+.agent-view-input { min-height: 90px; }
+.agent-view-footer { padding-top: 4px; }
+.agent-view-empty {
+  padding: 40px 0;
+  text-align: center;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
 .ai-bar-expanded {
   flex-shrink: 0;
   display: flex;

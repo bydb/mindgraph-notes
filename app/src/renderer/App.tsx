@@ -9,6 +9,8 @@ import { BrainConstellation } from './components/Canvas/BrainConstellation'
 import { BrainIcon } from './components/BrainIcon'
 import { MindGraphLogo } from './components/Shared/MindGraphLogo'
 import { WorkflowCanvasView } from './components/WorkflowCanvas/WorkflowCanvasView'
+import { AgentView } from './components/Agent/AgentView'
+import { initNoteAgentEvents } from './stores/noteAgentStore'
 import { LocalCanvas } from './components/Canvas/LocalCanvas'
 import { PDFViewer } from './components/PDFViewer/PDFViewer'
 import { CodeViewer } from './components/CodeViewer/CodeViewer'
@@ -158,6 +160,7 @@ const App: React.FC = () => {
   const dashboardEnabled = useUIStore(state => state.dashboard.enabled)
   const openDashboardTab = useTabStore(state => state.openDashboardTab)
   const openWorkflowCanvasTab = useTabStore(state => state.openWorkflowCanvasTab)
+  const openAgentTab = useTabStore(state => state.openAgentTab)
   const { unreadRelevantCount } = useEmailStore()
   const emailEnabled = useUIStore(state => state.email.enabled)
   const edooboxEnabled = usePluginEnabled('edoobox')
@@ -211,6 +214,13 @@ const App: React.FC = () => {
       }
     }
   }, [overduePanelOpen, tagsPanelOpen, smartConnectionsOpen, notesChatOpen, flashcardsPanelOpen, setFlashcardsPanelOpen, inboxPanelOpen, agentPanelOpen, semanticScholarOpen])
+
+  // Notiz-Agent: Fortschritts- und Ergebnis-Events genau EINMAL pro Fenster abonnieren.
+  // preload setzt die Hörer mit removeAllListeners — mehrere Abonnenten würden sich
+  // gegenseitig abmelden (Macher-Leiste UND Agent-Tab hören über den Store mit).
+  useEffect(() => {
+    initNoteAgentEvents()
+  }, [])
 
   // Werkzeuge-Überlaufmenü: bei Klick außerhalb schließen.
   useEffect(() => {
@@ -798,7 +808,7 @@ const App: React.FC = () => {
     const activeTab = currentTabs.find(t => t.id === currentActiveTabId)
     const shadowsViewer = !!activeTab && (
       activeTab.type === 'dashboard' || activeTab.type === 'workflow-canvas' || activeTab.type === 'code' ||
-      activeTab.type === 'plugin-editor'
+      activeTab.type === 'plugin-editor' || activeTab.type === 'agent'
     )
     if (!shadowsViewer) return // Viewer ist bereits sichtbar — nichts tun
 
@@ -1099,6 +1109,10 @@ const App: React.FC = () => {
     { id: 'view-brain', category: t('commandPalette.cat.view'), label: t('commandPalette.viewBrain'), keywords: 'graph canvas brain mindgraph', run: () => setViewMode('canvas') },
     ...(dashboardEnabled ? [{ id: 'open-dashboard', category: t('commandPalette.cat.view'), label: t('commandPalette.openDashboard'), keywords: 'dashboard widgets', run: () => openDashboardTab() }] : []),
     ...(vaultWorkflowCanvasActive ? [{ id: 'open-workflow', category: t('commandPalette.cat.view'), label: t('commandPalette.openWorkflow'), keywords: 'workflow automation canvas', run: () => openWorkflowCanvasTab() }] : []),
+    // setViewMode('editor') ist Pflicht: im Brain-Modus verdeckt der Canvas die
+    // Tab-Fläche, der Agent-Tab wäre zwar aktiv, aber unsichtbar (gleiches Muster
+    // wie bei den Werkzeug-Knöpfen für Dashboard und Workflow-Canvas).
+    { id: 'open-agent', category: t('commandPalette.cat.view'), label: t('commandPalette.openAgent'), keywords: 'agent ki ai ordner auswerten tabellen', run: () => { setViewMode('editor'); openAgentTab() } },
     { id: 'panel-tasks', category: t('commandPalette.cat.panels'), label: t('commandPalette.panelTasks'), keywords: 'tasks aufgaben termine overdue', run: () => switchRightPanel('overdue') },
     { id: 'panel-tags', category: t('commandPalette.cat.panels'), label: t('commandPalette.panelTags'), keywords: 'tags schlagworte', run: () => switchRightPanel('tags') },
     ...(smartConnectionsEnabled ? [{ id: 'panel-smart', category: t('commandPalette.cat.panels'), label: t('commandPalette.panelSmart'), keywords: 'smart connections similar aehnlich', run: () => switchRightPanel('smartConnections') }] : []),
@@ -1396,7 +1410,9 @@ const App: React.FC = () => {
                     : `0 0 ${splitPosition}%`
                 }}
               >
-                {activeTab?.type === 'workflow-canvas' ? (
+                {activeTab?.type === 'agent' ? (
+                  <AgentView tabId={activeTab.id} />
+                ) : activeTab?.type === 'workflow-canvas' ? (
                   <WorkflowCanvasView onOpenInbox={() => switchRightPanel('inbox')} />
                 ) : activeTab?.type === 'dashboard' ? (
                   <DashboardView

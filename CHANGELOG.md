@@ -2,6 +2,31 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.10.36-beta] - 2026-08-04
+
+Der Notiz-Agent wertet jetzt ganze Ordner mit gleichartigen Tabellen aus — und ist dafür auch ohne geöffnete Notiz erreichbar.
+
+### Neu
+
+- **Agent-Tab.** Der Notiz-Agent war bisher nur als Leiste unter einer geöffneten Notiz erreichbar. Für Aufträge, die gar keine Ausgangsnotiz haben — „werte die Rückmeldungen aller Schulen aus" — gab es damit keinen Einstieg. Jetzt gibt es einen eigenen Arbeitsplatz: über die Befehlspalette („Agent öffnen") oder per Rechtsklick auf einen Ordner im Dateibaum („Ordner mit Agent auswerten"), wobei der Ordner gleich angehängt wird.
+- **Ordner lesen statt raten.** Zwei neue Werkzeuge, sobald ein Ordner angehängt ist: Der Agent holt sich erst eine Übersicht des Ordners (Dateinamen, Größe, bei Excel auch Blattnamen und Zeilenzahl, ganz ohne Inhalte) und liest danach gezielt einzelne Dateien — blattweise und in Abschnitten. Vorher musste ein ganzer Ordner in eine einzige Antwort passen, was bei mehr als 20 Dateien nicht mehr aufging.
+- **Tabellen zusammenführen.** Bei vielen gleich aufgebauten Dateien führt die App sie selbst zusammen: Kopfzeile finden, gewünschte Spalten zuordnen (auch bei abweichender Schreibweise: „Name, Vorname" und „Name/Vorname" sind dieselbe Spalte), jede Zeile mit ihrer Herkunftsdatei versehen, auf Wunsch direkt filtern — nach nicht-leer, enthält, gleich oder Datumsbereich. Das Sprachmodell entscheidet dabei nur über Spalten und Filter und bekommt Kennzahlen, zwanzig Beispielzeilen und die Problemliste zurück. **Die eigentlichen Zeilen laufen nie durch das Modell**, sondern gehen direkt in die Excel-Datei. Bei 60 Rückläufen wäre sonst der stille Kontext-Überlauf gekommen: Das Modell hätte weitergearbeitet und ein plausibles, aber falsches Ergebnis geliefert.
+- **Zwei Ergebnisse pro Lauf.** Ein Auftrag darf jetzt eine Tabelle *und* eine begleitende Notiz erzeugen, jedes Format einmal. Recherche-Läufe bleiben bei genau einem Ergebnis — dort hängt der Quellennachweis daran.
+
+### Verbessert
+
+- **Ehrliche Auskunft über die eigenen Fähigkeiten.** Der Agent bekommt jetzt ausdrücklich gesagt, was er lesen kann und dass es keinen Upload gibt. Vorher konnte er auf eine nicht angehängte Excel-Datei mit „dieses Format kann ich nicht lesen, bitte lade es hoch" antworten — beides falsch. Die Ablehnungstexte der Werkzeuge zeigen jetzt auf den tatsächlichen Weg.
+- **Gleichnamige Ordner sind unterscheidbar.** Angehängte Dateien und Ordner aus dem Vault tragen ihren Pfad im Namen. Vorher hätte „Projekt B/Rückmeldungen" nach „Projekt A/Rückmeldungen" als bereits angehängt gegolten und wäre stillschweigend verschwunden. Bei echter Namensgleichheit wird ein Zähler angehängt, damit ein Werkzeugaufruf nie den falschen Anhang erwischt.
+- **Mehr Luft für Ordner-Aufträge.** Läufe mit Ordner-Anhang dürfen 20 statt 12 Arbeitsschritte machen — Übersicht, Stichproben, Zusammenführen und Schreiben passen sonst nicht in ein Limit, das für Textaufträge gedacht war.
+- **Sichtbarer Fortschritt.** Beim Zusammenführen meldet die App im Protokoll, wie viele Dateien sie schon gelesen hat. 60 Tabellen zu öffnen dauert, und eine stillstehende Anzeige sieht aus wie ein Absturz.
+
+### Behoben
+
+- **Unvollständige Auswertungen sahen vollständig aus.** Griff eine Obergrenze, wurde die angebrochene Datei trotzdem als vollständig verbucht und alle folgenden als „leer" — obwohl sie nie gelesen wurden. Eine gekappte Liste hätte man ohne Weiteres weitergegeben. Jetzt gibt es einen eigenen Zustand „nicht ausgewertet", die angebrochene Datei nennt ihre Zahlen, übersprungene Dateien stehen namentlich im Bericht, und die Warnung steht ganz oben statt in einer Fußnote.
+- **Abbrechen wirkt jetzt auch beim Zusammenführen.** Das Abbruchsignal wurde erst nach dem letzten Tabellen-Durchlauf geprüft. Bei vielen Dateien lief der Auftrag danach minutenlang weiter und blockierte den nächsten. Geprüft wird jetzt nach jeder Datei.
+- **Pfadprüfung auch beim Erstellen der Ordner-Übersicht.** Die Übersicht las Excel-Dateien, ohne den Pfad unmittelbar davor erneut aufzulösen. Ein zwischenzeitlich untergeschobener Verweis hätte damit aus dem Vault herausführen können. Sie nutzt jetzt dieselbe Prüfung wie alle anderen Lesewege.
+- **Agent-Tab im MindGraph-Modus.** „Agent öffnen" aktivierte den Tab, ließ aber den Graphen im Vordergrund — der Agent war da, aber unsichtbar. Der Befehl wechselt jetzt zusätzlich in die Editor-Ansicht, wie die Werkzeug-Knöpfe es schon taten.
+
 ## [0.10.35-beta] - 2026-08-03
 
 Wenn die Oberfläche am Beamer oder am zweiten Monitor zäh wird, zeigt die App jetzt, woran es liegt.

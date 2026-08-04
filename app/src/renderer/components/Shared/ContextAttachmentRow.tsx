@@ -44,9 +44,14 @@ export function ContextAttachmentRow({ attachments, onAttachDialog, onAttachFold
 
   const pickerMatches = useMemo(() => {
     const q = pickerQuery.trim().toLowerCase()
-    const attached = new Set(attachments.map(a => a.name))
+    // Vault-Anhänge tragen Main-seitig ihren vault-relativen Namen. Dadurch lassen
+    // sich gleichnamige Dateien/Ordner aus verschiedenen Projekten unterscheiden,
+    // ohne absolute Pfade externer Anhänge in den Renderer zu geben.
+    const attachedVaultPaths = new Set(
+      attachments.filter(a => a.insideVault).map(a => a.name.replace(/\\/g, '/'))
+    )
     const pool = q ? vaultFiles.filter(f => f.name.toLowerCase().includes(q) || f.relPath.toLowerCase().includes(q)) : vaultFiles
-    const candidates = pool.filter(f => !attached.has(f.name))
+    const candidates = pool.filter(f => !attachedVaultPaths.has(f.relPath.replace(/\\/g, '/')))
     // Dateien vor Ordnern — sonst dominieren bei leerer Suche die Top-Level-Ordner.
     return [...candidates.filter(f => !f.isFolder), ...candidates.filter(f => f.isFolder)].slice(0, 8)
   }, [pickerQuery, vaultFiles, attachments])

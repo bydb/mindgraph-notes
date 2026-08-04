@@ -5,6 +5,7 @@ import { useNotesStore, createNoteFromFile } from '../../stores/notesStore'
 import { useUIStore, FOLDER_COLORS, FOLDER_ICONS, type IconSet } from '../../stores/uiStore'
 import { useGraphStore } from '../../stores/graphStore'
 import { useTabStore } from '../../stores/tabStore'
+import { useNoteAgentStore } from '../../stores/noteAgentStore'
 import { useBookmarkStore } from '../../stores/bookmarkStore'
 import { useQuizStore } from '../../stores/quizStore'
 import { generateNoteId, extractTasks } from '../../utils/linkExtractor'
@@ -973,6 +974,19 @@ const FileItem: React.FC<FileItemProps> = ({
   }, [contextMenu, toggleTaskExcludedFolder])
 
   // Show folder in canvas view
+  // Ordner mit dem Agenten auswerten: Agent-Tab öffnen und den Ordner gleich als
+  // Kontext anhängen — der Agent kann nur lesen, was ausdrücklich angehängt wurde.
+  const handleAnalyzeFolderWithAgent = useCallback(() => {
+    if (!contextMenu || !contextMenu.entry.isDirectory || !vaultPath) return
+    const relPath = contextMenu.entry.path
+    const tabId = useTabStore.getState().openAgentTab()
+    // Doppelt-Anhängen verhindert der Store selbst — über den vollen Pfad, denn
+    // „Projekt A/Rückmeldungen" und „Projekt B/Rückmeldungen" heißen beide gleich.
+    void useNoteAgentStore.getState().attachVaultPath(tabId, vaultPath, relPath)
+    setViewMode('editor')
+    setContextMenu(null)
+  }, [contextMenu, vaultPath, setViewMode])
+
   const handleShowFolderInCanvas = useCallback(() => {
     if (!contextMenu || !contextMenu.entry.isDirectory) return
     setCanvasFilterPath(contextMenu.entry.path)
@@ -1425,6 +1439,11 @@ const FileItem: React.FC<FileItemProps> = ({
               <button onClick={handleShowFolderInCanvas} className="context-menu-item">
                 {t('fileTree.showInCanvas')}
               </button>
+              {ollama.enabled && (
+                <button onClick={handleAnalyzeFolderWithAgent} className="context-menu-item">
+                  {t('fileTree.analyzeWithAgent')}
+                </button>
+              )}
               <div className="context-menu-divider" />
               <button onClick={handleStripWikilinks} className="context-menu-item">
                 {t('fileTree.stripWikilinks')}

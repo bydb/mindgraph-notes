@@ -1,5 +1,4 @@
 import React, { useEffect, useRef, useCallback, useState, useMemo, memo } from 'react'
-import type { NoteAgentAttachment } from '../../../shared/types'
 import { EditorState, Compartment } from '@codemirror/state'
 import { EditorView, keymap, lineNumbers, highlightActiveLine } from '@codemirror/view'
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands'
@@ -32,7 +31,7 @@ import { SlashCommandMenu } from './SlashCommandMenu'
 import { livePreviewExtension } from './extensions/livePreview'
 import { imageHandlingExtension } from './extensions/imageHandling'
 import { languageToolExtension, setLanguageToolMatches, setCorrectionHighlights, setLtErrorClickHandler, type LanguageToolMatch, type LanguageToolPopupMatch } from './extensions/languageTool'
-import { AiActionBar, type AiProposalMeta, type AgentUiStep, type AgentUiResult, type AgentUiWeb } from './AiActionBar'
+import { AiActionBar, type AiProposalMeta } from './AiActionBar'
 import { diffLines } from '../../utils/blockDiff'
 import { dataviewExtension, setDataviewNotes, setDataviewLanguage, setDataviewViewMode, setNoteClickHandler } from './extensions/dataview'
 import { useDataviewStore } from '../../stores/dataviewStore'
@@ -71,28 +70,8 @@ import { isBrainNote, brainNoteLabel } from '../../utils/brainNote'
 import { BrainIcon } from '../BrainIcon'
 import { readClipboardText, writeClipboardText } from '../../utils/clipboard'
 import { cloudRoutesForFeature, cloudProviderForSentinel, type CloudProviderId } from '../../../shared/llmBackend'
+import { useNoteAgentStore, EMPTY_AGENT_SCOPE } from '../../stores/noteAgentStore'
 
-// Stabile leere Referenz für die Kontext-Datei-Selektion (kein neues Array pro Render —
-// bekannte Loop-Falle bei Zustand/React, siehe CLAUDE.md Workflow-Canvas-Lehren).
-const EMPTY_AGENT_ATTACHMENTS: NoteAgentAttachment[] = []
-
-// Notiz-Agent Phase 2: UI-Zustand eines Agent-Laufs, pro Notiz gekeyt.
-interface AgentRunUiState {
-  runId: string | null
-  phase: 'idle' | 'running' | 'review'
-  steps: AgentUiStep[]
-  results: AgentUiResult[]
-  finalText: string
-  web?: AgentUiWeb
-  // Provenienz des Laufs: Modell + Datenweg (lokal vs. Cloud-Provider-Label) —
-  // beim Start festgehalten, damit die Review-Karten sie anzeigen können.
-  model: string
-  cloudLabel: string | null
-  // Mitlernen (Stufe 3): Merksatz-Vorschlag des Modells, trifft asynchron nach dem
-  // Done-Event ein und befüllt das Merken-Feld vor (solange der Nutzer nichts tippt).
-  rememberSuggestion?: string
-}
-const EMPTY_AGENT_RUN: AgentRunUiState = { runId: null, phase: 'idle', steps: [], results: [], finalText: '', model: '', cloudLabel: null }
 
 const markdownCodeLanguages = [
   LanguageDescription.of({
@@ -1035,17 +1014,14 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
   const activeAiCloudRoute = aiCloudProvider
     ? (cloudPickerRoutes.find(r => r.provider === aiCloudProvider) ?? null)
     : null
-  // Notiz-Agent Phase 1: Kontext-Dateien, flüchtig und strikt auf die Note-ID gekeyt —
-  // der Editor bleibt bei Notizwechsel gemountet (docs/note-agent-harness-plan.md §1/F08).
-  const [agentAttachmentsByNote, setAgentAttachmentsByNote] = useState<Record<string, NoteAgentAttachment[]>>({})
-  const [agentAttachError, setAgentAttachError] = useState<string | null>(null)
-  const agentAttachments = (effectiveNoteId && agentAttachmentsByNote[effectiveNoteId]) || EMPTY_AGENT_ATTACHMENTS
-  // Notiz-Agent Phase 2: Zielordner + Lauf-Zustand pro Notiz; runId→noteId fürs Event-Routing.
-  const [agentTargetByNote, setAgentTargetByNote] = useState<Record<string, string>>({})
-  const agentTargetFolder = (effectiveNoteId && agentTargetByNote[effectiveNoteId]) || ''
-  const [agentRunByNote, setAgentRunByNote] = useState<Record<string, AgentRunUiState>>({})
-  const agentRunState = (effectiveNoteId && agentRunByNote[effectiveNoteId]) || EMPTY_AGENT_RUN
-  const agentRunNoteRef = useRef(new Map<string, string>())
+  // Notiz-Agent: Anhänge, Zielordner und Lauf liegen im noteAgentStore, gekeyt auf die
+  // Note-ID („Bereich"). Der Store hält auch die Event-Hörer — sie können nur EINMAL
+  // pro Renderer registriert werden, und der Agent-Tab braucht sie ebenfalls.
+  const agentScope = useNoteAgentStore(s => (effectiveNoteId ? s.scopes[effectiveNoteId] : undefined) ?? EMPTY_AGENT_SCOPE)
+  const agentAttachments = agentScope.attachments
+  const agentAttachError = agentScope.attachError
+  const agentTargetFolder = agentScope.targetFolder
+  const agentRunState = agentScope.run
   const [showAIImageDialog, setShowAIImageDialog] = useState(false)
   const [showPublishWpModal, setShowPublishWpModal] = useState(false)
   const [previewToolbar, setPreviewToolbar] = useState<{ x: number; y: number } | null>(null)
@@ -1891,121 +1867,29 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
     }
   }
 
-  // ── Notiz-Agent Phase 1: Kontext-Dateien für die Macher-Leiste ──────────────
-  const agentAddAttachments = useCallback((noteId: string, added: NoteAgentAttachment[]) => {
-    setAgentAttachmentsByNote(prev => ({ ...prev, [noteId]: [...(prev[noteId] || []), ...added] }))
-  }, [])
-
-  const agentAttachFromDialog = useCallback(async () => {
-    if (!effectiveNoteId) return
-    setAgentAttachError(null)
-    const res = await window.electronAPI.noteAgentAttachDialog()
-    if (res.attachments.length > 0) agentAddAttachments(effectiveNoteId, res.attachments)
-    if (res.errors.length > 0) setAgentAttachError(res.errors.join(' · '))
-  }, [effectiveNoteId, agentAddAttachments])
-
-  const agentAttachFolderFromDialog = useCallback(async () => {
-    if (!effectiveNoteId) return
-    setAgentAttachError(null)
-    const res = await window.electronAPI.noteAgentAttachFolderDialog()
-    if (res.attachments.length > 0) agentAddAttachments(effectiveNoteId, res.attachments)
-    if (res.errors.length > 0) setAgentAttachError(res.errors.join(' · '))
-  }, [effectiveNoteId, agentAddAttachments])
-
-  const agentAttachVaultFile = useCallback(async (relPath: string) => {
-    if (!effectiveNoteId || !vaultPath) return
-    setAgentAttachError(null)
-    const res = await window.electronAPI.noteAgentAttachVaultFile(vaultPath, relPath)
-    if (res.attachments.length > 0) agentAddAttachments(effectiveNoteId, res.attachments)
-    if (res.errors.length > 0) setAgentAttachError(res.errors.join(' · '))
-  }, [effectiveNoteId, vaultPath, agentAddAttachments])
-
-  const agentDetach = useCallback(async (id: string) => {
-    if (!effectiveNoteId) return
-    setAgentAttachError(null)
-    await window.electronAPI.noteAgentDetach(id)
-    setAgentAttachmentsByNote(prev => ({
-      ...prev,
-      [effectiveNoteId]: (prev[effectiveNoteId] || []).filter(a => a.id !== id)
-    }))
+  // ── Notiz-Agent: Anhänge, Zielordner, Lauf — Zustand und IPC im noteAgentStore ──
+  const agentAttachFromDialog = useCallback(() => {
+    if (effectiveNoteId) void useNoteAgentStore.getState().attachFromDialog(effectiveNoteId)
   }, [effectiveNoteId])
 
-  // ── Notiz-Agent Phase 2 (Modus B): Zielordner, Lauf, Ergebnis-Karten ────────
+  const agentAttachFolderFromDialog = useCallback(() => {
+    if (effectiveNoteId) void useNoteAgentStore.getState().attachFolderFromDialog(effectiveNoteId)
+  }, [effectiveNoteId])
+
+  const agentAttachVaultFile = useCallback((relPath: string) => {
+    if (effectiveNoteId && vaultPath) void useNoteAgentStore.getState().attachVaultPath(effectiveNoteId, vaultPath, relPath)
+  }, [effectiveNoteId, vaultPath])
+
+  const agentDetach = useCallback((id: string) => {
+    if (effectiveNoteId) void useNoteAgentStore.getState().detach(effectiveNoteId, id)
+  }, [effectiveNoteId])
+
   const agentSetTargetFolder = useCallback((rel: string | null) => {
-    if (!effectiveNoteId) return
-    setAgentTargetByNote(prev => {
-      const next = { ...prev }
-      if (rel) next[effectiveNoteId] = rel
-      else delete next[effectiveNoteId]
-      return next
-    })
+    if (effectiveNoteId) useNoteAgentStore.getState().setTargetFolder(effectiveNoteId, rel)
   }, [effectiveNoteId])
-
-  // Sender-gebundene Events vom Main: Routing über runId→noteId; Events fremder
-  // oder verworfener Läufe werden ignoriert (F10). Nur der Primär-Editor lauscht —
-  // preload erlaubt einen Listener pro Channel.
-  useEffect(() => {
-    if (isSecondary) return
-    window.electronAPI.onNoteAgentProgress(p => {
-      const noteId = agentRunNoteRef.current.get(p.runId)
-      if (!noteId) return
-      setAgentRunByNote(prev => {
-        const cur = prev[noteId]
-        if (!cur || cur.runId !== p.runId) return prev
-        return { ...prev, [noteId]: { ...cur, steps: [...cur.steps, { seq: p.seq, skill: p.skill, summary: p.summary }] } }
-      })
-    })
-    window.electronAPI.onNoteAgentDone(p => {
-      const noteId = agentRunNoteRef.current.get(p.runId)
-      if (!noteId) return
-      setAgentRunByNote(prev => {
-        const cur = prev[noteId]
-        if (!cur || cur.runId !== p.runId) return prev
-        return {
-          ...prev,
-          [noteId]: {
-            ...cur,
-            phase: 'review',
-            results: p.results.map(r => ({ ...r, state: 'pending' as const })),
-            web: p.web,
-            // Iterations-Limit sichtbar machen: sonst liest sich der letzte Modelltext
-            // („Ich erstelle jetzt…") wie ein laufender Prozess, obwohl der Lauf vorbei ist.
-            finalText: p.ok
-              ? [p.text || '', p.hitMaxIterations ? t('aiBar.agent.maxIterations') : ''].filter(Boolean).join('\n\n')
-              : p.cancelled
-                ? t('aiBar.agent.cancelled')
-                : `${t('aiBar.agent.errorPrefix')}: ${p.error || '?'}`
-          }
-        }
-      })
-    })
-    // Mitlernen (Stufe 3): Merksatz-Vorschlag trifft asynchron nach dem Done-Event ein.
-    window.electronAPI.onNoteAgentMemorySuggestion(p => {
-      const noteId = agentRunNoteRef.current.get(p.runId)
-      if (!noteId) return
-      setAgentRunByNote(prev => {
-        const cur = prev[noteId]
-        if (!cur || cur.runId !== p.runId) return prev
-        return { ...prev, [noteId]: { ...cur, rememberSuggestion: p.text } }
-      })
-    })
-    // C02: Main hat einen alten Lauf aus der Retention evakuiert — dessen Karten
-    // sind nicht mehr übernehmbar; als abgelaufen markieren statt „Unbekannter Lauf".
-    window.electronAPI.onNoteAgentRunEvicted(p => {
-      const noteId = agentRunNoteRef.current.get(p.runId)
-      if (!noteId) return
-      agentRunNoteRef.current.delete(p.runId)
-      setAgentRunByNote(prev => {
-        const cur = prev[noteId]
-        if (!cur || cur.runId !== p.runId) return prev
-        return { ...prev, [noteId]: { ...cur, phase: 'review', results: [], finalText: t('aiBar.agent.evicted') } }
-      })
-    })
-  }, [isSecondary, t])
 
   const agentRunStart = useCallback(async (instruction: string, opts?: { webResearch?: boolean }) => {
     if (!effectiveNoteId || !vaultPath || !agentTargetFolder) return
-    setAgentAttachError(null)
     // Cloud-Routing nur mit eigenem 'note-agent'-Opt-in (Entscheidung 7): der
     // Cloud-Eintrag im Picker allein reicht nicht — der gewählte Provider muss
     // note-agent explizit freigeschaltet haben.
@@ -2014,7 +1898,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
     if (activeAiCloudRoute) {
       const agentRoute = agentRoutes.find(r => r.provider === activeAiCloudRoute.provider)
       if (!agentRoute) {
-        setAgentAttachError(t('aiBar.agent.cloudNotEnabled'))
+        useNoteAgentStore.getState().setAttachError(effectiveNoteId, t('aiBar.agent.cloudNotEnabled'))
         return
       }
       cloud = { model: agentRoute.model, provider: agentRoute.provider }
@@ -2026,92 +1910,49 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
     // Modul-Override aus den Einstellungen → globales Modell. Ohne das mittlere Glied
     // zeigte die Kompatibilitäts-UI einen Agenten-Override an, der nie wirkte.
     const model = aiModel || ollama.moduleModelOverrides?.['note-agent'] || ollama.selectedModel
-    const res = await window.electronAPI.noteAgentRun({
+    await useNoteAgentStore.getState().startRun(effectiveNoteId, {
       vaultPath,
       noteId: effectiveNoteId,
       noteContent,
       instruction,
       model,
-      attachmentIds: agentAttachments.map(a => a.id),
-      targetFolderRel: agentTargetFolder,
       // Ohne Backend liefe eine LM-Studio-Auswahl gegen Ollama — der Picker oben
       // wird bei backend === 'lm-studio' aus LM Studios /v1/models befüllt.
       localBackend: ollama.backend === 'lm-studio' ? 'lmstudio' : 'ollama',
       lmStudioPort: ollama.lmStudioPort,
       cloud,
-      webResearch: opts?.webResearch ? { enabled: true } : null
+      cloudLabel,
+      webResearch: !!opts?.webResearch
     })
-    if (!res.success || !res.runId) {
-      setAgentAttachError(res.error || 'Start fehlgeschlagen')
-      return
-    }
-    agentRunNoteRef.current.set(res.runId, effectiveNoteId)
-    setAgentRunByNote(prev => ({
-      ...prev,
-      [effectiveNoteId]: {
-        runId: res.runId ?? null,
-        phase: 'running',
-        steps: [],
-        results: [],
-        finalText: '',
-        model: cloud ? cloud.model : model,
-        cloudLabel
-      }
-    }))
-  }, [effectiveNoteId, vaultPath, agentTargetFolder, activeAiCloudRoute, agentRoutes, ollama, aiModel, agentAttachments, selectedNote, t])
+  }, [effectiveNoteId, vaultPath, agentTargetFolder, activeAiCloudRoute, agentRoutes, ollama, aiModel, selectedNote, t])
 
   const agentRunCancel = useCallback(() => {
-    const run = effectiveNoteId ? agentRunByNote[effectiveNoteId] : undefined
-    if (run?.runId) void window.electronAPI.noteAgentCancel(run.runId)
-  }, [effectiveNoteId, agentRunByNote])
-
-  const agentResultPatch = useCallback((noteId: string, resultId: string, patch: Partial<AgentUiResult>) => {
-    setAgentRunByNote(prev => {
-      const cur = prev[noteId]
-      if (!cur) return prev
-      return { ...prev, [noteId]: { ...cur, results: cur.results.map(r => (r.resultId === resultId ? { ...r, ...patch } : r)) } }
-    })
-  }, [])
+    if (effectiveNoteId) useNoteAgentStore.getState().cancelRun(effectiveNoteId)
+  }, [effectiveNoteId])
 
   const agentResultAccept = useCallback(async (resultId: string) => {
-    const noteId = effectiveNoteId
-    const run = noteId ? agentRunByNote[noteId] : undefined
-    if (!noteId || !run?.runId) return
-    const res = await window.electronAPI.noteAgentAcceptResult(run.runId, resultId)
-    if (res.success) agentResultPatch(noteId, resultId, { state: 'accepted', finalName: res.fileName, error: undefined })
-    else agentResultPatch(noteId, resultId, { error: res.error })
-  }, [effectiveNoteId, agentRunByNote, agentResultPatch])
+    if (effectiveNoteId) await useNoteAgentStore.getState().acceptResult(effectiveNoteId, resultId)
+  }, [effectiveNoteId])
 
   const agentResultDiscard = useCallback(async (resultId: string) => {
-    const noteId = effectiveNoteId
-    const run = noteId ? agentRunByNote[noteId] : undefined
-    if (!noteId || !run?.runId) return
-    const res = await window.electronAPI.noteAgentDiscardResult(run.runId, resultId)
-    if (res.success) agentResultPatch(noteId, resultId, { state: 'discarded', error: undefined })
-    else agentResultPatch(noteId, resultId, { error: res.error })
-  }, [effectiveNoteId, agentRunByNote, agentResultPatch])
+    if (effectiveNoteId) await useNoteAgentStore.getState().discardResult(effectiveNoteId, resultId)
+  }, [effectiveNoteId])
 
   // Vorschau vor der Übernahme: liest die Staging-Datei read-only via Main.
   const agentResultPreview = useCallback(async (resultId: string) => {
-    const run = effectiveNoteId ? agentRunByNote[effectiveNoteId] : undefined
-    if (!run?.runId) return { success: false, error: 'Kein aktiver Lauf' }
-    return window.electronAPI.noteAgentPreviewResult(run.runId, resultId)
-  }, [effectiveNoteId, agentRunByNote])
+    if (!effectiveNoteId) return { success: false, error: 'Kein aktiver Lauf' }
+    return useNoteAgentStore.getState().previewResult(effectiveNoteId, resultId)
+  }, [effectiveNoteId])
 
   // Mitlernen (Stufe 3): Merksatz in die Agent-Gedächtnis-Notiz (Skills/Agent-Gedächtnis.md).
-  // Feedback (Erfolg + Fehler) rendert die AiActionBar direkt an der Merken-Zeile.
+  // Feedback (Erfolg + Fehler) rendert das AgentRunPanel direkt an der Merken-Zeile.
   const agentRemember = useCallback(async (text: string): Promise<{ success: boolean; relPath?: string; error?: string }> => {
     if (!vaultPath) return { success: false, error: 'Kein Vault geöffnet' }
     return window.electronAPI.noteAgentRemember(vaultPath, text)
   }, [vaultPath])
 
   const agentRunDismiss = useCallback(() => {
-    if (!effectiveNoteId) return
-    setAgentRunByNote(prev => {
-      const next = { ...prev }
-      delete next[effectiveNoteId]
-      return next
-    })
+    if (effectiveNoteId) useNoteAgentStore.getState().dismissRun(effectiveNoteId)
   }, [effectiveNoteId])
 
   // Entscheidung 12: Notizwechsel während 'running' bricht den Lauf ab —
@@ -2121,9 +1962,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
     const prev = prevAgentNoteRef.current
     prevAgentNoteRef.current = effectiveNoteId ?? null
     if (isSecondary || !prev || prev === effectiveNoteId) return
-    const run = agentRunByNote[prev]
-    if (run?.phase === 'running' && run.runId) void window.electronAPI.noteAgentCancel(run.runId)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    useNoteAgentStore.getState().cancelRun(prev)
   }, [effectiveNoteId, isSecondary])
 
   // „Mit KI bearbeiten" (z.B. aus dem PDF-Viewer): sobald die Ziel-Notiz aktiv ist,
@@ -2131,12 +1970,13 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
   useEffect(() => {
     if (!pendingAgentContext || isSecondary || !effectiveNoteId) return
     if (pendingAgentContext.noteId !== effectiveNoteId) return
-    const fileName = pendingAgentContext.relPath.split('/').pop()
-    const alreadyAttached = (agentAttachmentsByNote[effectiveNoteId] || []).some(a => a.name === fileName)
+    // Doppel-Anhänge verhindert der Store über den vollen Pfad (Basisnamen sind
+    // nicht eindeutig — gleichnamige Dateien in verschiedenen Ordnern).
+    const relPath = pendingAgentContext.relPath
     setPendingAgentContext(null)
     setAiBarOpen(true)
-    if (!alreadyAttached) void agentAttachVaultFile(pendingAgentContext.relPath)
-  }, [pendingAgentContext, setPendingAgentContext, isSecondary, effectiveNoteId, agentAttachmentsByNote, agentAttachVaultFile])
+    agentAttachVaultFile(relPath)
+  }, [pendingAgentContext, setPendingAgentContext, isSecondary, effectiveNoteId, agentAttachVaultFile])
 
   const aiGenerate = useCallback(async (instruction: string, preset: string | null) => {
     const view = viewRef.current
@@ -2150,7 +1990,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
     // Cloud im Picker gewählt, aber note-edit dort nicht freigeschaltet (nur note-agent):
     // nicht stillschweigend lokal ausweichen — klare Meldung.
     if (activeAiCloudRoute && !noteEditRoute) {
-      setAgentAttachError(t('aiBar.context.cloudNotEnabledEdit'))
+      if (effectiveNoteId) useNoteAgentStore.getState().setAttachError(effectiveNoteId, t('aiBar.context.cloudNotEnabledEdit'))
       setAiPhase('idle')
       return
     }
@@ -2200,7 +2040,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
       const result = response as AIResult
       if (!result.success || !result.result) {
         // Fehler sichtbar machen (z.B. fail-closed bei nicht lesbarer Kontext-Datei).
-        if (result.error) setAgentAttachError(result.error)
+        if (result.error && effectiveNoteId) useNoteAgentStore.getState().setAttachError(effectiveNoteId, result.error)
         setAiPhase('idle')
         return
       }
@@ -5570,13 +5410,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
           attachError={agentAttachError}
           targetFolder={agentTargetFolder}
           onTargetFolderChange={agentSetTargetFolder}
-          agentPhase={agentRunState.phase}
-          agentSteps={agentRunState.steps}
-          agentResults={agentRunState.results}
-          agentFinalText={agentRunState.finalText}
-          agentWeb={agentRunState.web}
-          agentModel={agentRunState.model}
-          agentCloudLabel={agentRunState.cloudLabel}
+          agentRun={agentRunState}
           onAgentRun={agentRunStart}
           onAgentCancel={agentRunCancel}
           onAgentAccept={agentResultAccept}
@@ -5584,7 +5418,6 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
           onAgentPreview={agentResultPreview}
           onAgentDismiss={agentRunDismiss}
           onRemember={agentRemember}
-          rememberSuggestion={agentRunState.rememberSuggestion ?? null}
         />
       )}
     </div>

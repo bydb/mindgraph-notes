@@ -1,9 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useUIStore } from '../../stores/uiStore'
 import { useTranslation } from '../../utils/translations'
 import { WEB_SEARCH_PROVIDER_META, isWebResearchConfigComplete } from '../../../shared/webResearch'
 import { ModelLogo } from '../Shared/ModelLogo'
 import { ModelPicker } from '../Shared/ModelPicker'
+import { AgentRunPanel, type AgentPreviewResponse } from '../Agent/AgentRunPanel'
+import type { AgentRunUiState } from '../../stores/noteAgentStore'
 import { HumanIcon } from '../Shared/HumanIcon'
 import { ContextAttachmentRow, FolderGlyph } from '../Shared/ContextAttachmentRow'
 import { diffStats, type DiffOp } from '../../utils/blockDiff'
@@ -13,43 +15,12 @@ import { useContextVaultFiles } from '../../utils/useContextVaultFiles'
 import { useIsModuleEnabled } from '../../utils/modules'
 import type { NoteAgentAttachment } from '../../../shared/types'
 
-// Notiz-Agent Phase 2 (Modus B): UI-Zustand eines Agent-Laufs — verwaltet im
-// MarkdownEditor (pro Notiz gekeyt), hier nur dargestellt.
-export interface AgentUiStep {
-  seq: number
-  skill: string
-  summary: string
-}
-
-export interface AgentUiResult {
-  resultId: string
-  suggestedName: string
-  kind: string
-  summary: string
-  sources: string[]
-  state: 'pending' | 'accepted' | 'discarded'
-  finalName?: string
-  error?: string
-}
-
-// Webrecherche-Provenienz eines Laufs — Suchen + Seitenabrufe inkl. Fehlversuchen.
-export interface AgentUiWeb {
-  queries: Array<{ query: string; status: string }>
-  fetches: Array<{ url: string; title: string; status: string }>
-  searchCount: number
-  fetchCount: number
-}
-
-// Vorschau-Antwort des Main-Prozesses (note-agent-preview-result): Inhalt der
-// Staging-Datei, nie Pfade.
-export interface AgentPreviewResponse {
-  success: boolean
-  kind?: string
-  binary?: boolean
-  text?: string
-  truncated?: boolean
-  error?: string
-}
+// Notiz-Agent Phase 2 (Modus B): Der Lauf-Zustand liegt im noteAgentStore (ein
+// Zustand für Macher-Leiste UND Agent-Tab), dargestellt wird er vom gemeinsamen
+// AgentRunPanel. Die Typen kommen von dort — hier nur re-exportiert, damit
+// bestehende Importe aus dieser Datei weiter funktionieren.
+export type { AgentUiStep, AgentUiResult, AgentUiWeb } from '../../stores/noteAgentStore'
+export type { AgentPreviewResponse }
 
 // Macher-Leiste: Anweisung → KI-Vorschlag als Block-Diff → Übernehmen/Verwerfen.
 // Eingeklappt = ruhiges Zuhause des ⌘⇧A-Assistenten. Provenienz ist eingewebt:
@@ -93,14 +64,8 @@ interface Props {
   // Notiz-Agent Phase 2 (Modus B): Zielordner = implizite Eskalation zum Agent-Loop.
   targetFolder: string
   onTargetFolderChange: (rel: string | null) => void
-  agentPhase: 'idle' | 'running' | 'review'
-  agentSteps: AgentUiStep[]
-  agentResults: AgentUiResult[]
-  agentFinalText: string
-  agentWeb?: AgentUiWeb
-  // Provenienz des Laufs: Modell + Datenweg (null = lokal, sonst Cloud-Label).
-  agentModel: string
-  agentCloudLabel: string | null
+  // Lauf-Zustand aus dem noteAgentStore (Protokoll, Ergebnis-Karten, Provenienz).
+  agentRun: AgentRunUiState
   onAgentRun: (instruction: string, opts: { webResearch: boolean }) => void
   onAgentCancel: () => void
   onAgentAccept: (resultId: string) => void
@@ -110,9 +75,6 @@ interface Props {
   onAgentDismiss: () => void
   // Mitlernen (Stufe 3): bestätigter Merksatz → Agent-Gedächtnis-Notiz.
   onRemember: (text: string) => Promise<{ success: boolean; relPath?: string; error?: string }>
-  // Merksatz-Vorschlag des Modells (trifft asynchron nach dem Lauf ein) —
-  // befüllt das Merken-Feld vor, solange der Nutzer nichts Eigenes getippt hat.
-  rememberSuggestion: string | null
 }
 
 // Globus-Icon für den Webrecherche-Toggle (SVG, kein Emoji).
@@ -133,8 +95,9 @@ const PRESETS = [
   { id: 'tone', key: 'aiBar.preset.tone' as const },
 ]
 
-export function AiActionBar({ open, onOpenChange, phase, proposal, onGenerate, onAccept, onDiscard, tagSuggestions, tagsLoading, onSuggestTags, onAcceptTag, onDismissTag, model, models, onModelChange, getModelLabel, attachments, onAttachDialog, onAttachFolderDialog, onAttachVaultFile, onDetach, attachError, targetFolder, onTargetFolderChange, agentPhase, agentSteps, agentResults, agentFinalText, agentWeb, agentModel, agentCloudLabel, onAgentRun, onAgentCancel, onAgentAccept, onAgentDiscard, onAgentPreview, onAgentDismiss, onRemember, rememberSuggestion }: Props) {
+export function AiActionBar({ open, onOpenChange, phase, proposal, onGenerate, onAccept, onDiscard, tagSuggestions, tagsLoading, onSuggestTags, onAcceptTag, onDismissTag, model, models, onModelChange, getModelLabel, attachments, onAttachDialog, onAttachFolderDialog, onAttachVaultFile, onDetach, attachError, targetFolder, onTargetFolderChange, agentRun, onAgentRun, onAgentCancel, onAgentAccept, onAgentDiscard, onAgentPreview, onAgentDismiss, onRemember }: Props) {
   const { t } = useTranslation()
+  const agentPhase = agentRun.phase
   const aiEnabled = useUIStore(s => s.ollama.enabled)
   const webResearchModule = useIsModuleEnabled('web-research')
   const webResearchConfig = useUIStore(s => s.webResearchConfig)
@@ -142,39 +105,6 @@ export function AiActionBar({ open, onOpenChange, phase, proposal, onGenerate, o
   const [webResearchArmed, setWebResearchArmed] = useState(false)
   const [instruction, setInstruction] = useState('')
   const [preset, setPreset] = useState<string | null>(null)
-  // Mitlernen (Stufe 3): Merksatz-Eingabe in der Review-Phase.
-  const [rememberText, setRememberText] = useState('')
-  const [rememberFeedback, setRememberFeedback] = useState<{ kind: 'saved'; relPath: string } | { kind: 'error'; text: string } | null>(null)
-  // true, sobald der Nutzer selbst getippt/geleert hat — dann überschreibt kein Vorschlag mehr.
-  const rememberTouched = useRef(false)
-
-  // Vorschlag vorbefüllen, solange das Feld unberührt und leer ist.
-  useEffect(() => {
-    if (!rememberSuggestion || rememberTouched.current || rememberText.trim()) return
-    setRememberText(rememberSuggestion)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rememberSuggestion])
-
-  // Neuer Lauf → Merken-Zeile zurücksetzen (sonst klebt der Vorschlag des Vorläufers).
-  useEffect(() => {
-    if (agentPhase === 'running') {
-      setRememberText('')
-      setRememberFeedback(null)
-      rememberTouched.current = false
-    }
-  }, [agentPhase])
-
-  const submitRemember = async () => {
-    if (!rememberText.trim()) return
-    const res = await onRemember(rememberText.trim())
-    if (res.success) {
-      setRememberText('')
-      setRememberFeedback({ kind: 'saved', relPath: res.relPath || 'Skills/Agent-Gedächtnis.md' })
-      setTimeout(() => setRememberFeedback(f => (f?.kind === 'saved' ? null : f)), 5000)
-    } else {
-      setRememberFeedback({ kind: 'error', text: res.error || t('aiBar.agent.rememberError') })
-    }
-  }
   // Zielordner-Picker (Modus B)
   const vaultEntries = useContextVaultFiles()
   const [targetPickerOpen, setTargetPickerOpen] = useState(false)
@@ -221,34 +151,6 @@ export function AiActionBar({ open, onOpenChange, phase, proposal, onGenerate, o
   useEffect(() => {
     if (agentMode) setPreset(null)
   }, [agentMode])
-
-  // Vorschau-Zustand pro Ergebnis-Karte (lazy geladen, gecacht bis Dismiss).
-  const [previews, setPreviews] = useState<Record<string, { open: boolean; loading: boolean; text?: string; binary?: boolean; truncated?: boolean; error?: string }>>({})
-
-  const togglePreview = async (resultId: string) => {
-    const cur = previews[resultId]
-    if (cur?.open) {
-      setPreviews(p => ({ ...p, [resultId]: { ...cur, open: false } }))
-      return
-    }
-    if (cur && !cur.loading) {
-      setPreviews(p => ({ ...p, [resultId]: { ...cur, open: true } }))
-      return
-    }
-    setPreviews(p => ({ ...p, [resultId]: { open: true, loading: true } }))
-    const res = await onAgentPreview(resultId)
-    setPreviews(p => ({
-      ...p,
-      [resultId]: {
-        open: true,
-        loading: false,
-        text: res.text,
-        binary: res.binary,
-        truncated: res.truncated,
-        error: res.success ? undefined : (res.error || '?')
-      }
-    }))
-  }
 
   if (!aiEnabled) return null
 
@@ -476,125 +378,16 @@ export function AiActionBar({ open, onOpenChange, phase, proposal, onGenerate, o
         </div>
       )}
 
-      {/* Agent-Lauf: Protokoll + Abbrechen + Ergebnis-Karten */}
-      {agentPhase !== 'idle' && (
-        <div className="ai-bar-agent">
-          {/* Provenienz: Modell + Datenweg des Laufs (analog zum Block-Diff-Kopf) */}
-          {agentModel && (
-            <div className="ai-bar-agent-prov" title={agentModel}>
-              <ModelLogo model={agentModel} size={13} />
-              <span className="ai-bar-agent-prov-model">{agentModel}</span>
-              <span className="ai-bar-agent-prov-route">
-                · {agentCloudLabel ? `${t('aiBar.agent.provCloud')} (${agentCloudLabel})` : t('aiBar.agent.provLocal')}
-              </span>
-            </div>
-          )}
-          {agentSteps.length > 0 && (
-            <div className="ai-bar-agent-steps">
-              {agentSteps.map(s => (
-                <div key={s.seq} className="ai-bar-agent-step">{s.seq}. {s.skill}{s.summary ? ` — ${s.summary}` : ''}</div>
-              ))}
-            </div>
-          )}
-          {agentPhase === 'running' && (
-            <div className="ai-bar-agent-row">
-              <span className="ai-bar-agent-working">{t('aiBar.agent.working')}</span>
-              <button type="button" className="ai-bar-cancel" onClick={onAgentCancel}>{t('aiBar.cancel')}</button>
-            </div>
-          )}
-          {agentPhase === 'review' && (
-            <>
-              {agentFinalText && <div className="ai-bar-agent-text">{agentFinalText}</div>}
-              {/* Webrecherche-Provenienz: „N Suchen · M Seiten" inkl. Fehlversuchen (P1-1). */}
-              {agentWeb && (agentWeb.searchCount > 0 || agentWeb.fetchCount > 0) && (
-                <div className="ai-bar-agent-web">
-                  <div className="ai-bar-agent-web-summary">
-                    {agentWeb.searchCount} {t('aiBar.web.searchesLabel')} · {agentWeb.fetchCount} {t('aiBar.web.pagesLabel')}
-                  </div>
-                  {agentWeb.queries.map((q, i) => (
-                    <div key={`q${i}`} className="ai-bar-agent-web-item">
-                      {t('aiBar.web.searchItem')}: „{q.query}"{q.status !== 'ok' ? ` (${t('aiBar.web.failed')})` : ''}
-                    </div>
-                  ))}
-                  {agentWeb.fetches.map((f, i) => (
-                    <div key={`f${i}`} className="ai-bar-agent-web-item" title={f.url}>
-                      {t('aiBar.web.pageItem')}: {f.title || f.url}{f.status !== 'ok' ? ` (${t('aiBar.web.failed')})` : ''}
-                    </div>
-                  ))}
-                </div>
-              )}
-              {agentResults.map(r => (
-                <div key={r.resultId} className="ai-bar-agent-card">
-                  <div className="ai-bar-agent-card-head">
-                    <span className="ai-bar-agent-card-name" title={r.suggestedName}>{r.suggestedName}</span>
-                    <span className="ai-bar-agent-card-meta">{r.summary}</span>
-                  </div>
-                  {r.sources.length > 0 && (
-                    <div className="ai-bar-agent-card-sources">{t('aiBar.agent.sources')}: {r.sources.join(', ')}</div>
-                  )}
-                  {/* Vorschau vor der Entscheidung: exakt der Inhalt, der bei
-                      „Übernehmen" in den Vault geschrieben würde. */}
-                  {r.state === 'pending' && previews[r.resultId]?.open && (
-                    <div className="ai-bar-agent-preview">
-                      {previews[r.resultId].loading ? (
-                        <span className="ai-bar-agent-preview-loading">…</span>
-                      ) : previews[r.resultId].error ? (
-                        <span className="ai-bar-context-error">{previews[r.resultId].error}</span>
-                      ) : previews[r.resultId].binary ? (
-                        <span className="ai-bar-agent-preview-binary">{t('aiBar.agent.previewBinary')}</span>
-                      ) : (
-                        <>
-                          <pre>{previews[r.resultId].text}</pre>
-                          {previews[r.resultId].truncated && (
-                            <div className="ai-bar-agent-preview-truncated">{t('aiBar.agent.previewTruncated')}</div>
-                          )}
-                        </>
-                      )}
-                    </div>
-                  )}
-                  {r.state === 'pending' ? (
-                    <div className="ai-bar-agent-card-actions">
-                      <button type="button" className="ai-bar-cancel ai-bar-agent-preview-btn" onClick={() => void togglePreview(r.resultId)}>
-                        {previews[r.resultId]?.open ? t('aiBar.agent.previewHide') : t('aiBar.agent.preview')}
-                      </button>
-                      <button type="button" className="ai-bar-cancel" onClick={() => onAgentDiscard(r.resultId)}>{t('aiBar.discard')}</button>
-                      <button type="button" className="ai-bar-send" onClick={() => onAgentAccept(r.resultId)}>{t('aiBar.agent.accept')}</button>
-                    </div>
-                  ) : (
-                    <div className="ai-bar-agent-card-state">
-                      {r.state === 'accepted' ? `${t('aiBar.agent.accepted')}: ${r.finalName || r.suggestedName}` : t('aiBar.agent.discardedState')}
-                    </div>
-                  )}
-                  {r.error && <div className="ai-bar-context-error">{r.error}</div>}
-                </div>
-              ))}
-              {/* Mitlernen (Stufe 3): bestätigter Merksatz → Agent-Gedächtnis-Notiz */}
-              <div className="ai-bar-agent-remember">
-                <input
-                  className="ai-bar-context-search"
-                  placeholder={t('aiBar.agent.rememberPlaceholder')}
-                  value={rememberText}
-                  onChange={e => { rememberTouched.current = true; setRememberText(e.target.value); if (rememberFeedback?.kind === 'error') setRememberFeedback(null) }}
-                  onKeyDown={e => { if (e.key === 'Enter') void submitRemember() }}
-                />
-                <button type="button" className="ai-bar-cancel" onClick={() => void submitRemember()} disabled={!rememberText.trim()}>
-                  {t('aiBar.agent.remember')}
-                </button>
-              </div>
-              {rememberFeedback?.kind === 'saved' && (
-                <div className="ai-bar-agent-remember-saved">&#10003; {t('aiBar.agent.remembered')} — {rememberFeedback.relPath}</div>
-              )}
-              {rememberFeedback?.kind === 'error' && (
-                <div className="ai-bar-context-error">{rememberFeedback.text}</div>
-              )}
-              <div className="ai-bar-agent-row">
-                <span />
-                <button type="button" className="ai-bar-cancel" onClick={onAgentDismiss}>{t('aiBar.agent.close')}</button>
-              </div>
-            </>
-          )}
-        </div>
-      )}
+      {/* Agent-Lauf: Protokoll, Ergebnis-Karten, Merken — geteilt mit dem Agent-Tab */}
+      <AgentRunPanel
+        run={agentRun}
+        onCancel={onAgentCancel}
+        onAccept={onAgentAccept}
+        onDiscard={onAgentDiscard}
+        onPreview={onAgentPreview}
+        onDismiss={onAgentDismiss}
+        onRemember={onRemember}
+      />
 
       <div className="ai-bar-footer">
         <div className="ai-bar-model-pick" title={t('aiBar.model')}>

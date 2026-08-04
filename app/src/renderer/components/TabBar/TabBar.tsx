@@ -75,7 +75,7 @@ const TabItem: React.FC<TabItemProps> = memo(({ tab, isActive, onActivate, onClo
   const isCanvasType = tab.type === 'canvas' || tab.type === 'global-canvas'
   const tabTone =
     tab.type === 'dashboard' ? 'tab-tone-organize' :
-    tab.type === 'workflow-canvas' ? 'tab-tone-ai' :
+    tab.type === 'workflow-canvas' || tab.type === 'agent' ? 'tab-tone-ai' :
     tab.type === 'code' ? 'tab-tone-integrate' :
     isCanvasType ? 'tab-tone-canvas' :
     'tab-tone-editor'
