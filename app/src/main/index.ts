@@ -171,7 +171,7 @@ import { createMainRegistry, discoverMainPlugins } from './plugins/registry'
 import { isPluginGateEnabled } from '../shared/plugins/moduleGate'
 import { registerPluginTransport, isTrustedSender } from './plugins/transport'
 import { registerContextAttachment, registerContextFolder, removeContextAttachment, clearContextAttachments, readContextBlock } from './noteAgent/contextFiles'
-import { startRun, getRunForSender, finishRun, publicResults, takeResult, peekResult, cancelRunsForSender, pruneRunIfConsumed, consumeEvictedRuns, type WebRunState } from './noteAgent/runRegistry'
+import { startRun, getRunForSender, finishRun, publicResults, takeResult, peekResult, cancelRunsForSender, pruneRunIfConsumed, consumeEvictedRuns, totalFolderReads, type WebRunState } from './noteAgent/runRegistry'
 import { acquireStayAwake } from './powerGuard'
 import { runNoteAgentLoop } from './noteAgent/loop'
 import { suggestAgentMemory } from './noteAgent/memorySuggestion'
@@ -4326,7 +4326,14 @@ ipcMain.handle('note-agent-run', async (event, params: NoteAgentRunParams) => {
         finishRun(run, cancelled ? 'cancelled' : 'error')
         let message = e instanceof Error ? e.message : String(e)
         if (/aborted due to timeout|TimeoutError/i.test(message)) {
-          message = 'Zeitüberschreitung: Das Modell hat nicht innerhalb von 10 Minuten geantwortet. Kleineres/schnelleres Modell wählen oder den Auftrag verkleinern.'
+          // Die Standard-Erklärung („zu langsam / Auftrag zu groß") ist bei
+          // Ordner-Läufen falsch und schickt den Nutzer in die Irre: Real hat das
+          // Modell 31 Dateien einzeln geladen, statt sie mit EINEM Aufruf
+          // zusammenzuführen. Die App weiß das — also sagt sie es auch.
+          const singleReads = totalFolderReads(run)
+          message = singleReads >= 5
+            ? `Zeitüberschreitung. Der Agent hat ${singleReads} Dateien einzeln gelesen, statt sie mit einem Aufruf zusammenzuführen — dadurch wurde der Auftrag zu groß für das Modell. Ein anderes Modell wählen oder den Lauf wiederholen; der Auftrag selbst ist nicht zu umfangreich.`
+            : 'Zeitüberschreitung: Das Modell hat nicht innerhalb von 10 Minuten geantwortet. Kleineres/schnelleres Modell wählen oder den Auftrag verkleinern.'
         }
         if (!sender.isDestroyed()) {
           sender.send('note-agent-done', {

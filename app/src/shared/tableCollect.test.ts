@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   normalizeHeaderCell, findHeaderRow, matchColumns, parseCellDate, rowMatchesFilters,
   extractFromSheet, pickSheet, problemFiles, formatCollectReport, parseDelimitedText,
+  findBestHeaderRow, labelMatchesColumn, findConstantsAbove, alwaysMissingColumns,
   type SheetLike, type FileCollectStatus
 } from './tableCollect'
 
@@ -135,6 +136,105 @@ describe('extractFromSheet', () => {
     expect(res.headerRowIndex).toBe(-1)
     expect(res.rows).toEqual([])
     expect(res.missingColumns).toEqual(['Name'])
+  })
+})
+
+// Praxislauf 2026-08-05: 34 Schul-Tabellen, alle mit Kopfblock über der Tabelle.
+// Die alte rein strukturelle Kopfzeilen-Regel traf 34 von 34 Dateien daneben.
+describe('echtes Formular mit Kopfblock (Regression aus dem Praxislauf)', () => {
+  const schulformular: SheetLike = {
+    name: 'Tabelle1',
+    rows: [
+      ['', 'Name der Schule:', '', 'Goetheschule Staufenberg', 'Schulnummer:', '3770', ''],
+      ['', '', '', '', '', '', ''],
+      ['Anmeldung für Grundschulen', 'Lehrkraft', '', '', '', '', ''],
+      ['', 'Vorname', 'Nachnahme', '', 'Ansprechpartner iserv in der Schule', '', ''],
+      ['1. Schulleiterin', 'Bärbel', 'Ockum', '', '', '', ''],
+      ['2.', 'Anke', 'Weber', '', '', '', ''],
+      ['', '', '', '', '', '', '']
+    ]
+  }
+
+  it('findet die Kopfzeile der Tabelle, nicht den Kopfblock', () => {
+    expect(findBestHeaderRow(schulformular.rows, ['Vorname', 'Nachname'])).toBe(3)
+    // Die alte Regel nahm Zeile 0 — der Beleg, warum es die neue braucht.
+    expect(findHeaderRow(schulformular.rows)).toBe(0)
+  })
+
+  it('zieht Vorname und Nachname trotz Tippfehler „Nachnahme"', () => {
+    const res = extractFromSheet(schulformular, ['Vorname', 'Nachname'])
+    expect(res.headerRowIndex).toBe(3)
+    expect(res.rows).toEqual([['Bärbel', 'Ockum'], ['Anke', 'Weber']])
+    expect(res.missingColumns).toEqual([])
+  })
+
+  it('holt Schulname und Schulnummer aus dem Kopfblock für jede Zeile', () => {
+    const res = extractFromSheet(schulformular, ['Schulname', 'Schulnummer', 'Vorname', 'Nachname'])
+    expect(res.constants).toEqual({ Schulname: 'Goetheschule Staufenberg', Schulnummer: '3770' })
+    expect(res.missingColumns).toEqual([])
+    expect(res.rows).toEqual([
+      ['Goetheschule Staufenberg', '3770', 'Bärbel', 'Ockum'],
+      ['Goetheschule Staufenberg', '3770', 'Anke', 'Weber']
+    ])
+  })
+
+  it('macht aus Leerzeilen der Vorlage keine Datenzeilen, nur weil Konstanten existieren', () => {
+    const res = extractFromSheet(schulformular, ['Schulname', 'Vorname'])
+    expect(res.rows.length).toBe(2)
+  })
+
+  it('fällt ohne jeden Spaltentreffer auf die strukturelle Regel zurück', () => {
+    expect(findBestHeaderRow(schulformular.rows, ['Voellig', 'Andere'])).toBe(0)
+  })
+})
+
+describe('labelMatchesColumn', () => {
+  it('erkennt andere Wortstellung („Name der Schule" = „Schulname")', () => {
+    expect(labelMatchesColumn('Name der Schule:', 'Schulname')).toBe(true)
+    expect(labelMatchesColumn('Schulnummer:', 'Schulnummer')).toBe(true)
+  })
+
+  it('verwechselt nicht, was nichts miteinander zu tun hat', () => {
+    expect(labelMatchesColumn('Name der Schule:', 'Besoldungsgruppe')).toBe(false)
+    expect(labelMatchesColumn('Ansprechpartner iserv in der Schule', 'Schulname')).toBe(false)
+  })
+})
+
+describe('findConstantsAbove', () => {
+  const rows = [
+    ['', 'Name der Schule:', '', 'Grundschule Beuern', 'Schulnummer:', '', ''],
+    ['', 'Vorname', 'Nachname', '', '', '', '']
+  ]
+
+  it('nimmt keinen Wert, wenn das Feld leer ist', () => {
+    expect(findConstantsAbove(rows, 1, ['Schulname', 'Schulnummer'])).toEqual({ Schulname: 'Grundschule Beuern' })
+  })
+
+  it('hält eine Beschriftung nicht für einen Wert', () => {
+    const r = [['Schulname:', 'Schulnummer:', '4711'], ['Vorname', 'Nachname']]
+    expect(findConstantsAbove(r, 1, ['Schulname'])).toEqual({})
+  })
+
+  it('liefert nichts, wenn die Kopfzeile ganz oben steht', () => {
+    expect(findConstantsAbove(rows, 0, ['Schulname'])).toEqual({})
+  })
+})
+
+describe('alwaysMissingColumns', () => {
+  it('meldet nur Spalten, die in JEDER ausgewerteten Datei fehlen', () => {
+    const files: FileCollectStatus[] = [
+      { file: 'a', status: 'teilweise', rows: 2, missingColumns: ['Besoldung', 'Vorname'] },
+      { file: 'b', status: 'teilweise', rows: 3, missingColumns: ['Besoldung'] }
+    ]
+    expect(alwaysMissingColumns(['Vorname', 'Besoldung'], files)).toEqual(['Besoldung'])
+  })
+
+  it('zählt nicht gelesene Dateien nicht mit', () => {
+    const files: FileCollectStatus[] = [
+      { file: 'a', status: 'ok', rows: 2 },
+      { file: 'b', status: 'nicht_ausgewertet', rows: 0 }
+    ]
+    expect(alwaysMissingColumns(['Vorname'], files)).toEqual([])
   })
 })
 

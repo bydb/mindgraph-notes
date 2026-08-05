@@ -2,6 +2,21 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.10.37-beta] - 2026-08-05
+
+Die Ordner-Auswertung aus 0.10.36 ist im Praxistest an echten Unterlagen gescheitert. Zwei unabhängige Ursachen, beide behoben.
+
+### Behoben
+
+- **Amtliche Vorlagen wurden falsch gelesen.** Die App suchte die Tabellenüberschrift als „erste Zeile mit mindestens zwei befüllten Zellen". Formulare tragen über der eigentlichen Tabelle aber fast immer einen Kopfblock — „Name der Schule: … Schulnummer: …" — und genau der wurde für die Überschrift gehalten. Getestet an 34 Schulformularen: **keine einzige** Datei lieferte alle gesuchten Spalten, herausgekommen wären 377 Zeilen mit leeren Spalten, die wie ein Ergebnis aussehen. Jetzt wird die Zeile gesucht, die zu den gefragten Spalten passt; Zellen mit Doppelpunkt gelten als Beschriftung und nicht als Überschrift; „Name der Schule" wird als „Schulname" verstanden; Tippfehler wie „Nachnahme" statt „Nachname" werden verziehen; Angaben aus dem Kopfblock gelten für alle Zeilen der Datei. Mit denselben 34 Dateien: **31 vollständig, 581 Zeilen** — die drei Ausnahmen haben tatsächlich keine Schulnummer im Original.
+- **Der Agent nahm den teuren Umweg.** Statt alle Tabellen mit einem Aufruf zusammenzuführen, las er sie einzeln — in zwei Läufen 25 bzw. 31 Dateien, bis der Auftrag an der Rechenzeit scheiterte. Die Anleitung im Hintergrund sagte das Richtige, das Sprachmodell hat sie überlesen. Ab sofort ist es keine Empfehlung mehr: Liegen mindestens acht gleichartige Tabellen im Ordner, dürfen höchstens drei einzeln geöffnet werden; danach verweist die App auf das Zusammenführen. Kleine Ordner bleiben unangetastet, und nach dem Zusammenführen sind gezielte Einzelabfragen wieder möglich.
+- **Die Fehlermeldung zeigte auf die falsche Ursache.** Nach einer Zeitüberschreitung hieß es „Modell zu langsam, Auftrag verkleinern". Beides war hier falsch: Das Modell war schnell genug und der Auftrag angemessen — es hatte sich nur den Kontext mit Einzeldateien vollgeladen. Die Meldung nennt jetzt die tatsächliche Zahl der einzeln gelesenen Dateien und sagt ausdrücklich, dass der Auftrag nicht zu umfangreich war.
+- **Unpassende Spaltennamen führten in die Sackgasse.** Fand sich eine Spalte in keiner einzigen Datei, meldete die App nur einen leeren Datensatz. Jetzt sagt sie es deutlich, zeigt die ersten Zeilen aus zwei Dateien im Original und fordert auf, es mit den richtigen Bezeichnungen erneut zu versuchen.
+
+### Hinweis
+
+Die Korrekturen sind durch Tests und durch Nachrechnen an den echten Unterlagen belegt, aber noch nicht im laufenden Fenster gegengeprüft.
+
 ## [0.10.36-beta] - 2026-08-04
 
 Der Notiz-Agent wertet jetzt ganze Ordner mit gleichartigen Tabellen aus — und ist dafür auch ohne geöffnete Notiz erreichbar.

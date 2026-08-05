@@ -34,9 +34,8 @@ function isEmptyRow(row: string[]): boolean {
 }
 
 /**
- * Index der Kopfzeile: die erste Zeile mit mindestens zwei befüllten Zellen.
- * Amtliche Vorlagen tragen oben oft einen Titel in einer einzelnen Zelle — der ist
- * keine Kopfzeile. Gibt -1 zurück, wenn es keine solche Zeile gibt.
+ * Index der Kopfzeile allein nach Struktur: die erste Zeile mit mindestens zwei
+ * befüllten Zellen. Nur noch Rückfallebene — siehe findBestHeaderRow.
  */
 export function findHeaderRow(rows: string[][], searchLimit = 20): number {
   const limit = Math.min(rows.length, searchLimit)
@@ -45,6 +44,43 @@ export function findHeaderRow(rows: string[][], searchLimit = 20): number {
     if (filled >= 2) return i
   }
   return -1
+}
+
+/**
+ * Kopfzeile nach INHALT wählen: die Zeile im Suchbereich, die zu den gesuchten
+ * Spalten am besten passt (bei Gleichstand die oberste).
+ *
+ * Die rein strukturelle Regel oben ist an echten Formularen gescheitert. Amtliche
+ * Vorlagen tragen über der Tabelle einen Kopfblock:
+ *
+ *   Zeile 0: | Name der Schule: |  | Grundschule X | Schulnummer: | 3770 |
+ *   Zeile 3: |                  | Vorname | Nachname |
+ *
+ * Zeile 0 hat mehr befüllte Zellen — die alte Regel nahm sie und behandelte die
+ * echte Kopfzeile als Daten. Im Praxislauf traf das 34 von 34 Dateien.
+ *
+ * Ohne jeden Treffer (fremde Spaltennamen) fällt die Wahl auf die strukturelle Regel
+ * zurück, damit der Bericht wenigstens sagen kann, was in der Datei steht.
+ */
+export function findBestHeaderRow(rows: string[][], columns: string[], searchLimit = 20): number {
+  const limit = Math.min(rows.length, searchLimit)
+  let bestRow = -1
+  let bestScore = 0
+  for (let i = 0; i < limit; i++) {
+    const filled = rows[i].filter(c => c && c.trim()).length
+    if (filled === 0) continue
+    // Eine Zelle mit Doppelpunkt ist eine BESCHRIFTUNG im Kopfblock („Schulnummer:"),
+    // keine Tabellenüberschrift. Ohne diese Abwertung gewinnt der Kopfblock bei
+    // Gleichstand, weil er weiter oben steht — genau der Fall im Praxislauf.
+    const score = matchColumns(rows[i], columns)
+      .filter(m => m.index !== -1)
+      .reduce((sum, m) => sum + ((m.header ?? '').trim().endsWith(':') ? 0.5 : 1), 0)
+    if (score > bestScore) {
+      bestScore = score
+      bestRow = i
+    }
+  }
+  return bestScore > 0 ? bestRow : findHeaderRow(rows, searchLimit)
 }
 
 export interface ColumnMatch {
@@ -62,6 +98,35 @@ export interface ColumnMatch {
  * enthält den Wunsch → Wunsch enthält die Überschrift. Eine Überschrift wird höchstens
  * einmal vergeben, sonst zieht ein unspezifischer Wunsch („name") mehrere Spalten an sich.
  */
+/** Editierabstand mit Abbruch, sobald `max` überschritten ist. */
+function editDistanceAtMost(a: string, b: string, max: number): number {
+  if (Math.abs(a.length - b.length) > max) return max + 1
+  let prev = Array.from({ length: b.length + 1 }, (_, i) => i)
+  for (let i = 1; i <= a.length; i++) {
+    const cur = [i]
+    let rowMin = i
+    for (let j = 1; j <= b.length; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1
+      cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + cost)
+      rowMin = Math.min(rowMin, cur[j])
+    }
+    if (rowMin > max) return max + 1
+    prev = cur
+  }
+  return prev[b.length]
+}
+
+/**
+ * Tippfehler-Toleranz als LETZTE Stufe. Reale Vorlagen schreiben „Nachnahme" statt
+ * „Nachname" — im Praxislauf in der Mehrzahl der Dateien. Bewusst eng: erst ab
+ * 6 Zeichen und höchstens ein Zeichen Unterschied, sonst würden kurze Spaltennamen
+ * wahllos aufeinander passen.
+ */
+function isTypoVariant(a: string, b: string): boolean {
+  if (a.length < 6 || b.length < 6) return false
+  return editDistanceAtMost(a, b, 1) <= 1
+}
+
 export function matchColumns(header: string[], wanted: string[]): ColumnMatch[] {
   const normHeader = header.map(normalizeHeaderCell)
   const taken = new Set<number>()
@@ -80,7 +145,8 @@ export function matchColumns(header: string[], wanted: string[]): ColumnMatch[] 
     (h, w) => h === w,
     (h, w) => h.startsWith(w),
     (h, w) => h.includes(w),
-    (h, w) => w.includes(h)
+    (h, w) => w.includes(h),
+    isTypoVariant
   ]
   for (const test of strategies) {
     for (const entry of result) {
@@ -94,6 +160,64 @@ export function matchColumns(header: string[], wanted: string[]): ColumnMatch[] 
     }
   }
   return result
+}
+
+// Füllwörter, die beim Vergleich von Beschriftungen nichts beitragen.
+const LABEL_STOPWORDS = new Set(['der', 'die', 'das', 'des', 'dem', 'den', 'und', 'von', 'fuer', 'im', 'in'])
+
+/**
+ * Passt eine Beschriftung aus dem Kopfblock zu einem gesuchten Spaltennamen?
+ * „Name der Schule:" und „Schulname" meinen dasselbe, teilen aber keinen
+ * gemeinsamen Teilstring — deshalb wortweise mit grober Stammform vergleichen
+ * (Schule → schul, damit „Schulname" trifft).
+ */
+export function labelMatchesColumn(label: string, column: string): boolean {
+  const target = normalizeHeaderCell(column)
+  if (!target) return false
+  const tokens = label
+    .toLowerCase()
+    .split(/[^a-zA-ZäöüßÄÖÜ0-9]+/)
+    .map(normalizeHeaderCell)
+    .filter(t => t.length >= 3 && !LABEL_STOPWORDS.has(t))
+  if (tokens.length === 0) return false
+  return tokens.every(tok => {
+    if (target.includes(tok)) return true
+    // Grobe Stammform: Endungen -e/-n/-en abschneiden (schule → schul).
+    const stem = tok.replace(/(en|e|n)$/, '')
+    return stem.length >= 3 && target.includes(stem)
+  })
+}
+
+/**
+ * Werte, die für die GANZE Datei gelten, aus dem Kopfblock über der Tabelle holen —
+ * für Spalten, die in der Kopfzeile selbst fehlen. Muster: eine Zelle ist die
+ * Beschriftung, der Wert steht in der nächsten befüllten Zelle rechts daneben.
+ * Eine Zelle, die selbst wie eine Beschriftung endet (Doppelpunkt), gilt nicht als Wert.
+ */
+export function findConstantsAbove(
+  rows: string[][],
+  headerRowIndex: number,
+  columns: string[]
+): Record<string, string> {
+  const out: Record<string, string> = {}
+  if (headerRowIndex <= 0) return out
+  for (const column of columns) {
+    for (let r = 0; r < headerRowIndex && !(column in out); r++) {
+      const row = rows[r]
+      for (let c = 0; c < row.length; c++) {
+        const cell = (row[c] ?? '').trim()
+        if (!cell || !labelMatchesColumn(cell, column)) continue
+        for (let v = c + 1; v < row.length; v++) {
+          const value = (row[v] ?? '').trim()
+          if (!value) continue
+          if (!value.endsWith(':')) out[column] = value
+          break
+        }
+        if (column in out) break
+      }
+    }
+  }
+  return out
 }
 
 export type RowFilterOp = 'nicht_leer' | 'enthaelt' | 'gleich' | 'datum_zwischen'
@@ -159,6 +283,8 @@ export interface SheetExtraction {
   missingColumns: string[]
   /** Tatsächliche Überschriften der gefundenen Spalten (für den Bericht). */
   matchedHeaders: string[]
+  /** Spalten, deren Wert aus dem Kopfblock über der Tabelle stammt und für alle Zeilen gilt. */
+  constants: Record<string, string>
   /** Datenzeilen unterhalb der Kopfzeile, bevor gefiltert wurde. */
   dataRowCount: number
   /** Zeilen, die der Filter aussortiert hat. */
@@ -172,12 +298,13 @@ export interface SheetExtraction {
  * schleppt jede Vorlage ihre Leerzeilen-Reserve in die Auswertung.
  */
 export function extractFromSheet(sheet: SheetLike, columns: string[], filters: RowFilter[] = []): SheetExtraction {
-  const headerRowIndex = findHeaderRow(sheet.rows)
+  const headerRowIndex = findBestHeaderRow(sheet.rows, columns)
   if (headerRowIndex === -1) {
     return {
       rows: [],
       missingColumns: [...columns],
       matchedHeaders: [],
+      constants: {},
       dataRowCount: 0,
       filteredOutCount: 0,
       headerRowIndex: -1
@@ -185,8 +312,13 @@ export function extractFromSheet(sheet: SheetLike, columns: string[], filters: R
   }
   const header = sheet.rows[headerRowIndex]
   const matches = matchColumns(header, columns)
-  const missingColumns = matches.filter(m => m.index === -1).map(m => m.wanted)
+  const missingInHeader = matches.filter(m => m.index === -1).map(m => m.wanted)
   const matchedHeaders = matches.filter(m => m.index !== -1).map(m => m.header as string)
+  // Was nicht in der Kopfzeile steht, kann im Kopfblock darüber stehen und für die
+  // ganze Datei gelten (Schulname, Schulnummer). Ohne das bliebe die Herkunft der
+  // Zeilen auf den Dateinamen beschränkt.
+  const constants = findConstantsAbove(sheet.rows, headerRowIndex, missingInHeader)
+  const missingColumns = missingInHeader.filter(c => !(c in constants))
 
   const rows: string[][] = []
   let dataRowCount = 0
@@ -195,7 +327,12 @@ export function extractFromSheet(sheet: SheetLike, columns: string[], filters: R
     const raw = sheet.rows[i]
     if (isEmptyRow(raw)) continue
     const values = matches.map(m => (m.index === -1 ? '' : (raw[m.index] ?? '').trim()))
+    // Konstanten dürfen NICHT darüber entscheiden, ob eine Zeile Inhalt hat — sonst
+    // gälte jede Leerzeile der Vorlage als Datenzeile (sie trüge ja den Schulnamen).
     if (values.every(v => !v)) continue
+    matches.forEach((m, idx) => {
+      if (m.index === -1 && m.wanted in constants) values[idx] = constants[m.wanted]
+    })
     dataRowCount++
     if (filters.length) {
       const asRecord: Record<string, string> = {}
@@ -207,7 +344,7 @@ export function extractFromSheet(sheet: SheetLike, columns: string[], filters: R
     }
     rows.push(values)
   }
-  return { rows, missingColumns, matchedHeaders, dataRowCount, filteredOutCount, headerRowIndex }
+  return { rows, missingColumns, matchedHeaders, constants, dataRowCount, filteredOutCount, headerRowIndex }
 }
 
 /** Blattwahl: Name (auch case-insensitiv) oder 1-basierte Nummer; ohne Angabe das erste. */
@@ -271,6 +408,21 @@ export interface CollectedTable {
   columns: string[]
   rows: string[][]
   files: FileCollectStatus[]
+  /** Spalten, die in JEDER ausgewerteten Datei gefehlt haben — der Name passt dann nicht. */
+  alwaysMissingColumns?: string[]
+  /** Beispiel-Zeilen aus den Dateien, damit das Modell die echten Überschriften sieht. */
+  headerCandidates?: Array<{ file: string; rows: string[] }>
+}
+
+/**
+ * Welche Spalten haben in ALLEN ausgewerteten Dateien gefehlt? Genau die sind
+ * falsch benannt — eine einzelne Datei ohne die Spalte ist dagegen normal.
+ * Dateien, die gar nicht gelesen wurden, zählen nicht mit.
+ */
+export function alwaysMissingColumns(columns: string[], files: FileCollectStatus[]): string[] {
+  const evaluated = files.filter(f => f.status !== 'nicht_ausgewertet' && f.status !== 'fehler')
+  if (evaluated.length === 0) return []
+  return columns.filter(c => evaluated.every(f => (f.missingColumns ?? []).includes(c)))
 }
 
 /** Dateien, bei denen etwas fehlte oder schiefging — die Grundlage der „Nicht verwertet"-Liste. */
@@ -312,6 +464,22 @@ export function formatCollectReport(
     for (const r of sample) lines.push(`| ${r.map(c => c.replace(/\|/g, '\\|').replace(/\n/g, ' ')).join(' | ')} |`)
   } else {
     lines.push('', 'Keine Zeilen gefunden — Spaltennamen oder Filter prüfen.')
+  }
+
+  // Spalten, die ÜBERALL fehlen: Das ist kein Datenproblem, sondern ein falscher
+  // Spaltenname. Ohne diese Rückmeldung ist das Modell im Praxislauf dazu
+  // übergegangen, alle Dateien einzeln zu lesen — und lief in die Zeitüberschreitung.
+  const alwaysMissing = table.alwaysMissingColumns ?? []
+  if (alwaysMissing.length) {
+    lines.push('', `SPALTEN NICHT GEFUNDEN: ${alwaysMissing.join(', ')} — diese Bezeichnung kommt in KEINER Datei vor.`)
+    if (table.headerCandidates?.length) {
+      lines.push('So sehen die Zeilen in den Dateien tatsächlich aus:')
+      for (const cand of table.headerCandidates) {
+        lines.push(`- ${cand.file}:`)
+        for (const r of cand.rows) lines.push(`    ${r}`)
+      }
+    }
+    lines.push('Rufe collect_table ERNEUT auf und nimm die Bezeichnungen, die dort wirklich stehen. Lies dafür NICHT alle Dateien einzeln.')
   }
 
   if (problems.length) {

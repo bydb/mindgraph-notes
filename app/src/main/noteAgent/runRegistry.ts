@@ -67,6 +67,13 @@ export interface AgentRun {
   // Zusammengeführte Tabellen dieses Laufs (collect_table). Sie leben NUR hier —
   // ihre Zeilen gehen nie an das Modell, sondern direkt in die Ergebnisdatei.
   datasets: Map<string, CollectedTable>
+  // Einzeln gelesene Dateien je Ordner. Zwei Zwecke: die Leitplanke, die nach ein
+  // paar Dateien auf collect_table verweist, und eine ehrliche Fehlermeldung bei
+  // Zeitüberschreitung (real: 31 Einzeldateien statt EINES Zusammenführens).
+  folderReads: Map<string, number>
+  // Ordner, für die collect_table bereits gelaufen ist — danach sind gezielte
+  // Einzelabfragen wieder legitim (nur nicht unbegrenzt).
+  collectedFolders: Set<string>
   sources: Set<string> // gelesene Anhänge/Notizen — landen auf den Ergebnis-Karten
   web?: WebRunState    // nur bei aktivierter Webrecherche
   // Bild-Generierung (Opt-in-Modul image-generation): beim Run-Start Main-seitig
@@ -144,6 +151,8 @@ export function startRun(params: {
     seq: 0,
     results: new Map(),
     datasets: new Map(),
+    folderReads: new Map(),
+    collectedFolders: new Set(),
     sources: new Set(),
     web: params.web,
     imageGen: params.imageGen
@@ -163,6 +172,13 @@ export function getRunForSender(senderId: number, runId: string): AgentRun | nul
 
 export function finishRun(run: AgentRun, status: Exclude<AgentRunStatus, 'running'>): void {
   if (run.status === 'running') run.status = status
+}
+
+/** Summe aller einzeln gelesenen Ordner-Dateien — Grundlage der Fehlermeldung. */
+export function totalFolderReads(run: AgentRun): number {
+  let sum = 0
+  for (const n of run.folderReads.values()) sum += n
+  return sum
 }
 
 export function nextSeq(run: AgentRun): number {

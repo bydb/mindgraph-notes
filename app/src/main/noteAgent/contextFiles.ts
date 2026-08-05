@@ -14,7 +14,7 @@ import * as path from 'path'
 import { randomBytes } from 'crypto'
 import { parseExcel, sheetToMarkdownTable, parseDocx, parsePptx } from '../office/officeService'
 import {
-  extractFromSheet, pickSheet, parseDelimitedText,
+  extractFromSheet, pickSheet, parseDelimitedText, alwaysMissingColumns,
   type CollectedTable, type FileCollectStatus, type RowFilter, type SheetLike
 } from '../../shared/tableCollect'
 
@@ -355,6 +355,22 @@ export async function listFolderManifest(senderId: number, ids: string[], folder
   return { folderName: entry.name, files: out, unsupportedCount, detailsOmitted }
 }
 
+/**
+ * Kanonischer Name eines angehängten Ordners. Nötig, um Einzel-Lesevorgänge pro
+ * Ordner zu zählen, BEVOR gelesen wird — das Modell schreibt den Ordnernamen nicht
+ * immer gleich.
+ */
+export function resolveFolderName(senderId: number, ids: string[], folderName: string): string {
+  return requireFolderEntry(senderId, ids, folderName).name
+}
+
+/** Wie viele Tabellen (Excel/CSV) liegen im Ordner? Ohne Parser — nur Verzeichnis lesen. */
+export async function countFolderTables(senderId: number, ids: string[], folderName: string): Promise<number> {
+  const entry = requireFolderEntry(senderId, ids, folderName)
+  const { files } = await listSupportedFolderFiles(entry)
+  return files.filter(f => f.kind === 'xlsx' || f.kind === 'csv').length
+}
+
 export interface ReadFolderFileOptions {
   /** Nur xlsx: Blattname oder 1-basierter Index. Ohne Angabe alle Blätter (bis zum Budget). */
   sheet?: string
@@ -686,6 +702,10 @@ async function readFolderContext(
 
 const MAX_COLLECT_FILES = 300
 const MAX_COLLECT_ROWS = 20_000
+// Beispiel-Zeilen für die Rückmeldung „Spalte nicht gefunden": wenige Dateien,
+// wenige Zeilen — das Ergebnis muss klein bleiben, es geht in den Modellkontext.
+const MAX_HEADER_CANDIDATE_FILES = 2
+const MAX_HEADER_CANDIDATE_ROWS = 6
 
 export interface CollectFolderOptions {
   /** Blattname oder 1-basierte Nummer; ohne Angabe das erste Blatt jeder Datei. */
@@ -738,6 +758,9 @@ export async function collectFolderTable(
   const outColumns = [...columns, 'Quelldatei']
   const rows: string[][] = []
   const statuses: FileCollectStatus[] = []
+  // Beispiel-Zeilen der ersten Dateien — nur nötig, wenn am Ende Spalten überall
+  // fehlen; dann zeigen sie dem Modell die echten Überschriften.
+  const headerCandidates: Array<{ file: string; rows: string[] }> = []
   let truncated = false
 
   // Dateien jenseits der Datei-Obergrenze NICHT stillschweigend weglassen: sie
@@ -789,6 +812,15 @@ export async function collectFolderTable(
         statuses.push({ file: f.name, status: 'fehler', rows: 0, message: 'keine Kopfzeile gefunden' })
         continue
       }
+      if (headerCandidates.length < MAX_HEADER_CANDIDATE_FILES) {
+        headerCandidates.push({
+          file: f.name,
+          rows: sheet.rows
+            .slice(0, MAX_HEADER_CANDIDATE_ROWS)
+            .map(r => r.map(c => (c ?? '').trim()).filter(Boolean).join(' | '))
+            .filter(Boolean)
+        })
+      }
       const room = Math.max(0, MAX_COLLECT_ROWS - rows.length)
       const taken = res.rows.slice(0, room)
       for (const r of taken) rows.push([...r, f.name])
@@ -825,7 +857,16 @@ export async function collectFolderTable(
     statuses.push({ file: f.name, status: 'nicht_ausgewertet', rows: 0, message: `Datei-Obergrenze (${MAX_COLLECT_FILES}) erreicht — Datei nicht gelesen` })
   }
 
-  return { folderName: entry.name, columns: outColumns, rows, files: statuses, truncated }
+  const alwaysMissing = alwaysMissingColumns(columns, statuses)
+  return {
+    folderName: entry.name,
+    columns: outColumns,
+    rows,
+    files: statuses,
+    truncated,
+    alwaysMissingColumns: alwaysMissing.length ? alwaysMissing : undefined,
+    headerCandidates: alwaysMissing.length ? headerCandidates : undefined
+  }
 }
 
 // Roh-Extraktion einer einzelnen Datei für Agent-Skills (references/assets, Stufe 3):
