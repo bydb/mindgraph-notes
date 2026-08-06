@@ -9,6 +9,7 @@ import {
   loadManifest,
   saveManifest,
   isSyncable,
+  assessDeletions,
   type FileManifest
 } from './fileTracker'
 import { moveToSyncTrash } from './trash'
@@ -167,6 +168,20 @@ export class SyncEngine {
     this.sendProgress({ status: 'connecting' })
 
     return new Promise((resolve, reject) => {
+      // connect() MUSS sich in jedem Fall entscheiden. Bleibt es hängen, kehrt das
+      // `await this.connect()` in sync() nie zurück → das `finally` dort läuft nie →
+      // `syncing` bleibt für immer true und jeder weitere Sync antwortet nur noch mit
+      // "Sync already in progress", bis die App neu gestartet wird (real aufgetreten).
+      let settled = false
+      let timeoutTimer: ReturnType<typeof setTimeout> | null = null
+      const settle = (err?: Error): void => {
+        if (settled) return
+        settled = true
+        if (timeoutTimer) clearTimeout(timeoutTimer)
+        if (err) reject(err)
+        else resolve()
+      }
+
       this.ws = new WebSocket(this.relayUrl)
 
       this.ws.on('pong', () => {
@@ -193,7 +208,7 @@ export class SyncEngine {
               this.sendProgress({ status: 'idle' })
               this.sendLog({ type: 'connect', message: 'Connected' })
               console.log('[Sync] Vault registered on server')
-              resolve()
+              settle()
               return
             }
             if (msg.type === 'error') {
@@ -205,7 +220,7 @@ export class SyncEngine {
               // keeps re-registering forever (zombie engine / reconnect storm).
               this.intentionalDisconnect = true
               this.ws?.close()
-              reject(new Error(msg.message || msg.code || 'Registration rejected'))
+              settle(new Error(msg.message || msg.code || 'Registration rejected'))
               return
             }
           }
@@ -229,6 +244,11 @@ export class SyncEngine {
         if (!this.intentionalDisconnect && this.key) {
           this.scheduleReconnect()
         }
+        // Verbindung ging auf und wieder zu, BEVOR die Registrierung bestätigt war:
+        // hier muss connect() abgelehnt werden. Die Timeouts unten können das nicht
+        // auffangen, weil dieser Handler `this.ws` bereits auf null gesetzt hat und
+        // ihre `this.ws && …`-Bedingungen damit alle falsch sind.
+        settle(new Error('Connection closed before registration'))
       })
 
       this.ws.on('error', (err) => {
@@ -239,20 +259,19 @@ export class SyncEngine {
           status: 'error',
           error: err.message
         })
-        reject(err)
+        settle(err)
       })
 
-      // Timeout after 10 seconds
-      setTimeout(() => {
-        if (this.ws && this.ws.readyState !== WebSocket.OPEN) {
-          this.ws.close()
-          reject(new Error('Connection timeout'))
-        }
-        // Also timeout if connected but not registered
-        if (this.ws && this.ws.readyState === WebSocket.OPEN && !this.registered) {
-          this.ws.close()
-          reject(new Error('Registration timeout'))
-        }
+      // Timeout after 10 seconds. Letzte Instanz: entscheidet auch dann, wenn der
+      // Socket weder 'open' noch 'close' noch 'error' gemeldet hat.
+      timeoutTimer = setTimeout(() => {
+        if (this.registered) return
+        // Erst entscheiden, dann schließen: close() löst den 'close'-Handler aus, der
+        // ebenfalls settle() ruft. Andersherum gewänne dessen unspezifische Begründung
+        // und der eigentliche Grund (Zeitüberschreitung) ginge im Log verloren.
+        const wasOpen = this.ws?.readyState === WebSocket.OPEN
+        settle(new Error(wasOpen ? 'Registration timeout' : 'Connection timeout'))
+        this.ws?.close()
       }, 10000)
     })
   }
@@ -421,35 +440,69 @@ export class SyncEngine {
         }
       }
 
-      // SAFETY: Mass-deletion protection
-      // If many local files would be deleted, something is likely wrong
-      // (e.g., stale manifest, corrupted vault ID, server error). Abort to prevent data loss.
+      // SAFETY: Mass-deletion protection.
+      // Umbenennungen/Verschiebungen werden vorher herausgerechnet (assessDeletions):
+      // eine Löschung, deren Inhalt im selben Lauf unter anderem Pfad in die
+      // Gegenrichtung geht, ist kein Verlust. Was übrig bleibt, wird an den
+      // Schwellen in DELETION_GUARD gemessen — ODER-verknüpft, nicht UND.
       if (!force) {
         const localFileCount = Object.keys(currentManifest.files).length
-        if (diff.toDeleteLocal.length > 0 && localFileCount > 0) {
-          const deleteRatio = diff.toDeleteLocal.length / localFileCount
-          if (deleteRatio > 0.1 && diff.toDeleteLocal.length >= 10) {
-            const errorMsg = `SAFETY: Refusing to delete ${diff.toDeleteLocal.length}/${localFileCount} local files (${Math.round(deleteRatio * 100)}%). This likely indicates a server/connection issue.`
-            console.error('[SyncEngine]', errorMsg)
-            this.sendLog({ type: 'error', message: errorMsg })
-            this.status = 'error'
-            this.sendProgress({ status: 'error', error: errorMsg })
-            return { success: false, uploaded: 0, downloaded: 0, conflicts: 0, error: errorMsg }
-          }
+        const remoteFileCount = Object.keys(remoteManifest.files).length
+
+        const blockDeletions = (
+          assessment: ReturnType<typeof assessDeletions>,
+          scope: 'local' | 'remote',
+          total: number
+        ): SyncResult => {
+          const { unmatched, renames, reason } = assessment
+          const share = total > 0 ? Math.round((unmatched.length / total) * 100) : 0
+          const hint = scope === 'local'
+            ? 'This likely indicates a server/connection issue.'
+            : 'This likely indicates a stale local manifest or an incomplete vault copy.'
+          const renameNote = renames.length > 0
+            ? ` (${renames.length} further path change(s) recognised as renames and not counted)`
+            : ''
+          const errorMsg =
+            `SAFETY: Refusing to delete ${unmatched.length}/${total} ${scope} files (${share}%, ` +
+            `triggered by ${reason === 'absolute' ? 'absolute count' : 'share'})${renameNote}. ${hint} ` +
+            `First: ${unmatched.slice(0, 3).join(', ')}${unmatched.length > 3 ? ', …' : ''}`
+          console.error('[SyncEngine]', errorMsg)
+          this.sendLog({ type: 'error', message: errorMsg })
+          this.status = 'error'
+          this.sendProgress({ status: 'error', error: errorMsg })
+          return { success: false, uploaded: 0, downloaded: 0, conflicts: 0, error: errorMsg }
         }
 
-        // SAFETY: Same protection for remote deletions
-        const remoteFileCount = Object.keys(remoteManifest.files).length
-        if (diff.toDeleteRemote.length > 0 && remoteFileCount > 0) {
-          const deleteRatio = diff.toDeleteRemote.length / remoteFileCount
-          if (deleteRatio > 0.1 && diff.toDeleteRemote.length >= 10) {
-            const errorMsg = `SAFETY: Refusing to delete ${diff.toDeleteRemote.length}/${remoteFileCount} remote files (${Math.round(deleteRatio * 100)}%). This likely indicates a stale local manifest.`
-            console.error('[SyncEngine]', errorMsg)
-            this.sendLog({ type: 'error', message: errorMsg })
-            this.status = 'error'
-            this.sendProgress({ status: 'error', error: errorMsg })
-            return { success: false, uploaded: 0, downloaded: 0, conflicts: 0, error: errorMsg }
+        if (diff.toDeleteLocal.length > 0) {
+          // Gegenrichtung für lokale Löschungen: was gerade heruntergeladen wird.
+          const incoming = new Set<string>()
+          for (const p of diff.toDownload) {
+            const h = remoteManifest.files[p]?.hash
+            if (h) incoming.add(h)
           }
+          const assessment = assessDeletions({
+            deletions: diff.toDeleteLocal,
+            totalFiles: localFileCount,
+            hashOf: p => currentManifest.files[p]?.hash,
+            compensatingHashes: incoming
+          })
+          if (assessment.blocked) return blockDeletions(assessment, 'local', localFileCount)
+        }
+
+        if (diff.toDeleteRemote.length > 0) {
+          // Gegenrichtung für Server-Löschungen: was gerade hochgeladen wird.
+          const outgoing = new Set<string>()
+          for (const p of diff.toUpload) {
+            const h = currentManifest.files[p]?.hash
+            if (h) outgoing.add(h)
+          }
+          const assessment = assessDeletions({
+            deletions: diff.toDeleteRemote,
+            totalFiles: remoteFileCount,
+            hashOf: p => remoteManifest.files[p]?.hash,
+            compensatingHashes: outgoing
+          })
+          if (assessment.blocked) return blockDeletions(assessment, 'remote', remoteFileCount)
         }
       }
 
@@ -486,14 +539,29 @@ export class SyncEngine {
         }))
       }
 
-      // Download files in parallel batches
+      // Download files in parallel batches. Fehler pro DATEI abfangen — dieselbe Lehre wie
+      // beim Upload oben: eine einzige nicht entschlüsselbare Datei riss sonst den ganzen
+      // Durchlauf ab (Promise.all → äußeres catch). Folge war nicht nur "eine Datei fehlt",
+      // sondern: Manifest wurde nie gespeichert, lastSyncTime nie gesetzt ("Nie
+      // synchronisiert" trotz Hunderter Downloads) und jeder Auto-Sync starb alle 5 Minuten
+      // an derselben Stelle. Real aufgetreten beim Multi-Device-Join eines großen Vaults.
+      const downloadFailures: string[] = []
       this.status = 'downloading'
       for (let i = 0; i < diff.toDownload.length; i += PARALLEL_DOWNLOADS) {
         if (this.destroyed) break  // SAFETY: stop immediately
         const batch = diff.toDownload.slice(i, i + PARALLEL_DOWNLOADS)
         await Promise.all(batch.map(async (filePath) => {
           if (this.destroyed) return  // SAFETY
-          await this.downloadFile(filePath)
+          try {
+            await this.downloadFile(filePath)
+          } catch (err) {
+            // Kein syncedAt/Manifest-Eintrag → die Datei wird beim nächsten Sync erneut
+            // versucht. Sie gilt weiterhin als "nur remote vorhanden", nie als gelöscht.
+            downloadFailures.push(filePath)
+            const msg = err instanceof Error ? err.message : String(err)
+            this.sendLog({ type: 'error', message: `Download failed: ${filePath} — ${msg}`, fileName: filePath })
+            return
+          }
           if (currentManifest.files[filePath]) {
             currentManifest.files[filePath].syncedAt = Date.now()
           } else if (this.manifest?.files[filePath]) {
@@ -617,26 +685,36 @@ export class SyncEngine {
       await saveManifest(this.vaultPath, this.manifest)
 
       const uploadedCount = diff.toUpload.length - uploadFailures.length
-      if (uploadFailures.length > 0) {
-        // Teilerfolg: erfolgreiche Uploads sind im Manifest markiert; die fehlgeschlagenen
-        // haben weiter kein syncedAt und werden beim nächsten Auto-Sync erneut versucht.
+      const downloadedCount = diff.toDownload.length - downloadFailures.length
+      if (uploadFailures.length > 0 || downloadFailures.length > 0) {
+        // Teilerfolg: erfolgreiche Übertragungen sind im Manifest markiert; die
+        // fehlgeschlagenen haben weiter kein syncedAt und werden beim nächsten Auto-Sync
+        // erneut versucht. Entscheidend: das Manifest wurde oben trotzdem gespeichert, der
+        // Durchlauf ist also abgeschlossen — der Rest des Vaults bleibt nicht blockiert.
         this.status = 'error'
-        const error = `${uploadFailures.length} upload(s) failed (will retry): ${uploadFailures[0]}${uploadFailures.length > 1 ? ', …' : ''}`
+        const parts: string[] = []
+        if (uploadFailures.length > 0) {
+          parts.push(`${uploadFailures.length} upload(s) failed: ${uploadFailures[0]}${uploadFailures.length > 1 ? ', …' : ''}`)
+        }
+        if (downloadFailures.length > 0) {
+          parts.push(`${downloadFailures.length} download(s) failed: ${downloadFailures[0]}${downloadFailures.length > 1 ? ', …' : ''}`)
+        }
+        const error = `${parts.join(' · ')} (will retry)`
         this.sendProgress({ status: 'error', error })
-        return { success: false, uploaded: uploadedCount, downloaded: diff.toDownload.length, conflicts: diff.conflicts.length, error }
+        return { success: false, uploaded: uploadedCount, downloaded: downloadedCount, conflicts: diff.conflicts.length, error }
       }
 
       this.status = 'done'
       const result: SyncResult = {
         success: true,
         uploaded: uploadedCount,
-        downloaded: diff.toDownload.length,
+        downloaded: downloadedCount,
         conflicts: diff.conflicts.length
       }
 
       this.sendLog({
         type: 'sync',
-        message: `${uploadedCount} uploaded, ${diff.toDownload.length} downloaded, ${diff.conflicts.length} conflicts`
+        message: `${uploadedCount} uploaded, ${downloadedCount} downloaded, ${diff.conflicts.length} conflicts`
       })
       this.sendProgress({ status: 'done', current: total, total })
 
@@ -784,7 +862,19 @@ export class SyncEngine {
     const iv = Buffer.from(fileData.iv, 'base64')
     const tag = Buffer.from(fileData.tag, 'base64')
 
-    const plaintext = decryptFile(ciphertext, this.key, iv, tag)
+    // AES-GCM meldet einen Schlüssel-/Integritätsfehler nur als rohes
+    // "Unsupported state or unable to authenticate data" — ohne Dateinamen und ohne Hinweis,
+    // was zu tun ist. Der Auth-Tag schlägt fehl, BEVOR die Hash-Prüfung unten greifen kann,
+    // deshalb muss die Einordnung hier passieren.
+    let plaintext: Buffer
+    try {
+      plaintext = decryptFile(ciphertext, this.key, iv, tag)
+    } catch {
+      throw new Error(
+        'Decryption failed — the copy on the server was encrypted with a different passphrase, ' +
+        'or its stored data is damaged. Re-upload this file from a device where it is intact.'
+      )
+    }
 
     // Integrity check: verify downloaded file matches expected hash and size
     if (fileData.hash && fileData.size) {

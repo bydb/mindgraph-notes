@@ -9,6 +9,8 @@ import {
   isSyncable,
   isTombstoned,
   diffManifests,
+  assessDeletions,
+  DELETION_GUARD,
   type FileManifest,
   type FileInfo
 } from './fileTracker'
@@ -261,5 +263,79 @@ describe('diffManifests — maxUploadSize', () => {
     const diff = diffManifests(local, manifest({}))
     expect(diff.toUpload).toEqual(['riesig.pdf'])
     expect(diff.skippedTooLarge).toEqual([])
+  })
+})
+
+// Löschbremse. Die alte Regel verlangte "Anteil > 10 % UND Anzahl >= 10" —
+// beide Bedingungen zugleich. Die ersten zwei Tests halten die realen Fälle fest,
+// die dadurch still durchliefen.
+describe('assessDeletions', () => {
+  const H = (p: string) => `hash-${p}`
+  const assess = (deletions: string[], totalFiles: number, compensating: string[] = []) =>
+    assessDeletions({
+      deletions,
+      totalFiles,
+      hashOf: p => H(p),
+      compensatingHashes: new Set(compensating.map(H))
+    })
+
+  const many = (n: number, prefix = 'f') => Array.from({ length: n }, (_, i) => `${prefix}${i}.md`)
+
+  it('blockt 49 von 7181 Dateien (0,7 %) — vorher am Anteil vorbeigerutscht', () => {
+    const result = assess(many(49), 7181)
+    expect(result.blocked).toBe(true)
+    expect(result.reason).toBe('absolute')
+  })
+
+  it('blockt 9 von 20 Dateien (45 %) — vorher an der Mindestanzahl vorbeigerutscht', () => {
+    const result = assess(many(9), 20)
+    expect(result.blocked).toBe(true)
+    expect(result.reason).toBe('ratio')
+  })
+
+  it('lässt Umbenennungen durch: gleicher Inhalt geht im selben Lauf wieder hoch', () => {
+    // Der reale Auslöser: 1434 Dateien mit anders codierten Umlauten im Namen.
+    const alt = many(60, 'alt')
+    const result = assessDeletions({
+      deletions: alt,
+      totalFiles: 7181,
+      hashOf: p => `inhalt-${p.replace('alt', '')}`,
+      compensatingHashes: new Set(many(60, 'neu').map(p => `inhalt-${p.replace('neu', '')}`))
+    })
+    expect(result.blocked).toBe(false)
+    expect(result.renames).toHaveLength(60)
+    expect(result.unmatched).toEqual([])
+  })
+
+  it('zählt nur den unerklärten Rest — Umbenennungen entlasten die Bilanz', () => {
+    const result = assessDeletions({
+      deletions: [...many(30, 'ren'), 'echt-weg.md'],
+      totalFiles: 500,
+      hashOf: p => (p === 'echt-weg.md' ? 'einzigartig' : 'wandert-mit'),
+      compensatingHashes: new Set(['wandert-mit'])
+    })
+    expect(result.blocked).toBe(false)
+    expect(result.renames).toHaveLength(30)
+    expect(result.unmatched).toEqual(['echt-weg.md'])
+  })
+
+  it('lässt eine kleine, gewollte Löschung im großen Vault durch', () => {
+    expect(assess(many(5), 7000).blocked).toBe(false)
+  })
+
+  it('lässt einen winzigen Vault in Ruhe (Mindestanzahl für die Anteilsregel)', () => {
+    // 2 von 3 wären 66 %, aber unter MIN_FOR_RATIO — sonst blockiert ein
+    // frisch angelegter Vault bei jeder Aufräumaktion.
+    expect(assess(many(2), 3).blocked).toBe(false)
+  })
+
+  it('greift bei totalFiles = 0 nicht über die Anteilsregel', () => {
+    expect(assess(many(3), 0).blocked).toBe(false)
+  })
+
+  it('blockt ab der absoluten Grenze auch ohne bekannte Gesamtzahl', () => {
+    const result = assess(many(DELETION_GUARD.ABSOLUTE), 0)
+    expect(result.blocked).toBe(true)
+    expect(result.reason).toBe('absolute')
   })
 })
