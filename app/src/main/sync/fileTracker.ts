@@ -296,6 +296,79 @@ export function diffManifests(
   return { toUpload, toDownload, conflicts, toDeleteLocal, toDeleteRemote, skippedTooLarge }
 }
 
+/**
+ * Schwellen der Löschbremse.
+ *
+ * Die frühere Regel verlangte `Anteil > 10% UND Anzahl >= 10` — beides zugleich.
+ * Damit rutschten zwei reale Fälle durch:
+ *   - 49 von 7181 Dateien (0,7 %) → Anteil zu klein, lief still durch
+ *   - 9 von 20 Dateien (45 %)     → Anzahl zu klein, lief still durch
+ * Jetzt reicht EIN Kriterium zum Blockieren.
+ */
+export const DELETION_GUARD = {
+  /** Ab so vielen unerklärten Löschungen wird unabhängig vom Anteil blockiert. */
+  ABSOLUTE: 25,
+  RATIO: 0.1,
+  /** Untergrenze für die Anteilsregel — sonst blockiert ein 3-Dateien-Vault dauernd. */
+  MIN_FOR_RATIO: 3
+}
+
+export interface DeletionAssessment {
+  /** Löschungen, deren Inhalt im selben Lauf unter anderem Namen wandert = Umbenennung. */
+  renames: string[]
+  /** Alles andere — echter Verlust, wenn die Annahme falsch ist. */
+  unmatched: string[]
+  blocked: boolean
+  reason: 'absolute' | 'ratio' | null
+}
+
+/**
+ * Bewertet anstehende Löschungen, bevor sie ausgeführt werden.
+ *
+ * Kernidee: Eine Löschung, deren Inhalt im selben Durchlauf unter einem anderen
+ * Pfad in die Gegenrichtung übertragen wird, ist eine Umbenennung/Verschiebung —
+ * kein Datenverlust. Solche Fälle dürfen die Bremse nicht auslösen (real: ein Vault,
+ * dessen Umlaut-Dateinamen beim Kopieren zwischen zwei Macs anders codiert wurden —
+ * 1434 Dateien sahen aus wie „gelöscht + neu"). Erst was danach übrig bleibt, wird
+ * an den Schwellen gemessen.
+ *
+ * @param hashOf              Inhalts-Hash der zu löschenden Datei
+ * @param compensatingHashes  Hashes der Dateien, die im selben Lauf in die
+ *                            Gegenrichtung gehen (Uploads bei Server-Löschungen,
+ *                            Downloads bei lokalen Löschungen)
+ */
+export function assessDeletions(params: {
+  deletions: string[]
+  totalFiles: number
+  hashOf: (path: string) => string | undefined
+  compensatingHashes: Set<string>
+}): DeletionAssessment {
+  const { deletions, totalFiles, hashOf, compensatingHashes } = params
+
+  const renames: string[] = []
+  const unmatched: string[] = []
+
+  for (const filePath of deletions) {
+    const hash = hashOf(filePath)
+    if (hash && compensatingHashes.has(hash)) renames.push(filePath)
+    else unmatched.push(filePath)
+  }
+
+  if (unmatched.length >= DELETION_GUARD.ABSOLUTE) {
+    return { renames, unmatched, blocked: true, reason: 'absolute' }
+  }
+
+  if (
+    totalFiles > 0 &&
+    unmatched.length >= DELETION_GUARD.MIN_FOR_RATIO &&
+    unmatched.length / totalFiles > DELETION_GUARD.RATIO
+  ) {
+    return { renames, unmatched, blocked: true, reason: 'ratio' }
+  }
+
+  return { renames, unmatched, blocked: false, reason: null }
+}
+
 const MANIFEST_FILE = '.mindgraph/sync-manifest.json'
 
 export async function loadManifest(vaultPath: string): Promise<FileManifest | null> {

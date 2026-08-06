@@ -9,6 +9,7 @@ import {
   loadManifest,
   saveManifest,
   isSyncable,
+  assessDeletions,
   type FileManifest
 } from './fileTracker'
 import { moveToSyncTrash } from './trash'
@@ -439,35 +440,69 @@ export class SyncEngine {
         }
       }
 
-      // SAFETY: Mass-deletion protection
-      // If many local files would be deleted, something is likely wrong
-      // (e.g., stale manifest, corrupted vault ID, server error). Abort to prevent data loss.
+      // SAFETY: Mass-deletion protection.
+      // Umbenennungen/Verschiebungen werden vorher herausgerechnet (assessDeletions):
+      // eine Löschung, deren Inhalt im selben Lauf unter anderem Pfad in die
+      // Gegenrichtung geht, ist kein Verlust. Was übrig bleibt, wird an den
+      // Schwellen in DELETION_GUARD gemessen — ODER-verknüpft, nicht UND.
       if (!force) {
         const localFileCount = Object.keys(currentManifest.files).length
-        if (diff.toDeleteLocal.length > 0 && localFileCount > 0) {
-          const deleteRatio = diff.toDeleteLocal.length / localFileCount
-          if (deleteRatio > 0.1 && diff.toDeleteLocal.length >= 10) {
-            const errorMsg = `SAFETY: Refusing to delete ${diff.toDeleteLocal.length}/${localFileCount} local files (${Math.round(deleteRatio * 100)}%). This likely indicates a server/connection issue.`
-            console.error('[SyncEngine]', errorMsg)
-            this.sendLog({ type: 'error', message: errorMsg })
-            this.status = 'error'
-            this.sendProgress({ status: 'error', error: errorMsg })
-            return { success: false, uploaded: 0, downloaded: 0, conflicts: 0, error: errorMsg }
-          }
+        const remoteFileCount = Object.keys(remoteManifest.files).length
+
+        const blockDeletions = (
+          assessment: ReturnType<typeof assessDeletions>,
+          scope: 'local' | 'remote',
+          total: number
+        ): SyncResult => {
+          const { unmatched, renames, reason } = assessment
+          const share = total > 0 ? Math.round((unmatched.length / total) * 100) : 0
+          const hint = scope === 'local'
+            ? 'This likely indicates a server/connection issue.'
+            : 'This likely indicates a stale local manifest or an incomplete vault copy.'
+          const renameNote = renames.length > 0
+            ? ` (${renames.length} further path change(s) recognised as renames and not counted)`
+            : ''
+          const errorMsg =
+            `SAFETY: Refusing to delete ${unmatched.length}/${total} ${scope} files (${share}%, ` +
+            `triggered by ${reason === 'absolute' ? 'absolute count' : 'share'})${renameNote}. ${hint} ` +
+            `First: ${unmatched.slice(0, 3).join(', ')}${unmatched.length > 3 ? ', …' : ''}`
+          console.error('[SyncEngine]', errorMsg)
+          this.sendLog({ type: 'error', message: errorMsg })
+          this.status = 'error'
+          this.sendProgress({ status: 'error', error: errorMsg })
+          return { success: false, uploaded: 0, downloaded: 0, conflicts: 0, error: errorMsg }
         }
 
-        // SAFETY: Same protection for remote deletions
-        const remoteFileCount = Object.keys(remoteManifest.files).length
-        if (diff.toDeleteRemote.length > 0 && remoteFileCount > 0) {
-          const deleteRatio = diff.toDeleteRemote.length / remoteFileCount
-          if (deleteRatio > 0.1 && diff.toDeleteRemote.length >= 10) {
-            const errorMsg = `SAFETY: Refusing to delete ${diff.toDeleteRemote.length}/${remoteFileCount} remote files (${Math.round(deleteRatio * 100)}%). This likely indicates a stale local manifest.`
-            console.error('[SyncEngine]', errorMsg)
-            this.sendLog({ type: 'error', message: errorMsg })
-            this.status = 'error'
-            this.sendProgress({ status: 'error', error: errorMsg })
-            return { success: false, uploaded: 0, downloaded: 0, conflicts: 0, error: errorMsg }
+        if (diff.toDeleteLocal.length > 0) {
+          // Gegenrichtung für lokale Löschungen: was gerade heruntergeladen wird.
+          const incoming = new Set<string>()
+          for (const p of diff.toDownload) {
+            const h = remoteManifest.files[p]?.hash
+            if (h) incoming.add(h)
           }
+          const assessment = assessDeletions({
+            deletions: diff.toDeleteLocal,
+            totalFiles: localFileCount,
+            hashOf: p => currentManifest.files[p]?.hash,
+            compensatingHashes: incoming
+          })
+          if (assessment.blocked) return blockDeletions(assessment, 'local', localFileCount)
+        }
+
+        if (diff.toDeleteRemote.length > 0) {
+          // Gegenrichtung für Server-Löschungen: was gerade hochgeladen wird.
+          const outgoing = new Set<string>()
+          for (const p of diff.toUpload) {
+            const h = currentManifest.files[p]?.hash
+            if (h) outgoing.add(h)
+          }
+          const assessment = assessDeletions({
+            deletions: diff.toDeleteRemote,
+            totalFiles: remoteFileCount,
+            hashOf: p => remoteManifest.files[p]?.hash,
+            compensatingHashes: outgoing
+          })
+          if (assessment.blocked) return blockDeletions(assessment, 'remote', remoteFileCount)
         }
       }
 
