@@ -486,14 +486,29 @@ export class SyncEngine {
         }))
       }
 
-      // Download files in parallel batches
+      // Download files in parallel batches. Fehler pro DATEI abfangen — dieselbe Lehre wie
+      // beim Upload oben: eine einzige nicht entschlüsselbare Datei riss sonst den ganzen
+      // Durchlauf ab (Promise.all → äußeres catch). Folge war nicht nur "eine Datei fehlt",
+      // sondern: Manifest wurde nie gespeichert, lastSyncTime nie gesetzt ("Nie
+      // synchronisiert" trotz Hunderter Downloads) und jeder Auto-Sync starb alle 5 Minuten
+      // an derselben Stelle. Real aufgetreten beim Multi-Device-Join eines großen Vaults.
+      const downloadFailures: string[] = []
       this.status = 'downloading'
       for (let i = 0; i < diff.toDownload.length; i += PARALLEL_DOWNLOADS) {
         if (this.destroyed) break  // SAFETY: stop immediately
         const batch = diff.toDownload.slice(i, i + PARALLEL_DOWNLOADS)
         await Promise.all(batch.map(async (filePath) => {
           if (this.destroyed) return  // SAFETY
-          await this.downloadFile(filePath)
+          try {
+            await this.downloadFile(filePath)
+          } catch (err) {
+            // Kein syncedAt/Manifest-Eintrag → die Datei wird beim nächsten Sync erneut
+            // versucht. Sie gilt weiterhin als "nur remote vorhanden", nie als gelöscht.
+            downloadFailures.push(filePath)
+            const msg = err instanceof Error ? err.message : String(err)
+            this.sendLog({ type: 'error', message: `Download failed: ${filePath} — ${msg}`, fileName: filePath })
+            return
+          }
           if (currentManifest.files[filePath]) {
             currentManifest.files[filePath].syncedAt = Date.now()
           } else if (this.manifest?.files[filePath]) {
@@ -617,26 +632,36 @@ export class SyncEngine {
       await saveManifest(this.vaultPath, this.manifest)
 
       const uploadedCount = diff.toUpload.length - uploadFailures.length
-      if (uploadFailures.length > 0) {
-        // Teilerfolg: erfolgreiche Uploads sind im Manifest markiert; die fehlgeschlagenen
-        // haben weiter kein syncedAt und werden beim nächsten Auto-Sync erneut versucht.
+      const downloadedCount = diff.toDownload.length - downloadFailures.length
+      if (uploadFailures.length > 0 || downloadFailures.length > 0) {
+        // Teilerfolg: erfolgreiche Übertragungen sind im Manifest markiert; die
+        // fehlgeschlagenen haben weiter kein syncedAt und werden beim nächsten Auto-Sync
+        // erneut versucht. Entscheidend: das Manifest wurde oben trotzdem gespeichert, der
+        // Durchlauf ist also abgeschlossen — der Rest des Vaults bleibt nicht blockiert.
         this.status = 'error'
-        const error = `${uploadFailures.length} upload(s) failed (will retry): ${uploadFailures[0]}${uploadFailures.length > 1 ? ', …' : ''}`
+        const parts: string[] = []
+        if (uploadFailures.length > 0) {
+          parts.push(`${uploadFailures.length} upload(s) failed: ${uploadFailures[0]}${uploadFailures.length > 1 ? ', …' : ''}`)
+        }
+        if (downloadFailures.length > 0) {
+          parts.push(`${downloadFailures.length} download(s) failed: ${downloadFailures[0]}${downloadFailures.length > 1 ? ', …' : ''}`)
+        }
+        const error = `${parts.join(' · ')} (will retry)`
         this.sendProgress({ status: 'error', error })
-        return { success: false, uploaded: uploadedCount, downloaded: diff.toDownload.length, conflicts: diff.conflicts.length, error }
+        return { success: false, uploaded: uploadedCount, downloaded: downloadedCount, conflicts: diff.conflicts.length, error }
       }
 
       this.status = 'done'
       const result: SyncResult = {
         success: true,
         uploaded: uploadedCount,
-        downloaded: diff.toDownload.length,
+        downloaded: downloadedCount,
         conflicts: diff.conflicts.length
       }
 
       this.sendLog({
         type: 'sync',
-        message: `${uploadedCount} uploaded, ${diff.toDownload.length} downloaded, ${diff.conflicts.length} conflicts`
+        message: `${uploadedCount} uploaded, ${downloadedCount} downloaded, ${diff.conflicts.length} conflicts`
       })
       this.sendProgress({ status: 'done', current: total, total })
 
@@ -784,7 +809,19 @@ export class SyncEngine {
     const iv = Buffer.from(fileData.iv, 'base64')
     const tag = Buffer.from(fileData.tag, 'base64')
 
-    const plaintext = decryptFile(ciphertext, this.key, iv, tag)
+    // AES-GCM meldet einen Schlüssel-/Integritätsfehler nur als rohes
+    // "Unsupported state or unable to authenticate data" — ohne Dateinamen und ohne Hinweis,
+    // was zu tun ist. Der Auth-Tag schlägt fehl, BEVOR die Hash-Prüfung unten greifen kann,
+    // deshalb muss die Einordnung hier passieren.
+    let plaintext: Buffer
+    try {
+      plaintext = decryptFile(ciphertext, this.key, iv, tag)
+    } catch {
+      throw new Error(
+        'Decryption failed — the copy on the server was encrypted with a different passphrase, ' +
+        'or its stored data is damaged. Re-upload this file from a device where it is intact.'
+      )
+    }
 
     // Integrity check: verify downloaded file matches expected hash and size
     if (fileData.hash && fileData.size) {
