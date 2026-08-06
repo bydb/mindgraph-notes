@@ -2,6 +2,23 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.10.38-beta] - 2026-08-06
+
+Ein Vault mit 7181 Dateien sollte auf ein zweites MacBook umziehen. Dabei kamen drei Fehler zum Vorschein, die sich gegenseitig verdeckt haben — jeder für sich harmlos aussehend, zusammen ein halber Tag Fehlersuche. Alle drei sind behoben und durch Tests abgesichert, darunter ein Integrationstest, der den echten Abgleich gegen einen nachgebauten Server fährt.
+
+### Behoben
+
+- **Eine unlesbare Datei brach den ganzen Abgleich ab.** Ließ sich eine einzige Datei vom Server nicht entschlüsseln, endete der komplette Durchlauf sofort — mitten in den Downloads, bevor der Stand gespeichert wurde. Sichtbare Folge: Die App meldete „Nie synchronisiert", obwohl Hunderte Dateien erfolgreich angekommen waren, und der automatische Abgleich starb alle fünf Minuten an derselben Stelle. Der Schutz pro Datei, den Uploads längst hatten, fehlte bei Downloads. Jetzt wird die betroffene Datei übersprungen und beim nächsten Mal erneut versucht; der Rest läuft durch.
+- **Die Fehlermeldung nannte die Datei nicht.** Statt des rohen `Unsupported state or unable to authenticate data` steht jetzt der Dateiname da, zusammen mit dem, was er bedeutet: Die Kopie auf dem Server wurde mit einer anderen Passphrase verschlüsselt oder ist beschädigt. Vorher ließ sich nicht einmal unterscheiden, ob eine Datei betroffen war oder alle.
+- **Der Abgleich konnte dauerhaft auf „läuft gerade" stehen bleiben.** Brach die Verbindung genau zwischen Verbindungsaufbau und Anmeldung ab, wartete die App auf eine Antwort, die nie kam — ohne Zeitbegrenzung, weil die vorhandenen Prüfungen ins Leere liefen. Ab da beantwortete sich jeder weitere Abgleich selbst mit „läuft bereits", bis die App neu gestartet wurde. In der Praxis über drei Stunden beobachtet. Die Verbindungsaufnahme kommt jetzt in jedem Fall zu einem Ergebnis.
+- **Die Löschbremse bremste die falschen Fälle.** Sie verlangte bisher *zugleich* mehr als zehn Prozent und mindestens zehn Dateien. Dadurch liefen 49 von 7181 Dateien (0,7 Prozent) ebenso still durch wie 9 von 20 (45 Prozent). Beides sind reale Fälle. Jetzt genügt ein Kriterium.
+- **Umbenennungen werden nicht mehr als Löschung gezählt.** Wird ein Vault zwischen zwei Macs kopiert, ändert macOS die Codierung der Umlaute in Dateinamen. Für das Auge identisch, für den Abgleich zwei verschiedene Dateien — 1434 Stück sahen dadurch aus wie gelöscht und neu angelegt. Die Schutzregel prüft jetzt, ob derselbe Inhalt im selben Durchlauf nur unter anderem Namen wandert, und zählt das nicht als Verlust. Ohne diese Unterscheidung hätte die schärfere Schwelle bei jedem Umzug blockiert und Nutzer dazu gebracht, die Bremse reflexhaft zu übergehen.
+- **Die Meldung der Löschbremse sagt jetzt, woran es liegt.** Auslöser, die ersten betroffenen Pfade und die Zahl der erkannten Umbenennungen — statt einer nackten Prozentangabe.
+
+### Hinweis
+
+Der Grund, warum einzelne Dateien auf dem Server unlesbar sein können, ist damit noch nicht geklärt. Ausgeschlossen sind eine falsche Passphrase und eine geänderte Schlüsselableitung. Dieses Release macht die betroffenen Dateien überhaupt erst sichtbar — die Ursachensuche folgt.
+
 ## [0.10.37-beta] - 2026-08-05
 
 Die Ordner-Auswertung aus 0.10.36 ist im Praxistest an echten Unterlagen gescheitert. Zwei unabhängige Ursachen, beide behoben.

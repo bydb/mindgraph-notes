@@ -48,7 +48,7 @@
     "url": "https://mindgraph-notes.de/",
     "downloadUrl": "https://github.com/bydb/mindgraph-notes/releases",
     "screenshot": "https://mindgraph-notes.de/screenshot.png",
-    "softwareVersion": "0.10.37-beta",
+    "softwareVersion": "0.10.38-beta",
     "author": { "@type": "Person", "name": "Jochen Leeder", "url": "https://bydb.io" },
     "license": "https://opensource.org/licenses/AGPL-3.0",
     "featureList": [
@@ -492,7 +492,7 @@
         <span class="hero-dot"></span>
         <span data-i18n="hero.badge">Open Source &middot; Lokal &middot; Kostenlos</span>
       </div>
-      <a class="release-badge" href="#changelog" data-i18n="hero.release">Ordner-Auswertung: jetzt nimmt der Agent den kurzen Weg &middot; v0.10.37</a>
+      <a class="release-badge" href="#changelog" data-i18n="hero.release">Sync: bleibt nicht mehr an einer einzigen Datei h&auml;ngen &middot; v0.10.38</a>
     </div>
 
     <h1 data-i18n="hero.title">Der Fokus bleibt.<br><em>Auch wenn das Leben dazwischenkommt.</em></h1>
@@ -1627,16 +1627,16 @@
     <div class="release-inner">
       <div class="release-head">
         <div>
-          <div class="st-eyebrow"><span class="d"></span><span data-i18n="release.label">Release 0.10.37 &middot; Ordner-Auswertung in der Praxis</span></div>
-          <h2 class="st-h" style="font-size:clamp(1.8rem,3.8vw,2.6rem)" data-i18n="release.heading">Was ist neu &mdash; <em>am echten Ordner getestet, an echten Formularen nachgebessert.</em></h2>
-          <p class="st-lead" data-i18n="release.lead">Die Ordner-Auswertung aus dem letzten Release ist an echten Unterlagen durchgefallen: 34 Schulformulare, kein brauchbares Ergebnis. Zwei Ursachen, beide behoben &mdash; die Tabellenerkennung kam mit amtlichen Vorlagen nicht zurecht, und der Agent w&auml;hlte den teuren Umweg statt des vorgesehenen Wegs.</p>
+          <div class="st-eyebrow"><span class="d"></span><span data-i18n="release.label">Release 0.10.38 &middot; Sync, an einem echten Umzug gepr&uuml;ft</span></div>
+          <h2 class="st-h" style="font-size:clamp(1.8rem,3.8vw,2.6rem)" data-i18n="release.heading">Was ist neu &mdash; <em>drei Zust&auml;nde, aus denen sich der Sync nicht mehr selbst befreien musste.</em></h2>
+          <p class="st-lead" data-i18n="release.lead">Ein Vault mit 7181 Dateien sollte auf ein zweites MacBook. Was folgte, waren drei Fehler, die sich gegenseitig verdeckt haben: ein Abgleich, der an einer Datei starb, einer, der dauerhaft auf &bdquo;l&auml;uft gerade&ldquo; stehen blieb, und eine Schutzregel, die die falschen F&auml;lle bremste. Alle drei sind behoben und mit Tests festgenagelt.</p>
         </div>
         <div class="release-date">v<span data-app-version>0.10.35-beta</span></div>
       </div>
       <div class="release-grid">
-        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c1h">Amtliche Vorlagen werden verstanden</b><p data-i18n="release.c1">Formulare tragen &uuml;ber der eigentlichen Tabelle einen Kopfblock: Name der Einrichtung, Nummer, Datum. Bisher hielt die App diesen Block f&uuml;r die Tabellen&uuml;berschrift und lieferte leere Spalten. Jetzt sucht sie die Zeile, die zu den gefragten Spalten passt, versteht &bdquo;Name der Schule&ldquo; als &bdquo;Schulname&ldquo;, verzeiht Tippfehler wie &bdquo;Nachnahme&ldquo; und &uuml;bernimmt Angaben aus dem Kopfblock in jede Zeile.</p></div></div>
-        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c2h">Der kurze Weg wird erzwungen</b><p data-i18n="release.c2">Liegen viele gleichartige Tabellen im Ordner, darf der Agent h&ouml;chstens drei als Stichprobe einzeln &ouml;ffnen &mdash; danach f&uuml;hrt die App sie alle auf einmal zusammen. Vorher stand das nur als Empfehlung in der Anleitung, und das Sprachmodell hat sie zweimal &uuml;berlesen: 31 Dateien einzeln geladen, Auftrag gescheitert. Jetzt ist es eine Regel der App, keine Bitte an das Modell.</p></div></div>
-        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c3h">Fehlermeldungen, die auf die Ursache zeigen</b><p data-i18n="release.c3">Bricht ein Auftrag nach zu langer Rechenzeit ab, hie&szlig; es bisher &bdquo;Modell zu langsam, Auftrag verkleinern&ldquo; &mdash; beides war im Ordner-Fall falsch und f&uuml;hrte in die Irre. Jetzt nennt die App, was wirklich passiert ist, und passen die Spaltennamen zu keiner Datei, zeigt sie die Zeilen aus den Unterlagen im Original.</p></div></div>
+        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c1h">Eine unlesbare Datei stoppt nicht mehr den ganzen Abgleich</b><p data-i18n="release.c1">Lie&szlig; sich eine einzige Datei vom Server nicht entschl&uuml;sseln, brach der komplette Durchlauf ab &mdash; mitten in den Downloads, bevor der Stand gespeichert wurde. Die App meldete &bdquo;Nie synchronisiert&ldquo;, obwohl Hunderte Dateien angekommen waren, und der automatische Abgleich starb alle f&uuml;nf Minuten an derselben Stelle. Jetzt wird die betroffene Datei &uuml;bersprungen, beim Namen genannt und beim n&auml;chsten Mal erneut versucht.</p></div></div>
+        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c2h">Kein Steckenbleiben auf &bdquo;l&auml;uft gerade&ldquo;</b><p data-i18n="release.c2">Brach die Verbindung genau zwischen Verbindungsaufbau und Anmeldung ab, wartete die App f&uuml;r immer auf eine Antwort, die nie kam. Jeder weitere Abgleich beschied sich selbst mit &bdquo;l&auml;uft bereits&ldquo; &mdash; bis zum Neustart der App. Die Verbindungsaufnahme entscheidet sich jetzt in jedem Fall, auch wenn der Server schweigt.</p></div></div>
+        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c3h">Die L&ouml;schbremse erkennt Umbenennungen</b><p data-i18n="release.c3">Wird ein Vault zwischen zwei Macs kopiert, &auml;ndert macOS die Codierung der Umlaute in Dateinamen. F&uuml;r den Abgleich sahen 1434 Dateien dadurch aus wie gel&ouml;scht und neu angelegt. Die Schutzregel pr&uuml;ft jetzt, ob der Inhalt im selben Durchlauf nur unter anderem Namen wandert &mdash; das ist eine Umbenennung und keine L&ouml;schung. Gleichzeitig greift sie auch bei kleinen Zahlen, wo sie bisher stillschweigend durchlie&szlig;.</p></div></div>
       </div>
       <a class="release-link" href="https://github.com/bydb/mindgraph-notes/releases" target="_blank" rel="noopener noreferrer" data-i18n="release.link">Vollst&auml;ndige Release Notes auf GitHub &rarr;</a>
     </div>
@@ -1901,7 +1901,7 @@
         "how.p5h": "Das Web, wenn du es brauchst",
         "how.p5": "Schalte die Webrecherche pro Auftrag zu – ganz optional. Der Agent sucht, liest die passenden Seiten und schreibt eine Notiz mit sauberem Quellenverzeichnis; du prüfst sie, bevor sie in deinen Vault kommt. Der Suchanbieter erhält nur die Suchanfragen; die vollständigen Seiten ruft die App lokal ab. Bei einem optionalen Cloud-Modell geht der gelesene Kontext zusätzlich an dessen Anbieter – darauf weist die App vor dem Lauf hin. Den Suchanbieter wählst du selbst: sofort einsatzbereit oder deine eigene, private Suchmaschine.",
         "hero.badge": "Open Source \u00b7 Lokal \u00b7 Kostenlos",
-        "hero.release": "Ordner-Auswertung: jetzt nimmt der Agent den kurzen Weg &middot; v{vs}",
+        "hero.release": "Sync: bleibt nicht mehr an einer einzigen Datei hängen &middot; v{vs}",
         "hero.videoPause": "Anhalten",
         "hero.videoPlay": "Abspielen",
         "hero.videoStart": "Video abspielen",
@@ -1978,15 +1978,15 @@
         "modules.opt.vision": "Vision OCR",
         "modules.opt.speech": "Diktat & Vorlesen",
         "modules.opt.terminal": "Terminal",
-        "release.label": "Release {vs} · Ordner-Auswertung in der Praxis",
-        "release.heading": "Was ist neu — <em>am echten Ordner getestet, an echten Formularen nachgebessert.</em>",
-        "release.lead": "Die Ordner-Auswertung aus dem letzten Release ist an echten Unterlagen durchgefallen: 34 Schulformulare, kein brauchbares Ergebnis. Zwei Ursachen, beide behoben — die Tabellenerkennung kam mit amtlichen Vorlagen nicht zurecht, und der Agent wählte den teuren Umweg statt des vorgesehenen Wegs.",
-        "release.c1h": "Amtliche Vorlagen werden verstanden",
-        "release.c1": "Formulare tragen über der eigentlichen Tabelle einen Kopfblock: Name der Einrichtung, Nummer, Datum. Bisher hielt die App diesen Block für die Tabellenüberschrift und lieferte leere Spalten. Jetzt sucht sie die Zeile, die zu den gefragten Spalten passt, versteht „Name der Schule“ als „Schulname“, verzeiht Tippfehler wie „Nachnahme“ und übernimmt Angaben aus dem Kopfblock in jede Zeile.",
-        "release.c2h": "Der kurze Weg wird erzwungen",
-        "release.c2": "Liegen viele gleichartige Tabellen im Ordner, darf der Agent höchstens drei als Stichprobe einzeln öffnen — danach führt die App sie alle auf einmal zusammen. Vorher stand das nur als Empfehlung in der Anleitung, und das Sprachmodell hat sie zweimal überlesen: 31 Dateien einzeln geladen, Auftrag gescheitert. Jetzt ist es eine Regel der App, keine Bitte an das Modell.",
-        "release.c3h": "Fehlermeldungen, die auf die Ursache zeigen",
-        "release.c3": "Bricht ein Auftrag nach zu langer Rechenzeit ab, hieß es bisher „Modell zu langsam, Auftrag verkleinern“ — beides war im Ordner-Fall falsch und führte in die Irre. Jetzt nennt die App, was wirklich passiert ist, und passen die Spaltennamen zu keiner Datei, zeigt sie die Zeilen aus den Unterlagen im Original.",
+        "release.label": "Release {vs} · Sync, an einem echten Umzug geprüft",
+        "release.heading": "Was ist neu — <em>drei Zustände, aus denen sich der Sync nicht mehr selbst befreien musste.</em>",
+        "release.lead": "Ein Vault mit 7181 Dateien sollte auf ein zweites MacBook. Was folgte, waren drei Fehler, die sich gegenseitig verdeckt haben: ein Abgleich, der an einer Datei starb, einer, der dauerhaft auf „läuft gerade“ stehen blieb, und eine Schutzregel, die die falschen Fälle bremste. Alle drei sind behoben und mit Tests festgenagelt.",
+        "release.c1h": "Eine unlesbare Datei stoppt nicht mehr den ganzen Abgleich",
+        "release.c1": "Ließ sich eine einzige Datei vom Server nicht entschlüsseln, brach der komplette Durchlauf ab — mitten in den Downloads, bevor der Stand gespeichert wurde. Die App meldete „Nie synchronisiert“, obwohl Hunderte Dateien angekommen waren, und der automatische Abgleich starb alle fünf Minuten an derselben Stelle. Jetzt wird die betroffene Datei übersprungen, beim Namen genannt und beim nächsten Mal erneut versucht.",
+        "release.c2h": "Kein Steckenbleiben auf „läuft gerade“",
+        "release.c2": "Brach die Verbindung genau zwischen Verbindungsaufbau und Anmeldung ab, wartete die App für immer auf eine Antwort, die nie kam. Jeder weitere Abgleich beschied sich selbst mit „läuft bereits“ — bis zum Neustart der App. Die Verbindungsaufnahme entscheidet sich jetzt in jedem Fall, auch wenn der Server schweigt.",
+        "release.c3h": "Die Löschbremse erkennt Umbenennungen",
+        "release.c3": "Wird ein Vault zwischen zwei Macs kopiert, ändert macOS die Codierung der Umlaute in Dateinamen. Für den Abgleich sahen 1434 Dateien dadurch aus wie gelöscht und neu angelegt. Die Schutzregel prüft jetzt, ob der Inhalt im selben Durchlauf nur unter anderem Namen wandert — das ist eine Umbenennung und keine Löschung. Gleichzeitig greift sie auch bei kleinen Zahlen, wo sie bisher stillschweigend durchließ.",
         "release.link": "Vollständige Release Notes auf GitHub →",
         "dl.label": "Download",
         "dl.heading": "Jetzt starten.",
@@ -2168,7 +2168,7 @@
         "how.p5h": "The web, when you need it",
         "how.p5": "Turn on web research per task – entirely optional. The agent searches, reads the relevant pages and writes a note with a clean list of sources; you review it before it enters your vault. The search provider receives only the queries; the app fetches full pages locally. With an optional cloud model, the extracted context is also sent to that model provider – the app warns you before the run. You choose the search provider yourself: ready to use or your own private search engine.",
         "hero.badge": "Open Source \u00b7 Local \u00b7 Free",
-        "hero.release": "Folder evaluation: the agent now takes the short path &middot; v{vs}",
+        "hero.release": "Sync: no longer stuck on a single file &middot; v{vs}",
         "hero.videoPause": "Pause",
         "hero.videoPlay": "Play",
         "hero.videoStart": "Play video",
@@ -2245,15 +2245,15 @@
         "modules.opt.vision": "Vision OCR",
         "modules.opt.speech": "Dictation & TTS",
         "modules.opt.terminal": "Terminal",
-        "release.label": "Release {vs} · Folder evaluation in practice",
-        "release.heading": "What’s new — <em>tested on a real folder, fixed against real forms.</em>",
-        "release.lead": "The folder evaluation from the last release failed on real paperwork: 34 school forms, no usable result. Two causes, both fixed — table detection could not cope with official templates, and the agent took the expensive detour instead of the intended path.",
-        "release.c1h": "Official templates are understood",
-        "release.c1": "Forms carry a header block above the actual table: name of the institution, number, date. Until now the app mistook that block for the table header and produced empty columns. It now looks for the row that matches the requested columns, reads “Name of the school” as “School name”, forgives typos, and carries values from the header block into every row.",
-        "release.c2h": "The short path is enforced",
-        "release.c2": "When a folder holds many spreadsheets of the same kind, the agent may open at most three of them individually as a sample — after that the app merges them all in one go. Previously this was only a recommendation in the instructions, and the language model ignored it twice: 31 files loaded one by one, task failed. It is now a rule of the app, not a request to the model.",
-        "release.c3h": "Error messages that point at the cause",
-        "release.c3": "When a task aborted after too much compute time, the message used to say “model too slow, shrink the task” — both wrong in the folder case, and misleading. The app now names what actually happened, and when the column names match no file, it shows the rows from the documents verbatim.",
+        "release.label": "Release {vs} · Sync, tested on a real migration",
+        "release.heading": "What’s new — <em>three states the sync could no longer get itself out of.</em>",
+        "release.lead": "A vault of 7181 files was meant to move to a second MacBook. What followed were three faults that masked one another: a run that died on a single file, one that stayed on “already running” for good, and a safety rule that braked the wrong cases. All three are fixed and pinned down with tests.",
+        "release.c1h": "One unreadable file no longer stops the whole run",
+        "release.c1": "If a single file could not be decrypted, the entire run aborted — mid-download, before the state was saved. The app reported “never synchronised” even though hundreds of files had arrived, and the automatic sync died at the same spot every five minutes. The affected file is now skipped, named explicitly, and retried next time.",
+        "release.c2h": "No more getting stuck on “already running”",
+        "release.c2": "If the connection dropped exactly between opening and registration, the app waited forever for an answer that never came. Every further sync answered itself with “already in progress” — until the app was restarted. Connecting now always reaches a decision, even when the server stays silent.",
+        "release.c3h": "The deletion guard recognises renames",
+        "release.c3": "When a vault is copied between two Macs, macOS changes how umlauts in file names are encoded. To the sync, 1434 files therefore looked deleted and newly created. The guard now checks whether the content simply moves under a different name in the same run — that is a rename, not a deletion. At the same time it also catches small numbers, where it previously let things through unnoticed.",
         "release.link": "Full release notes on GitHub →",
         "dl.label": "Download",
         "dl.heading": "Get started.",
