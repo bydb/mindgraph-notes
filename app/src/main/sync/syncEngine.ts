@@ -167,6 +167,20 @@ export class SyncEngine {
     this.sendProgress({ status: 'connecting' })
 
     return new Promise((resolve, reject) => {
+      // connect() MUSS sich in jedem Fall entscheiden. Bleibt es hängen, kehrt das
+      // `await this.connect()` in sync() nie zurück → das `finally` dort läuft nie →
+      // `syncing` bleibt für immer true und jeder weitere Sync antwortet nur noch mit
+      // "Sync already in progress", bis die App neu gestartet wird (real aufgetreten).
+      let settled = false
+      let timeoutTimer: ReturnType<typeof setTimeout> | null = null
+      const settle = (err?: Error): void => {
+        if (settled) return
+        settled = true
+        if (timeoutTimer) clearTimeout(timeoutTimer)
+        if (err) reject(err)
+        else resolve()
+      }
+
       this.ws = new WebSocket(this.relayUrl)
 
       this.ws.on('pong', () => {
@@ -193,7 +207,7 @@ export class SyncEngine {
               this.sendProgress({ status: 'idle' })
               this.sendLog({ type: 'connect', message: 'Connected' })
               console.log('[Sync] Vault registered on server')
-              resolve()
+              settle()
               return
             }
             if (msg.type === 'error') {
@@ -205,7 +219,7 @@ export class SyncEngine {
               // keeps re-registering forever (zombie engine / reconnect storm).
               this.intentionalDisconnect = true
               this.ws?.close()
-              reject(new Error(msg.message || msg.code || 'Registration rejected'))
+              settle(new Error(msg.message || msg.code || 'Registration rejected'))
               return
             }
           }
@@ -229,6 +243,11 @@ export class SyncEngine {
         if (!this.intentionalDisconnect && this.key) {
           this.scheduleReconnect()
         }
+        // Verbindung ging auf und wieder zu, BEVOR die Registrierung bestätigt war:
+        // hier muss connect() abgelehnt werden. Die Timeouts unten können das nicht
+        // auffangen, weil dieser Handler `this.ws` bereits auf null gesetzt hat und
+        // ihre `this.ws && …`-Bedingungen damit alle falsch sind.
+        settle(new Error('Connection closed before registration'))
       })
 
       this.ws.on('error', (err) => {
@@ -239,20 +258,19 @@ export class SyncEngine {
           status: 'error',
           error: err.message
         })
-        reject(err)
+        settle(err)
       })
 
-      // Timeout after 10 seconds
-      setTimeout(() => {
-        if (this.ws && this.ws.readyState !== WebSocket.OPEN) {
-          this.ws.close()
-          reject(new Error('Connection timeout'))
-        }
-        // Also timeout if connected but not registered
-        if (this.ws && this.ws.readyState === WebSocket.OPEN && !this.registered) {
-          this.ws.close()
-          reject(new Error('Registration timeout'))
-        }
+      // Timeout after 10 seconds. Letzte Instanz: entscheidet auch dann, wenn der
+      // Socket weder 'open' noch 'close' noch 'error' gemeldet hat.
+      timeoutTimer = setTimeout(() => {
+        if (this.registered) return
+        // Erst entscheiden, dann schließen: close() löst den 'close'-Handler aus, der
+        // ebenfalls settle() ruft. Andersherum gewänne dessen unspezifische Begründung
+        // und der eigentliche Grund (Zeitüberschreitung) ginge im Log verloren.
+        const wasOpen = this.ws?.readyState === WebSocket.OPEN
+        settle(new Error(wasOpen ? 'Registration timeout' : 'Connection timeout'))
+        this.ws?.close()
       }, 10000)
     })
   }
