@@ -74,6 +74,19 @@ interface MoveDialogState {
   selectedTargetPath: string | null
 }
 
+interface MoveOption {
+  path: string
+  name: string
+  depth: number
+  parentPath: string
+  isRoot?: boolean
+}
+
+// Suchvergleich ohne Groß/Klein, Akzente und Unicode-Normalisierungsunterschiede
+// (Umlaute liegen je nach Herkunft als NFC oder NFD im Dateinamen)
+const normalizeForSearch = (value: string): string =>
+  value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+
 // SVG Icons
 const ChevronIcon: React.FC<{ open: boolean }> = ({ open }) => (
   <svg
@@ -281,6 +294,10 @@ const FileItem: React.FC<FileItemProps> = ({
   const [isDragOver, setIsDragOver] = useState(false)
   const [pickerDialog, setPickerDialog] = useState<{ type: 'color' | 'icon'; path: string } | null>(null)
   const [moveDialog, setMoveDialog] = useState<MoveDialogState | null>(null)
+  const [moveSearch, setMoveSearch] = useState('')
+  const [moveHighlight, setMoveHighlight] = useState(0)
+  const moveSearchInputRef = useRef<HTMLInputElement>(null)
+  const moveListRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const rowRef = useRef<HTMLDivElement>(null)
   const contextMenuRef = useRef<HTMLDivElement>(null)
@@ -1090,10 +1107,12 @@ const FileItem: React.FC<FileItemProps> = ({
   }, [moveDialog])
 
   // Execute move (single or multi)
-  const handleExecuteMove = useCallback(async () => {
-    if (!moveDialog || moveDialog.selectedTargetPath === null || !vaultPath) return
+  // targetPathOverride: für Enter/Doppelklick, damit nicht auf den State-Update gewartet werden muss
+  const handleExecuteMove = useCallback(async (targetPathOverride?: string) => {
+    if (!moveDialog || !vaultPath) return
+    const targetFolderPath = targetPathOverride ?? moveDialog.selectedTargetPath
+    if (targetFolderPath === null) return
 
-    const targetFolderPath = moveDialog.selectedTargetPath
     const targetDir = targetFolderPath === '' ? vaultPath : `${vaultPath}/${targetFolderPath}`
     const entriesToMove = moveDialog.entries || [moveDialog.entry]
 
@@ -1132,6 +1151,98 @@ const FileItem: React.FC<FileItemProps> = ({
 
     setMoveDialog(null)
   }, [moveDialog, vaultPath, setFileTree, updateNotePath, clearSelection])
+
+  // --- Move-Dialog: Ordner-Suche ---
+
+  // Zielordner, die für den aktuellen Verschiebe-Vorgang in Frage kommen
+  const moveTargetFolders = useMemo(() => {
+    if (!moveDialog || !fileTree) return []
+    const entriesToMove = moveDialog.entries || [moveDialog.entry]
+    return collectFolders(fileTree).filter(folder => {
+      // Ordner, die selbst verschoben werden (und ihre Kinder), sind kein Ziel
+      for (const e of entriesToMove) {
+        if (e.isDirectory && folder.path === e.path) return false
+        if (e.isDirectory && folder.path.startsWith(e.path + '/')) return false
+      }
+      return true
+    })
+  }, [moveDialog, fileTree, collectFolders])
+
+  // Gefilterte Liste inkl. Vault-Root, gemeinsame Quelle für Anzeige und Tastatur-Navigation
+  const moveOptions = useMemo(() => {
+    const rootLabel = t('fileTree.vaultRoot')
+    const all: MoveOption[] = [
+      { path: '', name: rootLabel, depth: 0, parentPath: '', isRoot: true },
+      ...moveTargetFolders.map(f => ({
+        path: f.path,
+        name: f.name,
+        depth: f.depth,
+        parentPath: f.path.includes('/') ? f.path.substring(0, f.path.lastIndexOf('/')) : ''
+      }))
+    ]
+
+    const tokens = normalizeForSearch(moveSearch).split(/\s+/).filter(Boolean)
+    if (tokens.length === 0) return all
+
+    const scored: Array<{ option: MoveOption; score: number; index: number }> = []
+    all.forEach((option, index) => {
+      const name = normalizeForSearch(option.name)
+      const path = normalizeForSearch(option.path || option.name)
+      if (!tokens.every(tok => path.includes(tok) || name.includes(tok))) return
+      // Namenstreffer vor reinen Pfadtreffern, Präfix-Treffer ganz nach oben
+      let score = 2
+      if (tokens.every(tok => name.includes(tok))) score = 1
+      if (name.startsWith(tokens[0])) score = 0
+      scored.push({ option, score, index })
+    })
+    scored.sort((a, b) => a.score - b.score || a.index - b.index)
+    return scored.map(s => s.option)
+  }, [moveTargetFolders, moveSearch, t])
+
+  // Suchfeld beim Öffnen zurücksetzen und fokussieren
+  const moveDialogOpen = moveDialog !== null
+  useEffect(() => {
+    if (!moveDialogOpen) return
+    setMoveSearch('')
+    setMoveHighlight(0)
+    const timer = setTimeout(() => moveSearchInputRef.current?.focus(), 0)
+    return () => clearTimeout(timer)
+  }, [moveDialogOpen])
+
+  // Highlight in Sichtweite halten
+  useEffect(() => {
+    if (!moveDialogOpen) return
+    const el = moveListRef.current?.querySelector(`[data-move-index="${moveHighlight}"]`)
+    if (el) (el as HTMLElement).scrollIntoView({ block: 'nearest' })
+  }, [moveHighlight, moveDialogOpen, moveOptions.length])
+
+  const handleMoveDialogKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === 'Escape') {
+      e.preventDefault()
+      setMoveDialog(null)
+      return
+    }
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault()
+      if (moveOptions.length === 0) return
+      setMoveHighlight(prev => {
+        const next = e.key === 'ArrowDown' ? prev + 1 : prev - 1
+        return (next + moveOptions.length) % moveOptions.length
+      })
+      return
+    }
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      const option = moveOptions[moveHighlight]
+      if (!option) return
+      // Erstes Enter wählt aus, zweites Enter auf derselben Auswahl verschiebt
+      if (moveDialog?.selectedTargetPath === option.path) {
+        void handleExecuteMove(option.path)
+      } else {
+        handleSelectTargetFolder(option.path)
+      }
+    }
+  }, [moveOptions, moveHighlight, moveDialog, handleExecuteMove, handleSelectTargetFolder])
 
   const openPickerDialog = useCallback((type: 'color' | 'icon') => {
     if (!contextMenu || !contextMenu.entry.isDirectory) return
@@ -1671,49 +1782,80 @@ const FileItem: React.FC<FileItemProps> = ({
       {/* Move to Folder Dialog */}
       {moveDialog && createPortal(
         <div className="picker-dialog-overlay" onClick={() => setMoveDialog(null)}>
-          <div className="picker-dialog move-dialog" onClick={e => e.stopPropagation()}>
+          <div
+            className="picker-dialog move-dialog"
+            onClick={e => e.stopPropagation()}
+            onKeyDown={handleMoveDialogKeyDown}
+          >
             <div className="picker-dialog-header">
               {moveDialog.entries && moveDialog.entries.length > 1
                 ? t('fileTree.moveCount', { count: moveDialog.entries.length })
                 : t('fileTree.moveToTitle', { name: moveDialog.entry.name })}
             </div>
-            <div className="picker-dialog-content move-dialog-content">
-              {/* Root folder option */}
-              <button
-                className={`move-folder-item root-folder ${moveDialog.selectedTargetPath === '' ? 'selected' : ''}`}
-                onClick={() => handleSelectTargetFolder('')}
-              >
-                <span className="move-folder-icon">
-                  <FolderIcon open={false} color="#F5A623" iconSet={iconSet} />
-                </span>
-                <span className="move-folder-name">{t('fileTree.vaultRoot')}</span>
-              </button>
-              {/* All folders */}
-              {fileTree && collectFolders(fileTree).map(folder => {
-                const entriesToMove = moveDialog.entries || [moveDialog.entry]
-                // Don't show folders that are being moved or their children
-                for (const e of entriesToMove) {
-                  if (e.isDirectory && folder.path === e.path) return null
-                  if (e.isDirectory && folder.path.startsWith(e.path + '/')) return null
-                }
-
-                const folderCustomization = fileCustomizations[folder.path]
-                const isSelected = moveDialog.selectedTargetPath === folder.path
+            <div className="move-dialog-search">
+              <span className="move-dialog-search-icon">
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                  <circle cx="7" cy="7" r="4.5" stroke="currentColor" strokeWidth="1.5" />
+                  <path d="M10.5 10.5L14 14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                </svg>
+              </span>
+              <input
+                ref={moveSearchInputRef}
+                type="text"
+                value={moveSearch}
+                onChange={e => { setMoveSearch(e.target.value); setMoveHighlight(0) }}
+                placeholder={t('fileTree.moveSearchPlaceholder')}
+                spellCheck={false}
+              />
+              {moveSearch && (
+                <button
+                  className="move-dialog-search-clear"
+                  onClick={() => { setMoveSearch(''); setMoveHighlight(0); moveSearchInputRef.current?.focus() }}
+                  title={t('fileTree.moveSearchClear')}
+                  aria-label={t('fileTree.moveSearchClear')}
+                >
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                    <path d="M3 3L9 9M9 3L3 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                  </svg>
+                </button>
+              )}
+            </div>
+            <div className="picker-dialog-content move-dialog-content" ref={moveListRef}>
+              {moveOptions.length === 0 && (
+                <div className="move-dialog-empty">{t('fileTree.moveSearchNoResults')}</div>
+              )}
+              {moveOptions.map((option, index) => {
+                const folderCustomization = option.isRoot ? undefined : fileCustomizations[option.path]
+                const isSelected = moveDialog.selectedTargetPath === option.path
+                const isHighlighted = index === moveHighlight
+                const searching = moveSearch.trim().length > 0
                 return (
                   <button
-                    key={folder.path}
-                    className={`move-folder-item ${isSelected ? 'selected' : ''}`}
-                    style={{ paddingLeft: `${folder.depth * 16 + 12}px` }}
-                    onClick={() => handleSelectTargetFolder(folder.path)}
+                    key={option.isRoot ? '__root__' : option.path}
+                    data-move-index={index}
+                    className={`move-folder-item ${option.isRoot && !searching ? 'root-folder' : ''} ${isSelected ? 'selected' : ''} ${isHighlighted ? 'highlighted' : ''}`}
+                    style={searching ? undefined : { paddingLeft: `${option.depth * 16 + 12}px` }}
+                    onClick={() => handleSelectTargetFolder(option.path)}
+                    onDoubleClick={() => void handleExecuteMove(option.path)}
+                    onMouseEnter={() => setMoveHighlight(index)}
                   >
                     <span className="move-folder-icon">
                       {folderCustomization?.icon ? (
                         <span style={{ fontSize: '14px' }}>{folderCustomization.icon}</span>
                       ) : (
-                        <FolderIcon open={false} color={folderCustomization?.color} iconSet={iconSet} />
+                        <FolderIcon
+                          open={false}
+                          color={option.isRoot ? '#F5A623' : folderCustomization?.color}
+                          iconSet={iconSet}
+                        />
                       )}
                     </span>
-                    <span className="move-folder-name">{folder.name}</span>
+                    <span className="move-folder-labels">
+                      <span className="move-folder-name">{option.name}</span>
+                      {searching && option.parentPath && (
+                        <span className="move-folder-path">{option.parentPath}</span>
+                      )}
+                    </span>
                   </button>
                 )
               })}
@@ -1722,7 +1864,7 @@ const FileItem: React.FC<FileItemProps> = ({
               <button onClick={() => setMoveDialog(null)}>{t('fileTree.cancel')}</button>
               <button
                 className="btn-primary"
-                onClick={handleExecuteMove}
+                onClick={() => void handleExecuteMove()}
                 disabled={moveDialog.selectedTargetPath === null}
               >
                 {t('fileTree.moveButton')}

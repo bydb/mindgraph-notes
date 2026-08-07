@@ -5918,6 +5918,86 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
   gap: 2px;
 }
 
+.move-dialog-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 12px 20px 0;
+  padding: 7px 10px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+}
+
+.move-dialog-search:focus-within {
+  border-color: var(--accent-color);
+}
+
+.move-dialog-search-icon {
+  display: flex;
+  align-items: center;
+  color: var(--text-tertiary);
+  flex-shrink: 0;
+}
+
+.move-dialog-search input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: none;
+  outline: none;
+  font-size: 13px;
+  color: var(--text-primary);
+}
+
+.move-dialog-search input::placeholder {
+  color: var(--text-tertiary);
+}
+
+.move-dialog-search-clear {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: none;
+  padding: 2px;
+  cursor: pointer;
+  color: var(--text-tertiary);
+  border-radius: var(--radius-sm);
+  flex-shrink: 0;
+}
+
+.move-dialog-search-clear:hover {
+  color: var(--text-primary);
+  background: var(--bg-tertiary);
+}
+
+.move-dialog-empty {
+  padding: 16px 12px;
+  font-size: 13px;
+  color: var(--text-tertiary);
+  text-align: center;
+}
+
+.move-folder-labels {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 1px;
+}
+
+.move-folder-path {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.move-folder-item.highlighted:not(.selected) {
+  background: var(--bg-tertiary);
+}
+
 .move-folder-item {
   display: flex;
   align-items: center;
