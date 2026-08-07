@@ -2,6 +2,24 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.10.39-beta] - 2026-08-07
+
+Der Kontextmenü-Punkt „Verschieben nach…" zeigte den ganzen Ordnerbaum als eine lange Liste. Bei ein paar hundert Ordnern hieß das: scrollen und suchen. Jetzt steht oben ein Suchfeld.
+
+### Neu
+
+- **Ordner-Suche im Verschieben-Dialog.** Das Suchfeld hat beim Öffnen des Dialogs sofort den Fokus, man kann also direkt lostippen. Gefiltert wird über Ordnername *und* kompletten Pfad, mehrere Suchwörter gleichzeitig — alle müssen passen.
+- **Umlaute und Akzente sind beim Suchen egal.** „bucher" findet „Bücher". Das ist mehr als Bequemlichkeit: Je nach Herkunft einer Datei liegt derselbe Umlaut technisch unterschiedlich im Dateinamen (dieselbe Eigenheit, die beim Vault-Umzug in 0.10.38 die 1434 vermeintlichen Löschungen ausgelöst hat). Ein reiner Textvergleich hätte den Ordner je nach Herkunft mal gefunden und mal nicht.
+- **Gleichnamige Ordner sind unterscheidbar.** Beim Suchen tritt an die Stelle der Baum-Einrückung der Ordner, in dem der Treffer liegt. Drei Ordner namens „anhaenge" waren in der bisherigen Liste nicht auseinanderzuhalten.
+- **Sinnvolle Reihenfolge der Treffer.** Zuerst Ordner, deren Name mit dem Suchwort beginnt, dann die übrigen Namenstreffer, zuletzt die, bei denen nur der Pfad passt.
+- **Bedienung ohne Maus.** Pfeiltasten blättern, Enter wählt aus, ein zweites Enter verschiebt, Escape schließt. Ein Doppelklick auf einen Ordner verschiebt direkt.
+
+Ohne Suchbegriff ist der Dialog unverändert: Vault-Hauptordner oben, Baum mit Einrückung, Ordnerfarben und -Symbole.
+
+### Hinweis
+
+Alle Punkte wurden im laufenden Fenster geprüft, einschließlich eines echten Verschiebe-Vorgangs. Einzige Ausnahme: Das Schließen per Escape ließ sich nur mit einem programmatisch ausgelösten Tastendruck bestätigen — das verwendete Automatisierungswerkzeug stellt die Escape-Taste nicht an die App zu.
+
 ## [0.10.38-beta] - 2026-08-06
 
 Ein Vault mit 7181 Dateien sollte auf ein zweites MacBook umziehen. Dabei kamen drei Fehler zum Vorschein, die sich gegenseitig verdeckt haben — jeder für sich harmlos aussehend, zusammen ein halber Tag Fehlersuche. Alle drei sind behoben und durch Tests abgesichert, darunter ein Integrationstest, der den echten Abgleich gegen einen nachgebauten Server fährt.

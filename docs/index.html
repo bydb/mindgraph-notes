@@ -48,7 +48,7 @@
     "url": "https://mindgraph-notes.de/",
     "downloadUrl": "https://github.com/bydb/mindgraph-notes/releases",
     "screenshot": "https://mindgraph-notes.de/screenshot.png",
-    "softwareVersion": "0.10.38-beta",
+    "softwareVersion": "0.10.39-beta",
     "author": { "@type": "Person", "name": "Jochen Leeder", "url": "https://bydb.io" },
     "license": "https://opensource.org/licenses/AGPL-3.0",
     "featureList": [
@@ -492,7 +492,7 @@
         <span class="hero-dot"></span>
         <span data-i18n="hero.badge">Open Source &middot; Lokal &middot; Kostenlos</span>
       </div>
-      <a class="release-badge" href="#changelog" data-i18n="hero.release">Sync: bleibt nicht mehr an einer einzigen Datei h&auml;ngen &middot; v0.10.38</a>
+      <a class="release-badge" href="#changelog" data-i18n="hero.release">Verschieben nach: Ordner suchen statt scrollen &middot; v0.10.39</a>
     </div>
 
     <h1 data-i18n="hero.title">Der Fokus bleibt.<br><em>Auch wenn das Leben dazwischenkommt.</em></h1>
@@ -1627,16 +1627,16 @@
     <div class="release-inner">
       <div class="release-head">
         <div>
-          <div class="st-eyebrow"><span class="d"></span><span data-i18n="release.label">Release 0.10.38 &middot; Sync, an einem echten Umzug gepr&uuml;ft</span></div>
-          <h2 class="st-h" style="font-size:clamp(1.8rem,3.8vw,2.6rem)" data-i18n="release.heading">Was ist neu &mdash; <em>drei Zust&auml;nde, aus denen sich der Sync nicht mehr selbst befreien musste.</em></h2>
-          <p class="st-lead" data-i18n="release.lead">Ein Vault mit 7181 Dateien sollte auf ein zweites MacBook. Was folgte, waren drei Fehler, die sich gegenseitig verdeckt haben: ein Abgleich, der an einer Datei starb, einer, der dauerhaft auf &bdquo;l&auml;uft gerade&ldquo; stehen blieb, und eine Schutzregel, die die falschen F&auml;lle bremste. Alle drei sind behoben und mit Tests festgenagelt.</p>
+          <div class="st-eyebrow"><span class="d"></span><span data-i18n="release.label">Release 0.10.39 &middot; Verschieben, ohne zu suchen</span></div>
+          <h2 class="st-h" style="font-size:clamp(1.8rem,3.8vw,2.6rem)" data-i18n="release.heading">Was ist neu &mdash; <em>der Verschieben-Dialog hat jetzt eine Suche.</em></h2>
+          <p class="st-lead" data-i18n="release.lead">&bdquo;Verschieben nach&hellip;&ldquo; zeigte den ganzen Ordnerbaum als eine lange Liste. Wer ein paar hundert Ordner hat, scrollte. Jetzt steht oben ein Suchfeld, das beim &Ouml;ffnen den Fokus hat &mdash; tippen, ausw&auml;hlen, fertig.</p>
         </div>
         <div class="release-date">v<span data-app-version>0.10.35-beta</span></div>
       </div>
       <div class="release-grid">
-        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c1h">Eine unlesbare Datei stoppt nicht mehr den ganzen Abgleich</b><p data-i18n="release.c1">Lie&szlig; sich eine einzige Datei vom Server nicht entschl&uuml;sseln, brach der komplette Durchlauf ab &mdash; mitten in den Downloads, bevor der Stand gespeichert wurde. Die App meldete &bdquo;Nie synchronisiert&ldquo;, obwohl Hunderte Dateien angekommen waren, und der automatische Abgleich starb alle f&uuml;nf Minuten an derselben Stelle. Jetzt wird die betroffene Datei &uuml;bersprungen, beim Namen genannt und beim n&auml;chsten Mal erneut versucht.</p></div></div>
-        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c2h">Kein Steckenbleiben auf &bdquo;l&auml;uft gerade&ldquo;</b><p data-i18n="release.c2">Brach die Verbindung genau zwischen Verbindungsaufbau und Anmeldung ab, wartete die App f&uuml;r immer auf eine Antwort, die nie kam. Jeder weitere Abgleich beschied sich selbst mit &bdquo;l&auml;uft bereits&ldquo; &mdash; bis zum Neustart der App. Die Verbindungsaufnahme entscheidet sich jetzt in jedem Fall, auch wenn der Server schweigt.</p></div></div>
-        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c3h">Die L&ouml;schbremse erkennt Umbenennungen</b><p data-i18n="release.c3">Wird ein Vault zwischen zwei Macs kopiert, &auml;ndert macOS die Codierung der Umlaute in Dateinamen. F&uuml;r den Abgleich sahen 1434 Dateien dadurch aus wie gel&ouml;scht und neu angelegt. Die Schutzregel pr&uuml;ft jetzt, ob der Inhalt im selben Durchlauf nur unter anderem Namen wandert &mdash; das ist eine Umbenennung und keine L&ouml;schung. Gleichzeitig greift sie auch bei kleinen Zahlen, wo sie bisher stillschweigend durchlie&szlig;.</p></div></div>
+        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c1h">Tippen statt scrollen</b><p data-i18n="release.c1">Das Suchfeld filtert &uuml;ber Ordnernamen und kompletten Pfad, mehrere Suchw&ouml;rter gleichzeitig. Umlaute sind dabei egal: &bdquo;bucher&ldquo; findet &bdquo;B&uuml;cher&ldquo;. Das ist kein Detail &mdash; je nachdem, woher eine Datei stammt, liegt derselbe Umlaut technisch unterschiedlich im Namen.</p></div></div>
+        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c2h">Gleichnamige Ordner sind unterscheidbar</b><p data-i18n="release.c2">Beim Suchen steht unter jedem Treffer der Ordner, in dem er liegt. Drei Ordner namens &bdquo;anhaenge&ldquo; waren in der Baumliste nicht auseinanderzuhalten &mdash; jetzt schon. Die Treffer stehen in sinnvoller Reihenfolge: erst Ordner, deren Name so beginnt, dann die &uuml;brigen Namenstreffer, zuletzt Treffer im Pfad.</p></div></div>
+        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c3h">Ohne die Maus loszulassen</b><p data-i18n="release.c3">Pfeiltasten bl&auml;ttern durch die Treffer, Enter w&auml;hlt aus, ein zweites Enter verschiebt, Escape schlie&szlig;t. Wer lieber klickt: Ein Doppelklick auf einen Ordner verschiebt direkt. Ohne Suchbegriff sieht der Dialog aus wie bisher &mdash; Vault-Hauptordner oben, Baum mit Einr&uuml;ckung, Ordnerfarben und -Symbole.</p></div></div>
       </div>
       <a class="release-link" href="https://github.com/bydb/mindgraph-notes/releases" target="_blank" rel="noopener noreferrer" data-i18n="release.link">Vollst&auml;ndige Release Notes auf GitHub &rarr;</a>
     </div>
@@ -1901,7 +1901,7 @@
         "how.p5h": "Das Web, wenn du es brauchst",
         "how.p5": "Schalte die Webrecherche pro Auftrag zu – ganz optional. Der Agent sucht, liest die passenden Seiten und schreibt eine Notiz mit sauberem Quellenverzeichnis; du prüfst sie, bevor sie in deinen Vault kommt. Der Suchanbieter erhält nur die Suchanfragen; die vollständigen Seiten ruft die App lokal ab. Bei einem optionalen Cloud-Modell geht der gelesene Kontext zusätzlich an dessen Anbieter – darauf weist die App vor dem Lauf hin. Den Suchanbieter wählst du selbst: sofort einsatzbereit oder deine eigene, private Suchmaschine.",
         "hero.badge": "Open Source \u00b7 Lokal \u00b7 Kostenlos",
-        "hero.release": "Sync: bleibt nicht mehr an einer einzigen Datei hängen &middot; v{vs}",
+        "hero.release": "Verschieben nach: Ordner suchen statt scrollen &middot; v{vs}",
         "hero.videoPause": "Anhalten",
         "hero.videoPlay": "Abspielen",
         "hero.videoStart": "Video abspielen",
@@ -1978,15 +1978,15 @@
         "modules.opt.vision": "Vision OCR",
         "modules.opt.speech": "Diktat & Vorlesen",
         "modules.opt.terminal": "Terminal",
-        "release.label": "Release {vs} · Sync, an einem echten Umzug geprüft",
-        "release.heading": "Was ist neu — <em>drei Zustände, aus denen sich der Sync nicht mehr selbst befreien musste.</em>",
-        "release.lead": "Ein Vault mit 7181 Dateien sollte auf ein zweites MacBook. Was folgte, waren drei Fehler, die sich gegenseitig verdeckt haben: ein Abgleich, der an einer Datei starb, einer, der dauerhaft auf „läuft gerade“ stehen blieb, und eine Schutzregel, die die falschen Fälle bremste. Alle drei sind behoben und mit Tests festgenagelt.",
-        "release.c1h": "Eine unlesbare Datei stoppt nicht mehr den ganzen Abgleich",
-        "release.c1": "Ließ sich eine einzige Datei vom Server nicht entschlüsseln, brach der komplette Durchlauf ab — mitten in den Downloads, bevor der Stand gespeichert wurde. Die App meldete „Nie synchronisiert“, obwohl Hunderte Dateien angekommen waren, und der automatische Abgleich starb alle fünf Minuten an derselben Stelle. Jetzt wird die betroffene Datei übersprungen, beim Namen genannt und beim nächsten Mal erneut versucht.",
-        "release.c2h": "Kein Steckenbleiben auf „läuft gerade“",
-        "release.c2": "Brach die Verbindung genau zwischen Verbindungsaufbau und Anmeldung ab, wartete die App für immer auf eine Antwort, die nie kam. Jeder weitere Abgleich beschied sich selbst mit „läuft bereits“ — bis zum Neustart der App. Die Verbindungsaufnahme entscheidet sich jetzt in jedem Fall, auch wenn der Server schweigt.",
-        "release.c3h": "Die Löschbremse erkennt Umbenennungen",
-        "release.c3": "Wird ein Vault zwischen zwei Macs kopiert, ändert macOS die Codierung der Umlaute in Dateinamen. Für den Abgleich sahen 1434 Dateien dadurch aus wie gelöscht und neu angelegt. Die Schutzregel prüft jetzt, ob der Inhalt im selben Durchlauf nur unter anderem Namen wandert — das ist eine Umbenennung und keine Löschung. Gleichzeitig greift sie auch bei kleinen Zahlen, wo sie bisher stillschweigend durchließ.",
+        "release.label": "Release {vs} · Verschieben, ohne zu suchen",
+        "release.heading": "Was ist neu — <em>der Verschieben-Dialog hat jetzt eine Suche.</em>",
+        "release.lead": "„Verschieben nach…“ zeigte den ganzen Ordnerbaum als eine lange Liste. Wer ein paar hundert Ordner hat, scrollte. Jetzt steht oben ein Suchfeld, das beim Öffnen den Fokus hat — tippen, auswählen, fertig.",
+        "release.c1h": "Tippen statt scrollen",
+        "release.c1": "Das Suchfeld filtert über Ordnernamen und kompletten Pfad, mehrere Suchwörter gleichzeitig. Umlaute sind dabei egal: „bucher“ findet „Bücher“. Das ist kein Detail — je nachdem, woher eine Datei stammt, liegt derselbe Umlaut technisch unterschiedlich im Namen.",
+        "release.c2h": "Gleichnamige Ordner sind unterscheidbar",
+        "release.c2": "Beim Suchen steht unter jedem Treffer der Ordner, in dem er liegt. Drei Ordner namens „anhaenge“ waren in der Baumliste nicht auseinanderzuhalten — jetzt schon. Die Treffer stehen in sinnvoller Reihenfolge: erst Ordner, deren Name so beginnt, dann die übrigen Namenstreffer, zuletzt Treffer im Pfad.",
+        "release.c3h": "Ohne die Maus loszulassen",
+        "release.c3": "Pfeiltasten blättern durch die Treffer, Enter wählt aus, ein zweites Enter verschiebt, Escape schließt. Wer lieber klickt: Ein Doppelklick auf einen Ordner verschiebt direkt. Ohne Suchbegriff sieht der Dialog aus wie bisher — Vault-Hauptordner oben, Baum mit Einrückung, Ordnerfarben und -Symbole.",
         "release.link": "Vollständige Release Notes auf GitHub →",
         "dl.label": "Download",
         "dl.heading": "Jetzt starten.",
@@ -2168,7 +2168,7 @@
         "how.p5h": "The web, when you need it",
         "how.p5": "Turn on web research per task – entirely optional. The agent searches, reads the relevant pages and writes a note with a clean list of sources; you review it before it enters your vault. The search provider receives only the queries; the app fetches full pages locally. With an optional cloud model, the extracted context is also sent to that model provider – the app warns you before the run. You choose the search provider yourself: ready to use or your own private search engine.",
         "hero.badge": "Open Source \u00b7 Local \u00b7 Free",
-        "hero.release": "Sync: no longer stuck on a single file &middot; v{vs}",
+        "hero.release": "Move to: search folders instead of scrolling &middot; v{vs}",
         "hero.videoPause": "Pause",
         "hero.videoPlay": "Play",
         "hero.videoStart": "Play video",
@@ -2245,15 +2245,15 @@
         "modules.opt.vision": "Vision OCR",
         "modules.opt.speech": "Dictation & TTS",
         "modules.opt.terminal": "Terminal",
-        "release.label": "Release {vs} · Sync, tested on a real migration",
-        "release.heading": "What’s new — <em>three states the sync could no longer get itself out of.</em>",
-        "release.lead": "A vault of 7181 files was meant to move to a second MacBook. What followed were three faults that masked one another: a run that died on a single file, one that stayed on “already running” for good, and a safety rule that braked the wrong cases. All three are fixed and pinned down with tests.",
-        "release.c1h": "One unreadable file no longer stops the whole run",
-        "release.c1": "If a single file could not be decrypted, the entire run aborted — mid-download, before the state was saved. The app reported “never synchronised” even though hundreds of files had arrived, and the automatic sync died at the same spot every five minutes. The affected file is now skipped, named explicitly, and retried next time.",
-        "release.c2h": "No more getting stuck on “already running”",
-        "release.c2": "If the connection dropped exactly between opening and registration, the app waited forever for an answer that never came. Every further sync answered itself with “already in progress” — until the app was restarted. Connecting now always reaches a decision, even when the server stays silent.",
-        "release.c3h": "The deletion guard recognises renames",
-        "release.c3": "When a vault is copied between two Macs, macOS changes how umlauts in file names are encoded. To the sync, 1434 files therefore looked deleted and newly created. The guard now checks whether the content simply moves under a different name in the same run — that is a rename, not a deletion. At the same time it also catches small numbers, where it previously let things through unnoticed.",
+        "release.label": "Release {vs} · Moving, without the hunt",
+        "release.heading": "What’s new — <em>the move dialog now has a search.</em>",
+        "release.lead": "“Move to…” listed the entire folder tree as one long list. With a few hundred folders, that meant scrolling. Now there is a search box at the top that takes focus as the dialog opens — type, pick, done.",
+        "release.c1h": "Type instead of scroll",
+        "release.c1": "The search box filters on folder name and full path, several search words at once. Accents do not matter: “bucher” finds “Bücher”. That is not cosmetic — depending on where a file came from, the same umlaut is stored differently in its name.",
+        "release.c2h": "Folders with the same name are told apart",
+        "release.c2": "While searching, each hit shows the folder it sits in underneath. Three folders called “attachments” were indistinguishable in the tree list — no longer. Hits are ordered sensibly: folders whose name starts with the term first, then remaining name matches, then matches in the path.",
+        "release.c3h": "Without reaching for the mouse",
+        "release.c3": "Arrow keys walk the hits, Enter selects, a second Enter moves, Escape closes. If you prefer clicking: a double-click on a folder moves straight away. With an empty search the dialog looks exactly as before — vault root on top, indented tree, folder colours and icons.",
         "release.link": "Full release notes on GitHub →",
         "dl.label": "Download",
         "dl.heading": "Get started.",
