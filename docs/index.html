@@ -344,6 +344,9 @@
     .dl-info { text-align: left; }
     .dl-platform { font-weight: 600; font-size: 0.9rem; }
     .dl-version { font-size: 0.75rem; color: var(--text-muted); }
+    .dl-note { max-width: 62ch; margin: 0 auto 1rem; font-size: 0.82rem; line-height: 1.6; color: var(--text-muted); text-align: left; }
+    .dl-note b { color: var(--text); font-weight: 600; }
+    .dl-note code { font-size: 0.95em; }
     .dl-more { font-size: 0.8rem; color: var(--text-muted); }
     .dl-more a { color: var(--text-muted); text-decoration: underline; transition: color 0.2s; }
     .dl-more a:hover { color: var(--accent); }
@@ -1665,9 +1668,10 @@
       </a>
       <a href="https://github.com/bydb/mindgraph-notes/releases/latest" target="_blank" rel="noopener noreferrer" class="dl-btn">
         <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor"><path d="M0 3.449L9.75 2.1v9.451H0m10.949-9.602L24 0v11.4H10.949M0 12.6h9.75v9.451L0 20.699M10.949 12.6H24V24l-12.9-1.801"/></svg>
-        <div class="dl-info"><div class="dl-platform">Windows</div><div class="dl-version">.exe &middot; v<span data-app-version>0.10.27-beta</span></div></div>
+        <div class="dl-info"><div class="dl-platform">Windows</div><div class="dl-version">Setup .exe &middot; v<span data-app-version>0.10.27-beta</span></div></div>
       </a>
     </div>
+    <p class="dl-note" data-i18n="dl.winnote">Windows: Nimm die Datei mit <b>Setup</b> im Namen &mdash; die installiert sich richtig, ersetzt die Vorg&auml;ngerversion und aktualisiert sich sp&auml;ter selbst. Die Datei <em>ohne</em> &bdquo;Setup&ldquo; ist die portable Fassung f&uuml;r Rechner ohne Installationsrechte: Sie l&auml;uft direkt, installiert aber nichts und aktualisiert sich nicht. Dateien mit der Endung <code>.blockmap</code> sind Hilfsdateien des Auto-Updates und keine Programme.</p>
     <p class="dl-more">
       <a href="https://github.com/bydb/mindgraph-notes/releases/latest" target="_blank" rel="noopener noreferrer" data-i18n="dl.all">Alle Downloads (deb, snap, zip...)</a>
     </p>
@@ -1992,6 +1996,7 @@
         "dl.heading": "Jetzt starten.",
         "dl.sub": "Kostenlos, Open Source, in 2 Minuten startklar. \u00d6ffne einen bestehenden Vault oder starte mit dem Starter-Vault.",
         "dl.all": "Alle Downloads (deb, snap, zip...)",
+        "dl.winnote": "Windows: Nimm die Datei mit <b>Setup</b> im Namen — die installiert sich richtig, ersetzt die Vorgängerversion und aktualisiert sich später selbst. Die Datei <em>ohne</em> „Setup“ ist die portable Fassung für Rechner ohne Installationsrechte: Sie läuft direkt, installiert aber nichts und aktualisiert sich nicht. Dateien mit der Endung <code>.blockmap</code> sind Hilfsdateien des Auto-Updates und keine Programme.",
         "faq.label": "FAQ",
         "faq.heading": "H\u00e4ufige Fragen",
         "faq.q1": "Brauche ich ein Konto?",
@@ -2259,6 +2264,7 @@
         "dl.heading": "Get started.",
         "dl.sub": "Free, open source, ready in 2 minutes. Open an existing vault or start with the starter vault.",
         "dl.all": "All downloads (deb, snap, zip...)",
+        "dl.winnote": "Windows: take the file with <b>Setup</b> in its name — that one installs properly, replaces the previous version and updates itself later. The file <em>without</em> “Setup” is the portable build for machines where you cannot install anything: it runs straight away, but installs nothing and never updates. Files ending in <code>.blockmap</code> are helper files for the auto-update and not programs.",
         "faq.label": "FAQ",
         "faq.heading": "Frequently Asked Questions",
         "faq.q1": "Do I need an account?",
