@@ -48,7 +48,7 @@
     "url": "https://mindgraph-notes.de/",
     "downloadUrl": "https://github.com/bydb/mindgraph-notes/releases",
     "screenshot": "https://mindgraph-notes.de/screenshot.png",
-    "softwareVersion": "0.10.39-beta",
+    "softwareVersion": "0.10.40-beta",
     "author": { "@type": "Person", "name": "Jochen Leeder", "url": "https://bydb.io" },
     "license": "https://opensource.org/licenses/AGPL-3.0",
     "featureList": [
@@ -495,7 +495,7 @@
         <span class="hero-dot"></span>
         <span data-i18n="hero.badge">Open Source &middot; Lokal &middot; Kostenlos</span>
       </div>
-      <a class="release-badge" href="#changelog" data-i18n="hero.release">Verschieben nach: Ordner suchen statt scrollen &middot; v0.10.39</a>
+      <a class="release-badge" href="#changelog" data-i18n="hero.release">Agent-Zielordner: Das Suchfeld bleibt sichtbar &middot; v0.10.40</a>
     </div>
 
     <h1 data-i18n="hero.title">Der Fokus bleibt.<br><em>Auch wenn das Leben dazwischenkommt.</em></h1>
@@ -1630,16 +1630,16 @@
     <div class="release-inner">
       <div class="release-head">
         <div>
-          <div class="st-eyebrow"><span class="d"></span><span data-i18n="release.label">Release 0.10.39 &middot; Verschieben, ohne zu suchen</span></div>
-          <h2 class="st-h" style="font-size:clamp(1.8rem,3.8vw,2.6rem)" data-i18n="release.heading">Was ist neu &mdash; <em>der Verschieben-Dialog hat jetzt eine Suche.</em></h2>
-          <p class="st-lead" data-i18n="release.lead">&bdquo;Verschieben nach&hellip;&ldquo; zeigte den ganzen Ordnerbaum als eine lange Liste. Wer ein paar hundert Ordner hat, scrollte. Jetzt steht oben ein Suchfeld, das beim &Ouml;ffnen den Fokus hat &mdash; tippen, ausw&auml;hlen, fertig.</p>
+          <div class="st-eyebrow"><span class="d"></span><span data-i18n="release.label">Release 0.10.40 &middot; Ein Feld, das nicht mehr verschwindet</span></div>
+          <h2 class="st-h" style="font-size:clamp(1.8rem,3.8vw,2.6rem)" data-i18n="release.heading">Was ist neu &mdash; <em>der Zielordner im Agent klappt jetzt in die richtige Richtung auf.</em></h2>
+          <p class="st-lead" data-i18n="release.lead">Im Agent-Bereich fehlte beim Ausw&auml;hlen des Zielordners das Suchfeld. Die Trefferliste war da, das Eingabefeld nicht &mdash; das Ausklapp-Fenster &ouml;ffnete nach oben und wurde am oberen Rand abgeschnitten. Es klappt jetzt dorthin, wo Platz ist.</p>
         </div>
         <div class="release-date">v<span data-app-version>0.10.35-beta</span></div>
       </div>
       <div class="release-grid">
-        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c1h">Tippen statt scrollen</b><p data-i18n="release.c1">Das Suchfeld filtert &uuml;ber Ordnernamen und kompletten Pfad, mehrere Suchw&ouml;rter gleichzeitig. Umlaute sind dabei egal: &bdquo;bucher&ldquo; findet &bdquo;B&uuml;cher&ldquo;. Das ist kein Detail &mdash; je nachdem, woher eine Datei stammt, liegt derselbe Umlaut technisch unterschiedlich im Namen.</p></div></div>
-        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c2h">Gleichnamige Ordner sind unterscheidbar</b><p data-i18n="release.c2">Beim Suchen steht unter jedem Treffer der Ordner, in dem er liegt. Drei Ordner namens &bdquo;anhaenge&ldquo; waren in der Baumliste nicht auseinanderzuhalten &mdash; jetzt schon. Die Treffer stehen in sinnvoller Reihenfolge: erst Ordner, deren Name so beginnt, dann die &uuml;brigen Namenstreffer, zuletzt Treffer im Pfad.</p></div></div>
-        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c3h">Ohne die Maus loszulassen</b><p data-i18n="release.c3">Pfeiltasten bl&auml;ttern durch die Treffer, Enter w&auml;hlt aus, ein zweites Enter verschiebt, Escape schlie&szlig;t. Wer lieber klickt: Ein Doppelklick auf einen Ordner verschiebt direkt. Ohne Suchbegriff sieht der Dialog aus wie bisher &mdash; Vault-Hauptordner oben, Baum mit Einr&uuml;ckung, Ordnerfarben und -Symbole.</p></div></div>
+        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c1h">Das Suchfeld hat Vorrang</b><p data-i18n="release.c1">Reicht der Platz nicht f&uuml;r die ganze Liste, klappt das Fenster nach unten &mdash; auch wenn dort insgesamt weniger Raum ist. Nach unten ge&ouml;ffnet sitzt das Suchfeld direkt am Knopf und bleibt sichtbar; k&uuml;rzen l&auml;sst sich dann nur die Trefferliste, die ohnehin scrollt.</p></div></div>
+        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c2h">Gemessen statt geraten</b><p data-i18n="release.c2">Die Richtung wird beim &Ouml;ffnen am tats&auml;chlich verf&uuml;gbaren Platz bestimmt, nicht fest eingestellt. Am unteren Fensterrand &mdash; etwa in der Leiste unter dem Editor &mdash; klappt es weiterhin nach oben. Dieselbe Zeile verh&auml;lt sich also an beiden Orten richtig, statt an einem von beiden.</p></div></div>
+        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c3h">Windows: welche Datei die richtige ist</b><p data-i18n="release.c3">Pro Version liegen auf Windows drei &auml;hnlich hei&szlig;ende Dateien nebeneinander. Die Download-Karte nennt jetzt ausdr&uuml;cklich &bdquo;Setup .exe&ldquo;, und ein Hinweis erkl&auml;rt die anderen beiden. Wer die portable Fassung erwischt, installiert n&auml;mlich nie etwas und bekommt keine Updates.</p></div></div>
       </div>
       <a class="release-link" href="https://github.com/bydb/mindgraph-notes/releases" target="_blank" rel="noopener noreferrer" data-i18n="release.link">Vollst&auml;ndige Release Notes auf GitHub &rarr;</a>
     </div>
@@ -1905,7 +1905,7 @@
         "how.p5h": "Das Web, wenn du es brauchst",
         "how.p5": "Schalte die Webrecherche pro Auftrag zu – ganz optional. Der Agent sucht, liest die passenden Seiten und schreibt eine Notiz mit sauberem Quellenverzeichnis; du prüfst sie, bevor sie in deinen Vault kommt. Der Suchanbieter erhält nur die Suchanfragen; die vollständigen Seiten ruft die App lokal ab. Bei einem optionalen Cloud-Modell geht der gelesene Kontext zusätzlich an dessen Anbieter – darauf weist die App vor dem Lauf hin. Den Suchanbieter wählst du selbst: sofort einsatzbereit oder deine eigene, private Suchmaschine.",
         "hero.badge": "Open Source \u00b7 Lokal \u00b7 Kostenlos",
-        "hero.release": "Verschieben nach: Ordner suchen statt scrollen &middot; v{vs}",
+        "hero.release": "Agent-Zielordner: Das Suchfeld bleibt sichtbar &middot; v{vs}",
         "hero.videoPause": "Anhalten",
         "hero.videoPlay": "Abspielen",
         "hero.videoStart": "Video abspielen",
@@ -1982,15 +1982,15 @@
         "modules.opt.vision": "Vision OCR",
         "modules.opt.speech": "Diktat & Vorlesen",
         "modules.opt.terminal": "Terminal",
-        "release.label": "Release {vs} · Verschieben, ohne zu suchen",
-        "release.heading": "Was ist neu — <em>der Verschieben-Dialog hat jetzt eine Suche.</em>",
-        "release.lead": "„Verschieben nach…“ zeigte den ganzen Ordnerbaum als eine lange Liste. Wer ein paar hundert Ordner hat, scrollte. Jetzt steht oben ein Suchfeld, das beim Öffnen den Fokus hat — tippen, auswählen, fertig.",
-        "release.c1h": "Tippen statt scrollen",
-        "release.c1": "Das Suchfeld filtert über Ordnernamen und kompletten Pfad, mehrere Suchwörter gleichzeitig. Umlaute sind dabei egal: „bucher“ findet „Bücher“. Das ist kein Detail — je nachdem, woher eine Datei stammt, liegt derselbe Umlaut technisch unterschiedlich im Namen.",
-        "release.c2h": "Gleichnamige Ordner sind unterscheidbar",
-        "release.c2": "Beim Suchen steht unter jedem Treffer der Ordner, in dem er liegt. Drei Ordner namens „anhaenge“ waren in der Baumliste nicht auseinanderzuhalten — jetzt schon. Die Treffer stehen in sinnvoller Reihenfolge: erst Ordner, deren Name so beginnt, dann die übrigen Namenstreffer, zuletzt Treffer im Pfad.",
-        "release.c3h": "Ohne die Maus loszulassen",
-        "release.c3": "Pfeiltasten blättern durch die Treffer, Enter wählt aus, ein zweites Enter verschiebt, Escape schließt. Wer lieber klickt: Ein Doppelklick auf einen Ordner verschiebt direkt. Ohne Suchbegriff sieht der Dialog aus wie bisher — Vault-Hauptordner oben, Baum mit Einrückung, Ordnerfarben und -Symbole.",
+        "release.label": "Release {vs} · Ein Feld, das nicht mehr verschwindet",
+        "release.heading": "Was ist neu — <em>der Zielordner im Agent klappt jetzt in die richtige Richtung auf.</em>",
+        "release.lead": "Im Agent-Bereich fehlte beim Auswählen des Zielordners das Suchfeld. Die Trefferliste war da, das Eingabefeld nicht — das Ausklapp-Fenster öffnete nach oben und wurde am oberen Rand abgeschnitten. Es klappt jetzt dorthin, wo Platz ist.",
+        "release.c1h": "Das Suchfeld hat Vorrang",
+        "release.c1": "Reicht der Platz nicht für die ganze Liste, klappt das Fenster nach unten — auch wenn dort insgesamt weniger Raum ist. Nach unten geöffnet sitzt das Suchfeld direkt am Knopf und bleibt sichtbar; kürzen lässt sich dann nur die Trefferliste, die ohnehin scrollt.",
+        "release.c2h": "Gemessen statt geraten",
+        "release.c2": "Die Richtung wird beim Öffnen am tatsächlich verfügbaren Platz bestimmt, nicht fest eingestellt. Am unteren Fensterrand — etwa in der Leiste unter dem Editor — klappt es weiterhin nach oben. Dieselbe Zeile verhält sich also an beiden Orten richtig, statt an einem von beiden.",
+        "release.c3h": "Windows: welche Datei die richtige ist",
+        "release.c3": "Pro Version liegen auf Windows drei ähnlich heißende Dateien nebeneinander. Die Download-Karte nennt jetzt ausdrücklich „Setup .exe“, und ein Hinweis erklärt die anderen beiden. Wer die portable Fassung erwischt, installiert nämlich nie etwas und bekommt keine Updates.",
         "release.link": "Vollständige Release Notes auf GitHub →",
         "dl.label": "Download",
         "dl.heading": "Jetzt starten.",
@@ -2173,7 +2173,7 @@
         "how.p5h": "The web, when you need it",
         "how.p5": "Turn on web research per task – entirely optional. The agent searches, reads the relevant pages and writes a note with a clean list of sources; you review it before it enters your vault. The search provider receives only the queries; the app fetches full pages locally. With an optional cloud model, the extracted context is also sent to that model provider – the app warns you before the run. You choose the search provider yourself: ready to use or your own private search engine.",
         "hero.badge": "Open Source \u00b7 Local \u00b7 Free",
-        "hero.release": "Move to: search folders instead of scrolling &middot; v{vs}",
+        "hero.release": "Agent target folder: the search box stays visible &middot; v{vs}",
         "hero.videoPause": "Pause",
         "hero.videoPlay": "Play",
         "hero.videoStart": "Play video",
@@ -2250,15 +2250,15 @@
         "modules.opt.vision": "Vision OCR",
         "modules.opt.speech": "Dictation & TTS",
         "modules.opt.terminal": "Terminal",
-        "release.label": "Release {vs} · Moving, without the hunt",
-        "release.heading": "What’s new — <em>the move dialog now has a search.</em>",
-        "release.lead": "“Move to…” listed the entire folder tree as one long list. With a few hundred folders, that meant scrolling. Now there is a search box at the top that takes focus as the dialog opens — type, pick, done.",
-        "release.c1h": "Type instead of scroll",
-        "release.c1": "The search box filters on folder name and full path, several search words at once. Accents do not matter: “bucher” finds “Bücher”. That is not cosmetic — depending on where a file came from, the same umlaut is stored differently in its name.",
-        "release.c2h": "Folders with the same name are told apart",
-        "release.c2": "While searching, each hit shows the folder it sits in underneath. Three folders called “attachments” were indistinguishable in the tree list — no longer. Hits are ordered sensibly: folders whose name starts with the term first, then remaining name matches, then matches in the path.",
-        "release.c3h": "Without reaching for the mouse",
-        "release.c3": "Arrow keys walk the hits, Enter selects, a second Enter moves, Escape closes. If you prefer clicking: a double-click on a folder moves straight away. With an empty search the dialog looks exactly as before — vault root on top, indented tree, folder colours and icons.",
+        "release.label": "Release {vs} · A field that no longer disappears",
+        "release.heading": "What’s new — <em>the agent’s target folder picker now opens the right way.</em>",
+        "release.lead": "In the agent area, picking a target folder showed no search box. The list of hits was there, the input field was not — the panel opened upwards and was cut off at the top edge. It now opens towards whichever side has room.",
+        "release.c1h": "The search box comes first",
+        "release.c1": "When there is not enough room for the whole panel, it opens downwards — even if that side has less space overall. Opened downwards, the search box sits right next to the button and stays visible; only the list of hits gets shorter, and it scrolls anyway.",
+        "release.c2h": "Measured, not assumed",
+        "release.c2": "The direction is decided from the space actually available at the moment it opens, rather than being fixed. Near the bottom edge of the window — the bar below the editor, for instance — it still opens upwards. The same row now behaves correctly in both places instead of only one.",
+        "release.c3h": "Windows: which file is the right one",
+        "release.c3": "Each version ships three similarly named files on Windows. The download card now says “Setup .exe” explicitly, and a note explains the other two. Picking the portable build means nothing ever gets installed and no updates arrive.",
         "release.link": "Full release notes on GitHub →",
         "dl.label": "Download",
         "dl.heading": "Get started.",

@@ -2,6 +2,20 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.10.40-beta] - 2026-08-10
+
+Im Agent-Bereich fehlte beim Auswählen des Zielordners das Suchfeld. Die Trefferliste stand da, das Eingabefeld war nicht zu sehen — man konnte also nur unter den ersten acht Ordnern wählen und in einem größeren Vault den gesuchten gar nicht erreichen.
+
+### Behoben
+
+- **Das Suchfeld bei der Zielordner-Auswahl war verdeckt.** Das Ausklapp-Fenster öffnete nach oben. Das ist richtig für die Leiste unter dem Editor, die am unteren Fensterrand klebt — im Agent-Tab sitzt dieselbe Zeile aber knapp unter der Überschrift, und der Bereich darüber schneidet ab, was herausragt. Nach oben geöffnet liegt ausgerechnet das Suchfeld am äußersten Ende des Fensters, es verschwand also als Erstes. Derselbe Fehler betraf den „Kontext"-Knopf daneben.
+- **Die Aufklapp-Richtung wird jetzt gemessen, nicht festgelegt.** Beim Öffnen wird der Platz gegen den Bereich geprüft, der tatsächlich abschneidet — nicht gegen das Fenster. Passt oben alles, bleibt es oben; sonst klappt es nach unten. Zusätzlich bekommt das Fenster eine gemessene Höchsthöhe, damit es gar nicht erst übersteht.
+- **Bei Platzmangel gibt die Trefferliste nach, nicht das Suchfeld.** Nach unten geöffnet sitzt das Suchfeld direkt am Knopf und bleibt sichtbar; gekürzt wird nur die Liste, die ohnehin scrollt. Deshalb wird auch dann nach unten geklappt, wenn dort in Summe weniger Platz ist als oben — genau dieser Fall trat in der Praxis auf und blieb beim ersten Behebungsversuch noch stehen.
+
+### Website
+
+- **Windows-Downloads sind unterscheidbar.** Pro Version liegen drei ähnlich heißende Dateien nebeneinander: der Installer, die portable Fassung und eine Hilfsdatei des Auto-Updates. Die Download-Karte sagte nur „.exe". Wer die portable Version erwischt, installiert nie etwas, bekommt keine Updates und sammelt mit jedem Download eine weitere Datei an. Die Karte nennt jetzt „Setup .exe", ein Hinweis darunter erklärt alle drei Dateien.
+
 ## [0.10.39-beta] - 2026-08-07
 
 Der Kontextmenü-Punkt „Verschieben nach…" zeigte den ganzen Ordnerbaum als eine lange Liste. Bei ein paar hundert Ordnern hieß das: scrollen und suchen. Jetzt steht oben ein Suchfeld.
