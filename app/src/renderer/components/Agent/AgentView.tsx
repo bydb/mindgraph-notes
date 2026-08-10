@@ -7,7 +7,7 @@
 // Zustand und IPC liegen im noteAgentStore (Bereich = Tab-ID), die Lauf-Anzeige ist
 // dieselbe wie in der Macher-Leiste (AgentRunPanel).
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useUIStore } from '../../stores/uiStore'
 import { useNotesStore } from '../../stores/notesStore'
 import { useTranslation } from '../../utils/translations'
@@ -15,6 +15,7 @@ import { ContextAttachmentRow, FolderGlyph } from '../Shared/ContextAttachmentRo
 import { ModelPicker } from '../Shared/ModelPicker'
 import { AgentRunPanel } from './AgentRunPanel'
 import { useContextVaultFiles } from '../../utils/useContextVaultFiles'
+import { measurePlacement, type PickerLayout } from '../../utils/pickerPlacement'
 import { useIsModuleEnabled } from '../../utils/modules'
 import { useNoteAgentStore, EMPTY_AGENT_SCOPE } from '../../stores/noteAgentStore'
 import { cloudRoutesForFeature, cloudProviderForSentinel, type CloudProviderId } from '../../../shared/llmBackend'
@@ -100,6 +101,8 @@ export function AgentView({ tabId }: Props) {
   const vaultEntries = useContextVaultFiles()
   const [targetPickerOpen, setTargetPickerOpen] = useState(false)
   const [targetQuery, setTargetQuery] = useState('')
+  const targetWrapRef = useRef<HTMLDivElement>(null)
+  const [targetLayout, setTargetLayout] = useState<PickerLayout>({ placement: 'above', maxHeight: 300 })
   const targetMatches = useMemo(() => {
     const q = targetQuery.trim().toLowerCase()
     const folders = vaultEntries.filter(f => f.isFolder)
@@ -109,6 +112,10 @@ export function AgentView({ tabId }: Props) {
   const closeTargetPicker = () => {
     setTargetPickerOpen(false)
     setTargetQuery('')
+  }
+  const openTargetPicker = () => {
+    setTargetLayout(measurePlacement(targetWrapRef.current))
+    setTargetPickerOpen(true)
   }
 
   const store = useNoteAgentStore.getState
@@ -179,11 +186,11 @@ export function AgentView({ tabId }: Props) {
           cloudSelected={false}
           extra={
             <>
-              <div className="ai-bar-context-picker-wrap">
+              <div className="ai-bar-context-picker-wrap" ref={targetWrapRef}>
                 <button
                   type="button"
                   className={`ai-bar-context-btn ${scope.targetFolder ? 'active' : ''}`}
-                  onClick={() => (targetPickerOpen ? closeTargetPicker() : setTargetPickerOpen(true))}
+                  onClick={() => (targetPickerOpen ? closeTargetPicker() : openTargetPicker())}
                   disabled={busy}
                   title={t('aiBar.target.hint')}
                   aria-expanded={targetPickerOpen}
@@ -191,7 +198,10 @@ export function AgentView({ tabId }: Props) {
                   <FolderGlyph /> {t('aiBar.target.label')}
                 </button>
                 {targetPickerOpen && (
-                  <div className="ai-bar-context-picker">
+                  <div
+                    className={`ai-bar-context-picker ${targetLayout.placement === 'below' ? 'is-below' : ''}`}
+                    style={{ ['--picker-max-height' as string]: `${targetLayout.maxHeight}px` }}
+                  >
                     <input
                       autoFocus
                       className="ai-bar-context-search"

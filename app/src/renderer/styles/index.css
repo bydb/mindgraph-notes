@@ -21184,6 +21184,20 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
   background: var(--bg-primary);
   box-shadow: var(--shadow-lg);
 }
+/* Nach unten geklappt, wenn oberhalb der Zeile kein Platz ist (Agent-Tab:
+   `.agent-view` scrollt und schneidet alles ab, was nach oben herausragt —
+   zuerst das Suchfeld). Richtung und Höhendeckel werden beim Öffnen gemessen,
+   siehe utils/pickerPlacement.ts. */
+.ai-bar-context-picker.is-below {
+  top: calc(100% + 6px);
+  bottom: auto;
+}
+/* Bei knappem Platz schrumpft die Trefferliste, nie das Suchfeld oder die
+   Fußzeilen-Buttons. */
+.ai-bar-context-picker { max-height: var(--picker-max-height, none); }
+.ai-bar-context-picker > .ai-bar-context-search,
+.ai-bar-context-picker > .ai-bar-context-oschooser { flex: 0 0 auto; }
+.ai-bar-context-picker > .ai-bar-context-results { flex: 1 1 auto; min-height: 60px; }
 .ai-bar-context-search {
   width: 100%;
   padding: 6px 9px;
