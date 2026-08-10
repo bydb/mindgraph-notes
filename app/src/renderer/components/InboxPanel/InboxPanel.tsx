@@ -111,6 +111,7 @@ export const InboxPanel: React.FC<InboxPanelProps> = ({ onClose }) => {
     isFetching,
     isAnalyzing,
     fetchProgress,
+    pendingBacklog,
     analysisProgress,
     analysisError,
     clearAnalysisError,
@@ -1317,6 +1318,10 @@ export const InboxPanel: React.FC<InboxPanelProps> = ({ onClose }) => {
             </div>
           )}
         </div>
+      )}
+      {/* Rueckstand sichtbar machen: Frueher fielen gekappte Mails still weg. */}
+      {!isFetching && pendingBacklog > 0 && (
+        <div className="inbox-backlog-hint">{t('inbox.backlogPending').replace('{n}', String(pendingBacklog))}</div>
       )}
       {isAnalyzing && analysisProgress && (
         <div className="inbox-progress">

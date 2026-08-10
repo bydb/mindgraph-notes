@@ -11917,6 +11917,16 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
   line-height: 1;
 }
 
+/* Rueckstand aus gekappten Abrufen — ruhiger Hinweis, keine Fehlermeldung:
+   Die Mails sind nicht verloren, sie kommen mit den naechsten Abrufen. */
+.inbox-backlog-hint {
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--border-color);
+  background: color-mix(in srgb, var(--accent-color) 8%, transparent);
+  color: var(--text-secondary);
+  font-size: 11px;
+  line-height: 1.45;
+}
 .inbox-progress {
   padding: 6px 12px;
   font-size: 11px;

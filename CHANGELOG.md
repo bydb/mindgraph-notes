@@ -2,6 +2,23 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.10.41-beta] - 2026-08-10
+
+Einzelne E-Mails tauchten in der App nie auf, obwohl sie im Postfach lagen — bei manchen existierte sogar bereits die Notiz mit den Aufgaben dazu. Auslöser war eine konkrete Mail vom 07.08., die Suche danach förderte einen Fehler im Abruf zutage, der jede Installation betrifft.
+
+### Behoben
+
+- **Der Abruf begrenzte, bevor er verglich.** „max. E-Mails pro Abruf" (Standard: 2) griff, bevor die bereits bekannten Nachrichten aussortiert waren. Weil die Postfachsuche tagesgenau arbeitet, umfasste das Zeitfenster praktisch immer den ganzen letzten Tag — und Runde für Runde belegten dieselben zwei längst bekannten Mails das Kontingent. Ältere, noch fehlende Nachrichten aus demselben Fenster kamen deshalb nie an die Reihe. Jetzt wird zuerst abgeglichen und dann begrenzt.
+- **Der Merker rückte vor, obwohl etwas liegen blieb.** Der Zeitpunkt „zuletzt abgerufen" wurde nach jedem Durchgang bedingungslos auf jetzt gesetzt. Was aus dem Kontingent herausfiel, lag beim nächsten Abruf außerhalb des Suchfensters und war damit endgültig unerreichbar — ohne jede Meldung. Er wartet jetzt, bis der Rückstand abgearbeitet ist, und die App holt ihn Durchgang für Durchgang nach.
+- **Schutz gegen Stillstand.** Verschwindet eine Nachricht zwischen dem Abruf ihres Umschlags und dem Abruf ihres Textes vom Server, käme dieselbe Auswahl in jeder Runde erneut und der gesamte Posteingang bliebe stehen. Kam von einer Auswahl nichts an, rückt der Merker deshalb trotzdem vor.
+- **Rückstand ist sichtbar.** Warten noch Mails, steht das jetzt im Posteingang, mit dem Hinweis auf die Einstellung. Dass das Weglassen vollkommen lautlos passierte, ist der Grund, warum der Fehler so lange unentdeckt blieb.
+
+### Hinweis
+
+Wer viele Mails vermisst: „max. E-Mails pro Abruf" in den Email-Einstellungen hochsetzen (etwa 50). Der Wert bremst nicht die KI-Analyse — die läuft ohnehin über alles noch nicht Ausgewertete. Er begrenzt allein das Holen.
+
+Nicht behoben ist ein zweiter, unabhängiger Grund für fehlende Mails: Werden zwei Installationen auf demselben Vault betrieben, überschreiben sie sich gegenseitig die Mailliste, weil sie eine einzige Datei ist und komplett neu geschrieben wird. Die Notizen überleben das (einzelne Dateien), die Liste nicht. Befund und Lösungsvorschläge stehen in `docs/email-store-multi-device-plan.md`.
+
 ## [0.10.40-beta] - 2026-08-10
 
 Im Agent-Bereich fehlte beim Auswählen des Zielordners das Suchfeld. Die Trefferliste stand da, das Eingabefeld war nicht zu sehen — man konnte also nur unter den ersten acht Ordnern wählen und in einem größeren Vault den gesuchten gar nicht erreichen.

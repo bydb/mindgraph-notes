@@ -20,6 +20,7 @@ import { initDisplayDiagnostics, getDisplayHealth } from './displayDiagnostics'
 import { bundledResourcesDir } from './bundledResources'
 import { buildZettelContent, buildZettelFileName, extractFrontmatterTags, sanitizeZettelEmojis, sanitizeZettelTag } from '../shared/zettel'
 import { splitTextIntoChunks, LONG_TEXT_CHUNK_THRESHOLD } from '../shared/textChunking'
+import { selectFetchBatch, shouldAdvanceCursor, type FetchCandidate } from '../shared/emailFetchWindow'
 import { setAiProvenanceInContent, todayIsoDate, buildProvenanceFooterHtml } from '../shared/aiProvenance'
 
 // Dev-only userData-Isolation: ungepackt (`npm run dev`/`start`) NIEMALS das produktive Profil der
@@ -9937,6 +9938,9 @@ ipcMain.handle('email-fetch', async (_event, vaultPath: string, accounts: Array<
     const updatedLastFetchedAt = { ...lastFetchedAt }
     const folderUpdates: Array<{ id: string; folder: string }> = []
     let totalProcessed = 0
+    // Wie viele unbekannte Mails diesmal liegen blieben — der Renderer meldet es,
+    // damit der Rueckstand nicht wieder still passiert.
+    let totalSkipped = 0
 
     for (const account of accounts) {
       const fetchFolder = (account.folder && account.folder.trim()) || 'INBOX'
@@ -9983,16 +9987,29 @@ ipcMain.handle('email-fetch', async (_event, vaultPath: string, accounts: Array<
             ? (lastFetched > retainLimit ? lastFetched : retainLimit)
             : initialFetchLimit
 
-          // Alle UIDs im Zeitraum holen, dann absteigend sortieren (neueste zuerst)
-          const uids: number[] = []
+          // Erst die Umschläge des ganzen Zeitfensters holen (ohne Text, daher
+          // billig) — nur so lässt sich VOR der Kappung erkennen, welche Mails
+          // schon bekannt sind. Vorher belegten die immer gleichen neuesten
+          // (bekannten) Nachrichten das Kontingent, und ältere unbekannte kamen
+          // nie an die Reihe. Siehe shared/emailFetchWindow.ts.
+          const candidates: FetchCandidate[] = []
           for await (const msg of client.fetch(
             { since: sinceDate },
-            { uid: true }
+            { envelope: true, uid: true }
           )) {
-            uids.push(msg.uid)
+            candidates.push({
+              uid: msg.uid,
+              // Dieselbe Regel wie beim Verarbeiten weiter unten — sonst passen
+              // die Kennungen nicht zusammen und alles gilt als unbekannt.
+              messageId: msg.envelope?.messageId || `${account.id}-${msg.uid}`
+            })
           }
-          uids.sort((a, b) => b - a) // neueste (höchste UID) zuerst
-          const selectedUids = uids.slice(0, maxPerAccount)
+          const selection = selectFetchBatch(candidates, existingIds, maxPerAccount)
+          const selectedUids = selection.selectedUids
+          if (selection.skippedCount > 0) {
+            console.log(`[Email] ${account.id}/${fetchFolder}: ${selection.skippedCount} unbekannte Mails bleiben für den nächsten Abruf liegen (Kontingent ${maxPerAccount})`)
+          }
+          totalSkipped += selection.skippedCount
 
           // Nur die ausgewählten UIDs mit vollem Body laden
           const messages = []
@@ -10009,6 +10026,10 @@ ipcMain.handle('email-fetch', async (_event, vaultPath: string, accounts: Array<
 
           sendEmailWindowEvent('email-fetch-progress', { current: 0, total: messages.length, status: `${messages.length} Nachrichten verarbeiten...` })
 
+          // Wie viele der ausgewaehlten Mails wirklich angekommen sind. Bleibt
+          // das 0, obwohl etwas ausgewaehlt war, darf der Merker vorruecken —
+          // sonst steht der Abruf dauerhaft still (siehe shouldAdvanceCursor).
+          let importedThisRound = 0
           for (let i = 0; i < messages.length; i++) {
             const msg = messages[i]
             const messageId = msg.envelope?.messageId || `${account.id}-${msg.uid}`
@@ -10106,14 +10127,20 @@ ipcMain.handle('email-fetch', async (_event, vaultPath: string, accounts: Array<
             })
 
             totalProcessed++
+            importedThisRound++
             sendEmailWindowEvent('email-fetch-progress', { current: i + 1, total: messages.length, status: `Nachricht ${i + 1}/${messages.length}` })
           }
 
-          const nowIso = new Date().toISOString()
-          updatedLastFetchedAt[fetchKey] = nowIso
-          // Legacy-Kompatibilität: lastFetchedAt[accountId] bleibt das INBOX-Datum
-          if (fetchFolder === 'INBOX') {
-            updatedLastFetchedAt[account.id] = nowIso
+          // Der Merker rückt nur vor, wenn das Zeitfenster leer geräumt ist.
+          // Sonst fielen die liegen gebliebenen (älteren) Mails beim nächsten
+          // Abruf aus dem Fenster und wären endgültig unerreichbar.
+          if (shouldAdvanceCursor(selection.skippedCount, selectedUids.length, importedThisRound)) {
+            const nowIso = new Date().toISOString()
+            updatedLastFetchedAt[fetchKey] = nowIso
+            // Legacy-Kompatibilität: lastFetchedAt[accountId] bleibt das INBOX-Datum
+            if (fetchFolder === 'INBOX') {
+              updatedLastFetchedAt[account.id] = nowIso
+            }
           }
         } finally {
           lock.release()
@@ -10142,7 +10169,7 @@ ipcMain.handle('email-fetch', async (_event, vaultPath: string, accounts: Array<
     await fs.mkdir(path.dirname(emailsPath), { recursive: true })
     await fs.writeFile(emailsPath, JSON.stringify({ emails: allEmails, lastFetchedAt: updatedLastFetchedAt }, null, 2), 'utf-8')
 
-    return { success: true, newCount: newEmails.length, totalCount: allEmails.length }
+    return { success: true, newCount: newEmails.length, totalCount: allEmails.length, skippedCount: totalSkipped }
   } catch (error) {
     console.error('[Email] Fetch error:', error)
     return { success: false, newCount: 0, totalCount: 0, error: error instanceof Error ? error.message : 'Fehler beim Abruf' }

@@ -13,6 +13,9 @@ interface EmailState {
   fetchProgress: { current: number; total: number; status: string } | null
   analysisProgress: { current: number; total: number } | null
   analysisError: string | null
+  // Unbekannte Mails, die beim letzten Abruf wegen `maxEmailsPerFetch` liegen
+  // blieben. Sichtbar machen statt still lassen — genau daran fehlten Mails.
+  pendingBacklog: number
   activeFilter: EmailFilter
   unreadRelevantCount: number
   selectedEmailId: string | null
@@ -94,6 +97,7 @@ export const useEmailStore = create<EmailState>()((set, get) => ({
   fetchProgress: null,
   analysisProgress: null,
   analysisError: null,
+  pendingBacklog: 0,
   activeFilter: { onlyRelevant: true },
   unreadRelevantCount: 0,
   selectedEmailId: null,
@@ -181,6 +185,7 @@ export const useEmailStore = create<EmailState>()((set, get) => ({
       )
 
       if (result.success) {
+        set({ pendingBacklog: result.skippedCount || 0 })
         // Neu laden nach Fetch (skipAutoActions: fetchEmails steuert Analyse selbst)
         await get().loadEmails(vaultPath, true)
 

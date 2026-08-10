@@ -1540,6 +1540,10 @@ export interface EmailFetchResult {
   success: boolean
   newCount: number
   totalCount: number
+  /** Unbekannte Mails, die wegen `maxEmailsPerFetch` liegen blieben. Sie sind
+   *  NICHT verloren — der nächste Abruf holt sie. Wird angezeigt, damit ein
+   *  Rückstand nicht wieder still bleibt. */
+  skippedCount?: number
   error?: string
 }
 

@@ -48,7 +48,7 @@
     "url": "https://mindgraph-notes.de/",
     "downloadUrl": "https://github.com/bydb/mindgraph-notes/releases",
     "screenshot": "https://mindgraph-notes.de/screenshot.png",
-    "softwareVersion": "0.10.40-beta",
+    "softwareVersion": "0.10.41-beta",
     "author": { "@type": "Person", "name": "Jochen Leeder", "url": "https://bydb.io" },
     "license": "https://opensource.org/licenses/AGPL-3.0",
     "featureList": [
@@ -495,7 +495,7 @@
         <span class="hero-dot"></span>
         <span data-i18n="hero.badge">Open Source &middot; Lokal &middot; Kostenlos</span>
       </div>
-      <a class="release-badge" href="#changelog" data-i18n="hero.release">Agent-Zielordner: Das Suchfeld bleibt sichtbar &middot; v0.10.40</a>
+      <a class="release-badge" href="#changelog" data-i18n="hero.release">Der Mailabruf übersprang Nachrichten &middot; v0.10.41</a>
     </div>
 
     <h1 data-i18n="hero.title">Der Fokus bleibt.<br><em>Auch wenn das Leben dazwischenkommt.</em></h1>
@@ -1630,16 +1630,16 @@
     <div class="release-inner">
       <div class="release-head">
         <div>
-          <div class="st-eyebrow"><span class="d"></span><span data-i18n="release.label">Release 0.10.40 &middot; Ein Feld, das nicht mehr verschwindet</span></div>
-          <h2 class="st-h" style="font-size:clamp(1.8rem,3.8vw,2.6rem)" data-i18n="release.heading">Was ist neu &mdash; <em>der Zielordner im Agent klappt jetzt in die richtige Richtung auf.</em></h2>
-          <p class="st-lead" data-i18n="release.lead">Im Agent-Bereich fehlte beim Ausw&auml;hlen des Zielordners das Suchfeld. Die Trefferliste war da, das Eingabefeld nicht &mdash; das Ausklapp-Fenster &ouml;ffnete nach oben und wurde am oberen Rand abgeschnitten. Es klappt jetzt dorthin, wo Platz ist.</p>
+          <div class="st-eyebrow"><span class="d"></span><span data-i18n="release.label">Release 0.10.41 &middot; Post, die nie ankam</span></div>
+          <h2 class="st-h" style="font-size:clamp(1.8rem,3.8vw,2.6rem)" data-i18n="release.heading">Was ist neu &mdash; <em>der Mailabruf holte nur die zwei neuesten und lie&szlig; den Rest liegen.</em></h2>
+          <p class="st-lead" data-i18n="release.lead">Einzelne E-Mails tauchten in MindGraph Notes nie auf, obwohl sie im Postfach lagen &mdash; bei manchen existierte sogar schon die Notiz mit den Aufgaben dazu. Ursache war der Abruf selbst: Er nahm pro Durchgang nur die zwei neuesten Nachrichten und setzte den Merker trotzdem auf jetzt. Alles dazwischen war danach unerreichbar.</p>
         </div>
         <div class="release-date">v<span data-app-version>0.10.35-beta</span></div>
       </div>
       <div class="release-grid">
-        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c1h">Das Suchfeld hat Vorrang</b><p data-i18n="release.c1">Reicht der Platz nicht f&uuml;r die ganze Liste, klappt das Fenster nach unten &mdash; auch wenn dort insgesamt weniger Raum ist. Nach unten ge&ouml;ffnet sitzt das Suchfeld direkt am Knopf und bleibt sichtbar; k&uuml;rzen l&auml;sst sich dann nur die Trefferliste, die ohnehin scrollt.</p></div></div>
-        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c2h">Gemessen statt geraten</b><p data-i18n="release.c2">Die Richtung wird beim &Ouml;ffnen am tats&auml;chlich verf&uuml;gbaren Platz bestimmt, nicht fest eingestellt. Am unteren Fensterrand &mdash; etwa in der Leiste unter dem Editor &mdash; klappt es weiterhin nach oben. Dieselbe Zeile verh&auml;lt sich also an beiden Orten richtig, statt an einem von beiden.</p></div></div>
-        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c3h">Windows: welche Datei die richtige ist</b><p data-i18n="release.c3">Pro Version liegen auf Windows drei &auml;hnlich hei&szlig;ende Dateien nebeneinander. Die Download-Karte nennt jetzt ausdr&uuml;cklich &bdquo;Setup .exe&ldquo;, und ein Hinweis erkl&auml;rt die anderen beiden. Wer die portable Fassung erwischt, installiert n&auml;mlich nie etwas und bekommt keine Updates.</p></div></div>
+        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c1h">Erst schauen, was fehlt &mdash; dann begrenzen</b><p data-i18n="release.c1">Die Begrenzung griff, bevor bekannte Nachrichten aussortiert waren. Da die Postfachsuche tagesgenau arbeitet, belegten Runde f&uuml;r Runde dieselben zwei l&auml;ngst bekannten Mails das Kontingent &mdash; &auml;ltere, noch fehlende kamen nie an die Reihe. Jetzt wird zuerst abgeglichen und dann begrenzt.</p></div></div>
+        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c2h">Der Merker wartet, bis alles geholt ist</b><p data-i18n="release.c2">Blieb etwas liegen, r&uuml;ckte der Zeitpunkt &bdquo;zuletzt abgerufen&ldquo; trotzdem vor &mdash; die &uuml;bersprungenen Mails fielen damit aus dem Suchfenster und waren endg&uuml;ltig weg. Er wartet jetzt, bis der R&uuml;ckstand abgearbeitet ist. Eine Ausnahme verhindert Stillstand, falls eine Nachricht zwischenzeitlich vom Server verschwindet.</p></div></div>
+        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c3h">R&uuml;ckstand wird angezeigt</b><p data-i18n="release.c3">Warten noch Mails, steht das jetzt im Posteingang &mdash; mit dem Hinweis, wo sich das Kontingent pro Abruf hochsetzen l&auml;sst. Vorher passierte das Weglassen vollkommen lautlos, was der eigentliche Grund war, warum der Fehler so lange unentdeckt blieb.</p></div></div>
       </div>
       <a class="release-link" href="https://github.com/bydb/mindgraph-notes/releases" target="_blank" rel="noopener noreferrer" data-i18n="release.link">Vollst&auml;ndige Release Notes auf GitHub &rarr;</a>
     </div>
@@ -1905,7 +1905,7 @@
         "how.p5h": "Das Web, wenn du es brauchst",
         "how.p5": "Schalte die Webrecherche pro Auftrag zu – ganz optional. Der Agent sucht, liest die passenden Seiten und schreibt eine Notiz mit sauberem Quellenverzeichnis; du prüfst sie, bevor sie in deinen Vault kommt. Der Suchanbieter erhält nur die Suchanfragen; die vollständigen Seiten ruft die App lokal ab. Bei einem optionalen Cloud-Modell geht der gelesene Kontext zusätzlich an dessen Anbieter – darauf weist die App vor dem Lauf hin. Den Suchanbieter wählst du selbst: sofort einsatzbereit oder deine eigene, private Suchmaschine.",
         "hero.badge": "Open Source \u00b7 Lokal \u00b7 Kostenlos",
-        "hero.release": "Agent-Zielordner: Das Suchfeld bleibt sichtbar &middot; v{vs}",
+        "hero.release": "Der Mailabruf übersprang Nachrichten &middot; v{vs}",
         "hero.videoPause": "Anhalten",
         "hero.videoPlay": "Abspielen",
         "hero.videoStart": "Video abspielen",
@@ -1982,15 +1982,15 @@
         "modules.opt.vision": "Vision OCR",
         "modules.opt.speech": "Diktat & Vorlesen",
         "modules.opt.terminal": "Terminal",
-        "release.label": "Release {vs} · Ein Feld, das nicht mehr verschwindet",
-        "release.heading": "Was ist neu — <em>der Zielordner im Agent klappt jetzt in die richtige Richtung auf.</em>",
-        "release.lead": "Im Agent-Bereich fehlte beim Auswählen des Zielordners das Suchfeld. Die Trefferliste war da, das Eingabefeld nicht — das Ausklapp-Fenster öffnete nach oben und wurde am oberen Rand abgeschnitten. Es klappt jetzt dorthin, wo Platz ist.",
-        "release.c1h": "Das Suchfeld hat Vorrang",
-        "release.c1": "Reicht der Platz nicht für die ganze Liste, klappt das Fenster nach unten — auch wenn dort insgesamt weniger Raum ist. Nach unten geöffnet sitzt das Suchfeld direkt am Knopf und bleibt sichtbar; kürzen lässt sich dann nur die Trefferliste, die ohnehin scrollt.",
-        "release.c2h": "Gemessen statt geraten",
-        "release.c2": "Die Richtung wird beim Öffnen am tatsächlich verfügbaren Platz bestimmt, nicht fest eingestellt. Am unteren Fensterrand — etwa in der Leiste unter dem Editor — klappt es weiterhin nach oben. Dieselbe Zeile verhält sich also an beiden Orten richtig, statt an einem von beiden.",
-        "release.c3h": "Windows: welche Datei die richtige ist",
-        "release.c3": "Pro Version liegen auf Windows drei ähnlich heißende Dateien nebeneinander. Die Download-Karte nennt jetzt ausdrücklich „Setup .exe“, und ein Hinweis erklärt die anderen beiden. Wer die portable Fassung erwischt, installiert nämlich nie etwas und bekommt keine Updates.",
+        "release.label": "Release {vs} · Post, die nie ankam",
+        "release.heading": "Was ist neu — <em>der Mailabruf holte nur die zwei neuesten und ließ den Rest liegen.</em>",
+        "release.lead": "Einzelne E-Mails tauchten in MindGraph Notes nie auf, obwohl sie im Postfach lagen — bei manchen existierte sogar schon die Notiz mit den Aufgaben dazu. Ursache war der Abruf selbst: Er nahm pro Durchgang nur die zwei neuesten Nachrichten und setzte den Merker trotzdem auf jetzt. Alles dazwischen war danach unerreichbar.",
+        "release.c1h": "Erst schauen, was fehlt — dann begrenzen",
+        "release.c1": "Die Begrenzung griff, bevor bekannte Nachrichten aussortiert waren. Da die Postfachsuche tagesgenau arbeitet, belegten Runde für Runde dieselben zwei längst bekannten Mails das Kontingent — ältere, noch fehlende kamen nie an die Reihe. Jetzt wird zuerst abgeglichen und dann begrenzt.",
+        "release.c2h": "Der Merker wartet, bis alles geholt ist",
+        "release.c2": "Blieb etwas liegen, rückte der Zeitpunkt „zuletzt abgerufen“ trotzdem vor — die übersprungenen Mails fielen damit aus dem Suchfenster und waren endgültig weg. Er wartet jetzt, bis der Rückstand abgearbeitet ist. Eine Ausnahme verhindert Stillstand, falls eine Nachricht zwischenzeitlich vom Server verschwindet.",
+        "release.c3h": "Rückstand wird angezeigt",
+        "release.c3": "Warten noch Mails, steht das jetzt im Posteingang — mit dem Hinweis, wo sich das Kontingent pro Abruf hochsetzen lässt. Vorher passierte das Weglassen vollkommen lautlos, was der eigentliche Grund war, warum der Fehler so lange unentdeckt blieb.",
         "release.link": "Vollständige Release Notes auf GitHub →",
         "dl.label": "Download",
         "dl.heading": "Jetzt starten.",
@@ -2173,7 +2173,7 @@
         "how.p5h": "The web, when you need it",
         "how.p5": "Turn on web research per task – entirely optional. The agent searches, reads the relevant pages and writes a note with a clean list of sources; you review it before it enters your vault. The search provider receives only the queries; the app fetches full pages locally. With an optional cloud model, the extracted context is also sent to that model provider – the app warns you before the run. You choose the search provider yourself: ready to use or your own private search engine.",
         "hero.badge": "Open Source \u00b7 Local \u00b7 Free",
-        "hero.release": "Agent target folder: the search box stays visible &middot; v{vs}",
+        "hero.release": "Mail fetching was skipping messages &middot; v{vs}",
         "hero.videoPause": "Pause",
         "hero.videoPlay": "Play",
         "hero.videoStart": "Play video",
@@ -2250,15 +2250,15 @@
         "modules.opt.vision": "Vision OCR",
         "modules.opt.speech": "Dictation & TTS",
         "modules.opt.terminal": "Terminal",
-        "release.label": "Release {vs} · A field that no longer disappears",
-        "release.heading": "What’s new — <em>the agent’s target folder picker now opens the right way.</em>",
-        "release.lead": "In the agent area, picking a target folder showed no search box. The list of hits was there, the input field was not — the panel opened upwards and was cut off at the top edge. It now opens towards whichever side has room.",
-        "release.c1h": "The search box comes first",
-        "release.c1": "When there is not enough room for the whole panel, it opens downwards — even if that side has less space overall. Opened downwards, the search box sits right next to the button and stays visible; only the list of hits gets shorter, and it scrolls anyway.",
-        "release.c2h": "Measured, not assumed",
-        "release.c2": "The direction is decided from the space actually available at the moment it opens, rather than being fixed. Near the bottom edge of the window — the bar below the editor, for instance — it still opens upwards. The same row now behaves correctly in both places instead of only one.",
-        "release.c3h": "Windows: which file is the right one",
-        "release.c3": "Each version ships three similarly named files on Windows. The download card now says “Setup .exe” explicitly, and a note explains the other two. Picking the portable build means nothing ever gets installed and no updates arrive.",
+        "release.label": "Release {vs} · Mail that never arrived",
+        "release.heading": "What’s new — <em>mail fetching took only the two newest messages and left the rest behind.</em>",
+        "release.lead": "Individual emails never showed up in MindGraph Notes even though they sat in the mailbox — for some, the note with its tasks already existed. The cause was the fetch itself: it took only the two newest messages per round and moved the marker to now regardless. Everything in between became unreachable.",
+        "release.c1h": "Check what is missing, then limit",
+        "release.c1": "The limit applied before known messages were filtered out. Since mailbox search works by whole days, the same two long-known emails filled the quota round after round — older, still-missing ones never got a turn. The comparison now happens first, the limit second.",
+        "release.c2h": "The marker waits until everything is in",
+        "release.c2": "If anything was left over, the “last fetched” timestamp moved forward anyway — the skipped emails fell outside the search window and were gone for good. It now waits until the backlog is cleared. One exception prevents a standstill if a message disappears from the server in the meantime.",
+        "release.c3h": "The backlog is now visible",
+        "release.c3": "If emails are still waiting, the inbox says so — along with where to raise the per-fetch quota. Previously the dropping happened in complete silence, which is the real reason the fault went unnoticed for so long.",
         "release.link": "Full release notes on GitHub →",
         "dl.label": "Download",
         "dl.heading": "Get started.",
