@@ -1,6 +1,7 @@
-import { useMemo, useState, type ReactNode } from 'react'
+import { useMemo, useRef, useState, type ReactNode } from 'react'
 import { useTranslation } from '../../utils/translations'
 import { useContextVaultFiles } from '../../utils/useContextVaultFiles'
+import { measurePlacement, type PickerLayout } from '../../utils/pickerPlacement'
 import type { NoteAgentAttachment } from '../../../shared/types'
 
 // Notiz-Agent Phase 1: geteilte Kontext-Zeile (Pill-Button + Chips + Vault-Picker +
@@ -41,6 +42,8 @@ export function ContextAttachmentRow({ attachments, onAttachDialog, onAttachFold
   const vaultFiles = useContextVaultFiles()
   const [pickerOpen, setPickerOpen] = useState(false)
   const [pickerQuery, setPickerQuery] = useState('')
+  const wrapRef = useRef<HTMLDivElement>(null)
+  const [layout, setLayout] = useState<PickerLayout>({ placement: 'above', maxHeight: 300 })
 
   const pickerMatches = useMemo(() => {
     const q = pickerQuery.trim().toLowerCase()
@@ -60,15 +63,19 @@ export function ContextAttachmentRow({ attachments, onAttachDialog, onAttachFold
     setPickerOpen(false)
     setPickerQuery('')
   }
+  const openPicker = () => {
+    setLayout(measurePlacement(wrapRef.current))
+    setPickerOpen(true)
+  }
 
   return (
     <>
       <div className="ai-bar-context">
-        <div className="ai-bar-context-picker-wrap">
+        <div className="ai-bar-context-picker-wrap" ref={wrapRef}>
           <button
             type="button"
             className="ai-bar-context-btn"
-            onClick={() => (pickerOpen ? closePicker() : setPickerOpen(true))}
+            onClick={() => (pickerOpen ? closePicker() : openPicker())}
             disabled={disabled}
             title={t('aiBar.context.add')}
             aria-expanded={pickerOpen}
@@ -76,7 +83,10 @@ export function ContextAttachmentRow({ attachments, onAttachDialog, onAttachFold
             <PlusGlyph /> {t('aiBar.context.label')}
           </button>
           {pickerOpen && (
-            <div className="ai-bar-context-picker">
+            <div
+              className={`ai-bar-context-picker ${layout.placement === 'below' ? 'is-below' : ''}`}
+              style={{ ['--picker-max-height' as string]: `${layout.maxHeight}px` }}
+            >
               <input
                 autoFocus
                 className="ai-bar-context-search"
