@@ -82,7 +82,11 @@ export function ActiveModelBadge({ moduleId, tabOverride, tabOverrideLabel }: Pr
         color: 'var(--text-secondary, #6b7280)',
         cursor: 'pointer',
         fontFamily: 'inherit',
-        opacity: 0.55
+        opacity: 0.55,
+        // In schmalen Karten (Dashboard-Spalte) sonst mitten im Modellnamen
+        // umgebrochen: „gemma4:12b-" / „mlx". Lieber abschneiden.
+        minWidth: 0,
+        maxWidth: '100%'
       }}
     >
       <span
@@ -98,7 +102,7 @@ export function ActiveModelBadge({ moduleId, tabOverride, tabOverrideLabel }: Pr
       />
       <ModelLogo model={effectiveModel} size={13} />
       <ModelMarkers model={effectiveModel} size={12} />
-      <span>{effectiveModel}</span>
+      <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{effectiveModel}</span>
     </button>
   )
 }

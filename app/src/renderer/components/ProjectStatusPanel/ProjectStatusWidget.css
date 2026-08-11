@@ -11,10 +11,16 @@
   min-height: 80px;
 }
 
+/* Der Kopf muss umbrechen können. Die Dashboard-Spalte ist höchstens 380 px
+   breit, die Knöpfe stehen auf `white-space: nowrap` — ohne Umbruch kann die
+   Knopfgruppe nicht schrumpfen und lief aus der Karte heraus, quer über das
+   Nachbar-Widget. Bei zu wenig Platz rutschen die Aktionen jetzt in eine
+   eigene Zeile, statt den Nachbarn zu überdecken. */
 .psw-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: 8px;
 }
 
@@ -22,12 +28,19 @@
   margin: 0;
   font-size: 1.05rem;
   font-weight: 600;
+  /* Nicht mitten im Wort umbrechen („Projekt-" / „Status") — lieber die
+     Aktionen eine Zeile tiefer schicken. */
+  white-space: nowrap;
 }
 
 .psw-header-actions {
   display: flex;
   gap: 6px;
   align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  margin-left: auto;
+  min-width: 0;
 }
 
 /* ─── Buttons ───────────────────────────────────────────────────────────── */
