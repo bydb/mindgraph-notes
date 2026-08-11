@@ -48,7 +48,7 @@
     "url": "https://mindgraph-notes.de/",
     "downloadUrl": "https://github.com/bydb/mindgraph-notes/releases",
     "screenshot": "https://mindgraph-notes.de/screenshot.png",
-    "softwareVersion": "0.10.41-beta",
+    "softwareVersion": "0.10.42-beta",
     "author": { "@type": "Person", "name": "Jochen Leeder", "url": "https://bydb.io" },
     "license": "https://opensource.org/licenses/AGPL-3.0",
     "featureList": [
@@ -495,7 +495,7 @@
         <span class="hero-dot"></span>
         <span data-i18n="hero.badge">Open Source &middot; Lokal &middot; Kostenlos</span>
       </div>
-      <a class="release-badge" href="#changelog" data-i18n="hero.release">Der Mailabruf übersprang Nachrichten &middot; v0.10.41</a>
+      <a class="release-badge" href="#changelog" data-i18n="hero.release">Neue Dateien erscheinen sofort &middot; v0.10.42</a>
     </div>
 
     <h1 data-i18n="hero.title">Der Fokus bleibt.<br><em>Auch wenn das Leben dazwischenkommt.</em></h1>
@@ -1630,16 +1630,16 @@
     <div class="release-inner">
       <div class="release-head">
         <div>
-          <div class="st-eyebrow"><span class="d"></span><span data-i18n="release.label">Release 0.10.41 &middot; Post, die nie ankam</span></div>
-          <h2 class="st-h" style="font-size:clamp(1.8rem,3.8vw,2.6rem)" data-i18n="release.heading">Was ist neu &mdash; <em>der Mailabruf holte nur die zwei neuesten und lie&szlig; den Rest liegen.</em></h2>
-          <p class="st-lead" data-i18n="release.lead">Einzelne E-Mails tauchten in MindGraph Notes nie auf, obwohl sie im Postfach lagen &mdash; bei manchen existierte sogar schon die Notiz mit den Aufgaben dazu. Ursache war der Abruf selbst: Er nahm pro Durchgang nur die zwei neuesten Nachrichten und setzte den Merker trotzdem auf jetzt. Alles dazwischen war danach unerreichbar.</p>
+          <div class="st-eyebrow"><span class="d"></span><span data-i18n="release.label">Release 0.10.42 &middot; Da, ohne Neuladen</span></div>
+          <h2 class="st-h" style="font-size:clamp(1.8rem,3.8vw,2.6rem)" data-i18n="release.heading">Was ist neu &mdash; <em>neue Dateien und Ordner erscheinen jetzt sofort im Dateibaum.</em></h2>
+          <p class="st-lead" data-i18n="release.lead">Wer ein Bild in den Vault legte, einen Ordner anlegte oder den Notiz-Agenten eine HTML-Seite erzeugen lie&szlig;, sah davon nichts &mdash; bis das Fenster neu geladen wurde. Markdown-Notizen erschienen sofort, alles andere nicht. Der Grund war eine einzige Zeile, die genau das herausfilterte.</p>
         </div>
         <div class="release-date">v<span data-app-version>0.10.35-beta</span></div>
       </div>
       <div class="release-grid">
-        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c1h">Erst schauen, was fehlt &mdash; dann begrenzen</b><p data-i18n="release.c1">Die Begrenzung griff, bevor bekannte Nachrichten aussortiert waren. Da die Postfachsuche tagesgenau arbeitet, belegten Runde f&uuml;r Runde dieselben zwei l&auml;ngst bekannten Mails das Kontingent &mdash; &auml;ltere, noch fehlende kamen nie an die Reihe. Jetzt wird zuerst abgeglichen und dann begrenzt.</p></div></div>
-        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c2h">Der Merker wartet, bis alles geholt ist</b><p data-i18n="release.c2">Blieb etwas liegen, r&uuml;ckte der Zeitpunkt &bdquo;zuletzt abgerufen&ldquo; trotzdem vor &mdash; die &uuml;bersprungenen Mails fielen damit aus dem Suchfenster und waren endg&uuml;ltig weg. Er wartet jetzt, bis der R&uuml;ckstand abgearbeitet ist. Eine Ausnahme verhindert Stillstand, falls eine Nachricht zwischenzeitlich vom Server verschwindet.</p></div></div>
-        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c3h">R&uuml;ckstand wird angezeigt</b><p data-i18n="release.c3">Warten noch Mails, steht das jetzt im Posteingang &mdash; mit dem Hinweis, wo sich das Kontingent pro Abruf hochsetzen l&auml;sst. Vorher passierte das Weglassen vollkommen lautlos, was der eigentliche Grund war, warum der Fehler so lange unentdeckt blieb.</p></div></div>
+        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c1h">Bilder, PDFs, Tabellen, Ordner</b><p data-i18n="release.c1">Bisher meldete die App nur &Auml;nderungen an Markdown-Dateien ans Fenster. Betroffen waren damit genau die Ergebnisse, die der Notiz-Agent neben Notizen erzeugt &mdash; HTML-Seiten und Tabellen &mdash; und jede Datei, die man von au&szlig;en hineinlegt. Jetzt wird jede &Auml;nderung gemeldet.</p></div></div>
+        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c2h">Und trotzdem ruhig</b><p data-i18n="release.c2">Jede Meldung l&ouml;ste bisher einen vollst&auml;ndigen Durchlauf durch den ganzen Vault aus. Bei mehreren tausend Dateien und einem Agent-Lauf, der mehrere Dateien schreibt, w&auml;re die breitere Meldung von unangenehm zu hei&szlig; geworden. Die Auffrischung sammelt jetzt kurz und l&auml;uft einmal statt einmal pro Datei.</p></div></div>
+        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c3h">Kein Widget &uuml;berdeckt mehr seinen Nachbarn</b><p data-i18n="release.c3">Im Dashboard lief der Kopf des Projekt-Status-Widgets aus seiner Spalte heraus und legte sich quer &uuml;ber die &Uuml;berschrift daneben. Er darf jetzt umbrechen &mdash; und eine Rasterregel h&auml;lt grunds&auml;tzlich jedes Widget in seiner Spalte, damit das nicht beim n&auml;chsten neuen Knopf wiederkehrt.</p></div></div>
       </div>
       <a class="release-link" href="https://github.com/bydb/mindgraph-notes/releases" target="_blank" rel="noopener noreferrer" data-i18n="release.link">Vollst&auml;ndige Release Notes auf GitHub &rarr;</a>
     </div>
@@ -1905,7 +1905,7 @@
         "how.p5h": "Das Web, wenn du es brauchst",
         "how.p5": "Schalte die Webrecherche pro Auftrag zu – ganz optional. Der Agent sucht, liest die passenden Seiten und schreibt eine Notiz mit sauberem Quellenverzeichnis; du prüfst sie, bevor sie in deinen Vault kommt. Der Suchanbieter erhält nur die Suchanfragen; die vollständigen Seiten ruft die App lokal ab. Bei einem optionalen Cloud-Modell geht der gelesene Kontext zusätzlich an dessen Anbieter – darauf weist die App vor dem Lauf hin. Den Suchanbieter wählst du selbst: sofort einsatzbereit oder deine eigene, private Suchmaschine.",
         "hero.badge": "Open Source \u00b7 Lokal \u00b7 Kostenlos",
-        "hero.release": "Der Mailabruf übersprang Nachrichten &middot; v{vs}",
+        "hero.release": "Neue Dateien erscheinen sofort &middot; v{vs}",
         "hero.videoPause": "Anhalten",
         "hero.videoPlay": "Abspielen",
         "hero.videoStart": "Video abspielen",
@@ -1982,15 +1982,15 @@
         "modules.opt.vision": "Vision OCR",
         "modules.opt.speech": "Diktat & Vorlesen",
         "modules.opt.terminal": "Terminal",
-        "release.label": "Release {vs} · Post, die nie ankam",
-        "release.heading": "Was ist neu — <em>der Mailabruf holte nur die zwei neuesten und ließ den Rest liegen.</em>",
-        "release.lead": "Einzelne E-Mails tauchten in MindGraph Notes nie auf, obwohl sie im Postfach lagen — bei manchen existierte sogar schon die Notiz mit den Aufgaben dazu. Ursache war der Abruf selbst: Er nahm pro Durchgang nur die zwei neuesten Nachrichten und setzte den Merker trotzdem auf jetzt. Alles dazwischen war danach unerreichbar.",
-        "release.c1h": "Erst schauen, was fehlt — dann begrenzen",
-        "release.c1": "Die Begrenzung griff, bevor bekannte Nachrichten aussortiert waren. Da die Postfachsuche tagesgenau arbeitet, belegten Runde für Runde dieselben zwei längst bekannten Mails das Kontingent — ältere, noch fehlende kamen nie an die Reihe. Jetzt wird zuerst abgeglichen und dann begrenzt.",
-        "release.c2h": "Der Merker wartet, bis alles geholt ist",
-        "release.c2": "Blieb etwas liegen, rückte der Zeitpunkt „zuletzt abgerufen“ trotzdem vor — die übersprungenen Mails fielen damit aus dem Suchfenster und waren endgültig weg. Er wartet jetzt, bis der Rückstand abgearbeitet ist. Eine Ausnahme verhindert Stillstand, falls eine Nachricht zwischenzeitlich vom Server verschwindet.",
-        "release.c3h": "Rückstand wird angezeigt",
-        "release.c3": "Warten noch Mails, steht das jetzt im Posteingang — mit dem Hinweis, wo sich das Kontingent pro Abruf hochsetzen lässt. Vorher passierte das Weglassen vollkommen lautlos, was der eigentliche Grund war, warum der Fehler so lange unentdeckt blieb.",
+        "release.label": "Release {vs} · Da, ohne Neuladen",
+        "release.heading": "Was ist neu — <em>neue Dateien und Ordner erscheinen jetzt sofort im Dateibaum.</em>",
+        "release.lead": "Wer ein Bild in den Vault legte, einen Ordner anlegte oder den Notiz-Agenten eine HTML-Seite erzeugen ließ, sah davon nichts — bis das Fenster neu geladen wurde. Markdown-Notizen erschienen sofort, alles andere nicht. Der Grund war eine einzige Zeile, die genau das herausfilterte.",
+        "release.c1h": "Bilder, PDFs, Tabellen, Ordner",
+        "release.c1": "Bisher meldete die App nur Änderungen an Markdown-Dateien ans Fenster. Betroffen waren damit genau die Ergebnisse, die der Notiz-Agent neben Notizen erzeugt — HTML-Seiten und Tabellen — und jede Datei, die man von außen hineinlegt. Jetzt wird jede Änderung gemeldet.",
+        "release.c2h": "Und trotzdem ruhig",
+        "release.c2": "Jede Meldung löste bisher einen vollständigen Durchlauf durch den ganzen Vault aus. Bei mehreren tausend Dateien und einem Agent-Lauf, der mehrere Dateien schreibt, wäre die breitere Meldung von unangenehm zu heiß geworden. Die Auffrischung sammelt jetzt kurz und läuft einmal statt einmal pro Datei.",
+        "release.c3h": "Kein Widget überdeckt mehr seinen Nachbarn",
+        "release.c3": "Im Dashboard lief der Kopf des Projekt-Status-Widgets aus seiner Spalte heraus und legte sich quer über die Überschrift daneben. Er darf jetzt umbrechen — und eine Rasterregel hält grundsätzlich jedes Widget in seiner Spalte, damit das nicht beim nächsten neuen Knopf wiederkehrt.",
         "release.link": "Vollständige Release Notes auf GitHub →",
         "dl.label": "Download",
         "dl.heading": "Jetzt starten.",
@@ -2173,7 +2173,7 @@
         "how.p5h": "The web, when you need it",
         "how.p5": "Turn on web research per task – entirely optional. The agent searches, reads the relevant pages and writes a note with a clean list of sources; you review it before it enters your vault. The search provider receives only the queries; the app fetches full pages locally. With an optional cloud model, the extracted context is also sent to that model provider – the app warns you before the run. You choose the search provider yourself: ready to use or your own private search engine.",
         "hero.badge": "Open Source \u00b7 Local \u00b7 Free",
-        "hero.release": "Mail fetching was skipping messages &middot; v{vs}",
+        "hero.release": "New files show up instantly &middot; v{vs}",
         "hero.videoPause": "Pause",
         "hero.videoPlay": "Play",
         "hero.videoStart": "Play video",
@@ -2250,15 +2250,15 @@
         "modules.opt.vision": "Vision OCR",
         "modules.opt.speech": "Dictation & TTS",
         "modules.opt.terminal": "Terminal",
-        "release.label": "Release {vs} · Mail that never arrived",
-        "release.heading": "What’s new — <em>mail fetching took only the two newest messages and left the rest behind.</em>",
-        "release.lead": "Individual emails never showed up in MindGraph Notes even though they sat in the mailbox — for some, the note with its tasks already existed. The cause was the fetch itself: it took only the two newest messages per round and moved the marker to now regardless. Everything in between became unreachable.",
-        "release.c1h": "Check what is missing, then limit",
-        "release.c1": "The limit applied before known messages were filtered out. Since mailbox search works by whole days, the same two long-known emails filled the quota round after round — older, still-missing ones never got a turn. The comparison now happens first, the limit second.",
-        "release.c2h": "The marker waits until everything is in",
-        "release.c2": "If anything was left over, the “last fetched” timestamp moved forward anyway — the skipped emails fell outside the search window and were gone for good. It now waits until the backlog is cleared. One exception prevents a standstill if a message disappears from the server in the meantime.",
-        "release.c3h": "The backlog is now visible",
-        "release.c3": "If emails are still waiting, the inbox says so — along with where to raise the per-fetch quota. Previously the dropping happened in complete silence, which is the real reason the fault went unnoticed for so long.",
+        "release.label": "Release {vs} · There, without a reload",
+        "release.heading": "What’s new — <em>new files and folders now show up in the file tree straight away.</em>",
+        "release.lead": "Drop an image into the vault, create a folder, or have the note agent produce an HTML page — and nothing appeared until the window was reloaded. Markdown notes showed up instantly, everything else did not. The cause was a single line that filtered exactly that out.",
+        "release.c1h": "Images, PDFs, spreadsheets, folders",
+        "release.c1": "Until now the app only reported changes to Markdown files to the window. That hit precisely what the note agent produces alongside notes — HTML pages and spreadsheets — and every file you add from outside. Every change is now reported.",
+        "release.c2h": "And still calm",
+        "release.c2": "Each report used to trigger a full pass over the entire vault. With several thousand files and an agent run writing several files, the broader reporting would have gone from unpleasant to hot. Refreshes are now briefly collected and run once instead of once per file.",
+        "release.c3h": "No widget covers its neighbour",
+        "release.c3": "On the dashboard the project status widget’s header ran out of its column and lay across the heading next to it. It may now wrap — and a grid rule keeps every widget inside its column, so this does not return with the next new button.",
         "release.link": "Full release notes on GitHub →",
         "dl.label": "Download",
         "dl.heading": "Get started.",

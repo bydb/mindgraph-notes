@@ -2,6 +2,21 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.10.42-beta] - 2026-08-11
+
+Zwei Fehler aus dem Alltagsbetrieb: Neu angelegte Dateien und Ordner blieben im Dateibaum unsichtbar, bis man das Fenster neu lud. Und im Dashboard legte sich ein Widget quer über seinen Nachbarn.
+
+### Behoben
+
+- **Neue Dateien und Ordner erscheinen sofort.** Die App meldete bisher nur Änderungen an Markdown-Dateien ans Fenster. Alles andere blieb bis zu einem Neuladen unsichtbar: Bilder, PDFs, die HTML-Seiten und Tabellen des Notiz-Agenten und auch neu angelegte Ordner. Betroffen war damit genau das, was der Agent neben Notizen erzeugt — und jede Datei, die man von außen in den Vault legt.
+- **Der Dateibaum frischt trotzdem ruhig auf.** Jede einzelne Meldung löste bisher einen vollständigen Durchlauf durch den gesamten Vault aus. Bei mehreren tausend Dateien und einem Agent-Lauf, der mehrere Dateien schreibt, wäre die breitere Meldung von unangenehm zu heiß geworden. Die Auffrischung sammelt jetzt kurz und läuft einmal statt einmal pro Datei.
+- **Das Projekt-Status-Widget überdeckte sein Nachbar-Widget.** Titel, Modellanzeige und die beiden Knöpfe brauchen zusammen mehr Platz, als eine Dashboard-Spalte breit ist. Weil die Knöpfe nicht umbrechen dürfen, lief der Kopf aus der Karte heraus und legte sich quer über die Überschrift von „Zu beantworten"; der Titel wurde stattdessen mitten im Wort getrennt. Der Kopf darf jetzt umbrechen, und lange Modellnamen werden gekürzt statt zerlegt.
+- **Kein Widget kann mehr aus seiner Spalte wachsen.** Eine Rasterregel hält jedes Dashboard-Widget in seiner Spur. Ohne sie wäre derselbe Fehler beim nächsten zusätzlichen Knopf in irgendeinem anderen Widget wiedergekehrt.
+
+### Hinweis
+
+Die Watcher-Reaktion stand zweimal wortgleich im Code (zwei Wege, einen Vault zu öffnen). Jetzt einmal, von beiden benutzt — sonst wird so etwas künftig nur an einer der beiden Stellen repariert. Der Ordner `.mindgraph` bleibt weiterhin ausgenommen, es entsteht also keine Rückkopplung mit den Sync- und Mail-Dateien.
+
 ## [0.10.41-beta] - 2026-08-10
 
 Einzelne E-Mails tauchten in der App nie auf, obwohl sie im Postfach lagen — bei manchen existierte sogar bereits die Notiz mit den Aufgaben dazu. Auslöser war eine konkrete Mail vom 07.08., die Suche danach förderte einen Fehler im Abruf zutage, der jede Installation betrifft.
