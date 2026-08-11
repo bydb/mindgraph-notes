@@ -19,6 +19,11 @@ interface SidebarProps {
   onOpenSearch?: () => void
 }
 
+// Sammelfenster für das Auffrischen des Dateibaums. Kurz genug, dass es sich
+// sofort anfühlt; lang genug, dass ein Schwung Schreibvorgänge EINEN Scan
+// auslöst statt einen pro Datei.
+const TREE_REFRESH_DEBOUNCE_MS = 200
+
 export const Sidebar: React.FC<SidebarProps> = ({ onOpenSearch }) => {
   const { vaultPath, fileTree, notes, setVaultPath, setFileTree, setNotes, addNote, selectNote, setLoading } = useNotesStore()
   const { sidebarWidth, sidebarVisible, fileTreeDisplayMode, setFileTreeDisplayMode, notesRootFolder, setNotesRootFolder, dailyNote: dailyNoteSettings } = useUIStore()
@@ -39,6 +44,73 @@ export const Sidebar: React.FC<SidebarProps> = ({ onOpenSearch }) => {
 
   // Guard gegen doppeltes Laden (React Strict Mode)
   const isLoadingRef = useRef(false)
+
+  // ── Vault-Watcher: eine Reaktion für beide Einstiegswege ────────────────────
+  // Der Hauptprozess meldet jede Änderung, nicht nur `.md` — sonst erschienen
+  // Bilder, PDFs, die HTML-Seiten und Tabellen des Agenten sowie neue Ordner
+  // erst nach einem Neuladen des Fensters.
+  //
+  // Ein `readDirectory` scannt den kompletten Vault. Bei einem Schwung
+  // Schreibvorgänge (Agent-Lauf, Sync, Ordner kopieren) käme er sonst einmal PRO
+  // Datei — bei mehreren tausend Dateien der sichere Weg in die Hitze. Deshalb
+  // wird gesammelt und einmal am Ende aufgefrischt.
+  const treeRefreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const scheduleTreeRefresh = useCallback((vaultRoot: string) => {
+    if (treeRefreshTimer.current) clearTimeout(treeRefreshTimer.current)
+    treeRefreshTimer.current = setTimeout(async () => {
+      treeRefreshTimer.current = null
+      try {
+        setFileTree(await window.electronAPI.readDirectory(vaultRoot))
+      } catch (error) {
+        console.error('[Sidebar] Dateibaum konnte nicht aufgefrischt werden:', error)
+      }
+    }, TREE_REFRESH_DEBOUNCE_MS)
+  }, [setFileTree])
+
+  // Timer beim Verlassen abräumen — sonst schreibt er in eine tote Komponente.
+  useEffect(() => () => {
+    if (treeRefreshTimer.current) clearTimeout(treeRefreshTimer.current)
+  }, [])
+
+  const handleVaultFileChange = useCallback(async (vaultRoot: string, event: string, changedFilePath: string) => {
+    scheduleTreeRefresh(vaultRoot)
+
+    // Pfade normalisieren (Windows nutzt \, Unix /)
+    const normalizedChangedPath = changedFilePath.replace(/\\/g, '/')
+    const normalizedVaultPath = vaultRoot.replace(/\\/g, '/')
+    const relativePath = normalizedChangedPath.replace(normalizedVaultPath + '/', '')
+
+    // Der Notiz-Zustand betrifft nur Markdown. Für alles andere ist mit dem
+    // aufgefrischten Dateibaum bereits alles getan.
+    if (!relativePath.endsWith('.md')) return
+
+    if (event === 'add' || event === 'change') {
+      try {
+        const content = await window.electronAPI.readFile(changedFilePath)
+        const note = await createNoteFromFile(changedFilePath, relativePath, content)
+        const existingNote = useNotesStore.getState().getNoteByPath(relativePath)
+        if (existingNote) {
+          useNotesStore.getState().updateNote(existingNote.id, {
+            content,
+            title: note.title,
+            outgoingLinks: note.outgoingLinks,
+            tags: note.tags,
+            modifiedAt: new Date()
+          })
+        } else {
+          addNote(note)
+        }
+      } catch (error) {
+        console.error('Fehler beim Laden der geänderten Datei:', error)
+      }
+    } else if (event === 'unlink') {
+      const existingNote = useNotesStore.getState().getNoteByPath(relativePath)
+      if (existingNote) {
+        useNotesStore.getState().removeNote(existingNote.id)
+      }
+    }
+  }, [scheduleTreeRefresh, addNote])
+
   const notesRootLabel = notesRootFolder
     ? notesRootFolder.split('/').filter(Boolean).at(-1) || notesRootFolder
     : ''
@@ -81,53 +153,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ onOpenSearch }) => {
       // Graph-Daten aus dem Vault laden
       await loadGraphData(path)
 
-      window.electronAPI.watchDirectory(path, async (event: string, changedFilePath: string) => {
-        console.log('File changed:', event, changedFilePath)
-
-        // Dateibaum neu laden
-        const newTree = await window.electronAPI.readDirectory(path)
-        setFileTree(newTree)
-
-        // Bei neuer oder geänderter Datei: Notizen neu laden
-        if (event === 'add' || event === 'change') {
-          // Normalisiere Pfade für plattformübergreifende Kompatibilität (Windows verwendet \, Unix verwendet /)
-          const normalizedChangedPath = changedFilePath.replace(/\\/g, '/')
-          const normalizedVaultPath = path.replace(/\\/g, '/')
-          const relativePath = normalizedChangedPath.replace(normalizedVaultPath + '/', '')
-          if (relativePath.endsWith('.md')) {
-            try {
-              const content = await window.electronAPI.readFile(changedFilePath)
-              const note = await createNoteFromFile(changedFilePath, relativePath, content)
-
-              // Prüfen ob Notiz bereits existiert
-              const existingNote = useNotesStore.getState().getNoteByPath(relativePath)
-              if (existingNote) {
-                // Update existing note
-                useNotesStore.getState().updateNote(existingNote.id, {
-                  content,
-                  title: note.title,
-                  outgoingLinks: note.outgoingLinks,
-                  tags: note.tags,
-                  modifiedAt: new Date()
-                })
-              } else {
-                // Add new note
-                addNote(note)
-              }
-            } catch (error) {
-              console.error('Fehler beim Laden der geänderten Datei:', error)
-            }
-          }
-        } else if (event === 'unlink') {
-          // Datei gelöscht - auch hier Pfade normalisieren
-          const normalizedChangedPath = changedFilePath.replace(/\\/g, '/')
-          const normalizedVaultPath = path.replace(/\\/g, '/')
-          const relativePath = normalizedChangedPath.replace(normalizedVaultPath + '/', '')
-          const existingNote = useNotesStore.getState().getNoteByPath(relativePath)
-          if (existingNote) {
-            useNotesStore.getState().removeNote(existingNote.id)
-          }
-        }
+      window.electronAPI.watchDirectory(path, (event: string, changedFilePath: string) => {
+        void handleVaultFileChange(path, event, changedFilePath)
       })
       
       setLoading(false)
@@ -135,7 +162,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ onOpenSearch }) => {
       console.error('Fehler beim Öffnen des Vaults:', error)
       setLoading(false)
     }
-  }, [setVaultPath, setFileTree, setNotes, setLoading, loadGraphData, resetGraphStore, clearAllTabs])
+  }, [setVaultPath, setFileTree, setNotes, setLoading, loadGraphData, resetGraphStore, clearAllTabs, handleVaultFileChange])
   
   const handleNewNote = useCallback(() => {
     if (!vaultPath) {
@@ -341,48 +368,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ onOpenSearch }) => {
         }
 
         // File-Watcher starten
-        window.electronAPI.watchDirectory(targetVault, async (event: string, changedFilePath: string) => {
-          console.log('File changed:', event, changedFilePath)
-
-          const newTree = await window.electronAPI.readDirectory(targetVault!)
-          setFileTree(newTree)
-
-          if (event === 'add' || event === 'change') {
-            // Normalisiere Pfade für plattformübergreifende Kompatibilität (Windows verwendet \, Unix verwendet /)
-            const normalizedChangedPath = changedFilePath.replace(/\\/g, '/')
-            const normalizedVaultPath = targetVault!.replace(/\\/g, '/')
-            const relativePath = normalizedChangedPath.replace(normalizedVaultPath + '/', '')
-            if (relativePath.endsWith('.md')) {
-              try {
-                const content = await window.electronAPI.readFile(changedFilePath)
-                const note = await createNoteFromFile(changedFilePath, relativePath, content)
-
-                const existingNote = useNotesStore.getState().getNoteByPath(relativePath)
-                if (existingNote) {
-                  useNotesStore.getState().updateNote(existingNote.id, {
-                    content,
-                    title: note.title,
-                    outgoingLinks: note.outgoingLinks,
-                    tags: note.tags,
-                    modifiedAt: new Date()
-                  })
-                } else {
-                  addNote(note)
-                }
-              } catch (error) {
-                console.error('Fehler beim Laden der geänderten Datei:', error)
-              }
-            }
-          } else if (event === 'unlink') {
-            // Auch hier Pfade normalisieren
-            const normalizedChangedPath = changedFilePath.replace(/\\/g, '/')
-            const normalizedVaultPath = targetVault!.replace(/\\/g, '/')
-            const relativePath = normalizedChangedPath.replace(normalizedVaultPath + '/', '')
-            const existingNote = useNotesStore.getState().getNoteByPath(relativePath)
-            if (existingNote) {
-              useNotesStore.getState().removeNote(existingNote.id)
-            }
-          }
+        window.electronAPI.watchDirectory(targetVault, (event: string, changedFilePath: string) => {
+          void handleVaultFileChange(targetVault!, event, changedFilePath)
         })
 
         setLoading(false)

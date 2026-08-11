@@ -97,6 +97,15 @@
   margin: 0;
 }
 
+/* Raster-Elemente haben von Haus aus `min-width: auto` — ein Widget, dessen
+   Inhalt nicht schrumpfen kann, sprengt damit seine Spur und schiebt sich über
+   den Nachbarn (real passiert beim Projekt-Status-Kopf). Der Nullwert zwingt
+   jedes Widget in seine Spalte; ein Widget mit zu breitem Inhalt muss diesen
+   selbst umbrechen können. */
+.dashboard-view-grid > * {
+  min-width: 0;
+}
+
 /* Petrol redesign (Claude-Design-Layout): „Fokus heute" ist der volle-Breite-Hero-Streifen
    ganz oben, „Bestand" das ruhige volle-Breite-Zahlenband ganz unten. */
 .dashboard-view-grid > .dv-focus,
