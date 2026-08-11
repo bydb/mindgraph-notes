@@ -6381,7 +6381,7 @@ ipcMain.handle('check-command-exists', async (_event, command: string, args?: st
 })
 
 // ===== Voice: ElevenLabs TTS =====
-// ============ Bild-Generierung (image-generation-Modul, Google Imagen) ============
+// ============ Bild-Generierung (image-generation-Modul, Google Nano Banana) ============
 // Dünne IPC-Hülle um main/imageGen/imagenService.ts. Der Key bleibt Main-seitig
 // (safeStorage) — der Renderer bekommt für die Anzeige nur den geladenen Wert,
 // die Generierung selbst lädt ihn intern und reicht ihn nie durch.

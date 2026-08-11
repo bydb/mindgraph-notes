@@ -20,8 +20,8 @@ import type {
   AttendanceListData,
 } from '../../../shared/types'
 
-/** Rückgabe der DOCX-Export-Actions (Speichern via Dialog → Pfad | abgebrochen | Fehler). */
-type DocxExportResult = { success: boolean; filePath?: string; canceled?: boolean; error?: string }
+/** Rückgabe der Datei-Export-Actions (Speichern via Dialog → Pfad | abgebrochen | Fehler). */
+type FileExportResult = { success: boolean; filePath?: string; canceled?: boolean; error?: string }
 
 export const edooboxClient = {
   saveCredentials: (apiKey: string, apiSecret: string) =>
@@ -68,10 +68,10 @@ export const edooboxClient = {
     invokePlugin<EdooboxImportResult | null>('edoobox', 'edoobox.parseFormular'),
 
   generateIqReport: (data: IqReportData, suggestedFileName: string) =>
-    invokePlugin<DocxExportResult>('edoobox', 'edoobox.generateIqReport', { data, suggestedFileName }),
+    invokePlugin<FileExportResult>('edoobox', 'edoobox.generateIqReport', { data, suggestedFileName }),
 
   generateAttendanceList: (data: AttendanceListData, suggestedFileName: string) =>
-    invokePlugin<DocxExportResult>('edoobox', 'edoobox.generateAttendanceList', { data, suggestedFileName }),
+    invokePlugin<FileExportResult>('edoobox', 'edoobox.generateAttendanceList', { data, suggestedFileName }),
 
   // — Marketing: Ollama-Content + Bild-Auswahl. WordPress-Publishing = eigenes Plugin
   //   (wordpressServiceBridge), Bild-GENERIERUNG = Core-Modul image-generation. —
@@ -84,6 +84,9 @@ export const edooboxClient = {
 
   marketingSelectImage: () =>
     invokePlugin<{ fileName: string; imageBase64: string } | null>('edoobox', 'edoobox.marketingSelectImage'),
+
+  marketingSaveImage: (fileName: string, imageBase64: string) =>
+    invokePlugin<FileExportResult>('edoobox', 'edoobox.marketingSaveImage', { fileName, imageBase64 }),
 }
 
 // Registriert die Credential-Methoden als Service-Provider der neutralen Facade,

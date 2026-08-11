@@ -178,7 +178,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   openAlexDeleteMailto: () => ipcRenderer.invoke('openalex-delete-mailto'),
   openAlexCheck: () => ipcRenderer.invoke('openalex-check'),
 
-  // Bild-Generierung (image-generation-Modul, Google Imagen)
+  // Bild-Generierung (image-generation-Modul, Google Nano Banana)
   imageGenSaveKey: (apiKey: string) => ipcRenderer.invoke('image-gen-save-key', apiKey),
   imageGenLoadKey: () => ipcRenderer.invoke('image-gen-load-key'),
   imageGenDeleteKey: () => ipcRenderer.invoke('image-gen-delete-key'),

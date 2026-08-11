@@ -96,9 +96,9 @@ WEBRECHERCHE (für diesen Lauf aktiv):
     ? `
 
 BILD-GENERIERUNG (für diesen Lauf verfügbar):
-- generate_image erzeugt ein Bild (Google Imagen, landet als PNG im Staging). Prompt auf ENGLISCH, max. 50 Wörter, kein Text im Bild.
+- generate_image erzeugt ein Bild (Google Nano Banana, landet als JPEG im Staging). Prompt auf ENGLISCH, max. 50 Wörter, kein Text im Bild. Bei Kinder-/Jugendthemen ein symbolisches, personenfreies Motiv ohne Menschen oder Gesichter wählen.
 - Nur einsetzen, wenn der Auftrag ein Bild verlangt oder es das Ergebnis klar aufwertet (z.B. Titelbild eines Artikels).
-- Reihenfolge: ERST alle Bilder mit generate_image erzeugen, DANN die Notiz mit write_note — dort jedes Bild per ![[dateiname.png]] einbetten. Bild + Notiz zählen zusammen als EIN Ergebnis. Nach write_note ist keine Bild-Einbettung mehr möglich.`
+- Reihenfolge: ERST alle Bilder mit generate_image erzeugen, DANN die Notiz mit write_note — dort jedes Bild per ![[dateiname.jpg]] einbetten (exakt der Dateiname, den generate_image gemeldet hat). Bild + Notiz zählen zusammen als EIN Ergebnis. Nach write_note ist keine Bild-Einbettung mehr möglich.`
     : ''
 
   return `Du bist der Notiz-Agent in MindGraph Notes. Du erledigst EINEN Arbeitsauftrag des Nutzers und erzeugst dabei bei Bedarf Dateien.

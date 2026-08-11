@@ -14908,6 +14908,7 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
 
 .agent-marketing-image-row {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
 }
 
@@ -14957,6 +14958,16 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
   line-height: 1.4;
   font-style: italic;
   border-top: 1px solid var(--border-color);
+}
+
+.agent-marketing-image-error {
+  padding: 6px 8px;
+  border: 1px solid color-mix(in srgb, var(--danger-color, #ef4444) 35%, transparent);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--danger-color, #ef4444) 8%, transparent);
+  color: var(--danger-color, #ef4444);
+  font-size: 11px;
+  line-height: 1.4;
 }
 
 .agent-marketing-publish-btn {

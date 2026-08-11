@@ -164,10 +164,35 @@ function requireString(args: Record<string, unknown>, key: string): string | nul
   return typeof v === 'string' && v.trim() ? v.trim() : null
 }
 
+// Das Modell nennt sein Bild oft "titelbild.png" und bettet es dann auch so ein —
+// die Datei heisst aber nach der wirklich gelieferten Endung (Nano Banana: .jpg).
+// Ohne diese Korrektur zeigt das ![[…]] in der Notiz ins Leere, obwohl beide
+// Ergebnisse für sich in Ordnung sind. Nur der Namensstamm entscheidet; es wird
+// ausschliesslich auf tatsächlich erzeugte Bilder dieses Laufs umgeschrieben.
+export function repairImageEmbeds(markdown: string, ctx: NoteAgentContext): string {
+  const byStem = new Map<string, string>()
+  for (const r of ctx.run.results.values()) {
+    if (r.kind !== 'png' && r.kind !== 'jpg') continue
+    byStem.set(r.suggestedName.replace(/\.[^.]+$/, '').toLowerCase(), r.suggestedName)
+  }
+  if (byStem.size === 0) return markdown
+  // Beide Schreibweisen: Wikilink-Embed ![[bild.png]] UND Markdown-Bild ![alt](bild.png).
+  // Die zweite ist keine Theorie — im GUI-Test hat das Modell genau die benutzt.
+  return markdown
+    .replace(/!\[\[([^\[\]|#]+?)\.(png|jpe?g)((?:[|#][^\]]*)?)\]\]/gi, (match, stem: string, _ext, suffix: string) => {
+      const actual = byStem.get(stem.trim().toLowerCase())
+      return actual ? `![[${actual}${suffix}]]` : match
+    })
+    .replace(/(!\[[^\]]*\]\()([^()\s]+?)\.(png|jpe?g)(\))/gi, (match, head: string, stem: string, _ext, tail: string) => {
+      const actual = byStem.get(stem.trim().toLowerCase())
+      return actual ? `${head}${actual}${tail}` : match
+    })
+}
+
 async function registerStagedResult(
   ctx: NoteAgentContext,
   fileName: string,
-  kind: 'md' | 'xlsx' | 'docx' | 'txt' | 'csv' | 'html' | 'png',
+  kind: 'md' | 'xlsx' | 'docx' | 'txt' | 'csv' | 'html' | 'png' | 'jpg',
   data: Buffer | string,
   summary: string
 ): Promise<ToolResult> {
@@ -771,11 +796,11 @@ export function createNoteAgentRegistry(): ToolRegistry<NoteAgentContext> {
 
   // Bild-Generierung (Opt-in-Modul image-generation, Paket 4 der Modul-Entflechtung).
   // Nur in der Allowlist, wenn run.imageGen (Modul aktiv + Key hinterlegt) — siehe loop.ts.
-  // Der Imagen-Aufruf läuft komplett Main-seitig (Key verlässt den Main-Prozess nicht).
+  // Der Nano-Banana-Aufruf läuft komplett Main-seitig (Key verlässt den Main-Prozess nicht).
   registry.register({
     name: 'generate_image',
     description:
-      'Generiert ein Bild mit Google Imagen (Cloud, nutzt den hinterlegten API-Key des Nutzers) und legt es als PNG im Staging ab. Parameter: file_name, prompt (ENGLISCHER Bild-Prompt, max. 50 Wörter: Motiv, Stil, Licht konkret beschreiben; KEIN Text im Bild), optional aspect_ratio ("16:9" | "4:3" | "1:1" | "3:4" | "9:16", Default "16:9"). Das Bild kann in einer Notiz per ![[dateiname.png]] eingebettet werden — die Notiz mit write_note NACH diesem Tool erzeugen.',
+      'Generiert ein Bild mit Google Nano Banana (Cloud, nutzt den hinterlegten API-Key des Nutzers) und legt es als JPEG im Staging ab. Parameter: file_name (Endung .jpg), prompt (ENGLISCHER Bild-Prompt, max. 50 Wörter: Motiv, Stil, Licht konkret beschreiben; KEIN Text im Bild). Bei Themen mit Kindern/Jugendlichen ein symbolisches, personenfreies Motiv wählen — keine Minderjährigen, Personen oder Gesichter darstellen. Optional aspect_ratio ("16:9" | "4:3" | "1:1" | "3:4" | "9:16", Default "16:9"). Das Bild kann in einer Notiz per ![[dateiname.jpg]] eingebettet werden — die Notiz mit write_note NACH diesem Tool erzeugen.',
     parameters: {
       type: 'object',
       properties: {
@@ -794,13 +819,19 @@ export function createNoteAgentRegistry(): ToolRegistry<NoteAgentContext> {
       const RATIOS = ['16:9', '4:3', '1:1', '3:4', '9:16'] as const
       type Ratio = (typeof RATIOS)[number]
       const aspectRatio: Ratio = RATIOS.includes(args.aspect_ratio as Ratio) ? (args.aspect_ratio as Ratio) : '16:9'
-      const fileName = sanitizeOutputFileName(rawName, '.png')
       const { generateImage } = await import('../imageGen/imagenService')
       const res = await generateImage(prompt, { aspectRatio })
       if (!res.success || !res.imageBase64) {
         return err(res.error || 'Bildgenerierung fehlgeschlagen')
       }
-      return registerStagedResult(ctx, fileName, 'png', Buffer.from(res.imageBase64, 'base64'), `Bild ${aspectRatio}, Google Imagen`)
+      // Endung folgt den GELIEFERTEN Bytes (Nano Banana antwortet mit JPEG), nicht dem
+      // Wunsch des Modells. Eine vom Modell geratene Bild-Endung wird vorher entfernt,
+      // sonst entsteht "bild.png.jpg" und das ![[…]] in der Notiz zeigt ins Leere.
+      const ext = res.fileExtension === '.png' ? '.png' : '.jpg'
+      const kind = ext === '.png' ? 'png' : 'jpg'
+      const baseName = rawName.replace(/\.(?:png|jpe?g)$/i, '')
+      const fileName = sanitizeOutputFileName(`${baseName}${ext}`, ext, ['.jpeg'])
+      return registerStagedResult(ctx, fileName, kind, Buffer.from(res.imageBase64, 'base64'), `Bild ${aspectRatio}, Google Nano Banana`)
     }
   })
 
@@ -836,6 +867,7 @@ export function createNoteAgentRegistry(): ToolRegistry<NoteAgentContext> {
         if (ctx.run.web.wrote) return err('Das Ergebnis wurde bereits geschrieben — im Recherche-Modus ist nur EIN Ergebnis erlaubt.')
         markdown = mergeDeterministicSources(markdown, ctx.run.web.fetches)
       }
+      markdown = repairImageEmbeds(markdown, ctx)
       const fileName = sanitizeOutputFileName(rawName, '.md')
       const res = await registerStagedResult(ctx, fileName, 'md', markdown, `${markdown.split(/\s+/).length} Wörter`)
       // Erfolg atomar in den Endzustand überführen: kein weiterer Write, keine weitere

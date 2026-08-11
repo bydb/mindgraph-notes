@@ -2165,7 +2165,7 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab,
       { id: 'ai-openrouter', tab: 'ai', label: 'OpenRouter (Cloud)', path: `${g.modules} → ${t('settings.tab.ai')}`, keywords: 'openrouter cloud api opt-in claude gpt', anchor: 'ai-openrouter' },
       { id: 'ai-llmbase', tab: 'ai', label: 'LLMBase (EU-Cloud)', path: `${g.modules} → ${t('settings.tab.ai')}`, keywords: 'llmbase eu dsgvo cloud europa', anchor: 'ai-llmbase' },
       { id: 'ai-webresearch', tab: 'ai', label: 'Webrecherche', path: `${g.modules} → ${t('settings.tab.ai')}`, keywords: 'webrecherche tavily linkup suche web research agent', anchor: 'ai-webresearch' },
-      { id: 'ai-imagegen', tab: 'ai', label: 'Bild-Generierung', path: `${g.modules} → ${t('settings.tab.ai')}`, keywords: 'bild generierung imagen google bilder image generation api key', anchor: 'ai-imagegen' },
+      { id: 'ai-imagegen', tab: 'ai', label: 'Bild-Generierung', path: `${g.modules} → ${t('settings.tab.ai')}`, keywords: 'bild generierung nano banana imagen google bilder image generation api key', anchor: 'ai-imagegen' },
       { id: 'ai-smart-connections', tab: 'ai', label: t('settings.integrations.smartConnections'), path: `${g.modules} → ${t('settings.tab.ai')}`, keywords: 'smart connections gewichte reranker ähnliche notizen' },
       // E-Mail
       { id: 'email-analysis-model', tab: 'email', label: t('settings.email.analysisModel'), path: `${g.modules} → ${t('settings.email.title')}`, keywords: 'analyse modell email ki relevanz' },
@@ -6028,7 +6028,7 @@ LIMIT 10
                 )}
 
                 {/* WordPress-Publishing ist seit Paket 3 der Modul-Entflechtung das eigene
-                    Plugin `wordpress` (eigener Settings-Tab), Google Imagen das Core-Modul
+                    Plugin `wordpress` (eigener Settings-Tab), Google Nano Banana das Core-Modul
                     image-generation (KI-Tab) — hier nur noch edoobox selbst. */}
 
                 <div className="settings-divider" />

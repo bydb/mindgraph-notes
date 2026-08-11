@@ -552,7 +552,7 @@ export const MODULES: ModuleDescriptor[] = [
   { id: 'speech',           label: 'Sprache',          description: 'Vorlesen (TTS) und Diktieren (Whisper, läuft offline in der App) in Editor & Flashcards', category: 'ai' },
   { id: 'project-rag',      label: 'Projekt-RAG',      description: 'Projektordner semantisch befragen — On-demand-Index, Embedding & Antwort lokal', category: 'ai' },
   { id: 'web-research',     label: 'Webrecherche',     description: 'Der Notiz-Agent recherchiert im Web und erstellt eine Notiz mit Quellen — opt-in, eigene Suchmaschine (SearXNG) oder EU-Anbieter (Linkup)', category: 'ai' },
-  { id: 'image-generation', label: 'Bild-Generierung', description: 'Bilder mit Google Imagen erzeugen (Cloud, eigener API-Key) — nutzbar im Marketing-Tab und künftig im Notiz-Agenten', category: 'ai' }
+  { id: 'image-generation', label: 'Bild-Generierung', description: 'Bilder mit Google Nano Banana erzeugen (Cloud, eigener API-Key) — nutzbar im Marketing-Tab und Notiz-Agenten', category: 'ai' }
 ]
 
 export type TtsEngine = 'system' | 'elevenlabs'
@@ -652,7 +652,7 @@ interface UIState {
   // Spiegel der Main-seitigen Webrecherche-Config (0d) — nur zum Anzeigen in der KI-Leiste
   // (Provider-Tooltip, „konfiguriert?"). NICHT persistiert; wird per IPC geladen/aktualisiert.
   webResearchConfig: { provider: 'tavily' | 'searxng' | 'linkup'; searxngUrl: string; hasTavilyKey: boolean; hasLinkupKey: boolean } | null
-  /** Bild-Generierung (Google Imagen, Cloud, eigener Key) — opt-in. Key liegt via safeStorage im Main. */
+  /** Bild-Generierung (Google Nano Banana, Cloud, eigener Key) — opt-in. Key liegt via safeStorage im Main. */
   imageGenerationEnabled: boolean
   semanticScholarEnabled: boolean
   zoteroEnabled: boolean

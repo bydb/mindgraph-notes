@@ -159,9 +159,9 @@ export const CredentialsSettings: React.FC<Props> = ({ onNavigateToTab }) => {
     })
     rows.push({
       id: 'imagen',
-      label: 'Google Imagen API-Key',
+      label: 'Google AI Studio API-Key',
       category: 'KI-Cloud',
-      note: 'Bild-Generierung (Modul) — genutzt vom Marketing-Tab',
+      note: 'Nano-Banana-Bildgenerierung — genutzt von Marketing und Notiz-Agent',
       settingsTab: 'ai',
       checkSet: async () => !!(await window.electronAPI.imageGenLoadKey())
     })

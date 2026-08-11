@@ -24,6 +24,17 @@ interface ApiPayload {
   apiVersion: string
 }
 
+function sanitizeImageFileName(value: string): string {
+  const leaf = value.split(/[\\/]/).pop() || ''
+  const safe = leaf
+    .replace(/[<>:"/\\|?*\u0000-\u001f]+/g, '_')
+    .replace(/^\.+/, '')
+    .trim()
+    .slice(0, 120)
+  if (!safe) return 'nano-banana.png'
+  return /\.(?:jpe?g|png|gif|webp)$/i.test(safe) ? safe : `${safe}.png`
+}
+
 export default definePluginMain(
   { id: manifest.id, capabilities: EDOOBOX_CAPABILITIES },
   ({ host, actions }) => {
@@ -268,6 +279,28 @@ export default definePluginMain(
       } catch (e) {
         console.error('[edoobox] Select image failed:', e)
         return null
+      }
+    })
+
+    // Ausgewähltes oder generiertes Marketing-Bild über einen nativen Speichern-Dialog
+    // exportieren. Der Renderer übergibt nur Base64; Dateisystemzugriff bleibt im Host.
+    actions.register('edoobox.marketingSaveImage', async (p) => {
+      try {
+        const { fileName, imageBase64 } = p as { fileName: string; imageBase64: string }
+        const bytes = Buffer.from(imageBase64, 'base64')
+        if (bytes.length === 0) return { success: false, error: 'Das Bild enthält keine Daten' }
+        const saved = await host.dialog.saveFile(
+          {
+            title: 'Marketing-Bild speichern',
+            defaultPath: sanitizeImageFileName(fileName),
+            filters: IMAGE_FILTER,
+          },
+          bytes
+        )
+        if (!saved) return { success: false, canceled: true }
+        return { success: true, filePath: saved.path }
+      } catch (e) {
+        return { success: false, error: errMsg(e, 'Bild konnte nicht gespeichert werden') }
       }
     })
   }

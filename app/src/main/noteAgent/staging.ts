@@ -15,7 +15,7 @@ const MAX_STAGING_AGE_DAYS = 7
 // Endungen, die überhaupt als Agent-Output vorkommen. Welche davon ein
 // EINZELNES Werkzeug behalten darf, entscheidet der Aufrufer (siehe unten) —
 // diese Menge ist nur die äußere Schranke.
-const ALLOWED_OUTPUT_EXT = new Set(['.md', '.xlsx', '.docx', '.txt', '.csv', '.html', '.htm', '.png'])
+const ALLOWED_OUTPUT_EXT = new Set(['.md', '.xlsx', '.docx', '.txt', '.csv', '.html', '.htm', '.png', '.jpg', '.jpeg'])
 
 export function stagingRootFor(vaultPath: string): string {
   return path.join(vaultPath, '.mindgraph', STAGING_DIRNAME)

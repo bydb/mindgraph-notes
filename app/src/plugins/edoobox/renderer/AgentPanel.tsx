@@ -584,8 +584,9 @@ const MarketingPublishDetail: React.FC<{ offer: EdooboxOfferDashboard; onBack: (
   const {
     generatedBlogPost, generatedIgCaption, isGenerating, isPublishing,
     generateContent, setGeneratedBlogPost, setGeneratedIgCaption,
-    publishToWordpress, selectImage, generateImage, isGeneratingImage,
-    selectedImageFileName, imagePreviewDataUrl, imageGeneratedInfo, marketingPublishStatus
+    publishToWordpress, selectImage, generateImage, downloadImage, isGeneratingImage,
+    isSavingImage, imageSaveStatus, selectedImageBase64, selectedImageFileName,
+    imagePreviewDataUrl, imageGeneratedInfo, imageGenerationError, marketingPublishStatus
   } = useAgentStore()
   // WordPress-Publishing = eigenes Plugin; der Marketing-Tab liest dessen Config nur mit.
   const [wordpress] = usePluginConfig('wordpress', WORDPRESS_DEFAULTS)
@@ -692,7 +693,41 @@ const MarketingPublishDetail: React.FC<{ offer: EdooboxOfferDashboard; onBack: (
                 {t('agent.marketing.generateImage')}
               </button>
             )}
+            {selectedImageBase64 && (
+              <button
+                className="agent-marketing-image-btn"
+                onClick={downloadImage}
+                disabled={isSavingImage}
+              >
+                {isSavingImage ? (
+                  <svg className="spinning" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+                  </svg>
+                ) : (
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                    <path d="m7 10 5 5 5-5" />
+                    <path d="M12 15V3" />
+                  </svg>
+                )}
+                {isSavingImage
+                  ? t('agent.marketing.savingImage')
+                  : imageSaveStatus === 'saved'
+                    ? t('agent.marketing.imageSaved')
+                    : t('agent.marketing.downloadImage')}
+              </button>
+            )}
           </div>
+          {imageGenerationError && (
+            <div className="agent-marketing-image-error" role="alert">
+              {imageGenerationError}
+            </div>
+          )}
+          {imageSaveStatus === 'error' && (
+            <div className="agent-marketing-image-error" role="alert">
+              {t('agent.marketing.saveImageFailed')}
+            </div>
+          )}
           {imagePreviewDataUrl && (
             <div className="agent-marketing-image-preview">
               <img src={imagePreviewDataUrl} alt="Preview" />

@@ -441,7 +441,7 @@ Oder: `/release` Command verwenden.
 - **AgentPanel.tsx**: UI mit Tabs: Import | Dashboard | Marketing
 - **agentStore.ts**: Zustand Store für Events, Dashboard-Offers, Bookings, Marketing
 - Dashboard: Occupancy-Charts, Teilnehmerlisten, Neuanmeldungen
-- Marketing-Tab: WP Publishing, Ollama Content-Generierung, Google Imagen Bilder
+- Marketing-Tab: WP Publishing, Ollama Content-Generierung, Google Nano Banana Bilder
 - Settings im **Agenten-Tab**: API Key/Secret via `electron.safeStorage`
 - Credentials: `edooboxSaveCredentials` / `edooboxLoadCredentials` IPC-Handler
 

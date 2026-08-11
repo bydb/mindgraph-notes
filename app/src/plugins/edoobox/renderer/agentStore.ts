@@ -11,6 +11,19 @@ export interface MarketingPublishStatus {
   wordpress?: { postId: number; postUrl: string; status: string; publishedAt: string }
 }
 
+type ImageSaveStatus = 'idle' | 'saved' | 'error'
+
+// Endung folgt den gelieferten Bytes: Nano Banana antwortet mit JPEG. Ein .png-Name
+// auf JPEG-Bytes liesse den WordPress-Upload am MIME-Abgleich scheitern.
+function generatedImageFileName(offerName: string, ext: string): string {
+  const base = offerName
+    .replace(/[\\/:*?"<>|]+/g, '_')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 80) || 'Veranstaltung'
+  return `${base} – Nano Banana${ext}`
+}
+
 interface AgentState {
   events: EdooboxEvent[]
   offers: EdooboxOffer[]
@@ -77,9 +90,13 @@ interface AgentState {
   publishToWordpress: (offerId: string, title: string, content: string) => Promise<void>
   selectImage: () => Promise<void>
   generateImage: (offer: EdooboxOfferDashboard) => Promise<void>
+  downloadImage: () => Promise<void>
   isGeneratingImage: boolean
+  isSavingImage: boolean
+  imageSaveStatus: ImageSaveStatus
   imagePreviewDataUrl: string | null
   imageGeneratedInfo: string | null
+  imageGenerationError: string | null
 }
 
 export const useAgentStore = create<AgentState>()((set, get) => ({
@@ -116,8 +133,11 @@ export const useAgentStore = create<AgentState>()((set, get) => ({
   selectedImageBase64: null,
   selectedImageFileName: null,
   isGeneratingImage: false,
+  isSavingImage: false,
+  imageSaveStatus: 'idle',
   imagePreviewDataUrl: null,
   imageGeneratedInfo: null,
+  imageGenerationError: null,
 
   setSelectedEventId: (id) => set({ selectedEventId: id }),
 
@@ -288,7 +308,17 @@ export const useAgentStore = create<AgentState>()((set, get) => ({
   },
 
   // Marketing Actions
-  setSelectedMarketingOfferId: (id) => set({ selectedMarketingOfferId: id, generatedBlogPost: '', generatedIgCaption: '', selectedImageBase64: null, selectedImageFileName: null, imagePreviewDataUrl: null, imageGeneratedInfo: null }),
+  setSelectedMarketingOfferId: (id) => set({
+    selectedMarketingOfferId: id,
+    generatedBlogPost: '',
+    generatedIgCaption: '',
+    selectedImageBase64: null,
+    selectedImageFileName: null,
+    imagePreviewDataUrl: null,
+    imageGeneratedInfo: null,
+    imageGenerationError: null,
+    imageSaveStatus: 'idle',
+  }),
 
   loadMarketingOffers: async () => {
     set({ isMarketingLoading: true })
@@ -346,7 +376,7 @@ export const useAgentStore = create<AgentState>()((set, get) => ({
       let featuredMediaId: number | undefined
       if (selectedImageBase64) {
         const { imageGeneratedInfo } = get()
-        const caption = imageGeneratedInfo ? 'Bild generiert mit Google Imagen 4.0' : undefined
+        const caption = imageGeneratedInfo ? 'Bild generiert mit Google Nano Banana' : undefined
         const uploadResult = await wordpressService.uploadImage(baseUrl, username, selectedImageBase64, selectedImageFileName || 'bild.png', caption)
         if (uploadResult.success && uploadResult.mediaId) {
           featuredMediaId = uploadResult.mediaId
@@ -385,19 +415,26 @@ export const useAgentStore = create<AgentState>()((set, get) => ({
     if (result) {
       const mime = result.fileName.split('.').pop()?.toLowerCase() === 'png' ? 'png' : 'jpeg'
       const dataUrl = `data:image/${mime};base64,${result.imageBase64}`
-      set({ selectedImageBase64: result.imageBase64, selectedImageFileName: result.fileName, imagePreviewDataUrl: dataUrl, imageGeneratedInfo: null })
+      set({
+        selectedImageBase64: result.imageBase64,
+        selectedImageFileName: result.fileName,
+        imagePreviewDataUrl: dataUrl,
+        imageGeneratedInfo: null,
+        imageGenerationError: null,
+        imageSaveStatus: 'idle',
+      })
     }
   },
 
   generateImage: async (offer: EdooboxOfferDashboard) => {
     // Bild-Generierung = Core-Modul image-generation (Key liegt Main-seitig in safeStorage).
     if (!useUIStore.getState().imageGenerationEnabled) return
-    set({ isGeneratingImage: true })
+    set({ isGeneratingImage: true, imageGenerationError: null, imageSaveStatus: 'idle' })
     try {
       // Erst Ollama einen passenden Bild-Prompt generieren lassen
       const { ollama } = useUIStore.getState()
       const model = ollama.selectedModel || 'llama3.2'
-      const metaPrompt = `Write a short English image generation prompt (MAX 50 words, one paragraph) for a photo about: "${offer.name}". The image must visually match the topic. Photorealistic style, no text in image. Return ONLY the prompt, nothing else.`
+      const metaPrompt = `Write a short English image generation prompt (MAX 50 words, one paragraph) for a photo about: "${offer.name}". The image must visually match the topic. Photorealistic style, no text in image. If the topic concerns children, teenagers, schools or youth, create a symbolic people-free scene with no people or faces visible. Return ONLY the prompt, nothing else.`
 
       const ollamaResult = await window.electronAPI.ollamaGenerate({
         model,
@@ -407,7 +444,7 @@ export const useAgentStore = create<AgentState>()((set, get) => ({
         customPrompt: metaPrompt
       })
 
-      const fallbackPrompt = `Professional photo for educational workshop about ${offer.name.slice(0, 80)}. Realistic, modern classroom or conference setting, natural lighting, no text in image.`
+      const fallbackPrompt = `Professional symbolic photo for educational workshop about ${offer.name.slice(0, 80)}. Workshop materials in a modern classroom or conference setting, natural lighting, no people or faces visible, no text in image.`
       let rawPrompt = ollamaResult.success && ollamaResult.result
         ? ollamaResult.result
         : fallbackPrompt
@@ -421,21 +458,57 @@ export const useAgentStore = create<AgentState>()((set, get) => ({
       const imagePrompt = rawPrompt || fallbackPrompt
 
       // Try generation, retry once with fallback prompt if it fails
+      let usedPrompt = imagePrompt
       let result = await window.electronAPI.imageGenerate({ prompt: imagePrompt, aspectRatio: '16:9' })
       if (!result.success && imagePrompt !== fallbackPrompt) {
         console.log('[marketing] Image generation failed, retrying with fallback prompt')
+        usedPrompt = fallbackPrompt
         result = await window.electronAPI.imageGenerate({ prompt: fallbackPrompt, aspectRatio: '16:9' })
       }
       if (result.success && result.imageBase64) {
-        const dataUrl = `data:image/png;base64,${result.imageBase64}`
+        const mimeType = result.mimeType || 'image/jpeg'
+        const ext = result.fileExtension || '.jpg'
+        const dataUrl = `data:${mimeType};base64,${result.imageBase64}`
         const now = new Date()
-        const info = `Google Imagen 4.0 · ${now.toLocaleDateString('de-DE')} ${now.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} · Prompt: "${imagePrompt.slice(0, 100)}${imagePrompt.length > 100 ? '...' : ''}"`
-        set({ selectedImageBase64: result.imageBase64, selectedImageFileName: 'imagen.png', imagePreviewDataUrl: dataUrl, imageGeneratedInfo: info, isGeneratingImage: false })
+        const info = `Google Nano Banana · ${now.toLocaleDateString('de-DE')} ${now.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} · Prompt: "${usedPrompt.slice(0, 100)}${usedPrompt.length > 100 ? '...' : ''}"`
+        set({
+          selectedImageBase64: result.imageBase64,
+          selectedImageFileName: generatedImageFileName(offer.name, ext),
+          imagePreviewDataUrl: dataUrl,
+          imageGeneratedInfo: info,
+          imageGenerationError: null,
+          imageSaveStatus: 'idle',
+          isGeneratingImage: false,
+        })
       } else {
-        set({ isGeneratingImage: false })
+        set({
+          isGeneratingImage: false,
+          imageGenerationError: result.error || 'Bildgenerierung fehlgeschlagen',
+        })
       }
+    } catch (error) {
+      set({
+        isGeneratingImage: false,
+        imageGenerationError: error instanceof Error ? error.message : 'Bildgenerierung fehlgeschlagen',
+      })
+    }
+  },
+
+  downloadImage: async () => {
+    const { selectedImageBase64, selectedImageFileName } = get()
+    if (!selectedImageBase64) return
+    set({ isSavingImage: true, imageSaveStatus: 'idle' })
+    try {
+      const result = await edooboxClient.marketingSaveImage(
+        selectedImageFileName || 'nano-banana.png',
+        selectedImageBase64
+      )
+      set({
+        isSavingImage: false,
+        imageSaveStatus: result.success ? 'saved' : result.canceled ? 'idle' : 'error',
+      })
     } catch {
-      set({ isGeneratingImage: false })
+      set({ isSavingImage: false, imageSaveStatus: 'error' })
     }
   },
 

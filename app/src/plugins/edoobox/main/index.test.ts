@@ -5,7 +5,7 @@ import { PluginRegistry } from '../../../main/plugins/registry'
 import { createHostFactory, type HostServices } from '../../../main/plugins/host'
 import { validateManifest, validateManifestSemantics, validateAgainst } from '@mindgraph/plugin-api/validation'
 
-function buildRegistry() {
+function buildRegistry(overrides: Partial<HostServices> = {}) {
   const secrets = new Map<string, string>()
   const vault = new Map<string, string>()
   const services: HostServices = {
@@ -34,6 +34,7 @@ function buildRegistry() {
     dialogSaveFile: async () => null,
     readResource: async () => new Uint8Array(),
     emitWorkflow: async () => {},
+    ...overrides,
   }
   const registry = new PluginRegistry(createHostFactory(services))
   registry.register([{ manifest, loadEntry: async () => ({ default: entry }) }])
@@ -72,6 +73,23 @@ describe('edoobox-Plugin — Vertikale durch Registry + Host', () => {
     await registry.activate('edoobox')
     const res = await registry.invoke('edoobox', 'edoobox.listOffers', { baseUrl: 'https://app1.edoobox.com', apiVersion: 'v2' })
     expect(res).toEqual({ success: false, error: 'Keine Zugangsdaten gespeichert' })
+  })
+
+  it('Marketing-Bild: speichert dekodierte Bytes mit sicherem Dateinamen über den Dialog', async () => {
+    let saved: { defaultPath?: string; bytes: number[] } | null = null
+    const { registry } = buildRegistry({
+      dialogSaveFile: async (opts, bytes) => {
+        saved = { defaultPath: opts.defaultPath, bytes: [...bytes] }
+        return { path: '/tmp/Jugend_Konferenz_.png' }
+      },
+    })
+    await registry.activate('edoobox')
+
+    await expect(registry.invoke('edoobox', 'edoobox.marketingSaveImage', {
+      fileName: '../../Jugend:Konferenz?.png',
+      imageBase64: 'AQID',
+    })).resolves.toEqual({ success: true, filePath: '/tmp/Jugend_Konferenz_.png' })
+    expect(saved).toEqual({ defaultPath: 'Jugend_Konferenz_.png', bytes: [1, 2, 3] })
   })
 
   it('Events: leeres Laden ohne Datei, dann roundtrip über host.vault', async () => {
@@ -132,5 +150,11 @@ describe('edoobox-Plugin — Output-Schemas (Envelope-Validierung)', () => {
     expect(validateAgainst(out('edoobox.marketingSelectImage'), null).valid).toBe(true)
     expect(validateAgainst(out('edoobox.marketingSelectImage'), { fileName: 'b.png', imageBase64: 'AAAA' }).valid).toBe(true)
     expect(validateAgainst(out('edoobox.marketingSelectImage'), { fileName: 'b.png' }).valid).toBe(false)
+  })
+
+  it('marketingSaveImage: typisierte Speichern-/Abbruch-Hülle', () => {
+    expect(validateAgainst(out('edoobox.marketingSaveImage'), { success: true, filePath: '/tmp/b.png' }).valid).toBe(true)
+    expect(validateAgainst(out('edoobox.marketingSaveImage'), { success: false, canceled: true }).valid).toBe(true)
+    expect(validateAgainst(out('edoobox.marketingSaveImage'), { filePath: '/tmp/b.png' }).valid).toBe(false)
   })
 })

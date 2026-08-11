@@ -1,6 +1,6 @@
 // Bild-Generierung (image-generation-Modul) — Settings-Sektion im KI-Tab.
 //
-// Konfiguriert den Google-Imagen-API-Key des Nutzers. Der Key wird via safeStorage
+// Konfiguriert den Google-AI-Studio-API-Key des Nutzers. Der Key wird via safeStorage
 // im Main-Prozess verschlüsselt abgelegt (IPC image-gen-save/load/delete-key) —
 // NICHT im uiStore/localStorage (dort lag er vor der Modul-Entflechtung im Klartext).
 // Gerendert nur bei aktivem Modul (Gate in Settings.tsx, analog WebResearchSection).

@@ -79,7 +79,7 @@ export const manifest: PluginManifest = {
   capabilities: [...EDOOBOX_CAPABILITIES],
   // Baseline-Allowlist: edoobox-Provider. Der konfigurierte edoobox-Host (ui.edoobox.baseUrl)
   // wird zur Laufzeit ergänzt (resolveExtraAllowedHosts im Capability-Host). WordPress ist
-  // seit Paket 3 der Modul-Entflechtung ein eigenes Plugin, Bild-Generierung (Google Imagen)
+  // seit Paket 3 der Modul-Entflechtung ein eigenes Plugin, Bild-Generierung (Google Nano Banana)
   // ein CORE-Modul (image-generation) — keine fremden Hosts mehr hier.
   http: { allowedHosts: ['*.edoobox.com'] },
   credentials: [
@@ -214,6 +214,18 @@ export const manifest: PluginManifest = {
       },
     },
     { id: 'edoobox.marketingSelectImage', requiredCapabilities: ['dialog'] },
+    {
+      id: 'edoobox.marketingSaveImage',
+      label: 'Marketing-Bild speichern',
+      requiredCapabilities: ['dialog'],
+      isWrite: true,
+      inputSchema: {
+        type: 'object',
+        required: ['fileName', 'imageBase64'],
+        properties: { fileName: { type: 'string' }, imageBase64: { type: 'string' } },
+        additionalProperties: false,
+      },
+    },
   ],
   // Workflow-Canvas-Trigger (vorher statisch im Kern-Registry). Feuert bei steigender
   // Buchungszahl; der generische Text-Trigger-Executor gibt den vorformatierten Seed-Text aus.
@@ -258,6 +270,7 @@ const EDOOBOX_OUTPUT_SCHEMAS: Record<string, JsonSchema> = {
   'edoobox.generateAttendanceList': fileExportEnvelope,
   'edoobox.marketingGenerateContent': contentEnvelope,
   'edoobox.marketingSelectImage': selectedImageResult,
+  'edoobox.marketingSaveImage': fileExportEnvelope,
 }
 for (const action of manifest.actions ?? []) {
   action.outputSchema = EDOOBOX_OUTPUT_SCHEMAS[action.id]

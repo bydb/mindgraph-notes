@@ -2,6 +2,26 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.10.43-beta] - 2026-08-11
+
+Die Bild-Generierung läuft jetzt auf Google Nano Banana, dem aktuellen Bildmodell hinter Gemini. Beim Prüfen gegen die echte Schnittstelle kam heraus, dass das Modell ausschließlich JPEG liefert — die Anfrage nach PNG hätte jeden einzelnen Aufruf mit einem Fehler beantwortet. Der Fehler ist behoben, bevor er jemanden getroffen hat.
+
+### Geändert
+
+- **Bilder kommen von Google Nano Banana.** Die Umstellung von Imagen betrifft beide Stellen, an denen die App Bilder erzeugt: den Marketing-Tab des Veranstaltungsagenten und das Werkzeug `generate_image` des Notiz-Agenten. Unverändert bleibt: eigener Google-Schlüssel, verschlüsselt auf dem Rechner, und das Modul ist von sich aus aus.
+- **Bild-Prompts meiden Personen bei Kinder- und Jugendthemen.** Google lehnte Motive mit Minderjährigen ab, und der Lauf endete ohne sichtbaren Grund. Sowohl der Agent als auch der Marketing-Tab bitten jetzt um ein symbolisches, personenfreies Motiv.
+
+### Behoben
+
+- **Jeder Bildaufruf wäre fehlgeschlagen.** Die Umstellung forderte PNG an; Nano Banana beantwortet das mit „nicht unterstützt, nur JPEG" — und zwar bei jedem Aufruf, nicht nur bei manchen. Aufgefallen ist das erst durch einen echten Aufruf gegen Google: Ein Test, der nur die selbst erfundene Antwort prüft, hätte weiter grün gemeldet.
+- **Die Notiz zeigt auf das Bild, das wirklich da ist.** Weil die Bytes jetzt JPEG sind, heißt die Datei auch `.jpg`. Nannte das Modell sein Bild in der Notiz weiterhin `.png`, wären Bild und Notiz je für sich in Ordnung gewesen — und die Einbettung dazwischen tot. Die App zieht den Namen jetzt nach, in beiden Schreibweisen (`![[bild.jpg]]` und `![Text](bild.jpg)`).
+- **Der Dateiname passt zu den Bytes.** Im Marketing-Tab heißt das erzeugte Bild jetzt nach der Veranstaltung statt `imagen.png` — und trägt die richtige Endung. Ein `.png`-Name auf JPEG-Daten wäre beim Hochladen zu WordPress am Abgleich gescheitert.
+- **Abgelehnte Motive sagen, warum.** Lieferte Google kein Bild, blieb die Oberfläche vorher stumm. Jetzt steht der Grund unter den Knöpfen, und bei einer leeren Antwort erscheint ein verständlicher Hinweis statt eines leeren Datensatzes.
+
+### Neu
+
+- **„Bild herunterladen" im Marketing-Tab.** Ein ausgewähltes oder erzeugtes Bild lässt sich über den normalen Speichern-Dialog ablegen. Der Dateiname wird dabei entschärft, und die Datei schreibt weiterhin nur der geschützte Teil der App, nie die Oberfläche.
+
 ## [0.10.42-beta] - 2026-08-11
 
 Zwei Fehler aus dem Alltagsbetrieb: Neu angelegte Dateien und Ordner blieben im Dateibaum unsichtbar, bis man das Fenster neu lud. Und im Dashboard legte sich ein Widget quer über seinen Nachbarn.
