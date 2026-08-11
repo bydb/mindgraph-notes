@@ -6098,9 +6098,12 @@ ipcMain.on('watch-directory', async (_event, dirPath: string) => {
   })
   
   fileWatcher.on('all', (eventName, filePath) => {
-    if (filePath.endsWith('.md')) {
-      mainWindow?.webContents.send('file-changed', eventName, filePath)
-    }
+    // ALLE Änderungen melden, nicht nur `.md`. Vorher fiel hier alles andere
+    // weg — Bilder, PDFs, die HTML-Seiten und Tabellen des Agenten und auch
+    // neue Ordner (`addDir`). Sie tauchten im Dateibaum erst nach einem
+    // Neuladen des Fensters auf. Was daraus folgt (Baum auffrischen vs. Notiz
+    // nachladen), entscheidet der Renderer anhand der Endung.
+    mainWindow?.webContents.send('file-changed', eventName, filePath)
 
     // Notify sync engine of file changes (debounced in pushFile)
     if (syncEngine && syncEngine.isInitialized() && typeof filePath === 'string') {
