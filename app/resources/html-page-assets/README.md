@@ -7,7 +7,7 @@ offline — kein CDN, funktioniert in der sandboxed HTML-Vorschau.
 
 ## katex/
 
-KaTeX v0.16.47 (MIT, siehe LICENSE) — unverändert aus `node_modules/katex/dist`
+KaTeX v0.18.4 (MIT, siehe LICENSE) — unverändert aus `node_modules/katex/dist`
 kopiert: `katex.min.js`, `katex.min.css`, `auto-render.min.js`
 (= `contrib/auto-render.min.js`), `fonts/*.woff2` (nur woff2 — Chromium lädt
 ausschließlich diese Variante aus der Fallback-Kette der CSS).
