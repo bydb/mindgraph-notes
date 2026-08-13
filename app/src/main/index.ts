@@ -18,6 +18,7 @@ import {
 import { exportPreviewPdf, exportPreviewEpub } from './htmlExport'
 import { initDisplayDiagnostics, getDisplayHealth } from './displayDiagnostics'
 import { bundledResourcesDir } from './bundledResources'
+import { trashPath, VAULT_TRASH_DIR, type TrashDestination } from './fileTrash'
 import { buildZettelContent, buildZettelFileName, extractFrontmatterTags, sanitizeZettelEmojis, sanitizeZettelTag } from '../shared/zettel'
 import { splitTextIntoChunks, LONG_TEXT_CHUNK_THRESHOLD } from '../shared/textChunking'
 import { selectFetchBatch, shouldAdvanceCursor, type FetchCandidate } from '../shared/emailFetchWindow'
@@ -829,12 +830,15 @@ const mainTranslations: Record<'de' | 'en', Record<string, string>> = {
     'dialog.newNote.saveTitle': 'Neue Notiz erstellen',
     'dialog.deleteFile.title': 'Notiz löschen',
     'dialog.deleteFile.message': '"{name}" wirklich löschen?',
-    'dialog.deleteFile.detail': 'Diese Aktion kann nicht rückgängig gemacht werden.',
+    'dialog.deleteFile.detail': 'Die Notiz wandert in den Papierkorb und kann von dort zurückgeholt werden.',
+    'dialog.deleteFiles.message': '{count} Dateien löschen?',
+    'dialog.deleteFiles.more': '\n... und {count} weitere',
+    'dialog.deleteFiles.detailSuffix': '\n\nDie Dateien wandern in den Papierkorb und können von dort zurückgeholt werden. Auf anderen Geräten wird die Löschung beim nächsten Sync nachgezogen.',
     'dialog.deleteDir.title': 'Ordner löschen',
     'dialog.deleteDir.message': 'Ordner "{name}" wirklich löschen?',
-    'dialog.deleteDir.detailFiles': 'Dieser Ordner enthält {count} Datei(en). Alle Inhalte werden gelöscht.',
+    'dialog.deleteDir.detailFiles': 'Dieser Ordner enthält {count} Datei(en). Alle Inhalte werden mitgelöscht.',
     'dialog.deleteDir.detailEmpty': 'Dieser Ordner ist leer.',
-    'dialog.deleteDir.detailSuffix': '\n\nDiese Aktion kann nicht rückgängig gemacht werden.',
+    'dialog.deleteDir.detailSuffix': '\n\nDer Ordner wandert in den Papierkorb und kann von dort zurückgeholt werden. Auf anderen Geräten wird die Löschung beim nächsten Sync nachgezogen.',
     'dialog.fileExists.title': 'Datei existiert bereits',
     'dialog.fileExists.messageRename': '"{name}" existiert bereits.',
     'dialog.fileExists.messageMove': '"{name}" existiert bereits im Zielordner.',
@@ -877,12 +881,15 @@ const mainTranslations: Record<'de' | 'en', Record<string, string>> = {
     'dialog.newNote.saveTitle': 'Create New Note',
     'dialog.deleteFile.title': 'Delete Note',
     'dialog.deleteFile.message': 'Are you sure you want to delete "{name}"?',
-    'dialog.deleteFile.detail': 'This action cannot be undone.',
+    'dialog.deleteFile.detail': 'The note is moved to the trash and can be restored from there.',
+    'dialog.deleteFiles.message': 'Delete {count} files?',
+    'dialog.deleteFiles.more': '\n... and {count} more',
+    'dialog.deleteFiles.detailSuffix': '\n\nThe files are moved to the trash and can be restored from there. Other devices follow the deletion on the next sync.',
     'dialog.deleteDir.title': 'Delete Folder',
     'dialog.deleteDir.message': 'Are you sure you want to delete folder "{name}"?',
-    'dialog.deleteDir.detailFiles': 'This folder contains {count} file(s). All contents will be deleted.',
+    'dialog.deleteDir.detailFiles': 'This folder contains {count} file(s). All contents are deleted with it.',
     'dialog.deleteDir.detailEmpty': 'This folder is empty.',
-    'dialog.deleteDir.detailSuffix': '\n\nThis action cannot be undone.',
+    'dialog.deleteDir.detailSuffix': '\n\nThe folder is moved to the trash and can be restored from there. Other devices follow the deletion on the next sync.',
     'dialog.fileExists.title': 'File Already Exists',
     'dialog.fileExists.messageRename': '"{name}" already exists.',
     'dialog.fileExists.messageMove': '"{name}" already exists in the target folder.',
@@ -1113,6 +1120,23 @@ function findApprovedRootForPath(filePath: string): string | null {
   const resolved = path.resolve(filePath)
   const roots = [...approvedVaultRoots].sort((a, b) => b.length - a.length)
   return roots.find(root => isPathInside(resolved, root)) ?? null
+}
+
+/**
+ * Löschen aus dem Dateibaum — mit Rückweg statt `fs.rm`/`fs.unlink`.
+ * Details und Begründung in fileTrash.ts. Der Pfad muss vorher durch
+ * `assertSafePath` gelaufen sein.
+ */
+async function trashFromVault(safePath: string): Promise<TrashDestination> {
+  const destination = await trashPath({
+    absPath: safePath,
+    vaultRoot: findApprovedRootForPath(safePath),
+    trashItem: p => shell.trashItem(p)
+  })
+  if (destination === 'vault-trash') {
+    console.warn(`[Trash] OS-Papierkorb nicht verfügbar — verschoben nach ${VAULT_TRASH_DIR}: ${safePath}`)
+  }
+  return destination
 }
 
 // =====================================================================
@@ -2454,7 +2478,7 @@ ipcMain.handle('delete-file', async (_event, filePath: string) => {
   if (response === 0) return false
 
   try {
-    await fs.unlink(safe)
+    await trashFromVault(safe)
     return true
   } catch (error) {
     console.error('Fehler beim Löschen der Datei:', error)
@@ -2511,7 +2535,7 @@ ipcMain.handle('delete-directory', async (_event, dirPath: string) => {
   if (response === 0) return false
 
   try {
-    await fs.rm(safe, { recursive: true, force: true })
+    await trashFromVault(safe)
     return true
   } catch (error) {
     console.error('Fehler beim Löschen des Ordners:', error)
@@ -2531,13 +2555,15 @@ ipcMain.handle('delete-files', async (_event, filePaths: string[]) => {
 
   const fileNames = safePaths.map(p => path.basename(p))
   const listPreview = fileNames.slice(0, 5).join('\n• ')
-  const moreText = safePaths.length > 5 ? `\n... und ${safePaths.length - 5} weitere` : ''
+  const moreText = safePaths.length > 5
+    ? t('dialog.deleteFiles.more', { count: safePaths.length - 5 })
+    : ''
 
   const { response } = await dialog.showMessageBox(mainWindow, {
     type: 'warning',
     title: t('dialog.deleteFile.title'),
-    message: `${safePaths.length} Dateien löschen?`,
-    detail: `• ${listPreview}${moreText}\n\nDieser Vorgang kann nicht rückgängig gemacht werden.`,
+    message: t('dialog.deleteFiles.message', { count: safePaths.length }),
+    detail: `• ${listPreview}${moreText}${t('dialog.deleteFiles.detailSuffix')}`,
     buttons: [t('btn.cancel'), t('btn.delete')],
     defaultId: 0,
     cancelId: 0
@@ -2550,12 +2576,7 @@ ipcMain.handle('delete-files', async (_event, filePaths: string[]) => {
     try {
       // Vault-Roots niemals löschbar machen
       if (approvedVaultRoots.has(path.resolve(filePath))) continue
-      const stat = await fs.stat(filePath)
-      if (stat.isDirectory()) {
-        await fs.rm(filePath, { recursive: true, force: true })
-      } else {
-        await fs.unlink(filePath)
-      }
+      await trashFromVault(filePath)
       deleted++
     } catch (error) {
       console.error('Fehler beim Löschen:', filePath, error)
