@@ -48,7 +48,7 @@
     "url": "https://mindgraph-notes.de/",
     "downloadUrl": "https://github.com/bydb/mindgraph-notes/releases",
     "screenshot": "https://mindgraph-notes.de/screenshot.png",
-    "softwareVersion": "0.10.43-beta",
+    "softwareVersion": "0.10.44-beta",
     "author": { "@type": "Person", "name": "Jochen Leeder", "url": "https://bydb.io" },
     "license": "https://opensource.org/licenses/AGPL-3.0",
     "featureList": [
@@ -495,7 +495,7 @@
         <span class="hero-dot"></span>
         <span data-i18n="hero.badge">Open Source &middot; Lokal &middot; Kostenlos</span>
       </div>
-      <a class="release-badge" href="#changelog" data-i18n="hero.release">Bild-Generierung wieder funktionsf&auml;hig &middot; v0.10.43</a>
+      <a class="release-badge" href="#changelog" data-i18n="hero.release">Gel&ouml;schtes landet im Papierkorb &middot; v0.10.44</a>
     </div>
 
     <h1 data-i18n="hero.title">Der Fokus bleibt.<br><em>Auch wenn das Leben dazwischenkommt.</em></h1>
@@ -1630,16 +1630,16 @@
     <div class="release-inner">
       <div class="release-head">
         <div>
-          <div class="st-eyebrow"><span class="d"></span><span data-i18n="release.label">Release 0.10.43 &middot; Bilder, die auch ankommen</span></div>
+          <div class="st-eyebrow"><span class="d"></span><span data-i18n="release.label">Release 0.10.44 &middot; L&ouml;schen mit R&uuml;ckweg</span></div>
           <h2 class="st-h" style="font-size:clamp(1.8rem,3.8vw,2.6rem)" data-i18n="release.heading">Was ist neu &mdash; <em>die Bild-Generierung l&auml;uft auf Googles neues Modell und funktioniert wieder.</em></h2>
           <p class="st-lead" data-i18n="release.lead">Die Bild-Generierung wurde auf Google Nano Banana umgestellt &mdash; das aktuelle Bildmodell hinter Gemini. Beim Pr&uuml;fen gegen die echte Schnittstelle zeigte sich, dass das Modell nur JPEG liefert: Die Anfrage nach PNG h&auml;tte jeden einzelnen Aufruf mit einem Fehler beantwortet. Das ist behoben, bevor es jemanden getroffen hat.</p>
         </div>
         <div class="release-date">v<span data-app-version>0.10.35-beta</span></div>
       </div>
       <div class="release-grid">
-        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c1h">Neues Bildmodell</b><p data-i18n="release.c1">Statt Imagen erzeugt jetzt Google Nano Banana die Bilder &mdash; im Marketing-Tab und im Notiz-Agenten, weiterhin mit deinem eigenen Google-Schl&uuml;ssel und nur, wenn du das Modul einschaltest.</p></div></div>
-        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c2h">Bild und Notiz passen zusammen</b><p data-i18n="release.c2">Der Agent benennt das Bild jetzt nach dem, was tats&auml;chlich ankommt, und zieht die Einbettung in der Notiz nach. Vorher h&auml;tten Bild und Notiz je f&uuml;r sich in Ordnung sein k&ouml;nnen &mdash; und die Verbindung dazwischen w&auml;re tot gewesen.</p></div></div>
-        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c3h">Bilder herunterladen und klare Fehler</b><p data-i18n="release.c3">Im Marketing-Tab l&auml;sst sich ein erzeugtes Bild jetzt direkt speichern. Und wenn Google ein Motiv ablehnt, steht der Grund in der App, statt dass einfach nichts passiert.</p></div></div>
+        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c1h">Notizen und Ordner landen im Papierkorb</b><p data-i18n="release.c1">Gel&ouml;schtes geht in den Papierkorb deines Systems und l&auml;sst sich von dort zur&uuml;cklegen. Ist der nicht erreichbar, wandert es in den Papierkorb im Vault. Und wenn beides nicht geht, bricht der Vorgang mit einer Meldung ab, statt ersatzweise endg&uuml;ltig zu l&ouml;schen.</p></div></div>
+        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c2h">Die Nachfrage sagt jetzt die Wahrheit</b><p data-i18n="release.c2">Im L&ouml;schdialog stand &bdquo;kann nicht r&uuml;ckg&auml;ngig gemacht werden&ldquo;. Jetzt steht dort, dass die Datei in den Papierkorb wandert &mdash; und dass andere Ger&auml;te die L&ouml;schung beim n&auml;chsten Abgleich nachziehen. Das war vorher nirgends gesagt.</p></div></div>
+        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c3h">Punkte statt Karten im Graph</b><p data-i18n="release.c3">Der Wissensgraph zeigt Notizen auf Wunsch als Punkte statt als Karten, wie man es aus Obsidian kennt. Weil dabei keine Inhalte gelesen werden, bleibt die Ansicht bis 1500 Notizen ruhig statt bis 500, und die Punktgr&ouml;&szlig;e bildet auch gro&szlig;e Unterschiede in der Vernetzung noch ab.</p></div></div>
       </div>
       <a class="release-link" href="https://github.com/bydb/mindgraph-notes/releases" target="_blank" rel="noopener noreferrer" data-i18n="release.link">Vollst&auml;ndige Release Notes auf GitHub &rarr;</a>
     </div>
@@ -1905,7 +1905,7 @@
         "how.p5h": "Das Web, wenn du es brauchst",
         "how.p5": "Schalte die Webrecherche pro Auftrag zu – ganz optional. Der Agent sucht, liest die passenden Seiten und schreibt eine Notiz mit sauberem Quellenverzeichnis; du prüfst sie, bevor sie in deinen Vault kommt. Der Suchanbieter erhält nur die Suchanfragen; die vollständigen Seiten ruft die App lokal ab. Bei einem optionalen Cloud-Modell geht der gelesene Kontext zusätzlich an dessen Anbieter – darauf weist die App vor dem Lauf hin. Den Suchanbieter wählst du selbst: sofort einsatzbereit oder deine eigene, private Suchmaschine.",
         "hero.badge": "Open Source \u00b7 Lokal \u00b7 Kostenlos",
-        "hero.release": "Bild-Generierung wieder funktionsfähig &middot; v{vs}",
+        "hero.release": "Gelöschtes landet im Papierkorb &middot; v{vs}",
         "hero.videoPause": "Anhalten",
         "hero.videoPlay": "Abspielen",
         "hero.videoStart": "Video abspielen",
@@ -1982,15 +1982,15 @@
         "modules.opt.vision": "Vision OCR",
         "modules.opt.speech": "Diktat & Vorlesen",
         "modules.opt.terminal": "Terminal",
-        "release.label": "Release {vs} · Bilder, die auch ankommen",
-        "release.heading": "Was ist neu — <em>die Bild-Generierung läuft auf Googles neues Modell und funktioniert wieder.</em>",
-        "release.lead": "Die Bild-Generierung wurde auf Google Nano Banana umgestellt — das aktuelle Bildmodell hinter Gemini. Beim Prüfen gegen die echte Schnittstelle zeigte sich, dass das Modell nur JPEG liefert: Die Anfrage nach PNG hätte jeden einzelnen Aufruf mit einem Fehler beantwortet. Das ist behoben, bevor es jemanden getroffen hat.",
-        "release.c1h": "Neues Bildmodell",
-        "release.c1": "Statt Imagen erzeugt jetzt Google Nano Banana die Bilder — im Marketing-Tab und im Notiz-Agenten, weiterhin mit deinem eigenen Google-Schlüssel und nur, wenn du das Modul einschaltest.",
-        "release.c2h": "Bild und Notiz passen zusammen",
-        "release.c2": "Der Agent benennt das Bild jetzt nach dem, was tatsächlich ankommt, und zieht die Einbettung in der Notiz nach. Vorher hätten Bild und Notiz je für sich in Ordnung sein können — und die Verbindung dazwischen wäre tot gewesen.",
-        "release.c3h": "Bilder herunterladen und klare Fehler",
-        "release.c3": "Im Marketing-Tab lässt sich ein erzeugtes Bild jetzt direkt speichern. Und wenn Google ein Motiv ablehnt, steht der Grund in der App, statt dass einfach nichts passiert.",
+        "release.label": "Release {vs} · Löschen mit Rückweg",
+        "release.heading": "Was ist neu — <em>eine gelöschte Notiz ist nicht mehr weg, sondern im Papierkorb.</em>",
+        "release.lead": "Bisher hat die App beim Löschen sofort und endgültig gelöscht. Ausgerechnet diese Löschung ist die, die anschließend über den Sync auf alle deine Geräte durchschlägt — während umgekehrt eine Löschung, die vom Sync kommt, seit jeher im vault-eigenen Papierkorb landet und zurückholbar ist. Das war genau falsch herum und ist jetzt umgedreht.",
+        "release.c1h": "Notizen und Ordner landen im Papierkorb",
+        "release.c1": "Gelöschtes geht in den Papierkorb deines Systems und lässt sich von dort zurücklegen. Ist der nicht erreichbar, wandert es in den Papierkorb im Vault. Und wenn beides nicht geht, bricht der Vorgang mit einer Meldung ab, statt ersatzweise endgültig zu löschen.",
+        "release.c2h": "Die Nachfrage sagt jetzt die Wahrheit",
+        "release.c2": "Im Löschdialog stand „kann nicht rückgängig gemacht werden“. Jetzt steht dort, dass die Datei in den Papierkorb wandert — und dass andere Geräte die Löschung beim nächsten Abgleich nachziehen. Das war vorher nirgends gesagt.",
+        "release.c3h": "Punkte statt Karten im Graph",
+        "release.c3": "Der Wissensgraph zeigt Notizen auf Wunsch als Punkte statt als Karten, wie man es aus Obsidian kennt. Weil dabei keine Inhalte gelesen werden, bleibt die Ansicht bis 1500 Notizen ruhig statt bis 500, und die Punktgröße bildet auch große Unterschiede in der Vernetzung noch ab.",
         "release.link": "Vollständige Release Notes auf GitHub →",
         "dl.label": "Download",
         "dl.heading": "Jetzt starten.",
@@ -2173,7 +2173,7 @@
         "how.p5h": "The web, when you need it",
         "how.p5": "Turn on web research per task – entirely optional. The agent searches, reads the relevant pages and writes a note with a clean list of sources; you review it before it enters your vault. The search provider receives only the queries; the app fetches full pages locally. With an optional cloud model, the extracted context is also sent to that model provider – the app warns you before the run. You choose the search provider yourself: ready to use or your own private search engine.",
         "hero.badge": "Open Source \u00b7 Local \u00b7 Free",
-        "hero.release": "Image generation works again &middot; v{vs}",
+        "hero.release": "Deleted items go to the trash &middot; v{vs}",
         "hero.videoPause": "Pause",
         "hero.videoPlay": "Play",
         "hero.videoStart": "Play video",
@@ -2250,15 +2250,15 @@
         "modules.opt.vision": "Vision OCR",
         "modules.opt.speech": "Dictation & TTS",
         "modules.opt.terminal": "Terminal",
-        "release.label": "Release {vs} · Images that actually arrive",
-        "release.heading": "What’s new — <em>image generation moves to Google’s new model and works again.</em>",
-        "release.lead": "Image generation now runs on Google Nano Banana, the current image model behind Gemini. Checking it against the real interface revealed that the model only returns JPEG: asking for PNG would have answered every single call with an error. That is fixed before it reached anyone.",
-        "release.c1h": "New image model",
-        "release.c1": "Google Nano Banana replaces Imagen — in the marketing tab and in the note agent, still with your own Google key and only if you switch the module on.",
-        "release.c2h": "Image and note match up",
-        "release.c2": "The agent now names the image after what actually arrives and corrects the embed inside the note. Before, image and note could each have been fine on their own — and the link between them dead.",
-        "release.c3h": "Download images, and clear errors",
-        "release.c3": "In the marketing tab a generated image can now be saved directly. And when Google refuses a subject, the reason appears in the app instead of nothing happening at all.",
+        "release.label": "Release {vs} · Deleting has a way back",
+        "release.heading": "What’s new — <em>a deleted note is no longer gone, it is in the trash.</em>",
+        "release.lead": "Until now the app deleted immediately and for good. That deletion is precisely the one that then travels to every device you own — while a deletion arriving from sync has always been parked in the vault’s own trash and could be recovered. That was the wrong way round, and it is now reversed.",
+        "release.c1h": "Notes and folders go to the trash",
+        "release.c1": "Deleted items move to your system trash and can be put back from there. If that is unavailable, they go to the trash inside the vault. And if neither works, the operation stops with a message instead of deleting for good as a fallback.",
+        "release.c2h": "The confirmation now tells the truth",
+        "release.c2": "The delete dialog used to say “this action cannot be undone”. It now says the file moves to the trash — and that other devices follow the deletion on the next sync. Neither was stated anywhere before.",
+        "release.c3h": "Dots instead of cards in the graph",
+        "release.c3": "The knowledge graph can show notes as dots rather than cards, the way Obsidian does it. Since no note content is read for that, the view stays calm up to 1500 notes instead of 500, and the dot size still tells large differences in connectedness apart.",
         "release.link": "Full release notes on GitHub →",
         "dl.label": "Download",
         "dl.heading": "Get started.",

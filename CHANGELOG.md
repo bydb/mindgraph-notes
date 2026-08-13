@@ -2,6 +2,27 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.10.44-beta] - 2026-08-13
+
+Löschen hat jetzt einen Rückweg. Bisher hat die App eine Notiz oder einen Ordner sofort und endgültig gelöscht — ausgerechnet die Löschung also, die anschließend über den Sync auf alle Geräte durchschlägt. Umgekehrt landet eine Löschung, die vom Sync kommt, seit jeher im Papierkorb des Vaults und ist rückholbar. Das war genau falsch herum. Anlass war ein realer Fall: ein gelöschter Ordner mit 376 Dateien, von dem auf der Platte keine Spur mehr übrig war.
+
+### Geändert
+
+- **Notizen und Ordner wandern in den Papierkorb.** Gelöschtes geht zuerst in den Papierkorb des Betriebssystems — dort sucht man danach, und die Datei verlässt den Vault sauber. Ist er nicht erreichbar (unter Linux kommt das vor), wandert es in den vault-eigenen Papierkorb `.sync-trash`, also genau dorthin, wo Server-Löschungen seit jeher landen. Betroffen sind alle drei Wege: einzelne Notiz, Ordner samt Inhalt und Mehrfachauswahl.
+- **Schlägt beides fehl, wird nichts gelöscht.** Der Vorgang bricht dann mit einer Meldung ab, statt ersatzweise endgültig zu löschen. Ein stiller Rückfall hätte die Lücke wieder aufgemacht.
+- **Der Löschdialog sagt, was wirklich passiert.** Dort stand „Diese Aktion kann nicht rückgängig gemacht werden." Jetzt steht dort der Papierkorb-Hinweis und der Satz, dass andere Geräte die Löschung beim nächsten Abgleich nachziehen — das war vorher an keiner Stelle gesagt.
+- **Ein Papierkorb-Mechanismus statt zwei.** Server-Löschungen und eigene Löschungen nutzen dieselbe Implementierung und dieselbe Kollisionsregel: Ein bereits belegter Name im Papierkorb wird um Zeitstempel und notfalls Zähler ergänzt. Vorher hätte das Verschieben die ältere Löschung still überschrieben, weil ein Umbenennen im Dateisystem nicht nachfragt.
+
+### Hinzugefügt
+
+- **Punkte statt Karten im Wissensgraph.** Der Modus war halb vorhanden, aber unerreichbar. Der Umschalter sitzt jetzt in der Anzeige-Knopfgruppe, die Wahl bleibt erhalten. Weil dabei keine Notizinhalte gelesen werden — keine Callouts, keine Aufgaben, keine Bilder —, bleibt die Ansicht bis 1500 Notizen ruhig statt bis 500.
+- **Punktgröße bildet auch große Unterschiede ab.** Vorher war die Skala schon bei elf Verbindungen am Anschlag: In einem Vault mit 3686 Notizen lagen 22 Notizen auf derselben Größe, die mit elf Verbindungen sah aus wie die mit 399. Jetzt sind es noch zwei.
+- **Titel im Punkte-Modus.** Ab einer Zoomstufe von 0,85 stehen sie dauerhaft unter dem Punkt, darunter beim Überfahren mit der Maus.
+
+### Behoben
+
+- **Eingebettete Bilder zählen nicht mehr als Vernetzung.** Im Kartenmodus war das längst so; im Punkte-Modus wirkten Notizen mit vielen Bildern dadurch fälschlich stark vernetzt.
+
 ## [0.10.43-beta] - 2026-08-11
 
 Die Bild-Generierung läuft jetzt auf Google Nano Banana, dem aktuellen Bildmodell hinter Gemini. Beim Prüfen gegen die echte Schnittstelle kam heraus, dass das Modell ausschließlich JPEG liefert — die Anfrage nach PNG hätte jeden einzelnen Aufruf mit einem Fehler beantwortet. Der Fehler ist behoben, bevor er jemanden getroffen hat.
