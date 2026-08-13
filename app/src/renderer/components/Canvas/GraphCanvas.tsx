@@ -10,6 +10,7 @@ import ReactFlow, {
   Background,
   BackgroundVariant,
   useReactFlow,
+  useStore as useReactFlowStore,
   Connection,
   Panel,
   type NodeChange,
@@ -26,6 +27,7 @@ import { useUIStore } from '../../stores/uiStore'
 import { NoteNode } from './NoteNode'
 import { PdfNode } from './PdfNode'
 import { LabelNode } from './LabelNode'
+import { DotNode, dotSizeForLinks } from './DotNode'
 import type { FileEntry } from '../../../shared/types'
 import { resolveLink, extractLinks, generateNoteId, extractFirstCardCallout, extractTasks, extractExternalLinks, extractFirstImage } from '../../utils/linkExtractor'
 import { applyLayout, type LayoutAlgorithm, type LayoutNode, type LayoutEdge } from '../../utils/layoutAlgorithms'
@@ -37,6 +39,35 @@ import { getNoteKind } from '../../utils/noteKind'
 // eine Ordnerwahl statt zu rendern — ein ungefilterter 4000er-Graph ist weder
 // lesbar noch schafft ihn das Layout (Renderer-Freeze, real aufgetreten).
 const MAX_GRAPH_NOTES = 500
+
+// Im Punkte-Modus liegt die Grenze höher: dort werden weder Notiz-Inhalte
+// nachgeladen noch Callouts/Tasks/Bilder ausgewertet, und pro Notiz entsteht
+// nur ein kleiner Kreis statt einer Karte. Der teuerste Posten des alten
+// Freezes (Batch-Load + updateNote pro Notiz) entfällt komplett.
+const MAX_GRAPH_DOT_NOTES = 1500
+
+// Eingebettete Bilder erscheinen als ausgehende Links. Für jede Form von
+// "wie stark ist diese Notiz vernetzt" zählen sie nicht mit. Kein /g-Flag —
+// sonst wäre .test() zustandsbehaftet und würde jeden zweiten Treffer verlieren.
+const IMAGE_LINK_PATTERN = /\.(png|jpe?g|gif|svg|webp|bmp|ico|tiff?)$/i
+
+// Punkte-Modus zieht das Layout beim ANZEIGEN zusammen — die Positionen sind
+// für 280 px breite Karten gerechnet, zwischen 14-px-Punkten steht damit fast
+// nur Leerraum. Gespeichert wird weiterhin unskaliert: das Kartenlayout bleibt
+// unangetastet, und alles, was aus der Canvas-Koordinate zurück in den Store
+// schreibt, geht durch setNodePositionFromCanvas (rechnet den Faktor heraus).
+// 0,3 und nicht mehr: Die Anordnen-Layouts (hierarchisch, Raster, Cluster)
+// rechnen alle mit 240x140-Kartenkästen. Bei 0,45 blieb daraus ein 108x63-
+// Raster — für 14- bis 60-px-Punkte immer noch zwei- bis dreimal zu luftig,
+// die Hierarchie war deshalb nicht als Baum lesbar. Die Layouts hier NICHT auf
+// Punktgrößen umzustellen ist Absicht: ihr Ergebnis landet im gemeinsamen
+// Positionsspeicher, ein punktoptimiertes Layout ließe die Karten überlappen.
+const DOT_LAYOUT_SCALE = 0.3
+
+// Ab dieser Zoomstufe stehen die Beschriftungen dauerhaft unter den Punkten
+// (wie im Vorspann). Weiter draußen bleibt es ein ruhiges Punktefeld — sonst
+// wären es bei 1500 Notizen 1500 zusätzliche Textelemente.
+const DOT_LABEL_MIN_ZOOM = 0.85
 
 const nodeColors = [
   { labelKey: 'graphCanvas.colorDefault', value: undefined },
@@ -910,7 +941,12 @@ const AlignmentToolbar: React.FC<AlignmentToolbarProps> = memo(({ onAlign, onDis
 AlignmentToolbar.displayName = 'AlignmentToolbar'
 
 // Stabile Referenzen - MÜSSEN außerhalb der Komponente sein
+// Beide Maps sind Modul-Konstanten (stabile Referenz!) — React Flow baut den
+// Graphen sonst bei jedem Render neu auf. Getauscht wird die ganze Map, nicht
+// der Node-Typ: dadurch bleiben Auswahl, Kontextmenü, Ausrichtung und
+// Kantenlogik unverändert, sie prüfen alle auf type === 'note'.
 const nodeTypes = { note: NoteNode, pdf: PdfNode, label: LabelNode } as const
+const dotNodeTypes = { note: DotNode, pdf: PdfNode, label: LabelNode } as const
 const fitViewOptions = { padding: 0.2 }
 // Petrol redesign: Verbindungs-Vorschau (Drag) ruhig/neutral statt Akzent.
 const connectionLineStyle = { stroke: 'var(--border-color)', strokeWidth: 1.4 }
@@ -990,6 +1026,7 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
     canvasShowLinks, setCanvasShowLinks,
     canvasShowImages, setCanvasShowImages,
     canvasShowSummaries, setCanvasShowSummaries,
+    canvasViewMode, setCanvasViewMode,
     canvasCompactMode,
     canvasReadMode, setCanvasReadMode,
     canvasHoverScale, setCanvasHoverScale,
@@ -1125,10 +1162,41 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
   // ein (Layout + React Flow skalieren nicht auf Tausende Nodes — real passiert
   // bei 4251 Notizen). Oberhalb der Schwelle wird nicht gerendert, sondern eine
   // Ordnerwahl verlangt. Local Mode ist ausgenommen (zeigt nur Nachbarschaft).
-  const graphTooLarge = !localRootNoteId && notes.length > MAX_GRAPH_NOTES
+  const isDotMode = canvasViewMode === 'dots'
+  const maxGraphNotes = isDotMode ? MAX_GRAPH_DOT_NOTES : MAX_GRAPH_NOTES
+
+  // Faktor zwischen Speicher- und Anzeigekoordinate. Der Ref hält den Setter
+  // unten referenzstabil — sonst müsste jede der ~20 useCallback-Abhängigkeits-
+  // listen nachgezogen werden, und eine vergessene würde beim Moduswechsel den
+  // alten Faktor einfrieren und Positionen falsch speichern.
+  const posScale = isDotMode ? DOT_LAYOUT_SCALE : 1
+  const posScaleRef = useRef(posScale)
+  posScaleRef.current = posScale
+
+  // Für alles, was aus einer Canvas-Koordinate schreibt (Ziehen, Ausrichten,
+  // Anordnen, neue Notiz an Mausposition). Positionen, die bereits aus dem
+  // Store stammen, gehen weiterhin direkt an setNodePosition.
+  const setNodePositionFromCanvas = useCallback((nodeId: string, x: number, y: number) => {
+    const s = posScaleRef.current
+    setNodePosition(nodeId, x / s, y / s)
+  }, [setNodePosition])
+
+  // Der Selektor gibt bewusst einen Boolean zurück, keinen Zoomwert: so wird
+  // nur beim Über-/Unterschreiten der Schwelle neu gerendert und nicht bei
+  // jedem Mausrad-Tick. Umgesetzt wird es rein über eine CSS-Klasse — käme das
+  // Flag in die Node-Daten, müssten bei jedem Zoom alle Nodes neu gebaut werden.
+  const dotLabelsVisible = useReactFlowStore(
+    (s) => s.transform[2] >= DOT_LABEL_MIN_ZOOM
+  )
+  const graphTooLarge = !localRootNoteId && notes.length > maxGraphNotes
 
   useEffect(() => {
     if (!vaultPath) return
+    // Punkte-Modus zeigt keine Callouts, Tasks, Bilder oder Task-Häkchen —
+    // dann muss auch kein Notiz-Inhalt von der Platte gelesen werden. Das ist
+    // die eigentliche Ersparnis: sonst laufen hier pro Ordnerwechsel Hunderte
+    // Dateilesevorgänge plus ein updateNote je Notiz durch den Store.
+    if (isDotMode) return
     // Guard: solange die Ordnerwahl-Karte steht, KEINE Inhalte nachladen —
     // der Batch-Load + updateNote pro Notiz (Tausende Store-Updates mit
     // Re-Render-Kaskade) war der eigentliche Kern des Renderer-Freezes.
@@ -1160,7 +1228,7 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
         pathsToLoad.forEach(path => loadingContentPathsRef.current.delete(path))
       }
     })()
-  }, [graphTooLarge, notes, vaultPath, updateNote])
+  }, [graphTooLarge, isDotMode, notes, vaultPath, updateNote])
 
   // PDFs nach Ordner-Filter filtern (nur PDFs ohne Companion-Note anzeigen)
   const pdfs = useMemo(() => {
@@ -1917,6 +1985,33 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
       const storedWidth = positions[note.id]?.width
       const storedHeight = positions[note.id]?.height
 
+      // Punkte-Modus: keine Inhaltsauswertung (Callout/Tasks/Links/Bild),
+      // kein Bild-Laden über IPC, keine Dimensionsrechnung. Ein Punkt braucht
+      // nur Titel, Farbe und Verlinkungsgrad.
+      if (isDotMode) {
+        // Eingebettete Bilder stehen als ausgehende Links in der Notiz, sind
+        // aber keine inhaltliche Vernetzung. Der Kartenmodus filtert sie beim
+        // Link-Zähler ebenso heraus — sonst bekäme eine bebilderte Notiz allein
+        // deswegen einen dicken Punkt.
+        const dotLinkCount =
+          note.outgoingLinks.filter(l => !IMAGE_LINK_PATTERN.test(l)).length
+          + note.incomingLinks.length
+        const dotSize = dotSizeForLinks(dotLinkCount)
+        return {
+          id: note.id,
+          type: 'note',
+          position: { x: position.x * posScale, y: position.y * posScale },
+          data: {
+            title: note.title,
+            note,
+            color: positions[note.id]?.color,
+            linkCount: dotLinkCount,
+            dotSize
+          },
+          style: { width: dotSize, height: dotSize }
+        }
+      }
+
       // Callout für Kartenanzeige extrahieren
       const callout = extractCardCalloutSafe(note.content)
 
@@ -1938,7 +2033,7 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
       const hasImage = embeddedImage !== null && imageDataUrls[note.id] !== undefined
       const hasExternalLink = externalLink !== null
       const tagCount = note.tags.length
-      const linkCount = note.outgoingLinks.filter(l => !/\.(png|jpe?g|gif|svg|webp|bmp|ico|tiff?)$/i.test(l)).length
+      const linkCount = note.outgoingLinks.filter(l => !IMAGE_LINK_PATTERN.test(l)).length
 
       // Berechne die optimalen Dimensionen basierend auf Inhalt
       const dimensions = calculateNodeDimensions(
@@ -2028,7 +2123,7 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
       return {
         id: pdfId,
         type: 'pdf',
-        position,
+        position: { x: position.x * posScale, y: position.y * posScale },
         data: {
           title: pdf.title,
           path: pdf.path,
@@ -2054,7 +2149,7 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
     const labelNodes = filteredLabels.map((label) => ({
       id: label.id,
       type: 'label',
-      position: { x: label.x, y: label.y },
+      position: { x: label.x * posScale, y: label.y * posScale },
       data: {
         text: label.text,
         color: label.color,
@@ -2070,7 +2165,7 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
     }))
 
     return [...noteNodes, ...pdfNodes, ...labelNodes]
-  }, [graphTooLarge, notes, pdfs, positions, labels, getStablePosition, editingNodeId, handleNodeTitleChange, handleLabelTextChange, handleEditingDone, handleTaskToggle, handleOpenExternalLink, imageDataUrls, loadImageDataUrl, canvasShowTags, canvasShowLinks, canvasShowImages, canvasShowSummaries, canvasCompactMode, canvasDefaultCardWidth, canvasFilterPath, localRootNoteId, expandedNoteIds, onExpandNode, allNotes])
+  }, [graphTooLarge, isDotMode, posScale, notes, pdfs, positions, labels, getStablePosition, editingNodeId, handleNodeTitleChange, handleLabelTextChange, handleEditingDone, handleTaskToggle, handleOpenExternalLink, imageDataUrls, loadImageDataUrl, canvasShowTags, canvasShowLinks, canvasShowImages, canvasShowSummaries, canvasCompactMode, canvasDefaultCardWidth, canvasFilterPath, localRootNoteId, expandedNoteIds, onExpandNode, allNotes])
   
   // Links zu Edges konvertieren - bidirektionale Links zusammenführen
   const initialEdges: Edge[] = useMemo(() => {
@@ -2182,14 +2277,17 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
       `${l.id}:${l.text}:${l.color || ''}:${l.fontSize || ''}`
     ).sort().join(',')
 
-    const currentHash = `notes:${notesHash}|labels:${labelsHash}`
+    // Der Anzeigemodus gehört in den Hash: beim Wechsel Karten <-> Punkte
+    // ändern sich weder Notizen noch Labels, die Nodes müssen aber neu gebaut
+    // werden (andere Daten, andere Größen).
+    const currentHash = `mode:${canvasViewMode}|notes:${notesHash}|labels:${labelsHash}`
     const prevHash = prevNoteIdsRef.current
 
     if (currentHash !== prevHash) {
       setNodes(initialNodes)
       prevNoteIdsRef.current = currentHash
     }
-  }, [notes, labels, initialNodes, setNodes])
+  }, [notes, labels, canvasViewMode, initialNodes, setNodes])
 
   // Update Node-Positionen und Farben aus dem Store
   useEffect(() => {
@@ -2200,7 +2298,7 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
 
         return {
           ...node,
-          position: { x: storedPos.x, y: storedPos.y },
+          position: { x: storedPos.x * posScale, y: storedPos.y * posScale },
           data: {
             ...node.data,
             color: storedPos.color,
@@ -2209,7 +2307,7 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
         }
       })
     )
-  }, [positions, setNodes])
+  }, [positions, posScale, setNodes])
   
   // Sync edges when initialEdges change
   useEffect(() => {
@@ -2245,6 +2343,11 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
 
   // Update display settings and dimensions in nodes when they change
   useEffect(() => {
+    // Im Punkte-Modus greifen die Karten-Schalter nicht — und vor allem darf
+    // hier keine Kartendimension gesetzt werden, sonst würden die Punkte auf
+    // Kartengröße aufgeblasen.
+    if (isDotMode) return
+
     setNodes((currentNodes) =>
       currentNodes.map((node) => {
         // Nur Note-Nodes haben diese Eigenschaften
@@ -2302,7 +2405,7 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
         }
       })
     )
-  }, [canvasShowTags, canvasShowLinks, canvasShowImages, canvasShowSummaries, canvasCompactMode, canvasDefaultCardWidth, imageDataUrls, setNodes])
+  }, [isDotMode, canvasShowTags, canvasShowLinks, canvasShowImages, canvasShowSummaries, canvasCompactMode, canvasDefaultCardWidth, imageDataUrls, setNodes])
 
   // Update imageDataUrl in nodes when images are loaded
   useEffect(() => {
@@ -2346,9 +2449,14 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
           const finalPos = pos || dragPositionsRef.current[change.id]
           if (finalPos) {
             if (isLabel) {
-              updateLabel(change.id, { x: finalPos.x, y: finalPos.y })
+              // Labels teilen sich den Koordinatenraum mit den Notizen —
+              // im Punkte-Modus also ebenfalls zurückrechnen.
+              updateLabel(change.id, {
+                x: finalPos.x / posScaleRef.current,
+                y: finalPos.y / posScaleRef.current
+              })
             } else {
-              setNodePosition(change.id, finalPos.x, finalPos.y)
+              setNodePositionFromCanvas(change.id, finalPos.x, finalPos.y)
             }
             delete dragPositionsRef.current[change.id]
           }
@@ -2356,6 +2464,11 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
       }
       // Handle resize from NodeResizer
       if (change.type === 'dimensions') {
+        // Im Punkte-Modus gibt es keinen NodeResizer — jede Dimensions-Meldung
+        // kommt hier vom automatischen Ausmessen der Punkte. Würde sie
+        // gespeichert, hätte jede einmal als Punkt angezeigte Notiz danach
+        // dauerhaft eine 16-px-Karte.
+        if (isDotMode) return
         const dims = (change as any).dimensions
         if (dims?.width && dims?.height) {
           if (isLabel) {
@@ -2366,7 +2479,7 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
         }
       }
     })
-  }, [onNodesChange, setNodePosition, setNodeDimensions, updateLabel])
+  }, [onNodesChange, isDotMode, setNodePosition, setNodeDimensions, updateLabel])
   
   const handleEdgesChange = useCallback((changes: EdgeChange[]) => {
     onEdgesChange(changes)
@@ -2573,7 +2686,7 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
       addNote(note)
 
       // Position für neue Node setzen
-      setNodePosition(note.id, newNoteDialog.flowPosition.x, newNoteDialog.flowPosition.y)
+      setNodePositionFromCanvas(note.id, newNoteDialog.flowPosition.x, newNoteDialog.flowPosition.y)
 
       // Bidirektionale Wikilinks: Source → neue Note und neue Note → Source
       const sourceNote = notes.find(n => n.id === newNoteDialog.sourceNodeId)
@@ -2669,10 +2782,11 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
 
   // Überschrift (Label) auf Canvas erstellen
   const handleCreateLabel = useCallback((x: number, y: number) => {
+    // x/y kommen aus der Mausposition auf dem Canvas → in Speicherkoordinaten
     const labelId = addLabel({
       text: t('graphCanvas.newHeading'),
-      x,
-      y,
+      x: x / posScaleRef.current,
+      y: y / posScaleRef.current,
       width: 200,
       height: 50,
       fontSize: 'medium',
@@ -2807,31 +2921,31 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
     switch (type) {
       case 'left':
         targetValue = Math.min(...selectedNodes.map(n => n.position.x))
-        selectedNodes.forEach(n => setNodePosition(n.id, targetValue, n.position.y))
+        selectedNodes.forEach(n => setNodePositionFromCanvas(n.id, targetValue, n.position.y))
         break
       case 'right':
         targetValue = Math.max(...selectedNodes.map((n, i) => n.position.x + nodeWidths[i]))
-        selectedNodes.forEach((n, i) => setNodePosition(n.id, targetValue - nodeWidths[i], n.position.y))
+        selectedNodes.forEach((n, i) => setNodePositionFromCanvas(n.id, targetValue - nodeWidths[i], n.position.y))
         break
       case 'top':
         targetValue = Math.min(...selectedNodes.map(n => n.position.y))
-        selectedNodes.forEach(n => setNodePosition(n.id, n.position.x, targetValue))
+        selectedNodes.forEach(n => setNodePositionFromCanvas(n.id, n.position.x, targetValue))
         break
       case 'bottom':
         targetValue = Math.max(...selectedNodes.map((n, i) => n.position.y + nodeHeights[i]))
-        selectedNodes.forEach((n, i) => setNodePosition(n.id, n.position.x, targetValue - nodeHeights[i]))
+        selectedNodes.forEach((n, i) => setNodePositionFromCanvas(n.id, n.position.x, targetValue - nodeHeights[i]))
         break
       case 'centerH':
         const minX = Math.min(...selectedNodes.map(n => n.position.x))
         const maxX = Math.max(...selectedNodes.map((n, i) => n.position.x + nodeWidths[i]))
         const centerX = (minX + maxX) / 2
-        selectedNodes.forEach((n, i) => setNodePosition(n.id, centerX - nodeWidths[i] / 2, n.position.y))
+        selectedNodes.forEach((n, i) => setNodePositionFromCanvas(n.id, centerX - nodeWidths[i] / 2, n.position.y))
         break
       case 'centerV':
         const minY = Math.min(...selectedNodes.map(n => n.position.y))
         const maxY = Math.max(...selectedNodes.map((n, i) => n.position.y + nodeHeights[i]))
         const centerY = (minY + maxY) / 2
-        selectedNodes.forEach((n, i) => setNodePosition(n.id, n.position.x, centerY - nodeHeights[i] / 2))
+        selectedNodes.forEach((n, i) => setNodePositionFromCanvas(n.id, n.position.x, centerY - nodeHeights[i] / 2))
         break
     }
   }, [selectedNodes, setNodePosition])
@@ -2855,7 +2969,7 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
 
       let currentX = firstX
       sortedNodes.forEach((n, i) => {
-        setNodePosition(n.id, currentX, n.position.y)
+        setNodePositionFromCanvas(n.id, currentX, n.position.y)
         currentX += nodeWidths[i] + gap
       })
     } else {
@@ -2866,7 +2980,7 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
 
       let currentY = firstY
       sortedNodes.forEach((n, i) => {
-        setNodePosition(n.id, n.position.x, currentY)
+        setNodePositionFromCanvas(n.id, n.position.x, currentY)
         currentY += nodeHeights[i] + gap
       })
     }
@@ -2920,7 +3034,7 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
     nodesToArrange.forEach((n, i) => {
       const col = i % cols
       const row = Math.floor(i / cols)
-      setNodePosition(n.id, colX[col], rowY[row])
+      setNodePositionFromCanvas(n.id, colX[col], rowY[row])
     })
 
     // Nach dem Anordnen fitView aufrufen
@@ -2996,7 +3110,7 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
 
     // Update node positions
     Object.entries(result.positions).forEach(([nodeId, pos]) => {
-      setNodePosition(nodeId, pos.x, pos.y)
+      setNodePositionFromCanvas(nodeId, pos.x, pos.y)
     })
 
     // Fit view after layout
@@ -3069,7 +3183,7 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
         const pos = positions[node.id]
         const height = pos?.height || nodeHeight
 
-        setNodePosition(node.id, currentX, currentY)
+        setNodePositionFromCanvas(node.id, currentX, currentY)
 
         currentY += height + verticalGap
       })
@@ -3138,7 +3252,7 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
         const pos = positions[node.id]
         const height = pos?.height || nodeHeight
 
-        setNodePosition(node.id, currentX, currentY)
+        setNodePositionFromCanvas(node.id, currentX, currentY)
 
         currentY += height + verticalGap
       })
@@ -3272,7 +3386,7 @@ Antworte NUR mit JSON, kein anderer Text:
             cluster.ids.forEach(shortId => {
               const id = idMap.get(shortId) || shortId
               if (nodesToArrange.find(n => n.id === id)) {
-                setNodePosition(id, currentX, currentY)
+                setNodePositionFromCanvas(id, currentX, currentY)
                 currentY += (positions[id]?.height || nodeHeight) + verticalGap
               }
             })
@@ -3330,7 +3444,7 @@ Antworte NUR mit JSON, kein anderer Text:
           orderedShortIds.forEach(shortId => {
             const id = idMap.get(shortId) || shortId
             if (nodesToArrange.find(n => n.id === id)) {
-              setNodePosition(id, currentX, 0)
+              setNodePositionFromCanvas(id, currentX, 0)
               currentX += (positions[id]?.width || nodeWidth) + horizontalGap
               placedIds.add(id)
             }
@@ -3339,7 +3453,7 @@ Antworte NUR mit JSON, kein anderer Text:
           // Nicht zugeordnete Notizen am Ende platzieren
           nodesToArrange.forEach(node => {
             if (!placedIds.has(node.id)) {
-              setNodePosition(node.id, currentX, 0)
+              setNodePositionFromCanvas(node.id, currentX, 0)
               currentX += nodeWidth + horizontalGap
             }
           })
@@ -3582,6 +3696,22 @@ Antworte NUR mit JSON:
 
         {/* Display Toggles */}
         <div className="canvas-display-toggles">
+          {/* Karten <-> Punkte. Punkte zeigen nur Titel (bei Hover), Farbe und
+              Verlinkungsgrad — die Karten-Schalter darunter haben dort keine
+              Wirkung und werden deshalb ausgeblendet. */}
+          <button
+            className={`display-toggle-btn ${isDotMode ? 'active' : ''}`}
+            onClick={() => setCanvasViewMode(isDotMode ? 'cards' : 'dots')}
+            title={isDotMode ? t('graphCanvas.showCards') : t('graphCanvas.showDots')}
+            aria-pressed={isDotMode}
+          >
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+              <circle cx="4" cy="4" r="2.2" fill="currentColor"/>
+              <circle cx="12" cy="6" r="1.6" fill="currentColor"/>
+              <circle cx="6.5" cy="12" r="1.8" fill="currentColor"/>
+              <path d="M5.6 5.2 10.6 5.6M5 6.2l1.2 4" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round"/>
+            </svg>
+          </button>
           <button
             className={`display-toggle-btn ${canvasShowEdges ? 'active' : ''}`}
             onClick={() => setCanvasShowEdges(!canvasShowEdges)}
@@ -3593,6 +3723,8 @@ Antworte NUR mit JSON:
               <circle cx="13" cy="3" r="2" stroke="currentColor" strokeWidth="1.2"/>
             </svg>
           </button>
+          {!isDotMode && (
+          <>
           <button
             className={`display-toggle-btn ${canvasShowTags ? 'active' : ''}`}
             onClick={() => setCanvasShowTags(!canvasShowTags)}
@@ -3634,6 +3766,8 @@ Antworte NUR mit JSON:
               <path d="M4.5 6h7M4.5 8h7M4.5 10h4.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
             </svg>
           </button>
+          </>
+          )}
         </div>
 
         <div className="canvas-filter-divider" />
@@ -3714,7 +3848,7 @@ Antworte NUR mit JSON:
         <div className="canvas-empty canvas-too-large">
           <p className="canvas-too-large-title">{t('graphCanvas.tooLarge.title')}</p>
           <p className="canvas-too-large-hint">
-            {t('graphCanvas.tooLarge.hint', { count: notes.length, max: MAX_GRAPH_NOTES })}
+            {t('graphCanvas.tooLarge.hint', { count: notes.length, max: maxGraphNotes })}
           </p>
           <select
             className="canvas-filter-select"
@@ -3732,7 +3866,10 @@ Antworte NUR mit JSON:
         </div>
       ) : (
       <ReactFlow
-        className={canvasReadMode ? 'canvas-read-mode' : ''}
+        className={[
+          canvasReadMode ? 'canvas-read-mode' : '',
+          isDotMode && dotLabelsVisible ? 'dot-labels-visible' : ''
+        ].filter(Boolean).join(' ')}
         style={{ '--hover-scale': canvasHoverScale } as React.CSSProperties}
         nodes={displayNodes}
         edges={displayEdges}
@@ -3746,7 +3883,7 @@ Antworte NUR mit JSON:
         onEdgeContextMenu={handleEdgeContextMenu}
         onPaneContextMenu={handlePaneContextMenu}
         onMoveEnd={handleMoveEnd}
-        nodeTypes={nodeTypes}
+        nodeTypes={isDotMode ? dotNodeTypes : nodeTypes}
         defaultViewport={viewport}
         fitView={Object.keys(positions).length === 0}
         fitViewOptions={fitViewOptions}

@@ -5378,6 +5378,47 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
   opacity: 1;
 }
 
+/* Ab ausreichendem Zoom stehen die Titel dauerhaft UNTER den Punkten, als
+   ruhige Textzeile ohne Sprechblase (Bildsprache des Intro-Vorspanns).
+   Beim Draufzeigen kehrt die volle Sprechblase mit Verbindungszahl zurück —
+   daher :not(:hover) statt eigener Klassen. */
+.dot-labels-visible .dot-node:not(:hover) .dot-node-label {
+  opacity: 1;
+  top: calc(100% + 5px);
+  bottom: auto;
+  background: none;
+  border-color: transparent;
+  box-shadow: none;
+  padding: 0;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  z-index: 1;
+}
+
+.dot-labels-visible .dot-node:not(:hover) .dot-node-label-title {
+  display: block;
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dot-labels-visible .dot-node:not(:hover) .dot-node-label-count {
+  display: none;
+}
+
+/* Verbindungszahl als ruhige Zahl rechts neben dem Titel — erklärt die
+   Punktgröße, ohne die Sprechblase mit Wörtern zu verbreitern. */
+.dot-node-label-count {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  background: var(--bg-secondary);
+  border-radius: var(--radius-sm);
+  padding: 1px 6px;
+  margin-left: 2px;
+}
+
 .dot-handle {
   width: 8px;
   height: 8px;

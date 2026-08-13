@@ -6,7 +6,7 @@ import { toggleTaskFolder } from '../../shared/taskFolderFilter'
 
 type ViewMode = 'editor' | 'split' | 'canvas'
 type Theme = 'light' | 'dark' | 'system'
-type CanvasViewMode = 'cards'
+type CanvasViewMode = 'cards' | 'dots'
 type FileTreeDisplayMode = 'name' | 'path'  // 'name' = nur Dateiname, 'path' = voller Pfad
 type EditorViewMode = 'edit' | 'live-preview' | 'preview'
 export interface EditorHeaderActions {
