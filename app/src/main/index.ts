@@ -2479,6 +2479,7 @@ ipcMain.handle('delete-file', async (_event, filePath: string) => {
 
   try {
     await trashFromVault(safe)
+    await markDeletionConfirmed([safe], 'file')
     return true
   } catch (error) {
     console.error('Fehler beim Löschen der Datei:', error)
@@ -2536,6 +2537,7 @@ ipcMain.handle('delete-directory', async (_event, dirPath: string) => {
 
   try {
     await trashFromVault(safe)
+    await markDeletionConfirmed([safe], 'directory')
     return true
   } catch (error) {
     console.error('Fehler beim Löschen des Ordners:', error)
@@ -2572,16 +2574,19 @@ ipcMain.handle('delete-files', async (_event, filePaths: string[]) => {
   if (response === 0) return { deleted: 0, total: safePaths.length }
 
   let deleted = 0
+  const geloescht: string[] = []
   for (const filePath of safePaths) {
     try {
       // Vault-Roots niemals löschbar machen
       if (approvedVaultRoots.has(path.resolve(filePath))) continue
       await trashFromVault(filePath)
+      geloescht.push(filePath)
       deleted++
     } catch (error) {
       console.error('Fehler beim Löschen:', filePath, error)
     }
   }
+  await markDeletionConfirmed(geloescht, 'file')
 
   return { deleted, total: safePaths.length }
 })
@@ -8995,14 +9000,70 @@ function getSyncCredentialsPath(): string {
   return path.join(app.getPath('userData'), 'sync-credentials.enc')
 }
 
+/**
+ * Baut die Sync-Engine und hängt ihr das Backup vor jedem Download-Überschreiben an.
+ *
+ * Ein Download schreibt über eine Datei, die auf DIESEM Gerät gerade bearbeitet worden
+ * sein kann. Das war bis hierher der einzige Schreibpfad der App ohne Backup — eine
+ * falsch entschiedene Download-Richtung war damit spurlos. Die Backup-Logik bleibt in
+ * index.ts, weil sie an `approvedVaultRoots` hängt; die Engine kennt nur den Haken.
+ */
+/**
+ * Meldet der Sync-Engine, dass der Nutzer diese Löschung im Dialog bestätigt hat.
+ *
+ * Ohne die Meldung sah die Engine beim nächsten Lauf nur „viele Dateien sind weg" und
+ * blockierte mit dem SAFETY-Fehler — bei einem großen Ordner wurde die Löschung nie auf
+ * den Server gezogen, obwohl die Oberfläche „wird beim nächsten Sync nachgezogen" sagte.
+ * Fehler hier dürfen das Löschen NICHT kippen: die Datei liegt bereits im Papierkorb.
+ */
+async function markDeletionConfirmed(absPaths: string[], kind: 'file' | 'directory'): Promise<void> {
+  if (absPaths.length === 0) return
+  try {
+    // Nach Vault gruppieren: die Pfade im Manifest sind relativ zum Vault-Root.
+    const proVault = new Map<string, string[]>()
+    for (const abs of absPaths) {
+      const root = findApprovedRootForPath(abs)
+      if (!root) continue
+      const liste = proVault.get(root) ?? []
+      liste.push(path.relative(root, abs).replace(/\\/g, '/'))
+      proVault.set(root, liste)
+    }
+
+    for (const [root, relative] of proVault) {
+      if (syncEngine) {
+        // Läuft eine Engine, MUSS sie es eintragen: sie hält das Manifest im Speicher
+        // und würde einen direkten Dateischreibvorgang beim nächsten Speichern
+        // überschreiben.
+        await syncEngine.registerIntentionalDeletion(relative, kind)
+      } else {
+        // Keine laufende Engine (Sync abgeschaltet, oder App frisch gestartet und
+        // `sync-restore` noch nicht durch). Ohne diesen Weg wäre die Bestätigung
+        // verloren und die Löschbremse schlüge beim späteren Aktivieren erneut an.
+        const { recordConfirmedDeletions } = await import('./sync/fileTracker')
+        await recordConfirmedDeletions(root, relative, kind)
+      }
+    }
+  } catch (error) {
+    console.warn('[Sync] Löschabsicht konnte nicht vermerkt werden:', error)
+  }
+}
+
+async function createSyncEngine(): Promise<import('./sync/syncEngine').SyncEngine> {
+  const SyncEngineClass = await getSyncEngineClass()
+  const engine = new SyncEngineClass()
+  engine.setBeforeOverwrite(async (absPath, nextContent) => {
+    await backupMarkdownBeforeWrite(absPath, nextContent.toString('utf-8'))
+  })
+  return engine
+}
+
 ipcMain.handle('sync-setup', async (_event, vaultPath: string, passphrase: string, relayUrl: string, autoSyncInterval?: number, activationCode?: string) => {
   try {
     assertApprovedVault(vaultPath, 'sync-setup')
     // Stop any previous engine first — otherwise its reconnect loop lives on as a
     // zombie (repeated setups → reconnect storm with "invalid activation code").
     syncEngine?.disconnect()
-    const SyncEngineClass = await getSyncEngineClass()
-    syncEngine = new SyncEngineClass()
+    syncEngine = await createSyncEngine()
     const result = await syncEngine.init(vaultPath, passphrase, relayUrl, activationCode || '')
     await syncEngine.connect()
     if (autoSyncInterval && autoSyncInterval > 0) {
@@ -9021,8 +9082,7 @@ ipcMain.handle('sync-join', async (_event, vaultPath: string, vaultId: string, p
     // Stop any previous engine first — otherwise its reconnect loop lives on as a
     // zombie (repeated setups → reconnect storm with "invalid activation code").
     syncEngine?.disconnect()
-    const SyncEngineClass = await getSyncEngineClass()
-    syncEngine = new SyncEngineClass()
+    syncEngine = await createSyncEngine()
     await syncEngine.join(vaultPath, vaultId, passphrase, relayUrl, activationCode || '')
     await syncEngine.connect()
     if (autoSyncInterval && autoSyncInterval > 0) {
@@ -9146,8 +9206,7 @@ ipcMain.handle('sync-restore', async (_event, vaultPath: string, vaultId: string
     // Re-initialize sync engine — stop the previous one first to avoid a lingering
     // zombie engine with its own reconnect loop.
     syncEngine?.disconnect()
-    const SyncEngineClass = await getSyncEngineClass()
-    syncEngine = new SyncEngineClass()
+    syncEngine = await createSyncEngine()
     await syncEngine.join(vaultPath, vaultId, passphrase, relayUrl)
     await syncEngine.connect()
 

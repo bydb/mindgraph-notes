@@ -10,6 +10,8 @@ import {
   saveManifest,
   isSyncable,
   assessDeletions,
+  isConfirmedDeletion,
+  addConfirmedDeletions,
   type FileManifest
 } from './fileTracker'
 import { moveToSyncTrash } from './trash'
@@ -50,6 +52,13 @@ const RECONNECT_MAX_DELAY = 60000
 // a "Manifest request timeout" and the status getting stuck red.
 const HEARTBEAT_INTERVAL = 30000
 
+/** Der Stand, den der Server für einen Pfad bestätigt hat — s. uploadFile/downloadFile. */
+interface UploadedState {
+  hash: string
+  size: number
+  modifiedAt: number
+}
+
 export class SyncEngine {
   private ws: WebSocket | null = null
   private key: Buffer | null = null
@@ -69,6 +78,59 @@ export class SyncEngine {
   private heartbeatTimer: ReturnType<typeof setInterval> | null = null
   private wsAlive: boolean = true
   private excludeConfig: { folders: string[]; extensions: string[] } = { folders: [], extensions: [] }
+  /** Pfade, deren Upload noch aussteht (Sync lief / Push für denselben Pfad lief / Fehler). */
+  private pendingPushes: Set<string> = new Set()
+  /** Pfade mit gerade laufendem Push — verhindert parallele Uploads derselben Datei. */
+  private pushInFlight: Set<string> = new Set()
+  /** Reentranz-Sperre für drainPendingPushes(). */
+  private draining: boolean = false
+  /**
+   * Wird vor jedem Überschreiben durch einen Download aufgerufen (Backup).
+   * Gesetzt von index.ts, wo die abgesicherte Schreibgrenze liegt.
+   */
+  private beforeOverwrite: ((absPath: string, nextContent: Buffer) => Promise<void>) | null = null
+
+  setBeforeOverwrite(hook: (absPath: string, nextContent: Buffer) => Promise<void>): void {
+    this.beforeOverwrite = hook
+  }
+
+  /**
+   * Nimmt entgegen, dass der Nutzer diese Pfade in der App ausdrücklich zum Löschen
+   * bestätigt hat. Ohne diese Meldung sah die Sync-Engine beim nächsten Lauf nur
+   * „400 Dateien sind weg" und blockierte mit dem SAFETY-Fehler — die Löschung wurde
+   * nie auf den Server gezogen, obwohl die App „wird nachgezogen" versprach.
+   *
+   * `kind: 'directory'` vermerkt ein Pfad-Präfix und deckt damit den ganzen Baum ab.
+   * Löschungen außerhalb der App (Finder) melden sich hier NICHT und laufen weiterhin
+   * durch die Bremse — genau dort ist sie gewollt.
+   */
+  async registerIntentionalDeletion(relativePaths: string[], kind: 'file' | 'directory'): Promise<void> {
+    if (!this.manifest || relativePaths.length === 0) return
+    addConfirmedDeletions(this.manifest, relativePaths, kind, Date.now())
+    await saveManifest(this.vaultPath, this.manifest)
+  }
+
+  /**
+   * Räumt verbrauchte Löschabsichten ab: exakte Pfade, sobald der Server sie bestätigt
+   * hat; Präfixe, sobald unter ihnen serverseitig nichts mehr liegt. Ohne das Aufräumen
+   * bliebe ein Pfad dauerhaft von der Bremse ausgenommen.
+   */
+  private consumeConfirmedDeletions(remoteManifest: FileManifest, deletedPaths: string[]): void {
+    const confirmed = this.manifest?.confirmedDeletions
+    if (!confirmed) return
+
+    for (const p of deletedPaths) delete confirmed.paths[p]
+
+    const verbleibend = new Set(Object.keys(remoteManifest.files))
+    for (const p of deletedPaths) verbleibend.delete(p)
+    for (const prefix of Object.keys(confirmed.prefixes)) {
+      let nochDa = false
+      for (const p of verbleibend) {
+        if (p.startsWith(prefix)) { nochDa = true; break }
+      }
+      if (!nochDa) delete confirmed.prefixes[prefix]
+    }
+  }
 
   private sendLog(entry: { type: string; message: string; fileName?: string }): void {
     for (const win of BrowserWindow.getAllWindows()) {
@@ -401,6 +463,9 @@ export class SyncEngine {
         for (const [filePath, info] of Object.entries(this.manifest.files)) {
           if (currentManifest.files[filePath]) {
             currentManifest.files[filePath].syncedAt = info.syncedAt
+            // syncedHash MUSS mitwandern — ohne ihn fällt diffManifests auf den
+            // Zeitstempel-Vergleich zurück und der Datenverlust-Pfad ist wieder offen.
+            currentManifest.files[filePath].syncedHash = info.syncedHash ?? null
           }
         }
         currentManifest.lastSyncTime = this.manifest.lastSyncTime
@@ -454,14 +519,18 @@ export class SyncEngine {
           scope: 'local' | 'remote',
           total: number
         ): SyncResult => {
-          const { unmatched, renames, reason } = assessment
+          const { unmatched, renames, intentional, reason } = assessment
           const share = total > 0 ? Math.round((unmatched.length / total) * 100) : 0
           const hint = scope === 'local'
             ? 'This likely indicates a server/connection issue.'
             : 'This likely indicates a stale local manifest or an incomplete vault copy.'
-          const renameNote = renames.length > 0
-            ? ` (${renames.length} further path change(s) recognised as renames and not counted)`
-            : ''
+          const renameNote = (renames.length > 0
+            ? ` (${renames.length} further path change(s) recognised as renames and not counted`
+            : intentional.length > 0 ? ' (' : '')
+            + (intentional.length > 0
+              ? `${renames.length > 0 ? '; ' : ''}${intentional.length} confirmed in-app deletion(s) not counted`
+              : '')
+            + (renames.length > 0 || intentional.length > 0 ? ')' : '')
           const errorMsg =
             `SAFETY: Refusing to delete ${unmatched.length}/${total} ${scope} files (${share}%, ` +
             `triggered by ${reason === 'absolute' ? 'absolute count' : 'share'})${renameNote}. ${hint} ` +
@@ -475,10 +544,11 @@ export class SyncEngine {
 
         if (diff.toDeleteLocal.length > 0) {
           // Gegenrichtung für lokale Löschungen: was gerade heruntergeladen wird.
-          const incoming = new Set<string>()
+          // Liste, nicht Set: jede eingehende Datei entlastet genau EINE Löschung.
+          const incoming: string[] = []
           for (const p of diff.toDownload) {
             const h = remoteManifest.files[p]?.hash
-            if (h) incoming.add(h)
+            if (h) incoming.push(h)
           }
           const assessment = assessDeletions({
             deletions: diff.toDeleteLocal,
@@ -491,12 +561,17 @@ export class SyncEngine {
 
         if (diff.toDeleteRemote.length > 0) {
           // Gegenrichtung für Server-Löschungen: was gerade hochgeladen wird.
-          const outgoing = new Set<string>()
+          // Liste, nicht Set: jede ausgehende Datei entlastet genau EINE Löschung.
+          const outgoing: string[] = []
           for (const p of diff.toUpload) {
             const h = currentManifest.files[p]?.hash
-            if (h) outgoing.add(h)
+            if (h) outgoing.push(h)
           }
           const assessment = assessDeletions({
+            // Nur hier: Server-Löschungen gehen auf eine Aktion DIESES Geräts zurück,
+            // die der Nutzer bestätigt haben kann. Bei toDeleteLocal kommt die Ansage
+            // vom anderen Gerät — dort gibt es keine lokale Bestätigung, die zählt.
+            isIntentional: p => isConfirmedDeletion(p, this.manifest?.confirmedDeletions),
             deletions: diff.toDeleteRemote,
             totalFiles: remoteFileCount,
             hashOf: p => remoteManifest.files[p]?.hash,
@@ -518,8 +593,9 @@ export class SyncEngine {
       for (let i = 0; i < diff.toUpload.length; i += PARALLEL_UPLOADS) {
         const batch = diff.toUpload.slice(i, i + PARALLEL_UPLOADS)
         await Promise.all(batch.map(async (filePath) => {
+          let uploaded: UploadedState
           try {
-            await this.uploadFile(filePath)
+            uploaded = await this.uploadFile(filePath)
           } catch (err) {
             // syncedAt bleibt unangetastet → Datei wird beim nächsten Sync erneut versucht
             uploadFailures.push(filePath)
@@ -527,7 +603,16 @@ export class SyncEngine {
             this.sendLog({ type: 'error', message: `Upload failed: ${filePath} — ${msg}`, fileName: filePath })
             return
           }
-          currentManifest.files[filePath].syncedAt = Date.now()
+          // Bestätigt wird der HOCHGELADENE Stand, nicht der aktuelle Platteninhalt.
+          // Hat der Nutzer währenddessen weitergeschrieben, weicht `hash` beim nächsten
+          // Lauf von `syncedHash` ab → die Datei geht erneut hoch, statt still verloren
+          // zu gehen.
+          currentManifest.files[filePath] = {
+            ...currentManifest.files[filePath],
+            ...uploaded,
+            syncedAt: Date.now(),
+            syncedHash: uploaded.hash
+          }
           current++
           this.sendLog({ type: 'upload', message: `Uploaded: ${filePath}`, fileName: filePath })
           this.sendProgress({
@@ -564,6 +649,14 @@ export class SyncEngine {
           }
           if (currentManifest.files[filePath]) {
             currentManifest.files[filePath].syncedAt = Date.now()
+            // Der gerade geschriebene Server-Stand ist ab jetzt der bestätigte.
+            const written = this.manifest?.files[filePath]
+            if (written) {
+              currentManifest.files[filePath].hash = written.hash
+              currentManifest.files[filePath].size = written.size
+              currentManifest.files[filePath].modifiedAt = written.modifiedAt
+              currentManifest.files[filePath].syncedHash = written.hash
+            }
           } else if (this.manifest?.files[filePath]) {
             // File was newly downloaded (didn't exist on disk when buildManifest ran)
             // Copy the entry from this.manifest (set by downloadFile) into currentManifest
@@ -604,10 +697,12 @@ export class SyncEngine {
       }
 
       // Delete files on server that were deleted locally
+      const remoteDeleted: string[] = []
       for (const filePath of diff.toDeleteRemote) {
         if (this.destroyed) break  // SAFETY
         current++
         await this.deleteRemoteFile(filePath)
+        remoteDeleted.push(filePath)
         // Remove from saved manifest and add tombstone so re-uploads get deleted again
         if (this.manifest) {
           delete this.manifest.files[filePath]
@@ -622,6 +717,10 @@ export class SyncEngine {
           fileName: filePath
         })
       }
+
+      // Löschabsicht ist eingelöst, sobald der Server sie quittiert hat — sonst bliebe
+      // der Pfad dauerhaft von der Löschbremse ausgenommen.
+      this.consumeConfirmedDeletions(remoteManifest, remoteDeleted)
 
       // Handle remote deletes — move to .sync-trash/ instead of permanent deletion
       for (const filePath of diff.toDeleteLocal) {
@@ -735,6 +834,13 @@ export class SyncEngine {
       return { success: false, uploaded: 0, downloaded: 0, conflicts: 0, error }
     } finally {
       this.syncing = false
+      // Änderungen, die während des Laufs eingegangen sind, jetzt nachholen —
+      // sie wurden vorher stillschweigend fallengelassen.
+      if (!this.destroyed) {
+        void this.drainPendingPushes().catch(err => {
+          console.error('[Sync] Nachträglicher Push fehlgeschlagen:', err)
+        })
+      }
     }
   }
 
@@ -798,7 +904,15 @@ export class SyncEngine {
     })
   }
 
-  private async uploadFile(relativePath: string): Promise<void> {
+  /**
+   * Lädt den Inhalt hoch, der beim Lesen auf der Platte lag, und meldet GENAU diesen
+   * Stand zurück. Der Rückgabewert ist die einzige zulässige Quelle für den
+   * Manifest-Eintrag nach einem Upload: zwischen dem Lesen hier und dem Ack des Servers
+   * liegen bis zu 30 Sekunden, in denen der Nutzer weiterschreibt. Wer die Datei danach
+   * erneut liest und das Ergebnis als „synchronisiert" stempelt, erklärt einen Stand für
+   * bestätigt, der den Server nie erreicht hat — genau so gingen Aufgaben-Häkchen verloren.
+   */
+  private async uploadFile(relativePath: string): Promise<UploadedState> {
     if (!this.key) throw new Error('No encryption key')
 
     const absPath = path.join(this.vaultPath, relativePath)
@@ -806,6 +920,11 @@ export class SyncEngine {
     const stats = await fs.stat(absPath)
     const { iv, tag, ciphertext } = encryptFile(plaintext, this.key)
     const hashedPath = hashPath(relativePath)
+    const uploaded: UploadedState = {
+      hash: hashContent(plaintext),
+      size: plaintext.length,
+      modifiedAt: Math.floor(stats.mtimeMs)
+    }
 
     this.wsSend({
       type: 'upload',
@@ -815,13 +934,14 @@ export class SyncEngine {
       iv: iv.toString('base64'),
       tag: tag.toString('base64'),
       data: ciphertext.toString('base64'),
-      hash: hashContent(plaintext),
-      size: plaintext.length,
-      modifiedAt: Math.floor(stats.mtimeMs)
+      hash: uploaded.hash,
+      size: uploaded.size,
+      modifiedAt: uploaded.modifiedAt
     })
 
     // Wait for acknowledgment (per-Pfad korreliert, s. waitForAck)
     await this.waitForAck(hashedPath)
+    return uploaded
   }
 
   private async deleteRemoteFile(relativePath: string): Promise<void> {
@@ -834,11 +954,11 @@ export class SyncEngine {
     await this.waitForAck(hashedPath)
   }
 
-  private async downloadFile(relativePath: string): Promise<void> {
+  private async downloadFile(relativePath: string): Promise<UploadedState | null> {
     // SAFETY: refuse to write if engine was destroyed
     if (this.destroyed) {
       console.warn('[SyncEngine] BLOCKED: downloadFile() on destroyed engine, path:', relativePath)
-      return
+      return null
     }
 
     if (!this.key) throw new Error('No encryption key')
@@ -846,16 +966,16 @@ export class SyncEngine {
     // SAFETY: prevent path traversal attacks
     if (relativePath.includes('..') || path.isAbsolute(relativePath)) {
       console.error('[SyncEngine] BLOCKED: dangerous path:', relativePath)
-      return
+      return null
     }
 
     const fileData = await this.requestFile(relativePath)
-    if (!fileData) return
+    if (!fileData) return null
 
     // SAFETY: check destroyed again after async operation
     if (this.destroyed) {
       console.warn('[SyncEngine] BLOCKED: downloadFile() destroyed during download, path:', relativePath)
-      return
+      return null
     }
 
     const ciphertext = Buffer.from(fileData.data, 'base64')
@@ -882,12 +1002,12 @@ export class SyncEngine {
       if (plaintext.length !== fileData.size) {
         console.error(`[SyncEngine] INTEGRITY FAIL: ${relativePath} — expected ${fileData.size} bytes, got ${plaintext.length}`)
         this.sendLog({ type: 'error', message: `Integrity check failed for ${relativePath}: size mismatch (expected ${fileData.size}, got ${plaintext.length})`, fileName: relativePath })
-        return
+        return null
       }
       if (actualHash !== fileData.hash) {
         console.error(`[SyncEngine] INTEGRITY FAIL: ${relativePath} — hash mismatch`)
         this.sendLog({ type: 'error', message: `Integrity check failed for ${relativePath}: hash mismatch — file may be corrupted on server`, fileName: relativePath })
-        return
+        return null
       }
     }
 
@@ -896,20 +1016,48 @@ export class SyncEngine {
     // SAFETY: verify the resolved path is inside the vault
     if (!absPath.startsWith(this.vaultPath)) {
       console.error('[SyncEngine] BLOCKED: path escapes vault:', absPath)
-      return
+      return null
     }
 
     await fs.mkdir(path.dirname(absPath), { recursive: true })
+
+    // Ein Download überschreibt eine Datei, die der Nutzer auf DIESEM Gerät bearbeitet
+    // haben kann. Bis hierher war das der einzige Schreibpfad der App ohne Backup —
+    // ein falsch entschiedener Download war damit spurlos und unwiederbringlich.
+    // Der Haken wird in index.ts gesetzt (dort liegt die abgesicherte Schreibgrenze).
+    if (this.beforeOverwrite) {
+      try {
+        await this.beforeOverwrite(absPath, plaintext)
+      } catch (err) {
+        console.warn('[SyncEngine] Backup vor Download fehlgeschlagen:', relativePath, err)
+      }
+    }
+
     await fs.writeFile(absPath, plaintext)
 
-    // Update local manifest entry
+    // Update local manifest entry. modifiedAt kommt aus der echten mtime, nicht aus
+    // Date.now() — sonst weicht der Manifest-Stand vom nächsten buildManifest ab.
+    const downloaded: UploadedState = {
+      hash: hashContent(plaintext),
+      size: plaintext.length,
+      modifiedAt: await this.mtimeOf(absPath)
+    }
     if (this.manifest) {
       this.manifest.files[relativePath] = {
-        hash: hashContent(plaintext),
-        size: plaintext.length,
-        modifiedAt: Date.now(),
-        syncedAt: Date.now()
+        ...downloaded,
+        syncedAt: Date.now(),
+        // Gerade vom Server geholt — dieser Inhalt IST der bestätigte Stand.
+        syncedHash: downloaded.hash
       }
+    }
+    return downloaded
+  }
+
+  private async mtimeOf(absPath: string): Promise<number> {
+    try {
+      return Math.floor((await fs.stat(absPath)).mtimeMs)
+    } catch {
+      return Date.now()
     }
   }
 
@@ -950,7 +1098,9 @@ export class SyncEngine {
             hash: hashContent(localPlaintext),
             size: localPlaintext.length,
             modifiedAt: Math.floor((await fs.stat(absPath)).mtimeMs),
-            syncedAt: Date.now()
+            syncedAt: Date.now(),
+            // Inhaltlich identisch — beide Seiten tragen denselben bestätigten Stand.
+            syncedHash: hashContent(localPlaintext)
           }
           return
         }
@@ -974,11 +1124,23 @@ export class SyncEngine {
         // Local file might not exist
       }
 
-      await this.downloadFile(relativePath)
+      const downloaded = await this.downloadFile(relativePath)
+      if (downloaded) {
+        localManifest.files[relativePath] = {
+          ...downloaded,
+          syncedAt: Date.now(),
+          syncedHash: downloaded.hash
+        }
+      }
     } else {
       // Local is newer — upload local, remote becomes the conflict copy on other devices
-      await this.uploadFile(relativePath)
-      localManifest.files[relativePath].syncedAt = Date.now()
+      const uploaded = await this.uploadFile(relativePath)
+      localManifest.files[relativePath] = {
+        ...localManifest.files[relativePath],
+        ...uploaded,
+        syncedAt: Date.now(),
+        syncedHash: uploaded.hash
+      }
     }
   }
 
@@ -1163,10 +1325,47 @@ export class SyncEngine {
     })
   }
 
+  /**
+   * Schiebt eine einzelne geänderte Datei hoch (Aufrufer: der Vault-Watcher).
+   *
+   * Zwei Regeln, an denen hier real Daten verloren gingen:
+   * 1. Was der Server bestätigt hat, ist ausschließlich der Rückgabewert von uploadFile —
+   *    NICHT der Platteninhalt nach dem Ack. Zwischen Lesen und Ack liegen bis zu 30 s.
+   * 2. Läuft gerade ein voller Sync oder schon ein Push für denselben Pfad, wird die
+   *    Änderung VORGEMERKT statt verworfen. Vorher stieg die Methode einfach aus und
+   *    niemand kam je darauf zurück.
+   */
   async pushFile(relativePath: string): Promise<void> {
     if (!this.key || !this.ws || this.ws.readyState !== WebSocket.OPEN) return
-    if (this.syncing) return
 
+    if (this.syncing || this.pushInFlight.has(relativePath)) {
+      this.pendingPushes.add(relativePath)
+      return
+    }
+
+    const erfolgreich = await this.pushOnce(relativePath)
+    if (!erfolgreich) this.pendingPushes.add(relativePath)
+
+    // Direkt nachfassen, statt auf den nächsten vollen Sync zu warten. Sonst zeigt das
+    // andere Gerät bis zum nächsten Auto-Sync (Minuten) noch den alten Stand — genau
+    // das Symptom, um das es hier geht. Läuft ein Sync, übernimmt dessen finally.
+    // Ein gerade gescheiterter Pfad wird ausgenommen: der Server hat eben abgelehnt,
+    // ein sofortiger zweiter Versuch kostet nur eine weitere Übertragung.
+    if (!this.syncing) {
+      await this.drainPendingPushes(erfolgreich ? undefined : relativePath)
+    }
+  }
+
+  /**
+   * Ein Upload-Versuch. Meldet Erfolg zurück, statt selbst über Wiedervorlage zu
+   * entscheiden — diese Trennung ist das, was drainPendingPushes() erlaubt, „neue
+   * Änderung" von „fehlgeschlagener Versuch" zu unterscheiden. Ohne sie kreist die
+   * Nachzieh-Schleife auf einem dauerhaft scheiternden Upload endlos.
+   */
+  private async pushOnce(relativePath: string): Promise<boolean> {
+    if (!this.key || !this.ws || this.ws.readyState !== WebSocket.OPEN) return false
+
+    this.pushInFlight.add(relativePath)
     try {
       // Gleiche Größen-Schranke wie im Sync-Diff — pushFile umgeht diffManifests,
       // darf die WS-Verbindung aber genauso wenig am Server-Payload-Limit killen.
@@ -1176,23 +1375,66 @@ export class SyncEngine {
           this.loggedTooLargePaths.add(relativePath)
           this.sendLog({ type: 'error', message: `Skipped — file exceeds 64 MB sync limit: ${relativePath}`, fileName: relativePath })
         }
-        return
+        // Kein Fehler im Sinne der Wiedervorlage: ein erneuter Versuch scheitert genauso.
+        return true
       }
-      await this.uploadFile(relativePath)
+      const uploaded = await this.uploadFile(relativePath)
       if (this.manifest) {
-        const absPath = path.join(this.vaultPath, relativePath)
-        const content = await fs.readFile(absPath)
-        const stats = await fs.stat(absPath)
         this.manifest.files[relativePath] = {
-          hash: hashContent(content),
-          size: content.length,
-          modifiedAt: Math.floor(stats.mtimeMs),
-          syncedAt: Date.now()
+          ...uploaded,
+          syncedAt: Date.now(),
+          syncedHash: uploaded.hash
         }
         await saveManifest(this.vaultPath, this.manifest)
       }
+      return true
     } catch (err) {
       console.error('[Sync] Failed to push file:', relativePath, err)
+      // Das Manifest bleibt unangetastet — der nächste Versuch sieht die Datei
+      // weiterhin als lokal geändert (syncedHash zeigt noch auf den alten Stand).
+      return false
+    } finally {
+      this.pushInFlight.delete(relativePath)
+    }
+  }
+
+  /**
+   * Zieht vorgemerkte Änderungen nach, BIS NICHTS NEUES MEHR ENTSTEHT.
+   *
+   * Eine einzelne Momentaufnahme reicht nicht: Wer sieben Aufgaben in wenigen Sekunden
+   * abhakt, erzeugt Stand 3, während der nachgezogene Upload von Stand 2 noch läuft.
+   * Mit nur einem Durchlauf blieb Stand 3 bis zum nächsten Voll-Sync liegen und das
+   * andere Gerät zeigte minutenlang einen veralteten Stand.
+   *
+   * Gescheiterte Uploads werden zurückgestellt statt sofort wiederholt — sonst hielte
+   * ein dauerhaft scheiternder Pfad die Schleife endlos am Leben. Sie kommen am Ende
+   * zurück in die Vormerkung und damit in den nächsten Push oder Auto-Sync.
+   */
+  private async drainPendingPushes(bereitsGescheitert?: string): Promise<void> {
+    if (this.draining) return
+    this.draining = true
+    const zurueckgestellt = new Set<string>()
+    if (bereitsGescheitert) zurueckgestellt.add(bereitsGescheitert)
+    try {
+      while (this.pendingPushes.size > 0 && !this.destroyed && !this.syncing) {
+        const paths = [...this.pendingPushes]
+        this.pendingPushes.clear()
+        for (const relativePath of paths) {
+          if (zurueckgestellt.has(relativePath)) continue
+          if (this.destroyed || this.syncing) {
+            zurueckgestellt.add(relativePath)
+            continue
+          }
+          if (!(await this.pushOnce(relativePath))) zurueckgestellt.add(relativePath)
+        }
+        // Was in dieser Runde scheiterte, darf die Schleife nicht am Leben halten.
+        // Eine zwischenzeitlich NEU eingetroffene Änderung desselben Pfads geht damit
+        // nicht verloren: der Pfad landet unten wieder in der Vormerkung.
+        for (const relativePath of zurueckgestellt) this.pendingPushes.delete(relativePath)
+      }
+    } finally {
+      for (const relativePath of zurueckgestellt) this.pendingPushes.add(relativePath)
+      this.draining = false
     }
   }
 

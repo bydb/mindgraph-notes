@@ -7,12 +7,30 @@ export interface FileInfo {
   size: number
   modifiedAt: number
   syncedAt: number | null
+  /**
+   * Hash des Inhalts, den der Server für diesen Pfad BESTÄTIGT hat (Upload-Ack bzw.
+   * gerade heruntergeladener Stand). Bewusst getrennt von `hash` (= Stand auf der
+   * Platte) und von `syncedAt` (= Uhrzeit).
+   *
+   * Grund: „Hat sich lokal etwas geändert?" wurde vorher über `modifiedAt > syncedAt`
+   * beantwortet — ein Uhrzeit-Vergleich. Ein einziger falsch gesetzter Stempel machte
+   * eine lokale Änderung dauerhaft unsichtbar, und diffManifests schob den älteren
+   * Server-Stand still darüber (kein Backup, keine Konfliktkopie — real passiert am
+   * 09.06.2026, abgehakte Aufgaben standen danach wieder offen). Über den Hash ist die
+   * Frage exakt und unabhängig von Uhren, Laufzeiten und Doppel-Writes beantwortbar.
+   *
+   * Optional: Manifeste aus älteren Versionen haben das Feld nicht — dort gilt weiter
+   * die Zeitstempel-Regel, bis der Hash einmal gesetzt wurde.
+   */
+  syncedHash?: string | null
 }
 
 export interface FileManifest {
   files: Record<string, FileInfo>
   tombstones?: Record<string, number>  // exact path → deletion timestamp
   tombstonePrefixes?: Record<string, number>  // path prefix → deletion timestamp (for deleted folders)
+  /** Im Dialog bestätigte Löschungen, die noch nicht auf dem Server vollzogen sind. */
+  confirmedDeletions?: ConfirmedDeletions
   lastSyncTime: number
   vaultId: string
 }
@@ -184,7 +202,8 @@ export async function buildManifest(
         hash: hashContent(content),
         size: stats.size,
         modifiedAt: Math.floor(stats.mtimeMs),
-        syncedAt: null
+        syncedAt: null,
+        syncedHash: null
       }
     } catch {
       // Skip files that can't be read
@@ -272,11 +291,21 @@ export function diffManifests(
         if (localFile.syncedAt === null) {
           localFile.syncedAt = Date.now()
         }
+        // Beide Seiten tragen denselben Inhalt: damit ist er nachweislich bestätigt.
+        localFile.syncedHash = localFile.hash
         continue
       }
 
-      const localChanged = localFile.syncedAt === null || localFile.modifiedAt > localFile.syncedAt
-      const remoteChanged = remoteFile.modifiedAt > (localFile.syncedAt || 0)
+      // Bevorzugt inhaltsbasiert entscheiden (s. FileInfo.syncedHash). Nur wenn der
+      // bestätigte Hash fehlt — Manifest einer älteren Version — fällt die Entscheidung
+      // auf den alten Zeitstempel-Vergleich zurück.
+      const syncedHash = localFile.syncedHash
+      const localChanged = syncedHash != null
+        ? localFile.hash !== syncedHash
+        : localFile.syncedAt === null || localFile.modifiedAt > localFile.syncedAt
+      const remoteChanged = syncedHash != null
+        ? remoteFile.hash !== syncedHash
+        : remoteFile.modifiedAt > (localFile.syncedAt || 0)
 
       if (localChanged && tooLarge(localFile)) {
         // Upload unmöglich (Payload-Limit); Download würde den neueren lokalen Stand
@@ -316,6 +345,8 @@ export const DELETION_GUARD = {
 export interface DeletionAssessment {
   /** Löschungen, deren Inhalt im selben Lauf unter anderem Namen wandert = Umbenennung. */
   renames: string[]
+  /** Vom Nutzer im Dialog bestätigte Löschungen — kein Verdachtsfall. */
+  intentional: string[]
   /** Alles andere — echter Verlust, wenn die Annahme falsch ist. */
   unmatched: string[]
   blocked: boolean
@@ -341,21 +372,57 @@ export function assessDeletions(params: {
   deletions: string[]
   totalFiles: number
   hashOf: (path: string) => string | undefined
-  compensatingHashes: Set<string>
+  /**
+   * Hashes der Dateien, die im selben Lauf in die Gegenrichtung gehen — als
+   * ZÄHLENDE Liste, nicht als Set. Jeder Eintrag entlastet genau EINE Löschung.
+   *
+   * Vorher stand hier ein Set: ein einziger Hash entschuldigte damit beliebig viele
+   * gelöschte Dateien gleichen Inhalts. Bei leeren Notizen oder identischen Vorlagen
+   * ist das real — eine neu angelegte leere Notiz hätte 300 gelöschte leere Notizen
+   * als „Umbenennung" durchgewinkt und die Löschbremse komplett ausgehebelt.
+   */
+  compensatingHashes: Iterable<string>
+  /**
+   * Hat der Nutzer diesen Pfad in der App ausdrücklich zum Löschen bestätigt?
+   *
+   * Die Bremse schützt gegen ÜBERRASCHENDE Massenlöschungen (kaputtes Manifest,
+   * NFC/NFD-Umlaute, Verbindungsabbruch). Eine Löschung, die der Nutzer im Dialog
+   * bestätigt hat, ist keine Überraschung. Ohne diese Unterscheidung blockierte die
+   * Bremse jeden großen Ordner, den jemand bewusst gelöscht hat — die App meldete
+   * „wird beim nächsten Sync nachgezogen", und genau das passierte dann nie.
+   * Löschungen aus dem Finder laufen weiterhin durch die Bremse.
+   */
+  isIntentional?: (path: string) => boolean
 }): DeletionAssessment {
-  const { deletions, totalFiles, hashOf, compensatingHashes } = params
+  const { deletions, totalFiles, hashOf, isIntentional } = params
+
+  // Multiset: Hash → wie viele Löschungen dieser Hash noch decken kann.
+  const budget = new Map<string, number>()
+  for (const hash of params.compensatingHashes) {
+    budget.set(hash, (budget.get(hash) ?? 0) + 1)
+  }
 
   const renames: string[] = []
+  const intentional: string[] = []
   const unmatched: string[] = []
 
   for (const filePath of deletions) {
+    if (isIntentional?.(filePath)) {
+      intentional.push(filePath)
+      continue
+    }
     const hash = hashOf(filePath)
-    if (hash && compensatingHashes.has(hash)) renames.push(filePath)
-    else unmatched.push(filePath)
+    const left = hash ? budget.get(hash) ?? 0 : 0
+    if (hash && left > 0) {
+      budget.set(hash, left - 1)
+      renames.push(filePath)
+    } else {
+      unmatched.push(filePath)
+    }
   }
 
   if (unmatched.length >= DELETION_GUARD.ABSOLUTE) {
-    return { renames, unmatched, blocked: true, reason: 'absolute' }
+    return { renames, intentional, unmatched, blocked: true, reason: 'absolute' }
   }
 
   if (
@@ -363,10 +430,66 @@ export function assessDeletions(params: {
     unmatched.length >= DELETION_GUARD.MIN_FOR_RATIO &&
     unmatched.length / totalFiles > DELETION_GUARD.RATIO
   ) {
-    return { renames, unmatched, blocked: true, reason: 'ratio' }
+    return { renames, intentional, unmatched, blocked: true, reason: 'ratio' }
   }
 
-  return { renames, unmatched, blocked: false, reason: null }
+  return { renames, intentional, unmatched, blocked: false, reason: null }
+}
+
+/**
+ * Vom Nutzer bestätigte Löschabsichten. Einzelne Dateien stehen als exakter Pfad,
+ * gelöschte Ordner als Pfad-Präfix — sonst müsste beim Löschen eines Ordners mit
+ * 400 Dateien jeder einzelne Pfad einzeln vermerkt werden.
+ */
+export interface ConfirmedDeletions {
+  paths: Record<string, number>
+  prefixes: Record<string, number>
+}
+
+/** Trägt bestätigte Löschungen in ein Manifest ein (rein, ohne fs). */
+export function addConfirmedDeletions(
+  manifest: FileManifest,
+  relativePaths: string[],
+  kind: 'file' | 'directory',
+  now: number
+): void {
+  if (!manifest.confirmedDeletions) manifest.confirmedDeletions = { paths: {}, prefixes: {} }
+  for (const raw of relativePaths) {
+    const rel = raw.replace(/\\/g, '/').replace(/^\/+|\/+$/g, '')
+    if (!rel) continue
+    if (kind === 'directory') manifest.confirmedDeletions.prefixes[`${rel}/`] = now
+    else manifest.confirmedDeletions.paths[rel] = now
+  }
+}
+
+/**
+ * Schreibt die Löschabsicht direkt ins Manifest auf der Platte — für den Fall, dass
+ * gerade KEINE Sync-Engine läuft (Sync abgeschaltet, oder App frisch gestartet und
+ * `sync-restore` noch nicht durch). Ohne diesen Weg wäre die Bestätigung verloren und
+ * die Löschbremse würde beim späteren Aktivieren erneut anschlagen.
+ *
+ * Läuft eine Engine, MUSS stattdessen deren Methode benutzt werden: sie hält das
+ * Manifest im Speicher und würde diese Datei beim nächsten Speichern überschreiben.
+ */
+export async function recordConfirmedDeletions(
+  vaultPath: string,
+  relativePaths: string[],
+  kind: 'file' | 'directory'
+): Promise<void> {
+  if (relativePaths.length === 0) return
+  const manifest = await loadManifest(vaultPath)
+  if (!manifest) return  // Vault war nie im Sync — es gibt nichts zu vermerken.
+  addConfirmedDeletions(manifest, relativePaths, kind, Date.now())
+  await saveManifest(vaultPath, manifest)
+}
+
+export function isConfirmedDeletion(filePath: string, confirmed?: ConfirmedDeletions): boolean {
+  if (!confirmed) return false
+  if (confirmed.paths[filePath] !== undefined) return true
+  for (const prefix of Object.keys(confirmed.prefixes)) {
+    if (filePath.startsWith(prefix)) return true
+  }
+  return false
 }
 
 const MANIFEST_FILE = '.mindgraph/sync-manifest.json'

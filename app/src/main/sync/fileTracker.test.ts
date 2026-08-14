@@ -10,6 +10,7 @@ import {
   isTombstoned,
   diffManifests,
   assessDeletions,
+  isConfirmedDeletion,
   DELETION_GUARD,
   type FileManifest,
   type FileInfo
@@ -187,6 +188,62 @@ describe('diffManifests', () => {
     expect(diff.toDownload).toEqual(['x.md'])
   })
 
+  // Der Datenverlust-Fall, der real Aufgaben-Häkchen zurückgesetzt hat (09.06.2026):
+  // pushFile lud Stand A hoch, wartete bis zu 30 s auf das Server-Ack und stempelte
+  // DANACH den inzwischen weitergeschriebenen Stand B als "synchronisiert". Damit galt
+  // `modifiedAt > syncedAt` als falsch — Stand B war als lokale Änderung unsichtbar und
+  // der Server-Stand A wurde still darübergeschrieben (ohne Backup, ohne Konfliktkopie).
+  // syncedHash macht die Frage "hat sich lokal etwas geändert?" unabhängig von Uhrzeiten.
+  it('REGRESSION: lokal nach dem Upload weitergeschrieben → Upload, NIE stiller Download', () => {
+    // syncedHash = 'stand-a' (das, was der Server bestätigt hat),
+    // lokal liegt inzwischen 'stand-b', dessen mtime aber VOR dem syncedAt-Stempel liegt.
+    const local = manifest({
+      'journal.md': file('stand-b', { syncedAt: 900, modifiedAt: 800, syncedHash: 'stand-a' })
+    })
+    const remote = manifest({ 'journal.md': file('stand-a', { modifiedAt: 700 }) })
+    const diff = diffManifests(local, remote)
+    expect(diff.toUpload).toEqual(['journal.md'])
+    expect(diff.toDownload).toEqual([])
+  })
+
+  it('syncedHash: lokal unverändert, Server geändert → Download', () => {
+    const local = manifest({
+      'x.md': file('bestaetigt', { syncedAt: 900, modifiedAt: 950, syncedHash: 'bestaetigt' })
+    })
+    const remote = manifest({ 'x.md': file('server-neu', { modifiedAt: 100 }) })
+    const diff = diffManifests(local, remote)
+    // modifiedAt (950) > syncedAt (900) hätte hier fälschlich "lokal geändert" gesagt,
+    // obwohl der Inhalt identisch zum bestätigten Stand ist (z.B. Speichern ohne Änderung).
+    expect(diff.toDownload).toEqual(['x.md'])
+    expect(diff.conflicts).toEqual([])
+  })
+
+  it('syncedHash: beide Seiten weg vom bestätigten Stand → Konflikt', () => {
+    const local = manifest({
+      'x.md': file('lokal-neu', { syncedAt: 900, modifiedAt: 800, syncedHash: 'basis' })
+    })
+    const remote = manifest({ 'x.md': file('remote-neu', { modifiedAt: 100 }) })
+    const diff = diffManifests(local, remote)
+    expect(diff.conflicts).toEqual(['x.md'])
+  })
+
+  it('ohne syncedHash (Manifest aus einer älteren Version) bleibt die Zeitstempel-Regel gültig', () => {
+    const local = manifest({ 'x.md': file('neu', { syncedAt: 500, modifiedAt: 600 }) })
+    const remote = manifest({ 'x.md': file('alt', { modifiedAt: 400 }) })
+    expect(diffManifests(local, remote).toUpload).toEqual(['x.md'])
+
+    const local2 = manifest({ 'y.md': file('alt', { syncedAt: 600, modifiedAt: 500 }) })
+    const remote2 = manifest({ 'y.md': file('neu', { modifiedAt: 700 }) })
+    expect(diffManifests(local2, remote2).toDownload).toEqual(['y.md'])
+  })
+
+  it('identische Hashes setzen syncedHash, damit die Uhrzeit-Regel ab dann nicht mehr greift', () => {
+    const localFile = file('same', { syncedAt: null })
+    const diff = diffManifests(manifest({ 'gleich.md': localFile }), manifest({ 'gleich.md': file('same') }))
+    expect(diff.toUpload).toEqual([])
+    expect(localFile.syncedHash).toBe('same')
+  })
+
   it('füttert den Mass-Deletion-SAFETY-Check: leeres Remote-Manifest → alle gesyncten Dateien in toDeleteLocal', () => {
     // Szenario, gegen das der SAFETY-Check (deleteRatio > 0.1 && >= 10) schützt:
     // Server liefert (z.B. wegen Verbindungsproblem) ein leeres Manifest.
@@ -312,11 +369,70 @@ describe('assessDeletions', () => {
       deletions: [...many(30, 'ren'), 'echt-weg.md'],
       totalFiles: 500,
       hashOf: p => (p === 'echt-weg.md' ? 'einzigartig' : 'wandert-mit'),
-      compensatingHashes: new Set(['wandert-mit'])
+      // 30 verschobene Dateien = 30 Uploads mit demselben Inhalt. Die Aufrufstelle im
+      // syncEngine baut die Liste aus diff.toUpload, also mit 30 Einträgen.
+      compensatingHashes: Array(30).fill('wandert-mit')
     })
     expect(result.blocked).toBe(false)
     expect(result.renames).toHaveLength(30)
     expect(result.unmatched).toEqual(['echt-weg.md'])
+  })
+
+  // Die Umbenennungserkennung war ein Set: EIN Hash entschuldigte beliebig viele
+  // Löschungen gleichen Inhalts. Bei leeren Notizen oder identischen Vorlagen reicht
+  // damit eine einzige neu angelegte Datei, um die Löschbremse komplett auszuhebeln.
+  it('REGRESSION: eine kompensierende Datei entschuldigt nur EINE Löschung, nicht 30', () => {
+    const result = assessDeletions({
+      deletions: many(30, 'leer'),
+      totalFiles: 500,
+      hashOf: () => 'leerer-inhalt',
+      compensatingHashes: ['leerer-inhalt']  // nur EINE neue Datei
+    })
+    expect(result.renames).toHaveLength(1)
+    expect(result.unmatched).toHaveLength(29)
+    expect(result.blocked).toBe(true)
+  })
+
+  it('deckt teilweise: 10 eingehende Dateien decken 10 von 40 gleichartigen Löschungen', () => {
+    const result = assessDeletions({
+      deletions: many(40, 'gleich'),
+      totalFiles: 500,
+      hashOf: () => 'derselbe-inhalt',
+      compensatingHashes: Array(10).fill('derselbe-inhalt')
+    })
+    expect(result.renames).toHaveLength(10)
+    expect(result.unmatched).toHaveLength(30)
+    expect(result.blocked).toBe(true)
+  })
+
+  // Der Nutzer löscht einen großen Ordner, bestätigt den Dialog — und die Bremse
+  // blockierte trotzdem. Die Löschung wurde nie auf den Server gezogen, obwohl die
+  // Oberfläche "wird beim nächsten Sync nachgezogen" versprach.
+  it('REGRESSION: bestätigte Ordnerlöschung (376 Dateien) blockiert nicht mehr', () => {
+    const geloescht = many(376, '400 - Archiv/alt/')
+    const result = assessDeletions({
+      deletions: geloescht,
+      totalFiles: 7181,
+      hashOf: p => H(p),
+      compensatingHashes: [],
+      isIntentional: p => isConfirmedDeletion(p, { paths: {}, prefixes: { '400 - Archiv/alt/': 1 } })
+    })
+    expect(result.blocked).toBe(false)
+    expect(result.intentional).toHaveLength(376)
+    expect(result.unmatched).toEqual([])
+  })
+
+  it('unbestätigte Löschungen laufen weiter durch die Bremse — auch neben bestätigten', () => {
+    const result = assessDeletions({
+      deletions: [...many(20, 'bestaetigt/'), ...many(30, 'ausserhalb/')],
+      totalFiles: 500,
+      hashOf: p => H(p),
+      compensatingHashes: [],
+      isIntentional: p => isConfirmedDeletion(p, { paths: {}, prefixes: { 'bestaetigt/': 1 } })
+    })
+    expect(result.intentional).toHaveLength(20)
+    expect(result.unmatched).toHaveLength(30)
+    expect(result.blocked).toBe(true)
   })
 
   it('lässt eine kleine, gewollte Löschung im großen Vault durch', () => {
