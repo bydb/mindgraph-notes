@@ -2,6 +2,22 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.10.45-beta] - 2026-08-14
+
+Erledigte Aufgaben tauchten auf dem zweiten Gerät wieder auf. Wer abends auf dem einen Laptop abhakt und morgens am anderen sitzt, fand dort alles noch offen und musste es erneut durchgehen. Anlass war ein realer Fall, der sich an den Vault-Backups minutengenau nachweisen ließ: Am 09.06.2026 wurden um 21:15 sieben Aufgaben abgehakt — um 21:44 stand wieder eine davon offen da.
+
+### Behoben
+
+- **Der Abgleich verlor Änderungen, die während eines Uploads entstanden.** Nach dem Hochladen wartet die App bis zu 30 Sekunden auf die Bestätigung des Servers und trug anschließend den *inzwischen weitergeschriebenen* Stand als „synchronisiert" ein. Wer in diesen Sekunden weiterklickt — beim Abhaken mehrerer Aufgaben der Normalfall —, dessen Stand galt als bestätigt, obwohl der Server ihn nie bekommen hatte. Danach entschied der Abgleich über einen Uhrzeit-Vergleich „lokal unverändert" und schrieb den älteren Server-Stand still darüber. Ohne Sicherung, ohne Konfliktkopie, ohne Meldung. Auf dem zweiten Gerät kam die Änderung nie an, weil der Server sie nie hatte.
+- **Die Entscheidung „hat sich lokal etwas geändert?" läuft jetzt über den Inhalt.** Das Manifest merkt sich zusätzlich, welchen Inhalt der Server bestätigt hat. Damit ist die Frage exakt beantwortbar — unabhängig von Uhren, Wartezeiten und schnell aufeinanderfolgenden Speichervorgängen. Bestätigt wird ausschließlich, was tatsächlich hochgegangen ist. Manifeste aus älteren Versionen nutzen weiterhin die bisherige Regel, bis der Wert einmal gesetzt ist — es gibt keinen Bruch beim Update.
+- **Änderungen während eines laufenden Abgleichs werden nicht mehr verworfen.** Sie werden vorgemerkt und nachgezogen, bis nichts Neues mehr entsteht. Damit geht auch der dritte schnell aufeinanderfolgende Stand raus und nicht nur der zweite. Fehlgeschlagene Uploads werden für später abgegrenzt, statt sofort wiederholt zu werden.
+- **Holt der Abgleich eine Datei vom Server, wird vorher gesichert.** Das war bis jetzt der einzige Schreibweg der App ohne Sicherungskopie.
+
+### Geändert
+
+- **Große, bestätigte Ordnerlöschungen halten den Abgleich nicht mehr auf.** Die Schutzbremse gegen versehentliche Massenlöschungen erfuhr nie, dass der Nutzer die Löschung im Dialog bestätigt hatte, und blockierte deshalb auch gewollte Löschungen — die Oberfläche versprach „wird beim nächsten Abgleich nachgezogen", und genau das passierte dann nicht. Die Bestätigung wird jetzt vermerkt und überlebt auch einen Neustart oder einen zwischenzeitlich abgeschalteten Sync. Löschungen außerhalb der App laufen weiterhin durch die Bremse — dort ist sie gewollt.
+- **Die Umbenennungserkennung der Löschbremse zählt jetzt richtig.** Sie prüfte nur, *ob* ein Inhalt an anderer Stelle wieder auftaucht, nicht *wie oft*. Eine einzige neu angelegte leere Notiz konnte damit beliebig viele gelöschte leere Notizen als „Umbenennung" durchwinken und die Bremse aushebeln. Jede eingehende Datei entlastet jetzt genau eine Löschung.
+
 ## [0.10.44-beta] - 2026-08-13
 
 Löschen hat jetzt einen Rückweg. Bisher hat die App eine Notiz oder einen Ordner sofort und endgültig gelöscht — ausgerechnet die Löschung also, die anschließend über den Sync auf alle Geräte durchschlägt. Umgekehrt landet eine Löschung, die vom Sync kommt, seit jeher im Papierkorb des Vaults und ist rückholbar. Das war genau falsch herum. Anlass war ein realer Fall: ein gelöschter Ordner mit 376 Dateien, von dem auf der Platte keine Spur mehr übrig war.

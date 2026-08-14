@@ -48,7 +48,7 @@
     "url": "https://mindgraph-notes.de/",
     "downloadUrl": "https://github.com/bydb/mindgraph-notes/releases",
     "screenshot": "https://mindgraph-notes.de/screenshot.png",
-    "softwareVersion": "0.10.44-beta",
+    "softwareVersion": "0.10.45-beta",
     "author": { "@type": "Person", "name": "Jochen Leeder", "url": "https://bydb.io" },
     "license": "https://opensource.org/licenses/AGPL-3.0",
     "featureList": [
@@ -495,7 +495,7 @@
         <span class="hero-dot"></span>
         <span data-i18n="hero.badge">Open Source &middot; Lokal &middot; Kostenlos</span>
       </div>
-      <a class="release-badge" href="#changelog" data-i18n="hero.release">Gel&ouml;schtes landet im Papierkorb &middot; v0.10.44</a>
+      <a class="release-badge" href="#changelog" data-i18n="hero.release">Erledigtes bleibt erledigt &middot; v0.10.45</a>
     </div>
 
     <h1 data-i18n="hero.title">Der Fokus bleibt.<br><em>Auch wenn das Leben dazwischenkommt.</em></h1>
@@ -1630,7 +1630,7 @@
     <div class="release-inner">
       <div class="release-head">
         <div>
-          <div class="st-eyebrow"><span class="d"></span><span data-i18n="release.label">Release 0.10.44 &middot; L&ouml;schen mit R&uuml;ckweg</span></div>
+          <div class="st-eyebrow"><span class="d"></span><span data-i18n="release.label">Release 0.10.45 &middot; Erledigtes bleibt erledigt</span></div>
           <h2 class="st-h" style="font-size:clamp(1.8rem,3.8vw,2.6rem)" data-i18n="release.heading">Was ist neu &mdash; <em>die Bild-Generierung l&auml;uft auf Googles neues Modell und funktioniert wieder.</em></h2>
           <p class="st-lead" data-i18n="release.lead">Die Bild-Generierung wurde auf Google Nano Banana umgestellt &mdash; das aktuelle Bildmodell hinter Gemini. Beim Pr&uuml;fen gegen die echte Schnittstelle zeigte sich, dass das Modell nur JPEG liefert: Die Anfrage nach PNG h&auml;tte jeden einzelnen Aufruf mit einem Fehler beantwortet. Das ist behoben, bevor es jemanden getroffen hat.</p>
         </div>
@@ -1905,7 +1905,7 @@
         "how.p5h": "Das Web, wenn du es brauchst",
         "how.p5": "Schalte die Webrecherche pro Auftrag zu – ganz optional. Der Agent sucht, liest die passenden Seiten und schreibt eine Notiz mit sauberem Quellenverzeichnis; du prüfst sie, bevor sie in deinen Vault kommt. Der Suchanbieter erhält nur die Suchanfragen; die vollständigen Seiten ruft die App lokal ab. Bei einem optionalen Cloud-Modell geht der gelesene Kontext zusätzlich an dessen Anbieter – darauf weist die App vor dem Lauf hin. Den Suchanbieter wählst du selbst: sofort einsatzbereit oder deine eigene, private Suchmaschine.",
         "hero.badge": "Open Source \u00b7 Lokal \u00b7 Kostenlos",
-        "hero.release": "Gelöschtes landet im Papierkorb &middot; v{vs}",
+        "hero.release": "Erledigtes bleibt erledigt &middot; v{vs}",
         "hero.videoPause": "Anhalten",
         "hero.videoPlay": "Abspielen",
         "hero.videoStart": "Video abspielen",
@@ -1982,15 +1982,15 @@
         "modules.opt.vision": "Vision OCR",
         "modules.opt.speech": "Diktat & Vorlesen",
         "modules.opt.terminal": "Terminal",
-        "release.label": "Release {vs} · Löschen mit Rückweg",
-        "release.heading": "Was ist neu — <em>eine gelöschte Notiz ist nicht mehr weg, sondern im Papierkorb.</em>",
-        "release.lead": "Bisher hat die App beim Löschen sofort und endgültig gelöscht. Ausgerechnet diese Löschung ist die, die anschließend über den Sync auf alle deine Geräte durchschlägt — während umgekehrt eine Löschung, die vom Sync kommt, seit jeher im vault-eigenen Papierkorb landet und zurückholbar ist. Das war genau falsch herum und ist jetzt umgedreht.",
-        "release.c1h": "Notizen und Ordner landen im Papierkorb",
-        "release.c1": "Gelöschtes geht in den Papierkorb deines Systems und lässt sich von dort zurücklegen. Ist der nicht erreichbar, wandert es in den Papierkorb im Vault. Und wenn beides nicht geht, bricht der Vorgang mit einer Meldung ab, statt ersatzweise endgültig zu löschen.",
-        "release.c2h": "Die Nachfrage sagt jetzt die Wahrheit",
-        "release.c2": "Im Löschdialog stand „kann nicht rückgängig gemacht werden“. Jetzt steht dort, dass die Datei in den Papierkorb wandert — und dass andere Geräte die Löschung beim nächsten Abgleich nachziehen. Das war vorher nirgends gesagt.",
-        "release.c3h": "Punkte statt Karten im Graph",
-        "release.c3": "Der Wissensgraph zeigt Notizen auf Wunsch als Punkte statt als Karten, wie man es aus Obsidian kennt. Weil dabei keine Inhalte gelesen werden, bleibt die Ansicht bis 1500 Notizen ruhig statt bis 500, und die Punktgröße bildet auch große Unterschiede in der Vernetzung noch ab.",
+        "release.label": "Release {vs} · Erledigtes bleibt erledigt",
+        "release.heading": "Was ist neu — <em>eine Aufgabe, die du abhakst, bleibt abgehakt. Auch auf dem zweiten Gerät.</em>",
+        "release.lead": "Wer auf zwei Rechnern arbeitet, kennt das: Aufgaben, die man abends erledigt hat, stehen am nächsten Morgen auf dem anderen Gerät wieder offen. Die Ursache war ein Wettrennen im Abgleich — die App notierte einen Stand als „beim Server angekommen“, den der Server nie bekommen hatte. Danach war deine Änderung für den Abgleich unsichtbar und wurde still vom älteren Stand überschrieben. Das ist behoben.",
+        "release.c1h": "Abgehaktes bleibt abgehakt",
+        "release.c1": "Der Abgleich entscheidet „hat sich hier etwas geändert?“ nicht mehr über Uhrzeiten, sondern über den Inhalt, den der Server bestätigt hat. Damit kann eine Änderung nicht mehr unsichtbar werden, egal wie schnell du klickst. Wer sieben Aufgaben in wenigen Sekunden abhakt, dessen letzter Stand geht raus — nicht der vorletzte.",
+        "release.c2h": "Große Ordner löschen blockiert den Abgleich nicht mehr",
+        "release.c2": "Die Schutzbremse gegen versehentliche Massenlöschungen konnte nicht unterscheiden, ob du eine Löschung bestätigt hattest oder ob etwas schiefgelaufen war — und hielt deshalb auch gewollte Löschungen auf. Jetzt merkt sich die App deine Bestätigung. Was außerhalb der App gelöscht wird, läuft weiterhin durch die Bremse.",
+        "release.c3h": "Der Abgleich überschreibt nichts mehr ohne Sicherung",
+        "release.c3": "Holt der Abgleich eine Datei vom Server, legt die App vorher eine Sicherung an — wie bei jeder anderen Änderung auch. Das war bis jetzt der einzige Weg, auf dem eine Notiz ohne Sicherungskopie überschrieben werden konnte.",
         "release.link": "Vollständige Release Notes auf GitHub →",
         "dl.label": "Download",
         "dl.heading": "Jetzt starten.",
@@ -2173,7 +2173,7 @@
         "how.p5h": "The web, when you need it",
         "how.p5": "Turn on web research per task – entirely optional. The agent searches, reads the relevant pages and writes a note with a clean list of sources; you review it before it enters your vault. The search provider receives only the queries; the app fetches full pages locally. With an optional cloud model, the extracted context is also sent to that model provider – the app warns you before the run. You choose the search provider yourself: ready to use or your own private search engine.",
         "hero.badge": "Open Source \u00b7 Local \u00b7 Free",
-        "hero.release": "Deleted items go to the trash &middot; v{vs}",
+        "hero.release": "Done stays done &middot; v{vs}",
         "hero.videoPause": "Pause",
         "hero.videoPlay": "Play",
         "hero.videoStart": "Play video",
@@ -2250,15 +2250,15 @@
         "modules.opt.vision": "Vision OCR",
         "modules.opt.speech": "Dictation & TTS",
         "modules.opt.terminal": "Terminal",
-        "release.label": "Release {vs} · Deleting has a way back",
-        "release.heading": "What’s new — <em>a deleted note is no longer gone, it is in the trash.</em>",
-        "release.lead": "Until now the app deleted immediately and for good. That deletion is precisely the one that then travels to every device you own — while a deletion arriving from sync has always been parked in the vault’s own trash and could be recovered. That was the wrong way round, and it is now reversed.",
-        "release.c1h": "Notes and folders go to the trash",
-        "release.c1": "Deleted items move to your system trash and can be put back from there. If that is unavailable, they go to the trash inside the vault. And if neither works, the operation stops with a message instead of deleting for good as a fallback.",
-        "release.c2h": "The confirmation now tells the truth",
-        "release.c2": "The delete dialog used to say “this action cannot be undone”. It now says the file moves to the trash — and that other devices follow the deletion on the next sync. Neither was stated anywhere before.",
-        "release.c3h": "Dots instead of cards in the graph",
-        "release.c3": "The knowledge graph can show notes as dots rather than cards, the way Obsidian does it. Since no note content is read for that, the view stays calm up to 1500 notes instead of 500, and the dot size still tells large differences in connectedness apart.",
+        "release.label": "Release {vs} · Done stays done",
+        "release.heading": "What’s new — <em>a task you tick off stays ticked off. On your second machine too.</em>",
+        "release.lead": "Anyone working on two machines knows the feeling: tasks you finished last night are open again on the other device this morning. The cause was a race in sync — the app recorded a state as “safely on the server” that the server had never received. From then on your change was invisible to sync and was quietly overwritten by the older state. That is fixed.",
+        "release.c1h": "Done stays done",
+        "release.c1": "Sync no longer answers “did anything change here?” by comparing clocks, but by comparing the content the server has confirmed. A change can no longer become invisible, however fast you click. Tick off seven tasks in a few seconds and the last state goes out — not the one before it.",
+        "release.c2h": "Deleting large folders no longer stalls sync",
+        "release.c2": "The safety brake against accidental mass deletion could not tell whether you had confirmed a deletion or whether something had gone wrong — so it held up deliberate deletions too. The app now remembers your confirmation. Anything deleted outside the app still goes through the brake.",
+        "release.c3h": "Sync no longer overwrites anything unbacked",
+        "release.c3": "When sync pulls a file from the server, the app now writes a backup first — just as it does for every other change. Until now this was the only path on which a note could be overwritten without a safety copy.",
         "release.link": "Full release notes on GitHub →",
         "dl.label": "Download",
         "dl.heading": "Get started.",
