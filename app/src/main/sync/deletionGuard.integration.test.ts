@@ -50,6 +50,8 @@ class FakeRelay {
   private wss: WebSocketServer
   files = new Map<string, StoredFile>() // key: hashedPath
   deleted: string[] = []
+  /** Pfade (Klartext), deren Löschung der Server ablehnt — steht für Ack-Timeout/Serverfehler. */
+  failDeletes = new Set<string>()
 
   private constructor(wss: WebSocketServer) {
     this.wss = wss
@@ -133,6 +135,9 @@ class FakeRelay {
         }
         case 'delete': {
           const f = this.files.get(msg.path)
+          if (f && this.failDeletes.has(f.originalPath)) {
+            return send({ type: 'error', message: 'Delete rejected' })
+          }
           if (f) this.deleted.push(f.originalPath)
           this.files.delete(msg.path)
           send({ type: 'ack', path: msg.path })
@@ -325,6 +330,100 @@ describe('Löschbremse im echten sync()-Ablauf', () => {
     expect(gespeichert!.files['neu.md']?.syncedHash).toBeTruthy()
     // Die Konfliktdatei bleibt unbestätigt und kommt beim nächsten Lauf wieder.
     expect(gespeichert!.files[bestaetigt]?.syncedHash).not.toBe(gespeichert!.files[bestaetigt]?.hash)
+  })
+
+  // Review-Befund Codex, 17.08.2026: deleteRemoteFile lief ohne Schutz pro Datei. Ein
+  // abgelehntes Ack (oder 30-s-Timeout) sprang genauso in das äußere catch wie vorher der
+  // Konfliktfehler — Uploads verloren, Manifest nicht gespeichert, lastSyncTime steht.
+  it('eine abgelehnte Server-Löschung reißt den Durchlauf nicht mehr ab', async () => {
+    const bleibt = 'behalten.md'
+    const weg1 = 'weg-1.md'
+    const weg2 = 'weg-2.md'
+    for (const p of [bleibt, weg1, weg2]) relay.seed(p, body(p))
+    await seedManifest([bleibt, weg1, weg2], body)
+    await writeNote(bleibt, body(bleibt))
+    await writeNote('neu.md', body('neu.md'))
+    relay.failDeletes.add(weg1)
+
+    const result = await runSync()
+
+    expect(result.success).toBe(false)
+    expect(result.error).toMatch(/server delete\(s\) failed/)
+    expect(result.error).toContain(weg1)
+    // Die zweite Löschung und der Upload sind trotzdem durch …
+    expect(relay.deleted).toEqual([weg2])
+    expect(relay.paths()).toContain('neu.md')
+    // … und der Lauf ist abgeschlossen, statt beim nächsten Mal wieder von vorn zu starten.
+    const gespeichert = await loadManifest(vault)
+    expect(gespeichert!.lastSyncTime).toBeGreaterThan(500)
+    // Die gescheiterte Löschung bleibt FÄLLIG: der Eintrag wandert mit ins neue Manifest,
+    // sonst wäre die Datei beim nächsten Lauf eine unbekannte Server-Datei und käme als
+    // Download zurück, statt gelöscht zu werden.
+    expect(gespeichert!.files[weg1]).toBeTruthy()
+    expect(gespeichert!.files[weg1].syncedAt).not.toBeNull()
+    expect(gespeichert!.tombstones?.[weg1]).toBeUndefined()
+    expect(gespeichert!.tombstones?.[weg2]).toBeTruthy()
+  })
+
+  // Review-Befund Codex, 17.08.2026: downloadFile liefert bei Serverfehler, Timeout und
+  // gerissener Integritätsprüfung `null` statt zu werfen. Als "erledigt" verbucht, meldete
+  // der Lauf Erfolg und rückte lastSyncTime vor, obwohl der Konflikt offen blieb.
+  it('ein Download, der nur `null` liefert, gilt nicht als gelöster Konflikt', async () => {
+    const konflikt = 'konflikt-null.md'
+    await writeNote(konflikt, 'lokal geändert\n')
+    // Der Server nennt im Manifest eine Größe, die zum echten Blob nicht passt →
+    // die Integritätsprüfung in downloadFile schlägt an und liefert null.
+    relay.seed(konflikt, 'auf dem Server geändert\n', 9_000_000_000_000)
+    const gespeichertesBlob = relay.files.get(hashPath(konflikt))!
+    gespeichertesBlob.size = gespeichertesBlob.size + 99
+
+    const alterStand = Buffer.from('ursprünglich\n', 'utf-8')
+    const manifest: FileManifest = { files: {}, lastSyncTime: 500, vaultId: VAULT_ID }
+    manifest.files[konflikt] = {
+      hash: hashContent(alterStand),
+      size: alterStand.length,
+      modifiedAt: 1000,
+      syncedAt: 1000,
+      syncedHash: hashContent(alterStand)
+    }
+    await saveManifest(vault, manifest)
+
+    const result = await runSync()
+
+    expect(result.success).toBe(false)
+    expect(result.error).toMatch(/conflict\(s\) unresolved/)
+    expect(result.error).toContain(konflikt)
+    const gespeichert = await loadManifest(vault)
+    expect(gespeichert!.files[konflikt]?.syncedHash).toBe(hashContent(alterStand))
+  })
+
+  // Review-Befund Codex, 17.08.2026: Für LOKALE Löschungen darf ein Server-Hash nicht als
+  // Beweis gelten, dass der Inhalt überlebt — er ist nur eine Angabe im Manifest, der Blob
+  // kann unlesbar sein. Genau solche Blobs liegen auf dem Produktivserver.
+  it('ein Server-Hash allein entlastet KEINE lokale Löschung', async () => {
+    const inhalt = (i: number): string => `# Notiz ${i}\n\nGleicher Inhalt.\n`
+    // 30 lokal vorhandene Dateien, die auf dem Server fehlen → toDeleteLocal.
+    const lokalWeg = Array.from({ length: 30 }, (_, i) => `nur-lokal/notiz-${i}.md`)
+    // Dieselben Inhalte liegen auf dem Server unter anderem Pfad — und ebenso lokal,
+    // damit daraus kein Download wird, der die Löschung legitim entlasten würde.
+    const dublette = Array.from({ length: 30 }, (_, i) => `dublette/notiz-${i}.md`)
+
+    for (let i = 0; i < 30; i++) {
+      await writeNote(lokalWeg[i], inhalt(i))
+      await writeNote(dublette[i], inhalt(i))
+      relay.seed(dublette[i], inhalt(i))
+    }
+    await seedManifest([...lokalWeg, ...dublette], p => inhalt(Number(p.match(/notiz-(\d+)/)![1])))
+
+    const result = await runSync()
+
+    expect(result.success).toBe(false)
+    expect(result.error).toMatch(/SAFETY/)
+    expect(result.error).toMatch(/local files/)
+    // Entscheidend: nichts wurde lokal in den Papierkorb geschoben.
+    for (const p of lokalWeg) {
+      await expect(fs.access(path.join(vault, p))).resolves.toBeUndefined()
+    }
   })
 
   it('blockt bei kleinem Vault schon über den Anteil (9 von 20)', async () => {
