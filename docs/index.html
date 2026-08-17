@@ -48,7 +48,7 @@
     "url": "https://mindgraph-notes.de/",
     "downloadUrl": "https://github.com/bydb/mindgraph-notes/releases",
     "screenshot": "https://mindgraph-notes.de/screenshot.png",
-    "softwareVersion": "0.10.47-beta",
+    "softwareVersion": "0.10.48-beta",
     "author": { "@type": "Person", "name": "Jochen Leeder", "url": "https://bydb.io" },
     "license": "https://opensource.org/licenses/AGPL-3.0",
     "featureList": [
@@ -495,7 +495,7 @@
         <span class="hero-dot"></span>
         <span data-i18n="hero.badge">Open Source &middot; Lokal &middot; Kostenlos</span>
       </div>
-      <a class="release-badge" href="#changelog" data-i18n="hero.release">Notizen kommen auf beiden Geräten an &middot; v0.10.47</a>
+      <a class="release-badge" href="#changelog" data-i18n="hero.release">Neues Modell bewertet: qwen3.8 &middot; v0.10.48</a>
     </div>
 
     <h1 data-i18n="hero.title">Der Fokus bleibt.<br><em>Auch wenn das Leben dazwischenkommt.</em></h1>
@@ -1630,7 +1630,7 @@
     <div class="release-inner">
       <div class="release-head">
         <div>
-          <div class="st-eyebrow"><span class="d"></span><span data-i18n="release.label">Release 0.10.47 &middot; Notizen kommen auf beiden Geräten an</span></div>
+          <div class="st-eyebrow"><span class="d"></span><span data-i18n="release.label">Release 0.10.48 &middot; Neues Modell bewertet: qwen3.8</span></div>
           <h2 class="st-h" style="font-size:clamp(1.8rem,3.8vw,2.6rem)" data-i18n="release.heading">Was ist neu &mdash; <em>die Bild-Generierung l&auml;uft auf Googles neues Modell und funktioniert wieder.</em></h2>
           <p class="st-lead" data-i18n="release.lead">Die Bild-Generierung wurde auf Google Nano Banana umgestellt &mdash; das aktuelle Bildmodell hinter Gemini. Beim Pr&uuml;fen gegen die echte Schnittstelle zeigte sich, dass das Modell nur JPEG liefert: Die Anfrage nach PNG h&auml;tte jeden einzelnen Aufruf mit einem Fehler beantwortet. Das ist behoben, bevor es jemanden getroffen hat.</p>
         </div>
@@ -1905,7 +1905,7 @@
         "how.p5h": "Das Web, wenn du es brauchst",
         "how.p5": "Schalte die Webrecherche pro Auftrag zu – ganz optional. Der Agent sucht, liest die passenden Seiten und schreibt eine Notiz mit sauberem Quellenverzeichnis; du prüfst sie, bevor sie in deinen Vault kommt. Der Suchanbieter erhält nur die Suchanfragen; die vollständigen Seiten ruft die App lokal ab. Bei einem optionalen Cloud-Modell geht der gelesene Kontext zusätzlich an dessen Anbieter – darauf weist die App vor dem Lauf hin. Den Suchanbieter wählst du selbst: sofort einsatzbereit oder deine eigene, private Suchmaschine.",
         "hero.badge": "Open Source \u00b7 Lokal \u00b7 Kostenlos",
-        "hero.release": "Notizen kommen auf beiden Geräten an &middot; v{vs}",
+        "hero.release": "Neues Modell bewertet: qwen3.8 &middot; v{vs}",
         "hero.videoPause": "Anhalten",
         "hero.videoPlay": "Abspielen",
         "hero.videoStart": "Video abspielen",
@@ -1982,15 +1982,15 @@
         "modules.opt.vision": "Vision OCR",
         "modules.opt.speech": "Diktat & Vorlesen",
         "modules.opt.terminal": "Terminal",
-        "release.label": "Release {vs} · Notizen kommen auf beiden Geräten an",
-        "release.heading": "Was ist neu — <em>zwei Punkte im Dateinamen, und die Notiz kam auf dem zweiten Gerät nie an.</em>",
-        "release.lead": "Notizen aus E-Mails erben den Betreff. Endet der auf einen Punkt, heißt die Datei „… am 17.04..md" — zwei Punkte hintereinander. Die Sicherheitsprüfung des Abgleichs hielt das für einen Versuch, aus dem Vault auszubrechen, und verweigerte die Datei. Hochladen ging, herunterladen nie. Solche Notizen fehlten auf dem zweiten Gerät dauerhaft, ohne Meldung und ohne Spur. In einem gewachsenen Vault waren 20 Dateien betroffen.",
-        "release.c1h": "Punkte im Dateinamen sind kein Sicherheitsrisiko mehr",
-        "release.c1": "Geprüft wird jetzt, ob ein Pfad wirklich einen Ausbruchsschritt enthält, und nicht mehr, ob irgendwo zwei Punkte nebeneinander stehen. Ein echter Ausbruchsversuch wird weiterhin abgelehnt und schreibt nichts — die tragende Prüfung, dass die Zieldatei im Vault liegt, ist dabei sogar strenger geworden.",
-        "release.c2h": "Fehlende Dateien fallen jetzt auf",
-        "release.c2": "Der Fehler war doppelt unsichtbar: Die abgelehnte Datei erzeugte keine Meldung, sondern einfach nichts. Seit der vorigen Version nennt der Abgleich die Datei, an der er hängt — genau so kam dieser Fall überhaupt heraus. Ein Fehlschlag ist jetzt ein Fehlschlag und keine stille Lücke.",
-        "release.c3h": "Bereits betroffene Notizen kommen von allein nach",
-        "release.c3": "Es ist nichts zu tun und nichts umzubenennen. Die betroffenen Notizen liegen auf dem Server und wurden bei jedem Durchlauf erneut versucht — nach dem Update kommen sie beim nächsten Abgleich einfach an.",
+        "release.label": "Release {vs} · Neues Modell bewertet: qwen3.8",
+        "release.heading": "Was ist neu — <em>ein neues KI-Modell mit Prüfsiegel für jedes einzelne Modul.</em>",
+        "release.lead": "Nicht jedes KI-Modell taugt für jede Aufgabe. Ein Modell, das schöne Tageszusammenfassungen schreibt, kann bei Aufgaben aus E-Mails Dinge erfinden, die niemand gesagt hat. Deshalb trägt in MindGraph Notes jedes Modell ein eigenes Urteil pro Modul — gemessen, nicht geschätzt. Neu bewertet: qwen3.8 27B, mit 127 Messläufen über alle sechs Module.",
+        "release.c1h": "qwen3.8 27B: sechs von sechs Modulen bestanden",
+        "release.c1": "Beim Notiz-Agenten trifft es die gewünschte Notiz in 89 statt 67 Prozent der Fälle und ist dabei ein Drittel schneller, beim Tagesgedächtnis verlinkt es mehr wichtige Titel, und es braucht weniger Arbeitsspeicher als der bisherige große Vergleichskandidat. Wer 18 GB frei hat, findet das Urteil jetzt direkt am Modell-Auswahlfeld.",
+        "release.c2h": "Eine Schwäche steht dabei, nicht im Kleingedruckten",
+        "release.c2": "Beim Erkennen von Aufgaben aus E-Mails erfindet das Modell in zwei Testfällen zuverlässig eine Aufgabe, die in der Mail nicht steht. Das steht so im Beipackzettel, und die Voreinstellungen bleiben deshalb unverändert: Empfohlen wird weiterhin das Modell, das nicht nur den Messstand, sondern auch den Praxistest bestanden hat.",
+        "release.c3h": "Kleinigkeit im Posteingang",
+        "release.c3": "Absender, deren Name mit einem Symbol beginnt, zeigten im Posteingang ein Fragezeichen statt eines Kürzels. Jetzt sucht die Liste den ersten echten Buchstaben — aus einem Kontaktformular mit Symbol im Namen wird wieder ein sauberes Kürzel.",
         "release.link": "Vollständige Release Notes auf GitHub →",
         "dl.label": "Download",
         "dl.heading": "Jetzt starten.",
@@ -2173,7 +2173,7 @@
         "how.p5h": "The web, when you need it",
         "how.p5": "Turn on web research per task – entirely optional. The agent searches, reads the relevant pages and writes a note with a clean list of sources; you review it before it enters your vault. The search provider receives only the queries; the app fetches full pages locally. With an optional cloud model, the extracted context is also sent to that model provider – the app warns you before the run. You choose the search provider yourself: ready to use or your own private search engine.",
         "hero.badge": "Open Source \u00b7 Local \u00b7 Free",
-        "hero.release": "Notes arrive on both devices &middot; v{vs}",
+        "hero.release": "New model rated: qwen3.8 &middot; v{vs}",
         "hero.videoPause": "Pause",
         "hero.videoPlay": "Play",
         "hero.videoStart": "Play video",
@@ -2250,15 +2250,15 @@
         "modules.opt.vision": "Vision OCR",
         "modules.opt.speech": "Dictation & TTS",
         "modules.opt.terminal": "Terminal",
-        "release.label": "Release {vs} · Notes arrive on both devices",
-        "release.heading": "What’s new — <em>two dots in a filename, and the note never arrived on the second device.</em>",
-        "release.lead": "Notes made from emails inherit the subject line. If that ends in a period, the file is called “… on 17.04..md” — two dots in a row. Sync’s safety check read that as an attempt to break out of the vault and refused the file. Uploading worked, downloading never did. Notes like these were permanently missing on the second device, with no message and no trace. In one long-running vault, 20 files were affected.",
-        "release.c1h": "Dots in filenames are no longer a security risk",
-        "release.c1": "Sync now checks whether a path actually contains a step out of the vault, instead of whether two dots happen to sit next to each other. A genuine break-out attempt is still refused and writes nothing — the load-bearing check, that the target file lands inside the vault, has in fact become stricter.",
-        "release.c2h": "Missing files now surface",
-        "release.c2": "The bug was invisible twice over: the refused file produced no error, just nothing at all. Since the previous version sync names the file it is stuck on — which is exactly how this case came to light. A failure is now a failure, not a silent gap.",
-        "release.c3h": "Notes already affected catch up on their own",
-        "release.c3": "There is nothing to do and nothing to rename. The affected notes are on the server and were retried on every run — after the update they simply arrive with the next sync.",
+        "release.label": "Release {vs} · New model rated: qwen3.8",
+        "release.heading": "What’s new — <em>a new AI model, rated per module rather than in general.</em>",
+        "release.lead": "Not every AI model is fit for every job. A model that writes lovely daily summaries can invent tasks nobody ever wrote in an email. That is why every model in MindGraph Notes carries its own verdict per module — measured, not guessed. Newly rated: qwen3.8 27B, across 127 benchmark runs covering all six modules.",
+        "release.c1h": "qwen3.8 27B: six modules out of six",
+        "release.c1": "For the note agent it hits the intended note in 89 percent of cases instead of 67, and does so a third faster; for the daily memory it links more of the important titles; and it needs less memory than the previous large contender. If you have 18 GB free, the verdict now sits right next to the model picker.",
+        "release.c2h": "A weakness stated plainly, not in the small print",
+        "release.c2": "When extracting tasks from email, the model reliably invents a task in two test cases where the mail contains none. That is written into its data sheet, and the defaults stay as they are: the recommendation remains the model that passed not only the benchmark but the practical test.",
+        "release.c3h": "A small thing in the inbox",
+        "release.c3": "Senders whose name starts with a symbol showed a question mark instead of an initial. The list now looks for the first real letter — a contact form with a symbol in its name gets a proper initial again.",
         "release.link": "Full release notes on GitHub →",
         "dl.label": "Download",
         "dl.heading": "Get started.",

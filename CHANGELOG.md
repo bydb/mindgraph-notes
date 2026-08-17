@@ -2,6 +2,24 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.10.48-beta] - 2026-08-17
+
+Ein neues KI-Modell mit Prüfsiegel für jedes einzelne Modul — und eine Kleinigkeit im Posteingang.
+
+### Neu
+
+- **qwen3.8 27B (MLX) ist bewertet.** 127 Messläufe über alle sechs Module: Tagesgedächtnis, Aufgaben aus E-Mails, Mail-Zusammenfassung, Dashboard-Schnappschuss, Notiz-Agent und Projekt-Status. Sechsmal „geeignet". Beim Notiz-Agenten trifft es die gewünschte Notiz in 89 statt 67 Prozent der Fälle und ist dabei ein Drittel schneller, beim Tagesgedächtnis verlinkt es mehr wichtige Titel, und es braucht rund 18 statt 19 bis 22 GB Arbeitsspeicher.
+- **Die Schwäche steht dabei, nicht im Kleingedruckten.** Beim Erkennen von Aufgaben aus E-Mails erfindet das Modell in zwei Testfällen zuverlässig eine Aufgabe, die in der Mail nicht steht — 80 statt 89 Prozent Treffsicherheit. Das ist ausgerechnet das Modul, in dem ein Fehler Arbeit verursacht, deshalb ist es im Beipackzettel vermerkt.
+- **Die Voreinstellungen bleiben unverändert.** Empfohlen bleibt das Modell, das nicht nur den Messstand, sondern auch den Praxistest an echten Vault-Skills bestanden hat. Erst Praxistest, dann Wechsel.
+
+### Behoben
+
+- **Fragezeichen statt Kürzel im Posteingang.** Absender, deren Name mit einem Symbol beginnt, zeigten in der Liste ein Fragezeichen im Rhombus. Ursache war die App selbst: Sie nahm das erste Speicherzeichen des Namens, und ein Symbol besteht aus zweien — übrig blieb eine Hälfte, die sich nicht darstellen lässt. Jetzt wird der erste echte Buchstabe gesucht, Symbole und Satzzeichen werden übersprungen. Steht im Namen gar kein Buchstabe, kommt er aus der Adresse; findet sich nirgends einer, zeigt der Kreis ein Umschlag-Symbol.
+
+### Hinweis
+
+Die Messwerte lagen seit dem 15.08. vor, waren aber nie eingecheckt — in der App stand das Modell deshalb weiterhin in allen Modulen auf „nicht getestet". Ein Urteil wirkt erst, wenn es ausgeliefert ist.
+
 ## [0.10.47-beta] - 2026-08-17
 
 Notizen mit zwei Punkten im Dateinamen kamen auf einem zweiten Gerät nie an — dauerhaft, ohne Meldung und ohne Spur. Notizen aus E-Mails erben den Betreff; endet der auf einen Punkt, heißt die Datei „… am 17.04..md". Genau daran scheiterte der Abgleich. In einem gewachsenen Vault waren 20 Dateien betroffen.
