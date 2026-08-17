@@ -48,7 +48,7 @@
     "url": "https://mindgraph-notes.de/",
     "downloadUrl": "https://github.com/bydb/mindgraph-notes/releases",
     "screenshot": "https://mindgraph-notes.de/screenshot.png",
-    "softwareVersion": "0.10.45-beta",
+    "softwareVersion": "0.10.46-beta",
     "author": { "@type": "Person", "name": "Jochen Leeder", "url": "https://bydb.io" },
     "license": "https://opensource.org/licenses/AGPL-3.0",
     "featureList": [
@@ -495,7 +495,7 @@
         <span class="hero-dot"></span>
         <span data-i18n="hero.badge">Open Source &middot; Lokal &middot; Kostenlos</span>
       </div>
-      <a class="release-badge" href="#changelog" data-i18n="hero.release">Erledigtes bleibt erledigt &middot; v0.10.45</a>
+      <a class="release-badge" href="#changelog" data-i18n="hero.release">Der Abgleich bleibt nicht mehr stehen &middot; v0.10.46</a>
     </div>
 
     <h1 data-i18n="hero.title">Der Fokus bleibt.<br><em>Auch wenn das Leben dazwischenkommt.</em></h1>
@@ -1630,7 +1630,7 @@
     <div class="release-inner">
       <div class="release-head">
         <div>
-          <div class="st-eyebrow"><span class="d"></span><span data-i18n="release.label">Release 0.10.45 &middot; Erledigtes bleibt erledigt</span></div>
+          <div class="st-eyebrow"><span class="d"></span><span data-i18n="release.label">Release 0.10.46 &middot; Der Abgleich bleibt nicht mehr stehen</span></div>
           <h2 class="st-h" style="font-size:clamp(1.8rem,3.8vw,2.6rem)" data-i18n="release.heading">Was ist neu &mdash; <em>die Bild-Generierung l&auml;uft auf Googles neues Modell und funktioniert wieder.</em></h2>
           <p class="st-lead" data-i18n="release.lead">Die Bild-Generierung wurde auf Google Nano Banana umgestellt &mdash; das aktuelle Bildmodell hinter Gemini. Beim Pr&uuml;fen gegen die echte Schnittstelle zeigte sich, dass das Modell nur JPEG liefert: Die Anfrage nach PNG h&auml;tte jeden einzelnen Aufruf mit einem Fehler beantwortet. Das ist behoben, bevor es jemanden getroffen hat.</p>
         </div>
@@ -1905,7 +1905,7 @@
         "how.p5h": "Das Web, wenn du es brauchst",
         "how.p5": "Schalte die Webrecherche pro Auftrag zu – ganz optional. Der Agent sucht, liest die passenden Seiten und schreibt eine Notiz mit sauberem Quellenverzeichnis; du prüfst sie, bevor sie in deinen Vault kommt. Der Suchanbieter erhält nur die Suchanfragen; die vollständigen Seiten ruft die App lokal ab. Bei einem optionalen Cloud-Modell geht der gelesene Kontext zusätzlich an dessen Anbieter – darauf weist die App vor dem Lauf hin. Den Suchanbieter wählst du selbst: sofort einsatzbereit oder deine eigene, private Suchmaschine.",
         "hero.badge": "Open Source \u00b7 Lokal \u00b7 Kostenlos",
-        "hero.release": "Erledigtes bleibt erledigt &middot; v{vs}",
+        "hero.release": "Der Abgleich bleibt nicht mehr stehen &middot; v{vs}",
         "hero.videoPause": "Anhalten",
         "hero.videoPlay": "Abspielen",
         "hero.videoStart": "Video abspielen",
@@ -1982,15 +1982,15 @@
         "modules.opt.vision": "Vision OCR",
         "modules.opt.speech": "Diktat & Vorlesen",
         "modules.opt.terminal": "Terminal",
-        "release.label": "Release {vs} · Erledigtes bleibt erledigt",
-        "release.heading": "Was ist neu — <em>eine Aufgabe, die du abhakst, bleibt abgehakt. Auch auf dem zweiten Gerät.</em>",
-        "release.lead": "Wer auf zwei Rechnern arbeitet, kennt das: Aufgaben, die man abends erledigt hat, stehen am nächsten Morgen auf dem anderen Gerät wieder offen. Die Ursache war ein Wettrennen im Abgleich — die App notierte einen Stand als „beim Server angekommen“, den der Server nie bekommen hatte. Danach war deine Änderung für den Abgleich unsichtbar und wurde still vom älteren Stand überschrieben. Das ist behoben.",
-        "release.c1h": "Abgehaktes bleibt abgehakt",
-        "release.c1": "Der Abgleich entscheidet „hat sich hier etwas geändert?“ nicht mehr über Uhrzeiten, sondern über den Inhalt, den der Server bestätigt hat. Damit kann eine Änderung nicht mehr unsichtbar werden, egal wie schnell du klickst. Wer sieben Aufgaben in wenigen Sekunden abhakt, dessen letzter Stand geht raus — nicht der vorletzte.",
-        "release.c2h": "Große Ordner löschen blockiert den Abgleich nicht mehr",
-        "release.c2": "Die Schutzbremse gegen versehentliche Massenlöschungen konnte nicht unterscheiden, ob du eine Löschung bestätigt hattest oder ob etwas schiefgelaufen war — und hielt deshalb auch gewollte Löschungen auf. Jetzt merkt sich die App deine Bestätigung. Was außerhalb der App gelöscht wird, läuft weiterhin durch die Bremse.",
-        "release.c3h": "Der Abgleich überschreibt nichts mehr ohne Sicherung",
-        "release.c3": "Holt der Abgleich eine Datei vom Server, legt die App vorher eine Sicherung an — wie bei jeder anderen Änderung auch. Das war bis jetzt der einzige Weg, auf dem eine Notiz ohne Sicherungskopie überschrieben werden konnte.",
+        "release.label": "Release {vs} · Der Abgleich bleibt nicht mehr stehen",
+        "release.heading": "Was ist neu — <em>ein verschobener Ordner hielt den Abgleich zwei Tage lang auf. Das kann nicht mehr passieren.</em>",
+        "release.lead": "Zwei Rechner zeigten unterschiedlich viele Notizen — 4203 gegen 4320. Ursache war ein Ordner, der auf einem Gerät an einen neuen Platz gewandert war und beim Abgleich in zwei alten Kopien lag. Die Schutzbremse gegen versehentliche Massenlöschungen hielt das für 207 unerklärte Löschungen und stoppte den vollständigen Abgleich. Zwei Tage lang. Einzelne neue Notizen gingen weiter durch, der große Durchlauf nicht — deshalb sah alles gesund aus. Behoben, und dazu drei weitere Stellen, an denen eine einzige Datei den ganzen Durchlauf abreißen konnte.",
+        "release.c1h": "Verschobene Ordner halten den Abgleich nicht mehr auf",
+        "release.c1": "Die Schutzbremse erkennt jetzt, dass ein Inhalt nicht verloren ist, wenn er noch an einer anderen Stelle liegt. Vorher rechnete sie nur gegen das, was im selben Durchlauf hochging — bei zwei alten Kopien auf dem Server konnte das nie aufgehen, und der Abgleich stand für immer. Ein wirklich verschwundener Ordner blockiert weiterhin: Maßstab ist, ob die App den Inhalt selbst gelesen hat, nicht ob der Server behauptet, ihn noch zu haben.",
+        "release.c2h": "Eine einzelne Datei reißt den Durchlauf nicht mehr ab",
+        "release.c2": "Eine Datei, die sich auf beiden Geräten geändert hatte und vom Server nicht lesbar zurückkam, beendete den ganzen Durchlauf — mitten drin, nach den Uploads und vor dem Aufräumen. Der Abgleich galt danach als „nie gelaufen“ und startete alle fünf Minuten neu an derselben Stelle. Jetzt wird jede Datei einzeln behandelt, der Rest läuft fertig, und die Meldung nennt den Namen der Datei, die klemmt. Dasselbe gilt für Löschungen, die der Server nicht bestätigt.",
+        "release.c3h": "Nichts weicht, bevor der Ersatz da ist",
+        "release.c3": "Wird eine Notiz an einen neuen Platz verschoben, räumt der Abgleich den alten Platz auf. Bisher tat er das auch dann, wenn die Kopie für den neuen Platz gar nicht angekommen war — eine beschädigte Datei auf dem Server konnte damit eine unbeschädigte auf der Platte verdrängen. Jetzt bleibt die Datei liegen, bis ihr Ersatz wirklich da ist.",
         "release.link": "Vollständige Release Notes auf GitHub →",
         "dl.label": "Download",
         "dl.heading": "Jetzt starten.",
@@ -2173,7 +2173,7 @@
         "how.p5h": "The web, when you need it",
         "how.p5": "Turn on web research per task – entirely optional. The agent searches, reads the relevant pages and writes a note with a clean list of sources; you review it before it enters your vault. The search provider receives only the queries; the app fetches full pages locally. With an optional cloud model, the extracted context is also sent to that model provider – the app warns you before the run. You choose the search provider yourself: ready to use or your own private search engine.",
         "hero.badge": "Open Source \u00b7 Local \u00b7 Free",
-        "hero.release": "Done stays done &middot; v{vs}",
+        "hero.release": "Sync no longer stalls &middot; v{vs}",
         "hero.videoPause": "Pause",
         "hero.videoPlay": "Play",
         "hero.videoStart": "Play video",
@@ -2250,15 +2250,15 @@
         "modules.opt.vision": "Vision OCR",
         "modules.opt.speech": "Dictation & TTS",
         "modules.opt.terminal": "Terminal",
-        "release.label": "Release {vs} · Done stays done",
-        "release.heading": "What’s new — <em>a task you tick off stays ticked off. On your second machine too.</em>",
-        "release.lead": "Anyone working on two machines knows the feeling: tasks you finished last night are open again on the other device this morning. The cause was a race in sync — the app recorded a state as “safely on the server” that the server had never received. From then on your change was invisible to sync and was quietly overwritten by the older state. That is fixed.",
-        "release.c1h": "Done stays done",
-        "release.c1": "Sync no longer answers “did anything change here?” by comparing clocks, but by comparing the content the server has confirmed. A change can no longer become invisible, however fast you click. Tick off seven tasks in a few seconds and the last state goes out — not the one before it.",
-        "release.c2h": "Deleting large folders no longer stalls sync",
-        "release.c2": "The safety brake against accidental mass deletion could not tell whether you had confirmed a deletion or whether something had gone wrong — so it held up deliberate deletions too. The app now remembers your confirmation. Anything deleted outside the app still goes through the brake.",
-        "release.c3h": "Sync no longer overwrites anything unbacked",
-        "release.c3": "When sync pulls a file from the server, the app now writes a backup first — just as it does for every other change. Until now this was the only path on which a note could be overwritten without a safety copy.",
+        "release.label": "Release {vs} · Sync no longer stalls",
+        "release.heading": "What’s new — <em>one moved folder held sync up for two days. That can no longer happen.</em>",
+        "release.lead": "Two machines showed different note counts — 4203 against 4320. The cause was a folder that had moved to a new place on one device while the server still held two old copies of it. The safety brake against accidental mass deletion read that as 207 unexplained deletions and stopped the full sync run. For two days. Individual new notes still went through, the full run did not — which is why everything looked healthy. Fixed, along with three more places where a single file could tear down the entire run.",
+        "release.c1h": "Moved folders no longer stall sync",
+        "release.c1": "The safety brake now recognises that content is not lost when it still sits somewhere else. Before, it only counted against what went up in the same run — with two old copies on the server that could never balance out, and sync stalled for good. A folder that has genuinely vanished still blocks: what counts is whether the app read the content itself, not whether the server claims to still have it.",
+        "release.c2h": "A single file no longer tears down the run",
+        "release.c2": "A file that had changed on both devices and came back unreadable from the server ended the whole run — halfway through, after the uploads and before the cleanup. Sync then counted as “never run” and restarted every five minutes at the same spot. Each file is now handled on its own, the rest of the run finishes, and the message names the file that is stuck. The same goes for deletions the server does not confirm.",
+        "release.c3h": "Nothing gives way before its replacement arrives",
+        "release.c3": "When a note moves to a new place, sync clears out the old one. Until now it did that even when the copy for the new place had never arrived — so a damaged file on the server could displace an intact one on disk. The file now stays put until its replacement is really there.",
         "release.link": "Full release notes on GitHub →",
         "dl.label": "Download",
         "dl.heading": "Get started.",

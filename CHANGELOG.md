@@ -2,6 +2,25 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.10.46-beta] - 2026-08-17
+
+Zwei Rechner zeigten unterschiedlich viele Notizen — 4203 gegen 4320, dazu 16 gegen 12 überfällige Termine. Ursache war ein Ordner, der auf einem Gerät an einen neuen Platz gewandert war, auf dem Server aber noch in zwei alten Kopien lag. Die Schutzbremse gegen versehentliche Massenlöschungen hielt das für 207 unerklärte Löschungen und stoppte den vollständigen Abgleich — zwei Tage lang, mit einem Zustand, der sich selbst nie wieder auflösen konnte. Bei der Ursachensuche kamen drei weitere Stellen zum Vorschein, an denen eine einzelne Datei den ganzen Durchlauf abreißen konnte.
+
+Bemerkenswert daran: Es sah gesund aus. Einzelne neue und geänderte Notizen wurden weiter hochgeladen, nur der vollständige Durchlauf brach jedes Mal ab. Der verlässliche Anhaltspunkt ist deshalb der Zeitstempel des letzten vollständigen Abgleichs in den Einstellungen, nicht der Eindruck „es kommt doch was an".
+
+### Behoben
+
+- **Ein verschobener Ordner konnte den Abgleich dauerhaft anhalten.** Die Schutzbremse rechnete eine anstehende Löschung nur gegen das auf, was im selben Durchlauf hochgeht. Lag auf dem Server eine zweite alte Kopie desselben Ordners, konnte diese Rechnung nie aufgehen — und blockiert wurde genau die Löschung, die den Zustand beendet hätte. Jetzt zählt auch, dass der Inhalt lokal noch an einer anderen Stelle liegt. Maßstab ist dabei, ob die App den Inhalt selbst gelesen hat; eine Angabe des Servers reicht ausdrücklich nicht, denn ob die zugehörige Datei dort lesbar ist, weiß niemand.
+- **Eine unlesbare Datei riss den ganzen Durchlauf ab.** Wenn eine Datei sich auf beiden Geräten geändert hatte und die Fassung vom Server nicht entschlüsselt werden konnte, endete der komplette Abgleich — mitten drin, nach den Uploads und vor dem Aufräumen. Die App merkte sich den Durchlauf danach als „nie gelaufen" und startete alle fünf Minuten neu an derselben Stelle. Jede Datei wird jetzt einzeln behandelt, der Rest läuft fertig, und die Meldung nennt den Namen der Datei, die klemmt — bisher blieb unbekannt, welche den Abgleich aufhält.
+- **Löschungen, die der Server nicht bestätigt, reißen den Durchlauf nicht mehr ab.** Dieselbe Absicherung wie bei Uploads und Downloads, nur an der letzten Stelle, an der sie noch fehlte. Eine nicht bestätigte Löschung bleibt fällig und wird beim nächsten Durchlauf erneut versucht, statt als Download zurückzukommen.
+- **Nichts weicht, bevor der Ersatz da ist.** Wird eine Notiz verschoben, räumt der Abgleich den alten Platz auf. Das tat er bisher auch dann, wenn die Kopie für den neuen Platz gar nicht angekommen war — eine beschädigte Datei auf dem Server konnte damit eine unbeschädigte auf der Platte verdrängen. Jetzt bleibt die Datei liegen, bis ihr Ersatz wirklich übertragen ist.
+- **Ein abgebrochener Download galt als erledigt.** Kam eine Datei wegen eines Server-Fehlers, einer Zeitüberschreitung oder einer fehlgeschlagenen Prüfsumme nicht an, vermerkte die App sie trotzdem als geholt. Solche Fälle gelten jetzt als Fehler und werden wiederholt.
+- **Eine bestätigte Ordnerlöschung verlor ihre Bestätigung.** Sie lebte nur im Arbeitsspeicher und wurde am Ende jedes Durchlaufs überschrieben. Blieb eine Löschung offen, sah der nächste Durchlauf sie als unbestätigte Massenlöschung und blockierte — genau das, was die Bestätigung verhindern sollte.
+
+### Geändert
+
+- **Die Meldung der Schutzbremse sagt jetzt, was zu tun ist.** Vorher stand dort nur, was sie verweigert. Bei einer gewollten Löschung nennt sie den Weg über „Abgleich erzwingen", bei einem Verbindungsproblem sagt sie ausdrücklich, dass lokal nichts gelöscht wurde. Außerdem steht im Protokoll, welche Löschungen sie durchgelassen hat und warum — sonst ist eine bewusst durchgewunkene Löschung von einer nie erkannten nicht zu unterscheiden.
+
 ## [0.10.45-beta] - 2026-08-14
 
 Erledigte Aufgaben tauchten auf dem zweiten Gerät wieder auf. Wer abends auf dem einen Laptop abhakt und morgens am anderen sitzt, fand dort alles noch offen und musste es erneut durchgehen. Anlass war ein realer Fall, der sich an den Vault-Backups minutengenau nachweisen ließ: Am 09.06.2026 wurden um 21:15 sieben Aufgaben abgehakt — um 21:44 stand wieder eine davon offen da.
