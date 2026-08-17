@@ -426,6 +426,79 @@ describe('Löschbremse im echten sync()-Ablauf', () => {
     }
   })
 
+  // Review-Runde 2, Codex: `incoming` entsteht aus diff.toDownload, also aus einer ABSICHT —
+  // zu dem Zeitpunkt ist kein Byte übertragen. Scheitert der Download später, war die
+  // Entlastung gegenstandslos, die lokale Löschung lief bisher trotzdem: ein unlesbarer
+  // Server-Blob verdrängte eine intakte lokale Datei (jetzt eins zu eins statt unbegrenzt).
+  it('lokale Datei bleibt liegen, wenn ihr Ersatz nicht angekommen ist', async () => {
+    const inhalt = 'Verschobener Inhalt, nur hier vollständig.\n'
+    const alt = 'alt/notiz.md'   // lokal vorhanden, auf dem Server weg → toDeleteLocal
+    const neu = 'neu/notiz.md'   // auf dem Server, soll herkommen — Blob ist beschädigt
+    await writeNote(alt, inhalt)
+    relay.seed(neu, inhalt, 2000, true)
+    await seedManifest([alt], () => inhalt)
+
+    const result = await runSync()
+
+    // Der Download scheitert und wird gemeldet …
+    expect(result.success).toBe(false)
+    expect(result.error).toMatch(/download\(s\) failed/)
+    expect(result.error).toMatch(/replacement did not arrive/)
+    // … und die einzige vollständige Kopie liegt weiter im Vault, nicht im Papierkorb.
+    await expect(fs.access(path.join(vault, alt))).resolves.toBeUndefined()
+    await expect(fs.access(path.join(vault, '.sync-trash', alt))).rejects.toThrow()
+    // Die Löschung bleibt fällig, der Eintrag steht noch.
+    const gespeichert = await loadManifest(vault)
+    expect(gespeichert!.files[alt]).toBeTruthy()
+  })
+
+  // Review-Runde 2, Codex: confirmedDeletions lebte NUR auf this.manifest. buildManifest
+  // kennt es nicht, und currentManifest ersetzt am Ende das ganze Manifest — verbliebene
+  // Bestätigungen verschwanden also, nicht nur bei Teilerfolg. Folge: der nächste Lauf
+  // sieht dieselbe Löschung als unbestätigte Massenlöschung und blockiert.
+  it('bestätigte Massenlöschung bleibt über einen Teilerfolg hinweg bestätigt', async () => {
+    const ordner = '400 - Archiv/alt/'
+    const paths = Array.from({ length: 26 }, (_, i) => `${ordner}notiz-${i}.md`)
+    for (const p of paths) relay.seed(p, body(p))
+    // Alle Pfade waren synchronisiert, sind lokal weg — und die Löschung ist bestätigt.
+    const manifest: FileManifest = {
+      files: {},
+      lastSyncTime: 500,
+      vaultId: VAULT_ID,
+      confirmedDeletions: { paths: {}, prefixes: { [ordner]: 1000 } }
+    }
+    for (const p of paths) {
+      const plaintext = Buffer.from(body(p), 'utf-8')
+      manifest.files[p] = {
+        hash: hashContent(plaintext),
+        size: plaintext.length,
+        modifiedAt: 1000,
+        syncedAt: 1000,
+        syncedHash: hashContent(plaintext)
+      }
+    }
+    await saveManifest(vault, manifest)
+    await writeNote('bleibt.md', body('bleibt.md'))
+    // Der Server lehnt JEDE dieser Löschungen ab.
+    for (const p of paths) relay.failDeletes.add(p)
+
+    const ersterLauf = await runSync()
+
+    expect(ersterLauf.success).toBe(false)
+    expect(ersterLauf.error).toMatch(/26 server delete\(s\) failed/)
+    const nachLauf1 = await loadManifest(vault)
+    expect(nachLauf1!.confirmedDeletions?.prefixes[ordner]).toBeTruthy()
+
+    // Zweiter Lauf: 26 Löschungen wären ohne die Bestätigung eine Massenlöschung
+    // (Schwelle 25) und müssten an der Bremse blockieren.
+    const zweiterLauf = await engine.sync()
+
+    expect(zweiterLauf.error).not.toMatch(/SAFETY/)
+    expect(zweiterLauf.error).toMatch(/26 server delete\(s\) failed/)
+    // Der Server hat weiterhin alles, nichts ging verloren.
+    expect(relay.deleted).toEqual([])
+  })
+
   it('blockt bei kleinem Vault schon über den Anteil (9 von 20)', async () => {
     // Vorher rutschte dieser Fall durch: Anteil 45 %, aber Anzahl < 10.
     const paths = Array.from({ length: 20 }, (_, i) => note(i))

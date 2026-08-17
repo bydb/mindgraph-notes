@@ -683,6 +683,20 @@ export class SyncEngine {
       // synchronisiert" trotz Hunderter Downloads) und jeder Auto-Sync starb alle 5 Minuten
       // an derselben Stelle. Real aufgetreten beim Multi-Device-Join eines großen Vaults.
       const downloadFailures: string[] = []
+      /**
+       * Inhalts-Hashes, die dieser Lauf holen WOLLTE, aber nicht bekommen hat.
+       *
+       * Die Löschbremse entlastet eine lokale Löschung, wenn derselbe Inhalt im selben Lauf
+       * unter einem anderen Pfad hereinkommt (Verschiebung). Diese Rechnung entsteht aus
+       * `diff.toDownload`, also aus einer ABSICHT — zu diesem Zeitpunkt ist kein Byte
+       * übertragen. Kommt der Download dann nicht an (beschädigter Blob, Timeout,
+       * Integritätsbruch), war die Entlastung gegenstandslos, die lokale Löschung lief
+       * bisher trotzdem: ein unlesbarer Server-Blob verdrängte eine intakte lokale Datei.
+       *
+       * Bewusst ein Set und keine Mengenbilanz: hier wird nicht kompensiert, sondern
+       * gebremst. Im Zweifel bleibt die lokale Datei liegen.
+       */
+      const nichtAngekommeneHashes = new Set<string>()
       this.status = 'downloading'
       for (let i = 0; i < diff.toDownload.length; i += PARALLEL_DOWNLOADS) {
         if (this.destroyed) break  // SAFETY: stop immediately
@@ -700,6 +714,8 @@ export class SyncEngine {
             // Kein syncedAt/Manifest-Eintrag → die Datei wird beim nächsten Sync erneut
             // versucht. Sie gilt weiterhin als "nur remote vorhanden", nie als gelöscht.
             downloadFailures.push(filePath)
+            const erwarteterHash = remoteManifest.files[filePath]?.hash
+            if (erwarteterHash) nichtAngekommeneHashes.add(erwarteterHash)
             const msg = err instanceof Error ? err.message : String(err)
             this.sendLog({ type: 'error', message: `Download failed: ${filePath} — ${msg}`, fileName: filePath })
             return
@@ -826,8 +842,24 @@ export class SyncEngine {
       this.consumeConfirmedDeletions(remoteManifest, remoteDeleted)
 
       // Handle remote deletes — move to .sync-trash/ instead of permanent deletion
+      const deferredLocalDeletes: string[] = []
       for (const filePath of diff.toDeleteLocal) {
         if (this.destroyed) break  // SAFETY
+        // Ersatz nicht angekommen → Datei bleibt liegen (s. nichtAngekommeneHashes).
+        // Der Eintrag bleibt im Manifest, also steht die Löschung beim nächsten Lauf
+        // wieder an — dann hoffentlich mit erfolgreichem Download.
+        const eigenerHash = currentManifest.files[filePath]?.hash
+        if (eigenerHash && nichtAngekommeneHashes.has(eigenerHash)) {
+          deferredLocalDeletes.push(filePath)
+          this.sendLog({
+            type: 'error',
+            message:
+              `Kept local file — its replacement did not arrive: ${filePath}. ` +
+              'The copy on the server could not be transferred; nothing was moved to trash.',
+            fileName: filePath
+          })
+          continue
+        }
         try {
           await moveToSyncTrash(this.vaultPath, filePath)
           delete currentManifest.files[filePath]
@@ -838,6 +870,23 @@ export class SyncEngine {
         } catch {
           // File might already be gone
         }
+      }
+
+      // Löschabsichten, die dieser Lauf NICHT eingelöst hat, müssen ins neue Manifest
+      // wandern. `buildManifest` kennt sie nicht (es liest nur die Platte), und gleich
+      // ersetzt currentManifest das bisherige Manifest vollständig — ohne diesen Übertrag
+      // verschwindet jede verbliebene Bestätigung. Folge: der nächste Lauf sieht dieselben
+      // Löschungen als UNbestätigte Massenlöschung und blockiert an der Löschbremse. Genau
+      // das sollte `confirmedDeletions` verhindern (v0.10.45).
+      // `consumeConfirmedDeletions` hat oben schon abgeräumt, was der Server quittiert hat;
+      // hier steht nur noch der Rest. `this.manifest` ist an dieser Stelle noch das alte.
+      const offeneLoeschabsichten = this.manifest?.confirmedDeletions
+      if (
+        offeneLoeschabsichten &&
+        (Object.keys(offeneLoeschabsichten.paths).length > 0 ||
+          Object.keys(offeneLoeschabsichten.prefixes).length > 0)
+      ) {
+        currentManifest.confirmedDeletions = offeneLoeschabsichten
       }
 
       // Merge tombstones from saved manifest into current
@@ -911,6 +960,12 @@ export class SyncEngine {
         }
         if (deleteFailures.length > 0) {
           parts.push(`${deleteFailures.length} server delete(s) failed: ${deleteFailures[0]}${deleteFailures.length > 1 ? ', …' : ''}`)
+        }
+        if (deferredLocalDeletes.length > 0) {
+          parts.push(
+            `${deferredLocalDeletes.length} local file(s) kept because their replacement did not arrive: ` +
+            `${deferredLocalDeletes[0]}${deferredLocalDeletes.length > 1 ? ', …' : ''}`
+          )
         }
         const error = `${parts.join(' · ')} (will retry)`
         this.sendProgress({ status: 'error', error })
