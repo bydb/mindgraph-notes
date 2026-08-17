@@ -14,6 +14,7 @@ import { EmailAIChatView } from './EmailAIChatView'
 import { FolderPicker } from './FolderPicker'
 import { IconCalendar } from '../Shared/Icons'
 import { PanelHeader, PanelHeaderButton, PanelHeaderIconButton } from '../Shared/PanelHeader'
+import { avatarInitial } from '../../utils/avatarInitial'
 import type { EmailMessage } from '../../../shared/types'
 
 const isMac = window.electronAPI.platform === 'darwin'
@@ -1395,7 +1396,14 @@ export const InboxPanel: React.FC<InboxPanelProps> = ({ onClose }) => {
                       <polygon points="22 2 15 22 11 13 2 9 22 2" />
                     </svg>
                   ) : (
-                    (email.from.name || email.from.address).charAt(0).toUpperCase()
+                    avatarInitial(email.from.name, email.from.address) || (
+                      // Kein Buchstabe im Namen (z. B. Absender heißt nur „📬") — dann ein
+                      // Symbol statt eines Zeichens, nie ein halbes Emoji.
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <rect x="2" y="4" width="20" height="16" rx="2" />
+                        <path d="m22 7-10 6L2 7" />
+                      </svg>
+                    )
                   )}
                 </div>
                 <div className="inbox-email-content">
