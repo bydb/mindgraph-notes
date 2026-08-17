@@ -2,6 +2,21 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.10.47-beta] - 2026-08-17
+
+Notizen mit zwei Punkten im Dateinamen kamen auf einem zweiten Gerät nie an — dauerhaft, ohne Meldung und ohne Spur. Notizen aus E-Mails erben den Betreff; endet der auf einen Punkt, heißt die Datei „… am 17.04..md". Genau daran scheiterte der Abgleich. In einem gewachsenen Vault waren 20 Dateien betroffen.
+
+### Behoben
+
+- **Die Sicherheitsprüfung des Abgleichs hielt zwei Punkte im Dateinamen für einen Ausbruchsversuch.** Sie suchte nach der Zeichenfolge „..", nicht nach einem echten Ausbruchsschritt im Pfad. Solche Dateien ließen sich hochladen, aber nie herunterladen — auf dem zweiten Gerät fehlten sie für immer. Geprüft wird jetzt Pfadabschnitt für Pfadabschnitt. Ein echter Ausbruchsversuch wird weiterhin abgewiesen und schreibt nichts.
+- **Die Prüfung, dass die Zieldatei im Vault landet, ist strenger geworden.** Sie verglich den Pfadanfang ohne Rücksicht auf die Ordnergrenze und hätte damit auch einen Nachbarordner wie „<vault>-alt" akzeptiert. Das ist die tragende Sicherung, seit die Abschnittsprüfung nicht mehr über jeden Doppelpunkt stolpert.
+
+### Hinweis
+
+Betroffene Notizen liegen weiterhin auf dem Server und wurden bei jedem Durchlauf erneut versucht. Nach dem Update kommen sie beim nächsten Abgleich von allein an — es ist nichts umzubenennen und nichts nachzuholen.
+
+Noch offen: Die App erzeugt solche Dateinamen selbst, wenn ein Mail-Betreff auf einen Punkt endet. Übertragen werden sie jetzt zwar, aber der Punkt am Namensende gehört an der Quelle abgeschnitten.
+
 ## [0.10.46-beta] - 2026-08-17
 
 Zwei Rechner zeigten unterschiedlich viele Notizen — 4203 gegen 4320, dazu 16 gegen 12 überfällige Termine. Ursache war ein Ordner, der auf einem Gerät an einen neuen Platz gewandert war, auf dem Server aber noch in zwei alten Kopien lag. Die Schutzbremse gegen versehentliche Massenlöschungen hielt das für 207 unerklärte Löschungen und stoppte den vollständigen Abgleich — zwei Tage lang, mit einem Zustand, der sich selbst nie wieder auflösen konnte. Bei der Ursachensuche kamen drei weitere Stellen zum Vorschein, an denen eine einzelne Datei den ganzen Durchlauf abreißen konnte.
