@@ -15,7 +15,7 @@ import fs from 'fs/promises'
 import os from 'os'
 import path from 'path'
 import { deriveKey, encryptFile, hashContent, hashPath } from './crypto'
-import { saveManifest, type FileManifest } from './fileTracker'
+import { saveManifest, loadManifest, type FileManifest } from './fileTracker'
 
 vi.mock('electron', () => ({
   BrowserWindow: { getAllWindows: () => [] },
@@ -68,11 +68,19 @@ class FakeRelay {
     return `ws://127.0.0.1:${addr.port}`
   }
 
-  /** Legt eine Datei so ab, als hätte ein anderes Gerät sie hochgeladen. */
-  seed(relativePath: string, content: string, modifiedAt = 1000): void {
+  /**
+   * Legt eine Datei so ab, als hätte ein anderes Gerät sie hochgeladen.
+   *
+   * `damaged` verfälscht den Auth-Tag: der Blob sieht im Manifest normal aus, AES-GCM
+   * lehnt ihn beim Entschlüsseln aber ab. Genau dieser Zustand liegt real auf dem Server
+   * (einzelne unlesbare Blobs, Ursache seit 06.08.2026 offen) und ist die Sorte Fehler,
+   * die aus einer Konfliktdatei heraus den ganzen Durchlauf abgerissen hat.
+   */
+  seed(relativePath: string, content: string, modifiedAt = 1000, damaged = false): void {
     const key = testKey()
     const plaintext = Buffer.from(content, 'utf-8')
     const { iv, tag, ciphertext } = encryptFile(plaintext, key)
+    if (damaged) tag[0] ^= 0xff
     this.files.set(hashPath(relativePath), {
       originalPath: relativePath,
       hash: hashContent(plaintext),
@@ -264,6 +272,59 @@ describe('Löschbremse im echten sync()-Ablauf', () => {
     expect(result.success).toBe(true)
     expect(relay.deleted.sort()).toEqual(paths.slice(95).sort())
     expect(relay.files.size).toBe(95)
+  })
+
+  // Real am 17.08.2026: der Voll-Sync lud erfolgreich 194 Dateien hoch und starb dann in
+  // der Konfliktauflösung. Weil resolveConflict nicht pro Datei abgesichert war, lief
+  // saveManifest nie — lastSyncTime blieb zwei Tage stehen, die Löschungen wurden nie
+  // vollzogen, und jeder Auto-Sync starb an derselben Datei. Erkennbar war es nur daran,
+  // dass hochgeladene Pfade NICHT im Manifest standen.
+  it('eine unlösbare Konfliktdatei reißt den Durchlauf nicht mehr ab', async () => {
+    const bestaetigt = 'konflikt.md'
+    // Beide Seiten haben sich seit dem bestätigten Stand geändert = echter Konflikt,
+    // und der Server ist neuer → resolveConflict geht in den Download-Zweig.
+    await writeNote(bestaetigt, 'lokal geändert\n')
+    relay.seed(bestaetigt, 'auf dem Server geändert\n', 9_000_000_000_000, true)
+
+    // Drumherum echte Arbeit, die nach dem Konflikt noch dran ist.
+    await writeNote('neu.md', body('neu.md'))
+    relay.seed('bleibt.md', body('bleibt.md'))
+    await writeNote('bleibt.md', body('bleibt.md'))
+    relay.seed('gelöscht.md', body('gelöscht.md'))
+
+    const alterStand = Buffer.from('ursprünglich\n', 'utf-8')
+    const manifest: FileManifest = { files: {}, lastSyncTime: 500, vaultId: VAULT_ID }
+    manifest.files[bestaetigt] = {
+      hash: hashContent(alterStand),
+      size: alterStand.length,
+      modifiedAt: 1000,
+      syncedAt: 1000,
+      syncedHash: hashContent(alterStand)
+    }
+    const geloescht = Buffer.from(body('gelöscht.md'), 'utf-8')
+    manifest.files['gelöscht.md'] = {
+      hash: hashContent(geloescht),
+      size: geloescht.length,
+      modifiedAt: 1000,
+      syncedAt: 1000,
+      syncedHash: hashContent(geloescht)
+    }
+    await saveManifest(vault, manifest)
+
+    const result = await runSync()
+
+    // Teilerfolg: die Konfliktdatei wird gemeldet, samt Pfad …
+    expect(result.success).toBe(false)
+    expect(result.error).toMatch(/conflict\(s\) unresolved/)
+    expect(result.error).toContain(bestaetigt)
+    // … aber der Durchlauf ist trotzdem fertig geworden.
+    expect(relay.paths()).toContain('neu.md')
+    expect(relay.deleted).toEqual(['gelöscht.md'])
+    const gespeichert = await loadManifest(vault)
+    expect(gespeichert!.lastSyncTime).toBeGreaterThan(500)
+    expect(gespeichert!.files['neu.md']?.syncedHash).toBeTruthy()
+    // Die Konfliktdatei bleibt unbestätigt und kommt beim nächsten Lauf wieder.
+    expect(gespeichert!.files[bestaetigt]?.syncedHash).not.toBe(gespeichert!.files[bestaetigt]?.hash)
   })
 
   it('blockt bei kleinem Vault schon über den Anteil (9 von 20)', async () => {

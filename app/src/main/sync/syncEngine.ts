@@ -728,7 +728,15 @@ export class SyncEngine {
         return { success: false, uploaded: 0, downloaded: 0, conflicts: 0, error: 'Engine destroyed during sync' }
       }
 
-      // Handle conflicts (sequential — needs careful ordering)
+      // Handle conflicts (sequential — needs careful ordering).
+      // Fehler pro DATEI abfangen — dieselbe Lehre wie beim Upload und beim Download, hier
+      // beim dritten Mal: resolveConflict lädt am Ende hoch bzw. herunter, und beides kann
+      // werfen (Ack-Timeout nach 30 s, nicht entschlüsselbarer Blob). Ungefangen riss das
+      // den ganzen Durchlauf ab — NACH den Uploads, aber VOR den Löschungen und vor
+      // saveManifest. Folge: lastSyncTime blieb stehen, der Sync galt als "nie
+      // durchgelaufen", und jeder Auto-Sync starb an derselben Datei (real am 17.08.2026,
+      // aufgefallen an einem stehenden Voll-Sync trotz erfolgreicher Uploads).
+      const conflictFailures: string[] = []
       for (const filePath of diff.conflicts) {
         if (this.destroyed) break  // SAFETY
         current++
@@ -739,7 +747,20 @@ export class SyncEngine {
           total,
           fileName: filePath
         })
-        await this.resolveConflict(filePath, currentManifest, remoteManifest)
+        try {
+          await this.resolveConflict(filePath, currentManifest, remoteManifest)
+        } catch (err) {
+          // Kein syncedAt/syncedHash → die Datei kommt beim nächsten Lauf wieder als
+          // Konflikt hoch. Der Pfad MUSS in die Meldung, sonst bleibt unbekannt, welche
+          // Datei den Sync aufhält (genau diese Lücke stand seit dem 06.08. offen).
+          conflictFailures.push(filePath)
+          const msg = err instanceof Error ? err.message : String(err)
+          this.sendLog({
+            type: 'error',
+            message: `Conflict resolution failed: ${filePath} — ${msg}`,
+            fileName: filePath
+          })
+        }
       }
 
       // Delete files on server that were deleted locally
@@ -831,7 +852,7 @@ export class SyncEngine {
 
       const uploadedCount = diff.toUpload.length - uploadFailures.length
       const downloadedCount = diff.toDownload.length - downloadFailures.length
-      if (uploadFailures.length > 0 || downloadFailures.length > 0) {
+      if (uploadFailures.length > 0 || downloadFailures.length > 0 || conflictFailures.length > 0) {
         // Teilerfolg: erfolgreiche Übertragungen sind im Manifest markiert; die
         // fehlgeschlagenen haben weiter kein syncedAt und werden beim nächsten Auto-Sync
         // erneut versucht. Entscheidend: das Manifest wurde oben trotzdem gespeichert, der
@@ -843,6 +864,9 @@ export class SyncEngine {
         }
         if (downloadFailures.length > 0) {
           parts.push(`${downloadFailures.length} download(s) failed: ${downloadFailures[0]}${downloadFailures.length > 1 ? ', …' : ''}`)
+        }
+        if (conflictFailures.length > 0) {
+          parts.push(`${conflictFailures.length} conflict(s) unresolved: ${conflictFailures[0]}${conflictFailures.length > 1 ? ', …' : ''}`)
         }
         const error = `${parts.join(' · ')} (will retry)`
         this.sendProgress({ status: 'error', error })
