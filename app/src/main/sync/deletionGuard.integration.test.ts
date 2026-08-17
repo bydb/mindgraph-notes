@@ -401,19 +401,39 @@ describe('Löschbremse im echten sync()-Ablauf', () => {
   // Beweis gelten, dass der Inhalt überlebt — er ist nur eine Angabe im Manifest, der Blob
   // kann unlesbar sein. Genau solche Blobs liegen auf dem Produktivserver.
   it('ein Server-Hash allein entlastet KEINE lokale Löschung', async () => {
-    const inhalt = (i: number): string => `# Notiz ${i}\n\nGleicher Inhalt.\n`
+    const original = (i: number): string => `# Notiz ${i}\n\nDer eigentliche Inhalt.\n`
     // 30 lokal vorhandene Dateien, die auf dem Server fehlen → toDeleteLocal.
     const lokalWeg = Array.from({ length: 30 }, (_, i) => `nur-lokal/notiz-${i}.md`)
-    // Dieselben Inhalte liegen auf dem Server unter anderem Pfad — und ebenso lokal,
-    // damit daraus kein Download wird, der die Löschung legitim entlasten würde.
-    const dublette = Array.from({ length: 30 }, (_, i) => `dublette/notiz-${i}.md`)
+    // Der Server behauptet, denselben Inhalt unter anderem Pfad zu haben. Lokal liegt dort
+    // aber etwas ANDERES und Neueres — dieser Pfad geht also gleich hoch und überschreibt
+    // die angeblich überlebende Kopie. Nach dem Lauf gibt es den Inhalt nirgends mehr:
+    // genau der Fall, in dem eine Server-Angabe als Beleg tödlich ist.
+    const ueberschrieben = Array.from({ length: 30 }, (_, i) => `wird-ersetzt/notiz-${i}.md`)
 
+    const manifest: FileManifest = { files: {}, lastSyncTime: 500, vaultId: VAULT_ID }
     for (let i = 0; i < 30; i++) {
-      await writeNote(lokalWeg[i], inhalt(i))
-      await writeNote(dublette[i], inhalt(i))
-      relay.seed(dublette[i], inhalt(i))
+      await writeNote(lokalWeg[i], original(i))
+      const alt = Buffer.from(original(i), 'utf-8')
+      manifest.files[lokalWeg[i]] = {
+        hash: hashContent(alt),
+        size: alt.length,
+        modifiedAt: 1000,
+        syncedAt: 1000,
+        syncedHash: hashContent(alt)
+      }
+      // Server-Stand dieses Pfades = der Inhalt, der angeblich überlebt.
+      relay.seed(ueberschrieben[i], original(i), 1000)
+      await writeNote(ueberschrieben[i], `# Notiz ${i}\n\nLokal komplett neu geschrieben.\n`)
+      manifest.files[ueberschrieben[i]] = {
+        hash: hashContent(alt),
+        size: alt.length,
+        modifiedAt: 1000,
+        syncedAt: 1000,
+        // Bestätigt ist der Server-Stand → lokal geändert, remote unverändert → Upload.
+        syncedHash: hashContent(alt)
+      }
     }
-    await seedManifest([...lokalWeg, ...dublette], p => inhalt(Number(p.match(/notiz-(\d+)/)![1])))
+    await saveManifest(vault, manifest)
 
     const result = await runSync()
 
@@ -497,6 +517,35 @@ describe('Löschbremse im echten sync()-Ablauf', () => {
     expect(zweiterLauf.error).toMatch(/26 server delete\(s\) failed/)
     // Der Server hat weiterhin alles, nichts ging verloren.
     expect(relay.deleted).toEqual([])
+  })
+
+  // Das Gegengerät zum Doppelordner-Fall: dort werden 396 lokale Kopien fällig, deren
+  // Inhalt lokal längst am neuen Ort liegt. Ohne Entlastung blockiert es reihenweise und
+  // der Nutzer bräuchte auf JEDEM Gerät den Erzwingen-Knopf. Maßstab ist die Quelle des
+  // Belegs: lokal gelesen zählt (hier), eine Server-Angabe nicht (s. Test darunter).
+  it('lokale Löschung ist entlastet, wenn der Inhalt lokal woanders liegen bleibt', async () => {
+    const inhalt = (i: number): string => `# Notiz ${i}\n\nGleicher Inhalt.\n`
+    const alt = Array.from({ length: 30 }, (_, i) => `alter-ort/notiz-${i}.md`)
+    const neu = Array.from({ length: 30 }, (_, i) => `neuer-ort/notiz-${i}.md`)
+
+    for (let i = 0; i < 30; i++) {
+      // Beide Pfade liegen lokal; nur der neue liegt auch auf dem Server.
+      await writeNote(alt[i], inhalt(i))
+      await writeNote(neu[i], inhalt(i))
+      relay.seed(neu[i], inhalt(i))
+    }
+    await seedManifest([...alt, ...neu], p => inhalt(Number(p.match(/notiz-(\d+)/)![1])))
+
+    const result = await runSync()
+
+    expect(result.success).toBe(true)
+    // Die alten Pfade sind aufgeräumt — reversibel im .sync-trash …
+    for (const p of alt) {
+      await expect(fs.access(path.join(vault, p))).rejects.toThrow()
+      await expect(fs.access(path.join(vault, '.sync-trash', p))).resolves.toBeUndefined()
+    }
+    // … und der Inhalt liegt vollständig am neuen Ort.
+    for (const p of neu) await expect(fs.access(path.join(vault, p))).resolves.toBeUndefined()
   })
 
   it('blockt bei kleinem Vault schon über den Anteil (9 von 20)', async () => {

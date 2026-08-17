@@ -519,15 +519,18 @@ export class SyncEngine {
          * Lauf gerade lokal entfernt. Liegt der Inhalt einer Server-Löschung hier noch,
          * verschwindet nur ein Pfad, kein Inhalt (s. assessDeletions → contentSurvives).
          *
-         * Bewusst NUR diese Richtung. Die Gegenrichtung — „der Server hat den Inhalt noch
-         * unter einem anderen Pfad, also darf ich lokal löschen" — sieht symmetrisch aus,
-         * ist es aber nicht: lokale Hashes kommen aus `buildManifest`, das die Datei
-         * tatsächlich gelesen hat. Der Server-Hash ist bloß eine Angabe im Manifest; ob
-         * der zugehörige Blob überhaupt entschlüsselbar ist, weiß niemand. Auf genau
-         * diesem Server liegen nachweislich einzelne unlesbare Blobs (seit 06.08.2026).
-         * Einer davon hätte beliebig viele intakte lokale Dateien in den `.sync-trash`
-         * geschoben, mit einem „überlebenden" Inhalt, der sich nie wieder herstellen lässt.
-         * Der reale Doppelordner-Fall braucht diese Richtung nicht.
+         * Dieselbe Menge entlastet BEIDE Löschrichtungen, und zwar aus demselben Grund:
+         * Sie besteht aus Hashes, die `buildManifest` beim tatsächlichen LESEN der Dateien
+         * berechnet hat. Das ist ein Beweis, dass der Inhalt vorhanden und lesbar ist.
+         *
+         * Was hier ausdrücklich NICHT zählt, ist die Auskunft des Servers („ich habe den
+         * Inhalt noch unter einem anderen Pfad"). Ein Server-Hash ist bloß eine Angabe im
+         * Manifest; ob der zugehörige Blob überhaupt entschlüsselbar ist, weiß niemand. Auf
+         * genau diesem Server liegen nachweislich einzelne unlesbare Blobs (seit
+         * 06.08.2026) — einer davon hätte beliebig viele intakte lokale Dateien in den
+         * `.sync-trash` geschoben, mit einem „überlebenden" Inhalt, der sich nie wieder
+         * herstellen lässt. Maßstab ist deshalb nicht die Richtung, sondern die Quelle:
+         * selbst gelesen zählt, behauptet nicht.
          */
         const survivingLocalHashes = (): Set<string> => {
           const removed = new Set(diff.toDeleteLocal)
@@ -594,14 +597,20 @@ export class SyncEngine {
             const h = remoteManifest.files[p]?.hash
             if (h) incoming.push(h)
           }
-          // KEIN contentSurvives in dieser Richtung — Begründung oben bei
-          // survivingLocalHashes. Eine lokale Löschung wird nur durch einen Download
-          // entlastet, der tatsächlich ankommt.
+          // Auch eine lokale Löschung ist kein Inhaltsverlust, wenn derselbe Inhalt lokal
+          // unter einem anderen Pfad LIEGEN BLEIBT (Dublette, verschobener Ordner). Der
+          // Beleg dafür ist selbst gelesen, nicht vom Server behauptet — der Unterschied,
+          // um den es bei survivingLocalHashes geht. Ohne das blockiert das Gegengerät
+          // reihenweise, sobald hier ein doppelt abgelegter Ordner aufgeräumt wurde: es
+          // hätte 396 „unerklärte" lokale Löschungen, deren Inhalt es längst am neuen Ort
+          // hat.
+          const localSurvivorsForLocal = survivingLocalHashes()
           const assessment = assessDeletions({
             deletions: diff.toDeleteLocal,
             totalFiles: localFileCount,
             hashOf: p => currentManifest.files[p]?.hash,
-            compensatingHashes: incoming
+            compensatingHashes: incoming,
+            contentSurvives: h => localSurvivorsForLocal.has(h)
           })
           if (assessment.blocked) return blockDeletions(assessment, 'local', localFileCount)
           logWaved(assessment, 'local')
