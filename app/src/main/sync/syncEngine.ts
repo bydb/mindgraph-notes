@@ -1141,8 +1141,18 @@ export class SyncEngine {
 
     if (!this.key) throw new Error('No encryption key')
 
-    // SAFETY: prevent path traversal attacks
-    if (relativePath.includes('..') || path.isAbsolute(relativePath)) {
+    // SAFETY: prevent path traversal attacks.
+    //
+    // Geprüft wird auf einen `..`-PFADABSCHNITT, nicht auf die Zeichenfolge „..".
+    // Vorher stand hier `relativePath.includes('..')` — das lehnte jede Datei ab, deren
+    // NAME zwei Punkte enthält. Genau das passiert dauernd: Mail-Notizen erben den
+    // Betreff, endet der auf einen Punkt, heißt die Datei „… am 17.04..md". Solche
+    // Dateien konnte dieses Gerät hochladen, aber nie herunterladen — sie fehlten auf dem
+    // Zweitgerät dauerhaft und ohne jede Meldung (real: 22 Dateien im Vault, davon 2 in
+    // der Gegenrichtung vermisst). Der eigentliche Schutz ist die Prüfung weiter unten,
+    // dass der aufgelöste Pfad im Vault liegt.
+    const segmente = relativePath.split(/[/\\]/)
+    if (path.isAbsolute(relativePath) || segmente.includes('..') || segmente.includes('')) {
       console.error('[SyncEngine] BLOCKED: dangerous path:', relativePath)
       return null
     }
@@ -1191,8 +1201,14 @@ export class SyncEngine {
 
     const absPath = path.join(this.vaultPath, relativePath)
 
-    // SAFETY: verify the resolved path is inside the vault
-    if (!absPath.startsWith(this.vaultPath)) {
+    // SAFETY: verify the resolved path is inside the vault.
+    // Trennzeichen-Grenze mitprüfen — ein reines `startsWith` würde auch einen
+    // Nachbarordner wie „<vault>-alt/…" akzeptieren. Das ist jetzt die tragende
+    // Sicherung, nachdem die Abschnittsprüfung oben nicht mehr über jeden Doppelpunkt
+    // im Dateinamen stolpert.
+    const vaultRoot = path.resolve(this.vaultPath)
+    const aufgeloest = path.resolve(absPath)
+    if (aufgeloest !== vaultRoot && !aufgeloest.startsWith(vaultRoot + path.sep)) {
       console.error('[SyncEngine] BLOCKED: path escapes vault:', absPath)
       return null
     }

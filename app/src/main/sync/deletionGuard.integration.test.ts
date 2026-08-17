@@ -548,6 +548,34 @@ describe('Löschbremse im echten sync()-Ablauf', () => {
     for (const p of neu) await expect(fs.access(path.join(vault, p))).resolves.toBeUndefined()
   })
 
+  // Real am 17.08.2026 aufgefallen: zwei Notizen lagen auf dem Server und kamen auf dem
+  // zweiten Gerät NIE an, ohne jede Meldung. Ursache war die Pfadprüfung im Download:
+  // `relativePath.includes('..')` lehnte jede Datei ab, deren NAME zwei Punkte enthält.
+  // Mail-Notizen erben den Betreff — endet der auf einen Punkt, heißt die Datei
+  // „… am 17.04..md". Im Vault betraf das 22 Dateien: hochladbar, aber nicht herunterladbar.
+  it('lädt eine Datei mit zwei Punkten im Namen herunter (kein Pfadausbruch)', async () => {
+    const heikel = 'emails/2026-08-17 Termine für die Fortbildung (17.09., 18.09..md'
+    relay.seed(heikel, '# Termine\n\nInhalt der Notiz.\n')
+
+    const result = await runSync()
+
+    expect(result.success).toBe(true)
+    const geschrieben = await fs.readFile(path.join(vault, heikel), 'utf-8')
+    expect(geschrieben).toContain('Inhalt der Notiz.')
+  })
+
+  it('lehnt einen echten Pfadausbruch weiter ab', async () => {
+    // Ein bösartiger oder kaputter Server-Eintrag, der aus dem Vault heraus zeigt.
+    const ausbruch = '../ausserhalb.md'
+    relay.seed(ausbruch, 'darf nicht geschrieben werden\n')
+
+    const result = await runSync()
+
+    // Der Download schlägt fehl und wird gemeldet — geschrieben wird nichts.
+    expect(result.error).toMatch(/download\(s\) failed/)
+    await expect(fs.access(path.join(path.dirname(vault), 'ausserhalb.md'))).rejects.toThrow()
+  })
+
   it('blockt bei kleinem Vault schon über den Anteil (9 von 20)', async () => {
     // Vorher rutschte dieser Fall durch: Anteil 45 %, aber Anzahl < 10.
     const paths = Array.from({ length: 20 }, (_, i) => note(i))
