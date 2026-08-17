@@ -435,6 +435,83 @@ describe('assessDeletions', () => {
     expect(result.blocked).toBe(true)
   })
 
+  // Realer Fall vom 17.08.2026: ein Ordner wurde lokal verschoben, lag auf dem Server
+  // aber in ZWEI alten Kopien. Das Umbenennungs-Budget aus toUpload deckte nur eine
+  // davon, die zweite blieb "unerklärt" — 207 Stück, Voll-Sync stand zwei Tage.
+  it('REGRESSION: Dublette auf dem Server blockiert nicht mehr, wenn der Inhalt lokal liegt', () => {
+    const alteKopieA = many(180, 'alt-a/')
+    const alteKopieB = many(180, 'alt-b/')
+    const inhalt = (p: string): string => `inhalt-${p.split('/')[1]}`
+    const result = assessDeletions({
+      deletions: [...alteKopieA, ...alteKopieB],
+      totalFiles: 7140,
+      hashOf: inhalt,
+      // Nur EINE neue Kopie geht hoch — genau deshalb reichte das Budget nicht.
+      compensatingHashes: many(180, 'neu/').map(inhalt),
+      contentSurvives: h => many(180, 'neu/').map(inhalt).includes(h)
+    })
+    expect(result.blocked).toBe(false)
+    expect(result.preserved).toHaveLength(360)
+    expect(result.unmatched).toEqual([])
+  })
+
+  it('blockt weiter, wenn der Inhalt NIRGENDS mehr liegt (der eigentliche Schutzfall)', () => {
+    // Der Jazz-Ordner: 376 Dateien lokal verschwunden, Inhalt einzigartig.
+    const result = assessDeletions({
+      deletions: many(376, 'Jazz/'),
+      totalFiles: 7181,
+      hashOf: p => H(p),
+      compensatingHashes: [],
+      contentSurvives: () => false
+    })
+    expect(result.blocked).toBe(true)
+    expect(result.preserved).toEqual([])
+    expect(result.unmatched).toHaveLength(376)
+  })
+
+  it('trennt beide Entlastungen: überlebender Inhalt zählt als preserved, nicht als rename', () => {
+    const result = assessDeletions({
+      deletions: ['liegt-noch-da.md', 'wandert-mit.md', 'echt-weg.md'],
+      totalFiles: 500,
+      hashOf: p => `inhalt-${p}`,
+      compensatingHashes: ['inhalt-wandert-mit.md'],
+      contentSurvives: h => h === 'inhalt-liegt-noch-da.md'
+    })
+    expect(result.preserved).toEqual(['liegt-noch-da.md'])
+    expect(result.renames).toEqual(['wandert-mit.md'])
+    expect(result.unmatched).toEqual(['echt-weg.md'])
+    expect(result.blocked).toBe(false)
+  })
+
+  // Bewusst in Kauf genommen, damit es niemand später "reparariert": anders als das
+  // Umbenennungs-Budget ist contentSurvives ein Prädikat, kein Kontingent. Eine
+  // überlebende Kopie deckt beliebig viele inhaltsgleiche Pfade. Das kostet Pfade,
+  // keinen Inhalt — und beide Richtungen sind umkehrbar (.sync-trash bzw. Soft-Delete).
+  it('AKZEPTIERT: eine überlebende Kopie deckt beliebig viele inhaltsgleiche Pfade', () => {
+    const result = assessDeletions({
+      deletions: many(300, 'leer/'),
+      totalFiles: 5000,
+      hashOf: () => 'leerer-inhalt',
+      compensatingHashes: [],
+      contentSurvives: h => h === 'leerer-inhalt'
+    })
+    expect(result.blocked).toBe(false)
+    expect(result.preserved).toHaveLength(300)
+  })
+
+  it('bestätigte Löschung schlägt überlebenden Inhalt — die Buchung bleibt eindeutig', () => {
+    const result = assessDeletions({
+      deletions: ['bestaetigt/weg.md'],
+      totalFiles: 500,
+      hashOf: () => 'egal',
+      compensatingHashes: [],
+      contentSurvives: () => true,
+      isIntentional: p => isConfirmedDeletion(p, { paths: {}, prefixes: { 'bestaetigt/': 1 } })
+    })
+    expect(result.intentional).toEqual(['bestaetigt/weg.md'])
+    expect(result.preserved).toEqual([])
+  })
+
   it('lässt eine kleine, gewollte Löschung im großen Vault durch', () => {
     expect(assess(many(5), 7000).blocked).toBe(false)
   })

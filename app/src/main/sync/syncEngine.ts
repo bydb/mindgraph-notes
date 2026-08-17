@@ -514,32 +514,79 @@ export class SyncEngine {
         const localFileCount = Object.keys(currentManifest.files).length
         const remoteFileCount = Object.keys(remoteManifest.files).length
 
+        /**
+         * Inhalte, die LOKAL überleben — alles auf der Platte außer den Pfaden, die dieser
+         * Lauf gerade lokal entfernt. Liegt der Inhalt einer Server-Löschung hier noch,
+         * verschwindet nur ein Pfad, kein Inhalt (s. assessDeletions → contentSurvives).
+         *
+         * Dieselbe Menge entlastet BEIDE Löschrichtungen, und zwar aus demselben Grund:
+         * Sie besteht aus Hashes, die `buildManifest` beim tatsächlichen LESEN der Dateien
+         * berechnet hat. Das ist ein Beweis, dass der Inhalt vorhanden und lesbar ist.
+         *
+         * Was hier ausdrücklich NICHT zählt, ist die Auskunft des Servers („ich habe den
+         * Inhalt noch unter einem anderen Pfad"). Ein Server-Hash ist bloß eine Angabe im
+         * Manifest; ob der zugehörige Blob überhaupt entschlüsselbar ist, weiß niemand. Auf
+         * genau diesem Server liegen nachweislich einzelne unlesbare Blobs (seit
+         * 06.08.2026) — einer davon hätte beliebig viele intakte lokale Dateien in den
+         * `.sync-trash` geschoben, mit einem „überlebenden" Inhalt, der sich nie wieder
+         * herstellen lässt. Maßstab ist deshalb nicht die Richtung, sondern die Quelle:
+         * selbst gelesen zählt, behauptet nicht.
+         */
+        const survivingLocalHashes = (): Set<string> => {
+          const removed = new Set(diff.toDeleteLocal)
+          const hashes = new Set<string>()
+          for (const [filePath, info] of Object.entries(currentManifest.files)) {
+            if (!removed.has(filePath) && info.hash) hashes.add(info.hash)
+          }
+          return hashes
+        }
+
         const blockDeletions = (
           assessment: ReturnType<typeof assessDeletions>,
           scope: 'local' | 'remote',
           total: number
         ): SyncResult => {
-          const { unmatched, renames, intentional, reason } = assessment
+          const { unmatched, renames, preserved, intentional, reason } = assessment
           const share = total > 0 ? Math.round((unmatched.length / total) * 100) : 0
+          const notCounted: string[] = []
+          if (renames.length > 0) notCounted.push(`${renames.length} rename(s)/move(s)`)
+          if (preserved.length > 0) {
+            notCounted.push(`${preserved.length} whose content still exists under another path`)
+          }
+          if (intentional.length > 0) notCounted.push(`${intentional.length} confirmed in-app deletion(s)`)
+          const notCountedNote = notCounted.length > 0 ? ` Not counted: ${notCounted.join(', ')}.` : ''
+          // Die Meldung muss sagen, was zu tun ist. Vorher stand nur da, was sie verweigert —
+          // ein Nutzer stand damit real drei Tage vor einem stehenden Sync, weil der
+          // Erzwingen-Knopf als einziger Ausweg nicht benannt war.
           const hint = scope === 'local'
-            ? 'This likely indicates a server/connection issue.'
-            : 'This likely indicates a stale local manifest or an incomplete vault copy.'
-          const renameNote = (renames.length > 0
-            ? ` (${renames.length} further path change(s) recognised as renames and not counted`
-            : intentional.length > 0 ? ' (' : '')
-            + (intentional.length > 0
-              ? `${renames.length > 0 ? '; ' : ''}${intentional.length} confirmed in-app deletion(s) not counted`
-              : '')
-            + (renames.length > 0 || intentional.length > 0 ? ')' : '')
+            ? 'Nothing was deleted locally. This usually points to a server or connection problem — ' +
+              'the remote side looked emptier than it is. Check the connection and sync again.'
+            : 'This usually points to a stale local manifest or an incomplete vault copy. ' +
+              'If you deleted these files on purpose, use Force Sync to let the deletion through.'
           const errorMsg =
             `SAFETY: Refusing to delete ${unmatched.length}/${total} ${scope} files (${share}%, ` +
-            `triggered by ${reason === 'absolute' ? 'absolute count' : 'share'})${renameNote}. ${hint} ` +
+            `triggered by ${reason === 'absolute' ? 'absolute count' : 'share'}).${notCountedNote} ${hint} ` +
             `First: ${unmatched.slice(0, 3).join(', ')}${unmatched.length > 3 ? ', …' : ''}`
           console.error('[SyncEngine]', errorMsg)
           this.sendLog({ type: 'error', message: errorMsg })
           this.status = 'error'
           this.sendProgress({ status: 'error', error: errorMsg })
           return { success: false, uploaded: 0, downloaded: 0, conflicts: 0, error: errorMsg }
+        }
+
+        /** Was die Bremse durchgelassen hat, gehört ins Protokoll — sonst ist eine
+         *  weggewinkte Löschung von einer nie erkannten nicht zu unterscheiden. */
+        const logWaved = (assessment: ReturnType<typeof assessDeletions>, scope: 'local' | 'remote'): void => {
+          const { renames, preserved, intentional } = assessment
+          if (renames.length + preserved.length + intentional.length === 0) return
+          const parts: string[] = []
+          if (renames.length > 0) parts.push(`${renames.length} rename(s)/move(s)`)
+          if (preserved.length > 0) parts.push(`${preserved.length} with content preserved elsewhere`)
+          if (intentional.length > 0) parts.push(`${intentional.length} confirmed in-app`)
+          this.sendLog({
+            type: 'sync',
+            message: `Deletion guard passed ${scope} deletions: ${parts.join(', ')}`
+          })
         }
 
         if (diff.toDeleteLocal.length > 0) {
@@ -550,13 +597,23 @@ export class SyncEngine {
             const h = remoteManifest.files[p]?.hash
             if (h) incoming.push(h)
           }
+          // Auch eine lokale Löschung ist kein Inhaltsverlust, wenn derselbe Inhalt lokal
+          // unter einem anderen Pfad LIEGEN BLEIBT (Dublette, verschobener Ordner). Der
+          // Beleg dafür ist selbst gelesen, nicht vom Server behauptet — der Unterschied,
+          // um den es bei survivingLocalHashes geht. Ohne das blockiert das Gegengerät
+          // reihenweise, sobald hier ein doppelt abgelegter Ordner aufgeräumt wurde: es
+          // hätte 396 „unerklärte" lokale Löschungen, deren Inhalt es längst am neuen Ort
+          // hat.
+          const localSurvivorsForLocal = survivingLocalHashes()
           const assessment = assessDeletions({
             deletions: diff.toDeleteLocal,
             totalFiles: localFileCount,
             hashOf: p => currentManifest.files[p]?.hash,
-            compensatingHashes: incoming
+            compensatingHashes: incoming,
+            contentSurvives: h => localSurvivorsForLocal.has(h)
           })
           if (assessment.blocked) return blockDeletions(assessment, 'local', localFileCount)
+          logWaved(assessment, 'local')
         }
 
         if (diff.toDeleteRemote.length > 0) {
@@ -567,6 +624,8 @@ export class SyncEngine {
             const h = currentManifest.files[p]?.hash
             if (h) outgoing.push(h)
           }
+          // Überlebende Seite ist hier die Platte — minus dem, was dieser Lauf lokal löscht.
+          const localSurvivors = survivingLocalHashes()
           const assessment = assessDeletions({
             // Nur hier: Server-Löschungen gehen auf eine Aktion DIESES Geräts zurück,
             // die der Nutzer bestätigt haben kann. Bei toDeleteLocal kommt die Ansage
@@ -575,9 +634,11 @@ export class SyncEngine {
             deletions: diff.toDeleteRemote,
             totalFiles: remoteFileCount,
             hashOf: p => remoteManifest.files[p]?.hash,
-            compensatingHashes: outgoing
+            compensatingHashes: outgoing,
+            contentSurvives: h => localSurvivors.has(h)
           })
           if (assessment.blocked) return blockDeletions(assessment, 'remote', remoteFileCount)
+          logWaved(assessment, 'remote')
         }
       }
 
@@ -631,6 +692,20 @@ export class SyncEngine {
       // synchronisiert" trotz Hunderter Downloads) und jeder Auto-Sync starb alle 5 Minuten
       // an derselben Stelle. Real aufgetreten beim Multi-Device-Join eines großen Vaults.
       const downloadFailures: string[] = []
+      /**
+       * Inhalts-Hashes, die dieser Lauf holen WOLLTE, aber nicht bekommen hat.
+       *
+       * Die Löschbremse entlastet eine lokale Löschung, wenn derselbe Inhalt im selben Lauf
+       * unter einem anderen Pfad hereinkommt (Verschiebung). Diese Rechnung entsteht aus
+       * `diff.toDownload`, also aus einer ABSICHT — zu diesem Zeitpunkt ist kein Byte
+       * übertragen. Kommt der Download dann nicht an (beschädigter Blob, Timeout,
+       * Integritätsbruch), war die Entlastung gegenstandslos, die lokale Löschung lief
+       * bisher trotzdem: ein unlesbarer Server-Blob verdrängte eine intakte lokale Datei.
+       *
+       * Bewusst ein Set und keine Mengenbilanz: hier wird nicht kompensiert, sondern
+       * gebremst. Im Zweifel bleibt die lokale Datei liegen.
+       */
+      const nichtAngekommeneHashes = new Set<string>()
       this.status = 'downloading'
       for (let i = 0; i < diff.toDownload.length; i += PARALLEL_DOWNLOADS) {
         if (this.destroyed) break  // SAFETY: stop immediately
@@ -638,11 +713,18 @@ export class SyncEngine {
         await Promise.all(batch.map(async (filePath) => {
           if (this.destroyed) return  // SAFETY
           try {
-            await this.downloadFile(filePath)
+            // Rückgabewert auswerten, nicht nur auf eine Ausnahme warten: bei Server-Fehler,
+            // Timeout oder gerissener Integritätsprüfung liefert downloadFile `null` und hat
+            // NICHTS geschrieben. Vorher stempelte der Code danach trotzdem `syncedAt` —
+            // die Datei galt als geholt, obwohl sie es nicht war.
+            const result = await this.downloadFile(filePath)
+            if (!result) throw new Error('Transfer failed or integrity check failed')
           } catch (err) {
             // Kein syncedAt/Manifest-Eintrag → die Datei wird beim nächsten Sync erneut
             // versucht. Sie gilt weiterhin als "nur remote vorhanden", nie als gelöscht.
             downloadFailures.push(filePath)
+            const erwarteterHash = remoteManifest.files[filePath]?.hash
+            if (erwarteterHash) nichtAngekommeneHashes.add(erwarteterHash)
             const msg = err instanceof Error ? err.message : String(err)
             this.sendLog({ type: 'error', message: `Download failed: ${filePath} — ${msg}`, fileName: filePath })
             return
@@ -682,7 +764,15 @@ export class SyncEngine {
         return { success: false, uploaded: 0, downloaded: 0, conflicts: 0, error: 'Engine destroyed during sync' }
       }
 
-      // Handle conflicts (sequential — needs careful ordering)
+      // Handle conflicts (sequential — needs careful ordering).
+      // Fehler pro DATEI abfangen — dieselbe Lehre wie beim Upload und beim Download, hier
+      // beim dritten Mal: resolveConflict lädt am Ende hoch bzw. herunter, und beides kann
+      // werfen (Ack-Timeout nach 30 s, nicht entschlüsselbarer Blob). Ungefangen riss das
+      // den ganzen Durchlauf ab — NACH den Uploads, aber VOR den Löschungen und vor
+      // saveManifest. Folge: lastSyncTime blieb stehen, der Sync galt als "nie
+      // durchgelaufen", und jeder Auto-Sync starb an derselben Datei (real am 17.08.2026,
+      // aufgefallen an einem stehenden Voll-Sync trotz erfolgreicher Uploads).
+      const conflictFailures: string[] = []
       for (const filePath of diff.conflicts) {
         if (this.destroyed) break  // SAFETY
         current++
@@ -693,15 +783,53 @@ export class SyncEngine {
           total,
           fileName: filePath
         })
-        await this.resolveConflict(filePath, currentManifest, remoteManifest)
+        try {
+          await this.resolveConflict(filePath, currentManifest, remoteManifest)
+        } catch (err) {
+          // Kein syncedAt/syncedHash → die Datei kommt beim nächsten Lauf wieder als
+          // Konflikt hoch. Der Pfad MUSS in die Meldung, sonst bleibt unbekannt, welche
+          // Datei den Sync aufhält (genau diese Lücke stand seit dem 06.08. offen).
+          conflictFailures.push(filePath)
+          const msg = err instanceof Error ? err.message : String(err)
+          this.sendLog({
+            type: 'error',
+            message: `Conflict resolution failed: ${filePath} — ${msg}`,
+            fileName: filePath
+          })
+        }
       }
 
-      // Delete files on server that were deleted locally
+      // Delete files on server that were deleted locally.
+      // Auch hier Fehler pro DATEI abfangen: `deleteRemoteFile` wartet über `waitForAck`
+      // bis zu 30 s und lehnt bei jedem Server-Fehler ab. Ungefangen riss eine einzige
+      // nicht quittierte Löschung den Lauf ab, NACH allen Uploads und vor `saveManifest` —
+      // dieselbe Folge wie bei der Konfliktschleife: lastSyncTime bleibt stehen, der ganze
+      // Vault hängt an einer Datei.
       const remoteDeleted: string[] = []
+      const deleteFailures: string[] = []
       for (const filePath of diff.toDeleteRemote) {
         if (this.destroyed) break  // SAFETY
         current++
-        await this.deleteRemoteFile(filePath)
+        try {
+          await this.deleteRemoteFile(filePath)
+        } catch (err) {
+          deleteFailures.push(filePath)
+          // Löschabsicht erhalten. Der Pfad liegt nicht auf der Platte und steht deshalb
+          // NICHT in currentManifest — genau das wird gleich als neues Manifest gespeichert.
+          // Ohne diesen Übertrag wäre die Datei beim nächsten Lauf eine dem Gerät unbekannte
+          // Server-Datei und käme als Download zurück, statt gelöscht zu werden. (Vorher
+          // riss der Fehler den Lauf ab; dass nichts gespeichert wurde, war das zufällige
+          // Sicherheitsnetz — mit dem Abfangen muss die Absicht ausdrücklich mitwandern.)
+          const previous = this.manifest?.files[filePath]
+          if (previous) currentManifest.files[filePath] = previous
+          const msg = err instanceof Error ? err.message : String(err)
+          this.sendLog({
+            type: 'error',
+            message: `Delete on server failed: ${filePath} — ${msg}`,
+            fileName: filePath
+          })
+          continue
+        }
         remoteDeleted.push(filePath)
         // Remove from saved manifest and add tombstone so re-uploads get deleted again
         if (this.manifest) {
@@ -723,8 +851,24 @@ export class SyncEngine {
       this.consumeConfirmedDeletions(remoteManifest, remoteDeleted)
 
       // Handle remote deletes — move to .sync-trash/ instead of permanent deletion
+      const deferredLocalDeletes: string[] = []
       for (const filePath of diff.toDeleteLocal) {
         if (this.destroyed) break  // SAFETY
+        // Ersatz nicht angekommen → Datei bleibt liegen (s. nichtAngekommeneHashes).
+        // Der Eintrag bleibt im Manifest, also steht die Löschung beim nächsten Lauf
+        // wieder an — dann hoffentlich mit erfolgreichem Download.
+        const eigenerHash = currentManifest.files[filePath]?.hash
+        if (eigenerHash && nichtAngekommeneHashes.has(eigenerHash)) {
+          deferredLocalDeletes.push(filePath)
+          this.sendLog({
+            type: 'error',
+            message:
+              `Kept local file — its replacement did not arrive: ${filePath}. ` +
+              'The copy on the server could not be transferred; nothing was moved to trash.',
+            fileName: filePath
+          })
+          continue
+        }
         try {
           await moveToSyncTrash(this.vaultPath, filePath)
           delete currentManifest.files[filePath]
@@ -735,6 +879,23 @@ export class SyncEngine {
         } catch {
           // File might already be gone
         }
+      }
+
+      // Löschabsichten, die dieser Lauf NICHT eingelöst hat, müssen ins neue Manifest
+      // wandern. `buildManifest` kennt sie nicht (es liest nur die Platte), und gleich
+      // ersetzt currentManifest das bisherige Manifest vollständig — ohne diesen Übertrag
+      // verschwindet jede verbliebene Bestätigung. Folge: der nächste Lauf sieht dieselben
+      // Löschungen als UNbestätigte Massenlöschung und blockiert an der Löschbremse. Genau
+      // das sollte `confirmedDeletions` verhindern (v0.10.45).
+      // `consumeConfirmedDeletions` hat oben schon abgeräumt, was der Server quittiert hat;
+      // hier steht nur noch der Rest. `this.manifest` ist an dieser Stelle noch das alte.
+      const offeneLoeschabsichten = this.manifest?.confirmedDeletions
+      if (
+        offeneLoeschabsichten &&
+        (Object.keys(offeneLoeschabsichten.paths).length > 0 ||
+          Object.keys(offeneLoeschabsichten.prefixes).length > 0)
+      ) {
+        currentManifest.confirmedDeletions = offeneLoeschabsichten
       }
 
       // Merge tombstones from saved manifest into current
@@ -785,7 +946,12 @@ export class SyncEngine {
 
       const uploadedCount = diff.toUpload.length - uploadFailures.length
       const downloadedCount = diff.toDownload.length - downloadFailures.length
-      if (uploadFailures.length > 0 || downloadFailures.length > 0) {
+      if (
+        uploadFailures.length > 0 ||
+        downloadFailures.length > 0 ||
+        conflictFailures.length > 0 ||
+        deleteFailures.length > 0
+      ) {
         // Teilerfolg: erfolgreiche Übertragungen sind im Manifest markiert; die
         // fehlgeschlagenen haben weiter kein syncedAt und werden beim nächsten Auto-Sync
         // erneut versucht. Entscheidend: das Manifest wurde oben trotzdem gespeichert, der
@@ -797,6 +963,18 @@ export class SyncEngine {
         }
         if (downloadFailures.length > 0) {
           parts.push(`${downloadFailures.length} download(s) failed: ${downloadFailures[0]}${downloadFailures.length > 1 ? ', …' : ''}`)
+        }
+        if (conflictFailures.length > 0) {
+          parts.push(`${conflictFailures.length} conflict(s) unresolved: ${conflictFailures[0]}${conflictFailures.length > 1 ? ', …' : ''}`)
+        }
+        if (deleteFailures.length > 0) {
+          parts.push(`${deleteFailures.length} server delete(s) failed: ${deleteFailures[0]}${deleteFailures.length > 1 ? ', …' : ''}`)
+        }
+        if (deferredLocalDeletes.length > 0) {
+          parts.push(
+            `${deferredLocalDeletes.length} local file(s) kept because their replacement did not arrive: ` +
+            `${deferredLocalDeletes[0]}${deferredLocalDeletes.length > 1 ? ', …' : ''}`
+          )
         }
         const error = `${parts.join(' · ')} (will retry)`
         this.sendProgress({ status: 'error', error })
@@ -1124,13 +1302,19 @@ export class SyncEngine {
         // Local file might not exist
       }
 
+      // `downloadFile` WIRFT nicht bei jedem Fehlschlag: Server-Fehler, Timeout und die
+      // Integritätsprüfung (Größe/Hash) liefern `null`. Wer das als reguläres Ende
+      // behandelt, meldet einen gelösten Konflikt, der keiner ist — der Lauf gilt als
+      // erfolgreich, lastSyncTime rückt vor, und die Konfliktdatei ist trotzdem nicht
+      // aufgelöst. Deshalb hier explizit zum Fehler machen; der Aufrufer sammelt ihn.
       const downloaded = await this.downloadFile(relativePath)
-      if (downloaded) {
-        localManifest.files[relativePath] = {
-          ...downloaded,
-          syncedAt: Date.now(),
-          syncedHash: downloaded.hash
-        }
+      if (!downloaded) {
+        throw new Error('Could not fetch the server copy (transfer failed or integrity check failed)')
+      }
+      localManifest.files[relativePath] = {
+        ...downloaded,
+        syncedAt: Date.now(),
+        syncedHash: downloaded.hash
       }
     } else {
       // Local is newer — upload local, remote becomes the conflict copy on other devices
