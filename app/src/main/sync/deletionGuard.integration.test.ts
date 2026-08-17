@@ -226,6 +226,32 @@ describe('Löschbremse im echten sync()-Ablauf', () => {
     expect(relay.deleted.sort()).toEqual([...alt].sort())
   })
 
+  // Realer Fall vom 17.08.2026 in klein: der Ordner wurde lokal EINMAL verschoben, lag
+  // auf dem Server aber in ZWEI alten Kopien. Das Umbenennungs-Budget aus toUpload
+  // deckte nur eine Kopie — die zweite blieb "unerklärt" (207 Dateien) und der Voll-Sync
+  // stand zwei Tage. Jetzt entlastet der überlebende Inhalt beide Kopien.
+  it('lässt eine Verschiebung durch, obwohl der Server ZWEI alte Kopien hat', async () => {
+    const inhalt = (i: number): string => `# Notiz ${i}\n\nUnveränderter Inhalt.\n`
+    const kopieA = Array.from({ length: 30 }, (_, i) => `100 - Projekte/Fortbildung/notiz-${i}.md`)
+    const kopieB = Array.from({ length: 30 }, (_, i) => `200 - Bereich/Fortbildung/notiz-${i}.md`)
+    const neu = Array.from({ length: 30 }, (_, i) => `300 - Ressourcen/KI/Fortbildung/notiz-${i}.md`)
+    const nummer = (p: string): number => Number(p.match(/notiz-(\d+)/)![1])
+
+    for (let i = 0; i < 30; i++) {
+      relay.seed(kopieA[i], inhalt(i))
+      relay.seed(kopieB[i], inhalt(i))
+    }
+    await seedManifest([...kopieA, ...kopieB], p => inhalt(nummer(p)))
+    for (let i = 0; i < 30; i++) await writeNote(neu[i], inhalt(i))
+
+    const result = await runSync()
+
+    expect(result.success).toBe(true)
+    // Beide alten Kopien sind weg, der neue Ort liegt oben — kein Inhalt verloren.
+    expect(relay.paths()).toEqual([...neu].sort())
+    expect(relay.deleted.sort()).toEqual([...kopieA, ...kopieB].sort())
+  })
+
   it('lässt eine kleine, gewollte Löschung durch', async () => {
     const paths = Array.from({ length: 100 }, (_, i) => note(i))
     for (const p of paths) relay.seed(p, body(p))

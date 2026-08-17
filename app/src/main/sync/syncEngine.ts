@@ -514,32 +514,70 @@ export class SyncEngine {
         const localFileCount = Object.keys(currentManifest.files).length
         const remoteFileCount = Object.keys(remoteManifest.files).length
 
+        /**
+         * Inhalte, die auf einer Seite ÜBERLEBEN — also alles dort außer den Pfaden,
+         * die dieser Lauf gerade von genau dieser Seite entfernt. Liegt der Inhalt einer
+         * Löschung hier noch, verschwindet nur ein Pfad, kein Inhalt
+         * (s. assessDeletions → contentSurvives).
+         */
+        const survivingHashes = (
+          files: FileManifest['files'],
+          removedPaths: string[]
+        ): Set<string> => {
+          const removed = new Set(removedPaths)
+          const hashes = new Set<string>()
+          for (const [filePath, info] of Object.entries(files)) {
+            if (!removed.has(filePath) && info.hash) hashes.add(info.hash)
+          }
+          return hashes
+        }
+
         const blockDeletions = (
           assessment: ReturnType<typeof assessDeletions>,
           scope: 'local' | 'remote',
           total: number
         ): SyncResult => {
-          const { unmatched, renames, intentional, reason } = assessment
+          const { unmatched, renames, preserved, intentional, reason } = assessment
           const share = total > 0 ? Math.round((unmatched.length / total) * 100) : 0
+          const notCounted: string[] = []
+          if (renames.length > 0) notCounted.push(`${renames.length} rename(s)/move(s)`)
+          if (preserved.length > 0) {
+            notCounted.push(`${preserved.length} whose content still exists under another path`)
+          }
+          if (intentional.length > 0) notCounted.push(`${intentional.length} confirmed in-app deletion(s)`)
+          const notCountedNote = notCounted.length > 0 ? ` Not counted: ${notCounted.join(', ')}.` : ''
+          // Die Meldung muss sagen, was zu tun ist. Vorher stand nur da, was sie verweigert —
+          // ein Nutzer stand damit real drei Tage vor einem stehenden Sync, weil der
+          // Erzwingen-Knopf als einziger Ausweg nicht benannt war.
           const hint = scope === 'local'
-            ? 'This likely indicates a server/connection issue.'
-            : 'This likely indicates a stale local manifest or an incomplete vault copy.'
-          const renameNote = (renames.length > 0
-            ? ` (${renames.length} further path change(s) recognised as renames and not counted`
-            : intentional.length > 0 ? ' (' : '')
-            + (intentional.length > 0
-              ? `${renames.length > 0 ? '; ' : ''}${intentional.length} confirmed in-app deletion(s) not counted`
-              : '')
-            + (renames.length > 0 || intentional.length > 0 ? ')' : '')
+            ? 'Nothing was deleted locally. This usually points to a server or connection problem — ' +
+              'the remote side looked emptier than it is. Check the connection and sync again.'
+            : 'This usually points to a stale local manifest or an incomplete vault copy. ' +
+              'If you deleted these files on purpose, use Force Sync to let the deletion through.'
           const errorMsg =
             `SAFETY: Refusing to delete ${unmatched.length}/${total} ${scope} files (${share}%, ` +
-            `triggered by ${reason === 'absolute' ? 'absolute count' : 'share'})${renameNote}. ${hint} ` +
+            `triggered by ${reason === 'absolute' ? 'absolute count' : 'share'}).${notCountedNote} ${hint} ` +
             `First: ${unmatched.slice(0, 3).join(', ')}${unmatched.length > 3 ? ', …' : ''}`
           console.error('[SyncEngine]', errorMsg)
           this.sendLog({ type: 'error', message: errorMsg })
           this.status = 'error'
           this.sendProgress({ status: 'error', error: errorMsg })
           return { success: false, uploaded: 0, downloaded: 0, conflicts: 0, error: errorMsg }
+        }
+
+        /** Was die Bremse durchgelassen hat, gehört ins Protokoll — sonst ist eine
+         *  weggewinkte Löschung von einer nie erkannten nicht zu unterscheiden. */
+        const logWaved = (assessment: ReturnType<typeof assessDeletions>, scope: 'local' | 'remote'): void => {
+          const { renames, preserved, intentional } = assessment
+          if (renames.length + preserved.length + intentional.length === 0) return
+          const parts: string[] = []
+          if (renames.length > 0) parts.push(`${renames.length} rename(s)/move(s)`)
+          if (preserved.length > 0) parts.push(`${preserved.length} with content preserved elsewhere`)
+          if (intentional.length > 0) parts.push(`${intentional.length} confirmed in-app`)
+          this.sendLog({
+            type: 'sync',
+            message: `Deletion guard passed ${scope} deletions: ${parts.join(', ')}`
+          })
         }
 
         if (diff.toDeleteLocal.length > 0) {
@@ -550,13 +588,17 @@ export class SyncEngine {
             const h = remoteManifest.files[p]?.hash
             if (h) incoming.push(h)
           }
+          // Überlebende Seite ist hier der Server — minus dem, was dieser Lauf dort löscht.
+          const remoteSurvivors = survivingHashes(remoteManifest.files, diff.toDeleteRemote)
           const assessment = assessDeletions({
             deletions: diff.toDeleteLocal,
             totalFiles: localFileCount,
             hashOf: p => currentManifest.files[p]?.hash,
-            compensatingHashes: incoming
+            compensatingHashes: incoming,
+            contentSurvives: h => remoteSurvivors.has(h)
           })
           if (assessment.blocked) return blockDeletions(assessment, 'local', localFileCount)
+          logWaved(assessment, 'local')
         }
 
         if (diff.toDeleteRemote.length > 0) {
@@ -567,6 +609,8 @@ export class SyncEngine {
             const h = currentManifest.files[p]?.hash
             if (h) outgoing.push(h)
           }
+          // Überlebende Seite ist hier die Platte — minus dem, was dieser Lauf lokal löscht.
+          const localSurvivors = survivingHashes(currentManifest.files, diff.toDeleteLocal)
           const assessment = assessDeletions({
             // Nur hier: Server-Löschungen gehen auf eine Aktion DIESES Geräts zurück,
             // die der Nutzer bestätigt haben kann. Bei toDeleteLocal kommt die Ansage
@@ -575,9 +619,11 @@ export class SyncEngine {
             deletions: diff.toDeleteRemote,
             totalFiles: remoteFileCount,
             hashOf: p => remoteManifest.files[p]?.hash,
-            compensatingHashes: outgoing
+            compensatingHashes: outgoing,
+            contentSurvives: h => localSurvivors.has(h)
           })
           if (assessment.blocked) return blockDeletions(assessment, 'remote', remoteFileCount)
+          logWaved(assessment, 'remote')
         }
       }
 

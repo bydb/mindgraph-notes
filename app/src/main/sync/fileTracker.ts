@@ -345,6 +345,11 @@ export const DELETION_GUARD = {
 export interface DeletionAssessment {
   /** Löschungen, deren Inhalt im selben Lauf unter anderem Namen wandert = Umbenennung. */
   renames: string[]
+  /**
+   * Löschungen, deren Inhalt auf der überlebenden Seite schon unter einem anderen Pfad
+   * liegt — der Pfad verschwindet, der Inhalt nicht.
+   */
+  preserved: string[]
   /** Vom Nutzer im Dialog bestätigte Löschungen — kein Verdachtsfall. */
   intentional: string[]
   /** Alles andere — echter Verlust, wenn die Annahme falsch ist. */
@@ -393,8 +398,33 @@ export function assessDeletions(params: {
    * Löschungen aus dem Finder laufen weiterhin durch die Bremse.
    */
   isIntentional?: (path: string) => boolean
+  /**
+   * Liegt dieser Inhalt auf der überlebenden Seite noch unter einem ANDEREN Pfad?
+   * (Bei Server-Löschungen: irgendwo lokal. Bei lokalen Löschungen: irgendwo auf dem Server.)
+   *
+   * Bewusst ein Prädikat und KEIN Budget wie `compensatingHashes` — die beiden
+   * beantworten verschiedene Fragen. Das Budget fragt „wandert der Inhalt in diesem
+   * Lauf mit?"; ein Transfer ist eine Mengenbilanz, N eingehende Dateien können
+   * höchstens N Löschungen decken. Hier lautet die Frage „existiert der Inhalt danach
+   * überhaupt noch?" — das ist eine Eigenschaft des Inhalts, keine verbrauchbare
+   * Ressource. Eine überlebende Kopie macht beliebig viele Dubletten-Pfade löschbar,
+   * ohne dass Inhalt verloren geht.
+   *
+   * Realer Auslöser (17.08.2026): ein Ordner wurde lokal verschoben, lag auf dem Server
+   * aber in ZWEI alten Kopien. Das Budget aus `toUpload` deckte nur eine davon — die
+   * zweite blieb „unerklärt", 207 Stück, und die Bremse blockierte den Voll-Sync zwei
+   * Tage lang. Ausweg war nur der rote Erzwingen-Knopf. Von 396 Löschungen waren 388
+   * nachweisbar Verschiebungen: der Inhalt lag lokal Byte-für-Byte am neuen Ort.
+   *
+   * Preis, bewusst in Kauf genommen: ein Ordner mit N inhaltsgleichen Notizen (leere
+   * Notizen, identische Vorlagen) läuft durch, sobald eine Kopie woanders überlebt. Das
+   * kostet Pfade, keinen Inhalt — und beide Richtungen sind umkehrbar (lokal
+   * `.sync-trash`, auf dem Server 90 Tage Soft-Delete). Ein zwei Tage stehender Sync
+   * ist der teurere Fehler.
+   */
+  contentSurvives?: (hash: string) => boolean
 }): DeletionAssessment {
-  const { deletions, totalFiles, hashOf, isIntentional } = params
+  const { deletions, totalFiles, hashOf, isIntentional, contentSurvives } = params
 
   // Multiset: Hash → wie viele Löschungen dieser Hash noch decken kann.
   const budget = new Map<string, number>()
@@ -403,6 +433,7 @@ export function assessDeletions(params: {
   }
 
   const renames: string[] = []
+  const preserved: string[] = []
   const intentional: string[] = []
   const unmatched: string[] = []
 
@@ -412,6 +443,10 @@ export function assessDeletions(params: {
       continue
     }
     const hash = hashOf(filePath)
+    if (hash && contentSurvives?.(hash)) {
+      preserved.push(filePath)
+      continue
+    }
     const left = hash ? budget.get(hash) ?? 0 : 0
     if (hash && left > 0) {
       budget.set(hash, left - 1)
@@ -422,7 +457,7 @@ export function assessDeletions(params: {
   }
 
   if (unmatched.length >= DELETION_GUARD.ABSOLUTE) {
-    return { renames, intentional, unmatched, blocked: true, reason: 'absolute' }
+    return { renames, preserved, intentional, unmatched, blocked: true, reason: 'absolute' }
   }
 
   if (
@@ -430,10 +465,10 @@ export function assessDeletions(params: {
     unmatched.length >= DELETION_GUARD.MIN_FOR_RATIO &&
     unmatched.length / totalFiles > DELETION_GUARD.RATIO
   ) {
-    return { renames, intentional, unmatched, blocked: true, reason: 'ratio' }
+    return { renames, preserved, intentional, unmatched, blocked: true, reason: 'ratio' }
   }
 
-  return { renames, intentional, unmatched, blocked: false, reason: null }
+  return { renames, preserved, intentional, unmatched, blocked: false, reason: null }
 }
 
 /**
