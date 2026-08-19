@@ -17,6 +17,7 @@ import {
 } from '../shared/htmlPreview'
 import { exportPreviewPdf, exportPreviewEpub } from './htmlExport'
 import { initDisplayDiagnostics, getDisplayHealth } from './displayDiagnostics'
+import { parseLooseJsonObject } from '../shared/looseJson'
 import { bundledResourcesDir } from './bundledResources'
 import { trashPath, VAULT_TRASH_DIR, type TrashDestination } from './fileTrash'
 import { buildZettelContent, buildZettelFileName, extractFrontmatterTags, sanitizeZettelEmojis, sanitizeZettelTag } from '../shared/zettel'
@@ -10378,30 +10379,13 @@ function normalizeSuggestedActions(value: unknown): Array<{ action: string; date
 }
 
 // Toleranter JSON-Parser: entfernt <think>-Blöcke und Code-Fences, extrahiert das
-// erste {…}-Objekt aus umgebender Prosa und repariert Trailing-Commas. null wenn
-// nichts parsebar ist (Aufrufer entscheidet über Retry/Skip).
-function parseEmailAnalysisJson(raw: string): Record<string, unknown> | null {
-  if (!raw) return null
-  let s = raw.replace(/<think>[\s\S]*?<\/think>/g, '').trim()
-  s = s.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/i, '').trim()
-  const candidates: string[] = [s]
-  const start = s.indexOf('{')
-  const end = s.lastIndexOf('}')
-  if (start >= 0 && end > start) {
-    const block = s.slice(start, end + 1)
-    candidates.push(block)
-    candidates.push(block.replace(/,\s*([}\]])/g, '$1')) // Trailing-Commas entfernen
-  }
-  for (const c of candidates) {
-    try {
-      const parsed = JSON.parse(c)
-      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-        return parsed as Record<string, unknown>
-      }
-    } catch { /* nächsten Kandidaten versuchen */ }
-  }
-  return null
-}
+// erste brauchbare {…}-Objekt aus umgebender Prosa und repariert Trailing-Commas.
+// null wenn nichts parsebar ist (Aufrufer entscheidet über Retry/Skip).
+//
+// Die Logik liegt in shared/looseJson.ts, weil sie dort getestet werden kann —
+// unter anderem gegen die doppelte Modellantwort, an der die frühere Fassung
+// scheiterte (siehe Kopf jener Datei).
+const parseEmailAnalysisJson = parseLooseJsonObject
 
 ipcMain.handle('email-analyze', async (_event, vaultPath: string, model: string, emailIds?: string[], lowPowerMode: boolean = false, cloud?: { model: string; provider?: string } | null) => {
   console.log(`[Email] email-analyze called: vault=${vaultPath}, model=${model}, ids=${emailIds?.length ?? 'all'}, lowPower=${lowPowerMode}, cloud=${cloud?.model ? `${cloud.provider || 'openrouter'}/${cloud.model}` : 'no'}`)
