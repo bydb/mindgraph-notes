@@ -23,6 +23,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
     return () => ipcRenderer.removeListener('display-health-changed', handler)
   },
 
+  // Leistungsdaten der Modell-Läufe. `get` liest den Ringpuffer, `on…` bekommt
+  // jeden neuen Lauf gepusht (einmal pro Anfrage, nicht pro Token).
+  getLlmTelemetry: () => ipcRenderer.invoke('llm-telemetry-get'),
+  onLlmTelemetryRun: (callback: (run: unknown) => void) => {
+    const handler = (_e: unknown, run: unknown) => callback(run)
+    ipcRenderer.on('llm-telemetry-run', handler)
+    return () => ipcRenderer.removeListener('llm-telemetry-run', handler)
+  },
+
   openVault: () => ipcRenderer.invoke('open-vault'),
   selectFolderInVault: (vaultPath: string) => ipcRenderer.invoke('select-folder-in-vault', vaultPath),
   readDirectory: (dirPath: string) => ipcRenderer.invoke('read-directory', dirPath),

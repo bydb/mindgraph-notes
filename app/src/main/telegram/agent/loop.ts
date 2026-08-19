@@ -9,6 +9,7 @@
 import { chatWithTools, type ChatMessage, type ChatOptions, type ToolCall, type ChatBackend } from '../../llm/chatClient'
 import type { ToolRegistry, ToolContext } from './tools/registry'
 import { loadAgentMemory, formatAgentMemory } from './memory'
+import { findBalancedJsonObjects } from '../../../shared/looseJson'
 
 export interface AgentRunOptions {
   registry: ToolRegistry
@@ -77,6 +78,10 @@ function extractTextToolCalls(text: string, allowedTools: Set<string>): ToolCall
   if (firstBrace >= 0 && lastBrace > firstBrace) {
     candidates.push(stripMarkdownFence(text.slice(firstBrace, lastBrace + 1)))
   }
+  // Der Schnitt bis zur LETZTEN `}` fängt bei doppelter Modellausgabe beide
+  // Objekte ein und ergibt dann kein gültiges JSON mehr — real beobachtet, siehe
+  // shared/looseJson.ts. Die einzeln geschlossenen Objekte als Rückfallebene.
+  for (const obj of findBalancedJsonObjects(text)) candidates.push(obj)
 
   for (const candidate of candidates) {
     try {
@@ -127,7 +132,7 @@ export async function runAgent(
 
   while (iterations < opts.maxIterations) {
     iterations += 1
-    const result = await chatWithTools(messages, tools, opts.chatOptions)
+    const result = await chatWithTools(messages, tools, { ...opts.chatOptions, telemetryModule: 'telegram' })
     lastBackend = result.backend
     lastText = result.text
 

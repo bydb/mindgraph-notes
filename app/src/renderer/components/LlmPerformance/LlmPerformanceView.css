@@ -1,0 +1,127 @@
+/* Leistungsfenster. Bewusst ruhig gehalten: Die Zahlen sollen wirken, nicht die
+   Gestaltung. Keine Animationen — eine sich bewegende Messtabelle suggeriert eine
+   Live-Messung, die hier nicht stattfindet (aktualisiert wird pro Anfrage). */
+
+.llmperf {
+  padding: 32px 40px 48px;
+  max-width: 1000px;
+  margin: 0 auto;
+  overflow-y: auto;
+  height: 100%;
+}
+
+.llmperf-header h1 {
+  margin: 0 0 4px;
+  font-size: 22px;
+  font-weight: 600;
+}
+
+.llmperf-sub {
+  margin: 0 0 28px;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+/* Kennzahl des schnellsten Laufs — der eine Wert, den man beim Öffnen sucht. */
+.llmperf-headline {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 20px 24px;
+  margin-bottom: 24px;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--bg-secondary) 60%, transparent);
+}
+
+.llmperf-headline-value {
+  font-size: 40px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.llmperf-headline-unit { color: var(--text-secondary); font-size: 15px; }
+.llmperf-headline-model { margin-left: auto; font-size: 13px; }
+.llmperf-headline-module { color: var(--text-secondary); font-size: 12px; }
+
+/* Breite Tabellen scrollen in sich, nie die Seite. */
+.llmperf-tablewrap { overflow-x: auto; }
+
+.llmperf-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.llmperf-table th {
+  text-align: left;
+  font-weight: 500;
+  color: var(--text-secondary);
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border-color);
+  white-space: nowrap;
+}
+
+.llmperf-table td {
+  padding: 9px 12px;
+  border-bottom: 1px solid color-mix(in srgb, var(--border-color) 45%, transparent);
+}
+
+.llmperf-table .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.llmperf-strong { font-weight: 600; }
+.llmperf-model { font-family: var(--font-mono, monospace); font-size: 12px; }
+.llmperf-module { color: var(--text-secondary); font-size: 12px; }
+
+.llmperf-caveat {
+  color: var(--color-warning, #d08540);
+  margin-left: 2px;
+  cursor: help;
+}
+
+.llmperf-actions { display: flex; gap: 10px; margin-top: 20px; }
+
+.llmperf-actions button {
+  padding: 7px 14px;
+  font-size: 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 7px;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.llmperf-actions button:hover { background: var(--bg-hover); }
+
+.llmperf-empty {
+  padding: 48px 0;
+  text-align: center;
+  color: var(--text-secondary);
+}
+
+.llmperf-empty-hint { font-size: 12px; opacity: 0.75; }
+
+.llmperf-notes {
+  margin-top: 36px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border-color);
+}
+
+.llmperf-notes h2 {
+  margin: 0 0 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.llmperf-notes ul {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.75;
+}

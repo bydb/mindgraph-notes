@@ -3,12 +3,15 @@
 // Default). Klick öffnet Settings → Integrationen, damit der User direkt
 // das Modell ändern kann.
 
+import { useMemo } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { getModelVerdict, isHumanFavorite, isMlxModel, type ModuleId } from '../../../shared/modelCompatibility'
 import { useUIStore } from '../../stores/uiStore'
 import { VERDICT_COLOR } from '../Settings/ModelCompatibilitySection'
 import { ModelLogo } from './ModelLogo'
 import { ModelMarkers } from './ModelMarkers'
+import { useLlmTelemetryStore } from '../../stores/llmTelemetryStore'
+import { formatTps, summarize } from '../../../shared/llmTelemetry'
 
 interface Props {
   moduleId: ModuleId
@@ -46,6 +49,20 @@ export function ActiveModelBadge({ moduleId, tabOverride, tabOverrideLabel }: Pr
       ? 'Modul-Override (Einstellungen → Integrationen)'
       : 'Globales Standardmodell'
 
+  // Gemessene Geschwindigkeit dieses Modells, sofern es in dieser Sitzung schon
+  // gelaufen ist. Median über die WARMEN Läufe — ein Kaltstart misst das Laden der
+  // Gewichte, nicht das Modell, und würde die Zahl um Faktor 2 verziehen.
+  //
+  // Der Selektor liefert bewusst das ROHE runs-Array (stabile Referenz) und
+  // rechnet erst im Render. Ein Selektor, der die Zusammenfassung selbst baut,
+  // gäbe bei jedem Aufruf ein neues Objekt zurück — die dokumentierte
+  // „Maximum update depth"-Falle.
+  const runs = useLlmTelemetryStore(s => s.runs)
+  const speed = useMemo(
+    () => summarize(runs.filter(r => r.model === effectiveModel)),
+    [runs, effectiveModel]
+  )
+
   const favorite = isHumanFavorite(effectiveModel)
   const mlx = isMlxModel(effectiveModel)
   const tooltip = [
@@ -54,6 +71,12 @@ export function ActiveModelBadge({ moduleId, tabOverride, tabOverrideLabel }: Pr
     mlx ? '🍎 Apple-Silicon-optimiert (MLX)' : null,
     favorite ? '⭐ Entwickler-Favorit (Real-Use-Erfahrung)' : null,
     verdict.reasons.length ? `Hinweise: ${verdict.reasons.join(' · ')}` : null,
+    speed.outputTps !== null
+      ? `Gemessen: ${formatTps(speed.outputTps)} Tok/s${speed.promptTps !== null ? `, Prompt ${formatTps(speed.promptTps)} Tok/s` : ''} (Median aus ${speed.runs - speed.coldRuns} warmen Läufen)`
+      : null,
+    speed.hiddenThinkingRuns > 0
+      ? 'Bei Reasoning-Läufen meldet Ollama die Denk-Token nicht mit — der Wert ist dann zu niedrig'
+      : null,
     'Klick öffnet Einstellungen → Integrationen'
   ]
     .filter(Boolean)

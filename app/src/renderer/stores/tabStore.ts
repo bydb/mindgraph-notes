@@ -10,6 +10,7 @@ export type TabType =
   | 'workflow-canvas'
   | 'agent'
   | 'plugin-editor'
+  | 'llm-performance'
 
 export interface Tab {
   id: string
@@ -45,6 +46,7 @@ interface TabState {
   /** Agent-Tab (Notiz-Agent ohne offene Notiz). Liefert die Tab-ID — sie ist zugleich
    *  der Bereich im noteAgentStore, an den Aufrufer Anhänge hängen können. */
   openAgentTab: () => string
+  openLlmPerformanceTab: () => void
   openCodeTab: (relativePath: string, title: string) => void
   openPluginEditorTab: (pluginId: string, filePath: string, editorId: string, title: string) => void
   closeTab: (tabId: string) => void
@@ -211,6 +213,19 @@ export const useTabStore = create<TabState>()((set, get) => ({
     const newTab: Tab = { id: generateTabId(), type: 'agent', noteId: '', title: 'Agent' }
     set({ tabs: [...state.tabs, newTab], activeTabId: newTab.id })
     return newTab.id
+  },
+
+  // Genau EIN Leistungs-Tab: Er zeigt denselben Ringpuffer, ein zweiter wäre eine
+  // Kopie derselben Ansicht.
+  openLlmPerformanceTab: () => {
+    const state = get()
+    const existing = state.tabs.find(t => t.type === 'llm-performance')
+    if (existing) {
+      set({ activeTabId: existing.id })
+      return
+    }
+    const newTab: Tab = { id: generateTabId(), type: 'llm-performance', noteId: '', title: 'Modell-Leistung' }
+    set({ tabs: [...state.tabs, newTab], activeTabId: newTab.id })
   },
 
   openCodeTab: (relativePath, title) => {

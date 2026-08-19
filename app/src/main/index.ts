@@ -147,6 +147,9 @@ import { matchEmailToProjects, gateProjectMatch } from '../shared/projectMatch'
 import { parseRelevanceConfig, stripConfigBlock, buildReplyStats, computeHardSignals, combineRelevance, extractConfigBlock, upsertConfigBlock, emptyRelevanceConfig, isSentMail, isSentFolderName, DEFAULT_VIP_WEIGHT, DEFAULT_DOMAIN_WEIGHT, DEFAULT_KEYWORD_BOOST } from '../shared/emailRelevance'
 import { isHardLocked as isModelHardLocked, isCloudModel as isModelIsCloud } from '../shared/modelCompatibility'
 import { listCloudModels, chat as llmChat, streamCloudChat, type ChatOptions as LlmChatOptions, type CloudChatBackend } from './llm/chatClient'
+import { recordLlmRun, getLlmRuns } from './llm/telemetry'
+import { fromOllamaResponse, type OllamaTimings } from '../shared/llmTelemetry'
+import { parseLooseJsonObject } from '../shared/looseJson'
 import { registerWorkflowActions, unregisterWorkflowActions, workflowModuleGate } from '../shared/workflow/registry'
 import type { Workflow, WorkflowFile, WorkflowRunTrigger } from '../shared/workflow/model'
 import type {
@@ -1465,6 +1468,10 @@ ipcMain.handle('clipboard-read-text', () => {
 
 // Display-/GPU-Zustand für die Diagnose-Anzeige in den Einstellungen.
 ipcMain.handle('get-display-health', () => getDisplayHealth())
+
+// Leistungsdaten der Modell-Läufe (Token/s, Kaltstart, Zeit bis erstes Token).
+// Nur Lesen aus dem Arbeitsspeicher — kein Dateizugriff, keine Modellanfrage.
+ipcMain.handle('llm-telemetry-get', () => getLlmRuns())
 
 // Letzten Vault-Pfad laden
 // Aktueller Vault-Pfad im Main-Prozess (für Telegram-Bot etc.)
@@ -5433,6 +5440,7 @@ Stelle EINE Prüf-Frage zum Text — oder reagiere als Prüfer auf die letzte An
     const controller = new AbortController()
     const timeout = setTimeout(() => controller.abort(), 300000) // 5 min timeout
 
+    const streamStartedAt = Date.now()
     const response = await fetch(`${OLLAMA_API_URL}/api/chat`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -5457,6 +5465,11 @@ Stelle EINE Prüf-Frage zum Text — oder reagiere als Prüfer auf die letzte An
     const decoder = new TextDecoder()
     let fullResponse = ''
     let buffer = ''
+    // Leistungsmessung: Ollama legt die Kennzahlen in den ABSCHLIESSENDEN Chunk
+    // (done: true). Die Zeit bis zum ersten Token stoppen wir selbst — der Server
+    // meldet sie nicht, und sie ist die Zahl, die sich für den Nutzer nach
+    // „reagiert schnell" anfühlt.
+    let firstTokenMs: number | undefined
 
     while (true) {
       const { done, value } = await reader.read()
@@ -5476,11 +5489,20 @@ Stelle EINE Prüf-Frage zum Text — oder reagiere als Prüfer auf die letzte An
         try {
           const json = JSON.parse(trimmedLine)
           if (json.message?.content) {
+            if (firstTokenMs === undefined) firstTokenMs = Date.now() - streamStartedAt
             fullResponse += json.message.content
             // Sende Chunk an Renderer
             event.sender.send(chunkChannel, json.message.content)
           }
           if (json.done) {
+            recordLlmRun(fromOllamaResponse(json, {
+              module: chatMode === 'email' ? 'mail-summary' : 'chat',
+              model,
+              wallMs: Date.now() - streamStartedAt,
+              at: streamStartedAt,
+              firstTokenMs,
+              hiddenThinking: !!json.message?.thinking,
+            }))
             event.sender.send(doneChannel)
           }
         } catch {
@@ -10378,30 +10400,13 @@ function normalizeSuggestedActions(value: unknown): Array<{ action: string; date
 }
 
 // Toleranter JSON-Parser: entfernt <think>-Blöcke und Code-Fences, extrahiert das
-// erste {…}-Objekt aus umgebender Prosa und repariert Trailing-Commas. null wenn
-// nichts parsebar ist (Aufrufer entscheidet über Retry/Skip).
-function parseEmailAnalysisJson(raw: string): Record<string, unknown> | null {
-  if (!raw) return null
-  let s = raw.replace(/<think>[\s\S]*?<\/think>/g, '').trim()
-  s = s.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/i, '').trim()
-  const candidates: string[] = [s]
-  const start = s.indexOf('{')
-  const end = s.lastIndexOf('}')
-  if (start >= 0 && end > start) {
-    const block = s.slice(start, end + 1)
-    candidates.push(block)
-    candidates.push(block.replace(/,\s*([}\]])/g, '$1')) // Trailing-Commas entfernen
-  }
-  for (const c of candidates) {
-    try {
-      const parsed = JSON.parse(c)
-      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-        return parsed as Record<string, unknown>
-      }
-    } catch { /* nächsten Kandidaten versuchen */ }
-  }
-  return null
-}
+// erste brauchbare {…}-Objekt aus umgebender Prosa und repariert Trailing-Commas.
+// null wenn nichts parsebar ist (Aufrufer entscheidet über Retry/Skip).
+//
+// Die Logik liegt in shared/looseJson.ts, weil sie dort getestet werden kann —
+// unter anderem gegen die doppelte Modellantwort, an der die frühere Fassung
+// scheiterte (siehe Kopf jener Datei).
+const parseEmailAnalysisJson = parseLooseJsonObject
 
 ipcMain.handle('email-analyze', async (_event, vaultPath: string, model: string, emailIds?: string[], lowPowerMode: boolean = false, cloud?: { model: string; provider?: string } | null) => {
   console.log(`[Email] email-analyze called: vault=${vaultPath}, model=${model}, ids=${emailIds?.length ?? 'all'}, lowPower=${lowPowerMode}, cloud=${cloud?.model ? `${cloud.provider || 'openrouter'}/${cloud.model}` : 'no'}`)
@@ -10606,6 +10611,7 @@ AUSGABEFORMAT (NUR Schema — die <Platzhalter> NICHT abschreiben, sondern aus d
           }
           const controller = new AbortController()
           const timeout = setTimeout(() => controller.abort(), 5 * 60 * 1000) // 5 Minuten Timeout
+          const analysisStartedAt = Date.now()
           try {
             const response = await fetch(`${OLLAMA_API_URL}/api/chat`, {
               method: 'POST',
@@ -10641,7 +10647,14 @@ AUSGABEFORMAT (NUR Schema — die <Platzhalter> NICHT abschreiben, sondern aus d
               return null
             }
             // Fallback auf `thinking`, falls `think:false` ignoriert wurde.
-            const result = await response.json() as { message?: { content?: string; thinking?: string } }
+            const result = await response.json() as { message?: { content?: string; thinking?: string } } & OllamaTimings
+            recordLlmRun(fromOllamaResponse(result, {
+              module: 'mail-summary',
+              model,
+              wallMs: Date.now() - analysisStartedAt,
+              at: analysisStartedAt,
+              hiddenThinking: !!result.message?.thinking,
+            }))
             return parseEmailAnalysisJson(result.message?.content || result.message?.thinking || '')
           } finally {
             clearTimeout(timeout)

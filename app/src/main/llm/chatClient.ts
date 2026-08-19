@@ -16,6 +16,9 @@
 // (isCloudProviderReady / canUseCloudForFeature) und den Email-Picker (analysisModel).
 // Das Brain-Modul nutzt diesen Client NICHT — es ist hardcoded localhost.
 
+import { fromOllamaResponse, type OllamaTimings } from '../../shared/llmTelemetry'
+import { recordLlmRun } from './telemetry'
+
 export type ChatBackend = 'ollama' | 'lmstudio' | 'openrouter' | 'llmbase'
 // Die OpenAI-kompatiblen CLOUD-Backends. LM Studio spricht dasselbe Protokoll,
 // gehört hier aber bewusst NICHT dazu — an diesem Typ hängen die Privacy-Gates.
@@ -78,6 +81,9 @@ export interface ChatOptions {
   // qwen3.5:4b und qwen3.6:latest — prompt_eval_count fiel von 106 auf 59).
   // Deshalb setzt der Notiz-Agent den Wert explizit, statt zu hoffen.
   numCtx?: number
+  // Für welches Modul dieser Lauf zählt (Leistungsanzeige). Rein beschreibend —
+  // beeinflusst weder Modellwahl noch Hard-Lock. Ohne Angabe läuft er unter 'chat'.
+  telemetryModule?: string
 }
 
 export interface ChatResult {
@@ -304,6 +310,7 @@ async function chatViaOllama(messages: ChatMessage[], opts: ChatOptions): Promis
   const model = await pickDefaultOllamaModel(url, opts.ollamaModel)
   if (!model) throw new Error('Kein Ollama-Modell verfügbar')
 
+  const startedAt = Date.now()
   const res = await chatFetch(`${url}/api/chat`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -321,7 +328,16 @@ async function chatViaOllama(messages: ChatMessage[], opts: ChatOptions): Promis
     }
     throw new Error(`Ollama API ${res.status}: ${body}`)
   }
-  const json = await res.json() as { message?: { content?: string } }
+  const json = await res.json() as { message?: { content?: string; thinking?: string } } & OllamaTimings
+  recordLlmRun(fromOllamaResponse(json, {
+    module: opts.telemetryModule ?? 'chat',
+    model,
+    wallMs: Date.now() - startedAt,
+    at: startedAt,
+    // Über /api/chat zählt Ollama den Denk-Anteil nicht in eval_count mit — ohne
+    // diese Markierung sähe ein Reasoning-Lauf dreimal langsamer aus, als er ist.
+    hiddenThinking: !!json.message?.thinking,
+  }))
   return { text: json.message?.content ?? '', backend: 'ollama' }
 }
 
@@ -538,6 +554,7 @@ async function chatWithToolsViaOllama(
     }
   }))
 
+  const startedAt = Date.now()
   const res = await chatFetch(`${url}/api/chat`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -563,7 +580,14 @@ async function chatWithToolsViaOllama(
       tool_calls?: OllamaToolCallWire[]
     }
     prompt_eval_count?: number
-  }
+  } & OllamaTimings
+
+  recordLlmRun(fromOllamaResponse(json, {
+    module: opts.telemetryModule ?? 'chat',
+    model,
+    wallMs: Date.now() - startedAt,
+    at: startedAt,
+  }))
 
   const rawCalls = json.message?.tool_calls ?? []
   const toolCalls: ToolCall[] = rawCalls

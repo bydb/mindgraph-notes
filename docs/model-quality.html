@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Modell-Kompatibilität &amp; Qualitätssicherung | MindGraph Notes</title>
-<meta name="description" content="Welche lokalen KI-Modelle MindGraph Notes pro Modul empfiehlt, einschränkt oder sperrt — mit Messwerten, Methodik und Grenzen. Generiert aus der produktiven Kompatibilitäts-Matrix, Datenstand 2026-08-15.">
+<meta name="description" content="Welche lokalen KI-Modelle MindGraph Notes pro Modul empfiehlt, einschränkt oder sperrt — mit Messwerten, Methodik und Grenzen. Generiert aus der produktiven Kompatibilitäts-Matrix, Datenstand 2026-08-19.">
 <link rel="icon" href="favicon-32x32.png">
 <style>
   :root { --accent:#0f766e; --accent-light:#f0fdfa; --text:#1f2937; --text-mid:#4b5563; --text-muted:#9ca3af; --border:#e5e7eb; --card:#fff; --bg:#fafaf9; --radius:14px; }
@@ -47,7 +47,7 @@
   <nav class="top"><a href="index.html">← MindGraph Notes</a></nav>
   <h1>Modell-Kompatibilität, transparent.</h1>
   <p class="lead">MindGraph Notes läuft mit lokalen KI-Modellen — und nicht jedes Modell ist für jede Aufgabe gut genug. Diese Seite zeigt ungeschönt, welche Modelle wir pro Modul empfehlen, mit Einschränkungen zulassen oder sperren. Sie wird direkt aus derselben Kompatibilitäts-Matrix generiert, die auch in der App die Empfehlungen und Sperren steuert — was du hier liest, ist exakt das, was die Software tut.</p>
-  <span class="stamp">Datenstand: 2026-08-15 · automatisch generiert aus der produktiven Matrix</span>
+  <span class="stamp">Datenstand: 2026-08-19 · automatisch generiert aus der produktiven Matrix</span>
 
   <div class="box">
     <h2>Methodik</h2>
@@ -250,6 +250,16 @@
 <div class="model yellow">
           <div class="model-head">
             <span class="verdict" title="mit Einschränkungen">⚠️</span>
+            <code>qwen3.6:35b-a3b-nvfp4</code>
+            
+            <span class="verdict-label">mit Einschränkungen</span>
+          </div>
+          <div class="chips"><span class="chip">Score 100 %</span><span class="chip">Richtung 100 %</span><span class="chip">~3 s/Lauf</span><span class="chip">~22 GB RAM</span></div>
+          <details><summary>Details</summary><ul><li>needsReply nur 50 % — Muenzwurf, und Fehler in BEIDE Richtungen (nicht per Schwelle korrigierbar)</li><li>Stuft direkte Bitten mit Frist als "keine Antwort noetig" ein — betrifft das Widget "Zu beantworten"</li></ul><p>Bench 2026-08-19 (3 Reps, 10 Faelle, num_ctx 32768): Die reine Extraktion ist tadellos — JSON 100 %, Task-Recall 100 %, Deadlines 100 %, Termindaten 100 %, for_whom 100 %, Task-Precision 80 % (wie qwen3.6:latest). Kaputt ist ausschliesslich needsReply: 50 %, reproduzierbar exakt dieselben fuenf Faelle in allen drei Wiederholungen. Dieselben Faelle treffen qwen3.6:latest (80 %) und qwen3.6:27b-mlx (90 %) deutlich besser. Der Unterschied zu qwen3.6:latest ist NUR die Quantisierung (nvfp4 statt Q4_K_M) bei gleicher Architektur und Parameterzahl. Dafuer mit 48 Token/s das schnellste getestete Modell (qwen3.6:latest 35, qwen3.6:27b-mlx 10,5), 22 GB bei num_ctx 32768, vollstaendig auf der GPU. Wer das Tempo will und ohne verlaessliche Antwort-Erkennung leben kann, kann es bewusst waehlen — deshalb yellow und kein Hard-Lock.</p></details>
+        </div>
+<div class="model yellow">
+          <div class="model-head">
+            <span class="verdict" title="mit Einschränkungen">⚠️</span>
             <code>llama3.1:8b</code>
             
             <span class="verdict-label">mit Einschränkungen</span>
@@ -330,6 +340,16 @@
           </div>
           <div class="chips"><span class="chip">Score 100 %</span><span class="chip">~11 s/Lauf</span><span class="chip">~24 GB RAM</span></div>
           <details><summary>Details</summary><p>Nach Prompt-Fix 2026-07-27: 100 % avg — perfekter Lauf (Relevance 8/8, Sentiment 8/8, needsReply 8/8), gleichauf mit qwen3.6:27b-mlx. ~11 s/Mail, ~24 GB RAM.</p></details>
+        </div>
+<div class="model green">
+          <div class="model-head">
+            <span class="verdict" title="geeignet">✅</span>
+            <code>qwen3.6:35b-a3b-nvfp4</code>
+            
+            <span class="verdict-label">geeignet</span>
+          </div>
+          <div class="chips"><span class="chip">~5 s/Lauf</span><span class="chip">~22 GB RAM</span></div>
+          <details><summary>Details</summary><p>Bench 2026-08-19 (3 Reps, 8 Faelle, num_ctx 32768): 97-98 % Punkte, JSON/Sentiment/Relevanz/needsReply je 100 %. Mit 58 Token/s das schnellste getestete Modell (qwen3.6:latest 44, qwen3.6:27b-mlx 13,5), 22 GB bei num_ctx 32768. ACHTUNG: Dasselbe Modell faellt bei task-extraction auf 50 % needsReply — dieselbe Faehigkeit, anderer Prompt. Die Mail-Analyse der App laeuft ueber die task-extraction-Kette, dort gilt das yellow.</p></details>
         </div>
 <div class="model green">
           <div class="model-head">
