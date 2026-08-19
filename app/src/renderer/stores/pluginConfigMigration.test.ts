@@ -34,6 +34,22 @@ describe('migrateLegacyPluginConfig — A-pre Schritt 3', () => {
     expect(pc.edoobox?.apiVersion).toBe('v1')
   })
 
+  // Regression: der v1-Default galt früher für JEDE edoobox-Config. Der Modul-Schalter legt aber
+  // nur `{ enabled: true }` an — die bekam damit still v1 gespeichert und überstimmte den Default
+  // v2 dauerhaft. Folge: 401 beim Verbindungstest trotz gültiger Zugangsdaten.
+  it('nagelt frisch aktivierte Module NICHT auf v1 (Default v2 muss greifen)', () => {
+    const pc = migrateLegacyPluginConfig({}, { edoobox: { enabled: true } })
+    expect(pc.edoobox?.apiVersion).toBeUndefined()
+  })
+
+  it('lässt eine bereits gespeicherte apiVersion unangetastet', () => {
+    const pc = migrateLegacyPluginConfig(
+      { edoobox: { enabled: true, apiVersion: 'v2', baseUrl: 'https://app1.edoobox.com' } },
+      {}
+    )
+    expect(pc.edoobox?.apiVersion).toBe('v2')
+  })
+
   it('ist ein No-op ohne Legacy-Keys', () => {
     expect(migrateLegacyPluginConfig({}, {})).toEqual({})
   })

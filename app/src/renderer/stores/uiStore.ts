@@ -423,20 +423,30 @@ export function migrateLegacyPluginConfig(
   currentPluginConfig: Record<string, Record<string, unknown>>
 ): Record<string, Record<string, unknown>> {
   const pc: Record<string, Record<string, unknown>> = { ...currentPluginConfig }
+  const migratedFromLegacy = new Set<string>()
   for (const id of LEGACY_PLUGIN_CONFIG_IDS) {
     const legacy = saved[id]
     if (legacy && typeof legacy === 'object' && !pc[id]) {
       pc[id] = { ...(legacy as Record<string, unknown>) }
+      migratedFromLegacy.add(id)
     }
   }
   // edoobox-baseUrl-Normalisierung (vormals eigener Block): /v1|/v2-Suffix strippen, falsche
-  // app2-Migration zurückdrehen, fehlende apiVersion auf v1.
+  // app2-Migration zurückdrehen.
   const edo = pc.edoobox as Partial<EdooboxSettings> | undefined
   if (edo) {
     if (typeof edo.baseUrl === 'string') {
       edo.baseUrl = edo.baseUrl.replace(/\/v[12]$/i, '').replace('app2.edoobox.com', 'app1.edoobox.com')
     }
-    if (!edo.apiVersion) edo.apiVersion = 'v1'
+    // apiVersion nur für ALTBESTÄNDE auf v1 nageln — also für Configs, die gerade aus dem alten
+    // Top-Level-Key übernommen wurden. Die stammen aus der Zeit vor der V2-Anbindung und würden
+    // sonst still auf eine andere API umgestellt.
+    //
+    // Frisch aktivierte Module bekamen hier früher ebenfalls v1 verpasst: der Modul-Schalter legt
+    // `{ enabled: true }` an, `apiVersion` fehlt — und der gespeicherte v1-Wert überstimmt danach
+    // dauerhaft den Default v2 aus EDOOBOX_DEFAULTS. Ergebnis: 401 beim Verbindungstest, obwohl
+    // die Zugangsdaten stimmen (real aufgetreten 08/2026). Ohne Zuweisung greift der Default.
+    if (migratedFromLegacy.has('edoobox') && !edo.apiVersion) edo.apiVersion = 'v1'
   }
   return pc
 }
