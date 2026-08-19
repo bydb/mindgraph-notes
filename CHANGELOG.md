@@ -2,6 +2,30 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.10.50-beta] - 2026-08-19
+
+Eine Mail, auf die das Modell doppelt antwortet, fällt nicht mehr aus der Auswertung. Dazu eine Anzeige, wie schnell die lokalen Modelle tatsächlich arbeiten.
+
+### Behoben
+
+- **Manche Mails wurden stillschweigend nicht ausgewertet.** Sprachmodelle geben ihre Antwort gelegentlich zweimal aus, getrennt durch ein übrig gebliebenes Steuerzeichen. Die App suchte in der Antwort vom ersten bis zum letzten Klammerzeichen und fing damit beide Ausgaben ein — zwei Antworten hintereinander sind zusammen aber keine gültige Antwort mehr. Ergebnis: Die Mail blieb ohne Auswertung, ohne Fehlermeldung, ohne Hinweis. Sie tauchte einfach nicht in den Ergebnissen auf. Die App nimmt jetzt zusätzlich den ersten in sich geschlossenen Block; das Zählen der Klammern kennt dabei Textwerte, eine Klammer mitten in einem Satz beendet also nichts. Aufgefallen ist der Fehler beim Vermessen von Modellen, nicht im Betrieb — genau das war das Beunruhigende daran. Dieselbe Schwachstelle im Telegram-Assistenten wurde mitbehoben.
+
+### Neu
+
+- **Tempo-Anzeige in der Statusleiste.** Unten steht jetzt, wie viele Wörter pro Sekunde das Modell gerade geschrieben hat, dazu das Modul, für das es gearbeitet hat. Beim Draufzeigen erscheinen Einzelheiten: Schreib- und Lesetempo getrennt, Zeit bis zum ersten Wort, der Mittelwert dieses Modells über alle bisherigen Läufe. Diese Zahlen liefert der lokale Modellserver ohnehin bei jeder Antwort mit — es wird nichts zusätzlich gemessen, nichts gespeichert und nichts verschickt.
+- **Fenster für Modellvergleiche.** Ein Klick auf die Tempo-Anzeige öffnet eine Übersicht mit einer Zeile je Modell und Aufgabenbereich: Schreibtempo, Lesetempo, Zeit bis zum ersten Wort, Anzahl der Läufe und der Kaltstarts. Die Tabelle lässt sich als Markdown oder als Tabellenkalkulations-Datei in die Zwischenablage legen.
+
+  Drei Dinge macht diese Ansicht bewusst anders als übliche Tempo-Anzeigen. Sie trennt nach Modell **und** Aufgabenbereich, weil dasselbe Modell beim Zusammenfassen einer Mail lange Fließtexte schreibt und beim Erkennen von Aufgaben kurze strukturierte Daten — ein gemeinsamer Wert würde keine der beiden Aufgaben beschreiben. Sie rechnet mit dem Mittelwert der mittleren Messung statt mit dem Durchschnitt, damit ein einzelner Ausreißer die Zahl nicht kippt. Und sie zählt Kaltstarts getrennt: Muss ein Modell erst geladen werden, dauert das bei den großen zweistellige Sekunden, aber das misst die Ladezeit und nicht das Modell.
+
+### Verbessert
+
+- **Der Beipackzettel warnt jetzt vor einer schnellen, aber unzuverlässigen Modell-Variante.** Von einem verbreiteten Modell gibt es eine platzsparende Fassung, die auf demselben Rechner rund viermal schneller arbeitet als die große. Beim Nachmessen zeigte sich: Aufgaben, Fristen und Termine erkennt sie fehlerfrei, aber ob eine Mail überhaupt eine Antwort verlangt, trifft sie nur noch in der Hälfte der Fälle — Raten wäre gleich gut gewesen, und sie irrt in beide Richtungen. Betroffen sind ausgerechnet die eindeutigen Fälle: eine direkte Bitte mit Frist stufte sie als „keine Antwort nötig" ein. Da davon das Widget „Zu beantworten" lebt, verschwinden dort lautlos genau die Mails, die eine Handlung verlangen. Die Modell-Übersicht in den Einstellungen weist die Fassung jetzt mit Vorbehalt aus, statt sie als ungeprüft zu führen. Gesperrt wird sie nicht: Wer das Tempo braucht und ohne verlässliche Antwort-Erkennung auskommt, soll sie bewusst wählen können.
+
+### Unter der Haube
+
+- Die Messwerte, die der lokale Modellserver mitliefert, werden an vier Stellen ausgewertet statt bisher an einer: im gemeinsamen Chat-Zugang, beim laufenden Schreiben einer Antwort, bei der Mail-Auswertung und beim Tagesrückblick. Der Rest der Module meldet noch nichts.
+- Der Test-Werkzeugkasten außerhalb des Programms kann jetzt Modell-Einstellungen wie Temperatur und Nachdenken durchmessen. Ergebnis für die Aufgabenerkennung: Die bisherigen Voreinstellungen sind bereits die besten, und eingeschaltetes Nachdenken macht das Ergebnis messbar schlechter statt besser — es erfindet dann zusätzliche Aufgaben.
+
 ## [0.10.49-beta] - 2026-08-19
 
 Auf der ausgedruckten Anwesenheitsliste stehen nur noch die Personen, die wirklich einen Platz haben.
