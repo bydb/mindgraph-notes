@@ -21948,7 +21948,17 @@ body.presentation-mode *::after {
   align-items: baseline;
   gap: 4px;
   font-variant-numeric: tabular-nums;
+  /* Button-Reset: Die Anzeige öffnet per Klick die Modell-Leistung, soll in der
+     Statusleiste aber wie die anderen Einträge aussehen. */
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
 }
+
+.status-llm-speed:hover { text-decoration: underline; }
 
 .status-llm-speed-caveat {
   color: var(--color-warning, #d08540);

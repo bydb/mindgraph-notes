@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import {
   fromOllamaResponse, outputTokensPerSecond, promptTokensPerSecond,
-  isColdStart, summarize, median, nsToMs, formatTps, type LlmRunMetrics
+  isColdStart, summarize, median, nsToMs, formatTps,
+  buildComparisonRows, toMarkdownTable, toCsv, type LlmRunMetrics
 } from './llmTelemetry'
 
 function run(partial: Partial<LlmRunMetrics>): LlmRunMetrics {
@@ -100,5 +101,61 @@ describe('formatTps', () => {
     expect(formatTps(4.27)).toBe('4.3')
     expect(formatTps(18.6)).toBe('19')
     expect(formatTps(null)).toBe('—')
+  })
+})
+
+describe('buildComparisonRows', () => {
+  const runs: LlmRunMetrics[] = [
+    run({ model: 'a', module: 'chat', outputTokens: 100, evalMs: 10_000 }),   // 10 Tok/s
+    run({ model: 'a', module: 'brain', outputTokens: 400, evalMs: 10_000 }),  // 40 Tok/s
+    run({ model: 'b', module: 'chat', outputTokens: 200, evalMs: 10_000 }),   // 20 Tok/s
+  ]
+
+  it('trennt nach Modell UND Modul', () => {
+    const rows = buildComparisonRows(runs)
+    expect(rows).toHaveLength(3)
+    expect(rows.map(r => `${r.model}/${r.module}`)).toEqual(['a/brain', 'b/chat', 'a/chat'])
+  })
+
+  it('sortiert die schnellste Zeile nach oben', () => {
+    expect(buildComparisonRows(runs)[0].summary.outputTps).toBeCloseTo(40)
+  })
+
+  it('stellt Zeilen ohne messbaren Durchsatz hinten an, statt sie als 0 einzureihen', () => {
+    const rows = buildComparisonRows([...runs, run({ model: 'c', module: 'chat' })])
+    expect(rows[rows.length - 1].model).toBe('c')
+    expect(rows[rows.length - 1].summary.outputTps).toBeNull()
+  })
+})
+
+describe('Export', () => {
+  const rows = buildComparisonRows([
+    run({ model: 'qwen', module: 'chat', outputTokens: 180, evalMs: 10_000, promptTokens: 340, promptEvalMs: 1000, firstTokenMs: 800 }),
+  ])
+
+  it('baut eine Markdown-Tabelle', () => {
+    const md = toMarkdownTable(rows)
+    expect(md).toContain('| qwen | chat | 18 | 340 | 0.8 s | 1 | 0 |')
+    expect(md).toContain('Median über die warmen Läufe')
+  })
+
+  it('weist versteckten Denk-Anteil in der Markdown-Tabelle aus', () => {
+    const withThinking = buildComparisonRows([
+      run({ model: 'q', module: 'chat', outputTokens: 90, evalMs: 30_000, hiddenThinking: true }),
+    ])
+    const md = toMarkdownTable(withThinking)
+    expect(md).toContain('3.0*')
+    expect(md).toContain('Denk-Token')
+  })
+
+  it('baut CSV mit Semikolon und deutschem Dezimalkomma', () => {
+    const csv = toCsv(rows)
+    expect(csv.split('\n')[0]).toContain('Modell;Modul;')
+    expect(csv.split('\n')[1]).toBe('qwen;chat;18;340;800;1;0;0')
+  })
+
+  it('maskiert Semikolon im Modellnamen', () => {
+    const odd = buildComparisonRows([run({ model: 'a;b', module: 'chat', outputTokens: 10, evalMs: 1000 })])
+    expect(toCsv(odd)).toContain('"a;b"')
   })
 })

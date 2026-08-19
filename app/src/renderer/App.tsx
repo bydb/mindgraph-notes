@@ -62,6 +62,7 @@ import { buildBrainSensors, getDayBoundsMs } from './utils/brainSensors'
 import './styles/index.css'
 import { LlmSpeedIndicator } from './components/Shared/LlmSpeedIndicator'
 import { initLlmTelemetry } from './stores/llmTelemetryStore'
+import { LlmPerformanceView } from './components/LlmPerformance/LlmPerformanceView'
 
 type ViewMode = 'editor' | 'split' | 'canvas'
 
@@ -163,6 +164,7 @@ const App: React.FC = () => {
   const openDashboardTab = useTabStore(state => state.openDashboardTab)
   const openWorkflowCanvasTab = useTabStore(state => state.openWorkflowCanvasTab)
   const openAgentTab = useTabStore(state => state.openAgentTab)
+  const openLlmPerformanceTab = useTabStore(state => state.openLlmPerformanceTab)
   const { unreadRelevantCount } = useEmailStore()
   const emailEnabled = useUIStore(state => state.email.enabled)
   const edooboxEnabled = usePluginEnabled('edoobox')
@@ -815,7 +817,7 @@ const App: React.FC = () => {
     const activeTab = currentTabs.find(t => t.id === currentActiveTabId)
     const shadowsViewer = !!activeTab && (
       activeTab.type === 'dashboard' || activeTab.type === 'workflow-canvas' || activeTab.type === 'code' ||
-      activeTab.type === 'plugin-editor' || activeTab.type === 'agent'
+      activeTab.type === 'plugin-editor' || activeTab.type === 'agent' || activeTab.type === 'llm-performance'
     )
     if (!shadowsViewer) return // Viewer ist bereits sichtbar — nichts tun
 
@@ -1127,6 +1129,7 @@ const App: React.FC = () => {
     ...(flashcardsEnabled ? [{ id: 'panel-flashcards', category: t('commandPalette.cat.panels'), label: t('commandPalette.panelFlashcards'), keywords: 'flashcards karteikarten lernen', run: () => switchRightPanel('flashcards') }] : []),
     ...(emailEnabled ? [{ id: 'panel-inbox', category: t('commandPalette.cat.panels'), label: t('commandPalette.panelInbox'), keywords: 'email inbox posteingang mail', run: () => switchRightPanel('inbox') }] : []),
     ...(edooboxEnabled ? [{ id: 'panel-agent', category: t('commandPalette.cat.panels'), label: t('commandPalette.panelAgent'), keywords: 'agent edoobox veranstaltungen events', run: () => switchRightPanel('agent') }] : []),
+    { id: 'llm-performance', category: t('commandPalette.cat.panels'), label: t('commandPalette.llmPerformance'), keywords: 'leistung geschwindigkeit token modell performance speed tokens', run: () => openLlmPerformanceTab() },
     ...(semanticScholarEnabled ? [{ id: 'panel-scholar', category: t('commandPalette.cat.panels'), label: t('commandPalette.panelScholar'), keywords: 'semantic scholar paper research', run: () => switchRightPanel('semanticScholar') }] : []),
     { id: 'open-quick-search', category: t('commandPalette.cat.search'), label: t('commandPalette.quickSearch'), keywords: 'suche search volltext', shortcut: 'Cmd+P', run: () => setQuickSearchOpen(true) },
     { id: 'open-quick-switcher', category: t('commandPalette.cat.search'), label: t('commandPalette.quickSwitcher'), keywords: 'switcher notiz wechseln open note', shortcut: 'Cmd+K', run: () => setQuickSwitcherOpen(true) },
@@ -1417,7 +1420,9 @@ const App: React.FC = () => {
                     : `0 0 ${splitPosition}%`
                 }}
               >
-                {activeTab?.type === 'agent' ? (
+                {activeTab?.type === 'llm-performance' ? (
+                  <LlmPerformanceView />
+                ) : activeTab?.type === 'agent' ? (
                   <AgentView tabId={activeTab.id} />
                 ) : activeTab?.type === 'workflow-canvas' ? (
                   <WorkflowCanvasView onOpenInbox={() => switchRightPanel('inbox')} />

@@ -10,6 +10,7 @@ import {
   outputTokensPerSecond, promptTokensPerSecond, isColdStart, formatTps, summarize
 } from '../../../shared/llmTelemetry'
 import { useTranslation } from '../../utils/translations'
+import { useTabStore } from '../../stores/tabStore'
 
 export function LlmSpeedIndicator() {
   const { t } = useTranslation()
@@ -18,6 +19,7 @@ export function LlmSpeedIndicator() {
   // zurückgibt, löst die dokumentierte „Maximum update depth"-Schleife aus.
   const lastRun = useLlmTelemetryStore(s => s.lastRun)
   const runs = useLlmTelemetryStore(s => s.runs)
+  const openLlmPerformanceTab = useTabStore(s => s.openLlmPerformanceTab)
 
   if (!lastRun) return null
 
@@ -42,10 +44,15 @@ export function LlmSpeedIndicator() {
   ].filter(Boolean)
 
   return (
-    <span className="status-item status-llm-speed" title={lines.join('\n')}>
+    <button
+      type="button"
+      className="status-item status-llm-speed"
+      title={`${lines.join('\n')}\n\n${t('statusbar.speed.openPanel')}`}
+      onClick={openLlmPerformanceTab}
+    >
       {formatTps(tps)} {t('statusbar.speed.label')}
       {(cold || lastRun.hiddenThinking) && <span className="status-llm-speed-caveat">*</span>}
       <span className="status-llm-speed-module">{lastRun.module}</span>
-    </span>
+    </button>
   )
 }
