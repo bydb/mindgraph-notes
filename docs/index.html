@@ -48,7 +48,7 @@
     "url": "https://mindgraph-notes.de/",
     "downloadUrl": "https://github.com/bydb/mindgraph-notes/releases",
     "screenshot": "https://mindgraph-notes.de/screenshot.png",
-    "softwareVersion": "0.10.48-beta",
+    "softwareVersion": "0.10.49-beta",
     "author": { "@type": "Person", "name": "Jochen Leeder", "url": "https://bydb.io" },
     "license": "https://opensource.org/licenses/AGPL-3.0",
     "featureList": [
@@ -495,7 +495,7 @@
         <span class="hero-dot"></span>
         <span data-i18n="hero.badge">Open Source &middot; Lokal &middot; Kostenlos</span>
       </div>
-      <a class="release-badge" href="#changelog" data-i18n="hero.release">Neues Modell bewertet: qwen3.8 &middot; v0.10.48</a>
+      <a class="release-badge" href="#changelog" data-i18n="hero.release">Teilnehmerlisten ohne Warteliste &middot; v0.10.49</a>
     </div>
 
     <h1 data-i18n="hero.title">Der Fokus bleibt.<br><em>Auch wenn das Leben dazwischenkommt.</em></h1>
@@ -1630,7 +1630,7 @@
     <div class="release-inner">
       <div class="release-head">
         <div>
-          <div class="st-eyebrow"><span class="d"></span><span data-i18n="release.label">Release 0.10.48 &middot; Neues Modell bewertet: qwen3.8</span></div>
+          <div class="st-eyebrow"><span class="d"></span><span data-i18n="release.label">Release 0.10.49 &middot; Teilnehmerlisten ohne Warteliste</span></div>
           <h2 class="st-h" style="font-size:clamp(1.8rem,3.8vw,2.6rem)" data-i18n="release.heading">Was ist neu &mdash; <em>die Bild-Generierung l&auml;uft auf Googles neues Modell und funktioniert wieder.</em></h2>
           <p class="st-lead" data-i18n="release.lead">Die Bild-Generierung wurde auf Google Nano Banana umgestellt &mdash; das aktuelle Bildmodell hinter Gemini. Beim Pr&uuml;fen gegen die echte Schnittstelle zeigte sich, dass das Modell nur JPEG liefert: Die Anfrage nach PNG h&auml;tte jeden einzelnen Aufruf mit einem Fehler beantwortet. Das ist behoben, bevor es jemanden getroffen hat.</p>
         </div>
@@ -1905,7 +1905,7 @@
         "how.p5h": "Das Web, wenn du es brauchst",
         "how.p5": "Schalte die Webrecherche pro Auftrag zu – ganz optional. Der Agent sucht, liest die passenden Seiten und schreibt eine Notiz mit sauberem Quellenverzeichnis; du prüfst sie, bevor sie in deinen Vault kommt. Der Suchanbieter erhält nur die Suchanfragen; die vollständigen Seiten ruft die App lokal ab. Bei einem optionalen Cloud-Modell geht der gelesene Kontext zusätzlich an dessen Anbieter – darauf weist die App vor dem Lauf hin. Den Suchanbieter wählst du selbst: sofort einsatzbereit oder deine eigene, private Suchmaschine.",
         "hero.badge": "Open Source \u00b7 Lokal \u00b7 Kostenlos",
-        "hero.release": "Neues Modell bewertet: qwen3.8 &middot; v{vs}",
+        "hero.release": "Teilnehmerlisten ohne Warteliste &middot; v{vs}",
         "hero.videoPause": "Anhalten",
         "hero.videoPlay": "Abspielen",
         "hero.videoStart": "Video abspielen",
@@ -1982,15 +1982,15 @@
         "modules.opt.vision": "Vision OCR",
         "modules.opt.speech": "Diktat & Vorlesen",
         "modules.opt.terminal": "Terminal",
-        "release.label": "Release {vs} · Neues Modell bewertet: qwen3.8",
-        "release.heading": "Was ist neu — <em>ein neues KI-Modell mit Prüfsiegel für jedes einzelne Modul.</em>",
-        "release.lead": "Nicht jedes KI-Modell taugt für jede Aufgabe. Ein Modell, das schöne Tageszusammenfassungen schreibt, kann bei Aufgaben aus E-Mails Dinge erfinden, die niemand gesagt hat. Deshalb trägt in MindGraph Notes jedes Modell ein eigenes Urteil pro Modul — gemessen, nicht geschätzt. Neu bewertet: qwen3.8 27B, mit 127 Messläufen über alle sechs Module.",
-        "release.c1h": "qwen3.8 27B: sechs von sechs Modulen bestanden",
-        "release.c1": "Beim Notiz-Agenten trifft es die gewünschte Notiz in 89 statt 67 Prozent der Fälle und ist dabei ein Drittel schneller, beim Tagesgedächtnis verlinkt es mehr wichtige Titel, und es braucht weniger Arbeitsspeicher als der bisherige große Vergleichskandidat. Wer 18 GB frei hat, findet das Urteil jetzt direkt am Modell-Auswahlfeld.",
-        "release.c2h": "Eine Schwäche steht dabei, nicht im Kleingedruckten",
-        "release.c2": "Beim Erkennen von Aufgaben aus E-Mails erfindet das Modell in zwei Testfällen zuverlässig eine Aufgabe, die in der Mail nicht steht. Das steht so im Beipackzettel, und die Voreinstellungen bleiben deshalb unverändert: Empfohlen wird weiterhin das Modell, das nicht nur den Messstand, sondern auch den Praxistest bestanden hat.",
-        "release.c3h": "Kleinigkeit im Posteingang",
-        "release.c3": "Absender, deren Name mit einem Symbol beginnt, zeigten im Posteingang ein Fragezeichen statt eines Kürzels. Jetzt sucht die Liste den ersten echten Buchstaben — aus einem Kontaktformular mit Symbol im Namen wird wieder ein sauberes Kürzel.",
+        "release.label": "Release {vs} · Teilnehmerlisten ohne Warteliste",
+        "release.heading": "Was ist neu — <em>auf der Anwesenheitsliste stehen nur noch die, die wirklich kommen.</em>",
+        "release.lead": "Ist eine Fortbildung ausgebucht, rücken weitere Anmeldungen auf die Warteliste. Auf der Anwesenheitsliste zum Ausdrucken standen sie bisher trotzdem — bei 15 Plätzen kamen 24 Namen aufs Papier. Das ist behoben, aufgefallen an einer echten Veranstaltung.",
+        "release.c1h": "Nur noch die Personen mit festem Platz",
+        "release.c1": "Die Anwesenheitsliste übernimmt den Wartelisten-Status direkt aus dem Buchungssystem. Bewusst nicht über die Reihenfolge der Anmeldungen gerechnet: Wer nach einer Absage nachrückt, behält seinen späten Anmeldezeitpunkt und wäre so von der Liste geflogen — im echten Datensatz genau eine Person.",
+        "release.c2h": "Die Warteliste bleibt sichtbar, nur eben als solche",
+        "release.c2": "In der Übersicht sind Nachrücker als Warteliste gekennzeichnet, und die Kopfzeile zählt Plätze und Warteliste getrennt. Beim Erzeugen der Liste steht dabei, wie viele Personen sie nicht enthält — sonst wirkt eine plötzlich kürzere Liste wie ein Fehler.",
+        "release.c3h": "Einrichtung der Veranstaltungs-Anbindung",
+        "release.c3": "Wer die Anbindung an das Kursbuchungssystem neu einschaltete, kam nicht hinein: Der Verbindungstest meldete ungültige Zugangsdaten, obwohl sie stimmten. Die App stellte im Hintergrund auf eine veraltete Schnittstelle um. Neu eingerichtete Anbindungen nutzen jetzt die aktuelle.",
         "release.link": "Vollständige Release Notes auf GitHub →",
         "dl.label": "Download",
         "dl.heading": "Jetzt starten.",
@@ -2173,7 +2173,7 @@
         "how.p5h": "The web, when you need it",
         "how.p5": "Turn on web research per task – entirely optional. The agent searches, reads the relevant pages and writes a note with a clean list of sources; you review it before it enters your vault. The search provider receives only the queries; the app fetches full pages locally. With an optional cloud model, the extracted context is also sent to that model provider – the app warns you before the run. You choose the search provider yourself: ready to use or your own private search engine.",
         "hero.badge": "Open Source \u00b7 Local \u00b7 Free",
-        "hero.release": "New model rated: qwen3.8 &middot; v{vs}",
+        "hero.release": "Attendance lists without the waiting list &middot; v{vs}",
         "hero.videoPause": "Pause",
         "hero.videoPlay": "Play",
         "hero.videoStart": "Play video",
@@ -2250,15 +2250,15 @@
         "modules.opt.vision": "Vision OCR",
         "modules.opt.speech": "Dictation & TTS",
         "modules.opt.terminal": "Terminal",
-        "release.label": "Release {vs} · New model rated: qwen3.8",
-        "release.heading": "What’s new — <em>a new AI model, rated per module rather than in general.</em>",
-        "release.lead": "Not every AI model is fit for every job. A model that writes lovely daily summaries can invent tasks nobody ever wrote in an email. That is why every model in MindGraph Notes carries its own verdict per module — measured, not guessed. Newly rated: qwen3.8 27B, across 127 benchmark runs covering all six modules.",
-        "release.c1h": "qwen3.8 27B: six modules out of six",
-        "release.c1": "For the note agent it hits the intended note in 89 percent of cases instead of 67, and does so a third faster; for the daily memory it links more of the important titles; and it needs less memory than the previous large contender. If you have 18 GB free, the verdict now sits right next to the model picker.",
-        "release.c2h": "A weakness stated plainly, not in the small print",
-        "release.c2": "When extracting tasks from email, the model reliably invents a task in two test cases where the mail contains none. That is written into its data sheet, and the defaults stay as they are: the recommendation remains the model that passed not only the benchmark but the practical test.",
-        "release.c3h": "A small thing in the inbox",
-        "release.c3": "Senders whose name starts with a symbol showed a question mark instead of an initial. The list now looks for the first real letter — a contact form with a symbol in its name gets a proper initial again.",
+        "release.label": "Release {vs} · Attendance lists without the waiting list",
+        "release.heading": "What’s new — <em>the attendance sheet now lists only the people who actually have a seat.</em>",
+        "release.lead": "Once a course is full, further sign-ups go onto the waiting list. The printable attendance sheet still listed them — 24 names on paper for 15 seats. Fixed, found on a real event.",
+        "release.c1h": "Only the people holding a seat",
+        "release.c1": "The sheet takes the waiting-list state straight from the booking system. Deliberately not derived from sign-up order: someone moving up after a cancellation keeps their late timestamp and would have been dropped — exactly one person in the real data set.",
+        "release.c2h": "The waiting list stays visible, just labelled",
+        "release.c2": "In the overview, people moving up are marked as waiting list, and the header counts seats and waiting list separately. Creating the sheet tells you how many people it leaves out — otherwise a suddenly shorter list looks like a bug.",
+        "release.c3h": "Setting up the event integration",
+        "release.c3": "Switching on the course-booking integration for the first time locked you out: the connection test reported invalid credentials although they were correct. The app quietly fell back to an outdated interface. New setups now use the current one.",
         "release.link": "Full release notes on GitHub →",
         "dl.label": "Download",
         "dl.heading": "Get started.",

@@ -2,6 +2,19 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.10.49-beta] - 2026-08-19
+
+Auf der ausgedruckten Anwesenheitsliste stehen nur noch die Personen, die wirklich einen Platz haben.
+
+### Behoben
+
+- **Die Warteliste stand mit auf der Teilnehmerliste.** Ist eine Fortbildung ausgebucht, setzt das Buchungssystem weitere Anmeldungen auf die Warteliste. Die App las diesen Zustand nie aus und behandelte jede Anmeldung als festen Platz — bei einer Veranstaltung mit 15 Plätzen und 25 Anmeldungen standen 24 Namen auf dem Ausdruck. Der Status wird jetzt direkt aus dem Buchungssystem übernommen; auf der Liste bleiben genau die 15 Personen mit Platz. Bewusst nicht über die Reihenfolge der Anmeldungen gerechnet: Wer nach einer Absage nachrückt, behält seinen späten Anmeldezeitpunkt und wäre so von der Liste geflogen — im echten Datensatz betraf das genau eine Person.
+- **Wer die Anbindung an das Kursbuchungssystem neu einschaltete, kam nicht hinein.** Der Verbindungstest meldete ungültige Zugangsdaten, obwohl sie stimmten. Beim Einschalten des Moduls stellte die App im Hintergrund auf eine veraltete Schnittstelle um, die kaum noch etwas kann — und der einmal gespeicherte Wert überstimmte danach dauerhaft die richtige Einstellung. Neu eingerichtete Anbindungen nutzen jetzt die aktuelle Schnittstelle. Bestehende Installationen mit falsch gespeichertem Wert werden nicht automatisch umgestellt; dort die Einstellung einmal von Hand korrigieren.
+
+### Verbessert
+
+- **Die Warteliste bleibt sichtbar, nur eben als solche.** In der Buchungsübersicht sind Nachrücker als Warteliste gekennzeichnet, und die Kopfzeile zählt Plätze und Warteliste getrennt statt beides zusammen. Beim Erzeugen der Anwesenheitsliste steht dabei, wie viele Personen sie nicht enthält — sonst wirkt eine plötzlich kürzere Liste wie ein Fehler.
+
 ## [0.10.48-beta] - 2026-08-17
 
 Ein neues KI-Modell mit Prüfsiegel für jedes einzelne Modul — und eine Kleinigkeit im Posteingang.
