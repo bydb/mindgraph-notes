@@ -60,6 +60,8 @@ import { useIsModuleEnabled } from './utils/modules'
 import { getVaultTaskStats } from './utils/linkExtractor'
 import { buildBrainSensors, getDayBoundsMs } from './utils/brainSensors'
 import './styles/index.css'
+import { LlmSpeedIndicator } from './components/Shared/LlmSpeedIndicator'
+import { initLlmTelemetry } from './stores/llmTelemetryStore'
 
 type ViewMode = 'editor' | 'split' | 'canvas'
 
@@ -221,6 +223,11 @@ const App: React.FC = () => {
   useEffect(() => {
     initNoteAgentEvents()
   }, [])
+
+  // Leistungsdaten der Modell-Läufe abonnieren. Anders als die Notiz-Agent-Events
+  // meldet preload hier mit removeListener ab, mehrere Abonnenten wären also
+  // unkritisch — die Aufräumfunktion wird trotzdem zurückgegeben.
+  useEffect(() => initLlmTelemetry(), [])
 
   // Werkzeuge-Überlaufmenü: bei Klick außerhalb schließen.
   useEffect(() => {
@@ -1569,6 +1576,7 @@ const App: React.FC = () => {
           <span className="status-item">{notes.length} {t('statusbar.notes')}</span>
           <span className="status-separator">|</span>
           <span className="status-item">{linkCount} {t('statusbar.links')}</span>
+          <LlmSpeedIndicator />
           {taskStats.total > 0 && (
             <>
               <span className="status-separator">|</span>

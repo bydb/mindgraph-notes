@@ -833,6 +833,15 @@ const translations = {
     'statusbar.noVault': 'Kein Vault',
     'statusbar.notes': 'Notizen',
     'statusbar.links': 'Links',
+    'statusbar.speed.label': 'Tok/s',
+    'statusbar.speed.title': 'Geschwindigkeit des letzten Modell-Laufs',
+    'statusbar.speed.output': 'Antwort schreiben',
+    'statusbar.speed.prompt': 'Prompt lesen',
+    'statusbar.speed.firstToken': 'Bis zum ersten Wort',
+    'statusbar.speed.coldStart': 'Kaltstart — Gewichte mussten erst geladen werden',
+    'statusbar.speed.hiddenThinking': 'Mit Reasoning: Ollama meldet die Denk-Token nicht mit, der Wert ist zu niedrig',
+    'statusbar.speed.median': 'Median dieses Modells',
+    'statusbar.speed.runs': 'Läufe seit dem Start',
 
     // Titlebar Buttons
     'titlebar.sidebar': 'Sidebar umschalten',
@@ -3813,6 +3822,15 @@ const translations = {
     'statusbar.noVault': 'No Vault',
     'statusbar.notes': 'Notes',
     'statusbar.links': 'Links',
+    'statusbar.speed.label': 'tok/s',
+    'statusbar.speed.title': 'Speed of the last model run',
+    'statusbar.speed.output': 'Writing the answer',
+    'statusbar.speed.prompt': 'Reading the prompt',
+    'statusbar.speed.firstToken': 'Time to first word',
+    'statusbar.speed.coldStart': 'Cold start — weights had to be loaded first',
+    'statusbar.speed.hiddenThinking': 'With reasoning: Ollama does not report thinking tokens, so this value is too low',
+    'statusbar.speed.median': 'Median for this model',
+    'statusbar.speed.runs': 'Runs since start',
 
     // Titlebar Buttons
     'titlebar.sidebar': 'Toggle sidebar',

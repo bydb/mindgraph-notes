@@ -198,7 +198,7 @@ export async function runNoteAgentLoop(params: NoteAgentLoopParams): Promise<Not
   const maxIterations = hasFolder ? MAX_ITERATIONS_FOLDER : MAX_ITERATIONS
   for (let iteration = 1; iteration <= maxIterations; iteration++) {
     const sentChars = messages.reduce((n, m) => n + (m.content?.length ?? 0), 0)
-    const result = await chatWithTools(messages, tools, chatOptions)
+    const result = await chatWithTools(messages, tools, { ...chatOptions, telemetryModule: 'note-agent' })
     if (run.abort.signal.aborted) throw new Error('Abgebrochen')
 
     // Stiller Kontext-Überlauf: Die Mitte der Konversation (Auftrag + bisherige

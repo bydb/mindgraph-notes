@@ -21939,3 +21939,23 @@ body.presentation-mode *::after {
   transition-duration: 0.01ms !important;
   transition-delay: 0ms !important;
 }
+
+/* Geschwindigkeit des letzten Modell-Laufs in der Statusleiste.
+   Aktualisiert einmal pro Anfrage, nicht pro Token — deshalb keine Animation
+   und kein Übergang: Ein blinkender Wert würde eine Live-Messung vortäuschen. */
+.status-llm-speed {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  font-variant-numeric: tabular-nums;
+}
+
+.status-llm-speed-caveat {
+  color: var(--color-warning, #d08540);
+  font-weight: 600;
+}
+
+.status-llm-speed-module {
+  opacity: 0.6;
+  font-size: 0.85em;
+}

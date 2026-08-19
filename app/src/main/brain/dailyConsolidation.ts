@@ -2,6 +2,8 @@ import * as path from 'path'
 import * as fs from 'fs/promises'
 import type { BrainConsolidateInput, BrainConsolidateResult, BrainSensorNote } from './types'
 import { isCloudModel } from '../../shared/modelCompatibility'
+import { recordLlmRun } from '../llm/telemetry'
+import { fromOllamaResponse } from '../../shared/llmTelemetry'
 
 const OLLAMA_LOCAL_URL = 'http://localhost:11434'
 const DEFAULT_BRAIN_FOLDER = '800 - 🧠 brain'
@@ -158,6 +160,7 @@ RULES — follow all:
 }
 
 async function callOllama(model: string, prompt: string): Promise<string> {
+  const startedAt = Date.now()
   const response = await fetch(`${OLLAMA_LOCAL_URL}/api/generate`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -174,6 +177,9 @@ async function callOllama(model: string, prompt: string): Promise<string> {
     throw new Error(`Ollama API ${response.status} ${errText.slice(0, 200)}`)
   }
   const data = await response.json()
+  // Über /api/generate zählt Ollama den Denk-Anteil MIT in eval_count — anders als
+  // über /api/chat. Die Zahl ist hier also direkt mit anderen Läufen vergleichbar.
+  recordLlmRun(fromOllamaResponse(data, { module: 'brain', model, wallMs: Date.now() - startedAt, at: startedAt }))
   const result = (data.response || '').trim()
   if (!result) throw new Error('Ollama lieferte leere Antwort')
   return stripCodeFences(result)

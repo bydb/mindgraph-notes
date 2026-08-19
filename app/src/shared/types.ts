@@ -1,6 +1,7 @@
 import type { RelevanceConfig } from './emailRelevance'
 import type { RagIndexStatus, RagQueryResult, RetrievedChunk } from './rag/types'
 import type { DisplayHealth } from './displayHealth'
+import type { LlmRunMetrics } from './llmTelemetry'
 
 // Per-Vault Feature Toggles
 export interface VaultFeatures {
@@ -543,6 +544,10 @@ export interface ElectronAPI {
   getDisplayHealth: () => Promise<DisplayHealth>;
   /** Liefert eine Abmelde-Funktion zurück. */
   onDisplayHealthChanged: (callback: (health: DisplayHealth) => void) => () => void;
+
+  // Leistungsdaten der Modell-Läufe (Token/s, Kaltstart, Zeit bis erstes Token).
+  getLlmTelemetry: () => Promise<LlmRunMetrics[]>;
+  onLlmTelemetryRun: (callback: (run: LlmRunMetrics) => void) => () => void;
 
   openVault: () => Promise<string | null>;
   selectFolderInVault: (vaultPath: string) => Promise<string | null>;

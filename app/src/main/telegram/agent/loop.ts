@@ -132,7 +132,7 @@ export async function runAgent(
 
   while (iterations < opts.maxIterations) {
     iterations += 1
-    const result = await chatWithTools(messages, tools, opts.chatOptions)
+    const result = await chatWithTools(messages, tools, { ...opts.chatOptions, telemetryModule: 'telegram' })
     lastBackend = result.backend
     lastText = result.text
 
