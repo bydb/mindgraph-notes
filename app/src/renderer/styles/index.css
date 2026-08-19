@@ -14658,6 +14658,40 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
   margin-bottom: 6px;
 }
 
+/* Wartelisten-Kennzeichnung in der Buchungsliste. Gedämpft statt alarmierend: die Person
+   ist korrekt angemeldet, sie hat nur (noch) keinen Platz. */
+.agent-dashboard-booking-badge {
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  background: color-mix(in srgb, var(--text-secondary) 12%, transparent);
+  white-space: nowrap;
+}
+
+.agent-dashboard-booking.is-waitlist .agent-dashboard-booking-avatar {
+  opacity: 0.5;
+}
+
+.agent-dashboard-bookings-waitlist-count {
+  margin-left: 6px;
+  font-weight: 400;
+  color: var(--text-secondary);
+}
+
+/* Neutraler Hinweis unter der Teilnehmerlisten-Aktion (z.B. ausgelassene Warteliste) —
+   bewusst nicht rot: es ist kein Fehler, sondern eine Auskunft. */
+.agent-dashboard-action-note {
+  font-size: 11px;
+  color: var(--text-secondary);
+  background: color-mix(in srgb, var(--text-secondary) 8%, transparent);
+  border-radius: 4px;
+  padding: 6px 8px;
+  margin-bottom: 6px;
+}
+
 .agent-dashboard-bookings-header {
   display: flex;
   justify-content: space-between;

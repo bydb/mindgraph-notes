@@ -1628,11 +1628,14 @@ export interface EdooboxBooking {
   offerId: string
   userName: string
   userEmail: string
+  /** 'active' = fester Platz, 'waitlist' = Warteliste (edoobox-Feld `waiting_list`). */
   status: string
   bookedAt: string  // ISO
   present?: boolean
   schule?: string
   personalNr?: string
+  /** true = Nachrücker ohne festen Platz. Gehört NICHT auf die Anwesenheitsliste. */
+  waitingList?: boolean
 }
 
 export interface EdooboxOfferDashboard {

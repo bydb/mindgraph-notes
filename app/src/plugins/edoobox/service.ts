@@ -37,6 +37,14 @@ function payloadSize(v: unknown): number {
 /** Detail-Anhang für GEWORFENE Fehler: Rohtext nur im Debug-Modus, sonst generischer Hinweis.
  *  Verhindert, dass personenbezogene API-Rohdaten über Exception-Messages in Renderer-/Workflow-/
  *  Crash-Logs landen. */
+/** edoobox liefert Wahrheitswerte mal als boolean, mal als "1"/"0"/"" — hier auf boolean normalisiert. */
+function parseEdooboxFlag(value: unknown): boolean {
+  if (typeof value === 'boolean') return value
+  if (typeof value === 'number') return value !== 0
+  if (typeof value === 'string') return value !== '' && value !== '0' && value.toLowerCase() !== 'false'
+  return false
+}
+
 function errorDetail(raw: string): string {
   return EDOOBOX_VERBOSE ? truncateError(raw) : 'Details unterdrückt (Debug: MINDGRAPH_DEBUG_EDOOBOX=1)'
 }
@@ -390,6 +398,7 @@ export class EdooboxService {
     // Step 2: Fetch booking details + user details
     const userCache = new Map<string, { name: string; email: string; schule: string; personalNr: string }>()
     const bookings: EdooboxBooking[] = []
+    let waitingListCount = 0
 
     for (const item of arr) {
       const bookingId = String((item as Record<string, unknown>).id || '')
@@ -400,9 +409,6 @@ export class EdooboxService {
         const d = detail.data as Record<string, Record<string, unknown>> | undefined
         const bookingData = d ? (Object.values(d)[0] || {}) as Record<string, unknown> : {}
 
-        if (bookings.length === 0) {
-          console.log('[edoobox] Raw booking fields (first):', Object.keys(bookingData))
-        }
 
         const bookedAt = String(bookingData.time || '')
         const ownerId = String(bookingData.owner || '')
@@ -437,21 +443,31 @@ export class EdooboxService {
           continue
         }
 
+        // Warteliste: edoobox liefert `waiting_list` pro Buchung (empirisch bestätigt 08/2026 an
+        // einer 15-Platz-Veranstaltung mit 9 Nachrückern). NICHT über die Buchungsreihenfolge
+        // herleiten — beim Nachrücken nach einer Stornierung bleibt die späte Buchungszeit
+        // stehen, die Person hat aber einen festen Platz.
+        const waitingList = parseEdooboxFlag(bookingData.waiting_list)
+        if (waitingList) waitingListCount++
+
         bookings.push({
           id: bookingId,
           offerId,
           userName: user.name,
           userEmail: user.email,
-          status: 'active',
+          status: waitingList ? 'waitlist' : 'active',
           bookedAt,
           present,
           schule: user.schule || undefined,
-          personalNr: user.personalNr || undefined
+          personalNr: user.personalNr || undefined,
+          waitingList
         })
       } catch (e) {
         console.warn('[edoobox] Could not fetch booking detail:', bookingId, e)
       }
     }
+
+    console.log(`[edoobox] Buchungen ${offerId}: ${bookings.length} aktiv (davon ${waitingListCount} auf der Warteliste)`)
 
     return bookings
   }
