@@ -1,6 +1,24 @@
 // Modell-Kompatibilitäts-Matrix für lokale Ollama-Modelle in MindGraph Notes.
 // Quelle der Wahrheit für die Settings-UI ("Beipackzettel" pro Modul).
 //
+// 2026-08-19: qwen3.6:35b-a3b-nvfp4 aufgenommen — die nvfp4-Quantisierung des
+//   MoE-Modells. Anlass: Sie wird real benutzt, kanonisiert aber auf
+//   'qwen3.6:35b:a3b' und galt damit ueberall als untested (fail-closed).
+//   Dreiervergleich Extraktion + Mail, je 3 Wiederholungen, num_ctx auf 32768
+//   festgenagelt: Die MoE-Modelle sind 3,3- bis 4,6-mal schneller als das dichte
+//   qwen3.6:27b-mlx (48 bzw. 35 gegen 10,5 Token/s), die nvfp4-Fassung nochmal
+//   ein Drittel gegenueber Q4_K_M.
+//   ABER: needsReply bricht bei nvfp4 auf 50 % ein — Muenzwurf, in allen drei
+//   Wiederholungen exakt dieselben fuenf Faelle, Fehler in BEIDE Richtungen (also
+//   nicht per Schwelle korrigierbar). Darunter die zwei leichtesten Faelle des
+//   Testsatzes (direkte Bitte mit Frist), die sie als "keine Antwort noetig"
+//   einstuft; qwen3.6:latest und qwen3.6:27b-mlx treffen sie 3/3 richtig.
+//   Gleiche Architektur, gleiche Parameterzahl, andere Quantisierung — alle
+//   uebrigen Werte (JSON, Recall, Deadlines, Termindaten) bleiben bei 100 %.
+//   Merksatz: Quantisierungs-Varianten NIE vom getesteten Tag ableiten.
+//   Bei mail-summary dagegen unauffaellig (97-98 % Punkte, alle Teilwerte 100 %) —
+//   dieselbe Faehigkeit, anderer Prompt, anderes Ergebnis.
+//
 // 2026-08-15: qwen3.8:27b-mlx komplett gebenchmarkt — alle SECHS Chat-Module
 //   (task-extraction v2, mail-summary, dashboard, brain je 3 Wiederholungen;
 //   project-status 2×3; note-agent 7 Fälle × 3 Reps), 127 Modellläufe.
@@ -209,7 +227,7 @@ export interface ModelCompatibilityData {
 }
 
 export const MODEL_COMPATIBILITY: ModelCompatibilityData = {
-  version: '2026-08-15',
+  version: '2026-08-19',
   modules: {
     brain: {
       'ministral-3:8b': {
@@ -302,6 +320,12 @@ export const MODEL_COMPATIBILITY: ModelCompatibilityData = {
         reasons: [],
         metrics: { directionAccuracyPct: 100, recallPct: 100, latencySecondsPerRun: 7 }
       },
+      'qwen3.6:35b-a3b-nvfp4': {
+        verdict: 'yellow',
+        reasons: ['needsReply nur 50 % — Muenzwurf, und Fehler in BEIDE Richtungen (nicht per Schwelle korrigierbar)', 'Stuft direkte Bitten mit Frist als "keine Antwort noetig" ein — betrifft das Widget "Zu beantworten"'],
+        notes: 'Bench 2026-08-19 (3 Reps, 10 Faelle, num_ctx 32768): Die reine Extraktion ist tadellos — JSON 100 %, Task-Recall 100 %, Deadlines 100 %, Termindaten 100 %, for_whom 100 %, Task-Precision 80 % (wie qwen3.6:latest). Kaputt ist ausschliesslich needsReply: 50 %, reproduzierbar exakt dieselben fuenf Faelle in allen drei Wiederholungen. Dieselben Faelle treffen qwen3.6:latest (80 %) und qwen3.6:27b-mlx (90 %) deutlich besser. Der Unterschied zu qwen3.6:latest ist NUR die Quantisierung (nvfp4 statt Q4_K_M) bei gleicher Architektur und Parameterzahl. Dafuer mit 48 Token/s das schnellste getestete Modell (qwen3.6:latest 35, qwen3.6:27b-mlx 10,5), 22 GB bei num_ctx 32768, vollstaendig auf der GPU. Wer das Tempo will und ohne verlaessliche Antwort-Erkennung leben kann, kann es bewusst waehlen — deshalb yellow und kein Hard-Lock.',
+        metrics: { directionAccuracyPct: 100, recallPct: 100, latencySecondsPerRun: 3, ramGigabytes: 22 }
+      },
       'llama3.1:8b': {
         verdict: 'yellow',
         reasons: ['Richtungs-Erkennung 63 %', 'Bei seltenen Mustern Recall-Einbruch'],
@@ -361,6 +385,12 @@ export const MODEL_COMPATIBILITY: ModelCompatibilityData = {
         reasons: [],
         notes: 'Nach Prompt-Fix 2026-07-27: 100 % avg — perfekter Lauf (Relevance 8/8, Sentiment 8/8, needsReply 8/8), gleichauf mit qwen3.6:27b-mlx. ~11 s/Mail, ~24 GB RAM.',
         metrics: { recallPct: 100, latencySecondsPerRun: 11, ramGigabytes: 24 }
+      },
+      'qwen3.6:35b-a3b-nvfp4': {
+        verdict: 'green',
+        reasons: [],
+        notes: 'Bench 2026-08-19 (3 Reps, 8 Faelle, num_ctx 32768): 97-98 % Punkte, JSON/Sentiment/Relevanz/needsReply je 100 %. Mit 58 Token/s das schnellste getestete Modell (qwen3.6:latest 44, qwen3.6:27b-mlx 13,5), 22 GB bei num_ctx 32768. ACHTUNG: Dasselbe Modell faellt bei task-extraction auf 50 % needsReply — dieselbe Faehigkeit, anderer Prompt. Die Mail-Analyse der App laeuft ueber die task-extraction-Kette, dort gilt das yellow.',
+        metrics: { latencySecondsPerRun: 5, ramGigabytes: 22 }
       },
       'llama3.1:8b': {
         verdict: 'green',

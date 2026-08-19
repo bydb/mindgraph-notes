@@ -1,6 +1,6 @@
 {
   "generatedFrom": "app/src/shared/modelCompatibility.ts",
-  "version": "2026-08-15",
+  "version": "2026-08-19",
   "modules": {
     "brain": {
       "ministral-3:8b": {
@@ -190,6 +190,20 @@
           "latencySecondsPerRun": 7
         }
       },
+      "qwen3.6:35b-a3b-nvfp4": {
+        "verdict": "yellow",
+        "reasons": [
+          "needsReply nur 50 % — Muenzwurf, und Fehler in BEIDE Richtungen (nicht per Schwelle korrigierbar)",
+          "Stuft direkte Bitten mit Frist als \"keine Antwort noetig\" ein — betrifft das Widget \"Zu beantworten\""
+        ],
+        "notes": "Bench 2026-08-19 (3 Reps, 10 Faelle, num_ctx 32768): Die reine Extraktion ist tadellos — JSON 100 %, Task-Recall 100 %, Deadlines 100 %, Termindaten 100 %, for_whom 100 %, Task-Precision 80 % (wie qwen3.6:latest). Kaputt ist ausschliesslich needsReply: 50 %, reproduzierbar exakt dieselben fuenf Faelle in allen drei Wiederholungen. Dieselben Faelle treffen qwen3.6:latest (80 %) und qwen3.6:27b-mlx (90 %) deutlich besser. Der Unterschied zu qwen3.6:latest ist NUR die Quantisierung (nvfp4 statt Q4_K_M) bei gleicher Architektur und Parameterzahl. Dafuer mit 48 Token/s das schnellste getestete Modell (qwen3.6:latest 35, qwen3.6:27b-mlx 10,5), 22 GB bei num_ctx 32768, vollstaendig auf der GPU. Wer das Tempo will und ohne verlaessliche Antwort-Erkennung leben kann, kann es bewusst waehlen — deshalb yellow und kein Hard-Lock.",
+        "metrics": {
+          "directionAccuracyPct": 100,
+          "recallPct": 100,
+          "latencySecondsPerRun": 3,
+          "ramGigabytes": 22
+        }
+      },
       "llama3.1:8b": {
         "verdict": "yellow",
         "reasons": [
@@ -301,6 +315,15 @@
           "recallPct": 100,
           "latencySecondsPerRun": 11,
           "ramGigabytes": 24
+        }
+      },
+      "qwen3.6:35b-a3b-nvfp4": {
+        "verdict": "green",
+        "reasons": [],
+        "notes": "Bench 2026-08-19 (3 Reps, 8 Faelle, num_ctx 32768): 97-98 % Punkte, JSON/Sentiment/Relevanz/needsReply je 100 %. Mit 58 Token/s das schnellste getestete Modell (qwen3.6:latest 44, qwen3.6:27b-mlx 13,5), 22 GB bei num_ctx 32768. ACHTUNG: Dasselbe Modell faellt bei task-extraction auf 50 % needsReply — dieselbe Faehigkeit, anderer Prompt. Die Mail-Analyse der App laeuft ueber die task-extraction-Kette, dort gilt das yellow.",
+        "metrics": {
+          "latencySecondsPerRun": 5,
+          "ramGigabytes": 22
         }
       },
       "llama3.1:8b": {
