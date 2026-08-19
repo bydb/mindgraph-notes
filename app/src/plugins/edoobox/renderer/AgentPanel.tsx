@@ -79,6 +79,8 @@ const DashboardOfferCard: React.FC<{ offer: EdooboxOfferDashboard }> = ({ offer 
   const [loadingBookings, setLoadingBookings] = useState(false)
   const [generatingList, setGeneratingList] = useState(false)
   const [listError, setListError] = useState<string | null>(null)
+  // Sichtbarer Beleg, dass Wartelisten-Personen bewusst fehlen — sonst wirkt die Liste zu kurz.
+  const [listNote, setListNote] = useState<string | null>(null)
 
   const handleExpand = useCallback(async () => {
     if (!expanded && offer.bookings.length === 0 && offer.bookingCount > 0) {
@@ -92,13 +94,20 @@ const DashboardOfferCard: React.FC<{ offer: EdooboxOfferDashboard }> = ({ offer 
   const handleDownloadAttendanceList = useCallback(async (e: React.MouseEvent) => {
     e.stopPropagation()
     setListError(null)
+    setListNote(null)
     setGeneratingList(true)
     try {
       // Immer frisch nachladen, damit neue Felder (Schule/Personalnummer) sicher
       // aktuell sind und kein Cache aus älteren Sessions verwendet wird.
       await loadBookingsForOffer(offer.id)
       const refreshed = useAgentStore.getState().dashboardOffers.find(o => o.id === offer.id)
-      let bookings = refreshed?.bookings || offer.bookings
+      const allBookings = refreshed?.bookings || offer.bookings
+      // Warteliste gehört nicht auf die Anwesenheitsliste: diese Personen haben keinen Platz
+      // und erscheinen nicht zur Veranstaltung. Maßgeblich ist das edoobox-Feld `waiting_list`
+      // (in EdooboxBooking als waitingList), NICHT die Buchungsreihenfolge — Nachrücker behalten
+      // ihre späte Buchungszeit, haben aber einen festen Platz.
+      let bookings = allBookings.filter(b => !b.waitingList)
+      const waitlistCount = allBookings.length - bookings.length
       if (bookings.length > MAX_ATTENDANCE_PARTICIPANTS) {
         setListError(t('agent.attendanceList.tooMany', { max: String(MAX_ATTENDANCE_PARTICIPANTS), count: String(bookings.length) }))
         return
@@ -132,6 +141,8 @@ const DashboardOfferCard: React.FC<{ offer: EdooboxOfferDashboard }> = ({ offer 
       const result = await edooboxClient.generateAttendanceList(data, fileName)
       if (!result.success && !result.canceled) {
         setListError(result.error || t('agent.attendanceList.generateFailed'))
+      } else if (result.success && waitlistCount > 0) {
+        setListNote(t('agent.attendanceList.waitlistExcluded', { count: String(waitlistCount) }))
       }
     } catch (err) {
       setListError(err instanceof Error ? err.message : t('agent.attendanceList.generateFailed'))
@@ -141,6 +152,8 @@ const DashboardOfferCard: React.FC<{ offer: EdooboxOfferDashboard }> = ({ offer 
   }, [offer, loadBookingsForOffer, edooboxBaseUrl, edooboxApiVersion, t])
 
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
+  // Nachrücker ohne festen Platz — zählen nicht als Teilnehmer und stehen nicht auf der Liste.
+  const waitlistTotal = offer.bookings.filter(b => b.waitingList).length
   const newBookings = offer.bookings.filter(b => b.bookedAt > sevenDaysAgo)
 
   const formatDate = (iso: string) => {
@@ -201,6 +214,7 @@ const DashboardOfferCard: React.FC<{ offer: EdooboxOfferDashboard }> = ({ offer 
             </button>
           </div>
           {listError && <div className="agent-dashboard-action-error">{listError}</div>}
+          {listNote && <div className="agent-dashboard-action-note">{listNote}</div>}
           {loadingBookings ? (
             <div className="agent-dashboard-loading-bookings">
               <svg className="spinning" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -213,19 +227,30 @@ const DashboardOfferCard: React.FC<{ offer: EdooboxOfferDashboard }> = ({ offer 
             <>
               <div className="agent-dashboard-bookings-header">
                 <span>{t('agent.dashboard.participants')}</span>
-                <span>{offer.bookings.length}</span>
+                <span>
+                  {offer.bookings.length - waitlistTotal}
+                  {waitlistTotal > 0 && (
+                    <span className="agent-dashboard-bookings-waitlist-count">
+                      {t('agent.dashboard.waitlistCount', { count: String(waitlistTotal) })}
+                    </span>
+                  )}
+                </span>
               </div>
               <div className="agent-dashboard-bookings-list">
               {offer.bookings.map(booking => {
                 const isNew = booking.bookedAt > sevenDaysAgo
+                const isWaitlist = booking.waitingList === true
                 return (
-                  <div key={booking.id} className={`agent-dashboard-booking ${isNew ? 'is-new' : ''}`}>
+                  <div key={booking.id} className={`agent-dashboard-booking ${isNew ? 'is-new' : ''} ${isWaitlist ? 'is-waitlist' : ''}`}>
                     <div className="agent-dashboard-booking-avatar">
                       {booking.userName.charAt(0).toUpperCase()}
                     </div>
                     <div className="agent-dashboard-booking-info">
                       <div className="agent-dashboard-booking-name">
                         {booking.userName}
+                        {isWaitlist && (
+                          <span className="agent-dashboard-booking-badge">{t('agent.dashboard.waitlist')}</span>
+                        )}
                         {isNew && <span className="agent-dashboard-dot" />}
                       </div>
                       <div className="agent-dashboard-booking-email">{booking.userEmail}</div>
