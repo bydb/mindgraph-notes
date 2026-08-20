@@ -496,12 +496,24 @@ export interface DashboardSettings {
   briefingIncludeCalendar: boolean
   lastBriefingDate: string             // YYYY-MM-DD; leer = nie gezeigt
   calendarDaysAhead: number            // wie viele Tage Kalender voraus zeigen (default 1)
-  radarAiEnabled: boolean              // KI-basierte Relevanz-Analyse pro 🔴 aktivieren
-  radarAiRefreshIntervalHours: number  // wie oft wird die KI-Analyse pro Notiz aufgefrischt (1/6/24)
-  radarAiModel: string                 // Ollama-Modell für Notiz-Analyse; leer = nutze ollama.selectedModel
+  /**
+   * Stand der einmaligen Widget-Nachtrag-Migrationen (siehe `initializeUISettings`).
+   * Ohne diesen Merker liefen die Nachträge bei JEDEM App-Start — ein bewusst
+   * abgewähltes Widget (z.B. 'radar' samt KI-Relevanzanalyse) kam nach dem
+   * nächsten Start immer zurück. Ausschalten hielt also nie.
+   */
+  widgetMigrationVersion: number
 }
 
 export const DASHBOARD_ALL_WIDGETS: DashboardWidgetId[] = ['focus', 'radar', 'activity', 'tasks', 'emails', 'calendar', 'bookings', 'antares', 'project-status', 'sync']
+
+/**
+ * Höchste Nummer der Widget-Nachtrag-Migrationen. Wird ein NEUES Widget eingeführt, das
+ * bestehende Installationen bekommen sollen: hochzählen und den Nachtrag in
+ * `initializeUISettings` an die Kette hängen. Nicht hochzählen für Änderungen an
+ * bereits ausgelieferten Widgets — sonst kommt ein abgewähltes Widget zurück.
+ */
+export const DASHBOARD_WIDGET_MIGRATION_VERSION = 1
 
 const normalizeVaultFolder = (folder: string): string => folder.trim().replace(/^\/+|\/+$/g, '')
 
@@ -1156,9 +1168,7 @@ const defaultState = {
     briefingIncludeCalendar: true,
     lastBriefingDate: '',
     calendarDaysAhead: 1,
-    radarAiEnabled: true,
-    radarAiRefreshIntervalHours: 6,
-    radarAiModel: ''
+    widgetMigrationVersion: DASHBOARD_WIDGET_MIGRATION_VERSION
   } as DashboardSettings,
 
   // Telegram Bot
@@ -1568,36 +1578,68 @@ export async function initializeUISettings(): Promise<void> {
         }
       }
 
-      // Migrate Dashboard-Widgets: Focus-Widget nachtragen wenn Nutzer vor der Einführung gespeichert hat
+      // Dashboard-Widgets nachtragen — EINMALIG, nicht bei jedem Start.
+      //
+      // Vorher liefen diese Nachträge bei jedem `initializeUISettings()`-Lauf. Wer ein Widget
+      // bewusst abwählte, hatte es nach dem nächsten App-Start wieder auf dem Dashboard. Beim
+      // 'radar' war das besonders teuer: mit ihm kehrte die KI-Relevanzanalyse zurück, die pro
+      // 🔴-Notiz einen Ollama-Lauf startet (an einem realen Vault: 37 Notizen à ~9 s auf einem
+      // 27B-Modell, zwei parallel — rund drei Minuten Volllast bei jedem Dashboard-Öffnen).
+      // Der Nutzer konnte das nicht abstellen, weil die Abwahl den Neustart nicht überlebte.
+      //
+      // `widgetMigrationVersion` merkt sich den erledigten Stand. Bestehende Installationen ohne
+      // Merker werden als „fertig migriert" gestempelt, OHNE die Nachträge erneut anzuwenden:
+      // alle betroffenen Widgets wurden vor 05/2026 eingeführt, jede aktive Installation hat sie
+      // längst gesehen. Ein fehlendes Widget ist dann eine bewusste Entscheidung — die zählt mehr
+      // als ein Nachtrag, den niemand mehr braucht. Fehlt ein neues Widget wirklich, holt der
+      // Nutzer es in Einstellungen → Dashboard zurück.
       if (validSettings.dashboard) {
         const dash = validSettings.dashboard as DashboardSettings
-        if (Array.isArray(dash.widgets) && !dash.widgets.includes('focus')) {
-          dash.widgets = ['focus', ...dash.widgets]
+        // Wichtig: die Version aus den GESPEICHERTEN Daten lesen, nicht aus `dash`. `dash` ist das
+        // Ergebnis des Deep-Merge mit den Defaults und trägt deshalb immer schon die aktuelle
+        // Versionsnummer — eine Prüfung darauf wäre tot und würde jede künftige Migration
+        // stillschweigend überspringen.
+        const savedDash = savedPersistedOnly.dashboard as Partial<DashboardSettings> | undefined
+        const hasSavedWidgets = Array.isArray(savedDash?.widgets)
+        const savedVersion = typeof savedDash?.widgetMigrationVersion === 'number'
+          ? savedDash.widgetMigrationVersion
+          : (hasSavedWidgets ? DASHBOARD_WIDGET_MIGRATION_VERSION : 0)
+
+        if (savedVersion < 1 && Array.isArray(dash.widgets)) {
+          // v1: Widgets, die nach der ersten Dashboard-Fassung dazukamen.
+          if (!dash.widgets.includes('focus')) {
+            dash.widgets = ['focus', ...dash.widgets]
+          }
+          if (!dash.widgets.includes('radar')) {
+            const focusIndex = dash.widgets.indexOf('focus')
+            dash.widgets = focusIndex >= 0
+              ? [...dash.widgets.slice(0, focusIndex + 1), 'radar', ...dash.widgets.slice(focusIndex + 1)]
+              : ['radar', ...dash.widgets]
+          }
+          if (!dash.widgets.includes('activity')) {
+            const radarIndex = dash.widgets.indexOf('radar')
+            dash.widgets = radarIndex >= 0
+              ? [...dash.widgets.slice(0, radarIndex + 1), 'activity', ...dash.widgets.slice(radarIndex + 1)]
+              : ['activity', ...dash.widgets]
+          }
+          if (!dash.widgets.includes('antares')) {
+            dash.widgets = [...dash.widgets, 'antares']
+          }
+          // 'project-status' (eingeführt 2026-05-17)
+          if (!dash.widgets.includes('project-status')) {
+            dash.widgets = [...dash.widgets, 'project-status']
+          }
         }
-        if (Array.isArray(dash.widgets) && !dash.widgets.includes('radar')) {
-          const focusIndex = dash.widgets.indexOf('focus')
-          dash.widgets = focusIndex >= 0
-            ? [...dash.widgets.slice(0, focusIndex + 1), 'radar', ...dash.widgets.slice(focusIndex + 1)]
-            : ['radar', ...dash.widgets]
-        }
-        if (Array.isArray(dash.widgets) && !dash.widgets.includes('activity')) {
-          const radarIndex = dash.widgets.indexOf('radar')
-          dash.widgets = radarIndex >= 0
-            ? [...dash.widgets.slice(0, radarIndex + 1), 'activity', ...dash.widgets.slice(radarIndex + 1)]
-            : ['activity', ...dash.widgets]
-        }
-        if (Array.isArray(dash.widgets) && !dash.widgets.includes('antares')) {
-          dash.widgets = [...dash.widgets, 'antares']
-        }
-        // Auto-migrate: 'project-status' bei bestehenden Installationen einfügen (eingeführt 2026-05-17)
-        if (Array.isArray(dash.widgets) && !dash.widgets.includes('project-status')) {
-          dash.widgets = [...dash.widgets, 'project-status']
-        }
-        if (typeof dash.radarAiEnabled !== 'boolean') dash.radarAiEnabled = true
-        if (typeof dash.radarAiRefreshIntervalHours !== 'number' || dash.radarAiRefreshIntervalHours <= 0) {
-          dash.radarAiRefreshIntervalHours = 6
-        }
-        if (typeof dash.radarAiModel !== 'string') dash.radarAiModel = ''
+        dash.widgetMigrationVersion = DASHBOARD_WIDGET_MIGRATION_VERSION
+
+        // Aufräumen: Die KI-Relevanzanalyse des Radars wurde 08/2026 entfernt. `deepMergeSettings`
+        // reicht unbekannte gespeicherte Schlüssel durch, sonst schleppte jede Installation diese
+        // drei toten Felder für immer weiter.
+        const legacyDash = dash as unknown as Record<string, unknown>
+        delete legacyDash.radarAiEnabled
+        delete legacyDash.radarAiRefreshIntervalHours
+        delete legacyDash.radarAiModel
+
       }
       // Migrate ollama: moduleModelOverrides ergänzen (eingeführt 2026-05-14)
       if (validSettings.ollama) {

@@ -101,7 +101,7 @@ npm run test         # vitest run — Unit-Tests für pure shared/-Logik
 Neuer IPC-Handler: `ipcMain.handle()` in `main/index.ts` + `contextBridge.exposeInMainWorld()` in `preload.ts`.
 
 ### State Management (Zustand, 16 Stores)
-- **uiStore**: UI-Einstellungen, persisted via `persistedKeys` Array. Enthält u.a. `ollama.moduleModelOverrides`, `brain.folderPath`, `notesRootFolder`, `fileTreeKindFilter`, `dashboard.radarAi*`, `editorDefaultView`, `imagesFolder`, `smartConnections.useLLMReranker`
+- **uiStore**: UI-Einstellungen, persisted via `persistedKeys` Array. Enthält u.a. `ollama.moduleModelOverrides`, `brain.folderPath`, `notesRootFolder`, `fileTreeKindFilter`, `editorDefaultView`, `imagesFolder`, `smartConnections.useLLMReranker`
 - **notesStore**: Notizen, Vault-Daten
 - **tabStore**: Tab-Verwaltung (Editor, Canvas, Dashboard, Code-Viewer)
 - **graphStore**: Graph-Canvas Positionen, Edges
@@ -170,7 +170,7 @@ Module als verbindbare Bausteine mit **typisierten Ports** auf einem React-Flow-
 ### Modell-Kompatibilitäts-Matrix
 - **Single-Source-of-Truth**: `app/src/shared/modelCompatibility.ts`. Datenstand im File-Header dokumentiert (`version: '2026-05-14'`).
 - **Modellnamen-Kanonisierung** (`canonicalModelKey`): Matrix-Keys sind Ollama-Tags, aber LM-Studio-IDs (`qwen/qwen3.5-4b`, `Meta-Llama-3.1-8B-Instruct-GGUF`, `mlx-community/…`) werden auf denselben kanonischen Schlüssel abgebildet — gleiche Gewichte = gleiches Verdict, und der Hard-Lock greift auch bei LM Studio. Fine-Tune-Suffixe (`-abliterated` etc.) erben bewusst NICHTS (fail-closed → untested). MLX-Miss fällt auf den GGUF-Eintrag zurück (nicht umgekehrt).
-- 5 Module: `brain`, `task-extraction`, `mail-summary`, `dashboard-snapshot`, `smart-connections`.
+- 5 Module: `brain`, `task-extraction`, `mail-summary`, `dashboard-snapshot`, `smart-connections`. **`dashboard-snapshot` hat seit dem Wegfall der KI-Relevanzanalyse (08/2026) keinen Verbraucher mehr** — Eintrag und Benchmark-Daten bleiben als Messdokumentation stehen, der Modell-Override in den Einstellungen läuft aber ins Leere.
 - 4 Verdicts: `green` (geeignet), `yellow` (Vorbehalt), `red` (Hard-Lock), `untested` (Default für unbekannte Modelle).
 - **`damageRelevant: true`** für `task-extraction` und `dashboard-snapshot` → bei `red` echter Code-Lock via `isHardLocked()`.
 - **Prio-Reihenfolge im Code**: tab-spezifisches Modell (z.B. `email.analysisModel`) → `ollama.moduleModelOverrides[module]` → globales `selectedModel`.
@@ -207,11 +207,13 @@ Module als verbindbare Bausteine mit **typisierten Ports** auf einem React-Flow-
 
 ### Relevanz-Radar (Dashboard-Widget „Relevante Notizen")
 - `DashboardPanel/DashboardView.tsx` → `RadarWidget`.
-- **KI-Score in localStorage**, nicht im Frontmatter (`mindgraph:relevance-cache:{vaultPath}`) — sonst Multi-Device-Sync-Konflikte.
-- Score-Mischung: KI-Score + heuristik-Boost (gedeckelt +25), **kein `Math.max`**. Sonst überstrahlt KI alle Tagessignale.
-- Concurrency-Lock als **Modul-Singleton** (`radarAiWorkerRunning`), nicht als `useRef` — sonst Doppelläufe bei schnellem Dashboard-Mount/Unmount.
+- **Rein heuristisch, kein LLM.** Score aus überfälligen/heutigen Aufgaben, Backlinks aus Lösungs-/Info-Notizen, thematisch passenden Mails und Terminen. Ein Durchlauf über 4171 Notizen kostet 3 ms.
+- **Die KI-Relevanzanalyse wurde 08/2026 entfernt** (IPC `note-analyze-relevance`, `dashboard.radarAi*`, localStorage-Cache `mindgraph:relevance-cache:*`). Sie lief bei jedem Dashboard-Öffnen über alle offenen 🔴-Notizen — an einem realen Vault 37 Stück à rund 9 s auf einem 27B-Modell, also drei Minuten Volllast für ein Ergebnis, das nie genutzt wurde. Nicht wieder einführen ohne Schalter in den Einstellungen und ohne Abbruch beim Verlassen des Tabs.
+- Beim Entfernen wurde der Heuristik-Deckel (`Math.min(score, 25)`) mit aufgehoben: er existierte nur, damit die Heuristik die KI-Skala nicht überstrahlt. Ohne KI hätte er die Rangfolge plattgedrückt — alles ab 25 Rohpunkten mit gleichem Endscore.
+- Historie/Delta-Anzeige bleibt (`mindgraph:radar-history:{vaultPath}`, 7 Tage).
 - ErrorBoundary pro Widget — ein Render-Crash im Radar darf nicht das ganze Dashboard mitnehmen.
 - **Nur 🔴-Notizen** kommen ins Radar (Frontmatter `category:` **oder** strikter Titel-Match nach `getNoteKindFromTitleStrict`).
+- Widget-Nachträge in `initializeUISettings` laufen **einmalig** über `dashboard.widgetMigrationVersion`. Vorher liefen sie bei jedem Start und holten abgewählte Widgets zurück — Ausschalten hielt nie. Neues Widget nachtragen: Version hochzählen, Nachtrag anhängen. Die Version aus den GESPEICHERTEN Daten lesen, nicht aus dem Deep-Merge-Ergebnis.
 
 ### Lokales Kontextgedächtnis (`utils/contextMemory.ts`)
 - localStorage-Event-Log mit 6 Typen: `note_opened`, `note_created`, `note_updated`, `note_deleted`, `task_created`, `task_updated`.

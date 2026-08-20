@@ -561,17 +561,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('email-relevance-config-load', vaultPath),
   emailRelevanceConfigSave: (vaultPath: string, config: unknown) =>
     ipcRenderer.invoke('email-relevance-config-save', vaultPath, config),
-  noteAnalyzeRelevance: (payload: {
-    vaultPath: string
-    noteRelativePath: string
-    model: string
-    context: {
-      todayIso: string
-      calendar: Array<{ title: string; startIso: string; daysAhead: number; location?: string }>
-      emails: Array<{ from: string; subject: string; snippet: string; date: string }>
-      recentNoteTitles: string[]
-    }
-  }) => ipcRenderer.invoke('note-analyze-relevance', payload),
   emailLoad: (vaultPath: string) =>
     ipcRenderer.invoke('email-load', vaultPath),
   emailSave: (vaultPath: string, data: { emails: object[]; lastFetchedAt: Record<string, string> }) =>

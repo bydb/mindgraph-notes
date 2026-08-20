@@ -1009,17 +1009,6 @@ export interface ElectronAPI {
   emailAnalyze: (vaultPath: string, model: string, emailIds?: string[], lowPowerMode?: boolean, cloud?: { model: string; provider?: 'openrouter' | 'llmbase' } | null) => Promise<{ success: boolean; analyzed: number; failed?: number; total?: number; lastError?: string | null; error?: string }>;
   emailRelevanceConfigLoad: (vaultPath: string) => Promise<{ success: boolean; config?: RelevanceConfig; hasBlock?: boolean; notePath?: string; error?: string }>;
   emailRelevanceConfigSave: (vaultPath: string, config: RelevanceConfig) => Promise<{ success: boolean; notePath?: string; error?: string }>;
-  noteAnalyzeRelevance: (payload: {
-    vaultPath: string
-    noteRelativePath: string
-    model: string
-    context: {
-      todayIso: string
-      calendar: Array<{ title: string; startIso: string; daysAhead: number; location?: string }>
-      emails: Array<{ from: string; subject: string; snippet: string; date: string }>
-      recentNoteTitles: string[]
-    }
-  }) => Promise<{ success: true; score: number; reason: string; model: string; checkedAt: string } | { success: false; error: string; raw?: string }>;
   emailLoad: (vaultPath: string) => Promise<{ emails: EmailMessage[]; lastFetchedAt: Record<string, string> } | null>;
   emailSave: (vaultPath: string, data: { emails: EmailMessage[]; lastFetchedAt: Record<string, string> }) => Promise<boolean>;
   emailContactsLoad: (vaultPath: string) => Promise<SavedEmailContact[]>;

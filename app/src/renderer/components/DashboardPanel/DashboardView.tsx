@@ -28,12 +28,10 @@ import {
   getNoteKindFromContent,
   getNoteKindFromTitleStrict,
   stripNoteKindMarker,
-  getNoteStatus,
-  getNoteRelevance
+  getNoteStatus
 } from '../../utils/noteKind'
 import { ErrorBoundary } from '../ErrorBoundary'
 import { ProjectStatusWidget } from '../ProjectStatusPanel/ProjectStatusWidget'
-import { isHardLocked } from '../../../shared/modelCompatibility'
 import { ActiveModelBadge } from '../Shared/ActiveModelBadge'
 import './DashboardView.css'
 
@@ -44,48 +42,9 @@ type RadarFeedbackValue = 'positive' | 'negative'
 const SLEEPING_THRESHOLD_DAYS = 14
 const RADAR_HISTORY_RETAIN_DAYS = 7
 
-// The radar widget can be mounted/unmounted quickly when the user switches views.
-// Keep the expensive Ollama relevance worker singleton at module level so a new
-// widget instance does not start a second batch while the previous one is still running.
-let radarAiWorkerRunning = false
-
 const getRadarHistoryKey = (vaultPath: string | null): string => `mindgraph:radar-history:${vaultPath || 'default'}`
 
 const getRadarUiKey = (vaultPath: string | null): string => `mindgraph:radar-ui:${vaultPath || 'default'}`
-
-// KI-Relevanz wird pro Gerät lokal in localStorage gehalten — vorher schrieb der AI-Worker die
-// Felder direkt ins Notiz-Frontmatter, was bei Multi-Device-Setups Sync-Konflikte produzierte
-// (jedes Gerät analysiert unabhängig → beide schreiben → Konflikt). Der Cache ist deviceintern,
-// die Notiz-Datei selbst wird durch eine Analyse nicht mehr verändert. Frontmatter-Reader bleibt
-// als Fallback für vor 0.5.34-beta analysierte Notizen.
-interface RelevanceCacheEntry {
-  score: number
-  reason: string
-  checkedAt: string
-  model: string
-}
-type RelevanceCacheMap = Record<string, RelevanceCacheEntry>
-
-const getRelevanceCacheKey = (vaultPath: string | null): string => `mindgraph:relevance-cache:${vaultPath || 'default'}`
-
-const loadRelevanceCache = (vaultPath: string | null): RelevanceCacheMap => {
-  try {
-    const raw = localStorage.getItem(getRelevanceCacheKey(vaultPath))
-    if (!raw) return {}
-    const parsed = JSON.parse(raw)
-    return parsed && typeof parsed === 'object' ? parsed : {}
-  } catch {
-    return {}
-  }
-}
-
-const saveRelevanceCache = (vaultPath: string | null, cache: RelevanceCacheMap): void => {
-  try {
-    localStorage.setItem(getRelevanceCacheKey(vaultPath), JSON.stringify(cache))
-  } catch {
-    // localStorage voll/gesperrt — kein kritisches Problem
-  }
-}
 
 
 interface RadarHistoryEntry {
@@ -153,6 +112,18 @@ const collectMarkdownPaths = (entries: FileEntry[], includePdfCompanions: boolea
   return paths
 }
 
+// Der Dashboard-Tab wird bei jedem Tab-Wechsel abgeräumt (App.tsx rendert ihn nur als aktiven
+// Tab). Lag der Snapshot ausschließlich in Komponenten-State, war er danach weg: zurück auf dem
+// Dashboard gab es erst einen Vollbild-Spinner und dann den kompletten Aufbau von vorn. Diese
+// beiden Modul-Variablen überleben den Wechsel — der letzte Stand steht beim Zurückkommen sofort
+// wieder da und wird nur noch leise im Hintergrund aufgefrischt.
+let lastSnapshotCache: { vaultPath: string | null; snapshot: DashboardSnapshot } | null = null
+// Der Vault-Neuladevorgang (readDirectory + readFilesBatch über alle Notizen) muss nur einmal pro
+// Vault laufen, nicht bei jedem Öffnen des Tabs. Der Pfad wird mitgeführt, damit ein Vault-Wechsel
+// den Reload wieder auslöst — sonst sähe das Dashboard im neuen Vault nur die Cache-Notizen mit
+// leerem `content` und übersähe alle per Frontmatter markierten Probleme.
+let vaultWithInitialReload: string | null = null
+
 const reloadVaultNotesForDashboard = async (vaultPath: string): Promise<Note[]> => {
   const tree = await window.electronAPI.readDirectory(vaultPath) as FileEntry[]
   useNotesStore.getState().setFileTree(tree)
@@ -183,19 +154,38 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onOpenInbox, onOpe
   const emails = useEmailStore(state => state.emails)
   const loadDashboardOffers = useEventAgentBridge(state => state.loadOffers)
 
-  const [snapshot, setSnapshot] = useState<DashboardSnapshot | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
+  // Beim Zurückkommen auf den Tab: letzten Snapshot sofort zeigen statt Spinner.
+  const cachedSnapshot = lastSnapshotCache && lastSnapshotCache.vaultPath === vaultPath
+    ? lastSnapshotCache.snapshot
+    : null
+  const [snapshot, setSnapshot] = useState<DashboardSnapshot | null>(cachedSnapshot)
+  const [isLoading, setIsLoading] = useState(cachedSnapshot === null)
   const [isRefreshing, setIsRefreshing] = useState(false)
 
+  // Snapshot zentral setzen, damit der Modul-Cache nie am State vorbeiläuft.
+  const publishSnapshot = useCallback((snap: DashboardSnapshot) => {
+    lastSnapshotCache = { vaultPath, snapshot: snap }
+    setSnapshot(snap)
+  }, [vaultPath])
+
+  // Nur das Buchungs-Widget zeigt edoobox-Daten an. Ohne dieses Widget war der Abruf reine
+  // Wartezeit: `listBookingsForOffer` fragt pro Veranstaltung erst die Buchungsliste, dann JEDE
+  // Buchung und JEDEN Teilnehmer einzeln und nacheinander ab (plugins/edoobox/service.ts).
+  // Bei ~120 ms pro Runde sind das mehrere Sekunden je Veranstaltung — für Daten, die niemand
+  // anzeigt. Und weil `notes`/`emails` in den Abhängigkeiten stehen, lief das auch bei jeder
+  // Notizänderung und jedem Mailabruf erneut.
+  const needsBookings = dashboard.widgets.includes('bookings')
+
   // Refs für robustes Reload-Verhalten:
-  // - isInitialLoadRef: setIsLoading(true) nur beim ersten Load, sonst silent reload
+  // - isInitialLoadRef: Vollbild-Spinner nur, solange noch gar kein Snapshot da ist. Liegt einer
+  //   aus dem Modul-Cache vor, wird stumm im Hintergrund aktualisiert.
   // - loadDebounceTimer: viele schnelle updateNote-Calls (KI-Worker) lösen sonst pro Notiz einen Full-Reload
   //   aus → Dashboard flackert permanent. Debounce sammelt Updates auf 800ms.
-  // - didInitialReloadRef: beim ersten Mount einmalig den Vault frisch von Disk laden, damit auch
-  //   Notizen mit `category: problem` im Frontmatter (ohne 🔴-Prefix im Titel) im Radar erscheinen.
-  //   Ohne das hatte Cmd+R systematisch weniger Kandidaten als der Aktualisieren-Button.
-  const isInitialLoadRef = useRef(true)
-  const didInitialReloadRef = useRef(false)
+  // - Der einmalige Vault-Neuladevorgang (damit auch Notizen mit `category: problem` im
+  //   Frontmatter erkannt werden) hängt an `vaultWithInitialReload` auf Modulebene, nicht an einem
+  //   Ref: ein Ref startet bei jedem Tab-Wechsel wieder bei null und hätte den ganzen Vault
+  //   jedes Mal neu von der Platte gelesen.
+  const isInitialLoadRef = useRef(cachedSnapshot === null)
   const loadDebounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const loadRequestIdRef = useRef(0)
 
@@ -207,7 +197,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onOpenInbox, onOpe
       const snapshotNotes = options?.reloadVault && vaultPath
         ? await reloadVaultNotesForDashboard(vaultPath)
         : notes
-      const latestOffers = await loadDashboardOffers({ includeBookings: true })
+      const latestOffers = needsBookings ? await loadDashboardOffers({ includeBookings: true }) : []
       const snap = await buildDashboardSnapshot({
         notes: snapshotNotes,
         vaultPath,
@@ -220,7 +210,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onOpenInbox, onOpe
         includeCalendar: true,
         taskLeadTime
       })
-      if (requestId === loadRequestIdRef.current) setSnapshot(snap)
+      if (requestId === loadRequestIdRef.current) publishSnapshot(snap)
     } catch (error) {
       // Defensive: ein einzelner fehlerhafter Sub-Call (edoobox-Timeout, Kalender-Permission-Race,
       // korruptes Frontmatter in einer Notiz) hat vorher die ganze Promise abgebrochen — der Effect
@@ -234,15 +224,15 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onOpenInbox, onOpe
         isInitialLoadRef.current = false
       }
     }
-  }, [notes, vaultPath, taskExcludedFolders, taskIncludedFolders, emails, loadDashboardOffers, dashboard.calendarDaysAhead, taskLeadTime])
+  }, [notes, vaultPath, taskExcludedFolders, taskIncludedFolders, emails, loadDashboardOffers, needsBookings, publishSnapshot, dashboard.calendarDaysAhead, taskLeadTime])
 
   useEffect(() => {
     // Initial: sofort laden, einmalig mit reloadVault damit alle Notizen Content haben (sonst
     // werden frontmatter-markierte Probleme nicht erkannt). Re-Triggers (z.B. durch updateNote
     // vom KI-Worker): 800ms debounce, ohne reloadVault.
     if (loadDebounceTimer.current) clearTimeout(loadDebounceTimer.current)
-    if (!didInitialReloadRef.current) {
-      didInitialReloadRef.current = true
+    if (vaultPath && vaultWithInitialReload !== vaultPath) {
+      vaultWithInitialReload = vaultPath
       loadSnapshot({ reloadVault: true })
     } else if (isInitialLoadRef.current) {
       loadSnapshot()
@@ -252,7 +242,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onOpenInbox, onOpe
     return () => {
       if (loadDebounceTimer.current) clearTimeout(loadDebounceTimer.current)
     }
-  }, [loadSnapshot])
+  }, [loadSnapshot, vaultPath])
 
   const handleTaskClick = (task: DashboardTask) => selectNote(task.noteId)
 
@@ -276,9 +266,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onOpenInbox, onOpe
     if (!vaultPath) return
     // Optimistisches Lokalpatch: Eintrag sofort aus dem Snapshot filtern,
     // damit das Häkchen wirkt, bevor saveEmails() durchläuft.
-    setSnapshot(prev => prev
-      ? { ...prev, emails: prev.emails.filter(e => e.email.id !== item.email.id) }
-      : prev)
+    setSnapshot(prev => {
+      if (!prev) return prev
+      const next = { ...prev, emails: prev.emails.filter(e => e.email.id !== item.email.id) }
+      lastSnapshotCache = { vaultPath, snapshot: next }
+      return next
+    })
     // Async im Hintergrund: Store-Update + Persistenz nach emails.json.
     // Fehler werden ignoriert — Snapshot wird beim nächsten regulären
     // loadSnapshot() ohnehin aus dem persistierten Stand rekonstruiert.
@@ -670,9 +663,6 @@ interface RadarItem {
   context?: RadarConnection
   delta: number | null   // null = neu im Radar oder keine History
   isNew: boolean
-  aiScore?: number       // 0-100 von Ollama (Stufe 2)
-  aiReason?: string      // 1-Satz-Begründung von Ollama
-  aiCheckedAt?: string   // ISO-Timestamp der KI-Analyse
 }
 
 interface SleepingItem {
@@ -733,8 +723,7 @@ const collectRadarSnapshot = (
   notes: Note[],
   snapshot: DashboardSnapshot,
   t: TFn,
-  previousScores: Record<string, number> | null,
-  relevanceCache: RelevanceCacheMap
+  previousScores: Record<string, number> | null
 ): RadarSnapshot => {
   const notesById = new Map(notes.map(note => [note.id, note]))
   const tasksByNote = new Map<string, { overdue: number; today: number; upcoming: number; critical: number }>()
@@ -883,29 +872,15 @@ const collectRadarSnapshot = (
     // gleichen Quatsch wie das UI produziert.
     const inScope = hasActionSignal || hasPositiveFeedback
 
-    // KI-Relevanz aus dem deviceintern persistierten Cache (Stufe 2): primäre Quelle ist
-    // localStorage, weil das Frontmatter sonst pro Analyse churnt und Sync-Konflikte produziert.
-    // Frontmatter-Reader bleibt als Fallback für Notizen, die vor 0.5.34-beta analysiert wurden.
-    const cached = relevanceCache[note.path]
-    const ai = cached
-      ? { score: cached.score, reason: cached.reason, checkedAt: cached.checkedAt, model: cached.model }
-      : getNoteRelevance(note)
-    const aiScore = typeof ai.score === 'number' ? ai.score : undefined
-    const heuristicScore = inScope ? score : 0
-    const hasMeaningfulAi = aiScore !== undefined && aiScore >= 40
-    // Score-Mischung: KI liefert die Hauptbewertung (Skala 0–100), Heuristik addiert einen
-    // gedeckelten Tagesdringlichkeits-Bonus oben drauf. Vorher Math.max — KI dominierte alles,
-    // Tagessignale unsichtbar. Erste Iteration mit Multiplikator 3 ohne Deckel — Heuristik
-    // explodierte (40+ Rohpunkte × 3 = +120), Endscores >150, KI hatte keinen Einfluss mehr.
-    // Jetzt: Boost mit Cap, sodass die KI-Skala intakt bleibt und der Bonus klar erkennbar oben
-    // draufkommt. Notizen ohne KI-Analyse mit aktivem Trigger bekommen einen Default-Sockel.
-    const heuristicBoostCap = 25
-    const aiFallback = 35
-    const heuristicBoost = Math.min(heuristicScore, heuristicBoostCap)
-    const aiBase = aiScore !== undefined
-      ? aiScore
-      : (heuristicScore > 0 ? aiFallback : 0)
-    const finalScore = aiBase + heuristicBoost
+    // Score = die heuristischen Signale (überfällige/heutige Aufgaben, Backlinks aus Lösungs-
+    // und Info-Notizen, passende Mails und Termine).
+    //
+    // Bis 08/2026 lag hier eine Mischung aus KI-Score und einem auf 25 gedeckelten Heuristik-
+    // Bonus. Der Deckel existierte nur, damit die Heuristik die KI-Skala nicht überstrahlt. Mit
+    // dem Wegfall der KI-Analyse wäre er schädlich geworden: alles ab 25 Rohpunkten hätte
+    // denselben Endscore bekommen und die Rangfolge wäre flach geworden. Deshalb zählt jetzt der
+    // Rohwert — er unterscheidet genau dort, wo die Liste sortiert wird.
+    const finalScore = inScope ? score : 0
 
     const previousScore = previousScores ? previousScores[note.id] : undefined
     const delta = previousScore === undefined ? null : finalScore - previousScore
@@ -919,21 +894,17 @@ const collectRadarSnapshot = (
       context,
       delta,
       isNew,
-      aiScore,
-      aiReason: ai.reason,
-      aiCheckedAt: ai.checkedAt,
       hasOpenTasks: !!taskStats && (taskStats.overdue + taskStats.today + taskStats.upcoming) > 0,
-      modifiedAt,
-      hasMeaningfulAi
+      modifiedAt
     }
   })
 
   const active: RadarItem[] = candidates
-    .filter(item => item.score > 0 || item.hasMeaningfulAi)
+    .filter(item => item.score > 0)
     .sort((a, b) => b.score - a.score)
     .slice(0, 5)
-    .map(({ note, score, triggers, solution, context, delta, isNew, aiScore, aiReason, aiCheckedAt }) =>
-      ({ note, score, triggers, solution, context, delta, isNew, aiScore, aiReason, aiCheckedAt })
+    .map(({ note, score, triggers, solution, context, delta, isNew }) =>
+      ({ note, score, triggers, solution, context, delta, isNew })
     )
 
   const activeIds = new Set(active.map(item => item.note.id))
@@ -1131,16 +1102,9 @@ const RadarWidget: React.FC<RadarWidgetProps> = ({ snapshot, notes, vaultPath, o
   const radarHistory = React.useMemo(() => loadRadarHistory(vaultPath), [vaultPath])
   const previousScores = React.useMemo(() => getPreviousScores(radarHistory), [radarHistory])
 
-  // Deviceinterner Relevanz-Cache. Wird beim AI-Worker-Lauf gefüllt; das Notiz-File wird nicht
-  // mehr durch eine Analyse verändert (vorher Sync-Konflikte auf 🔴-Notizen).
-  const [relevanceCache, setRelevanceCache] = useState<RelevanceCacheMap>(() => loadRelevanceCache(vaultPath))
-  useEffect(() => {
-    setRelevanceCache(loadRelevanceCache(vaultPath))
-  }, [vaultPath])
-
   const radarSnapshot = React.useMemo(
-    () => collectRadarSnapshot(notes, snapshot, t, previousScores, relevanceCache),
-    [notes, snapshot, t, previousScores, relevanceCache]
+    () => collectRadarSnapshot(notes, snapshot, t, previousScores),
+    [notes, snapshot, t, previousScores]
   )
 
   // Heutigen Snapshot persistieren — mit Dedupe-Ref, damit identische Score-Maps nicht jeden Render
@@ -1173,201 +1137,6 @@ const RadarWidget: React.FC<RadarWidgetProps> = ({ snapshot, notes, vaultPath, o
     })
   }
 
-  // ─── KI-Relevanz Auto-Analyse (Stufe 2) ────────────────────────────────────
-  // Selektive Subscriptions mit useShallow, damit der Effect nur bei tatsächlichen Setting-Änderungen re-triggert.
-  // Vorher: state.dashboard als ganzes Objekt → bei jedem dashboard-Field-Update neue Ref → Effect läuft mehrfach parallel.
-  const { radarAiEnabled, radarAiModel, radarAiRefreshIntervalHours } = useUIStore(useShallow(s => ({
-    radarAiEnabled: s.dashboard.radarAiEnabled,
-    radarAiModel: s.dashboard.radarAiModel,
-    radarAiRefreshIntervalHours: s.dashboard.radarAiRefreshIntervalHours
-  })))
-  const { ollamaEnabled, ollamaSelectedModel, dashboardOverride } = useUIStore(useShallow(s => ({
-    ollamaEnabled: s.ollama.enabled,
-    ollamaSelectedModel: s.ollama.selectedModel,
-    dashboardOverride: s.ollama.moduleModelOverrides?.['dashboard-snapshot'] || ''
-  })))
-  // Priorität: radarAiModel (Dashboard-Tab) → Modul-Override (Kompatibilitäts-Sektion) → globales selectedModel.
-  const aiModel = radarAiModel || dashboardOverride || ollamaSelectedModel
-  const aiHardLocked = aiModel ? isHardLocked(aiModel, 'dashboard-snapshot') : false
-  const aiEnabled = !!(radarAiEnabled && ollamaEnabled && aiModel && !aiHardLocked)
-
-  const [analyzingIds, setAnalyzingIds] = useState<Set<string>>(new Set())
-  const [forceRefreshTick, setForceRefreshTick] = useState(0)
-
-  // Refs für aktuellste Werte ohne Effect-Re-Trigger
-  const notesRef = useRef(notes)
-  notesRef.current = notes
-  const snapshotRef = useRef(snapshot)
-  snapshotRef.current = snapshot
-
-  const consumedForceRefreshTickRef = useRef(0)
-  // Spiegel des aktuellen Tick-Werts, damit der Batch-Finally erkennen kann, ob während des Laufs
-  // ein weiterer Refresh-Klick eingegangen ist (und entsprechend einen erneuten Lauf triggern muss).
-  const forceRefreshTickRef = useRef(forceRefreshTick)
-  forceRefreshTickRef.current = forceRefreshTick
-
-  useEffect(() => {
-    if (!aiEnabled || !vaultPath) {
-      console.log('[Radar] AI worker idle:', { aiEnabled, hasVault: !!vaultPath, model: aiModel, ollamaEnabled })
-      return
-    }
-    if (radarAiWorkerRunning) {
-      console.log('[Radar] AI worker already running, skipping re-trigger')
-      return
-    }
-
-    let canUpdateLocalState = true
-    const refreshMs = radarAiRefreshIntervalHours * 60 * 60 * 1000
-    const now = Date.now()
-    const forceRefresh = forceRefreshTick !== consumedForceRefreshTickRef.current
-
-    // Re-Analyze-Bedingungen (vereinfacht & robust):
-    // 1. Notiz hat kein relevanceCheckedAt im Frontmatter → noch nie analysiert
-    // 2. relevanceCheckedAt älter als refreshIntervalHours (Default 6h) → Cache abgelaufen
-    // 3. forceRefreshTick gesetzt → User hat manuellen Refresh-Button geklickt
-    //
-    // Modified-At-basiertes Re-Trigger absichtlich NICHT mehr drin: jeder Disk-Write des Workers
-    // bzw. jedes Watcher-Echo bzw. jeder Sync-Push erzeugt frisches modifiedAt — das hat in
-    // mehreren Hotfix-Iterationen zu Self-Trigger-Loops und Render-Crashes beim Tab-Wechsel
-    // geführt. User-Edits werden nun verlässlich nach Cache-Expiry (6h) oder via Refresh-Button
-    // analysiert; bei sofortigem Bedarf einfach den Refresh klicken.
-    // Re-Analyze-Bedingung prüft primär den Cache (jetzige Wahrheit), fällt für Altdaten auf
-    // das Frontmatter zurück.
-    const cacheAtTrigger = loadRelevanceCache(vaultPath)
-    const candidates = notesRef.current.filter(note => {
-      const kind = getNoteKindFromContent(note.content) || getNoteKindFromTitleStrict(note.title)
-      if (kind?.id !== 'problem') return false
-      if (getNoteStatus(note).status !== 'open') return false
-      if (forceRefresh) return true
-      const cached = cacheAtTrigger[note.path]
-      const checkedAtIso = cached?.checkedAt ?? getNoteRelevance(note).checkedAt
-      if (!checkedAtIso) return true
-      const checkedAtMs = new Date(checkedAtIso).getTime()
-      if (Number.isNaN(checkedAtMs)) return true
-      if (now - checkedAtMs > refreshMs) return true
-      return false
-    })
-
-    console.log(`[Radar] AI worker: ${candidates.length} candidates, model=${aiModel}, refreshIntervalH=${radarAiRefreshIntervalHours}, force=${forceRefresh}`)
-    if (forceRefresh) consumedForceRefreshTickRef.current = forceRefreshTick
-    if (candidates.length === 0) return
-
-    const todayIso = new Date().toISOString().split('T')[0]
-    const calendar = snapshotRef.current.calendar.slice(0, 8).map(c => ({
-      title: c.event.title,
-      startIso: typeof c.event.startDate === 'string' ? c.event.startDate : new Date(c.event.startDate).toISOString(),
-      daysAhead: c.dayOffset,
-      location: c.event.location
-    }))
-    const emails = snapshotRef.current.emails.slice(0, 6).map(e => ({
-      from: e.email.from.name || e.email.from.address,
-      subject: e.email.subject,
-      snippet: e.email.snippet,
-      date: e.email.date
-    }))
-    const fourteenDaysAgo = now - 14 * 24 * 60 * 60 * 1000
-    const recentNoteTitles = notesRef.current
-      .filter(n => {
-        const m = new Date(n.modifiedAt).getTime()
-        return !Number.isNaN(m) && m > fourteenDaysAgo
-      })
-      .sort((a, b) => new Date(b.modifiedAt).getTime() - new Date(a.modifiedAt).getTime())
-      .slice(0, 8)
-      .map(n => stripNoteKindMarker(n.title))
-
-    const candidateIds = candidates.map(c => c.id)
-    setAnalyzingIds(prev => {
-      const next = new Set(prev)
-      candidateIds.forEach(id => next.add(id))
-      return next
-    })
-
-    radarAiWorkerRunning = true
-    const runBatch = async () => {
-      // Reduzierte Parallelität: 2 statt 3, damit Ollama nicht überlastet
-      const batchSize = 2
-      for (let i = 0; i < candidates.length; i += batchSize) {
-        const batch = candidates.slice(i, i + batchSize)
-        await Promise.all(batch.map(async (note) => {
-          try {
-            const result = await window.electronAPI.noteAnalyzeRelevance({
-              vaultPath,
-              noteRelativePath: note.path,
-              model: aiModel,
-              context: { todayIso, calendar, emails, recentNoteTitles }
-            })
-            if (!result.success) {
-              console.warn('[Radar] AI analyze failed for', note.path, result.error)
-              return
-            }
-            console.log(`[Radar] AI analyzed "${note.title}" → score=${result.score}, reason="${result.reason}"`)
-            // Statt das Notiz-Frontmatter zu schreiben (vorher: Sync-Konflikt-Quelle Nr. 1 bei
-            // Multi-Device-Setups), legen wir das Ergebnis nur lokal in localStorage ab. Die Datei
-            // selbst wird durch eine Analyse nicht mehr verändert → kein modifiedAt-Bump → kein
-            // Sync-Push. State-Update triggert Re-Render des Radar-Snapshots.
-            if (canUpdateLocalState) {
-              setRelevanceCache(prev => {
-                const next = {
-                  ...prev,
-                  [note.path]: {
-                    score: result.score,
-                    reason: result.reason,
-                    checkedAt: result.checkedAt,
-                    model: result.model
-                  }
-                }
-                saveRelevanceCache(vaultPath, next)
-                return next
-              })
-            }
-          } catch (err) {
-            console.error('[Radar] AI analyze threw for', note.path, err)
-          } finally {
-            if (canUpdateLocalState) {
-              setAnalyzingIds(prev => {
-                const next = new Set(prev)
-                next.delete(note.id)
-                return next
-              })
-            }
-          }
-        }))
-      }
-    }
-    runBatch().finally(() => {
-      radarAiWorkerRunning = false
-      // Defensive Spinner-Aufräumung: wenn der Effect während des Batches ein zweites Mal
-      // gefeuert hat (z.B. weil sich aiEnabled/aiModel kurzzeitig ändert), wird canUpdateLocalState
-      // im ALTEN Closure auf false gesetzt — dadurch sprangen die per-Note `setAnalyzingIds(...delete)`
-      // ins Leere, und der Spinner-Counter blieb endlos hochgezählt, obwohl die Analyse längst
-      // durch war. Am Batch-Ende garantiert alle eigenen Kandidaten-IDs entfernen, damit der
-      // Spinner zuverlässig verschwindet.
-      setAnalyzingIds(prev => {
-        if (prev.size === 0) return prev
-        const next = new Set(prev)
-        let changed = false
-        for (const id of candidateIds) {
-          if (next.delete(id)) changed = true
-        }
-        return changed ? next : prev
-      })
-      console.log('[Radar] AI worker batch finished')
-      // Wenn während des Batches ein weiterer Force-Refresh-Klick einging (Tick > consumed),
-      // diesen jetzt nachholen — sonst geht der Klick verloren, weil der Effect beim Klick
-      // wegen radarAiWorkerRunning early-returnt hatte ohne consumed zu aktualisieren.
-      if (canUpdateLocalState && forceRefreshTickRef.current !== consumedForceRefreshTickRef.current) {
-        console.log('[Radar] Pending force-refresh detected, re-triggering')
-        setForceRefreshTick(prev => prev + 1)
-      }
-    })
-
-    return () => {
-      canUpdateLocalState = false
-      // The batch intentionally keeps running after unmount. A quick dashboard re-open should
-      // reuse the singleton lock instead of aborting and starting another Ollama batch.
-    }
-  }, [vaultPath, aiEnabled, aiModel, forceRefreshTick, radarAiRefreshIntervalHours])
-
   // Petrol redesign (Stage 2): leeres Radar kollabiert zur Einzeile (kein KI-Refresh nötig,
   // wenn es keine Notiz zu prüfen gibt).
   if (radarSnapshot.active.length === 0 && radarSnapshot.sleeping.length === 0) {
@@ -1378,30 +1147,6 @@ const RadarWidget: React.FC<RadarWidgetProps> = ({ snapshot, notes, vaultPath, o
     <section className="dv-widget dv-widget-radar">
       <header className="dv-widget-header">
         <h3>{t('dashboard.widgets.radar')}</h3>
-        <ActiveModelBadge
-          moduleId="dashboard-snapshot"
-          tabOverride={radarAiModel || undefined}
-          tabOverrideLabel="Radar-AI-Einstellung"
-        />
-        {aiEnabled && (
-          <button
-            type="button"
-            className="dv-radar-ai-refresh"
-            onClick={() => setForceRefreshTick(prev => prev + 1)}
-            disabled={analyzingIds.size > 0}
-            data-tooltip={analyzingIds.size > 0 ? t('dashboard.radar.aiRunning', { count: analyzingIds.size }) : t('dashboard.radar.aiRefresh')}
-            aria-label={t('dashboard.radar.aiRefresh')}
-          >
-            {analyzingIds.size > 0 ? (
-              <span className="dv-radar-ai-refresh-spinner" />
-            ) : (
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="23 4 23 10 17 10"/>
-                <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
-              </svg>
-            )}
-          </button>
-        )}
         <span className="dv-widget-count">{radarSnapshot.active.length}</span>
       </header>
       <div className="dv-widget-body">
@@ -1409,7 +1154,7 @@ const RadarWidget: React.FC<RadarWidgetProps> = ({ snapshot, notes, vaultPath, o
           {radarSnapshot.active.map(item => (
             <div
               key={item.note.id}
-                className={`dv-radar-row ${item.aiReason ? 'with-ai' : ''} ${analyzingIds.has(item.note.id) ? 'analyzing' : ''}`}
+                className="dv-radar-row"
                 role="button"
                 tabIndex={0}
                 onClick={() => onNoteClick(item.note.id)}
@@ -1419,16 +1164,9 @@ const RadarWidget: React.FC<RadarWidgetProps> = ({ snapshot, notes, vaultPath, o
                 {renderDelta(item.delta, item.isNew)}
                 <span className="dv-radar-body">
                   <span className="dv-radar-title">{getCleanNoteTitle(item.note)}</span>
-                  {item.aiReason ? (
-                    <span className="dv-radar-ai-reason" title={item.aiCheckedAt ? `KI-Analyse: ${new Date(item.aiCheckedAt).toLocaleString('de-DE')}` : undefined}>
-                      <span className="dv-radar-ai-badge">KI</span>
-                      {item.aiReason}
-                    </span>
-                  ) : (
-                    <span className="dv-radar-triggers">
-                      {item.triggers.slice(0, 2).join(' · ')}
-                    </span>
-                  )}
+                  <span className="dv-radar-triggers">
+                    {item.triggers.slice(0, 2).join(' · ')}
+                  </span>
                 </span>
                 <span className="dv-radar-actions" onClick={event => event.stopPropagation()}>
                   <button

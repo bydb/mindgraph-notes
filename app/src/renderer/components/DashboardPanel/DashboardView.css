@@ -1114,97 +1114,11 @@
   border-top: 1px solid var(--border-subtle);
 }
 
-/* KI-Reason im Radar-Item: ersetzt die jetzigen Trigger-Zähler wenn KI-Analyse vorliegt */
-.dv-radar-ai-reason {
-  font-size: 11.5px;
-  color: var(--text-secondary);
-  line-height: 1.35;
-  display: block;
-  white-space: normal;
-  word-wrap: break-word;
-}
-
-.dv-radar-ai-badge {
-  display: inline-block;
-  margin-right: 6px;
-  padding: 1px 5px;
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: 0.4px;
-  border-radius: 3px;
-  background: color-mix(in srgb, var(--accent-color) 15%, transparent);
-  color: color-mix(in srgb, var(--accent-color) 85%, var(--text-primary));
-  text-transform: uppercase;
-  vertical-align: middle;
-}
-
-/* Refresh-Button im Radar-Header */
-.dv-radar-ai-refresh {
-  background: transparent;
-  border: 1px solid var(--border-subtle);
-  border-radius: 5px;
-  cursor: pointer;
-  color: var(--text-muted);
-  padding: 3px 6px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  margin-right: 6px;
-  position: relative;
-}
-
 /* Widget-Header-Tooltips nach UNTEN rendern, sonst werden sie über die Karten-Border
    hinaus gezeichnet und auf dem Akzent-getönten Header unleserlich. */
 .dv-widget-header [data-tooltip]::after {
   bottom: auto;
   top: calc(100% + 6px);
-}
-.dv-radar-ai-refresh:hover:not(:disabled) {
-  color: var(--text-primary);
-  border-color: var(--border-color);
-  background: var(--bg-hover);
-}
-.dv-radar-ai-refresh:disabled {
-  cursor: progress;
-  opacity: 0.85;
-}
-
-.dv-radar-ai-refresh-spinner {
-  width: 11px;
-  height: 11px;
-  border: 1.5px solid color-mix(in srgb, var(--text-muted) 35%, transparent);
-  border-top-color: var(--text-secondary);
-  border-radius: 50%;
-  animation: dv-radar-ai-spin 0.85s linear infinite;
-}
-
-@keyframes dv-radar-ai-spin {
-  to { transform: rotate(360deg); }
-}
-
-/* Item, das gerade analysiert wird: dezenter Pulse statt blockierender Overlay */
-.dv-radar-row.analyzing {
-  position: relative;
-}
-.dv-radar-row.analyzing::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: linear-gradient(90deg,
-    transparent 0%,
-    color-mix(in srgb, var(--accent-color) 6%, transparent) 50%,
-    transparent 100%);
-  background-size: 200% 100%;
-  animation: dv-radar-shimmer 1.4s ease-in-out infinite;
-  pointer-events: none;
-}
-
-@keyframes dv-radar-shimmer {
-  0% { background-position: -100% 0; }
-  100% { background-position: 200% 0; }
 }
 
 /* Solved-Counter Footer */
