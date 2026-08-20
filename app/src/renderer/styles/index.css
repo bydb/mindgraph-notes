@@ -21969,3 +21969,16 @@ body.presentation-mode *::after {
   opacity: 0.6;
   font-size: 0.85em;
 }
+
+/* Auslöser für die Termin-Erkennung in der Mail-Detailansicht. */
+.inbox-event-trigger {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 10px 0;
+}
+
+.inbox-event-error {
+  font-size: 12px;
+  color: var(--color-error, #c1553f);
+}

@@ -1,0 +1,131 @@
+/* Prüfkarte für einen erkannten Termin. Karteikarten-Look wie die übrigen
+   Modul-Panels, ruhig gehalten — hier wird geprüft, nicht gestaltet. */
+
+.event-draft {
+  margin: 12px 0;
+  padding: 14px 16px;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--bg-secondary) 55%, transparent);
+}
+
+.event-draft-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.event-draft-title {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.event-draft-close {
+  border: none;
+  background: none;
+  color: var(--text-secondary);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 4px;
+}
+
+/* Angenommene Werte und verworfene Felder. Bewusst sichtbar und nicht als
+   Tooltip versteckt: Wer eine angenommene Dauer nicht bemerkt, trägt sie ein. */
+.event-draft-problems {
+  margin: 0 0 12px;
+  padding: 8px 10px 8px 26px;
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--color-warning, #d08540) 12%, transparent);
+  color: var(--text-primary);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.event-draft-field {
+  display: block;
+  margin-bottom: 10px;
+}
+
+.event-draft-field > span {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.event-draft-field input,
+.event-draft-field textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 6px 9px;
+  border: 1px solid var(--border-color);
+  border-radius: 7px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 13px;
+}
+
+.event-draft-field textarea { resize: vertical; }
+
+.event-draft-row {
+  display: flex;
+  gap: 10px;
+}
+
+.event-draft-row .event-draft-field { flex: 1; }
+.event-draft-field--narrow { flex: 0 0 110px !important; }
+
+.event-draft-reminders {
+  margin: 2px 0 12px;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.event-draft-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.event-draft-btn {
+  padding: 7px 13px;
+  border: 1px solid var(--border-color);
+  border-radius: 7px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.event-draft-btn:hover:not(:disabled) { background: var(--bg-hover); }
+.event-draft-btn:disabled { opacity: 0.5; cursor: default; }
+
+/* Dieselben Tokens wie .inbox-action-btn--primary. Ein fest verdrahtetes Weiss
+   ist hier falsch: Die Akzentfarbe ist themen- und einstellungsabhaengig (der
+   Akzent „ink" ist im hellen Thema fast schwarz, im dunklen fast weiss), und
+   --accent-on traegt genau die dazu passende Schriftfarbe. */
+.event-draft-btn--primary {
+  background: var(--accent-color);
+  border-color: var(--accent-color);
+  color: var(--accent-on);
+}
+
+.event-draft-btn--primary:hover:not(:disabled) {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+  color: var(--accent-on);
+}
+
+.event-draft-ok,
+.event-draft-err {
+  margin-top: 10px;
+  font-size: 12px;
+}
+
+.event-draft-ok { color: var(--color-success, #3d8b58); }
+.event-draft-err { color: var(--color-error, #c1553f); }
