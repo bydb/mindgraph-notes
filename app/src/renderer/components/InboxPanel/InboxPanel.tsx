@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useMemo } from 'react'
+import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { useEmailStore } from '../../stores/emailStore'
 import { collectOwnAddresses, collectReplyAllRecipients } from '../../../shared/emailReply'
@@ -16,6 +16,9 @@ import { IconCalendar } from '../Shared/Icons'
 import { PanelHeader, PanelHeaderButton, PanelHeaderIconButton } from '../Shared/PanelHeader'
 import { avatarInitial } from '../../utils/avatarInitial'
 import type { EmailMessage } from '../../../shared/types'
+import { EventDraftCard } from './EventDraftCard'
+import type { CalendarEventDraft } from '../../../shared/calendarEvent'
+import { CLOUD_PROVIDER_META, cloudProviderForSentinel, isCloudProviderReady } from '../../../shared/llmBackend'
 
 const isMac = window.electronAPI.platform === 'darwin'
 
@@ -137,6 +140,10 @@ export const InboxPanel: React.FC<InboxPanelProps> = ({ onClose }) => {
   const projectsRootFolder = useUIStore(s => s.projectsRootFolder)
   const projectRagEnabled = useIsModuleEnabled('project-rag')
   const ragEmbedModel = useUIStore(s => s.ollama.projectRagEmbeddingModel)
+  const taskModelOverride = useUIStore(s => s.ollama.moduleModelOverrides?.['task-extraction'] || '')
+  const globalModel = useUIStore(s => s.ollama.selectedModel || '')
+  const openrouterSettings = useUIStore(s => s.ollama.openrouter)
+  const llmbaseSettings = useUIStore(s => s.ollama.llmbase)
   // Semantisches Re-Ranking ambiger Projekt-Kandidaten (nur Sortierung, kein Auto-Assign).
   const [ambiguousRank, setAmbiguousRank] = useState<Record<string, number | null>>({})
   const projects = useProjectStatusStore(s => s.projects)
@@ -163,6 +170,14 @@ export const InboxPanel: React.FC<InboxPanelProps> = ({ onClose }) => {
   const [attachmentError, setAttachmentError] = useState('')
   const [attachmentAction, setAttachmentAction] = useState<Record<number, 'busy' | 'done' | 'error'>>({})
   const [icsMsg, setIcsMsg] = useState('')
+  // Terminvorschlag aus dem Mailtext. Entsteht erst auf Klick — der Modellaufruf
+  // laeuft nicht bei jeder Mail mit, sondern nur wenn jemand ihn anfordert.
+  const [eventDraft, setEventDraft] = useState<{ draft: CalendarEventDraft; problems: Array<{ field: string; message: string }> } | null>(null)
+  const [eventBusy, setEventBusy] = useState(false)
+  const [eventError, setEventError] = useState('')
+  // Generation statt nur Boolean: Wechselt der Nutzer waehrend des Modellaufrufs
+  // die Mail, darf die spaete Antwort nicht in der neuen Mail erscheinen.
+  const eventRequestGeneration = useRef(0)
   // Platz fürs Lesen: Anhänge + Analyse-Details standardmäßig eingeklappt.
   // attachmentsExpanded wird pro Mail zurückgesetzt; analysisExpanded gilt für die Session
   // (wer die Details aufklappt, will sie meist auch bei der nächsten Mail sehen).
@@ -171,12 +186,16 @@ export const InboxPanel: React.FC<InboxPanelProps> = ({ onClose }) => {
 
   // Body-/Anhang-State bei Mailwechsel zurücksetzen (sonst Leak aus der vorherigen Mail).
   useEffect(() => {
+    eventRequestGeneration.current += 1
     setBodyHtmlView(false)
     setAttachmentList(null)
     setAttachmentError('')
     setAttachmentAction({})
     setIcsMsg('')
     setAttachmentsExpanded(false)
+    setEventDraft(null)
+    setEventBusy(false)
+    setEventError('')
   }, [selectedEmailId])
 
   const openLink = useCallback((href: string) => {
@@ -316,6 +335,57 @@ export const InboxPanel: React.FC<InboxPanelProps> = ({ onClose }) => {
   const selectedEmail = selectedEmailId
     ? emails.find(e => e.id === selectedEmailId)
     : null
+
+  const handleExtractEvent = useCallback(async () => {
+    if (!selectedEmail) return
+    const requestGeneration = ++eventRequestGeneration.current
+    setEventBusy(true); setEventError(''); setEventDraft(null)
+    try {
+      // Exakt dieselbe Routing-Policy wie bei der Mail-Analyse: Der Tab-Wert kann
+      // ein lokales Modell ODER ein Cloud-Sentinel sein. Ein Sentinel darf nie als
+      // vermeintlicher Modellname an Ollama gehen.
+      const analysisChoice = emailSettings.analysisModel?.trim() || ''
+      const cloudProvider = cloudProviderForSentinel(analysisChoice)
+      const cloudSettings = cloudProvider === 'openrouter'
+        ? openrouterSettings
+        : cloudProvider === 'llmbase'
+          ? llmbaseSettings
+          : undefined
+      if (cloudProvider && !isCloudProviderReady(cloudSettings)) {
+        setEventError(t('inbox.event.cloudUnavailable', { provider: CLOUD_PROVIDER_META[cloudProvider].label }))
+        return
+      }
+
+      const localChoice = analysisChoice && !cloudProvider ? analysisChoice : ''
+      const model = localChoice || taskModelOverride || globalModel || ''
+      const cloud = cloudProvider && cloudSettings
+        ? {
+            provider: cloudProvider,
+            model: cloudSettings.moduleModelOverrides?.['task-extraction']?.trim() || cloudSettings.model.trim(),
+          }
+        : null
+      const now = new Date()
+      const todayIso = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+      const r = await window.electronAPI.emailExtractEvent({
+        model,
+        cloud,
+        subject: selectedEmail.subject || '',
+        body: selectedEmail.bodyText || '',
+        from: selectedEmail.from?.address,
+        todayIso,
+      })
+      if (requestGeneration !== eventRequestGeneration.current) return
+      if (r.success && r.draft) setEventDraft({ draft: r.draft, problems: r.problems || [] })
+      else if (r.noEvent) setEventError(t('inbox.event.noEvent'))
+      else setEventError(r.error || t('inbox.event.failed'))
+    } catch (e) {
+      if (requestGeneration === eventRequestGeneration.current) {
+        setEventError(e instanceof Error ? e.message : t('inbox.event.failed'))
+      }
+    } finally {
+      if (requestGeneration === eventRequestGeneration.current) setEventBusy(false)
+    }
+  }, [selectedEmail, emailSettings.analysisModel, taskModelOverride, globalModel, openrouterSettings, llmbaseSettings, t])
 
   const projectMatches = useMemo(() => {
     if (!selectedEmail || projects.length === 0) return []
@@ -774,6 +844,23 @@ export const InboxPanel: React.FC<InboxPanelProps> = ({ onClose }) => {
                   )}
                   {icsMsg && <div className="inbox-attachment-ok">{icsMsg}</div>}
                   {attachmentError && <div className="inbox-attachment-err">{attachmentError}</div>}
+                </div>
+              )}
+
+              {/* Termin aus dem Mailtext — greift auch bei Mails OHNE .ics-Anhang,
+                  wo Ort, Datum und Konferenzlink nur im Fliesstext stehen. */}
+              {eventDraft ? (
+                <EventDraftCard
+                  draft={eventDraft.draft}
+                  problems={eventDraft.problems}
+                  onClose={() => setEventDraft(null)}
+                />
+              ) : (
+                <div className="inbox-event-trigger">
+                  <button className="inbox-action-btn" onClick={handleExtractEvent} disabled={eventBusy}>
+                    {eventBusy ? t('inbox.event.searching') : t('inbox.event.create')}
+                  </button>
+                  {eventError && <span className="inbox-event-error">{eventError}</span>}
                 </div>
               )}
 

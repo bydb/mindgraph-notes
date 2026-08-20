@@ -637,8 +637,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Apple Calendar (macOS)
   calendarGetEvents: (startDate: string, endDate: string) =>
     ipcRenderer.invoke('calendar-get-events', startDate, endDate),
-  calendarCreateEvent: (params: { title: string; startIso: string; durationMinutes: number; notes?: string }) =>
+  calendarCreateEvent: (params: { title: string; startIso: string; durationMinutes: number; notes?: string; location?: string; url?: string; reminderMinutes?: number[] }) =>
     ipcRenderer.invoke('calendar-create-event', params),
+  // Termin als .ics speichern — plattformunabhaengig, im Gegensatz zum EventKit-Weg.
+  calendarSaveIcs: (draft: unknown, reminderMinutes?: number[]) =>
+    ipcRenderer.invoke('calendar-save-ics', draft, reminderMinutes),
+  // Terminvorschlag aus einer Mail ziehen (eigener Modellaufruf, nur auf Klick).
+  emailExtractEvent: (payload: { model: string; cloud?: { model: string; provider?: 'openrouter' | 'llmbase' } | null; subject: string; body: string; from?: string; todayIso: string }) =>
+    ipcRenderer.invoke('email-extract-event', payload),
   calendarRequestAccess: () =>
     ipcRenderer.invoke('calendar-request-access'),
 
