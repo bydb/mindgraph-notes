@@ -2,6 +2,30 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.10.52-beta] - 2026-08-20
+
+Das Dashboard war nach jedem Klick auf einen Termin minutenlang beschäftigt. Ursache war nicht das Laden der Notizen, sondern eine KI-Analyse im Hintergrund. Sie ist entfernt.
+
+### Behoben
+
+- **Das Dashboard wartet nicht mehr auf ein Sprachmodell.** Nachgemessen an einem echten Vault mit 4171 Notizen: Ordner durchsuchen, 12 MB Notizen lesen und auswerten kostet zusammen 0,7 Sekunden. Die restliche Wartezeit ging an die Relevanzanalyse für Notizen, die bei jedem Öffnen des Dashboards jede offene Problem-Notiz einzeln durch das lokale Sprachmodell schickte — im Test 37 Notizen zu je rund neun Sekunden auf einem 27B-Modell, zwei gleichzeitig. Das sind rund drei Minuten Volllast, und zwar bei jedem Öffnen, sobald der Zwischenspeicher älter als sechs Stunden war.
+
+  Verschärfend kam hinzu, dass der Lauf nach dem Verlassen des Dashboards absichtlich weiterrechnete — das Ergebnis aber verwarf, weil der Schreibvorgang daran hing, ob die Ansicht noch geöffnet war. Die App wurde also minutenlang zäh, während man längst in einer Notiz arbeitete, und beim nächsten Öffnen fing dieselbe Notiz wieder bei null an.
+
+  Die Analyse ist vollständig entfernt. Das Widget „Relevante Notizen" bleibt und sortiert weiter nach überfälligen und heute fälligen Aufgaben, Verweisen aus Lösungs- und Info-Notizen sowie thematisch passenden Mails und Terminen. Ein Durchlauf kostet jetzt drei Millisekunden.
+
+- **Abgewählte Widgets bleiben abgewählt.** Beim Programmstart trug die App fehlende Dashboard-Widgets nach — ohne zu unterscheiden, ob sie neu hinzugekommen waren oder bewusst abgeschaltet wurden. Wer ein Widget abwählte, hatte es nach dem nächsten Start zurück. Beim Widget „Relevante Notizen" bedeutete das, dass sich die Analyse überhaupt nicht abstellen ließ: ein Bedienelement dafür gab es nie, und der einzige Weg — das Widget entfernen — überlebte den Neustart nicht. Die Nachträge laufen jetzt einmalig über einen Versionsmerker.
+
+- **Zurückkommen zeigt sofort den letzten Stand.** Der Dashboard-Tab wird beim Wechseln abgeräumt. Weil die Daten nur in der Ansicht selbst lagen, gab es beim Zurückkommen erst einen Ladekreis über der ganzen Seite und dann den kompletten Neuaufbau. Der letzte Stand überlebt den Wechsel jetzt und wird leise im Hintergrund aufgefrischt. Der Vault wird außerdem nur noch einmal je Sitzung neu von der Platte gelesen statt bei jedem Tab-Wechsel.
+
+- **Veranstaltungsdaten werden nur noch geholt, wenn sie jemand anzeigt.** Das Dashboard lud bei jedem Aufbau die edoobox-Buchungen — auch ohne aktives Widget „Neue Anmeldungen". Der Abruf fragt pro Veranstaltung erst die Buchungsliste und dann jede Buchung und jeden Teilnehmer einzeln und nacheinander ab; bei rund 120 Millisekunden pro Anfrage summiert sich das je Veranstaltung auf Sekunden. Ausgelöst wurde er nicht nur beim Öffnen, sondern auch bei jeder Notizänderung und bei jedem Mailabruf im Fünf-Minuten-Takt.
+
+### Hinweis für Bestandsinstallationen
+
+Die Widget-Nachträge werden einmalig als erledigt vermerkt, statt erneut angewendet zu werden. Alle betroffenen Widgets wurden vor Mai 2026 eingeführt und sind in laufenden Installationen längst vorhanden; ein fehlendes Widget ist deshalb als bewusste Entscheidung gewertet. Fehlt trotzdem eines, lässt es sich unter Einstellungen → Dashboard → Sichtbare Widgets zurückholen.
+
+Notizen, die noch die Felder `relevanceScore`, `relevanceReason`, `relevanceCheckedAt` und `relevanceModel` im Frontmatter tragen, behalten sie. Sie werden von nichts mehr gelesen und können bei Bedarf von Hand entfernt werden.
+
 ## [0.10.51-beta] - 2026-08-20
 
 Aus einer Einladung per E-Mail wird ein Kalendertermin — auch dann, wenn keine Kalenderdatei angehängt ist.

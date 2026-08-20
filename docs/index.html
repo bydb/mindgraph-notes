@@ -48,7 +48,7 @@
     "url": "https://mindgraph-notes.de/",
     "downloadUrl": "https://github.com/bydb/mindgraph-notes/releases",
     "screenshot": "https://mindgraph-notes.de/screenshot.png",
-    "softwareVersion": "0.10.51-beta",
+    "softwareVersion": "0.10.52-beta",
     "author": { "@type": "Person", "name": "Jochen Leeder", "url": "https://bydb.io" },
     "license": "https://opensource.org/licenses/AGPL-3.0",
     "featureList": [
@@ -495,7 +495,7 @@
         <span class="hero-dot"></span>
         <span data-i18n="hero.badge">Open Source &middot; Lokal &middot; Kostenlos</span>
       </div>
-      <a class="release-badge" href="#changelog" data-i18n="hero.release">Teilnehmerlisten ohne Warteliste &middot; v0.10.49</a>
+      <a class="release-badge" href="#changelog" data-i18n="hero.release">Das Dashboard ist wieder schnell &middot; v0.10.52</a>
     </div>
 
     <h1 data-i18n="hero.title">Der Fokus bleibt.<br><em>Auch wenn das Leben dazwischenkommt.</em></h1>
@@ -1630,7 +1630,7 @@
     <div class="release-inner">
       <div class="release-head">
         <div>
-          <div class="st-eyebrow"><span class="d"></span><span data-i18n="release.label">Release 0.10.49 &middot; Teilnehmerlisten ohne Warteliste</span></div>
+          <div class="st-eyebrow"><span class="d"></span><span data-i18n="release.label">Release 0.10.52 &middot; Das Dashboard ist wieder schnell</span></div>
           <h2 class="st-h" style="font-size:clamp(1.8rem,3.8vw,2.6rem)" data-i18n="release.heading">Was ist neu &mdash; <em>die Bild-Generierung l&auml;uft auf Googles neues Modell und funktioniert wieder.</em></h2>
           <p class="st-lead" data-i18n="release.lead">Die Bild-Generierung wurde auf Google Nano Banana umgestellt &mdash; das aktuelle Bildmodell hinter Gemini. Beim Pr&uuml;fen gegen die echte Schnittstelle zeigte sich, dass das Modell nur JPEG liefert: Die Anfrage nach PNG h&auml;tte jeden einzelnen Aufruf mit einem Fehler beantwortet. Das ist behoben, bevor es jemanden getroffen hat.</p>
         </div>
@@ -1905,7 +1905,7 @@
         "how.p5h": "Das Web, wenn du es brauchst",
         "how.p5": "Schalte die Webrecherche pro Auftrag zu – ganz optional. Der Agent sucht, liest die passenden Seiten und schreibt eine Notiz mit sauberem Quellenverzeichnis; du prüfst sie, bevor sie in deinen Vault kommt. Der Suchanbieter erhält nur die Suchanfragen; die vollständigen Seiten ruft die App lokal ab. Bei einem optionalen Cloud-Modell geht der gelesene Kontext zusätzlich an dessen Anbieter – darauf weist die App vor dem Lauf hin. Den Suchanbieter wählst du selbst: sofort einsatzbereit oder deine eigene, private Suchmaschine.",
         "hero.badge": "Open Source \u00b7 Lokal \u00b7 Kostenlos",
-        "hero.release": "Termine aus E-Mails in den Kalender &middot; v{vs}",
+        "hero.release": "Das Dashboard ist wieder schnell &middot; v{vs}",
         "hero.videoPause": "Anhalten",
         "hero.videoPlay": "Abspielen",
         "hero.videoStart": "Video abspielen",
@@ -1982,15 +1982,15 @@
         "modules.opt.vision": "Vision OCR",
         "modules.opt.speech": "Diktat & Vorlesen",
         "modules.opt.terminal": "Terminal",
-        "release.label": "Release {vs} · Termine aus E-Mails in den Kalender",
-        "release.heading": "Was ist neu — <em>aus einer Einladung wird ein Kalendertermin, auch ohne Anhang.</em>",
-        "release.lead": "Einladungen aus Behörden und Schulen kommen selten mit einer Kalenderdatei. Ort, Datum, Dauer und der Zugangslink stehen einfach im Text. Die App liest sie jetzt heraus, zeigt sie zum Prüfen und trägt sie auf Wunsch ein — oder legt eine Kalenderdatei ab, die jedes Programm versteht.",
-        "release.c1h": "Termin erstellen, direkt aus der Mail",
-        "release.c1": "Ein Schalter in der Mail-Ansicht liest Titel, Beginn, Dauer, Ort und den Link zur Videokonferenz heraus. Danach entweder direkt in den Kalender oder als Datei zum Doppelklicken. Erinnerungen kommen mit: eine am Vortag, eine 15 Minuten vorher.",
-        "release.c2h": "Nichts landet ungeprüft im Kalender",
-        "release.c2": "Vor dem Eintragen erscheint eine Karte, in der jedes Feld änderbar ist. Hat die App etwas angenommen, steht es dort — etwa „Keine Dauer erkannt, 60 Minuten angenommen". Ein falscher Termin im Kalender fällt sonst niemandem auf, und das ist schlimmer als gar keiner.",
-        "release.c3h": "Der Zugangslink wird gesucht, nicht geraten",
-        "release.c3": "Den Link zur Videokonferenz sucht die App selbst im Text, statt ihn sich vom Sprachmodell nennen zu lassen — eine gekürzte oder erfundene Adresse merkt man erst vor verschlossener Tür. Erkannt werden die verbreiteten Dienste; Abmelde- und Impressumslinks bleiben außen vor.",
+        "release.label": "Release {vs} · Das Dashboard ist wieder schnell",
+        "release.heading": "Was ist neu — <em>das Dashboard wartet nicht mehr auf ein Sprachmodell.</em>",
+        "release.lead": "Das Dashboard brauchte nach jedem Klick auf einen Termin lange, bis es wieder stand. Nachgemessen an einem echten Vault mit 4171 Notizen: Dateien lesen und auswerten kostet zusammen 0,7 Sekunden — die restliche Wartezeit ging an eine KI-Analyse, die bei jedem Öffnen alle offenen Problem-Notizen durch ein lokales Modell schickte. Die ist jetzt raus.",
+        "release.c1h": "Zurückkommen zeigt sofort den letzten Stand",
+        "release.c1": "Wer eine Aufgabe anklickte und dann zurück aufs Dashboard ging, sah einen Ladekreis über der ganzen Seite und musste den Aufbau abwarten. Jetzt steht die letzte Ansicht sofort wieder da und frischt sich leise im Hintergrund auf. Auch der Vault wird nur noch einmal je Sitzung neu eingelesen statt bei jedem Wechsel.",
+        "release.c2h": "Die Relevanzanalyse für Notizen ist entfernt",
+        "release.c2": "Sie bewertete beim Öffnen jede offene Problem-Notiz einzeln mit einem Sprachmodell — im Test 37 Notizen zu je rund neun Sekunden, also Minuten unter Volllast, und das auch noch, nachdem man das Dashboard längst verlassen hatte. Das Widget „Relevante Notizen" bleibt und sortiert weiterhin nach überfälligen Aufgaben, Verweisen, Mails und Terminen. Ein Durchlauf dauert jetzt drei Millisekunden.",
+        "release.c3h": "Abgewählte Widgets bleiben abgewählt",
+        "release.c3": "Beim Start trug die App fehlende Dashboard-Widgets nach — auch solche, die man absichtlich abgeschaltet hatte. Ausschalten hielt damit nie länger als bis zum nächsten Programmstart. Die Nachträge laufen jetzt einmalig; eine bewusste Entscheidung bleibt bestehen.",
         "release.link": "Vollständige Release Notes auf GitHub →",
         "dl.label": "Download",
         "dl.heading": "Jetzt starten.",
@@ -2173,7 +2173,7 @@
         "how.p5h": "The web, when you need it",
         "how.p5": "Turn on web research per task – entirely optional. The agent searches, reads the relevant pages and writes a note with a clean list of sources; you review it before it enters your vault. The search provider receives only the queries; the app fetches full pages locally. With an optional cloud model, the extracted context is also sent to that model provider – the app warns you before the run. You choose the search provider yourself: ready to use or your own private search engine.",
         "hero.badge": "Open Source \u00b7 Local \u00b7 Free",
-        "hero.release": "Turn email invitations into calendar events &middot; v{vs}",
+        "hero.release": "The dashboard is quick again &middot; v{vs}",
         "hero.videoPause": "Pause",
         "hero.videoPlay": "Play",
         "hero.videoStart": "Play video",
@@ -2250,15 +2250,15 @@
         "modules.opt.vision": "Vision OCR",
         "modules.opt.speech": "Dictation & TTS",
         "modules.opt.terminal": "Terminal",
-        "release.label": "Release {vs} · Turn email invitations into calendar events",
-        "release.heading": "What’s new — <em>an invitation becomes a calendar event, even without an attachment.</em>",
-        "release.lead": "Invitations from schools and public bodies rarely come with a calendar file. Place, date, duration and the joining link simply sit in the text. The app now reads them out, shows them for review, and adds the event — or writes a calendar file any program understands.",
-        "release.c1h": "Create an event straight from the email",
-        "release.c1": "A button in the email view extracts title, start, duration, location and the video-call link. From there, either straight into your calendar or as a file to double-click. Reminders come along: one the day before, one 15 minutes ahead.",
-        "release.c2h": "Nothing reaches your calendar unchecked",
-        "release.c2": "Before anything is added, a card appears with every field editable. Where the app assumed something, it says so — for example „no duration found, assumed 60 minutes". A wrong event in a calendar goes unnoticed, and that is worse than no event at all.",
-        "release.c3h": "The joining link is found, not guessed",
-        "release.c3": "The app searches the text for the video-call link itself rather than asking the language model for it — a shortened or invented address only shows up once you are standing at a locked door. Common services are recognised; unsubscribe and imprint links stay out.",
+        "release.label": "Release {vs} · The dashboard is quick again",
+        "release.heading": "What’s new — <em>the dashboard no longer waits on a language model.</em>",
+        "release.lead": "The dashboard took a long time to come back after clicking through to a note. Measured against a real vault of 4,171 notes: reading and parsing the files costs 0.7 seconds in total — the rest of the wait went to an AI analysis that ran every open problem note through a local model on each open. It is gone now.",
+        "release.c1h": "Coming back shows the last state right away",
+        "release.c1": "Clicking a task and returning to the dashboard used to mean a full-page spinner and a wait for the whole rebuild. Now the previous view is there immediately and refreshes quietly in the background. The vault is also re-read once per session rather than on every tab switch.",
+        "release.c2h": "The note relevance analysis has been removed",
+        "release.c2": "It scored every open problem note individually with a language model on each open — 37 notes at around nine seconds each in testing, so minutes at full load, and it kept going after you had left the dashboard. The „Relevant notes" widget stays and still ranks by overdue tasks, links, emails and appointments. One pass now takes three milliseconds.",
+        "release.c3h": "Widgets you turn off stay off",
+        "release.c3": "On startup the app filled in missing dashboard widgets — including ones you had deliberately switched off. Turning something off never survived a restart. Those additions now run once; a deliberate choice sticks.",
         "release.link": "Full release notes on GitHub →",
         "dl.label": "Download",
         "dl.heading": "Get started.",
