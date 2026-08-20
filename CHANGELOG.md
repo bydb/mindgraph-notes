@@ -2,6 +2,29 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.10.51-beta] - 2026-08-20
+
+Aus einer Einladung per E-Mail wird ein Kalendertermin — auch dann, wenn keine Kalenderdatei angehängt ist.
+
+### Neu
+
+- **Termin erstellen, direkt aus der Mail.** Einladungen aus Behörden und Schulen kommen selten mit einer Kalenderdatei; Ort, Datum, Uhrzeit, Dauer und der Zugangslink zur Videokonferenz stehen einfach im Text. Bisher gab es dafür keinen Weg — nur Mails **mit** angehängter Kalenderdatei ließen sich übernehmen. Ein neuer Schalter in der Mail-Ansicht liest die Angaben jetzt aus dem Text heraus. Danach wahlweise direkt in den Kalender oder als Kalenderdatei zum Doppelklicken, die jedes Programm auf jedem Betriebssystem versteht. Erinnerungen kommen mit: eine am Vortag zum Vorbereiten, eine 15 Minuten vorher zum Hingehen.
+
+  Der Weg direkt in den Kalender ist macOS vorbehalten und braucht eine Systemfreigabe; auf anderen Systemen erscheint nur der Weg über die Datei, statt mit einer Fehlermeldung zu antworten.
+
+- **Vor dem Eintragen wird geprüft.** Es erscheint eine Karte, in der jedes Feld änderbar ist. Hat die App etwas angenommen, statt es zu lesen, steht es dort ausdrücklich — etwa „Keine Dauer erkannt, 60 Minuten angenommen". Der Grund für diesen Zwischenschritt: Ein Sprachmodell, das Datum und Uhrzeit aus Fließtext liest, liegt meistens richtig und gelegentlich daneben. Ein falscher Termin im Kalender fällt niemandem auf, und das ist schlimmer als gar kein Termin.
+
+- **Der Zugangslink wird gesucht, nicht geraten.** Den Link zur Videokonferenz sucht die App selbst im Mailtext, statt ihn sich vom Sprachmodell nennen zu lassen — eine gekürzte oder erfundene Adresse merkt man erst, wenn man vor verschlossener Tür steht. Erkannt werden die verbreiteten Dienste. Abmelde-, Impressums- und Werbelinks, die in fast jeder Rundmail stehen, bleiben bewusst außen vor.
+
+### Sicherheit
+
+- **Termindaten werden nicht mehr in Programmtext eingesetzt.** Beim Eintragen in den macOS-Kalender wurden Titel und Notizen bisher in ein kleines Hilfsprogramm hineingeschrieben, das die App zur Laufzeit erzeugt. Damit aus dem Text einer fremden E-Mail kein ausführbarer Befehl werden konnte, mussten Anführungszeichen, Schrägstriche und Dollarzeichen vorher entfernt werden. Mit Ort und Zugangslink wäre diese Fläche gewachsen. Die Daten werden dem Hilfsprogramm jetzt getrennt übergeben, nicht mehr in seinen Text eingesetzt — es gibt also nichts mehr zu entfernen. Nebeneffekt: Umlaute, Kommata und Anführungszeichen in Ortsangaben gehen nicht mehr verloren. Eine Adresse wie „Breitlacherstraße 92, Frankfurt" kommt jetzt vollständig im Kalender an.
+
+### Unter der Haube
+
+- Die Erzeugung der Kalenderdatei liegt als eigenständige Logik mit 32 Tests vor: Maskierung nach RFC 5545, Zeilenumbruch nach Bytes statt nach Zeichen (ein Umlaut belegt zwei Bytes; falsch umgebrochene Zeilen weisen manche Kalender ab), Zeiten in UTC statt einer eigenen Zeitzonen-Definition, und eine Prüfung, die kalendarisch unmögliche Angaben wie den 31. Februar abweist, statt sie stillschweigend auf den 3. März zu schieben.
+- Die Termin-Erkennung ist ein eigener Vorgang, der nur auf Knopfdruck läuft. Die bestehende Mail-Analyse bleibt unverändert — ihre Qualität ist durch Messreihen belegt, und eine Erweiterung hätte diese Belege entwertet.
+
 ## [0.10.50-beta] - 2026-08-19
 
 Eine Mail, auf die das Modell doppelt antwortet, fällt nicht mehr aus der Auswertung. Dazu eine Anzeige, wie schnell die lokalen Modelle tatsächlich arbeiten.
