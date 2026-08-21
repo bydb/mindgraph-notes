@@ -2,6 +2,26 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.10.53-beta] - 2026-08-21
+
+Ein Schalter im Posteingang stand am falschen Platz und sah dadurch aus wie vergessen. Beim Nachsehen kamen drei weitere Stellen mit heraus, die still danebenlagen.
+
+### Behoben
+
+- **Der Schalter für „Termin aus einer Mail" sitzt jetzt bei den anderen Mail-Aktionen.** Er stand in einer eigenen Zeile zwischen dem Antwort-Status und der Aktionsleiste, obwohl er eine Mail-Aktion wie jede andere ist. Er kam so an seinen Platz, weil im Quelltext daneben schon der Anhang-Block stand — Code-Nähe statt Lesereihenfolge.
+
+  Das hatte zwei Folgen. Er zerschnitt den Weg von „was ist das für eine Mail" zu „was mache ich damit". Und weil er außerhalb der Aktionsleiste lag und kein Symbol hatte, griff deren Umbruchregel nicht: Unter 660 Pixel Panelbreite — das ist die übliche Breite — klappten alle Nachbarn auf Symbol-Quadrate zusammen, er blieb als einzige Textpille stehen.
+
+  Jetzt sitzt er zwischen „Diskutieren" und „Erledigt", mit Kalendersymbol und Ladeanzeige während der Suche, und klappt wie die anderen zusammen. Eine Fehlermeldung erscheint unter der Leiste, in derselben Form wie die Meldung des Verschieben-Knopfs daneben.
+
+- **Die Beschriftung verspricht nicht mehr zu viel.** Sie lautete „Termin erstellen", der Klick erstellt aber nichts: Er lässt erst das Sprachmodell den Mailtext nach einem Termin durchsuchen. Angelegt wird der Termin in der Prüfkarte, die danach erscheint. Die Beschriftung heißt jetzt „Termin", der Erklärtext beim Überfahren „Termin aus dieser Mail erstellen".
+
+- **Die Termin-Prüfkarte folgt wieder dem Kartenstil der App.** Sie hatte eine getönte Fläche, einen orange hinterlegten Warnkasten für die Annahmen des Modells und eine kleine graue Überschrift in Großbuchstaben — genau die Form, die im Marketing-Bereich schon einmal als „verloren wirkend" auffiel. Getönte Kartenflächen sind im Kartenstil ausdrücklich ausgeschlossen. Die Karte hat jetzt dieselbe Fläche wie alle anderen, einen Kartentitel in Normalgröße mit farbigem Symbol, und die Annahmen stehen als Punkt-Zeilen statt im Farbkasten. Dazu ein Schließen-Symbol statt eines „x"-Zeichens, einheitliche Eckenrundungen und ein sichtbarer Fokusrahmen auf den Eingabefeldern. Was die Karte tut, ist unverändert.
+
+- **Zwei Farbwerte, auf die sich über vierzig Stellen der Oberfläche beriefen, waren nie festgelegt.** Ein nicht definierter Wert fällt in CSS auf die Grundeinstellung zurück: Rahmen nahmen die Textfarbe an, Hintergründe wurden durchsichtig. Steht der Wert in einer Farbmischung, wird die ganze Anweisung ungültig — dort passierte gar nichts mehr.
+
+  Sichtbar war das an sieben Zeilen im Dashboard (Mails, relevante Notizen, Buchungen, Fokus), die sich beim Überfahren mit der Maus überhaupt nicht hervorhoben, und an Schaltflächen, die dabei ihre Fläche verloren. Beide Werte sind jetzt zentral gesetzt und lösen sich pro Farbschema auf. Zwei Elemente, die selbst schon auf der Hover-Fläche liegen, bekommen eine Stufe weiter, damit ihr Hover nicht wirkungslos bleibt. Hell und dunkel gegengeprüft.
+
 ## [0.10.52-beta] - 2026-08-20
 
 Das Dashboard war nach jedem Klick auf einen Termin minutenlang beschäftigt. Ursache war nicht das Laden der Notizen, sondern eine KI-Analyse im Hintergrund. Sie ist entfernt.

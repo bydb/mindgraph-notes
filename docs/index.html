@@ -48,7 +48,7 @@
     "url": "https://mindgraph-notes.de/",
     "downloadUrl": "https://github.com/bydb/mindgraph-notes/releases",
     "screenshot": "https://mindgraph-notes.de/screenshot.png",
-    "softwareVersion": "0.10.52-beta",
+    "softwareVersion": "0.10.53-beta",
     "author": { "@type": "Person", "name": "Jochen Leeder", "url": "https://bydb.io" },
     "license": "https://opensource.org/licenses/AGPL-3.0",
     "featureList": [
@@ -495,7 +495,7 @@
         <span class="hero-dot"></span>
         <span data-i18n="hero.badge">Open Source &middot; Lokal &middot; Kostenlos</span>
       </div>
-      <a class="release-badge" href="#changelog" data-i18n="hero.release">Das Dashboard ist wieder schnell &middot; v0.10.52</a>
+      <a class="release-badge" href="#changelog" data-i18n="hero.release">Der Termin-Schalter steht wieder in der Reihe &middot; v0.10.53</a>
     </div>
 
     <h1 data-i18n="hero.title">Der Fokus bleibt.<br><em>Auch wenn das Leben dazwischenkommt.</em></h1>
@@ -1630,7 +1630,7 @@
     <div class="release-inner">
       <div class="release-head">
         <div>
-          <div class="st-eyebrow"><span class="d"></span><span data-i18n="release.label">Release 0.10.52 &middot; Das Dashboard ist wieder schnell</span></div>
+          <div class="st-eyebrow"><span class="d"></span><span data-i18n="release.label">Release 0.10.53 &middot; Der Termin-Schalter steht wieder in der Reihe</span></div>
           <h2 class="st-h" style="font-size:clamp(1.8rem,3.8vw,2.6rem)" data-i18n="release.heading">Was ist neu &mdash; <em>die Bild-Generierung l&auml;uft auf Googles neues Modell und funktioniert wieder.</em></h2>
           <p class="st-lead" data-i18n="release.lead">Die Bild-Generierung wurde auf Google Nano Banana umgestellt &mdash; das aktuelle Bildmodell hinter Gemini. Beim Pr&uuml;fen gegen die echte Schnittstelle zeigte sich, dass das Modell nur JPEG liefert: Die Anfrage nach PNG h&auml;tte jeden einzelnen Aufruf mit einem Fehler beantwortet. Das ist behoben, bevor es jemanden getroffen hat.</p>
         </div>
@@ -1905,7 +1905,7 @@
         "how.p5h": "Das Web, wenn du es brauchst",
         "how.p5": "Schalte die Webrecherche pro Auftrag zu – ganz optional. Der Agent sucht, liest die passenden Seiten und schreibt eine Notiz mit sauberem Quellenverzeichnis; du prüfst sie, bevor sie in deinen Vault kommt. Der Suchanbieter erhält nur die Suchanfragen; die vollständigen Seiten ruft die App lokal ab. Bei einem optionalen Cloud-Modell geht der gelesene Kontext zusätzlich an dessen Anbieter – darauf weist die App vor dem Lauf hin. Den Suchanbieter wählst du selbst: sofort einsatzbereit oder deine eigene, private Suchmaschine.",
         "hero.badge": "Open Source \u00b7 Lokal \u00b7 Kostenlos",
-        "hero.release": "Das Dashboard ist wieder schnell &middot; v{vs}",
+        "hero.release": "Der Termin-Schalter steht wieder in der Reihe &middot; v{vs}",
         "hero.videoPause": "Anhalten",
         "hero.videoPlay": "Abspielen",
         "hero.videoStart": "Video abspielen",
@@ -1982,15 +1982,15 @@
         "modules.opt.vision": "Vision OCR",
         "modules.opt.speech": "Diktat & Vorlesen",
         "modules.opt.terminal": "Terminal",
-        "release.label": "Release {vs} · Das Dashboard ist wieder schnell",
-        "release.heading": "Was ist neu — <em>das Dashboard wartet nicht mehr auf ein Sprachmodell.</em>",
-        "release.lead": "Das Dashboard brauchte nach jedem Klick auf einen Termin lange, bis es wieder stand. Nachgemessen an einem echten Vault mit 4171 Notizen: Dateien lesen und auswerten kostet zusammen 0,7 Sekunden — die restliche Wartezeit ging an eine KI-Analyse, die bei jedem Öffnen alle offenen Problem-Notizen durch ein lokales Modell schickte. Die ist jetzt raus.",
-        "release.c1h": "Zurückkommen zeigt sofort den letzten Stand",
-        "release.c1": "Wer eine Aufgabe anklickte und dann zurück aufs Dashboard ging, sah einen Ladekreis über der ganzen Seite und musste den Aufbau abwarten. Jetzt steht die letzte Ansicht sofort wieder da und frischt sich leise im Hintergrund auf. Auch der Vault wird nur noch einmal je Sitzung neu eingelesen statt bei jedem Wechsel.",
-        "release.c2h": "Die Relevanzanalyse für Notizen ist entfernt",
-        "release.c2": "Sie bewertete beim Öffnen jede offene Problem-Notiz einzeln mit einem Sprachmodell — im Test 37 Notizen zu je rund neun Sekunden, also Minuten unter Volllast, und das auch noch, nachdem man das Dashboard längst verlassen hatte. Das Widget „Relevante Notizen" bleibt und sortiert weiterhin nach überfälligen Aufgaben, Verweisen, Mails und Terminen. Ein Durchlauf dauert jetzt drei Millisekunden.",
-        "release.c3h": "Abgewählte Widgets bleiben abgewählt",
-        "release.c3": "Beim Start trug die App fehlende Dashboard-Widgets nach — auch solche, die man absichtlich abgeschaltet hatte. Ausschalten hielt damit nie länger als bis zum nächsten Programmstart. Die Nachträge laufen jetzt einmalig; eine bewusste Entscheidung bleibt bestehen.",
+        "release.label": "Release {vs} · Der Termin-Schalter steht wieder in der Reihe",
+        "release.heading": "Was ist neu — <em>eine Schaltfläche, die aus der Reihe fiel, steht wieder darin.</em>",
+        "release.lead": "Aus einer Mail einen Termin machen ging über einen Schalter, der in einer eigenen Zeile über den übrigen Mail-Aktionen stand. Bei der üblichen Panelbreite klappen die anderen Schaltflächen auf ihr Symbol zusammen — dieser eine blieb als einzelne Textpille stehen und sah aus wie vergessen. Er sitzt jetzt bei den anderen, und drei weitere Stellen, die still danebenlagen, sind mitgerichtet.",
+        "release.c1h": "Termin aus einer Mail: eine Schaltfläche unter den anderen",
+        "release.c1": "Sie steht jetzt zwischen „Diskutieren" und „Erledigt", mit Kalendersymbol, und klappt bei schmalem Fenster genauso zusammen wie ihre Nachbarn. Auch die Beschriftung stimmt wieder: Sie hieß „Termin erstellen", der Klick sucht aber erst einmal im Mailtext nach einem Termin — erstellt wird er in der Prüfkarte, die danach erscheint.",
+        "release.c2h": "Die Termin-Prüfkarte sieht aus wie der Rest der App",
+        "release.c2": "Die Karte, in der ein erkannter Termin vor dem Eintragen geprüft wird, hatte eine getönte Fläche, einen orangefarbenen Warnkasten und eine kleine graue Überschrift in Großbuchstaben — überall sonst in der App gilt der ruhige Kartenstil. Die Karte folgt ihm jetzt: gleiche Fläche, gleiche Titelgröße, Hinweise als Punkte statt als Farbkasten. Was die Karte tut, bleibt unverändert.",
+        "release.c3h": "Zeilen im Dashboard reagieren wieder auf die Maus",
+        "release.c3": "Zwei Farbwerte, auf die sich über vierzig Stellen der Oberfläche beriefen, waren nie festgelegt worden. Folge: Sieben Zeilen im Dashboard — Mails, relevante Notizen, Buchungen, Fokus — hoben sich beim Überfahren gar nicht hervor, und an anderen Stellen verlor eine Schaltfläche dabei ihre Fläche. Beide Werte sind jetzt gesetzt, hell und dunkel geprüft.",
         "release.link": "Vollständige Release Notes auf GitHub →",
         "dl.label": "Download",
         "dl.heading": "Jetzt starten.",
@@ -2173,7 +2173,7 @@
         "how.p5h": "The web, when you need it",
         "how.p5": "Turn on web research per task – entirely optional. The agent searches, reads the relevant pages and writes a note with a clean list of sources; you review it before it enters your vault. The search provider receives only the queries; the app fetches full pages locally. With an optional cloud model, the extracted context is also sent to that model provider – the app warns you before the run. You choose the search provider yourself: ready to use or your own private search engine.",
         "hero.badge": "Open Source \u00b7 Local \u00b7 Free",
-        "hero.release": "The dashboard is quick again &middot; v{vs}",
+        "hero.release": "The event button is back in line &middot; v{vs}",
         "hero.videoPause": "Pause",
         "hero.videoPlay": "Play",
         "hero.videoStart": "Play video",
@@ -2250,15 +2250,15 @@
         "modules.opt.vision": "Vision OCR",
         "modules.opt.speech": "Dictation & TTS",
         "modules.opt.terminal": "Terminal",
-        "release.label": "Release {vs} · The dashboard is quick again",
-        "release.heading": "What’s new — <em>the dashboard no longer waits on a language model.</em>",
-        "release.lead": "The dashboard took a long time to come back after clicking through to a note. Measured against a real vault of 4,171 notes: reading and parsing the files costs 0.7 seconds in total — the rest of the wait went to an AI analysis that ran every open problem note through a local model on each open. It is gone now.",
-        "release.c1h": "Coming back shows the last state right away",
-        "release.c1": "Clicking a task and returning to the dashboard used to mean a full-page spinner and a wait for the whole rebuild. Now the previous view is there immediately and refreshes quietly in the background. The vault is also re-read once per session rather than on every tab switch.",
-        "release.c2h": "The note relevance analysis has been removed",
-        "release.c2": "It scored every open problem note individually with a language model on each open — 37 notes at around nine seconds each in testing, so minutes at full load, and it kept going after you had left the dashboard. The „Relevant notes" widget stays and still ranks by overdue tasks, links, emails and appointments. One pass now takes three milliseconds.",
-        "release.c3h": "Widgets you turn off stay off",
-        "release.c3": "On startup the app filled in missing dashboard widgets — including ones you had deliberately switched off. Turning something off never survived a restart. Those additions now run once; a deliberate choice sticks.",
+        "release.label": "Release {vs} · The event button is back in line",
+        "release.heading": "What’s new — <em>a button that stood out of line is back in it.</em>",
+        "release.lead": "Turning an email into a calendar event went through a button that sat on its own line above the other mail actions. At the usual panel width the other buttons collapse to their icon — this one stayed behind as a lone text pill and looked forgotten. It now sits with the others, and three further things that were quietly off have been put right alongside it.",
+        "release.c1h": "Event from an email: one button among the others",
+        "release.c1": "It now sits between “Discuss” and “Handled”, with a calendar icon, and collapses at narrow widths just like its neighbours. The label is honest again, too: it read “Create event”, but the click first searches the message body — the event itself is created in the review card that follows.",
+        "release.c2h": "The event review card looks like the rest of the app",
+        "release.c2": "The card where a detected event is checked before it is saved had a tinted surface, an orange warning box and a small grey heading in capitals — everywhere else the app uses one quiet card style. The card follows it now: same surface, same title size, notes as dots rather than a coloured box. What the card does is unchanged.",
+        "release.c3h": "Dashboard rows respond to the mouse again",
+        "release.c3": "Two colour values that more than forty places in the interface referred to had never been defined. As a result seven dashboard rows — emails, relevant notes, bookings, focus — gave no highlight at all on hover, and elsewhere a button lost its fill while the pointer was over it. Both values are now set, checked in light and dark.",
         "release.link": "Full release notes on GitHub →",
         "dl.label": "Download",
         "dl.heading": "Get started.",
