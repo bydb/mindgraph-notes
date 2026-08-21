@@ -50,6 +50,19 @@
   --color-info: #256fd1;
   --color-muted-accent: #8a8f98;
 
+  /* Aliase auf die Themen-Tokens. Beide Namen wurden ueber die App verteilt
+     benutzt, ohne je definiert zu sein — undefiniert faellt border-color auf
+     currentColor zurueck (textfarbene Rahmen) und background auf transparent
+     (die Flaeche verschwand beim Ueberfahren). In color-mix() war die ganze
+     Deklaration ungueltig, dort gab es gar kein Hover-Feedback.
+     Aufgeloest werden sie pro Thema: data-theme sitzt auf <html>, also
+     demselben Element wie :root — --bg-tertiary/--border-color tragen hier
+     schon den Wert des aktiven Themas.
+     --bg-hover = --bg-tertiary ist die dokumentierte Hover-Stufe (vgl.
+     .panel-card:hover, .inbox-action-btn:hover). */
+  --border: var(--border-color);
+  --bg-hover: var(--bg-tertiary);
+
   /* Backlink Colors - quiet blue (links read as links, no warm tint) */
   --backlink-color: #2563eb;
   --backlink-bg: #1a1a1a;
@@ -13289,7 +13302,7 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
   align-items: center;
   gap: 6px;
   padding: 5px 10px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-color);
   border-radius: var(--radius-sm);
   background: var(--bg-secondary);
   color: var(--text-primary);
@@ -18419,7 +18432,9 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
 }
 
 .flashcards-topic-header:hover {
-  background: var(--bg-hover);
+  /* Grundflaeche ist bereits --bg-tertiary; --bg-hover waere hier ein
+     No-op. Eine Stufe weiter, in beiden Themen in die richtige Richtung. */
+  background: color-mix(in srgb, var(--bg-tertiary) 92%, var(--text-primary));
 }
 
 .flashcards-topic-chevron {
@@ -20664,7 +20679,9 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
   white-space: nowrap;
 }
 .sync-btn-secondary:hover {
-  background: var(--bg-hover);
+  /* Grundflaeche ist bereits --bg-tertiary; --bg-hover waere hier ein
+     No-op. Eine Stufe weiter, in beiden Themen in die richtige Richtung. */
+  background: color-mix(in srgb, var(--bg-tertiary) 92%, var(--text-primary));
 }
 .sync-btn-secondary:disabled {
   opacity: 0.5;
@@ -21970,15 +21987,13 @@ body.presentation-mode *::after {
   font-size: 0.85em;
 }
 
-/* Auslöser für die Termin-Erkennung in der Mail-Detailansicht. */
-.inbox-event-trigger {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin: 10px 0;
-}
-
+/* Fehlermeldung der Termin-Erkennung. Steht unter der Aktionsleiste (der Auslöser
+   sitzt seit 08/2026 IN der Leiste), gleiche Optik wie .inbox-move-error daneben. */
 .inbox-event-error {
-  font-size: 12px;
-  color: var(--color-error, #c1553f);
+  margin-top: 6px;
+  padding: 4px 8px;
+  font-size: 11px;
+  background: color-mix(in srgb, var(--color-danger) 12%, transparent);
+  color: var(--color-danger);
+  border-radius: var(--radius-sm);
 }

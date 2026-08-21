@@ -11,6 +11,7 @@
 
 import React, { useState } from 'react'
 import { useTranslation } from '../../utils/translations'
+import { IconCalendar, IconClose } from '../Shared/Icons'
 import { DEFAULT_REMINDER_MINUTES, normalizeDraft, type CalendarEventDraft } from '../../../shared/calendarEvent'
 import './EventDraftCard.css'
 
@@ -96,13 +97,26 @@ export const EventDraftCard: React.FC<Props> = ({ draft: initial, problems = [],
   return (
     <div className="event-draft">
       <div className="event-draft-head">
+        <span className="event-draft-head-icon" aria-hidden="true"><IconCalendar size={15} /></span>
         <span className="event-draft-title">{t('inbox.event.cardTitle')}</span>
-        <button className="event-draft-close" onClick={onClose} aria-label={t('common.close')}>×</button>
+        <button
+          className="event-draft-close"
+          onClick={onClose}
+          aria-label={t('common.close')}
+          title={t('common.close')}
+        >
+          <IconClose size={14} />
+        </button>
       </div>
 
       {displayedProblems.length > 0 && (
         <ul className="event-draft-problems">
-          {displayedProblems.map((p, i) => <li key={`${p.field}-${i}`}>{p.message}</li>)}
+          {displayedProblems.map((p, i) => (
+            <li key={`${p.field}-${i}`}>
+              <span className="panel-dot panel-dot--warning" aria-hidden="true" />
+              <span>{p.message}</span>
+            </li>
+          ))}
         </ul>
       )}
 
@@ -168,8 +182,18 @@ export const EventDraftCard: React.FC<Props> = ({ draft: initial, problems = [],
         </button>
       </div>
 
-      {message && <div className="event-draft-ok">{message}</div>}
-      {error && <div className="event-draft-err">{error}</div>}
+      {message && (
+        <div className="event-draft-ok" role="status">
+          <span className="panel-dot panel-dot--success" aria-hidden="true" />
+          <span>{message}</span>
+        </div>
+      )}
+      {error && (
+        <div className="event-draft-err" role="alert">
+          <span className="panel-dot panel-dot--danger" aria-hidden="true" />
+          <span>{error}</span>
+        </div>
+      )}
     </div>
   )
 }

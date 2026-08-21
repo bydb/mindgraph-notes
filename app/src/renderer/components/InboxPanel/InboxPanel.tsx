@@ -848,20 +848,15 @@ export const InboxPanel: React.FC<InboxPanelProps> = ({ onClose }) => {
               )}
 
               {/* Termin aus dem Mailtext — greift auch bei Mails OHNE .ics-Anhang,
-                  wo Ort, Datum und Konferenzlink nur im Fliesstext stehen. */}
-              {eventDraft ? (
+                  wo Ort, Datum und Konferenzlink nur im Fliesstext stehen.
+                  Der Auslöser sitzt unten in der Aktionsleiste; hier steht nur die
+                  Prüfkarte, sobald ein Termin gefunden wurde. */}
+              {eventDraft && (
                 <EventDraftCard
                   draft={eventDraft.draft}
                   problems={eventDraft.problems}
                   onClose={() => setEventDraft(null)}
                 />
-              ) : (
-                <div className="inbox-event-trigger">
-                  <button className="inbox-action-btn" onClick={handleExtractEvent} disabled={eventBusy}>
-                    {eventBusy ? t('inbox.event.searching') : t('inbox.event.create')}
-                  </button>
-                  {eventError && <span className="inbox-event-error">{eventError}</span>}
-                </div>
               )}
 
               {/* Action buttons */}
@@ -899,6 +894,25 @@ export const InboxPanel: React.FC<InboxPanelProps> = ({ onClose }) => {
                     <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
                   </svg>
                   <span className="inbox-action-label">{t('inbox.discuss')}</span>
+                </button>
+                {/* Termin: gehört zu den Mail-Aktionen, nicht in eine eigene Zeile darüber.
+                    Dadurch klappt er bei schmalem Panel wie die Nachbarn auf das Icon zusammen. */}
+                <button
+                  className="inbox-action-btn"
+                  onClick={handleExtractEvent}
+                  disabled={eventBusy}
+                  data-tooltip={t('inbox.event.tooltip')}
+                >
+                  {eventBusy ? (
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="spinning">
+                      <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+                    </svg>
+                  ) : (
+                    <IconCalendar size={14} />
+                  )}
+                  <span className="inbox-action-label">
+                    {eventBusy ? t('inbox.event.searching') : t('inbox.event.create')}
+                  </span>
                 </button>
                 {selectedEmail.analysis?.needsReply && (
                   <button
@@ -962,6 +976,9 @@ export const InboxPanel: React.FC<InboxPanelProps> = ({ onClose }) => {
               </div>
               {moveStatus === 'error' && (
                 <div className="inbox-move-error" role="alert">{moveError}</div>
+              )}
+              {eventError && (
+                <div className="inbox-event-error" role="alert">{eventError}</div>
               )}
             </div>
 

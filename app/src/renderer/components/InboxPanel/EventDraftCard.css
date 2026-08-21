@@ -1,49 +1,89 @@
-/* Prüfkarte für einen erkannten Termin. Karteikarten-Look wie die übrigen
-   Modul-Panels, ruhig gehalten — hier wird geprüft, nicht gestaltet. */
+/* Prüfkarte für einen erkannten Termin.
+   Design folgt dem app-weiten Karteikarten-Kanon (.panel-card): --bg-secondary,
+   1px --border-subtle, --radius-md. Keine getönten Flächen, keine Schatten, keine
+   farbigen Randstreifen — hier wird geprüft, nicht gestaltet. */
 
 .event-draft {
   margin: 12px 0;
   padding: 14px 16px;
+  /* --border-color statt des .panel-card-ueblichen --border-subtle: Diese Karte
+     enthaelt Eingabefelder, die selbst --border-color tragen. Mit dem schwaecheren
+     Rahmen war die Huelle undeutlicher als ihr Inhalt. */
   border: 1px solid var(--border-color);
-  border-radius: 10px;
-  background: color-mix(in srgb, var(--bg-secondary) 55%, transparent);
+  border-radius: var(--radius-md);
+  background: var(--bg-secondary);
 }
 
 .event-draft-head {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  margin-bottom: 10px;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+/* Farbiges Modul-Icon + fetter Titel — dieselbe Kopfsprache wie .panel-header.
+   Die kleine graue Großbuchstaben-Zeile davor wirkte verloren. */
+.event-draft-head-icon {
+  display: flex;
+  flex-shrink: 0;
+  color: var(--accent-color);
 }
 
 .event-draft-title {
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
-  color: var(--text-secondary);
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.4;
+  color: var(--text-primary);
 }
 
 .event-draft-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  padding: 0;
   border: none;
+  border-radius: var(--radius-xs);
   background: none;
   color: var(--text-secondary);
-  font-size: 18px;
-  line-height: 1;
   cursor: pointer;
-  padding: 0 4px;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.event-draft-close:hover {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
 }
 
 /* Angenommene Werte und verworfene Felder. Bewusst sichtbar und nicht als
-   Tooltip versteckt: Wer eine angenommene Dauer nicht bemerkt, trägt sie ein. */
+   Tooltip versteckt: Wer eine angenommene Dauer nicht bemerkt, trägt sie ein.
+   Signal ist der app-weite Status-Punkt, keine getönte Fläche. */
 .event-draft-problems {
+  list-style: none;
   margin: 0 0 12px;
-  padding: 8px 10px 8px 26px;
-  border-radius: 7px;
-  background: color-mix(in srgb, var(--color-warning, #d08540) 12%, transparent);
-  color: var(--text-primary);
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.event-draft-problems li {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
   font-size: 12px;
-  line-height: 1.6;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+.event-draft-problems .panel-dot {
+  /* An der ersten Textzeile ausrichten, nicht an der Grundlinie mitrutschen. */
+  align-self: flex-start;
+  margin-top: 5px;
 }
 
 .event-draft-field {
@@ -64,11 +104,19 @@
   box-sizing: border-box;
   padding: 6px 9px;
   border: 1px solid var(--border-color);
-  border-radius: 7px;
+  border-radius: var(--radius-sm);
   background: var(--bg-primary);
   color: var(--text-primary);
   font: inherit;
   font-size: 13px;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.event-draft-field input:focus-visible,
+.event-draft-field textarea:focus-visible {
+  outline: none;
+  border-color: var(--link-color);
+  box-shadow: 0 0 0 3px var(--focus-ring);
 }
 
 .event-draft-field textarea { resize: vertical; }
@@ -84,25 +132,33 @@
 .event-draft-reminders {
   margin: 2px 0 12px;
   font-size: 11px;
+  line-height: 1.5;
   color: var(--text-secondary);
 }
 
 .event-draft-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
 }
 
 .event-draft-btn {
   padding: 7px 13px;
   border: 1px solid var(--border-color);
-  border-radius: 7px;
+  border-radius: var(--radius-sm);
   background: var(--bg-primary);
   color: var(--text-primary);
   font-size: 12px;
   cursor: pointer;
+  white-space: nowrap;
+  transition: background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
 }
 
-.event-draft-btn:hover:not(:disabled) { background: var(--bg-hover); }
+.event-draft-btn:hover:not(:disabled) {
+  background: var(--bg-tertiary);
+  border-color: var(--accent-color);
+  color: var(--accent-color);
+}
 .event-draft-btn:disabled { opacity: 0.5; cursor: default; }
 
 /* Dieselben Tokens wie .inbox-action-btn--primary. Ein fest verdrahtetes Weiss
@@ -123,9 +179,16 @@
 
 .event-draft-ok,
 .event-draft-err {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
   margin-top: 10px;
   font-size: 12px;
+  line-height: 1.5;
 }
 
-.event-draft-ok { color: var(--color-success, #3d8b58); }
-.event-draft-err { color: var(--color-error, #c1553f); }
+.event-draft-ok { color: var(--color-success); }
+.event-draft-err { color: var(--color-danger); }
+
+.event-draft-ok .panel-dot,
+.event-draft-err .panel-dot { margin-top: 5px; }
