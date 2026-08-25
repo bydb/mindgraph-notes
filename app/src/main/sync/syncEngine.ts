@@ -345,6 +345,17 @@ export class SyncEngine {
         // ebenfalls settle() ruft. Andersherum gewänne dessen unspezifische Begründung
         // und der eigentliche Grund (Zeitüberschreitung) ginge im Log verloren.
         const wasOpen = this.ws?.readyState === WebSocket.OPEN
+        // Sichtbar melden, nicht nur ablehnen: Beim automatischen Neuverbinden gibt es
+        // keinen Aufrufer, der die Ablehnung weiterreicht. Ohne diese Meldung stünde in
+        // den Einstellungen gar nichts mehr — schlimmer als eine falsche Meldung, denn
+        // der Sync liefe seit Stunden nicht und niemand wüsste davon.
+        this.status = 'error'
+        this.sendProgress({
+          status: 'error',
+          error: wasOpen
+            ? 'Der Server antwortet nicht auf die Anmeldung (Zeitüberschreitung nach 10 Sekunden).'
+            : 'Der Sync-Server ist nicht erreichbar (Zeitüberschreitung nach 10 Sekunden).'
+        })
         settle(new Error(wasOpen ? 'Registration timeout' : 'Connection timeout'))
         this.ws?.close()
       }, 10000)

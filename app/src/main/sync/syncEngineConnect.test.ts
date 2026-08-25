@@ -166,6 +166,10 @@ describe('SyncEngine.connect() settlement', () => {
 
     const fehler = gemeldet.filter(p => p.status === 'error')
     expect(fehler.map(f => f.error).join(' ')).not.toMatch(/before the connection was established/i)
+    // Und der Filter darf die Anzeige nicht verstummen lassen: Beim automatischen
+    // Neuverbinden ist diese Meldung die EINZIGE Spur, die den Nutzer erreicht.
+    expect(fehler).toHaveLength(1)
+    expect(fehler[0].error).toMatch(/nicht erreichbar/i)
   })
 
   it('meldet beim Abschalten des Syncs keinen WebSocket-Fehler', async () => {
