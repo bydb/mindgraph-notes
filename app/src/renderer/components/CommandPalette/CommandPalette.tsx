@@ -1,5 +1,8 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react'
 import { useTranslation } from '../../utils/translations'
+import { useUIStore } from '../../stores/uiStore'
+import { useVoiceCommandStore } from '../../stores/voiceCommandStore'
+import { VoiceCommandPanel } from './VoiceCommandPanel'
 
 // Aktions-Palette (Cmd+Shift+P): öffnet Panels, Ansichten, Tabs und Werkzeuge
 // per Textsuche. Cmd+P/Cmd+K finden nur Notizen — für ~30 Oberflächen braucht
@@ -25,6 +28,16 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose,
   const { t } = useTranslation()
   const [query, setQuery] = useState('')
   const [selectedIndex, setSelectedIndex] = useState(0)
+  const speech = useUIStore(state => state.speech)
+  const voiceState = useVoiceCommandStore(state => state.state)
+  const voiceSubmit = useVoiceCommandStore(state => state.submit)
+  const voiceStart = useVoiceCommandStore(state => state.startListening)
+  const voiceStop = useVoiceCommandStore(state => state.stopListening)
+  const voiceAbort = useVoiceCommandStore(state => state.abort)
+  const voiceActive = voiceState.kind !== 'idle'
+  // Eine Bedingung, nicht zwei: ein zweiter Opt-in-Schalter für einen Knopf, der bis
+  // zum Klick nichts tut, versteckt die Funktion mehr als er schützt.
+  const micEnabled = speech.enabled
   const inputRef = useRef<HTMLInputElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
 
@@ -43,8 +56,11 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose,
       setQuery('')
       setSelectedIndex(0)
       setTimeout(() => inputRef.current?.focus(), 50)
+    } else {
+      // Schließen gibt das Mikrofon frei und beendet eine laufende Sprachausgabe.
+      voiceAbort('blur')
     }
-  }, [isOpen])
+  }, [isOpen, voiceAbort])
 
   useEffect(() => {
     setSelectedIndex(0)
@@ -76,24 +92,32 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose,
             const action = filtered[selectedIndex]
             onClose()
             action.run()
+          } else if (query.trim()) {
+            // Genau hier tat die Palette bisher nichts: kein Treffer, Enter verpufft.
+            // Ein ganzer Satz ("was ist überfällig") landet deshalb im Erkenner, ohne
+            // dass sich das bestehende Verhalten bei Treffern ändert.
+            void voiceSubmit(query, 'keyboard', t)
           }
           break
         case 'Escape':
           e.preventDefault()
-          onClose()
+          // Erst die Sprachschicht zurücksetzen, dann die Palette schließen —
+          // sonst nimmt ein Escape mitten in der Aufnahme das Mikrofon mit.
+          if (voiceActive) voiceAbort('escape')
+          else onClose()
           break
       }
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [isOpen, filtered, selectedIndex, onClose])
+  }, [isOpen, filtered, selectedIndex, onClose, query, voiceActive, voiceAbort, voiceSubmit, t])
 
   if (!isOpen) return null
 
   return (
     <div className="quick-switcher-overlay" onClick={onClose}>
       <div className="quick-switcher" onClick={e => e.stopPropagation()}>
-        <div className="quick-switcher-header">
+        <div className="quick-switcher-header command-palette-header">
           <input
             ref={inputRef}
             type="text"
@@ -102,9 +126,27 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ isOpen, onClose,
             value={query}
             onChange={e => setQuery(e.target.value)}
           />
+          {micEnabled && (
+            <button
+              className={`voice-mic-button ${voiceState.kind === 'listening' ? 'recording' : ''}`}
+              title={voiceState.kind === 'listening' ? t('voiceCommand.stopListening') : t('voiceCommand.startListening')}
+              onClick={() => {
+                if (voiceState.kind === 'listening') void voiceStop(t)
+                else void voiceStart(t)
+              }}
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
+                <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                <line x1="12" y1="19" x2="12" y2="23" />
+              </svg>
+            </button>
+          )}
         </div>
 
-        <div className="quick-switcher-list" ref={listRef}>
+        <VoiceCommandPanel t={t} onClose={onClose} />
+
+        <div className="quick-switcher-list" ref={listRef} style={voiceActive ? { display: 'none' } : undefined}>
           {filtered.length === 0 ? (
             <div className="quick-switcher-empty">{t('commandPalette.noResults')}</div>
           ) : (

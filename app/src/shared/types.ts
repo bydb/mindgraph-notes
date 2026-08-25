@@ -3,6 +3,7 @@ import type { RagIndexStatus, RagQueryResult, RetrievedChunk } from './rag/types
 import type { DisplayHealth } from './displayHealth'
 import type { LlmRunMetrics } from './llmTelemetry'
 import type { CalendarEventDraft } from './calendarEvent'
+import type { ActivityEvent, ActivitySummary } from './activityLog'
 
 // Per-Vault Feature Toggles
 export interface VaultFeatures {
@@ -717,6 +718,9 @@ export interface ElectronAPI {
   noteSkillsCatalogInstall: (vaultPath: string, id: string) => Promise<{ success: boolean; relPath?: string; folderName?: string; error?: string }>;
   noteSkillsImportDialog: (vaultPath: string) => Promise<{ success: boolean; cancelled?: boolean; relPath?: string; folderName?: string; skippedScripts?: boolean; error?: string }>;
   noteAgentAcceptResult: (runId: string, resultId: string) => Promise<{ success: boolean; fileName?: string; relPath?: string; error?: string }>;
+  activityAppend: (vaultPath: string, entry: ActivityEvent) => Promise<{ success: boolean; error?: string }>;
+  activitySummary: (vaultPath: string, range?: { from: number; to: number }) => Promise<{ success: boolean; summary?: ActivitySummary; error?: string }>;
+  onActivityChanged: (callback: (payload: { vaultPath: string }) => void) => () => void;
   noteAgentDiscardResult: (runId: string, resultId: string) => Promise<{ success: boolean; error?: string }>;
   noteAgentPreviewResult: (runId: string, resultId: string) => Promise<{ success: boolean; kind?: string; binary?: boolean; text?: string; truncated?: boolean; sizeBytes?: number; error?: string }>;
   onNoteAgentProgress: (callback: (p: NoteAgentProgressEvent) => void) => void;

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react'
+import React, { useState, useEffect, useMemo, useCallback } from 'react'
 import { useUIStore, ACCENT_COLORS, AI_LANGUAGES, FONT_FAMILIES, UI_LANGUAGES, BACKGROUND_COLORS, ICON_SETS, OUTLINE_STYLES, MODULE_CATEGORIES, EDOOBOX_DEFAULTS, REMARKABLE_DEFAULTS, type Language, type FontFamily, type BackgroundColor, type IconSet, type OutlineStyle, type LLMBackend, type TransportDestination, type ModuleCategory, type ModuleDescriptor } from '../../stores/uiStore'
 import { usePluginConfig } from '../../plugins/config'
 import { MODULES, isModuleEnabled, setModuleEnabled, useIsModuleEnabled, isPluginModule, pluginIdsForModule } from '../../utils/modules'
@@ -28,6 +28,7 @@ import { isCloudProviderReady, cloudProviderForSentinel, CLOUD_PROVIDER_META, ty
 import { ModelRamWarning } from '../Shared/ModelRamWarning'
 import { ModelPicker } from '../Shared/ModelPicker'
 import { ensureTransformersModel, isTransformersModelReady } from '../../utils/voice/transformersStt'
+import { ACTIVITY_TYPES, type ActivityType } from '../../../shared/activityLog'
 import { writeClipboardText } from '../../utils/clipboard'
 
 type TabTFn = (key: TranslationKey, params?: Record<string, string | number>) => string
@@ -1716,6 +1717,25 @@ const SpeechSettingsTab: React.FC<{ t: TabTFn }> = ({ t }) => {
         </>
       )}
 
+      <h4 style={{ marginTop: 32 }}>{t('settings.speech.commandsSection')}</h4>
+      <p className="settings-hint">{t('settings.speech.commandsHint')}</p>
+
+      <div className="settings-row">
+        <label>{t('settings.speech.inputDevice')}</label>
+        <MicrophonePicker
+          value={speech.inputDeviceId}
+          onChange={id => setSpeech({ inputDeviceId: id })}
+          t={t}
+        />
+      </div>
+      <p className="settings-hint">{t('settings.speech.inputDeviceHint')}</p>
+
+      <h4 style={{ marginTop: 32 }}>{t('settings.impact.section')}</h4>
+      <p className="settings-hint">{t('settings.impact.hint')}</p>
+      <ReferenceMinutesRows t={t} />
+      <p className="settings-hint">{t('settings.impact.basis')}</p>
+      <ImpactStatusBarToggle t={t} />
+
       <h4 style={{ marginTop: 32 }}>Flashcards</h4>
       <div className="settings-row">
         <label>{t('settings.speech.flashcards.autoPlay')}</label>
@@ -1727,6 +1747,62 @@ const SpeechSettingsTab: React.FC<{ t: TabTFn }> = ({ t }) => {
       </div>
       <p className="settings-hint">{t('settings.speech.flashcards.autoPlay.hint')}</p>
     </div>
+  )
+}
+
+/**
+ * Referenzzeiten je Tätigkeitsart. Leeres Feld heißt „keine Angabe" — und genau das
+ * ist der Unterschied zu einer 0: Ohne Angabe zeigt die Tagesbilanz für diese Art
+ * keine Minuten, statt „nichts gespart" zu behaupten.
+ */
+const ImpactStatusBarToggle: React.FC<{ t: TabTFn }> = ({ t }) => {
+  const showInStatusBar = useUIStore(state => state.impact.showInStatusBar)
+  const setImpact = useUIStore(state => state.setImpact)
+  return (
+    <>
+      <div className="settings-row">
+        <label>{t('settings.impact.statusBar')}</label>
+        <input
+          type="checkbox"
+          checked={showInStatusBar}
+          onChange={e => setImpact({ showInStatusBar: e.target.checked })}
+        />
+      </div>
+      <p className="settings-hint">{t('settings.impact.statusBarHint')}</p>
+    </>
+  )
+}
+
+const ReferenceMinutesRows: React.FC<{ t: TabTFn }> = ({ t }) => {
+  const referenceMinutes = useUIStore(state => state.impact.referenceMinutes)
+  const setReferenceMinutes = useUIStore(state => state.setReferenceMinutes)
+
+  const labels: Record<ActivityType, string> = {
+    'table-merge': t('voiceCommand.activityType.tableMerge'),
+    document: t('voiceCommand.activityType.document'),
+    summary: t('voiceCommand.activityType.summary'),
+    'web-research': t('voiceCommand.activityType.webResearch'),
+    other: t('voiceCommand.activityType.other')
+  }
+
+  return (
+    <>
+      {ACTIVITY_TYPES.map(type => (
+        <div className="settings-row" key={type}>
+          <label>{labels[type]}</label>
+          <input
+            type="number"
+            min={0}
+            step={5}
+            value={referenceMinutes[type] ?? ''}
+            placeholder={t('settings.impact.placeholder')}
+            onChange={e => setReferenceMinutes(type, e.target.value === '' ? null : Number(e.target.value))}
+            style={{ width: 140 }}
+          />
+          <span style={{ marginLeft: 8, fontSize: 12, opacity: 0.7 }}>{t('settings.impact.column')}</span>
+        </div>
+      ))}
+    </>
   )
 }
 
@@ -6090,6 +6166,62 @@ LIMIT 10
           </div>
         </div>
       </div>
+    </div>
+  )
+}
+
+
+/**
+ * Auswahl des Aufnahmegeräts.
+ *
+ * Die Gerätenamen liefert der Browser erst, NACHDEM die Mikrofonfreigabe erteilt wurde —
+ * vorher sind die Labels leer. Deshalb der Knopf „Geräte anzeigen": er fordert einmal
+ * kurz Zugriff an, liest die Liste und gibt das Mikrofon sofort wieder frei. Ohne diesen
+ * Schritt stünde in der Liste nur „Mikrofon 1", „Mikrofon 2".
+ */
+const MicrophonePicker: React.FC<{
+  value: string
+  onChange: (deviceId: string) => void
+  t: TabTFn
+}> = ({ value, onChange, t }) => {
+  const [devices, setDevices] = useState<MediaDeviceInfo[]>([])
+  const [loading, setLoading] = useState(false)
+
+  const load = useCallback(async (askPermission: boolean) => {
+    setLoading(true)
+    try {
+      if (askPermission) {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+        stream.getTracks().forEach(track => track.stop())
+      }
+      const all = await navigator.mediaDevices.enumerateDevices()
+      setDevices(all.filter(d => d.kind === 'audioinput'))
+    } catch (err) {
+      console.warn('[settings] Mikrofonliste nicht lesbar:', err)
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => { void load(false) }, [load])
+
+  const labelled = devices.some(d => d.label)
+
+  return (
+    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+      <select value={value} onChange={e => onChange(e.target.value)}>
+        <option value="">{t('settings.speech.inputDeviceDefault')}</option>
+        {devices.map((device, index) => (
+          <option key={device.deviceId} value={device.deviceId}>
+            {device.label || `${t('settings.speech.inputDevice')} ${index + 1}`}
+          </option>
+        ))}
+      </select>
+      {!labelled && (
+        <button className="btn-secondary" onClick={() => void load(true)} disabled={loading}>
+          {t('settings.speech.inputDeviceReveal')}
+        </button>
+      )}
     </div>
   )
 }

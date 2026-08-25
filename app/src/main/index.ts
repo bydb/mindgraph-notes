@@ -178,6 +178,8 @@ import { isPluginGateEnabled } from '../shared/plugins/moduleGate'
 import { registerPluginTransport, isTrustedSender } from './plugins/transport'
 import { registerContextAttachment, registerContextFolder, removeContextAttachment, clearContextAttachments, readContextBlock } from './noteAgent/contextFiles'
 import { startRun, getRunForSender, finishRun, publicResults, takeResult, peekResult, cancelRunsForSender, pruneRunIfConsumed, consumeEvictedRuns, totalFolderReads, type WebRunState } from './noteAgent/runRegistry'
+import { recordActivity, readActivitySummary, onActivityChanged } from './activityLedger'
+import { deriveActivityType, isActivityEvent, type ActivityEvent } from '../shared/activityLog'
 import { acquireStayAwake } from './powerGuard'
 import { runNoteAgentLoop } from './noteAgent/loop'
 import { suggestAgentMemory } from './noteAgent/memorySuggestion'
@@ -1057,8 +1059,16 @@ function isTrustedRendererUrl(url: string): boolean {
 }
 
 function setupMediaPermissions(): void {
+  // Diagnose bleibt drin: Eine stumme Aufnahmespur sieht im Renderer wie Erfolg aus
+  // (trackMuted=false, readyState=live) und ist ohne diese drei Zeilen nicht von einer
+  // fehlenden Systemfreigabe zu unterscheiden. Feuert nur bei Medien-Anfragen.
+  if (process.platform === 'darwin') {
+    console.log(`[media] Systemstatus Mikrofon beim Start: ${systemPreferences.getMediaAccessStatus('microphone')}`)
+  }
+
   session.defaultSession.setPermissionRequestHandler((webContents, permission, callback, details) => {
     const url = webContents.getURL()
+    if (permission === 'media') console.log(`[media] Anfrage-Handler aufgerufen, vertrauenswürdig=${isTrustedRendererUrl(url)}`)
     if (permission === 'media' && isTrustedRendererUrl(url)) {
       const mediaTypes = (details as { mediaTypes?: string[] }).mediaTypes ?? []
       if (!mediaTypes.includes('audio')) {
@@ -1067,9 +1077,16 @@ function setupMediaPermissions(): void {
       }
 
       if (process.platform === 'darwin') {
+        console.log(`[media] Anfrage-Handler: rufe askForMediaAccess auf (Status vorher: ${systemPreferences.getMediaAccessStatus('microphone')})`)
         void systemPreferences.askForMediaAccess('microphone')
-          .then(granted => callback(granted))
-          .catch(() => callback(false))
+          .then(granted => {
+            console.log(`[media] askForMediaAccess ergab: ${granted} (Status danach: ${systemPreferences.getMediaAccessStatus('microphone')})`)
+            callback(granted)
+          })
+          .catch(err => {
+            console.log(`[media] askForMediaAccess warf: ${err}`)
+            callback(false)
+          })
         return
       }
 
@@ -1082,7 +1099,23 @@ function setupMediaPermissions(): void {
   session.defaultSession.setPermissionCheckHandler((_webContents, permission, requestingOrigin, details) => {
     if (permission !== 'media' || !isTrustedRendererUrl(requestingOrigin)) return false
     const mediaType = details?.mediaType
-    return mediaType == null || mediaType === 'audio'
+    if (mediaType != null && mediaType !== 'audio') return false
+
+    // macOS: hier NUR dann „erteilt" melden, wenn die Systemfreigabe wirklich vorliegt.
+    //
+    // Chromium ruft immer zuerst diesen Prüf-Handler. Meldet er bedingungslos true,
+    // hält Chromium die Berechtigung für vorhanden und ruft den Anfrage-Handler
+    // darüber NIE auf — damit läuft askForMediaAccess() nie, macOS stellt nie die
+    // Systemabfrage, die App taucht in Datenschutz & Sicherheit gar nicht erst auf,
+    // und getUserMedia liefert eine lebende, aber stumme Aufnahmespur statt eines
+    // Fehlers. Das sieht im Log wie Erfolg aus (trackMuted=false, readyState=live)
+    // und ist real aufgetreten: Pegel dauerhaft 0.000.
+    if (process.platform === 'darwin') {
+      const status = systemPreferences.getMediaAccessStatus('microphone')
+      console.log(`[media] Prüf-Handler: Status ${status} -> melde ${status === 'granted'}`)
+      return status === 'granted'
+    }
+    return true
   })
 }
 
@@ -2362,6 +2395,7 @@ ipcMain.handle('tasks-create', async (_event, data: {
     const newContent = existing + separator + data.taskLine + '\n'
     // Eine Schreibgrenze: writeFileSafe erledigt Auto-Heal + Backup + Empty-Write-Block.
     await writeFileSafe(fullPath, newContent)
+    recordActivity(data.vaultPath, { at: Date.now(), kind: 'task-created', count: 1 })
     return { success: true, relativePath: data.relativePath }
   } catch (error) {
     console.error('[tasks-create] Fehler:', error)
@@ -4334,6 +4368,17 @@ ipcMain.handle('note-agent-run', async (event, params: NoteAgentRunParams) => {
           }
         })
         finishRun(run, 'done')
+        // Tätigkeitsprotokoll: Dauer genau EINMAL, hier am Lauf-Ende — nicht bei der
+        // Übernahme. Sonst zählte ein Lauf mit drei übernommenen Ergebnissen dreifach.
+        recordActivity(run.vaultPath, {
+          at: Date.now(),
+          kind: 'agent-run-finished',
+          runId: run.runId,
+          durationMs: Date.now() - run.startedAt,
+          activityType: deriveActivityType(run.toolsUsed),
+          resultCount: run.results.size,
+          status: 'ok'
+        })
         if (!sender.isDestroyed()) {
           sender.send('note-agent-done', {
             runId: run.runId,
@@ -4359,6 +4404,15 @@ ipcMain.handle('note-agent-run', async (event, params: NoteAgentRunParams) => {
       } catch (e) {
         const cancelled = run.abort.signal.aborted
         finishRun(run, cancelled ? 'cancelled' : 'error')
+        recordActivity(run.vaultPath, {
+          at: Date.now(),
+          kind: 'agent-run-finished',
+          runId: run.runId,
+          durationMs: Date.now() - run.startedAt,
+          activityType: deriveActivityType(run.toolsUsed),
+          resultCount: run.results.size,
+          status: cancelled ? 'aborted' : 'failed'
+        })
         let message = e instanceof Error ? e.message : String(e)
         if (/aborted due to timeout|TimeoutError/i.test(message)) {
           // Die Standard-Erklärung („zu langsam / Auftrag zu groß") ist bei
@@ -4433,6 +4487,9 @@ ipcMain.handle('note-agent-accept-result', async (event, runId: string, resultId
     }
     await fs.rm(real, { force: true }).catch(() => undefined)
     pruneRunIfConsumed(run)
+    // Erst NACH der geglückten Übernahme protokollieren: Nur übernommene Ergebnisse
+    // zählen für die Bilanz. Nur Format und Lauf-Kennung, nie der Dateiname.
+    recordActivity(run.vaultPath, { at: Date.now(), kind: 'agent-result-accepted', runId: run.runId, format: entry.kind })
     return { success: true, fileName: finalName, relPath: path.join(run.targetFolderRel, finalName).replace(/\\/g, '/') }
   } catch (error) {
     // Übernahme gescheitert → Konsum zurücknehmen, damit der Nutzer es erneut versuchen kann.
@@ -4483,6 +4540,43 @@ ipcMain.handle('note-agent-remember', async (event, vaultPath: string, text: str
     assertApprovedVault(vaultPath, 'note-agent-remember')
     const relPath = await appendAgentMemory(vaultPath, text)
     return { success: true, relPath }
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : 'Unbekannter Fehler' }
+  }
+})
+
+// Änderungen am Protokoll an alle Fenster melden. Ohne diesen Weg müsste die
+// Statusleiste im Takt fragen — für etwas, das ein paar Mal am Tag passiert.
+onActivityChanged(vaultPath => {
+  for (const win of BrowserWindow.getAllWindows()) {
+    if (!win.isDestroyed()) win.webContents.send('activity-changed', { vaultPath })
+  }
+})
+
+// ── Tätigkeitsprotokoll (Effizienzindex, docs/voice-command-plan.md §7) ──
+// Der Renderer darf NUR Sprachbefehl-Ereignisse anhängen. Lauf-Dauern, Übernahmen und
+// Aufgaben schreibt ausschließlich der Main an der Stelle, an der sie tatsächlich
+// passieren — sonst könnte ein kompromittierter Renderer die Bilanz erfinden.
+ipcMain.handle('activity-append', async (event, vaultPath: string, entry: unknown) => {
+  if (!isTrustedSender(event)) return { success: false, error: 'Nicht autorisierter Aufrufer' }
+  try {
+    assertApprovedVault(vaultPath, 'activity-append')
+    if (!isActivityEvent(entry) || (entry as ActivityEvent).kind !== 'voice-command') {
+      return { success: false, error: 'Nur Sprachbefehl-Ereignisse erlaubt' }
+    }
+    recordActivity(vaultPath, entry as ActivityEvent)
+    return { success: true }
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : 'Unbekannter Fehler' }
+  }
+})
+
+ipcMain.handle('activity-summary', async (event, vaultPath: string, range?: { from: number; to: number }) => {
+  if (!isTrustedSender(event)) return { success: false, error: 'Nicht autorisierter Aufrufer' }
+  try {
+    assertApprovedVault(vaultPath, 'activity-summary')
+    const valid = range && Number.isFinite(range.from) && Number.isFinite(range.to) && range.to > range.from
+    return { success: true, summary: await readActivitySummary(vaultPath, valid ? range : undefined) }
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : 'Unbekannter Fehler' }
   }
@@ -4599,6 +4693,7 @@ ipcMain.handle('note-agent-discard-result', async (event, runId: string, resultI
     /* Datei fehlt bereits — Verwerfen ist idempotent */
   }
   pruneRunIfConsumed(run)
+  recordActivity(run.vaultPath, { at: Date.now(), kind: 'agent-result-discarded', runId: run.runId, format: entry.kind })
   return { success: true }
 })
 

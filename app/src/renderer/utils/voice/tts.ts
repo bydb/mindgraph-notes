@@ -15,6 +15,14 @@ export interface TtsOptions {
   /** Override für Pitch (0.5 – 2.0); sonst aus uiStore.speech.ttsPitch. */
   pitch?: number
   onEnd?: () => void
+  /**
+   * Erzwingt die System-Stimme, auch wenn ElevenLabs eingestellt ist.
+   *
+   * Für Sprachbefehl-Antworten Pflicht: dort erzeugt die App den Text selbst aus
+   * Vault-Daten (Aufgabentitel, Notizinhalt). Der Nutzer hat ElevenLabs für Karteikarten
+   * gewählt, nicht dafür, dass selbst erzeugte Antworten das Gerät verlassen.
+   */
+  forceLocal?: boolean
 }
 
 /**
@@ -126,7 +134,7 @@ export function speak(text: string, opts: TtsOptions): boolean {
 
   const settings = useUIStore.getState().speech
 
-  if (settings.ttsEngine === 'elevenlabs') {
+  if (settings.ttsEngine === 'elevenlabs' && !opts.forceLocal) {
     speakElevenLabs(trimmed, opts).catch(err => {
       const msg = err instanceof Error ? err.message : String(err)
       useVoiceStore.getState().setError(`ElevenLabs: ${msg}`)

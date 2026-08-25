@@ -23,6 +23,9 @@ import { QuickSearch } from './components/QuickSearch/QuickSearch'
 import { ZoteroSearch } from './components/ZoteroSearch/ZoteroSearch'
 import { QuickSwitcher } from './components/QuickSwitcher/QuickSwitcher'
 import { CommandPalette, type CommandAction } from './components/CommandPalette/CommandPalette'
+import { COMMAND_CATALOG, type CommandId, type CommandRequirement } from '../shared/commandCatalog'
+import { registerVoiceUiBridge } from './voice/uiBridge'
+import { useVoiceCommandStore } from './stores/voiceCommandStore'
 import { TemplatePicker } from './components/TemplatePicker/TemplatePicker'
 import { TemplateSettings } from './components/TemplatePicker/TemplateSettings'
 import { Settings } from './components/Settings/Settings'
@@ -61,6 +64,7 @@ import { getVaultTaskStats } from './utils/linkExtractor'
 import { buildBrainSensors, getDayBoundsMs } from './utils/brainSensors'
 import './styles/index.css'
 import { LlmSpeedIndicator } from './components/Shared/LlmSpeedIndicator'
+import { ImpactIndicator } from './components/Shared/ImpactIndicator'
 import { initLlmTelemetry } from './stores/llmTelemetryStore'
 import { LlmPerformanceView } from './components/LlmPerformance/LlmPerformanceView'
 
@@ -143,6 +147,8 @@ const App: React.FC = () => {
   const [toolsMenuOpen, setToolsMenuOpen] = useState(false)
   const toolsMenuRef = useRef<HTMLDivElement>(null)
   const [quickSearchOpen, setQuickSearchOpen] = useState(false)
+  // Vorbelegter Suchbegriff für den Sprachbefehl "suche nach ..." — leer bei Cmd+P.
+  const [quickSearchQuery, setQuickSearchQuery] = useState('')
   const [zoteroSearchOpen, setZoteroSearchOpen] = useState(false)
   const [quickSwitcherOpen, setQuickSwitcherOpen] = useState(false)
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false)
@@ -160,6 +166,8 @@ const App: React.FC = () => {
   const [agentPanelOpen, setAgentPanelOpen] = useState(false)
   const [semanticScholarOpen, setSemanticScholarOpen] = useState(false)
   const [briefingOpen, setBriefingOpen] = useState(false)
+  const speechSettings = useUIStore(state => state.speech)
+  const voiceCommandKind = useVoiceCommandStore(state => state.state.kind)
   const dashboardEnabled = useUIStore(state => state.dashboard.enabled)
   const openDashboardTab = useTabStore(state => state.openDashboardTab)
   const openWorkflowCanvasTab = useTabStore(state => state.openWorkflowCanvasTab)
@@ -926,6 +934,7 @@ const App: React.FC = () => {
       // Cmd+P / Ctrl+P für Schnellsuche
       if ((e.metaKey || e.ctrlKey) && e.key === 'p' && !e.shiftKey) {
         e.preventDefault()
+        setQuickSearchQuery('')
         setQuickSearchOpen(true)
       }
       // Cmd+Shift+Z / Ctrl+Shift+Z für Zotero-Suche (nur wenn Modul aktiv)
@@ -1112,37 +1121,99 @@ const App: React.FC = () => {
   // Befehls-Palette (Cmd+Shift+P): alle Panels/Ansichten/Werkzeuge per Textsuche.
   // Bewusst pro Render neu gebaut (kein useMemo) — die Liste hängt an vielen
   // Modul-Flags, und die Palette rendert nur bei geöffnetem Zustand.
-  const commandActions: CommandAction[] = [
-    { id: 'view-editor', category: t('commandPalette.cat.view'), label: t('commandPalette.viewEditor'), keywords: 'editor view ansicht', run: () => setViewMode('editor') },
-    { id: 'view-split', category: t('commandPalette.cat.view'), label: t('commandPalette.viewSplit'), keywords: 'split view ansicht', run: () => setViewMode('split') },
-    { id: 'view-brain', category: t('commandPalette.cat.view'), label: t('commandPalette.viewBrain'), keywords: 'graph canvas brain mindgraph', run: () => setViewMode('canvas') },
-    ...(dashboardEnabled ? [{ id: 'open-dashboard', category: t('commandPalette.cat.view'), label: t('commandPalette.openDashboard'), keywords: 'dashboard widgets', run: () => openDashboardTab() }] : []),
-    ...(vaultWorkflowCanvasActive ? [{ id: 'open-workflow', category: t('commandPalette.cat.view'), label: t('commandPalette.openWorkflow'), keywords: 'workflow automation canvas', run: () => openWorkflowCanvasTab() }] : []),
+  // Der Bestand steht als Daten in shared/commandCatalog.ts, hier stehen nur die
+  // Rückrufe. `Record<CommandId, ...>` erzwingt Vollständigkeit: kommt ein Eintrag in
+  // den Katalog, bricht der Typecheck, solange es hier keinen Rückruf gibt.
+  const commandRuns: Record<CommandId, () => void> = {
+    'view-editor': () => setViewMode('editor'),
+    'view-split': () => setViewMode('split'),
+    'view-brain': () => setViewMode('canvas'),
+    'open-dashboard': () => openDashboardTab(),
+    'open-workflow': () => openWorkflowCanvasTab(),
     // setViewMode('editor') ist Pflicht: im Brain-Modus verdeckt der Canvas die
     // Tab-Fläche, der Agent-Tab wäre zwar aktiv, aber unsichtbar (gleiches Muster
     // wie bei den Werkzeug-Knöpfen für Dashboard und Workflow-Canvas).
-    { id: 'open-agent', category: t('commandPalette.cat.view'), label: t('commandPalette.openAgent'), keywords: 'agent ki ai ordner auswerten tabellen', run: () => { setViewMode('editor'); openAgentTab() } },
-    { id: 'panel-tasks', category: t('commandPalette.cat.panels'), label: t('commandPalette.panelTasks'), keywords: 'tasks aufgaben termine overdue', run: () => switchRightPanel('overdue') },
-    { id: 'panel-tags', category: t('commandPalette.cat.panels'), label: t('commandPalette.panelTags'), keywords: 'tags schlagworte', run: () => switchRightPanel('tags') },
-    ...(smartConnectionsEnabled ? [{ id: 'panel-smart', category: t('commandPalette.cat.panels'), label: t('commandPalette.panelSmart'), keywords: 'smart connections similar aehnlich', run: () => switchRightPanel('smartConnections') }] : []),
-    ...(notesChatEnabled ? [{ id: 'panel-chat', category: t('commandPalette.cat.panels'), label: t('commandPalette.panelChat'), keywords: 'chat ki ai notes', run: () => switchRightPanel('notesChat') }] : []),
-    ...(flashcardsEnabled ? [{ id: 'panel-flashcards', category: t('commandPalette.cat.panels'), label: t('commandPalette.panelFlashcards'), keywords: 'flashcards karteikarten lernen', run: () => switchRightPanel('flashcards') }] : []),
-    ...(emailEnabled ? [{ id: 'panel-inbox', category: t('commandPalette.cat.panels'), label: t('commandPalette.panelInbox'), keywords: 'email inbox posteingang mail', run: () => switchRightPanel('inbox') }] : []),
-    ...(edooboxEnabled ? [{ id: 'panel-agent', category: t('commandPalette.cat.panels'), label: t('commandPalette.panelAgent'), keywords: 'agent edoobox veranstaltungen events', run: () => switchRightPanel('agent') }] : []),
-    { id: 'llm-performance', category: t('commandPalette.cat.panels'), label: t('commandPalette.llmPerformance'), keywords: 'leistung geschwindigkeit token modell performance speed tokens', run: () => openLlmPerformanceTab() },
-    ...(semanticScholarEnabled ? [{ id: 'panel-scholar', category: t('commandPalette.cat.panels'), label: t('commandPalette.panelScholar'), keywords: 'semantic scholar paper research', run: () => switchRightPanel('semanticScholar') }] : []),
-    { id: 'open-quick-search', category: t('commandPalette.cat.search'), label: t('commandPalette.quickSearch'), keywords: 'suche search volltext', shortcut: 'Cmd+P', run: () => setQuickSearchOpen(true) },
-    { id: 'open-quick-switcher', category: t('commandPalette.cat.search'), label: t('commandPalette.quickSwitcher'), keywords: 'switcher notiz wechseln open note', shortcut: 'Cmd+K', run: () => setQuickSwitcherOpen(true) },
-    { id: 'open-templates', category: t('commandPalette.cat.search'), label: t('commandPalette.templates'), keywords: 'template vorlage einfuegen', shortcut: 'Cmd+Shift+T', run: () => setTemplatePickerOpen(true) },
-    ...(zoteroModuleEnabled ? [{ id: 'open-zotero', category: t('commandPalette.cat.search'), label: t('commandPalette.zotero'), keywords: 'zotero literatur bibliothek', shortcut: 'Cmd+Shift+Z', run: () => setZoteroSearchOpen(true) }] : []),
-    ...(transportEnabled ? [{ id: 'open-transport', category: t('commandPalette.cat.tools'), label: t('commandPalette.transport'), keywords: 'transport schnellerfassung capture', run: () => window.electronAPI.transportShow() }] : []),
-    { id: 'toggle-terminal', category: t('commandPalette.cat.tools'), label: t('commandPalette.terminal'), keywords: 'terminal shell konsole', run: () => setTerminalVisible(v => !v) },
-    { id: 'toggle-sidebar', category: t('commandPalette.cat.tools'), label: t('commandPalette.sidebar'), keywords: 'sidebar seitenleiste', run: () => toggleSidebar() },
-    { id: 'toggle-theme', category: t('commandPalette.cat.tools'), label: t('commandPalette.theme'), keywords: 'theme dark light hell dunkel', run: () => setTheme(theme === 'dark' ? 'light' : 'dark') },
-    { id: 'open-settings', category: t('commandPalette.cat.tools'), label: t('commandPalette.settings'), keywords: 'settings einstellungen preferences', shortcut: 'Cmd+,', run: () => setSettingsOpen(true) },
-    { id: 'open-settings-modules', category: t('commandPalette.cat.tools'), label: t('commandPalette.settingsModules'), keywords: 'module plugins aktivieren', run: () => { setSettingsInitialTab('modules'); setSettingsOpen(true) } },
-    { id: 'open-help', category: t('commandPalette.cat.tools'), label: t('commandPalette.help'), keywords: 'hilfe help guide uebersicht', shortcut: 'Cmd+/', run: () => setHelpGuideOpen(true) }
-  ]
+    'open-agent': () => { setViewMode('editor'); openAgentTab() },
+    'panel-tasks': () => switchRightPanel('overdue'),
+    'panel-tags': () => switchRightPanel('tags'),
+    'panel-smart': () => switchRightPanel('smartConnections'),
+    'panel-chat': () => switchRightPanel('notesChat'),
+    'panel-flashcards': () => switchRightPanel('flashcards'),
+    'panel-inbox': () => switchRightPanel('inbox'),
+    'panel-agent': () => switchRightPanel('agent'),
+    'llm-performance': () => openLlmPerformanceTab(),
+    'panel-scholar': () => switchRightPanel('semanticScholar'),
+    'new-note': () => window.dispatchEvent(new CustomEvent('mindgraph:newNote')),
+    'open-quick-search': () => { setQuickSearchQuery(''); setQuickSearchOpen(true) },
+    'open-quick-switcher': () => setQuickSwitcherOpen(true),
+    'open-templates': () => setTemplatePickerOpen(true),
+    'open-zotero': () => setZoteroSearchOpen(true),
+    'open-transport': () => window.electronAPI.transportShow(),
+    'toggle-terminal': () => setTerminalVisible(v => !v),
+    'toggle-sidebar': () => toggleSidebar(),
+    'toggle-theme': () => setTheme(theme === 'dark' ? 'light' : 'dark'),
+    'open-settings': () => setSettingsOpen(true),
+    'open-settings-modules': () => { setSettingsInitialTab('modules'); setSettingsOpen(true) },
+    'open-help': () => setHelpGuideOpen(true)
+  }
+
+  const commandModuleActive: Record<CommandRequirement, boolean> = {
+    dashboard: dashboardEnabled,
+    workflowCanvas: vaultWorkflowCanvasActive,
+    smartConnections: smartConnectionsEnabled,
+    notesChat: notesChatEnabled,
+    flashcards: flashcardsEnabled,
+    email: emailEnabled,
+    edoobox: edooboxEnabled,
+    semanticScholar: semanticScholarEnabled,
+    zotero: zoteroModuleEnabled,
+    transport: transportEnabled
+  }
+
+  const commandActions: CommandAction[] = COMMAND_CATALOG
+    .filter(descriptor => !descriptor.requires || commandModuleActive[descriptor.requires])
+    .map(descriptor => ({
+      id: descriptor.id,
+      label: t(descriptor.labelKey as Parameters<typeof t>[0]),
+      category: t(descriptor.categoryKey as Parameters<typeof t>[0]),
+      keywords: descriptor.keywords,
+      shortcut: descriptor.shortcut,
+      run: commandRuns[descriptor.id]
+    }))
+
+  // Klick auf die Tagesbilanz in der Statusleiste: dieselbe Karte wie auf die Frage
+  // „Was hat MindGraph heute übernommen?" — eine zweite Darstellung derselben Zahlen
+  // wäre eine zweite Wahrheit.
+  const handleImpactClick = () => {
+    setCommandPaletteOpen(true)
+    void useVoiceCommandStore.getState().runDirect({ id: 'activity.today', params: {} }, t)
+  }
+
+  const handleVoiceButton = () => {
+    const store = useVoiceCommandStore.getState()
+    if (voiceCommandKind === 'listening') {
+      void store.stopListening(t)
+      return
+    }
+    setCommandPaletteOpen(true)
+    void store.startListening(t)
+  }
+
+  // Sprachbefehle: App.tsx meldet die Oberflächenaktionen an, die nur hier liegen
+  // (rechte Leiste, QuickSearch, Ansichtswechsel). Semantische Aufrufe, keine Klicks.
+  useEffect(() => {
+    return registerVoiceUiBridge({
+      openDashboard: () => { setViewMode('editor'); openDashboardTab() },
+      openQuickSearch: (query: string) => { setQuickSearchQuery(query); setQuickSearchOpen(true) },
+      openTasksPanel: () => switchRightPanel('overdue'),
+      // Der Zustand des Dialogs liegt in der Seitenleiste. Ereignis statt Prop-Kette,
+      // wie bei 'mindgraph:openSettings' — die Seitenleiste hört darauf.
+      newNote: () => window.dispatchEvent(new CustomEvent('mindgraph:newNote')),
+      runCommand: (commandId: string) => commandRuns[commandId as CommandId]?.(),
+      isModuleEnabled: (module) => (module === 'dashboard' ? dashboardEnabled : false),
+      getAvailableCommands: () => commandActions.map(a => ({ id: a.id, label: a.label, keywords: a.keywords }))
+    })
+  })
 
   return (
     <ReactFlowProvider>
@@ -1247,6 +1318,19 @@ const App: React.FC = () => {
           
           <div className="titlebar-right">
             <div className="view-mode-switcher">
+              {speechSettings.enabled && (
+                <button
+                  className={`view-mode-btn cat-editor ${voiceCommandKind === 'listening' || voiceCommandKind === 'preparing' ? 'active' : ''}`}
+                  onClick={handleVoiceButton}
+                  title={voiceCommandKind === 'listening' ? t('voiceCommand.stopListening') : t('voiceCommand.startListening')}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+                    <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+                    <line x1="12" y1="19" x2="12" y2="23"/>
+                  </svg>
+                </button>
+              )}
               {transportTitlebarButtonVisible && (
                 <button
                   className="view-mode-btn cat-editor"
@@ -1323,6 +1407,12 @@ const App: React.FC = () => {
                       <span>{t('commandPalette.menuLabel')}</span>
                       <span className="titlebar-tools-shortcut">⇧⌘P</span>
                     </button>
+                    {speechSettings.enabled && (
+                      <button className="titlebar-tools-item" role="menuitem" onClick={() => { setToolsMenuOpen(false); handleVoiceButton() }}>
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/></svg>
+                        <span>{t('voiceCommand.startListening')}</span>
+                      </button>
+                    )}
                     <button className={`titlebar-tools-item ${tagsPanelOpen ? 'active' : ''}`} role="menuitem" onClick={() => { switchRightPanel('tags'); setToolsMenuOpen(false) }}>
                       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
                       <span>{t('titlebar.tags')}</span>
@@ -1607,6 +1697,7 @@ const App: React.FC = () => {
               </span>
             </>
           )}
+          <ImpactIndicator onOpenCard={handleImpactClick} />
           {syncEnabled && (
             <>
               <span className="status-separator">|</span>
@@ -1641,6 +1732,7 @@ const App: React.FC = () => {
       {/* Quick Search Modal */}
       <QuickSearch
         isOpen={quickSearchOpen}
+        initialQuery={quickSearchQuery}
         onClose={() => setQuickSearchOpen(false)}
       />
 

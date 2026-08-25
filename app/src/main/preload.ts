@@ -215,6 +215,17 @@ contextBridge.exposeInMainWorld('electronAPI', {
     webResearch?: { enabled: boolean } | null
   }) => ipcRenderer.invoke('note-agent-run', params),
   noteAgentCancel: (runId: string) => ipcRenderer.invoke('note-agent-cancel', runId),
+
+  // Tätigkeitsprotokoll (Effizienzindex). Anhängen darf der Renderer nur
+  // Sprachbefehl-Ereignisse — alles andere schreibt der Main selbst.
+  activityAppend: (vaultPath: string, entry: unknown) => ipcRenderer.invoke('activity-append', vaultPath, entry),
+  activitySummary: (vaultPath: string, range?: { from: number; to: number }) =>
+    ipcRenderer.invoke('activity-summary', vaultPath, range),
+  onActivityChanged: (callback: (payload: { vaultPath: string }) => void) => {
+    const handler = (_e: unknown, payload: { vaultPath: string }) => callback(payload)
+    ipcRenderer.on('activity-changed', handler)
+    return () => ipcRenderer.removeListener('activity-changed', handler)
+  },
   noteAgentRemember: (vaultPath: string, text: string) => ipcRenderer.invoke('note-agent-remember', vaultPath, text),
   // Agent-Skills Stufe 1: Vault-Skills verwalten
   noteSkillsList: (vaultPath: string) => ipcRenderer.invoke('note-skills-list', vaultPath),

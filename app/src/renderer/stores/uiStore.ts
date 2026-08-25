@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import type { ActivityType, ReferenceMinutes } from '../../shared/activityLog'
 import type { UpdateInfo } from '../../shared/types'
 import type { NoteKindId } from '../utils/noteKind'
 import { DEFAULT_OPENROUTER_SETTINGS, DEFAULT_LLMBASE_SETTINGS, type CloudProviderSettings } from '../../shared/llmBackend'
@@ -587,6 +588,13 @@ export interface SpeechSettings {
   ttsVoice: string           // voiceURI aus speechSynthesis.getVoices(); leer = Default
   ttsRate: number            // 0.5 – 2.0 (1.0 = normal)
   ttsPitch: number           // 0.5 – 2.0 (1.0 = normal)
+  /**
+   * deviceId des Aufnahmegeräts. Leer = macOS-Standard.
+   * Ohne diese Wahl hängt die Aufnahme daran, welches Mikrofon das System gerade
+   * bevorzugt — ein stummes eingebautes Mikrofon macht die Funktion dann unbenutzbar,
+   * ohne dass die App etwas dagegen tun kann.
+   */
+  inputDeviceId: string
   sttLanguage: string        // Whisper-Sprachcode: 'de', 'en', 'auto'
   sttEngine: SttEngine       // 'transformers' = im Browser via WebGPU/WASM, 'whisper-cli' = lokales CLI (Power-User)
   transformersModel: TransformersWhisperModel  // Modellgröße fürs eingebaute Whisper (tiny ~39MB / base ~80MB / small ~244MB)
@@ -599,6 +607,20 @@ export interface SpeechSettings {
   elevenlabsModel: string    // 'eleven_multilingual_v2' | 'eleven_turbo_v2_5' | 'eleven_flash_v2_5'
   elevenlabsStability: number // 0 – 1
   elevenlabsSimilarity: number // 0 – 1
+}
+
+/**
+ * Referenzzeiten für die Zeitersparnis (Effizienzindex).
+ *
+ * Bewusst leer voreingestellt: Die Anzeige darf NUR auf einer vom Nutzer selbst
+ * eingetragenen Vergleichsdauer beruhen. Eine geratene Voreinstellung würde aus einer
+ * Schätzung des Nutzers eine Behauptung der App machen.
+ */
+export interface ImpactSettings {
+  referenceMinutes: ReferenceMinutes
+  /** Tagesbilanz in der Statusleiste. An, aber abschaltbar — eine dauerhaft sichtbare
+   *  Zahl über die eigene Arbeit will nicht jeder ständig vor sich haben. */
+  showInStatusBar: boolean
 }
 
 interface UIState {
@@ -879,6 +901,11 @@ interface UIState {
   dashboard: DashboardSettings
   setDashboard: (settings: Partial<DashboardSettings>) => void
 
+  // Effizienzindex: Referenzzeiten je Tätigkeitsart
+  impact: ImpactSettings
+  setReferenceMinutes: (type: ActivityType, minutes: number | null) => void
+  setImpact: (settings: Partial<ImpactSettings>) => void
+
   // Telegram Bot
   telegramBot: TelegramBotSettings
   setTelegramBot: (settings: Partial<TelegramBotSettings>) => void
@@ -1007,6 +1034,7 @@ const defaultState = {
     ttsVoice: '',
     ttsRate: 1.0,
     ttsPitch: 1.0,
+    inputDeviceId: '',
     sttLanguage: 'de',
     sttEngine: 'transformers',
     transformersModel: 'base',
@@ -1171,6 +1199,9 @@ const defaultState = {
     widgetMigrationVersion: DASHBOARD_WIDGET_MIGRATION_VERSION
   } as DashboardSettings,
 
+  // Effizienzindex — leer heißt: keine Minutenanzeige, nur Zähler
+  impact: { referenceMinutes: {}, showInStatusBar: true } as ImpactSettings,
+
   // Telegram Bot
   telegramBot: {
     enabled: false,
@@ -1226,6 +1257,7 @@ const persistedKeys = [
   'presentationMode',
   'transport',
   'dashboard',
+  'impact',
   'telegramBot',
   'taskLeadTime'
 ] as const
@@ -1407,6 +1439,15 @@ export const useUIStore = create<UIState>()((set, get) => ({
   setDashboard: (settings) => set((state) => ({
     dashboard: { ...state.dashboard, ...settings }
   })),
+  // 0 oder null löscht den Eintrag: „keine Angabe" und „null Minuten" dürfen nicht
+  // dasselbe sein — sonst zeigte die Karte 0 gesparte Minuten statt gar keine Zahl.
+  setImpact: (settings) => set((state) => ({ impact: { ...state.impact, ...settings } })),
+  setReferenceMinutes: (type, minutes) => set((state) => {
+    const next = { ...state.impact.referenceMinutes }
+    if (minutes === null || !Number.isFinite(minutes) || minutes <= 0) delete next[type]
+    else next[type] = Math.round(minutes)
+    return { impact: { ...state.impact, referenceMinutes: next } }
+  }),
   setTelegramBot: (settings) => set((state) => ({
     telegramBot: { ...state.telegramBot, ...settings }
   })),

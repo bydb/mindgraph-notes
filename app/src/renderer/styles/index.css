@@ -256,6 +256,14 @@ h2 { letter-spacing: -0.016em; }
   top: calc(100% + 6px);
 }
 
+/* Tooltip nach unten in der Befehlspalette: .quick-switcher hat overflow:hidden,
+   und die Kopfzeile ist die oberste Reihe — ein Tooltip darüber wird am Rand
+   abgeschnitten und ist unsichtbar. */
+.command-palette-header [data-tooltip]::after {
+  bottom: auto;
+  top: calc(100% + 6px);
+}
+
 /* Tooltip nach unten für Editor-Nav und Toolbar-Buttons */
 .editor-nav-buttons [data-tooltip]::after,
 .editor-toolbar [data-tooltip]::after,
@@ -21986,6 +21994,22 @@ body.presentation-mode *::after {
   opacity: 0.6;
   font-size: 0.85em;
 }
+
+/* Tagesbilanz (Effizienzindex) in der Statusleiste. Gleicher Button-Reset wie die
+   Geschwindigkeitsanzeige daneben — es soll ein Eintrag der Leiste sein, kein Knopf. */
+.status-impact {
+  display: inline-flex;
+  align-items: baseline;
+  font-variant-numeric: tabular-nums;
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+.status-impact:hover { text-decoration: underline; }
 
 /* Fehlermeldung der Termin-Erkennung. Steht unter der Aktionsleiste (der Auslöser
    sitzt seit 08/2026 IN der Leiste), gleiche Optik wie .inbox-move-error daneben. */

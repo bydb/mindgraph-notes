@@ -53,11 +53,28 @@ export async function startDictation(cb: DictationCallbacks): Promise<DictationH
 
   let stream: MediaStream
   try {
-    stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+    // `exact` erzwingt das gewählte Gerät — sonst nimmt der Browser stillschweigend
+    // ein anderes, und die Einstellung wäre eine Attrappe.
+    stream = await navigator.mediaDevices.getUserMedia(
+      settings.inputDeviceId ? { audio: { deviceId: { exact: settings.inputDeviceId } } } : { audio: true }
+    )
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err)
-    voiceStore.setError(message)
-    throw new Error(message)
+    // Gewähltes Gerät abgezogen oder umbenannt: einmal auf den Systemstandard
+    // zurückfallen, statt die Aufnahme ganz zu verweigern.
+    if (settings.inputDeviceId) {
+      console.warn('[stt] gewähltes Mikrofon nicht verfügbar, weiche auf den Standard aus')
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      } catch (fallbackErr) {
+        const message = fallbackErr instanceof Error ? fallbackErr.message : String(fallbackErr)
+        voiceStore.setError(message)
+        throw new Error(message)
+      }
+    } else {
+      const message = err instanceof Error ? err.message : String(err)
+      voiceStore.setError(message)
+      throw new Error(message)
+    }
   }
 
   const mimeType = pickMimeType()

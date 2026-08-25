@@ -6,6 +6,8 @@ import type { Note } from '../../../shared/types'
 interface QuickSearchProps {
   isOpen: boolean
   onClose: () => void
+  /** Vorbelegter Suchbegriff (Sprachbefehl „suche nach ..."). Leer = wie bisher. */
+  initialQuery?: string
 }
 
 interface SearchResult {
@@ -14,7 +16,7 @@ interface SearchResult {
   matchText: string
 }
 
-export const QuickSearch: React.FC<QuickSearchProps> = ({ isOpen, onClose }) => {
+export const QuickSearch: React.FC<QuickSearchProps> = ({ isOpen, onClose, initialQuery = '' }) => {
   const { t } = useTranslation()
   const [query, setQuery] = useState('')
   const [selectedIndex, setSelectedIndex] = useState(0)
@@ -26,11 +28,16 @@ export const QuickSearch: React.FC<QuickSearchProps> = ({ isOpen, onClose }) => 
   // Fokus auf Input wenn geöffnet
   useEffect(() => {
     if (isOpen) {
-      setQuery('')
+      setQuery(initialQuery)
       setSelectedIndex(0)
-      setTimeout(() => inputRef.current?.focus(), 50)
+      // Bei vorbelegtem Begriff den Text markieren: Überschreiben bleibt möglich,
+      // ohne dass erst geleert werden muss.
+      setTimeout(() => {
+        inputRef.current?.focus()
+        if (initialQuery) inputRef.current?.select()
+      }, 50)
     }
-  }, [isOpen])
+  }, [isOpen, initialQuery])
 
   // Suchergebnisse berechnen
   const results: SearchResult[] = useMemo(() => {

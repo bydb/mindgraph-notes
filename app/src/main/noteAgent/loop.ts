@@ -7,7 +7,7 @@ import { chatWithTools, type ChatMessage, type ChatOptions } from '../llm/chatCl
 import { looksTruncated, contextTruncationMessage, AGENT_NUM_CTX, AGENT_NUM_CTX_WEB } from '../../shared/contextGuard'
 import { getContextAttachmentInfos } from './contextFiles'
 import { createNoteAgentRegistry, type NoteAgentContext } from './skills'
-import { nextSeq, type AgentRun } from './runRegistry'
+import { nextSeq, recordToolUse, type AgentRun } from './runRegistry'
 
 // 12 statt 8: recherche-lastige Läufe (viele note_read/note_search vor dem Schreiben)
 // brauchen Luft für die Schreib-Iteration plus eine Fehler-Korrektur — real lief ein
@@ -266,6 +266,9 @@ export async function runNoteAgentLoop(params: NoteAgentLoopParams): Promise<Not
         // Abgelehnte Tool-Aufrufe im Protokoll zeigen — sonst sieht der Lauf nach
         // Fortschritt aus, während das Modell still eine Fehler-Schleife dreht.
         if (!toolResult.ok) onStep(nextSeq(run), call.name, shortToolError(toolResult.content))
+        // Nur ERFOLGREICHE Aufrufe zählen für die Tätigkeitsart: Ein abgelehntes
+        // write_xlsx macht aus einem Rechercheauftrag keine Tabellen-Auswertung.
+        else recordToolUse(run, call.name)
         messages.push({
           role: 'tool',
           tool_call_id: call.id,

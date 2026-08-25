@@ -397,8 +397,15 @@ export const Sidebar: React.FC<SidebarProps> = ({ onOpenSearch }) => {
       }
     }
 
+    // Sprachbefehl „neue Notiz" nimmt denselben Weg wie Cmd+N und das Plus.
+    const handleNewNoteEvent = () => handleNewNote()
+
     window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
+    window.addEventListener('mindgraph:newNote', handleNewNoteEvent)
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown)
+      window.removeEventListener('mindgraph:newNote', handleNewNoteEvent)
+    }
   }, [handleNewNote, handleOpenVault])
   
   if (!sidebarVisible) {

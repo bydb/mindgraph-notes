@@ -75,6 +75,12 @@ export interface AgentRun {
   // Einzelabfragen wieder legitim (nur nicht unbegrenzt).
   collectedFolders: Set<string>
   sources: Set<string> // gelesene Anhänge/Notizen — landen auf den Ergebnis-Karten
+  // Beginn des Laufs. Grundlage der Gesamtdauer im Tätigkeitsprotokoll:
+  // llmTelemetry.wallMs misst einzelne Modellaufrufe, nicht den Auftrag samt Tool-Runden.
+  startedAt: number
+  // Erfolgreich gelaufene Werkzeuge. Nur die NAMEN, nie Argumente — daraus leitet
+  // shared/activityLog.ts die Tätigkeitsart ab (inhaltsfrei, siehe deriveActivityType).
+  toolsUsed: Set<string>
   web?: WebRunState    // nur bei aktivierter Webrecherche
   // Bild-Generierung (Opt-in-Modul image-generation): beim Run-Start Main-seitig
   // bestimmt (Modul aktiv + Imagen-Key hinterlegt) → schaltet das generate_image-Tool frei.
@@ -154,6 +160,8 @@ export function startRun(params: {
     folderReads: new Map(),
     collectedFolders: new Set(),
     sources: new Set(),
+    startedAt: Date.now(),
+    toolsUsed: new Set(),
     web: params.web,
     imageGen: params.imageGen
   }
@@ -168,6 +176,11 @@ export function getRunForSender(senderId: number, runId: string): AgentRun | nul
   const run = runsById.get(runId)
   if (!run || run.senderId !== senderId) return null
   return run
+}
+
+/** Werkzeugnamen eines erfolgreichen Aufrufs merken — Grundlage der Tätigkeitsart. */
+export function recordToolUse(run: AgentRun, toolName: string): void {
+  run.toolsUsed.add(toolName)
 }
 
 export function finishRun(run: AgentRun, status: Exclude<AgentRunStatus, 'running'>): void {

@@ -1,0 +1,210 @@
+/*
+ * Die geteilte Kopfzeile (.quick-switcher-header) ist ein Block mit einem 100 % breiten
+ * Eingabefeld — ein zweites Element rutscht darunter an den linken Rand und ist praktisch
+ * nicht auffindbar (real passiert). Deshalb hier eine eigene Klasse NUR für die
+ * Befehlspalette; QuickSwitcher und QuickSearch bleiben unberührt.
+ */
+.command-palette-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.command-palette-header .quick-switcher-search {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Die Tooltip-Richtung für diese Kopfzeile steht bei den übrigen Richtungs-
+   Ausnahmen in styles/index.css (Suche nach .command-palette-header). */
+
+.voice-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.voice-transcript {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.voice-transcript-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary);
+}
+
+.voice-transcript-input,
+.voice-param-input {
+  width: 100%;
+  padding: 7px 9px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font-size: 13px;
+}
+
+.voice-transcript-input:focus,
+.voice-param-input:focus {
+  outline: none;
+  border-color: var(--accent-color);
+}
+
+.voice-status {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.voice-status-live {
+  color: var(--accent-color);
+}
+
+.voice-status-error {
+  color: var(--danger-color, #d9534f);
+}
+
+.voice-options {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.voice-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.voice-option:hover {
+  border-color: var(--accent-color);
+}
+
+.voice-option-index {
+  min-width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  background: var(--bg-tertiary, var(--bg-primary));
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.voice-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.voice-card-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.voice-card-empty {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.voice-card-lines {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.voice-card-group {
+  margin-top: 4px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary);
+}
+
+.voice-card-group:first-child {
+  margin-top: 0;
+}
+
+.voice-card-line {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--text-primary);
+}
+
+.voice-card-due {
+  flex-shrink: 0;
+  font-size: 11px;
+  color: var(--danger-color, #d9534f);
+}
+
+.voice-card-footnote {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.voice-card-followups {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.voice-secondary {
+  padding: 6px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.voice-secondary:hover {
+  color: var(--text-primary);
+  border-color: var(--accent-color);
+}
+
+.voice-mic-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.voice-mic-button:hover {
+  color: var(--text-primary);
+  border-color: var(--accent-color);
+}
+
+.voice-mic-button.recording {
+  color: var(--accent-color);
+  border-color: var(--accent-color);
+}
