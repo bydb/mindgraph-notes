@@ -513,13 +513,21 @@ const activityToday: ActionSpec<'activity.today'> = {
       }
     }
 
-    const speech = saved.lines.length > 0
-      ? t('voiceCommand.speech.activityWithMinutes', {
-          accepted: summary.acceptedTotal,
-          tasks: summary.tasksCreated,
-          minutes: saved.totalMinutes
-        })
-      : t('voiceCommand.speech.activity', { accepted: summary.acceptedTotal, tasks: summary.tasksCreated })
+    // Gesprochen darf kein „minus fünf Minuten gespart" herauskommen — ein Verlust
+    // braucht seinen eigenen Satz, sonst klingt die Bilanz kaputt oder verharmlosend.
+    const speech = saved.lines.length === 0
+      ? t('voiceCommand.speech.activity', { accepted: summary.acceptedTotal, tasks: summary.tasksCreated })
+      : saved.totalMinutes < 0
+        ? t('voiceCommand.speech.activityWithLoss', {
+            accepted: summary.acceptedTotal,
+            tasks: summary.tasksCreated,
+            minutes: Math.abs(saved.totalMinutes)
+          })
+        : t('voiceCommand.speech.activityWithMinutes', {
+            accepted: summary.acceptedTotal,
+            tasks: summary.tasksCreated,
+            minutes: saved.totalMinutes
+          })
 
     return {
       card: {

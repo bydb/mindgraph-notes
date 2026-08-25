@@ -217,6 +217,39 @@ function takeReviewMs(runId: string): number | undefined {
   return measurement.end()
 }
 
+/** Feste Zahl als Messung ablegen — zum Zurücklegen nach einem gescheiterten Aufruf. */
+function keepMeasured(store: Map<string, ActiveMeasurement>, runId: string, ms: number): void {
+  store.set(runId, { begin: () => {}, end: () => ms, cancel: () => {} })
+}
+
+/**
+ * Nach einer Entscheidung: Die Messwerte gehen NICHT verloren.
+ *
+ * Zwei Fälle, die vorher Zeit verschluckten:
+ *  - Der Aufruf scheitert (Datei gesperrt, Pfad weg) → die Werte müssen zurück, sonst
+ *    steht der zweite Versuch ohne Prüfzeit da.
+ *  - Es liegen noch weitere Karten → für sie beginnt eine NEUE Prüfphase. Ohne das
+ *    wurde nur die erste Entscheidung gemessen und der Lauf sah zu günstig aus.
+ */
+function settleTimings(
+  runId: string,
+  timings: { reviewMs?: number; waitingMs?: number },
+  erfolgreich: boolean,
+  weitereKartenOffen: boolean
+): void {
+  if (!erfolgreich) {
+    if (typeof timings.reviewMs === 'number') keepMeasured(reviewTimers, runId, timings.reviewMs)
+    if (typeof timings.waitingMs === 'number') keepMeasured(waitTimers, runId, timings.waitingMs)
+    return
+  }
+  if (weitereKartenOffen) startReviewTimer(runId)
+}
+
+/** Sind neben `entschieden` noch Ergebnisse offen? */
+function hatOffeneKarten(results: Array<{ resultId: string; state: string }>, entschieden: string): boolean {
+  return results.some(r => r.resultId !== entschieden && r.state === 'pending')
+}
+
 export const useNoteAgentStore = create<NoteAgentStoreState>((set, get) => ({
   scopes: {},
   runScope: {},
@@ -319,10 +352,10 @@ export const useNoteAgentStore = create<NoteAgentStoreState>((set, get) => ({
   acceptResult: async (scopeId, resultId) => {
     const run = get().getScope(scopeId).run
     if (!run.runId) return
-    const res = await window.electronAPI.noteAgentAcceptResult(run.runId, resultId, {
-      reviewMs: takeReviewMs(run.runId),
-      waitingMs: takeWaitMs(run.runId)
-    })
+    const timings = { reviewMs: takeReviewMs(run.runId), waitingMs: takeWaitMs(run.runId) }
+    const weitereOffen = hatOffeneKarten(run.results, resultId)
+    const res = await window.electronAPI.noteAgentAcceptResult(run.runId, resultId, timings)
+    settleTimings(run.runId, timings, !!res.success, weitereOffen)
     set(s => withScope(s, scopeId, sc => ({
       ...sc,
       run: {
@@ -337,10 +370,10 @@ export const useNoteAgentStore = create<NoteAgentStoreState>((set, get) => ({
   discardResult: async (scopeId, resultId) => {
     const run = get().getScope(scopeId).run
     if (!run.runId) return
-    const res = await window.electronAPI.noteAgentDiscardResult(run.runId, resultId, {
-      reviewMs: takeReviewMs(run.runId),
-      waitingMs: takeWaitMs(run.runId)
-    })
+    const timings = { reviewMs: takeReviewMs(run.runId), waitingMs: takeWaitMs(run.runId) }
+    const weitereOffen = hatOffeneKarten(run.results, resultId)
+    const res = await window.electronAPI.noteAgentDiscardResult(run.runId, resultId, timings)
+    settleTimings(run.runId, timings, !!res.success, weitereOffen)
     set(s => withScope(s, scopeId, sc => ({
       ...sc,
       run: {

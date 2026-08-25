@@ -84,6 +84,7 @@ export function ImpactIndicator({ onOpenCard }: { onOpenCard: () => void }) {
     badge.kind === 'minutes' && badge.minutes < 0 ? t('statusbar.impact.loss', { minutes: Math.abs(badge.minutes) })
     : badge.kind === 'minutes' ? t('statusbar.impact.minutes', { minutes: badge.minutes })
     : badge.kind === 'accepted' ? t('statusbar.impact.accepted', { count: badge.count })
+    : badge.kind === 'email-tasks' ? t('statusbar.impact.emailTasks', { count: badge.count })
     : t('statusbar.impact.tasks', { count: badge.count })
 
   const lines = [

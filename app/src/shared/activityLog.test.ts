@@ -433,6 +433,31 @@ describe('Modellvergleich', () => {
   })
 })
 
+describe('Dritte Durchsicht', () => {
+  const range = localDayRange(NOW)
+
+  it('zeigt einen Tag mit ausschließlich Mail-Aufgaben statt zu verstummen', () => {
+    // Ohne Referenzzeit gibt es keine Minuten — aber der Tag ist nicht leer, und genau
+    // dieser Fall ist der häufigste.
+    const events: ActivityEvent[] = [
+      { at: NOW, kind: 'email-tasks-extracted', id: 'm1', emails: 18, tasks: 5, durationMs: 60_000, waitingMs: 30_000 }
+    ]
+    const summary = summarizeActivity(events, range)
+    expect(impactBadge(summary, estimateSavedMinutes(summary, {}))).toEqual({ kind: 'email-tasks', count: 5 })
+  })
+
+  it('zeigt Mail-Aufgaben auch bei exakt ausgeglichener Bilanz', () => {
+    const events: ActivityEvent[] = [
+      { at: NOW, kind: 'email-tasks-extracted', id: 'm1', emails: 4, tasks: 3, durationMs: 60_000, waitingMs: 20 * 60_000 }
+    ]
+    const summary = summarizeActivity(events, range)
+    // 20 min Vordergrund gegen 20 min Referenz: null Unterschied, aber drei Aufgaben.
+    const saved = estimateSavedMinutes(summary, { 'email-tasks': 20 })
+    expect(saved.totalMinutes).toBe(0)
+    expect(impactBadge(summary, saved)).toEqual({ kind: 'email-tasks', count: 3 })
+  })
+})
+
 describe('impactBadge', () => {
   const range = localDayRange(NOW)
 

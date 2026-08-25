@@ -510,7 +510,8 @@ export function estimateSavedMinutes(summary: ActivitySummary, reference: Refere
  * Was die Statusleiste anzeigt — als Entscheidung, nicht als fertiger Text: Die
  * Übersetzung gehört in den Renderer, die Regel gehört hierher und ist so prüfbar.
  *
- * Rangfolge: Minuten schlagen Zähler, Übernahmen schlagen Aufgaben. `none` heißt
+ * Rangfolge: Minuten schlagen Zähler, Übernahmen schlagen Aufgaben, Aufgaben schlagen
+ * erkannte Mail-Aufgaben. `none` heißt
  * „nichts zu sagen" — dann steht in der Leiste nichts, statt einer Null. Eine Null ist
  * eine Aussage über einen Tag, an dem noch gar nichts passiert ist.
  */
@@ -518,6 +519,7 @@ export type ImpactBadge =
   | { kind: 'minutes'; minutes: number }
   | { kind: 'accepted'; count: number }
   | { kind: 'tasks'; count: number }
+  | { kind: 'email-tasks'; count: number }
   | { kind: 'none' }
 
 export function impactBadge(summary: ActivitySummary, saved: SavedTime): ImpactBadge {
@@ -527,6 +529,9 @@ export function impactBadge(summary: ActivitySummary, saved: SavedTime): ImpactB
   }
   if (summary.acceptedTotal > 0) return { kind: 'accepted', count: summary.acceptedTotal }
   if (summary.tasksCreated > 0) return { kind: 'tasks', count: summary.tasksCreated }
+  // Ohne diesen Rückfall verschwand ein Tag, an dem NUR Mail-Aufgaben erkannt wurden,
+  // vollständig aus der Leiste — obwohl gerade das der häufigste Fall ist.
+  if (summary.emailTasks > 0) return { kind: 'email-tasks', count: summary.emailTasks }
   return { kind: 'none' }
 }
 

@@ -713,6 +713,32 @@ Einstellungstext sagt das jetzt ausdrücklich.
 Bleibt offen: der echte Vergleichsmodus (dieselbe Aufgabe mehrfach konventionell und mehrfach mit
 MindGraph, Median und Übernahmequote). Erst der macht aus der persönlichen Bilanz einen Nachweis.
 
+### Dritte Durchsicht: drei Restfehler (25.08.2026)
+
+1. **Der Mehrergebnis-Fehler war nur halb behoben.** Die Auswertung sammelte die Zeiten über beide
+   Entscheidungsarten — aber der Renderer beendete den Prüftimer bei der ERSTEN Entscheidung und
+   startete keinen neuen. Der Testfall bildete damit einen Ablauf ab, den der Store gar nicht
+   erzeugen kann. Jetzt beginnt nach jeder Entscheidung eine neue Prüfphase, solange Karten offen
+   sind; und **ein gescheiterter Aufruf legt die Messwerte zurück**, statt sie zu verbrauchen —
+   sonst stünde der zweite Versuch ohne Prüfzeit da. Zwei Store-Tests, gegen den defekten Stand
+   gegengeprüft (beide rot).
+2. **Die Sprachausgabe sagte „minus fünf Minuten gespart".** Karte und Leiste behandelten das Minus
+   korrekt, der gesprochene Satz nicht. Eigener Verlust-Satz mit Absolutwert. Die Überschrift heißt
+   jetzt neutral **„Zeitbilanz (geschätzt)"**, weil sie beides tragen muss.
+3. **Ein Tag mit ausschließlich Mail-Aufgaben verschwand aus der Leiste**, sobald die Bilanz exakt
+   null war oder keine Referenzzeit vorlag: `impactBadge` kannte `emailTasks` nicht als Rückfall.
+   Ergänzt — und das ist der häufigste Fall überhaupt.
+
+Dazu: Der **Mittelwert** wurde berechnet, aber nie angezeigt. Er steht jetzt ab drei Vorgängen neben
+dem Median. Weicht er deutlich ab, ist genau das die Auskunft.
+
+### Vergleichsmodus — Vorgabe aus der Durchsicht
+
+Nicht dieselbe Aufgabe wiederholen: Lern- und Erinnerungseffekte verzerren das Ergebnis. Stattdessen
+**vergleichbare Fälle derselben Aufgabenklasse, zufällig auf „konventionell" und „MindGraph"
+verteilt**, gemessen an aktiver Zeit, Korrekturzeit, Übernahmequote und Ergebnisqualität. Das ist
+der Entwurf, der als Nächstes geschrieben werden muss.
+
 ### Nächste Schritte
 
 1. `tiny` gegen `base` messen, warm und kalt, auf der Zielhardware.
