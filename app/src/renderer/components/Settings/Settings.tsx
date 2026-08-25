@@ -1730,12 +1730,6 @@ const SpeechSettingsTab: React.FC<{ t: TabTFn }> = ({ t }) => {
       </div>
       <p className="settings-hint">{t('settings.speech.inputDeviceHint')}</p>
 
-      <h4 style={{ marginTop: 32 }}>{t('settings.impact.section')}</h4>
-      <p className="settings-hint">{t('settings.impact.hint')}</p>
-      <ReferenceMinutesRows t={t} />
-      <p className="settings-hint">{t('settings.impact.basis')}</p>
-      <ImpactStatusBarToggle t={t} />
-
       <h4 style={{ marginTop: 32 }}>Flashcards</h4>
       <div className="settings-row">
         <label>{t('settings.speech.flashcards.autoPlay')}</label>
@@ -2228,6 +2222,9 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab,
       { id: 'general-accent', tab: 'general', label: t('settings.general.accentColor'), path: `${g.basics} → ${t('settings.tab.general')}`, keywords: 'akzentfarbe accent farbe petrol color' },
       { id: 'general-language', tab: 'general', label: t('settings.general.language'), path: `${g.basics} → ${t('settings.tab.general')}`, keywords: 'sprache oberfläche language deutsch english ui' },
       { id: 'general-font', tab: 'general', label: t('settings.general.font'), path: `${g.basics} → ${t('settings.tab.general')}`, keywords: 'schriftart font typografie' },
+      // Wortschatz wie im Befehlskatalog: die Wörter, die Nutzer benutzen — „gespart",
+      // „bilanz", „wieviel zeit", nicht nur die interne Benennung.
+      { id: 'general-impact', tab: 'general', label: t('settings.impact.section'), path: `${g.basics} → ${t('settings.tab.general')}`, keywords: 'zeitersparnis referenzzeit minuten gespart bilanz tagesbilanz effizienz statusleiste zeitgewinn wieviel zeit' },
       // Editor
       { id: 'editor-default-view', tab: 'editor', label: t('settings.editor.defaultViewLabel'), path: `${g.basics} → ${t('settings.tab.editor')}`, keywords: 'standardmodus lesen schreiben markdown default view' },
       { id: 'editor-languagetool', tab: 'editor', label: 'LanguageTool', path: `${g.basics} → ${t('settings.tab.editor')}`, keywords: 'rechtschreibung grammatik korrektur languagetool prüfen' },
@@ -3237,6 +3234,12 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab,
                 </div>
 
                 <PresentationSection />
+
+                <h3>{t('settings.impact.section')}</h3>
+                <p className="settings-hint">{t('settings.impact.hint')}</p>
+                <ReferenceMinutesRows t={t} />
+                <p className="settings-hint">{t('settings.impact.basis')}</p>
+                <ImpactStatusBarToggle t={t} />
 
                 <h3>{t('settings.general.vault')}</h3>
                 <div className="settings-row">
