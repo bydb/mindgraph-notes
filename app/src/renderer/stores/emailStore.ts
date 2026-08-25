@@ -275,22 +275,14 @@ export const useEmailStore = create<EmailState>()((set, get) => ({
         | {
             success: boolean; analyzed?: number; failed?: number; total?: number
             lastError?: string | null; error?: string
-            impact?: { tasks: number; durationMs: number; model?: string }
+            impact?: { id: string }
           }
         | undefined
-      const wartezeitMs = warten.end()
-      // Nur ein Durchgang, der wirklich Aufgaben gefunden hat, ist ein Vorgang, der
-      // Handarbeit ersetzt. Ein Lauf ohne Fund kostet Zeit, spart aber nichts.
-      if (result?.success && result.impact && result.impact.tasks > 0) {
-        void window.electronAPI.activityAppend(vaultPath, {
-          at: Date.now(),
-          kind: 'email-tasks-extracted',
-          emails: result.analyzed ?? 0,
-          tasks: result.impact.tasks,
-          durationMs: result.impact.durationMs,
-          model: result.impact.model,
-          waitingMs: wartezeitMs
-        }).catch(() => undefined)
+      const vordergrundMs = warten.end()
+      // Der Eintrag selbst stammt aus dem Main-Prozess — hier wird ausschließlich die
+      // Zeit nachgetragen, die nur das Fenster kennen kann.
+      if (result?.success && result.impact?.id) {
+        void window.electronAPI.activityForeground(vaultPath, result.impact.id, vordergrundMs).catch(() => undefined)
       }
       // Neu laden nach Analyse (skipAutoActions: verhindert erneuten analyzeEmails-Aufruf)
       await get().loadEmails(vaultPath, true)

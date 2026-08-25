@@ -20,7 +20,7 @@ import {
   type ActivityType,
   type ActivitySummary
 } from '../../shared/activityLog'
-import { ACTIVITY_TYPE_LABEL_KEY, acceptedLine, emailTasksLine, tasksLine, savedBasisLine, savedContextLine, sampleLine, unmeasuredLine, unpricedLine } from '../utils/impactText'
+import { ACTIVITY_TYPE_LABEL_KEY, acceptedLine, emailTasksLine, tasksLine, savedBasisLine, savedContextLine, sampleLine, unmeasuredLine, unpricedLine, modelComparisonLine } from '../utils/impactText'
 
 export type TFn = (key: any, params?: Record<string, string | number>) => string
 
@@ -459,7 +459,13 @@ const activityToday: ActionSpec<'activity.today'> = {
 
     if (saved.lines.length > 0) {
       const savedGroup = t('voiceCommand.card.groupSaved')
-      lines.push({ group: savedGroup, text: t('voiceCommand.card.savedTotal', { minutes: saved.totalMinutes }) })
+      // Ein Minus wird als Minus benannt, nicht als kleiner Gewinn getarnt.
+      lines.push({
+        group: savedGroup,
+        text: saved.totalMinutes < 0
+          ? t('voiceCommand.card.savedLoss', { minutes: Math.abs(saved.totalMinutes) })
+          : t('voiceCommand.card.savedTotal', { minutes: saved.totalMinutes })
+      })
       // Die Rechengrundlage steht auf der Karte, nicht im Kleingedruckten: Die Zahl
       // ist eine Ableitung aus einer Angabe des Nutzers, keine Messung.
       for (const line of saved.lines) {
@@ -472,6 +478,18 @@ const activityToday: ActionSpec<'activity.today'> = {
     // Läufe ohne hinterlegte Referenzzeit sind kein Nullwert, sondern nicht bewertbar —
     // und der Unterschied gehört sichtbar gemacht, sonst wirkt eine fehlende Angabe
     // wie „nichts gespart".
+    // Modellvergleich nur, wenn es etwas zu vergleichen gibt: Bei einem einzigen Modell
+    // sagt die Zeile nichts, was nicht schon oben steht.
+    const vergleich = saved.byModel.filter(row =>
+      saved.byModel.filter(other => other.activityType === row.activityType).length > 1
+    )
+    if (vergleich.length > 0) {
+      const modelGroup = t('voiceCommand.card.groupModels')
+      for (const row of vergleich) {
+        lines.push({ group: modelGroup, text: `${t(ACTIVITY_TYPE_LABEL_KEY[row.activityType])} — ${modelComparisonLine(row, t)}` })
+      }
+    }
+
     // Beide Gründe können zugleich gelten: eine Art ohne Referenzzeit UND Läufe ohne
     // gemessene Arbeitszeit. Sie getrennt zu benennen ist der Unterschied zwischen
     // „nichts gespart" und „nicht bewertbar".

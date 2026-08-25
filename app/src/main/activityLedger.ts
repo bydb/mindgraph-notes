@@ -104,6 +104,34 @@ export function recordActivity(vaultPath: string, event: ActivityEvent): void {
 }
 
 /**
+ * Trägt die Vordergrundzeit an einem bereits geschriebenen Mail-Ereignis nach.
+ *
+ * Der Weg existiert, damit der Renderer NICHT das ganze Ereignis liefern muss: Zahlen
+ * und Dauer stammen aus der Analyse in diesem Prozess, der Renderer kennt nur den
+ * Fensterfokus. Er kann über die opake Kennung ausschließlich diesen einen Wert setzen
+ * — und nur, solange er noch fehlt.
+ */
+export async function setEmailForegroundMs(vaultPath: string, id: string, foregroundMs: number): Promise<boolean> {
+  if (!vaultPath || !id || !Number.isFinite(foregroundMs) || foregroundMs < 0) return false
+  const file = ledgerFile(vaultPath)
+  return enqueue(file, async () => {
+    try {
+      const events = await readFile(file)
+      const treffer = events.find(e => e.kind === 'email-tasks-extracted' && e.id === id)
+      if (!treffer || treffer.kind !== 'email-tasks-extracted' || treffer.waitingMs !== undefined) return false
+      treffer.waitingMs = foregroundMs
+      await writeAtomic(file, events)
+      for (const listener of listeners) {
+        try { listener(vaultPath) } catch { /* ein defekter Beobachter darf nichts aufhalten */ }
+      }
+      return true
+    } catch {
+      return false
+    }
+  })
+}
+
+/**
  * Bilanz eines Zeitraums. Die Auswertung bekommt ALLE Ereignisse, nicht nur den
  * Zeitraum — sonst fehlt die Laufzeit zu einer Übernahme, deren Lauf vor Mitternacht
  * endete (siehe summarizeActivity).

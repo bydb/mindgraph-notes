@@ -6,7 +6,7 @@
 // übernommen"). Zwei Formulierungen derselben Zahl laufen immer auseinander.
 
 import type { TranslationKey } from './translations'
-import type { ActivityType, ActivitySummary, SavedTimeLine } from '../../shared/activityLog'
+import type { ActivityType, ActivitySummary, ModelComparisonRow, SavedTimeLine } from '../../shared/activityLog'
 
 export type ImpactTFn = (key: TranslationKey, params?: Record<string, string | number>) => string
 
@@ -94,6 +94,20 @@ export function sampleLine(count: number, t: ImpactTFn): string {
 /** Läufe ohne gemessene Arbeitszeit: nicht bewertet, aber auch nicht verschwiegen. */
 export function unmeasuredLine(count: number, t: ImpactTFn): string {
   return t(count === 1 ? 'voiceCommand.card.savedUnmeasuredOne' : 'voiceCommand.card.savedUnmeasured', { count })
+}
+
+/**
+ * Eine Zeile je Modell — erst damit lassen sich zwei Modelle gegeneinander lesen.
+ * Median statt Mittelwert: Bei fünf Vorgängen verzieht ein Ausreißer den Schnitt.
+ */
+export function modelComparisonLine(row: ModelComparisonRow, t: ImpactTFn): string {
+  const unterEiner = t('voiceCommand.card.underOneMinute')
+  return t(row.runs === 1 ? 'voiceCommand.card.modelRowOne' : 'voiceCommand.card.modelRow', {
+    model: row.model,
+    runs: row.runs,
+    active: row.medianActiveMinutes === 0 && row.medianActiveMs > 0 ? unterEiner : row.medianActiveMinutes,
+    runtime: row.medianRuntimeMinutes === 0 && row.medianRuntimeMs > 0 ? unterEiner : row.medianRuntimeMinutes
+  })
 }
 
 export function unpricedLine(types: ActivityType[], t: ImpactTFn): string {

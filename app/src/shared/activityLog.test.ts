@@ -239,13 +239,14 @@ describe('estimateSavedMinutes', () => {
     expect(saved.totalMinutes).toBe(41)
   })
 
-  it('wird nie negativ, wenn der Lauf länger dauert als die Referenzzeit', () => {
+  it('weist Mehraufwand als Minus aus, statt ihn zu verschweigen', () => {
     const events: ActivityEvent[] = [
       runFinished({ runId: 'run-a', instructionMs: 40 * 60_000 }),
       accepted({ runId: 'run-a', reviewMs: 20 * 60_000 })
     ]
     const saved = estimateSavedMinutes(summarizeActivity(events, range), { 'table-merge': 45 })
-    expect(saved.totalMinutes).toBe(0)
+    // 60 min aktiv gegen 45 min von Hand — das sind 15 Minuten Verlust, keine Null.
+    expect(saved.totalMinutes).toBe(-15)
   })
 
   it('summiert mehrere Vorgänge derselben Art korrekt', () => {
@@ -332,7 +333,7 @@ describe('Wartezeit und Modellvergleich', () => {
 
   it('führt Mail-Extraktion als eigenen Vorgang mit Wartezeit', () => {
     const events: ActivityEvent[] = [
-      { at: NOW, kind: 'email-tasks-extracted', emails: 23, tasks: 7, durationMs: 4 * 60_000, model: 'llmbase/deepseek-flash-v4', waitingMs: 2 * 60_000 }
+      { at: NOW, kind: 'email-tasks-extracted', id: 'mail-1', emails: 23, tasks: 7, durationMs: 4 * 60_000, model: 'llmbase/deepseek-flash-v4', waitingMs: 2 * 60_000 }
     ]
     const summary = summarizeActivity(events, range)
     expect(summary.emailTasks).toBe(7)
@@ -345,12 +346,90 @@ describe('Wartezeit und Modellvergleich', () => {
   it('bewertet einen Mail-Durchgang ohne Fund NICHT', () => {
     // Ein Lauf, der nichts findet, kostet Zeit und ersetzt keine Handarbeit.
     const events: ActivityEvent[] = [
-      { at: NOW, kind: 'email-tasks-extracted', emails: 12, tasks: 0, durationMs: 60_000, waitingMs: 30_000 }
+      { at: NOW, kind: 'email-tasks-extracted', id: 'mail-2', emails: 12, tasks: 0, durationMs: 60_000, waitingMs: 30_000 }
     ]
     const summary = summarizeActivity(events, range)
     expect(summary.emailRuns).toBe(1)
     expect(summary.acceptedRuns).toEqual([])
     expect(estimateSavedMinutes(summary, { 'email-tasks': 20 }).totalMinutes).toBe(0)
+  })
+})
+
+describe('Nachbesserungen aus der zweiten Durchsicht', () => {
+  const range = localDayRange(NOW)
+
+  it('verliert keine Zeit, wenn erst verworfen und dann übernommen wird', () => {
+    // Die Zeiten hängen an der ERSTEN Entscheidung. Zählte die Bilanz nur Übernahmen,
+    // stünde der übernommene Lauf ohne Prüf- und Vordergrundzeit da — also zu günstig.
+    const events: ActivityEvent[] = [
+      runFinished({ runId: 'run-a', instructionMs: 60_000 }),
+      { at: NOW, kind: 'agent-result-discarded', runId: 'run-a', format: 'md', reviewMs: 4 * 60_000, waitingMs: 5 * 60_000 },
+      accepted({ runId: 'run-a', format: 'xlsx', reviewMs: 2 * 60_000 })
+    ]
+    const saved = estimateSavedMinutes(summarizeActivity(events, range), { 'table-merge': 45 })
+    // 1 min Auftrag + (4 + 2) min Prüfen + 5 min Vordergrund = 12 min
+    expect(saved.lines[0].activeMinutes).toBe(12)
+    expect(saved.totalMinutes).toBe(33)
+  })
+
+  it('zeigt einen Zeitverlust als Minus, statt ihn auf null zu kappen', () => {
+    // Eine Kennzahl, die nur gewinnen kann, ist als Nachweis wertlos.
+    const events: ActivityEvent[] = [
+      runFinished({ runId: 'run-a', instructionMs: 20 * 60_000 }),
+      accepted({ runId: 'run-a', reviewMs: 30 * 60_000 })
+    ]
+    const saved = estimateSavedMinutes(summarizeActivity(events, range), { 'table-merge': 45 })
+    expect(saved.totalMinutes).toBe(-5)
+    expect(impactBadge(summarizeActivity(events, range), saved)).toEqual({ kind: 'minutes', minutes: -5 })
+  })
+
+  it('weist eine beschädigte Mail-Zeile ab, statt NaN zu erzeugen', () => {
+    expect(isActivityEvent({ at: NOW, kind: 'email-tasks-extracted', id: 'x', tasks: 3, durationMs: 100 })).toBe(false)
+    expect(isActivityEvent({ at: NOW, kind: 'email-tasks-extracted', id: 'x', emails: 5, tasks: 3, durationMs: 100 })).toBe(true)
+    expect(isActivityEvent({ at: NOW, kind: 'email-tasks-extracted', emails: 5, tasks: 3, durationMs: 100 })).toBe(false)
+    expect(isActivityEvent({ at: NOW, kind: 'email-tasks-extracted', id: 'x', emails: 5, tasks: -1, durationMs: 100 })).toBe(false)
+    expect(isActivityEvent({ at: NOW, kind: 'email-tasks-extracted', id: 'x', emails: 5, tasks: 3, durationMs: 100, waitingMs: 'viel' })).toBe(false)
+  })
+})
+
+describe('Modellvergleich', () => {
+  const range = localDayRange(NOW)
+
+  it('trennt zwei Modelle derselben Tätigkeitsart mit Anzahl und Median', () => {
+    // Zusammengefasst mit beiden Namen ließ sich nichts vergleichen — genau das war
+    // der Befund. Jetzt steht je Modell eine Zeile.
+    const events: ActivityEvent[] = [
+      runFinished({ runId: 'q1', model: 'qwen3.8:27b-mlx', durationMs: 14 * 60_000, instructionMs: 60_000 }),
+      accepted({ runId: 'q1', reviewMs: 60_000, waitingMs: 8 * 60_000 }),
+      runFinished({ runId: 'q2', model: 'qwen3.8:27b-mlx', durationMs: 12 * 60_000, instructionMs: 60_000 }),
+      accepted({ runId: 'q2', reviewMs: 60_000, waitingMs: 6 * 60_000 }),
+      runFinished({ runId: 'd1', model: 'llmbase/deepseek-flash-v4', durationMs: 60_000, instructionMs: 60_000 }),
+      accepted({ runId: 'd1', reviewMs: 60_000, waitingMs: 60_000 })
+    ]
+    const saved = estimateSavedMinutes(summarizeActivity(events, range), { 'table-merge': 45 })
+    expect(saved.byModel).toHaveLength(2)
+    const qwen = saved.byModel.find(r => r.model.startsWith('qwen'))!
+    const deep = saved.byModel.find(r => r.model.startsWith('llmbase'))!
+    expect(qwen.runs).toBe(2)
+    expect(qwen.medianActiveMinutes).toBe(9)      // Median aus 10 und 8
+    expect(qwen.medianRuntimeMinutes).toBe(13)
+    expect(deep.runs).toBe(1)
+    expect(deep.medianActiveMinutes).toBe(3)
+  })
+
+  it('nimmt den Median, nicht den Mittelwert, damit ein Ausreißer nicht regiert', () => {
+    const events: ActivityEvent[] = [
+      runFinished({ runId: 'a', model: 'm', instructionMs: 60_000 }),
+      accepted({ runId: 'a', reviewMs: 0, waitingMs: 0 }),
+      runFinished({ runId: 'b', model: 'm', instructionMs: 60_000 }),
+      accepted({ runId: 'b', reviewMs: 0, waitingMs: 0 }),
+      runFinished({ runId: 'c', model: 'm', instructionMs: 60 * 60_000 }),
+      accepted({ runId: 'c', reviewMs: 0, waitingMs: 0 })
+    ]
+    const saved = estimateSavedMinutes(summarizeActivity(events, range), { 'table-merge': 45 })
+    const zeile = saved.byModel[0]
+    expect(zeile.medianActiveMinutes).toBe(1)     // 1, 1, 60 → Median 1
+    expect(zeile.meanActiveMinutes).toBe(21)      // Mittelwert wäre irreführend
   })
 })
 
@@ -386,14 +465,13 @@ describe('impactBadge', () => {
     expect(badgeFor([{ at: NOW, kind: 'task-created', count: 4 }])).toEqual({ kind: 'tasks', count: 4 })
   })
 
-  it('zeigt keine Minuten, wenn die Ersparnis auf null zusammenfällt', () => {
+  it('zeigt bei exakt ausgeglichener Bilanz die Übernahmen statt einer Null', () => {
     const events: ActivityEvent[] = [
-      // Aktive Arbeit länger als von Hand — kein Gewinn, aber die Übernahme zählt.
-      runFinished({ runId: 'run-a', instructionMs: 30 * 60_000 }),
-      accepted({ runId: 'run-a', format: 'xlsx', reviewMs: 30 * 60_000 })
+      // 20 + 25 min aktiv gegen 45 min von Hand: exakt null Unterschied.
+      runFinished({ runId: 'run-a', instructionMs: 20 * 60_000 }),
+      accepted({ runId: 'run-a', format: 'xlsx', reviewMs: 25 * 60_000 })
     ]
-    // Der Lauf dauerte länger als die Referenzzeit — dann steht die Übernahme da,
-    // nicht „0 min gespart".
+    // Genau null ist keine Aussage über den Tag — dann steht da, was passiert ist.
     expect(badgeFor(events, { 'table-merge': 45 })).toEqual({ kind: 'accepted', count: 1 })
   })
 })

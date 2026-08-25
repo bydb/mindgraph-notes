@@ -223,6 +223,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   activityAppend: (vaultPath: string, entry: unknown) => ipcRenderer.invoke('activity-append', vaultPath, entry),
   activitySummary: (vaultPath: string, range?: { from: number; to: number }) =>
     ipcRenderer.invoke('activity-summary', vaultPath, range),
+  /** Trägt NUR die Vordergrundzeit an einem vom Main geschriebenen Mail-Ereignis nach. */
+  activityForeground: (vaultPath: string, id: string, foregroundMs: number) =>
+    ipcRenderer.invoke('activity-foreground', vaultPath, id, foregroundMs),
   onActivityChanged: (callback: (payload: { vaultPath: string }) => void) => {
     const handler = (_e: unknown, payload: { vaultPath: string }) => callback(payload)
     ipcRenderer.on('activity-changed', handler)

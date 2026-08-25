@@ -721,6 +721,7 @@ export interface ElectronAPI {
   noteAgentAcceptResult: (runId: string, resultId: string, timings?: { reviewMs?: number; waitingMs?: number }) => Promise<{ success: boolean; fileName?: string; relPath?: string; error?: string }>;
   activityAppend: (vaultPath: string, entry: ActivityEvent) => Promise<{ success: boolean; error?: string }>;
   activitySummary: (vaultPath: string, range?: { from: number; to: number }) => Promise<{ success: boolean; summary?: ActivitySummary; error?: string }>;
+  activityForeground: (vaultPath: string, id: string, foregroundMs: number) => Promise<{ success: boolean; error?: string }>;
   onActivityChanged: (callback: (payload: { vaultPath: string }) => void) => () => void;
   noteAgentDiscardResult: (runId: string, resultId: string, timings?: { reviewMs?: number; waitingMs?: number }) => Promise<{ success: boolean; error?: string }>;
   noteAgentPreviewResult: (runId: string, resultId: string) => Promise<{ success: boolean; kind?: string; binary?: boolean; text?: string; truncated?: boolean; sizeBytes?: number; error?: string }>;

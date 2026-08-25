@@ -72,6 +72,8 @@ export type ActivityEvent =
        */
       at: number
       kind: 'email-tasks-extracted'
+      /** Opaker Anker, damit der Renderer NUR die Vordergrundzeit nachtragen kann. */
+      id: string
       emails: number
       tasks: number
       durationMs: number
@@ -123,7 +125,13 @@ export function isActivityEvent(value: unknown): value is ActivityEvent {
   }
   if (e.kind === 'task-created') return typeof e.count === 'number'
   if (e.kind === 'email-tasks-extracted') {
-    return typeof e.tasks === 'number' && typeof e.durationMs === 'number'
+    // Vollständig prüfen: Eine von Hand beschädigte Zeile ohne `emails` rutschte sonst
+    // durch und erzeugte beim Summieren NaN — die Tagesbilanz wäre danach unlesbar.
+    const zahl = (v: unknown): boolean => typeof v === 'number' && Number.isFinite(v) && v >= 0
+    if (!zahl(e.emails) || !zahl(e.tasks) || !zahl(e.durationMs)) return false
+    if (e.waitingMs !== undefined && !zahl(e.waitingMs)) return false
+    if (e.model !== undefined && typeof e.model !== 'string') return false
+    return typeof e.id === 'string'
   }
   return typeof e.status === 'string'
 }
@@ -222,20 +230,25 @@ export function summarizeActivity(events: ActivityEvent[], range: ActivityRange)
   // Prüfzeit je Lauf über ALLE Übernahmen summieren: Ein Lauf mit zwei Ergebnissen
   // wurde auch zweimal geprüft, und beides ist Arbeitszeit des Nutzers.
   const reviewMsByRun = new Map<string, number | null>()
-  // Wartezeit gehört dem LAUF, nicht dem einzelnen Ergebnis: Sie wird nur beim ersten
-  // Übernehmen mitgeschickt und hier höchstens einmal je Lauf gezählt.
-  const waitingMsByRun = new Map<string, number>()
+  // Vordergrundzeit gehört dem LAUF, nicht dem einzelnen Ergebnis: höchstens einmal je Lauf.
+  const foregroundMsByRun = new Map<string, number>()
   for (const e of events) {
-    if (e.kind !== 'agent-result-accepted') continue
-    const known = firstAcceptedAt.get(e.runId)
-    if (known === undefined || e.at < known) firstAcceptedAt.set(e.runId, e.at)
+    // BEIDE Entscheidungen zählen. Wer ein Ergebnis prüft und verwirft, hat gearbeitet —
+    // und weil die Zeiten an der ERSTEN Entscheidung hängen, lägen sie bei „erst
+    // verwerfen, dann übernehmen" sonst nur am verworfenen Ereignis. Der übernommene
+    // Lauf sähe dadurch günstiger aus, als er war.
+    if (e.kind !== 'agent-result-accepted' && e.kind !== 'agent-result-discarded') continue
+    if (e.kind === 'agent-result-accepted') {
+      const known = firstAcceptedAt.get(e.runId)
+      if (known === undefined || e.at < known) firstAcceptedAt.set(e.runId, e.at)
+    }
     if (typeof e.reviewMs === 'number') {
       reviewMsByRun.set(e.runId, (reviewMsByRun.get(e.runId) ?? 0) + e.reviewMs)
     } else if (!reviewMsByRun.has(e.runId)) {
       reviewMsByRun.set(e.runId, null)
     }
-    if (typeof e.waitingMs === 'number' && !waitingMsByRun.has(e.runId)) {
-      waitingMsByRun.set(e.runId, e.waitingMs)
+    if (typeof e.waitingMs === 'number' && !foregroundMsByRun.has(e.runId)) {
+      foregroundMsByRun.set(e.runId, e.waitingMs)
     }
   }
 
@@ -319,7 +332,7 @@ export function summarizeActivity(events: ActivityEvent[], range: ActivityRange)
       activeMs: activeTimeOf({
         instructionMs: run.instructionMs,
         reviewMs: review ?? undefined,
-        waitingMs: waitingMsByRun.get(runId)
+        waitingMs: foregroundMsByRun.get(runId)
       }),
       elapsedMs: Math.max(0, first - startedAt),
       accepted
@@ -352,6 +365,26 @@ export interface SavedTimeLine {
   savedMinutes: number
 }
 
+export interface ModelComparisonRow {
+  activityType: ActivityType
+  model: string
+  runs: number
+  /** Median der aktiven Zeit je Vorgang — robuster als der Mittelwert bei wenigen Läufen. */
+  medianActiveMinutes: number
+  /** Rohwert, damit ein Sekunden-Vorgang nicht als „0 min" erscheint. */
+  medianActiveMs: number
+  meanActiveMinutes: number
+  medianRuntimeMinutes: number
+  medianRuntimeMs: number
+}
+
+function median(werte: number[]): number {
+  if (werte.length === 0) return 0
+  const sortiert = [...werte].sort((a, b) => a - b)
+  const mitte = Math.floor(sortiert.length / 2)
+  return sortiert.length % 2 === 1 ? sortiert[mitte] : (sortiert[mitte - 1] + sortiert[mitte]) / 2
+}
+
 export interface SavedTime {
   totalMinutes: number
   lines: SavedTimeLine[]
@@ -363,6 +396,12 @@ export interface SavedTime {
    * gespart" und „nicht gemessen" benennen kann.
    */
   unmeasuredRuns: number
+  /**
+   * Je Tätigkeitsart und Modell, absteigend nach Anzahl. Nur damit lassen sich zwei
+   * Modelle wirklich gegeneinander lesen — eine zusammengefasste Zeile mit beiden
+   * Namen sagt über keines von beiden etwas aus.
+   */
+  byModel: ModelComparisonRow[]
 }
 
 /**
@@ -383,6 +422,7 @@ export function estimateSavedMinutes(summary: ActivitySummary, reference: Refere
     models: Map<string, number>
   }>()
   let unmeasuredRuns = 0
+  const perModel = new Map<string, { activityType: ActivityType; model: string; active: number[]; runtime: number[] }>()
 
   for (const run of summary.acceptedRuns) {
     // Ohne gemessene Arbeitszeit keine Bewertung. Eine 0 anzunehmen hieße, die volle
@@ -398,12 +438,23 @@ export function estimateSavedMinutes(summary: ActivitySummary, reference: Refere
     bucket.activeMs += run.activeMs
     bucket.runtimeMs += run.durationMs
     bucket.elapsedMs += run.elapsedMs
-    if (run.model) bucket.models.set(run.model, (bucket.models.get(run.model) ?? 0) + 1)
+    if (run.model) {
+      bucket.models.set(run.model, (bucket.models.get(run.model) ?? 0) + 1)
+      const key = `${run.activityType}\u0000${run.model}`
+      const roh = perModel.get(key) ?? { activityType: run.activityType, model: run.model, active: [], runtime: [] }
+      roh.active.push(run.activeMs)
+      roh.runtime.push(run.durationMs)
+      perModel.set(key, roh)
+    }
     if (typeof ref === 'number' && ref > 0) {
       // Abgezogen wird die AKTIVE Zeit, nicht die Laufzeit: Wer während des Laufs etwas
-      // anderes erledigt, hat diese Minuten nicht aufgewendet. Nie negativ — ein Vorgang,
-      // der länger dauert als von Hand, hat nichts gespart, aber auch nichts gekostet.
-      bucket.saved += Math.max(0, ref - run.activeMs / 60_000)
+      // anderes erledigt, hat diese Minuten nicht aufgewendet.
+      //
+      // BEWUSST NICHT bei null gekappt: Ein Vorgang, der länger dauert als von Hand,
+      // ist ein Verlust und muss als Verlust dastehen. Die Kappung machte die Kennzahl
+      // systematisch positiv — als Effizienznachweis wäre sie damit wertlos, weil sie
+      // nur gewinnen und nie verlieren kann.
+      bucket.saved += ref - run.activeMs / 60_000
     }
     byType.set(run.activityType, bucket)
   }
@@ -433,11 +484,25 @@ export function estimateSavedMinutes(summary: ActivitySummary, reference: Refere
     })
   }
 
+  const byModel: ModelComparisonRow[] = [...perModel.values()]
+    .map(roh => ({
+      activityType: roh.activityType,
+      model: roh.model,
+      runs: roh.active.length,
+      medianActiveMinutes: Math.round(median(roh.active) / 60_000),
+      medianActiveMs: median(roh.active),
+      meanActiveMinutes: Math.round(roh.active.reduce((a, b) => a + b, 0) / roh.active.length / 60_000),
+      medianRuntimeMinutes: Math.round(median(roh.runtime) / 60_000),
+      medianRuntimeMs: median(roh.runtime)
+    }))
+    .sort((a, b) => b.runs - a.runs || a.model.localeCompare(b.model))
+
   return {
     totalMinutes: lines.reduce((sum, line) => sum + line.savedMinutes, 0),
     lines,
     unpricedTypes: unpriced,
-    unmeasuredRuns
+    unmeasuredRuns,
+    byModel
   }
 }
 
@@ -456,7 +521,10 @@ export type ImpactBadge =
   | { kind: 'none' }
 
 export function impactBadge(summary: ActivitySummary, saved: SavedTime): ImpactBadge {
-  if (saved.totalMinutes > 0) return { kind: 'minutes', minutes: saved.totalMinutes }
+  // Auch ein Minus wird gezeigt. Eine Anzeige, die nur gewinnen kann, glaubt niemand.
+  if (saved.lines.length > 0 && saved.totalMinutes !== 0) {
+    return { kind: 'minutes', minutes: saved.totalMinutes }
+  }
   if (summary.acceptedTotal > 0) return { kind: 'accepted', count: summary.acceptedTotal }
   if (summary.tasksCreated > 0) return { kind: 'tasks', count: summary.tasksCreated }
   return { kind: 'none' }

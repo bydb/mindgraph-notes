@@ -178,7 +178,8 @@ import { isPluginGateEnabled } from '../shared/plugins/moduleGate'
 import { registerPluginTransport, isTrustedSender } from './plugins/transport'
 import { registerContextAttachment, registerContextFolder, removeContextAttachment, clearContextAttachments, readContextBlock } from './noteAgent/contextFiles'
 import { startRun, getRunForSender, finishRun, publicResults, takeResult, peekResult, cancelRunsForSender, pruneRunIfConsumed, consumeEvictedRuns, totalFolderReads, type WebRunState } from './noteAgent/runRegistry'
-import { recordActivity, readActivitySummary, onActivityChanged } from './activityLedger'
+import { randomBytes } from 'crypto'
+import { recordActivity, readActivitySummary, onActivityChanged, setEmailForegroundMs } from './activityLedger'
 import { deriveActivityType, isActivityEvent, type ActivityEvent } from '../shared/activityLog'
 import { acquireStayAwake } from './powerGuard'
 import { runNoteAgentLoop } from './noteAgent/loop'
@@ -4577,17 +4578,24 @@ ipcMain.handle('activity-append', async (event, vaultPath: string, entry: unknow
   if (!isTrustedSender(event)) return { success: false, error: 'Nicht autorisierter Aufrufer' }
   try {
     assertApprovedVault(vaultPath, 'activity-append')
-    // Erlaubt sind Sprachbefehle und die Mail-Extraktion. Beide sind Renderer-Wissen:
-    // die Sprachzeiten ohnehin, und bei der Mail-Analyse kommen Zahlen und Dauer aus
-    // dem Ergebnis dieses Prozesses, während nur der Renderer die am Bildschirm
-    // verbrachte Wartezeit kennt. Lauf-Dauern, Übernahmen und Aufgaben bleiben
-    // ausschließlich Main-geschrieben.
-    const erlaubt: ActivityEvent['kind'][] = ['voice-command', 'email-tasks-extracted']
-    if (!isActivityEvent(entry) || !erlaubt.includes((entry as ActivityEvent).kind)) {
-      return { success: false, error: 'Ereignisart hier nicht erlaubt' }
+    if (!isActivityEvent(entry) || (entry as ActivityEvent).kind !== 'voice-command') {
+      return { success: false, error: 'Nur Sprachbefehl-Ereignisse erlaubt' }
     }
     recordActivity(vaultPath, entry as ActivityEvent)
     return { success: true }
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : 'Unbekannter Fehler' }
+  }
+})
+
+// Einziger Weg, auf dem der Renderer eine wirtschaftliche Kennzahl beeinflusst: die am
+// Bildschirm verbrachte Zeit während der Mail-Analyse. Alles andere — Aufgabenzahl,
+// Dauer, Modell — hat dieser Prozess selbst gemessen und geschrieben.
+ipcMain.handle('activity-foreground', async (event, vaultPath: string, id: string, foregroundMs: number) => {
+  if (!isTrustedSender(event)) return { success: false, error: 'Nicht autorisierter Aufrufer' }
+  try {
+    assertApprovedVault(vaultPath, 'activity-foreground')
+    return { success: await setEmailForegroundMs(vaultPath, id, foregroundMs) }
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : 'Unbekannter Fehler' }
   }
@@ -10881,15 +10889,31 @@ AUSGABEFORMAT (NUR Schema — die <Platzhalter> NICHT abschreiben, sondern aus d
     // Finaler Merge-Write: frischen Bestand lesen, nur analysis-Felder hineinmergen.
     await persistAnalyses()
 
+    // Nur ein Durchgang MIT Fund ersetzt Handarbeit — einer ohne kostet Zeit und spart nichts.
+    let impactId: string | null = null
+    if (extractedTasks > 0) {
+      impactId = `mail-${randomBytes(8).toString('hex')}`
+      recordActivity(vaultPath, {
+        at: Date.now(),
+        kind: 'email-tasks-extracted',
+        id: impactId,
+        emails: analyzed,
+        tasks: extractedTasks,
+        durationMs: Date.now() - analysisStartedAt,
+        model: usedModel
+      })
+    }
+
     return {
       success: true,
       analyzed,
       failed,
       total: toAnalyze.length,
       lastError,
-      // Kennzahlen für die Wirkungsbilanz. Der Renderer ergänzt die am Bildschirm
-      // verbrachte Wartezeit und schreibt den Eintrag — nur er kann den Fokus messen.
-      impact: { tasks: extractedTasks, durationMs: Date.now() - analysisStartedAt, model: usedModel }
+      // Kennzahlen für die Wirkungsbilanz schreibt DIESER Prozess — sie sind hier
+      // gemessen. Der Renderer bekommt nur eine opake Kennung, über die er
+      // ausschließlich die Vordergrundzeit nachtragen kann (siehe activity-foreground).
+      impact: impactId ? { id: impactId } : undefined
     }
   } catch (error) {
     console.error('[Email] Analysis error:', error)

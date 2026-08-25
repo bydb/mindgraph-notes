@@ -685,6 +685,34 @@ Dabei fiel ein Anzeigefehler auf: Bei zwei Vorgängen derselben Art stand „30 
 weil die Referenzzeit je Vorgang gilt, aktive Zeit und Gewinn aber Summen sind. Die Zeile nennt den
 Faktor jetzt: „2 × 30 min von Hand − 1 min aktiv = 59 min".
 
+### Zweite Durchsicht: vier Verzerrungen behoben (25.08.2026)
+
+1. **Mehrergebnis-Fehler.** Warte- und Prüfzeit hängen an der ERSTEN Entscheidung. Wurde zuerst
+   verworfen und danach übernommen, lagen sie am verworfenen Ereignis — die Bilanz las aber nur
+   Übernahmen. Der übernommene Lauf stand dadurch ohne seine Prüfzeit da, also zu günstig.
+   `summarizeActivity` sammelt die Zeiten jetzt über **beide** Entscheidungsarten; wer ein Ergebnis
+   prüft und verwirft, hat trotzdem gearbeitet.
+2. **Kappung auf null entfernt.** Ein Vorgang, der länger dauert als von Hand, ist ein Verlust und
+   steht jetzt als Minus da („heute 5 min Mehraufwand"). Eine Kennzahl, die nur gewinnen kann, ist
+   als Nachweis wertlos.
+3. **Modellvergleich statt Sammelzeile.** `SavedTime.byModel` gruppiert nach Tätigkeitsart UND
+   Modell, mit Anzahl, **Median** und Mittelwert. Median, weil bei fünf Vorgängen ein Ausreißer den
+   Schnitt regiert. Die Karte zeigt den Block „Nach Modell", sobald für eine Art mehr als ein Modell
+   vorliegt.
+4. **Mail-Protokollierung gehärtet.** Der Main schreibt sein `email-tasks-extracted` jetzt selbst
+   (Aufgabenzahl, Dauer, Modell) und gibt dem Renderer nur eine **opake Kennung** zurück. Über den
+   neuen, engen Kanal `activity-foreground` kann der Renderer ausschließlich die Vordergrundzeit
+   nachtragen — und nur, solange sie fehlt. `activity-append` nimmt wieder ausschließlich
+   Sprachbefehle. Dazu vollständige Validierung der Mail-Zeile: fehlt `emails`, wird die Zeile
+   abgewiesen, statt beim Summieren NaN zu erzeugen.
+
+**Benennung korrigiert**: Es heißt **Vordergrundzeit während des Laufs**, nicht „Wartezeit". Die App
+kann nicht wissen, ob jemand wartet oder im selben Fenster eine andere Notiz bearbeitet — der
+Einstellungstext sagt das jetzt ausdrücklich.
+
+Bleibt offen: der echte Vergleichsmodus (dieselbe Aufgabe mehrfach konventionell und mehrfach mit
+MindGraph, Median und Übernahmequote). Erst der macht aus der persönlichen Bilanz einen Nachweis.
+
 ### Nächste Schritte
 
 1. `tiny` gegen `base` messen, warm und kalt, auf der Zielhardware.
