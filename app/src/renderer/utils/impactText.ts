@@ -15,6 +15,7 @@ export const ACTIVITY_TYPE_LABEL_KEY: Record<ActivityType, TranslationKey> = {
   document: 'voiceCommand.activityType.document',
   summary: 'voiceCommand.activityType.summary',
   'web-research': 'voiceCommand.activityType.webResearch',
+  'email-tasks': 'voiceCommand.activityType.emailTasks',
   other: 'voiceCommand.activityType.other'
 }
 
@@ -22,6 +23,14 @@ export function acceptedLine(summary: ActivitySummary, t: ImpactTFn): string {
   return t(
     summary.acceptedTotal === 1 ? 'voiceCommand.card.activityAcceptedOne' : 'voiceCommand.card.activityAccepted',
     { count: summary.acceptedTotal }
+  )
+}
+
+/** „7 Aufgaben aus 23 Mails erkannt" — der Weg ohne Übernahme-Schritt. */
+export function emailTasksLine(summary: ActivitySummary, t: ImpactTFn): string {
+  return t(
+    summary.emailTasks === 1 ? 'voiceCommand.card.activityEmailTasksOne' : 'voiceCommand.card.activityEmailTasks',
+    { tasks: summary.emailTasks, emails: summary.emailsAnalyzed }
   )
 }
 
@@ -41,7 +50,12 @@ export function tasksLine(summary: ActivitySummary, t: ImpactTFn): string {
  * Abzug.
  */
 export function savedBasisLine(line: SavedTimeLine, t: ImpactTFn): string {
-  return t('voiceCommand.card.savedBasis', {
+  // Die Referenzzeit gilt je Vorgang, aktive Zeit und Gewinn sind Summen. Bei mehreren
+  // Vorgängen muss der Faktor sichtbar sein, sonst steht dort „30 − 1 = 59" und die
+  // ganze Rechnung wirkt kaputt (real so aufgetreten).
+  const schluessel = line.runs > 1 ? 'voiceCommand.card.savedBasisMany' : 'voiceCommand.card.savedBasis'
+  return t(schluessel, {
+    runs: line.runs,
     type: t(ACTIVITY_TYPE_LABEL_KEY[line.activityType]),
     reference: line.referenceMinutes,
     // Ein Vorgang unter einer Minute rundet auf 0 — „− 0 min aktiv" läse sich wie ein Fehler.
@@ -57,10 +71,16 @@ export function savedContextLine(line: SavedTimeLine, t: ImpactTFn): string {
   // Dieselbe Rundungsregel wie oben: Ein 40-Sekunden-Lauf ist „unter 1 min", nicht
   // „0 min". Eine Null liest sich wie ein Messfehler und zieht die Zeile in Zweifel.
   const unterEiner = t('voiceCommand.card.underOneMinute')
-  return t('voiceCommand.card.savedContext', {
+  const basis = t('voiceCommand.card.savedContext', {
     runtime: line.runtimeMinutes === 0 && line.runtimeMs > 0 ? unterEiner : line.runtimeMinutes,
     elapsed: line.elapsedMinutes === 0 && line.elapsedMs > 0 ? unterEiner : line.elapsedMinutes
   })
+  // Das Modell gehört dazu: Ohne es ist eine Durchlaufzeit nicht einzuordnen, und zwei
+  // Modelle lassen sich nicht vergleichen. Mehr als zwei Namen sprengen die Zeile.
+  if (line.models.length === 0) return basis
+  const namen = line.models.slice(0, 2).join(', ')
+  const rest = line.models.length > 2 ? ` +${line.models.length - 2}` : ''
+  return `${basis} · ${namen}${rest}`
 }
 
 /**

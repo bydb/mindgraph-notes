@@ -58,15 +58,18 @@ export class ActiveTimer {
 }
 
 /**
- * Aktive Zeit eines Vorgangs: Auftrag formulieren plus Ergebnis prüfen.
+ * Aktive Zeit eines Vorgangs: Auftrag formulieren, am Bildschirm warten, Ergebnis prüfen.
+ *
+ * Die Wartezeit zählt nur, solange das Fenster vorn ist. Erst dadurch schlägt sich die
+ * Modellwahl in der Zahl nieder: Wer vierzehn Minuten auf ein lokales Modell wartet,
+ * hat diese Zeit verloren — wer in der Zwischenzeit etwas anderes tut, nicht.
  *
  * `null` heißt „nicht erfasst" und ist NICHT dasselbe wie 0. Läufe aus der Zeit vor
  * dieser Messung haben keine Werte — sie dürfen keinen Zeitgewinn erzeugen, statt mit
  * einer 0 die volle Referenzzeit als Ersparnis auszuweisen.
  */
-export function activeMs(parts: { instructionMs?: number; reviewMs?: number }): number | null {
-  const instruction = parts.instructionMs
-  const review = parts.reviewMs
-  if (typeof instruction !== 'number' && typeof review !== 'number') return null
-  return (instruction ?? 0) + (review ?? 0)
+export function activeMs(parts: { instructionMs?: number; reviewMs?: number; waitingMs?: number }): number | null {
+  const teile = [parts.instructionMs, parts.reviewMs, parts.waitingMs]
+  if (!teile.some(t => typeof t === 'number')) return null
+  return teile.reduce<number>((sum, t) => sum + (typeof t === 'number' ? t : 0), 0)
 }

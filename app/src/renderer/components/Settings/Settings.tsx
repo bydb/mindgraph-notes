@@ -1776,6 +1776,7 @@ const ReferenceMinutesRows: React.FC<{ t: TabTFn }> = ({ t }) => {
     document: t('voiceCommand.activityType.document'),
     summary: t('voiceCommand.activityType.summary'),
     'web-research': t('voiceCommand.activityType.webResearch'),
+    'email-tasks': t('voiceCommand.activityType.emailTasks'),
     other: t('voiceCommand.activityType.other')
   }
 

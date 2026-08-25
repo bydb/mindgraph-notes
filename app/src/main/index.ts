@@ -4381,6 +4381,7 @@ ipcMain.handle('note-agent-run', async (event, params: NoteAgentRunParams) => {
           runId: run.runId,
           durationMs: Date.now() - run.startedAt,
           instructionMs: run.instructionMs,
+          model: run.model,
           activityType: deriveActivityType(run.toolsUsed),
           resultCount: run.results.size,
           status: 'ok'
@@ -4416,6 +4417,7 @@ ipcMain.handle('note-agent-run', async (event, params: NoteAgentRunParams) => {
           runId: run.runId,
           durationMs: Date.now() - run.startedAt,
           instructionMs: run.instructionMs,
+          model: run.model,
           activityType: deriveActivityType(run.toolsUsed),
           resultCount: run.results.size,
           status: cancelled ? 'aborted' : 'failed'
@@ -4459,7 +4461,7 @@ ipcMain.handle('note-agent-cancel', async (event, runId: string) => {
   return { success: true }
 })
 
-ipcMain.handle('note-agent-accept-result', async (event, runId: string, resultId: string, reviewMs?: number) => {
+ipcMain.handle('note-agent-accept-result', async (event, runId: string, resultId: string, timings?: { reviewMs?: number; waitingMs?: number }) => {
   if (!isTrustedSender(event)) return { success: false, error: 'Nicht autorisierter Aufrufer' }
   const run = getRunForSender(event.sender.id, runId)
   if (!run) return { success: false, error: 'Unbekannter Lauf' }
@@ -4501,7 +4503,8 @@ ipcMain.handle('note-agent-accept-result', async (event, runId: string, resultId
       kind: 'agent-result-accepted',
       runId: run.runId,
       format: entry.kind,
-      reviewMs: typeof reviewMs === 'number' && reviewMs >= 0 ? reviewMs : undefined
+      reviewMs: typeof timings?.reviewMs === 'number' && timings.reviewMs >= 0 ? timings.reviewMs : undefined,
+      waitingMs: typeof timings?.waitingMs === 'number' && timings.waitingMs >= 0 ? timings.waitingMs : undefined
     })
     return { success: true, fileName: finalName, relPath: path.join(run.targetFolderRel, finalName).replace(/\\/g, '/') }
   } catch (error) {
@@ -4574,8 +4577,14 @@ ipcMain.handle('activity-append', async (event, vaultPath: string, entry: unknow
   if (!isTrustedSender(event)) return { success: false, error: 'Nicht autorisierter Aufrufer' }
   try {
     assertApprovedVault(vaultPath, 'activity-append')
-    if (!isActivityEvent(entry) || (entry as ActivityEvent).kind !== 'voice-command') {
-      return { success: false, error: 'Nur Sprachbefehl-Ereignisse erlaubt' }
+    // Erlaubt sind Sprachbefehle und die Mail-Extraktion. Beide sind Renderer-Wissen:
+    // die Sprachzeiten ohnehin, und bei der Mail-Analyse kommen Zahlen und Dauer aus
+    // dem Ergebnis dieses Prozesses, während nur der Renderer die am Bildschirm
+    // verbrachte Wartezeit kennt. Lauf-Dauern, Übernahmen und Aufgaben bleiben
+    // ausschließlich Main-geschrieben.
+    const erlaubt: ActivityEvent['kind'][] = ['voice-command', 'email-tasks-extracted']
+    if (!isActivityEvent(entry) || !erlaubt.includes((entry as ActivityEvent).kind)) {
+      return { success: false, error: 'Ereignisart hier nicht erlaubt' }
     }
     recordActivity(vaultPath, entry as ActivityEvent)
     return { success: true }
@@ -4693,7 +4702,7 @@ ipcMain.handle('note-skills-import-dialog', async (event, vaultPath: string) => 
   }
 })
 
-ipcMain.handle('note-agent-discard-result', async (event, runId: string, resultId: string, reviewMs?: number) => {
+ipcMain.handle('note-agent-discard-result', async (event, runId: string, resultId: string, timings?: { reviewMs?: number; waitingMs?: number }) => {
   if (!isTrustedSender(event)) return { success: false, error: 'Nicht autorisierter Aufrufer' }
   const run = getRunForSender(event.sender.id, runId)
   if (!run) return { success: false, error: 'Unbekannter Lauf' }
@@ -4711,7 +4720,8 @@ ipcMain.handle('note-agent-discard-result', async (event, runId: string, resultI
     kind: 'agent-result-discarded',
     runId: run.runId,
     format: entry.kind,
-    reviewMs: typeof reviewMs === 'number' && reviewMs >= 0 ? reviewMs : undefined
+    reviewMs: typeof timings?.reviewMs === 'number' && timings.reviewMs >= 0 ? timings.reviewMs : undefined,
+    waitingMs: typeof timings?.waitingMs === 'number' && timings.waitingMs >= 0 ? timings.waitingMs : undefined
   })
   return { success: true }
 })
@@ -10621,6 +10631,11 @@ ipcMain.handle('email-analyze', async (_event, vaultPath: string, model: string,
 
     let analyzed = 0
     let failed = 0
+    // Für die Wirkungsbilanz: Wie viele Aufgaben hat die Analyse gefunden, wie lange
+    // hat sie gebraucht, mit welchem Modell. Inhalte gehen nicht ins Protokoll.
+    let extractedTasks = 0
+    const analysisStartedAt = Date.now()
+    let usedModel = model
     // Letzter Fehlergrund für die UI — sonst scheitert die Analyse (OOM, fehlendes Modell,
     // Timeout) komplett lautlos und der Datensatz behält ein evtl. gesyncten Fremd-Modell.
     let lastError: string | null = null
@@ -10830,6 +10845,8 @@ AUSGABEFORMAT (NUR Schema — die <Platzhalter> NICHT abschreiben, sondern aus d
             console.log(`[Email] ${email.id}: LLM=${llmScore ?? 'n/a'} Floor=${hard.floor} Boost=${hard.boost} → ${combined.relevanceScore} (${hard.signals.map(s => `${s.kind}:${s.mode}`).join(',')})`)
           }
           analyzed++
+          extractedTasks += normalizeSuggestedActions(analysis.suggestedActions).length
+          usedModel = recordedModel
           if (analyzed % PERSIST_EVERY === 0) {
             try {
               await persistAnalyses()
@@ -10864,7 +10881,16 @@ AUSGABEFORMAT (NUR Schema — die <Platzhalter> NICHT abschreiben, sondern aus d
     // Finaler Merge-Write: frischen Bestand lesen, nur analysis-Felder hineinmergen.
     await persistAnalyses()
 
-    return { success: true, analyzed, failed, total: toAnalyze.length, lastError }
+    return {
+      success: true,
+      analyzed,
+      failed,
+      total: toAnalyze.length,
+      lastError,
+      // Kennzahlen für die Wirkungsbilanz. Der Renderer ergänzt die am Bildschirm
+      // verbrachte Wartezeit und schreibt den Eintrag — nur er kann den Fokus messen.
+      impact: { tasks: extractedTasks, durationMs: Date.now() - analysisStartedAt, model: usedModel }
+    }
   } catch (error) {
     console.error('[Email] Analysis error:', error)
     return { success: false, analyzed: 0, failed: 0, total: 0, error: error instanceof Error ? error.message : 'Analyse fehlgeschlagen' }

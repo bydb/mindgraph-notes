@@ -248,6 +248,21 @@ describe('estimateSavedMinutes', () => {
     expect(saved.totalMinutes).toBe(0)
   })
 
+  it('summiert mehrere Vorgänge derselben Art korrekt', () => {
+    // Die Referenzzeit gilt JE Vorgang. Bei zwei Läufen stehen 2 × 30 min Handarbeit
+    // gegen die Summe der aktiven Zeit — sonst liest sich die Zeile wie ein Rechenfehler.
+    const events: ActivityEvent[] = [
+      runFinished({ runId: 'a', instructionMs: 60_000 }),
+      accepted({ runId: 'a', reviewMs: 60_000 }),
+      runFinished({ runId: 'b', instructionMs: 60_000 }),
+      accepted({ runId: 'b', reviewMs: 60_000 })
+    ]
+    const saved = estimateSavedMinutes(summarizeActivity(events, range), { 'table-merge': 30 })
+    expect(saved.lines[0].runs).toBe(2)
+    expect(saved.lines[0].activeMinutes).toBe(4)
+    expect(saved.totalMinutes).toBe(56)   // 2 × (30 − 2)
+  })
+
   it('bewertet nur bepreiste Arten und meldet die anderen getrennt', () => {
     const events: ActivityEvent[] = [
       runFinished({ runId: 'run-a', durationMs: 5 * 60_000 }),
@@ -269,6 +284,73 @@ describe('estimateSavedMinutes', () => {
     const saved = estimateSavedMinutes(summarizeActivity(events, range), { 'table-merge': 0 })
     expect(saved.lines).toEqual([])
     expect(saved.unpricedTypes).toEqual(['table-merge'])
+  })
+})
+
+describe('Wartezeit und Modellvergleich', () => {
+  const range = localDayRange(NOW)
+
+  it('zählt die Wartezeit am Bildschirm zur aktiven Zeit', () => {
+    // Genau hier wird die Modellwahl sichtbar: Wer vierzehn Minuten vor dem Schirm
+    // wartet, hat diese Zeit verloren — wer wegklickt, nicht.
+    const events: ActivityEvent[] = [
+      runFinished({ runId: 'run-a', durationMs: 14 * 60_000, instructionMs: 2 * 60_000, model: 'qwen3.8:27b-mlx' }),
+      accepted({ runId: 'run-a', reviewMs: 3 * 60_000, waitingMs: 10 * 60_000 })
+    ]
+    const saved = estimateSavedMinutes(summarizeActivity(events, range), { 'table-merge': 45 })
+    expect(saved.lines[0].activeMinutes).toBe(15)   // 2 + 3 + 10
+    expect(saved.totalMinutes).toBe(30)
+    expect(saved.lines[0].models).toEqual(['qwen3.8:27b-mlx'])
+  })
+
+  it('zählt die Wartezeit nur EINMAL je Lauf, auch bei zwei Ergebnissen', () => {
+    const events: ActivityEvent[] = [
+      runFinished({ runId: 'run-a', instructionMs: 0 }),
+      accepted({ runId: 'run-a', format: 'xlsx', reviewMs: 60_000, waitingMs: 5 * 60_000 }),
+      accepted({ runId: 'run-a', format: 'md', reviewMs: 60_000, waitingMs: 5 * 60_000 })
+    ]
+    const saved = estimateSavedMinutes(summarizeActivity(events, range), { 'table-merge': 45 })
+    // 5 min Warten + 2 × 1 min Prüfen — nicht 10 min Warten.
+    expect(saved.lines[0].activeMinutes).toBe(7)
+  })
+
+  it('macht den Unterschied zwischen zwei Modellen sichtbar', () => {
+    const langsam: ActivityEvent[] = [
+      runFinished({ runId: 'lokal', durationMs: 14 * 60_000, instructionMs: 2 * 60_000, model: 'qwen3.8:27b-mlx' }),
+      accepted({ runId: 'lokal', reviewMs: 6 * 60_000, waitingMs: 4 * 60_000 })
+    ]
+    const schnell: ActivityEvent[] = [
+      runFinished({ runId: 'cloud', durationMs: 60_000, instructionMs: 2 * 60_000, model: 'llmbase/deepseek-flash-v4' }),
+      accepted({ runId: 'cloud', reviewMs: 6 * 60_000, waitingMs: 60_000 })
+    ]
+    const a = estimateSavedMinutes(summarizeActivity(langsam, range), { 'table-merge': 45 })
+    const b = estimateSavedMinutes(summarizeActivity(schnell, range), { 'table-merge': 45 })
+    expect(a.totalMinutes).toBe(33)
+    expect(b.totalMinutes).toBe(36)
+    expect(b.lines[0].models).toEqual(['llmbase/deepseek-flash-v4'])
+  })
+
+  it('führt Mail-Extraktion als eigenen Vorgang mit Wartezeit', () => {
+    const events: ActivityEvent[] = [
+      { at: NOW, kind: 'email-tasks-extracted', emails: 23, tasks: 7, durationMs: 4 * 60_000, model: 'llmbase/deepseek-flash-v4', waitingMs: 2 * 60_000 }
+    ]
+    const summary = summarizeActivity(events, range)
+    expect(summary.emailTasks).toBe(7)
+    expect(summary.emailsAnalyzed).toBe(23)
+    expect(summary.acceptedRuns).toHaveLength(1)
+    const saved = estimateSavedMinutes(summary, { 'email-tasks': 20 })
+    expect(saved.totalMinutes).toBe(18)
+  })
+
+  it('bewertet einen Mail-Durchgang ohne Fund NICHT', () => {
+    // Ein Lauf, der nichts findet, kostet Zeit und ersetzt keine Handarbeit.
+    const events: ActivityEvent[] = [
+      { at: NOW, kind: 'email-tasks-extracted', emails: 12, tasks: 0, durationMs: 60_000, waitingMs: 30_000 }
+    ]
+    const summary = summarizeActivity(events, range)
+    expect(summary.emailRuns).toBe(1)
+    expect(summary.acceptedRuns).toEqual([])
+    expect(estimateSavedMinutes(summary, { 'email-tasks': 20 }).totalMinutes).toBe(0)
   })
 })
 

@@ -34,9 +34,29 @@ function makeWeb(overrides: Partial<WebRunState> = {}): WebRunState {
 }
 
 const noToolCalls = { text: 'fertig', toolCalls: [], assistantMessage: { role: 'assistant', content: 'fertig' } }
-const run = (web?: WebRunState) => runNoteAgentLoop({ run: makeRun(web), noteContent: '', agentMemory: '', chatOptions: {} as never, onStep: () => {} })
+const runWithChatOptions = (web: WebRunState | undefined, chatOptions: Record<string, unknown>) =>
+  runNoteAgentLoop({ run: makeRun(web), noteContent: '', agentMemory: '', chatOptions: chatOptions as never, onStep: () => {} })
+const run = (web?: WebRunState) => runWithChatOptions(web, {})
 
 beforeEach(() => mockChat.mockReset())
+
+describe('Agent-Ausführungsprofil', () => {
+  it('setzt von sich aus kein Profil — auch nicht für Thinking-Modelle', async () => {
+    mockChat.mockResolvedValue(noToolCalls)
+    await runWithChatOptions(undefined, { backend: 'ollama', ollamaModel: 'qwen3.8:27b-mlx' })
+    expect(mockChat.mock.calls[0][2].executionProfile).toBeUndefined()
+  })
+
+  it('reicht ein vom Aufrufer gesetztes Profil unverändert durch', async () => {
+    mockChat.mockResolvedValue(noToolCalls)
+    const executionProfile = {
+      id: 'explizit-preserve',
+      ollama: { thinkingMode: 'preserve', temperature: 1, topP: 0.95 }
+    }
+    await runWithChatOptions(undefined, { backend: 'ollama', ollamaModel: 'qwen3.8:27b-mlx', executionProfile })
+    expect(mockChat.mock.calls[0][2].executionProfile).toEqual(executionProfile)
+  })
+})
 
 describe('Web-Lauf-Abschluss (0e: genau ein Write)', () => {
   it('Web-Lauf ohne erfolgreichen Write endet NICHT erfolgreich (Fehler statt ok)', async () => {

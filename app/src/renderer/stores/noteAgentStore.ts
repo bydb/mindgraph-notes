@@ -171,6 +171,36 @@ function patchRun(
  * „Karte erscheint" und „Klick" liegt sonst auch eine Mittagspause.
  */
 const reviewTimers = new Map<string, ActiveMeasurement>()
+/**
+ * Wartezeit AM BILDSCHIRM während der Agent rechnet. Läuft nur, solange das Fenster
+ * vorn ist — wer wegklickt, zahlt nichts. Erst dadurch schlägt sich die Modellwahl in
+ * der Bilanz nieder: Vierzehn Minuten auf ein lokales Modell zu warten ist verlorene
+ * Zeit, dieselbe Aufgabe in zwanzig Sekunden nicht.
+ */
+const waitTimers = new Map<string, ActiveMeasurement>()
+
+function startWaitTimer(runId: string): void {
+  const measurement = createActiveMeasurement()
+  measurement.begin()
+  waitTimers.set(runId, measurement)
+}
+
+/** Einmalig je Lauf: Die Wartezeit gehört dem Lauf, nicht dem einzelnen Ergebnis. */
+function takeWaitMs(runId: string): number | undefined {
+  const measurement = waitTimers.get(runId)
+  if (!measurement) return undefined
+  waitTimers.delete(runId)
+  return measurement.end()
+}
+
+/** Beendet die Wartemessung, ohne sie zu verbrauchen — beim Eintreffen der Ergebnisse. */
+function stopWaiting(runId: string): void {
+  const measurement = waitTimers.get(runId)
+  if (!measurement) return
+  const ms = measurement.end()
+  // Wert festhalten, damit ihn die erste Entscheidung mitschicken kann.
+  waitTimers.set(runId, { begin: () => {}, end: () => ms, cancel: () => {} })
+}
 
 function startReviewTimer(runId: string): void {
   if (reviewTimers.has(runId)) return
@@ -265,6 +295,7 @@ export const useNoteAgentStore = create<NoteAgentStoreState>((set, get) => ({
       return
     }
     const runId = res.runId
+    startWaitTimer(runId)
     set(s => ({
       runScope: { ...s.runScope, [runId]: scopeId },
       ...withScope(s, scopeId, sc => ({
@@ -288,7 +319,10 @@ export const useNoteAgentStore = create<NoteAgentStoreState>((set, get) => ({
   acceptResult: async (scopeId, resultId) => {
     const run = get().getScope(scopeId).run
     if (!run.runId) return
-    const res = await window.electronAPI.noteAgentAcceptResult(run.runId, resultId, takeReviewMs(run.runId))
+    const res = await window.electronAPI.noteAgentAcceptResult(run.runId, resultId, {
+      reviewMs: takeReviewMs(run.runId),
+      waitingMs: takeWaitMs(run.runId)
+    })
     set(s => withScope(s, scopeId, sc => ({
       ...sc,
       run: {
@@ -303,7 +337,10 @@ export const useNoteAgentStore = create<NoteAgentStoreState>((set, get) => ({
   discardResult: async (scopeId, resultId) => {
     const run = get().getScope(scopeId).run
     if (!run.runId) return
-    const res = await window.electronAPI.noteAgentDiscardResult(run.runId, resultId, takeReviewMs(run.runId))
+    const res = await window.electronAPI.noteAgentDiscardResult(run.runId, resultId, {
+      reviewMs: takeReviewMs(run.runId),
+      waitingMs: takeWaitMs(run.runId)
+    })
     set(s => withScope(s, scopeId, sc => ({
       ...sc,
       run: {
@@ -358,6 +395,7 @@ export function initNoteAgentEvents(): void {
   window.electronAPI.onNoteAgentDone(p => {
     // Ab hier zählt die Prüfzeit: Die Karten stehen, der Nutzer entscheidet.
     // Ohne Ergebnisse gibt es nichts zu prüfen — dann läuft auch keine Messung.
+    stopWaiting(p.runId)
     if (p.results && p.results.length > 0) startReviewTimer(p.runId)
     store.setState(s => patchRun(s, p.runId, run => ({
       ...run,

@@ -4,6 +4,7 @@ import { isSentMail } from '../../shared/emailRelevance'
 import { collectOwnAddresses, collectReplyAllRecipients } from '../../shared/emailReply'
 import { useUIStore } from './uiStore'
 import { useNotesStore } from './notesStore'
+import { createActiveMeasurement } from '../utils/activeTimeTracker'
 
 interface EmailState {
   emails: EmailMessage[]
@@ -264,10 +265,33 @@ export const useEmailStore = create<EmailState>()((set, get) => ({
       set({ analysisProgress: progress })
     })
 
+    // Wartezeit am Bildschirm während der Analyse — nur solange das Fenster vorn ist.
+    // Genau hier wird der Modellunterschied sichtbar: Ein schnelles Cloud-Modell kostet
+    // Sekunden, ein großes lokales Modell hält den Nutzer minutenlang fest.
+    const warten = createActiveMeasurement()
+    warten.begin()
     try {
       const result = await window.electronAPI.emailAnalyze(vaultPath, model, emailIds, email.lowPowerMode, cloud) as
-        | { success: boolean; analyzed?: number; failed?: number; total?: number; lastError?: string | null; error?: string }
+        | {
+            success: boolean; analyzed?: number; failed?: number; total?: number
+            lastError?: string | null; error?: string
+            impact?: { tasks: number; durationMs: number; model?: string }
+          }
         | undefined
+      const wartezeitMs = warten.end()
+      // Nur ein Durchgang, der wirklich Aufgaben gefunden hat, ist ein Vorgang, der
+      // Handarbeit ersetzt. Ein Lauf ohne Fund kostet Zeit, spart aber nichts.
+      if (result?.success && result.impact && result.impact.tasks > 0) {
+        void window.electronAPI.activityAppend(vaultPath, {
+          at: Date.now(),
+          kind: 'email-tasks-extracted',
+          emails: result.analyzed ?? 0,
+          tasks: result.impact.tasks,
+          durationMs: result.impact.durationMs,
+          model: result.impact.model,
+          waitingMs: wartezeitMs
+        }).catch(() => undefined)
+      }
       // Neu laden nach Analyse (skipAutoActions: verhindert erneuten analyzeEmails-Aufruf)
       await get().loadEmails(vaultPath, true)
 
@@ -290,6 +314,7 @@ export const useEmailStore = create<EmailState>()((set, get) => ({
       console.error('[EmailStore] Analysis failed:', error)
       set({ analysisError: error instanceof Error ? error.message : 'Analyse fehlgeschlagen.' })
     } finally {
+      warten.cancel()
       set({ isAnalyzing: false, analysisProgress: null })
     }
   },

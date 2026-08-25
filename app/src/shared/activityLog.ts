@@ -18,9 +18,9 @@ import { activeMs as activeTimeOf } from './activeTime'
  * ist ohne Inhaltskenntnis nicht ableitbar. Wer sie lesen will, vergibt sie selbst,
  * indem er für diese Art eine Referenzzeit hinterlegt.
  */
-export type ActivityType = 'table-merge' | 'document' | 'summary' | 'web-research' | 'other'
+export type ActivityType = 'table-merge' | 'document' | 'summary' | 'web-research' | 'email-tasks' | 'other'
 
-export const ACTIVITY_TYPES: ActivityType[] = ['table-merge', 'document', 'summary', 'web-research', 'other']
+export const ACTIVITY_TYPES: ActivityType[] = ['table-merge', 'document', 'summary', 'web-research', 'email-tasks', 'other']
 
 /** Formate, die der Agent als Ergebnis anbieten kann (Spiegel von AgentResultEntry['kind']). */
 export type ResultFormat = 'md' | 'xlsx' | 'docx' | 'txt' | 'csv' | 'html' | 'png' | 'jpg'
@@ -34,6 +34,8 @@ export type ActivityEvent =
       durationMs: number
       /** Aktive Zeit beim Formulieren des Auftrags. Fehlt bei Läufen vor dieser Messung. */
       instructionMs?: number
+      /** Modell des Laufs (lokaler Tag oder `<provider>/<modell>`). Macht Läufe vergleichbar. */
+      model?: string
       activityType: ActivityType
       resultCount: number
       status: 'ok' | 'failed' | 'aborted'
@@ -45,8 +47,37 @@ export type ActivityEvent =
       format: ResultFormat
       /** Aktive Zeit beim Prüfen dieses Ergebnisses (Fenster im Vordergrund, gedeckelt). */
       reviewMs?: number
+      /**
+       * Wartezeit AM BILDSCHIRM während des Laufs (Fenster im Vordergrund). Nur EINMAL
+       * je Lauf gesetzt — sie gehört dem Lauf, nicht dem einzelnen Ergebnis.
+       *
+       * Erst damit taucht die Modellwahl in der Zahl auf: Wer vierzehn Minuten vor dem
+       * Bildschirm wartet, hat diese Zeit verloren; wer wegklickt, nicht.
+       */
+      waitingMs?: number
     }
-  | { at: number; kind: 'agent-result-discarded'; runId: string; format: ResultFormat; reviewMs?: number }
+  | {
+      at: number
+      kind: 'agent-result-discarded'
+      runId: string
+      format: ResultFormat
+      reviewMs?: number
+      waitingMs?: number
+    }
+  | {
+      /**
+       * Aufgabenextraktion aus Mails. Kein Agent-Lauf: Es gibt keine Übernahme, die
+       * Aufgaben entstehen mit der Notiz. Gezählt wird ein Durchgang, der Aufgaben
+       * gefunden hat — mit Modell, Laufzeit und Wartezeit am Bildschirm.
+       */
+      at: number
+      kind: 'email-tasks-extracted'
+      emails: number
+      tasks: number
+      durationMs: number
+      model?: string
+      waitingMs?: number
+    }
   | { at: number; kind: 'task-created'; count: number }
   | {
       at: number
@@ -70,6 +101,7 @@ const KNOWN_KINDS: ActivityEventKind[] = [
   'agent-result-accepted',
   'agent-result-discarded',
   'task-created',
+  'email-tasks-extracted',
   'voice-command'
 ]
 
@@ -90,6 +122,9 @@ export function isActivityEvent(value: unknown): value is ActivityEvent {
     return typeof e.runId === 'string' && typeof e.format === 'string'
   }
   if (e.kind === 'task-created') return typeof e.count === 'number'
+  if (e.kind === 'email-tasks-extracted') {
+    return typeof e.tasks === 'number' && typeof e.durationMs === 'number'
+  }
   return typeof e.status === 'string'
 }
 
@@ -119,6 +154,8 @@ export function deriveActivityType(tools: Iterable<string>): ActivityType {
 export interface AcceptedRun {
   runId: string
   activityType: ActivityType
+  /** Modell des Laufs — erst damit lassen sich Läufe vergleichen. */
+  model?: string
   /** Durchlaufzeit des Agenten — Kontext, NIE Abzug. */
   durationMs: number
   /**
@@ -143,6 +180,11 @@ export interface ActivitySummary {
   voiceCommands: number
   runsFinished: number
   runsFailed: number
+  /** Aufgaben, die aus Mails erkannt wurden (eigener Weg, ohne Übernahme-Schritt). */
+  emailTasks: number
+  /** Mails, die dafür analysiert wurden — ohne sie ist die Aufgabenzahl nicht einzuordnen. */
+  emailsAnalyzed: number
+  emailRuns: number
   /**
    * Läufe mit mindestens einem übernommenen Ergebnis — die einzige Grundlage der
    * Zeitersparnis. Ein Lauf, dessen Ergebnisse alle verworfen wurden, hat keine Zeit
@@ -180,6 +222,9 @@ export function summarizeActivity(events: ActivityEvent[], range: ActivityRange)
   // Prüfzeit je Lauf über ALLE Übernahmen summieren: Ein Lauf mit zwei Ergebnissen
   // wurde auch zweimal geprüft, und beides ist Arbeitszeit des Nutzers.
   const reviewMsByRun = new Map<string, number | null>()
+  // Wartezeit gehört dem LAUF, nicht dem einzelnen Ergebnis: Sie wird nur beim ersten
+  // Übernehmen mitgeschickt und hier höchstens einmal je Lauf gezählt.
+  const waitingMsByRun = new Map<string, number>()
   for (const e of events) {
     if (e.kind !== 'agent-result-accepted') continue
     const known = firstAcceptedAt.get(e.runId)
@@ -188,6 +233,9 @@ export function summarizeActivity(events: ActivityEvent[], range: ActivityRange)
       reviewMsByRun.set(e.runId, (reviewMsByRun.get(e.runId) ?? 0) + e.reviewMs)
     } else if (!reviewMsByRun.has(e.runId)) {
       reviewMsByRun.set(e.runId, null)
+    }
+    if (typeof e.waitingMs === 'number' && !waitingMsByRun.has(e.runId)) {
+      waitingMsByRun.set(e.runId, e.waitingMs)
     }
   }
 
@@ -201,6 +249,9 @@ export function summarizeActivity(events: ActivityEvent[], range: ActivityRange)
     voiceCommands: 0,
     runsFinished: 0,
     runsFailed: 0,
+    emailTasks: 0,
+    emailsAnalyzed: 0,
+    emailRuns: 0,
     acceptedRuns: []
   }
 
@@ -227,6 +278,25 @@ export function summarizeActivity(events: ActivityEvent[], range: ActivityRange)
         summary.runsFinished += 1
         if (e.status !== 'ok') summary.runsFailed += 1
         break
+      case 'email-tasks-extracted':
+        summary.emailTasks += e.tasks
+        summary.emailsAnalyzed += e.emails
+        summary.emailRuns += 1
+        // Ein Durchgang, der Aufgaben gefunden hat, ist ein bewertbarer Vorgang: Er
+        // ersetzt das Durchsehen der Mails und das Herausschreiben von Hand. Eine
+        // Übernahme gibt es hier nicht — die Aufgaben entstehen mit der Notiz.
+        if (e.tasks > 0) {
+          summary.acceptedRuns.push({
+            runId: `mail-${e.at}`,
+            activityType: 'email-tasks',
+            model: e.model,
+            durationMs: e.durationMs,
+            activeMs: typeof e.waitingMs === 'number' ? e.waitingMs : null,
+            elapsedMs: e.durationMs,
+            accepted: e.tasks
+          })
+        }
+        break
     }
   }
 
@@ -244,8 +314,13 @@ export function summarizeActivity(events: ActivityEvent[], range: ActivityRange)
     summary.acceptedRuns.push({
       runId,
       activityType: run.activityType,
+      model: run.model,
       durationMs: run.durationMs,
-      activeMs: activeTimeOf({ instructionMs: run.instructionMs, reviewMs: review ?? undefined }),
+      activeMs: activeTimeOf({
+        instructionMs: run.instructionMs,
+        reviewMs: review ?? undefined,
+        waitingMs: waitingMsByRun.get(runId)
+      }),
       elapsedMs: Math.max(0, first - startedAt),
       accepted
     })
@@ -272,6 +347,8 @@ export interface SavedTimeLine {
   /** Von der Auftragserteilung bis zur Übernahme. */
   elapsedMinutes: number
   elapsedMs: number
+  /** Modelle, mit denen diese Vorgänge liefen — nach Häufigkeit, ohne Dopplungen. */
+  models: string[]
   savedMinutes: number
 }
 
@@ -303,6 +380,7 @@ export interface SavedTime {
 export function estimateSavedMinutes(summary: ActivitySummary, reference: ReferenceMinutes): SavedTime {
   const byType = new Map<ActivityType, {
     runs: number; activeMs: number; runtimeMs: number; elapsedMs: number; saved: number
+    models: Map<string, number>
   }>()
   let unmeasuredRuns = 0
 
@@ -315,11 +393,12 @@ export function estimateSavedMinutes(summary: ActivitySummary, reference: Refere
     }
     const ref = reference[run.activityType]
     const bucket = byType.get(run.activityType)
-      ?? { runs: 0, activeMs: 0, runtimeMs: 0, elapsedMs: 0, saved: 0 }
+      ?? { runs: 0, activeMs: 0, runtimeMs: 0, elapsedMs: 0, saved: 0, models: new Map<string, number>() }
     bucket.runs += 1
     bucket.activeMs += run.activeMs
     bucket.runtimeMs += run.durationMs
     bucket.elapsedMs += run.elapsedMs
+    if (run.model) bucket.models.set(run.model, (bucket.models.get(run.model) ?? 0) + 1)
     if (typeof ref === 'number' && ref > 0) {
       // Abgezogen wird die AKTIVE Zeit, nicht die Laufzeit: Wer während des Laufs etwas
       // anderes erledigt, hat diese Minuten nicht aufgewendet. Nie negativ — ein Vorgang,
@@ -349,6 +428,7 @@ export function estimateSavedMinutes(summary: ActivitySummary, reference: Refere
       runtimeMs: bucket.runtimeMs,
       elapsedMinutes: Math.round(bucket.elapsedMs / 60_000),
       elapsedMs: bucket.elapsedMs,
+      models: [...bucket.models.entries()].sort((a, b) => b[1] - a[1]).map(([name]) => name),
       savedMinutes: Math.round(bucket.saved)
     })
   }

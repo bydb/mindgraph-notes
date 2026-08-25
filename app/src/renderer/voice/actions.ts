@@ -20,7 +20,7 @@ import {
   type ActivityType,
   type ActivitySummary
 } from '../../shared/activityLog'
-import { ACTIVITY_TYPE_LABEL_KEY, acceptedLine, tasksLine, savedBasisLine, savedContextLine, sampleLine, unmeasuredLine, unpricedLine } from '../utils/impactText'
+import { ACTIVITY_TYPE_LABEL_KEY, acceptedLine, emailTasksLine, tasksLine, savedBasisLine, savedContextLine, sampleLine, unmeasuredLine, unpricedLine } from '../utils/impactText'
 
 export type TFn = (key: any, params?: Record<string, string | number>) => string
 
@@ -452,6 +452,9 @@ const activityToday: ActionSpec<'activity.today'> = {
     }
     if (summary.tasksCreated > 0) {
       lines.push({ group: doneGroup, text: tasksLine(summary, t) })
+    }
+    if (summary.emailTasks > 0) {
+      lines.push({ group: doneGroup, text: emailTasksLine(summary, t) })
     }
 
     if (saved.lines.length > 0) {

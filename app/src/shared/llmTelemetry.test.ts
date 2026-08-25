@@ -60,8 +60,12 @@ describe('fromOllamaResponse', () => {
     expect(isColdStart(m)).toBe(true)
   })
   it('merkt sich, wenn der Denk-Anteil nicht in den Token steckt', () => {
-    const m = fromOllamaResponse({ eval_count: 98, eval_duration: 30_000_000_000 }, { module: 'chat', model: 'm', wallMs: 30_000, at: 0, hiddenThinking: true })
+    const m = fromOllamaResponse(
+      { eval_count: 98, eval_duration: 30_000_000_000 },
+      { module: 'chat', model: 'm', wallMs: 30_000, at: 0, hiddenThinking: true, executionProfile: 'agent-test-v1' }
+    )
     expect(m.hiddenThinking).toBe(true)
+    expect(m.executionProfile).toBe('agent-test-v1')
   })
 })
 

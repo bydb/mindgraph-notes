@@ -17,6 +17,10 @@
 // Das Brain-Modul nutzt diesen Client NICHT — es ist hardcoded localhost.
 
 import { fromOllamaResponse, type OllamaTimings } from '../../shared/llmTelemetry'
+import {
+  resolveOllamaExecutionProfile,
+  type LlmExecutionProfile
+} from '../../shared/agentExecutionProfile'
 import { recordLlmRun } from './telemetry'
 
 export type ChatBackend = 'ollama' | 'lmstudio' | 'openrouter' | 'llmbase'
@@ -37,6 +41,9 @@ export interface ToolCall {
 export interface ChatMessage {
   role: 'system' | 'user' | 'assistant' | 'tool'
   content: string
+  // Nur Ollama-Assistant-History: flüchtiger Reasoning-Zustand innerhalb eines
+  // Laufs. Wird weder gerendert noch als Ergebnis oder Gedächtnis gespeichert.
+  thinking?: string
   tool_calls?: ToolCall[]                 // nur auf assistant
   tool_call_id?: string                   // OpenRouter braucht das auf tool-Antworten
   tool_name?: string                      // nur auf tool (Ollama)
@@ -64,6 +71,9 @@ export interface ChatOptions {
   responseFormat?: 'json'                  // Cloud: erzwingt response_format json_object (für strukturierte Analysen)
   temperature?: number                     // Cloud: temperature
   maxTokens?: number                      // Cloud: max_tokens; Ollama: nur dokumentarisch
+  // Reproduzierbare, modellabhängige Laufparameter. Der aufrufende Agent löst
+  // das Profil einmal auf; der Ollama-Adapter setzt es konsistent auf Wire-Ebene um.
+  executionProfile?: LlmExecutionProfile
   // Externes Abbruch-Signal (z.B. Abbrechen-Button im Notiz-Agent) — wird mit dem
   // internen Request-Timeout kombiniert, ersetzt ihn nicht (Plan F05).
   signal?: AbortSignal
@@ -309,6 +319,12 @@ async function chatViaOllama(messages: ChatMessage[], opts: ChatOptions): Promis
   const url = opts.ollamaUrl ?? DEFAULT_OLLAMA_URL
   const model = await pickDefaultOllamaModel(url, opts.ollamaModel)
   if (!model) throw new Error('Kein Ollama-Modell verfügbar')
+  const execution = resolveOllamaExecutionProfile(opts.executionProfile)
+  const ollamaOptions = {
+    ...(opts.numCtx ? { num_ctx: opts.numCtx } : {}),
+    ...(execution.temperature !== undefined ? { temperature: execution.temperature } : {}),
+    ...(execution.topP !== undefined ? { top_p: execution.topP } : {})
+  }
 
   const startedAt = Date.now()
   const res = await chatFetch(`${url}/api/chat`, {
@@ -316,9 +332,10 @@ async function chatViaOllama(messages: ChatMessage[], opts: ChatOptions): Promis
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       model,
-      messages: messages.map(m => ({ role: m.role, content: m.content })),
+      messages: messages.map(ollamaMessageToWire),
       stream: false,
-      ...(opts.numCtx ? { options: { num_ctx: opts.numCtx } } : {})
+      ...(execution.think !== undefined ? { think: execution.think } : {}),
+      ...(Object.keys(ollamaOptions).length > 0 ? { options: ollamaOptions } : {})
     }),
   }, { timeoutMs: opts.timeoutMs ?? 120000, userSignal: opts.signal })
   if (!res.ok) {
@@ -337,6 +354,7 @@ async function chatViaOllama(messages: ChatMessage[], opts: ChatOptions): Promis
     // Über /api/chat zählt Ollama den Denk-Anteil nicht in eval_count mit — ohne
     // diese Markierung sähe ein Reasoning-Lauf dreimal langsamer aus, als er ist.
     hiddenThinking: !!json.message?.thinking,
+    executionProfile: opts.executionProfile?.id,
   }))
   return { text: json.message?.content ?? '', backend: 'ollama' }
 }
@@ -514,7 +532,7 @@ function nextToolCallId(): string {
   return `tc_${Date.now().toString(36)}_${toolCallCounter}`
 }
 
-function ollamaMessageToWire(m: ChatMessage): Record<string, unknown> {
+export function ollamaMessageToWire(m: ChatMessage): Record<string, unknown> {
   if (m.role === 'tool') {
     // Ollama erwartet tool-Antworten als {role: 'tool', content: '...'}
     return { role: 'tool', content: m.content }
@@ -523,6 +541,7 @@ function ollamaMessageToWire(m: ChatMessage): Record<string, unknown> {
     return {
       role: 'assistant',
       content: m.content,
+      ...(m.thinking ? { thinking: m.thinking } : {}),
       tool_calls: m.tool_calls.map(tc => ({
         function: { name: tc.name, arguments: tc.arguments }
       }))
@@ -543,6 +562,12 @@ async function chatWithToolsViaOllama(
   const url = opts.ollamaUrl ?? DEFAULT_OLLAMA_URL
   const model = await pickDefaultOllamaModel(url, opts.ollamaModel)
   if (!model) throw new Error('Kein Ollama-Modell verfügbar')
+  const execution = resolveOllamaExecutionProfile(opts.executionProfile)
+  const ollamaOptions = {
+    ...(opts.numCtx ? { num_ctx: opts.numCtx } : {}),
+    ...(execution.temperature !== undefined ? { temperature: execution.temperature } : {}),
+    ...(execution.topP !== undefined ? { top_p: execution.topP } : {})
+  }
   console.log(`[chatClient] Ollama tool chat: model=${model}, tools=${tools.map(t => t.name).join(', ')}`)
 
   const wireTools = tools.map(t => ({
@@ -563,7 +588,8 @@ async function chatWithToolsViaOllama(
       messages: messages.map(ollamaMessageToWire),
       tools: wireTools,
       stream: false,
-      ...(opts.numCtx ? { options: { num_ctx: opts.numCtx } } : {})
+      ...(execution.think !== undefined ? { think: execution.think } : {}),
+      ...(Object.keys(ollamaOptions).length > 0 ? { options: ollamaOptions } : {})
     }),
   }, { timeoutMs: opts.timeoutMs ?? 180000, userSignal: opts.signal })
   if (!res.ok) {
@@ -577,6 +603,7 @@ async function chatWithToolsViaOllama(
     message?: {
       role?: string
       content?: string
+      thinking?: string
       tool_calls?: OllamaToolCallWire[]
     }
     prompt_eval_count?: number
@@ -587,6 +614,8 @@ async function chatWithToolsViaOllama(
     model,
     wallMs: Date.now() - startedAt,
     at: startedAt,
+    hiddenThinking: !!json.message?.thinking,
+    executionProfile: opts.executionProfile?.id,
   }))
 
   const rawCalls = json.message?.tool_calls ?? []
@@ -617,6 +646,9 @@ async function chatWithToolsViaOllama(
   const assistantMessage: ChatMessage = {
     role: 'assistant',
     content: text,
+    ...(execution.preserveThinking && json.message?.thinking
+      ? { thinking: json.message.thinking }
+      : {}),
     tool_calls: toolCalls.length > 0 ? toolCalls : undefined
   }
 

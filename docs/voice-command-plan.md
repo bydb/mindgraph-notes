@@ -645,6 +645,46 @@ Einkauf wirklich trägt — und ein eigenes Feature mit eigenem Entwurf. Wichtig
 Zeiten der bisherigen Programme kann MindGraph nicht messen; sie sind Nutzerangabe und müssen als
 solche gekennzeichnet bleiben.
 
+### Wartezeit, Modell und Mail-Extraktion (25.08.2026)
+
+Anschlussfrage aus derselben Runde: Der Zeitgewinn unterschied sich nicht zwischen einem großen
+lokalen Modell und einem schnellen Cloud-Modell — obwohl das im Alltag der spürbarste Unterschied
+ist. Drei Lücken, alle geschlossen:
+
+1. **Wartezeit am Bildschirm zählt jetzt zur aktiven Zeit.** Vorher galt Warten als kostenlos; damit
+   war der Zeitgewinn modellunabhängig und die Modellwahl tauchte in der Zahl nie auf. Gemessen wird
+   nur, solange das Fenster vorn ist: **Wer wegklickt, zahlt nichts; wer wartet, sieht es.** Die
+   Wartezeit gehört dem LAUF und wird nur beim ersten Übernehmen mitgeschickt — sonst zählte ein Lauf
+   mit zwei Ergebnissen sie doppelt.
+2. **Das Modell steht im Protokoll** (`agent-run-finished.model`, lokaler Tag oder
+   `<provider>/<modell>`) und auf der Karte hinter der Durchlaufzeit. Ohne das ließen sich Läufe
+   nicht vergleichen.
+3. **Aufgabenextraktion aus Mails ist eine eigene Tätigkeitsart** (`email-tasks`). Sie lief bisher
+   komplett an der Bilanz vorbei: anderer Weg (`email-analyze` + `emailCreateNote`), kein
+   Protokolleintrag. Jetzt zählt ein Durchgang, der Aufgaben gefunden hat, als Vorgang — mit Modell,
+   Laufzeit, Mail- und Aufgabenzahl. Ein Durchgang ohne Fund wird NICHT bewertet: Er kostet Zeit,
+   ersetzt aber keine Handarbeit.
+
+Ehrliche Grenze, die in den Einstellungen steht: Bei „Aufgaben aus Mails" deckt die Referenzzeit
+EINEN Durchgang ab (Mails durchsehen, Aufgaben herausschreiben). Was danach mit den erkannten
+Aufgaben geschieht, misst die App nicht.
+
+**Ausnahme bei `activity-append`**: Der Renderer darf neben Sprachbefehlen auch
+`email-tasks-extracted` anhängen. Zahlen und Dauer stammen aus dem Ergebnis des Main-Prozesses, aber
+nur der Renderer kennt den Fensterfokus. Lauf-Dauern, Übernahmen und Aufgaben bleiben unverändert
+Main-geschrieben.
+
+**Am lebenden Objekt gemessen** (zwei Läufe, gleiches Modell, unterschiedliches Verhalten):
+
+| | Laufzeit | Wartezeit | gezählt |
+|---|---|---|---|
+| am Bildschirm gewartet | 9,9 s | **9,9 s** | voll |
+| weggeklickt | 21,5 s | **0 s** | nichts |
+
+Dabei fiel ein Anzeigefehler auf: Bei zwei Vorgängen derselben Art stand „30 min − 1 min = 59 min",
+weil die Referenzzeit je Vorgang gilt, aktive Zeit und Gewinn aber Summen sind. Die Zeile nennt den
+Faktor jetzt: „2 × 30 min von Hand − 1 min aktiv = 59 min".
+
 ### Nächste Schritte
 
 1. `tiny` gegen `base` messen, warm und kalt, auf der Zielhardware.

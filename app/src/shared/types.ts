@@ -718,11 +718,11 @@ export interface ElectronAPI {
   noteSkillsCatalog: () => Promise<{ skills: NoteAgentCatalogSkill[]; error?: string }>;
   noteSkillsCatalogInstall: (vaultPath: string, id: string) => Promise<{ success: boolean; relPath?: string; folderName?: string; error?: string }>;
   noteSkillsImportDialog: (vaultPath: string) => Promise<{ success: boolean; cancelled?: boolean; relPath?: string; folderName?: string; skippedScripts?: boolean; error?: string }>;
-  noteAgentAcceptResult: (runId: string, resultId: string, reviewMs?: number) => Promise<{ success: boolean; fileName?: string; relPath?: string; error?: string }>;
+  noteAgentAcceptResult: (runId: string, resultId: string, timings?: { reviewMs?: number; waitingMs?: number }) => Promise<{ success: boolean; fileName?: string; relPath?: string; error?: string }>;
   activityAppend: (vaultPath: string, entry: ActivityEvent) => Promise<{ success: boolean; error?: string }>;
   activitySummary: (vaultPath: string, range?: { from: number; to: number }) => Promise<{ success: boolean; summary?: ActivitySummary; error?: string }>;
   onActivityChanged: (callback: (payload: { vaultPath: string }) => void) => () => void;
-  noteAgentDiscardResult: (runId: string, resultId: string, reviewMs?: number) => Promise<{ success: boolean; error?: string }>;
+  noteAgentDiscardResult: (runId: string, resultId: string, timings?: { reviewMs?: number; waitingMs?: number }) => Promise<{ success: boolean; error?: string }>;
   noteAgentPreviewResult: (runId: string, resultId: string) => Promise<{ success: boolean; kind?: string; binary?: boolean; text?: string; truncated?: boolean; sizeBytes?: number; error?: string }>;
   onNoteAgentProgress: (callback: (p: NoteAgentProgressEvent) => void) => void;
   onNoteAgentDone: (callback: (p: NoteAgentDoneEvent) => void) => void;
