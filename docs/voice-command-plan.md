@@ -738,10 +738,16 @@ Nicht dieselbe Aufgabe wiederholen: Lern- und Erinnerungseffekte verzerren das E
 **vergleichbare Fälle derselben Aufgabenklasse, zufällig auf „konventionell" und „MindGraph"
 verteilt**, gemessen an aktiver Zeit, Korrekturzeit, Übernahmequote und Ergebnisqualität.
 
-**Der Entwurf dazu steht in `docs/comparison-mode-plan.md`** (25.08.2026, noch kein Code). Er hält
-auch fest, was die Zeitbilanz heute NICHT kann und was der Vergleichsmodus dafür braucht: die
-Korrekturzeit nach der Übernahme, die Trennung von „gemessen" und „selbst gestoppt", eine
-Mindestfallzahl, bevor überhaupt ein Median gezeigt wird.
+**Der Bauvertrag dazu steht in `docs/comparison-mode-plan.md`** (25.08.2026, zweite Fassung, noch
+kein Code). Zwei Punkte daraus betreffen auch die Zeitbilanz:
+
+- **Der 30-Minuten-Deckel aus `shared/activeTime.ts` gilt dort NICHT.** In der Tagesbilanz ist er
+  richtig (sonst wird die Mittagspause zur Prüfzeit); für Vergleichsfälle, die legitim zwei Stunden
+  dauern, würde er lange Fälle systematisch kürzen — und weil er nur die automatisch erfasste Seite
+  trifft, bevorteilte er ausgerechnet MindGraph.
+- **„Vordergrundzeit" heißt: das Fenster war vorn, nicht: jemand hat getippt.** Der Vergleichsmodus
+  verzichtet bewusst auf eine Pausenerkennung über Tastatur — Lesen und Prüfen ist Arbeit ohne
+  Tastenanschlag, und eine solche Erkennung würde genau die Prüfarbeit kleinrechnen.
 
 ### Nächste Schritte
 

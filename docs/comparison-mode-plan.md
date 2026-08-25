@@ -1,140 +1,250 @@
-# Vergleichsmodus — Entwurf
+# Vergleichsmodus — Bauvertrag
 
-Stand: 25.08.2026. **Noch kein Code.** Dieses Dokument beschreibt, was gebaut werden soll, wo die
-Grenzen liegen und welche Entscheidungen offen sind.
+Stand: 25.08.2026, zweite Fassung nach methodischer Durchsicht. **Noch kein Code.** Was hier steht,
+ist die Zusage, gegen die gebaut wird — insbesondere die Regeln, die sich später nicht mehr
+nachrüsten lassen, weil sie in der Datenschicht sitzen.
 
 ## Wozu
 
-Die Zeitbilanz (`docs/voice-command-plan.md`, Abschnitte zu Wirkungsbilanz und Zeitgewinn) beantwortet
-die Frage „Was hat mir MindGraph heute abgenommen?" — auf Grundlage einer **Schätzung des Nutzers**.
-Für die eigene Motivation reicht das. Vor einem Einkauf reicht es nicht: Die erste Rückfrage lautet,
-woher die Vergleichszahl stammt, und die Antwort „hat der Nutzer selbst eingetragen" beendet das
-Gespräch.
+Die Zeitbilanz (`docs/voice-command-plan.md`) beantwortet „Was hat mir MindGraph heute abgenommen?"
+auf Grundlage einer **Schätzung des Nutzers**. Für die eigene Motivation reicht das; vor einem
+Einkauf nicht. Die erste Rückfrage lautet, woher die Vergleichszahl stammt.
 
 Der Vergleichsmodus soll einen Satz tragen können wie:
 
-> Bei 8 Angebotsauswertungen sank die aktive Bearbeitungszeit im Median von 42 auf 11 Minuten
-> (4 Fälle konventionell, 4 mit MindGraph, zufällig zugeteilt). Übernahmequote 3 von 4.
-> Ergebnisqualität: 3× „gut", 1× „mit Nacharbeit".
+> Aufgabenklasse Angebotsauswertung, 6 Fälle zugeteilt, 4 abgeschlossen (2 je Weg).
+> Der Median der gesamtaktiven Zeit betrug konventionell 42 und mit MindGraph 11 Minuten.
+> Ein MindGraph-Fall wurde verworfen und von Hand fertiggestellt; seine 38 Minuten sind enthalten.
 
-Nicht mehr, aber auch nicht weniger. Ein solcher Satz hält einer Nachfrage stand, eine große Zahl
-ohne Herkunft nicht.
+Nicht „sank von 42 auf 11": Es sind **nicht dieselben Fälle** vorher und nachher, sondern zwei
+Gruppen. Ein Satz mit „sank" behauptet eine Messwiederholung, die es nicht gibt.
 
-## 1. Versuchsanlage
+## 1. Kampagne als eigene Entität
 
-**Nicht dieselbe Aufgabe zweimal.** Der naheliegende Aufbau — eine Aufgabe erst von Hand, dann mit
-MindGraph — misst beim zweiten Durchgang vor allem Erinnerung. Man kennt das Ergebnis schon, weiß,
-wo die Zahlen stehen, und ist deshalb schneller. Der Effekt geht in dieselbe Richtung wie der zu
-messende und lässt sich nachträglich nicht herausrechnen.
+Eine **Kampagne** ist der Rahmen, in dem verglichen wird. Sie hält fest, was während des Laufs
+unveränderlich bleibt:
 
-**Stattdessen: vergleichbare Fälle derselben Aufgabenklasse.** Der Nutzer legt eine Aufgabenklasse
-an („Angebotsauswertung", „Rückläufe aus Schulen zusammenführen") und trägt echte Vorgänge als Fälle
-ein, sobald sie anfallen. Jeder Fall wird **zufällig** einem der beiden Wege zugeteilt.
+- Aufgabenklasse (eine, nie mehrere)
+- Einschlussregeln — was ist ein vergleichbarer Fall, was gehört nicht dazu
+- **Akzeptanzdefinition**: was gilt in dieser Kampagne als brauchbares Ergebnis (vorab, nicht
+  hinterher)
+- Beginn und Ende
+- Randomisierungsverfahren samt Parametern
+- Protokollversion
 
-**Zuteilung durch die App, nicht durch den Nutzer.** Wer selbst wählt, schiebt die kniffligen Fälle
-unbewusst auf den Weg, dem er mehr zutraut — und misst am Ende diese Vorauswahl. Die Zuteilung
-erfolgt **blockweise** (je vier Fälle zwei und zwei, Reihenfolge zufällig): Bei kleinen Zahlen
-verhindert das die Klumpung „erst sechs konventionell, dann sechs mit MindGraph", die sonst
-schlicht den Lernfortschritt über die Zeit misst.
+Fälle verweisen auf ihre Kampagne. **Mehrere Aufgabenklassen laufen als getrennte Kampagnen, ohne
+gemeinsame Kennzahl** — Fälle aus verschiedenen Klassen dürfen nie in einen Median fallen.
 
-**Zuteilung vor der Bearbeitung, nach dem Anlegen.** Der Fall wird mit Kurzbezeichnung angelegt,
-dann zeigt die App den Weg an. Wer den Weg vorher sieht, wählt indirekt doch aus.
+Ändert sich eine Messregel, entsteht eine neue Protokollversion und damit eine neue Kampagne. Alte
+und neue Regeln in einer Auswertung zu mischen wäre der leiseste und schwerste Fehler.
 
-**Abbrüche zählen.** Ein begonnener und nicht beendeter Fall bleibt als „abgebrochen" stehen und
-erscheint in der Auswertung. Ohne das überlebt nur, was gut lief.
+## 2. Zuteilung
 
-## 2. Was gemessen wird
+**Die App teilt zu, nicht der Nutzer.** Wer selbst wählt, schiebt die kniffligen Fälle unbewusst auf
+den Weg, dem er mehr zutraut, und misst am Ende diese Vorauswahl.
 
-| Größe | konventionell | mit MindGraph |
-|---|---|---|
-| Aktive Bearbeitungszeit | **selbst gestoppt** | gemessen (Auftrag + Vordergrundzeit + Prüfung) |
-| Korrekturzeit danach | selbst gestoppt | **gemessen** (Bearbeitung der Ergebnisdatei) |
-| Durchlaufzeit | vom Anlegen bis zum Abschluss | dito |
-| Übernahmequote | entfällt | übernommen / verworfen |
-| Ergebnisqualität | Bewertung des Bearbeiters | dito |
+**Zuteilung erst nach dem Anlegen** des Falls (Kurzbezeichnung, Einschlussprüfung), nie vorher. Wer
+den Weg vorher sieht, wählt indirekt doch aus.
 
-**Der Unterschied zwischen „gemessen" und „selbst gestoppt" wird überall mitgeführt** — in der
-Datenhaltung, in der Anzeige und im Export. Er ist der ehrlichste Teil des ganzen Vorhabens: Die
-konventionelle Seite kann MindGraph nicht messen, weil Excel, Outlook und der Dateimanager nicht mit
-ihr reden. Wer das verschweigt, verkauft eine Schätzung als Messung.
+**Keine festen Viererblöcke.** Bei 2:2 in Vierergruppen ist nach drei Fällen der vierte Weg sicher
+bekannt, bei zwei gleichen Anfängen sogar die beiden folgenden. Stattdessen eine **balancierende
+Zufallsregel** (Urnenmodell nach Efron): Liegt ein Weg vorn, bekommt der andere die höhere
+Wahrscheinlichkeit — vorhergesagt werden kann die einzelne Zuteilung aber nie, weil jede Zuteilung
+ein echter Zufallszug bleibt.
 
-**Korrekturzeit ist neu und heute die größte Lücke.** Was nach der Übernahme an der Ergebnisdatei
-geschieht, sieht die Bilanz bisher gar nicht — dabei entscheidet gerade das über den echten Nutzen.
-Vorschlag: aktive Bearbeitungszeit **an der übernommenen Datei** (Editor im Vordergrund, Tastatur
-aktiv), bis der Fall geschlossen wird, gedeckelt wie die übrigen Messungen. Auf der konventionellen
-Seite bleibt sie eine Stoppuhr-Angabe.
+- Der Zufallsgenerator wird **eingespeist**, nicht importiert. Nur so ist die Regel prüfbar.
+- Gespeichert wird je Fall der gezogene Weg **und der Ungleichstand im Moment der Ziehung**. Damit
+  ist die Zuteilung nachvollziehbar, ohne dass ein gespeicherter Startwert die nächste Ziehung
+  verraten würde.
+- **Die Zuteilung wird atomar mit dem Fall geschrieben und nie geändert.** Kein Umteilen, kein
+  Löschen, kein „der zählt nicht".
 
-**Ergebnisqualität** kann keine Maschine bewerten. Vier Stufen, für beide Wege dieselben:
-unbrauchbar · mit Nacharbeit · gut · besser als sonst. **Ehrliche Grenze: nicht verblindet.** Wer
-weiß, welchen Weg er gegangen ist, bewertet nicht neutral. Das gehört in den Export, nicht in eine
-Fußnote.
+## 3. Fallzustände — alle Zugeteilten bleiben im Nenner
 
-## 3. Auswertung
+| Zustand | Bedeutung |
+|---|---|
+| `offen` | zugeteilt, in Arbeit |
+| `abgeschlossen` | fertig, bewertet |
+| `abgebrochen` | nicht zu Ende geführt (mit Grund) |
+| `nicht messbar` | bearbeitet, aber Zeiten fehlen oder sind unbrauchbar (mit Grund) |
 
-- **Median statt Mittelwert**, dazu der Interquartilsabstand. Bei acht Fällen regiert sonst ein
-  Ausreißer die Aussage.
-- **N je Weg immer sichtbar**, direkt neben jeder Zahl. „Median 11 min" ohne „aus 4 Fällen" ist
-  keine Aussage, sondern eine Andeutung.
-- **Unter drei Fällen je Weg: keine Kennzahl.** Die App zeigt dann die Einzelfälle und sagt, wie
-  viele noch fehlen. Ein Median aus zwei Werten ist deren Mittel und suggeriert Verlässlichkeit,
-  die nicht da ist.
-- **Keine Signifikanztests.** Bei diesen Fallzahlen wäre ein p-Wert Theater. Wer ihn verlangt,
-  braucht eine andere Studie, keine andere Anzeige.
-- **Kein Kappen bei null**, wie in der Zeitbilanz: Ist MindGraph langsamer, steht das so da.
+Kennzahlen rechnen **nur mit vollständigen Werten**, weisen aber immer daneben aus: „4 abgeschlossen
+von 6 zugeteilt". Ohne diese zweite Zahl entsteht Überlebensbias — es überlebt, was gut lief.
 
-## 4. Datenhaltung
+## 4. Die Hauptkennzahl
 
-`userData/comparisons/<sha256(vaultPath)>.json`, gleiche Begründung wie beim Tätigkeitsprotokoll:
-nicht im Vault, damit es nicht über iCloud oder Dropbox auf mehreren Geräten doppelt geführt wird.
+**Gesamtaktive Zeit bis zum nutzbaren Ergebnis**, je Fall:
 
-Gespeichert je Fall: Kennung, Aufgabenklasse, zugeteilter Weg, Zeitstempel, die Messwerte, Herkunft
-jedes Werts (gemessen / selbst gestoppt), Übernahme-Status, Qualitätsstufe, Abbruchgrund.
+```
+Gesamtaktive Zeit = Auftrag + Vordergrundzeit + Prüfung + Nacharbeit + Rückfallarbeit
+```
 
-**Freitext gibt es genau an einer Stelle**: der Kurzbezeichnung des Falls, die der Nutzer selbst
-vergibt. Sie bleibt lokal und wandert nicht in Auswertungen, die man weitergibt — der Export nennt
-Fälle als „Fall 3", nicht als „Angebot Müller".
+**Rückfallarbeit ist der Kern dieser Regel.** Wird ein MindGraph-Ergebnis verworfen und der Fall
+danach von Hand fertiggestellt, gehört diese Handarbeit **weiterhin zum zugeteilten
+MindGraph-Fall**. Sonst werden Fehlschläge künstlich billig: Ein Weg, der in der Hälfte der Fälle
+scheitert, sähe blendend aus, weil nur die geglückten Fälle seine Zeit tragen.
 
-## 5. Export
+Das ist das Prinzip „Auswertung nach Zuteilung, nicht nach tatsächlich benutztem Werkzeug". Es ist
+unbequem und der einzige Grund, warum die Zahl am Ende etwas wert ist.
 
-Ein Bericht als Markdown und als CSV: Kopf mit Aufgabenklasse, Zeitraum, Fallzahlen und
-Zuteilungsverfahren; Tabelle der Fälle; darunter die Kennzahlen. Jede Zahl trägt ihre Herkunft.
-Der Bericht ist das, was ins Controlling geht — deshalb muss er ohne die App verständlich sein und
-seine eigenen Grenzen benennen.
+Die Bestandteile erscheinen zusätzlich einzeln — sie erklären, WO die Zeit liegt. Die Hauptaussage
+ist aber immer die Summe.
 
-## 6. Abgrenzung
+**Durchlaufzeit** ist eine eigene Größe mit vier Zeitpunkten: Anlage · Arbeitsbeginn ·
+Ergebnisbereitstellung · Abschluss. Sie ersetzt die aktive Zeit nie, sondern ergänzt sie.
 
-- **Kein Modellvergleich.** Der steckt in der Zeitbilanz („Nach Modell") und beantwortet eine andere
-  Frage: welches Modell, nicht welcher Arbeitsweg.
-- **Nichts läuft automatisch.** Ein Vergleich entsteht nur, weil jemand ihn anlegt, und endet, weil
-  jemand ihn beendet. Eine im Hintergrund mitlaufende Dauerstudie wäre weder erklärbar noch ehrlich.
-- **Keine Empfehlung aus wenigen Fällen.** Die App zeigt Zahlen, sie zieht keinen Schluss („MindGraph
-  ist 74 % schneller"). Den Schluss zieht der Mensch, der die Fälle kennt.
+## 5. Herkunft jedes Werts
 
-## 7. Offene Entscheidungen
+Jeder Zeitwert trägt seine Herkunft mit — in der Datei, in der Anzeige, im Export:
 
-1. **Wie wird die konventionelle Zeit erfasst?** Stoppuhr in der App (genauer, aber man muss daran
-   denken) oder Eintrag am Ende (bequemer, aber gerundet und erinnerungsverzerrt). Vorschlag:
-   Stoppuhr mit der Möglichkeit, den Wert nachträglich zu korrigieren — jede Korrektur wird als
-   solche gespeichert.
-2. **Woran hängt die Korrekturzeit?** An der übernommenen Datei ist naheliegend, greift aber nicht,
-   wenn die Nacharbeit in Excel stattfindet. Dann bleibt auch dort nur die Stoppuhr.
-3. **Wann endet ein Fall?** Manuell („Fall abschließen") oder automatisch nach Frist? Automatisch
-   spart Klicks, verfälscht aber die Durchlaufzeit.
-4. **Wo lebt die Oberfläche?** Eigener Tab, Bereich im Dashboard oder Abschnitt in den
-   Einstellungen. Der Vergleich ist eine Kampagne mit Anfang und Ende — das spricht für einen
-   eigenen Tab, nicht für ein Dauer-Widget.
-5. **Mehrere Aufgabenklassen gleichzeitig?** Technisch einfach, in der Auswertung heikel: Fälle aus
-   verschiedenen Klassen dürfen nie in einen Median fallen.
+| Herkunft | Bedeutung |
+|---|---|
+| `vordergrund-automatisch` | von der App erfasst, solange ihr Fenster vorn war |
+| `gestoppt` | Stoppuhr in der App, vom Nutzer gestartet und beendet |
+| `nachgetragen` | hinterher eingetragen |
+| `korrigiert` | geänderter Wert; Originalwert und Grund bleiben gespeichert |
+| `nicht gemessen` | fehlt (Fall gilt als `nicht messbar`) |
 
-## 8. Reihenfolge
+**Was `vordergrund-automatisch` wirklich heißt, muss dabeistehen:** Die App erfasst, dass ihr Fenster
+vorn war — nicht, dass jemand getippt hat. Beides ist nicht dasselbe, und die Bezeichnung darf keine
+Genauigkeit behaupten, die es nicht gibt.
 
-1. **Datenschicht und Zuteilung** (rein, getestet): Fälle, Blockrandomisierung, Kennzahlen mit
-   Herkunft, Mindestfallzahl-Regel. Ohne Oberfläche prüfbar.
-2. **Erfassung mit MindGraph**: an die bestehenden Messungen andocken, Fall-Bezug herstellen,
-   Korrekturzeit ergänzen.
-3. **Erfassung konventionell**: Stoppuhr und Nachtrag.
+Bewusst wird **keine Tastaturaktivität** als Abschaltkriterium verwendet: Ein Ergebnis zu lesen und
+zu prüfen ist Arbeit ohne Tastenanschlag. Eine Pausenerkennung über Tastatur würde genau die
+Prüfarbeit kleinrechnen — und damit ausgerechnet die MindGraph-Seite bevorteilen.
+
+Stattdessen: **Sitzungen statt Summen.** Gespeichert werden Arbeitssitzungen je Fall (Beginn, Ende,
+Herkunft, Unterbrechungen). Auffällige Sitzungen (sehr lang, ohne Unterbrechung) werden
+**gekennzeichnet, nicht gekappt**.
+
+**Der 30-Minuten-Deckel der Tagesbilanz gilt hier nicht.** Er ist dort richtig, weil eine
+Mittagspause sonst als Prüfzeit erschiene. Ein Vergleichsfall darf legitim zwei Stunden dauern; ein
+Deckel würde lange Fälle systematisch kürzen und — weil er nur auf der automatisch erfassten Seite
+greift — die MindGraph-Seite einseitig begünstigen.
+
+## 6. Qualität
+
+Bewertet wird **beim Abschluss**, am **fertigen Ergebnis**, mit demselben Maßstab für beide Wege:
+
+> unbrauchbar · wesentliche Mängel · kleinere Mängel · vollständig brauchbar
+
+Der Maßstab ist die **Akzeptanzdefinition der Kampagne**, festgelegt bevor der erste Fall läuft.
+Ohne sie bewertet man am Ende die eigene Erwartung.
+
+**Nacharbeitsbedarf und Übernahme sind keine Qualitätsstufen**, sondern eigene Prozessgrößen: Wie
+viel Nacharbeit nötig war, steckt in der Zeit; ob übernommen oder verworfen wurde, ist die
+Übernahmequote. „Mit Nacharbeit" als Qualitätsstufe vermischte beides.
+
+**Ehrliche Grenze: nicht verblindet.** Wer weiß, welchen Weg er gegangen ist, bewertet nicht
+neutral. Das gehört in den Export, nicht in eine Fußnote.
+
+## 7. Auswertung
+
+- **Median mit Interquartilsabstand**, nicht Mittelwert. Bei diesen Fallzahlen regiert sonst ein
+  Ausreißer.
+- **N immer neben der Zahl**, dazu „x von y zugeteilten Fällen abgeschlossen".
+- **Unter drei abgeschlossenen Fällen je Weg: keine Kennzahl.** Dann Einzelfälle und der Hinweis,
+  wie viele fehlen. Ein Median aus zwei Werten ist deren Mittel und täuscht Verlässlichkeit vor.
+- **Keine Signifikanztests.** Bei diesen Zahlen wäre ein p-Wert Theater.
+- **Kein Kappen bei null.** Ist MindGraph langsamer, steht das so da.
+- **Kein Schluss.** Die App zeigt Zahlen; „74 % schneller" sagt der Mensch, der die Fälle kennt.
+
+## 8. Datenhaltung
+
+`userData/comparisons/<sha256(vaultPath)>.json` — nicht im Vault, damit die Kampagne nicht über
+iCloud oder Dropbox doppelt geführt wird (gleiche Begründung wie beim Tätigkeitsprotokoll).
+
+Grobe Form:
+
+```ts
+interface Campaign {
+  id: string
+  taskClass: string
+  inclusionRules: string
+  acceptanceDefinition: string
+  randomization: { method: 'efron-biased-coin'; bias: number }
+  protocolVersion: number
+  startedAt: number
+  endedAt?: number
+}
+
+interface Case {
+  id: string
+  campaignId: string
+  label: string                       // einziger Freitext, bleibt lokal
+  arm: 'konventionell' | 'mindgraph'  // atomar mit dem Fall geschrieben, nie geändert
+  imbalanceAtDraw: number
+  state: 'offen' | 'abgeschlossen' | 'abgebrochen' | 'nicht messbar'
+  stateReason?: string
+  createdAt: number
+  startedAt?: number
+  resultReadyAt?: number
+  closedAt?: number
+  sessions: WorkSession[]
+  accepted?: boolean                  // nur im MindGraph-Arm
+  quality?: 1 | 2 | 3 | 4
+}
+
+interface WorkSession {
+  kind: 'auftrag' | 'vordergrund' | 'pruefung' | 'nacharbeit' | 'rueckfallarbeit'
+  from: number
+  to: number
+  origin: 'vordergrund-automatisch' | 'gestoppt' | 'nachgetragen' | 'korrigiert'
+  originalMs?: number                 // bei 'korrigiert'
+  correctionReason?: string
+  flagged?: 'ungewoehnlich-lang'
+}
+```
+
+**Freitext gibt es an zwei Stellen**: Kurzbezeichnung des Falls und Korrekturgrund. Beide bleiben
+lokal; der Export nennt Fälle als „Fall 3", nicht als „Angebot Müller".
+
+## 9. Export
+
+Bericht als Markdown und CSV: Kopf mit Kampagne, Akzeptanzdefinition, Randomisierungsverfahren,
+Zeitraum und Fallzahlen; Tabelle der Fälle mit Zustand und Herkunft der Werte; darunter die
+Kennzahlen; am Ende die Grenzen (nicht verblindet, konventionelle Zeiten gestoppt statt gemessen).
+Der Bericht geht ins Controlling — er muss ohne die App verständlich sein.
+
+## 10. Abgrenzung
+
+- **Kein Modellvergleich.** Der steckt in der Zeitbilanz und beantwortet eine andere Frage.
+- **Nichts läuft automatisch.** Eine Kampagne entsteht, weil jemand sie anlegt, und endet, weil
+  jemand sie beendet. **Abschluss eines Falls ausschließlich manuell** — eine automatische Frist
+  verfälscht die Durchlaufzeit.
+- **Keine Empfehlung aus wenigen Fällen.**
+
+## 11. Entschiedene Punkte
+
+1. **Konventionelle Zeit**: Stoppuhr als Standard; Nachtrag und Korrektur erlaubt, jeweils mit
+   eigener Herkunft.
+2. **Korrekturzeit**: an den **Fall und seine Arbeitssitzungen** gebunden, nicht an eine Datei.
+   Nacharbeit an einer Vault-Datei wird automatisch erfasst, Nacharbeit in Excel oder einem anderen
+   Programm per Stoppuhr.
+3. **Abschluss**: ausschließlich manuell.
+4. **Oberfläche**: eigener Tab. Eine Kampagne hat Anfang und Ende — das ist kein Dauer-Widget.
+5. **Mehrere Aufgabenklassen**: ja, aber ausschließlich als getrennte Kampagnen ohne gemeinsame
+   Kennzahl.
+
+## 12. Offen
+
+- Wie streng ist die Einschlussprüfung? Freitextregel und Häkchen des Nutzers, oder strukturierte
+  Kriterien? Strukturiert ist prüfbarer, kostet aber Aufwand bei jedem Fall.
+- Ab wann gilt eine Sitzung als `ungewoehnlich-lang`? Vorschlag: relativ zum Median der Kampagne,
+  nicht als feste Minutenzahl.
+- Soll eine Kampagne pausierbar sein (Urlaub, Projektwechsel), und was heißt das für die
+  Durchlaufzeit?
+
+## 13. Reihenfolge
+
+1. **Datenschicht, Zuteilung und Kennzahlen** (rein, getestet, ohne Oberfläche): Kampagne, Fall,
+   Sitzungen, Urnenmodell mit eingespeistem Zufall, Gesamtzeit inklusive Rückfallarbeit,
+   Nenner-Regel, Mindestfallzahl.
+2. **Erfassung im MindGraph-Arm**: an die bestehenden Messungen andocken, Fall-Bezug herstellen,
+   Nacharbeit und Rückfallarbeit ergänzen.
+3. **Erfassung im konventionellen Arm**: Stoppuhr, Nachtrag, Korrektur.
 4. **Auswertung und Export.**
 5. **Erst danach** die Frage, ob und wie das in eine Verkaufsunterlage einfließt.
 
-Die Schritte 1 und 2 sind die eigentliche Arbeit. Wer bei 4 anfängt, baut eine Anzeige für Zahlen,
-die es noch nicht gibt.
+Schritt 1 ist die eigentliche Arbeit: Dort sitzen die Regeln, die sich später nicht mehr korrigieren
+lassen, ohne alle bereits erhobenen Fälle unbrauchbar zu machen.
