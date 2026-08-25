@@ -314,6 +314,19 @@ export class SyncEngine {
       })
 
       this.ws.on('error', (err) => {
+        // Ein SELBST abgebrochener Verbindungsversuch meldet sich hier als Fehler: ws
+        // wirft „WebSocket was closed before the connection was established", sobald der
+        // Socket im Zustand CONNECTING geschlossen wird — mit close() genauso wie mit
+        // terminate() (beides gemessen, terminate() ist kein Ausweg).
+        //
+        // Das ist eine Folge, keine Ursache. Ungefiltert landete sie über sendProgress
+        // wörtlich in den Einstellungen und verdrängte den echten Grund: Der Nutzer las
+        // eine Meldung über einen WebSocket, obwohl der Server schlicht nicht erreichbar
+        // war oder er den Sync gerade selbst abgeschaltet hatte.
+        if (this.intentionalDisconnect || (settled && !this.registered)) {
+          console.log('[Sync] Verbindungsversuch beendet:', err.message)
+          return
+        }
         console.error('[Sync] WebSocket error:', err)
         this.status = 'error'
         this.registered = false

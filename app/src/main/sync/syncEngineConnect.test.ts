@@ -18,13 +18,26 @@ class FakeSocket extends EventEmitter {
     this.sent.push(JSON.parse(data))
   }
 
+  /**
+   * Wie das echte ws-Paket: Wird ein Socket im Zustand CONNECTING geschlossen, meldet
+   * er ZUERST einen Fehler und dann den Abbruch. Gemessen mit ws 8.21 gegen einen
+   * Server, der die Verbindung annimmt und nie antwortet — für close() UND terminate().
+   */
+  private abortHandshake(): void {
+    if (this.readyState === 0) {
+      this.emit('error', new Error('WebSocket was closed before the connection was established'))
+    }
+  }
+
   close(): void {
+    this.abortHandshake()
     this.readyState = 3
     this.emit('close')
   }
 
   terminate(): void {
     this.terminated = true
+    this.abortHandshake()
     this.readyState = 3
     this.emit('close')
   }
@@ -133,6 +146,51 @@ describe('SyncEngine.connect() settlement', () => {
 
     await expect(promise).resolves.toBeUndefined()
     expect(socket.sent).toContainEqual(expect.objectContaining({ type: 'register', vaultId: 'mg-test' }))
+  })
+
+  /**
+   * Regression: Der Nutzer las in den Einstellungen „WebSocket was closed before the
+   * connection was established". Diese Meldung stammt von ws selbst und entsteht, wenn
+   * WIR den Verbindungsversuch abbrechen — sie beschreibt unsere eigene Reaktion, nicht
+   * die Ursache. Sichtbar wurde sie, weil der error-Handler sie ungefiltert über
+   * sendProgress in die Oberfläche schrieb.
+   */
+  it('meldet den eigenen Abbruch nach Zeitüberschreitung NICHT als Fehlerursache', async () => {
+    const { engine, promise } = await connectingEngine()
+    const gemeldet: Array<{ status: string; error?: string }> = []
+    Object.assign(engine, { sendProgress: (p: { status: string; error?: string }) => gemeldet.push(p) })
+
+    const abgelehnt = expect(promise).rejects.toThrow(/Connection timeout/i)
+    await vi.advanceTimersByTimeAsync(10_000)
+    await abgelehnt
+
+    const fehler = gemeldet.filter(p => p.status === 'error')
+    expect(fehler.map(f => f.error).join(' ')).not.toMatch(/before the connection was established/i)
+  })
+
+  it('meldet beim Abschalten des Syncs keinen WebSocket-Fehler', async () => {
+    const { engine, promise } = await connectingEngine()
+    const gemeldet: Array<{ status: string; error?: string }> = []
+    Object.assign(engine, { sendProgress: (p: { status: string; error?: string }) => gemeldet.push(p) })
+
+    // Der Nutzer schaltet den Sync ab, während die Verbindung noch aufgebaut wird.
+    const abgelehnt = expect(promise).rejects.toThrow()
+    engine.disconnect()
+    await abgelehnt
+
+    expect(gemeldet.filter(p => p.status === 'error')).toEqual([])
+  })
+
+  it('meldet einen ECHTEN Verbindungsfehler weiterhin', async () => {
+    const { engine, promise, socket } = await connectingEngine()
+    const gemeldet: Array<{ status: string; error?: string }> = []
+    Object.assign(engine, { sendProgress: (p: { status: string; error?: string }) => gemeldet.push(p) })
+
+    const abgelehnt = expect(promise).rejects.toThrow(/ENOTFOUND/)
+    socket.emit('error', new Error('getaddrinfo ENOTFOUND sync.mindgraph-notes.de'))
+    await abgelehnt
+
+    expect(gemeldet).toContainEqual(expect.objectContaining({ status: 'error', error: expect.stringMatching(/ENOTFOUND/) }))
   })
 
   it('bleibt aufgelöst, wenn die Verbindung SPÄTER abbricht (kein doppeltes Settlement)', async () => {
