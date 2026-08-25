@@ -2,6 +2,37 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.10.54-beta] - 2026-08-25
+
+Zwei Dinge, die zusammengehören: Du kannst der App sagen, was du brauchst, statt die Funktion zu suchen. Und die App führt Buch darüber, was sie dir abgenommen hat — mit Zahlen, die sie belegen kann.
+
+### Neu
+
+- **Sprachbefehle: sagen, was man braucht, statt es zu suchen.** Ein Mikrofonknopf in der Titelleiste, ein Satz, eine Antwortkarte. Sechs Absichten sind gebaut: Tagesbriefing („Was ist heute wichtig"), überfällige Aufgaben, was heute ansteht, Notizsuche, Dashboard öffnen, neue Notiz.
+
+  Erkannt wird mit festen Mustern auf dem eigenen Rechner — **kein Sprachmodell nach der Transkription**. Das ist eine Entscheidung, keine Sparmaßnahme: Für „Öffne das Dashboard" auf ein Modell zu warten, wäre langsamer als der Klick, den es ersetzen soll. Wer will, tippt denselben Satz statt ihn zu sprechen.
+
+  Versteht MindGraph den Satz nicht als Befehl, durchsucht es damit die Notizen und schlägt passende Palettenbefehle vor, statt zu schweigen. Antworten werden mit der Systemstimme gesprochen und verlassen dabei nie das Gerät — auch dann nicht, wenn für Karteikarten eine Cloud-Stimme eingestellt ist.
+
+- **Eine Tagesbilanz, die nichts erfindet.** Unten in der Statusleiste steht, was der Tag gebracht hat: übernommene Ergebnisse, angelegte Aufgaben — und geschätzte Minuten, sobald hinterlegt ist, wie lange so eine Arbeit von Hand dauert (Einstellungen → Diktat & Vorlesen → Zeitersparnis). Ein Klick öffnet die vollständige Karte, dieselbe wie auf die Frage „Was hat MindGraph heute übernommen?".
+
+  Die Regeln dahinter sind bewusst streng, weil eine erfundene Zahl schlimmer ist als keine:
+
+  - Minuten gibt es **nur** auf Grundlage einer selbst eingetragenen Vergleichsdauer. Ohne Eintrag zeigt die Bilanz nur Zähler und sagt, dass sie nicht bewerten kann — sie schätzt nicht.
+  - Gezählt wird nur, was **übernommen** wurde. Ein verworfenes Ergebnis spart keine Zeit, egal wie lange der Lauf dauerte.
+  - Die Rechnung steht dabei: deine Referenzzeit abzüglich der reinen Laufzeit. Das Formulieren des Auftrags und das Prüfen des Ergebnisses stecken nicht darin, und genau das sagt die Karte auch.
+  - An einem Tag ohne Ergebnis bleibt die Stelle in der Leiste leer, statt eine Null zu zeigen.
+
+  Das Protokoll liegt auf dem Gerät (nicht im Vault, damit es nicht über iCloud oder Dropbox auf allen Rechnern liegt und die Tageszähler sich verdoppeln) und enthält **keine Dateinamen, Notiztitel oder Transkripte** — nur Art, Dauer und Status. Nach 90 Tagen fällt es weg.
+
+### Behoben
+
+- **Das Mikrofon fragte nie nach Erlaubnis.** Die App meldete dem Browserkern bedingungslos „Audio erlaubt" und übersprang damit die Nachfrage bei macOS. Auf einem frischen Rechner erschien deshalb **nie ein Systemdialog** — betroffen war nicht nur die neue Sprachsteuerung, sondern auch das seit Langem ausgelieferte Diktat im Editor.
+
+- **Das Aufnahmegerät lässt sich jetzt wählen.** Vorher nahm die App immer das Systemstandard-Mikrofon. Ist das ein stummes eingebautes MacBook-Mikrofon, war die Funktion unbenutzbar, ohne dass man etwas dagegen tun konnte.
+
+- **Die Webseite war seit dem letzten Release halb tot.** In zwei Übersetzungstexten war das schließende deutsche Anführungszeichen ein gerades `"` — das beendet den JavaScript-String mitten im Satz. Folge: Der gesamte Übersetzungsblock brach mit einem Syntaxfehler ab. Die Sprachumschaltung auf Englisch tat nichts, die Download-Karten zeigten **0.10.27 statt 0.10.53**, und die „Was ist neu"-Karten standen auf dem Stand von vor mehreren Releases. Behoben und im Browser gegengeprüft.
+
 ## [0.10.53-beta] - 2026-08-21
 
 Ein Schalter im Posteingang stand am falschen Platz und sah dadurch aus wie vergessen. Beim Nachsehen kamen drei weitere Stellen mit heraus, die still danebenlagen.
