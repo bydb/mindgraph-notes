@@ -736,8 +736,12 @@ dem Median. Weicht er deutlich ab, ist genau das die Auskunft.
 
 Nicht dieselbe Aufgabe wiederholen: Lern- und Erinnerungseffekte verzerren das Ergebnis. Stattdessen
 **vergleichbare Fälle derselben Aufgabenklasse, zufällig auf „konventionell" und „MindGraph"
-verteilt**, gemessen an aktiver Zeit, Korrekturzeit, Übernahmequote und Ergebnisqualität. Das ist
-der Entwurf, der als Nächstes geschrieben werden muss.
+verteilt**, gemessen an aktiver Zeit, Korrekturzeit, Übernahmequote und Ergebnisqualität.
+
+**Der Entwurf dazu steht in `docs/comparison-mode-plan.md`** (25.08.2026, noch kein Code). Er hält
+auch fest, was die Zeitbilanz heute NICHT kann und was der Vergleichsmodus dafür braucht: die
+Korrekturzeit nach der Übernahme, die Trennung von „gemessen" und „selbst gestoppt", eine
+Mindestfallzahl, bevor überhaupt ein Median gezeigt wird.
 
 ### Nächste Schritte
 
