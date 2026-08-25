@@ -39,6 +39,8 @@ vi.mock('../voice/uiBridge', () => ({
 }))
 
 const ranActions: string[] = []
+// Wird beim Aufruf der Aktion gesetzt: hält sie an, bis der Test sie freigibt.
+let releaseAction: (() => void) | null = null
 vi.mock('../voice/actions', () => {
   const make = (id: string) => ({
     id,
@@ -52,7 +54,16 @@ vi.mock('../voice/actions', () => {
     ACTIONS: {
       'tasks.overdue': make('tasks.overdue'),
       'search.notes': make('search.notes'),
-      'view.dashboard': make('view.dashboard')
+      'view.dashboard': make('view.dashboard'),
+      'briefing.today': {
+        id: 'briefing.today',
+        kind: 'answer' as const,
+        run: async () => {
+          await new Promise<void>(resolve => { releaseAction = resolve })
+          ranActions.push('briefing.today')
+          return { card: { title: 'briefing', lines: [], sources: [], followUps: [] }, speech: 'gesprochen', dataMs: 0 }
+        }
+      }
     }
   }
 })
@@ -67,6 +78,7 @@ beforeEach(() => {
   ranActions.length = 0
   resolveStart = null
   onErrorCb = null
+  releaseAction = null
   useVoiceCommandStore.getState().reset()
 })
 
@@ -134,5 +146,48 @@ describe('Aufnahme-Lebenszyklus', () => {
     resolveStart?.({ stop, cancel })
     await Promise.all([first, second])
     expect(useVoiceCommandStore.getState().state.kind).toBe('listening')
+  })
+})
+
+/**
+ * Der Generationsschutz deckte nur den Start der Aufnahme ab. Alles danach — die
+ * Transkription (Sekunden auf schwacher Hardware) und die Datenbeschaffung der Aktion
+ * (Kalender, Mails, alle Aufgaben) — lief nach einem Abbruch weiter bis zur Karte.
+ * Sichtbar wurde das als Antwort, die aufpoppt und vorgelesen wird, nachdem der Nutzer
+ * die Palette längst geschlossen hat.
+ */
+describe('Abbruch nach dem Start', () => {
+  it('liefert nach einem Abbruch während der Transkription keine Karte nach', async () => {
+    const store = useVoiceCommandStore.getState()
+    const starting = store.startListening(t)
+    resolveStart!({ stop, cancel })
+    await starting
+
+    let fertig: ((text: string) => void) | null = null
+    stop.mockImplementationOnce(() => new Promise<string>(resolve => { fertig = resolve as never }))
+    const stopping = store.stopListening(t)
+    await Promise.resolve()
+    expect(useVoiceCommandStore.getState().state.kind).toBe('transcribing')
+
+    store.abort('escape')          // Nutzer schließt die Palette …
+    fertig!('was ist überfällig')  // … und erst danach ist Whisper fertig
+    await stopping
+
+    expect(useVoiceCommandStore.getState().state.kind).toBe('idle')
+    expect(ranActions).toEqual([])
+  })
+
+  it('liefert nach einem Abbruch während der Datenbeschaffung keine Karte nach', async () => {
+    const store = useVoiceCommandStore.getState()
+    const submitting = store.submit('was ist heute wichtig', 'voice', t)
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(useVoiceCommandStore.getState().state.kind).toBe('running')
+
+    store.abort('escape')
+    releaseAction!()
+    await submitting
+
+    expect(useVoiceCommandStore.getState().state.kind).toBe('idle')
   })
 })

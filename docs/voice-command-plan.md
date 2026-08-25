@@ -546,7 +546,7 @@ derselben Zahlen wäre eine zweite Wahrheit.
   nichts. **An einem Tag ohne Ergebnis bleibt die Stelle leer**, statt eine Null zu zeigen; eine Null
   wäre eine Aussage über einen Tag, an dem noch gar nichts passiert ist. Fällt die Ersparnis auf 0
   (Lauf dauerte länger als die Referenzzeit), zeigt die Leiste die Übernahmen statt „0 min gespart".
-- **Abschaltbar** über `impact.showInStatusBar` (Standard an, Einstellungen → Diktat & Vorlesen →
+- **Abschaltbar** über `impact.showInStatusBar` (Standard an, Einstellungen → **Allgemein** →
   Zeitersparnis). Eine dauerhaft sichtbare Zahl über die eigene Arbeit will nicht jeder vor sich haben.
 - **Textbausteine liegen in `renderer/utils/impactText.ts`**, weil Karte und Tooltip dieselben Zeilen
   zeigen. Beim ersten Anlauf standen sie doppelt im Code — und die Singularform war prompt nur an
@@ -578,6 +578,34 @@ Erkenner gar nicht, weil `fuzzyMatch` in `CommandPalette.tsx` es als Untersequen
 Palettenbefehl legt („tagesbilanz" öffnete das Dashboard). Enter geht nur dann in die Sprachschicht,
 wenn KEIN Befehl passt. Ganze Sätze sind davon nicht betroffen, gesprochene Eingaben nie — sie
 laufen am Trefferlisten-Weg vorbei.
+
+### Nachgebessert nach Codex-Durchsicht (25.08.2026)
+
+Vier Lücken, alle bestätigt und behoben — es waren echte Lücken, keine Fehleinschätzungen.
+
+1. **Zeitgutschrift konnte sich über Tagesgrenzen verdoppeln.** Ein Lauf darf zwei Ergebnisse
+   liefern (Tabelle plus begleitende Notiz). Wurden die an zwei Tagen übernommen, bekam JEDER
+   dieser Tage die volle Referenzzeit für dieselbe Arbeit. `summarizeActivity` sucht die erste
+   Übernahme je `runId` jetzt über den GESAMTEN Bestand und schreibt nur an diesem Tag gut; jede
+   weitere Übernahme zählt als Ergebnis, nicht als Arbeit. Für eine Zahl, die jemand einem
+   Controlling zeigt, war das die wichtigste der vier.
+2. **Der Abbruch deckte nur den Start der Aufnahme ab.** Wer die Palette schloss, während Whisper
+   noch transkribierte oder während die Aktion ihre Daten holte, bekam die Karte trotzdem — und
+   hörte die Antwort vorgelesen. Die Generation wird jetzt nach JEDEM längeren `await` geprüft:
+   nach `handle.stop()` und nach dem Aktionslauf. Zwei Regressionstests, gegen den defekten Stand
+   gegengeprüft (beide rot).
+3. **Der Cache-Schlüssel bildete die Einstellungen nicht ab.** `settingsRev` zählte nur die Ordner.
+   Ein Austausch bei gleicher Anzahl blieb unbemerkt, die Vorlaufzeit ging gar nicht ein — bis zu
+   60 Sekunden alte Aufgaben nach einer Änderung. Ersetzt durch `computeSettingsRevision()`, einen
+   Hash über Ordnerlisten und Vorlaufzeiten. Bewusst ein Hash statt Zählern im Store: Er kann
+   nicht vergessen werden, wenn eine neue Einstellung dazukommt.
+4. **Der Mitternachts-Timer lief nur einmal.** Die Statusleiste plante beim Einhängen genau einen
+   Timeout; bei tagelang geöffneter App stand nach der zweiten Mitternacht der Vortag da. Der
+   Timer plant sich jetzt selbst neu.
+
+Offen bleibt aus derselben Durchsicht die gemeinsame Cache-Infrastruktur: `DashboardView` benutzt
+weiterhin seinen eigenen Modulcache, und echte Revisionszähler in den Stores gibt es nicht
+(Schritt 2 unten). Der Hash aus Punkt 3 nimmt dem den Zeitdruck, ersetzt ihn aber nicht.
 
 ### Nächste Schritte
 

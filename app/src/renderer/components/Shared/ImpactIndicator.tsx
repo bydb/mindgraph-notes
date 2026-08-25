@@ -56,8 +56,17 @@ export function ImpactIndicator({ onOpenCard }: { onOpenCard: () => void }) {
     })
     const onFocus = () => void load()
     window.addEventListener('focus', onFocus)
-    // Tageswechsel: Um Mitternacht zeigt „heute" sonst bis zum nächsten Ereignis den Vortag.
-    const midnight = setTimeout(() => void load(), msUntilNextMidnight())
+    // Tageswechsel: Um Mitternacht zeigt „heute" sonst bis zum nächsten Ereignis den
+    // Vortag. Der Timer plant sich SELBST neu — ein einzelner Timeout hätte nur die
+    // erste Mitternacht erwischt, und die App läuft bei vielen Nutzern tagelang durch.
+    let midnight: ReturnType<typeof setTimeout>
+    const scheduleMidnight = (): void => {
+      midnight = setTimeout(() => {
+        void load()
+        scheduleMidnight()
+      }, msUntilNextMidnight())
+    }
+    scheduleMidnight()
     return () => {
       off?.()
       window.removeEventListener('focus', onFocus)

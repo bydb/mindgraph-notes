@@ -11,7 +11,7 @@ import type { Note } from '../../shared/types'
 import { useNotesStore } from '../stores/notesStore'
 import { useUIStore } from '../stores/uiStore'
 import { getVoiceUiBridge } from './uiBridge'
-import { computeNotesRevision, dashboardSnapshotProvider } from '../utils/dashboardSnapshotProvider'
+import { computeNotesRevision, computeSettingsRevision, dashboardSnapshotProvider } from '../utils/dashboardSnapshotProvider'
 import { collectFocusTasks } from '../utils/dashboardData'
 import { useEmailStore } from '../stores/emailStore'
 import {
@@ -146,7 +146,11 @@ async function loadTasks(): Promise<{ snapshot: Awaited<ReturnType<typeof dashbo
       vaultPath,
       notesRev: computeNotesRevision(notes),
       emailsRev: 0,
-      settingsRev: ui.taskExcludedFolders.length * 1000 + ui.taskIncludedFolders.length,
+      settingsRev: computeSettingsRevision({
+        excludedFolders: ui.taskExcludedFolders,
+        includedFolders: ui.taskIncludedFolders,
+        taskLeadTime: ui.taskLeadTime
+      }),
       includeCalendar: false
     }
   )
@@ -257,7 +261,11 @@ const briefingToday: ActionSpec<'briefing.today'> = {
         vaultPath,
         notesRev: computeNotesRevision(notes),
         emailsRev: emails.length * 31 + openReplies,
-        settingsRev: ui.taskExcludedFolders.length * 1000 + ui.taskIncludedFolders.length,
+        settingsRev: computeSettingsRevision({
+        excludedFolders: ui.taskExcludedFolders,
+        includedFolders: ui.taskIncludedFolders,
+        taskLeadTime: ui.taskLeadTime
+      }),
         includeCalendar: true
       }
     )

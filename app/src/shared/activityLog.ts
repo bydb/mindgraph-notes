@@ -150,6 +150,18 @@ export function summarizeActivity(events: ActivityEvent[], range: ActivityRange)
   const runById = new Map<string, Extract<ActivityEvent, { kind: 'agent-run-finished' }>>()
   for (const e of events) if (e.kind === 'agent-run-finished') runById.set(e.runId, e)
 
+  // Erste Übernahme je Lauf über den GESAMTEN Bestand, nicht nur über den Zeitraum.
+  // Ein Lauf darf zwei Ergebnisse liefern (Tabelle plus begleitende Notiz). Werden die
+  // an verschiedenen Tagen übernommen, bekäme sonst JEDER dieser Tage die volle
+  // Referenzzeit gutgeschrieben — für dieselbe eine Arbeit. Die Gutschrift gehört an
+  // den Tag der ersten Übernahme; jede weitere zählt als Ergebnis, nicht als Arbeit.
+  const firstAcceptedAt = new Map<string, number>()
+  for (const e of events) {
+    if (e.kind !== 'agent-result-accepted') continue
+    const known = firstAcceptedAt.get(e.runId)
+    if (known === undefined || e.at < known) firstAcceptedAt.set(e.runId, e.at)
+  }
+
   const summary: ActivitySummary = {
     from: range.from,
     to: range.to,
@@ -194,6 +206,9 @@ export function summarizeActivity(events: ActivityEvent[], range: ActivityRange)
     // Ohne zugehörigen Lauf keine Dauer — dann zählt die Übernahme, aber sie trägt
     // keine Zeitersparnis. Lieber eine Lücke als eine erfundene Dauer.
     if (!run) continue
+    // Nur am Tag der ersten Übernahme gutschreiben (siehe oben).
+    const first = firstAcceptedAt.get(runId)
+    if (first === undefined || !inRange(first)) continue
     summary.acceptedRuns.push({
       runId,
       activityType: run.activityType,

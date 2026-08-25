@@ -277,9 +277,15 @@ export const useVoiceCommandStore = create<VoiceCommandStore>((set, get) => ({
     const handle = dictation
     if (!handle) return
     dictation = null
+    // Die Generation gilt für den GANZEN Ablauf bis zur Antwort. Der Schutz beim Start
+    // reicht nicht: Whisper braucht auf schwacher Hardware Sekunden, und wer die Palette
+    // in dieser Zeit schließt, bekam trotzdem noch eine Karte — und hörte die Antwort
+    // vorgelesen, obwohl er die Funktion gerade weggeklickt hatte.
+    const myGeneration = generation
     set({ state: { kind: 'transcribing' } })
     try {
       const transcript = await handle.stop()
+      if (myGeneration !== generation) return
       const sttMs = Math.round(performance.now() - listeningStartedAt)
       if (!transcript.trim()) {
         // Die Aufnahmeschicht weiß mehr als wir: sie nennt Pegel und Mikrofonnamen.
@@ -289,6 +295,7 @@ export const useVoiceCommandStore = create<VoiceCommandStore>((set, get) => ({
       }
       await get().submit(transcript, 'voice', t, sttMs)
     } catch (err) {
+      if (myGeneration !== generation) return
       set({ state: { kind: 'error', message: err instanceof Error ? err.message : String(err) } })
     }
   },
@@ -345,12 +352,16 @@ async function runAction(
     return
   }
   set({ state: { kind: 'running', transcript } })
+  // Auch hier: Datenbeschaffung dauert (Kalender-IPC, Aufgaben über alle Notizen). Ein
+  // Abbruch währenddessen darf weder Karte noch Sprachausgabe nachliefern.
+  const myGeneration = generation
   try {
     // Der Cast ist nötig, weil TypeScript die Verbindung zwischen action.id und
     // action.params über die Map hinweg nicht mitführt. matchIntent baut beide
     // gemeinsam (buildAction), deshalb können sie nicht auseinanderlaufen.
     const run = spec.run as (p: unknown, t: TFn) => Promise<ActionOutcome>
     const outcome = await run(action.params, t)
+    if (myGeneration !== generation) return
     set({
       state: {
         kind: 'answer',
@@ -363,6 +374,7 @@ async function runAction(
     logVoiceCommand(action.id, 'ok', { sttMs: timings.sttMs, matchMs: timings.matchMs, dataMs: outcome.dataMs })
     speakIfVoice(outcome.speech, source)
   } catch (err) {
+    if (myGeneration !== generation) return
     set({ state: { kind: 'error', transcript, message: err instanceof Error ? err.message : String(err) } })
   }
 }

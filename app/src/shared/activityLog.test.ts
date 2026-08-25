@@ -128,6 +128,28 @@ describe('summarizeActivity', () => {
     expect(summary.acceptedRuns[0].accepted).toBe(2)
   })
 
+  it('schreibt einen Lauf nur EINMAL gut, auch wenn sein zweites Ergebnis am Folgetag übernommen wird', () => {
+    // Ein Lauf darf zwei Ergebnisse liefern (Tabelle plus Notiz). Werden die an zwei
+    // Tagen übernommen, bekäme sonst jeder Tag die volle Referenzzeit für dieselbe
+    // Arbeit — die Tagessumme wäre doppelt so hoch wie die tatsächliche Ersparnis.
+    const gestern = range.from - 6 * 3_600_000
+    const events: ActivityEvent[] = [
+      runFinished({ at: gestern, runId: 'run-zwei', durationMs: 10 * 60_000 }),
+      { at: gestern + 60_000, kind: 'agent-result-accepted', runId: 'run-zwei', format: 'xlsx' },
+      { at: NOW, kind: 'agent-result-accepted', runId: 'run-zwei', format: 'md' }
+    ]
+    const heute = summarizeActivity(events, range)
+    // Heute wurde ein Ergebnis übernommen — aber die Arbeit war gestern gutgeschrieben.
+    expect(heute.acceptedTotal).toBe(1)
+    expect(heute.acceptedRuns).toEqual([])
+    expect(estimateSavedMinutes(heute, { 'table-merge': 45 }).totalMinutes).toBe(0)
+
+    const gesternRange = { from: range.from - 86_400_000, to: range.from }
+    const vortag = summarizeActivity(events, gesternRange)
+    expect(vortag.acceptedRuns).toHaveLength(1)
+    expect(estimateSavedMinutes(vortag, { 'table-merge': 45 }).totalMinutes).toBe(35)
+  })
+
   it('erfindet keine Dauer, wenn der zugehörige Lauf fehlt', () => {
     const events: ActivityEvent[] = [{ at: NOW, kind: 'agent-result-accepted', runId: 'weg', format: 'md' }]
     const summary = summarizeActivity(events, range)

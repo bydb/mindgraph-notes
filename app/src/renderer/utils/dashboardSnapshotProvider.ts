@@ -66,6 +66,38 @@ export function computeNotesRevision(notes: Note[]): number {
   return notes.length * 31 + newest
 }
 
+/**
+ * Kennzahl der aufgabenrelevanten Einstellungen.
+ *
+ * Vorher stand hier die reine ANZAHL der ein- und ausgeschlossenen Ordner. Damit blieb
+ * der Schlüssel gleich, wenn ein Ordner gegen einen anderen getauscht wurde — und die
+ * Vorlaufzeit ging gar nicht ein. Der Nutzer änderte also eine Einstellung und bekam bis
+ * zu 60 Sekunden lang die alte Antwort, ohne dass etwas darauf hindeutete.
+ *
+ * Bewusst ein Hash über die Inhalte und keine Zähler im Store: Der Hash ist billig
+ * (wenige Dutzend Zeichen) und kann nicht vergessen werden, wenn eine neue Einstellung
+ * dazukommt — man muss sie nur hier anhängen.
+ */
+export function computeSettingsRevision(input: {
+  excludedFolders: string[]
+  includedFolders: string[]
+  /** Vorlaufzeiten je Dringlichkeit (uiStore `taskLeadTime`) — strukturell getypt,
+   *  damit dieses Modul nicht am Store hängt. */
+  taskLeadTime: { critical: number; high: number; normal: number }
+}): number {
+  const lead = input.taskLeadTime
+  const text = [
+    input.excludedFolders.join('|'),
+    input.includedFolders.join('|'),
+    `${lead.critical}/${lead.high}/${lead.normal}`
+  ].join('#')
+  // djb2 — klein, stabil, ohne Abhängigkeit. Kollisionen sind hier folgenlos teuer
+  // (ein überflüssiger Neuberechnungslauf), nicht gefährlich.
+  let hash = 5381
+  for (let i = 0; i < text.length; i++) hash = ((hash << 5) + hash + text.charCodeAt(i)) | 0
+  return hash
+}
+
 class SnapshotProvider implements DashboardSnapshotProvider {
   private entries: CacheEntry[] = []
 
