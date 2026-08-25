@@ -4199,6 +4199,9 @@ interface NoteAgentRunParams {
   // Webrecherche für diesen Lauf (Globus-Toggle) — nur { enabled }, die Provider-Config
   // liegt Main-seitig (0d). Der Main seedet die erlaubte URL-Liste aus dem Auftrag (0f).
   webResearch?: { enabled: boolean } | null
+  // Aktive Zeit, die der Nutzer mit dem Formulieren verbracht hat (Wirkungsbilanz).
+  // Renderer-Messung: nur bei Fenster im Vordergrund, gedeckelt.
+  instructionMs?: number
 }
 
 // Web-Provenienz fürs done-Event (Renderer zeigt „N Suchen · M Seiten" + Liste). Enthält
@@ -4335,6 +4338,8 @@ ipcMain.handle('note-agent-run', async (event, params: NoteAgentRunParams) => {
       attachmentIds: params.attachmentIds || [],
       instruction: params.instruction.trim(),
       model: provenanceModel,
+      // Aktive Zeit beim Formulieren (Renderer-Messung, Fenster im Vordergrund).
+      instructionMs: typeof params.instructionMs === 'number' ? params.instructionMs : undefined,
       skills,
       web,
       imageGen
@@ -4375,6 +4380,7 @@ ipcMain.handle('note-agent-run', async (event, params: NoteAgentRunParams) => {
           kind: 'agent-run-finished',
           runId: run.runId,
           durationMs: Date.now() - run.startedAt,
+          instructionMs: run.instructionMs,
           activityType: deriveActivityType(run.toolsUsed),
           resultCount: run.results.size,
           status: 'ok'
@@ -4409,6 +4415,7 @@ ipcMain.handle('note-agent-run', async (event, params: NoteAgentRunParams) => {
           kind: 'agent-run-finished',
           runId: run.runId,
           durationMs: Date.now() - run.startedAt,
+          instructionMs: run.instructionMs,
           activityType: deriveActivityType(run.toolsUsed),
           resultCount: run.results.size,
           status: cancelled ? 'aborted' : 'failed'
@@ -4452,7 +4459,7 @@ ipcMain.handle('note-agent-cancel', async (event, runId: string) => {
   return { success: true }
 })
 
-ipcMain.handle('note-agent-accept-result', async (event, runId: string, resultId: string) => {
+ipcMain.handle('note-agent-accept-result', async (event, runId: string, resultId: string, reviewMs?: number) => {
   if (!isTrustedSender(event)) return { success: false, error: 'Nicht autorisierter Aufrufer' }
   const run = getRunForSender(event.sender.id, runId)
   if (!run) return { success: false, error: 'Unbekannter Lauf' }
@@ -4489,7 +4496,13 @@ ipcMain.handle('note-agent-accept-result', async (event, runId: string, resultId
     pruneRunIfConsumed(run)
     // Erst NACH der geglückten Übernahme protokollieren: Nur übernommene Ergebnisse
     // zählen für die Bilanz. Nur Format und Lauf-Kennung, nie der Dateiname.
-    recordActivity(run.vaultPath, { at: Date.now(), kind: 'agent-result-accepted', runId: run.runId, format: entry.kind })
+    recordActivity(run.vaultPath, {
+      at: Date.now(),
+      kind: 'agent-result-accepted',
+      runId: run.runId,
+      format: entry.kind,
+      reviewMs: typeof reviewMs === 'number' && reviewMs >= 0 ? reviewMs : undefined
+    })
     return { success: true, fileName: finalName, relPath: path.join(run.targetFolderRel, finalName).replace(/\\/g, '/') }
   } catch (error) {
     // Übernahme gescheitert → Konsum zurücknehmen, damit der Nutzer es erneut versuchen kann.
@@ -4680,7 +4693,7 @@ ipcMain.handle('note-skills-import-dialog', async (event, vaultPath: string) => 
   }
 })
 
-ipcMain.handle('note-agent-discard-result', async (event, runId: string, resultId: string) => {
+ipcMain.handle('note-agent-discard-result', async (event, runId: string, resultId: string, reviewMs?: number) => {
   if (!isTrustedSender(event)) return { success: false, error: 'Nicht autorisierter Aufrufer' }
   const run = getRunForSender(event.sender.id, runId)
   if (!run) return { success: false, error: 'Unbekannter Lauf' }
@@ -4693,7 +4706,13 @@ ipcMain.handle('note-agent-discard-result', async (event, runId: string, resultI
     /* Datei fehlt bereits — Verwerfen ist idempotent */
   }
   pruneRunIfConsumed(run)
-  recordActivity(run.vaultPath, { at: Date.now(), kind: 'agent-result-discarded', runId: run.runId, format: entry.kind })
+  recordActivity(run.vaultPath, {
+    at: Date.now(),
+    kind: 'agent-result-discarded',
+    runId: run.runId,
+    format: entry.kind,
+    reviewMs: typeof reviewMs === 'number' && reviewMs >= 0 ? reviewMs : undefined
+  })
   return { success: true }
 })
 

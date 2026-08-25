@@ -9,6 +9,8 @@
 // Dokumentinhalte. Ein Dateiname wie „Angebot Müller 2026.xlsx" ist bereits Inhalt.
 // Das Protokoll trägt nur Art, Zeitpunkt, Dauer und Status.
 
+import { activeMs as activeTimeOf } from './activeTime'
+
 /**
  * Tätigkeitsart eines Agent-Laufs. Wird aus der WERKZEUGFOLGE abgeleitet, nie aus Text.
  *
@@ -28,13 +30,23 @@ export type ActivityEvent =
       at: number
       kind: 'agent-run-finished'
       runId: string
+      /** Laufzeit des Agenten = DURCHLAUFZEIT. Nicht die Arbeitszeit des Menschen. */
       durationMs: number
+      /** Aktive Zeit beim Formulieren des Auftrags. Fehlt bei Läufen vor dieser Messung. */
+      instructionMs?: number
       activityType: ActivityType
       resultCount: number
       status: 'ok' | 'failed' | 'aborted'
     }
-  | { at: number; kind: 'agent-result-accepted'; runId: string; format: ResultFormat }
-  | { at: number; kind: 'agent-result-discarded'; runId: string; format: ResultFormat }
+  | {
+      at: number
+      kind: 'agent-result-accepted'
+      runId: string
+      format: ResultFormat
+      /** Aktive Zeit beim Prüfen dieses Ergebnisses (Fenster im Vordergrund, gedeckelt). */
+      reviewMs?: number
+    }
+  | { at: number; kind: 'agent-result-discarded'; runId: string; format: ResultFormat; reviewMs?: number }
   | { at: number; kind: 'task-created'; count: number }
   | {
       at: number
@@ -107,7 +119,16 @@ export function deriveActivityType(tools: Iterable<string>): ActivityType {
 export interface AcceptedRun {
   runId: string
   activityType: ActivityType
+  /** Durchlaufzeit des Agenten — Kontext, NIE Abzug. */
   durationMs: number
+  /**
+   * Aktive Arbeitszeit des Menschen (Auftrag + Prüfung). `null` heißt „nicht erfasst"
+   * und schließt den Lauf von der Bewertung aus — eine 0 würde die volle Referenzzeit
+   * als Ersparnis ausweisen und wäre damit die unehrlichste aller Zahlen.
+   */
+  activeMs: number | null
+  /** Von der Auftragserteilung bis zur Übernahme — „Ergebnis nach". */
+  elapsedMs: number
   /** Anzahl übernommener Ergebnisse aus diesem Lauf. */
   accepted: number
 }
@@ -156,10 +177,18 @@ export function summarizeActivity(events: ActivityEvent[], range: ActivityRange)
   // Referenzzeit gutgeschrieben — für dieselbe eine Arbeit. Die Gutschrift gehört an
   // den Tag der ersten Übernahme; jede weitere zählt als Ergebnis, nicht als Arbeit.
   const firstAcceptedAt = new Map<string, number>()
+  // Prüfzeit je Lauf über ALLE Übernahmen summieren: Ein Lauf mit zwei Ergebnissen
+  // wurde auch zweimal geprüft, und beides ist Arbeitszeit des Nutzers.
+  const reviewMsByRun = new Map<string, number | null>()
   for (const e of events) {
     if (e.kind !== 'agent-result-accepted') continue
     const known = firstAcceptedAt.get(e.runId)
     if (known === undefined || e.at < known) firstAcceptedAt.set(e.runId, e.at)
+    if (typeof e.reviewMs === 'number') {
+      reviewMsByRun.set(e.runId, (reviewMsByRun.get(e.runId) ?? 0) + e.reviewMs)
+    } else if (!reviewMsByRun.has(e.runId)) {
+      reviewMsByRun.set(e.runId, null)
+    }
   }
 
   const summary: ActivitySummary = {
@@ -209,10 +238,15 @@ export function summarizeActivity(events: ActivityEvent[], range: ActivityRange)
     // Nur am Tag der ersten Übernahme gutschreiben (siehe oben).
     const first = firstAcceptedAt.get(runId)
     if (first === undefined || !inRange(first)) continue
+    const review = reviewMsByRun.get(runId) ?? null
+    // Laufbeginn rückwärts aus Ende minus Dauer — der Ledger speichert kein Startdatum.
+    const startedAt = run.at - run.durationMs
     summary.acceptedRuns.push({
       runId,
       activityType: run.activityType,
       durationMs: run.durationMs,
+      activeMs: activeTimeOf({ instructionMs: run.instructionMs, reviewMs: review ?? undefined }),
+      elapsedMs: Math.max(0, first - startedAt),
       accepted
     })
   }
@@ -224,16 +258,20 @@ export type ReferenceMinutes = Partial<Record<ActivityType, number>>
 
 export interface SavedTimeLine {
   activityType: ActivityType
-  /** Läufe dieser Art mit übernommenem Ergebnis. */
+  /** Bewertete Läufe dieser Art (übernommen UND mit gemessener Arbeitszeit). */
   runs: number
+  /** Referenzzeit des Nutzers: aktive Arbeitszeit von Hand, in Minuten. */
   referenceMinutes: number
-  /** Tatsächliche Laufzeit dieser Läufe, auf ganze Minuten gerundet. */
-  durationMinutes: number
-  /**
-   * Rohe Laufzeit. Nötig, weil ein 15-Sekunden-Lauf auf 0 Minuten rundet und die Karte
-   * sonst „abzüglich 0 min Laufzeit" schreibt — das liest sich wie ein Fehler.
-   */
-  durationMs: number
+  /** Gemessene aktive Arbeitszeit (Auftrag + Prüfung), auf Minuten gerundet. */
+  activeMinutes: number
+  /** Rohwert, damit die Karte bei unter einer Minute nicht „0 min" schreibt. */
+  activeMs: number
+  /** Durchlaufzeit des Agenten — Kontext neben der Rechnung, nie im Abzug. */
+  runtimeMinutes: number
+  runtimeMs: number
+  /** Von der Auftragserteilung bis zur Übernahme. */
+  elapsedMinutes: number
+  elapsedMs: number
   savedMinutes: number
 }
 
@@ -242,6 +280,12 @@ export interface SavedTime {
   lines: SavedTimeLine[]
   /** Arten, für die Läufe vorliegen, aber keine Referenzzeit hinterlegt ist. */
   unpricedTypes: ActivityType[]
+  /**
+   * Läufe, deren aktive Arbeitszeit nicht gemessen wurde (ältere Läufe). Sie bleiben
+   * unbewertet und werden gezählt, damit die Karte den Unterschied zwischen „nichts
+   * gespart" und „nicht gemessen" benennen kann.
+   */
+  unmeasuredRuns: number
 }
 
 /**
@@ -257,17 +301,30 @@ export interface SavedTime {
  * statt die Zahl wie eine Messung aussehen zu lassen.
  */
 export function estimateSavedMinutes(summary: ActivitySummary, reference: ReferenceMinutes): SavedTime {
-  const byType = new Map<ActivityType, { runs: number; durationMs: number; saved: number }>()
+  const byType = new Map<ActivityType, {
+    runs: number; activeMs: number; runtimeMs: number; elapsedMs: number; saved: number
+  }>()
+  let unmeasuredRuns = 0
 
   for (const run of summary.acceptedRuns) {
+    // Ohne gemessene Arbeitszeit keine Bewertung. Eine 0 anzunehmen hieße, die volle
+    // Referenzzeit als Ersparnis auszuweisen — die unehrlichste aller Möglichkeiten.
+    if (run.activeMs === null) {
+      unmeasuredRuns += 1
+      continue
+    }
     const ref = reference[run.activityType]
-    const bucket = byType.get(run.activityType) ?? { runs: 0, durationMs: 0, saved: 0 }
+    const bucket = byType.get(run.activityType)
+      ?? { runs: 0, activeMs: 0, runtimeMs: 0, elapsedMs: 0, saved: 0 }
     bucket.runs += 1
-    bucket.durationMs += run.durationMs
+    bucket.activeMs += run.activeMs
+    bucket.runtimeMs += run.durationMs
+    bucket.elapsedMs += run.elapsedMs
     if (typeof ref === 'number' && ref > 0) {
-      // Nie negativ: Ein Lauf, der länger dauert als die Referenzzeit, hat keine Zeit
-      // gekostet, die MindGraph zu verantworten hätte — er hat nur nichts gespart.
-      bucket.saved += Math.max(0, ref - run.durationMs / 60_000)
+      // Abgezogen wird die AKTIVE Zeit, nicht die Laufzeit: Wer während des Laufs etwas
+      // anderes erledigt, hat diese Minuten nicht aufgewendet. Nie negativ — ein Vorgang,
+      // der länger dauert als von Hand, hat nichts gespart, aber auch nichts gekostet.
+      bucket.saved += Math.max(0, ref - run.activeMs / 60_000)
     }
     byType.set(run.activityType, bucket)
   }
@@ -286,8 +343,12 @@ export function estimateSavedMinutes(summary: ActivitySummary, reference: Refere
       activityType: type,
       runs: bucket.runs,
       referenceMinutes: ref,
-      durationMinutes: Math.round(bucket.durationMs / 60_000),
-      durationMs: bucket.durationMs,
+      activeMinutes: Math.round(bucket.activeMs / 60_000),
+      activeMs: bucket.activeMs,
+      runtimeMinutes: Math.round(bucket.runtimeMs / 60_000),
+      runtimeMs: bucket.runtimeMs,
+      elapsedMinutes: Math.round(bucket.elapsedMs / 60_000),
+      elapsedMs: bucket.elapsedMs,
       savedMinutes: Math.round(bucket.saved)
     })
   }
@@ -295,7 +356,8 @@ export function estimateSavedMinutes(summary: ActivitySummary, reference: Refere
   return {
     totalMinutes: lines.reduce((sum, line) => sum + line.savedMinutes, 0),
     lines,
-    unpricedTypes: unpriced
+    unpricedTypes: unpriced,
+    unmeasuredRuns
   }
 }
 

@@ -213,6 +213,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     lmStudioPort?: number
     cloud?: { model: string } | null
     webResearch?: { enabled: boolean } | null
+    /** Gemessene aktive Zeit beim Formulieren des Auftrags (Wirkungsbilanz). */
+    instructionMs?: number
   }) => ipcRenderer.invoke('note-agent-run', params),
   noteAgentCancel: (runId: string) => ipcRenderer.invoke('note-agent-cancel', runId),
 
@@ -237,8 +239,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   noteSkillsCatalog: () => ipcRenderer.invoke('note-skills-catalog'),
   noteSkillsCatalogInstall: (vaultPath: string, id: string) => ipcRenderer.invoke('note-skills-catalog-install', vaultPath, id),
   noteSkillsImportDialog: (vaultPath: string) => ipcRenderer.invoke('note-skills-import-dialog', vaultPath),
-  noteAgentAcceptResult: (runId: string, resultId: string) => ipcRenderer.invoke('note-agent-accept-result', runId, resultId),
-  noteAgentDiscardResult: (runId: string, resultId: string) => ipcRenderer.invoke('note-agent-discard-result', runId, resultId),
+  noteAgentAcceptResult: (runId: string, resultId: string, reviewMs?: number) => ipcRenderer.invoke('note-agent-accept-result', runId, resultId, reviewMs),
+  noteAgentDiscardResult: (runId: string, resultId: string, reviewMs?: number) => ipcRenderer.invoke('note-agent-discard-result', runId, resultId, reviewMs),
   noteAgentPreviewResult: (runId: string, resultId: string) => ipcRenderer.invoke('note-agent-preview-result', runId, resultId),
   onNoteAgentProgress: (callback: (p: { runId: string; seq: number; skill: string; summary: string }) => void) => {
     ipcRenderer.removeAllListeners('note-agent-progress')

@@ -14,6 +14,7 @@ import { isCloudModel } from '../../../shared/modelCompatibility'
 import { useContextVaultFiles } from '../../utils/useContextVaultFiles'
 import { useIsModuleEnabled } from '../../utils/modules'
 import type { NoteAgentAttachment } from '../../../shared/types'
+import { useComposeMeasurement } from '../../utils/activeTimeTracker'
 
 // Notiz-Agent Phase 2 (Modus B): Der Lauf-Zustand liegt im noteAgentStore (ein
 // Zustand für Macher-Leiste UND Agent-Tab), dargestellt wird er vom gemeinsamen
@@ -66,7 +67,7 @@ interface Props {
   onTargetFolderChange: (rel: string | null) => void
   // Lauf-Zustand aus dem noteAgentStore (Protokoll, Ergebnis-Karten, Provenienz).
   agentRun: AgentRunUiState
-  onAgentRun: (instruction: string, opts: { webResearch: boolean }) => void
+  onAgentRun: (instruction: string, opts: { webResearch: boolean; instructionMs?: number }) => void
   onAgentCancel: () => void
   onAgentAccept: (resultId: string) => void
   onAgentDiscard: (resultId: string) => void
@@ -168,6 +169,9 @@ export function AiActionBar({ open, onOpenChange, phase, proposal, onGenerate, o
     closeTargetPicker()
   }
 
+  // Aktive Zeit am Auftrag — dieselbe Messung wie im Agent-Tab.
+  const compose = useComposeMeasurement()
+
   const submit = () => {
     if (busy) return
     // Modus B: Zielordner verknüpft → Agent-Loop statt Block-Diff (implizite Eskalation).
@@ -175,7 +179,7 @@ export function AiActionBar({ open, onOpenChange, phase, proposal, onGenerate, o
       if (!instruction.trim()) return
       // webResearch nur, wenn Modul an, scharfgestellt UND konfiguriert — nie „scharf-aber-
       // unkonfiguriert" an den Main geben (der Lauf würde sonst scheitern).
-      onAgentRun(instruction.trim(), { webResearch: webResearchModule && webResearchArmed && webConfigured })
+      onAgentRun(instruction.trim(), { webResearch: webResearchModule && webResearchArmed && webConfigured, instructionMs: compose.take() })
       return
     }
     if (!preset && !instruction.trim()) return
@@ -252,7 +256,7 @@ export function AiActionBar({ open, onOpenChange, phase, proposal, onGenerate, o
         className="ai-bar-input"
         placeholder={t('aiBar.placeholder')}
         value={instruction}
-        onChange={e => setInstruction(e.target.value)}
+        onChange={e => { compose.noteTyping(); setInstruction(e.target.value) }}
         rows={2}
         autoFocus
         disabled={phase === 'generating'}

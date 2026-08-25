@@ -607,6 +607,44 @@ Offen bleibt aus derselben Durchsicht die gemeinsame Cache-Infrastruktur: `Dashb
 weiterhin seinen eigenen Modulcache, und echte Revisionszähler in den Stores gibt es nicht
 (Schritt 2 unten). Der Hash aus Punkt 3 nimmt dem den Zeitdruck, ersetzt ihn aber nicht.
 
+### Wirkungsbilanz: aktive Zeit statt Laufzeit (25.08.2026)
+
+Rückmeldung aus dem Umfeld Controlling/Einkauf, und sie trifft einen methodischen Fehler: Die
+Bilanz zog die **Laufzeit des Agenten** von der Referenzzeit ab und vermischte damit zwei Größen.
+
+- **Durchlaufzeit**: wie lange es dauert, bis das Ergebnis da ist.
+- **Aktive Arbeitszeit**: wie lange ein Mensch dafür am Rechner saß.
+
+Rechnet der Agent 14 Minuten, während der Nutzer etwas anderes erledigt, sind das keine 14 Minuten
+Arbeitszeit. Die alte Formel war deshalb nicht nur falsch, sondern auch ungünstig: Sie bestrafte
+langsame Modelle, obwohl in dieser Zeit niemand am Schreibtisch saß.
+
+**Jetzt gemessen** (`shared/activeTime.ts`, rein und getestet; Anbindung in
+`renderer/utils/activeTimeTracker.ts`):
+
+- `instructionMs` — Zeit am Auftrag, ab dem ersten Tastendruck bis zum Abschicken. Beide Eingänge
+  (Agent-Tab und Macher-Leiste) messen dasselbe.
+- `reviewMs` — Zeit von der Ergebniskarte bis zur Entscheidung, je Lauf summiert.
+- **Nur bei Fenster im Vordergrund**, Deckel 30 Minuten je Abschnitt. Ohne diese Regel landet eine
+  Mittagspause in der Prüfzeit („Karte um 11:50, Klick um 13:10") — und an genau so einer Zahl
+  zerbricht das Vertrauen in die ganze Bilanz.
+- Abgezogen wird `instructionMs + reviewMs`. Die Laufzeit steht als **Durchlaufzeit** daneben,
+  zusammen mit „Ergebnis nach" — sichtbar, aber nie im Abzug.
+- **Läufe ohne Messung werden nicht bewertet**, sondern gezählt und gemeldet. Eine 0 anzunehmen
+  hieße, die volle Referenzzeit als Ersparnis auszuweisen — die unehrlichste aller Möglichkeiten.
+  Betrifft alle Läufe vor dieser Änderung.
+- **Stichprobengröße auf der Karte**: „Grundlage: deine Referenzzeit, N vergleichbare Vorgänge".
+  Eine Zahl aus einem Lauf ist etwas anderes als eine aus zwanzig.
+
+**Benennung**: „Zeitgewinn (geschätzt)" statt „Zeitersparnis". Kein „Index" — das Wort klingt nach
+standardisierter Kennzahl, und die erste Rückfrage aus dem Controlling wäre die nach der Formel.
+
+**Offen, bewusst nicht gebaut**: der Vergleichsmodus (dieselbe Aufgabe mehrfach konventionell und
+mehrfach mit MindGraph, Median und Übernahmequote). Das ist das Einzige, was gegenüber einem
+Einkauf wirklich trägt — und ein eigenes Feature mit eigenem Entwurf. Wichtige Grenze dabei: Die
+Zeiten der bisherigen Programme kann MindGraph nicht messen; sie sind Nutzerangabe und müssen als
+solche gekennzeichnet bleiben.
+
 ### Nächste Schritte
 
 1. `tiny` gegen `base` messen, warm und kalt, auf der Zielhardware.

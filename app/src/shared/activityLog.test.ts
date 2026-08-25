@@ -20,11 +20,17 @@ function runFinished(over: Partial<Extract<ActivityEvent, { kind: 'agent-run-fin
     kind: 'agent-run-finished',
     runId: 'run-1',
     durationMs: 60_000,
+    instructionMs: 2 * 60_000,
     activityType: 'table-merge',
     resultCount: 1,
     status: 'ok',
     ...over
   }
+}
+
+/** Übernahme mit gemessener Prüfzeit — ohne sie bleibt ein Lauf unbewertet. */
+function accepted(over: Partial<Extract<ActivityEvent, { kind: 'agent-result-accepted' }>> = {}): ActivityEvent {
+  return { at: NOW, kind: 'agent-result-accepted', runId: 'run-1', format: 'xlsx', reviewMs: 3 * 60_000, ...over }
 }
 
 describe('deriveActivityType', () => {
@@ -92,7 +98,7 @@ describe('summarizeActivity', () => {
     const events: ActivityEvent[] = [
       runFinished({ runId: 'run-a' }),
       runFinished({ runId: 'run-b', activityType: 'document' }),
-      { at: NOW, kind: 'agent-result-accepted', runId: 'run-a', format: 'xlsx' },
+      accepted({ runId: 'run-a', format: 'xlsx' }),
       { at: NOW, kind: 'agent-result-discarded', runId: 'run-b', format: 'docx' }
     ]
     const summary = summarizeActivity(events, range)
@@ -106,21 +112,21 @@ describe('summarizeActivity', () => {
     const beforeMidnight = range.from - 2 * 60_000
     const events: ActivityEvent[] = [
       runFinished({ at: beforeMidnight, runId: 'run-nacht', durationMs: 300_000 }),
-      { at: range.from + 60_000, kind: 'agent-result-accepted', runId: 'run-nacht', format: 'xlsx' }
+      accepted({ at: range.from + 60_000, runId: 'run-nacht', format: 'xlsx' })
     ]
     const summary = summarizeActivity(events, range)
     // Der Lauf selbst zählt zum Vortag, die Übernahme zu heute — die Dauer wird trotzdem gefunden.
     expect(summary.runsFinished).toBe(0)
     expect(summary.acceptedRuns).toEqual([
-      { runId: 'run-nacht', activityType: 'table-merge', durationMs: 300_000, accepted: 1 }
+      expect.objectContaining({ runId: 'run-nacht', activityType: 'table-merge', durationMs: 300_000, accepted: 1 })
     ])
   })
 
   it('zählt einen Lauf mit zwei übernommenen Ergebnissen EINMAL', () => {
     const events: ActivityEvent[] = [
       runFinished({ runId: 'run-x' }),
-      { at: NOW, kind: 'agent-result-accepted', runId: 'run-x', format: 'xlsx' },
-      { at: NOW, kind: 'agent-result-accepted', runId: 'run-x', format: 'md' }
+      accepted({ runId: 'run-x', format: 'xlsx' }),
+      accepted({ runId: 'run-x', format: 'md' })
     ]
     const summary = summarizeActivity(events, range)
     expect(summary.acceptedTotal).toBe(2)
@@ -135,8 +141,8 @@ describe('summarizeActivity', () => {
     const gestern = range.from - 6 * 3_600_000
     const events: ActivityEvent[] = [
       runFinished({ at: gestern, runId: 'run-zwei', durationMs: 10 * 60_000 }),
-      { at: gestern + 60_000, kind: 'agent-result-accepted', runId: 'run-zwei', format: 'xlsx' },
-      { at: NOW, kind: 'agent-result-accepted', runId: 'run-zwei', format: 'md' }
+      accepted({ at: gestern + 60_000, runId: 'run-zwei', format: 'xlsx' }),
+      accepted({ runId: 'run-zwei', format: 'md' })
     ]
     const heute = summarizeActivity(events, range)
     // Heute wurde ein Ergebnis übernommen — aber die Arbeit war gestern gutgeschrieben.
@@ -147,11 +153,12 @@ describe('summarizeActivity', () => {
     const gesternRange = { from: range.from - 86_400_000, to: range.from }
     const vortag = summarizeActivity(events, gesternRange)
     expect(vortag.acceptedRuns).toHaveLength(1)
-    expect(estimateSavedMinutes(vortag, { 'table-merge': 45 }).totalMinutes).toBe(35)
+    // 2 min Auftrag + 2 × 3 min Prüfung = 8 min aktive Arbeit, abgezogen von 45.
+    expect(estimateSavedMinutes(vortag, { 'table-merge': 45 }).totalMinutes).toBe(37)
   })
 
   it('erfindet keine Dauer, wenn der zugehörige Lauf fehlt', () => {
-    const events: ActivityEvent[] = [{ at: NOW, kind: 'agent-result-accepted', runId: 'weg', format: 'md' }]
+    const events: ActivityEvent[] = [accepted({ runId: 'weg', format: 'md' })]
     const summary = summarizeActivity(events, range)
     expect(summary.acceptedTotal).toBe(1)
     expect(summary.acceptedRuns).toEqual([])
@@ -172,7 +179,7 @@ describe('estimateSavedMinutes', () => {
   it('sagt ohne Referenzzeit nichts über Minuten', () => {
     const events: ActivityEvent[] = [
       runFinished({ runId: 'run-a' }),
-      { at: NOW, kind: 'agent-result-accepted', runId: 'run-a', format: 'xlsx' }
+      accepted({ runId: 'run-a', format: 'xlsx' })
     ]
     const saved = estimateSavedMinutes(summarizeActivity(events, range), {})
     expect(saved.totalMinutes).toBe(0)
@@ -180,30 +187,62 @@ describe('estimateSavedMinutes', () => {
     expect(saved.unpricedTypes).toEqual(['table-merge'])
   })
 
-  it('rechnet Referenzzeit minus Laufzeit', () => {
+  it('zieht die AKTIVE Arbeitszeit ab, nicht die Laufzeit des Agenten', () => {
+    // Der Kern der Wirkungsbilanz: Der Agent rechnet 14 Minuten, der Mensch hat davon
+    // 2 Minuten formuliert und 3 Minuten geprüft. Abgezogen werden 5, nicht 14 — wer
+    // während des Laufs anderes erledigt, hat diese Zeit nicht aufgewendet.
     const events: ActivityEvent[] = [
-      runFinished({ runId: 'run-a', durationMs: 14 * 60_000 }),
-      { at: NOW, kind: 'agent-result-accepted', runId: 'run-a', format: 'xlsx' }
+      runFinished({ runId: 'run-a', durationMs: 14 * 60_000, instructionMs: 2 * 60_000 }),
+      accepted({ runId: 'run-a', reviewMs: 3 * 60_000 })
     ]
     const saved = estimateSavedMinutes(summarizeActivity(events, range), { 'table-merge': 45 })
-    expect(saved.totalMinutes).toBe(31)
-    expect(saved.lines[0]).toMatchObject({ runs: 1, referenceMinutes: 45, durationMinutes: 14, savedMinutes: 31 })
+    expect(saved.totalMinutes).toBe(40)
+    expect(saved.lines[0]).toMatchObject({
+      runs: 1, referenceMinutes: 45, activeMinutes: 5, runtimeMinutes: 14, savedMinutes: 40
+    })
   })
 
-  it('behält die Rohdauer, damit ein Kurzläufer nicht als „0 min Laufzeit" erscheint', () => {
+  it('behält den Rohwert, damit ein kurzer Vorgang nicht als „0 min aktiv" erscheint', () => {
     const events: ActivityEvent[] = [
-      runFinished({ runId: 'run-a', durationMs: 15_000 }),
-      { at: NOW, kind: 'agent-result-accepted', runId: 'run-a', format: 'xlsx' }
+      runFinished({ runId: 'run-a', durationMs: 15_000, instructionMs: 8_000 }),
+      accepted({ runId: 'run-a', reviewMs: 7_000 })
     ]
     const saved = estimateSavedMinutes(summarizeActivity(events, range), { 'table-merge': 30 })
-    expect(saved.lines[0].durationMinutes).toBe(0)
-    expect(saved.lines[0].durationMs).toBe(15_000)
+    expect(saved.lines[0].activeMinutes).toBe(0)
+    expect(saved.lines[0].activeMs).toBe(15_000)
+    // Auch die Kontextzeile braucht den Rohwert — ein 15-Sekunden-Lauf ist nicht „0 min".
+    expect(saved.lines[0].runtimeMinutes).toBe(0)
+    expect(saved.lines[0].runtimeMs).toBe(15_000)
+  })
+
+  it('bewertet einen Lauf ohne gemessene Arbeitszeit NICHT, sondern meldet ihn', () => {
+    // Alte Läufe tragen keine Messung. Eine 0 anzunehmen hieße, die volle Referenzzeit
+    // als Ersparnis auszuweisen — die unehrlichste aller Möglichkeiten.
+    const events: ActivityEvent[] = [
+      { at: NOW, kind: 'agent-run-finished', runId: 'alt', durationMs: 60_000, activityType: 'table-merge', resultCount: 1, status: 'ok' },
+      { at: NOW, kind: 'agent-result-accepted', runId: 'alt', format: 'xlsx' }
+    ]
+    const saved = estimateSavedMinutes(summarizeActivity(events, range), { 'table-merge': 45 })
+    expect(saved.totalMinutes).toBe(0)
+    expect(saved.lines).toEqual([])
+    expect(saved.unmeasuredRuns).toBe(1)
+  })
+
+  it('summiert die Prüfzeit über mehrere Ergebnisse desselben Laufs', () => {
+    const events: ActivityEvent[] = [
+      runFinished({ runId: 'run-a', instructionMs: 60_000 }),
+      accepted({ runId: 'run-a', format: 'xlsx', reviewMs: 60_000 }),
+      accepted({ runId: 'run-a', format: 'md', reviewMs: 120_000 })
+    ]
+    const saved = estimateSavedMinutes(summarizeActivity(events, range), { 'table-merge': 45 })
+    expect(saved.lines[0].activeMinutes).toBe(4)
+    expect(saved.totalMinutes).toBe(41)
   })
 
   it('wird nie negativ, wenn der Lauf länger dauert als die Referenzzeit', () => {
     const events: ActivityEvent[] = [
-      runFinished({ runId: 'run-a', durationMs: 90 * 60_000 }),
-      { at: NOW, kind: 'agent-result-accepted', runId: 'run-a', format: 'xlsx' }
+      runFinished({ runId: 'run-a', instructionMs: 40 * 60_000 }),
+      accepted({ runId: 'run-a', reviewMs: 20 * 60_000 })
     ]
     const saved = estimateSavedMinutes(summarizeActivity(events, range), { 'table-merge': 45 })
     expect(saved.totalMinutes).toBe(0)
@@ -213,8 +252,8 @@ describe('estimateSavedMinutes', () => {
     const events: ActivityEvent[] = [
       runFinished({ runId: 'run-a', durationMs: 5 * 60_000 }),
       runFinished({ runId: 'run-b', activityType: 'document', durationMs: 5 * 60_000 }),
-      { at: NOW, kind: 'agent-result-accepted', runId: 'run-a', format: 'xlsx' },
-      { at: NOW, kind: 'agent-result-accepted', runId: 'run-b', format: 'docx' }
+      accepted({ runId: 'run-a', format: 'xlsx' }),
+      accepted({ runId: 'run-b', format: 'docx' })
     ]
     const saved = estimateSavedMinutes(summarizeActivity(events, range), { 'table-merge': 45 })
     expect(saved.totalMinutes).toBe(40)
@@ -225,7 +264,7 @@ describe('estimateSavedMinutes', () => {
   it('ignoriert eine Referenzzeit von 0 — sie ist keine Angabe', () => {
     const events: ActivityEvent[] = [
       runFinished({ runId: 'run-a' }),
-      { at: NOW, kind: 'agent-result-accepted', runId: 'run-a', format: 'xlsx' }
+      accepted({ runId: 'run-a', format: 'xlsx' })
     ]
     const saved = estimateSavedMinutes(summarizeActivity(events, range), { 'table-merge': 0 })
     expect(saved.lines).toEqual([])
@@ -248,7 +287,7 @@ describe('impactBadge', () => {
   it('zeigt Minuten, sobald eine Referenzzeit greift', () => {
     const events: ActivityEvent[] = [
       runFinished({ runId: 'run-a', durationMs: 5 * 60_000 }),
-      { at: NOW, kind: 'agent-result-accepted', runId: 'run-a', format: 'xlsx' }
+      accepted({ runId: 'run-a', format: 'xlsx' })
     ]
     expect(badgeFor(events, { 'table-merge': 45 })).toEqual({ kind: 'minutes', minutes: 40 })
   })
@@ -256,7 +295,7 @@ describe('impactBadge', () => {
   it('fällt ohne Referenzzeit auf die Übernahmen zurück', () => {
     const events: ActivityEvent[] = [
       runFinished({ runId: 'run-a' }),
-      { at: NOW, kind: 'agent-result-accepted', runId: 'run-a', format: 'xlsx' }
+      accepted({ runId: 'run-a', format: 'xlsx' })
     ]
     expect(badgeFor(events)).toEqual({ kind: 'accepted', count: 1 })
   })
@@ -267,8 +306,9 @@ describe('impactBadge', () => {
 
   it('zeigt keine Minuten, wenn die Ersparnis auf null zusammenfällt', () => {
     const events: ActivityEvent[] = [
-      runFinished({ runId: 'run-a', durationMs: 90 * 60_000 }),
-      { at: NOW, kind: 'agent-result-accepted', runId: 'run-a', format: 'xlsx' }
+      // Aktive Arbeit länger als von Hand — kein Gewinn, aber die Übernahme zählt.
+      runFinished({ runId: 'run-a', instructionMs: 30 * 60_000 }),
+      accepted({ runId: 'run-a', format: 'xlsx', reviewMs: 30 * 60_000 })
     ]
     // Der Lauf dauerte länger als die Referenzzeit — dann steht die Übernahme da,
     // nicht „0 min gespart".

@@ -11,7 +11,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useNotesStore } from '../../stores/notesStore'
 import { useUIStore } from '../../stores/uiStore'
 import { useTranslation } from '../../utils/translations'
-import { acceptedLine, tasksLine, savedBasisLine, unpricedLine } from '../../utils/impactText'
+import { acceptedLine, tasksLine, savedBasisLine, savedContextLine, unmeasuredLine, unpricedLine } from '../../utils/impactText'
 import {
   estimateSavedMinutes,
   impactBadge,
@@ -89,10 +89,11 @@ export function ImpactIndicator({ onOpenCard }: { onOpenCard: () => void }) {
     t('statusbar.impact.title'),
     summary.acceptedTotal > 0 ? acceptedLine(summary, t) : null,
     summary.tasksCreated > 0 ? tasksLine(summary, t) : null,
-    ...saved.lines.map(line => savedBasisLine(line, t)),
+    ...saved.lines.flatMap(line => [savedBasisLine(line, t), savedContextLine(line, t)]),
     // Ohne Referenzzeit ist die Zahl nicht klein, sondern nicht vorhanden — das gehört
     // auch in die Kurzfassung, sonst wirkt die Statusleiste wie ein Urteil.
     saved.unpricedTypes.length > 0 ? unpricedLine(saved.unpricedTypes, t) : null,
+    saved.unmeasuredRuns > 0 ? unmeasuredLine(saved.unmeasuredRuns, t) : null,
     t('statusbar.impact.openCard')
   ].filter(Boolean)
 

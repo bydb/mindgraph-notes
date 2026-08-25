@@ -1888,7 +1888,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
     if (effectiveNoteId) useNoteAgentStore.getState().setTargetFolder(effectiveNoteId, rel)
   }, [effectiveNoteId])
 
-  const agentRunStart = useCallback(async (instruction: string, opts?: { webResearch?: boolean }) => {
+  const agentRunStart = useCallback(async (instruction: string, opts?: { webResearch?: boolean; instructionMs?: number }) => {
     if (!effectiveNoteId || !vaultPath || !agentTargetFolder) return
     // Cloud-Routing nur mit eigenem 'note-agent'-Opt-in (Entscheidung 7): der
     // Cloud-Eintrag im Picker allein reicht nicht — der gewählte Provider muss
@@ -1922,7 +1922,8 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
       lmStudioPort: ollama.lmStudioPort,
       cloud,
       cloudLabel,
-      webResearch: !!opts?.webResearch
+      webResearch: !!opts?.webResearch,
+      instructionMs: opts?.instructionMs
     })
   }, [effectiveNoteId, vaultPath, agentTargetFolder, activeAiCloudRoute, agentRoutes, ollama, aiModel, selectedNote, t])
 

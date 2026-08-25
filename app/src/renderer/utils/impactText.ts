@@ -33,18 +33,47 @@ export function tasksLine(summary: ActivitySummary, t: ImpactTFn): string {
 }
 
 /**
- * Die Rechengrundlage im Klartext. Ein 15-Sekunden-Lauf rundet auf 0 Minuten — dann
- * steht „unter 1 min" da, sonst läse sich die Zeile wie ein Rechenfehler.
+ * Die Rechnung im Klartext — sie steht auf der Karte, nicht im Kleingedruckten.
+ *
+ * Abgezogen wird die AKTIVE Arbeitszeit (Auftrag + Prüfung), nicht die Laufzeit des
+ * Agenten. Wer während des Laufs etwas anderes erledigt, hat diese Minuten nicht
+ * aufgewendet. Die Laufzeit steht daneben als Durchlaufzeit — sichtbar, aber nie im
+ * Abzug.
  */
 export function savedBasisLine(line: SavedTimeLine, t: ImpactTFn): string {
   return t('voiceCommand.card.savedBasis', {
     type: t(ACTIVITY_TYPE_LABEL_KEY[line.activityType]),
     reference: line.referenceMinutes,
-    duration: line.durationMinutes === 0 && line.durationMs > 0
+    // Ein Vorgang unter einer Minute rundet auf 0 — „− 0 min aktiv" läse sich wie ein Fehler.
+    active: line.activeMinutes === 0 && line.activeMs > 0
       ? t('voiceCommand.card.underOneMinute')
-      : line.durationMinutes,
+      : line.activeMinutes,
     saved: line.savedMinutes
   })
+}
+
+/** Durchlaufzeit und Fertigstellung — Kontext, damit die Zahl einordenbar bleibt. */
+export function savedContextLine(line: SavedTimeLine, t: ImpactTFn): string {
+  // Dieselbe Rundungsregel wie oben: Ein 40-Sekunden-Lauf ist „unter 1 min", nicht
+  // „0 min". Eine Null liest sich wie ein Messfehler und zieht die Zeile in Zweifel.
+  const unterEiner = t('voiceCommand.card.underOneMinute')
+  return t('voiceCommand.card.savedContext', {
+    runtime: line.runtimeMinutes === 0 && line.runtimeMs > 0 ? unterEiner : line.runtimeMinutes,
+    elapsed: line.elapsedMinutes === 0 && line.elapsedMs > 0 ? unterEiner : line.elapsedMinutes
+  })
+}
+
+/**
+ * Wie viele vergleichbare Vorgänge hinter der Referenzzeit stehen. Eine Zahl aus einem
+ * einzigen Lauf ist etwas anderes als eine aus zwanzig, und das gehört dazugesagt.
+ */
+export function sampleLine(count: number, t: ImpactTFn): string {
+  return t(count === 1 ? 'voiceCommand.card.savedSampleOne' : 'voiceCommand.card.savedSample', { count })
+}
+
+/** Läufe ohne gemessene Arbeitszeit: nicht bewertet, aber auch nicht verschwiegen. */
+export function unmeasuredLine(count: number, t: ImpactTFn): string {
+  return t(count === 1 ? 'voiceCommand.card.savedUnmeasuredOne' : 'voiceCommand.card.savedUnmeasured', { count })
 }
 
 export function unpricedLine(types: ActivityType[], t: ImpactTFn): string {

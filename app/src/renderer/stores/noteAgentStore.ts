@@ -10,6 +10,7 @@
 // „Bereich" (scopeId) ist die Notiz-ID (Editor) oder die Tab-ID (Agent-Tab).
 
 import { create } from 'zustand'
+import { createActiveMeasurement, type ActiveMeasurement } from '../utils/activeTimeTracker'
 import type { NoteAgentAttachment } from '../../shared/types'
 import type { CloudProviderId } from '../../shared/llmBackend'
 
@@ -109,6 +110,8 @@ export interface AgentStartParams {
   cloud: { model: string; provider: CloudProviderId } | null
   cloudLabel: string | null
   webResearch: boolean
+  /** Gemessene aktive Zeit beim Formulieren des Auftrags (Wirkungsbilanz). */
+  instructionMs?: number
 }
 
 interface NoteAgentStoreState {
@@ -157,6 +160,31 @@ function patchRun(
   // Events verworfener oder fremder Läufe ignorieren (F10).
   if (!scope || scope.run.runId !== runId) return null
   return { scopes: { ...state.scopes, [scopeId]: { ...scope, run: update(scope.run) } } }
+}
+
+/**
+ * Prüfzeit je Lauf: läuft, sobald die Ergebniskarten da sind, und endet mit der
+ * Entscheidung. Bewusst außerhalb des Stores — eine laufende Messung ist kein
+ * Anzeigezustand und soll kein Rendern auslösen.
+ *
+ * Gemessen wird nur bei Fenster im Vordergrund (siehe activeTimeTracker): Zwischen
+ * „Karte erscheint" und „Klick" liegt sonst auch eine Mittagspause.
+ */
+const reviewTimers = new Map<string, ActiveMeasurement>()
+
+function startReviewTimer(runId: string): void {
+  if (reviewTimers.has(runId)) return
+  const measurement = createActiveMeasurement()
+  measurement.begin()
+  reviewTimers.set(runId, measurement)
+}
+
+/** Liefert die bisher aktiv verbrachte Prüfzeit und beendet die Messung des Laufs. */
+function takeReviewMs(runId: string): number | undefined {
+  const measurement = reviewTimers.get(runId)
+  if (!measurement) return undefined
+  reviewTimers.delete(runId)
+  return measurement.end()
 }
 
 export const useNoteAgentStore = create<NoteAgentStoreState>((set, get) => ({
@@ -229,7 +257,8 @@ export const useNoteAgentStore = create<NoteAgentStoreState>((set, get) => ({
       localBackend: params.localBackend,
       lmStudioPort: params.lmStudioPort,
       cloud: params.cloud,
-      webResearch: params.webResearch ? { enabled: true } : null
+      webResearch: params.webResearch ? { enabled: true } : null,
+      instructionMs: params.instructionMs
     })
     if (!res.success || !res.runId) {
       get().setAttachError(scopeId, res.error || 'Start fehlgeschlagen')
@@ -259,7 +288,7 @@ export const useNoteAgentStore = create<NoteAgentStoreState>((set, get) => ({
   acceptResult: async (scopeId, resultId) => {
     const run = get().getScope(scopeId).run
     if (!run.runId) return
-    const res = await window.electronAPI.noteAgentAcceptResult(run.runId, resultId)
+    const res = await window.electronAPI.noteAgentAcceptResult(run.runId, resultId, takeReviewMs(run.runId))
     set(s => withScope(s, scopeId, sc => ({
       ...sc,
       run: {
@@ -274,7 +303,7 @@ export const useNoteAgentStore = create<NoteAgentStoreState>((set, get) => ({
   discardResult: async (scopeId, resultId) => {
     const run = get().getScope(scopeId).run
     if (!run.runId) return
-    const res = await window.electronAPI.noteAgentDiscardResult(run.runId, resultId)
+    const res = await window.electronAPI.noteAgentDiscardResult(run.runId, resultId, takeReviewMs(run.runId))
     set(s => withScope(s, scopeId, sc => ({
       ...sc,
       run: {
@@ -327,6 +356,9 @@ export function initNoteAgentEvents(): void {
   })
 
   window.electronAPI.onNoteAgentDone(p => {
+    // Ab hier zählt die Prüfzeit: Die Karten stehen, der Nutzer entscheidet.
+    // Ohne Ergebnisse gibt es nichts zu prüfen — dann läuft auch keine Messung.
+    if (p.results && p.results.length > 0) startReviewTimer(p.runId)
     store.setState(s => patchRun(s, p.runId, run => ({
       ...run,
       phase: 'review',

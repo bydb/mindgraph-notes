@@ -20,7 +20,7 @@ import {
   type ActivityType,
   type ActivitySummary
 } from '../../shared/activityLog'
-import { ACTIVITY_TYPE_LABEL_KEY, acceptedLine, tasksLine, savedBasisLine, unpricedLine } from '../utils/impactText'
+import { ACTIVITY_TYPE_LABEL_KEY, acceptedLine, tasksLine, savedBasisLine, savedContextLine, sampleLine, unmeasuredLine, unpricedLine } from '../utils/impactText'
 
 export type TFn = (key: any, params?: Record<string, string | number>) => string
 
@@ -419,12 +419,24 @@ const activityToday: ActionSpec<'activity.today'> = {
       }
     }
 
-    const res = await window.electronAPI.activitySummary(vaultPath, localDayRange(Date.now()))
+    const today = localDayRange(Date.now())
+    // Zwei Abfragen: heute für die Bilanz, der ganze Bestand für die Stichprobengröße.
+    // „Grundlage: deine Referenzzeit, 6 vergleichbare Vorgänge" ist der Unterschied
+    // zwischen einer Zahl aus einem Lauf und einer aus zwanzig — und den muss die Karte
+    // benennen, sonst wirkt eine einmalige Messung wie ein Erfahrungswert.
+    const [res, history] = await Promise.all([
+      window.electronAPI.activitySummary(vaultPath, today),
+      window.electronAPI.activitySummary(vaultPath, { from: 0, to: today.to })
+    ])
     const dataMs = Math.round(performance.now() - started)
     if (!res.success || !res.summary) {
       throw new Error(res.error || t('voiceCommand.card.activityUnavailable'))
     }
     const summary: ActivitySummary = res.summary
+    const sampleByType = new Map<string, number>()
+    for (const run of history.summary?.acceptedRuns ?? []) {
+      sampleByType.set(run.activityType, (sampleByType.get(run.activityType) ?? 0) + 1)
+    }
     const saved = estimateSavedMinutes(summary, useUIStore.getState().impact.referenceMinutes)
 
     const doneGroup = t('voiceCommand.card.groupDone')
@@ -449,15 +461,22 @@ const activityToday: ActionSpec<'activity.today'> = {
       // ist eine Ableitung aus einer Angabe des Nutzers, keine Messung.
       for (const line of saved.lines) {
         lines.push({ group: savedGroup, text: savedBasisLine(line, t) })
+        lines.push({ group: savedGroup, text: savedContextLine(line, t) })
+        lines.push({ group: savedGroup, text: sampleLine(sampleByType.get(line.activityType) ?? line.runs, t) })
       }
     }
 
     // Läufe ohne hinterlegte Referenzzeit sind kein Nullwert, sondern nicht bewertbar —
     // und der Unterschied gehört sichtbar gemacht, sonst wirkt eine fehlende Angabe
     // wie „nichts gespart".
-    const footnote = saved.unpricedTypes.length > 0
-      ? unpricedLine(saved.unpricedTypes, t)
-      : undefined
+    // Beide Gründe können zugleich gelten: eine Art ohne Referenzzeit UND Läufe ohne
+    // gemessene Arbeitszeit. Sie getrennt zu benennen ist der Unterschied zwischen
+    // „nichts gespart" und „nicht bewertbar".
+    const footnotes = [
+      saved.unpricedTypes.length > 0 ? unpricedLine(saved.unpricedTypes, t) : null,
+      saved.unmeasuredRuns > 0 ? unmeasuredLine(saved.unmeasuredRuns, t) : null
+    ].filter(Boolean) as string[]
+    const footnote = footnotes.length > 0 ? footnotes.join(' ') : undefined
 
     if (lines.length === 0) {
       return {

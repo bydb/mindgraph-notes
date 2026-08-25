@@ -10,6 +10,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useUIStore } from '../../stores/uiStore'
 import { useNotesStore } from '../../stores/notesStore'
+import { useComposeMeasurement } from '../../utils/activeTimeTracker'
 import { useTranslation } from '../../utils/translations'
 import { ContextAttachmentRow, FolderGlyph } from '../Shared/ContextAttachmentRow'
 import { ModelPicker } from '../Shared/ModelPicker'
@@ -119,6 +120,9 @@ export function AgentView({ tabId }: Props) {
   }
 
   const store = useNoteAgentStore.getState
+  // Aktive Zeit am Auftrag: läuft ab dem ersten Tastendruck, pausiert, sobald das
+  // Fenster in den Hintergrund geht. Grundlage der Wirkungsbilanz.
+  const compose = useComposeMeasurement()
   const busy = run.phase === 'running'
   const canRun = !!vaultPath && !!scope.targetFolder && !!instruction.trim() && !busy
 
@@ -141,7 +145,8 @@ export function AgentView({ tabId }: Props) {
       lmStudioPort: ollama.lmStudioPort,
       cloud,
       cloudLabel,
-      webResearch: webResearchModule && webArmed && webConfigured
+      webResearch: webResearchModule && webArmed && webConfigured,
+      instructionMs: compose.take()
     })
   }
 
@@ -167,7 +172,7 @@ export function AgentView({ tabId }: Props) {
           className="ai-bar-input agent-view-input"
           placeholder={t('agentTab.placeholder')}
           value={instruction}
-          onChange={e => setInstruction(e.target.value)}
+          onChange={e => { compose.noteTyping(); setInstruction(e.target.value) }}
           rows={4}
           disabled={busy}
           onKeyDown={e => {
