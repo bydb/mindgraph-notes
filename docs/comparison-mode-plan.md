@@ -293,12 +293,33 @@ Kampagnen und Fälle werden abgewiesen, eine Kampagne ohne Akzeptanzdefinition e
 - Ein MindGraph-Fall lässt sich einem Agent-Lauf zurechnen („Agent-Lauf diesem Fall zurechnen");
   die gemessenen Zeiten wandern dann zusätzlich in den Fall.
 
-**Bekannte Grenze:** Eine laufende Stoppuhr lebt nur im Fenster. Wird MindGraph geschlossen, während
-sie läuft, ist die Messung weg. Für einen konventionellen Fall, der eine Stunde in Excel dauert, ist
-das unbequem — die Uhr muss so lange laufen bleiben. Ein Nachtrag über „nachgetragen" ist möglich,
-eine Wiederaufnahme nach Neustart noch nicht.
+**Stoppuhr-Lücke geschlossen** (26.08.2026): Die laufende Uhr übersteht einen Neustart — aber
+**nur als Angebot, nie als stille Fortschreibung**. Eine Uhr, die über Nacht weiterläuft und am
+Morgen vierzehn Stunden meldet, sähe aus wie eine Messung. Beim Start steht deshalb: „Eine Stoppuhr
+wurde nicht beendet — Fall, Art, Startzeit. Das Ende hat niemand beobachtet: Wie viele Minuten waren
+es?" mit Vorschlag (Wanduhrzeit), Kürzen und Verwerfen.
 
-Noch nicht gebaut: Export.
+Der bestätigte Wert wird als **`nachgetragen`** gespeichert, nicht als `gestoppt`: Der Endzeitpunkt
+ist eine Angabe, keine Beobachtung. Gegengeprüft mit hartem Abschuss der App bei laufender Uhr — das
+Angebot erschien, ein gekürzter Wert landete mit der richtigen Herkunft im Fall.
+
+Dazu **Nachtrag** (Minuten von Hand, Herkunft `nachgetragen`) und **Korrektur** je Sitzung mit Grund
+und erhaltenem Originalwert. Jede Sitzung eines offenen Falls steht mit Dauer und Herkunft unter dem
+Fall.
+
+**Schritt 5 ist gebaut**: Export als Markdown und CSV (`shared/comparison/export.ts`, 9 Tests).
+
+- **Keine Kurzbezeichnung im Bericht** — Fälle heißen „Fall 3". Ein Test prüft das ausdrücklich.
+- **Spalte „Grundlage"** je Fall: gemessen · gestoppt · nachgetragen · korrigiert.
+- **Unterhalb der Mindestfallzahl keine Kennzahl**, sondern der Hinweis, wie viele fehlen.
+- Am Ende ein Abschnitt „Was diese Zahlen sind — und was nicht": Rückfallarbeit enthalten,
+  Auswertung nach Zuteilung, konventionelle Zeiten gestoppt statt gemessen, Qualität nicht
+  verblindet, Median statt Mittelwert, keine Signifikanztests, alle Zugeteilten im Nenner.
+- CSV mit BOM, sonst zeigt Excel die Umlaute falsch — der Bericht geht ins Controlling.
+
+**Nicht am lebenden Objekt geprüft**: der Speicherdialog samt Schreiben der Datei. Der Inhalt des
+Berichts ist getestet, der Weg über `showSaveDialog` nicht — dafür bräuchte es eine Bedienung des
+Systemdialogs.
 
 ## 14. Reihenfolge
 

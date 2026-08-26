@@ -6,6 +6,7 @@ import type { CalendarEventDraft } from './calendarEvent'
 import type { ActivityEvent, ActivitySummary } from './activityLog'
 import type { Campaign, ComparisonCase, Quality, WorkSession } from './comparison/types'
 import type { CampaignReport } from './comparison/metrics'
+import type { ExportLabels } from './comparison/export'
 
 export interface ComparisonData {
   campaigns: Campaign[]
@@ -747,6 +748,7 @@ export interface ElectronAPI {
   comparisonUpdateCase: (vaultPath: string, caseId: string, action: ComparisonActionInput) => Promise<{ success: boolean; data?: ComparisonData; error?: string }>;
   comparisonEndCampaign: (vaultPath: string, campaignId: string) => Promise<{ success: boolean; data?: ComparisonData; error?: string }>;
   comparisonReport: (vaultPath: string, campaignId: string) => Promise<{ success: boolean; report?: CampaignReport; error?: string }>;
+  comparisonExport: (vaultPath: string, campaignId: string, format: 'md' | 'csv', labels: ExportLabels) => Promise<{ success: boolean; path?: string; cancelled?: boolean; error?: string }>;
   onActivityChanged: (callback: (payload: { vaultPath: string }) => void) => () => void;
   noteAgentDiscardResult: (runId: string, resultId: string, timings?: { reviewMs?: number; waitingMs?: number }) => Promise<{ success: boolean; error?: string }>;
   noteAgentPreviewResult: (runId: string, resultId: string) => Promise<{ success: boolean; kind?: string; binary?: boolean; text?: string; truncated?: boolean; sizeBytes?: number; error?: string }>;

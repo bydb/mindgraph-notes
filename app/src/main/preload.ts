@@ -238,6 +238,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('comparison-end-campaign', vaultPath, campaignId),
   comparisonReport: (vaultPath: string, campaignId: string) =>
     ipcRenderer.invoke('comparison-report', vaultPath, campaignId),
+  comparisonExport: (vaultPath: string, campaignId: string, format: 'md' | 'csv', labels: unknown) =>
+    ipcRenderer.invoke('comparison-export', vaultPath, campaignId, format, labels),
 
   /** Trägt NUR die Vordergrundzeit an einem vom Main geschriebenen Mail-Ereignis nach. */
   activityForeground: (vaultPath: string, id: string, foregroundMs: number) =>

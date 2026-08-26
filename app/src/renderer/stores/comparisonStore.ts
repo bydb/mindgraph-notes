@@ -23,6 +23,40 @@ interface RunningStopwatch {
   startedAt: number
 }
 
+/**
+ * Die laufende Uhr überlebt einen Neustart — aber NICHT als stille Fortschreibung.
+ *
+ * Eine Uhr, die über Nacht weiterläuft und am Morgen vierzehn Stunden meldet, wäre
+ * schlimmer als gar keine: Sie sähe aus wie eine Messung. Deshalb wird ein gefundener
+ * Stand nur ANGEBOTEN — übernehmen, kürzen oder verwerfen.
+ */
+const STOPWATCH_KEY = 'mindgraph:comparison-stopwatch'
+
+function stopwatchKey(vaultPath: string): string {
+  return `${STOPWATCH_KEY}:${vaultPath}`
+}
+
+function persistStopwatch(vaultPath: string, laufend: RunningStopwatch | null): void {
+  try {
+    if (laufend) localStorage.setItem(stopwatchKey(vaultPath), JSON.stringify(laufend))
+    else localStorage.removeItem(stopwatchKey(vaultPath))
+  } catch {
+    // Kein Speicher, kein Drama: Die Uhr läuft dann nur bis zum Schließen des Fensters.
+  }
+}
+
+function readPersistedStopwatch(vaultPath: string): RunningStopwatch | null {
+  try {
+    const roh = localStorage.getItem(stopwatchKey(vaultPath))
+    if (!roh) return null
+    const w = JSON.parse(roh) as RunningStopwatch
+    if (!w?.caseId || !w?.kind || typeof w.startedAt !== 'number') return null
+    return w
+  } catch {
+    return null
+  }
+}
+
 interface ComparisonState {
   campaigns: Campaign[]
   cases: ComparisonCase[]
@@ -31,6 +65,8 @@ interface ComparisonState {
   /** Fall, dem ein Agent-Lauf zugerechnet wird (an noteAgentStore durchgereicht). */
   activeCaseId: string | null
   stopwatch: RunningStopwatch | null
+  /** Beim Start gefundene, nicht beendete Uhr — wartet auf eine Entscheidung. */
+  pendingStopwatch: RunningStopwatch | null
   loading: boolean
   error: string | null
 
@@ -41,9 +77,21 @@ interface ComparisonState {
   endCampaign: (vaultPath: string) => Promise<void>
   setActiveCampaign: (campaignId: string | null) => void
   setActiveCase: (caseId: string | null) => void
-  startStopwatch: (caseId: string, kind: SessionKind) => void
+  startStopwatch: (vaultPath: string, caseId: string, kind: SessionKind) => void
   /** Beendet die Uhr und schreibt die Sitzung — oder verwirft sie bei `keep: false`. */
   stopStopwatch: (vaultPath: string, keep: boolean) => Promise<void>
+  /**
+   * Entscheidet über eine gefundene, offene Uhr. `minutes` ist der vom Nutzer
+   * bestätigte oder gekürzte Wert; `null` verwirft sie.
+   *
+   * Herkunft ist `nachgetragen`, nicht `gestoppt`: Der Endzeitpunkt wurde nicht
+   * beobachtet, sondern hinterher behauptet. Diesen Unterschied muss der Export tragen.
+   */
+  resolvePendingStopwatch: (vaultPath: string, minutes: number | null) => Promise<void>
+  /** Zeit von Hand eintragen (z. B. Arbeit in Excel, die niemand mitgestoppt hat). */
+  addManualTime: (vaultPath: string, caseId: string, kind: SessionKind, minutes: number) => Promise<void>
+  /** Korrigiert eine Sitzung; Originalwert und Grund bleiben erhalten. */
+  correctSessionTime: (vaultPath: string, caseId: string, index: number, minutes: number, reason: string) => Promise<void>
 }
 
 function applyData(set: (partial: Partial<ComparisonState>) => void, data?: { campaigns: Campaign[]; cases: ComparisonCase[] }): void {
@@ -57,6 +105,7 @@ export const useComparisonStore = create<ComparisonState>((set, get) => ({
   activeCampaignId: null,
   activeCaseId: null,
   stopwatch: null,
+  pendingStopwatch: null,
   loading: false,
   error: null,
 
@@ -69,7 +118,19 @@ export const useComparisonStore = create<ComparisonState>((set, get) => ({
     }
     const laufende = res.data.campaigns.find(c => c.endedAt === undefined) ?? res.data.campaigns[0] ?? null
     const aktiv = get().activeCampaignId ?? laufende?.id ?? null
-    set({ campaigns: res.data.campaigns, cases: res.data.cases, activeCampaignId: aktiv, loading: false })
+    // Eine gefundene Uhr gehört nur zu einem Fall, der noch offen ist.
+    const gefunden = readPersistedStopwatch(vaultPath)
+    const gueltig = gefunden && res.data.cases.some(c => c.id === gefunden.caseId && c.state === 'offen')
+      ? gefunden
+      : null
+    if (gefunden && !gueltig) persistStopwatch(vaultPath, null)
+    set({
+      campaigns: res.data.campaigns,
+      cases: res.data.cases,
+      activeCampaignId: aktiv,
+      pendingStopwatch: get().stopwatch ? null : gueltig,
+      loading: false
+    })
     if (aktiv) await refreshReport(vaultPath, aktiv, set)
   },
 
@@ -125,15 +186,18 @@ export const useComparisonStore = create<ComparisonState>((set, get) => ({
   setActiveCampaign: (campaignId) => set({ activeCampaignId: campaignId, report: null }),
   setActiveCase: (caseId) => set({ activeCaseId: caseId }),
 
-  startStopwatch: (caseId, kind) => {
+  startStopwatch: (vaultPath, caseId, kind) => {
     if (get().stopwatch) return   // Zwei laufende Uhren wären zwei Wahrheiten.
-    set({ stopwatch: { caseId, kind, startedAt: Date.now() } })
+    const laufend = { caseId, kind, startedAt: Date.now() }
+    persistStopwatch(vaultPath, laufend)
+    set({ stopwatch: laufend, pendingStopwatch: null })
   },
 
   stopStopwatch: async (vaultPath, keep) => {
     const laufend = get().stopwatch
     if (!laufend) return
     set({ stopwatch: null })
+    persistStopwatch(vaultPath, null)
     if (!keep) return
     const session: WorkSession = {
       kind: laufend.kind,
@@ -142,6 +206,36 @@ export const useComparisonStore = create<ComparisonState>((set, get) => ({
       origin: 'gestoppt'
     }
     await get().update(vaultPath, laufend.caseId, { type: 'add-session', session })
+  },
+
+  resolvePendingStopwatch: async (vaultPath, minutes) => {
+    const offen = get().pendingStopwatch
+    if (!offen) return
+    set({ pendingStopwatch: null })
+    persistStopwatch(vaultPath, null)
+    if (minutes === null || !Number.isFinite(minutes) || minutes <= 0) return
+    const bis = Date.now()
+    await get().update(vaultPath, offen.caseId, {
+      type: 'add-session',
+      session: { kind: offen.kind, from: bis - minutes * 60_000, to: bis, origin: 'nachgetragen' }
+    })
+  },
+
+  addManualTime: async (vaultPath, caseId, kind, minutes) => {
+    if (!Number.isFinite(minutes) || minutes <= 0) return
+    const bis = Date.now()
+    await get().update(vaultPath, caseId, {
+      type: 'add-session',
+      session: { kind, from: bis - minutes * 60_000, to: bis, origin: 'nachgetragen' }
+    })
+  },
+
+  correctSessionTime: async (vaultPath, caseId, index, minutes, reason) => {
+    if (!Number.isFinite(minutes) || minutes <= 0 || !reason.trim()) return
+    const bis = Date.now()
+    await get().update(vaultPath, caseId, {
+      type: 'correct-session', index, from: bis - minutes * 60_000, to: bis, reason: reason.trim()
+    })
   }
 }))
 

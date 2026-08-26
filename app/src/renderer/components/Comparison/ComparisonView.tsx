@@ -76,6 +76,8 @@ export function ComparisonView(): React.ReactElement {
 
         {store.error && <p className="comparison-error">{store.error}</p>}
 
+        <PendingStopwatch vaultPath={vaultPath} />
+
         {!campaign ? (
           <section className="comparison-card">
             <h3>{t('comparison.newCampaign')}</h3>
@@ -186,6 +188,7 @@ function OpenCase({ fall, vaultPath }: { fall: ComparisonCase; vaultPath: string
   const store = useComparisonStore()
   const [kind, setKind] = useState<SessionKind>(fall.arm === 'konventionell' ? 'nacharbeit' : 'rueckfallarbeit')
   const [grund, setGrund] = useState('')
+  const [nachtrag, setNachtrag] = useState('')
   const laeuft = store.stopwatch?.caseId === fall.id
   const istAktiverFall = store.activeCaseId === fall.id
 
@@ -207,7 +210,7 @@ function OpenCase({ fall, vaultPath }: { fall: ComparisonCase; vaultPath: string
             <button onClick={() => void store.stopStopwatch(vaultPath, false)}>{t('comparison.stopDiscard')}</button>
           </>
         ) : (
-          <button onClick={() => store.startStopwatch(fall.id, kind)} disabled={!!store.stopwatch}>
+          <button onClick={() => store.startStopwatch(vaultPath, fall.id, kind)} disabled={!!store.stopwatch}>
             {t('comparison.start')}
           </button>
         )}
@@ -231,6 +234,46 @@ function OpenCase({ fall, vaultPath }: { fall: ComparisonCase; vaultPath: string
       </div>
 
       <div className="comparison-case-actions">
+        <input
+          className="comparison-minutes"
+          type="number"
+          min={1}
+          value={nachtrag}
+          onChange={e => setNachtrag(e.target.value)}
+          placeholder={t('comparison.manualPlaceholder')}
+        />
+        <button
+          disabled={!Number(nachtrag)}
+          onClick={() => { void store.addManualTime(vaultPath, fall.id, kind, Number(nachtrag)); setNachtrag('') }}
+        >
+          {t('comparison.addManual')}
+        </button>
+      </div>
+
+      {fall.sessions.length > 0 && (
+        <ul className="comparison-sessions">
+          {fall.sessions.map((sitzung, i) => (
+            <li key={i}>
+              <span>{t(SESSION_LABEL_KEY[sitzung.kind])}</span>
+              <span className="comparison-num">{minuten(sitzung.to - sitzung.from)} min</span>
+              <span className="comparison-hint">{t(`comparison.origin.${sitzung.origin}` as TranslationKey)}</span>
+              <button
+                onClick={() => {
+                  const wert = window.prompt(t('comparison.correctPrompt'))
+                  if (!wert) return
+                  const grundText = window.prompt(t('comparison.correctReasonPrompt'))
+                  if (!grundText?.trim()) return
+                  void store.correctSessionTime(vaultPath, fall.id, i, Number(wert), grundText)
+                }}
+              >
+                {t('comparison.correct')}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <div className="comparison-case-actions">
         <input value={grund} onChange={e => setGrund(e.target.value)} placeholder={t('comparison.reasonPlaceholder')} />
         <button disabled={!grund.trim()} onClick={() => void store.update(vaultPath, fall.id, { type: 'abort', reason: grund })}>
           {t('comparison.abort')}
@@ -243,9 +286,92 @@ function OpenCase({ fall, vaultPath }: { fall: ComparisonCase; vaultPath: string
   )
 }
 
+/**
+ * Angebot für eine Uhr, die beim letzten Mal nicht beendet wurde.
+ *
+ * Bewusst kein automatisches Weiterlaufen: Der Endzeitpunkt wurde nie beobachtet. Was
+ * hier eingetragen wird, ist eine Behauptung des Nutzers — und wird als `nachgetragen`
+ * gespeichert, nicht als `gestoppt`.
+ */
+function PendingStopwatch({ vaultPath }: { vaultPath: string }): React.ReactElement | null {
+  const { t } = useTranslation()
+  const store = useComparisonStore()
+  const offen = store.pendingStopwatch
+  const fall = store.cases.find(c => c.id === offen?.caseId)
+  const [minutenWert, setMinutenWert] = useState('')
+
+  useEffect(() => {
+    if (offen) setMinutenWert(String(Math.max(1, Math.round((Date.now() - offen.startedAt) / 60_000))))
+  }, [offen])
+
+  if (!offen || !fall) return null
+
+  return (
+    <section className="comparison-card comparison-pending">
+      <h3>{t('comparison.pendingTitle')}</h3>
+      <p className="comparison-hint">
+        {t('comparison.pendingBody', {
+          label: fall.label || fall.id,
+          kind: t(SESSION_LABEL_KEY[offen.kind]),
+          since: new Date(offen.startedAt).toLocaleString()
+        })}
+      </p>
+      <div className="comparison-case-actions">
+        <input
+          className="comparison-minutes"
+          type="number"
+          min={1}
+          value={minutenWert}
+          onChange={e => setMinutenWert(e.target.value)}
+        />
+        <span className="comparison-hint">{t('comparison.minutes')}</span>
+        <button className="btn-primary" onClick={() => void store.resolvePendingStopwatch(vaultPath, Number(minutenWert))}>
+          {t('comparison.pendingKeep')}
+        </button>
+        <button onClick={() => void store.resolvePendingStopwatch(vaultPath, null)}>{t('comparison.pendingDiscard')}</button>
+      </div>
+      <p className="comparison-hint">{t('comparison.pendingWhy')}</p>
+    </section>
+  )
+}
+
 function ReportBlock(): React.ReactElement | null {
   const { t } = useTranslation()
   const report = useComparisonStore(s => s.report)
+  const campaignId = useComparisonStore(s => s.activeCampaignId)
+  const vaultPath = useNotesStore(s => s.vaultPath)
+  const [hinweis, setHinweis] = useState<string | null>(null)
+
+  // Die Beschriftungen kommen von hier — der Bericht soll in der Sprache der Oberfläche
+  // stehen, ohne dass der Renderer die Zahlen liefert.
+  const exportieren = async (format: 'md' | 'csv'): Promise<void> => {
+    if (!vaultPath || !campaignId) return
+    const labels = {
+      arm: { konventionell: t('comparison.arm.konventionell'), mindgraph: t('comparison.arm.mindgraph') },
+      state: {
+        offen: t('comparison.state.offen'),
+        abgeschlossen: t('comparison.state.abgeschlossen'),
+        abgebrochen: t('comparison.state.abgebrochen'),
+        'nicht-messbar': t('comparison.state.nicht-messbar')
+      },
+      quality: {
+        1: t('comparison.quality.unusable'),
+        2: t('comparison.quality.majorFlaws'),
+        3: t('comparison.quality.minorFlaws'),
+        4: t('comparison.quality.usable')
+      },
+      origin: {
+        'vordergrund-automatisch': t('comparison.origin.vordergrund-automatisch'),
+        gestoppt: t('comparison.origin.gestoppt'),
+        nachgetragen: t('comparison.origin.nachgetragen'),
+        korrigiert: t('comparison.origin.korrigiert')
+      }
+    }
+    const res = await window.electronAPI.comparisonExport(vaultPath, campaignId, format, labels)
+    if (res.cancelled) return
+    setHinweis(res.success ? t('comparison.exportDone', { path: res.path ?? '' }) : res.error ?? '')
+  }
+
   if (!report) return null
 
   return (
@@ -281,6 +407,11 @@ function ReportBlock(): React.ReactElement | null {
         </tbody>
       </table>
       <p className="comparison-hint">{t('comparison.reportLimits')}</p>
+      <div className="comparison-case-actions">
+        <button onClick={() => void exportieren('md')}>{t('comparison.exportMd')}</button>
+        <button onClick={() => void exportieren('csv')}>{t('comparison.exportCsv')}</button>
+        {hinweis && <span className="comparison-hint">{hinweis}</span>}
+      </div>
     </section>
   )
 }

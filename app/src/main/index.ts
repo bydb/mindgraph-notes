@@ -182,6 +182,7 @@ import { randomBytes } from 'crypto'
 import { loadComparisons, updateComparisons, mainRandom } from './comparisonStore'
 import { createCampaign, createCase, startWork, markResultReady, addSession, correctSession, setAccepted, closeCase, abortCase, markNotMeasurable, endCampaign } from '../shared/comparison/model'
 import { campaignReport } from '../shared/comparison/metrics'
+import { toCsv, toMarkdown, type ExportLabels } from '../shared/comparison/export'
 import type { ComparisonCase, Quality, WorkSession } from '../shared/comparison/types'
 import { recordActivity, readActivitySummary, onActivityChanged, setEmailForegroundMs } from './activityLedger'
 import { deriveActivityType, isActivityEvent, type ActivityEvent } from '../shared/activityLog'
@@ -4730,6 +4731,45 @@ ipcMain.handle('comparison-end-campaign', async (event, vaultPath: string, campa
       campaigns: d.campaigns.map(c => (c.id === campaignId ? endCampaign(c, now) : c))
     }))
     return { success: true, data }
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : 'Unbekannter Fehler' }
+  }
+})
+
+// Export des Berichts. Die Beschriftungen kommen aus dem Renderer (dort liegen die
+// Übersetzungen), die Daten aus diesem Prozess — so bleibt der Bericht in der Sprache
+// der Oberfläche, ohne dass der Renderer die Zahlen liefert.
+ipcMain.handle('comparison-export', async (
+  event,
+  vaultPath: string,
+  campaignId: string,
+  format: 'md' | 'csv',
+  labels: ExportLabels
+) => {
+  if (!isTrustedSender(event)) return { success: false, error: 'Nicht autorisierter Aufrufer' }
+  try {
+    assertApprovedVault(vaultPath, 'comparison-export')
+    const { campaigns, cases } = await loadComparisons(vaultPath)
+    const campaign = campaigns.find(c => c.id === campaignId)
+    if (!campaign) return { success: false, error: 'Unbekannte Kampagne' }
+
+    const dateiname = `Vergleich-${campaign.taskClass.replace(/[^\p{L}\p{N}]+/gu, '-')}.${format}`
+    const win = BrowserWindow.getFocusedWindow() || BrowserWindow.getAllWindows()[0]
+    const ziel = await dialog.showSaveDialog(win, {
+      title: 'Vergleichsbericht speichern',
+      defaultPath: dateiname,
+      filters: format === 'md'
+        ? [{ name: 'Markdown', extensions: ['md'] }]
+        : [{ name: 'CSV', extensions: ['csv'] }]
+    })
+    if (ziel.canceled || !ziel.filePath) return { success: false, cancelled: true }
+
+    const inhalt = format === 'md'
+      ? toMarkdown(campaign, cases, labels, Date.now())
+      : toCsv(campaign, cases, labels)
+    // CSV mit BOM, sonst zeigt Excel Umlaute falsch an — der Bericht geht ins Controlling.
+    await fs.writeFile(ziel.filePath, format === 'csv' ? `\ufeff${inhalt}` : inhalt, 'utf-8')
+    return { success: true, path: ziel.filePath }
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : 'Unbekannter Fehler' }
   }
