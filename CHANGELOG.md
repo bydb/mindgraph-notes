@@ -2,6 +2,46 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.10.55-beta] - 2026-08-26
+
+Die Zeitanzeige aus dem letzten Release rechnete falsch — zu deinen Ungunsten. Das ist behoben, und dazu kommt ein Modus, mit dem sich der Nutzen nicht nur behaupten, sondern belegen lässt.
+
+### Behoben
+
+- **Die Zeitbilanz zog die falsche Größe ab.** Abgezogen wurde die Laufzeit des Agenten — also Zeit, in der niemand am Schreibtisch sitzt. Jetzt zählt die eigene Arbeitszeit: Auftrag formulieren, am Bildschirm warten, Ergebnis prüfen. Die Rechenzeit steht daneben als Durchlaufzeit. Nebeneffekt: Die Zahl wird größer, weil langsame Modelle nicht mehr bestraft werden — und die Modellwahl taucht überhaupt erst in der Bilanz auf, weil Warten vor dem Bildschirm zählt, Wegklicken aber nicht.
+
+- **Ein Mehraufwand wurde auf null gekappt.** Dauerte ein Vorgang länger als von Hand, zeigte die App trotzdem keine negative Zahl. Eine Kennzahl, die nur gewinnen kann, ist als Nachweis wertlos. Jetzt steht dort „heute 5 min Mehraufwand", wenn es so war.
+
+- **Zeit konnte doppelt gutgeschrieben werden.** Wurden zwei Ergebnisse desselben Laufs an verschiedenen Tagen übernommen, bekam jeder Tag die volle Referenzzeit für dieselbe Arbeit. Die Gutschrift hängt jetzt am Tag der ersten Übernahme.
+
+- **Zeit ging verloren, wenn erst verworfen und dann übernommen wurde.** Prüf- und Wartezeit hingen an der ersten Entscheidung und fehlten dem übernommenen Lauf. Beide Entscheidungen zählen jetzt, und nach jeder Entscheidung beginnt eine neue Prüfphase, solange Karten offen sind.
+
+- **Der Sync meldete eine Meldung aus dem Maschinenraum.** Bei einem nicht erreichbaren Server stand in den Einstellungen etwas über einen WebSocket, der geschlossen wurde, bevor die Verbindung stand. Das beschrieb die eigene Reaktion der App, nicht die Ursache. Jetzt steht dort „Der Sync-Server ist nicht erreichbar (Zeitüberschreitung nach 10 Sekunden)". Echte Verbindungsfehler melden sich unverändert.
+
+- **Die Einstellung für die Zeitbilanz war versteckt.** Sie lag unter „Diktat & Vorlesen" — und dieser Reiter erscheint nur, wenn das Sprach-Modul an ist. Wer die Sprachbefehle nicht nutzt, sah die Bilanz, kam aber nicht an die Referenzzeiten. Sie steht jetzt unter „Allgemein".
+
+- **Ein Abbruch kam zu spät.** Wer die Befehlspalette schloss, während die Spracherkennung noch arbeitete oder die Aktion ihre Daten holte, bekam die Antwortkarte trotzdem — und hörte sie vorgelesen.
+
+- Kleinere Anzeigefehler in der Bilanz: „1 Ergebnisse", „0 min Laufzeit" bei Vorgängen unter einer Minute, „30 − 1 = 59" bei mehreren Vorgängen und eine gesprochene Antwort, die von „minus fünf gesparten Minuten" sprach.
+
+### Neu
+
+- **Vergleichsmodus** (eigener Tab, über die Befehlspalette). Er beantwortet die Frage, die ein Einkauf zuerst stellt: Woher kommt die Zahl?
+
+  Für eine Aufgabenklasse legst du echte Vorgänge als Fälle an. **Die App teilt jeden Fall zufällig einem der beiden Wege zu** — konventionell oder mit MindGraph. Du wählst nicht: Wer selbst wählt, schiebt die kniffligen Fälle unbewusst auf den Weg, dem er mehr zutraut, und misst am Ende diese Vorauswahl. Bewusst auch keine Wiederholung derselben Aufgabe, denn beim zweiten Durchgang misst man vor allem Erinnerung.
+
+  Gemessen werden aktive Zeit, Nacharbeit, Übernahmequote und eine Qualitätsstufe. **Arbeit, die nach einem verworfenen Ergebnis von Hand nötig war, bleibt beim Fall** — ein Fehlschlag wird dadurch teurer, nicht billiger. Alle zugeteilten Fälle bleiben in der Rechnung, auch abgebrochene.
+
+  Die Auswertung zeigt Median und Streuung, immer mit der Zahl der Fälle daneben. **Unter drei abgeschlossenen Fällen je Weg zeigt die App gar keine Kennzahl**, sondern was noch fehlt. Keine Signifikanztests, keine Schlussfolgerung — die zieht der Mensch, der die Fälle kennt.
+
+  Der Bericht als Markdown oder CSV nennt für jede Zahl ihre Herkunft (gemessen, gestoppt, nachgetragen, korrigiert), führt Fälle als „Fall 3" statt mit deiner Bezeichnung, und endet mit einem Abschnitt darüber, was die Zahlen **nicht** sind.
+
+- **Stoppuhr für den konventionellen Weg**, die bewusst weiterläuft, wenn MindGraph im Hintergrund ist — dort arbeitest du ja gerade in Excel. Sie übersteht einen Neustart, wird danach aber nur angeboten und nie stillschweigend fortgeschrieben: Das Ende hat niemand beobachtet, und der bestätigte Wert wird als „nachgetragen" gespeichert.
+
+- **Modellvergleich in der Tagesbilanz**: Läufe werden mit ihrem Modell protokolliert, die Karte zeigt je Modell Anzahl, Median und ab drei Vorgängen den Mittelwert.
+
+- **Aufgaben aus Mails zählen mit.** Die Extraktion lief bisher an der Bilanz vorbei — weder Aufgaben noch Laufzeit noch Modell tauchten auf. Sie ist jetzt eine eigene Tätigkeitsart mit eigener Referenzzeit. Ein Durchgang ohne Fund wird nicht bewertet: Er kostet Zeit, ersetzt aber keine Handarbeit.
+
 ## [0.10.54-beta] - 2026-08-25
 
 Zwei Dinge, die zusammengehören: Du kannst der App sagen, was du brauchst, statt die Funktion zu suchen. Und die App führt Buch darüber, was sie dir abgenommen hat — mit Zahlen, die sie belegen kann.
