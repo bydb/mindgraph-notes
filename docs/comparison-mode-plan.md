@@ -235,7 +235,31 @@ Der Bericht geht ins Controlling — er muss ohne die App verständlich sein.
 - Soll eine Kampagne pausierbar sein (Urlaub, Projektwechsel), und was heißt das für die
   Durchlaufzeit?
 
-## 13. Reihenfolge
+## 13. Stand der Umsetzung
+
+**Schritt 1 ist gebaut** (26.08.2026): `shared/comparison/` mit `types.ts`, `randomization.ts`,
+`model.ts`, `metrics.ts` und 34 Tests. Rein, ohne Oberfläche, ohne Persistenz.
+
+Was dabei aus dem Vertrag in Code wurde:
+
+- **Zuteilung und Anlegen in EINEM Schritt** (`createCase`). Dazwischen darf keine Lücke sein: Ein
+  Fall ohne Zuteilung wäre die Gelegenheit, ihn nach dem Blick auf den Weg wieder zu verwerfen.
+- **Endzustände sind endgültig.** `abgeschlossen`, `abgebrochen` und `nicht-messbar` lassen sich
+  nicht mehr verlassen; jede Funktion gibt ein neues Objekt zurück und fasst ihre Eingabe nicht an.
+  Getestet wird beides — auch, dass die Eingabe unverändert bleibt.
+- **Ausgleich über die ZUTEILUNG, nicht über die Abschlüsse.** Sonst verschiebt ein abgebrochener
+  Fall die Verteilung.
+- **Abschluss ohne Arbeitssitzung wird abgewiesen** — so ein Fall ist nicht abgeschlossen, sondern
+  nicht messbar.
+- **Korrektur nur mit Grund**, Originalwert bleibt erhalten. Eine Korrektur ohne Spur wäre von einer
+  Erfindung nicht zu unterscheiden.
+- **Kennzahlen nur aus abgeschlossenen Fällen**, Nenner aus allen zugeteilten, `null` statt Median
+  unterhalb der Mindestzahl.
+
+Noch nicht gebaut: Persistenz (`userData/comparisons/…`), Erfassung an den bestehenden Messungen,
+Stoppuhr, Oberfläche, Export.
+
+## 14. Reihenfolge
 
 1. **Datenschicht, Zuteilung und Kennzahlen** (rein, getestet, ohne Oberfläche): Kampagne, Fall,
    Sitzungen, Urnenmodell mit eingespeistem Zufall, Gesamtzeit inklusive Rückfallarbeit,
