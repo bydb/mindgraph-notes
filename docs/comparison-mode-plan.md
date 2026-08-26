@@ -256,8 +256,28 @@ Was dabei aus dem Vertrag in Code wurde:
 - **Kennzahlen nur aus abgeschlossenen Fällen**, Nenner aus allen zugeteilten, `null` statt Median
   unterhalb der Mindestzahl.
 
-Noch nicht gebaut: Persistenz (`userData/comparisons/…`), Erfassung an den bestehenden Messungen,
-Stoppuhr, Oberfläche, Export.
+**Schritt 2 ist gebaut** (26.08.2026): Persistenz und Erfassung im MindGraph-Arm.
+
+- `shared/comparison/validation.ts` — prüft jede gespeicherte Zeile. Der gefährlichste Fund ist ein
+  Fall **ohne gültigen Weg**: Er ließe sich nachträglich zuteilen, und genau das darf nie möglich
+  sein. Eine korrigierte Sitzung ohne Originalwert und Grund wird ebenfalls abgewiesen.
+- `main/comparisonStore.ts` — `userData/comparisons/<hash(vault)>.json`, serielle Warteschlange,
+  atomares Schreiben. Beschädigte Zeilen fallen weg, die Kampagne bleibt.
+- **Die Regeln setzt der Main durch, nicht die Oberfläche.** Der Renderer schickt Absichten
+  („Fall anlegen", „abschließen"), der Main zieht den Weg mit `crypto.randomInt` und wendet die
+  reinen Modellfunktionen an. Ein Renderer kann damit weder umteilen noch löschen.
+- **Anschluss an den Agent-Lauf**: Trägt ein Lauf eine `comparisonCaseId`, wandern die ohnehin
+  gemessenen Zeiten zusätzlich als Arbeitssitzungen in den Fall — Auftragszeit beim Lauf-Ende,
+  Vordergrund- und Prüfzeit bei der Entscheidung, dazu der Übernahme-Status. Ein bereits
+  abgeschlossener Fall nimmt nichts mehr an; nachträgliches Anhängen wäre nicht prüfbar.
+
+Gegengeprüft in der laufenden App: Kampagne angelegt, sechs Fälle gezogen (3:3, ohne festes Muster),
+Sitzungen eingetragen, abgeschlossen. Der Bericht zeigt konventionell 40 min gegen MindGraph 12 min
+im Median — **einschließlich des gescheiterten Falls mit 47 min**, der die Rückfallarbeit trägt.
+Alle Sperren greifen über die IPC-Grenze: abgeschlossene Fälle nehmen nichts mehr an, unbekannte
+Kampagnen und Fälle werden abgewiesen, eine Kampagne ohne Akzeptanzdefinition entsteht gar nicht.
+
+Noch nicht gebaut: Stoppuhr für den konventionellen Arm, Oberfläche, Export.
 
 ## 14. Reihenfolge
 

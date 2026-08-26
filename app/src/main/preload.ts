@@ -215,6 +215,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     webResearch?: { enabled: boolean } | null
     /** Gemessene aktive Zeit beim Formulieren des Auftrags (Wirkungsbilanz). */
     instructionMs?: number
+    /** Vergleichsfall, zu dem dieser Lauf gehört (Vergleichsmodus, optional). */
+    comparisonCaseId?: string
   }) => ipcRenderer.invoke('note-agent-run', params),
   noteAgentCancel: (runId: string) => ipcRenderer.invoke('note-agent-cancel', runId),
 
@@ -223,6 +225,20 @@ contextBridge.exposeInMainWorld('electronAPI', {
   activityAppend: (vaultPath: string, entry: unknown) => ipcRenderer.invoke('activity-append', vaultPath, entry),
   activitySummary: (vaultPath: string, range?: { from: number; to: number }) =>
     ipcRenderer.invoke('activity-summary', vaultPath, range),
+  // Vergleichsmodus: Der Renderer schickt Absichten, der Main zieht den Weg und prüft
+  // die Übergänge (docs/comparison-mode-plan.md).
+  comparisonLoad: (vaultPath: string) => ipcRenderer.invoke('comparison-load', vaultPath),
+  comparisonCreateCampaign: (vaultPath: string, params: { taskClass: string; inclusionRules: string; acceptanceDefinition: string }) =>
+    ipcRenderer.invoke('comparison-create-campaign', vaultPath, params),
+  comparisonCreateCase: (vaultPath: string, campaignId: string, label: string) =>
+    ipcRenderer.invoke('comparison-create-case', vaultPath, campaignId, label),
+  comparisonUpdateCase: (vaultPath: string, caseId: string, action: unknown) =>
+    ipcRenderer.invoke('comparison-update-case', vaultPath, caseId, action),
+  comparisonEndCampaign: (vaultPath: string, campaignId: string) =>
+    ipcRenderer.invoke('comparison-end-campaign', vaultPath, campaignId),
+  comparisonReport: (vaultPath: string, campaignId: string) =>
+    ipcRenderer.invoke('comparison-report', vaultPath, campaignId),
+
   /** Trägt NUR die Vordergrundzeit an einem vom Main geschriebenen Mail-Ereignis nach. */
   activityForeground: (vaultPath: string, id: string, foregroundMs: number) =>
     ipcRenderer.invoke('activity-foreground', vaultPath, id, foregroundMs),

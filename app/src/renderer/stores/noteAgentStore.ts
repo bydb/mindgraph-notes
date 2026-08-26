@@ -112,6 +112,8 @@ export interface AgentStartParams {
   webResearch: boolean
   /** Gemessene aktive Zeit beim Formulieren des Auftrags (Wirkungsbilanz). */
   instructionMs?: number
+  /** Vergleichsfall, zu dem dieser Lauf gehört (Vergleichsmodus, optional). */
+  comparisonCaseId?: string
 }
 
 interface NoteAgentStoreState {
@@ -321,7 +323,8 @@ export const useNoteAgentStore = create<NoteAgentStoreState>((set, get) => ({
       lmStudioPort: params.lmStudioPort,
       cloud: params.cloud,
       webResearch: params.webResearch ? { enabled: true } : null,
-      instructionMs: params.instructionMs
+      instructionMs: params.instructionMs,
+      comparisonCaseId: params.comparisonCaseId
     })
     if (!res.success || !res.runId) {
       get().setAttachError(scopeId, res.error || 'Start fehlgeschlagen')

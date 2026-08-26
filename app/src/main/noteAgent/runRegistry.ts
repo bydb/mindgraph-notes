@@ -84,6 +84,10 @@ export interface AgentRun {
   // Aktive Zeit, die der Nutzer mit dem Formulieren des Auftrags verbracht hat
   // (Renderer-Messung, nur bei Fenster im Vordergrund). Undefiniert, wenn nicht gemessen.
   instructionMs?: number
+  // Vergleichsfall, zu dem dieser Lauf gehört (Vergleichsmodus). Gesetzt nur, wenn der
+  // Nutzer einen Fall aktiv geschaltet hat — die gemessenen Zeiten wandern dann
+  // zusätzlich als Arbeitssitzungen in die Kampagne.
+  comparisonCaseId?: string
   web?: WebRunState    // nur bei aktivierter Webrecherche
   // Bild-Generierung (Opt-in-Modul image-generation): beim Run-Start Main-seitig
   // bestimmt (Modul aktiv + Imagen-Key hinterlegt) → schaltet das generate_image-Tool frei.
@@ -137,6 +141,7 @@ export function startRun(params: {
   instruction: string
   model: string
   instructionMs?: number
+  comparisonCaseId?: string
   skills?: Array<{ name: string; description: string; folderName: string }>
   web?: WebRunState
   imageGen?: boolean
@@ -167,6 +172,7 @@ export function startRun(params: {
     startedAt: Date.now(),
     toolsUsed: new Set(),
     instructionMs: params.instructionMs,
+    comparisonCaseId: params.comparisonCaseId,
     web: params.web,
     imageGen: params.imageGen
   }

@@ -179,6 +179,10 @@ import { registerPluginTransport, isTrustedSender } from './plugins/transport'
 import { registerContextAttachment, registerContextFolder, removeContextAttachment, clearContextAttachments, readContextBlock } from './noteAgent/contextFiles'
 import { startRun, getRunForSender, finishRun, publicResults, takeResult, peekResult, cancelRunsForSender, pruneRunIfConsumed, consumeEvictedRuns, totalFolderReads, type WebRunState } from './noteAgent/runRegistry'
 import { randomBytes } from 'crypto'
+import { loadComparisons, updateComparisons, mainRandom } from './comparisonStore'
+import { createCampaign, createCase, startWork, markResultReady, addSession, correctSession, setAccepted, closeCase, abortCase, markNotMeasurable, endCampaign } from '../shared/comparison/model'
+import { campaignReport } from '../shared/comparison/metrics'
+import type { ComparisonCase, Quality, WorkSession } from '../shared/comparison/types'
 import { recordActivity, readActivitySummary, onActivityChanged, setEmailForegroundMs } from './activityLedger'
 import { deriveActivityType, isActivityEvent, type ActivityEvent } from '../shared/activityLog'
 import { acquireStayAwake } from './powerGuard'
@@ -4203,6 +4207,8 @@ interface NoteAgentRunParams {
   // Aktive Zeit, die der Nutzer mit dem Formulieren verbracht hat (Wirkungsbilanz).
   // Renderer-Messung: nur bei Fenster im Vordergrund, gedeckelt.
   instructionMs?: number
+  // Vergleichsfall, zu dem dieser Lauf gehört (Vergleichsmodus, optional).
+  comparisonCaseId?: string
 }
 
 // Web-Provenienz fürs done-Event (Renderer zeigt „N Suchen · M Seiten" + Liste). Enthält
@@ -4341,6 +4347,7 @@ ipcMain.handle('note-agent-run', async (event, params: NoteAgentRunParams) => {
       model: provenanceModel,
       // Aktive Zeit beim Formulieren (Renderer-Messung, Fenster im Vordergrund).
       instructionMs: typeof params.instructionMs === 'number' ? params.instructionMs : undefined,
+      comparisonCaseId: typeof params.comparisonCaseId === 'string' ? params.comparisonCaseId : undefined,
       skills,
       web,
       imageGen
@@ -4374,6 +4381,8 @@ ipcMain.handle('note-agent-run', async (event, params: NoteAgentRunParams) => {
           }
         })
         finishRun(run, 'done')
+        // Vergleichsmodus: Auftragszeit als Arbeitssitzung, sobald der Lauf steht.
+        recordComparisonSession(run.vaultPath, run.comparisonCaseId, 'auftrag', run.instructionMs, Date.now())
         // Tätigkeitsprotokoll: Dauer genau EINMAL, hier am Lauf-Ende — nicht bei der
         // Übernahme. Sonst zählte ein Lauf mit drei übernommenen Ergebnissen dreifach.
         recordActivity(run.vaultPath, {
@@ -4499,6 +4508,15 @@ ipcMain.handle('note-agent-accept-result', async (event, runId: string, resultId
     pruneRunIfConsumed(run)
     // Erst NACH der geglückten Übernahme protokollieren: Nur übernommene Ergebnisse
     // zählen für die Bilanz. Nur Format und Lauf-Kennung, nie der Dateiname.
+    const jetzt = Date.now()
+    recordComparisonSession(run.vaultPath, run.comparisonCaseId, 'vordergrund', timings?.waitingMs, jetzt)
+    recordComparisonSession(run.vaultPath, run.comparisonCaseId, 'pruefung', timings?.reviewMs, jetzt)
+    if (run.comparisonCaseId) {
+      void updateComparisons(run.vaultPath, d => ({
+        ...d,
+        cases: d.cases.map(c => (c.id === run.comparisonCaseId && c.state === 'offen' ? setAccepted(c, true) : c))
+      })).catch(() => undefined)
+    }
     recordActivity(run.vaultPath, {
       at: Date.now(),
       kind: 'agent-result-accepted',
@@ -4567,6 +4585,164 @@ ipcMain.handle('note-agent-remember', async (event, vaultPath: string, text: str
 onActivityChanged(vaultPath => {
   for (const win of BrowserWindow.getAllWindows()) {
     if (!win.isDestroyed()) win.webContents.send('activity-changed', { vaultPath })
+  }
+})
+
+/**
+ * Hängt eine gemessene Arbeitssitzung an einen Vergleichsfall.
+ *
+ * Die Dauer ist gemessen, die Lage im Tag rekonstruiert (`bis` minus Dauer) — für die
+ * Kennzahlen zählt die Dauer, für die Durchlaufzeit die eigenen Zeitstempel des Falls.
+ * Fehler bleiben still: Ein Vergleichsfall darf keinen Agent-Lauf scheitern lassen.
+ */
+function recordComparisonSession(
+  vaultPath: string,
+  caseId: string | undefined,
+  kind: WorkSession['kind'],
+  durationMs: number | undefined,
+  bis: number
+): void {
+  if (!caseId || typeof durationMs !== 'number' || durationMs <= 0) return
+  const session: WorkSession = {
+    kind,
+    from: Math.max(0, bis - durationMs),
+    to: bis,
+    origin: 'vordergrund-automatisch'
+  }
+  void updateComparisons(vaultPath, d => {
+    const vorhanden = d.cases.find(c => c.id === caseId)
+    // Ein bereits abgeschlossener Fall nimmt nichts mehr an — dann geht die Sitzung
+    // verloren, und das ist richtig so: Nachträgliches Anhängen wäre nicht prüfbar.
+    if (!vorhanden || vorhanden.state !== 'offen') return d
+    return { ...d, cases: d.cases.map(c => (c.id === caseId ? addSession(c, session) : c)) }
+  }).catch(() => undefined)
+}
+
+// ── Vergleichsmodus (docs/comparison-mode-plan.md) ──
+// Der Renderer schickt Absichten, nicht Ergebnisse: Der Weg wird HIER gezogen, die
+// Zustandsübergänge werden HIER geprüft. Ein Renderer, der einen Fall umteilen oder
+// löschen könnte, machte die ganze Auswertung wertlos.
+
+ipcMain.handle('comparison-load', async (event, vaultPath: string) => {
+  if (!isTrustedSender(event)) return { success: false, error: 'Nicht autorisierter Aufrufer' }
+  try {
+    assertApprovedVault(vaultPath, 'comparison-load')
+    return { success: true, data: await loadComparisons(vaultPath) }
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : 'Unbekannter Fehler' }
+  }
+})
+
+ipcMain.handle('comparison-create-campaign', async (event, vaultPath: string, params: {
+  taskClass: string; inclusionRules: string; acceptanceDefinition: string
+}) => {
+  if (!isTrustedSender(event)) return { success: false, error: 'Nicht autorisierter Aufrufer' }
+  try {
+    assertApprovedVault(vaultPath, 'comparison-create-campaign')
+    const campaign = createCampaign({
+      id: `kmp-${randomBytes(6).toString('hex')}`,
+      taskClass: params.taskClass,
+      inclusionRules: params.inclusionRules ?? '',
+      acceptanceDefinition: params.acceptanceDefinition,
+      startedAt: Date.now()
+    })
+    const data = await updateComparisons(vaultPath, d => ({ ...d, campaigns: [...d.campaigns, campaign] }))
+    return { success: true, campaignId: campaign.id, data }
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : 'Unbekannter Fehler' }
+  }
+})
+
+// Anlegen UND Zuteilen in einem Schritt. Dazwischen darf keine Lücke sein: Sie wäre die
+// Gelegenheit, einen Fall nach dem Blick auf den Weg wieder zu verwerfen.
+ipcMain.handle('comparison-create-case', async (event, vaultPath: string, campaignId: string, label: string) => {
+  if (!isTrustedSender(event)) return { success: false, error: 'Nicht autorisierter Aufrufer' }
+  try {
+    assertApprovedVault(vaultPath, 'comparison-create-case')
+    let neuerFall: ComparisonCase | null = null
+    const data = await updateComparisons(vaultPath, d => {
+      const campaign = d.campaigns.find(c => c.id === campaignId)
+      if (!campaign) throw new Error('Unbekannte Kampagne')
+      neuerFall = createCase({
+        id: `fall-${randomBytes(6).toString('hex')}`,
+        campaign,
+        label: String(label ?? ''),
+        existingCases: d.cases,
+        random: mainRandom,
+        createdAt: Date.now()
+      })
+      return { ...d, cases: [...d.cases, neuerFall] }
+    })
+    return { success: true, case: neuerFall, data }
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : 'Unbekannter Fehler' }
+  }
+})
+
+export type ComparisonAction =
+  | { type: 'start' }
+  | { type: 'result-ready' }
+  | { type: 'add-session'; session: WorkSession }
+  | { type: 'correct-session'; index: number; from: number; to: number; reason: string }
+  | { type: 'set-accepted'; accepted: boolean }
+  | { type: 'close'; quality: Quality }
+  | { type: 'abort'; reason: string }
+  | { type: 'not-measurable'; reason: string }
+
+function applyComparisonAction(c: ComparisonCase, action: ComparisonAction, now: number): ComparisonCase {
+  switch (action.type) {
+    case 'start': return startWork(c, now)
+    case 'result-ready': return markResultReady(c, now)
+    case 'add-session': return addSession(c, action.session)
+    case 'correct-session': return correctSession(c, action.index, { from: action.from, to: action.to, reason: action.reason })
+    case 'set-accepted': return setAccepted(c, action.accepted)
+    case 'close': return closeCase(c, { quality: action.quality, at: now })
+    case 'abort': return abortCase(c, { reason: action.reason, at: now })
+    case 'not-measurable': return markNotMeasurable(c, { reason: action.reason, at: now })
+    default: throw new Error('Unbekannte Aktion')
+  }
+}
+
+ipcMain.handle('comparison-update-case', async (event, vaultPath: string, caseId: string, action: ComparisonAction) => {
+  if (!isTrustedSender(event)) return { success: false, error: 'Nicht autorisierter Aufrufer' }
+  try {
+    assertApprovedVault(vaultPath, 'comparison-update-case')
+    const now = Date.now()
+    const data = await updateComparisons(vaultPath, d => {
+      const vorhanden = d.cases.find(c => c.id === caseId)
+      if (!vorhanden) throw new Error('Unbekannter Fall')
+      const geaendert = applyComparisonAction(vorhanden, action, now)
+      return { ...d, cases: d.cases.map(c => (c.id === caseId ? geaendert : c)) }
+    })
+    return { success: true, data }
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : 'Unbekannter Fehler' }
+  }
+})
+
+ipcMain.handle('comparison-end-campaign', async (event, vaultPath: string, campaignId: string) => {
+  if (!isTrustedSender(event)) return { success: false, error: 'Nicht autorisierter Aufrufer' }
+  try {
+    assertApprovedVault(vaultPath, 'comparison-end-campaign')
+    const now = Date.now()
+    const data = await updateComparisons(vaultPath, d => ({
+      ...d,
+      campaigns: d.campaigns.map(c => (c.id === campaignId ? endCampaign(c, now) : c))
+    }))
+    return { success: true, data }
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : 'Unbekannter Fehler' }
+  }
+})
+
+ipcMain.handle('comparison-report', async (event, vaultPath: string, campaignId: string) => {
+  if (!isTrustedSender(event)) return { success: false, error: 'Nicht autorisierter Aufrufer' }
+  try {
+    assertApprovedVault(vaultPath, 'comparison-report')
+    const { cases } = await loadComparisons(vaultPath)
+    return { success: true, report: campaignReport(campaignId, cases) }
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : 'Unbekannter Fehler' }
   }
 })
 
@@ -4723,6 +4899,15 @@ ipcMain.handle('note-agent-discard-result', async (event, runId: string, resultI
     /* Datei fehlt bereits — Verwerfen ist idempotent */
   }
   pruneRunIfConsumed(run)
+  const verworfenAm = Date.now()
+  recordComparisonSession(run.vaultPath, run.comparisonCaseId, 'vordergrund', timings?.waitingMs, verworfenAm)
+  recordComparisonSession(run.vaultPath, run.comparisonCaseId, 'pruefung', timings?.reviewMs, verworfenAm)
+  if (run.comparisonCaseId) {
+    void updateComparisons(run.vaultPath, d => ({
+      ...d,
+      cases: d.cases.map(c => (c.id === run.comparisonCaseId && c.state === 'offen' ? setAccepted(c, false) : c))
+    })).catch(() => undefined)
+  }
   recordActivity(run.vaultPath, {
     at: Date.now(),
     kind: 'agent-result-discarded',

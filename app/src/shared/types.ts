@@ -4,6 +4,24 @@ import type { DisplayHealth } from './displayHealth'
 import type { LlmRunMetrics } from './llmTelemetry'
 import type { CalendarEventDraft } from './calendarEvent'
 import type { ActivityEvent, ActivitySummary } from './activityLog'
+import type { Campaign, ComparisonCase, Quality, WorkSession } from './comparison/types'
+import type { CampaignReport } from './comparison/metrics'
+
+export interface ComparisonData {
+  campaigns: Campaign[]
+  cases: ComparisonCase[]
+}
+
+/** Absichten, die der Renderer schicken darf — ausgeführt und geprüft wird im Main. */
+export type ComparisonActionInput =
+  | { type: 'start' }
+  | { type: 'result-ready' }
+  | { type: 'add-session'; session: WorkSession }
+  | { type: 'correct-session'; index: number; from: number; to: number; reason: string }
+  | { type: 'set-accepted'; accepted: boolean }
+  | { type: 'close'; quality: Quality }
+  | { type: 'abort'; reason: string }
+  | { type: 'not-measurable'; reason: string }
 
 // Per-Vault Feature Toggles
 export interface VaultFeatures {
@@ -706,6 +724,7 @@ export interface ElectronAPI {
     cloud?: { model: string; provider?: 'openrouter' | 'llmbase' } | null;
     webResearch?: { enabled: boolean } | null;
     instructionMs?: number;
+    comparisonCaseId?: string;
   }) => Promise<{ success: boolean; runId?: string; error?: string }>;
   noteAgentCancel: (runId: string) => Promise<{ success: boolean }>;
   noteAgentRemember: (vaultPath: string, text: string) => Promise<{ success: boolean; relPath?: string; error?: string }>;
@@ -722,6 +741,12 @@ export interface ElectronAPI {
   activityAppend: (vaultPath: string, entry: ActivityEvent) => Promise<{ success: boolean; error?: string }>;
   activitySummary: (vaultPath: string, range?: { from: number; to: number }) => Promise<{ success: boolean; summary?: ActivitySummary; error?: string }>;
   activityForeground: (vaultPath: string, id: string, foregroundMs: number) => Promise<{ success: boolean; error?: string }>;
+  comparisonLoad: (vaultPath: string) => Promise<{ success: boolean; data?: ComparisonData; error?: string }>;
+  comparisonCreateCampaign: (vaultPath: string, params: { taskClass: string; inclusionRules: string; acceptanceDefinition: string }) => Promise<{ success: boolean; campaignId?: string; data?: ComparisonData; error?: string }>;
+  comparisonCreateCase: (vaultPath: string, campaignId: string, label: string) => Promise<{ success: boolean; case?: ComparisonCase; data?: ComparisonData; error?: string }>;
+  comparisonUpdateCase: (vaultPath: string, caseId: string, action: ComparisonActionInput) => Promise<{ success: boolean; data?: ComparisonData; error?: string }>;
+  comparisonEndCampaign: (vaultPath: string, campaignId: string) => Promise<{ success: boolean; data?: ComparisonData; error?: string }>;
+  comparisonReport: (vaultPath: string, campaignId: string) => Promise<{ success: boolean; report?: CampaignReport; error?: string }>;
   onActivityChanged: (callback: (payload: { vaultPath: string }) => void) => () => void;
   noteAgentDiscardResult: (runId: string, resultId: string, timings?: { reviewMs?: number; waitingMs?: number }) => Promise<{ success: boolean; error?: string }>;
   noteAgentPreviewResult: (runId: string, resultId: string) => Promise<{ success: boolean; kind?: string; binary?: boolean; text?: string; truncated?: boolean; sizeBytes?: number; error?: string }>;
