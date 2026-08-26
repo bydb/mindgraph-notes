@@ -1,0 +1,178 @@
+/* Vergleichsmodus. Karten-Kanon wie im Rest der App: eine Fläche, keine Tönung,
+   Titel in Normalgröße. Zahlen tabellarisch, damit Spalten untereinander lesbar sind. */
+
+.comparison-view {
+  height: 100%;
+  overflow-y: auto;
+  background: var(--bg-primary);
+}
+
+.comparison-inner {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 32px 24px 64px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.comparison-head h2 {
+  margin: 0 0 4px;
+  font-size: 1.5rem;
+}
+
+.comparison-sub,
+.comparison-hint {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.comparison-error {
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--color-danger) 12%, transparent);
+  color: var(--color-danger);
+  font-size: 13px;
+}
+
+.comparison-card {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.comparison-card h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.comparison-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+}
+
+.comparison-field input,
+.comparison-new-case input,
+.comparison-case-actions input {
+  padding: 8px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font: inherit;
+}
+
+.comparison-campaign-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.comparison-new-case {
+  display: flex;
+  gap: 8px;
+}
+
+.comparison-new-case input { flex: 1; }
+
+/* Das Ziehungsergebnis ist die einzige Stelle, an der Farbe etwas bedeutet: Sie trennt
+   die beiden Wege. Gedeckt gehalten — es ist eine Zuteilung, keine Auszeichnung. */
+.comparison-draw {
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-color);
+  font-size: 14px;
+}
+
+.comparison-arm {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  border: 1px solid var(--border-color);
+}
+
+.comparison-arm-mindgraph,
+.comparison-draw-mindgraph {
+  background: color-mix(in srgb, var(--accent-color) 14%, transparent);
+}
+
+.comparison-arm-konventionell,
+.comparison-draw-konventionell {
+  background: color-mix(in srgb, var(--text-secondary) 12%, transparent);
+}
+
+.comparison-case {
+  border-top: 1px solid var(--border-color);
+  padding-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.comparison-case:first-of-type {
+  border-top: none;
+  padding-top: 0;
+}
+
+.comparison-case-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.comparison-case-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.comparison-case-actions button,
+.comparison-campaign-head button,
+.comparison-new-case button {
+  padding: 6px 12px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-color);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font: inherit;
+  cursor: pointer;
+}
+
+.comparison-case-actions button:disabled { opacity: 0.5; cursor: not-allowed; }
+.comparison-case-actions button:hover:not(:disabled) { background: var(--bg-hover); }
+
+.comparison-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.comparison-table th,
+.comparison-table td {
+  text-align: left;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.comparison-table th {
+  font-weight: 600;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.comparison-num {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}

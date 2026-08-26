@@ -277,7 +277,28 @@ im Median — **einschließlich des gescheiterten Falls mit 47 min**, der die R�
 Alle Sperren greifen über die IPC-Grenze: abgeschlossene Fälle nehmen nichts mehr an, unbekannte
 Kampagnen und Fälle werden abgewiesen, eine Kampagne ohne Akzeptanzdefinition entsteht gar nicht.
 
-Noch nicht gebaut: Stoppuhr für den konventionellen Arm, Oberfläche, Export.
+**Schritte 3 und 4 sind gebaut** (26.08.2026): eigener Tab samt Stoppuhr.
+
+- `TabType 'comparison'`, Ansicht `components/Comparison/ComparisonView.tsx`, Store
+  `stores/comparisonStore.ts`, Befehl „Vergleich öffnen (Kampagne)".
+- **Die Stoppuhr hängt bewusst NICHT am Fensterfokus.** Beim konventionellen Weg arbeitet der
+  Nutzer in Excel oder Outlook — MindGraph ist dann gerade nicht vorn. Eine fokusabhängige Messung
+  zählte dort null und würde ausgerechnet den Weg kleinrechnen, gegen den verglichen wird. Herkunft
+  ist deshalb `gestoppt`, nicht `vordergrund-automatisch`. Gemessen im laufenden Programm: 6,6 s bei
+  bewusst weggeklicktem Fenster.
+- **Nur EINE Uhr gleichzeitig** — zwei laufende Uhren wären zwei Wahrheiten.
+- Die Oberfläche lässt den Weg nicht wählen und zeigt keine Kennzahl, solange zu wenige Fälle
+  abgeschlossen sind; stattdessen steht dort, wie viele fehlen. Der Nenner („3 von 3 abgeschlossen")
+  steht immer neben der Zahl, die Grenzen stehen unter der Tabelle.
+- Ein MindGraph-Fall lässt sich einem Agent-Lauf zurechnen („Agent-Lauf diesem Fall zurechnen");
+  die gemessenen Zeiten wandern dann zusätzlich in den Fall.
+
+**Bekannte Grenze:** Eine laufende Stoppuhr lebt nur im Fenster. Wird MindGraph geschlossen, während
+sie läuft, ist die Messung weg. Für einen konventionellen Fall, der eine Stunde in Excel dauert, ist
+das unbequem — die Uhr muss so lange laufen bleiben. Ein Nachtrag über „nachgetragen" ist möglich,
+eine Wiederaufnahme nach Neustart noch nicht.
+
+Noch nicht gebaut: Export.
 
 ## 14. Reihenfolge
 

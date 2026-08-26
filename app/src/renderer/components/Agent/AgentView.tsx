@@ -11,6 +11,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useUIStore } from '../../stores/uiStore'
 import { useNotesStore } from '../../stores/notesStore'
 import { useComposeMeasurement } from '../../utils/activeTimeTracker'
+import { useComparisonStore } from '../../stores/comparisonStore'
 import { useTranslation } from '../../utils/translations'
 import { ContextAttachmentRow, FolderGlyph } from '../Shared/ContextAttachmentRow'
 import { ModelPicker } from '../Shared/ModelPicker'
@@ -123,6 +124,9 @@ export function AgentView({ tabId }: Props) {
   // Aktive Zeit am Auftrag: läuft ab dem ersten Tastendruck, pausiert, sobald das
   // Fenster in den Hintergrund geht. Grundlage der Wirkungsbilanz.
   const compose = useComposeMeasurement()
+  // Läuft eine Vergleichskampagne und ist ein Fall zugerechnet, wandern die gemessenen
+  // Zeiten dieses Laufs zusätzlich als Arbeitssitzungen in den Fall.
+  const comparisonCaseId = useComparisonStore(s => s.activeCaseId)
   const busy = run.phase === 'running'
   const canRun = !!vaultPath && !!scope.targetFolder && !!instruction.trim() && !busy
 
@@ -146,7 +150,8 @@ export function AgentView({ tabId }: Props) {
       cloud,
       cloudLabel,
       webResearch: webResearchModule && webArmed && webConfigured,
-      instructionMs: compose.take()
+      instructionMs: compose.take(),
+      comparisonCaseId: comparisonCaseId ?? undefined
     })
   }
 

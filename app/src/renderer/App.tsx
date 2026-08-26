@@ -65,6 +65,7 @@ import { buildBrainSensors, getDayBoundsMs } from './utils/brainSensors'
 import './styles/index.css'
 import { LlmSpeedIndicator } from './components/Shared/LlmSpeedIndicator'
 import { ImpactIndicator } from './components/Shared/ImpactIndicator'
+import { ComparisonView } from './components/Comparison/ComparisonView'
 import { initLlmTelemetry } from './stores/llmTelemetryStore'
 import { LlmPerformanceView } from './components/LlmPerformance/LlmPerformanceView'
 
@@ -173,6 +174,7 @@ const App: React.FC = () => {
   const openWorkflowCanvasTab = useTabStore(state => state.openWorkflowCanvasTab)
   const openAgentTab = useTabStore(state => state.openAgentTab)
   const openLlmPerformanceTab = useTabStore(state => state.openLlmPerformanceTab)
+  const openComparisonTab = useTabStore(state => state.openComparisonTab)
   const { unreadRelevantCount } = useEmailStore()
   const emailEnabled = useUIStore(state => state.email.enabled)
   const edooboxEnabled = usePluginEnabled('edoobox')
@@ -825,7 +827,8 @@ const App: React.FC = () => {
     const activeTab = currentTabs.find(t => t.id === currentActiveTabId)
     const shadowsViewer = !!activeTab && (
       activeTab.type === 'dashboard' || activeTab.type === 'workflow-canvas' || activeTab.type === 'code' ||
-      activeTab.type === 'plugin-editor' || activeTab.type === 'agent' || activeTab.type === 'llm-performance'
+      activeTab.type === 'plugin-editor' || activeTab.type === 'agent' || activeTab.type === 'llm-performance' ||
+      activeTab.type === 'comparison'
     )
     if (!shadowsViewer) return // Viewer ist bereits sichtbar — nichts tun
 
@@ -1142,6 +1145,7 @@ const App: React.FC = () => {
     'panel-inbox': () => switchRightPanel('inbox'),
     'panel-agent': () => switchRightPanel('agent'),
     'llm-performance': () => openLlmPerformanceTab(),
+    'open-comparison': () => openComparisonTab(),
     'panel-scholar': () => switchRightPanel('semanticScholar'),
     'new-note': () => window.dispatchEvent(new CustomEvent('mindgraph:newNote')),
     'open-quick-search': () => { setQuickSearchQuery(''); setQuickSearchOpen(true) },
@@ -1510,7 +1514,9 @@ const App: React.FC = () => {
                     : `0 0 ${splitPosition}%`
                 }}
               >
-                {activeTab?.type === 'llm-performance' ? (
+                {activeTab?.type === 'comparison' ? (
+                  <ComparisonView />
+                ) : activeTab?.type === 'llm-performance' ? (
                   <LlmPerformanceView />
                 ) : activeTab?.type === 'agent' ? (
                   <AgentView tabId={activeTab.id} />

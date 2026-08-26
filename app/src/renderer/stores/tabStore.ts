@@ -11,6 +11,7 @@ export type TabType =
   | 'agent'
   | 'plugin-editor'
   | 'llm-performance'
+  | 'comparison'
 
 export interface Tab {
   id: string
@@ -46,6 +47,7 @@ interface TabState {
   /** Agent-Tab (Notiz-Agent ohne offene Notiz). Liefert die Tab-ID — sie ist zugleich
    *  der Bereich im noteAgentStore, an den Aufrufer Anhänge hängen können. */
   openAgentTab: () => string
+  openComparisonTab: () => string
   openLlmPerformanceTab: () => void
   openCodeTab: (relativePath: string, title: string) => void
   openPluginEditorTab: (pluginId: string, filePath: string, editorId: string, title: string) => void
@@ -211,6 +213,20 @@ export const useTabStore = create<TabState>()((set, get) => ({
       return existingTab.id
     }
     const newTab: Tab = { id: generateTabId(), type: 'agent', noteId: '', title: 'Agent' }
+    set({ tabs: [...state.tabs, newTab], activeTabId: newTab.id })
+    return newTab.id
+  },
+
+  // Genau EIN Vergleichs-Tab: Er zeigt die Kampagnen des Vaults, ein zweiter wäre
+  // dieselbe Ansicht doppelt.
+  openComparisonTab: () => {
+    const state = get()
+    const existing = state.tabs.find(t => t.type === 'comparison')
+    if (existing) {
+      set({ activeTabId: existing.id })
+      return existing.id
+    }
+    const newTab: Tab = { id: generateTabId(), type: 'comparison', noteId: '', title: 'Vergleich' }
     set({ tabs: [...state.tabs, newTab], activeTabId: newTab.id })
     return newTab.id
   },
