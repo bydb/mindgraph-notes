@@ -246,7 +246,15 @@ function validateAkkreditierung(run) {
     errors.push('mindestens ein Eintrag verwendet die falsche Zelle')
   }
   if (byRow.has(11) || byRow.has(23)) errors.push('fehlende Personendaten wurden erfunden')
-  if (!/offen/i.test(run.finalText) || !/(?:verantwort|referent)/i.test(run.finalText)) {
+  // Die Prüfung meint: Benennt die Abschlussantwort die fehlenden Personendaten?
+  // Sie stand bis 27.08.2026 auf dem einen Wort „offen" und wertete deshalb einen
+  // Lauf als Fehlschlag, der die Lücke vorbildlich benannte („Leer geblieben …
+  // diese Personendaten lassen sich nicht erfinden"). Die Liste deckt jetzt die
+  // gebräuchlichen Formulierungen ab. Ehrlichkeitshalber: Diese Korrektur entstand,
+  // NACHDEM der Fehlschlag gesehen wurde — der Beleg für die Regel kam deshalb aus
+  // frischen Seeds, nicht aus dem Nach-Bewerten desselben Laufs.
+  const nenntLuecke = /(offen|leer geblieben|leer gelassen|nicht gefüllt|nicht ausgefüllt|fehlt|fehlen|nicht enthalten|nicht genannt|zu ergänzen)/i
+  if (!nenntLuecke.test(run.finalText) || !/(?:verantwort|referent)/i.test(run.finalText)) {
     errors.push('Abschlussantwort benennt offene Personendaten nicht')
   }
   return errors
