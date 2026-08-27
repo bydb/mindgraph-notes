@@ -4,7 +4,7 @@
 // nativen Tool-Calls in den Loop (Plan F07 — Capability sauber getrennt von Qualität).
 
 import { chatWithTools, type ChatMessage, type ChatOptions } from '../llm/chatClient'
-import { costOfCalls } from '../llm/chatClient'
+import { costOfCalls, warmPricingCache } from '../llm/chatClient'
 import type { CallUsage, RunCost } from '../../shared/llmCost'
 import { looksTruncated, contextTruncationMessage, AGENT_NUM_CTX, AGENT_NUM_CTX_WEB } from '../../shared/contextGuard'
 import { getContextAttachmentInfos } from './contextFiles'
@@ -212,6 +212,9 @@ export async function runNoteAgentLoop(params: NoteAgentLoopParams): Promise<Not
   const maxIterations = hasFolder ? MAX_ITERATIONS_FOLDER : MAX_ITERATIONS
   // Verbrauch jeder Iteration einzeln — daraus wird am Ende die Lauf-Bilanz.
   const callUsages: Array<CallUsage | null> = []
+  // Preise jetzt holen, nicht erst beim Bilanzieren: sonst wartet der Nutzer am
+  // Ende des Laufs auf eine Netzabfrage, die längst hätte laufen können.
+  warmPricingCache(chatOptions)
 
   for (let iteration = 1; iteration <= maxIterations; iteration++) {
     const sentChars = messages.reduce((n, m) => n + (m.content?.length ?? 0), 0)

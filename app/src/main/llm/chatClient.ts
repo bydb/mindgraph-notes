@@ -902,6 +902,24 @@ export async function streamOpenRouterChat(
  * welcher Schlüssel zum Backend gehören. Lokale Backends geben undefined zurück —
  * nicht 0: ein lokaler Lauf hat keine Kosten, nicht die Kosten null.
  */
+/**
+ * Preiskatalog im Hintergrund warmlaufen lassen.
+ *
+ * Ohne das zahlt der Nutzer die Katalog-Abfrage als WARTEZEIT: costOfCalls läuft
+ * erst, wenn das Modell fertig ist, und bei LLMBase (meldet keine Kosten, also
+ * wird immer ein Preis gebraucht) hing der erste Lauf einer Sitzung danach noch
+ * bis zu 10 Sekunden — für eine Zahl, die er nicht einmal zu sehen bekommt.
+ * Beim Start des Laufs angestoßen ist der Katalog längst da, wenn er gebraucht wird.
+ */
+export function warmPricingCache(opts: ChatOptions): void {
+  if (!isCloudChatBackend(opts.backend)) return
+  const backend = opts.backend as CloudChatBackend
+  const model = (backend === 'llmbase' ? opts.llmbaseModel : opts.openrouterModel)?.trim()
+  if (!model) return
+  const apiKey = (backend === 'llmbase' ? opts.llmbaseApiKey : opts.openrouterApiKey)?.trim()
+  void getModelPricing(backend, CLOUD_PROVIDERS[backend].baseUrl, model, apiKey).catch(() => undefined)
+}
+
 export async function costOfCalls(
   usages: Array<CallUsage | null>,
   opts: ChatOptions
