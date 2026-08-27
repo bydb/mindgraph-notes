@@ -1051,13 +1051,13 @@ export interface ElectronAPI {
   openrouterSaveKey: (apiKey: string) => Promise<{ success: boolean; hasKey?: boolean; error?: string }>;
   openrouterHasKey: () => Promise<boolean>;
   openrouterClearKey: () => Promise<{ success: boolean }>;
-  openrouterListModels: () => Promise<{ success: boolean; models: Array<{ id: string; name: string; contextLength?: number; promptPrice?: string }>; error?: string }>;
+  openrouterListModels: () => Promise<{ success: boolean; models: Array<{ id: string; name: string; contextLength?: number; promptPrice?: string; completionPrice?: string; pricing?: import('./llmCost').ModelPricing }>; error?: string }>;
   openrouterTest: (model: string) => Promise<{ success: boolean; reply?: string; error?: string }>;
   // LLMBase Cloud-Backend (EU/DSGVO)
   llmbaseSaveKey: (apiKey: string) => Promise<{ success: boolean; hasKey?: boolean; error?: string }>;
   llmbaseHasKey: () => Promise<boolean>;
   llmbaseClearKey: () => Promise<{ success: boolean }>;
-  llmbaseListModels: () => Promise<{ success: boolean; models: Array<{ id: string; name: string; contextLength?: number; promptPrice?: string }>; error?: string }>;
+  llmbaseListModels: () => Promise<{ success: boolean; models: Array<{ id: string; name: string; contextLength?: number; promptPrice?: string; completionPrice?: string; pricing?: import('./llmCost').ModelPricing }>; error?: string }>;
   llmbaseTest: (model: string) => Promise<{ success: boolean; reply?: string; error?: string }>;
 
   // Webrecherche (Opt-in) — Provider-Config + API-Keys liegen Main-seitig (0d), pro Provider.

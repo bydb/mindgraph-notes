@@ -7,7 +7,7 @@
 //                    sich den Wire-Code mit den Cloud-Providern, ist aber KEINE
 //                    Cloud: kein API-Key, nichts verlässt den Rechner.
 //   - 'openrouter' — OpenAI-kompatibles Cloud-Backend (https://openrouter.ai).
-//   - 'llmbase'    — OpenAI-kompatibles EU-Cloud-Backend (https://llmbase.ai,
+//   - 'llmbase'    — OpenAI-kompatibles Cloud-Backend eines europäischen Anbieters (https://llmbase.ai,
 //                    Inference in DE/NL/FI/CH — DSGVO-Positionierung).
 //
 // WICHTIG (Privacy): OpenRouter und LLMBase sind Cloud-Dienste. Der Aufrufer ist
@@ -16,12 +16,14 @@
 // (isCloudProviderReady / canUseCloudForFeature) und den Email-Picker (analysisModel).
 // Das Brain-Modul nutzt diesen Client NICHT — es ist hardcoded localhost.
 
-import { fromOllamaResponse, type OllamaTimings } from '../../shared/llmTelemetry'
+import { fromOllamaResponse, fromCloudResponse, type OllamaTimings } from '../../shared/llmTelemetry'
 import {
   resolveOllamaExecutionProfile,
   type LlmExecutionProfile
 } from '../../shared/agentExecutionProfile'
 import { recordLlmRun } from './telemetry'
+import { getModelPricing } from './cloudPricing'
+import { parseCallUsage, parseModelPricing, sumCalls, type CallUsage, type ModelPricing, type RunCost } from '../../shared/llmCost'
 
 export type ChatBackend = 'ollama' | 'lmstudio' | 'openrouter' | 'llmbase'
 // Die OpenAI-kompatiblen CLOUD-Backends. LM Studio spricht dasselbe Protokoll,
@@ -111,6 +113,11 @@ export interface ChatWithToolsResult {
   // wenn der Server nichts meldet. Einziger verlässlicher Beleg dafür, dass die
   // Konversation vollständig ankam — siehe ChatOptions.numCtx.
   promptTokens?: number
+  // Verbrauch dieses EINEN Aufrufs (nur Cloud-Backends — lokal kostet nichts).
+  // Der Agenten-Loop summiert daraus die Kosten eines ganzen Laufs; er kann sie
+  // nicht am Ende aus dem letzten Aufruf ableiten, weil jede Iteration die
+  // komplette Konversation neu bezahlt.
+  usage?: CallUsage
 }
 
 const DEFAULT_OLLAMA_URL = 'http://localhost:11434'
@@ -453,6 +460,9 @@ interface OpenAiCompatibleTarget {
   headers: Record<string, string>
   model: string
   friendlyError: (status: number, body: string) => string
+  // Nur bei Cloud-Backends gesetzt — Adresse und Schlüssel für den Preiskatalog,
+  // damit die Kostenerfassung sie nicht ein zweites Mal herleiten muss.
+  pricingLookup?: { backend: CloudChatBackend; baseUrl: string; apiKey: string }
 }
 
 function cloudTarget(backend: CloudChatBackend, opts: ChatOptions): OpenAiCompatibleTarget {
@@ -461,7 +471,8 @@ function cloudTarget(backend: CloudChatBackend, opts: ChatOptions): OpenAiCompat
     endpoint: `${CLOUD_PROVIDERS[backend].baseUrl}/chat/completions`,
     headers: cloudHeaders(backend, apiKey),
     model,
-    friendlyError: (status, body) => friendlyCloudError(backend, status, body, model)
+    friendlyError: (status, body) => friendlyCloudError(backend, status, body, model),
+    pricingLookup: { backend, baseUrl: CLOUD_PROVIDERS[backend].baseUrl, apiKey }
   }
 }
 
@@ -481,12 +492,48 @@ function openAiCompatibleTarget(backend: ChatBackend, opts: ChatOptions): OpenAi
   return backend === 'lmstudio' ? lmStudioTarget(opts) : cloudTarget(backend as CloudChatBackend, opts)
 }
 
+/**
+ * Kosten und Verbrauch EINES Cloud-Aufrufs festhalten.
+ *
+ * Läuft bewusst nach der Antwort und schluckt eigene Fehler: Eine misslungene
+ * Kostenerfassung darf niemals den Aufruf scheitern lassen, dessen Kosten sie
+ * erfassen soll. Für LM Studio wird nichts erfasst — das läuft lokal und kostet
+ * nichts; ein Eintrag mit 0 wäre dort keine Messung, sondern eine Behauptung.
+ */
+async function recordCloudCall(
+  target: OpenAiCompatibleTarget,
+  rawUsage: unknown,
+  meta: { module: string; wallMs: number; at: number; firstTokenMs?: number }
+): Promise<void> {
+  const lookup = target.pricingLookup
+  if (!lookup) return
+  try {
+    const usage = parseCallUsage(rawUsage)
+    // Preis nur holen, wenn wir ihn brauchen: OpenRouter meldet den Betrag selbst.
+    const pricing = usage?.reportedCostUsd === undefined
+      ? await getModelPricing(lookup.backend, lookup.baseUrl, target.model, lookup.apiKey)
+      : null
+    recordLlmRun(fromCloudResponse(usage, {
+      module: meta.module,
+      model: target.model,
+      backend: lookup.backend,
+      wallMs: meta.wallMs,
+      at: meta.at,
+      firstTokenMs: meta.firstTokenMs,
+      pricing
+    }))
+  } catch {
+    // Kostenerfassung ist Beiwerk — der Aufruf selbst ist längst erfolgreich.
+  }
+}
+
 async function chatViaOpenAiCompatible(
   backend: ChatBackend,
   messages: ChatMessage[],
   opts: ChatOptions
 ): Promise<ChatResult> {
   const target = openAiCompatibleTarget(backend, opts)
+  const startedAt = Date.now()
   const res = await chatFetch(target.endpoint, {
     method: 'POST',
     headers: target.headers,
@@ -502,7 +549,12 @@ async function chatViaOpenAiCompatible(
   if (!res.ok) {
     throw new Error(target.friendlyError(res.status, await res.text()))
   }
-  const json = await res.json() as { choices?: OpenAIChatChoice[] }
+  const json = await res.json() as { choices?: OpenAIChatChoice[]; usage?: unknown }
+  void recordCloudCall(target, json.usage, {
+    module: opts.telemetryModule ?? 'chat',
+    wallMs: Date.now() - startedAt,
+    at: startedAt
+  })
   return { text: openrouterMessageText(json.choices?.[0]?.message), backend }
 }
 
@@ -697,6 +749,7 @@ async function chatWithToolsViaOpenAiCompatible(
     function: { name: t.name, description: t.description, parameters: t.parameters }
   }))
 
+  const startedAt = Date.now()
   const res = await chatFetch(target.endpoint, {
     method: 'POST',
     headers: target.headers,
@@ -711,6 +764,13 @@ async function chatWithToolsViaOpenAiCompatible(
     throw new Error(target.friendlyError(res.status, await res.text()))
   }
   const json = await res.json() as { choices?: OpenAIChatChoice[]; usage?: { prompt_tokens?: number } }
+  // Jede Iteration des Agenten-Loops ist ein eigener bezahlter Aufruf — hier wird
+  // sie einzeln erfasst, aggregiert wird erst im Loop (shared/llmCost.ts sumCalls).
+  void recordCloudCall(target, json.usage, {
+    module: opts.telemetryModule ?? 'chat',
+    wallMs: Date.now() - startedAt,
+    at: startedAt
+  })
   const msg = json.choices?.[0]?.message
   const rawCalls = msg?.tool_calls ?? []
   const toolCalls: ToolCall[] = rawCalls
@@ -739,7 +799,11 @@ async function chatWithToolsViaOpenAiCompatible(
     content: text,
     tool_calls: toolCalls.length > 0 ? toolCalls : undefined
   }
-  return { text, toolCalls, backend, assistantMessage, promptTokens: json.usage?.prompt_tokens }
+  return {
+    text, toolCalls, backend, assistantMessage,
+    promptTokens: json.usage?.prompt_tokens,
+    usage: parseCallUsage(json.usage) ?? undefined
+  }
 }
 
 export async function chatWithTools(
@@ -831,18 +895,51 @@ export async function streamOpenRouterChat(
   return streamCloudChat(messages, { ...opts, backend: 'openrouter' }, onToken)
 }
 
+/**
+ * Kostenbilanz über die Aufrufe EINES Laufs (z.B. alle Iterationen des Agenten).
+ *
+ * Liegt hier statt beim Aufrufer, weil nur der chatClient weiß, welche Adresse und
+ * welcher Schlüssel zum Backend gehören. Lokale Backends geben undefined zurück —
+ * nicht 0: ein lokaler Lauf hat keine Kosten, nicht die Kosten null.
+ */
+export async function costOfCalls(
+  usages: Array<CallUsage | null>,
+  opts: ChatOptions
+): Promise<RunCost | undefined> {
+  if (!isCloudChatBackend(opts.backend)) return undefined
+  const backend = opts.backend as CloudChatBackend
+  const model = (backend === 'llmbase' ? opts.llmbaseModel : opts.openrouterModel)?.trim()
+  const apiKey = (backend === 'llmbase' ? opts.llmbaseApiKey : opts.openrouterApiKey)?.trim()
+  if (!model) return undefined
+  // Preis nur holen, wenn mindestens ein Aufruf keinen gemeldeten Betrag hatte.
+  const needsPricing = usages.some(u => u && u.reportedCostUsd === undefined)
+  const pricing = needsPricing
+    ? await getModelPricing(backend, CLOUD_PROVIDERS[backend].baseUrl, model, apiKey)
+    : null
+  return sumCalls(usages.map(usage => ({ usage, pricing })))
+}
+
 // ─── Cloud (OpenRouter/LLMBase): Modell-Liste (für Settings-Picker) ──────────
 
 export interface OpenRouterModelInfo {
   id: string
   name: string
   contextLength?: number
-  promptPrice?: string        // USD pro 1M Tokens, als String wie vom Provider geliefert
+  // USD je EINZELNEM Token, als String wie vom Anbieter geliefert (0.00000015).
+  // NICHT je Million — der alte Kommentar behauptete das und der Picker zeigte
+  // darum eine Zahl, aus der niemand einen Preis ablesen konnte. Umrechnung und
+  // Anzeige stehen in shared/llmCost.ts (parseModelPricing/formatPricing).
+  promptPrice?: string
+  completionPrice?: string
+  pricing?: ModelPricing      // schon umgerechnet: USD je 1 Mio. Token
 }
 
 export async function listCloudModels(backend: CloudChatBackend, apiKey: string): Promise<OpenRouterModelInfo[]> {
   const { label, baseUrl } = CLOUD_PROVIDERS[backend]
-  const res = await fetch(`${baseUrl}/models`, {
+  // metadata=true ist für LLMBase Pflicht: ohne den Parameter fehlt das
+  // pricing-Feld vollständig (am Livekatalog geprüft, 27.08.2026). OpenRouter
+  // liefert die Preise ohnehin und ignoriert den Parameter.
+  const res = await fetch(`${baseUrl}/models?metadata=true`, {
     headers: apiKey ? { 'Authorization': `Bearer ${apiKey}` } : {},
     signal: AbortSignal.timeout(10000)
   })
@@ -852,7 +949,7 @@ export async function listCloudModels(backend: CloudChatBackend, apiKey: string)
       id?: string
       name?: string
       context_length?: number
-      pricing?: { prompt?: string }
+      pricing?: { prompt?: string; completion?: string }
     }>
   }
   return (json.data ?? [])
@@ -861,7 +958,9 @@ export async function listCloudModels(backend: CloudChatBackend, apiKey: string)
       id: m.id!,
       name: m.name || m.id!,
       contextLength: m.context_length,
-      promptPrice: m.pricing?.prompt
+      promptPrice: m.pricing?.prompt,
+      completionPrice: m.pricing?.completion,
+      pricing: parseModelPricing(m.pricing) ?? undefined
     }))
 }
 

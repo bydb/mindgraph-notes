@@ -5,6 +5,7 @@ import {
   type CloudFeatureId
 } from '../../../shared/llmBackend'
 import openrouterLogo from '../../assets/model-vendors/openrouter.svg'
+import { formatPricing, type ModelPricing } from '../../../shared/llmCost'
 
 // Anzeige-Labels für Nicht-Matrix-Cloud-Features.
 const FEATURE_LABELS: Record<CloudFeatureId, { de: string; en: string }> = {
@@ -25,7 +26,7 @@ export function OpenRouterSection() {
 
   const [apiKeyInput, setApiKeyInput] = useState('')
   const [savingKey, setSavingKey] = useState(false)
-  const [models, setModels] = useState<Array<{ id: string; name: string; promptPrice?: string }>>([])
+  const [models, setModels] = useState<Array<{ id: string; name: string; promptPrice?: string; pricing?: ModelPricing }>>([])
   const [loadingModels, setLoadingModels] = useState(false)
   const [freeOnly, setFreeOnly] = useState(false)
   const [testResult, setTestResult] = useState<{ ok: boolean; msg: string } | null>(null)
@@ -178,7 +179,7 @@ export function OpenRouterSection() {
                   {!freeOnly && paidModels.length > 0 && (
                     <optgroup label={en ? 'Paid (pay-as-you-go)' : 'Kostenpflichtig (Guthaben nötig)'}>
                       {paidModels.map(m => (
-                        <option key={m.id} value={m.id}>{m.name}{m.promptPrice ? ` (${m.promptPrice}$/tok)` : ''}</option>
+                        <option key={m.id} value={m.id}>{m.name}{m.pricing ? ` — ${formatPricing(m.pricing)}` : ''}</option>
                       ))}
                     </optgroup>
                   )}

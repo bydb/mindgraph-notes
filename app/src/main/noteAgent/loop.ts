@@ -4,6 +4,8 @@
 // nativen Tool-Calls in den Loop (Plan F07 — Capability sauber getrennt von Qualität).
 
 import { chatWithTools, type ChatMessage, type ChatOptions } from '../llm/chatClient'
+import { costOfCalls } from '../llm/chatClient'
+import type { CallUsage, RunCost } from '../../shared/llmCost'
 import { looksTruncated, contextTruncationMessage, AGENT_NUM_CTX, AGENT_NUM_CTX_WEB } from '../../shared/contextGuard'
 import { getContextAttachmentInfos } from './contextFiles'
 import { createNoteAgentRegistry, type NoteAgentContext } from './skills'
@@ -31,6 +33,11 @@ export interface NoteAgentLoopParams {
 export interface NoteAgentLoopResult {
   text: string
   hitMaxIterations: boolean
+  // Kostenbilanz des GANZEN Laufs (nur Cloud-Backends; lokal bleibt sie undefined).
+  // Bewusst die Summe aller Iterationen: Der Loop schickt jedes Mal die komplette
+  // Konversation neu, ein Lauf mit vier Iterationen kostet also deutlich mehr als
+  // der letzte Aufruf vermuten ließe.
+  cost?: RunCost
 }
 
 const registry = createNoteAgentRegistry()
@@ -203,9 +210,13 @@ export async function runNoteAgentLoop(params: NoteAgentLoopParams): Promise<Not
   let nudgedForWrite = false
   let previousPromptTokens: number | undefined
   const maxIterations = hasFolder ? MAX_ITERATIONS_FOLDER : MAX_ITERATIONS
+  // Verbrauch jeder Iteration einzeln — daraus wird am Ende die Lauf-Bilanz.
+  const callUsages: Array<CallUsage | null> = []
+
   for (let iteration = 1; iteration <= maxIterations; iteration++) {
     const sentChars = messages.reduce((n, m) => n + (m.content?.length ?? 0), 0)
     const result = await chatWithTools(messages, tools, { ...chatOptions, telemetryModule: 'note-agent' })
+    callUsages.push(result.usage ?? null)
     if (run.abort.signal.aborted) throw new Error('Abgebrochen')
 
     // Stiller Kontext-Überlauf: Die Mitte der Konversation (Auftrag + bisherige
@@ -251,7 +262,7 @@ export async function runNoteAgentLoop(params: NoteAgentLoopParams): Promise<Not
         }
         throw new Error('Der Lauf wurde ohne Ergebnis beendet — keine Datei erzeugt und keine Antwort gegeben. Bitte den Auftrag konkreter formulieren oder ein stärkeres Modell wählen.')
       }
-      return { text: result.text, hitMaxIterations: false }
+      return { text: result.text, hitMaxIterations: false, cost: await costOfCalls(callUsages, chatOptions) }
     }
 
     for (const call of result.toolCalls) {
@@ -300,7 +311,11 @@ export async function runNoteAgentLoop(params: NoteAgentLoopParams): Promise<Not
   if (run.web && !run.web.wrote) {
     throw new Error('Iterations-Limit erreicht, ohne dass die Recherche eine Notiz geschrieben hat. Der Auftrag war möglicherweise zu umfangreich für das Modell.')
   }
-  return { text: lastText || 'Iterations-Limit erreicht ohne abschließende Antwort.', hitMaxIterations: true }
+  return {
+    text: lastText || 'Iterations-Limit erreicht ohne abschließende Antwort.',
+    hitMaxIterations: true,
+    cost: await costOfCalls(callUsages, chatOptions)
+  }
 }
 
 // Fehler-Zeile fürs Lauf-Protokoll: „Fehler:"-Präfix vereinheitlichen, Rest kürzen.

@@ -12,7 +12,7 @@
 //   - Das Brain-Modul kann NIE in die Cloud (hardcoded localhost — Privacy-Konstante).
 //
 // Provider (2026-07-07): OpenRouter (US, größte Modellauswahl) und LLMBase
-// (llmbase.ai, Eyloo GmbH — EU-Inference in DE/NL/FI/CH, DSGVO-Positionierung,
+// (llmbase.ai, Eyloo GmbH — europäischer Anbieter, DSGVO-Positionierung; Verarbeitungsregion modellabhängig,
 // Zero-Retention laut Anbieter). Beide OpenAI-kompatibel; identische Settings-Form.
 //
 // Siehe Memory: feedback-no-cloud-for-personal-data, project-openrouter-cloud-backend.
@@ -49,8 +49,8 @@ export const CLOUD_PROVIDER_META: Record<CloudProviderId, {
     sentinel: LLMBASE_MODEL_SENTINEL,
     keysUrl: 'https://llmbase.ai',
     privacyNote: {
-      de: 'EU-Inference (DE/NL/FI/CH), DSGVO-Positionierung mit AVV — Inhalte verlassen trotzdem deinen Rechner.',
-      en: 'EU inference (DE/NL/FI/CH), GDPR positioning with DPA — content still leaves your computer.'
+      de: 'Europäischer Anbieter, DSGVO-Positionierung mit AVV. Die Verarbeitungsregion hängt vom Modell ab — Inhalte verlassen in jedem Fall deinen Rechner.',
+      en: 'European provider, GDPR positioning with DPA. The processing region depends on the model — either way, content leaves your computer.'
     }
   }
 }

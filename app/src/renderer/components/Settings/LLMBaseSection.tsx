@@ -5,6 +5,7 @@ import {
   type CloudFeatureId
 } from '../../../shared/llmBackend'
 import llmbaseLogo from '../../assets/model-vendors/llmbase.svg'
+import { formatPricing, type ModelPricing } from '../../../shared/llmCost'
 
 // Anzeige-Labels für Nicht-Matrix-Cloud-Features (identisch zur OpenRouter-Sektion).
 const FEATURE_LABELS: Record<CloudFeatureId, { de: string; en: string }> = {
@@ -14,9 +15,16 @@ const FEATURE_LABELS: Record<CloudFeatureId, { de: string; en: string }> = {
   'note-agent': { de: 'Notiz-Agent (Dateien erzeugen)', en: 'Note agent (create files)' }
 }
 
-// LLMBase Cloud-Backend (opt-in) — llmbase.ai, Eyloo GmbH. EU-Inference (DE/NL/FI/CH),
-// DSGVO-Positionierung mit AVV. Gleiche Privacy-Policy wie OpenRouter (shared/llmBackend.ts):
-// Default lokal, globaler Opt-in + pro-Feature-Opt-in mit Warnung — auch EU-Cloud ist Cloud.
+// LLMBase Cloud-Backend (opt-in) — llmbase.ai, Eyloo GmbH. Gleiche Privacy-Policy wie
+// OpenRouter (shared/llmBackend.ts): Default lokal, globaler Opt-in + pro-Feature-Opt-in
+// mit Warnung — auch eine europäische Cloud ist Cloud.
+//
+// KEINE pauschale EU-Zusage mehr (27.08.2026): Der Anbieter formuliert selbst, dass die
+// Verarbeitungsregion vom MODELL abhängt — eine europäische API-Adresse garantiert nicht,
+// dass jedes Modell ausschließlich in der EU verarbeitet wird. Modellbezogen anzeigen
+// können wir es nicht: Der Katalog (?metadata=true) enthält kein Regionsfeld, geprüft am
+// Livekatalog. Deshalb die vorsichtige Formulierung — eine Zusage, die wir nicht prüfen
+// können, dürfen wir nicht im Namen des Nutzers geben.
 export function LLMBaseSection() {
   const language = useUIStore(s => s.language)
   const en = language === 'en'
@@ -26,7 +34,7 @@ export function LLMBaseSection() {
 
   const [apiKeyInput, setApiKeyInput] = useState('')
   const [savingKey, setSavingKey] = useState(false)
-  const [models, setModels] = useState<Array<{ id: string; name: string; promptPrice?: string }>>([])
+  const [models, setModels] = useState<Array<{ id: string; name: string; promptPrice?: string; pricing?: ModelPricing }>>([])
   const [loadingModels, setLoadingModels] = useState(false)
   const [testResult, setTestResult] = useState<{ ok: boolean; msg: string } | null>(null)
   const [testing, setTesting] = useState(false)
@@ -92,8 +100,8 @@ export function LLMBaseSection() {
     if (on) {
       const label = en ? FEATURE_LABELS[f].en : FEATURE_LABELS[f].de
       const warn = en
-        ? `“${label}” processes note content (personal data). Enabling cloud sends this content to LLMBase (EU inference, GDPR positioning) and leaves your computer. Continue?`
-        : `„${label}" verarbeitet Notiz-Inhalte (personenbezogene Daten). Mit Cloud werden diese an LLMBase gesendet (EU-Inference, DSGVO-Positionierung) und verlassen deinen Rechner. Fortfahren?`
+        ? `“${label}” processes note content (personal data). Enabling cloud sends this content to LLMBase and it leaves your computer. LLMBase is a European provider, but the processing region depends on the chosen model — check it for your model if that matters. Continue?`
+        : `„${label}" verarbeitet Notiz-Inhalte (personenbezogene Daten). Mit Cloud werden diese an LLMBase gesendet und verlassen deinen Rechner. LLMBase ist ein europäischer Anbieter, die Verarbeitungsregion hängt aber vom gewählten Modell ab — wenn das für dich zählt, prüfe sie für dein Modell. Fortfahren?`
       // eslint-disable-next-line no-alert
       if (!window.confirm(warn)) return
     }
@@ -107,7 +115,7 @@ export function LLMBaseSection() {
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <label style={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
           <img src={llmbaseLogo} width={20} height={20} alt="" />
-          {en ? 'LLMBase (EU cloud) — optional' : 'LLMBase (EU-Cloud) — optional'}
+          {en ? 'LLMBase (European provider) — optional' : 'LLMBase (europäischer Anbieter) — optional'}
         </label>
         <input
           type="checkbox"
@@ -118,8 +126,8 @@ export function LLMBaseSection() {
 
       <p className="settings-hint" style={{ fontSize: '11px', margin: 0 }}>
         {en
-          ? 'German provider (llmbase.ai): open-weight models on EU servers (DE/NL/FI/CH), GDPR positioning with DPA. Off by default — content still leaves your computer, so every feature needs an explicit opt-in. The Brain module always stays local.'
-          : 'Deutscher Anbieter (llmbase.ai): Open-Weight-Modelle auf EU-Servern (DE/NL/FI/CH), DSGVO-Positionierung mit AVV. Standardmäßig aus — Inhalte verlassen trotzdem deinen Rechner, daher braucht jede Funktion ein explizites Opt-in. Das Brain-Modul bleibt immer lokal.'}
+          ? 'German provider (llmbase.ai): open-weight models, GDPR positioning with DPA. The processing region depends on the model — a European API endpoint does not guarantee every model is processed in the EU. Off by default — content still leaves your computer, so every feature needs an explicit opt-in. The Brain module always stays local.'
+          : 'Deutscher Anbieter (llmbase.ai): Open-Weight-Modelle, DSGVO-Positionierung mit AVV. Die Verarbeitungsregion hängt vom Modell ab — eine europäische API-Adresse garantiert nicht, dass jedes Modell in der EU verarbeitet wird. Standardmäßig aus — Inhalte verlassen trotzdem deinen Rechner, daher braucht jede Funktion ein explizites Opt-in. Das Brain-Modul bleibt immer lokal.'}
       </p>
 
       {lb.enabled && (
@@ -164,7 +172,7 @@ export function LLMBaseSection() {
                 <select value={lb.model} onChange={e => patch({ model: e.target.value })} style={{ flex: 1 }}>
                   <option value="">{en ? '— select —' : '— wählen —'}</option>
                   {models.map(m => (
-                    <option key={m.id} value={m.id}>{m.name}</option>
+                    <option key={m.id} value={m.id}>{m.name}{m.pricing ? ` — ${formatPricing(m.pricing)}` : ''}</option>
                   ))}
                 </select>
               ) : (

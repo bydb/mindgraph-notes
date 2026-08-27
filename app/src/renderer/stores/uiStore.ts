@@ -270,7 +270,7 @@ interface LLMSettings {
   // Die API-Keys selbst liegen NICHT hier, sondern verschlüsselt im Main (safeStorage);
   // `hasApiKey` spiegelt nur, ob einer hinterlegt ist.
   openrouter: CloudProviderSettings
-  // LLMBase (llmbase.ai) — EU-Inference (DE/NL/FI/CH), DSGVO-Positionierung.
+  // LLMBase (llmbase.ai) — europäischer Anbieter, DSGVO-Positionierung. Verarbeitungsregion modellabhängig.
   llmbase: CloudProviderSettings
 }
 
