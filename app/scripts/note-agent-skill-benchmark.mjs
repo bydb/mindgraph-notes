@@ -19,7 +19,7 @@ import { SKILL_CASES } from './note-agent-skill-cases.mjs'
 const HERE = path.dirname(fileURLToPath(import.meta.url))
 const APP_ROOT = path.resolve(HERE, '..')
 const RESULTS_DIR = path.join(APP_ROOT, 'benchmarks', 'note-agent-skills', 'results')
-const BENCHMARK_VERSION = 2
+const BENCHMARK_VERSION = 4
 const MAX_ITERATIONS = 12
 const MAX_SKILL_BODY_CHARS = 12_000
 const REQUEST_TIMEOUT_MS_DEFAULT = 600_000
@@ -35,7 +35,8 @@ Aufruf:
     --skills-vault /Pfad/zum/Vault \\
     --models qwen3.5:4b,ministral-3:8b \\
     [--backend ollama|lmstudio] [--cases s01_elternbrief,s09_akkreditierung] \\
-    [--reps 3] [--num-ctx 32768] [--out datei.json]
+    [--reps 3] [--num-ctx 32768] [--thinking discard|preserve|off] \\
+    [--temperature 1] [--top-p 0.95] [--seed 4711] [--out datei.json]
 
 Hilfen:
   --dry-run       Skills, Fälle und Konfiguration prüfen; kein Modellaufruf
@@ -76,6 +77,10 @@ function parseCli(argv) {
     reps: positiveInteger(values.get('reps') ?? '1', '--reps'),
     numCtx: positiveInteger(values.get('num-ctx') ?? process.env.BENCH_NUM_CTX ?? String(NUM_CTX_DEFAULT), '--num-ctx'),
     timeoutMs: positiveInteger(values.get('timeout-ms') ?? String(REQUEST_TIMEOUT_MS_DEFAULT), '--timeout-ms'),
+    thinkingMode: values.get('thinking') ?? 'discard',
+    temperature: optionalNumber(values.get('temperature'), '--temperature', 0, 2),
+    topP: optionalNumber(values.get('top-p'), '--top-p', 0, 1),
+    seed: optionalInteger(values.get('seed'), '--seed'),
     out: values.get('out')
   }
 }
@@ -87,6 +92,22 @@ function splitCsv(value) {
 function positiveInteger(value, label) {
   const number = Number(value)
   if (!Number.isSafeInteger(number) || number <= 0) throw new Error(`${label} muss eine positive ganze Zahl sein`)
+  return number
+}
+
+function optionalNumber(value, label, min, max) {
+  if (value === undefined) return undefined
+  const number = Number(value)
+  if (!Number.isFinite(number) || number < min || number > max) {
+    throw new Error(`${label} muss zwischen ${min} und ${max} liegen`)
+  }
+  return number
+}
+
+function optionalInteger(value, label) {
+  if (value === undefined) return undefined
+  const number = Number(value)
+  if (!Number.isSafeInteger(number) || number < 0) throw new Error(`${label} muss eine ganze Zahl >= 0 sein`)
   return number
 }
 
@@ -542,6 +563,7 @@ function ollamaMessages(messages) {
       return {
         role: 'assistant',
         content: message.content,
+        ...(message.thinking ? { thinking: message.thinking } : {}),
         tool_calls: message.tool_calls.map(call => ({
           function: { name: call.name, arguments: call.arguments }
         }))
@@ -634,7 +656,7 @@ function normalizeArguments(raw) {
   }
 }
 
-async function callModel({ backend, baseUrl, model, messages, tools, numCtx, timeoutMs }) {
+async function callModel({ backend, baseUrl, model, messages, tools, numCtx, timeoutMs, executionProfile, seed }) {
   const endpoint = backend === 'lmstudio'
     ? `${baseUrl}/v1/chat/completions`
     : `${baseUrl}/api/chat`
@@ -643,14 +665,21 @@ async function callModel({ backend, baseUrl, model, messages, tools, numCtx, tim
         model,
         messages: openAiMessages(messages),
         tools: wireTools(tools),
-        stream: false
+        stream: false,
+        ...(seed !== null && seed !== undefined ? { seed } : {})
       }
     : {
         model,
         messages: ollamaMessages(messages),
         tools: wireTools(tools),
         stream: false,
-        options: { num_ctx: numCtx }
+        think: executionProfile.thinkingMode === 'off' ? false : true,
+        options: {
+          num_ctx: numCtx,
+          ...(executionProfile.temperature !== null ? { temperature: executionProfile.temperature } : {}),
+          ...(executionProfile.topP !== null ? { top_p: executionProfile.topP } : {}),
+          ...(seed !== null && seed !== undefined ? { seed } : {})
+        }
       }
   const response = await requestWithRetry('POST', endpoint, payload, timeoutMs)
   if (response.status !== 200) {
@@ -672,13 +701,14 @@ async function callModel({ backend, baseUrl, model, messages, tools, numCtx, tim
     }))
   return {
     text: String(message.content ?? ''),
+    thinking: String(message.thinking ?? ''),
     calls,
     promptTokens: backend === 'lmstudio' ? json.usage?.prompt_tokens : json.prompt_eval_count,
     completionTokens: backend === 'lmstudio' ? json.usage?.completion_tokens : json.eval_count
   }
 }
 
-async function executeCase({ backend, baseUrl, model, testCase, skills, numCtx, timeoutMs }) {
+async function executeCase({ backend, baseUrl, model, testCase, skills, numCtx, timeoutMs, executionProfile, seed }) {
   const tools = createTools(testCase, skills)
   const state = initialState(testCase, skills)
   const messages = [
@@ -692,16 +722,24 @@ async function executeCase({ backend, baseUrl, model, testCase, skills, numCtx, 
   let timedOut = false
   let transportError = null
   let httpError = null
+  // Summen über ALLE Iterationen, nicht der letzte Aufruf. Der Loop schickt jedes
+  // Mal die komplette Konversation neu; wer nur den letzten Wert speichert,
+  // unterschätzt den Verbrauch eines Laufs um ein Vielfaches (bei 4 Iterationen
+  // rund 7.000 statt 21.000 Eingabe-Token). `lastPromptTokens` bleibt daneben
+  // stehen, weil nur der letzte Prompt zeigt, wie nah der Lauf am Kontextfenster war.
   let promptTokens = null
   let completionTokens = null
+  let lastPromptTokens = null
   let nudgedForWrite = false
   let terminalError = null
+  let thinkingChars = 0
+  let thinkingTurns = 0
 
   for (let iteration = 1; iteration <= MAX_ITERATIONS; iteration += 1) {
     iterations = iteration
     let response
     try {
-      response = await callModel({ backend, baseUrl, model, messages, tools, numCtx, timeoutMs })
+      response = await callModel({ backend, baseUrl, model, messages, tools, numCtx, timeoutMs, executionProfile, seed })
     } catch (error) {
       if (error instanceof RequestTimeout) timedOut = true
       else transportError = String(error?.message ?? error)
@@ -712,11 +750,21 @@ async function executeCase({ backend, baseUrl, model, testCase, skills, numCtx, 
       break
     }
     finalText = response.text
-    promptTokens = response.promptTokens ?? promptTokens
-    completionTokens = response.completionTokens ?? completionTokens
+    if (response.thinking) {
+      thinkingChars += response.thinking.length
+      thinkingTurns += 1
+    }
+    if (typeof response.promptTokens === 'number') {
+      promptTokens = (promptTokens ?? 0) + response.promptTokens
+      lastPromptTokens = response.promptTokens
+    }
+    if (typeof response.completionTokens === 'number') {
+      completionTokens = (completionTokens ?? 0) + response.completionTokens
+    }
     messages.push({
       role: 'assistant',
       content: response.text,
+      ...(executionProfile.thinkingMode === 'preserve' && response.thinking ? { thinking: response.thinking } : {}),
       tool_calls: response.calls.length ? response.calls : undefined
     })
     if (!response.calls.length) {
@@ -775,6 +823,10 @@ async function executeCase({ backend, baseUrl, model, testCase, skills, numCtx, 
     nudgedForWrite,
     promptTokens,
     completionTokens,
+    lastPromptTokens,
+    thinkingChars,
+    thinkingTurns,
+    seed: seed ?? null,
     finalText: finalText.slice(0, 1000),
     calls: state.calls,
     errors: state.errors,
@@ -891,6 +943,7 @@ async function loadOrCreateResult(outFile, meta) {
       backend: existing.meta?.backend,
       baseUrl: existing.meta?.baseUrl,
       numCtx: existing.meta?.numCtx,
+      executionProfile: existing.meta?.executionProfile,
       implementationHashes: existing.meta?.implementationHashes,
       skills: existing.meta?.skills
     }
@@ -899,6 +952,7 @@ async function loadOrCreateResult(outFile, meta) {
       backend: meta.backend,
       baseUrl: meta.baseUrl,
       numCtx: meta.numCtx,
+      executionProfile: meta.executionProfile,
       implementationHashes: meta.implementationHashes,
       skills: meta.skills
     }
@@ -966,6 +1020,12 @@ async function main() {
     return
   }
   if (!['ollama', 'lmstudio'].includes(options.backend)) throw new Error('--backend muss ollama oder lmstudio sein')
+  if (!['discard', 'preserve', 'off'].includes(options.thinkingMode)) {
+    throw new Error('--thinking muss discard, preserve oder off sein')
+  }
+  if (options.backend !== 'ollama' && options.thinkingMode !== 'discard') {
+    throw new Error('--thinking preserve|off wird derzeit nur für Ollama unterstützt')
+  }
   const baseUrl = normalizedBaseUrl(options)
   if (options.listModels) {
     await listModels(options.backend, baseUrl, options.timeoutMs)
@@ -988,12 +1048,22 @@ async function main() {
   await preflight(options.backend, baseUrl, options.timeoutMs)
 
   const outFile = path.resolve(options.out ?? defaultOutputPath())
+  const executionProfile = {
+    thinkingMode: options.thinkingMode,
+    temperature: options.temperature ?? null,
+    topP: options.topP ?? null,
+    // Basis-Seed. Wiederholung n bekommt seedBase + (n - 1): Arm A und Arm B
+    // sehen bei gleicher Wiederholung denselben Seed (gepaarter Vergleich),
+    // die Wiederholungen untereinander bleiben verschieden.
+    seedBase: options.seed ?? null
+  }
   const meta = {
     benchmarkVersion: BENCHMARK_VERSION,
     createdAt: new Date().toISOString(),
     backend: options.backend,
     baseUrl,
     numCtx: options.backend === 'ollama' ? options.numCtx : null,
+    executionProfile,
     timeoutMs: options.timeoutMs,
     maxIterations: MAX_ITERATIONS,
     localOnly: true,
@@ -1002,13 +1072,14 @@ async function main() {
     implementationHashes: await implementationHashes()
   }
   const result = await loadOrCreateResult(outFile, meta)
-  console.error(`Modelle: ${options.models.join(', ')} · Wiederholungen: ${options.reps}`)
+  console.error(`Modelle: ${options.models.join(', ')} · Wiederholungen: ${options.reps} · Profil: ${JSON.stringify(executionProfile)}`)
 
   for (const model of options.models) {
     for (const testCase of cases) {
       for (let rep = 1; rep <= options.reps; rep += 1) {
         const exists = result.runs.some(run => run.model === model && run.caseId === testCase.id && run.rep === rep)
         if (exists) continue
+        const seed = options.seed === undefined ? null : options.seed + (rep - 1)
         const run = await executeCase({
           backend: options.backend,
           baseUrl,
@@ -1016,7 +1087,9 @@ async function main() {
           testCase,
           skills,
           numCtx: options.numCtx,
-          timeoutMs: options.timeoutMs
+          timeoutMs: options.timeoutMs,
+          executionProfile,
+          seed
         })
         if (run.transportError) {
           console.error(`ABBRUCH: ${model} · ${testCase.id} #${rep} · ${run.transportError}`)

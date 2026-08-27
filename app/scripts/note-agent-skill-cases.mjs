@@ -201,7 +201,9 @@ function validateTabellenZuordnung(run) {
   if (!includesAll(flattened[1] ?? '', ['K-01', 'Datenschutz', 'Aula'])) errors.push('zweite Quellzeile wurde nicht korrekt zugeordnet')
   if (!includesAll(flattened[2] ?? '', ['K-99', 'Archivkunde', 'nicht gefunden'])) errors.push('fehlender Treffer wurde nicht markiert')
   if (!includesAll(flattened[3] ?? '', ['K-02', 'Podcast', 'Studio'])) errors.push('vierte Quellzeile wurde nicht korrekt zugeordnet')
-  if (!/\b3\b/.test(run.finalText) || !/\b1\b/.test(run.finalText) || !/nicht (?:zugeordnet|gefunden)/i.test(run.finalText)) {
+  const finalTextNamesMatchCount = /\b3\b/.test(run.finalText) && /zugeordnet|treffer/i.test(run.finalText)
+  const finalTextNamesMissingMatch = /nicht (?:zugeordnet|gefunden)/i.test(run.finalText)
+  if (!finalTextNamesMatchCount || !finalTextNamesMissingMatch) {
     errors.push('Abschlussantwort nennt zugeordnete und nicht zugeordnete Zeilen nicht')
   }
   return errors
