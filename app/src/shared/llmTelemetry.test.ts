@@ -236,3 +236,13 @@ describe('summarizeCost', () => {
     expect(formatCostCell(c)).toBe('$0.0040')
   })
 })
+
+describe('Sprachfaehige Kostenzelle', () => {
+  it('nimmt das uebersetzte Wort fuer lokale Laeufe', () => {
+    const lokal = summarizeCost([
+      { at: 1, module: 'chat', model: 'm', backend: 'ollama', wallMs: 10 }
+    ])
+    expect(formatCostCell(lokal, { local: 'local' })).toBe('local')
+    expect(formatCostCell(lokal)).toBe('lokal')
+  })
+})

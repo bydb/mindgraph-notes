@@ -193,10 +193,25 @@ export function formatUsd(usd: number | null): string {
   return `$${usd.toFixed(2)}`
 }
 
+/**
+ * Anzeigetexte des Preis-Etiketts. Sie kommen von aussen, weil dieses Modul auch
+ * im Main-Prozess laeuft, wo es keinen Uebersetzungs-Hook gibt — und weil ein
+ * fest verdrahtetes "gratis" im englischen Modell-Picker gestanden haette.
+ */
+export interface PricingLabels {
+  free: string
+  perMillion: string
+}
+
+export const DEFAULT_PRICING_LABELS: PricingLabels = { free: 'gratis', perMillion: 'je 1 Mio.' }
+
 /** Preis-Etikett für den Modell-Picker: Ein- und Ausgabe, je 1 Mio. Token. */
-export function formatPricing(pricing: ModelPricing | null | undefined): string {
+export function formatPricing(
+  pricing: ModelPricing | null | undefined,
+  labels: PricingLabels = DEFAULT_PRICING_LABELS
+): string {
   if (!pricing) return ''
-  if (pricing.inputPerMillion === 0 && pricing.outputPerMillion === 0) return 'gratis'
-  const fmt = (v: number) => (v < 1 ? `$${v.toFixed(2)}` : `$${v.toFixed(2)}`)
-  return `${fmt(pricing.inputPerMillion)} / ${fmt(pricing.outputPerMillion)} je 1 Mio.`
+  if (pricing.inputPerMillion === 0 && pricing.outputPerMillion === 0) return labels.free
+  const fmt = (v: number) => `$${v.toFixed(2)}`
+  return `${fmt(pricing.inputPerMillion)} / ${fmt(pricing.outputPerMillion)} ${labels.perMillion}`
 }

@@ -113,7 +113,7 @@ export function LlmPerformanceView() {
                     </td>
                     <td className="num">{formatTps(r.summary.promptTps)}</td>
                     <td className="num">{seconds(r.summary.firstTokenMs)}</td>
-                    <td className="num llmperf-cost" title={costHint(r, t)}>{formatCostCell(r.cost)}</td>
+                    <td className="num llmperf-cost" title={costHint(r, t)}>{formatCostCell(r.cost, { local: t('llmPerf.cost.local') })}</td>
                     <td className="num">{r.summary.runs}</td>
                     <td className="num">{r.summary.coldRuns > 0 ? r.summary.coldRuns : '—'}</td>
                   </tr>

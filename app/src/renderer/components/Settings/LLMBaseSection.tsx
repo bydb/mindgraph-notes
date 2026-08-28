@@ -7,6 +7,11 @@ import {
 import llmbaseLogo from '../../assets/model-vendors/llmbase.svg'
 import { formatPricing, type ModelPricing } from '../../../shared/llmCost'
 
+// Preis-Etikett des Modell-Pickers. Stand bis 28.08.2026 fest auf Deutsch in
+// shared/llmCost.ts — im englischen Picker las sich das als "je 1 Mio.".
+const DE_PRICE_LABELS = { free: 'gratis', perMillion: 'je 1 Mio.' }
+const EN_PRICE_LABELS = { free: 'free', perMillion: 'per 1M' }
+
 // Anzeige-Labels für Nicht-Matrix-Cloud-Features (identisch zur OpenRouter-Sektion).
 const FEATURE_LABELS: Record<CloudFeatureId, { de: string; en: string }> = {
   'notes-chat': { de: 'Notes Chat', en: 'Notes Chat' },
@@ -172,7 +177,7 @@ export function LLMBaseSection() {
                 <select value={lb.model} onChange={e => patch({ model: e.target.value })} style={{ flex: 1 }}>
                   <option value="">{en ? '— select —' : '— wählen —'}</option>
                   {models.map(m => (
-                    <option key={m.id} value={m.id}>{m.name}{m.pricing ? ` — ${formatPricing(m.pricing)}` : ''}</option>
+                    <option key={m.id} value={m.id}>{m.name}{m.pricing ? ` — ${formatPricing(m.pricing, en ? EN_PRICE_LABELS : DE_PRICE_LABELS)}` : ''}</option>
                   ))}
                 </select>
               ) : (

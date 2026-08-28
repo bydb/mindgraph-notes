@@ -265,8 +265,18 @@ export function buildComparisonRows(runs: LlmRunMetrics[]): LlmComparisonRow[] {
  *   '≈ …'    — ganz oder teilweise aus Token × Katalogpreis gerechnet
  *   '$…'    — vom Anbieter abgerechnet, ohne Vorbehalt
  */
-export function formatCostCell(cost: LlmCostSummary): string {
-  if (cost.cloudRuns === 0) return 'lokal'
+export interface CostCellLabels {
+  /** Lief auf diesem Rechner. Stand hier bis 28.08.2026 fest auf Deutsch. */
+  local: string
+}
+
+export const DEFAULT_COST_CELL_LABELS: CostCellLabels = { local: 'lokal' }
+
+export function formatCostCell(
+  cost: LlmCostSummary,
+  labels: CostCellLabels = DEFAULT_COST_CELL_LABELS
+): string {
+  if (cost.cloudRuns === 0) return labels.local
   if (cost.totalUsd === null) return '—'
   const betrag = formatUsd(cost.totalUsd)
   if (cost.unpricedRuns > 0) return `≥ ${betrag}`

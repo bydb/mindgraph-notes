@@ -187,3 +187,17 @@ describe('Kleinstbetraege', () => {
     expect(formatUsd(0.0005)).toBe('$0.0005')
   })
 })
+
+describe('Sprachfaehige Etiketten', () => {
+  it('nimmt uebersetzte Woerter statt fest verdrahtetem Deutsch', () => {
+    const gratis = parseModelPricing({ prompt: '0', completion: '0' })
+    const bezahlt = parseModelPricing({ prompt: '0.00000015', completion: '0.00000047' })
+    const en = { free: 'free', perMillion: 'per 1M' }
+    expect(formatPricing(gratis, en)).toBe('free')
+    expect(formatPricing(bezahlt, en)).toBe('$0.15 / $0.47 per 1M')
+  })
+
+  it('bleibt ohne Angabe bei den deutschen Vorgaben', () => {
+    expect(formatPricing(parseModelPricing({ prompt: '0', completion: '0' }))).toBe('gratis')
+  })
+})

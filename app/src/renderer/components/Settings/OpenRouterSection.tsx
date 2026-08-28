@@ -7,6 +7,11 @@ import {
 import openrouterLogo from '../../assets/model-vendors/openrouter.svg'
 import { formatPricing, type ModelPricing } from '../../../shared/llmCost'
 
+// Preis-Etikett des Modell-Pickers. Stand bis 28.08.2026 fest auf Deutsch in
+// shared/llmCost.ts — im englischen Picker las sich das als "je 1 Mio.".
+const DE_PRICE_LABELS = { free: 'gratis', perMillion: 'je 1 Mio.' }
+const EN_PRICE_LABELS = { free: 'free', perMillion: 'per 1M' }
+
 // Anzeige-Labels für Nicht-Matrix-Cloud-Features.
 const FEATURE_LABELS: Record<CloudFeatureId, { de: string; en: string }> = {
   'notes-chat': { de: 'Notes Chat', en: 'Notes Chat' },
@@ -179,7 +184,7 @@ export function OpenRouterSection() {
                   {!freeOnly && paidModels.length > 0 && (
                     <optgroup label={en ? 'Paid (pay-as-you-go)' : 'Kostenpflichtig (Guthaben nötig)'}>
                       {paidModels.map(m => (
-                        <option key={m.id} value={m.id}>{m.name}{m.pricing ? ` — ${formatPricing(m.pricing)}` : ''}</option>
+                        <option key={m.id} value={m.id}>{m.name}{m.pricing ? ` — ${formatPricing(m.pricing, en ? EN_PRICE_LABELS : DE_PRICE_LABELS)}` : ''}</option>
                       ))}
                     </optgroup>
                   )}
