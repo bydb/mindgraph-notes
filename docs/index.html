@@ -48,7 +48,7 @@
     "url": "https://mindgraph-notes.de/",
     "downloadUrl": "https://github.com/bydb/mindgraph-notes/releases",
     "screenshot": "https://mindgraph-notes.de/screenshot.png",
-    "softwareVersion": "0.10.56-beta",
+    "softwareVersion": "0.10.57-beta",
     "author": { "@type": "Person", "name": "Jochen Leeder", "url": "https://bydb.io" },
     "license": "https://opensource.org/licenses/AGPL-3.0",
     "featureList": [
@@ -1630,16 +1630,16 @@
     <div class="release-inner">
       <div class="release-head">
         <div>
-          <div class="st-eyebrow"><span class="d"></span><span data-i18n="release.label">Release 0.10.56 &middot; Was fehlt, bleibt leer</span></div>
-          <h2 class="st-h" style="font-size:clamp(1.8rem,3.8vw,2.6rem)" data-i18n="release.heading">Was ist neu &mdash; <em>Der Agent erfindet keine Namen mehr. Und sagt, was er kostet.</em></h2>
-          <p class="st-lead" data-i18n="release.lead">Lie&szlig; man ein Formular ausf&uuml;llen, in dem die verantwortliche Person nicht genannt war, schrieb der Agent dort einen plausibel klingenden Namen hin. Ein leeres Feld f&auml;llt beim Pr&uuml;fen auf, ein erfundener Name nicht &mdash; und unterschrieben wird am Ende, was dasteht. Das ist behoben und an zw&ouml;lf L&auml;ufen nachgemessen. Dazu zeigt die App jetzt, was ein Cloud-Lauf tats&auml;chlich kostet.</p>
+          <div class="st-eyebrow"><span class="d"></span><span data-i18n="release.label">Release 0.10.57 &middot; Nichts Halbfertiges</span></div>
+          <h2 class="st-h" style="font-size:clamp(1.8rem,3.8vw,2.6rem)" data-i18n="release.heading">Was ist neu &mdash; <em>Geschlossene Sicherheitsl&uuml;cken. Und ein Agent, der Unfertiges nicht als fertig ausgibt.</em></h2>
+          <p class="st-lead" data-i18n="release.lead">Ein Wartungs-Release ohne gro&szlig;e Geste. Es schlie&szlig;t 29 bekannte Sicherheitsl&uuml;cken in den mitgelieferten Bibliotheken &mdash; darunter ausgerechnet in der, die fremdes HTML entsch&auml;rfen soll. Und der Agent legt dir kein Ergebnis mehr vor, in dem noch Platzhalter stehen.</p>
         </div>
         <div class="release-date">v<span data-app-version>0.10.35-beta</span></div>
       </div>
       <div class="release-grid">
-        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c1h">Keine erfundenen Personendaten</b><p data-i18n="release.c1">Namen, Anschriften, Mailadressen und Zust&auml;ndigkeiten &uuml;bernimmt der Agent nur noch aus dem, was du ihm gegeben hast. Fehlt eine Angabe, bleibt das Feld leer und die L&uuml;cke steht in seiner Antwort. Nachgemessen an zw&ouml;lf L&auml;ufen desselben Antrags.</p></div></div>
-        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c2h">Was ein Lauf kostet, steht jetzt da</b><p data-i18n="release.c2">Im Leistungsfenster steht neben Tempo und Wartezeit, was gelaufen ist &mdash; je Modell und Aufgabe. Die Spalte sagt auch, woher die Zahl kommt: &bdquo;lokal&ldquo; hei&szlig;t, es lief auf deinem Rechner und kostet nichts.</p></div></div>
-        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c3h">Lesbare Preise, ehrlichere Zusage</b><p data-i18n="release.c3">Neben den Cloud-Modellen stand bisher ein Preis, aus dem sich nichts ablesen lie&szlig;. Jetzt steht dort &bdquo;$0.15 / $0.47 je 1 Mio.&ldquo;. Zugleich haben wir die Zusage &bdquo;Modelle auf EU-Servern&ldquo; zur&uuml;ckgenommen.</p></div></div>
+        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c1h">Nichts Halbfertiges mehr</b><p data-i18n="release.c1">Vor dem Speichern pr&uuml;ft die App das Ergebnis auf stehengebliebene Platzhalter und darauf, ob die geforderte Anzahl an Entw&uuml;rfen wirklich da ist. Fehlt etwas, schreibt der Agent neu.</p></div></div>
+        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c2h">29 Sicherheitsl&uuml;cken geschlossen</b><p data-i18n="release.c2">Betroffen waren unter anderem die Bibliothek zum Entsch&auml;rfen von fremdem HTML, der Diagramm-Renderer und die Netzwerkschicht des Mail-Abrufs &mdash; alles Stellen, die Inhalte von au&szlig;en verarbeiten.</p></div></div>
+        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c3h">Cloud-L&auml;ufe fordern Nicht-Speicherung an</b><p data-i18n="release.c3">Bei OpenRouter verlangt jede einzelne Anfrage ausdr&uuml;cklich, dass der Anbieter nichts aufbewahrt &mdash; nicht nur als Kontoeinstellung, die falsch stehen kann.</p></div></div>
       </div>
       <a class="release-link" href="https://github.com/bydb/mindgraph-notes/releases" target="_blank" rel="noopener noreferrer" data-i18n="release.link">Vollst&auml;ndige Release Notes auf GitHub &rarr;</a>
     </div>
@@ -1982,15 +1982,15 @@
         "modules.opt.vision": "Vision OCR",
         "modules.opt.speech": "Diktat & Vorlesen",
         "modules.opt.terminal": "Terminal",
-        "release.label": "Release {vs} · Was fehlt, bleibt leer",
-        "release.heading": "Was ist neu — <em>Der Agent erfindet keine Namen mehr. Und sagt, was er kostet.</em>",
-        "release.lead": "Ließ man ein Formular ausfüllen, in dem die verantwortliche Person nicht genannt war, schrieb der Agent dort einen plausibel klingenden Namen hin. Ein leeres Feld fällt beim Prüfen auf, ein erfundener Name nicht — und unterschrieben wird am Ende, was dasteht. Das ist behoben und an zwölf Läufen nachgemessen. Dazu zeigt die App jetzt, was ein Cloud-Lauf tatsächlich kostet.",
-        "release.c1h": "Keine erfundenen Personendaten",
-        "release.c1": "Namen, Anschriften, Mailadressen und Zuständigkeiten übernimmt der Agent nur noch aus dem, was du ihm gegeben hast. Fehlt eine Angabe, bleibt das Feld leer und die Lücke steht in seiner Antwort. Verboten war das vorher nirgends — die Arbeitsanweisung sagte sogar “triff sinnvolle Annahmen“, und bei einem leeren Namensfeld heißt das genau: sich einen ausdenken. Nachgemessen an zwölf Läufen desselben Antrags.",
-        "release.c2h": "Was ein Lauf kostet, steht jetzt da",
-        "release.c2": "Im Leistungsfenster steht neben Tempo und Wartezeit, was gelaufen ist — je Modell und Aufgabe. Die Spalte sagt auch, woher die Zahl kommt: “lokal“ heißt, es lief auf deinem Rechner und kostet nichts; ein Strich heißt, es gab Cloud-Läufe, aber keine Kostenangabe. Beides als 0 zu zeigen wäre wieder eine Zahl, die nur gewinnen kann. Zur Größenordnung: ein Agentenlauf kostet zwischen einem Zehntel Cent und sechs Cent.",
-        "release.c3h": "Lesbare Preise, ehrlichere Zusage",
-        "release.c3": "Neben den Cloud-Modellen stand bisher “0.00000015$/tok“ — die Zahl stimmte, ablesen ließ sich nichts, und der teurere Ausgabepreis fehlte ganz. Jetzt steht dort “$0.15 / $0.47 je 1 Mio.“, bei LLMBase erstmals überhaupt ein Preis. Zugleich haben wir die Zusage “Modelle auf EU-Servern“ zurückgenommen: Der Anbieter sagt selbst, dass die Verarbeitungsregion vom Modell abhängt.",
+        "release.label": "Release {vs} · Nichts Halbfertiges",
+        "release.heading": "Was ist neu — <em>Geschlossene Sicherheitslücken. Und ein Agent, der Unfertiges nicht als fertig ausgibt.</em>",
+        "release.lead": "Ein Wartungs-Release ohne große Geste. Es schließt 29 bekannte Sicherheitslücken in den mitgelieferten Bibliotheken — darunter ausgerechnet in der, die fremdes HTML entschärfen soll. Und der Agent legt dir kein Ergebnis mehr vor, in dem noch Platzhalter stehen.",
+        "release.c1h": "Nichts Halbfertiges mehr",
+        "release.c1": "Vor dem Speichern prüft die App das Ergebnis auf stehengebliebene Platzhalter, abgebrochene Textauszeichnung und darauf, ob die geforderte Anzahl an Entwürfen wirklich da ist. Fehlt etwas, schreibt der Agent neu, statt es dir vorzulegen. Das ergänzt die Personendaten-Regel: Die verhindert erfundene Inhalte, diese Prüfung unfertige, die fertig aussehen.",
+        "release.c2h": "29 Sicherheitslücken geschlossen",
+        "release.c2": "Betroffen waren unter anderem die Bibliothek zum Entschärfen von fremdem HTML, der Diagramm-Renderer und die Netzwerkschicht des Mail-Abrufs. Alles davon verarbeitet Inhalte, die von außen kommen — fremde Notizen, Mails, Diagramme. Eine Aktualisierung haben wir bewusst ausgelassen: Sie hätte beim PDF-Lesen eine neue Lücke gebracht.",
+        "release.c3h": "Cloud-Läufe fordern Nicht-Speicherung an",
+        "release.c3": "Läuft der Agent über OpenRouter, verlangt jede einzelne Anfrage ausdrücklich, dass der Anbieter nichts aufbewahrt — nicht nur als Kontoeinstellung, die falsch stehen kann. Ob eine Anfrage abgelehnt wird, wenn er das nicht zusichern kann, ist noch ungeprüft; bis dahin gilt es als Bevorzugung, nicht als Zusicherung.",
         "release.link": "Vollständige Release Notes auf GitHub →",
         "dl.label": "Download",
         "dl.heading": "Jetzt starten.",
@@ -2250,15 +2250,15 @@
         "modules.opt.vision": "Vision OCR",
         "modules.opt.speech": "Dictation & TTS",
         "modules.opt.terminal": "Terminal",
-        "release.label": "Release {vs} · What is missing stays empty",
-        "release.heading": "What’s new — <em>The agent no longer invents names. And it tells you what it costs.</em>",
-        "release.lead": "If you had a form filled in that did not name the responsible person, the agent simply wrote a plausible-sounding name there. An empty field gets noticed when you check the document; an invented name does not — and it is the document that gets signed. That is fixed, and measured across twelve runs. On top of that the app now shows what a cloud run actually costs.",
-        "release.c1h": "No invented personal data",
-        "release.c1": "Names, addresses, mail addresses and responsibilities are now taken only from what you gave the agent. If something is missing, the field stays empty and the gap is named in its answer. Nothing forbade this before — the instructions even said “make sensible assumptions“, and for an empty name field that means exactly: make one up. Measured across twelve runs of the same application form.",
-        "release.c2h": "What a run costs is now shown",
-        "release.c2": "The performance window now shows next to speed and waiting time what a run consumed — per model and per task. The column also says where the figure comes from: “local“ means it ran on your machine and costs nothing; a dash means there were cloud runs but no cost was reported. Showing both as 0 would again be a figure that can only win. For scale: an agent run costs between a tenth of a cent and six cents.",
-        "release.c3h": "Readable prices, a more honest promise",
-        "release.c3": "Next to the cloud models it used to say “0.00000015$/tok“ — the figure was correct, but unreadable, and the more expensive output price was missing entirely. It now reads “$0.15 / $0.47 per 1M“, and for LLMBase a price appears at all for the first time. We have also withdrawn the claim “models on EU servers“: the provider itself states that the processing region depends on the model.",
+        "release.label": "Release {vs} · Nothing half-finished",
+        "release.heading": "What’s new — <em>Security holes closed. And an agent that stops passing off unfinished work as finished.</em>",
+        "release.lead": "A maintenance release without a grand gesture. It closes 29 known security holes in the bundled libraries — including, of all things, the one meant to neutralise foreign HTML. And the agent no longer hands you a result with placeholders still in it.",
+        "release.c1h": "Nothing half-finished",
+        "release.c1": "Before saving, the app checks the result for leftover placeholders, broken text formatting, and whether the number of drafts you asked for is actually there. If something is missing the agent rewrites it instead of handing it to you. This complements the personal-data rule: that one prevents invented content, this check prevents unfinished content that looks finished.",
+        "release.c2h": "29 security holes closed",
+        "release.c2": "Affected were, among others, the library that neutralises foreign HTML, the diagram renderer and the network layer of the mail fetch. All of these process content that comes from outside — foreign notes, mails, diagrams. One update was deliberately skipped: it would have introduced a new hole in PDF reading.",
+        "release.c3h": "Cloud runs request no retention",
+        "release.c3": "When the agent runs via OpenRouter, every single request explicitly asks that the provider retain nothing — not just as an account setting that can be wrong. Whether a request is refused when the provider cannot guarantee it is still unverified; until then it counts as a preference, not an assurance.",
         "release.link": "Full release notes on GitHub →",
         "dl.label": "Download",
         "dl.heading": "Get started.",

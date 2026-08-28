@@ -2,6 +2,28 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.10.57-beta] - 2026-08-29
+
+Ein Wartungs-Release. Es schließt bekannte Sicherheitslücken in den mitgelieferten Bibliotheken und sorgt dafür, dass der Agent keine halbfertige Arbeit mehr als fertig ausgibt.
+
+### Behoben
+
+- **29 bekannte Sicherheitslücken in mitgelieferten Bibliotheken geschlossen.** Betroffen waren unter anderem die Bibliothek, mit der die App fremdes HTML entschärft (eine Lücke ließ einen abgetrennten Teil des Dokuments ausführbar zurück — genau das, was die Entschärfung verhindern soll), der Diagramm-Renderer für Mermaid und die Netzwerkschicht des Mail-Abrufs. Dazu die Programmgrundlage selbst.
+
+  Alles davon betrifft Inhalte, die von außen kommen: fremde Notizen, Mails, Diagramme. Ein Update ist deshalb sinnvoll, auch wenn nichts spürbar anders ist.
+
+- **Eine Aktualisierung wurde bewusst nicht mitgemacht.** Die Bibliothek, die PDFs liest, hätte durch das Update eine neue Lücke bekommen — beliebige Programmausführung beim Öffnen einer präparierten PDF, und gelesen werden PDFs aus Anhängen und aus dem reMarkable-Import. Sie bleibt deshalb auf dem geprüften Stand darunter.
+
+### Neu
+
+- **Der Agent gibt nichts Unfertiges mehr als fertig aus.** Vor dem Speichern prüft die App das Ergebnis auf stehengebliebene Platzhalter („noch auszufüllen", „TBD"), auf abgebrochene Textauszeichnung und darauf, ob die im Auftrag geforderte Anzahl an Entwürfen wirklich da ist. Fehlt etwas, schreibt der Agent neu, statt es dir vorzulegen.
+
+  Das ist die Ergänzung zur Personendaten-Regel aus dem letzten Release: Die verhindert **erfundene** Inhalte, diese Prüfung **unfertige**, die fertig aussehen. Beurteilt wird ausdrücklich keine fachliche Richtigkeit — nur, was sich zweifelsfrei erkennen lässt.
+
+- **Cloud-Läufe des Agenten fordern bei OpenRouter ausdrücklich an, dass der Anbieter nichts speichert** (Zero Data Retention), und zwar bei jeder einzelnen Anfrage statt nur als Kontoeinstellung. Ob der Anbieter eine Anfrage ablehnt, wenn er das nicht zusichern kann, ist noch ungeprüft — bis das geklärt ist, gilt das als Bevorzugung und nicht als Zusicherung.
+
+- Längere Cloud-Antworten brechen nicht mehr mitten im Text ab. Für lokale Modelle ändert sich nichts; dort gab es diese Grenze nie.
+
 ## [0.10.56-beta] - 2026-08-28
 
 Der Notiz-Agent hat Namen erfunden, wenn im Antrag welche fehlten. Das ist behoben und nachgemessen. Dazu zeigt die App jetzt, was ein Cloud-Lauf kostet.
