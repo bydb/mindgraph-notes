@@ -2473,7 +2473,7 @@ var require_formats = __commonJS({
     module2.exports = formats;
     function formats(mode) {
       mode = mode == "full" ? "full" : "fast";
-      return util.copy(formats[mode]);
+      return util.copy(formats[mode], /* @__PURE__ */ Object.create(null));
     }
     formats.fast = {
       // date: http://tools.ietf.org/html/rfc3339#section-5.6
