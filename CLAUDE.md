@@ -275,6 +275,8 @@ Module als verbindbare Bausteine mit **typisierten Ports** auf einem React-Flow-
 
 ## Sicherheit
 
+- **`pdfjs-dist` ist EXAKT auf `5.4.296` verankert** (kein `^`) — nicht aufräumen. Die 5.7er-Reihe hat eine Lücke mit beliebiger JavaScript-Ausführung beim Öffnen einer präparierten PDF (verwundbar: `>=5.6.83 <6.2.108`); 5.4.296 liegt darunter. Ein `npm update` mit `^5.4.296` springt genau hinein — real passiert am 28.08.2026. Zusätzlich steht an beiden Aufrufstellen `isEvalSupported: false` (`noteAgent/contextFiles.ts`, `plugins/remarkable/pdfReflow.ts`); die Option existiert ab 5.7 nicht mehr, weil der eval-Pfad dort entfiel — kein Grund, auf 5.7 zu gehen. Der Ausweg nach vorn ist `6.2.108`, aber das ist ein Major-Sprung neben `react-pdf@10` und gehört getestet.
+- **Nach jedem Dependency-Update `npm audit` laufen lassen**, nicht nur die Dependabot-Liste abarbeiten. Dependabot bewertet den Stand VOR der Änderung; eine durch das Update neu eingeschleppte Lücke taucht dort nicht auf.
 - **HTML-Sanitization**: Immer `sanitizeHtml()` / `sanitizeSvg()` / `escapeHtml()` aus `utils/sanitize.ts`
 - **Mermaid**: `securityLevel: 'strict'`
 - **KaTeX**: `trust: false`

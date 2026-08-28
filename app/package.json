@@ -171,7 +171,7 @@
     "mermaid": "^11.12.2",
     "node-pty": "^1.1.0",
     "nodemailer": "^9.0.1",
-    "pdfjs-dist": "^5.4.296",
+    "pdfjs-dist": "5.4.296",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
     "react-pdf": "^10.3.0",
