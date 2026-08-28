@@ -175,3 +175,15 @@ describe('Anzeige', () => {
     expect(formatPricing(null)).toBe('')
   })
 })
+
+describe('Kleinstbetraege', () => {
+  it('unterscheidet echte Null von einem winzigen Betrag', () => {
+    // In der laufenden App zeigte ein OpenRouter-Verbindungstest '$0.0000' — das
+    // las sich wie null, war aber ein realer Betrag unterhalb der vierten Stelle.
+    expect(formatUsd(0)).toBe('$0')
+    expect(formatUsd(0.000002)).toBe('<$0.0001')
+    expect(formatUsd(0.00009)).toBe('<$0.0001')
+    expect(formatUsd(0.0001)).toBe('$0.0001')
+    expect(formatUsd(0.0005)).toBe('$0.0005')
+  })
+})

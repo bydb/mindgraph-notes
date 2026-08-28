@@ -185,6 +185,9 @@ export function isComplete(cost: RunCost): boolean {
 export function formatUsd(usd: number | null): string {
   if (usd === null || !Number.isFinite(usd)) return '—'
   if (usd === 0) return '$0'
+  // Unter vier Nachkommastellen wuerde toFixed(4) '$0.0000' liefern — das liest sich
+  // wie null, ist aber keine. Ein einzelner kleiner Chat-Aufruf kostet real so wenig.
+  if (usd < 0.0001) return '<$0.0001'
   if (usd < 0.01) return `$${usd.toFixed(4)}`
   if (usd < 1) return `$${usd.toFixed(3)}`
   return `$${usd.toFixed(2)}`
