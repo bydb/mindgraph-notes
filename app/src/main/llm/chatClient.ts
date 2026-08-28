@@ -817,7 +817,14 @@ async function chatWithToolsViaOpenAiCompatible(
       }
     })
 
-  const text = msg?.content ?? ''
+  // Reasoning-Modelle (DeepSeek V4, gpt-oss, …) liefern eine Runde OHNE Werkzeugaufruf
+  // manchmal mit leerem `content`; die Antwort steht dann in `reasoning`. Ohne diesen
+  // Rückfall sieht der Agenten-Loop „kein Werkzeug UND kein Text", schiebt einmal nach
+  // und bricht dann mit „ohne Ergebnis beendet — stärkeres Modell wählen" ab, obwohl das
+  // Modell geantwortet hat (real mit deepseek-v4-flash über OpenRouter).
+  // Bewusst NUR im werkzeuglosen Fall: auf Tool-Runden ist leeres content der Normalfall,
+  // dort würde der Denk-Text in die Historie wandern und den Kontext aufblähen.
+  const text = toolCalls.length > 0 ? (msg?.content ?? '') : openrouterMessageText(msg)
   const assistantMessage: ChatMessage = {
     role: 'assistant',
     content: text,
