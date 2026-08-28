@@ -27,6 +27,7 @@ import {
   mergeDeterministicSourcesHtml, MAX_WEB_SEARCHES_PER_RUN, MAX_WEB_FETCHES_PER_RUN,
   type WebSearchHit
 } from '../../shared/webResearch'
+import { validateAgentMarkdownResult } from '../../shared/agentResultQuality'
 
 export interface NoteAgentContext {
   senderId: number
@@ -860,6 +861,13 @@ export function createNoteAgentRegistry(): ToolRegistry<NoteAgentContext> {
           isToolAvailable(ctx, 'write_html')
             ? 'write_note schreibt ausschließlich Markdown. Für eine HTML-Seite das Werkzeug write_html benutzen (Parameter: title, body_html) — nur dann bekommt die Seite die Formel-Darstellung und das Layout.'
             : 'write_note schreibt ausschließlich Markdown, und HTML-Seiten sind in diesem Lauf nicht verfügbar. Gib der Datei die Endung .md und schreibe das Ergebnis als Markdown-Notiz.'
+        )
+      }
+      const qualityIssues = validateAgentMarkdownResult(markdown, ctx.run.instruction)
+      if (qualityIssues.length > 0) {
+        return err(
+          `Automatische Qualitätsprüfung fehlgeschlagen: ${qualityIssues.map(issue => issue.message).join('; ')}. ` +
+          'Überarbeite das Ergebnis vollständig und rufe write_note danach erneut auf.'
         )
       }
       // Web-Lauf (0e): genau EIN Write; die App hängt den Quellenblock deterministisch an.

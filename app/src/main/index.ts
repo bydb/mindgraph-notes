@@ -146,7 +146,7 @@ import { runWorkflow, type RunnerServices, type SeedEmail } from './workflows/ru
 import { matchEmailToProjects, gateProjectMatch } from '../shared/projectMatch'
 import { parseRelevanceConfig, stripConfigBlock, buildReplyStats, computeHardSignals, combineRelevance, extractConfigBlock, upsertConfigBlock, emptyRelevanceConfig, isSentMail, isSentFolderName, DEFAULT_VIP_WEIGHT, DEFAULT_DOMAIN_WEIGHT, DEFAULT_KEYWORD_BOOST } from '../shared/emailRelevance'
 import { isHardLocked as isModelHardLocked, isCloudModel as isModelIsCloud } from '../shared/modelCompatibility'
-import { listCloudModels, chat as llmChat, streamCloudChat, type ChatOptions as LlmChatOptions, type CloudChatBackend } from './llm/chatClient'
+import { listCloudModels, chat as llmChat, streamCloudChat, isCloudChatBackend, type ChatOptions as LlmChatOptions, type CloudChatBackend } from './llm/chatClient'
 import { recordLlmRun, getLlmRuns } from './llm/telemetry'
 import { fromOllamaResponse, type OllamaTimings } from '../shared/llmTelemetry'
 import { parseLooseJsonObject } from '../shared/looseJson'
@@ -4200,8 +4200,8 @@ interface NoteAgentRunParams {
   // Fehler) — der Renderer schickt deshalb sein `ollama.backend` mit.
   localBackend?: 'ollama' | 'lmstudio'
   lmStudioPort?: number
-  // Cloud-Routing (OpenRouter) — nur gesetzt, wenn per 'note-agent'-Opt-in freigegeben.
-  cloud?: { model: string } | null
+  // Cloud-Routing — nur gesetzt, wenn per 'note-agent'-Opt-in freigegeben.
+  cloud?: { model: string; provider?: 'openrouter' | 'llmbase' } | null
   // Webrecherche für diesen Lauf (Globus-Toggle) — nur { enabled }, die Provider-Config
   // liegt Main-seitig (0d). Der Main seedet die erlaubte URL-Liste aus dem Auftrag (0f).
   webResearch?: { enabled: boolean } | null
@@ -4292,6 +4292,24 @@ ipcMain.handle('note-agent-run', async (event, params: NoteAgentRunParams) => {
       }
     } else {
       chatOptions = { backend: 'ollama', ollamaModel: params.model }
+    }
+
+    // Cloud-Läufe: Ausgabegrenze setzen und OpenRouter pro Request auf Zero Data
+    // Retention festlegen. Im Beschaffungs-Härtetest endete ein Cloud-Lauf mitten im
+    // letzten Abschnitt, weil ohne max_tokens der Anbieter-Default greift.
+    //
+    // BEWUSST NUR CLOUD. Ollama setzt von sich aus kein num_predict, die Ausgabe ist
+    // dort nur vom Kontextfenster begrenzt — ein Limit hier würde lokal eine Decke
+    // einziehen, die es nie gab, und eine große Ordner-Auswertung abschneiden.
+    // Ebenso bewusst KEINE temperature/top_p: Die Modelle bringen abgestimmte Werte mit
+    // (qwen3.5:4b z.B. 1.0/0.95), und der Skill-Benchmark hat auf genau diesen Werten
+    // gemessen. Ein Default-Wechsel gehört gemessen, nicht aus einem Szenario abgeleitet.
+    if (isCloudChatBackend(chatOptions.backend)) {
+      chatOptions = {
+        ...chatOptions,
+        maxTokens: 8_192,
+        zeroDataRetention: chatOptions.backend === 'openrouter'
+      }
     }
 
     // Agent-Skills Stufe 1: aktivierte Vault-Skills als Discovery-Metadaten mitgeben.

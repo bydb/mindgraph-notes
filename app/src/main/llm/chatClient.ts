@@ -21,6 +21,7 @@ import {
   resolveOllamaExecutionProfile,
   type LlmExecutionProfile
 } from '../../shared/agentExecutionProfile'
+import { isCloudModel } from '../../shared/modelCompatibility'
 import { recordLlmRun } from './telemetry'
 import { getModelPricing } from './cloudPricing'
 import { parseCallUsage, parseModelPricing, sumCalls, type CallUsage, type ModelPricing, type RunCost } from '../../shared/llmCost'
@@ -71,8 +72,13 @@ export interface ChatOptions {
   llmbaseApiKey?: string                  // Pflicht wenn backend === 'llmbase'
   llmbaseModel?: string                   // z.B. 'qwen/qwen3.5-9b' (Pflicht für LLMBase)
   responseFormat?: 'json'                  // Cloud: erzwingt response_format json_object (für strukturierte Analysen)
-  temperature?: number                     // Cloud: temperature
-  maxTokens?: number                      // Cloud: max_tokens; Ollama: nur dokumentarisch
+  temperature?: number                     // Backend-übergreifend: temperature
+  topP?: number                            // Backend-übergreifend: top_p
+  maxTokens?: number                       // Cloud: max_tokens; Ollama: num_predict
+  // OpenRouter: nur an Endpunkte routen, die Zero Data Retention zusichern.
+  // Bewusst pro Request statt nur als Account-Einstellung, damit ein sensibler Lauf
+  // auch mit einem falsch konfigurierten persönlichen Account fail-closed bleibt.
+  zeroDataRetention?: boolean
   // Reproduzierbare, modellabhängige Laufparameter. Der aufrufende Agent löst
   // das Profil einmal auf; der Ollama-Adapter setzt es konsistent auf Wire-Ebene um.
   executionProfile?: LlmExecutionProfile
@@ -309,7 +315,7 @@ async function pickDefaultOllamaModel(url: string, preferred?: string): Promise<
       throw new Error(`Ollama-Modell "${requested}" nicht gefunden. Installierte Modelle: ${names.join(', ') || '(keine)'}`)
     }
     // Auto-Pick: nur LOKALE Tool-/Chat-fähige Modelle. Cloud-Modelle filtern.
-    const localNames = names.filter(n => !/-cloud$/i.test(n))
+    const localNames = names.filter(n => !isCloudModel(n))
     for (const candidate of ['qwen3', 'qwen2.5-coder', 'llama3.1', 'llama3.1:8b', 'llama3', 'qwen2.5:7b-instruct', 'mistral-nemo', 'mistral']) {
       const match = localNames.find(n => n === candidate || n.startsWith(candidate + ':'))
       if (match) return match
@@ -492,6 +498,14 @@ function openAiCompatibleTarget(backend: ChatBackend, opts: ChatOptions): OpenAi
   return backend === 'lmstudio' ? lmStudioTarget(opts) : cloudTarget(backend as CloudChatBackend, opts)
 }
 
+/** Provider-spezifische Datenschutzvorgaben für den Request-Body. */
+function cloudRequestPolicy(backend: ChatBackend, opts: ChatOptions): Record<string, unknown> {
+  if (backend === 'openrouter' && opts.zeroDataRetention) {
+    return { provider: { zdr: true } }
+  }
+  return {}
+}
+
 /**
  * Kosten und Verbrauch EINES Cloud-Aufrufs festhalten.
  *
@@ -541,8 +555,10 @@ async function chatViaOpenAiCompatible(
       model: target.model,
       messages: messages.map(m => ({ role: m.role, content: m.content })),
       stream: false,
+      ...cloudRequestPolicy(backend, opts),
       ...(opts.responseFormat === 'json' ? { response_format: { type: 'json_object' } } : {}),
       ...(typeof opts.temperature === 'number' ? { temperature: opts.temperature } : {}),
+      ...(typeof opts.topP === 'number' ? { top_p: opts.topP } : {}),
       ...(opts.maxTokens ? { max_tokens: opts.maxTokens } : {})
     }),
   }, { timeoutMs: opts.timeoutMs ?? 120000, userSignal: opts.signal })
@@ -615,6 +631,10 @@ async function chatWithToolsViaOllama(
   const model = await pickDefaultOllamaModel(url, opts.ollamaModel)
   if (!model) throw new Error('Kein Ollama-Modell verfügbar')
   const execution = resolveOllamaExecutionProfile(opts.executionProfile)
+  // Sampling kommt ausschliesslich aus dem Ausfuehrungsprofil, nie aus den generischen
+  // ChatOptions: Ollama-Modelle bringen abgestimmte Defaults mit, und der Skill-Benchmark
+  // misst auf ihnen. Auch KEIN num_predict — der Server laesst die Ausgabe sonst
+  // unbegrenzt bis zum Kontextfenster laufen, ein Limit hier waere eine neue Decke.
   const ollamaOptions = {
     ...(opts.numCtx ? { num_ctx: opts.numCtx } : {}),
     ...(execution.temperature !== undefined ? { temperature: execution.temperature } : {}),
@@ -757,7 +777,11 @@ async function chatWithToolsViaOpenAiCompatible(
       model: target.model,
       messages: messages.map(openrouterMessageToWire),
       tools: wireTools,
-      stream: false
+      stream: false,
+      ...cloudRequestPolicy(backend, opts),
+      ...(typeof opts.temperature === 'number' ? { temperature: opts.temperature } : {}),
+      ...(typeof opts.topP === 'number' ? { top_p: opts.topP } : {}),
+      ...(opts.maxTokens ? { max_tokens: opts.maxTokens } : {})
     }),
   }, { timeoutMs: opts.timeoutMs ?? 180000, userSignal: opts.signal })
   if (!res.ok) {
