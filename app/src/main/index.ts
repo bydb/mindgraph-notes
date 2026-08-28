@@ -4304,6 +4304,13 @@ ipcMain.handle('note-agent-run', async (event, params: NoteAgentRunParams) => {
     // Ebenso bewusst KEINE temperature/top_p: Die Modelle bringen abgestimmte Werte mit
     // (qwen3.5:4b z.B. 1.0/0.95), und der Skill-Benchmark hat auf genau diesen Werten
     // gemessen. Ein Default-Wechsel gehört gemessen, nicht aus einem Szenario abgeleitet.
+    //
+    // UNGEPRÜFT (Stand 28.08.2026): Was OpenRouter tut, wenn für das gewählte Modell
+    // KEIN ZDR-Endpunkt existiert, ist nicht belegt. Die Doku nennt für den verwandten
+    // `only`-Filter ein 404, sagt es für `zdr` aber nicht. Solange das offen ist, gilt
+    // die Anforderung als BEVORZUGUNG, nicht als Garantie — nicht als Zusicherung
+    // auftreten und nicht in der Oberfläche versprechen. Prüfskript liegt bereit:
+    // scripts/check-openrouter-zdr.mjs (braucht einen OpenRouter-Schlüssel).
     if (isCloudChatBackend(chatOptions.backend)) {
       chatOptions = {
         ...chatOptions,
