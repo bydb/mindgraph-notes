@@ -2,6 +2,34 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.10.56-beta] - 2026-08-28
+
+Der Notiz-Agent hat Namen erfunden, wenn im Antrag welche fehlten. Das ist behoben und nachgemessen. Dazu zeigt die App jetzt, was ein Cloud-Lauf kostet.
+
+### Behoben
+
+- **Der Notiz-Agent erfand fehlende Personendaten.** Wer einen Akkreditierungsantrag ausfüllen ließ, in dem die verantwortliche Person nicht genannt war, bekam an dieser Stelle einen plausibel klingenden Namen. Verboten war das nirgends — im Gegenteil, die Arbeitsanweisung sagte „triff sinnvolle Annahmen", und bei einem leeren Namensfeld heißt das genau: sich einen ausdenken.
+
+  Jetzt gilt eine harte Grenze. Namen, Anschriften, Mailadressen, Telefonnummern, Geburtsdaten und personengebundene Funktionen übernimmt der Agent nur aus Anhängen, Notizen oder dem Auftrag. Fehlt eine Angabe, bleibt das Feld leer und die Lücke steht in der Abschlussantwort. Ein leeres Feld fällt beim Prüfen auf, ein erfundener Name nicht — und unterschrieben wird am Ende, was dasteht.
+
+  Belegt an 12 Läufen desselben Antrags (zwei Betriebsarten, zwei Zufallsstartwerte, je drei Wiederholungen): kein einziges Mal etwas erfunden, jedes Mal die fehlenden Felder benannt. Der Durchgang, der vorher in einem von drei Läufen erfand, geht jetzt vollständig durch.
+
+- **Der Modell-Picker zeigte einen unlesbaren Preis.** Neben den Cloud-Modellen stand `0.00000015$/tok`. Die Zahl stimmte, ablesen ließ sich daraus nichts, und der Ausgabepreis fehlte ganz — dabei ist er der teurere Teil. Jetzt steht dort `$0.15 / $0.47 je 1 Mio.`
+
+- **Bei LLMBase stand gar kein Preis.** Der Anbieter liefert seine Preisliste nur auf ausdrückliche Anfrage; die App hat sie nie angefordert. Jetzt zeigt auch dieser Picker Preise.
+
+- **Die App versprach für LLMBase mehr, als sie halten kann.** In den Einstellungen stand „Open-Weight-Modelle auf EU-Servern (DE/NL/FI/CH)". Der Anbieter selbst sagt inzwischen, dass die Verarbeitungsregion vom gewählten Modell abhängt — eine europäische Adresse garantiert nicht, dass jedes Modell in der EU verarbeitet wird. Die Zusage ist entsprechend zurückgenommen. Modellgenau anzeigen lässt sie sich nicht: Die Preisliste des Anbieters enthält keine Regionsangabe.
+
+### Neu
+
+- **Kostenspalte im Leistungsfenster.** Neben Durchsatz und Wartezeit steht jetzt, was gelaufen ist — je Modell und Modul. Gegenstück zur Zeitbilanz: die sagt, was ein Vorgang spart, hier steht, was er kostet.
+
+  Die Spalte trägt die Herkunft ihrer Zahl mit, weil ein Betrag allein mehrdeutig wäre. `lokal` heißt: lief auf diesem Rechner, kostet nichts. Ein Strich heißt: es gab Cloud-Läufe, aber zu keinem eine Kostenangabe — eine Lücke, keine Null. `≈` heißt aus Preisliste und Tokenzahl gerechnet, `≥` heißt, dass mindestens ein Lauf keine Angabe hatte und die Summe deshalb eine Untergrenze ist. Ohne Zeichen ist der Betrag so abgerechnet worden.
+
+  Kostenlos und unbekannt beides als 0 anzuzeigen wäre wieder eine Kennzahl, die nur gewinnen kann.
+
+  Zur Größenordnung: Ein Agentenlauf kostet je nach Modell zwischen einem Zehntel Cent und sechs Cent. Der Aufschlag beim Aufladen von Guthaben fällt bei dieser Nutzung stärker ins Gewicht als die Rechenzeit selbst.
+
 ## [0.10.55-beta] - 2026-08-26
 
 Die Zeitanzeige aus dem letzten Release rechnete falsch — zu deinen Ungunsten. Das ist behoben, und dazu kommt ein Modus, mit dem sich der Nutzen nicht nur behaupten, sondern belegen lässt.

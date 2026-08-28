@@ -48,7 +48,7 @@
     "url": "https://mindgraph-notes.de/",
     "downloadUrl": "https://github.com/bydb/mindgraph-notes/releases",
     "screenshot": "https://mindgraph-notes.de/screenshot.png",
-    "softwareVersion": "0.10.55-beta",
+    "softwareVersion": "0.10.56-beta",
     "author": { "@type": "Person", "name": "Jochen Leeder", "url": "https://bydb.io" },
     "license": "https://opensource.org/licenses/AGPL-3.0",
     "featureList": [
@@ -1630,16 +1630,16 @@
     <div class="release-inner">
       <div class="release-head">
         <div>
-          <div class="st-eyebrow"><span class="d"></span><span data-i18n="release.label">Release 0.10.55 &middot; Belegen statt behaupten</span></div>
-          <h2 class="st-h" style="font-size:clamp(1.8rem,3.8vw,2.6rem)" data-i18n="release.heading">Was ist neu &mdash; <em>MindGraph rechnet nicht mehr nur vor, es l&auml;sst sich nachrechnen.</em></h2>
-          <p class="st-lead" data-i18n="release.lead">Die Zeitbilanz zog bisher die Rechenzeit des Agenten ab &mdash; also Zeit, in der du l&auml;ngst etwas anderes machst. Jetzt z&auml;hlt, was du selbst gearbeitet hast. Und wenn ein Vorgang l&auml;nger dauert als von Hand, steht das als Minus da. Neu dazu kommt ein Vergleichsmodus, der vergleichbare F&auml;lle zuf&auml;llig auf beide Wege verteilt.</p>
+          <div class="st-eyebrow"><span class="d"></span><span data-i18n="release.label">Release 0.10.56 &middot; Was fehlt, bleibt leer</span></div>
+          <h2 class="st-h" style="font-size:clamp(1.8rem,3.8vw,2.6rem)" data-i18n="release.heading">Was ist neu &mdash; <em>Der Agent erfindet keine Namen mehr. Und sagt, was er kostet.</em></h2>
+          <p class="st-lead" data-i18n="release.lead">Lie&szlig; man ein Formular ausf&uuml;llen, in dem die verantwortliche Person nicht genannt war, schrieb der Agent dort einen plausibel klingenden Namen hin. Ein leeres Feld f&auml;llt beim Pr&uuml;fen auf, ein erfundener Name nicht &mdash; und unterschrieben wird am Ende, was dasteht. Das ist behoben und an zw&ouml;lf L&auml;ufen nachgemessen. Dazu zeigt die App jetzt, was ein Cloud-Lauf tats&auml;chlich kostet.</p>
         </div>
         <div class="release-date">v<span data-app-version>0.10.35-beta</span></div>
       </div>
       <div class="release-grid">
-        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c1h">Eine Zeitbilanz, die auch verlieren kann</b><p data-i18n="release.c1">Abgezogen wird deine aktive Arbeitszeit, nicht die Laufzeit des Agenten &mdash; dessen Rechenzeit steht als Durchlaufzeit daneben. Ein Mehraufwand wurde bisher auf null gekappt: Eine Kennzahl, die nur gewinnen kann, ist als Nachweis wertlos.</p></div></div>
-        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c2h">Vergleichsmodus: belegen statt behaupten</b><p data-i18n="release.c2">Die App teilt vergleichbare F&auml;lle zuf&auml;llig auf beide Wege zu &mdash; du w&auml;hlst nicht, sonst misst du deine eigene Vorauswahl. Unter drei abgeschlossenen F&auml;llen je Weg zeigt sie bewusst keine Kennzahl. Der Bericht nennt f&uuml;r jede Zahl, ob sie gemessen, gestoppt oder nachgetragen wurde.</p></div></div>
-        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c3h">Der Sync sagt jetzt, was los ist</b><p data-i18n="release.c3">Bei einem nicht erreichbaren Server stand dort eine Meldung &uuml;ber einen WebSocket, die aus dem Inneren des Programms stammte. Jetzt steht dort, dass der Sync-Server nicht erreichbar ist.</p></div></div>
+        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c1h">Keine erfundenen Personendaten</b><p data-i18n="release.c1">Namen, Anschriften, Mailadressen und Zust&auml;ndigkeiten &uuml;bernimmt der Agent nur noch aus dem, was du ihm gegeben hast. Fehlt eine Angabe, bleibt das Feld leer und die L&uuml;cke steht in seiner Antwort. Nachgemessen an zw&ouml;lf L&auml;ufen desselben Antrags.</p></div></div>
+        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c2h">Was ein Lauf kostet, steht jetzt da</b><p data-i18n="release.c2">Im Leistungsfenster steht neben Tempo und Wartezeit, was gelaufen ist &mdash; je Modell und Aufgabe. Die Spalte sagt auch, woher die Zahl kommt: &bdquo;lokal&ldquo; hei&szlig;t, es lief auf deinem Rechner und kostet nichts.</p></div></div>
+        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c3h">Lesbare Preise, ehrlichere Zusage</b><p data-i18n="release.c3">Neben den Cloud-Modellen stand bisher ein Preis, aus dem sich nichts ablesen lie&szlig;. Jetzt steht dort &bdquo;$0.15 / $0.47 je 1 Mio.&ldquo;. Zugleich haben wir die Zusage &bdquo;Modelle auf EU-Servern&ldquo; zur&uuml;ckgenommen.</p></div></div>
       </div>
       <a class="release-link" href="https://github.com/bydb/mindgraph-notes/releases" target="_blank" rel="noopener noreferrer" data-i18n="release.link">Vollst&auml;ndige Release Notes auf GitHub &rarr;</a>
     </div>
@@ -1982,15 +1982,15 @@
         "modules.opt.vision": "Vision OCR",
         "modules.opt.speech": "Diktat & Vorlesen",
         "modules.opt.terminal": "Terminal",
-        "release.label": "Release {vs} · Belegen statt behaupten",
-        "release.heading": "Was ist neu — <em>MindGraph rechnet nicht mehr nur vor, es lässt sich nachrechnen.</em>",
-        "release.lead": "Die Zeitbilanz zog bisher die Rechenzeit des Agenten ab — also Zeit, in der du längst etwas anderes machst. Jetzt zählt, was du selbst gearbeitet hast: Auftrag schreiben, am Bildschirm warten, Ergebnis prüfen. Und wenn ein Vorgang länger dauert als von Hand, steht das als Minus da. Neu dazu kommt ein Vergleichsmodus, der vergleichbare Fälle zufällig auf “konventionell“ und “mit MindGraph“ verteilt und am Ende einen Bericht schreibt, der seine eigenen Grenzen benennt.",
-        "release.c1h": "Eine Zeitbilanz, die auch verlieren kann",
-        "release.c1": "Abgezogen wird deine aktive Arbeitszeit, nicht die Laufzeit des Agenten — dessen Rechenzeit steht als Durchlaufzeit daneben. Wartest du dagegen davor, zählt das mit; deshalb schlägt sich auch die Modellwahl in der Zahl nieder. Bisher wurde ein Mehraufwand auf null gekappt: Eine Kennzahl, die nur gewinnen kann, ist als Nachweis wertlos. Jetzt steht dort “heute 5 min Mehraufwand“, wenn es so war.",
-        "release.c2h": "Vergleichsmodus: belegen statt behaupten",
-        "release.c2": "Für eine Aufgabenklasse legst du Fälle an; die App teilt jeden Fall zufällig einem der beiden Wege zu — du wählst nicht, sonst misst du am Ende deine eigene Vorauswahl. Gemessen werden aktive Zeit, Nacharbeit und Übernahmequote, und die Arbeit nach einem verworfenen Ergebnis bleibt beim Fall: Ein Fehlschlag wird dadurch teurer, nicht billiger. Unter drei abgeschlossenen Fällen je Weg zeigt die App bewusst keine Kennzahl, sondern was noch fehlt. Der Bericht als Markdown oder CSV nennt für jede Zahl, ob sie gemessen, gestoppt oder nachgetragen wurde.",
-        "release.c3h": "Der Sync sagt jetzt, was los ist",
-        "release.c3": "Bei einem nicht erreichbaren Server stand in den Einstellungen eine Meldung über einen WebSocket, die aus dem Inneren des Programms stammte und niemandem half. Sie beschrieb die eigene Reaktion, nicht die Ursache. Jetzt steht dort “Der Sync-Server ist nicht erreichbar (Zeitüberschreitung nach 10 Sekunden)“. Echte Verbindungsfehler melden sich unverändert.",
+        "release.label": "Release {vs} · Was fehlt, bleibt leer",
+        "release.heading": "Was ist neu — <em>Der Agent erfindet keine Namen mehr. Und sagt, was er kostet.</em>",
+        "release.lead": "Ließ man ein Formular ausfüllen, in dem die verantwortliche Person nicht genannt war, schrieb der Agent dort einen plausibel klingenden Namen hin. Ein leeres Feld fällt beim Prüfen auf, ein erfundener Name nicht — und unterschrieben wird am Ende, was dasteht. Das ist behoben und an zwölf Läufen nachgemessen. Dazu zeigt die App jetzt, was ein Cloud-Lauf tatsächlich kostet.",
+        "release.c1h": "Keine erfundenen Personendaten",
+        "release.c1": "Namen, Anschriften, Mailadressen und Zuständigkeiten übernimmt der Agent nur noch aus dem, was du ihm gegeben hast. Fehlt eine Angabe, bleibt das Feld leer und die Lücke steht in seiner Antwort. Verboten war das vorher nirgends — die Arbeitsanweisung sagte sogar “triff sinnvolle Annahmen“, und bei einem leeren Namensfeld heißt das genau: sich einen ausdenken. Nachgemessen an zwölf Läufen desselben Antrags.",
+        "release.c2h": "Was ein Lauf kostet, steht jetzt da",
+        "release.c2": "Im Leistungsfenster steht neben Tempo und Wartezeit, was gelaufen ist — je Modell und Aufgabe. Die Spalte sagt auch, woher die Zahl kommt: “lokal“ heißt, es lief auf deinem Rechner und kostet nichts; ein Strich heißt, es gab Cloud-Läufe, aber keine Kostenangabe. Beides als 0 zu zeigen wäre wieder eine Zahl, die nur gewinnen kann. Zur Größenordnung: ein Agentenlauf kostet zwischen einem Zehntel Cent und sechs Cent.",
+        "release.c3h": "Lesbare Preise, ehrlichere Zusage",
+        "release.c3": "Neben den Cloud-Modellen stand bisher “0.00000015$/tok“ — die Zahl stimmte, ablesen ließ sich nichts, und der teurere Ausgabepreis fehlte ganz. Jetzt steht dort “$0.15 / $0.47 je 1 Mio.“, bei LLMBase erstmals überhaupt ein Preis. Zugleich haben wir die Zusage “Modelle auf EU-Servern“ zurückgenommen: Der Anbieter sagt selbst, dass die Verarbeitungsregion vom Modell abhängt.",
         "release.link": "Vollständige Release Notes auf GitHub →",
         "dl.label": "Download",
         "dl.heading": "Jetzt starten.",
@@ -2250,15 +2250,15 @@
         "modules.opt.vision": "Vision OCR",
         "modules.opt.speech": "Dictation & TTS",
         "modules.opt.terminal": "Terminal",
-        "release.label": "Release {vs} · Prove it, don't claim it",
-        "release.heading": "What’s new — <em>MindGraph no longer just does the maths, it lets you check it.</em>",
-        "release.lead": "Until now the time balance subtracted the agent’s runtime — time in which you are long since doing something else. Now it counts what you actually worked on: writing the instruction, waiting at the screen, reviewing the result. And if a task takes longer than by hand, that shows as a minus. New alongside it: a comparison mode that assigns comparable cases at random to “conventional” and “with MindGraph” and writes a report that names its own limits.",
-        "release.c1h": "A time balance that can also lose",
-        "release.c1": "What is subtracted is your active working time, not the agent’s runtime — that sits next to it as elapsed time. If you do wait in front of the screen, it counts; which is why the choice of model now shows up in the figure. Extra effort used to be capped at zero: a metric that can only win is worthless as evidence. Now it says “5 min extra effort today” when that is what happened.",
-        "release.c2h": "Comparison mode: prove it, don’t claim it",
-        "release.c2": "For one task class you add cases; the app assigns each case at random to one of the two routes — you do not choose, otherwise you end up measuring your own preselection. Active time, rework and acceptance rate are recorded, and work done by hand after a discarded result stays with the case: a failure becomes more expensive, not cheaper. Below three completed cases per route the app deliberately shows no metric, only what is still missing. The report as Markdown or CSV states for every figure whether it was measured, timed or entered later.",
-        "release.c3h": "Sync now says what is going on",
-        "release.c3": "With an unreachable server the settings showed a message about a WebSocket that came from deep inside the program and helped nobody: it described our own reaction, not the cause. It now reads “The sync server is not reachable (timeout after 10 seconds)”. Genuine connection errors are reported unchanged.",
+        "release.label": "Release {vs} · What is missing stays empty",
+        "release.heading": "What’s new — <em>The agent no longer invents names. And it tells you what it costs.</em>",
+        "release.lead": "If you had a form filled in that did not name the responsible person, the agent simply wrote a plausible-sounding name there. An empty field gets noticed when you check the document; an invented name does not — and it is the document that gets signed. That is fixed, and measured across twelve runs. On top of that the app now shows what a cloud run actually costs.",
+        "release.c1h": "No invented personal data",
+        "release.c1": "Names, addresses, mail addresses and responsibilities are now taken only from what you gave the agent. If something is missing, the field stays empty and the gap is named in its answer. Nothing forbade this before — the instructions even said “make sensible assumptions“, and for an empty name field that means exactly: make one up. Measured across twelve runs of the same application form.",
+        "release.c2h": "What a run costs is now shown",
+        "release.c2": "The performance window now shows next to speed and waiting time what a run consumed — per model and per task. The column also says where the figure comes from: “local“ means it ran on your machine and costs nothing; a dash means there were cloud runs but no cost was reported. Showing both as 0 would again be a figure that can only win. For scale: an agent run costs between a tenth of a cent and six cents.",
+        "release.c3h": "Readable prices, a more honest promise",
+        "release.c3": "Next to the cloud models it used to say “0.00000015$/tok“ — the figure was correct, but unreadable, and the more expensive output price was missing entirely. It now reads “$0.15 / $0.47 per 1M“, and for LLMBase a price appears at all for the first time. We have also withdrawn the claim “models on EU servers“: the provider itself states that the processing region depends on the model.",
         "release.link": "Full release notes on GitHub →",
         "dl.label": "Download",
         "dl.heading": "Get started.",
