@@ -19,10 +19,27 @@
 import { useMemo, useState } from 'react'
 import { useLlmTelemetryStore } from '../../stores/llmTelemetryStore'
 import {
-  buildComparisonRows, toMarkdownTable, toCsv, formatTps, type LlmComparisonRow
+  buildComparisonRows, toMarkdownTable, toCsv, formatTps, formatCostCell, type LlmComparisonRow
 } from '../../../shared/llmTelemetry'
-import { useTranslation } from '../../utils/translations'
+import { useTranslation, type TranslationKey } from '../../utils/translations'
 import './LlmPerformanceView.css'
+
+/**
+ * Tooltip zur Kostenzelle. Das Vorzeichen allein sagt nicht, WARUM die Zahl
+ * unter Vorbehalt steht — hier steht, welcher Vorbehalt gilt.
+ */
+type T = (key: TranslationKey, params?: Record<string, string | number>) => string
+
+function costHint(r: LlmComparisonRow, t: T): string {
+  const c = r.cost
+  if (c.cloudRuns === 0) return t('llmPerf.costHint.local')
+  if (c.totalUsd === null) return t('llmPerf.costHint.none')
+  const teile: string[] = []
+  if (c.unpricedRuns > 0) teile.push(t('llmPerf.costHint.partial', { n: c.unpricedRuns }))
+  if (c.computedUsd > 0) teile.push(t('llmPerf.costHint.computed'))
+  if (c.reportedUsd > 0) teile.push(t('llmPerf.costHint.reported'))
+  return teile.join(' ')
+}
 
 function seconds(ms: number | null): string {
   return ms === null || !Number.isFinite(ms) ? '—' : `${(ms / 1000).toFixed(1)} s`
@@ -78,6 +95,7 @@ export function LlmPerformanceView() {
                   <th className="num">{t('llmPerf.col.output')}</th>
                   <th className="num">{t('llmPerf.col.prompt')}</th>
                   <th className="num">{t('llmPerf.col.firstToken')}</th>
+                  <th className="num">{t('llmPerf.col.cost')}</th>
                   <th className="num">{t('llmPerf.col.runs')}</th>
                   <th className="num">{t('llmPerf.col.cold')}</th>
                 </tr>
@@ -95,6 +113,7 @@ export function LlmPerformanceView() {
                     </td>
                     <td className="num">{formatTps(r.summary.promptTps)}</td>
                     <td className="num">{seconds(r.summary.firstTokenMs)}</td>
+                    <td className="num llmperf-cost" title={costHint(r, t)}>{formatCostCell(r.cost)}</td>
                     <td className="num">{r.summary.runs}</td>
                     <td className="num">{r.summary.coldRuns > 0 ? r.summary.coldRuns : '—'}</td>
                   </tr>
@@ -121,6 +140,7 @@ export function LlmPerformanceView() {
           <li>{t('llmPerf.noteCold')}</li>
           <li>{t('llmPerf.notePrompt')}</li>
           <li>{t('llmPerf.noteThinking')}</li>
+          <li>{t('llmPerf.noteCost')}</li>
           <li>{t('llmPerf.noteSession')}</li>
         </ul>
       </section>

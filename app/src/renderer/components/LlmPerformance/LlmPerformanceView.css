@@ -125,3 +125,16 @@
   font-size: 12px;
   line-height: 1.75;
 }
+
+/* Kostenspalte. Bewusst zurueckgenommen: Die Leistungswerte sind die Hauptaussage
+   der Tabelle, die Kosten der Nebensatz. Ein Betrag traegt ausserdem oft ein
+   Vorzeichen (≈ oder ≥), das nur mit dem Tooltip vollstaendig ist — der
+   gepunktete Unterstrich zeigt an, dass da noch etwas steht. */
+.llmperf-cost {
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  cursor: help;
+  text-decoration: underline dotted color-mix(in srgb, var(--text-secondary) 40%, transparent);
+  text-underline-offset: 3px;
+}

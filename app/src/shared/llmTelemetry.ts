@@ -10,7 +10,7 @@
 // Elektron-Abhängigkeit — damit sie testbar bleibt und Main wie Renderer
 // dieselbe Rechnung benutzen.
 
-import { type CallUsage, type CostSource, type ModelPricing, callCostUsd } from './llmCost'
+import { type CallUsage, type CostSource, type ModelPricing, callCostUsd, formatUsd } from './llmCost'
 
 export type LlmBackendId = 'ollama' | 'lmstudio' | 'openrouter' | 'llmbase'
 
@@ -186,6 +186,48 @@ export interface LlmComparisonRow {
   model: string
   module: string
   summary: LlmSummary
+  cost: LlmCostSummary
+}
+
+/**
+ * Was eine Gruppe von Läufen gekostet hat.
+ *
+ * `localRuns` und `cloudRuns` stehen getrennt, weil „kostet nichts" und „Kosten
+ * nicht bekannt" zwei verschiedene Aussagen sind. Ein lokaler Lauf ist gratis —
+ * das ist ein Fakt. Ein Cloud-Lauf ohne Kostenangabe ist eine Lücke. Beides als
+ * $0 anzuzeigen wäre die Sorte Kennzahl, die nur gewinnen kann.
+ */
+export interface LlmCostSummary {
+  localRuns: number
+  cloudRuns: number
+  /** Cloud-Läufe mit bekannter Kostenangabe. */
+  pricedRuns: number
+  /** Cloud-Läufe ohne — die Summe ist dann eine Untergrenze, kein Gesamtbetrag. */
+  unpricedRuns: number
+  /** Vom Anbieter gemeldet (Abrechnungswahrheit). */
+  reportedUsd: number
+  /** Aus Token und Katalogpreis gerechnet. */
+  computedUsd: number
+  /** null = kein einziger Lauf hatte eine Kostenangabe. NICHT 0. */
+  totalUsd: number | null
+}
+
+export function summarizeCost(runs: LlmRunMetrics[]): LlmCostSummary {
+  const out: LlmCostSummary = {
+    localRuns: 0, cloudRuns: 0, pricedRuns: 0, unpricedRuns: 0,
+    reportedUsd: 0, computedUsd: 0, totalUsd: null,
+  }
+  for (const run of runs) {
+    const isCloud = run.backend === 'openrouter' || run.backend === 'llmbase'
+    if (!isCloud) { out.localRuns += 1; continue }
+    out.cloudRuns += 1
+    if (typeof run.costUsd !== 'number') { out.unpricedRuns += 1; continue }
+    out.pricedRuns += 1
+    if (run.costSource === 'reported') out.reportedUsd += run.costUsd
+    else out.computedUsd += run.costUsd
+  }
+  if (out.pricedRuns > 0) out.totalUsd = out.reportedUsd + out.computedUsd
+  return out
 }
 
 /**
@@ -207,11 +249,29 @@ export function buildComparisonRows(runs: LlmRunMetrics[]): LlmComparisonRow[] {
   const rows: LlmComparisonRow[] = []
   for (const [key, list] of groups) {
     const [model, module] = key.split(' ')
-    rows.push({ model, module, summary: summarize(list) })
+    rows.push({ model, module, summary: summarize(list), cost: summarizeCost(list) })
   }
   // Schnellste zuerst — das ist die Frage, mit der man auf diese Tabelle schaut.
   // Zeilen ohne messbaren Durchsatz nach hinten, nicht als „0" dazwischen.
   return rows.sort((a, b) => (b.summary.outputTps ?? -1) - (a.summary.outputTps ?? -1))
+}
+
+/**
+ * Kostenzelle als Text. Die Vorzeichen tragen die Herkunft der Zahl mit, weil
+ * eine nackte Summe drei verschiedene Dinge heißen könnte:
+ *   'lokal'  — lief auf diesem Rechner, kostet nichts (Fakt, keine Messung)
+ *   '—'      — Cloud-Läufe, aber zu keinem eine Kostenangabe
+ *   '≥ …'    — mindestens ein Lauf ohne Preis: die Summe ist eine Untergrenze
+ *   '≈ …'    — ganz oder teilweise aus Token × Katalogpreis gerechnet
+ *   '$…'    — vom Anbieter abgerechnet, ohne Vorbehalt
+ */
+export function formatCostCell(cost: LlmCostSummary): string {
+  if (cost.cloudRuns === 0) return 'lokal'
+  if (cost.totalUsd === null) return '—'
+  const betrag = formatUsd(cost.totalUsd)
+  if (cost.unpricedRuns > 0) return `≥ ${betrag}`
+  if (cost.computedUsd > 0) return `≈ ${betrag}`
+  return betrag
 }
 
 function msToSeconds(ms: number | null): string {
@@ -221,13 +281,13 @@ function msToSeconds(ms: number | null): string {
 /** Markdown-Tabelle zum Einfügen in eine Notiz oder Videofolie. */
 export function toMarkdownTable(rows: LlmComparisonRow[]): string {
   const lines = [
-    '| Modell | Modul | Antwort Tok/s | Prompt Tok/s | 1. Wort | Läufe | Kaltstarts |',
-    '|---|---|---|---|---|---|---|',
+    '| Modell | Modul | Antwort Tok/s | Prompt Tok/s | 1. Wort | Kosten | Läufe | Kaltstarts |',
+    '|---|---|---|---|---|---|---|---|',
   ]
   for (const r of rows) {
     const s = r.summary
     const star = s.hiddenThinkingRuns > 0 ? '*' : ''
-    lines.push(`| ${r.model} | ${r.module} | ${formatTps(s.outputTps)}${star} | ${formatTps(s.promptTps)} | ${msToSeconds(s.firstTokenMs)} | ${s.runs} | ${s.coldRuns} |`)
+    lines.push(`| ${r.model} | ${r.module} | ${formatTps(s.outputTps)}${star} | ${formatTps(s.promptTps)} | ${msToSeconds(s.firstTokenMs)} | ${formatCostCell(r.cost)} | ${s.runs} | ${s.coldRuns} |`)
   }
   lines.push('')
   if (rows.some(r => r.summary.hiddenThinkingRuns > 0)) {
@@ -235,6 +295,10 @@ export function toMarkdownTable(rows: LlmComparisonRow[]): string {
     lines.push('')
   }
   lines.push('Median über die warmen Läufe. Kaltstarts (Laden der Gewichte) sind aus der Geschwindigkeit herausgerechnet und getrennt gezählt.')
+  if (rows.some(r => r.cost.cloudRuns > 0)) {
+    lines.push('')
+    lines.push('Kosten: `lokal` = auf diesem Rechner gelaufen, kostet nichts. `≈` = aus Token und Katalogpreis gerechnet. `≥` = mindestens ein Lauf ohne Preisangabe, die Summe ist eine Untergrenze. Ohne Zeichen: vom Anbieter so abgerechnet.')
+  }
   return lines.join('\n')
 }
 
@@ -242,10 +306,19 @@ export function toMarkdownTable(rows: LlmComparisonRow[]): string {
 export function toCsv(rows: LlmComparisonRow[]): string {
   const esc = (v: string) => /[";]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v
   const num = (v: number | null) => v === null || !Number.isFinite(v) ? '' : String(Math.round(v * 10) / 10).replace('.', ',')
-  const out = ['Modell;Modul;Antwort Tok/s;Prompt Tok/s;Zeit bis 1. Wort (ms);Laeufe;Kaltstarts;Laeufe mit verstecktem Reasoning']
+  const out = ['Modell;Modul;Antwort Tok/s;Prompt Tok/s;Zeit bis 1. Wort (ms);Kosten USD;davon abgerechnet;davon gerechnet;Cloud-Laeufe;davon ohne Preis;Laeufe;Kaltstarts;Laeufe mit verstecktem Reasoning']
   for (const r of rows) {
     const s = r.summary
-    out.push([esc(r.model), esc(r.module), num(s.outputTps), num(s.promptTps), num(s.firstTokenMs), String(s.runs), String(s.coldRuns), String(s.hiddenThinkingRuns)].join(';'))
+    const c = r.cost
+    // Kosten mit voller Genauigkeit: ein Agentenlauf kostet Bruchteile eines Cents,
+    // auf zwei Stellen gerundet stünde in der Tabellenkalkulation überall 0.
+    const usd = (v: number | null) => v === null ? '' : String(v.toFixed(6)).replace('.', ',')
+    out.push([
+      esc(r.model), esc(r.module), num(s.outputTps), num(s.promptTps), num(s.firstTokenMs),
+      usd(c.totalUsd), usd(c.pricedRuns ? c.reportedUsd : null), usd(c.pricedRuns ? c.computedUsd : null),
+      String(c.cloudRuns), String(c.unpricedRuns),
+      String(s.runs), String(s.coldRuns), String(s.hiddenThinkingRuns)
+    ].join(';'))
   }
   return out.join('\n')
 }

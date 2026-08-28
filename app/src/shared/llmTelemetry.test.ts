@@ -1,8 +1,22 @@
-import { describe, it, expect } from 'vitest'
 import {
-  fromOllamaResponse, outputTokensPerSecond, promptTokensPerSecond,
-  isColdStart, summarize, median, nsToMs, formatTps,
-  buildComparisonRows, toMarkdownTable, toCsv, type LlmRunMetrics
+  describe,
+  it,
+  expect } from 'vitest'
+import {
+  fromOllamaResponse,
+  outputTokensPerSecond,
+  promptTokensPerSecond,
+  isColdStart,
+  summarize,
+  median,
+  nsToMs,
+  formatTps,
+  buildComparisonRows,
+  toMarkdownTable,
+  toCsv,
+  type LlmRunMetrics,
+  summarizeCost,
+  formatCostCell
 } from './llmTelemetry'
 
 function run(partial: Partial<LlmRunMetrics>): LlmRunMetrics {
@@ -139,7 +153,7 @@ describe('Export', () => {
 
   it('baut eine Markdown-Tabelle', () => {
     const md = toMarkdownTable(rows)
-    expect(md).toContain('| qwen | chat | 18 | 340 | 0.8 s | 1 | 0 |')
+    expect(md).toContain('| qwen | chat | 18 | 340 | 0.8 s | lokal | 1 | 0 |')
     expect(md).toContain('Median über die warmen Läufe')
   })
 
@@ -155,11 +169,70 @@ describe('Export', () => {
   it('baut CSV mit Semikolon und deutschem Dezimalkomma', () => {
     const csv = toCsv(rows)
     expect(csv.split('\n')[0]).toContain('Modell;Modul;')
-    expect(csv.split('\n')[1]).toBe('qwen;chat;18;340;800;1;0;0')
+    // Kostenspalten bleiben bei lokalen Laeufen leer — nicht 0, das hiesse 'gemessen: gratis'.
+    expect(csv.split('\n')[1]).toBe('qwen;chat;18;340;800;;;;0;0;1;0;0')
   })
 
   it('maskiert Semikolon im Modellnamen', () => {
     const odd = buildComparisonRows([run({ model: 'a;b', module: 'chat', outputTokens: 10, evalMs: 1000 })])
     expect(toCsv(odd)).toContain('"a;b"')
+  })
+})
+
+// ─── Kosten im Leistungsfenster ──────────────────────────────────────────────
+
+describe('summarizeCost', () => {
+  const run = (over: Partial<LlmRunMetrics>): LlmRunMetrics => ({
+    at: 1, module: 'note-agent', model: 'm', backend: 'openrouter', wallMs: 100, ...over
+  })
+
+  it('zaehlt lokale Laeufe getrennt und gibt keine Kosten aus', () => {
+    // 'kostet nichts' und 'Kosten unbekannt' duerfen nicht beide als $0 erscheinen.
+    const c = summarizeCost([run({ backend: 'ollama' }), run({ backend: 'lmstudio' })])
+    expect(c.localRuns).toBe(2)
+    expect(c.cloudRuns).toBe(0)
+    expect(c.totalUsd).toBeNull()
+    expect(formatCostCell(c)).toBe('lokal')
+  })
+
+  it('summiert gemeldete und gerechnete Betraege getrennt', () => {
+    const c = summarizeCost([
+      run({ costUsd: 0.002, costSource: 'reported' }),
+      run({ costUsd: 0.003, costSource: 'reported' }),
+      run({ costUsd: 0.001, costSource: 'computed', backend: 'llmbase' }),
+    ])
+    expect(c.reportedUsd).toBeCloseTo(0.005, 8)
+    expect(c.computedUsd).toBeCloseTo(0.001, 8)
+    expect(c.totalUsd).toBeCloseTo(0.006, 8)
+    expect(c.pricedRuns).toBe(3)
+  })
+
+  it('meldet eine Untergrenze, wenn ein Cloud-Lauf keinen Preis hatte', () => {
+    const c = summarizeCost([
+      run({ costUsd: 0.002, costSource: 'reported' }),
+      run({}),   // Cloud-Lauf ohne Kostenangabe
+    ])
+    expect(c.unpricedRuns).toBe(1)
+    expect(c.totalUsd).toBeCloseTo(0.002, 8)
+    expect(formatCostCell(c)).toBe('≥ $0.0020')
+  })
+
+  it('gibt null statt 0, wenn kein Cloud-Lauf einen Preis hatte', () => {
+    const c = summarizeCost([run({}), run({})])
+    expect(c.totalUsd).toBeNull()
+    expect(formatCostCell(c)).toBe('—')
+  })
+
+  it('kennzeichnet gerechnete Betraege, nicht aber abgerechnete', () => {
+    expect(formatCostCell(summarizeCost([run({ costUsd: 0.05, costSource: 'computed' })]))).toBe('≈ $0.050')
+    expect(formatCostCell(summarizeCost([run({ costUsd: 0.05, costSource: 'reported' })]))).toBe('$0.050')
+  })
+
+  it('mischt lokale und Cloud-Laeufe ohne die lokalen mitzuzaehlen', () => {
+    const c = summarizeCost([run({ backend: 'ollama' }), run({ costUsd: 0.004, costSource: 'reported' })])
+    expect(c.localRuns).toBe(1)
+    expect(c.cloudRuns).toBe(1)
+    expect(c.unpricedRuns).toBe(0)      // der lokale Lauf ist KEINE Luecke
+    expect(formatCostCell(c)).toBe('$0.0040')
   })
 })
